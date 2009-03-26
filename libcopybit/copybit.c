@@ -228,6 +228,13 @@ static int set_parameter_copybit(
                 ctx->mFlags &= ~MDP_DITHER;
             }
             break;
+        case COPYBIT_BLUR:
+            if (value == COPYBIT_ENABLE) {
+                ctx->mFlags |= MDP_BLUR;
+            } else if (value == COPYBIT_DISABLE) {
+                ctx->mFlags &= ~MDP_BLUR;
+            }
+            break;
         case COPYBIT_TRANSFORM:
             ctx->mFlags &= ~0x7;
             ctx->mFlags |= value & 0x7;
