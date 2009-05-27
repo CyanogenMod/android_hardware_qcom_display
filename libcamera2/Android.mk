@@ -1,4 +1,4 @@
-BUILD_LIBCAMERA:=
+BUILD_LIBCAMERA:=true
 ifeq ($(BUILD_LIBCAMERA),true)
 
 # When zero we link against libmmcamera; when 1, we dlopen libmmcamera.
