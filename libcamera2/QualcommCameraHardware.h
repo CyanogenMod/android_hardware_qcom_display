@@ -18,8 +18,8 @@
 #define ANDROID_HARDWARE_QUALCOMM_CAMERA_HARDWARE_H
 
 #include <ui/CameraHardwareInterface.h>
-#include <utils/MemoryBase.h>
-#include <utils/MemoryHeapBase.h>
+#include <binder/MemoryBase.h>
+#include <binder/MemoryHeapBase.h>
 #include <stdint.h>
 
 extern "C" {

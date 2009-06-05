@@ -1,4 +1,4 @@
-BUILD_LIBCAMERA:=
+BUILD_LIBCAMERA:=true
 ifeq ($(BUILD_LIBCAMERA),true)
 
 # When zero we link against libmmcamera; when 1, we dlopen libmmcamera.
@@ -22,6 +22,7 @@ LOCAL_C_INCLUDES+= \
 
 LOCAL_SHARED_LIBRARIES:= libutils libui liblog
 
+LOCAL_SHARED_LIBRARIES+= libbinder
 ifneq ($(DLOPEN_LIBMMCAMERA),1)
 LOCAL_SHARED_LIBRARIES+= libmmcamera
 else
