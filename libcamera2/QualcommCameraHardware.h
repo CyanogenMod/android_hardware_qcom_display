@@ -67,7 +67,7 @@ public:
                        bool unregister,
                        bool active);
     bool native_register_preview_bufs(int camfd,
-                                      struct msm_frame_t *frame,bool active);
+                                      struct msm_frame *frame,bool active);
 	bool native_unregister_preview_bufs(int camfd, int pmempreviewfd,
                                         uint8_t *prev_buf);
     
@@ -91,7 +91,7 @@ public:
 	bool native_set_zoom(int camfd, void *pZm);
 	bool native_get_zoom(int camfd, void *pZm);
 
-    void receivePreviewFrame(struct msm_frame_t *frame);
+    void receivePreviewFrame(struct msm_frame *frame);
     void receiveJpegPicture(void);
     void receiveJpegPictureFragment(
         uint8_t * buff_ptr , uint32_t buff_size);
@@ -277,7 +277,7 @@ private:
     pthread_t mCamConfigThread;
     pthread_t mFrameThread;
 
-    struct msm_frame_t frames[kPreviewBufferCount];
+    struct msm_frame frames[kPreviewBufferCount];
     bool mInPreviewCallback;
 };
 

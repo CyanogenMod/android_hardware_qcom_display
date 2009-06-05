@@ -87,7 +87,7 @@ bool  (*LINK_jpeg_encoder_encode)(const cam_ctrl_dimension_t *dimen,
 int  (*LINK_camframe_terminate)(void);
 int8_t (*LINK_jpeg_encoder_setMainImageQuality)(uint32_t quality);
 // callbacks
-void  (**LINK_mmcamera_camframe_callback)(struct msm_frame_t *frame);
+void  (**LINK_mmcamera_camframe_callback)(struct msm_frame *frame);
 void  (**LINK_mmcamera_jpegfragment_callback)(uint8_t *buff_ptr,
                                               uint32_t buff_size);
 void  (**LINK_mmcamera_jpeg_callback)(jpeg_event_t status);
@@ -99,7 +99,7 @@ void  (**LINK_mmcamera_jpeg_callback)(jpeg_event_t status);
 #define LINK_jpeg_encoder_encode jpeg_encoder_encode
 #define LINK_camframe_terminate camframe_terminate
 #define LINK_jpeg_encoder_setMainImageQuality jpeg_encoder_setMainImageQuality
-extern void (*mmcamera_camframe_callback)(struct msm_frame_t *frame);
+extern void (*mmcamera_camframe_callback)(struct msm_frame *frame);
 extern void (*mmcamera_jpegfragment_callback)(uint8_t *buff_ptr,
                                       uint32_t buff_size);
 extern void (*mmcamera_jpeg_callback)(jpeg_event_t status);
@@ -215,7 +215,7 @@ namespace android {
 
 static Mutex singleton_lock;
 
-static void receive_camframe_callback(struct msm_frame_t *frame);
+static void receive_camframe_callback(struct msm_frame *frame);
 static void receive_jpeg_fragment_callback(uint8_t *buff_ptr, uint32_t buff_size);
 static void receive_jpeg_callback(jpeg_event_t status);
 static uint8_t *hal_mmap (uint32_t size, int *pmemFd);
@@ -475,7 +475,7 @@ status_t QualcommCameraHardware::dump(int fd,
 
 bool QualcommCameraHardware::native_set_dimension(int camfd)
 {
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
 
     ctrlCmd.type       = CAMERA_SET_PARM_DIMENSION;
     ctrlCmd.timeout_ms = 5000;
@@ -496,7 +496,7 @@ bool QualcommCameraHardware::native_set_dimension(int camfd)
 bool native_set_afmode(int camfd, isp3a_af_mode_t af_type)
 {
     int rc;
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
 
     ctrlCmd.timeout_ms = 5000;
     ctrlCmd.type = CAMERA_SET_PARM_AUTO_FOCUS;
@@ -516,7 +516,7 @@ bool native_set_afmode(int camfd, isp3a_af_mode_t af_type)
 bool native_cancel_afmode(int camfd, int af_fd)
 {
     int rc;
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
 
     ctrlCmd.timeout_ms = 5000;
     ctrlCmd.type = CAMERA_AUTO_FOCUS_CANCEL;
@@ -541,7 +541,7 @@ void QualcommCameraHardware::reg_unreg_buf(
     bool active)
 {
     uint32_t y_size;
-    struct msm_pmem_info_t pmemBuf;
+    struct msm_pmem_info pmemBuf;
     uint32_t ioctl_cmd;
 
     if (prev_buf == NULL)
@@ -572,7 +572,7 @@ void QualcommCameraHardware::reg_unreg_buf(
 
 bool QualcommCameraHardware::native_register_preview_bufs(
     int camfd,
-    struct msm_frame_t *frame,
+    struct msm_frame *frame,
     bool active)
 {
     LOGV("mDimension.display_width = %d, display_height = %d",
@@ -608,7 +608,7 @@ bool QualcommCameraHardware::native_unregister_preview_bufs(
 
 bool QualcommCameraHardware::native_start_preview(int camfd)
 {
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
 
     ctrlCmd.timeout_ms = 5000;
     ctrlCmd.type       = CAMERA_START_PREVIEW;
@@ -684,7 +684,7 @@ bool QualcommCameraHardware::native_unregister_snapshot_bufs(
 
 bool QualcommCameraHardware::native_get_picture (int camfd)
 {
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
 
     ctrlCmd.timeout_ms = 5000;
     ctrlCmd.length     = 0;
@@ -701,7 +701,7 @@ bool QualcommCameraHardware::native_get_picture (int camfd)
 
 bool QualcommCameraHardware::native_stop_preview(int camfd)
 {
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
     ctrlCmd.timeout_ms = 5000;
     ctrlCmd.type       = CAMERA_STOP_PREVIEW;
     ctrlCmd.length     = 0;
@@ -719,7 +719,7 @@ bool QualcommCameraHardware::native_stop_preview(int camfd)
 
 bool QualcommCameraHardware::native_start_snapshot(int camfd)
 {
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
 
     ctrlCmd.timeout_ms = 5000;
     ctrlCmd.type       = CAMERA_START_SNAPSHOT;
@@ -738,7 +738,7 @@ bool QualcommCameraHardware::native_start_snapshot(int camfd)
 
 bool QualcommCameraHardware::native_stop_snapshot (int camfd)
 {
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
 
     ctrlCmd.timeout_ms = 5000;
     ctrlCmd.type       = CAMERA_STOP_SNAPSHOT;
@@ -1064,7 +1064,7 @@ void QualcommCameraHardware::release()
     }
 
     int cnt, rc;
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
 
     if (mCameraRunning) {
         cancelAutoFocus();
@@ -1523,7 +1523,7 @@ static void dump_to_file(const char *fname,
 }
 #endif // CAMERA_RAW
 
-void QualcommCameraHardware::receivePreviewFrame(struct msm_frame_t *frame)
+void QualcommCameraHardware::receivePreviewFrame(struct msm_frame *frame)
 {
 //    LOGV("receivePreviewFrame E");
 
@@ -1742,7 +1742,7 @@ void  QualcommCameraHardware::setSensorPreviewEffect(int camfd, const char *effe
 {
     LOGV("In setSensorPreviewEffect...");
     int effectsValue = 1;
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
 
     ctrlCmd.timeout_ms = 5000;
     ctrlCmd.type       = CAMERA_SET_PARM_EFFECT;
@@ -1760,7 +1760,7 @@ void  QualcommCameraHardware::setSensorPreviewEffect(int camfd, const char *effe
 void QualcommCameraHardware::setSensorWBLighting(int camfd, const char *lighting)
 {
     int lightingValue = 1;
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
 
     ctrlCmd.timeout_ms = 5000;
     ctrlCmd.type = CAMERA_SET_PARM_WB;
@@ -1778,7 +1778,7 @@ void QualcommCameraHardware::setSensorWBLighting(int camfd, const char *lighting
 void QualcommCameraHardware::setAntiBanding(int camfd, const char *antibanding)
 {
     int antibandvalue = 0;
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
 
     ctrlCmd.timeout_ms = 5000;
     ctrlCmd.type       = CAMERA_SET_PARM_ANTIBANDING;
@@ -1799,7 +1799,7 @@ void QualcommCameraHardware::setAntiBanding(int camfd, const char *antibanding)
 
 void QualcommCameraHardware::setBrightness(int brightness)
 {
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
     LOGV("In setBrightness: %d", brightness);
     ctrlCmd.timeout_ms = 5000;
     ctrlCmd.type       = CAMERA_SET_PARM_BRIGHTNESS;
@@ -1814,7 +1814,7 @@ void QualcommCameraHardware::setBrightness(int brightness)
 
 bool QualcommCameraHardware::native_get_zoom(int camfd, void *pZm)
 {
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
     cam_parm_info_t *pZoom = (cam_parm_info_t *)pZm;
     ctrlCmd.type     = CAMERA_GET_PARM_ZOOM;
     ctrlCmd.timeout_ms = 5000;
@@ -1841,7 +1841,7 @@ bool QualcommCameraHardware::native_get_zoom(int camfd, void *pZm)
 
 bool QualcommCameraHardware::native_set_zoom(int camfd, void *pZm)
 {
-    struct msm_ctrl_cmd_t ctrlCmd;
+    struct msm_ctrl_cmd ctrlCmd;
 
     int32_t *pZoom = (int32_t *)pZm;
 
@@ -2103,7 +2103,7 @@ status_t QualcommCameraHardware::MemPool::dump(int fd, const Vector<String16>& a
     return NO_ERROR;
 }
 
-static void receive_camframe_callback(struct msm_frame_t *frame)
+static void receive_camframe_callback(struct msm_frame *frame)
 {
     sp<QualcommCameraHardware> obj = QualcommCameraHardware::getInstance();
     if (obj != 0) {
