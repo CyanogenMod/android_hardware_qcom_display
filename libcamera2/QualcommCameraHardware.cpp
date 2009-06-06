@@ -118,6 +118,7 @@ static preview_size_type preview_sizes[] = {
     { 480, 320 }, // HVGA
     { 352, 288 }, // CIF
     { 320, 240 }, // QVGA
+    { 240, 160 }, // SQVGA
     { 176, 144 }, // QCIF
 };
 
