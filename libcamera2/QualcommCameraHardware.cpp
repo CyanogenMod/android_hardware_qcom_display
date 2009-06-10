@@ -1554,9 +1554,6 @@ void QualcommCameraHardware::receivePreviewFrame(struct msm_frame *frame)
         pcb(mPreviewHeap->mBuffers[mPreviewFrameOffset],
             pdata);
 
-    mPreviewFrameOffset++;
-    mPreviewFrameOffset %= kPreviewBufferCount;
-
     if(rcb != NULL) {
         Mutex::Autolock rLock(&mRecordFrameLock);
         rcb(mPreviewHeap->mBuffers[mPreviewFrameOffset], rdata);
@@ -1567,6 +1564,9 @@ void QualcommCameraHardware::receivePreviewFrame(struct msm_frame *frame)
         mReleasedRecordingFrame = false;
     }
     mInPreviewCallback = false;
+
+    mPreviewFrameOffset++;
+    mPreviewFrameOffset %= kPreviewBufferCount;
 
 //    LOGV("receivePreviewFrame X");
 }
