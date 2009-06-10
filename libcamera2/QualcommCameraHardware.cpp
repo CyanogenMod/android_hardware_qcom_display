@@ -72,6 +72,7 @@ extern "C" {
 #define PREVIEW_SIZE_COUNT (sizeof(preview_sizes)/sizeof(preview_size_type))
 
 #define BRIGHTNESS_MAX 10 // FIXME: this should correlate with brightness-values
+#define BRIGHTNESS_DEF  5 // FIXME: this should correlate with brightness-values
 #define ZOOM_MAX       10 // FIXME: this should correlate with zoom-values
 
 #if DLOPEN_LIBMMCAMERA
@@ -281,7 +282,7 @@ QualcommCameraHardware::QualcommCameraHardware()
       mPreviewWidth(-1),
       mRawHeight(-1),
       mRawWidth(-1),
-      mBrightness(0),
+      mBrightness(BRIGHTNESS_DEF),
       mZoomValuePrev(0),
       mZoomValueCurr(0),
       mZoomInitialised(false),
@@ -1153,7 +1154,7 @@ status_t QualcommCameraHardware::startPreviewInternal()
     setSensorPreviewEffect(mCameraControlFd, mParameters.get("effect"));
     setSensorWBLighting(mCameraControlFd, mParameters.get("whitebalance"));
     setAntiBanding(mCameraControlFd, mParameters.get("antibanding"));
-    setBrightness(mParameters.getInt("exposure-offset"));
+    setBrightness();
     // FIXME: set nightshot, luma adaptatiom, zoom and check ranges
 
     LOGV("startPreview X");
@@ -1387,17 +1388,7 @@ status_t QualcommCameraHardware::setParameters(
 
     if (mCameraRunning)
     {
-        int val = mParameters.getInt("exposure-offset");
-        if(val >= 0 && mBrightness != val)
-        {
-            if (val > BRIGHTNESS_MAX)
-                LOGE("invalid brightness value %d", val);
-            else {
-                LOGV("new brightness value %d", val);
-                mBrightness = val;
-                setBrightness(val);
-            }
-        }
+        setBrightness();
 
         mZoomValueCurr = mParameters.getInt("zoom");
         if(mZoomValueCurr >= 0 && mZoomValueCurr <= ZOOM_MAX &&
@@ -1421,7 +1412,6 @@ status_t QualcommCameraHardware::setParameters(
         setSensorPreviewEffect(mCameraControlFd, mParameters.get("effect"));
         setSensorWBLighting(mCameraControlFd, mParameters.get("whitebalance"));
         setAntiBanding(mCameraControlFd, mParameters.get("antibanding"));
-        setBrightness(mParameters.getInt("exposure-offset"));
         // FIXME: set nightshot, luma adaptatiom, zoom and check ranges
     }
 
@@ -1798,19 +1788,32 @@ void QualcommCameraHardware::setAntiBanding(int camfd, const char *antibanding)
              camfd, strerror(errno));
 }
 
-void QualcommCameraHardware::setBrightness(int brightness)
+void QualcommCameraHardware::setBrightness()
 {
-    struct msm_ctrl_cmd ctrlCmd;
-    LOGV("In setBrightness: %d", brightness);
-    ctrlCmd.timeout_ms = 5000;
-    ctrlCmd.type       = CAMERA_SET_PARM_BRIGHTNESS;
-    ctrlCmd.length     = sizeof(int);
-    ctrlCmd.value      = (void *)&brightness;
-    ctrlCmd.resp_fd    = mCameraControlFd; // FIXME: this will be put in by the kernel
+    int val = mParameters.getInt("exposure-offset");
+    if (val < 0)
+        val = BRIGHTNESS_DEF;
+    else if (val > BRIGHTNESS_MAX)
+        val = BRIGHTNESS_MAX;
 
-    if(ioctl(mCameraControlFd, MSM_CAM_IOCTL_CTRL_COMMAND, &ctrlCmd) < 0)
-        LOGE("setBrightness: ioctl fd %d error %s",
-             mCameraControlFd, strerror(errno));
+    if (mBrightness != val) {
+        LOGV("new brightness value %d", val);
+        mBrightness = val;
+
+        struct msm_ctrl_cmd ctrlCmd;
+        LOGV("In setBrightness: %d", val);
+        ctrlCmd.timeout_ms = 5000;
+        ctrlCmd.type       = CAMERA_SET_PARM_BRIGHTNESS;
+        ctrlCmd.length     = sizeof(int);
+        ctrlCmd.value      = (void *)&val;
+        // FIXME: this will be put in by the kernel
+        ctrlCmd.resp_fd    = mCameraControlFd;
+
+        if(ioctl(mCameraControlFd,
+                 MSM_CAM_IOCTL_CTRL_COMMAND, &ctrlCmd) < 0)
+            LOGE("setBrightness: ioctl fd %d error %s",
+                 mCameraControlFd, strerror(errno));
+    }
 }
 
 bool QualcommCameraHardware::native_get_zoom(int camfd, void *pZm)
