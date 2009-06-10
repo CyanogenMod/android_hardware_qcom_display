@@ -958,9 +958,9 @@ bool QualcommCameraHardware::initRaw(bool initJpegHeap)
         return false;
     }
 
-    mRawSize = mRawWidth * mRawHeight * 1.5;
+    mRawSize = mRawWidth * mRawHeight * 3 / 2;
 
-    mJpegMaxSize = mRawWidth * mRawHeight * 1.5;
+    mJpegMaxSize = mRawWidth * mRawHeight * 3 / 2;
 
     LOGE("initRaw: clearing old mJpegHeap.");
     mJpegHeap.clear();
@@ -1412,7 +1412,7 @@ status_t QualcommCameraHardware::setParameters(
             {
                 ZoomDirectionIn = true;
             }
-            LOGV("new zoom value: %2.2f direction = %s",
+            LOGV("new zoom value: %d direction = %s",
                  mZoomValueCurr, (ZoomDirectionIn ? "in" : "out"));
             mZoomValuePrev = mZoomValueCurr;
             performZoom(ZoomDirectionIn);
@@ -1547,7 +1547,7 @@ void QualcommCameraHardware::receivePreviewFrame(struct msm_frame *frame)
 
     memcpy((uint8_t *)mPreviewHeap->mHeap->base() + offset,
            (uint8_t *)frame->buffer,
-           mPreviewWidth * mPreviewHeight * 1.5);
+           mPreviewWidth * mPreviewHeight * 3 / 2);
 
     mInPreviewCallback = true;
     if (pcb != NULL)
@@ -1655,10 +1655,10 @@ QualcommCameraHardware::receiveRawPicture()
             LOGE("getPicture failed!");
             return;
         }
-        ssize_t offset = (mRawWidth * mRawHeight  * 1.5 * snapshot_offset);
+        ssize_t offset = (mRawWidth * mRawHeight  * snapshot_offset * 3 / 2);
 #if CAPTURE_RAW
         dump_to_file("/sdcard/photo.raw",
-                     (uint8_t *)mMainImageBuf, mRawWidth * mRawHeight * 1.5 );
+                     (uint8_t *)mMainImageBuf, mRawWidth * mRawHeight * 3 / 2);
 #endif
         mRawPictureCallback(mRawHeap->mBuffers[offset],
                             mPictureCallbackCookie);
