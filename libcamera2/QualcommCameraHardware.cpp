@@ -1288,6 +1288,7 @@ status_t QualcommCameraHardware::autoFocus(autofocus_callback af_cb,
                                 auto_focus_thread, NULL);
             if (!mAutoFocusThreadRunning) {
                 LOGE("failed to start autofocus thread");
+                mAutoFocusThreadLock.unlock();
                 return UNKNOWN_ERROR;
             }
         }
