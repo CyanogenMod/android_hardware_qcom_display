@@ -125,12 +125,12 @@ private:
     int mPreviewWidth;
     int mRawHeight;
     int mRawWidth;
-	unsigned int frame_size;
-	int mBrightness;
-	float mZoomValuePrev;
-    float mZoomValueCurr;
-	bool mZoomInitialised;
-	bool mCameraRunning;
+    unsigned int frame_size;
+    int mBrightness;
+    int mZoomValuePrev;
+    int mZoomValueCurr;
+    bool mZoomInitialised;
+    bool mCameraRunning;
     bool mPreviewInitialized;
     
     // This class represents a heap which maintains several contiguous
