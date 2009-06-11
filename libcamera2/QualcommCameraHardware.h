@@ -219,7 +219,7 @@ private:
     void setSensorPreviewEffect(int, const char*);
     void setSensorWBLighting(int, const char*);
     void setAntiBanding(int, const char*);
-    void setBrightness(int);
+    void setBrightness(void);
     void performZoom(bool);
 
     Mutex mLock;
