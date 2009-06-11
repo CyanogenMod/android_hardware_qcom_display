@@ -1547,7 +1547,7 @@ void QualcommCameraHardware::receivePreviewFrame(struct msm_frame *frame)
     if(rcb != NULL) {
         Mutex::Autolock rLock(&mRecordFrameLock);
         rcb(mPreviewHeap->mBuffers[mPreviewFrameOffset], rdata);
-        while(mReleasedRecordingFrame != true) {
+        if (mReleasedRecordingFrame != true) {
             LOGV("block for release frame request/command");
             mRecordWait.wait(mRecordFrameLock);
         }
