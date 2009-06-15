@@ -87,6 +87,7 @@ bool  (*LINK_jpeg_encoder_encode)(const cam_ctrl_dimension_t *dimen,
                                   const uint8_t *snapshotbuf, int snapshotfd);
 int  (*LINK_camframe_terminate)(void);
 int8_t (*LINK_jpeg_encoder_setMainImageQuality)(uint32_t quality);
+int8_t (*LINK_jpeg_encoder_setThumbnailQuality)(uint32_t quality);
 // callbacks
 void  (**LINK_mmcamera_camframe_callback)(struct msm_frame *frame);
 void  (**LINK_mmcamera_jpegfragment_callback)(uint8_t *buff_ptr,
@@ -100,6 +101,7 @@ void  (**LINK_mmcamera_jpeg_callback)(jpeg_event_t status);
 #define LINK_jpeg_encoder_encode jpeg_encoder_encode
 #define LINK_camframe_terminate camframe_terminate
 #define LINK_jpeg_encoder_setMainImageQuality jpeg_encoder_setMainImageQuality
+#define LINK_jpeg_encoder_setThumbnailQuality jpeg_encoder_setThumbnailQuality
 extern void (*mmcamera_camframe_callback)(struct msm_frame *frame);
 extern void (*mmcamera_jpegfragment_callback)(uint8_t *buff_ptr,
                                       uint32_t buff_size);
@@ -340,7 +342,7 @@ void QualcommCameraHardware::initDefaultParameters()
 
     p.set("jpeg-thumbnail-width", THUMBNAIL_WIDTH_STR); // informative
     p.set("jpeg-thumbnail-height", THUMBNAIL_HEIGHT_STR); // informative
-  //p.set("jpeg-thumbnail-quality", "90"); // FIXME: hook up through mm-camera
+    p.set("jpeg-thumbnail-quality", "90");
     p.setPictureSize(mDimension.picture_width, mDimension.picture_height);
 
 #if 0
@@ -415,6 +417,9 @@ void QualcommCameraHardware::startCamera()
 
     *(void**)&LINK_jpeg_encoder_setMainImageQuality =
         ::dlsym(libmmcamera, "jpeg_encoder_setMainImageQuality");
+
+    *(void**)&LINK_jpeg_encoder_setThumbnailQuality =
+        ::dlsym(libmmcamera, "jpeg_encoder_setThumbnailQuality");
 
     *(void **)&LINK_cam_conf =
         ::dlsym(libmmcamera, "cam_conf");
@@ -768,6 +773,16 @@ bool QualcommCameraHardware::native_jpeg_encode (
         LOGV("native_jpeg_encode, current jpeg main img quality =%d",
              jpeg_quality);
         if(!LINK_jpeg_encoder_setMainImageQuality(jpeg_quality)) {
+            LOGE("native_jpeg_encode set failed");
+            return false;
+        }
+    }
+
+    int thumbnail_quality = mParameters.getInt("jpeg-thumbnail-quality");
+    if (thumbnail_quality >= 0) {
+        LOGV("native_jpeg_encode, current jpeg thumbnail quality =%d",
+             thumbnail_quality);
+        if(!LINK_jpeg_encoder_setThumbnailQuality(thumbnail_quality)) {
             LOGE("native_jpeg_encode set failed");
             return false;
         }
