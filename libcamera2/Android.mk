@@ -23,7 +23,7 @@ LOCAL_C_INCLUDES+= \
 LOCAL_SHARED_LIBRARIES:= libutils libui liblog
 
 ifneq ($(DLOPEN_LIBMMCAMERA),1)
-LOCAL_SHARED_LIBRARIES+= libmmcamera
+LOCAL_SHARED_LIBRARIES+= libqcamera
 else
 LOCAL_SHARED_LIBRARIES+= libdl
 endif

@@ -84,7 +84,8 @@ bool  (*LINK_jpeg_encoder_init)();
 void  (*LINK_jpeg_encoder_join)();
 bool  (*LINK_jpeg_encoder_encode)(const cam_ctrl_dimension_t *dimen,
                                   const uint8_t *thumbnailbuf, int thumbnailfd,
-                                  const uint8_t *snapshotbuf, int snapshotfd);
+                                  const uint8_t *snapshotbuf, int snapshotfd,
+                                  common_crop_t *scaling_parms);
 int  (*LINK_camframe_terminate)(void);
 int8_t (*LINK_jpeg_encoder_setMainImageQuality)(uint32_t quality);
 int8_t (*LINK_jpeg_encoder_setThumbnailQuality)(uint32_t quality);
@@ -802,9 +803,11 @@ bool QualcommCameraHardware::native_jpeg_encode (
         }
     }
 
+    static common_crop_t scale; // no scaling
     if (!LINK_jpeg_encoder_encode(&mDimension,
                                   thumbnail_buf, thumb_fd,
-                                  main_img_buf, snap_fd)) {
+                                  main_img_buf, snap_fd,
+                                  &scale)) {
         LOGE("native_jpeg_encode: jpeg_encoder_encode failed.");
         return false;
     }
@@ -1089,10 +1092,14 @@ void QualcommCameraHardware::release()
     LOGV("release E");
     Mutex::Autolock l(&mLock);
 
+#if DLOPEN_LIBMMCAMERA
     if (libmmcamera == NULL) {
         LOGE("ERROR: multiple release!");
         return;
     }
+#else
+#warning "Cannot detect multiple release when not dlopen()ing libqcamera!"
+#endif
 
     int cnt, rc;
     struct msm_ctrl_cmd ctrlCmd;
