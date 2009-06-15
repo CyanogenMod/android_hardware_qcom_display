@@ -88,6 +88,7 @@ bool  (*LINK_jpeg_encoder_encode)(const cam_ctrl_dimension_t *dimen,
 int  (*LINK_camframe_terminate)(void);
 int8_t (*LINK_jpeg_encoder_setMainImageQuality)(uint32_t quality);
 int8_t (*LINK_jpeg_encoder_setThumbnailQuality)(uint32_t quality);
+int8_t (*LINK_jpeg_encoder_setRotation)(uint32_t rotation);
 // callbacks
 void  (**LINK_mmcamera_camframe_callback)(struct msm_frame *frame);
 void  (**LINK_mmcamera_jpegfragment_callback)(uint8_t *buff_ptr,
@@ -102,6 +103,7 @@ void  (**LINK_mmcamera_jpeg_callback)(jpeg_event_t status);
 #define LINK_camframe_terminate camframe_terminate
 #define LINK_jpeg_encoder_setMainImageQuality jpeg_encoder_setMainImageQuality
 #define LINK_jpeg_encoder_setThumbnailQuality jpeg_encoder_setThumbnailQuality
+#define LINK_jpeg_encoder_setRotation jpeg_encoder_setRotation
 extern void (*mmcamera_camframe_callback)(struct msm_frame *frame);
 extern void (*mmcamera_jpegfragment_callback)(uint8_t *buff_ptr,
                                       uint32_t buff_size);
@@ -420,6 +422,9 @@ void QualcommCameraHardware::startCamera()
 
     *(void**)&LINK_jpeg_encoder_setThumbnailQuality =
         ::dlsym(libmmcamera, "jpeg_encoder_setThumbnailQuality");
+
+    *(void**)&LINK_jpeg_encoder_setRotation =
+        ::dlsym(libmmcamera, "jpeg_encoder_setRotation");
 
     *(void **)&LINK_cam_conf =
         ::dlsym(libmmcamera, "cam_conf");
@@ -773,7 +778,7 @@ bool QualcommCameraHardware::native_jpeg_encode (
         LOGV("native_jpeg_encode, current jpeg main img quality =%d",
              jpeg_quality);
         if(!LINK_jpeg_encoder_setMainImageQuality(jpeg_quality)) {
-            LOGE("native_jpeg_encode set failed");
+            LOGE("native_jpeg_encode set jpeg-quality failed");
             return false;
         }
     }
@@ -783,7 +788,16 @@ bool QualcommCameraHardware::native_jpeg_encode (
         LOGV("native_jpeg_encode, current jpeg thumbnail quality =%d",
              thumbnail_quality);
         if(!LINK_jpeg_encoder_setThumbnailQuality(thumbnail_quality)) {
-            LOGE("native_jpeg_encode set failed");
+            LOGE("native_jpeg_encode set thumbnail-quality failed");
+            return false;
+        }
+    }
+
+    int rotation = mParameters.getInt("rotation");
+    if (rotation >= 0) {
+        LOGV("native_jpeg_encode, rotation = %d", rotation);
+        if(!LINK_jpeg_encoder_setRotation(rotation)) {
+            LOGE("native_jpeg_encode set rotation failed");
             return false;
         }
     }
