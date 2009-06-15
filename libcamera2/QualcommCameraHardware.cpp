@@ -1069,7 +1069,6 @@ void QualcommCameraHardware::release()
     struct msm_ctrl_cmd ctrlCmd;
 
     if (mCameraRunning) {
-        cancelAutoFocus();
         if(mRecordingCallback != NULL) {
             mRecordFrameLock.lock();
             mReleasedRecordingFrame = true;
@@ -1179,6 +1178,16 @@ void QualcommCameraHardware::stopPreviewInternal()
 {
     LOGV("stopPreviewInternal E: %d", mCameraRunning);
     if (mCameraRunning) {
+        // Cancel auto focus.
+        if (mAutoFocusCallback) {
+            {
+                Mutex::Autolock cbLock(&mCallbackLock);
+                mAutoFocusCallback = NULL;
+                mAutoFocusCallbackCookie = NULL;
+            }
+            cancelAutoFocus();
+        }
+
         mCameraRunning = !native_stop_preview(mCameraControlFd);
         if (!mCameraRunning && mPreviewInitialized) {
             deinitPreview();
@@ -1196,7 +1205,6 @@ void QualcommCameraHardware::stopPreview()
 
     {
         Mutex::Autolock cbLock(&mCallbackLock);
-        mAutoFocusCallback = NULL;
         mPreviewCallback = NULL;
         mPreviewCallbackCookie = NULL;
         if(mRecordingCallback != NULL)
@@ -1236,6 +1244,11 @@ void QualcommCameraHardware::runAutoFocus()
     mCallbackLock.unlock();
     if (cb != NULL)
         cb(status, data);
+
+    mCallbackLock.lock();
+    mAutoFocusCallback = NULL;
+    mAutoFocusCallbackCookie = NULL;
+    mCallbackLock.unlock();
 }
 
 void QualcommCameraHardware::cancelAutoFocus()
@@ -1263,15 +1276,20 @@ status_t QualcommCameraHardware::autoFocus(autofocus_callback af_cb,
     LOGV("autoFocus E");
     Mutex::Autolock l(&mLock);
 
+    if (mCameraControlFd < 0) {
+        LOGE("not starting autofocus: main control fd %d", mCameraControlFd);
+        return UNKNOWN_ERROR;
+    }
+
+    if (mAutoFocusCallback != NULL) {
+        LOGW("Auto focus is already in progress");
+        return mAutoFocusCallback == af_cb ? NO_ERROR : INVALID_OPERATION;
+    }
+
     {
         Mutex::Autolock cbl(&mCallbackLock);
         mAutoFocusCallback = af_cb;
         mAutoFocusCallbackCookie = user;
-    }
-
-    if (mCameraControlFd < 0) {
-        LOGE("not starting autofocus: main control fd %d", mCameraControlFd);
-        return UNKNOWN_ERROR;
     }
 
     {
