@@ -867,13 +867,13 @@ void QualcommCameraHardware::runFrameThread(void *data)
 
 void *frame_thread(void *user)
 {
-    LOGV("frame_thread E");
+    LOGD("frame_thread E");
     sp<QualcommCameraHardware> obj = QualcommCameraHardware::getInstance();
     if (obj != 0) {
         obj->runFrameThread(user);
     }
     else LOGW("not starting frame thread: the object went away!");
-    LOGV("frame_thread X");
+    LOGD("frame_thread X");
     return NULL;
 }
 
@@ -1089,7 +1089,7 @@ void QualcommCameraHardware::deinitRaw()
 
 void QualcommCameraHardware::release()
 {
-    LOGV("release E");
+    LOGD("release E");
     Mutex::Autolock l(&mLock);
 
 #if DLOPEN_LIBMMCAMERA
@@ -1141,14 +1141,14 @@ void QualcommCameraHardware::release()
     }
 #endif
 
-    LOGV("release X");
+    LOGD("release X");
 }
 
 QualcommCameraHardware::~QualcommCameraHardware()
 {
-    LOGV("~QualcommCameraHardware E");
+    LOGD("~QualcommCameraHardware E");
     singleton.clear();
-    LOGV("~QualcommCameraHardware X");
+    LOGD("~QualcommCameraHardware X");
 }
 
 sp<IMemoryHeap> QualcommCameraHardware::getRawHeap() const
@@ -1493,13 +1493,13 @@ wp<QualcommCameraHardware> QualcommCameraHardware::singleton;
 // and return it.
 sp<CameraHardwareInterface> QualcommCameraHardware::createInstance()
 {
-    LOGV("createInstance: E");
+    LOGD("createInstance: E");
 
     Mutex::Autolock lock(&singleton_lock);
     if (singleton != 0) {
         sp<CameraHardwareInterface> hardware = singleton.promote();
         if (hardware != 0) {
-            LOGV("createInstance: X return existing hardware=%p", &(*hardware));
+            LOGD("createInstance: X return existing hardware=%p", &(*hardware));
             return hardware;
         }
     }
@@ -1508,7 +1508,7 @@ sp<CameraHardwareInterface> QualcommCameraHardware::createInstance()
         struct stat st;
         int rc = stat("/dev/oncrpc", &st);
         if (rc < 0) {
-            LOGV("createInstance: X failed to create hardware: %s", strerror(errno));
+            LOGD("createInstance: X failed to create hardware: %s", strerror(errno));
             return NULL;
         }
     }
@@ -1519,7 +1519,7 @@ sp<CameraHardwareInterface> QualcommCameraHardware::createInstance()
 
     cam->startCamera();
     cam->initDefaultParameters();
-    LOGV("createInstance: X created hardware=%p", &(*hardware));
+    LOGD("createInstance: X created hardware=%p", &(*hardware));
     return hardware;
 }
 
