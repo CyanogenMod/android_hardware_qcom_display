@@ -24,7 +24,7 @@ LOCAL_SHARED_LIBRARIES:= libutils libui liblog
 
 LOCAL_SHARED_LIBRARIES+= libbinder
 ifneq ($(DLOPEN_LIBMMCAMERA),1)
-LOCAL_SHARED_LIBRARIES+= libmmcamera
+LOCAL_SHARED_LIBRARIES+= libqcamera
 else
 LOCAL_SHARED_LIBRARIES+= libdl
 endif
