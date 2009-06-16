@@ -1879,7 +1879,7 @@ bool QualcommCameraHardware::native_get_zoom(int camfd, void *pZm)
     ctrlCmd.timeout_ms = 5000;
     ctrlCmd.length   = sizeof(cam_parm_info_t);
     ctrlCmd.value    = pZoom;
-    ctrlCmd.resp_fd    = camfd; // FIXME: this will be put in by the kernel
+    ctrlCmd.resp_fd  = camfd; // FIXME: this will be put in by the kernel
 
     if(ioctl(camfd, MSM_CAM_IOCTL_CTRL_COMMAND, &ctrlCmd) < 0) {
         LOGE("native_get_zoom: ioctl fd %d error %s",
@@ -1887,13 +1887,13 @@ bool QualcommCameraHardware::native_get_zoom(int camfd, void *pZm)
         return false;
     }
 
-    LOGV("native_get_zoom::current val=%d max=%d min=%d step val=%d",
+    memcpy(pZoom, *(cam_parm_info_t **)ctrlCmd.value, sizeof(cam_parm_info_t));
+
+    LOGD("native_get_zoom::current val=%d max=%d min=%d step val=%d",
          pZoom->current_value,
          pZoom->maximum_value,
          pZoom->minimum_value,
          pZoom->step_value);
-
-    memcpy(pZoom, (cam_parm_info_t *)ctrlCmd.value, sizeof(cam_parm_info_t));
 
     return ctrlCmd.status;
 }
