@@ -180,7 +180,7 @@ static char *whitebalance_values;
 
 // from camera_effect_t
 static const str_map color_effects[] = {
-    { "none",       CAMERA_EFFECT_OFF },  /* This list must match aeecamera.h */
+    { "off",        CAMERA_EFFECT_OFF },  /* This list must match aeecamera.h */
     { "mono",       CAMERA_EFFECT_MONO },
     { "negative",   CAMERA_EFFECT_NEGATIVE },
     { "solarize",   CAMERA_EFFECT_SOLARIZE },
@@ -362,8 +362,9 @@ void QualcommCameraHardware::initDefaultParameters()
     INIT_VALUES_FOR(whitebalance);
 
     p.set("anti-banding-values", anti_banding_values);
-    p.set("color-effects-values", color_effects_values);
+    p.set("effect-values", color_effects_values);
     p.set("whitebalance-values", whitebalance_values);
+    p.set("picture-size-values", "2048x1536,1600x1200,1024x768");
 
     // FIXME: we can specify these numeric ranges better
     p.set("exposure-offset-values", "0,1,2,3,4,5,6,7,8,9,10");
