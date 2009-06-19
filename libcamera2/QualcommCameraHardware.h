@@ -97,6 +97,7 @@ public:
         uint8_t * buff_ptr , uint32_t buff_size);
 	bool        previewEnabled(); 
 	
+    void jpeg_set_location();
 
 private:
 
