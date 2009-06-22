@@ -60,6 +60,7 @@ public:
     void receiveJpegPicture(void);
     void jpeg_set_location();
     void receiveJpegPictureFragment(uint8_t *buf, uint32_t size);
+    void notifyShutter();
 
 private:
 
@@ -180,8 +181,6 @@ private:
 
     Mutex mLock;
     bool mReleasedRecordingFrame;
-
-    void notifyShutter();
 
     void receiveRawPicture(void);
 

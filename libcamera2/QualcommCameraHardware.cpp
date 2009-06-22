@@ -95,6 +95,7 @@ void  (**LINK_mmcamera_camframe_callback)(struct msm_frame *frame);
 void  (**LINK_mmcamera_jpegfragment_callback)(uint8_t *buff_ptr,
                                               uint32_t buff_size);
 void  (**LINK_mmcamera_jpeg_callback)(jpeg_event_t status);
+void  (**LINK_mmcamera_shutter_callback)();
 #else
 #define LINK_cam_conf cam_conf
 #define LINK_cam_frame cam_frame
@@ -110,6 +111,7 @@ extern void (*mmcamera_camframe_callback)(struct msm_frame *frame);
 extern void (*mmcamera_jpegfragment_callback)(uint8_t *buff_ptr,
                                       uint32_t buff_size);
 extern void (*mmcamera_jpeg_callback)(jpeg_event_t status);
+extern void (*mmcamera_shutter_callback)();
 #endif
 
 } // extern "C"
@@ -227,6 +229,7 @@ static Mutex singleton_lock;
 static void receive_camframe_callback(struct msm_frame *frame);
 static void receive_jpeg_fragment_callback(uint8_t *buff_ptr, uint32_t buff_size);
 static void receive_jpeg_callback(jpeg_event_t status);
+static void receive_shutter_callback();
 
 QualcommCameraHardware::QualcommCameraHardware()
     : mParameters(),
@@ -355,6 +358,11 @@ void QualcommCameraHardware::startCamera()
 
     *LINK_mmcamera_jpeg_callback = receive_jpeg_callback;
 
+    *(void **)&LINK_mmcamera_shutter_callback =
+        ::dlsym(libmmcamera, "mmcamera_shutter_callback");
+
+    *LINK_mmcamera_shutter_callback = receive_shutter_callback;
+
     *(void**)&LINK_jpeg_encoder_setMainImageQuality =
         ::dlsym(libmmcamera, "jpeg_encoder_setMainImageQuality");
 
@@ -373,6 +381,7 @@ void QualcommCameraHardware::startCamera()
     mmcamera_camframe_callback = receive_camframe_callback;
     mmcamera_jpegfragment_callback = receive_jpeg_fragment_callback;
     mmcamera_jpeg_callback = receive_jpeg_callback;
+    mmcamera_shutter_callback = receive_shutter_callback;
 #endif // DLOPEN_LIBMMCAMERA
 
     /* The control thread is in libcamera itself. */
@@ -1569,10 +1578,18 @@ bool QualcommCameraHardware::recordingEnabled()
 
 void QualcommCameraHardware::notifyShutter()
 {
-    LOGV("notifyShutter: E");
     if (mShutterCallback)
         mShutterCallback(mPictureCallbackCookie);
-    LOGV("notifyShutter: X");
+}
+
+static void receive_shutter_callback()
+{
+    LOGV("receive_shutter_callback: E");
+    sp<QualcommCameraHardware> obj = QualcommCameraHardware::getInstance();
+    if (obj != 0) {
+        obj->notifyShutter();
+    }
+    LOGV("receive_shutter_callback: X");
 }
 
 void QualcommCameraHardware::receiveRawPicture()
@@ -1580,9 +1597,8 @@ void QualcommCameraHardware::receiveRawPicture()
     LOGV("receiveRawPicture: E");
 
     int ret,rc,rete;
-// Temporary fix for multiple snapshot issue on 8k: disabling shutter callback
+
     Mutex::Autolock cbLock(&mCallbackLock);
-    notifyShutter();
     if (mRawPictureCallback != NULL) {
         if(native_get_picture(mCameraControlFd, &mCrop)== false) {
             LOGE("getPicture failed!");
