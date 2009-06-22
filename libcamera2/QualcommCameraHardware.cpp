@@ -90,6 +90,7 @@ int  (*LINK_camframe_terminate)(void);
 int8_t (*LINK_jpeg_encoder_setMainImageQuality)(uint32_t quality);
 int8_t (*LINK_jpeg_encoder_setThumbnailQuality)(uint32_t quality);
 int8_t (*LINK_jpeg_encoder_setRotation)(uint32_t rotation);
+int8_t (*LINK_jpeg_encoder_setLocation)(const camera_position_type *location);
 // callbacks
 void  (**LINK_mmcamera_camframe_callback)(struct msm_frame *frame);
 void  (**LINK_mmcamera_jpegfragment_callback)(uint8_t *buff_ptr,
@@ -105,6 +106,7 @@ void  (**LINK_mmcamera_jpeg_callback)(jpeg_event_t status);
 #define LINK_jpeg_encoder_setMainImageQuality jpeg_encoder_setMainImageQuality
 #define LINK_jpeg_encoder_setThumbnailQuality jpeg_encoder_setThumbnailQuality
 #define LINK_jpeg_encoder_setRotation jpeg_encoder_setRotation
+#define LINK_jpeg_encoder_setLocation jpeg_encoder_setLocation
 extern void (*mmcamera_camframe_callback)(struct msm_frame *frame);
 extern void (*mmcamera_jpegfragment_callback)(uint8_t *buff_ptr,
                                       uint32_t buff_size);
@@ -427,6 +429,9 @@ void QualcommCameraHardware::startCamera()
 
     *(void**)&LINK_jpeg_encoder_setRotation =
         ::dlsym(libmmcamera, "jpeg_encoder_setRotation");
+
+    *(void**)&LINK_jpeg_encoder_setLocation =
+        ::dlsym(libmmcamera, "jpeg_encoder_setLocation");
 
     *(void **)&LINK_cam_conf =
         ::dlsym(libmmcamera, "cam_conf");
@@ -804,6 +809,8 @@ bool QualcommCameraHardware::native_jpeg_encode (
         }
     }
 
+    jpeg_set_location();
+
     static common_crop_t scale; // no scaling
     if (!LINK_jpeg_encoder_encode(&mDimension,
                                   thumbnail_buf, thumb_fd,
@@ -813,6 +820,50 @@ bool QualcommCameraHardware::native_jpeg_encode (
         return false;
     }
     return true;
+}
+
+void QualcommCameraHardware::jpeg_set_location()
+{
+    bool encode_location = true;
+    camera_position_type pt;
+
+#define PARSE_LOCATION(what,type,fmt,desc) do {                                \
+        pt.what = 0;                                                           \
+        const char *what##_str = mParameters.get("gps-"#what);                 \
+        LOGV("GPS PARM %s --> [%s]", "gps-"#what, what##_str);                 \
+        if (what##_str) {                                                      \
+            type what = 0;                                                     \
+            if (sscanf(what##_str, fmt, &what) == 1)                           \
+                pt.what = what;                                                \
+            else {                                                             \
+                LOGE("GPS " #what " %s could not"                              \
+                     " be parsed as a " #desc, what##_str);                    \
+                encode_location = false;                                       \
+            }                                                                  \
+        }                                                                      \
+        else {                                                                 \
+            LOGV("GPS " #what " not specified: "                               \
+                 "defaulting to zero in EXIF header.");                        \
+            encode_location = false;                                           \
+       }                                                                       \
+    } while(0)
+
+    PARSE_LOCATION(timestamp, long, "%ld", "long");
+    if (!pt.timestamp) pt.timestamp = time(NULL);
+    PARSE_LOCATION(altitude, short, "%hd", "short");
+    PARSE_LOCATION(latitude, double, "%lf", "double float");
+    PARSE_LOCATION(longitude, double, "%lf", "double float");
+
+#undef PARSE_LOCATION
+
+    if (encode_location) {
+        LOGD("setting image location ALT %d LAT %lf LON %lf",
+             pt.altitude, pt.latitude, pt.longitude);
+        if (!LINK_jpeg_encoder_setLocation(&pt)) {
+            LOGE("jpeg_set_location: LINK_jpeg_encoder_setLocation failed.");
+        }
+    }
+    else LOGV("not setting image location");
 }
 
 void QualcommCameraHardware::runFrameThread(void *data)
