@@ -36,68 +36,30 @@ public:
     virtual sp<IMemoryHeap> getPreviewHeap() const;
     virtual sp<IMemoryHeap> getRawHeap() const;
 
-    virtual status_t    dump(int fd, const Vector<String16>& args) const;
-    virtual status_t    startPreview(preview_callback cb, void* user);
-    virtual void        stopPreview();
-    virtual status_t    startRecording(recording_callback cb, void* user);
-    virtual void        stopRecording();
-    virtual bool        recordingEnabled();
-    virtual void        releaseRecordingFrame(const sp<IMemory>& mem);
-    virtual status_t    autoFocus(autofocus_callback, void *user);
-    virtual status_t    takePicture(shutter_callback,
-                                    raw_callback,
-                                    jpeg_callback,
-                                    void* user);
-    virtual status_t    cancelPicture(bool cancel_shutter,
-                                      bool cancel_raw, bool cancel_jpeg);
-    virtual status_t    setParameters(const CameraParameters& params);
-    virtual CameraParameters  getParameters() const;
-
+    virtual status_t dump(int fd, const Vector<String16>& args) const;
+    virtual status_t startPreview(preview_callback cb, void* user);
+    virtual void stopPreview();
+    virtual bool previewEnabled();
+    virtual status_t startRecording(recording_callback cb, void* user);
+    virtual void stopRecording();
+    virtual bool recordingEnabled();
+    virtual void releaseRecordingFrame(const sp<IMemory>& mem);
+    virtual status_t autoFocus(autofocus_callback, void *user);
+    virtual status_t takePicture(shutter_callback, raw_callback,
+                                 jpeg_callback, void *);
+    virtual status_t cancelPicture(bool cancel_shutter,
+                                   bool cancel_raw, bool cancel_jpeg);
+    virtual status_t setParameters(const CameraParameters& params);
+    virtual CameraParameters getParameters() const;
     virtual void release();
 
     static sp<CameraHardwareInterface> createInstance();
     static sp<QualcommCameraHardware> getInstance();
 
-    
-
-    bool native_set_dimension (int camfd);
-	void reg_unreg_buf(int camfd, int width, int height,
-                       int pmempreviewfd, uint8_t *prev_buf,
-                       int pmem_type,
-                       bool unregister,
-                       bool active);
-    bool native_register_preview_bufs(int camfd,
-                                      struct msm_frame *frame,bool active);
-	bool native_unregister_preview_bufs(int camfd, int pmempreviewfd,
-                                        uint8_t *prev_buf);
-    
-	bool native_start_preview(int camfd);
-	bool native_stop_preview(int camfd);
-
-	bool native_register_snapshot_bufs(int camfd, int pmemthumbnailfd,
-                                       int pmemsnapshotfd,
-                                       uint8_t *thumbnail_buf,
-                                       uint8_t *main_img_buf);
-    bool native_unregister_snapshot_bufs(int camfd, int pmemThumbnailfd,
-                                         int pmemSnapshotfd,
-                                         uint8_t *thumbnail_buf,
-                                         uint8_t *main_img_buf);
-    bool native_get_picture(int camfd);
-	bool native_start_snapshot(int camfd);
-    bool native_stop_snapshot(int camfd);
-    bool native_jpeg_encode (int pmemThumbnailfd, int pmemSnapshotfd,
-                             uint8_t *thumbnail_buf, uint8_t *main_img_buf);
-
-	bool native_set_zoom(int camfd, void *pZm);
-	bool native_get_zoom(int camfd, void *pZm);
-
     void receivePreviewFrame(struct msm_frame *frame);
     void receiveJpegPicture(void);
-    void receiveJpegPictureFragment(
-        uint8_t * buff_ptr , uint32_t buff_size);
-	bool        previewEnabled(); 
-	
     void jpeg_set_location();
+    void receiveJpegPictureFragment(uint8_t *buf, uint32_t size);
 
 private:
 
@@ -108,6 +70,8 @@ private:
     friend void *auto_focus_thread(void *user);
     void runAutoFocus();
     void cancelAutoFocus();
+    bool native_set_dimension (int camfd);
+    bool native_jpeg_encode (void);
 
     static wp<QualcommCameraHardware> singleton;
 
@@ -118,7 +82,6 @@ private:
     static const int kPreviewBufferCount = 4;
     static const int kRawBufferCount = 1;
     static const int kJpegBufferCount = 1;
-    static const int kRawFrameHeaderSize = 0;
 
     //TODO: put the picture dimensions in the CameraParameters object;
     CameraParameters mParameters;
@@ -133,7 +96,7 @@ private:
     bool mZoomInitialised;
     bool mCameraRunning;
     bool mPreviewInitialized;
-    
+
     // This class represents a heap which maintains several contiguous
     // buffers.  The heap may be backed by pmem (when pmem_pool contains
     // the name of a /dev/pmem* file), or by ashmem (when pmem_pool == NULL).
@@ -147,7 +110,7 @@ private:
         virtual ~MemPool() = 0;
 
         void completeInitialization();
-        bool initialized() const { 
+        bool initialized() const {
             return mHeap != NULL && mHeap->base() != MAP_FAILED;
         }
 
@@ -172,37 +135,23 @@ private:
 
     struct PmemPool : public MemPool {
         PmemPool(const char *pmem_pool,
-                int buffer_size, int num_buffers,
-                int frame_size,
-                int frame_offset,
-                const char *name);
-        virtual ~PmemPool(){ }
+                 int control_camera_fd, int pmem_type,
+                 int buffer_size, int num_buffers,
+                 int frame_size, int frame_offset,
+                 const char *name);
+        virtual ~PmemPool();
         int mFd;
+        int mPmemType;
+        int mCameraControlFd;
         uint32_t mAlignedSize;
         struct pmem_region mSize;
     };
 
-    struct PreviewPmemPool : public PmemPool {
-        virtual ~PreviewPmemPool();
-        PreviewPmemPool(int buffer_size, int num_buffers,
-                        int frame_size,
-                        int frame_offset,
-                        const char *name);
-    };
-
-    struct RawPmemPool : public PmemPool {
-        virtual ~RawPmemPool();
-        RawPmemPool(const char *pmem_pool,
-                    int buffer_size, int num_buffers,
-                    int frame_size,
-                    int frame_offset,
-                    const char *name);
-    };
-
-    sp<PreviewPmemPool> mPreviewHeap;
-    sp<RawPmemPool> mRawHeap;
+    sp<PmemPool> mPreviewHeap;
+    sp<PmemPool> mThumbnailHeap;
+    sp<PmemPool> mRawHeap;
     sp<AshmemPool> mJpegHeap;
-	
+
     void startCamera();
     bool initPreview();
     void deinitPreview();
@@ -214,6 +163,12 @@ private:
     Condition mFrameThreadWait;
     friend void *frame_thread(void *user);
     void runFrameThread(void *data);
+
+    bool mSnapshotThreadRunning;
+    Mutex mSnapshotThreadWaitLock;
+    Condition mSnapshotThreadWait;
+    friend void *snapshot_thread(void *user);
+    void runSnapshotThread(void *data);
 
     void initDefaultParameters();
 
@@ -227,7 +182,7 @@ private:
     bool mReleasedRecordingFrame;
 
     void notifyShutter();
- 
+
     void receiveRawPicture(void);
 
     Mutex mCallbackLock;
@@ -241,7 +196,6 @@ private:
        zero, or the size of the last JPEG picture taken.
     */
     uint32_t mJpegSize;
-   
 
     shutter_callback    mShutterCallback;
     raw_callback        mRawPictureCallback;
@@ -266,17 +220,13 @@ private:
     int mCameraControlFd;
     cam_parm_info_t mZoom;
     cam_ctrl_dimension_t mDimension;
-    int mPmemThumbnailFd;
-    int mPmemSnapshotFd;
-    ssize_t mPreviewFrameOffset;
-    uint8_t *mThumbnailBuf;
-    uint8_t *mMainImageBuf;
     bool mAutoFocusThreadRunning;
     Mutex mAutoFocusThreadLock;
     int mAutoFocusFd;
 
     pthread_t mCamConfigThread;
     pthread_t mFrameThread;
+    pthread_t mSnapshotThread;
 
     struct msm_frame frames[kPreviewBufferCount];
     bool mInPreviewCallback;
