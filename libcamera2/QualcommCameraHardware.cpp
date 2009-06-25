@@ -123,6 +123,7 @@ static preview_size_type preview_sizes[] = {
     { 800, 480 }, // WVGA
     { 640, 480 }, // VGA
     { 480, 320 }, // HVGA
+    { 384, 288 },
     { 352, 288 }, // CIF
     { 320, 240 }, // QVGA
     { 240, 160 }, // SQVGA
