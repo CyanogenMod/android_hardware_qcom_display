@@ -678,7 +678,7 @@ void QualcommCameraHardware::runFrameThread(void *data)
     // lifetime of this object.  We do not want to dlclose() libqcamera while
     // LINK_cam_frame is still running.
     void *libhandle = ::dlopen("libqcamera.so", RTLD_NOW);
-    LOGV("loading libqcamera at %p", libhandle);
+    LOGV("FRAME: loading libqcamera at %p", libhandle);
     if (!libhandle) {
         LOGE("FATAL ERROR: could not dlopen libqcamera.so: %s", dlerror());
     }
@@ -1097,6 +1097,23 @@ void QualcommCameraHardware::runAutoFocus()
         return;
     }
 
+#if DLOPEN_LIBMMCAMERA
+    // We need to maintain a reference to libqcamera.so for the duration of the
+    // AF thread, because we do not know when it will exit relative to the
+    // lifetime of this object.  We do not want to dlclose() libqcamera while
+    // LINK_cam_frame is still running.
+    void *libhandle = ::dlopen("libqcamera.so", RTLD_NOW);
+    LOGV("AF: loading libqcamera at %p", libhandle);
+    if (!libhandle) {
+        LOGE("FATAL ERROR: could not dlopen libqcamera.so: %s", dlerror());
+        close(mAutoFocusFd);
+        mAutoFocusFd = -1;
+        mAutoFocusThreadRunning = false;
+        mAutoFocusThreadLock.unlock();
+        return;
+    }
+#endif
+
     /* This will block until either AF completes or is cancelled. */
     LOGV("af start (fd %d)", mAutoFocusFd);
     bool status = native_set_afmode(mAutoFocusFd, AF_MODE_AUTO);
@@ -1117,6 +1134,13 @@ void QualcommCameraHardware::runAutoFocus()
     mAutoFocusCallback = NULL;
     mAutoFocusCallbackCookie = NULL;
     mCallbackLock.unlock();
+
+#if DLOPEN_LIBMMCAMERA
+    if (libhandle) {
+        ::dlclose(libhandle);
+        LOGV("AF: dlclose(libqcamera)");
+    }
+#endif
 }
 
 void QualcommCameraHardware::cancelAutoFocus()
