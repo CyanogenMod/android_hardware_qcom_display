@@ -262,6 +262,7 @@ QualcommCameraHardware::QualcommCameraHardware()
 {
     memset(&mZoom, 0, sizeof(mZoom));
     memset(&mDimension, 0, sizeof(mDimension));
+    memset(&mCrop, 0, sizeof(mCrop));
     LOGV("constructor EX");
 }
 
@@ -502,12 +503,13 @@ static bool native_start_preview(int camfd)
     return true;
 }
 
-static bool native_get_picture (int camfd)
+static bool native_get_picture (int camfd, common_crop_t *crop)
 {
     struct msm_ctrl_cmd ctrlCmd;
 
     ctrlCmd.timeout_ms = 5000;
-    ctrlCmd.length     = 0;
+    ctrlCmd.length     = sizeof(common_crop_t);
+    ctrlCmd.value      = crop;
 
     if(ioctl(camfd, MSM_CAM_IOCTL_GET_PICTURE, &ctrlCmd) < 0) {
         LOGE("native_get_picture: MSM_CAM_IOCTL_GET_PICTURE fd %d error %s",
@@ -515,6 +517,18 @@ static bool native_get_picture (int camfd)
              strerror(errno));
         return false;
     }
+
+    LOGV("crop: in1_w %d", crop->in1_w);
+    LOGV("crop: in1_h %d", crop->in1_h);
+    LOGV("crop: out1_w %d", crop->out1_w);
+    LOGV("crop: out1_h %d", crop->out1_h);
+
+    LOGV("crop: in2_w %d", crop->in2_w);
+    LOGV("crop: in2_h %d", crop->in2_h);
+    LOGV("crop: out2_w %d", crop->out2_w);
+    LOGV("crop: out2_h %d", crop->out2_h);
+
+    LOGV("crop: update %d", crop->update_flag);
 
     return true;
 }
@@ -608,14 +622,12 @@ bool QualcommCameraHardware::native_jpeg_encode(void)
 
     jpeg_set_location();
 
-    static common_crop_t scale; // no scaling
-
     if (!LINK_jpeg_encoder_encode(&mDimension,
                                   (uint8_t *)mThumbnailHeap->mHeap->base(),
                                   mThumbnailHeap->mHeap->getHeapID(),
                                   (uint8_t *)mRawHeap->mHeap->base(),
                                   mRawHeap->mHeap->getHeapID(),
-                                  &scale)) {
+                                  &mCrop)) {
         LOGE("native_jpeg_encode: jpeg_encoder_encode failed.");
         return false;
     }
@@ -1572,7 +1584,7 @@ void QualcommCameraHardware::receiveRawPicture()
     Mutex::Autolock cbLock(&mCallbackLock);
     notifyShutter();
     if (mRawPictureCallback != NULL) {
-        if(native_get_picture(mCameraControlFd)== false) {
+        if(native_get_picture(mCameraControlFd, &mCrop)== false) {
             LOGE("getPicture failed!");
             return;
         }
@@ -1700,7 +1712,7 @@ void QualcommCameraHardware::setAntiBanding(int camfd, const char *antibanding)
 
     antibandvalue = attr_lookup(anti_banding,
                                 antibanding,
-                                CAMERA_ANTIBANDING_OFF);
+                                CAMERA_ANTIBANDING_60HZ);
     ctrlCmd.value = (void *)&antibandvalue;
     LOGV("In setAntiBanding: match: %s: %d",
          antibanding, antibandvalue);

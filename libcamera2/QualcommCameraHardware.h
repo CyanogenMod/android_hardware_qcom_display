@@ -228,6 +228,8 @@ private:
     pthread_t mFrameThread;
     pthread_t mSnapshotThread;
 
+    common_crop_t mCrop;
+
     struct msm_frame frames[kPreviewBufferCount];
     bool mInPreviewCallback;
 };
