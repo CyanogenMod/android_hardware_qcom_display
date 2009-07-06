@@ -60,6 +60,7 @@ public:
     void receiveJpegPicture(void);
     void jpeg_set_location();
     void receiveJpegPictureFragment(uint8_t *buf, uint32_t size);
+    void notifyShutter();
 
 private:
 
@@ -181,8 +182,6 @@ private:
     Mutex mLock;
     bool mReleasedRecordingFrame;
 
-    void notifyShutter();
-
     void receiveRawPicture(void);
 
     Mutex mCallbackLock;
@@ -227,6 +226,8 @@ private:
     pthread_t mCamConfigThread;
     pthread_t mFrameThread;
     pthread_t mSnapshotThread;
+
+    common_crop_t mCrop;
 
     struct msm_frame frames[kPreviewBufferCount];
     bool mInPreviewCallback;

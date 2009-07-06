@@ -95,6 +95,7 @@ void  (**LINK_mmcamera_camframe_callback)(struct msm_frame *frame);
 void  (**LINK_mmcamera_jpegfragment_callback)(uint8_t *buff_ptr,
                                               uint32_t buff_size);
 void  (**LINK_mmcamera_jpeg_callback)(jpeg_event_t status);
+void  (**LINK_mmcamera_shutter_callback)();
 #else
 #define LINK_cam_conf cam_conf
 #define LINK_cam_frame cam_frame
@@ -110,6 +111,7 @@ extern void (*mmcamera_camframe_callback)(struct msm_frame *frame);
 extern void (*mmcamera_jpegfragment_callback)(uint8_t *buff_ptr,
                                       uint32_t buff_size);
 extern void (*mmcamera_jpeg_callback)(jpeg_event_t status);
+extern void (*mmcamera_shutter_callback)();
 #endif
 
 } // extern "C"
@@ -227,6 +229,7 @@ static Mutex singleton_lock;
 static void receive_camframe_callback(struct msm_frame *frame);
 static void receive_jpeg_fragment_callback(uint8_t *buff_ptr, uint32_t buff_size);
 static void receive_jpeg_callback(jpeg_event_t status);
+static void receive_shutter_callback();
 
 QualcommCameraHardware::QualcommCameraHardware()
     : mParameters(),
@@ -262,6 +265,7 @@ QualcommCameraHardware::QualcommCameraHardware()
 {
     memset(&mZoom, 0, sizeof(mZoom));
     memset(&mDimension, 0, sizeof(mDimension));
+    memset(&mCrop, 0, sizeof(mCrop));
     LOGV("constructor EX");
 }
 
@@ -354,6 +358,11 @@ void QualcommCameraHardware::startCamera()
 
     *LINK_mmcamera_jpeg_callback = receive_jpeg_callback;
 
+    *(void **)&LINK_mmcamera_shutter_callback =
+        ::dlsym(libmmcamera, "mmcamera_shutter_callback");
+
+    *LINK_mmcamera_shutter_callback = receive_shutter_callback;
+
     *(void**)&LINK_jpeg_encoder_setMainImageQuality =
         ::dlsym(libmmcamera, "jpeg_encoder_setMainImageQuality");
 
@@ -372,6 +381,7 @@ void QualcommCameraHardware::startCamera()
     mmcamera_camframe_callback = receive_camframe_callback;
     mmcamera_jpegfragment_callback = receive_jpeg_fragment_callback;
     mmcamera_jpeg_callback = receive_jpeg_callback;
+    mmcamera_shutter_callback = receive_shutter_callback;
 #endif // DLOPEN_LIBMMCAMERA
 
     /* The control thread is in libcamera itself. */
@@ -502,12 +512,13 @@ static bool native_start_preview(int camfd)
     return true;
 }
 
-static bool native_get_picture (int camfd)
+static bool native_get_picture (int camfd, common_crop_t *crop)
 {
     struct msm_ctrl_cmd ctrlCmd;
 
     ctrlCmd.timeout_ms = 5000;
-    ctrlCmd.length     = 0;
+    ctrlCmd.length     = sizeof(common_crop_t);
+    ctrlCmd.value      = crop;
 
     if(ioctl(camfd, MSM_CAM_IOCTL_GET_PICTURE, &ctrlCmd) < 0) {
         LOGE("native_get_picture: MSM_CAM_IOCTL_GET_PICTURE fd %d error %s",
@@ -515,6 +526,18 @@ static bool native_get_picture (int camfd)
              strerror(errno));
         return false;
     }
+
+    LOGV("crop: in1_w %d", crop->in1_w);
+    LOGV("crop: in1_h %d", crop->in1_h);
+    LOGV("crop: out1_w %d", crop->out1_w);
+    LOGV("crop: out1_h %d", crop->out1_h);
+
+    LOGV("crop: in2_w %d", crop->in2_w);
+    LOGV("crop: in2_h %d", crop->in2_h);
+    LOGV("crop: out2_w %d", crop->out2_w);
+    LOGV("crop: out2_h %d", crop->out2_h);
+
+    LOGV("crop: update %d", crop->update_flag);
 
     return true;
 }
@@ -608,14 +631,12 @@ bool QualcommCameraHardware::native_jpeg_encode(void)
 
     jpeg_set_location();
 
-    static common_crop_t scale; // no scaling
-
     if (!LINK_jpeg_encoder_encode(&mDimension,
                                   (uint8_t *)mThumbnailHeap->mHeap->base(),
                                   mThumbnailHeap->mHeap->getHeapID(),
                                   (uint8_t *)mRawHeap->mHeap->base(),
                                   mRawHeap->mHeap->getHeapID(),
-                                  &scale)) {
+                                  &mCrop)) {
         LOGE("native_jpeg_encode: jpeg_encoder_encode failed.");
         return false;
     }
@@ -1557,10 +1578,18 @@ bool QualcommCameraHardware::recordingEnabled()
 
 void QualcommCameraHardware::notifyShutter()
 {
-    LOGV("notifyShutter: E");
     if (mShutterCallback)
         mShutterCallback(mPictureCallbackCookie);
-    LOGV("notifyShutter: X");
+}
+
+static void receive_shutter_callback()
+{
+    LOGV("receive_shutter_callback: E");
+    sp<QualcommCameraHardware> obj = QualcommCameraHardware::getInstance();
+    if (obj != 0) {
+        obj->notifyShutter();
+    }
+    LOGV("receive_shutter_callback: X");
 }
 
 void QualcommCameraHardware::receiveRawPicture()
@@ -1568,11 +1597,10 @@ void QualcommCameraHardware::receiveRawPicture()
     LOGV("receiveRawPicture: E");
 
     int ret,rc,rete;
-// Temporary fix for multiple snapshot issue on 8k: disabling shutter callback
+
     Mutex::Autolock cbLock(&mCallbackLock);
-    notifyShutter();
     if (mRawPictureCallback != NULL) {
-        if(native_get_picture(mCameraControlFd)== false) {
+        if(native_get_picture(mCameraControlFd, &mCrop)== false) {
             LOGE("getPicture failed!");
             return;
         }
@@ -1700,7 +1728,7 @@ void QualcommCameraHardware::setAntiBanding(int camfd, const char *antibanding)
 
     antibandvalue = attr_lookup(anti_banding,
                                 antibanding,
-                                CAMERA_ANTIBANDING_OFF);
+                                CAMERA_ANTIBANDING_60HZ);
     ctrlCmd.value = (void *)&antibandvalue;
     LOGV("In setAntiBanding: match: %s: %d",
          antibanding, antibandvalue);
