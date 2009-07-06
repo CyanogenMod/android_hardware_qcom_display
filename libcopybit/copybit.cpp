@@ -34,6 +34,8 @@
 
 #include <hardware/copybit.h>
 
+#include "gralloc_priv.h"
+
 /******************************************************************************/
 
 /** State information for each device instance */
@@ -52,21 +54,21 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
         struct hw_device_t** device);
 
 static struct hw_module_methods_t copybit_module_methods = {
-    .open =  open_copybit
+    open:  open_copybit
 };
 
 /*
  * The COPYBIT Module
  */
-const struct copybit_module_t HAL_MODULE_INFO_SYM = {
-    .common = {
-        .tag = HARDWARE_MODULE_TAG,
-        .version_major = 1,
-        .version_minor = 0,
-        .id = COPYBIT_HARDWARE_MODULE_ID,
-        .name = "QCT MSM7K COPYBIT Module",
-        .author = "Google, Inc.",
-        .methods = &copybit_module_methods,
+struct copybit_module_t HAL_MODULE_INFO_SYM = {
+    common: {
+        tag: HARDWARE_MODULE_TAG,
+        version_major: 1,
+        version_minor: 0,
+        id: COPYBIT_HARDWARE_MODULE_ID,
+        name: "QCT MSM7K COPYBIT Module",
+        author: "Google, Inc.",
+        methods: &copybit_module_methods
     }
 };
 
@@ -113,13 +115,14 @@ static int get_format(int format) {
 }
 
 /** convert from copybit image to mdp image structure */
-static void set_image(struct mdp_img *img,
-                      const struct copybit_image_t *rhs) {
+static void set_image(struct mdp_img *img, const struct copybit_image_t *rhs) 
+{
+    private_handle_t* hnd = (private_handle_t*)rhs->handle;
     img->width      = rhs->w;
     img->height     = rhs->h;
     img->format     = get_format(rhs->format);
-    img->offset     = rhs->offset;
-    img->memory_id  = rhs->fd;
+    img->offset     = hnd->offset;
+    img->memory_id  = hnd->fd;
 }
 
 /** setup rectangles */
@@ -360,12 +363,13 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
         struct hw_device_t** device)
 {
     int status = -EINVAL;
-    struct copybit_context_t *ctx = malloc(sizeof(struct copybit_context_t));
+    copybit_context_t *ctx;
+    ctx = (copybit_context_t *)malloc(sizeof(copybit_context_t));
     memset(ctx, 0, sizeof(*ctx));
 
     ctx->device.common.tag = HARDWARE_DEVICE_TAG;
-    ctx->device.common.version = 0;
-    ctx->device.common.module = module;
+    ctx->device.common.version = 1;
+    ctx->device.common.module = const_cast<hw_module_t*>(module);
     ctx->device.common.close = close_copybit;
     ctx->device.set_parameter = set_parameter_copybit;
     ctx->device.get = get;
