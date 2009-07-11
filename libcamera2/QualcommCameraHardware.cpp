@@ -1728,7 +1728,13 @@ void QualcommCameraHardware::setAntiBanding(int camfd, const char *antibanding)
 
     antibandvalue = attr_lookup(anti_banding,
                                 antibanding,
-                                CAMERA_ANTIBANDING_60HZ);
+                                /* FIXME:
+                                 * CAMERA_ANTIBANDING_60HZ broke the barcode scanner
+                                 * somehow. turn it off and revert it back to off
+                                 * for now until we figure out what is the best
+                                 * solution.
+                                 */
+                                CAMERA_ANTIBANDING_OFF /*CAMERA_ANTIBANDING_60HZ */);
     ctrlCmd.value = (void *)&antibandvalue;
     LOGV("In setAntiBanding: match: %s: %d",
          antibanding, antibandvalue);
