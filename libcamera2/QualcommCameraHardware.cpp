@@ -225,6 +225,8 @@ static inline unsigned clp2(unsigned x)
 namespace android {
 
 static Mutex singleton_lock;
+static bool singleton_releasing;
+static Condition singleton_wait;
 
 static void receive_camframe_callback(struct msm_frame *frame);
 static void receive_jpeg_fragment_callback(uint8_t *buff_ptr, uint32_t buff_size);
@@ -993,6 +995,9 @@ void QualcommCameraHardware::release()
     }
 #endif
 
+    Mutex::Autolock lock(&singleton_lock);
+    singleton_releasing = true;
+
     LOGD("release X");
 }
 
@@ -1001,6 +1006,8 @@ QualcommCameraHardware::~QualcommCameraHardware()
     LOGD("~QualcommCameraHardware E");
     Mutex::Autolock lock(&singleton_lock);
     singleton.clear();
+    singleton_releasing = false;
+    singleton_wait.signal();
     LOGD("~QualcommCameraHardware X");
 }
 
@@ -1435,6 +1442,13 @@ sp<CameraHardwareInterface> QualcommCameraHardware::createInstance()
     LOGD("createInstance: E");
 
     Mutex::Autolock lock(&singleton_lock);
+
+    // Wait until the previous release is done.
+    while (singleton_releasing) {
+        LOGD("Wait for previous release.");
+        singleton_wait.wait(singleton_lock);
+    }
+
     if (singleton != 0) {
         sp<CameraHardwareInterface> hardware = singleton.promote();
         if (hardware != 0) {
