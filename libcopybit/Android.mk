@@ -24,7 +24,7 @@ LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_SHARED_LIBRARIES := liblog
 LOCAL_SRC_FILES := copybit.cpp
 LOCAL_MODULE := copybit.msm7k
-LOCAL_C_INCLUDES += hardware/libhardware/msm7k/libgralloc
+LOCAL_C_INCLUDES += hardware/msm7k/libgralloc
 include $(BUILD_SHARED_LIBRARY)
 endif
 
