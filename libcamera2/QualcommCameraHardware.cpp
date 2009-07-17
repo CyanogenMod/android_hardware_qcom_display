@@ -67,12 +67,9 @@ extern "C" {
 #define THUMBNAIL_BUFFER_SIZE (THUMBNAIL_WIDTH * THUMBNAIL_HEIGHT * 3/2)
 
 #define DEFAULT_PREVIEW_SETTING 2 // HVGA
-#define MAX_ZOOM_STEPS          6
 #define PREVIEW_SIZE_COUNT (sizeof(preview_sizes)/sizeof(preview_size_type))
 
-#define BRIGHTNESS_MAX 10 // FIXME: this should correlate with brightness-values
-#define BRIGHTNESS_DEF  5 // FIXME: this should correlate with brightness-values
-#define ZOOM_MAX       10 // FIXME: this should correlate with zoom-values
+#define NOT_FOUND -1
 
 #if DLOPEN_LIBMMCAMERA
 #include <dlfcn.h>
@@ -132,14 +129,7 @@ static preview_size_type preview_sizes[] = {
     { 176, 144 }, // QCIF
 };
 
-struct str_map {
-    const char *const desc;
-    int val;
-};
-
-static int attr_lookup(const struct str_map *const arr,
-                       const char *name,
-                       int def)
+static int attr_lookup(const struct str_map *const arr, const char *name)
 {
     if (name) {
         const struct str_map *trav = arr;
@@ -149,7 +139,7 @@ static int attr_lookup(const struct str_map *const arr,
             trav++;
         }
     }
-    return def;
+    return NOT_FOUND;
 }
 
 #define INIT_VALUES_FOR(parm) do {                               \
@@ -183,7 +173,7 @@ static const str_map whitebalance[] = {
 static char *whitebalance_values;
 
 // from camera_effect_t
-static const str_map color_effects[] = {
+static const str_map effect[] = {
     { "off",        CAMERA_EFFECT_OFF },  /* This list must match aeecamera.h */
     { "mono",       CAMERA_EFFECT_MONO },
     { "negative",   CAMERA_EFFECT_NEGATIVE },
@@ -198,17 +188,17 @@ static const str_map color_effects[] = {
     { "aqua",       CAMERA_EFFECT_AQUA },
     { NULL, 0 }
 };
-static char *color_effects_values;
+static char *effect_values;
 
 // from qcamera/common/camera.h
-static const str_map anti_banding[] = {
+static const str_map antibanding[] = {
     { "off",  CAMERA_ANTIBANDING_OFF },
     { "60hz", CAMERA_ANTIBANDING_60HZ },
     { "50hz", CAMERA_ANTIBANDING_50HZ },
     { "auto", CAMERA_ANTIBANDING_AUTO },
     { NULL, 0 }
 };
-static char *anti_banding_values;
+static char *antibanding_values;
 
 // round to the next power of two
 static inline unsigned clp2(unsigned x)
@@ -239,10 +229,6 @@ QualcommCameraHardware::QualcommCameraHardware()
       mPreviewWidth(-1),
       mRawHeight(-1),
       mRawWidth(-1),
-      mBrightness(BRIGHTNESS_DEF),
-      mZoomValuePrev(0),
-      mZoomValueCurr(0),
-      mZoomInitialised(false),
       mCameraRunning(false),
       mPreviewInitialized(false),
       mFrameThreadRunning(false),
@@ -265,7 +251,6 @@ QualcommCameraHardware::QualcommCameraHardware()
       mAutoFocusFd(-1),
       mInPreviewCallback(false)
 {
-    memset(&mZoom, 0, sizeof(mZoom));
     memset(&mDimension, 0, sizeof(mDimension));
     memset(&mCrop, 0, sizeof(mCrop));
     LOGV("constructor EX");
@@ -288,6 +273,15 @@ void QualcommCameraHardware::initDefaultParameters()
     p.set("jpeg-thumbnail-quality", "90");
 
     p.setPictureSize(DEFAULT_PICTURE_WIDTH, DEFAULT_PICTURE_HEIGHT);
+    p.set("antibanding",
+          /* FIXME:
+           * CAMERA_ANTIBANDING_60HZ broke the barcode scanner somehow. turn it
+           * off and revert it back to off for now until we figure out what is
+           * the best solution.
+           */
+          "off" /*"60hz" */);
+    p.set("effect", "off");
+    p.set("whitebalance", "auto");
 
 #if 0
     p.set("gps-timestamp", "1199145600"); // Jan 1, 2008, 00:00:00
@@ -298,18 +292,14 @@ void QualcommCameraHardware::initDefaultParameters()
 
     // This will happen only one in the lifetime of the mediaserver process.
     // We do not free the _values arrays when we destroy the camera object.
-    INIT_VALUES_FOR(anti_banding);
-    INIT_VALUES_FOR(color_effects);
+    INIT_VALUES_FOR(antibanding);
+    INIT_VALUES_FOR(effect);
     INIT_VALUES_FOR(whitebalance);
 
-    p.set("anti-banding-values", anti_banding_values);
-    p.set("effect-values", color_effects_values);
+    p.set("antibanding-values", antibanding_values);
+    p.set("effect-values", effect_values);
     p.set("whitebalance-values", whitebalance_values);
     p.set("picture-size-values", "2048x1536,1600x1200,1024x768");
-
-    // FIXME: we can specify these numeric ranges better
-    p.set("exposure-offset-values", "0,1,2,3,4,5,6,7,8,9,10");
-    p.set("zoom-values", "0,1,2,3,4,5,6,7,8,9,10");
 
     if (setParameters(p) != NO_ERROR) {
         LOGE("Failed to set default parameters?!");
@@ -435,27 +425,6 @@ status_t QualcommCameraHardware::dump(int fd,
     }
     mParameters.dump(fd, args);
     return NO_ERROR;
-}
-
-bool QualcommCameraHardware::native_set_dimension(int camfd)
-{
-    struct msm_ctrl_cmd ctrlCmd;
-
-    ctrlCmd.type       = CAMERA_SET_PARM_DIMENSION;
-    ctrlCmd.timeout_ms = 5000;
-    ctrlCmd.length     = sizeof(cam_ctrl_dimension_t);
-    ctrlCmd.value      = &mDimension;
-    ctrlCmd.resp_fd    = camfd; // FIXME: this will be put in by the kernel
-
-    if(ioctl(camfd, MSM_CAM_IOCTL_CTRL_COMMAND, &ctrlCmd) < 0) {
-        LOGE("native_set_dimension: ioctl fd %d error %s",
-             camfd,
-             strerror(errno));
-        return false;
-    }
-
-    LOGV("native_set_dimension status %d\n", ctrlCmd.status);
-    return ctrlCmd.status == CAM_CTRL_SUCCESS;
 }
 
 static bool native_set_afmode(int camfd, isp3a_af_mode_t af_type)
@@ -645,6 +614,36 @@ bool QualcommCameraHardware::native_jpeg_encode(void)
     return true;
 }
 
+bool QualcommCameraHardware::native_set_dimension(cam_ctrl_dimension_t *value)
+{
+    return native_set_parm(CAMERA_SET_PARM_DIMENSION,
+                           sizeof(cam_ctrl_dimension_t), value);
+}
+
+bool QualcommCameraHardware::native_set_parm(
+    cam_ctrl_type type, uint16_t length, void *value)
+{
+    int rc = true;
+    struct msm_ctrl_cmd ctrlCmd;
+
+    ctrlCmd.timeout_ms = 5000;
+    ctrlCmd.type       = (uint16_t)type;
+    ctrlCmd.length     = length;
+    // FIXME: this will be put in by the kernel
+    ctrlCmd.resp_fd    = mCameraControlFd;
+    ctrlCmd.value = value;
+
+    LOGV("native_set_parm. camfd=%d, type=%d, length=%d",
+         mCameraControlFd, type, length);
+    rc = ioctl(mCameraControlFd, MSM_CAM_IOCTL_CTRL_COMMAND, &ctrlCmd);
+    if(rc < 0 || ctrlCmd.status != CAM_CTRL_SUCCESS) {
+        LOGE("ioctl error. camfd=%d, type=%d, length=%d, rc=%d, ctrlCmd.status=%d, %s",
+             mCameraControlFd, type, length, rc, ctrlCmd.status, strerror(errno));
+        return false;
+    }
+    return true;
+}
+
 void QualcommCameraHardware::jpeg_set_location()
 {
     bool encode_location = true;
@@ -781,7 +780,7 @@ bool QualcommCameraHardware::initPreview()
     mDimension.picture_width  = DEFAULT_PICTURE_WIDTH;
     mDimension.picture_height = DEFAULT_PICTURE_HEIGHT;
 
-    bool ret = native_set_dimension(mCameraControlFd);
+    bool ret = native_set_dimension(&mDimension);
 
     if (ret) {
         for (cnt = 0; cnt < kPreviewBufferCount; cnt++) {
@@ -843,7 +842,7 @@ bool QualcommCameraHardware::initRaw(bool initJpegHeap)
     mRawSize = mRawWidth * mRawHeight * 3 / 2;
     mJpegMaxSize = mRawWidth * mRawHeight * 3 / 2;
 
-    if(!native_set_dimension(mCameraControlFd)) {
+    if(!native_set_dimension(&mDimension)) {
         LOGE("initRaw X: failed to set dimension");
         return false;
     }
@@ -1045,12 +1044,6 @@ status_t QualcommCameraHardware::startPreviewInternal()
         LOGE("startPreview X: native_start_preview failed!");
         return UNKNOWN_ERROR;
     }
-
-    setSensorPreviewEffect(mCameraControlFd, mParameters.get("effect"));
-    setSensorWBLighting(mCameraControlFd, mParameters.get("whitebalance"));
-    setAntiBanding(mCameraControlFd, mParameters.get("antibanding"));
-    setBrightness();
-    // FIXME: set nightshot, luma adaptatiom, zoom and check ranges
 
     LOGV("startPreview X");
     return NO_ERROR;
@@ -1335,8 +1328,8 @@ status_t QualcommCameraHardware::setParameters(
 
     Mutex::Autolock l(&mLock);
 
+    // Set preview size.
     preview_size_type *ps = preview_sizes;
-
     {
         int width, height;
         params.getPreviewSize(&width, &height);
@@ -1353,18 +1346,15 @@ status_t QualcommCameraHardware::setParameters(
             return BAD_VALUE;
         }
     }
-
     mPreviewWidth = mDimension.display_width = ps->width;
     mPreviewHeight = mDimension.display_height = ps->height;
 
     // FIXME: validate snapshot sizes,
-
     params.getPictureSize(&mRawWidth, &mRawHeight);
     mDimension.picture_width = mRawWidth;
     mDimension.picture_height = mRawHeight;
 
     // Set up the jpeg-thumbnail-size parameters.
-
     {
         int val;
 
@@ -1387,34 +1377,10 @@ status_t QualcommCameraHardware::setParameters(
 
     mParameters = params;
 
-    if (mCameraRunning)
-    {
-        setBrightness();
-
-        mZoomValueCurr = mParameters.getInt("zoom");
-        if(mZoomValueCurr >= 0 && mZoomValueCurr <= ZOOM_MAX &&
-           mZoomValuePrev != mZoomValueCurr)
-        {
-            bool ZoomDirectionIn = true;
-            if(mZoomValuePrev > mZoomValueCurr)
-            {
-                ZoomDirectionIn = false;
-            }
-            else
-            {
-                ZoomDirectionIn = true;
-            }
-            LOGV("new zoom value: %d direction = %s",
-                 mZoomValueCurr, (ZoomDirectionIn ? "in" : "out"));
-            mZoomValuePrev = mZoomValueCurr;
-            performZoom(ZoomDirectionIn);
-        }
-
-        setSensorPreviewEffect(mCameraControlFd, mParameters.get("effect"));
-        setSensorWBLighting(mCameraControlFd, mParameters.get("whitebalance"));
-        setAntiBanding(mCameraControlFd, mParameters.get("antibanding"));
-        // FIXME: set nightshot, luma adaptatiom, zoom and check ranges
-    }
+    setAntibanding();
+    setEffect();
+    setWhiteBalance();
+    // FIXME: set nightshot and luma adaptatiom
 
     LOGV("setParameters: X");
     return NO_ERROR ;
@@ -1693,198 +1659,38 @@ bool QualcommCameraHardware::previewEnabled()
     return mCameraRunning && mPreviewCallback != NULL;
 }
 
-void  QualcommCameraHardware::setSensorPreviewEffect(int camfd, const char *effect)
+int QualcommCameraHardware::getParm(
+    const char *parm_str, const struct str_map *const parm_map)
 {
-    LOGV("In setSensorPreviewEffect...");
-    int effectsValue = 1;
-    struct msm_ctrl_cmd ctrlCmd;
+    // Check if the parameter exists.
+    const char *str = mParameters.get(parm_str);
+    if (str == NULL) return NOT_FOUND;
 
-    ctrlCmd.timeout_ms = 5000;
-    ctrlCmd.type       = CAMERA_SET_PARM_EFFECT;
-    ctrlCmd.length     = sizeof(uint32_t);
-    ctrlCmd.resp_fd    = camfd; // FIXME: this will be put in by the kernel
-
-    effectsValue = attr_lookup(color_effects, effect, CAMERA_EFFECT_OFF);
-    ctrlCmd.value = (void *)&effectsValue;
-    LOGV("In setSensorPreviewEffect, color effect match %s %d",
-         effect, effectsValue);
-    if(ioctl(camfd, MSM_CAM_IOCTL_CTRL_COMMAND, &ctrlCmd) < 0)
-        LOGE("setSensorPreviewEffect fd %d error %s", camfd, strerror(errno));
+    // Look up the parameter value.
+    return attr_lookup(parm_map, str);
 }
 
-void QualcommCameraHardware::setSensorWBLighting(int camfd, const char *lighting)
+void QualcommCameraHardware::setEffect()
 {
-    int lightingValue = 1;
-    struct msm_ctrl_cmd ctrlCmd;
-
-    ctrlCmd.timeout_ms = 5000;
-    ctrlCmd.type = CAMERA_SET_PARM_WB;
-    ctrlCmd.length = sizeof(uint32_t);
-    lightingValue = attr_lookup(whitebalance, lighting, CAMERA_WB_AUTO);
-    ctrlCmd.value = (void *)&lightingValue;
-    ctrlCmd.resp_fd = camfd; // FIXME: this will be put in by the kernel
-    LOGV("In setSensorWBLighting: match: %s: %d",
-         lighting, lightingValue);
-    if (ioctl(camfd, MSM_CAM_IOCTL_CTRL_COMMAND, &ctrlCmd) < 0)
-        LOGE("setSensorWBLighting: ioctl fd %d error %s",
-             camfd, strerror(errno));
+    int32_t value = getParm("effect", effect);
+    if (value != NOT_FOUND) {
+        native_set_parm(CAMERA_SET_PARM_EFFECT, sizeof(value), (void *)&value);
+    }    
 }
 
-void QualcommCameraHardware::setAntiBanding(int camfd, const char *antibanding)
+void QualcommCameraHardware::setWhiteBalance()
 {
-    int antibandvalue = 0;
-    struct msm_ctrl_cmd ctrlCmd;
-
-    ctrlCmd.timeout_ms = 5000;
-    ctrlCmd.type       = CAMERA_SET_PARM_ANTIBANDING;
-    ctrlCmd.length     = sizeof(int32_t);
-    ctrlCmd.resp_fd    = camfd; // FIXME: this will be put in by the kernel
-
-    antibandvalue = attr_lookup(anti_banding,
-                                antibanding,
-                                /* FIXME:
-                                 * CAMERA_ANTIBANDING_60HZ broke the barcode scanner
-                                 * somehow. turn it off and revert it back to off
-                                 * for now until we figure out what is the best
-                                 * solution.
-                                 */
-                                CAMERA_ANTIBANDING_OFF /*CAMERA_ANTIBANDING_60HZ */);
-    ctrlCmd.value = (void *)&antibandvalue;
-    LOGV("In setAntiBanding: match: %s: %d",
-         antibanding, antibandvalue);
-
-    if(ioctl(camfd, MSM_CAM_IOCTL_CTRL_COMMAND, &ctrlCmd) < 0)
-        LOGE("setAntiBanding: ioctl %d error %s",
-             camfd, strerror(errno));
-}
-
-void QualcommCameraHardware::setBrightness()
-{
-    int val = mParameters.getInt("exposure-offset");
-    if (val < 0)
-        val = BRIGHTNESS_DEF;
-    else if (val > BRIGHTNESS_MAX)
-        val = BRIGHTNESS_MAX;
-
-    if (mBrightness != val) {
-        LOGV("new brightness value %d", val);
-        mBrightness = val;
-
-        struct msm_ctrl_cmd ctrlCmd;
-        LOGV("In setBrightness: %d", val);
-        ctrlCmd.timeout_ms = 5000;
-        ctrlCmd.type       = CAMERA_SET_PARM_BRIGHTNESS;
-        ctrlCmd.length     = sizeof(int);
-        ctrlCmd.value      = (void *)&val;
-        // FIXME: this will be put in by the kernel
-        ctrlCmd.resp_fd    = mCameraControlFd;
-
-        if(ioctl(mCameraControlFd,
-                 MSM_CAM_IOCTL_CTRL_COMMAND, &ctrlCmd) < 0)
-            LOGE("setBrightness: ioctl fd %d error %s",
-                 mCameraControlFd, strerror(errno));
+    int32_t value = getParm("whitebalance", whitebalance);
+    if (value != NOT_FOUND) {
+        native_set_parm(CAMERA_SET_PARM_WB, sizeof(value), (void *)&value);
     }
 }
 
-static bool native_get_zoom(int camfd, void *pZm)
+void QualcommCameraHardware::setAntibanding()
 {
-    struct msm_ctrl_cmd ctrlCmd;
-    cam_parm_info_t *pZoom = (cam_parm_info_t *)pZm;
-    ctrlCmd.type     = CAMERA_GET_PARM_ZOOM;
-    ctrlCmd.timeout_ms = 5000;
-    ctrlCmd.length   = sizeof(cam_parm_info_t);
-    ctrlCmd.value    = pZoom;
-    ctrlCmd.resp_fd  = camfd; // FIXME: this will be put in by the kernel
-
-    if(ioctl(camfd, MSM_CAM_IOCTL_CTRL_COMMAND, &ctrlCmd) < 0) {
-        LOGE("native_get_zoom: ioctl fd %d error %s",
-             camfd, strerror(errno));
-        return false;
-    }
-
-    memcpy(pZoom, *(cam_parm_info_t **)ctrlCmd.value, sizeof(cam_parm_info_t));
-
-    LOGD("native_get_zoom::current val=%d max=%d min=%d step val=%d",
-         pZoom->current_value,
-         pZoom->maximum_value,
-         pZoom->minimum_value,
-         pZoom->step_value);
-
-    return ctrlCmd.status;
-}
-
-static bool native_set_zoom(int camfd, void *pZm)
-{
-    struct msm_ctrl_cmd ctrlCmd;
-
-    int32_t *pZoom = (int32_t *)pZm;
-
-    ctrlCmd.type         = CAMERA_SET_PARM_ZOOM;
-    ctrlCmd.timeout_ms = 5000;
-    ctrlCmd.length   = sizeof(int32_t);
-    ctrlCmd.value    = pZoom;
-    ctrlCmd.resp_fd    = camfd; // FIXME: this will be put in by the kernel
-
-    if(ioctl(camfd, MSM_CAM_IOCTL_CTRL_COMMAND, &ctrlCmd) < 0) {
-        LOGE("native_set_zoom: ioctl fd %d error %s",
-             camfd, strerror(errno));
-        return false;
-    }
-
-    memcpy(pZoom, (int32_t *)ctrlCmd.value, sizeof(int32_t));
-    return ctrlCmd.status;
-}
-
-void QualcommCameraHardware::performZoom(bool ZoomDir)
-{
-    if(mZoomInitialised == false) {
-        native_get_zoom(mCameraControlFd, (void *)&mZoom);
-        if(mZoom.maximum_value != 0) {
-            mZoomInitialised = true;
-            mZoom.step_value = (int) (mZoom.maximum_value/MAX_ZOOM_STEPS);
-            if( mZoom.step_value > 3 )
-                mZoom.step_value = 3;
-        }
-    }
-
-    if (ZoomDir) {
-        LOGV("performZoom::got zoom value of %d %d %d zoom in",
-             mZoom.current_value,
-             mZoom.step_value,
-             mZoom.maximum_value);
-        if((mZoom.current_value + mZoom.step_value) < mZoom.maximum_value) {
-            mZoom.current_value += mZoom.step_value;
-            LOGV("performZoom::Setting Zoom value of %d ",mZoom.current_value);
-            native_set_zoom(mCameraControlFd, (void *)&mZoom.current_value);
-        }
-        else {
-            LOGV("performZoom::not able to zoom in %d %d %d",
-                 mZoom.current_value,
-                 mZoom.step_value,
-                 mZoom.maximum_value);
-        }
-    }
-    else
-    {
-        LOGV("performZoom::got zoom value of %d %d %d zoom out",
-             mZoom.current_value,
-             mZoom.step_value,
-             mZoom.minimum_value);
-        if((mZoom.current_value - mZoom.step_value) >= mZoom.minimum_value)
-        {
-            mZoom.current_value -= mZoom.step_value;
-            LOGV("performZoom::setting zoom value of %d ",
-                 mZoom.current_value);
-            native_set_zoom(mCameraControlFd, (void *)&mZoom.current_value);
-        }
-        else
-        {
-            LOGV("performZoom::not able to zoom out %d %d %d",
-                 mZoom.current_value,
-                 mZoom.step_value,
-                 mZoom.maximum_value);
-        }
-    }
+    camera_antibanding_type value =
+        (camera_antibanding_type) getParm("antibanding", antibanding);
+    native_set_parm(CAMERA_SET_PARM_ANTIBANDING, sizeof(value), (void *)&value);
 }
 
 QualcommCameraHardware::MemPool::MemPool(int buffer_size, int num_buffers,

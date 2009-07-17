@@ -28,6 +28,11 @@ extern "C" {
 #include <camera.h>
 }
 
+struct str_map {
+    const char *const desc;
+    int val;
+};
+
 namespace android {
 
 class QualcommCameraHardware : public CameraHardwareInterface {
@@ -63,7 +68,6 @@ public:
     void notifyShutter();
 
 private:
-
     QualcommCameraHardware();
     virtual ~QualcommCameraHardware();
     status_t startPreviewInternal();
@@ -73,6 +77,9 @@ private:
     void cancelAutoFocus();
     bool native_set_dimension (int camfd);
     bool native_jpeg_encode (void);
+    bool native_set_parm(cam_ctrl_type type, uint16_t length, void *value);
+    bool native_set_dimension(cam_ctrl_dimension_t *value);
+    int getParm(const char *parm_str, const str_map *parm_map);
 
     static wp<QualcommCameraHardware> singleton;
 
@@ -91,10 +98,6 @@ private:
     int mRawHeight;
     int mRawWidth;
     unsigned int frame_size;
-    int mBrightness;
-    int mZoomValuePrev;
-    int mZoomValueCurr;
-    bool mZoomInitialised;
     bool mCameraRunning;
     bool mPreviewInitialized;
 
@@ -173,11 +176,9 @@ private:
 
     void initDefaultParameters();
 
-    void setSensorPreviewEffect(int, const char*);
-    void setSensorWBLighting(int, const char*);
-    void setAntiBanding(int, const char*);
-    void setBrightness(void);
-    void performZoom(bool);
+    void setAntibanding();
+    void setEffect();
+    void setWhiteBalance();
 
     Mutex mLock;
     bool mReleasedRecordingFrame;
@@ -217,7 +218,6 @@ private:
 #endif
 
     int mCameraControlFd;
-    cam_parm_info_t mZoom;
     cam_ctrl_dimension_t mDimension;
     bool mAutoFocusThreadRunning;
     Mutex mAutoFocusThreadLock;
