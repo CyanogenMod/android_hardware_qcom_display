@@ -161,7 +161,6 @@ static int attr_lookup(const struct str_map *const arr, const char *name)
 // from aeecamera.h
 static const str_map whitebalance[] = {
     { "auto",         CAMERA_WB_AUTO },
-    { "custom",       CAMERA_WB_CUSTOM },
     { "incandescent", CAMERA_WB_INCANDESCENT },
     { "florescent",   CAMERA_WB_FLUORESCENT },
     { "daylight",     CAMERA_WB_DAYLIGHT },
@@ -178,9 +177,6 @@ static const str_map effect[] = {
     { "mono",       CAMERA_EFFECT_MONO },
     { "negative",   CAMERA_EFFECT_NEGATIVE },
     { "solarize",   CAMERA_EFFECT_SOLARIZE },
-    { "pastel",     CAMERA_EFFECT_PASTEL },
-    { "mosaic",     CAMERA_EFFECT_MOSAIC },
-    { "resize",     CAMERA_EFFECT_RESIZE },
     { "sepia",      CAMERA_EFFECT_SEPIA },
     { "postersize", CAMERA_EFFECT_POSTERIZE },
     { "whiteboard", CAMERA_EFFECT_WHITEBOARD },
