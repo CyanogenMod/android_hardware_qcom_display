@@ -1263,6 +1263,14 @@ status_t QualcommCameraHardware::takePicture(shutter_callback shutter_cb,
          raw_cb, jpeg_cb);
     Mutex::Autolock l(&mLock);
 
+    // Wait for old snapshot thread to complete.
+    mSnapshotThreadWaitLock.lock();
+    while (mSnapshotThreadRunning) {
+        LOGV("takePicture: waiting for old snapshot thread to complete.");
+        mSnapshotThreadWait.wait(mSnapshotThreadWaitLock);
+        LOGV("takePicture: old snapshot thread completed.");
+    }
+
     stopPreviewInternal();
 
     if (!initRaw(jpeg_cb != NULL)) {
@@ -1278,12 +1286,9 @@ status_t QualcommCameraHardware::takePicture(shutter_callback shutter_cb,
         mPictureCallbackCookie = user;
     }
 
-    mSnapshotThreadWaitLock.lock();
-    while (mSnapshotThreadRunning) {
-        LOGV("takePicture: waiting for old snapshot thread to complete.");
-        mSnapshotThreadWait.wait(mSnapshotThreadWaitLock);
-        LOGV("takePicture: old snapshot thread completed.");
-    }
+    mShutterLock.lock();
+    mShutterPending = true;
+    mShutterLock.unlock();
 
     pthread_attr_t attr;
     pthread_attr_init(&attr);
@@ -1554,8 +1559,12 @@ bool QualcommCameraHardware::recordingEnabled()
 
 void QualcommCameraHardware::notifyShutter()
 {
-    if (mShutterCallback)
+    mShutterLock.lock();
+    if (mShutterPending && mShutterCallback) {
         mShutterCallback(mPictureCallbackCookie);
+        mShutterPending = false;
+    }
+    mShutterLock.unlock();
 }
 
 static void receive_shutter_callback()
@@ -1572,14 +1581,17 @@ void QualcommCameraHardware::receiveRawPicture()
 {
     LOGV("receiveRawPicture: E");
 
-    int ret,rc,rete;
-
     Mutex::Autolock cbLock(&mCallbackLock);
+
     if (mRawPictureCallback != NULL) {
-        if(native_get_picture(mCameraControlFd, &mCrop)== false) {
+        if(native_get_picture(mCameraControlFd, &mCrop) == false) {
             LOGE("getPicture failed!");
             return;
         }
+
+        // By the time native_get_picture returns, picture is taken. Call
+        // shutter callback if cam config thread has not done that.
+        notifyShutter();
         mRawPictureCallback(mRawHeap->mBuffers[0],
                             mPictureCallbackCookie);
     }

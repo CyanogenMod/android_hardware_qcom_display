@@ -168,6 +168,9 @@ private:
     friend void *frame_thread(void *user);
     void runFrameThread(void *data);
 
+    bool mShutterPending;
+    Mutex mShutterLock;
+
     bool mSnapshotThreadRunning;
     Mutex mSnapshotThreadWaitLock;
     Condition mSnapshotThreadWait;
