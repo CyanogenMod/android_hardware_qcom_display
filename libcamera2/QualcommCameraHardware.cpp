@@ -178,7 +178,7 @@ static const str_map effect[] = {
     { "negative",   CAMERA_EFFECT_NEGATIVE },
     { "solarize",   CAMERA_EFFECT_SOLARIZE },
     { "sepia",      CAMERA_EFFECT_SEPIA },
-    { "postersize", CAMERA_EFFECT_POSTERIZE },
+    { "posterize",  CAMERA_EFFECT_POSTERIZE },
     { "whiteboard", CAMERA_EFFECT_WHITEBOARD },
     { "blackboard", CAMERA_EFFECT_BLACKBOARD },
     { "aqua",       CAMERA_EFFECT_AQUA },
