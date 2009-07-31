@@ -25,7 +25,7 @@ LOCAL_SHARED_LIBRARIES := liblog
 LOCAL_SRC_FILES := copybit.cpp
 LOCAL_MODULE := copybit.msm7k
 LOCAL_C_INCLUDES += hardware/msm7k/libgralloc
-LOCAL_C_FLAGS := -DCOPYBIT_MSM7K=1
+LOCAL_CFLAGS += -DCOPYBIT_MSM7K=1
 include $(BUILD_SHARED_LIBRARY)
 endif
 
@@ -37,6 +37,6 @@ LOCAL_SHARED_LIBRARIES := liblog
 LOCAL_SRC_FILES := copybit.cpp
 LOCAL_MODULE := copybit.qsd8k
 LOCAL_C_INCLUDES += hardware/libhardware/modules/gralloc
-LOCAL_C_FLAGS := -DCOPYBIT_QSD8K=1
+LOCAL_CFLAGS += -DCOPYBIT_QSD8K=1
 include $(BUILD_SHARED_LIBRARY)
 endif
