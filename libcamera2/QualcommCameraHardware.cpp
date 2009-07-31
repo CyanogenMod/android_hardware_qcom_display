@@ -189,9 +189,6 @@ static char *effect_values;
 // from qcamera/common/camera.h
 static const str_map antibanding[] = {
     { "off",  CAMERA_ANTIBANDING_OFF },
-    { "60hz", CAMERA_ANTIBANDING_60HZ },
-    { "50hz", CAMERA_ANTIBANDING_50HZ },
-    { "auto", CAMERA_ANTIBANDING_AUTO },
     { NULL, 0 }
 };
 static char *antibanding_values;
@@ -270,13 +267,7 @@ void QualcommCameraHardware::initDefaultParameters()
     p.set("jpeg-thumbnail-quality", "90");
 
     p.setPictureSize(DEFAULT_PICTURE_WIDTH, DEFAULT_PICTURE_HEIGHT);
-    p.set("antibanding",
-          /* FIXME:
-           * CAMERA_ANTIBANDING_60HZ broke the barcode scanner somehow. turn it
-           * off and revert it back to off for now until we figure out what is
-           * the best solution.
-           */
-          "off" /*"60hz" */);
+    p.set("antibanding", "off");
     p.set("effect", "off");
     p.set("whitebalance", "auto");
 
