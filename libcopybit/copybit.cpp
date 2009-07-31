@@ -122,8 +122,12 @@ static void set_image(struct mdp_img *img, const struct copybit_image_t *rhs)
     img->height     = rhs->h;
     img->format     = get_format(rhs->format);
     img->offset     = hnd->offset;
+#if defined(COPYBIT_MSM7K)
     img->memory_id  = (hnd->flags & private_handle_t::PRIV_FLAGS_USES_GPU)
         ? hnd->gpu_fd : hnd->fd;
+#else
+    img->memory_id  = hnd->fd;
+#endif
 }
 /** setup rectangles */
 static void set_rects(struct copybit_context_t *dev,
