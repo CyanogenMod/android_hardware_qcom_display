@@ -264,6 +264,7 @@ void QualcommCameraHardware::initDefaultParameters()
     p.setPreviewFormat("yuv420sp"); // informative
     p.setPictureFormat("jpeg"); // informative
 
+    p.set("jpeg-quality", "100"); // maximum quality
     p.set("jpeg-thumbnail-width", THUMBNAIL_WIDTH_STR); // informative
     p.set("jpeg-thumbnail-height", THUMBNAIL_HEIGHT_STR); // informative
     p.set("jpeg-thumbnail-quality", "90");
