@@ -178,7 +178,7 @@ static const str_map effect[] = {
     { "negative",   CAMERA_EFFECT_NEGATIVE },
     { "solarize",   CAMERA_EFFECT_SOLARIZE },
     { "sepia",      CAMERA_EFFECT_SEPIA },
-    { "postersize", CAMERA_EFFECT_POSTERIZE },
+    { "posterize",  CAMERA_EFFECT_POSTERIZE },
     { "whiteboard", CAMERA_EFFECT_WHITEBOARD },
     { "blackboard", CAMERA_EFFECT_BLACKBOARD },
     { "aqua",       CAMERA_EFFECT_AQUA },
@@ -189,9 +189,6 @@ static char *effect_values;
 // from qcamera/common/camera.h
 static const str_map antibanding[] = {
     { "off",  CAMERA_ANTIBANDING_OFF },
-    { "60hz", CAMERA_ANTIBANDING_60HZ },
-    { "50hz", CAMERA_ANTIBANDING_50HZ },
-    { "auto", CAMERA_ANTIBANDING_AUTO },
     { NULL, 0 }
 };
 static char *antibanding_values;
@@ -264,18 +261,13 @@ void QualcommCameraHardware::initDefaultParameters()
     p.setPreviewFormat("yuv420sp"); // informative
     p.setPictureFormat("jpeg"); // informative
 
+    p.set("jpeg-quality", "100"); // maximum quality
     p.set("jpeg-thumbnail-width", THUMBNAIL_WIDTH_STR); // informative
     p.set("jpeg-thumbnail-height", THUMBNAIL_HEIGHT_STR); // informative
     p.set("jpeg-thumbnail-quality", "90");
 
     p.setPictureSize(DEFAULT_PICTURE_WIDTH, DEFAULT_PICTURE_HEIGHT);
-    p.set("antibanding",
-          /* FIXME:
-           * CAMERA_ANTIBANDING_60HZ broke the barcode scanner somehow. turn it
-           * off and revert it back to off for now until we figure out what is
-           * the best solution.
-           */
-          "off" /*"60hz" */);
+    p.set("antibanding", "off");
     p.set("effect", "off");
     p.set("whitebalance", "auto");
 
