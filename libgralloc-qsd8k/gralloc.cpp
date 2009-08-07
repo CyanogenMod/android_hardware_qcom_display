@@ -155,9 +155,10 @@ static int gralloc_alloc_framebuffer_locked(alloc_device_t* dev,
         }
         vaddr += bufferSize;
     }
-    
+
     hnd->base = vaddr;
     hnd->offset = vaddr - intptr_t(m->framebuffer->base);
+    hnd->phys = intptr_t(m->framebuffer->phys) + hnd->offset;
     *pHandle = hnd;
 
     return 0;
