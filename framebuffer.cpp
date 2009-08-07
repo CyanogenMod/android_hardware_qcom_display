@@ -301,6 +301,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
         return -errno;
     }
     module->framebuffer->base = intptr_t(vaddr);
+    module->framebuffer->phys = intptr_t(finfo.smem_start);
     memset(vaddr, 0, fbSize);
     return 0;
 }
