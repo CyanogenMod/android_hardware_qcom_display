@@ -105,9 +105,11 @@ static void intersect(struct copybit_rect_t *out,
 /** convert COPYBIT_FORMAT to MDP format */
 static int get_format(int format) {
     switch (format) {
+    case COPYBIT_FORMAT_RGB_565:       return MDP_RGB_565;
+    case COPYBIT_FORMAT_RGBX_8888:     return MDP_XRGB_8888; // currently wrong
+    case COPYBIT_FORMAT_RGB_888:       return MDP_RGB_888;
     case COPYBIT_FORMAT_RGBA_8888:     return MDP_RGBA_8888;
     case COPYBIT_FORMAT_BGRA_8888:     return MDP_BGRA_8888;
-    case COPYBIT_FORMAT_RGB_565:       return MDP_RGB_565;
     case COPYBIT_FORMAT_YCbCr_422_SP:  return MDP_Y_CBCR_H2V1;
     case COPYBIT_FORMAT_YCbCr_420_SP:  return MDP_Y_CBCR_H2V2;
     }
