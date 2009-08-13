@@ -14,36 +14,27 @@
  * limitations under the License.
  */
 
-#include <sys/mman.h>
-
 #include <dlfcn.h>
-
+#include <errno.h>
+#include <fcntl.h>
+#include <linux/fb.h>
+#include <linux/msm_mdp.h>
+#include <sys/mman.h>
+#include <sys/ioctl.h>
+#include <cutils/atomic.h>
 #include <cutils/ashmem.h>
 #include <cutils/log.h>
-
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>
 
-#include <fcntl.h>
-#include <errno.h>
-
-#include <cutils/log.h>
-#include <cutils/atomic.h>
-
-#if HAVE_ANDROID_OS
-#include <linux/fb.h>
-#endif
-
 #include "gralloc_priv.h"
-#include <linux/msm_mdp.h>
-#include <sys/ioctl.h>
+
 /*****************************************************************************/
 
 // should be a build option
 #define SUPPORTS_UPDATE_ON_DEMAND   1
 
 #define NUM_BUFFERS 2
-
 
 enum {
     PAGE_FLIP = 0x00000001,
@@ -56,7 +47,7 @@ struct fb_context_t {
 
 /*****************************************************************************/
 
-void
+static void
 msm_copy_buffer(buffer_handle_t handle, int fd, int width, int height,
                 int x, int y, int w, int h);
 
@@ -95,14 +86,13 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
     private_handle_t const* hnd = reinterpret_cast<private_handle_t const*>(buffer);
     private_module_t* m = reinterpret_cast<private_module_t*>(
             dev->common.module);
-    
+
     if (m->currentBuffer) {
         m->base.unlock(&m->base, m->currentBuffer);
         m->currentBuffer = 0;
     }
 
     if (hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
-
         m->base.lock(&m->base, buffer, 
                 private_module_t::PRIV_USAGE_LOCKED_FOR_POST, 
                 0, 0, m->info.xres, m->info.yres, NULL);
@@ -116,14 +106,13 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
             return -errno;
         }
         m->currentBuffer = buffer;
-        
     } else {
         // If we can't do the page_flip, just copy the buffer to the front 
         // FIXME: use copybit HAL instead of memcpy
-        
+
         void* fb_vaddr;
         void* buffer_vaddr;
-        
+
         m->base.lock(&m->base, m->framebuffer, 
                 GRALLOC_USAGE_SW_WRITE_RARELY, 
                 0, 0, m->info.xres, m->info.yres,
@@ -135,7 +124,7 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
                 &buffer_vaddr);
 
         //memcpy(fb_vaddr, buffer_vaddr, m->finfo.line_length * m->info.yres);
-        
+
         msm_copy_buffer(m->framebuffer, m->framebuffer->fd,
                 m->info.xres, m->info.yres,
                 m->info.xoffset, m->info.yoffset,
@@ -144,7 +133,7 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
         m->base.unlock(&m->base, buffer); 
         m->base.unlock(&m->base, m->framebuffer); 
     }
-    
+
     return 0;
 }
 
@@ -356,10 +345,8 @@ int fb_device_open(hw_module_t const* module, const char* name,
         dev->device.common.module = const_cast<hw_module_t*>(module);
         dev->device.common.close = fb_close;
         dev->device.setSwapInterval = fb_setSwapInterval;
-#if SUPPORTS_UPDATE_ON_DEMAND
-        dev->device.setUpdateRect   = fb_setUpdateRect;
-#endif
         dev->device.post            = fb_post;
+        dev->device.setUpdateRect = 0;
 
         private_module_t* m = (private_module_t*)module;
         status = mapFrameBuffer(m);
@@ -376,6 +363,14 @@ int fb_device_open(hw_module_t const* module, const char* name,
             const_cast<int&>(dev->device.minSwapInterval) = 1;
             const_cast<int&>(dev->device.maxSwapInterval) = 1;
 
+#if SUPPORTS_UPDATE_ON_DEMAND
+            if (m->finfo.reserved[0] == 0x5444 &&
+                    m->finfo.reserved[1] == 0x5055) {
+                dev->device.setUpdateRect = fb_setUpdateRect;
+                LOGD("UPDATE_ON_DEMAND supported");
+            }
+#endif
+
             *device = &dev->device.common;
         }
     }
@@ -384,7 +379,7 @@ int fb_device_open(hw_module_t const* module, const char* name,
 
 /* Copy a pmem buffer to the framebuffer */
 
-void
+static void
 msm_copy_buffer(buffer_handle_t handle, int fd, int width, int height,
                 int x, int y, int w, int h)
 {
@@ -405,7 +400,7 @@ msm_copy_buffer(buffer_handle_t handle, int fd, int width, int height,
     blit.req.src.height = height;
     blit.req.src.offset = 0;
     blit.req.src.memory_id = priv->fd;
-    
+
     blit.req.dst.width = width;
     blit.req.dst.height = height;
     blit.req.dst.offset = 0;
