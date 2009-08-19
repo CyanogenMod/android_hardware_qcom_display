@@ -101,7 +101,7 @@ struct private_handle_t {
 #ifdef __cplusplus
     static const int sNumInts = 10;
     static const int sNumFds = 1;
-    static const int sMagic = 'msm8';
+    static const int sMagic = 'gmsm';
 
     private_handle_t(int fd, int size, int flags) :
         fd(fd), magic(sMagic), flags(flags), size(size), offset(0),
