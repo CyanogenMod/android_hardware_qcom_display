@@ -14,27 +14,39 @@
  * limitations under the License.
  */
 
-#include <dlfcn.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <linux/fb.h>
-#include <linux/msm_mdp.h>
 #include <sys/mman.h>
-#include <sys/ioctl.h>
-#include <cutils/atomic.h>
+
+#include <dlfcn.h>
+
 #include <cutils/ashmem.h>
 #include <cutils/log.h>
+
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>
 
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/ioctl.h>
+#include <string.h>
+#include <stdlib.h>
+
+#include <cutils/log.h>
+#include <cutils/atomic.h>
+
+#include <linux/fb.h>
+#include <linux/msm_mdp.h>
+
 #include "gralloc_priv.h"
+#include "gr.h"
 
 /*****************************************************************************/
 
 // should be a build option
-#define SUPPORTS_UPDATE_ON_DEMAND   1
+#define SUPPORTS_UPDATE_ON_DEMAND   0
 
+// numbers of buffers for page flipping
 #define NUM_BUFFERS 2
+
 
 enum {
     PAGE_FLIP = 0x00000001,
@@ -86,13 +98,14 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
     private_handle_t const* hnd = reinterpret_cast<private_handle_t const*>(buffer);
     private_module_t* m = reinterpret_cast<private_module_t*>(
             dev->common.module);
-
+    
     if (m->currentBuffer) {
         m->base.unlock(&m->base, m->currentBuffer);
         m->currentBuffer = 0;
     }
 
     if (hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
+
         m->base.lock(&m->base, buffer, 
                 private_module_t::PRIV_USAGE_LOCKED_FOR_POST, 
                 0, 0, m->info.xres, m->info.yres, NULL);
@@ -106,13 +119,14 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
             return -errno;
         }
         m->currentBuffer = buffer;
+        
     } else {
         // If we can't do the page_flip, just copy the buffer to the front 
         // FIXME: use copybit HAL instead of memcpy
-
+        
         void* fb_vaddr;
         void* buffer_vaddr;
-
+        
         m->base.lock(&m->base, m->framebuffer, 
                 GRALLOC_USAGE_SW_WRITE_RARELY, 
                 0, 0, m->info.xres, m->info.yres,
@@ -290,7 +304,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
     int err;
     size_t fbSize = roundUpToPageSize(finfo.line_length * info.yres_virtual);
     module->framebuffer = new private_handle_t(dup(fd), fbSize,
-            private_handle_t::PRIV_FLAGS_USES_PMEM, BUFFER_TYPE_FB);
+            private_handle_t::PRIV_FLAGS_USES_PMEM);
 
     module->numBuffers = info.yres_virtual / info.yres;
     module->bufferMask = 0;
@@ -330,7 +344,6 @@ int fb_device_open(hw_module_t const* module, const char* name,
 {
     int status = -EINVAL;
     if (!strcmp(name, GRALLOC_HARDWARE_FB0)) {
-
         alloc_device_t* gralloc_device;
         status = gralloc_open(module, &gralloc_device);
         if (status < 0)
