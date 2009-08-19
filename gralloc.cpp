@@ -19,6 +19,8 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <pthread.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -41,10 +43,16 @@
 
 /*****************************************************************************/
 
+#define ALLOCATORREGION_RESERVED_SIZE           (3<<20)
+
+static SimpleBestFitAllocator sAllocator;
+static SimpleBestFitAllocator sAllocatorGPU(ALLOCATORREGION_RESERVED_SIZE);
+
+/*****************************************************************************/
+
 struct gralloc_context_t {
     alloc_device_t  device;
     /* our private data here */
-	int bufferType;
 };
 
 static int gralloc_alloc_buffer(alloc_device_t* dev,
@@ -103,8 +111,8 @@ struct private_module_t HAL_MODULE_INFO_SYM = {
     pmem_master: -1,
     pmem_master_base: 0,
     master_phys: 0,
-    gpu_master: -1,
-    gpu_master_base: 0
+    gpu: -1,
+    gpu_base: 0
 };
 
 /*****************************************************************************/
@@ -145,7 +153,7 @@ static int gralloc_alloc_framebuffer_locked(alloc_device_t* dev,
     intptr_t vaddr = intptr_t(m->framebuffer->base);
     private_handle_t* hnd = new private_handle_t(dup(m->framebuffer->fd), size,
             private_handle_t::PRIV_FLAGS_USES_PMEM |
-            private_handle_t::PRIV_FLAGS_FRAMEBUFFER, BUFFER_TYPE_FB);
+            private_handle_t::PRIV_FLAGS_FRAMEBUFFER);
 
     // find a free slot
     for (uint32_t i=0 ; i<numBuffers ; i++) {
@@ -155,10 +163,9 @@ static int gralloc_alloc_framebuffer_locked(alloc_device_t* dev,
         }
         vaddr += bufferSize;
     }
-
+    
     hnd->base = vaddr;
     hnd->offset = vaddr - intptr_t(m->framebuffer->base);
-    hnd->phys = intptr_t(m->framebuffer->phys) + hnd->offset;
     *pHandle = hnd;
 
     return 0;
@@ -175,62 +182,113 @@ static int gralloc_alloc_framebuffer(alloc_device_t* dev,
     return err;
 }
 
-static SimpleBestFitAllocator sAllocator(10*1024*1024);
-static SimpleBestFitAllocator sGPUAllocator(3*1024*1024);
 
-static int init_pmem_area(private_module_t* m, int type)
+static int init_pmem_area_locked(private_module_t* m)
 {
     int err = 0;
-    int master_fd = -1;
-    size_t master_heap_size;
-    if(type == BUFFER_TYPE_GPU0)
-    {
-        master_fd = open("/dev/pmem_gpu0", O_RDWR, 0);
-        master_heap_size = sGPUAllocator.size();
-    }
-    else if(type == BUFFER_TYPE_GPU1)
-    {
-        master_fd = open("/dev/pmem_gpu1", O_RDWR, 0);
-        master_heap_size = sGPUAllocator.size();
-    }
-    else if (type == BUFFER_TYPE_PMEM)
-    {
-        master_fd = open("/dev/pmem", O_RDWR, 0);
-        master_heap_size = sAllocator.size();
-    }
-    
+    int master_fd = open("/dev/pmem", O_RDWR, 0);
     if (master_fd >= 0) {
-        void* base = mmap(0, master_heap_size,
+        
+        size_t size;
+        pmem_region region;
+        if (ioctl(master_fd, PMEM_GET_TOTAL_SIZE, &region) < 0) {
+            LOGE("PMEM_GET_TOTAL_SIZE failed, limp mode");
+            size = 8<<20;   // 8 MiB
+        } else {
+            size = region.len;
+        }
+        sAllocator.setSize(size);
+
+        void* base = mmap(0, size, 
                 PROT_READ|PROT_WRITE, MAP_SHARED, master_fd, 0);
         if (base == MAP_FAILED) {
-            LOGE("Enter init_pmem_area error: %d", -errno);
             err = -errno;
             base = 0;
             close(master_fd);
             master_fd = -1;
         }
-        if(type == BUFFER_TYPE_PMEM){
-        	m->pmem_master = master_fd;
-        	m->pmem_master_base = base;
-        }
-        else
-    	{
-            m->gpu_master = master_fd;
-            m->gpu_master_base = base;
-    		pmem_region region;
-        	err = ioctl(m->gpu_master, PMEM_GET_PHYS, &region);
-        	if(err < 0)
-        	{
-        		LOGE("init pmem: master ioctl failed %d", -errno);
-        	}
-        	else
-        	{
-               	m->master_phys = (unsigned long)region.offset;
-        	}
-        }
+        m->pmem_master = master_fd;
+        m->pmem_master_base = base;
     } else {
         err = -errno;
     }
+    return err;
+}
+
+static int init_pmem_area(private_module_t* m)
+{
+    pthread_mutex_lock(&m->lock);
+    int err = m->pmem_master;
+    if (err == -1) {
+        // first time, try to initialize pmem
+        err = init_pmem_area_locked(m);
+        if (err) {
+            m->pmem_master = err;
+        }
+    } else if (err < 0) {
+        // pmem couldn't be initialized, never use it
+    } else {
+        // pmem OK
+        err = 0;
+    }
+    pthread_mutex_unlock(&m->lock);
+    return err;
+}
+
+static int init_gpu_area_locked(private_module_t* m)
+{
+    int err = 0;
+    int gpu = open("/dev/pmem_gpu1", O_RDWR, 0);
+    LOGE_IF(gpu<0, "could not open /dev/pmem_gpu1 (%s)", strerror(errno));
+    if (gpu >= 0) {
+        size_t size = sAllocatorGPU.size();
+        void* base = mmap(0, size,
+                PROT_READ|PROT_WRITE, MAP_SHARED, gpu, 0);
+
+        if (base == MAP_FAILED) {
+            LOGE("mmap /dev/pmem_gpu1 (%s)", strerror(errno));
+            err = -errno;
+            base = 0;
+            close(gpu);
+            gpu = -1;
+        } else {
+            pmem_region region;
+            err = ioctl(gpu, PMEM_GET_PHYS, &region);
+            if(err < 0) {
+                LOGE("init pmem: master ioctl failed %d", -errno);
+            } else {
+                m->master_phys = (unsigned long)region.offset;
+            }
+        }
+
+        m->gpu = gpu;
+        m->gpu_base = base;
+
+    } else {
+        err = -errno;
+        m->gpu = 0;
+        m->gpu_base = 0;
+    }
+    return err;
+}
+
+static int init_gpu_area(private_module_t* m)
+{
+    pthread_mutex_lock(&m->lock);
+    int err = m->gpu;
+    if (err == -1) {
+        // first time, try to initialize gpu
+        err = init_gpu_area_locked(m);
+        if (err) {
+            m->gpu = err;
+        }
+    } else if (err < 0) {
+        // gpu couldn't be initialized, never use it
+    } else {
+        // gpu OK
+        err = 0;
+    }
+    pthread_mutex_unlock(&m->lock);
     return err;
 }
 
@@ -241,105 +299,66 @@ static int gralloc_alloc_buffer(alloc_device_t* dev,
     int flags = 0;
 
     int fd = -1;
+    int gpu_fd = -1;
     void* base = 0;
     int offset = 0;
     int lockState = 0;
-    
-    private_module_t* m = reinterpret_cast<private_module_t*>(
-                dev->common.module);
-
-    gralloc_context_t *context = (gralloc_context_t *) dev;
-    int bufferType;
 
     size = roundUpToPageSize(size);
     
-    if (usage & (GRALLOC_USAGE_HW_2D | GRALLOC_USAGE_HW_RENDER)) {
-        flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
-        bufferType = context->bufferType;
-    }
-    else if (usage & GRALLOC_USAGE_HW_TEXTURE) {
+    if (usage & GRALLOC_USAGE_HW_TEXTURE) {
         // enable pmem in that case, so our software GL can fallback to
         // the copybit module.
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
-        bufferType = BUFFER_TYPE_PMEM;
+    }
+    
+    if (usage & GRALLOC_USAGE_HW_2D) {
+        flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
     }
 
-    int phys = 0;
     if ((flags & private_handle_t::PRIV_FLAGS_USES_PMEM) == 0) {
 try_ashmem:
-        fd = ashmem_create_region("Buffer", size);
+        fd = ashmem_create_region("gralloc-buffer", size);
         if (fd < 0) {
-            LOGE("couldn't create ashmem (%s)", strerror(-errno));
+            LOGE("couldn't create ashmem (%s)", strerror(errno));
             err = -errno;
         }
-    } else {
-       
-        int master_fd = -1;    
-        if(bufferType == BUFFER_TYPE_PMEM)
-        {
-            master_fd = m->pmem_master;
-        }
-        else      
-        {
-            master_fd = m->gpu_master;
-        }
+    } else if ((usage & GRALLOC_USAGE_HW_RENDER) == 0) {
+        private_module_t* m = reinterpret_cast<private_module_t*>(
+                dev->common.module);
 
-        pthread_mutex_lock(&m->lock);
-        if (master_fd == -1) {
-            err = init_pmem_area(m, bufferType);
-        }
-        pthread_mutex_unlock(&m->lock);
-        
-        if(bufferType == BUFFER_TYPE_PMEM)
-        {
-            master_fd = m->pmem_master;
-        }
-        else
-        {
-            master_fd = m->gpu_master;
-        }
-          
-        if (master_fd >= 0) {
+        err = init_pmem_area(m);
+        if (err == 0) {
             // PMEM buffers are always mmapped
-            if(bufferType == BUFFER_TYPE_PMEM)
-            {
-                base = m->pmem_master_base;
-                offset = sAllocator.allocate(size);
-            }
-            else
-            {
-               base = m->gpu_master_base;
-               offset = sGPUAllocator.allocate(size);
-            }
-            
+            base = m->pmem_master_base;
             lockState |= private_handle_t::LOCK_STATE_MAPPED;
 
+            offset = sAllocator.allocate(size);
             if (offset < 0) {
+                // no more pmem memory
                 err = -ENOMEM;
             } else {
-                if(bufferType == BUFFER_TYPE_GPU0)
-                    fd = open("/dev/pmem_gpu0", O_RDWR, 0);
-                else if(bufferType == BUFFER_TYPE_GPU1)
-                    fd = open("/dev/pmem_gpu1", O_RDWR, 0);
-                else if (bufferType == BUFFER_TYPE_PMEM)
-                    fd = open("/dev/pmem", O_RDWR, 0);
+                struct pmem_region sub = { offset, size };
+                
+                // now create the "sub-heap"
+                fd = open("/dev/pmem", O_RDWR, 0);
+                err = fd < 0 ? fd : 0;
+                
+                // and connect to it
+                if (err == 0)
+                    err = ioctl(fd, PMEM_CONNECT, m->pmem_master);
 
-                err = ioctl(fd, PMEM_CONNECT, master_fd);
+                // and make it available to the client process
+                if (err == 0)
+                    err = ioctl(fd, PMEM_MAP, &sub);
+
                 if (err < 0) {
                     err = -errno;
-                } else {
-                    struct pmem_region sub = { offset, size };
-                    err = ioctl(fd, PMEM_MAP, &sub);
-                }
-                
-                if (err < 0) {
                     close(fd);
-                    if(bufferType == BUFFER_TYPE_PMEM)
-                    	sAllocator.deallocate(offset);
-                    else
-                        sGPUAllocator.deallocate(offset);
+                    sAllocator.deallocate(offset);
                     fd = -1;
                 }
+                memset((char*)base + offset, 0, size);
                 //LOGD_IF(!err, "allocating pmem size=%d, offset=%d", size, offset);
             }
         } else {
@@ -349,20 +368,51 @@ try_ashmem:
                 err = 0;
                 goto try_ashmem;
             } else {
-                LOGE("couldn't open pmem (%s)", strerror(-errno));
+                LOGE("couldn't open pmem (%s)", strerror(errno));
             }
-        } 
+        }
+    } else {
+        // looks like we want 3D...
+        flags &= ~private_handle_t::PRIV_FLAGS_USES_PMEM;
+        flags |= private_handle_t::PRIV_FLAGS_USES_GPU;
+
+        private_module_t* m = reinterpret_cast<private_module_t*>(
+                dev->common.module);
+
+        err = init_gpu_area(m);
+        if (err == 0) {
+            // GPU buffers are always mmapped
+            base = m->gpu_base;
+            lockState |= private_handle_t::LOCK_STATE_MAPPED;
+            offset = sAllocatorGPU.allocate(size);
+            if (offset < 0) {
+                // no more pmem memory
+                err = -ENOMEM;
+            } else {
+                LOGD("allocating GPU size=%d, offset=%d", size, offset);
+                fd = open("/dev/null", O_RDONLY); // just so marshalling doesn't fail
+                gpu_fd = m->gpu;
+                memset((char*)base + offset, 0, size);
+            }
+        } else {
+            // not enough memory, try ashmem
+            flags &= ~private_handle_t::PRIV_FLAGS_USES_GPU;
+            err = 0;
+            goto try_ashmem;
+        }
     }
 
     if (err == 0) {
-        private_handle_t* hnd = new private_handle_t(fd, size, flags, bufferType);
+        private_handle_t* hnd = new private_handle_t(fd, size, flags);
         hnd->offset = offset;
         hnd->base = int(base)+offset;
         hnd->lockState = lockState;
-        if(bufferType == BUFFER_TYPE_GPU1)
-        	hnd->phys = m->master_phys + offset;
-        else
-                hnd->phys = 0;
+        hnd->gpu_fd = gpu_fd;
+        if (flags & private_handle_t::PRIV_FLAGS_USES_GPU) {
+            private_module_t* m = reinterpret_cast<private_module_t*>(
+                    dev->common.module);
+            hnd->phys = m->master_phys + offset;
+        }
         *pHandle = hnd;
     }
     
@@ -380,25 +430,48 @@ static int gralloc_alloc(alloc_device_t* dev,
     if (!pHandle || !pStride)
         return -EINVAL;
 
-    int align = 4;
-    int bpp = 0;
-    switch (format) {
-        case HAL_PIXEL_FORMAT_RGBA_8888:
-        case HAL_PIXEL_FORMAT_BGRA_8888:
-            bpp = 4;
-            break;
-        case HAL_PIXEL_FORMAT_RGB_565:
-        case HAL_PIXEL_FORMAT_RGBA_5551:
-        case HAL_PIXEL_FORMAT_RGBA_4444:
-            bpp = 2;
-            break;
-        default:
-            return -EINVAL;
+    size_t size, stride;
+    if (format == HAL_PIXEL_FORMAT_YCbCr_420_SP || 
+            format == HAL_PIXEL_FORMAT_YCbCr_422_SP) 
+    {
+        // FIXME: there is no way to return the vstride
+        int vstride;
+        stride = (w + 1) & ~1; 
+        switch (format) {
+            case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+                size = stride * h * 2;
+                break;
+            case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+                vstride = (h+1) & ~1;
+                size = (stride * vstride) + (w/2 * h/2) * 2;
+                break;
+            default:
+                return -EINVAL;
+        }
+    } else {
+        int align = 4;
+        int bpp = 0;
+        switch (format) {
+            case HAL_PIXEL_FORMAT_RGBA_8888:
+            case HAL_PIXEL_FORMAT_RGBX_8888:
+            case HAL_PIXEL_FORMAT_BGRA_8888:
+                bpp = 4;
+                break;
+            case HAL_PIXEL_FORMAT_RGB_888:
+                bpp = 3;
+                break;
+            case HAL_PIXEL_FORMAT_RGB_565:
+            case HAL_PIXEL_FORMAT_RGBA_5551:
+            case HAL_PIXEL_FORMAT_RGBA_4444:
+                bpp = 2;
+                break;
+            default:
+                return -EINVAL;
+        }
+        size_t bpr = (w*bpp + (align-1)) & ~(align-1);
+        size = bpr * h;
+        stride = bpr / bpp;
     }
-
-    size_t bpr = (w*bpp + (align-1)) & ~(align-1);
-    size_t size = bpr * h;
-    size_t stride = bpr / bpp;
 
     int err;
     if (usage & GRALLOC_USAGE_HW_FB) {
@@ -406,6 +479,7 @@ static int gralloc_alloc(alloc_device_t* dev,
     } else {
         err = gralloc_alloc_buffer(dev, size, usage, pHandle);
     }
+
     if (err < 0) {
         return err;
     }
@@ -428,23 +502,31 @@ static int gralloc_free(alloc_device_t* dev,
         const size_t bufferSize = m->finfo.line_length * m->info.yres;
         int index = (hnd->base - m->framebuffer->base) / bufferSize;
         m->bufferMask &= ~(1<<index); 
-    } else if (true || hnd->flags & private_handle_t::PRIV_FLAGS_USES_PMEM) {
-        if (hnd->fd >= 0) {
-            if(hnd->bufferType == BUFFER_TYPE_PMEM){
-                sAllocator.deallocate(hnd->offset);
-                memset((void *)hnd->base, 0, hnd->size);
+    } else { 
+        if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_PMEM) {
+            if (hnd->fd >= 0) {
+                struct pmem_region sub = { hnd->offset, hnd->size };
+                int err = ioctl(hnd->fd, PMEM_UNMAP, &sub);
+                LOGE_IF(err<0, "PMEM_UNMAP failed (%s), "
+                        "fd=%d, sub.offset=%lu, sub.size=%lu",
+                        strerror(errno), hnd->fd, hnd->offset, hnd->size);
+                if (err == 0) {
+                    // we can't deallocate the memory in case of UNMAP failure
+                    // because it would give that process access to someone else's
+                    // surfaces, which would be a security breach.
+                    sAllocator.deallocate(hnd->offset);
+                }
             }
-            else {
-                  sGPUAllocator.deallocate(hnd->offset);
-                memset((void *)hnd->base, 0, hnd->size);
-            }
-       }
+        } else if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_GPU) {
+            LOGD("freeing GPU buffer at %d", hnd->offset);
+            sAllocatorGPU.deallocate(hnd->offset);
+        }
+
+        gralloc_module_t* module = reinterpret_cast<gralloc_module_t*>(
+                dev->common.module);
+        terminateBuffer(module, const_cast<private_handle_t*>(hnd));
     }
 
-    gralloc_module_t* m = reinterpret_cast<gralloc_module_t*>(
-            dev->common.module);
-    gralloc_unregister_buffer(m, handle);
-    
     close(hnd->fd);
     delete hnd;
     return 0;
@@ -483,7 +565,7 @@ int gralloc_device_open(const hw_module_t* module, const char* name,
 
         dev->device.alloc   = gralloc_alloc;
         dev->device.free    = gralloc_free;
-        dev->bufferType = BUFFER_TYPE_GPU1;
+
         *device = &dev->device.common;
         status = 0;
     } else {
