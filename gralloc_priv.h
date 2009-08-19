@@ -37,7 +37,7 @@ struct private_handle_t;
 struct private_module_t {
     gralloc_module_t base;
 
-    private_handle_t* framebuffer;
+    struct private_handle_t* framebuffer;
     uint32_t flags;
     uint32_t numBuffers;
     uint32_t bufferMask;
@@ -67,7 +67,7 @@ struct private_module_t {
 struct private_handle_t : public native_handle {
 #else
 struct private_handle_t {
-    struct native_handle nativeHandle;
+    native_handle_t nativeHandle;
 #endif
     
     enum {
@@ -89,20 +89,19 @@ struct private_handle_t {
     int     flags;
     int     size;
     int     offset;
-    int     gpu_fd;
+    int     gpu_fd; // stored as an int, b/c we don't want it marshalled
 
     // FIXME: the attributes below should be out-of-line
     int     base;
     int     lockState;
     int     writeOwner;
-    int     bufferType;
     int     phys; // The physical address of that chunk of memory. If using ashmem, set to 0 They don't care
     int     pid;
 
 #ifdef __cplusplus
-    static const int sNumInts = 11;
+    static const int sNumInts = 10;
     static const int sNumFds = 1;
-    static const int sMagic = 0x3141592; // FIXME: should be 'msm8'
+    static const int sMagic = 'msm8';
 
     private_handle_t(int fd, int size, int flags) :
         fd(fd), magic(sMagic), flags(flags), size(size), offset(0),
