@@ -174,8 +174,6 @@ int terminateBuffer(gralloc_module_t const* module,
                 // (see gralloc_alloc_buffer())
                 gralloc_unmap(module, hnd);
             }
-        } else if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_GPU) {
-            // XXX: for now do nothing here
         } else {
             gralloc_unmap(module, hnd);
         }
