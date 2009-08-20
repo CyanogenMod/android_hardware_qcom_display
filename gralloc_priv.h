@@ -46,8 +46,6 @@ struct private_module_t {
     int pmem_master;
     void* pmem_master_base;
     unsigned long master_phys;
-    int gpu;
-    void* gpu_base;
 
     struct fb_var_screeninfo info;
     struct fb_fix_screeninfo finfo;
@@ -73,7 +71,6 @@ struct private_handle_t {
     enum {
         PRIV_FLAGS_FRAMEBUFFER = 0x00000001,
         PRIV_FLAGS_USES_PMEM   = 0x00000002,
-        PRIV_FLAGS_USES_GPU    = 0x00000004,
     };
 
     enum {
@@ -104,8 +101,8 @@ struct private_handle_t {
     static const int sMagic = 'gmsm';
 
     private_handle_t(int fd, int size, int flags) :
-        fd(fd), magic(sMagic), flags(flags), size(size), offset(0),
-        base(0), lockState(0), writeOwner(0), pid(getpid())
+        fd(fd), magic(sMagic), flags(flags), size(size), offset(0), gpu_fd(-1),
+        base(0), lockState(0), writeOwner(0), phys(0), pid(getpid())
     {
         version = sizeof(native_handle);
         numInts = sNumInts;
@@ -116,7 +113,7 @@ struct private_handle_t {
     }
 
     bool usesPhysicallyContiguousMemory() {
-        return (flags & (PRIV_FLAGS_USES_PMEM|PRIV_FLAGS_USES_GPU)) != 0;
+        return (flags & PRIV_FLAGS_USES_PMEM) != 0;
     }
 
     static int validate(const native_handle* h) {
