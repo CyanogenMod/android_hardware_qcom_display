@@ -346,26 +346,26 @@ static int gralloc_alloc(alloc_device_t* dev,
     if (!pHandle || !pStride)
         return -EINVAL;
 
-    size_t size, stride;
+    size_t size, alignedw, alignedh;
     if (format == HAL_PIXEL_FORMAT_YCbCr_420_SP || 
             format == HAL_PIXEL_FORMAT_YCbCr_422_SP) 
     {
-        // FIXME: there is no way to return the vstride
-        int vstride;
-        stride = (w + 1) & ~1; 
+        // FIXME: there is no way to return the alignedh
+        alignedw = (w + 1) & ~1;
         switch (format) {
             case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-                size = stride * h * 2;
+                size = alignedw * h * 2;
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_422_SP:
-                vstride = (h+1) & ~1;
-                size = (stride * vstride) + (w/2 * h/2) * 2;
+                alignedh = (h+1) & ~1;
+                size = (alignedw * alignedh) + (w/2 * h/2) * 2;
                 break;
             default:
                 return -EINVAL;
         }
     } else {
-        int align = 4;
+        alignedw = (w + 31) & ~31;
+        alignedh = (h + 31) & ~31;
         int bpp = 0;
         switch (format) {
             case HAL_PIXEL_FORMAT_RGBA_8888:
@@ -384,9 +384,7 @@ static int gralloc_alloc(alloc_device_t* dev,
             default:
                 return -EINVAL;
         }
-        size_t bpr = (w*bpp + (align-1)) & ~(align-1);
-        size = bpr * h;
-        stride = bpr / bpp;
+        size = alignedw * alignedh * bpp;
     }
 
     int err;
@@ -400,7 +398,7 @@ static int gralloc_alloc(alloc_device_t* dev,
         return err;
     }
 
-    *pStride = stride;
+    *pStride = alignedw;
     return 0;
 }
 
