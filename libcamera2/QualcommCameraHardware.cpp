@@ -173,7 +173,7 @@ static char *whitebalance_values;
 
 // from camera_effect_t
 static const str_map effect[] = {
-    { "off",        CAMERA_EFFECT_OFF },  /* This list must match aeecamera.h */
+    { "none",       CAMERA_EFFECT_OFF },  /* This list must match aeecamera.h */
     { "mono",       CAMERA_EFFECT_MONO },
     { "negative",   CAMERA_EFFECT_NEGATIVE },
     { "solarize",   CAMERA_EFFECT_SOLARIZE },
@@ -268,7 +268,7 @@ void QualcommCameraHardware::initDefaultParameters()
 
     p.setPictureSize(DEFAULT_PICTURE_WIDTH, DEFAULT_PICTURE_HEIGHT);
     p.set("antibanding", "off");
-    p.set("effect", "off");
+    p.set("effect", "none");
     p.set("whitebalance", "auto");
 
 #if 0
