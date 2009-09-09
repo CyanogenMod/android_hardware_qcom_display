@@ -38,6 +38,16 @@
 
 /******************************************************************************/
 
+#if defined(COPYBIT_MSM7K)
+#define MAX_SCALE_FACTOR    (4)
+#else if defined(COPYBIT_QSD8K)
+#define MAX_SCALE_FACTOR    (8)
+#else
+#error "Unsupported MDP version"
+#endif
+
+/******************************************************************************/
+
 /** State information for each device instance */
 struct copybit_context_t {
     struct copybit_device_t device;
@@ -273,10 +283,10 @@ static int get(struct copybit_device_t *dev, int name)
     if (ctx) {
         switch(name) {
         case COPYBIT_MINIFICATION_LIMIT:
-            value = 4;
+            value = MAX_SCALE_FACTOR;
             break;
         case COPYBIT_MAGNIFICATION_LIMIT:
-            value = 4;
+            value = MAX_SCALE_FACTOR;
             break;
         case COPYBIT_SCALING_FRAC_BITS:
             value = 32;
