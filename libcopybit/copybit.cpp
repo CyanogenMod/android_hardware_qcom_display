@@ -40,7 +40,7 @@
 
 #if defined(COPYBIT_MSM7K)
 #define MAX_SCALE_FACTOR    (4)
-#else if defined(COPYBIT_QSD8K)
+#elif defined(COPYBIT_QSD8K)
 #define MAX_SCALE_FACTOR    (8)
 #else
 #error "Unsupported MDP version"
