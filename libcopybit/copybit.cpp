@@ -192,7 +192,7 @@ static void set_rects(struct copybit_context_t *dev,
 static void set_infos(struct copybit_context_t *dev, struct mdp_blit_req *req) {
     req->alpha = dev->mAlpha;
     req->transp_mask = MDP_TRANSP_NOP;
-    req->flags = dev->mFlags;
+    req->flags = dev->mFlags | MDP_BLEND_FG_PREMULT;
 }
 
 /** copy the bits */
