@@ -36,6 +36,8 @@
 #include <linux/fb.h>
 #include <linux/msm_mdp.h>
 
+#include <GLES/gl.h>
+
 #include "gralloc_priv.h"
 #include "gr.h"
 
@@ -144,6 +146,14 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
         m->base.unlock(&m->base, buffer); 
         m->base.unlock(&m->base, m->framebuffer); 
     }
+
+    return 0;
+}
+
+static int fb_compositionComplete(struct framebuffer_device_t* dev)
+{
+    // STOPSHIP: Properly implement composition complete callback
+    glFinish();
 
     return 0;
 }
@@ -358,6 +368,7 @@ int fb_device_open(hw_module_t const* module, const char* name,
         dev->device.setSwapInterval = fb_setSwapInterval;
         dev->device.post            = fb_post;
         dev->device.setUpdateRect = 0;
+        dev->device.compositionComplete = fb_compositionComplete;
 
         private_module_t* m = (private_module_t*)module;
         status = mapFrameBuffer(m);
