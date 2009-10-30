@@ -36,6 +36,8 @@
 
 #include "gralloc_priv.h"
 
+#define DEBUG_MDP_ERRORS 0
+
 /******************************************************************************/
 
 #if defined(COPYBIT_MSM7K)
@@ -201,10 +203,37 @@ static int msm_copybit(struct copybit_context_t *dev, void const *list)
     int err = ioctl(dev->mFD, MSMFB_BLIT,
                     (struct mdp_blit_req_list const*)list);
     LOGE_IF(err<0, "copyBits failed (%s)", strerror(errno));
-    if (err == 0)
+    if (err == 0) {
         return 0;
-    else
+    } else {
+#if DEBUG_MDP_ERRORS
+        struct mdp_blit_req_list const* l = (struct mdp_blit_req_list const*)list;
+        for (int i=0 ; i<l->count ; i++) {
+            LOGD("%d: src={w=%d, h=%d, f=%d, rect={%d,%d,%d,%d}}\n"
+                 "    dst={w=%d, h=%d, f=%d, rect={%d,%d,%d,%d}}\n"
+                 "    flags=%08lx"
+                    ,
+                    i,
+                    l->req[i].src.width,
+                    l->req[i].src.height,
+                    l->req[i].src.format,
+                    l->req[i].src_rect.x,
+                    l->req[i].src_rect.y,
+                    l->req[i].src_rect.w,
+                    l->req[i].src_rect.h,
+                    l->req[i].dst.width,
+                    l->req[i].dst.height,
+                    l->req[i].dst.format,
+                    l->req[i].dst_rect.x,
+                    l->req[i].dst_rect.y,
+                    l->req[i].dst_rect.w,
+                    l->req[i].dst_rect.h,
+                    l->req[i].flags
+            );
+        }
+#endif
         return -errno;
+    }
 }
 
 /*****************************************************************************/
@@ -338,10 +367,18 @@ static int stretch_copybit(
         status = 0;
         while ((status == 0) && region->next(region, &clip)) {
             intersect(&clip, &bounds, &clip);
-            set_infos(ctx, &list.req[list.count]);
-            set_image(&list.req[list.count].dst, dst);
-            set_image(&list.req[list.count].src, src);
-            set_rects(ctx, &list.req[list.count], dst_rect, src_rect, &clip);
+            mdp_blit_req* req = &list.req[list.count];
+            set_infos(ctx, req);
+            set_image(&req->dst, dst);
+            set_image(&req->src, src);
+            set_rects(ctx, req, dst_rect, src_rect, &clip);
+
+            if (req->src_rect.w<=0 || req->src_rect.h<=0)
+                continue;
+
+            if (req->dst_rect.w<=0 || req->dst_rect.h<=0)
+                continue;
+
             if (++list.count == maxCount) {
                 status = msm_copybit(ctx, &list);
                 list.count = 0;
