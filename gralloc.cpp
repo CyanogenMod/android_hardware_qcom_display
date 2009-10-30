@@ -77,6 +77,9 @@ extern int gralloc_register_buffer(gralloc_module_t const* module,
 extern int gralloc_unregister_buffer(gralloc_module_t const* module,
         buffer_handle_t handle);
 
+extern int gralloc_perform(struct gralloc_module_t const* module,
+        int operation, ... );
+
 /*****************************************************************************/
 
 static struct hw_module_methods_t gralloc_module_methods = {
@@ -98,6 +101,7 @@ struct private_module_t HAL_MODULE_INFO_SYM = {
         unregisterBuffer: gralloc_unregister_buffer,
         lock: gralloc_lock,
         unlock: gralloc_unlock,
+        perform: gralloc_perform,
     },
     framebuffer: 0,
     flags: 0,
