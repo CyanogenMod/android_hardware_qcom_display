@@ -19,6 +19,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -283,4 +284,39 @@ int gralloc_unlock(gralloc_module_t const* module,
             (volatile int32_t*)&hnd->lockState));
 
     return 0;
+}
+
+/*****************************************************************************/
+
+int gralloc_perform(struct gralloc_module_t const* module,
+        int operation, ... )
+{
+    int res = -EINVAL;
+    va_list args;
+    va_start(args, operation);
+
+    switch (operation) {
+        case GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER: {
+            int fd = va_arg(args, int);
+            size_t size = va_arg(args, size_t);
+            size_t offset = va_arg(args, size_t);
+            void* base = va_arg(args, void*);
+            native_handle_t** handle = va_arg(args, native_handle_t**);
+            private_handle_t* hnd = (private_handle_t*)native_handle_create(
+                    private_handle_t::sNumFds, private_handle_t::sNumInts);
+            hnd->magic = private_handle_t::sMagic;
+            hnd->fd = fd;
+            hnd->flags = private_handle_t::PRIV_FLAGS_USES_PMEM;
+            hnd->size = size;
+            hnd->offset = offset;
+            hnd->base = intptr_t(base) + offset;
+            hnd->lockState = private_handle_t::LOCK_STATE_MAPPED;
+            *handle = (native_handle_t *)hnd;
+            res = 0;
+            break;
+        }
+    }
+
+    va_end(args);
+    return res;
 }
