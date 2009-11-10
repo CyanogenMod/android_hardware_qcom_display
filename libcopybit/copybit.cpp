@@ -36,7 +36,7 @@
 
 #include "gralloc_priv.h"
 
-#define DEBUG_MDP_ERRORS 0
+#define DEBUG_MDP_ERRORS 1
 
 /******************************************************************************/
 
@@ -359,7 +359,13 @@ static int stretch_copybit(
                     return -EINVAL;
             }
         }
-        
+
+        if (src_rect->l < 0 || src_rect->r > src->w ||
+            src_rect->t < 0 || src_rect->b > src->h) {
+            // this is always invalid
+            return -EINVAL;
+        }
+
         const uint32_t maxCount = sizeof(list.req)/sizeof(list.req[0]);
         const struct copybit_rect_t bounds = { 0, 0, dst->w, dst->h };
         struct copybit_rect_t clip;
