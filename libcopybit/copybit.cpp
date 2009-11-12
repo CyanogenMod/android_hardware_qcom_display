@@ -42,8 +42,10 @@
 
 #if defined(COPYBIT_MSM7K)
 #define MAX_SCALE_FACTOR    (4)
+#define MAX_DIMENSION       (4096)
 #elif defined(COPYBIT_QSD8K)
 #define MAX_SCALE_FACTOR    (8)
+#define MAX_DIMENSION       (2048)
 #else
 #error "Unsupported MDP version"
 #endif
@@ -365,6 +367,12 @@ static int stretch_copybit(
             // this is always invalid
             return -EINVAL;
         }
+
+        if (src->w > MAX_DIMENSION || src->h > MAX_DIMENSION)
+            return -EINVAL;
+
+        if (dst->w > MAX_DIMENSION || dst->h > MAX_DIMENSION)
+            return -EINVAL;
 
         const uint32_t maxCount = sizeof(list.req)/sizeof(list.req[0]);
         const struct copybit_rect_t bounds = { 0, 0, dst->w, dst->h };
