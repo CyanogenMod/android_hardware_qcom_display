@@ -34,6 +34,20 @@
 
 #include <hardware/copybit.h>
 
+#include "gralloc_priv.h"
+
+#define DEBUG_MDP_ERRORS 1
+
+/******************************************************************************/
+
+#if defined(COPYBIT_MSM7K)
+#define MAX_SCALE_FACTOR    (4)
+#elif defined(COPYBIT_QSD8K)
+#define MAX_SCALE_FACTOR    (8)
+#else
+#error "Unsupported MDP version"
+#endif
+
 /******************************************************************************/
 
 /** State information for each device instance */
@@ -52,21 +66,21 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
         struct hw_device_t** device);
 
 static struct hw_module_methods_t copybit_module_methods = {
-    .open =  open_copybit
+    open:  open_copybit
 };
 
 /*
  * The COPYBIT Module
  */
-const struct copybit_module_t HAL_MODULE_INFO_SYM = {
-    .common = {
-        .tag = HARDWARE_MODULE_TAG,
-        .version_major = 1,
-        .version_minor = 0,
-        .id = COPYBIT_HARDWARE_MODULE_ID,
-        .name = "QCT MSM7K COPYBIT Module",
-        .author = "Google, Inc.",
-        .methods = &copybit_module_methods,
+struct copybit_module_t HAL_MODULE_INFO_SYM = {
+    common: {
+        tag: HARDWARE_MODULE_TAG,
+        version_major: 1,
+        version_minor: 0,
+        id: COPYBIT_HARDWARE_MODULE_ID,
+        name: "QCT MSM7K COPYBIT Module",
+        author: "Google, Inc.",
+        methods: &copybit_module_methods
     }
 };
 
@@ -103,9 +117,11 @@ static void intersect(struct copybit_rect_t *out,
 /** convert COPYBIT_FORMAT to MDP format */
 static int get_format(int format) {
     switch (format) {
+    case COPYBIT_FORMAT_RGB_565:       return MDP_RGB_565;
+    case COPYBIT_FORMAT_RGBX_8888:     return MDP_RGBX_8888;
+    case COPYBIT_FORMAT_RGB_888:       return MDP_RGB_888;
     case COPYBIT_FORMAT_RGBA_8888:     return MDP_RGBA_8888;
     case COPYBIT_FORMAT_BGRA_8888:     return MDP_BGRA_8888;
-    case COPYBIT_FORMAT_RGB_565:       return MDP_RGB_565;
     case COPYBIT_FORMAT_YCbCr_422_SP:  return MDP_Y_CBCR_H2V1;
     case COPYBIT_FORMAT_YCbCr_420_SP:  return MDP_Y_CBCR_H2V2;
     }
@@ -113,15 +129,27 @@ static int get_format(int format) {
 }
 
 /** convert from copybit image to mdp image structure */
-static void set_image(struct mdp_img *img,
-                      const struct copybit_image_t *rhs) {
+static void set_image(struct mdp_img *img, const struct copybit_image_t *rhs) 
+{
+    private_handle_t* hnd = (private_handle_t*)rhs->handle;
     img->width      = rhs->w;
     img->height     = rhs->h;
     img->format     = get_format(rhs->format);
-    img->offset     = rhs->offset;
-    img->memory_id  = rhs->fd;
+    img->offset     = hnd->offset;
+#if defined(COPYBIT_MSM7K)
+    if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_GPU) {
+        img->memory_id = hnd->gpu_fd;
+        if (img->format == MDP_RGBA_8888) {
+            // msm7201A GPU only supports BGRA_8888 destinations
+            img->format = MDP_BGRA_8888;
+        }
+    } else {
+        img->memory_id = hnd->fd;
+    }
+#else
+    img->memory_id  = hnd->fd;
+#endif
 }
-
 /** setup rectangles */
 static void set_rects(struct copybit_context_t *dev,
                       struct mdp_blit_req *e,
@@ -166,7 +194,7 @@ static void set_rects(struct copybit_context_t *dev,
 static void set_infos(struct copybit_context_t *dev, struct mdp_blit_req *req) {
     req->alpha = dev->mAlpha;
     req->transp_mask = MDP_TRANSP_NOP;
-    req->flags = dev->mFlags;
+    req->flags = dev->mFlags | MDP_BLEND_FG_PREMULT;
 }
 
 /** copy the bits */
@@ -175,10 +203,37 @@ static int msm_copybit(struct copybit_context_t *dev, void const *list)
     int err = ioctl(dev->mFD, MSMFB_BLIT,
                     (struct mdp_blit_req_list const*)list);
     LOGE_IF(err<0, "copyBits failed (%s)", strerror(errno));
-    if (err == 0)
+    if (err == 0) {
         return 0;
-    else
+    } else {
+#if DEBUG_MDP_ERRORS
+        struct mdp_blit_req_list const* l = (struct mdp_blit_req_list const*)list;
+        for (int i=0 ; i<l->count ; i++) {
+            LOGD("%d: src={w=%d, h=%d, f=%d, rect={%d,%d,%d,%d}}\n"
+                 "    dst={w=%d, h=%d, f=%d, rect={%d,%d,%d,%d}}\n"
+                 "    flags=%08lx"
+                    ,
+                    i,
+                    l->req[i].src.width,
+                    l->req[i].src.height,
+                    l->req[i].src.format,
+                    l->req[i].src_rect.x,
+                    l->req[i].src_rect.y,
+                    l->req[i].src_rect.w,
+                    l->req[i].src_rect.h,
+                    l->req[i].dst.width,
+                    l->req[i].dst.height,
+                    l->req[i].dst.format,
+                    l->req[i].dst_rect.x,
+                    l->req[i].dst_rect.y,
+                    l->req[i].dst_rect.w,
+                    l->req[i].dst_rect.h,
+                    l->req[i].flags
+            );
+        }
+#endif
         return -errno;
+    }
 }
 
 /*****************************************************************************/
@@ -257,10 +312,10 @@ static int get(struct copybit_device_t *dev, int name)
     if (ctx) {
         switch(name) {
         case COPYBIT_MINIFICATION_LIMIT:
-            value = 4;
+            value = MAX_SCALE_FACTOR;
             break;
         case COPYBIT_MAGNIFICATION_LIMIT:
-            value = 4;
+            value = MAX_SCALE_FACTOR;
             break;
         case COPYBIT_SCALING_FRAC_BITS:
             value = 32;
@@ -304,7 +359,13 @@ static int stretch_copybit(
                     return -EINVAL;
             }
         }
-        
+
+        if (src_rect->l < 0 || src_rect->r > src->w ||
+            src_rect->t < 0 || src_rect->b > src->h) {
+            // this is always invalid
+            return -EINVAL;
+        }
+
         const uint32_t maxCount = sizeof(list.req)/sizeof(list.req[0]);
         const struct copybit_rect_t bounds = { 0, 0, dst->w, dst->h };
         struct copybit_rect_t clip;
@@ -312,10 +373,18 @@ static int stretch_copybit(
         status = 0;
         while ((status == 0) && region->next(region, &clip)) {
             intersect(&clip, &bounds, &clip);
-            set_infos(ctx, &list.req[list.count]);
-            set_image(&list.req[list.count].dst, dst);
-            set_image(&list.req[list.count].src, src);
-            set_rects(ctx, &list.req[list.count], dst_rect, src_rect, &clip);
+            mdp_blit_req* req = &list.req[list.count];
+            set_infos(ctx, req);
+            set_image(&req->dst, dst);
+            set_image(&req->src, src);
+            set_rects(ctx, req, dst_rect, src_rect, &clip);
+
+            if (req->src_rect.w<=0 || req->src_rect.h<=0)
+                continue;
+
+            if (req->dst_rect.w<=0 || req->dst_rect.h<=0)
+                continue;
+
             if (++list.count == maxCount) {
                 status = msm_copybit(ctx, &list);
                 list.count = 0;
@@ -360,12 +429,13 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
         struct hw_device_t** device)
 {
     int status = -EINVAL;
-    struct copybit_context_t *ctx = malloc(sizeof(struct copybit_context_t));
+    copybit_context_t *ctx;
+    ctx = (copybit_context_t *)malloc(sizeof(copybit_context_t));
     memset(ctx, 0, sizeof(*ctx));
 
     ctx->device.common.tag = HARDWARE_DEVICE_TAG;
-    ctx->device.common.version = 0;
-    ctx->device.common.module = module;
+    ctx->device.common.version = 1;
+    ctx->device.common.module = const_cast<hw_module_t*>(module);
     ctx->device.common.close = close_copybit;
     ctx->device.set_parameter = set_parameter_copybit;
     ctx->device.get = get;
