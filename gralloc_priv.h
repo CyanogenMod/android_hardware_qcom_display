@@ -38,6 +38,7 @@ struct private_module_t {
     gralloc_module_t base;
 
     struct private_handle_t* framebuffer;
+    uint32_t fbFormat;
     uint32_t flags;
     uint32_t numBuffers;
     uint32_t bufferMask;
