@@ -104,6 +104,7 @@ struct private_module_t HAL_MODULE_INFO_SYM = {
         perform: gralloc_perform,
     },
     framebuffer: 0,
+    fbFormat: 0,
     flags: 0,
     numBuffers: 0,
     bufferMask: 0,
