@@ -20,6 +20,7 @@
 
 #include <cutils/ashmem.h>
 #include <cutils/log.h>
+#include <cutils/properties.h>
 
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>
@@ -217,7 +218,15 @@ int mapFrameBufferLocked(struct private_module_t* module)
     info.blue.length    = 8;
     info.transp.offset  = 0;
     info.transp.length  = 0;
-    module->fbFormat = HAL_PIXEL_FORMAT_RGBX_8888;
+
+    /* Note: the GL driver does not have a r=8 g=8 b=8 a=0 config, so if we do
+     * not use the MDP for composition (i.e. hw composition == 0), ask for
+     * RGBA instead of RGBX. */
+    char property[PROPERTY_VALUE_MAX];
+    if (property_get("debug.sf.hw", property, NULL) > 0 && atoi(property) == 0)
+        module->fbFormat = HAL_PIXEL_FORMAT_RGBX_8888;
+    else
+        module->fbFormat = HAL_PIXEL_FORMAT_RGBA_8888;
 
     /*
      * Request NUM_BUFFERS screens (at lest 2 for page flipping)
