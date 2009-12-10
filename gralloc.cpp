@@ -386,6 +386,9 @@ static int gralloc_alloc(alloc_device_t* dev,
         size = alignedw * alignedh * bpp;
     }
 
+    if ((ssize_t)size <= 0)
+        return -EINVAL;
+
     int err;
     if (usage & GRALLOC_USAGE_HW_FB) {
         err = gralloc_alloc_framebuffer(dev, size, usage, pHandle);
