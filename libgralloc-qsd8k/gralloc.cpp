@@ -279,9 +279,16 @@ try_ashmem:
                 err = -ENOMEM;
             } else {
                 struct pmem_region sub = { offset, size };
-                
+                int openFlags = O_RDWR | O_SYNC;
+                uint32_t uread = usage & GRALLOC_USAGE_SW_READ_MASK;
+                uint32_t uwrite = usage & GRALLOC_USAGE_SW_WRITE_MASK;
+                if (uread == GRALLOC_USAGE_SW_READ_OFTEN ||
+                    uwrite == GRALLOC_USAGE_SW_WRITE_OFTEN) {
+                    openFlags &= ~O_SYNC;
+                }
+
                 // now create the "sub-heap"
-                fd = open("/dev/pmem", O_RDWR, 0);
+                fd = open("/dev/pmem", openFlags, 0);
                 err = fd < 0 ? fd : 0;
                 
                 // and connect to it
@@ -297,8 +304,11 @@ try_ashmem:
                     close(fd);
                     sAllocator.deallocate(offset);
                     fd = -1;
+                } else {
+                    memset((char*)base + offset, 0, size);
+                    // clean and invalidate the new allocation
+                    cacheflush(intptr_t(base) + offset, size, 0);
                 }
-                memset((char*)base + offset, 0, size);
                 //LOGD_IF(!err, "allocating pmem size=%d, offset=%d", size, offset);
             }
         } else {
