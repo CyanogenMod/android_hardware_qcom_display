@@ -38,6 +38,7 @@ struct private_module_t {
     gralloc_module_t base;
 
     struct private_handle_t* framebuffer;
+    uint32_t fbFormat;
     uint32_t flags;
     uint32_t numBuffers;
     uint32_t bufferMask;
@@ -45,7 +46,6 @@ struct private_module_t {
     buffer_handle_t currentBuffer;
     int pmem_master;
     void* pmem_master_base;
-    unsigned long master_phys;
 
     struct fb_var_screeninfo info;
     struct fb_fix_screeninfo finfo;
@@ -92,7 +92,7 @@ struct private_handle_t {
     int     base;
     int     lockState;
     int     writeOwner;
-    int     phys; // The physical address of that chunk of memory. If using ashmem, set to 0 They don't care
+    int     gpuaddr; // The gpu address mapped into the mmu. If using ashmem, set to 0 They don't care
     int     pid;
 
 #ifdef __cplusplus
@@ -102,7 +102,7 @@ struct private_handle_t {
 
     private_handle_t(int fd, int size, int flags) :
         fd(fd), magic(sMagic), flags(flags), size(size), offset(0), gpu_fd(-1),
-        base(0), lockState(0), writeOwner(0), phys(0), pid(getpid())
+        base(0), lockState(0), writeOwner(0), gpuaddr(0), pid(getpid())
     {
         version = sizeof(native_handle);
         numInts = sNumInts;
