@@ -24,12 +24,15 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/ioctl.h>
 
 #include <cutils/log.h>
 #include <cutils/atomic.h>
 
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>
+
+#include <linux/android_pmem.h>
 
 #include "gralloc_priv.h"
 
@@ -301,6 +304,13 @@ int gralloc_perform(struct gralloc_module_t const* module,
             size_t size = va_arg(args, size_t);
             size_t offset = va_arg(args, size_t);
             void* base = va_arg(args, void*);
+
+            // validate that it's indeed a pmem buffer
+            pmem_region region;
+            if (ioctl(fd, PMEM_GET_SIZE, &region) < 0) {
+                break;
+            }
+
             native_handle_t** handle = va_arg(args, native_handle_t**);
             private_handle_t* hnd = (private_handle_t*)native_handle_create(
                     private_handle_t::sNumFds, private_handle_t::sNumInts);
