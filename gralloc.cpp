@@ -346,45 +346,28 @@ static int gralloc_alloc(alloc_device_t* dev,
         return -EINVAL;
 
     size_t size, alignedw, alignedh;
-    if (format == HAL_PIXEL_FORMAT_YCbCr_420_SP || 
-            format == HAL_PIXEL_FORMAT_YCbCr_422_SP) 
-    {
-        // FIXME: there is no way to return the alignedh
-        alignedw = (w + 1) & ~1;
-        switch (format) {
-            case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-                size = alignedw * h * 2;
-                break;
-            case HAL_PIXEL_FORMAT_YCbCr_422_SP:
-                alignedh = (h+1) & ~1;
-                size = (alignedw * alignedh) + (w/2 * h/2) * 2;
-                break;
-            default:
-                return -EINVAL;
-        }
-    } else {
-        alignedw = (w + 31) & ~31;
-        alignedh = (h + 31) & ~31;
-        int bpp = 0;
-        switch (format) {
-            case HAL_PIXEL_FORMAT_RGBA_8888:
-            case HAL_PIXEL_FORMAT_RGBX_8888:
-            case HAL_PIXEL_FORMAT_BGRA_8888:
-                bpp = 4;
-                break;
-            case HAL_PIXEL_FORMAT_RGB_888:
-                bpp = 3;
-                break;
-            case HAL_PIXEL_FORMAT_RGB_565:
-            case HAL_PIXEL_FORMAT_RGBA_5551:
-            case HAL_PIXEL_FORMAT_RGBA_4444:
-                bpp = 2;
-                break;
-            default:
-                return -EINVAL;
-        }
-        size = alignedw * alignedh * bpp;
+
+    alignedw = (w + 31) & ~31;
+    alignedh = (h + 31) & ~31;
+    int bpp = 0;
+    switch (format) {
+        case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+        case HAL_PIXEL_FORMAT_BGRA_8888:
+            bpp = 4;
+            break;
+        case HAL_PIXEL_FORMAT_RGB_888:
+            bpp = 3;
+            break;
+        case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_RGBA_5551:
+        case HAL_PIXEL_FORMAT_RGBA_4444:
+            bpp = 2;
+            break;
+        default:
+            return -EINVAL;
     }
+    size = alignedw * alignedh * bpp;
 
     if ((ssize_t)size <= 0)
         return -EINVAL;
