@@ -71,6 +71,7 @@ struct private_handle_t {
     enum {
         PRIV_FLAGS_FRAMEBUFFER = 0x00000001,
         PRIV_FLAGS_USES_PMEM   = 0x00000002,
+        PRIV_FLAGS_NEEDS_FLUSH = 0x00000004,
     };
 
     enum {
