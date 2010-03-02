@@ -235,6 +235,13 @@ int gralloc_lock(gralloc_module_t const* module,
         hnd->writeOwner = gettid();
     }
 
+    // if requesting sw write for non-framebuffer handles, flag for
+    // flushing at unlock
+    if ((usage & GRALLOC_USAGE_SW_WRITE_MASK) &&
+        !(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
+        hnd->flags |= private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
+    }
+
     if (usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK)) {
         if (!(current_value & private_handle_t::LOCK_STATE_MAPPED)) {
             // we need to map for real
@@ -263,6 +270,18 @@ int gralloc_unlock(gralloc_module_t const* module,
 
     private_handle_t* hnd = (private_handle_t*)handle;
     int32_t current_value, new_value;
+
+    if (hnd->flags & private_handle_t::PRIV_FLAGS_NEEDS_FLUSH) {
+        struct pmem_region region;
+        int err;
+
+        region.offset = hnd->offset;
+        region.len = hnd->size;
+        err = ioctl(hnd->fd, PMEM_CACHE_FLUSH, &region);
+        LOGE_IF(err < 0, "cannot flush handle %p (offs=%x len=%x)\n",
+                hnd, hnd->offset, hnd->size);
+        hnd->flags &= ~private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
+    }
 
     do {
         current_value = hnd->lockState;
