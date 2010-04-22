@@ -23,10 +23,22 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libGLESv1_CM
 
 LOCAL_SRC_FILES := 	\
 	allocator.cpp 	\
-	gralloc.cpp 	\
 	framebuffer.cpp \
-	mapper.cpp
+	gpu.cpp			\
+	gralloc.cpp		\
+	mapper.cpp		\
+	pmemalloc.cpp
 	
 LOCAL_MODULE := gralloc.$(TARGET_BOARD_PLATFORM)
 LOCAL_CFLAGS:= -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).gralloc\"
 include $(BUILD_SHARED_LIBRARY)
+
+# Build a host library for testing
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES :=		\
+    gpu.cpp				\
+	pmemalloc.cpp
+	
+LOCAL_MODULE := libgralloc_qsd8k_host
+LOCAL_CFLAGS:= -DLOG_TAG=\"gralloc-qsd8k\"
+include $(BUILD_HOST_STATIC_LIBRARY)
