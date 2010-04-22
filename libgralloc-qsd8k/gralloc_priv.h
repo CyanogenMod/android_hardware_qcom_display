@@ -29,10 +29,16 @@
 
 #include <linux/fb.h>
 
+enum {
+    /* gralloc usage bit indicating a pmem_adsp allocation should be used */
+    GRALLOC_USAGE_PRIVATE_PMEM_ADSP = GRALLOC_USAGE_PRIVATE_0,
+};
+
 /*****************************************************************************/
 
 struct private_module_t;
 struct private_handle_t;
+struct PmemAllocator;
 
 struct private_module_t {
     gralloc_module_t base;
@@ -44,8 +50,6 @@ struct private_module_t {
     uint32_t bufferMask;
     pthread_mutex_t lock;
     buffer_handle_t currentBuffer;
-    int pmem_master;
-    void* pmem_master_base;
 
     struct fb_var_screeninfo info;
     struct fb_fix_screeninfo finfo;
@@ -69,9 +73,10 @@ struct private_handle_t {
 #endif
     
     enum {
-        PRIV_FLAGS_FRAMEBUFFER = 0x00000001,
-        PRIV_FLAGS_USES_PMEM   = 0x00000002,
-        PRIV_FLAGS_NEEDS_FLUSH = 0x00000004,
+        PRIV_FLAGS_FRAMEBUFFER    = 0x00000001,
+        PRIV_FLAGS_USES_PMEM      = 0x00000002,
+        PRIV_FLAGS_USES_PMEM_ADSP = 0x00000004,
+        PRIV_FLAGS_NEEDS_FLUSH    = 0x00000008,
     };
 
     enum {
