@@ -338,6 +338,10 @@ try_ashmem:
 
 /*****************************************************************************/
 
+static inline size_t ALIGN(size_t x, size_t align) {
+    return (x + align-1) & (align-1);
+}
+
 static int gralloc_alloc(alloc_device_t* dev,
         int w, int h, int format, int usage,
         buffer_handle_t* pHandle, int* pStride)
@@ -347,27 +351,47 @@ static int gralloc_alloc(alloc_device_t* dev,
 
     size_t size, alignedw, alignedh;
 
-    alignedw = (w + 31) & ~31;
-    alignedh = (h + 31) & ~31;
-    int bpp = 0;
+    alignedw = ALIGN(w, 32);
+    alignedh = ALIGN(h, 32);
     switch (format) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_BGRA_8888:
-            bpp = 4;
+            size = alignedw * alignedh * 4;
             break;
         case HAL_PIXEL_FORMAT_RGB_888:
-            bpp = 3;
+            size = alignedw * alignedh * 3;
             break;
         case HAL_PIXEL_FORMAT_RGB_565:
         case HAL_PIXEL_FORMAT_RGBA_5551:
         case HAL_PIXEL_FORMAT_RGBA_4444:
-            bpp = 2;
+            size = alignedw * alignedh * 2;
             break;
+
+        // adreno formats
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:         // NV21
+            size  = ALIGN(alignedw*alignedh, 4096);
+            size += ALIGN(2 * ALIGN(w/2, 32) * ALIGN(h/2, 32), 4096);
+            break;
+        case HAL_PIXEL_FORMAT_YCbCr_422_I:          // YUYV
+        case HAL_PIXEL_FORMAT_CbYCrY_422_I:         // UYVY
+            size  = ALIGN(alignedw*alignedh*2, 4096);
+            break;
+        case HAL_PIXEL_FORMAT_YCrCb_422_P:          // YV12
+            size  = ALIGN(alignedw*alignedh, 4096);
+            size += ALIGN(2 * ALIGN(w/2, 32) * ALIGN(h, 32), 4096) * 2;
+            break;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:   // NV12
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP_TILED:   // NV21
+            // The chroma plane is subsampled,
+            // but the pitch in bytes is unchanged
+            size  = ALIGN( ALIGN(w, 128) * alignedh, 4096);
+            size += ALIGN( ALIGN(w, 128) * ALIGN(h/2, 32), 4096);
+            break;
+
         default:
             return -EINVAL;
     }
-    size = alignedw * alignedh * bpp;
 
     if ((ssize_t)size <= 0)
         return -EINVAL;
