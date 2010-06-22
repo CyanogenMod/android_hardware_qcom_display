@@ -377,7 +377,12 @@ static int gralloc_alloc(alloc_device_t* dev,
         case HAL_PIXEL_FORMAT_CbYCrY_422_I:         // UYVY
             size  = ALIGN(alignedw*alignedh*2, 4096);
             break;
+        case HAL_PIXEL_FORMAT_YCrCb_422_P:          // YV12
+            size  = ALIGN(alignedw*alignedh, 4096);
+            size += ALIGN(2 * ALIGN(w/2, 32) * ALIGN(h, 32), 4096) * 2;
+            break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:   // NV12
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP_TILED:   // NV21
             // The chroma plane is subsampled,
             // but the pitch in bytes is unchanged
             size  = ALIGN( ALIGN(w, 128) * alignedh, 4096);
