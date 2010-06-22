@@ -339,7 +339,7 @@ try_ashmem:
 /*****************************************************************************/
 
 static inline size_t ALIGN(size_t x, size_t align) {
-    return (x + align-1) & (align-1);
+    return (x + align-1) & ~(align-1);
 }
 
 static int gralloc_alloc(alloc_device_t* dev,
