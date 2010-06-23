@@ -380,7 +380,8 @@ static int gralloc_alloc(alloc_device_t* dev,
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:   // NV12
             // The chroma plane is subsampled,
             // but the pitch in bytes is unchanged
-            size  = ALIGN( ALIGN(w, 128) * alignedh, 4096);
+            // The GPU needs 4K alignment, but the video decoder needs 8K
+            size  = ALIGN( ALIGN(w, 128) * alignedh, 8192);
             size += ALIGN( ALIGN(w, 128) * ALIGN(h/2, 32), 4096);
             break;
 
