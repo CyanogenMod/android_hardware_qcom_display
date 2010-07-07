@@ -240,14 +240,9 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
 
         case HAL_PIXEL_FORMAT_YV12:
             alignedw = ALIGN(w, 16);
-            alignedh = ALIGN(h, 16);
-            size  = alignedw * alignedh;
-            size += size / 2;
-            break;
-
-        case HAL_PIXEL_FORMAT_YV16:
-            alignedh = ALIGN(h, 16);
-            size = alignedw * alignedh * 2;
+            alignedh = ALIGN(h,  2);
+            size = alignedw*alignedh +
+                    (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
             break;
 
         default:
