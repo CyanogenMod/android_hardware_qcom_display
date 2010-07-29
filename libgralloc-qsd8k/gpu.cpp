@@ -282,8 +282,10 @@ int gpu_context_t::free_impl(private_handle_t const* hnd) {
         } else if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP) {
             pmem_allocator = &pmemAdspAllocator;
         }
-        pmem_allocator->free_pmem_buffer(hnd->size, (void*)hnd->base,
-                hnd->offset, hnd->fd);
+        if (pmem_allocator) {
+            pmem_allocator->free_pmem_buffer(hnd->size, (void*)hnd->base,
+                    hnd->offset, hnd->fd);
+        }
         deps.terminateBuffer(&m->base, const_cast<private_handle_t*>(hnd));
     }
 
