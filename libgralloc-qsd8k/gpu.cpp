@@ -225,7 +225,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
             break;
 
         // adreno formats
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP:         // NV21
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:  // NV21
             size  = ALIGN(alignedw*alignedh, 4096);
             size += ALIGN(2 * ALIGN(w/2, 32) * ALIGN(h/2, 32), 4096);
             break;
