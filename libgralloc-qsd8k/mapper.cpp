@@ -238,8 +238,14 @@ int gralloc_lock(gralloc_module_t const* module,
 
     // if requesting sw write for non-framebuffer handles, flag for
     // flushing at unlock
+
+    const uint32_t pmemMask =
+            private_handle_t::PRIV_FLAGS_USES_PMEM |
+            private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP;
+
     if ((usage & GRALLOC_USAGE_SW_WRITE_MASK) &&
-        !(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
+            (hnd->flags & pmemMask) &&
+            !(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
         hnd->flags |= private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
     }
 
