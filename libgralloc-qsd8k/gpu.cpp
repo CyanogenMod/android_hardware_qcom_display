@@ -164,7 +164,7 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
         // Allocate the buffer from pmem
         err = pma->alloc_pmem_buffer(size, usage, &base, &offset, &fd);
         if (err < 0) {
-            if (((usage & GRALLOC_USAGE_HW_2D) == 0) &&
+            if (((usage & GRALLOC_USAGE_HW_MASK) == 0) &&
                 ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) == 0)) {
                 // the caller didn't request PMEM, so we can try something else
                 flags &= ~private_handle_t::PRIV_FLAGS_USES_PMEM;
