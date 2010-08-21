@@ -36,6 +36,25 @@ enum {
 
 /*****************************************************************************/
 
+enum {
+    /* OEM specific HAL formats */
+    //HAL_PIXEL_FORMAT_YCbCr_422_SP = 0x100, // defined in hardware.h
+    //HAL_PIXEL_FORMAT_YCrCb_420_SP = 0x101, // defined in hardware.h
+    HAL_PIXEL_FORMAT_YCbCr_422_P  = 0x102,
+    HAL_PIXEL_FORMAT_YCbCr_420_P  = 0x103,
+    //HAL_PIXEL_FORMAT_YCbCr_422_I  = 0x104, // defined in hardware.h
+    HAL_PIXEL_FORMAT_YCbCr_420_I  = 0x105,
+    HAL_PIXEL_FORMAT_CbYCrY_422_I = 0x106,
+    HAL_PIXEL_FORMAT_CbYCrY_420_I = 0x107,
+    HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED     = 0x108,
+    HAL_PIXEL_FORMAT_YCbCr_420_SP           = 0x109,
+    HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO    = 0x10A,
+    HAL_PIXEL_FORMAT_YCrCb_422_SP           = 0x10B,
+    HAL_PIXEL_FORMAT_YCrCb_420_SP_INTERLACE = 0x10C,
+};
+
+/*****************************************************************************/
+
 struct private_module_t;
 struct private_handle_t;
 struct PmemAllocator;
