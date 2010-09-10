@@ -239,8 +239,12 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
             break;
 
         case HAL_PIXEL_FORMAT_YV12:
+            if ((w&1) || (h&1)) {
+                LOGE("w or h is odd for HAL_PIXEL_FORMAT_YV12");
+                return -EINVAL;
+            }
             alignedw = ALIGN(w, 16);
-            alignedh = ALIGN(h,  2);
+            alignedh = h;
             size = alignedw*alignedh +
                     (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
             break;
