@@ -85,6 +85,42 @@ static bool isRGBType(int format) {
     return false;
 }
 
+static int get_mdp_orientation(int rotation, int flip) {
+    switch(flip) {
+    case HAL_TRANSFORM_FLIP_H:
+        switch(rotation) {
+        case 0: return MDP_FLIP_UD;
+        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_LR);
+        case HAL_TRANSFORM_ROT_180: return MDP_FLIP_LR;
+        case HAL_TRANSFORM_ROT_270: return (MDP_ROT_90 | MDP_FLIP_UD);
+        default: return -1;
+        break;
+        }
+    break;
+    case HAL_TRANSFORM_FLIP_V:
+        switch(rotation) {
+        case 0: return MDP_FLIP_LR;
+        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_UD);
+        case HAL_TRANSFORM_ROT_180: return MDP_FLIP_UD;
+        case HAL_TRANSFORM_ROT_270: return (MDP_ROT_90 | MDP_FLIP_LR);
+        default: return -1;
+        break;
+        }
+    break;
+    default:
+        switch(rotation) {
+        case 0: return MDP_ROT_NOP;
+        case HAL_TRANSFORM_ROT_90:  return MDP_ROT_90;
+        case HAL_TRANSFORM_ROT_180: return MDP_ROT_180;
+        case HAL_TRANSFORM_ROT_270: return MDP_ROT_270;
+        default: return -1;
+        break;
+        }
+    break;
+    }
+    return -1;
+}
+
 #define LOG_TAG "OverlayLIB"
 static void reportError(const char* message) {
     LOGE( "%s", message);
@@ -578,111 +614,121 @@ bool OverlayControlChannel::setParameter(int param, int value) {
     case OVERLAY_DITHER:
         break;
     case OVERLAY_TRANSFORM:
-	{
-	int val = mOVInfo.user_data[0];
-	if (value && mNoRot)
-	    return true;
+    {
+        int val = mOVInfo.user_data[0];
+        if (value && mNoRot)
+            return true;
 
-        switch(value) {
-	case 0:
-	    {
-	        if (val == MDP_ROT_90) {
+        int rot = value;
+        int flip = 0;
+        if(value & HAL_TRANSFORM_FLIP_SRC_H) {
+            flip = HAL_TRANSFORM_FLIP_H;
+        } else if(value & HAL_TRANSFORM_FLIP_SRC_V) {
+            flip = HAL_TRANSFORM_FLIP_V;
+        }
+        rot = value & HAL_TRANSFORM_ROT_MASK;
+
+        switch(rot) {
+        case 0:
+        {
+            if (val == MDP_ROT_90) {
                     int tmp = mOVInfo.src_rect.y;
                     mOVInfo.src_rect.y = mOVInfo.src.width -
-                               (mOVInfo.src_rect.x + mOVInfo.src_rect.w);
+                            (mOVInfo.src_rect.x + mOVInfo.src_rect.w);
                     mOVInfo.src_rect.x = tmp;
                     swapOVRotWidthHeight();
-	        }
-		else if (val == MDP_ROT_270) {
+            }
+            else if (val == MDP_ROT_270) {
                     int tmp = mOVInfo.src_rect.x;
                     mOVInfo.src_rect.x = mOVInfo.src.height - (
-		                             mOVInfo.src_rect.y + mOVInfo.src_rect.h);
+                            mOVInfo.src_rect.y + mOVInfo.src_rect.h);
                     mOVInfo.src_rect.y = tmp;
                     swapOVRotWidthHeight();
-		}
-		mOVInfo.user_data[0] = MDP_ROT_NOP;
-	        break;
-	    }
-	case OVERLAY_TRANSFORM_ROT_90:
-	    {
-		if (val == MDP_ROT_270) {
+            }
+            break;
+        }
+        case OVERLAY_TRANSFORM_ROT_90:
+        {
+            if (val == MDP_ROT_270) {
                     mOVInfo.src_rect.x = mOVInfo.src.width - (
-		                   mOVInfo.src_rect.x + mOVInfo.src_rect.w);
+                            mOVInfo.src_rect.x + mOVInfo.src_rect.w);
                     mOVInfo.src_rect.y = mOVInfo.src.height - (
-		                   mOVInfo.src_rect.y + mOVInfo.src_rect.h);
-		}
-	        else if (val == MDP_ROT_NOP || val == MDP_ROT_180) {
+                    mOVInfo.src_rect.y + mOVInfo.src_rect.h);
+            }
+            else if (val == MDP_ROT_NOP || val == MDP_ROT_180) {
                     int tmp = mOVInfo.src_rect.x;
                     mOVInfo.src_rect.x = mOVInfo.src.height -
                                (mOVInfo.src_rect.y + mOVInfo.src_rect.h);
                     mOVInfo.src_rect.y = tmp;
                     swapOVRotWidthHeight();
-	        }
-		mOVInfo.user_data[0] = MDP_ROT_90;
-	        break;
-	    }
-	case OVERLAY_TRANSFORM_ROT_180:
-	    {
-	        if (val == MDP_ROT_270) {
+            }
+            break;
+        }
+        case OVERLAY_TRANSFORM_ROT_180:
+        {
+            if (val == MDP_ROT_270) {
                     int tmp = mOVInfo.src_rect.y;
                     mOVInfo.src_rect.y = mOVInfo.src.width -
                                (mOVInfo.src_rect.x + mOVInfo.src_rect.w);
                     mOVInfo.src_rect.x = tmp;
                     swapOVRotWidthHeight();
-	        }
-		else if (val == MDP_ROT_90) {
+            }
+            else if (val == MDP_ROT_90) {
                     int tmp = mOVInfo.src_rect.x;
                     mOVInfo.src_rect.x = mOVInfo.src.height - (
-		                             mOVInfo.src_rect.y + mOVInfo.src_rect.h);
+                             mOVInfo.src_rect.y + mOVInfo.src_rect.h);
                     mOVInfo.src_rect.y = tmp;
                     swapOVRotWidthHeight();
-		}
-		mOVInfo.user_data[0] = MDP_ROT_180;
-	        break;
-	    }
-	case OVERLAY_TRANSFORM_ROT_270:
-	    {
-	        if (val == MDP_ROT_90) {
+            }
+            break;
+        }
+        case OVERLAY_TRANSFORM_ROT_270:
+        {
+            if (val == MDP_ROT_90) {
                     mOVInfo.src_rect.y = mOVInfo.src.height -
                                (mOVInfo.src_rect.y + mOVInfo.src_rect.h);
                     mOVInfo.src_rect.x = mOVInfo.src.width -
                                (mOVInfo.src_rect.x + mOVInfo.src_rect.w);
-	        }
-	        else if (val == MDP_ROT_NOP || val == MDP_ROT_180) {
+            }
+            else if (val == MDP_ROT_NOP || val == MDP_ROT_180) {
                     int tmp = mOVInfo.src_rect.y;
                     mOVInfo.src_rect.y = mOVInfo.src.width - (
-		                    mOVInfo.src_rect.x + mOVInfo.src_rect.w);
+                        mOVInfo.src_rect.x + mOVInfo.src_rect.w);
                     mOVInfo.src_rect.x = tmp;
                     swapOVRotWidthHeight();
-	        }
-
-		mOVInfo.user_data[0] = MDP_ROT_270;
-	        break;
-	    }
-	default: return false;
-	}
-	mRotInfo.rotations = mOVInfo.user_data[0];
-	if (mOVInfo.user_data[0])
-	    mRotInfo.enable = 1;
-	else {
-	    if(mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE)
-		mOVInfo.src.format = MDP_Y_CRCB_H2V2_TILE;
-	    mRotInfo.enable = 0;
+            }
+            break;
         }
-	if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
-	    reportError("setParameter, rotator start failed");
-	    return false;
-	}
+        default: return false;
+    }
+    int mdp_format = get_mdp_orientation(rot, flip);
+    if(mdp_format == -1)
+        return false;
 
-	if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
-	    reportError("setParameter, overlay set failed");
-	    return false;
-	}
+    mOVInfo.user_data[0] = mdp_format;
+    mRotInfo.rotations = mOVInfo.user_data[0];
+
+    if (mOVInfo.user_data[0])
+        mRotInfo.enable = 1;
+    else {
+        if(mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE)
+            mOVInfo.src.format = MDP_Y_CRCB_H2V2_TILE;
+            mRotInfo.enable = 0;
+        }
+        if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
+            reportError("setParameter, rotator start failed");
+            return false;
+        }
+
+    if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
+        reportError("setParameter, overlay set failed");
+        return false;
+    }
         break;
-	}
+    }
     default:
         reportError("Unsupproted param");
-	return false;
+    return false;
     }
 
     return true;
