@@ -247,18 +247,15 @@ static void *hdmi_ui_loop(void *ptr)
                          // ROT_0
                          case 0:
                          // ROT_180
-                         case HAL_TRANSFORM_ROT_180:
-                         x = (width - fbwidth) / 2;
-                         if (x < 0)
-                            x = 0;
-                         if (fbwidth < width)
-                            width = fbwidth;
-                         if (fbheight < height)
-                            height = fbheight;
-                            if(rot ==  HAL_TRANSFORM_ROT_180)
-                               rot = OVERLAY_TRANSFORM_ROT_180;
-                            else
-                               rot = 0;
+                         case HAL_TRANSFORM_ROT_180: {
+                                int tmpWidth = (height * fbwidth) / fbheight;
+                                x = (width - tmpWidth) / 2;
+                                width = tmpWidth;
+                                if(rot ==  HAL_TRANSFORM_ROT_180)
+                                  rot = OVERLAY_TRANSFORM_ROT_180;
+                                else
+                                  rot = 0;
+                            }
                             break;
                          // ROT_90
                          case HAL_TRANSFORM_ROT_90:
@@ -283,22 +280,19 @@ static void *hdmi_ui_loop(void *ptr)
                          // ROT_90
                          case HAL_TRANSFORM_ROT_90:
                          // ROT_270
-                         case HAL_TRANSFORM_ROT_270:
-                            //Swap width and height
-                         int t = fbwidth;
-                         fbwidth = fbheight;
-                         fbheight = t;
-                         x = (width - fbwidth) / 2;
-                         if (x < 0)
-                            x = 0;
-                         if (fbwidth < width)
-                            width = fbwidth;
-                         if (fbheight < height)
-                            height = fbheight;
-                            if(rot == HAL_TRANSFORM_ROT_90)
-                               rot = OVERLAY_TRANSFORM_ROT_270;
-                            else
-                               rot = OVERLAY_TRANSFORM_ROT_90;
+                         case HAL_TRANSFORM_ROT_270: {
+                                //Swap width and height
+                                int t = fbwidth;
+                                fbwidth = fbheight;
+                                fbheight = t;
+                                int tmpWidth = (height * fbwidth) / fbheight;
+                                x = (width - tmpWidth) / 2;
+                                width = tmpWidth;
+                                if(rot == HAL_TRANSFORM_ROT_90)
+                                    rot = OVERLAY_TRANSFORM_ROT_270;
+                                else
+                                    rot = OVERLAY_TRANSFORM_ROT_90;
+                            }
                             break;
                         }
                     }
