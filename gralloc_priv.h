@@ -51,6 +51,10 @@ enum {
     HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO    = 0x10A,
     HAL_PIXEL_FORMAT_YCrCb_422_SP           = 0x10B,
     HAL_PIXEL_FORMAT_YCrCb_420_SP_INTERLACE = 0x10C,
+    HAL_PIXEL_FORMAT_R_8                    = 0x10D,
+    HAL_PIXEL_FORMAT_RG_88                  = 0x10E,
+    HAL_PIXEL_FORMAT_INTERLACE              = 0x180,
+
 };
 
 /*****************************************************************************/
@@ -96,6 +100,7 @@ struct private_handle_t {
         PRIV_FLAGS_USES_PMEM      = 0x00000002,
         PRIV_FLAGS_USES_PMEM_ADSP = 0x00000004,
         PRIV_FLAGS_NEEDS_FLUSH    = 0x00000008,
+        PRIV_FLAGS_USES_ASHMEM    = 0x00000010,
     };
 
     enum {
