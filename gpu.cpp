@@ -79,7 +79,7 @@ int gpu_context_t::gralloc_alloc_framebuffer_locked(size_t size, int usage,
 
     // create a "fake" handles for it
     intptr_t vaddr = intptr_t(m->framebuffer->base);
-    private_handle_t* hnd = new private_handle_t(dup(m->framebuffer->fd), size,
+    private_handle_t* hnd = new private_handle_t(dup(m->framebuffer->fd), bufferSize,
                                                  private_handle_t::PRIV_FLAGS_USES_PMEM |
                                                  private_handle_t::PRIV_FLAGS_FRAMEBUFFER);
 
@@ -110,6 +110,46 @@ int gpu_context_t::gralloc_alloc_framebuffer(size_t size, int usage,
     return err;
 }
 
+int gpu_context_t::alloc_ashmem_buffer(size_t size, unsigned int postfix, void** pBase,
+            int* pOffset, int* pFd)
+{
+    int err = 0;
+    int fd = -1;
+    void* base = 0;
+    int offset = 0;
+
+    char name[ASHMEM_NAME_LEN];
+    snprintf(name, ASHMEM_NAME_LEN, "gralloc-buffer-%x", postfix);
+    int prot = PROT_READ | PROT_WRITE;
+    fd = ashmem_create_region(name, size);
+    if (fd < 0) {
+        LOGE("couldn't create ashmem (%s)", strerror(errno));
+        err = -errno;
+    } else {
+        if (ashmem_set_prot_region(fd, prot) < 0) {
+            LOGE("ashmem_set_prot_region(fd=%d, prot=%x) failed (%s)",
+                 fd, prot, strerror(errno));
+            close(fd);
+            err = -errno;
+        } else {
+            base = mmap(0, size, prot, MAP_SHARED|MAP_POPULATE|MAP_LOCKED, fd, 0);
+            if (base == MAP_FAILED) {
+                LOGE("alloc mmap(fd=%d, size=%d, prot=%x) failed (%s)",
+                     fd, size, prot, strerror(errno));
+                close(fd);
+                err = -errno;
+            } else {
+                memset((char*)base + offset, 0, size);
+            }
+        }
+    }
+    if(err == 0) {
+        *pFd = fd;
+        *pBase = base;
+        *pOffset = offset;
+    }
+    return err;
+}
 
 int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t* pHandle)
 {
@@ -123,7 +163,7 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
     int lockState = 0;
 
     size = roundUpToPageSize(size);
-
+#ifndef USE_ASHMEM
     if (usage & GRALLOC_USAGE_HW_TEXTURE) {
         // enable pmem in that case, so our software GL can fallback to
         // the copybit module.
@@ -133,15 +173,25 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
     if (usage & GRALLOC_USAGE_HW_2D) {
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
     }
-
+#else
+    if (usage & GRALLOC_USAGE_PRIVATE_PMEM){
+        flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
+    }
+#endif
     if (usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) {
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP;
         flags &= ~private_handle_t::PRIV_FLAGS_USES_PMEM;
     }
 
     private_module_t* m = reinterpret_cast<private_module_t*>(common.module);
-
-    if ((flags & private_handle_t::PRIV_FLAGS_USES_PMEM) != 0 ||
+    if((flags & private_handle_t::PRIV_FLAGS_USES_PMEM) == 0 &&
+       (flags & private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP) == 0) {
+       flags |= private_handle_t::PRIV_FLAGS_USES_ASHMEM;
+       err = alloc_ashmem_buffer(size, (unsigned int)pHandle, &base, &offset, &fd);
+       if(err >= 0)
+            lockState |= private_handle_t::LOCK_STATE_MAPPED; 
+    }
+    else if ((flags & private_handle_t::PRIV_FLAGS_USES_PMEM) != 0 ||
         (flags & private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP) != 0) {
 
         PmemAllocator* pma = 0;

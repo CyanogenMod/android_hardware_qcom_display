@@ -31,7 +31,22 @@ LOCAL_SRC_FILES := 	\
 	
 LOCAL_MODULE := gralloc.$(TARGET_BOARD_PLATFORM)
 LOCAL_CFLAGS:= -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).gralloc\"
+
+ifneq (, $(filter msm7625_ffa msm7625_surf msm7627_ffa msm7627_surf msm7627_7x_ffa msm7627_7x_surf, $(QCOM_TARGET_PRODUCT)))
+LOCAL_CFLAGS += -DTARGET_MSM7x27
+endif
+
+ifeq ($(TARGET_HAVE_HDMI_OUT),true)
+LOCAL_CFLAGS += -DHDMI_DUAL_DISPLAY
+LOCAL_C_INCLUDES := $(LOCAL_PATH)/../liboverlay
+LOCAL_SHARED_LIBRARIES += liboverlay
+endif
+
+ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
+LOCAL_CFLAGS += -DUSE_ASHMEM
+endif
 include $(BUILD_SHARED_LIBRARY)
+
 
 # Build a host library for testing
 ifeq ($(HOST_OS),linux)
