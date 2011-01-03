@@ -826,6 +826,9 @@ int fb_device_open(hw_module_t const* module, const char* name,
 
             *device = &dev->device.common;
         }
+
+        // Close the gralloc module
+        gralloc_close(gralloc_device);
     }
     return status;
 }
