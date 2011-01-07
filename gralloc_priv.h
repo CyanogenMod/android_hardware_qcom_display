@@ -149,9 +149,9 @@ enum {
     HAL_3D_IN_LR_SIDE  = 0x10000,
     HAL_3D_IN_LR_TOP   = 0x20000,
     HAL_3D_IN_LR_INTERLEAVE = 0x40000,
-    HAL_3D_OUT_LR_SIDE  = 0x1,
-    HAL_3D_OUT_LR_TOP   = 0x2,
-    HAL_3D_OUT_LR_INTERLEAVE = 0x4
+    HAL_3D_OUT_LR_SIDE  = 0x1000,
+    HAL_3D_OUT_LR_TOP   = 0x2000,
+    HAL_3D_OUT_LR_INTERLEAVE = 0x4000
 };
 
 /*****************************************************************************/
