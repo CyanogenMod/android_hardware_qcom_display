@@ -70,6 +70,7 @@
 
 namespace overlay {
 
+const int max_num_buffers = 3;
 struct overlay_rect {
     int x;
     int y;
@@ -94,7 +95,8 @@ class OverlayControlChannel {
     mdp_overlay mOVInfo;
     msm_rotator_img_info mRotInfo;
     bool openDevices(int fbnum = -1);
-    bool setOverlayInformation(int w, int h, int format, int flags, int zorder = 0);
+    bool setOverlayInformation(int w, int h, int format,
+                       int flags, int zorder = 0, bool ignoreFB = false);
     bool startOVRotatorSessions(int w, int h, int format);
     void swapOVRotWidthHeight();
 
@@ -103,10 +105,11 @@ public:
     ~OverlayControlChannel();
     bool startControlChannel(int w, int h, int format,
                                int fbnum, bool norot = false,
-                               unsigned int format3D = 0, int zorder = 0);
+                               unsigned int format3D = 0, int zorder = 0,
+                               bool ignoreFB = false);
     bool closeControlChannel();
     bool setPosition(int x, int y, uint32_t w, uint32_t h);
-    bool setParameter(int param, int value);
+    bool setParameter(int param, int value, bool fetch = true);
     bool getPosition(int& x, int& y, uint32_t& w, uint32_t& h);
     bool getOvSessionID(int& sessionID) const;
     bool getRotSessionID(int& sessionID) const;
@@ -116,7 +119,8 @@ public:
     int getFBHeight() const { return mFBHeight; }
     int getFormat3D() const { return mFormat3D; }
     bool getOrientation(int& orientation) const;
-    bool setSource(uint32_t w, uint32_t h, int format, int orientation);
+    bool setSource(uint32_t w, uint32_t h, int format,
+                       int orientation, bool ignoreFB);
     bool getAspectRatioPosition(int w, int h, int format, overlay_rect *rect);
 };
 
@@ -131,16 +135,21 @@ class OverlayDataChannel {
     msmfb_overlay_data mOvData;
     msmfb_overlay_data mOvDataRot;
     msm_rotator_data_info mRotData;
+    int mRotOffset[max_num_buffers];
+    int mCurrentItem;
+    int mNumBuffers;
 
-    bool openDevices(int fbnum = -1, bool uichannel = false);
+    bool openDevices(int fbnum = -1, bool uichannel = false, int num_buffers = 2);
 
 public:
     OverlayDataChannel();
     ~OverlayDataChannel();
     bool startDataChannel(const OverlayControlChannel& objOvCtrlChannel,
-                                int fbnum, bool norot = false, bool uichannel = false);
+                                int fbnum, bool norot = false,
+                                bool uichannel = false, int num_buffers = 2);
     bool startDataChannel(int ovid, int rotid, int size,
-                       int fbnum, bool norot = false, bool uichannel = false);
+                       int fbnum, bool norot = false, bool uichannel = false,
+                       int num_buffers = 2);
     bool closeDataChannel();
     bool setFd(int fd);
     bool queueBuffer(uint32_t offset);
@@ -156,6 +165,7 @@ class Overlay {
 
     bool mChannelUP;
     bool mHDMIConnected;
+    bool mCloseChannel;
 
     OverlayControlChannel objOvCtrlChannel[2];
     OverlayDataChannel    objOvDataChannel[2];
@@ -165,7 +175,8 @@ public:
     ~Overlay();
 
     bool startChannel(int w, int h, int format, int fbnum, bool norot = false,
-                                bool uichannel = false, unsigned int format3D = 0);
+                          bool uichannel = false, unsigned int format3D = 0,
+                          bool ignoreFB = false, int num_buffers = 2);
     bool closeChannel();
     bool setPosition(int x, int y, uint32_t w, uint32_t h);
     bool setParameter(int param, int value);
@@ -178,7 +189,9 @@ public:
     int getFBHeight(int channel = 0) const;
     bool getOrientation(int& orientation) const;
     bool queueBuffer(buffer_handle_t buffer);
-    bool setSource(uint32_t w, uint32_t h, int format, int orientation, bool hdmiConnected);
+    bool setSource(uint32_t w, uint32_t h, int format,
+                    int orientation, bool hdmiConnected,
+                    bool ignoreFB = false, int numBuffers = 2);
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
 
 private:

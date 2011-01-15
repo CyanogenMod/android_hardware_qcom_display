@@ -29,6 +29,8 @@ static int get_mdp_format(int format) {
         return MDP_BGRA_8888;
     case HAL_PIXEL_FORMAT_RGB_565:
         return MDP_RGB_565;
+    case HAL_PIXEL_FORMAT_RGBX_8888:
+        return MDP_RGBX_8888;
     case HAL_PIXEL_FORMAT_YCbCr_422_SP:
         return MDP_Y_CBCR_H2V1;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP:
@@ -48,6 +50,7 @@ static int get_size(int format, int w, int h) {
     switch (format) {
     case MDP_RGBA_8888:
     case MDP_BGRA_8888:
+    case MDP_RGBX_8888:
         size *= 4;
 	break;
     case MDP_RGB_565:
@@ -72,17 +75,6 @@ static int get_size(int format, int w, int h) {
         return 0;
     }
     return size;
-}
-
-static bool isRGBType(int format) {
-    switch (format) {
-        case MDP_RGBA_8888:
-        case MDP_BGRA_8888:
-        case MDP_RGBX_8888:
-        case MDP_RGB_565:
-            return true;
-    }
-    return false;
 }
 
 static int get_mdp_orientation(int rotation, int flip) {
@@ -121,6 +113,29 @@ static int get_mdp_orientation(int rotation, int flip) {
     return -1;
 }
 
+static bool isRGBType(int format) {
+    switch (format) {
+        case MDP_RGBA_8888:
+        case MDP_BGRA_8888:
+        case MDP_RGBX_8888:
+        case MDP_RGB_565:
+            return true;
+    }
+    return false;
+}
+
+static int getRGBBpp(int format) {
+    switch (format) {
+        case MDP_RGBA_8888:
+        case MDP_BGRA_8888:
+        case MDP_RGBX_8888:
+            return 4;
+        case MDP_RGB_565:
+            return 2;
+    }
+    return -1;
+}
+
 #define LOG_TAG "OverlayLIB"
 static void reportError(const char* message) {
     LOGE( "%s", message);
@@ -128,7 +143,8 @@ static void reportError(const char* message) {
 
 using namespace overlay;
 
-Overlay::Overlay() : mChannelUP(false), mHDMIConnected(false) {
+Overlay::Overlay() : mChannelUP(false), mHDMIConnected(false),
+                     mCloseChannel(false) {
 }
 
 Overlay::~Overlay() {
@@ -143,13 +159,18 @@ int Overlay::getFBHeight(int channel) const {
     return objOvCtrlChannel[channel].getFBHeight();
 }
 
-bool Overlay::startChannel(int w, int h, int format, int fbnum, bool norot, bool uichannel, unsigned int format3D) {
-    mChannelUP = objOvCtrlChannel[0].startControlChannel(w, h, format, fbnum, norot, format3D);
+bool Overlay::startChannel(int w, int h, int format, int fbnum,
+                              bool norot, bool uichannel,
+                              unsigned int format3D, bool ignoreFB,
+                              int num_buffers) {
+    mChannelUP = objOvCtrlChannel[0].startControlChannel(w, h, format, fbnum,
+                                                   norot, format3D, 0, ignoreFB);
     if (!mChannelUP) {
         LOGE("startChannel for fb0 failed");
         return mChannelUP;
     }
-    return objOvDataChannel[0].startDataChannel(objOvCtrlChannel[0], fbnum, norot, uichannel);
+    return objOvDataChannel[0].startDataChannel(objOvCtrlChannel[0], fbnum,
+                                            norot, uichannel, num_buffers);
 }
 
 bool Overlay::startChannelHDMI(int w, int h, int format, bool norot) {
@@ -184,7 +205,8 @@ bool Overlay::startChannelHDMI(int w, int h, int format, bool norot) {
 }
 
 bool Overlay::closeChannel() {
-    if (!mChannelUP)
+
+    if (!mCloseChannel && !mChannelUP)
         return true;
 
     objOvCtrlChannel[0].closeControlChannel();
@@ -194,6 +216,7 @@ bool Overlay::closeChannel() {
     objOvDataChannel[1].closeDataChannel();
 
     mChannelUP = false;
+    mCloseChannel = false;
     return true;
 }
 
@@ -209,15 +232,26 @@ bool Overlay::setPosition(int x, int y, uint32_t w, uint32_t h) {
     return objOvCtrlChannel[0].setPosition(x, y, w, h);
 }
 
-bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation, bool hdmiConnected) {
-    if ((hdmiConnected != mHDMIConnected) || !objOvCtrlChannel[0].setSource(w, h, format, orientation)) {
+bool Overlay::setSource(uint32_t w, uint32_t h, int format, 
+                         int orientation, bool hdmiConnected, bool ignoreFB, int num_buffers) {
+    if (mCloseChannel)
         closeChannel();
-        mChannelUP = false;
+
+    if ((hdmiConnected != mHDMIConnected)
+             || !objOvCtrlChannel[0].setSource(w, h, format,
+                                      orientation, ignoreFB)) {
+        if (mChannelUP) {
+            mCloseChannel = true;
+            return false;
+        }
         mHDMIConnected = hdmiConnected;
+        int hw_format = get_mdp_format(format);
+        bool uichannel = isRGBType(hw_format);
         if (mHDMIConnected) {
             return startChannelHDMI(w, h, format, !orientation);
         } else {
-            return startChannel(w, h, format, 0, !orientation);
+            return startChannel(w, h, format, 0, !orientation,
+                                 uichannel, 0, ignoreFB, num_buffers);
         }
     }
     else
@@ -371,7 +405,8 @@ bool OverlayControlChannel::openDevices(int fbnum) {
 }
 
 bool OverlayControlChannel::setOverlayInformation(int w, int h,
-                                                 int format, int flags, int zorder) {
+                                  int format, int flags, int zorder,
+                                  bool ignoreFB) {
     int origW, origH, xoff, yoff;
 
     mOVInfo.id = MSMFB_NEW_REQUEST;
@@ -411,10 +446,12 @@ bool OverlayControlChannel::setOverlayInformation(int w, int h,
     mOVInfo.alpha = 0xff;
     mOVInfo.transp_mask = 0xffffffff;
     mOVInfo.flags = flags;
+    if (isRGBType(format))
+        mOVInfo.is_fg = ignoreFB;
+    if (ignoreFB && isRGBType(format) && getRGBBpp(format) == 4)
+        mOVInfo.flags &= ~MDP_OV_PIPE_SHARE;
     if (!isRGBType(format))
         mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
-
-    mOVInfo.is_fg = 0;
     mSize = get_size(format, w, h);
     return true;
 }
@@ -422,14 +459,12 @@ bool OverlayControlChannel::setOverlayInformation(int w, int h,
 bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
                                           int format) {
     bool ret = true;
-    if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
-        reportError("startOVRotatorSessions, Overlay set failed");
-        ret = false;
-    }
-    else if (mNoRot)
-        return true;
 
-    if (ret) {
+    if (!mNoRot) {
+        if (isRGBType(format) && mOVInfo.is_fg) {
+            w = (w + 31) & ~31;
+            h = (h + 31) & ~31;
+        }
         mRotInfo.src.format = format;
         mRotInfo.src.width = w;
         mRotInfo.src.height = h;
@@ -460,18 +495,32 @@ bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
             reportError("Rotator session failed");
 	    ret = false;
 	}
-	else
-	    return ret;
     }
 
-    closeControlChannel();
+    if (!mNoRot && isRGBType(format) && mOrientation && mOVInfo.is_fg) {
+        mOVInfo.dst_rect.w = mFBWidth;
+        mOVInfo.dst_rect.h = mFBHeight;
+        ret = setParameter(OVERLAY_TRANSFORM, mOrientation, false);
+        if (!ret) {
+            reportError("Overlay set failed.. ");
+            return false;
+        }
+    }
+    else if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
+        reportError("startOVRotatorSessions, Overlay set failed");
+        ret = false;
+    }
+
+    if (!ret)
+        closeControlChannel();
 
     return ret;
 }
 
 bool OverlayControlChannel::startControlChannel(int w, int h,
                                            int format, int fbnum, bool norot,
-                                           unsigned int format3D, int zorder) {
+                                           unsigned int format3D, int zorder,
+                                           bool ignoreFB) {
     mNoRot = norot;
     fb_fix_screeninfo finfo;
     fb_var_screeninfo vinfo;
@@ -498,7 +547,7 @@ bool OverlayControlChannel::startControlChannel(int w, int h,
     if (!openDevices(fbnum))
         return false;
 
-    if (!setOverlayInformation(w, h, hw_format, flags, zorder))
+    if (!setOverlayInformation(w, h, hw_format, flags, zorder, ignoreFB))
         return false;
 
     return startOVRotatorSessions(w, h, hw_format);
@@ -524,10 +573,12 @@ bool OverlayControlChannel::closeControlChannel() {
     return true;
 }
 
-bool OverlayControlChannel::setSource(uint32_t w, uint32_t h, int format, int orientation) {
+bool OverlayControlChannel::setSource(uint32_t w, uint32_t h,
+                        int format, int orientation, bool ignoreFB) {
     format = get_mdp_format(format);
-    if ((orientation == mOrientation) && ((orientation == MDP_ROT_90)
-                       || (orientation == MDP_ROT_270))) {
+    if ((orientation == mOrientation) 
+            && ((orientation == OVERLAY_TRANSFORM_ROT_90)
+            || (orientation == OVERLAY_TRANSFORM_ROT_270))) {
         if (format == MDP_Y_CRCB_H2V2_TILE) {
             format = MDP_Y_CRCB_H2V2;
             w = (((w-1)/64 +1)*64);
@@ -538,8 +589,21 @@ bool OverlayControlChannel::setSource(uint32_t w, uint32_t h, int format, int or
         h = tmp;
     }
     if (w == mOVInfo.src.width && h == mOVInfo.src.height
-            && format == mOVInfo.src.format && orientation == mOrientation)
+            && format == mOVInfo.src.format && orientation == mOrientation) {
+        if (!isRGBType(format))
+            return true;
+        if (ignoreFB == mOVInfo.is_fg)
+            return true;
+        mdp_overlay ov;
+        ov.id = mOVInfo.id;
+        if (ioctl(mFD, MSMFB_OVERLAY_GET, &ov))
+            return false;
+        mOVInfo = ov;
+        mOVInfo.is_fg = ignoreFB;
+        if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo))
+            return false;
         return true;
+    }
     mOrientation = orientation;
     return false;
 }
@@ -598,13 +662,12 @@ void OverlayControlChannel::swapOVRotWidthHeight() {
     mRotInfo.dst.height = tmp;
 }
 
-bool OverlayControlChannel::setParameter(int param, int value) {
+bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
     if (!isChannelUP())
         return false;
 
-    mdp_overlay ov;
-    ov.id = mOVInfo.id;
-    if (ioctl(mFD, MSMFB_OVERLAY_GET, &ov)) {
+    mdp_overlay ov = mOVInfo;
+    if (fetch && ioctl(mFD, MSMFB_OVERLAY_GET, &ov)) {
         reportError("setParameter, overlay GET failed");
         return false;
     }
@@ -799,7 +862,7 @@ OverlayDataChannel::~OverlayDataChannel() {
 
 bool OverlayDataChannel::startDataChannel(
                const OverlayControlChannel& objOvCtrlChannel,
-	       int fbnum, bool norot, bool uichannel) {
+               int fbnum, bool norot, bool uichannel, int num_buffers) {
     int ovid, rotid, size;
     mNoRot = norot;
     memset(&mOvData, 0, sizeof(mOvData));
@@ -808,13 +871,14 @@ bool OverlayDataChannel::startDataChannel(
     if (objOvCtrlChannel.getOvSessionID(ovid) &&
             objOvCtrlChannel.getRotSessionID(rotid) &&
 	    objOvCtrlChannel.getSize(size)) {
-        return startDataChannel(ovid, rotid, size, fbnum, norot, uichannel);
+        return startDataChannel(ovid, rotid, size, fbnum,
+                      norot, uichannel, num_buffers);
     }
     else
         return false;
 }
 
-bool OverlayDataChannel::openDevices(int fbnum, bool uichannel) {
+bool OverlayDataChannel::openDevices(int fbnum, bool uichannel, int num_buffers) {
     if (fbnum < 0)
         return false;
     char const * const device_template =
@@ -841,7 +905,7 @@ bool OverlayDataChannel::openDevices(int fbnum, bool uichannel) {
         if(!uichannel) {
             mPmemFD = open("/dev/pmem_smipool", O_RDWR | O_SYNC);
             if(mPmemFD >= 0)
-                mPmemAddr = (void *) mmap(NULL, mPmemOffset * 2, PROT_READ | PROT_WRITE,
+                mPmemAddr = (void *) mmap(NULL, mPmemOffset * num_buffers, PROT_READ | PROT_WRITE,
                          MAP_SHARED, mPmemFD, 0);
         }
 
@@ -855,7 +919,7 @@ bool OverlayDataChannel::openDevices(int fbnum, bool uichannel) {
                 mRotFD = -1;
                 return false;
            } else {
-                mPmemAddr = (void *) mmap(NULL, mPmemOffset * 2, PROT_READ | PROT_WRITE,
+                mPmemAddr = (void *) mmap(NULL, mPmemOffset * num_buffers, PROT_READ | PROT_WRITE,
                     MAP_SHARED, mPmemFD, 0);
                 if (mPmemAddr == MAP_FAILED) {
                     reportError("Cant map pmem_adsp ");
@@ -873,13 +937,18 @@ bool OverlayDataChannel::openDevices(int fbnum, bool uichannel) {
         mOvDataRot.data.memory_id = mPmemFD;
         mRotData.dst.memory_id = mPmemFD;
         mRotData.dst.offset = 0;
+        mNumBuffers = num_buffers;
+        mCurrentItem = 0;
+        for (int i = 0; i < num_buffers; i++)
+            mRotOffset[i] = i * mPmemOffset;
     }
 
     return true;
 }
 
 bool OverlayDataChannel::startDataChannel(int ovid, int rotid, int size,
-                                   int fbnum, bool norot, bool uichannel) {
+                                   int fbnum, bool norot,
+                                   bool uichannel, int num_buffers) {
     memset(&mOvData, 0, sizeof(mOvData));
     memset(&mOvDataRot, 0, sizeof(mOvDataRot));
     memset(&mRotData, 0, sizeof(mRotData));
@@ -889,8 +958,10 @@ bool OverlayDataChannel::startDataChannel(int ovid, int rotid, int size,
     mOvDataRot = mOvData;
     mPmemOffset = size;
     mRotData.session_id = rotid;
+    mNumBuffers = 0;
+    mCurrentItem = 0;
 
-    return openDevices(fbnum, uichannel);
+    return openDevices(fbnum, uichannel, num_buffers);
 }
 
 bool OverlayDataChannel::closeDataChannel() {
@@ -898,7 +969,7 @@ bool OverlayDataChannel::closeDataChannel() {
         return true;
 
     if (!mNoRot && mRotFD > 0) {
-        munmap(mPmemAddr, mPmemOffset * 2);
+        munmap(mPmemAddr, mPmemOffset * mNumBuffers);
         close(mPmemFD);
         mPmemFD = -1;
         close(mRotFD);
@@ -909,6 +980,9 @@ bool OverlayDataChannel::closeDataChannel() {
     memset(&mOvData, 0, sizeof(mOvData));
     memset(&mOvDataRot, 0, sizeof(mOvDataRot));
     memset(&mRotData, 0, sizeof(mRotData));
+
+    mNumBuffers = 0;
+    mCurrentItem = 0;
 
     return true;
 }
@@ -932,6 +1006,8 @@ bool OverlayDataChannel::queueBuffer(uint32_t offset) {
         mRotData.src.memory_id = mOvData.data.memory_id;
         mRotData.src.offset = offset;
         mRotData.dst.offset = (mRotData.dst.offset) ? 0 : mPmemOffset;
+        mRotData.dst.offset = mRotOffset[mCurrentItem];
+        mCurrentItem = (mCurrentItem + 1) % mNumBuffers;
 
         int result = ioctl(mRotFD,
                                MSM_ROTATOR_IOCTL_ROTATE, &mRotData);
@@ -939,6 +1015,10 @@ bool OverlayDataChannel::queueBuffer(uint32_t offset) {
         if (!result) {
             mOvDataRot.data.offset = (uint32_t) mRotData.dst.offset;
 	    odPtr = &mOvDataRot;
+        }
+        else if (max_num_buffers == mNumBuffers) {
+            reportError("Rotator failed..");
+            return false;
         }
     }
 
