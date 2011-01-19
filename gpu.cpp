@@ -335,6 +335,16 @@ int gpu_context_t::free_impl(private_handle_t const* hnd) {
             pmem_allocator = &pmemAllocator;
         } else if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP) {
             pmem_allocator = &pmemAdspAllocator;
+        } else if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_ASHMEM) {
+            // free ashmem
+            if (hnd->fd >= 0) {
+                if (hnd->base) {
+                    int err = munmap((void*)hnd->base, hnd->size);
+                    LOGE_IF(err<0, "ASHMEM_UNMAP failed (%s), "
+                        "fd=%d, sub.offset=%d, sub.size=%d",
+                        strerror(errno), hnd->fd, hnd->offset, hnd->size);
+                }
+            }
         }
         if (pmem_allocator) {
             pmem_allocator->free_pmem_buffer(hnd->size, (void*)hnd->base,
