@@ -216,10 +216,7 @@ static void *hdmi_ui_loop(void *ptr)
                     int width = pTemp->getFBWidth();
                     int height = pTemp->getFBHeight();
                     int aswidth = width, asheight = height;
-                    int final_width = width, final_height = height;
-                    int x = 0, y = 0; // Used for calculating normal x,y co-ordinates
-                    int x1 = 0, y1 = 0; // Action safe x, y co-ordinates
-                    int xx = 0, yy = 0; // Final x, y co-ordinates
+                    int asX = 0, asY = 0; // Action safe x, y co-ordinates
                     int fbwidth = m->info.xres, fbheight = m->info.yres;
                     float defaultASWidthRatio = 0.0f, defaultASHeightRatio = 0.0f;
                     if(HEIGHT_1080P == height) {
@@ -239,8 +236,8 @@ static void *hdmi_ui_loop(void *ptr)
 
                     aswidth = (int)((float)width  - (float)(width * asWidthRatio));
                     asheight = (int)((float)height  - (float)(height * asHeightRatio));
-                    x1 = (int)(width * asWidthRatio) / 2;
-                    y1 = (int)(height * asHeightRatio) / 2;
+                    asX = (width - aswidth) / 2;
+                    asY = (height - asheight) / 2;
                     int rot = m->orientation;
                     if (fbwidth < fbheight) {
                          switch(rot) {
@@ -248,9 +245,8 @@ static void *hdmi_ui_loop(void *ptr)
                          case 0:
                          // ROT_180
                          case HAL_TRANSFORM_ROT_180: {
-                                int tmpWidth = (height * fbwidth) / fbheight;
-                                x = (width - tmpWidth) / 2;
-                                width = tmpWidth;
+                                aswidth = (asheight * fbwidth) / fbheight;
+                                asX = (width - aswidth) / 2;
                                 if(rot ==  HAL_TRANSFORM_ROT_180)
                                   rot = OVERLAY_TRANSFORM_ROT_180;
                                 else
@@ -285,9 +281,8 @@ static void *hdmi_ui_loop(void *ptr)
                                 int t = fbwidth;
                                 fbwidth = fbheight;
                                 fbheight = t;
-                                int tmpWidth = (height * fbwidth) / fbheight;
-                                x = (width - tmpWidth) / 2;
-                                width = tmpWidth;
+                                aswidth = (asheight * fbwidth) / fbheight;
+                                asX = (width - aswidth) / 2;
                                 if(rot == HAL_TRANSFORM_ROT_90)
                                     rot = OVERLAY_TRANSFORM_ROT_270;
                                 else
@@ -296,19 +291,13 @@ static void *hdmi_ui_loop(void *ptr)
                             break;
                         }
                     }
-                         pTemp->setParameter(OVERLAY_TRANSFORM,
+                    pTemp->setParameter(OVERLAY_TRANSFORM,
                                           rot);
-                    // Calculate the interection of final destination parameters
-                    // Intersection of Action Safe rect and the orig rect will give the final dest rect
-                    xx = max(x1, x);
-                    yy = max(y1, y);
-                    final_width = min((x1+aswidth), (x+width))- xx;
-                    final_height = min((y1+asheight), (y+height))- yy;
-                    EVEN_OUT(xx);
-                    EVEN_OUT(yy);
-                    EVEN_OUT(final_width);
-                    EVEN_OUT(final_height);
-                    pTemp->setPosition(xx, yy, final_width, final_height);
+                    EVEN_OUT(asX);
+                    EVEN_OUT(asY);
+                    EVEN_OUT(aswidth);
+                    EVEN_OUT(asheight);
+                    pTemp->setPosition(asX, asY, aswidth, asheight);
                     pTemp->queueBuffer(m->currentOffset);
                 }
             }
