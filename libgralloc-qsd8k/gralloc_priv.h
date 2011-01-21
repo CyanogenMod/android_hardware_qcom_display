@@ -41,7 +41,12 @@ enum {
     GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL = GRALLOC_USAGE_PRIVATE_1,
 };
 
-#define NUM_BUFFERS 2
+/* numbers of max buffers for page flipping */
+#define NUM_FRAMEBUFFERS_MIN 2
+#define NUM_FRAMEBUFFERS_MAX 3
+
+/* number of default bufers for page flipping */
+#define NUM_DEF_FRAME_BUFFERS 2
 #define NO_SURFACEFLINGER_SWAPINTERVAL
 #define INTERLACE_MASK 0x80
 #define S3D_FORMAT_MASK 0xFF000
@@ -175,11 +180,18 @@ struct qbuf_t {
     int  idx;
 };
 
+enum buf_state {
+    SUB,
+    REF,
+    AVL
+};
+
 struct avail_t {
     pthread_mutex_t lock;
     pthread_cond_t cond;
 #ifdef __cplusplus
     bool is_avail;
+    buf_state state;
 #endif
 };
 
@@ -204,7 +216,7 @@ struct private_module_t {
     Queue<struct qbuf_t> disp; // non-empty when buffer is ready for display    
 #endif
     int currentIdx;
-    struct avail_t avail[NUM_BUFFERS];
+    struct avail_t avail[NUM_FRAMEBUFFERS_MAX];
     pthread_mutex_t qlock;
     pthread_cond_t qpost;
 
