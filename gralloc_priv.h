@@ -146,12 +146,14 @@ enum {
 /* possible formats for 3D content*/
 enum {
     HAL_NO_3D = 0x00,
-    HAL_3D_IN_LR_SIDE  = 0x10000,
-    HAL_3D_IN_LR_TOP   = 0x20000,
-    HAL_3D_IN_LR_INTERLEAVE = 0x40000,
-    HAL_3D_OUT_LR_SIDE  = 0x1000,
-    HAL_3D_OUT_LR_TOP   = 0x2000,
-    HAL_3D_OUT_LR_INTERLEAVE = 0x4000
+    HAL_3D_IN_SIDE_BY_SIDE_HALF_L_R   = 0x10000,
+    HAL_3D_IN_TOP_BOTTOM              = 0x20000,
+    HAL_3D_IN_INTERLEAVE              = 0x40000,
+    HAL_3D_IN_SIDE_BY_SIDE_FULL       = 0x80000,
+    HAL_3D_IN_SIDE_BY_SIDE_HALF_R_L   = 0xC0000,
+    HAL_3D_OUT_SIDE_BY_SIDE       = 0x1000,
+    HAL_3D_OUT_TOP_BOTTOM         = 0x2000,
+    HAL_3D_OUT_INTERLEAVE         = 0x4000,
 };
 
 /*****************************************************************************/
