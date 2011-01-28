@@ -842,7 +842,7 @@ return 0;
 		                        dev->common.module);
 		struct overlay_data_context_t* ctx = (struct overlay_data_context_t*)dev;
 		Mutex::Autolock objLock(m->pobjMutex);
-		bool ret;
+		bool ret = false;
 		// for the 3D usecase extract L and R channels from a frame
 		if(ctx->format3D) {
 			if ((ctx->format3D & HAL_3D_IN_SIDE_BY_SIDE_HALF_L_R) ||

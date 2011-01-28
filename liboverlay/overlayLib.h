@@ -45,7 +45,11 @@
 #define HW_OVERLAY_MINIFICATION_LIMIT HW_OVERLAY_MAGNIFICATION_LIMIT
 
 #define EVEN_OUT(x) if (x & 0x0001) {x--;}
-
+#define VG0_PIPE 0
+#define VG1_PIPE 1
+#define NUM_CHANNELS 2
+#define FRAMEBUFFER_0 0
+#define FRAMEBUFFER_1 1
 /* ------------------------------- 3D defines ---------------------------------------*/
 // The compound format passed to the overlay is
 // ABCCC where A is the input 3D format,
@@ -122,6 +126,7 @@ public:
     bool setSource(uint32_t w, uint32_t h, int format,
                        int orientation, bool ignoreFB);
     bool getAspectRatioPosition(int w, int h, int format, overlay_rect *rect);
+    bool getPositionS3D(int channel, int format, overlay_rect *rect);
 };
 
 class OverlayDataChannel {
@@ -154,6 +159,7 @@ public:
     bool setFd(int fd);
     bool queueBuffer(uint32_t offset);
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
+    bool getCropS3D(overlay_rect *inRect, int channel, int format, overlay_rect *rect);
     bool isChannelUP() const { return (mFD > 0); }
 };
 
@@ -165,6 +171,7 @@ class Overlay {
 
     bool mChannelUP;
     bool mHDMIConnected;
+    int  mS3DFormat;
     bool mCloseChannel;
 
     OverlayControlChannel objOvCtrlChannel[2];
@@ -176,18 +183,19 @@ public:
 
     bool startChannel(int w, int h, int format, int fbnum, bool norot = false,
                           bool uichannel = false, unsigned int format3D = 0,
-                          bool ignoreFB = false, int num_buffers = 2);
+                          int channel = 0, bool ignoreFB = false,
+                          int num_buffers = 2);
     bool closeChannel();
     bool setPosition(int x, int y, uint32_t w, uint32_t h);
     bool setParameter(int param, int value);
-    bool setOrientation(int value);
-    bool setFd(int fd);
-    bool queueBuffer(uint32_t offset);
-    bool getPosition(int& x, int& y, uint32_t& w, uint32_t& h);
+    bool setOrientation(int value, int channel = 0);
+    bool setFd(int fd, int channel = 0);
+    bool queueBuffer(uint32_t offset, int channel = 0);
+    bool getPosition(int& x, int& y, uint32_t& w, uint32_t& h, int channel = 0);
     bool isChannelUP() const { return mChannelUP; }
     int getFBWidth(int channel = 0) const;
     int getFBHeight(int channel = 0) const;
-    bool getOrientation(int& orientation) const;
+    bool getOrientation(int& orientation, int channel = 0) const;
     bool queueBuffer(buffer_handle_t buffer);
     bool setSource(uint32_t w, uint32_t h, int format,
                     int orientation, bool hdmiConnected,
@@ -196,6 +204,12 @@ public:
 
 private:
     bool startChannelHDMI(int w, int h, int format, bool norot);
+    bool startChannelS3D(int w, int h, int format, bool norot, int s3DFormat);
+    bool setPositionS3D(int x, int y, uint32_t w, uint32_t h);
+    bool setParameterS3D(int param, int value);
+    bool setChannelPosition(int x, int y, uint32_t w, uint32_t h, int channel = 0);
+    bool setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int channel);
+    bool queueBuffer(int fd, uint32_t offset, int channel);
 };
 
 struct overlay_shared_data {
