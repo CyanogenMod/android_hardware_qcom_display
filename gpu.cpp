@@ -289,6 +289,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
             break;
 
         case HAL_PIXEL_FORMAT_YV12:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
             if ((w&1) || (h&1)) {
                 LOGE("w or h is odd for HAL_PIXEL_FORMAT_YV12");
                 return -EINVAL;
