@@ -64,6 +64,8 @@ extern int gralloc_perform(struct gralloc_module_t const* module,
 class PmemAllocatorDepsDeviceImpl : public PmemUserspaceAllocator::Deps,
         public PmemKernelAllocator::Deps {
 
+    const private_module_t* module;
+
     virtual size_t getPmemTotalSize(int fd, size_t* size) {
         int err = 0;
 #ifndef TARGET_MSM7x27
@@ -74,7 +76,10 @@ class PmemAllocatorDepsDeviceImpl : public PmemUserspaceAllocator::Deps,
         }
 #else
 #ifdef USE_ASHMEM
-	*size = m->info.xres * m->info.yres * 2 * 2;
+        if(module != NULL)
+            *size = module->info.xres * module->info.yres * 2 * 2;
+        else
+            return -ENOMEM;
 #else
 	*size = 23<<20; //23MB for 7x27
 #endif
@@ -116,6 +121,12 @@ class PmemAllocatorDepsDeviceImpl : public PmemUserspaceAllocator::Deps,
     virtual int close(int fd) {
         return ::close(fd);
     }
+
+public:
+    void setModule(const private_module_t* m) {
+        module = m;
+    }
+
 };
 
 class GpuContextDepsDeviceImpl : public gpu_context_t::Deps {
@@ -193,6 +204,7 @@ int gralloc_device_open(const hw_module_t* module, const char* name,
     if (!strcmp(name, GRALLOC_HARDWARE_GPU0)) {
         const private_module_t* m = reinterpret_cast<const private_module_t*>(
                 module);
+        pmemAllocatorDeviceDepsImpl.setModule(m);
         gpu_context_t *dev;
         dev = new gpu_context_t(gpuContextDeviceDepsImpl, pmemAllocator,
                 pmemAdspAllocator, m);
