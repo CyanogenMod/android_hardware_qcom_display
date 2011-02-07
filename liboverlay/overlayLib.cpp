@@ -79,22 +79,18 @@ static int get_size(int format, int w, int h) {
 
 static int get_mdp_orientation(int rotation, int flip) {
     switch(flip) {
-    case HAL_TRANSFORM_FLIP_H:
+    case HAL_TRANSFORM_FLIP_V:
         switch(rotation) {
         case 0: return MDP_FLIP_UD;
-        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_LR);
-        case HAL_TRANSFORM_ROT_180: return MDP_FLIP_LR;
-        case HAL_TRANSFORM_ROT_270: return (MDP_ROT_90 | MDP_FLIP_UD);
+        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_UD);
         default: return -1;
         break;
         }
     break;
-    case HAL_TRANSFORM_FLIP_V:
+    case HAL_TRANSFORM_FLIP_H:
         switch(rotation) {
         case 0: return MDP_FLIP_LR;
-        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_UD);
-        case HAL_TRANSFORM_ROT_180: return MDP_FLIP_UD;
-        case HAL_TRANSFORM_ROT_270: return (MDP_ROT_90 | MDP_FLIP_LR);
+        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_LR);
         default: return -1;
         break;
         }
@@ -855,15 +851,11 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
 
         int rot = value;
         int flip = 0;
-        if(value & HAL_TRANSFORM_FLIP_SRC_H) {
-            flip = HAL_TRANSFORM_FLIP_H;
-        } else if(value & HAL_TRANSFORM_FLIP_SRC_V) {
-            flip = HAL_TRANSFORM_FLIP_V;
-        }
-        rot = value & HAL_TRANSFORM_ROT_MASK;
 
         switch(rot) {
         case 0:
+        case HAL_TRANSFORM_FLIP_H:
+        case HAL_TRANSFORM_FLIP_V:
         {
             if (val == MDP_ROT_90) {
                     int tmp = mOVInfo.src_rect.y;
@@ -879,9 +871,13 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
                     mOVInfo.src_rect.y = tmp;
                     swapOVRotWidthHeight();
             }
+            rot = 0;
+            flip = value & (HAL_TRANSFORM_FLIP_H|HAL_TRANSFORM_FLIP_V);
             break;
         }
-        case OVERLAY_TRANSFORM_ROT_90:
+        case HAL_TRANSFORM_ROT_90:
+        case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H):
+        case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V):
         {
             if (val == MDP_ROT_270) {
                     mOVInfo.src_rect.x = mOVInfo.src.width - (
@@ -896,9 +892,11 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
                     mOVInfo.src_rect.y = tmp;
                     swapOVRotWidthHeight();
             }
+            rot = HAL_TRANSFORM_ROT_90;
+            flip = value & (HAL_TRANSFORM_FLIP_H|HAL_TRANSFORM_FLIP_V);
             break;
         }
-        case OVERLAY_TRANSFORM_ROT_180:
+        case HAL_TRANSFORM_ROT_180:
         {
             if (val == MDP_ROT_270) {
                     int tmp = mOVInfo.src_rect.y;
@@ -916,7 +914,7 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
             }
             break;
         }
-        case OVERLAY_TRANSFORM_ROT_270:
+        case HAL_TRANSFORM_ROT_270:
         {
             if (val == MDP_ROT_90) {
                     mOVInfo.src_rect.y = mOVInfo.src.height -
@@ -935,11 +933,11 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
         }
         default: return false;
     }
-    int mdp_format = get_mdp_orientation(rot, flip);
-    if(mdp_format == -1)
+    int mdp_rotation = get_mdp_orientation(rot, flip);
+    if (mdp_rotation == -1)
         return false;
 
-    mOVInfo.user_data[0] = mdp_format;
+    mOVInfo.user_data[0] = mdp_rotation;
     mRotInfo.rotations = mOVInfo.user_data[0];
 
     if (mOVInfo.user_data[0])
