@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,7 +90,7 @@ int gpu_context_t::gralloc_alloc_framebuffer_locked(size_t size, int usage,
             m->bufferMask |= (1LU<<i);
             break;
         }
-        vaddr += bufferSize;
+        vaddr += (m->finfo.line_length * (m->info.yres + m->yres_delta));
     }
 
     hnd->base = vaddr;

@@ -694,25 +694,41 @@ int mapFrameBufferLocked(struct private_module_t* module)
 	info.transp.length  = 0;
 	module->fbFormat = HAL_PIXEL_FORMAT_RGB_565;
     }
+
+    // Calculate the FbSize to map.
+    int y = -1;
+    do {
+       y++;
+    } while (((finfo.line_length * (info.yres + y)) % 4096) != 0);
+    module->yres_delta = y;
+
     /*
      * Request NUM_BUFFERS screens (at lest 2 for page flipping)
      */
-    int numberOfBuffers = (int)(finfo.smem_len/(info.yres * info.xres * (info.bits_per_pixel/8)));
+
+    // Calculate the number of buffers required
+    int numberOfBuffers = 0;
+    int requiredSize = info.xres * (info.bits_per_pixel/8) *
+                           (info.yres + module->yres_delta);
+    for (int num = NUM_FRAMEBUFFERS_MAX; num > 0; num--) {
+        int totalSizeRequired = num * requiredSize;
+        if (finfo.smem_len >= totalSizeRequired) {
+            numberOfBuffers = num;
+            break;
+        }
+    }
     LOGV("num supported framebuffers in kernel = %d", numberOfBuffers);
 
     if (property_get("debug.gr.numframebuffers", property, NULL) > 0) {
-        int num = atoi(property);
-        if ((num >= NUM_FRAMEBUFFERS_MIN) && (num <= NUM_FRAMEBUFFERS_MAX)) {
-            numberOfBuffers = num;
+        int reqNum = atoi(property);
+        if ((reqNum <= numberOfBuffers) && (reqNum >= NUM_FRAMEBUFFERS_MIN)
+             && (reqNum <= NUM_FRAMEBUFFERS_MAX)) {
+            numberOfBuffers = reqNum;
         }
     }
 
-    if (numberOfBuffers > NUM_FRAMEBUFFERS_MAX)
-        numberOfBuffers = NUM_FRAMEBUFFERS_MAX;
-
+    info.yres_virtual = numberOfBuffers*(info.yres + module->yres_delta);
     LOGD("We support %d buffers", numberOfBuffers);
-
-    info.yres_virtual = info.yres * numberOfBuffers;
 
     uint32_t flags = PAGE_FLIP;
     if (ioctl(fd, FBIOPUT_VSCREENINFO, &info) == -1) {
