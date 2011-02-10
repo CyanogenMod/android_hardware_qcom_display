@@ -181,7 +181,9 @@ int PmemUserspaceAllocator::alloc_pmem_buffer(size_t size, int usage,
             } else {
                 LOGV("%s: mapped fd %d at offset %d, size %d", pmemdev, fd, offset, size);
                 memset((char*)base + offset, 0, size);
-                //cacheflush(intptr_t(base) + offset, intptr_t(base) + offset + size, 0);
+#ifdef HOST
+                 cacheflush(intptr_t(base) + offset, intptr_t(base) + offset + size, 0);
+#endif
                 *pBase = base;
                 *pOffset = offset;
                 *pFd = fd;
