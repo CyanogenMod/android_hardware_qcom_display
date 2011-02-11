@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -154,15 +154,15 @@ enum {
 
 /* possible formats for 3D content*/
 enum {
-    HAL_NO_3D = 0x00,
-    HAL_3D_IN_SIDE_BY_SIDE_HALF_L_R   = 0x10000,
+    HAL_NO_3D                         = 0x0000,
+    HAL_3D_IN_SIDE_BY_SIDE_L_R        = 0x10000,
     HAL_3D_IN_TOP_BOTTOM              = 0x20000,
     HAL_3D_IN_INTERLEAVE              = 0x40000,
-    HAL_3D_IN_SIDE_BY_SIDE_FULL       = 0x80000,
-    HAL_3D_IN_SIDE_BY_SIDE_HALF_R_L   = 0xC0000,
-    HAL_3D_OUT_SIDE_BY_SIDE       = 0x1000,
-    HAL_3D_OUT_TOP_BOTTOM         = 0x2000,
-    HAL_3D_OUT_INTERLEAVE         = 0x4000,
+    HAL_3D_IN_SIDE_BY_SIDE_R_L        = 0x80000,
+    HAL_3D_OUT_SIDE_BY_SIDE           = 0x1000,
+    HAL_3D_OUT_TOP_BOTTOM             = 0x2000,
+    HAL_3D_OUT_INTERLEAVE             = 0x4000,
+    HAL_3D_OUT_MONOSCOPIC             = 0x8000
 };
 
 enum {
