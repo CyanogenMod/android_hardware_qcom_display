@@ -174,7 +174,7 @@ public:
 	    }
 	    bool ret = mHandle.pobjControlChannel[index]->startControlChannel(
 	             mHandle.w, mHandle.h, mHandle.format, fbnum, norot,
-	             format3D, zorder);
+	             format3D, zorder, true);
 	    if (ret) {
 	        if (!(mHandle.pobjControlChannel[index]->
 			     getOvSessionID(mHandle.ovid[index]) &&

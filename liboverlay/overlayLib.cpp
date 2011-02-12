@@ -240,12 +240,13 @@ bool Overlay::setSource(uint32_t w, uint32_t h, int format,
     if ((hdmiConnected != mHDMIConnected)
              || !objOvCtrlChannel[0].setSource(w, h, format,
                                       orientation, ignoreFB)) {
-        if (mChannelUP) {
+        int hw_format = get_mdp_format(format);
+        if (mChannelUP && isRGBType(hw_format)) {
             mCloseChannel = true;
             return false;
         }
+        closeChannel();
         mHDMIConnected = hdmiConnected;
-        int hw_format = get_mdp_format(format);
         bool uichannel = isRGBType(hw_format);
         if (mHDMIConnected) {
             return startChannelHDMI(w, h, format, !orientation);
@@ -450,7 +451,7 @@ bool OverlayControlChannel::setOverlayInformation(int w, int h,
         mOVInfo.is_fg = ignoreFB;
     if (ignoreFB && isRGBType(format) && getRGBBpp(format) == 4)
         mOVInfo.flags &= ~MDP_OV_PIPE_SHARE;
-    if (!isRGBType(format))
+    if (!ignoreFB)
         mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
     mSize = get_size(format, w, h);
     return true;
@@ -590,16 +591,23 @@ bool OverlayControlChannel::setSource(uint32_t w, uint32_t h,
     }
     if (w == mOVInfo.src.width && h == mOVInfo.src.height
             && format == mOVInfo.src.format && orientation == mOrientation) {
-        if (!isRGBType(format))
-            return true;
-        if (ignoreFB == mOVInfo.is_fg)
+        if ((ignoreFB == mOVInfo.is_fg) && isRGBType(format))
             return true;
         mdp_overlay ov;
         ov.id = mOVInfo.id;
         if (ioctl(mFD, MSMFB_OVERLAY_GET, &ov))
             return false;
         mOVInfo = ov;
-        mOVInfo.is_fg = ignoreFB;
+
+        if (isRGBType(format))
+            mOVInfo.is_fg = ignoreFB;
+
+        if (!isRGBType(format)) {
+            if (!ignoreFB)
+                mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
+            else
+                mOVInfo.flags &= ~MDP_OV_PLAY_NOWAIT;
+        }
         if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo))
             return false;
         return true;
