@@ -86,8 +86,13 @@ enum {
 #define HAL_3D_OUT_INTERLEAVE_MASK   (HAL_3D_OUT_INTERLEAVE   >> SHIFT_OUTPUT_3D)
 #define HAL_3D_OUT_MONOSCOPIC_MASK   (HAL_3D_OUT_MONOSCOPIC   >> SHIFT_OUTPUT_3D)
 
+// 3D panel barrier orientation
+#define BARRIER_LANDSCAPE 1
+#define BARRIER_PORTRAIT  2
+
 #define FORMAT_3D_FILE        "/sys/class/graphics/fb1/format_3d"
 #define EDID_3D_INFO_FILE     "/sys/class/graphics/fb1/3d_present"
+#define BARRIER_FILE          "/sys/devices/platform/mipi_novatek.0/enable_3d_barrier"
 /* -------------------------- end 3D defines ----------------------------------------*/
 
 // Struct to hold the buffer info: geometry and size
@@ -101,7 +106,8 @@ struct overlay_buffer_info {
 namespace overlay {
 
 enum {
-    OV_2D_VIDEO_ON_PANEL = 0,
+    OV_UI_MIRROR_TV = 0,
+    OV_2D_VIDEO_ON_PANEL,
     OV_2D_VIDEO_ON_TV,
     OV_3D_VIDEO_2D_PANEL,
     OV_3D_VIDEO_2D_TV,
@@ -110,8 +116,12 @@ enum {
 };
 bool isHDMIConnected();
 bool is3DTV();
+bool isPanel3D();
+bool usePanel3D();
 bool send3DInfoPacket(unsigned int format3D);
-unsigned int  getOverlayConfig (unsigned int format3D);
+bool enableBarrier(unsigned int orientation);
+unsigned int  getOverlayConfig (unsigned int format3D, bool poll = true,
+                                bool isHDMI = false);
 
 int get_mdp_format(int format);
 int get_size(int format, int w, int h);
@@ -143,6 +153,7 @@ class OverlayControlChannel {
     bool mUIChannel;
     mdp_overlay mOVInfo;
     msm_rotator_img_info mRotInfo;
+    msmfb_overlay_3d m3DOVInfo;
     bool openDevices(int fbnum = -1);
     bool setOverlayInformation(const overlay_buffer_info& info,
                                int flags, int orientation, int zorder = 0, bool ignoreFB = false,
@@ -177,6 +188,7 @@ public:
     bool getPositionS3D(int channel, int format, overlay_rect *rect);
     bool updateOverlaySource(const overlay_buffer_info& info, int orientation);
     bool getFormat() const { return mFormat; }
+    bool useVirtualFB ();
 };
 
 class OverlayDataChannel {
@@ -231,6 +243,7 @@ class Overlay {
     int mCroppedSrcWidth;
     int mCroppedSrcHeight;
     overlay_buffer_info mOVBufferInfo;
+    int mState;
     OverlayControlChannel objOvCtrlChannel[2];
     OverlayDataChannel    objOvDataChannel[2];
 
@@ -263,10 +276,6 @@ public:
     bool updateOverlaySource(const overlay_buffer_info& info, int orientation);
 
 private:
-    bool startChannelHDMI(const overlay_buffer_info& info, bool norot);
-    bool startChannelS3D(const overlay_buffer_info& info, bool norot);
-    bool setPositionS3D(int x, int y, uint32_t w, uint32_t h);
-    bool setParameterS3D(int param, int value);
     bool setChannelPosition(int x, int y, uint32_t w, uint32_t h, int channel = 0);
     bool setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int channel);
     bool queueBuffer(int fd, uint32_t offset, int channel);
@@ -277,7 +286,7 @@ private:
 };
 
 struct overlay_shared_data {
-    int readyToQueue;
+    volatile bool isControlSetup;
     unsigned int state;
     int rotid[2];
     int ovid[2];
