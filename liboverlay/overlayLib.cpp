@@ -1272,6 +1272,14 @@ bool OverlayDataChannel::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
         w = h;
         h = tmp;
     }
+    else if(ov.user_data[0] == MDP_ROT_180) {
+        if ((ov.src.height < (y + h)) || (ov.src.width < ( x + w)))
+           return false;
+
+        x = ov.src.width - (x + w);
+        y = ov.src.height - (y + h);
+    }
+
 
     if ((ov.src_rect.x == x) &&
            (ov.src_rect.y == y) &&
