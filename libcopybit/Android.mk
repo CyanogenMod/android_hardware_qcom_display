@@ -24,6 +24,8 @@ ifeq ($(TARGET_USES_C2D_COMPOSITION),true)
     LOCAL_SHARED_LIBRARIES := liblog libdl
     LOCAL_SRC_FILES := copybit_c2d.cpp
     LOCAL_MODULE := copybit.$(TARGET_BOARD_PLATFORM)
+    LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
+    LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
     LOCAL_C_INCLUDES += hardware/msm7k/libgralloc-qsd8k
     LOCAL_CFLAGS += -DCOPYBIT_Z180=1 -DC2D_SUPPORT_DISPLAY=1
     include $(BUILD_SHARED_LIBRARY)
@@ -43,6 +45,8 @@ else
             LOCAL_SHARED_LIBRARIES := liblog
             LOCAL_SRC_FILES := copybit.cpp
             LOCAL_MODULE := copybit.msm7k
+            LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
+            LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
             LOCAL_C_INCLUDES += hardware/msm7k/libgralloc-qsd8k
             LOCAL_CFLAGS += -DCOPYBIT_MSM7K=1
             include $(BUILD_SHARED_LIBRARY)
@@ -59,6 +63,8 @@ else
             LOCAL_SHARED_LIBRARIES := liblog
             LOCAL_SRC_FILES := copybit.cpp
             LOCAL_MODULE := copybit.qsd8k
+            LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
+            LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
             LOCAL_C_INCLUDES += hardware/msm7k/libgralloc-qsd8k
             LOCAL_CFLAGS += -DCOPYBIT_QSD8K=1
             include $(BUILD_SHARED_LIBRARY)
