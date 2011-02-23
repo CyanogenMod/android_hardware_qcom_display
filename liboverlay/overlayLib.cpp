@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -321,7 +321,7 @@ bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
             }
         } else {
             return startChannel(w, h, colorFormat, 0, !orientation,
-                                uichannel, 0, ignoreFB, num_buffers);
+                                uichannel, 0, VG0_PIPE, ignoreFB, num_buffers);
         }
     }
     else
