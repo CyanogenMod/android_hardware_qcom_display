@@ -630,10 +630,6 @@ bool OverlayControlChannel::setOverlayInformation(int w, int h,
     mOVInfo.alpha = 0xff;
     mOVInfo.transp_mask = 0xffffffff;
     mOVInfo.flags = flags;
-    if (isRGBType(format))
-        mOVInfo.is_fg = ignoreFB;
-    if (ignoreFB && isRGBType(format) && getRGBBpp(format) == 4)
-        mOVInfo.flags &= ~MDP_OV_PIPE_SHARE;
     if (!ignoreFB)
         mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
     mSize = get_size(format, w, h);
@@ -784,23 +780,17 @@ bool OverlayControlChannel::setSource(uint32_t w, uint32_t h,
     }
     if (w == mOVInfo.src.width && h == mOVInfo.src.height
             && format == mOVInfo.src.format && orientation == mOrientation) {
-        if ((ignoreFB == mOVInfo.is_fg) && isRGBType(format))
-            return true;
         mdp_overlay ov;
         ov.id = mOVInfo.id;
         if (ioctl(mFD, MSMFB_OVERLAY_GET, &ov))
             return false;
         mOVInfo = ov;
 
-        if (isRGBType(format))
-            mOVInfo.is_fg = ignoreFB;
+        if (!ignoreFB)
+            mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
+        else
+            mOVInfo.flags &= ~MDP_OV_PLAY_NOWAIT;
 
-        if (!isRGBType(format)) {
-            if (!ignoreFB)
-                mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
-            else
-                mOVInfo.flags &= ~MDP_OV_PLAY_NOWAIT;
-        }
         if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo))
             return false;
         return true;
