@@ -179,7 +179,7 @@ bool Overlay::startChannel(int w, int h, int format, int fbnum,
                               unsigned int format3D, int channel,
                               bool ignoreFB, int num_buffers) {
     int zorder = 0;
-    if( mRotate)
+    if(mRotate && !fbnum)
         norot = 0;
 
     if (format3D)
