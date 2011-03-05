@@ -100,11 +100,14 @@ enum {
     OV_3D_VIDEO_3D_PANEL,
     OV_3D_VIDEO_3D_TV
 };
-
 bool isHDMIConnected();
 bool is3DTV();
 bool send3DInfoPacket(unsigned int format3D);
 unsigned int  getOverlayConfig (unsigned int format3D);
+
+int get_mdp_format(int format);
+int get_size(int format, int w, int h);
+int get_mdp_orientation(int rotation, int flip);
 
 const int max_num_buffers = 3;
 typedef struct mdp_rect overlay_rect;
@@ -208,7 +211,6 @@ class Overlay {
 
     bool mChannelUP;
     bool mHDMIConnected;
-    bool mCloseChannel;
     unsigned int mS3DFormat;
     int mWidth;
     int mHeight;

@@ -24,7 +24,7 @@ static inline size_t ALIGN(size_t x, size_t align) {
     return (x + align-1) & ~(align-1);
 }
 
-static int get_mdp_format(int format) {
+int overlay::get_mdp_format(int format) {
     switch (format) {
     case HAL_PIXEL_FORMAT_RGBA_8888 :
         return MDP_RGBA_8888;
@@ -46,7 +46,7 @@ static int get_mdp_format(int format) {
     return -1;
 }
 
-static int get_size(int format, int w, int h) {
+int overlay::get_size(int format, int w, int h) {
     int size, aligned_height, pitch;
 
     size = w * h;
@@ -84,7 +84,7 @@ static int get_size(int format, int w, int h) {
     return size;
 }
 
-static int get_mdp_orientation(int rotation, int flip) {
+int overlay::get_mdp_orientation(int rotation, int flip) {
     switch(flip) {
     case HAL_TRANSFORM_FLIP_V:
         switch(rotation) {
@@ -178,8 +178,7 @@ unsigned int overlay::getOverlayConfig (unsigned int format3D) {
 }
 
 Overlay::Overlay() : mChannelUP(false), mHDMIConnected(false),
-                     mCloseChannel(false), mS3DFormat(0),
-                     mWidth(0), mHeight(0),
+                     mS3DFormat(0), mWidth(0), mHeight(0),
                      mCroppedSrcWidth(0), mCroppedSrcHeight(0) {
 }
 
@@ -242,7 +241,7 @@ bool Overlay::startChannelS3D(int w, int h, int format, bool norot) {
 
 bool Overlay::closeChannel() {
 
-    if (!mCloseChannel && !mChannelUP)
+    if (!mChannelUP)
         return true;
 
     if(mS3DFormat) {
@@ -253,7 +252,6 @@ bool Overlay::closeChannel() {
         objOvDataChannel[i].closeDataChannel();
     }
     mChannelUP = false;
-    mCloseChannel = false;
     mS3DFormat = 0;
     mWidth = 0;
     mHeight = 0;
@@ -355,9 +353,6 @@ int Overlay::hasHDMIStatusChanged() {
 
 bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
                         bool hdmiConnected, bool ignoreFB, int num_buffers) {
-    if (mCloseChannel)
-        closeChannel();
-
     // Separate the color format from the 3D format.
     // If there is 3D content; the effective format passed by the client is:
     // effectiveFormat = 3D_IN | 3D_OUT | ColorFormat
@@ -1333,10 +1328,6 @@ bool OverlayDataChannel::queue(uint32_t offset) {
         if (!result) {
             mOvDataRot.data.offset = (uint32_t) mRotData.dst.offset;
             odPtr = &mOvDataRot;
-        }
-        else if (max_num_buffers == mNumBuffers) {
-            reportError("Rotator failed..");
-            return false;
         }
     }
 
