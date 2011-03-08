@@ -162,11 +162,6 @@ enum {
 	BUFFER_TYPE_UI = 0,
 	BUFFER_TYPE_VIDEO
 };
-
-static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
-static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
-static const int QOMX_INTERLACE_FLAG = 0x49283654;
-static const int QOMX_3D_VIDEO_FLAG = 0x23784238;
 /*****************************************************************************/
 
 struct private_module_t;
