@@ -207,7 +207,7 @@ static uint32 c2d_get_gpuaddr(int device_fd, struct private_handle_t *handle)
     param.offset = handle->offset;
     param.hostptr = handle->base;
 
-    if (handle->flags & private_handle_t::PRIV_FLAGS_USES_PMEM)
+    if (handle->flags & (private_handle_t::PRIV_FLAGS_USES_PMEM|private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP))
         param.memtype = KGSL_USER_MEM_TYPE_PMEM;
     else
         param.memtype = KGSL_USER_MEM_TYPE_ASHMEM;
