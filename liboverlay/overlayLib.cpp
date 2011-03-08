@@ -74,6 +74,17 @@ static int get_size(int format, int w, int h) {
     return size;
 }
 
+static bool isRGBType(int format) {
+    switch (format) {
+        case MDP_RGBA_8888:
+        case MDP_BGRA_8888:
+        case MDP_RGBX_8888:
+        case MDP_RGB_565:
+            return true;
+    }
+    return false;
+}
+
 #define LOG_TAG "OverlayLIB"
 static void reportError(const char* message) {
     LOGE( "%s", message);
@@ -364,6 +375,9 @@ bool OverlayControlChannel::setOverlayInformation(int w, int h,
     mOVInfo.alpha = 0xff;
     mOVInfo.transp_mask = 0xffffffff;
     mOVInfo.flags = flags;
+    if (!isRGBType(format))
+        mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
+
     mOVInfo.is_fg = 0;
     mSize = get_size(format, w, h);
     return true;
