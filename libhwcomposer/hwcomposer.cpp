@@ -58,6 +58,7 @@ struct hwc_context_t {
     hwc_composer_device_t device;
     /* our private state goes below here */
     overlay::Overlay* mOverlayLibObject;
+    bool hdmiConnected;
 };
 
 static int hwc_device_open(const struct hw_module_t* module, const char* name,
@@ -107,6 +108,12 @@ static void dump_layer(hwc_layer_t const* l) {
             l->displayFrame.bottom);
 }
 
+static void hwc_enableHDMIOutput(hwc_composer_device_t *dev, bool enable) {
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+    if(ctx) {
+        ctx->hdmiConnected = enable;
+    }
+}
 
 static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
@@ -147,7 +154,7 @@ static int drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
 
-        ret = ovLibObject->setSource(hnd->width, hnd->height, hnd->format, layer->transform);
+        ret = ovLibObject->setSource(hnd->width, hnd->height, hnd->format, layer->transform, false);
         if (!ret) {
             LOGE("drawLayerUsingOverlay setSource failed");
             return -1;
@@ -313,6 +320,8 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
         } else
             dev->mOverlayLibObject = NULL;
 
+        dev->hdmiConnected = false;
+
         /* initialize the procs */
         dev->device.common.tag = HARDWARE_DEVICE_TAG;
         dev->device.common.version = 0;
@@ -321,7 +330,7 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
 
         dev->device.prepare = hwc_prepare;
         dev->device.set = hwc_set;
-
+        dev->device.enableHDMIOutput = hwc_enableHDMIOutput;
         *device = &dev->device.common;
 
         status = 0;
