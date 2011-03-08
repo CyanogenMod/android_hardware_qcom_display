@@ -59,6 +59,7 @@ struct hwc_context_t {
     /* our private state goes below here */
     overlay::Overlay* mOverlayLibObject;
     bool hdmiConnected;
+    bool videoHDMIStarted;
 };
 
 static int hwc_device_open(const struct hw_module_t* module, const char* name,
@@ -73,6 +74,7 @@ struct private_hwc_module_t {
     hwc_module_t base;
     overlay_control_device_t *overlayEngine;
     copybit_device_t *copybitEngine;
+    framebuffer_device_t *fbDevice;
     int compositionType;
 };
 
@@ -90,6 +92,7 @@ struct private_hwc_module_t HAL_MODULE_INFO_SYM = {
    },
    overlayEngine: NULL,
    copybitEngine: NULL,
+   fbDevice: NULL,
    compositionType: 0,
 };
 
@@ -116,6 +119,22 @@ static void hwc_enableHDMIOutput(hwc_composer_device_t *dev, bool enable) {
 }
 
 static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
+
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    if(!ctx) {
+         LOGE("hwc_prepare null context ");
+         return -1;
+    }
+
+    private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
+                                                           dev->common.module);
+    overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
+
+    if(!hwcModule) {
+        LOGE("hwc_prepare null module ");
+        return -1;
+    }
 
     int yuvBufferCount = 0;
 
@@ -144,6 +163,25 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
         }
     }
 
+    // Inform the gralloc to close the UI mirroring channel if HDMI is connected
+    // and we have a video buffer
+    framebuffer_device_t *fbDev = hwcModule->fbDevice;
+    if ((yuvBufferCount == 1) && ctx->hdmiConnected && !ctx->videoHDMIStarted) {
+        if (fbDev) {
+            fbDev->videoOverlayStarted(fbDev, true);
+        }
+        ctx->videoHDMIStarted = true;
+    }
+
+    if (ctx->videoHDMIStarted && yuvBufferCount != 1) {
+        if(ovLibObject)
+            ovLibObject->closeChannel();
+        if (fbDev) {
+            fbDev->videoOverlayStarted(fbDev, false);
+        }
+        ctx->videoHDMIStarted = false;
+    }
+
     return 0;
 }
 
@@ -154,7 +192,7 @@ static int drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
 
-        ret = ovLibObject->setSource(hnd->width, hnd->height, hnd->format, layer->transform, false);
+        ret = ovLibObject->setSource(hnd->width, hnd->height, hnd->format, layer->transform, ctx->hdmiConnected);
         if (!ret) {
             LOGE("drawLayerUsingOverlay setSource failed");
             return -1;
@@ -248,6 +286,10 @@ static int hwc_device_close(struct hw_device_t *dev)
         overlay_control_close(hwcModule->overlayEngine);
         hwcModule->overlayEngine = NULL;
     }
+    if(hwcModule->fbDevice) {
+        framebuffer_close(hwcModule->fbDevice);
+        hwcModule->fbDevice = NULL;
+    }
 
     if (ctx) {
          delete ctx->mOverlayLibObject;
@@ -269,6 +311,9 @@ static int hwc_module_initialize(struct private_hwc_module_t* hwcModule)
     }
     if (hw_get_module(OVERLAY_HARDWARE_MODULE_ID, &module) == 0) {
         overlay_control_open(module, &(hwcModule->overlayEngine));
+    }
+    if (hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &module) == 0) {
+        framebuffer_open(module, &(hwcModule->fbDevice));
     }
 
     // get the current composition type
@@ -321,6 +366,7 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
             dev->mOverlayLibObject = NULL;
 
         dev->hdmiConnected = false;
+        dev->videoHDMIStarted = false;
 
         /* initialize the procs */
         dev->device.common.tag = HARDWARE_DEVICE_TAG;
