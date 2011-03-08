@@ -785,14 +785,18 @@ bool OverlayControlChannel::setSource(uint32_t w, uint32_t h,
         if (ioctl(mFD, MSMFB_OVERLAY_GET, &ov))
             return false;
         mOVInfo = ov;
+        int flags = mOVInfo.flags;
 
         if (!ignoreFB)
             mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
         else
             mOVInfo.flags &= ~MDP_OV_PLAY_NOWAIT;
 
-        if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo))
-            return false;
+        if (flags != mOVInfo.flags) {
+            if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo))
+                return false;
+        }
+
         return true;
     }
     mOrientation = orientation;
