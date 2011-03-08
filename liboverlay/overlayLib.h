@@ -44,6 +44,29 @@
 #define HW_OVERLAY_MAGNIFICATION_LIMIT 8
 #define HW_OVERLAY_MINIFICATION_LIMIT HW_OVERLAY_MAGNIFICATION_LIMIT
 
+#define EVEN_OUT(x) if (x & 0x0001) {x--;}
+
+/* ------------------------------- 3D defines ---------------------------------------*/
+// The compound format passed to the overlay is
+// ABCCC where A is the input 3D format,
+// B is the output 3D format
+// CCC is the color format e.g YCbCr420SP YCrCb420SP etc.
+#define FORMAT_3D(x) (x & 0xFF000)
+#define COLOR_FORMAT(x) (x & 0xFFF)
+// in the final 3D format, the MSB 2Bytes are the input format and the
+// LSB 2bytes are the output format. Shift the output byte 12 bits.
+#define FORMAT_3D_OUTPUT(x) ((x & 0xF000) >> 12)
+#define FORMAT_3D_INPUT(x) (x & 0xF0000)
+#define INPUT_MASK_3D         0xFFFF0000
+#define OUTPUT_MASK_3D        0x0000FFFF
+#define SHIFT_3D              16
+// The output format is the 2MSB bytes. Shift the format by 12 to reflect this
+#define HAL_3D_OUT_LR_SIDE_MASK       (HAL_3D_OUT_LR_SIDE >> 12)
+#define HAL_3D_OUT_LR_TOP_MASK        (HAL_3D_OUT_LR_TOP >> 12)
+#define HAL_3D_OUT_LR_INTERLEAVE_MASK (HAL_3D_OUT_LR_INTERLEAVE >> 12)
+#define FORMAT_3D_FILE        "/sys/class/graphics/fb1/format_3d"
+/* -------------------------- end 3D defines ----------------------------------------*/
+
 namespace overlay {
 
 class OverlayControlChannel {
@@ -59,10 +82,11 @@ class OverlayControlChannel {
     int mRotFD;
     int mSize;
     int mOrientation;
+    unsigned int mFormat3D;
     mdp_overlay mOVInfo;
     msm_rotator_img_info mRotInfo;
     bool openDevices(int fbnum = -1);
-    bool setOverlayInformation(int w, int h, int format, int flags);
+    bool setOverlayInformation(int w, int h, int format, int flags, int zorder = 0);
     bool startOVRotatorSessions(int w, int h, int format);
     void swapOVRotWidthHeight();
 
@@ -70,7 +94,8 @@ public:
     OverlayControlChannel();
     ~OverlayControlChannel();
     bool startControlChannel(int w, int h, int format,
-                               int fbnum, bool norot = false);
+                               int fbnum, bool norot = false,
+                               unsigned int format3D = 0, int zorder = 0);
     bool closeControlChannel();
     bool setPosition(int x, int y, uint32_t w, uint32_t h);
     bool setParameter(int param, int value);
@@ -81,6 +106,7 @@ public:
     bool isChannelUP() const { return (mFD > 0); }
     int getFBWidth() const { return mFBWidth; }
     int getFBHeight() const { return mFBHeight; }
+    int getFormat3D() const { return mFormat3D; }
     bool getOrientation(int& orientation) const;
     bool setSource(uint32_t w, uint32_t h, int format, int orientation);
 };
@@ -128,7 +154,8 @@ public:
     Overlay();
     ~Overlay();
 
-    bool startChannel(int w, int h, int format, int fbnum, bool norot = false, bool uichannel = false);
+    bool startChannel(int w, int h, int format, int fbnum, bool norot = false,
+                                bool uichannel = false, unsigned int format3D = 0);
     bool closeChannel();
     bool setPosition(int x, int y, uint32_t w, uint32_t h);
     bool setParameter(int param, int value);

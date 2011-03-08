@@ -38,6 +38,7 @@ using namespace overlay;
 struct overlay_control_context_t {
 	struct overlay_control_device_t device;
 	void *sharedMemBase;
+	unsigned int format3D; //input and output 3D format, zero means no 3D
 };
 
 struct ov_crop_rect_t {
@@ -51,6 +52,7 @@ struct overlay_data_context_t {
 	struct overlay_data_device_t device;
 	OverlayDataChannel* pobjDataChannel[2];
 	int setCrop;
+	unsigned int format3D;
 	struct ov_crop_rect_t cropRect;
 	void *sharedMemBase;
 };
@@ -90,6 +92,7 @@ struct handle_t : public native_handle {
 	int w;
 	int h;
 	int format;
+	unsigned int format3D;
 	OverlayControlChannel *pobjControlChannel[2];
 };
 
@@ -110,6 +113,10 @@ static int handle_get_shared_fd(const overlay_handle_t overlay) {
 	return static_cast<const struct handle_t *>(overlay)->sharedMemoryFd;
 }
 
+static int handle_get_format3D(const overlay_handle_t overlay) {
+	return static_cast<const struct handle_t *>(overlay)->format3D;
+}
+
 /*
  * This is the overlay_t object, it is returned to the user and represents
  * an overlay.
@@ -125,7 +132,7 @@ class overlay_object : public overlay_t {
 	}
 
 public:
-	overlay_object(int w, int h, int format, int fd) {
+	overlay_object(int w, int h, int format, int fd, unsigned int format3D = 0) {
 		this->overlay_t::getHandleRef = getHandleRef;
 		mHandle.version = sizeof(native_handle);
 		mHandle.sharedMemoryFd = fd;
@@ -139,6 +146,7 @@ public:
 		mHandle.w = w;
 		mHandle.h = h;
 		mHandle.format = format;
+		mHandle.format3D = format3D;
 		mHandle.pobjControlChannel[0] = 0;
 		mHandle.pobjControlChannel[1] = 0;
 	}
@@ -151,67 +159,74 @@ public:
         int getRotSessionId(int index = 0) { return mHandle.rotid[index]; }
         int getSharedMemoryFD() {return mHandle.sharedMemoryFd;}
 
-	bool startControlChannel(int fbnum, bool norot = false) {
-	    if (!mHandle.pobjControlChannel[fbnum])
-	        mHandle.pobjControlChannel[fbnum] = new OverlayControlChannel();
+	bool startControlChannel(int fbnum, bool norot = false,
+	                                unsigned int format3D = 0, int zorder = 0) {
+	    int index = 0;
+	    if (format3D)
+	        index = zorder;
+	    else
+	        index = fbnum;
+	    if (!mHandle.pobjControlChannel[index])
+	        mHandle.pobjControlChannel[index] = new OverlayControlChannel();
 	    else {
-		mHandle.pobjControlChannel[fbnum]->closeControlChannel();
-	        mHandle.pobjControlChannel[fbnum] = new OverlayControlChannel();
+	        mHandle.pobjControlChannel[index]->closeControlChannel();
+	        mHandle.pobjControlChannel[index] = new OverlayControlChannel();
 	    }
-	    bool ret = mHandle.pobjControlChannel[fbnum]->startControlChannel(
-	                 mHandle.w, mHandle.h, mHandle.format, fbnum, norot);
+	    bool ret = mHandle.pobjControlChannel[index]->startControlChannel(
+	             mHandle.w, mHandle.h, mHandle.format, fbnum, norot,
+	             format3D, zorder);
 	    if (ret) {
-	        if (!(mHandle.pobjControlChannel[fbnum]->
-		             getOvSessionID(mHandle.ovid[fbnum]) &&
-			     mHandle.pobjControlChannel[fbnum]->
-			     getRotSessionID(mHandle.rotid[fbnum]) &&
-			     mHandle.pobjControlChannel[fbnum]->
+	        if (!(mHandle.pobjControlChannel[index]->
+			     getOvSessionID(mHandle.ovid[index]) &&
+			     mHandle.pobjControlChannel[index]->
+			     getRotSessionID(mHandle.rotid[index]) &&
+			     mHandle.pobjControlChannel[index]->
 			     getSize(mHandle.size)))
 	            ret = false;
 	    }
 
 	    if (!ret) {
-	        closeControlChannel(fbnum);
+	        closeControlChannel(index);
 	    }
 
 	    return ret;
 	}
 
-	bool setPosition(int x, int y, uint32_t w, uint32_t h, int fbnum) {
-	    if (!mHandle.pobjControlChannel[fbnum])
+	bool setPosition(int x, int y, uint32_t w, uint32_t h, int channel) {
+	    if (!mHandle.pobjControlChannel[channel])
 	        return false;
-	    return mHandle.pobjControlChannel[fbnum]->setPosition(
+	    return mHandle.pobjControlChannel[channel]->setPosition(
 	                     x, y, w, h);
 	}
 
-	bool setParameter(int param, int value, int fbnum) {
-	    if (!mHandle.pobjControlChannel[fbnum])
+	bool setParameter(int param, int value, int channel) {
+	    if (!mHandle.pobjControlChannel[channel])
 	        return false;
-	    return mHandle.pobjControlChannel[fbnum]->setParameter(
+	    return mHandle.pobjControlChannel[channel]->setParameter(
 	                     param, value);
 	}
 
-	bool closeControlChannel(int fbnum) {
-	    if (!mHandle.pobjControlChannel[fbnum])
+	bool closeControlChannel(int channel) {
+	    if (!mHandle.pobjControlChannel[channel])
 	        return true;
-	    bool ret = mHandle.pobjControlChannel[fbnum]->
+	    bool ret = mHandle.pobjControlChannel[channel]->
 	                  closeControlChannel();
-	    delete mHandle.pobjControlChannel[fbnum];
-	    mHandle.pobjControlChannel[fbnum] = 0;
+	    delete mHandle.pobjControlChannel[channel];
+	    mHandle.pobjControlChannel[channel] = 0;
 	    return ret;
 	}
 
-	bool getPosition(int *x, int *y, uint32_t *w, uint32_t *h, int fbnum) {
-	    if (!mHandle.pobjControlChannel[fbnum])
+	bool getPosition(int *x, int *y, uint32_t *w, uint32_t *h, int channel) {
+	    if (!mHandle.pobjControlChannel[channel])
 	        return false;
-	    return mHandle.pobjControlChannel[fbnum]->getPosition(
+	    return mHandle.pobjControlChannel[channel]->getPosition(
 	                     *x, *y, *w, *h);
 	}
 
-	bool getOrientation(int *orientation, int fbnum) {
-	    if (!mHandle.pobjControlChannel[fbnum])
+	bool getOrientation(int *orientation, int channel) {
+	    if (!mHandle.pobjControlChannel[channel])
 	        return false;
-	    return mHandle.pobjControlChannel[fbnum]->getOrientation(
+	    return mHandle.pobjControlChannel[channel]->getOrientation(
 	                     *orientation);
 	}
 
@@ -219,18 +234,24 @@ public:
 	    close(mHandle.sharedMemoryFd);
 	    closeControlChannel(0);
 	    closeControlChannel(1);
+	    FILE *fp = NULL;
+	    fp = fopen(FORMAT_3D_FILE, "wb");
+	    if(fp) {
+	        fprintf(fp, "0"); //Sending hdmi info packet(2D)
+	        fclose(fp);
+	    }
 	}
 
-	int getFBWidth(int fbnum) {
-	    if (!mHandle.pobjControlChannel[fbnum])
+	int getFBWidth(int channel) {
+	    if (!mHandle.pobjControlChannel[channel])
 	        return false;
-	    return mHandle.pobjControlChannel[fbnum]->getFBWidth();
+	    return mHandle.pobjControlChannel[channel]->getFBWidth();
 	}
 
-	int getFBHeight(int fbnum) {
-	    if (!mHandle.pobjControlChannel[fbnum])
+	int getFBHeight(int channel) {
+	    if (!mHandle.pobjControlChannel[channel])
 	        return false;
-	    return mHandle.pobjControlChannel[fbnum]->getFBHeight();
+	    return mHandle.pobjControlChannel[channel]->getFBHeight();
 	}
 };
 
@@ -304,11 +325,29 @@ public:
 				return NULL;
 			}
 		}
+
+		// Separate the color format from the 3D format.
+		// If there is 3D content; the effective format passed by the client is:
+		// effectiveFormat = 3D_IN | 3D_OUT | ColorFormat
+		unsigned int format3D = FORMAT_3D(format);
+		format = COLOR_FORMAT(format);
+		int fIn3D = FORMAT_3D_INPUT(format3D); // MSB 2 bytes are input format
+		int fOut3D = FORMAT_3D_OUTPUT(format3D); // LSB 2 bytes are output format
+		format3D = fIn3D | fOut3D;
+		// Use the same in/out format if not mentioned
+		if (!fIn3D) {
+			format3D |= fOut3D << SHIFT_3D; //Set the input format
+		}
+		if(!fOut3D) {
+			format3D |= fIn3D >> SHIFT_3D; //Set the output format
+		}
+
 		ctx->sharedMemBase = base;
+		ctx->format3D = format3D;
 		memset(ctx->sharedMemBase, 0, size);
 
 		/* number of buffer is not being used as overlay buffers are coming from client */
-		overlay = new overlay_object(w, h, format, fd);
+		overlay = new overlay_object(w, h, format, fd, format3D);
 
 		if (overlay == NULL) {
 			LOGE("%s: can't create overlay object!", __FUNCTION__);
@@ -321,6 +360,26 @@ public:
 			return NULL;
 		}
 
+		if (format3D) {
+			bool res1, res2;
+			res1 = overlay->startControlChannel(1, false, format3D, 0);
+			res2 = overlay->startControlChannel(1, false, format3D, 1);
+			if (!res1 || !res2) {
+				LOGE("Failed to start control channel for VG pipe 0 or 1");
+				overlay->closeControlChannel(0);
+				overlay->closeControlChannel(1);
+				if(ctx && (ctx->sharedMemBase != MAP_FAILED)) {
+					munmap(ctx->sharedMemBase, size);
+					ctx->sharedMemBase = MAP_FAILED;
+				}
+				if(fd > 0)
+					close(fd);
+
+				delete overlay;
+				return NULL;
+			}
+			return overlay;
+		}
 #ifdef USE_MSM_ROTATOR
 		if (!overlay->startControlChannel(0)) {
 #else
@@ -429,10 +488,38 @@ public:
 		private_overlay_module_t* m = reinterpret_cast<private_overlay_module_t*>(
 		                        dev->common.module);
 		Mutex::Autolock objLock(m->pobjMutex);
-
-		bool ret = obj->setPosition(x, y, w, h, 0);
-		if (!ret)
-		    	return -1;
+		bool ret;
+		if(ctx->format3D){
+			int wHDMI = obj->getFBWidth(1);
+			int hHDMI = obj->getFBHeight(1);
+			if(ctx->format3D & HAL_3D_OUT_LR_SIDE_MASK) {
+				ret = obj->setPosition(0, 0, wHDMI/2, hHDMI, 0);
+				if (!ret)
+					return -1;
+				ret = obj->setPosition(wHDMI/2, 0, wHDMI/2, hHDMI, 1);
+				if (!ret)
+					return -1;
+			}
+			else if (ctx->format3D & HAL_3D_OUT_LR_TOP_MASK) {
+				ret = obj->setPosition(0, 0, wHDMI, hHDMI/2, 0);
+				if (!ret)
+					return -1;
+				ret = obj->setPosition(0, hHDMI/2, wHDMI, hHDMI/2, 1);
+				if (!ret)
+					return -1;
+			}
+			else if (ctx->format3D & HAL_3D_OUT_LR_INTERLEAVE_MASK) {
+				//TBD
+			}
+			else {
+				LOGE("%s: Unsupported 3D output format!!!", __func__);
+			}
+		}
+		else {
+			ret = obj->setPosition(x, y, w, h, 0);
+			if (!ret)
+				return -1;
+		}
 		return 0;
 	}
 
@@ -485,12 +572,21 @@ return 0;
 			data.readyToQueue = 0;
 			memcpy(ctx->sharedMemBase, (void*)&data, sizeof(data));
 		}
-
-		bool ret = obj->setParameter(param, value, 0);
-		if (!ret)
-	            return -1;
-
-        return 0;
+		bool ret;
+		if (ctx->format3D) {
+			ret = obj->setParameter(param, value, 0);
+			if (!ret)
+				return -1;
+			ret = obj->setParameter(param, value, 1);
+			if (!ret)
+				return -1;
+		}
+		else {
+			ret = obj->setParameter(param, value, 0);
+			if (!ret)
+				return -1;
+		}
+		return 0;
 	}
 
 	static int overlay_control_close(struct hw_device_t *dev)
@@ -528,12 +624,14 @@ return 0;
 		int rotid = handle_get_rotId(handle);
 		int size = handle_get_size(handle);
 		int sharedFd = handle_get_shared_fd(handle);
-
+		unsigned int format3D = handle_get_format3D(handle);
+		FILE *fp = NULL;
 		private_overlay_module_t* m = reinterpret_cast<private_overlay_module_t*>(
 		                        dev->common.module);
 		Mutex::Autolock objLock(m->pobjMutex);
 
 		ctx->sharedMemBase = MAP_FAILED;
+		ctx->format3D = format3D;
 
 		if(sharedFd > 0) {
 			void *base = mmap(0, sizeof(overlay_shared_data), PROT_READ,
@@ -548,6 +646,33 @@ return 0;
 			return -1;
 		}
 
+		if (ctx->format3D) {
+			bool res1, res2;
+			ctx->pobjDataChannel[0] = new OverlayDataChannel();
+			ctx->pobjDataChannel[1] = new OverlayDataChannel();
+			res1 =
+				ctx->pobjDataChannel[0]->startDataChannel(ovid, rotid, size, 1);
+			ovid = handle_get_ovId(handle, 1);
+			rotid = handle_get_rotId(handle, 1);
+			res2 =
+				ctx->pobjDataChannel[1]->startDataChannel(ovid, rotid, size, 1);
+			if (!res1 || !res2) {
+				LOGE("Couldnt start data channel for VG pipe 0 or 1");
+				delete ctx->pobjDataChannel[0];
+				ctx->pobjDataChannel[0] = 0;
+				delete ctx->pobjDataChannel[1];
+				ctx->pobjDataChannel[1] = 0;
+				return -1;
+			}
+			//Sending hdmi info packet(3D output format)
+			fp = fopen(FORMAT_3D_FILE, "wb");
+			if (fp) {
+				fprintf(fp, "%d", format3D & OUTPUT_MASK_3D);
+				fclose(fp);
+				fp = NULL;
+			}
+			return 0;
+		}
 		ctx->pobjDataChannel[0] = new OverlayDataChannel();
 		if (!ctx->pobjDataChannel[0]->startDataChannel(ovid, rotid,
 		                      size, 0)) {
@@ -573,7 +698,12 @@ return 0;
                     delete ctx->pobjDataChannel[1];
                     ctx->pobjDataChannel[1] = 0;
 		}
-
+		fp = fopen(FORMAT_3D_FILE, "wb");
+		if (fp) {
+			fprintf(fp, "0"); //Sending hdmi info packet(2D)
+			fclose(fp);
+			fp = NULL;
+		}
 		return 0;
 	}
 
@@ -610,6 +740,29 @@ return 0;
 			LOGE("Overlay is not ready to queue buffers");
 			return -1;
 		}
+
+		bool result;
+		if (ctx->format3D) {
+			if ( (ctx->format3D & HAL_3D_OUT_LR_SIDE_MASK) ||
+					(ctx->format3D & HAL_3D_OUT_LR_TOP_MASK) ) {
+				result = (ctx->pobjDataChannel[0] &&
+								ctx->pobjDataChannel[0]->
+								queueBuffer((uint32_t) buffer));
+				if (!result)
+					LOGE("Queuebuffer failed for VG pipe 0");
+				result = (ctx->pobjDataChannel[1] &&
+								ctx->pobjDataChannel[1]->
+								queueBuffer((uint32_t) buffer));
+				if (!result)
+					LOGE("Queuebuffer failed for VG pipe 1");
+			}
+			else if (ctx->format3D & HAL_3D_OUT_LR_INTERLEAVE_MASK) {
+			}
+			else {
+				LOGE("%s:Unknown 3D Format...", __func__);
+			}
+			return 0;
+		}
 		if(ctx->setCrop) {
 			bool result = (ctx->pobjDataChannel[0] &&
 				ctx->pobjDataChannel[0]->
@@ -621,7 +774,7 @@ return 0;
 			}
 		}
 
-		bool result = (ctx->pobjDataChannel[0] &&
+		result = (ctx->pobjDataChannel[0] &&
 		                               ctx->pobjDataChannel[0]->
 		                               queueBuffer((uint32_t) buffer));
 		if (!result)
@@ -650,8 +803,23 @@ return 0;
 		                        dev->common.module);
 		struct overlay_data_context_t* ctx = (struct overlay_data_context_t*)dev;
 		Mutex::Autolock objLock(m->pobjMutex);
-
-		bool ret = (ctx->pobjDataChannel[0] &&
+		bool ret;
+		if (ctx->format3D) {
+			ret = (ctx->pobjDataChannel[0] &&
+					ctx->pobjDataChannel[0]->setFd(fd));
+			if (!ret) {
+				LOGE("set fd failed for VG pipe 0");
+				return -1;
+			}
+			ret = (ctx->pobjDataChannel[1] &&
+					ctx->pobjDataChannel[1]->setFd(fd));
+			if (!ret) {
+				LOGE("set fd failed for VG pipe 1");
+				return -1;
+			}
+			return 0;
+		}
+		ret = (ctx->pobjDataChannel[0] &&
 		               ctx->pobjDataChannel[0]->setFd(fd));
 		if (!ret) {
 		    LOGE("set fd failed for framebuffer 0");
@@ -680,7 +848,46 @@ return 0;
 		                        dev->common.module);
 		struct overlay_data_context_t* ctx = (struct overlay_data_context_t*)dev;
 		Mutex::Autolock objLock(m->pobjMutex);
-
+		bool ret;
+		// for the 3D usecase extract L and R channels from a frame
+		if(ctx->format3D) {
+			if (ctx->format3D & HAL_3D_IN_LR_SIDE) {
+				ret = (ctx->pobjDataChannel[0] &&
+						   ctx->pobjDataChannel[0]->
+						   setCrop(0, 0, w/2, h));
+				if (!ret) {
+					LOGE("set crop failed for VG pipe 0");
+					return -1;
+				}
+				ret = (ctx->pobjDataChannel[1] &&
+						   ctx->pobjDataChannel[1]->
+						   setCrop(w/2, 0, w/2, h));
+				if (!ret) {
+					LOGE("set crop failed for VG pipe 1");
+					return -1;
+				}
+			}
+			else if (ctx->format3D & HAL_3D_IN_LR_TOP) {
+				ret = (ctx->pobjDataChannel[0] &&
+						ctx->pobjDataChannel[0]->
+						setCrop(0, 0, w, h/2));
+				if (!ret) {
+					LOGE("set crop failed for VG pipe 0");
+					return -1;
+				}
+				ret = (ctx->pobjDataChannel[1] &&
+						ctx->pobjDataChannel[1]->
+						setCrop(0, h/2, w, h/2));
+				if (!ret) {
+					LOGE("set crop failed for VG pipe 1");
+					return -1;
+				}
+			}
+			else if (ctx->format3D & HAL_3D_IN_LR_INTERLEAVE) {
+			//TBD
+			}
+			return 0;
+		}
 		//For primary set Crop
 		ctx->setCrop = 1;
 		ctx->cropRect.x = x;
@@ -694,8 +901,8 @@ return 0;
                         return 0;
 		}
 
-		bool ret = (ctx->pobjDataChannel[1] &&
-		               ctx->pobjDataChannel[1]->
+		ret = (ctx->pobjDataChannel[1] &&
+				   ctx->pobjDataChannel[1]->
 			       setCrop(x, y, w, h));
 		if (!ret) {
 		    LOGE("set crop failed for framebuffer 1");

@@ -96,8 +96,8 @@ int Overlay::getFBHeight() const {
     return objOvCtrlChannel.getFBHeight();
 }
 
-bool Overlay::startChannel(int w, int h, int format, int fbnum, bool norot, bool uichannel) {
-    mChannelUP = objOvCtrlChannel.startControlChannel(w, h, format, fbnum, norot);
+bool Overlay::startChannel(int w, int h, int format, int fbnum, bool norot, bool uichannel, unsigned int format3D) {
+    mChannelUP = objOvCtrlChannel.startControlChannel(w, h, format, fbnum, norot, format3D);
     if (!mChannelUP) {
         return mChannelUP;
     }
@@ -169,7 +169,7 @@ bool Overlay::queueBuffer(buffer_handle_t buffer) {
     return false;
 }
 
-OverlayControlChannel::OverlayControlChannel() : mNoRot(false), mFD(-1), mRotFD(-1) {
+OverlayControlChannel::OverlayControlChannel() : mNoRot(false), mFD(-1), mRotFD(-1), mFormat3D(0) {
     memset(&mOVInfo, 0, sizeof(mOVInfo));
     memset(&mRotInfo, 0, sizeof(mRotInfo));
 }
@@ -228,7 +228,7 @@ bool OverlayControlChannel::openDevices(int fbnum) {
 }
 
 bool OverlayControlChannel::setOverlayInformation(int w, int h,
-                                                 int format, int flags) {
+                                                 int format, int flags, int zorder) {
     int origW, origH, xoff, yoff;
 
     mOVInfo.id = MSMFB_NEW_REQUEST;
@@ -264,7 +264,7 @@ bool OverlayControlChannel::setOverlayInformation(int w, int h,
         mOVInfo.dst_rect.w = mFBWidth;
     if (h > mFBHeight)
         mOVInfo.dst_rect.h = mFBHeight;
-    mOVInfo.z_order = 0;
+    mOVInfo.z_order = zorder;
     mOVInfo.alpha = 0xff;
     mOVInfo.transp_mask = 0xffffffff;
     mOVInfo.flags = flags;
@@ -324,7 +324,8 @@ bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
 }
 
 bool OverlayControlChannel::startControlChannel(int w, int h,
-                                           int format, int fbnum, bool norot) {
+                                           int format, int fbnum, bool norot,
+                                           unsigned int format3D, int zorder) {
     mNoRot = norot;
     fb_fix_screeninfo finfo;
     fb_var_screeninfo vinfo;
@@ -343,10 +344,15 @@ bool OverlayControlChannel::startControlChannel(int w, int h,
         return false;
     }
 
+    mFormat3D = format3D;
+    if (!mFormat3D) {
+        // Set the share bit for sharing the VG pipe
+        flags |= MDP_OV_PIPE_SHARE;
+    }
     if (!openDevices(fbnum))
         return false;
 
-    if (!setOverlayInformation(w, h, hw_format, flags))
+    if (!setOverlayInformation(w, h, hw_format, flags, zorder))
         return false;
 
     return startOVRotatorSessions(w, h, hw_format);
