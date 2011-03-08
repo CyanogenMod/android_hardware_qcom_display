@@ -218,7 +218,7 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
         // PMEM buffers are always mmapped
         lockState |= private_handle_t::LOCK_STATE_MAPPED;
 
-        err = pma->alloc_pmem_buffer(size, usage, &base, &offset, &fd, &masterFd);
+        err = pma->alloc_pmem_buffer(size, usage, &base, &offset, &fd, &masterFd, format);
         if (err < 0) {
             if (((usage & GRALLOC_USAGE_HW_MASK) == 0) &&
                 ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) == 0)) {

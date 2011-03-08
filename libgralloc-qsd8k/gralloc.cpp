@@ -96,6 +96,13 @@ class PmemAllocatorDepsDeviceImpl : public PmemUserspaceAllocator::Deps,
         return ioctl(fd, PMEM_UNMAP, &sub);
     }
 
+    virtual int alignPmem(int fd, size_t size, int align) {
+        struct pmem_allocation allocation;
+        allocation.size = size;
+        allocation.align = align;
+        return ioctl(fd, PMEM_ALLOCATE_ALIGNED, &allocation);
+    }
+
     virtual int getErrno() {
         return errno;
     }

@@ -143,7 +143,7 @@ int PmemUserspaceAllocator::init_pmem_area()
 
 
 int PmemUserspaceAllocator::alloc_pmem_buffer(size_t size, int usage,
-        void** pBase, int* pOffset, int* pFd, int* masterFd)
+        void** pBase, int* pOffset, int* pFd, int* masterFd, int format)
 {
     BEGIN_FUNC;
     int err = init_pmem_area();
@@ -260,7 +260,7 @@ static unsigned clp2(unsigned x) {
 
 
 int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
-        void** pBase,int* pOffset, int* pFd, int* masterFd)
+        void** pBase,int* pOffset, int* pFd, int* masterFd, int format)
 {
     BEGIN_FUNC;
 
@@ -291,6 +291,14 @@ int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
 
     // The size should already be page aligned, now round it up to a power of 2.
     //size = clp2(size);
+
+    if (format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) {
+        // Tile format buffers need physical alignment to 8K
+        err = deps.alignPmem(master_fd, size, 8192);
+        if (err < 0) {
+            LOGE("alignPmem failed");
+        }
+    }
 
     void* base = deps.mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, master_fd, 0);
     if (base == MAP_FAILED) {
