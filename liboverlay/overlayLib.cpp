@@ -412,9 +412,11 @@ bool OverlayControlChannel::setPosition(int x, int y, uint32_t w, uint32_t h) {
     /* Scaling of upto a max of 8 times supported */
     if(w >(ov.src_rect.w * HW_OVERLAY_MAGNIFICATION_LIMIT)){
         w = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.w;
+        x = (mFBWidth - w) / 2;
     }
     if(h >(ov.src_rect.h * HW_OVERLAY_MAGNIFICATION_LIMIT)) {
         h = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.h;
+        y = (mFBHeight - h) / 2;
    }
     ov.dst_rect.x = x;
     ov.dst_rect.y = y;
