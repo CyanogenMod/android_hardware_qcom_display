@@ -199,6 +199,13 @@ public:
 	                     x, y, w, h);
 	}
 
+	bool getAspectRatioPosition(overlay_rect *rect, int channel) {
+	    if (!mHandle.pobjControlChannel[channel])
+	        return false;
+	    return mHandle.pobjControlChannel[channel]->getAspectRatioPosition(mHandle.w,
+	                     mHandle.h, mHandle.format, rect);
+	}
+
 	bool setParameter(int param, int value, int channel) {
 	    if (!mHandle.pobjControlChannel[channel])
 	        return false;
@@ -435,45 +442,12 @@ public:
 			return NULL;
 		}
 		else {
-			int width = w, height = h, x, y;
-			int fbWidthHDMI = overlay->getFBWidth(1);
-			int fbHeightHDMI = overlay->getFBHeight(1);
-			// width and height for YUV TILE format
-			int tempWidth = w, tempHeight = h;
-			/* Caculate the width and height if it is YUV TILE format*/
-			if(format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) {
-				tempWidth = w - ( (((w-1)/64 +1)*64) - w);
-				tempHeight = h - ((((h-1)/32 +1)*32) - h);
+			overlay_rect rect;
+			if(overlay->getAspectRatioPosition(&rect, 1)) {
+				if (!overlay->setPosition(rect.x, rect.y, rect.width, rect.height, 1)) {
+					LOGE("Failed to upscale for framebuffer 1");
+				}
 			}
-
-			if (width * fbHeightHDMI >
-					fbWidthHDMI * height) {
-				height = fbWidthHDMI * height / width;
-				EVEN_OUT(height);
-				width = fbWidthHDMI;
-			} else if (width * fbHeightHDMI <
-					fbWidthHDMI * height) {
-				width = fbHeightHDMI * width / height;
-				EVEN_OUT(width);
-				height = fbHeightHDMI;
-			} else {
-				width = fbWidthHDMI;
-				height = fbHeightHDMI;
-			}
-			/* Scaling of upto a max of 8 times supported */
-			if(width >(tempWidth * HW_OVERLAY_MAGNIFICATION_LIMIT)){
-				width = HW_OVERLAY_MAGNIFICATION_LIMIT * tempWidth;
-			}
-			if(height >(tempHeight*HW_OVERLAY_MAGNIFICATION_LIMIT)) {
-				height = HW_OVERLAY_MAGNIFICATION_LIMIT * tempHeight;
-			}
-			if (width > fbWidthHDMI) width = fbWidthHDMI;
-			if (height > fbHeightHDMI) height = fbHeightHDMI;
-			x = (fbWidthHDMI - width) / 2;
-			y = (fbHeightHDMI - height) / 2;
-
-			if (!overlay->setPosition(x, y, width, height, 1))
-			    LOGE("Failed to upscale for framebuffer 1");
 		}
 
 		return overlay;

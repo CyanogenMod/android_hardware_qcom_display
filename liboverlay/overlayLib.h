@@ -70,6 +70,13 @@
 
 namespace overlay {
 
+struct overlay_rect {
+    int x;
+    int y;
+    int width;
+    int height;
+};
+
 class OverlayControlChannel {
 
     bool mNoRot;
@@ -110,6 +117,7 @@ public:
     int getFormat3D() const { return mFormat3D; }
     bool getOrientation(int& orientation) const;
     bool setSource(uint32_t w, uint32_t h, int format, int orientation);
+    bool getAspectRatioPosition(int w, int h, int format, overlay_rect *rect);
 };
 
 class OverlayDataChannel {
@@ -147,9 +155,10 @@ public:
 class Overlay {
 
     bool mChannelUP;
+    bool mHDMIConnected;
 
-    OverlayControlChannel objOvCtrlChannel;
-    OverlayDataChannel    objOvDataChannel;
+    OverlayControlChannel objOvCtrlChannel[2];
+    OverlayDataChannel    objOvDataChannel[2];
 
 public:
     Overlay();
@@ -165,17 +174,19 @@ public:
     bool queueBuffer(uint32_t offset);
     bool getPosition(int& x, int& y, uint32_t& w, uint32_t& h);
     bool isChannelUP() const { return mChannelUP; }
-    int getFBWidth() const;
-    int getFBHeight() const;
+    int getFBWidth(int channel = 0) const;
+    int getFBHeight(int channel = 0) const;
     bool getOrientation(int& orientation) const;
     bool queueBuffer(buffer_handle_t buffer);
-    bool setSource(uint32_t w, uint32_t h, int format, int orientation);
+    bool setSource(uint32_t w, uint32_t h, int format, int orientation, bool hdmiConnected);
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
+
+private:
+    bool startChannelHDMI(int w, int h, int format, bool norot);
 };
 
 struct overlay_shared_data {
     int readyToQueue;
 };
-
 };
 #endif

@@ -81,56 +81,97 @@ static void reportError(const char* message) {
 
 using namespace overlay;
 
-Overlay::Overlay() : mChannelUP(false) {
+Overlay::Overlay() : mChannelUP(false), mHDMIConnected(false) {
 }
 
 Overlay::~Overlay() {
     closeChannel();
 }
 
-int Overlay::getFBWidth() const {
-    return objOvCtrlChannel.getFBWidth();
+int Overlay::getFBWidth(int channel) const {
+    return objOvCtrlChannel[channel].getFBWidth();
 }
 
-int Overlay::getFBHeight() const {
-    return objOvCtrlChannel.getFBHeight();
+int Overlay::getFBHeight(int channel) const {
+    return objOvCtrlChannel[channel].getFBHeight();
 }
 
 bool Overlay::startChannel(int w, int h, int format, int fbnum, bool norot, bool uichannel, unsigned int format3D) {
-    mChannelUP = objOvCtrlChannel.startControlChannel(w, h, format, fbnum, norot, format3D);
+    mChannelUP = objOvCtrlChannel[0].startControlChannel(w, h, format, fbnum, norot, format3D);
     if (!mChannelUP) {
+        LOGE("startChannel for fb0 failed");
         return mChannelUP;
     }
-    return objOvDataChannel.startDataChannel(objOvCtrlChannel, fbnum, norot, uichannel);
+    return objOvDataChannel[0].startDataChannel(objOvCtrlChannel[0], fbnum, norot, uichannel);
+}
+
+bool Overlay::startChannelHDMI(int w, int h, int format, bool norot) {
+
+    if(!mHDMIConnected) {
+        LOGE(" HDMI has been disabled - close the channel");
+        objOvCtrlChannel[1].closeControlChannel();
+        objOvDataChannel[1].closeDataChannel();
+        return true;
+    }
+    bool ret = startChannel(w, h, format, 0, norot);
+    if(ret) {
+        if (!objOvCtrlChannel[1].startControlChannel(w, h, format, 1, 1)) {
+            LOGE("Failed to start control channel for framebuffer 1");
+            objOvCtrlChannel[1].closeControlChannel();
+            return false;
+        } else {
+            if(!objOvDataChannel[1].startDataChannel(objOvCtrlChannel[1], 1, 1)) {
+                LOGE("Failed to start data channel for framebuffer 1");
+                return false;
+            }
+            overlay_rect rect;
+            if(objOvCtrlChannel[1].getAspectRatioPosition(w, h, format, &rect)) {
+                if(!objOvCtrlChannel[1].setPosition(rect.x, rect.y, rect.width, rect.height)) {
+                      LOGE("Failed to upscale for framebuffer 1");
+                      return false;
+                }
+            }
+        }
+    }
+    return ret;
 }
 
 bool Overlay::closeChannel() {
     if (!mChannelUP)
         return true;
-    objOvCtrlChannel.closeControlChannel();
-    objOvDataChannel.closeDataChannel();
+
+    objOvCtrlChannel[0].closeControlChannel();
+    objOvDataChannel[0].closeDataChannel();
+
+    objOvCtrlChannel[1].closeControlChannel();
+    objOvDataChannel[1].closeDataChannel();
+
     mChannelUP = false;
     return true;
 }
 
 bool Overlay::getPosition(int& x, int& y, uint32_t& w, uint32_t& h) {
-    return objOvCtrlChannel.getPosition(x, y, w, h);
+    return objOvCtrlChannel[0].getPosition(x, y, w, h);
 }
 
 bool Overlay::getOrientation(int& orientation) const {
-    return objOvCtrlChannel.getOrientation(orientation);
+    return objOvCtrlChannel[0].getOrientation(orientation);
 }
 
 bool Overlay::setPosition(int x, int y, uint32_t w, uint32_t h) {
-    return objOvCtrlChannel.setPosition(x, y, w, h);
+    return objOvCtrlChannel[0].setPosition(x, y, w, h);
 }
 
-bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation) {
-    if (!objOvCtrlChannel.setSource(w, h, format, orientation)) {
-        objOvCtrlChannel.closeControlChannel();
-        objOvDataChannel.closeDataChannel();
+bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation, bool hdmiConnected) {
+    if ((hdmiConnected != mHDMIConnected) || !objOvCtrlChannel[0].setSource(w, h, format, orientation)) {
+        closeChannel();
         mChannelUP = false;
-        return startChannel(w, h, format, 0, !orientation);
+        mHDMIConnected = hdmiConnected;
+        if (mHDMIConnected) {
+            return startChannelHDMI(w, h, format, !orientation);
+        } else {
+            return startChannel(w, h, format, 0, !orientation);
+        }
     }
     else
         return true;
@@ -139,23 +180,26 @@ bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation) {
 bool Overlay::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
     if (!mChannelUP)
         return false;
-    return objOvDataChannel.setCrop(x, y, w, h);
+        if(mHDMIConnected) {
+            objOvDataChannel[1].setCrop(x, y, w, h);
+        }
+        return objOvDataChannel[0].setCrop(x, y, w, h);
 }
 
 bool Overlay::setParameter(int param, int value) {
-    return objOvCtrlChannel.setParameter(param, value);
+    return objOvCtrlChannel[0].setParameter(param, value);
 }
 
 bool Overlay::setOrientation(int value) {
-    return objOvCtrlChannel.setParameter(OVERLAY_TRANSFORM, value);
+    return objOvCtrlChannel[0].setParameter(OVERLAY_TRANSFORM, value);
 }
 
 bool Overlay::setFd(int fd) {
-    return objOvDataChannel.setFd(fd);
+    return objOvDataChannel[0].setFd(fd);
 }
 
 bool Overlay::queueBuffer(uint32_t offset) {
-    return objOvDataChannel.queueBuffer(offset);
+    return objOvDataChannel[0].queueBuffer(offset);
 }
 
 bool Overlay::queueBuffer(buffer_handle_t buffer) {
@@ -163,7 +207,17 @@ bool Overlay::queueBuffer(buffer_handle_t buffer) {
                                    <private_handle_t const*>(buffer);
     const size_t offset = hnd->offset;
     const int fd = hnd->fd;
-    if (setFd(fd)) {
+    bool ret = true;
+
+    if(mHDMIConnected) {
+        ret = objOvDataChannel[1].setFd(fd);
+        if(!ret) {
+            reportError("Overlay::queueBuffer channel 1 setFd failed");
+            return false;
+        }
+        ret = objOvDataChannel[1].queueBuffer(offset);
+    }
+    if (ret && setFd(fd)) {
         return queueBuffer(offset);
     }
     return false;
@@ -177,6 +231,48 @@ OverlayControlChannel::OverlayControlChannel() : mNoRot(false), mFD(-1), mRotFD(
 
 OverlayControlChannel::~OverlayControlChannel() {
     closeControlChannel();
+}
+
+bool OverlayControlChannel::getAspectRatioPosition(int w, int h, int format, overlay_rect *rect)
+{
+    int width = w, height = h, x, y;
+    int fbWidthHDMI = getFBWidth();
+    int fbHeightHDMI = getFBHeight();
+    // width and height for YUV TILE format
+    int tempWidth = w, tempHeight = h;
+    /* Calculate the width and height if it is YUV TILE format*/
+    if(format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) {
+        tempWidth = w - ( (((w-1)/64 +1)*64) - w);
+        tempHeight = h - ((((h-1)/32 +1)*32) - h);
+    }
+    if (width * fbHeightHDMI > fbWidthHDMI * height) {
+        height = fbWidthHDMI * height / width;
+        EVEN_OUT(height);
+        width = fbWidthHDMI;
+    } else if (width * fbHeightHDMI < fbWidthHDMI * height) {
+        width = fbHeightHDMI * width / height;
+        EVEN_OUT(width);
+        height = fbHeightHDMI;
+    } else {
+        width = fbWidthHDMI;
+        height = fbHeightHDMI;
+    }
+    /* Scaling of upto a max of 8 times supported */
+    if(width >(tempWidth * HW_OVERLAY_MAGNIFICATION_LIMIT)){
+        width = HW_OVERLAY_MAGNIFICATION_LIMIT * tempWidth;
+    }
+    if(height >(tempHeight*HW_OVERLAY_MAGNIFICATION_LIMIT)) {
+        height = HW_OVERLAY_MAGNIFICATION_LIMIT * tempHeight;
+    }
+    if (width > fbWidthHDMI) width = fbWidthHDMI;
+    if (height > fbHeightHDMI) height = fbHeightHDMI;
+    x = (fbWidthHDMI - width) / 2;
+    y = (fbHeightHDMI - height) / 2;
+    rect->x = x;
+    rect->y = y;
+    rect->width = width;
+    rect->height = height;
+    return true;
 }
 
 bool OverlayControlChannel::openDevices(int fbnum) {
