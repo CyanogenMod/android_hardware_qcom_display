@@ -61,9 +61,10 @@
 #define OUTPUT_MASK_3D        0x0000FFFF
 #define SHIFT_3D              16
 // The output format is the 2MSB bytes. Shift the format by 12 to reflect this
-#define HAL_3D_OUT_LR_SIDE_MASK       (HAL_3D_OUT_LR_SIDE >> 12)
-#define HAL_3D_OUT_LR_TOP_MASK        (HAL_3D_OUT_LR_TOP >> 12)
-#define HAL_3D_OUT_LR_INTERLEAVE_MASK (HAL_3D_OUT_LR_INTERLEAVE >> 12)
+#define HAL_3D_OUT_SIDE_BY_SIDE_HALF_MASK       ((HAL_3D_IN_SIDE_BY_SIDE_HALF_L_R|HAL_3D_IN_SIDE_BY_SIDE_HALF_R_L) >> SHIFT_3D)
+#define HAL_3D_OUT_SIDE_BY_SIDE_FULL_MASK       (HAL_3D_IN_SIDE_BY_SIDE_FULL >> SHIFT_3D)
+#define HAL_3D_OUT_TOP_BOTTOM_MASK              (HAL_3D_OUT_TOP_BOTTOM >> 12)
+#define HAL_3D_OUT_INTERLEAVE_MASK              (HAL_3D_OUT_INTERLEAVE >> 12)
 #define FORMAT_3D_FILE        "/sys/class/graphics/fb1/format_3d"
 /* -------------------------- end 3D defines ----------------------------------------*/
 

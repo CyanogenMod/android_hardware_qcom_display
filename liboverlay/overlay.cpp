@@ -339,7 +339,18 @@ public:
 			format3D |= fOut3D << SHIFT_3D; //Set the input format
 		}
 		if(!fOut3D) {
-			format3D |= fIn3D >> SHIFT_3D; //Set the output format
+			switch (fIn3D) {
+			case HAL_3D_IN_SIDE_BY_SIDE_HALF_L_R:
+			case HAL_3D_IN_SIDE_BY_SIDE_HALF_R_L:
+			case HAL_3D_IN_SIDE_BY_SIDE_FULL:
+				// For all side by side formats, set the output
+				// format as Side-by-Side i.e 0x1
+				format3D |= HAL_3D_IN_SIDE_BY_SIDE_HALF_L_R >> SHIFT_3D;
+				break;
+			default:
+				format3D |= fIn3D >> SHIFT_3D; //Set the output format
+				break;
+			}
 		}
 
 		ctx->sharedMemBase = base;
@@ -362,8 +373,14 @@ public:
 
 		if (format3D) {
 			bool res1, res2;
-			res1 = overlay->startControlChannel(1, false, format3D, 0);
-			res2 = overlay->startControlChannel(1, false, format3D, 1);
+			if (format3D & HAL_3D_IN_SIDE_BY_SIDE_HALF_R_L) {
+				// For R-L formats, set the Zorder of the second channel as 0
+				res1 = overlay->startControlChannel(1, false, format3D, 1);
+				res2 = overlay->startControlChannel(1, false, format3D, 0);
+			} else {
+				res1 = overlay->startControlChannel(1, false, format3D, 0);
+				res2 = overlay->startControlChannel(1, false, format3D, 1);
+			}
 			if (!res1 || !res2) {
 				LOGE("Failed to start control channel for VG pipe 0 or 1");
 				overlay->closeControlChannel(0);
@@ -492,7 +509,7 @@ public:
 		if(ctx->format3D){
 			int wHDMI = obj->getFBWidth(1);
 			int hHDMI = obj->getFBHeight(1);
-			if(ctx->format3D & HAL_3D_OUT_LR_SIDE_MASK) {
+			if(ctx->format3D & HAL_3D_OUT_SIDE_BY_SIDE_HALF_MASK) {
 				ret = obj->setPosition(0, 0, wHDMI/2, hHDMI, 0);
 				if (!ret)
 					return -1;
@@ -500,7 +517,7 @@ public:
 				if (!ret)
 					return -1;
 			}
-			else if (ctx->format3D & HAL_3D_OUT_LR_TOP_MASK) {
+			else if (ctx->format3D & HAL_3D_OUT_TOP_BOTTOM_MASK) {
 				ret = obj->setPosition(0, 0, wHDMI, hHDMI/2, 0);
 				if (!ret)
 					return -1;
@@ -508,10 +525,11 @@ public:
 				if (!ret)
 					return -1;
 			}
-			else if (ctx->format3D & HAL_3D_OUT_LR_INTERLEAVE_MASK) {
+			else if (ctx->format3D & HAL_3D_OUT_INTERLEAVE_MASK) {
 				//TBD
-			}
-			else {
+			} else if (ctx->format3D & HAL_3D_OUT_SIDE_BY_SIDE_FULL_MASK) {
+                               //TBD
+			} else {
 				LOGE("%s: Unsupported 3D output format!!!", __func__);
 			}
 		}
@@ -743,8 +761,8 @@ return 0;
 
 		bool result;
 		if (ctx->format3D) {
-			if ( (ctx->format3D & HAL_3D_OUT_LR_SIDE_MASK) ||
-					(ctx->format3D & HAL_3D_OUT_LR_TOP_MASK) ) {
+			if ( (ctx->format3D & HAL_3D_OUT_SIDE_BY_SIDE_HALF_MASK) ||
+					(ctx->format3D & HAL_3D_OUT_TOP_BOTTOM_MASK) ) {
 				result = (ctx->pobjDataChannel[0] &&
 								ctx->pobjDataChannel[0]->
 								queueBuffer((uint32_t) buffer));
@@ -756,9 +774,11 @@ return 0;
 				if (!result)
 					LOGE("Queuebuffer failed for VG pipe 1");
 			}
-			else if (ctx->format3D & HAL_3D_OUT_LR_INTERLEAVE_MASK) {
-			}
-			else {
+			else if (ctx->format3D & HAL_3D_OUT_INTERLEAVE_MASK) {
+				//TBD
+			} else if (ctx->format3D & HAL_3D_OUT_SIDE_BY_SIDE_FULL_MASK) {
+				//TBD
+			} else {
 				LOGE("%s:Unknown 3D Format...", __func__);
 			}
 			return 0;
@@ -851,7 +871,8 @@ return 0;
 		bool ret;
 		// for the 3D usecase extract L and R channels from a frame
 		if(ctx->format3D) {
-			if (ctx->format3D & HAL_3D_IN_LR_SIDE) {
+			if ((ctx->format3D & HAL_3D_IN_SIDE_BY_SIDE_HALF_L_R) ||
+                            (ctx->format3D & HAL_3D_IN_SIDE_BY_SIDE_HALF_R_L)) {
 				ret = (ctx->pobjDataChannel[0] &&
 						   ctx->pobjDataChannel[0]->
 						   setCrop(0, 0, w/2, h));
@@ -867,7 +888,7 @@ return 0;
 					return -1;
 				}
 			}
-			else if (ctx->format3D & HAL_3D_IN_LR_TOP) {
+			else if (ctx->format3D & HAL_3D_IN_TOP_BOTTOM) {
 				ret = (ctx->pobjDataChannel[0] &&
 						ctx->pobjDataChannel[0]->
 						setCrop(0, 0, w, h/2));
@@ -883,10 +904,12 @@ return 0;
 					return -1;
 				}
 			}
-			else if (ctx->format3D & HAL_3D_IN_LR_INTERLEAVE) {
-			//TBD
+			else if (ctx->format3D & HAL_3D_IN_INTERLEAVE) {
+				//TBD
+			} else if (ctx->format3D & HAL_3D_IN_SIDE_BY_SIDE_FULL) {
+				//TBD
 			}
-			return 0;
+                        return 0;
 		}
 		//For primary set Crop
 		ctx->setCrop = 1;

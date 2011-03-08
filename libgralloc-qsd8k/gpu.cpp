@@ -280,7 +280,7 @@ void gpu_context_t::getGrallocInformationFromFormat(int inputFormat, int *colorF
     case (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_3D_VIDEO_FLAG):
     {
         *colorFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
-        *halFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED | HAL_3D_IN_LR_SIDE | HAL_3D_OUT_LR_SIDE;
+        *halFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED | HAL_3D_IN_SIDE_BY_SIDE_HALF_L_R | HAL_3D_OUT_SIDE_BY_SIDE;
     } break;
     case QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
     {
