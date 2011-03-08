@@ -122,8 +122,8 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
 
-    if(!ctx) {
-         LOGE("hwc_prepare null context ");
+    if(!ctx || !list) {
+         LOGE("hwc_prepare invalid context or list");
          return -1;
     }
 
@@ -242,8 +242,8 @@ static int hwc_set(hwc_composer_device_t *dev,
 {
     
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    if(!ctx) {
-         LOGE("hwc_set null context ");
+    if(!ctx || !list) {
+         LOGE("hwc_set invalid context or list");
          return -1;
     }
 
@@ -272,6 +272,11 @@ static int hwc_set(hwc_composer_device_t *dev,
 
 static int hwc_device_close(struct hw_device_t *dev)
 {
+    if(!dev) {
+        LOGE("hwc_device_close null device pointer");
+        return -1;
+    }
+
     struct hwc_context_t* ctx = (struct hwc_context_t*)dev;
 
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
