@@ -802,7 +802,10 @@ bool OverlayDataChannel::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
     }
 
     if (ov.user_data[0] == MDP_ROT_90) {
-        int tmp = x;
+        if (ov.src.width < (y + h))
+            return false;
+
+        uint32_t tmp = x;
         x = ov.src.width - (y + h);
         y = tmp;
 
@@ -811,7 +814,10 @@ bool OverlayDataChannel::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
         h = tmp;
     }
     else if (ov.user_data[0] == MDP_ROT_270) {
-        int tmp = y;
+        if (ov.src.height < (x + w))
+            return false;
+
+        uint32_t tmp = y;
         y = ov.src.height - (x + w);
         x = tmp;
 
@@ -825,10 +831,6 @@ bool OverlayDataChannel::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
            (ov.src_rect.w == w) &&
            (ov.src_rect.h == h))
         return true;
-    if ( (int) x < 0 || (int) y < 0 || (int) w < 0 || (int) h < 0){
-       LOGE("%s: invalid value for crop: x=%d,y=%d,w=%d,h=%d",__func__,x,y,w,h);
-       return false;
-    }
 
     ov.src_rect.x = x;
     ov.src_rect.y = y;
