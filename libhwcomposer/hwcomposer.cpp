@@ -36,22 +36,25 @@
 #include <overlayLib.h>
 
 #include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <ui/android_native_buffer.h>
 #include <gralloc_priv.h>
 
 /*****************************************************************************/
+#define ALIGN(x, align) (((x) + ((align)-1)) & ~((align)-1))
 
 // Enum containing the supported composition types
 enum {
-    COMPOSITION_TYPE_GPU,
-    COMPOSITION_TYPE_MDP,
-    COMPOSITION_TYPE_C2D,
-    COMPOSITION_TYPE_CPU
+    COMPOSITION_TYPE_GPU = 0,
+    COMPOSITION_TYPE_MDP = 0x1,
+    COMPOSITION_TYPE_C2D = 0x2,
+    COMPOSITION_TYPE_CPU = 0x4
 };
 
-enum LayerType{
-    GPU,     // This layer is to be handled by Surfaceflinger
-    OVERLAY, // This layer is to be handled by the overlay
-    COPYBIT  // This layer is to be handled by copybit
+enum HWCCompositionType {
+    HWC_USE_GPU,     // This layer is to be handled by Surfaceflinger
+    HWC_USE_OVERLAY, // This layer is to be handled by the overlay
+    HWC_USE_COPYBIT  // This layer is to be handled by copybit
 };
 
 struct hwc_context_t {
@@ -154,10 +157,11 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             // If there is a single Fullscreen layer, we can bypass it - TBD
             // If there is only one video/camera buffer, we can bypass itn
             if(hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO) && (yuvBufferCount == 1)) {
-                list->hwLayers[i].compositionType = OVERLAY;
+                list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
                 list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
+            } else if (hnd && (hwcModule->compositionType & (COMPOSITION_TYPE_C2D|COMPOSITION_TYPE_MDP))) {
+                list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
             } else {
-                // For other layers, check composition used. - C2D/MDP composition - TBD
                 list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
             }
         }
@@ -183,6 +187,116 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
     }
 
     return 0;
+}
+// ---------------------------------------------------------------------------
+struct range {
+    int current;
+    int end;
+};
+struct region_iterator : public copybit_region_t {
+    
+    region_iterator(hwc_region_t region) {
+        mRegion = region;
+        r.end = region.numRects;
+        r.current = 0;
+        this->next = iterate;
+    }
+
+private:
+    static int iterate(copybit_region_t const * self, copybit_rect_t* rect) {
+        if (!self || !rect) {
+            LOGE("iterate invalid parameters");
+            return 0;
+        }
+
+        region_iterator const* me = static_cast<region_iterator const*>(self);
+        if (me->r.current != me->r.end) {
+            rect->l = me->mRegion.rects[me->r.current].left;
+            rect->t = me->mRegion.rects[me->r.current].top;
+            rect->r = me->mRegion.rects[me->r.current].right;
+            rect->b = me->mRegion.rects[me->r.current].bottom;
+            me->r.current++;
+            return 1;
+        }
+        return 0;
+    }
+    
+    hwc_region_t mRegion;
+    mutable range r; 
+};
+
+
+static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer, EGLDisplay dpy,
+                                 EGLSurface surface)
+{
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+    if(!ctx) {
+         LOGE("drawLayerUsingCopybit null context ");
+         return -1;
+    }
+
+    private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(dev->common.module);
+    if(!hwcModule) {
+        LOGE("drawLayerUsingCopybit null module ");
+        return -1;
+    }
+
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    if(!hnd) {
+        LOGE("drawLayerUsingCopybit invalid handle");
+        return -1;
+    }
+
+    // Set the copybit source:
+    copybit_image_t src;
+    src.w = ALIGN(hnd->width, 32);
+    src.h = hnd->height;
+    src.format = hnd->format;
+    src.base = (void *)hnd->base;
+    src.handle = (native_handle_t *)layer->handle;
+
+    // Copybit source rect
+    hwc_rect_t sourceCrop = layer->sourceCrop;
+    copybit_rect_t srcRect = {sourceCrop.left, sourceCrop.top,
+                              (sourceCrop.right - sourceCrop.left),
+                              (sourceCrop.bottom-sourceCrop.top)};
+
+    // Copybit destination rect
+    hwc_rect_t displayFrame = layer->displayFrame;
+    copybit_rect_t dstRect = {displayFrame.left, displayFrame.top,
+                              (displayFrame.right - displayFrame.left),
+                              (displayFrame.bottom-displayFrame.top)};
+
+    // Copybit dst
+    copybit_image_t dst;
+    android_native_buffer_t *renderBuffer = (android_native_buffer_t *)eglGetRenderBufferANDROID(dpy, surface);
+    if (!renderBuffer) {
+        LOGE("eglGetRenderBufferANDROID returned NULL buffer");
+    }
+    private_handle_t *fbHandle = (private_handle_t *)renderBuffer->handle;
+    if(!fbHandle) {
+        LOGE("Framebuffer handle is NULL");
+        return -1;
+    }
+    dst.w = ALIGN(fbHandle->width,32);
+    dst.h = fbHandle->height;
+    dst.format = fbHandle->format;
+    dst.base = (void *)fbHandle->base;
+    dst.handle = (native_handle_t *)renderBuffer->handle;
+
+    // Copybit region
+    hwc_region_t region = layer->visibleRegionScreen;
+    region_iterator copybitRegion(region);
+
+    copybit_device_t *copybit = hwcModule->copybitEngine;
+    copybit->set_parameter(copybit, COPYBIT_TRANSFORM, layer->transform);
+    copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, layer->blending);
+    int err = copybit->stretch(copybit, &dst, &src, &dstRect, &srcRect, &copybitRegion);
+
+    if(err < 0)
+        LOGE("copybit stretch failed");
+
+    return err;
 }
 
 static int drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
@@ -253,13 +367,15 @@ static int hwc_set(hwc_composer_device_t *dev,
         LOGE("hwc_set null module ");
         return -1;
     }
-
     for (size_t i=0 ; i<list->numHwLayers ; i++) {
-        if (list->hwLayers[i].compositionType == HWC_OVERLAY) {
+        if (list->hwLayers[i].flags == HWC_SKIP_LAYER) {
+            continue;
+        }
+
+        if (list->hwLayers[i].compositionType == HWC_USE_OVERLAY) {
             drawLayerUsingOverlay(ctx, &(list->hwLayers[i]));
-        } else if ((hwcModule->compositionType == COMPOSITION_TYPE_C2D) ||
-                (hwcModule->compositionType == COMPOSITION_TYPE_MDP)) {
-            // TBD
+        } else if (list->hwLayers[i].compositionType == HWC_USE_COPYBIT) {
+            drawLayerUsingCopybit(dev, &(list->hwLayers[i]), (EGLDisplay)dpy, (EGLSurface)sur);            
         }
     }
     EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
@@ -331,17 +447,17 @@ static int hwc_module_initialize(struct private_hwc_module_t* hwcModule)
             // Get the composition type
             property_get("debug.composition.type", property, NULL);
             if (property == NULL) {
-                hwcModule->compositionType == COMPOSITION_TYPE_GPU;
+                hwcModule->compositionType = COMPOSITION_TYPE_GPU;
             } else if ((strncmp(property, "mdp", 3)) == 0) {
-                hwcModule->compositionType == COMPOSITION_TYPE_MDP;
+                hwcModule->compositionType = COMPOSITION_TYPE_MDP;
             } else if ((strncmp(property, "c2d", 3)) == 0) {
-                hwcModule->compositionType == COMPOSITION_TYPE_C2D;
+                hwcModule->compositionType = COMPOSITION_TYPE_C2D;
             } else {
-                hwcModule->compositionType == COMPOSITION_TYPE_GPU;
+                hwcModule->compositionType = COMPOSITION_TYPE_GPU;
             }
 
             if(!hwcModule->copybitEngine)
-                hwcModule->compositionType == COMPOSITION_TYPE_GPU;
+                hwcModule->compositionType = COMPOSITION_TYPE_GPU;
             }
     } else { //debug.sf.hw is not set. Use cpu composition
         hwcModule->compositionType = COMPOSITION_TYPE_CPU;
