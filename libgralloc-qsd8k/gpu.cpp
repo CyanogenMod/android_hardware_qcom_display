@@ -69,7 +69,7 @@ int gpu_context_t::gralloc_alloc_framebuffer_locked(size_t size, int usage,
         // we return a regular buffer which will be memcpy'ed to the main
         // screen when post is called.
         int newUsage = (usage & ~GRALLOC_USAGE_HW_FB) | GRALLOC_USAGE_HW_2D;
-        return gralloc_alloc_buffer(bufferSize, newUsage, pHandle);
+        return gralloc_alloc_buffer(bufferSize, newUsage, pHandle, BUFFER_TYPE_UI, m->fbFormat, m->info.xres, m->info.yres);
     }
 
     if (bufferMask >= ((1LU<<numBuffers)-1)) {
@@ -81,7 +81,8 @@ int gpu_context_t::gralloc_alloc_framebuffer_locked(size_t size, int usage,
     intptr_t vaddr = intptr_t(m->framebuffer->base);
     private_handle_t* hnd = new private_handle_t(dup(m->framebuffer->fd), bufferSize,
                                                  private_handle_t::PRIV_FLAGS_USES_PMEM |
-                                                 private_handle_t::PRIV_FLAGS_FRAMEBUFFER);
+                                                 private_handle_t::PRIV_FLAGS_FRAMEBUFFER,
+                                                 BUFFER_TYPE_UI, m->fbFormat, m->info.xres, m->info.yres);
 
     // find a free slot
     for (uint32_t i=0 ; i<numBuffers ; i++) {
@@ -151,7 +152,8 @@ int gpu_context_t::alloc_ashmem_buffer(size_t size, unsigned int postfix, void**
     return err;
 }
 
-int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t* pHandle)
+int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t* pHandle,
+                                        int bufferType, int format, int width, int height)
 {
     int err = 0;
     int flags = 0;
@@ -161,7 +163,6 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
                     // the PmemAllocator rather than getting the base & offset separately
     int offset = 0;
     int lockState = 0;
-
     size = roundUpToPageSize(size);
 #ifndef USE_ASHMEM
     if (usage & GRALLOC_USAGE_HW_TEXTURE) {
@@ -178,7 +179,7 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
     }
 #endif
-    if (usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) {
+    if ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) || (usage & GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL)) {
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP;
         flags &= ~private_handle_t::PRIV_FLAGS_USES_PMEM;
     }
@@ -211,7 +212,6 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
         // PMEM buffers are always mmapped
         lockState |= private_handle_t::LOCK_STATE_MAPPED;
 
-        // Allocate the buffer from pmem
         err = pma->alloc_pmem_buffer(size, usage, &base, &offset, &fd);
         if (err < 0) {
             if (((usage & GRALLOC_USAGE_HW_MASK) == 0) &&
@@ -234,7 +234,7 @@ try_ashmem:
     }
 
     if (err == 0) {
-        private_handle_t* hnd = new private_handle_t(fd, size, flags);
+        private_handle_t* hnd = new private_handle_t(fd, size, flags, bufferType, format, width, height);
         hnd->offset = offset;
         hnd->base = int(base)+offset;
         hnd->lockState = lockState;
@@ -250,6 +250,61 @@ static inline size_t ALIGN(size_t x, size_t align) {
     return (x + align-1) & ~(align-1);
 }
 
+void gpu_context_t::getGrallocInformationFromFormat(int inputFormat, int *colorFormat, int *bufferType, int *halFormat)
+{
+    *bufferType = BUFFER_TYPE_VIDEO;
+    *halFormat = inputFormat;
+    *colorFormat = inputFormat;
+
+    switch(inputFormat) {
+    case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
+    {
+        *colorFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+        *halFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+    } break;
+    case (OMX_QCOM_COLOR_FormatYVU420SemiPlanar ^ QOMX_INTERLACE_FLAG):
+    {
+        *colorFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+        *halFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP ^ HAL_PIXEL_FORMAT_INTERLACE;
+    } break;
+    case (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_INTERLACE_FLAG):
+    {
+        *colorFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
+        *halFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED ^ HAL_PIXEL_FORMAT_INTERLACE;
+    } break;
+    case (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_3D_VIDEO_FLAG):
+    {
+        *colorFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
+        *halFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED | HAL_3D_IN_LR_SIDE | HAL_3D_OUT_LR_SIDE;
+    } break;
+    case QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
+    {
+        *colorFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
+        *halFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
+    } break;
+    default:
+    {
+        if (inputFormat & S3D_FORMAT_MASK) {
+            // S3D format
+            *colorFormat = COLOR_FORMAT(inputFormat);
+        } else if (inputFormat & INTERLACE_MASK) {
+            // Interlaced
+            *colorFormat = inputFormat ^ HAL_PIXEL_FORMAT_INTERLACE;
+        } else if (inputFormat < 0x7) {
+            // RGB formats
+            *colorFormat = inputFormat;
+            *bufferType = BUFFER_TYPE_UI;
+        } else if ((inputFormat == HAL_PIXEL_FORMAT_R_8) ||
+                   (inputFormat == HAL_PIXEL_FORMAT_RG_88)) {
+            *colorFormat = inputFormat;
+            *bufferType = BUFFER_TYPE_UI;
+        }
+        break;
+    }
+}
+
+}
+
 int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
         buffer_handle_t* pHandle, int* pStride) {
     if (!pHandle || !pStride)
@@ -259,7 +314,10 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
 
     alignedw = ALIGN(w, 32);
     alignedh = ALIGN(h, 32);
-    switch (format) {
+    int colorFormat, bufferType, halFormat;
+    getGrallocInformationFromFormat(format, &colorFormat, &bufferType, &halFormat);
+	
+    switch (colorFormat) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_BGRA_8888:
@@ -287,10 +345,11 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
             size  = ALIGN( alignedw * alignedh, 8192);
             size += ALIGN( alignedw * ALIGN(h/2, 32), 4096);
             break;
-
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+	case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         case HAL_PIXEL_FORMAT_YV12:
             if ((w&1) || (h&1)) {
-                LOGE("w or h is odd for HAL_PIXEL_FORMAT_YV12");
+                LOGE("w or h is odd for the YUV format");
                 return -EINVAL;
             }
             alignedw = ALIGN(w, 16);
@@ -311,7 +370,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
     if (usage & GRALLOC_USAGE_HW_FB) {
         err = gralloc_alloc_framebuffer(size, usage, pHandle);
     } else {
-        err = gralloc_alloc_buffer(size, usage, pHandle);
+        err = gralloc_alloc_buffer(size, usage, pHandle, bufferType, halFormat, w, h);
     }
 
     if (err < 0) {

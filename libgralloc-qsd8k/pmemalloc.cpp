@@ -225,9 +225,8 @@ PmemUserspaceAllocator::Deps::~Deps()
     END_FUNC;
 }
 
-PmemKernelAllocator::PmemKernelAllocator(Deps& deps, const char* pmemdev):
-    deps(deps),
-    pmemdev(pmemdev)
+PmemKernelAllocator::PmemKernelAllocator(Deps& deps):
+    deps(deps)
 {
     BEGIN_FUNC;
     END_FUNC;
@@ -268,33 +267,66 @@ int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
     *pOffset = 0;
     *pFd = -1;
 
-    int err;
+    int err, offset = 0;
     int openFlags = get_open_flags(usage);
-    int fd = deps.open(pmemdev, openFlags, 0);
-    if (fd < 0) {
+    const char *device;
+    
+    if (usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) {
+        device = DEVICE_PMEM_ADSP;
+    } else if (usage & GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL) {
+        device = DEVICE_PMEM_SMIPOOL;
+    } else {
+        LOGE("Invalid device");
+        return -EINVAL;
+    }
+
+    int master_fd = deps.open(device, openFlags, 0);
+    if (master_fd < 0) {
         err = -deps.getErrno();
         END_FUNC;
+        LOGE("Error opening %s", device);
         return err;
     }
 
     // The size should already be page aligned, now round it up to a power of 2.
-    size = clp2(size);
+    //size = clp2(size);
 
-    void* base = deps.mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    void* base = deps.mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, master_fd, 0);
     if (base == MAP_FAILED) {
-        LOGE("%s: failed to map pmem fd: %s", pmemdev,
+        LOGE("%s: failed to map pmem fd: %s", device,
              strerror(deps.getErrno()));
         err = -deps.getErrno();
-        deps.close(fd);
+        deps.close(master_fd);
         END_FUNC;
         return err;
     }
-
     memset(base, 0, size);
+    
+    // Connect and map the PMEM region to give to the client process
+    int fd = deps.open(device, O_RDWR, 0);
+    err = fd < 0 ? fd : 0;
 
-    *pBase = base;
-    *pOffset = 0;
-    *pFd = fd;
+    // and connect to it
+    if (err == 0) {
+        err = deps.connectPmem(fd, master_fd);
+    }
+
+    // and make it available to the client process
+    if (err == 0) {
+        err = deps.mapPmem(fd, offset, size);
+    }
+    
+    if (err == 0) {
+        *pBase = base;
+        *pOffset = 0;
+        *pFd = fd;
+    } else {
+        deps.munmap(base, size);
+        deps.unmapPmem(fd, offset, size);
+        deps.close(fd);
+        deps.close(master_fd);
+        return err;
+    }
 
     END_FUNC;
     return 0;
@@ -306,12 +338,18 @@ int PmemKernelAllocator::free_pmem_buffer(size_t size, void* base, int offset, i
     BEGIN_FUNC;
     // The size should already be page aligned, now round it up to a power of 2
     // like we did when allocating.
-    size = clp2(size);
+    //size = clp2(size);
 
-    int err = deps.munmap(base, size);
+    int err = deps.unmapPmem(fd, offset, size);
     if (err < 0) {
         err = deps.getErrno();
-        LOGW("%s: error unmapping pmem fd: %s", pmemdev, strerror(err));
+        LOGW("error unmapping pmem fd: %s", strerror(err));
+        return -err;
+    }
+    err = deps.munmap(base, size);
+    if (err < 0) {
+        err = deps.getErrno();
+        LOGW("error unmapping pmem master_fd: %s", strerror(err));
         return -err;
     }
     END_FUNC;

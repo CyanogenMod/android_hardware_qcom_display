@@ -139,9 +139,12 @@ class PmemKernelAllocator: public PmemAllocator {
         virtual int munmap(void* start, size_t length) = 0;
         virtual int open(const char* pathname, int flags, int mode) = 0;
         virtual int close(int fd) = 0;
+        virtual int connectPmem(int fd, int master_fd) = 0;
+        virtual int mapPmem(int fd, int offset, size_t size) = 0;
+        virtual int unmapPmem(int fd, int offset, size_t size) = 0;
     };
 
-    PmemKernelAllocator(Deps& deps, const char* pmemdev);
+    PmemKernelAllocator(Deps& deps);
     virtual ~PmemKernelAllocator();
 
     // Only valid after init_pmem_area() has completed successfully.
@@ -154,8 +157,6 @@ class PmemKernelAllocator: public PmemAllocator {
  private:
 
     Deps& deps;
-
-    const char* pmemdev;
 };
 
 #endif  // GRALLOC_QSD8K_PMEMALLOC_H

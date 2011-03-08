@@ -56,7 +56,8 @@ class gpu_context_t : public alloc_device_t {
             buffer_handle_t* pHandle);
     int gralloc_alloc_framebuffer(size_t size, int usage,
             buffer_handle_t* pHandle);
-    int gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t* pHandle);
+    int gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t* pHandle, int bufferType, int format,
+                             int width, int height);
     int free_impl(private_handle_t const* hnd);
     int alloc_impl(int w, int h, int format, int usage,
             buffer_handle_t* pHandle, int* pStride);
@@ -73,6 +74,7 @@ class gpu_context_t : public alloc_device_t {
     PmemAllocator& pmemAdspAllocator;
     int alloc_ashmem_buffer(size_t size, unsigned int postfix, void** pBase,
             int* pOffset, int* pFd);
+    void getGrallocInformationFromFormat(int inputFormat, int *colorFormat, int *bufferType, int *halFormat);
 };
 
 #endif  // GRALLOC_QSD8K_GPU_H

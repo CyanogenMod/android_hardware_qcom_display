@@ -38,12 +38,16 @@ using namespace overlay;
 enum {
     /* gralloc usage bit indicating a pmem_adsp allocation should be used */
     GRALLOC_USAGE_PRIVATE_PMEM_ADSP = GRALLOC_USAGE_PRIVATE_0,
-    GRALLOC_USAGE_PRIVATE_PMEM = GRALLOC_USAGE_PRIVATE_1,
+    GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL = GRALLOC_USAGE_PRIVATE_1,
 };
 
 #define NUM_BUFFERS 2
 #define NO_SURFACEFLINGER_SWAPINTERVAL
 #define INTERLACE_MASK 0x80
+#define S3D_FORMAT_MASK 0xFF000
+#define COLOR_FORMAT(x) (x & 0xFFF) // Max range for colorFormats is 0 - FFF
+#define DEVICE_PMEM_ADSP "/dev/pmem_adsp"
+#define DEVICE_PMEM_SMIPOOL "/dev/pmem_smipool"
 /*****************************************************************************/
 #ifdef __cplusplus
 template <class T>
@@ -154,6 +158,15 @@ enum {
     HAL_3D_OUT_LR_INTERLEAVE = 0x4
 };
 
+enum {
+	BUFFER_TYPE_UI = 0,
+	BUFFER_TYPE_VIDEO
+};
+
+static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
+static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
+static const int QOMX_INTERLACE_FLAG = 0x49283654;
+static const int QOMX_3D_VIDEO_FLAG = 0x23784238;
 /*****************************************************************************/
 
 struct private_module_t;
@@ -248,7 +261,7 @@ struct private_handle_t {
     int     flags;
     int     size;
     int     offset;
-    int     gpu_fd; // stored as an int, b/c we don't want it marshalled
+    int     bufferType;
 
     // FIXME: the attributes below should be out-of-line
     int     base;
@@ -256,15 +269,19 @@ struct private_handle_t {
     int     writeOwner;
     int     gpuaddr; // The gpu address mapped into the mmu. If using ashmem, set to 0 They don't care
     int     pid;
+    int     format;
+    int     width;
+    int     height;
 
 #ifdef __cplusplus
-    static const int sNumInts = 10;
+    static const int sNumInts = 13;
     static const int sNumFds = 1;
     static const int sMagic = 'gmsm';
 
-    private_handle_t(int fd, int size, int flags) :
-        fd(fd), magic(sMagic), flags(flags), size(size), offset(0), gpu_fd(-1),
-        base(0), lockState(0), writeOwner(0), gpuaddr(0), pid(getpid())
+    private_handle_t(int fd, int size, int flags, int bufferType, int format, int width, int height) :
+        fd(fd), magic(sMagic), flags(flags), size(size), offset(0), bufferType(bufferType),
+        base(0), lockState(0), writeOwner(0), gpuaddr(0), pid(getpid()), format(format), width(width),
+        height(height)
     {
         version = sizeof(native_handle);
         numInts = sNumInts;

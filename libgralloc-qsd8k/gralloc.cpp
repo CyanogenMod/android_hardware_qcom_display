@@ -149,8 +149,7 @@ static SimpleBestFitAllocator pmemAllocMgr;
 static PmemUserspaceAllocator pmemAllocator(pmemAllocatorDeviceDepsImpl, pmemAllocMgr,
         "/dev/pmem");
 
-static PmemKernelAllocator pmemAdspAllocator(pmemAllocatorDeviceDepsImpl,
-        "/dev/pmem_adsp");
+static PmemKernelAllocator pmemAdspAllocator(pmemAllocatorDeviceDepsImpl);
 
 /*****************************************************************************/
 
