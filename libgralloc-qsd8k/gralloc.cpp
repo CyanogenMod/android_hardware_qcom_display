@@ -65,11 +65,20 @@ class PmemAllocatorDepsDeviceImpl : public PmemUserspaceAllocator::Deps,
         public PmemKernelAllocator::Deps {
 
     virtual size_t getPmemTotalSize(int fd, size_t* size) {
+        int err = 0;
+#ifndef TARGET_MSM7x27
         pmem_region region;
-        int err = ioctl(fd, PMEM_GET_TOTAL_SIZE, &region);
+        err = ioctl(fd, PMEM_GET_TOTAL_SIZE, &region);
         if (err == 0) {
             *size = region.len;
         }
+#else
+#ifdef USE_ASHMEM
+	*size = m->info.xres * m->info.yres * 2 * 2;
+#else
+	*size = 23<<20; //23MB for 7x27
+#endif
+#endif
         return err;
     }
 
