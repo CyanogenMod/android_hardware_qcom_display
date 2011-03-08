@@ -143,7 +143,7 @@ int PmemUserspaceAllocator::init_pmem_area()
 
 
 int PmemUserspaceAllocator::alloc_pmem_buffer(size_t size, int usage,
-        void** pBase, int* pOffset, int* pFd)
+        void** pBase, int* pOffset, int* pFd, int* masterFd)
 {
     BEGIN_FUNC;
     int err = init_pmem_area();
@@ -185,6 +185,7 @@ int PmemUserspaceAllocator::alloc_pmem_buffer(size_t size, int usage,
                 *pBase = base;
                 *pOffset = offset;
                 *pFd = fd;
+                *masterFd = -1;
             }
             //LOGD_IF(!err, "%s: allocating pmem size=%d, offset=%d", pmemdev, size, offset);
         }
@@ -259,7 +260,7 @@ static unsigned clp2(unsigned x) {
 
 
 int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
-        void** pBase,int* pOffset, int* pFd)
+        void** pBase,int* pOffset, int* pFd, int* masterFd)
 {
     BEGIN_FUNC;
 
@@ -320,6 +321,7 @@ int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
         *pBase = base;
         *pOffset = 0;
         *pFd = fd;
+        *masterFd = master_fd;
     } else {
         deps.munmap(base, size);
         deps.unmapPmem(fd, offset, size);
@@ -346,12 +348,7 @@ int PmemKernelAllocator::free_pmem_buffer(size_t size, void* base, int offset, i
         LOGW("error unmapping pmem fd: %s", strerror(err));
         return -err;
     }
-    err = deps.munmap(base, size);
-    if (err < 0) {
-        err = deps.getErrno();
-        LOGW("error unmapping pmem master_fd: %s", strerror(err));
-        return -err;
-    }
+
     END_FUNC;
     return 0;
 }
