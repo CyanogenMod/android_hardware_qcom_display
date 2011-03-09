@@ -61,7 +61,7 @@ struct hwc_context_t {
     /* our private state goes below here */
     overlay::Overlay* mOverlayLibObject;
     bool hdmiConnected;
-    bool videoHDMIStarted;
+    bool videoStarted;
 };
 
 static int hwc_device_open(const struct hw_module_t* module, const char* name,
@@ -164,25 +164,26 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
             }
         }
-    }
 
-    // Inform the gralloc to close the UI mirroring channel if HDMI is connected
-    // and we have a video buffer
-    framebuffer_device_t *fbDev = hwcModule->fbDevice;
-    if ((yuvBufferCount == 1) && ctx->hdmiConnected && !ctx->videoHDMIStarted) {
-        if (fbDev) {
-            fbDev->videoOverlayStarted(fbDev, true);
+        // Inform the gralloc to close the UI mirroring channel if HDMI is connected
+        // and we have a video buffer
+        framebuffer_device_t *fbDev = hwcModule->fbDevice;
+        if ((yuvBufferCount == 1) && !ctx->videoStarted) {
+            if (ctx->hdmiConnected && fbDev) {
+                fbDev->videoOverlayStarted(fbDev, true);
+            }
+            ctx->videoStarted = true;
         }
-        ctx->videoHDMIStarted = true;
-    }
 
-    if (ctx->videoHDMIStarted && yuvBufferCount != 1) {
-        if(ovLibObject)
-            ovLibObject->closeChannel();
-        if (fbDev) {
-            fbDev->videoOverlayStarted(fbDev, false);
+        if (ctx->videoStarted && yuvBufferCount != 1) {
+            if(ovLibObject)
+                ovLibObject->closeChannel();
+
+            if (ctx->hdmiConnected && fbDev) {
+                fbDev->videoOverlayStarted(fbDev, false);
+            }
+            ctx->videoStarted = false;
         }
-        ctx->videoHDMIStarted = false;
     }
 
     return 0;
@@ -486,7 +487,7 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
             dev->mOverlayLibObject = NULL;
 
         dev->hdmiConnected = false;
-        dev->videoHDMIStarted = false;
+        dev->videoStarted = false;
 
         /* initialize the procs */
         dev->device.common.tag = HARDWARE_DEVICE_TAG;
