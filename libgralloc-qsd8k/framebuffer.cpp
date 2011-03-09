@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -312,13 +312,24 @@ static void *hdmi_ui_loop(void *ptr)
                             break;
                         }
                     }
-                    pTemp->setParameter(OVERLAY_TRANSFORM,
-                                          rot);
+                    int currentOrientation = 0;
+                    pTemp->getOrientation(currentOrientation);
+                    if(rot != currentOrientation) {
+                        pTemp->setParameter(OVERLAY_TRANSFORM,
+                                              rot);
+                    }
                     EVEN_OUT(asX);
                     EVEN_OUT(asY);
                     EVEN_OUT(aswidth);
                     EVEN_OUT(asheight);
-                    pTemp->setPosition(asX, asY, aswidth, asheight);
+                    int currentX = 0, currentY = 0;
+                    uint32_t currentW = width, currentH = height;
+                    if (pTemp->getPosition(currentX, currentY, currentW, currentH)) {
+                        if ((currentX != asX) || (currentY != asY) || (currentW != aswidth)
+                            || (currentH != asheight)) {
+                            pTemp->setPosition(asX, asY, aswidth, asheight);
+                        }
+                    }
                     pTemp->queueBuffer(m->currentOffset);
                 }
             }
