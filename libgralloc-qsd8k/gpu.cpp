@@ -350,7 +350,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
             // The GPU needs 4K alignment, but the video decoder needs 8K
             alignedw = ALIGN(w, 128);
             size  = ALIGN( alignedw * alignedh, 8192);
-            size += ALIGN( alignedw * ALIGN(h/2, 32), 4096);
+            size += ALIGN( alignedw * ALIGN(h/2, 32), 8192);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
 	case HAL_PIXEL_FORMAT_YCrCb_420_SP:
