@@ -32,6 +32,7 @@
 
 #if defined(__cplusplus) && defined(HDMI_DUAL_DISPLAY)
 #include "overlayLib.h"
+#include "overlayLibUI.h"
 using namespace overlay;
 #endif
 
@@ -231,6 +232,12 @@ struct private_module_t {
     bool hdmiStateChanged;
     pthread_mutex_t overlayLock;
     pthread_cond_t overlayPost;
+
+    /*
+     * Comp. bypass specific variables
+     * pobjOverlayUI - UI overlay channel for comp. bypass.
+     */
+    OverlayUI* pobjOverlayUI;
 #endif
 };
 

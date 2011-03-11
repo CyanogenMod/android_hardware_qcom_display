@@ -408,6 +408,51 @@ static int fb_orientationChanged(struct framebuffer_device_t* dev, int orientati
     pthread_mutex_unlock(&m->overlayLock);
     return 0;
 }
+
+static int fb_postBypassBuffer(struct framebuffer_device_t* dev,
+                                 buffer_handle_t buffer, int w,
+                                 int h, int format, int orientation, int isHPDON)
+{
+    if (isHPDON)
+        return -EINVAL;
+
+    private_module_t* m = reinterpret_cast<private_module_t*>(
+            dev->common.module);
+    if (m->pobjOverlayUI) {
+        OverlayUI* pobjOverlay = m->pobjOverlayUI;
+        if (buffer == NULL) {
+            pobjOverlay->closeChannel();
+            return NO_ERROR;
+        }
+
+        bool useVGPipe = false;
+
+        status_t ret = pobjOverlay->setSource(w, h, format, orientation, useVGPipe);
+        if (ret != NO_ERROR)
+            return ret;
+
+        ret = pobjOverlay->queueBuffer(buffer);
+
+        if (ret != NO_ERROR)
+            LOGE("error in queue.. ");
+        return ret;
+    }
+    return NO_ERROR;
+}
+
+static int fb_closeBypass(struct framebuffer_device_t* dev)
+{
+    private_module_t* m = reinterpret_cast<private_module_t*>(
+            dev->common.module);
+    if (m->pobjOverlayUI) {
+        OverlayUI* pobjOverlay = m->pobjOverlayUI;
+        pobjOverlay->closeChannel();
+        return NO_ERROR;
+    }
+
+    return NO_ERROR;
+}
+
 #endif
 
 static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
@@ -816,6 +861,8 @@ int mapFrameBufferLocked(struct private_module_t* module)
     module->hdmiStateChanged = false;
     pthread_t hdmiUIThread;
     pthread_create(&hdmiUIThread, NULL, &hdmi_ui_loop, (void *) module);
+
+    module->pobjOverlayUI = new OverlayUI();
 #endif
 
     return 0;
@@ -841,6 +888,9 @@ static int fb_close(struct hw_device_t *dev)
     m->exitHDMIUILoop = true;
     pthread_cond_signal(&(m->overlayPost));
     pthread_mutex_unlock(&m->overlayLock);
+
+    delete m->pobjOverlayUI;
+    m->pobjOverlayUI = 0;
 #endif
     if (ctx) {
         free(ctx);
@@ -878,6 +928,8 @@ int fb_device_open(hw_module_t const* module, const char* name,
         dev->device.enableHDMIOutput = fb_enableHDMIOutput;
         dev->device.setActionSafeWidthRatio = fb_setActionSafeWidthRatio;
         dev->device.setActionSafeHeightRatio = fb_setActionSafeHeightRatio;
+        dev->device.postBypassBuffer = fb_postBypassBuffer;
+        dev->device.closeBypass      = fb_closeBypass;
 #endif
 
         private_module_t* m = (private_module_t*)module;
