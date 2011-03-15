@@ -257,14 +257,14 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
     // Copybit source rect
     hwc_rect_t sourceCrop = layer->sourceCrop;
     copybit_rect_t srcRect = {sourceCrop.left, sourceCrop.top,
-                              (sourceCrop.right - sourceCrop.left),
-                              (sourceCrop.bottom-sourceCrop.top)};
+                              sourceCrop.right,
+                              sourceCrop.bottom};
 
     // Copybit destination rect
     hwc_rect_t displayFrame = layer->displayFrame;
     copybit_rect_t dstRect = {displayFrame.left, displayFrame.top,
-                              (displayFrame.right - displayFrame.left),
-                              (displayFrame.bottom-displayFrame.top)};
+                              displayFrame.right,
+                              displayFrame.bottom};
 
     // Copybit dst
     copybit_image_t dst;
@@ -289,7 +289,7 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
 
     copybit_device_t *copybit = hwcModule->copybitEngine;
     copybit->set_parameter(copybit, COPYBIT_TRANSFORM, layer->transform);
-    copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, layer->blending);
+    copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, 0xFF);
     int err = copybit->stretch(copybit, &dst, &src, &dstRect, &srcRect, &copybitRegion);
 
     if(err < 0)
