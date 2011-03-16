@@ -43,6 +43,7 @@ gpu_context_t::gpu_context_t(Deps& deps, PmemAllocator& pmemAllocator,
     common.module  = const_cast<hw_module_t*>(&module->base.common);
     common.close   = gralloc_close;
     alloc          = gralloc_alloc;
+    allocSize      = gralloc_alloc_size;
     free           = gralloc_free;
 }
 
@@ -313,7 +314,7 @@ void gpu_context_t::getGrallocInformationFromFormat(int inputFormat, int *colorF
 }
 
 int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
-        buffer_handle_t* pHandle, int* pStride) {
+        buffer_handle_t* pHandle, int* pStride, int bufferSize) {
     if (!pHandle || !pStride)
         return -EINVAL;
 
@@ -372,6 +373,8 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
 
     if ((ssize_t)size <= 0)
         return -EINVAL;
+
+    size = (bufferSize >= size)? bufferSize : size;
 
     int err;
     if (usage & GRALLOC_USAGE_HW_FB) {
@@ -439,7 +442,17 @@ int gpu_context_t::gralloc_alloc(alloc_device_t* dev, int w, int h, int format,
         return -EINVAL;
     }
     gpu_context_t* gpu = reinterpret_cast<gpu_context_t*>(dev);
-    return gpu->alloc_impl(w, h, format, usage, pHandle, pStride);
+    return gpu->alloc_impl(w, h, format, usage, pHandle, pStride, 0);
+}
+
+int gpu_context_t::gralloc_alloc_size(alloc_device_t* dev, int w, int h, int format,
+        int usage, buffer_handle_t* pHandle, int* pStride, int bufferSize)
+{
+    if (!dev) {
+        return -EINVAL;
+    }
+    gpu_context_t* gpu = reinterpret_cast<gpu_context_t*>(dev);
+    return gpu->alloc_impl(w, h, format, usage, pHandle, pStride, bufferSize);
 }
 
 int gpu_context_t::gralloc_free(alloc_device_t* dev,

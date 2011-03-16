@@ -60,11 +60,13 @@ class gpu_context_t : public alloc_device_t {
                              int width, int height);
     int free_impl(private_handle_t const* hnd);
     int alloc_impl(int w, int h, int format, int usage,
-            buffer_handle_t* pHandle, int* pStride);
+            buffer_handle_t* pHandle, int* pStride, int bufferSize = 0);
 
     static int gralloc_alloc(alloc_device_t* dev, int w, int h, int format,
             int usage, buffer_handle_t* pHandle, int* pStride);
     static int gralloc_free(alloc_device_t* dev, buffer_handle_t handle);
+    static int gralloc_alloc_size(alloc_device_t* dev, int w, int h, int format,
+            int usage, buffer_handle_t* pHandle, int* pStride, int bufferSize);
     static int gralloc_close(struct hw_device_t *dev);
 
  private:
