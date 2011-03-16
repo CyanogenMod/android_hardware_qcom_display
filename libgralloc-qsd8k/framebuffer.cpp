@@ -347,14 +347,16 @@ static int fb_videoOverlayStarted(struct framebuffer_device_t* dev, int started)
             dev->common.module);
     pthread_mutex_lock(&m->overlayLock);
     Overlay* pTemp = m->pobjOverlay;
-    if (started && pTemp) {
-        pTemp->closeChannel();
-        m->videoOverlay = true;
-        pthread_cond_signal(&(m->overlayPost));
-    }
-    else {
-        m->videoOverlay = false;
-        pthread_cond_signal(&(m->overlayPost));
+    if(started != m->videoOverlay) {
+        if (started && pTemp) {
+            pTemp->closeChannel();
+            m->videoOverlay = true;
+            pthread_cond_signal(&(m->overlayPost));
+        }
+        else {
+           m->videoOverlay = false;
+           pthread_cond_signal(&(m->overlayPost));
+        }
     }
     pthread_mutex_unlock(&m->overlayLock);
     return 0;
