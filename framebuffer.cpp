@@ -180,7 +180,7 @@ static void *disp_loop(void *ptr)
         } else {
             pthread_mutex_lock(&(m->avail[nxtBuf.idx].lock));
             if (m->avail[nxtBuf.idx].state != SUB) {
-                LOGE("[%d] state %c, expected %c", nxtBuf.idx,
+                LOGE_IF(m->swapInterval != 0, "[%d] state %c, expected %c", nxtBuf.idx,
                     framebufferStateName[m->avail[nxtBuf.idx].state],
                     framebufferStateName[SUB]);
             }
@@ -190,7 +190,7 @@ static void *disp_loop(void *ptr)
             pthread_mutex_lock(&(m->avail[cur_buf].lock));
             m->avail[cur_buf].is_avail = true;
             if (m->avail[cur_buf].state != REF) {
-                LOGE("[%d] state %c, expected %c", cur_buf,
+                LOGE_IF(m->swapInterval != 0, "[%d] state %c, expected %c", cur_buf,
                     framebufferStateName[m->avail[cur_buf].state],
                     framebufferStateName[REF]);
             }
@@ -447,7 +447,7 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
             // post/queue the new buffer
             pthread_mutex_lock(&(m->avail[nxtIdx].lock));
             if (m->avail[nxtIdx].is_avail != true) {
-                LOGE("Found %d buf to be not avail", nxtIdx);
+                LOGE_IF(m->swapInterval != 0, "Found %d buf to be not avail", nxtIdx);
             }
 
             m->avail[nxtIdx].is_avail = false;
@@ -486,7 +486,7 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
             m->currentBuffer = buffer;
             m->currentIdx = nxtIdx;
             if (m->avail[futureIdx].state != AVL) {
-                LOGE("[%d] != AVL!", futureIdx);
+                LOGE_IF(m->swapInterval != 0, "[%d] != AVL!", futureIdx);
             }
         } else {
             if (m->currentBuffer)
@@ -544,7 +544,7 @@ static int fb_dequeueBuffer(struct framebuffer_device_t* dev, int index)
             dev->common.module);
 
     // Return immediately if the buffer is available
-    if (m->avail[index].state == AVL)
+    if ((m->avail[index].state == AVL) || (m->swapInterval == 0))
         return 0;
 
     pthread_mutex_lock(&(m->avail[index].lock));
