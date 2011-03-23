@@ -19,9 +19,6 @@
 #include "gralloc_priv.h"
 
 #define INTERLACE_MASK 0x80
-#define FBDEV_0 "/dev/graphics/fb0"
-#define FBDEV_LEN strlen("msmfbXX_")
-#define MDDI_PANEL '1'
 /* Helper functions */
 
 static int get_mdp_format(int format) {
@@ -143,23 +140,7 @@ static void reportError(const char* message) {
 using namespace overlay;
 
 Overlay::Overlay() : mChannelUP(false), mHDMIConnected(false),
-                     mCloseChannel(false), mS3DFormat(0), mRotate(false) {
-    fb_fix_screeninfo finfo;
-    memset(&finfo, 0, sizeof(finfo));
-    int fd = open(FBDEV_0, O_RDWR, 0);
-    if (fd < 0) {
-        reportError("Cant open framebuffer ");
-        return;
-    } else {
-        if(ioctl(fd, FBIOGET_FSCREENINFO, &finfo) == -1) {
-            reportError("FBIOGET_FSCREENINFO on fb0 failed");
-            close(fd);
-            return;
-        }
-        if((finfo.id)[FBDEV_LEN] == MDDI_PANEL)
-            mRotate = true;
-        close(fd);
-    }
+                     mCloseChannel(false), mS3DFormat(0) {
 }
 
 Overlay::~Overlay() {
@@ -179,8 +160,6 @@ bool Overlay::startChannel(int w, int h, int format, int fbnum,
                               unsigned int format3D, int channel,
                               bool ignoreFB, int num_buffers) {
     int zorder = 0;
-    if(mRotate && !fbnum)
-        norot = 0;
 
     if (format3D)
         zorder = channel;
@@ -325,7 +304,7 @@ bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
        hdmiChanged = 0x1;
 
     stateChanged = s3dChanged|hdmiChanged;
-    if (stateChanged || !objOvCtrlChannel[0].setSource(w, h, colorFormat, orientation, ignoreFB, mRotate)) {
+    if (stateChanged || !objOvCtrlChannel[0].setSource(w, h, colorFormat, orientation, ignoreFB)) {
         if (mChannelUP && isRGBType(hw_format) && (stateChanged != 0x10)) {
             mCloseChannel = true;
             return false;
@@ -561,8 +540,6 @@ bool OverlayControlChannel::openDevices(int fbnum) {
         return false;
     }
 
-    mFBPanelType = finfo.id[FBDEV_LEN];
-
     fb_var_screeninfo vinfo;
     if (ioctl(mFD, FBIOGET_VSCREENINFO, &vinfo) == -1) {
         reportError("FBIOGET_VSCREENINFO on fb1 failed");
@@ -668,10 +645,7 @@ bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
         mRotInfo.src_rect.x = 0;
         mRotInfo.src_rect.y = 0;
         mRotInfo.rotations = 0;
-        if(mFBPanelType == MDDI_PANEL)
-            mRotInfo.enable = 1;
-        else
-            mRotInfo.enable = 0;
+        mRotInfo.enable = 0;
         mRotInfo.session_id = 0;
 	int result = ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo);
 	if (result) {
@@ -757,26 +731,19 @@ bool OverlayControlChannel::closeControlChannel() {
 }
 
 bool OverlayControlChannel::setSource(uint32_t w, uint32_t h,
-                        int format, int orientation, bool ignoreFB, bool useRot) {
+                        int format, int orientation, bool ignoreFB) {
     format = get_mdp_format(format);
-    if (useRot || ((orientation == mOrientation) && orientation)) {
+    if ((orientation == mOrientation)
+            && ((orientation == OVERLAY_TRANSFORM_ROT_90)
+            || (orientation == OVERLAY_TRANSFORM_ROT_270))) {
         if (format == MDP_Y_CRCB_H2V2_TILE) {
             format = MDP_Y_CRCB_H2V2;
             w = (((w-1)/64 +1)*64);
             h = (((h-1)/32 +1)*32);
         }
-        switch(orientation){
-            case OVERLAY_TRANSFORM_ROT_90:
-            case OVERLAY_TRANSFORM_ROT_270:
-            {
-                 int tmp = w;
-                 w = h;
-                 h = tmp;
-                break;
-            }
-            default:
-                 break;
-       }
+        int tmp = w;
+        w = h;
+        h = tmp;
     }
     if (w == mOVInfo.src.width && h == mOVInfo.src.height
             && format == mOVInfo.src.format && orientation == mOrientation) {
@@ -973,9 +940,6 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
     else {
         if(mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE)
             mOVInfo.src.format = MDP_Y_CRCB_H2V2_TILE;
-        if(mFBPanelType == MDDI_PANEL)
-            mRotInfo.enable = 1;
-        else
             mRotInfo.enable = 0;
         }
         if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
