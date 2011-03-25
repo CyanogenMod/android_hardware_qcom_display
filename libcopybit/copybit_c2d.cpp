@@ -710,13 +710,14 @@ static int is_alpha(int cformat)
 }
 
 /** do a stretch blit type operation */
-static int stretch_copybit(
+static int stretch_copybit_internal(
         struct copybit_device_t *dev,
         struct copybit_image_t const *dst,
         struct copybit_image_t const *src,
         struct copybit_rect_t const *dst_rect,
         struct copybit_rect_t const *src_rect,
-        struct copybit_region_t const *region)
+        struct copybit_region_t const *region,
+        bool enableBlend)
 {
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
     int status = COPYBIT_SUCCESS;
@@ -770,19 +771,23 @@ static int stretch_copybit(
         return COPYBIT_FAILURE;
     }
 
-    if(ctx->blitState.config_mask & C2D_GLOBAL_ALPHA_BIT) {
-        ctx->blitState.config_mask &= ~C2D_ALPHA_BLEND_NONE;
-        if(!(ctx->blitState.global_alpha)) {
-            // src alpha is zero
-            unset_image(ctx->g12_device_fd, ctx->src[surface_index], src, src_mapped);
-            unset_image(ctx->g12_device_fd, ctx->dst, dst, trg_mapped);
-            return status;
+    if (enableBlend) {
+        if(ctx->blitState.config_mask & C2D_GLOBAL_ALPHA_BIT) {
+            ctx->blitState.config_mask &= ~C2D_ALPHA_BLEND_NONE;
+            if(!(ctx->blitState.global_alpha)) {
+                // src alpha is zero
+                unset_image(ctx->g12_device_fd, ctx->src[surface_index], src, src_mapped);
+                unset_image(ctx->g12_device_fd, ctx->dst, dst, trg_mapped);
+                return status;
+            }
+        } else {
+            if(is_alpha(cformat))
+                ctx->blitState.config_mask &= ~C2D_ALPHA_BLEND_NONE;
+            else
+                ctx->blitState.config_mask |= C2D_ALPHA_BLEND_NONE;
         }
     } else {
-        if(is_alpha(cformat))
-            ctx->blitState.config_mask &= ~C2D_ALPHA_BLEND_NONE;
-        else
-            ctx->blitState.config_mask |= C2D_ALPHA_BLEND_NONE;
+        ctx->blitState.config_mask |= C2D_ALPHA_BLEND_NONE;
     }
 
     ctx->blitState.surface_id = ctx->src[surface_index];
@@ -813,6 +818,17 @@ static int stretch_copybit(
     return status;
 }
 
+static int stretch_copybit(
+        struct copybit_device_t *dev,
+        struct copybit_image_t const *dst,
+        struct copybit_image_t const *src,
+        struct copybit_rect_t const *dst_rect,
+        struct copybit_rect_t const *src_rect,
+        struct copybit_region_t const *region)
+{
+    return stretch_copybit_internal(dev, dst, src, dst_rect, src_rect, region, true);
+}
+
 /** Perform a blit type operation */
 static int blit_copybit(
         struct copybit_device_t *dev,
@@ -822,7 +838,7 @@ static int blit_copybit(
 {
     struct copybit_rect_t dr = { 0, 0, dst->w, dst->h };
     struct copybit_rect_t sr = { 0, 0, src->w, src->h };
-    return stretch_copybit(dev, dst, src, &dr, &sr, region);
+    return stretch_copybit_internal(dev, dst, src, &dr, &sr, region, false);
 }
 
 /*****************************************************************************/
