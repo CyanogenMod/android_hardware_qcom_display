@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -538,7 +538,7 @@ static void set_rects(struct copybit_context_t *ctx,
        (ctx->trg_transform & C2D_TARGET_ROTATE_180)) {
         /* target rotation is 270 */
         c2dObject->target_rect.x        = (dst->t)<<16;
-        c2dObject->target_rect.y        = (ctx->fb_width - (dst->r))<<16;
+        c2dObject->target_rect.y        = (ALIGN(ctx->fb_width,32) - (dst->r))<<16;
         c2dObject->target_rect.height   = ((dst->r) - (dst->l))<<16;
         c2dObject->target_rect.width    = ((dst->b) - (dst->t))<<16;
     } else if(ctx->trg_transform & C2D_TARGET_ROTATE_90) {
@@ -548,7 +548,7 @@ static void set_rects(struct copybit_context_t *ctx,
         c2dObject->target_rect.width    = ((dst->b) - (dst->t))<<16;
     } else if(ctx->trg_transform & C2D_TARGET_ROTATE_180) {
         c2dObject->target_rect.y        = (ctx->fb_height - dst->b)<<16;
-        c2dObject->target_rect.x        = (ctx->fb_width - dst->r)<<16;
+        c2dObject->target_rect.x        = (ALIGN(ctx->fb_width,32) - dst->r)<<16;
         c2dObject->target_rect.height   = ((dst->b) - (dst->t))<<16;
         c2dObject->target_rect.width    = ((dst->r) - (dst->l))<<16;
     } else {
