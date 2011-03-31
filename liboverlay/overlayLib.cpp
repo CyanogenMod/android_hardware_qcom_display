@@ -948,11 +948,15 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
         mRotInfo.enable = 0;
         if(mUIChannel)
             mRotInfo.enable = 1;
-        }
-        if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
-            reportError("setParameter, rotator start failed");
-            return false;
-        }
+    }
+    if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
+        reportError("setParameter, rotator start failed");
+        return false;
+    }
+
+    if ((mOVInfo.user_data[0] == MDP_ROT_90) ||
+        (mOVInfo.user_data[0] == MDP_ROT_270))
+        mOVInfo.flags |= MDP_SOURCE_ROTATED_90;
 
     if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
         reportError("setParameter, overlay set failed");
