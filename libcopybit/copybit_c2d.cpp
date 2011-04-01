@@ -103,6 +103,7 @@ struct copybit_context_t {
     int g12_device_fd;
     int fb_width;
     int fb_height;
+    bool isPremultipliedAlpha;
 };
 
 struct blitlist{
@@ -293,7 +294,8 @@ static int calculate_yuv_offset_and_stride(int format, int width, int height, in
 }
 
 /** create C2D surface from copybit image */
-static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image_t *rhs, int *cformat, uint32_t *mapped)
+static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image_t *rhs, int *cformat, uint32_t *mapped,
+                     const bool isPremultipliedAlpha)
 {
     struct private_handle_t* handle = (struct private_handle_t*)rhs->handle;
     C2D_SURFACE_TYPE surfaceType;
@@ -323,7 +325,7 @@ static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image
         surfaceDef.phys = (void*) handle->gpuaddr;
         surfaceDef.buffer = (void*) (handle->base);
 
-        surfaceDef.format = *cformat;
+        surfaceDef.format = *cformat | (isPremultipliedAlpha ? C2D_FORMAT_PREMULTIPLIED : 0);
         surfaceDef.width = rhs->w;
         surfaceDef.height = rhs->h;
         surfaceDef.stride = ALIGN(((surfaceDef.width * c2diGetBpp(surfaceDef.format))>>3), 32);
@@ -648,6 +650,10 @@ static int set_parameter_copybit(
                 ctx->trg_transform = C2D_TARGET_ROTATE_270;
         }
         break;
+    case COPYBIT_PREMULTIPLIED_ALPHA:
+        (value == COPYBIT_ENABLE) ? ctx->isPremultipliedAlpha = true :
+                                    ctx->isPremultipliedAlpha = false;
+        break;
     default:
         LOGE("%s: default case", __func__);
         return -EINVAL;
@@ -750,7 +756,7 @@ static int stretch_copybit_internal(
     struct copybit_rect_t clip;
     list.count = 0;
 
-    status = set_image(ctx->g12_device_fd, ctx->dst, dst, &cformat, &trg_mapped);
+    status = set_image(ctx->g12_device_fd, ctx->dst, dst, &cformat, &trg_mapped, ctx->isPremultipliedAlpha);
     if(status) {
         LOGE("%s: set_image error", __func__);
         return COPYBIT_FAILURE;
@@ -765,7 +771,7 @@ static int stretch_copybit_internal(
         return -EINVAL;
     }
 
-    status = set_image(ctx->g12_device_fd, ctx->src[surface_index], src, &cformat, &src_mapped);
+    status = set_image(ctx->g12_device_fd, ctx->src[surface_index], src, &cformat, &src_mapped, ctx->isPremultipliedAlpha);
     if(status) {
         LOGE("%s: set_src_image error", __func__);
         return COPYBIT_FAILURE;
@@ -814,7 +820,7 @@ static int stretch_copybit_internal(
 
     unset_image(ctx->g12_device_fd, ctx->src[surface_index], src, src_mapped);
     unset_image(ctx->g12_device_fd, ctx->dst, dst, trg_mapped);
-
+    ctx->isPremultipliedAlpha = false;
     return status;
 }
 
@@ -1004,6 +1010,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->fb_width = info.xres;
     ctx->fb_height = info.yres;
     close(fd);
+    ctx->isPremultipliedAlpha = false;
     return status;
 
 error5:
