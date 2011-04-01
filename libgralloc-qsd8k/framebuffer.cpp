@@ -163,6 +163,7 @@ static void *disp_loop(void *ptr)
         pthread_mutex_lock(&m->overlayLock);
         m->orientation = neworientation;
         m->currentOffset = offset;
+        m->hdmiStateChanged = true;
         pthread_cond_signal(&(m->overlayPost));
         pthread_mutex_unlock(&m->overlayLock);
 #endif
@@ -210,7 +211,9 @@ static void *hdmi_ui_loop(void *ptr)
             ptr);
     while (1) {
         pthread_mutex_lock(&m->overlayLock);
-        pthread_cond_wait(&(m->overlayPost), &(m->overlayLock));
+        while(!(m->hdmiStateChanged))
+            pthread_cond_wait(&(m->overlayPost), &(m->overlayLock));
+        m->hdmiStateChanged = false;
         if (m->exitHDMIUILoop) {
             pthread_mutex_unlock(&m->overlayLock);
             return NULL;
@@ -226,7 +229,7 @@ static void *hdmi_ui_loop(void *ptr)
                 if (!pTemp->isChannelUP()) {
                    int alignedW = ALIGN(m->info.xres, 32); 
                    if (pTemp->startChannel(alignedW, m->info.yres,
-                                 m->fbFormat, 1, false, true)) {
+                                 m->fbFormat, 1, false, true, 0, VG0_PIPE, true)) {
                         pTemp->setFd(m->framebuffer->fd);
                         pTemp->setCrop(0, 0, m->info.xres, m->info.yres);
                    } else
@@ -312,11 +315,10 @@ static void *hdmi_ui_loop(void *ptr)
                             break;
                         }
                     }
-                    int currentOrientation = 0;
-                    pTemp->getOrientation(currentOrientation);
-                    if(rot != currentOrientation) {
+                    if(rot != m->currentOrientation) {
                         pTemp->setParameter(OVERLAY_TRANSFORM,
                                               rot);
+                        m->currentOrientation = rot;
                     }
                     EVEN_OUT(asX);
                     EVEN_OUT(asY);
@@ -348,6 +350,7 @@ static int fb_videoOverlayStarted(struct framebuffer_device_t* dev, int started)
     pthread_mutex_lock(&m->overlayLock);
     Overlay* pTemp = m->pobjOverlay;
     if(started != m->videoOverlay) {
+        m->hdmiStateChanged = true;
         if (started && pTemp) {
             pTemp->closeChannel();
             m->videoOverlay = true;
@@ -371,6 +374,7 @@ static int fb_enableHDMIOutput(struct framebuffer_device_t* dev, int enable)
     if (!enable && pTemp)
         pTemp->closeChannel();
     m->enableHDMIOutput = enable;
+    m->hdmiStateChanged = true;
     pthread_cond_signal(&(m->overlayPost));
     pthread_mutex_unlock(&m->overlayLock);
     return 0;
@@ -809,6 +813,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
     module->pobjOverlay = new Overlay();
     module->currentOffset = 0;
     module->exitHDMIUILoop = false;
+    module->hdmiStateChanged = false;
     pthread_t hdmiUIThread;
     pthread_create(&hdmiUIThread, NULL, &hdmi_ui_loop, (void *) module);
 #endif

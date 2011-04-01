@@ -173,7 +173,7 @@ public:
 	        mHandle.pobjControlChannel[index] = new OverlayControlChannel();
 	    }
 	    bool ret = mHandle.pobjControlChannel[index]->startControlChannel(
-	             mHandle.w, mHandle.h, mHandle.format, fbnum, norot,
+	             mHandle.w, mHandle.h, mHandle.format, fbnum, norot, false,
 	             format3D, zorder, true);
 	    if (ret) {
 	        if (!(mHandle.pobjControlChannel[index]->

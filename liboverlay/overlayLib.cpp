@@ -164,7 +164,7 @@ bool Overlay::startChannel(int w, int h, int format, int fbnum,
     if (format3D)
         zorder = channel;
     mChannelUP = objOvCtrlChannel[channel].startControlChannel(w, h, format, fbnum,
-                                                   norot, format3D, zorder, ignoreFB);
+                                                   norot, uichannel, format3D, zorder, ignoreFB);
     if (!mChannelUP) {
         LOGE("startChannel for fb%d failed", fbnum);
         return mChannelUP;
@@ -295,7 +295,6 @@ bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
 
     int stateChanged = 0;
     int hw_format = get_mdp_format(colorFormat);
-    bool uichannel = isRGBType(hw_format);
     int s3dChanged =0, hdmiChanged = 0;
 
     if (format3D != mS3DFormat)
@@ -322,7 +321,7 @@ bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
             }
         } else {
             return startChannel(w, h, colorFormat, 0, !orientation,
-                                uichannel, 0, VG0_PIPE, ignoreFB, num_buffers);
+                                false, 0, VG0_PIPE, ignoreFB, num_buffers);
         }
     }
     else
@@ -646,6 +645,8 @@ bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
         mRotInfo.src_rect.y = 0;
         mRotInfo.rotations = 0;
         mRotInfo.enable = 0;
+        if(mUIChannel)
+            mRotInfo.enable = 1;
         mRotInfo.session_id = 0;
 	int result = ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo);
 	if (result) {
@@ -676,9 +677,11 @@ bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
 
 bool OverlayControlChannel::startControlChannel(int w, int h,
                                            int format, int fbnum, bool norot,
+                                           bool uichannel,
                                            unsigned int format3D, int zorder,
                                            bool ignoreFB) {
     mNoRot = norot;
+    mUIChannel = uichannel;
     fb_fix_screeninfo finfo;
     fb_var_screeninfo vinfo;
     int hw_format;
@@ -940,7 +943,9 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
     else {
         if(mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE)
             mOVInfo.src.format = MDP_Y_CRCB_H2V2_TILE;
-            mRotInfo.enable = 0;
+        mRotInfo.enable = 0;
+        if(mUIChannel)
+            mRotInfo.enable = 1;
         }
         if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
             reportError("setParameter, rotator start failed");
@@ -965,15 +970,7 @@ bool OverlayControlChannel::getPosition(int& x, int& y,
                                   uint32_t& w, uint32_t& h) {
     if (!isChannelUP())
         return false;
-
-    mdp_overlay ov;
-    ov.id = mOVInfo.id;
-    if (ioctl(mFD, MSMFB_OVERLAY_GET, &ov)) {
-        reportError("getPosition, overlay GET failed");
-        return false;
-    }
-    mOVInfo = ov;
-
+    //mOVInfo has the current Overlay Position
     x = mOVInfo.dst_rect.x;
     y = mOVInfo.dst_rect.y;
     w = mOVInfo.dst_rect.w;

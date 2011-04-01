@@ -96,6 +96,7 @@ class OverlayControlChannel {
     int mSize;
     int mOrientation;
     unsigned int mFormat3D;
+    bool mUIChannel;
     mdp_overlay mOVInfo;
     msm_rotator_img_info mRotInfo;
     bool openDevices(int fbnum = -1);
@@ -109,6 +110,7 @@ public:
     ~OverlayControlChannel();
     bool startControlChannel(int w, int h, int format,
                                int fbnum, bool norot = false,
+                               bool uichannel = false,
                                unsigned int format3D = 0, int zorder = 0,
                                bool ignoreFB = false);
     bool closeControlChannel();
