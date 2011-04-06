@@ -734,7 +734,9 @@ bool OverlayControlChannel::closeControlChannel() {
 }
 
 bool OverlayControlChannel::setSource(uint32_t w, uint32_t h,
-                        int format, int orientation, bool ignoreFB) {
+                        int cFormat, int orientation, bool ignoreFB) {
+    int format = cFormat & INTERLACE_MASK ?
+                (cFormat ^ HAL_PIXEL_FORMAT_INTERLACE) : cFormat;
     format = get_mdp_format(format);
     if ((orientation == mOrientation)
             && ((orientation == OVERLAY_TRANSFORM_ROT_90)
