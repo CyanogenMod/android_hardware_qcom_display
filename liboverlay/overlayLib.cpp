@@ -1052,8 +1052,15 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
     mOVInfo.user_data[0] = mdp_rotation;
     mRotInfo.rotations = mOVInfo.user_data[0];
 
-    if (mOVInfo.user_data[0])
+    /* Rotator always outputs non-tiled formats.
+    If rotator is used, set Overlay input to non-tiled
+    Else, overlay input remains tiled */
+
+    if (mOVInfo.user_data[0]) {
+        if (mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE)
+            mOVInfo.src.format = MDP_Y_CRCB_H2V2;
         mRotInfo.enable = 1;
+    }
     else {
         if(mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE)
             mOVInfo.src.format = MDP_Y_CRCB_H2V2_TILE;
