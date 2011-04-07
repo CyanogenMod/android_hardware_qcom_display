@@ -315,10 +315,11 @@ static void *hdmi_ui_loop(void *ptr)
                             break;
                         }
                     }
-                    if(rot != m->currentOrientation) {
+                    int currOrientation = 0;
+                    pTemp->getOrientation(currOrientation);
+                    if(rot != currOrientation) {
                         pTemp->setParameter(OVERLAY_TRANSFORM,
                                               rot);
-                        m->currentOrientation = rot;
                     }
                     EVEN_OUT(asX);
                     EVEN_OUT(asY);

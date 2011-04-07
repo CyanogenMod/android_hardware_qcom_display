@@ -1109,14 +1109,8 @@ bool OverlayControlChannel::getPosition(int& x, int& y,
 bool OverlayControlChannel::getOrientation(int& orientation) const {
     if (!isChannelUP())
         return false;
-
-    mdp_overlay ov;
-    ov.id = mOVInfo.id;
-    if (ioctl(mFD, MSMFB_OVERLAY_GET, &ov)) {
-        reportError("getOrientation, overlay GET failed");
-        return false;
-    }
-    orientation = ov.user_data[0];
+    // mOVInfo has the current orientation
+    orientation = mOVInfo.user_data[0];
     return true;
 }
 bool OverlayControlChannel::getOvSessionID(int& sessionID) const {
