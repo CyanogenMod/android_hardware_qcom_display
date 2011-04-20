@@ -1361,7 +1361,9 @@ bool OverlayDataChannel::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
 	return false;
     }
 
-    if (ov.user_data[0] == MDP_ROT_90) {
+    if ((ov.user_data[0] == MDP_ROT_90) ||
+        (ov.user_data[0] == (MDP_ROT_90 | MDP_FLIP_UD)) ||
+        (ov.user_data[0] == (MDP_ROT_90 | MDP_FLIP_LR))){
         if (ov.src.width < (y + h))
             return false;
 
