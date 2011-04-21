@@ -234,7 +234,6 @@ bool Overlay::closeChannel() {
     }
     mChannelUP = false;
     mCloseChannel = false;
-    mHDMIConnected = false;
     mS3DFormat = 0;
     return true;
 }
@@ -299,8 +298,17 @@ bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
 
     if (format3D != mS3DFormat)
        s3dChanged = 0x10;
-    if (hdmiConnected != mHDMIConnected)
-       hdmiChanged = 0x1;
+    if (mHDMIConnected) {
+        // If HDMI is connected and both channels are not up, set the status
+        if (!objOvCtrlChannel[0].isChannelUP() || !objOvCtrlChannel[1].isChannelUP()) {
+            hdmiChanged = 0x1;
+        }
+    } else {
+        // HDMI is disconnected and both channels are up, set the status
+        if (objOvCtrlChannel[0].isChannelUP() && objOvCtrlChannel[1].isChannelUP()) {
+            hdmiChanged = 0x1;
+        }
+    }
 
     stateChanged = s3dChanged|hdmiChanged;
     if (stateChanged || !objOvCtrlChannel[0].setSource(w, h, colorFormat, orientation, ignoreFB)) {
@@ -309,7 +317,6 @@ bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
             return false;
         }
         closeChannel();
-        mHDMIConnected = hdmiConnected;
         mS3DFormat = format3D;
 
         if (mHDMIConnected) {

@@ -50,6 +50,16 @@
 #define NUM_CHANNELS 2
 #define FRAMEBUFFER_0 0
 #define FRAMEBUFFER_1 1
+
+enum {
+    HDMI_OFF,
+    HDMI_ON
+};
+
+enum {
+    OVERLAY_CHANNEL_DOWN,
+    OVERLAY_CHANNEL_UP
+};
 /* ------------------------------- 3D defines ---------------------------------------*/
 // The compound format passed to the overlay is
 // ABCCC where A is the input 3D format,
@@ -203,6 +213,9 @@ public:
                     int orientation, bool hdmiConnected,
                     bool ignoreFB = false, int numBuffers = 2);
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
+    int  getChannelStatus() const { return (mChannelUP ? OVERLAY_CHANNEL_UP: OVERLAY_CHANNEL_DOWN); }
+    void setHDMIStatus (bool isHDMIConnected) { mHDMIConnected = isHDMIConnected; }
+    int getHDMIStatus() const {return (mHDMIConnected ? HDMI_ON : HDMI_OFF); }
 
 private:
     bool startChannelHDMI(int w, int h, int format, bool norot);
