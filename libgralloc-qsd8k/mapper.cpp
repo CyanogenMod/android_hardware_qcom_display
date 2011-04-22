@@ -361,123 +361,21 @@ int gralloc_perform(struct gralloc_module_t const* module,
             res = 0;
             break;
         }
-        case GRALLOC_MODULE_PERFORM_DECIDE_PUSH_BUFFER_HANDLING: {
-            int format = va_arg(args, int);
-            int width = va_arg(args, int);
-            int height = va_arg(args, int);
-            char *compositionUsed = va_arg(args, char*);
-            int hasBlitEngine = va_arg(args, int);
-            int *needConversion = va_arg(args, int*);
-            int *useBufferDirectly = va_arg(args, int*);
-            size_t *size = va_arg(args, size_t*);
-            *size = calculateBufferSize(width, height, format);
-            int conversion = 0;
-            int direct = 0;
-            res = decideBufferHandlingMechanism(format, compositionUsed, hasBlitEngine,
-                                                needConversion, useBufferDirectly);
-	    break;
-	}
+        case GRALLOC_MODULE_PERFORM_UPDATE_BUFFER_HANDLE: {
+            native_handle_t* handle = va_arg(args, native_handle_t*);
+            int w = va_arg(args, int);
+            int h = va_arg(args, int);
+            int f = va_arg(args, int);
+            private_handle_t* hnd = (private_handle_t*)handle;
+            hnd->width = w;
+            hnd->height = h;
+            hnd->format = f;
+            break;
+        }
 	default:
 	    break;
     }
 
     va_end(args);
     return res;
-}
-
-int decideBufferHandlingMechanism(int format, const char *compositionUsed, int hasBlitEngine,
-                                  int *needConversion, int *useBufferDirectly)
-{
-    *needConversion = FALSE;
-    *useBufferDirectly = FALSE;
-    if(compositionUsed == NULL) {
-        LOGE("null pointer");
-        return -1;
-    }
-
-    if(format == HAL_PIXEL_FORMAT_RGB_565) {
-       // Software video renderer gives the output in RGB565 format.
-       // This can be handled by all compositors
-       *needConversion = FALSE;
-       *useBufferDirectly = TRUE;
-    } else if(strncmp(compositionUsed, "cpu", 3) == 0){
-        *needConversion = FALSE;
-        *useBufferDirectly = FALSE;
-    } else if(strncmp(compositionUsed, "gpu", 3) == 0) {
-        if(format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED
-           || format == HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO) {
-            *needConversion = FALSE;
-            *useBufferDirectly = TRUE;
-        } else if(hasBlitEngine) {
-            *needConversion = TRUE;
-            *useBufferDirectly = FALSE;
-        }
-    } else if ((strncmp(compositionUsed, "mdp", 3) == 0) ||
-               (strncmp(compositionUsed, "c2d", 3) == 0)){
-        if(format == HAL_PIXEL_FORMAT_YCbCr_420_SP ||
-           format == HAL_PIXEL_FORMAT_YCrCb_420_SP) {
-            *needConversion = FALSE;
-            *useBufferDirectly = TRUE;
-        } else if((strncmp(compositionUsed, "c2d", 3) == 0) &&
-           format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) {
-           *needConversion = FALSE;
-           *useBufferDirectly = TRUE;
-        } else if(hasBlitEngine) {
-            *needConversion = TRUE;
-            *useBufferDirectly = FALSE;
-        }
-    } else {
-        LOGE("Invalid composition type %s", compositionUsed);
-        return -1;
-    }
-    return 0;
-}
-
-size_t calculateBufferSize(int width, int height, int format)
-{
-    if(!width || !height)
-        return 0;
-
-    size_t size = 0;
-
-    switch (format)
-    {
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED: {
-            int aligned_height = (height + 31) & ~31;
-            int pitch     = (width + 127) & ~127;
-            size = pitch * aligned_height;
-            size = (size + 8191) & ~8191;
-            int secondPlaneOffset = size;
-
-            aligned_height = ((height >> 1) + 31) & ~31;
-            size += pitch * aligned_height;
-            size = (size + 8191) & ~8191;
-            break;
-        }
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO: {
-            int aligned_height = (height + 31) & ~31;
-            int pitch = (width + 31) & ~31;
-            size = pitch * aligned_height;
-            size  = (size + 4095) & ~4095;
-            int secondPlaneOffset = size;
-
-            pitch = 2 * (((width >> 1) + 31) & ~31);
-            aligned_height = ((height >> 1) + 31) & ~31;
-            size += pitch * aligned_height;
-            size = (size + 4095) & ~4095;
-            break;
-        }
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP: {
-            /* Camera and video YUV 420 semi-planar buffers are allocated   with
-            size equal to w * h * 1.5 */
-            int aligned_width = (width + 15) & ~15;
-            int aligned_chroma_width = ((width/2) + 15) & ~15;
-            size = (aligned_width * height) + ((aligned_chroma_width * height/2) *2);
-            break;
-        }
-        default:
-            break;
-    }
-    return size;
 }
