@@ -228,8 +228,6 @@ struct private_module_t {
     uint32_t currentOffset;
     bool enableHDMIOutput;
     bool exitHDMIUILoop;
-    float actionsafeWidthRatio;
-    float actionsafeHeightRatio;
     bool hdmiStateChanged;
     pthread_mutex_t overlayLock;
     pthread_cond_t overlayPost;

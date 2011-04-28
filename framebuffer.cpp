@@ -62,6 +62,7 @@
 #define HEIGHT_480P 480
 #define EVEN_OUT(x) if (x & 0x0001) {x--;}
 using overlay::Overlay;
+using overlay::ActionSafe;
 /** min of int a, b */
 static inline int min(int a, int b) {
     return (a<b) ? a : b;
@@ -218,8 +219,8 @@ static void *hdmi_ui_loop(void *ptr)
             pthread_mutex_unlock(&m->overlayLock);
             return NULL;
         }
-        float asWidthRatio = m->actionsafeWidthRatio/100.0f;
-        float asHeightRatio = m->actionsafeHeightRatio/100.0f;
+        float asWidthRatio = ActionSafe::getWidthRatio() / 100.0f;
+        float asHeightRatio = ActionSafe::getHeightRatio() / 100.0f;
 
         if (m->pobjOverlay) {
             Overlay* pTemp = m->pobjOverlay;
@@ -381,25 +382,6 @@ static int fb_enableHDMIOutput(struct framebuffer_device_t* dev, int enable)
     return 0;
 }
 
-static int fb_setActionSafeWidthRatio(struct framebuffer_device_t* dev, float asWidthRatio)
-{
-    private_module_t* m = reinterpret_cast<private_module_t*>(
-            dev->common.module);
-    pthread_mutex_lock(&m->overlayLock);
-    m->actionsafeWidthRatio = asWidthRatio;
-    pthread_mutex_unlock(&m->overlayLock);
-    return 0;
-}
-
-static int fb_setActionSafeHeightRatio(struct framebuffer_device_t* dev, float asHeightRatio)
-{
-    private_module_t* m = reinterpret_cast<private_module_t*>(
-            dev->common.module);
-    pthread_mutex_lock(&m->overlayLock);
-    m->actionsafeHeightRatio = asHeightRatio;
-    pthread_mutex_unlock(&m->overlayLock);
-    return 0;
-}
 static int fb_orientationChanged(struct framebuffer_device_t* dev, int orientation)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(
@@ -954,8 +936,6 @@ int fb_device_open(hw_module_t const* module, const char* name,
         dev->device.orientationChanged = fb_orientationChanged;
         dev->device.videoOverlayStarted = fb_videoOverlayStarted;
         dev->device.enableHDMIOutput = fb_enableHDMIOutput;
-        dev->device.setActionSafeWidthRatio = fb_setActionSafeWidthRatio;
-        dev->device.setActionSafeHeightRatio = fb_setActionSafeHeightRatio;
         dev->device.postBypassBuffer = fb_postBypassBuffer;
         dev->device.closeBypass      = fb_closeBypass;
 #endif
