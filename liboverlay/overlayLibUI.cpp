@@ -17,6 +17,7 @@
 
 #include "overlayLibUI.h"
 #include "gralloc_priv.h"
+#define LOG_TAG "OverlayUI"
 
 namespace {
 /* helper functions */
@@ -34,7 +35,9 @@ bool checkOVState(int w, int h, int format, int orientation,
             break;
     }
 
-    bool displayAttrsCheck = ((w == ov.src.width) && (h == ov.src.height) &&
+    int srcw = (w + 31) & ~31;
+    int srch = (h + 31) & ~31;
+    bool displayAttrsCheck = ((srcw == ov.src.width) && (srch == ov.src.height) &&
                                  (format == ov.src.format));
     bool zOrderCheck = (ov.z_order == zorder);
 
@@ -67,8 +70,10 @@ void setupOvRotInfo(int w, int h, int format, int orientation,
     memset(&ovInfo, 0, sizeof(ovInfo));
     memset(&rotInfo, 0, sizeof(rotInfo));
     ovInfo.id = MSMFB_NEW_REQUEST;
-    ovInfo.src.width = w;
-    ovInfo.src.height = h;
+    int srcw = (w + 31) & ~31;
+    int srch = (h + 31) & ~31;
+    ovInfo.src.width = srcw;
+    ovInfo.src.height = srch;
     ovInfo.src.format = format;
     ovInfo.src_rect.w = w;
     ovInfo.src_rect.h = h;
@@ -76,14 +81,12 @@ void setupOvRotInfo(int w, int h, int format, int orientation,
     ovInfo.transp_mask = 0xffffffff;
     rotInfo.src.format = format;
     rotInfo.dst.format = format;
-    w = (w + 31) & ~31;
-    h = (h + 31) & ~31;
-    rotInfo.src.width = w;
-    rotInfo.src.height = h;
-    rotInfo.src_rect.w = w;
-    rotInfo.src_rect.h = h;
-    rotInfo.dst.width = w;
-    rotInfo.dst.height = h;
+    rotInfo.src.width = srcw;
+    rotInfo.src.height = srch;
+    rotInfo.src_rect.w = srcw;
+    rotInfo.src_rect.h = srch;
+    rotInfo.dst.width = srcw;
+    rotInfo.dst.height = srch;
 
     int rot = orientation;
     int flip = 0;
