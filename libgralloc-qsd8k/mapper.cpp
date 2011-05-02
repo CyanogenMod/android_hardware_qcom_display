@@ -369,7 +369,10 @@ int gralloc_perform(struct gralloc_module_t const* module,
             private_handle_t* hnd = (private_handle_t*)handle;
             hnd->width = w;
             hnd->height = h;
-            hnd->format = f;
+            if (hnd->format != f) {
+                hnd->format = f;
+                hnd->flags |= private_handle_t::PRIV_FLAGS_FORMAT_CHANGED;
+            }
             break;
         }
 	default:

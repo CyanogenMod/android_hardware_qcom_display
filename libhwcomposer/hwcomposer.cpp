@@ -341,12 +341,31 @@ static int drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
 
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
+        int orientation = 0;
+        if (OVERLAY_CHANNEL_UP == ovLibObject->getChannelStatus())
+            ovLibObject->getOrientation(orientation);
 
-        ret = ovLibObject->setSource(hnd->width, hnd->height, hnd->format, layer->transform,
+        if ((OVERLAY_CHANNEL_DOWN == ovLibObject->getChannelStatus())
+            || (layer->transform != orientation) ||
+            (hnd->flags & private_handle_t::PRIV_FLAGS_FORMAT_CHANGED)) {
+            // Overlay channel is not started, or we have an orientation change or there is a
+            // format change, call setSource to open the overlay if necessary
+            ret = ovLibObject->setSource(hnd->width, hnd->height, hnd->format, layer->transform,
                                      (ovLibObject->getHDMIStatus()?true:false), false);
-        if (!ret) {
-            LOGE("drawLayerUsingOverlay setSource failed");
-            return -1;
+            if (!ret) {
+                LOGE("drawLayerUsingOverlay setSource failed");
+                return -1;
+            }
+            // Reset this flag so that we don't keep opening and closing channels unnecessarily
+            hnd->flags &= ~private_handle_t::PRIV_FLAGS_FORMAT_CHANGED;
+        } else {
+            // The overlay goemetry may have changed, we only need to update the overlay
+            ret = ovLibObject->updateOverlaySource(hnd->width, hnd->height, hnd->format,
+                                                   layer->transform);
+            if (!ret) {
+                LOGE("drawLayerUsingOverlay updateOverlaySource failed");
+                return -1;
+            }
         }
 
         hwc_rect_t sourceCrop = layer->sourceCrop;
@@ -373,7 +392,6 @@ static int drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
             return -1;
         }
 
-        int orientation;
         ovLibObject->getOrientation(orientation);
         if (orientation != layer->transform)
             ret = ovLibObject->setParameter(OVERLAY_TRANSFORM, layer->transform);

@@ -271,6 +271,37 @@ bool Overlay::setPositionS3D(int x, int y, uint32_t w, uint32_t h) {
     return ret;
 }
 
+bool Overlay::updateOverlaySource(uint32_t w, uint32_t h, int format, int orientation) {
+    if (hasHDMIStatusChanged()) {
+        return setSource(w, h, format, orientation, mHDMIConnected);
+    }
+
+    bool ret = true;
+    // Set the overlay source info
+    if (objOvCtrlChannel[0].isChannelUP()) {
+        ret = objOvCtrlChannel[0].updateOverlaySource(w, h);
+        if (ret && objOvCtrlChannel[1].isChannelUP())
+            ret = objOvCtrlChannel[1].updateOverlaySource(w, h);
+    }
+    return ret;
+}
+
+int Overlay::hasHDMIStatusChanged() {
+    int hdmiChanged = 0;
+    if (mHDMIConnected) {
+        // If HDMI is connected and both channels are not up, set the status
+        if (!objOvCtrlChannel[0].isChannelUP() || !objOvCtrlChannel[1].isChannelUP()) {
+            hdmiChanged = 0x1;
+        }
+    } else {
+        // HDMI is disconnected and both channels are up, set the status
+        if (objOvCtrlChannel[0].isChannelUP() && objOvCtrlChannel[1].isChannelUP()) {
+            hdmiChanged = 0x1;
+        }
+    }
+    return hdmiChanged;
+}
+
 bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
                         bool hdmiConnected, bool ignoreFB, int num_buffers) {
     if (mCloseChannel)
@@ -298,19 +329,8 @@ bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
 
     if (format3D != mS3DFormat)
        s3dChanged = 0x10;
-    if (mHDMIConnected) {
-        // If HDMI is connected and both channels are not up, set the status
-        if (!objOvCtrlChannel[0].isChannelUP() || !objOvCtrlChannel[1].isChannelUP()) {
-            hdmiChanged = 0x1;
-        }
-    } else {
-        // HDMI is disconnected and both channels are up, set the status
-        if (objOvCtrlChannel[0].isChannelUP() && objOvCtrlChannel[1].isChannelUP()) {
-            hdmiChanged = 0x1;
-        }
-    }
 
-    stateChanged = s3dChanged|hdmiChanged;
+    stateChanged = s3dChanged|hasHDMIStatusChanged();
     if (stateChanged || !objOvCtrlChannel[0].setSource(w, h, colorFormat, orientation, ignoreFB)) {
         if (mChannelUP && isRGBType(hw_format) && (stateChanged != 0x10)) {
             mCloseChannel = true;
@@ -680,6 +700,91 @@ bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
         closeControlChannel();
 
     return ret;
+}
+
+bool OverlayControlChannel::updateOverlaySource(uint32_t w, uint32_t h)
+{
+    // Set Rotator info
+    if (mRotFD >=0) {
+        if(mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE) {
+            if ((mRotInfo.src.width == (((w-1)/64 +1)*64)) &&
+               (mRotInfo.src.height == (((h-1)/32 +1)*32)))
+                return true;
+
+            mRotInfo.src.width =  (((w-1)/64 +1)*64);
+            mRotInfo.src.height = (((h-1)/32 +1)*32);
+            mRotInfo.src_rect.w = (((w-1)/64 +1)*64);
+            mRotInfo.src_rect.h = (((h-1)/32 +1)*32);
+            mRotInfo.dst.height = (((w-1)/64 +1)*64);
+            mRotInfo.dst.width = (((h-1)/32 +1)*32);
+            mRotInfo.dst.format = MDP_Y_CRCB_H2V2;
+        } else {
+            if ((mRotInfo.src.width == w) &&
+                (mRotInfo.src.height == h))
+                return true;
+
+            mRotInfo.src.width = w;
+            mRotInfo.src.height = h;
+            mRotInfo.src_rect.w = w;
+            mRotInfo.src_rect.h = h;
+            mRotInfo.dst.width = h;
+            mRotInfo.dst.height = w;
+        }
+
+        if (mOVInfo.user_data[0] == MDP_ROT_NOP)
+            mRotInfo.enable = 0;
+
+        if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
+            LOGE("updateOverlaySource MSM_ROTATOR_IOCTL_START failed");
+            return true;
+        }
+    }
+
+    // Set overlay info
+    switch (mOVInfo.user_data[0]) {
+    case MDP_ROT_90:
+    case (MDP_ROT_90 | MDP_FLIP_UD):
+    case (MDP_ROT_90 | MDP_FLIP_LR):
+    case MDP_ROT_270: {
+        if ((mOVInfo.src.height == (((w-1)/64 +1)*64)) &&
+            (mOVInfo.src.width == (((h-1)/32 +1)*32)))
+            return true;
+
+        mOVInfo.src_rect.w = h;
+        mOVInfo.src_rect.h = w;
+        mOVInfo.src.height = (((w-1)/64 +1)*64);
+        mOVInfo.src.width = (((h-1)/32 +1)*32);
+        mOVInfo.src_rect.x = 0;
+        mOVInfo.src_rect.y = 0;;
+    } break;
+    case MDP_ROT_180:
+    case MDP_ROT_NOP: {
+        if ((mOVInfo.src.width  == w) &&
+            (mOVInfo.src.height == h))
+            return true;
+
+        mOVInfo.src.width  = w;
+        mOVInfo.src.height = h;
+        mOVInfo.src_rect.x = 0;
+        mOVInfo.src_rect.y = 0;
+        if(mOVInfo.src.format == MDP_Y_CRCB_H2V2_TILE) {
+            mOVInfo.src_rect.w = w - ( (((w-1)/64 +1)*64) - w);
+            mOVInfo.src_rect.h = h - ((((h-1)/32 +1)*32) - h);
+        } else {
+            mOVInfo.src_rect.w = w;
+            mOVInfo.src_rect.h = h;
+        }
+    } break;
+    default:
+        LOGE("updateOverlaySource: Invalid rotation parameter");
+        return false;
+    }
+
+    if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
+        LOGE("updateOverlaySource MSMFB_OVERLAY_SET failed");
+        return true;
+    }
+    return true;
 }
 
 bool OverlayControlChannel::startControlChannel(int w, int h,

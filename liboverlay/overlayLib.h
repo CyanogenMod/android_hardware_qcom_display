@@ -139,6 +139,7 @@ public:
                        int orientation, bool ignoreFB);
     bool getAspectRatioPosition(int w, int h, int format, overlay_rect *rect);
     bool getPositionS3D(int channel, int format, overlay_rect *rect);
+    bool updateOverlaySource(uint32_t w, uint32_t h);
 };
 
 class OverlayDataChannel {
@@ -216,6 +217,7 @@ public:
     int  getChannelStatus() const { return (mChannelUP ? OVERLAY_CHANNEL_UP: OVERLAY_CHANNEL_DOWN); }
     void setHDMIStatus (bool isHDMIConnected) { mHDMIConnected = isHDMIConnected; }
     int getHDMIStatus() const {return (mHDMIConnected ? HDMI_ON : HDMI_OFF); }
+    bool updateOverlaySource(uint32_t w, uint32_t h, int format, int orientation);
 
 private:
     bool startChannelHDMI(int w, int h, int format, bool norot);
@@ -225,6 +227,7 @@ private:
     bool setChannelPosition(int x, int y, uint32_t w, uint32_t h, int channel = 0);
     bool setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int channel);
     bool queueBuffer(int fd, uint32_t offset, int channel);
+    int  hasHDMIStatusChanged();
 };
 
 struct overlay_shared_data {
