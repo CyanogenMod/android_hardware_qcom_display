@@ -655,7 +655,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
     * stream and is written to video memory as that unmodified. This implies
     * big-endian byte order if bits_per_pixel is greater than 8.
     */
-
+    bool pageAlignmentRequired = true;
     if(info.bits_per_pixel == 32) {
 	/*
 	* Explicitly request RGBA_8888
@@ -673,11 +673,14 @@ int mapFrameBufferLocked(struct private_module_t* module)
 	/* Note: the GL driver does not have a r=8 g=8 b=8 a=0 config, so if we do
 	* not use the MDP for composition (i.e. hw composition == 0), ask for
 	* RGBA instead of RGBX. */
-	if (property_get("debug.sf.hw", property, NULL) > 0 && atoi(property) == 0)
+	if (property_get("debug.sf.hw", property, NULL) > 0 && atoi(property) == 0) {
 		module->fbFormat = HAL_PIXEL_FORMAT_RGBX_8888;
-	else if(property_get("debug.composition.type", property, NULL) > 0 && (strncmp(property, "mdp", 3) == 0))
+                pageAlignmentRequired = false;
+	} else if(property_get("debug.composition.type", property, NULL) > 0 &&
+                 (strncmp(property, "mdp", 3) == 0)) {
 		module->fbFormat = HAL_PIXEL_FORMAT_RGBX_8888;
-	else
+                pageAlignmentRequired = false;
+	} else
 		module->fbFormat = HAL_PIXEL_FORMAT_RGBA_8888;
     } else {
 	/*
@@ -693,14 +696,22 @@ int mapFrameBufferLocked(struct private_module_t* module)
 	info.transp.offset  = 0;
 	info.transp.length  = 0;
 	module->fbFormat = HAL_PIXEL_FORMAT_RGB_565;
+	if ((property_get("debug.sf.hw", property, NULL) > 0 && atoi(property) == 0) ||
+	    (property_get("debug.composition.type", property, NULL) > 0 &&
+            (strncmp(property, "mdp", 3) == 0))) {
+            pageAlignmentRequired = false;
+        }
     }
 
+    if (pageAlignmentRequired) {
     // Calculate the FbSize to map.
-    int y = -1;
-    do {
-       y++;
-    } while (((finfo.line_length * (info.yres + y)) % 4096) != 0);
-    module->yres_delta = y;
+        int y = -1;
+        do {
+            y++;
+        } while (((finfo.line_length * (info.yres + y)) % 4096) != 0);
+        module->yres_delta = y;
+    } else
+        module->yres_delta = 0;
 
     /*
      * Request NUM_BUFFERS screens (at lest 2 for page flipping)
