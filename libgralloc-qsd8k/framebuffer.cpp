@@ -687,18 +687,6 @@ int mapFrameBufferLocked(struct private_module_t* module)
     if (ioctl(fd, FBIOGET_VSCREENINFO, &info) == -1)
         return -errno;
 
-    int refreshRate = 1000000000000000LLU /
-    (
-            uint64_t( info.upper_margin + info.lower_margin + info.yres )
-            * ( info.left_margin  + info.right_margin + info.xres )
-            * info.pixclock
-    );
-
-    if (refreshRate == 0) {
-        // bleagh, bad info from the driver
-        refreshRate = 60*1000;  // 60 Hz
-    }
-
     if (int(info.width) <= 0 || int(info.height) <= 0) {
         // the driver doesn't return that information
         // default to 160 dpi
@@ -708,7 +696,8 @@ int mapFrameBufferLocked(struct private_module_t* module)
 
     float xdpi = (info.xres * 25.4f) / info.width;
     float ydpi = (info.yres * 25.4f) / info.height;
-    float fps  = refreshRate / 1000.0f;
+    //The reserved[4] field is used to store FPS by the driver.
+    float fps  = info.reserved[4];
 
     LOGI(   "using (fd=%d)\n"
             "id           = %s\n"
