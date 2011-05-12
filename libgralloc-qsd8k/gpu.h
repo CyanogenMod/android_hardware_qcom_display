@@ -76,7 +76,7 @@ class gpu_context_t : public alloc_device_t {
     PmemAllocator& pmemAdspAllocator;
     int alloc_ashmem_buffer(size_t size, unsigned int postfix, void** pBase,
             int* pOffset, int* pFd);
-    void getGrallocInformationFromFormat(int inputFormat, int *colorFormat, int *bufferType, int *halFormat);
+    void getGrallocInformationFromFormat(int inputFormat, int *colorFormat, int *bufferType);
 };
 
 #endif  // GRALLOC_QSD8K_GPU_H

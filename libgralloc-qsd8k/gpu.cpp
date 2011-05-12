@@ -258,59 +258,28 @@ static inline size_t ALIGN(size_t x, size_t align) {
     return (x + align-1) & ~(align-1);
 }
 
-void gpu_context_t::getGrallocInformationFromFormat(int inputFormat, int *colorFormat, int *bufferType, int *halFormat)
+void gpu_context_t::getGrallocInformationFromFormat(int inputFormat, int *colorFormat, int *bufferType)
 {
     *bufferType = BUFFER_TYPE_VIDEO;
-    *halFormat = inputFormat;
     *colorFormat = inputFormat;
 
-    switch(inputFormat) {
-    case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
-    {
-        *colorFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP;
-        *halFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP;
-    } break;
-    case (OMX_QCOM_COLOR_FormatYVU420SemiPlanar ^ QOMX_INTERLACE_FLAG):
-    {
-        *colorFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP;
-        *halFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP ^ HAL_PIXEL_FORMAT_INTERLACE;
-    } break;
-    case (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_INTERLACE_FLAG):
-    {
-        *colorFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
-        *halFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED ^ HAL_PIXEL_FORMAT_INTERLACE;
-    } break;
-    case (QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka ^ QOMX_3D_VIDEO_FLAG):
-    {
-        *colorFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
-        *halFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED | HAL_3D_IN_SIDE_BY_SIDE_HALF_L_R | HAL_3D_OUT_SIDE_BY_SIDE;
-    } break;
-    case QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
-    {
-        *colorFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
-        *halFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
-    } break;
-    default:
-    {
-        if (inputFormat & S3D_FORMAT_MASK) {
-            // S3D format
-            *colorFormat = COLOR_FORMAT(inputFormat);
-        } else if (inputFormat & INTERLACE_MASK) {
-            // Interlaced
-            *colorFormat = inputFormat ^ HAL_PIXEL_FORMAT_INTERLACE;
-        } else if (inputFormat < 0x7) {
-            // RGB formats
-            *colorFormat = inputFormat;
-            *bufferType = BUFFER_TYPE_UI;
-        } else if ((inputFormat == HAL_PIXEL_FORMAT_R_8) ||
-                   (inputFormat == HAL_PIXEL_FORMAT_RG_88)) {
-            *colorFormat = inputFormat;
-            *bufferType = BUFFER_TYPE_UI;
-        }
-        break;
+    if (inputFormat == HAL_PIXEL_FORMAT_YV12) {
+        *bufferType = BUFFER_TYPE_UI; // There is no overlay support for this format yet.
+    } else if (inputFormat & S3D_FORMAT_MASK) {
+        // S3D format
+        *colorFormat = COLOR_FORMAT(inputFormat);
+    } else if (inputFormat & INTERLACE_MASK) {
+        // Interlaced
+        *colorFormat = inputFormat ^ HAL_PIXEL_FORMAT_INTERLACE;
+    } else if (inputFormat < 0x7) {
+        // RGB formats
+        *colorFormat = inputFormat;
+        *bufferType = BUFFER_TYPE_UI;
+    } else if ((inputFormat == HAL_PIXEL_FORMAT_R_8) ||
+               (inputFormat == HAL_PIXEL_FORMAT_RG_88)) {
+        *colorFormat = inputFormat;
+        *bufferType = BUFFER_TYPE_UI;
     }
-}
-
 }
 
 int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
@@ -322,8 +291,8 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
 
     alignedw = ALIGN(w, 32);
     alignedh = ALIGN(h, 32);
-    int colorFormat, bufferType, halFormat;
-    getGrallocInformationFromFormat(format, &colorFormat, &bufferType, &halFormat);
+    int colorFormat, bufferType;
+    getGrallocInformationFromFormat(format, &colorFormat, &bufferType);
 	
     switch (colorFormat) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
@@ -380,7 +349,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
     if (usage & GRALLOC_USAGE_HW_FB) {
         err = gralloc_alloc_framebuffer(size, usage, pHandle);
     } else {
-        err = gralloc_alloc_buffer(size, usage, pHandle, bufferType, halFormat, w, h);
+        err = gralloc_alloc_buffer(size, usage, pHandle, bufferType, format, w, h);
     }
 
     if (err < 0) {
