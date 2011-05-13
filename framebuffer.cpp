@@ -206,11 +206,16 @@ static void *disp_loop(void *ptr)
 }
 
 #if defined(HDMI_DUAL_DISPLAY)
+static int postOrigResHDMI(private_module_t *);
 static void *hdmi_ui_loop(void *ptr)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(
             ptr);
     while (1) {
+        if(m->isOrigResStarted) {
+            postOrigResHDMI(m);
+            continue;
+        }
         pthread_mutex_lock(&m->overlayLock);
         while(!(m->hdmiStateChanged))
             pthread_cond_wait(&(m->overlayPost), &(m->overlayLock));
@@ -226,7 +231,8 @@ static void *hdmi_ui_loop(void *ptr)
             Overlay* pTemp = m->pobjOverlay;
             if (!m->enableHDMIOutput)
                 pTemp->closeChannel();
-            else if (m->enableHDMIOutput && !m->videoOverlay) {
+            else if (m->enableHDMIOutput && !m->videoOverlay &&
+                        !(m->isOrigResStarted)) {
                 if (!pTemp->isChannelUP()) {
                    int alignedW = ALIGN(m->info.xres, 32); 
                    if (pTemp->startChannel(alignedW, m->info.yres,
@@ -373,9 +379,12 @@ static int fb_enableHDMIOutput(struct framebuffer_device_t* dev, int enable)
             dev->common.module);
     pthread_mutex_lock(&m->overlayLock);
     Overlay* pTemp = m->pobjOverlay;
-    if (!enable && pTemp)
-        pTemp->closeChannel();
     m->enableHDMIOutput = enable;
+    if(m->isOrigResStarted) {
+        m->ts.isHDMIExitPending = !enable;
+    } else if (!enable && pTemp) {
+        pTemp->closeChannel();
+    }
     m->hdmiStateChanged = true;
     pthread_cond_signal(&(m->overlayPost));
     pthread_mutex_unlock(&m->overlayLock);
@@ -390,6 +399,119 @@ static int fb_orientationChanged(struct framebuffer_device_t* dev, int orientati
     neworientation = orientation;
     pthread_mutex_unlock(&m->overlayLock);
     return 0;
+}
+
+/* Posts buffers in their original resolution to secondary.
+ */
+static int postOrigResHDMI(private_module_t* m) {
+    int w, h, format;
+    buffer_handle_t buffer;
+    int ret = NO_ERROR;
+
+    //Wait for new buffer call and read values
+    pthread_mutex_lock(&m->ts.newBufferMutex);
+    while(m->ts.isNewBuffer == false) {
+        pthread_cond_wait(&m->ts.newBufferCond, &m->ts.newBufferMutex);
+    }
+    m->ts.get(w,h,format,buffer);
+    m->ts.isNewBuffer = false;
+    pthread_mutex_unlock(&m->ts.newBufferMutex);
+
+    //Post them to secondary
+    if(m->enableHDMIOutput) {
+        const bool waitForVsync = true;
+        const int orientation = 0;
+        const int fbnum = OverlayUI::FB1;
+        const bool useVGPipe = true;
+        ret = m->pOrigResTV->setSource(w, h, format, orientation, useVGPipe,
+                    waitForVsync, fbnum);
+        if(ret == NO_ERROR) {
+            m->pOrigResTV->setPosition(0, 0, m->pOrigResTV->getFBWidth(),
+                    m->pOrigResTV->getFBHeight());
+            ret = m->pOrigResTV->queueBuffer(buffer);
+        }
+        if(ret != NO_ERROR)
+            LOGE("Posting original resolution surface to secondary failed");
+    }
+    //Signal that we posted the buffer
+    pthread_mutex_lock(&m->ts.bufferPostedMutex);
+    m->ts.isBufferPosted = true;
+    pthread_cond_signal(&m->ts.bufferPostedCond);
+    pthread_mutex_unlock(&m->ts.bufferPostedMutex);
+    if(m->ts.isExitPending || m->ts.isHDMIExitPending) {
+        m->pOrigResTV->closeChannel();
+    }
+    return ret;
+}
+
+
+/* Posts buffers in their original resolution to primary.
+ */
+static int fb_postOrigResBuffer(struct framebuffer_device_t* dev,
+                                 buffer_handle_t buffer, int w,
+                                 int h, int format, int orientation) {
+    private_module_t* m = reinterpret_cast<private_module_t*>(
+            dev->common.module);
+    int ret = NO_ERROR;
+    if (m->isOrigResStarted) {
+        //Share new values
+        pthread_mutex_lock(&m->ts.newBufferMutex);
+        m->ts.set(w,h,format,buffer);
+        m->ts.isNewBuffer = true;
+        pthread_cond_signal(&m->ts.newBufferCond);
+        pthread_mutex_unlock(&m->ts.newBufferMutex);
+
+        const bool useVGPipe = true;
+        const bool waitForVsync = true;
+        const int fbnum = OverlayUI::FB0;
+        ret = m->pOrigResPanel->setSource(w, h, format, orientation, useVGPipe,
+                        waitForVsync, fbnum);
+        if(ret == NO_ERROR) {
+            ret = m->pOrigResPanel->queueBuffer(buffer);
+        }
+        if(ret != NO_ERROR)
+            LOGE("Posting original resolution surface to primary failed");
+
+        //Wait for HDMI to post buffers
+        pthread_mutex_lock(&m->ts.bufferPostedMutex);
+        while(m->ts.isBufferPosted == false) {
+            pthread_cond_wait(&m->ts.bufferPostedCond,
+                &m->ts.bufferPostedMutex);
+        }
+        m->ts.isBufferPosted = false;
+        pthread_mutex_unlock(&m->ts.bufferPostedMutex);
+    }
+    if(m->ts.isExitPending) {
+        m->pOrigResPanel->closeChannel();
+    }
+    return ret;
+}
+
+static int fb_startOrigResDisplay(struct framebuffer_device_t* dev) {
+    private_module_t* m = reinterpret_cast<private_module_t*>(
+            dev->common.module);
+    int ret = NO_ERROR;
+    dev->videoOverlayStarted(dev, true);
+    m->ts.clear();
+    m->isOrigResStarted = true;
+    return ret;
+}
+
+static int fb_stopOrigResDisplay(struct framebuffer_device_t* dev) {
+    private_module_t* m = reinterpret_cast<private_module_t*>(
+            dev->common.module);
+    int ret = NO_ERROR;
+    m->isOrigResStarted = false;
+    m->ts.isExitPending = true;
+    //Free the threads
+    m->ts.isNewBuffer = true;
+    m->ts.isBufferPosted = true;
+    pthread_cond_signal(&m->ts.newBufferCond);
+    pthread_cond_signal(&m->ts.bufferPostedCond);
+    m->pOrigResPanel->closeChannel();
+    m->pOrigResTV->closeChannel();
+    dev->videoOverlayStarted(dev, false);
+    return ret;
 }
 
 static int fb_postBypassBuffer(struct framebuffer_device_t* dev,
@@ -873,6 +995,9 @@ int mapFrameBufferLocked(struct private_module_t* module)
     pthread_create(&hdmiUIThread, NULL, &hdmi_ui_loop, (void *) module);
 
     module->pobjOverlayUI = new OverlayUI();
+    module->pOrigResPanel = new OverlayOrigRes<OverlayUI::FB0>();
+    module->pOrigResTV = new OverlayOrigRes<OverlayUI::FB1>();
+    module->isOrigResStarted = false;
 #endif
 
     return 0;
@@ -901,6 +1026,8 @@ static int fb_close(struct hw_device_t *dev)
 
     delete m->pobjOverlayUI;
     m->pobjOverlayUI = 0;
+    delete m->pOrigResPanel;
+    delete m->pOrigResTV;
 #endif
     if (ctx) {
         free(ctx);
@@ -938,6 +1065,9 @@ int fb_device_open(hw_module_t const* module, const char* name,
         dev->device.enableHDMIOutput = fb_enableHDMIOutput;
         dev->device.postBypassBuffer = fb_postBypassBuffer;
         dev->device.closeBypass      = fb_closeBypass;
+        dev->device.postOrigResBuffer = fb_postOrigResBuffer;
+        dev->device.startOrigResDisplay = fb_startOrigResDisplay;
+        dev->device.stopOrigResDisplay = fb_stopOrigResDisplay;
 #endif
 
         private_module_t* m = (private_module_t*)module;

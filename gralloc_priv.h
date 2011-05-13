@@ -189,6 +189,57 @@ struct avail_t {
 #endif
 };
 
+
+#ifdef __cplusplus
+/* Store for shared data and synchronization */
+struct ThreadShared {
+    int w;
+    int h;
+    int format;
+    buffer_handle_t buffer;
+    bool isNewBuffer;
+    bool isBufferPosted;
+    bool isExitPending; //Feature close
+    bool isHDMIExitPending; //Only HDMI close
+    //New buffer arrival condition
+    pthread_mutex_t newBufferMutex;
+    pthread_cond_t newBufferCond;
+    //Buffer posted to display  condition, used instead of barrier
+    pthread_mutex_t bufferPostedMutex;
+    pthread_cond_t bufferPostedCond;
+
+    ThreadShared():w(0),h(0),format(0),buffer(0),isNewBuffer(false),
+            isBufferPosted(false), isExitPending(false),
+            isHDMIExitPending(false) {
+        pthread_mutex_init(&newBufferMutex, NULL);
+        pthread_mutex_init(&bufferPostedMutex, NULL);
+        pthread_cond_init(&newBufferCond, NULL);
+        pthread_cond_init(&bufferPostedCond, NULL);
+    }
+
+    void set(int w, int h, int format, buffer_handle_t buffer) {
+        this->w = w;
+        this->h = h;
+        this->format = format;
+        this->buffer = buffer;
+    }
+
+    void get(int& w, int& h, int& format, buffer_handle_t& buffer) {
+        w = this->w;
+        h = this->h;
+        format = this->format;
+        buffer = this->buffer;
+    }
+
+    void clear() {
+        w = h = format = 0;
+        buffer = 0;
+        isNewBuffer = isBufferPosted = isExitPending = \
+                isHDMIExitPending = false;
+    }
+};
+#endif
+
 struct private_module_t {
     gralloc_module_t base;
 
@@ -237,6 +288,10 @@ struct private_module_t {
      * pobjOverlayUI - UI overlay channel for comp. bypass.
      */
     OverlayUI* pobjOverlayUI;
+    OverlayOrigRes<OverlayUI::FB0>* pOrigResPanel;
+    OverlayOrigRes<OverlayUI::FB1>* pOrigResTV;
+    bool isOrigResStarted;
+    ThreadShared ts;
 #endif
 };
 
