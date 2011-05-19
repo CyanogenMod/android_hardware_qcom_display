@@ -124,9 +124,25 @@ static void dump_layer(hwc_layer_t const* l) {
 
 static void hwc_enableHDMIOutput(hwc_composer_device_t *dev, bool enable) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
+                                                           dev->common.module);
+    framebuffer_device_t *fbDev = hwcModule->fbDevice;
+    if (fbDev) {
+        fbDev->enableHDMIOutput(fbDev, enable);
+    }
+
     if(ctx && ctx->mOverlayLibObject) {
         overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
         ovLibObject->setHDMIStatus(enable);
+
+        if (!enable) {
+            // Close the overlay channels if HDMI is disconnected
+            ovLibObject->closeChannel();
+            // Inform the gralloc that video mirroring is stopped
+            framebuffer_device_t *fbDev = hwcModule->fbDevice;
+            if (fbDev)
+                fbDev->videoOverlayStarted(fbDev, false);
+        }
     }
 }
 
