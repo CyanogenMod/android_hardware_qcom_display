@@ -117,7 +117,7 @@ class OverlayControlChannel {
     int mFBHeight;
     int mFBbpp;
     int mFBystride;
-
+    int mFormat;
     int mFD;
     int mRotFD;
     int mSize;
@@ -155,9 +155,10 @@ public:
     bool getOrientation(int& orientation) const;
     bool setSource(uint32_t w, uint32_t h, int format,
                        int orientation, bool ignoreFB);
-    bool getAspectRatioPosition(int w, int h, int format, overlay_rect *rect);
+    bool getAspectRatioPosition(int w, int h, overlay_rect *rect);
     bool getPositionS3D(int channel, int format, overlay_rect *rect);
     bool updateOverlaySource(uint32_t w, uint32_t h, int format, int orientation);
+    bool getFormat() const { return mFormat; }
 };
 
 class OverlayDataChannel {

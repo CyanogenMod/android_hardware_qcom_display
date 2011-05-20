@@ -198,7 +198,7 @@ public:
 	    if (!mHandle.pobjControlChannel[channel])
 	        return false;
 	    return mHandle.pobjControlChannel[channel]->getAspectRatioPosition(mHandle.w,
-	                     mHandle.h, mHandle.format, rect);
+	                     mHandle.h, rect);
 	}
 
 	bool setParameter(int param, int value, int channel) {

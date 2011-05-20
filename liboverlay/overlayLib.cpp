@@ -217,7 +217,7 @@ bool Overlay::startChannelHDMI(int w, int h, int format, bool norot) {
     if(ret) {
         ret = startChannel(w, h, format, FRAMEBUFFER_1, true, 0, 0, VG1_PIPE);
         overlay_rect rect;
-        if(ret && objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(w, h, format, &rect)) {
+        if(ret && objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(w, h, &rect)) {
             if(!setChannelPosition(rect.x, rect.y, rect.w, rect.h, VG1_PIPE)) {
                 LOGE("Failed to upscale for framebuffer 1");
                 return false;
@@ -275,9 +275,13 @@ bool Overlay::getOrientation(int& orientation, int channel) const {
 bool Overlay::setPosition(int x, int y, uint32_t w, uint32_t h) {
     if(mS3DFormat && mHDMIConnected) {
         return setPositionS3D(x, y, w, h);
-    } else {
-        return setChannelPosition(x, y, w, h, VG0_PIPE);
     }
+    if(mHDMIConnected) {
+        overlay_rect rect;
+        objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(w, h, &rect);
+        setChannelPosition(rect.x, rect.y, rect.w, rect.h, VG1_PIPE);
+    }
+    return setChannelPosition(x, y, w, h, VG0_PIPE);
 }
 
 bool Overlay::setChannelPosition(int x, int y, uint32_t w, uint32_t h, int channel) {
@@ -521,7 +525,7 @@ OverlayControlChannel::~OverlayControlChannel() {
     closeControlChannel();
 }
 
-bool OverlayControlChannel::getAspectRatioPosition(int w, int h, int format, overlay_rect *rect)
+bool OverlayControlChannel::getAspectRatioPosition(int w, int h, overlay_rect *rect)
 {
     int width = w, height = h, x, y;
     int fbWidth	 = getFBWidth();
@@ -529,7 +533,7 @@ bool OverlayControlChannel::getAspectRatioPosition(int w, int h, int format, ove
     // width and height for YUV TILE format
     int tempWidth = w, tempHeight = h;
     /* Calculate the width and height if it is YUV TILE format*/
-    if(format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) {
+    if(getFormat() == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) {
         tempWidth = w - ( (((w-1)/64 +1)*64) - w);
         tempHeight = h - ((((h-1)/32 +1)*32) - h);
     }
@@ -779,6 +783,7 @@ bool OverlayControlChannel::startControlChannel(int w, int h,
                                            unsigned int format3D, int zorder,
                                            bool ignoreFB) {
     mNoRot = norot;
+    mFormat = format;
     mUIChannel = uichannel;
     fb_fix_screeninfo finfo;
     fb_var_screeninfo vinfo;
