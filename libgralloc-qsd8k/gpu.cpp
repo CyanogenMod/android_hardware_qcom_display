@@ -333,6 +333,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
             alignedh = h;
             size = alignedw*alignedh +
                     (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
+            size = ALIGN(size, 4096);
             break;
 
         default:
