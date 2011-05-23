@@ -89,7 +89,7 @@ int overlay::get_mdp_orientation(int rotation, int flip) {
     case HAL_TRANSFORM_FLIP_V:
         switch(rotation) {
         case 0: return MDP_FLIP_UD;
-        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_UD);
+        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_LR);
         default: return -1;
         break;
         }
@@ -97,7 +97,7 @@ int overlay::get_mdp_orientation(int rotation, int flip) {
     case HAL_TRANSFORM_FLIP_H:
         switch(rotation) {
         case 0: return MDP_FLIP_LR;
-        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_LR);
+        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_UD);
         default: return -1;
         break;
         }
