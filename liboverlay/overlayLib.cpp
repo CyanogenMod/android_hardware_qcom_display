@@ -109,29 +109,6 @@ static int get_mdp_orientation(int rotation, int flip) {
     return -1;
 }
 
-static bool isRGBType(int format) {
-    switch (format) {
-        case MDP_RGBA_8888:
-        case MDP_BGRA_8888:
-        case MDP_RGBX_8888:
-        case MDP_RGB_565:
-            return true;
-    }
-    return false;
-}
-
-static int getRGBBpp(int format) {
-    switch (format) {
-        case MDP_RGBA_8888:
-        case MDP_BGRA_8888:
-        case MDP_RGBX_8888:
-            return 4;
-        case MDP_RGB_565:
-            return 2;
-    }
-    return -1;
-}
-
 #define LOG_TAG "OverlayLIB"
 static void reportError(const char* message) {
     LOGE( "%s", message);
@@ -383,10 +360,6 @@ bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
 
     stateChanged = s3dChanged|hasHDMIStatusChanged();
     if (stateChanged || !objOvCtrlChannel[0].setSource(w, h, colorFormat, orientation, ignoreFB)) {
-        if (mChannelUP && isRGBType(hw_format) && (stateChanged != 0x10)) {
-            mCloseChannel = true;
-            return false;
-        }
         closeChannel();
         mS3DFormat = format3D;
 
@@ -709,10 +682,6 @@ bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
     bool ret = true;
 
     if (!mNoRot) {
-        if (isRGBType(format) && mOVInfo.is_fg) {
-            w = (w + 31) & ~31;
-            h = (h + 31) & ~31;
-        }
         mRotInfo.src.format = format;
         mRotInfo.src.width = w;
         mRotInfo.src.height = h;
@@ -747,16 +716,7 @@ bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
         }
     }
 
-    if (!mNoRot && isRGBType(format) && mOrientation && mOVInfo.is_fg) {
-        mOVInfo.dst_rect.w = mFBWidth;
-        mOVInfo.dst_rect.h = mFBHeight;
-        ret = setParameter(OVERLAY_TRANSFORM, mOrientation, false);
-        if (!ret) {
-            reportError("Overlay set failed.. ");
-            return false;
-        }
-    }
-    else if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
+    if (ret && ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
         reportError("startOVRotatorSessions, Overlay set failed");
         ret = false;
     }
