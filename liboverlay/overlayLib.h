@@ -60,6 +60,11 @@ enum {
     OVERLAY_CHANNEL_DOWN,
     OVERLAY_CHANNEL_UP
 };
+
+enum {
+    NEW_REQUEST,
+    UPDATE_REQUEST
+};
 /* ------------------------------- 3D defines ---------------------------------------*/
 // The compound format passed to the overlay is
 // ABCCC where A is the input 3D format,
@@ -123,8 +128,9 @@ class OverlayControlChannel {
     msm_rotator_img_info mRotInfo;
     bool openDevices(int fbnum = -1);
     bool setOverlayInformation(int w, int h, int format,
-                       int flags, int zorder = 0, bool ignoreFB = false);
-    bool startOVRotatorSessions(int w, int h, int format);
+                               int flags, int orientation, int zorder = 0, bool ignoreFB = false,
+                               int requestType = NEW_REQUEST);
+    bool startOVRotatorSessions(int w, int h, int format, int orientation, int requestType);
     void swapOVRotWidthHeight();
 
 public:
@@ -151,7 +157,7 @@ public:
                        int orientation, bool ignoreFB);
     bool getAspectRatioPosition(int w, int h, int format, overlay_rect *rect);
     bool getPositionS3D(int channel, int format, overlay_rect *rect);
-    bool updateOverlaySource(uint32_t w, uint32_t h);
+    bool updateOverlaySource(uint32_t w, uint32_t h, int format, int orientation);
 };
 
 class OverlayDataChannel {
@@ -162,14 +168,18 @@ class OverlayDataChannel {
     int mPmemFD;
     void* mPmemAddr;
     uint32_t mPmemOffset;
+    uint32_t mNewPmemOffset;
     msmfb_overlay_data mOvData;
     msmfb_overlay_data mOvDataRot;
     msm_rotator_data_info mRotData;
     int mRotOffset[max_num_buffers];
     int mCurrentItem;
     int mNumBuffers;
+    int mUpdateDataChannel;
 
     bool openDevices(int fbnum = -1, bool uichannel = false, int num_buffers = 2);
+    bool mapRotatorMemory(int num_buffers, bool uiChannel, int requestType);
+    bool queue(uint32_t offset);
 
 public:
     OverlayDataChannel();
@@ -186,6 +196,7 @@ public:
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
     bool getCropS3D(overlay_rect *inRect, int channel, int format, overlay_rect *rect);
     bool isChannelUP() const { return (mFD > 0); }
+    bool updateDataChannel(int updateStatus, int size);
 };
 
 /*
@@ -198,6 +209,8 @@ class Overlay {
     bool mHDMIConnected;
     bool mCloseChannel;
     unsigned int mS3DFormat;
+    int mWidth;
+    int mHeight;
 
     OverlayControlChannel objOvCtrlChannel[2];
     OverlayDataChannel    objOvDataChannel[2];

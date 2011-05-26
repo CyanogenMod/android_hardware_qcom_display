@@ -20,6 +20,9 @@
 
 #define INTERLACE_MASK 0x80
 /* Helper functions */
+static inline size_t ALIGN(size_t x, size_t align) {
+    return (x + align-1) & ~(align-1);
+}
 
 static int get_mdp_format(int format) {
     switch (format) {
@@ -58,9 +61,13 @@ static int get_size(int format, int w, int h) {
         size *= 2;
         break;
     case MDP_Y_CBCR_H2V2:
-    case MDP_Y_CRCB_H2V2:
-        size = (size * 3) / 2;
-        break;
+    case MDP_Y_CRCB_H2V2: {
+        int alignedw = ALIGN(w, 16);
+        int alignedh = h;
+        size = alignedw*alignedh +
+               (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
+        size = ALIGN(size, 4096);
+    } break;
     case MDP_Y_CRCB_H2V2_TILE:
         aligned_height = (h + 31) & ~31;
         pitch = (w + 127) & ~127;
@@ -171,7 +178,8 @@ unsigned int overlay::getOverlayConfig (unsigned int format3D) {
 }
 
 Overlay::Overlay() : mChannelUP(false), mHDMIConnected(false),
-                     mCloseChannel(false), mS3DFormat(0) {
+                     mCloseChannel(false), mS3DFormat(0),
+                     mWidth(0), mHeight(0) {
 }
 
 Overlay::~Overlay() {
@@ -251,6 +259,8 @@ bool Overlay::closeChannel() {
     mChannelUP = false;
     mCloseChannel = false;
     mS3DFormat = 0;
+    mWidth = 0;
+    mHeight = 0;
     return true;
 }
 
@@ -296,13 +306,32 @@ bool Overlay::updateOverlaySource(uint32_t w, uint32_t h, int format, int orient
         return setSource(w, h, format, orientation, mHDMIConnected);
     }
 
-    bool ret = true;
+    bool ret = false;
+    if (w == mWidth && h == mHeight) {
+        objOvDataChannel[0].updateDataChannel(0, 0);
+        return true;
+    }
+
     // Set the overlay source info
     if (objOvCtrlChannel[0].isChannelUP()) {
-        ret = objOvCtrlChannel[0].updateOverlaySource(w, h);
+        ret = objOvCtrlChannel[0].updateOverlaySource(w, h, format, orientation);
+        if (!ret) {
+            LOGE("objOvCtrlChannel[0].updateOverlaySource failed");
+            return false;
+        }
+        int updateDataChannel = orientation ? 1:0;
+        int size = get_size(get_mdp_format(format), w, h);
+        ret = objOvDataChannel[0].updateDataChannel(updateDataChannel, size);
+
         if (ret && objOvCtrlChannel[1].isChannelUP())
-            ret = objOvCtrlChannel[1].updateOverlaySource(w, h);
+            ret = objOvCtrlChannel[1].updateOverlaySource(w, h, format, orientation);
     }
+
+    if (ret) {
+        mWidth = w;
+        mHeight = h;
+    } else
+        LOGE("update failed");
     return ret;
 }
 
@@ -363,6 +392,8 @@ bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
         closeChannel();
         mS3DFormat = format3D;
 
+        mWidth = w;
+        mHeight = h;
         if (mHDMIConnected) {
             if (mS3DFormat) {
                 // Start both the VG pipes
@@ -630,11 +661,8 @@ bool OverlayControlChannel::openDevices(int fbnum) {
 }
 
 bool OverlayControlChannel::setOverlayInformation(int w, int h,
-                                  int format, int flags, int zorder,
-                                  bool ignoreFB) {
-    int origW, origH, xoff, yoff;
-
-    mOVInfo.id = MSMFB_NEW_REQUEST;
+                                  int format, int flags, int orientation, int zorder,
+                                  bool ignoreFB, int requestType) {
     mOVInfo.src.width  = w;
     mOVInfo.src.height = h;
     mOVInfo.src_rect.x = 0;
@@ -644,7 +672,7 @@ bool OverlayControlChannel::setOverlayInformation(int w, int h,
     mOVInfo.dst_rect.w = w;
     mOVInfo.dst_rect.h = h;
     if(format == MDP_Y_CRCB_H2V2_TILE) {
-        if (mNoRot) {
+        if (!orientation) {
            mOVInfo.src_rect.w = w - ( (((w-1)/64 +1)*64) - w);
            mOVInfo.src_rect.h = h - ((((h-1)/32 +1)*32) - h);
            mOVInfo.src.format = MDP_Y_CRCB_H2V2_TILE;
@@ -667,21 +695,25 @@ bool OverlayControlChannel::setOverlayInformation(int w, int h,
         mOVInfo.dst_rect.w = mFBWidth;
     if (h > mFBHeight)
         mOVInfo.dst_rect.h = mFBHeight;
-    mOVInfo.z_order = zorder;
-    mOVInfo.alpha = 0xff;
-    mOVInfo.transp_mask = 0xffffffff;
-    mOVInfo.flags = flags;
-    if (!ignoreFB)
-        mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
+
+    if (requestType == NEW_REQUEST) {
+        mOVInfo.id = MSMFB_NEW_REQUEST;
+        mOVInfo.z_order = zorder;
+        mOVInfo.alpha = 0xff;
+        mOVInfo.transp_mask = 0xffffffff;
+        mOVInfo.flags = flags;
+        if (!ignoreFB)
+            mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
+    }
     mSize = get_size(format, w, h);
     return true;
 }
 
 bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
-                                          int format) {
+                           int format, int orientation, int requestType) {
     bool ret = true;
 
-    if (!mNoRot) {
+    if (orientation) {
         mRotInfo.src.format = format;
         mRotInfo.src.width = w;
         mRotInfo.src.height = h;
@@ -704,11 +736,16 @@ bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
         mRotInfo.dst_y = 0;
         mRotInfo.src_rect.x = 0;
         mRotInfo.src_rect.y = 0;
-        mRotInfo.rotations = 0;
-        mRotInfo.enable = 0;
-        if(mUIChannel)
+
+        if (requestType == NEW_REQUEST) {
+            mRotInfo.rotations = 0;
+            mRotInfo.enable = 0;
+            if(mUIChannel)
+               mRotInfo.enable = 1;
+            mRotInfo.session_id = 0;
+        } else
             mRotInfo.enable = 1;
-        mRotInfo.session_id = 0;
+
         int result = ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo);
         if (result) {
             reportError("Rotator session failed");
@@ -727,89 +764,13 @@ bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
     return ret;
 }
 
-bool OverlayControlChannel::updateOverlaySource(uint32_t w, uint32_t h)
+bool OverlayControlChannel::updateOverlaySource(uint32_t w, uint32_t h, int format, int orientation)
 {
-    // Set Rotator info
-    if (mRotFD >=0) {
-        if(mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE) {
-            if ((mRotInfo.src.width == (((w-1)/64 +1)*64)) &&
-               (mRotInfo.src.height == (((h-1)/32 +1)*32)))
-                return true;
-
-            mRotInfo.src.width =  (((w-1)/64 +1)*64);
-            mRotInfo.src.height = (((h-1)/32 +1)*32);
-            mRotInfo.src_rect.w = (((w-1)/64 +1)*64);
-            mRotInfo.src_rect.h = (((h-1)/32 +1)*32);
-            mRotInfo.dst.height = (((w-1)/64 +1)*64);
-            mRotInfo.dst.width = (((h-1)/32 +1)*32);
-            mRotInfo.dst.format = MDP_Y_CRCB_H2V2;
-        } else {
-            if ((mRotInfo.src.width == w) &&
-                (mRotInfo.src.height == h))
-                return true;
-
-            mRotInfo.src.width = w;
-            mRotInfo.src.height = h;
-            mRotInfo.src_rect.w = w;
-            mRotInfo.src_rect.h = h;
-            mRotInfo.dst.width = h;
-            mRotInfo.dst.height = w;
-        }
-
-        if (mOVInfo.user_data[0] == MDP_ROT_NOP)
-            mRotInfo.enable = 0;
-
-        if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
-            LOGE("updateOverlaySource MSM_ROTATOR_IOCTL_START failed");
-            return true;
-        }
-    }
-
-    // Set overlay info
-    switch (mOVInfo.user_data[0]) {
-    case MDP_ROT_90:
-    case (MDP_ROT_90 | MDP_FLIP_UD):
-    case (MDP_ROT_90 | MDP_FLIP_LR):
-    case MDP_ROT_270: {
-        if ((mOVInfo.src.height == (((w-1)/64 +1)*64)) &&
-            (mOVInfo.src.width == (((h-1)/32 +1)*32)))
-            return true;
-
-        mOVInfo.src_rect.w = h;
-        mOVInfo.src_rect.h = w;
-        mOVInfo.src.height = (((w-1)/64 +1)*64);
-        mOVInfo.src.width = (((h-1)/32 +1)*32);
-        mOVInfo.src_rect.x = 0;
-        mOVInfo.src_rect.y = 0;;
-    } break;
-    case MDP_ROT_180:
-    case MDP_ROT_NOP: {
-        if ((mOVInfo.src.width  == w) &&
-            (mOVInfo.src.height == h))
-            return true;
-
-        mOVInfo.src.width  = w;
-        mOVInfo.src.height = h;
-        mOVInfo.src_rect.x = 0;
-        mOVInfo.src_rect.y = 0;
-        if(mOVInfo.src.format == MDP_Y_CRCB_H2V2_TILE) {
-            mOVInfo.src_rect.w = w - ( (((w-1)/64 +1)*64) - w);
-            mOVInfo.src_rect.h = h - ((((h-1)/32 +1)*32) - h);
-        } else {
-            mOVInfo.src_rect.w = w;
-            mOVInfo.src_rect.h = h;
-        }
-    } break;
-    default:
-        LOGE("updateOverlaySource: Invalid rotation parameter");
+    int hw_format = get_mdp_format(format);
+    if (!setOverlayInformation(w, h, hw_format, 0, orientation, 0, 0, UPDATE_REQUEST))
         return false;
-    }
 
-    if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
-        LOGE("updateOverlaySource MSMFB_OVERLAY_SET failed");
-        return true;
-    }
-    return true;
+    return startOVRotatorSessions(w, h, hw_format, orientation, UPDATE_REQUEST);
 }
 
 bool OverlayControlChannel::startControlChannel(int w, int h,
@@ -844,10 +805,11 @@ bool OverlayControlChannel::startControlChannel(int w, int h,
     if (!openDevices(fbnum))
         return false;
 
-    if (!setOverlayInformation(w, h, hw_format, flags, zorder, ignoreFB))
+    int orientation = mNoRot ? 0: 1;
+    if (!setOverlayInformation(w, h, hw_format, flags, orientation, zorder, ignoreFB, NEW_REQUEST))
         return false;
 
-    return startOVRotatorSessions(w, h, hw_format);
+    return startOVRotatorSessions(w, h, hw_format, orientation, NEW_REQUEST);
 }
 
 bool OverlayControlChannel::closeControlChannel() {
@@ -1160,7 +1122,7 @@ bool OverlayControlChannel::getSize(int& size) const {
 }
 
 OverlayDataChannel::OverlayDataChannel() : mNoRot(false), mFD(-1), mRotFD(-1),
-                                  mPmemFD(-1), mPmemAddr(0) {
+                                  mPmemFD(-1), mPmemAddr(0), mUpdateDataChannel(0) {
 }
 
 OverlayDataChannel::~OverlayDataChannel() {
@@ -1207,49 +1169,61 @@ bool OverlayDataChannel::openDevices(int fbnum, bool uichannel, int num_buffers)
             return false;
         }
 
-        mPmemAddr = MAP_FAILED;
+        return mapRotatorMemory(num_buffers, uichannel, NEW_REQUEST);
+    }
+    return true;
+}
 
-        if(!uichannel) {
-            mPmemFD = open("/dev/pmem_smipool", O_RDWR | O_SYNC);
-            if(mPmemFD >= 0)
-                mPmemAddr = (void *) mmap(NULL, mPmemOffset * num_buffers, PROT_READ | PROT_WRITE,
-                         MAP_SHARED, mPmemFD, 0);
-        }
+bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int requestType)
+{
+    mPmemAddr = MAP_FAILED;
 
-        if (mPmemAddr == MAP_FAILED) {
-            mPmemFD = open("/dev/pmem_adsp", O_RDWR | O_SYNC);
-            if (mPmemFD < 0) {
-                reportError("Cant open pmem_adsp ");
+    if((requestType == NEW_REQUEST) && !uiChannel) {
+        mPmemFD = open("/dev/pmem_smipool", O_RDWR | O_SYNC);
+        if(mPmemFD >= 0)
+            mPmemAddr = (void *) mmap(NULL, mPmemOffset * num_buffers, PROT_READ | PROT_WRITE,
+                                      MAP_SHARED, mPmemFD, 0);
+    }
+
+    if (mPmemAddr == MAP_FAILED) {
+        mPmemFD = open("/dev/pmem_adsp", O_RDWR | O_SYNC);
+        if (mPmemFD < 0) {
+            reportError("Cant open pmem_adsp ");
+            close(mFD);
+            mFD = -1;
+            close(mRotFD);
+            mRotFD = -1;
+            return false;
+        } else {
+            mPmemAddr = (void *) mmap(NULL, mPmemOffset * num_buffers, PROT_READ | PROT_WRITE,
+                                      MAP_SHARED, mPmemFD, 0);
+            if (mPmemAddr == MAP_FAILED) {
+                reportError("Cant map pmem_adsp ");
                 close(mFD);
                 mFD = -1;
+                close(mPmemFD);
+                mPmemFD = -1;
                 close(mRotFD);
                 mRotFD = -1;
                 return false;
-           } else {
-                mPmemAddr = (void *) mmap(NULL, mPmemOffset * num_buffers, PROT_READ | PROT_WRITE,
-                    MAP_SHARED, mPmemFD, 0);
-                if (mPmemAddr == MAP_FAILED) {
-                    reportError("Cant map pmem_adsp ");
-                    close(mFD);
-                    mFD = -1;
-                    close(mPmemFD);
-                    mPmemFD = -1;
-                    close(mRotFD);
-                    mRotFD = -1;
-                    return false;
-                }
             }
         }
-
-        mOvDataRot.data.memory_id = mPmemFD;
-        mRotData.dst.memory_id = mPmemFD;
-        mRotData.dst.offset = 0;
-        mNumBuffers = num_buffers;
-        mCurrentItem = 0;
-        for (int i = 0; i < num_buffers; i++)
-            mRotOffset[i] = i * mPmemOffset;
     }
 
+    mOvDataRot.data.memory_id = mPmemFD;
+    mRotData.dst.memory_id = mPmemFD;
+    mRotData.dst.offset = 0;
+    mNumBuffers = num_buffers;
+    mCurrentItem = 0;
+    for (int i = 0; i < num_buffers; i++)
+        mRotOffset[i] = i * mPmemOffset;
+
+    return true;
+}
+
+bool OverlayDataChannel::updateDataChannel(int updateStatus, int size) {
+    mUpdateDataChannel = updateStatus;
+    mNewPmemOffset = size;
     return true;
 }
 
@@ -1277,6 +1251,7 @@ bool OverlayDataChannel::closeDataChannel() {
 
     if (!mNoRot && mRotFD > 0) {
         munmap(mPmemAddr, mPmemOffset * mNumBuffers);
+
         close(mPmemFD);
         mPmemFD = -1;
         close(mRotFD);
@@ -1305,10 +1280,41 @@ bool OverlayDataChannel::queueBuffer(uint32_t offset) {
         return false;
     }
 
+    int oldPmemFD = -1;
+    void* oldPmemAddr = MAP_FAILED;
+    uint32_t oldPmemOffset = -1;
+    bool result;
+    if (!mNoRot) {
+        if (mUpdateDataChannel) {
+            oldPmemFD = mPmemFD;
+            oldPmemAddr = mPmemAddr;
+            oldPmemOffset = mPmemOffset;
+            mPmemOffset = mNewPmemOffset;
+            mNewPmemOffset = -1;
+            // Map the new PMEM memory
+            result = mapRotatorMemory(mNumBuffers, 0, UPDATE_REQUEST);
+            if (!result) {
+                LOGE("queueBuffer: mapRotatorMemory failed");
+                return false;
+            }
+        }
+    }
+
+    result = queue(offset);
+
+    // Unmap the old PMEM memory after the queueBuffer has returned
+    if (oldPmemFD != -1 && oldPmemAddr != MAP_FAILED) {
+        munmap(oldPmemAddr, oldPmemOffset * mNumBuffers);
+        close(oldPmemFD);
+        oldPmemFD = -1;
+    }
+    return result;
+}
+
+bool OverlayDataChannel::queue(uint32_t offset) {
     msmfb_overlay_data *odPtr;
     mOvData.data.offset = offset;
     odPtr = &mOvData;
-
     if (!mNoRot) {
         mRotData.src.memory_id = mOvData.data.memory_id;
         mRotData.src.offset = offset;
@@ -1317,7 +1323,7 @@ bool OverlayDataChannel::queueBuffer(uint32_t offset) {
         mCurrentItem = (mCurrentItem + 1) % mNumBuffers;
 
         int result = ioctl(mRotFD,
-                               MSM_ROTATOR_IOCTL_ROTATE, &mRotData);
+                       MSM_ROTATOR_IOCTL_ROTATE, &mRotData);
 
         if (!result) {
             mOvDataRot.data.offset = (uint32_t) mRotData.dst.offset;
@@ -1333,7 +1339,6 @@ bool OverlayDataChannel::queueBuffer(uint32_t offset) {
         reportError("overlay play failed.");
         return false;
     }
-
     return true;
 }
 
