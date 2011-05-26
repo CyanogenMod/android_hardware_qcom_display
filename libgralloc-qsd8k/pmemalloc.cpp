@@ -143,7 +143,7 @@ int PmemUserspaceAllocator::init_pmem_area()
 
 
 int PmemUserspaceAllocator::alloc_pmem_buffer(size_t size, int usage,
-        void** pBase, int* pOffset, int* pFd, int* masterFd, int format)
+        void** pBase, int* pOffset, int* pFd, int format)
 {
     BEGIN_FUNC;
     int err = init_pmem_area();
@@ -187,7 +187,6 @@ int PmemUserspaceAllocator::alloc_pmem_buffer(size_t size, int usage,
                 *pBase = base;
                 *pOffset = offset;
                 *pFd = fd;
-                *masterFd = -1;
             }
             //LOGD_IF(!err, "%s: allocating pmem size=%d, offset=%d", pmemdev, size, offset);
         }
@@ -262,7 +261,7 @@ static unsigned clp2(unsigned x) {
 
 
 int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
-        void** pBase,int* pOffset, int* pFd, int* masterFd, int format)
+        void** pBase,int* pOffset, int* pFd, int format)
 {
     BEGIN_FUNC;
 
@@ -283,8 +282,8 @@ int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
         return -EINVAL;
     }
 
-    int master_fd = deps.open(device, openFlags, 0);
-    if (master_fd < 0) {
+    int fd = deps.open(device, openFlags, 0);
+    if (fd < 0) {
         err = -deps.getErrno();
         END_FUNC;
         LOGE("Error opening %s", device);
@@ -296,49 +295,26 @@ int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
 
     if (format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) {
         // Tile format buffers need physical alignment to 8K
-        err = deps.alignPmem(master_fd, size, 8192);
+        err = deps.alignPmem(fd, size, 8192);
         if (err < 0) {
             LOGE("alignPmem failed");
         }
     }
 
-    void* base = deps.mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, master_fd, 0);
+    void* base = deps.mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     if (base == MAP_FAILED) {
         LOGE("%s: failed to map pmem fd: %s", device,
              strerror(deps.getErrno()));
         err = -deps.getErrno();
-        deps.close(master_fd);
+        deps.close(fd);
         END_FUNC;
         return err;
     }
     memset(base, 0, size);
-    
-    // Connect and map the PMEM region to give to the client process
-    int fd = deps.open(device, O_RDWR, 0);
-    err = fd < 0 ? fd : 0;
 
-    // and connect to it
-    if (err == 0) {
-        err = deps.connectPmem(fd, master_fd);
-    }
-
-    // and make it available to the client process
-    if (err == 0) {
-        err = deps.mapPmem(fd, offset, size);
-    }
-    
-    if (err == 0) {
-        *pBase = base;
-        *pOffset = 0;
-        *pFd = fd;
-        *masterFd = master_fd;
-    } else {
-        deps.munmap(base, size);
-        deps.unmapPmem(fd, offset, size);
-        deps.close(fd);
-        deps.close(master_fd);
-        return err;
-    }
+    *pBase = base;
+    *pOffset = 0;
+    *pFd = fd;
 
     END_FUNC;
     return 0;
@@ -352,7 +328,7 @@ int PmemKernelAllocator::free_pmem_buffer(size_t size, void* base, int offset, i
     // like we did when allocating.
     //size = clp2(size);
 
-    int err = deps.unmapPmem(fd, offset, size);
+    int err = deps.munmap(base, size);
     if (err < 0) {
         err = deps.getErrno();
         LOGW("error unmapping pmem fd: %s", strerror(err));

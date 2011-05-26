@@ -169,7 +169,7 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
                     // the PmemAllocator rather than getting the base & offset separately
     int offset = 0;
     int lockState = 0;
-    int masterFd = -1;
+
     size = roundUpToPageSize(size);
 #ifndef USE_ASHMEM
     if (usage & GRALLOC_USAGE_HW_TEXTURE) {
@@ -219,7 +219,7 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
         // PMEM buffers are always mmapped
         lockState |= private_handle_t::LOCK_STATE_MAPPED;
 
-        err = pma->alloc_pmem_buffer(size, usage, &base, &offset, &fd, &masterFd, format);
+        err = pma->alloc_pmem_buffer(size, usage, &base, &offset, &fd, format);
         if (err < 0) {
             if (((usage & GRALLOC_USAGE_HW_MASK) == 0) &&
                 ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) == 0)) {
@@ -245,7 +245,6 @@ try_ashmem:
         hnd->offset = offset;
         hnd->base = int(base)+offset;
         hnd->lockState = lockState;
-        hnd->masterFd = masterFd;
         *pHandle = hnd;
     }
 
@@ -394,9 +393,6 @@ int gpu_context_t::free_impl(private_handle_t const* hnd) {
     }
 
     deps.close(hnd->fd);
-    if (hnd->masterFd != -1) {
-        deps.close(hnd->masterFd);
-    }
     delete hnd; // XXX JMG: move this to the deps
     return 0;
 }

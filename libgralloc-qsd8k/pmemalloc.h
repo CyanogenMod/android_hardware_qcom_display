@@ -36,7 +36,7 @@ class PmemAllocator {
     virtual void* get_base_address() = 0;
 
     virtual int alloc_pmem_buffer(size_t size, int usage, void** pBase,
-            int* pOffset, int* pFd, int* masterFd, int format) = 0;
+            int* pOffset, int* pFd, int format) = 0;
     virtual int free_pmem_buffer(size_t size, void* base, int offset, int fd) = 0;
 };
 
@@ -89,7 +89,7 @@ class PmemUserspaceAllocator: public PmemAllocator {
     virtual int init_pmem_area_locked();
     virtual int init_pmem_area();
     virtual int alloc_pmem_buffer(size_t size, int usage, void** pBase,
-            int* pOffset, int* pFd, int* masterFd, int format);
+            int* pOffset, int* pFd, int format);
     virtual int free_pmem_buffer(size_t size, void* base, int offset, int fd);
 
 #ifndef ANDROID_OS
@@ -139,9 +139,6 @@ class PmemKernelAllocator: public PmemAllocator {
         virtual int munmap(void* start, size_t length) = 0;
         virtual int open(const char* pathname, int flags, int mode) = 0;
         virtual int close(int fd) = 0;
-        virtual int connectPmem(int fd, int master_fd) = 0;
-        virtual int mapPmem(int fd, int offset, size_t size) = 0;
-        virtual int unmapPmem(int fd, int offset, size_t size) = 0;
         virtual int alignPmem(int fd, size_t size, int align) = 0;
     };
 
@@ -152,7 +149,7 @@ class PmemKernelAllocator: public PmemAllocator {
     virtual void* get_base_address();
 
     virtual int alloc_pmem_buffer(size_t size, int usage, void** pBase,
-            int* pOffset, int* pFd, int* masterFd, int format);
+            int* pOffset, int* pFd, int format);
     virtual int free_pmem_buffer(size_t size, void* base, int offset, int fd);
 
  private:
