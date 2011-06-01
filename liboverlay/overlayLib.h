@@ -212,7 +212,9 @@ class Overlay {
     unsigned int mS3DFormat;
     int mWidth;
     int mHeight;
-
+    //Actual cropped source width and height of overlay
+    int mCroppedSrcWidth;
+    int mCroppedSrcHeight;
     OverlayControlChannel objOvCtrlChannel[2];
     OverlayDataChannel    objOvDataChannel[2];
 

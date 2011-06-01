@@ -179,7 +179,8 @@ unsigned int overlay::getOverlayConfig (unsigned int format3D) {
 
 Overlay::Overlay() : mChannelUP(false), mHDMIConnected(false),
                      mCloseChannel(false), mS3DFormat(0),
-                     mWidth(0), mHeight(0) {
+                     mWidth(0), mHeight(0),
+                     mCroppedSrcWidth(0), mCroppedSrcHeight(0) {
 }
 
 Overlay::~Overlay() {
@@ -199,6 +200,8 @@ bool Overlay::startChannel(int w, int h, int format, int fbnum,
                               unsigned int format3D, int channel,
                               bool ignoreFB, int num_buffers) {
     int zorder = 0;
+    mCroppedSrcWidth = w;
+    mCroppedSrcHeight = h;
     if (format3D)
         zorder = channel;
     mChannelUP = objOvCtrlChannel[channel].startControlChannel(w, h, format, fbnum,
@@ -216,13 +219,6 @@ bool Overlay::startChannelHDMI(int w, int h, int format, bool norot) {
     bool ret = startChannel(w, h, format, FRAMEBUFFER_0, norot);
     if(ret) {
         ret = startChannel(w, h, format, FRAMEBUFFER_1, true, 0, 0, VG1_PIPE);
-        overlay_rect rect;
-        if(ret && objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(w, h, &rect)) {
-            if(!setChannelPosition(rect.x, rect.y, rect.w, rect.h, VG1_PIPE)) {
-                LOGE("Failed to upscale for framebuffer 1");
-                return false;
-            }
-        }
     }
     return ret;
 }
@@ -273,13 +269,15 @@ bool Overlay::getOrientation(int& orientation, int channel) const {
 }
 
 bool Overlay::setPosition(int x, int y, uint32_t w, uint32_t h) {
-    if(mS3DFormat && mHDMIConnected) {
-        return setPositionS3D(x, y, w, h);
-    }
     if(mHDMIConnected) {
-        overlay_rect rect;
-        objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(w, h, &rect);
-        setChannelPosition(rect.x, rect.y, rect.w, rect.h, VG1_PIPE);
+        if(mS3DFormat) {
+            return setPositionS3D(x, y, w, h);
+        } else {
+            overlay_rect rect;
+            objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(mCroppedSrcWidth,
+                            mCroppedSrcHeight, &rect);
+            setChannelPosition(rect.x, rect.y, rect.w, rect.h, VG1_PIPE);
+        }
     }
     return setChannelPosition(x, y, w, h, VG0_PIPE);
 }
@@ -420,6 +418,8 @@ bool Overlay::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
     bool ret;
     overlay_rect rect, inRect;
     inRect.x = x; inRect.y = y; inRect.w = w; inRect.h = h;
+    mCroppedSrcWidth = w;
+    mCroppedSrcHeight = h;
 
     if (mHDMIConnected) {
         if (mS3DFormat) {
