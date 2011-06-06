@@ -419,15 +419,10 @@ static int postOrigResHDMI(private_module_t* m) {
 
     //Post them to secondary
     if(m->enableHDMIOutput) {
-        const bool waitForVsync = true;
         const int orientation = 0;
-        const int fbnum = OverlayUI::FB1;
-        const bool useVGPipe = true;
-        ret = m->pOrigResTV->setSource(w, h, format, orientation, useVGPipe,
-                    waitForVsync, fbnum);
+        ret = m->pOrigResTV->setSource(w, h, format, orientation);
         if(ret == NO_ERROR) {
-            m->pOrigResTV->setPosition(0, 0, m->pOrigResTV->getFBWidth(),
-                    m->pOrigResTV->getFBHeight());
+            m->pOrigResTV->setPosition();
             ret = m->pOrigResTV->queueBuffer(buffer);
         }
         if(ret != NO_ERROR)
@@ -461,11 +456,7 @@ static int fb_postOrigResBuffer(struct framebuffer_device_t* dev,
         pthread_cond_signal(&m->ts.newBufferCond);
         pthread_mutex_unlock(&m->ts.newBufferMutex);
 
-        const bool useVGPipe = true;
-        const bool waitForVsync = true;
-        const int fbnum = OverlayUI::FB0;
-        ret = m->pOrigResPanel->setSource(w, h, format, orientation, useVGPipe,
-                        waitForVsync, fbnum);
+        ret = m->pOrigResPanel->setSource(w, h, format, orientation);
         if(ret == NO_ERROR) {
             ret = m->pOrigResPanel->queueBuffer(buffer);
         }
