@@ -838,18 +838,28 @@ bool OverlayControlChannel::setSource(uint32_t w, uint32_t h,
     int format = cFormat & INTERLACE_MASK ?
                 (cFormat ^ HAL_PIXEL_FORMAT_INTERLACE) : cFormat;
     format = get_mdp_format(format);
-    if ((orientation == mOrientation)
-            && ((orientation == OVERLAY_TRANSFORM_ROT_90)
-            || (orientation == OVERLAY_TRANSFORM_ROT_270))) {
+    if (orientation == mOrientation && orientation != 0){
+        //set format to non-tiled and align w, h to 64-bit and 32-bit respectively.
         if (format == MDP_Y_CRCB_H2V2_TILE) {
             format = MDP_Y_CRCB_H2V2;
             w = (((w-1)/64 +1)*64);
             h = (((h-1)/32 +1)*32);
         }
-        int tmp = w;
-        w = h;
-        h = tmp;
+        switch(orientation){
+            case (HAL_TRANSFORM_ROT_90 | HAL_TRANSFORM_FLIP_H):
+            case (HAL_TRANSFORM_ROT_90 | HAL_TRANSFORM_FLIP_V):
+            case HAL_TRANSFORM_ROT_90:
+            case HAL_TRANSFORM_ROT_270:
+                {
+                    int tmp = w;
+                    w = h;
+                    h = tmp;
+                }
+            default:
+                break;
+        }
     }
+
     if (w == mOVInfo.src.width && h == mOVInfo.src.height
             && format == mOVInfo.src.format && orientation == mOrientation) {
         mdp_overlay ov;
