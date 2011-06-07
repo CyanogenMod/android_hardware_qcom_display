@@ -71,6 +71,7 @@ struct hwc_context_t {
     hwc_composer_device_t device;
     /* our private state goes below here */
     overlay::Overlay* mOverlayLibObject;
+    int previousLayerCount;
 };
 
 static int hwc_device_open(const struct hw_module_t* module, const char* name,
@@ -198,7 +199,8 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
     int yuvBufferCount = 0;
     int layerType = 0;
-    if (list && (list->flags & HWC_GEOMETRY_CHANGED)) {
+    int numLayersNotUpdating = 0;
+    if (list) {
         for (size_t i=0 ; i<list->numHwLayers; i++) {
             private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
             if(hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO)) {
@@ -206,6 +208,8 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 if (yuvBufferCount > 1) {
                     break;
                 }
+            } else if (list->hwLayers[i].flags & HWC_LAYER_NOT_UPDATING) {
+                numLayersNotUpdating++;
             }
         }
 
@@ -227,9 +231,23 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             }
         }
 
-        layerType |= (yuvBufferCount == 1) ? HWC_SINGLE_VIDEO: 0;
-        // Inform the gralloc of the current HDMI status
-        hwc_updateOverlayStatus(ctx, layerType);
+        bool compCountChanged = false;
+        if (list->numHwLayers != ctx->previousLayerCount) {
+            compCountChanged = true;
+            ctx->previousLayerCount = list->numHwLayers;
+        }
+        if ((yuvBufferCount == 1) && ((list->numHwLayers-1) == numLayersNotUpdating)
+            && !compCountChanged) {
+            list->flags |= HWC_SKIP_COMPOSITION;
+        } else {
+            list->flags &= ~HWC_SKIP_COMPOSITION;
+        }
+
+        if (list->flags & HWC_GEOMETRY_CHANGED) {
+            layerType |= (yuvBufferCount == 1) ? HWC_SINGLE_VIDEO: 0;
+            // Inform the gralloc of the current HDMI status
+            hwc_updateOverlayStatus(ctx, layerType);
+        }
     }
 
     return 0;
@@ -448,22 +466,27 @@ static int hwc_set(hwc_composer_device_t *dev,
         LOGE("hwc_set null module ");
         return -1;
     }
-    for (size_t i=0 ; i<list->numHwLayers ; i++) {
+    for (size_t i=0; i<list->numHwLayers; i++) {
         if (list->hwLayers[i].flags == HWC_SKIP_LAYER) {
             continue;
         }
 
         if (list->hwLayers[i].compositionType == HWC_USE_OVERLAY) {
             drawLayerUsingOverlay(ctx, &(list->hwLayers[i]));
+        } else if (list->flags & HWC_SKIP_COMPOSITION) {
+            break;
         } else if (list->hwLayers[i].compositionType == HWC_USE_COPYBIT) {
-            drawLayerUsingCopybit(dev, &(list->hwLayers[i]), (EGLDisplay)dpy, (EGLSurface)sur);            
+            drawLayerUsingCopybit(dev, &(list->hwLayers[i]), (EGLDisplay)dpy, (EGLSurface)sur);
         }
     }
-    EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
-    if (!sucess) {
-        return HWC_EGL_ERROR;
-    }
 
+    // Do not call eglSwapBuffers if we the skip composition flag is set on the list.
+    if (!(list->flags & HWC_SKIP_COMPOSITION)) {
+        EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
+        if (!sucess) {
+            return HWC_EGL_ERROR;
+        }
+    }
     return 0;
 }
 
