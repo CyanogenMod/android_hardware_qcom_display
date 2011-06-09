@@ -901,7 +901,6 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->libc2d2 = ::dlopen("libC2D2.so", RTLD_NOW);
     if (!ctx->libc2d2) {
         LOGE("FATAL ERROR: could not dlopen libc2d2.so: %s", dlerror());
-        status = COPYBIT_FAILURE;
         goto error;
     }
     *(void **)&LINK_c2dCreateSurface = ::dlsym(ctx->libc2d2,
@@ -922,7 +921,6 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
        || !LINK_c2dDraw || !LINK_c2dFlush || !LINK_c2dWaitTimestamp || !LINK_c2dFinish
        || !LINK_c2dDestroySurface) {
         LOGE("%s: dlsym ERROR", __func__);
-        status = COPYBIT_FAILURE;
         goto error1;
     }
 
@@ -939,7 +937,6 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->g12_device_fd = open(G12_DEVICE_NAME, O_RDWR | O_SYNC);
     if(ctx->g12_device_fd < 0) {
       LOGE("%s: g12_device_fd open failed", __func__);
-        status = COPYBIT_FAILURE;
         goto error1;
     }
 
@@ -955,7 +952,6 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
                              (C2D_SURFACE_TYPE)(C2D_SURFACE_RGB_HOST |
                              C2D_SURFACE_WITH_PHYS), &surfDefinition)) {
         LOGE("%s: create ctx->dst failed", __func__);
-        status = COPYBIT_FAILURE;
         goto error2;
     }
 
@@ -963,7 +959,6 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
                              (C2D_SURFACE_TYPE)(C2D_SURFACE_RGB_HOST |
                              C2D_SURFACE_WITH_PHYS), &surfDefinition)) {
         LOGE("%s: create ctx->src[RGB_SURFACE] failed", __func__);
-        status = COPYBIT_FAILURE;
         goto error3;
     }
 
@@ -984,16 +979,10 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
                              (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS),
                              &yuvSurfaceDef)) {
         LOGE("%s: create ctx->src[YUV_SURFACE] failed", __func__);
-        status = COPYBIT_FAILURE;
         goto error4;
     }
 
-    if (status == COPYBIT_SUCCESS)
-        *device = &ctx->device.common;
-    else {
-        close_copybit(&ctx->device.common);
-        goto error4;
-    }
+    *device = &ctx->device.common;
 
     while ((fd==-1) && device_template[i]) {
         snprintf(fbName, 64, device_template[i], 0);
@@ -1001,11 +990,11 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
         i++;
     }
     if (fd < 0)
-        goto error4;
+        goto error5;
 
     struct fb_var_screeninfo info;
     if (ioctl(fd, FBIOGET_VSCREENINFO, &info) == -1)
-        goto error5;
+        goto error6;
 
     ctx->fb_width = info.xres;
     ctx->fb_height = info.yres;
@@ -1013,9 +1002,11 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->isPremultipliedAlpha = false;
     return status;
 
-error5:
+error6:
     close(fd);
     fd = -1;
+error5:
+    LINK_c2dDestroySurface(ctx->src[YUV_SURFACE]);
 error4:
     LINK_c2dDestroySurface(ctx->src[RGB_SURFACE]);
 error3:
@@ -1026,6 +1017,8 @@ error1:
     ::dlclose(ctx->libc2d2);
 error:
     free(ctx);
+    status = COPYBIT_FAILURE;
+    *device = NULL;
 
     return status;
 }
