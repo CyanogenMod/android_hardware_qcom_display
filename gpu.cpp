@@ -17,6 +17,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <cutils/properties.h>
 
 #include <sys/mman.h>
 
@@ -27,7 +28,8 @@ gpu_context_t::gpu_context_t(Deps& deps, PmemAllocator& pmemAllocator,
         PmemAllocator& pmemAdspAllocator, const private_module_t* module) :
     deps(deps),
     pmemAllocator(pmemAllocator),
-    pmemAdspAllocator(pmemAdspAllocator)
+    pmemAdspAllocator(pmemAdspAllocator),
+    isMDPComposition(false)
 {
     // Zero out the alloc_device_t
     memset(static_cast<alloc_device_t*>(this), 0, sizeof(alloc_device_t));
@@ -39,6 +41,11 @@ gpu_context_t::gpu_context_t(Deps& deps, PmemAllocator& pmemAllocator,
     common.close   = gralloc_close;
     alloc          = gralloc_alloc;
     free           = gralloc_free;
+
+    char property[PROPERTY_VALUE_MAX];
+    if((property_get("debug.composition.type", property, NULL) > 0) &&
+       (strncmp(property, "mdp", 3) == 0))
+        isMDPComposition = true;
 }
 
 int gpu_context_t::gralloc_alloc_framebuffer_locked(size_t size, int usage,
@@ -175,6 +182,13 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
     }
 #else
     if (usage & GRALLOC_USAGE_PRIVATE_PMEM){
+        flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
+    }
+
+    // Enable use of PMEM only when MDP composition is used (and other conditions apply).
+    // Else fall back on using ASHMEM
+    if (isMDPComposition &&
+        ((usage & GRALLOC_USAGE_HW_TEXTURE) || (usage & GRALLOC_USAGE_HW_2D)) ) {
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
     }
 #endif

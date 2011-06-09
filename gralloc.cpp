@@ -21,6 +21,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <cutils/properties.h>
 
 #include <linux/android_pmem.h>
 
@@ -76,10 +77,20 @@ class PmemAllocatorDepsDeviceImpl : public PmemUserspaceAllocator::Deps,
         }
 #else
 #ifdef USE_ASHMEM
-        if(module != NULL)
-            *size = module->info.xres * module->info.yres * 2 * 2;
-        else
-            return -ENOMEM;
+        char property[PROPERTY_VALUE_MAX];
+        bool isMDPComposition = false;
+        if((property_get("debug.composition.type", property, NULL) > 0) &&
+          (strncmp(property, "mdp", 3) == 0))
+            isMDPComposition = true;
+
+        if (isMDPComposition) {
+            *size = 23<<20; //23MB for 7x27
+        } else {
+            if(module != NULL)
+                *size = module->info.xres * module->info.yres * 2 * 2;
+            else
+                return -ENOMEM;
+        }
 #else
 	*size = 23<<20; //23MB for 7x27
 #endif
