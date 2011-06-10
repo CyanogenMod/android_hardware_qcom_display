@@ -264,7 +264,6 @@ struct private_module_t {
     struct avail_t avail[NUM_FRAMEBUFFERS_MAX];
     pthread_mutex_t qlock;
     pthread_cond_t qpost;
-    uint32_t yres_delta;
 
     enum {
         // flag to indicate we'll post this buffer

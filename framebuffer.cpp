@@ -750,7 +750,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
     * stream and is written to video memory as that unmodified. This implies
     * big-endian byte order if bits_per_pixel is greater than 8.
     */
-    bool pageAlignmentRequired = true;
+
     if(info.bits_per_pixel == 32) {
 	/*
 	* Explicitly request RGBA_8888
@@ -768,14 +768,11 @@ int mapFrameBufferLocked(struct private_module_t* module)
 	/* Note: the GL driver does not have a r=8 g=8 b=8 a=0 config, so if we do
 	* not use the MDP for composition (i.e. hw composition == 0), ask for
 	* RGBA instead of RGBX. */
-	if (property_get("debug.sf.hw", property, NULL) > 0 && atoi(property) == 0) {
+	if (property_get("debug.sf.hw", property, NULL) > 0 && atoi(property) == 0)
 		module->fbFormat = HAL_PIXEL_FORMAT_RGBX_8888;
-                pageAlignmentRequired = false;
-	} else if(property_get("debug.composition.type", property, NULL) > 0 &&
-                 (strncmp(property, "mdp", 3) == 0)) {
+	else if(property_get("debug.composition.type", property, NULL) > 0 && (strncmp(property, "mdp", 3) == 0))
 		module->fbFormat = HAL_PIXEL_FORMAT_RGBX_8888;
-                pageAlignmentRequired = false;
-	} else
+	else
 		module->fbFormat = HAL_PIXEL_FORMAT_RGBA_8888;
     } else {
 	/*
@@ -791,50 +788,26 @@ int mapFrameBufferLocked(struct private_module_t* module)
 	info.transp.offset  = 0;
 	info.transp.length  = 0;
 	module->fbFormat = HAL_PIXEL_FORMAT_RGB_565;
-	if ((property_get("debug.sf.hw", property, NULL) > 0 && atoi(property) == 0) ||
-	    (property_get("debug.composition.type", property, NULL) > 0 &&
-            (strncmp(property, "mdp", 3) == 0))) {
-            pageAlignmentRequired = false;
-        }
     }
-
-    if (pageAlignmentRequired) {
-    // Calculate the FbSize to map.
-        int y = -1;
-        do {
-            y++;
-        } while (((finfo.line_length * (info.yres + y)) % 4096) != 0);
-        module->yres_delta = y;
-    } else
-        module->yres_delta = 0;
-
     /*
      * Request NUM_BUFFERS screens (at lest 2 for page flipping)
      */
-
-    // Calculate the number of buffers required
-    int numberOfBuffers = 0;
-    int requiredSize = info.xres * (info.bits_per_pixel/8) *
-                           (info.yres + module->yres_delta);
-    for (int num = NUM_FRAMEBUFFERS_MAX; num > 0; num--) {
-        int totalSizeRequired = num * requiredSize;
-        if (finfo.smem_len >= totalSizeRequired) {
-            numberOfBuffers = num;
-            break;
-        }
-    }
+    int numberOfBuffers = (int)(finfo.smem_len/(info.yres * info.xres * (info.bits_per_pixel/8)));
     LOGV("num supported framebuffers in kernel = %d", numberOfBuffers);
 
     if (property_get("debug.gr.numframebuffers", property, NULL) > 0) {
-        int reqNum = atoi(property);
-        if ((reqNum <= numberOfBuffers) && (reqNum >= NUM_FRAMEBUFFERS_MIN)
-             && (reqNum <= NUM_FRAMEBUFFERS_MAX)) {
-            numberOfBuffers = reqNum;
+        int num = atoi(property);
+        if ((num >= NUM_FRAMEBUFFERS_MIN) && (num <= NUM_FRAMEBUFFERS_MAX)) {
+            numberOfBuffers = num;
         }
     }
 
-    info.yres_virtual = numberOfBuffers*(info.yres + module->yres_delta);
+    if (numberOfBuffers > NUM_FRAMEBUFFERS_MAX)
+        numberOfBuffers = NUM_FRAMEBUFFERS_MAX;
+
     LOGD("We support %d buffers", numberOfBuffers);
+
+    info.yres_virtual = info.yres * numberOfBuffers;
 
     uint32_t flags = PAGE_FLIP;
     if (ioctl(fd, FBIOPUT_VSCREENINFO, &info) == -1) {
