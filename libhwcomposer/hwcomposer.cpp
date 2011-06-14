@@ -57,7 +57,8 @@ enum HWCCompositionType {
 };
 
 enum HWCPrivateFlags {
-    HWC_USE_ORIGINAL_RESOLUTION = 0x10000000, // This layer is to be drawn using overlays
+    HWC_USE_ORIGINAL_RESOLUTION = HWC_FLAGS_PRIVATE_0, // This layer is to be drawn using overlays
+    HWC_DO_NOT_USE_OVERLAY      = HWC_FLAGS_PRIVATE_1, // Do not use overlays to draw this layer
 };
 
 enum HWCLayerType{
@@ -203,7 +204,8 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
     if (list) {
         for (size_t i=0 ; i<list->numHwLayers; i++) {
             private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
-            if(hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO)) {
+            if(hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO) &&
+               !(list->hwLayers[i].flags & HWC_DO_NOT_USE_OVERLAY)) {
                 yuvBufferCount++;
                 if (yuvBufferCount > 1) {
                     break;
