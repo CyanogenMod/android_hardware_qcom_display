@@ -41,6 +41,8 @@
 
 /*****************************************************************************/
 #define ALIGN(x, align) (((x) + ((align)-1)) & ~((align)-1))
+#define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
+#define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 
 // Enum containing the supported composition types
 enum {
@@ -181,6 +183,88 @@ static int hwc_updateOverlayStatus(hwc_context_t* ctx, int layerType) {
     return 0;
 }
 
+/*
+ * Configures mdp pipes
+ */
+static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer) {
+     int ret = 0;
+     if (LIKELY(ctx && ctx->mOverlayLibObject)) {
+        private_hwc_module_t* hwcModule =
+            reinterpret_cast<private_hwc_module_t*>(ctx->device.common.module);
+        if (UNLIKELY(!hwcModule)) {
+            LOGE("prepareOverlay null module ");
+            return -1;
+        }
+
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
+        overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
+        int orientation = 0;
+        if (OVERLAY_CHANNEL_UP == ovLibObject->getChannelStatus())
+            ovLibObject->getOrientation(orientation);
+
+        if ((OVERLAY_CHANNEL_DOWN == ovLibObject->getChannelStatus())
+            || (layer->transform != orientation) ||
+            (hnd->flags & private_handle_t::PRIV_FLAGS_FORMAT_CHANGED)) {
+            // Overlay channel is not started, or we have an orientation change
+            // or there is a format change, call setSource to open the overlay
+            // if necessary
+            ret = ovLibObject->setSource(hnd->width, hnd->height, hnd->format,
+                    layer->transform, (ovLibObject->getHDMIStatus()?true:false),
+                    false);
+            if (!ret) {
+                LOGE("prepareOverlay setSource failed");
+                return -1;
+            }
+            // Reset this flag so that we don't keep opening and closing channels
+            // unnecessarily
+            hnd->flags &= ~private_handle_t::PRIV_FLAGS_FORMAT_CHANGED;
+        } else {
+            // The overlay goemetry may have changed, we only need to update the
+            // overlay
+            ret = ovLibObject->updateOverlaySource(hnd->width, hnd->height,
+                    hnd->format, layer->transform);
+            if (!ret) {
+                LOGE("prepareOverlay updateOverlaySource failed");
+                return -1;
+            }
+        }
+
+        hwc_rect_t sourceCrop = layer->sourceCrop;
+        ret = ovLibObject->setCrop(sourceCrop.left, sourceCrop.top,
+                                  (sourceCrop.right - sourceCrop.left),
+                                  (sourceCrop.bottom - sourceCrop.top));
+        if (!ret) {
+            LOGE("prepareOverlay setCrop failed");
+            return -1;
+        }
+
+        if (layer->flags == HWC_USE_ORIGINAL_RESOLUTION) {
+            framebuffer_device_t* fbDev = hwcModule->fbDevice;
+            ret = ovLibObject->setPosition(0, 0,
+                                           fbDev->width, fbDev->height);
+        } else {
+            hwc_rect_t displayFrame = layer->displayFrame;
+            ret = ovLibObject->setPosition(displayFrame.left, displayFrame.top,
+                                    (displayFrame.right - displayFrame.left),
+                                    (displayFrame.bottom - displayFrame.top));
+        }
+        if (!ret) {
+            LOGE("prepareOverlay setPosition failed");
+            return -1;
+        }
+
+        ovLibObject->getOrientation(orientation);
+        if (orientation != layer->transform)
+            ret = ovLibObject->setParameter(OVERLAY_TRANSFORM, layer->transform);
+        if (!ret) {
+            LOGE("prepareOverlay setParameter failed transform %x",
+                    layer->transform);
+            return -1;
+        }
+     }
+     return 0;
+}
+
 static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
@@ -220,8 +304,19 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             // If there is a single Fullscreen layer, we can bypass it - TBD
             // If there is only one video/camera buffer, we can bypass itn
             if (hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO) && (yuvBufferCount == 1)) {
-                list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
-                list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
+                if(prepareOverlay(ctx, &(list->hwLayers[i])) == 0) {
+                    list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
+                    list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
+                } else if (hwcModule->compositionType & (COMPOSITION_TYPE_C2D)) {
+                    //Fail safe path: If drawing with overlay fails,
+                    //Use C2D if available.
+                    list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
+                    yuvBufferCount = 0;
+                } else {
+                    //If C2D is not enabled fall back to GPU.
+                    list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
+                    yuvBufferCount = 0;
+                }
             } else if (list->hwLayers[i].flags == HWC_USE_ORIGINAL_RESOLUTION) {
                 list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
                 list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
@@ -371,83 +466,22 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
 
 static int drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
 {
-     int ret = 0;
-     if (ctx && ctx->mOverlayLibObject) {
+    if (ctx && ctx->mOverlayLibObject) {
         private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(ctx->device.common.module);
         if (!hwcModule) {
             LOGE("drawLayerUsingLayer null module ");
             return -1;
         }
-
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
-        int orientation = 0;
-        if (OVERLAY_CHANNEL_UP == ovLibObject->getChannelStatus())
-            ovLibObject->getOrientation(orientation);
-
-        if ((OVERLAY_CHANNEL_DOWN == ovLibObject->getChannelStatus())
-            || (layer->transform != orientation) ||
-            (hnd->flags & private_handle_t::PRIV_FLAGS_FORMAT_CHANGED)) {
-            // Overlay channel is not started, or we have an orientation change or there is a
-            // format change, call setSource to open the overlay if necessary
-            ret = ovLibObject->setSource(hnd->width, hnd->height, hnd->format, layer->transform,
-                                     (ovLibObject->getHDMIStatus()?true:false), false);
-            if (!ret) {
-                LOGE("drawLayerUsingOverlay setSource failed");
-                return -1;
-            }
-            // Reset this flag so that we don't keep opening and closing channels unnecessarily
-            hnd->flags &= ~private_handle_t::PRIV_FLAGS_FORMAT_CHANGED;
-        } else {
-            // The overlay goemetry may have changed, we only need to update the overlay
-            ret = ovLibObject->updateOverlaySource(hnd->width, hnd->height, hnd->format,
-                                                   layer->transform);
-            if (!ret) {
-                LOGE("drawLayerUsingOverlay updateOverlaySource failed");
-                return -1;
-            }
-        }
-
-        hwc_rect_t sourceCrop = layer->sourceCrop;
-        ret = ovLibObject->setCrop(sourceCrop.left, sourceCrop.top,
-                                  (sourceCrop.right - sourceCrop.left),
-                                  (sourceCrop.bottom-sourceCrop.top));
-        if (!ret) {
-            LOGE("drawLayerUsingOverlay setCrop failed");
-            return -1;
-        }
-
-        if (layer->flags == HWC_USE_ORIGINAL_RESOLUTION) {
-            framebuffer_device_t* fbDev = hwcModule->fbDevice;
-            ret = ovLibObject->setPosition(0, 0,
-                                           fbDev->width, fbDev->height);
-        } else {
-            hwc_rect_t displayFrame = layer->displayFrame;
-            ret = ovLibObject->setPosition(displayFrame.left, displayFrame.top,
-                                       (displayFrame.right - displayFrame.left),
-                                       (displayFrame.bottom-displayFrame.top));
-        }
-        if (!ret) {
-            LOGE("drawLayerUsingOverlay setPosition failed");
-            return -1;
-        }
-
-        ovLibObject->getOrientation(orientation);
-        if (orientation != layer->transform)
-            ret = ovLibObject->setParameter(OVERLAY_TRANSFORM, layer->transform);
-        if (!ret) {
-            LOGE("drawLayerUsingOverlay setParameter failed transform %x", layer->transform);
-            return -1;
-        }
-
+        int ret = 0;
         ret = ovLibObject->queueBuffer(hnd);
         if (!ret) {
             LOGE("drawLayerUsingOverlay queueBuffer failed");
             return -1;
         }
-        return 0;
     }
-    return -1;
+    return 0;
 }
 
 static int hwc_set(hwc_composer_device_t *dev,
@@ -472,7 +506,6 @@ static int hwc_set(hwc_composer_device_t *dev,
         if (list->hwLayers[i].flags == HWC_SKIP_LAYER) {
             continue;
         }
-
         if (list->hwLayers[i].compositionType == HWC_USE_OVERLAY) {
             drawLayerUsingOverlay(ctx, &(list->hwLayers[i]));
         } else if (list->flags & HWC_SKIP_COMPOSITION) {
