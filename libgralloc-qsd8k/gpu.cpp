@@ -181,10 +181,6 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
     if (usage & GRALLOC_USAGE_HW_2D) {
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
     }
-#else
-    if (usage & GRALLOC_USAGE_PRIVATE_PMEM){
-        flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
-    }
 #endif
     if ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) || (usage & GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL)) {
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP;

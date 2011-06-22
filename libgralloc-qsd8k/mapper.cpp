@@ -291,7 +291,7 @@ int gralloc_unlock(gralloc_module_t const* module,
             err = ioctl( hnd->fd, PMEM_CLEAN_CACHES,  &pmem_addr);
         } else if ((hnd->flags & private_handle_t::PRIV_FLAGS_USES_ASHMEM)) {
             unsigned long addr = hnd->base + hnd->offset;
-            err = ioctl(hnd->fd, ASHMEM_CACHE_CLEAN_RANGE, NULL);
+            err = ioctl(hnd->fd, ASHMEM_CACHE_FLUSH_RANGE, NULL);
         }         
 
         LOGE_IF(err < 0, "cannot flush handle %p (offs=%x len=%x)\n",
