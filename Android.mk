@@ -45,6 +45,10 @@ LOCAL_C_INCLUDES += $(LOCAL_PATH)/../liboverlay
 LOCAL_SHARED_LIBRARIES += liboverlay
 endif
 
+ifeq ($(TARGET_USES_SF_BYPASS),true)
+LOCAL_CFLAGS += -DSF_BYPASS
+endif
+
 ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
 LOCAL_CFLAGS += -DUSE_ASHMEM
 endif

@@ -505,6 +505,9 @@ static int fb_stopOrigResDisplay(struct framebuffer_device_t* dev) {
     return ret;
 }
 
+#endif
+
+#if defined(SF_BYPASS)
 static int fb_postBypassBuffer(struct framebuffer_device_t* dev,
                                  buffer_handle_t buffer, int w,
                                  int h, int format, int orientation, int isHPDON)
@@ -544,6 +547,18 @@ static int fb_closeBypass(struct framebuffer_device_t* dev)
         OverlayUI* pobjOverlay = m->pobjOverlayUI;
         pobjOverlay->closeChannel();
         return NO_ERROR;
+    }
+
+    return NO_ERROR;
+}
+
+static int fb_copyBypassBuffer(struct framebuffer_device_t* dev)
+{
+    private_module_t* m = reinterpret_cast<private_module_t*>(
+            dev->common.module);
+    if (m->pobjOverlayUI) {
+        OverlayUI* pobjOverlay = m->pobjOverlayUI;
+        return (pobjOverlay->copyBuffer());
     }
 
     return NO_ERROR;
@@ -946,11 +961,14 @@ int mapFrameBufferLocked(struct private_module_t* module)
     module->hdmiStateChanged = false;
     pthread_t hdmiUIThread;
     pthread_create(&hdmiUIThread, NULL, &hdmi_ui_loop, (void *) module);
-
-    module->pobjOverlayUI = new OverlayUI();
     module->pOrigResPanel = new OverlayOrigRes<OverlayUI::FB0>();
     module->pOrigResTV = new OverlayOrigRes<OverlayUI::FB1>();
     module->isOrigResStarted = false;
+
+#endif
+
+#if defined(SF_BYPASS)
+    module->pobjOverlayUI = new OverlayUI();
 #endif
 
     return 0;
@@ -976,11 +994,13 @@ static int fb_close(struct hw_device_t *dev)
     m->exitHDMIUILoop = true;
     pthread_cond_signal(&(m->overlayPost));
     pthread_mutex_unlock(&m->overlayLock);
-
-    delete m->pobjOverlayUI;
-    m->pobjOverlayUI = 0;
     delete m->pOrigResPanel;
     delete m->pOrigResTV;
+#endif
+
+#if defined(SF_BYPASS)
+    delete m->pobjOverlayUI;
+    m->pobjOverlayUI = 0;
 #endif
     if (ctx) {
         free(ctx);
@@ -1016,11 +1036,15 @@ int fb_device_open(hw_module_t const* module, const char* name,
         dev->device.orientationChanged = fb_orientationChanged;
         dev->device.videoOverlayStarted = fb_videoOverlayStarted;
         dev->device.enableHDMIOutput = fb_enableHDMIOutput;
-        dev->device.postBypassBuffer = fb_postBypassBuffer;
-        dev->device.closeBypass      = fb_closeBypass;
         dev->device.postOrigResBuffer = fb_postOrigResBuffer;
         dev->device.startOrigResDisplay = fb_startOrigResDisplay;
         dev->device.stopOrigResDisplay = fb_stopOrigResDisplay;
+#endif
+
+#if defined(SF_BYPASS)
+        dev->device.postBypassBuffer = fb_postBypassBuffer;
+        dev->device.closeBypass      = fb_closeBypass;
+        dev->device.copyBypassBuffer = fb_copyBypassBuffer;
 #endif
 
         private_module_t* m = (private_module_t*)module;

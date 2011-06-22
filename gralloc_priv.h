@@ -281,16 +281,18 @@ struct private_module_t {
     bool hdmiStateChanged;
     pthread_mutex_t overlayLock;
     pthread_cond_t overlayPost;
+    OverlayOrigRes<OverlayUI::FB0>* pOrigResPanel;
+    OverlayOrigRes<OverlayUI::FB1>* pOrigResTV;
+    bool isOrigResStarted;
+    ThreadShared ts;
+#endif
 
+#if defined(__cplusplus) && defined(SF_BYPASS)
     /*
      * Comp. bypass specific variables
      * pobjOverlayUI - UI overlay channel for comp. bypass.
      */
     OverlayUI* pobjOverlayUI;
-    OverlayOrigRes<OverlayUI::FB0>* pOrigResPanel;
-    OverlayOrigRes<OverlayUI::FB1>* pOrigResTV;
-    bool isOrigResStarted;
-    ThreadShared ts;
 #endif
 };
 
