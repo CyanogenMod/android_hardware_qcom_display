@@ -408,8 +408,9 @@ int decideBufferHandlingMechanism(int format, const char *compositionUsed, int h
         *needConversion = FALSE;
         *useBufferDirectly = FALSE;
     } else if(strncmp(compositionUsed, "gpu", 3) == 0) {
-        if(format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED
-           || format == HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO) {
+        if(format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED  ||
+           format == HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO ||
+           format == HAL_PIXEL_FORMAT_YV12) {
             *needConversion = FALSE;
             *useBufferDirectly = TRUE;
         } else if(hasBlitEngine) {
@@ -419,7 +420,8 @@ int decideBufferHandlingMechanism(int format, const char *compositionUsed, int h
     } else if ((strncmp(compositionUsed, "mdp", 3) == 0) ||
                (strncmp(compositionUsed, "c2d", 3) == 0)){
         if(format == HAL_PIXEL_FORMAT_YCbCr_420_SP ||
-           format == HAL_PIXEL_FORMAT_YCrCb_420_SP) {
+           format == HAL_PIXEL_FORMAT_YCrCb_420_SP ||
+           format == HAL_PIXEL_FORMAT_YV12) {
             *needConversion = FALSE;
             *useBufferDirectly = TRUE;
         } else if((strncmp(compositionUsed, "c2d", 3) == 0) &&
@@ -472,7 +474,8 @@ size_t calculateBufferSize(int width, int height, int format)
             break;
         }
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP: {
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YV12: {
             /* Camera and video YUV 420 semi-planar buffers are allocated   with
             size equal to w * h * 1.5 */
             int aligned_width = (width + 15) & ~15;
