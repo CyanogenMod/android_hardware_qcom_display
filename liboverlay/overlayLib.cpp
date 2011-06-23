@@ -46,44 +46,6 @@ int overlay::get_mdp_format(int format) {
     return -1;
 }
 
-int overlay::get_size(int format, int w, int h) {
-    int size, aligned_height, pitch;
-
-    size = w * h;
-    switch (format) {
-    case MDP_RGBA_8888:
-    case MDP_BGRA_8888:
-    case MDP_RGBX_8888:
-        size *= 4;
-        break;
-    case MDP_RGB_565:
-    case MDP_Y_CBCR_H2V1:
-        size *= 2;
-        break;
-    case MDP_Y_CBCR_H2V2:
-    case MDP_Y_CRCB_H2V2: {
-        int alignedw = ALIGN(w, 16);
-        int alignedh = h;
-        size = alignedw*alignedh +
-               (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
-        size = ALIGN(size, 4096);
-    } break;
-    case MDP_Y_CRCB_H2V2_TILE:
-        aligned_height = (h + 31) & ~31;
-        pitch = (w + 127) & ~127;
-        size = pitch * aligned_height;
-        size = (size + 8191) & ~8191;
-
-        aligned_height = ((h >> 1) + 31) & ~31;
-        size += pitch * aligned_height;
-        size = (size + 8191) & ~8191;
-        break;
-    default:
-        return 0;
-    }
-    return size;
-}
-
 int overlay::get_mdp_orientation(int rotation, int flip) {
     switch(flip) {
     case HAL_TRANSFORM_FLIP_V:
@@ -178,8 +140,10 @@ unsigned int overlay::getOverlayConfig (unsigned int format3D) {
 }
 
 Overlay::Overlay() : mChannelUP(false), mHDMIConnected(false),
-                     mS3DFormat(0), mWidth(0), mHeight(0),
-                     mCroppedSrcWidth(0), mCroppedSrcHeight(0) {
+                     mS3DFormat(0), mCroppedSrcWidth(0),
+                     mCroppedSrcHeight(0) {
+    mOVBufferInfo.width = mOVBufferInfo.height = 0;
+    mOVBufferInfo.format = mOVBufferInfo.size = 0;
 }
 
 Overlay::~Overlay() {
@@ -194,43 +158,47 @@ int Overlay::getFBHeight(int channel) const {
     return objOvCtrlChannel[channel].getFBHeight();
 }
 
-bool Overlay::startChannel(int w, int h, int format, int fbnum,
+bool Overlay::startChannel(const overlay_buffer_info& info, int fbnum,
                               bool norot, bool uichannel,
                               unsigned int format3D, int channel,
                               bool ignoreFB, int num_buffers) {
     int zorder = 0;
-    mCroppedSrcWidth = w;
-    mCroppedSrcHeight = h;
+    int format = getColorFormat(info.format);
+    mCroppedSrcWidth = info.width;
+    mCroppedSrcHeight = info.height;
     if (format3D)
         zorder = channel;
-    mChannelUP = objOvCtrlChannel[channel].startControlChannel(w, h, format, fbnum,
-                                                   norot, uichannel, format3D, zorder, ignoreFB);
+    mChannelUP = objOvCtrlChannel[channel].startControlChannel(info.width,
+                                                       info.height, format, fbnum,
+                                                       norot, uichannel,
+                                                       format3D, zorder, ignoreFB);
     if (!mChannelUP) {
         LOGE("startChannel for fb%d failed", fbnum);
         return mChannelUP;
     }
+    objOvCtrlChannel[channel].setSize(info.size);
     return objOvDataChannel[channel].startDataChannel(objOvCtrlChannel[channel], fbnum,
                                             norot, uichannel, num_buffers);
 }
 
-bool Overlay::startChannelHDMI(int w, int h, int format, bool norot) {
+bool Overlay::startChannelHDMI(const overlay_buffer_info& info, bool norot) {
 
-    bool ret = startChannel(w, h, format, FRAMEBUFFER_0, norot);
+    bool ret = startChannel(info, FRAMEBUFFER_0, norot);
     if(ret) {
-        ret = startChannel(w, h, format, FRAMEBUFFER_1, true, 0, 0, VG1_PIPE);
+        ret = startChannel(info, FRAMEBUFFER_1, true, 0, 0, VG1_PIPE);
     }
     return ret;
 }
 
-bool Overlay::startChannelS3D(int w, int h, int format, bool norot) {
+bool Overlay::startChannelS3D(const overlay_buffer_info& info, bool norot) {
     bool ret = false;
     // Start  both the channels for the S3D content
     if (mS3DFormat & HAL_3D_OUT_MONOSCOPIC_MASK)
-        ret = startChannel(w, h, format, FRAMEBUFFER_0, norot, 0, mS3DFormat, VG0_PIPE);
+        ret = startChannel(info, FRAMEBUFFER_0, norot, 0, mS3DFormat, VG0_PIPE);
     else
-        ret = startChannel(w, h, format, FRAMEBUFFER_1, norot, 0, mS3DFormat, VG0_PIPE);
+        ret = startChannel(info, FRAMEBUFFER_1, norot, 0, mS3DFormat, VG0_PIPE);
     if (ret) {
-        ret = startChannel(w, h, format, FRAMEBUFFER_1, norot, 0, mS3DFormat, VG1_PIPE);
+        ret = startChannel(info, FRAMEBUFFER_1, norot, 0, mS3DFormat, VG1_PIPE);
     }
     if (!ret) {
         closeChannel();
@@ -253,8 +221,10 @@ bool Overlay::closeChannel() {
     }
     mChannelUP = false;
     mS3DFormat = 0;
-    mWidth = 0;
-    mHeight = 0;
+    mOVBufferInfo.width = 0;
+    mOVBufferInfo.height = 0;
+    mOVBufferInfo.format = 0;
+    mOVBufferInfo.size = 0;
     return true;
 }
 
@@ -301,35 +271,33 @@ bool Overlay::setPositionS3D(int x, int y, uint32_t w, uint32_t h) {
     return ret;
 }
 
-bool Overlay::updateOverlaySource(uint32_t w, uint32_t h, int format, int orientation) {
+bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientation) {
     if (hasHDMIStatusChanged()) {
-        return setSource(w, h, format, orientation, mHDMIConnected);
+        return setSource(info, orientation, mHDMIConnected);
     }
 
     bool ret = false;
-    if (w == mWidth && h == mHeight) {
+    if (info.width == mOVBufferInfo.width &&
+        info.height == mOVBufferInfo.height) {
         objOvDataChannel[0].updateDataChannel(0, 0);
         return true;
     }
 
     // Set the overlay source info
-    if (objOvCtrlChannel[0].isChannelUP()) {
-        ret = objOvCtrlChannel[0].updateOverlaySource(w, h, format, orientation);
-        if (!ret) {
-            LOGE("objOvCtrlChannel[0].updateOverlaySource failed");
-            return false;
+    for (int i = 0; i < NUM_CHANNELS; i++) {
+        if (objOvCtrlChannel[i].isChannelUP()) {
+            ret = objOvCtrlChannel[i].updateOverlaySource(info, orientation);
+            if (!ret) {
+                LOGE("objOvCtrlChannel[%d].updateOverlaySource failed", i);
+                return false;
+            }
+            objOvCtrlChannel[i].setSize(info.size);
+            int updateDataChannel = orientation ? 1:0;
+            ret = objOvDataChannel[i].updateDataChannel(updateDataChannel, info.size);
         }
-        int updateDataChannel = orientation ? 1:0;
-        int size = get_size(get_mdp_format(format), w, h);
-        ret = objOvDataChannel[0].updateDataChannel(updateDataChannel, size);
-
-        if (ret && objOvCtrlChannel[1].isChannelUP())
-            ret = objOvCtrlChannel[1].updateOverlaySource(w, h, format, orientation);
     }
-
     if (ret) {
-        mWidth = w;
-        mHeight = h;
+        mOVBufferInfo = info;
     } else
         LOGE("update failed");
     return ret;
@@ -351,23 +319,28 @@ int Overlay::hasHDMIStatusChanged() {
     return hdmiChanged;
 }
 
-bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
-                        bool hdmiConnected, bool ignoreFB, int num_buffers) {
-    // Separate the color format from the 3D format.
-    // If there is 3D content; the effective format passed by the client is:
-    // effectiveFormat = 3D_IN | 3D_OUT | ColorFormat
-    unsigned int format3D = FORMAT_3D(format);
-    int colorFormat = COLOR_FORMAT(format);
+int Overlay::getS3DFormat(int format) {
+    int format3D = FORMAT_3D(format);
     int fIn3D = FORMAT_3D_INPUT(format3D); // MSB 2 bytes are input format
     int fOut3D = FORMAT_3D_OUTPUT(format3D); // LSB 2 bytes are output format
     format3D = fIn3D | fOut3D;
-    // Use the same in/out format if not mentioned
     if (!fIn3D) {
         format3D |= fOut3D << SHIFT_3D; //Set the input format
     }
     if (!fOut3D) {
         format3D |= fIn3D >> SHIFT_3D; //Set the output format
     }
+    return format3D;
+}
+
+bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
+                        bool hdmiConnected, bool ignoreFB, int num_buffers) {
+    // Separate the color format from the 3D format.
+    // If there is 3D content; the effective format passed by the client is:
+    // effectiveFormat = 3D_IN | 3D_OUT | ColorFormat
+    unsigned int format3D = getS3DFormat(info.format);
+    int colorFormat = getColorFormat(info.format);
+
     if (format3D) {
         bool isTV3D = false;
         if (hdmiConnected)
@@ -385,21 +358,20 @@ bool Overlay::setSource(uint32_t w, uint32_t h, int format, int orientation,
        s3dChanged = 0x10;
 
     stateChanged = s3dChanged|hasHDMIStatusChanged();
-    if (stateChanged || !objOvCtrlChannel[0].setSource(w, h, colorFormat, orientation, ignoreFB)) {
+    if (stateChanged || !objOvCtrlChannel[0].setSource(info.width, info.height, colorFormat, orientation, ignoreFB)) {
         closeChannel();
         mS3DFormat = format3D;
 
-        mWidth = w;
-        mHeight = h;
+        mOVBufferInfo = info;
         if (mHDMIConnected) {
             if (mS3DFormat) {
                 // Start both the VG pipes
-                return startChannelS3D(w, h, colorFormat, !orientation);
+                return startChannelS3D(info, !orientation);
             } else {
-                return startChannelHDMI(w, h, colorFormat, !orientation);
+                return startChannelHDMI(info, !orientation);
             }
         } else {
-            return startChannel(w, h, colorFormat, 0, !orientation,
+            return startChannel(info, 0, !orientation,
                                 false, 0, VG0_PIPE, ignoreFB, num_buffers);
         }
     }
@@ -481,6 +453,10 @@ bool Overlay::queueBuffer(uint32_t offset, int channel) {
 bool Overlay::queueBuffer(buffer_handle_t buffer) {
     private_handle_t const* hnd = reinterpret_cast
                                    <private_handle_t const*>(buffer);
+    if (!hnd) {
+        LOGE("Overlay::queueBuffer invalid handle");
+        return false;
+    }
     const size_t offset = hnd->offset;
     const int fd = hnd->fd;
     bool ret = true;
@@ -659,9 +635,13 @@ bool OverlayControlChannel::openDevices(int fbnum) {
     return true;
 }
 
-bool OverlayControlChannel::setOverlayInformation(int w, int h,
-                                  int format, int flags, int orientation, int zorder,
+bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& info,
+                                  int flags, int orientation, int zorder,
                                   bool ignoreFB, int requestType) {
+    int w = info.width;
+    int h = info.height;
+    int format = info.format;
+
     mOVInfo.src.width  = w;
     mOVInfo.src.height = h;
     mOVInfo.src_rect.x = 0;
@@ -704,13 +684,16 @@ bool OverlayControlChannel::setOverlayInformation(int w, int h,
         if (!ignoreFB)
             mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
     }
-    mSize = get_size(format, w, h);
     return true;
 }
 
-bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
-                           int format, int orientation, int requestType) {
+bool OverlayControlChannel::startOVRotatorSessions(
+                           const overlay_buffer_info& info,
+                           int orientation, int requestType) {
     bool ret = true;
+    int w = info.width;
+    int h = info.height;
+    int format = info.format;
 
     if (orientation) {
         mRotInfo.src.format = format;
@@ -763,13 +746,18 @@ bool OverlayControlChannel::startOVRotatorSessions(int w, int h,
     return ret;
 }
 
-bool OverlayControlChannel::updateOverlaySource(uint32_t w, uint32_t h, int format, int orientation)
+bool OverlayControlChannel::updateOverlaySource(const overlay_buffer_info& info,
+                                                int orientation)
 {
-    int hw_format = get_mdp_format(format);
-    if (!setOverlayInformation(w, h, hw_format, 0, orientation, 0, 0, UPDATE_REQUEST))
+    int hw_format = get_mdp_format(info.format);
+    overlay_buffer_info ovBufInfo;
+    ovBufInfo.width = info.width;
+    ovBufInfo.height = info.height;
+    ovBufInfo.format = hw_format;
+    if (!setOverlayInformation(ovBufInfo, 0, orientation, 0, 0, UPDATE_REQUEST))
         return false;
 
-    return startOVRotatorSessions(w, h, hw_format, orientation, UPDATE_REQUEST);
+    return startOVRotatorSessions(ovBufInfo, orientation, UPDATE_REQUEST);
 }
 
 bool OverlayControlChannel::startControlChannel(int w, int h,
@@ -806,10 +794,14 @@ bool OverlayControlChannel::startControlChannel(int w, int h,
         return false;
 
     int orientation = mNoRot ? 0: 1;
-    if (!setOverlayInformation(w, h, hw_format, flags, orientation, zorder, ignoreFB, NEW_REQUEST))
+    overlay_buffer_info ovBufInfo;
+    ovBufInfo.width = w;
+    ovBufInfo.height = h;
+    ovBufInfo.format = hw_format;
+    if (!setOverlayInformation(ovBufInfo, flags, orientation, zorder, ignoreFB, NEW_REQUEST))
         return false;
 
-    return startOVRotatorSessions(w, h, hw_format, orientation, NEW_REQUEST);
+    return startOVRotatorSessions(ovBufInfo, orientation, NEW_REQUEST);
 }
 
 bool OverlayControlChannel::closeControlChannel() {

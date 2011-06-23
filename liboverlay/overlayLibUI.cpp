@@ -299,7 +299,7 @@ status_t OVHelper::getOVInfo(mdp_overlay& ovInfo) {
 }
 
 status_t Rotator::startRotSession(msm_rotator_img_info& rotInfo,
-                                               int numBuffers) {
+                                   int size, int numBuffers) {
     status_t ret = ALREADY_EXISTS;
     if (mSessionID == NO_INIT && mFD == NO_INIT) {
         mNumBuffers = numBuffers;
@@ -322,7 +322,7 @@ status_t Rotator::startRotSession(msm_rotator_img_info& rotInfo,
             return NO_INIT;
         }
 
-        mSize = get_size(rotInfo.src.format, rotInfo.src.width, rotInfo.src.height);
+        mSize = size;
         mPmemAddr = (void *) mmap(NULL, mSize* mNumBuffers, PROT_READ | PROT_WRITE,
                                                      MAP_SHARED, mPmemFD, 0);
         if (mPmemAddr == MAP_FAILED) {
@@ -379,14 +379,14 @@ status_t OverlayUI::closeChannel() {
     return NO_ERROR;
 }
 
-status_t OverlayUI::setSource(int w, int h, int format, int orientation,
+status_t OverlayUI::setSource(const overlay_buffer_info& info, int orientation,
                                              bool useVGPipe, bool ignoreFB,
                                              int fbnum, int zorder) {
     status_t ret = NO_INIT;
 
-    int format3D = FORMAT_3D(format);
-    int colorFormat = COLOR_FORMAT(format);
-    format = get_mdp_format(colorFormat);
+    int format3D = FORMAT_3D(info.format);
+    int colorFormat = COLOR_FORMAT(info.format);
+    int format = get_mdp_format(colorFormat);
 
     if (format3D || !isRGBType(format))
         return ret;
@@ -399,7 +399,7 @@ status_t OverlayUI::setSource(int w, int h, int format, int orientation,
         if (mobjOVHelper.getOVInfo(ov) == NO_ERROR) {
             if (mOrientation == orientation &&
                    mFBNum == fbnum &&
-                   checkOVState(w, h, format, orientation, zorder, ov))
+                   checkOVState(info.width, info.height, format, orientation, zorder, ov))
                 return NO_ERROR;
             else
                 mChannelState = PENDING_CLOSE;
@@ -412,7 +412,7 @@ status_t OverlayUI::setSource(int w, int h, int format, int orientation,
     mOrientation = orientation;
     mdp_overlay ovInfo;
     msm_rotator_img_info rotInfo;
-    setupOvRotInfo(w, h, format, orientation, ovInfo, rotInfo);
+    setupOvRotInfo(info.width, info.height, format, orientation, ovInfo, rotInfo);
 
     int flags = 0;
     if (ignoreFB)
@@ -431,19 +431,20 @@ status_t OverlayUI::setSource(int w, int h, int format, int orientation,
     if (zorder != NO_INIT)
         ovInfo.z_order = zorder;
 
-    ret = startChannel(fbnum, ovInfo, rotInfo);
+    ret = startChannel(fbnum, ovInfo, rotInfo, info.size);
     return ret;
 }
 
 status_t OverlayUI::startChannel(int fbnum, mdp_overlay& ovInfo,
-                                      msm_rotator_img_info& rotInfo) {
+                                 msm_rotator_img_info& rotInfo, int size) {
     status_t ret = BAD_VALUE;
     if (mChannelState == UP)
         return ret;
 
     ret = mobjOVHelper.startOVSession(ovInfo, fbnum);
-    if (ret == NO_ERROR && mOrientation)
-        ret = mobjRotator.startRotSession(rotInfo);
+    if (ret == NO_ERROR && mOrientation) {
+        ret = mobjRotator.startRotSession(rotInfo, size);
+    }
 
     if (ret == NO_ERROR) {
         mChannelState = UP;

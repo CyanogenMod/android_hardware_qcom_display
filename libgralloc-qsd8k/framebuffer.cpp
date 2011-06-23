@@ -227,9 +227,18 @@ static void *hdmi_ui_loop(void *ptr)
                 pTemp->closeChannel();
             else if (m->enableHDMIOutput && !m->videoOverlay) {
                 if (!pTemp->isChannelUP()) {
-                   int alignedW = ALIGN(m->info.xres, 32); 
-                   if (pTemp->startChannel(alignedW, m->info.yres,
-                                 m->fbFormat, 1, false, true, 0, VG0_PIPE, true)) {
+                   int alignedW = ALIGN(m->info.xres, 32);
+
+                   private_handle_t const* hnd =
+                      reinterpret_cast<private_handle_t const*>(m->framebuffer);
+                   overlay_buffer_info info;
+                   info.width = alignedW;
+                   info.height = hnd->height;
+                   info.format = hnd->format;
+                   info.size = hnd->size;
+
+                   if (pTemp->startChannel(info, 1,
+                                           false, true, 0, VG0_PIPE, true)) {
                         pTemp->setFd(m->framebuffer->fd);
                         pTemp->setCrop(0, 0, m->info.xres, m->info.yres);
                    } else

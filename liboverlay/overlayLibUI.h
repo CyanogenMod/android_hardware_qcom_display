@@ -107,7 +107,8 @@ class Rotator {
 public:
     explicit Rotator() : mFD(NO_INIT), mSessionID(NO_INIT), mPmemFD(-1) { };
     ~Rotator() { closeRotSession(); }
-    status_t startRotSession(msm_rotator_img_info& rotInfo, int numBuffers = max_num_buffers);
+    status_t startRotSession(msm_rotator_img_info& rotInfo, int size,
+                             int numBuffers = max_num_buffers);
     status_t closeRotSession();
     status_t rotateBuffer(msm_rotator_data_info& rotData);
 };
@@ -128,14 +129,14 @@ class OverlayUI {
     OverlayUI& operator=(const OverlayUI& objOverlay);
 
     status_t startChannel(int fbnum, mdp_overlay& ovInfo,
-                               msm_rotator_img_info& rotInfo);
+                               msm_rotator_img_info& rotInfo, int size);
 public:
 
     enum fbnum_t { FB0, FB1 };
 
     explicit OverlayUI() : mChannelState(CLOSED), mOrientation(NO_INIT), mFBNum(NO_INIT) { };
     ~OverlayUI() { closeChannel(); };
-    status_t setSource(int w, int h, int format, int orientation,
+    status_t setSource(const overlay_buffer_info& info, int orientation,
                           bool useVGPipe = false, bool ignoreFB = true,
                           int fbnum = FB0, int zorder = NO_INIT);
     status_t setPosition(int x, int y, int w, int h) {

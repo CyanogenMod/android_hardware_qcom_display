@@ -199,6 +199,12 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer) {
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
         int orientation = 0;
+        overlay_buffer_info info;
+        info.width = hnd->width;
+        info.height = hnd->height;
+        info.format = hnd->format;
+        info.size = hnd->size;
+
         if (OVERLAY_CHANNEL_UP == ovLibObject->getChannelStatus())
             ovLibObject->getOrientation(orientation);
 
@@ -208,9 +214,8 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer) {
             // Overlay channel is not started, or we have an orientation change
             // or there is a format change, call setSource to open the overlay
             // if necessary
-            ret = ovLibObject->setSource(hnd->width, hnd->height, hnd->format,
-                    layer->transform, (ovLibObject->getHDMIStatus()?true:false),
-                    false);
+            ret = ovLibObject->setSource(info, layer->transform,
+                            (ovLibObject->getHDMIStatus()?true:false), false);
             if (!ret) {
                 LOGE("prepareOverlay setSource failed");
                 return -1;
@@ -221,8 +226,7 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer) {
         } else {
             // The overlay goemetry may have changed, we only need to update the
             // overlay
-            ret = ovLibObject->updateOverlaySource(hnd->width, hnd->height,
-                    hnd->format, layer->transform);
+            ret = ovLibObject->updateOverlaySource(info, layer->transform);
             if (!ret) {
                 LOGE("prepareOverlay updateOverlaySource failed");
                 return -1;
@@ -475,6 +479,7 @@ static int drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
         int ret = 0;
+
         ret = ovLibObject->queueBuffer(hnd);
         if (!ret) {
             LOGE("drawLayerUsingOverlay queueBuffer failed");
