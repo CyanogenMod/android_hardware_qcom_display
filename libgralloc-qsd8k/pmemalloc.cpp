@@ -277,6 +277,15 @@ int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
         device = DEVICE_PMEM_ADSP;
     } else if (usage & GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL) {
         device = DEVICE_PMEM_SMIPOOL;
+    } else if ((usage & GRALLOC_USAGE_EXTERNAL_DISP) ||
+               (usage & GRALLOC_USAGE_PROTECTED)) {
+        int tempFd = deps.open(DEVICE_PMEM_SMIPOOL, openFlags, 0);
+        if (tempFd < 0) {
+            device = DEVICE_PMEM_ADSP;
+        } else {
+            close(tempFd);
+            device = DEVICE_PMEM_SMIPOOL;
+        }
     } else {
         LOGE("Invalid device");
         return -EINVAL;

@@ -182,7 +182,8 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
     }
 #endif
-    if ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) || (usage & GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL)) {
+    if ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) || (usage & GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL)
+        || (usage & GRALLOC_USAGE_EXTERNAL_DISP) || (usage & GRALLOC_USAGE_PROTECTED)) {
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP;
         flags &= ~private_handle_t::PRIV_FLAGS_USES_PMEM;
     }
@@ -341,6 +342,12 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
 
     size = (bufferSize >= size)? bufferSize : size;
 
+    // All buffers marked as protected or for external
+    // display need to go to overlay
+    if ((usage & GRALLOC_USAGE_EXTERNAL_DISP) ||
+        (usage & GRALLOC_USAGE_PROTECTED)) {
+            bufferType = BUFFER_TYPE_VIDEO;
+    }
     int err;
     if (usage & GRALLOC_USAGE_HW_FB) {
         err = gralloc_alloc_framebuffer(size, usage, pHandle);
