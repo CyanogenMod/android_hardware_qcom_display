@@ -42,6 +42,8 @@ int overlay::get_mdp_format(int format) {
         return MDP_Y_CBCR_H2V2;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
         return MDP_Y_CRCB_H2V2_TILE;
+    case HAL_PIXEL_FORMAT_YV12:
+        return MDP_Y_CR_CB_H2V2;
     }
     return -1;
 }
@@ -320,6 +322,11 @@ int Overlay::hasHDMIStatusChanged() {
 }
 
 int Overlay::getS3DFormat(int format) {
+    // The S3D is part of the HAL_PIXEL_FORMAT_YV12 value. Add
+    // an explicit check for the format
+    if (format == HAL_PIXEL_FORMAT_YV12) {
+        return 0;
+    }
     int format3D = FORMAT_3D(format);
     int fIn3D = FORMAT_3D_INPUT(format3D); // MSB 2 bytes are input format
     int fOut3D = FORMAT_3D_OUTPUT(format3D); // LSB 2 bytes are output format
@@ -773,7 +780,9 @@ bool OverlayControlChannel::startControlChannel(int w, int h,
     int hw_format;
     int flags = 0;
     int colorFormat = format;
-    if (format & INTERLACE_MASK) {
+    // The interlace mask is part of the HAL_PIXEL_FORMAT_YV12 value. Add
+    // an explicit check for the format
+    if ((format != HAL_PIXEL_FORMAT_YV12) && (format & INTERLACE_MASK)) {
         flags |= MDP_DEINTERLACE;
 
         // Get the actual format

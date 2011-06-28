@@ -259,7 +259,7 @@ void gpu_context_t::getGrallocInformationFromFormat(int inputFormat, int *colorF
     *colorFormat = inputFormat;
 
     if (inputFormat == HAL_PIXEL_FORMAT_YV12) {
-        *bufferType = BUFFER_TYPE_UI; // There is no overlay support for this format yet.
+        *bufferType = BUFFER_TYPE_VIDEO;
     } else if (inputFormat & S3D_FORMAT_MASK) {
         // S3D format
         *colorFormat = COLOR_FORMAT(inputFormat);

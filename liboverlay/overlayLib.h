@@ -265,7 +265,8 @@ private:
     bool setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int channel);
     bool queueBuffer(int fd, uint32_t offset, int channel);
     int  hasHDMIStatusChanged();
-    int getColorFormat(int format) { return COLOR_FORMAT(format); }
+    int getColorFormat(int format) { return (format == HAL_PIXEL_FORMAT_YV12) ?
+                                            format : COLOR_FORMAT(format); }
     int getS3DFormat(int format);
 };
 
