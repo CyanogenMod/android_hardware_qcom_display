@@ -68,12 +68,14 @@ class gpu_context_t : public alloc_device_t {
     static int gralloc_alloc_size(alloc_device_t* dev, int w, int h, int format,
             int usage, buffer_handle_t* pHandle, int* pStride, int bufferSize);
     static int gralloc_close(struct hw_device_t *dev);
+    int get_composition_type() const { return compositionType; }
 
  private:
 
     Deps& deps;
     PmemAllocator& pmemAllocator;
     PmemAllocator& pmemAdspAllocator;
+    int compositionType;
     int alloc_ashmem_buffer(size_t size, unsigned int postfix, void** pBase,
             int* pOffset, int* pFd);
     void getGrallocInformationFromFormat(int inputFormat, int *colorFormat, int *bufferType);

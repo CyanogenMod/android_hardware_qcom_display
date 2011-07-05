@@ -20,6 +20,8 @@
 
 #include <sys/mman.h>
 
+#include <cutils/properties.h>
+
 #include "gr.h"
 #include "gpu.h"
 
@@ -36,6 +38,28 @@ gpu_context_t::gpu_context_t(Deps& deps, PmemAllocator& pmemAllocator,
 {
     // Zero out the alloc_device_t
     memset(static_cast<alloc_device_t*>(this), 0, sizeof(alloc_device_t));
+
+    char property[PROPERTY_VALUE_MAX];
+    if (property_get("debug.sf.hw", property, NULL) > 0) {
+        if(atoi(property) == 0) {
+            //debug.sf.hw = 0
+            compositionType = CPU_COMPOSITION;
+        } else { //debug.sf.hw = 1
+            // Get the composition type
+            property_get("debug.composition.type", property, NULL);
+            if (property == NULL) {
+                compositionType = GPU_COMPOSITION;
+            } else if ((strncmp(property, "mdp", 3)) == 0) {
+                compositionType = MDP_COMPOSITION;
+            } else if ((strncmp(property, "c2d", 3)) == 0) {
+                compositionType = C2D_COMPOSITION;
+            } else {
+                compositionType = GPU_COMPOSITION;
+            }
+        }
+    } else { //debug.sf.hw is not set. Use cpu composition
+        compositionType = CPU_COMPOSITION;
+    }
 
     // Initialize the procs
     common.tag     = HARDWARE_DEVICE_TAG;
@@ -181,6 +205,17 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
     if (usage & GRALLOC_USAGE_HW_2D) {
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
     }
+#else
+    // Enable use of PMEM only when MDP composition is used (and other conditions apply).
+    // Else fall back on using ASHMEM
+    if ((get_composition_type() == MDP_COMPOSITION) &&
+        ((usage & GRALLOC_USAGE_HW_TEXTURE) || (usage & GRALLOC_USAGE_HW_2D)) ) {
+        flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
+    }
+
+    if (usage & GRALLOC_USAGE_PRIVATE_PMEM) {
+        flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
+    }
 #endif
     if ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) || (usage & GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL)
         || (usage & GRALLOC_USAGE_EXTERNAL_DISP) || (usage & GRALLOC_USAGE_PROTECTED)) {
@@ -218,11 +253,18 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
 
         err = pma->alloc_pmem_buffer(size, usage, &base, &offset, &fd, format);
         if (err < 0) {
-            if (((usage & GRALLOC_USAGE_HW_MASK) == 0) &&
+            // Pmem allocation failed. Try falling back to ashmem iff we are:
+            // a. not using MDP composition
+            // b. not allocating memory for a buffer to be used by overlays
+            // c. The client has not explicitly requested a PMEM buffer
+            if ((get_composition_type() != MDP_COMPOSITION) &&
+                (bufferType != BUFFER_TYPE_VIDEO) &&
+                ((usage & GRALLOC_USAGE_PRIVATE_PMEM) == 0) &&
                 ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) == 0)) {
                 // the caller didn't request PMEM, so we can try something else
                 flags &= ~private_handle_t::PRIV_FLAGS_USES_PMEM;
                 err = 0;
+                LOGE("Pmem allocation failed. Trying ashmem");
                 goto try_ashmem;
             } else {
                 LOGE("couldn't open pmem (%s)", strerror(errno));
@@ -230,10 +272,12 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
         }
     } else {
 try_ashmem:
-        fd = deps.ashmem_create_region("gralloc-buffer", size);
-        if (fd < 0) {
-            LOGE("couldn't create ashmem (%s)", strerror(errno));
-            err = -errno;
+        err = alloc_ashmem_buffer(size, (unsigned int)pHandle, &base, &offset, &fd);
+        if (err >= 0) {
+            lockState |= private_handle_t::LOCK_STATE_MAPPED;
+            flags |= private_handle_t::PRIV_FLAGS_USES_ASHMEM;
+        } else {
+            LOGE("Ashmem fallback failed");
         }
     }
 

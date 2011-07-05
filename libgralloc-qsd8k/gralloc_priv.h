@@ -39,6 +39,14 @@ enum {
     /* gralloc usage bit indicating a pmem_adsp allocation should be used */
     GRALLOC_USAGE_PRIVATE_PMEM_ADSP = GRALLOC_USAGE_PRIVATE_0,
     GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL = GRALLOC_USAGE_PRIVATE_1,
+    GRALLOC_USAGE_PRIVATE_PMEM = GRALLOC_USAGE_PRIVATE_2,
+};
+
+enum {
+    GPU_COMPOSITION,
+    C2D_COMPOSITION,
+    MDP_COMPOSITION,
+    CPU_COMPOSITION,
 };
 
 /* numbers of max buffers for page flipping */
