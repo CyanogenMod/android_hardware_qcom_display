@@ -285,10 +285,12 @@ bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientati
         return true;
     }
 
+    // Disable rotation for the HDMI channel
+    int orient[2] = {orientation, 0};
     // Set the overlay source info
     for (int i = 0; i < NUM_CHANNELS; i++) {
         if (objOvCtrlChannel[i].isChannelUP()) {
-            ret = objOvCtrlChannel[i].updateOverlaySource(info, orientation);
+            ret = objOvCtrlChannel[i].updateOverlaySource(info, orient[i]);
             if (!ret) {
                 LOGE("objOvCtrlChannel[%d].updateOverlaySource failed", i);
                 return false;
@@ -682,6 +684,7 @@ bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& inf
     if (h > mFBHeight)
         mOVInfo.dst_rect.h = mFBHeight;
 
+    mOVInfo.user_data[0] = 0;
     if (requestType == NEW_REQUEST) {
         mOVInfo.id = MSMFB_NEW_REQUEST;
         mOVInfo.z_order = zorder;
@@ -725,9 +728,9 @@ bool OverlayControlChannel::startOVRotatorSessions(
         mRotInfo.dst_y = 0;
         mRotInfo.src_rect.x = 0;
         mRotInfo.src_rect.y = 0;
+        mRotInfo.rotations = 0;
 
         if (requestType == NEW_REQUEST) {
-            mRotInfo.rotations = 0;
             mRotInfo.enable = 0;
             if(mUIChannel)
                mRotInfo.enable = 1;
