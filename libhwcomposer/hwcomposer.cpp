@@ -127,6 +127,7 @@ static void dump_layer(hwc_layer_t const* l) {
 }
 
 static void hwc_enableHDMIOutput(hwc_composer_device_t *dev, bool enable) {
+#if defined HDMI_DUAL_DISPLAY
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
                                                            dev->common.module);
@@ -148,10 +149,11 @@ static void hwc_enableHDMIOutput(hwc_composer_device_t *dev, bool enable) {
                 fbDev->videoOverlayStarted(fbDev, false);
         }
     }
+#endif
 }
 
 static int hwc_updateOverlayStatus(hwc_context_t* ctx, int layerType) {
-
+#if defined HDMI_DUAL_DISPLAY
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
                                                            ctx->device.common.module);
     overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
@@ -180,6 +182,7 @@ static int hwc_updateOverlayStatus(hwc_context_t* ctx, int layerType) {
         ovLibObject->closeChannel();
         fbDev->videoOverlayStarted(fbDev, false);
     }
+#endif
     return 0;
 }
 
