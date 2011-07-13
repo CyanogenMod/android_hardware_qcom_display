@@ -112,6 +112,14 @@ class PmemAllocatorDepsDeviceImpl : public PmemUserspaceAllocator::Deps,
         return ioctl(fd, PMEM_UNMAP, &sub);
     }
 
+    virtual int cleanPmem(int fd, unsigned long base, int offset, size_t size) {
+        struct pmem_addr pmem_addr;
+        pmem_addr.vaddr = base;
+        pmem_addr.offset = offset;
+        pmem_addr.length = size;
+        return ioctl(fd, PMEM_CLEAN_INV_CACHES, &pmem_addr);
+    }
+
     virtual int getErrno() {
         return errno;
     }
