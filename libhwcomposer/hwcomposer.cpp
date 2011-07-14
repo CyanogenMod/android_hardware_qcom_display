@@ -49,7 +49,8 @@ enum {
     COMPOSITION_TYPE_GPU = 0,
     COMPOSITION_TYPE_MDP = 0x1,
     COMPOSITION_TYPE_C2D = 0x2,
-    COMPOSITION_TYPE_CPU = 0x4
+    COMPOSITION_TYPE_CPU = 0x4,
+    COMPOSITION_TYPE_DYN = 0x8
 };
 
 enum HWCCompositionType {
@@ -302,6 +303,65 @@ bool canSkipComposition(hwc_context_t* ctx, int yuvBufferCount, int currentLayer
     return false;
 }
 
+static bool isFullScreenUpdate(const framebuffer_device_t* fbDev, const hwc_layer_list_t* list) {
+
+    if(!fbDev) {
+       LOGE("ERROR: %s : fb device is invalid",__func__);
+       return false;
+    }
+
+    int fb_w = fbDev->width;
+    int fb_h = fbDev->height;
+
+    /*
+     *  We have full screen condition when
+     * 1. We have 1 layer to compose
+     *    a. layers dest rect equals display resolution.
+     * 2. We have 2 layers to compose
+     *    a. Sum of their dest rects equals display resolution.
+     */
+
+    if(list->numHwLayers == 1)
+    {
+        hwc_rect_t rect = list->hwLayers[0].displayFrame;
+
+        int w = rect.right - rect.left;
+        int h = rect.bottom - rect.top;
+
+        int transform = list->hwLayers[0].transform;
+
+        if(transform == (HWC_TRANSFORM_ROT_90 | HWC_TRANSFORM_ROT_270))
+            return ((fb_w == h) && (fb_h == w));
+        else
+            return ((fb_h == h) && (fb_w == w));
+    }
+
+    if(list->numHwLayers == 2) {
+
+        hwc_rect_t rect_1 = list->hwLayers[0].displayFrame;
+        hwc_rect_t rect_2 = list->hwLayers[1].displayFrame;
+
+        int transform_1 = list->hwLayers[0].transform;
+        int transform_2 = list->hwLayers[1].transform;
+
+        int w1 = rect_1.right - rect_1.left;
+        int h1 = rect_1.bottom - rect_1.top;
+        int w2 = rect_2.right - rect_2.left;
+        int h2 = rect_2.bottom - rect_2.top;
+
+        if(transform_1 == transform_2) {
+            if(transform_1 == (HWC_TRANSFORM_ROT_90 | HWC_TRANSFORM_ROT_270)) {
+                if((fb_w == (w1 + w2)) && (fb_h == h1) && (fb_h == h2))
+                    return true;
+            } else {
+                if((fb_w == w1) && (fb_w == w2) && (fb_h == (h1 + h2)))
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+
 static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
@@ -313,7 +373,6 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
                                                            dev->common.module);
-
     if(!hwcModule) {
         LOGE("hwc_prepare null module ");
         return -1;
@@ -322,7 +381,11 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
     int yuvBufferCount = 0;
     int layerType = 0;
     int numLayersNotUpdating = 0;
+    bool fullscreen = false;
+
     if (list) {
+        fullscreen = isFullScreenUpdate(hwcModule->fbDevice, list);
+
         for (size_t i=0 ; i<list->numHwLayers; i++) {
             private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
             if(hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO) &&
@@ -359,6 +422,8 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
                 layerType |= HWC_ORIG_RESOLUTION;
             } else if (hnd && (hwcModule->compositionType & (COMPOSITION_TYPE_C2D|COMPOSITION_TYPE_MDP))) {
+                list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
+            } else if ((hwcModule->compositionType == COMPOSITION_TYPE_DYN) && fullscreen) {
                 list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
             } else {
                 list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
@@ -623,6 +688,8 @@ static int hwc_module_initialize(struct private_hwc_module_t* hwcModule)
                 hwcModule->compositionType = COMPOSITION_TYPE_MDP;
             } else if ((strncmp(property, "c2d", 3)) == 0) {
                 hwcModule->compositionType = COMPOSITION_TYPE_C2D;
+            } else if ((strncmp(property, "dyn", 3)) == 0) {
+                hwcModule->compositionType = COMPOSITION_TYPE_DYN;
             } else {
                 hwcModule->compositionType = COMPOSITION_TYPE_GPU;
             }
