@@ -354,7 +354,8 @@ int gralloc_perform(struct gralloc_module_t const* module,
             hnd->magic = private_handle_t::sMagic;
             hnd->fd = fd;
             hnd->flags = (memoryFlags == GRALLOC_USAGE_PRIVATE_PMEM) ?
-                         private_handle_t::PRIV_FLAGS_USES_PMEM :
+                         private_handle_t::PRIV_FLAGS_USES_PMEM |
+                         private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH:
                          private_handle_t::PRIV_FLAGS_USES_ASHMEM;
             hnd->size = size;
             hnd->offset = offset;

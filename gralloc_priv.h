@@ -311,6 +311,7 @@ struct private_handle_t {
         PRIV_FLAGS_USES_PMEM_ADSP = 0x00000004,
         PRIV_FLAGS_NEEDS_FLUSH    = 0x00000008,
         PRIV_FLAGS_USES_ASHMEM    = 0x00000010,
+        PRIV_FLAGS_DO_NOT_FLUSH   = 0x00000020,
     };
 
     enum {
