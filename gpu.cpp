@@ -228,11 +228,13 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
         // Allocate the buffer from pmem
         err = pma->alloc_pmem_buffer(size, usage, &base, &offset, &fd);
         if (err < 0) {
-            if (((usage & GRALLOC_USAGE_HW_MASK) == 0) &&
-                ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) == 0)) {
+            if (((usage & GRALLOC_USAGE_PRIVATE_PMEM) == 0) &&
+                ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) == 0) &&
+                 !isMDPComposition) {
                 // the caller didn't request PMEM, so we can try something else
                 flags &= ~private_handle_t::PRIV_FLAGS_USES_PMEM;
                 err = 0;
+                LOGE("Pmem allocation failed. Trying ashmem");
                 goto try_ashmem;
             } else {
                 LOGE("couldn't open pmem (%s)", strerror(errno));
@@ -240,10 +242,12 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
         }
     } else {
 try_ashmem:
-        fd = deps.ashmem_create_region("gralloc-buffer", size);
-        if (fd < 0) {
-            LOGE("couldn't create ashmem (%s)", strerror(errno));
-            err = -errno;
+        err = alloc_ashmem_buffer(size, (unsigned int)pHandle, &base, &offset, &fd);
+        if (err >= 0) {
+            lockState |= private_handle_t::LOCK_STATE_MAPPED;
+            flags |= private_handle_t::PRIV_FLAGS_USES_ASHMEM;
+        } else {
+            LOGE("Ashmem fallback failed");
         }
     }
 
