@@ -22,6 +22,7 @@
 #include <cutils/ashmem.h>
 #include <cutils/log.h>
 #include <cutils/properties.h>
+#include <utils/Timers.h>
 
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>
@@ -79,6 +80,36 @@ static inline size_t ALIGN(size_t x, size_t align) {
 
 char framebufferStateName[] = {'S', 'R', 'A'};
 
+#ifdef DEBUG_CALC_FPS
+
+#define MAX_FPS_CALC_PERIOD_IN_FRAMES 128
+#define MAX_FRAMARRIVAL_STEPS          50
+#define MAX_DEBUG_FPS_LEVEL             2
+
+struct debug_fps_metadata_t {
+    /* indicates how many frames do we wait till we calculate FPS */
+    unsigned int period;
+    /* current frame, will go upto period, and then reset */
+    unsigned int curr_frame;
+    /* frame will arrive at a multiple of 16666 us at the display.
+       This indicates how many steps to consider for our calculations.
+       For example, if framearrival_steps = 10, then the frame that arrived
+       after 166660 us or more will be ignored.
+    */
+    unsigned int framearrival_steps;
+    /* ignorethresh_us = framearrival_steps * 16666 */
+    nsecs_t      ignorethresh_us;
+    /* used to calculate the actual frame arrival step, the times might not be
+       accurate
+    */
+    unsigned int margin_us;
+    /* actual data storage */
+    nsecs_t      framearrivals[MAX_FPS_CALC_PERIOD_IN_FRAMES];
+    nsecs_t      accum_framearrivals[MAX_FRAMARRIVAL_STEPS];
+};
+
+#endif
+
 /*****************************************************************************/
 
 enum {
@@ -99,6 +130,12 @@ struct fb_context_t {
 };
 
 static int neworientation;
+
+#ifdef DEBUG_CALC_FPS
+static debug_fps_metadata_t debug_fps_metadata;
+static unsigned int debug_fps_level = 0;
+#endif
+
 /*****************************************************************************/
 
 static void
@@ -133,6 +170,92 @@ static int fb_setUpdateRect(struct framebuffer_device_t* dev,
     m->info.reserved[2] = (uint16_t)(l+w) | ((uint32_t)(t+h) << 16);
     return 0;
 }
+
+#ifdef DEBUG_CALC_FPS
+
+static void populate_debug_fps_metadata(void)
+{
+    char prop[PROPERTY_VALUE_MAX];
+
+    property_get("debug.gr.calcfps.period", prop, "10");
+    debug_fps_metadata.period = atoi(prop);
+
+    /* default ignorethresh_us: 500 milli seconds */
+    property_get("debug.gr.calcfps.ignorethresh_us", prop, "500000");
+    debug_fps_metadata.ignorethresh_us = atoi(prop);
+
+    debug_fps_metadata.framearrival_steps =
+                       (debug_fps_metadata.ignorethresh_us / 16666);
+
+    if (debug_fps_metadata.framearrival_steps > MAX_FRAMARRIVAL_STEPS) {
+        debug_fps_metadata.framearrival_steps = MAX_FRAMARRIVAL_STEPS;
+        debug_fps_metadata.ignorethresh_us =
+                        debug_fps_metadata.framearrival_steps * 16666;
+    }
+
+    /* 2ms margin of error for the gettimeofday */
+    debug_fps_metadata.margin_us = 2000;
+
+    for (int i = 0; i < MAX_FRAMARRIVAL_STEPS; i++)
+        debug_fps_metadata.accum_framearrivals[i] = 0;
+
+    LOGE("period: %d", debug_fps_metadata.period);
+    LOGE("ignorethresh_us: %lld", debug_fps_metadata.ignorethresh_us);
+}
+
+static void calc_fps(nsecs_t currtime_us)
+{
+    static nsecs_t oldtime_us = 0;
+
+    nsecs_t diff = currtime_us - oldtime_us;
+
+    oldtime_us = currtime_us;
+
+    if (diff > debug_fps_metadata.ignorethresh_us) {
+        return;
+    }
+
+    if (debug_fps_metadata.curr_frame == debug_fps_metadata.period) {
+        /* time to calculate and display FPS */
+        nsecs_t sum = 0;
+        for (unsigned int i = 0; i < debug_fps_metadata.period; i++)
+            sum += debug_fps_metadata.framearrivals[i];
+        LOGE("FPS for last %d frames: %3.2f", debug_fps_metadata.period,
+                        (debug_fps_metadata.period * float(1000000))/float(sum));
+
+        debug_fps_metadata.curr_frame = 0;
+        if (debug_fps_level > 1) {
+            LOGE("Frame Arrival Distribution:");
+            for (unsigned int i = 0;
+                     i < ((debug_fps_metadata.framearrival_steps / 6) + 1);
+                     i++) {
+                LOGE("%lld %lld %lld %lld %lld %lld",
+                    debug_fps_metadata.accum_framearrivals[i*6],
+                    debug_fps_metadata.accum_framearrivals[i*6+1],
+                    debug_fps_metadata.accum_framearrivals[i*6+2],
+                    debug_fps_metadata.accum_framearrivals[i*6+3],
+                    debug_fps_metadata.accum_framearrivals[i*6+4],
+                    debug_fps_metadata.accum_framearrivals[i*6+5]);
+            }
+
+            /* We are done with displaying, now clear the stats */
+            for (unsigned int i = 0; i < debug_fps_metadata.framearrival_steps; i++)
+                debug_fps_metadata.accum_framearrivals[i] = 0;
+        }
+    }
+
+    debug_fps_metadata.framearrivals[debug_fps_metadata.curr_frame++] = diff;
+
+    if (debug_fps_level > 1) {
+        unsigned int currstep = (diff + debug_fps_metadata.margin_us) / 16666;
+
+        if (currstep < debug_fps_metadata.framearrival_steps) {
+            debug_fps_metadata.accum_framearrivals[currstep-1]++;
+        }
+    }
+}
+
+#endif // DEBUG_CALC_FPS
 
 static void *disp_loop(void *ptr)
 {
@@ -171,6 +294,10 @@ static void *disp_loop(void *ptr)
         if (ioctl(m->framebuffer->fd, FBIOPUT_VSCREENINFO, &m->info) == -1) {
             LOGE("ERROR FBIOPUT_VSCREENINFO failed; frame not displayed");
         }
+
+#ifdef DEBUG_CALC_FPS
+        if (debug_fps_level > 0) calc_fps(ns2us(systemTime()));
+#endif
 
         if (cur_buf == -1) {
             int nxtAvail = ((nxtBuf.idx + 1) % m->numBuffers);
@@ -820,7 +947,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
     if (numberOfBuffers > NUM_FRAMEBUFFERS_MAX)
         numberOfBuffers = NUM_FRAMEBUFFERS_MAX;
 
-    LOGD("We support %d buffers", numberOfBuffers);
+    LOGE("We support %d buffers", numberOfBuffers);
 
     info.yres_virtual = info.yres * numberOfBuffers;
 
@@ -913,6 +1040,19 @@ int mapFrameBufferLocked(struct private_module_t* module)
 #else
     /* when surfaceflinger supports swapInterval then can just do this */
     module->swapInterval = 1;
+#endif
+
+#ifdef DEBUG_CALC_FPS
+    char prop[PROPERTY_VALUE_MAX];
+    property_get("debug.gr.calcfps", prop, "0");
+    debug_fps_level = atoi(prop);
+    if (debug_fps_level > MAX_DEBUG_FPS_LEVEL) {
+        LOGW("out of range value for debug.gr.calcfps, using 0");
+        debug_fps_level = 0;
+    }
+
+    LOGE("DEBUG_CALC_FPS: %d", debug_fps_level);
+    populate_debug_fps_metadata();
 #endif
 
     module->currentIdx = -1;
