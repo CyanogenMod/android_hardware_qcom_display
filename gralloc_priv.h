@@ -34,6 +34,13 @@
 #include "overlayLib.h"
 #include "overlayLibUI.h"
 using namespace overlay;
+/*
+ * BYPASS_OV_CHANNEL_OPEN - bypass channel is open
+ * BYPASS_OV_CHANNEL_PENDING_CLOSE - disp_loop to close bypass channel
+ * BYPASS_OV_CHANNEL_CLOSED - bypass channel is closed
+ */
+enum { BYPASS_OV_CHANNEL_OPEN,
+          BYPASS_OV_CHANNEL_PENDING_CLOSE, BYPASS_OV_CHANNEL_CLOSED };
 #endif
 
 enum {
@@ -291,8 +298,17 @@ struct private_module_t {
     /*
      * Comp. bypass specific variables
      * pobjOverlayUI - UI overlay channel for comp. bypass.
+     * overlayui_lock - mutex lock for synchronization between
+     *                  disp_loop and main thread to modify
+     *                  bypassChannelState
+     * bypassChannelState - Current Channel State
+     *                       - OPEN - bypass channel is open
+     *                       - PENDING_CLOSE - close channel pending
+     *                       - CLOSED - bypass channel is closed
      */
     OverlayUI* pobjOverlayUI;
+    pthread_mutex_t overlayui_lock;
+    int bypassChannelState;
 #endif
 };
 

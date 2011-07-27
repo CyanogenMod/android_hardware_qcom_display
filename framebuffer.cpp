@@ -299,6 +299,23 @@ static void *disp_loop(void *ptr)
         if (debug_fps_level > 0) calc_fps(ns2us(systemTime()));
 #endif
 
+#if defined(SF_BYPASS)
+        /*
+         * Comp. bypass sepcific.
+         * Close the bypass channel if PENDING_CLOSE.
+         * We require this code here because -
+         *        disp_loop can only guarantee push of FB
+         */
+        pthread_mutex_lock(&m->overlayui_lock);
+        if (m->bypassChannelState == BYPASS_OV_CHANNEL_PENDING_CLOSE) {
+            if (m->pobjOverlayUI) {
+                m->pobjOverlayUI->closeChannel();
+            }
+            m->bypassChannelState = BYPASS_OV_CHANNEL_CLOSED;
+        }
+        pthread_mutex_unlock(&m->overlayui_lock);
+#endif
+
         if (cur_buf == -1) {
             int nxtAvail = ((nxtBuf.idx + 1) % m->numBuffers);
             pthread_mutex_lock(&(m->avail[nxtBuf.idx].lock));
@@ -635,6 +652,20 @@ static int fb_stopOrigResDisplay(struct framebuffer_device_t* dev) {
 #endif
 
 #if defined(SF_BYPASS)
+/*
+ * function: fb_postBypassBuffer
+ * Input: framebuffer device pointer, buffer handle, width
+ *        height, format, orientation and HPD state
+ * Return Value: Result of posting the bypass buffer.
+ *               NO_ERROR - Success in pushing the buffer
+ * Works as following:
+ *    Currently, if HPD is on, bypass feature is disabled.
+ *    If Bypass channel state is PENDING CLOSE, dont push the buffer
+ *    Else, push the buffer with following two steps
+ *      1) Set the source geometery
+ *      2) queue the buffer
+ *    Set the bypass channel state as OPEN if we try to push the buffer
+ */
 static int fb_postBypassBuffer(struct framebuffer_device_t* dev,
                                  buffer_handle_t buffer, int w,
                                  int h, int format, int orientation, int isHPDON)
@@ -645,11 +676,18 @@ static int fb_postBypassBuffer(struct framebuffer_device_t* dev,
     private_module_t* m = reinterpret_cast<private_module_t*>(
             dev->common.module);
     if (m->pobjOverlayUI) {
-        OverlayUI* pobjOverlay = m->pobjOverlayUI;
-        if (buffer == NULL) {
-            pobjOverlay->closeChannel();
-            return NO_ERROR;
+
+        pthread_mutex_lock(&m->overlayui_lock);
+        if (m->bypassChannelState == BYPASS_OV_CHANNEL_PENDING_CLOSE) {
+            pthread_mutex_unlock(&m->overlayui_lock);
+            return NO_INIT;
         }
+
+        pthread_mutex_unlock(&m->overlayui_lock);
+
+        OverlayUI* pobjOverlay = m->pobjOverlayUI;
+        if (buffer == NULL)
+            return -EINVAL;
 
         bool useVGPipe = false;
 
@@ -661,34 +699,58 @@ static int fb_postBypassBuffer(struct framebuffer_device_t* dev,
 
         if (ret != NO_ERROR)
             LOGE("error in queue.. ");
+        m->bypassChannelState = BYPASS_OV_CHANNEL_OPEN;
         return ret;
     }
-    return NO_ERROR;
+    return NO_INIT;
 }
+
+/*
+ * function: fb_closeBypass
+ * Input: Framebuffer device pointer
+ * Its only job is to set the bypassChannelState to PENDING_CLOSE.
+ * so that disp_loop could close the channel when a post happens
+ */
 
 static int fb_closeBypass(struct framebuffer_device_t* dev)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(
             dev->common.module);
     if (m->pobjOverlayUI) {
-        OverlayUI* pobjOverlay = m->pobjOverlayUI;
-        pobjOverlay->closeChannel();
-        return NO_ERROR;
+        pthread_mutex_lock(&m->overlayui_lock);
+        m->bypassChannelState = BYPASS_OV_CHANNEL_PENDING_CLOSE;
+        pthread_mutex_unlock(&m->overlayui_lock);
     }
 
     return NO_ERROR;
 }
 
+/*
+ * function: fb_copyBypassBuffer
+ * Input: Framebuffer device pointer
+ * This function is to copy the bypass buffer.
+ * This function is required because:
+ *               Before closing the bypass channel
+ *               MDP read buffer pointer need to be changed
+ *               so that application buffer could be released
+ *               It calls on to OverlayUI::copyBuffer for the same
+ */
+
 static int fb_copyBypassBuffer(struct framebuffer_device_t* dev)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(
             dev->common.module);
+    status_t ret = NO_ERROR;
     if (m->pobjOverlayUI) {
-        OverlayUI* pobjOverlay = m->pobjOverlayUI;
-        return (pobjOverlay->copyBuffer());
+        pthread_mutex_lock(&m->overlayui_lock);
+        if (m->bypassChannelState != BYPASS_OV_CHANNEL_PENDING_CLOSE) {
+            OverlayUI* pobjOverlay = m->pobjOverlayUI;
+            ret = pobjOverlay->copyBuffer();
+        }
+        pthread_mutex_unlock(&m->overlayui_lock);
     }
 
-    return NO_ERROR;
+    return ret;
 }
 
 #endif
@@ -1109,6 +1171,8 @@ int mapFrameBufferLocked(struct private_module_t* module)
 
 #if defined(SF_BYPASS)
     module->pobjOverlayUI = new OverlayUI();
+    module->bypassChannelState = BYPASS_OV_CHANNEL_CLOSED;
+    pthread_mutex_init(&(module->overlayui_lock), NULL);
 #endif
 
     return 0;
