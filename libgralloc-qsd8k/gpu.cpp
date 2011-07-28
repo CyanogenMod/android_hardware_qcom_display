@@ -21,6 +21,9 @@
 #include <sys/mman.h>
 
 #include <cutils/properties.h>
+#ifdef HOST
+#include <linux/ashmem.h>
+#endif
 
 #include "gr.h"
 #include "gpu.h"
@@ -178,6 +181,11 @@ int gpu_context_t::alloc_ashmem_buffer(size_t size, unsigned int postfix, void**
         *pFd = fd;
         *pBase = base;
         *pOffset = offset;
+#ifdef HOST
+        if (ioctl(fd, ASHMEM_CACHE_INV_RANGE, NULL)) {
+            LOGE("ASHMEM_CACHE_INV_RANGE failed fd = %d", fd);
+        }
+#endif
     }
     return err;
 }
