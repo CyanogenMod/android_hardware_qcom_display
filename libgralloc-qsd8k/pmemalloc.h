@@ -69,6 +69,7 @@ class PmemUserspaceAllocator: public PmemAllocator {
         virtual int connectPmem(int fd, int master_fd) = 0;
         virtual int mapPmem(int fd, int offset, size_t size) = 0;
         virtual int unmapPmem(int fd, int offset, size_t size) = 0;
+        virtual int cleanPmem(int fd, unsigned long base, int offset, size_t size) = 0;
 
         // C99
         virtual int getErrno() = 0;
