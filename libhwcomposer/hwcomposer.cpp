@@ -272,6 +272,36 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer) {
      return 0;
 }
 
+bool canSkipComposition(hwc_context_t* ctx, int yuvBufferCount, int currentLayerCount,
+                        int numLayersNotUpdating)
+{
+    if (!ctx) {
+        LOGE("canSkipComposition invalid context");
+        return false;
+    }
+
+    bool compCountChanged = false;
+    if (yuvBufferCount == 1) {
+        if (currentLayerCount != ctx->previousLayerCount) {
+            compCountChanged = true;
+            ctx->previousLayerCount = currentLayerCount;
+        }
+
+        if (!compCountChanged) {
+            if ((currentLayerCount == 1) ||
+                ((currentLayerCount-1) == numLayersNotUpdating)) {
+                // We either have only one overlay layer or we have
+                // all the non-UI layers not updating. In this case
+                // we can skip the composition of the UI layers.
+                return true;
+            }
+        }
+    } else {
+        ctx->previousLayerCount = -1;
+    }
+    return false;
+}
+
 static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
@@ -335,13 +365,7 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             }
         }
 
-        bool compCountChanged = false;
-        if (list->numHwLayers != ctx->previousLayerCount) {
-            compCountChanged = true;
-            ctx->previousLayerCount = list->numHwLayers;
-        }
-        if ((yuvBufferCount == 1) && ((list->numHwLayers-1) == numLayersNotUpdating)
-            && !compCountChanged) {
+        if (canSkipComposition(ctx, yuvBufferCount, list->numHwLayers, numLayersNotUpdating)) {
             list->flags |= HWC_SKIP_COMPOSITION;
         } else {
             list->flags &= ~HWC_SKIP_COMPOSITION;
