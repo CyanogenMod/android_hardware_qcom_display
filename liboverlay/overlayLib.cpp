@@ -890,41 +890,40 @@ bool OverlayControlChannel::setSource(uint32_t w, uint32_t h,
 
 bool OverlayControlChannel::setPosition(int x, int y, uint32_t w, uint32_t h) {
 
-    int width = w, height = h;
     if (!isChannelUP() ||
            (x < 0) || (y < 0) || ((x + w) > mFBWidth) ||
            ((y + h) > mFBHeight)) {
         reportError("setPosition failed");
         return false;
     }
+    if( x != mOVInfo.dst_rect.x || y != mOVInfo.dst_rect.y ||
+        w != mOVInfo.dst_rect.w || h !=  mOVInfo.dst_rect.h ) {
+        mdp_overlay ov;
+        ov.id = mOVInfo.id;
+        if (ioctl(mFD, MSMFB_OVERLAY_GET, &ov)) {
+            reportError("setPosition, overlay GET failed");
+            return false;
+        }
 
-    mdp_overlay ov;
-    ov.id = mOVInfo.id;
-    if (ioctl(mFD, MSMFB_OVERLAY_GET, &ov)) {
-        reportError("setPosition, overlay GET failed");
-        return false;
+        /* Scaling of upto a max of 8 times supported */
+        if(w >(ov.src_rect.w * HW_OVERLAY_MAGNIFICATION_LIMIT)){
+            w = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.w;
+            x = (mFBWidth - w) / 2;
+        }
+        if(h >(ov.src_rect.h * HW_OVERLAY_MAGNIFICATION_LIMIT)) {
+            h = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.h;
+            y = (mFBHeight - h) / 2;
+        }
+        ov.dst_rect.x = x;
+        ov.dst_rect.y = y;
+        ov.dst_rect.w = w;
+        ov.dst_rect.h = h;
+        if (ioctl(mFD, MSMFB_OVERLAY_SET, &ov)) {
+            reportError("setPosition, Overlay SET failed");
+            return false;
+        }
+        mOVInfo = ov;
     }
-
-    /* Scaling of upto a max of 8 times supported */
-    if(w >(ov.src_rect.w * HW_OVERLAY_MAGNIFICATION_LIMIT)){
-        w = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.w;
-        x = (mFBWidth - w) / 2;
-    }
-    if(h >(ov.src_rect.h * HW_OVERLAY_MAGNIFICATION_LIMIT)) {
-        h = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.h;
-        y = (mFBHeight - h) / 2;
-   }
-    ov.dst_rect.x = x;
-    ov.dst_rect.y = y;
-    ov.dst_rect.w = w;
-    ov.dst_rect.h = h;
-
-    if (ioctl(mFD, MSMFB_OVERLAY_SET, &ov)) {
-        reportError("setPosition, Overlay SET failed");
-        return false;
-    }
-    mOVInfo = ov;
-
     return true;
 }
 
