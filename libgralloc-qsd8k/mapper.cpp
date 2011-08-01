@@ -179,8 +179,9 @@ int terminateBuffer(gralloc_module_t const* module,
 
     if (hnd->lockState & private_handle_t::LOCK_STATE_MAPPED) {
         // this buffer was mapped, unmap it now
-        if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_PMEM ||
-            hnd->flags & private_handle_t::PRIV_FLAGS_USES_ASHMEM) {
+        if (hnd->flags & (private_handle_t::PRIV_FLAGS_USES_PMEM |
+                          private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP |
+                          private_handle_t::PRIV_FLAGS_USES_ASHMEM)) {
             if (hnd->pid != getpid()) {
                 // ... unless it's a "master" pmem buffer, that is a buffer
                 // mapped in the process it's been allocated.
@@ -188,6 +189,7 @@ int terminateBuffer(gralloc_module_t const* module,
                 gralloc_unmap(module, hnd);
             }
         } else {
+            LOGE("terminateBuffer: unmapping a non pmem/ashmem buffer flags = 0x%x", hnd->flags);
             gralloc_unmap(module, hnd);
         }
     }
@@ -283,7 +285,8 @@ int gralloc_unlock(gralloc_module_t const* module,
 
     if (hnd->flags & private_handle_t::PRIV_FLAGS_NEEDS_FLUSH) {
         int err;
-        if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_PMEM) {
+        if (hnd->flags & (private_handle_t::PRIV_FLAGS_USES_PMEM |
+                          private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP)) {
             struct pmem_addr pmem_addr;
             pmem_addr.vaddr = hnd->base;
             pmem_addr.offset = hnd->offset;
