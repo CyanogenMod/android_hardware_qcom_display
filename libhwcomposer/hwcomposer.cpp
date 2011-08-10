@@ -33,6 +33,7 @@
 #include <hardware/overlay.h>
 #include <hardware/copybit.h>
 #include <overlayLib.h>
+#include <overlayLibUI.h>
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -62,6 +63,7 @@ enum HWCCompositionType {
 enum HWCPrivateFlags {
     HWC_USE_ORIGINAL_RESOLUTION = HWC_FLAGS_PRIVATE_0, // This layer is to be drawn using overlays
     HWC_DO_NOT_USE_OVERLAY      = HWC_FLAGS_PRIVATE_1, // Do not use overlays to draw this layer
+    HWC_COMP_BYPASS             = HWC_FLAGS_PRIVATE_3, // Layer "might" use or have used bypass
 };
 
 enum HWCLayerType{
@@ -71,10 +73,32 @@ enum HWCLayerType{
     HWC_STOP_UI_MIRRORING_MASK = 0xF
 };
 
+#ifdef COMPOSITION_BYPASS
+enum BypassState {
+    BYPASS_ON,
+    BYPASS_OFF,
+    BYPASS_OFF_PENDING,
+};
+
+enum {
+    MAX_BYPASS_LAYERS = 2,
+    ANIM_FRAME_COUNT = 30,
+};
+#endif
+
 struct hwc_context_t {
     hwc_composer_device_t device;
     /* our private state goes below here */
     overlay::Overlay* mOverlayLibObject;
+#ifdef COMPOSITION_BYPASS
+    overlay::OverlayUI* mOvUI[MAX_BYPASS_LAYERS];
+    int animCount;
+    BypassState bypassState;
+#endif
+#if defined HDMI_DUAL_DISPLAY
+    bool mHDMIEnabled;
+    bool pendingHDMI;
+#endif
     int previousLayerCount;
 };
 
@@ -92,6 +116,7 @@ struct private_hwc_module_t {
     copybit_device_t *copybitEngine;
     framebuffer_device_t *fbDevice;
     int compositionType;
+    bool isBypassEnabled; //from build.prop debug.compbypass.enable
 };
 
 struct private_hwc_module_t HAL_MODULE_INFO_SYM = {
@@ -110,6 +135,7 @@ struct private_hwc_module_t HAL_MODULE_INFO_SYM = {
    copybitEngine: NULL,
    fbDevice: NULL,
    compositionType: 0,
+   isBypassEnabled: false,
 };
 
 /*****************************************************************************/
@@ -125,32 +151,6 @@ static void dump_layer(hwc_layer_t const* l) {
             l->displayFrame.top,
             l->displayFrame.right,
             l->displayFrame.bottom);
-}
-
-static void hwc_enableHDMIOutput(hwc_composer_device_t *dev, bool enable) {
-#if defined HDMI_DUAL_DISPLAY
-    hwc_context_t* ctx = (hwc_context_t*)(dev);
-    private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
-                                                           dev->common.module);
-    framebuffer_device_t *fbDev = hwcModule->fbDevice;
-    if (fbDev) {
-        fbDev->enableHDMIOutput(fbDev, enable);
-    }
-
-    if(ctx && ctx->mOverlayLibObject) {
-        overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
-        ovLibObject->setHDMIStatus(enable);
-
-        if (!enable) {
-            // Close the overlay channels if HDMI is disconnected
-            ovLibObject->closeChannel();
-            // Inform the gralloc that video mirroring is stopped
-            framebuffer_device_t *fbDev = hwcModule->fbDevice;
-            if (fbDev)
-                fbDev->videoOverlayStarted(fbDev, false);
-        }
-    }
-#endif
 }
 
 static int hwc_updateOverlayStatus(hwc_context_t* ctx, int layerType) {
@@ -242,6 +242,15 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer) {
             return -1;
         }
 
+        ovLibObject->getOrientation(orientation);
+        if (orientation != layer->transform)
+            ret = ovLibObject->setParameter(OVERLAY_TRANSFORM, layer->transform);
+        if (!ret) {
+            LOGE("prepareOverlay setParameter failed transform %x",
+                    layer->transform);
+            return -1;
+        }
+
         if (layer->flags == HWC_USE_ORIGINAL_RESOLUTION) {
             framebuffer_device_t* fbDev = hwcModule->fbDevice;
             ret = ovLibObject->setPosition(0, 0,
@@ -254,15 +263,6 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer) {
         }
         if (!ret) {
             LOGE("prepareOverlay setPosition failed");
-            return -1;
-        }
-
-        ovLibObject->getOrientation(orientation);
-        if (orientation != layer->transform)
-            ret = ovLibObject->setParameter(OVERLAY_TRANSFORM, layer->transform);
-        if (!ret) {
-            LOGE("prepareOverlay setParameter failed transform %x",
-                    layer->transform);
             return -1;
         }
      }
@@ -358,6 +358,194 @@ static bool isFullScreenUpdate(const framebuffer_device_t* fbDev, const hwc_laye
     return false;
 }
 
+#ifdef COMPOSITION_BYPASS
+/*
+ * Configures pipe(s) for composition bypass
+ */
+static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer, int index,
+        int lastLayerIndex) {
+    if (ctx && ctx->mOvUI[index]) {
+        private_hwc_module_t* hwcModule = reinterpret_cast<
+                private_hwc_module_t*>(ctx->device.common.module);
+        if (!hwcModule) {
+            LOGE("prepareBypass null module ");
+            return -1;
+        }
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
+        if(!hnd) {
+            LOGE("prepareBypass handle null");
+            return -1;
+        }
+        if(hnd->width > hwcModule->fbDevice->width ||
+                hnd->height > hwcModule->fbDevice->height) {
+            ctx->animCount = ANIM_FRAME_COUNT;
+            return -1;
+        }
+        overlay::OverlayUI *ovUI = ctx->mOvUI[index];
+        int ret = 0;
+        int orientation = layer->transform;
+        overlay_buffer_info info;
+        info.width = hnd->width;
+        info.height = hnd->height;
+        info.format = hnd->format;
+        info.size = hnd->size;
+        const bool useVGPipe = true;
+        //only last layer should wait for vsync
+        const bool waitForVsync = (index == lastLayerIndex);
+        const int fbnum = 0;
+        //Just to differentiate zorders for different layers
+        const int zorder = index;
+        ret = ovUI->setSource(info, orientation, useVGPipe, waitForVsync,
+                fbnum, zorder);
+        if (ret) {
+            LOGE("prepareBypass setSource failed");
+            return -1;
+        }
+        hwc_rect_t displayFrame = layer->displayFrame;
+        ret = ovUI->setPosition(displayFrame.left, displayFrame.top,
+                (displayFrame.right - displayFrame.left),
+                (displayFrame.bottom - displayFrame.top));
+        if (ret) {
+            LOGE("prepareBypass setPosition failed");
+            return -1;
+        }
+    }
+    return 0;
+}
+
+static int drawLayerUsingBypass(hwc_context_t *ctx, hwc_layer_t *layer,
+        int index) {
+    if (ctx && ctx->mOvUI[index]) {
+        overlay::OverlayUI *ovUI = ctx->mOvUI[index];
+        int ret = 0;
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
+        ret = ovUI->queueBuffer(hnd);
+        if (ret) {
+            LOGE("drawLayerUsingBypass queueBuffer failed");
+            return -1;
+        }
+    }
+    return 0;
+}
+
+/*
+ * Checks if doing comp. bypass is possible. If video is not on and there
+ * are 2 layers then its doable.
+ */
+inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount,
+        const int numLayers) {
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+    private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
+                                                           dev->common.module);
+    //Check if enabled in build.prop
+    if(hwcModule->isBypassEnabled == false) {
+        return false;
+    }
+    //Disable bypass during animation
+    if(UNLIKELY(ctx->animCount)) {
+        --(ctx->animCount);
+        return false;
+    }
+#if defined HDMI_DUAL_DISPLAY
+    //Disable bypass when HDMI is enabled
+    if(ctx->mHDMIEnabled || ctx->pendingHDMI) {
+        return false;
+    }
+#endif
+    return (yuvCount == 0) && (numLayers == MAX_BYPASS_LAYERS);
+}
+
+/*
+ * Bypass is not efficient if area is greater than 1280x720
+ * AND rotation is necessary, since the rotator consumes
+ * time greater than 1 Vsync and is sequential.
+ */
+inline static bool isBypassEfficient(const framebuffer_device_t* fbDev,
+        const hwc_layer_list_t* list, hwc_context_t* ctx) {
+    bool rotationNeeded = false;
+    for(int i = 0; i < list->numHwLayers; ++i) {
+        if(list->hwLayers[i].transform) {
+            rotationNeeded = true;
+            break;
+        }
+    }
+    return !(rotationNeeded);
+}
+
+bool setupBypass(hwc_context_t* ctx, hwc_layer_list_t* list) {
+    for (int index = 0 ; index < list->numHwLayers; index++) {
+        if(prepareBypass(ctx, &(list->hwLayers[index]), index,
+                list->numHwLayers - 1) != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void setBypassLayerFlags(hwc_context_t* ctx, hwc_layer_list_t* list) {
+    for (int index = 0 ; index < list->numHwLayers; index++) {
+        list->hwLayers[index].flags = HWC_COMP_BYPASS;
+        list->hwLayers[index].compositionType = HWC_USE_OVERLAY;
+        #ifdef DEBUG
+            LOGE("%s: layer = %d", __FUNCTION__, index);
+        #endif
+    }
+}
+
+void unsetBypassLayerFlags(hwc_layer_list_t* list) {
+    for (int index = 0 ; index < list->numHwLayers; index++) {
+        if(list->hwLayers[index].flags == HWC_COMP_BYPASS) {
+            list->hwLayers[index].flags = 0;
+        }
+    }
+}
+
+void closeBypass(hwc_context_t* ctx) {
+    for (int index = 0 ; index < MAX_BYPASS_LAYERS; index++) {
+        ctx->mOvUI[index]->closeChannel();
+        #ifdef DEBUG
+            LOGE("%s", __FUNCTION__);
+        #endif
+    }
+}
+#endif  //COMPOSITION_BYPASS
+
+
+static void handleHDMIStateChange(hwc_composer_device_t *dev) {
+#if defined HDMI_DUAL_DISPLAY
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+    private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
+                                                           dev->common.module);
+    framebuffer_device_t *fbDev = hwcModule->fbDevice;
+    if (fbDev) {
+        fbDev->enableHDMIOutput(fbDev, ctx->mHDMIEnabled);
+    }
+
+    if(ctx && ctx->mOverlayLibObject) {
+        overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
+        ovLibObject->setHDMIStatus(ctx->mHDMIEnabled);
+        if (!(ctx->mHDMIEnabled)) {
+            // Close the overlay channels if HDMI is disconnected
+            ovLibObject->closeChannel();
+        }
+    }
+#endif
+}
+
+
+/* Just mark flags and do stuff after eglSwapBuffers */
+static void hwc_enableHDMIOutput(hwc_composer_device_t *dev, bool enable) {
+#if defined HDMI_DUAL_DISPLAY
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+    ctx->mHDMIEnabled = enable;
+    if(enable) { //On connect, allow bypass to draw once to FB
+        ctx->pendingHDMI = true;
+    } else { //On disconnect, close immediately (there will be no bypass)
+        handleHDMIStateChange(dev);
+    }
+#endif
+}
+
 static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
@@ -423,20 +611,42 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
                 list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
                 layerType |= HWC_ORIG_RESOLUTION;
-            } else if (hnd && (hwcModule->compositionType & (COMPOSITION_TYPE_C2D|COMPOSITION_TYPE_MDP))) {
+            } else if (hnd && (hwcModule->compositionType &
+                    (COMPOSITION_TYPE_C2D|COMPOSITION_TYPE_MDP))) {
                 list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
-            } else if ((hwcModule->compositionType == COMPOSITION_TYPE_DYN) && fullscreen) {
+            } else if ((hwcModule->compositionType == COMPOSITION_TYPE_DYN)
+                    && fullscreen) {
                 list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
             } else {
                 list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
             }
         }
 
-        if (canSkipComposition(ctx, yuvBufferCount, list->numHwLayers, numLayersNotUpdating)) {
+        if (canSkipComposition(ctx, yuvBufferCount, list->numHwLayers,
+                    numLayersNotUpdating)) {
             list->flags |= HWC_SKIP_COMPOSITION;
         } else {
             list->flags &= ~HWC_SKIP_COMPOSITION;
         }
+
+#ifdef COMPOSITION_BYPASS
+        //Check if bypass is feasible
+        if(isBypassDoable(dev, yuvBufferCount, list->numHwLayers) &&
+                isBypassEfficient(hwcModule->fbDevice, list, ctx)) {
+            //Setup bypass
+            if(setupBypass(ctx, list)) {
+                //Overwrite layer flags only if setup succeeds.
+                setBypassLayerFlags(ctx, list);
+                list->flags |= HWC_SKIP_COMPOSITION;
+                ctx->bypassState = BYPASS_ON;
+            }
+        } else {
+            unsetBypassLayerFlags(list);
+            if(ctx->bypassState == BYPASS_ON) {
+                ctx->bypassState = BYPASS_OFF_PENDING;
+            }
+        }
+#endif
     }
 
     return 0;
@@ -598,8 +808,11 @@ static int hwc_set(hwc_composer_device_t *dev,
     for (size_t i=0; i<list->numHwLayers; i++) {
         if (list->hwLayers[i].flags == HWC_SKIP_LAYER) {
             continue;
-        }
-        if (list->hwLayers[i].compositionType == HWC_USE_OVERLAY) {
+#ifdef COMPOSITION_BYPASS
+        } else if (list->hwLayers[i].flags == HWC_COMP_BYPASS) {
+            drawLayerUsingBypass(ctx, &(list->hwLayers[i]), i);
+#endif
+        } else if (list->hwLayers[i].compositionType == HWC_USE_OVERLAY) {
             drawLayerUsingOverlay(ctx, &(list->hwLayers[i]));
         } else if (list->flags & HWC_SKIP_COMPOSITION) {
             break;
@@ -615,6 +828,18 @@ static int hwc_set(hwc_composer_device_t *dev,
             return HWC_EGL_ERROR;
         }
     }
+#ifdef COMPOSITION_BYPASS
+    if(ctx->bypassState == BYPASS_OFF_PENDING) {
+        closeBypass(ctx);
+        ctx->bypassState = BYPASS_OFF;
+    }
+#endif
+#if defined HDMI_DUAL_DISPLAY
+    if(ctx->pendingHDMI) {
+        handleHDMIStateChange(dev);
+        ctx->pendingHDMI = false;
+    }
+#endif
     return 0;
 }
 
@@ -647,6 +872,11 @@ static int hwc_device_close(struct hw_device_t *dev)
     if (ctx) {
          delete ctx->mOverlayLibObject;
          ctx->mOverlayLibObject = NULL;
+#ifdef COMPOSITION_BYPASS
+         for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
+            delete ctx->mOvUI[i];
+         }
+#endif
         free(ctx);
     }
     return 0;
@@ -697,6 +927,13 @@ static int hwc_module_initialize(struct private_hwc_module_t* hwcModule)
         hwcModule->compositionType = COMPOSITION_TYPE_CPU;
     }
 
+    //Check if composition bypass is enabled
+    if(property_get("debug.compbypass.enable", property, NULL) > 0) {
+        if(atoi(property) == 1) {
+            hwcModule->isBypassEnabled = true;
+        }
+    }
+
     return 0;
 }
 
@@ -716,10 +953,26 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
         /* initialize our state here */
         memset(dev, 0, sizeof(*dev));
 	if(hwcModule->overlayEngine) {
-		dev->mOverlayLibObject = new overlay::Overlay();
-        } else
+	    dev->mOverlayLibObject = new overlay::Overlay();
+#ifdef COMPOSITION_BYPASS
+            for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
+		dev->mOvUI[i] = new overlay::OverlayUI();
+            }
+            dev->animCount = 0;
+            dev->bypassState = BYPASS_OFF;
+#endif
+        } else {
             dev->mOverlayLibObject = NULL;
-
+#ifdef COMPOSITION_BYPASS
+            for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
+		dev->mOvUI[i] = NULL;
+            }
+#endif
+        }
+#if defined HDMI_DUAL_DISPLAY
+        dev->mHDMIEnabled = false;
+        dev->pendingHDMI = false;
+#endif
         /* initialize the procs */
         dev->device.common.tag = HARDWARE_DEVICE_TAG;
         dev->device.common.version = 0;
