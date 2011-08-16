@@ -169,14 +169,10 @@ static int hwc_updateOverlayStatus(hwc_context_t* ctx, int layerType) {
         return -1;
     }
 
-    if ((layerType & HWC_STOP_UI_MIRRORING_MASK) &&
-        (OVERLAY_CHANNEL_DOWN == ovLibObject->getChannelStatus())) {
+    if (layerType & HWC_STOP_UI_MIRRORING_MASK) {
         // Inform the gralloc to stop UI mirroring
         fbDev->videoOverlayStarted(fbDev, true);
-    }
-
-    if ((OVERLAY_CHANNEL_UP == ovLibObject->getChannelStatus()) &&
-        !(layerType & HWC_STOP_UI_MIRRORING_MASK)) {
+    } else {
         // Video mirroring is going on, and we do not have any layers to
         // mirror directly. Close the current video channel and inform the
         // gralloc to start UI mirroring
@@ -399,6 +395,12 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             }
         }
 
+        if (list->flags & HWC_GEOMETRY_CHANGED) {
+            layerType |= (yuvBufferCount == 1) ? HWC_SINGLE_VIDEO: 0;
+            // Inform the gralloc of the current HDMI status
+            hwc_updateOverlayStatus(ctx, layerType);
+        }
+
         for (size_t i=0 ; i<list->numHwLayers ; i++) {
             private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
             // If there is a single Fullscreen layer, we can bypass it - TBD
@@ -434,12 +436,6 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             list->flags |= HWC_SKIP_COMPOSITION;
         } else {
             list->flags &= ~HWC_SKIP_COMPOSITION;
-        }
-
-        if (list->flags & HWC_GEOMETRY_CHANGED) {
-            layerType |= (yuvBufferCount == 1) ? HWC_SINGLE_VIDEO: 0;
-            // Inform the gralloc of the current HDMI status
-            hwc_updateOverlayStatus(ctx, layerType);
         }
     }
 
