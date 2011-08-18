@@ -117,6 +117,12 @@ int get_mdp_format(int format);
 int get_size(int format, int w, int h);
 int get_mdp_orientation(int rotation, int flip);
 
+/* Print values being sent to driver in case of ioctl failures
+   These logs are enabled only if DEBUG_OVERLAY is true       */
+void dump(msm_rotator_img_info& mRotInfo);
+void dump(mdp_overlay& mOvInfo);
+const char* getFormatString(int format);
+
 const int max_num_buffers = 3;
 typedef struct mdp_rect overlay_rect;
 

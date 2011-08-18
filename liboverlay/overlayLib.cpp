@@ -19,6 +19,7 @@
 #include "gralloc_priv.h"
 
 #define INTERLACE_MASK 0x80
+#define DEBUG_OVERLAY true
 /* Helper functions */
 static inline size_t ALIGN(size_t x, size_t align) {
     return (x + align-1) & ~(align-1);
@@ -83,6 +84,63 @@ int overlay::get_mdp_orientation(int rotation, int flip) {
 #define LOG_TAG "OverlayLIB"
 static void reportError(const char* message) {
     LOGE( "%s", message);
+}
+
+void overlay::dump(mdp_overlay& mOVInfo) {
+    if (!DEBUG_OVERLAY)
+        return;
+    LOGE("mOVInfo:");
+    LOGE("src: width %d height %d format %s user_data[0] %d", mOVInfo.src.width,
+        mOVInfo.src.height, getFormatString(mOVInfo.src.format),
+        mOVInfo.user_data[0]);
+    LOGE("src_rect: x %d y %d w %d h %d", mOVInfo.src_rect.x,
+        mOVInfo.src_rect.y, mOVInfo.src_rect.w, mOVInfo.src_rect.h);
+    LOGE("dst_rect: x %d y %d w %d h %d", mOVInfo.dst_rect.x,
+        mOVInfo.dst_rect.y, mOVInfo.dst_rect.w, mOVInfo.dst_rect.h);
+    LOGE("z_order %d is_fg %d alpha %d transp_mask %d flags %x id %d",
+        mOVInfo.z_order, mOVInfo.is_fg, mOVInfo.alpha, mOVInfo.transp_mask,
+        mOVInfo.flags, mOVInfo.id);
+}
+
+void overlay::dump(msm_rotator_img_info& mRotInfo) {
+    if (!DEBUG_OVERLAY)
+        return;
+    LOGE("mRotInfo:");
+    LOGE("session_id %d dst_x %d dst_y %d rotations %d enable %d",
+        mRotInfo.session_id, mRotInfo.dst_x, mRotInfo.dst_y,
+        mRotInfo.rotations, mRotInfo.enable);
+    LOGE("src: width %d height %d format %s", mRotInfo.src.width,
+        mRotInfo.src.height, getFormatString(mRotInfo.src.format));
+    LOGE("dst: width %d height %d format %s", mRotInfo.dst.width,
+        mRotInfo.dst.height, getFormatString(mRotInfo.src.format));
+    LOGE("src_rect: x %d y %d w %d h %d", mRotInfo.src_rect.x,
+        mRotInfo.src_rect.y, mRotInfo.src_rect.w, mRotInfo.src_rect.h);
+}
+
+const char* overlay::getFormatString(int format){
+    static const char* formats[] = {
+             "MDP_RGB_565",
+             "MDP_XRGB_8888",
+             "MDP_Y_CBCR_H2V2",
+             "MDP_ARGB_8888",
+             "MDP_RGB_888",
+             "MDP_Y_CRCB_H2V2",
+             "MDP_YCRYCB_H2V1",
+             "MDP_Y_CRCB_H2V1",
+             "MDP_Y_CBCR_H2V1",
+             "MDP_RGBA_8888",
+             "MDP_BGRA_8888",
+             "MDP_RGBX_8888",
+             "MDP_Y_CRCB_H2V2_TILE",
+             "MDP_Y_CBCR_H2V2_TILE",
+             "MDP_Y_CR_CB_H2V2",
+             "MDP_Y_CB_CR_H2V2",
+             "MDP_IMGTYPE_LIMIT",
+             "MDP_BGR_565",
+             "MDP_FB_FORMAT",
+             "MDP_IMGTYPE_LIMIT2"
+        };
+    return formats[format];
 }
 
 using namespace overlay;
@@ -741,12 +799,14 @@ bool OverlayControlChannel::startOVRotatorSessions(
         int result = ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo);
         if (result) {
             reportError("Rotator session failed");
+            dump(mRotInfo);
             ret = false;
         }
     }
 
     if (ret && ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
         reportError("startOVRotatorSessions, Overlay set failed");
+        dump(mOVInfo);
         ret = false;
     }
 
@@ -878,8 +938,11 @@ bool OverlayControlChannel::setSource(uint32_t w, uint32_t h,
             mOVInfo.flags &= ~MDP_OV_PLAY_NOWAIT;
 
         if (flags != mOVInfo.flags) {
-            if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo))
+            if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
+                LOGE("setSource, OVERLAY_SET failed");
+                dump(mOVInfo);
                 return false;
+             }
         }
 
         return true;
@@ -894,6 +957,8 @@ bool OverlayControlChannel::setPosition(int x, int y, uint32_t w, uint32_t h) {
            (x < 0) || (y < 0) || ((x + w) > mFBWidth) ||
            ((y + h) > mFBHeight)) {
         reportError("setPosition failed");
+        LOGW("x %d y %d (x+w) %d (y+h) %d FBWidth %d FBHeight %d", x, y, x+w, y+h,
+                                                        mFBWidth,mFBHeight);
         return false;
     }
     if( x != mOVInfo.dst_rect.x || y != mOVInfo.dst_rect.y ||
@@ -920,6 +985,7 @@ bool OverlayControlChannel::setPosition(int x, int y, uint32_t w, uint32_t h) {
         ov.dst_rect.h = h;
         if (ioctl(mFD, MSMFB_OVERLAY_SET, &ov)) {
             reportError("setPosition, Overlay SET failed");
+            dump(ov);
             return false;
         }
         mOVInfo = ov;
@@ -1081,6 +1147,7 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
 
     if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
         reportError("setParameter, overlay set failed");
+        dump(mOVInfo);
         return false;
     }
         break;
