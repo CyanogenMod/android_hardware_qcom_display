@@ -326,7 +326,7 @@ static bool isFullScreenUpdate(const framebuffer_device_t* fbDev, const hwc_laye
 
         int transform = list->hwLayers[0].transform;
 
-        if(transform == (HWC_TRANSFORM_ROT_90 | HWC_TRANSFORM_ROT_270))
+        if(transform & (HWC_TRANSFORM_ROT_90 | HWC_TRANSFORM_ROT_270))
             return ((fb_w == h) && (fb_h == w));
         else
             return ((fb_h == h) && (fb_w == w));
@@ -346,7 +346,7 @@ static bool isFullScreenUpdate(const framebuffer_device_t* fbDev, const hwc_laye
         int h2 = rect_2.bottom - rect_2.top;
 
         if(transform_1 == transform_2) {
-            if(transform_1 == (HWC_TRANSFORM_ROT_90 | HWC_TRANSFORM_ROT_270)) {
+            if(transform_1 & (HWC_TRANSFORM_ROT_90 | HWC_TRANSFORM_ROT_270)) {
                 if((fb_w == (w1 + w2)) && (fb_h == h1) && (fb_h == h2))
                     return true;
             } else {
