@@ -182,7 +182,10 @@ int PmemUserspaceAllocator::alloc_pmem_buffer(size_t size, int usage,
                 LOGV("%s: mapped fd %d at offset %d, size %d", pmemdev, fd, offset, size);
                 memset((char*)base + offset, 0, size);
                 //Clean cache before flushing to ensure pmem is properly flushed
-                deps.cleanPmem(fd, (unsigned long) base, offset, size);
+                err = deps.cleanPmem(fd, (unsigned long) base + offset, offset, size);
+                if (err < 0) {
+                    LOGE("cleanPmem failed: (%s)", strerror(deps.getErrno()));
+                }
 #ifdef HOST
                  cacheflush(intptr_t(base) + offset, intptr_t(base) + offset + size, 0);
 #endif
