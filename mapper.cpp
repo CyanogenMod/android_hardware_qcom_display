@@ -294,8 +294,8 @@ int gralloc_unlock(gralloc_module_t const* module,
             err = ioctl(hnd->fd, ASHMEM_CACHE_FLUSH_RANGE, NULL);
         }         
 
-        LOGE_IF(err < 0, "cannot flush handle %p (offs=%x len=%x)\n",
-                hnd, hnd->offset, hnd->size);
+        LOGE_IF(err < 0, "cannot flush handle %p (offs=%x len=%x, flags = 0x%x) err=%s\n",
+                hnd, hnd->offset, hnd->size, hnd->flags, strerror(errno));
         hnd->flags &= ~private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
     }
 
