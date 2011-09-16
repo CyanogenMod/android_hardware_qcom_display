@@ -122,10 +122,11 @@ bool send3DInfoPacket(unsigned int format3D);
 bool enableBarrier(unsigned int orientation);
 unsigned int  getOverlayConfig (unsigned int format3D, bool poll = true,
                                 bool isHDMI = false);
-
+int getColorFormat(int format);
 int get_mdp_format(int format);
 int get_size(int format, int w, int h);
-int get_mdp_orientation(int rotation, int flip);
+int get_rot_output_format(int format);
+int get_mdp_orientation(int value);
 void normalize_crop(uint32_t& xy, uint32_t& wh);
 
 /* Print values being sent to driver in case of ioctl failures
@@ -155,6 +156,7 @@ class OverlayControlChannel {
     mdp_overlay mOVInfo;
     msm_rotator_img_info mRotInfo;
     msmfb_overlay_3d m3DOVInfo;
+    bool mIsChannelUpdated;
     bool openDevices(int fbnum = -1);
     bool setOverlayInformation(const overlay_buffer_info& info,
                                int flags, int orientation, int zorder = 0, bool ignoreFB = false,
@@ -183,13 +185,13 @@ public:
     int getFBHeight() const { return mFBHeight; }
     int getFormat3D() const { return mFormat3D; }
     bool getOrientation(int& orientation) const;
-    bool setSource(uint32_t w, uint32_t h, int format,
-                       int orientation, bool ignoreFB);
+    bool updateWaitForVsyncFlags(bool waitForVsync);
     bool getAspectRatioPosition(int w, int h, overlay_rect *rect);
     bool getPositionS3D(int channel, int format, overlay_rect *rect);
-    bool updateOverlaySource(const overlay_buffer_info& info, int orientation);
+    bool updateOverlaySource(const overlay_buffer_info& info, int orientation, bool waitForVsync);
     bool getFormat() const { return mFormat; }
     bool useVirtualFB ();
+    int getOverlayFlags() const { return mOVInfo.flags; }
 };
 
 class OverlayDataChannel {
@@ -272,17 +274,14 @@ public:
                     bool ignoreFB = false, int numBuffers = 2);
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
     int  getChannelStatus() const { return (mChannelUP ? OVERLAY_CHANNEL_UP: OVERLAY_CHANNEL_DOWN); }
-    void setHDMIStatus (bool isHDMIConnected) { mHDMIConnected = isHDMIConnected; }
+    void setHDMIStatus (bool isHDMIConnected) { mHDMIConnected = isHDMIConnected; mState = -1; }
     int getHDMIStatus() const {return (mHDMIConnected ? HDMI_ON : HDMI_OFF); }
-    bool updateOverlaySource(const overlay_buffer_info& info, int orientation);
 
 private:
     bool setChannelPosition(int x, int y, uint32_t w, uint32_t h, int channel = 0);
     bool setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int channel);
     bool queueBuffer(int fd, uint32_t offset, int channel);
-    int  hasHDMIStatusChanged();
-    int getColorFormat(int format) { return (format == HAL_PIXEL_FORMAT_YV12) ?
-                                            format : COLOR_FORMAT(format); }
+    bool updateOverlaySource(const overlay_buffer_info& info, int orientation, bool waitForVsync);
     int getS3DFormat(int format);
 };
 

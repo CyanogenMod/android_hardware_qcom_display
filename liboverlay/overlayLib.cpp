@@ -45,38 +45,42 @@ int overlay::get_mdp_format(int format) {
         return MDP_Y_CRCB_H2V2_TILE;
     case HAL_PIXEL_FORMAT_YV12:
         return MDP_Y_CR_CB_H2V2;
+    default:
+        LOGE("%s: unknown color format [0x%x]", __FUNCTION__, format);
+        return -1;
     }
     return -1;
 }
 
-int overlay::get_mdp_orientation(int rotation, int flip) {
-    switch(flip) {
-    case HAL_TRANSFORM_FLIP_V:
-        switch(rotation) {
-        case 0: return MDP_FLIP_UD;
-        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_LR);
-        default: return -1;
-        break;
-        }
-    break;
-    case HAL_TRANSFORM_FLIP_H:
-        switch(rotation) {
-        case 0: return MDP_FLIP_LR;
-        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_UD);
-        default: return -1;
-        break;
-        }
-    break;
-    default:
-        switch(rotation) {
-        case 0: return MDP_ROT_NOP;
+int overlay::get_mdp_orientation(int value) {
+    switch(value) {
+        case 0: return 0;
+        case HAL_TRANSFORM_FLIP_V:  return MDP_FLIP_UD;
+        case HAL_TRANSFORM_FLIP_H:  return MDP_FLIP_LR;
         case HAL_TRANSFORM_ROT_90:  return MDP_ROT_90;
+        case HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V:
+                                    return MDP_ROT_90|MDP_FLIP_LR;
+        case HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H:
+                                    return MDP_ROT_90|MDP_FLIP_UD;
         case HAL_TRANSFORM_ROT_180: return MDP_ROT_180;
         case HAL_TRANSFORM_ROT_270: return MDP_ROT_270;
-        default: return -1;
-        break;
-        }
-    break;
+        default:
+            LOGE("%s: invalid rotation value (value = 0x%x",
+                  __FUNCTION__, value);
+            return -1;
+    }
+    return -1;
+}
+
+// Rotator - input to output mapping
+int overlay::get_rot_output_format(int format) {
+    switch (format) {
+    case MDP_Y_CRCB_H2V2_TILE:
+        return MDP_Y_CRCB_H2V2;
+    case MDP_Y_CB_CR_H2V2:
+        return MDP_Y_CBCR_H2V2;
+    default:
+        return format;
     }
     return -1;
 }
@@ -231,6 +235,12 @@ bool overlay::enableBarrier (unsigned int orientation) {
     }
     LOGE("%s:no sysfs entry for enabling barriers on 3D panel!", __FUNCTION__);
     return false;
+}
+
+int overlay::getColorFormat(int format)
+{
+    return (format == HAL_PIXEL_FORMAT_YV12) ?
+            format : COLOR_FORMAT(format);
 }
 
 unsigned int overlay::getOverlayConfig (unsigned int format3D, bool poll,
@@ -393,20 +403,44 @@ bool Overlay::setChannelPosition(int x, int y, uint32_t w, uint32_t h, int chann
     return objOvCtrlChannel[channel].setPosition(x, y, w, h);
 }
 
-bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientation) {
-    if (hasHDMIStatusChanged()) {
-        return setSource(info, orientation, mHDMIConnected);
+bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientation,
+                                  bool waitForVsync) {
+    bool ret = false;
+    int currentFlags = 0;
+    if (objOvCtrlChannel[0].isChannelUP()) {
+        currentFlags = objOvCtrlChannel[0].getOverlayFlags();
     }
 
-    bool ret = false;
+    bool needUpdateFlags = false;
+    if (waitForVsync) {
+        if (currentFlags & MDP_OV_PLAY_NOWAIT) {
+            needUpdateFlags = true;
+        }
+    } else {
+        if (!(currentFlags & MDP_OV_PLAY_NOWAIT)) {
+            needUpdateFlags = true;
+        }
+    }
+
+    bool geometryChanged = true;
     if (info.width == mOVBufferInfo.width &&
-        info.height == mOVBufferInfo.height) {
+        info.height == mOVBufferInfo.height &&
+        info.format == mOVBufferInfo.format) {
+        geometryChanged = false;
+    }
+
+    if ((false == needUpdateFlags) && (false == geometryChanged)) {
         objOvDataChannel[0].updateDataChannel(0, 0);
         return true;
     }
 
     // Disable rotation for the HDMI channels
-    int orient[2] = {orientation, 0};
+    int orientHdmi = 0;
+    int orient[2] = {true, orientHdmi};
+    // enable waitForVsync on HDMI
+    bool waitForHDMI = true;
+    bool wait[2] = {waitForVsync, waitForHDMI};
+
     switch(mState) {
         case OV_3D_VIDEO_3D_PANEL:
             orient[1] = orientation;
@@ -418,10 +452,19 @@ bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientati
             break;
     }
 
+    int numChannelsToUpdate = NUM_CHANNELS;
+    if (!geometryChanged) {
+        // Only update the primary channel - we only need to update the
+        // wait/no-wait flags
+        if (objOvCtrlChannel[0].isChannelUP()) {
+            return objOvCtrlChannel[0].updateWaitForVsyncFlags(waitForVsync);
+        }
+    }
+
     // Set the overlay source info
     for (int i = 0; i < NUM_CHANNELS; i++) {
         if (objOvCtrlChannel[i].isChannelUP()) {
-            ret = objOvCtrlChannel[i].updateOverlaySource(info, orient[i]);
+            ret = objOvCtrlChannel[i].updateOverlaySource(info, orient[i], wait[i]);
             if (!ret) {
                 LOGE("objOvCtrlChannel[%d].updateOverlaySource failed", i);
                 return false;
@@ -436,22 +479,6 @@ bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientati
     } else
         LOGE("update failed");
     return ret;
-}
-
-int Overlay::hasHDMIStatusChanged() {
-    int hdmiChanged = 0;
-    if (mHDMIConnected) {
-        // If HDMI is connected and both channels are not up, set the status
-        if (!objOvCtrlChannel[0].isChannelUP() || !objOvCtrlChannel[1].isChannelUP()) {
-            hdmiChanged = 0x1;
-        }
-    } else {
-        // HDMI is disconnected and both channels are up, set the status
-        if (objOvCtrlChannel[0].isChannelUP() && objOvCtrlChannel[1].isChannelUP()) {
-            hdmiChanged = 0x1;
-        }
-    }
-    return hdmiChanged;
 }
 
 int Overlay::getS3DFormat(int format) {
@@ -474,22 +501,20 @@ int Overlay::getS3DFormat(int format) {
 }
 
 bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
-                        bool hdmiConnected, bool ignoreFB, int num_buffers) {
+                        bool hdmiConnected, bool waitForVsync, int num_buffers) {
     // Separate the color format from the 3D format.
     // If there is 3D content; the effective format passed by the client is:
     // effectiveFormat = 3D_IN | 3D_OUT | ColorFormat
     int newState = mState;
-    bool stateChange = false, ret = true;
+    bool stateChange = false, ret = false;
     unsigned int format3D = getS3DFormat(info.format);
     int colorFormat = getColorFormat(info.format);
-    newState = getOverlayConfig (format3D, false, hdmiConnected);
-    stateChange = (mState == newState) ? false : true;
-    // Check if the orientation of the primary channel changed
-    if (mState != OV_3D_VIDEO_3D_TV)
-        if (mChannelUP)
-            ret = objOvCtrlChannel[0].setSource(info.width, info.height,
-                                    colorFormat, orientation, ignoreFB);
-    if (stateChange || !ret) {
+    if (-1 == mState) {
+        newState = getOverlayConfig (format3D, false, hdmiConnected);
+        stateChange = (mState == newState) ? false : true;
+    }
+
+    if (stateChange) {
         closeChannel();
         mHDMIConnected = hdmiConnected;
         mState = newState;
@@ -498,17 +523,18 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
             LOGI("3D content on 2D display: set the output format as monoscopic");
             mS3DFormat = FORMAT_3D_INPUT(format3D) | HAL_3D_OUT_MONOSCOPIC_MASK;
         }
-        bool noRot = !orientation;
+        // We always enable the rotator for the primary.
+        bool noRot = false;
         switch(mState) {
             case OV_2D_VIDEO_ON_PANEL:
             case OV_3D_VIDEO_2D_PANEL:
                 return startChannel(info, FRAMEBUFFER_0, noRot, false,
-                        mS3DFormat, VG0_PIPE, ignoreFB, num_buffers);
+                        mS3DFormat, VG0_PIPE, waitForVsync, num_buffers);
                 break;
             case OV_3D_VIDEO_3D_PANEL:
                 for (int i=0; i<NUM_CHANNELS; i++) {
-                    if(!startChannel(info, false, false,
-                                mS3DFormat, i, ignoreFB, num_buffers)) {
+                    if(!startChannel(info, FRAMEBUFFER_0, noRot,
+                                mS3DFormat, i, waitForVsync, num_buffers)) {
                         LOGE("%s:failed to open channel %d", __FUNCTION__, i);
                         return false;
                     }
@@ -517,10 +543,13 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
             case OV_2D_VIDEO_ON_TV:
             case OV_3D_VIDEO_2D_TV:
                 for (int i=0; i<NUM_CHANNELS; i++) {
-                    if (FRAMEBUFFER_1 == i)
+                    if (FRAMEBUFFER_1 == i) {
+                        // Disable rotation for HDMI
                         noRot = true;
+                        waitForVsync = true;
+                    }
                     if(!startChannel(info, i, noRot, false, mS3DFormat,
-                                i, ignoreFB, num_buffers)) {
+                                i, waitForVsync, num_buffers)) {
                         LOGE("%s:failed to open channel %d", __FUNCTION__, i);
                         return false;
                     }
@@ -532,7 +561,7 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
             case OV_3D_VIDEO_3D_TV:
                 for (int i=0; i<NUM_CHANNELS; i++) {
                     if(!startChannel(info, FRAMEBUFFER_1, true, false,
-                                mS3DFormat, i, ignoreFB, num_buffers)) {
+                                mS3DFormat, i, waitForVsync, num_buffers)) {
                         LOGE("%s:failed to open channel %d", __FUNCTION__, i);
                         return false;
                     }
@@ -543,13 +572,17 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                 LOGE("%s:Unknown state %d", __FUNCTION__, mState);
                 break;
         }
+    } else {
+        ret = updateOverlaySource(info, orientation, waitForVsync);
     }
     return true;
 }
 
 bool Overlay::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
-    if (!mChannelUP)
+    if (!mChannelUP) {
+        LOGE("%s: channel not set", __FUNCTION__);
         return false;
+    }
     overlay_rect rect, inRect;
     inRect.x = x; inRect.y = y; inRect.w = w; inRect.h = h;
     mCroppedSrcWidth = w;
@@ -595,6 +628,9 @@ bool Overlay::setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int
 }
 
 bool Overlay::setParameter(int param, int value) {
+    int currentOrientation = -1;
+    getOrientation(currentOrientation);
+
     switch (mState) {
         case OV_UI_MIRROR_TV:
         case OV_2D_VIDEO_ON_PANEL:
@@ -703,7 +739,8 @@ bool Overlay::queueBuffer(int fd, uint32_t offset, int channel) {
     return ret;
 }
 
-OverlayControlChannel::OverlayControlChannel() : mNoRot(false), mFD(-1), mRotFD(-1), mFormat3D(0) {
+OverlayControlChannel::OverlayControlChannel() : mNoRot(false), mFD(-1), mRotFD(-1),
+                                                 mFormat3D(0), mIsChannelUpdated(true) {
     memset(&mOVInfo, 0, sizeof(mOVInfo));
     memset(&m3DOVInfo, 0, sizeof(m3DOVInfo));
     memset(&mRotInfo, 0, sizeof(mRotInfo));
@@ -870,24 +907,22 @@ bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& inf
     mOVInfo.dst_rect.h = h;
     if(format == MDP_Y_CRCB_H2V2_TILE) {
         if (!orientation) {
-            mOVInfo.src_rect.w = w - ( (((w-1)/64 +1)*64) - w);
-            mOVInfo.src_rect.h = h - ((((h-1)/32 +1)*32) - h);
-            mOVInfo.src.format = MDP_Y_CRCB_H2V2_TILE;
+           mOVInfo.src_rect.w = w - ((((w-1)/64 +1)*64) - w);
+           mOVInfo.src_rect.h = h - ((((h-1)/32 +1)*32) - h);
         } else {
-            mOVInfo.src_rect.w = w;
-            mOVInfo.src_rect.h = h;
-            mOVInfo.src.width  = (((w-1)/64 +1)*64);
-            mOVInfo.src.height = (((h-1)/32 +1)*32);
-            mOVInfo.src_rect.x = mOVInfo.src.width - w;
-            mOVInfo.src_rect.y = mOVInfo.src.height - h;
-            mOVInfo.src.format = MDP_Y_CRCB_H2V2;
+           mOVInfo.src_rect.w = w;
+           mOVInfo.src_rect.h = h;
+           mOVInfo.src.width  = (((w-1)/64 +1)*64);
+           mOVInfo.src.height = (((h-1)/32 +1)*32);
+           mOVInfo.src_rect.x = mOVInfo.src.width - w;
+           mOVInfo.src_rect.y = mOVInfo.src.height - h;
         }
     } else {
         mOVInfo.src_rect.w = w;
         mOVInfo.src_rect.h = h;
-        mOVInfo.src.format = format;
     }
 
+    mOVInfo.src.format = format;
     if (w > mFBWidth)
         mOVInfo.dst_rect.w = mFBWidth;
     if (h > mFBHeight)
@@ -900,9 +935,12 @@ bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& inf
         mOVInfo.alpha = 0xff;
         mOVInfo.transp_mask = 0xffffffff;
         mOVInfo.flags = flags;
-        if (!ignoreFB)
-            mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
     }
+    if (!ignoreFB)
+        mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
+    else
+        mOVInfo.flags &= ~MDP_OV_PLAY_NOWAIT;
+
     return true;
 }
 
@@ -930,9 +968,8 @@ bool OverlayControlChannel::startOVRotatorSessions(
             mRotInfo.dst.width = (((w-1)/64 +1)*64);
             mRotInfo.dst.height = (((h-1)/32 +1)*32);
             mRotInfo.dst.format = MDP_Y_CRCB_H2V2;
-        } else {
-            mRotInfo.dst.format = format;
         }
+        mRotInfo.dst.format = get_rot_output_format(format);
         mRotInfo.dst_x = 0;
         mRotInfo.dst_y = 0;
         mRotInfo.src_rect.x = 0;
@@ -963,19 +1000,22 @@ bool OverlayControlChannel::startOVRotatorSessions(
 
     if (!ret)
         closeControlChannel();
-
+    else
+        mIsChannelUpdated = true;
     return ret;
 }
 
 bool OverlayControlChannel::updateOverlaySource(const overlay_buffer_info& info,
-                                                int orientation)
+                                                int orientation, bool waitForVsync)
 {
-    int hw_format = get_mdp_format(COLOR_FORMAT(info.format));
+    int colorFormat = getColorFormat(info.format);
+    int hw_format = get_mdp_format(colorFormat);
     overlay_buffer_info ovBufInfo;
     ovBufInfo.width = info.width;
     ovBufInfo.height = info.height;
     ovBufInfo.format = hw_format;
-    if (!setOverlayInformation(ovBufInfo, 0, orientation, 0, 0, UPDATE_REQUEST))
+
+    if (!setOverlayInformation(ovBufInfo, 0, orientation, 0, waitForVsync, UPDATE_REQUEST))
         return false;
 
     return startOVRotatorSessions(ovBufInfo, orientation, UPDATE_REQUEST);
@@ -1053,59 +1093,18 @@ bool OverlayControlChannel::closeControlChannel() {
     return true;
 }
 
-bool OverlayControlChannel::setSource(uint32_t w, uint32_t h,
-                        int cFormat, int orientation, bool ignoreFB) {
-    int format = cFormat & INTERLACE_MASK ?
-                (cFormat ^ HAL_PIXEL_FORMAT_INTERLACE) : cFormat;
-    format = get_mdp_format(format);
-    if (orientation == mOrientation && orientation != 0){
-        //set format to non-tiled and align w, h to 64-bit and 32-bit respectively.
-        if (format == MDP_Y_CRCB_H2V2_TILE) {
-            format = MDP_Y_CRCB_H2V2;
-            w = (((w-1)/64 +1)*64);
-            h = (((h-1)/32 +1)*32);
-        }
-        switch(orientation){
-            case (HAL_TRANSFORM_ROT_90 | HAL_TRANSFORM_FLIP_H):
-            case (HAL_TRANSFORM_ROT_90 | HAL_TRANSFORM_FLIP_V):
-            case HAL_TRANSFORM_ROT_90:
-            case HAL_TRANSFORM_ROT_270:
-                {
-                    int tmp = w;
-                    w = h;
-                    h = tmp;
-                }
-            default:
-                break;
-        }
+bool OverlayControlChannel::updateWaitForVsyncFlags(bool waitForVsync) {
+    if (!waitForVsync)
+        mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
+    else
+        mOVInfo.flags &= ~MDP_OV_PLAY_NOWAIT;
+
+    if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
+        LOGE("%s: OVERLAY_SET failed", __FUNCTION__);
+        dump(mOVInfo);
+        return false;
     }
-
-    if (w == mOVInfo.src.width && h == mOVInfo.src.height
-            && format == mOVInfo.src.format && orientation == mOrientation) {
-        mdp_overlay ov;
-        ov.id = mOVInfo.id;
-        if (ioctl(mFD, MSMFB_OVERLAY_GET, &ov))
-            return false;
-        mOVInfo = ov;
-        int flags = mOVInfo.flags;
-
-        if (!ignoreFB)
-            mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
-        else
-            mOVInfo.flags &= ~MDP_OV_PLAY_NOWAIT;
-
-        if (flags != mOVInfo.flags) {
-            if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
-                LOGE("setSource, OVERLAY_SET failed");
-                dump(mOVInfo);
-                return false;
-             }
-        }
-
-        return true;
-    }
-    mOrientation = orientation;
-    return false;
+    return true;
 }
 
 bool OverlayControlChannel::setPosition(int x, int y, uint32_t w, uint32_t h) {
@@ -1177,8 +1176,10 @@ bool OverlayControlChannel::useVirtualFB() {
 }
 
 bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
-    if (!isChannelUP())
+    if (!isChannelUP()) {
+        LOGE("%s: channel is not up", __FUNCTION__);
         return false;
+    }
 
     mdp_overlay ov = mOVInfo;
     if (fetch && ioctl(mFD, MSMFB_OVERLAY_GET, &ov)) {
@@ -1186,6 +1187,13 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
         return false;
     }
     mOVInfo = ov;
+    if (!mIsChannelUpdated && (OVERLAY_TRANSFORM == param)) {
+        int orientation = get_mdp_orientation(value);
+        if (orientation == mOVInfo.user_data[0]) {
+            return true;
+        }
+    }
+    mIsChannelUpdated = false;
 
     switch (param) {
     case OVERLAY_DITHER:
@@ -1197,7 +1205,6 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
             return true;
 
         int rot = value;
-        int flip = 0;
 
         switch(rot) {
         case 0:
@@ -1218,8 +1225,6 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
                     mOVInfo.src_rect.y = tmp;
                     swapOVRotWidthHeight();
             }
-            rot = 0;
-            flip = value & (HAL_TRANSFORM_FLIP_H|HAL_TRANSFORM_FLIP_V);
             break;
         }
         case HAL_TRANSFORM_ROT_90:
@@ -1239,8 +1244,6 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
                     mOVInfo.src_rect.y = tmp;
                     swapOVRotWidthHeight();
             }
-            rot = HAL_TRANSFORM_ROT_90;
-            flip = value & (HAL_TRANSFORM_FLIP_H|HAL_TRANSFORM_FLIP_V);
             break;
         }
         case HAL_TRANSFORM_ROT_180:
@@ -1280,7 +1283,7 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
         }
         default: return false;
     }
-    int mdp_rotation = get_mdp_orientation(rot, flip);
+    int mdp_rotation = get_mdp_orientation(rot);
     if (mdp_rotation == -1)
         return false;
 

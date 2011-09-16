@@ -198,39 +198,24 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer) {
 
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
-        int orientation = 0;
         overlay_buffer_info info;
         info.width = hnd->width;
         info.height = hnd->height;
         info.format = hnd->format;
         info.size = hnd->size;
 
-        if (OVERLAY_CHANNEL_UP == ovLibObject->getChannelStatus())
-            ovLibObject->getOrientation(orientation);
-
-        if ((OVERLAY_CHANNEL_DOWN == ovLibObject->getChannelStatus())
-            || (layer->transform != orientation) ||
-            (hnd->flags & private_handle_t::PRIV_FLAGS_FORMAT_CHANGED)) {
-            // Overlay channel is not started, or we have an orientation change
-            // or there is a format change, call setSource to open the overlay
-            // if necessary
-            ret = ovLibObject->setSource(info, layer->transform,
+        ret = ovLibObject->setSource(info, layer->transform,
                             (ovLibObject->getHDMIStatus()?true:false), false);
-            if (!ret) {
-                LOGE("prepareOverlay setSource failed");
-                return -1;
-            }
-            // Reset this flag so that we don't keep opening and closing channels
-            // unnecessarily
-            hnd->flags &= ~private_handle_t::PRIV_FLAGS_FORMAT_CHANGED;
-        } else {
-            // The overlay goemetry may have changed, we only need to update the
-            // overlay
-            ret = ovLibObject->updateOverlaySource(info, layer->transform);
-            if (!ret) {
-                LOGE("prepareOverlay updateOverlaySource failed");
-                return -1;
-            }
+        if (!ret) {
+            LOGE("prepareOverlay setSource failed");
+            return -1;
+        }
+
+        ret = ovLibObject->setParameter(OVERLAY_TRANSFORM, layer->transform);
+        if (!ret) {
+            LOGE("prepareOverlay setParameter failed transform %x",
+                    layer->transform);
+            return -1;
         }
 
         hwc_rect_t sourceCrop = layer->sourceCrop;
@@ -239,15 +224,6 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer) {
                                   (sourceCrop.bottom - sourceCrop.top));
         if (!ret) {
             LOGE("prepareOverlay setCrop failed");
-            return -1;
-        }
-
-        ovLibObject->getOrientation(orientation);
-        if (orientation != layer->transform)
-            ret = ovLibObject->setParameter(OVERLAY_TRANSFORM, layer->transform);
-        if (!ret) {
-            LOGE("prepareOverlay setParameter failed transform %x",
-                    layer->transform);
             return -1;
         }
 

@@ -89,13 +89,11 @@ void setupOvRotInfo(int w, int h, int format, int orientation,
     rotInfo.dst.height = srch;
 
     int rot = orientation;
-    int flip = 0;
     switch(rot) {
         case 0:
         case HAL_TRANSFORM_FLIP_H:
         case HAL_TRANSFORM_FLIP_V:
             rot = 0;
-            flip = orientation & (HAL_TRANSFORM_FLIP_H|HAL_TRANSFORM_FLIP_V);
             break;
         case HAL_TRANSFORM_ROT_90:
         case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H):
@@ -106,7 +104,6 @@ void setupOvRotInfo(int w, int h, int format, int orientation,
             ovInfo.src_rect.y = tmp;
             swapOVRotWidthHeight(rotInfo, ovInfo);
             rot = HAL_TRANSFORM_ROT_90;
-            flip = orientation & (HAL_TRANSFORM_FLIP_H|HAL_TRANSFORM_FLIP_V);
             break;
         }
         case HAL_TRANSFORM_ROT_180:
@@ -123,7 +120,7 @@ void setupOvRotInfo(int w, int h, int format, int orientation,
             break;
     }
 
-    int mdp_rotation = overlay::get_mdp_orientation(rot, flip);
+    int mdp_rotation = overlay::get_mdp_orientation(rot);
     if (mdp_rotation < 0)
         mdp_rotation = 0;
     ovInfo.user_data[0] = mdp_rotation;
