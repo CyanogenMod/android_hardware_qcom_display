@@ -186,7 +186,7 @@ static int hwc_updateOverlayStatus(hwc_context_t* ctx, int layerType) {
 /*
  * Configures mdp pipes
  */
-static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer) {
+static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const bool waitForVsync) {
      int ret = 0;
      if (LIKELY(ctx && ctx->mOverlayLibObject)) {
         private_hwc_module_t* hwcModule =
@@ -205,7 +205,7 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer) {
         info.size = hnd->size;
 
         ret = ovLibObject->setSource(info, layer->transform,
-                            (ovLibObject->getHDMIStatus()?true:false), false);
+                            (ovLibObject->getHDMIStatus()?true:false), waitForVsync);
         if (!ret) {
             LOGE("prepareOverlay setSource failed");
             return -1;
@@ -559,6 +559,8 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             }
         }
 
+        bool skipComposition = canSkipComposition(ctx, yuvBufferCount,
+                                         list->numHwLayers, numLayersNotUpdating);
         if (list->flags & HWC_GEOMETRY_CHANGED) {
             layerType |= (yuvBufferCount == 1) ? HWC_SINGLE_VIDEO: 0;
             // Inform the gralloc of the current HDMI status
@@ -570,18 +572,19 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             // If there is a single Fullscreen layer, we can bypass it - TBD
             // If there is only one video/camera buffer, we can bypass itn
             if (hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO) && (yuvBufferCount == 1)) {
-                if(prepareOverlay(ctx, &(list->hwLayers[i])) == 0) {
+                bool waitForVsync = skipComposition ? true:false;
+                if(prepareOverlay(ctx, &(list->hwLayers[i]), waitForVsync) == 0) {
                     list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
                     list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
                 } else if (hwcModule->compositionType & (COMPOSITION_TYPE_C2D)) {
                     //Fail safe path: If drawing with overlay fails,
                     //Use C2D if available.
                     list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
-                    yuvBufferCount = 0;
+                    skipComposition = false;
                 } else {
                     //If C2D is not enabled fall back to GPU.
                     list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
-                    yuvBufferCount = 0;
+                    skipComposition = false;
                 }
             } else if (list->hwLayers[i].flags == HWC_USE_ORIGINAL_RESOLUTION) {
                 list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
@@ -598,8 +601,7 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             }
         }
 
-        if (canSkipComposition(ctx, yuvBufferCount, list->numHwLayers,
-                    numLayersNotUpdating)) {
+        if (skipComposition) {
             list->flags |= HWC_SKIP_COMPOSITION;
         } else {
             list->flags &= ~HWC_SKIP_COMPOSITION;
@@ -768,7 +770,6 @@ static int hwc_set(hwc_composer_device_t *dev,
         hwc_surface_t sur,
         hwc_layer_list_t* list)
 {
-    
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     if(!ctx || !list) {
          LOGE("hwc_set invalid context or list");
@@ -781,6 +782,7 @@ static int hwc_set(hwc_composer_device_t *dev,
         LOGE("hwc_set null module ");
         return -1;
     }
+
     for (size_t i=0; i<list->numHwLayers; i++) {
         if (list->hwLayers[i].flags == HWC_SKIP_LAYER) {
             continue;
