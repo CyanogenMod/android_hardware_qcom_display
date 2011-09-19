@@ -609,26 +609,11 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
             pthread_cond_signal(&(m->qpost));
             pthread_mutex_unlock(&(m->qlock));
 
-            // LCDC: after new buffer grabbed by MDP can unlock previous
-            // (current) buffer
-            if (m->currentBuffer) {
-                if (m->swapInterval != 0) {
-                    pthread_mutex_lock(&(m->avail[futureIdx].lock));
-                    //while (! m->avail[futureIdx].is_avail) {
-                    while (m->avail[futureIdx].state != AVL) {
-                        pthread_cond_wait(&(m->avail[futureIdx].cond),
-                                         &(m->avail[futureIdx].lock));
-                        //m->avail[futureIdx].is_avail = true;
-                    }
-                    pthread_mutex_unlock(&(m->avail[futureIdx].lock));
-                }
+            if (m->currentBuffer)
                 m->base.unlock(&m->base, m->currentBuffer);
-            }
+
             m->currentBuffer = buffer;
             m->currentIdx = nxtIdx;
-            if (m->avail[futureIdx].state != AVL) {
-                LOGE_IF(m->swapInterval != 0, "[%d] != AVL!", futureIdx);
-            }
         } else {
             if (m->currentBuffer)
                 m->base.unlock(&m->base, m->currentBuffer);
@@ -679,7 +664,7 @@ static int fb_compositionComplete(struct framebuffer_device_t* dev)
     return 0;
 }
 
-static int fb_dequeueBuffer(struct framebuffer_device_t* dev, int index)
+static int fb_lockBuffer(struct framebuffer_device_t* dev, int index)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(
             dev->common.module);
@@ -1010,7 +995,7 @@ int fb_device_open(hw_module_t const* module, const char* name,
         dev->device.post            = fb_post;
         dev->device.setUpdateRect = 0;
         dev->device.compositionComplete = fb_compositionComplete;
-        dev->device.dequeueBuffer = fb_dequeueBuffer;
+        dev->device.lockBuffer = fb_lockBuffer;
 #if defined(HDMI_DUAL_DISPLAY)
         dev->device.orientationChanged = fb_orientationChanged;
         dev->device.videoOverlayStarted = fb_videoOverlayStarted;
