@@ -81,6 +81,26 @@ int overlay::get_mdp_orientation(int rotation, int flip) {
     return -1;
 }
 
+// This function normalizes the crop values to be all even
+void overlay::normalize_crop(uint32_t& xy, uint32_t& wh) {
+
+    if (xy & 0x0001) {
+        // x or y is odd, increment it's value
+        xy += 1;
+        // Since we've incremented x(y), we need to decrement
+        // w(h) accordingly
+        if (wh & 0x0001) {
+            // w or h is odd, decrement it by 1, to make it even
+            EVEN_OUT(wh);
+        } else {
+            // w(h) is already even, hence we decrement by 2
+            wh -=2;
+        }
+    } else {
+        EVEN_OUT(wh);
+    }
+}
+
 #define LOG_TAG "OverlayLIB"
 static void reportError(const char* message) {
     LOGE( "%s", message);
@@ -1672,6 +1692,9 @@ bool OverlayDataChannel::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
            (ov.src_rect.w == w) &&
            (ov.src_rect.h == h))
         return true;
+
+    normalize_crop(x, w);
+    normalize_crop(y, h);
 
     ov.src_rect.x = x;
     ov.src_rect.y = y;

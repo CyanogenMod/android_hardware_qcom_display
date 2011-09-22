@@ -126,6 +126,7 @@ unsigned int  getOverlayConfig (unsigned int format3D, bool poll = true,
 int get_mdp_format(int format);
 int get_size(int format, int w, int h);
 int get_mdp_orientation(int rotation, int flip);
+void normalize_crop(uint32_t& xy, uint32_t& wh);
 
 /* Print values being sent to driver in case of ioctl failures
    These logs are enabled only if DEBUG_OVERLAY is true       */
