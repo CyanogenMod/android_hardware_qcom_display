@@ -404,7 +404,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
     if (usage & GRALLOC_USAGE_HW_FB) {
         err = gralloc_alloc_framebuffer(size, usage, pHandle);
     } else {
-        err = gralloc_alloc_buffer(size, usage, pHandle, bufferType, format, w, h);
+        err = gralloc_alloc_buffer(size, usage, pHandle, bufferType, format, alignedw, alignedh);
     }
 
     if (err < 0) {
