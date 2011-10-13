@@ -390,8 +390,9 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer, int index,
             LOGE("prepareBypass handle null");
             return -1;
         }
-        if(hnd->width > hwcModule->fbDevice->width ||
-                hnd->height > hwcModule->fbDevice->height) {
+        hwc_rect_t sourceCrop = layer->sourceCrop;
+        if((sourceCrop.right - sourceCrop.left) > hwcModule->fbDevice->width ||
+                (sourceCrop.bottom - sourceCrop.top) > hwcModule->fbDevice->height) {
             ctx->animCount = ANIM_FRAME_COUNT;
             return -1;
         }
@@ -399,8 +400,8 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer, int index,
         int ret = 0;
         int orientation = layer->transform;
         overlay_buffer_info info;
-        info.width = hnd->width;
-        info.height = hnd->height;
+        info.width = sourceCrop.right - sourceCrop.left;
+        info.height = sourceCrop.bottom - sourceCrop.top;
         info.format = hnd->format;
         info.size = hnd->size;
         const bool useVGPipe = true;
@@ -415,6 +416,7 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer, int index,
             LOGE("prepareBypass setSource failed");
             return -1;
         }
+
         hwc_rect_t displayFrame = layer->displayFrame;
         ret = ovUI->setPosition(displayFrame.left, displayFrame.top,
                 (displayFrame.right - displayFrame.left),
