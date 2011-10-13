@@ -86,6 +86,20 @@ char framebufferStateName[] = {'S', 'R', 'A'};
 #define MAX_DEBUG_FPS_LEVEL             2
 
 struct debug_fps_metadata_t {
+    /*fps calculation based on time or number of frames*/
+    enum DfmType {
+      DFM_FRAMES = 0,
+      DFM_TIME   = 1,
+    };
+
+    DfmType type;
+
+    /* indicates how much time do we wait till we calculate FPS */
+    unsigned long time_period;
+
+    /*indicates how much time elapsed since we report fps*/
+    float time_elapsed;
+
     /* indicates how many frames do we wait till we calculate FPS */
     unsigned int period;
     /* current frame, will go upto period, and then reset */
@@ -176,8 +190,20 @@ static void populate_debug_fps_metadata(void)
 {
     char prop[PROPERTY_VALUE_MAX];
 
+    /*defaults calculation of fps to based on number of frames*/
+    property_get("debug.gr.calcfps.type", prop, "0");
+    debug_fps_metadata.type = (debug_fps_metadata_t::DfmType) atoi(prop);
+
+    /*defaults to 1000ms*/
+    property_get("debug.gr.calcfps.timeperiod", prop, "1000");
+    debug_fps_metadata.time_period = atoi(prop);
+
     property_get("debug.gr.calcfps.period", prop, "10");
     debug_fps_metadata.period = atoi(prop);
+
+    if (debug_fps_metadata.period > MAX_FPS_CALC_PERIOD_IN_FRAMES) {
+        debug_fps_metadata.period = MAX_FPS_CALC_PERIOD_IN_FRAMES;
+    }
 
     /* default ignorethresh_us: 500 milli seconds */
     property_get("debug.gr.calcfps.ignorethresh_us", prop, "500000");
@@ -202,6 +228,41 @@ static void populate_debug_fps_metadata(void)
     LOGE("ignorethresh_us: %lld", debug_fps_metadata.ignorethresh_us);
 }
 
+static void print_fps(float fps)
+{
+    if (debug_fps_metadata_t::DFM_FRAMES == debug_fps_metadata.type)
+        LOGE("FPS for last %d frames: %3.2f", debug_fps_metadata.period, fps);
+    else
+        LOGE("FPS for last (%f ms, %d frames): %3.2f",
+             debug_fps_metadata.time_elapsed,
+             debug_fps_metadata.curr_frame, fps);
+
+    debug_fps_metadata.curr_frame = 0;
+    debug_fps_metadata.time_elapsed = 0.0;
+
+    if (debug_fps_level > 1) {
+        LOGE("Frame Arrival Distribution:");
+        for (unsigned int i = 0;
+             i < ((debug_fps_metadata.framearrival_steps / 6) + 1);
+             i++) {
+            LOGE("%lld %lld %lld %lld %lld %lld",
+                 debug_fps_metadata.accum_framearrivals[i*6],
+                 debug_fps_metadata.accum_framearrivals[i*6+1],
+                 debug_fps_metadata.accum_framearrivals[i*6+2],
+                 debug_fps_metadata.accum_framearrivals[i*6+3],
+                 debug_fps_metadata.accum_framearrivals[i*6+4],
+                 debug_fps_metadata.accum_framearrivals[i*6+5]);
+        }
+
+        /* We are done with displaying, now clear the stats */
+        for (unsigned int i = 0;
+             i < debug_fps_metadata.framearrival_steps;
+             i++)
+            debug_fps_metadata.accum_framearrivals[i] = 0;
+    }
+    return;
+}
+
 static void calc_fps(nsecs_t currtime_us)
 {
     static nsecs_t oldtime_us = 0;
@@ -210,40 +271,14 @@ static void calc_fps(nsecs_t currtime_us)
 
     oldtime_us = currtime_us;
 
-    if (diff > debug_fps_metadata.ignorethresh_us) {
+    if (debug_fps_metadata_t::DFM_FRAMES == debug_fps_metadata.type &&
+        diff > debug_fps_metadata.ignorethresh_us) {
         return;
     }
 
-    if (debug_fps_metadata.curr_frame == debug_fps_metadata.period) {
-        /* time to calculate and display FPS */
-        nsecs_t sum = 0;
-        for (unsigned int i = 0; i < debug_fps_metadata.period; i++)
-            sum += debug_fps_metadata.framearrivals[i];
-        LOGE("FPS for last %d frames: %3.2f", debug_fps_metadata.period,
-                        (debug_fps_metadata.period * float(1000000))/float(sum));
-
-        debug_fps_metadata.curr_frame = 0;
-        if (debug_fps_level > 1) {
-            LOGE("Frame Arrival Distribution:");
-            for (unsigned int i = 0;
-                     i < ((debug_fps_metadata.framearrival_steps / 6) + 1);
-                     i++) {
-                LOGE("%lld %lld %lld %lld %lld %lld",
-                    debug_fps_metadata.accum_framearrivals[i*6],
-                    debug_fps_metadata.accum_framearrivals[i*6+1],
-                    debug_fps_metadata.accum_framearrivals[i*6+2],
-                    debug_fps_metadata.accum_framearrivals[i*6+3],
-                    debug_fps_metadata.accum_framearrivals[i*6+4],
-                    debug_fps_metadata.accum_framearrivals[i*6+5]);
-            }
-
-            /* We are done with displaying, now clear the stats */
-            for (unsigned int i = 0; i < debug_fps_metadata.framearrival_steps; i++)
-                debug_fps_metadata.accum_framearrivals[i] = 0;
-        }
+    if (debug_fps_metadata.curr_frame < MAX_FPS_CALC_PERIOD_IN_FRAMES) {
+        debug_fps_metadata.framearrivals[debug_fps_metadata.curr_frame++] = diff;
     }
-
-    debug_fps_metadata.framearrivals[debug_fps_metadata.curr_frame++] = diff;
 
     if (debug_fps_level > 1) {
         unsigned int currstep = (diff + debug_fps_metadata.margin_us) / 16666;
@@ -252,6 +287,25 @@ static void calc_fps(nsecs_t currtime_us)
             debug_fps_metadata.accum_framearrivals[currstep-1]++;
         }
     }
+
+    if (debug_fps_metadata_t::DFM_FRAMES == debug_fps_metadata.type) {
+        if (debug_fps_metadata.curr_frame == debug_fps_metadata.period) {
+            /* time to calculate and display FPS */
+            nsecs_t sum = 0;
+            for (unsigned int i = 0; i < debug_fps_metadata.period; i++)
+                sum += debug_fps_metadata.framearrivals[i];
+            print_fps((debug_fps_metadata.period * float(1000000))/float(sum));
+        }
+    }
+    else if (debug_fps_metadata_t::DFM_TIME == debug_fps_metadata.type) {
+        debug_fps_metadata.time_elapsed += ((float)diff/1000.0);
+        if (debug_fps_metadata.time_elapsed >= debug_fps_metadata.time_period) {
+            float fps = (1000.0 * debug_fps_metadata.curr_frame)/
+                        (float)debug_fps_metadata.time_elapsed;
+            print_fps(fps);
+        }
+    }
+    return;
 }
 
 #endif // DEBUG_CALC_FPS
