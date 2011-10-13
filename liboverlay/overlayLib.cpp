@@ -52,7 +52,7 @@ int overlay::get_mdp_format(int format) {
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
         return MDP_Y_CRCB_H2V2_TILE;
     case HAL_PIXEL_FORMAT_YV12:
-        return MDP_Y_CR_CB_H2V2;
+        return MDP_Y_CR_CB_GH2V2;
     default:
         LOGE("%s: unknown color format [0x%x]", __FUNCTION__, format);
         return -1;
@@ -86,6 +86,7 @@ int overlay::get_rot_output_format(int format) {
     case MDP_Y_CRCB_H2V2_TILE:
         return MDP_Y_CRCB_H2V2;
     case MDP_Y_CB_CR_H2V2:
+    case MDP_Y_CR_CB_GH2V2:
         return MDP_Y_CBCR_H2V2;
     default:
         return format;
@@ -166,7 +167,10 @@ const char* overlay::getFormatString(int format){
              "MDP_Y_CRCB_H2V2_TILE",
              "MDP_Y_CBCR_H2V2_TILE",
              "MDP_Y_CR_CB_H2V2",
+             "MDP_Y_CR_CB_GH2V2",
              "MDP_Y_CB_CR_H2V2",
+             "MDP_Y_CRCB_H1V1",
+             "MDP_Y_CBCR_H1V1",
              "MDP_IMGTYPE_LIMIT",
              "MDP_BGR_565",
              "MDP_FB_FORMAT",
