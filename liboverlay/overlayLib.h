@@ -90,8 +90,13 @@ enum {
 #define BARRIER_LANDSCAPE 1
 #define BARRIER_PORTRAIT  2
 
+#ifdef HDMI_AS_PRIMARY
+#define FORMAT_3D_FILE        "/sys/class/graphics/fb0/format_3d"
+#define EDID_3D_INFO_FILE     "/sys/class/graphics/fb0/3d_present"
+#else
 #define FORMAT_3D_FILE        "/sys/class/graphics/fb1/format_3d"
 #define EDID_3D_INFO_FILE     "/sys/class/graphics/fb1/3d_present"
+#endif
 #define BARRIER_FILE          "/sys/devices/platform/mipi_novatek.0/enable_3d_barrier"
 /* -------------------------- end 3D defines ----------------------------------------*/
 
@@ -254,6 +259,7 @@ public:
     Overlay();
     ~Overlay();
 
+    static bool sHDMIAsPrimary;
     bool startChannel(const overlay_buffer_info& info, int fbnum, bool norot = false,
                           bool uichannel = false, unsigned int format3D = 0,
                           int channel = 0, bool ignoreFB = false,

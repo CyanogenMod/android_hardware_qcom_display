@@ -605,6 +605,46 @@ static int getYUVBufferCount (const hwc_layer_list_t* list) {
     return yuvBufferCount;
 }
 
+static int getS3DVideoFormat (const hwc_layer_list_t* list) {
+    int s3dFormat = 0;
+    if (list) {
+        for (size_t i=0; i<list->numHwLayers; i++) {
+            private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
+            if (hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO))
+                s3dFormat = FORMAT_3D_INPUT(hnd->format);
+            if (s3dFormat)
+                break;
+        }
+    }
+    return s3dFormat;
+}
+
+static bool isS3DCompositionRequired() {
+#ifdef HDMI_AS_PRIMARY
+    return overlay::is3DTV();
+#endif
+    return false;
+}
+
+static void markUILayerForS3DComposition (hwc_layer_t &layer, int s3dVideoFormat) {
+#ifdef HDMI_AS_PRIMARY
+    layer.compositionType = HWC_FRAMEBUFFER;
+    switch(s3dVideoFormat) {
+        case HAL_3D_IN_SIDE_BY_SIDE_L_R:
+        case HAL_3D_IN_SIDE_BY_SIDE_R_L:
+            layer.hints |= HWC_HINT_DRAW_S3D_SIDE_BY_SIDE;
+            break;
+        case HAL_3D_IN_TOP_BOTTOM:
+            layer.hints |= HWC_HINT_DRAW_S3D_TOP_BOTTOM;
+            break;
+        default:
+            LOGE("%s: Unknown S3D input format 0x%x", __FUNCTION__, s3dVideoFormat);
+            break;
+    }
+#endif
+    return;
+}
+
 static int getLayersNotUpdatingCount(const hwc_layer_list_t* list) {
     int numLayersNotUpdating = 0;
     if (list) {
@@ -636,6 +676,8 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
     int yuvBufferCount = 0;
     int layerType = 0;
+    bool isS3DCompositionNeeded = false;
+    int s3dVideoFormat = 0;
     int numLayersNotUpdating = 0;
     bool fullscreen = false;
 
@@ -648,6 +690,9 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             numLayersNotUpdating = getLayersNotUpdatingCount(list);
             skipComposition = canSkipComposition(ctx, yuvBufferCount,
                                          list->numHwLayers, numLayersNotUpdating);
+            s3dVideoFormat = getS3DVideoFormat(list);
+            if (s3dVideoFormat)
+                isS3DCompositionNeeded = isS3DCompositionRequired();
         }
 
         if (list->flags & HWC_GEOMETRY_CHANGED) {
@@ -662,6 +707,10 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             // If there is a single Fullscreen layer, we can bypass it - TBD
             // If there is only one video/camera buffer, we can bypass itn
             if (list->hwLayers[i].flags & HWC_SKIP_LAYER) {
+                // During the animaton UI layers are marked as SKIP
+                // need to still mark the layer for S3D composition
+                if (isS3DCompositionNeeded)
+                    markUILayerForS3DComposition(list->hwLayers[i], s3dVideoFormat);
                 continue;
             }
             if (hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO) && (yuvBufferCount == 1)) {
@@ -685,6 +734,8 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                     list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
                     skipComposition = false;
                 }
+            } else if (isS3DCompositionNeeded) {
+                markUILayerForS3DComposition(list->hwLayers[i], s3dVideoFormat);
             } else if (list->hwLayers[i].flags == HWC_USE_ORIGINAL_RESOLUTION) {
                 list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
                 list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;

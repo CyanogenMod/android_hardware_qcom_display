@@ -27,6 +27,9 @@ LOCAL_SRC_FILES := \
     overlayLib.cpp \
     overlayLibUI.cpp \
 LOCAL_CFLAGS:= -DLOG_TAG=\"OverlayLib\"
+ifeq ($(TARGET_USE_HDMI_AS_PRIMARY),true)
+LOCAL_CFLAGS += -DHDMI_AS_PRIMARY
+endif
 LOCAL_MODULE := liboverlay
 include $(BUILD_SHARED_LIBRARY)
 
