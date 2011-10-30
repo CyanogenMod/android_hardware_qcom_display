@@ -342,7 +342,7 @@ int gralloc_perform(struct gralloc_module_t const* module,
 
             native_handle_t** handle = va_arg(args, native_handle_t**);
             int memoryFlags = va_arg(args, int);
-            if (memoryFlags == GRALLOC_USAGE_PRIVATE_PMEM) {
+            if (memoryFlags == GRALLOC_USAGE_PRIVATE_EBI_HEAP) {
                 // validate that it's indeed a pmem buffer
                 pmem_region region;
                 if (ioctl(fd, PMEM_GET_SIZE, &region) < 0) {
@@ -353,7 +353,7 @@ int gralloc_perform(struct gralloc_module_t const* module,
                     private_handle_t::sNumFds, private_handle_t::sNumInts);
             hnd->magic = private_handle_t::sMagic;
             hnd->fd = fd;
-            hnd->flags = (memoryFlags == GRALLOC_USAGE_PRIVATE_PMEM) ?
+            hnd->flags = (memoryFlags == GRALLOC_USAGE_PRIVATE_EBI_HEAP) ?
                          private_handle_t::PRIV_FLAGS_USES_PMEM |
                          private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH:
                          private_handle_t::PRIV_FLAGS_USES_ASHMEM;
