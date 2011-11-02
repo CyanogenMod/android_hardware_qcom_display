@@ -160,6 +160,14 @@ static void dump_layer(hwc_layer_t const* l) {
             l->displayFrame.bottom);
 }
 
+static inline int min(const int& a, const int& b) {
+    return (a < b) ? a : b;
+}
+
+static inline int max(const int& a, const int& b) {
+    return (a > b) ? a : b;
+}
+
 static int setVideoOverlayStatusInGralloc(hwc_context_t* ctx, const bool enable) {
 #if defined HDMI_DUAL_DISPLAY
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
@@ -444,12 +452,42 @@ static int drawLayerUsingBypass(hwc_context_t *ctx, hwc_layer_t *layer,
     return 0;
 }
 
+/* Checks if 2 layers intersect */
+static bool isIntersect(const hwc_rect_t& one, const hwc_rect_t& two) {
+    hwc_rect_t result;
+    result.left = max(one.left, two.left);
+    result.top = max(one.top, two.top);
+    result.right = min(one.right, two.right);
+    result.bottom = min(one.bottom, two.bottom);
+    const int width = result.right - result.left;
+    const int height = result.bottom - result.top;
+    const bool isEmpty = width <= 0 || height <= 0;
+    return !isEmpty;
+}
+
+/* Check if layers are disjoint */
+static bool isDisjoint(const hwc_layer_list_t* list) {
+    //Validate supported layer range
+    if(list->numHwLayers <= 0 || list->numHwLayers > MAX_BYPASS_LAYERS) {
+        return false;
+    }
+    for(int i = 0; i < (list->numHwLayers) - 1; i++) {
+        for(int j = i + 1; j < list->numHwLayers; j++) {
+            if(isIntersect(list->hwLayers[i].displayFrame,
+                list->hwLayers[j].displayFrame)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 /*
  * Checks if doing comp. bypass is possible. If video is not on and there
  * are 2 layers then its doable.
  */
 inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount,
-        const int numLayers) {
+        const hwc_layer_list_t* list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
                                                            dev->common.module);
@@ -468,7 +506,7 @@ inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount
         return false;
     }
 #endif
-    return (yuvCount == 0) && (numLayers == MAX_BYPASS_LAYERS);
+    return (yuvCount == 0) && isDisjoint(list);
 }
 
 /*
@@ -759,7 +797,7 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
 #ifdef COMPOSITION_BYPASS
         //Check if bypass is feasible
-        if(isBypassDoable(dev, yuvBufferCount, list->numHwLayers) &&
+        if(isBypassDoable(dev, yuvBufferCount, list) &&
                 isBypassEfficient(hwcModule->fbDevice, list, ctx)) {
             //Setup bypass
             if(setupBypass(ctx, list)) {
