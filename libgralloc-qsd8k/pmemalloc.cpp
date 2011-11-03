@@ -278,9 +278,9 @@ int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
     int openFlags = get_open_flags(usage);
     const char *device;
     
-    if (usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) {
+    if (usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP) {
         device = DEVICE_PMEM_ADSP;
-    } else if (usage & GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL) {
+    } else if (usage & GRALLOC_USAGE_PRIVATE_SMI_HEAP) {
         device = DEVICE_PMEM_SMIPOOL;
     } else if ((usage & GRALLOC_USAGE_EXTERNAL_DISP) ||
                (usage & GRALLOC_USAGE_PROTECTED)) {

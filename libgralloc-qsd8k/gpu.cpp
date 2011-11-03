@@ -80,7 +80,7 @@ int gpu_context_t::gralloc_alloc_framebuffer_locked(size_t size, int usage,
     private_module_t* m = reinterpret_cast<private_module_t*>(common.module);
 
     // we don't support allocations with both the FB and PMEM_ADSP flags
-    if (usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) {
+    if (usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP) {
         return -EINVAL;
     }
 
@@ -221,11 +221,11 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
     }
 
-    if (usage & GRALLOC_USAGE_PRIVATE_PMEM) {
+    if (usage & GRALLOC_USAGE_PRIVATE_EBI_HEAP) {
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM;
     }
 #endif
-    if ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) || (usage & GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL)
+    if ((usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP) || (usage & GRALLOC_USAGE_PRIVATE_SMI_HEAP)
         || (usage & GRALLOC_USAGE_EXTERNAL_DISP) || (usage & GRALLOC_USAGE_PROTECTED)) {
         flags |= private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP;
         flags &= ~private_handle_t::PRIV_FLAGS_USES_PMEM;
@@ -267,8 +267,8 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage, buffer_handle_t*
             // c. The client has not explicitly requested a PMEM buffer
             if ((get_composition_type() != MDP_COMPOSITION) &&
                 (bufferType != BUFFER_TYPE_VIDEO) &&
-                ((usage & GRALLOC_USAGE_PRIVATE_PMEM) == 0) &&
-                ((usage & GRALLOC_USAGE_PRIVATE_PMEM_ADSP) == 0)) {
+                ((usage & GRALLOC_USAGE_PRIVATE_EBI_HEAP) == 0) &&
+                ((usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP) == 0)) {
                 // the caller didn't request PMEM, so we can try something else
                 flags &= ~private_handle_t::PRIV_FLAGS_USES_PMEM;
                 err = 0;

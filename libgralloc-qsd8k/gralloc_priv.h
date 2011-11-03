@@ -36,10 +36,15 @@ using namespace overlay;
 #endif
 
 enum {
-    /* gralloc usage bit indicating a pmem_adsp allocation should be used */
-    GRALLOC_USAGE_PRIVATE_PMEM_ADSP = GRALLOC_USAGE_PRIVATE_0,
-    GRALLOC_USAGE_PRIVATE_PMEM_SMIPOOL = GRALLOC_USAGE_PRIVATE_1,
-    GRALLOC_USAGE_PRIVATE_PMEM = GRALLOC_USAGE_PRIVATE_2,
+    /* gralloc usage bits indicating the type
+     * of allocation that should be used */
+    GRALLOC_USAGE_PRIVATE_ADSP_HEAP = GRALLOC_USAGE_PRIVATE_0,
+    GRALLOC_USAGE_PRIVATE_EBI_HEAP = GRALLOC_USAGE_PRIVATE_1,
+    GRALLOC_USAGE_PRIVATE_SMI_HEAP = GRALLOC_USAGE_PRIVATE_2,
+    GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP = GRALLOC_USAGE_PRIVATE_3,
+    /* Set this for allocating uncached memory (using O_DSYNC)
+     * cannot be used with the system heap */
+    GRALLOC_USAGE_PRIVATE_UNCACHED = 0x00010000,
 };
 
 enum {
@@ -262,9 +267,10 @@ struct private_handle_t {
         PRIV_FLAGS_FRAMEBUFFER    = 0x00000001,
         PRIV_FLAGS_USES_PMEM      = 0x00000002,
         PRIV_FLAGS_USES_PMEM_ADSP = 0x00000004,
-        PRIV_FLAGS_NEEDS_FLUSH    = 0x00000008,
+        PRIV_FLAGS_USES_ION       = 0x00000008,
         PRIV_FLAGS_USES_ASHMEM    = 0x00000010,
-        PRIV_FLAGS_FORMAT_CHANGED = 0x00000020,
+        PRIV_FLAGS_NEEDS_FLUSH    = 0x00000020,
+        PRIV_FLAGS_DO_NOT_FLUSH   = 0x00000040,
     };
 
     enum {
