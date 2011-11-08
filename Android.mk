@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+ifeq ($(TARGET_USES_ION),true)
 LOCAL_PATH := $(call my-dir)
 
 # HAL module implemenation, not prelinked and stored in
@@ -66,4 +66,5 @@ LOCAL_MODULE_TAGS := tests
 LOCAL_MODULE := libgralloc_qsd8k_host
 LOCAL_CFLAGS:= -DLOG_TAG=\"gralloc-qsd8k\"
 include $(BUILD_HOST_STATIC_LIBRARY)
+endif
 endif
