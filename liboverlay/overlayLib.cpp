@@ -1489,6 +1489,9 @@ bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int r
             }
         }
     }
+    // Set this flag if source memory is fb
+    if(uiChannel)
+        mRotData.src.flags |= MDP_MEMORY_ID_TYPE_FB;
 
     mOvDataRot.data.memory_id = mPmemFD;
     mRotData.dst.memory_id = mPmemFD;
