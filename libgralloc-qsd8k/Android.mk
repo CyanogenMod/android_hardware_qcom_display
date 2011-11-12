@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+ifneq ($(TARGET_USES_ION),true)
 LOCAL_PATH := $(call my-dir)
 
 # HAL module implemenation, not prelinked and stored in
@@ -21,7 +21,8 @@ LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_SHARED_LIBRARIES := liblog libcutils libGLESv1_CM libutils
 
-LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
+LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include \
+                    hardware/qcom/display/libgralloc
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_SRC_FILES := 	\
 	allocator.cpp 	\
@@ -61,4 +62,5 @@ LOCAL_MODULE_TAGS := tests
 LOCAL_MODULE := libgralloc_qsd8k_host
 LOCAL_CFLAGS:= -DLOG_TAG=\"gralloc-qsd8k\"
 include $(BUILD_HOST_STATIC_LIBRARY)
+endif
 endif
