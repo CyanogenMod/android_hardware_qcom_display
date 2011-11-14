@@ -307,6 +307,11 @@ static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image
         return -EINVAL;
     }
 
+    if(handle == NULL) {
+        LOGE("%s: invalid handle", __func__);
+        return -EINVAL;
+    }
+
     if (handle->gpuaddr == 0) {
        handle->gpuaddr = c2d_get_gpuaddr(device_fd, handle);
        if(!handle->gpuaddr) {
