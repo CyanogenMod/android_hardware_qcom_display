@@ -40,6 +40,9 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <hardware/overlay.h>
+#include <utils/RefBase.h>
+#include <alloc_controller.h>
+#include <memalloc.h>
 
 #define HW_OVERLAY_MAGNIFICATION_LIMIT 8
 #define HW_OVERLAY_MINIFICATION_LIMIT HW_OVERLAY_MAGNIFICATION_LIMIT
@@ -215,6 +218,8 @@ class OverlayDataChannel {
     int mCurrentItem;
     int mNumBuffers;
     int mUpdateDataChannel;
+    android::sp<gralloc::IAllocController> mAlloc;
+    int mBufferType;
 
     bool openDevices(int fbnum = -1, bool uichannel = false, int num_buffers = 2);
     bool mapRotatorMemory(int num_buffers, bool uiChannel, int requestType);

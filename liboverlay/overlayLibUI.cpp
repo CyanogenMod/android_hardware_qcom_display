@@ -19,6 +19,10 @@
 #include "gralloc_priv.h"
 #define LOG_TAG "OverlayUI"
 
+using android::sp;
+using gralloc::IMemAlloc;
+using gralloc::alloc_data;
+
 namespace {
 /* helper functions */
 bool checkOVState(int w, int h, int format, int orientation,
@@ -315,6 +319,27 @@ status_t Rotator::startRotSession(msm_rotator_img_info& rotInfo,
             return NO_INIT;
         }
 
+#ifdef USE_ION
+        alloc_data data;
+        data.base = 0;
+        data.fd = -1;
+        data.offset = 0;
+        data.size = mSize * mNumBuffers;
+        data.align = getpagesize();
+        data.uncached = true;
+
+        int err = mAlloc->allocate(data, GRALLOC_USAGE_PRIVATE_ADSP_HEAP|
+                                         GRALLOC_USAGE_PRIVATE_SMI_HEAP, 0);
+
+        if(err) {
+            LOGE("Cant allocate from ION");
+            closeRotSession();
+            return NO_INIT;
+        }
+        mPmemFD = data.fd;
+        mPmemAddr = data.base;
+        mBufferType = data.allocType;
+#else
         mSessionID = rotInfo.session_id;
         mPmemFD = open("/dev/pmem_adsp", O_RDWR | O_SYNC);
         if (mPmemFD < 0) {
@@ -329,6 +354,7 @@ status_t Rotator::startRotSession(msm_rotator_img_info& rotInfo,
             closeRotSession();
             return NO_INIT;
         }
+#endif
 
         mCurrentItem = 0;
         for (int i = 0; i < mNumBuffers; i++)
@@ -343,7 +369,13 @@ status_t Rotator::closeRotSession() {
     if (mSessionID != NO_INIT && mFD != NO_INIT) {
         ioctl(mFD, MSM_ROTATOR_IOCTL_FINISH, &mSessionID);
         close(mFD);
+#ifdef USE_ION
+        sp<IMemAlloc> memalloc = mAlloc->getAllocator(mBufferType);
+        memalloc->free_buffer(mPmemAddr, mSize * mNumBuffers, 0, mPmemFD);
+#else
         munmap(mPmemAddr, mSize * mNumBuffers);
+        close(mPmemFD);
+#endif
         close(mPmemFD);
     }
 

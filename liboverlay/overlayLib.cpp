@@ -26,6 +26,10 @@ static inline size_t ALIGN(size_t x, size_t align) {
 }
 
 using namespace overlay;
+using android::sp;
+using gralloc::IMemAlloc;
+using gralloc::IonController;
+using gralloc::alloc_data;
 
 #ifdef HDMI_AS_PRIMARY
 bool Overlay::sHDMIAsPrimary = true;
@@ -1406,7 +1410,11 @@ bool OverlayControlChannel::getSize(int& size) const {
 }
 
 OverlayDataChannel::OverlayDataChannel() : mNoRot(false), mFD(-1), mRotFD(-1),
-                                  mPmemFD(-1), mPmemAddr(0), mUpdateDataChannel(0) {
+                                  mPmemFD(-1), mPmemAddr(0), mUpdateDataChannel(0)
+{
+#ifdef USE_ION
+    mAlloc = gralloc::IAllocController::getInstance();
+#endif
 }
 
 OverlayDataChannel::~OverlayDataChannel() {
@@ -1462,6 +1470,30 @@ bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int r
 {
     mPmemAddr = MAP_FAILED;
 
+#ifdef USE_ION
+    alloc_data data;
+    data.base = 0;
+    data.fd = -1;
+    data.offset = 0;
+    data.size = mPmemOffset * num_buffers;
+    data.align = getpagesize();
+    data.uncached = true;
+
+    int err = mAlloc->allocate(data, GRALLOC_USAGE_PRIVATE_ADSP_HEAP|
+                                     GRALLOC_USAGE_PRIVATE_SMI_HEAP, 0);
+    if(err) {
+        reportError("Cant allocate from ION");
+        close(mFD);
+        mFD = -1;
+        close(mRotFD);
+        mRotFD = -1;
+        return false;
+    }
+    mPmemFD = data.fd;
+    mPmemAddr = data.base;
+    mBufferType = data.allocType;
+#else
+
     if((requestType == NEW_REQUEST) && !uiChannel) {
         mPmemFD = open("/dev/pmem_smipool", O_RDWR | O_SYNC);
         if(mPmemFD >= 0)
@@ -1493,6 +1525,7 @@ bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int r
             }
         }
     }
+#endif
     // Set this flag if source memory is fb
     if(uiChannel)
         mRotData.src.flags |= MDP_MEMORY_ID_TYPE_FB;
@@ -1537,8 +1570,13 @@ bool OverlayDataChannel::closeDataChannel() {
         return true;
 
     if (!mNoRot && mRotFD > 0) {
+#ifdef USE_ION
+        sp<IMemAlloc> memalloc = mAlloc->getAllocator(mBufferType);
+        memalloc->free_buffer(mPmemAddr, mPmemOffset * mNumBuffers, 0, mPmemFD);
+#else
         munmap(mPmemAddr, mPmemOffset * mNumBuffers);
-
+        close(mPmemFD);
+#endif
         close(mPmemFD);
         mPmemFD = -1;
         close(mRotFD);
@@ -1591,8 +1629,14 @@ bool OverlayDataChannel::queueBuffer(uint32_t offset) {
 
     // Unmap the old PMEM memory after the queueBuffer has returned
     if (oldPmemFD != -1 && oldPmemAddr != MAP_FAILED) {
+#ifdef USE_ION
+        sp<IMemAlloc> memalloc = mAlloc->getAllocator(mBufferType);
+        memalloc->free_buffer(oldPmemAddr, oldPmemOffset * mNumBuffers, 0, oldPmemFD);
+#else
         munmap(oldPmemAddr, oldPmemOffset * mNumBuffers);
         close(oldPmemFD);
+#endif
+
         oldPmemFD = -1;
     }
     return result;
