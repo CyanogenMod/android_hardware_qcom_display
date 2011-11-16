@@ -54,7 +54,8 @@ PmemAllocator::~PmemAllocator()
 }
 
 
-PmemUserspaceAllocator::PmemUserspaceAllocator(Deps& deps, Deps::Allocator& allocator, const char* pmemdev):
+PmemUserspaceAllocator::PmemUserspaceAllocator(Deps& deps,
+        Deps::Allocator& allocator, const char* pmemdev):
     deps(deps),
     allocator(allocator),
     pmemdev(pmemdev),
@@ -201,7 +202,8 @@ int PmemUserspaceAllocator::alloc_pmem_buffer(size_t size, int usage,
 }
 
 
-int PmemUserspaceAllocator::free_pmem_buffer(size_t size, void* base, int offset, int fd)
+int PmemUserspaceAllocator::free_pmem_buffer(size_t size, void* base,
+                                             int offset, int fd)
 {
     BEGIN_FUNC;
     int err = 0;
@@ -277,7 +279,6 @@ int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
     int err, offset = 0;
     int openFlags = get_open_flags(usage);
     const char *device;
-    
     if (usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP) {
         device = DEVICE_PMEM_ADSP;
     } else if (usage & GRALLOC_USAGE_PRIVATE_SMI_HEAP) {
@@ -335,10 +336,12 @@ int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
 }
 
 
-int PmemKernelAllocator::free_pmem_buffer(size_t size, void* base, int offset, int fd)
+int PmemKernelAllocator::free_pmem_buffer(size_t size, void* base,
+                                          int offset, int fd)
 {
     BEGIN_FUNC;
-    // The size should already be page aligned, now round it up to a power of 2
+    // The size should already be page aligned,
+    // now round it up to a power of 2
     // like we did when allocating.
     //size = clp2(size);
 

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +17,7 @@
 
 #include <cutils/log.h>
 
-#include "allocator.h"
+#include "pmem_bestfit_alloc.h"
 
 
 // align all the memory blocks on a cache-line boundary
@@ -50,8 +51,7 @@ ssize_t SimpleBestFitAllocator::setSize(size_t size)
     mList.insertHead(node);
     return size;
 }
-    
-    
+
 size_t SimpleBestFitAllocator::size() const
 {
     return mHeapSize;
