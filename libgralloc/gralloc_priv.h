@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,24 +32,31 @@
 
 #if defined(__cplusplus) && defined(HDMI_DUAL_DISPLAY)
 #include "overlayLib.h"
-#include "overlayLibUI.h"
 using namespace overlay;
-/*
- * BYPASS_OV_CHANNEL_OPEN - bypass channel is open
- * BYPASS_OV_CHANNEL_PENDING_CLOSE - disp_loop to close bypass channel
- * BYPASS_OV_CHANNEL_CLOSED - bypass channel is closed
- */
-enum { BYPASS_OV_CHANNEL_OPEN,
-          BYPASS_OV_CHANNEL_PENDING_CLOSE, BYPASS_OV_CHANNEL_CLOSED };
 #endif
 
 enum {
-    /* gralloc usage bit indicating the type
+    /* gralloc usage bits indicating the type
      * of allocation that should be used */
     GRALLOC_USAGE_PRIVATE_ADSP_HEAP = GRALLOC_USAGE_PRIVATE_0,
     GRALLOC_USAGE_PRIVATE_EBI_HEAP = GRALLOC_USAGE_PRIVATE_1,
     GRALLOC_USAGE_PRIVATE_SMI_HEAP = GRALLOC_USAGE_PRIVATE_2,
     GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP = GRALLOC_USAGE_PRIVATE_3,
+    /* Set this for allocating uncached memory (using O_DSYNC)
+     * cannot be used with the system heap */
+    GRALLOC_USAGE_PRIVATE_UNCACHED = 0x00010000,
+    /* This flag needs to be set when using a system heap
+     * from ION. If not set, the system heap is assumed
+     * to be coming from ashmem
+     */
+    GRALLOC_USAGE_PRIVATE_ION = 0x00020000,
+};
+
+enum {
+    GPU_COMPOSITION,
+    C2D_COMPOSITION,
+    MDP_COMPOSITION,
+    CPU_COMPOSITION,
 };
 
 /* numbers of max buffers for page flipping */
@@ -60,8 +67,14 @@ enum {
 #define NUM_DEF_FRAME_BUFFERS 2
 #define NO_SURFACEFLINGER_SWAPINTERVAL
 #define INTERLACE_MASK 0x80
+#define S3D_FORMAT_MASK 0xFF000
+#define COLOR_FORMAT(x) (x & 0xFFF) // Max range for colorFormats is 0 - FFF
+#define DEVICE_PMEM_ADSP "/dev/pmem_adsp"
+#define DEVICE_PMEM_SMIPOOL "/dev/pmem_smipool"
 /*****************************************************************************/
 #ifdef __cplusplus
+
+//XXX: Remove framebuffer specific classes and defines to a different header
 template <class T>
 struct Node
 {
@@ -172,6 +185,10 @@ enum {
     HAL_3D_OUT_MONOSCOPIC             = 0x8000
 };
 
+enum {
+	BUFFER_TYPE_UI = 0,
+	BUFFER_TYPE_VIDEO
+};
 /*****************************************************************************/
 
 struct private_module_t;
@@ -198,57 +215,6 @@ struct avail_t {
 #endif
 };
 
-
-#ifdef __cplusplus
-/* Store for shared data and synchronization */
-struct ThreadShared {
-    int w;
-    int h;
-    int format;
-    buffer_handle_t buffer;
-    bool isNewBuffer;
-    bool isBufferPosted;
-    bool isExitPending; //Feature close
-    bool isHDMIExitPending; //Only HDMI close
-    //New buffer arrival condition
-    pthread_mutex_t newBufferMutex;
-    pthread_cond_t newBufferCond;
-    //Buffer posted to display  condition, used instead of barrier
-    pthread_mutex_t bufferPostedMutex;
-    pthread_cond_t bufferPostedCond;
-
-    ThreadShared():w(0),h(0),format(0),buffer(0),isNewBuffer(false),
-            isBufferPosted(false), isExitPending(false),
-            isHDMIExitPending(false) {
-        pthread_mutex_init(&newBufferMutex, NULL);
-        pthread_mutex_init(&bufferPostedMutex, NULL);
-        pthread_cond_init(&newBufferCond, NULL);
-        pthread_cond_init(&bufferPostedCond, NULL);
-    }
-
-    void set(int w, int h, int format, buffer_handle_t buffer) {
-        this->w = w;
-        this->h = h;
-        this->format = format;
-        this->buffer = buffer;
-    }
-
-    void get(int& w, int& h, int& format, buffer_handle_t& buffer) {
-        w = this->w;
-        h = this->h;
-        format = this->format;
-        buffer = this->buffer;
-    }
-
-    void clear() {
-        w = h = format = 0;
-        buffer = 0;
-        isNewBuffer = isBufferPosted = isExitPending = \
-                isHDMIExitPending = false;
-    }
-};
-#endif
-
 struct private_module_t {
     gralloc_module_t base;
 
@@ -267,7 +233,7 @@ struct private_module_t {
     float fps;
     int swapInterval;
 #ifdef __cplusplus
-    Queue<struct qbuf_t> disp; // non-empty when buffer is ready for display    
+    Queue<struct qbuf_t> disp; // non-empty when buffer is ready for display
 #endif
     int currentIdx;
     struct avail_t avail[NUM_FRAMEBUFFERS_MAX];
@@ -287,30 +253,11 @@ struct private_module_t {
     uint32_t currentOffset;
     bool enableHDMIOutput;
     bool exitHDMIUILoop;
+    float actionsafeWidthRatio;
+    float actionsafeHeightRatio;
     bool hdmiStateChanged;
     pthread_mutex_t overlayLock;
     pthread_cond_t overlayPost;
-    OverlayOrigRes<OverlayUI::FB0>* pOrigResPanel;
-    OverlayOrigRes<OverlayUI::FB1>* pOrigResTV;
-    bool isOrigResStarted;
-    ThreadShared ts;
-#endif
-
-#if defined(__cplusplus) && defined(SF_BYPASS)
-    /*
-     * Comp. bypass specific variables
-     * pobjOverlayUI - UI overlay channel for comp. bypass.
-     * overlayui_lock - mutex lock for synchronization between
-     *                  disp_loop and main thread to modify
-     *                  bypassChannelState
-     * bypassChannelState - Current Channel State
-     *                       - OPEN - bypass channel is open
-     *                       - PENDING_CLOSE - close channel pending
-     *                       - CLOSED - bypass channel is closed
-     */
-    OverlayUI* pobjOverlayUI;
-    pthread_mutex_t overlayui_lock;
-    int bypassChannelState;
 #endif
 };
 
@@ -322,7 +269,6 @@ struct private_handle_t : public native_handle {
 struct private_handle_t {
     native_handle_t nativeHandle;
 #endif
-    
     enum {
         PRIV_FLAGS_FRAMEBUFFER    = 0x00000001,
         PRIV_FLAGS_USES_PMEM      = 0x00000002,
@@ -346,7 +292,7 @@ struct private_handle_t {
     int     flags;
     int     size;
     int     offset;
-    int     gpu_fd; // stored as an int, b/c we don't want it marshalled
+    int     bufferType;
 
     // FIXME: the attributes below should be out-of-line
     int     base;
@@ -354,15 +300,19 @@ struct private_handle_t {
     int     writeOwner;
     int     gpuaddr; // The gpu address mapped into the mmu. If using ashmem, set to 0 They don't care
     int     pid;
+    int     format;
+    int     width;
+    int     height;
 
 #ifdef __cplusplus
-    static const int sNumInts = 10;
+    static const int sNumInts = 13;
     static const int sNumFds = 1;
     static const int sMagic = 'gmsm';
 
-    private_handle_t(int fd, int size, int flags) :
-        fd(fd), magic(sMagic), flags(flags), size(size), offset(0), gpu_fd(-1),
-        base(0), lockState(0), writeOwner(0), gpuaddr(0), pid(getpid())
+    private_handle_t(int fd, int size, int flags, int bufferType, int format, int width, int height) :
+        fd(fd), magic(sMagic), flags(flags), size(size), offset(0), bufferType(bufferType),
+        base(0), lockState(0), writeOwner(0), gpuaddr(0), pid(getpid()), format(format), width(width),
+        height(height)
     {
         version = sizeof(native_handle);
         numInts = sNumInts;
@@ -380,7 +330,7 @@ struct private_handle_t {
         const private_handle_t* hnd = (const private_handle_t*)h;
         if (!h || h->version != sizeof(native_handle) ||
                 h->numInts != sNumInts || h->numFds != sNumFds ||
-                hnd->magic != sMagic) 
+                hnd->magic != sMagic)
         {
             LOGE("invalid gralloc handle (at %p)", h);
             return -EINVAL;

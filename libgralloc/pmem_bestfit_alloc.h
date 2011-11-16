@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,7 +72,7 @@ public:
             mFirst = newNode;
         }
     }
-    
+
     void insertTail(NODE* newNode) {
         if (mLast == 0) {
             insertHead(newNode);
@@ -108,7 +109,7 @@ public:
 
 private:
     struct chunk_t {
-        chunk_t(size_t start, size_t size) 
+        chunk_t(size_t start, size_t size)
             : start(start), size(size), free(1), prev(0), next(0) {
         }
         size_t              start;

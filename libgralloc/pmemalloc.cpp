@@ -54,7 +54,8 @@ PmemAllocator::~PmemAllocator()
 }
 
 
-PmemUserspaceAllocator::PmemUserspaceAllocator(Deps& deps, Deps::Allocator& allocator, const char* pmemdev):
+PmemUserspaceAllocator::PmemUserspaceAllocator(Deps& deps,
+        Deps::Allocator& allocator, const char* pmemdev):
     deps(deps),
     allocator(allocator),
     pmemdev(pmemdev),
@@ -143,7 +144,7 @@ int PmemUserspaceAllocator::init_pmem_area()
 
 
 int PmemUserspaceAllocator::alloc_pmem_buffer(size_t size, int usage,
-        void** pBase, int* pOffset, int* pFd)
+        void** pBase, int* pOffset, int* pFd, int format)
 {
     BEGIN_FUNC;
     int err = init_pmem_area();
@@ -201,7 +202,8 @@ int PmemUserspaceAllocator::alloc_pmem_buffer(size_t size, int usage,
 }
 
 
-int PmemUserspaceAllocator::free_pmem_buffer(size_t size, void* base, int offset, int fd)
+int PmemUserspaceAllocator::free_pmem_buffer(size_t size, void* base,
+                                             int offset, int fd)
 {
     BEGIN_FUNC;
     int err = 0;
@@ -232,9 +234,8 @@ PmemUserspaceAllocator::Deps::~Deps()
     END_FUNC;
 }
 
-PmemKernelAllocator::PmemKernelAllocator(Deps& deps, const char* pmemdev):
-    deps(deps),
-    pmemdev(pmemdev)
+PmemKernelAllocator::PmemKernelAllocator(Deps& deps):
+    deps(deps)
 {
     BEGIN_FUNC;
     END_FUNC;
@@ -267,7 +268,7 @@ static unsigned clp2(unsigned x) {
 
 
 int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
-        void** pBase,int* pOffset, int* pFd)
+        void** pBase,int* pOffset, int* pFd, int format)
 {
     BEGIN_FUNC;
 
@@ -275,28 +276,55 @@ int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
     *pOffset = 0;
     *pFd = -1;
 
-    int err;
+    int err, offset = 0;
     int openFlags = get_open_flags(usage);
-    int fd = deps.open(pmemdev, openFlags, 0);
+    const char *device;
+    if (usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP) {
+        device = DEVICE_PMEM_ADSP;
+    } else if (usage & GRALLOC_USAGE_PRIVATE_SMI_HEAP) {
+        device = DEVICE_PMEM_SMIPOOL;
+    } else if ((usage & GRALLOC_USAGE_EXTERNAL_DISP) ||
+               (usage & GRALLOC_USAGE_PROTECTED)) {
+        int tempFd = deps.open(DEVICE_PMEM_SMIPOOL, openFlags, 0);
+        if (tempFd < 0) {
+            device = DEVICE_PMEM_ADSP;
+        } else {
+            close(tempFd);
+            device = DEVICE_PMEM_SMIPOOL;
+        }
+    } else {
+        LOGE("Invalid device");
+        return -EINVAL;
+    }
+
+    int fd = deps.open(device, openFlags, 0);
     if (fd < 0) {
         err = -deps.getErrno();
         END_FUNC;
+        LOGE("Error opening %s", device);
         return err;
     }
 
     // The size should already be page aligned, now round it up to a power of 2.
-    size = clp2(size);
+    //size = clp2(size);
+
+    if (format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) {
+        // Tile format buffers need physical alignment to 8K
+        err = deps.alignPmem(fd, size, 8192);
+        if (err < 0) {
+            LOGE("alignPmem failed");
+        }
+    }
 
     void* base = deps.mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     if (base == MAP_FAILED) {
-        LOGE("%s: failed to map pmem fd: %s", pmemdev,
+        LOGE("%s: failed to map pmem fd: %s", device,
              strerror(deps.getErrno()));
         err = -deps.getErrno();
         deps.close(fd);
         END_FUNC;
         return err;
     }
-
     memset(base, 0, size);
 
     *pBase = base;
@@ -308,19 +336,22 @@ int PmemKernelAllocator::alloc_pmem_buffer(size_t size, int usage,
 }
 
 
-int PmemKernelAllocator::free_pmem_buffer(size_t size, void* base, int offset, int fd)
+int PmemKernelAllocator::free_pmem_buffer(size_t size, void* base,
+                                          int offset, int fd)
 {
     BEGIN_FUNC;
-    // The size should already be page aligned, now round it up to a power of 2
+    // The size should already be page aligned,
+    // now round it up to a power of 2
     // like we did when allocating.
-    size = clp2(size);
+    //size = clp2(size);
 
     int err = deps.munmap(base, size);
     if (err < 0) {
         err = deps.getErrno();
-        LOGW("%s: error unmapping pmem fd: %s", pmemdev, strerror(err));
+        LOGW("error unmapping pmem fd: %s", strerror(err));
         return -err;
     }
+
     END_FUNC;
     return 0;
 }

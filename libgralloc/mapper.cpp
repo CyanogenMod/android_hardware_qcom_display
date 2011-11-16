@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,19 +39,30 @@
 
 #include "gralloc_priv.h"
 #include "gr.h"
+#include "ionalloc.h"
+#include "ashmemalloc.h"
 
-// we need this for now because pmem cannot mmap at an offset
-#define PMEM_HACK   1
-
-/* desktop Linux needs a little help with gettid() */
-#if defined(ARCH_X86) && !defined(HAVE_ANDROID_OS)
-#define __KERNEL__
-# include <linux/unistd.h>
-pid_t gettid() { return syscall(__NR_gettid);}
-#undef __KERNEL__
-#endif
-
+using gralloc::IMemAlloc;
+using gralloc::IonAlloc;
+using gralloc::AshmemAlloc;
+using android::sp;
 /*****************************************************************************/
+
+// Return the type of allocator -
+// these are used for mapping/unmapping
+static sp<IMemAlloc> getAllocator(int flags)
+{
+    sp<IMemAlloc> memalloc;
+    if (flags & private_handle_t::PRIV_FLAGS_USES_ION) {
+        memalloc =  new IonAlloc();
+    }
+    if (flags & private_handle_t::PRIV_FLAGS_USES_ASHMEM) {
+        memalloc =  new AshmemAlloc();
+    }
+
+    // XXX Return allocator for pmem
+    return memalloc;
+}
 
 static int gralloc_map(gralloc_module_t const* module,
         buffer_handle_t handle,
@@ -60,16 +72,16 @@ static int gralloc_map(gralloc_module_t const* module,
     void *mappedAddress;
     if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
         size_t size = hnd->size;
-#if PMEM_HACK
-        size += hnd->offset;
-#endif
-        if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_ASHMEM) {
-            mappedAddress = mmap(0, size,
-                PROT_READ|PROT_WRITE, MAP_SHARED | MAP_POPULATE, hnd->fd, 0);
-        } else {
-            mappedAddress = mmap(0, size,
-                PROT_READ|PROT_WRITE, MAP_SHARED, hnd->fd, 0);
+        sp<IMemAlloc> memalloc = getAllocator(hnd->flags) ;
+        int err = memalloc->map_buffer(&mappedAddress, size,
+                hnd->offset, hnd->fd);
+        if(err) {
+            LOGE("Could not mmap handle %p, fd=%d (%s)",
+                    handle, hnd->fd, strerror(errno));
+            hnd->base = 0;
+            return -errno;
         }
+
         if (mappedAddress == MAP_FAILED) {
             LOGE("Could not mmap handle %p, fd=%d (%s)",
                     handle, hnd->fd, strerror(errno));
@@ -77,7 +89,7 @@ static int gralloc_map(gralloc_module_t const* module,
             return -errno;
         }
         hnd->base = intptr_t(mappedAddress) + hnd->offset;
-        //LOGD("gralloc_map() succeeded fd=%d, off=%d, size=%d, vaddr=%p", 
+        //LOGD("gralloc_map() succeeded fd=%d, off=%d, size=%d, vaddr=%p",
         //        hnd->fd, hnd->offset, hnd->size, mappedAddress);
     }
     *vaddr = (void*)hnd->base;
@@ -89,15 +101,14 @@ static int gralloc_unmap(gralloc_module_t const* module,
 {
     private_handle_t* hnd = (private_handle_t*)handle;
     if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
+        int err = -EINVAL;
         void* base = (void*)hnd->base;
         size_t size = hnd->size;
-#if PMEM_HACK
-        base = (void*)(intptr_t(base) - hnd->offset);
-        size += hnd->offset;
-#endif
-        //LOGD("unmapping from %p, size=%d", base, size);
-        if (munmap(base, size) < 0) {
-            LOGE("Could not unmap %s", strerror(errno));
+        sp<IMemAlloc> memalloc = getAllocator(hnd->flags) ;
+        if(memalloc != NULL)
+            err = memalloc->unmap_buffer(base, size, hnd->offset);
+        if (err) {
+            LOGE("Could not unmap memory at address %p", base);
         }
     }
     hnd->base = 0;
@@ -106,7 +117,7 @@ static int gralloc_unmap(gralloc_module_t const* module,
 
 /*****************************************************************************/
 
-static pthread_mutex_t sMapLock = PTHREAD_MUTEX_INITIALIZER; 
+static pthread_mutex_t sMapLock = PTHREAD_MUTEX_INITIALIZER;
 
 /*****************************************************************************/
 
@@ -121,9 +132,9 @@ int gralloc_register_buffer(gralloc_module_t const* module,
     /* NOTE: we need to initialize the buffer as not mapped/not locked
      * because it shouldn't when this function is called the first time
      * in a new process. Ideally these flags shouldn't be part of the
-     * handle, but instead maintained in the kernel or at least 
+     * handle, but instead maintained in the kernel or at least
      * out-of-line
-     */ 
+     */
 
     // if this handle was created in this process, then we keep it as is.
     private_handle_t* hnd = (private_handle_t*)handle;
@@ -148,7 +159,7 @@ int gralloc_unregister_buffer(gralloc_module_t const* module,
      */
 
     private_handle_t* hnd = (private_handle_t*)handle;
-    
+
     LOGE_IF(hnd->lockState & private_handle_t::LOCK_STATE_READ_MASK,
             "[unregister] handle %p still locked (state=%08x)",
             hnd, hnd->lockState);
@@ -179,8 +190,9 @@ int terminateBuffer(gralloc_module_t const* module,
 
     if (hnd->lockState & private_handle_t::LOCK_STATE_MAPPED) {
         // this buffer was mapped, unmap it now
-        if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_PMEM ||
-            hnd->flags & private_handle_t::PRIV_FLAGS_USES_ASHMEM) {
+        if (hnd->flags & (private_handle_t::PRIV_FLAGS_USES_PMEM |
+                          private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP |
+                          private_handle_t::PRIV_FLAGS_USES_ASHMEM)) {
             if (hnd->pid != getpid()) {
                 // ... unless it's a "master" pmem buffer, that is a buffer
                 // mapped in the process it's been allocated.
@@ -188,6 +200,7 @@ int terminateBuffer(gralloc_module_t const* module,
                 gralloc_unmap(module, hnd);
             }
         } else {
+            LOGE("terminateBuffer: unmapping a non pmem/ashmem buffer flags = 0x%x", hnd->flags);
             gralloc_unmap(module, hnd);
         }
     }
@@ -213,7 +226,7 @@ int gralloc_lock(gralloc_module_t const* module,
         new_value = current_value;
 
         if (current_value & private_handle_t::LOCK_STATE_WRITE) {
-            // already locked for write 
+            // already locked for write
             LOGE("handle %p already locked for write", handle);
             return -EBUSY;
         } else if (current_value & private_handle_t::LOCK_STATE_READ_MASK) {
@@ -223,7 +236,7 @@ int gralloc_lock(gralloc_module_t const* module,
                 return -EBUSY;
             } else {
                 // this is not an error
-                //LOGD("%p already locked for read... count = %d", 
+                //LOGD("%p already locked for read... count = %d",
                 //        handle, (current_value & ~(1<<31)));
             }
         }
@@ -235,7 +248,7 @@ int gralloc_lock(gralloc_module_t const* module,
         }
         new_value++;
 
-        retry = android_atomic_cmpxchg(current_value, new_value, 
+        retry = android_atomic_cmpxchg(current_value, new_value,
                 (volatile int32_t*)&hnd->lockState);
     } while (retry);
 
@@ -272,7 +285,7 @@ int gralloc_lock(gralloc_module_t const* module,
     return err;
 }
 
-int gralloc_unlock(gralloc_module_t const* module, 
+int gralloc_unlock(gralloc_module_t const* module,
         buffer_handle_t handle)
 {
     if (private_handle_t::validate(handle) < 0)
@@ -283,17 +296,9 @@ int gralloc_unlock(gralloc_module_t const* module,
 
     if (hnd->flags & private_handle_t::PRIV_FLAGS_NEEDS_FLUSH) {
         int err;
-        if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_PMEM) {
-            struct pmem_addr pmem_addr;
-            pmem_addr.vaddr = hnd->base;
-            pmem_addr.offset = hnd->offset;
-            pmem_addr.length = hnd->size;
-            err = ioctl( hnd->fd, PMEM_CLEAN_CACHES,  &pmem_addr);
-        } else if ((hnd->flags & private_handle_t::PRIV_FLAGS_USES_ASHMEM)) {
-            unsigned long addr = hnd->base + hnd->offset;
-            err = ioctl(hnd->fd, ASHMEM_CACHE_FLUSH_RANGE, NULL);
-        }         
-
+        sp<IMemAlloc> memalloc = getAllocator(hnd->flags) ;
+        err = memalloc->clean_buffer((void*)hnd->base,
+                hnd->size, hnd->offset, hnd->fd);
         LOGE_IF(err < 0, "cannot flush handle %p (offs=%x len=%x, flags = 0x%x) err=%s\n",
                 hnd, hnd->offset, hnd->size, hnd->flags, strerror(errno));
         hnd->flags &= ~private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
@@ -318,8 +323,8 @@ int gralloc_unlock(gralloc_module_t const* module,
 
         new_value--;
 
-    } while (android_atomic_cmpxchg(current_value, new_value, 
-            (volatile int32_t*)&hnd->lockState));
+    } while (android_atomic_cmpxchg(current_value, new_value,
+                (volatile int32_t*)&hnd->lockState));
 
     return 0;
 }
@@ -334,158 +339,66 @@ int gralloc_perform(struct gralloc_module_t const* module,
     va_start(args, operation);
 
     switch (operation) {
-        case GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER: {
-            int fd = va_arg(args, int);
-            size_t size = va_arg(args, size_t);
-            size_t offset = va_arg(args, size_t);
-            void* base = va_arg(args, void*);
+        case GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER:
+            {
+                int fd = va_arg(args, int);
+                size_t size = va_arg(args, size_t);
+                size_t offset = va_arg(args, size_t);
+                void* base = va_arg(args, void*);
 
-            native_handle_t** handle = va_arg(args, native_handle_t**);
-            int memoryFlags = va_arg(args, int);
-            if (memoryFlags == GRALLOC_USAGE_PRIVATE_EBI_HEAP) {
-                // validate that it's indeed a pmem buffer
-                pmem_region region;
-                if (ioctl(fd, PMEM_GET_SIZE, &region) < 0) {
-                    break;
+                native_handle_t** handle = va_arg(args, native_handle_t**);
+                int memoryFlags = va_arg(args, int);
+                private_handle_t* hnd = (private_handle_t*)native_handle_create(
+                        private_handle_t::sNumFds, private_handle_t::sNumInts);
+                hnd->magic = private_handle_t::sMagic;
+                hnd->fd = fd;
+                unsigned int contigFlags = GRALLOC_USAGE_PRIVATE_ADSP_HEAP |
+                                  GRALLOC_USAGE_PRIVATE_EBI_HEAP |
+                                  GRALLOC_USAGE_PRIVATE_SMI_HEAP;
+
+                if (memoryFlags & contigFlags) {
+                    // check if the buffer is a pmem buffer
+                    pmem_region region;
+                    if (ioctl(fd, PMEM_GET_SIZE, &region) < 0)
+                        hnd->flags =  private_handle_t::PRIV_FLAGS_USES_ION;
+                    else
+                        hnd->flags =  private_handle_t::PRIV_FLAGS_USES_PMEM |
+                                      private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
+                } else {
+                    if (memoryFlags & GRALLOC_USAGE_PRIVATE_ION)
+                        hnd->flags =  private_handle_t::PRIV_FLAGS_USES_ION;
+                    else
+                        hnd->flags =  private_handle_t::PRIV_FLAGS_USES_ASHMEM;
                 }
+
+                hnd->size = size;
+                hnd->offset = offset;
+                hnd->base = intptr_t(base) + offset;
+                hnd->lockState = private_handle_t::LOCK_STATE_MAPPED;
+                hnd->gpuaddr = 0;
+                *handle = (native_handle_t *)hnd;
+                res = 0;
+                break;
+
             }
-            private_handle_t* hnd = (private_handle_t*)native_handle_create(
-                    private_handle_t::sNumFds, private_handle_t::sNumInts);
-            hnd->magic = private_handle_t::sMagic;
-            hnd->fd = fd;
-            hnd->flags = (memoryFlags == GRALLOC_USAGE_PRIVATE_EBI_HEAP) ?
-                         private_handle_t::PRIV_FLAGS_USES_PMEM |
-                         private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH:
-                         private_handle_t::PRIV_FLAGS_USES_ASHMEM;
-            hnd->size = size;
-            hnd->offset = offset;
-            hnd->base = intptr_t(base) + offset;
-            hnd->lockState = private_handle_t::LOCK_STATE_MAPPED;
-            hnd->gpuaddr = 0;
-            *handle = (native_handle_t *)hnd;
-            res = 0;
+        case GRALLOC_MODULE_PERFORM_UPDATE_BUFFER_HANDLE:
+            {
+                native_handle_t* handle = va_arg(args, native_handle_t*);
+                int w = va_arg(args, int);
+                int h = va_arg(args, int);
+                int f = va_arg(args, int);
+                private_handle_t* hnd = (private_handle_t*)handle;
+                hnd->width = w;
+                hnd->height = h;
+                if (hnd->format != f) {
+                    hnd->format = f;
+                }
+                break;
+            }
+        default:
             break;
-        }
-        case GRALLOC_MODULE_PERFORM_DECIDE_PUSH_BUFFER_HANDLING: {
-            int format = va_arg(args, int);
-            int width = va_arg(args, int);
-            int height = va_arg(args, int);
-            char *compositionUsed = va_arg(args, char*);
-            int hasBlitEngine = va_arg(args, int);
-            int *needConversion = va_arg(args, int*);
-            int *useBufferDirectly = va_arg(args, int*);
-            size_t *size = va_arg(args, size_t*);
-            *size = calculateBufferSize(width, height, format);
-            int conversion = 0;
-            int direct = 0;
-            res = decideBufferHandlingMechanism(format, compositionUsed, hasBlitEngine,
-                                                needConversion, useBufferDirectly);
-	    break;
-	}
-	default:
-	    break;
     }
 
     va_end(args);
     return res;
-}
-
-int decideBufferHandlingMechanism(int format, const char *compositionUsed, int hasBlitEngine,
-                                  int *needConversion, int *useBufferDirectly)
-{
-    *needConversion = FALSE;
-    *useBufferDirectly = FALSE;
-    if(compositionUsed == NULL) {
-        LOGE("null pointer");
-        return -1;
-    }
-
-    if(format == HAL_PIXEL_FORMAT_RGB_565) {
-       // Software video renderer gives the output in RGB565 format.
-       // This can be handled by all compositors
-       *needConversion = FALSE;
-       *useBufferDirectly = TRUE;
-    } else if(strncmp(compositionUsed, "cpu", 3) == 0){
-        *needConversion = FALSE;
-        *useBufferDirectly = FALSE;
-    } else if(strncmp(compositionUsed, "gpu", 3) == 0) {
-        if(format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED  ||
-           format == HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO ||
-           format == HAL_PIXEL_FORMAT_YV12) {
-            *needConversion = FALSE;
-            *useBufferDirectly = TRUE;
-        } else if(hasBlitEngine) {
-            *needConversion = TRUE;
-            *useBufferDirectly = FALSE;
-        }
-    } else if ((strncmp(compositionUsed, "mdp", 3) == 0) ||
-               (strncmp(compositionUsed, "c2d", 3) == 0)){
-        if(format == HAL_PIXEL_FORMAT_YCbCr_420_SP ||
-           format == HAL_PIXEL_FORMAT_YCrCb_420_SP ||
-           format == HAL_PIXEL_FORMAT_YV12) {
-            *needConversion = FALSE;
-            *useBufferDirectly = TRUE;
-        } else if((strncmp(compositionUsed, "c2d", 3) == 0) &&
-           format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) {
-           *needConversion = FALSE;
-           *useBufferDirectly = TRUE;
-        } else if(hasBlitEngine) {
-            *needConversion = TRUE;
-            *useBufferDirectly = FALSE;
-        }
-    } else {
-        LOGE("Invalid composition type %s", compositionUsed);
-        return -1;
-    }
-    return 0;
-}
-
-size_t calculateBufferSize(int width, int height, int format)
-{
-    if(!width || !height)
-        return 0;
-
-    size_t size = 0;
-
-    switch (format)
-    {
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED: {
-            int aligned_height = (height + 31) & ~31;
-            int pitch     = (width + 127) & ~127;
-            size = pitch * aligned_height;
-            size = (size + 8191) & ~8191;
-            int secondPlaneOffset = size;
-
-            aligned_height = ((height >> 1) + 31) & ~31;
-            size += pitch * aligned_height;
-            size = (size + 8191) & ~8191;
-            break;
-        }
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO: {
-            int aligned_height = (height + 31) & ~31;
-            int pitch = (width + 31) & ~31;
-            size = pitch * aligned_height;
-            size  = (size + 4095) & ~4095;
-            int secondPlaneOffset = size;
-
-            pitch = 2 * (((width >> 1) + 31) & ~31);
-            aligned_height = ((height >> 1) + 31) & ~31;
-            size += pitch * aligned_height;
-            size = (size + 4095) & ~4095;
-            break;
-        }
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-        case HAL_PIXEL_FORMAT_YV12: {
-            /* Camera and video YUV 420 semi-planar buffers are allocated   with
-            size equal to w * h * 1.5 */
-            int aligned_width = (width + 15) & ~15;
-            int aligned_chroma_width = ((width/2) + 15) & ~15;
-            size = (aligned_width * height) + ((aligned_chroma_width * height/2) *2);
-            break;
-        }
-        default:
-            break;
-    }
-    return size;
 }
