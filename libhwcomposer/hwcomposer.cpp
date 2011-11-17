@@ -20,7 +20,6 @@
 #include <unistd.h>
 
 #include <hardware/hardware.h>
-#include <hardware/overlay.h>
 
 #include <fcntl.h>
 #include <errno.h>
@@ -30,8 +29,6 @@
 #include <cutils/properties.h>
 
 #include <hardware/hwcomposer.h>
-#include <hardware/overlay.h>
-#include <hardware/copybit.h>
 #include <overlayLib.h>
 #include <overlayLibUI.h>
 
@@ -119,8 +116,9 @@ static struct hw_module_methods_t hwc_module_methods = {
 
 struct private_hwc_module_t {
     hwc_module_t base;
-    overlay_control_device_t *overlayEngine;
+#ifdef COPYBIT_ENABLE
     copybit_device_t *copybitEngine;
+#endif
     framebuffer_device_t *fbDevice;
     int compositionType;
     bool isBypassEnabled; //from build.prop debug.compbypass.enable
@@ -138,8 +136,9 @@ struct private_hwc_module_t HAL_MODULE_INFO_SYM = {
             methods: &hwc_module_methods,
         }
    },
-   overlayEngine: NULL,
+#ifdef COPYBIT_ENABLE
    copybitEngine: NULL,
+#endif
    fbDevice: NULL,
    compositionType: 0,
    isBypassEnabled: false,
@@ -257,9 +256,9 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const bool wai
             return -1;
         }
 
-        ret = ovLibObject->setParameter(OVERLAY_TRANSFORM, layer->transform);
+        ret = ovLibObject->setTransform(layer->transform);
         if (!ret) {
-            LOGE("prepareOverlay setParameter failed transform %x",
+            LOGE("prepareOverlay setTransform failed transform %x",
                     layer->transform);
             return -1;
         }
@@ -761,13 +760,17 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                     list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
                     // We've opened the channel. Set the state to open.
                     ctx->hwcOverlayStatus = HWC_OVERLAY_OPEN;
-                } else if (hwcModule->compositionType & (COMPOSITION_TYPE_C2D)) {
+                }
+#ifdef COPYBIT_ENABLE
+                else if (hwcModule->compositionType & (COMPOSITION_TYPE_C2D)) {
                     //Fail safe path: If drawing with overlay fails,
 
                     //Use C2D if available.
                     list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
                     skipComposition = false;
-                } else {
+                }
+#endif
+                else {
                     //If C2D is not enabled fall back to GPU.
                     list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
                     skipComposition = false;
@@ -778,13 +781,17 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
                 list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
                 layerType |= HWC_ORIG_RESOLUTION;
-            } else if (hnd && (hwcModule->compositionType &
+            }
+#ifdef COPYBIT_ENABLE
+            else if (hnd && (hwcModule->compositionType &
                     (COMPOSITION_TYPE_C2D|COMPOSITION_TYPE_MDP))) {
                 list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
             } else if ((hwcModule->compositionType == COMPOSITION_TYPE_DYN)
                     && fullscreen) {
                 list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
-            } else {
+            }
+#endif
+            else {
                 list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
             }
         }
@@ -817,6 +824,7 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
     return 0;
 }
+#ifdef COPYBIT_ENABLE
 // ---------------------------------------------------------------------------
 struct range {
     int current;
@@ -853,7 +861,6 @@ private:
     hwc_region_t mRegion;
     mutable range r; 
 };
-
 
 static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer, EGLDisplay dpy,
                                  EGLSurface surface)
@@ -931,6 +938,7 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
 
     return err;
 }
+#endif
 
 static int drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
 {
@@ -983,9 +991,12 @@ static int hwc_set(hwc_composer_device_t *dev,
             drawLayerUsingOverlay(ctx, &(list->hwLayers[i]));
         } else if (list->flags & HWC_SKIP_COMPOSITION) {
             break;
-        } else if (list->hwLayers[i].compositionType == HWC_USE_COPYBIT) {
+        }
+#ifdef COPYBIT_ENABLE
+        else if (list->hwLayers[i].compositionType == HWC_USE_COPYBIT) {
             drawLayerUsingCopybit(dev, &(list->hwLayers[i]), (EGLDisplay)dpy, (EGLSurface)sur);
         }
+#endif
     }
 
     // Do not call eglSwapBuffers if we the skip composition flag is set on the list.
@@ -1025,16 +1036,13 @@ static int hwc_device_close(struct hw_device_t *dev)
 
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
             ctx->device.common.module);
-
+#ifdef COPYBIT_ENABLE
     // Close the overlay and copybit modules
     if(hwcModule->copybitEngine) {
         copybit_close(hwcModule->copybitEngine);
         hwcModule->copybitEngine = NULL;
     }
-    if(hwcModule->overlayEngine) {
-        overlay_control_close(hwcModule->overlayEngine);
-        hwcModule->overlayEngine = NULL;
-    }
+#endif
     if(hwcModule->fbDevice) {
         framebuffer_close(hwcModule->fbDevice);
         hwcModule->fbDevice = NULL;
@@ -1059,13 +1067,11 @@ static int hwc_module_initialize(struct private_hwc_module_t* hwcModule)
 
     // Open the overlay and copybit modules
     hw_module_t const *module;
-
+#ifdef COPYBIT_ENABLE
     if (hw_get_module(COPYBIT_HARDWARE_MODULE_ID, &module) == 0) {
         copybit_open(module, &(hwcModule->copybitEngine));
     }
-    if (hw_get_module(OVERLAY_HARDWARE_MODULE_ID, &module) == 0) {
-        overlay_control_open(module, &(hwcModule->overlayEngine));
-    }
+#endif
     if (hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &module) == 0) {
         framebuffer_open(module, &(hwcModule->fbDevice));
     }
@@ -1091,9 +1097,11 @@ static int hwc_module_initialize(struct private_hwc_module_t* hwcModule)
                 hwcModule->compositionType = COMPOSITION_TYPE_GPU;
             }
 
+#ifdef COPYBIT_ENABLE
             if(!hwcModule->copybitEngine)
                 hwcModule->compositionType = COMPOSITION_TYPE_GPU;
-            }
+#endif
+        }
     } else { //debug.sf.hw is not set. Use cpu composition
         hwcModule->compositionType = COMPOSITION_TYPE_CPU;
     }
@@ -1123,23 +1131,15 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
 
         /* initialize our state here */
         memset(dev, 0, sizeof(*dev));
-        if(hwcModule->overlayEngine) {
-            dev->mOverlayLibObject = new overlay::Overlay();
+        dev->mOverlayLibObject = new overlay::Overlay();
 #ifdef COMPOSITION_BYPASS
-            for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
-                dev->mOvUI[i] = new overlay::OverlayUI();
-            }
-            dev->animCount = 0;
-            dev->bypassState = BYPASS_OFF;
-#endif
-        } else {
-            dev->mOverlayLibObject = NULL;
-#ifdef COMPOSITION_BYPASS
-            for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
-                dev->mOvUI[i] = NULL;
-            }
-#endif
+        for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
+            dev->mOvUI[i] = new overlay::OverlayUI();
         }
+        dev->animCount = 0;
+        dev->bypassState = BYPASS_OFF;
+#endif
+
 #if defined HDMI_DUAL_DISPLAY
         dev->mHDMIEnabled = false;
         dev->pendingHDMI = false;
