@@ -1,7 +1,8 @@
-# Build only new gralloc
-
+#Enables the listed display HAL modules
+display-hals := liboverlay
 ifeq ($(TARGET_USES_ION),true)
-    display-hals := libgralloc
+    display-hals += libgralloc
     include $(call all-named-subdir-makefiles,$(display-hals))
 endif
+include $(call all-named-subdir-makefiles,$(display-hals))
 

@@ -39,7 +39,6 @@
 
 #include <sys/mman.h>
 #include <sys/ioctl.h>
-#include <hardware/overlay.h>
 #include <utils/RefBase.h>
 #include <alloc_controller.h>
 #include <memalloc.h>
@@ -182,7 +181,7 @@ public:
                                bool ignoreFB = false);
     bool closeControlChannel();
     bool setPosition(int x, int y, uint32_t w, uint32_t h);
-    bool setParameter(int param, int value, bool fetch = true);
+    bool setTransform(int value, bool fetch = true);
     void setSize (int size) { mSize = size; }
     bool getPosition(int& x, int& y, uint32_t& w, uint32_t& h);
     bool getOvSessionID(int& sessionID) const;
@@ -271,7 +270,7 @@ public:
                           int num_buffers = 2);
     bool closeChannel();
     bool setPosition(int x, int y, uint32_t w, uint32_t h);
-    bool setParameter(int param, int value);
+    bool setTransform(int value);
     bool setOrientation(int value, int channel = 0);
     bool setFd(int fd, int channel = 0);
     bool queueBuffer(uint32_t offset, int channel = 0);

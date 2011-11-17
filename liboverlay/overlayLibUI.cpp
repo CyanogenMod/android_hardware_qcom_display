@@ -28,8 +28,8 @@ namespace {
 bool checkOVState(int w, int h, int format, int orientation,
                             int zorder, const mdp_overlay& ov) {
     switch(orientation) {
-        case OVERLAY_TRANSFORM_ROT_90:
-        case OVERLAY_TRANSFORM_ROT_270: {
+        case HAL_TRANSFORM_ROT_90:
+        case HAL_TRANSFORM_ROT_270: {
             int tmp = w;
             w = h;
             h = tmp;

@@ -663,43 +663,38 @@ bool Overlay::setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int
     return objOvDataChannel[channel].setCrop(x, y, w, h);
 }
 
-bool Overlay::setParameter(int param, int value) {
-    int currentOrientation = -1;
-    getOrientation(currentOrientation);
-
+bool Overlay::setTransform(int value) {
+    int barrier = 0;
     switch (mState) {
         case OV_UI_MIRROR_TV:
         case OV_2D_VIDEO_ON_PANEL:
         case OV_3D_VIDEO_2D_PANEL:
-            return objOvCtrlChannel[VG0_PIPE].setParameter(param, value);
+            return objOvCtrlChannel[VG0_PIPE].setTransform(value);
             break;
         case OV_2D_VIDEO_ON_TV:
         case OV_3D_VIDEO_2D_TV:
         case OV_3D_VIDEO_3D_TV:
             for (int i=0; i<NUM_CHANNELS; i++) {
-                if(!objOvCtrlChannel[i].setParameter(param, value)) {
+                if(!objOvCtrlChannel[i].setTransform(value)) {
                     LOGE("%s:failed for channel %d", __FUNCTION__, i);
                     return false;
                 }
             }
             break;
         case OV_3D_VIDEO_3D_PANEL:
-            if (!sHDMIAsPrimary && param == OVERLAY_TRANSFORM) {
-                int barrier = 0;
-                switch (value) {
-                    case HAL_TRANSFORM_ROT_90:
-                    case HAL_TRANSFORM_ROT_270:
-                        barrier = BARRIER_LANDSCAPE;
-                        break;
-                    default:
-                        barrier = BARRIER_PORTRAIT;
-                        break;
-                }
-                if(!enableBarrier(barrier))
-                    LOGE("%s:failed to enable barriers for 3D video", __FUNCTION__);
+            switch (value) {
+                case HAL_TRANSFORM_ROT_90:
+                case HAL_TRANSFORM_ROT_270:
+                    barrier = BARRIER_LANDSCAPE;
+                    break;
+                default:
+                    barrier = BARRIER_PORTRAIT;
+                    break;
+                    if(!enableBarrier(barrier))
+                        LOGE("%s:failed to enable barriers for 3D video", __FUNCTION__);
             }
             for (int i=0; i<NUM_CHANNELS; i++) {
-                if(!objOvCtrlChannel[i].setParameter(param, value)) {
+                if(!objOvCtrlChannel[i].setTransform(value)) {
                     LOGE("%s:failed for channel %d", __FUNCTION__, i);
                     return false;
                }
@@ -710,10 +705,6 @@ bool Overlay::setParameter(int param, int value) {
             break;
     }
     return true;
-}
-
-bool Overlay::setOrientation(int value, int channel) {
-    return objOvCtrlChannel[channel].setParameter(OVERLAY_TRANSFORM, value);
 }
 
 bool Overlay::setFd(int fd, int channel) {
@@ -1211,7 +1202,7 @@ bool OverlayControlChannel::useVirtualFB() {
     return true;
 }
 
-bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
+bool OverlayControlChannel::setTransform(int value, bool fetch) {
     if (!isChannelUP()) {
         LOGE("%s: channel is not up", __FUNCTION__);
         return false;
@@ -1223,7 +1214,7 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
         return false;
     }
     mOVInfo = ov;
-    if (!mIsChannelUpdated && (OVERLAY_TRANSFORM == param)) {
+    if (!mIsChannelUpdated) {
         int orientation = get_mdp_orientation(value);
         if (orientation == mOVInfo.user_data[0]) {
             return true;
@@ -1231,18 +1222,13 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
     }
     mIsChannelUpdated = false;
 
-    switch (param) {
-    case OVERLAY_DITHER:
-        break;
-    case OVERLAY_TRANSFORM:
-    {
-        int val = mOVInfo.user_data[0];
-        if (mNoRot)
-            return true;
+    int val = mOVInfo.user_data[0];
+    if (mNoRot)
+        return true;
 
-        int rot = value;
+    int rot = value;
 
-        switch(rot) {
+    switch(rot) {
         case 0:
         case HAL_TRANSFORM_FLIP_H:
         case HAL_TRANSFORM_FLIP_V:
@@ -1319,6 +1305,7 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
         }
         default: return false;
     }
+
     int mdp_rotation = get_mdp_orientation(rot);
     if (mdp_rotation == -1)
         return false;
@@ -1329,7 +1316,6 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
     /* Rotator always outputs non-tiled formats.
     If rotator is used, set Overlay input to non-tiled
     Else, overlay input remains tiled */
-
     if (mOVInfo.user_data[0]) {
         if (mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE)
             mOVInfo.src.format = MDP_Y_CRCB_H2V2;
@@ -1338,12 +1324,15 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
     else {
         if(mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE)
             mOVInfo.src.format = MDP_Y_CRCB_H2V2_TILE;
+
         mRotInfo.enable = 0;
+        //Always enable rotation for UI mirror usecase
         if(mUIChannel)
             mRotInfo.enable = 1;
     }
+
     if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
-        reportError("setParameter, rotator start failed");
+        reportError("setTransform, rotator start failed");
         return false;
     }
 
@@ -1354,15 +1343,9 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
         mOVInfo.flags &= ~MDP_SOURCE_ROTATED_90;
 
     if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
-        reportError("setParameter, overlay set failed");
+        reportError("setTransform, overlay set failed");
         dump(mOVInfo);
         return false;
-    }
-        break;
-    }
-    default:
-        reportError("Unsupproted param");
-    return false;
     }
 
     return true;
