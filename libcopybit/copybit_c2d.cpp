@@ -38,7 +38,7 @@
 #include <cutils/native_handle.h>
 #include <gralloc_priv.h>
 
-#include <hardware/copybit.h>
+#include <copybit.h>
 
 #include "c2d2.h"
 

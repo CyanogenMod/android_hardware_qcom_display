@@ -32,7 +32,7 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 
-#include <hardware/copybit.h>
+#include <copybit.h>
 
 #include "gralloc_priv.h"
 
