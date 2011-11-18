@@ -110,6 +110,20 @@ struct overlay_buffer_info {
     int size;
 };
 
+/* values for copybit_set_parameter(OVERLAY_TRANSFORM) */
+enum {
+    /* flip source image horizontally */
+    OVERLAY_TRANSFORM_FLIP_H    = HAL_TRANSFORM_FLIP_H,
+    /* flip source image vertically */
+    OVERLAY_TRANSFORM_FLIP_V    = HAL_TRANSFORM_FLIP_V,
+    /* rotate source image 90 degrees */
+    OVERLAY_TRANSFORM_ROT_90    = HAL_TRANSFORM_ROT_90,
+    /* rotate source image 180 degrees */
+    OVERLAY_TRANSFORM_ROT_180   = HAL_TRANSFORM_ROT_180,
+    /* rotate source image 270 degrees */
+    OVERLAY_TRANSFORM_ROT_270   = HAL_TRANSFORM_ROT_270
+};
+
 namespace overlay {
 
 enum {
