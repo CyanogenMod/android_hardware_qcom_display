@@ -641,15 +641,15 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
             // post/queue the new buffer
             pthread_mutex_lock(&(m->avail[nxtIdx].lock));
             if (m->avail[nxtIdx].is_avail != true) {
-                LOGE_IF(m->swapInterval != 0, "Found %d buf to be not avail", nxtIdx);
+                //LOGE_IF(m->swapInterval != 0, "Found %d buf to be not avail", nxtIdx);
             }
 
             m->avail[nxtIdx].is_avail = false;
 
             if (m->avail[nxtIdx].state != AVL) {
-                LOGD("[%d] state %c, expected %c", nxtIdx,
-                    framebufferStateName[m->avail[nxtIdx].state],
-                    framebufferStateName[AVL]);
+                //LOGD("[%d] state %c, expected %c", nxtIdx,
+                //    framebufferStateName[m->avail[nxtIdx].state],
+                //    framebufferStateName[AVL]);
             }
 
             m->avail[nxtIdx].state = SUB;
@@ -824,6 +824,9 @@ int mapFrameBufferLocked(struct private_module_t* module)
     /*
      * Request NUM_BUFFERS screens (at lest 2 for page flipping)
      */
+    // XXX Disable triple FB for now
+    int numberOfBuffers = NUM_FRAMEBUFFERS_MIN;
+#if 0
     int numberOfBuffers = (int)(finfo.smem_len/(info.yres * info.xres * (info.bits_per_pixel/8)));
     LOGV("num supported framebuffers in kernel = %d", numberOfBuffers);
 
@@ -833,7 +836,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
             numberOfBuffers = num;
         }
     }
-
+#endif
     if (numberOfBuffers > NUM_FRAMEBUFFERS_MAX)
         numberOfBuffers = NUM_FRAMEBUFFERS_MAX;
 
@@ -1046,7 +1049,11 @@ int fb_device_open(hw_module_t const* module, const char* name,
         dev->device.post            = fb_post;
         dev->device.setUpdateRect = 0;
         dev->device.compositionComplete = fb_compositionComplete;
+        // XXX triple buffering related changes
+        // are disabled
+#if 0
         dev->device.lockBuffer = fb_lockBuffer;
+#endif
 #if defined(HDMI_DUAL_DISPLAY)
         dev->device.orientationChanged = fb_orientationChanged;
         dev->device.videoOverlayStarted = fb_videoOverlayStarted;
@@ -1069,8 +1076,9 @@ int fb_device_open(hw_module_t const* module, const char* name,
             const_cast<float&>(dev->device.fps) = m->fps;
             const_cast<int&>(dev->device.minSwapInterval) = private_module_t::PRIV_MIN_SWAP_INTERVAL;
             const_cast<int&>(dev->device.maxSwapInterval) = private_module_t::PRIV_MAX_SWAP_INTERVAL;
+#if 0
             const_cast<int&>(dev->device.numFramebuffers) = m->numBuffers;
-
+#endif
             if (m->finfo.reserved[0] == 0x5444 &&
                     m->finfo.reserved[1] == 0x5055) {
                 dev->device.setUpdateRect = fb_setUpdateRect;

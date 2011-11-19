@@ -337,7 +337,7 @@ int gralloc_perform(struct gralloc_module_t const* module,
     int res = -EINVAL;
     va_list args;
     va_start(args, operation);
-
+#if 0
     switch (operation) {
         case GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER:
             {
@@ -398,7 +398,7 @@ int gralloc_perform(struct gralloc_module_t const* module,
         default:
             break;
     }
-
+#endif
     va_end(args);
     return res;
 }

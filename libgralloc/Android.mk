@@ -33,6 +33,7 @@ LOCAL_SRC_FILES :=  framebuffer.cpp \
                     pmem_bestfit_alloc.cpp
 
 LOCAL_MODULE := gralloc.$(TARGET_BOARD_PLATFORM)
+LOCAL_MODULE_TAGS := optional
 LOCAL_CFLAGS:= -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).gralloc\" -DHOST -DDEBUG_CALC_FPS -DUSE_ION
 
 ifeq ($(call is-board-platform,msm7627_surf msm7627_6x),true)
@@ -40,8 +41,8 @@ ifeq ($(call is-board-platform,msm7627_surf msm7627_6x),true)
 endif
 
 ifeq ($(TARGET_HAVE_HDMI_OUT),true)
-    LOCAL_CFLAGS += -DHDMI_DUAL_DISPLAY
-    LOCAL_C_INCLUDES += hardware/msm7k/liboverlay
+#    LOCAL_CFLAGS += -DHDMI_DUAL_DISPLAY
+    LOCAL_C_INCLUDES += hardware/qcom/display/liboverlay
     LOCAL_SHARED_LIBRARIES += liboverlay
 endif
 
@@ -66,5 +67,6 @@ LOCAL_SRC_FILES :=  ionalloc.cpp \
                     alloc_controller.cpp
 LOCAL_CFLAGS:= -DLOG_TAG=\"memalloc\" -DLOG_NDDEBUG=0 -DUSE_ION
 LOCAL_MODULE := libmemalloc
+LOCAL_MODULE_TAGS := optional
 include $(BUILD_SHARED_LIBRARY)
 endif #TARGET_USES_ION
