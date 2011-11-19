@@ -30,7 +30,6 @@
 /*
  * A simple templatized doubly linked-list implementation
  */
-
 template <typename NODE>
 class LinkedList
 {
@@ -93,7 +92,7 @@ public:
     }
 };
 
-class SimpleBestFitAllocator : public PmemUserspaceAllocator::Deps::Allocator
+class SimpleBestFitAllocator : public gralloc::PmemUserspaceAlloc::Allocator
 {
 public:
 
@@ -127,5 +126,4 @@ private:
     LinkedList<chunk_t> mList;
     size_t              mHeapSize;
 };
-
 #endif /* GRALLOC_ALLOCATOR_H_ */

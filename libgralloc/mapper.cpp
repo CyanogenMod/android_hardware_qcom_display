@@ -39,12 +39,10 @@
 
 #include "gralloc_priv.h"
 #include "gr.h"
-#include "ionalloc.h"
-#include "ashmemalloc.h"
+#include "alloc_controller.h"
+#include "memalloc.h"
 
-using gralloc::IMemAlloc;
-using gralloc::IonAlloc;
-using gralloc::AshmemAlloc;
+using namespace gralloc;
 using android::sp;
 /*****************************************************************************/
 
@@ -53,14 +51,8 @@ using android::sp;
 static sp<IMemAlloc> getAllocator(int flags)
 {
     sp<IMemAlloc> memalloc;
-    if (flags & private_handle_t::PRIV_FLAGS_USES_ION) {
-        memalloc =  new IonAlloc();
-    }
-    if (flags & private_handle_t::PRIV_FLAGS_USES_ASHMEM) {
-        memalloc =  new AshmemAlloc();
-    }
-
-    // XXX Return allocator for pmem
+    sp<IAllocController> alloc_ctrl = IAllocController::getInstance(true);
+    memalloc = alloc_ctrl->getAllocator(flags);
     return memalloc;
 }
 
@@ -192,7 +184,8 @@ int terminateBuffer(gralloc_module_t const* module,
         // this buffer was mapped, unmap it now
         if (hnd->flags & (private_handle_t::PRIV_FLAGS_USES_PMEM |
                           private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP |
-                          private_handle_t::PRIV_FLAGS_USES_ASHMEM)) {
+                          private_handle_t::PRIV_FLAGS_USES_ASHMEM |
+                          private_handle_t::PRIV_FLAGS_USES_ION)) {
             if (hnd->pid != getpid()) {
                 // ... unless it's a "master" pmem buffer, that is a buffer
                 // mapped in the process it's been allocated.

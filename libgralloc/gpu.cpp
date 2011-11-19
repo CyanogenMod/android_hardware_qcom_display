@@ -161,7 +161,6 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
     else
         data.align = getpagesize();
     data.pHandle = (unsigned int) pHandle;
-    data.bufferType = bufferType;
     err = mAllocCtrl->allocate(data, usage, compositionType);
 
     if (err == 0) {
@@ -307,8 +306,8 @@ int gpu_context_t::free_impl(private_handle_t const* hnd) {
                 hnd->offset, hnd->fd);
         if(err)
             return err;
+        terminateBuffer(&m->base, const_cast<private_handle_t*>(hnd));
     }
-    // XXX any additional cleanup.
     delete hnd;
     return 0;
 }

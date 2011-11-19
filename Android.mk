@@ -1,8 +1,4 @@
 #Enables the listed display HAL modules
-display-hals := libhwcomposer liboverlay
-ifeq ($(TARGET_USES_ION),true)
-    display-hals += libgralloc
-    include $(call all-named-subdir-makefiles,$(display-hals))
-endif
+display-hals := libhwcomposer liboverlay libgralloc
 include $(call all-named-subdir-makefiles,$(display-hals))
 

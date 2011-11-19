@@ -69,6 +69,7 @@ enum {
 #define INTERLACE_MASK 0x80
 #define S3D_FORMAT_MASK 0xFF000
 #define COLOR_FORMAT(x) (x & 0xFFF) // Max range for colorFormats is 0 - FFF
+#define DEVICE_PMEM "/dev/pmem"
 #define DEVICE_PMEM_ADSP "/dev/pmem_adsp"
 #define DEVICE_PMEM_SMIPOOL "/dev/pmem_smipool"
 /*****************************************************************************/

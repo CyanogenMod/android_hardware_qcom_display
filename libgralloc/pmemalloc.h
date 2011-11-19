@@ -1,161 +1,106 @@
 /*
- * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of Code Aurora Forum, Inc. nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef GRALLOC_QSD8K_PMEMALLOC_H
-#define GRALLOC_QSD8K_PMEMALLOC_H
+#ifndef GRALLOC_PMEMALLOC_H
+#define GRALLOC_PMEMALLOC_H
 
-#include <limits.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <unistd.h>
+#include <linux/ion.h>
+#include <utils/RefBase.h>
+#include "memalloc.h"
 
+namespace gralloc {
+    class PmemUserspaceAlloc : public IMemAlloc  {
 
-/**
- * An interface to the PMEM allocators.
- */
-class PmemAllocator {
+        public:
+            class Allocator: public android::RefBase {
+                public:
+                    virtual ~Allocator() {};
+                    virtual ssize_t setSize(size_t size) = 0;
+                    virtual size_t  size() const = 0;
+                    virtual ssize_t allocate(size_t size, uint32_t flags = 0) = 0;
+                    virtual ssize_t deallocate(size_t offset) = 0;
+            };
 
- public:
+            virtual int alloc_buffer(alloc_data& data);
 
-    virtual ~PmemAllocator();
+            virtual int free_buffer(void *base, size_t size,
+                    int offset, int fd);
 
-    // Only valid after init_pmem_area() has completed successfully.
-    virtual void* get_base_address() = 0;
+            virtual int map_buffer(void **pBase, size_t size,
+                    int offset, int fd);
 
-    virtual int alloc_pmem_buffer(size_t size, int usage, void** pBase,
-            int* pOffset, int* pFd, int format) = 0;
-    virtual int free_pmem_buffer(size_t size, void* base, int offset, int fd) = 0;
-};
+            virtual int unmap_buffer(void *base, size_t size,
+                    int offset);
 
+            virtual int clean_buffer(void*base, size_t size,
+                    int offset, int fd);
 
-/**
- * A PMEM allocator that allocates the entire pmem memory from the kernel and
- * then uses a user-space allocator to suballocate from that.  This requires
- * that the PMEM device driver have kernel allocation disabled.
- */
-class PmemUserspaceAllocator: public PmemAllocator {
+            PmemUserspaceAlloc();
 
- public:
+            ~PmemUserspaceAlloc();
 
-    class Deps {
-     public:
+        private:
+            int mMasterFd;
+            void* mMasterBase;
+            const char* mPmemDev;
+            android::sp<Allocator> mAllocator;
+            pthread_mutex_t mLock;
+            int init_pmem_area();
+            int init_pmem_area_locked();
 
-        class Allocator {
-         public:
-            virtual ~Allocator();
-            virtual ssize_t setSize(size_t size) = 0;
-            virtual size_t  size() const = 0;
-            virtual ssize_t allocate(size_t size, uint32_t flags = 0) = 0;
-            virtual ssize_t deallocate(size_t offset) = 0;
-        };
-
-        virtual ~Deps();
-
-        // pmem
-        virtual size_t getPmemTotalSize(int fd, size_t* size) = 0;
-        virtual int connectPmem(int fd, int master_fd) = 0;
-        virtual int mapPmem(int fd, int offset, size_t size) = 0;
-        virtual int unmapPmem(int fd, int offset, size_t size) = 0;
-        virtual int cleanPmem(int fd, unsigned long base, int offset, size_t size) = 0;
-
-        // C99
-        virtual int getErrno() = 0;
-
-        // POSIX
-        virtual void* mmap(void* start, size_t length, int prot, int flags, int fd,
-                off_t offset) = 0;
-        virtual int open(const char* pathname, int flags, int mode) = 0;
-        virtual int close(int fd) = 0;
     };
 
-    PmemUserspaceAllocator(Deps& deps, Deps::Allocator& allocator, const char* pmemdev);
-    virtual ~PmemUserspaceAllocator();
+    class PmemKernelAlloc : public IMemAlloc  {
 
-    // Only valid after init_pmem_area() has completed successfully.
-    virtual void* get_base_address();
+        public:
+            virtual int alloc_buffer(alloc_data& data);
 
-    virtual int init_pmem_area_locked();
-    virtual int init_pmem_area();
-    virtual int alloc_pmem_buffer(size_t size, int usage, void** pBase,
-            int* pOffset, int* pFd, int format);
-    virtual int free_pmem_buffer(size_t size, void* base, int offset, int fd);
+            virtual int free_buffer(void *base, size_t size,
+                    int offset, int fd);
 
-#ifndef ANDROID_OS
-    // DO NOT USE: For testing purposes only.
-    void set_master_values(int fd, void* base) {
-        master_fd = fd;
-        master_base = base;
-    }
-#endif // ANDROID_OS
+            virtual int map_buffer(void **pBase, size_t size,
+                    int offset, int fd);
 
- private:
+            virtual int unmap_buffer(void *base, size_t size,
+                    int offset);
 
-    enum {
-        MASTER_FD_INIT = -1,
+            virtual int clean_buffer(void*base, size_t size,
+                    int offset, int fd);
+
+            PmemKernelAlloc(const char* device);
+
+            ~PmemKernelAlloc();
+        private:
+            const char* mPmemDev;
+
+
     };
 
-    Deps& deps;
-    Deps::Allocator& allocator;
-
-    pthread_mutex_t lock;
-    const char* pmemdev;
-    int master_fd;
-    void* master_base;
-};
-
-
-/**
- * A PMEM allocator that allocates each individual allocation from the kernel
- * (using the kernel's allocator).  This requires the kernel driver for the
- * particular PMEM device being allocated from to support kernel allocation.
- */
-class PmemKernelAllocator: public PmemAllocator {
-
- public:
-
-    class Deps {
-     public:
-
-        virtual ~Deps();
-
-        // C99
-        virtual int getErrno() = 0;
-
-        // POSIX
-        virtual void* mmap(void* start, size_t length, int prot, int flags, int fd,
-                off_t offset) = 0;
-        virtual int munmap(void* start, size_t length) = 0;
-        virtual int open(const char* pathname, int flags, int mode) = 0;
-        virtual int close(int fd) = 0;
-        virtual int alignPmem(int fd, size_t size, int align) = 0;
-    };
-
-    PmemKernelAllocator(Deps& deps);
-    virtual ~PmemKernelAllocator();
-
-    // Only valid after init_pmem_area() has completed successfully.
-    virtual void* get_base_address();
-
-    virtual int alloc_pmem_buffer(size_t size, int usage, void** pBase,
-            int* pOffset, int* pFd, int format);
-    virtual int free_pmem_buffer(size_t size, void* base, int offset, int fd);
-
- private:
-
-    Deps& deps;
-};
-
-#endif  // GRALLOC_QSD8K_PMEMALLOC_H
+}
+#endif /* GRALLOC_PMEMALLOC_H */

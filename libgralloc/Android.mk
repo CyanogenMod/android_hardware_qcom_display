@@ -13,7 +13,6 @@
 # limitations under the License.
 
 # Use this flag until pmem/ashmem is implemented in the new gralloc
-ifeq ($(TARGET_USES_ION),true)
 LOCAL_PATH := $(call my-dir)
 
 # HAL module implemenation, not prelinked and stored in
@@ -28,13 +27,11 @@ LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_SRC_FILES :=  framebuffer.cpp \
                     gpu.cpp         \
                     gralloc.cpp     \
-                    mapper.cpp      \
-                    pmemalloc.cpp   \
-                    pmem_bestfit_alloc.cpp
+                    mapper.cpp
 
 LOCAL_MODULE := gralloc.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_TAGS := optional
-LOCAL_CFLAGS:= -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).gralloc\" -DHOST -DDEBUG_CALC_FPS -DUSE_ION
+LOCAL_CFLAGS:= -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).gralloc\" -DHOST -DDEBUG_CALC_FPS
 
 ifeq ($(call is-board-platform,msm7627_surf msm7627_6x),true)
     LOCAL_CFLAGS += -DTARGET_MSM7x27
@@ -53,6 +50,7 @@ endif
 ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
     LOCAL_CFLAGS += -DUSE_ASHMEM
 endif
+
 include $(BUILD_SHARED_LIBRARY)
 
 #MemAlloc Library
@@ -64,9 +62,15 @@ LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils
 LOCAL_SRC_FILES :=  ionalloc.cpp \
                     ashmemalloc.cpp \
+                    pmemalloc.cpp \
+                    pmem_bestfit_alloc.cpp \
                     alloc_controller.cpp
-LOCAL_CFLAGS:= -DLOG_TAG=\"memalloc\" -DLOG_NDDEBUG=0 -DUSE_ION
+LOCAL_CFLAGS:= -DLOG_TAG=\"memalloc\" -DLOG_NDDEBUG=0
+
+ifeq ($(TARGET_USES_ION),true)
+    LOCAL_CFLAGS += -DUSE_ION
+endif
+
 LOCAL_MODULE := libmemalloc
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_SHARED_LIBRARY)
-endif #TARGET_USES_ION

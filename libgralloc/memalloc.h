@@ -44,7 +44,6 @@ namespace gralloc {
         unsigned int   pHandle;
         bool           uncached;
         unsigned int   flags;
-        int            bufferType;
         int            allocType;
     };
 

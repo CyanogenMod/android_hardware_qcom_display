@@ -102,7 +102,7 @@ int gralloc_device_open(const hw_module_t* module, const char* name,
         const private_module_t* m = reinterpret_cast<const private_module_t*>(
                 module);
         gpu_context_t *dev;
-        sp<IAllocController> alloc_ctrl = IAllocController::getInstance();
+        sp<IAllocController> alloc_ctrl = IAllocController::getInstance(true);
         dev = new gpu_context_t(m, alloc_ctrl);
         *device = &dev->common;
         status = 0;
