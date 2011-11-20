@@ -278,12 +278,7 @@ struct private_handle_t {
         PRIV_FLAGS_USES_ASHMEM    = 0x00000010,
         PRIV_FLAGS_NEEDS_FLUSH    = 0x00000020,
         PRIV_FLAGS_DO_NOT_FLUSH   = 0x00000040,
-    };
-
-    enum {
-        LOCK_STATE_WRITE     =   1<<31,
-        LOCK_STATE_MAPPED    =   1<<30,
-        LOCK_STATE_READ_MASK =   0x3FFFFFFF
+        PRIV_FLAGS_SW_LOCK        = 0x00000080,
     };
 
     // file-descriptors
@@ -298,8 +293,6 @@ struct private_handle_t {
 
     // FIXME: the attributes below should be out-of-line
     int     base;
-    int     lockState;
-    int     writeOwner;
     int     gpuaddr; // The gpu address mapped into the mmu. If using ashmem, set to 0 They don't care
     int     pid;
     int     format;
@@ -308,14 +301,14 @@ struct private_handle_t {
     int     genlockPrivFd; // local fd of the genlock device.
 
 #ifdef __cplusplus
-    static const int sNumInts = 14;
+    static const int sNumInts = 12;
     static const int sNumFds = 2;
     static const int sMagic = 'gmsm';
 
     private_handle_t(int fd, int size, int flags, int bufferType, int format, int width, int height) :
         fd(fd), genlockHandle(-1), magic(sMagic), flags(flags), size(size), offset(0),
-	bufferType(bufferType), base(0), lockState(0), writeOwner(0), gpuaddr(0),
-	pid(getpid()), format(format), width(width), height(height), genlockPrivFd(-1)
+        bufferType(bufferType), base(0), gpuaddr(0), pid(getpid()), format(format),
+        width(width), height(height), genlockPrivFd(-1)
     {
         version = sizeof(native_handle);
         numInts = sNumInts;

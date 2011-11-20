@@ -172,7 +172,6 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
 
         hnd->offset = data.offset;
         hnd->base = int(data.base) + data.offset;
-        hnd->lockState = private_handle_t::LOCK_STATE_MAPPED;
         *pHandle = hnd;
     }
 
