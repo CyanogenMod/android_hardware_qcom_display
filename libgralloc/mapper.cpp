@@ -34,6 +34,7 @@
 
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>
+#include <genlock.h>
 
 #include <linux/android_pmem.h>
 
@@ -134,6 +135,17 @@ int gralloc_register_buffer(gralloc_module_t const* module,
         hnd->base = 0;
         hnd->lockState  = 0;
         hnd->writeOwner = 0;
+        // Reset the genlock private fd flag in the handle
+        hnd->genlockPrivFd = -1;
+
+        // Check if there is a valid lock attached to the handle.
+        if (-1 == hnd->genlockHandle) {
+            LOGE("%s: the lock is invalid.", __FUNCTION__);
+            return -EINVAL;
+        }
+
+        // Attach the genlock handle
+        return genlock_attach_lock((native_handle_t *)handle);
     }
     return 0;
 }
@@ -164,6 +176,14 @@ int gralloc_unregister_buffer(gralloc_module_t const* module,
         hnd->base = 0;
         hnd->lockState  = 0;
         hnd->writeOwner = 0;
+
+        // Release the genlock
+        if (-1 != hnd->genlockHandle) {
+            return genlock_release_lock((native_handle_t *)handle);
+        } else {
+            LOGE("%s: there was no genlock attached to this buffer", __FUNCTION__);
+            return -EINVAL;
+        }
     }
     return 0;
 }
