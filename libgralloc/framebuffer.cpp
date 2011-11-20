@@ -507,8 +507,7 @@ static void *hdmi_ui_loop(void *ptr)
                     int currOrientation = 0;
                     pTemp->getOrientation(currOrientation);
                     if(rot != currOrientation) {
-                        pTemp->setParameter(OVERLAY_TRANSFORM,
-                                              rot);
+                        pTemp->setTransform(rot);
                     }
                     EVEN_OUT(asX);
                     EVEN_OUT(asY);

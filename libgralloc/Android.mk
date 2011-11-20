@@ -38,7 +38,7 @@ ifeq ($(call is-board-platform,msm7627_surf msm7627_6x),true)
 endif
 
 ifeq ($(TARGET_HAVE_HDMI_OUT),true)
-#    LOCAL_CFLAGS += -DHDMI_DUAL_DISPLAY
+    LOCAL_CFLAGS += -DHDMI_DUAL_DISPLAY
     LOCAL_C_INCLUDES += hardware/qcom/display/liboverlay
     LOCAL_SHARED_LIBRARIES += liboverlay
 endif
