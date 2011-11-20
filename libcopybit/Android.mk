@@ -28,14 +28,15 @@ ifeq ($(TARGET_USES_C2D_COMPOSITION),true)
     LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
     LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
     LOCAL_CFLAGS += -DCOPYBIT_Z180=1 -DC2D_SUPPORT_DISPLAY=1
+    LOCAL_MODULE_TAGS := optional
     include $(BUILD_SHARED_LIBRARY)
 else
-    ifneq "$(findstring msm7630,$(TARGET_PRODUCT))" "msm7630"
-        ifeq ($(TARGET_BOARD_PLATFORM),msm7k)
+    ifneq ($(call is-chipset-in-board-platform,msm7630),true)
+        ifeq ($(call is-board-platform-in-list,$(MSM7K_BOARD_PLATFORMS)),true)
             include $(CLEAR_VARS)
             ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
                 LOCAL_CFLAGS += -DUSE_ASHMEM
-                ifeq "$(findstring msm7627,$(TARGET_PRODUCT))" "msm7627"
+                ifeq ($(call is-chipset-prefix-in-board-platform,msm7627),true)
                    LOCAL_CFLAGS += -DTARGET_7x27
                 endif
             endif
@@ -49,24 +50,6 @@ else
             LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
             LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
             LOCAL_CFLAGS += -DCOPYBIT_MSM7K=1
-            include $(BUILD_SHARED_LIBRARY)
-        endif
-
-        ifeq ($(TARGET_BOARD_PLATFORM),qsd8k)
-            include $(CLEAR_VARS)
-            ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
-                LOCAL_CFLAGS += -DUSE_ASHMEM
-            endif
-
-            LOCAL_PRELINK_MODULE := false
-            LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
-            LOCAL_SHARED_LIBRARIES := liblog
-            LOCAL_SRC_FILES := copybit.cpp
-            LOCAL_MODULE := copybit.qsd8k
-            LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
-            LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
-            LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
-            LOCAL_CFLAGS += -DCOPYBIT_QSD8K=1
             include $(BUILD_SHARED_LIBRARY)
         endif
     endif
