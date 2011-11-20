@@ -120,7 +120,7 @@ struct private_hwc_module_t {
     copybit_device_t *copybitEngine;
     framebuffer_device_t *fbDevice;
     int compositionType;
-    bool isBypassEnabled; //from build.prop debug.compbypass.enable
+    bool isBypassEnabled; //from build.prop ro.sf.compbypass.enable
 };
 
 struct private_hwc_module_t HAL_MODULE_INFO_SYM = {
@@ -225,11 +225,31 @@ static int hwc_closeOverlayChannels(hwc_context_t* ctx) {
     return 0;
 }
 
+#ifdef COMPOSITION_BYPASS
+// To-do: Merge this with other blocks & move them to a separate file.
+void closeBypass(hwc_context_t* ctx) {
+    for (int index = 0 ; index < MAX_BYPASS_LAYERS; index++) {
+        ctx->mOvUI[index]->closeChannel();
+        #ifdef DEBUG
+            LOGE("%s", __FUNCTION__);
+        #endif
+    }
+}
+#endif
+
 /*
  * Configures mdp pipes
  */
 static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const bool waitForVsync) {
      int ret = 0;
+
+#ifdef COMPOSITION_BYPASS
+     if(ctx && (ctx->bypassState != BYPASS_OFF)) {
+        closeBypass(ctx);
+        ctx->bypassState = BYPASS_OFF;
+     }
+#endif
+
      if (LIKELY(ctx && ctx->mOverlayLibObject)) {
         private_hwc_module_t* hwcModule =
             reinterpret_cast<private_hwc_module_t*>(ctx->device.common.module);
@@ -502,7 +522,7 @@ inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount
         return false;
     }
 #endif
-    return (yuvCount == 0) && isDisjoint(list);
+    return (yuvCount == 0) && (ctx->hwcOverlayStatus == HWC_OVERLAY_CLOSED) && isDisjoint(list);
 }
 
 /*
@@ -550,14 +570,6 @@ void unsetBypassLayerFlags(hwc_layer_list_t* list) {
     }
 }
 
-void closeBypass(hwc_context_t* ctx) {
-    for (int index = 0 ; index < MAX_BYPASS_LAYERS; index++) {
-        ctx->mOvUI[index]->closeChannel();
-        #ifdef DEBUG
-            LOGE("%s", __FUNCTION__);
-        #endif
-    }
-}
 #endif  //COMPOSITION_BYPASS
 
 
@@ -1090,7 +1102,7 @@ static int hwc_module_initialize(struct private_hwc_module_t* hwcModule)
     }
 
     //Check if composition bypass is enabled
-    if(property_get("debug.compbypass.enable", property, NULL) > 0) {
+    if(property_get("ro.sf.compbypass.enable", property, NULL) > 0) {
         if(atoi(property) == 1) {
             hwcModule->isBypassEnabled = true;
         }
