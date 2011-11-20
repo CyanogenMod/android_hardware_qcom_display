@@ -14,6 +14,7 @@ LOCAL_MODULE := hwcomposer.$(TARGET_BOARD_PLATFORM)
 LOCAL_CFLAGS:= -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).hwcomposer\"
 LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
 LOCAL_C_INCLUDES += hardware/qcom/display/liboverlay
+LOCAL_C_INCLUDES += hardware/qcom/display/libcopybit
 LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 ifeq ($(TARGET_HAVE_HDMI_OUT),true)
