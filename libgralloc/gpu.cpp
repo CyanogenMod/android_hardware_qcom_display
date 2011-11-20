@@ -21,6 +21,8 @@
 #include <cutils/properties.h>
 #include <sys/mman.h>
 
+#include <genlock.h>
+
 #include "gr.h"
 #include "gpu.h"
 #include "memalloc.h"
@@ -289,6 +291,13 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
         return err;
     }
 
+    // Create a genlock lock for this buffer handle.
+    err = genlock_create_lock((native_handle_t*)(*pHandle));
+    if (err) {
+        LOGE("%s: genlock_create_lock failed", __FUNCTION__);
+        free_impl(reinterpret_cast<private_handle_t*>(pHandle));
+        return err;
+    }
     *pStride = alignedw;
     return 0;
 }
@@ -308,6 +317,13 @@ int gpu_context_t::free_impl(private_handle_t const* hnd) {
             return err;
         terminateBuffer(&m->base, const_cast<private_handle_t*>(hnd));
     }
+
+    // Release the genlock
+    int err = genlock_release_lock((native_handle_t*)hnd);
+    if (err) {
+        LOGE("%s: genlock_release_lock failed", __FUNCTION__);
+    }
+
     delete hnd;
     return 0;
 }
