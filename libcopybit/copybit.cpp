@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010 - 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +36,7 @@
 #include <copybit.h>
 
 #include "gralloc_priv.h"
+#include "software_converter.h"
 
 #define DEBUG_MDP_ERRORS 1
 
@@ -136,19 +138,15 @@ static int get_format(int format) {
 static void set_image(struct mdp_img *img, const struct copybit_image_t *rhs) 
 {
     private_handle_t* hnd = (private_handle_t*)rhs->handle;
+    if(hnd == NULL){
+        LOGE("copybit: Invalid handle");
+        return;
+    }
     img->width      = rhs->w;
     img->height     = rhs->h;
     img->format     = get_format(rhs->format);
     img->offset     = hnd->offset;
-    #if defined(COPYBIT_MSM7K)
-        #if defined(USE_ASHMEM) && (TARGET_7x27)
-             img->memory_id = hnd->fd;
-        #else //USE_ASHMEM not defined
-             img->memory_id = hnd->fd;
-        #endif //end USE_ASHMEM
-    #else
-        img->memory_id  = hnd->fd;
-    #endif
+    img->memory_id  = hnd->fd;
 }
 /** setup rectangles */
 static void set_rects(struct copybit_context_t *dev,
@@ -387,6 +385,18 @@ static int stretch_copybit(
         if (dst->w > MAX_DIMENSION || dst->h > MAX_DIMENSION)
             return -EINVAL;
 
+        if(src->format ==  HAL_PIXEL_FORMAT_YV12) {
+            if(0 == convertYV12toYCrCb420SP(src)){
+                //if inplace conversion,just convert and return
+                if(src->base == dst->base)
+                    return status;
+            }
+            else{
+                LOGE("Error copybit conversion from yv12 failed");
+                return -EINVAL;
+            }
+        }
+
         const uint32_t maxCount = sizeof(list.req)/sizeof(list.req[0]);
         const struct copybit_rect_t bounds = { 0, 0, dst->w, dst->h };
         struct copybit_rect_t clip;
@@ -397,6 +407,11 @@ static int stretch_copybit(
             mdp_blit_req* req = &list.req[list.count];
             int flags = 0;
 
+            private_handle_t* src_hnd = (private_handle_t*)src->handle;
+            if(src_hnd != NULL && src_hnd->flags & private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH) {
+                flags |=  MDP_BLIT_NON_CACHED;
+            }
+ 
             set_infos(ctx, req, flags);
             set_image(&req->dst, dst);
             set_image(&req->src, src);

@@ -34,6 +34,12 @@ else
     ifneq ($(call is-chipset-in-board-platform,msm7630),true)
         ifeq ($(call is-board-platform-in-list,$(MSM7K_BOARD_PLATFORMS)),true)
             include $(CLEAR_VARS)
+            ifeq ($(ARCH_ARM_HAVE_NEON),true)
+                LOCAL_CFLAGS += -D__ARM_HAVE_NEON
+            endif
+            ifeq ($(call is-board-platform,msm7627a),true)
+                LOCAL_CFLAGS += -DTARGET_7x27A
+            endif
             ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
                 LOCAL_CFLAGS += -DUSE_ASHMEM
                 ifeq ($(call is-chipset-prefix-in-board-platform,msm7627),true)
@@ -44,8 +50,9 @@ else
             LOCAL_PRELINK_MODULE := false
             LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
             LOCAL_SHARED_LIBRARIES := liblog
-            LOCAL_SRC_FILES := copybit.cpp
-            LOCAL_MODULE := copybit.msm7k
+            LOCAL_SRC_FILES := software_converter.cpp copybit.cpp
+            LOCAL_MODULE := copybit.$(TARGET_BOARD_PLATFORM)
+            LOCAL_MODULE_TAGS := optional
             LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
             LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
             LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
