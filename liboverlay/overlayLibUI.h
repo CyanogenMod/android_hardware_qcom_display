@@ -107,13 +107,8 @@ class Rotator {
     Rotator& operator=(const Rotator& objRotator);
 
 public:
-    explicit Rotator() : mFD(NO_INIT), mSessionID(NO_INIT), mPmemFD(-1)
-    {
-#ifdef USE_ION
-        mAlloc = gralloc::IAllocController::getInstance();
-#endif
-    }
-    ~Rotator() { closeRotSession(); }
+    explicit Rotator();
+    ~Rotator();
     status_t startRotSession(msm_rotator_img_info& rotInfo, int size,
                              int numBuffers = max_num_buffers);
     status_t closeRotSession();

@@ -18,7 +18,7 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)
-LOCAL_SHARED_LIBRARIES := liblog libcutils libutils
+LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libmemalloc
 LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
@@ -26,11 +26,6 @@ LOCAL_SRC_FILES := \
     overlayLib.cpp \
     overlayLibUI.cpp \
 LOCAL_CFLAGS:= -DLOG_TAG=\"OverlayLib\"
-
-ifeq ($(TARGET_USES_ION),true)
-    LOCAL_CFLAGS += -DUSE_ION
-    LOCAL_SHARED_LIBRARIES += libmemalloc
-endif
 
 ifeq ($(TARGET_USE_HDMI_AS_PRIMARY),true)
 LOCAL_CFLAGS += -DHDMI_AS_PRIMARY

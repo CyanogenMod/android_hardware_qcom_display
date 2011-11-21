@@ -1395,9 +1395,10 @@ bool OverlayControlChannel::getSize(int& size) const {
 OverlayDataChannel::OverlayDataChannel() : mNoRot(false), mFD(-1), mRotFD(-1),
                                   mPmemFD(-1), mPmemAddr(0), mUpdateDataChannel(0)
 {
-#ifdef USE_ION
-    mAlloc = gralloc::IAllocController::getInstance();
-#endif
+    //XXX: getInstance(false) implies that it should only
+    // use the kernel allocator. Change it to something
+    // more descriptive later.
+    mAlloc = gralloc::IAllocController::getInstance(false);
 }
 
 OverlayDataChannel::~OverlayDataChannel() {
@@ -1453,7 +1454,6 @@ bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int r
 {
     mPmemAddr = MAP_FAILED;
 
-#ifdef USE_ION
     alloc_data data;
     data.base = 0;
     data.fd = -1;
@@ -1462,10 +1462,13 @@ bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int r
     data.align = getpagesize();
     data.uncached = true;
 
-    int err = mAlloc->allocate(data, GRALLOC_USAGE_PRIVATE_ADSP_HEAP|
-                                     GRALLOC_USAGE_PRIVATE_SMI_HEAP, 0);
+    int allocFlags = GRALLOC_USAGE_PRIVATE_ADSP_HEAP;
+    if((requestType == NEW_REQUEST) && !uiChannel)
+        allocFlags |= GRALLOC_USAGE_PRIVATE_SMI_HEAP;
+
+    int err = mAlloc->allocate(data, allocFlags, 0);
     if(err) {
-        reportError("Cant allocate from ION");
+        reportError("Cant allocate rotatory memory");
         close(mFD);
         mFD = -1;
         close(mRotFD);
@@ -1475,40 +1478,7 @@ bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int r
     mPmemFD = data.fd;
     mPmemAddr = data.base;
     mBufferType = data.allocType;
-#else
 
-    if((requestType == NEW_REQUEST) && !uiChannel) {
-        mPmemFD = open("/dev/pmem_smipool", O_RDWR | O_SYNC);
-        if(mPmemFD >= 0)
-            mPmemAddr = (void *) mmap(NULL, mPmemOffset * num_buffers, PROT_READ | PROT_WRITE,
-                                      MAP_SHARED, mPmemFD, 0);
-    }
-
-    if (mPmemAddr == MAP_FAILED) {
-        mPmemFD = open("/dev/pmem_adsp", O_RDWR | O_SYNC);
-        if (mPmemFD < 0) {
-            reportError("Cant open pmem_adsp ");
-            close(mFD);
-            mFD = -1;
-            close(mRotFD);
-            mRotFD = -1;
-            return false;
-        } else {
-            mPmemAddr = (void *) mmap(NULL, mPmemOffset * num_buffers, PROT_READ | PROT_WRITE,
-                                      MAP_SHARED, mPmemFD, 0);
-            if (mPmemAddr == MAP_FAILED) {
-                reportError("Cant map pmem_adsp ");
-                close(mFD);
-                mFD = -1;
-                close(mPmemFD);
-                mPmemFD = -1;
-                close(mRotFD);
-                mRotFD = -1;
-                return false;
-            }
-        }
-    }
-#endif
     // Set this flag if source memory is fb
     if(uiChannel)
         mRotData.src.flags |= MDP_MEMORY_ID_TYPE_FB;
@@ -1553,13 +1523,8 @@ bool OverlayDataChannel::closeDataChannel() {
         return true;
 
     if (!mNoRot && mRotFD > 0) {
-#ifdef USE_ION
         sp<IMemAlloc> memalloc = mAlloc->getAllocator(mBufferType);
         memalloc->free_buffer(mPmemAddr, mPmemOffset * mNumBuffers, 0, mPmemFD);
-#else
-        munmap(mPmemAddr, mPmemOffset * mNumBuffers);
-        close(mPmemFD);
-#endif
         close(mPmemFD);
         mPmemFD = -1;
         close(mRotFD);
@@ -1612,14 +1577,8 @@ bool OverlayDataChannel::queueBuffer(uint32_t offset) {
 
     // Unmap the old PMEM memory after the queueBuffer has returned
     if (oldPmemFD != -1 && oldPmemAddr != MAP_FAILED) {
-#ifdef USE_ION
         sp<IMemAlloc> memalloc = mAlloc->getAllocator(mBufferType);
         memalloc->free_buffer(oldPmemAddr, oldPmemOffset * mNumBuffers, 0, oldPmemFD);
-#else
-        munmap(oldPmemAddr, oldPmemOffset * mNumBuffers);
-        close(oldPmemFD);
-#endif
-
         oldPmemFD = -1;
     }
     return result;
