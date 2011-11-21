@@ -131,8 +131,8 @@ int AshmemAlloc::clean_buffer(void *base, size_t size, int offset, int fd)
     //    LOGD("%s: Clean buffer fd=%d base = %p size=%d PID=%d", __FUNCTION__,
     //                            fd, base, size, getpid());
     int err = 0;
-    if (ioctl(fd, ASHMEM_CACHE_INV_RANGE, NULL)) {
-        LOGE("ASHMEM_CACHE_INV_RANGE failed fd = %d", fd);
+    if (ioctl(fd, ASHMEM_CACHE_FLUSH_RANGE, NULL)) {
+        LOGE("ASHMEM_CACHE_FLUSH_RANGE failed fd = %d", fd);
     }
 
     return err;
