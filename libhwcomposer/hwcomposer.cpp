@@ -764,13 +764,16 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 if (!isValidDestination(hwcModule->fbDevice, list->hwLayers[i].displayFrame)) {
                     list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
                     skipComposition = false;
+#ifdef USE_OVERLAY
                 } else if(prepareOverlay(ctx, &(list->hwLayers[i]), waitForVsync) == 0) {
                     list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
                     list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
                     // We've opened the channel. Set the state to open.
                     ctx->hwcOverlayStatus = HWC_OVERLAY_OPEN;
+#endif
                 }
-                else if (hwcModule->compositionType & (COMPOSITION_TYPE_C2D)) {
+                else if (hwcModule->compositionType & (COMPOSITION_TYPE_C2D|
+                            COMPOSITION_TYPE_MDP)) {
                     //Fail safe path: If drawing with overlay fails,
 
                     //Use C2D if available.
