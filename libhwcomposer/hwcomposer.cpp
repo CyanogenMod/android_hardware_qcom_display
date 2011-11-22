@@ -37,6 +37,7 @@
 #include <EGL/eglext.h>
 #include <ui/android_native_buffer.h>
 #include <gralloc_priv.h>
+#include <genlock.h>
 
 /*****************************************************************************/
 #define ALIGN(x, align) (((x) + ((align)-1)) & ~((align)-1))
@@ -94,6 +95,7 @@ struct hwc_context_t {
     hwc_composer_device_t device;
     /* our private state goes below here */
     overlay::Overlay* mOverlayLibObject;
+    native_handle_t *previousOverlayHandle;
 #ifdef COMPOSITION_BYPASS
     overlay::OverlayUI* mOvUI[MAX_BYPASS_LAYERS];
     int animCount;
@@ -739,6 +741,12 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             s3dVideoFormat = getS3DVideoFormat(list);
             if (s3dVideoFormat)
                 isS3DCompositionNeeded = isS3DCompositionRequired();
+        } else {
+            if (ctx->previousOverlayHandle) {
+                // Unlock any previously locked buffers
+                if (GENLOCK_NO_ERROR == genlock_unlock_buffer(ctx->previousOverlayHandle))
+                    ctx->previousOverlayHandle = NULL;
+            }
         }
 
         if (list->flags & HWC_GEOMETRY_CHANGED) {
@@ -763,7 +771,6 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 bool waitForVsync = skipComposition ? true:false;
                 if (!isValidDestination(hwcModule->fbDevice, list->hwLayers[i].displayFrame)) {
                     list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
-                    skipComposition = false;
 #ifdef USE_OVERLAY
                 } else if(prepareOverlay(ctx, &(list->hwLayers[i]), waitForVsync) == 0) {
                     list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
@@ -778,11 +785,17 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
                     //Use C2D if available.
                     list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
-                    skipComposition = false;
                 }
                 else {
                     //If C2D is not enabled fall back to GPU.
                     list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
+                }
+                if (HWC_USE_OVERLAY != list->hwLayers[i].compositionType) {
+                    if (ctx->previousOverlayHandle) {
+                       // Unlock any previously locked buffers before the fallback.
+                       if (GENLOCK_NO_ERROR == genlock_unlock_buffer(ctx->previousOverlayHandle))
+                          ctx->previousOverlayHandle = NULL;
+                    }
                     skipComposition = false;
                 }
             } else if (isS3DCompositionNeeded) {
@@ -890,6 +903,14 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
         return -1;
     }
 
+    // Lock this buffer for read.
+    genlock_lock_type lockType = GENLOCK_READ_LOCK;
+    int err = genlock_lock_buffer(hnd, lockType, GENLOCK_MAX_TIMEOUT);
+    if (GENLOCK_FAILURE == err) {
+        LOGE("%s: genlock_lock_buffer(READ) failed", __FUNCTION__);
+        return -1;
+    }
+
     // Set the copybit source:
     copybit_image_t src;
     src.w = ALIGN(hnd->width, 32);
@@ -915,11 +936,13 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
     android_native_buffer_t *renderBuffer = (android_native_buffer_t *)eglGetRenderBufferANDROID(dpy, surface);
     if (!renderBuffer) {
         LOGE("eglGetRenderBufferANDROID returned NULL buffer");
+        genlock_unlock_buffer(hnd);
         return -1;
     }
     private_handle_t *fbHandle = (private_handle_t *)renderBuffer->handle;
     if(!fbHandle) {
         LOGE("Framebuffer handle is NULL");
+        genlock_unlock_buffer(hnd);
         return -1;
     }
     dst.w = ALIGN(fbHandle->width,32);
@@ -938,10 +961,16 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
                            (layer->blending == HWC_BLENDING_NONE) ? 0xFF : layer->alpha);
     copybit->set_parameter(copybit, COPYBIT_PREMULTIPLIED_ALPHA,
                            (layer->blending == HWC_BLENDING_PREMULT)? COPYBIT_ENABLE : COPYBIT_DISABLE);
-    int err = copybit->stretch(copybit, &dst, &src, &dstRect, &srcRect, &copybitRegion);
+    err = copybit->stretch(copybit, &dst, &src, &dstRect, &srcRect, &copybitRegion);
 
     if(err < 0)
         LOGE("copybit stretch failed");
+
+    // Unlock this buffer since copybit is done with it.
+    err = genlock_unlock_buffer(hnd);
+    if (GENLOCK_FAILURE == err) {
+        LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
+    }
 
     return err;
 }
@@ -958,13 +987,37 @@ static int drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
         overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
         int ret = 0;
 
-        ret = ovLibObject->queueBuffer(hnd);
-        if (!ret) {
-            LOGE("drawLayerUsingOverlay queueBuffer failed");
+        // Lock this buffer for read.
+        if (GENLOCK_NO_ERROR != genlock_lock_buffer(hnd, GENLOCK_READ_LOCK,
+                                                    GENLOCK_MAX_TIMEOUT)) {
+            LOGE("%s: genlock_lock_buffer(READ) failed", __FUNCTION__);
             return -1;
         }
+
+        ret = ovLibObject->queueBuffer(hnd);
+
+        // Unlock the previously locked buffer, since the overlay has completed reading the buffer
+        if (ctx->previousOverlayHandle) {
+            if (GENLOCK_FAILURE == genlock_unlock_buffer(ctx->previousOverlayHandle)) {
+                LOGE("%s: genlock_unlock_buffer for the previous handle failed",
+                    __FUNCTION__);
+            }
+        }
+
+        if (!ret) {
+            LOGE("drawLayerUsingOverlay queueBuffer failed");
+            // Unlock the buffer handle
+            genlock_unlock_buffer(hnd);
+            ctx->previousOverlayHandle = NULL;
+        } else {
+            // Store the current buffer handle as the one that is to be unlocked after
+            // the next overlay play call.
+            ctx->previousOverlayHandle = hnd;
+        }
+
+        return ret;
     }
-    return 0;
+    return -1;
 }
 
 static int hwc_set(hwc_composer_device_t *dev,
@@ -1048,6 +1101,13 @@ static int hwc_device_close(struct hw_device_t *dev)
     if(hwcModule->fbDevice) {
         framebuffer_close(hwcModule->fbDevice);
         hwcModule->fbDevice = NULL;
+    }
+
+    if (ctx->previousOverlayHandle) {
+        if (GENLOCK_NO_ERROR != genlock_unlock_buffer(ctx->previousOverlayHandle)) {
+            LOGE("%s: genlock_unlock_buffer for the previous handle failed",
+                __FUNCTION__);
+        }
     }
 
     if (ctx) {
@@ -1142,6 +1202,7 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
         dev->mHDMIEnabled = false;
         dev->pendingHDMI = false;
 #endif
+        dev->previousOverlayHandle = NULL;
         dev->hwcOverlayStatus = HWC_OVERLAY_CLOSED;
         /* initialize the procs */
         dev->device.common.tag = HARDWARE_DEVICE_TAG;
