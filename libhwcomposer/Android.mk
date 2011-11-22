@@ -18,6 +18,9 @@ LOCAL_C_INCLUDES += hardware/qcom/display/libcopybit
 ifeq ($(TARGET_HAVE_HDMI_OUT),true)
 LOCAL_CFLAGS += -DHDMI_DUAL_DISPLAY
 endif
+ifeq ($(TARGET_USES_OVERLAY),true)
+LOCAL_CFLAGS += -DUSE_OVERLAY
+endif
 ifeq ($(TARGET_HAVE_BYPASS),true)
 LOCAL_CFLAGS += -DCOMPOSITION_BYPASS
 endif
