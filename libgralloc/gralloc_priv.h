@@ -53,6 +53,13 @@ enum {
 };
 
 enum {
+    /* Gralloc perform enums
+    */
+    GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER = 0x080000001,
+};
+
+
+enum {
     GPU_COMPOSITION,
     C2D_COMPOSITION,
     MDP_COMPOSITION,

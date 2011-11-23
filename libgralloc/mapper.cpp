@@ -309,7 +309,6 @@ int gralloc_perform(struct gralloc_module_t const* module,
     int res = -EINVAL;
     va_list args;
     va_start(args, operation);
-#if 0
     switch (operation) {
         case GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER:
             {
@@ -317,6 +316,9 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 size_t size = va_arg(args, size_t);
                 size_t offset = va_arg(args, size_t);
                 void* base = va_arg(args, void*);
+                int width = va_arg(args, int);
+                int height = va_arg(args, int);
+                int format = va_arg(args, int);
 
                 native_handle_t** handle = va_arg(args, native_handle_t**);
                 int memoryFlags = va_arg(args, int);
@@ -346,31 +348,18 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 hnd->size = size;
                 hnd->offset = offset;
                 hnd->base = intptr_t(base) + offset;
-                hnd->lockState = private_handle_t::LOCK_STATE_MAPPED;
                 hnd->gpuaddr = 0;
+                hnd->width = width;
+                hnd->height = height;
+                hnd->format = format;
                 *handle = (native_handle_t *)hnd;
                 res = 0;
                 break;
 
             }
-        case GRALLOC_MODULE_PERFORM_UPDATE_BUFFER_HANDLE:
-            {
-                native_handle_t* handle = va_arg(args, native_handle_t*);
-                int w = va_arg(args, int);
-                int h = va_arg(args, int);
-                int f = va_arg(args, int);
-                private_handle_t* hnd = (private_handle_t*)handle;
-                hnd->width = w;
-                hnd->height = h;
-                if (hnd->format != f) {
-                    hnd->format = f;
-                }
-                break;
-            }
         default:
             break;
     }
-#endif
     va_end(args);
     return res;
 }
