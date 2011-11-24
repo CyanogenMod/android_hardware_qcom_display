@@ -387,9 +387,8 @@ static int stretch_copybit(
 
         if(src->format ==  HAL_PIXEL_FORMAT_YV12) {
             if(0 == convertYV12toYCrCb420SP(src)){
-                //if inplace conversion,just convert and return
-                if(src->base == dst->base)
-                    return status;
+                (const_cast<copybit_image_t *>(src))->format =
+                        HAL_PIXEL_FORMAT_YCrCb_420_SP;
             }
             else{
                 LOGE("Error copybit conversion from yv12 failed");
