@@ -113,11 +113,14 @@ namespace {
  */
 genlock_status_t genlock_create_lock(native_handle_t *buffer_handle)
 {
+    genlock_status_t ret = GENLOCK_NO_ERROR;
     if (private_handle_t::validate(buffer_handle)) {
         LOGE("%s: handle is invalid", __FUNCTION__);
         return GENLOCK_FAILURE;
     }
 
+    private_handle_t *hnd = reinterpret_cast<private_handle_t*>(buffer_handle);
+#ifdef USE_GENLOCK
     // Open the genlock device
     int fd = open(GENLOCK_DEVICE, O_RDWR);
     if (fd < 0) {
@@ -126,9 +129,7 @@ genlock_status_t genlock_create_lock(native_handle_t *buffer_handle)
         return GENLOCK_FAILURE;
     }
 
-    genlock_status_t ret = GENLOCK_NO_ERROR;
     // Create a new lock
-    private_handle_t *hnd = reinterpret_cast<private_handle_t*>(buffer_handle);
     genlock_lock lock;
     if (ioctl(fd, GENLOCK_IOC_NEW, NULL)) {
         LOGE("%s: GENLOCK_IOC_NEW failed (error=%s)", __FUNCTION__,
@@ -150,6 +151,9 @@ genlock_status_t genlock_create_lock(native_handle_t *buffer_handle)
     // Store the lock params in the handle.
     hnd->genlockPrivFd = fd;
     hnd->genlockHandle = lock.fd;
+#else
+    hnd->genlockHandle = 0;
+#endif
     return ret;
 }
 
@@ -162,12 +166,13 @@ genlock_status_t genlock_create_lock(native_handle_t *buffer_handle)
  */
 genlock_status_t genlock_release_lock(native_handle_t *buffer_handle)
 {
+    genlock_status_t ret = GENLOCK_NO_ERROR;
+#ifdef USE_GENLOCK
     if (private_handle_t::validate(buffer_handle)) {
         LOGE("%s: handle is invalid", __FUNCTION__);
         return GENLOCK_FAILURE;
     }
 
-    genlock_status_t ret = GENLOCK_NO_ERROR;
     private_handle_t *hnd = reinterpret_cast<private_handle_t*>(buffer_handle);
     if (hnd->genlockPrivFd < 0) {
         LOGE("%s: the lock is invalid", __FUNCTION__);
@@ -182,6 +187,7 @@ genlock_status_t genlock_release_lock(native_handle_t *buffer_handle)
 
     // Close the fd and reset the parameters.
     close_genlock_fd_and_handle(hnd->genlockPrivFd, hnd->genlockHandle);
+#endif
     return ret;
 }
 
@@ -194,6 +200,8 @@ genlock_status_t genlock_release_lock(native_handle_t *buffer_handle)
  */
 genlock_status_t genlock_attach_lock(native_handle_t *buffer_handle)
 {
+    genlock_status_t ret = GENLOCK_NO_ERROR;
+#ifdef USE_GENLOCK
     if (private_handle_t::validate(buffer_handle)) {
         LOGE("%s: handle is invalid", __FUNCTION__);
         return GENLOCK_FAILURE;
@@ -207,7 +215,6 @@ genlock_status_t genlock_attach_lock(native_handle_t *buffer_handle)
         return GENLOCK_FAILURE;
     }
 
-    genlock_status_t ret = GENLOCK_NO_ERROR;
     // Attach the local handle to an existing lock
     private_handle_t *hnd = reinterpret_cast<private_handle_t*>(buffer_handle);
     genlock_lock lock;
@@ -221,6 +228,7 @@ genlock_status_t genlock_attach_lock(native_handle_t *buffer_handle)
 
     // Store the relavant information in the handle
     hnd->genlockPrivFd = fd;
+#endif
     return ret;
 }
 
@@ -240,6 +248,8 @@ genlock_status_t genlock_lock_buffer(native_handle_t *buffer_handle,
         genlock_lock_type_t lockType,
         int timeout)
 {
+    genlock_status_t ret = GENLOCK_NO_ERROR;
+#ifdef USE_GENLOCK
     // Translate the locktype
     int kLockType = get_kernel_lock_type(lockType);
     if (-1 == kLockType) {
@@ -251,7 +261,9 @@ genlock_status_t genlock_lock_buffer(native_handle_t *buffer_handle,
         LOGW("%s: trying to lock a buffer with timeout = 0", __FUNCTION__);
     }
     // Call the private function to perform the lock operation specified.
-    return perform_lock_unlock_operation(buffer_handle, kLockType, timeout);
+    ret = perform_lock_unlock_operation(buffer_handle, kLockType, timeout);
+#endif
+    return ret;
 }
 
 
@@ -263,9 +275,13 @@ genlock_status_t genlock_lock_buffer(native_handle_t *buffer_handle,
 */
 genlock_status_t genlock_unlock_buffer(native_handle_t *buffer_handle)
 {
+    genlock_status_t ret = GENLOCK_NO_ERROR;
+#ifdef USE_GENLOCK
     // Do the unlock operation by setting the unlock flag. Timeout is always
     // 0 in this case.
-    return perform_lock_unlock_operation(buffer_handle, GENLOCK_UNLOCK, 0);
+    ret = perform_lock_unlock_operation(buffer_handle, GENLOCK_UNLOCK, 0);
+#endif
+    return ret;
 }
 
 /*
@@ -276,6 +292,7 @@ genlock_status_t genlock_unlock_buffer(native_handle_t *buffer_handle)
  * return: error status.
  */
 genlock_status_t genlock_wait(native_handle_t *buffer_handle, int timeout) {
+#ifdef USE_GENLOCK
     if (private_handle_t::validate(buffer_handle)) {
         LOGE("%s: handle is invalid", __FUNCTION__);
         return GENLOCK_FAILURE;
@@ -297,5 +314,6 @@ genlock_status_t genlock_wait(native_handle_t *buffer_handle, int timeout) {
         LOGE("%s: GENLOCK_IOC_WAIT failed (err=%s)",  __FUNCTION__, strerror(errno));
         return GENLOCK_FAILURE;
     }
+#endif
     return GENLOCK_NO_ERROR;
 }
