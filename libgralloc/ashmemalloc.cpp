@@ -103,7 +103,7 @@ int AshmemAlloc::map_buffer(void **pBase, size_t size, int offset, int fd)
         return err;
 
     base = mmap(0, size, PROT_READ| PROT_WRITE,
-            MAP_SHARED, fd, 0);
+            MAP_SHARED|MAP_POPULATE, fd, 0);
     *pBase = base;
     if(base == MAP_FAILED) {
         LOGD("%s: Failed to map memory in the client: %s",
