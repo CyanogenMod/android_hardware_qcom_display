@@ -28,11 +28,6 @@
 #include "memalloc.h"
 #include "alloc_controller.h"
 
-static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
-static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
-static const int QOMX_INTERLACE_FLAG = 0x49283654;
-static const int QOMX_3D_VIDEO_FLAG = 0x23784238;
-
 using namespace gralloc;
 using android::sp;
 
@@ -248,6 +243,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
             size  = ALIGN( alignedw * alignedh, 8192);
             size += ALIGN( alignedw * ALIGN(h/2, 32), 8192);
             break;
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         case HAL_PIXEL_FORMAT_YV12:
@@ -257,8 +253,14 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
             }
             alignedw = ALIGN(w, 16);
             alignedh = h;
-            size = alignedw*alignedh +
+            if (HAL_PIXEL_FORMAT_NV12_ENCODEABLE == colorFormat) {
+                // The encoder requires a 2K aligned chroma offset.
+                size = ALIGN(alignedw*alignedh, 2048) +
+                       (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
+            } else {
+                size = alignedw*alignedh +
                     (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
+            }
             size = ALIGN(size, 4096);
             break;
 
