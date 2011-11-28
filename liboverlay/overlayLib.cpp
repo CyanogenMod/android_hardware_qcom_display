@@ -466,8 +466,8 @@ bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientati
     int orientHdmi = 0;
     int orientPrimary = sHDMIAsPrimary ? 0 : orientation;
     int orient[2] = {orientPrimary, orientHdmi};
-    // enable waitForVsync on HDMI
-    bool waitForHDMI = true;
+    // disable waitForVsync on HDMI, since we call the wait ioctl
+    bool waitForHDMI = false;
     bool waitForPrimary = sHDMIAsPrimary ? true : waitForVsync;
     bool waitCond[2] = {waitForPrimary, waitForHDMI};
 
@@ -582,7 +582,7 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                     if (FRAMEBUFFER_1 == i) {
                         // Disable rotation for HDMI
                         noRot = true;
-                        waitForVsync = true;
+                        waitForVsync = false;
                     }
                     if(!startChannel(info, i, noRot, false, mS3DFormat,
                                 i, waitForVsync, num_buffers)) {
@@ -715,6 +715,10 @@ bool Overlay::queueBuffer(uint32_t offset, int channel) {
     return objOvDataChannel[channel].queueBuffer(offset);
 }
 
+bool Overlay::waitForHdmiVsync(int channel) {
+    return objOvDataChannel[channel].waitForHdmiVsync();
+}
+
 bool Overlay::queueBuffer(buffer_handle_t buffer) {
     private_handle_t const* hnd = reinterpret_cast
                                    <private_handle_t const*>(buffer);
@@ -737,11 +741,16 @@ bool Overlay::queueBuffer(buffer_handle_t buffer) {
         case OV_3D_VIDEO_3D_PANEL:
         case OV_3D_VIDEO_2D_TV:
         case OV_3D_VIDEO_3D_TV:
-            for (int i=0; i<NUM_CHANNELS; i++) {
+            for (int i=NUM_CHANNELS-1; i>=0; i--) {
                 if(!queueBuffer(fd, offset, i)) {
                     LOGE("%s:failed for channel %d", __FUNCTION__, i);
                     return false;
                 }
+            }
+            //Wait for HDMI done..
+            if(!waitForHdmiVsync(VG1_PIPE)) {
+                LOGE("%s: waitforHdmiVsync failed", __FUNCTION__);
+                return false;
             }
             break;
         default:
@@ -1606,6 +1615,19 @@ bool OverlayDataChannel::queue(uint32_t offset) {
 
     if (ioctl(mFD, MSMFB_OVERLAY_PLAY, odPtr)) {
         reportError("overlay play failed.");
+        return false;
+    }
+
+    return true;
+}
+
+bool OverlayDataChannel::waitForHdmiVsync() {
+    if (!isChannelUP()) {
+        reportError("waitForHdmiVsync: channel not up");
+        return false;
+    }
+    if (ioctl(mFD, MSMFB_OVERLAY_PLAY_WAIT, &mOvData)) {
+        reportError("waitForHdmiVsync: MSMFB_OVERLAY_PLAY_WAIT failed");
         return false;
     }
     return true;

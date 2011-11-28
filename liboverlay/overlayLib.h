@@ -250,6 +250,7 @@ public:
     bool closeDataChannel();
     bool setFd(int fd);
     bool queueBuffer(uint32_t offset);
+    bool waitForHdmiVsync();
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
     bool getCropS3D(overlay_rect *inRect, int channel, int format, overlay_rect *rect);
     bool isChannelUP() const { return (mFD > 0); }
@@ -297,6 +298,7 @@ public:
     bool setSource(const overlay_buffer_info& info, int orientation, bool hdmiConnected,
                     bool ignoreFB = false, int numBuffers = 2);
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
+    bool waitForHdmiVsync(int channel);
     int  getChannelStatus() const { return (mChannelUP ? OVERLAY_CHANNEL_UP: OVERLAY_CHANNEL_DOWN); }
     void setHDMIStatus (bool isHDMIConnected) { mHDMIConnected = isHDMIConnected; mState = -1; }
     int getHDMIStatus() const {return (mHDMIConnected ? HDMI_ON : HDMI_OFF); }
