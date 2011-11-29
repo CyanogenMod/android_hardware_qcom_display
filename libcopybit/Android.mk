@@ -24,15 +24,12 @@ ifeq ($(TARGET_USES_C2D_COMPOSITION),true)
     LOCAL_SHARED_LIBRARIES := liblog libdl
     LOCAL_SRC_FILES := copybit_c2d.cpp
     LOCAL_MODULE := copybit.$(TARGET_BOARD_PLATFORM)
-    LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
-    LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
     LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
     LOCAL_CFLAGS += -DCOPYBIT_Z180=1 -DC2D_SUPPORT_DISPLAY=1
     LOCAL_MODULE_TAGS := optional
     include $(BUILD_SHARED_LIBRARY)
 else
-    ifneq ($(call is-chipset-in-board-platform,msm7630),true)
-        ifeq ($(call is-board-platform-in-list,$(MSM7K_BOARD_PLATFORMS)),true)
+    ifneq ($(call is-chipset-in-board-platform,msm7x30),true)
             include $(CLEAR_VARS)
             ifeq ($(ARCH_ARM_HAVE_NEON),true)
                 LOCAL_CFLAGS += -D__ARM_HAVE_NEON
@@ -59,5 +56,4 @@ else
             LOCAL_CFLAGS += -DCOPYBIT_MSM7K=1
             include $(BUILD_SHARED_LIBRARY)
         endif
-    endif
 endif
