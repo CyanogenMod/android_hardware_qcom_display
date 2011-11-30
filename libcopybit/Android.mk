@@ -28,6 +28,9 @@ ifeq ($(TARGET_USES_C2D_COMPOSITION),true)
     LOCAL_CFLAGS += -DCOPYBIT_Z180=1 -DC2D_SUPPORT_DISPLAY=1
     LOCAL_MODULE_TAGS := optional
     include $(BUILD_SHARED_LIBRARY)
+ifeq ($(TARGET_USES_ION),true)
+    LOCAL_CFLAGS += -DUSE_ION
+endif
 else
     ifneq ($(TARGET_BOARD_PLATFORM),msm7x30)
             include $(CLEAR_VARS)
