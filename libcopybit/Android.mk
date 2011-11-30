@@ -30,6 +30,9 @@ ifeq ($(TARGET_USES_C2D_COMPOSITION),true)
     LOCAL_CFLAGS += -DCOPYBIT_Z180=1 -DC2D_SUPPORT_DISPLAY=1
     LOCAL_MODULE_TAGS := optional
     include $(BUILD_SHARED_LIBRARY)
+ifeq ($(TARGET_USES_ION),true)
+    LOCAL_CFLAGS += -DUSE_ION
+endif
 else
     ifneq ($(call is-chipset-in-board-platform,msm7630),true)
         ifeq ($(call is-board-platform-in-list,$(MSM7K_BOARD_PLATFORMS)),true)
