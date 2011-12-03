@@ -332,6 +332,18 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const bool wai
      return 0;
 }
 
+void unlockPreviousOverlayBuffer(hwc_context_t* ctx)
+{
+    if (ctx->previousOverlayHandle) {
+        // Unlock any previously locked buffers
+        if (GENLOCK_NO_ERROR == genlock_unlock_buffer(ctx->previousOverlayHandle)) {
+            ctx->previousOverlayHandle = NULL;
+        } else {
+            LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
+        }
+    }
+}
+
 bool canSkipComposition(hwc_context_t* ctx, int yuvBufferCount, int currentLayerCount,
                         int numLayersNotUpdating)
 {
@@ -762,15 +774,20 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
 
-    if(!ctx || !list) {
-         LOGE("hwc_prepare invalid context or list");
-         return -1;
+    if(!ctx) {
+        LOGE("hwc_prepare invalid context");
+        return -1;
     }
 
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
                                                            dev->common.module);
-    if(!hwcModule) {
-        LOGE("hwc_prepare null module ");
+    if (!list || !hwcModule) {
+        LOGE("hwc_prepare invalid list or module");
+#ifdef COMPOSITION_BYPASS
+        unlockPreviousBypassBuffers(ctx);
+        unsetBypassBufferLockState(ctx);
+#endif
+        unlockPreviousOverlayBuffer(ctx);
         return -1;
     }
 
@@ -794,11 +811,7 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             if (s3dVideoFormat)
                 isS3DCompositionNeeded = isS3DCompositionRequired();
         } else {
-            if (ctx->previousOverlayHandle) {
-                // Unlock any previously locked buffers
-                if (GENLOCK_NO_ERROR == genlock_unlock_buffer(ctx->previousOverlayHandle))
-                    ctx->previousOverlayHandle = NULL;
-            }
+            unlockPreviousOverlayBuffer(ctx);
         }
 
         if (list->flags & HWC_GEOMETRY_CHANGED) {
@@ -843,11 +856,7 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                     list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
                 }
                 if (HWC_USE_OVERLAY != list->hwLayers[i].compositionType) {
-                    if (ctx->previousOverlayHandle) {
-                       // Unlock any previously locked buffers before the fallback.
-                       if (GENLOCK_NO_ERROR == genlock_unlock_buffer(ctx->previousOverlayHandle))
-                          ctx->previousOverlayHandle = NULL;
-                    }
+                    unlockPreviousOverlayBuffer(ctx);
                     skipComposition = false;
                 }
             } else if (isS3DCompositionNeeded) {
@@ -1051,12 +1060,7 @@ static int drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
         ret = ovLibObject->queueBuffer(hnd);
 
         // Unlock the previously locked buffer, since the overlay has completed reading the buffer
-        if (ctx->previousOverlayHandle) {
-            if (GENLOCK_FAILURE == genlock_unlock_buffer(ctx->previousOverlayHandle)) {
-                LOGE("%s: genlock_unlock_buffer for the previous handle failed",
-                    __FUNCTION__);
-            }
-        }
+        unlockPreviousOverlayBuffer(ctx);
 
         if (!ret) {
             LOGE("drawLayerUsingOverlay queueBuffer failed");
@@ -1080,15 +1084,20 @@ static int hwc_set(hwc_composer_device_t *dev,
         hwc_layer_list_t* list)
 {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    if(!ctx || !list) {
-         LOGE("hwc_set invalid context or list");
-         return -1;
+    if(!ctx) {
+        LOGE("hwc_set invalid context");
+        return -1;
     }
 
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
                                                            dev->common.module);
-    if(!hwcModule) {
-        LOGE("hwc_set null module ");
+    if (!list || !hwcModule) {
+        LOGE("hwc_set invalid list or module");
+#ifdef COMPOSITION_BYPASS
+        unlockPreviousBypassBuffers(ctx);
+        unsetBypassBufferLockState(ctx);
+#endif
+        unlockPreviousOverlayBuffer(ctx);
         return -1;
     }
 
@@ -1163,12 +1172,7 @@ static int hwc_device_close(struct hw_device_t *dev)
         hwcModule->fbDevice = NULL;
     }
 
-    if (ctx->previousOverlayHandle) {
-        if (GENLOCK_NO_ERROR != genlock_unlock_buffer(ctx->previousOverlayHandle)) {
-            LOGE("%s: genlock_unlock_buffer for the previous handle failed",
-                __FUNCTION__);
-        }
-    }
+    unlockPreviousOverlayBuffer(ctx);
 
     if (ctx) {
          delete ctx->mOverlayLibObject;
