@@ -23,7 +23,7 @@ ifeq ($(TARGET_USES_C2D_COMPOSITION),true)
     LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
     LOCAL_SHARED_LIBRARIES := liblog libdl
     LOCAL_SRC_FILES := copybit_c2d.cpp
-    LOCAL_MODULE := copybit.$(TARGET_BOARD_PLATFORM)
+    LOCAL_MODULE := copybit.$(TARGET_BOOTLOADER_BOARD_NAME)
     LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
     LOCAL_CFLAGS += -DCOPYBIT_Z180=1 -DC2D_SUPPORT_DISPLAY=1
     LOCAL_MODULE_TAGS := optional
@@ -48,7 +48,7 @@ else
             LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
             LOCAL_SHARED_LIBRARIES := liblog
             LOCAL_SRC_FILES := software_converter.cpp copybit.cpp
-            LOCAL_MODULE := copybit.$(TARGET_BOARD_PLATFORM)
+            LOCAL_MODULE := copybit.$(TARGET_BOOTLOADER_BOARD_NAME)
             LOCAL_MODULE_TAGS := optional
             LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
             LOCAL_CFLAGS += -DCOPYBIT_MSM7K=1
