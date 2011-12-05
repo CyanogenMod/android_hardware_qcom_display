@@ -83,6 +83,11 @@ enum {
     MAX_BYPASS_LAYERS = 2,
     ANIM_FRAME_COUNT = 30,
 };
+
+enum BypassBufferLockState {
+    BYPASS_BUFFER_UNLOCKED,
+    BYPASS_BUFFER_LOCKED,
+};
 #endif
 
 enum eHWCOverlayStatus {
@@ -98,6 +103,8 @@ struct hwc_context_t {
     native_handle_t *previousOverlayHandle;
 #ifdef COMPOSITION_BYPASS
     overlay::OverlayUI* mOvUI[MAX_BYPASS_LAYERS];
+    native_handle_t* previousBypassHandle[MAX_BYPASS_LAYERS];
+    BypassBufferLockState bypassBufferLockState[MAX_BYPASS_LAYERS];
     int animCount;
     BypassState bypassState;
 #endif
@@ -229,14 +236,30 @@ static int hwc_closeOverlayChannels(hwc_context_t* ctx) {
 
 #ifdef COMPOSITION_BYPASS
 // To-do: Merge this with other blocks & move them to a separate file.
+void unlockPreviousBypassBuffers(hwc_context_t* ctx) {
+    // Unlock the previous bypass buffers. We can blindly unlock the buffers here,
+    // because buffers will be in this list only if the lock was successfully acquired.
+    for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
+        if (ctx->previousBypassHandle[i]) {
+            private_handle_t *hnd = (private_handle_t*) ctx->previousBypassHandle[i];
+            if (GENLOCK_FAILURE == genlock_unlock_buffer(ctx->previousBypassHandle[i])) {
+                LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
+            } else {
+                ctx->previousBypassHandle[i] = NULL;
+            }
+        }
+    }
+}
+
 void closeBypass(hwc_context_t* ctx) {
-    for (int index = 0 ; index < MAX_BYPASS_LAYERS; index++) {
-        ctx->mOvUI[index]->closeChannel();
+        unlockPreviousBypassBuffers(ctx);
+        for (int index = 0 ; index < MAX_BYPASS_LAYERS; index++) {
+            ctx->mOvUI[index]->closeChannel();
+        }
         #ifdef DEBUG
             LOGE("%s", __FUNCTION__);
         #endif
     }
-}
 #endif
 
 /*
@@ -461,9 +484,20 @@ static int drawLayerUsingBypass(hwc_context_t *ctx, hwc_layer_t *layer,
         overlay::OverlayUI *ovUI = ctx->mOvUI[index];
         int ret = 0;
         private_handle_t *hnd = (private_handle_t *)layer->handle;
+        if (GENLOCK_FAILURE == genlock_lock_buffer(hnd, GENLOCK_READ_LOCK,
+                                                   GENLOCK_MAX_TIMEOUT)) {
+            LOGE("%s: genlock_lock_buffer(READ) failed", __FUNCTION__);
+            return -1;
+        }
+        ctx->bypassBufferLockState[index] = BYPASS_BUFFER_LOCKED;
         ret = ovUI->queueBuffer(hnd);
         if (ret) {
             LOGE("drawLayerUsingBypass queueBuffer failed");
+            // Unlock the locked buffer
+            if (GENLOCK_FAILURE == genlock_unlock_buffer(hnd)) {
+                LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
+            }
+            ctx->bypassBufferLockState[index] = BYPASS_BUFFER_UNLOCKED;
             return -1;
         }
     }
@@ -572,6 +606,24 @@ void unsetBypassLayerFlags(hwc_layer_list_t* list) {
     }
 }
 
+void unsetBypassBufferLockState(hwc_context_t* ctx) {
+    for (int i=0; i< MAX_BYPASS_LAYERS; i++) {
+        ctx->bypassBufferLockState[i] = BYPASS_BUFFER_UNLOCKED;
+    }
+}
+
+void storeLockedBypassHandle(hwc_layer_list_t* list, hwc_context_t* ctx) {
+    for (int index = 0 ; index < list->numHwLayers; index++) {
+        // Store the current bypass handle.
+        if (list->hwLayers[index].flags == HWC_COMP_BYPASS) {
+            private_handle_t *hnd = (private_handle_t*)list->hwLayers[index].handle;
+            if (ctx->bypassBufferLockState[index] == BYPASS_BUFFER_LOCKED)
+                ctx->previousBypassHandle[index] = (native_handle_t*)list->hwLayers[index].handle;
+            else
+                ctx->previousBypassHandle[index] = NULL;
+        }
+    }
+}
 #endif  //COMPOSITION_BYPASS
 
 
@@ -835,7 +887,9 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 ctx->bypassState = BYPASS_ON;
             }
         } else {
+            unlockPreviousBypassBuffers(ctx);
             unsetBypassLayerFlags(list);
+            unsetBypassBufferLockState(ctx);
             if(ctx->bypassState == BYPASS_ON) {
                 ctx->bypassState = BYPASS_OFF_PENDING;
             }
@@ -1056,6 +1110,12 @@ static int hwc_set(hwc_composer_device_t *dev,
         }
     }
 
+#ifdef COMPOSITION_BYPASS
+    unlockPreviousBypassBuffers(ctx);
+    storeLockedBypassHandle(list, ctx);
+    // We have stored the handles, unset the current lock states in the context.
+    unsetBypassBufferLockState(ctx);
+#endif
     // Do not call eglSwapBuffers if we the skip composition flag is set on the list.
     if (!(list->flags & HWC_SKIP_COMPOSITION)) {
         EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
@@ -1114,9 +1174,11 @@ static int hwc_device_close(struct hw_device_t *dev)
          delete ctx->mOverlayLibObject;
          ctx->mOverlayLibObject = NULL;
 #ifdef COMPOSITION_BYPASS
-         for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
-            delete ctx->mOvUI[i];
-         }
+            for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
+                delete ctx->mOvUI[i];
+            }
+            unlockPreviousBypassBuffers(ctx);
+            unsetBypassBufferLockState(ctx);
 #endif
         free(ctx);
     }
@@ -1193,7 +1255,9 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
 #ifdef COMPOSITION_BYPASS
         for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
             dev->mOvUI[i] = new overlay::OverlayUI();
+            dev->previousBypassHandle[i] = NULL;
         }
+        unsetBypassBufferLockState(dev);
         dev->animCount = 0;
         dev->bypassState = BYPASS_OFF;
 #endif
