@@ -36,11 +36,14 @@
 #include <ui/egl/android_natives.h>
 #include <private/ui/android_natives_priv.h>
 #include <cutils/native_handle.h>
+#include <cutils/ashmem.h>
+#include <linux/ashmem.h>
 #include <gralloc_priv.h>
 
 #include <copybit.h>
 
 #include "c2d2.h"
+#include "software_converter.h"
 
 #include <dlfcn.h>
 C2D_STATUS (*LINK_c2dCreateSurface)( uint32 *surface_id,
@@ -83,15 +86,17 @@ C2D_STATUS (*LINK_c2dDestroySurface)( uint32 surface_id );
 
 #define G12_DEVICE_NAME "/dev/kgsl-2d0"
 
-#define COPYBIT_SUCCESS 0
-#define COPYBIT_FAILURE -1
 #define NUM_SURFACES 3
-#define ALIGN(x, align) (((x) + ((align)-1)) & ~((align)-1))
 
 enum {
     RGB_SURFACE,
     YUV_SURFACE_2_PLANES,
     YUV_SURFACE_3_PLANES
+};
+
+enum eConversionType {
+    CONVERT_TO_ANDROID_FORMAT,
+    CONVERT_TO_C2D_FORMAT
 };
 
 enum eC2DFlags {
@@ -125,6 +130,11 @@ struct bufferInfo {
     int format;
 };
 
+struct memInfo {
+    int fd;
+    size_t size;
+    int base;
+};
 
 struct yuvPlaneInfo {
     int yStride;       //luma stride
@@ -298,6 +308,7 @@ static int get_num_planes(int format)
     switch(format) {
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED: {
             return 2;
         }
@@ -421,7 +432,8 @@ static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image
         surfaceDef.format = *cformat | ((flags & FLAGS_PREMULTIPLIED_ALPHA) ? C2D_FORMAT_PREMULTIPLIED : 0);
         surfaceDef.width = rhs->w;
         surfaceDef.height = rhs->h;
-        surfaceDef.stride = ALIGN(((surfaceDef.width * c2diGetBpp(surfaceDef.format))>>3), 32);
+        int aligned_width = ALIGN(surfaceDef.width,32);
+        surfaceDef.stride = (aligned_width * c2diGetBpp(surfaceDef.format))>>3;
 
         if(LINK_c2dUpdateSurface( surfaceId,C2D_TARGET | C2D_SOURCE, surfaceType, &surfaceDef)) {
             LOGE("%s: RGB Surface c2dUpdateSurface ERROR", __FUNCTION__);
@@ -773,7 +785,7 @@ static int set_parameter_copybit(
          ctx->fb_height = value;
          break;
     default:
-        LOGE("%s: default case", __func__);
+        LOGE("%s: default case param=0x%x", __FUNCTION__, name);
         return -EINVAL;
         break;
     }
@@ -788,7 +800,7 @@ static int get(struct copybit_device_t *dev, int name)
     int value;
 
     if (!ctx) {
-        LOGE("%s: null context error", __func__);
+        LOGE("%s: null context error", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -806,7 +818,7 @@ static int get(struct copybit_device_t *dev, int name)
         value = 1;
         break;
     default:
-        LOGE("%s: default case", __func__);
+        LOGE("%s: default case param=0x%x", __FUNCTION__, name);
         value = -EINVAL;
     }
     return value;
@@ -833,6 +845,171 @@ static int is_alpha(int cformat)
     return alpha;
 }
 
+/* Function to check if we need a temporary buffer for the blit.
+ * This would happen if the requested destination stride and the
+ * C2D stride do not match. We ignore RGB buffers, since their
+ * stride is always aligned to 32.
+ */
+static bool need_temp_buffer(struct copybit_image_t const *img)
+{
+    if (COPYBIT_SUCCESS == is_supported_rgb_format(img->format))
+        return false;
+
+    struct private_handle_t* handle = (struct private_handle_t*)img->handle;
+
+    // The width parameter in the handle contains the aligned_w. We check if we
+    // need to convert based on this param. YUV formats have bpp=1, so checking
+    // if the requested stride is aligned should suffice.
+    if (0 == (handle->width)%32) {
+        return false;
+    }
+
+    return true;
+}
+
+/* Function to extract the information from the copybit image and set the corresponding
+ * values in the bufferInfo struct.
+ */
+static void populate_buffer_info(struct copybit_image_t const *img, bufferInfo& info)
+{
+    info.width = img->w;
+    info.height = img->h;
+    info.format = img->format;
+}
+
+/* Function to get the required size for a particular format, inorder for C2D to perform
+ * the blit operation.
+ */
+static size_t get_size(const bufferInfo& info)
+{
+    size_t size = 0;
+    int w = info.width;
+    int h = info.height;
+    int aligned_w = ALIGN(w, 32);
+    switch(info.format) {
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+        {
+            // Chroma for this format is aligned to 2K.
+            size = ALIGN((aligned_w*h), 2048) +
+                   ALIGN(w/2, 32) * h/2 *2;
+            size = ALIGN(size, 4096);
+        } break;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        {
+            size = aligned_w*h +
+                   ALIGN(w/2, 32) * h/2 *2;
+            size = ALIGN(size, 4096);
+        } break;
+        default: break;
+    }
+    return size;
+}
+
+/* Function to allocate memory for the temporary buffer. This memory is
+ * allocated from Ashmem. It is the caller's responsibility to free this
+ * memory.
+ */
+static int get_temp_buffer(const bufferInfo& info, memInfo& mem_info)
+{
+    // Alloc memory from ashmem
+    int err = COPYBIT_SUCCESS;
+    size_t size = get_size(info);
+    char name[ASHMEM_NAME_LEN];
+    snprintf(name, ASHMEM_NAME_LEN, "c2d-buffer-%x",mem_info);
+    int prot = PROT_READ | PROT_WRITE;
+    int fd = ashmem_create_region(name, size);
+    void *base = 0;
+    if (fd < 0) {
+        LOGE("%s: couldn't create ashmem (%s)", __FUNCTION__,
+                                                strerror(errno));
+        return COPYBIT_FAILURE;
+    } else {
+        if (ashmem_set_prot_region(fd, prot) < 0) {
+            LOGE("%s: ashmem_set_prot_region(fd=%d, prot=%x) failed (%s)",
+                 __FUNCTION__, fd, prot, strerror(errno));
+            close(fd);
+            fd = -1;
+            return COPYBIT_FAILURE;
+        } else {
+            base = mmap(0, size, prot, MAP_SHARED|MAP_POPULATE|MAP_LOCKED, fd, 0);
+            if (base == MAP_FAILED) {
+                LOGE("%s: alloc mmap(fd=%d, size=%d, prot=%x) failed (%s)",
+                     __FUNCTION__, fd, size, prot, strerror(errno));
+                close(fd);
+                fd = -1;
+                return COPYBIT_FAILURE;
+            }
+        }
+    }
+    if (ioctl(fd, ASHMEM_CACHE_INV_RANGE, NULL)) {
+        LOGE("ASHMEM_CACHE_INV_RANGE failed fd = %d", fd);
+    }
+
+    // Save the memory info.
+    mem_info.fd = fd;
+    mem_info.size = size;
+    mem_info.base = (int)base;
+    return err;
+}
+
+/* Function to free the temporary allocated memory.*/
+static void free_temp_image(private_handle_t *hnd)
+{
+    if (hnd) {
+        if (0 != hnd->base) {
+            munmap((void *)hnd->base, hnd->size);
+            hnd->base = 0;
+        }
+
+        if (hnd->fd != -1) {
+            close(hnd->fd);
+            hnd->fd = -1;
+        }
+    }
+}
+
+/* Function to perform the software color conversion. Convert the
+ * C2D compatible format to the Android compatible format
+ */
+static int copy_image(private_handle_t *src_handle,
+                     struct copybit_image_t const *rhs,
+                     eConversionType conversionType)
+{
+    if (src_handle->fd == -1) {
+        LOGE("%s: src_handle fd is invalid", __FUNCTION__);
+        return COPYBIT_FAILURE;
+    }
+
+    // Copy the info.
+    int ret = COPYBIT_SUCCESS;
+    switch(rhs->format) {
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        {
+            if (CONVERT_TO_ANDROID_FORMAT == conversionType) {
+                return convert_yuv_c2d_to_yuv_android(src_handle, rhs);
+            } else {
+                return convert_yuv_android_to_yuv_c2d(src_handle, rhs);
+            }
+
+        } break;
+        default: {
+            LOGE("%s: invalid format 0x%x", __FUNCTION__, rhs->format);
+            ret = COPYBIT_FAILURE;
+        } break;
+    }
+    return ret;
+}
+
+static void delete_handle(private_handle_t *handle)
+{
+    if (handle) {
+        delete handle;
+        handle = 0;
+    }
+}
 /** do a stretch blit type operation */
 static int stretch_copybit_internal(
         struct copybit_device_t *dev,
@@ -899,15 +1076,49 @@ static int stretch_copybit_internal(
         return COPYBIT_FAILURE;
     }
 
+    copybit_image_t dst_image;
+    dst_image.w = dst->w;
+    dst_image.h = dst->h;
+    dst_image.format = dst->format;
+    dst_image.handle = dst->handle;
+    // Check if we need a temp. copy for the destination. We'd need this the destination
+    // width is not aligned to 32. This case occurs for YUV formats. RGB formats are
+    // aligned to 32.
+    bool needTempDestination = need_temp_buffer(dst);
+    memInfo mem_info;
+    bufferInfo dst_info;
+    populate_buffer_info(dst, dst_info);
+    private_handle_t* dst_hnd = new private_handle_t(-1, 0, 0, 0, dst_info.format,
+                                                 dst_info.width, dst_info.height);
+    if (dst_hnd == NULL) {
+        LOGE("%s: dst_hnd is null", __FUNCTION__);
+        return COPYBIT_FAILURE;
+    }
+    if (needTempDestination) {
+        // Create a temp buffer and set that as the destination.
+        if (COPYBIT_SUCCESS == get_temp_buffer(dst_info, mem_info)) {
+            dst_hnd->fd = mem_info.fd;
+            dst_hnd->size = mem_info.size;
+            dst_hnd->flags = private_handle_t::PRIV_FLAGS_USES_ASHMEM;
+            dst_hnd->base = mem_info.base;
+            dst_hnd->offset = 0;
+            dst_hnd->gpuaddr = 0;
+            dst_image.handle = dst_hnd;
+        }
+    }
 
     int flags = 0;
     flags |= (ctx->isPremultipliedAlpha) ? FLAGS_PREMULTIPLIED_ALPHA : 0;
     flags |= (isYUVDestination) ? FLAGS_YUV_DESTINATION : 0;
 
-    status = set_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], dst, &cformat,
-	                   &trg_mapped,  (eC2DFlags)flags);
+    status = set_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], &dst_image, &cformat,
+                       &trg_mapped, (eC2DFlags)flags);
     if(status) {
-        LOGE("%s: set_image error", __func__);
+        LOGE("%s: dst: set_image error", __FUNCTION__);
+        if (needTempDestination) {
+            free_temp_image(dst_hnd);
+        }
+        delete_handle(dst_hnd);
         return COPYBIT_FAILURE;
     }
 
@@ -922,17 +1133,81 @@ static int stretch_copybit_internal(
         } else {
             LOGE("%s: src number of YUV planes is invalid src format = 0x%x",
                  __FUNCTION__, src->format);
+            if (needTempDestination) {
+                free_temp_image(dst_hnd);
+            }
+            delete_handle(dst_hnd);
             return -EINVAL;
         }
     } else {
-        LOGE("%s: Invalid source surface format %x", __func__, src->format);
+        LOGE("%s: Invalid source surface format 0x%x", __FUNCTION__, src->format);
+        if (needTempDestination) {
+            free_temp_image(dst_hnd);
+        }
+        delete_handle(dst_hnd);
         return -EINVAL;
     }
 
-    status = set_image(ctx->g12_device_fd, ctx->src[src_surface_index], src, &cformat,
-	                   &src_mapped, (eC2DFlags)flags);
+    copybit_image_t src_image;
+    src_image.w = src->w;
+    src_image.h = src->h;
+    src_image.format = src->format;
+    src_image.handle = src->handle;
+
+    bool needTempSource = need_temp_buffer(src);
+    bufferInfo src_info;
+    populate_buffer_info(src, src_info);
+    private_handle_t* src_hnd = new private_handle_t(-1, 0, 0, 0, src_info.format,
+                                                 src_info.width, src_info.height);
+    if (NULL == src_hnd) {
+        LOGE("%s: src_hnd is null", __FUNCTION__);
+        if (needTempDestination) {
+            free_temp_image(dst_hnd);
+        }
+        delete_handle(dst_hnd);
+        return COPYBIT_FAILURE;
+    }
+    if (needTempSource) {
+        // Create a temp buffer and set that as the destination.
+        if (COPYBIT_SUCCESS == get_temp_buffer(src_info, mem_info)) {
+            src_hnd->fd = mem_info.fd;
+            src_hnd->size = mem_info.size;
+            src_hnd->flags = private_handle_t::PRIV_FLAGS_USES_ASHMEM;
+            src_hnd->base = mem_info.base;
+            src_hnd->offset = 0;
+            src_hnd->gpuaddr = 0;
+            src_image.handle = src_hnd;
+
+            // Copy the source.
+            copy_image((private_handle_t *)src->handle, &src_image, CONVERT_TO_C2D_FORMAT);
+
+            // Flush the cache
+            if (ioctl(src_hnd->fd, ASHMEM_CACHE_FLUSH_RANGE, NULL)) {
+                LOGE("%s: ASHMEM_CACHE_FLUSH_RANGE failed (error=%s)",
+                     __FUNCTION__, strerror(errno));
+                if (needTempDestination) {
+                    free_temp_image(dst_hnd);
+                }
+                free_temp_image(src_hnd);
+                delete_handle(dst_hnd);
+                delete_handle(src_hnd);
+                return COPYBIT_FAILURE;
+            }
+        }
+    }
+
+    status = set_image(ctx->g12_device_fd, ctx->src[src_surface_index], &src_image, &cformat,
+                       &src_mapped, (eC2DFlags)flags);
     if(status) {
-        LOGE("%s: set_src_image error", __func__);
+        LOGE("%s: set_src_image error", __FUNCTION__);
+        if (needTempDestination) {
+            free_temp_image(dst_hnd);
+        }
+        if (needTempSource) {
+            free_temp_image(src_hnd);
+        }
+        delete_handle(dst_hnd);
+        delete_handle(src_hnd);
         return COPYBIT_FAILURE;
     }
 
@@ -941,8 +1216,16 @@ static int stretch_copybit_internal(
             ctx->blitState.config_mask &= ~C2D_ALPHA_BLEND_NONE;
             if(!(ctx->blitState.global_alpha)) {
                 // src alpha is zero
-                unset_image(ctx->g12_device_fd, ctx->src[src_surface_index], src, src_mapped);
-                unset_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], dst, trg_mapped);
+                unset_image(ctx->g12_device_fd, ctx->src[src_surface_index], &src_image, src_mapped);
+                unset_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], &dst_image, trg_mapped);
+                if (needTempDestination) {
+                    free_temp_image(dst_hnd);
+                }
+                if (needTempSource) {
+                    free_temp_image(src_hnd);
+                }
+                delete_handle(dst_hnd);
+                delete_handle(src_hnd);
                 return status;
             }
         } else {
@@ -976,9 +1259,20 @@ static int stretch_copybit_internal(
         LOGE("%s: LINK_c2dFinish ERROR", __FUNCTION__);
     }
 
-
-    unset_image(ctx->g12_device_fd, ctx->src[src_surface_index], src, src_mapped);
-    unset_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], dst, trg_mapped);
+    unset_image(ctx->g12_device_fd, ctx->src[src_surface_index], &src_image, src_mapped);
+    unset_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], &dst_image, trg_mapped);
+    if (needTempDestination) {
+        // copy the temp. destination without the alignment to the actual destination.
+        copy_image(dst_hnd, dst, CONVERT_TO_ANDROID_FORMAT);
+        // Free the temp memory.
+        free_temp_image(dst_hnd);
+    }
+    if (needTempSource) {
+        // Free the temp memory.
+        free_temp_image(src_hnd);
+    }
+    delete_handle(dst_hnd);
+    delete_handle(src_hnd);
     ctx->isPremultipliedAlpha = false;
     ctx->fb_width = 0;
     ctx->fb_height = 0;

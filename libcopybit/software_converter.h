@@ -30,9 +30,36 @@
 
 
 #include <copybit.h>
+#include "gralloc_priv.h"
+
+#define COPYBIT_SUCCESS 0
+#define COPYBIT_FAILURE -1
 
 inline unsigned int ALIGN(unsigned int x, unsigned int align) {
         return (x + align-1) & ~(align-1);
 }
 
 int convertYV12toYCrCb420SP(const copybit_image_t *src);
+
+/*
+ * Function to convert the c2d format into an equivalent Android format
+ *
+ * @param: source buffer handle
+ * @param: destination image
+ *
+ * @return: return status
+ */
+int convert_yuv_c2d_to_yuv_android(private_handle_t *hnd,
+                                   struct copybit_image_t const *rhs);
+
+
+/*
+ * Function to convert the Android format into an equivalent C2D format
+ *
+ * @param: source buffer handle
+ * @param: destination image
+ *
+ * @return: return status
+ */
+int convert_yuv_android_to_yuv_c2d(private_handle_t *hnd,
+                                   struct copybit_image_t const *rhs);
