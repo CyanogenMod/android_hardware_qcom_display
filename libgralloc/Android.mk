@@ -22,8 +22,6 @@ LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_SHARED_LIBRARIES := liblog libcutils libGLESv1_CM libutils libmemalloc
 
-LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
-LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_SRC_FILES :=  framebuffer.cpp \
                     gpu.cpp         \
                     gralloc.cpp     \
@@ -55,20 +53,21 @@ include $(BUILD_SHARED_LIBRARY)
 
 #MemAlloc Library
 include $(CLEAR_VARS)
+
+
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)
-LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
-LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils
-LOCAL_SRC_FILES :=  ionalloc.cpp \
-                    ashmemalloc.cpp \
+LOCAL_SRC_FILES +=  ashmemalloc.cpp \
                     pmemalloc.cpp \
                     pmem_bestfit_alloc.cpp \
                     alloc_controller.cpp
+
 LOCAL_CFLAGS:= -DLOG_TAG=\"memalloc\" -DLOG_NDDEBUG=0
 
 ifeq ($(TARGET_USES_ION),true)
     LOCAL_CFLAGS += -DUSE_ION
+    LOCAL_SRC_FILES += ionalloc.cpp
 endif
 
 LOCAL_MODULE := libmemalloc
