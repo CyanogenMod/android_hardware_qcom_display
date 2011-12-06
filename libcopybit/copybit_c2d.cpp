@@ -85,18 +85,26 @@ C2D_STATUS (*LINK_c2dDestroySurface)( uint32 surface_id );
 
 #define COPYBIT_SUCCESS 0
 #define COPYBIT_FAILURE -1
-
-#define RGB_SURFACE 0
-#define YUV_SURFACE 1
-#define NUM_SRC_SURFACES 2
+#define NUM_SURFACES 3
 #define ALIGN(x, align) (((x) + ((align)-1)) & ~((align)-1))
+
+enum {
+    RGB_SURFACE,
+    YUV_SURFACE_2_PLANES,
+    YUV_SURFACE_3_PLANES
+};
+
+enum eC2DFlags {
+    FLAGS_PREMULTIPLIED_ALPHA = 1<<0,
+    FLAGS_YUV_DESTINATION     = 1<<1
+};
 /******************************************************************************/
 
 /** State information for each device instance */
 struct copybit_context_t {
     struct copybit_device_t device;
-    unsigned int src[NUM_SRC_SURFACES];
-    unsigned int dst;                /* dst surface */
+    unsigned int src[NUM_SURFACES];  /* src surfaces */
+    unsigned int dst[NUM_SURFACES];  /* dst surfaces */
     unsigned int trg_transform;      /* target transform */
     C2D_OBJECT blitState;
     void *libc2d2;
@@ -109,6 +117,21 @@ struct copybit_context_t {
 struct blitlist{
     uint32_t count;
     C2D_OBJECT blitObjects[12];
+};
+
+struct bufferInfo {
+    int width;
+    int height;
+    int format;
+};
+
+
+struct yuvPlaneInfo {
+    int yStride;       //luma stride
+    int plane1_stride;
+    int plane2_stride;
+    int plane1_offset;
+    int plane2_offset;
 };
 
 /**
@@ -148,9 +171,25 @@ static int get_format(int format) {
     case HAL_PIXEL_FORMAT_RGBA_5551:      return C2D_COLOR_FORMAT_5551_RGBA;
     case HAL_PIXEL_FORMAT_RGBA_4444:      return C2D_COLOR_FORMAT_4444_RGBA;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP:   return C2D_COLOR_FORMAT_420_NV12;
+    case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:return C2D_COLOR_FORMAT_420_NV12;
     case HAL_PIXEL_FORMAT_YCrCb_420_SP:   return C2D_COLOR_FORMAT_420_NV21;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED: return C2D_COLOR_FORMAT_420_NV12 | C2D_FORMAT_MACROTILED;
-    default:                            return -EINVAL;
+    default:                              LOGE("%s: invalid format (0x%x", __FUNCTION__, format); return -EINVAL;
+    }
+    return -EINVAL;
+}
+
+/* Get the C2D formats needed for conversion to YUV */
+static int get_c2d_format_for_yuv_destination(int halFormat) {
+    switch (halFormat) {
+    // We do not swap the RB when the target is YUV
+    case HAL_PIXEL_FORMAT_RGBX_8888:      return C2D_COLOR_FORMAT_8888_ARGB | C2D_FORMAT_DISABLE_ALPHA;
+    case HAL_PIXEL_FORMAT_RGBA_8888:      return C2D_COLOR_FORMAT_8888_ARGB;
+    // The U and V need to be interchanged when the target is YUV
+    case HAL_PIXEL_FORMAT_YCbCr_420_SP:   return C2D_COLOR_FORMAT_420_NV21;
+    case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:return C2D_COLOR_FORMAT_420_NV21;
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP:   return C2D_COLOR_FORMAT_420_NV12;
+    default:                              return get_format(halFormat);
     }
     return -EINVAL;
 }
@@ -254,11 +293,28 @@ static int is_supported_rgb_format(int format)
     }
 }
 
+static int get_num_planes(int format)
+{
+    switch(format) {
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED: {
+            return 2;
+        }
+        case HAL_PIXEL_FORMAT_YV12: {
+            return 3;
+        }
+        default:
+            return COPYBIT_FAILURE;
+    }
+}
+
 static int is_supported_yuv_format(int format)
 {
     switch(format) {
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED: {
             return COPYBIT_SUCCESS;
         }
@@ -267,8 +323,21 @@ static int is_supported_yuv_format(int format)
     }
 }
 
-static int calculate_yuv_offset_and_stride(int format, int width, int height, int *offset, int *yStride, int *uvStride)
+static int is_valid_destination_format(int format)
 {
+    if (format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) {
+        // C2D does not support NV12Tile as a destination format.
+        return COPYBIT_FAILURE;
+    }
+    return COPYBIT_SUCCESS;
+}
+
+static int calculate_yuv_offset_and_stride(const bufferInfo& info, yuvPlaneInfo& yuvInfo)
+{
+    int width  = info.width;
+    int height = info.height;
+    int format = info.format;
+
     int aligned_height = 0;
     int aligned_width = 0, size = 0;
 
@@ -280,17 +349,23 @@ static int calculate_yuv_offset_and_stride(int format, int width, int height, in
             aligned_height = ALIGN(height, 32);
             aligned_width  = ALIGN(width, 128);
             size = aligned_width * aligned_height;
-            *offset = ALIGN(size,8192);
-            *yStride = aligned_width;
-            *uvStride = aligned_width;
+            yuvInfo.plane1_offset = ALIGN(size,8192);
+            yuvInfo.yStride = aligned_width;
+            yuvInfo.plane1_stride = aligned_width;
             break;
         }
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP: {
             aligned_width = ALIGN(width, 32);
-            *offset = aligned_width * height;
-            *yStride = aligned_width;
-            *uvStride = aligned_width;
+            yuvInfo.yStride = aligned_width;
+            yuvInfo.plane1_stride = aligned_width;
+            if (HAL_PIXEL_FORMAT_NV12_ENCODEABLE == format) {
+                // The encoder requires a 2K aligned chroma offset
+                yuvInfo.plane1_offset = ALIGN(aligned_width * height, 2048);
+            } else
+                yuvInfo.plane1_offset = aligned_width * height;
+
             break;
         }
         default: {
@@ -302,15 +377,20 @@ static int calculate_yuv_offset_and_stride(int format, int width, int height, in
 
 /** create C2D surface from copybit image */
 static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image_t *rhs, int *cformat, uint32_t *mapped,
-                     const bool isPremultipliedAlpha)
+                     const eC2DFlags flags)
 {
     struct private_handle_t* handle = (struct private_handle_t*)rhs->handle;
     C2D_SURFACE_TYPE surfaceType;
     int status = COPYBIT_SUCCESS;
 
-    *cformat  = get_format(rhs->format);
+    if (flags & FLAGS_YUV_DESTINATION) {
+        *cformat = get_c2d_format_for_yuv_destination(rhs->format);
+    } else {
+        *cformat = get_format(rhs->format);
+    }
+
     if(*cformat == -EINVAL) {
-        LOGE("%s: invalid format", __func__);
+        LOGE("%s: invalid format", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -322,6 +402,7 @@ static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image
     if (handle->gpuaddr == 0) {
        handle->gpuaddr = c2d_get_gpuaddr(device_fd, handle);
        if(!handle->gpuaddr) {
+           LOGE("%s: c2d_get_gpuaddr failed", __FUNCTION__);
            return COPYBIT_FAILURE;
        }
        *mapped = 1;
@@ -337,28 +418,31 @@ static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image
         surfaceDef.phys = (void*) handle->gpuaddr;
         surfaceDef.buffer = (void*) (handle->base);
 
-        surfaceDef.format = *cformat | (isPremultipliedAlpha ? C2D_FORMAT_PREMULTIPLIED : 0);
+        surfaceDef.format = *cformat | ((flags & FLAGS_PREMULTIPLIED_ALPHA) ? C2D_FORMAT_PREMULTIPLIED : 0);
         surfaceDef.width = rhs->w;
         surfaceDef.height = rhs->h;
         surfaceDef.stride = ALIGN(((surfaceDef.width * c2diGetBpp(surfaceDef.format))>>3), 32);
 
         if(LINK_c2dUpdateSurface( surfaceId,C2D_TARGET | C2D_SOURCE, surfaceType, &surfaceDef)) {
-            LOGE("%s: RGB Surface c2dUpdateSurface ERROR", __func__);
+            LOGE("%s: RGB Surface c2dUpdateSurface ERROR", __FUNCTION__);
             goto error;
             status = COPYBIT_FAILURE;
         }
     } else if (is_supported_yuv_format(rhs->format) == COPYBIT_SUCCESS) {
         C2D_YUV_SURFACE_DEF surfaceDef;
-        int offset = 0;
-        int yStride = 0;
-        int uvStride = 0;
         memset(&surfaceDef, 0, sizeof(surfaceDef));
         surfaceType = (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS);
         surfaceDef.format = *cformat;
 
-        status = calculate_yuv_offset_and_stride(rhs->format, rhs->w, rhs->h, &offset, &yStride, &uvStride);
+        bufferInfo info;
+        info.width = rhs->w;
+        info.height = rhs->h;
+        info.format = rhs->format;
+
+        yuvPlaneInfo yuvInfo;
+        status = calculate_yuv_offset_and_stride(info, yuvInfo);
         if(status != COPYBIT_SUCCESS) {
-            LOGE("calculate_yuv_offset_and_stride error");
+            LOGE("%s: calculate_yuv_offset_and_stride error", __FUNCTION__);
             goto error;
         }
 
@@ -366,19 +450,24 @@ static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image
         surfaceDef.height = rhs->h;
         surfaceDef.plane0 = (void*) (handle->base);
         surfaceDef.phys0 = (void*) (handle->gpuaddr);
-        surfaceDef.stride0 = yStride;
+        surfaceDef.stride0 = yuvInfo.yStride;
 
-        surfaceDef.plane1 = (void*) (handle->base + offset);
-        surfaceDef.phys1 = (void*) (handle->gpuaddr + offset);
-        surfaceDef.stride1 = uvStride;
+        surfaceDef.plane1 = (void*) (handle->base + yuvInfo.plane1_offset);
+        surfaceDef.phys1 = (void*) (handle->gpuaddr + yuvInfo.plane1_offset);
+        surfaceDef.stride1 = yuvInfo.plane1_stride;
+        if (3 == get_num_planes(rhs->format)) {
+            surfaceDef.plane2 = (void*) (handle->base + yuvInfo.plane2_offset);
+            surfaceDef.phys2 = (void*) (handle->gpuaddr + yuvInfo.plane2_offset);
+            surfaceDef.stride2 = yuvInfo.plane2_stride;
+        }
 
         if(LINK_c2dUpdateSurface( surfaceId,C2D_TARGET | C2D_SOURCE, surfaceType, &surfaceDef)) {
-            LOGE("%s: YUV Surface c2dUpdateSurface ERROR", __func__);
+            LOGE("%s: YUV Surface c2dUpdateSurface ERROR", __FUNCTION__);
             goto error;
             status = COPYBIT_FAILURE;
         }
     } else {
-        LOGE("%s: invalid format %x", __func__, rhs->format);
+        LOGE("%s: invalid format 0x%x", __FUNCTION__, rhs->format);
         goto error;
         status = COPYBIT_FAILURE;
     }
@@ -427,7 +516,7 @@ static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_
         surfaceDef.stride = ALIGN(((surfaceDef.width * c2diGetBpp(surfaceDef.format))>>3), 32);
 
         if(LINK_c2dCreateSurface( surfaceId, C2D_TARGET, surfaceType,(void*)&surfaceDef)) {
-            LOGE("%s: LINK_c2dCreateSurface error", __func__);
+            LOGE("%s: LINK_c2dCreateSurface error", __FUNCTION__);
             status = COPYBIT_FAILURE;
             goto error;
         }
@@ -441,9 +530,15 @@ static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_
 
         surfaceType = (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS);
         surfaceDef.format = get_format(rhs->format);
-        status = calculate_yuv_offset_and_stride(rhs->format, rhs->w, rhs->h, &offset, &yStride, &uvStride);
+        bufferInfo info;
+        info.width = rhs->w;
+        info.height = rhs->h;
+        info.format = rhs->format;
+
+        yuvPlaneInfo yuvInfo;
+        status = calculate_yuv_offset_and_stride(info, yuvInfo);
         if(status != COPYBIT_SUCCESS) {
-            LOGE("calculate_yuv_offset_and_stride error");
+            LOGE("%s: calculate_yuv_offset_and_stride error", __FUNCTION__);
             goto error;
         }
 
@@ -451,11 +546,11 @@ static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_
         surfaceDef.height = rhs->h;
         surfaceDef.plane0 = (void*) (handle->base);
         surfaceDef.phys0 = (void*) handle->gpuaddr;
-        surfaceDef.stride0 = yStride;
+        surfaceDef.stride0 = yuvInfo.yStride;
 
-        surfaceDef.plane1 = (void*) (handle->base + offset);
-        surfaceDef.phys1 = (void*) (handle->gpuaddr + offset);
-        surfaceDef.stride1 = uvStride;
+        surfaceDef.plane1 = (void*) (handle->base + yuvInfo.plane1_offset);
+        surfaceDef.phys1 = (void*) (handle->gpuaddr + yuvInfo.plane1_offset);
+        surfaceDef.stride1 = yuvInfo.plane1_stride;
 
         if(LINK_c2dCreateSurface( surfaceId, C2D_TARGET | C2D_SOURCE, surfaceType, (void*)&surfaceDef)) {
             LOGE("%s: YUV surface LINK_c2dCreateSurface error", __func__);
@@ -463,7 +558,7 @@ static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_
             goto error;
         }
     } else {
-        LOGE("%s: Invalid format %x", __func__, rhs->format);
+        LOGE("%s: Invalid format 0x%x", __FUNCTION__, rhs->format);
         status = COPYBIT_FAILURE;
     }
 
@@ -598,7 +693,7 @@ static int msm_copybit(struct copybit_context_t *dev, blitlist *list, uint32 tar
 
     if(LINK_c2dDraw(target,dev->trg_transform, 0x0, 0, 0, list->blitObjects,
                     list->count)) {
-       LOGE("%s: LINK_c2dDraw ERROR");
+       LOGE("%s: LINK_c2dDraw ERROR", __FUNCTION__);
        return COPYBIT_FAILURE;
     }
 
@@ -615,7 +710,7 @@ static int set_parameter_copybit(
 {
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
     if (!ctx) {
-        LOGE("%s: null context", __func__);
+        LOGE("%s: null context", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -746,20 +841,20 @@ static int stretch_copybit_internal(
     memset(&list, 0, sizeof(list));
     int cformat;
     c2d_ts_handle timestamp;
-    uint32 surface_index = 0;
+    uint32 src_surface_index = 0, dst_surface_index = 0;
 
     if (!ctx) {
-        LOGE("%s: null context error", __func__);
+        LOGE("%s: null context error", __FUNCTION__);
         return -EINVAL;
     }
 
     if (src->w > MAX_DIMENSION || src->h > MAX_DIMENSION) {
-        LOGE("%s: src dimension error", __func__);
+        LOGE("%s: src dimension error", __FUNCTION__);
         return -EINVAL;
     }
 
     if (dst->w > MAX_DIMENSION || dst->h > MAX_DIMENSION) {
-        LOGE("%s : dst dimension error dst w %d h %d",  __func__, dst->w, dst->h);
+        LOGE("%s : dst dimension error dst w %d h %d",  __FUNCTION__, dst->w, dst->h);
         return -EINVAL;
     }
 
@@ -768,22 +863,63 @@ static int stretch_copybit_internal(
     struct copybit_rect_t clip;
     list.count = 0;
 
-    status = set_image(ctx->g12_device_fd, ctx->dst, dst, &cformat, &trg_mapped, ctx->isPremultipliedAlpha);
+    if (is_valid_destination_format(dst->format) == COPYBIT_FAILURE) {
+        LOGE("%s: Invalid destination format format = 0x%x", __FUNCTION__, dst->format);
+        return COPYBIT_FAILURE;
+    }
+
+    bool isYUVDestination = false;
+    if (is_supported_rgb_format(dst->format) == COPYBIT_SUCCESS) {
+        dst_surface_index = RGB_SURFACE;
+    } else if (is_supported_yuv_format(dst->format) == COPYBIT_SUCCESS) {
+        isYUVDestination = true;
+        int num_planes = get_num_planes(dst->format);
+        if (num_planes == 2) {
+            dst_surface_index = YUV_SURFACE_2_PLANES;
+        } else if (num_planes == 3) {
+            dst_surface_index = YUV_SURFACE_3_PLANES;
+        } else {
+            LOGE("%s: dst number of YUV planes is invalid dst format = 0x%x",
+                  __FUNCTION__, dst->format);
+            return COPYBIT_FAILURE;
+        }
+    } else {
+        LOGE("%s: Invalid dst surface format 0x%x", __FUNCTION__, dst->format);
+        return COPYBIT_FAILURE;
+    }
+
+
+    int flags = 0;
+    flags |= (ctx->isPremultipliedAlpha) ? FLAGS_PREMULTIPLIED_ALPHA : 0;
+    flags |= (isYUVDestination) ? FLAGS_YUV_DESTINATION : 0;
+
+    status = set_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], dst, &cformat,
+	                   &trg_mapped,  (eC2DFlags)flags);
     if(status) {
         LOGE("%s: set_image error", __func__);
         return COPYBIT_FAILURE;
     }
 
     if(is_supported_rgb_format(src->format) == COPYBIT_SUCCESS) {
-        surface_index = RGB_SURFACE;
+        src_surface_index = RGB_SURFACE;
     } else if (is_supported_yuv_format(src->format) == COPYBIT_SUCCESS) {
-        surface_index = YUV_SURFACE;
+        int num_planes = get_num_planes(src->format);
+        if (num_planes == 2) {
+            src_surface_index = YUV_SURFACE_2_PLANES;
+        } else if (num_planes == 3) {
+            src_surface_index = YUV_SURFACE_3_PLANES;
+        } else {
+            LOGE("%s: src number of YUV planes is invalid src format = 0x%x",
+                 __FUNCTION__, src->format);
+            return -EINVAL;
+        }
     } else {
         LOGE("%s: Invalid source surface format %x", __func__, src->format);
         return -EINVAL;
     }
 
-    status = set_image(ctx->g12_device_fd, ctx->src[surface_index], src, &cformat, &src_mapped, ctx->isPremultipliedAlpha);
+    status = set_image(ctx->g12_device_fd, ctx->src[src_surface_index], src, &cformat,
+	                   &src_mapped, (eC2DFlags)flags);
     if(status) {
         LOGE("%s: set_src_image error", __func__);
         return COPYBIT_FAILURE;
@@ -794,8 +930,8 @@ static int stretch_copybit_internal(
             ctx->blitState.config_mask &= ~C2D_ALPHA_BLEND_NONE;
             if(!(ctx->blitState.global_alpha)) {
                 // src alpha is zero
-                unset_image(ctx->g12_device_fd, ctx->src[surface_index], src, src_mapped);
-                unset_image(ctx->g12_device_fd, ctx->dst, dst, trg_mapped);
+                unset_image(ctx->g12_device_fd, ctx->src[src_surface_index], src, src_mapped);
+                unset_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], dst, trg_mapped);
                 return status;
             }
         } else {
@@ -808,7 +944,7 @@ static int stretch_copybit_internal(
         ctx->blitState.config_mask |= C2D_ALPHA_BLEND_NONE;
     }
 
-    ctx->blitState.surface_id = ctx->src[surface_index];
+    ctx->blitState.surface_id = ctx->src[src_surface_index];
 
     while ((status == 0) && region->next(region, &clip)) {
         req = &(list.blitObjects[list.count]);
@@ -817,21 +953,21 @@ static int stretch_copybit_internal(
         set_rects(ctx, req, dst_rect, src_rect, &clip);
 
         if (++list.count == maxCount) {
-            status = msm_copybit(ctx, &list, ctx->dst);
+            status = msm_copybit(ctx, &list, ctx->dst[dst_surface_index]);
             list.count = 0;
         }
     }
     if ((status == 0) && list.count) {
-        status = msm_copybit(ctx, &list, ctx->dst);
+        status = msm_copybit(ctx, &list, ctx->dst[dst_surface_index]);
     }
 
-    if(LINK_c2dFinish(ctx->dst)) {
-        LOGE("%s: LINK_c2dFinish ERROR", __func__);
+    if(LINK_c2dFinish(ctx->dst[dst_surface_index])) {
+        LOGE("%s: LINK_c2dFinish ERROR", __FUNCTION__);
     }
 
 
-    unset_image(ctx->g12_device_fd, ctx->src[surface_index], src, src_mapped);
-    unset_image(ctx->g12_device_fd, ctx->dst, dst, trg_mapped);
+    unset_image(ctx->g12_device_fd, ctx->src[src_surface_index], src, src_mapped);
+    unset_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], dst, trg_mapped);
     ctx->isPremultipliedAlpha = false;
     return status;
 }
@@ -866,8 +1002,8 @@ static int close_copybit(struct hw_device_t *dev)
 {
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
     if (ctx) {
-        LINK_c2dDestroySurface(ctx->dst);
-        for(int i = 0; i <NUM_SRC_SURFACES; i++) {
+        for(int i = 0; i <NUM_SURFACES; i++) {
+            LINK_c2dDestroySurface(ctx->dst[i]);
             LINK_c2dDestroySurface(ctx->src[i]);
         }
 
@@ -903,12 +1039,17 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
 
     ctx = (struct copybit_context_t *)malloc(sizeof(struct copybit_context_t));
     if(!ctx) {
-        LOGE("%s: malloc failed", __func__);
+        LOGE("%s: malloc failed", __FUNCTION__);
         return COPYBIT_FAILURE;
     }
 
     /* initialize drawstate */
     memset(ctx, 0, sizeof(*ctx));
+
+    for (int i=0; i< NUM_SURFACES; i++) {
+        ctx->dst[i] = -1;
+        ctx->src[i] = -1;
+    }
 
     ctx->libc2d2 = ::dlopen("libC2D2.so", RTLD_NOW);
     if (!ctx->libc2d2) {
@@ -929,11 +1070,11 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     *(void **)&LINK_c2dDestroySurface = ::dlsym(ctx->libc2d2,
                                                 "c2dDestroySurface");
 
-    if(!LINK_c2dCreateSurface || !LINK_c2dUpdateSurface || !LINK_c2dReadSurface
+    if (!LINK_c2dCreateSurface || !LINK_c2dUpdateSurface || !LINK_c2dReadSurface
        || !LINK_c2dDraw || !LINK_c2dFlush || !LINK_c2dWaitTimestamp || !LINK_c2dFinish
        || !LINK_c2dDestroySurface) {
-        LOGE("%s: dlsym ERROR", __func__);
-        goto error1;
+        LOGE("%s: dlsym ERROR", __FUNCTION__);
+        goto error;
     }
 
     ctx->device.common.tag = HARDWARE_DEVICE_TAG;
@@ -947,9 +1088,9 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->blitState.config_mask = C2D_NO_BILINEAR_BIT | C2D_NO_ANTIALIASING_BIT;
     ctx->trg_transform = C2D_TARGET_ROTATE_0;
     ctx->g12_device_fd = open(G12_DEVICE_NAME, O_RDWR | O_SYNC);
-    if(ctx->g12_device_fd < 0) {
-      LOGE("%s: g12_device_fd open failed", __func__);
-        goto error1;
+    if (ctx->g12_device_fd < 0) {
+      LOGE("%s: g12_device_fd open failed", __FUNCTION__);
+        goto error;
     }
 
     /* Create RGB Surface */
@@ -959,19 +1100,21 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     surfDefinition.width = 1;
     surfDefinition.height = 1;
     surfDefinition.format = C2D_COLOR_FORMAT_8888_ARGB;
-
-    if(LINK_c2dCreateSurface(&ctx->dst,C2D_TARGET | C2D_SOURCE,
+    if (LINK_c2dCreateSurface(&(ctx->dst[RGB_SURFACE]), C2D_TARGET | C2D_SOURCE,
                              (C2D_SURFACE_TYPE)(C2D_SURFACE_RGB_HOST |
                              C2D_SURFACE_WITH_PHYS), &surfDefinition)) {
-        LOGE("%s: create ctx->dst failed", __func__);
-        goto error2;
+        LOGE("%s: create ctx->dst[RGB_SURFACE] failed", __FUNCTION__);
+        ctx->dst[RGB_SURFACE] = -1;
+        goto error;
     }
 
-    if(LINK_c2dCreateSurface(&(ctx->src[RGB_SURFACE]), C2D_TARGET | C2D_SOURCE,
+
+    if (LINK_c2dCreateSurface(&(ctx->src[RGB_SURFACE]), C2D_TARGET | C2D_SOURCE,
                              (C2D_SURFACE_TYPE)(C2D_SURFACE_RGB_HOST |
                              C2D_SURFACE_WITH_PHYS), &surfDefinition)) {
-        LOGE("%s: create ctx->src[RGB_SURFACE] failed", __func__);
-        goto error3;
+        LOGE("%s: create ctx->src[RGB_SURFACE] failed", __FUNCTION__);
+        ctx->src[RGB_SURFACE] = -1;
+        goto error;
     }
 
     /* Create YUV source surface */
@@ -987,11 +1130,41 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     yuvSurfaceDef.phys1 = (void*) 0xaaaaaaaa;
     yuvSurfaceDef.stride1 = 4;
 
-    if(LINK_c2dCreateSurface(&(ctx->src[YUV_SURFACE]),C2D_TARGET | C2D_SOURCE,
+    if (LINK_c2dCreateSurface(&(ctx->src[YUV_SURFACE_2_PLANES]),C2D_TARGET | C2D_SOURCE,
                              (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS),
                              &yuvSurfaceDef)) {
-        LOGE("%s: create ctx->src[YUV_SURFACE] failed", __func__);
-        goto error4;
+        LOGE("%s: create ctx->src[YUV_SURFACE_2_PLANES] failed", __FUNCTION__);
+        ctx->src[YUV_SURFACE_2_PLANES] = -1;
+        goto error;
+    }
+
+    if (LINK_c2dCreateSurface(&(ctx->dst[YUV_SURFACE_2_PLANES]),C2D_TARGET | C2D_SOURCE,
+                             (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS),
+                             &yuvSurfaceDef)) {
+        LOGE("%s: create ctx->dst[YUV_SURFACE_2_PLANES] failed", __FUNCTION__);
+        ctx->dst[YUV_SURFACE_2_PLANES] = -1;
+        goto error;
+    }
+
+    yuvSurfaceDef.format = C2D_COLOR_FORMAT_420_YV12;
+    yuvSurfaceDef.plane2 = (void*)0xaaaaaaaa;
+    yuvSurfaceDef.phys2 = (void*) 0xaaaaaaaa;
+    yuvSurfaceDef.stride2 = 4;
+
+    if (LINK_c2dCreateSurface(&(ctx->src[YUV_SURFACE_3_PLANES]),C2D_TARGET | C2D_SOURCE,
+                             (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS),
+                             &yuvSurfaceDef)) {
+        LOGE("%s: create ctx->src[YUV_SURFACE_3_PLANES] failed", __FUNCTION__);
+        ctx->src[YUV_SURFACE_3_PLANES] = -1;
+        goto error;
+    }
+
+    if (LINK_c2dCreateSurface(&(ctx->dst[YUV_SURFACE_3_PLANES]),C2D_TARGET | C2D_SOURCE,
+                             (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS),
+                             &yuvSurfaceDef)) {
+        LOGE("%s: create ctx->dst[YUV_SURFACE_3_PLANES] failed", __FUNCTION__);
+        ctx->dst[YUV_SURFACE_3_PLANES] = -1;
+        goto error;
     }
 
     *device = &ctx->device.common;
@@ -1002,11 +1175,11 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
         i++;
     }
     if (fd < 0)
-        goto error5;
+        goto error;
 
     struct fb_var_screeninfo info;
     if (ioctl(fd, FBIOGET_VSCREENINFO, &info) == -1)
-        goto error6;
+        goto error;
 
     ctx->fb_width = info.xres;
     ctx->fb_height = info.yres;
@@ -1014,21 +1187,29 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->isPremultipliedAlpha = false;
     return status;
 
-error6:
-    close(fd);
-    fd = -1;
-error5:
-    LINK_c2dDestroySurface(ctx->src[YUV_SURFACE]);
-error4:
-    LINK_c2dDestroySurface(ctx->src[RGB_SURFACE]);
-error3:
-    LINK_c2dDestroySurface(ctx->dst);
-error2:
-    close(ctx->g12_device_fd);
-error1:
-    ::dlclose(ctx->libc2d2);
 error:
-    free(ctx);
+    if (fd >= 0) {
+        close(fd);
+        fd = -1;
+    }
+
+    for (int i = 0; i<NUM_SURFACES; i++) {
+        if (-1 != (ctx->src[i])) {
+             LINK_c2dDestroySurface(ctx->src[i]);
+             ctx->src[i] = -1;
+        }
+        if (-1 != (ctx->dst[i])) {
+             LINK_c2dDestroySurface(ctx->dst[i]);
+             ctx->dst[i] = -1;
+        }
+    }
+    if (ctx->g12_device_fd >= 0) {
+        close(ctx->g12_device_fd);
+    }
+    if (ctx->libc2d2)
+        ::dlclose(ctx->libc2d2);
+    if (ctx)
+        free(ctx);
     status = COPYBIT_FAILURE;
     *device = NULL;
 
