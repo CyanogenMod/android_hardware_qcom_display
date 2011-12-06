@@ -1039,6 +1039,8 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
     region_iterator copybitRegion(region);
 
     copybit_device_t *copybit = hwcModule->copybitEngine;
+    copybit->set_parameter(copybit, COPYBIT_FRAMEBUFFER_WIDTH, renderBuffer->width);
+    copybit->set_parameter(copybit, COPYBIT_FRAMEBUFFER_HEIGHT, renderBuffer->height);
     copybit->set_parameter(copybit, COPYBIT_TRANSFORM, layer->transform);
     copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA,
                            (layer->blending == HWC_BLENDING_NONE) ? 0xFF : layer->alpha);
