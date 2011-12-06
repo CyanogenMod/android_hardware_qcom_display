@@ -642,22 +642,26 @@ static void set_rects(struct copybit_context_t *ctx,
                       const struct copybit_rect_t *src,
                       const struct copybit_rect_t *scissor)
 {
-
+    // Set the target rect.
     if((ctx->trg_transform & C2D_TARGET_ROTATE_90) &&
        (ctx->trg_transform & C2D_TARGET_ROTATE_180)) {
         /* target rotation is 270 */
         c2dObject->target_rect.x        = (dst->t)<<16;
-        c2dObject->target_rect.y        = (ALIGN(ctx->fb_width,32) - (dst->r))<<16;
+        c2dObject->target_rect.y        = ctx->fb_width?(ALIGN(ctx->fb_width,32)- dst->r):dst->r;
+        c2dObject->target_rect.y        = c2dObject->target_rect.y<<16;
         c2dObject->target_rect.height   = ((dst->r) - (dst->l))<<16;
         c2dObject->target_rect.width    = ((dst->b) - (dst->t))<<16;
     } else if(ctx->trg_transform & C2D_TARGET_ROTATE_90) {
-        c2dObject->target_rect.x        = (ctx->fb_height - dst->b)<<16;
+        c2dObject->target_rect.x        = ctx->fb_height?(ctx->fb_height - dst->b):dst->b;
+        c2dObject->target_rect.x        = c2dObject->target_rect.x<<16;
         c2dObject->target_rect.y        = (dst->l)<<16;
         c2dObject->target_rect.height   = ((dst->r) - (dst->l))<<16;
         c2dObject->target_rect.width    = ((dst->b) - (dst->t))<<16;
     } else if(ctx->trg_transform & C2D_TARGET_ROTATE_180) {
-        c2dObject->target_rect.y        = (ctx->fb_height - dst->b)<<16;
-        c2dObject->target_rect.x        = (ALIGN(ctx->fb_width,32) - dst->r)<<16;
+        c2dObject->target_rect.y        = ctx->fb_height?(ctx->fb_height - dst->b):dst->b;
+        c2dObject->target_rect.y        = c2dObject->target_rect.y<<16;
+        c2dObject->target_rect.x        = ctx->fb_width?(ALIGN(ctx->fb_width,32) - dst->r):dst->r;
+        c2dObject->target_rect.x        = c2dObject->target_rect.x<<16;
         c2dObject->target_rect.height   = ((dst->b) - (dst->t))<<16;
         c2dObject->target_rect.width    = ((dst->r) - (dst->l))<<16;
     } else {
@@ -668,17 +672,18 @@ static void set_rects(struct copybit_context_t *ctx,
     }
     c2dObject->config_mask |= C2D_TARGET_RECT_BIT;
 
+    // Set the source rect
     c2dObject->source_rect.x        = (src->l)<<16;
     c2dObject->source_rect.y        = (src->t)<<16;
     c2dObject->source_rect.height   = ((src->b) - (src->t))<<16;
     c2dObject->source_rect.width    = ((src->r) - (src->l))<<16;
     c2dObject->config_mask |= C2D_SOURCE_RECT_BIT;
 
+    // Set the scissor rect
     c2dObject->scissor_rect.x       = scissor->l;
     c2dObject->scissor_rect.y       = scissor->t;
     c2dObject->scissor_rect.height  = (scissor->b) - (scissor->t);
     c2dObject->scissor_rect.width   = (scissor->r) - (scissor->l);
-
     c2dObject->config_mask |= C2D_SCISSOR_RECT_BIT;
 }
 
@@ -761,6 +766,12 @@ static int set_parameter_copybit(
         (value == COPYBIT_ENABLE) ? ctx->isPremultipliedAlpha = true :
                                     ctx->isPremultipliedAlpha = false;
         break;
+    case COPYBIT_FRAMEBUFFER_WIDTH:
+        ctx->fb_width = value;
+        break;
+    case COPYBIT_FRAMEBUFFER_HEIGHT:
+         ctx->fb_height = value;
+         break;
     default:
         LOGE("%s: default case", __func__);
         return -EINVAL;
@@ -969,6 +980,8 @@ static int stretch_copybit_internal(
     unset_image(ctx->g12_device_fd, ctx->src[src_surface_index], src, src_mapped);
     unset_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], dst, trg_mapped);
     ctx->isPremultipliedAlpha = false;
+    ctx->fb_width = 0;
+    ctx->fb_height = 0;
     return status;
 }
 
@@ -1028,13 +1041,6 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     C2D_RGB_SURFACE_DEF surfDefinition = {0};
     C2D_YUV_SURFACE_DEF yuvSurfaceDef = {0} ;
     struct copybit_context_t *ctx;
-    char const * const device_template[] = {
-            "/dev/graphics/fb%u",
-            "/dev/fb%u",
-            0 };
-
-    int fd = -1;
-    int i=0;
     char fbName[64];
 
     ctx = (struct copybit_context_t *)malloc(sizeof(struct copybit_context_t));
@@ -1167,32 +1173,13 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
         goto error;
     }
 
-    *device = &ctx->device.common;
-
-    while ((fd==-1) && device_template[i]) {
-        snprintf(fbName, 64, device_template[i], 0);
-        fd = open(fbName, O_RDWR, 0);
-        i++;
-    }
-    if (fd < 0)
-        goto error;
-
-    struct fb_var_screeninfo info;
-    if (ioctl(fd, FBIOGET_VSCREENINFO, &info) == -1)
-        goto error;
-
-    ctx->fb_width = info.xres;
-    ctx->fb_height = info.yres;
-    close(fd);
+    ctx->fb_width = 0;
+    ctx->fb_height = 0;
     ctx->isPremultipliedAlpha = false;
+    *device = &ctx->device.common;
     return status;
 
 error:
-    if (fd >= 0) {
-        close(fd);
-        fd = -1;
-    }
-
     for (int i = 0; i<NUM_SURFACES; i++) {
         if (-1 != (ctx->src[i])) {
              LINK_c2dDestroySurface(ctx->src[i]);
