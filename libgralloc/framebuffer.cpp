@@ -393,6 +393,14 @@ static void *disp_loop(void *ptr)
 }
 
 #if defined(HDMI_DUAL_DISPLAY)
+static int closeHDMIChannel(private_module_t* m)
+{
+    Overlay* pTemp = m->pobjOverlay;
+    if(pTemp != NULL)
+        pTemp->closeChannel();
+    return 0;
+}
+
 static void *hdmi_ui_loop(void *ptr)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(
@@ -408,12 +416,13 @@ static void *hdmi_ui_loop(void *ptr)
         }
         float asWidthRatio = m->actionsafeWidthRatio/100.0f;
         float asHeightRatio = m->actionsafeHeightRatio/100.0f;
+        bool waitForVsync = true;
 
         if (m->pobjOverlay) {
             Overlay* pTemp = m->pobjOverlay;
-            if (!m->enableHDMIOutput)
-                pTemp->closeChannel();
-            else if (m->enableHDMIOutput && !m->videoOverlay) {
+            if (m->hdmiMirroringState == HDMI_NO_MIRRORING)
+                closeHDMIChannel(m);
+            else if(m->hdmiMirroringState == HDMI_UI_MIRRORING) {
                 if (!pTemp->isChannelUP()) {
                    int alignedW = ALIGN(m->info.xres, 32);
 
@@ -425,12 +434,15 @@ static void *hdmi_ui_loop(void *ptr)
                    info.format = hnd->format;
                    info.size = hnd->size;
 
-                   if (pTemp->startChannel(info, 1,
-                                           false, true, 0, VG0_PIPE, true)) {
+                   if (m->trueMirrorSupport)
+                       waitForVsync = false;
+
+                   if (pTemp->startChannel(info, FRAMEBUFFER_1,
+                                           false, true, 0, VG0_PIPE, waitForVsync)) {
                         pTemp->setFd(m->framebuffer->fd);
                         pTemp->setCrop(0, 0, m->info.xres, m->info.yres);
                    } else
-                       pTemp->closeChannel();
+                       closeHDMIChannel(m);
                 }
 
                 if (pTemp->isChannelUP()) {
@@ -440,21 +452,23 @@ static void *hdmi_ui_loop(void *ptr)
                     int asX = 0, asY = 0; // Action safe x, y co-ordinates
                     int fbwidth = m->info.xres, fbheight = m->info.yres;
                     float defaultASWidthRatio = 0.0f, defaultASHeightRatio = 0.0f;
-                    if(HEIGHT_1080P == height) {
-                        defaultASHeightRatio = AS_1080_RATIO_H;
-                        defaultASWidthRatio = AS_1080_RATIO_W;
-                    } else if(HEIGHT_720P == height) {
-                        defaultASHeightRatio = AS_720_RATIO_H;
-                        defaultASWidthRatio = AS_720_RATIO_W;
-                    } else if(HEIGHT_480P == height) {
-                        defaultASHeightRatio = AS_480_RATIO_H;
-                        defaultASWidthRatio = AS_480_RATIO_W;
+                    // TODO: disable OverScan for now
+                    if(!m->trueMirrorSupport) {
+                        if(HEIGHT_1080P == height) {
+                            defaultASHeightRatio = AS_1080_RATIO_H;
+                            defaultASWidthRatio = AS_1080_RATIO_W;
+                        } else if(HEIGHT_720P == height) {
+                            defaultASHeightRatio = AS_720_RATIO_H;
+                            defaultASWidthRatio = AS_720_RATIO_W;
+                        } else if(HEIGHT_480P == height) {
+                            defaultASHeightRatio = AS_480_RATIO_H;
+                            defaultASWidthRatio = AS_480_RATIO_W;
+                        }
+                        if(asWidthRatio <= 0.0f)
+                            asWidthRatio = defaultASWidthRatio;
+                        if(asHeightRatio <= 0.0f)
+                            asHeightRatio = defaultASHeightRatio;
                     }
-                    if(asWidthRatio <= 0.0f)
-                        asWidthRatio = defaultASWidthRatio;
-                    if(asHeightRatio <= 0.0f)
-                        asHeightRatio = defaultASHeightRatio;
-
                     aswidth = (int)((float)width  - (float)(width * asWidthRatio));
                     asheight = (int)((float)height  - (float)(height * asHeightRatio));
                     asX = (width - aswidth) / 2;
@@ -529,11 +543,16 @@ static void *hdmi_ui_loop(void *ptr)
                             pTemp->setPosition(asX, asY, aswidth, asheight);
                         }
                     }
+                    if (m->trueMirrorSupport) {
+                        // if video is started the UI channel should be NO_WAIT.
+                        waitForVsync = !m->videoOverlay;
+                        pTemp->updateWaitForVsyncFlags(waitForVsync);
+                    }
                     pTemp->queueBuffer(m->currentOffset);
                 }
             }
             else
-                pTemp->closeChannel();
+                closeHDMIChannel(m);
         }
         pthread_mutex_unlock(&m->overlayLock);
     }
@@ -547,15 +566,15 @@ static int fb_videoOverlayStarted(struct framebuffer_device_t* dev, int started)
     pthread_mutex_lock(&m->overlayLock);
     Overlay* pTemp = m->pobjOverlay;
     if(started != m->videoOverlay) {
-        m->hdmiStateChanged = true;
-        if (started && pTemp) {
-            pTemp->closeChannel();
-            m->videoOverlay = true;
+        m->videoOverlay = started;
+        if (!m->trueMirrorSupport) {
+            m->hdmiStateChanged = true;
+            if (started && pTemp) {
+                m->hdmiMirroringState = HDMI_NO_MIRRORING;
+                closeHDMIChannel(m);
+            } else if (m->enableHDMIOutput)
+                m->hdmiMirroringState = HDMI_UI_MIRRORING;
             pthread_cond_signal(&(m->overlayPost));
-        }
-        else {
-           m->videoOverlay = false;
-           pthread_cond_signal(&(m->overlayPost));
         }
     }
     pthread_mutex_unlock(&m->overlayLock);
@@ -568,14 +587,24 @@ static int fb_enableHDMIOutput(struct framebuffer_device_t* dev, int enable)
             dev->common.module);
     pthread_mutex_lock(&m->overlayLock);
     Overlay* pTemp = m->pobjOverlay;
-    if (!enable && pTemp)
-        pTemp->closeChannel();
     m->enableHDMIOutput = enable;
+    if(enable) {
+        if (m->trueMirrorSupport) {
+            m->hdmiMirroringState = HDMI_UI_MIRRORING;
+        } else {
+            if(!m->videoOverlay)
+                m->hdmiMirroringState = HDMI_UI_MIRRORING;
+        }
+    } else if (!enable && pTemp) {
+        m->hdmiMirroringState = HDMI_NO_MIRRORING;
+        closeHDMIChannel(m);
+    }
     m->hdmiStateChanged = true;
     pthread_cond_signal(&(m->overlayPost));
     pthread_mutex_unlock(&m->overlayLock);
     return 0;
 }
+
 
 static int fb_setActionSafeWidthRatio(struct framebuffer_device_t* dev, float asWidthRatio)
 {
@@ -590,12 +619,13 @@ static int fb_setActionSafeWidthRatio(struct framebuffer_device_t* dev, float as
 static int fb_setActionSafeHeightRatio(struct framebuffer_device_t* dev, float asHeightRatio)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(
-            dev->common.module);
+                    dev->common.module);
     pthread_mutex_lock(&m->overlayLock);
     m->actionsafeHeightRatio = asHeightRatio;
     pthread_mutex_unlock(&m->overlayLock);
     return 0;
 }
+
 static int fb_orientationChanged(struct framebuffer_device_t* dev, int orientation)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(
@@ -1025,6 +1055,8 @@ int mapFrameBufferLocked(struct private_module_t* module)
     module->hdmiStateChanged = false;
     pthread_t hdmiUIThread;
     pthread_create(&hdmiUIThread, NULL, &hdmi_ui_loop, (void *) module);
+    module->hdmiMirroringState = HDMI_NO_MIRRORING;
+    module->trueMirrorSupport = FrameBufferInfo::getInstance()->canSupportTrueMirroring();
 #endif
 #if defined COMPOSITION_BYPASS
     pthread_mutex_init(&(module->bufferPostLock), NULL);

@@ -39,6 +39,7 @@
 
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <utils/threads.h>
 #include <utils/RefBase.h>
 #include <alloc_controller.h>
 #include <memalloc.h>
@@ -47,6 +48,7 @@
 #define HW_OVERLAY_MINIFICATION_LIMIT HW_OVERLAY_MAGNIFICATION_LIMIT
 
 #define EVEN_OUT(x) if (x & 0x0001) {x--;}
+#define NO_PIPE -1
 #define VG0_PIPE 0
 #define VG1_PIPE 1
 #define NUM_CHANNELS 2
@@ -124,7 +126,58 @@ enum {
     OVERLAY_TRANSFORM_ROT_270   = HAL_TRANSFORM_ROT_270
 };
 
+using android::Mutex;
 namespace overlay {
+    //Utility Class to query the framebuffer info
+    class FrameBufferInfo {
+        int mFBWidth;
+        int mFBHeight;
+        bool mBorderFillSupported;
+        static FrameBufferInfo *sFBInfoInstance;
+
+        FrameBufferInfo():mFBWidth(0),mFBHeight(0), mBorderFillSupported(false) {
+            char const * const device_name =
+                       "/dev/graphics/fb0";
+            int fd = open(device_name, O_RDWR, 0);
+            mdp_overlay ov;
+            memset(&ov, 0, sizeof(ov));
+            if (fd < 0) {
+               LOGE("FrameBufferInfo: Cant open framebuffer ");
+               return;
+            }
+            fb_var_screeninfo vinfo;
+            if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) == -1) {
+                  LOGE("FrameBufferInfo: FBIOGET_VSCREENINFO on fb0 failed");
+                  close(fd);
+                  fd = -1;
+                  return;
+            }
+            ov.id = 1;
+            if(ioctl(fd, MSMFB_OVERLAY_GET, &ov)) {
+                  LOGE("FrameBufferInfo: MSMFB_OVERLAY_GET on fb0 failed");
+                  close(fd);
+                  fd = -1;
+                  return;
+            }
+            close(fd);
+            fd = -1;
+            mFBWidth = vinfo.xres;
+            mFBHeight = vinfo.yres;
+            mBorderFillSupported = (ov.flags & MDP_BORDERFILL_SUPPORTED) ?
+                                                              true : false;
+        }
+        public:
+        static FrameBufferInfo* getInstance(){
+            if (!sFBInfoInstance){
+                sFBInfoInstance = new FrameBufferInfo;
+            }
+            return sFBInfoInstance;
+        }
+        int getWidth() const { return mFBWidth; }
+        int getHeight() const { return mFBHeight; }
+        bool canSupportTrueMirroring() const {
+            return mBorderFillSupported; }
+    };
 
 enum {
     OV_UI_MIRROR_TV = 0,
@@ -157,13 +210,46 @@ void dump(msm_rotator_img_info& mRotInfo);
 void dump(mdp_overlay& mOvInfo);
 const char* getFormatString(int format);
 
+    //singleton class to decide the z order of new overlay surfaces
+    class ZOrderManager {
+        bool mFB0Pipes[NUM_CHANNELS];
+        bool mFB1Pipes[NUM_CHANNELS+1]; //FB1 can have 3 pipes
+        int  mPipesInuse; // Holds the number of pipes in use
+        int  mMaxPipes;   // Max number of pipes
+        static ZOrderManager *sInstance;
+        Mutex *mObjMutex;
+        ZOrderManager(){
+            mPipesInuse = 0;
+            // for true mirroring support there can be 3 pipes on secondary
+            mMaxPipes = FrameBufferInfo::getInstance()->canSupportTrueMirroring()?
+                                                  NUM_CHANNELS+1 : NUM_CHANNELS;
+            for (int i = 0; i < NUM_CHANNELS; i++)
+                mFB0Pipes[i] = false;
+            for (int j = 0; j < mMaxPipes; j++)
+                mFB1Pipes[j] = false;
+            mObjMutex = new Mutex();
+        }
+        ~ZOrderManager() {
+            delete sInstance;
+            delete mObjMutex;
+        }
+        public:
+        static ZOrderManager* getInstance(){
+            if (!sInstance){
+                sInstance = new ZOrderManager;
+            }
+            return sInstance;
+        }
+        int getZ(int fbnum);
+        void decZ(int fbnum, int zorder);
+    };
 const int max_num_buffers = 3;
 typedef struct mdp_rect overlay_rect;
 
 class OverlayControlChannel {
 
     bool mNoRot;
-
+    int mFBNum;
     int mFBWidth;
     int mFBHeight;
     int mFBbpp;
@@ -209,6 +295,10 @@ public:
     bool getOrientation(int& orientation) const;
     bool updateWaitForVsyncFlags(bool waitForVsync);
     bool getAspectRatioPosition(int w, int h, overlay_rect *rect);
+    // Calculates the aspect ratio for video on HDMI based on primary
+    //  aspect ratio used in case of true mirroring
+    bool getAspectRatioPosition(int w, int h, int orientation,
+                                overlay_rect *inRect, overlay_rect *outRect);
     bool getPositionS3D(int channel, int format, overlay_rect *rect);
     bool updateOverlaySource(const overlay_buffer_info& info, int orientation, bool waitForVsync);
     bool getFormat() const { return mFormat; }
@@ -272,6 +362,8 @@ class Overlay {
     int mCroppedSrcHeight;
     overlay_buffer_info mOVBufferInfo;
     int mState;
+    // Stores the current device orientation
+    int mDevOrientation;
     OverlayControlChannel objOvCtrlChannel[2];
     OverlayDataChannel    objOvDataChannel[2];
 
@@ -285,6 +377,7 @@ public:
                           int channel = 0, bool ignoreFB = false,
                           int num_buffers = 2);
     bool closeChannel();
+    bool setDeviceOrientation(int orientation);
     bool setPosition(int x, int y, uint32_t w, uint32_t h);
     bool setTransform(int value);
     bool setOrientation(int value, int channel = 0);
@@ -299,6 +392,7 @@ public:
     bool setSource(const overlay_buffer_info& info, int orientation, bool hdmiConnected,
                     bool ignoreFB = false, int numBuffers = 2);
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
+    bool updateWaitForVsyncFlags(bool waitForVsync);
     bool waitForHdmiVsync(int channel);
     int  getChannelStatus() const { return (mChannelUP ? OVERLAY_CHANNEL_UP: OVERLAY_CHANNEL_DOWN); }
     void setHDMIStatus (bool isHDMIConnected) { mHDMIConnected = isHDMIConnected; mState = -1; }
