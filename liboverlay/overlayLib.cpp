@@ -37,6 +37,13 @@ bool Overlay::sHDMIAsPrimary = true;
 bool Overlay::sHDMIAsPrimary = false;
 #endif
 
+template <class Type>
+void swapWidthHeight(Type& width, Type& height) {
+    Type tmp = width;
+    width = height;
+    height = tmp;
+}
+
 int overlay::get_mdp_format(int format) {
     switch (format) {
     case HAL_PIXEL_FORMAT_RGBA_8888 :
@@ -182,6 +189,66 @@ const char* overlay::getFormatString(int format){
              "MDP_IMGTYPE_LIMIT2"
         };
     return formats[format];
+}
+ZOrderManager* ZOrderManager::sInstance = 0;
+FrameBufferInfo* FrameBufferInfo::sFBInfoInstance = 0;
+
+int ZOrderManager::getZ(int fbnum){
+    int zorder = NO_PIPE;;
+    Mutex::Autolock objLock(mObjMutex);
+    if(mPipesInuse == mMaxPipes) {
+        LOGE("No free pipes available.. inUse = %d ", mPipesInuse);
+        return NO_PIPE;
+    }
+    switch(fbnum) {
+        case FRAMEBUFFER_0:
+            for (int i = 0;i < NUM_CHANNELS; i++) {
+                if(mFB0Pipes[i] == false) {
+                    mFB0Pipes[i]= true;
+                    zorder = i;
+                    break;
+                }
+            }
+            break;
+        case FRAMEBUFFER_1:
+            for (int i = 0;i < mMaxPipes; i++) {
+                if(mFB1Pipes[i] == false) {
+                    mFB1Pipes[i]= true;
+                    zorder = i;
+                    break;
+                 }
+             }
+             break;
+         default:
+             LOGE("getZ: Invalid framebuffer..");
+             break;
+    }
+    mPipesInuse++;
+    LOGE("getZ: return zorder = %d for fbdev = %d, pipesinUse = %d",
+            zorder, fbnum, mPipesInuse);
+    return zorder;
+}
+
+void ZOrderManager::decZ(int fbnum, int zorder){
+   Mutex::Autolock objLock(mObjMutex);
+   switch(fbnum) {
+       case FRAMEBUFFER_0:
+           LOG_ASSERT(!mFB0Pipes[zorder],"channel with ZOrder does not exist");
+           LOGE("decZ: freeing the pipe with zorder = %d for fbdev = %d", zorder, fbnum);
+           mFB0Pipes[zorder] = false;
+           break;
+       case FRAMEBUFFER_1:
+           LOG_ASSERT(!mFB1Pipes[zorder],"channel with ZOrder does not exist");
+           LOGE("decZ: freeing the pipe with zorder = %d for fbdev = %d", zorder, fbnum);
+           mFB1Pipes[zorder] = false;
+           break;
+       default:
+           LOGE("decZ: Invalid framebuffer ");
+           break;
+    }
+    if(mPipesInuse > 0)
+        mPipesInuse--;
+    LOGE("decZ: Pipes in use  = %d", mPipesInuse);
 }
 
 bool overlay::isHDMIConnected () {
@@ -385,55 +452,77 @@ bool Overlay::getOrientation(int& orientation, int channel) const {
     return objOvCtrlChannel[channel].getOrientation(orientation);
 }
 
+bool Overlay::setDeviceOrientation(int orientation) {
+    // Use this to calculate the position on HDMI
+    mDevOrientation = orientation;
+    return true;
+}
+
 bool Overlay::setPosition(int x, int y, uint32_t w, uint32_t h) {
     bool ret = false;
     overlay_rect rect;
-    switch (mState) {
-        case OV_UI_MIRROR_TV:
-        case OV_2D_VIDEO_ON_PANEL:
-        case OV_3D_VIDEO_2D_PANEL:
-            return setChannelPosition(x, y, w, h, VG0_PIPE);
-            break;
-        case OV_2D_VIDEO_ON_TV:
-            objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(mCroppedSrcWidth,
-                            mCroppedSrcHeight, &rect);
-            setChannelPosition(rect.x, rect.y, rect.w, rect.h, VG1_PIPE);
-            return setChannelPosition(x, y, w, h, VG0_PIPE);
-            break;
-        case OV_3D_VIDEO_3D_PANEL:
-            for (int i = 0; i < NUM_CHANNELS; i++) {
-                if (sHDMIAsPrimary)
-                    objOvCtrlChannel[i].getPositionS3D(i, mS3DFormat, &rect);
-                else {
-                    if (!objOvCtrlChannel[i].useVirtualFB()) {
-                        LOGE("%s: failed virtual fb for channel %d", __FUNCTION__, i);
+    overlay_rect inrect;
+    int currX, currY;
+    uint32_t currW, currH;
+    // Set even destination co-ordinates
+    EVEN_OUT(x); EVEN_OUT(y);
+    EVEN_OUT(w); EVEN_OUT(h);
+    objOvCtrlChannel[VG0_PIPE].getPosition(currX, currY, currW, currH);
+    inrect.x = x, inrect.y = y;
+    inrect.w = w, inrect.h = h;
+    if(x != currX || y != currY || w != currW || h != currH) {
+        switch (mState) {
+            case OV_UI_MIRROR_TV:
+            case OV_2D_VIDEO_ON_PANEL:
+            case OV_3D_VIDEO_2D_PANEL:
+                return setChannelPosition(x, y, w, h, VG0_PIPE);
+                break;
+            case OV_2D_VIDEO_ON_TV:
+                if (FrameBufferInfo::getInstance()->canSupportTrueMirroring()) {
+                    objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(mCroppedSrcWidth,
+                                         mCroppedSrcHeight, mDevOrientation, &inrect, &rect);
+                } else {
+                    objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(mCroppedSrcWidth,
+                                         mCroppedSrcHeight, &rect);
+                }
+                setChannelPosition(rect.x, rect.y, rect.w, rect.h, VG1_PIPE);
+                return setChannelPosition(x, y, w, h, VG0_PIPE);
+                break;
+            case OV_3D_VIDEO_3D_PANEL:
+                for (int i = 0; i < NUM_CHANNELS; i++) {
+                    if (sHDMIAsPrimary)
+                        objOvCtrlChannel[i].getPositionS3D(i, mS3DFormat, &rect);
+                    else {
+                        if (!objOvCtrlChannel[i].useVirtualFB()) {
+                            LOGE("%s: failed virtual fb for channel %d", __FUNCTION__, i);
+                            return false;
+                        }
+                        objOvCtrlChannel[i].getPositionS3D(i, 0x1, &rect);
+                    }
+                    if(!setChannelPosition(rect.x, rect.y, rect.w, rect.h, i)) {
+                        LOGE("%s: failed for channel %d", __FUNCTION__, i);
                         return false;
                     }
-                    objOvCtrlChannel[i].getPositionS3D(i, 0x1, &rect);
                 }
-                if(!setChannelPosition(rect.x, rect.y, rect.w, rect.h, i)) {
-                    LOGE("%s: failed for channel %d", __FUNCTION__, i);
-                    return false;
+                break;
+            case OV_3D_VIDEO_2D_TV:
+            case OV_3D_VIDEO_3D_TV:
+                for (int i = 0; i < NUM_CHANNELS; i++) {
+                    ret = objOvCtrlChannel[i].getPositionS3D(i, mS3DFormat, &rect);
+                    if (!ret)
+                        ret = setChannelPosition(x, y, w, h, i);
+                    else
+                        ret = setChannelPosition(rect.x, rect.y, rect.w, rect.h, i);
+                    if (!ret) {
+                        LOGE("%s: failed for channel %d", __FUNCTION__, i);
+                        return ret;
+                    }
                 }
-            }
-            break;
-        case OV_3D_VIDEO_2D_TV:
-        case OV_3D_VIDEO_3D_TV:
-            for (int i = 0; i < NUM_CHANNELS; i++) {
-                ret = objOvCtrlChannel[i].getPositionS3D(i, mS3DFormat, &rect);
-                if (!ret)
-                    ret = setChannelPosition(x, y, w, h, i);
-                else
-                    ret = setChannelPosition(rect.x, rect.y, rect.w, rect.h, i);
-                if (!ret) {
-                    LOGE("%s: failed for channel %d", __FUNCTION__, i);
-                    return ret;
-                }
-            }
-            break;
-        default:
-            LOGE("%s:Unknown state %d", __FUNCTION__, mState);
-            break;
+                break;
+            default:
+                LOGE("%s:Unknown state %d", __FUNCTION__, mState);
+                break;
+        }
     }
     return true;
 }
@@ -604,9 +693,7 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                         return false;
                     }
                 }
-                overlay_rect rect;
-                objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(info.width, info.height, &rect);
-                return setChannelPosition(rect.x, rect.y, rect.w, rect.h, VG1_PIPE);
+                return true;
                 break;
             case OV_3D_VIDEO_3D_TV:
                 for (int i=0; i<NUM_CHANNELS; i++) {
@@ -675,6 +762,10 @@ bool Overlay::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
 
 bool Overlay::setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int channel) {
     return objOvDataChannel[channel].setCrop(x, y, w, h);
+}
+
+bool Overlay::updateWaitForVsyncFlags(bool waitForVsync) {
+        return objOvCtrlChannel[VG0_PIPE].updateWaitForVsyncFlags(waitForVsync);
 }
 
 bool Overlay::setTransform(int value) {
@@ -842,6 +933,106 @@ bool OverlayControlChannel::getAspectRatioPosition(int w, int h, overlay_rect *r
     rect->h = height;
     return true;
 }
+
+
+// This function gets the destination position for Seconday display
+// based on the aspect ratio of the primary
+bool OverlayControlChannel::getAspectRatioPosition(int w, int h, int orientation,
+                                 overlay_rect *inRect, overlay_rect *outRect) {
+    float priWidth  = FrameBufferInfo::getInstance()->getWidth();
+    float priHeight = FrameBufferInfo::getInstance()->getHeight();
+    float fbWidth = getFBWidth();
+    float fbHeight = getFBHeight();
+    float wRatio = 1.0;
+    float hRatio = 1.0;
+    float xRatio = 1.0;
+    float yRatio = 1.0;
+
+    int xPos = 0;
+    int tmp = 0;
+    float actualWidth = fbWidth;
+    if(priWidth < priHeight) {
+        switch(orientation) {
+            case MDP_ROT_NOP:
+                actualWidth  = (fbHeight * priWidth) / priHeight;
+                xPos = (fbWidth - actualWidth) / 2;
+                break;
+            case MDP_ROT_180:
+                actualWidth  = (fbHeight * priWidth) / priHeight;
+                xPos = (fbWidth - actualWidth) / 2;
+                inRect->x = priWidth - (inRect->x + inRect->w);
+                inRect->y = priHeight - (inRect->y + inRect->h);
+                break;
+            case MDP_ROT_90:
+                tmp = inRect->y;
+                inRect->y = priWidth - (inRect->x + inRect->w);
+                inRect->x = tmp;
+                // Swap width/height for primary
+                swapWidthHeight(priWidth, priHeight);
+                //Swap the destination width/height
+                swapWidthHeight(inRect->w, inRect->h);
+                break;
+            case MDP_ROT_270:
+                tmp = inRect->x;
+                inRect->x = priHeight - (inRect->y + inRect->h);
+                inRect->y = tmp;
+                // Swap width/height for primary
+                swapWidthHeight(priWidth, priHeight);
+                //Swap the destination width/height
+                swapWidthHeight(inRect->w, inRect->h);
+                break;
+            default:
+                LOGE("In  %s: Portrait: Unknown Orientation", __FUNCTION__);
+                break;
+        }
+    } else {
+        switch(orientation) {
+            case MDP_ROT_NOP:
+                break;
+            case MDP_ROT_180:
+                inRect->x = priWidth - (inRect->x + inRect->w);
+                inRect->y = priHeight - (inRect->y + inRect->h);
+                break;
+            case MDP_ROT_90:
+            case MDP_ROT_270:
+                // Swap width/height for primary
+                swapWidthHeight(priWidth, priHeight);
+                //Swap the destination width/height
+                swapWidthHeight(inRect->w, inRect->h);
+                actualWidth = ( fbHeight * priWidth) / priHeight;
+                xPos = (fbWidth - actualWidth) / 2;
+                if(orientation == MDP_ROT_90) {
+                    tmp = inRect->y;
+                    inRect->y = priWidth - (inRect->x + inRect->w);
+                    inRect->x = tmp;
+                }
+                else if(orientation == MDP_ROT_270) {
+                    tmp = inRect->x;
+                    inRect->x = priHeight - (inRect->y + inRect->h);
+                    inRect->y = tmp;
+                }
+                break;
+            default:
+                LOGE("In  %s: Landscape: Unknown Orientation", __FUNCTION__);
+                break;
+        }
+    }
+    //Calculate the position...
+    xRatio = inRect->x/priWidth;
+    yRatio = inRect->y/priHeight;
+
+    wRatio = inRect->w/priWidth;
+    hRatio = inRect->h/priHeight;
+    outRect->x = (xRatio * fbWidth) + xPos;
+    outRect->y = yRatio * fbHeight;
+
+    outRect->w = (wRatio * actualWidth);
+    outRect->h = hRatio * fbHeight;
+    LOGE("Calculated AS Position for HDMI:  X= %d, y = %d w = %d h = %d",
+                                  outRect->x, outRect->y,outRect->w, outRect->h);
+    return true;
+}
+
 
 bool OverlayControlChannel::getPositionS3D(int channel, int format, overlay_rect *rect) {
     int wDisp = getFBWidth();
@@ -1081,6 +1272,7 @@ bool OverlayControlChannel::startControlChannel(int w, int h,
     mNoRot = norot;
     mFormat = format;
     mUIChannel = uichannel;
+    mFBNum = fbnum;
     fb_fix_screeninfo finfo;
     fb_var_screeninfo vinfo;
     int hw_format;
@@ -1105,8 +1297,17 @@ bool OverlayControlChannel::startControlChannel(int w, int h,
         // Set the share bit for sharing the VG pipe
         flags |= MDP_OV_PIPE_SHARE;
     }
+    //do not set the PIPE SHARE bit for true mirroring
+    if(uichannel && FrameBufferInfo::getInstance()->canSupportTrueMirroring())
+        flags &= ~MDP_OV_PIPE_SHARE;
     if (!openDevices(fbnum))
         return false;
+
+   //get Z order
+    zorder = ZOrderManager::getInstance()->getZ(fbnum);
+    if (zorder == NO_PIPE)
+        return false;
+
 
     int orientation = mNoRot ? 0: 1;
     overlay_buffer_info ovBufInfo;
@@ -1137,9 +1338,15 @@ bool OverlayControlChannel::closeControlChannel() {
     }
 
     close(mFD);
+
+    if(NO_PIPE != mOVInfo.z_order){
+        ZOrderManager::getInstance()->decZ(mFBNum, mOVInfo.z_order);
+    }
     memset(&mOVInfo, 0, sizeof(mOVInfo));
     memset(&mRotInfo, 0, sizeof(mRotInfo));
     memset(&m3DOVInfo, 0, sizeof(m3DOVInfo));
+
+    mOVInfo.z_order = NO_PIPE;
     mFD = -1;
 
     return true;

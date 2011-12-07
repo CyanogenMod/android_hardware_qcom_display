@@ -302,7 +302,19 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const bool wai
             LOGE("prepareOverlay setCrop failed");
             return -1;
         }
-
+#if defined HDMI_DUAL_DISPLAY
+        // Send the device orientation to  overlayLib
+        if(hwcModule) {
+            framebuffer_device_t *fbDev = reinterpret_cast<framebuffer_device_t*>
+                                                            (hwcModule->fbDevice);
+            if(fbDev) {
+                private_module_t* m = reinterpret_cast<private_module_t*>(
+                                                         fbDev->common.module);
+                if(m)
+                    ovLibObject->setDeviceOrientation(m->orientation);
+            }
+        }
+#endif
         if (layer->flags & HWC_USE_ORIGINAL_RESOLUTION) {
             framebuffer_device_t* fbDev = hwcModule->fbDevice;
             ret = ovLibObject->setPosition(0, 0,
