@@ -88,6 +88,7 @@ int IonController::allocate(alloc_data& data, int usage,
 {
     int ionFlags = 0;
     int ret;
+    bool noncontig = false;
 
     //System heap cannot be uncached
     if (usage & GRALLOC_USAGE_PRIVATE_UNCACHED &&
@@ -105,8 +106,10 @@ int IonController::allocate(alloc_data& data, int usage,
     if(usage & GRALLOC_USAGE_PRIVATE_EBI_HEAP)
         ionFlags |= 1 << ION_HEAP_EBI_ID;
 
-    if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP)
+    if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP) {
         ionFlags |= 1 << ION_HEAP_SYSTEM_ID;
+        noncontig = true;
+    }
 
     // if no flags are set, default to
     // EBI heap, so that bypass can work
@@ -125,11 +128,15 @@ int IonController::allocate(alloc_data& data, int usage,
     {
         LOGW("Falling back to system heap");
         data.flags = 1 << ION_HEAP_SYSTEM_ID;
+        noncontig = true;
         ret = mIonAlloc->alloc_buffer(data);
     }
 
-    if(ret >= 0 )
+    if(ret >= 0 ) {
         data.allocType = private_handle_t::PRIV_FLAGS_USES_ION;
+        if(noncontig)
+            data.allocType |= private_handle_t::PRIV_FLAGS_NONCONTIGUOUS_MEM;
+    }
 
     return ret;
 }
@@ -252,8 +259,10 @@ int PmemAshmemController::allocate(alloc_data& data, int usage,
 
     if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP) {
         ret = mAshmemAlloc->alloc_buffer(data);
-        if(ret >= 0)
+        if(ret >= 0) {
             data.allocType = private_handle_t::PRIV_FLAGS_USES_ASHMEM;
+            data.allocType |= private_handle_t::PRIV_FLAGS_NONCONTIGUOUS_MEM;
+        }
         return ret;
     }
 
@@ -269,8 +278,10 @@ int PmemAshmemController::allocate(alloc_data& data, int usage,
     } else if(ret < 0 && canFallback(compositionType, usage, false)) {
         LOGW("Falling back to ashmem");
         ret = mAshmemAlloc->alloc_buffer(data);
-        if(ret >= 0)
+        if(ret >= 0) {
             data.allocType = private_handle_t::PRIV_FLAGS_USES_ASHMEM;
+            data.allocType |= private_handle_t::PRIV_FLAGS_NONCONTIGUOUS_MEM;
+        }
     }
 
     return ret;

@@ -546,9 +546,26 @@ static bool isDisjoint(const hwc_layer_list_t* list) {
     return true;
 }
 
+static bool usesContiguousMemory(const hwc_layer_list_t* list) {
+    for(int i = 0; i < list->numHwLayers; i++) {
+        const private_handle_t *hnd =
+            reinterpret_cast<const private_handle_t *>(list->hwLayers[i].handle);
+        if(hnd != NULL && (hnd->flags &
+                           private_handle_t::PRIV_FLAGS_NONCONTIGUOUS_MEM
+                          )) {
+            // Bypass cannot work for non contiguous buffers
+            return false;
+        }
+    }
+    return true;
+}
+
 /*
- * Checks if doing comp. bypass is possible. If video is not on and there
- * are 2 layers then its doable.
+ * Checks if doing comp. bypass is possible.
+ * It is possible if
+ * 1. If video is not on
+ * 2. There are 2 layers
+ * 3. The memory type is contiguous
  */
 inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount,
         const hwc_layer_list_t* list) {
@@ -559,6 +576,9 @@ inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount
     if(hwcModule->isBypassEnabled == false) {
         return false;
     }
+    // Check if memory type is contiguous
+    if(!usesContiguousMemory(list))
+       return false;
     //Disable bypass during animation
     if(UNLIKELY(ctx->animCount)) {
         --(ctx->animCount);
