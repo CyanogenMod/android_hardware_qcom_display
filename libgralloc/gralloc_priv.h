@@ -206,6 +206,14 @@ enum {
 	BUFFER_TYPE_UI = 0,
 	BUFFER_TYPE_VIDEO
 };
+
+#if defined(HDMI_DUAL_DISPLAY)
+enum hdmi_mirroring_state {
+    HDMI_NO_MIRRORING,
+    HDMI_UI_MIRRORING,
+    HDMI_ORIGINAL_RESOLUTION_MIRRORING
+};
+#endif
 /*****************************************************************************/
 
 struct private_module_t;
@@ -269,10 +277,12 @@ struct private_module_t {
     bool videoOverlay;
     uint32_t currentOffset;
     bool enableHDMIOutput;
+    bool trueMirrorSupport;
     bool exitHDMIUILoop;
     float actionsafeWidthRatio;
     float actionsafeHeightRatio;
     bool hdmiStateChanged;
+    hdmi_mirroring_state hdmiMirroringState;
     pthread_mutex_t overlayLock;
     pthread_cond_t overlayPost;
 #endif
