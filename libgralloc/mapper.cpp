@@ -327,7 +327,7 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 hnd->magic = private_handle_t::sMagic;
                 hnd->fd = fd;
                 unsigned int contigFlags = GRALLOC_USAGE_PRIVATE_ADSP_HEAP |
-                                  GRALLOC_USAGE_PRIVATE_EBI_HEAP |
+                                  GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP |
                                   GRALLOC_USAGE_PRIVATE_SMI_HEAP;
 
                 if (memoryFlags & contigFlags) {

@@ -1486,7 +1486,10 @@ bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int r
     data.align = getpagesize();
     data.uncached = true;
 
-    int allocFlags = GRALLOC_USAGE_PRIVATE_ADSP_HEAP;
+    int allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP          |
+                     GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP   |
+                     GRALLOC_USAGE_PRIVATE_ADSP_HEAP        |
+                     GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
     if((requestType == NEW_REQUEST) && !uiChannel)
         allocFlags |= GRALLOC_USAGE_PRIVATE_SMI_HEAP;
 
