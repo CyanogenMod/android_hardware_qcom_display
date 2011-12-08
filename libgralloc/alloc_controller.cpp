@@ -40,24 +40,43 @@
 using namespace gralloc;
 using android::sp;
 
+const int GRALLOC_HEAP_MASK = GRALLOC_USAGE_PRIVATE_ADSP_HEAP      |
+                              GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP |
+                              GRALLOC_USAGE_PRIVATE_SMI_HEAP       |
+                              GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP    |
+                              GRALLOC_USAGE_PRIVATE_IOMMU_HEAP     |
+                              GRALLOC_USAGE_PRIVATE_MM_HEAP        |
+                              GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP |
+                              GRALLOC_USAGE_PRIVATE_CAMERA_HEAP;
+
+
 //Common functions
 static bool canFallback(int compositionType, int usage, bool triedSystem)
 {
     // Fallback to system heap when alloc fails unless
     // 1. Composition type is MDP
-    // 2. Earlier alloc attempt was from system heap
-    // 3. Contiguous heap requsted explicitly
+    // 2. Alloc from system heap was already tried
+    // 3. The heap type is requsted explicitly
+    // 4. The heap type is protected
 
     if(compositionType == MDP_COMPOSITION)
         return false;
     if(triedSystem)
         return false;
-    if(usage &(GRALLOC_USAGE_PRIVATE_ADSP_HEAP|
-               GRALLOC_USAGE_PRIVATE_EBI_HEAP |
-               GRALLOC_USAGE_PRIVATE_SMI_HEAP))
+    if(usage & (GRALLOC_HEAP_MASK | GRALLOC_USAGE_PROTECTED))
         return false;
     //Return true by default
     return true;
+}
+
+static bool useUncached(int usage)
+{
+    // System heaps cannot be uncached
+    if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP)
+        return false;
+    if (usage & GRALLOC_USAGE_PRIVATE_UNCACHED)
+        return true;
+    return false;
 }
 
 sp<IAllocController> IAllocController::sController = NULL;
@@ -91,43 +110,47 @@ int IonController::allocate(alloc_data& data, int usage,
     int ret;
     bool noncontig = false;
 
-    //System heap cannot be uncached
-    if (usage & GRALLOC_USAGE_PRIVATE_UNCACHED &&
-            !(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP))
-        data.uncached = true;
-    else
-        data.uncached = false;
+    data.uncached = useUncached(usage);
 
-    if(usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP)
-        ionFlags |= 1 << ION_HEAP_ADSP_ID;
-
-    if(usage & GRALLOC_USAGE_PRIVATE_SMI_HEAP)
-        ionFlags |= 1 << ION_HEAP_SMI_ID;
-
-    if(usage & GRALLOC_USAGE_PRIVATE_EBI_HEAP)
-        ionFlags |= 1 << ION_HEAP_EBI_ID;
+    if(usage & GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP)
+        ionFlags |= ION_HEAP(ION_SF_HEAP_ID);
 
     if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP) {
-        ionFlags |= 1 << ION_HEAP_SYSTEM_ID;
+        ionFlags |= ION_HEAP(ION_SYSTEM_HEAP_ID);
         noncontig = true;
     }
+
+    if(usage & GRALLOC_USAGE_PRIVATE_IOMMU_HEAP)
+        ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
+
+    if(usage & GRALLOC_USAGE_PRIVATE_MM_HEAP)
+        ionFlags |= ION_HEAP(ION_CP_MM_HEAP_ID);
+
+    if(usage & GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP)
+        ionFlags |= ION_HEAP(ION_CP_WB_HEAP_ID);
+
+    if(usage & GRALLOC_USAGE_PRIVATE_CAMERA_HEAP)
+        ionFlags |= ION_HEAP(ION_CAMERA_HEAP_ID);
+
+    if(usage & GRALLOC_USAGE_PROTECTED)
+        ionFlags |= ION_SECURE;
 
     // if no flags are set, default to
     // EBI heap, so that bypass can work
     // we can fall back to system heap if
     // we run out.
     if(!ionFlags)
-        ionFlags = 1 << ION_HEAP_EBI_ID;
+        ionFlags = ION_HEAP(ION_SF_HEAP_ID);
 
     data.flags = ionFlags;
     ret = mIonAlloc->alloc_buffer(data);
     // Fallback
     if(ret < 0 && canFallback(compositionType,
                               usage,
-                              (ionFlags & ION_HEAP_SYSTEM_ID)))
+                              (ionFlags & ION_SYSTEM_HEAP_ID)))
     {
         LOGW("Falling back to system heap");
-        data.flags = 1 << ION_HEAP_SYSTEM_ID;
+        data.flags = ION_HEAP(ION_SYSTEM_HEAP_ID);
         noncontig = true;
         ret = mIonAlloc->alloc_buffer(data);
     }

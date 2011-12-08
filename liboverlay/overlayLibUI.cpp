@@ -345,7 +345,13 @@ status_t Rotator::startRotSession(msm_rotator_img_info& rotInfo,
         data.align = getpagesize();
         data.uncached = true;
 
-        int err = mAlloc->allocate(data, GRALLOC_USAGE_PRIVATE_SMI_HEAP, 0);
+        int allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP          |
+                         GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP   |
+                         GRALLOC_USAGE_PRIVATE_ADSP_HEAP        |
+                         GRALLOC_USAGE_PRIVATE_IOMMU_HEAP       |
+                         GRALLOC_USAGE_PRIVATE_SMI_HEAP;
+
+        int err = mAlloc->allocate(data, allocFlags, 0);
 
         if(err) {
             LOGE("%s: Can't allocate rotator memory", __func__);

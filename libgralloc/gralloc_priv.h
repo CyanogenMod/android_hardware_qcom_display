@@ -38,18 +38,34 @@ using namespace overlay;
 enum {
     /* gralloc usage bits indicating the type
      * of allocation that should be used */
-    GRALLOC_USAGE_PRIVATE_ADSP_HEAP = GRALLOC_USAGE_PRIVATE_0,
-    GRALLOC_USAGE_PRIVATE_EBI_HEAP = GRALLOC_USAGE_PRIVATE_1,
-    GRALLOC_USAGE_PRIVATE_SMI_HEAP = GRALLOC_USAGE_PRIVATE_2,
-    GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP = GRALLOC_USAGE_PRIVATE_3,
+
+    /* ADSP heap is deprecated, use only if using pmem */
+    GRALLOC_USAGE_PRIVATE_ADSP_HEAP       =       GRALLOC_USAGE_PRIVATE_0,
+    /* SF heap is used for application buffers, is not secured */
+    GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP  =       GRALLOC_USAGE_PRIVATE_1,
+    /* SMI heap is deprecated, use only if using pmem */
+    GRALLOC_USAGE_PRIVATE_SMI_HEAP        =       GRALLOC_USAGE_PRIVATE_2,
+    /* SYSTEM heap comes from kernel vmalloc,
+     * can never be uncached, is not secured*/
+    GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP     =       GRALLOC_USAGE_PRIVATE_3,
+    /* IOMMU heap comes from manually allocated pages,
+     * can be cached/uncached, is not secured */
+    GRALLOC_USAGE_PRIVATE_IOMMU_HEAP      =       0x01000000,
+    /* MM heap is a carveout heap for video, can be secured*/
+    GRALLOC_USAGE_PRIVATE_MM_HEAP         =       0x02000000,
+    /* WRITEBACK heap is a carveout heap for writeback, can be secured*/
+    GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP  =       0x04000000,
+    /* CAMERA heap is a carveout heap for camera, is not secured*/
+    GRALLOC_USAGE_PRIVATE_CAMERA_HEAP     =       0x08000000,
+
     /* Set this for allocating uncached memory (using O_DSYNC)
-     * cannot be used with the system heap */
-    GRALLOC_USAGE_PRIVATE_UNCACHED = 0x00010000,
-    /* This flag needs to be set when using a system heap
-     * from ION. If not set, the system heap is assumed
-     * to be coming from ashmem
+     * cannot be used with noncontiguous heaps */
+    GRALLOC_USAGE_PRIVATE_UNCACHED        =       0x00010000,
+
+    /* This flag needs to be set when using a non-contiguous heap from ION.
+     * If not set, the system heap is assumed to be coming from ashmem
      */
-    GRALLOC_USAGE_PRIVATE_ION = 0x00020000,
+    GRALLOC_USAGE_PRIVATE_ION             =       0x00020000,
 };
 
 enum {
