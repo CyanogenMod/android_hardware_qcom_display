@@ -164,6 +164,8 @@ int PmemKernelController::allocate(alloc_data& data, int usage,
 {
     int ret = 0;
     bool adspFallback = false;
+    if (!(usage & GRALLOC_USAGE_PRIVATE_SMI_HEAP))
+        adspFallback = true;
 
     // Try SMI first
     if ((usage & GRALLOC_USAGE_PRIVATE_SMI_HEAP) ||
@@ -179,8 +181,8 @@ int PmemKernelController::allocate(alloc_data& data, int usage,
             if(ret >= 0)
                 return ret;
             else {
-                adspFallback = true;
-                LOGW("Allocation from SMI failed, trying ADSP");
+                if(adspFallback)
+                    LOGW("Allocation from SMI failed, trying ADSP");
             }
         }
     }
