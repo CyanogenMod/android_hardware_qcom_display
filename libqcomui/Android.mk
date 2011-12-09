@@ -7,9 +7,10 @@ LOCAL_SRC_FILES := \
 LOCAL_SHARED_LIBRARIES := \
         libutils \
         libcutils \
-        libmemalloc
+        libmemalloc \
+        libui
 
-LOCAL_C_INCLUDES := $(TOP)/hardware/qcom/display/libgralloc
+LOCAL_C_INCLUDES := $(TOP)/hardware/qcom/display/libgralloc \
 LOCAL_CFLAGS := -DLOG_TAG=\"libQcomUI\"
 LOCAL_MODULE := libQcomUI
 LOCAL_MODULE_TAGS := optional

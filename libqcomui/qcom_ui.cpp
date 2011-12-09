@@ -108,6 +108,9 @@ int getNumberOfArgsForOperation(int operation) {
         case NATIVE_WINDOW_SET_BUFFERS_SIZE:
             num_args = 1;
             break;
+        case  NATIVE_WINDOW_UPDATE_BUFFERS_GEOMETRY:
+            num_args = 3;
+            break;
         default: LOGE("%s: invalid operation(0x%x)", __FUNCTION__, operation);
             break;
     };
@@ -169,6 +172,81 @@ int checkBuffer(native_handle_t *buffer_handle, int size, int usage)
     return 0;
 }
 
+/*
+ * Checks if memory needs to be reallocated for this buffer.
+ *
+ * @param: Geometry of the current buffer.
+ * @param: Required Geometry.
+ * @param: Geometry of the updated buffer.
+ *
+ * @return True if a memory reallocation is required.
+ */
+bool needNewBuffer(const qBufGeometry currentGeometry,
+                   const qBufGeometry requiredGeometry,
+                   const qBufGeometry updatedGeometry)
+{
+    // If the current buffer info matches the updated info,
+    // we do not require any memory allocation.
+    if (updatedGeometry.width && updatedGeometry.height &&
+        updatedGeometry.format) {
+        return false;
+    }
+    if (currentGeometry.width != requiredGeometry.width ||
+        currentGeometry.height != requiredGeometry.height ||
+        currentGeometry.format != requiredGeometry.format) {
+        // Current and required geometry do not match. Allocation
+        // required.
+        return true;
+    }
+    return false;
+}
 
+/*
+ * Update the geometry of this buffer without reallocation.
+ *
+ * @param: buffer whose geometry needs to be updated.
+ * @param: Updated width
+ * @param: Updated height
+ * @param: Updated format
+ */
+int updateBufferGeometry(sp<GraphicBuffer> buffer, const qBufGeometry updatedGeometry)
+{
+    if (buffer == 0) {
+        LOGE("%s: graphic buffer is NULL", __FUNCTION__);
+        return -EINVAL;
+    }
+
+    if (!updatedGeometry.width || !updatedGeometry.height ||
+        !updatedGeometry.format) {
+        // No update required. Return.
+        return 0;
+    }
+    if (buffer->width == updatedGeometry.width &&
+        buffer->height == updatedGeometry.height &&
+        buffer->format == updatedGeometry.format) {
+        // The buffer has already been updated. Return.
+        return 0;
+    }
+
+    // Validate the handle
+    if (private_handle_t::validate(buffer->handle)) {
+        LOGE("%s: handle is invalid", __FUNCTION__);
+        return -EINVAL;
+    }
+    buffer->width  = updatedGeometry.width;
+    buffer->height = updatedGeometry.height;
+    buffer->format = updatedGeometry.format;
+    private_handle_t *hnd = (private_handle_t*)(buffer->handle);
+    if (hnd) {
+        hnd->width  = updatedGeometry.width;
+        hnd->height = updatedGeometry.height;
+        hnd->format = updatedGeometry.format;
+    } else {
+        LOGE("%s: hnd is NULL", __FUNCTION__);
+        return -EINVAL;
+    }
+
+    return 0;
+}
 
 

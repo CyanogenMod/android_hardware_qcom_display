@@ -31,12 +31,31 @@
 #define INCLUDE_LIBQCOM_UI
 
 #include <cutils/native_handle.h>
+#include <ui/GraphicBuffer.h>
+
+using android::sp;
+using android::GraphicBuffer;
 
 /*
  * Qcom specific Native Window perform operations
  */
 enum {
-    NATIVE_WINDOW_SET_BUFFERS_SIZE = 0x10000000,
+    NATIVE_WINDOW_SET_BUFFERS_SIZE        = 0x10000000,
+    NATIVE_WINDOW_UPDATE_BUFFERS_GEOMETRY = 0x20000000,
+};
+
+/*
+ * Structure to hold the buffer geometry
+ */
+struct qBufGeometry {
+    int width;
+    int height;
+    int format;
+    void set(int w, int h, int f) {
+       width = w;
+       height = h;
+       format = f;
+    }
 };
 
 /*
@@ -69,4 +88,25 @@ bool isGPUSupportedFormat(int format);
  * @return -EINVAL if the operation is invalid.
  */
 int getNumberOfArgsForOperation(int operation);
+
+/*
+ * Checks if memory needs to be reallocated for this buffer.
+ *
+ * @param: Geometry of the current buffer.
+ * @param: Required Geometry.
+ * @param: Geometry of the updated buffer.
+ *
+ * @return True if a memory reallocation is required.
+ */
+bool needNewBuffer(const qBufGeometry currentGeometry,
+                            const qBufGeometry requiredGeometry,
+                            const qBufGeometry updatedGeometry);
+
+/*
+ * Update the geometry of this buffer without reallocation.
+ *
+ * @param: buffer whose geometry needs to be updated.
+ * @param: Updated buffer geometry
+ */
+int updateBufferGeometry(sp<GraphicBuffer> buffer, const qBufGeometry bufGeometry);
 #endif // INCLUDE_LIBQCOM_UI
