@@ -38,6 +38,7 @@
 #include <ui/android_native_buffer.h>
 #include <gralloc_priv.h>
 #include <genlock.h>
+#include <qcom_ui.h>
 
 /*****************************************************************************/
 #define ALIGN(x, align) (((x) + ((align)-1)) & ~((align)-1))
@@ -57,12 +58,6 @@ enum HWCCompositionType {
     HWC_USE_GPU = HWC_FRAMEBUFFER, // This layer is to be handled by Surfaceflinger
     HWC_USE_OVERLAY = HWC_OVERLAY, // This layer is to be handled by the overlay
     HWC_USE_COPYBIT                // This layer is to be handled by copybit
-};
-
-enum HWCPrivateFlags {
-    HWC_USE_ORIGINAL_RESOLUTION = HWC_FLAGS_PRIVATE_0, // This layer is to be drawn using overlays
-    HWC_DO_NOT_USE_OVERLAY      = HWC_FLAGS_PRIVATE_1, // Do not use overlays to draw this layer
-    HWC_COMP_BYPASS             = HWC_FLAGS_PRIVATE_3, // Layer "might" use or have used bypass
 };
 
 enum HWCLayerType{

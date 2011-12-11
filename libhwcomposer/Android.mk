@@ -18,6 +18,7 @@ LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
 LOCAL_C_INCLUDES += hardware/qcom/display/liboverlay
 LOCAL_C_INCLUDES += hardware/qcom/display/libcopybit
 LOCAL_C_INCLUDES += hardware/qcom/display/libgenlock
+LOCAL_C_INCLUDES += hardware/qcom/display/libqcomui
 LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
