@@ -45,6 +45,30 @@ enum {
 };
 
 /*
+ * Layer Attributes
+ */
+enum eLayerAttrib {
+    LAYER_UPDATE_STATUS,
+};
+
+/*
+ * Layer Flags
+ */
+enum {
+    LAYER_UPDATING = 1<<0,
+};
+
+/*
+ * Flags set by the layer and sent to HWC
+ */
+enum {
+    HWC_LAYER_NOT_UPDATING      = 0x00000002,
+    HWC_USE_ORIGINAL_RESOLUTION = 0x10000000,
+    HWC_DO_NOT_USE_OVERLAY      = 0x20000000,
+    HWC_COMP_BYPASS             = 0x40000000,
+};
+
+/*
  * Structure to hold the buffer geometry
  */
 struct qBufGeometry {
@@ -109,4 +133,26 @@ bool needNewBuffer(const qBufGeometry currentGeometry,
  * @param: Updated buffer geometry
  */
 int updateBufferGeometry(sp<GraphicBuffer> buffer, const qBufGeometry bufGeometry);
+
+/*
+ * Updates the flags for the layer
+ *
+ * @param: Attribute
+ * @param: Identifies if the attribute was enabled or disabled.
+ * @param: current Layer flags.
+ *
+ * @return: Flags for the layer
+ */
+int updateLayerQcomFlags(eLayerAttrib attribute, bool enable, int& currentFlags);
+
+/*
+ * Gets the per frame HWC flags for this layer.
+ *
+ * @param: current hwcl flags
+ * @param: current layerFlags
+ *
+ * @return: the per frame flags.
+ */
+int getPerFrameFlags(int hwclFlags, int layerFlags);
+
 #endif // INCLUDE_LIBQCOM_UI

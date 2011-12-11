@@ -249,4 +249,45 @@ int updateBufferGeometry(sp<GraphicBuffer> buffer, const qBufGeometry updatedGeo
     return 0;
 }
 
+/*
+ * Updates the flags for the layer
+ *
+ * @param: Attribute
+ * @param: Identifies if the attribute was enabled or disabled.
+ *
+ * @return: -EINVAL if the attribute is invalid
+ */
+int updateLayerQcomFlags(eLayerAttrib attribute, bool enable, int& currentFlags)
+{
+    int ret = 0;
+    switch (attribute) {
+        case LAYER_UPDATE_STATUS: {
+            if (enable)
+                currentFlags |= LAYER_UPDATING;
+            else
+                currentFlags &= ~LAYER_UPDATING;
+        } break;
+        default: LOGE("%s: invalid attribute(0x%x)", __FUNCTION__, attribute);
+                 break;
+    }
+    return ret;
+}
+
+/*
+ * Gets the per frame HWC flags for this layer.
+ *
+ * @param: current hwcl flags
+ * @param: current layerFlags
+ *
+ * @return: the per frame flags.
+ */
+int getPerFrameFlags(int hwclFlags, int layerFlags) {
+    int flags = hwclFlags;
+    if (layerFlags & LAYER_UPDATING)
+        flags &= ~HWC_LAYER_NOT_UPDATING;
+    else
+        flags |= HWC_LAYER_NOT_UPDATING;
+
+    return flags;
+}
 
