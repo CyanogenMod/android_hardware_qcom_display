@@ -144,6 +144,7 @@ bool enableBarrier(unsigned int orientation);
 unsigned int  getOverlayConfig (unsigned int format3D, bool poll = true,
                                 bool isHDMI = false);
 int getColorFormat(int format);
+bool isInterlacedContent(int format);
 int get_mdp_format(int format);
 int get_size(int format, int w, int h);
 int get_rot_output_format(int format);

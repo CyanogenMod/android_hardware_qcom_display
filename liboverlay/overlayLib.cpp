@@ -256,8 +256,21 @@ bool overlay::enableBarrier (unsigned int orientation) {
 
 int overlay::getColorFormat(int format)
 {
-    return (format == HAL_PIXEL_FORMAT_YV12) ?
-            format : COLOR_FORMAT(format);
+    if (format == HAL_PIXEL_FORMAT_YV12)
+        return format;
+    else if (format & INTERLACE_MASK)
+        return format ^ HAL_PIXEL_FORMAT_INTERLACE;
+    else
+        return COLOR_FORMAT(format);
+}
+
+bool overlay::isInterlacedContent(int format)
+{
+    if ((format != HAL_PIXEL_FORMAT_YV12) &&
+        (format & INTERLACE_MASK))
+        return true;
+
+    return false;
 }
 
 unsigned int overlay::getOverlayConfig (unsigned int format3D, bool poll,
@@ -970,8 +983,8 @@ bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& inf
         mOVInfo.z_order = zorder;
         mOVInfo.alpha = 0xff;
         mOVInfo.transp_mask = 0xffffffff;
-        mOVInfo.flags = flags;
     }
+    mOVInfo.flags = flags;
     if (!ignoreFB)
         mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
     else
@@ -1051,7 +1064,9 @@ bool OverlayControlChannel::updateOverlaySource(const overlay_buffer_info& info,
     ovBufInfo.height = info.height;
     ovBufInfo.format = hw_format;
 
-    if (!setOverlayInformation(ovBufInfo, 0, orientation, 0, waitForVsync, UPDATE_REQUEST))
+    int flags = isInterlacedContent(info.format) ? MDP_DEINTERLACE : 0;
+    if (!setOverlayInformation(ovBufInfo, flags, orientation, 0, waitForVsync,
+                               UPDATE_REQUEST))
         return false;
 
     return startOVRotatorSessions(ovBufInfo, orientation, UPDATE_REQUEST);
@@ -1072,7 +1087,7 @@ bool OverlayControlChannel::startControlChannel(int w, int h,
     int colorFormat = format;
     // The interlace mask is part of the HAL_PIXEL_FORMAT_YV12 value. Add
     // an explicit check for the format
-    if ((format != HAL_PIXEL_FORMAT_YV12) && (format & INTERLACE_MASK)) {
+    if (isInterlacedContent(format)) {
         flags |= MDP_DEINTERLACE;
 
         // Get the actual format
