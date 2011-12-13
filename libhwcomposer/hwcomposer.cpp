@@ -237,10 +237,19 @@ void unlockPreviousBypassBuffers(hwc_context_t* ctx) {
     for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
         if (ctx->previousBypassHandle[i]) {
             private_handle_t *hnd = (private_handle_t*) ctx->previousBypassHandle[i];
-            if (GENLOCK_FAILURE == genlock_unlock_buffer(ctx->previousBypassHandle[i])) {
-                LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
-            } else {
-                ctx->previousBypassHandle[i] = NULL;
+            // Validate the handle to make sure it hasn't been deallocated.
+            if (private_handle_t::validate(ctx->previousBypassHandle[i])) {
+                continue;
+            }
+            // Check if the handle was locked previously
+            if (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags) {
+                if (GENLOCK_FAILURE == genlock_unlock_buffer(ctx->previousBypassHandle[i])) {
+                    LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
+                } else {
+                    ctx->previousBypassHandle[i] = NULL;
+                    // Reset the lock flag
+                    hnd->flags &= ~private_handle_t::PRIV_FLAGS_HWC_LOCK;
+                }
             }
         }
     }
@@ -330,11 +339,18 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const bool wai
 void unlockPreviousOverlayBuffer(hwc_context_t* ctx)
 {
     if (ctx->previousOverlayHandle) {
-        // Unlock any previously locked buffers
-        if (GENLOCK_NO_ERROR == genlock_unlock_buffer(ctx->previousOverlayHandle)) {
-            ctx->previousOverlayHandle = NULL;
-        } else {
-            LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
+        // Validate the handle before attempting to use it.
+        if (!private_handle_t::validate(ctx->previousOverlayHandle)) {
+            private_handle_t *hnd = (private_handle_t*)ctx->previousOverlayHandle;
+            // Unlock any previously locked buffers
+            if (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags) {
+                if (GENLOCK_NO_ERROR == genlock_unlock_buffer(ctx->previousOverlayHandle)) {
+                    ctx->previousOverlayHandle = NULL;
+                    hnd->flags &= ~private_handle_t::PRIV_FLAGS_HWC_LOCK;
+                } else {
+                    LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
+                }
+            }
         }
     }
 }
@@ -491,6 +507,7 @@ static int drawLayerUsingBypass(hwc_context_t *ctx, hwc_layer_t *layer,
         overlay::OverlayUI *ovUI = ctx->mOvUI[index];
         int ret = 0;
         private_handle_t *hnd = (private_handle_t *)layer->handle;
+        ctx->bypassBufferLockState[index] = BYPASS_BUFFER_UNLOCKED;
         if (GENLOCK_FAILURE == genlock_lock_buffer(hnd, GENLOCK_READ_LOCK,
                                                    GENLOCK_MAX_TIMEOUT)) {
             LOGE("%s: genlock_lock_buffer(READ) failed", __FUNCTION__);
@@ -644,9 +661,10 @@ void storeLockedBypassHandle(hwc_layer_list_t* list, hwc_context_t* ctx) {
         // Store the current bypass handle.
         if (list->hwLayers[index].flags == HWC_COMP_BYPASS) {
             private_handle_t *hnd = (private_handle_t*)list->hwLayers[index].handle;
-            if (ctx->bypassBufferLockState[index] == BYPASS_BUFFER_LOCKED)
+            if (ctx->bypassBufferLockState[index] == BYPASS_BUFFER_LOCKED) {
                 ctx->previousBypassHandle[index] = (native_handle_t*)list->hwLayers[index].handle;
-            else
+                hnd->flags |= private_handle_t::PRIV_FLAGS_HWC_LOCK;
+            } else
                 ctx->previousBypassHandle[index] = NULL;
         }
     }
@@ -1093,6 +1111,7 @@ static int drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
             // Store the current buffer handle as the one that is to be unlocked after
             // the next overlay play call.
             ctx->previousOverlayHandle = hnd;
+            hnd->flags |= private_handle_t::PRIV_FLAGS_HWC_LOCK;
         }
 
         return ret;

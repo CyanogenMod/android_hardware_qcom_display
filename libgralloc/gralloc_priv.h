@@ -285,6 +285,7 @@ struct private_handle_t {
         PRIV_FLAGS_DO_NOT_FLUSH   = 0x00000040,
         PRIV_FLAGS_SW_LOCK        = 0x00000080,
         PRIV_FLAGS_NONCONTIGUOUS_MEM = 0x00000100,
+        PRIV_FLAGS_HWC_LOCK       = 0x00000200, // Set by HWC when storing the handle
     };
 
     // file-descriptors
