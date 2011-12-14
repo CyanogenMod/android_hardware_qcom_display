@@ -996,6 +996,11 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
     src.format = hnd->format;
     src.base = (void *)hnd->base;
     src.handle = (native_handle_t *)layer->handle;
+    src.horiz_padding = src.w - hnd->width;
+    // Initialize vertical padding to zero for now,
+    // this needs to change to accomodate vertical stride
+    // if needed in the future
+    src.vert_padding = 0;
 
     // Copybit source rect
     hwc_rect_t sourceCrop = layer->sourceCrop;
