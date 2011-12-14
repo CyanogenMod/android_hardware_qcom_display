@@ -32,6 +32,7 @@
 
 #include <cutils/native_handle.h>
 #include <ui/GraphicBuffer.h>
+#include <hardware/hwcomposer.h>
 
 using android::sp;
 using android::GraphicBuffer;
@@ -66,6 +67,12 @@ enum {
     HWC_USE_ORIGINAL_RESOLUTION = 0x10000000,
     HWC_DO_NOT_USE_OVERLAY      = 0x20000000,
     HWC_COMP_BYPASS             = 0x40000000,
+};
+
+enum HWCCompositionType {
+    HWC_USE_GPU = HWC_FRAMEBUFFER, // This layer is to be handled by Surfaceflinger
+    HWC_USE_OVERLAY = HWC_OVERLAY, // This layer is to be handled by the overlay
+    HWC_USE_COPYBIT                // This layer is to be handled by copybit
 };
 
 /*
@@ -154,5 +161,14 @@ int updateLayerQcomFlags(eLayerAttrib attribute, bool enable, int& currentFlags)
  * @return: the per frame flags.
  */
 int getPerFrameFlags(int hwclFlags, int layerFlags);
+
+/*
+ * Checks if FB is updated by this composition type
+ *
+ * @param: composition type
+ * @return: true if FB is updated, false if not
+ */
+
+bool isUpdatingFB(HWCCompositionType compositionType);
 
 #endif // INCLUDE_LIBQCOM_UI

@@ -291,3 +291,23 @@ int getPerFrameFlags(int hwclFlags, int layerFlags) {
     return flags;
 }
 
+
+/*
+ * Checks if FB is updated by this composition type
+ *
+ * @param: composition type
+ * @return: true if FB is updated, false if not
+ */
+
+bool isUpdatingFB(HWCCompositionType compositionType)
+{
+    switch(compositionType)
+    {
+        case HWC_USE_COPYBIT:
+            return true;
+        default:
+            LOGE("%s: invalid composition type(%d)", __FUNCTION__, compositionType);
+            return false;
+    };
+}
+
