@@ -54,12 +54,6 @@ enum {
     COMPOSITION_TYPE_DYN = 0x8
 };
 
-enum HWCCompositionType {
-    HWC_USE_GPU = HWC_FRAMEBUFFER, // This layer is to be handled by Surfaceflinger
-    HWC_USE_OVERLAY = HWC_OVERLAY, // This layer is to be handled by the overlay
-    HWC_USE_COPYBIT                // This layer is to be handled by copybit
-};
-
 enum HWCLayerType{
     HWC_SINGLE_VIDEO           = 0x1,
     HWC_ORIG_RESOLUTION        = 0x2,
