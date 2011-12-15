@@ -303,7 +303,7 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const bool wai
             return -1;
         }
 
-        if (layer->flags == HWC_USE_ORIGINAL_RESOLUTION) {
+        if (layer->flags & HWC_USE_ORIGINAL_RESOLUTION) {
             framebuffer_device_t* fbDev = hwcModule->fbDevice;
             ret = ovLibObject->setPosition(0, 0,
                                            fbDev->width, fbDev->height);
@@ -619,7 +619,7 @@ bool setupBypass(hwc_context_t* ctx, hwc_layer_list_t* list) {
 
 void setBypassLayerFlags(hwc_context_t* ctx, hwc_layer_list_t* list) {
     for (int index = 0 ; index < list->numHwLayers; index++) {
-        list->hwLayers[index].flags = HWC_COMP_BYPASS;
+        list->hwLayers[index].flags |= HWC_COMP_BYPASS;
         list->hwLayers[index].compositionType = HWC_USE_OVERLAY;
         #ifdef DEBUG
             LOGE("%s: layer = %d", __FUNCTION__, index);
@@ -629,7 +629,7 @@ void setBypassLayerFlags(hwc_context_t* ctx, hwc_layer_list_t* list) {
 
 void unsetBypassLayerFlags(hwc_layer_list_t* list) {
     for (int index = 0 ; index < list->numHwLayers; index++) {
-        if(list->hwLayers[index].flags == HWC_COMP_BYPASS) {
+        if(list->hwLayers[index].flags & HWC_COMP_BYPASS) {
             list->hwLayers[index].flags = 0;
         }
     }
@@ -644,7 +644,7 @@ void unsetBypassBufferLockState(hwc_context_t* ctx) {
 void storeLockedBypassHandle(hwc_layer_list_t* list, hwc_context_t* ctx) {
     for (int index = 0 ; index < list->numHwLayers; index++) {
         // Store the current bypass handle.
-        if (list->hwLayers[index].flags == HWC_COMP_BYPASS) {
+        if (list->hwLayers[index].flags & HWC_COMP_BYPASS) {
             private_handle_t *hnd = (private_handle_t*)list->hwLayers[index].handle;
             if (ctx->bypassBufferLockState[index] == BYPASS_BUFFER_LOCKED) {
                 ctx->previousBypassHandle[index] = (native_handle_t*)list->hwLayers[index].handle;
@@ -901,7 +901,7 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 }
             } else if (isS3DCompositionNeeded) {
                 markUILayerForS3DComposition(list->hwLayers[i], s3dVideoFormat);
-            } else if (list->hwLayers[i].flags == HWC_USE_ORIGINAL_RESOLUTION) {
+            } else if (list->hwLayers[i].flags & HWC_USE_ORIGINAL_RESOLUTION) {
                 list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
                 list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
                 layerType |= HWC_ORIG_RESOLUTION;
@@ -1154,10 +1154,10 @@ static int hwc_set(hwc_composer_device_t *dev,
 
     int ret = 0;
     for (size_t i=0; i<list->numHwLayers; i++) {
-        if (list->hwLayers[i].flags == HWC_SKIP_LAYER) {
+        if (list->hwLayers[i].flags & HWC_SKIP_LAYER) {
             continue;
 #ifdef COMPOSITION_BYPASS
-        } else if (list->hwLayers[i].flags == HWC_COMP_BYPASS) {
+        } else if (list->hwLayers[i].flags & HWC_COMP_BYPASS) {
             drawLayerUsingBypass(ctx, &(list->hwLayers[i]), i);
 #endif
         } else if (list->hwLayers[i].compositionType == HWC_USE_OVERLAY) {
