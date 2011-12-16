@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,6 +58,7 @@
 #define NUM_CHANNELS 2
 #define FRAMEBUFFER_0 0
 #define FRAMEBUFFER_1 1
+#define FRAMEBUFFER_2 2
 #define NUM_SHARPNESS_VALS 256
 #define SHARPNESS_RANGE 1.0f
 #define HUE_RANGE 180
@@ -385,7 +386,8 @@ public:
 class Overlay {
 
     bool mChannelUP;
-    bool mHDMIConnected;
+    ////stores the connected external display
+    int mHDMIConnected;
     unsigned int mS3DFormat;
     //Actual cropped source width and height of overlay
     int mCroppedSrcWidth;
@@ -419,7 +421,7 @@ public:
     int getFBHeight(int channel = 0) const;
     bool getOrientation(int& orientation, int channel = 0) const;
     bool queueBuffer(buffer_handle_t buffer);
-    bool setSource(const overlay_buffer_info& info, int orientation, bool hdmiConnected,
+    bool setSource(const overlay_buffer_info& info, int orientation, int hdmiConnected,
                     bool ignoreFB = false, int numBuffers = 2);
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
     bool updateWaitForVsyncFlags(bool waitForVsync);

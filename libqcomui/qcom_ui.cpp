@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -407,6 +407,39 @@ int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur)
             dst += stride;
         } while(--h);
     }
-
     return 0;
+}
+
+/*
+ * Handles the externalDisplay event
+ * HDMI has highest priority compared to WifiDisplay
+ * Based on the current and the new display event, decides the
+ * external display to be enabled
+ *
+ * @param: newEvent - new external event
+ * @param: currEvent - currently enabled external event
+ * @return: external display to be enabled
+ *
+ */
+external_display handleEventHDMI(external_display newState, external_display
+                                                                   currState)
+{
+    external_display retState = currState;
+    switch(newState) {
+        case EXT_DISPLAY_HDMI:
+            retState = EXT_DISPLAY_HDMI;
+            break;
+        case EXT_DISPLAY_WIFI:
+            if(currState != EXT_DISPLAY_HDMI) {
+                retState = EXT_DISPLAY_WIFI;
+            }
+            break;
+        case EXT_DISPLAY_OFF:
+            retState = EXT_DISPLAY_OFF;
+            break;
+        default:
+            LOGE("handleEventHDMI: unknown Event");
+            break;
+    }
+    return retState;
 }

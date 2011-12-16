@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -211,6 +211,7 @@ int ZOrderManager::getZ(int fbnum){
             }
             break;
         case FRAMEBUFFER_1:
+        case FRAMEBUFFER_2:
             for (int i = 0;i < mMaxPipes; i++) {
                 if(mFB1Pipes[i] == false) {
                     mFB1Pipes[i]= true;
@@ -238,6 +239,7 @@ void ZOrderManager::decZ(int fbnum, int zorder){
            mFB0Pipes[zorder] = false;
            break;
        case FRAMEBUFFER_1:
+       case FRAMEBUFFER_2:
            LOG_ASSERT(!mFB1Pipes[zorder],"channel with ZOrder does not exist");
            LOGE("decZ: freeing the pipe with zorder = %d for fbdev = %d", zorder, fbnum);
            mFB1Pipes[zorder] = false;
@@ -634,7 +636,7 @@ int Overlay::getS3DFormat(int format) {
 }
 
 bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
-                        bool hdmiConnected, bool waitForVsync, int num_buffers) {
+                        int hdmiConnected, bool waitForVsync, int num_buffers) {
     // Separate the color format from the 3D format.
     // If there is 3D content; the effective format passed by the client is:
     // effectiveFormat = 3D_IN | 3D_OUT | ColorFormat
@@ -659,6 +661,7 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
         // We always enable the rotator for the primary.
         bool noRot = false;
         bool uiChannel = false;
+        int fbnum = 0;
         switch(mState) {
             case OV_2D_VIDEO_ON_PANEL:
             case OV_3D_VIDEO_2D_PANEL:
@@ -682,12 +685,16 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
             case OV_2D_VIDEO_ON_TV:
             case OV_3D_VIDEO_2D_TV:
                 for (int i=0; i<NUM_CHANNELS; i++) {
-                    if (FRAMEBUFFER_1 == i) {
-                        // Disable rotation for HDMI
+                    fbnum = i;
+                    //start two channels for one for primary and external.
+                    if (fbnum) {
+                        // Disable rotation for external
                         noRot = true;
                         waitForVsync = false;
+                        //set fbnum to hdmiConnected, which holds the ext display
+                        fbnum = hdmiConnected;
                     }
-                    if(!startChannel(info, i, noRot, false, mS3DFormat,
+                    if(!startChannel(info, fbnum, noRot, false, mS3DFormat,
                                 i, waitForVsync, num_buffers)) {
                         LOGE("%s:failed to open channel %d", __FUNCTION__, i);
                         return false;
@@ -1091,7 +1098,6 @@ bool OverlayControlChannel::openDevices(int fbnum) {
                        "/dev/graphics/fb%u";
     char dev_name[64];
     snprintf(dev_name, 64, device_template, fbnum);
-
     mFD = open(dev_name, O_RDWR, 0);
     if (mFD < 0) {
         reportError("Cant open framebuffer ");

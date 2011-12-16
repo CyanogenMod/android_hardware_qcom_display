@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -276,7 +276,7 @@ struct private_module_t {
     int orientation;
     bool videoOverlay;
     uint32_t currentOffset;
-    bool enableHDMIOutput;
+    int enableHDMIOutput; // holds the type of external display
     bool trueMirrorSupport;
     bool exitHDMIUILoop;
     float actionsafeWidthRatio;
