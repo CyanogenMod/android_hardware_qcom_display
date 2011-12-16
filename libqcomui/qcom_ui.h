@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -85,6 +85,12 @@ enum HWCCompositionType {
     HWC_USE_GPU = HWC_FRAMEBUFFER, // This layer is to be handled by Surfaceflinger
     HWC_USE_OVERLAY = HWC_OVERLAY, // This layer is to be handled by the overlay
     HWC_USE_COPYBIT                // This layer is to be handled by copybit
+};
+
+enum external_display {
+    EXT_DISPLAY_OFF,
+    EXT_DISPLAY_HDMI,
+    EXT_DISPLAY_WIFI
 };
 
 /*
@@ -200,4 +206,18 @@ int getCompositionType();
  * @return 0 on success
  */
 int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur);
+
+/*
+ * Handles the externalDisplay event
+ * HDMI has highest priority compared to WifiDisplay
+ * Based on the current and the new display event, decides the
+ * external display to be enabled
+ *
+ * @param: newEvent - new external event
+ * @param: currEvent - currently enabled external event
+ * @return: external display to be enabled
+ *
+ */
+external_display handleEventHDMI(external_display newEvent, external_display
+                                                                   currEvent);
 #endif // INCLUDE_LIBQCOM_UI

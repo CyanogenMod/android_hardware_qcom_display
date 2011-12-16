@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2011 Code Aurora Forum. All rights reserved.
+* Copyright (c) 2010-2012 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -442,8 +442,9 @@ static void *hdmi_ui_loop(void *ptr)
 
                    if (m->trueMirrorSupport)
                        waitForVsync = false;
-
-                   if (pTemp->startChannel(info, FRAMEBUFFER_1,
+                   // start the overlay Channel for mirroring
+                   // m->enableHDMIOutput corresponds to the fbnum
+                   if (pTemp->startChannel(info, m->enableHDMIOutput,
                                            false, true, 0, VG0_PIPE, waitForVsync)) {
                         pTemp->setFd(m->framebuffer->fd);
                         pTemp->setCrop(0, 0, m->info.xres, m->info.yres);
@@ -587,21 +588,22 @@ static int fb_videoOverlayStarted(struct framebuffer_device_t* dev, int started)
     return 0;
 }
 
-static int fb_enableHDMIOutput(struct framebuffer_device_t* dev, int enable)
+static int fb_enableHDMIOutput(struct framebuffer_device_t* dev, int externaltype)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(
             dev->common.module);
     pthread_mutex_lock(&m->overlayLock);
     Overlay* pTemp = m->pobjOverlay;
-    m->enableHDMIOutput = enable;
-    if(enable) {
+    m->enableHDMIOutput = externaltype;
+    LOGE("In fb_enableHDMIOutput: externaltype = %d", m->enableHDMIOutput);
+    if(externaltype) {
         if (m->trueMirrorSupport) {
             m->hdmiMirroringState = HDMI_UI_MIRRORING;
         } else {
             if(!m->videoOverlay)
                 m->hdmiMirroringState = HDMI_UI_MIRRORING;
         }
-    } else if (!enable && pTemp) {
+    } else if (!externaltype && pTemp) {
         m->hdmiMirroringState = HDMI_NO_MIRRORING;
         closeHDMIChannel(m);
     }

@@ -89,7 +89,7 @@ struct hwc_context_t {
     BypassState bypassState;
 #endif
 #if defined HDMI_DUAL_DISPLAY
-    bool mHDMIEnabled;
+    external_display mHDMIEnabled; // Type of external display
     bool pendingHDMI;
 #endif
     int previousLayerCount;
@@ -280,8 +280,13 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const bool wai
         info.format = hnd->format;
         info.size = hnd->size;
 
+        int hdmiConnected = 0;
+
+#if defined HDMI_DUAL_DISPLAY
+        hdmiConnected = (int)ctx->mHDMIEnabled;
+#endif
         ret = ovLibObject->setSource(info, layer->transform,
-                            (ovLibObject->getHDMIStatus()?true:false), waitForVsync);
+                            hdmiConnected, waitForVsync);
         if (!ret) {
             LOGE("prepareOverlay setSource failed");
             return -1;
@@ -667,20 +672,20 @@ void storeLockedBypassHandle(hwc_layer_list_t* list, hwc_context_t* ctx) {
 #endif  //COMPOSITION_BYPASS
 
 
-static void handleHDMIStateChange(hwc_composer_device_t *dev) {
+static void handleHDMIStateChange(hwc_composer_device_t *dev, int externaltype) {
 #if defined HDMI_DUAL_DISPLAY
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
                                                            dev->common.module);
     framebuffer_device_t *fbDev = hwcModule->fbDevice;
     if (fbDev) {
-        fbDev->enableHDMIOutput(fbDev, ctx->mHDMIEnabled);
+        fbDev->enableHDMIOutput(fbDev, externaltype);
     }
 
     if(ctx && ctx->mOverlayLibObject) {
         overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
-        ovLibObject->setHDMIStatus(ctx->mHDMIEnabled);
-        if (!(ctx->mHDMIEnabled)) {
+        ovLibObject->setHDMIStatus(externaltype);
+        if (!externaltype) {
             // Close the overlay channels if HDMI is disconnected
             ovLibObject->closeChannel();
         }
@@ -689,15 +694,29 @@ static void handleHDMIStateChange(hwc_composer_device_t *dev) {
 }
 
 
-/* Just mark flags and do stuff after eglSwapBuffers */
-static void hwc_enableHDMIOutput(hwc_composer_device_t *dev, bool enable) {
+/*
+ * function to set the status of external display in hwc
+ * Just mark flags and do stuff after eglSwapBuffers
+ * externaltype - can be HDMI, WIFI or OFF
+ */
+static void hwc_enableHDMIOutput(hwc_composer_device_t *dev, int externaltype) {
 #if defined HDMI_DUAL_DISPLAY
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    ctx->mHDMIEnabled = enable;
-    if(enable) { //On connect, allow bypass to draw once to FB
+    private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
+                                                           dev->common.module);
+    framebuffer_device_t *fbDev = hwcModule->fbDevice;
+    overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
+    if(externaltype && (externaltype != ctx->mHDMIEnabled)) {
+        // Close the current external display - as the SF will
+        // prioritize and send the correct external display
+        handleHDMIStateChange(dev, 0);
+    }
+    // Store the external display
+    ctx->mHDMIEnabled = (external_display)externaltype;
+    if(ctx->mHDMIEnabled) { //On connect, allow bypass to draw once to FB
         ctx->pendingHDMI = true;
     } else { //On disconnect, close immediately (there will be no bypass)
-        handleHDMIStateChange(dev);
+        handleHDMIStateChange(dev, ctx->mHDMIEnabled);
     }
 #endif
 }
@@ -1204,7 +1223,7 @@ static int hwc_set(hwc_composer_device_t *dev,
 #endif
 #if defined HDMI_DUAL_DISPLAY
     if(ctx->pendingHDMI) {
-        handleHDMIStateChange(dev);
+        handleHDMIStateChange(dev, ctx->mHDMIEnabled);
         ctx->pendingHDMI = false;
     }
 #endif
@@ -1331,7 +1350,7 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
 #endif
 
 #if defined HDMI_DUAL_DISPLAY
-        dev->mHDMIEnabled = false;
+        dev->mHDMIEnabled = EXT_DISPLAY_OFF;
         dev->pendingHDMI = false;
 #endif
         dev->previousOverlayHandle = NULL;
