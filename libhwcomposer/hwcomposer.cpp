@@ -45,15 +45,6 @@
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 
-// Enum containing the supported composition types
-enum {
-    COMPOSITION_TYPE_GPU = 0,
-    COMPOSITION_TYPE_MDP = 0x1,
-    COMPOSITION_TYPE_C2D = 0x2,
-    COMPOSITION_TYPE_CPU = 0x4,
-    COMPOSITION_TYPE_DYN = 0x8
-};
-
 enum HWCLayerType{
     HWC_SINGLE_VIDEO           = 0x1,
     HWC_ORIG_RESOLUTION        = 0x2,
