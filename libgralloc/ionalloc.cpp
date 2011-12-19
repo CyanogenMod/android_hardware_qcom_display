@@ -139,10 +139,9 @@ int IonAlloc::alloc_buffer(alloc_data& data)
         close(ionSyncFd);
     ionSyncFd = FD_INIT;
 
-    // Not doing memset for ION, uncomment if needed
-    // memset(base, 0, ionAllocData.len);
+    memset(base, 0, ionAllocData.len);
     // Clean cache after memset
-    // clean_buffer(base, data.size, data.offset, fd_data.fd);
+    clean_buffer(base, data.size, data.offset, fd_data.fd);
     data.base = base;
     data.fd = fd_data.fd;
     ioctl(mIonFd, ION_IOC_FREE, &handle_data);

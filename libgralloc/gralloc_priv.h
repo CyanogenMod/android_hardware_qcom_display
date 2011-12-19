@@ -53,6 +53,13 @@ enum {
 };
 
 enum {
+    /* Gralloc perform enums
+    */
+    GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER = 0x080000001,
+};
+
+
+enum {
     GPU_COMPOSITION,
     C2D_COMPOSITION,
     MDP_COMPOSITION,
@@ -155,14 +162,7 @@ private:
 
 enum {
     /* OEM specific HAL formats */
-    //HAL_PIXEL_FORMAT_YCbCr_422_SP = 0x100, // defined in hardware.h
-    //HAL_PIXEL_FORMAT_YCrCb_420_SP = 0x101, // defined in hardware.h
-    HAL_PIXEL_FORMAT_YCbCr_422_P  = 0x102,
-    HAL_PIXEL_FORMAT_YCbCr_420_P  = 0x103,
-    //HAL_PIXEL_FORMAT_YCbCr_422_I  = 0x104, // defined in hardware.h
-    HAL_PIXEL_FORMAT_YCbCr_420_I  = 0x105,
-    HAL_PIXEL_FORMAT_CbYCrY_422_I = 0x106,
-    HAL_PIXEL_FORMAT_CbYCrY_420_I = 0x107,
+    HAL_PIXEL_FORMAT_NV12_ENCODEABLE  = 0x102,
     HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED     = 0x108,
     HAL_PIXEL_FORMAT_YCbCr_420_SP           = 0x109,
     HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO    = 0x10A,
@@ -260,6 +260,11 @@ struct private_module_t {
     pthread_mutex_t overlayLock;
     pthread_cond_t overlayPost;
 #endif
+#ifdef COMPOSITION_BYPASS
+    pthread_mutex_t bufferPostLock;
+    pthread_cond_t bufferPostCond;
+    bool bufferPostDone;
+#endif
 };
 
 /*****************************************************************************/
@@ -278,16 +283,14 @@ struct private_handle_t {
         PRIV_FLAGS_USES_ASHMEM    = 0x00000010,
         PRIV_FLAGS_NEEDS_FLUSH    = 0x00000020,
         PRIV_FLAGS_DO_NOT_FLUSH   = 0x00000040,
-    };
-
-    enum {
-        LOCK_STATE_WRITE     =   1<<31,
-        LOCK_STATE_MAPPED    =   1<<30,
-        LOCK_STATE_READ_MASK =   0x3FFFFFFF
+        PRIV_FLAGS_SW_LOCK        = 0x00000080,
+        PRIV_FLAGS_NONCONTIGUOUS_MEM = 0x00000100,
+        PRIV_FLAGS_HWC_LOCK       = 0x00000200, // Set by HWC when storing the handle
     };
 
     // file-descriptors
     int     fd;
+    int     genlockHandle; // genlock handle to be dup'd by the binder
     // ints
     int     magic;
     int     flags;
@@ -297,23 +300,22 @@ struct private_handle_t {
 
     // FIXME: the attributes below should be out-of-line
     int     base;
-    int     lockState;
-    int     writeOwner;
     int     gpuaddr; // The gpu address mapped into the mmu. If using ashmem, set to 0 They don't care
     int     pid;
     int     format;
     int     width;
     int     height;
+    int     genlockPrivFd; // local fd of the genlock device.
 
 #ifdef __cplusplus
-    static const int sNumInts = 13;
-    static const int sNumFds = 1;
+    static const int sNumInts = 12;
+    static const int sNumFds = 2;
     static const int sMagic = 'gmsm';
 
     private_handle_t(int fd, int size, int flags, int bufferType, int format, int width, int height) :
-        fd(fd), magic(sMagic), flags(flags), size(size), offset(0), bufferType(bufferType),
-        base(0), lockState(0), writeOwner(0), gpuaddr(0), pid(getpid()), format(format), width(width),
-        height(height)
+        fd(fd), genlockHandle(-1), magic(sMagic), flags(flags), size(size), offset(0),
+        bufferType(bufferType), base(0), gpuaddr(0), pid(getpid()), format(format),
+        width(width), height(height), genlockPrivFd(-1)
     {
         version = sizeof(native_handle);
         numInts = sNumInts;
