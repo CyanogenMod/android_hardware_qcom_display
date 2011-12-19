@@ -21,7 +21,8 @@ include $(CLEAR_VARS)
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_SHARED_LIBRARIES := liblog libcutils libGLESv1_CM libutils libmemalloc
-
+LOCAL_SHARED_LIBRARIES += libgenlock
+LOCAL_C_INCLUDES += hardware/qcom/display/libgenlock
 LOCAL_SRC_FILES :=  framebuffer.cpp \
                     gpu.cpp         \
                     gralloc.cpp     \
@@ -41,8 +42,8 @@ ifeq ($(TARGET_HAVE_HDMI_OUT),true)
     LOCAL_SHARED_LIBRARIES += liboverlay
 endif
 
-ifeq ($(TARGET_USES_SF_BYPASS),true)
-    LOCAL_CFLAGS += -DSF_BYPASS
+ifeq ($(TARGET_HAVE_BYPASS),true)
+    LOCAL_CFLAGS += -DCOMPOSITION_BYPASS
 endif
 
 ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)

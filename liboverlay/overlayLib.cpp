@@ -256,8 +256,21 @@ bool overlay::enableBarrier (unsigned int orientation) {
 
 int overlay::getColorFormat(int format)
 {
-    return (format == HAL_PIXEL_FORMAT_YV12) ?
-            format : COLOR_FORMAT(format);
+    if (format == HAL_PIXEL_FORMAT_YV12)
+        return format;
+    else if (format & INTERLACE_MASK)
+        return format ^ HAL_PIXEL_FORMAT_INTERLACE;
+    else
+        return COLOR_FORMAT(format);
+}
+
+bool overlay::isInterlacedContent(int format)
+{
+    if ((format != HAL_PIXEL_FORMAT_YV12) &&
+        (format & INTERLACE_MASK))
+        return true;
+
+    return false;
 }
 
 unsigned int overlay::getOverlayConfig (unsigned int format3D, bool poll,
@@ -466,8 +479,8 @@ bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientati
     int orientHdmi = 0;
     int orientPrimary = sHDMIAsPrimary ? 0 : orientation;
     int orient[2] = {orientPrimary, orientHdmi};
-    // enable waitForVsync on HDMI
-    bool waitForHDMI = true;
+    // disable waitForVsync on HDMI, since we call the wait ioctl
+    bool waitForHDMI = false;
     bool waitForPrimary = sHDMIAsPrimary ? true : waitForVsync;
     bool waitCond[2] = {waitForPrimary, waitForHDMI};
 
@@ -582,7 +595,7 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                     if (FRAMEBUFFER_1 == i) {
                         // Disable rotation for HDMI
                         noRot = true;
-                        waitForVsync = true;
+                        waitForVsync = false;
                     }
                     if(!startChannel(info, i, noRot, false, mS3DFormat,
                                 i, waitForVsync, num_buffers)) {
@@ -715,6 +728,10 @@ bool Overlay::queueBuffer(uint32_t offset, int channel) {
     return objOvDataChannel[channel].queueBuffer(offset);
 }
 
+bool Overlay::waitForHdmiVsync(int channel) {
+    return objOvDataChannel[channel].waitForHdmiVsync();
+}
+
 bool Overlay::queueBuffer(buffer_handle_t buffer) {
     private_handle_t const* hnd = reinterpret_cast
                                    <private_handle_t const*>(buffer);
@@ -737,11 +754,16 @@ bool Overlay::queueBuffer(buffer_handle_t buffer) {
         case OV_3D_VIDEO_3D_PANEL:
         case OV_3D_VIDEO_2D_TV:
         case OV_3D_VIDEO_3D_TV:
-            for (int i=0; i<NUM_CHANNELS; i++) {
+            for (int i=NUM_CHANNELS-1; i>=0; i--) {
                 if(!queueBuffer(fd, offset, i)) {
                     LOGE("%s:failed for channel %d", __FUNCTION__, i);
                     return false;
                 }
+            }
+            //Wait for HDMI done..
+            if(!waitForHdmiVsync(VG1_PIPE)) {
+                LOGE("%s: waitforHdmiVsync failed", __FUNCTION__);
+                return false;
             }
             break;
         default:
@@ -961,8 +983,8 @@ bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& inf
         mOVInfo.z_order = zorder;
         mOVInfo.alpha = 0xff;
         mOVInfo.transp_mask = 0xffffffff;
-        mOVInfo.flags = flags;
     }
+    mOVInfo.flags = flags;
     if (!ignoreFB)
         mOVInfo.flags |= MDP_OV_PLAY_NOWAIT;
     else
@@ -1042,7 +1064,9 @@ bool OverlayControlChannel::updateOverlaySource(const overlay_buffer_info& info,
     ovBufInfo.height = info.height;
     ovBufInfo.format = hw_format;
 
-    if (!setOverlayInformation(ovBufInfo, 0, orientation, 0, waitForVsync, UPDATE_REQUEST))
+    int flags = isInterlacedContent(info.format) ? MDP_DEINTERLACE : 0;
+    if (!setOverlayInformation(ovBufInfo, flags, orientation, 0, waitForVsync,
+                               UPDATE_REQUEST))
         return false;
 
     return startOVRotatorSessions(ovBufInfo, orientation, UPDATE_REQUEST);
@@ -1063,7 +1087,7 @@ bool OverlayControlChannel::startControlChannel(int w, int h,
     int colorFormat = format;
     // The interlace mask is part of the HAL_PIXEL_FORMAT_YV12 value. Add
     // an explicit check for the format
-    if ((format != HAL_PIXEL_FORMAT_YV12) && (format & INTERLACE_MASK)) {
+    if (isInterlacedContent(format)) {
         flags |= MDP_DEINTERLACE;
 
         // Get the actual format
@@ -1606,6 +1630,19 @@ bool OverlayDataChannel::queue(uint32_t offset) {
 
     if (ioctl(mFD, MSMFB_OVERLAY_PLAY, odPtr)) {
         reportError("overlay play failed.");
+        return false;
+    }
+
+    return true;
+}
+
+bool OverlayDataChannel::waitForHdmiVsync() {
+    if (!isChannelUP()) {
+        reportError("waitForHdmiVsync: channel not up");
+        return false;
+    }
+    if (ioctl(mFD, MSMFB_OVERLAY_PLAY_WAIT, &mOvData)) {
+        reportError("waitForHdmiVsync: MSMFB_OVERLAY_PLAY_WAIT failed");
         return false;
     }
     return true;

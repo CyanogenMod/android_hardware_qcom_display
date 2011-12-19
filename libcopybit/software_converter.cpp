@@ -32,7 +32,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include "software_converter.h"
-#include "gralloc_priv.h"
 
 /** Convert YV12 to YCrCb_420_SP */
 int convertYV12toYCrCb420SP(const copybit_image_t *src)
@@ -165,4 +164,142 @@ int convertYV12toYCrCb420SP(const copybit_image_t *src)
     if(tempBuf)
         free(tempBuf);
     return 0;
+}
+
+struct copyInfo{
+    int width;
+    int height;
+    int src_stride;
+    int dst_stride;
+    int src_plane1_offset;
+    int src_plane2_offset;
+    int dst_plane1_offset;
+    int dst_plane2_offset;
+};
+
+/* Internal function to do the actual copy of source to destination */
+static int copy_source_to_destination(const int src_base, const int dst_base,
+                                      copyInfo& info)
+{
+    if (!src_base || !dst_base) {
+        LOGE("%s: invalid memory src_base = 0x%x dst_base=0x%x",
+             __FUNCTION__, src_base, dst_base);
+         return COPYBIT_FAILURE;
+    }
+
+    int width = info.width;
+    int height = info.height;
+    unsigned char *src = (unsigned char*)src_base;
+    unsigned char *dst = (unsigned char*)dst_base;
+
+    // Copy the luma
+    for (int i = 0; i < height; i++) {
+        memcpy(dst, src, width);
+        src += info.src_stride;
+        dst += info.dst_stride;
+    }
+
+    // Copy plane 1
+    src = (unsigned char*)(src_base + info.src_plane1_offset);
+    dst = (unsigned char*)(dst_base + info.dst_plane1_offset);
+    width = width/2;
+    height = height/2;
+    for (int i = 0; i < height; i++) {
+        memcpy(dst, src, info.src_stride);
+        src += info.src_stride;
+        dst += info.dst_stride;
+    }
+    return 0;
+}
+
+
+/*
+ * Function to convert the c2d format into an equivalent Android format
+ *
+ * @param: source buffer handle
+ * @param: destination image
+ *
+ * @return: return status
+ */
+int convert_yuv_c2d_to_yuv_android(private_handle_t *hnd,
+                                   struct copybit_image_t const *rhs)
+{
+    LOGD("Enter %s", __FUNCTION__);
+    if (!hnd || !rhs) {
+        LOGE("%s: invalid inputs hnd=%p rhs=%p", __FUNCTION__, hnd, rhs);
+        return COPYBIT_FAILURE;
+    }
+
+    int ret = COPYBIT_SUCCESS;
+    private_handle_t *dst_hnd = (private_handle_t *)rhs->handle;
+
+    copyInfo info;
+    info.width = rhs->w;
+    info.height = rhs->h;
+    info.src_stride = ALIGN(info.width, 32);
+    info.dst_stride = ALIGN(info.width, 16);
+    switch(rhs->format) {
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP: {
+            info.src_plane1_offset = info.src_stride*info.height;
+            info.dst_plane1_offset = info.dst_stride*info.height;
+        } break;
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE: {
+            // Chroma is 2K aligned for the NV12 encodeable format.
+            info.src_plane1_offset = ALIGN(info.src_stride*info.height, 2048);
+            info.dst_plane1_offset = ALIGN(info.dst_stride*info.height, 2048);
+        } break;
+        default:
+            LOGE("%s: unsupported format (format=0x%x)", __FUNCTION__,
+                 rhs->format);
+            return COPYBIT_FAILURE;
+    }
+
+    ret = copy_source_to_destination(hnd->base, dst_hnd->base, info);
+    return ret;
+}
+
+/*
+ * Function to convert the Android format into an equivalent C2D format
+ *
+ * @param: source buffer handle
+ * @param: destination image
+ *
+ * @return: return status
+ */
+int convert_yuv_android_to_yuv_c2d(private_handle_t *hnd,
+                                   struct copybit_image_t const *rhs)
+{
+    if (!hnd || !rhs) {
+        LOGE("%s: invalid inputs hnd=%p rhs=%p", __FUNCTION__, hnd, rhs);
+        return COPYBIT_FAILURE;
+    }
+
+    int ret = COPYBIT_SUCCESS;
+    private_handle_t *dst_hnd = (private_handle_t *)rhs->handle;
+
+    copyInfo info;
+    info.width = rhs->w;
+    info.height = rhs->h;
+    info.src_stride = ALIGN(info.width, 16);
+    info.dst_stride = ALIGN(info.width, 32);
+    switch(rhs->format) {
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP: {
+            info.src_plane1_offset = info.src_stride*info.height;
+            info.dst_plane1_offset = info.dst_stride*info.height;
+        } break;
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE: {
+            // Chroma is 2K aligned for the NV12 encodeable format.
+            info.src_plane1_offset = ALIGN(info.src_stride*info.height, 2048);
+            info.dst_plane1_offset = ALIGN(info.dst_stride*info.height, 2048);
+        } break;
+        default:
+            LOGE("%s: unsupported format (format=0x%x)", __FUNCTION__,
+                 rhs->format);
+            return -1;
+    }
+
+    ret = copy_source_to_destination(hnd->base, dst_hnd->base, info);
+    return ret;
 }

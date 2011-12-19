@@ -36,11 +36,14 @@
 #include <ui/egl/android_natives.h>
 #include <private/ui/android_natives_priv.h>
 #include <cutils/native_handle.h>
+#include <cutils/ashmem.h>
+#include <linux/ashmem.h>
 #include <gralloc_priv.h>
 
 #include <copybit.h>
 
 #include "c2d2.h"
+#include "software_converter.h"
 
 #include <dlfcn.h>
 C2D_STATUS (*LINK_c2dCreateSurface)( uint32 *surface_id,
@@ -83,20 +86,30 @@ C2D_STATUS (*LINK_c2dDestroySurface)( uint32 surface_id );
 
 #define G12_DEVICE_NAME "/dev/kgsl-2d0"
 
-#define COPYBIT_SUCCESS 0
-#define COPYBIT_FAILURE -1
+#define NUM_SURFACES 3
 
-#define RGB_SURFACE 0
-#define YUV_SURFACE 1
-#define NUM_SRC_SURFACES 2
-#define ALIGN(x, align) (((x) + ((align)-1)) & ~((align)-1))
+enum {
+    RGB_SURFACE,
+    YUV_SURFACE_2_PLANES,
+    YUV_SURFACE_3_PLANES
+};
+
+enum eConversionType {
+    CONVERT_TO_ANDROID_FORMAT,
+    CONVERT_TO_C2D_FORMAT
+};
+
+enum eC2DFlags {
+    FLAGS_PREMULTIPLIED_ALPHA = 1<<0,
+    FLAGS_YUV_DESTINATION     = 1<<1
+};
 /******************************************************************************/
 
 /** State information for each device instance */
 struct copybit_context_t {
     struct copybit_device_t device;
-    unsigned int src[NUM_SRC_SURFACES];
-    unsigned int dst;                /* dst surface */
+    unsigned int src[NUM_SURFACES];  /* src surfaces */
+    unsigned int dst[NUM_SURFACES];  /* dst surfaces */
     unsigned int trg_transform;      /* target transform */
     C2D_OBJECT blitState;
     void *libc2d2;
@@ -109,6 +122,26 @@ struct copybit_context_t {
 struct blitlist{
     uint32_t count;
     C2D_OBJECT blitObjects[12];
+};
+
+struct bufferInfo {
+    int width;
+    int height;
+    int format;
+};
+
+struct memInfo {
+    int fd;
+    size_t size;
+    int base;
+};
+
+struct yuvPlaneInfo {
+    int yStride;       //luma stride
+    int plane1_stride;
+    int plane2_stride;
+    int plane1_offset;
+    int plane2_offset;
 };
 
 /**
@@ -148,9 +181,25 @@ static int get_format(int format) {
     case HAL_PIXEL_FORMAT_RGBA_5551:      return C2D_COLOR_FORMAT_5551_RGBA;
     case HAL_PIXEL_FORMAT_RGBA_4444:      return C2D_COLOR_FORMAT_4444_RGBA;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP:   return C2D_COLOR_FORMAT_420_NV12;
+    case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:return C2D_COLOR_FORMAT_420_NV12;
     case HAL_PIXEL_FORMAT_YCrCb_420_SP:   return C2D_COLOR_FORMAT_420_NV21;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED: return C2D_COLOR_FORMAT_420_NV12 | C2D_FORMAT_MACROTILED;
-    default:                            return -EINVAL;
+    default:                              LOGE("%s: invalid format (0x%x", __FUNCTION__, format); return -EINVAL;
+    }
+    return -EINVAL;
+}
+
+/* Get the C2D formats needed for conversion to YUV */
+static int get_c2d_format_for_yuv_destination(int halFormat) {
+    switch (halFormat) {
+    // We do not swap the RB when the target is YUV
+    case HAL_PIXEL_FORMAT_RGBX_8888:      return C2D_COLOR_FORMAT_8888_ARGB | C2D_FORMAT_DISABLE_ALPHA;
+    case HAL_PIXEL_FORMAT_RGBA_8888:      return C2D_COLOR_FORMAT_8888_ARGB;
+    // The U and V need to be interchanged when the target is YUV
+    case HAL_PIXEL_FORMAT_YCbCr_420_SP:   return C2D_COLOR_FORMAT_420_NV21;
+    case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:return C2D_COLOR_FORMAT_420_NV21;
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP:   return C2D_COLOR_FORMAT_420_NV12;
+    default:                              return get_format(halFormat);
     }
     return -EINVAL;
 }
@@ -256,11 +305,29 @@ static int is_supported_rgb_format(int format)
     }
 }
 
+static int get_num_planes(int format)
+{
+    switch(format) {
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED: {
+            return 2;
+        }
+        case HAL_PIXEL_FORMAT_YV12: {
+            return 3;
+        }
+        default:
+            return COPYBIT_FAILURE;
+    }
+}
+
 static int is_supported_yuv_format(int format)
 {
     switch(format) {
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED: {
             return COPYBIT_SUCCESS;
         }
@@ -269,8 +336,21 @@ static int is_supported_yuv_format(int format)
     }
 }
 
-static int calculate_yuv_offset_and_stride(int format, int width, int height, int *offset, int *yStride, int *uvStride)
+static int is_valid_destination_format(int format)
 {
+    if (format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED) {
+        // C2D does not support NV12Tile as a destination format.
+        return COPYBIT_FAILURE;
+    }
+    return COPYBIT_SUCCESS;
+}
+
+static int calculate_yuv_offset_and_stride(const bufferInfo& info, yuvPlaneInfo& yuvInfo)
+{
+    int width  = info.width;
+    int height = info.height;
+    int format = info.format;
+
     int aligned_height = 0;
     int aligned_width = 0, size = 0;
 
@@ -282,17 +362,23 @@ static int calculate_yuv_offset_and_stride(int format, int width, int height, in
             aligned_height = ALIGN(height, 32);
             aligned_width  = ALIGN(width, 128);
             size = aligned_width * aligned_height;
-            *offset = ALIGN(size,8192);
-            *yStride = aligned_width;
-            *uvStride = aligned_width;
+            yuvInfo.plane1_offset = ALIGN(size,8192);
+            yuvInfo.yStride = aligned_width;
+            yuvInfo.plane1_stride = aligned_width;
             break;
         }
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP: {
             aligned_width = ALIGN(width, 32);
-            *offset = aligned_width * height;
-            *yStride = aligned_width;
-            *uvStride = aligned_width;
+            yuvInfo.yStride = aligned_width;
+            yuvInfo.plane1_stride = aligned_width;
+            if (HAL_PIXEL_FORMAT_NV12_ENCODEABLE == format) {
+                // The encoder requires a 2K aligned chroma offset
+                yuvInfo.plane1_offset = ALIGN(aligned_width * height, 2048);
+            } else
+                yuvInfo.plane1_offset = aligned_width * height;
+
             break;
         }
         default: {
@@ -304,15 +390,20 @@ static int calculate_yuv_offset_and_stride(int format, int width, int height, in
 
 /** create C2D surface from copybit image */
 static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image_t *rhs, int *cformat, uint32_t *mapped,
-                     const bool isPremultipliedAlpha)
+                     const eC2DFlags flags)
 {
     struct private_handle_t* handle = (struct private_handle_t*)rhs->handle;
     C2D_SURFACE_TYPE surfaceType;
     int status = COPYBIT_SUCCESS;
 
-    *cformat  = get_format(rhs->format);
+    if (flags & FLAGS_YUV_DESTINATION) {
+        *cformat = get_c2d_format_for_yuv_destination(rhs->format);
+    } else {
+        *cformat = get_format(rhs->format);
+    }
+
     if(*cformat == -EINVAL) {
-        LOGE("%s: invalid format", __func__);
+        LOGE("%s: invalid format", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -324,6 +415,7 @@ static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image
     if (handle->gpuaddr == 0) {
        handle->gpuaddr = c2d_get_gpuaddr(device_fd, handle);
        if(!handle->gpuaddr) {
+           LOGE("%s: c2d_get_gpuaddr failed", __FUNCTION__);
            return COPYBIT_FAILURE;
        }
        *mapped = 1;
@@ -339,28 +431,32 @@ static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image
         surfaceDef.phys = (void*) handle->gpuaddr;
         surfaceDef.buffer = (void*) (handle->base);
 
-        surfaceDef.format = *cformat | (isPremultipliedAlpha ? C2D_FORMAT_PREMULTIPLIED : 0);
+        surfaceDef.format = *cformat | ((flags & FLAGS_PREMULTIPLIED_ALPHA) ? C2D_FORMAT_PREMULTIPLIED : 0);
         surfaceDef.width = rhs->w;
         surfaceDef.height = rhs->h;
-        surfaceDef.stride = ALIGN(((surfaceDef.width * c2diGetBpp(surfaceDef.format))>>3), 32);
+        int aligned_width = ALIGN(surfaceDef.width,32);
+        surfaceDef.stride = (aligned_width * c2diGetBpp(surfaceDef.format))>>3;
 
         if(LINK_c2dUpdateSurface( surfaceId,C2D_TARGET | C2D_SOURCE, surfaceType, &surfaceDef)) {
-            LOGE("%s: RGB Surface c2dUpdateSurface ERROR", __func__);
+            LOGE("%s: RGB Surface c2dUpdateSurface ERROR", __FUNCTION__);
             goto error;
             status = COPYBIT_FAILURE;
         }
     } else if (is_supported_yuv_format(rhs->format) == COPYBIT_SUCCESS) {
         C2D_YUV_SURFACE_DEF surfaceDef;
-        int offset = 0;
-        int yStride = 0;
-        int uvStride = 0;
         memset(&surfaceDef, 0, sizeof(surfaceDef));
         surfaceType = (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS);
         surfaceDef.format = *cformat;
 
-        status = calculate_yuv_offset_and_stride(rhs->format, rhs->w, rhs->h, &offset, &yStride, &uvStride);
+        bufferInfo info;
+        info.width = rhs->w;
+        info.height = rhs->h;
+        info.format = rhs->format;
+
+        yuvPlaneInfo yuvInfo;
+        status = calculate_yuv_offset_and_stride(info, yuvInfo);
         if(status != COPYBIT_SUCCESS) {
-            LOGE("calculate_yuv_offset_and_stride error");
+            LOGE("%s: calculate_yuv_offset_and_stride error", __FUNCTION__);
             goto error;
         }
 
@@ -368,19 +464,24 @@ static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image
         surfaceDef.height = rhs->h;
         surfaceDef.plane0 = (void*) (handle->base);
         surfaceDef.phys0 = (void*) (handle->gpuaddr);
-        surfaceDef.stride0 = yStride;
+        surfaceDef.stride0 = yuvInfo.yStride;
 
-        surfaceDef.plane1 = (void*) (handle->base + offset);
-        surfaceDef.phys1 = (void*) (handle->gpuaddr + offset);
-        surfaceDef.stride1 = uvStride;
+        surfaceDef.plane1 = (void*) (handle->base + yuvInfo.plane1_offset);
+        surfaceDef.phys1 = (void*) (handle->gpuaddr + yuvInfo.plane1_offset);
+        surfaceDef.stride1 = yuvInfo.plane1_stride;
+        if (3 == get_num_planes(rhs->format)) {
+            surfaceDef.plane2 = (void*) (handle->base + yuvInfo.plane2_offset);
+            surfaceDef.phys2 = (void*) (handle->gpuaddr + yuvInfo.plane2_offset);
+            surfaceDef.stride2 = yuvInfo.plane2_stride;
+        }
 
         if(LINK_c2dUpdateSurface( surfaceId,C2D_TARGET | C2D_SOURCE, surfaceType, &surfaceDef)) {
-            LOGE("%s: YUV Surface c2dUpdateSurface ERROR", __func__);
+            LOGE("%s: YUV Surface c2dUpdateSurface ERROR", __FUNCTION__);
             goto error;
             status = COPYBIT_FAILURE;
         }
     } else {
-        LOGE("%s: invalid format %x", __func__, rhs->format);
+        LOGE("%s: invalid format 0x%x", __FUNCTION__, rhs->format);
         goto error;
         status = COPYBIT_FAILURE;
     }
@@ -429,7 +530,7 @@ static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_
         surfaceDef.stride = ALIGN(((surfaceDef.width * c2diGetBpp(surfaceDef.format))>>3), 32);
 
         if(LINK_c2dCreateSurface( surfaceId, C2D_TARGET, surfaceType,(void*)&surfaceDef)) {
-            LOGE("%s: LINK_c2dCreateSurface error", __func__);
+            LOGE("%s: LINK_c2dCreateSurface error", __FUNCTION__);
             status = COPYBIT_FAILURE;
             goto error;
         }
@@ -443,9 +544,15 @@ static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_
 
         surfaceType = (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS);
         surfaceDef.format = get_format(rhs->format);
-        status = calculate_yuv_offset_and_stride(rhs->format, rhs->w, rhs->h, &offset, &yStride, &uvStride);
+        bufferInfo info;
+        info.width = rhs->w;
+        info.height = rhs->h;
+        info.format = rhs->format;
+
+        yuvPlaneInfo yuvInfo;
+        status = calculate_yuv_offset_and_stride(info, yuvInfo);
         if(status != COPYBIT_SUCCESS) {
-            LOGE("calculate_yuv_offset_and_stride error");
+            LOGE("%s: calculate_yuv_offset_and_stride error", __FUNCTION__);
             goto error;
         }
 
@@ -453,11 +560,11 @@ static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_
         surfaceDef.height = rhs->h;
         surfaceDef.plane0 = (void*) (handle->base);
         surfaceDef.phys0 = (void*) handle->gpuaddr;
-        surfaceDef.stride0 = yStride;
+        surfaceDef.stride0 = yuvInfo.yStride;
 
-        surfaceDef.plane1 = (void*) (handle->base + offset);
-        surfaceDef.phys1 = (void*) (handle->gpuaddr + offset);
-        surfaceDef.stride1 = uvStride;
+        surfaceDef.plane1 = (void*) (handle->base + yuvInfo.plane1_offset);
+        surfaceDef.phys1 = (void*) (handle->gpuaddr + yuvInfo.plane1_offset);
+        surfaceDef.stride1 = yuvInfo.plane1_stride;
 
         if(LINK_c2dCreateSurface( surfaceId, C2D_TARGET | C2D_SOURCE, surfaceType, (void*)&surfaceDef)) {
             LOGE("%s: YUV surface LINK_c2dCreateSurface error", __func__);
@@ -465,7 +572,7 @@ static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_
             goto error;
         }
     } else {
-        LOGE("%s: Invalid format %x", __func__, rhs->format);
+        LOGE("%s: Invalid format 0x%x", __FUNCTION__, rhs->format);
         status = COPYBIT_FAILURE;
     }
 
@@ -549,22 +656,26 @@ static void set_rects(struct copybit_context_t *ctx,
                       const struct copybit_rect_t *src,
                       const struct copybit_rect_t *scissor)
 {
-
+    // Set the target rect.
     if((ctx->trg_transform & C2D_TARGET_ROTATE_90) &&
        (ctx->trg_transform & C2D_TARGET_ROTATE_180)) {
         /* target rotation is 270 */
         c2dObject->target_rect.x        = (dst->t)<<16;
-        c2dObject->target_rect.y        = (ALIGN(ctx->fb_width,32) - (dst->r))<<16;
+        c2dObject->target_rect.y        = ctx->fb_width?(ALIGN(ctx->fb_width,32)- dst->r):dst->r;
+        c2dObject->target_rect.y        = c2dObject->target_rect.y<<16;
         c2dObject->target_rect.height   = ((dst->r) - (dst->l))<<16;
         c2dObject->target_rect.width    = ((dst->b) - (dst->t))<<16;
     } else if(ctx->trg_transform & C2D_TARGET_ROTATE_90) {
-        c2dObject->target_rect.x        = (ctx->fb_height - dst->b)<<16;
+        c2dObject->target_rect.x        = ctx->fb_height?(ctx->fb_height - dst->b):dst->b;
+        c2dObject->target_rect.x        = c2dObject->target_rect.x<<16;
         c2dObject->target_rect.y        = (dst->l)<<16;
         c2dObject->target_rect.height   = ((dst->r) - (dst->l))<<16;
         c2dObject->target_rect.width    = ((dst->b) - (dst->t))<<16;
     } else if(ctx->trg_transform & C2D_TARGET_ROTATE_180) {
-        c2dObject->target_rect.y        = (ctx->fb_height - dst->b)<<16;
-        c2dObject->target_rect.x        = (ALIGN(ctx->fb_width,32) - dst->r)<<16;
+        c2dObject->target_rect.y        = ctx->fb_height?(ctx->fb_height - dst->b):dst->b;
+        c2dObject->target_rect.y        = c2dObject->target_rect.y<<16;
+        c2dObject->target_rect.x        = ctx->fb_width?(ALIGN(ctx->fb_width,32) - dst->r):dst->r;
+        c2dObject->target_rect.x        = c2dObject->target_rect.x<<16;
         c2dObject->target_rect.height   = ((dst->b) - (dst->t))<<16;
         c2dObject->target_rect.width    = ((dst->r) - (dst->l))<<16;
     } else {
@@ -575,17 +686,18 @@ static void set_rects(struct copybit_context_t *ctx,
     }
     c2dObject->config_mask |= C2D_TARGET_RECT_BIT;
 
+    // Set the source rect
     c2dObject->source_rect.x        = (src->l)<<16;
     c2dObject->source_rect.y        = (src->t)<<16;
     c2dObject->source_rect.height   = ((src->b) - (src->t))<<16;
     c2dObject->source_rect.width    = ((src->r) - (src->l))<<16;
     c2dObject->config_mask |= C2D_SOURCE_RECT_BIT;
 
+    // Set the scissor rect
     c2dObject->scissor_rect.x       = scissor->l;
     c2dObject->scissor_rect.y       = scissor->t;
     c2dObject->scissor_rect.height  = (scissor->b) - (scissor->t);
     c2dObject->scissor_rect.width   = (scissor->r) - (scissor->l);
-
     c2dObject->config_mask |= C2D_SCISSOR_RECT_BIT;
 }
 
@@ -600,7 +712,7 @@ static int msm_copybit(struct copybit_context_t *dev, blitlist *list, uint32 tar
 
     if(LINK_c2dDraw(target,dev->trg_transform, 0x0, 0, 0, list->blitObjects,
                     list->count)) {
-       LOGE("%s: LINK_c2dDraw ERROR");
+       LOGE("%s: LINK_c2dDraw ERROR", __FUNCTION__);
        return COPYBIT_FAILURE;
     }
 
@@ -617,7 +729,7 @@ static int set_parameter_copybit(
 {
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
     if (!ctx) {
-        LOGE("%s: null context", __func__);
+        LOGE("%s: null context", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -668,8 +780,14 @@ static int set_parameter_copybit(
         (value == COPYBIT_ENABLE) ? ctx->isPremultipliedAlpha = true :
                                     ctx->isPremultipliedAlpha = false;
         break;
+    case COPYBIT_FRAMEBUFFER_WIDTH:
+        ctx->fb_width = value;
+        break;
+    case COPYBIT_FRAMEBUFFER_HEIGHT:
+         ctx->fb_height = value;
+         break;
     default:
-        LOGE("%s: default case", __func__);
+        LOGE("%s: default case param=0x%x", __FUNCTION__, name);
         return -EINVAL;
         break;
     }
@@ -684,7 +802,7 @@ static int get(struct copybit_device_t *dev, int name)
     int value;
 
     if (!ctx) {
-        LOGE("%s: null context error", __func__);
+        LOGE("%s: null context error", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -702,7 +820,7 @@ static int get(struct copybit_device_t *dev, int name)
         value = 1;
         break;
     default:
-        LOGE("%s: default case", __func__);
+        LOGE("%s: default case param=0x%x", __FUNCTION__, name);
         value = -EINVAL;
     }
     return value;
@@ -729,6 +847,171 @@ static int is_alpha(int cformat)
     return alpha;
 }
 
+/* Function to check if we need a temporary buffer for the blit.
+ * This would happen if the requested destination stride and the
+ * C2D stride do not match. We ignore RGB buffers, since their
+ * stride is always aligned to 32.
+ */
+static bool need_temp_buffer(struct copybit_image_t const *img)
+{
+    if (COPYBIT_SUCCESS == is_supported_rgb_format(img->format))
+        return false;
+
+    struct private_handle_t* handle = (struct private_handle_t*)img->handle;
+
+    // The width parameter in the handle contains the aligned_w. We check if we
+    // need to convert based on this param. YUV formats have bpp=1, so checking
+    // if the requested stride is aligned should suffice.
+    if (0 == (handle->width)%32) {
+        return false;
+    }
+
+    return true;
+}
+
+/* Function to extract the information from the copybit image and set the corresponding
+ * values in the bufferInfo struct.
+ */
+static void populate_buffer_info(struct copybit_image_t const *img, bufferInfo& info)
+{
+    info.width = img->w;
+    info.height = img->h;
+    info.format = img->format;
+}
+
+/* Function to get the required size for a particular format, inorder for C2D to perform
+ * the blit operation.
+ */
+static size_t get_size(const bufferInfo& info)
+{
+    size_t size = 0;
+    int w = info.width;
+    int h = info.height;
+    int aligned_w = ALIGN(w, 32);
+    switch(info.format) {
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+        {
+            // Chroma for this format is aligned to 2K.
+            size = ALIGN((aligned_w*h), 2048) +
+                   ALIGN(w/2, 32) * h/2 *2;
+            size = ALIGN(size, 4096);
+        } break;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        {
+            size = aligned_w*h +
+                   ALIGN(w/2, 32) * h/2 *2;
+            size = ALIGN(size, 4096);
+        } break;
+        default: break;
+    }
+    return size;
+}
+
+/* Function to allocate memory for the temporary buffer. This memory is
+ * allocated from Ashmem. It is the caller's responsibility to free this
+ * memory.
+ */
+static int get_temp_buffer(const bufferInfo& info, memInfo& mem_info)
+{
+    // Alloc memory from ashmem
+    int err = COPYBIT_SUCCESS;
+    size_t size = get_size(info);
+    char name[ASHMEM_NAME_LEN];
+    snprintf(name, ASHMEM_NAME_LEN, "c2d-buffer-%x",mem_info);
+    int prot = PROT_READ | PROT_WRITE;
+    int fd = ashmem_create_region(name, size);
+    void *base = 0;
+    if (fd < 0) {
+        LOGE("%s: couldn't create ashmem (%s)", __FUNCTION__,
+                                                strerror(errno));
+        return COPYBIT_FAILURE;
+    } else {
+        if (ashmem_set_prot_region(fd, prot) < 0) {
+            LOGE("%s: ashmem_set_prot_region(fd=%d, prot=%x) failed (%s)",
+                 __FUNCTION__, fd, prot, strerror(errno));
+            close(fd);
+            fd = -1;
+            return COPYBIT_FAILURE;
+        } else {
+            base = mmap(0, size, prot, MAP_SHARED|MAP_POPULATE|MAP_LOCKED, fd, 0);
+            if (base == MAP_FAILED) {
+                LOGE("%s: alloc mmap(fd=%d, size=%d, prot=%x) failed (%s)",
+                     __FUNCTION__, fd, size, prot, strerror(errno));
+                close(fd);
+                fd = -1;
+                return COPYBIT_FAILURE;
+            }
+        }
+    }
+    if (ioctl(fd, ASHMEM_CACHE_INV_RANGE, NULL)) {
+        LOGE("ASHMEM_CACHE_INV_RANGE failed fd = %d", fd);
+    }
+
+    // Save the memory info.
+    mem_info.fd = fd;
+    mem_info.size = size;
+    mem_info.base = (int)base;
+    return err;
+}
+
+/* Function to free the temporary allocated memory.*/
+static void free_temp_image(private_handle_t *hnd)
+{
+    if (hnd) {
+        if (0 != hnd->base) {
+            munmap((void *)hnd->base, hnd->size);
+            hnd->base = 0;
+        }
+
+        if (hnd->fd != -1) {
+            close(hnd->fd);
+            hnd->fd = -1;
+        }
+    }
+}
+
+/* Function to perform the software color conversion. Convert the
+ * C2D compatible format to the Android compatible format
+ */
+static int copy_image(private_handle_t *src_handle,
+                     struct copybit_image_t const *rhs,
+                     eConversionType conversionType)
+{
+    if (src_handle->fd == -1) {
+        LOGE("%s: src_handle fd is invalid", __FUNCTION__);
+        return COPYBIT_FAILURE;
+    }
+
+    // Copy the info.
+    int ret = COPYBIT_SUCCESS;
+    switch(rhs->format) {
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        {
+            if (CONVERT_TO_ANDROID_FORMAT == conversionType) {
+                return convert_yuv_c2d_to_yuv_android(src_handle, rhs);
+            } else {
+                return convert_yuv_android_to_yuv_c2d(src_handle, rhs);
+            }
+
+        } break;
+        default: {
+            LOGE("%s: invalid format 0x%x", __FUNCTION__, rhs->format);
+            ret = COPYBIT_FAILURE;
+        } break;
+    }
+    return ret;
+}
+
+static void delete_handle(private_handle_t *handle)
+{
+    if (handle) {
+        delete handle;
+        handle = 0;
+    }
+}
 /** do a stretch blit type operation */
 static int stretch_copybit_internal(
         struct copybit_device_t *dev,
@@ -748,20 +1031,20 @@ static int stretch_copybit_internal(
     memset(&list, 0, sizeof(list));
     int cformat;
     c2d_ts_handle timestamp;
-    uint32 surface_index = 0;
+    uint32 src_surface_index = 0, dst_surface_index = 0;
 
     if (!ctx) {
-        LOGE("%s: null context error", __func__);
+        LOGE("%s: null context error", __FUNCTION__);
         return -EINVAL;
     }
 
     if (src->w > MAX_DIMENSION || src->h > MAX_DIMENSION) {
-        LOGE("%s: src dimension error", __func__);
+        LOGE("%s: src dimension error", __FUNCTION__);
         return -EINVAL;
     }
 
     if (dst->w > MAX_DIMENSION || dst->h > MAX_DIMENSION) {
-        LOGE("%s : dst dimension error dst w %d h %d",  __func__, dst->w, dst->h);
+        LOGE("%s : dst dimension error dst w %d h %d",  __FUNCTION__, dst->w, dst->h);
         return -EINVAL;
     }
 
@@ -770,24 +1053,163 @@ static int stretch_copybit_internal(
     struct copybit_rect_t clip;
     list.count = 0;
 
-    status = set_image(ctx->g12_device_fd, ctx->dst, dst, &cformat, &trg_mapped, ctx->isPremultipliedAlpha);
+    if (is_valid_destination_format(dst->format) == COPYBIT_FAILURE) {
+        LOGE("%s: Invalid destination format format = 0x%x", __FUNCTION__, dst->format);
+        return COPYBIT_FAILURE;
+    }
+
+    bool isYUVDestination = false;
+    if (is_supported_rgb_format(dst->format) == COPYBIT_SUCCESS) {
+        dst_surface_index = RGB_SURFACE;
+    } else if (is_supported_yuv_format(dst->format) == COPYBIT_SUCCESS) {
+        isYUVDestination = true;
+        int num_planes = get_num_planes(dst->format);
+        if (num_planes == 2) {
+            dst_surface_index = YUV_SURFACE_2_PLANES;
+        } else if (num_planes == 3) {
+            dst_surface_index = YUV_SURFACE_3_PLANES;
+        } else {
+            LOGE("%s: dst number of YUV planes is invalid dst format = 0x%x",
+                  __FUNCTION__, dst->format);
+            return COPYBIT_FAILURE;
+        }
+    } else {
+        LOGE("%s: Invalid dst surface format 0x%x", __FUNCTION__, dst->format);
+        return COPYBIT_FAILURE;
+    }
+
+    copybit_image_t dst_image;
+    dst_image.w = dst->w;
+    dst_image.h = dst->h;
+    dst_image.format = dst->format;
+    dst_image.handle = dst->handle;
+    // Check if we need a temp. copy for the destination. We'd need this the destination
+    // width is not aligned to 32. This case occurs for YUV formats. RGB formats are
+    // aligned to 32.
+    bool needTempDestination = need_temp_buffer(dst);
+    memInfo mem_info;
+    bufferInfo dst_info;
+    populate_buffer_info(dst, dst_info);
+    private_handle_t* dst_hnd = new private_handle_t(-1, 0, 0, 0, dst_info.format,
+                                                 dst_info.width, dst_info.height);
+    if (dst_hnd == NULL) {
+        LOGE("%s: dst_hnd is null", __FUNCTION__);
+        return COPYBIT_FAILURE;
+    }
+    if (needTempDestination) {
+        // Create a temp buffer and set that as the destination.
+        if (COPYBIT_SUCCESS == get_temp_buffer(dst_info, mem_info)) {
+            dst_hnd->fd = mem_info.fd;
+            dst_hnd->size = mem_info.size;
+            dst_hnd->flags = private_handle_t::PRIV_FLAGS_USES_ASHMEM;
+            dst_hnd->base = mem_info.base;
+            dst_hnd->offset = 0;
+            dst_hnd->gpuaddr = 0;
+            dst_image.handle = dst_hnd;
+        }
+    }
+
+    int flags = 0;
+    flags |= (ctx->isPremultipliedAlpha) ? FLAGS_PREMULTIPLIED_ALPHA : 0;
+    flags |= (isYUVDestination) ? FLAGS_YUV_DESTINATION : 0;
+
+    status = set_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], &dst_image, &cformat,
+                       &trg_mapped, (eC2DFlags)flags);
     if(status) {
-        LOGE("%s: set_image error", __func__);
+        LOGE("%s: dst: set_image error", __FUNCTION__);
+        if (needTempDestination) {
+            free_temp_image(dst_hnd);
+        }
+        delete_handle(dst_hnd);
         return COPYBIT_FAILURE;
     }
 
     if(is_supported_rgb_format(src->format) == COPYBIT_SUCCESS) {
-        surface_index = RGB_SURFACE;
+        src_surface_index = RGB_SURFACE;
     } else if (is_supported_yuv_format(src->format) == COPYBIT_SUCCESS) {
-        surface_index = YUV_SURFACE;
+        int num_planes = get_num_planes(src->format);
+        if (num_planes == 2) {
+            src_surface_index = YUV_SURFACE_2_PLANES;
+        } else if (num_planes == 3) {
+            src_surface_index = YUV_SURFACE_3_PLANES;
+        } else {
+            LOGE("%s: src number of YUV planes is invalid src format = 0x%x",
+                 __FUNCTION__, src->format);
+            if (needTempDestination) {
+                free_temp_image(dst_hnd);
+            }
+            delete_handle(dst_hnd);
+            return -EINVAL;
+        }
     } else {
-        LOGE("%s: Invalid source surface format %x", __func__, src->format);
+        LOGE("%s: Invalid source surface format 0x%x", __FUNCTION__, src->format);
+        if (needTempDestination) {
+            free_temp_image(dst_hnd);
+        }
+        delete_handle(dst_hnd);
         return -EINVAL;
     }
 
-    status = set_image(ctx->g12_device_fd, ctx->src[surface_index], src, &cformat, &src_mapped, ctx->isPremultipliedAlpha);
+    copybit_image_t src_image;
+    src_image.w = src->w;
+    src_image.h = src->h;
+    src_image.format = src->format;
+    src_image.handle = src->handle;
+
+    bool needTempSource = need_temp_buffer(src);
+    bufferInfo src_info;
+    populate_buffer_info(src, src_info);
+    private_handle_t* src_hnd = new private_handle_t(-1, 0, 0, 0, src_info.format,
+                                                 src_info.width, src_info.height);
+    if (NULL == src_hnd) {
+        LOGE("%s: src_hnd is null", __FUNCTION__);
+        if (needTempDestination) {
+            free_temp_image(dst_hnd);
+        }
+        delete_handle(dst_hnd);
+        return COPYBIT_FAILURE;
+    }
+    if (needTempSource) {
+        // Create a temp buffer and set that as the destination.
+        if (COPYBIT_SUCCESS == get_temp_buffer(src_info, mem_info)) {
+            src_hnd->fd = mem_info.fd;
+            src_hnd->size = mem_info.size;
+            src_hnd->flags = private_handle_t::PRIV_FLAGS_USES_ASHMEM;
+            src_hnd->base = mem_info.base;
+            src_hnd->offset = 0;
+            src_hnd->gpuaddr = 0;
+            src_image.handle = src_hnd;
+
+            // Copy the source.
+            copy_image((private_handle_t *)src->handle, &src_image, CONVERT_TO_C2D_FORMAT);
+
+            // Flush the cache
+            if (ioctl(src_hnd->fd, ASHMEM_CACHE_FLUSH_RANGE, NULL)) {
+                LOGE("%s: ASHMEM_CACHE_FLUSH_RANGE failed (error=%s)",
+                     __FUNCTION__, strerror(errno));
+                if (needTempDestination) {
+                    free_temp_image(dst_hnd);
+                }
+                free_temp_image(src_hnd);
+                delete_handle(dst_hnd);
+                delete_handle(src_hnd);
+                return COPYBIT_FAILURE;
+            }
+        }
+    }
+
+    status = set_image(ctx->g12_device_fd, ctx->src[src_surface_index], &src_image, &cformat,
+                       &src_mapped, (eC2DFlags)flags);
     if(status) {
-        LOGE("%s: set_src_image error", __func__);
+        LOGE("%s: set_src_image error", __FUNCTION__);
+        if (needTempDestination) {
+            free_temp_image(dst_hnd);
+        }
+        if (needTempSource) {
+            free_temp_image(src_hnd);
+        }
+        delete_handle(dst_hnd);
+        delete_handle(src_hnd);
         return COPYBIT_FAILURE;
     }
 
@@ -796,8 +1218,16 @@ static int stretch_copybit_internal(
             ctx->blitState.config_mask &= ~C2D_ALPHA_BLEND_NONE;
             if(!(ctx->blitState.global_alpha)) {
                 // src alpha is zero
-                unset_image(ctx->g12_device_fd, ctx->src[surface_index], src, src_mapped);
-                unset_image(ctx->g12_device_fd, ctx->dst, dst, trg_mapped);
+                unset_image(ctx->g12_device_fd, ctx->src[src_surface_index], &src_image, src_mapped);
+                unset_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], &dst_image, trg_mapped);
+                if (needTempDestination) {
+                    free_temp_image(dst_hnd);
+                }
+                if (needTempSource) {
+                    free_temp_image(src_hnd);
+                }
+                delete_handle(dst_hnd);
+                delete_handle(src_hnd);
                 return status;
             }
         } else {
@@ -810,7 +1240,7 @@ static int stretch_copybit_internal(
         ctx->blitState.config_mask |= C2D_ALPHA_BLEND_NONE;
     }
 
-    ctx->blitState.surface_id = ctx->src[surface_index];
+    ctx->blitState.surface_id = ctx->src[src_surface_index];
 
     while ((status == 0) && region->next(region, &clip)) {
         req = &(list.blitObjects[list.count]);
@@ -819,22 +1249,35 @@ static int stretch_copybit_internal(
         set_rects(ctx, req, dst_rect, src_rect, &clip);
 
         if (++list.count == maxCount) {
-            status = msm_copybit(ctx, &list, ctx->dst);
+            status = msm_copybit(ctx, &list, ctx->dst[dst_surface_index]);
             list.count = 0;
         }
     }
     if ((status == 0) && list.count) {
-        status = msm_copybit(ctx, &list, ctx->dst);
+        status = msm_copybit(ctx, &list, ctx->dst[dst_surface_index]);
     }
 
-    if(LINK_c2dFinish(ctx->dst)) {
-        LOGE("%s: LINK_c2dFinish ERROR", __func__);
+    if(LINK_c2dFinish(ctx->dst[dst_surface_index])) {
+        LOGE("%s: LINK_c2dFinish ERROR", __FUNCTION__);
     }
 
-
-    unset_image(ctx->g12_device_fd, ctx->src[surface_index], src, src_mapped);
-    unset_image(ctx->g12_device_fd, ctx->dst, dst, trg_mapped);
+    unset_image(ctx->g12_device_fd, ctx->src[src_surface_index], &src_image, src_mapped);
+    unset_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], &dst_image, trg_mapped);
+    if (needTempDestination) {
+        // copy the temp. destination without the alignment to the actual destination.
+        copy_image(dst_hnd, dst, CONVERT_TO_ANDROID_FORMAT);
+        // Free the temp memory.
+        free_temp_image(dst_hnd);
+    }
+    if (needTempSource) {
+        // Free the temp memory.
+        free_temp_image(src_hnd);
+    }
+    delete_handle(dst_hnd);
+    delete_handle(src_hnd);
     ctx->isPremultipliedAlpha = false;
+    ctx->fb_width = 0;
+    ctx->fb_height = 0;
     return status;
 }
 
@@ -868,8 +1311,8 @@ static int close_copybit(struct hw_device_t *dev)
 {
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
     if (ctx) {
-        LINK_c2dDestroySurface(ctx->dst);
-        for(int i = 0; i <NUM_SRC_SURFACES; i++) {
+        for(int i = 0; i <NUM_SURFACES; i++) {
+            LINK_c2dDestroySurface(ctx->dst[i]);
             LINK_c2dDestroySurface(ctx->src[i]);
         }
 
@@ -894,23 +1337,21 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     C2D_RGB_SURFACE_DEF surfDefinition = {0};
     C2D_YUV_SURFACE_DEF yuvSurfaceDef = {0} ;
     struct copybit_context_t *ctx;
-    char const * const device_template[] = {
-            "/dev/graphics/fb%u",
-            "/dev/fb%u",
-            0 };
-
-    int fd = -1;
-    int i=0;
     char fbName[64];
 
     ctx = (struct copybit_context_t *)malloc(sizeof(struct copybit_context_t));
     if(!ctx) {
-        LOGE("%s: malloc failed", __func__);
+        LOGE("%s: malloc failed", __FUNCTION__);
         return COPYBIT_FAILURE;
     }
 
     /* initialize drawstate */
     memset(ctx, 0, sizeof(*ctx));
+
+    for (int i=0; i< NUM_SURFACES; i++) {
+        ctx->dst[i] = -1;
+        ctx->src[i] = -1;
+    }
 
     ctx->libc2d2 = ::dlopen("libC2D2.so", RTLD_NOW);
     if (!ctx->libc2d2) {
@@ -931,11 +1372,11 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     *(void **)&LINK_c2dDestroySurface = ::dlsym(ctx->libc2d2,
                                                 "c2dDestroySurface");
 
-    if(!LINK_c2dCreateSurface || !LINK_c2dUpdateSurface || !LINK_c2dReadSurface
+    if (!LINK_c2dCreateSurface || !LINK_c2dUpdateSurface || !LINK_c2dReadSurface
        || !LINK_c2dDraw || !LINK_c2dFlush || !LINK_c2dWaitTimestamp || !LINK_c2dFinish
        || !LINK_c2dDestroySurface) {
-        LOGE("%s: dlsym ERROR", __func__);
-        goto error1;
+        LOGE("%s: dlsym ERROR", __FUNCTION__);
+        goto error;
     }
 
     ctx->device.common.tag = HARDWARE_DEVICE_TAG;
@@ -949,9 +1390,9 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->blitState.config_mask = C2D_NO_BILINEAR_BIT | C2D_NO_ANTIALIASING_BIT;
     ctx->trg_transform = C2D_TARGET_ROTATE_0;
     ctx->g12_device_fd = open(G12_DEVICE_NAME, O_RDWR | O_SYNC);
-    if(ctx->g12_device_fd < 0) {
-      LOGE("%s: g12_device_fd open failed", __func__);
-        goto error1;
+    if (ctx->g12_device_fd < 0) {
+      LOGE("%s: g12_device_fd open failed", __FUNCTION__);
+        goto error;
     }
 
     /* Create RGB Surface */
@@ -961,19 +1402,21 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     surfDefinition.width = 1;
     surfDefinition.height = 1;
     surfDefinition.format = C2D_COLOR_FORMAT_8888_ARGB;
-
-    if(LINK_c2dCreateSurface(&ctx->dst,C2D_TARGET | C2D_SOURCE,
+    if (LINK_c2dCreateSurface(&(ctx->dst[RGB_SURFACE]), C2D_TARGET | C2D_SOURCE,
                              (C2D_SURFACE_TYPE)(C2D_SURFACE_RGB_HOST |
                              C2D_SURFACE_WITH_PHYS), &surfDefinition)) {
-        LOGE("%s: create ctx->dst failed", __func__);
-        goto error2;
+        LOGE("%s: create ctx->dst[RGB_SURFACE] failed", __FUNCTION__);
+        ctx->dst[RGB_SURFACE] = -1;
+        goto error;
     }
 
-    if(LINK_c2dCreateSurface(&(ctx->src[RGB_SURFACE]), C2D_TARGET | C2D_SOURCE,
+
+    if (LINK_c2dCreateSurface(&(ctx->src[RGB_SURFACE]), C2D_TARGET | C2D_SOURCE,
                              (C2D_SURFACE_TYPE)(C2D_SURFACE_RGB_HOST |
                              C2D_SURFACE_WITH_PHYS), &surfDefinition)) {
-        LOGE("%s: create ctx->src[RGB_SURFACE] failed", __func__);
-        goto error3;
+        LOGE("%s: create ctx->src[RGB_SURFACE] failed", __FUNCTION__);
+        ctx->src[RGB_SURFACE] = -1;
+        goto error;
     }
 
     /* Create YUV source surface */
@@ -989,48 +1432,67 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     yuvSurfaceDef.phys1 = (void*) 0xaaaaaaaa;
     yuvSurfaceDef.stride1 = 4;
 
-    if(LINK_c2dCreateSurface(&(ctx->src[YUV_SURFACE]),C2D_TARGET | C2D_SOURCE,
+    if (LINK_c2dCreateSurface(&(ctx->src[YUV_SURFACE_2_PLANES]),C2D_TARGET | C2D_SOURCE,
                              (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS),
                              &yuvSurfaceDef)) {
-        LOGE("%s: create ctx->src[YUV_SURFACE] failed", __func__);
-        goto error4;
+        LOGE("%s: create ctx->src[YUV_SURFACE_2_PLANES] failed", __FUNCTION__);
+        ctx->src[YUV_SURFACE_2_PLANES] = -1;
+        goto error;
     }
 
-    *device = &ctx->device.common;
-
-    while ((fd==-1) && device_template[i]) {
-        snprintf(fbName, 64, device_template[i], 0);
-        fd = open(fbName, O_RDWR, 0);
-        i++;
+    if (LINK_c2dCreateSurface(&(ctx->dst[YUV_SURFACE_2_PLANES]),C2D_TARGET | C2D_SOURCE,
+                             (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS),
+                             &yuvSurfaceDef)) {
+        LOGE("%s: create ctx->dst[YUV_SURFACE_2_PLANES] failed", __FUNCTION__);
+        ctx->dst[YUV_SURFACE_2_PLANES] = -1;
+        goto error;
     }
-    if (fd < 0)
-        goto error5;
 
-    struct fb_var_screeninfo info;
-    if (ioctl(fd, FBIOGET_VSCREENINFO, &info) == -1)
-        goto error6;
+    yuvSurfaceDef.format = C2D_COLOR_FORMAT_420_YV12;
+    yuvSurfaceDef.plane2 = (void*)0xaaaaaaaa;
+    yuvSurfaceDef.phys2 = (void*) 0xaaaaaaaa;
+    yuvSurfaceDef.stride2 = 4;
 
-    ctx->fb_width = info.xres;
-    ctx->fb_height = info.yres;
-    close(fd);
+    if (LINK_c2dCreateSurface(&(ctx->src[YUV_SURFACE_3_PLANES]),C2D_TARGET | C2D_SOURCE,
+                             (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS),
+                             &yuvSurfaceDef)) {
+        LOGE("%s: create ctx->src[YUV_SURFACE_3_PLANES] failed", __FUNCTION__);
+        ctx->src[YUV_SURFACE_3_PLANES] = -1;
+        goto error;
+    }
+
+    if (LINK_c2dCreateSurface(&(ctx->dst[YUV_SURFACE_3_PLANES]),C2D_TARGET | C2D_SOURCE,
+                             (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS),
+                             &yuvSurfaceDef)) {
+        LOGE("%s: create ctx->dst[YUV_SURFACE_3_PLANES] failed", __FUNCTION__);
+        ctx->dst[YUV_SURFACE_3_PLANES] = -1;
+        goto error;
+    }
+
+    ctx->fb_width = 0;
+    ctx->fb_height = 0;
     ctx->isPremultipliedAlpha = false;
+    *device = &ctx->device.common;
     return status;
 
-error6:
-    close(fd);
-    fd = -1;
-error5:
-    LINK_c2dDestroySurface(ctx->src[YUV_SURFACE]);
-error4:
-    LINK_c2dDestroySurface(ctx->src[RGB_SURFACE]);
-error3:
-    LINK_c2dDestroySurface(ctx->dst);
-error2:
-    close(ctx->g12_device_fd);
-error1:
-    ::dlclose(ctx->libc2d2);
 error:
-    free(ctx);
+    for (int i = 0; i<NUM_SURFACES; i++) {
+        if (-1 != (ctx->src[i])) {
+             LINK_c2dDestroySurface(ctx->src[i]);
+             ctx->src[i] = -1;
+        }
+        if (-1 != (ctx->dst[i])) {
+             LINK_c2dDestroySurface(ctx->dst[i]);
+             ctx->dst[i] = -1;
+        }
+    }
+    if (ctx->g12_device_fd >= 0) {
+        close(ctx->g12_device_fd);
+    }
+    if (ctx->libc2d2)
+        ::dlclose(ctx->libc2d2);
+    if (ctx)
+        free(ctx);
     status = COPYBIT_FAILURE;
     *device = NULL;
 
