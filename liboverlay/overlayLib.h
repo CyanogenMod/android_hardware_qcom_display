@@ -44,6 +44,10 @@
 #include <alloc_controller.h>
 #include <memalloc.h>
 
+#ifdef USES_POST_PROCESSING
+#include "lib-postproc.h"
+#endif
+
 #define HW_OVERLAY_MAGNIFICATION_LIMIT 8
 #define HW_OVERLAY_MINIFICATION_LIMIT HW_OVERLAY_MAGNIFICATION_LIMIT
 
@@ -54,6 +58,16 @@
 #define NUM_CHANNELS 2
 #define FRAMEBUFFER_0 0
 #define FRAMEBUFFER_1 1
+#define NUM_SHARPNESS_VALS 256
+#define SHARPNESS_RANGE 1.0f
+#define HUE_RANGE 180
+#define BRIGHTNESS_RANGE 255
+#define CON_SAT_RANGE 1.0f
+#define CAP_RANGE(value,max,min) do { if (value - min < -0.0001)\
+                                          {value = min;}\
+                                      else if(value - max > 0.0001)\
+                                          {value = max;}\
+                                    } while(0);
 
 enum {
     HDMI_OFF,
@@ -248,6 +262,17 @@ typedef struct mdp_rect overlay_rect;
 
 class OverlayControlChannel {
 
+enum {
+    SET_NONE = 0,
+    SET_SHARPNESS,
+#ifdef USES_POST_PROCESSING
+    SET_HUE,
+    SET_BRIGHTNESS,
+    SET_SATURATION,
+    SET_CONTRAST,
+#endif
+    RESET_ALL,
+};
     bool mNoRot;
     int mFBNum;
     int mFBWidth;
@@ -261,6 +286,9 @@ class OverlayControlChannel {
     int mOrientation;
     unsigned int mFormat3D;
     bool mUIChannel;
+#ifdef USES_POST_PROCESSING
+    struct display_pp_conv_cfg hsic_cfg;
+#endif
     mdp_overlay mOVInfo;
     msm_rotator_img_info mRotInfo;
     msmfb_overlay_3d m3DOVInfo;
@@ -271,6 +299,7 @@ class OverlayControlChannel {
                                int requestType = NEW_REQUEST);
     bool startOVRotatorSessions(const overlay_buffer_info& info, int orientation, int requestType);
     void swapOVRotWidthHeight();
+    int commitVisualParam(int8_t paramType, float paramValue);
 
 public:
     OverlayControlChannel();
@@ -302,6 +331,7 @@ public:
     bool getPositionS3D(int channel, int format, overlay_rect *rect);
     bool updateOverlaySource(const overlay_buffer_info& info, int orientation, bool waitForVsync);
     bool getFormat() const { return mFormat; }
+    bool setVisualParam(int8_t paramType, float paramValue);
     bool useVirtualFB ();
     int getOverlayFlags() const { return mOVInfo.flags; }
 };
@@ -393,6 +423,7 @@ public:
                     bool ignoreFB = false, int numBuffers = 2);
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
     bool updateWaitForVsyncFlags(bool waitForVsync);
+    void setVisualParam(int8_t paramType, float paramValue);
     bool waitForHdmiVsync(int channel);
     int  getChannelStatus() const { return (mChannelUP ? OVERLAY_CHANNEL_UP: OVERLAY_CHANNEL_DOWN); }
     void setHDMIStatus (bool isHDMIConnected) { mHDMIConnected = isHDMIConnected; mState = -1; }
