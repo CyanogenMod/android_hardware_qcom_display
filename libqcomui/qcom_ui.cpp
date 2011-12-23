@@ -399,6 +399,10 @@ int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur)
                        (r.left + r.top*renderBuffer->stride)*bytesPerPixel;
         int w = r.width()*bytesPerPixel;
         int h = r.height();
+       if(((int)dst + w ) > (fbHandle->base + renderBuffer->stride*bytesPerPixel)){
+               LOGE("%s: Excedding the framebuffer limit",__FUNCTION__ ) ;
+               return -1;
+       }
         do {
             android_memset32((uint32_t*)dst, 0, w);
             dst += stride;
