@@ -26,7 +26,7 @@ using gralloc::alloc_data;
 namespace {
 /* helper functions */
 bool checkOVState(int w, int h, int format, int orientation,
-                            int zorder, const mdp_overlay& ov) {
+                    int zorder, bool ignoreFB, const mdp_overlay& ov) {
     switch(orientation) {
         case HAL_TRANSFORM_ROT_90:
         case HAL_TRANSFORM_ROT_270: {
@@ -44,6 +44,13 @@ bool checkOVState(int w, int h, int format, int orientation,
     bool displayAttrsCheck = ((srcw == ov.src.width) && (srch == ov.src.height) &&
                                  (format == ov.src.format));
     bool zOrderCheck = (ov.z_order == zorder);
+
+    int is_fg = 0;
+    if (ignoreFB)
+        is_fg = 1;
+
+    if (ov.is_fg != is_fg)
+        return false;
 
     if (displayAttrsCheck && zorder == overlay::NO_INIT)
         return true;
@@ -419,7 +426,8 @@ status_t OverlayUI::setSource(const overlay_buffer_info& info, int orientation,
         if (mobjOVHelper.getOVInfo(ov) == NO_ERROR) {
             if (mOrientation == orientation &&
                    mFBNum == fbnum &&
-                   checkOVState(info.width, info.height, format, orientation, zorder, ov))
+                   checkOVState(info.width, info.height, format, orientation,
+                                  zorder, ignoreFB, ov))
                 return NO_ERROR;
             else
                 mChannelState = PENDING_CLOSE;
