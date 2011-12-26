@@ -256,16 +256,8 @@ int PmemAshmemController::allocate(alloc_data& data, int usage,
 {
     int ret = 0;
 
-    // Decide caching
-    // Decide based on usage
-    uint32_t uread = usage & GRALLOC_USAGE_SW_READ_MASK;
-    uint32_t uwrite = usage & GRALLOC_USAGE_SW_WRITE_MASK;
-    if (uread == GRALLOC_USAGE_SW_READ_OFTEN ||
-        uwrite == GRALLOC_USAGE_SW_WRITE_OFTEN) {
+    // Make buffers cacheable by default
         data.uncached = false;
-    } else {
-        data.uncached = true;
-    }
 
     // Override if we explicitly need uncached buffers
     if (usage & GRALLOC_USAGE_PRIVATE_UNCACHED)
