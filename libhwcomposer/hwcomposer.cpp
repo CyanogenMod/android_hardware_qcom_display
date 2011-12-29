@@ -279,6 +279,8 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const bool wai
         info.height = hnd->height;
         info.format = hnd->format;
         info.size = hnd->size;
+        info.secure = (hnd->flags &
+                       private_handle_t::PRIV_FLAGS_SECURE_BUFFER)? true:false;
 
         int hdmiConnected = 0;
 
@@ -478,6 +480,8 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer, int index,
         info.height = sourceCrop.bottom - sourceCrop.top;
         info.format = hnd->format;
         info.size = hnd->size;
+        info.secure = (hnd->flags &
+                       private_handle_t::PRIV_FLAGS_SECURE_BUFFER)? true:false;
         const bool useVGPipe = true;
         //only last layer should wait for vsync
         const bool waitForVsync = (index == lastLayerIndex);

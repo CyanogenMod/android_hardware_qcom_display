@@ -63,7 +63,8 @@ static int gralloc_map(gralloc_module_t const* module,
 {
     private_handle_t* hnd = (private_handle_t*)handle;
     void *mappedAddress;
-    if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
+    if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) &&
+        !(hnd->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER)) {
         size_t size = hnd->size;
         sp<IMemAlloc> memalloc = getAllocator(hnd->flags) ;
         int err = memalloc->map_buffer(&mappedAddress, size,
