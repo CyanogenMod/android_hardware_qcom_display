@@ -110,6 +110,7 @@ struct overlay_buffer_info {
     int height;
     int format;
     int size;
+    bool secure;
 };
 
 /* values for copybit_set_parameter(OVERLAY_TRANSFORM) */
@@ -309,6 +310,7 @@ public:
 class OverlayDataChannel {
 
     bool mNoRot;
+    bool mSecure;
     int mFD;
     int mRotFD;
     int mPmemFD;
@@ -333,7 +335,7 @@ public:
     OverlayDataChannel();
     ~OverlayDataChannel();
     bool startDataChannel(const OverlayControlChannel& objOvCtrlChannel,
-                                int fbnum, bool norot = false,
+                                int fbnum, bool norot = false, bool secure = false,
                                 bool uichannel = false, int num_buffers = 2);
     bool startDataChannel(int ovid, int rotid, int size,
                        int fbnum, bool norot = false, bool uichannel = false,
