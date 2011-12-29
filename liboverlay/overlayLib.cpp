@@ -377,6 +377,7 @@ Overlay::Overlay() : mChannelUP(false), mHDMIConnected(false),
                      mCroppedSrcHeight(0), mState(-1) {
     mOVBufferInfo.width = mOVBufferInfo.height = 0;
     mOVBufferInfo.format = mOVBufferInfo.size = 0;
+    mOVBufferInfo.secure = false;
 }
 
 Overlay::~Overlay() {
@@ -414,7 +415,7 @@ bool Overlay::startChannel(const overlay_buffer_info& info, int fbnum,
     }
     objOvCtrlChannel[channel].setSize(info.size);
     return objOvDataChannel[channel].startDataChannel(objOvCtrlChannel[channel], fbnum,
-                                            norot, uichannel, num_buffers);
+                                            norot, info.secure, uichannel, num_buffers);
 }
 
 bool Overlay::closeChannel() {
@@ -442,6 +443,7 @@ bool Overlay::closeChannel() {
     mOVBufferInfo.height = 0;
     mOVBufferInfo.format = 0;
     mOVBufferInfo.size = 0;
+    mOVBufferInfo.secure = false;
     mState = -1;
     return true;
 }
@@ -1188,6 +1190,11 @@ bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& inf
     else
         mOVInfo.flags &= ~MDP_OV_PLAY_NOWAIT;
 
+    if(info.secure)
+         mOVInfo.flags |= MDP_SECURE_OVERLAY_SESSION;
+    else
+         mOVInfo.flags &= MDP_SECURE_OVERLAY_SESSION;
+
     return true;
 }
 
@@ -1645,9 +1652,11 @@ OverlayDataChannel::~OverlayDataChannel() {
 
 bool OverlayDataChannel::startDataChannel(
                const OverlayControlChannel& objOvCtrlChannel,
-               int fbnum, bool norot, bool uichannel, int num_buffers) {
+               int fbnum, bool norot, bool secure, bool uichannel,
+               int num_buffers) {
     int ovid, rotid, size;
     mNoRot = norot;
+    mSecure = secure;
     memset(&mOvData, 0, sizeof(mOvData));
     memset(&mOvDataRot, 0, sizeof(mOvDataRot));
     memset(&mRotData, 0, sizeof(mRotData));
@@ -1700,12 +1709,17 @@ bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int r
     data.align = getpagesize();
     data.uncached = true;
 
-    int allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP          |
-                     GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP   |
-                     GRALLOC_USAGE_PRIVATE_ADSP_HEAP        |
-                     GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
-    if((requestType == NEW_REQUEST) && !uiChannel)
-        allocFlags |= GRALLOC_USAGE_PRIVATE_SMI_HEAP;
+    int allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP   |
+                     GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP;
+
+    if(mSecure) {
+        allocFlags |= GRALLOC_USAGE_PROTECTED;
+    } else {
+        allocFlags |= GRALLOC_USAGE_PRIVATE_ADSP_HEAP        |
+                      GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+        if((requestType == NEW_REQUEST) && !uiChannel)
+            allocFlags |= GRALLOC_USAGE_PRIVATE_SMI_HEAP;
+    }
 
     int err = mAlloc->allocate(data, allocFlags, 0);
     if(err) {
