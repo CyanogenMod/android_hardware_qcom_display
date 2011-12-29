@@ -159,6 +159,8 @@ int IonController::allocate(alloc_data& data, int usage,
         data.allocType = private_handle_t::PRIV_FLAGS_USES_ION;
         if(noncontig)
             data.allocType |= private_handle_t::PRIV_FLAGS_NONCONTIGUOUS_MEM;
+        if(ionFlags & ION_SECURE)
+            data.allocType |= private_handle_t::PRIV_FLAGS_SECURE_BUFFER;
     }
 
 

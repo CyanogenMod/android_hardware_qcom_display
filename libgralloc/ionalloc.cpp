@@ -123,25 +123,29 @@ int IonAlloc::alloc_buffer(alloc_data& data)
         return err;
     }
 
-    base = mmap(0, ionAllocData.len, PROT_READ|PROT_WRITE,
-            MAP_SHARED, fd_data.fd, 0);
-    if(base == MAP_FAILED) {
-        LOGD("%s: Failed to map the allocated memory: %s",
-                __FUNCTION__, strerror(errno));
-        err = -errno;
-        ioctl(mIonFd, ION_IOC_FREE, &handle_data);
-        close_device();
-        ionSyncFd = FD_INIT;
-        return err;
+    if(!(data.flags & ION_SECURE)) {
+
+        base = mmap(0, ionAllocData.len, PROT_READ|PROT_WRITE,
+                                MAP_SHARED, fd_data.fd, 0);
+        if(base == MAP_FAILED) {
+            LOGD("%s: Failed to map the allocated memory: %s",
+                                    __FUNCTION__, strerror(errno));
+            err = -errno;
+            ioctl(mIonFd, ION_IOC_FREE, &handle_data);
+            close_device();
+            ionSyncFd = FD_INIT;
+            return err;
+        }
+        memset(base, 0, ionAllocData.len);
+        // Clean cache after memset
+        clean_buffer(base, data.size, data.offset, fd_data.fd);
     }
+
     //Close the uncached FD since we no longer need it;
     if(ionSyncFd >= 0)
         close(ionSyncFd);
     ionSyncFd = FD_INIT;
 
-    memset(base, 0, ionAllocData.len);
-    // Clean cache after memset
-    clean_buffer(base, data.size, data.offset, fd_data.fd);
     data.base = base;
     data.fd = fd_data.fd;
     ioctl(mIonFd, ION_IOC_FREE, &handle_data);
@@ -161,11 +165,8 @@ int IonAlloc::free_buffer(void* base, size_t size, int offset, int fd)
     if (err)
         return err;
 
-    if(!base) {
-        LOGE("Invalid free");
-        return -EINVAL;
-    }
-    err = unmap_buffer(base, size, offset);
+    if(base)
+        err = unmap_buffer(base, size, offset);
     close(fd);
     return err;
 }
