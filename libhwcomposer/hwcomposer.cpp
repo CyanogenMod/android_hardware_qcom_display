@@ -243,7 +243,8 @@ void unlockPreviousBypassBuffers(hwc_context_t* ctx) {
 void closeBypass(hwc_context_t* ctx) {
         unlockPreviousBypassBuffers(ctx);
         for (int index = 0 ; index < MAX_BYPASS_LAYERS; index++) {
-            ctx->mOvUI[index]->closeChannel();
+            if (overlay::CLOSED != ctx->mOvUI[index]->isChannelUP())
+                ctx->mOvUI[index]->closeChannel();
         }
         #ifdef DEBUG
             LOGE("%s", __FUNCTION__);
@@ -608,6 +609,24 @@ inline static bool isBypassEfficient(const framebuffer_device_t* fbDev,
 }
 
 bool setupBypass(hwc_context_t* ctx, hwc_layer_list_t* list) {
+    int currentBypassLayerCount = list->numHwLayers;
+    // Check the number of open bypass channels
+
+    int openBypassChannels = 0;
+    for (int index = 0; index < MAX_BYPASS_LAYERS; index++) {
+        if (overlay::UP == ctx->mOvUI[index]->isChannelUP()) {
+            openBypassChannels++;
+        }
+    }
+    if (openBypassChannels && (openBypassChannels != currentBypassLayerCount)) {
+        // Number of overlay channels that are open is not the same as
+        // the number of bypass channels. We could run into an issue
+        // where the channels could potentially move into an incorrect/inconsistent
+        // stste. Return a failure so that the channels can be closed and re-opened
+        // with the correct states.
+        return false;
+    }
+
     for (int index = 0 ; index < list->numHwLayers; index++) {
         if(prepareBypass(ctx, &(list->hwLayers[index]), index,
                 list->numHwLayers - 1) != 0) {
@@ -926,6 +945,7 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
 #ifdef COMPOSITION_BYPASS
         //Check if bypass is feasible
+        bool unsetBypass = false;
         if(isBypassDoable(dev, yuvBufferCount, list) &&
                 isBypassEfficient(hwcModule->fbDevice, list, ctx)) {
             //Setup bypass
@@ -934,13 +954,22 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 setBypassLayerFlags(ctx, list);
                 list->flags |= HWC_SKIP_COMPOSITION;
                 ctx->bypassState = BYPASS_ON;
+            } else {
+                unsetBypass = true;
             }
         } else {
+            unsetBypass = true;
+        }
+
+        if (unsetBypass) {
             unlockPreviousBypassBuffers(ctx);
             unsetBypassLayerFlags(list);
             unsetBypassBufferLockState(ctx);
             if(ctx->bypassState == BYPASS_ON) {
                 ctx->bypassState = BYPASS_OFF_PENDING;
+            } else if (BYPASS_OFF == ctx->bypassState) {
+                // If bypass is off, close any open overlay channels.
+                closeBypass(ctx);
             }
         }
 #endif
