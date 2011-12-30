@@ -73,6 +73,9 @@ int AshmemAlloc::alloc_buffer(alloc_data& data)
         data.base = base;
         data.offset = offset;
         clean_buffer(base, data.size, offset, fd);
+        LOGD("ashmem: Allocated buffer base:%p size:%d fd:%d",
+                                base, data.size, fd);
+
     }
     return err;
 
@@ -80,8 +83,8 @@ int AshmemAlloc::alloc_buffer(alloc_data& data)
 
 int AshmemAlloc::free_buffer(void* base, size_t size, int offset, int fd)
 {
-    LOGD("%s:Freeing buffer size=%d base=%p fd=%d PID=%d",
-            __FUNCTION__, size, base, fd, getpid());
+    LOGD("ashmem: Freeing buffer base:%p size:%d fd:%d",
+                            base, size, fd);
     int err = 0;
 
     if(!base) {
@@ -95,44 +98,39 @@ int AshmemAlloc::free_buffer(void* base, size_t size, int offset, int fd)
 
 int AshmemAlloc::map_buffer(void **pBase, size_t size, int offset, int fd)
 {
-    LOGD("%s: Mapping buffer fd=%d size=%d PID=%d", __FUNCTION__,
-            fd, size, getpid());
     int err = 0;
     void *base = 0;
-    if (err)
-        return err;
 
     base = mmap(0, size, PROT_READ| PROT_WRITE,
             MAP_SHARED|MAP_POPULATE, fd, 0);
     *pBase = base;
     if(base == MAP_FAILED) {
-        LOGD("%s: Failed to map memory in the client: %s",
-                __FUNCTION__, strerror(errno));
+        LOGE("ashmem: Failed to map memory in the client: %s",
+                                strerror(errno));
         err = -errno;
     } else {
-        LOGD("%s: Successfully mapped %d bytes", __FUNCTION__, size);
+        LOGD("ashmem: Mapped buffer base:%p size:%d fd:%d",
+                 base, size, fd);
     }
     return err;
 }
 
 int AshmemAlloc::unmap_buffer(void *base, size_t size, int offset)
 {
-    LOGD("%s: Unmapping buffer at address %p", __FUNCTION__, base);
+    LOGD("ashmem: Unmapping buffer base: %p size: %d", base, size);
     int err = munmap(base, size);
     if(err) {
-        LOGE("%s: Failed to unmap memory at %p: %s",
-                __FUNCTION__, base, strerror(errno));
+        LOGE("ashmem: Failed to unmap memory at %p: %s",
+                                base, strerror(errno));
     }
     return err;
 
 }
 int AshmemAlloc::clean_buffer(void *base, size_t size, int offset, int fd)
 {
-    //    LOGD("%s: Clean buffer fd=%d base = %p size=%d PID=%d", __FUNCTION__,
-    //                            fd, base, size, getpid());
     int err = 0;
     if (ioctl(fd, ASHMEM_CACHE_FLUSH_RANGE, NULL)) {
-        LOGE("ASHMEM_CACHE_FLUSH_RANGE failed fd = %d", fd);
+        LOGE("ashmem: ASHMEM_CACHE_FLUSH_RANGE failed fd = %d", fd);
     }
 
     return err;
