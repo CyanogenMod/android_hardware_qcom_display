@@ -107,10 +107,6 @@ int IonAlloc::alloc_buffer(alloc_data& data)
 
     fd_data.handle = ionAllocData.handle;
     handle_data.handle = ionAllocData.handle;
-    LOGD("%s: Trying ION_IOC_MAP pid=%d handle=%p size=%d mIonFd=%d flags=%x",
-            __FUNCTION__, getpid(), ionAllocData.handle,
-            ionAllocData.len, mIonFd, ionAllocData.flags);
-
     err = ioctl(iFd, ION_IOC_MAP, &fd_data);
     if(err) {
         LOGE("%s: ION_IOC_MAP failed with error - %s",
@@ -128,7 +124,7 @@ int IonAlloc::alloc_buffer(alloc_data& data)
         base = mmap(0, ionAllocData.len, PROT_READ|PROT_WRITE,
                                 MAP_SHARED, fd_data.fd, 0);
         if(base == MAP_FAILED) {
-            LOGD("%s: Failed to map the allocated memory: %s",
+            LOGE("%s: Failed to map the allocated memory: %s",
                                     __FUNCTION__, strerror(errno));
             err = -errno;
             ioctl(mIonFd, ION_IOC_FREE, &handle_data);
@@ -149,17 +145,16 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     data.base = base;
     data.fd = fd_data.fd;
     ioctl(mIonFd, ION_IOC_FREE, &handle_data);
-    LOGD("%s: ION alloc succeeded - mIonFd=%d, SharedFD=%d PID=%d size=%d"
-            " ionHandle=%p", __FUNCTION__, mIonFd, fd_data.fd, getpid(),
-            ionAllocData.len, ionAllocData.handle);
+    LOGD("ion: Allocated buffer base:%p size:%d fd:%d",
+                            data.base, ionAllocData.len, data.fd);
     return err;
 }
 
 
 int IonAlloc::free_buffer(void* base, size_t size, int offset, int fd)
 {
-    LOGD("%s:Freeing buffer size=%d base=%p mIonFd=%d fd=%d PID=%d",
-            __FUNCTION__, size, base, mIonFd, fd, getpid());
+    LOGD("ion: Freeing buffer base:%p size:%d fd:%d",
+            base, size, fd);
     int err = 0;
     err = open_device();
     if (err)
@@ -173,8 +168,6 @@ int IonAlloc::free_buffer(void* base, size_t size, int offset, int fd)
 
 int IonAlloc::map_buffer(void **pBase, size_t size, int offset, int fd)
 {
-    LOGD("%s: Mapping buffer fd=%d size=%d PID=%d", __FUNCTION__,
-            fd, size, getpid());
     int err = 0;
     void *base = 0;
     // It is a (quirky) requirement of ION to have opened the
@@ -187,30 +180,29 @@ int IonAlloc::map_buffer(void **pBase, size_t size, int offset, int fd)
             MAP_SHARED, fd, 0);
     *pBase = base;
     if(base == MAP_FAILED) {
-        LOGD("%s: Failed to map memory in the client: %s",
-                __FUNCTION__, strerror(errno));
+        LOGD("ion: Failed to map memory in the client: %s",
+                                strerror(errno));
         err = -errno;
     } else {
-        LOGD("%s: Successfully mapped %d bytes", __FUNCTION__, size);
+        LOGD("ion: Mapped buffer base:%p size:%d offset:%d fd:%d",
+                                base, size, offset, fd);
     }
     return err;
 }
 
 int IonAlloc::unmap_buffer(void *base, size_t size, int offset)
 {
-    LOGD("%s: Unmapping buffer at address %p", __FUNCTION__, base);
+    LOGD("ion: Unmapping buffer  base:%p size:%d", base, size);
     int err = munmap(base, size);
     if(err) {
-        LOGE("%s: Failed to unmap memory at %p: %s",
-                __FUNCTION__, base, strerror(errno));
+        LOGE("ion: Failed to unmap memory at %p : %s",
+                 base, strerror(errno));
     }
     return err;
 
 }
 int IonAlloc::clean_buffer(void *base, size_t size, int offset, int fd)
 {
-    //    LOGD("%s: Clean buffer fd=%d base = %p size=%d PID=%d", __FUNCTION__,
-    //                            fd, base, size, getpid());
     struct ion_flush_data flush_data;
     struct ion_fd_data fd_data;
     struct ion_handle_data handle_data;
