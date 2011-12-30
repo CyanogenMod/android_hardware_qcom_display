@@ -245,8 +245,8 @@ int PmemUserspaceAlloc::map_buffer(void **pBase, size_t size, int offset, int fd
             MAP_SHARED, fd, 0);
     *pBase = base;
     if(base == MAP_FAILED) {
-        LOGD("%s: Failed to map memory in the client: %s",
-                mPmemDev, strerror(errno));
+        LOGE("%s: Failed to map buffer size:%d offset:%d fd:%d Error: %s",
+                mPmemDev, size, offset, fd, strerror(errno));
         err = -errno;
     } else {
         LOGD("%s: Mapped buffer base:%p size:%d offset:%d fd:%d",
@@ -265,7 +265,9 @@ int PmemUserspaceAlloc::unmap_buffer(void *base, size_t size, int offset)
     LOGD("%s: Unmapping buffer base:%p size:%d offset:%d",
             mPmemDev , base, size, offset);
     if (munmap(base, size) < 0) {
-        LOGE("Could not unmap %s", strerror(errno));
+        LOGE("%s: Failed to unmap memory at %p :%s",
+                   mPmemDev, base, strerror(errno));
+
         err = -errno;
     }
 
@@ -323,12 +325,17 @@ int PmemKernelAlloc::alloc_buffer(alloc_data& data)
     data.base = base;
     data.offset = 0;
     data.fd = fd;
+    LOGD("%s: Allocated buffer base:%p size:%d fd:%d",
+                            mPmemDev, base, size, fd);
     return 0;
 
 }
 
 int PmemKernelAlloc::free_buffer(void* base, size_t size, int offset, int fd)
 {
+    LOGD("%s: Freeing buffer base:%p size:%d fd:%d",
+            mPmemDev, base, size, fd);
+
     int err =  unmap_buffer(base, size, offset);
     close(fd);
     return err;
@@ -341,11 +348,12 @@ int PmemKernelAlloc::map_buffer(void **pBase, size_t size, int offset, int fd)
             MAP_SHARED, fd, 0);
     *pBase = base;
     if(base == MAP_FAILED) {
-        LOGD("%s: Failed to map memory in the client: %s",
-                __func__, strerror(errno));
+        LOGE("%s: Failed to map memory in the client: %s",
+                mPmemDev, strerror(errno));
         err = -errno;
     } else {
-        LOGD("%s: Mapped %d bytes", __func__, size);
+        LOGD("%s: Mapped buffer base:%p size:%d, fd:%d",
+                                mPmemDev, base, size, fd);
     }
     return err;
 
@@ -357,7 +365,8 @@ int PmemKernelAlloc::unmap_buffer(void *base, size_t size, int offset)
     munmap(base, size);
     if (err < 0) {
         err = -errno;
-        LOGW("Error unmapping pmem fd: %s", strerror(err));
+        LOGW("%s: Error unmapping memory at %p: %s",
+                                mPmemDev, base, strerror(err));
     }
     return err;
 
