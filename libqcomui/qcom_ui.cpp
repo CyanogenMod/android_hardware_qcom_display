@@ -28,16 +28,21 @@
  */
 
 #include <cutils/log.h>
+#include <cutils/memory.h>
 #include <qcom_ui.h>
 #include <gralloc_priv.h>
 #include <alloc_controller.h>
 #include <memalloc.h>
 #include <errno.h>
+#include <cutils/properties.h>
+#include <EGL/eglext.h>
 
 using gralloc::IMemAlloc;
 using gralloc::IonController;
 using gralloc::alloc_data;
 using android::sp;
+
+static int sCompositionType = -1;
 
 namespace {
 
@@ -291,3 +296,117 @@ int getPerFrameFlags(int hwclFlags, int layerFlags) {
     return flags;
 }
 
+
+/*
+ * Checks if FB is updated by this composition type
+ *
+ * @param: composition type
+ * @return: true if FB is updated, false if not
+ */
+
+bool isUpdatingFB(HWCCompositionType compositionType)
+{
+    switch(compositionType)
+    {
+        case HWC_USE_COPYBIT:
+            return true;
+        default:
+            LOGE("%s: invalid composition type(%d)", __FUNCTION__, compositionType);
+            return false;
+    };
+}
+
+/*
+ * Get the current composition Type
+ *
+ * @return the compositon Type
+ */
+int getCompositionType() {
+    char property[PROPERTY_VALUE_MAX];
+    int compositionType = 0;
+    if (property_get("debug.sf.hw", property, NULL) > 0) {
+        if(atoi(property) == 0) {
+            compositionType = COMPOSITION_TYPE_CPU;
+        } else { //debug.sf.hw = 1
+            property_get("debug.composition.type", property, NULL);
+            if (property == NULL) {
+                compositionType = COMPOSITION_TYPE_GPU;
+            } else if ((strncmp(property, "mdp", 3)) == 0) {
+                compositionType = COMPOSITION_TYPE_MDP;
+            } else if ((strncmp(property, "c2d", 3)) == 0) {
+                compositionType = COMPOSITION_TYPE_C2D;
+            } else if ((strncmp(property, "dyn", 3)) == 0) {
+                compositionType = COMPOSITION_TYPE_DYN;
+            } else {
+                compositionType = COMPOSITION_TYPE_GPU;
+            }
+        }
+    } else { //debug.sf.hw is not set. Use cpu composition
+        compositionType = COMPOSITION_TYPE_CPU;
+    }
+    return compositionType;
+}
+
+/*
+ * Clear Region implementation for C2D/MDP versions.
+ *
+ * @param: region to be cleared
+ * @param: EGL Display
+ * @param: EGL Surface
+ *
+ * @return 0 on success
+ */
+int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur)
+{
+    int ret = 0;
+
+    if (-1 == sCompositionType) {
+        sCompositionType = getCompositionType();
+    }
+
+    if ((COMPOSITION_TYPE_MDP != sCompositionType) &&
+        (COMPOSITION_TYPE_C2D != sCompositionType) &&
+        (COMPOSITION_TYPE_CPU != sCompositionType)) {
+        // For non CPU/C2D/MDP composition, return an error, so that SF can use
+        // the GPU to draw the wormhole.
+        return -1;
+    }
+
+    android_native_buffer_t *renderBuffer = (android_native_buffer_t *)
+                                        eglGetRenderBufferANDROID(dpy, sur);
+    if (!renderBuffer) {
+        LOGE("%s: eglGetRenderBufferANDROID returned NULL buffer",
+            __FUNCTION__);
+            return -1;
+    }
+    private_handle_t *fbHandle = (private_handle_t *)renderBuffer->handle;
+    if(!fbHandle) {
+        LOGE("%s: Framebuffer handle is NULL", __FUNCTION__);
+        return -1;
+    }
+
+    int bytesPerPixel = 4;
+    if (HAL_PIXEL_FORMAT_RGB_565 == fbHandle->format) {
+        bytesPerPixel = 2;
+    }
+
+    Region::const_iterator it = region.begin();
+    Region::const_iterator const end = region.end();
+    const int32_t stride = renderBuffer->stride*bytesPerPixel;
+    while (it != end) {
+        const Rect& r = *it++;
+        uint8_t* dst = (uint8_t*) fbHandle->base +
+                       (r.left + r.top*renderBuffer->stride)*bytesPerPixel;
+        int w = r.width()*bytesPerPixel;
+        int h = r.height();
+        do {
+            if(4 == bytesPerPixel)
+                android_memset32((uint32_t*)dst, 0, w);
+            else
+                android_memset16((uint16_t*)dst, 0, w);
+            dst += stride;
+        } while(--h);
+    }
+
+    return 0;
+}

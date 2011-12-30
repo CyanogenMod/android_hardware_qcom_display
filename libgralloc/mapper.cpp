@@ -152,7 +152,7 @@ int gralloc_register_buffer(gralloc_module_t const* module,
         }
 
         // Attach the genlock handle
-        if (GENLOCK_FAILURE == genlock_attach_lock((native_handle_t *)handle)) {
+        if (GENLOCK_NO_ERROR != genlock_attach_lock((native_handle_t *)handle)) {
             LOGE("%s: genlock_attach_lock failed", __FUNCTION__);
             gralloc_unmap(module, handle);
             hnd->base = 0;
@@ -252,7 +252,7 @@ int gralloc_lock(gralloc_module_t const* module,
         }
 
         int timeout = GENLOCK_MAX_TIMEOUT;
-        if (GENLOCK_FAILURE == genlock_lock_buffer((native_handle_t *)handle,
+        if (GENLOCK_NO_ERROR != genlock_lock_buffer((native_handle_t *)handle,
                                                    (genlock_lock_type)lockType,
                                                    timeout)) {
             LOGE("%s: genlock_lock_buffer (lockType=0x%x) failed", __FUNCTION__,
@@ -292,7 +292,7 @@ int gralloc_unlock(gralloc_module_t const* module,
 
     if ((hnd->flags & private_handle_t::PRIV_FLAGS_SW_LOCK)) {
         // Unlock the buffer.
-        if (GENLOCK_FAILURE == genlock_unlock_buffer((native_handle_t *)handle)) {
+        if (GENLOCK_NO_ERROR != genlock_unlock_buffer((native_handle_t *)handle)) {
             LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
             return -EINVAL;
         } else

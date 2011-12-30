@@ -8,7 +8,8 @@ LOCAL_SHARED_LIBRARIES := \
         libutils \
         libcutils \
         libmemalloc \
-        libui
+        libui \
+        libEGL
 
 LOCAL_C_INCLUDES := $(TOP)/hardware/qcom/display/libgralloc \
 LOCAL_CFLAGS := -DLOG_TAG=\"libQcomUI\"

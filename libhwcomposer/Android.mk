@@ -13,6 +13,7 @@ LOCAL_SRC_FILES := 	\
 	
 LOCAL_MODULE := hwcomposer.$(TARGET_BOARD_PLATFORM)
 LOCAL_CFLAGS:= -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).hwcomposer\"
+LOCAL_CFLAGS += -DQCOM_HARDWARE
 
 LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
 LOCAL_C_INCLUDES += hardware/qcom/display/liboverlay
@@ -22,8 +23,8 @@ LOCAL_C_INCLUDES += hardware/qcom/display/libqcomui
 
 LOCAL_CFLAGS += -DQCOM_HARDWARE
 
-ifeq ($(TARGET_HAVE_HDMI_OUT),true)
-LOCAL_CFLAGS += -DHDMI_DUAL_DISPLAY
+ifeq ($(TARGET_QCOM_HDMI_OUT),true)
+LOCAL_CFLAGS += -DHDMI_DUAL_DISPLAY -DQCOM_HDMI_OUT
 endif
 ifeq ($(TARGET_USES_OVERLAY),true)
 LOCAL_CFLAGS += -DUSE_OVERLAY

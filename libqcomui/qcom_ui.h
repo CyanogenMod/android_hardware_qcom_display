@@ -32,7 +32,11 @@
 
 #include <cutils/native_handle.h>
 #include <ui/GraphicBuffer.h>
+#include <hardware/hwcomposer.h>
+#include <ui/Region.h>
+#include <EGL/egl.h>
 
+using namespace android;
 using android::sp;
 using android::GraphicBuffer;
 
@@ -42,6 +46,15 @@ using android::GraphicBuffer;
 enum {
     NATIVE_WINDOW_SET_BUFFERS_SIZE        = 0x10000000,
     NATIVE_WINDOW_UPDATE_BUFFERS_GEOMETRY = 0x20000000,
+};
+
+// Enum containing the supported composition types
+enum {
+    COMPOSITION_TYPE_GPU = 0,
+    COMPOSITION_TYPE_MDP = 0x1,
+    COMPOSITION_TYPE_C2D = 0x2,
+    COMPOSITION_TYPE_CPU = 0x4,
+    COMPOSITION_TYPE_DYN = 0x8
 };
 
 /*
@@ -66,6 +79,12 @@ enum {
     HWC_USE_ORIGINAL_RESOLUTION = 0x10000000,
     HWC_DO_NOT_USE_OVERLAY      = 0x20000000,
     HWC_COMP_BYPASS             = 0x40000000,
+};
+
+enum HWCCompositionType {
+    HWC_USE_GPU = HWC_FRAMEBUFFER, // This layer is to be handled by Surfaceflinger
+    HWC_USE_OVERLAY = HWC_OVERLAY, // This layer is to be handled by the overlay
+    HWC_USE_COPYBIT                // This layer is to be handled by copybit
 };
 
 /*
@@ -155,4 +174,30 @@ int updateLayerQcomFlags(eLayerAttrib attribute, bool enable, int& currentFlags)
  */
 int getPerFrameFlags(int hwclFlags, int layerFlags);
 
+/*
+ * Checks if FB is updated by this composition type
+ *
+ * @param: composition type
+ * @return: true if FB is updated, false if not
+ */
+
+bool isUpdatingFB(HWCCompositionType compositionType);
+
+/*
+ * Get the current composition Type
+ *
+ * @return the compositon Type
+ */
+int getCompositionType();
+
+/*
+ * Clear region implementation for C2D/MDP versions.
+ *
+ * @param: region to be cleared
+ * @param: EGL Display
+ * @param: EGL Surface
+ *
+ * @return 0 on success
+ */
+int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur);
 #endif // INCLUDE_LIBQCOM_UI
