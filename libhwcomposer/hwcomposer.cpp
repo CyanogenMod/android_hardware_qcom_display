@@ -1042,10 +1042,25 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
         LOGE("%s: genlock_lock_buffer(READ) failed", __FUNCTION__);
         return -1;
     }
-
-    // Set the copybit source:
+    //render buffer
+    android_native_buffer_t *renderBuffer = (android_native_buffer_t *)eglGetRenderBufferANDROID(dpy, surface);
+    if (!renderBuffer) {
+        LOGE("eglGetRenderBufferANDROID returned NULL buffer");
+        genlock_unlock_buffer(hnd);
+        return -1;
+    }
+    private_handle_t *fbHandle = (private_handle_t *)renderBuffer->handle;
+    if(!fbHandle) {
+        LOGE("Framebuffer handle is NULL");
+        genlock_unlock_buffer(hnd);
+        return -1;
+    }
+    int alignment = 32;
+    if( HAL_PIXEL_FORMAT_RGB_565 == fbHandle->format )
+        alignment = 16;
+     // Set the copybit source:
     copybit_image_t src;
-    src.w = ALIGN(hnd->width, 32);
+    src.w = ALIGN(hnd->width, alignment);
     src.h = hnd->height;
     src.format = hnd->format;
     src.base = (void *)hnd->base;
@@ -1070,19 +1085,7 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
 
     // Copybit dst
     copybit_image_t dst;
-    android_native_buffer_t *renderBuffer = (android_native_buffer_t *)eglGetRenderBufferANDROID(dpy, surface);
-    if (!renderBuffer) {
-        LOGE("eglGetRenderBufferANDROID returned NULL buffer");
-        genlock_unlock_buffer(hnd);
-        return -1;
-    }
-    private_handle_t *fbHandle = (private_handle_t *)renderBuffer->handle;
-    if(!fbHandle) {
-        LOGE("Framebuffer handle is NULL");
-        genlock_unlock_buffer(hnd);
-        return -1;
-    }
-    dst.w = ALIGN(fbHandle->width,32);
+    dst.w = ALIGN(fbHandle->width,alignment);
     dst.h = fbHandle->height;
     dst.format = fbHandle->format;
     dst.base = (void *)fbHandle->base;
