@@ -13,6 +13,7 @@ LOCAL_SHARED_LIBRARIES := \
 
 LOCAL_C_INCLUDES := $(TOP)/hardware/qcom/display/libgralloc \
 LOCAL_CFLAGS := -DLOG_TAG=\"libQcomUI\"
+LOCAL_CFLAGS += -DQCOM_HARDWARE
 LOCAL_MODULE := libQcomUI
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_SHARED_LIBRARY)
