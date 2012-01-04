@@ -90,8 +90,9 @@ int overlay::get_rot_output_format(int format) {
     case MDP_Y_CRCB_H2V2_TILE:
         return MDP_Y_CRCB_H2V2;
     case MDP_Y_CB_CR_H2V2:
-    case MDP_Y_CR_CB_GH2V2:
         return MDP_Y_CBCR_H2V2;
+    case MDP_Y_CR_CB_GH2V2:
+        return MDP_Y_CRCB_H2V2;
     default:
         return format;
     }
@@ -1341,14 +1342,14 @@ bool OverlayControlChannel::setTransform(int value, bool fetch) {
     If rotator is used, set Overlay input to non-tiled
     Else, overlay input remains tiled */
     if (mOVInfo.user_data[0]) {
-        if (mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE)
-            mOVInfo.src.format = MDP_Y_CRCB_H2V2;
+        mOVInfo.src.format = get_rot_output_format(mRotInfo.src.format);
         mRotInfo.enable = 1;
     }
     else {
-        if(mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE)
-            mOVInfo.src.format = MDP_Y_CRCB_H2V2_TILE;
-
+        //We can switch between rotator ON and OFF. Reset overlay
+        //i/p format whenever this happens
+        if(mRotInfo.dst.format == mOVInfo.src.format)
+            mOVInfo.src.format = mRotInfo.src.format;
         mRotInfo.enable = 0;
         //Always enable rotation for UI mirror usecase
         if(mUIChannel)
