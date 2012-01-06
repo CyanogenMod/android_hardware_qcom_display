@@ -1195,6 +1195,10 @@ bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& inf
     else
          mOVInfo.flags &= MDP_SECURE_OVERLAY_SESSION;
 
+    //set the default sharpening settings
+    mOVInfo.flags |= MDP_SHARPENING;
+    mOVInfo.dpp.sharp_strength = 0;
+
     return true;
 }
 
