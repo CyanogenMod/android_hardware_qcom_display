@@ -25,42 +25,6 @@ using gralloc::alloc_data;
 
 namespace {
 /* helper functions */
-bool checkOVState(int w, int h, int format, int orientation,
-                    int zorder, bool ignoreFB, const mdp_overlay& ov) {
-    switch(orientation) {
-        case HAL_TRANSFORM_ROT_90:
-        case HAL_TRANSFORM_ROT_270: {
-            int tmp = w;
-            w = h;
-            h = tmp;
-            break;
-        }
-        default:
-            break;
-    }
-
-    int srcw = (w + 31) & ~31;
-    int srch = (h + 31) & ~31;
-    bool displayAttrsCheck = ((srcw == ov.src.width) && (srch == ov.src.height) &&
-                                 (format == ov.src.format));
-    bool zOrderCheck = (ov.z_order == zorder);
-
-    int is_fg = 0;
-    if (ignoreFB)
-        is_fg = 1;
-
-    if (ov.is_fg != is_fg)
-        return false;
-
-    if (displayAttrsCheck && zorder == overlay::NO_INIT)
-        return true;
-
-    if (displayAttrsCheck && zorder != overlay::NO_INIT
-                            && ov.z_order == zorder)
-        return true;
-    return false;
-}
-
 void swapOVRotWidthHeight(msm_rotator_img_info& rotInfo,
                                  mdp_overlay& ovInfo) {
     int srcWidth = ovInfo.src.width;
@@ -74,72 +38,6 @@ void swapOVRotWidthHeight(msm_rotator_img_info& rotInfo,
     int dstWidth = rotInfo.dst.width;
     rotInfo.dst.width = rotInfo.dst.height;
     rotInfo.dst.height = dstWidth;
-}
-
-void setupOvRotInfo(int w, int h, int format, int orientation,
-                             mdp_overlay& ovInfo, msm_rotator_img_info& rotInfo) {
-    memset(&ovInfo, 0, sizeof(ovInfo));
-    memset(&rotInfo, 0, sizeof(rotInfo));
-    ovInfo.id = MSMFB_NEW_REQUEST;
-    int srcw = (w + 31) & ~31;
-    int srch = (h + 31) & ~31;
-    ovInfo.src.width = srcw;
-    ovInfo.src.height = srch;
-    ovInfo.src.format = format;
-    ovInfo.src_rect.w = w;
-    ovInfo.src_rect.h = h;
-    ovInfo.alpha = 0xff;
-    ovInfo.transp_mask = 0xffffffff;
-    rotInfo.src.format = format;
-    rotInfo.dst.format = format;
-    rotInfo.src.width = srcw;
-    rotInfo.src.height = srch;
-    rotInfo.src_rect.w = srcw;
-    rotInfo.src_rect.h = srch;
-    rotInfo.dst.width = srcw;
-    rotInfo.dst.height = srch;
-
-    int rot = orientation;
-    switch(rot) {
-        case 0:
-        case HAL_TRANSFORM_FLIP_H:
-        case HAL_TRANSFORM_FLIP_V:
-            rot = 0;
-            break;
-        case HAL_TRANSFORM_ROT_90:
-        case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H):
-        case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V): {
-            int tmp = ovInfo.src_rect.x;
-            ovInfo.src_rect.x = ovInfo.src.height -
-                                 (ovInfo.src_rect.y + ovInfo.src_rect.h);
-            ovInfo.src_rect.y = tmp;
-            swapOVRotWidthHeight(rotInfo, ovInfo);
-            rot = HAL_TRANSFORM_ROT_90;
-            break;
-        }
-        case HAL_TRANSFORM_ROT_180:
-            break;
-        case HAL_TRANSFORM_ROT_270: {
-            int tmp = ovInfo.src_rect.y;
-            ovInfo.src_rect.y = ovInfo.src.width -
-                                   (ovInfo.src_rect.x + ovInfo.src_rect.w);
-            ovInfo.src_rect.x = tmp;
-            swapOVRotWidthHeight(rotInfo, ovInfo);
-            break;
-        }
-        default:
-            break;
-    }
-
-    int mdp_rotation = overlay::get_mdp_orientation(rot);
-    if (mdp_rotation < 0)
-        mdp_rotation = 0;
-    ovInfo.user_data[0] = mdp_rotation;
-    rotInfo.rotations = ovInfo.user_data[0];
-    if (mdp_rotation)
-        rotInfo.enable = 1;
-    ovInfo.dst_rect.w = ovInfo.src_rect.w;
-    ovInfo.dst_rect.h = ovInfo.src_rect.h;
 }
 
 bool isRGBType(int format) {
@@ -193,7 +91,7 @@ namespace overlay {
 
 status_t Display::openDisplay(int fbnum) {
     if (mFD != NO_INIT)
-        return ALREADY_EXISTS;
+        return NO_ERROR;
 
     status_t ret = NO_INIT;
     char const * const device_template =
@@ -223,90 +121,9 @@ status_t Display::openDisplay(int fbnum) {
     return ret;
 }
 
-status_t OVHelper::startOVSession(mdp_overlay& ovInfo, int fbnum) {
-    status_t ret = NO_INIT;
-
-    if (mSessionID == NO_INIT) {
-        ret = mobjDisplay.openDisplay(fbnum);
-        if (ret != NO_ERROR)
-            return ret;
-
-        if (ioctl(mobjDisplay.getFD(), MSMFB_OVERLAY_SET, &ovInfo)) {
-            LOGE("OVerlay set failed..");
-            mobjDisplay.closeDisplay();
-            ret = BAD_VALUE;
-        }
-        else {
-            mSessionID = ovInfo.id;
-            mOVInfo = ovInfo;
-            ret  = NO_ERROR;
-        }
-    }
-    else
-        ret = ALREADY_EXISTS;
-
-    return ret;
-}
-
-status_t OVHelper::queueBuffer(msmfb_overlay_data ovData) {
-    if (mSessionID == NO_INIT)
-        return NO_INIT;
-
-    ovData.id = mSessionID;
-    if (ioctl(mobjDisplay.getFD(), MSMFB_OVERLAY_PLAY, &ovData))
-        return BAD_VALUE;
-
-    return NO_ERROR;
-}
-
-status_t OVHelper::closeOVSession() {
-    if (mSessionID != NO_INIT) {
-        ioctl(mobjDisplay.getFD(), MSMFB_OVERLAY_UNSET, &mSessionID);
-        mobjDisplay.closeDisplay();
-    }
-
-    mSessionID = NO_INIT;
-
-    return NO_ERROR;
-}
-
-status_t OVHelper::setPosition(int x, int y, int w, int h) {
-    status_t ret = BAD_VALUE;
-    if (mSessionID != NO_INIT) {
-        int fd = mobjDisplay.getFD();
-        if (x < 0 || y < 0 || ((x + w) > getFBWidth())) {
-            LOGE("set position failed, invalid argument");
-            return ret;
-        }
-
-        mdp_overlay ov;
-        ov.id = mSessionID;
-        if (!ioctl(fd, MSMFB_OVERLAY_GET, &ov)) {
-            if (x != ov.dst_rect.x || y != ov.dst_rect.y ||
-                      w != ov.dst_rect.w || h != ov.dst_rect.h) {
-                ov.dst_rect.x = x;
-                ov.dst_rect.y = y;
-                ov.dst_rect.w = w;
-                ov.dst_rect.h = h;
-                if (ioctl(fd, MSMFB_OVERLAY_SET, &ov)) {
-                    LOGE("set position failed");
-                    return ret;
-                }
-            }
-            mOVInfo = ov;
-            return NO_ERROR;
-        }
-        return ret;
-    }
-
-    return NO_INIT;
-}
-
-status_t OVHelper::getOVInfo(mdp_overlay& ovInfo) {
-    if (mSessionID == NO_INIT)
-        return NO_INIT;
-    ovInfo = mOVInfo;
-    return NO_ERROR;
+void Display::closeDisplay() {
+    close(mFD);
+    mFD = NO_INIT;
 }
 
 Rotator::Rotator() : mFD(NO_INIT), mSessionID(NO_INIT), mPmemFD(-1)
@@ -321,7 +138,7 @@ Rotator::~Rotator()
 
 status_t Rotator::startRotSession(msm_rotator_img_info& rotInfo,
                                    int size, int numBuffers) {
-    status_t ret = ALREADY_EXISTS;
+    status_t ret = NO_ERROR;
     if (mSessionID == NO_INIT && mFD == NO_INIT) {
         mNumBuffers = numBuffers;
         mFD = open("/dev/msm_rotator", O_RDWR, 0);
@@ -330,7 +147,7 @@ status_t Rotator::startRotSession(msm_rotator_img_info& rotInfo,
             return NO_INIT;
         }
 
-        if (int check = ioctl(mFD, MSM_ROTATOR_IOCTL_START, &rotInfo)) {
+        if (ioctl(mFD, MSM_ROTATOR_IOCTL_START, &rotInfo)) {
             close(mFD);
             mFD = NO_INIT;
             return NO_INIT;
@@ -367,7 +184,6 @@ status_t Rotator::startRotSession(msm_rotator_img_info& rotInfo,
             mRotOffset[i] = i * mSize;
         ret = NO_ERROR;
     }
-
     return ret;
 }
 
@@ -405,88 +221,198 @@ status_t Rotator::rotateBuffer(msm_rotator_data_info& rotData) {
     return ret;
 }
 
-status_t OverlayUI::closeChannel() {
-    mobjOVHelper.closeOVSession();
-    mobjRotator.closeRotSession();
-    mChannelState = CLOSED;
-    return NO_ERROR;
+//===================== OverlayUI =================//
+
+OverlayUI::OverlayUI() : mChannelState(CLOSED), mOrientation(NO_INIT),
+        mFBNum(NO_INIT), mZorder(NO_INIT), mWaitForVsync(false), mIsFg(false),
+        mSessionID(NO_INIT) {
+        memset(&mOvInfo, 0, sizeof(mOvInfo));
+        memset(&mRotInfo, 0, sizeof(mRotInfo));
 }
 
-status_t OverlayUI::setSource(const overlay_buffer_info& info, int orientation,
-                                             bool useVGPipe, bool ignoreFB,
-                                             int fbnum, int zorder) {
-    status_t ret = NO_INIT;
+OverlayUI::~OverlayUI() {
+    closeChannel();
+}
 
+void OverlayUI::setSource(const overlay_buffer_info& info, int orientation) {
+    status_t ret = NO_INIT;
     int format3D = FORMAT_3D(info.format);
     int colorFormat = COLOR_FORMAT(info.format);
     int format = get_mdp_format(colorFormat);
 
-    if (format3D || !isRGBType(format))
-        return ret;
-
-    if (mChannelState == PENDING_CLOSE)
-        closeChannel();
-
-    if (mChannelState == UP) {
-        mdp_overlay ov;
-        if (mobjOVHelper.getOVInfo(ov) == NO_ERROR) {
-            if (mOrientation == orientation &&
-                   mFBNum == fbnum &&
-                   checkOVState(info.width, info.height, format, orientation,
-                                  zorder, ignoreFB, ov))
-                return NO_ERROR;
-            else
-                mChannelState = PENDING_CLOSE;
-        }
-        else
-            mChannelState = PENDING_CLOSE;
-        return ret;
+    if (format3D || !isRGBType(format)) {
+        LOGE("%s: Unsupported format", __func__);
+        return;
     }
-
+    mSource.width = info.width;
+    mSource.height = info.height;
+    mSource.format = format;
+    mSource.size = info.size;
     mOrientation = orientation;
-    mdp_overlay ovInfo;
-    msm_rotator_img_info rotInfo;
-    setupOvRotInfo(info.width, info.height, format, orientation, ovInfo, rotInfo);
+    setupOvRotInfo();
+}
 
+void OverlayUI::setDisplayParams(int fbNum, bool waitForVsync, bool isFg, int
+        zorder, bool isVGPipe) {
     int flags = 0;
-    if (ignoreFB)
-        ovInfo.is_fg = 1;
+    mFBNum = fbNum;
+    mOvInfo.is_fg = isFg;
+
+    if(false == waitForVsync)
+        flags |= MDP_OV_PLAY_NOWAIT;
     else
-        flags |= MDP_OV_PLAY_NOWAIT;
+        flags &= ~MDP_OV_PLAY_NOWAIT;
 
-    if (turnOFFVSync())
-        flags |= MDP_OV_PLAY_NOWAIT;
-
-    if (useVGPipe ||
-          (fbnum == FB0 && getRGBBpp(format) != mobjOVHelper.getFBBpp()))
+    if(isVGPipe)
         flags |= MDP_OV_PIPE_SHARE;
+    else
+        flags &= ~MDP_OV_PIPE_SHARE;
 
-    ovInfo.flags = flags;
-    if (zorder != NO_INIT)
-        ovInfo.z_order = zorder;
+    mOvInfo.flags = flags;
+    mOvInfo.z_order = zorder;
+}
 
-    ret = startChannel(fbnum, ovInfo, rotInfo, info.size);
+void OverlayUI::setPosition(int x, int y, int w, int h) {
+    mOvInfo.dst_rect.x = x;
+    mOvInfo.dst_rect.y = y;
+    mOvInfo.dst_rect.w = w;
+    mOvInfo.dst_rect.h = h;
+}
+
+void OverlayUI::setCrop(int x, int y, int w, int h) {
+    mOvInfo.src_rect.x = x;
+    mOvInfo.src_rect.y = y;
+    mOvInfo.src_rect.w = w;
+    mOvInfo.src_rect.h = h;
+}
+
+void OverlayUI::setupOvRotInfo() {
+    int w = mSource.width;
+    int h = mSource.height;
+    int format = mSource.format;
+    int srcw = (w + 31) & ~31;
+    int srch = (h + 31) & ~31;
+    mOvInfo.src.width = srcw;
+    mOvInfo.src.height = srch;
+    mOvInfo.src.format = format;
+    mOvInfo.src_rect.w = w;
+    mOvInfo.src_rect.h = h;
+    mOvInfo.alpha = 0xff;
+    mOvInfo.transp_mask = 0xffffffff;
+    mRotInfo.src.format = format;
+    mRotInfo.dst.format = format;
+    mRotInfo.src.width = srcw;
+    mRotInfo.src.height = srch;
+    mRotInfo.src_rect.w = srcw;
+    mRotInfo.src_rect.h = srch;
+    mRotInfo.dst.width = srcw;
+    mRotInfo.dst.height = srch;
+
+    int rot = mOrientation;
+    switch(rot) {
+        case 0:
+        case HAL_TRANSFORM_FLIP_H:
+        case HAL_TRANSFORM_FLIP_V:
+            rot = 0;
+            break;
+        case HAL_TRANSFORM_ROT_90:
+        case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H):
+        case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V): {
+            int tmp = mOvInfo.src_rect.x;
+            mOvInfo.src_rect.x = mOvInfo.src.height -
+                (mOvInfo.src_rect.y + mOvInfo.src_rect.h);
+            mOvInfo.src_rect.y = tmp;
+            swapOVRotWidthHeight(mRotInfo, mOvInfo);
+            rot = HAL_TRANSFORM_ROT_90;
+            break;
+        }
+        case HAL_TRANSFORM_ROT_180:
+            break;
+        case HAL_TRANSFORM_ROT_270: {
+            int tmp = mOvInfo.src_rect.y;
+            mOvInfo.src_rect.y = mOvInfo.src.width -
+                (mOvInfo.src_rect.x + mOvInfo.src_rect.w);
+            mOvInfo.src_rect.x = tmp;
+            swapOVRotWidthHeight(mRotInfo, mOvInfo);
+            break;
+        }
+        default:
+            break;
+    }
+    int mdp_rotation = overlay::get_mdp_orientation(rot);
+    if (mdp_rotation < 0)
+        mdp_rotation = 0;
+    mOvInfo.user_data[0] = mdp_rotation;
+    mRotInfo.rotations = mOvInfo.user_data[0];
+    if (mdp_rotation)
+        mRotInfo.enable = 1;
+    mOvInfo.dst_rect.w = mOvInfo.src_rect.w;
+    mOvInfo.dst_rect.h = mOvInfo.src_rect.h;
+}
+
+status_t OverlayUI::commit() {
+    status_t ret = BAD_VALUE;
+    if(mChannelState != UP)
+        mOvInfo.id = MSMFB_NEW_REQUEST;
+    ret = startOVSession();
+    if (ret == NO_ERROR && mOrientation) {
+        ret = mobjRotator.startRotSession(mRotInfo, mSource.size);
+    }
+    if (ret == NO_ERROR) {
+        mChannelState = UP;
+    } else {
+        LOGE("start channel failed.");
+    }
     return ret;
 }
 
-status_t OverlayUI::startChannel(int fbnum, mdp_overlay& ovInfo,
-                                 msm_rotator_img_info& rotInfo, int size) {
-    status_t ret = BAD_VALUE;
-    if (mChannelState == UP)
+status_t OverlayUI::closeChannel() {
+    if( mChannelState != UP ) {
+        return NO_ERROR;
+    }
+    if(NO_ERROR != closeOVSession()) {
+        LOGE("%s: closeOVSession() failed.", __FUNCTION__);
+        return BAD_VALUE;
+    }
+    if(NO_ERROR != mobjRotator.closeRotSession()) {
+        LOGE("%s: closeRotSession() failed.", __FUNCTION__);
+        return BAD_VALUE;
+    }
+    mChannelState = CLOSED;
+    memset(&mOvInfo, 0, sizeof(mOvInfo));
+    memset(&mRotInfo, 0, sizeof(mRotInfo));
+    return NO_ERROR;
+}
+
+status_t OverlayUI::startOVSession() {
+    status_t ret = NO_INIT;
+    ret = mobjDisplay.openDisplay(mFBNum);
+
+    if (ret != NO_ERROR)
         return ret;
 
-    ret = mobjOVHelper.startOVSession(ovInfo, fbnum);
-    if (ret == NO_ERROR && mOrientation) {
-        ret = mobjRotator.startRotSession(rotInfo, size);
+    mdp_overlay ovInfo = mOvInfo;
+    if (ioctl(mobjDisplay.getFD(), MSMFB_OVERLAY_SET, &ovInfo)) {
+        LOGE("Overlay set failed..");
+        ret = BAD_VALUE;
+    } else {
+        mSessionID = ovInfo.id;
+        mOvInfo = ovInfo;
+        ret = NO_ERROR;
     }
+    return ret;
+}
 
-    if (ret == NO_ERROR) {
-        mChannelState = UP;
-        mFBNum = fbnum;
+status_t OverlayUI::closeOVSession() {
+    status_t ret = NO_ERROR;
+    int err = 0;
+    if(err = ioctl(mobjDisplay.getFD(), MSMFB_OVERLAY_UNSET, &mSessionID)) {
+        LOGE("%s: MSMFB_OVERLAY_UNSET failed. (%d)", __FUNCTION__, err);
+        ret = BAD_VALUE;
+    } else {
+        mobjDisplay.closeDisplay();
+        mSessionID = NO_INIT;
     }
-    else
-        LOGE("start channel failed.");
-
     return ret;
 }
 
@@ -515,12 +441,12 @@ status_t OverlayUI::queueBuffer(buffer_handle_t buffer) {
         ovData.data.memory_id = rotData.dst.memory_id;
         ovData.data.offset = rotData.dst.offset;
     }
-
-    ret = mobjOVHelper.queueBuffer(ovData);
-    if (ret != NO_ERROR)
+    ovData.id = mSessionID;
+    if (ioctl(mobjDisplay.getFD(), MSMFB_OVERLAY_PLAY, &ovData)) {
         LOGE("Queuebuffer failed ");
-
-    return ret;
+        return BAD_VALUE;
+    }
+    return NO_ERROR;
 }
 
 };

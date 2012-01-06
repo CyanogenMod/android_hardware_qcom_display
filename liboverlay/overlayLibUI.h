@@ -55,34 +55,7 @@ public:
     int getFBHeight() const { return mFBHeight; };
     int getFBBpp() const { return mFBBpp; };
     status_t openDisplay(int fbnum);
-    void closeDisplay() { close(mFD); mFD = NO_INIT; };
-};
-
-/*
- * OVHelper class, provides apis related to Overlay
- * It communicates with MDP driver, provides following services
- * Start overlay session
- * Set position of the destination on to display
- */
-
-class OVHelper {
-    int mSessionID;
-    Display mobjDisplay;
-    mdp_overlay mOVInfo;
-    OVHelper(const OVHelper& objOVHelper);
-    OVHelper& operator=(const OVHelper& objOVHelper);
-
-public:
-    explicit OVHelper() : mSessionID(NO_INIT) { };
-    ~OVHelper() { closeOVSession(); };
-    status_t startOVSession(mdp_overlay& ovInfo, int fbnum);
-    status_t closeOVSession();
-    status_t queueBuffer(msmfb_overlay_data ovData);
-    int getFBWidth() const { return mobjDisplay.getFBWidth(); };
-    int getFBHeight() const { return mobjDisplay.getFBHeight(); };
-    int getFBBpp() const { return mobjDisplay.getFBBpp(); };
-    status_t setPosition(int x, int y, int w, int h);
-    status_t getOVInfo(mdp_overlay& ovInfo);
+    void closeDisplay();
 };
 
 /*
@@ -122,32 +95,42 @@ public:
 
 class OverlayUI {
     channel_state_t mChannelState;
+    overlay_buffer_info mSource;
+    int mZorder;
     int mOrientation;
     int mFBNum;
-    OVHelper mobjOVHelper;
+    bool mWaitForVsync;
+    bool mIsFg;
+    int mSessionID;
+    Display mobjDisplay;
     Rotator mobjRotator;
+
+    mdp_overlay mOvInfo;
+    msm_rotator_img_info mRotInfo;
 
     OverlayUI(const OverlayUI& objOverlay);
     OverlayUI& operator=(const OverlayUI& objOverlay);
 
-    status_t startChannel(int fbnum, mdp_overlay& ovInfo,
-                               msm_rotator_img_info& rotInfo, int size);
+    status_t startOVSession();
+    status_t closeOVSession();
+    void setupOvRotInfo();
+
 public:
 
     enum fbnum_t { FB0, FB1 };
 
-    explicit OverlayUI() : mChannelState(CLOSED), mOrientation(NO_INIT), mFBNum(NO_INIT) { };
-    ~OverlayUI() { closeChannel(); };
-    status_t setSource(const overlay_buffer_info& info, int orientation,
-                          bool useVGPipe = false, bool ignoreFB = true,
-                          int fbnum = FB0, int zorder = NO_INIT);
-    status_t setPosition(int x, int y, int w, int h) {
-        return mobjOVHelper.setPosition(x, y, w, h);
-    };
+    OverlayUI();
+    ~OverlayUI();
+    void setSource(const overlay_buffer_info& info, int orientation);
+    void setPosition(int x, int y, int w, int h);
+    void setCrop(int x, int y, int w, int h);
+    void setDisplayParams(int fbNum, bool waitForVsync, bool isFg, int zorder,
+            bool isVGPipe);
+    status_t commit();
     status_t closeChannel();
     channel_state_t isChannelUP() const { return mChannelState; };
-    int getFBWidth() const { return mobjOVHelper.getFBWidth(); };
-    int getFBHeight() const { return mobjOVHelper.getFBHeight(); };
+    int getFBWidth() const { return mobjDisplay.getFBWidth(); };
+    int getFBHeight() const { return mobjDisplay.getFBHeight(); };
     status_t queueBuffer(buffer_handle_t buffer);
 };
 
