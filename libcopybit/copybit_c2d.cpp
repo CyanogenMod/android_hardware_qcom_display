@@ -1276,7 +1276,10 @@ static int stretch_copybit(
         struct copybit_rect_t const *src_rect,
         struct copybit_region_t const *region)
 {
-    return stretch_copybit_internal(dev, dst, src, dst_rect, src_rect, region, true);
+    struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
+    bool needsBlending = (ctx->blitState.global_alpha != 0);
+    return stretch_copybit_internal(dev, dst, src, dst_rect, src_rect,
+                                                    region, needsBlending);
 }
 
 /** Perform a blit type operation */
