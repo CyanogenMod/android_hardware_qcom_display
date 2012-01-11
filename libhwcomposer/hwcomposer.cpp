@@ -1069,6 +1069,8 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
                            (layer->blending == HWC_BLENDING_NONE) ? -1 : layer->alpha);
     copybit->set_parameter(copybit, COPYBIT_PREMULTIPLIED_ALPHA,
                            (layer->blending == HWC_BLENDING_PREMULT)? COPYBIT_ENABLE : COPYBIT_DISABLE);
+    copybit->set_parameter(copybit, COPYBIT_DITHER,
+                            (dst.format == HAL_PIXEL_FORMAT_RGB_565)? COPYBIT_ENABLE : COPYBIT_DISABLE);
     err = copybit->stretch(copybit, &dst, &src, &dstRect, &srcRect, &copybitRegion);
 
     if(err < 0)
