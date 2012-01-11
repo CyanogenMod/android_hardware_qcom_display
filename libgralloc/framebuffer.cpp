@@ -159,6 +159,12 @@ msm_copy_buffer(buffer_handle_t handle, int fd,
 static int fb_setSwapInterval(struct framebuffer_device_t* dev,
             int interval)
 {
+    char pval[PROPERTY_VALUE_MAX];
+    property_get("debug.gr.swapinterval", pval, "-1");
+    int property_interval = atoi(pval);
+    if (property_interval >= 0)
+        interval = property_interval;
+
     fb_context_t* ctx = (fb_context_t*)dev;
     private_module_t* m = reinterpret_cast<private_module_t*>(
             dev->common.module);
