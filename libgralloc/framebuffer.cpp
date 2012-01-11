@@ -1037,7 +1037,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
 
     int err;
     size_t fbSize = roundUpToPageSize(finfo.line_length * info.yres_virtual);
-    module->framebuffer = new private_handle_t(dup(fd), fbSize,
+    module->framebuffer = new private_handle_t(fd, fbSize,
             private_handle_t::PRIV_FLAGS_USES_PMEM, BUFFER_TYPE_UI, module->fbFormat, info.xres, info.yres);
 
     module->numBuffers = info.yres_virtual / info.yres;
