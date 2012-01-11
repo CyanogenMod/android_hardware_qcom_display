@@ -285,7 +285,7 @@ static int set_parameter_copybit(
             }
             break;
         case COPYBIT_PLANE_ALPHA:
-            if (value < 0)      value = 0;
+            if (value < 0)      value = MDP_ALPHA_NOP;
             if (value >= 256)   value = 255;
             ctx->mAlpha = value;
             break;
