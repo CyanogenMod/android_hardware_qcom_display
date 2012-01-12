@@ -268,6 +268,9 @@ void OverlayUI::setDisplayParams(int fbNum, bool waitForVsync, bool isFg, int
     else
         flags &= ~MDP_OV_PIPE_SHARE;
 
+    if (turnOFFVSync())
+        flags |= MDP_OV_PLAY_NOWAIT;
+
     mOvInfo.flags = flags;
     mOvInfo.z_order = zorder;
 }
