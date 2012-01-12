@@ -84,7 +84,7 @@ void TileRenderer::startTileRendering(OpenGLRenderer* renderer,
     if (status == GL_NO_ERROR)
         mIsTiled = true;
     else
-        LOGE("glStartTilingQCOM: 0x%x", status);
+        LOGD("glStartTilingQCOM: 0x%x", status);
 }
 
 void TileRenderer::endTileRendering(OpenGLRenderer*) {
@@ -95,7 +95,7 @@ void TileRenderer::endTileRendering(OpenGLRenderer*) {
     mIsTiled = false;
     GLenum status = GL_NO_ERROR;
     while ((status = glGetError()) != GL_NO_ERROR) {
-        LOGE("glEndTilingQCOM: 0x%x", status);
+        LOGD("glEndTilingQCOM: 0x%x", status);
     }
 }
 
