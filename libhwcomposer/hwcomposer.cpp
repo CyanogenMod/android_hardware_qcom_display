@@ -859,26 +859,13 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 if (isS3DCompositionNeeded)
                     markUILayerForS3DComposition(list->hwLayers[i], s3dVideoFormat);
 
-                if (hwcModule->compositionType
-                        & (COMPOSITION_TYPE_C2D | COMPOSITION_TYPE_MDP)) {
-                    // Ensure that HWC_OVERLAY layers below skip layers do not
-                    // overwrite GPU composed skip layers.
-                    ssize_t layer_countdown = ((ssize_t)i) - 1;
-                    while (layer_countdown >= 0)
-                    {
-                        // Mark every non-mdp overlay layer below the
-                        // skip-layer for GPU composition.
-                        switch(list->hwLayers[layer_countdown].compositionType) {
-                        case HWC_FRAMEBUFFER:
-                        case HWC_USE_OVERLAY:
-                            break;
-                        case HWC_USE_COPYBIT:
-                        default:
-                            list->hwLayers[layer_countdown].compositionType = HWC_FRAMEBUFFER;
-                            break;
-                        }
-                        layer_countdown--;
-                    }
+                ssize_t layer_countdown = ((ssize_t)i) - 1;
+                // Mark every layer below the SKIP layer to be composed by the GPU
+                while (layer_countdown >= 0)
+                {
+                    list->hwLayers[layer_countdown].compositionType = HWC_FRAMEBUFFER;
+                    list->hwLayers[i].hints &= ~HWC_HINT_CLEAR_FB;
+                    layer_countdown--;
                 }
                 continue;
             }
