@@ -384,7 +384,22 @@ bool canSkipComposition(hwc_context_t* ctx, int yuvBufferCount, int currentLayer
     return false;
 }
 
-static bool isFullScreenUpdate(const framebuffer_device_t* fbDev, const hwc_layer_list_t* list) {
+void getNonRotatedResolution(const hwc_layer_t* layer, int& width, int& height)
+{
+    int transform = layer->transform;
+
+    hwc_rect_t displayFrame  = layer->displayFrame;
+
+    width = displayFrame.right - displayFrame.left;
+    height = displayFrame.bottom - displayFrame.top;
+
+    if(transform & (HWC_TRANSFORM_ROT_90 | HWC_TRANSFORM_ROT_270)) {
+        height = displayFrame.right - displayFrame.left;
+        width = displayFrame.bottom - displayFrame.top;
+    }
+}
+
+static bool canUseCopybit(const framebuffer_device_t* fbDev, const hwc_layer_list_t* list) {
 
     if(!fbDev) {
        LOGE("ERROR: %s : fb device is invalid",__func__);
@@ -395,52 +410,31 @@ static bool isFullScreenUpdate(const framebuffer_device_t* fbDev, const hwc_laye
     int fb_h = fbDev->height;
 
     /*
-     *  We have full screen condition when
+     * We can use copybit when
      * 1. We have 1 layer to compose
-     *    a. layers dest rect equals display resolution.
      * 2. We have 2 layers to compose
-     *    a. Sum of their dest rects equals display resolution.
+     *    a. Sum of both layers covers full screen
+     *    b. One of the layers is full screen and the
+     *       other is less than full screen (includes
+     *       pop ups, volume bar etc.)
+     * TODO: Need to revisit this logic to use copybit
+     * based on the total blitting region instead of total
+     * layers count
      */
 
-    if(list->numHwLayers == 1)
-    {
-        hwc_rect_t rect = list->hwLayers[0].displayFrame;
-
-        int w = rect.right - rect.left;
-        int h = rect.bottom - rect.top;
-
-        int transform = list->hwLayers[0].transform;
-
-        if(transform & (HWC_TRANSFORM_ROT_90 | HWC_TRANSFORM_ROT_270))
-            return ((fb_w == h) && (fb_h == w));
-        else
-            return ((fb_h == h) && (fb_w == w));
-    }
+    bool use_copybit = (list->numHwLayers == 1);
 
     if(list->numHwLayers == 2) {
+        int w1, h1;
+        int w2, h2;
 
-        hwc_rect_t rect_1 = list->hwLayers[0].displayFrame;
-        hwc_rect_t rect_2 = list->hwLayers[1].displayFrame;
+        getNonRotatedResolution(&list->hwLayers[0], w1, h1);
+        getNonRotatedResolution(&list->hwLayers[1], w2, h2);
 
-        int transform_1 = list->hwLayers[0].transform;
-        int transform_2 = list->hwLayers[1].transform;
-
-        int w1 = rect_1.right - rect_1.left;
-        int h1 = rect_1.bottom - rect_1.top;
-        int w2 = rect_2.right - rect_2.left;
-        int h2 = rect_2.bottom - rect_2.top;
-
-        if(transform_1 == transform_2) {
-            if(transform_1 & (HWC_TRANSFORM_ROT_90 | HWC_TRANSFORM_ROT_270)) {
-                if((fb_w == (w1 + w2)) && (fb_h == h1) && (fb_h == h2))
-                    return true;
-            } else {
-                if((fb_w == w1) && (fb_w == w2) && (fb_h == (h1 + h2)))
-                    return true;
-            }
-        }
+        use_copybit = ((fb_w >= w1) && (fb_w >= w2) && ((fb_h * 2) > (h1 + h2)));
     }
-    return false;
+
+    return use_copybit;
 }
 
 #ifdef COMPOSITION_BYPASS
@@ -828,10 +822,10 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
     bool isS3DCompositionNeeded = false;
     int s3dVideoFormat = 0;
     int numLayersNotUpdating = 0;
-    bool fullscreen = false;
+    bool useCopybit = false;
 
     if (list) {
-        fullscreen = isFullScreenUpdate(hwcModule->fbDevice, list);
+        useCopybit = canUseCopybit(hwcModule->fbDevice, list);
         yuvBufferCount = getYUVBufferCount(list);
 
         bool skipComposition = false;
@@ -911,7 +905,7 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                     (COMPOSITION_TYPE_C2D|COMPOSITION_TYPE_MDP))) {
                 list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
             } else if ((hwcModule->compositionType == COMPOSITION_TYPE_DYN)
-                    && fullscreen) {
+                    && useCopybit) {
                 list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
             }
             else {
