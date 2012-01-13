@@ -78,7 +78,8 @@ static bool canFallback(int compositionType, int usage, bool triedSystem)
 static bool useUncached(int usage)
 {
     // System heaps cannot be uncached
-    if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP)
+    if(usage & (GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP |
+                GRALLOC_USAGE_PRIVATE_IOMMU_HEAP))
         return false;
     if (usage & GRALLOC_USAGE_PRIVATE_UNCACHED)
         return true;
@@ -148,11 +149,11 @@ int IonController::allocate(alloc_data& data, int usage,
         data.allocType  &=  ~(private_handle_t::PRIV_FLAGS_NOT_MAPPED);
 
     // if no flags are set, default to
-    // EBI heap, so that bypass can work
+    // SF + IOMMU heaps, so that bypass can work
     // we can fall back to system heap if
     // we run out.
     if(!ionFlags)
-        ionFlags = ION_HEAP(ION_SF_HEAP_ID);
+        ionFlags = ION_HEAP(ION_SF_HEAP_ID) | ION_HEAP(ION_IOMMU_HEAP_ID);
 
     data.flags = ionFlags;
     ret = mIonAlloc->alloc_buffer(data);
