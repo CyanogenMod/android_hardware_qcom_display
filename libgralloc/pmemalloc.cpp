@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <cutils/log.h>
 #include <errno.h>
+#include <linux/ioctl.h>
 #include <linux/android_pmem.h>
 #include "gralloc_priv.h"
 #include "pmemalloc.h"
