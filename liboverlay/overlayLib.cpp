@@ -1987,3 +1987,145 @@ bool OverlayDataChannel::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
 
     return true;
 }
+
+/* setVisualParam can be called to set the configuration value of a post
+ * processing feature (HUE,SATURATION,BRIGHTNESS,CONTRAST,SMOOTHING/SHARPENING)
+ * for the first 4, the setting will stay set until the parameter is changed
+ * by another call to setVisualParam with that same paramType */
+void Overlay::setVisualParam(int8_t paramType, float paramValue) {
+    switch (mState) {
+    case OV_UI_MIRROR_TV:
+    case OV_2D_VIDEO_ON_PANEL:
+    case OV_3D_VIDEO_2D_PANEL:
+        // set the parameter value for the given parameter type.
+        if(!objOvCtrlChannel[VG0_PIPE].setVisualParam(paramType, paramValue)) {
+            LOGE("Failed to set param %d for value %f", paramType, paramValue);
+        }
+        break;
+    case OV_2D_VIDEO_ON_TV:
+    case OV_3D_VIDEO_3D_PANEL:
+    case OV_3D_VIDEO_2D_TV:
+    case OV_3D_VIDEO_3D_TV:
+        for (int i=0; i<NUM_CHANNELS; i++) {
+            //setting the value for the given parameter on each pipe (i.e. for
+            //both video pipes)
+            if(!objOvCtrlChannel[i].setVisualParam(paramType, paramValue)) {
+                LOGE("Failed to set param %d for value %f", paramType, paramValue);
+            }
+        }
+        break;
+     default:
+        break;
+     }
+}
+
+/* Finalizes the parameter value in the hsic_cfg structure*/
+int OverlayControlChannel::commitVisualParam(int8_t paramType, float paramValue) {
+#ifdef USES_POST_PROCESSING
+    switch(paramType) {
+    case SET_HUE:
+        //API expects param within range -180 - 180
+        CAP_RANGE(paramValue, HUE_RANGE, -HUE_RANGE);
+        hsic_cfg.hue = (int32_t) paramValue;
+        break;
+    case SET_BRIGHTNESS:
+        //API expects param within range -255 - 255
+        CAP_RANGE(paramValue, BRIGHTNESS_RANGE, -BRIGHTNESS_RANGE);
+        hsic_cfg.intensity = (int32_t) paramValue;
+        break;
+    case SET_SATURATION:
+        //API expects param within range -1 - 1
+        CAP_RANGE(paramValue, CON_SAT_RANGE, -CON_SAT_RANGE);
+        hsic_cfg.sat = paramValue;
+        break;
+    case SET_CONTRAST:
+        //API expects param within range -1 - 1
+        CAP_RANGE(paramValue, CON_SAT_RANGE, -CON_SAT_RANGE);
+        hsic_cfg.contrast = paramValue;
+        break;
+    default:
+        return -1;
+    }
+    return 0;
+#endif
+    return -1;
+}
+
+/* Converts paramValue to the expected range for each paramType, */
+bool OverlayControlChannel::setVisualParam(int8_t paramType, float paramValue)
+{
+    if (!isChannelUP()) {
+        LOGE("%s: Channel not set", __FUNCTION__);
+        return false;
+    }
+
+    bool setFlag = false;
+
+    //Sharpness values range from -128 to 127
+    //Integer values must be converted accordingly
+
+    int8_t value;
+    if (paramType == SET_SHARPNESS) {
+        //binding paramValue to the limits of its range.
+        CAP_RANGE(paramValue, SHARPNESS_RANGE, -SHARPNESS_RANGE);
+        value = paramValue * NUM_SHARPNESS_VALS - (NUM_SHARPNESS_VALS / 2);
+    }
+
+    uint32_t block = MDP_BLOCK_MAX;
+
+    //tranlate mOVInfo.id into block type for pp_conv
+    switch(mOVInfo.id) {
+        case 3:
+            // 3 is the pipe_ndx given when OVERLAY_PIPE_VG1 is used
+            block = MDP_BLOCK_VG_1;
+            break;
+        case 4:
+            // 4 is the pipe_ndx given when OVERLAY_PIPE_VG2 is used
+            block = MDP_BLOCK_VG_2;
+            break;
+        default:
+            LOGE("%s: Invalid HSIC overlay id",__FUNCTION__);
+    }
+
+    //save the paramValue to hsic_cfg
+    commitVisualParam(paramType, paramValue);
+#ifdef USES_POST_PROCESSING
+    //calling our user space library to configure the post processing color
+    //conversion (does Hue, Saturation, Brightness, and Contrast adjustment)
+    display_pp_conv_set_cfg(block, &hsic_cfg);
+#endif
+    mdp_overlay overlay;
+
+    switch(paramType) {
+    case SET_NONE:
+        return true;
+    case SET_SHARPNESS:
+        if (ioctl(mFD, MSMFB_OVERLAY_GET, &overlay)) {
+            reportError("setVisualParam, overlay GET failed");
+            return false;
+        }
+        if (overlay.dpp.sharp_strength != value) {
+            mOVInfo.flags |= MDP_SHARPENING;
+            mOVInfo.dpp.sharp_strength = value;
+            setFlag = true;
+        }
+        break;
+    case RESET_ALL:
+        //set all visual params to a default value
+        //passed in from the app
+        mOVInfo.flags |= MDP_SHARPENING;
+        mOVInfo.dpp.sharp_strength = value;
+        setFlag = true;
+        break;
+    default:
+        return false;
+    }
+    if (setFlag) {
+        if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
+            reportError("setVisualParam, overlay set failed");
+            dump(mOVInfo);
+            return false;
+        }
+    }
+    return true;
+}
