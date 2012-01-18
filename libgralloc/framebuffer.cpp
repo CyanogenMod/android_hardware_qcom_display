@@ -54,15 +54,6 @@
 #define FB_DEBUG 0
 
 #if defined(HDMI_DUAL_DISPLAY)
-#define AS_1080_RATIO_H (4.25/100)  // Default Action Safe vertical limit for 1080p
-#define AS_1080_RATIO_W (4.25/100)  // Default Action Safe horizontal limit for 1080p
-#define AS_720_RATIO_H (6.0/100)  // Default Action Safe vertical limit for 720p
-#define AS_720_RATIO_W (4.25/100)  // Default Action Safe horizontal limit for 720p
-#define AS_480_RATIO_H (8.0/100)  // Default Action Safe vertical limit for 480p
-#define AS_480_RATIO_W (5.0/100)  // Default Action Safe horizontal limit for 480p
-#define HEIGHT_1080P 1080
-#define HEIGHT_720P 720
-#define HEIGHT_480P 480
 #define EVEN_OUT(x) if (x & 0x0001) {x--;}
 using overlay::Overlay;
 /** min of int a, b */
@@ -224,6 +215,48 @@ static int closeHDMIChannel(private_module_t* m)
     return 0;
 }
 
+static void getSecondaryDisplayDestinationInfo(private_module_t* m, overlay_rect&
+                                rect, int& orientation)
+{
+    Overlay* pTemp = m->pobjOverlay;
+    int width = pTemp->getFBWidth();
+    int height = pTemp->getFBHeight();
+    int fbwidth = m->info.xres, fbheight = m->info.yres;
+    rect.x = 0; rect.y = 0;
+    rect.w = width; rect.h = height;
+    int rot = m->orientation;
+    switch(rot) {
+        // ROT_0
+        case 0:
+        // ROT_180
+        case HAL_TRANSFORM_ROT_180:
+            pTemp->getAspectRatioPosition(fbwidth, fbheight,
+                                                   &rect);
+            if(rot ==  HAL_TRANSFORM_ROT_180)
+                orientation = HAL_TRANSFORM_ROT_180;
+            else
+                orientation  = 0;
+            break;
+            // ROT_90
+        case HAL_TRANSFORM_ROT_90:
+            // ROT_270
+        case HAL_TRANSFORM_ROT_270:
+            //Calculate the Aspectratio for the UI
+            //in the landscape mode
+            //Width and height will be swapped as there
+            //is rotation
+            pTemp->getAspectRatioPosition(fbheight, fbwidth,
+                    &rect);
+
+            if(rot == HAL_TRANSFORM_ROT_90)
+                orientation = HAL_TRANSFORM_ROT_270;
+            else if(rot == HAL_TRANSFORM_ROT_270)
+                orientation = HAL_TRANSFORM_ROT_90;
+            break;
+    }
+    return;
+}
+
 static void *hdmi_ui_loop(void *ptr)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(
@@ -237,8 +270,6 @@ static void *hdmi_ui_loop(void *ptr)
             pthread_mutex_unlock(&m->overlayLock);
             return NULL;
         }
-        float asWidthRatio = m->actionsafeWidthRatio/100.0f;
-        float asHeightRatio = m->actionsafeHeightRatio/100.0f;
         bool waitForVsync = true;
 
         if (m->pobjOverlay) {
@@ -269,101 +300,25 @@ static void *hdmi_ui_loop(void *ptr)
                 }
 
                 if (pTemp->isChannelUP()) {
-                    int width = pTemp->getFBWidth();
-                    int height = pTemp->getFBHeight();
-                    int aswidth = width, asheight = height;
-                    int asX = 0, asY = 0; // Action safe x, y co-ordinates
-                    int fbwidth = m->info.xres, fbheight = m->info.yres;
-                    float defaultASWidthRatio = 0.0f, defaultASHeightRatio = 0.0f;
-                    // TODO: disable OverScan for now
-                    if(!m->trueMirrorSupport) {
-                        if(HEIGHT_1080P == height) {
-                            defaultASHeightRatio = AS_1080_RATIO_H;
-                            defaultASWidthRatio = AS_1080_RATIO_W;
-                        } else if(HEIGHT_720P == height) {
-                            defaultASHeightRatio = AS_720_RATIO_H;
-                            defaultASWidthRatio = AS_720_RATIO_W;
-                        } else if(HEIGHT_480P == height) {
-                            defaultASHeightRatio = AS_480_RATIO_H;
-                            defaultASWidthRatio = AS_480_RATIO_W;
-                        }
-                        if(asWidthRatio <= 0.0f)
-                            asWidthRatio = defaultASWidthRatio;
-                        if(asHeightRatio <= 0.0f)
-                            asHeightRatio = defaultASHeightRatio;
-                    }
-                    aswidth = (int)((float)width  - (float)(width * asWidthRatio));
-                    asheight = (int)((float)height  - (float)(height * asHeightRatio));
-                    asX = (width - aswidth) / 2;
-                    asY = (height - asheight) / 2;
-                    int rot = m->orientation;
-                    if (fbwidth < fbheight) {
-                         switch(rot) {
-                         // ROT_0
-                         case 0:
-                         // ROT_180
-                         case HAL_TRANSFORM_ROT_180: {
-                                aswidth = (asheight * fbwidth) / fbheight;
-                                asX = (width - aswidth) / 2;
-                                if(rot ==  HAL_TRANSFORM_ROT_180)
-                                  rot = OVERLAY_TRANSFORM_ROT_180;
-                                else
-                                  rot = 0;
-                            }
-                            break;
-                         // ROT_90
-                         case HAL_TRANSFORM_ROT_90:
-                            rot = OVERLAY_TRANSFORM_ROT_270;
-                            break;
-                         // ROT_270
-                         case HAL_TRANSFORM_ROT_270:
-                            rot = OVERLAY_TRANSFORM_ROT_90;
-                            break;
-                        }
-                    }
-                    else if (fbwidth > fbheight) {
-                         switch(rot) {
-                         // ROT_0
-                         case 0:
-                            rot = 0;
-                            break;
-                         // ROT_180
-                         case HAL_TRANSFORM_ROT_180:
-                            rot = OVERLAY_TRANSFORM_ROT_180;
-                            break;
-                         // ROT_90
-                         case HAL_TRANSFORM_ROT_90:
-                         // ROT_270
-                         case HAL_TRANSFORM_ROT_270: {
-                                //Swap width and height
-                                int t = fbwidth;
-                                fbwidth = fbheight;
-                                fbheight = t;
-                                aswidth = (asheight * fbwidth) / fbheight;
-                                asX = (width - aswidth) / 2;
-                                if(rot == HAL_TRANSFORM_ROT_90)
-                                    rot = OVERLAY_TRANSFORM_ROT_270;
-                                else
-                                    rot = OVERLAY_TRANSFORM_ROT_90;
-                            }
-                            break;
-                        }
-                    }
+                    overlay_rect destRect;
+                    int rot = 0;
                     int currOrientation = 0;
+                    getSecondaryDisplayDestinationInfo(m, destRect, rot);
                     pTemp->getOrientation(currOrientation);
                     if(rot != currOrientation) {
                         pTemp->setTransform(rot);
                     }
-                    EVEN_OUT(asX);
-                    EVEN_OUT(asY);
-                    EVEN_OUT(aswidth);
-                    EVEN_OUT(asheight);
+                    EVEN_OUT(destRect.x);
+                    EVEN_OUT(destRect.y);
+                    EVEN_OUT(destRect.w);
+                    EVEN_OUT(destRect.h);
                     int currentX = 0, currentY = 0;
-                    uint32_t currentW = width, currentH = height;
+                    uint32_t currentW = 0, currentH = 0;
                     if (pTemp->getPosition(currentX, currentY, currentW, currentH)) {
-                        if ((currentX != asX) || (currentY != asY) || (currentW != aswidth)
-                            || (currentH != asheight)) {
-                            pTemp->setPosition(asX, asY, aswidth, asheight);
+                        if ((currentX != destRect.x) || (currentY != destRect.y) ||
+                                (currentW != destRect.w) || (currentH != destRect.h)) {
+                            pTemp->setPosition(destRect.x, destRect.y, destRect.w,
+                                                                    destRect.h);
                         }
                     }
                     if (m->trueMirrorSupport) {

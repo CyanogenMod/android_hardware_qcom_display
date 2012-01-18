@@ -462,16 +462,16 @@ bool Overlay::setDeviceOrientation(int orientation) {
 
 bool Overlay::setPosition(int x, int y, uint32_t w, uint32_t h) {
     bool ret = false;
-    overlay_rect rect;
-    overlay_rect inrect;
+    overlay_rect secDest;
+    overlay_rect priDest;
     int currX, currY;
     uint32_t currW, currH;
     // Set even destination co-ordinates
     EVEN_OUT(x); EVEN_OUT(y);
     EVEN_OUT(w); EVEN_OUT(h);
     objOvCtrlChannel[VG0_PIPE].getPosition(currX, currY, currW, currH);
-    inrect.x = x, inrect.y = y;
-    inrect.w = w, inrect.h = h;
+    priDest.x = x, priDest.y = y;
+    priDest.w = w, priDest.h = h;
     if(x != currX || y != currY || w != currW || h != currH) {
         switch (mState) {
             case OV_UI_MIRROR_TV:
@@ -481,27 +481,30 @@ bool Overlay::setPosition(int x, int y, uint32_t w, uint32_t h) {
                 break;
             case OV_2D_VIDEO_ON_TV:
                 if (FrameBufferInfo::getInstance()->canSupportTrueMirroring()) {
-                    objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(mCroppedSrcWidth,
-                                         mCroppedSrcHeight, mDevOrientation, &inrect, &rect);
+                    objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(
+                            mCroppedSrcWidth, mCroppedSrcHeight, mDevOrientation,
+                            &priDest, &secDest);
                 } else {
-                    objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(mCroppedSrcWidth,
-                                         mCroppedSrcHeight, &rect);
+                    objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(
+                            mCroppedSrcWidth, mCroppedSrcHeight, &secDest);
                 }
-                setChannelPosition(rect.x, rect.y, rect.w, rect.h, VG1_PIPE);
+                setChannelPosition(secDest.x, secDest.y, secDest.w, secDest.h,
+                            VG1_PIPE);
                 return setChannelPosition(x, y, w, h, VG0_PIPE);
                 break;
             case OV_3D_VIDEO_3D_PANEL:
                 for (int i = 0; i < NUM_CHANNELS; i++) {
                     if (sHDMIAsPrimary)
-                        objOvCtrlChannel[i].getPositionS3D(i, mS3DFormat, &rect);
+                        objOvCtrlChannel[i].getPositionS3D(i, mS3DFormat, &secDest);
                     else {
                         if (!objOvCtrlChannel[i].useVirtualFB()) {
                             LOGE("%s: failed virtual fb for channel %d", __FUNCTION__, i);
                             return false;
                         }
-                        objOvCtrlChannel[i].getPositionS3D(i, 0x1, &rect);
+                        objOvCtrlChannel[i].getPositionS3D(i, 0x1, &secDest);
                     }
-                    if(!setChannelPosition(rect.x, rect.y, rect.w, rect.h, i)) {
+                    if(!setChannelPosition(secDest.x, secDest.y, secDest.w,
+                                                               secDest.h, i)) {
                         LOGE("%s: failed for channel %d", __FUNCTION__, i);
                         return false;
                     }
@@ -510,11 +513,13 @@ bool Overlay::setPosition(int x, int y, uint32_t w, uint32_t h) {
             case OV_3D_VIDEO_2D_TV:
             case OV_3D_VIDEO_3D_TV:
                 for (int i = 0; i < NUM_CHANNELS; i++) {
-                    ret = objOvCtrlChannel[i].getPositionS3D(i, mS3DFormat, &rect);
+                    ret = objOvCtrlChannel[i].getPositionS3D(i, mS3DFormat,
+                                                                     &secDest);
                     if (!ret)
                         ret = setChannelPosition(x, y, w, h, i);
                     else
-                        ret = setChannelPosition(rect.x, rect.y, rect.w, rect.h, i);
+                        ret = setChannelPosition(secDest.x, secDest.y, secDest.w,
+                                                                  secDest.h, i);
                     if (!ret) {
                         LOGE("%s: failed for channel %d", __FUNCTION__, i);
                         return ret;
@@ -614,6 +619,10 @@ bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientati
     } else
         LOGE("update failed");
     return ret;
+}
+
+bool Overlay::getAspectRatioPosition(int w, int h, overlay_rect *rect, int channel) {
+    return objOvCtrlChannel[channel].getAspectRatioPosition(w, h, rect);
 }
 
 int Overlay::getS3DFormat(int format) {
@@ -726,7 +735,6 @@ bool Overlay::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
     inRect.x = x; inRect.y = y; inRect.w = w; inRect.h = h;
     mCroppedSrcWidth = w;
     mCroppedSrcHeight = h;
-
     switch (mState) {
         case OV_UI_MIRROR_TV:
         case OV_2D_VIDEO_ON_PANEL:
@@ -927,6 +935,15 @@ bool OverlayControlChannel::getAspectRatioPosition(int w, int h, overlay_rect *r
     }
     if (width > fbWidth) width = fbWidth;
     if (height > fbHeight) height = fbHeight;
+
+    char value[PROPERTY_VALUE_MAX];
+    property_get("hw.actionsafe.width", value, "0");
+    float asWidth = atof(value);
+    property_get("hw.actionsafe.height", value, "0");
+    float asHeight = atof(value);
+    width = width * (1.0f -  asWidth / 100.0f);
+    height = height * (1.0f -  asHeight / 100.0f);
+
     x = (fbWidth - width) / 2;
     y = (fbHeight - height) / 2;
     rect->x = x;
@@ -938,7 +955,7 @@ bool OverlayControlChannel::getAspectRatioPosition(int w, int h, overlay_rect *r
 
 
 // This function gets the destination position for Seconday display
-// based on the aspect ratio of the primary
+// based on the position and aspect ratio of the primary
 bool OverlayControlChannel::getAspectRatioPosition(int w, int h, int orientation,
                                  overlay_rect *inRect, overlay_rect *outRect) {
     float priWidth  = FrameBufferInfo::getInstance()->getWidth();
@@ -951,73 +968,51 @@ bool OverlayControlChannel::getAspectRatioPosition(int w, int h, int orientation
     float yRatio = 1.0;
 
     int xPos = 0;
+    int yPos = 0;
     int tmp = 0;
     float actualWidth = fbWidth;
-    if(priWidth < priHeight) {
-        switch(orientation) {
-            case MDP_ROT_NOP:
-                actualWidth  = (fbHeight * priWidth) / priHeight;
-                xPos = (fbWidth - actualWidth) / 2;
-                break;
-            case MDP_ROT_180:
-                actualWidth  = (fbHeight * priWidth) / priHeight;
-                xPos = (fbWidth - actualWidth) / 2;
+    overlay_rect rect;
+    switch(orientation) {
+        case MDP_ROT_NOP:
+        case MDP_ROT_180:
+            getAspectRatioPosition((int)priWidth, (int)priHeight, &rect);
+            xPos = rect.x;
+            yPos = rect.y;
+            fbWidth = rect.w;
+            fbHeight = rect.h;
+            actualWidth = fbWidth;
+
+            if(orientation == MDP_ROT_180) {
                 inRect->x = priWidth - (inRect->x + inRect->w);
                 inRect->y = priHeight - (inRect->y + inRect->h);
-                break;
-            case MDP_ROT_90:
+            }
+            break;
+        case MDP_ROT_90:
+        case MDP_ROT_270:
+            // Swap width/height for primary
+            swapWidthHeight(priWidth, priHeight);
+            //Swap the destination width/height
+            swapWidthHeight(inRect->w, inRect->h);
+            getAspectRatioPosition((int)priWidth, (int)priHeight, &rect);
+            xPos = rect.x;
+            yPos = rect.y;
+            fbWidth = rect.w;
+            actualWidth = fbWidth;
+            fbHeight = rect.h;
+            if(orientation == MDP_ROT_90) {
                 tmp = inRect->y;
                 inRect->y = priWidth - (inRect->x + inRect->w);
                 inRect->x = tmp;
-                // Swap width/height for primary
-                swapWidthHeight(priWidth, priHeight);
-                //Swap the destination width/height
-                swapWidthHeight(inRect->w, inRect->h);
-                break;
-            case MDP_ROT_270:
+            }
+            else if(orientation == MDP_ROT_270) {
                 tmp = inRect->x;
                 inRect->x = priHeight - (inRect->y + inRect->h);
                 inRect->y = tmp;
-                // Swap width/height for primary
-                swapWidthHeight(priWidth, priHeight);
-                //Swap the destination width/height
-                swapWidthHeight(inRect->w, inRect->h);
-                break;
-            default:
-                LOGE("In  %s: Portrait: Unknown Orientation", __FUNCTION__);
-                break;
-        }
-    } else {
-        switch(orientation) {
-            case MDP_ROT_NOP:
-                break;
-            case MDP_ROT_180:
-                inRect->x = priWidth - (inRect->x + inRect->w);
-                inRect->y = priHeight - (inRect->y + inRect->h);
-                break;
-            case MDP_ROT_90:
-            case MDP_ROT_270:
-                // Swap width/height for primary
-                swapWidthHeight(priWidth, priHeight);
-                //Swap the destination width/height
-                swapWidthHeight(inRect->w, inRect->h);
-                actualWidth = ( fbHeight * priWidth) / priHeight;
-                xPos = (fbWidth - actualWidth) / 2;
-                if(orientation == MDP_ROT_90) {
-                    tmp = inRect->y;
-                    inRect->y = priWidth - (inRect->x + inRect->w);
-                    inRect->x = tmp;
-                }
-                else if(orientation == MDP_ROT_270) {
-                    tmp = inRect->x;
-                    inRect->x = priHeight - (inRect->y + inRect->h);
-                    inRect->y = tmp;
-                }
-                break;
-            default:
-                LOGE("In  %s: Landscape: Unknown Orientation", __FUNCTION__);
-                break;
-        }
+            }
+            break;
+        default:
+            LOGE("In  %s: Unknown Orientation", __FUNCTION__);
+            break;
     }
     //Calculate the position...
     xRatio = inRect->x/priWidth;
@@ -1025,12 +1020,12 @@ bool OverlayControlChannel::getAspectRatioPosition(int w, int h, int orientation
 
     wRatio = inRect->w/priWidth;
     hRatio = inRect->h/priHeight;
-    outRect->x = (xRatio * fbWidth) + xPos;
-    outRect->y = yRatio * fbHeight;
+    outRect->x = (xRatio * actualWidth) + xPos;
+    outRect->y = (yRatio * fbHeight) + yPos;
 
     outRect->w = (wRatio * actualWidth);
     outRect->h = hRatio * fbHeight;
-    LOGE("Calculated AS Position for HDMI:  X= %d, y = %d w = %d h = %d",
+    LOGD("Calculated AS Position for HDMI:  X= %d, y = %d w = %d h = %d",
                                   outRect->x, outRect->y,outRect->w, outRect->h);
     return true;
 }
