@@ -113,20 +113,6 @@ struct overlay_buffer_info {
     bool secure;
 };
 
-/* values for copybit_set_parameter(OVERLAY_TRANSFORM) */
-enum {
-    /* flip source image horizontally */
-    OVERLAY_TRANSFORM_FLIP_H    = HAL_TRANSFORM_FLIP_H,
-    /* flip source image vertically */
-    OVERLAY_TRANSFORM_FLIP_V    = HAL_TRANSFORM_FLIP_V,
-    /* rotate source image 90 degrees */
-    OVERLAY_TRANSFORM_ROT_90    = HAL_TRANSFORM_ROT_90,
-    /* rotate source image 180 degrees */
-    OVERLAY_TRANSFORM_ROT_180   = HAL_TRANSFORM_ROT_180,
-    /* rotate source image 270 degrees */
-    OVERLAY_TRANSFORM_ROT_270   = HAL_TRANSFORM_ROT_270
-};
-
 using android::Mutex;
 namespace overlay {
     //Utility Class to query the framebuffer info
@@ -393,13 +379,13 @@ public:
     bool queueBuffer(buffer_handle_t buffer);
     bool setSource(const overlay_buffer_info& info, int orientation, bool hdmiConnected,
                     bool ignoreFB = false, int numBuffers = 2);
+    bool getAspectRatioPosition(int w, int h, overlay_rect *rect, int channel = 0);
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
     bool updateWaitForVsyncFlags(bool waitForVsync);
     bool waitForHdmiVsync(int channel);
     int  getChannelStatus() const { return (mChannelUP ? OVERLAY_CHANNEL_UP: OVERLAY_CHANNEL_DOWN); }
     void setHDMIStatus (bool isHDMIConnected) { mHDMIConnected = isHDMIConnected; mState = -1; }
     int getHDMIStatus() const {return (mHDMIConnected ? HDMI_ON : HDMI_OFF); }
-
 private:
     bool setChannelPosition(int x, int y, uint32_t w, uint32_t h, int channel = 0);
     bool setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int channel);
