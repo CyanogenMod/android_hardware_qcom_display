@@ -66,6 +66,14 @@ enum {
      * If not set, the system heap is assumed to be coming from ashmem
      */
     GRALLOC_USAGE_PRIVATE_ION             =       0x00020000,
+
+    /* This flag can be set to disable genlock synchronization
+     * for the gralloc buffer. If this flag is set the caller
+     * is required to perform explicit synchronization.
+     * WARNING - flag is outside the standard PRIVATE region
+     * and may need to be moved if the gralloc API changes
+     */
+    GRALLOC_USAGE_PRIVATE_UNSYNCHRONIZED  =       0X00040000,
 };
 
 enum {
@@ -313,6 +321,7 @@ struct private_handle_t {
         PRIV_FLAGS_NONCONTIGUOUS_MEM = 0x00000100,
         PRIV_FLAGS_HWC_LOCK       = 0x00000200, // Set by HWC when storing the handle
         PRIV_FLAGS_SECURE_BUFFER  = 0x00000400,
+        PRIV_FLAGS_UNSYNCHRONIZED = 0x00000800, // For explicit synchronization
     };
 
     // file-descriptors
