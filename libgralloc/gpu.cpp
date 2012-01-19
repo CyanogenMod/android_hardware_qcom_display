@@ -160,6 +160,10 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
     data.pHandle = (unsigned int) pHandle;
     err = mAllocCtrl->allocate(data, usage, compositionType);
 
+    if (usage & GRALLOC_USAGE_PRIVATE_UNSYNCHRONIZED) {
+        flags |= private_handle_t::PRIV_FLAGS_UNSYNCHRONIZED;
+    }
+
     if (err == 0) {
         flags |= data.allocType;
         private_handle_t* hnd = new private_handle_t(data.fd, size, flags,
