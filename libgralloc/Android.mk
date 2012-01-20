@@ -43,8 +43,8 @@ ifeq ($(TARGET_QCOM_HDMI_OUT),true)
     LOCAL_SHARED_LIBRARIES += liboverlay
 endif
 
-ifeq ($(TARGET_HAVE_BYPASS),true)
-    LOCAL_CFLAGS += -DCOMPOSITION_BYPASS
+ifeq ($(TARGET_USES_SF_BYPASS),true)
+    LOCAL_CFLAGS += -DSF_BYPASS
 endif
 
 ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
