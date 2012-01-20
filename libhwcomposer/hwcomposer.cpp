@@ -1261,6 +1261,9 @@ static int hwc_set(hwc_composer_device_t *dev,
             LOGE("eglSwapBuffers() failed in %s", __FUNCTION__);
         }
     }
+    else {
+        CALC_FPS();
+    }
 #ifdef COMPOSITION_BYPASS
     if(ctx->bypassState == BYPASS_OFF_PENDING) {
         //Close channels only after fb content is displayed.
@@ -1371,6 +1374,8 @@ static int hwc_module_initialize(struct private_hwc_module_t* hwcModule)
             hwcModule->isBypassEnabled = true;
         }
     }
+
+    CALC_INIT();
 
     return 0;
 }
