@@ -1210,9 +1210,6 @@ static int hwc_set(hwc_composer_device_t *dev,
 
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
                                                            dev->common.module);
-
-    framebuffer_device_t *fbDev = hwcModule->fbDevice;
-
     if (!list || !hwcModule) {
         LOGE("hwc_set invalid list or module");
 #ifdef COMPOSITION_BYPASS
@@ -1246,19 +1243,12 @@ static int hwc_set(hwc_composer_device_t *dev,
     storeLockedBypassHandle(list, ctx);
     // We have stored the handles, unset the current lock states in the context.
     unsetBypassBufferLockState(ctx);
-
-    //Setup for waiting until 1 FB post is done before closing bypass mode.
-    if (ctx->bypassState == BYPASS_OFF_PENDING) {
-        fbDev->resetBufferPostStatus(fbDev);
-    }
 #endif
-
     // Do not call eglSwapBuffers if we the skip composition flag is set on the list.
     if (!(list->flags & HWC_SKIP_COMPOSITION)) {
         EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
         if (!sucess) {
             ret = HWC_EGL_ERROR;
-            LOGE("eglSwapBuffers() failed in %s", __FUNCTION__);
         }
     }
     else {
@@ -1266,12 +1256,6 @@ static int hwc_set(hwc_composer_device_t *dev,
     }
 #ifdef COMPOSITION_BYPASS
     if(ctx->bypassState == BYPASS_OFF_PENDING) {
-        //Close channels only after fb content is displayed.
-        //We have already reset status before eglSwapBuffers.
-        if (!(list->flags & HWC_SKIP_COMPOSITION)) {
-            fbDev->waitForBufferPost(fbDev);
-        }
-
         closeBypass(ctx);
         ctx->bypassState = BYPASS_OFF;
     }
