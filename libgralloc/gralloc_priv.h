@@ -294,11 +294,6 @@ struct private_module_t {
     pthread_mutex_t overlayLock;
     pthread_cond_t overlayPost;
 #endif
-#ifdef COMPOSITION_BYPASS
-    pthread_mutex_t bufferPostLock;
-    pthread_cond_t bufferPostCond;
-    bool bufferPostDone;
-#endif
 };
 
 /*****************************************************************************/
