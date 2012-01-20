@@ -139,7 +139,7 @@ static void *disp_loop(void *ptr)
         pthread_mutex_lock(&(m->qlock));
 
         // wait (sleep) while display queue is empty;
-        while (m->disp.isEmpty()) {
+        if (m->disp.isEmpty()) {
             pthread_cond_wait(&(m->qpost),&(m->qlock));
         }
 
@@ -167,13 +167,6 @@ static void *disp_loop(void *ptr)
             LOGE("ERROR FBIOPUT_VSCREENINFO failed; frame not displayed");
         }
 
-#if defined COMPOSITION_BYPASS
-        //Signal so that we can close channels if we need to
-        pthread_mutex_lock(&m->bufferPostLock);
-        m->bufferPostDone = true;
-        pthread_cond_signal(&m->bufferPostCond);
-        pthread_mutex_unlock(&m->bufferPostLock);
-#endif
         CALC_FPS();
 
         if (cur_buf == -1) {
@@ -420,34 +413,6 @@ static int fb_orientationChanged(struct framebuffer_device_t* dev, int orientati
 }
 #endif
 
-//Wait until framebuffer content is displayed.
-//This is called in the context of threadLoop.
-//Display loop wakes this up after display.
-static int fb_waitForBufferPost(struct framebuffer_device_t* dev)
-{
-#if defined COMPOSITION_BYPASS
-    private_module_t* m = reinterpret_cast<private_module_t*>(
-            dev->common.module);
-    pthread_mutex_lock(&m->bufferPostLock);
-    while(m->bufferPostDone == false) {
-        pthread_cond_wait(&(m->bufferPostCond), &(m->bufferPostLock));
-    }
-    pthread_mutex_unlock(&m->bufferPostLock);
-#endif
-    return 0;
-}
-
-static int fb_resetBufferPostStatus(struct framebuffer_device_t* dev)
-{
-#if defined COMPOSITION_BYPASS
-    private_module_t* m = reinterpret_cast<private_module_t*>(
-            dev->common.module);
-    pthread_mutex_lock(&m->bufferPostLock);
-    m->bufferPostDone = false;
-    pthread_mutex_unlock(&m->bufferPostLock);
-#endif
-    return 0;
-}
 static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
 {
     if (private_handle_t::validate(buffer) < 0)
@@ -830,11 +795,6 @@ int mapFrameBufferLocked(struct private_module_t* module)
     module->hdmiMirroringState = HDMI_NO_MIRRORING;
     module->trueMirrorSupport = FrameBufferInfo::getInstance()->canSupportTrueMirroring();
 #endif
-#if defined COMPOSITION_BYPASS
-    pthread_mutex_init(&(module->bufferPostLock), NULL);
-    pthread_cond_init(&(module->bufferPostCond), NULL);
-    module->bufferPostDone = false;
-#endif
 
     return 0;
 }
@@ -896,11 +856,6 @@ int fb_device_open(hw_module_t const* module, const char* name,
         dev->device.enableHDMIOutput = fb_enableHDMIOutput;
         dev->device.setActionSafeWidthRatio = fb_setActionSafeWidthRatio;
         dev->device.setActionSafeHeightRatio = fb_setActionSafeHeightRatio;
-#endif
-
-#if defined COMPOSITION_BYPASS
-        dev->device.waitForBufferPost = fb_waitForBufferPost;
-        dev->device.resetBufferPostStatus = fb_resetBufferPostStatus;
 #endif
 
         private_module_t* m = (private_module_t*)module;
