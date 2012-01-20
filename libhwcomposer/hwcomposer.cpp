@@ -1057,11 +1057,82 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
     dst.base = (void *)fbHandle->base;
     dst.handle = (native_handle_t *)renderBuffer->handle;
 
+    copybit_device_t *copybit = hwcModule->copybitEngine;
+
+    int32_t screen_w        = displayFrame.right - displayFrame.left;
+    int32_t screen_h        = displayFrame.bottom - displayFrame.top;
+    int32_t src_crop_width  = sourceCrop.right - sourceCrop.left;
+    int32_t src_crop_height = sourceCrop.bottom -sourceCrop.top;
+
+    int32_t copybitsMaxScale = copybit->get(copybit,COPYBIT_MAGNIFICATION_LIMIT);
+
+    if(layer->transform & (HWC_TRANSFORM_ROT_90 | HWC_TRANSFORM_ROT_270)){
+        //swap screen width and height
+        int tmp = screen_w;
+        screen_w  = screen_h;
+        screen_h = tmp;
+    }
+    int32_t dsdx = screen_w/src_crop_width;
+    int32_t dtdy = screen_h/src_crop_height;
+    sp<GraphicBuffer> tempBitmap;
+
+    if(dsdx  > copybitsMaxScale || dtdy > copybitsMaxScale){
+        // The requested scale is out of the range the hardware
+        // can support.
+       LOGD("%s:%d::Need to scale dsdx=%d, dtdy=%d,maxScaleInv=%d,screen_w=%d,screen_h=%d \
+                  src_crop_width=%d src_crop_height=%d",__FUNCTION__,__LINE__,
+                  dsdx,dtdy,copybitsMaxScale,screen_w,screen_h,src_crop_width,src_crop_height);
+
+       //Driver makes width and height as even
+       //that may cause wrong calculation of the ratio
+       //in display and crop.Hence we make
+       //crop width and height as even.
+       src_crop_width  = (src_crop_width/2)*2;
+       src_crop_height = (src_crop_height/2)*2;
+
+       int tmp_w =  src_crop_width*copybitsMaxScale;
+       int tmp_h =  src_crop_height*copybitsMaxScale;
+
+       LOGD("%s:%d::tmp_w = %d,tmp_h = %d",__FUNCTION__,__LINE__,tmp_w,tmp_h);
+       tempBitmap = new GraphicBuffer(
+                    tmp_w, tmp_h, src.format,
+                    GraphicBuffer::USAGE_HW_2D);
+
+       err = tempBitmap->initCheck();
+       if (err == android::NO_ERROR){
+            copybit_image_t tmp_dst;
+            copybit_rect_t tmp_rect;
+            tmp_dst.w = tmp_w;
+            tmp_dst.h = tmp_h;
+            tmp_dst.format = tempBitmap->format;
+            tmp_dst.handle = (native_handle_t*)tempBitmap->getNativeBuffer()->handle;
+            tmp_dst.horiz_padding = src.horiz_padding;
+            tmp_dst.vert_padding = src.vert_padding;
+            tmp_rect.l = 0;
+            tmp_rect.t = 0;
+            tmp_rect.r = tmp_dst.w;
+            tmp_rect.b = tmp_dst.h;
+            //create one clip region
+            hwc_rect tmp_hwc_rect = {0,0,tmp_rect.r,tmp_rect.b};
+            hwc_region_t tmp_hwc_reg = {1,(hwc_rect_t const*)&tmp_hwc_rect};
+            region_iterator tmp_it(tmp_hwc_reg);
+            copybit->set_parameter(copybit,COPYBIT_TRANSFORM,0);
+            copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA,
+                        (layer->blending == HWC_BLENDING_NONE) ? -1 : layer->alpha);
+            err = copybit->stretch(copybit,&tmp_dst, &src, &tmp_rect, &srcRect, &tmp_it);
+            if(err < 0){
+                LOGE("%s:%d::tmp copybit stretch failed",__FUNCTION__,__LINE__);
+                return err;
+            }
+            // copy new src and src rect crop
+            src = tmp_dst;
+            srcRect = tmp_rect;
+      }
+    }
     // Copybit region
     hwc_region_t region = layer->visibleRegionScreen;
     region_iterator copybitRegion(region);
 
-    copybit_device_t *copybit = hwcModule->copybitEngine;
     copybit->set_parameter(copybit, COPYBIT_FRAMEBUFFER_WIDTH, renderBuffer->width);
     copybit->set_parameter(copybit, COPYBIT_FRAMEBUFFER_HEIGHT, renderBuffer->height);
     copybit->set_parameter(copybit, COPYBIT_TRANSFORM, layer->transform);
