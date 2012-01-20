@@ -20,9 +20,10 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
-LOCAL_SHARED_LIBRARIES := liblog libcutils libGLESv1_CM libutils libmemalloc
+LOCAL_SHARED_LIBRARIES := liblog libcutils libGLESv1_CM libutils libmemalloc libQcomUI
 LOCAL_SHARED_LIBRARIES += libgenlock
 LOCAL_C_INCLUDES += hardware/qcom/display/libgenlock
+LOCAL_C_INCLUDES += hardware/qcom/display/libqcomui
 LOCAL_SRC_FILES :=  framebuffer.cpp \
                     gpu.cpp         \
                     gralloc.cpp     \
