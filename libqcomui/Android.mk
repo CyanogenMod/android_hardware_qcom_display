@@ -23,6 +23,8 @@ else
     LOCAL_SHARED_LIBRARIES += libmemalloc
 endif
 
+LOCAL_CFLAGS += -DDEBUG_CALC_FPS
+
 LOCAL_MODULE := libQcomUI
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_SHARED_LIBRARY)
