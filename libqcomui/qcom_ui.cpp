@@ -158,7 +158,7 @@ bool isGPUSupportedFormat(int format) {
 int checkBuffer(native_handle_t *buffer_handle, int size, int usage)
 {
     // If the client hasn't set a size, return
-    if (0 == size) {
+    if (0 >= size) {
         return 0;
     }
 
@@ -170,10 +170,9 @@ int checkBuffer(native_handle_t *buffer_handle, int size, int usage)
 
     // Obtain the private_handle from the native handle
     private_handle_t *hnd = reinterpret_cast<private_handle_t*>(buffer_handle);
-    if (hnd->size < size) {
+    if (hnd->size != size) {
         return reallocate_memory(hnd, size, usage);
     }
-
     return 0;
 }
 
