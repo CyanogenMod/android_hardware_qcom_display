@@ -130,6 +130,14 @@ int getNumberOfArgsForOperation(int operation) {
  * @return true if the format is supported by the GPU.
  */
 bool isGPUSupportedFormat(int format) {
+
+    // For 7x27A bypass creating EGL image for 420 SP
+    // This is done to save CPU utilization by SurfaceFlinger thread
+#ifdef BYPASS_EGLIMAGE
+    if (format == HAL_PIXEL_FORMAT_YCrCb_420_SP){
+        return false;
+    }
+#endif
     if (format == HAL_PIXEL_FORMAT_YV12) {
         // We check the YV12 formats, since some Qcom specific formats
         // could have the bits set.
