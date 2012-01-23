@@ -164,24 +164,28 @@ static void set_rects(struct copybit_context_t *dev,
     e->dst_rect.w  = clip.r - clip.l;
     e->dst_rect.h  = clip.b - clip.t;
 
-    uint32_t W, H;
+    uint32_t W, H, delta_x, delta_y;
     if (dev->mFlags & COPYBIT_TRANSFORM_ROT_90) {
-        e->src_rect.x = (clip.t - dst->t) + src->t;
-        e->src_rect.y = (dst->r - clip.r) + src->l;
+        delta_x = (clip.t - dst->t);
+        delta_y = (dst->r - clip.r);
         e->src_rect.w = (clip.b - clip.t);
         e->src_rect.h = (clip.r - clip.l);
         W = dst->b - dst->t;
         H = dst->r - dst->l;
     } else {
-        e->src_rect.x  = (clip.l - dst->l) + src->l;
-        e->src_rect.y  = (clip.t - dst->t) + src->t;
+        delta_x  = (clip.l - dst->l);
+        delta_y  = (clip.t - dst->t);
         e->src_rect.w  = (clip.r - clip.l);
         e->src_rect.h  = (clip.b - clip.t);
         W = dst->r - dst->l;
         H = dst->b - dst->t;
     }
-    MULDIV(&e->src_rect.x, &e->src_rect.w, src->r - src->l, W);
-    MULDIV(&e->src_rect.y, &e->src_rect.h, src->b - src->t, H);
+
+    MULDIV(&delta_x, &e->src_rect.w, src->r - src->l, W);
+    MULDIV(&delta_y, &e->src_rect.h, src->b - src->t, H);
+
+    e->src_rect.x = delta_x + src->l;
+    e->src_rect.y = delta_y + src->t;
 
     if (dev->mFlags & COPYBIT_TRANSFORM_FLIP_V) {
         if (dev->mFlags & COPYBIT_TRANSFORM_ROT_90) {
