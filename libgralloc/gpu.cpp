@@ -251,8 +251,8 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         case HAL_PIXEL_FORMAT_YV12:
-            if ((w&1) || (h&1)) {
-                LOGE("w or h is odd for the YUV format");
+            if ((format == HAL_PIXEL_FORMAT_YV12) && ((w&1) || (h&1))) {
+                LOGE("w or h is odd for the YV12 format");
                 return -EINVAL;
             }
             alignedw = ALIGN(w, 16);
