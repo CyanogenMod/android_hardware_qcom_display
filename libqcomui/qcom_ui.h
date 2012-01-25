@@ -36,6 +36,7 @@
 #include <ui/Region.h>
 #include <EGL/egl.h>
 #include <utils/Singleton.h>
+#include "../libgralloc/gralloc_priv.h"
 
 using namespace android;
 using android::sp;
@@ -83,6 +84,8 @@ enum {
     HWC_USE_ORIGINAL_RESOLUTION = 0x10000000,
     HWC_DO_NOT_USE_OVERLAY      = 0x20000000,
     HWC_COMP_BYPASS             = 0x40000000,
+    HWC_USE_EXT_ONLY            = 0x80000000, //Layer displayed on external only
+    HWC_USE_EXT_BLOCK           = 0x01000000, //Layer displayed on external only
     HWC_BYPASS_RESERVE_0        = 0x00000010,
     HWC_BYPASS_RESERVE_1        = 0x00000020,
 };

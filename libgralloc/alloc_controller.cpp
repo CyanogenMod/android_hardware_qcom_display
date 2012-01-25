@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -59,12 +59,15 @@ static bool canFallback(int compositionType, int usage, bool triedSystem)
     // 2. Alloc from system heap was already tried
     // 3. The heap type is requsted explicitly
     // 4. The heap type is protected
+    // 5. The buffer is meant for external display only
 
     if(compositionType == MDP_COMPOSITION)
         return false;
     if(triedSystem)
         return false;
     if(usage & (GRALLOC_HEAP_MASK | GRALLOC_USAGE_PROTECTED))
+        return false;
+    if(usage & (GRALLOC_HEAP_MASK | GRALLOC_USAGE_EXTERNAL_ONLY))
         return false;
     //Return true by default
     return true;

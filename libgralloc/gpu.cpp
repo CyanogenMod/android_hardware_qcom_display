@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012 Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -162,6 +162,14 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
 
     if (usage & GRALLOC_USAGE_PRIVATE_UNSYNCHRONIZED) {
         flags |= private_handle_t::PRIV_FLAGS_UNSYNCHRONIZED;
+    }
+
+    if (usage & GRALLOC_USAGE_EXTERNAL_ONLY) {
+        flags |= private_handle_t::PRIV_FLAGS_EXTERNAL_ONLY;
+        //The EXTERNAL_BLOCK flag is always an add-on
+        if (usage & GRALLOC_USAGE_EXTERNAL_BLOCK) {
+            flags |= private_handle_t::PRIV_FLAGS_EXTERNAL_BLOCK;
+        }
     }
 
     if (err == 0) {

@@ -60,12 +60,12 @@ enum {
 
     /* Set this for allocating uncached memory (using O_DSYNC)
      * cannot be used with noncontiguous heaps */
-    GRALLOC_USAGE_PRIVATE_UNCACHED        =       0x00010000,
+    GRALLOC_USAGE_PRIVATE_UNCACHED        =       0x00100000,
 
     /* This flag needs to be set when using a non-contiguous heap from ION.
      * If not set, the system heap is assumed to be coming from ashmem
      */
-    GRALLOC_USAGE_PRIVATE_ION             =       0x00020000,
+    GRALLOC_USAGE_PRIVATE_ION             =       0x00200000,
 
     /* This flag can be set to disable genlock synchronization
      * for the gralloc buffer. If this flag is set the caller
@@ -73,10 +73,18 @@ enum {
      * WARNING - flag is outside the standard PRIVATE region
      * and may need to be moved if the gralloc API changes
      */
-    GRALLOC_USAGE_PRIVATE_UNSYNCHRONIZED  =       0X00040000,
+    GRALLOC_USAGE_PRIVATE_UNSYNCHRONIZED  =       0X00400000,
 
     /* Set this flag when you need to avoid mapping the memory in userspace */
-    GRALLOC_USAGE_PRIVATE_DO_NOT_MAP      =       0X00080000,
+    GRALLOC_USAGE_PRIVATE_DO_NOT_MAP      =       0X00800000,
+
+    /* Buffer content should be displayed on an external display only */
+    GRALLOC_USAGE_EXTERNAL_ONLY           =       0x00010000,
+
+    /* Only this buffer content should be displayed on external, even if
+     * other EXTERNAL_ONLY buffers are available. Used during suspend.
+     */
+    GRALLOC_USAGE_EXTERNAL_BLOCK          =       0x00020000,
 };
 
 enum {
@@ -321,6 +329,8 @@ struct private_handle_t {
         PRIV_FLAGS_SECURE_BUFFER  = 0x00000400,
         PRIV_FLAGS_UNSYNCHRONIZED = 0x00000800, // For explicit synchronization
         PRIV_FLAGS_NOT_MAPPED     = 0x00001000, // Not mapped in userspace
+        PRIV_FLAGS_EXTERNAL_ONLY  = 0x00002000, // Display on external only
+        PRIV_FLAGS_EXTERNAL_BLOCK = 0x00004000, // Display only this buffer on external
     };
 
     // file-descriptors

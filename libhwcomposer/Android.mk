@@ -9,8 +9,9 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libEGL libhardware libutils liboverla
 LOCAL_SHARED_LIBRARIES += libgenlock libQcomUI libmemalloc
 
 LOCAL_SRC_FILES := 	\
-	hwcomposer.cpp
-	
+    hwcomposer.cpp \
+    external_display_only.h
+
 LOCAL_MODULE := hwcomposer.$(TARGET_BOARD_PLATFORM)
 LOCAL_CFLAGS:= -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).hwcomposer\" -DDEBUG_CALC_FPS
 
