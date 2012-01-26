@@ -87,7 +87,6 @@ int IonAlloc::alloc_buffer(alloc_data& data)
         if(ionSyncFd < 0) {
             LOGE("%s: Failed to open ion device - %s",
                     __FUNCTION__, strerror(errno));
-            close_device();
             return -errno;
         }
         iFd = ionSyncFd;
@@ -98,7 +97,6 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     err = ioctl(iFd, ION_IOC_ALLOC, &ionAllocData);
     if(err) {
         LOGE("ION_IOC_ALLOC failed with error - %s", strerror(errno));
-        close_device();
         if(ionSyncFd >= 0)
             close(ionSyncFd);
         ionSyncFd = FD_INIT;
@@ -112,7 +110,6 @@ int IonAlloc::alloc_buffer(alloc_data& data)
         LOGE("%s: ION_IOC_MAP failed with error - %s",
                 __FUNCTION__, strerror(errno));
         ioctl(mIonFd, ION_IOC_FREE, &handle_data);
-        close_device();
         if(ionSyncFd >= 0)
             close(ionSyncFd);
         ionSyncFd = FD_INIT;
@@ -128,7 +125,6 @@ int IonAlloc::alloc_buffer(alloc_data& data)
                                     __FUNCTION__, strerror(errno));
             err = -errno;
             ioctl(mIonFd, ION_IOC_FREE, &handle_data);
-            close_device();
             ionSyncFd = FD_INIT;
             return err;
         }
@@ -218,7 +214,6 @@ int IonAlloc::clean_buffer(void *base, size_t size, int offset, int fd)
     if(err) {
         LOGE("%s: ION_IOC_IMPORT failed with error - %s",
                 __FUNCTION__, strerror(errno));
-        close_device();
         return err;
     }
 
@@ -232,7 +227,6 @@ int IonAlloc::clean_buffer(void *base, size_t size, int offset, int fd)
         LOGE("%s: ION_IOC_CLEAN_INV_CACHES failed with error - %s",
                 __FUNCTION__, strerror(errno));
         ioctl(mIonFd, ION_IOC_FREE, &handle_data);
-        close_device();
         return err;
     }
     ioctl(mIonFd, ION_IOC_FREE, &handle_data);
