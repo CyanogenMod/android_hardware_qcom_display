@@ -587,7 +587,7 @@ static int hwc_closeOverlayChannels(hwc_context_t* ctx) {
 /*
  * Configures mdp pipes
  */
-static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const bool waitForVsync) {
+static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const int flags) {
      int ret = 0;
 
 #ifdef COMPOSITION_BYPASS
@@ -623,7 +623,7 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const bool wai
             hdmiConnected = (int)ctx->mHDMIEnabled;
 #endif
         ret = ovLibObject->setSource(info, layer->transform,
-                            hdmiConnected, waitForVsync);
+                            hdmiConnected, flags);
         if (!ret) {
             LOGE("prepareOverlay setSource failed");
             return -1;
@@ -1021,11 +1021,12 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 continue;
             }
             if (hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO) && (yuvBufferCount == 1)) {
-                bool waitForVsync = true;
+                int flags = WAIT_FOR_VSYNC;
+                flags |= (1 == list->numHwLayers) ? DISABLE_FRAMEBUFFER_FETCH : 0;
                 if (!isValidDestination(hwcModule->fbDevice, list->hwLayers[i].displayFrame)) {
                     list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
 #ifdef USE_OVERLAY
-                } else if(prepareOverlay(ctx, &(list->hwLayers[i]), waitForVsync) == 0) {
+                } else if(prepareOverlay(ctx, &(list->hwLayers[i]), flags) == 0) {
                     list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
                     list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
                     // We've opened the channel. Set the state to open.
