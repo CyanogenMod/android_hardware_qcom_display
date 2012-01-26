@@ -84,6 +84,15 @@ enum {
     NEW_REQUEST,
     UPDATE_REQUEST
 };
+
+enum {
+    WAIT_FOR_VSYNC             = 1<<0,
+    DISABLE_FRAMEBUFFER_FETCH  = 1<<1,
+    INTERLACED_CONTENT         = 1<<2,
+    OVERLAY_PIPE_SHARE         = 1<<3,
+    SECURE_OVERLAY_SESSION     = 1<<4,
+};
+
 /* ------------------------------- 3D defines ---------------------------------------*/
 // The compound format passed to the overlay is
 // ABCCC where A is the input 3D format,
@@ -297,11 +306,12 @@ enum {
     bool mIsChannelUpdated;
     bool openDevices(int fbnum = -1);
     bool setOverlayInformation(const overlay_buffer_info& info,
-                               int flags, int orientation, int zorder = 0, bool ignoreFB = false,
+                               int orientation, int zorder = 0, int flags = 0,
                                int requestType = NEW_REQUEST);
     bool startOVRotatorSessions(const overlay_buffer_info& info, int orientation, int requestType);
     void swapOVRotWidthHeight();
     int commitVisualParam(int8_t paramType, float paramValue);
+    void setInformationFromFlags(int flags, mdp_overlay& ov);
 
 public:
     OverlayControlChannel();
@@ -310,7 +320,7 @@ public:
                                int fbnum, bool norot = false,
                                bool uichannel = false,
                                unsigned int format3D = 0, int zorder = 0,
-                               bool ignoreFB = false);
+                               int flags = 0);
     bool closeControlChannel();
     bool setPosition(int x, int y, uint32_t w, uint32_t h);
     bool setTransform(int value, bool fetch = true);
@@ -324,18 +334,18 @@ public:
     int getFBHeight() const { return mFBHeight; }
     int getFormat3D() const { return mFormat3D; }
     bool getOrientation(int& orientation) const;
-    bool updateWaitForVsyncFlags(bool waitForVsync);
+    bool updateOverlayFlags(int flags);
     bool getAspectRatioPosition(int w, int h, overlay_rect *rect);
     // Calculates the aspect ratio for video on HDMI based on primary
     //  aspect ratio used in case of true mirroring
     bool getAspectRatioPosition(int w, int h, int orientation,
                                 overlay_rect *inRect, overlay_rect *outRect);
     bool getPositionS3D(int channel, int format, overlay_rect *rect);
-    bool updateOverlaySource(const overlay_buffer_info& info, int orientation, bool waitForVsync);
+    bool updateOverlaySource(const overlay_buffer_info& info, int orientation, int flags);
     bool getFormat() const { return mFormat; }
     bool setVisualParam(int8_t paramType, float paramValue);
     bool useVirtualFB ();
-    int getOverlayFlags() const { return mOVInfo.flags; }
+    bool doFlagsNeedUpdate(int flags);
 };
 
 class OverlayDataChannel {
@@ -408,7 +418,7 @@ public:
     static bool sHDMIAsPrimary;
     bool startChannel(const overlay_buffer_info& info, int fbnum, bool norot = false,
                           bool uichannel = false, unsigned int format3D = 0,
-                          int channel = 0, bool ignoreFB = false,
+                          int channel = 0, int flags = 0,
                           int num_buffers = 2);
     bool closeChannel();
     bool setDeviceOrientation(int orientation);
@@ -424,9 +434,9 @@ public:
     bool getOrientation(int& orientation, int channel = 0) const;
     bool queueBuffer(buffer_handle_t buffer);
     bool setSource(const overlay_buffer_info& info, int orientation, int hdmiConnected,
-                    bool ignoreFB = false, int numBuffers = 2);
+                    int flags, int numBuffers = 2);
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
-    bool updateWaitForVsyncFlags(bool waitForVsync);
+    bool updateOverlayFlags(int flags);
     void setVisualParam(int8_t paramType, float paramValue);
     bool waitForHdmiVsync(int channel);
     int  getChannelStatus() const { return (mChannelUP ? OVERLAY_CHANNEL_UP: OVERLAY_CHANNEL_DOWN); }
@@ -436,7 +446,7 @@ private:
     bool setChannelPosition(int x, int y, uint32_t w, uint32_t h, int channel = 0);
     bool setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int channel);
     bool queueBuffer(int fd, uint32_t offset, int channel);
-    bool updateOverlaySource(const overlay_buffer_info& info, int orientation, bool waitForVsync);
+    bool updateOverlaySource(const overlay_buffer_info& info, int orientation, int flags);
     int getS3DFormat(int format);
 };
 
