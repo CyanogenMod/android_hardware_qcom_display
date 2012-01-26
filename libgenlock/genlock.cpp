@@ -186,12 +186,6 @@ genlock_status_t genlock_release_lock(native_handle_t *buffer_handle)
             return GENLOCK_FAILURE;
         }
 
-        if (ioctl(hnd->genlockPrivFd, GENLOCK_IOC_RELEASE, NULL)) {
-            LOGE("%s: GENLOCK_IOC_RELEASE failed (err=%s)", __FUNCTION__,
-                    strerror(errno));
-            ret = GENLOCK_FAILURE;
-        }
-
         // Close the fd and reset the parameters.
         close_genlock_fd_and_handle(hnd->genlockPrivFd, hnd->genlockHandle);
     }
