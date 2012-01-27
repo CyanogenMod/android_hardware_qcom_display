@@ -164,7 +164,8 @@ status_t Rotator::startRotSession(msm_rotator_img_info& rotInfo,
                          GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP   |
                          GRALLOC_USAGE_PRIVATE_ADSP_HEAP        |
                          GRALLOC_USAGE_PRIVATE_IOMMU_HEAP       |
-                         GRALLOC_USAGE_PRIVATE_SMI_HEAP;
+                         GRALLOC_USAGE_PRIVATE_SMI_HEAP         |
+                         GRALLOC_USAGE_PRIVATE_DO_NOT_MAP;
 
         int err = mAlloc->allocate(data, allocFlags, 0);
 
