@@ -74,6 +74,9 @@ enum {
      * and may need to be moved if the gralloc API changes
      */
     GRALLOC_USAGE_PRIVATE_UNSYNCHRONIZED  =       0X00040000,
+
+    /* Set this flag when you need to avoid mapping the memory in userspace */
+    GRALLOC_USAGE_PRIVATE_DO_NOT_MAP      =       0X00080000,
 };
 
 enum {
@@ -317,6 +320,7 @@ struct private_handle_t {
         PRIV_FLAGS_HWC_LOCK       = 0x00000200, // Set by HWC when storing the handle
         PRIV_FLAGS_SECURE_BUFFER  = 0x00000400,
         PRIV_FLAGS_UNSYNCHRONIZED = 0x00000800, // For explicit synchronization
+        PRIV_FLAGS_NOT_MAPPED     = 0x00001000, // Not mapped in userspace
     };
 
     // file-descriptors

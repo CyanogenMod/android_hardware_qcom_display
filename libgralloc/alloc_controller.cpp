@@ -135,6 +135,9 @@ int IonController::allocate(alloc_data& data, int usage,
     if(usage & GRALLOC_USAGE_PROTECTED)
         ionFlags |= ION_SECURE;
 
+    if(usage & GRALLOC_USAGE_PRIVATE_DO_NOT_MAP)
+        data.allocType  =  private_handle_t::PRIV_FLAGS_NOT_MAPPED;
+
     // if no flags are set, default to
     // EBI heap, so that bypass can work
     // we can fall back to system heap if
