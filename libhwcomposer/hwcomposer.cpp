@@ -682,10 +682,9 @@ static void handleHDMIStateChange(hwc_composer_device_t *dev, int externaltype) 
 
     if(ctx && ctx->mOverlayLibObject) {
         overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
-        ovLibObject->setHDMIStatus(externaltype);
         if (!externaltype) {
-            // Close the overlay channels if HDMI is disconnected
-            ovLibObject->closeChannel();
+            // Close the external overlay channels if HDMI is disconnected
+            ovLibObject->closeExternalChannel();
         }
     }
 #endif

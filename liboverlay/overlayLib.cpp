@@ -448,6 +448,13 @@ bool Overlay::closeChannel() {
     return true;
 }
 
+void Overlay::closeExternalChannel() {
+    if (objOvCtrlChannel[VG1_PIPE].isChannelUP()) {
+        objOvCtrlChannel[VG1_PIPE].closeControlChannel();
+        objOvDataChannel[VG1_PIPE].closeDataChannel();
+    }
+}
+
 bool Overlay::getPosition(int& x, int& y, uint32_t& w, uint32_t& h, int channel) {
     return objOvCtrlChannel[channel].getPosition(x, y, w, h);
 }
@@ -643,16 +650,17 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
     // If there is 3D content; the effective format passed by the client is:
     // effectiveFormat = 3D_IN | 3D_OUT | ColorFormat
     int newState = mState;
-    bool stateChange = false, ret = false;
+    bool stateChange = false, ret = true;
+    bool isHDMIStateChange = (mHDMIConnected != hdmiConnected) && (mState != -1);
     unsigned int format3D = getS3DFormat(info.format);
     int colorFormat = getColorFormat(info.format);
-    if (-1 == mState) {
+    if (isHDMIStateChange || -1 == mState) {
+        // we were mirroring UI. Also HDMI state stored was stale
         newState = getOverlayConfig (format3D, false, hdmiConnected);
         stateChange = (mState == newState) ? false : true;
     }
 
     if (stateChange) {
-        closeChannel();
         mHDMIConnected = hdmiConnected;
         mState = newState;
         mS3DFormat = format3D;
@@ -666,11 +674,18 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
         int fbnum = 0;
         switch(mState) {
             case OV_2D_VIDEO_ON_PANEL:
+                if(isHDMIStateChange) {
+                    //close HDMI Only
+                    closeExternalChannel();
+                    break;
+                }
             case OV_3D_VIDEO_2D_PANEL:
+                closeChannel();
                 return startChannel(info, FRAMEBUFFER_0, noRot, false,
                         mS3DFormat, VG0_PIPE, waitForVsync, num_buffers);
                 break;
             case OV_3D_VIDEO_3D_PANEL:
+                closeChannel();
                 if (sHDMIAsPrimary) {
                     noRot = true;
                     waitForVsync = true;
@@ -685,7 +700,22 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                 }
                 break;
             case OV_2D_VIDEO_ON_TV:
+                if(isHDMIStateChange) {
+                   //start only HDMI channel
+                   noRot = true;
+                   bool waitForVsync = true;
+                   if(!startChannel(info, FRAMEBUFFER_1, noRot, false, mS3DFormat,
+                                    VG1_PIPE, waitForVsync, num_buffers)) {
+                       LOGE("%s:failed to open channel %d", __func__, VG1_PIPE);
+                       return false;
+                    }
+                    overlay_rect rect;
+                    objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(info.width,
+                                                                  info.height, &rect);
+                    return setChannelPosition(rect.x, rect.y, rect.w, rect.h, VG1_PIPE);
+                }
             case OV_3D_VIDEO_2D_TV:
+                closeChannel();
                 for (int i=0; i<NUM_CHANNELS; i++) {
                     fbnum = i;
                     //start two channels for one for primary and external.
@@ -705,6 +735,7 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                 return true;
                 break;
             case OV_3D_VIDEO_3D_TV:
+                closeChannel();
                 for (int i=0; i<NUM_CHANNELS; i++) {
                     if(!startChannel(info, FRAMEBUFFER_1, true, false,
                                 mS3DFormat, i, waitForVsync, num_buffers)) {

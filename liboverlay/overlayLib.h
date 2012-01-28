@@ -430,8 +430,7 @@ public:
     void setVisualParam(int8_t paramType, float paramValue);
     bool waitForHdmiVsync(int channel);
     int  getChannelStatus() const { return (mChannelUP ? OVERLAY_CHANNEL_UP: OVERLAY_CHANNEL_DOWN); }
-    void setHDMIStatus (bool isHDMIConnected) { mHDMIConnected = isHDMIConnected; mState = -1; }
-    int getHDMIStatus() const {return (mHDMIConnected ? HDMI_ON : HDMI_OFF); }
+    void closeExternalChannel();
 
 private:
     bool setChannelPosition(int x, int y, uint32_t w, uint32_t h, int channel = 0);
