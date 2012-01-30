@@ -56,6 +56,12 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
 int decideBufferHandlingMechanism(int format, const char *compositionUsed,
                                    int hasBlitEngine, int *needConversion,
                                    int *useBufferDirectly);
+
+// Allocate buffer from width, height, format into a private_handle_t
+// It is the responsibility of the caller to free the buffer
+int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage);
+void free_buffer(private_handle_t *hnd);
+
 /*****************************************************************************/
 
 class Locker {

@@ -6,7 +6,7 @@ include $(CLEAR_VARS)
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_SHARED_LIBRARIES := liblog libcutils libEGL libhardware libutils liboverlay
-LOCAL_SHARED_LIBRARIES += libgenlock libui libQcomUI
+LOCAL_SHARED_LIBRARIES += libgenlock libQcomUI libmemalloc
 
 LOCAL_SRC_FILES := 	\
 	hwcomposer.cpp

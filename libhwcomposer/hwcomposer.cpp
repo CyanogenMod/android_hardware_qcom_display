@@ -39,6 +39,7 @@
 #include <gralloc_priv.h>
 #include <genlock.h>
 #include <qcom_ui.h>
+#include <gr.h>
 
 /*****************************************************************************/
 #define ALIGN(x, align) (((x) + ((align)-1)) & ~((align)-1))
@@ -1099,7 +1100,7 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
     }
     int32_t dsdx = screen_w/src_crop_width;
     int32_t dtdy = screen_h/src_crop_height;
-    sp<GraphicBuffer> tempBitmap;
+    private_handle_t *tmpHnd = NULL;
 
     if(dsdx  > copybitsMaxScale || dtdy > copybitsMaxScale){
         // The requested scale is out of the range the hardware
@@ -1119,18 +1120,17 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
        int tmp_h =  src_crop_height*copybitsMaxScale;
 
        LOGD("%s:%d::tmp_w = %d,tmp_h = %d",__FUNCTION__,__LINE__,tmp_w,tmp_h);
-       tempBitmap = new GraphicBuffer(
-                    tmp_w, tmp_h, src.format,
-                    GraphicBuffer::USAGE_HW_2D);
 
-       err = tempBitmap->initCheck();
-       if (err == android::NO_ERROR){
+       int usage = GRALLOC_USAGE_PRIVATE_ADSP_HEAP |
+                   GRALLOC_USAGE_PRIVATE_MM_HEAP;
+
+       if (0 == alloc_buffer(&tmpHnd, tmp_w, tmp_h, src.format, usage)){
             copybit_image_t tmp_dst;
             copybit_rect_t tmp_rect;
             tmp_dst.w = tmp_w;
             tmp_dst.h = tmp_h;
-            tmp_dst.format = tempBitmap->format;
-            tmp_dst.handle = (native_handle_t*)tempBitmap->getNativeBuffer()->handle;
+            tmp_dst.format = tmpHnd->format;
+            tmp_dst.handle = tmpHnd;
             tmp_dst.horiz_padding = src.horiz_padding;
             tmp_dst.vert_padding = src.vert_padding;
             tmp_rect.l = 0;
@@ -1147,6 +1147,8 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
             err = copybit->stretch(copybit,&tmp_dst, &src, &tmp_rect, &srcRect, &tmp_it);
             if(err < 0){
                 LOGE("%s:%d::tmp copybit stretch failed",__FUNCTION__,__LINE__);
+                if(tmpHnd)
+                    free_buffer(tmpHnd);
                 return err;
             }
             // copy new src and src rect crop
@@ -1168,6 +1170,9 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
     copybit->set_parameter(copybit, COPYBIT_DITHER,
                             (dst.format == HAL_PIXEL_FORMAT_RGB_565)? COPYBIT_ENABLE : COPYBIT_DISABLE);
     err = copybit->stretch(copybit, &dst, &src, &dstRect, &srcRect, &copybitRegion);
+
+    if(tmpHnd)
+        free_buffer(tmpHnd);
 
     if(err < 0)
         LOGE("copybit stretch failed");

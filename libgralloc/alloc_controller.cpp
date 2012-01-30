@@ -388,3 +388,48 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
 
     return size;
 }
+
+// Allocate buffer from width, height and format into a
+// private_handle_t. It is the responsibility of the caller
+// to free the buffer using the free_buffer function
+int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage)
+{
+     alloc_data data;
+     int alignedw, alignedh;
+     android::sp<gralloc::IAllocController> sAlloc =
+         gralloc::IAllocController::getInstance(false);
+     data.base = 0;
+     data.fd = -1;
+     data.offset = 0;
+     data.size = getBufferSizeAndDimensions(w, h, format, alignedw, alignedh);
+     data.align = getpagesize();
+     data.uncached = true;
+     int allocFlags = usage;
+
+     int err = sAlloc->allocate(data, allocFlags, 0);
+     if (0 != err) {
+         LOGE("%s: allocate failed", __FUNCTION__);
+         return -ENOMEM;
+     }
+
+     private_handle_t* hnd = new private_handle_t(data.fd, data.size,
+                             data.allocType, 0, format, alignedw, alignedh);
+     hnd->base = (int) data.base;
+     hnd->offset = data.offset;
+     hnd->gpuaddr = 0;
+     *pHnd = hnd;
+     return 0;
+}
+
+void free_buffer(private_handle_t *hnd)
+{
+    android::sp<gralloc::IAllocController> sAlloc =
+        gralloc::IAllocController::getInstance(false);
+    if (hnd && hnd->fd > 0) {
+        sp<IMemAlloc> memalloc = sAlloc->getAllocator(hnd->flags);
+        memalloc->free_buffer((void*)hnd->base, hnd->size, hnd->offset, hnd->fd);
+    }
+    if(hnd)
+        delete hnd;
+
+}
