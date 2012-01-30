@@ -178,10 +178,6 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
     return err;
 }
 
-static inline size_t ALIGN(size_t x, size_t align) {
-    return (x + align-1) & ~(align-1);
-}
-
 void gpu_context_t::getGrallocInformationFromFormat(int inputFormat,
                                                     int *colorFormat,
                                                     int *bufferType)
@@ -213,69 +209,14 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
     if (!pHandle || !pStride)
         return -EINVAL;
 
-    size_t size, alignedw, alignedh;
-
-    alignedw = ALIGN(w, 32);
-    alignedh = ALIGN(h, 32);
+    size_t size;
+    int alignedw, alignedh;
     int colorFormat, bufferType;
     getGrallocInformationFromFormat(format, &colorFormat, &bufferType);
-    switch (colorFormat) {
-        case HAL_PIXEL_FORMAT_RGBA_8888:
-        case HAL_PIXEL_FORMAT_RGBX_8888:
-        case HAL_PIXEL_FORMAT_BGRA_8888:
-            size = alignedw * alignedh * 4;
-            break;
-        case HAL_PIXEL_FORMAT_RGB_888:
-            size = alignedw * alignedh * 3;
-            break;
-        case HAL_PIXEL_FORMAT_RGB_565:
-        case HAL_PIXEL_FORMAT_RGBA_5551:
-        case HAL_PIXEL_FORMAT_RGBA_4444:
-            size = alignedw * alignedh * 2;
-            break;
-
-            // adreno formats
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:  // NV21
-            size  = ALIGN(alignedw*alignedh, 4096);
-            size += ALIGN(2 * ALIGN(w/2, 32) * ALIGN(h/2, 32), 4096);
-            break;
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:   // NV12
-            // The chroma plane is subsampled,
-            // but the pitch in bytes is unchanged
-            // The GPU needs 4K alignment, but the video decoder needs 8K
-            alignedw = ALIGN(w, 128);
-            size  = ALIGN( alignedw * alignedh, 8192);
-            size += ALIGN( alignedw * ALIGN(h/2, 32), 8192);
-            break;
-        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-        case HAL_PIXEL_FORMAT_YV12:
-            if ((w&1) || (h&1)) {
-                LOGE("w or h is odd for the YUV format");
-                return -EINVAL;
-            }
-            alignedw = ALIGN(w, 16);
-            alignedh = h;
-            if (HAL_PIXEL_FORMAT_NV12_ENCODEABLE == colorFormat) {
-                // The encoder requires a 2K aligned chroma offset.
-                size = ALIGN(alignedw*alignedh, 2048) +
-                       (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
-            } else {
-                size = alignedw*alignedh +
-                    (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
-            }
-            size = ALIGN(size, 4096);
-            break;
-
-        default:
-            LOGE("unrecognized pixel format: %d", format);
-            return -EINVAL;
-    }
+    size = getBufferSizeAndDimensions(w, h, colorFormat, alignedw, alignedh);
 
     if ((ssize_t)size <= 0)
         return -EINVAL;
-
     size = (bufferSize >= size)? bufferSize : size;
 
     // All buffers marked as protected or for external

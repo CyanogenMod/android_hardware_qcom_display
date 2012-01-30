@@ -41,12 +41,18 @@ inline size_t roundUpToPageSize(size_t x) {
     return (x + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1);
 }
 
+inline size_t ALIGN(size_t x, size_t align) {
+    return (x + align-1) & ~(align-1);
+}
+
 #define FALSE 0
 #define TRUE  1
 
 int mapFrameBufferLocked(struct private_module_t* module);
 int terminateBuffer(gralloc_module_t const* module, private_handle_t* hnd);
-size_t calculateBufferSize(int width, int height, int format);
+size_t getBufferSizeAndDimensions(int width, int height, int format,
+                        int& alignedw, int &alignedh);
+
 int decideBufferHandlingMechanism(int format, const char *compositionUsed,
                                    int hasBlitEngine, int *needConversion,
                                    int *useBufferDirectly);

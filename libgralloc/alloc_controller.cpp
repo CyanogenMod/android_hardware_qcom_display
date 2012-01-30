@@ -36,6 +36,7 @@
 #include "ionalloc.h"
 #include "pmemalloc.h"
 #include "ashmemalloc.h"
+#include "gr.h"
 
 using namespace gralloc;
 using android::sp;
@@ -324,4 +325,66 @@ sp<IMemAlloc> PmemAshmemController::getAllocator(int flags)
     return memalloc;
 }
 
+size_t getBufferSizeAndDimensions(int width, int height, int format,
+                        int& alignedw, int &alignedh)
+{
+    size_t size;
 
+    alignedw = ALIGN(width, 32);
+    alignedh = ALIGN(height, 32);
+    switch (format) {
+        case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+        case HAL_PIXEL_FORMAT_BGRA_8888:
+            size = alignedw * alignedh * 4;
+            break;
+        case HAL_PIXEL_FORMAT_RGB_888:
+            size = alignedw * alignedh * 3;
+            break;
+        case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_RGBA_5551:
+        case HAL_PIXEL_FORMAT_RGBA_4444:
+            size = alignedw * alignedh * 2;
+            break;
+
+            // adreno formats
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:  // NV21
+            size  = ALIGN(alignedw*alignedh, 4096);
+            size += ALIGN(2 * ALIGN(width/2, 32) * ALIGN(height/2, 32), 4096);
+            break;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:   // NV12
+            // The chroma plane is subsampled,
+            // but the pitch in bytes is unchanged
+            // The GPU needs 4K alignment, but the video decoder needs 8K
+            alignedw = ALIGN(width, 128);
+            size  = ALIGN( alignedw * alignedh, 8192);
+            size += ALIGN( alignedw * ALIGN(height/2, 32), 8192);
+            break;
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_YV12:
+            if ((format == HAL_PIXEL_FORMAT_YV12) && ((width&1) || (height&1))) {
+                LOGE("w or h is odd for the YV12 format");
+                return -EINVAL;
+            }
+            alignedw = ALIGN(width, 16);
+            alignedh = height;
+            if (HAL_PIXEL_FORMAT_NV12_ENCODEABLE == format) {
+                // The encoder requires a 2K aligned chroma offset.
+                size = ALIGN(alignedw*alignedh, 2048) +
+                       (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
+            } else {
+                size = alignedw*alignedh +
+                    (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
+            }
+            size = ALIGN(size, 4096);
+            break;
+
+        default:
+            LOGE("unrecognized pixel format: %d", format);
+            return -EINVAL;
+    }
+
+    return size;
+}
