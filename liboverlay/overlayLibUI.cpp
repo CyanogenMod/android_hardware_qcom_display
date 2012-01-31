@@ -94,10 +94,8 @@ status_t Display::openDisplay(int fbnum) {
         return NO_ERROR;
 
     status_t ret = NO_INIT;
-    char const * const device_template =
-                        "/dev/graphics/fb%u";
     char dev_name[64];
-    snprintf(dev_name, 64, device_template, fbnum);
+    snprintf(dev_name, 64, FB_DEVICE_TEMPLATE, fbnum);
 
     mFD = open(dev_name, O_RDWR, 0);
     if (mFD < 0) {

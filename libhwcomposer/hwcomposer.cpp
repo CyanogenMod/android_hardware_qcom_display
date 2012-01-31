@@ -1538,17 +1538,21 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
     int status = -EINVAL;
 
     if (!strcmp(name, HWC_HARDWARE_COMPOSER)) {
-	 private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>
+        private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>
                                         (const_cast<hw_module_t*>(module));
-        
-	hwc_module_initialize(hwcModule);
+        hwc_module_initialize(hwcModule);
         struct hwc_context_t *dev;
         dev = (hwc_context_t*)malloc(sizeof(*dev));
 
         /* initialize our state here */
         memset(dev, 0, sizeof(*dev));
+#ifdef USE_OVERLAY
         dev->mOverlayLibObject = new overlay::Overlay();
-
+        if(overlay::initOverlay() == -1)
+            LOGE("overlay::initOverlay() ERROR!!");
+#else
+        dev->mOverlayLibObject = NULL;
+#endif
 #ifdef COMPOSITION_BYPASS
         for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
             dev->mOvUI[i] = new overlay::OverlayUI();
