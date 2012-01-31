@@ -970,8 +970,15 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 // Mark every layer below the SKIP layer to be composed by the GPU
                 while (layer_countdown >= 0)
                 {
+                    private_handle_t *countdown_handle =
+                               (private_handle_t *)list->hwLayers[layer_countdown].handle;
+                    if (countdown_handle && (countdown_handle->bufferType == BUFFER_TYPE_VIDEO)
+                        && (yuvBufferCount == 1)) {
+                        unlockPreviousOverlayBuffer(ctx);
+                        skipComposition = false;
+                    }
                     list->hwLayers[layer_countdown].compositionType = HWC_FRAMEBUFFER;
-                    list->hwLayers[i].hints &= ~HWC_HINT_CLEAR_FB;
+                    list->hwLayers[layer_countdown].hints &= ~HWC_HINT_CLEAR_FB;
                     layer_countdown--;
                 }
                 continue;
