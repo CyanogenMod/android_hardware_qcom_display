@@ -47,6 +47,7 @@ using android::GraphicBuffer;
 enum {
     NATIVE_WINDOW_SET_BUFFERS_SIZE        = 0x10000000,
     NATIVE_WINDOW_UPDATE_BUFFERS_GEOMETRY = 0x20000000,
+    NATIVE_WINDOW_SET_S3D_FORMAT          = 0x40000000,
 };
 
 // Enum containing the supported composition types
@@ -254,6 +255,14 @@ bool needNewBuffer(const qBufGeometry currentGeometry,
  * @param: Updated buffer geometry
  */
 int updateBufferGeometry(sp<GraphicBuffer> buffer, const qBufGeometry bufGeometry);
+
+/*
+ * Update the S3D format of this buffer.
+ *
+ * @param: buffer whosei S3D format needs to be updated.
+ * @param: Updated buffer S3D format
+ */
+int updateBufferS3DFormat(sp<GraphicBuffer> buffer, const int s3dFormat);
 
 /*
  * Updates the flags for the layer

@@ -772,6 +772,28 @@ static int getS3DVideoFormat (const hwc_layer_list_t* list) {
     return s3dFormat;
 }
 
+static int getS3DFormat (const hwc_layer_list_t* list) {
+    int s3dFormat = 0;
+    if (list) {
+        for (size_t i=0; i<list->numHwLayers; i++) {
+            private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
+            if (hnd)
+                s3dFormat = FORMAT_3D_INPUT(hnd->format);
+            if (s3dFormat)
+                break;
+        }
+    }
+    return s3dFormat;
+}
+
+
+static int getLayerS3DFormat (hwc_layer_t &layer) {
+    int s3dFormat = 0;
+    private_handle_t *hnd = (private_handle_t *)layer.handle;
+    if (hnd)
+        s3dFormat = FORMAT_3D_INPUT(hnd->format);
+    return s3dFormat;
+}
 static bool isS3DCompositionRequired() {
 #ifdef HDMI_AS_PRIMARY
     return overlay::is3DTV();
@@ -851,6 +873,9 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             s3dVideoFormat = getS3DVideoFormat(list);
             if (s3dVideoFormat)
                 isS3DCompositionNeeded = isS3DCompositionRequired();
+        } else if((s3dVideoFormat = getS3DFormat(list))){
+            if (s3dVideoFormat)
+                isS3DCompositionNeeded = isS3DCompositionRequired();
         } else {
             unlockPreviousOverlayBuffer(ctx);
         }
@@ -916,6 +941,17 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                     unlockPreviousOverlayBuffer(ctx);
                     skipComposition = false;
                 }
+            } else if (getLayerS3DFormat(list->hwLayers[i])) {
+                int flags = WAIT_FOR_VSYNC;
+                flags |= (1 == list->numHwLayers) ? DISABLE_FRAMEBUFFER_FETCH : 0;
+#ifdef USE_OVERLAY
+                if(prepareOverlay(ctx, &(list->hwLayers[i]), flags) == 0) {
+                    list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
+                    list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
+                    // We've opened the channel. Set the state to open.
+                    ctx->hwcOverlayStatus = HWC_OVERLAY_OPEN;
+                }
+#endif
             } else if (isS3DCompositionNeeded) {
                 markUILayerForS3DComposition(list->hwLayers[i], s3dVideoFormat);
             } else if (list->hwLayers[i].flags & HWC_USE_ORIGINAL_RESOLUTION) {
