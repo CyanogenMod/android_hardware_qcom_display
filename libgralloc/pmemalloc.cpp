@@ -49,6 +49,7 @@ static int getPmemTotalSize(int fd, size_t* size)
     pmem_region region;
     if (ioctl(fd, PMEM_GET_TOTAL_SIZE, &region)) {
         err = -errno;
+    } else {
         *size = region.len;
     }
     return err;
