@@ -717,19 +717,12 @@ bool canSkipComposition(hwc_context_t* ctx, int yuvBufferCount, int currentLayer
     return false;
 }
 
-void getNonRotatedResolution(const hwc_layer_t* layer, int& width, int& height)
+inline void getLayerResolution(const hwc_layer_t* layer, int& width, int& height)
 {
-    int transform = layer->transform;
+   hwc_rect_t displayFrame  = layer->displayFrame;
 
-    hwc_rect_t displayFrame  = layer->displayFrame;
-
-    width = displayFrame.right - displayFrame.left;
-    height = displayFrame.bottom - displayFrame.top;
-
-    if(transform & (HWC_TRANSFORM_ROT_90 | HWC_TRANSFORM_ROT_270)) {
-        height = displayFrame.right - displayFrame.left;
-        width = displayFrame.bottom - displayFrame.top;
-    }
+   width = displayFrame.right - displayFrame.left;
+   height = displayFrame.bottom - displayFrame.top;
 }
 
 static bool canUseCopybit(const framebuffer_device_t* fbDev, const hwc_layer_list_t* list) {
@@ -761,8 +754,8 @@ static bool canUseCopybit(const framebuffer_device_t* fbDev, const hwc_layer_lis
         int w1, h1;
         int w2, h2;
 
-        getNonRotatedResolution(&list->hwLayers[0], w1, h1);
-        getNonRotatedResolution(&list->hwLayers[1], w2, h2);
+        getLayerResolution(&list->hwLayers[0], w1, h1);
+        getLayerResolution(&list->hwLayers[1], w2, h2);
 
         use_copybit = ((fb_w >= w1) && (fb_w >= w2) && ((fb_h * 2) > (h1 + h2)));
     }
