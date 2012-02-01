@@ -1399,7 +1399,7 @@ static int hwc_set(hwc_composer_device_t *dev,
         } else if (list->hwLayers[i].compositionType == HWC_USE_OVERLAY) {
             drawLayerUsingOverlay(ctx, &(list->hwLayers[i]));
         } else if (list->flags & HWC_SKIP_COMPOSITION) {
-            break;
+            continue;
         }
         else if (list->hwLayers[i].compositionType == HWC_USE_COPYBIT) {
             drawLayerUsingCopybit(dev, &(list->hwLayers[i]), (EGLDisplay)dpy, (EGLSurface)sur);
