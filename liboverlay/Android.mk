@@ -37,5 +37,5 @@ LOCAL_C_INCLUDES += vendor/qcom/proprietary/mm-core-noship/display/abl/inc
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/lib/
 endif
 LOCAL_MODULE := liboverlay
-LOCAL_MODULE_TAGS := eng
+LOCAL_MODULE_TAGS := optional
 include $(BUILD_SHARED_LIBRARY)
