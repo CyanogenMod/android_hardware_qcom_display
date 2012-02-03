@@ -197,6 +197,17 @@ int checkBuffer(native_handle_t *buffer_handle, int size, int usage);
 bool isGPUSupportedFormat(int format);
 
 /*
+ * Checks if the format is natively supported by the GPU.
+ * For now, we use this function to check only if CHECK_FOR_EXTERNAL_FORMAT
+ * is set.
+ *
+ * @param: format to check
+ *
+ * @return true if the format is supported by the GPU.
+ */
+bool isGPUSupportedFormatInHW(int format);
+
+/*
  * Gets the number of arguments required for this operation.
  *
  * @param: operation whose argument count is required.
