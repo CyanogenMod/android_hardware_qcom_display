@@ -126,7 +126,7 @@ void Display::closeDisplay() {
     mFD = NO_INIT;
 }
 
-Rotator::Rotator() : mFD(NO_INIT), mSessionID(NO_INIT), mPmemFD(-1)
+Rotator::Rotator() : mFD(NO_INIT), mSessionID(NO_INIT), mPmemFD(NO_INIT)
 {
     mAlloc = gralloc::IAllocController::getInstance(false);
 }
@@ -191,9 +191,11 @@ status_t Rotator::closeRotSession() {
     if (mSessionID != NO_INIT && mFD != NO_INIT) {
         ioctl(mFD, MSM_ROTATOR_IOCTL_FINISH, &mSessionID);
         close(mFD);
-        sp<IMemAlloc> memalloc = mAlloc->getAllocator(mBufferType);
-        memalloc->free_buffer(mPmemAddr, mSize * mNumBuffers, 0, mPmemFD);
-        close(mPmemFD);
+        if (NO_INIT != mPmemFD) {
+            sp<IMemAlloc> memalloc = mAlloc->getAllocator(mBufferType);
+            memalloc->free_buffer(mPmemAddr, mSize * mNumBuffers, 0, mPmemFD);
+            close(mPmemFD);
+        }
     }
 
     mFD = NO_INIT;
