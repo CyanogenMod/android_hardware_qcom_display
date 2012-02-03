@@ -130,14 +130,6 @@ int getNumberOfArgsForOperation(int operation) {
  * @return true if the format is supported by the GPU.
  */
 bool isGPUSupportedFormat(int format) {
-
-    // For 7x27A bypass creating EGL image for 420 SP
-    // This is done to save CPU utilization by SurfaceFlinger thread
-#ifdef BYPASS_EGLIMAGE
-    if (format == HAL_PIXEL_FORMAT_YCrCb_420_SP){
-        return false;
-    }
-#endif
     if (format == HAL_PIXEL_FORMAT_YV12) {
         // We check the YV12 formats, since some Qcom specific formats
         // could have the bits set.
@@ -151,6 +143,36 @@ bool isGPUSupportedFormat(int format) {
     }
     return true;
 }
+
+/*
+ * Checks if the format is natively supported by the GPU.
+ * For now, we use this function to check only if CHECK_FOR_EXTERNAL_FORMAT
+ * is set.
+ *
+ * @param: format to check
+ *
+ * @return true if the format is supported by the GPU.
+ */
+bool isGPUSupportedFormatInHW(int format) {
+    // For 7x27A bypass creating EGL image for formats not natively supported
+    // in GPU.
+    // This is done to save CPU utilization by SurfaceFlinger thread
+#ifdef CHECK_FOR_EXTERNAL_FORMAT
+
+    if (format == HAL_PIXEL_FORMAT_YV12){
+        return false;
+    } else if (format == HAL_PIXEL_FORMAT_YCrCb_420_SP) {
+        return false;
+    } else if (format == HAL_PIXEL_FORMAT_YCbCr_420_SP) {
+        return false;
+    } else if (format == HAL_PIXEL_FORMAT_NV12_ENCODEABLE) {
+       return false;
+    }
+#endif
+
+    return true;
+}
+
 
 /*
  * Function to check if the allocated buffer is of the correct size.
