@@ -316,7 +316,7 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer,
             return -1;
         }
 
-        if(dst.left < 0 || dst.right < 0 || dst.right > hw_w || dst.bottom > hw_h) {
+        if(dst.left < 0 || dst.top < 0 || dst.right > hw_w || dst.bottom > hw_h) {
             LOGE_IF(BYPASS_DEBUG,"%s: Destination has negative coordinates", __FUNCTION__);
 
             calculate_crop_rects(crop, dst, hw_w, hw_h);
@@ -356,17 +356,16 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer,
         ovUI->setDisplayParams(fbnum, waitForVsync, isFg, zorder, useVGPipe);
         ovUI->setPosition(dst.left, dst.top, dst_w, dst_h);
 
-        if(ovUI->commit() != overlay::NO_ERROR) {
-            LOGE("%s: Overlay Commit failed", __FUNCTION__);
-            return -1;
-        }
-
         LOGE_IF(BYPASS_DEBUG,"%s: Bypass set: crop[%d,%d,%d,%d] dst[%d,%d,%d,%d] waitforVsync: %d \
                                 isFg: %d zorder: %d VG = %d nPipe: %d",__FUNCTION__,
                                 crop.left, crop.top, crop_w, crop_h,
                                 dst.left, dst.top, dst_w, dst_h,
                                 waitForVsync, isFg, zorder, useVGPipe, nPipeIndex );
 
+        if(ovUI->commit() != overlay::NO_ERROR) {
+            LOGE("%s: Overlay Commit failed", __FUNCTION__);
+            return -1;
+        }
     }
     return 0;
 }
@@ -1086,8 +1085,9 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
 #ifdef COMPOSITION_BYPASS
         bool isBypassUsed = true;
+        bool isDoable = isBypassDoable(dev, yuvBufferCount, list);
         //Check if bypass is feasible
-        if(isBypassDoable(dev, yuvBufferCount, list) && !isSkipLayerPresent) {
+        if(isDoable && !isSkipLayerPresent) {
             if(setupBypass(ctx, list)) {
                 setBypassLayerFlags(ctx, list);
                 ctx->bypassState = BYPASS_ON;
@@ -1097,7 +1097,7 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             }
         } else {
             LOGE_IF(BYPASS_DEBUG,"%s: Bypass not possible[%d,%d]",__FUNCTION__,
-                       isBypassDoable(dev, yuvBufferCount, list) && !isSkipLayerPresent );
+                       isDoable, !isSkipLayerPresent );
             isBypassUsed = false;
         }
 
