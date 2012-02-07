@@ -691,9 +691,15 @@ bool canSkipComposition(hwc_context_t* ctx, int yuvBufferCount, int currentLayer
                         int numLayersNotUpdating)
 {
     if (!ctx) {
-        LOGE("canSkipComposition invalid context");
+        LOGE("%s: invalid context",__FUNCTION__);
         return false;
     }
+
+    hwc_composer_device_t* dev = (hwc_composer_device_t *)(ctx);
+    private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
+                                                           dev->common.module);
+    if (hwcModule->compositionType == COMPOSITION_TYPE_CPU)
+        return false;
 
     bool compCountChanged = false;
     if (yuvBufferCount == 1) {
