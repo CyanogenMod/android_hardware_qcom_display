@@ -57,11 +57,11 @@ int overlay::get_mdp_format(int format) {
     case HAL_PIXEL_FORMAT_YCbCr_422_SP:
         return MDP_Y_CBCR_H2V1;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-        return MDP_Y_CRCB_H2V2;
-    case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         return MDP_Y_CBCR_H2V2;
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        return MDP_Y_CRCB_H2V2;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
-        return MDP_Y_CRCB_H2V2_TILE;
+        return MDP_Y_CBCR_H2V2_TILE;
     case HAL_PIXEL_FORMAT_YV12:
         return MDP_Y_CR_CB_GH2V2;
     default:
@@ -87,21 +87,6 @@ int overlay::get_mdp_orientation(int value) {
             LOGE("%s: invalid rotation value (value = 0x%x",
                   __FUNCTION__, value);
             return -1;
-    }
-    return -1;
-}
-
-// Rotator - input to output mapping
-int overlay::get_rot_output_format(int format) {
-    switch (format) {
-    case MDP_Y_CRCB_H2V2_TILE:
-        return MDP_Y_CRCB_H2V2;
-    case MDP_Y_CB_CR_H2V2:
-        return MDP_Y_CBCR_H2V2;
-    case MDP_Y_CR_CB_GH2V2:
-        return MDP_Y_CRCB_H2V2;
-    default:
-        return format;
     }
     return -1;
 }
@@ -1220,7 +1205,7 @@ bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& inf
     mOVInfo.dst_rect.y = 0;
     mOVInfo.dst_rect.w = w;
     mOVInfo.dst_rect.h = h;
-    if(format == MDP_Y_CRCB_H2V2_TILE) {
+    if(format == MDP_Y_CRCB_H2V2_TILE || format == MDP_Y_CBCR_H2V2_TILE) {
         if (mNoRot) {
            mOVInfo.src_rect.w = w - ((((w-1)/64 +1)*64) - w);
            mOVInfo.src_rect.h = h - ((((h-1)/32 +1)*32) - h);
@@ -1345,16 +1330,14 @@ bool OverlayControlChannel::startOVRotatorSessions(
         mRotInfo.src_rect.h = h;
         mRotInfo.dst.width = w;
         mRotInfo.dst.height = h;
-        if(format == MDP_Y_CRCB_H2V2_TILE) {
+        if(format == MDP_Y_CRCB_H2V2_TILE || format == MDP_Y_CBCR_H2V2_TILE) {
             mRotInfo.src.width =  (((w-1)/64 +1)*64);
             mRotInfo.src.height = (((h-1)/32 +1)*32);
             mRotInfo.src_rect.w = (((w-1)/64 +1)*64);
             mRotInfo.src_rect.h = (((h-1)/32 +1)*32);
             mRotInfo.dst.width = (((w-1)/64 +1)*64);
             mRotInfo.dst.height = (((h-1)/32 +1)*32);
-            mRotInfo.dst.format = MDP_Y_CRCB_H2V2;
         }
-        mRotInfo.dst.format = get_rot_output_format(format);
         mRotInfo.dst_x = 0;
         mRotInfo.dst_y = 0;
         mRotInfo.src_rect.x = 0;
@@ -1693,28 +1676,22 @@ bool OverlayControlChannel::setTransform(int value, bool fetch) {
     mOVInfo.user_data[0] = mdp_rotation;
     mRotInfo.rotations = mOVInfo.user_data[0];
 
-    /* Rotator always outputs non-tiled formats.
-    If rotator is used, set Overlay input to non-tiled
-    Else, overlay input remains tiled */
-    if (mOVInfo.user_data[0]) {
-        mOVInfo.src.format = get_rot_output_format(mRotInfo.src.format);
+    //Always enable rotation for UI mirror usecase
+    if (mOVInfo.user_data[0] || mUIChannel)
         mRotInfo.enable = 1;
-    }
-    else {
-        //We can switch between rotator ON and OFF. Reset overlay
-        //i/p format whenever this happens
-        if(mRotInfo.dst.format == mOVInfo.src.format)
-            mOVInfo.src.format = mRotInfo.src.format;
+    else
         mRotInfo.enable = 0;
-        //Always enable rotation for UI mirror usecase
-        if(mUIChannel)
-            mRotInfo.enable = 1;
-    }
 
     if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
         reportError("setTransform, rotator start failed");
         return false;
     }
+
+    /* set input format to overlay depending on rotator being used or not */
+    if (mRotInfo.enable)
+        mOVInfo.src.format = mRotInfo.dst.format;
+    else
+        mOVInfo.src.format = mRotInfo.src.format;
 
     if ((mOVInfo.user_data[0] == MDP_ROT_90) ||
         (mOVInfo.user_data[0] == MDP_ROT_270))

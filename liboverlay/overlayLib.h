@@ -215,7 +215,6 @@ int getColorFormat(int format);
 bool isInterlacedContent(int format);
 int get_mdp_format(int format);
 int get_size(int format, int w, int h);
-int get_rot_output_format(int format);
 int get_mdp_orientation(int value);
 void normalize_crop(uint32_t& xy, uint32_t& wh);
 //Initializes the overlay - cleans up any existing overlay pipes
