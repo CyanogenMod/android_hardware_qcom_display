@@ -390,8 +390,8 @@ public:
 class Overlay {
 
     bool mChannelUP;
-    ////stores the connected external display
-    int mHDMIConnected;
+    //stores the connected external display Ex: HDMI(1) WFD(2)
+    int mExternalDisplay;
     unsigned int mS3DFormat;
     //Actual cropped source width and height of overlay
     int mCroppedSrcWidth;

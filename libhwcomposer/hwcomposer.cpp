@@ -286,7 +286,8 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const bool wai
         int hdmiConnected = 0;
 
 #if defined HDMI_DUAL_DISPLAY
-        hdmiConnected = (int)ctx->mHDMIEnabled;
+        if(!ctx->pendingHDMI) //makes sure the UI channel is opened first
+            hdmiConnected = (int)ctx->mHDMIEnabled;
 #endif
         ret = ovLibObject->setSource(info, layer->transform,
                             hdmiConnected, waitForVsync);
