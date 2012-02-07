@@ -51,6 +51,8 @@ namespace {
     int reallocate_memory(native_handle_t *buffer_handle, int mReqSize, int usage)
     {
         int ret = 0;
+
+#ifndef NON_QCOM_TARGET
         if (sAlloc == 0) {
             sAlloc = gralloc::IAllocController::getInstance(true);
         }
@@ -96,6 +98,7 @@ namespace {
             LOGE("%s: allocate failed", __FUNCTION__);
             return -EINVAL;
         }
+#endif
         return ret;
     }
 }; // ANONYNMOUS NAMESPACE

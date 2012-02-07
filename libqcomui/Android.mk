@@ -11,12 +11,18 @@ endif
 LOCAL_SHARED_LIBRARIES := \
         libutils \
         libcutils \
-        libmemalloc \
         libui \
         libEGL
 
 LOCAL_C_INCLUDES := $(TOP)/hardware/qcom/display/libgralloc \
 LOCAL_CFLAGS := -DLOG_TAG=\"libQcomUI\"
+
+ifneq ($(call is-vendor-board-platform,QCOM),true)
+    LOCAL_CFLAGS += -DNON_QCOM_TARGET
+else
+    LOCAL_SHARED_LIBRARIES += libmemalloc
+endif
+
 LOCAL_MODULE := libQcomUI
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_SHARED_LIBRARY)
