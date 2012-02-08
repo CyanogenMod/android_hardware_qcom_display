@@ -331,7 +331,7 @@ int PmemKernelAlloc::alloc_buffer(alloc_data& data)
         return err;
     }
     memset(base, 0, size);
-    //XXX: Flush here if cached
+    clean_buffer((void*)((intptr_t) base + offset), size, offset, fd);
     data.base = base;
     data.offset = 0;
     data.fd = fd;
