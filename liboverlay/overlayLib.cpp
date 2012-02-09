@@ -372,6 +372,50 @@ unsigned int overlay::getOverlayConfig (unsigned int format3D, bool poll,
     return curState;
 }
 
+/* clears any VG pipes allocated to the fb devices */
+int overlay::initOverlay() {
+    msmfb_mixer_info_req  req;
+    mdp_mixer_info *minfo = NULL;
+    char name[64];
+    int fd = -1;
+    for(int i = 0; i < NUM_FB_DEVICES; i++) {
+        snprintf(name, 64, FB_DEVICE_TEMPLATE, i);
+        LOGD("initoverlay:: opening the device:: %s", name);
+        fd = open(name, O_RDWR, 0);
+        if(fd < 0) {
+            LOGE("cannot open framebuffer(%d)", i);
+            return -1;
+        }
+        //Get the mixer configuration */
+        req.mixer_num = i;
+        if (ioctl(fd, MSMFB_MIXER_INFO, &req) == -1) {
+            LOGE("ERROR: MSMFB_MIXER_INFO ioctl failed");
+            close(fd);
+            return -1;
+        }
+        minfo = req.info;
+        for (int j = 0; j < req.cnt; j++) {
+            LOGD("ndx=%d num=%d z_order=%d", minfo->pndx, minfo->pnum,
+                    minfo->z_order);
+            // except the RGB base layer with z_order of -1, clear any
+            // other pipes connected to mixer.
+            if((minfo->z_order) != -1) {
+                int index = minfo->pndx;
+                LOGD("Unset overlay with index: %d at mixer %d", index, i);
+                if(ioctl(fd, MSMFB_OVERLAY_UNSET, &index) == -1) {
+                    LOGE("ERROR: MSMFB_OVERLAY_UNSET failed");
+                    close(fd);
+                    return -1;
+                }
+            }
+            minfo++;
+        }
+        close(fd);
+        fd = -1;
+    }
+    return 0;
+}
+
 Overlay::Overlay() : mChannelUP(false), mHDMIConnected(false),
                      mS3DFormat(0), mCroppedSrcWidth(0),
                      mCroppedSrcHeight(0), mState(-1) {
@@ -1112,10 +1156,8 @@ bool OverlayControlChannel::openDevices(int fbnum) {
     if (fbnum < 0)
         return false;
 
-    char const * const device_template =
-                       "/dev/graphics/fb%u";
     char dev_name[64];
-    snprintf(dev_name, 64, device_template, fbnum);
+    snprintf(dev_name, 64, FB_DEVICE_TEMPLATE, fbnum);
     mFD = open(dev_name, O_RDWR, 0);
     if (mFD < 0) {
         reportError("Cant open framebuffer ");
@@ -1752,10 +1794,8 @@ bool OverlayDataChannel::startDataChannel(
 bool OverlayDataChannel::openDevices(int fbnum, bool uichannel, int num_buffers) {
     if (fbnum < 0)
         return false;
-    char const * const device_template =
-                      "/dev/graphics/fb%u";
     char dev_name[64];
-    snprintf(dev_name, 64, device_template, fbnum);
+    snprintf(dev_name, 64, FB_DEVICE_TEMPLATE, fbnum);
 
     mFD = open(dev_name, O_RDWR, 0);
     if (mFD < 0) {

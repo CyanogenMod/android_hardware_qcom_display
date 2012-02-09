@@ -56,6 +56,7 @@
 #define VG0_PIPE 0
 #define VG1_PIPE 1
 #define NUM_CHANNELS 2
+#define NUM_FB_DEVICES 3
 #define FRAMEBUFFER_0 0
 #define FRAMEBUFFER_1 1
 #define FRAMEBUFFER_2 2
@@ -139,6 +140,9 @@ struct overlay_buffer_info {
 
 using android::Mutex;
 namespace overlay {
+
+#define FB_DEVICE_TEMPLATE "/dev/graphics/fb%u"
+
     //Utility Class to query the framebuffer info
     class FrameBufferInfo {
         int mFBWidth;
@@ -214,6 +218,8 @@ int get_size(int format, int w, int h);
 int get_rot_output_format(int format);
 int get_mdp_orientation(int value);
 void normalize_crop(uint32_t& xy, uint32_t& wh);
+//Initializes the overlay - cleans up any existing overlay pipes
+int initOverlay();
 
 /* Print values being sent to driver in case of ioctl failures
    These logs are enabled only if DEBUG_OVERLAY is true       */
