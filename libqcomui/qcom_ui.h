@@ -181,6 +181,35 @@ private:
 };
 #endif
 
+class QCBaseLayer
+{
+//    int mS3DFormat;
+    int32_t mComposeS3DFormat;
+public:
+    QCBaseLayer()
+    {
+        mComposeS3DFormat = 0;
+    }
+    enum { // S3D formats
+        eS3D_SIDE_BY_SIDE   = 0x10000,
+        eS3D_TOP_BOTTOM     = 0x20000
+    };
+/*
+    virtual status_t setStereoscopic3DFormat(int format) { mS3DFormat = format; return 0; }
+    virtual int getStereoscopic3DFormat() const { return mS3DFormat; }
+ */
+    void setS3DComposeFormat (int32_t hints)
+    {
+        if (hints & HWC_HINT_DRAW_S3D_SIDE_BY_SIDE)
+            mComposeS3DFormat = eS3D_SIDE_BY_SIDE;
+        else if (hints & HWC_HINT_DRAW_S3D_TOP_BOTTOM)
+            mComposeS3DFormat = eS3D_TOP_BOTTOM;
+        else
+            mComposeS3DFormat = 0;
+    }
+    int32_t needsS3DCompose () const { return mComposeS3DFormat; }
+};
+
 /*
  * Function to check if the allocated buffer is of the correct size.
  * Reallocate the buffer with the correct size, if the size doesn't
