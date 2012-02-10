@@ -298,9 +298,9 @@ enum {
     bool mIsChannelUpdated;
     bool openDevices(int fbnum = -1);
     bool setOverlayInformation(const overlay_buffer_info& info,
-                               int orientation, int zorder = 0, int flags = 0,
+                               int zorder = 0, int flags = 0,
                                int requestType = NEW_REQUEST);
-    bool startOVRotatorSessions(const overlay_buffer_info& info, int orientation, int requestType);
+    bool startOVRotatorSessions(const overlay_buffer_info& info, int requestType);
     void swapOVRotWidthHeight();
     int commitVisualParam(int8_t paramType, float paramValue);
     void setInformationFromFlags(int flags, mdp_overlay& ov);
@@ -356,7 +356,7 @@ class OverlayDataChannel {
     int mRotOffset[max_num_buffers];
     int mCurrentItem;
     int mNumBuffers;
-    int mUpdateDataChannel;
+    bool mUpdateDataChannel;
     android::sp<gralloc::IAllocController> mAlloc;
     int mBufferType;
 
@@ -380,7 +380,7 @@ public:
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
     bool getCropS3D(overlay_rect *inRect, int channel, int format, overlay_rect *rect);
     bool isChannelUP() const { return (mFD > 0); }
-    bool updateDataChannel(int updateStatus, int size);
+    bool updateDataChannel(int size);
 };
 
 /*

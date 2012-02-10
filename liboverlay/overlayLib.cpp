@@ -612,7 +612,6 @@ bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientati
         needUpdateFlags = false;
 
     if ((false == needUpdateFlags) && (false == geometryChanged)) {
-        objOvDataChannel[0].updateDataChannel(0, 0);
         return true;
     }
 
@@ -653,8 +652,7 @@ bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientati
                 return false;
             }
             objOvCtrlChannel[i].setSize(info.size);
-            int updateDataChannel = orientation ? 1:0;
-            ret = objOvDataChannel[i].updateDataChannel(updateDataChannel, info.size);
+            ret = objOvDataChannel[i].updateDataChannel(info.size);
         }
     }
     if (ret) {
@@ -1198,8 +1196,7 @@ bool OverlayControlChannel::openDevices(int fbnum) {
 }
 
 bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& info,
-                                  int orientation, int zorder,
-                                  int flags, int requestType) {
+                                  int zorder, int flags, int requestType) {
     int w = info.width;
     int h = info.height;
     int format = info.format;
@@ -1213,7 +1210,7 @@ bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& inf
     mOVInfo.dst_rect.w = w;
     mOVInfo.dst_rect.h = h;
     if(format == MDP_Y_CRCB_H2V2_TILE) {
-        if (!orientation) {
+        if (mNoRot) {
            mOVInfo.src_rect.w = w - ((((w-1)/64 +1)*64) - w);
            mOVInfo.src_rect.h = h - ((((h-1)/32 +1)*32) - h);
         } else {
@@ -1230,11 +1227,19 @@ bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& inf
     }
 
     mOVInfo.src.format = format;
-    if (w > mFBWidth)
-        mOVInfo.dst_rect.w = mFBWidth;
-    if (h > mFBHeight)
-        mOVInfo.dst_rect.h = mFBHeight;
+    int dst_w = w;
+    int dst_h = h;
 
+    if (dst_w > mFBWidth) {
+        dst_w = mFBWidth;
+        dst_h = dst_h * mFBWidth / w;
+    }
+    if (dst_h > mFBHeight) {
+        dst_h = mFBHeight;
+        dst_w = dst_w * mFBHeight / h;
+    }
+    mOVInfo.dst_rect.w = dst_w;
+    mOVInfo.dst_rect.h = dst_h;
     mOVInfo.user_data[0] = 0;
     if (requestType == NEW_REQUEST) {
         mOVInfo.id = MSMFB_NEW_REQUEST;
@@ -1315,13 +1320,13 @@ bool OverlayControlChannel::doFlagsNeedUpdate(int flags) {
 
 bool OverlayControlChannel::startOVRotatorSessions(
                            const overlay_buffer_info& info,
-                           int orientation, int requestType) {
+                           int requestType) {
     bool ret = true;
     int w = info.width;
     int h = info.height;
     int format = info.format;
 
-    if (orientation) {
+    if (!mNoRot) {
         mRotInfo.src.format = format;
         mRotInfo.src.width = w;
         mRotInfo.src.height = h;
@@ -1387,11 +1392,11 @@ bool OverlayControlChannel::updateOverlaySource(const overlay_buffer_info& info,
     if (isInterlacedContent(info.format)) {
         flags |= INTERLACED_CONTENT;
     }
-    if (!setOverlayInformation(ovBufInfo, orientation, 0, flags,
+    if (!setOverlayInformation(ovBufInfo, 0, flags,
                                UPDATE_REQUEST))
         return false;
 
-    return startOVRotatorSessions(ovBufInfo, orientation, UPDATE_REQUEST);
+    return startOVRotatorSessions(ovBufInfo, UPDATE_REQUEST);
 }
 
 bool OverlayControlChannel::startControlChannel(int w, int h,
@@ -1437,16 +1442,14 @@ bool OverlayControlChannel::startControlChannel(int w, int h,
     if (zorder == NO_PIPE)
         return false;
 
-
-    int orientation = mNoRot ? 0: 1;
     overlay_buffer_info ovBufInfo;
     ovBufInfo.width = w;
     ovBufInfo.height = h;
     ovBufInfo.format = hw_format;
-    if (!setOverlayInformation(ovBufInfo, orientation, zorder, flags, NEW_REQUEST))
+    if (!setOverlayInformation(ovBufInfo, zorder, flags, NEW_REQUEST))
         return false;
 
-    return startOVRotatorSessions(ovBufInfo, orientation, NEW_REQUEST);
+    return startOVRotatorSessions(ovBufInfo, NEW_REQUEST);
 }
 
 bool OverlayControlChannel::closeControlChannel() {
@@ -1759,7 +1762,7 @@ bool OverlayControlChannel::getSize(int& size) const {
 }
 
 OverlayDataChannel::OverlayDataChannel() : mNoRot(false), mFD(-1), mRotFD(-1),
-                                  mPmemFD(-1), mPmemAddr(0), mUpdateDataChannel(0)
+                                  mPmemFD(-1), mPmemAddr(0), mUpdateDataChannel(false)
 {
     //XXX: getInstance(false) implies that it should only
     // use the kernel allocator. Change it to something
@@ -1869,8 +1872,8 @@ bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int r
     return true;
 }
 
-bool OverlayDataChannel::updateDataChannel(int updateStatus, int size) {
-    mUpdateDataChannel = updateStatus;
+bool OverlayDataChannel::updateDataChannel(int size) {
+    mUpdateDataChannel = true;
     mNewPmemOffset = size;
     return true;
 }
@@ -1945,7 +1948,8 @@ bool OverlayDataChannel::queueBuffer(uint32_t offset) {
                 LOGE("queueBuffer: mapRotatorMemory failed");
                 return false;
             }
-        }
+            mUpdateDataChannel = false;
+       }
     }
 
     result = queue(offset);
