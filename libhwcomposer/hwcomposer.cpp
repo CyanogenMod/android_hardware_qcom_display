@@ -1091,22 +1091,39 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
     int32_t src_crop_width  = sourceCrop.right - sourceCrop.left;
     int32_t src_crop_height = sourceCrop.bottom -sourceCrop.top;
 
-    int32_t copybitsMaxScale = copybit->get(copybit,COPYBIT_MAGNIFICATION_LIMIT);
+    float copybitsMaxScale = (float)copybit->get(copybit,COPYBIT_MAGNIFICATION_LIMIT);
 
-    if(layer->transform & (HWC_TRANSFORM_ROT_90 | HWC_TRANSFORM_ROT_270)){
+    if((layer->transform == HWC_TRANSFORM_ROT_90) ||
+                           (layer->transform == HWC_TRANSFORM_ROT_270)) {
         //swap screen width and height
         int tmp = screen_w;
         screen_w  = screen_h;
         screen_h = tmp;
     }
-    int32_t dsdx = screen_w/src_crop_width;
-    int32_t dtdy = screen_h/src_crop_height;
     private_handle_t *tmpHnd = NULL;
 
-    if(dsdx  > copybitsMaxScale || dtdy > copybitsMaxScale){
+    if(screen_w <=0 || screen_h<=0 ||src_crop_width<=0 || src_crop_height<=0 ) {
+        LOGE("%s: wrong params for display screen_w=%d src_crop_width=%d screen_w=%d \
+                                src_crop_width=%d", __FUNCTION__, screen_w,
+                                src_crop_width,screen_w,src_crop_width);
+        genlock_unlock_buffer(hnd);
+        return -1;
+    }
+
+    float dsdx = (float)screen_w/src_crop_width;
+    float dtdy = (float)screen_h/src_crop_height;
+
+    int scaleLimit = copybitsMaxScale * copybitsMaxScale;
+    if(dsdx > scaleLimit || dtdy > scaleLimit) {
+        LOGE("%s: greater than max supported size ", __FUNCTION__ );
+        genlock_unlock_buffer(hnd);
+        return -1;
+    }
+
+    if(dsdx > copybitsMaxScale || dtdy > copybitsMaxScale){
         // The requested scale is out of the range the hardware
         // can support.
-       LOGD("%s:%d::Need to scale dsdx=%d, dtdy=%d,maxScaleInv=%d,screen_w=%d,screen_h=%d \
+       LOGD("%s:%d::Need to scale twice dsdx=%f, dtdy=%f,maxScaleInv=%f,screen_w=%d,screen_h=%d \
                   src_crop_width=%d src_crop_height=%d",__FUNCTION__,__LINE__,
                   dsdx,dtdy,copybitsMaxScale,screen_w,screen_h,src_crop_width,src_crop_height);
 
@@ -1125,7 +1142,7 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
        int usage = GRALLOC_USAGE_PRIVATE_ADSP_HEAP |
                    GRALLOC_USAGE_PRIVATE_MM_HEAP;
 
-       if (0 == alloc_buffer(&tmpHnd, tmp_w, tmp_h, src.format, usage)){
+       if (0 == alloc_buffer(&tmpHnd, tmp_w, tmp_h, fbHandle->format, usage)){
             copybit_image_t tmp_dst;
             copybit_rect_t tmp_rect;
             tmp_dst.w = tmp_w;
@@ -1150,6 +1167,7 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
                 LOGE("%s:%d::tmp copybit stretch failed",__FUNCTION__,__LINE__);
                 if(tmpHnd)
                     free_buffer(tmpHnd);
+                genlock_unlock_buffer(hnd);
                 return err;
             }
             // copy new src and src rect crop
