@@ -472,6 +472,9 @@ bool setupBypass(hwc_context_t* ctx, hwc_layer_list_t* list) {
 }
 
 void unsetBypassLayerFlags(hwc_layer_list_t* list) {
+    if (!list)
+        return;
+
     for (int index = 0 ; index < list->numHwLayers; index++) {
         if(list->hwLayers[index].flags & HWC_COMP_BYPASS) {
             list->hwLayers[index].flags &= ~HWC_COMP_BYPASS;
@@ -486,6 +489,9 @@ void unsetBypassBufferLockState(hwc_context_t* ctx) {
 }
 
 void storeLockedBypassHandle(hwc_layer_list_t* list, hwc_context_t* ctx) {
+   if (!list)
+        return;
+
    for(int index = 0; index < MAX_BYPASS_LAYERS; index++ ) {
        hwc_layer_t layer = list->hwLayers[ctx->layerindex[index]];
 
@@ -747,6 +753,9 @@ static bool canUseCopybit(const framebuffer_device_t* fbDev, const hwc_layer_lis
        return false;
     }
 
+    if (!list)
+        return false;
+
     int fb_w = fbDev->width;
     int fb_h = fbDev->height;
 
@@ -958,8 +967,8 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
                                                            dev->common.module);
-    if (!list || !hwcModule) {
-        LOGE("hwc_prepare invalid list or module");
+    if (!hwcModule) {
+        LOGE("hwc_prepare invalid module");
 #ifdef COMPOSITION_BYPASS
         unlockPreviousBypassBuffers(ctx);
         unsetBypassBufferLockState(ctx);
@@ -1124,6 +1133,12 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
             }
         }
 #endif
+    } else {
+#ifdef COMPOSITION_BYPASS
+        unlockPreviousBypassBuffers(ctx);
+        unsetBypassBufferLockState(ctx);
+#endif
+        unlockPreviousOverlayBuffer(ctx);
     }
     return 0;
 }
@@ -1464,8 +1479,8 @@ static int hwc_set(hwc_composer_device_t *dev,
 
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
                                                            dev->common.module);
-    if (!list || !hwcModule) {
-        LOGE("hwc_set invalid list or module");
+    if (!hwcModule) {
+        LOGE("hwc_set invalid module");
 #ifdef COMPOSITION_BYPASS
         unlockPreviousBypassBuffers(ctx);
         unsetBypassBufferLockState(ctx);
@@ -1480,29 +1495,22 @@ static int hwc_set(hwc_composer_device_t *dev,
         for (size_t i=0; i<list->numHwLayers; i++) {
             if (list->hwLayers[i].flags & HWC_SKIP_LAYER) {
                 continue;
-            } else if(list->hwLayers[i].flags & HWC_USE_EXT_ONLY) {
-                continue;
-            //Draw after layers for primary are drawn
 #ifdef COMPOSITION_BYPASS
-        } else if (list->hwLayers[i].flags & HWC_COMP_BYPASS) {
-            drawLayerUsingBypass(ctx, &(list->hwLayers[i]), i);
+            } else if (list->hwLayers[i].flags & HWC_COMP_BYPASS) {
+                drawLayerUsingBypass(ctx, &(list->hwLayers[i]), i);
 #endif
-        } else if (list->hwLayers[i].compositionType == HWC_USE_OVERLAY) {
-            drawLayerUsingOverlay(ctx, &(list->hwLayers[i]));
-        } else if (list->flags & HWC_SKIP_COMPOSITION) {
-            continue;
-        }
-        else if (list->hwLayers[i].compositionType == HWC_USE_COPYBIT) {
-            drawLayerUsingCopybit(dev, &(list->hwLayers[i]), (EGLDisplay)dpy, (EGLSurface)sur);
+            } else if (list->hwLayers[i].compositionType == HWC_USE_OVERLAY) {
+                drawLayerUsingOverlay(ctx, &(list->hwLayers[i]));
+            } else if (list->flags & HWC_SKIP_COMPOSITION) {
+                continue;
+            } else if (list->hwLayers[i].compositionType == HWC_USE_COPYBIT) {
+                drawLayerUsingCopybit(dev, &(list->hwLayers[i]), (EGLDisplay)dpy, (EGLSurface)sur);
+            }
         }
     }
-}
-    bool canSkipComposition = list && list->flags & HWC_SKIP_COMPOSITION;
-    //Draw External-only layers
-    if(ExtDispOnly::draw(ctx, list) != overlay::NO_ERROR) {
-        ExtDispOnly::close();
-    }
+    
 
+    bool canSkipComposition = list && list->flags & HWC_SKIP_COMPOSITION;
 #ifdef COMPOSITION_BYPASS
     unlockPreviousBypassBuffers(ctx);
     storeLockedBypassHandle(list, ctx);
@@ -1510,20 +1518,19 @@ static int hwc_set(hwc_composer_device_t *dev,
     unsetBypassBufferLockState(ctx);
     closeExtraPipes(ctx);
 #if BYPASS_DEBUG
-    if(list->flags & HWC_SKIP_COMPOSITION)
+    if(canSkipComposition)
         LOGE("%s: skipping eglSwapBuffer call", __FUNCTION__);
 #endif
 #endif
     // Do not call eglSwapBuffers if we the skip composition flag is set on the list.
-    if (!(list->flags & HWC_SKIP_COMPOSITION)) {
+    if (dpy && sur && !canSkipComposition) {
         EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
         if (!sucess) {
             ret = HWC_EGL_ERROR;
+        } else {
+            CALC_FPS();
         }
-    } else {
-        CALC_FPS();
     }
-
 #if defined HDMI_DUAL_DISPLAY
     if(ctx->pendingHDMI) {
         handleHDMIStateChange(dev, ctx->mHDMIEnabled);
@@ -1534,6 +1541,7 @@ static int hwc_set(hwc_composer_device_t *dev,
     hwc_closeOverlayChannels(ctx);
     int yuvBufferCount = getYUVBufferCount(list);
     setHWCOverlayStatus(ctx, yuvBufferCount);
+
     return ret;
 }
 
