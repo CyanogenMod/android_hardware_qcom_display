@@ -210,6 +210,22 @@ bool isGPUSupportedFormat(int format);
 bool isGPUSupportedFormatInHW(int format);
 
 /*
+ * Adreno is not optimized for GL_TEXTURE_EXTERNAL_OES
+ * texure target. DO NOT choose TEXTURE_EXTERNAL_OES
+ * target for RGB formats.
+ *
+ * Based on the pixel format, decide the texture target.
+ *
+ * @param : pixel format to check
+ *
+ * @return : GL_TEXTURE_2D for RGB formats, and
+ *           GL_TEXTURE_EXTERNAL_OES for YUV formats.
+ *
+*/
+
+int decideTextureTarget (const int pixel_format);
+
+/*
  * Gets the number of arguments required for this operation.
  *
  * @param: operation whose argument count is required.
