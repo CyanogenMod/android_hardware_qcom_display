@@ -189,17 +189,17 @@ static void set_rects(struct copybit_context_t *dev,
 
     if (dev->mFlags & COPYBIT_TRANSFORM_FLIP_V) {
         if (dev->mFlags & COPYBIT_TRANSFORM_ROT_90) {
-            e->src_rect.x = e->src.width - (e->src_rect.x + e->src_rect.w) - horiz_padding;
+            e->src_rect.x = (src->l + src->r) - (e->src_rect.x + e->src_rect.w);
         }else{
-            e->src_rect.y = e->src.height - (e->src_rect.y + e->src_rect.h) - vert_padding;
+            e->src_rect.y = (src->t + src->b) - (e->src_rect.y + e->src_rect.h);
         }
     }
 
     if (dev->mFlags & COPYBIT_TRANSFORM_FLIP_H) {
         if (dev->mFlags & COPYBIT_TRANSFORM_ROT_90) {
-            e->src_rect.y = e->src.height - (e->src_rect.y + e->src_rect.h) - vert_padding;
+            e->src_rect.y = (src->t + src->b) - (e->src_rect.y + e->src_rect.h);
         }else{
-            e->src_rect.x = e->src.width - (e->src_rect.x + e->src_rect.w) - horiz_padding;
+            e->src_rect.x = (src->l + src->r) - (e->src_rect.x + e->src_rect.w);
         }
     }
 }
