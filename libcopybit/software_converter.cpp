@@ -34,11 +34,11 @@
 #include "software_converter.h"
 
 /** Convert YV12 to YCrCb_420_SP */
-int convertYV12toYCrCb420SP(const copybit_image_t *src)
+int convertYV12toYCrCb420SP(const copybit_image_t *src, private_handle_t *yv12_handle)
 {
     private_handle_t* hnd = (private_handle_t*)src->handle;
 
-    if(hnd == NULL){
+    if(hnd == NULL || yv12_handle == NULL){
         LOGE("Invalid handle");
         return -1;
     }
@@ -56,57 +56,18 @@ int convertYV12toYCrCb420SP(const copybit_image_t *src)
     unsigned int   y_size  = stride * src->h;
     unsigned int   c_width = ALIGN(stride/2, 16);
     unsigned int   c_size  = c_width * src->h/2;
-    unsigned char* chroma  = (unsigned char *) (hnd->base + y_size);
-    unsigned int   tempBufSize = c_size * 2;
-    unsigned char* tempBuf = (unsigned char*) malloc (tempBufSize);
-
-    if(tempBuf == NULL) {
-        LOGE("Failed to allocate temporary buffer");
-        return -errno;
-    }
+    unsigned int   chromaSize = c_size * 2;
+    unsigned char* newChroma = (unsigned char *)(yv12_handle->base + y_size);
+    unsigned char* oldChroma = (unsigned char*)(hnd->base + y_size);
+    memcpy((char *)yv12_handle->base,(char *)hnd->base,y_size);
 
 #ifdef __ARM_HAVE_NEON
-    /* copy into temp buffer */
-
-    unsigned char * t1 = chroma;
-    unsigned char * t2 = tempBuf;
-
-#ifdef TARGET_7x27A
-    // Since the Sparrow core on 7x27A has a performance issue
-    // with reading from uncached memory using Neon instructions,
-    // use regular ARM instructions to copy the buffer on this
-    // target. There is no issue with storing, hence using
-    // Neon instructions for interleaving
-    for(unsigned int i=0; i < (tempBufSize>>5); i++) {
-        __asm__ __volatile__ (
-                                "LDMIA %0!, {r3 - r10} \n"
-                                "STMIA %1!, {r3 - r10} \n"
-                                :"+r"(t1), "+r"(t2)
-                                :
-                                :"memory","r3","r4","r5",
-                                "r6","r7","r8","r9","r10"
-                             );
-
-    }
-#else
-    for(unsigned int i=0; i < (tempBufSize>>5); i++) {
-        __asm__ __volatile__ (
-                                "vld1.u8 {d0-d3}, [%0]! \n"
-                                "vst1.u8 {d0-d3}, [%1]! \n"
-                                :"+r"(t1), "+r"(t2)
-                                :
-                                :"memory","d0","d1","d2","d3"
-                             );
-
-    }
-#endif //TARGET_7x27A
-
-    /* interleave */
+   /* interleave */
     if(!padding) {
-        t1 = chroma;
-        t2 = tempBuf;
-        unsigned char * t3 = t2 + tempBufSize/2;
-        for(unsigned int i=0; i < (tempBufSize/2)>>3; i++) {
+        unsigned char * t1 = newChroma;
+        unsigned char * t2 = oldChroma;
+        unsigned char * t3 = t2 + chromaSize/2;
+        for(unsigned int i=0; i < (chromaSize/2)>>3; i++) {
             __asm__ __volatile__ (
                                     "vld1.u8 d0, [%0]! \n"
                                     "vld1.u8 d1, [%1]! \n"
@@ -119,11 +80,10 @@ int convertYV12toYCrCb420SP(const copybit_image_t *src)
         }
     }
 #else  //__ARM_HAVE_NEON
-    memcpy(tempBuf, chroma, tempBufSize);
     if(!padding) {
-        for(unsigned int i = 0; i< tempBufSize/2; i++) {
-            chroma[i*2]   = tempBuf[i];
-            chroma[i*2+1] = tempBuf[i+tempBufSize/2];
+        for(unsigned int i = 0; i< chromaSize/2; i++) {
+            newChroma[i*2]   = oldChroma[i];
+            newChroma[i*2+1] = oldChroma[i+chromaSize/2];
         }
 
     }
@@ -144,13 +104,13 @@ int convertYV12toYCrCb420SP(const copybit_image_t *src)
                 continue;
             }
             if (j+1 == width/2) {
-                chroma[r2*c_width + j] = tempBuf[r1*c_width+i];
+                newChroma[r2*c_width + j] = oldChroma[r1*c_width+i];
                 r2++;
-                chroma[r2*c_width] = tempBuf[r1*c_width+i+c_size];
+                newChroma[r2*c_width] = oldChroma[r1*c_width+i+c_size];
                 j = 1;
             } else {
-                chroma[r2*c_width + j] = tempBuf[r1*c_width+i];
-                chroma[r2*c_width + j + 1] = tempBuf[r1*c_width+i+c_size];
+                newChroma[r2*c_width + j] = oldChroma[r1*c_width+i];
+                newChroma[r2*c_width + j + 1] = oldChroma[r1*c_width+i+c_size];
                 j+=2;
             }
             i++;
@@ -161,9 +121,7 @@ int convertYV12toYCrCb420SP(const copybit_image_t *src)
         }
     }
 
-    if(tempBuf)
-        free(tempBuf);
-    return 0;
+  return 0;
 }
 
 struct copyInfo{

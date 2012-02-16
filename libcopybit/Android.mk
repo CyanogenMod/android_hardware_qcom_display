@@ -49,7 +49,7 @@ else
 
             LOCAL_PRELINK_MODULE := false
             LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
-            LOCAL_SHARED_LIBRARIES := liblog
+            LOCAL_SHARED_LIBRARIES := liblog libmemalloc
             LOCAL_SRC_FILES := software_converter.cpp copybit.cpp
             LOCAL_MODULE := copybit.$(TARGET_BOARD_PLATFORM)
             LOCAL_MODULE_TAGS := optional

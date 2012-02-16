@@ -360,6 +360,7 @@ static int stretch_copybit(
 {
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
     int status = 0;
+    private_handle_t *yv12_handle = NULL;
     if (ctx) {
         struct {
             uint32_t count;
@@ -390,16 +391,25 @@ static int stretch_copybit(
             return -EINVAL;
 
         if(src->format ==  HAL_PIXEL_FORMAT_YV12) {
-            if(0 == convertYV12toYCrCb420SP(src)){
-                (const_cast<copybit_image_t *>(src))->format =
-                        HAL_PIXEL_FORMAT_YCrCb_420_SP;
-            }
-            else{
-                LOGE("Error copybit conversion from yv12 failed");
-                return -EINVAL;
-            }
+            int usage = GRALLOC_USAGE_PRIVATE_ADSP_HEAP | GRALLOC_USAGE_PRIVATE_MM_HEAP;
+            if (0 == alloc_buffer(&yv12_handle,src->w,src->h,src->format, usage)){
+                 if(0 == convertYV12toYCrCb420SP(src,yv12_handle)){
+                       (const_cast<copybit_image_t *>(src))->format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+                       (const_cast<copybit_image_t *>(src))->handle = yv12_handle;
+                       (const_cast<copybit_image_t *>(src))->base = (void *)yv12_handle->base;
+                 }
+                 else{
+                    LOGE("Error copybit conversion from yv12 failed");
+                    if(yv12_handle)
+                       free_buffer(yv12_handle);
+                    return -EINVAL;
+                 }
+           }
+           else{
+              LOGE("Error:unable to allocate memeory for yv12 software conversion");
+              return -EINVAL;
+           }
         }
-
         const uint32_t maxCount = sizeof(list.req)/sizeof(list.req[0]);
         const struct copybit_rect_t bounds = { 0, 0, dst->w, dst->h };
         struct copybit_rect_t clip;
@@ -437,6 +447,8 @@ static int stretch_copybit(
     } else {
         status = -EINVAL;
     }
+    if(yv12_handle)
+      free_buffer(yv12_handle);
     return status;
 }
 
