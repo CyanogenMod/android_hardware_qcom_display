@@ -198,6 +198,7 @@ static void setHWCOverlayStatus(hwc_context_t *ctx, bool isVideoPresent) {
 }
 
 static int hwc_closeOverlayChannels(hwc_context_t* ctx) {
+#ifdef USE_OVERLAY
     overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
     if(!ovLibObject) {
         LOGE("%s: invalid params", __FUNCTION__);
@@ -212,6 +213,7 @@ static int hwc_closeOverlayChannels(hwc_context_t* ctx) {
         // Inform the gralloc that video overlay has stopped.
         setVideoOverlayStatusInGralloc(ctx, false);
     }
+#endif
     return 0;
 }
 
