@@ -728,11 +728,11 @@ bool Overlay::setFd(int fd, int channel) {
 bool Overlay::queueBuffer(uint32_t offset, int channel) {
     return objOvDataChannel[channel].queueBuffer(offset);
 }
-
+#if 0
 bool Overlay::waitForHdmiVsync(int channel) {
     return objOvDataChannel[channel].waitForHdmiVsync();
 }
-
+#endif
 bool Overlay::queueBuffer(buffer_handle_t buffer) {
     private_handle_t const* hnd = reinterpret_cast
                                    <private_handle_t const*>(buffer);
@@ -761,11 +761,13 @@ bool Overlay::queueBuffer(buffer_handle_t buffer) {
                     return false;
                 }
             }
+#if 0
             //Wait for HDMI done..
             if(!waitForHdmiVsync(VG1_PIPE)) {
                 LOGE("%s: waitforHdmiVsync failed", __FUNCTION__);
                 return false;
             }
+#endif
             break;
         default:
             LOGE("%s:Unknown state %d", __FUNCTION__, mState);
@@ -1506,11 +1508,11 @@ bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int r
     mPmemFD = data.fd;
     mPmemAddr = data.base;
     mBufferType = data.allocType;
-
+#if 0
     // Set this flag if source memory is fb
     if(uiChannel)
         mRotData.src.flags |= MDP_MEMORY_ID_TYPE_FB;
-
+#endif
     mOvDataRot.data.memory_id = mPmemFD;
     mRotData.dst.memory_id = mPmemFD;
     mRotData.dst.offset = 0;
@@ -1639,7 +1641,7 @@ bool OverlayDataChannel::queue(uint32_t offset) {
 
     return true;
 }
-
+#if 0
 bool OverlayDataChannel::waitForHdmiVsync() {
     if (!isChannelUP()) {
         reportError("waitForHdmiVsync: channel not up");
@@ -1651,7 +1653,7 @@ bool OverlayDataChannel::waitForHdmiVsync() {
     }
     return true;
 }
-
+#endif
 bool OverlayDataChannel::getCropS3D(overlay_rect *inRect, int channel, int format,
                                     overlay_rect *rect) {
     // for the 3D usecase extract channels from a frame
