@@ -52,10 +52,10 @@ int convertYV12toYCrCb420SP(const copybit_image_t *src, private_handle_t *yv12_h
     unsigned int   stride  = src->w;
     unsigned int   width   = src->w - src->horiz_padding;
     unsigned int   height  = src->h;
-    unsigned int   padding = src->horiz_padding;
     unsigned int   y_size  = stride * src->h;
     unsigned int   c_width = ALIGN(stride/2, 16);
     unsigned int   c_size  = c_width * src->h/2;
+    unsigned int   chromaPadding = c_width - width/2;
     unsigned int   chromaSize = c_size * 2;
     unsigned char* newChroma = (unsigned char *)(yv12_handle->base + y_size);
     unsigned char* oldChroma = (unsigned char*)(hnd->base + y_size);
@@ -63,7 +63,7 @@ int convertYV12toYCrCb420SP(const copybit_image_t *src, private_handle_t *yv12_h
 
 #ifdef __ARM_HAVE_NEON
    /* interleave */
-    if(!padding) {
+    if(!chromaPadding) {
         unsigned char * t1 = newChroma;
         unsigned char * t2 = oldChroma;
         unsigned char * t3 = t2 + chromaSize/2;
@@ -80,7 +80,7 @@ int convertYV12toYCrCb420SP(const copybit_image_t *src, private_handle_t *yv12_h
         }
     }
 #else  //__ARM_HAVE_NEON
-    if(!padding) {
+    if(!chromaPadding) {
         for(unsigned int i = 0; i< chromaSize/2; i++) {
             newChroma[i*2]   = oldChroma[i];
             newChroma[i*2+1] = oldChroma[i+chromaSize/2];
@@ -95,22 +95,22 @@ int convertYV12toYCrCb420SP(const copybit_image_t *src, private_handle_t *yv12_h
     // The width/2 checks are to avoid copying
     // from the padding
 
-    if(padding) {
+    if(chromaPadding) {
         unsigned int r1 = 0, r2 = 0, i = 0, j = 0;
         while(r1 < height/2) {
-            if(j == width/2) {
+            if(j == width) {
                 j = 0;
                 r2++;
                 continue;
             }
-            if (j+1 == width/2) {
-                newChroma[r2*c_width + j] = oldChroma[r1*c_width+i];
+            if (j+1 == width) {
+                newChroma[r2*width + j] = oldChroma[r1*c_width+i];
                 r2++;
-                newChroma[r2*c_width] = oldChroma[r1*c_width+i+c_size];
+                newChroma[r2*width] = oldChroma[r1*c_width+i+c_size];
                 j = 1;
             } else {
-                newChroma[r2*c_width + j] = oldChroma[r1*c_width+i];
-                newChroma[r2*c_width + j + 1] = oldChroma[r1*c_width+i+c_size];
+                newChroma[r2*width + j] = oldChroma[r1*c_width+i];
+                newChroma[r2*width + j + 1] = oldChroma[r1*c_width+i+c_size];
                 j+=2;
             }
             i++;
