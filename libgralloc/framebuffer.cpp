@@ -64,10 +64,6 @@ static inline int min(int a, int b) {
 static inline int max(int a, int b) {
     return (a>b) ? a : b;
 }
-/** align */
-static inline size_t ALIGN(size_t x, size_t align) {
-    return (x + align-1) & ~(align-1);
-}
 #endif
 
 char framebufferStateName[] = {'S', 'R', 'A'};
