@@ -414,7 +414,7 @@ int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage)
      data.offset = 0;
      data.size = getBufferSizeAndDimensions(w, h, format, alignedw, alignedh);
      data.align = getpagesize();
-     data.uncached = true;
+     data.uncached = useUncached(usage);
      int allocFlags = usage;
 
      int err = sAlloc->allocate(data, allocFlags, 0);
