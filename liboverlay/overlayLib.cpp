@@ -418,7 +418,8 @@ int overlay::initOverlay() {
 
 Overlay::Overlay() : mChannelUP(false), mExternalDisplay(false),
                      mS3DFormat(0), mCroppedSrcWidth(0),
-                     mCroppedSrcHeight(0), mState(-1) {
+                     mCroppedSrcHeight(0), mState(-1),
+                     mSrcOrientation(0) {
     mOVBufferInfo.width = mOVBufferInfo.height = 0;
     mOVBufferInfo.format = mOVBufferInfo.size = 0;
     mOVBufferInfo.secure = false;
@@ -487,7 +488,7 @@ bool Overlay::closeChannel() {
     mOVBufferInfo.height = 0;
     mOVBufferInfo.format = 0;
     mOVBufferInfo.size = 0;
-    mOVBufferInfo.secure = false;
+    mSrcOrientation = 0;
     mState = -1;
     return true;
 }
@@ -536,8 +537,13 @@ bool Overlay::setPosition(int x, int y, uint32_t w, uint32_t h) {
                             mCroppedSrcWidth, mCroppedSrcHeight, mDevOrientation,
                             &priDest, &secDest);
                 } else {
-                    objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(
-                            mCroppedSrcWidth, mCroppedSrcHeight, &secDest);
+                    int w = mCroppedSrcWidth, h = mCroppedSrcHeight;
+                    if(mSrcOrientation == HAL_TRANSFORM_ROT_90 ||
+                            mSrcOrientation == HAL_TRANSFORM_ROT_270) {
+                        swapWidthHeight(w, h);
+                    }
+                    objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(w, h,
+                                                                  &secDest);
                 }
                 setChannelPosition(secDest.x, secDest.y, secDest.w, secDest.h,
                             VG1_PIPE);
@@ -589,8 +595,7 @@ bool Overlay::setChannelPosition(int x, int y, uint32_t w, uint32_t h, int chann
     return objOvCtrlChannel[channel].setPosition(x, y, w, h);
 }
 
-bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientation,
-                                  int flags) {
+bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int flags) {
     bool ret = false;
     int currentFlags = 0;
 
@@ -613,24 +618,10 @@ bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientati
         return true;
     }
 
-    // Disable rotation for the HDMI channels
-    int orientHdmi = 0;
-    int orientPrimary = sHDMIAsPrimary ? 0 : orientation;
-    int orient[2] = {orientPrimary, orientHdmi};
     // disable waitForVsync on HDMI, since we call the wait ioctl
     int ovFlagsExternal = 0;
     int ovFlagsPrimary = sHDMIAsPrimary ? (flags |= WAIT_FOR_VSYNC): flags;
     int ovFlags[2] = {flags, ovFlagsExternal};
-    switch(mState) {
-        case OV_3D_VIDEO_3D_PANEL:
-            orient[1] = sHDMIAsPrimary ? 0 : orientation;
-            break;
-        case OV_3D_VIDEO_3D_TV:
-            orient[0] = 0;
-            break;
-        default:
-            break;
-    }
 
     int numChannelsToUpdate = NUM_CHANNELS;
     if (!geometryChanged) {
@@ -644,7 +635,7 @@ bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int orientati
     // Set the overlay source info
     for (int i = 0; i < NUM_CHANNELS; i++) {
         if (objOvCtrlChannel[i].isChannelUP()) {
-            ret = objOvCtrlChannel[i].updateOverlaySource(info, orient[i], ovFlags[i]);
+            ret = objOvCtrlChannel[i].updateOverlaySource(info, ovFlags[i]);
             if (!ret) {
                 LOGE("objOvCtrlChannel[%d].updateOverlaySource failed", i);
                 return false;
@@ -740,8 +731,6 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                 break;
             case OV_2D_VIDEO_ON_TV:
                 if(isHDMIStateChange) {
-                   //start only HDMI channel
-                   noRot = true;
                    //DO NOT WAIT for VSYNC for external
                    flags &= ~WAIT_FOR_VSYNC;
                    // External display connected, start corresponding channel
@@ -763,8 +752,13 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                                mCroppedSrcWidth, mCroppedSrcHeight, mDevOrientation,
                                &priDest, &secDest);
                    } else {
-                       objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(
-                               mCroppedSrcWidth, mCroppedSrcHeight, &secDest);
+                       int w = mCroppedSrcWidth, h = mCroppedSrcHeight;
+                       if(mSrcOrientation == HAL_TRANSFORM_ROT_90 ||
+                               mSrcOrientation == HAL_TRANSFORM_ROT_270) {
+                           swapWidthHeight(w, h);
+                       }
+                       objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(w, h,
+                                                                     &secDest);
                    }
                    return setChannelPosition(secDest.x, secDest.y, secDest.w, secDest.h, VG1_PIPE);
                 }
@@ -774,8 +768,6 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                     fbnum = i;
                     //start two channels for one for primary and external.
                     if (fbnum) {
-                        // Disable rotation for external
-                        noRot = true;
                         //set fbnum to hdmiConnected, which holds the ext display
                         fbnum = hdmiConnected;
                         flags &= ~WAIT_FOR_VSYNC;
@@ -804,7 +796,7 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                 break;
         }
     } else {
-        ret = updateOverlaySource(info, orientation, flags);
+        ret = updateOverlaySource(info, flags);
     }
     return true;
 }
@@ -863,13 +855,28 @@ bool Overlay::updateOverlayFlags(int flags) {
 
 bool Overlay::setTransform(int value) {
     int barrier = 0;
+    // To get the rotation info
+    int transform = value & FINAL_TRANSFORM_MASK;
+    int srcTransform = ((value & SRC_TRANSFORM_MASK) >> SHIFT_SRC_TRANSFORM);
+    mSrcOrientation = srcTransform;
+
     switch (mState) {
         case OV_UI_MIRROR_TV:
         case OV_2D_VIDEO_ON_PANEL:
         case OV_3D_VIDEO_2D_PANEL:
-            return objOvCtrlChannel[VG0_PIPE].setTransform(value);
+            return objOvCtrlChannel[VG0_PIPE].setTransform(transform);
             break;
         case OV_2D_VIDEO_ON_TV:
+            for (int i=0; i<NUM_CHANNELS; i++) {
+                //if its the secondary channel set orientation to be srcOrientation
+                if(i) // i - external display channel
+                    transform = mSrcOrientation;
+                if(!objOvCtrlChannel[i].setTransform(transform)) {
+                    LOGE("%s:failed for channel %d", __FUNCTION__, i);
+                    return false;
+                }
+            }
+            break;
         case OV_3D_VIDEO_2D_TV:
         case OV_3D_VIDEO_3D_TV:
             for (int i=0; i<NUM_CHANNELS; i++) {
@@ -892,7 +899,7 @@ bool Overlay::setTransform(int value) {
                         LOGE("%s:failed to enable barriers for 3D video", __FUNCTION__);
             }
             for (int i=0; i<NUM_CHANNELS; i++) {
-                if(!objOvCtrlChannel[i].setTransform(value)) {
+                if(!objOvCtrlChannel[i].setTransform(transform)) {
                     LOGE("%s:failed for channel %d", __FUNCTION__, i);
                     return false;
                }
@@ -1391,7 +1398,7 @@ bool OverlayControlChannel::startOVRotatorSessions(
 }
 
 bool OverlayControlChannel::updateOverlaySource(const overlay_buffer_info& info,
-                                                int orientation, int flags)
+                                                     int flags)
 {
     int colorFormat = getColorFormat(info.format);
     int hw_format = get_mdp_format(colorFormat);
@@ -1607,7 +1614,6 @@ bool OverlayControlChannel::setTransform(int value, bool fetch) {
         return true;
 
     int rot = value;
-
     switch(rot) {
         case 0:
         case HAL_TRANSFORM_FLIP_H:
@@ -1769,10 +1775,6 @@ bool OverlayControlChannel::getSize(int& size) const {
 OverlayDataChannel::OverlayDataChannel() : mNoRot(false), mFD(-1), mRotFD(-1),
                                   mPmemFD(-1), mPmemAddr(0), mUpdateDataChannel(false)
 {
-    //XXX: getInstance(false) implies that it should only
-    // use the kernel allocator. Change it to something
-    // more descriptive later.
-    mAlloc = gralloc::IAllocController::getInstance(false);
 }
 
 OverlayDataChannel::~OverlayDataChannel() {
@@ -1848,8 +1850,11 @@ bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int r
         if((requestType == NEW_REQUEST) && !uiChannel)
             allocFlags |= GRALLOC_USAGE_PRIVATE_SMI_HEAP;
     }
-
-    int err = mAlloc->allocate(data, allocFlags, 0);
+    //XXX: getInstance(false) implies that it should only
+    // use the kernel allocator. Change it to something
+    // more descriptive later.
+    android::sp<gralloc::IAllocController> allocController = gralloc::IAllocController::getInstance(false);
+    int err = allocController->allocate(data, allocFlags, 0);
     if(err) {
         reportError("Cant allocate rotatory memory");
         close(mFD);
@@ -1906,7 +1911,11 @@ bool OverlayDataChannel::closeDataChannel() {
         return true;
 
     if (!mNoRot && mRotFD > 0) {
-        sp<IMemAlloc> memalloc = mAlloc->getAllocator(mBufferType);
+        //XXX: getInstance(false) implies that it should only
+        // use the kernel allocator. Change it to something
+        // more descriptive later.
+        android::sp<gralloc::IAllocController> allocController = gralloc::IAllocController::getInstance(false);
+        sp<IMemAlloc> memalloc = allocController->getAllocator(mBufferType);
         memalloc->free_buffer(mPmemAddr, mPmemOffset * mNumBuffers, 0, mPmemFD);
         close(mPmemFD);
         mPmemFD = -1;
@@ -1961,7 +1970,11 @@ bool OverlayDataChannel::queueBuffer(uint32_t offset) {
 
     // Unmap the old PMEM memory after the queueBuffer has returned
     if (oldPmemFD != -1 && oldPmemAddr != MAP_FAILED) {
-        sp<IMemAlloc> memalloc = mAlloc->getAllocator(mBufferType);
+        //XXX: getInstance(false) implies that it should only
+        // use the kernel allocator. Change it to something
+        // more descriptive later.
+        android::sp<gralloc::IAllocController> allocController = gralloc::IAllocController::getInstance(false);
+        sp<IMemAlloc> memalloc = allocController->getAllocator(mBufferType);
         memalloc->free_buffer(oldPmemAddr, oldPmemOffset * mNumBuffers, 0, oldPmemFD);
         oldPmemFD = -1;
     }
