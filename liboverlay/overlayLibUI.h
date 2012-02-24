@@ -108,6 +108,8 @@ class OverlayUI {
     mdp_overlay mOvInfo;
     msm_rotator_img_info mRotInfo;
 
+    bool mParamsChanged;
+
     OverlayUI(const OverlayUI& objOverlay);
     OverlayUI& operator=(const OverlayUI& objOverlay);
 

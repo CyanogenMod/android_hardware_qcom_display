@@ -2121,14 +2121,14 @@ bool OverlayDataChannel::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
     }
 
 
+    normalize_crop(x, w);
+    normalize_crop(y, h);
+
     if ((ov.src_rect.x == x) &&
            (ov.src_rect.y == y) &&
            (ov.src_rect.w == w) &&
            (ov.src_rect.h == h))
         return true;
-
-    normalize_crop(x, w);
-    normalize_crop(y, h);
 
     ov.src_rect.x = x;
     ov.src_rect.y = y;
