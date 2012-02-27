@@ -33,7 +33,7 @@ endif
 ifeq ($(TARGET_USES_POST_PROCESSING),true)
 LOCAL_CFLAGS += -DUSES_POST_PROCESSING
 LOCAL_SHARED_LIBRARIES += libmm-abl
-LOCAL_C_INCLUDES += vendor/qcom/proprietary/mm-core-noship/display/abl/inc
+LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/pp/inc
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/lib/
 endif
 LOCAL_MODULE := liboverlay
