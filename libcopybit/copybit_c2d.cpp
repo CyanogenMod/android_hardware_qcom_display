@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@
 #include <sys/mman.h>
 
 #include <linux/msm_kgsl.h>
-#include <linux/ioctl.h>
 
 #include <ui/egl/android_natives.h>
 #include <ui/egl/android_natives.h>
@@ -82,6 +81,9 @@ C2D_STATUS (*LINK_c2dWaitTimestamp)( c2d_ts_handle timestamp );
 
 C2D_STATUS (*LINK_c2dDestroySurface)( uint32 surface_id );
 
+C2D_STATUS (*LINK_c2dMapAddr) ( int mem_fd, void * hostptr, uint32 len, uint32 offset, uint32 flags, void ** gpuaddr);
+
+C2D_STATUS (*LINK_c2dUnMapAddr) ( void * gpuaddr);
 
 /******************************************************************************/
 
@@ -91,8 +93,6 @@ C2D_STATUS (*LINK_c2dDestroySurface)( uint32 surface_id );
 #else
 #error "Unsupported HW version"
 #endif
-
-#define G12_DEVICE_NAME "/dev/kgsl-2d0"
 
 #define NUM_SURFACES 3
 
@@ -125,7 +125,6 @@ struct copybit_context_t {
     void *libc2d2;
     alloc_data temp_src_buffer;
     alloc_data temp_dst_buffer;
-    int g12_device_fd;
     int fb_width;
     int fb_height;
     bool isPremultipliedAlpha;
@@ -256,50 +255,33 @@ int c2diGetBpp(int32 colorformat)
     return c2dBpp;
 }
 
-static uint32 c2d_get_gpuaddr(int device_fd, struct private_handle_t *handle)
+static uint32 c2d_get_gpuaddr( struct private_handle_t *handle)
 {
+    uint32 memtype, *gpuaddr;
+    C2D_STATUS rc;
+
     if(!handle)
         return 0;
 
-    struct kgsl_map_user_mem param;
-    memset(&param, 0, sizeof(param));
-    param.fd = handle->fd;
-    param.len = handle->size;
-    param.offset = handle->offset;
-    param.hostptr = handle->base;
-
     if (handle->flags & (private_handle_t::PRIV_FLAGS_USES_PMEM |
                 private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP))
-        param.memtype = KGSL_USER_MEM_TYPE_PMEM;
+        memtype = KGSL_USER_MEM_TYPE_PMEM;
     else if (handle->flags & private_handle_t::PRIV_FLAGS_USES_ASHMEM)
-        param.memtype = KGSL_USER_MEM_TYPE_ASHMEM;
+        memtype = KGSL_USER_MEM_TYPE_ASHMEM;
 #ifdef USE_ION
     else if (handle->flags & private_handle_t::PRIV_FLAGS_USES_ION)
-        param.memtype = KGSL_USER_MEM_TYPE_ION;
+        memtype = KGSL_USER_MEM_TYPE_ION;
 #endif
     else {
         LOGE("Invalid handle flags: 0x%x", handle->flags);
         return 0;
     }
 
-    if (!ioctl(device_fd, IOCTL_KGSL_MAP_USER_MEM, (void *)&param,
-                 sizeof(param))) {
-        return param.gpuaddr;
+     rc = LINK_c2dMapAddr(handle->fd, (void*)handle->base, handle->size, handle->offset, memtype, (void**)&gpuaddr);
+    if (rc == C2D_STATUS_OK) {
+        return (uint32) gpuaddr;
     }
-
     return 0;
-}
-
-static uint32 c2d_unmap_gpuaddr(int device_fd, unsigned int gpuaddr)
-{
-    struct kgsl_sharedmem_free param;
-
-    memset(&param, 0, sizeof(param));
-    param.gpuaddr = gpuaddr;
-
-    ioctl(device_fd, IOCTL_KGSL_SHAREDMEM_FREE, (void *)&param,
-            sizeof(param));
-    return COPYBIT_SUCCESS;
 }
 
 static int is_supported_rgb_format(int format)
@@ -403,7 +385,7 @@ static int calculate_yuv_offset_and_stride(const bufferInfo& info,
 }
 
 /** create C2D surface from copybit image */
-static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image_t *rhs,
+static int set_image( uint32 surfaceId, const struct copybit_image_t *rhs,
                      int *cformat, uint32_t *mapped, const eC2DFlags flags)
 {
     struct private_handle_t* handle = (struct private_handle_t*)rhs->handle;
@@ -427,7 +409,7 @@ static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image
     }
 
     if (handle->gpuaddr == 0) {
-       handle->gpuaddr = c2d_get_gpuaddr(device_fd, handle);
+       handle->gpuaddr = c2d_get_gpuaddr(handle);
        if(!handle->gpuaddr) {
            LOGE("%s: c2d_get_gpuaddr failed", __FUNCTION__);
            return COPYBIT_FAILURE;
@@ -506,14 +488,14 @@ static int set_image(int device_fd, uint32 surfaceId, const struct copybit_image
 
 error:
     if(*mapped == 1) {
-        c2d_unmap_gpuaddr(device_fd, handle->gpuaddr);
+        LINK_c2dUnMapAddr( (void*) handle->gpuaddr);
         handle->gpuaddr = 0;
         *mapped = 0;
     }
     return status;
 }
 
-static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_image_t *rhs,
+static int set_src_image( uint32 *surfaceId, const struct copybit_image_t *rhs,
                          int *cformat, uint32 *mapped)
 {
     struct private_handle_t* handle = (struct private_handle_t*)rhs->handle;
@@ -524,7 +506,7 @@ static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_
 
     if (handle->gpuaddr == 0)
     {
-       handle->gpuaddr = c2d_get_gpuaddr(device_fd, handle);
+       handle->gpuaddr = c2d_get_gpuaddr( handle);
        if(!handle->gpuaddr)
            return COPYBIT_FAILURE;
 
@@ -535,7 +517,7 @@ static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_
     if(is_supported_rgb_format(rhs->format) == COPYBIT_SUCCESS) {
         /* RGB */
         C2D_RGB_SURFACE_DEF surfaceDef;
-        surfaceType = (C2D_SURFACE_TYPE) (C2D_SURFACE_RGB_HOST | C2D_SURFACE_WITH_PHYS);
+        surfaceType = (C2D_SURFACE_TYPE) (C2D_SURFACE_RGB_HOST | C2D_SURFACE_WITH_PHYS | C2D_SURFACE_WITH_PHYS_DUMMY);
 
         surfaceDef.phys = (void*) handle->gpuaddr;
         surfaceDef.buffer = (void*) (handle->base);
@@ -559,7 +541,7 @@ static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_
         int uvStride = 0;
         memset(&surfaceDef, 0, sizeof(surfaceDef));
 
-        surfaceType = (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS);
+        surfaceType = (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS | C2D_SURFACE_WITH_PHYS_DUMMY);
         surfaceDef.format = get_format(rhs->format);
         bufferInfo info;
         info.width = rhs->w;
@@ -598,26 +580,26 @@ static int set_src_image(int device_fd, uint32 *surfaceId, const struct copybit_
 
 error:
     if(*mapped == 1) {
-        c2d_unmap_gpuaddr(device_fd, handle->gpuaddr);
+        LINK_c2dUnMapAddr( (void*) handle->gpuaddr);
         handle->gpuaddr = 0;
         *mapped = 0;
     }
     return status;
 }
 
-void unset_image(int device_fd, uint32 surfaceId, const struct copybit_image_t *rhs,
+void unset_image( uint32 surfaceId, const struct copybit_image_t *rhs,
                  uint32 mmapped)
 {
     struct private_handle_t* handle = (struct private_handle_t*)rhs->handle;
 
     if (mmapped && handle->gpuaddr) {
         // Unmap this gpuaddr
-        c2d_unmap_gpuaddr(device_fd, handle->gpuaddr);
+        LINK_c2dUnMapAddr( (void*) handle->gpuaddr);
         handle->gpuaddr = 0;
     }
 }
 
-static int blit_to_target(int device_fd, uint32 surfaceId, const struct copybit_image_t *rhs)
+static int blit_to_target( uint32 surfaceId, const struct copybit_image_t *rhs)
 {
     struct private_handle_t* handle = (struct private_handle_t*)rhs->handle;
     uint32 cformat  = get_format(rhs->format);
@@ -626,7 +608,7 @@ static int blit_to_target(int device_fd, uint32 surfaceId, const struct copybit_
     int status = COPYBIT_SUCCESS;
 
     if (!handle->gpuaddr) {
-        handle->gpuaddr = c2d_get_gpuaddr(device_fd,handle);
+        handle->gpuaddr = c2d_get_gpuaddr(handle);
         if(!handle->gpuaddr)
             return COPYBIT_FAILURE;
 
@@ -662,7 +644,7 @@ static int blit_to_target(int device_fd, uint32 surfaceId, const struct copybit_
 
 done:
     if (memoryMapped) {
-        c2d_unmap_gpuaddr(device_fd, handle->gpuaddr);
+        LINK_c2dUnMapAddr( (void*) handle->gpuaddr);
         handle->gpuaddr = 0;
     }
     return status;
@@ -1118,7 +1100,7 @@ static int stretch_copybit_internal(
     flags |= (ctx->isPremultipliedAlpha) ? FLAGS_PREMULTIPLIED_ALPHA : 0;
     flags |= (isYUVDestination) ? FLAGS_YUV_DESTINATION : 0;
 
-    status = set_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], &dst_image,
+    status = set_image( ctx->dst[dst_surface_index], &dst_image,
                        &cformat, &trg_mapped, (eC2DFlags)flags);
     if(status) {
         LOGE("%s: dst: set_image error", __FUNCTION__);
@@ -1195,7 +1177,7 @@ static int stretch_copybit_internal(
         }
     }
 
-    status = set_image(ctx->g12_device_fd, ctx->src[src_surface_index], &src_image,
+    status = set_image( ctx->src[src_surface_index], &src_image,
                        &cformat, &src_mapped, (eC2DFlags)flags);
     if(status) {
         LOGE("%s: set_src_image error", __FUNCTION__);
@@ -1209,9 +1191,9 @@ static int stretch_copybit_internal(
             ctx->blitState.config_mask &= ~C2D_ALPHA_BLEND_NONE;
             if(!(ctx->blitState.global_alpha)) {
                 // src alpha is zero
-                unset_image(ctx->g12_device_fd, ctx->src[src_surface_index],
+                unset_image( ctx->src[src_surface_index],
                             &src_image, src_mapped);
-                unset_image(ctx->g12_device_fd, ctx->dst[dst_surface_index],
+                unset_image( ctx->dst[dst_surface_index],
                             &dst_image, trg_mapped);
                 delete_handle(dst_hnd);
                 delete_handle(src_hnd);
@@ -1248,9 +1230,9 @@ static int stretch_copybit_internal(
         LOGE("%s: LINK_c2dFinish ERROR", __FUNCTION__);
     }
 
-    unset_image(ctx->g12_device_fd, ctx->src[src_surface_index], &src_image,
+    unset_image( ctx->src[src_surface_index], &src_image,
                 src_mapped);
-    unset_image(ctx->g12_device_fd, ctx->dst[dst_surface_index], &dst_image,
+    unset_image( ctx->dst[dst_surface_index], &dst_image,
                 trg_mapped);
     if (needTempDestination) {
         // copy the temp. destination without the alignment to the actual destination.
@@ -1311,9 +1293,6 @@ static int close_copybit(struct hw_device_t *dev)
            LOGV("dlclose(libc2d2)");
         }
 
-        if(ctx->g12_device_fd)
-          close(ctx->g12_device_fd);
-
         free_temp_buffer(ctx->temp_src_buffer);
         free_temp_buffer(ctx->temp_dst_buffer);
         free(ctx);
@@ -1364,6 +1343,10 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
                                                "c2dWaitTimestamp");
     *(void **)&LINK_c2dDestroySurface = ::dlsym(ctx->libc2d2,
                                                 "c2dDestroySurface");
+    *(void **)&LINK_c2dMapAddr = ::dlsym(ctx->libc2d2,
+                                                "c2dMapAddr");
+    *(void **)&LINK_c2dUnMapAddr = ::dlsym(ctx->libc2d2,
+                                                "c2dUnMapAddr");
 
     if (!LINK_c2dCreateSurface || !LINK_c2dUpdateSurface || !LINK_c2dReadSurface
        || !LINK_c2dDraw || !LINK_c2dFlush || !LINK_c2dWaitTimestamp || !LINK_c2dFinish
@@ -1382,11 +1365,6 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->device.stretch = stretch_copybit;
     ctx->blitState.config_mask = C2D_NO_BILINEAR_BIT | C2D_NO_ANTIALIASING_BIT;
     ctx->trg_transform = C2D_TARGET_ROTATE_0;
-    ctx->g12_device_fd = open(G12_DEVICE_NAME, O_RDWR | O_SYNC);
-    if (ctx->g12_device_fd < 0) {
-      LOGE("%s: g12_device_fd open failed", __FUNCTION__);
-        goto error;
-    }
 
     /* Create RGB Surface */
     surfDefinition.buffer = (void*)0xdddddddd;
@@ -1397,7 +1375,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     surfDefinition.format = C2D_COLOR_FORMAT_8888_ARGB;
     if (LINK_c2dCreateSurface(&(ctx->dst[RGB_SURFACE]), C2D_TARGET | C2D_SOURCE,
                              (C2D_SURFACE_TYPE)(C2D_SURFACE_RGB_HOST |
-                             C2D_SURFACE_WITH_PHYS), &surfDefinition)) {
+                             C2D_SURFACE_WITH_PHYS | C2D_SURFACE_WITH_PHYS_DUMMY ), &surfDefinition)) {
         LOGE("%s: create ctx->dst[RGB_SURFACE] failed", __FUNCTION__);
         ctx->dst[RGB_SURFACE] = -1;
         goto error;
@@ -1406,7 +1384,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
 
     if (LINK_c2dCreateSurface(&(ctx->src[RGB_SURFACE]), C2D_TARGET | C2D_SOURCE,
                              (C2D_SURFACE_TYPE)(C2D_SURFACE_RGB_HOST |
-                             C2D_SURFACE_WITH_PHYS), &surfDefinition)) {
+                             C2D_SURFACE_WITH_PHYS | C2D_SURFACE_WITH_PHYS_DUMMY), &surfDefinition)) {
         LOGE("%s: create ctx->src[RGB_SURFACE] failed", __FUNCTION__);
         ctx->src[RGB_SURFACE] = -1;
         goto error;
@@ -1427,7 +1405,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
 
     if (LINK_c2dCreateSurface(&(ctx->src[YUV_SURFACE_2_PLANES]),
                     C2D_TARGET | C2D_SOURCE,
-                    (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST|C2D_SURFACE_WITH_PHYS),
+                    (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST|C2D_SURFACE_WITH_PHYS | C2D_SURFACE_WITH_PHYS_DUMMY),
                     &yuvSurfaceDef)) {
         LOGE("%s: create ctx->src[YUV_SURFACE_2_PLANES] failed", __FUNCTION__);
         ctx->src[YUV_SURFACE_2_PLANES] = -1;
@@ -1436,7 +1414,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
 
     if (LINK_c2dCreateSurface(&(ctx->dst[YUV_SURFACE_2_PLANES]),
                     C2D_TARGET | C2D_SOURCE,
-                    (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS),
+                    (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS | C2D_SURFACE_WITH_PHYS_DUMMY),
                     &yuvSurfaceDef)) {
         LOGE("%s: create ctx->dst[YUV_SURFACE_2_PLANES] failed", __FUNCTION__);
         ctx->dst[YUV_SURFACE_2_PLANES] = -1;
@@ -1450,7 +1428,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
 
     if (LINK_c2dCreateSurface(&(ctx->src[YUV_SURFACE_3_PLANES]),
                     C2D_TARGET | C2D_SOURCE,
-                    (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS),
+                    (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS | C2D_SURFACE_WITH_PHYS_DUMMY),
                     &yuvSurfaceDef)) {
         LOGE("%s: create ctx->src[YUV_SURFACE_3_PLANES] failed", __FUNCTION__);
         ctx->src[YUV_SURFACE_3_PLANES] = -1;
@@ -1459,7 +1437,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
 
     if (LINK_c2dCreateSurface(&(ctx->dst[YUV_SURFACE_3_PLANES]),
                     C2D_TARGET | C2D_SOURCE,
-                    (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS),
+                    (C2D_SURFACE_TYPE)(C2D_SURFACE_YUV_HOST | C2D_SURFACE_WITH_PHYS | C2D_SURFACE_WITH_PHYS_DUMMY),
                     &yuvSurfaceDef)) {
         LOGE("%s: create ctx->dst[YUV_SURFACE_3_PLANES] failed", __FUNCTION__);
         ctx->dst[YUV_SURFACE_3_PLANES] = -1;
@@ -1491,9 +1469,6 @@ error:
              LINK_c2dDestroySurface(ctx->dst[i]);
              ctx->dst[i] = -1;
         }
-    }
-    if (ctx->g12_device_fd >= 0) {
-        close(ctx->g12_device_fd);
     }
     if (ctx->libc2d2)
         ::dlclose(ctx->libc2d2);

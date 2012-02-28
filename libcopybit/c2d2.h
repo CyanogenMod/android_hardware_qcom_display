@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010,2012, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,16 +33,16 @@
 extern "C" {
 #endif
 
-#include <EGL/egl.h> /* for EGL surfaces */
-
 #ifndef C2D_API
 #define C2D_API /* define API export as needed */
 #endif
-#ifndef int32
+#if !defined(int32) && !defined(_INT32_DEFINED)
 typedef int                     int32;
+#define _INT32_DEFINED
 #endif
-#ifndef uint32
+#if !defined(uint32) && !defined(_UINT32_DEFINED)
 typedef unsigned int            uint32;
+#define _UINT32_DEFINED
 #endif
 
 /*****************************************************************************/
@@ -93,7 +93,7 @@ typedef enum {
  * is inverted: 0 - opaque, 1 - transparent, if applicable.
  * If the C2D_FORMAT_DISABLE_ALPHA bit is set, the alpha channel serves
  * as a placeholder and is ignored during blit, if applicable.
- * If the COMP_FORMAT_MACROTILED bit is set, the surface is in the
+ * If the C2D_FORMAT_MACROTILED bit is set, the surface is in the
  * tiled format : 64x32 for 8bpp, 32x32 for 16bpp formats  */
 typedef enum {
     C2D_COLOR_FORMAT_1            = 0,   /* 1-bit alpha/color expansion */
@@ -284,21 +284,15 @@ typedef enum {
 
 /* Surface type enumeration */
 typedef enum {
-    C2D_SURFACE_EGL          = 0, /* Arbitrary EGL surface */
-    C2D_SURFACE_RGB_HOST     = 1, /* Host memory RGB surface */
-    C2D_SURFACE_RGB_EXT      = 2, /* External memory RGB surface */
-    C2D_SURFACE_YUV_HOST     = 3, /* Host memory YUV surface */
-    C2D_SURFACE_YUV_EXT      = 4, /* External memory YUV surface */
-    C2D_SURFACE_WITH_PHYS    = (1<<3), /* physical address allready mapped */
+    C2D_SURFACE_RGB_HOST        = 1, /* Host memory RGB surface */
+    C2D_SURFACE_RGB_EXT         = 2, /* External memory RGB surface */
+    C2D_SURFACE_YUV_HOST        = 3, /* Host memory YUV surface */
+    C2D_SURFACE_YUV_EXT         = 4, /* External memory YUV surface */
+    C2D_SURFACE_WITH_PHYS       = (1<<3), /* physical address already mapped */
+                                        /* this bit is valid with HOST types */
+    C2D_SURFACE_WITH_PHYS_DUMMY = (1<<4), /* physical address already mapped */
                                         /* this bit is valid with HOST types */
 } C2D_SURFACE_TYPE;
-
-/* Structure for registering an EGL surface as a blit surface */
-typedef struct {
-    EGLDisplay display; /* EGL display */
-    EGLContext context; /* EGL context, reserved - pass EGL_NO_CONTEXT */
-    EGLSurface surface; /* EGL surface */
-} C2D_EGL_SURFACE_DEF;
 
 /* Structure for registering a RGB buffer as a blit surface */
 typedef struct {
@@ -398,12 +392,6 @@ typedef struct C2D_OBJECT_STR {
  * For external memory types the memory is allocated within API.
  * On success, the non-zero surface identifier is returned.
  * All numbers greater that 0 are valid surface identifiers, 0 is invalid.
-
- * arbitrary EGL surface (including  proprietary Command List Surface):
- * surface_type       = C2D_SURFACE_EGL
- * surface_definition = C2D_EGL_SURFACE_DEF
- * all fields in definition structure should be set
- * context field is reserved and can be ignored
 
  * Host memory RGB surface:
  * surface_type       = C2D_SURFACE_RGB_HOST
@@ -608,6 +596,18 @@ C2D_API C2D_STATUS c2dDisplayGetProperties( uint32 display,
 C2D_API C2D_STATUS c2dDisplaySetObject( uint32 display,
                          uint32 target_config, uint32 target_color_key,
                          C2D_OBJECT * c2dObject, uint32 mode);
+
+/* allows user to map a memory region to the gpu. only supported on linux
+ * mem_fd is the fd of the memory region, hostptr is the host pointer to the region,
+ * len and offset are the size and offset of the memory.
+ * flags is one of the memory types supported by gsl
+ * gpaddr is passed by refernce back to the user
+ */
+C2D_API C2D_STATUS c2dMapAddr ( int mem_fd, void * hostptr, uint32 len, uint32 offset, uint32 flags, void ** gpuaddr);
+
+/* allows user to unmap memory region mapped by c2dMapAddr.
+ * gpaddr is the gpuaddr to unmap */
+C2D_API C2D_STATUS c2dUnMapAddr (void * gpuaddr);
 
 /*****************************************************************************/
 
