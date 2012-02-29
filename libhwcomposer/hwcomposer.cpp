@@ -1495,7 +1495,10 @@ static int hwc_set(hwc_composer_device_t *dev,
 
     int ret = 0;
     if (list) {
+        bool bDumpLayers = needToDumpLayers(); // Check need for debugging dumps
         for (size_t i=0; i<list->numHwLayers; i++) {
+            if (bDumpLayers)
+                dumpLayer(hwcModule->compositionType, list->flags, i, list->hwLayers);
             if (list->hwLayers[i].flags & HWC_SKIP_LAYER) {
                 continue;
 #ifdef COMPOSITION_BYPASS
