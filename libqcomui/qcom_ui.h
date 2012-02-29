@@ -36,6 +36,7 @@
 #include <ui/Region.h>
 #include <EGL/egl.h>
 #include <utils/Singleton.h>
+#include <cutils/properties.h>
 #include "../libgralloc/gralloc_priv.h"
 
 using namespace android;
@@ -353,4 +354,38 @@ int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur);
  */
 external_display handleEventHDMI(external_display newEvent, external_display
                                                                    currEvent);
+
+/*
+ * Checks if layers need to be dumped based on system property "debug.sf.dump"
+ * for raw dumps and "debug.sf.dump.png" for png dumps.
+ *
+ * For example, to dump 25 frames in raw format, do,
+ *     adb shell setprop debug.sf.dump 25
+ * Layers are dumped in a time-stamped location: /data/sfdump*.
+ *
+ * To dump 10 frames in png format, do,
+ *     adb shell setprop debug.sf.dump.png 10
+ * To dump another 25 or so frames in raw format, do,
+ *     adb shell setprop debug.sf.dump 26
+ *
+ * To turn off logcat logging of layer-info, set both properties to 0,
+ *     adb shell setprop debug.sf.dump.png 0
+ *     adb shell setprop debug.sf.dump 0
+ *
+ * @return: true if layers need to be dumped (or logcat-ed).
+ */
+bool needToDumpLayers();
+
+/*
+ * Dumps a layer's info into logcat and its buffer into raw/png files.
+ *
+ * @param: moduleCompositionType - Composition type set in hwcomposer module.
+ * @param: listFlags - Flags used in hwcomposer's list.
+ * @param: layerIndex - Index of layer being dumped.
+ * @param: hwLayers - Address of hwc_layer_t to log and dump.
+ *
+ */
+void dumpLayer(int moduleCompositionType, int listFlags, size_t layerIndex,
+                                                    hwc_layer_t hwLayers[]);
+
 #endif // INCLUDE_LIBQCOM_UI
