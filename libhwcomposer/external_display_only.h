@@ -98,13 +98,13 @@ private:
 
     //Data members
 #if defined (HDMI_DUAL_DISPLAY) && defined (USE_OVERLAY)
-    static overlay::OverlayUI* mOvExtUI[MAX_EXT_ONLY_LAYERS];
-    static native_handle_t* previousExtHandle[MAX_EXT_ONLY_LAYERS];
-    static ExternalOnlyMode eExtOnlyMode;
-    static int numExtOnlyLayers;
-    static bool skipLayerPresent;
-    static bool blockLayerPresent;
-    static int blockLayerIndex;
+    static overlay::OverlayUI* sOvExtUI[MAX_EXT_ONLY_LAYERS];
+    static native_handle_t* sPreviousExtHandle[MAX_EXT_ONLY_LAYERS];
+    static ExternalOnlyMode sExtOnlyMode;
+    static int sNumExtOnlyLayers;
+    static bool sSkipLayerPresent;
+    static bool sBlockLayerPresent;
+    static int sBlockLayerIndex;
 #endif
 }; //class ExtDispOnly
 
@@ -158,10 +158,10 @@ void ExtDispOnly::unlockBuffer(native_handle_t *hnd) {
 
 void ExtDispOnly::unlockPreviousBuffers() {
 #if defined (HDMI_DUAL_DISPLAY) && defined (USE_OVERLAY)
-    for(int i = 0; (i < MAX_EXT_ONLY_LAYERS) && previousExtHandle[i]; i++) {
+    for(int i = 0; (i < MAX_EXT_ONLY_LAYERS) && sPreviousExtHandle[i]; i++) {
         LOGE_IF(EXTDEBUG, "%s", __func__);
-        ExtDispOnly::unlockBuffer(previousExtHandle[i]);
-        previousExtHandle[i] = NULL;
+        ExtDispOnly::unlockBuffer(sPreviousExtHandle[i]);
+        sPreviousExtHandle[i] = NULL;
     }
 #endif
 }
@@ -169,14 +169,14 @@ void ExtDispOnly::unlockPreviousBuffers() {
 void ExtDispOnly::init() {
 #if defined (HDMI_DUAL_DISPLAY) && defined (USE_OVERLAY)
     for(int i = 0; i < MAX_EXT_ONLY_LAYERS; i++) {
-        mOvExtUI[i] = new overlay::OverlayUI();
-        previousExtHandle[i] = NULL;
+        sOvExtUI[i] = new overlay::OverlayUI();
+        sPreviousExtHandle[i] = NULL;
     }
-    eExtOnlyMode = EXT_ONLY_MODE_OFF;
-    numExtOnlyLayers = 0;
-    skipLayerPresent = false;
-    blockLayerPresent = false;
-    blockLayerIndex = -1;
+    sExtOnlyMode = EXT_ONLY_MODE_OFF;
+    sNumExtOnlyLayers = 0;
+    sSkipLayerPresent = false;
+    sBlockLayerPresent = false;
+    sBlockLayerIndex = -1;
     LOGE_IF(EXTDEBUG, "%s", __func__);
 #endif
 }
@@ -184,7 +184,7 @@ void ExtDispOnly::init() {
 void ExtDispOnly::destroy() {
 #if defined (HDMI_DUAL_DISPLAY) && defined (USE_OVERLAY)
     for(int i = 0; i < MAX_EXT_ONLY_LAYERS; i++) {
-        delete mOvExtUI[i];
+        delete sOvExtUI[i];
     }
 #endif
 }
@@ -192,12 +192,12 @@ void ExtDispOnly::destroy() {
 void ExtDispOnly::closeRange(int start) {
 #if defined (HDMI_DUAL_DISPLAY) && defined (USE_OVERLAY)
     for (int index = start; index < MAX_EXT_ONLY_LAYERS; index++) {
-        if(previousExtHandle[index]) {
+        if(sPreviousExtHandle[index]) {
             LOGE_IF(EXTDEBUG, "%s", __func__);
-            ExtDispOnly::unlockBuffer(previousExtHandle[index]);
-            previousExtHandle[index] = NULL;
+            ExtDispOnly::unlockBuffer(sPreviousExtHandle[index]);
+            sPreviousExtHandle[index] = NULL;
         }
-        mOvExtUI[index]->closeChannel();
+        sOvExtUI[index]->closeChannel();
     }
 #endif
 }
@@ -215,7 +215,7 @@ int ExtDispOnly::prepare(hwc_context_t *ctx, hwc_layer_t *layer, int index,
         ctx->pendingHDMI == true)
         return -1;
 
-    if (ctx && mOvExtUI[index]) {
+    if (ctx && sOvExtUI[index]) {
         private_hwc_module_t* hwcModule = reinterpret_cast<
                 private_hwc_module_t*>(ctx->device.common.module);
         if (!hwcModule) {
@@ -227,7 +227,7 @@ int ExtDispOnly::prepare(hwc_context_t *ctx, hwc_layer_t *layer, int index,
             LOGE("%s handle null", __func__);
             return -1;
         }
-        overlay::OverlayUI *ovUI = mOvExtUI[index];
+        overlay::OverlayUI *ovUI = sOvExtUI[index];
         int ret = 0;
         //int orientation = layer->transform;
         //Assuming layers will always be source landscape
@@ -288,7 +288,7 @@ inline void ExtDispOnly::stopDefaultMirror(hwc_context_t* ctx) {
 inline bool ExtDispOnly::isExtModeStarting(hwc_context_t* ctx, const int&
         numExtLayers) {
 #if defined (HDMI_DUAL_DISPLAY) && defined (USE_OVERLAY)
-    return ((eExtOnlyMode == EXT_ONLY_MODE_OFF) && numExtLayers);
+    return ((sExtOnlyMode == EXT_ONLY_MODE_OFF) && numExtLayers);
 #endif
     return false;
 }
@@ -296,34 +296,34 @@ inline bool ExtDispOnly::isExtModeStarting(hwc_context_t* ctx, const int&
 inline bool ExtDispOnly::isExtModeStopping(hwc_context_t* ctx, const int&
         numExtLayers) {
 #if defined (HDMI_DUAL_DISPLAY) && defined (USE_OVERLAY)
-    return ((eExtOnlyMode == EXT_ONLY_MODE_ON) && (numExtLayers == 0));
+    return ((sExtOnlyMode == EXT_ONLY_MODE_ON) && (numExtLayers == 0));
 #endif
     return false;
 }
 
 inline bool ExtDispOnly::isModeOn() {
 #if defined (HDMI_DUAL_DISPLAY) && defined (USE_OVERLAY)
-    return (eExtOnlyMode == EXT_ONLY_MODE_ON);
+    return (sExtOnlyMode == EXT_ONLY_MODE_ON);
 #endif
     return false;
 }
 
 int ExtDispOnly::update(hwc_context_t* ctx, hwc_layer_list_t* list) {
 #if defined (HDMI_DUAL_DISPLAY) && defined (USE_OVERLAY)
-    int numExtLayers = 0;
-    bool skipLayerPresent = false;
-    bool blockLayerPresent = false;
-    int blockLayerIndex = -1;
+    int aNumExtLayers = 0;
+    bool aSkipLayerPresent = false;
+    bool aBlockLayerPresent = false;
+    int aBlockLayerIndex = -1;
 
     //Book-keeping done each cycle
     for (size_t i = 0; i < list->numHwLayers; i++) {
         private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
         // Dont draw in this round
         if(list->hwLayers[i].flags & HWC_SKIP_LAYER) {
-            skipLayerPresent = true;
+            aSkipLayerPresent = true;
         }
         if(hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_ONLY)) {
-            numExtLayers++;
+            aNumExtLayers++;
             // No way we can let this be drawn by GPU to fb0
             if(list->hwLayers[i].flags & HWC_SKIP_LAYER) {
                 list->hwLayers[i].flags &= ~ HWC_SKIP_LAYER;
@@ -334,31 +334,31 @@ int ExtDispOnly::update(hwc_context_t* ctx, hwc_layer_list_t* list) {
             //EXTERNAL_BLOCK is always an add-on
             if(hnd && (hnd->flags &
                     private_handle_t::PRIV_FLAGS_EXTERNAL_BLOCK)) {
-                blockLayerPresent = true;
-                blockLayerIndex = i;
+                aBlockLayerPresent = true;
+                aBlockLayerIndex = i;
                 list->hwLayers[i].flags |= HWC_USE_EXT_BLOCK;
             }
         }
     }
 
     //Update Default mirroring state
-    if (isExtModeStarting(ctx, numExtLayers)) {
+    if (isExtModeStarting(ctx, aNumExtLayers)) {
         stopDefaultMirror(ctx);
-    } else if (isExtModeStopping(ctx, numExtLayers)) {
+    } else if (isExtModeStopping(ctx, aNumExtLayers)) {
         startDefaultMirror(ctx);
     }
 
     //Cache our stats
-    eExtOnlyMode = numExtLayers ? EXT_ONLY_MODE_ON : EXT_ONLY_MODE_OFF;
-    numExtOnlyLayers = numExtLayers;
-    skipLayerPresent = skipLayerPresent;
-    blockLayerPresent = blockLayerPresent;
-    blockLayerIndex = blockLayerIndex;
+    sExtOnlyMode = aNumExtLayers ? EXT_ONLY_MODE_ON : EXT_ONLY_MODE_OFF;
+    sNumExtOnlyLayers = aNumExtLayers;
+    sSkipLayerPresent = aSkipLayerPresent;
+    sBlockLayerPresent = aBlockLayerPresent;
+    sBlockLayerIndex = aBlockLayerIndex;
 
     LOGE_IF(EXTDEBUG, "%s: numExtLayers = %d skipLayerPresent = %d", __func__,
-            numExtLayers, skipLayerPresent);
+            aNumExtLayers, aSkipLayerPresent);
     //If skip layer present return. Buffers to be unlocked in draw phase.
-    if(skipLayerPresent) {
+    if(aSkipLayerPresent) {
         return overlay::NO_ERROR;
     }
 
@@ -374,16 +374,16 @@ int ExtDispOnly::update(hwc_context_t* ctx, hwc_layer_list_t* list) {
     bool waitForVsync = true;
     bool index = 0;
 
-    if (blockLayerPresent) {
+    if (aBlockLayerPresent) {
         ExtDispOnly::closeRange(1);
-        ExtDispOnly::prepare(ctx, &(list->hwLayers[blockLayerIndex]),
+        ExtDispOnly::prepare(ctx, &(list->hwLayers[aBlockLayerIndex]),
             index, waitForVsync);
-    } else if (numExtLayers) {
-        ExtDispOnly::closeRange(numExtLayers);
+    } else if (aNumExtLayers) {
+        ExtDispOnly::closeRange(aNumExtLayers);
         for (size_t i = 0; i < list->numHwLayers; i++) {
             private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
             if(hnd && hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_ONLY) {
-                waitForVsync = (index == (numExtLayers - 1));
+                waitForVsync = (index == (aNumExtLayers - 1));
                 ExtDispOnly::prepare(ctx, &(list->hwLayers[i]),
                     index, waitForVsync);
                 index++;
@@ -399,14 +399,14 @@ int ExtDispOnly::update(hwc_context_t* ctx, hwc_layer_list_t* list) {
 void ExtDispOnly::storeLockedHandles(hwc_layer_list_t* list) {
 #if defined (HDMI_DUAL_DISPLAY) && defined (USE_OVERLAY)
     int index = 0;
-    if(blockLayerPresent) {
+    if(sBlockLayerPresent) {
         private_handle_t *hnd = (private_handle_t *)
-            list->hwLayers[blockLayerIndex].handle;
-        if(list->hwLayers[blockLayerIndex].flags & HWC_USE_EXT_ONLY) {
+            list->hwLayers[sBlockLayerIndex].handle;
+        if(list->hwLayers[sBlockLayerIndex].flags & HWC_USE_EXT_ONLY) {
             if(!(hnd->flags & private_handle_t::PRIV_FLAGS_HWC_LOCK)) {
                 ExtDispOnly::lockBuffer(hnd);
             }
-            previousExtHandle[index] = hnd;
+            sPreviousExtHandle[index] = hnd;
             LOGE_IF(EXTDEBUG, "%s BLOCK: handle = %p", __func__, hnd);
             return;
         }
@@ -417,7 +417,7 @@ void ExtDispOnly::storeLockedHandles(hwc_layer_list_t* list) {
             if(!(hnd->flags & private_handle_t::PRIV_FLAGS_HWC_LOCK)) {
                 ExtDispOnly::lockBuffer(hnd);
             }
-            previousExtHandle[index] = hnd;
+            sPreviousExtHandle[index] = hnd;
             index++;
             LOGE_IF(EXTDEBUG, "%s: handle = %p", __func__, hnd);
         }
@@ -438,16 +438,16 @@ int ExtDispOnly::draw(hwc_context_t *ctx, hwc_layer_list_t *list) {
     int index = 0;
 
     //If skip layer present or list invalid unlock and return.
-    if(skipLayerPresent || list == NULL) {
+    if(sSkipLayerPresent || list == NULL) {
         ExtDispOnly::unlockPreviousBuffers();
         return overlay::NO_ERROR;
     }
 
-    if(blockLayerPresent) {
+    if(sBlockLayerPresent) {
         private_handle_t *hnd = (private_handle_t*)
-            list->hwLayers[blockLayerIndex].handle;
+            list->hwLayers[sBlockLayerIndex].handle;
         ExtDispOnly::lockBuffer(hnd);
-        ret =  mOvExtUI[index]->queueBuffer(hnd);
+        ret =  sOvExtUI[index]->queueBuffer(hnd);
         if (ret) {
             LOGE("%s queueBuffer failed", __func__);
             // Unlock the locked buffer
@@ -463,7 +463,7 @@ int ExtDispOnly::draw(hwc_context_t *ctx, hwc_layer_list_t *list) {
     for(int i = 0; i < list->numHwLayers; i++) {
         private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
         if(hnd && list->hwLayers[i].flags & HWC_USE_EXT_ONLY) {
-            overlay::OverlayUI *ovUI = mOvExtUI[index];
+            overlay::OverlayUI *ovUI = sOvExtUI[index];
             ExtDispOnly::lockBuffer(hnd);
             ret = ovUI->queueBuffer(hnd);
             if (ret) {
@@ -488,11 +488,11 @@ int ExtDispOnly::draw(hwc_context_t *ctx, hwc_layer_list_t *list) {
 }
 
 #if defined (HDMI_DUAL_DISPLAY) && defined (USE_OVERLAY)
-overlay::OverlayUI* ExtDispOnly::mOvExtUI[MAX_EXT_ONLY_LAYERS];
-native_handle_t* ExtDispOnly::previousExtHandle[MAX_EXT_ONLY_LAYERS];
-ExtDispOnly::ExternalOnlyMode ExtDispOnly::eExtOnlyMode;
-int ExtDispOnly::numExtOnlyLayers;
-bool ExtDispOnly::skipLayerPresent;
-bool ExtDispOnly::blockLayerPresent;
-int ExtDispOnly::blockLayerIndex;
+overlay::OverlayUI* ExtDispOnly::sOvExtUI[MAX_EXT_ONLY_LAYERS];
+native_handle_t* ExtDispOnly::sPreviousExtHandle[MAX_EXT_ONLY_LAYERS];
+ExtDispOnly::ExternalOnlyMode ExtDispOnly::sExtOnlyMode;
+int ExtDispOnly::sNumExtOnlyLayers;
+bool ExtDispOnly::sSkipLayerPresent;
+bool ExtDispOnly::sBlockLayerPresent;
+int ExtDispOnly::sBlockLayerIndex;
 #endif
