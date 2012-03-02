@@ -520,16 +520,14 @@ void closeExtraPipes(hwc_context_t* ctx) {
         if (ctx->previousBypassHandle[i]) {
             private_handle_t *hnd = (private_handle_t*) ctx->previousBypassHandle[i];
 
-            if (private_handle_t::validate(ctx->previousBypassHandle[i])) {
-                continue;
-            }
-
-            if (GENLOCK_FAILURE == genlock_unlock_buffer(ctx->previousBypassHandle[i])) {
-                LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
-            } else {
-                ctx->previousBypassHandle[i] = NULL;
-                ctx->bypassBufferLockState[i] = BYPASS_BUFFER_UNLOCKED;
-                hnd->flags &= ~private_handle_t::PRIV_FLAGS_HWC_LOCK;
+            if (!private_handle_t::validate(ctx->previousBypassHandle[i])) {
+                if (GENLOCK_FAILURE == genlock_unlock_buffer(ctx->previousBypassHandle[i])) {
+                    LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
+                } else {
+                    ctx->previousBypassHandle[i] = NULL;
+                    ctx->bypassBufferLockState[i] = BYPASS_BUFFER_UNLOCKED;
+                    hnd->flags &= ~private_handle_t::PRIV_FLAGS_HWC_LOCK;
+                }
             }
         }
         ctx->mOvUI[i]->closeChannel();
