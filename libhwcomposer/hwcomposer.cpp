@@ -768,31 +768,19 @@ static bool canUseCopybit(const framebuffer_device_t* fbDev, const hwc_layer_lis
     int fb_h = fbDev->height;
 
     /*
-     * We can use copybit when
-     * 1. We have 1 layer to compose
-     * 2. We have 2 layers to compose
-     *    a. Sum of both layers covers full screen
-     *    b. One of the layers is full screen and the
-     *       other is less than full screen (includes
-     *       pop ups, volume bar etc.)
-     * TODO: Need to revisit this logic to use copybit
-     * based on the total blitting region instead of total
-     * layers count
+     * Use copybit only when we need to blit
+     * max 2 full screen sized regions
      */
 
-    bool use_copybit = (list->numHwLayers == 1);
+    unsigned int renderArea = 0;
 
-    if(list->numHwLayers == 2) {
-        int w1, h1;
-        int w2, h2;
-
-        getLayerResolution(&list->hwLayers[0], w1, h1);
-        getLayerResolution(&list->hwLayers[1], w2, h2);
-
-        use_copybit = ((fb_w >= w1) && (fb_w >= w2) && ((fb_h * 2) > (h1 + h2)));
+    for(int i = 0; i < list->numHwLayers; i++ ) {
+        int w, h;
+        getLayerResolution(&list->hwLayers[i], w, h);
+        renderArea += w*h;
     }
 
-    return use_copybit;
+    return (renderArea <= (2 * fb_w * fb_h));
 }
 
 static void handleHDMIStateChange(hwc_composer_device_t *dev, int externaltype) {
