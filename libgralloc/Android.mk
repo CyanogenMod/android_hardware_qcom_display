@@ -23,10 +23,8 @@ LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_SHARED_LIBRARIES := liblog libcutils libGLESv1_CM libutils libmemalloc libQcomUI
 LOCAL_SHARED_LIBRARIES += libgenlock
 
-LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 LOCAL_C_INCLUDES += hardware/qcom/display/libgenlock
 LOCAL_C_INCLUDES += hardware/qcom/display/libqcomui
-LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_SRC_FILES :=  framebuffer.cpp \
                     gpu.cpp         \
                     gralloc.cpp     \
@@ -35,13 +33,14 @@ LOCAL_SRC_FILES :=  framebuffer.cpp \
 LOCAL_MODULE := gralloc.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_TAGS := optional
 LOCAL_CFLAGS:= -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).gralloc\" -DHOST -DDEBUG_CALC_FPS
+LOCAL_CFLAGS += -DQCOM_HARDWARE
 
 ifeq ($(call is-board-platform,msm7627_surf msm7627_6x),true)
     LOCAL_CFLAGS += -DTARGET_MSM7x27
 endif
 
 ifeq ($(TARGET_HAVE_HDMI_OUT),true)
-    LOCAL_CFLAGS += -DHDMI_DUAL_DISPLAY
+    LOCAL_CFLAGS += -DHDMI_DUAL_DISPLAY -DQCOM_HDMI_OUT
     LOCAL_C_INCLUDES += hardware/qcom/display/liboverlay
     LOCAL_SHARED_LIBRARIES += liboverlay
 endif
@@ -60,8 +59,6 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)
-LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
-LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils
 LOCAL_SRC_FILES :=  ionalloc.cpp \
                     ashmemalloc.cpp \

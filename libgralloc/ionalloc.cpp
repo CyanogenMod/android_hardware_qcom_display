@@ -84,7 +84,7 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     if(data.uncached) {
         // Use the sync FD to alloc and map
         // when we need uncached memory
-        ionSyncFd = open(ION_DEVICE, O_RDONLY|O_DSYNC);
+        ionSyncFd = open(ION_DEVICE, O_RDONLY|O_SYNC);
         if(ionSyncFd < 0) {
             LOGE("%s: Failed to open ion device - %s",
                     __FUNCTION__, strerror(errno));
