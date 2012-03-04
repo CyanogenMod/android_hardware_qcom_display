@@ -41,6 +41,8 @@ using namespace android;
 using android::sp;
 using android::GraphicBuffer;
 
+#define HWC_BYPASS_INDEX_MASK 0x00000030
+
 /*
  * Qcom specific Native Window perform operations
  */
@@ -80,6 +82,8 @@ enum {
     HWC_USE_ORIGINAL_RESOLUTION = 0x10000000,
     HWC_DO_NOT_USE_OVERLAY      = 0x20000000,
     HWC_COMP_BYPASS             = 0x40000000,
+    HWC_BYPASS_RESERVE_0        = 0x00000010,
+    HWC_BYPASS_RESERVE_1        = 0x00000020,
 };
 
 enum HWCCompositionType {
