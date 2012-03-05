@@ -4,10 +4,6 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES := \
         qcom_ui.cpp
 
-ifeq ($(call is-board-platform,msm7627a),true)
-      LOCAL_CFLAGS += -DCHECK_FOR_EXTERNAL_FORMAT
-endif
-
 LOCAL_SHARED_LIBRARIES := \
         libutils \
         libcutils \
