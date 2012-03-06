@@ -350,6 +350,12 @@ int updateLayerQcomFlags(eLayerAttrib attribute, bool enable, int& currentFlags)
             else
                 currentFlags &= ~LAYER_UPDATING;
         } break;
+        case LAYER_ASYNCHRONOUS_STATUS: {
+            if (enable)
+                currentFlags |= LAYER_ASYNCHRONOUS;
+            else
+                currentFlags &= ~LAYER_ASYNCHRONOUS;
+        } break;
         default: LOGE("%s: invalid attribute(0x%x)", __FUNCTION__, attribute);
                  break;
     }
@@ -370,6 +376,11 @@ int getPerFrameFlags(int hwclFlags, int layerFlags) {
         flags &= ~HWC_LAYER_NOT_UPDATING;
     else
         flags |= HWC_LAYER_NOT_UPDATING;
+
+    if (layerFlags & LAYER_ASYNCHRONOUS)
+        flags |= HWC_LAYER_ASYNCHRONOUS;
+    else
+        flags &= ~HWC_LAYER_ASYNCHRONOUS;
 
     return flags;
 }

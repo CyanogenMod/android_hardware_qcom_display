@@ -406,9 +406,12 @@ inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount
         return false;
     }
 
-    //Bypass is not efficient if rotation is needed.
+    //Bypass is not efficient if rotation or asynchronous mode is needed.
     for(int i = 0; i < list->numHwLayers; ++i) {
         if(list->hwLayers[i].transform) {
+            return false;
+        }
+        if(list->hwLayers[i].flags & HWC_LAYER_ASYNCHRONOUS) {
             return false;
         }
     }
