@@ -1281,6 +1281,7 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
     int32_t src_crop_height = sourceCrop.bottom -sourceCrop.top;
 
     float copybitsMaxScale = (float)copybit->get(copybit,COPYBIT_MAGNIFICATION_LIMIT);
+    float copybitsMinScale = (float)copybit->get(copybit,COPYBIT_MINIFICATION_LIMIT);
 
     if((layer->transform == HWC_TRANSFORM_ROT_90) ||
                            (layer->transform == HWC_TRANSFORM_ROT_270)) {
@@ -1302,19 +1303,19 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
     float dsdx = (float)screen_w/src_crop_width;
     float dtdy = (float)screen_h/src_crop_height;
 
-    int scaleLimit = copybitsMaxScale * copybitsMaxScale;
-    if(dsdx > scaleLimit || dtdy > scaleLimit) {
-        LOGE("%s: greater than max supported size ", __FUNCTION__ );
+    float scaleLimitMax = copybitsMaxScale * copybitsMaxScale;
+    float scaleLimitMin = copybitsMinScale * copybitsMinScale;
+    if(dsdx > scaleLimitMax || dtdy > scaleLimitMax || dsdx < 1/scaleLimitMin || dtdy < 1/scaleLimitMin) {
+        LOGE("%s: greater than max supported size dsdx=%f dtdy=%f scaleLimitMax=%f scaleLimitMin=%f", __FUNCTION__,dsdx,dtdy,scaleLimitMax,1/scaleLimitMin);
         genlock_unlock_buffer(hnd);
         return -1;
     }
-
-    if(dsdx > copybitsMaxScale || dtdy > copybitsMaxScale){
+    if(dsdx > copybitsMaxScale || dtdy > copybitsMaxScale || dsdx < 1/copybitsMinScale || dtdy < 1/copybitsMinScale){
         // The requested scale is out of the range the hardware
         // can support.
-       LOGD("%s:%d::Need to scale twice dsdx=%f, dtdy=%f,maxScaleInv=%f,screen_w=%d,screen_h=%d \
+       LOGD("%s:%d::Need to scale twice dsdx=%f, dtdy=%f,copybitsMaxScale=%f,copybitsMinScale=%f,screen_w=%d,screen_h=%d \
                   src_crop_width=%d src_crop_height=%d",__FUNCTION__,__LINE__,
-                  dsdx,dtdy,copybitsMaxScale,screen_w,screen_h,src_crop_width,src_crop_height);
+                  dsdx,dtdy,copybitsMaxScale,1/copybitsMinScale,screen_w,screen_h,src_crop_width,src_crop_height);
 
        //Driver makes width and height as even
        //that may cause wrong calculation of the ratio
@@ -1323,9 +1324,18 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
        src_crop_width  = (src_crop_width/2)*2;
        src_crop_height = (src_crop_height/2)*2;
 
-       int tmp_w =  src_crop_width*copybitsMaxScale;
-       int tmp_h =  src_crop_height*copybitsMaxScale;
+       int tmp_w =  src_crop_width;
+       int tmp_h =  src_crop_height;
 
+       if (dsdx > copybitsMaxScale || dtdy > copybitsMaxScale ){
+         tmp_w = src_crop_width*copybitsMaxScale;
+         tmp_h = src_crop_height*copybitsMaxScale;
+       }else if (dsdx < 1/copybitsMinScale ||dtdy < 1/copybitsMinScale ){
+         tmp_w = src_crop_width/copybitsMinScale;
+         tmp_h = src_crop_height/copybitsMinScale;
+         tmp_w  = (tmp_w/2)*2;
+         tmp_h = (tmp_h/2)*2;
+       }
        LOGD("%s:%d::tmp_w = %d,tmp_h = %d",__FUNCTION__,__LINE__,tmp_w,tmp_h);
 
        int usage = GRALLOC_USAGE_PRIVATE_ADSP_HEAP |
@@ -1383,7 +1393,7 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
         free_buffer(tmpHnd);
 
     if(err < 0)
-        LOGE("copybit stretch failed");
+        LOGE("%s: copybit stretch failed",__FUNCTION__);
 
     // Unlock this buffer since copybit is done with it.
     err = genlock_unlock_buffer(hnd);
