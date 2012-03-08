@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -274,6 +274,8 @@ void OverlayUI::setDisplayParams(int fbNum, bool waitForVsync, bool isFg, int
 
     mOvInfo.flags = flags;
     mOvInfo.z_order = zorder;
+
+    mobjDisplay.openDisplay(mFBNum);
 }
 
 void OverlayUI::setPosition(int x, int y, int w, int h) {
@@ -390,14 +392,10 @@ status_t OverlayUI::closeChannel() {
 
 status_t OverlayUI::startOVSession() {
     status_t ret = NO_INIT;
-    ret = mobjDisplay.openDisplay(mFBNum);
-
-    if (ret != NO_ERROR)
-        return ret;
-
     mdp_overlay ovInfo = mOvInfo;
+
     if (ioctl(mobjDisplay.getFD(), MSMFB_OVERLAY_SET, &ovInfo)) {
-        LOGE("Overlay set failed..");
+        LOGE("%s: Overlay set failed", __FUNCTION__);
         ret = BAD_VALUE;
     } else {
         mSessionID = ovInfo.id;
