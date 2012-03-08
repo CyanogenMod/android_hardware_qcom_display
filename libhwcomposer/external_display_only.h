@@ -238,7 +238,7 @@ int ExtDispOnly::prepare(hwc_context_t *ctx, hwc_layer_t *layer, int index,
         info.height = sourceCrop.bottom - sourceCrop.top;
         info.format = hnd->format;
         info.size = hnd->size;
-        info.secure = false;
+
 
         const int fbnum = ctx->mHDMIEnabled; //HDMI or WFD
         const bool isFg = false;

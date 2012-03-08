@@ -422,7 +422,6 @@ Overlay::Overlay() : mChannelUP(false), mExternalDisplay(false),
                      mSrcOrientation(0) {
     mOVBufferInfo.width = mOVBufferInfo.height = 0;
     mOVBufferInfo.format = mOVBufferInfo.size = 0;
-    mOVBufferInfo.secure = false;
 }
 
 Overlay::~Overlay() {
@@ -442,7 +441,6 @@ bool Overlay::startChannel(const overlay_buffer_info& info, int fbnum,
                               unsigned int format3D, int channel,
                               int flags, int num_buffers) {
     int zorder = 0;
-    int format = getColorFormat(info.format);
     mCroppedSrcWidth = info.width;
     mCroppedSrcHeight = info.height;
     if (format3D)
@@ -450,17 +448,17 @@ bool Overlay::startChannel(const overlay_buffer_info& info, int fbnum,
     if (mState == -1)
         mState = OV_UI_MIRROR_TV;
 
-    mChannelUP = objOvCtrlChannel[channel].startControlChannel(info.width,
-                                                       info.height, format, fbnum,
+    mChannelUP = objOvCtrlChannel[channel].startControlChannel(info, fbnum,
                                                        norot, uichannel,
                                                        format3D, zorder, flags);
     if (!mChannelUP) {
         LOGE("startChannel for fb%d failed", fbnum);
         return mChannelUP;
     }
+    bool secure = flags & SECURE_OVERLAY_SESSION;
     objOvCtrlChannel[channel].setSize(info.size);
     return objOvDataChannel[channel].startDataChannel(objOvCtrlChannel[channel], fbnum,
-                                            norot, info.secure, uichannel, num_buffers);
+                                            norot, secure, uichannel, num_buffers);
 }
 
 bool Overlay::closeChannel() {
@@ -1265,11 +1263,6 @@ bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& inf
         mOVInfo.transp_mask = 0xffffffff;
     }
     mOVInfo.flags = 0;
-    if (info.secure) {
-        flags |= SECURE_OVERLAY_SESSION;
-    } else {
-        flags &= ~SECURE_OVERLAY_SESSION;
-    }
     setInformationFromFlags(flags, mOVInfo);
     mOVInfo.dpp.sharp_strength = 0;
     return true;
@@ -1417,26 +1410,27 @@ bool OverlayControlChannel::updateOverlaySource(const overlay_buffer_info& info,
     return startOVRotatorSessions(ovBufInfo, UPDATE_REQUEST);
 }
 
-bool OverlayControlChannel::startControlChannel(int w, int h,
-                                           int format, int fbnum, bool norot,
+bool OverlayControlChannel::startControlChannel(const overlay_buffer_info& info,
+                                           int fbnum, bool norot,
                                            bool uichannel,
                                            unsigned int format3D, int zorder,
                                            int flags) {
+    int colorFormat = getColorFormat(info.format);
     mNoRot = norot;
-    mFormat = format;
+    mFormat = colorFormat;
     mUIChannel = uichannel;
     mFBNum = fbnum;
     fb_fix_screeninfo finfo;
     fb_var_screeninfo vinfo;
     int hw_format;
-    int colorFormat = format;
+
     // The interlace mask is part of the HAL_PIXEL_FORMAT_YV12 value. Add
     // an explicit check for the format
-    if (isInterlacedContent(format)) {
+    if (isInterlacedContent(colorFormat)) {
         flags |= MDP_DEINTERLACE;
 
         // Get the actual format
-        colorFormat = format ^ HAL_PIXEL_FORMAT_INTERLACE;
+        colorFormat = colorFormat ^ HAL_PIXEL_FORMAT_INTERLACE;
     }
     hw_format = get_mdp_format(colorFormat);
     if (hw_format < 0) {
@@ -1461,8 +1455,8 @@ bool OverlayControlChannel::startControlChannel(int w, int h,
         return false;
 
     overlay_buffer_info ovBufInfo;
-    ovBufInfo.width = w;
-    ovBufInfo.height = h;
+    ovBufInfo.width = info.width;
+    ovBufInfo.height = info.height;
     ovBufInfo.format = hw_format;
     if (!setOverlayInformation(ovBufInfo, zorder, flags, NEW_REQUEST))
         return false;
