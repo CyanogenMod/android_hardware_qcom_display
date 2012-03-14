@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/ioctl.h>
 #include <stdlib.h>
 #include <cutils/log.h>
 #include <errno.h>
