@@ -362,6 +362,8 @@ static int fb_enableHDMIOutput(struct framebuffer_device_t* dev, int externaltyp
             dev->common.module);
     pthread_mutex_lock(&m->overlayLock);
     Overlay* pTemp = m->pobjOverlay;
+    //Check if true mirroring can be supported
+    m->trueMirrorSupport = FrameBufferInfo::getInstance()->canSupportTrueMirroring();
     m->enableHDMIOutput = externaltype;
     LOGE("In fb_enableHDMIOutput: externaltype = %d", m->enableHDMIOutput);
     if(externaltype) {
@@ -793,7 +795,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
     pthread_t hdmiUIThread;
     pthread_create(&hdmiUIThread, NULL, &hdmi_ui_loop, (void *) module);
     module->hdmiMirroringState = HDMI_NO_MIRRORING;
-    module->trueMirrorSupport = FrameBufferInfo::getInstance()->canSupportTrueMirroring();
+    module->trueMirrorSupport = false;
 #endif
 
     return 0;
