@@ -478,29 +478,27 @@ int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur)
  * Based on the current and the new display event, decides the
  * external display to be enabled
  *
- * @param: newEvent - new external event
+ * @param: disp - external display type
+ * @param: newEvent - new external event(on/off)
  * @param: currEvent - currently enabled external event
  * @return: external display to be enabled
  *
  */
-external_display handleEventHDMI(external_display newState, external_display
-                                                                   currState)
+external_display_state handleEventHDMI(external_display_type disp,
+                                 external_display_state newState,
+                                 external_display_state currState)
 {
-    external_display retState = currState;
-    switch(newState) {
-        case EXT_DISPLAY_HDMI:
-            retState = EXT_DISPLAY_HDMI;
+    external_display_state retState = currState;
+    switch(disp) {
+        case EXT_TYPE_HDMI:
+            retState = newState;
             break;
-        case EXT_DISPLAY_WIFI:
-            if(currState != EXT_DISPLAY_HDMI) {
-                retState = EXT_DISPLAY_WIFI;
-            }
-            break;
-        case EXT_DISPLAY_OFF:
-            retState = EXT_DISPLAY_OFF;
+        case EXT_TYPE_WIFI:
+            if(currState != EXT_DISPLAY_HDMI)
+                retState = newState;
             break;
         default:
-            LOGE("handleEventHDMI: unknown Event");
+            LOGE("%s: Unknown External Display Type!!");
             break;
     }
     return retState;
