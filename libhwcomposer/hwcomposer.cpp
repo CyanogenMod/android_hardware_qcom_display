@@ -95,7 +95,7 @@ struct hwc_context_t {
     bool idleTimeOut;
 #endif
 #if defined HDMI_DUAL_DISPLAY
-    external_display mHDMIEnabled; // Type of external display
+    external_display_type mHDMIEnabled; // Type of external display
     bool pendingHDMI;
 #endif
     int previousLayerCount;
@@ -873,7 +873,7 @@ static void hwc_enableHDMIOutput(hwc_composer_device_t *dev, int externaltype) {
         handleHDMIStateChange(dev, 0);
     }
     // Store the external display
-    ctx->mHDMIEnabled = (external_display)externaltype;
+    ctx->mHDMIEnabled = (external_display_type)externaltype;
     if(ctx->mHDMIEnabled) { //On connect, allow bypass to draw once to FB
         ctx->pendingHDMI = true;
     } else { //On disconnect, close immediately (there will be no bypass)
@@ -1778,7 +1778,7 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
 #endif
         ExtDispOnly::init();
 #if defined HDMI_DUAL_DISPLAY
-        dev->mHDMIEnabled = EXT_DISPLAY_OFF;
+        dev->mHDMIEnabled = EXT_TYPE_NONE;
         dev->pendingHDMI = false;
 #endif
         dev->previousOverlayHandle = NULL;

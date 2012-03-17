@@ -444,35 +444,39 @@ int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur)
 /*
  * Handles the externalDisplay event
  * HDMI has highest priority compared to WifiDisplay
- * Based on the current and the new display event, decides the
+ * Based on the current and the new display type, decides the
  * external display to be enabled
  *
- * @param: newEvent - new external event
- * @param: currEvent - currently enabled external event
- * @return: external display to be enabled
+ * @param: disp - external display type(wfd/hdmi)
+ * @param: value - external event(0/1)
+ * @param: currdispType - Current enabled external display Type
+ * @return: external display type to be enabled
  *
  */
-external_display handleEventHDMI(external_display newState, external_display
-                                                                   currState)
+external_display_type handleEventHDMI(external_display_type disp, int value,
+                                       external_display_type currDispType)
 {
-    external_display retState = currState;
-    switch(newState) {
-        case EXT_DISPLAY_HDMI:
-            retState = EXT_DISPLAY_HDMI;
+    external_display_type retDispType = currDispType;
+    switch(disp) {
+        case EXT_TYPE_HDMI:
+            if(value)
+                retDispType = EXT_TYPE_HDMI;
+            else
+                retDispType = EXT_TYPE_NONE;
             break;
-        case EXT_DISPLAY_WIFI:
-            if(currState != EXT_DISPLAY_HDMI) {
-                retState = EXT_DISPLAY_WIFI;
+        case EXT_TYPE_WIFI:
+            if(currDispType != EXT_TYPE_HDMI) {
+                if(value)
+                    retDispType = EXT_TYPE_WIFI;
+                else
+                    retDispType = EXT_TYPE_NONE;
             }
             break;
-        case EXT_DISPLAY_OFF:
-            retState = EXT_DISPLAY_OFF;
-            break;
         default:
-            LOGE("handleEventHDMI: unknown Event");
+            LOGE("%s: Unknown External Display Type!!");
             break;
     }
-    return retState;
+    return retDispType;
 }
 
 // Using global variables for layer dumping since "property_set("debug.sf.dump",

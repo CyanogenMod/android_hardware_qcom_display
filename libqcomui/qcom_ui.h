@@ -100,10 +100,10 @@ enum HWCCompositionType {
     HWC_USE_COPYBIT                // This layer is to be handled by copybit
 };
 
-enum external_display {
-    EXT_DISPLAY_OFF,
-    EXT_DISPLAY_HDMI,
-    EXT_DISPLAY_WIFI
+enum external_display_type {
+    EXT_TYPE_NONE,
+    EXT_TYPE_HDMI,
+    EXT_TYPE_WIFI
 };
 
 /*
@@ -269,9 +269,8 @@ int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur);
  * @return: external display to be enabled
  *
  */
-external_display handleEventHDMI(external_display newEvent, external_display
-                                                                   currEvent);
-
+external_display_type handleEventHDMI(external_display_type disp, int value,
+                                      external_display_type currDispType);
 /*
  * Checks if layers need to be dumped based on system property "debug.sf.dump"
  * for raw dumps and "debug.sf.dump.png" for png dumps.
