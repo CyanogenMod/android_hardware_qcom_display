@@ -90,7 +90,7 @@ struct hwc_context_t {
     BypassState bypassState;
 #endif
 #if defined HDMI_DUAL_DISPLAY
-    external_display mHDMIEnabled; // Type of external display
+    external_display_state mHDMIEnabled; // Type of external display
     bool pendingHDMI;
 #endif
     int previousLayerCount;
@@ -823,7 +823,7 @@ static void hwc_enableHDMIOutput(hwc_composer_device_t *dev, int externaltype) {
         handleHDMIStateChange(dev, 0);
     }
     // Store the external display
-    ctx->mHDMIEnabled = (external_display)externaltype;
+    ctx->mHDMIEnabled = (external_display_state)externaltype;
     if(ctx->mHDMIEnabled) { //On connect, allow bypass to draw once to FB
         ctx->pendingHDMI = true;
     } else { //On disconnect, close immediately (there will be no bypass)
