@@ -805,6 +805,20 @@ static void handleHDMIStateChange(hwc_composer_device_t *dev, int externaltype) 
 }
 
 /*
+ * Save callback functions registered to HWC
+ */
+static void hwc_registerProcs(struct hwc_composer_device* dev, hwc_procs_t const* procs) {
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    if(!ctx) {
+        LOGE("%s: Invalid context", __FUNCTION__);
+        return;
+    }
+
+    ctx->device.reserved_proc[0] = (void*)procs;
+}
+
+/*
  * function to set the status of external display in hwc
  * Just mark flags and do stuff after eglSwapBuffers
  * externaltype - can be HDMI, WIFI or OFF
@@ -1709,6 +1723,7 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
 
         dev->device.prepare = hwc_prepare;
         dev->device.set = hwc_set;
+        dev->device.registerProcs = hwc_registerProcs;
         dev->device.enableHDMIOutput = hwc_enableHDMIOutput;
         *device = &dev->device.common;
 
