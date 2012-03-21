@@ -1529,8 +1529,10 @@ static int hwc_set(hwc_composer_device_t *dev,
         ctx->nPipesUsed = 0;
 #endif
         ctx->hwcOverlayStatus =  HWC_OVERLAY_PREPARE_TO_CLOSE;
+        unlockPreviousOverlayBuffer(ctx);
     }
     
+
 
     bool canSkipComposition = list && list->flags & HWC_SKIP_COMPOSITION;
 #ifdef COMPOSITION_BYPASS
