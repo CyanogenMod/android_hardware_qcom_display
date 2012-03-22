@@ -594,9 +594,7 @@ bool Overlay::setChannelPosition(int x, int y, uint32_t w, uint32_t h, int chann
 }
 
 bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int flags) {
-    bool ret = false;
-    int currentFlags = 0;
-
+    bool ret = true;
     bool needUpdateFlags = false;
     if (objOvCtrlChannel[0].isChannelUP()) {
         needUpdateFlags = objOvCtrlChannel[0].doFlagsNeedUpdate(flags);
@@ -618,10 +616,8 @@ bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int flags) {
 
     // disable waitForVsync on HDMI, since we call the wait ioctl
     int ovFlagsExternal = 0;
-    int ovFlagsPrimary = sHDMIAsPrimary ? (flags |= WAIT_FOR_VSYNC): flags;
     int ovFlags[2] = {flags, ovFlagsExternal};
 
-    int numChannelsToUpdate = NUM_CHANNELS;
     if (!geometryChanged) {
         // Only update the primary channel - we only need to update the
         // wait/no-wait flags
@@ -681,39 +677,51 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
     bool stateChange = false, ret = true;
     bool isHDMIStateChange = (mExternalDisplay != hdmiConnected) && (mState != -1);
     unsigned int format3D = getS3DFormat(info.format);
-    int colorFormat = getColorFormat(info.format);
-    if (isHDMIStateChange || -1 == mState) {
+    int newIn3D = FORMAT_3D_INPUT(format3D);
+    int curIn3D = FORMAT_3D_INPUT(mS3DFormat);
+    bool isS3DFormatChange = (curIn3D != newIn3D) && (mState != -1);
+    if (isHDMIStateChange || (-1 == mState) || isS3DFormatChange) {
         // we were mirroring UI. Also HDMI state stored was stale
         newState = getOverlayConfig (format3D, false, hdmiConnected);
-        stateChange = (mState == newState) ? false : true;
+        stateChange = (mState != newState) || (isS3DFormatChange);
     }
 
     if (stateChange) {
+        if (mState != -1) {
+            if ((mState == OV_3D_VIDEO_3D_PANEL) ||
+                (mState == OV_3D_VIDEO_3D_TV) ||
+                (newState == OV_3D_VIDEO_3D_PANEL) ||
+                (newState == OV_3D_VIDEO_3D_TV)) {
+                LOGI("S3D state transition: closing the channels");
+                closeChannel();
+                isHDMIStateChange = false;
+                isS3DFormatChange = false;
+            }
+        }
         mExternalDisplay = hdmiConnected;
         mState = newState;
         mS3DFormat = format3D;
-        if (mState == OV_3D_VIDEO_2D_PANEL || mState == OV_3D_VIDEO_2D_TV) {
-            LOGI("3D content on 2D display: set the output format as monoscopic");
-            mS3DFormat = FORMAT_3D_INPUT(format3D) | HAL_3D_OUT_MONOSCOPIC_MASK;
-        }
         // We always enable the rotator for the primary.
         bool noRot = false;
         bool uiChannel = false;
         int fbnum = 0;
         switch(mState) {
             case OV_2D_VIDEO_ON_PANEL:
+            case OV_3D_VIDEO_2D_PANEL:
+                if (format3D) {
+                    LOGI("3D content on 2D display: set the output format as monoscopic");
+                    mS3DFormat = FORMAT_3D_INPUT(format3D) | HAL_3D_OUT_MONOSCOPIC_MASK;
+                }
                 if(isHDMIStateChange) {
                     //close HDMI Only
                     closeExternalChannel();
                     break;
                 }
-            case OV_3D_VIDEO_2D_PANEL:
-                closeChannel();
-                return startChannel(info, FRAMEBUFFER_0, noRot, false,
-                        mS3DFormat, VG0_PIPE, flags, num_buffers);
+                else if(!isS3DFormatChange)
+                    return startChannel(info, FRAMEBUFFER_0, noRot, false,
+                            mS3DFormat, VG0_PIPE, flags, num_buffers);
                 break;
             case OV_3D_VIDEO_3D_PANEL:
-                closeChannel();
                 if (sHDMIAsPrimary) {
                     noRot = true;
                     flags |= WAIT_FOR_VSYNC;
@@ -728,58 +736,61 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                 }
                 break;
             case OV_2D_VIDEO_ON_TV:
-                if(isHDMIStateChange) {
-                   //DO NOT WAIT for VSYNC for external
-                   flags &= ~WAIT_FOR_VSYNC;
-                   // External display connected, start corresponding channel
-                   // mExternalDisplay will hold the fbnum
-                   if(!startChannel(info, mExternalDisplay, noRot, false, mS3DFormat,
-                               VG1_PIPE, flags, num_buffers)) {
-                       LOGE("%s:failed to open channel %d", __func__, VG1_PIPE);
-                       return false;
-                   }
-                   int currX, currY;
-                   uint32_t currW, currH;
-                   overlay_rect priDest;
-                   overlay_rect secDest;
-                   objOvCtrlChannel[VG0_PIPE].getPosition(currX, currY, currW, currH);
-                   priDest.x = currX, priDest.y = currY;
-                   priDest.w = currW, priDest.h = currH;
-                   if (FrameBufferInfo::getInstance()->canSupportTrueMirroring()) {
-                       objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(
-                               mCroppedSrcWidth, mCroppedSrcHeight, mDevOrientation,
-                               &priDest, &secDest);
-                   } else {
-                       int w = mCroppedSrcWidth, h = mCroppedSrcHeight;
-                       if(mSrcOrientation == HAL_TRANSFORM_ROT_90 ||
-                               mSrcOrientation == HAL_TRANSFORM_ROT_270) {
-                           swapWidthHeight(w, h);
-                       }
-                       objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(w, h,
-                                                                     &secDest);
-                   }
-                   return setChannelPosition(secDest.x, secDest.y, secDest.w, secDest.h, VG1_PIPE);
-                }
             case OV_3D_VIDEO_2D_TV:
-                closeChannel();
-                for (int i=0; i<NUM_CHANNELS; i++) {
-                    fbnum = i;
-                    //start two channels for one for primary and external.
-                    if (fbnum) {
-                        //set fbnum to hdmiConnected, which holds the ext display
-                        fbnum = hdmiConnected;
-                        flags &= ~WAIT_FOR_VSYNC;
-                    }
-                    if(!startChannel(info, fbnum, noRot, false, mS3DFormat,
-                                i, flags, num_buffers)) {
-                        LOGE("%s:failed to open channel %d", __FUNCTION__, i);
+                if (format3D) {
+                    LOGI("3D content on 2D display: set the output format as monoscopic");
+                    mS3DFormat = FORMAT_3D_INPUT(format3D) | HAL_3D_OUT_MONOSCOPIC_MASK;
+                }
+                if(isHDMIStateChange) {
+                    //DO NOT WAIT for VSYNC for external
+                    flags &= ~WAIT_FOR_VSYNC;
+                    // External display connected, start corresponding channel
+                    // mExternalDisplay will hold the fbnum
+                    if(!startChannel(info, mExternalDisplay, noRot, false, mS3DFormat,
+                                VG1_PIPE, flags, num_buffers)) {
+                        LOGE("%s:failed to open channel %d", __func__, VG1_PIPE);
                         return false;
                     }
+                } else if (!isS3DFormatChange) {
+                    for (int i=0; i<NUM_CHANNELS; i++) {
+                        fbnum = i;
+                        //start two channels for one for primary and external.
+                        if (fbnum) {
+                            // Disable rotation for external
+                            noRot = true;
+                            //set fbnum to hdmiConnected, which holds the ext display
+                            fbnum = hdmiConnected;
+                            flags &= ~WAIT_FOR_VSYNC;
+                        }
+                        if(!startChannel(info, fbnum, noRot, false, mS3DFormat,
+                                    i, flags, num_buffers)) {
+                            LOGE("%s:failed to open channel %d", __FUNCTION__, i);
+                            return false;
+                        }
+                    }
                 }
-                return true;
-                break;
+                int currX, currY;
+                uint32_t currW, currH;
+                overlay_rect priDest;
+                overlay_rect secDest;
+                objOvCtrlChannel[VG0_PIPE].getPosition(currX, currY, currW, currH);
+                priDest.x = currX, priDest.y = currY;
+                priDest.w = currW, priDest.h = currH;
+                if (FrameBufferInfo::getInstance()->canSupportTrueMirroring()) {
+                    objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(
+                            mCroppedSrcWidth, mCroppedSrcHeight, mDevOrientation,
+                            &priDest, &secDest);
+                } else {
+                    int w = mCroppedSrcWidth, h = mCroppedSrcHeight;
+                    if(mSrcOrientation == HAL_TRANSFORM_ROT_90 ||
+                            mSrcOrientation == HAL_TRANSFORM_ROT_270) {
+                        swapWidthHeight(w, h);
+                    }
+                    objOvCtrlChannel[VG1_PIPE].getAspectRatioPosition(
+                            mCroppedSrcWidth, mCroppedSrcHeight, &secDest);
+                }
+                return setChannelPosition(secDest.x, secDest.y, secDest.w, secDest.h, VG1_PIPE);
             case OV_3D_VIDEO_3D_TV:
-                closeChannel();
                 for (int i=0; i<NUM_CHANNELS; i++) {
                     if(!startChannel(info, FRAMEBUFFER_1, true, false,
                                 mS3DFormat, i, flags, num_buffers)) {
@@ -793,9 +804,8 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                 LOGE("%s:Unknown state %d", __FUNCTION__, mState);
                 break;
         }
-    } else {
-        ret = updateOverlaySource(info, flags);
-    }
+    } else
+        return updateOverlaySource(info, flags);
     return true;
 }
 
