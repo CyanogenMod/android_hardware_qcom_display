@@ -40,6 +40,7 @@
 #include <genlock.h>
 #include <qcom_ui.h>
 #include <gr.h>
+#include <utils/profiler.h>
 
 /*****************************************************************************/
 #define ALIGN(x, align) (((x) + ((align)-1)) & ~((align)-1))

@@ -49,7 +49,7 @@
 #include <cutils/properties.h>
 #endif
 
-#include <qcom_ui.h>
+#include <utils/profiler.h>
 
 #define FB_DEBUG 0
 

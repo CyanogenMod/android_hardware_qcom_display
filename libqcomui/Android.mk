@@ -2,7 +2,8 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-        qcom_ui.cpp
+        qcom_ui.cpp \
+        utils/profiler.cpp
 
 ifeq ($(TARGET_BOARD_PLATFORM),msm7x27a)
       LOCAL_CFLAGS += -DCHECK_FOR_EXTERNAL_FORMAT
