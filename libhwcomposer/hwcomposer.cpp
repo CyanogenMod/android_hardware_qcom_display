@@ -52,6 +52,7 @@
 #define MAX_BYPASS_LAYERS 3
 #define BYPASS_DEBUG 0
 #define BYPASS_INDEX_OFFSET 4
+#define RGB_RESERVED_INDEX 1
 #define DEFAULT_IDLE_TIME 2000
 
 enum BypassState {
@@ -170,6 +171,14 @@ static void swap(int &a, int&b) {
     int c= a;
     a = b;
     b = c;
+}
+
+inline void getLayerResolution(const hwc_layer_t* layer, int& width, int& height)
+{
+   hwc_rect_t displayFrame  = layer->displayFrame;
+
+   width = displayFrame.right - displayFrame.left;
+   height = displayFrame.bottom - displayFrame.top;
 }
 
 #ifdef COMPOSITION_BYPASS
@@ -417,7 +426,7 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer,
 
         int fbnum = 0;
         int orientation = layer->transform & FINAL_TRANSFORM_MASK;
-        const bool useVGPipe =  (nPipeIndex != (MAX_BYPASS_LAYERS-1));
+        const bool useVGPipe =  (nPipeIndex != RGB_RESERVED_INDEX);
         //only last layer should wait for vsync
         const bool waitForVsync = vsync_wait;
         const bool isFg = isFG;
@@ -441,6 +450,33 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer,
         }
     }
     return 0;
+}
+
+bool isMDPSupported( const hwc_layer_list_t* list ) {
+
+    // Blending can be ignored for layer with zorder 0.
+    // The only RGB pipe which can handle alpha downscaling
+    // is hardcoded for layer with zorder 1 based on the use
+    // cases profiled. If layer with zorder 2 needs alpha
+    // downscaling, bypass is not possible
+
+    if(list->numHwLayers < 3)
+        return true;
+
+    const hwc_layer_t* layer = &list->hwLayers[2];
+    bool needsBlending = layer->blending != HWC_BLENDING_NONE;
+
+    int dst_w, dst_h;
+    getLayerResolution(layer, dst_w, dst_h);
+
+    hwc_rect_t sourceCrop = layer->sourceCrop;
+    const int src_w = sourceCrop.right - sourceCrop.left;
+    const int src_h = sourceCrop.bottom - sourceCrop.top;
+
+    if(((src_w > dst_w) || (src_h > dst_h)) && needsBlending)
+        return false;
+
+    return true;
 }
 
 /*
@@ -496,8 +532,8 @@ inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount
         }
     }
 
-    return (yuvCount == 0) && (ctx->hwcOverlayStatus == HWC_OVERLAY_CLOSED)
-                                   && (list->numHwLayers <= MAX_BYPASS_LAYERS);
+    return (yuvCount == 0) &&(ctx->hwcOverlayStatus == HWC_OVERLAY_CLOSED) &&
+               (list->numHwLayers <= MAX_BYPASS_LAYERS) && isMDPSupported(list);
 }
 
 void setBypassLayerFlags(hwc_context_t* ctx, hwc_layer_list_t* list)
@@ -863,14 +899,6 @@ bool canSkipComposition(hwc_context_t* ctx, int yuvBufferCount, int currentLayer
         ctx->previousLayerCount = -1;
     }
     return false;
-}
-
-inline void getLayerResolution(const hwc_layer_t* layer, int& width, int& height)
-{
-   hwc_rect_t displayFrame  = layer->displayFrame;
-
-   width = displayFrame.right - displayFrame.left;
-   height = displayFrame.bottom - displayFrame.top;
 }
 
 static bool canUseCopybit(const framebuffer_device_t* fbDev, const hwc_layer_list_t* list) {
