@@ -52,6 +52,7 @@
 #define MAX_BYPASS_LAYERS 3
 #define BYPASS_DEBUG 0
 #define BYPASS_INDEX_OFFSET 4
+#define RGB_RESERVED_INDEX 1
 #define DEFAULT_IDLE_TIME 2000
 
 enum BypassState {
@@ -473,6 +474,33 @@ inline bool isLayerCropped(const hwc_layer_t* layer, int hw_w, int hw_h) {
 }
 #endif
 
+bool isMDPSupported( const hwc_layer_list_t* list ) {
+
+    // Blending can be ignored for layer with zorder 0.
+    // The only RGB pipe which can handle alpha downscaling
+    // is hardcoded for layer with zorder 1 based on the use
+    // cases profiled. If layer with zorder 2 needs alpha
+    // downscaling, bypass is not possible
+
+    if(list->numHwLayers < 3)
+        return true;
+
+    const hwc_layer_t* layer = &list->hwLayers[2];
+    bool needsBlending = layer->blending != HWC_BLENDING_NONE;
+
+    int dst_w, dst_h;
+    getLayerResolution(layer, dst_w, dst_h);
+
+    hwc_rect_t sourceCrop = layer->sourceCrop;
+    const int src_w = sourceCrop.right - sourceCrop.left;
+    const int src_h = sourceCrop.bottom - sourceCrop.top;
+
+    if(((src_w > dst_w) || (src_h > dst_h)) && needsBlending)
+        return false;
+
+    return true;
+}
+
 /*
  * Checks if doing comp. bypass is possible.
  * It is possible if
@@ -536,8 +564,8 @@ inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount
 #endif
     }
 
-    return (yuvCount == 0) && (ctx->hwcOverlayStatus == HWC_OVERLAY_CLOSED)
-                                   && (list->numHwLayers <= MAX_BYPASS_LAYERS);
+    return (yuvCount == 0) &&(ctx->hwcOverlayStatus == HWC_OVERLAY_CLOSED) &&
+               (list->numHwLayers <= MAX_BYPASS_LAYERS) && isMDPSupported(list);
 }
 
 void setBypassLayerFlags(hwc_context_t* ctx, hwc_layer_list_t* list)
