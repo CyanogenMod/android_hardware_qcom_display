@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,12 +60,12 @@ enum {
 
     /* Set this for allocating uncached memory (using O_DSYNC)
      * cannot be used with noncontiguous heaps */
-    GRALLOC_USAGE_PRIVATE_UNCACHED        =       0x00010000,
+    GRALLOC_USAGE_PRIVATE_UNCACHED        =       0x00100000,
 
     /* This flag needs to be set when using a non-contiguous heap from ION.
      * If not set, the system heap is assumed to be coming from ashmem
      */
-    GRALLOC_USAGE_PRIVATE_ION             =       0x00020000,
+    GRALLOC_USAGE_PRIVATE_ION             =       0x00200000,
 
     /* This flag can be set to disable genlock synchronization
      * for the gralloc buffer. If this flag is set the caller
@@ -73,7 +73,18 @@ enum {
      * WARNING - flag is outside the standard PRIVATE region
      * and may need to be moved if the gralloc API changes
      */
-    GRALLOC_USAGE_PRIVATE_UNSYNCHRONIZED  =       0X00040000,
+    GRALLOC_USAGE_PRIVATE_UNSYNCHRONIZED  =       0X00400000,
+
+    /* Set this flag when you need to avoid mapping the memory in userspace */
+    GRALLOC_USAGE_PRIVATE_DO_NOT_MAP      =       0X00800000,
+
+    /* Buffer content should be displayed on an external display only */
+    GRALLOC_USAGE_EXTERNAL_ONLY           =       0x00010000,
+
+    /* Only this buffer content should be displayed on external, even if
+     * other EXTERNAL_ONLY buffers are available. Used during suspend.
+     */
+    GRALLOC_USAGE_EXTERNAL_BLOCK          =       0x00020000,
 };
 
 enum {
@@ -214,6 +225,14 @@ enum {
 	BUFFER_TYPE_UI = 0,
 	BUFFER_TYPE_VIDEO
 };
+
+#if defined(HDMI_DUAL_DISPLAY)
+enum hdmi_mirroring_state {
+    HDMI_NO_MIRRORING,
+    HDMI_UI_MIRRORING,
+    HDMI_ORIGINAL_RESOLUTION_MIRRORING
+};
+#endif
 /*****************************************************************************/
 
 struct private_module_t;
@@ -276,18 +295,15 @@ struct private_module_t {
     int orientation;
     bool videoOverlay;
     uint32_t currentOffset;
-    bool enableHDMIOutput;
+    int enableHDMIOutput; // holds the type of external display
+    bool trueMirrorSupport;
     bool exitHDMIUILoop;
     float actionsafeWidthRatio;
     float actionsafeHeightRatio;
     bool hdmiStateChanged;
+    hdmi_mirroring_state hdmiMirroringState;
     pthread_mutex_t overlayLock;
     pthread_cond_t overlayPost;
-#endif
-#ifdef COMPOSITION_BYPASS
-    pthread_mutex_t bufferPostLock;
-    pthread_cond_t bufferPostCond;
-    bool bufferPostDone;
 #endif
 };
 
@@ -310,7 +326,11 @@ struct private_handle_t {
         PRIV_FLAGS_SW_LOCK        = 0x00000080,
         PRIV_FLAGS_NONCONTIGUOUS_MEM = 0x00000100,
         PRIV_FLAGS_HWC_LOCK       = 0x00000200, // Set by HWC when storing the handle
+        PRIV_FLAGS_SECURE_BUFFER  = 0x00000400,
         PRIV_FLAGS_UNSYNCHRONIZED = 0x00000800, // For explicit synchronization
+        PRIV_FLAGS_NOT_MAPPED     = 0x00001000, // Not mapped in userspace
+        PRIV_FLAGS_EXTERNAL_ONLY  = 0x00002000, // Display on external only
+        PRIV_FLAGS_EXTERNAL_BLOCK = 0x00004000, // Display only this buffer on external
     };
 
     // file-descriptors

@@ -20,9 +20,11 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
-LOCAL_SHARED_LIBRARIES := liblog libcutils libGLESv1_CM libutils libmemalloc
+LOCAL_SHARED_LIBRARIES := liblog libcutils libGLESv1_CM libutils libmemalloc libQcomUI
 LOCAL_SHARED_LIBRARIES += libgenlock
+
 LOCAL_C_INCLUDES += hardware/qcom/display/libgenlock
+LOCAL_C_INCLUDES += hardware/qcom/display/libqcomui
 LOCAL_SRC_FILES :=  framebuffer.cpp \
                     gpu.cpp         \
                     gralloc.cpp     \
@@ -33,18 +35,18 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_CFLAGS:= -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).gralloc\" -DHOST -DDEBUG_CALC_FPS
 LOCAL_CFLAGS += -DQCOM_HARDWARE
 
-ifeq ($(call is-board-platform,msm7x27),true)
+ifeq ($(call is-board-platform,msm7627_surf msm7627_6x),true)
     LOCAL_CFLAGS += -DTARGET_MSM7x27
 endif
 
-ifeq ($(TARGET_QCOM_HDMI_OUT),true)
+ifeq ($(TARGET_HAVE_HDMI_OUT),true)
     LOCAL_CFLAGS += -DHDMI_DUAL_DISPLAY -DQCOM_HDMI_OUT
     LOCAL_C_INCLUDES += hardware/qcom/display/liboverlay
     LOCAL_SHARED_LIBRARIES += liboverlay
 endif
 
-ifeq ($(TARGET_HAVE_BYPASS),true)
-    LOCAL_CFLAGS += -DCOMPOSITION_BYPASS
+ifeq ($(TARGET_USES_SF_BYPASS),true)
+    LOCAL_CFLAGS += -DSF_BYPASS
 endif
 
 ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
@@ -55,21 +57,18 @@ include $(BUILD_SHARED_LIBRARY)
 
 #MemAlloc Library
 include $(CLEAR_VARS)
-
-
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils
-LOCAL_SRC_FILES +=  ashmemalloc.cpp \
+LOCAL_SRC_FILES :=  ionalloc.cpp \
+                    ashmemalloc.cpp \
                     pmemalloc.cpp \
                     pmem_bestfit_alloc.cpp \
                     alloc_controller.cpp
-
 LOCAL_CFLAGS:= -DLOG_TAG=\"memalloc\" -DLOG_NDDEBUG=0
 
 ifeq ($(TARGET_USES_ION),true)
     LOCAL_CFLAGS += -DUSE_ION
-    LOCAL_SRC_FILES += ionalloc.cpp
 endif
 
 LOCAL_MODULE := libmemalloc

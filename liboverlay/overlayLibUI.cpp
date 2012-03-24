@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,10 +94,8 @@ status_t Display::openDisplay(int fbnum) {
         return NO_ERROR;
 
     status_t ret = NO_INIT;
-    char const * const device_template =
-                        "/dev/graphics/fb%u";
     char dev_name[64];
-    snprintf(dev_name, 64, device_template, fbnum);
+    snprintf(dev_name, 64, FB_DEVICE_TEMPLATE, fbnum);
 
     mFD = open(dev_name, O_RDWR, 0);
     if (mFD < 0) {
@@ -126,7 +124,7 @@ void Display::closeDisplay() {
     mFD = NO_INIT;
 }
 
-Rotator::Rotator() : mFD(NO_INIT), mSessionID(NO_INIT), mPmemFD(-1)
+Rotator::Rotator() : mFD(NO_INIT), mSessionID(NO_INIT), mPmemFD(NO_INIT)
 {
     mAlloc = gralloc::IAllocController::getInstance(false);
 }
@@ -166,7 +164,8 @@ status_t Rotator::startRotSession(msm_rotator_img_info& rotInfo,
                          GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP   |
                          GRALLOC_USAGE_PRIVATE_ADSP_HEAP        |
                          GRALLOC_USAGE_PRIVATE_IOMMU_HEAP       |
-                         GRALLOC_USAGE_PRIVATE_SMI_HEAP;
+                         GRALLOC_USAGE_PRIVATE_SMI_HEAP         |
+                         GRALLOC_USAGE_PRIVATE_DO_NOT_MAP;
 
         int err = mAlloc->allocate(data, allocFlags, 0);
 
@@ -191,9 +190,11 @@ status_t Rotator::closeRotSession() {
     if (mSessionID != NO_INIT && mFD != NO_INIT) {
         ioctl(mFD, MSM_ROTATOR_IOCTL_FINISH, &mSessionID);
         close(mFD);
-        sp<IMemAlloc> memalloc = mAlloc->getAllocator(mBufferType);
-        memalloc->free_buffer(mPmemAddr, mSize * mNumBuffers, 0, mPmemFD);
-        close(mPmemFD);
+        if (NO_INIT != mPmemFD) {
+            sp<IMemAlloc> memalloc = mAlloc->getAllocator(mBufferType);
+            memalloc->free_buffer(mPmemAddr, mSize * mNumBuffers, 0, mPmemFD);
+            close(mPmemFD);
+        }
     }
 
     mFD = NO_INIT;
@@ -268,8 +269,13 @@ void OverlayUI::setDisplayParams(int fbNum, bool waitForVsync, bool isFg, int
     else
         flags &= ~MDP_OV_PIPE_SHARE;
 
+    if (turnOFFVSync())
+        flags |= MDP_OV_PLAY_NOWAIT;
+
     mOvInfo.flags = flags;
     mOvInfo.z_order = zorder;
+
+    mobjDisplay.openDisplay(mFBNum);
 }
 
 void OverlayUI::setPosition(int x, int y, int w, int h) {
@@ -386,14 +392,10 @@ status_t OverlayUI::closeChannel() {
 
 status_t OverlayUI::startOVSession() {
     status_t ret = NO_INIT;
-    ret = mobjDisplay.openDisplay(mFBNum);
-
-    if (ret != NO_ERROR)
-        return ret;
-
     mdp_overlay ovInfo = mOvInfo;
+
     if (ioctl(mobjDisplay.getFD(), MSMFB_OVERLAY_SET, &ovInfo)) {
-        LOGE("Overlay set failed..");
+        LOGE("%s: Overlay set failed", __FUNCTION__);
         ret = BAD_VALUE;
     } else {
         mSessionID = ovInfo.id;

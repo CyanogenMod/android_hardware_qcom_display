@@ -28,6 +28,12 @@ LOCAL_CFLAGS:= -DLOG_TAG=\"OverlayLib\"
 ifeq ($(TARGET_USE_HDMI_AS_PRIMARY),true)
 LOCAL_CFLAGS += -DHDMI_AS_PRIMARY
 endif
+ifeq ($(TARGET_USES_POST_PROCESSING),true)
+LOCAL_CFLAGS += -DUSES_POST_PROCESSING
+LOCAL_SHARED_LIBRARIES += libmm-abl
+LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/pp/inc
+LOCAL_C_INCLUDES += vendor/qcom/proprietary/mm-core-noship/display/abl/inc
+endif
 LOCAL_MODULE := liboverlay
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_SHARED_LIBRARY)

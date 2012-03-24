@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -37,6 +37,10 @@
 #include <cutils/properties.h>
 #include <EGL/eglext.h>
 
+#include <EGL/egl.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+
 using gralloc::IMemAlloc;
 using gralloc::IonController;
 using gralloc::alloc_data;
@@ -51,6 +55,8 @@ namespace {
     int reallocate_memory(native_handle_t *buffer_handle, int mReqSize, int usage)
     {
         int ret = 0;
+
+#ifndef NON_QCOM_TARGET
         if (sAlloc == 0) {
             sAlloc = gralloc::IAllocController::getInstance(true);
         }
@@ -96,6 +102,7 @@ namespace {
             LOGE("%s: allocate failed", __FUNCTION__);
             return -EINVAL;
         }
+#endif
         return ret;
     }
 }; // ANONYNMOUS NAMESPACE
@@ -130,18 +137,45 @@ int getNumberOfArgsForOperation(int operation) {
  * @return true if the format is supported by the GPU.
  */
 bool isGPUSupportedFormat(int format) {
-    bool isSupportedFormat = true;
-    switch(format) {
-        case (HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED^HAL_PIXEL_FORMAT_INTERLACE):
-        case (HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED|HAL_3D_OUT_SIDE_BY_SIDE
-              |HAL_3D_IN_SIDE_BY_SIDE_R_L):
-        case (HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED|HAL_3D_OUT_SIDE_BY_SIDE
-              |HAL_3D_IN_SIDE_BY_SIDE_L_R):
-            isSupportedFormat = false;
-            break;
-        default: break;
+    if (format == HAL_PIXEL_FORMAT_YV12) {
+        // We check the YV12 formats, since some Qcom specific formats
+        // could have the bits set.
+        return true;
+    } else if (format & INTERLACE_MASK) {
+        // Interlaced content
+        return false;
+    } else if (format & S3D_FORMAT_MASK) {
+        // S3D Formats are not supported by the GPU
+       return false;
     }
-    return isSupportedFormat;
+    return true;
+}
+
+/* decide the texture target dynamically, based on the pixel format*/
+
+int decideTextureTarget(int pixel_format)
+{
+
+  // Default the return value to GL_TEXTURE_EXTERAL_OES
+  int retVal = GL_TEXTURE_EXTERNAL_OES;
+
+  // Change texture target to TEXTURE_2D for RGB formats
+  switch (pixel_format) {
+
+     case HAL_PIXEL_FORMAT_RGBA_8888:
+     case HAL_PIXEL_FORMAT_RGBX_8888:
+     case HAL_PIXEL_FORMAT_RGB_888:
+     case HAL_PIXEL_FORMAT_RGB_565:
+     case HAL_PIXEL_FORMAT_BGRA_8888:
+     case HAL_PIXEL_FORMAT_RGBA_5551:
+     case HAL_PIXEL_FORMAT_RGBA_4444:
+          retVal = GL_TEXTURE_2D;
+          break;
+     default:
+          retVal = GL_TEXTURE_EXTERNAL_OES;
+          break;
+  }
+  return retVal;
 }
 
 /*
@@ -158,7 +192,7 @@ bool isGPUSupportedFormat(int format) {
 int checkBuffer(native_handle_t *buffer_handle, int size, int usage)
 {
     // If the client hasn't set a size, return
-    if (0 == size) {
+    if (0 >= size) {
         return 0;
     }
 
@@ -170,10 +204,9 @@ int checkBuffer(native_handle_t *buffer_handle, int size, int usage)
 
     // Obtain the private_handle from the native handle
     private_handle_t *hnd = reinterpret_cast<private_handle_t*>(buffer_handle);
-    if (hnd->size < size) {
+    if (hnd->size != size) {
         return reallocate_memory(hnd, size, usage);
     }
-
     return 0;
 }
 
@@ -254,6 +287,21 @@ int updateBufferGeometry(sp<GraphicBuffer> buffer, const qBufGeometry updatedGeo
     return 0;
 }
 
+/* Update the S3D format of this buffer.
+*
+* @param: buffer whosei S3D format needs to be updated.
+* @param: Updated buffer S3D format
+*/
+int updateBufferS3DFormat(sp<GraphicBuffer> buffer, const int s3dFormat)
+{
+    if (buffer == 0) {
+        LOGE("%s: graphic buffer is NULL", __FUNCTION__);
+        return -EINVAL;
+    }
+
+    buffer->format |= s3dFormat;
+    return 0;
+}
 /*
  * Updates the flags for the layer
  *
@@ -271,6 +319,12 @@ int updateLayerQcomFlags(eLayerAttrib attribute, bool enable, int& currentFlags)
                 currentFlags |= LAYER_UPDATING;
             else
                 currentFlags &= ~LAYER_UPDATING;
+        } break;
+        case LAYER_ASYNCHRONOUS_STATUS: {
+            if (enable)
+                currentFlags |= LAYER_ASYNCHRONOUS;
+            else
+                currentFlags &= ~LAYER_ASYNCHRONOUS;
         } break;
         default: LOGE("%s: invalid attribute(0x%x)", __FUNCTION__, attribute);
                  break;
@@ -292,6 +346,11 @@ int getPerFrameFlags(int hwclFlags, int layerFlags) {
         flags &= ~HWC_LAYER_NOT_UPDATING;
     else
         flags |= HWC_LAYER_NOT_UPDATING;
+
+    if (layerFlags & LAYER_ASYNCHRONOUS)
+        flags |= HWC_LAYER_ASYNCHRONOUS;
+    else
+        flags &= ~HWC_LAYER_ASYNCHRONOUS;
 
     return flags;
 }
@@ -407,6 +466,192 @@ int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur)
             dst += stride;
         } while(--h);
     }
-
     return 0;
 }
+
+/*
+ * Handles the externalDisplay event
+ * HDMI has highest priority compared to WifiDisplay
+ * Based on the current and the new display event, decides the
+ * external display to be enabled
+ *
+ * @param: newEvent - new external event
+ * @param: currEvent - currently enabled external event
+ * @return: external display to be enabled
+ *
+ */
+external_display handleEventHDMI(external_display newState, external_display
+                                                                   currState)
+{
+    external_display retState = currState;
+    switch(newState) {
+        case EXT_DISPLAY_HDMI:
+            retState = EXT_DISPLAY_HDMI;
+            break;
+        case EXT_DISPLAY_WIFI:
+            if(currState != EXT_DISPLAY_HDMI) {
+                retState = EXT_DISPLAY_WIFI;
+            }
+            break;
+        case EXT_DISPLAY_OFF:
+            retState = EXT_DISPLAY_OFF;
+            break;
+        default:
+            LOGE("handleEventHDMI: unknown Event");
+            break;
+    }
+    return retState;
+}
+#ifdef DEBUG_CALC_FPS
+ANDROID_SINGLETON_STATIC_INSTANCE(CalcFps) ;
+
+CalcFps::CalcFps() {
+    debug_fps_level = 0;
+    Init();
+}
+
+CalcFps::~CalcFps() {
+}
+
+void CalcFps::Init() {
+    char prop[PROPERTY_VALUE_MAX];
+    property_get("debug.gr.calcfps", prop, "0");
+    debug_fps_level = atoi(prop);
+    if (debug_fps_level > MAX_DEBUG_FPS_LEVEL) {
+        LOGW("out of range value for debug.gr.calcfps, using 0");
+        debug_fps_level = 0;
+    }
+
+    LOGE("DEBUG_CALC_FPS: %d", debug_fps_level);
+    populate_debug_fps_metadata();
+}
+
+void CalcFps::Fps() {
+    if (debug_fps_level > 0)
+        calc_fps(ns2us(systemTime()));
+}
+
+void CalcFps::populate_debug_fps_metadata(void)
+{
+    char prop[PROPERTY_VALUE_MAX];
+
+    /*defaults calculation of fps to based on number of frames*/
+    property_get("debug.gr.calcfps.type", prop, "0");
+    debug_fps_metadata.type = (debug_fps_metadata_t::DfmType) atoi(prop);
+
+    /*defaults to 1000ms*/
+    property_get("debug.gr.calcfps.timeperiod", prop, "1000");
+    debug_fps_metadata.time_period = atoi(prop);
+
+    property_get("debug.gr.calcfps.period", prop, "10");
+    debug_fps_metadata.period = atoi(prop);
+
+    if (debug_fps_metadata.period > MAX_FPS_CALC_PERIOD_IN_FRAMES) {
+        debug_fps_metadata.period = MAX_FPS_CALC_PERIOD_IN_FRAMES;
+    }
+
+    /* default ignorethresh_us: 500 milli seconds */
+    property_get("debug.gr.calcfps.ignorethresh_us", prop, "500000");
+    debug_fps_metadata.ignorethresh_us = atoi(prop);
+
+    debug_fps_metadata.framearrival_steps =
+                       (debug_fps_metadata.ignorethresh_us / 16666);
+
+    if (debug_fps_metadata.framearrival_steps > MAX_FRAMEARRIVAL_STEPS) {
+        debug_fps_metadata.framearrival_steps = MAX_FRAMEARRIVAL_STEPS;
+        debug_fps_metadata.ignorethresh_us =
+                        debug_fps_metadata.framearrival_steps * 16666;
+    }
+
+    /* 2ms margin of error for the gettimeofday */
+    debug_fps_metadata.margin_us = 2000;
+
+    for (unsigned int i = 0; i < MAX_FRAMEARRIVAL_STEPS; i++)
+        debug_fps_metadata.accum_framearrivals[i] = 0;
+
+    LOGE("period: %d", debug_fps_metadata.period);
+    LOGE("ignorethresh_us: %lld", debug_fps_metadata.ignorethresh_us);
+}
+
+void CalcFps::print_fps(float fps)
+{
+    if (debug_fps_metadata_t::DFM_FRAMES == debug_fps_metadata.type)
+        LOGE("FPS for last %d frames: %3.2f", debug_fps_metadata.period, fps);
+    else
+        LOGE("FPS for last (%f ms, %d frames): %3.2f",
+             debug_fps_metadata.time_elapsed,
+             debug_fps_metadata.curr_frame, fps);
+
+    debug_fps_metadata.curr_frame = 0;
+    debug_fps_metadata.time_elapsed = 0.0;
+
+    if (debug_fps_level > 1) {
+        LOGE("Frame Arrival Distribution:");
+        for (unsigned int i = 0;
+             i < ((debug_fps_metadata.framearrival_steps / 6) + 1);
+             i++) {
+            LOGE("%lld %lld %lld %lld %lld %lld",
+                 debug_fps_metadata.accum_framearrivals[i*6],
+                 debug_fps_metadata.accum_framearrivals[i*6+1],
+                 debug_fps_metadata.accum_framearrivals[i*6+2],
+                 debug_fps_metadata.accum_framearrivals[i*6+3],
+                 debug_fps_metadata.accum_framearrivals[i*6+4],
+                 debug_fps_metadata.accum_framearrivals[i*6+5]);
+        }
+
+        /* We are done with displaying, now clear the stats */
+        for (unsigned int i = 0;
+             i < debug_fps_metadata.framearrival_steps;
+             i++)
+            debug_fps_metadata.accum_framearrivals[i] = 0;
+    }
+    return;
+}
+
+void CalcFps::calc_fps(nsecs_t currtime_us)
+{
+    static nsecs_t oldtime_us = 0;
+
+    nsecs_t diff = currtime_us - oldtime_us;
+
+    oldtime_us = currtime_us;
+
+    if (debug_fps_metadata_t::DFM_FRAMES == debug_fps_metadata.type &&
+        diff > debug_fps_metadata.ignorethresh_us) {
+        return;
+    }
+
+    if (debug_fps_metadata.curr_frame < MAX_FPS_CALC_PERIOD_IN_FRAMES) {
+        debug_fps_metadata.framearrivals[debug_fps_metadata.curr_frame] = diff;
+    }
+
+    debug_fps_metadata.curr_frame++;
+
+    if (debug_fps_level > 1) {
+        unsigned int currstep = (diff + debug_fps_metadata.margin_us) / 16666;
+
+        if (currstep < debug_fps_metadata.framearrival_steps) {
+            debug_fps_metadata.accum_framearrivals[currstep-1]++;
+        }
+    }
+
+    if (debug_fps_metadata_t::DFM_FRAMES == debug_fps_metadata.type) {
+        if (debug_fps_metadata.curr_frame == debug_fps_metadata.period) {
+            /* time to calculate and display FPS */
+            nsecs_t sum = 0;
+            for (unsigned int i = 0; i < debug_fps_metadata.period; i++)
+                sum += debug_fps_metadata.framearrivals[i];
+            print_fps((debug_fps_metadata.period * float(1000000))/float(sum));
+        }
+    }
+    else if (debug_fps_metadata_t::DFM_TIME == debug_fps_metadata.type) {
+        debug_fps_metadata.time_elapsed += ((float)diff/1000.0);
+        if (debug_fps_metadata.time_elapsed >= debug_fps_metadata.time_period) {
+            float fps = (1000.0 * debug_fps_metadata.curr_frame)/
+                        (float)debug_fps_metadata.time_elapsed;
+            print_fps(fps);
+        }
+    }
+    return;
+}
+#endif

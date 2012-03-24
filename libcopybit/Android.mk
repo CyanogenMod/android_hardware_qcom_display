@@ -28,33 +28,30 @@ ifeq ($(TARGET_USES_C2D_COMPOSITION),true)
     LOCAL_CFLAGS += -DCOPYBIT_Z180=1 -DC2D_SUPPORT_DISPLAY=1
     LOCAL_MODULE_TAGS := optional
     include $(BUILD_SHARED_LIBRARY)
-ifeq ($(TARGET_USES_ION),true)
-    LOCAL_CFLAGS += -DUSE_ION
-endif
 else
     ifneq ($(TARGET_BOARD_PLATFORM),msm7x30)
-            include $(CLEAR_VARS)
-            ifeq ($(ARCH_ARM_HAVE_NEON),true)
-                LOCAL_CFLAGS += -D__ARM_HAVE_NEON
-            endif
-            ifeq ($(call is-board-platform,msm7x27a),true)
-                LOCAL_CFLAGS += -DTARGET_7x27A
-            endif
-            ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
-                LOCAL_CFLAGS += -DUSE_ASHMEM
-                ifeq ($(call is-chipset-prefix-in-board-platform,msm7x27),true)
-                   LOCAL_CFLAGS += -DTARGET_7x27
-                endif
-            endif
-
-            LOCAL_PRELINK_MODULE := false
-            LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
-            LOCAL_SHARED_LIBRARIES := liblog
-            LOCAL_SRC_FILES := software_converter.cpp copybit.cpp
-            LOCAL_MODULE := copybit.$(TARGET_BOARD_PLATFORM)
-            LOCAL_MODULE_TAGS := optional
-            LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
-            LOCAL_CFLAGS += -DCOPYBIT_MSM7K=1
-            include $(BUILD_SHARED_LIBRARY)
+        include $(CLEAR_VARS)
+        ifeq ($(ARCH_ARM_HAVE_NEON),true)
+            LOCAL_CFLAGS += -D__ARM_HAVE_NEON
         endif
+        ifeq ($(TARGET_BOARD_PLATFORM),msm7x27a)
+            LOCAL_CFLAGS += -DTARGET_7x27A
+        endif
+        ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
+            LOCAL_CFLAGS += -DUSE_ASHMEM
+            ifeq ($(TARGET_BOARD_PLATFORM),msm7x27)
+               LOCAL_CFLAGS += -DTARGET_7x27
+            endif
+        endif
+
+        LOCAL_PRELINK_MODULE := false
+        LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
+        LOCAL_SHARED_LIBRARIES := liblog libmemalloc
+        LOCAL_SRC_FILES := software_converter.cpp copybit.cpp
+        LOCAL_MODULE := copybit.$(TARGET_BOARD_PLATFORM)
+        LOCAL_MODULE_TAGS := optional
+        LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
+        LOCAL_CFLAGS += -DCOPYBIT_MSM7K=1
+        include $(BUILD_SHARED_LIBRARY)
+    endif
 endif

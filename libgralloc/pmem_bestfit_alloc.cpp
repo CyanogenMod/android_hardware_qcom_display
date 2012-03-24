@@ -125,6 +125,36 @@ ssize_t SimpleBestFitAllocator::alloc(size_t size, uint32_t flags)
         }
         return (free_chunk->start)*kMemoryAlign;
     }
+    // we are out of PMEM. Print pmem stats
+    // check if there is any leak or fragmentation
+
+    LOGD (" Out of PMEM. Dumping PMEM stats for debugging");
+    LOGD (" ------------- PRINT PMEM STATS --------------");
+
+    cur = mList.head();
+    static uint32_t node_count;
+    static uint64_t allocated, free_space;
+
+    while (cur) {
+      LOGD (" Node %d -> Start Address : %u Size %u Free info %d",\
+              node_count++, cur->start, cur->size, cur->free);
+
+      // if cur-> free is 1 , the node is free
+      // calculate the total allocated and total free stats also
+
+      if (cur->free)
+         free_space += cur->size;
+      else
+         allocated += cur->size;
+      // read next node
+      cur = cur->next;
+    }
+    LOGD (" Total Allocated: %l Total Free: %l", allocated, free_space );
+
+    node_count = 0;
+    allocated = 0;
+    free_space = 0;
+    LOGD ("----------------------------------------------");
     return -ENOMEM;
 }
 

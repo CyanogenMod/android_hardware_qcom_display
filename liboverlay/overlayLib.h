@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,19 +39,37 @@
 
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <utils/threads.h>
 #include <utils/RefBase.h>
 #include <alloc_controller.h>
 #include <memalloc.h>
+
+#ifdef USES_POST_PROCESSING
+#include "lib-postproc.h"
+#endif
 
 #define HW_OVERLAY_MAGNIFICATION_LIMIT 8
 #define HW_OVERLAY_MINIFICATION_LIMIT HW_OVERLAY_MAGNIFICATION_LIMIT
 
 #define EVEN_OUT(x) if (x & 0x0001) {x--;}
+#define NO_PIPE -1
 #define VG0_PIPE 0
 #define VG1_PIPE 1
 #define NUM_CHANNELS 2
+#define NUM_FB_DEVICES 3
 #define FRAMEBUFFER_0 0
 #define FRAMEBUFFER_1 1
+#define FRAMEBUFFER_2 2
+#define NUM_SHARPNESS_VALS 256
+#define SHARPNESS_RANGE 1.0f
+#define HUE_RANGE 180
+#define BRIGHTNESS_RANGE 255
+#define CON_SAT_RANGE 1.0f
+#define CAP_RANGE(value,max,min) do { if (value - min < -0.0001)\
+                                          {value = min;}\
+                                      else if(value - max > 0.0001)\
+                                          {value = max;}\
+                                    } while(0);
 
 enum {
     HDMI_OFF,
@@ -67,6 +85,15 @@ enum {
     NEW_REQUEST,
     UPDATE_REQUEST
 };
+
+enum {
+    WAIT_FOR_VSYNC             = 1<<0,
+    DISABLE_FRAMEBUFFER_FETCH  = 1<<1,
+    INTERLACED_CONTENT         = 1<<2,
+    OVERLAY_PIPE_SHARE         = 1<<3,
+    SECURE_OVERLAY_SESSION     = 1<<4,
+};
+
 /* ------------------------------- 3D defines ---------------------------------------*/
 // The compound format passed to the overlay is
 // ABCCC where A is the input 3D format,
@@ -108,23 +135,64 @@ struct overlay_buffer_info {
     int height;
     int format;
     int size;
+    bool secure;
 };
 
-/* values for copybit_set_parameter(OVERLAY_TRANSFORM) */
-enum {
-    /* flip source image horizontally */
-    OVERLAY_TRANSFORM_FLIP_H    = HAL_TRANSFORM_FLIP_H,
-    /* flip source image vertically */
-    OVERLAY_TRANSFORM_FLIP_V    = HAL_TRANSFORM_FLIP_V,
-    /* rotate source image 90 degrees */
-    OVERLAY_TRANSFORM_ROT_90    = HAL_TRANSFORM_ROT_90,
-    /* rotate source image 180 degrees */
-    OVERLAY_TRANSFORM_ROT_180   = HAL_TRANSFORM_ROT_180,
-    /* rotate source image 270 degrees */
-    OVERLAY_TRANSFORM_ROT_270   = HAL_TRANSFORM_ROT_270
-};
-
+using android::Mutex;
 namespace overlay {
+
+#define FB_DEVICE_TEMPLATE "/dev/graphics/fb%u"
+
+    //Utility Class to query the framebuffer info
+    class FrameBufferInfo {
+        int mFBWidth;
+        int mFBHeight;
+        bool mBorderFillSupported;
+        static FrameBufferInfo *sFBInfoInstance;
+
+        FrameBufferInfo():mFBWidth(0),mFBHeight(0), mBorderFillSupported(false) {
+            char const * const device_name =
+                       "/dev/graphics/fb0";
+            int fd = open(device_name, O_RDWR, 0);
+            mdp_overlay ov;
+            memset(&ov, 0, sizeof(ov));
+            if (fd < 0) {
+               LOGE("FrameBufferInfo: Cant open framebuffer ");
+               return;
+            }
+            fb_var_screeninfo vinfo;
+            if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) == -1) {
+                  LOGE("FrameBufferInfo: FBIOGET_VSCREENINFO on fb0 failed");
+                  close(fd);
+                  fd = -1;
+                  return;
+            }
+            ov.id = 1;
+            if(ioctl(fd, MSMFB_OVERLAY_GET, &ov)) {
+                  LOGE("FrameBufferInfo: MSMFB_OVERLAY_GET on fb0 failed");
+                  close(fd);
+                  fd = -1;
+                  return;
+            }
+            close(fd);
+            fd = -1;
+            mFBWidth = vinfo.xres;
+            mFBHeight = vinfo.yres;
+            mBorderFillSupported = (ov.flags & MDP_BORDERFILL_SUPPORTED) ?
+                                                              true : false;
+        }
+        public:
+        static FrameBufferInfo* getInstance(){
+            if (!sFBInfoInstance){
+                sFBInfoInstance = new FrameBufferInfo;
+            }
+            return sFBInfoInstance;
+        }
+        int getWidth() const { return mFBWidth; }
+        int getHeight() const { return mFBHeight; }
+        bool canSupportTrueMirroring() const {
+            return mBorderFillSupported; }
+    };
 
 enum {
     OV_UI_MIRROR_TV = 0,
@@ -147,9 +215,10 @@ int getColorFormat(int format);
 bool isInterlacedContent(int format);
 int get_mdp_format(int format);
 int get_size(int format, int w, int h);
-int get_rot_output_format(int format);
 int get_mdp_orientation(int value);
 void normalize_crop(uint32_t& xy, uint32_t& wh);
+//Initializes the overlay - cleans up any existing overlay pipes
+int initOverlay();
 
 /* Print values being sent to driver in case of ioctl failures
    These logs are enabled only if DEBUG_OVERLAY is true       */
@@ -157,13 +226,57 @@ void dump(msm_rotator_img_info& mRotInfo);
 void dump(mdp_overlay& mOvInfo);
 const char* getFormatString(int format);
 
+    //singleton class to decide the z order of new overlay surfaces
+    class ZOrderManager {
+        bool mFB0Pipes[NUM_CHANNELS];
+        bool mFB1Pipes[NUM_CHANNELS+1]; //FB1 can have 3 pipes
+        int  mPipesInuse; // Holds the number of pipes in use
+        int  mMaxPipes;   // Max number of pipes
+        static ZOrderManager *sInstance;
+        Mutex *mObjMutex;
+        ZOrderManager(){
+            mPipesInuse = 0;
+            // for true mirroring support there can be 3 pipes on secondary
+            mMaxPipes = FrameBufferInfo::getInstance()->canSupportTrueMirroring()?
+                                                  NUM_CHANNELS+1 : NUM_CHANNELS;
+            for (int i = 0; i < NUM_CHANNELS; i++)
+                mFB0Pipes[i] = false;
+            for (int j = 0; j < mMaxPipes; j++)
+                mFB1Pipes[j] = false;
+            mObjMutex = new Mutex();
+        }
+        ~ZOrderManager() {
+            delete sInstance;
+            delete mObjMutex;
+        }
+        public:
+        static ZOrderManager* getInstance(){
+            if (!sInstance){
+                sInstance = new ZOrderManager;
+            }
+            return sInstance;
+        }
+        int getZ(int fbnum);
+        void decZ(int fbnum, int zorder);
+    };
 const int max_num_buffers = 3;
 typedef struct mdp_rect overlay_rect;
 
 class OverlayControlChannel {
 
+enum {
+    SET_NONE = 0,
+    SET_SHARPNESS,
+#ifdef USES_POST_PROCESSING
+    SET_HUE,
+    SET_BRIGHTNESS,
+    SET_SATURATION,
+    SET_CONTRAST,
+#endif
+    RESET_ALL,
+};
     bool mNoRot;
-
+    int mFBNum;
     int mFBWidth;
     int mFBHeight;
     int mFBbpp;
@@ -175,16 +288,21 @@ class OverlayControlChannel {
     int mOrientation;
     unsigned int mFormat3D;
     bool mUIChannel;
+#ifdef USES_POST_PROCESSING
+    struct display_pp_conv_cfg hsic_cfg;
+#endif
     mdp_overlay mOVInfo;
     msm_rotator_img_info mRotInfo;
     msmfb_overlay_3d m3DOVInfo;
     bool mIsChannelUpdated;
     bool openDevices(int fbnum = -1);
     bool setOverlayInformation(const overlay_buffer_info& info,
-                               int flags, int orientation, int zorder = 0, bool ignoreFB = false,
+                               int zorder = 0, int flags = 0,
                                int requestType = NEW_REQUEST);
-    bool startOVRotatorSessions(const overlay_buffer_info& info, int orientation, int requestType);
+    bool startOVRotatorSessions(const overlay_buffer_info& info, int requestType);
     void swapOVRotWidthHeight();
+    int commitVisualParam(int8_t paramType, float paramValue);
+    void setInformationFromFlags(int flags, mdp_overlay& ov);
 
 public:
     OverlayControlChannel();
@@ -193,7 +311,7 @@ public:
                                int fbnum, bool norot = false,
                                bool uichannel = false,
                                unsigned int format3D = 0, int zorder = 0,
-                               bool ignoreFB = false);
+                               int flags = 0);
     bool closeControlChannel();
     bool setPosition(int x, int y, uint32_t w, uint32_t h);
     bool setTransform(int value, bool fetch = true);
@@ -207,18 +325,24 @@ public:
     int getFBHeight() const { return mFBHeight; }
     int getFormat3D() const { return mFormat3D; }
     bool getOrientation(int& orientation) const;
-    bool updateWaitForVsyncFlags(bool waitForVsync);
+    bool updateOverlayFlags(int flags);
     bool getAspectRatioPosition(int w, int h, overlay_rect *rect);
+    // Calculates the aspect ratio for video on HDMI based on primary
+    //  aspect ratio used in case of true mirroring
+    bool getAspectRatioPosition(int w, int h, int orientation,
+                                overlay_rect *inRect, overlay_rect *outRect);
     bool getPositionS3D(int channel, int format, overlay_rect *rect);
-    bool updateOverlaySource(const overlay_buffer_info& info, int orientation, bool waitForVsync);
+    bool updateOverlaySource(const overlay_buffer_info& info, int orientation, int flags);
     bool getFormat() const { return mFormat; }
+    bool setVisualParam(int8_t paramType, float paramValue);
     bool useVirtualFB ();
-    int getOverlayFlags() const { return mOVInfo.flags; }
+    bool doFlagsNeedUpdate(int flags);
 };
 
 class OverlayDataChannel {
 
     bool mNoRot;
+    bool mSecure;
     int mFD;
     int mRotFD;
     int mPmemFD;
@@ -231,7 +355,7 @@ class OverlayDataChannel {
     int mRotOffset[max_num_buffers];
     int mCurrentItem;
     int mNumBuffers;
-    int mUpdateDataChannel;
+    bool mUpdateDataChannel;
     android::sp<gralloc::IAllocController> mAlloc;
     int mBufferType;
 
@@ -243,7 +367,7 @@ public:
     OverlayDataChannel();
     ~OverlayDataChannel();
     bool startDataChannel(const OverlayControlChannel& objOvCtrlChannel,
-                                int fbnum, bool norot = false,
+                                int fbnum, bool norot = false, bool secure = false,
                                 bool uichannel = false, int num_buffers = 2);
     bool startDataChannel(int ovid, int rotid, int size,
                        int fbnum, bool norot = false, bool uichannel = false,
@@ -255,7 +379,7 @@ public:
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
     bool getCropS3D(overlay_rect *inRect, int channel, int format, overlay_rect *rect);
     bool isChannelUP() const { return (mFD > 0); }
-    bool updateDataChannel(int updateStatus, int size);
+    bool updateDataChannel(int size);
 };
 
 /*
@@ -265,13 +389,16 @@ public:
 class Overlay {
 
     bool mChannelUP;
-    bool mHDMIConnected;
+    //stores the connected external display Ex: HDMI(1) WFD(2)
+    int mExternalDisplay;
     unsigned int mS3DFormat;
     //Actual cropped source width and height of overlay
     int mCroppedSrcWidth;
     int mCroppedSrcHeight;
     overlay_buffer_info mOVBufferInfo;
     int mState;
+    // Stores the current device orientation
+    int mDevOrientation;
     OverlayControlChannel objOvCtrlChannel[2];
     OverlayDataChannel    objOvDataChannel[2];
 
@@ -282,9 +409,10 @@ public:
     static bool sHDMIAsPrimary;
     bool startChannel(const overlay_buffer_info& info, int fbnum, bool norot = false,
                           bool uichannel = false, unsigned int format3D = 0,
-                          int channel = 0, bool ignoreFB = false,
+                          int channel = 0, int flags = 0,
                           int num_buffers = 2);
     bool closeChannel();
+    bool setDeviceOrientation(int orientation);
     bool setPosition(int x, int y, uint32_t w, uint32_t h);
     bool setTransform(int value);
     bool setOrientation(int value, int channel = 0);
@@ -296,19 +424,20 @@ public:
     int getFBHeight(int channel = 0) const;
     bool getOrientation(int& orientation, int channel = 0) const;
     bool queueBuffer(buffer_handle_t buffer);
-    bool setSource(const overlay_buffer_info& info, int orientation, bool hdmiConnected,
-                    bool ignoreFB = false, int numBuffers = 2);
+    bool setSource(const overlay_buffer_info& info, int orientation, int hdmiConnected,
+                    int flags, int numBuffers = 2);
+    bool getAspectRatioPosition(int w, int h, overlay_rect *rect, int channel = 0);
     bool setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
+    bool updateOverlayFlags(int flags);
+    void setVisualParam(int8_t paramType, float paramValue);
     bool waitForHdmiVsync(int channel);
     int  getChannelStatus() const { return (mChannelUP ? OVERLAY_CHANNEL_UP: OVERLAY_CHANNEL_DOWN); }
-    void setHDMIStatus (bool isHDMIConnected) { mHDMIConnected = isHDMIConnected; mState = -1; }
-    int getHDMIStatus() const {return (mHDMIConnected ? HDMI_ON : HDMI_OFF); }
-
+    void closeExternalChannel();
 private:
     bool setChannelPosition(int x, int y, uint32_t w, uint32_t h, int channel = 0);
     bool setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int channel);
     bool queueBuffer(int fd, uint32_t offset, int channel);
-    bool updateOverlaySource(const overlay_buffer_info& info, int orientation, bool waitForVsync);
+    bool updateOverlaySource(const overlay_buffer_info& info, int orientation, int flags);
     int getS3DFormat(int format);
 };
 

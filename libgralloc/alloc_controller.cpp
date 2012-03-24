@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -36,6 +36,7 @@
 #include "ionalloc.h"
 #include "pmemalloc.h"
 #include "ashmemalloc.h"
+#include "gr.h"
 
 using namespace gralloc;
 using android::sp;
@@ -58,12 +59,15 @@ static bool canFallback(int compositionType, int usage, bool triedSystem)
     // 2. Alloc from system heap was already tried
     // 3. The heap type is requsted explicitly
     // 4. The heap type is protected
+    // 5. The buffer is meant for external display only
 
     if(compositionType == MDP_COMPOSITION)
         return false;
     if(triedSystem)
         return false;
     if(usage & (GRALLOC_HEAP_MASK | GRALLOC_USAGE_PROTECTED))
+        return false;
+    if(usage & (GRALLOC_HEAP_MASK | GRALLOC_USAGE_EXTERNAL_ONLY))
         return false;
     //Return true by default
     return true;
@@ -95,7 +99,6 @@ sp<IAllocController> IAllocController::getInstance(bool useMasterHeap)
     return sController;
 }
 
-#ifdef USE_ION
 
 //-------------- IonController-----------------------//
 IonController::IonController()
@@ -135,6 +138,9 @@ int IonController::allocate(alloc_data& data, int usage,
     if(usage & GRALLOC_USAGE_PROTECTED)
         ionFlags |= ION_SECURE;
 
+    if(usage & GRALLOC_USAGE_PRIVATE_DO_NOT_MAP)
+        data.allocType  =  private_handle_t::PRIV_FLAGS_NOT_MAPPED;
+
     // if no flags are set, default to
     // EBI heap, so that bypass can work
     // we can fall back to system heap if
@@ -144,6 +150,7 @@ int IonController::allocate(alloc_data& data, int usage,
 
     data.flags = ionFlags;
     ret = mIonAlloc->alloc_buffer(data);
+
     // Fallback
     if(ret < 0 && canFallback(compositionType,
                               usage,
@@ -159,8 +166,9 @@ int IonController::allocate(alloc_data& data, int usage,
         data.allocType = private_handle_t::PRIV_FLAGS_USES_ION;
         if(noncontig)
             data.allocType |= private_handle_t::PRIV_FLAGS_NONCONTIGUOUS_MEM;
+        if(ionFlags & ION_SECURE)
+            data.allocType |= private_handle_t::PRIV_FLAGS_SECURE_BUFFER;
     }
-
 
     return ret;
 }
@@ -176,7 +184,6 @@ sp<IMemAlloc> IonController::getAllocator(int flags)
 
     return memalloc;
 }
-#endif
 
 //-------------- PmemKernelController-----------------------//
 
@@ -321,4 +328,111 @@ sp<IMemAlloc> PmemAshmemController::getAllocator(int flags)
     return memalloc;
 }
 
+size_t getBufferSizeAndDimensions(int width, int height, int format,
+                        int& alignedw, int &alignedh)
+{
+    size_t size;
 
+    alignedw = ALIGN(width, 32);
+    alignedh = ALIGN(height, 32);
+    switch (format) {
+        case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+        case HAL_PIXEL_FORMAT_BGRA_8888:
+            size = alignedw * alignedh * 4;
+            break;
+        case HAL_PIXEL_FORMAT_RGB_888:
+            size = alignedw * alignedh * 3;
+            break;
+        case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_RGBA_5551:
+        case HAL_PIXEL_FORMAT_RGBA_4444:
+            size = alignedw * alignedh * 2;
+            break;
+
+            // adreno formats
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:  // NV21
+            size  = ALIGN(alignedw*alignedh, 4096);
+            size += ALIGN(2 * ALIGN(width/2, 32) * ALIGN(height/2, 32), 4096);
+            break;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:   // NV12
+            // The chroma plane is subsampled,
+            // but the pitch in bytes is unchanged
+            // The GPU needs 4K alignment, but the video decoder needs 8K
+            alignedw = ALIGN(width, 128);
+            size  = ALIGN( alignedw * alignedh, 8192);
+            size += ALIGN( alignedw * ALIGN(height/2, 32), 8192);
+            break;
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_YV12:
+            if ((format == HAL_PIXEL_FORMAT_YV12) && ((width&1) || (height&1))) {
+                LOGE("w or h is odd for the YV12 format");
+                return -EINVAL;
+            }
+            alignedw = ALIGN(width, 16);
+            alignedh = height;
+            if (HAL_PIXEL_FORMAT_NV12_ENCODEABLE == format) {
+                // The encoder requires a 2K aligned chroma offset.
+                size = ALIGN(alignedw*alignedh, 2048) +
+                       (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
+            } else {
+                size = alignedw*alignedh +
+                    (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
+            }
+            size = ALIGN(size, 4096);
+            break;
+
+        default:
+            LOGE("unrecognized pixel format: %d", format);
+            return -EINVAL;
+    }
+
+    return size;
+}
+
+// Allocate buffer from width, height and format into a
+// private_handle_t. It is the responsibility of the caller
+// to free the buffer using the free_buffer function
+int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage)
+{
+     alloc_data data;
+     int alignedw, alignedh;
+     android::sp<gralloc::IAllocController> sAlloc =
+         gralloc::IAllocController::getInstance(false);
+     data.base = 0;
+     data.fd = -1;
+     data.offset = 0;
+     data.size = getBufferSizeAndDimensions(w, h, format, alignedw, alignedh);
+     data.align = getpagesize();
+     data.uncached = true;
+     int allocFlags = usage;
+
+     int err = sAlloc->allocate(data, allocFlags, 0);
+     if (0 != err) {
+         LOGE("%s: allocate failed", __FUNCTION__);
+         return -ENOMEM;
+     }
+
+     private_handle_t* hnd = new private_handle_t(data.fd, data.size,
+                             data.allocType, 0, format, alignedw, alignedh);
+     hnd->base = (int) data.base;
+     hnd->offset = data.offset;
+     hnd->gpuaddr = 0;
+     *pHnd = hnd;
+     return 0;
+}
+
+void free_buffer(private_handle_t *hnd)
+{
+    android::sp<gralloc::IAllocController> sAlloc =
+        gralloc::IAllocController::getInstance(false);
+    if (hnd && hnd->fd > 0) {
+        sp<IMemAlloc> memalloc = sAlloc->getAllocator(hnd->flags);
+        memalloc->free_buffer((void*)hnd->base, hnd->size, hnd->offset, hnd->fd);
+    }
+    if(hnd)
+        delete hnd;
+
+}

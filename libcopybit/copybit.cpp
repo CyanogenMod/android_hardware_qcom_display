@@ -130,6 +130,7 @@ static int get_format(int format) {
     case HAL_PIXEL_FORMAT_YCrCb_420_SP:  return MDP_Y_CBCR_H2V2;
     case HAL_PIXEL_FORMAT_YCbCr_422_SP:  return MDP_Y_CRCB_H2V1;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP:  return MDP_Y_CRCB_H2V2;
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO: return MDP_Y_CBCR_H2V2_ADRENO;
     }
     return -1;
 }
@@ -164,38 +165,42 @@ static void set_rects(struct copybit_context_t *dev,
     e->dst_rect.w  = clip.r - clip.l;
     e->dst_rect.h  = clip.b - clip.t;
 
-    uint32_t W, H;
+    uint32_t W, H, delta_x, delta_y;
     if (dev->mFlags & COPYBIT_TRANSFORM_ROT_90) {
-        e->src_rect.x = (clip.t - dst->t) + src->t;
-        e->src_rect.y = (dst->r - clip.r) + src->l;
+        delta_x = (clip.t - dst->t);
+        delta_y = (dst->r - clip.r);
         e->src_rect.w = (clip.b - clip.t);
         e->src_rect.h = (clip.r - clip.l);
         W = dst->b - dst->t;
         H = dst->r - dst->l;
     } else {
-        e->src_rect.x  = (clip.l - dst->l) + src->l;
-        e->src_rect.y  = (clip.t - dst->t) + src->t;
+        delta_x  = (clip.l - dst->l);
+        delta_y  = (clip.t - dst->t);
         e->src_rect.w  = (clip.r - clip.l);
         e->src_rect.h  = (clip.b - clip.t);
         W = dst->r - dst->l;
         H = dst->b - dst->t;
     }
-    MULDIV(&e->src_rect.x, &e->src_rect.w, src->r - src->l, W);
-    MULDIV(&e->src_rect.y, &e->src_rect.h, src->b - src->t, H);
+
+    MULDIV(&delta_x, &e->src_rect.w, src->r - src->l, W);
+    MULDIV(&delta_y, &e->src_rect.h, src->b - src->t, H);
+
+    e->src_rect.x = delta_x + src->l;
+    e->src_rect.y = delta_y + src->t;
 
     if (dev->mFlags & COPYBIT_TRANSFORM_FLIP_V) {
         if (dev->mFlags & COPYBIT_TRANSFORM_ROT_90) {
-            e->src_rect.x = e->src.width - (e->src_rect.x + e->src_rect.w) - horiz_padding;
+            e->src_rect.x = (src->l + src->r) - (e->src_rect.x + e->src_rect.w);
         }else{
-            e->src_rect.y = e->src.height - (e->src_rect.y + e->src_rect.h) - vert_padding;
+            e->src_rect.y = (src->t + src->b) - (e->src_rect.y + e->src_rect.h);
         }
     }
 
     if (dev->mFlags & COPYBIT_TRANSFORM_FLIP_H) {
         if (dev->mFlags & COPYBIT_TRANSFORM_ROT_90) {
-            e->src_rect.y = e->src.height - (e->src_rect.y + e->src_rect.h) - vert_padding;
+            e->src_rect.y = (src->t + src->b) - (e->src_rect.y + e->src_rect.h);
         }else{
-            e->src_rect.x = e->src.width - (e->src_rect.x + e->src_rect.w) - horiz_padding;
+            e->src_rect.x = (src->l + src->r) - (e->src_rect.x + e->src_rect.w);
         }
     }
 }
@@ -356,6 +361,7 @@ static int stretch_copybit(
 {
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
     int status = 0;
+    private_handle_t *yv12_handle = NULL;
     if (ctx) {
         struct {
             uint32_t count;
@@ -386,16 +392,25 @@ static int stretch_copybit(
             return -EINVAL;
 
         if(src->format ==  HAL_PIXEL_FORMAT_YV12) {
-            if(0 == convertYV12toYCrCb420SP(src)){
-                (const_cast<copybit_image_t *>(src))->format =
-                        HAL_PIXEL_FORMAT_YCrCb_420_SP;
-            }
-            else{
-                LOGE("Error copybit conversion from yv12 failed");
-                return -EINVAL;
-            }
+            int usage = GRALLOC_USAGE_PRIVATE_ADSP_HEAP | GRALLOC_USAGE_PRIVATE_MM_HEAP;
+            if (0 == alloc_buffer(&yv12_handle,src->w,src->h,src->format, usage)){
+                 if(0 == convertYV12toYCrCb420SP(src,yv12_handle)){
+                       (const_cast<copybit_image_t *>(src))->format = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+                       (const_cast<copybit_image_t *>(src))->handle = yv12_handle;
+                       (const_cast<copybit_image_t *>(src))->base = (void *)yv12_handle->base;
+                 }
+                 else{
+                    LOGE("Error copybit conversion from yv12 failed");
+                    if(yv12_handle)
+                       free_buffer(yv12_handle);
+                    return -EINVAL;
+                 }
+           }
+           else{
+              LOGE("Error:unable to allocate memeory for yv12 software conversion");
+              return -EINVAL;
+           }
         }
-
         const uint32_t maxCount = sizeof(list.req)/sizeof(list.req[0]);
         const struct copybit_rect_t bounds = { 0, 0, dst->w, dst->h };
         struct copybit_rect_t clip;
@@ -433,6 +448,8 @@ static int stretch_copybit(
     } else {
         status = -EINVAL;
     }
+    if(yv12_handle)
+      free_buffer(yv12_handle);
     return status;
 }
 
