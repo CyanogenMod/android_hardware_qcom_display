@@ -123,6 +123,8 @@ struct private_hwc_module_t HAL_MODULE_INFO_SYM = {
             name: "Hardware Composer Module",
             author: "The Android Open Source Project",
             methods: &hwc_module_methods,
+            dso: NULL, /* remove compilation warnings */
+            reserved: {0}, /* remove compilation warnings */
         }
    },
    copybitEngine: NULL,
