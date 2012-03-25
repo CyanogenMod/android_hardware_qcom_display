@@ -31,7 +31,9 @@
 #define GRALLOC_ASHMEMALLOC_H
 
 #include "memalloc.h"
+#ifdef USE_ION
 #include <linux/ion.h>
+#endif
 
 namespace gralloc {
     class AshmemAlloc : public IMemAlloc  {

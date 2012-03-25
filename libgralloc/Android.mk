@@ -60,14 +60,14 @@ include $(CLEAR_VARS)
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils
-LOCAL_SRC_FILES :=  ionalloc.cpp \
-                    ashmemalloc.cpp \
+LOCAL_SRC_FILES :=  ashmemalloc.cpp \
                     pmemalloc.cpp \
                     pmem_bestfit_alloc.cpp \
                     alloc_controller.cpp
 LOCAL_CFLAGS:= -DLOG_TAG=\"memalloc\" -DLOG_NDDEBUG=0
 
 ifeq ($(TARGET_USES_ION),true)
+    LOCAL_SRC_FILES += ionalloc.cpp
     LOCAL_CFLAGS += -DUSE_ION
 endif
 

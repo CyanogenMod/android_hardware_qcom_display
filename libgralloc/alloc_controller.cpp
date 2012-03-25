@@ -33,7 +33,9 @@
 #include "gralloc_priv.h"
 #include "alloc_controller.h"
 #include "memalloc.h"
+#ifdef USE_ION
 #include "ionalloc.h"
+#endif
 #include "pmemalloc.h"
 #include "ashmemalloc.h"
 #include "gr.h"
@@ -100,6 +102,7 @@ sp<IAllocController> IAllocController::getInstance(bool useMasterHeap)
 }
 
 
+#ifdef USE_ION
 //-------------- IonController-----------------------//
 IonController::IonController()
 {
@@ -184,6 +187,7 @@ sp<IMemAlloc> IonController::getAllocator(int flags)
 
     return memalloc;
 }
+#endif
 
 //-------------- PmemKernelController-----------------------//
 
