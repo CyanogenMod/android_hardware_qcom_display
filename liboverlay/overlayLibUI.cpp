@@ -224,9 +224,9 @@ status_t Rotator::rotateBuffer(msm_rotator_data_info& rotData) {
 
 //===================== OverlayUI =================//
 
-OverlayUI::OverlayUI() : mChannelState(CLOSED), mOrientation(NO_INIT),
-        mFBNum(NO_INIT), mZorder(NO_INIT), mWaitForVsync(false), mIsFg(false),
-        mSessionID(NO_INIT) {
+OverlayUI::OverlayUI() : mChannelState(CLOSED), mZorder(NO_INIT),
+        mOrientation(NO_INIT), mFBNum(NO_INIT), mWaitForVsync(false),
+        mIsFg(false), mSessionID(NO_INIT) {
         memset(&mOvInfo, 0, sizeof(mOvInfo));
         memset(&mRotInfo, 0, sizeof(mRotInfo));
 }
@@ -408,7 +408,7 @@ status_t OverlayUI::startOVSession() {
 status_t OverlayUI::closeOVSession() {
     status_t ret = NO_ERROR;
     int err = 0;
-    if(err = ioctl(mobjDisplay.getFD(), MSMFB_OVERLAY_UNSET, &mSessionID)) {
+    if((err = ioctl(mobjDisplay.getFD(), MSMFB_OVERLAY_UNSET, &mSessionID))) {
         LOGE("%s: MSMFB_OVERLAY_UNSET failed. (%d)", __FUNCTION__, err);
         ret = BAD_VALUE;
     } else {
