@@ -1575,9 +1575,9 @@ static int hwc_set(hwc_composer_device_t *dev,
         EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
         if (!sucess) {
             ret = HWC_EGL_ERROR;
-        } else {
-            CALC_FPS();
         }
+    } else {
+        CALC_FPS();
     }
 #if defined HDMI_DUAL_DISPLAY
     if(ctx->pendingHDMI) {
