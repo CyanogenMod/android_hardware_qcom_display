@@ -75,16 +75,6 @@ int getRGBBpp(int format) {
     return ret;
 }
 
-bool turnOFFVSync() {
-    static int swapIntervalPropVal = -1;
-    if (swapIntervalPropVal == -1) {
-        char pval[PROPERTY_VALUE_MAX];
-        property_get("debug.gr.swapinterval", pval, "1");
-        swapIntervalPropVal = atoi(pval);
-    }
-    return (swapIntervalPropVal == 0);
-}
-
 };
 
 namespace overlay {
@@ -268,9 +258,6 @@ void OverlayUI::setDisplayParams(int fbNum, bool waitForVsync, bool isFg, int
         flags |= MDP_OV_PIPE_SHARE;
     else
         flags &= ~MDP_OV_PIPE_SHARE;
-
-    if (turnOFFVSync())
-        flags |= MDP_OV_PLAY_NOWAIT;
 
     mOvInfo.flags = flags;
     mOvInfo.z_order = zorder;

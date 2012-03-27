@@ -96,6 +96,7 @@ struct hwc_context_t {
 #endif
     int previousLayerCount;
     eHWCOverlayStatus hwcOverlayStatus;
+    int swapInterval;
 };
 
 static int hwc_device_open(const struct hw_module_t* module, const char* name,
@@ -407,13 +408,18 @@ inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount
         return false;
     }
 
+    char value[PROPERTY_VALUE_MAX];
+    if (property_get("debug.egl.swapinterval", value, "1") > 0) {
+        ctx->swapInterval = atoi(value);
+    }
     //Bypass is not efficient if rotation or asynchronous mode is needed.
     for(int i = 0; i < list->numHwLayers; ++i) {
         if(list->hwLayers[i].transform) {
             return false;
         }
         if(list->hwLayers[i].flags & HWC_LAYER_ASYNCHRONOUS) {
-            return false;
+            if (ctx->swapInterval > 0)
+                return false;
         }
     }
 
@@ -1468,13 +1474,14 @@ static int drawLayerUsingBypass(hwc_context_t *ctx, hwc_layer_t *layer, int laye
 
         ctx->bypassBufferLockState[index] = BYPASS_BUFFER_UNLOCKED;
 
-        if (GENLOCK_FAILURE == genlock_lock_buffer(hnd, GENLOCK_READ_LOCK,
-                                                   GENLOCK_MAX_TIMEOUT)) {
-            LOGE("%s: genlock_lock_buffer(READ) failed", __FUNCTION__);
-            return -1;
+        if (ctx->swapInterval > 0) {
+            if (GENLOCK_FAILURE == genlock_lock_buffer(hnd, GENLOCK_READ_LOCK,
+                                                        GENLOCK_MAX_TIMEOUT)) {
+                LOGE("%s: genlock_lock_buffer(READ) failed", __FUNCTION__);
+                return -1;
+            }
+            ctx->bypassBufferLockState[index] = BYPASS_BUFFER_LOCKED;
         }
-
-        ctx->bypassBufferLockState[index] = BYPASS_BUFFER_LOCKED;
 
         LOGE_IF(BYPASS_DEBUG,"%s: Bypassing layer: %p using pipe: %d",__FUNCTION__, layer, index );
 
@@ -1482,8 +1489,10 @@ static int drawLayerUsingBypass(hwc_context_t *ctx, hwc_layer_t *layer, int laye
 
         if (ret) {
             // Unlock the locked buffer
-            if (GENLOCK_FAILURE == genlock_unlock_buffer(hnd)) {
-                LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
+            if (ctx->swapInterval > 0) {
+                if (GENLOCK_FAILURE == genlock_unlock_buffer(hnd)) {
+                    LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
+                }
             }
             ctx->bypassBufferLockState[index] = BYPASS_BUFFER_UNLOCKED;
             return -1;
@@ -1716,6 +1725,12 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
         dev->previousOverlayHandle = NULL;
         dev->hwcOverlayStatus = HWC_OVERLAY_CLOSED;
         dev->previousLayerCount = -1;
+        char value[PROPERTY_VALUE_MAX];
+        if (property_get("debug.egl.swapinterval", value, "1") > 0) {
+            dev->swapInterval = atoi(value);
+        }
+
+
         /* initialize the procs */
         dev->device.common.tag = HARDWARE_DEVICE_TAG;
         dev->device.common.version = 0;
