@@ -17,6 +17,10 @@ LOCAL_PATH:= $(call my-dir)
 # HAL module implemenation, not prelinked and stored in
 # hw/<COPYPIX_HARDWARE_MODULE_ID>.<ro.board.platform>.so
 
+ifeq ($(TARGET_USES_ION),true)
+    LOCAL_CFLAGS += -DUSE_ION
+endif
+
 ifeq ($(TARGET_USES_C2D_COMPOSITION),true)
     include $(CLEAR_VARS)
     LOCAL_PRELINK_MODULE := false
@@ -55,3 +59,4 @@ else
         include $(BUILD_SHARED_LIBRARY)
     endif
 endif
+
