@@ -273,8 +273,10 @@ static uint32 c2d_get_gpuaddr(int device_fd, struct private_handle_t *handle)
         param.memtype = KGSL_USER_MEM_TYPE_PMEM;
     else if (handle->flags & private_handle_t::PRIV_FLAGS_USES_ASHMEM)
         param.memtype = KGSL_USER_MEM_TYPE_ASHMEM;
+#ifdef USE_ION
     else if (handle->flags & private_handle_t::PRIV_FLAGS_USES_ION)
         param.memtype = KGSL_USER_MEM_TYPE_ION;
+#endif
     else {
         LOGE("Invalid handle flags: 0x%x", handle->flags);
         return 0;
