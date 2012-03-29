@@ -719,21 +719,26 @@ bool canSkipComposition(hwc_context_t* ctx, int yuvBufferCount, int currentLayer
         return false;
     }
 
-    bool compCountChanged = false;
-    if (yuvBufferCount == 1) {
-        if (currentLayerCount != ctx->previousLayerCount) {
-            compCountChanged = true;
-            ctx->previousLayerCount = currentLayerCount;
-        }
+    hwc_composer_device_t* dev = (hwc_composer_device_t *)(ctx);
+    private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
+                                                           dev->common.module);
+    if (hwcModule->compositionType == COMPOSITION_TYPE_CPU)
+        return false;
 
-        if (!compCountChanged) {
-            if ((currentLayerCount == 1) ||
-                ((currentLayerCount-1) == numLayersNotUpdating)) {
-                // We either have only one overlay layer or we have
-                // all the non-UI layers not updating. In this case
-                // we can skip the composition of the UI layers.
-                return true;
-            }
+    //Video / Camera case
+    if (yuvBufferCount == 1) {
+        //If the previousLayerCount is anything other than the current count, it
+        //means something changed and we need to compose atleast once to FB.
+        if (currentLayerCount != ctx->previousLayerCount) {
+            ctx->previousLayerCount = currentLayerCount;
+            return false;
+        }
+        // We either have only one overlay layer or we have
+        // all non-updating UI layers.
+        // We can skip the composition of the UI layers.
+        if ((currentLayerCount == 1) ||
+            ((currentLayerCount - 1) == numLayersNotUpdating)) {
+            return true;
         }
     } else {
         ctx->previousLayerCount = -1;
@@ -988,16 +993,16 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
     int numLayersNotUpdating = 0;
     bool useCopybit = false;
     bool isSkipLayerPresent = false;
+    bool skipComposition = false;
 
     if (list) {
         useCopybit = canUseCopybit(hwcModule->fbDevice, list);
         yuvBufferCount = getYUVBufferCount(list);
+        numLayersNotUpdating = getLayersNotUpdatingCount(list);
+        skipComposition = canSkipComposition(ctx, yuvBufferCount,
+                                list->numHwLayers, numLayersNotUpdating);
 
-        bool skipComposition = false;
         if (yuvBufferCount == 1) {
-            numLayersNotUpdating = getLayersNotUpdatingCount(list);
-            skipComposition = canSkipComposition(ctx, yuvBufferCount,
-                                         list->numHwLayers, numLayersNotUpdating);
             s3dVideoFormat = getS3DVideoFormat(list);
             if (s3dVideoFormat)
                 isS3DCompositionNeeded = isS3DCompositionRequired();
@@ -1024,11 +1029,15 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 // During the animaton UI layers are marked as SKIP
                 // need to still mark the layer for S3D composition
                 isSkipLayerPresent = true;
+                skipComposition = false;
+                //Reset count, so that we end up composing once after animation
+                //is over, in case of overlay.
+                ctx->previousLayerCount = -1;
 
                 if (isS3DCompositionNeeded)
                     markUILayerForS3DComposition(list->hwLayers[i], s3dVideoFormat);
 
-                ssize_t layer_countdown = ((ssize_t)i) - 1;
+                ssize_t layer_countdown = ((ssize_t)i);
                 // Mark every layer below the SKIP layer to be composed by the GPU
                 while (layer_countdown >= 0)
                 {
@@ -1037,7 +1046,6 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                     if (countdown_handle && (countdown_handle->bufferType == BUFFER_TYPE_VIDEO)
                         && (yuvBufferCount == 1)) {
                         unlockPreviousOverlayBuffer(ctx);
-                        skipComposition = false;
                     }
                     list->hwLayers[layer_countdown].compositionType = HWC_FRAMEBUFFER;
                     list->hwLayers[layer_countdown].hints &= ~HWC_HINT_CLEAR_FB;
@@ -1048,6 +1056,12 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 flags |= (1 == list->numHwLayers) ? DISABLE_FRAMEBUFFER_FETCH : 0;
                 if (!isValidDestination(hwcModule->fbDevice, list->hwLayers[i].displayFrame)) {
                     list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
+                    //Even though there are no skip layers, animation is still
+                    //ON and in its final stages.
+                    //Reset count, so that we end up composing once after animation
+                    //is done, if overlay is used.
+                    ctx->previousLayerCount = -1;
+                    skipComposition = false;
 #ifdef USE_OVERLAY
                 } else if(prepareOverlay(ctx, &(list->hwLayers[i]), flags) == 0) {
                     list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
@@ -1679,6 +1693,7 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
 #endif
         dev->previousOverlayHandle = NULL;
         dev->hwcOverlayStatus = HWC_OVERLAY_CLOSED;
+        dev->previousLayerCount = -1;
         /* initialize the procs */
         dev->device.common.tag = HARDWARE_DEVICE_TAG;
         dev->device.common.version = 0;
