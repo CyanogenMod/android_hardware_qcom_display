@@ -744,11 +744,12 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
                 if(isHDMIStateChange) {
                    //start only HDMI channel
                    noRot = true;
-                   bool waitForVsync = true;
+                   //DO NOT WAIT for VSYNC for external
+                   flags &= ~WAIT_FOR_VSYNC;
                    // External display connected, start corresponding channel
                    // mExternalDisplay will hold the fbnum
                    if(!startChannel(info, mExternalDisplay, noRot, false, mS3DFormat,
-                               VG1_PIPE, waitForVsync, num_buffers)) {
+                               VG1_PIPE, flags, num_buffers)) {
                        LOGE("%s:failed to open channel %d", __func__, VG1_PIPE);
                        return false;
                    }
