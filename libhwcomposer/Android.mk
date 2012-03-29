@@ -22,7 +22,7 @@ LOCAL_C_INCLUDES += hardware/qcom/display/libcopybit
 LOCAL_C_INCLUDES += hardware/qcom/display/libgenlock
 LOCAL_C_INCLUDES += hardware/qcom/display/libqcomui
 
-ifeq ($(TARGET_HAVE_HDMI_OUT),true)
+ifeq ($(TARGET_QCOM_HDMI_OUT),true)
 LOCAL_CFLAGS += -DHDMI_DUAL_DISPLAY
 endif
 ifeq ($(TARGET_USES_OVERLAY),true)
