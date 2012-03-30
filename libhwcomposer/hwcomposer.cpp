@@ -133,7 +133,7 @@ struct private_hwc_module_t HAL_MODULE_INFO_SYM = {
 
 //Only at this point would the compiler know all storage class sizes.
 //The header has hooks which need to know those beforehand.
-#include "external_display_only.h"
+#include <external_display_only.h>
 
 /*****************************************************************************/
 
