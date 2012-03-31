@@ -1352,9 +1352,10 @@ bool OverlayControlChannel::startOVRotatorSessions(
             mRotInfo.src_rect.h = (((h-1)/32 +1)*32);
             mRotInfo.dst.width = (((w-1)/64 +1)*64);
             mRotInfo.dst.height = (((h-1)/32 +1)*32);
-            mRotInfo.dst.format = MDP_Y_CRCB_H2V2;
         }
+#ifndef QCOM_ROTATOR_KERNEL_FORMATS
         mRotInfo.dst.format = get_rot_output_format(format);
+#endif
         mRotInfo.dst_x = 0;
         mRotInfo.dst_y = 0;
         mRotInfo.src_rect.x = 0;
