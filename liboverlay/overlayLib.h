@@ -56,7 +56,9 @@
 #define VG0_PIPE 0
 #define VG1_PIPE 1
 #define NUM_CHANNELS 2
+#ifndef NUM_FB_DEVICES
 #define NUM_FB_DEVICES 3
+#endif
 #define FRAMEBUFFER_0 0
 #define FRAMEBUFFER_1 1
 #define FRAMEBUFFER_2 2

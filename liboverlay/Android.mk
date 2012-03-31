@@ -34,6 +34,9 @@ LOCAL_SHARED_LIBRARIES += libmm-abl
 LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/pp/inc
 LOCAL_C_INCLUDES += vendor/qcom/proprietary/mm-core-noship/display/abl/inc
 endif
+ifneq ($(TARGET_NUM_FB_DEVICES),)
+LOCAL_CFLAGS += -DNUM_FB_DEVICES=$(TARGET_NUM_FB_DEVICES)
+endif
 LOCAL_MODULE := liboverlay
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_SHARED_LIBRARY)
