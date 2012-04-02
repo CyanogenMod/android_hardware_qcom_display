@@ -20,6 +20,7 @@ LOCAL_CFLAGS := -DLOG_TAG=\"libQcomUI\"
 ifneq ($(BOARD_USES_QCOM_HARDWARE),true)
     LOCAL_CFLAGS += -DNON_QCOM_TARGET
 else
+    LOCAL_CFLAGS += -DQCOM_HARDWARE
     LOCAL_SHARED_LIBRARIES += libmemalloc
 endif
 
