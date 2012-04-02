@@ -14,7 +14,6 @@ LOCAL_SRC_FILES := 	\
 
 LOCAL_MODULE := hwcomposer.$(TARGET_BOARD_PLATFORM)
 LOCAL_CFLAGS:= -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).hwcomposer\" -DDEBUG_CALC_FPS
-LOCAL_CFLAGS += -DQCOM_HARDWARE
 
 LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
 LOCAL_C_INCLUDES += hardware/qcom/display/liboverlay

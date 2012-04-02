@@ -33,7 +33,6 @@ LOCAL_SRC_FILES :=  framebuffer.cpp \
 LOCAL_MODULE := gralloc.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_TAGS := optional
 LOCAL_CFLAGS:= -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).gralloc\" -DHOST -DDEBUG_CALC_FPS
-LOCAL_CFLAGS += -DQCOM_HARDWARE
 
 ifeq ($(call is-board-platform,msm7627_surf msm7627_6x),true)
     LOCAL_CFLAGS += -DTARGET_MSM7x27
