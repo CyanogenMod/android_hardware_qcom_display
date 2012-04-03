@@ -59,7 +59,7 @@ struct copybit_context_t {
     struct copybit_device_t device;
     int     mFD;
     uint8_t mAlpha;
-    uint8_t mFlags;
+    int     mFlags;
 };
 
 /**
@@ -306,6 +306,13 @@ static int set_parameter_copybit(
                 ctx->mFlags |= MDP_BLUR;
             } else if (value == COPYBIT_DISABLE) {
                 ctx->mFlags &= ~MDP_BLUR;
+            }
+            break;
+        case COPYBIT_PREMULTIPLIED_ALPHA:
+            if(value == COPYBIT_ENABLE) {
+                ctx->mFlags |= MDP_BLEND_FG_PREMULT;
+            } else if (value == COPYBIT_DISABLE) {
+                ctx->mFlags &= ~MDP_BLEND_FG_PREMULT;
             }
             break;
         case COPYBIT_TRANSFORM:
