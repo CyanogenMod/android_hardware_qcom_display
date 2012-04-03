@@ -829,7 +829,8 @@ static void handleHDMIStateChange(hwc_composer_device_t *dev, int externaltype) 
         if (fbDev) {
             fbDev->enableHDMIOutput(fbDev, externaltype);
         }
-
+        // Yield - Allows the UI channel(with zorder 0) to be opened first
+        sched_yield();
         if(ctx && ctx->mOverlayLibObject) {
             overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
             if (!externaltype) {
@@ -1614,6 +1615,16 @@ static int hwc_set(hwc_composer_device_t *dev,
     if(ctx->pendingHDMI) {
         handleHDMIStateChange(dev, ctx->mHDMIEnabled);
         ctx->pendingHDMI = false;
+        hwc_procs* proc = (hwc_procs*)ctx->device.reserved_proc[0];
+        if(!proc) {
+                LOGE("%s: HWC proc not registered", __FUNCTION__);
+        } else {
+            /* Trigger SF to redraw the current frame
+             * Used when the video is paused and external
+             * display is connected
+             */
+            proc->invalidate(proc);
+        }
     }
 #endif
 
