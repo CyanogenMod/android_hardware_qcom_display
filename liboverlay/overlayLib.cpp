@@ -519,9 +519,7 @@ bool Overlay::setPosition(int x, int y, uint32_t w, uint32_t h) {
     overlay_rect priDest;
     int currX, currY;
     uint32_t currW, currH;
-    // Set even destination co-ordinates
-    EVEN_OUT(x); EVEN_OUT(y);
-    EVEN_OUT(w); EVEN_OUT(h);
+
     objOvCtrlChannel[VG0_PIPE].getPosition(currX, currY, currW, currH);
     priDest.x = x, priDest.y = y;
     priDest.w = w, priDest.h = h;
