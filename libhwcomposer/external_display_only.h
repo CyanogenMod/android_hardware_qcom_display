@@ -268,7 +268,7 @@ inline void ExtDispOnly::startDefaultMirror(hwc_context_t* ctx) {
     framebuffer_device_t *fbDev = hwcModule->fbDevice;
     if (fbDev) {
         //mHDMIEnabled could be HDMI/WFD/NO EXTERNAL
-        fbDev->enableHDMIOutput(fbDev, ctx->mHDMIEnabled);
+        fbDev->perform(fbDev, EVENT_EXTERNAL_DISPLAY, ctx->mHDMIEnabled);
     }
 #endif
 }
@@ -280,7 +280,7 @@ inline void ExtDispOnly::stopDefaultMirror(hwc_context_t* ctx) {
         reinterpret_cast<private_hwc_module_t*>(dev->common.module);
     framebuffer_device_t *fbDev = hwcModule->fbDevice;
     if (fbDev) {
-        fbDev->enableHDMIOutput(fbDev, EXT_TYPE_NONE);
+        fbDev->perform(fbDev, EVENT_EXTERNAL_DISPLAY, EXT_TYPE_NONE);
     }
 #endif
 }

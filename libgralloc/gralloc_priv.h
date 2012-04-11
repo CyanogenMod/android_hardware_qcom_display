@@ -293,7 +293,8 @@ struct private_module_t {
 #if defined(__cplusplus) && defined(HDMI_DUAL_DISPLAY)
     Overlay* pobjOverlay;
     int orientation;
-    bool videoOverlay;
+    int videoOverlay; // VIDEO_OVERLAY - 2D or 3D
+    int secureVideoOverlay; // VideoOverlay is secure
     uint32_t currentOffset;
     int enableHDMIOutput; // holds the type of external display
     bool trueMirrorSupport;

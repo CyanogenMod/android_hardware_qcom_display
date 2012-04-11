@@ -106,6 +106,23 @@ enum external_display_type {
     EXT_TYPE_WIFI
 };
 
+/* Events to the Display HAL perform function
+   As of now used for external display related such as
+   connect, disconnect, orientation, video started etc.,
+*/
+enum {
+    EVENT_EXTERNAL_DISPLAY,   // External display on/off Event
+    EVENT_VIDEO_OVERLAY,      // Video Overlay start/stop Event
+    EVENT_ORIENTATION_CHANGE, // Orientation Change Event
+};
+
+// Video information sent to framebuffer HAl
+// used for handling UI mirroring.
+enum {
+    VIDEO_OVERLAY_ENDED = 0,
+    VIDEO_2D_OVERLAY_STARTED,
+    VIDEO_3D_OVERLAY_STARTED
+};
 /*
  * Structure to hold the buffer geometry
  */
