@@ -230,7 +230,8 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
     // All buffers marked as protected or for external
     // display need to go to overlay
     if ((usage & GRALLOC_USAGE_EXTERNAL_DISP) ||
-        (usage & GRALLOC_USAGE_PROTECTED)) {
+        (usage & GRALLOC_USAGE_PROTECTED) ||
+        (usage & GRALLOC_USAGE_PRIVATE_CP_BUFFER)) {
             bufferType = BUFFER_TYPE_VIDEO;
     }
     int err;
