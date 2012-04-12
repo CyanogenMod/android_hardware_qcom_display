@@ -239,7 +239,7 @@ int convert_yuv_android_to_yuv_c2d(private_handle_t *hnd,
     copyInfo info;
     info.width = rhs->w;
     info.height = rhs->h;
-    info.src_stride = ALIGN(info.width, 16);
+    info.src_stride = ALIGN(hnd->width, 16);
     info.dst_stride = ALIGN(info.width, 32);
     switch(rhs->format) {
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
