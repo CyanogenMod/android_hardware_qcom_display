@@ -1850,7 +1850,7 @@ bool OverlayDataChannel::mapRotatorMemory(int num_buffers, bool uiChannel, int r
                      GRALLOC_USAGE_PRIVATE_DO_NOT_MAP;
 
     if(mSecure) {
-        allocFlags |= GRALLOC_USAGE_PROTECTED;
+        allocFlags |= GRALLOC_USAGE_PRIVATE_CP_BUFFER;
     } else {
         allocFlags |= GRALLOC_USAGE_PRIVATE_ADSP_HEAP        |
                       GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
