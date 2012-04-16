@@ -368,6 +368,7 @@ class OverlayDataChannel {
     bool openDevices(int fbnum = -1, bool uichannel = false, int num_buffers = 2);
     bool mapRotatorMemory(int num_buffers, bool uiChannel, int requestType);
     bool queue(uint32_t offset);
+    bool freeRotatorMemory(void *pmemAddr, uint32_t pmemOffset, int pmemFD);
 
 public:
     OverlayDataChannel();
