@@ -380,7 +380,24 @@ struct private_handle_t {
                 h->numInts != sNumInts || h->numFds != sNumFds ||
                 hnd->magic != sMagic)
         {
-            LOGE("invalid gralloc handle (at %p)", h);
+            LOGE("Invalid gralloc handle (at %p): "
+                "ver(%d/%d) ints(%d/%d) fds(%d/%d) magic(%c%c%c%c/%c%c%c%c)",
+                h,
+                h ? h->version : -1, sizeof(native_handle),
+                h ? h->numInts : -1, sNumInts,
+                h ? h->numFds : -1, sNumFds,
+                hnd ? (((hnd->magic >> 24) & 0xFF)?
+                        ((hnd->magic >> 24) & 0xFF) : '-') : '?',
+                hnd ? (((hnd->magic >> 16) & 0xFF)?
+                        ((hnd->magic >> 16) & 0xFF) : '-') : '?',
+                hnd ? (((hnd->magic >> 8) & 0xFF)?
+                        ((hnd->magic >> 8) & 0xFF) : '-') : '?',
+                hnd ? (((hnd->magic >> 0) & 0xFF)?
+                        ((hnd->magic >> 0) & 0xFF) : '-') : '?',
+                (sMagic >> 24) & 0xFF,
+                (sMagic >> 16) & 0xFF,
+                (sMagic >> 8) & 0xFF,
+                (sMagic >> 0) & 0xFF);
             return -EINVAL;
         }
         return 0;

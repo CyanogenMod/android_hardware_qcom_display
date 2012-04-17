@@ -203,25 +203,29 @@ int  getLayerbypassIndex(hwc_layer_t* layer)
 }
 
 void unlockPreviousBypassBuffers(hwc_context_t* ctx) {
-    // Unlock the previous bypass buffers. We can blindly unlock the buffers here,
-    // because buffers will be in this list only if the lock was successfully acquired.
-    for(int i = 0; i < MAX_BYPASS_LAYERS && ctx->previousBypassHandle[i]; i++) {
-       private_handle_t *hnd = (private_handle_t*) ctx->previousBypassHandle[i];
-
-       // Validate the handle to make sure it hasn't been deallocated.
-       if (private_handle_t::validate(ctx->previousBypassHandle[i])) {
+    // Unlock the previous bypass buffers. We can blindly unlock the buffers
+    // here, because buffers will be in this list only if the lock was
+    // successfully acquired.
+    for(int i = 0; i < MAX_BYPASS_LAYERS; i++) {
+        private_handle_t *hnd = (private_handle_t*) ctx->previousBypassHandle[i];
+        if (!hnd)
             continue;
-       }
-       // Check if the handle was locked previously
-       if (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags) {
-          if (GENLOCK_FAILURE == genlock_unlock_buffer(ctx->previousBypassHandle[i])) {
-              LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
-          } else {
-              ctx->previousBypassHandle[i] = NULL;
-              // Reset the lock flag
-              hnd->flags &= ~private_handle_t::PRIV_FLAGS_HWC_LOCK;
-          }
-       }
+        // Validate the handle to make sure it hasn't been deallocated.
+        if (private_handle_t::validate(hnd)) {
+            LOGE("%s: Unregistering invalid gralloc handle %p.", __FUNCTION__, hnd);
+            ctx->previousBypassHandle[i] = NULL;
+            continue;
+        }
+        // Check if the handle was locked previously
+        if (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags) {
+            if (GENLOCK_FAILURE == genlock_unlock_buffer(hnd)) {
+                LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
+            } else {
+                ctx->previousBypassHandle[i] = NULL;
+                // Reset the lock flag
+                hnd->flags &= ~private_handle_t::PRIV_FLAGS_HWC_LOCK;
+            }
+        }
     }
 }
 
@@ -556,17 +560,20 @@ void closeExtraPipes(hwc_context_t* ctx) {
 
     //Unused pipes must be of higher z-order
     for (int i =  pipes_used ; i < MAX_BYPASS_LAYERS; i++) {
-        if (ctx->previousBypassHandle[i]) {
-            private_handle_t *hnd = (private_handle_t*) ctx->previousBypassHandle[i];
-
-            if (!private_handle_t::validate(ctx->previousBypassHandle[i])) {
-                if (GENLOCK_FAILURE == genlock_unlock_buffer(ctx->previousBypassHandle[i])) {
+        private_handle_t *hnd = (private_handle_t*) ctx->previousBypassHandle[i];
+        if (hnd) {
+            if (!private_handle_t::validate(hnd)) {
+                if (GENLOCK_FAILURE == genlock_unlock_buffer(hnd)) {
                     LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
                 } else {
                     ctx->previousBypassHandle[i] = NULL;
                     ctx->bypassBufferLockState[i] = BYPASS_BUFFER_UNLOCKED;
                     hnd->flags &= ~private_handle_t::PRIV_FLAGS_HWC_LOCK;
                 }
+            } else {
+                LOGE("%s: Unregistering invalid gralloc handle %p.",
+                    __FUNCTION__, hnd);
+                ctx->previousBypassHandle[i] = NULL;
             }
         }
         ctx->mOvUI[i]->closeChannel();
@@ -742,15 +749,18 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const int flag
 
 void unlockPreviousOverlayBuffer(hwc_context_t* ctx)
 {
-    private_handle_t *hnd = (private_handle_t*)ctx->previousOverlayHandle;
-    if (isBufferLocked(hnd) && !private_handle_t::validate(hnd)) {
-        if (GENLOCK_NO_ERROR == genlock_unlock_buffer(hnd)) {
-            //If previous is same as current, keep locked.
-            if(hnd != ctx->currentOverlayHandle) {
-                hnd->flags &= ~private_handle_t::PRIV_FLAGS_HWC_LOCK;
+    private_handle_t *hnd = (private_handle_t*) ctx->previousOverlayHandle;
+    if (hnd) {
+        // Validate the handle before attempting to use it.
+        if (!private_handle_t::validate(hnd) && isBufferLocked(hnd)) {
+            if (GENLOCK_NO_ERROR == genlock_unlock_buffer(hnd)) {
+                //If previous is same as current, keep locked.
+                if(hnd != ctx->currentOverlayHandle) {
+                    hnd->flags &= ~private_handle_t::PRIV_FLAGS_HWC_LOCK;
+                }
+            } else {
+                LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
             }
-        } else {
-            LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
         }
     }
     ctx->previousOverlayHandle = ctx->currentOverlayHandle;
@@ -1257,19 +1267,19 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
 {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     if(!ctx) {
-         LOGE("drawLayerUsingCopybit null context ");
+         LOGE("%s: null context ", __FUNCTION__);
          return -1;
     }
 
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(dev->common.module);
     if(!hwcModule) {
-        LOGE("drawLayerUsingCopybit null module ");
+        LOGE("%s: null module ", __FUNCTION__);
         return -1;
     }
 
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     if(!hnd) {
-        LOGE("drawLayerUsingCopybit invalid handle");
+        LOGE("%s: invalid handle", __FUNCTION__);
         return -1;
     }
 
@@ -1283,13 +1293,13 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
     //render buffer
     android_native_buffer_t *renderBuffer = (android_native_buffer_t *)eglGetRenderBufferANDROID(dpy, surface);
     if (!renderBuffer) {
-        LOGE("eglGetRenderBufferANDROID returned NULL buffer");
+        LOGE("%s: eglGetRenderBufferANDROID returned NULL buffer", __FUNCTION__);
         genlock_unlock_buffer(hnd);
         return -1;
     }
     private_handle_t *fbHandle = (private_handle_t *)renderBuffer->handle;
     if(!fbHandle) {
-        LOGE("Framebuffer handle is NULL");
+        LOGE("%s: Framebuffer handle is NULL", __FUNCTION__);
         genlock_unlock_buffer(hnd);
         return -1;
     }
