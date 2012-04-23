@@ -636,12 +636,25 @@ static inline bool isBufferLocked(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags));
 }
 
-//Marks layers for GPU composition
+static int getLayerS3DFormat (hwc_layer_t &layer) {
+    int s3dFormat = 0;
+    private_handle_t *hnd = (private_handle_t *)layer.handle;
+    if (hnd)
+        s3dFormat = FORMAT_3D_INPUT(hnd->format);
+    return s3dFormat;
+}
+
+//Mark layers for GPU composition but not if it is a 3D layer.
 static inline void markForGPUComp(const hwc_context_t *ctx,
     hwc_layer_list_t* list, const int limit) {
     for(int i = 0; i < limit; i++) {
-        list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
-        list->hwLayers[i].hints &= ~HWC_HINT_CLEAR_FB;
+        if( getLayerS3DFormat( list->hwLayers[i] ) ) {
+            continue;
+        }
+        else {
+            list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
+            list->hwLayers[i].hints &= ~HWC_HINT_CLEAR_FB;
+        }
     }
 }
 
@@ -1004,13 +1017,6 @@ static int getS3DFormat (const hwc_layer_list_t* list) {
 }
 
 
-static int getLayerS3DFormat (hwc_layer_t &layer) {
-    int s3dFormat = 0;
-    private_handle_t *hnd = (private_handle_t *)layer.handle;
-    if (hnd)
-        s3dFormat = FORMAT_3D_INPUT(hnd->format);
-    return s3dFormat;
-}
 static bool isS3DCompositionRequired() {
 #ifdef HDMI_AS_PRIMARY
     return overlay::is3DTV();
