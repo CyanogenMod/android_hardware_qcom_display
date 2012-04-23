@@ -64,6 +64,7 @@ void IonAlloc::close_device()
 
 int IonAlloc::alloc_buffer(alloc_data& data)
 {
+    Locker::Autolock _l(mLock);
     int err = 0;
     int ionSyncFd = FD_INIT;
     int iFd = FD_INIT;
@@ -151,6 +152,7 @@ int IonAlloc::alloc_buffer(alloc_data& data)
 
 int IonAlloc::free_buffer(void* base, size_t size, int offset, int fd)
 {
+    Locker::Autolock _l(mLock);
     LOGD("ion: Freeing buffer base:%p size:%d fd:%d",
             base, size, fd);
     int err = 0;

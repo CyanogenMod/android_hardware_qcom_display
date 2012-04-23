@@ -264,12 +264,12 @@ int gpu_context_t::free_impl(private_handle_t const* hnd) {
         int index = (hnd->base - m->framebuffer->base) / bufferSize;
         m->bufferMask &= ~(1<<index);
     } else {
+        terminateBuffer(&m->base, const_cast<private_handle_t*>(hnd));
         sp<IMemAlloc> memalloc = mAllocCtrl->getAllocator(hnd->flags);
         int err = memalloc->free_buffer((void*)hnd->base, (size_t) hnd->size,
                 hnd->offset, hnd->fd);
         if(err)
             return err;
-        terminateBuffer(&m->base, const_cast<private_handle_t*>(hnd));
     }
 
     // Release the genlock
