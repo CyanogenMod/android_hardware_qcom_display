@@ -43,6 +43,7 @@
 #include <utils/RefBase.h>
 #include <alloc_controller.h>
 #include <memalloc.h>
+#include <qcom_ui.h>
 
 #ifdef USES_POST_PROCESSING
 #include "lib-postproc.h"
@@ -60,12 +61,6 @@
 #define FRAMEBUFFER_0 0
 #define FRAMEBUFFER_1 1
 #define FRAMEBUFFER_2 2
-
-// To extract the src buffer transform
-#define SHIFT_SRC_TRANSFORM 4
-#define SRC_TRANSFORM_MASK  0x00F0
-#define FINAL_TRANSFORM_MASK 0x000F
-
 
 #define NUM_SHARPNESS_VALS 256
 #define SHARPNESS_RANGE 1.0f

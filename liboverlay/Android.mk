@@ -20,6 +20,7 @@ LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libmemalloc
 LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
+LOCAL_C_INCLUDES += hardware/qcom/display/libqcomui
 LOCAL_SRC_FILES := \
     overlayLib.cpp \
     overlayLibUI.cpp \
