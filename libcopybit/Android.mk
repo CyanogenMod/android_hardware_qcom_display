@@ -17,12 +17,13 @@ LOCAL_PATH:= $(call my-dir)
 # HAL module implemenation, not prelinked and stored in
 # hw/<COPYPIX_HARDWARE_MODULE_ID>.<ro.board.platform>.so
 
-ifeq ($(TARGET_USES_ION),true)
-    LOCAL_CFLAGS += -DUSE_ION
-endif
-
 ifeq ($(TARGET_USES_C2D_COMPOSITION),true)
     include $(CLEAR_VARS)
+
+    ifeq ($(TARGET_USES_ION),true)
+        LOCAL_CFLAGS += -DUSE_ION
+    endif
+
     LOCAL_PRELINK_MODULE := false
     LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
     LOCAL_SHARED_LIBRARIES := liblog libdl libcutils libmemalloc libutils
@@ -46,6 +47,10 @@ else
             ifeq ($(TARGET_BOARD_PLATFORM),msm7x27)
                LOCAL_CFLAGS += -DTARGET_7x27
             endif
+        endif
+
+        ifeq ($(TARGET_USES_ION),true)
+            LOCAL_CFLAGS += -DUSE_ION
         endif
 
         LOCAL_PRELINK_MODULE := false
