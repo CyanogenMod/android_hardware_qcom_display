@@ -1390,7 +1390,7 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
 
     // Copybit dst
     copybit_image_t dst;
-    dst.w = fbHandle->width;
+    dst.w = ALIGN(fbHandle->width,32);
     dst.h = fbHandle->height;
     dst.format = fbHandle->format;
     dst.base = (void *)fbHandle->base;
