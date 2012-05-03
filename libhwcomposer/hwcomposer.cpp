@@ -562,23 +562,10 @@ void closeExtraPipes(hwc_context_t* ctx) {
     int pipes_used = ctx->nPipesUsed;
 
     //Unused pipes must be of higher z-order
+    //Note that MDP on closechannel call just marks the
+    //pipes for closure. The pipes are actually closed
+    //on next VSYNC
     for (int i =  pipes_used ; i < MAX_BYPASS_LAYERS; i++) {
-        private_handle_t *hnd = (private_handle_t*) ctx->previousBypassHandle[i];
-        if (hnd) {
-            if (!private_handle_t::validate(hnd)) {
-                if (GENLOCK_FAILURE == genlock_unlock_buffer(hnd)) {
-                    LOGE("%s: genlock_unlock_buffer failed", __FUNCTION__);
-                } else {
-                    ctx->previousBypassHandle[i] = NULL;
-                    ctx->bypassBufferLockState[i] = BYPASS_BUFFER_UNLOCKED;
-                    hnd->flags &= ~private_handle_t::PRIV_FLAGS_HWC_LOCK;
-                }
-            } else {
-                LOGE("%s: Unregistering invalid gralloc handle %p.",
-                    __FUNCTION__, hnd);
-                ctx->previousBypassHandle[i] = NULL;
-            }
-        }
         ctx->mOvUI[i]->closeChannel();
         ctx->layerindex[i] = -1;
     }
@@ -670,6 +657,8 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const int flag
      if(ctx && (ctx->bypassState != BYPASS_OFF)) {
         ctx->nPipesUsed = 0;
         closeExtraPipes(ctx);
+        unlockPreviousBypassBuffers(ctx);
+        unsetBypassBufferLockState(ctx);
         ctx->bypassState = BYPASS_OFF;
      }
 #endif
@@ -1600,6 +1589,8 @@ static int hwc_set(hwc_composer_device_t *dev,
 
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
                                                            dev->common.module);
+    framebuffer_device_t *fbDev = hwcModule->fbDevice;
+
     if (!hwcModule) {
         LOGE("hwc_set invalid module");
 #ifdef COMPOSITION_BYPASS
@@ -1610,6 +1601,14 @@ static int hwc_set(hwc_composer_device_t *dev,
         unlockPreviousOverlayBuffer(ctx);
         return -1;
     }
+#ifdef COMPOSITION_BYPASS
+    if(!list){
+        //Device in suspended state. Close all the MDP pipes
+        ctx->nPipesUsed = 0;
+    }
+    closeExtraPipes(ctx);
+#endif
+
 
     int ret = 0;
     if (list) {
@@ -1633,38 +1632,50 @@ static int hwc_set(hwc_composer_device_t *dev,
             }
         }
     } else {
-        //Device in suspended state. Close all the MDP pipes
-#ifdef COMPOSITION_BYPASS
-        ctx->nPipesUsed = 0;
-#endif
         ctx->hwcOverlayStatus =  HWC_OVERLAY_PREPARE_TO_CLOSE;
     }
     
 
     bool canSkipComposition = list && list->flags & HWC_SKIP_COMPOSITION;
+
+    //Draw External-only layers
+    if(ExtDispOnly::draw(ctx, list) != overlay::NO_ERROR) {
+        ExtDispOnly::close();
+    }
+
+#if BYPASS_DEBUG
+    if(canSkipComposition)
+        LOGE("%s: skipping eglSwapBuffer call", __FUNCTION__);
+#endif
+    // Do not call eglSwapBuffers if we the skip composition flag is set on the list.
+    if (dpy && sur && !canSkipComposition) {
+#ifdef COMPOSITION_BYPASS
+        if(ctx->bypassState == BYPASS_OFF_PENDING)
+            fbDev->perform(fbDev, EVENT_RESET_POSTBUFFER, NULL);
+#endif
+        EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
+        if (!sucess) {
+            ret = HWC_EGL_ERROR;
+        } else {
+#ifdef COMPOSITION_BYPASS
+           if(ctx->bypassState == BYPASS_OFF_PENDING) {
+              fbDev->perform(fbDev, EVENT_WAIT_POSTBUFFER, NULL);
+              ctx->bypassState = BYPASS_OFF;
+           }
+#endif
+            CALC_FPS();
+        }
+    }
+
+    // Unlock the previously locked buffer, since the overlay has completed reading the buffer
+    unlockPreviousOverlayBuffer(ctx);
+
 #ifdef COMPOSITION_BYPASS
     unlockPreviousBypassBuffers(ctx);
     storeLockedBypassHandle(list, ctx);
     // We have stored the handles, unset the current lock states in the context.
     unsetBypassBufferLockState(ctx);
-    closeExtraPipes(ctx);
-#if BYPASS_DEBUG
-    if(canSkipComposition)
-        LOGE("%s: skipping eglSwapBuffer call", __FUNCTION__);
 #endif
-#endif
-    // Do not call eglSwapBuffers if we the skip composition flag is set on the list.
-    if (dpy && sur && !canSkipComposition) {
-        EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
-        if (!sucess) {
-            ret = HWC_EGL_ERROR;
-        }
-    } else {
-        CALC_FPS();
-    }
-
-    // Unlock the previously locked buffer, since the overlay has completed reading the buffer
-    unlockPreviousOverlayBuffer(ctx);
 
 #if defined HDMI_DUAL_DISPLAY
     if(ctx->pendingHDMI) {
