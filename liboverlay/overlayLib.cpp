@@ -383,8 +383,8 @@ int overlay::initOverlay() {
         LOGD("initoverlay:: opening the device:: %s", name);
         fd = open(name, O_RDWR, 0);
         if(fd < 0) {
-            LOGE("cannot open framebuffer(%d)", i);
-            return -1;
+            LOGW("cannot open framebuffer(%d)", i);
+            continue;
         }
         //Get the mixer configuration */
         req.mixer_num = i;
