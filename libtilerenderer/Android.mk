@@ -4,7 +4,7 @@ include $(CLEAR_VARS)
 ifeq ($(USE_OPENGL_RENDERER),true)
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)
-LOCAL_SHARED_LIBRARIES := libutils libcutils libGLESv2 libhwui
+LOCAL_SHARED_LIBRARIES := libutils libcutils libGLESv2
 
 LOCAL_C_INCLUDES += \
 	frameworks/base/include/utils \
