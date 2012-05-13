@@ -71,9 +71,7 @@ void TileRenderer::startTileRendering(OpenGLRenderer* renderer,
     }
 
     //clear off all errors before tiling, if any
-    while ((status = glGetError()) != GL_NO_ERROR) {
-        LOGE("glStartTilingQCOM: 0x%x", status);
-    }
+    while ((status = glGetError()) != GL_NO_ERROR);
 
     if (preserve)
         glStartTilingQCOM(l, t, w, h, GL_COLOR_BUFFER_BIT0_QCOM);
@@ -83,8 +81,6 @@ void TileRenderer::startTileRendering(OpenGLRenderer* renderer,
     status = glGetError();
     if (status == GL_NO_ERROR)
         mIsTiled = true;
-    else
-        LOGE("glStartTilingQCOM: 0x%x", status);
 }
 
 void TileRenderer::endTileRendering(OpenGLRenderer*) {
@@ -94,9 +90,7 @@ void TileRenderer::endTileRendering(OpenGLRenderer*) {
     glEndTilingQCOM(GL_COLOR_BUFFER_BIT0_QCOM);
     mIsTiled = false;
     GLenum status = GL_NO_ERROR;
-    while ((status = glGetError()) != GL_NO_ERROR) {
-        LOGE("glEndTilingQCOM: 0x%x", status);
-    }
+    while ((status = glGetError()) != GL_NO_ERROR);
 }
 
 }; // namespace uirenderer
