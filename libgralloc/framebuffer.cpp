@@ -49,7 +49,7 @@
 #include <cutils/properties.h>
 #endif
 
-#include <qcom_ui.h>
+#include <utils/profiler.h>
 
 #define FB_DEBUG 0
 
@@ -100,7 +100,7 @@ static int fb_setSwapInterval(struct framebuffer_device_t* dev,
             int interval)
 {
     char pval[PROPERTY_VALUE_MAX];
-    property_get("debug.gr.swapinterval", pval, "-1");
+    property_get("debug.egl.swapinterval", pval, "-1");
     int property_interval = atoi(pval);
     if (property_interval >= 0)
         interval = property_interval;

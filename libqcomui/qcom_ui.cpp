@@ -34,12 +34,11 @@
 #include <alloc_controller.h>
 #include <memalloc.h>
 #include <errno.h>
-#include <cutils/properties.h>
 #include <EGL/eglext.h>
-
-#include <EGL/egl.h>
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
+#include <sys/stat.h>
+#include <SkBitmap.h>
+#include <SkImageEncoder.h>
+#include <Transform.h>
 
 using gralloc::IMemAlloc;
 using gralloc::IonController;
@@ -149,33 +148,6 @@ bool isGPUSupportedFormat(int format) {
        return false;
     }
     return true;
-}
-
-/* decide the texture target dynamically, based on the pixel format*/
-
-int decideTextureTarget(int pixel_format)
-{
-
-  // Default the return value to GL_TEXTURE_EXTERAL_OES
-  int retVal = GL_TEXTURE_EXTERNAL_OES;
-
-  // Change texture target to TEXTURE_2D for RGB formats
-  switch (pixel_format) {
-
-     case HAL_PIXEL_FORMAT_RGBA_8888:
-     case HAL_PIXEL_FORMAT_RGBX_8888:
-     case HAL_PIXEL_FORMAT_RGB_888:
-     case HAL_PIXEL_FORMAT_RGB_565:
-     case HAL_PIXEL_FORMAT_BGRA_8888:
-     case HAL_PIXEL_FORMAT_RGBA_5551:
-     case HAL_PIXEL_FORMAT_RGBA_4444:
-          retVal = GL_TEXTURE_2D;
-          break;
-     default:
-          retVal = GL_TEXTURE_EXTERNAL_OES;
-          break;
-  }
-  return retVal;
 }
 
 /*
@@ -472,186 +444,312 @@ int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur)
 /*
  * Handles the externalDisplay event
  * HDMI has highest priority compared to WifiDisplay
- * Based on the current and the new display event, decides the
+ * Based on the current and the new display type, decides the
  * external display to be enabled
  *
- * @param: newEvent - new external event
- * @param: currEvent - currently enabled external event
- * @return: external display to be enabled
+ * @param: disp - external display type(wfd/hdmi)
+ * @param: value - external event(0/1)
+ * @param: currdispType - Current enabled external display Type
+ * @return: external display type to be enabled
  *
  */
-external_display handleEventHDMI(external_display newState, external_display
-                                                                   currState)
+external_display_type handleEventHDMI(external_display_type disp, int value,
+                                       external_display_type currDispType)
 {
-    external_display retState = currState;
-    switch(newState) {
-        case EXT_DISPLAY_HDMI:
-            retState = EXT_DISPLAY_HDMI;
+    external_display_type retDispType = currDispType;
+    switch(disp) {
+        case EXT_TYPE_HDMI:
+            if(value)
+                retDispType = EXT_TYPE_HDMI;
+            else
+                retDispType = EXT_TYPE_NONE;
             break;
-        case EXT_DISPLAY_WIFI:
-            if(currState != EXT_DISPLAY_HDMI) {
-                retState = EXT_DISPLAY_WIFI;
+        case EXT_TYPE_WIFI:
+            if(currDispType != EXT_TYPE_HDMI) {
+                if(value)
+                    retDispType = EXT_TYPE_WIFI;
+                else
+                    retDispType = EXT_TYPE_NONE;
             }
             break;
-        case EXT_DISPLAY_OFF:
-            retState = EXT_DISPLAY_OFF;
-            break;
         default:
-            LOGE("handleEventHDMI: unknown Event");
+            LOGE("%s: Unknown External Display Type!!");
             break;
     }
-    return retState;
-}
-#ifdef DEBUG_CALC_FPS
-ANDROID_SINGLETON_STATIC_INSTANCE(CalcFps) ;
-
-CalcFps::CalcFps() {
-    debug_fps_level = 0;
-    Init();
+    return retDispType;
 }
 
-CalcFps::~CalcFps() {
-}
+// Using global variables for layer dumping since "property_set("debug.sf.dump",
+// property)" does not work.
+int sfdump_countlimit_raw = 0;
+int sfdump_counter_raw = 1;
+char sfdump_propstr_persist_raw[PROPERTY_VALUE_MAX] = "";
+char sfdumpdir_raw[256] = "";
+int sfdump_countlimit_png = 0;
+int sfdump_counter_png = 1;
+char sfdump_propstr_persist_png[PROPERTY_VALUE_MAX] = "";
+char sfdumpdir_png[256] = "";
 
-void CalcFps::Init() {
-    char prop[PROPERTY_VALUE_MAX];
-    property_get("debug.gr.calcfps", prop, "0");
-    debug_fps_level = atoi(prop);
-    if (debug_fps_level > MAX_DEBUG_FPS_LEVEL) {
-        LOGW("out of range value for debug.gr.calcfps, using 0");
-        debug_fps_level = 0;
-    }
-
-    LOGE("DEBUG_CALC_FPS: %d", debug_fps_level);
-    populate_debug_fps_metadata();
-}
-
-void CalcFps::Fps() {
-    if (debug_fps_level > 0)
-        calc_fps(ns2us(systemTime()));
-}
-
-void CalcFps::populate_debug_fps_metadata(void)
+bool needToDumpLayers()
 {
-    char prop[PROPERTY_VALUE_MAX];
+    bool bDumpLayer = false;
+    char sfdump_propstr[PROPERTY_VALUE_MAX];
+    time_t timenow;
+    tm sfdump_time;
 
-    /*defaults calculation of fps to based on number of frames*/
-    property_get("debug.gr.calcfps.type", prop, "0");
-    debug_fps_metadata.type = (debug_fps_metadata_t::DfmType) atoi(prop);
+    time(&timenow);
+    localtime_r(&timenow, &sfdump_time);
 
-    /*defaults to 1000ms*/
-    property_get("debug.gr.calcfps.timeperiod", prop, "1000");
-    debug_fps_metadata.time_period = atoi(prop);
-
-    property_get("debug.gr.calcfps.period", prop, "10");
-    debug_fps_metadata.period = atoi(prop);
-
-    if (debug_fps_metadata.period > MAX_FPS_CALC_PERIOD_IN_FRAMES) {
-        debug_fps_metadata.period = MAX_FPS_CALC_PERIOD_IN_FRAMES;
-    }
-
-    /* default ignorethresh_us: 500 milli seconds */
-    property_get("debug.gr.calcfps.ignorethresh_us", prop, "500000");
-    debug_fps_metadata.ignorethresh_us = atoi(prop);
-
-    debug_fps_metadata.framearrival_steps =
-                       (debug_fps_metadata.ignorethresh_us / 16666);
-
-    if (debug_fps_metadata.framearrival_steps > MAX_FRAMEARRIVAL_STEPS) {
-        debug_fps_metadata.framearrival_steps = MAX_FRAMEARRIVAL_STEPS;
-        debug_fps_metadata.ignorethresh_us =
-                        debug_fps_metadata.framearrival_steps * 16666;
-    }
-
-    /* 2ms margin of error for the gettimeofday */
-    debug_fps_metadata.margin_us = 2000;
-
-    for (unsigned int i = 0; i < MAX_FRAMEARRIVAL_STEPS; i++)
-        debug_fps_metadata.accum_framearrivals[i] = 0;
-
-    LOGE("period: %d", debug_fps_metadata.period);
-    LOGE("ignorethresh_us: %lld", debug_fps_metadata.ignorethresh_us);
-}
-
-void CalcFps::print_fps(float fps)
-{
-    if (debug_fps_metadata_t::DFM_FRAMES == debug_fps_metadata.type)
-        LOGE("FPS for last %d frames: %3.2f", debug_fps_metadata.period, fps);
-    else
-        LOGE("FPS for last (%f ms, %d frames): %3.2f",
-             debug_fps_metadata.time_elapsed,
-             debug_fps_metadata.curr_frame, fps);
-
-    debug_fps_metadata.curr_frame = 0;
-    debug_fps_metadata.time_elapsed = 0.0;
-
-    if (debug_fps_level > 1) {
-        LOGE("Frame Arrival Distribution:");
-        for (unsigned int i = 0;
-             i < ((debug_fps_metadata.framearrival_steps / 6) + 1);
-             i++) {
-            LOGE("%lld %lld %lld %lld %lld %lld",
-                 debug_fps_metadata.accum_framearrivals[i*6],
-                 debug_fps_metadata.accum_framearrivals[i*6+1],
-                 debug_fps_metadata.accum_framearrivals[i*6+2],
-                 debug_fps_metadata.accum_framearrivals[i*6+3],
-                 debug_fps_metadata.accum_framearrivals[i*6+4],
-                 debug_fps_metadata.accum_framearrivals[i*6+5]);
+    if ((property_get("debug.sf.dump.png", sfdump_propstr, NULL) > 0) &&
+            (strncmp(sfdump_propstr, sfdump_propstr_persist_png,
+                                                    PROPERTY_VALUE_MAX - 1))) {
+        // Strings exist & not equal implies it has changed, so trigger a dump
+        strncpy(sfdump_propstr_persist_png, sfdump_propstr,
+                                                    PROPERTY_VALUE_MAX - 1);
+        sfdump_countlimit_png = atoi(sfdump_propstr);
+        sfdump_countlimit_png = (sfdump_countlimit_png < 0) ? 0:
+                        (sfdump_countlimit_png >= LONG_MAX) ? (LONG_MAX - 1):
+                                                        sfdump_countlimit_png;
+        if (sfdump_countlimit_png) {
+            sprintf(sfdumpdir_png,"/data/sfdump.png%04d%02d%02d.%02d%02d%02d",
+            sfdump_time.tm_year + 1900, sfdump_time.tm_mon + 1,
+            sfdump_time.tm_mday, sfdump_time.tm_hour,
+            sfdump_time.tm_min, sfdump_time.tm_sec);
+            if (0 == mkdir(sfdumpdir_png, 0777))
+                sfdump_counter_png = 0;
+            else
+                LOGE("sfdump: Error: %s. Failed to create sfdump directory"
+                ": %s", strerror(errno), sfdumpdir_png);
         }
-
-        /* We are done with displaying, now clear the stats */
-        for (unsigned int i = 0;
-             i < debug_fps_metadata.framearrival_steps;
-             i++)
-            debug_fps_metadata.accum_framearrivals[i] = 0;
     }
-    return;
+
+    if (sfdump_counter_png <= sfdump_countlimit_png)
+        sfdump_counter_png++;
+
+    if ((property_get("debug.sf.dump", sfdump_propstr, NULL) > 0) &&
+            (strncmp(sfdump_propstr, sfdump_propstr_persist_raw,
+                                                    PROPERTY_VALUE_MAX - 1))) {
+        // Strings exist & not equal implies it has changed, so trigger a dump
+        strncpy(sfdump_propstr_persist_raw, sfdump_propstr,
+                                                    PROPERTY_VALUE_MAX - 1);
+        sfdump_countlimit_raw = atoi(sfdump_propstr);
+        sfdump_countlimit_raw = (sfdump_countlimit_raw < 0) ? 0:
+                        (sfdump_countlimit_raw >= LONG_MAX) ? (LONG_MAX - 1):
+                                                        sfdump_countlimit_raw;
+        if (sfdump_countlimit_raw) {
+            sprintf(sfdumpdir_raw,"/data/sfdump.raw%04d%02d%02d.%02d%02d%02d",
+            sfdump_time.tm_year + 1900, sfdump_time.tm_mon + 1,
+            sfdump_time.tm_mday, sfdump_time.tm_hour,
+            sfdump_time.tm_min, sfdump_time.tm_sec);
+            if (0 == mkdir(sfdumpdir_raw, 0777))
+                sfdump_counter_raw = 0;
+            else
+                LOGE("sfdump: Error: %s. Failed to create sfdump directory"
+                ": %s", strerror(errno), sfdumpdir_raw);
+        }
+    }
+
+    if (sfdump_counter_raw <= sfdump_countlimit_raw)
+        sfdump_counter_raw++;
+
+    bDumpLayer = (sfdump_countlimit_png || sfdump_countlimit_raw)? true : false;
+    return bDumpLayer;
 }
 
-void CalcFps::calc_fps(nsecs_t currtime_us)
+inline void getHalPixelFormatStr(int format, char pixelformatstr[])
 {
-    static nsecs_t oldtime_us = 0;
+    if (!pixelformatstr)
+        return;
 
-    nsecs_t diff = currtime_us - oldtime_us;
+    switch(format) {
+    case HAL_PIXEL_FORMAT_RGBA_8888:
+        strcpy(pixelformatstr, "RGBA_8888");
+        break;
+    case HAL_PIXEL_FORMAT_RGBX_8888:
+        strcpy(pixelformatstr, "RGBX_8888");
+        break;
+    case HAL_PIXEL_FORMAT_RGB_888:
+        strcpy(pixelformatstr, "RGB_888");
+        break;
+    case HAL_PIXEL_FORMAT_RGB_565:
+        strcpy(pixelformatstr, "RGB_565");
+        break;
+    case HAL_PIXEL_FORMAT_BGRA_8888:
+        strcpy(pixelformatstr, "BGRA_8888");
+        break;
+    case HAL_PIXEL_FORMAT_RGBA_5551:
+        strcpy(pixelformatstr, "RGBA_5551");
+        break;
+    case HAL_PIXEL_FORMAT_RGBA_4444:
+        strcpy(pixelformatstr, "RGBA_4444");
+        break;
+    case HAL_PIXEL_FORMAT_YV12:
+        strcpy(pixelformatstr, "YV12");
+        break;
+    case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+        strcpy(pixelformatstr, "YCbCr_422_SP_NV16");
+        break;
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        strcpy(pixelformatstr, "YCrCb_420_SP_NV21");
+        break;
+    case HAL_PIXEL_FORMAT_YCbCr_422_I:
+        strcpy(pixelformatstr, "YCbCr_422_I_YUY2");
+        break;
+    case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+        strcpy(pixelformatstr, "NV12_ENCODEABLE");
+        break;
+    case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
+        strcpy(pixelformatstr, "YCbCr_420_SP_TILED_TILE_4x2");
+        break;
+    case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        strcpy(pixelformatstr, "YCbCr_420_SP");
+        break;
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
+        strcpy(pixelformatstr, "YCrCb_420_SP_ADRENO");
+        break;
+    case HAL_PIXEL_FORMAT_YCrCb_422_SP:
+        strcpy(pixelformatstr, "YCrCb_422_SP");
+        break;
+    case HAL_PIXEL_FORMAT_R_8:
+        strcpy(pixelformatstr, "R_8");
+        break;
+    case HAL_PIXEL_FORMAT_RG_88:
+        strcpy(pixelformatstr, "RG_88");
+        break;
+    case HAL_PIXEL_FORMAT_INTERLACE:
+        strcpy(pixelformatstr, "INTERLACE");
+        break;
+    default:
+        sprintf(pixelformatstr, "Unknown0x%X", format);
+        break;
+    }
+}
 
-    oldtime_us = currtime_us;
-
-    if (debug_fps_metadata_t::DFM_FRAMES == debug_fps_metadata.type &&
-        diff > debug_fps_metadata.ignorethresh_us) {
+void dumpLayer(int moduleCompositionType, int listFlags, size_t layerIndex,
+                                                        hwc_layer_t hwLayers[])
+{
+    char dumplogstr_png[128] = "";
+    char dumplogstr_raw[128] = "";
+    if (sfdump_counter_png <= sfdump_countlimit_png) {
+        sprintf(dumplogstr_png, "[png-dump-frame: %03d of %03d] ",
+                                    sfdump_counter_png, sfdump_countlimit_png);
+    }
+    if (sfdump_counter_raw <= sfdump_countlimit_raw) {
+        sprintf(dumplogstr_raw, "[raw-dump-frame: %03d of %03d]",
+                                    sfdump_counter_raw, sfdump_countlimit_raw);
+    }
+    if (NULL == hwLayers) {
+        LOGE("sfdump: Error.%s%sLayer[%d] No hwLayers to dump.",
+                                dumplogstr_raw, dumplogstr_png, layerIndex);
         return;
     }
+    hwc_layer *layer = &hwLayers[layerIndex];
+    hwc_rect_t sourceCrop = layer->sourceCrop;
+    hwc_rect_t displayFrame = layer->displayFrame;
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    char pixelformatstr[32] = "None";
 
-    if (debug_fps_metadata.curr_frame < MAX_FPS_CALC_PERIOD_IN_FRAMES) {
-        debug_fps_metadata.framearrivals[debug_fps_metadata.curr_frame] = diff;
-    }
+    if (hnd)
+        getHalPixelFormatStr(hnd->format, pixelformatstr);
 
-    debug_fps_metadata.curr_frame++;
+    LOGE("sfdump: %s%s[%s]-Composition, Layer[%d] SrcBuff[%dx%d] "
+        "SrcCrop[%dl, %dt, %dr, %db] "
+        "DispFrame[%dl, %dt, %dr, %db] Composition-type = %s, Format = %s, "
+        "Orientation = %s, Flags = %s%s%s%s%s%s%s%s%s%s",
+        dumplogstr_raw, dumplogstr_png,
+        (moduleCompositionType == COMPOSITION_TYPE_GPU)? "GPU":
+        (moduleCompositionType == COMPOSITION_TYPE_MDP)? "MDP":
+        (moduleCompositionType == COMPOSITION_TYPE_C2D)? "C2D":
+        (moduleCompositionType == COMPOSITION_TYPE_CPU)? "CPU":
+        (moduleCompositionType == COMPOSITION_TYPE_DYN)? "DYN": "???",
+        layerIndex,
+        (hnd)? hnd->width : -1, (hnd)? hnd->height : -1,
+        sourceCrop.left, sourceCrop.top,
+        sourceCrop.right, sourceCrop.bottom,
+        displayFrame.left, displayFrame.top,
+        displayFrame.right, displayFrame.bottom,
+        (layer->compositionType == HWC_FRAMEBUFFER)? "Framebuffer (OpenGL ES)":
+        (layer->compositionType == HWC_OVERLAY)? "Overlay":
+        (layer->compositionType == HWC_USE_COPYBIT)? "Copybit": "???",
+        pixelformatstr,
+        (layer->transform == Transform::ROT_0)? "ROT_0":
+        (layer->transform == Transform::FLIP_H)? "FLIP_H":
+        (layer->transform == Transform::FLIP_V)? "FLIP_V":
+        (layer->transform == Transform::ROT_90)? "ROT_90":
+        (layer->transform == Transform::ROT_180)? "ROT_180":
+        (layer->transform == Transform::ROT_270)? "ROT_270":
+        (layer->transform == Transform::ROT_INVALID)? "ROT_INVALID":"???",
+        (layer->flags == 0)? "[None]":"",
+        (layer->flags & HWC_SKIP_LAYER)? "[Skip layer]":"",
+        (layer->flags & HWC_LAYER_NOT_UPDATING)? "[Layer not updating]":"",
+        (layer->flags & HWC_USE_ORIGINAL_RESOLUTION)? "[Original Resolution]":"",
+        (layer->flags & HWC_DO_NOT_USE_OVERLAY)? "[Do not use Overlay]":"",
+        (layer->flags & HWC_COMP_BYPASS)? "[Bypass]":"",
+        (layer->flags & HWC_BYPASS_RESERVE_0)? "[Bypass Reserve 0]":"",
+        (layer->flags & HWC_BYPASS_RESERVE_1)? "[Bypass Reserve 1]":"",
+        (listFlags & HWC_GEOMETRY_CHANGED)? "[List: Geometry Changed]":"",
+        (listFlags & HWC_SKIP_COMPOSITION)? "[List: Skip Composition]":"");
 
-    if (debug_fps_level > 1) {
-        unsigned int currstep = (diff + debug_fps_metadata.margin_us) / 16666;
-
-        if (currstep < debug_fps_metadata.framearrival_steps) {
-            debug_fps_metadata.accum_framearrivals[currstep-1]++;
+        if (NULL == hnd) {
+            LOGE("sfdump: %s%sLayer[%d] private-handle is invalid.",
+                                dumplogstr_raw, dumplogstr_png, layerIndex);
+            return;
         }
-    }
 
-    if (debug_fps_metadata_t::DFM_FRAMES == debug_fps_metadata.type) {
-        if (debug_fps_metadata.curr_frame == debug_fps_metadata.period) {
-            /* time to calculate and display FPS */
-            nsecs_t sum = 0;
-            for (unsigned int i = 0; i < debug_fps_metadata.period; i++)
-                sum += debug_fps_metadata.framearrivals[i];
-            print_fps((debug_fps_metadata.period * float(1000000))/float(sum));
+        if ((sfdump_counter_png <= sfdump_countlimit_png) && hnd->base) {
+            bool bResult = false;
+            char sfdumpfile_name[256];
+            SkBitmap *tempSkBmp = new SkBitmap();
+            SkBitmap::Config tempSkBmpConfig = SkBitmap::kNo_Config;
+            sprintf(sfdumpfile_name, "%s/sfdump%03d_layer%d.png", sfdumpdir_png,
+                    sfdump_counter_png, layerIndex);
+
+            switch (hnd->format) {
+                case HAL_PIXEL_FORMAT_RGBA_8888:
+                case HAL_PIXEL_FORMAT_RGBX_8888:
+                case HAL_PIXEL_FORMAT_BGRA_8888:
+                    tempSkBmpConfig = SkBitmap::kARGB_8888_Config;
+                    break;
+                case HAL_PIXEL_FORMAT_RGB_565:
+                case HAL_PIXEL_FORMAT_RGBA_5551:
+                case HAL_PIXEL_FORMAT_RGBA_4444:
+                    tempSkBmpConfig = SkBitmap::kRGB_565_Config;
+                    break;
+                case HAL_PIXEL_FORMAT_RGB_888:
+                default:
+                    tempSkBmpConfig = SkBitmap::kNo_Config;
+                    break;
+            }
+            if (SkBitmap::kNo_Config != tempSkBmpConfig) {
+                tempSkBmp->setConfig(tempSkBmpConfig, hnd->width, hnd->height);
+                tempSkBmp->setPixels((void*)hnd->base);
+                bResult = SkImageEncoder::EncodeFile(sfdumpfile_name,
+                                *tempSkBmp, SkImageEncoder::kPNG_Type, 100);
+                LOGE("sfdump: %sDumped Layer[%d] to %s: %s", dumplogstr_png,
+                    layerIndex, sfdumpfile_name, bResult ? "Success" : "Fail");
+            }
+            else {
+                LOGE("sfdump: %sSkipping Layer[%d] dump: Unsupported layer "
+                    "format %s for png encoder.", dumplogstr_png, layerIndex,
+                                            pixelformatstr);
+            }
+            delete tempSkBmp; // Calls SkBitmap::freePixels() internally.
         }
-    }
-    else if (debug_fps_metadata_t::DFM_TIME == debug_fps_metadata.type) {
-        debug_fps_metadata.time_elapsed += ((float)diff/1000.0);
-        if (debug_fps_metadata.time_elapsed >= debug_fps_metadata.time_period) {
-            float fps = (1000.0 * debug_fps_metadata.curr_frame)/
-                        (float)debug_fps_metadata.time_elapsed;
-            print_fps(fps);
+
+        if ((sfdump_counter_raw <= sfdump_countlimit_raw) && hnd->base) {
+            char sfdumpfile_name[256];
+            bool bResult = false;
+            sprintf(sfdumpfile_name, "%s/sfdump%03d_layer%d_%dx%d_%s.raw",
+                sfdumpdir_raw,
+                sfdump_counter_raw, layerIndex, hnd->width, hnd->height,
+                pixelformatstr);
+            FILE* fp = fopen(sfdumpfile_name, "w+");
+            if (fp != NULL) {
+                bResult = (bool) fwrite((void*)hnd->base, hnd->size, 1, fp);
+                fclose(fp);
+            }
+            LOGE("sfdump: %s Dumped Layer[%d] to %s: %s", dumplogstr_raw,
+                layerIndex, sfdumpfile_name, bResult ? "Success" : "Fail");
         }
-    }
-    return;
 }
-#endif
+

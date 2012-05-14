@@ -60,6 +60,13 @@
 #define FRAMEBUFFER_0 0
 #define FRAMEBUFFER_1 1
 #define FRAMEBUFFER_2 2
+
+// To extract the src buffer transform
+#define SHIFT_SRC_TRANSFORM 4
+#define SRC_TRANSFORM_MASK  0x00F0
+#define FINAL_TRANSFORM_MASK 0x000F
+
+
 #define NUM_SHARPNESS_VALS 256
 #define SHARPNESS_RANGE 1.0f
 #define HUE_RANGE 180
@@ -135,7 +142,6 @@ struct overlay_buffer_info {
     int height;
     int format;
     int size;
-    bool secure;
 };
 
 using android::Mutex;
@@ -308,7 +314,7 @@ enum {
 public:
     OverlayControlChannel();
     ~OverlayControlChannel();
-    bool startControlChannel(int w, int h, int format,
+    bool startControlChannel(const overlay_buffer_info& info,
                                int fbnum, bool norot = false,
                                bool uichannel = false,
                                unsigned int format3D = 0, int zorder = 0,
@@ -333,7 +339,7 @@ public:
     bool getAspectRatioPosition(int w, int h, int orientation,
                                 overlay_rect *inRect, overlay_rect *outRect);
     bool getPositionS3D(int channel, int format, overlay_rect *rect);
-    bool updateOverlaySource(const overlay_buffer_info& info, int orientation, int flags);
+    bool updateOverlaySource(const overlay_buffer_info& info, int flags);
     bool getFormat() const { return mFormat; }
     bool setVisualParam(int8_t paramType, float paramValue);
     bool useVirtualFB ();
@@ -357,7 +363,6 @@ class OverlayDataChannel {
     int mCurrentItem;
     int mNumBuffers;
     bool mUpdateDataChannel;
-    android::sp<gralloc::IAllocController> mAlloc;
     int mBufferType;
 
     bool openDevices(int fbnum = -1, bool uichannel = false, int num_buffers = 2);
@@ -400,6 +405,8 @@ class Overlay {
     int mState;
     // Stores the current device orientation
     int mDevOrientation;
+    //Store the Actual buffer Orientation
+    int mSrcOrientation;
     OverlayControlChannel objOvCtrlChannel[2];
     OverlayDataChannel    objOvDataChannel[2];
 
@@ -438,7 +445,7 @@ private:
     bool setChannelPosition(int x, int y, uint32_t w, uint32_t h, int channel = 0);
     bool setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int channel);
     bool queueBuffer(int fd, uint32_t offset, int channel);
-    bool updateOverlaySource(const overlay_buffer_info& info, int orientation, int flags);
+    bool updateOverlaySource(const overlay_buffer_info& info, int flags);
     int getS3DFormat(int format);
 };
 

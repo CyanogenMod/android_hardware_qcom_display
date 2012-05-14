@@ -117,6 +117,7 @@ int IonController::allocate(alloc_data& data, int usage,
     bool noncontig = false;
 
     data.uncached = useUncached(usage);
+    data.allocType = 0;
 
     if(usage & GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP)
         ionFlags |= ION_HEAP(ION_SF_HEAP_ID);
@@ -142,7 +143,9 @@ int IonController::allocate(alloc_data& data, int usage,
         ionFlags |= ION_SECURE;
 
     if(usage & GRALLOC_USAGE_PRIVATE_DO_NOT_MAP)
-        data.allocType  =  private_handle_t::PRIV_FLAGS_NOT_MAPPED;
+        data.allocType  |=  private_handle_t::PRIV_FLAGS_NOT_MAPPED;
+    else
+        data.allocType  &=  ~(private_handle_t::PRIV_FLAGS_NOT_MAPPED);
 
     // if no flags are set, default to
     // EBI heap, so that bypass can work
@@ -166,7 +169,7 @@ int IonController::allocate(alloc_data& data, int usage,
     }
 
     if(ret >= 0 ) {
-        data.allocType = private_handle_t::PRIV_FLAGS_USES_ION;
+        data.allocType |= private_handle_t::PRIV_FLAGS_USES_ION;
         if(noncontig)
             data.allocType |= private_handle_t::PRIV_FLAGS_NONCONTIGUOUS_MEM;
         if(ionFlags & ION_SECURE)
@@ -266,6 +269,7 @@ int PmemAshmemController::allocate(alloc_data& data, int usage,
         int compositionType)
 {
     int ret = 0;
+    data.allocType = 0;
 
     // Make buffers cacheable by default
         data.uncached = false;
@@ -410,7 +414,7 @@ int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage)
      data.offset = 0;
      data.size = getBufferSizeAndDimensions(w, h, format, alignedw, alignedh);
      data.align = getpagesize();
-     data.uncached = true;
+     data.uncached = useUncached(usage);
      int allocFlags = usage;
 
      int err = sAlloc->allocate(data, allocFlags, 0);
