@@ -10,6 +10,10 @@ ifeq ($(TARGET_BOARD_PLATFORM),msm7x27a)
       LOCAL_CFLAGS += -DCHECK_FOR_EXTERNAL_FORMAT
 endif
 
+ifeq ($(BOARD_ADRENO_DECIDE_TEXTURE_TARGET),true)
+      LOCAL_CFLAGS += -DDECIDE_TEXTURE_TARGET
+endif
+
 LOCAL_SHARED_LIBRARIES := \
         libutils \
         libcutils \
