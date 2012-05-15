@@ -40,6 +40,10 @@
 #include <SkImageEncoder.h>
 #include <Transform.h>
 
+#include <EGL/egl.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+
 using gralloc::IMemAlloc;
 using gralloc::IonController;
 using gralloc::alloc_data;
@@ -148,6 +152,33 @@ bool isGPUSupportedFormat(int format) {
        return false;
     }
     return true;
+}
+
+/* decide the texture target dynamically, based on the pixel format*/
+
+int decideTextureTarget(int pixel_format)
+{
+
+  // Default the return value to GL_TEXTURE_EXTERAL_OES
+  int retVal = GL_TEXTURE_EXTERNAL_OES;
+
+  // Change texture target to TEXTURE_2D for RGB formats
+  switch (pixel_format) {
+
+     case HAL_PIXEL_FORMAT_RGBA_8888:
+     case HAL_PIXEL_FORMAT_RGBX_8888:
+     case HAL_PIXEL_FORMAT_RGB_888:
+     case HAL_PIXEL_FORMAT_RGB_565:
+     case HAL_PIXEL_FORMAT_BGRA_8888:
+     case HAL_PIXEL_FORMAT_RGBA_5551:
+     case HAL_PIXEL_FORMAT_RGBA_4444:
+          retVal = GL_TEXTURE_2D;
+          break;
+     default:
+          retVal = GL_TEXTURE_EXTERNAL_OES;
+          break;
+  }
+  return retVal;
 }
 
 /*
