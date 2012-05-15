@@ -1085,8 +1085,6 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
         } else if((s3dVideoFormat = getS3DFormat(list))){
             if (s3dVideoFormat)
                 isS3DCompositionNeeded = isS3DCompositionRequired();
-        } else {
-            unlockPreviousOverlayBuffer(ctx);
         }
 
         for (size_t i=0 ; i<list->numHwLayers ; i++) {
@@ -1107,7 +1105,6 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 if(isYuvBuffer(hnd) && !isExternalConnected(ctx)) {
                     if (ctx->hwcOverlayStatus == HWC_OVERLAY_OPEN)
                         ctx->hwcOverlayStatus = HWC_OVERLAY_PREPARE_TO_CLOSE;
-                    unlockPreviousOverlayBuffer(ctx);
                 }
                 // During the animaton UI layers are marked as SKIP
                 // need to still mark the layer for S3D composition
@@ -1118,7 +1115,7 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 list->hwLayers[i].hints &= ~HWC_HINT_CLEAR_FB;
                 markForGPUComp(ctx, list, i);
             } else if (hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO) && (ctx->yuvBufferCount == 1)) {
-                int flags = WAIT_FOR_VSYNC;
+                int flags = skipComposition ? WAIT_FOR_VSYNC : 0;
                 flags |= (hnd->flags &
                        private_handle_t::PRIV_FLAGS_SECURE_BUFFER)?
                        SECURE_OVERLAY_SESSION : 0;
@@ -1136,7 +1133,6 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                     skipComposition = false;
                     if (ctx->hwcOverlayStatus == HWC_OVERLAY_OPEN)
                         ctx->hwcOverlayStatus = HWC_OVERLAY_PREPARE_TO_CLOSE;
-                    unlockPreviousOverlayBuffer(ctx);
 #ifdef USE_OVERLAY
                 } else if(prepareOverlay(ctx, &(list->hwLayers[i]), flags) == 0) {
                     list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
@@ -1156,11 +1152,10 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                     list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
                 }
                 if (HWC_USE_OVERLAY != list->hwLayers[i].compositionType) {
-                    unlockPreviousOverlayBuffer(ctx);
                     skipComposition = false;
                 }
             } else if (getLayerS3DFormat(list->hwLayers[i])) {
-                int flags = WAIT_FOR_VSYNC;
+                int flags = skipComposition ? WAIT_FOR_VSYNC : 0;
                 flags |= (1 == list->numHwLayers) ? DISABLE_FRAMEBUFFER_FETCH : 0;
                 flags |= (hnd->flags &
                        private_handle_t::PRIV_FLAGS_SECURE_BUFFER)?
@@ -1647,28 +1642,41 @@ static int hwc_set(hwc_composer_device_t *dev,
     if(canSkipComposition)
         LOGE("%s: skipping eglSwapBuffer call", __FUNCTION__);
 #endif
+
     // Do not call eglSwapBuffers if we the skip composition flag is set on the list.
     if (dpy && sur && !canSkipComposition) {
+        //Wait for closing pipes and unlocking buffers until FB is done posting
+        //buffers, only if MDP pipes are in use. (Video, Comp.Bypass)
+        //For future releases we might wait even for UI updates. TBD.
+        bool waitForFBPost = false;
+
 #ifdef COMPOSITION_BYPASS
         if(ctx->bypassState == BYPASS_OFF_PENDING)
-            fbDev->perform(fbDev, EVENT_RESET_POSTBUFFER, NULL);
+            waitForFBPost = true;
 #endif
+        if(ctx->hwcOverlayStatus != HWC_OVERLAY_CLOSED)
+            waitForFBPost = true;
+
+        //Reset FB post status before doing eglSwap
+        if(waitForFBPost)
+            fbDev->perform(fbDev, EVENT_RESET_POSTBUFFER, NULL);
+
         EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
         if (!sucess) {
             ret = HWC_EGL_ERROR;
         } else {
-#ifdef COMPOSITION_BYPASS
-           if(ctx->bypassState == BYPASS_OFF_PENDING) {
+            //If swap succeeds, wait till FB posts buffer for display.
+            if(waitForFBPost)
               fbDev->perform(fbDev, EVENT_WAIT_POSTBUFFER, NULL);
+
+#ifdef COMPOSITION_BYPASS
+            if(ctx->bypassState == BYPASS_OFF_PENDING)
               ctx->bypassState = BYPASS_OFF;
-           }
 #endif
+
             CALC_FPS();
         }
     }
-
-    // Unlock the previously locked buffer, since the overlay has completed reading the buffer
-    unlockPreviousOverlayBuffer(ctx);
 
 #ifdef COMPOSITION_BYPASS
     unlockPreviousBypassBuffers(ctx);
@@ -1695,6 +1703,12 @@ static int hwc_set(hwc_composer_device_t *dev,
 #endif
 
     hwc_closeOverlayChannels(ctx);
+
+    // Unlock the previously locked vdeo buffer, since the overlay has completed
+    // reading the buffer. Should be done only after closing channels, if
+    // applicable.
+    unlockPreviousOverlayBuffer(ctx);
+
     return ret;
 }
 
