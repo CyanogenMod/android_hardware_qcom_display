@@ -62,7 +62,7 @@ namespace {
 
     /* Internal function to perform the actual lock/unlock operations */
     genlock_status_t perform_lock_unlock_operation(native_handle_t *buffer_handle,
-            int lockType, int timeout)
+            int lockType, int timeout, int flags)
     {
         if (private_handle_t::validate(buffer_handle)) {
             LOGE("%s: handle is invalid", __FUNCTION__);
@@ -79,10 +79,21 @@ namespace {
 
             genlock_lock lock;
             lock.op = lockType;
-            lock.flags = 0;
+            lock.flags = flags;
             lock.timeout = timeout;
             lock.fd = hnd->genlockHandle;
 
+#ifdef GENLOCK_IOC_DREADLOCK
+            if (ioctl(hnd->genlockPrivFd, GENLOCK_IOC_DREADLOCK, &lock)) {
+                LOGE("%s: GENLOCK_IOC_DREADLOCK failed (lockType0x%x, err=%s fd=%d)", __FUNCTION__,
+                        lockType, strerror(errno), hnd->fd);
+                if (ETIMEDOUT == errno)
+                    return GENLOCK_TIMEDOUT;
+
+                return GENLOCK_FAILURE;
+            }
+#else
+            // depreciated
             if (ioctl(hnd->genlockPrivFd, GENLOCK_IOC_LOCK, &lock)) {
                 LOGE("%s: GENLOCK_IOC_LOCK failed (lockType0x%x, err=%s fd=%d)", __FUNCTION__,
                         lockType, strerror(errno), hnd->fd);
@@ -91,6 +102,7 @@ namespace {
 
                 return GENLOCK_FAILURE;
             }
+#endif
         }
         return GENLOCK_NO_ERROR;
     }
@@ -269,7 +281,7 @@ genlock_status_t genlock_lock_buffer(native_handle_t *buffer_handle,
         LOGW("%s: trying to lock a buffer with timeout = 0", __FUNCTION__);
     }
     // Call the private function to perform the lock operation specified.
-    ret = perform_lock_unlock_operation(buffer_handle, kLockType, timeout);
+    ret = perform_lock_unlock_operation(buffer_handle, kLockType, timeout, 0);
 #endif
     return ret;
 }
@@ -287,7 +299,7 @@ genlock_status_t genlock_unlock_buffer(native_handle_t *buffer_handle)
 #ifdef USE_GENLOCK
     // Do the unlock operation by setting the unlock flag. Timeout is always
     // 0 in this case.
-    ret = perform_lock_unlock_operation(buffer_handle, GENLOCK_UNLOCK, 0);
+    ret = perform_lock_unlock_operation(buffer_handle, GENLOCK_UNLOCK, 0, 0);
 #endif
     return ret;
 }
@@ -326,4 +338,28 @@ genlock_status_t genlock_wait(native_handle_t *buffer_handle, int timeout) {
     }
 #endif
     return GENLOCK_NO_ERROR;
+}
+
+/*
+ * Convert a write lock that we own to a read lock
+ *
+ * @param: handle of the buffer
+ * @param: timeout value for the wait.
+ * return: error status.
+ */
+genlock_status_t genlock_write_to_read(native_handle_t *buffer_handle, int timeout) {
+    genlock_status_t ret = GENLOCK_NO_ERROR;
+#ifdef USE_GENLOCK
+    if (0 == timeout) {
+        LOGW("%s: trying to lock a buffer with timeout = 0", __FUNCTION__);
+    }
+    // Call the private function to perform the lock operation specified.
+#ifdef GENLOCK_IOC_DREADLOCK
+    ret = perform_lock_unlock_operation(buffer_handle, GENLOCK_RDLOCK, timeout, GENLOCK_WRITE_TO_READ);
+#else
+    // depreciated
+    ret = perform_lock_unlock_operation(buffer_handle, GENLOCK_RDLOCK, timeout, 0);
+#endif
+#endif
+    return ret;
 }

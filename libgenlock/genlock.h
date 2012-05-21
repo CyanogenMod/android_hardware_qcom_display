@@ -111,6 +111,15 @@ genlock_status_t genlock_unlock_buffer(native_handle_t *buffer_handle);
  */
 genlock_status_t genlock_wait(native_handle_t *buffer_handle, int timeout);
 
+/*
+ * Convert a write lock that we own to a read lock
+ *
+ * @param: handle of the buffer
+ * @param: timeout value for the wait.
+ * return: error status.
+ */
+genlock_status_t genlock_write_to_read(native_handle_t *buffer_handle, int timeout);
+
 #ifdef __cplusplus
 }
 #endif
