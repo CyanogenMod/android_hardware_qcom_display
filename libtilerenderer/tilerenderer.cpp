@@ -38,6 +38,7 @@ void TileRenderer::startTileRendering(OpenGLRenderer* renderer,
     int width = 0;
     int height = 0;
     GLenum status = GL_NO_ERROR;
+    int preserve = 0;
 
     if (renderer != NULL) {
         renderer->getViewport(width, height);
@@ -48,6 +49,7 @@ void TileRenderer::startTileRendering(OpenGLRenderer* renderer,
         top = 0;
         right = width;
         bottom = height;
+        preserve = 1;
     }
 
     if (!left && !right && !top && !bottom) {
@@ -56,7 +58,7 @@ void TileRenderer::startTileRendering(OpenGLRenderer* renderer,
         return;
     }
 
-    int l = left, t = (height - bottom), w = (right - left), h = (bottom - top), preserve = 0;
+    int l = left, t = (height - bottom), w = (right - left), h = (bottom - top);
 
     if (l < 0 || t < 0) {
         l = (l < 0) ? 0 : l;
