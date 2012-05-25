@@ -166,6 +166,15 @@ static inline int min(const int& a, const int& b) {
 static inline int max(const int& a, const int& b) {
     return (a > b) ? a : b;
 }
+
+inline void getLayerResolution(const hwc_layer_t* layer, int& width, int& height)
+{
+   hwc_rect_t displayFrame  = layer->displayFrame;
+
+   width = displayFrame.right - displayFrame.left;
+   height = displayFrame.bottom - displayFrame.top;
+}
+
 #ifdef COMPOSITION_BYPASS
 static void timeout_handler(void *udata) {
     LOGD("Comp bypass timeout_handler...");
@@ -382,7 +391,12 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer,
 
         int fbnum = 0;
         int orientation = layer->transform;
-        const bool useVGPipe =  (nPipeIndex != (MAX_BYPASS_LAYERS-1));
+        const bool useVGPipe =
+#ifdef NO_BYPASS_CROPPING
+                (nPipeIndex != (MAX_BYPASS_LAYERS - 2));
+#else
+                (nPipeIndex != (MAX_BYPASS_LAYERS - 1));
+#endif
         //only last layer should wait for vsync
         const bool waitForVsync = vsync_wait;
         const bool isFg = isFG;
@@ -406,6 +420,35 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer,
         }
     }
     return 0;
+}
+
+bool isLayerCropped(private_hwc_module_t* hwcModule, const hwc_layer_list_t* list ) {
+
+    if (!hwcModule) {
+        LOGE("%s: NULL Module", __FUNCTION__);
+        return -1;
+    }
+
+    int hw_w = hwcModule->fbDevice->width;
+    int hw_h = hwcModule->fbDevice->height;
+
+    for (int i = 0; i < list->numHwLayers; ++i) {
+        const hwc_layer_t* layer = &list->hwLayers[i];
+        int dst_w, dst_h;
+        getLayerResolution(layer, dst_w, dst_h);
+
+        hwc_rect_t sourceCrop = layer->sourceCrop;
+        const int src_w = sourceCrop.right - sourceCrop.left;
+        const int src_h = sourceCrop.bottom - sourceCrop.top;
+
+        hwc_rect_t dst = layer->displayFrame;
+
+        if (dst.left < 0 || dst.top < 0 || dst.right > hw_w || dst.bottom > hw_h ||
+                src_w > dst_w || src_h > dst_h) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /*
@@ -463,6 +506,9 @@ inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount
     }
 
     return (yuvCount == 0) && (ctx->hwcOverlayStatus == HWC_OVERLAY_CLOSED)
+#ifdef NO_BYPASS_CROPPING
+                                   && !isLayerCropped(hwcModule, list)
+#endif
                                    && (list->numHwLayers <= MAX_BYPASS_LAYERS);
 }
 
@@ -791,14 +837,6 @@ bool canSkipComposition(hwc_context_t* ctx, int yuvBufferCount, int currentLayer
         ctx->previousLayerCount = -1;
     }
     return false;
-}
-
-inline void getLayerResolution(const hwc_layer_t* layer, int& width, int& height)
-{
-   hwc_rect_t displayFrame  = layer->displayFrame;
-
-   width = displayFrame.right - displayFrame.left;
-   height = displayFrame.bottom - displayFrame.top;
 }
 
 static bool canUseCopybit(const framebuffer_device_t* fbDev, const hwc_layer_list_t* list) {
