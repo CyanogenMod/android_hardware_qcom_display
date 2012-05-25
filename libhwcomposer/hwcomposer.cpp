@@ -49,7 +49,9 @@
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 
 #ifdef COMPOSITION_BYPASS
+#ifndef MAX_BYPASS_LAYERS
 #define MAX_BYPASS_LAYERS 3
+#endif
 #define BYPASS_DEBUG 0
 #define BYPASS_INDEX_OFFSET 4
 #define DEFAULT_IDLE_TIME 2000
