@@ -902,9 +902,7 @@ int fb_device_open(hw_module_t const* module, const char* name,
         dev->device.setUpdateRect = 0;
         dev->device.compositionComplete = fb_compositionComplete;
         dev->device.lockBuffer = fb_lockBuffer;
-#if defined(HDMI_DUAL_DISPLAY)
         dev->device.perform = fb_perform;
-#endif
 
         private_module_t* m = (private_module_t*)module;
         status = mapFrameBuffer(m);
