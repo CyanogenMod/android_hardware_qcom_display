@@ -1691,7 +1691,7 @@ static int hwc_set(hwc_composer_device_t *dev,
             waitForFBPost = true;
 
         //Reset FB post status before doing eglSwap
-        if(waitForFBPost)
+        if(waitForFBPost && fbDev->perform)
             fbDev->perform(fbDev, EVENT_RESET_POSTBUFFER, NULL);
 
         EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
@@ -1699,7 +1699,7 @@ static int hwc_set(hwc_composer_device_t *dev,
             ret = HWC_EGL_ERROR;
         } else {
             //If swap succeeds, wait till FB posts buffer for display.
-            if(waitForFBPost)
+            if(waitForFBPost && fbDev->perform)
               fbDev->perform(fbDev, EVENT_WAIT_POSTBUFFER, NULL);
 
 #ifdef COMPOSITION_BYPASS
