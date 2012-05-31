@@ -30,6 +30,12 @@
 #include "IdleTimer.h"
 TimerHandler IdleTimer::mHandler = NULL;
 
+IdleTimer::IdleTimer():mID(-1) {
+    memset(&mSAction, 0, sizeof(struct sigaction));
+    memset(&mSEvent, 0, sizeof(struct sigevent));
+    memset(&mSpec, 0, sizeof(struct itimerspec));
+}
+
 int IdleTimer::create(TimerHandler reg_handler, void* user_data) {
 
     /* store registerd handler */
@@ -75,8 +81,6 @@ int IdleTimer::reset() {
 void IdleTimer::setFreq(unsigned long freq_msecs) {
     mSpec.it_value.tv_sec = freq_msecs / 1000;
     mSpec.it_value.tv_nsec = 0;
-    mSpec.it_interval.tv_sec = mSpec.it_value.tv_sec;
-    mSpec.it_interval.tv_nsec = mSpec.it_value.tv_nsec;
 }
 
 void IdleTimer::timer_cb(int sig, siginfo_t* si, void* uc) {
