@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "OverlayLIB"
+
 #include "overlayLib.h"
 #include "gralloc_priv.h"
 
@@ -42,6 +44,20 @@ void swapWidthHeight(Type& width, Type& height) {
     Type tmp = width;
     width = height;
     height = tmp;
+}
+
+const char* overlay::getFbNumString(int fbnum)
+{
+    static const char* fbnames[] = {
+             "primary",
+             "secondary",
+             "tertiary",
+             "unspecified"
+        };
+    const int fbnum_lim = (sizeof(fbnames)/sizeof(fbnames[0])) - 2;
+    if ((fbnum < 0) || (fbnum > fbnum_lim))
+        fbnum = fbnum_lim + 1;
+    return fbnames[fbnum];
 }
 
 int overlay::get_mdp_format(int format) {
@@ -125,8 +141,6 @@ void overlay::normalize_crop(uint32_t& xy, uint32_t& wh) {
         EVEN_OUT(wh);
     }
 }
-
-#define LOG_TAG "OverlayLIB"
 static void reportError(const char* message) {
     LOGE( "%s", message);
 }
@@ -824,7 +838,7 @@ bool Overlay::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
             return setChannelCrop(x, y, w, h, VG0_PIPE);
             break;
         case OV_3D_VIDEO_2D_PANEL:
-            objOvDataChannel[VG0_PIPE].getCropS3D(&inRect, VG0_PIPE, mS3DFormat, &rect);
+            objOvCtrlChannel[VG0_PIPE].getCropS3D(&inRect, VG0_PIPE, mS3DFormat, &rect);
             return setChannelCrop(rect.x, rect.y, rect.w, rect.h, VG0_PIPE);
             break;
         case OV_2D_VIDEO_ON_TV:
@@ -843,7 +857,7 @@ bool Overlay::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
         Change: Display left view of 3D video on both primary and external
         2D display devices. */
         case OV_3D_VIDEO_2D_TV:
-            objOvDataChannel[0].getCropS3D(&inRect, 0, mS3DFormat, &rect);
+            objOvCtrlChannel[0].getCropS3D(&inRect, 0, mS3DFormat, &rect);
             for (int i=0; i<NUM_CHANNELS; i++) {
                 if(!setChannelCrop(rect.x, rect.y, rect.w, rect.h, i)) {
                     LOGE("%s: failed for pipe %d", __FUNCTION__, i);
@@ -854,7 +868,7 @@ bool Overlay::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
         case OV_3D_VIDEO_3D_PANEL:
         case OV_3D_VIDEO_3D_TV:
             for (int i=0; i<NUM_CHANNELS; i++) {
-                objOvDataChannel[i].getCropS3D(&inRect, i, mS3DFormat, &rect);
+                objOvCtrlChannel[i].getCropS3D(&inRect, i, mS3DFormat, &rect);
                 if(!setChannelCrop(rect.x, rect.y, rect.w, rect.h, i)) {
                     LOGE("%s: failed for pipe %d", __FUNCTION__, i);
                     return false;
@@ -869,7 +883,7 @@ bool Overlay::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
 }
 
 bool Overlay::setChannelCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int channel) {
-    return objOvDataChannel[channel].setCrop(x, y, w, h);
+    return objOvCtrlChannel[channel].setCrop(x, y, w, h);
 }
 
 bool Overlay::updateOverlayFlags(int flags) {
@@ -1003,8 +1017,10 @@ bool Overlay::queueBuffer(int fd, uint32_t offset, int channel) {
     return ret;
 }
 
-OverlayControlChannel::OverlayControlChannel() : mNoRot(false), mFD(-1), mRotFD(-1),
-                                                 mFormat3D(0), mIsChannelUpdated(true) {
+OverlayControlChannel::OverlayControlChannel() :
+                                        mNoRot(false), mFD(-1), mRotFD(-1),
+                                        mFormat3D(0), mIsChannelUpdated(true),
+                                        mRotDscaleAdj(ROT_DSCALE_NONE) {
     memset(&mOVInfo, 0, sizeof(mOVInfo));
     memset(&m3DOVInfo, 0, sizeof(m3DOVInfo));
     memset(&mRotInfo, 0, sizeof(mRotInfo));
@@ -1364,6 +1380,8 @@ bool OverlayControlChannel::startOVRotatorSessions(
     int w = info.width;
     int h = info.height;
     int format = info.format;
+    LOGD("[%s]startOVRotatorSessions(w=%d, h=%d)", getFbNumString(mFBNum),
+                                                                w, h, mFBNum);
 
     if (!mNoRot) {
         mRotInfo.src.format = format;
@@ -1398,10 +1416,16 @@ bool OverlayControlChannel::startOVRotatorSessions(
         } else
             mRotInfo.enable = 1;
 
+
+        // Reset rotator scaling factor.
+        mRotDscaleAdj = ROT_DSCALE_NONE;
+        mRotInfo.downscale_ratio = ROT_DSCALE_NONE;
+
         int result = ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo);
         if (result) {
-            reportError("Rotator session failed");
+            reportError("startOVRotatorSessions, Rotator session failed");
             dump(mRotInfo);
+            mRotInfo.enable = 0;
             ret = false;
         }
     }
@@ -1487,6 +1511,7 @@ bool OverlayControlChannel::startControlChannel(const overlay_buffer_info& info,
     ovBufInfo.width = info.width;
     ovBufInfo.height = info.height;
     ovBufInfo.format = hw_format;
+    mRotDscaleAdj = ROT_DSCALE_NONE;
     if (!setOverlayInformation(ovBufInfo, zorder, flags, NEW_REQUEST))
         return false;
 
@@ -1531,6 +1556,7 @@ bool OverlayControlChannel::closeControlChannel() {
     mSize = 0;
     mOrientation = 0;
     mFormat3D = 0;
+    mRotDscaleAdj = ROT_DSCALE_NONE;
 
     return true;
 }
@@ -1559,6 +1585,8 @@ bool OverlayControlChannel::updateOverlayFlags(int flags) {
 }
 
 bool OverlayControlChannel::setPosition(int x, int y, uint32_t w, uint32_t h) {
+    LOGD("[%s] setPosition(x=%d, y=%d, w=%d, h=%d)", getFbNumString(mFBNum),
+                                                                    x, y, w, h);
 
     if (!isChannelUP() ||
            (x < 0) || (y < 0) || ((x + w) > mFBWidth) ||
@@ -1570,32 +1598,42 @@ bool OverlayControlChannel::setPosition(int x, int y, uint32_t w, uint32_t h) {
     }
     if( x != mOVInfo.dst_rect.x || y != mOVInfo.dst_rect.y ||
         w != mOVInfo.dst_rect.w || h !=  mOVInfo.dst_rect.h ) {
-        mdp_overlay ov;
-        ov.id = mOVInfo.id;
-        if (ioctl(mFD, MSMFB_OVERLAY_GET, &ov)) {
-            reportError("setPosition, overlay GET failed");
-            return false;
-        }
+        mdp_overlay ov = mOVInfo;
+        msm_rotator_img_info rot = mRotInfo;
 
         /* Scaling of upto a max of 8 times supported */
-        if(w >(ov.src_rect.w * HW_OVERLAY_MAGNIFICATION_LIMIT)){
-            w = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.w;
+        if(w >((ov.src_rect.w << mRotDscaleAdj) * HW_OVERLAY_MAGNIFICATION_LIMIT)){
+            w = HW_OVERLAY_MAGNIFICATION_LIMIT * (ov.src_rect.w << mRotDscaleAdj);
             x = (mFBWidth - w) / 2;
         }
-        if(h >(ov.src_rect.h * HW_OVERLAY_MAGNIFICATION_LIMIT)) {
-            h = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.h;
+        if(h >((ov.src_rect.h << mRotDscaleAdj) * HW_OVERLAY_MAGNIFICATION_LIMIT)) {
+            h = HW_OVERLAY_MAGNIFICATION_LIMIT * (ov.src_rect.h << mRotDscaleAdj);
             y = (mFBHeight - h) / 2;
         }
         ov.dst_rect.x = x;
         ov.dst_rect.y = y;
         ov.dst_rect.w = w;
         ov.dst_rect.h = h;
+
+        // Reset adjust on src_rect for pre-adjust logics correctness.
+        rotatorResetAdjustOvSrcRect(ov);
+
+        // Check need for rotator and enable/disable
+        if (false == rotatorDownscaleControl(ov.src_rect.w, ov.src_rect.h,
+                                     ov.dst_rect.w, ov.dst_rect.h, ov, rot))
+            return false;
+
+        // Apply adjust on src_rect.
+        rotatorAdjustOvSrcRect(ov);
+
         if (ioctl(mFD, MSMFB_OVERLAY_SET, &ov)) {
             reportError("setPosition, Overlay SET failed");
             dump(ov);
             return false;
         }
+
         mOVInfo = ov;
+        mRotInfo = rot;
     }
     return true;
 }
@@ -1627,17 +1665,14 @@ bool OverlayControlChannel::useVirtualFB() {
 }
 
 bool OverlayControlChannel::setTransform(int value, bool fetch) {
+    LOGD("[%s]setTransform(value=%d, fetch=%d)", getFbNumString(mFBNum),
+                                                                value, fetch);
+
     if (!isChannelUP()) {
         LOGE("%s: channel is not up", __FUNCTION__);
         return false;
     }
 
-    mdp_overlay ov = mOVInfo;
-    if (fetch && ioctl(mFD, MSMFB_OVERLAY_GET, &ov)) {
-        reportError("setParameter, overlay GET failed");
-        return false;
-    }
-    mOVInfo = ov;
     if (!mIsChannelUpdated) {
         int orientation = get_mdp_orientation(value);
         if (orientation == mOVInfo.user_data[0]) {
@@ -1649,6 +1684,9 @@ bool OverlayControlChannel::setTransform(int value, bool fetch) {
     int val = mOVInfo.user_data[0];
     if (mNoRot)
         return true;
+
+    // Reset adjust on src_rect for pre-adjust logics correctness.
+    rotatorResetAdjustOvSrcRect(mOVInfo);
 
     int rot = value;
     switch(rot) {
@@ -1738,22 +1776,15 @@ bool OverlayControlChannel::setTransform(int value, bool fetch) {
     mOVInfo.user_data[0] = mdp_rotation;
     mRotInfo.rotations = mOVInfo.user_data[0];
 
-    //Always enable rotation for UI mirror usecase
-    if (mOVInfo.user_data[0] || mUIChannel)
-        mRotInfo.enable = 1;
-    else
-        mRotInfo.enable = 0;
+    // Check need for rotator and enable/disable
+    bool res = rotatorDownscaleControl(mOVInfo.src_rect.w, mOVInfo.src_rect.h,
+                     mOVInfo.dst_rect.w, mOVInfo.dst_rect.h, mOVInfo, mRotInfo);
 
-    if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
-        reportError("setTransform, rotator start failed");
+    // Apply adjust on src_rect.
+    rotatorAdjustOvSrcRect(mOVInfo);
+
+    if (false == res)
         return false;
-    }
-
-    /* set input format to overlay depending on rotator being used or not */
-    if (mRotInfo.enable)
-        mOVInfo.src.format = mRotInfo.dst.format;
-    else
-        mOVInfo.src.format = mRotInfo.src.format;
 
     if ((mOVInfo.user_data[0] == MDP_ROT_90) ||
         (mOVInfo.user_data[0] == MDP_ROT_270))
@@ -1779,6 +1810,153 @@ bool OverlayControlChannel::getPosition(int& x, int& y,
     y = mOVInfo.dst_rect.y;
     w = mOVInfo.dst_rect.w;
     h = mOVInfo.dst_rect.h;
+
+    return true;
+}
+
+bool OverlayControlChannel::getCropS3D(overlay_rect *inRect, int channel,
+                                            int format, overlay_rect *rect) {
+    // for the 3D usecase extract channels from a frame
+    switch (format & INPUT_MASK_3D) {
+    case HAL_3D_IN_SIDE_BY_SIDE_L_R:
+        if(channel == 0) {
+            rect->x = 0;
+            rect->y = 0;
+            rect->w = inRect->w/2;
+            rect->h = inRect->h;
+        } else {
+            rect->x = inRect->w/2;
+            rect->y = 0;
+            rect->w = inRect->w/2;
+            rect->h = inRect->h;
+        }
+        break;
+    case HAL_3D_IN_SIDE_BY_SIDE_R_L:
+         if(channel == 1) {
+            rect->x = 0;
+            rect->y = 0;
+            rect->w = inRect->w/2;
+            rect->h = inRect->h;
+        } else {
+            rect->x = inRect->w/2;
+            rect->y = 0;
+            rect->w = inRect->w/2;
+            rect->h = inRect->h;
+        }
+         break;
+    case HAL_3D_IN_TOP_BOTTOM:
+        if(channel == 0) {
+            rect->x = 0;
+            rect->y = 0;
+            rect->w = inRect->w;
+            rect->h = inRect->h/2;
+        } else {
+            rect->x = 0;
+            rect->y = inRect->h/2;
+            rect->w = inRect->w;
+            rect->h = inRect->h/2;
+        }
+        break;
+    case HAL_3D_IN_INTERLEAVE:
+      break;
+    default:
+        reportError("Unsupported 3D format...");
+        break;
+   }
+   return true;
+}
+
+
+bool OverlayControlChannel::setCrop(uint32_t x, uint32_t y,
+                                                    uint32_t w, uint32_t h) {
+    LOGD("[%s]setCrop(x=%d, y=%d, w=%d, h=%d)",  getFbNumString(mFBNum), x, y,
+                                                                        w, h);
+
+    if (!isChannelUP()) {
+        reportError("Channel not set");
+        return false;
+    }
+
+    mdp_overlay ov = mOVInfo;
+    msm_rotator_img_info rot = mRotInfo;
+
+    if ((ov.user_data[0] == MDP_ROT_90) ||
+        (ov.user_data[0] == (MDP_ROT_90 | MDP_FLIP_UD)) ||
+        (ov.user_data[0] == (MDP_ROT_90 | MDP_FLIP_LR))){
+        if (ov.src.width < (y + h))
+            return false;
+
+        uint32_t tmp = x;
+        x = ov.src.width - (y + h);
+        y = tmp;
+
+        tmp = w;
+        w = h;
+        h = tmp;
+    }
+    else if (ov.user_data[0] == MDP_ROT_270) {
+        if (ov.src.height < (x + w))
+            return false;
+
+        uint32_t tmp = y;
+        y = ov.src.height - (x + w);
+        x = tmp;
+
+        tmp = w;
+        w = h;
+        h = tmp;
+    }
+    else if(ov.user_data[0] == MDP_ROT_180) {
+        if ((ov.src.height < (y + h)) || (ov.src.width < ( x + w)))
+            return false;
+
+        x = ov.src.width - (x + w);
+        y = ov.src.height - (y + h);
+    }
+
+    normalize_crop(x, w);
+    normalize_crop(y, h);
+
+    // Reset adjust on src_rect for pre-adjust logics correctness.
+    rotatorResetAdjustOvSrcRect(ov);
+
+    if ((ov.src_rect.x == x) &&
+           (ov.src_rect.y == y) &&
+           (ov.src_rect.w == w) &&
+           (ov.src_rect.h == h))
+        return true;
+
+    // Check need for rotator and enable/disable
+    if (false == rotatorDownscaleControl(ov.src_rect.w, ov.src_rect.h,
+                                 ov.dst_rect.w, ov.dst_rect.h, ov, rot))
+        return false;
+
+    ov.src_rect.x = x;
+    ov.src_rect.y = y;
+    ov.src_rect.w = w;
+    ov.src_rect.h = h;
+
+    // Apply adjust on src_rect.
+    rotatorAdjustOvSrcRect(ov);
+    normalize_crop(ov.src_rect.x, ov.src_rect.w);
+    normalize_crop(ov.src_rect.y, ov.src_rect.h);
+
+
+    /* Scaling of upto a max of 8 times supported */
+    if(ov.dst_rect.w >(ov.src_rect.w * HW_OVERLAY_MAGNIFICATION_LIMIT)){
+        ov.dst_rect.w = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.w;
+    }
+    if(ov.dst_rect.h >(ov.src_rect.h * HW_OVERLAY_MAGNIFICATION_LIMIT)) {
+        ov.dst_rect.h = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.h;
+    }
+    if (ioctl(mFD, MSMFB_OVERLAY_SET, &ov)) {
+        reportError("setCrop, overlay set error");
+        dump(ov);
+        return false;
+    }
+
+    mOVInfo = ov;
+    mRotInfo = rot;
 
     return true;
 }
@@ -1811,9 +1989,121 @@ bool OverlayControlChannel::getSize(int& size) const {
     return true;
 }
 
-OverlayDataChannel::OverlayDataChannel() : mNoRot(false), mFD(-1), mRotFD(-1),
-                                  mPmemFD(-1), mPmemAddr(0), mUpdateDataChannel(false)
+rot_dscale_factor OverlayControlChannel::rotatorDownscaleCheck(
+                    int src_w, int src_h, int dst_w, int dst_h)
 {
+    // We need this check to engage the rotator whenever possible to assist MDP
+    // in performing video downscale.
+    // This saves bandwidth and avoids causing the driver to make too many panel
+    // -mode switches between BLT (writeback) and non-BLT (Direct) modes.
+    // Use-case: Video playback [with downscaling and rotation].
+
+    rot_dscale_factor dscale_factor = ROT_DSCALE_NONE;
+
+    // Check for valid fbnums before making the rotator downscale decision.
+    // ExtDisplay (FbNums): 0 = primary, 1 = HDMI (usually), 2 = WFD (usually)
+    if ((mFBNum < 0) || (mFBNum > 2) || mNoRot)
+        return dscale_factor;
+
+    if (dst_w && dst_h)
+    {
+        int w_ratio = src_w / dst_w;
+        int h_ratio = src_h / dst_h;
+        int dscale = (w_ratio > h_ratio) ? w_ratio : h_ratio;
+        switch(dscale) {
+        case 0: case 1:
+            // Scale ~51% to 100% or more.
+            break;
+        case 2: case 3:
+            // Scale ~26% to 50%
+            dscale_factor = ROT_DSCALE_ONE_HALF;
+            break;
+        case 4: case 5: case 6: case 7:
+            // Scale ~12.6% to 25%
+            dscale_factor = ROT_DSCALE_ONE_FOURTH;
+            break;
+        default:
+            // Scale 12.5% and less.
+            dscale_factor = ROT_DSCALE_ONE_EIGTH;
+            break;
+        }
+        LOGD_IF(dscale_factor, "Rotator 1/%d downscaling activated on %s "
+            "display with src_w = %d, src_h = %d, dst_w = %d, dst_h = %d",
+            1 << dscale_factor, getFbNumString(mFBNum),
+            src_w, src_h, dst_w, dst_h);
+    }
+
+    return dscale_factor;
+}
+
+bool OverlayControlChannel::rotatorDownscaleControl(
+            int src_w, int src_h, int dst_w, int dst_h, mdp_overlay &ovinfo,
+                                                msm_rotator_img_info &rotinfo)
+{
+    if (mNoRot)
+        return true;
+
+    if (mUIChannel)
+        mRotDscaleAdj = ROT_DSCALE_NONE;
+    else
+        mRotDscaleAdj = rotatorDownscaleCheck(src_w, src_h, dst_w, dst_h);
+
+    // Always enable rotation for UI mirror usecase.
+    rotinfo.downscale_ratio = mRotDscaleAdj;
+    if (ovinfo.user_data[0] || mUIChannel || mRotDscaleAdj){
+        rotinfo.enable = 1;
+    } else {
+        rotinfo.enable = 0;
+    }
+
+    LOGE("%s rotator on %s display: src(%dx%d) -> dst(%dx%d) (rot downscale"
+        " factor = 1/%d, src(%dx%d))",
+        rotinfo.enable ? "Enabling" : "Disabling", getFbNumString(mFBNum),
+                    src_w, src_h, dst_w, dst_h, 1 << rotinfo.downscale_ratio,
+                    src_w >> mRotDscaleAdj, src_h >> mRotDscaleAdj);
+    if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &rotinfo)) {
+        reportError("rotatorDownscaleControl, rotator start failed");
+        dump(rotinfo);
+        rotinfo.enable = 0;
+        rotinfo.downscale_ratio = ROT_DSCALE_NONE;
+        mRotDscaleAdj = ROT_DSCALE_NONE;
+        return false;
+    }
+
+    // Set overlay input format depending on rotator being used or not.
+    if (rotinfo.enable)
+        ovinfo.src.format = rotinfo.dst.format;
+    else
+        ovinfo.src.format = rotinfo.src.format;
+    return true;
+}
+
+
+void OverlayControlChannel::rotatorAdjustOvSrcRect(mdp_overlay &ov)
+{
+    // Apply adjust on src_rect.
+    if (mRotDscaleAdj) {
+        ov.src_rect.x >>= mRotDscaleAdj;
+        ov.src_rect.y >>= mRotDscaleAdj;
+        ov.src_rect.w >>= mRotDscaleAdj;
+        ov.src_rect.h >>= mRotDscaleAdj;
+    }
+}
+
+void OverlayControlChannel::rotatorResetAdjustOvSrcRect(mdp_overlay &ov)
+{
+    // Reset adjust on src_rect for pre-adjust logics correctness.
+    if (mRotDscaleAdj) {
+        ov.src_rect.x <<= mRotDscaleAdj;
+        ov.src_rect.y <<= mRotDscaleAdj;
+        ov.src_rect.w <<= mRotDscaleAdj;
+        ov.src_rect.h <<= mRotDscaleAdj;
+    }
+}
+
+
+OverlayDataChannel::OverlayDataChannel() : mNoRot(false), mFD(-1), mRotFD(-1),
+            mPmemFD(-1), mPmemAddr(0), mUpdateDataChannel(false){
 }
 
 OverlayDataChannel::~OverlayDataChannel() {
@@ -2071,135 +2361,6 @@ bool OverlayDataChannel::waitForHdmiVsync() {
         LOGE("%s: MSMFB_OVERLAY_PLAY_WAIT failed", __FUNCTION__);
         return false;
     }
-    return true;
-}
-
-bool OverlayDataChannel::getCropS3D(overlay_rect *inRect, int channel, int format,
-                                    overlay_rect *rect) {
-    // for the 3D usecase extract channels from a frame
-    switch (format & INPUT_MASK_3D) {
-    case HAL_3D_IN_SIDE_BY_SIDE_L_R:
-        if(channel == 0) {
-            rect->x = 0;
-            rect->y = 0;
-            rect->w = inRect->w/2;
-            rect->h = inRect->h;
-        } else {
-            rect->x = inRect->w/2;
-            rect->y = 0;
-            rect->w = inRect->w/2;
-            rect->h = inRect->h;
-        }
-        break;
-    case HAL_3D_IN_SIDE_BY_SIDE_R_L:
-         if(channel == 1) {
-            rect->x = 0;
-            rect->y = 0;
-            rect->w = inRect->w/2;
-            rect->h = inRect->h;
-        } else {
-            rect->x = inRect->w/2;
-            rect->y = 0;
-            rect->w = inRect->w/2;
-            rect->h = inRect->h;
-        }
-         break;
-    case HAL_3D_IN_TOP_BOTTOM:
-        if(channel == 0) {
-            rect->x = 0;
-            rect->y = 0;
-            rect->w = inRect->w;
-            rect->h = inRect->h/2;
-        } else {
-            rect->x = 0;
-            rect->y = inRect->h/2;
-            rect->w = inRect->w;
-            rect->h = inRect->h/2;
-        }
-        break;
-    case HAL_3D_IN_INTERLEAVE:
-      break;
-    default:
-        reportError("Unsupported 3D format...");
-        break;
-   }
-   return true;
-}
-
-bool OverlayDataChannel::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
-    if (!isChannelUP()) {
-        reportError("Channel not set");
-        return false;
-    }
-
-    mdp_overlay ov;
-    ov.id = mOvData.id;
-    if (ioctl(mFD, MSMFB_OVERLAY_GET, &ov)) {
-        reportError("setCrop, overlay GET failed");
-        return false;
-    }
-
-    if ((ov.user_data[0] == MDP_ROT_90) ||
-        (ov.user_data[0] == (MDP_ROT_90 | MDP_FLIP_UD)) ||
-        (ov.user_data[0] == (MDP_ROT_90 | MDP_FLIP_LR))){
-        if (ov.src.width < (y + h))
-            return false;
-
-        uint32_t tmp = x;
-        x = ov.src.width - (y + h);
-        y = tmp;
-
-        tmp = w;
-        w = h;
-        h = tmp;
-    }
-    else if (ov.user_data[0] == MDP_ROT_270) {
-        if (ov.src.height < (x + w))
-            return false;
-
-        uint32_t tmp = y;
-        y = ov.src.height - (x + w);
-        x = tmp;
-
-        tmp = w;
-        w = h;
-        h = tmp;
-    }
-    else if(ov.user_data[0] == MDP_ROT_180) {
-        if ((ov.src.height < (y + h)) || (ov.src.width < ( x + w)))
-            return false;
-
-        x = ov.src.width - (x + w);
-        y = ov.src.height - (y + h);
-    }
-
-
-    normalize_crop(x, w);
-    normalize_crop(y, h);
-
-    if ((ov.src_rect.x == x) &&
-           (ov.src_rect.y == y) &&
-           (ov.src_rect.w == w) &&
-           (ov.src_rect.h == h))
-        return true;
-
-    ov.src_rect.x = x;
-    ov.src_rect.y = y;
-    ov.src_rect.w = w;
-    ov.src_rect.h = h;
-
-    /* Scaling of upto a max of 8 times supported */
-    if(ov.dst_rect.w >(ov.src_rect.w * HW_OVERLAY_MAGNIFICATION_LIMIT)){
-        ov.dst_rect.w = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.w;
-    }
-    if(ov.dst_rect.h >(ov.src_rect.h * HW_OVERLAY_MAGNIFICATION_LIMIT)) {
-        ov.dst_rect.h = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.h;
-    }
-    if (ioctl(mFD, MSMFB_OVERLAY_SET, &ov)) {
-        reportError("setCrop, overlay set error");
-        return false;
-    }
-
     return true;
 }
 
