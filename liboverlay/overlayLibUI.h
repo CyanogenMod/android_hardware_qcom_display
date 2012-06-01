@@ -127,7 +127,7 @@ public:
     void setPosition(int x, int y, int w, int h);
     void setCrop(int x, int y, int w, int h);
     void setDisplayParams(int fbNum, bool waitForVsync, bool isFg, int zorder,
-            bool isVGPipe);
+            bool isVGPipe, bool preMultiBlanding);
     status_t commit();
     status_t closeChannel();
     channel_state_t isChannelUP() const { return mChannelState; };
