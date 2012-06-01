@@ -690,7 +690,6 @@ bool Overlay::setSource(const overlay_buffer_info& info, int orientation,
         newState = getOverlayConfig (format3D, false, hdmiConnected);
         stateChange = (mState != newState) || (isS3DFormatChange);
     }
-
     if (stateChange) {
         if (isS3DFormatChange ||
             (mState == OV_3D_VIDEO_3D_PANEL) ||
@@ -1325,6 +1324,12 @@ void OverlayControlChannel::setInformationFromFlags(int flags, mdp_overlay& ov)
     } else {
         mOVInfo.flags &= ~MDP_OV_PIPE_SHARE;
     }
+
+    if(flags & OVERLAY_BLENDING_PREMULT)
+       mOVInfo.flags |= MDP_BLEND_FG_PREMULT;
+    else
+       mOVInfo.flags &= ~MDP_BLEND_FG_PREMULT;
+
 }
 
 bool OverlayControlChannel::doFlagsNeedUpdate(int flags) {
@@ -1542,6 +1547,10 @@ bool OverlayControlChannel::updateOverlayFlags(int flags) {
         mOVInfo.is_fg = 1;
     else
         mOVInfo.is_fg = 0;
+    if(flags & OVERLAY_BLENDING_PREMULT)
+       mOVInfo.flags |= MDP_BLEND_FG_PREMULT;
+   else
+       mOVInfo.flags &= ~MDP_BLEND_FG_PREMULT;
 
     if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
         LOGE("%s: OVERLAY_SET failed", __FUNCTION__);

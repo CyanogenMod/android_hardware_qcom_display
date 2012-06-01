@@ -251,7 +251,7 @@ void OverlayUI::setSource(const overlay_buffer_info& info, int orientation) {
 }
 
 void OverlayUI::setDisplayParams(int fbNum, bool waitForVsync, bool isFg, int
-        zorder, bool isVGPipe) {
+        zorder, bool isVGPipe, bool premultipliedAlpha) {
     int flags = 0;
 
     if(false == waitForVsync)
@@ -263,7 +263,10 @@ void OverlayUI::setDisplayParams(int fbNum, bool waitForVsync, bool isFg, int
         flags |= MDP_OV_PIPE_SHARE;
     else
         flags &= ~MDP_OV_PIPE_SHARE;
-
+    if(premultipliedAlpha)
+        flags |= MDP_BLEND_FG_PREMULT;
+    else
+        flags &= ~MDP_BLEND_FG_PREMULT;
     //MDP needs this information to set up pixel repeat
     //for VG pipes when upscaling
     flags |= MDP_BACKEND_COMPOSITION;

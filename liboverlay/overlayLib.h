@@ -94,6 +94,7 @@ enum {
     INTERLACED_CONTENT         = 1<<2,
     OVERLAY_PIPE_SHARE         = 1<<3,
     SECURE_OVERLAY_SESSION     = 1<<4,
+    OVERLAY_BLENDING_PREMULT   = 1<<5,
 };
 
 /* ------------------------------- 3D defines ---------------------------------------*/

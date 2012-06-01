@@ -246,7 +246,7 @@ int ExtDispOnly::prepare(hwc_context_t *ctx, hwc_layer_t *layer, int index,
         const int zorder = index;
         const bool isVGPipe = true;
         ovUI->setSource(info, orientation);
-        ovUI->setDisplayParams(fbnum, waitForVsync, isFg, zorder, isVGPipe);
+        ovUI->setDisplayParams(fbnum, waitForVsync, isFg, zorder, isVGPipe,false);
         const int fbWidth = ovUI->getFBWidth();
         const int fbHeight = ovUI->getFBHeight();
         ovUI->setPosition(0, 0, fbWidth, fbHeight);
