@@ -144,7 +144,7 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     data.base = base;
     data.fd = fd_data.fd;
     ioctl(mIonFd, ION_IOC_FREE, &handle_data);
-    LOGD("ion: Allocated buffer base:%p size:%d fd:%d",
+    LOGV("ion: Allocated buffer base:%p size:%d fd:%d",
                             data.base, ionAllocData.len, data.fd);
     return 0;
 }
@@ -153,7 +153,7 @@ int IonAlloc::alloc_buffer(alloc_data& data)
 int IonAlloc::free_buffer(void* base, size_t size, int offset, int fd)
 {
     Locker::Autolock _l(mLock);
-    LOGD("ion: Freeing buffer base:%p size:%d fd:%d",
+    LOGV("ion: Freeing buffer base:%p size:%d fd:%d",
             base, size, fd);
     int err = 0;
     err = open_device();
@@ -184,7 +184,7 @@ int IonAlloc::map_buffer(void **pBase, size_t size, int offset, int fd)
         LOGD("ion: Failed to map memory in the client: %s",
                                 strerror(errno));
     } else {
-        LOGD("ion: Mapped buffer base:%p size:%d offset:%d fd:%d",
+        LOGV("ion: Mapped buffer base:%p size:%d offset:%d fd:%d",
                                 base, size, offset, fd);
     }
     return err;
@@ -192,7 +192,7 @@ int IonAlloc::map_buffer(void **pBase, size_t size, int offset, int fd)
 
 int IonAlloc::unmap_buffer(void *base, size_t size, int offset)
 {
-    LOGD("ion: Unmapping buffer  base:%p size:%d", base, size);
+    LOGV("ion: Unmapping buffer  base:%p size:%d", base, size);
     int err = 0;
     if(munmap(base, size)) {
         err = -errno;
