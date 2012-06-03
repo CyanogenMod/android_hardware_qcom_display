@@ -681,6 +681,7 @@ void dumpLayer(int moduleCompositionType, int listFlags, size_t layerIndex,
     hwc_rect_t displayFrame = layer->displayFrame;
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     char pixelformatstr[32] = "None";
+    uint32_t transform = layer->transform & FINAL_TRANSFORM_MASK;
 
     if (hnd)
         getHalPixelFormatStr(hnd->format, pixelformatstr);
@@ -705,13 +706,13 @@ void dumpLayer(int moduleCompositionType, int listFlags, size_t layerIndex,
         (layer->compositionType == HWC_OVERLAY)? "Overlay":
         (layer->compositionType == HWC_USE_COPYBIT)? "Copybit": "???",
         pixelformatstr,
-        (layer->transform == Transform::ROT_0)? "ROT_0":
-        (layer->transform == Transform::FLIP_H)? "FLIP_H":
-        (layer->transform == Transform::FLIP_V)? "FLIP_V":
-        (layer->transform == Transform::ROT_90)? "ROT_90":
-        (layer->transform == Transform::ROT_180)? "ROT_180":
-        (layer->transform == Transform::ROT_270)? "ROT_270":
-        (layer->transform == Transform::ROT_INVALID)? "ROT_INVALID":"???",
+        (transform == Transform::ROT_0)? "ROT_0":
+        (transform == Transform::FLIP_H)? "FLIP_H":
+        (transform == Transform::FLIP_V)? "FLIP_V":
+        (transform == Transform::ROT_90)? "ROT_90":
+        (transform == Transform::ROT_180)? "ROT_180":
+        (transform == Transform::ROT_270)? "ROT_270":
+        (transform == Transform::ROT_INVALID)? "ROT_INVALID":"???",
         (layer->flags == 0)? "[None]":"",
         (layer->flags & HWC_SKIP_LAYER)? "[Skip layer]":"",
         (layer->flags & HWC_LAYER_NOT_UPDATING)? "[Layer not updating]":"",
