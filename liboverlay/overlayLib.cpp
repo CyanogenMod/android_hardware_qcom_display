@@ -836,8 +836,23 @@ bool Overlay::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
                 }
             }
             break;
-        case OV_3D_VIDEO_3D_PANEL:
+/*      In 3D video capture, right and left cameras are placed at different
+        view point. so there will be a difference in right and left views.
+        currently we are displaying left view on the primary panel and right
+        view on the external display.
+
+        Change: Display left view of 3D video on both primary and external
+        2D display devices. */
         case OV_3D_VIDEO_2D_TV:
+            objOvDataChannel[0].getCropS3D(&inRect, 0, mS3DFormat, &rect);
+            for (int i=0; i<NUM_CHANNELS; i++) {
+                if(!setChannelCrop(rect.x, rect.y, rect.w, rect.h, i)) {
+                    LOGE("%s: failed for pipe %d", __FUNCTION__, i);
+                    return false;
+                }
+            }
+            break;
+        case OV_3D_VIDEO_3D_PANEL:
         case OV_3D_VIDEO_3D_TV:
             for (int i=0; i<NUM_CHANNELS; i++) {
                 objOvDataChannel[i].getCropS3D(&inRect, i, mS3DFormat, &rect);
