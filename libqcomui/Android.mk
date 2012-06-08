@@ -1,10 +1,23 @@
 LOCAL_PATH := $(call my-dir)
+
+#Headers to export
+include $(CLEAR_VARS)
+LOCAL_COPY_HEADERS_TO := qcom/display
+LOCAL_COPY_HEADERS := qcom_ui.h
+include $(BUILD_COPY_HEADERS)
+
+include $(CLEAR_VARS)
+LOCAL_COPY_HEADERS_TO := qcom/display/utils
+LOCAL_COPY_HEADERS := utils/IdleInvalidator.h
+LOCAL_COPY_HEADERS += utils/profiler.h
+include $(BUILD_COPY_HEADERS)
+
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
         qcom_ui.cpp \
         utils/profiler.cpp \
-        utils/IdleTimer.cpp
+        utils/IdleInvalidator.cpp
 
 LOCAL_CFLAGS := -DLOG_TAG=\"libQcomUI\"
 
