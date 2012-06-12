@@ -8,8 +8,7 @@ LOCAL_SHARED_LIBRARIES := \
         libutils \
         libcutils \
         libui \
-        libEGL \
-        libskia
+        libEGL
 
 LOCAL_C_INCLUDES := $(TOP)/hardware/qcom/display/libgralloc \
                     $(TOP)/frameworks/native/services/surfaceflinger \
