@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,11 +51,11 @@ inline size_t ALIGN(size_t x, size_t align) {
 int mapFrameBufferLocked(struct private_module_t* module);
 int terminateBuffer(gralloc_module_t const* module, private_handle_t* hnd);
 size_t getBufferSizeAndDimensions(int width, int height, int format,
-                        int& alignedw, int &alignedh);
+                                  int& alignedw, int &alignedh);
 
 int decideBufferHandlingMechanism(int format, const char *compositionUsed,
-                                   int hasBlitEngine, int *needConversion,
-                                   int *useBufferDirectly);
+                                  int hasBlitEngine, int *needConversion,
+                                  int *useBufferDirectly);
 
 // Allocate buffer from width, height, format into a private_handle_t
 // It is the responsibility of the caller to free the buffer
@@ -66,10 +66,10 @@ void free_buffer(private_handle_t *hnd);
 
 class Locker {
     pthread_mutex_t mutex;
-public:
+    public:
     class Autolock {
         Locker& locker;
-    public:
+        public:
         inline Autolock(Locker& locker) : locker(locker) {  locker.lock(); }
         inline ~Autolock() { locker.unlock(); }
     };

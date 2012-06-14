@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -53,14 +53,14 @@ int AshmemAlloc::alloc_buffer(alloc_data& data)
     } else {
         if (ashmem_set_prot_region(fd, prot) < 0) {
             ALOGE("ashmem_set_prot_region(fd=%d, prot=%x) failed (%s)",
-                 fd, prot, strerror(errno));
+                  fd, prot, strerror(errno));
             close(fd);
             err = -errno;
         } else {
             base = mmap(0, data.size, prot, MAP_SHARED|MAP_POPULATE|MAP_LOCKED, fd, 0);
             if (base == MAP_FAILED) {
                 ALOGE("alloc mmap(fd=%d, size=%d, prot=%x) failed (%s)",
-                     fd, data.size, prot, strerror(errno));
+                      fd, data.size, prot, strerror(errno));
                 close(fd);
                 err = -errno;
             } else {
@@ -74,7 +74,7 @@ int AshmemAlloc::alloc_buffer(alloc_data& data)
         data.offset = offset;
         clean_buffer(base, data.size, offset, fd);
         ALOGD("ashmem: Allocated buffer base:%p size:%d fd:%d",
-                                base, data.size, fd);
+              base, data.size, fd);
 
     }
     return err;
@@ -84,7 +84,7 @@ int AshmemAlloc::alloc_buffer(alloc_data& data)
 int AshmemAlloc::free_buffer(void* base, size_t size, int offset, int fd)
 {
     ALOGD("ashmem: Freeing buffer base:%p size:%d fd:%d",
-                            base, size, fd);
+          base, size, fd);
     int err = 0;
 
     if(!base) {
@@ -102,15 +102,15 @@ int AshmemAlloc::map_buffer(void **pBase, size_t size, int offset, int fd)
     void *base = 0;
 
     base = mmap(0, size, PROT_READ| PROT_WRITE,
-            MAP_SHARED|MAP_POPULATE, fd, 0);
+                MAP_SHARED|MAP_POPULATE, fd, 0);
     *pBase = base;
     if(base == MAP_FAILED) {
         ALOGE("ashmem: Failed to map memory in the client: %s",
-                                strerror(errno));
+              strerror(errno));
         err = -errno;
     } else {
         ALOGD("ashmem: Mapped buffer base:%p size:%d fd:%d",
-                 base, size, fd);
+              base, size, fd);
     }
     return err;
 }
@@ -121,7 +121,7 @@ int AshmemAlloc::unmap_buffer(void *base, size_t size, int offset)
     int err = munmap(base, size);
     if(err) {
         ALOGE("ashmem: Failed to unmap memory at %p: %s",
-                                base, strerror(errno));
+              base, strerror(errno));
     }
     return err;
 

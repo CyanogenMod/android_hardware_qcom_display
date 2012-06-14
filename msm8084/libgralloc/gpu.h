@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,54 +28,51 @@
 #include <utils/RefBase.h>
 
 #include "gralloc_priv.h"
+#include <fb_priv.h>
 
 namespace gralloc {
-    class IAllocController;
-    class gpu_context_t : public alloc_device_t {
-        public:
-            gpu_context_t(const private_module_t* module,
-                          android::sp<IAllocController>alloc_ctrl);
+class IAllocController;
+class gpu_context_t : public alloc_device_t {
+    public:
+    gpu_context_t(const private_module_t* module,
+                  android::sp<IAllocController>alloc_ctrl);
 
-            int gralloc_alloc_framebuffer_locked(size_t size, int usage,
-                                                 buffer_handle_t* pHandle);
+    int gralloc_alloc_framebuffer_locked(size_t size, int usage,
+                                         buffer_handle_t* pHandle);
 
-            int gralloc_alloc_framebuffer(size_t size, int usage,
-                                          buffer_handle_t* pHandle);
+    int gralloc_alloc_framebuffer(size_t size, int usage,
+                                  buffer_handle_t* pHandle);
 
-            int gralloc_alloc_buffer(size_t size, int usage,
-                                     buffer_handle_t* pHandle,
-                                     int bufferType, int format,
-                                     int width, int height);
+    int gralloc_alloc_buffer(size_t size, int usage,
+                             buffer_handle_t* pHandle,
+                             int bufferType, int format,
+                             int width, int height);
 
-            int free_impl(private_handle_t const* hnd);
+    int free_impl(private_handle_t const* hnd);
 
-            int alloc_impl(int w, int h, int format, int usage,
-                           buffer_handle_t* pHandle, int* pStride,
-                           size_t bufferSize = 0);
+    int alloc_impl(int w, int h, int format, int usage,
+                   buffer_handle_t* pHandle, int* pStride,
+                   size_t bufferSize = 0);
 
-            static int gralloc_alloc(alloc_device_t* dev, int w, int h,
-                                     int format, int usage,
-                                     buffer_handle_t* pHandle,
-                                     int* pStride);
+    static int gralloc_alloc(alloc_device_t* dev, int w, int h,
+                             int format, int usage,
+                             buffer_handle_t* pHandle,
+                             int* pStride);
 
-            static int gralloc_free(alloc_device_t* dev, buffer_handle_t handle);
+    static int gralloc_free(alloc_device_t* dev, buffer_handle_t handle);
 
-            static int gralloc_alloc_size(alloc_device_t* dev,
-                                          int w, int h, int format,
-                                          int usage, buffer_handle_t* pHandle,
-                                          int* pStride, int bufferSize);
+    static int gralloc_alloc_size(alloc_device_t* dev,
+                                  int w, int h, int format,
+                                  int usage, buffer_handle_t* pHandle,
+                                  int* pStride, int bufferSize);
 
-            static int gralloc_close(struct hw_device_t *dev);
+    static int gralloc_close(struct hw_device_t *dev);
 
-            int get_composition_type() const { return compositionType; }
-
-
-        private:
-            android::sp<IAllocController> mAllocCtrl;
-            int compositionType;
-            void getGrallocInformationFromFormat(int inputFormat,
-                                                 int *colorFormat,
-                                                 int *bufferType);
-    };
+    private:
+    android::sp<IAllocController> mAllocCtrl;
+    void getGrallocInformationFromFormat(int inputFormat,
+                                         int *colorFormat,
+                                         int *bufferType);
+};
 }
 #endif  // GRALLOC_GPU_H

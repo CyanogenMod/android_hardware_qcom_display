@@ -33,18 +33,19 @@
 #include <cutils/native_handle.h>
 #include <ui/GraphicBuffer.h>
 #include <hardware/hwcomposer.h>
-#include <hardware/hwcomposer_defs.h>
 #include <ui/Region.h>
 #include <EGL/egl.h>
+#include <GLES/gl.h>
 #include <utils/Singleton.h>
 #include <cutils/properties.h>
-#include "../libgralloc/gralloc_priv.h"
 
 using namespace android;
 using android::sp;
 using android::GraphicBuffer;
 
 #define HWC_BYPASS_INDEX_MASK 0x00000030
+#define DEFAULT_WIDTH_RATIO  1
+#define DEFAULT_HEIGHT_RATIO 1
 
 /*
  * Qcom specific Native Window perform operations
@@ -53,15 +54,7 @@ enum {
     NATIVE_WINDOW_SET_BUFFERS_SIZE        = 0x10000000,
     NATIVE_WINDOW_UPDATE_BUFFERS_GEOMETRY = 0x20000000,
     NATIVE_WINDOW_SET_S3D_FORMAT          = 0x40000000,
-};
-
-// Enum containing the supported composition types
-enum {
-    COMPOSITION_TYPE_GPU = 0,
-    COMPOSITION_TYPE_MDP = 0x1,
-    COMPOSITION_TYPE_C2D = 0x2,
-    COMPOSITION_TYPE_CPU = 0x4,
-    COMPOSITION_TYPE_DYN = 0x8
+    NATIVE_WINDOW_SET_PIXEL_ASPECT_RATIO  = 0x80000000,
 };
 
 /*
@@ -81,16 +74,21 @@ enum {
 };
 
 /*
+ * Layer Transformation - refers to Layer::setGeometry()
+ */
+#define SHIFT_SRC_TRANSFORM  4
+#define SRC_TRANSFORM_MASK   0x00F0
+#define FINAL_TRANSFORM_MASK 0x000F
+
+/*
  * Flags set by the layer and sent to HWC
  */
 enum {
     HWC_LAYER_NOT_UPDATING      = 0x00000002,
     HWC_LAYER_ASYNCHRONOUS      = 0x00000004,
-    HWC_USE_ORIGINAL_RESOLUTION = 0x10000000,
-    HWC_DO_NOT_USE_OVERLAY      = 0x20000000,
-    HWC_COMP_BYPASS             = 0x40000000,
-    HWC_USE_EXT_ONLY            = 0x80000000, //Layer displayed on external only
-    HWC_USE_EXT_BLOCK           = 0x01000000, //Layer displayed on external only
+    HWC_COMP_BYPASS             = 0x10000000,
+    HWC_USE_EXT_ONLY            = 0x20000000, //Layer displayed on external only
+    HWC_USE_EXT_BLOCK           = 0x40000000, //Layer displayed on external only
     HWC_BYPASS_RESERVE_0        = 0x00000010,
     HWC_BYPASS_RESERVE_1        = 0x00000020,
 };
@@ -101,10 +99,41 @@ enum HWCCompositionType {
     HWC_USE_COPYBIT                // This layer is to be handled by copybit
 };
 
-enum external_display {
-    EXT_DISPLAY_OFF,
-    EXT_DISPLAY_HDMI,
-    EXT_DISPLAY_WIFI
+enum external_display_type {
+    EXT_TYPE_NONE,
+    EXT_TYPE_HDMI,
+    EXT_TYPE_WIFI
+};
+
+/* Events to the Display HAL perform function
+   As of now used for external display related such as
+   connect, disconnect, orientation, video started etc.,
+   */
+enum {
+    EVENT_EXTERNAL_DISPLAY,     // External display on/off Event
+    EVENT_VIDEO_OVERLAY,        // Video Overlay start/stop Event
+    EVENT_ORIENTATION_CHANGE,   // Orientation Change Event
+    EVENT_OVERLAY_STATE_CHANGE, // Overlay State Change Event
+    EVENT_OPEN_SECURE_START,    // Start of secure session setup config by stagefright
+    EVENT_OPEN_SECURE_END,      // End of secure session setup config by stagefright
+    EVENT_CLOSE_SECURE_START,   // Start of secure session teardown config
+    EVENT_CLOSE_SECURE_END,     // End of secure session teardown config
+    EVENT_RESET_POSTBUFFER,     // Reset post framebuffer mutex
+    EVENT_WAIT_POSTBUFFER,      // Wait until post framebuffer returns
+};
+
+// Video information sent to framebuffer HAl
+// used for handling UI mirroring.
+enum {
+    VIDEO_OVERLAY_ENDED = 0,
+    VIDEO_2D_OVERLAY_STARTED,
+    VIDEO_3D_OVERLAY_STARTED
+};
+
+// Information about overlay state change
+enum {
+    OVERLAY_STATE_CHANGE_START = 0,
+    OVERLAY_STATE_CHANGE_END
 };
 
 /*
@@ -115,86 +144,18 @@ struct qBufGeometry {
     int height;
     int format;
     void set(int w, int h, int f) {
-       width = w;
-       height = h;
-       format = f;
+        width = w;
+        height = h;
+        format = f;
     }
 };
-
-#ifndef DEBUG_CALC_FPS
-#define CALC_FPS() ((void)0)
-#define CALC_INIT() ((void)0)
-#else
-#define CALC_FPS() CalcFps::getInstance().Fps()
-#define CALC_INIT() CalcFps::getInstance().Init()
-
-class CalcFps : public Singleton<CalcFps> {
-public:
-    CalcFps();
-    ~CalcFps();
-
-    void Init();
-    void Fps();
-
-private:
-    static const unsigned int MAX_FPS_CALC_PERIOD_IN_FRAMES = 128;
-    static const unsigned int MAX_FRAMEARRIVAL_STEPS = 50;
-    static const unsigned int MAX_DEBUG_FPS_LEVEL = 2;
-
-    struct debug_fps_metadata_t {
-        /*fps calculation based on time or number of frames*/
-        enum DfmType {
-          DFM_FRAMES = 0,
-          DFM_TIME   = 1,
-        };
-
-        DfmType type;
-
-        /* indicates how much time do we wait till we calculate FPS */
-        unsigned long time_period;
-
-        /*indicates how much time elapsed since we report fps*/
-        float time_elapsed;
-
-        /* indicates how many frames do we wait till we calculate FPS */
-        unsigned int period;
-        /* current frame, will go upto period, and then reset */
-        unsigned int curr_frame;
-        /* frame will arrive at a multiple of 16666 us at the display.
-           This indicates how many steps to consider for our calculations.
-           For example, if framearrival_steps = 10, then the frame that arrived
-           after 166660 us or more will be ignored.
-        */
-        unsigned int framearrival_steps;
-        /* ignorethresh_us = framearrival_steps * 16666 */
-        nsecs_t      ignorethresh_us;
-        /* used to calculate the actual frame arrival step, the times might not be
-           accurate
-        */
-        unsigned int margin_us;
-
-        /* actual data storage */
-        nsecs_t      framearrivals[MAX_FPS_CALC_PERIOD_IN_FRAMES];
-        nsecs_t      accum_framearrivals[MAX_FRAMEARRIVAL_STEPS];
-    };
-
-private:
-    void populate_debug_fps_metadata(void);
-    void print_fps(float fps);
-    void calc_fps(nsecs_t currtime_us);
-
-private:
-    debug_fps_metadata_t debug_fps_metadata;
-    unsigned int debug_fps_level;
-};
-#endif
 
 #if 0
 class QCBaseLayer
 {
-//    int mS3DFormat;
+    //    int mS3DFormat;
     int32_t mComposeS3DFormat;
-public:
+    public:
     QCBaseLayer()
     {
         mComposeS3DFormat = 0;
@@ -203,10 +164,10 @@ public:
         eS3D_SIDE_BY_SIDE   = 0x10000,
         eS3D_TOP_BOTTOM     = 0x20000
     };
-/*
-    virtual status_t setStereoscopic3DFormat(int format) { mS3DFormat = format; return 0; }
-    virtual int getStereoscopic3DFormat() const { return mS3DFormat; }
- */
+    /*
+       virtual status_t setStereoscopic3DFormat(int format) { mS3DFormat = format; return 0; }
+       virtual int getStereoscopic3DFormat() const { return mS3DFormat; }
+       */
     void setS3DComposeFormat (int32_t hints)
     {
         if (hints & HWC_HINT_DRAW_S3D_SIDE_BY_SIDE)
@@ -242,21 +203,6 @@ int checkBuffer(native_handle_t *buffer_handle, int size, int usage);
  */
 bool isGPUSupportedFormat(int format);
 
-/*
- * Adreno is not optimized for GL_TEXTURE_EXTERNAL_OES
- * texure target. DO NOT choose TEXTURE_EXTERNAL_OES
- * target for RGB formats.
- *
- * Based on the pixel format, decide the texture target.
- *
- * @param : pixel format to check
- *
- * @return : GL_TEXTURE_2D for RGB formats, and
- *           GL_TEXTURE_EXTERNAL_OES for YUV formats.
- *
-*/
-
-int decideTextureTarget (const int pixel_format);
 
 /*
  * Gets the number of arguments required for this operation.
@@ -277,8 +223,8 @@ int getNumberOfArgsForOperation(int operation);
  * @return True if a memory reallocation is required.
  */
 bool needNewBuffer(const qBufGeometry currentGeometry,
-                            const qBufGeometry requiredGeometry,
-                            const qBufGeometry updatedGeometry);
+                   const qBufGeometry requiredGeometry,
+                   const qBufGeometry updatedGeometry);
 
 /*
  * Update the geometry of this buffer without reallocation.
@@ -327,13 +273,6 @@ int getPerFrameFlags(int hwclFlags, int layerFlags);
 bool isUpdatingFB(HWCCompositionType compositionType);
 
 /*
- * Get the current composition Type
- *
- * @return the compositon Type
- */
-int getCompositionType();
-
-/*
  * Clear region implementation for C2D/MDP versions.
  *
  * @param: region to be cleared
@@ -355,9 +294,8 @@ int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur);
  * @return: external display to be enabled
  *
  */
-external_display handleEventHDMI(external_display newEvent, external_display
-                                                                   currEvent);
-
+external_display_type handleEventHDMI(external_display_type disp, int value,
+                                      external_display_type currDispType);
 /*
  * Checks if layers need to be dumped based on system property "debug.sf.dump"
  * for raw dumps and "debug.sf.dump.png" for png dumps.
@@ -389,6 +327,10 @@ bool needToDumpLayers();
  *
  */
 void dumpLayer(int moduleCompositionType, int listFlags, size_t layerIndex,
-                                                    hwc_layer_t hwLayers[]);
+               hwc_layer_t hwLayers[]);
+
+bool needsAspectRatio (int wRatio, int hRatio);
+void applyPixelAspectRatio (int wRatio, int hRatio, int orientation, int fbWidth,
+                            int fbHeight, Rect& visibleRect, GLfloat vertices[][2]);
 
 #endif // INCLUDE_LIBQCOM_UI

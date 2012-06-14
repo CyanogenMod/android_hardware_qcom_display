@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -35,72 +35,72 @@
 #include "memalloc.h"
 
 namespace gralloc {
-    class PmemUserspaceAlloc : public IMemAlloc  {
+class PmemUserspaceAlloc : public IMemAlloc  {
 
+    public:
+    class Allocator: public android::RefBase {
         public:
-            class Allocator: public android::RefBase {
-                public:
-                    virtual ~Allocator() {};
-                    virtual ssize_t setSize(size_t size) = 0;
-                    virtual size_t  size() const = 0;
-                    virtual ssize_t allocate(size_t size, uint32_t flags = 0) = 0;
-                    virtual ssize_t deallocate(size_t offset) = 0;
-            };
-
-            virtual int alloc_buffer(alloc_data& data);
-
-            virtual int free_buffer(void *base, size_t size,
-                    int offset, int fd);
-
-            virtual int map_buffer(void **pBase, size_t size,
-                    int offset, int fd);
-
-            virtual int unmap_buffer(void *base, size_t size,
-                    int offset);
-
-            virtual int clean_buffer(void*base, size_t size,
-                    int offset, int fd);
-
-            PmemUserspaceAlloc();
-
-            ~PmemUserspaceAlloc();
-
-        private:
-            int mMasterFd;
-            void* mMasterBase;
-            const char* mPmemDev;
-            android::sp<Allocator> mAllocator;
-            pthread_mutex_t mLock;
-            int init_pmem_area();
-            int init_pmem_area_locked();
-
+        virtual ~Allocator() {};
+        virtual ssize_t setSize(size_t size) = 0;
+        virtual size_t  size() const = 0;
+        virtual ssize_t allocate(size_t size, uint32_t flags = 0) = 0;
+        virtual ssize_t deallocate(size_t offset) = 0;
     };
 
-    class PmemKernelAlloc : public IMemAlloc  {
+    virtual int alloc_buffer(alloc_data& data);
 
-        public:
-            virtual int alloc_buffer(alloc_data& data);
+    virtual int free_buffer(void *base, size_t size,
+                            int offset, int fd);
 
-            virtual int free_buffer(void *base, size_t size,
-                    int offset, int fd);
+    virtual int map_buffer(void **pBase, size_t size,
+                           int offset, int fd);
 
-            virtual int map_buffer(void **pBase, size_t size,
-                    int offset, int fd);
+    virtual int unmap_buffer(void *base, size_t size,
+                             int offset);
 
-            virtual int unmap_buffer(void *base, size_t size,
-                    int offset);
+    virtual int clean_buffer(void*base, size_t size,
+                             int offset, int fd);
 
-            virtual int clean_buffer(void*base, size_t size,
-                    int offset, int fd);
+    PmemUserspaceAlloc();
 
-            PmemKernelAlloc(const char* device);
+    ~PmemUserspaceAlloc();
 
-            ~PmemKernelAlloc();
-        private:
-            const char* mPmemDev;
+    private:
+    int mMasterFd;
+    void* mMasterBase;
+    const char* mPmemDev;
+    android::sp<Allocator> mAllocator;
+    pthread_mutex_t mLock;
+    int init_pmem_area();
+    int init_pmem_area_locked();
+
+};
+
+class PmemKernelAlloc : public IMemAlloc  {
+
+    public:
+    virtual int alloc_buffer(alloc_data& data);
+
+    virtual int free_buffer(void *base, size_t size,
+                            int offset, int fd);
+
+    virtual int map_buffer(void **pBase, size_t size,
+                           int offset, int fd);
+
+    virtual int unmap_buffer(void *base, size_t size,
+                             int offset);
+
+    virtual int clean_buffer(void*base, size_t size,
+                             int offset, int fd);
+
+    PmemKernelAlloc(const char* device);
+
+    ~PmemKernelAlloc();
+    private:
+    const char* mPmemDev;
 
 
-    };
+};
 
 }
 #endif /* GRALLOC_PMEMALLOC_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -43,7 +43,7 @@
 #endif
 
 namespace {
-    /* Internal function to map the userspace locks to the kernel lock types */
+/* Internal function to map the userspace locks to the kernel lock types */
     int get_kernel_lock_type(genlock_lock_type lockType)
     {
         int kLockType = 0;
@@ -62,7 +62,7 @@ namespace {
 
     /* Internal function to perform the actual lock/unlock operations */
     genlock_status_t perform_lock_unlock_operation(native_handle_t *buffer_handle,
-            int lockType, int timeout)
+                                                   int lockType, int timeout)
     {
         if (private_handle_t::validate(buffer_handle)) {
             ALOGE("%s: handle is invalid", __FUNCTION__);
@@ -73,7 +73,7 @@ namespace {
         if ((hnd->flags & private_handle_t::PRIV_FLAGS_UNSYNCHRONIZED) == 0) {
             if (hnd->genlockPrivFd < 0) {
                 ALOGE("%s: the lock has not been created, or has not been attached",
-                        __FUNCTION__);
+                      __FUNCTION__);
                 return GENLOCK_FAILURE;
             }
 
@@ -85,7 +85,7 @@ namespace {
 
             if (ioctl(hnd->genlockPrivFd, GENLOCK_IOC_LOCK, &lock)) {
                 ALOGE("%s: GENLOCK_IOC_LOCK failed (lockType0x%x, err=%s fd=%d)", __FUNCTION__,
-                        lockType, strerror(errno), hnd->fd);
+                      lockType, strerror(errno), hnd->fd);
                 if (ETIMEDOUT == errno)
                     return GENLOCK_TIMEDOUT;
 
@@ -132,7 +132,7 @@ genlock_status_t genlock_create_lock(native_handle_t *buffer_handle)
         int fd = open(GENLOCK_DEVICE, O_RDWR);
         if (fd < 0) {
             ALOGE("%s: open genlock device failed (err=%s)", __FUNCTION__,
-                    strerror(errno));
+                  strerror(errno));
             return GENLOCK_FAILURE;
         }
 
@@ -140,7 +140,7 @@ genlock_status_t genlock_create_lock(native_handle_t *buffer_handle)
         genlock_lock lock;
         if (ioctl(fd, GENLOCK_IOC_NEW, NULL)) {
             ALOGE("%s: GENLOCK_IOC_NEW failed (error=%s)", __FUNCTION__,
-                    strerror(errno));
+                  strerror(errno));
             close_genlock_fd_and_handle(fd, lock.fd);
             ret = GENLOCK_FAILURE;
         }
@@ -149,7 +149,7 @@ genlock_status_t genlock_create_lock(native_handle_t *buffer_handle)
         if (GENLOCK_FAILURE != ret) {
             if (ioctl(fd, GENLOCK_IOC_EXPORT, &lock)) {
                 ALOGE("%s: GENLOCK_IOC_EXPORT failed (error=%s)", __FUNCTION__,
-                        strerror(errno));
+                      strerror(errno));
                 close_genlock_fd_and_handle(fd, lock.fd);
                 ret = GENLOCK_FAILURE;
             }
@@ -219,7 +219,7 @@ genlock_status_t genlock_attach_lock(native_handle_t *buffer_handle)
         int fd = open(GENLOCK_DEVICE, O_RDWR);
         if (fd < 0) {
             ALOGE("%s: open genlock device failed (err=%s)", __FUNCTION__,
-                    strerror(errno));
+                  strerror(errno));
             return GENLOCK_FAILURE;
         }
 
@@ -228,7 +228,7 @@ genlock_status_t genlock_attach_lock(native_handle_t *buffer_handle)
         lock.fd = hnd->genlockHandle;
         if (ioctl(fd, GENLOCK_IOC_ATTACH, &lock)) {
             ALOGE("%s: GENLOCK_IOC_ATTACH failed (err=%s)", __FUNCTION__,
-                    strerror(errno));
+                  strerror(errno));
             close_genlock_fd_and_handle(fd, lock.fd);
             ret = GENLOCK_FAILURE;
         }
@@ -253,8 +253,8 @@ genlock_status_t genlock_attach_lock(native_handle_t *buffer_handle)
  * @return error status.
  */
 genlock_status_t genlock_lock_buffer(native_handle_t *buffer_handle,
-        genlock_lock_type_t lockType,
-        int timeout)
+                                     genlock_lock_type_t lockType,
+                                     int timeout)
 {
     genlock_status_t ret = GENLOCK_NO_ERROR;
 #ifdef USE_GENLOCK
@@ -280,7 +280,7 @@ genlock_status_t genlock_lock_buffer(native_handle_t *buffer_handle,
  *
  * @param: handle of the buffer to be unlocked.
  * @return: error status.
-*/
+ */
 genlock_status_t genlock_unlock_buffer(native_handle_t *buffer_handle)
 {
     genlock_status_t ret = GENLOCK_NO_ERROR;

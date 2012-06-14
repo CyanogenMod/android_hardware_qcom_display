@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,82 +33,82 @@
 
 namespace gralloc {
 
-    struct alloc_data;
-    class IMemAlloc;
-    class IonAlloc;
+struct alloc_data;
+class IMemAlloc;
+class IonAlloc;
 
-    class IAllocController : public android::RefBase {
+class IAllocController : public android::RefBase {
 
-        public:
-            /* Allocate using a suitable method
-             * Returns the type of buffer allocated
-             */
-            virtual int allocate(alloc_data& data, int usage,
-                    int compositionType) = 0;
+    public:
+    /* Allocate using a suitable method
+     * Returns the type of buffer allocated
+     */
+    virtual int allocate(alloc_data& data, int usage,
+                         int compositionType) = 0;
 
-            virtual android::sp<IMemAlloc> getAllocator(int flags) = 0;
+    virtual android::sp<IMemAlloc> getAllocator(int flags) = 0;
 
-            virtual ~IAllocController() {};
+    virtual ~IAllocController() {};
 
-            static android::sp<IAllocController> getInstance(bool useMasterHeap);
+    static android::sp<IAllocController> getInstance(bool useMasterHeap);
 
-        private:
-            static android::sp<IAllocController> sController;
+    private:
+    static android::sp<IAllocController> sController;
 
-    };
+};
 
-    class IonController : public IAllocController {
+class IonController : public IAllocController {
 
-        public:
-            virtual int allocate(alloc_data& data, int usage,
-                    int compositionType);
+    public:
+    virtual int allocate(alloc_data& data, int usage,
+                         int compositionType);
 
-            virtual android::sp<IMemAlloc> getAllocator(int flags);
+    virtual android::sp<IMemAlloc> getAllocator(int flags);
 
-            IonController();
+    IonController();
 
-        private:
-            android::sp<IonAlloc> mIonAlloc;
+    private:
+    android::sp<IonAlloc> mIonAlloc;
 
-    };
+};
 
-    class PmemKernelController : public IAllocController {
+class PmemKernelController : public IAllocController {
 
-        public:
-            virtual int allocate(alloc_data& data, int usage,
-                    int compositionType);
+    public:
+    virtual int allocate(alloc_data& data, int usage,
+                         int compositionType);
 
-            virtual android::sp<IMemAlloc> getAllocator(int flags);
+    virtual android::sp<IMemAlloc> getAllocator(int flags);
 
-            PmemKernelController ();
+    PmemKernelController ();
 
-            ~PmemKernelController ();
+    ~PmemKernelController ();
 
-        private:
-            android::sp<IMemAlloc> mPmemAdspAlloc;
+    private:
+    android::sp<IMemAlloc> mPmemAdspAlloc;
 
-    };
+};
 
-    // Main pmem controller - this should only
-    // be used within gralloc
-    class PmemAshmemController : public IAllocController {
+// Main pmem controller - this should only
+// be used within gralloc
+class PmemAshmemController : public IAllocController {
 
-        public:
-            virtual int allocate(alloc_data& data, int usage,
-                    int compositionType);
+    public:
+    virtual int allocate(alloc_data& data, int usage,
+                         int compositionType);
 
-            virtual android::sp<IMemAlloc> getAllocator(int flags);
+    virtual android::sp<IMemAlloc> getAllocator(int flags);
 
-            PmemAshmemController();
+    PmemAshmemController();
 
-            ~PmemAshmemController();
+    ~PmemAshmemController();
 
-        private:
-            android::sp<IMemAlloc> mPmemUserspaceAlloc;
-            android::sp<IMemAlloc> mAshmemAlloc;
-            android::sp<IAllocController> mPmemKernelCtrl;
+    private:
+    android::sp<IMemAlloc> mPmemUserspaceAlloc;
+    android::sp<IMemAlloc> mAshmemAlloc;
+    android::sp<IAllocController> mPmemKernelCtrl;
 
-    };
+};
 
 } //end namespace gralloc
 #endif // GRALLOC_ALLOCCONTROLLER_H
