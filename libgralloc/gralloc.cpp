@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008, The Android Open Source Project
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,71 +36,71 @@ using namespace gralloc;
 using android::sp;
 
 int fb_device_open(const hw_module_t* module, const char* name,
-        hw_device_t** device);
+                   hw_device_t** device);
 
 static int gralloc_device_open(const hw_module_t* module, const char* name,
-        hw_device_t** device);
+                               hw_device_t** device);
 
 extern int gralloc_lock(gralloc_module_t const* module,
-        buffer_handle_t handle, int usage,
-        int l, int t, int w, int h,
-        void** vaddr);
+                        buffer_handle_t handle, int usage,
+                        int l, int t, int w, int h,
+                        void** vaddr);
 
 extern int gralloc_unlock(gralloc_module_t const* module,
-        buffer_handle_t handle);
+                          buffer_handle_t handle);
 
 extern int gralloc_register_buffer(gralloc_module_t const* module,
-        buffer_handle_t handle);
+                                   buffer_handle_t handle);
 
 extern int gralloc_unregister_buffer(gralloc_module_t const* module,
-        buffer_handle_t handle);
+                                     buffer_handle_t handle);
 
 extern int gralloc_perform(struct gralloc_module_t const* module,
-        int operation, ... );
+                           int operation, ... );
 
 // HAL module methods
 static struct hw_module_methods_t gralloc_module_methods = {
-    open: gralloc_device_open
+open: gralloc_device_open
 };
 
 // HAL module initialize
 struct private_module_t HAL_MODULE_INFO_SYM = {
-    base: {
-        common: {
-            tag: HARDWARE_MODULE_TAG,
-            version_major: 1,
-            version_minor: 0,
-            id: GRALLOC_HARDWARE_MODULE_ID,
-            name: "Graphics Memory Allocator Module",
-            author: "The Android Open Source Project",
-            methods: &gralloc_module_methods,
-            dso: 0,
-            reserved: {0},
-        },
-        registerBuffer: gralloc_register_buffer,
-        unregisterBuffer: gralloc_unregister_buffer,
-        lock: gralloc_lock,
-        unlock: gralloc_unlock,
-        perform: gralloc_perform,
-        reserved_proc: {0},
-    },
-    framebuffer: 0,
-    fbFormat: 0,
-    flags: 0,
-    numBuffers: 0,
-    bufferMask: 0,
-    lock: PTHREAD_MUTEX_INITIALIZER,
-    currentBuffer: 0,
+base: {
+    common: {
+        tag: HARDWARE_MODULE_TAG,
+             version_major: 1,
+             version_minor: 0,
+             id: GRALLOC_HARDWARE_MODULE_ID,
+             name: "Graphics Memory Allocator Module",
+             author: "The Android Open Source Project",
+             methods: &gralloc_module_methods,
+             dso: 0,
+             reserved: {0},
+            },
+    registerBuffer: gralloc_register_buffer,
+    unregisterBuffer: gralloc_unregister_buffer,
+    lock: gralloc_lock,
+    unlock: gralloc_unlock,
+    perform: gralloc_perform,
+    reserved_proc: {0},
+      },
+framebuffer: 0,
+fbFormat: 0,
+flags: 0,
+numBuffers: 0,
+bufferMask: 0,
+lock: PTHREAD_MUTEX_INITIALIZER,
+currentBuffer: 0,
 };
 
 // Open Gralloc device
 int gralloc_device_open(const hw_module_t* module, const char* name,
-        hw_device_t** device)
+                        hw_device_t** device)
 {
     int status = -EINVAL;
     if (!strcmp(name, GRALLOC_HARDWARE_GPU0)) {
         const private_module_t* m = reinterpret_cast<const private_module_t*>(
-                module);
+            module);
         gpu_context_t *dev;
         sp<IAllocController> alloc_ctrl = IAllocController::getInstance(true);
         dev = new gpu_context_t(m, alloc_ctrl);
