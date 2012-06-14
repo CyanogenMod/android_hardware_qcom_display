@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,39 +31,44 @@
 #define GRALLOC_IONALLOC_H
 
 #include "memalloc.h"
+#include "gr.h"
+//#include <linux/ion.h>
+//XXX: Move to bionic
 #include "ion_msm.h"
 
 namespace gralloc {
 
-    class IonAlloc : public IMemAlloc  {
+class IonAlloc : public IMemAlloc  {
 
-        public:
-            virtual int alloc_buffer(alloc_data& data);
+    public:
+    virtual int alloc_buffer(alloc_data& data);
 
-            virtual int free_buffer(void *base, size_t size,
-                    int offset, int fd);
+    virtual int free_buffer(void *base, size_t size,
+                            int offset, int fd);
 
-            virtual int map_buffer(void **pBase, size_t size,
-                    int offset, int fd);
+    virtual int map_buffer(void **pBase, size_t size,
+                           int offset, int fd);
 
-            virtual int unmap_buffer(void *base, size_t size,
-                    int offset);
+    virtual int unmap_buffer(void *base, size_t size,
+                             int offset);
 
-            virtual int clean_buffer(void*base, size_t size,
-                    int offset, int fd);
+    virtual int clean_buffer(void*base, size_t size,
+                             int offset, int fd);
 
-            IonAlloc() { mIonFd = FD_INIT; }
+    IonAlloc() { mIonFd = FD_INIT; }
 
-            ~IonAlloc() { close_device(); }
+    ~IonAlloc() { close_device(); }
 
-        private:
-            int mIonFd;
+    private:
+    int mIonFd;
 
-            int open_device();
+    int open_device();
 
-            void close_device();
+    void close_device();
 
-    };
+    mutable Locker mLock;
+
+};
 
 }
 

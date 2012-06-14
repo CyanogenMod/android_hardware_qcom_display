@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -48,7 +48,7 @@ int IonAlloc::open_device()
 
     if(mIonFd < 0 ) {
         ALOGE("%s: Failed to open ion device - %s",
-                __FUNCTION__, strerror(errno));
+              __FUNCTION__, strerror(errno));
         mIonFd = FD_INIT;
         return -errno;
     }
@@ -64,6 +64,7 @@ void IonAlloc::close_device()
 
 int IonAlloc::alloc_buffer(alloc_data& data)
 {
+    Locker::Autolock _l(mLock);
     int err = 0;
     int ionSyncFd = FD_INIT;
     int iFd = FD_INIT;
@@ -84,12 +85,11 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     if(data.uncached) {
         // Use the sync FD to alloc and map
         // when we need uncached memory
-        // FIX: О–DSYNC defined to open uncached - add that in kernel
-	//ionSyncFd = open(ION_DEVICE, O_RDONLY|O_DSYNC);
-        ionSyncFd = open(ION_DEVICE, O_RDONLY);
+        // XXX: Change O_SYNC to O_DSYNC when available in bionic
+        ionSyncFd = open(ION_DEVICE, O_RDONLY|O_SYNC);
         if(ionSyncFd < 0) {
             ALOGE("%s: Failed to open ion device - %s",
-                    __FUNCTION__, strerror(errno));
+                  __FUNCTION__, strerror(errno));
             return -errno;
         }
         iFd = ionSyncFd;
@@ -111,7 +111,7 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     if(ioctl(iFd, ION_IOC_MAP, &fd_data)) {
         err = -errno;
         ALOGE("%s: ION_IOC_MAP failed with error - %s",
-                __FUNCTION__, strerror(errno));
+              __FUNCTION__, strerror(errno));
         ioctl(mIonFd, ION_IOC_FREE, &handle_data);
         if(ionSyncFd >= 0)
             close(ionSyncFd);
@@ -119,15 +119,15 @@ int IonAlloc::alloc_buffer(alloc_data& data)
         return err;
     }
 
-    //if(!(data.flags & ION_SECURE) &&
-    if(!(data.allocType & private_handle_t::PRIV_FLAGS_NOT_MAPPED)) {
+    if(!(data.flags & ION_SECURE) &&
+       !(data.allocType & private_handle_t::PRIV_FLAGS_NOT_MAPPED)) {
 
         base = mmap(0, ionAllocData.len, PROT_READ|PROT_WRITE,
-                                MAP_SHARED, fd_data.fd, 0);
+                    MAP_SHARED, fd_data.fd, 0);
         if(base == MAP_FAILED) {
             err = -errno;
             ALOGE("%s: Failed to map the allocated memory: %s",
-                                    __FUNCTION__, strerror(errno));
+                  __FUNCTION__, strerror(errno));
             ioctl(mIonFd, ION_IOC_FREE, &handle_data);
             ionSyncFd = FD_INIT;
             return err;
@@ -146,15 +146,16 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     data.fd = fd_data.fd;
     ioctl(mIonFd, ION_IOC_FREE, &handle_data);
     ALOGD("ion: Allocated buffer base:%p size:%d fd:%d",
-                            data.base, ionAllocData.len, data.fd);
+          data.base, ionAllocData.len, data.fd);
     return 0;
 }
 
 
 int IonAlloc::free_buffer(void* base, size_t size, int offset, int fd)
 {
+    Locker::Autolock _l(mLock);
     ALOGD("ion: Freeing buffer base:%p size:%d fd:%d",
-            base, size, fd);
+          base, size, fd);
     int err = 0;
     err = open_device();
     if (err)
@@ -177,15 +178,15 @@ int IonAlloc::map_buffer(void **pBase, size_t size, int offset, int fd)
         return err;
 
     base = mmap(0, size, PROT_READ| PROT_WRITE,
-            MAP_SHARED, fd, 0);
+                MAP_SHARED, fd, 0);
     *pBase = base;
     if(base == MAP_FAILED) {
         err = -errno;
         ALOGD("ion: Failed to map memory in the client: %s",
-                                strerror(errno));
+              strerror(errno));
     } else {
         ALOGD("ion: Mapped buffer base:%p size:%d offset:%d fd:%d",
-                                base, size, offset, fd);
+              base, size, offset, fd);
     }
     return err;
 }
@@ -197,7 +198,7 @@ int IonAlloc::unmap_buffer(void *base, size_t size, int offset)
     if(munmap(base, size)) {
         err = -errno;
         ALOGE("ion: Failed to unmap memory at %p : %s",
-                 base, strerror(errno));
+              base, strerror(errno));
     }
     return err;
 
@@ -218,7 +219,7 @@ int IonAlloc::clean_buffer(void *base, size_t size, int offset, int fd)
     if (ioctl(mIonFd, ION_IOC_IMPORT, &fd_data)) {
         err = -errno;
         ALOGE("%s: ION_IOC_IMPORT failed with error - %s",
-                __FUNCTION__, strerror(errno));
+              __FUNCTION__, strerror(errno));
         return err;
     }
 
@@ -230,7 +231,7 @@ int IonAlloc::clean_buffer(void *base, size_t size, int offset, int fd)
     if(ioctl(mIonFd, ION_IOC_CLEAN_INV_CACHES, &flush_data)) {
         err = -errno;
         ALOGE("%s: ION_IOC_CLEAN_INV_CACHES failed with error - %s",
-                __FUNCTION__, strerror(errno));
+              __FUNCTION__, strerror(errno));
         ioctl(mIonFd, ION_IOC_FREE, &handle_data);
         return err;
     }

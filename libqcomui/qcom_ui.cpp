@@ -30,86 +30,78 @@
 #include <cutils/log.h>
 #include <cutils/memory.h>
 #include <qcom_ui.h>
+#include <utils/comptype.h>
 #include <gralloc_priv.h>
 #include <alloc_controller.h>
 #include <memalloc.h>
 #include <errno.h>
 #include <EGL/eglext.h>
 #include <sys/stat.h>
-#if 0
 #include <SkBitmap.h>
 #include <SkImageEncoder.h>
-#endif
 #include <Transform.h>
-
-#include <EGL/egl.h>
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
 
 using gralloc::IMemAlloc;
 using gralloc::IonController;
 using gralloc::alloc_data;
 using android::sp;
-
-static int sCompositionType = -1;
-
 namespace {
 
-    static android::sp<gralloc::IAllocController> sAlloc = 0;
+static android::sp<gralloc::IAllocController> sAlloc = 0;
 
-    int reallocate_memory(native_handle_t *buffer_handle, int mReqSize, int usage)
-    {
-        int ret = 0;
+int reallocate_memory(native_handle_t *buffer_handle, int mReqSize, int usage)
+{
+    int ret = 0;
 
 #ifndef NON_QCOM_TARGET
-        if (sAlloc == 0) {
-            sAlloc = gralloc::IAllocController::getInstance(true);
-        }
-        if (sAlloc == 0) {
-            ALOGE("sAlloc is still NULL");
-            return -EINVAL;
-        }
-
-        // Dealloc the old memory
-        private_handle_t *hnd = (private_handle_t *)buffer_handle;
-        sp<IMemAlloc> memalloc = sAlloc->getAllocator(hnd->flags);
-        ret = memalloc->free_buffer((void*)hnd->base, hnd->size, hnd->offset, hnd->fd);
-
-        if (ret) {
-            ALOGE("%s: free_buffer failed", __FUNCTION__);
-            return -1;
-        }
-
-        // Realloc new memory
-        alloc_data data;
-        data.base = 0;
-        data.fd = -1;
-        data.offset = 0;
-        data.size = mReqSize;
-        data.align = getpagesize();
-        data.uncached = true;
-        int allocFlags = usage;
-
-        switch (hnd->format) {
-            case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
-            case (HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED^HAL_PIXEL_FORMAT_INTERLACE): {
-                data.align = 8192;
-            } break;
-            default: break;
-        }
-        ret = sAlloc->allocate(data, allocFlags, 0);
-        if (ret == 0) {
-            hnd->fd = data.fd;
-            hnd->base = (int)data.base;
-            hnd->offset = data.offset;
-            hnd->size = data.size;
-        } else {
-            ALOGE("%s: allocate failed", __FUNCTION__);
-            return -EINVAL;
-        }
-#endif
-        return ret;
+    if (sAlloc == 0) {
+        sAlloc = gralloc::IAllocController::getInstance(true);
     }
+    if (sAlloc == 0) {
+        LOGE("sAlloc is still NULL");
+        return -EINVAL;
+    }
+
+    // Dealloc the old memory
+    private_handle_t *hnd = (private_handle_t *)buffer_handle;
+    sp<IMemAlloc> memalloc = sAlloc->getAllocator(hnd->flags);
+    ret = memalloc->free_buffer((void*)hnd->base, hnd->size, hnd->offset, hnd->fd);
+
+    if (ret) {
+        LOGE("%s: free_buffer failed", __FUNCTION__);
+        return -1;
+    }
+
+    // Realloc new memory
+    alloc_data data;
+    data.base = 0;
+    data.fd = -1;
+    data.offset = 0;
+    data.size = mReqSize;
+    data.align = getpagesize();
+    data.uncached = true;
+    int allocFlags = usage;
+
+    switch (hnd->format) {
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
+        case (HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED^HAL_PIXEL_FORMAT_INTERLACE): {
+            data.align = 8192;
+        } break;
+        default: break;
+    }
+    ret = sAlloc->allocate(data, allocFlags, 0);
+    if (ret == 0) {
+        hnd->fd = data.fd;
+        hnd->base = (int)data.base;
+        hnd->offset = data.offset;
+        hnd->size = data.size;
+    } else {
+        LOGE("%s: allocate failed", __FUNCTION__);
+        return -EINVAL;
+    }
+#endif
+    return ret;
+}
 }; // ANONYNMOUS NAMESPACE
 
 /*
@@ -128,8 +120,11 @@ int getNumberOfArgsForOperation(int operation) {
         case  NATIVE_WINDOW_UPDATE_BUFFERS_GEOMETRY:
             num_args = 3;
             break;
-        default: ALOGE("%s: invalid operation(0x%x)", __FUNCTION__, operation);
+        case NATIVE_WINDOW_SET_PIXEL_ASPECT_RATIO:
+            num_args = 2;
             break;
+        default: LOGE("%s: invalid operation(0x%x)", __FUNCTION__, operation);
+                 break;
     };
     return num_args;
 }
@@ -146,41 +141,18 @@ bool isGPUSupportedFormat(int format) {
         // We check the YV12 formats, since some Qcom specific formats
         // could have the bits set.
         return true;
+    } else if ((format == HAL_PIXEL_FORMAT_RGB_888) ||
+               (format == HAL_PIXEL_FORMAT_YCrCb_422_SP) ||
+               (format == HAL_PIXEL_FORMAT_YCbCr_422_SP)){
+        return false;
     } else if (format & INTERLACE_MASK) {
         // Interlaced content
         return false;
     } else if (format & S3D_FORMAT_MASK) {
         // S3D Formats are not supported by the GPU
-       return false;
+        return false;
     }
     return true;
-}
-
-/* decide the texture target dynamically, based on the pixel format*/
-
-int decideTextureTarget(int pixel_format)
-{
-
-  // Default the return value to GL_TEXTURE_EXTERAL_OES
-  int retVal = GL_TEXTURE_EXTERNAL_OES;
-
-  // Change texture target to TEXTURE_2D for RGB formats
-  switch (pixel_format) {
-
-     case HAL_PIXEL_FORMAT_RGBA_8888:
-     case HAL_PIXEL_FORMAT_RGBX_8888:
-     case HAL_PIXEL_FORMAT_RGB_888:
-     case HAL_PIXEL_FORMAT_RGB_565:
-     case HAL_PIXEL_FORMAT_BGRA_8888:
-     case HAL_PIXEL_FORMAT_RGBA_5551:
-     case HAL_PIXEL_FORMAT_RGBA_4444:
-          retVal = GL_TEXTURE_2D;
-          break;
-     default:
-          retVal = GL_TEXTURE_EXTERNAL_OES;
-          break;
-  }
-  return retVal;
 }
 
 /*
@@ -203,7 +175,7 @@ int checkBuffer(native_handle_t *buffer_handle, int size, int usage)
 
     // Validate the handle
     if (private_handle_t::validate(buffer_handle)) {
-        ALOGE("%s: handle is invalid", __FUNCTION__);
+        LOGE("%s: handle is invalid", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -255,7 +227,7 @@ bool needNewBuffer(const qBufGeometry currentGeometry,
 int updateBufferGeometry(sp<GraphicBuffer> buffer, const qBufGeometry updatedGeometry)
 {
     if (buffer == 0) {
-        ALOGE("%s: graphic buffer is NULL", __FUNCTION__);
+        LOGE("%s: graphic buffer is NULL", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -273,7 +245,7 @@ int updateBufferGeometry(sp<GraphicBuffer> buffer, const qBufGeometry updatedGeo
 
     // Validate the handle
     if (private_handle_t::validate(buffer->handle)) {
-        ALOGE("%s: handle is invalid", __FUNCTION__);
+        LOGE("%s: handle is invalid", __FUNCTION__);
         return -EINVAL;
     }
     buffer->width  = updatedGeometry.width;
@@ -285,7 +257,7 @@ int updateBufferGeometry(sp<GraphicBuffer> buffer, const qBufGeometry updatedGeo
         hnd->height = updatedGeometry.height;
         hnd->format = updatedGeometry.format;
     } else {
-        ALOGE("%s: hnd is NULL", __FUNCTION__);
+        LOGE("%s: hnd is NULL", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -293,14 +265,14 @@ int updateBufferGeometry(sp<GraphicBuffer> buffer, const qBufGeometry updatedGeo
 }
 
 /* Update the S3D format of this buffer.
-*
-* @param: buffer whosei S3D format needs to be updated.
-* @param: Updated buffer S3D format
-*/
+ *
+ * @param: buffer whosei S3D format needs to be updated.
+ * @param: Updated buffer S3D format
+ */
 int updateBufferS3DFormat(sp<GraphicBuffer> buffer, const int s3dFormat)
 {
     if (buffer == 0) {
-        ALOGE("%s: graphic buffer is NULL", __FUNCTION__);
+        LOGE("%s: graphic buffer is NULL", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -331,7 +303,7 @@ int updateLayerQcomFlags(eLayerAttrib attribute, bool enable, int& currentFlags)
             else
                 currentFlags &= ~LAYER_ASYNCHRONOUS;
         } break;
-        default: ALOGE("%s: invalid attribute(0x%x)", __FUNCTION__, attribute);
+        default: LOGE("%s: invalid attribute(0x%x)", __FUNCTION__, attribute);
                  break;
     }
     return ret;
@@ -375,40 +347,9 @@ bool isUpdatingFB(HWCCompositionType compositionType)
         case HWC_USE_COPYBIT:
             return true;
         default:
-            ALOGE("%s: invalid composition type(%d)", __FUNCTION__, compositionType);
+            LOGE("%s: invalid composition type(%d)", __FUNCTION__, compositionType);
             return false;
     };
-}
-
-/*
- * Get the current composition Type
- *
- * @return the compositon Type
- */
-int getCompositionType() {
-    char property[PROPERTY_VALUE_MAX];
-    int compositionType = 0;
-    if (property_get("debug.sf.hw", property, NULL) > 0) {
-        if(atoi(property) == 0) {
-            compositionType = COMPOSITION_TYPE_CPU;
-        } else { //debug.sf.hw = 1
-            property_get("debug.composition.type", property, NULL);
-            if (property == NULL) {
-                compositionType = COMPOSITION_TYPE_GPU;
-            } else if ((strncmp(property, "mdp", 3)) == 0) {
-                compositionType = COMPOSITION_TYPE_MDP;
-            } else if ((strncmp(property, "c2d", 3)) == 0) {
-                compositionType = COMPOSITION_TYPE_C2D;
-            } else if ((strncmp(property, "dyn", 3)) == 0) {
-                compositionType = COMPOSITION_TYPE_DYN;
-            } else {
-                compositionType = COMPOSITION_TYPE_GPU;
-            }
-        }
-    } else { //debug.sf.hw is not set. Use cpu composition
-        compositionType = COMPOSITION_TYPE_CPU;
-    }
-    return compositionType;
 }
 
 /*
@@ -422,31 +363,27 @@ int getCompositionType() {
  */
 int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur)
 {
-#if 0 /* FIXME DIE */
     int ret = 0;
+    int compositionType = QCCompositionType::getInstance().getCompositionType();
 
-    if (-1 == sCompositionType) {
-        sCompositionType = getCompositionType();
-    }
-
-    if ((COMPOSITION_TYPE_MDP != sCompositionType) &&
-        (COMPOSITION_TYPE_C2D != sCompositionType) &&
-        (COMPOSITION_TYPE_CPU != sCompositionType)) {
-        // For non CPU/C2D/MDP composition, return an error, so that SF can use
+    if (compositionType & COMPOSITION_TYPE_GPU ||
+        (compositionType == COMPOSITION_TYPE_DYN|COMPOSITION_TYPE_C2D))
+    {
+        // For GPU or DYN comp. with C2D, return an error, so that SF can use
         // the GPU to draw the wormhole.
         return -1;
     }
 
     android_native_buffer_t *renderBuffer = (android_native_buffer_t *)
-                                        eglGetRenderBufferANDROID(dpy, sur);
+        eglGetRenderBufferANDROID(dpy, sur);
     if (!renderBuffer) {
-        ALOGE("%s: eglGetRenderBufferANDROID returned NULL buffer",
-            __FUNCTION__);
-            return -1;
+        LOGE("%s: eglGetRenderBufferANDROID returned NULL buffer",
+             __FUNCTION__);
+        return -1;
     }
     private_handle_t *fbHandle = (private_handle_t *)renderBuffer->handle;
     if(!fbHandle) {
-        ALOGE("%s: Framebuffer handle is NULL", __FUNCTION__);
+        LOGE("%s: Framebuffer handle is NULL", __FUNCTION__);
         return -1;
     }
 
@@ -461,7 +398,7 @@ int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur)
     while (it != end) {
         const Rect& r = *it++;
         uint8_t* dst = (uint8_t*) fbHandle->base +
-                       (r.left + r.top*renderBuffer->stride)*bytesPerPixel;
+            (r.left + r.top*renderBuffer->stride)*bytesPerPixel;
         int w = r.width()*bytesPerPixel;
         int h = r.height();
         do {
@@ -472,42 +409,45 @@ int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur)
             dst += stride;
         } while(--h);
     }
-#endif
     return 0;
 }
 
 /*
  * Handles the externalDisplay event
  * HDMI has highest priority compared to WifiDisplay
- * Based on the current and the new display event, decides the
+ * Based on the current and the new display type, decides the
  * external display to be enabled
  *
- * @param: newEvent - new external event
- * @param: currEvent - currently enabled external event
- * @return: external display to be enabled
+ * @param: disp - external display type(wfd/hdmi)
+ * @param: value - external event(0/1)
+ * @param: currdispType - Current enabled external display Type
+ * @return: external display type to be enabled
  *
  */
-external_display handleEventHDMI(external_display newState, external_display
-                                                                   currState)
+external_display_type handleEventHDMI(external_display_type disp, int value,
+                                      external_display_type currDispType)
 {
-    external_display retState = currState;
-    switch(newState) {
-        case EXT_DISPLAY_HDMI:
-            retState = EXT_DISPLAY_HDMI;
+    external_display_type retDispType = currDispType;
+    switch(disp) {
+        case EXT_TYPE_HDMI:
+            if(value)
+                retDispType = EXT_TYPE_HDMI;
+            else
+                retDispType = EXT_TYPE_NONE;
             break;
-        case EXT_DISPLAY_WIFI:
-            if(currState != EXT_DISPLAY_HDMI) {
-                retState = EXT_DISPLAY_WIFI;
+        case EXT_TYPE_WIFI:
+            if(currDispType != EXT_TYPE_HDMI) {
+                if(value)
+                    retDispType = EXT_TYPE_WIFI;
+                else
+                    retDispType = EXT_TYPE_NONE;
             }
             break;
-        case EXT_DISPLAY_OFF:
-            retState = EXT_DISPLAY_OFF;
-            break;
         default:
-            ALOGE("handleEventHDMI: unknown Event");
+            LOGE("%s: Unknown External Display Type!!");
             break;
     }
-    return retState;
+    return retDispType;
 }
 
 // Using global variables for layer dumping since "property_set("debug.sf.dump",
@@ -532,25 +472,25 @@ bool needToDumpLayers()
     localtime_r(&timenow, &sfdump_time);
 
     if ((property_get("debug.sf.dump.png", sfdump_propstr, NULL) > 0) &&
-            (strncmp(sfdump_propstr, sfdump_propstr_persist_png,
-                                                    PROPERTY_VALUE_MAX - 1))) {
+        (strncmp(sfdump_propstr, sfdump_propstr_persist_png,
+                 PROPERTY_VALUE_MAX - 1))) {
         // Strings exist & not equal implies it has changed, so trigger a dump
         strncpy(sfdump_propstr_persist_png, sfdump_propstr,
-                                                    PROPERTY_VALUE_MAX - 1);
+                PROPERTY_VALUE_MAX - 1);
         sfdump_countlimit_png = atoi(sfdump_propstr);
         sfdump_countlimit_png = (sfdump_countlimit_png < 0) ? 0:
-                        (sfdump_countlimit_png >= LONG_MAX) ? (LONG_MAX - 1):
-                                                        sfdump_countlimit_png;
+            (sfdump_countlimit_png >= LONG_MAX) ? (LONG_MAX - 1):
+            sfdump_countlimit_png;
         if (sfdump_countlimit_png) {
             sprintf(sfdumpdir_png,"/data/sfdump.png%04d%02d%02d.%02d%02d%02d",
-            sfdump_time.tm_year + 1900, sfdump_time.tm_mon + 1,
-            sfdump_time.tm_mday, sfdump_time.tm_hour,
-            sfdump_time.tm_min, sfdump_time.tm_sec);
+                    sfdump_time.tm_year + 1900, sfdump_time.tm_mon + 1,
+                    sfdump_time.tm_mday, sfdump_time.tm_hour,
+                    sfdump_time.tm_min, sfdump_time.tm_sec);
             if (0 == mkdir(sfdumpdir_png, 0777))
                 sfdump_counter_png = 0;
             else
-                ALOGE("sfdump: Error: %s. Failed to create sfdump directory"
-                ": %s", strerror(errno), sfdumpdir_png);
+                LOGE("sfdump: Error: %s. Failed to create sfdump directory"
+                     ": %s", strerror(errno), sfdumpdir_png);
         }
     }
 
@@ -558,25 +498,25 @@ bool needToDumpLayers()
         sfdump_counter_png++;
 
     if ((property_get("debug.sf.dump", sfdump_propstr, NULL) > 0) &&
-            (strncmp(sfdump_propstr, sfdump_propstr_persist_raw,
-                                                    PROPERTY_VALUE_MAX - 1))) {
+        (strncmp(sfdump_propstr, sfdump_propstr_persist_raw,
+                 PROPERTY_VALUE_MAX - 1))) {
         // Strings exist & not equal implies it has changed, so trigger a dump
         strncpy(sfdump_propstr_persist_raw, sfdump_propstr,
-                                                    PROPERTY_VALUE_MAX - 1);
+                PROPERTY_VALUE_MAX - 1);
         sfdump_countlimit_raw = atoi(sfdump_propstr);
         sfdump_countlimit_raw = (sfdump_countlimit_raw < 0) ? 0:
-                        (sfdump_countlimit_raw >= LONG_MAX) ? (LONG_MAX - 1):
-                                                        sfdump_countlimit_raw;
+            (sfdump_countlimit_raw >= LONG_MAX) ? (LONG_MAX - 1):
+            sfdump_countlimit_raw;
         if (sfdump_countlimit_raw) {
             sprintf(sfdumpdir_raw,"/data/sfdump.raw%04d%02d%02d.%02d%02d%02d",
-            sfdump_time.tm_year + 1900, sfdump_time.tm_mon + 1,
-            sfdump_time.tm_mday, sfdump_time.tm_hour,
-            sfdump_time.tm_min, sfdump_time.tm_sec);
+                    sfdump_time.tm_year + 1900, sfdump_time.tm_mon + 1,
+                    sfdump_time.tm_mday, sfdump_time.tm_hour,
+                    sfdump_time.tm_min, sfdump_time.tm_sec);
             if (0 == mkdir(sfdumpdir_raw, 0777))
                 sfdump_counter_raw = 0;
             else
-                ALOGE("sfdump: Error: %s. Failed to create sfdump directory"
-                ": %s", strerror(errno), sfdumpdir_raw);
+                LOGE("sfdump: Error: %s. Failed to create sfdump directory"
+                     ": %s", strerror(errno), sfdumpdir_raw);
         }
     }
 
@@ -593,85 +533,85 @@ inline void getHalPixelFormatStr(int format, char pixelformatstr[])
         return;
 
     switch(format) {
-    case HAL_PIXEL_FORMAT_RGBA_8888:
-        strcpy(pixelformatstr, "RGBA_8888");
-        break;
-    case HAL_PIXEL_FORMAT_RGBX_8888:
-        strcpy(pixelformatstr, "RGBX_8888");
-        break;
-    case HAL_PIXEL_FORMAT_RGB_888:
-        strcpy(pixelformatstr, "RGB_888");
-        break;
-    case HAL_PIXEL_FORMAT_RGB_565:
-        strcpy(pixelformatstr, "RGB_565");
-        break;
-    case HAL_PIXEL_FORMAT_BGRA_8888:
-        strcpy(pixelformatstr, "BGRA_8888");
-        break;
-    case HAL_PIXEL_FORMAT_RGBA_5551:
-        strcpy(pixelformatstr, "RGBA_5551");
-        break;
-    case HAL_PIXEL_FORMAT_RGBA_4444:
-        strcpy(pixelformatstr, "RGBA_4444");
-        break;
-    case HAL_PIXEL_FORMAT_YV12:
-        strcpy(pixelformatstr, "YV12");
-        break;
-    case HAL_PIXEL_FORMAT_YCbCr_422_SP:
-        strcpy(pixelformatstr, "YCbCr_422_SP_NV16");
-        break;
-    case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-        strcpy(pixelformatstr, "YCrCb_420_SP_NV21");
-        break;
-    case HAL_PIXEL_FORMAT_YCbCr_422_I:
-        strcpy(pixelformatstr, "YCbCr_422_I_YUY2");
-        break;
-    case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
-        strcpy(pixelformatstr, "NV12_ENCODEABLE");
-        break;
-    case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
-        strcpy(pixelformatstr, "YCbCr_420_SP_TILED_TILE_4x2");
-        break;
-    case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-        strcpy(pixelformatstr, "YCbCr_420_SP");
-        break;
-    case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
-        strcpy(pixelformatstr, "YCrCb_420_SP_ADRENO");
-        break;
-    case HAL_PIXEL_FORMAT_YCrCb_422_SP:
-        strcpy(pixelformatstr, "YCrCb_422_SP");
-        break;
-    case HAL_PIXEL_FORMAT_R_8:
-        strcpy(pixelformatstr, "R_8");
-        break;
-    case HAL_PIXEL_FORMAT_RG_88:
-        strcpy(pixelformatstr, "RG_88");
-        break;
-    case HAL_PIXEL_FORMAT_INTERLACE:
-        strcpy(pixelformatstr, "INTERLACE");
-        break;
-    default:
-        sprintf(pixelformatstr, "Unknown0x%X", format);
-        break;
+        case HAL_PIXEL_FORMAT_RGBA_8888:
+            strcpy(pixelformatstr, "RGBA_8888");
+            break;
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+            strcpy(pixelformatstr, "RGBX_8888");
+            break;
+        case HAL_PIXEL_FORMAT_RGB_888:
+            strcpy(pixelformatstr, "RGB_888");
+            break;
+        case HAL_PIXEL_FORMAT_RGB_565:
+            strcpy(pixelformatstr, "RGB_565");
+            break;
+        case HAL_PIXEL_FORMAT_BGRA_8888:
+            strcpy(pixelformatstr, "BGRA_8888");
+            break;
+        case HAL_PIXEL_FORMAT_RGBA_5551:
+            strcpy(pixelformatstr, "RGBA_5551");
+            break;
+        case HAL_PIXEL_FORMAT_RGBA_4444:
+            strcpy(pixelformatstr, "RGBA_4444");
+            break;
+        case HAL_PIXEL_FORMAT_YV12:
+            strcpy(pixelformatstr, "YV12");
+            break;
+        case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+            strcpy(pixelformatstr, "YCbCr_422_SP_NV16");
+            break;
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+            strcpy(pixelformatstr, "YCrCb_420_SP_NV21");
+            break;
+        case HAL_PIXEL_FORMAT_YCbCr_422_I:
+            strcpy(pixelformatstr, "YCbCr_422_I_YUY2");
+            break;
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+            strcpy(pixelformatstr, "NV12_ENCODEABLE");
+            break;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
+            strcpy(pixelformatstr, "YCbCr_420_SP_TILED_TILE_4x2");
+            break;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+            strcpy(pixelformatstr, "YCbCr_420_SP");
+            break;
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
+            strcpy(pixelformatstr, "YCrCb_420_SP_ADRENO");
+            break;
+        case HAL_PIXEL_FORMAT_YCrCb_422_SP:
+            strcpy(pixelformatstr, "YCrCb_422_SP");
+            break;
+        case HAL_PIXEL_FORMAT_R_8:
+            strcpy(pixelformatstr, "R_8");
+            break;
+        case HAL_PIXEL_FORMAT_RG_88:
+            strcpy(pixelformatstr, "RG_88");
+            break;
+        case HAL_PIXEL_FORMAT_INTERLACE:
+            strcpy(pixelformatstr, "INTERLACE");
+            break;
+        default:
+            sprintf(pixelformatstr, "Unknown0x%X", format);
+            break;
     }
 }
 
 void dumpLayer(int moduleCompositionType, int listFlags, size_t layerIndex,
-                                                        hwc_layer_t hwLayers[])
+               hwc_layer_t hwLayers[])
 {
     char dumplogstr_png[128] = "";
     char dumplogstr_raw[128] = "";
     if (sfdump_counter_png <= sfdump_countlimit_png) {
         sprintf(dumplogstr_png, "[png-dump-frame: %03d of %03d] ",
-                                    sfdump_counter_png, sfdump_countlimit_png);
+                sfdump_counter_png, sfdump_countlimit_png);
     }
     if (sfdump_counter_raw <= sfdump_countlimit_raw) {
         sprintf(dumplogstr_raw, "[raw-dump-frame: %03d of %03d]",
-                                    sfdump_counter_raw, sfdump_countlimit_raw);
+                sfdump_counter_raw, sfdump_countlimit_raw);
     }
     if (NULL == hwLayers) {
-        ALOGE("sfdump: Error.%s%sLayer[%d] No hwLayers to dump.",
-                                dumplogstr_raw, dumplogstr_png, layerIndex);
+        LOGE("sfdump: Error.%s%sLayer[%d] No hwLayers to dump.",
+             dumplogstr_raw, dumplogstr_png, layerIndex);
         return;
     }
     hwc_layer *layer = &hwLayers[layerIndex];
@@ -679,263 +619,245 @@ void dumpLayer(int moduleCompositionType, int listFlags, size_t layerIndex,
     hwc_rect_t displayFrame = layer->displayFrame;
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     char pixelformatstr[32] = "None";
+    uint32_t transform = layer->transform & FINAL_TRANSFORM_MASK;
 
     if (hnd)
         getHalPixelFormatStr(hnd->format, pixelformatstr);
-#if 0
-    ALOGE("sfdump: %s%s[%s]-Composition, Layer[%d] SrcBuff[%dx%d] "
-        "SrcCrop[%dl, %dt, %dr, %db] "
-        "DispFrame[%dl, %dt, %dr, %db] Composition-type = %s, Format = %s, "
-        "Orientation = %s, Flags = %s%s%s%s%s%s%s%s%s%s",
-        dumplogstr_raw, dumplogstr_png,
-        (moduleCompositionType == COMPOSITION_TYPE_GPU)? "GPU":
-        (moduleCompositionType == COMPOSITION_TYPE_MDP)? "MDP":
-        (moduleCompositionType == COMPOSITION_TYPE_C2D)? "C2D":
-        (moduleCompositionType == COMPOSITION_TYPE_CPU)? "CPU":
-        (moduleCompositionType == COMPOSITION_TYPE_DYN)? "DYN": "???",
-        layerIndex,
-        (hnd)? hnd->width : -1, (hnd)? hnd->height : -1,
-        sourceCrop.left, sourceCrop.top,
-        sourceCrop.right, sourceCrop.bottom,
-        displayFrame.left, displayFrame.top,
-        displayFrame.right, displayFrame.bottom,
-        (layer->compositionType == HWC_FRAMEBUFFER)? "Framebuffer (OpenGL ES)":
-        (layer->compositionType == HWC_OVERLAY)? "Overlay":
-        (layer->compositionType == HWC_USE_COPYBIT)? "Copybit": "???",
-        pixelformatstr,
-        (layer->transform == Transform::ROT_0)? "ROT_0":
-        (layer->transform == Transform::FLIP_H)? "FLIP_H":
-        (layer->transform == Transform::FLIP_V)? "FLIP_V":
-        (layer->transform == Transform::ROT_90)? "ROT_90":
-        (layer->transform == Transform::ROT_180)? "ROT_180":
-        (layer->transform == Transform::ROT_270)? "ROT_270":
-        (layer->transform == Transform::ROT_INVALID)? "ROT_INVALID":"???",
-        (layer->flags == 0)? "[None]":"",
-        (layer->flags & HWC_SKIP_LAYER)? "[Skip layer]":"",
-        (layer->flags & HWC_LAYER_NOT_UPDATING)? "[Layer not updating]":"",
-        (layer->flags & HWC_USE_ORIGINAL_RESOLUTION)? "[Original Resolution]":"",
-        (layer->flags & HWC_DO_NOT_USE_OVERLAY)? "[Do not use Overlay]":"",
-        (layer->flags & HWC_COMP_BYPASS)? "[Bypass]":"",
-        (layer->flags & HWC_BYPASS_RESERVE_0)? "[Bypass Reserve 0]":"",
-        (layer->flags & HWC_BYPASS_RESERVE_1)? "[Bypass Reserve 1]":"",
-        (listFlags & HWC_GEOMETRY_CHANGED)? "[List: Geometry Changed]":"",
-        (listFlags & HWC_SKIP_COMPOSITION)? "[List: Skip Composition]":"");
-#endif
-        if (NULL == hnd) {
-            ALOGE("sfdump: %s%sLayer[%d] private-handle is invalid.",
-                                dumplogstr_raw, dumplogstr_png, layerIndex);
-            return;
-        }
 
-        if ((sfdump_counter_png <= sfdump_countlimit_png) && hnd->base) {
-#if 0
-            bool bResult = false;
-            char sfdumpfile_name[256];
-            SkBitmap *tempSkBmp = new SkBitmap();
-            SkBitmap::Config tempSkBmpConfig = SkBitmap::kNo_Config;
-            sprintf(sfdumpfile_name, "%s/sfdump%03d_layer%d.png", sfdumpdir_png,
-                    sfdump_counter_png, layerIndex);
+    LOGE("sfdump: %s%s[%s]-Composition, Layer[%d] SrcBuff[%dx%d] "
+         "SrcCrop[%dl, %dt, %dr, %db] "
+         "DispFrame[%dl, %dt, %dr, %db] Composition-type = %s, Format = %s, "
+         "Orientation = %s, Flags = %s%s%s%s%s%s%s%s%s%s",
+         dumplogstr_raw, dumplogstr_png,
+         (moduleCompositionType == COMPOSITION_TYPE_GPU)? "GPU":
+         (moduleCompositionType == COMPOSITION_TYPE_MDP)? "MDP":
+         (moduleCompositionType == COMPOSITION_TYPE_C2D)? "C2D":
+         (moduleCompositionType == COMPOSITION_TYPE_CPU)? "CPU":
+         (moduleCompositionType == COMPOSITION_TYPE_DYN)? "DYN": "???",
+         layerIndex,
+         (hnd)? hnd->width : -1, (hnd)? hnd->height : -1,
+         sourceCrop.left, sourceCrop.top,
+         sourceCrop.right, sourceCrop.bottom,
+         displayFrame.left, displayFrame.top,
+         displayFrame.right, displayFrame.bottom,
+         (layer->compositionType == HWC_FRAMEBUFFER)? "Framebuffer (OpenGL ES)":
+         (layer->compositionType == HWC_OVERLAY)? "Overlay":
+         (layer->compositionType == HWC_USE_COPYBIT)? "Copybit": "???",
+         pixelformatstr,
+         (transform == Transform::ROT_0)? "ROT_0":
+             (transform == Transform::FLIP_H)? "FLIP_H":
+             (transform == Transform::FLIP_V)? "FLIP_V":
+             (transform == Transform::ROT_90)? "ROT_90":
+             (transform == Transform::ROT_180)? "ROT_180":
+             (transform == Transform::ROT_270)? "ROT_270":
+             (transform == Transform::ROT_INVALID)? "ROT_INVALID":"???",
+         (layer->flags == 0)? "[None]":"",
+         (layer->flags & HWC_SKIP_LAYER)? "[Skip layer]":"",
+         (layer->flags & HWC_LAYER_NOT_UPDATING)? "[Layer not updating]":"",
+         (layer->flags & HWC_COMP_BYPASS)? "[Bypass]":"",
+         (layer->flags & HWC_BYPASS_RESERVE_0)? "[Bypass Reserve 0]":"",
+         (layer->flags & HWC_BYPASS_RESERVE_1)? "[Bypass Reserve 1]":"",
+         (listFlags & HWC_GEOMETRY_CHANGED)? "[List: Geometry Changed]":"",
+         (listFlags & HWC_SKIP_COMPOSITION)? "[List: Skip Composition]":"");
 
-            switch (hnd->format) {
-                case HAL_PIXEL_FORMAT_RGBA_8888:
-                case HAL_PIXEL_FORMAT_RGBX_8888:
-                case HAL_PIXEL_FORMAT_BGRA_8888:
-                    tempSkBmpConfig = SkBitmap::kARGB_8888_Config;
-                    break;
-                case HAL_PIXEL_FORMAT_RGB_565:
-                case HAL_PIXEL_FORMAT_RGBA_5551:
-                case HAL_PIXEL_FORMAT_RGBA_4444:
-                    tempSkBmpConfig = SkBitmap::kRGB_565_Config;
-                    break;
-                case HAL_PIXEL_FORMAT_RGB_888:
-                default:
-                    tempSkBmpConfig = SkBitmap::kNo_Config;
-                    break;
-            }
-            if (SkBitmap::kNo_Config != tempSkBmpConfig) {
-                tempSkBmp->setConfig(tempSkBmpConfig, hnd->width, hnd->height);
-                tempSkBmp->setPixels((void*)hnd->base);
-                bResult = SkImageEncoder::EncodeFile(sfdumpfile_name,
-                                *tempSkBmp, SkImageEncoder::kPNG_Type, 100);
-                ALOGE("sfdump: %sDumped Layer[%d] to %s: %s", dumplogstr_png,
-                    layerIndex, sfdumpfile_name, bResult ? "Success" : "Fail");
-            }
-            else {
-                ALOGE("sfdump: %sSkipping Layer[%d] dump: Unsupported layer "
-                    "format %s for png encoder.", dumplogstr_png, layerIndex,
-                                            pixelformatstr);
-            }
-            delete tempSkBmp; // Calls SkBitmap::freePixels() internally.
-#endif
-        }
-
-        if ((sfdump_counter_raw <= sfdump_countlimit_raw) && hnd->base) {
-            char sfdumpfile_name[256];
-            bool bResult = false;
-            sprintf(sfdumpfile_name, "%s/sfdump%03d_layer%d_%dx%d_%s.raw",
-                sfdumpdir_raw,
-                sfdump_counter_raw, layerIndex, hnd->width, hnd->height,
-                pixelformatstr);
-            FILE* fp = fopen(sfdumpfile_name, "w+");
-            if (fp != NULL) {
-                bResult = (bool) fwrite((void*)hnd->base, hnd->size, 1, fp);
-                fclose(fp);
-            }
-            ALOGE("sfdump: %s Dumped Layer[%d] to %s: %s", dumplogstr_raw,
-                layerIndex, sfdumpfile_name, bResult ? "Success" : "Fail");
-        }
-}
-
-#ifdef DEBUG_CALC_FPS
-ANDROID_SINGLETON_STATIC_INSTANCE(CalcFps) ;
-
-CalcFps::CalcFps() {
-    debug_fps_level = 0;
-    Init();
-}
-
-CalcFps::~CalcFps() {
-}
-
-void CalcFps::Init() {
-    char prop[PROPERTY_VALUE_MAX];
-    property_get("debug.gr.calcfps", prop, "0");
-    debug_fps_level = atoi(prop);
-    if (debug_fps_level > MAX_DEBUG_FPS_LEVEL) {
-        ALOGW("out of range value for debug.gr.calcfps, using 0");
-        debug_fps_level = 0;
-    }
-
-    ALOGE("DEBUG_CALC_FPS: %d", debug_fps_level);
-    populate_debug_fps_metadata();
-}
-
-void CalcFps::Fps() {
-    if (debug_fps_level > 0)
-        calc_fps(ns2us(systemTime()));
-}
-
-void CalcFps::populate_debug_fps_metadata(void)
-{
-    char prop[PROPERTY_VALUE_MAX];
-
-    /*defaults calculation of fps to based on number of frames*/
-    property_get("debug.gr.calcfps.type", prop, "0");
-    debug_fps_metadata.type = (debug_fps_metadata_t::DfmType) atoi(prop);
-
-    /*defaults to 1000ms*/
-    property_get("debug.gr.calcfps.timeperiod", prop, "1000");
-    debug_fps_metadata.time_period = atoi(prop);
-
-    property_get("debug.gr.calcfps.period", prop, "10");
-    debug_fps_metadata.period = atoi(prop);
-
-    if (debug_fps_metadata.period > MAX_FPS_CALC_PERIOD_IN_FRAMES) {
-        debug_fps_metadata.period = MAX_FPS_CALC_PERIOD_IN_FRAMES;
-    }
-
-    /* default ignorethresh_us: 500 milli seconds */
-    property_get("debug.gr.calcfps.ignorethresh_us", prop, "500000");
-    debug_fps_metadata.ignorethresh_us = atoi(prop);
-
-    debug_fps_metadata.framearrival_steps =
-                       (debug_fps_metadata.ignorethresh_us / 16666);
-
-    if (debug_fps_metadata.framearrival_steps > MAX_FRAMEARRIVAL_STEPS) {
-        debug_fps_metadata.framearrival_steps = MAX_FRAMEARRIVAL_STEPS;
-        debug_fps_metadata.ignorethresh_us =
-                        debug_fps_metadata.framearrival_steps * 16666;
-    }
-
-    /* 2ms margin of error for the gettimeofday */
-    debug_fps_metadata.margin_us = 2000;
-
-    for (unsigned int i = 0; i < MAX_FRAMEARRIVAL_STEPS; i++)
-        debug_fps_metadata.accum_framearrivals[i] = 0;
-
-    ALOGE("period: %d", debug_fps_metadata.period);
-    ALOGE("ignorethresh_us: %lld", debug_fps_metadata.ignorethresh_us);
-}
-
-void CalcFps::print_fps(float fps)
-{
-    if (debug_fps_metadata_t::DFM_FRAMES == debug_fps_metadata.type)
-        ALOGE("FPS for last %d frames: %3.2f", debug_fps_metadata.period, fps);
-    else
-        ALOGE("FPS for last (%f ms, %d frames): %3.2f",
-             debug_fps_metadata.time_elapsed,
-             debug_fps_metadata.curr_frame, fps);
-
-    debug_fps_metadata.curr_frame = 0;
-    debug_fps_metadata.time_elapsed = 0.0;
-
-    if (debug_fps_level > 1) {
-        ALOGE("Frame Arrival Distribution:");
-        for (unsigned int i = 0;
-             i < ((debug_fps_metadata.framearrival_steps / 6) + 1);
-             i++) {
-            ALOGE("%lld %lld %lld %lld %lld %lld",
-                 debug_fps_metadata.accum_framearrivals[i*6],
-                 debug_fps_metadata.accum_framearrivals[i*6+1],
-                 debug_fps_metadata.accum_framearrivals[i*6+2],
-                 debug_fps_metadata.accum_framearrivals[i*6+3],
-                 debug_fps_metadata.accum_framearrivals[i*6+4],
-                 debug_fps_metadata.accum_framearrivals[i*6+5]);
-        }
-
-        /* We are done with displaying, now clear the stats */
-        for (unsigned int i = 0;
-             i < debug_fps_metadata.framearrival_steps;
-             i++)
-            debug_fps_metadata.accum_framearrivals[i] = 0;
-    }
-    return;
-}
-
-void CalcFps::calc_fps(nsecs_t currtime_us)
-{
-    static nsecs_t oldtime_us = 0;
-
-    nsecs_t diff = currtime_us - oldtime_us;
-
-    oldtime_us = currtime_us;
-
-    if (debug_fps_metadata_t::DFM_FRAMES == debug_fps_metadata.type &&
-        diff > debug_fps_metadata.ignorethresh_us) {
+    if (NULL == hnd) {
+        LOGE("sfdump: %s%sLayer[%d] private-handle is invalid.",
+             dumplogstr_raw, dumplogstr_png, layerIndex);
         return;
     }
 
-    if (debug_fps_metadata.curr_frame < MAX_FPS_CALC_PERIOD_IN_FRAMES) {
-        debug_fps_metadata.framearrivals[debug_fps_metadata.curr_frame] = diff;
-    }
+    if ((sfdump_counter_png <= sfdump_countlimit_png) && hnd->base) {
+        bool bResult = false;
+        char sfdumpfile_name[256];
+        SkBitmap *tempSkBmp = new SkBitmap();
+        SkBitmap::Config tempSkBmpConfig = SkBitmap::kNo_Config;
+        sprintf(sfdumpfile_name, "%s/sfdump%03d_layer%d.png", sfdumpdir_png,
+                sfdump_counter_png, layerIndex);
 
-    debug_fps_metadata.curr_frame++;
-
-    if (debug_fps_level > 1) {
-        unsigned int currstep = (diff + debug_fps_metadata.margin_us) / 16666;
-
-        if (currstep < debug_fps_metadata.framearrival_steps) {
-            debug_fps_metadata.accum_framearrivals[currstep-1]++;
+        switch (hnd->format) {
+            case HAL_PIXEL_FORMAT_RGBA_8888:
+            case HAL_PIXEL_FORMAT_RGBX_8888:
+            case HAL_PIXEL_FORMAT_BGRA_8888:
+                tempSkBmpConfig = SkBitmap::kARGB_8888_Config;
+                break;
+            case HAL_PIXEL_FORMAT_RGB_565:
+            case HAL_PIXEL_FORMAT_RGBA_5551:
+            case HAL_PIXEL_FORMAT_RGBA_4444:
+                tempSkBmpConfig = SkBitmap::kRGB_565_Config;
+                break;
+            case HAL_PIXEL_FORMAT_RGB_888:
+            default:
+                tempSkBmpConfig = SkBitmap::kNo_Config;
+                break;
         }
+        if (SkBitmap::kNo_Config != tempSkBmpConfig) {
+            tempSkBmp->setConfig(tempSkBmpConfig, hnd->width, hnd->height);
+            tempSkBmp->setPixels((void*)hnd->base);
+            bResult = SkImageEncoder::EncodeFile(sfdumpfile_name,
+                                                 *tempSkBmp, SkImageEncoder::kPNG_Type, 100);
+            LOGE("sfdump: %sDumped Layer[%d] to %s: %s", dumplogstr_png,
+                 layerIndex, sfdumpfile_name, bResult ? "Success" : "Fail");
+        }
+        else {
+            LOGE("sfdump: %sSkipping Layer[%d] dump: Unsupported layer "
+                 "format %s for png encoder.", dumplogstr_png, layerIndex,
+                 pixelformatstr);
+        }
+        delete tempSkBmp; // Calls SkBitmap::freePixels() internally.
     }
 
-    if (debug_fps_metadata_t::DFM_FRAMES == debug_fps_metadata.type) {
-        if (debug_fps_metadata.curr_frame == debug_fps_metadata.period) {
-            /* time to calculate and display FPS */
-            nsecs_t sum = 0;
-            for (unsigned int i = 0; i < debug_fps_metadata.period; i++)
-                sum += debug_fps_metadata.framearrivals[i];
-            print_fps((debug_fps_metadata.period * float(1000000))/float(sum));
+    if ((sfdump_counter_raw <= sfdump_countlimit_raw) && hnd->base) {
+        char sfdumpfile_name[256];
+        bool bResult = false;
+        sprintf(sfdumpfile_name, "%s/sfdump%03d_layer%d_%dx%d_%s.raw",
+                sfdumpdir_raw,
+                sfdump_counter_raw, layerIndex, hnd->width, hnd->height,
+                pixelformatstr);
+        FILE* fp = fopen(sfdumpfile_name, "w+");
+        if (fp != NULL) {
+            bResult = (bool) fwrite((void*)hnd->base, hnd->size, 1, fp);
+            fclose(fp);
         }
+        LOGE("sfdump: %s Dumped Layer[%d] to %s: %s", dumplogstr_raw,
+             layerIndex, sfdumpfile_name, bResult ? "Success" : "Fail");
     }
-    else if (debug_fps_metadata_t::DFM_TIME == debug_fps_metadata.type) {
-        debug_fps_metadata.time_elapsed += ((float)diff/1000.0);
-        if (debug_fps_metadata.time_elapsed >= debug_fps_metadata.time_period) {
-            float fps = (1000.0 * debug_fps_metadata.curr_frame)/
-                        (float)debug_fps_metadata.time_elapsed;
-            print_fps(fps);
-        }
-    }
-    return;
 }
-#endif
+
+bool needsAspectRatio (int wRatio, int hRatio) {
+    return ((wRatio != DEFAULT_WIDTH_RATIO) || (hRatio != DEFAULT_HEIGHT_RATIO));
+}
+
+void applyPixelAspectRatio (int wRatio, int hRatio, int orientation, int maxWidth,
+                            int maxHeight, Rect& visibleRect, GLfloat mVertices[][2]) {
+
+    if ((wRatio == 0) || (hRatio == 0))
+        return;
+
+    float wDelta = 0;
+    float hDelta = 0;
+    float aspectRatio;
+    float displayRatio;
+    float new_width, new_height;
+    float old_width = abs(visibleRect.right - visibleRect.left);
+    float old_height = abs(visibleRect.bottom - visibleRect.top);
+
+    if (orientation == Transform::ROT_INVALID) {
+        // During animation, no defined orientation, rely on mTransformedBounds
+        if (old_width >= old_height)
+            orientation = Transform::ROT_0;
+        else
+            orientation = Transform::ROT_90;
+    }
+
+    switch (orientation) {
+
+        case Transform::ROT_0:
+        case Transform::ROT_180:
+
+            // Calculated Aspect Ratio = Original Aspect Ratio x Pixel Aspect Ratio
+            aspectRatio = (old_width * wRatio) / (old_height * hRatio);
+            displayRatio = (float)maxWidth / (float)maxHeight;
+
+            if (aspectRatio >= displayRatio) {
+                new_height = old_width / aspectRatio;
+                if (new_height > maxHeight) {
+                    new_height = maxHeight;
+                    new_width = new_height * aspectRatio;
+                    wDelta = (new_width - old_width) / 2;
+                }
+                hDelta = (new_height - old_height) / 2;
+            } else {
+                new_width = old_height * aspectRatio;
+                if (new_width > maxWidth) {
+                    new_width = maxWidth;
+                    new_height = new_width / aspectRatio;
+                    hDelta = (new_height - old_height) / 2;
+                }
+                wDelta = (new_width - old_width) / 2;
+            }
+
+            if (hDelta != 0) {
+                visibleRect.top -= hDelta;
+                visibleRect.bottom += hDelta;
+
+                // Set mVertices for GPU fallback (During rotation)
+                if (orientation == Transform::ROT_0) {
+                    mVertices[1][1] = mVertices[2][1] = visibleRect.top;
+                    mVertices[0][1] = mVertices[3][1] = visibleRect.bottom;
+                } else {
+                    mVertices[0][1] = mVertices[3][1] = visibleRect.top;
+                    mVertices[1][1] = mVertices[2][1] = visibleRect.bottom;
+                }
+            }
+
+            if (wDelta != 0) {
+                visibleRect.left -= wDelta;
+                visibleRect.right += wDelta;
+
+                // Set mVertices for GPU fallback (During rotation)
+                mVertices[0][0] = mVertices[1][0] = visibleRect.left;
+                mVertices[2][0] = mVertices[3][0] = visibleRect.right;
+            }
+            break;
+
+        case Transform::ROT_90:
+        case Transform::ROT_270:
+
+            // Calculated Aspect Ratio = Original Aspect Ratio x Pixel Aspect Ratio
+            aspectRatio = (old_height * wRatio) / (old_width * hRatio);
+            displayRatio = (float)maxHeight / (float)maxWidth;
+
+            if (aspectRatio >= displayRatio) {
+                new_height = old_width * aspectRatio;
+                if (new_height > maxHeight) {
+                    new_height = maxHeight;
+                    new_width = new_height / aspectRatio;
+                    wDelta = (new_width - old_width) / 2;
+                }
+                hDelta = (new_height - old_height) / 2;
+            } else {
+                new_width = old_height / aspectRatio;
+                if (new_width > maxWidth) {
+                    new_width = maxWidth;
+                    new_height = new_width * aspectRatio;
+                    hDelta = (new_height - old_height) / 2;
+                }
+                wDelta = (new_width - old_width) / 2;
+            }
+
+            if (hDelta != 0) {
+                visibleRect.top -= hDelta;
+                visibleRect.bottom += hDelta;
+
+                // Set mVertices for GPU fallback (During rotation)
+                if (orientation == Transform::ROT_90) {
+                    mVertices[2][1] = mVertices[3][1] = visibleRect.top;
+                    mVertices[0][1] = mVertices[1][1] = visibleRect.bottom;
+                } else {
+                    mVertices[0][1] = mVertices[1][1] = visibleRect.top;
+                    mVertices[2][1] = mVertices[3][1] = visibleRect.bottom;
+                }
+            }
+
+            if (wDelta != 0) {
+                visibleRect.left -= wDelta;
+                visibleRect.right += wDelta;
+
+                // Set mVertices for GPU fallback (During rotation)
+                if (orientation == Transform::ROT_90) {
+                    mVertices[1][0] = mVertices[2][0] = visibleRect.left;
+                    mVertices[0][0] = mVertices[3][0] = visibleRect.right;
+                } else {
+                    mVertices[0][0] = mVertices[3][0] = visibleRect.left;
+                    mVertices[1][0] = mVertices[2][0] = visibleRect.right;
+                }
+            }
+            break;
+
+        default: // Handled above.
+            break;
+
+    }
+}
+
+

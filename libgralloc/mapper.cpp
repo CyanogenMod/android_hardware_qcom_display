@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,8 +58,8 @@ static sp<IMemAlloc> getAllocator(int flags)
 }
 
 static int gralloc_map(gralloc_module_t const* module,
-        buffer_handle_t handle,
-        void** vaddr)
+                       buffer_handle_t handle,
+                       void** vaddr)
 {
     private_handle_t* hnd = (private_handle_t*)handle;
     void *mappedAddress;
@@ -68,22 +68,22 @@ static int gralloc_map(gralloc_module_t const* module,
         size_t size = hnd->size;
         sp<IMemAlloc> memalloc = getAllocator(hnd->flags) ;
         int err = memalloc->map_buffer(&mappedAddress, size,
-                hnd->offset, hnd->fd);
+                                       hnd->offset, hnd->fd);
         if(err) {
             ALOGE("Could not mmap handle %p, fd=%d (%s)",
-                    handle, hnd->fd, strerror(errno));
+                  handle, hnd->fd, strerror(errno));
             hnd->base = 0;
             return -errno;
         }
 
         if (mappedAddress == MAP_FAILED) {
             ALOGE("Could not mmap handle %p, fd=%d (%s)",
-                    handle, hnd->fd, strerror(errno));
+                  handle, hnd->fd, strerror(errno));
             hnd->base = 0;
             return -errno;
         }
         hnd->base = intptr_t(mappedAddress) + hnd->offset;
-        //ALOGD("gralloc_map() succeeded fd=%d, off=%d, size=%d, vaddr=%p",
+        //LOGD("gralloc_map() succeeded fd=%d, off=%d, size=%d, vaddr=%p",
         //        hnd->fd, hnd->offset, hnd->size, mappedAddress);
     }
     *vaddr = (void*)hnd->base;
@@ -91,7 +91,7 @@ static int gralloc_map(gralloc_module_t const* module,
 }
 
 static int gralloc_unmap(gralloc_module_t const* module,
-        buffer_handle_t handle)
+                         buffer_handle_t handle)
 {
     private_handle_t* hnd = (private_handle_t*)handle;
     if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
@@ -116,7 +116,7 @@ static pthread_mutex_t sMapLock = PTHREAD_MUTEX_INITIALIZER;
 /*****************************************************************************/
 
 int gralloc_register_buffer(gralloc_module_t const* module,
-        buffer_handle_t handle)
+                            buffer_handle_t handle)
 {
     if (private_handle_t::validate(handle) < 0)
         return -EINVAL;
@@ -164,7 +164,7 @@ int gralloc_register_buffer(gralloc_module_t const* module,
 }
 
 int gralloc_unregister_buffer(gralloc_module_t const* module,
-        buffer_handle_t handle)
+                              buffer_handle_t handle)
 {
     if (private_handle_t::validate(handle) < 0)
         return -EINVAL;
@@ -195,7 +195,7 @@ int gralloc_unregister_buffer(gralloc_module_t const* module,
 }
 
 int terminateBuffer(gralloc_module_t const* module,
-        private_handle_t* hnd)
+                    private_handle_t* hnd)
 {
     /*
      * If the buffer has been mapped during a lock operation, it's time
@@ -215,7 +215,8 @@ int terminateBuffer(gralloc_module_t const* module,
                 gralloc_unmap(module, hnd);
             }
         } else {
-            ALOGE("terminateBuffer: unmapping a non pmem/ashmem buffer flags = 0x%x", hnd->flags);
+            ALOGE("terminateBuffer: unmapping a non pmem/ashmem buffer flags = 0x%x",
+                  hnd->flags);
             gralloc_unmap(module, hnd);
         }
     }
@@ -224,9 +225,9 @@ int terminateBuffer(gralloc_module_t const* module,
 }
 
 int gralloc_lock(gralloc_module_t const* module,
-        buffer_handle_t handle, int usage,
-        int l, int t, int w, int h,
-        void** vaddr)
+                 buffer_handle_t handle, int usage,
+                 int l, int t, int w, int h,
+                 void** vaddr)
 {
     if (private_handle_t::validate(handle) < 0)
         return -EINVAL;
@@ -254,10 +255,10 @@ int gralloc_lock(gralloc_module_t const* module,
 
         int timeout = GENLOCK_MAX_TIMEOUT;
         if (GENLOCK_NO_ERROR != genlock_lock_buffer((native_handle_t *)handle,
-                                                   (genlock_lock_type)lockType,
-                                                   timeout)) {
+                                                    (genlock_lock_type)lockType,
+                                                    timeout)) {
             ALOGE("%s: genlock_lock_buffer (lockType=0x%x) failed", __FUNCTION__,
-                lockType);
+                  lockType);
             return -EINVAL;
         } else {
             // Mark this buffer as locked for SW read/write operation.
@@ -274,7 +275,7 @@ int gralloc_lock(gralloc_module_t const* module,
 }
 
 int gralloc_unlock(gralloc_module_t const* module,
-        buffer_handle_t handle)
+                   buffer_handle_t handle)
 {
     if (private_handle_t::validate(handle) < 0)
         return -EINVAL;
@@ -285,9 +286,9 @@ int gralloc_unlock(gralloc_module_t const* module,
         int err;
         sp<IMemAlloc> memalloc = getAllocator(hnd->flags) ;
         err = memalloc->clean_buffer((void*)hnd->base,
-                hnd->size, hnd->offset, hnd->fd);
+                                     hnd->size, hnd->offset, hnd->fd);
         ALOGE_IF(err < 0, "cannot flush handle %p (offs=%x len=%x, flags = 0x%x) err=%s\n",
-                hnd, hnd->offset, hnd->size, hnd->flags, strerror(errno));
+                 hnd, hnd->offset, hnd->size, hnd->flags, strerror(errno));
         hnd->flags &= ~private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
     }
 
@@ -305,7 +306,7 @@ int gralloc_unlock(gralloc_module_t const* module,
 /*****************************************************************************/
 
 int gralloc_perform(struct gralloc_module_t const* module,
-        int operation, ... )
+                    int operation, ... )
 {
     int res = -EINVAL;
     va_list args;
@@ -324,12 +325,12 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 native_handle_t** handle = va_arg(args, native_handle_t**);
                 int memoryFlags = va_arg(args, int);
                 private_handle_t* hnd = (private_handle_t*)native_handle_create(
-                        private_handle_t::sNumFds, private_handle_t::sNumInts);
+                    private_handle_t::sNumFds, private_handle_t::sNumInts);
                 hnd->magic = private_handle_t::sMagic;
                 hnd->fd = fd;
                 unsigned int contigFlags = GRALLOC_USAGE_PRIVATE_ADSP_HEAP |
-                                  GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP |
-                                  GRALLOC_USAGE_PRIVATE_SMI_HEAP;
+                    GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP |
+                    GRALLOC_USAGE_PRIVATE_SMI_HEAP;
 
                 if (memoryFlags & contigFlags) {
                     // check if the buffer is a pmem buffer
@@ -338,7 +339,7 @@ int gralloc_perform(struct gralloc_module_t const* module,
                         hnd->flags =  private_handle_t::PRIV_FLAGS_USES_ION;
                     else
                         hnd->flags =  private_handle_t::PRIV_FLAGS_USES_PMEM |
-                                      private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
+                            private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
                 } else {
                     if (memoryFlags & GRALLOC_USAGE_PRIVATE_ION)
                         hnd->flags =  private_handle_t::PRIV_FLAGS_USES_ION;

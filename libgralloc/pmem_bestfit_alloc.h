@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
- * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,8 +36,8 @@ class LinkedList
     NODE*  mFirst;
     NODE*  mLast;
 
-public:
-                LinkedList() : mFirst(0), mLast(0) { }
+ public:
+    LinkedList() : mFirst(0), mLast(0) { }
     bool        isEmpty() const { return mFirst == 0; }
     NODE const* head() const { return mFirst; }
     NODE*       head() { return mFirst; }
@@ -53,11 +53,11 @@ public:
     }
 
     void insertBefore(NODE* node, NODE* newNode) {
-         newNode->prev = node->prev;
-         newNode->next = node;
-         if (node->prev == 0)   mFirst = newNode;
-         else                   node->prev->next = newNode;
-         node->prev = newNode;
+        newNode->prev = node->prev;
+        newNode->next = node;
+        if (node->prev == 0)   mFirst = newNode;
+        else                   node->prev->next = newNode;
+        node->prev = newNode;
     }
 
     void insertHead(NODE* newNode) {
@@ -94,36 +94,36 @@ public:
 
 class SimpleBestFitAllocator : public gralloc::PmemUserspaceAlloc::Allocator
 {
-public:
+ public:
 
-    SimpleBestFitAllocator();
-    SimpleBestFitAllocator(size_t size);
-    virtual ~SimpleBestFitAllocator();
+  SimpleBestFitAllocator();
+  SimpleBestFitAllocator(size_t size);
+  virtual ~SimpleBestFitAllocator();
 
-    virtual ssize_t setSize(size_t size);
+  virtual ssize_t setSize(size_t size);
 
-    virtual ssize_t allocate(size_t size, uint32_t flags = 0);
-    virtual ssize_t deallocate(size_t offset);
-    virtual size_t  size() const;
+  virtual ssize_t allocate(size_t size, uint32_t flags = 0);
+  virtual ssize_t deallocate(size_t offset);
+  virtual size_t  size() const;
 
-private:
-    struct chunk_t {
-        chunk_t(size_t start, size_t size)
-            : start(start), size(size), free(1), prev(0), next(0) {
-        }
-        size_t              start;
-        size_t              size : 28;
-        int                 free : 4;
-        mutable chunk_t*    prev;
-        mutable chunk_t*    next;
-    };
+ private:
+  struct chunk_t {
+      chunk_t(size_t start, size_t size)
+          : start(start), size(size), free(1), prev(0), next(0) {
+          }
+      size_t              start;
+      size_t              size : 28;
+      int                 free : 4;
+      mutable chunk_t*    prev;
+      mutable chunk_t*    next;
+  };
 
-    ssize_t  alloc(size_t size, uint32_t flags);
-    chunk_t* dealloc(size_t start);
+  ssize_t  alloc(size_t size, uint32_t flags);
+  chunk_t* dealloc(size_t start);
 
-    static const int    kMemoryAlign;
-    mutable Locker      mLock;
-    LinkedList<chunk_t> mList;
-    size_t              mHeapSize;
+  static const int    kMemoryAlign;
+  mutable Locker      mLock;
+  LinkedList<chunk_t> mList;
+  size_t              mHeapSize;
 };
 #endif /* GRALLOC_ALLOCATOR_H_ */

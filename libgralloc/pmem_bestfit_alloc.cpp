@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
- * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,12 +24,12 @@
 const int SimpleBestFitAllocator::kMemoryAlign = 32;
 
 SimpleBestFitAllocator::SimpleBestFitAllocator()
-    : mHeapSize(0)
+: mHeapSize(0)
 {
 }
 
 SimpleBestFitAllocator::SimpleBestFitAllocator(size_t size)
-    : mHeapSize(0)
+: mHeapSize(0)
 {
     setSize(size);
 }
@@ -113,13 +113,13 @@ ssize_t SimpleBestFitAllocator::alloc(size_t size, uint32_t flags)
                 mList.insertBefore(free_chunk, split);
             }
 
-            LOGE_IF(((free_chunk->start*kMemoryAlign)&(pagesize-1)),
-                    "page is not aligned!!!");
+            ALOGE_IF(((free_chunk->start*kMemoryAlign)&(pagesize-1)),
+                     "page is not aligned!!!");
 
             const ssize_t tail_free = free_size - (size+extra);
             if (tail_free > 0) {
                 chunk_t* split = new chunk_t(
-                        free_chunk->start + free_chunk->size, tail_free);
+                    free_chunk->start + free_chunk->size, tail_free);
                 mList.insertAfter(free_chunk, split);
             }
         }
@@ -128,33 +128,33 @@ ssize_t SimpleBestFitAllocator::alloc(size_t size, uint32_t flags)
     // we are out of PMEM. Print pmem stats
     // check if there is any leak or fragmentation
 
-    LOGD (" Out of PMEM. Dumping PMEM stats for debugging");
-    LOGD (" ------------- PRINT PMEM STATS --------------");
+    ALOGD (" Out of PMEM. Dumping PMEM stats for debugging");
+    ALOGD (" ------------- PRINT PMEM STATS --------------");
 
     cur = mList.head();
     static uint32_t node_count;
     static uint64_t allocated, free_space;
 
     while (cur) {
-      LOGD (" Node %d -> Start Address : %u Size %u Free info %d",\
-              node_count++, cur->start, cur->size, cur->free);
+        ALOGD (" Node %d -> Start Address : %u Size %u Free info %d",\
+               node_count++, cur->start, cur->size, cur->free);
 
-      // if cur-> free is 1 , the node is free
-      // calculate the total allocated and total free stats also
+        // if cur-> free is 1 , the node is free
+        // calculate the total allocated and total free stats also
 
-      if (cur->free)
-         free_space += cur->size;
-      else
-         allocated += cur->size;
-      // read next node
-      cur = cur->next;
+        if (cur->free)
+            free_space += cur->size;
+        else
+            allocated += cur->size;
+        // read next node
+        cur = cur->next;
     }
-    LOGD (" Total Allocated: %l Total Free: %l", allocated, free_space );
+    ALOGD (" Total Allocated: %l Total Free: %l", allocated, free_space );
 
     node_count = 0;
     allocated = 0;
     free_space = 0;
-    LOGD ("----------------------------------------------");
+    ALOGD ("----------------------------------------------");
     return -ENOMEM;
 }
 
@@ -164,9 +164,9 @@ SimpleBestFitAllocator::chunk_t* SimpleBestFitAllocator::dealloc(size_t start)
     chunk_t* cur = mList.head();
     while (cur) {
         if (cur->start == start) {
-            LOG_FATAL_IF(cur->free,
-                "block at offset 0x%08lX of size 0x%08lX already freed",
-                cur->start*kMemoryAlign, cur->size*kMemoryAlign);
+            ALOG_FATAL_IF(cur->free,
+                          "block at offset 0x%08lX of size 0x%08lX already freed",
+                          cur->start*kMemoryAlign, cur->size*kMemoryAlign);
 
             // merge freed blocks together
             chunk_t* freed = cur;
@@ -183,9 +183,9 @@ SimpleBestFitAllocator::chunk_t* SimpleBestFitAllocator::dealloc(size_t start)
                 cur = n;
             } while (cur && cur->free);
 
-            LOG_FATAL_IF(!freed->free,
-                "freed block at offset 0x%08lX of size 0x%08lX is not free!",
-                freed->start * kMemoryAlign, freed->size * kMemoryAlign);
+            ALOG_FATAL_IF(!freed->free,
+                          "freed block at offset 0x%08lX of size 0x%08lX is not free!",
+                          freed->start * kMemoryAlign, freed->size * kMemoryAlign);
 
             return freed;
         }

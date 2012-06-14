@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ void TileRenderer::startTileRendering(OpenGLRenderer* renderer,
 
     if (!left && !right && !top && !bottom) {
         //can't do tile rendering
-        LOGE("can't tile render; drity region, width, height not available");
+        ALOGE("can't tile render; drity region, width, height not available");
         return;
     }
 
