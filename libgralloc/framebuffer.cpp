@@ -274,7 +274,7 @@ static int startExternalChannel(private_module_t *m)
         info.width = alignedW;
         info.height = hnd->height;
         info.format = hnd->format;
-        info.size = hnd->size;
+        info.size = hnd->size / m->numBuffers;
 
         if (m->trueMirrorSupport)
             flags &= ~WAIT_FOR_VSYNC;
