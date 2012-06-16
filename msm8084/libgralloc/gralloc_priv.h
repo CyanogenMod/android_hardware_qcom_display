@@ -105,8 +105,8 @@ enum {
 /*****************************************************************************/
 enum {
     /* OEM specific HAL formats */
-    HAL_PIXEL_FORMAT_NV12_ENCODEABLE  = 0x102,
-    HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED     = 0x108,
+    HAL_PIXEL_FORMAT_NV12_ENCODEABLE        = 0x102,
+    HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED     = 0x7FA30C03,
     HAL_PIXEL_FORMAT_YCbCr_420_SP           = 0x109,
     HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO    = 0x10A,
     HAL_PIXEL_FORMAT_YCrCb_422_SP           = 0x10B,
