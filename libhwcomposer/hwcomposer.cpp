@@ -1200,30 +1200,17 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 flags |= (1 == list->numHwLayers) ? DISABLE_FRAMEBUFFER_FETCH : 0;
                 int videoStarted = VIDEO_2D_OVERLAY_STARTED;
                 setVideoOverlayStatusInGralloc(ctx, videoStarted);
-                //If it is secure buffer GPU can not render push it to overlay
-                if (!isValidDestination(hwcModule->fbDevice,
-                                            list->hwLayers[i].displayFrame) &&
-                                        (!isSecureBuffer(hnd))) {
-                    list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
-                    list->hwLayers[i].hints &= ~HWC_HINT_CLEAR_FB;
-                    //Even though there are no skip layers, animation is still
-                    //ON and in its final stages.
-                    //Reset count, so that we end up composing once after animation
-                    //is done, if overlay is used.
-                    ctx->previousLayerCount = -1;
-                    skipComposition = false;
-                    if (ctx->hwcOverlayStatus == HWC_OVERLAY_OPEN)
-                        ctx->hwcOverlayStatus = HWC_OVERLAY_PREPARE_TO_CLOSE;
 #ifdef USE_OVERLAY
-                } else if(prepareOverlay(ctx, &(list->hwLayers[i]), flags) == 0) {
-                    list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
-                    list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
-                    // We've opened the channel. Set the state to open.
-                    ctx->hwcOverlayStatus = HWC_OVERLAY_OPEN;
+		if(prepareOverlay(ctx, &(list->hwLayers[i]), flags) == 0) {
+		      list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
+		      list->hwLayers[i].hints |= HWC_HINT_CLEAR_FB;
+		      // We've opened the channel. Set the state to open.
+		      ctx->hwcOverlayStatus = HWC_OVERLAY_OPEN;
+		} else
 
 #endif
-                } else if (hwcModule->compositionType & (COMPOSITION_TYPE_C2D|
-                            COMPOSITION_TYPE_MDP)) {
+	       if (hwcModule->compositionType & (COMPOSITION_TYPE_C2D|
+						COMPOSITION_TYPE_MDP)) {
                     //Fail safe path: If drawing with overlay fails,
 
                     //Use C2D if available.
