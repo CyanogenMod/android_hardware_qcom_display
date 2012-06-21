@@ -79,15 +79,17 @@ extern "C" {
     genlock_status_t genlock_attach_lock(native_handle_t *buffer_handle);
 
     /*
-     * Lock the buffer specified by the buffer handle. The lock held by the buffer
-     * is specified by the lockType. This function will block if a write lock is
-     * requested on the buffer which has previously been locked for a read or write
-     * operation. A buffer can be locked by multiple clients for read. An optional
-     * timeout value can be specified. By default, there is no timeout.
+     * Lock the buffer specified by the buffer handle. The lock held by the
+     * buffer is specified by the lockType. This function will block if a write
+     * lock is requested on the buffer which has previously been locked for a
+     * read or write operation. A buffer can be locked by multiple clients for
+     * read. An optional timeout value can be specified.
+     * By default, there is no timeout.
      *
      * @param: handle of the buffer
      * @param: type of lock to be acquired by the buffer.
-     * @param: timeout value in ms. GENLOCK_MAX_TIMEOUT is the maximum timeout value.
+     * @param: timeout value in ms. GENLOCK_MAX_TIMEOUT is the maximum timeout
+     *         value.
      * @return error status.
      */
     genlock_status_t genlock_lock_buffer(native_handle_t *buffer_handle,
@@ -111,8 +113,17 @@ extern "C" {
      */
     genlock_status_t genlock_wait(native_handle_t *buffer_handle, int timeout);
 
+    /*
+     * Convert a write lock that we own to a read lock
+     *
+     * @param: handle of the buffer
+     * @param: timeout value for the wait.
+     * return: error status.
+     */
+    genlock_status_t genlock_write_to_read(native_handle_t *buffer_handle,
+                                           int timeout);
+
 #ifdef __cplusplus
 }
 #endif
-
 #endif
