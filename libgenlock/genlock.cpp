@@ -83,7 +83,7 @@ namespace {
             lock.timeout = timeout;
             lock.fd = hnd->genlockHandle;
 
-#ifdef GENLOCK_IOC_DREADLOCK
+#if defined(GENLOCK_IOC_DREADLOCK) && !defined(GENLOCK_COMPAT)
             if (ioctl(hnd->genlockPrivFd, GENLOCK_IOC_DREADLOCK, &lock)) {
                 LOGE("%s: GENLOCK_IOC_DREADLOCK failed (lockType0x%x, err=%s fd=%d)", __FUNCTION__,
                         lockType, strerror(errno), hnd->fd);
