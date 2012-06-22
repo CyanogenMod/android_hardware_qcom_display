@@ -819,8 +819,10 @@ struct RotOutFmt<ROT_OUT_FMT_Y_CRCB_H2V2>
 
 inline uint32_t getColorFormat(uint32_t format)
 {
-    return (format == HAL_PIXEL_FORMAT_YV12) ?
-            format : colorFormat(format);
+    //XXX: Earlier this used to mask the format
+    //to check for interlaced or 3D. Just return
+    //the format now
+    return format;
 }
 
 // FB0
