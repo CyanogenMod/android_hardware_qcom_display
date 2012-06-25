@@ -1380,7 +1380,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->device.get = get;
     ctx->device.blit = blit_copybit;
     ctx->device.stretch = stretch_copybit;
-    ctx->blitState.config_mask = C2D_NO_BILINEAR_BIT | C2D_NO_ANTIALIASING_BIT;
+    ctx->blitState.config_mask = C2D_NO_ANTIALIASING_BIT;
     ctx->trg_transform = C2D_TARGET_ROTATE_0;
     ctx->g12_device_fd = open(G12_DEVICE_NAME, O_RDWR | O_SYNC);
     if (ctx->g12_device_fd < 0) {
