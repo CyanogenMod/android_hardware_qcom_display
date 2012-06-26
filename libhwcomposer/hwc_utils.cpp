@@ -18,7 +18,7 @@
 #include "hwc_utils.h"
 #include "mdp_version.h"
 #include "hwc_video.h"
-
+#include "hwc_ext_observer.h"
 namespace qhwc {
 void initContext(hwc_context_t *ctx)
 {
@@ -30,6 +30,8 @@ void initContext(hwc_context_t *ctx)
     ctx->hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ALOGI("MDP version: %d",ctx->mdpVersion);
 
+    ctx->mExtDisplayObserver = ExtDisplayObserver::getInstance();
+    ctx->mExtDisplayObserver->setHwcContext(ctx);
 }
 
 void closeContext(hwc_context_t *ctx)

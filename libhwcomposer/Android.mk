@@ -7,7 +7,9 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware libutils libdl \
                           libhardware_legacy libmemalloc
 LOCAL_SRC_FILES :=  hwc.cpp          \
                     hwc_video.cpp  \
-                    hwc_utils.cpp
+                    hwc_utils.cpp  \
+					hwc_uimirror.cpp \
+					hwc_ext_observer.cpp
 LOCAL_MODULE := hwcomposer.$(TARGET_BOARD_PLATFORM)
 LOCAL_C_INCLUDES := hardware/qcom/display/libgralloc
 LOCAL_C_INCLUDES += hardware/qcom/display/libgenlock

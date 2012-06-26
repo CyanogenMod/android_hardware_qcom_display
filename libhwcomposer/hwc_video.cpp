@@ -16,6 +16,7 @@
  */
 
 #include "hwc_video.h"
+#include "hwc_ext_observer.h"
 
 namespace qhwc {
 
@@ -56,12 +57,14 @@ void VideoOverlay::chooseState(hwc_context_t *ctx) {
 
     //Support 1 video layer
     if(sYuvCount == 1) {
-        if(sIsLayerSkip && ctx->hdmiEnabled) { //Skip on primary, display on ext.
+        //Skip on primary, display on ext.
+        if(sIsLayerSkip && ctx->mExtDisplayObserver->getExternalDisplay()) {
             //TODO
             //VIDEO_ON_TV_ONLY
         } else if(sIsLayerSkip) { //skip on primary, no ext
             newState = ovutils::OV_CLOSED;
-        } else if(ctx->hdmiEnabled) { //display on both
+        } else if(ctx->mExtDisplayObserver->getExternalDisplay()) {
+            //display on both
             newState = ovutils::OV_2D_VIDEO_ON_PANEL_TV;
         } else { //display on primary only
             newState = ovutils::OV_2D_VIDEO_ON_PANEL;
