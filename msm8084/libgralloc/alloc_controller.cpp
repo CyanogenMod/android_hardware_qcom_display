@@ -37,9 +37,10 @@
 #include "pmemalloc.h"
 #include "ashmemalloc.h"
 #include "gr.h"
-#include "qcomutils/comptype.h"
+#include "comptype.h"
 
 using namespace gralloc;
+using namespace qdutils;
 using android::sp;
 
 const int GRALLOC_HEAP_MASK  =  GRALLOC_USAGE_PRIVATE_ADSP_HEAP      |
@@ -62,7 +63,8 @@ static bool canFallback(int usage, bool triedSystem)
     // 4. The heap type is protected
     // 5. The buffer is meant for external display only
 
-    if(QCCompositionType::getInstance().getCompositionType() & COMPOSITION_TYPE_MDP)
+    if(QCCompositionType::getInstance().getCompositionType() &
+       COMPOSITION_TYPE_MDP)
         return false;
     if(triedSystem)
         return false;

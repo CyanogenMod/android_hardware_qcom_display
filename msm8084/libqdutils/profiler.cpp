@@ -27,14 +27,16 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define LOG_TAG "CALCFPS"
+#define LOG_NDDEBUG 0
 #include "profiler.h"
 
 #ifdef DEBUG_CALC_FPS
 
-#define LOG_TAG "CALCFPS"
-#define LOG_NDDEBUG 0
 
-ANDROID_SINGLETON_STATIC_INSTANCE(CalcFps) ;
+ANDROID_SINGLETON_STATIC_INSTANCE(qdutils::CalcFps) ;
+
+namespace qdutils {
 
 CalcFps::CalcFps() {
     debug_fps_level = 0;
@@ -185,4 +187,5 @@ void CalcFps::calc_fps(nsecs_t currtime_us)
     }
     return;
 }
+};//namespace qomutils
 #endif
