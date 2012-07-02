@@ -35,7 +35,7 @@
 #include <cutils/properties.h>
 
 using namespace android;
-
+namespace qdutils {
 // Enum containing the supported composition types
 enum {
     COMPOSITION_TYPE_GPU = 0,
@@ -58,7 +58,6 @@ class QCCompositionType : public Singleton <QCCompositionType>
 
 };
 
-ANDROID_SINGLETON_STATIC_INSTANCE(QCCompositionType);
 inline QCCompositionType::QCCompositionType()
 {
     char property[PROPERTY_VALUE_MAX];
@@ -89,4 +88,6 @@ inline QCCompositionType::QCCompositionType()
     }
 
 }
+}; //namespace qdutils
+ANDROID_SINGLETON_STATIC_INSTANCE(qdutils::QCCompositionType);
 #endif //INCLUDE_LIBQCOM_COMPTYPES

@@ -34,15 +34,15 @@
 #include <utils/Singleton.h>
 #include <cutils/properties.h>
 #include <cutils/log.h>
-using namespace android;
 
 #ifndef DEBUG_CALC_FPS
 #define CALC_FPS() ((void)0)
 #define CALC_INIT() ((void)0)
 #else
-#define CALC_FPS() CalcFps::getInstance().Fps()
-#define CALC_INIT() CalcFps::getInstance().Init()
-
+#define CALC_FPS() qdutils::CalcFps::getInstance().Fps()
+#define CALC_INIT() qdutils::CalcFps::getInstance().Init()
+using namespace android;
+namespace qdutils {
 class CalcFps : public Singleton<CalcFps> {
     public:
     CalcFps();
@@ -102,6 +102,7 @@ class CalcFps : public Singleton<CalcFps> {
     debug_fps_metadata_t debug_fps_metadata;
     unsigned int debug_fps_level;
 };
+};//namespace qdutils
 #endif
 
 #endif // INCLUDE_PROFILER

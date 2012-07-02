@@ -19,10 +19,10 @@ include $(CLEAR_VARS)
 LOCAL_PRELINK_MODULE   := false
 LOCAL_MODULE_PATH      := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libmemalloc
-LOCAL_SHARED_LIBRARIES += libgenlock libQcomUI libGLESv1_CM
+LOCAL_SHARED_LIBRARIES += libgenlock libqdutils libGLESv1_CM
 LOCAL_C_INCLUDES       := hardware/qcom/display/liboverlay/
 LOCAL_C_INCLUDES       += hardware/qcom/display/libgenlock
-LOCAL_C_INCLUDES       += hardware/qcom/display/libqcomui
+LOCAL_C_INCLUDES       += hardware/qcom/display/libqdutils
 LOCAL_MODULE           := gralloc.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_TAGS      := optional
 LOCAL_CFLAGS           := -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).gralloc\" \
@@ -48,7 +48,7 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)
-LOCAL_C_INCLUDES := hardware/qcom/display/libqcomui
+LOCAL_C_INCLUDES := hardware/qcom/display/libqdutils
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils
 LOCAL_SRC_FILES :=  ionalloc.cpp alloc_controller.cpp
 LOCAL_CFLAGS:= -DLOG_TAG=\"memalloc\"

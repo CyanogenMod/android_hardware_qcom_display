@@ -26,7 +26,6 @@
 #include <string.h>
 #include <fb_priv.h>
 #include <overlay.h>
-#include <qcom_ui.h>
 #include <genlock.h>
 #include "hwc_qbuf.h"
 
@@ -36,6 +35,13 @@
 
 struct hwc_context_t;
 namespace qhwc {
+
+enum external_display_type {
+    EXT_TYPE_NONE,
+    EXT_TYPE_HDMI,
+    EXT_TYPE_WIFI
+};
+
 
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
@@ -93,6 +99,8 @@ struct hwc_context_t {
     int yuvBufferCount;
     int hdmiEnabled;
     int numHwLayers;
+    int mdpVersion;
+    bool hasOverlay;
     bool skipComposition;
 
     //Framebuffer device
