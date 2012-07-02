@@ -94,7 +94,7 @@ static int hwc_set(hwc_composer_device_t *dev,
         for (size_t i=0; i<list->numHwLayers; i++) {
             if (list->hwLayers[i].flags & HWC_SKIP_LAYER) {
                 continue;
-            } else if (list->hwLayers[i].compositionType == HWC_USE_OVERLAY) {
+            } else if (list->hwLayers[i].compositionType == HWC_OVERLAY) {
                 drawLayerUsingOverlay(ctx, &(list->hwLayers[i]));
             }
         }

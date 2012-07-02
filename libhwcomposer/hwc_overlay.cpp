@@ -16,6 +16,7 @@
  */
 
 #include "hwc_utils.h"
+#define FINAL_TRANSFORM_MASK 0x000F
 
 namespace qhwc {
 // Determine overlay state based on decoded video info

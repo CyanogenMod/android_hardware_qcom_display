@@ -93,18 +93,6 @@ enum {
     HWC_BYPASS_RESERVE_1        = 0x00000020,
 };
 
-enum HWCCompositionType {
-    HWC_USE_GPU = HWC_FRAMEBUFFER, // This layer is to be handled by Surfaceflinger
-    HWC_USE_OVERLAY = HWC_OVERLAY, // This layer is to be handled by the overlay
-    HWC_USE_COPYBIT                // This layer is to be handled by copybit
-};
-
-enum external_display_type {
-    EXT_TYPE_NONE,
-    EXT_TYPE_HDMI,
-    EXT_TYPE_WIFI
-};
-
 /* Events to the Display HAL perform function
    As of now used for external display related such as
    connect, disconnect, orientation, video started etc.,

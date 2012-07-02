@@ -40,7 +40,7 @@
 #include "fb_priv.h"
 #include "gr.h"
 #include <cutils/properties.h>
-#include <qcomutils/profiler.h>
+#include <profiler.h>
 
 #include "overlay.h"
 namespace ovutils = overlay::utils;

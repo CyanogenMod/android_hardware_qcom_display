@@ -16,6 +16,7 @@
  */
 
 #include "hwc_utils.h"
+#include "mdp_version.h"
 
 namespace qhwc {
 void initContext(hwc_context_t *ctx)
@@ -24,6 +25,9 @@ void initContext(hwc_context_t *ctx)
     openFramebufferDevice(ctx);
     ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->qbuf = new QueuedBufferStore();
+    ctx->mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
+    ctx->hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
+    ALOGI("MDP version: %d",ctx->mdpVersion);
 
 }
 
@@ -89,7 +93,7 @@ void handleYUV(hwc_context_t *ctx, hwc_layer_t *layer)
                    (private_handle_t *)layer->handle;
     //XXX: Handle targets not using overlay
     if(prepareOverlay(ctx, layer)) {
-        layer->compositionType = HWC_USE_OVERLAY;
+        layer->compositionType = HWC_OVERLAY;
         layer->hints |= HWC_HINT_CLEAR_FB;
     }
 }
