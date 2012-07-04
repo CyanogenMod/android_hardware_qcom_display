@@ -504,9 +504,10 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
 
     fb_context_t* ctx = (fb_context_t*)dev;
 
-    private_handle_t const* hnd = reinterpret_cast<private_handle_t const*>(buffer);
-    private_module_t* m = reinterpret_cast<private_module_t*>(
-        dev->common.module);
+    private_handle_t const* hnd =
+        reinterpret_cast<private_handle_t const*>(buffer);
+    private_module_t* m =
+        reinterpret_cast<private_module_t*>(dev->common.module);
 
     if (hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
         m->base.lock(&m->base, buffer,
@@ -830,6 +831,7 @@ int fb_device_open(hw_module_t const* module, const char* name,
             const_cast<float&>(dev->device.fps) = m->fps;
             const_cast<int&>(dev->device.minSwapInterval) = PRIV_MIN_SWAP_INTERVAL;
             const_cast<int&>(dev->device.maxSwapInterval) = PRIV_MAX_SWAP_INTERVAL;
+            const_cast<int&>(dev->device.numFramebuffers) = m->numBuffers;
             if (m->finfo.reserved[0] == 0x5444 &&
                 m->finfo.reserved[1] == 0x5055) {
                 dev->device.setUpdateRect = fb_setUpdateRect;
