@@ -26,7 +26,8 @@ LOCAL_C_INCLUDES       += hardware/qcom/display/libqcomui
 LOCAL_MODULE           := gralloc.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_TAGS      := optional
 LOCAL_CFLAGS           := -DLOG_TAG=\"$(TARGET_BOARD_PLATFORM).gralloc\" \
-                          -DDEBUG_CALC_FPS
+                          -DDEBUG_CALC_FPS \
+                          -Wno-missing-field-initializers
 LOCAL_SRC_FILES :=  gpu.cpp gralloc.cpp framebuffer.cpp mapper.cpp
 
 ifeq ($(TARGET_USES_POST_PROCESSING),true)
