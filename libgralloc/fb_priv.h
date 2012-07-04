@@ -20,8 +20,7 @@
 #include <linux/fb.h>
 
 #define NUM_FRAMEBUFFERS_MIN  2
-//XXX: Enable triple framebuffers
-#define NUM_FRAMEBUFFERS_MAX  2
+#define NUM_FRAMEBUFFERS_MAX  3
 
 #define NO_SURFACEFLINGER_SWAPINTERVAL
 #define COLOR_FORMAT(x) (x & 0xFFF) // Max range for colorFormats is 0 - FFF
