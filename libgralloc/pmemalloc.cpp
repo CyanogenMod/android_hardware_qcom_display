@@ -87,7 +87,7 @@ static int alignPmem(int fd, size_t size, int align) {
     struct pmem_allocation allocation;
     allocation.size = size;
     allocation.align = align;
-    if (ioctl(fd, PMEM_ALLOCATE_ALIGNED, &allocation))
+    if (ioctl(fd, PMEM_ALLOCATE_ALIGNED, &allocation) < 0)
         return -errno;
     return 0;
 }
