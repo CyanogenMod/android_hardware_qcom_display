@@ -51,6 +51,7 @@ else
             LOCAL_SRC_FILES := software_converter.cpp copybit.cpp
             LOCAL_MODULE := copybit.$(TARGET_BOARD_PLATFORM)
             LOCAL_MODULE_TAGS := optional
+            LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
             LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/qcom/display/libgralloc
             LOCAL_CFLAGS += -DCOPYBIT_MSM7K=1
             include $(BUILD_SHARED_LIBRARY)
