@@ -1087,6 +1087,10 @@ static void hwc_perform(hwc_composer_device_t *dev, int event, int value) {
             hwc_enableHDMIOutput(dev, value);
             break;
 #endif
+       case EVENT_FORCE_COMPOSITION:
+            ctx->forceComposition = value;
+            break;
+
         default:
             LOGE("In hwc:perform UNKNOWN EVENT = %d!!", event);
             break;

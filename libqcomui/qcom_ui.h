@@ -128,6 +128,7 @@ enum {
     EVENT_CLOSE_SECURE_END,     // End of secure session teardown config
     EVENT_RESET_POSTBUFFER,     // Reset post framebuffer mutex
     EVENT_WAIT_POSTBUFFER,      // Wait until post framebuffer returns
+    EVENT_FORCE_COMPOSITION,    // On/Off event for avoiding skip composition
 };
 
 // Video information sent to framebuffer HAl
