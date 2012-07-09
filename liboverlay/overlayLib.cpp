@@ -616,13 +616,17 @@ bool Overlay::updateOverlaySource(const overlay_buffer_info& info, int flags) {
     }
 
     // disable waitForVsync on HDMI, since we call the wait ioctl
-    int ovFlagsExternal = 0;
-    int ovFlags[2] = {flags, ovFlagsExternal};
+    // ensure that the en_fb flag setting is in-tact
+    int ovFlags[2] = {flags, (flags & DISABLE_FRAMEBUFFER_FETCH)};
 
     if (!geometryChanged) {
-        // Only update the primary channel - we only need to update the
+        // Update the primary channel - we only need to update the
         // wait/no-wait flags
         if (objOvCtrlChannel[0].isChannelUP()) {
+            // Update the secondary channel - We only need to update is_fg flag
+            if (objOvCtrlChannel[1].isChannelUP()) {
+                objOvCtrlChannel[1].updateOverlayFlags(flags & DISABLE_FRAMEBUFFER_FETCH);
+            }
             return objOvCtrlChannel[0].updateOverlayFlags(flags);
         }
     }
