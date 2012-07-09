@@ -314,8 +314,6 @@ void OverlayUI::setupOvRotInfo() {
     mOvInfo.src.width = srcw;
     mOvInfo.src.height = srch;
     mOvInfo.src.format = format;
-    mOvInfo.src_rect.w = w;
-    mOvInfo.src_rect.h = h;
     mOvInfo.alpha = 0xff;
     mOvInfo.transp_mask = 0xffffffff;
     mRotInfo.src.format = format;
