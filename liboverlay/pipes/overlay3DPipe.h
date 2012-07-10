@@ -50,20 +50,15 @@ public:
     /* Please look at overlayGenPipe.h for info */
     explicit M3DExtPipe();
     ~M3DExtPipe();
-    bool open(RotatorBase* rot);
+    bool init(RotatorBase* rot);
     bool close();
     bool commit();
-    void setId(int id);
-    void setMemoryId(int id);
-    bool queueBuffer(uint32_t offset);
-    bool dequeueBuffer(void*& buf);
+    bool queueBuffer(int fd, uint32_t offset);
     bool waitForVsync();
     bool setCrop(const utils::Dim& d);
-    bool start(const utils::PipeArgs& args);
     bool setPosition(const utils::Dim& dim);
-    bool setParameter(const utils::Params& param);
+    bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    const utils::PipeArgs& getArgs() const;
     utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
@@ -87,20 +82,15 @@ public:
     /* Please look at overlayGenPipe.h for info */
     explicit M3DPrimaryPipe();
     ~M3DPrimaryPipe();
-    bool open(RotatorBase* rot);
+    bool init(RotatorBase* rot);
     bool close();
     bool commit();
-    void setId(int id);
-    void setMemoryId(int id);
-    bool queueBuffer(uint32_t offset);
-    bool dequeueBuffer(void*& buf);
+    bool queueBuffer(int fd, uint32_t offset);
     bool waitForVsync();
     bool setCrop(const utils::Dim& d);
-    bool start(const utils::PipeArgs& args);
     bool setPosition(const utils::Dim& dim);
-    bool setParameter(const utils::Params& param);
+    bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    const utils::PipeArgs& getArgs() const;
     utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
@@ -124,20 +114,15 @@ public:
     /* Please look at overlayGenPipe.h for info */
     explicit S3DExtPipe();
     ~S3DExtPipe();
-    bool open(RotatorBase* rot);
+    bool init(RotatorBase* rot);
     bool close();
     bool commit();
-    void setId(int id);
-    void setMemoryId(int id);
-    bool queueBuffer(uint32_t offset);
-    bool dequeueBuffer(void*& buf);
+    bool queueBuffer(int fd, uint32_t offset);
     bool waitForVsync();
     bool setCrop(const utils::Dim& d);
-    bool start(const utils::PipeArgs& args);
     bool setPosition(const utils::Dim& dim);
-    bool setParameter(const utils::Params& param);
+    bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    const utils::PipeArgs& getArgs() const;
     utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
@@ -161,20 +146,15 @@ public:
     /* Please look at overlayGenPipe.h for info */
     explicit S3DPrimaryPipe();
     ~S3DPrimaryPipe();
-    bool open(RotatorBase* rot);
+    bool init(RotatorBase* rot);
     bool close();
     bool commit();
-    void setId(int id);
-    void setMemoryId(int id);
-    bool queueBuffer(uint32_t offset);
-    bool dequeueBuffer(void*& buf);
+    bool queueBuffer(int fd, uint32_t offset);
     bool waitForVsync();
     bool setCrop(const utils::Dim& d);
-    bool start(const utils::PipeArgs& args);
     bool setPosition(const utils::Dim& dim);
-    bool setParameter(const utils::Params& param);
+    bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    const utils::PipeArgs& getArgs() const;
     utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
@@ -197,10 +177,10 @@ inline M3DExtPipe<CHAN>::M3DExtPipe() : mM3Dfmt(0) {}
 template <int CHAN>
 inline M3DExtPipe<CHAN>::~M3DExtPipe() { close(); }
 template <int CHAN>
-inline bool M3DExtPipe<CHAN>::open(RotatorBase* rot) {
-    ALOGE_IF(DEBUG_OVERLAY, "M3DExtPipe open");
-    if(!mM3d.open(rot)) {
-        ALOGE("3Dpipe failed to open");
+inline bool M3DExtPipe<CHAN>::init(RotatorBase* rot) {
+    ALOGE_IF(DEBUG_OVERLAY, "M3DExtPipe init");
+    if(!mM3d.init(rot)) {
+        ALOGE("3Dpipe failed to init");
         return false;
     }
     return true;
@@ -212,15 +192,9 @@ inline bool M3DExtPipe<CHAN>::close() {
 template <int CHAN>
 inline bool M3DExtPipe<CHAN>::commit() { return mM3d.commit(); }
 template <int CHAN>
-inline void M3DExtPipe<CHAN>::setId(int id) { mM3d.setId(id); }
-template <int CHAN>
-inline void M3DExtPipe<CHAN>::setMemoryId(int id) { mM3d.setMemoryId(id); }
-template <int CHAN>
-inline bool M3DExtPipe<CHAN>::queueBuffer(uint32_t offset) {
-    return mM3d.queueBuffer(offset); }
-template <int CHAN>
-inline bool M3DExtPipe<CHAN>::dequeueBuffer(void*& buf) {
-    return mM3d.dequeueBuffer(buf); }
+inline bool M3DExtPipe<CHAN>::queueBuffer(int fd, uint32_t offset) {
+    return mM3d.queueBuffer(fd, offset);
+}
 template <int CHAN>
 inline bool M3DExtPipe<CHAN>::waitForVsync() {
     return mM3d.waitForVsync(); }
@@ -233,14 +207,7 @@ inline bool M3DExtPipe<CHAN>::setCrop(const utils::Dim& d) {
     }
     return mM3d.setCrop(_dim);
 }
-template <int CHAN>
-inline bool M3DExtPipe<CHAN>::start(const utils::PipeArgs& args) {
-    if(!mM3d.start(args)) {
-        ALOGE("M3DExtPipe start failed");
-        return false;
-    }
-    return true;
-}
+
 template <int CHAN>
 inline bool M3DExtPipe<CHAN>::setPosition(const utils::Dim& d) {
     utils::Dim _dim;
@@ -258,8 +225,8 @@ inline bool M3DExtPipe<CHAN>::setPosition(const utils::Dim& d) {
     return mM3d.setPosition(_dim);
 }
 template <int CHAN>
-inline bool M3DExtPipe<CHAN>::setParameter(const utils::Params& param) {
-    return mM3d.setParameter(param);
+inline bool M3DExtPipe<CHAN>::setTransform(const utils::eTransform& param) {
+    return mM3d.setTransform(param);
 }
 template <int CHAN>
 inline bool M3DExtPipe<CHAN>::setSource(const utils::PipeArgs& args)
@@ -267,17 +234,7 @@ inline bool M3DExtPipe<CHAN>::setSource(const utils::PipeArgs& args)
     // extract 3D fmt
     mM3Dfmt = utils::format3DInput(utils::getS3DFormat(args.whf.format)) |
             utils::HAL_3D_OUT_MONOS_MASK;
-    if(mM3d.isClosed()){
-        if(!this->start(args)) {
-            ALOGE("M3DExtPipe setSource failed to start");
-            return false;
-        }
-    }
     return mM3d.setSource(args);
-}
-template <int CHAN>
-inline const utils::PipeArgs& M3DExtPipe<CHAN>::getArgs() const {
-    return mM3d.getArgs();
 }
 template <int CHAN>
 inline utils::eOverlayPipeType M3DExtPipe<CHAN>::getOvPipeType() const {
@@ -296,10 +253,10 @@ inline M3DPrimaryPipe<CHAN>::M3DPrimaryPipe() : mM3Dfmt(0) {}
 template <int CHAN>
 inline M3DPrimaryPipe<CHAN>::~M3DPrimaryPipe() { close(); }
 template <int CHAN>
-inline bool M3DPrimaryPipe<CHAN>::open(RotatorBase* rot) {
-    ALOGE_IF(DEBUG_OVERLAY, "M3DPrimaryPipe open");
-    if(!mM3d.open(rot)) {
-        ALOGE("3Dpipe failed to open");
+inline bool M3DPrimaryPipe<CHAN>::init(RotatorBase* rot) {
+    ALOGE_IF(DEBUG_OVERLAY, "M3DPrimaryPipe init");
+    if(!mM3d.init(rot)) {
+        ALOGE("3Dpipe failed to init");
         return false;
     }
     return true;
@@ -311,15 +268,9 @@ inline bool M3DPrimaryPipe<CHAN>::close() {
 template <int CHAN>
 inline bool M3DPrimaryPipe<CHAN>::commit() { return mM3d.commit(); }
 template <int CHAN>
-inline void M3DPrimaryPipe<CHAN>::setId(int id) { mM3d.setId(id); }
-template <int CHAN>
-inline void M3DPrimaryPipe<CHAN>::setMemoryId(int id) { mM3d.setMemoryId(id); }
-template <int CHAN>
-inline bool M3DPrimaryPipe<CHAN>::queueBuffer(uint32_t offset) {
-    return mM3d.queueBuffer(offset); }
-template <int CHAN>
-inline bool M3DPrimaryPipe<CHAN>::dequeueBuffer(void*& buf) {
-    return mM3d.dequeueBuffer(buf); }
+inline bool M3DPrimaryPipe<CHAN>::queueBuffer(int fd, uint32_t offset) {
+    return mM3d.queueBuffer(fd, offset);
+}
 template <int CHAN>
 inline bool M3DPrimaryPipe<CHAN>::waitForVsync() {
     return mM3d.waitForVsync(); }
@@ -333,20 +284,12 @@ inline bool M3DPrimaryPipe<CHAN>::setCrop(const utils::Dim& d) {
     return mM3d.setCrop(_dim);
 }
 template <int CHAN>
-inline bool M3DPrimaryPipe<CHAN>::start(const utils::PipeArgs& args) {
-    if(!mM3d.start(args)) {
-        ALOGE("M3DPrimaryPipe start failed");
-        return false;
-    }
-    return true;
-}
-template <int CHAN>
 inline bool M3DPrimaryPipe<CHAN>::setPosition(const utils::Dim& d) {
     return mM3d.setPosition(d);
 }
 template <int CHAN>
-inline bool M3DPrimaryPipe<CHAN>::setParameter(const utils::Params& param) {
-    return mM3d.setParameter(param);
+inline bool M3DPrimaryPipe<CHAN>::setTransform(const utils::eTransform& param) {
+    return mM3d.setTransform(param);
 }
 template <int CHAN>
 inline bool M3DPrimaryPipe<CHAN>::setSource(const utils::PipeArgs& args)
@@ -354,17 +297,7 @@ inline bool M3DPrimaryPipe<CHAN>::setSource(const utils::PipeArgs& args)
     // extract 3D fmt
     mM3Dfmt = utils::format3DInput(utils::getS3DFormat(args.whf.format)) |
             utils::HAL_3D_OUT_MONOS_MASK;
-    if (mM3d.isClosed()) {
-        if (!this->start(args)) {
-            ALOGE("M3DPrimaryPipe setSource failed to start");
-            return false;
-        }
-    }
     return mM3d.setSource(args);
-}
-template <int CHAN>
-inline const utils::PipeArgs& M3DPrimaryPipe<CHAN>::getArgs() const {
-    return mM3d.getArgs();
 }
 template <int CHAN>
 inline utils::eOverlayPipeType M3DPrimaryPipe<CHAN>::getOvPipeType() const {
@@ -382,10 +315,10 @@ inline S3DExtPipe<CHAN>::S3DExtPipe() : mS3Dfmt(0) {}
 template <int CHAN>
 inline S3DExtPipe<CHAN>::~S3DExtPipe() { close(); }
 template <int CHAN>
-inline bool S3DExtPipe<CHAN>::open(RotatorBase* rot) {
-    ALOGE_IF(DEBUG_OVERLAY, "S3DExtPipe open");
-    if(!mS3d.open(rot)) {
-        ALOGE("3Dpipe failed to open");
+inline bool S3DExtPipe<CHAN>::init(RotatorBase* rot) {
+    ALOGE_IF(DEBUG_OVERLAY, "S3DExtPipe init");
+    if(!mS3d.init(rot)) {
+        ALOGE("3Dpipe failed to init");
         return false;
     }
     return true;
@@ -400,16 +333,9 @@ inline bool S3DExtPipe<CHAN>::close() {
 template <int CHAN>
 inline bool S3DExtPipe<CHAN>::commit() { return mS3d.commit(); }
 template <int CHAN>
-inline void S3DExtPipe<CHAN>::setId(int id) { mS3d.setId(id); }
-template <int CHAN>
-inline void S3DExtPipe<CHAN>::setMemoryId(int id) { mS3d.setMemoryId(id); }
-template <int CHAN>
-inline bool S3DExtPipe<CHAN>::queueBuffer(uint32_t offset) {
-    //this->dump();
-    return mS3d.queueBuffer(offset); }
-template <int CHAN>
-inline bool S3DExtPipe<CHAN>::dequeueBuffer(void*& buf) {
-    return mS3d.dequeueBuffer(buf); }
+inline bool S3DExtPipe<CHAN>::queueBuffer(int fd, uint32_t offset) {
+    return mS3d.queueBuffer(fd, offset);
+}
 template <int CHAN>
 inline bool S3DExtPipe<CHAN>::waitForVsync() {
     return mS3d.waitForVsync(); }
@@ -421,20 +347,6 @@ inline bool S3DExtPipe<CHAN>::setCrop(const utils::Dim& d) {
         _dim = d;
     }
     return mS3d.setCrop(_dim);
-}
-template <int CHAN>
-inline bool S3DExtPipe<CHAN>::start(const utils::PipeArgs& args) {
-    OVASSERT(mS3Dfmt, "S3DExtPipe mS3Dfmt should not be 0 here");
-    if(!mS3d.start(args)) {
-        ALOGE("S3DExtPipe start failed");
-        return false;
-    }
-    uint32_t fmt = mS3Dfmt & utils::OUTPUT_3D_MASK;
-    if(!utils::send3DInfoPacket(fmt)){
-        ALOGE("Error S3DExtPipe start error send3DInfoPacket %d", fmt);
-        return false;
-    }
-    return true;
 }
 template <int CHAN>
 inline bool S3DExtPipe<CHAN>::setPosition(const utils::Dim& d)
@@ -450,23 +362,13 @@ inline bool S3DExtPipe<CHAN>::setPosition(const utils::Dim& d)
     return mS3d.setPosition(_dim);
 }
 template <int CHAN>
-inline bool S3DExtPipe<CHAN>::setParameter(const utils::Params& param) {
-    return mS3d.setParameter(param);
+inline bool S3DExtPipe<CHAN>::setTransform(const utils::eTransform& param) {
+    return mS3d.setTransform(param);
 }
 template <int CHAN>
 inline bool S3DExtPipe<CHAN>::setSource(const utils::PipeArgs& args) {
     mS3Dfmt = utils::getS3DFormat(args.whf.format);
-    if(mS3d.isClosed()){
-        if(!this->start(args)) {
-            ALOGE("S3DExtPipe setSource failed to start");
-            return false;
-        }
-    }
     return mS3d.setSource(args);
-}
-template <int CHAN>
-inline const utils::PipeArgs& S3DExtPipe<CHAN>::getArgs() const {
-    return mS3d.getArgs();
 }
 template <int CHAN>
 inline utils::eOverlayPipeType S3DExtPipe<CHAN>::getOvPipeType() const {
@@ -484,10 +386,10 @@ inline S3DPrimaryPipe<CHAN>::S3DPrimaryPipe() : mS3Dfmt(0) {}
 template <int CHAN>
 inline S3DPrimaryPipe<CHAN>::~S3DPrimaryPipe() { close(); }
 template <int CHAN>
-inline bool S3DPrimaryPipe<CHAN>::open(RotatorBase* rot) {
-    ALOGE_IF(DEBUG_OVERLAY, "S3DPrimaryPipe open");
-    if(!mS3d.open(rot)) {
-        ALOGE("3Dpipe failed to open");
+inline bool S3DPrimaryPipe<CHAN>::init(RotatorBase* rot) {
+    ALOGE_IF(DEBUG_OVERLAY, "S3DPrimaryPipe init");
+    if(!mS3d.init(rot)) {
+        ALOGE("3Dpipe failed to init");
         return false;
     }
     // set the ctrl fd
@@ -502,18 +404,20 @@ inline bool S3DPrimaryPipe<CHAN>::close() {
     mCtrl3D.close();
     return mS3d.close();
 }
+
 template <int CHAN>
-inline bool S3DPrimaryPipe<CHAN>::commit() { return mS3d.commit(); }
+inline bool S3DPrimaryPipe<CHAN>::commit() {
+    uint32_t fmt = mS3Dfmt & utils::OUTPUT_3D_MASK;
+    if(!utils::send3DInfoPacket(fmt)){
+        ALOGE("Error S3DExtPipe start error send3DInfoPacket %d", fmt);
+        return false;
+    }
+    return mS3d.commit();
+}
 template <int CHAN>
-inline void S3DPrimaryPipe<CHAN>::setId(int id) { mS3d.setId(id); }
-template <int CHAN>
-inline void S3DPrimaryPipe<CHAN>::setMemoryId(int id) { mS3d.setMemoryId(id); }
-template <int CHAN>
-inline bool S3DPrimaryPipe<CHAN>::queueBuffer(uint32_t offset) {
-    return mS3d.queueBuffer(offset); }
-template <int CHAN>
-inline bool S3DPrimaryPipe<CHAN>::dequeueBuffer(void*& buf) {
-    return mS3d.dequeueBuffer(buf); }
+inline bool S3DPrimaryPipe<CHAN>::queueBuffer(int fd, uint32_t offset) {
+    return mS3d.queueBuffer(fd, offset);
+}
 template <int CHAN>
 inline bool S3DPrimaryPipe<CHAN>::waitForVsync() {
     return mS3d.waitForVsync(); }
@@ -525,14 +429,6 @@ inline bool S3DPrimaryPipe<CHAN>::setCrop(const utils::Dim& d) {
         _dim = d;
     }
     return mS3d.setCrop(_dim);
-}
-template <int CHAN>
-inline bool S3DPrimaryPipe<CHAN>::start(const utils::PipeArgs& args) {
-    if(!mS3d.start(args)) {
-        ALOGE("S3DPrimaryPipe start failed");
-        return false;
-    }
-    return true;
 }
 template <int CHAN>
 inline bool S3DPrimaryPipe<CHAN>::setPosition(const utils::Dim& d)
@@ -562,45 +458,33 @@ inline bool S3DPrimaryPipe<CHAN>::setPosition(const utils::Dim& d)
 * So the easiest way to achieve it, is to make sure FB0 is having it before
 * setParam is running */
 template <>
-inline bool S3DPrimaryPipe<utils::OV_PIPE0>::setParameter(
-        const utils::Params& param) {
-    if(utils::OVERLAY_TRANSFORM == param.param){
-        uint32_t barrier=0;
-        switch(param.value) {
-            case HAL_TRANSFORM_ROT_90:
-            case HAL_TRANSFORM_ROT_270:
-                barrier = utils::BARRIER_LAND;
-                break;
-            default:
-                barrier = utils::BARRIER_PORT;
-                break;
-        }
-        if(!utils::enableBarrier(barrier)) {
-            ALOGE("S3DPrimaryPipe setParameter failed to enable barrier");
-        }
+inline bool S3DPrimaryPipe<utils::OV_PIPE0>::setTransform(
+        const utils::eTransform& param) {
+    uint32_t barrier=0;
+    switch(param) {
+        case utils::OVERLAY_TRANSFORM_ROT_90:
+        case utils::OVERLAY_TRANSFORM_ROT_270:
+            barrier = utils::BARRIER_LAND;
+            break;
+        default:
+            barrier = utils::BARRIER_PORT;
+            break;
     }
-    return mS3d.setParameter(param);
+    if(!utils::enableBarrier(barrier)) {
+        ALOGE("S3DPrimaryPipe setTransform failed to enable barrier");
+    }
+    return mS3d.setTransform(param);
 }
 
 template <int CHAN>
-inline bool S3DPrimaryPipe<CHAN>::setParameter(const utils::Params& param) {
-    return mS3d.setParameter(param);
+inline bool S3DPrimaryPipe<CHAN>::setTransform(const utils::eTransform& param) {
+    return mS3d.setTransform(param);
 }
 template <int CHAN>
 inline bool S3DPrimaryPipe<CHAN>::setSource(const utils::PipeArgs& args)
 {
     mS3Dfmt = utils::getS3DFormat(args.whf.format);
-    if(mS3d.isClosed()){
-        if(!this->start(args)) {
-            ALOGE("S3DPrimaryPipe setSource failed to start");
-            return false;
-        }
-    }
     return mS3d.setSource(args);
-}
-template <int CHAN>
-inline const utils::PipeArgs& S3DPrimaryPipe<CHAN>::getArgs() const {
-    return mS3d.getArgs();
 }
 template <int CHAN>
 inline utils::eOverlayPipeType S3DPrimaryPipe<CHAN>::getOvPipeType() const {

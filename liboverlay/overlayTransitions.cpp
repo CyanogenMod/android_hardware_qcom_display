@@ -42,12 +42,12 @@ OverlayImplBase* OverlayState::handle_xxx_to_2D_2DPanel(
 
     // Create new ovimpl based on new state
     typedef StateTraits<utils::OV_2D_VIDEO_ON_PANEL> NewState;
-    OverlayImplBase* newov = new NewState::ovimpl;
+    OverlayImplBase* newov = new NewState::ovimpl();
 
     //===========================================================
     // For each pipe:
     //    - If pipe matches, copy from previous into new ovimpl
-    //    - Otherwise open for new and delete from previous ovimpl
+    //    - Otherwise init for new and delete from previous ovimpl
     //===========================================================
 
     // pipe0/rot0 (GenericPipe)
@@ -55,10 +55,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_2D_2DPanel(
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe0 (GenericPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE0);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe0 (GenericPipe)", __FUNCTION__);
-        RotatorBase* rot0 = new NewState::rot0;
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe0 (GenericPipe)", __FUNCTION__);
         ov->closePipe(utils::OV_PIPE0);
-        newov->openPipe(rot0, utils::OV_PIPE0);
+        RotatorBase* rot0 = new NewState::rot0;
+        newov->initPipe(rot0, utils::OV_PIPE0);
     }
 
     // pipe1/rot1 (NullPipe)
@@ -66,10 +66,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_2D_2DPanel(
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe1 (NullPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE1);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe1 (NullPipe)", __FUNCTION__);
-        RotatorBase* rot1 = new NewState::rot1;
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe1 (NullPipe)", __FUNCTION__);
         ov->closePipe(utils::OV_PIPE1);
-        newov->openPipe(rot1, utils::OV_PIPE1);
+        RotatorBase* rot1 = new NewState::rot1;
+        newov->initPipe(rot1, utils::OV_PIPE1);
     }
 
     // pipe2/rot2 (NullPipe)
@@ -77,10 +77,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_2D_2DPanel(
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe2 (NullPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE2);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe2 (NullPipe)", __FUNCTION__);
-        RotatorBase* rot2 = new NewState::rot2;
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe2 (NullPipe)", __FUNCTION__);
         ov->closePipe(utils::OV_PIPE2);
-        newov->openPipe(rot2, utils::OV_PIPE2);
+        RotatorBase* rot2 = new NewState::rot2;
+        newov->initPipe(rot2, utils::OV_PIPE2);
     }
 
     // All pipes are copied or deleted so no more need for previous ovimpl
@@ -106,7 +106,7 @@ OverlayImplBase* OverlayState::handle_xxx_to_2D_2DTV(
     //===========================================================
     // For each pipe:
     //    - If pipe matches, copy from previous into new ovimpl
-    //    - Otherwise open for new and delete from previous ovimpl
+    //    - Otherwise init for new and delete from previous ovimpl
     //===========================================================
 
     // pipe0/rot0 (GenericPipe)
@@ -114,21 +114,21 @@ OverlayImplBase* OverlayState::handle_xxx_to_2D_2DTV(
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe0 (GenericPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE0);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe0 (GenericPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe0 (GenericPipe)", __FUNCTION__);
         RotatorBase* rot0 = new NewState::rot0;
         ov->closePipe(utils::OV_PIPE0);
-        newov->openPipe(rot0, utils::OV_PIPE0);
+        newov->initPipe(rot0, utils::OV_PIPE0);
     }
 
-    // pipe1/rot1 (HdmiPipe)
-    if (ov->getOvPipeType(utils::OV_PIPE1) == utils::OV_PIPE_TYPE_HDMI) {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe1 (HdmiPipe)", __FUNCTION__);
+    // pipe1/rot1 (VideoExtPipe)
+    if (ov->getOvPipeType(utils::OV_PIPE1) == utils::OV_PIPE_TYPE_VIDEO_EXT) {
+        ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe1 (VideoExtPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE1);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe1 (HdmiPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe1 (VideoExtPipe)", __FUNCTION__);
         RotatorBase* rot1 = new NewState::rot1;
         ov->closePipe(utils::OV_PIPE1);
-        newov->openPipe(rot1, utils::OV_PIPE1);
+        newov->initPipe(rot1, utils::OV_PIPE1);
     }
 
     // pipe2/rot2 (NullPipe)
@@ -136,10 +136,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_2D_2DTV(
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe2 (NullPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE2);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe2 (NullPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe2 (NullPipe)", __FUNCTION__);
         RotatorBase* rot2 = new NewState::rot2;
         ov->closePipe(utils::OV_PIPE2);
-        newov->openPipe(rot2, utils::OV_PIPE2);
+        newov->initPipe(rot2, utils::OV_PIPE2);
     }
 
     // All pipes are copied or deleted so no more need for previous ovimpl
@@ -162,21 +162,22 @@ OverlayImplBase* OverlayState::handle_xxx_to_3D_2DPanel(
     typedef StateTraits<utils::OV_3D_VIDEO_ON_2D_PANEL> NewState;
     OverlayImplBase* newov = new NewState::ovimpl;
 
-    //===========================================================
+    //=================================================================
     // For each pipe:
-    //    - If pipe matches, copy from previous into new ovimpl
-    //    - Otherwise open for new and delete from previous ovimpl
-    //===========================================================
+    //    - If pipe matches, copy from previous into new ovimpl.
+    //      (which also makes previous pipe ref 0, so nobody can use)
+    //    - Otherwise init pipe for new ovimpl and delete from previous
+    //=================================================================
 
     // pipe0/rot0 (M3DPrimaryPipe)
     if (ov->getOvPipeType(utils::OV_PIPE0) == utils::OV_PIPE_TYPE_M3D_PRIMARY) {
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe0 (M3DPrimaryPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE0);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe0 (M3DPrimaryPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe0 (M3DPrimaryPipe)", __FUNCTION__);
         RotatorBase* rot0 = new NewState::rot0;
         ov->closePipe(utils::OV_PIPE0);
-        newov->openPipe(rot0, utils::OV_PIPE0);
+        newov->initPipe(rot0, utils::OV_PIPE0);
     }
 
     // pipe1/rot1 (NullPipe)
@@ -184,10 +185,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_3D_2DPanel(
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe1 (NullPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE1);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe1 (NullPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe1 (NullPipe)", __FUNCTION__);
         RotatorBase* rot1 = new NewState::rot1;
         ov->closePipe(utils::OV_PIPE1);
-        newov->openPipe(rot1, utils::OV_PIPE1);
+        newov->initPipe(rot1, utils::OV_PIPE1);
     }
 
     // pipe2/rot2 (NullPipe)
@@ -195,10 +196,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_3D_2DPanel(
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe2 (NullPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE2);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe2 (NullPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe2 (NullPipe)", __FUNCTION__);
         RotatorBase* rot2 = new NewState::rot2;
         ov->closePipe(utils::OV_PIPE2);
-        newov->openPipe(rot2, utils::OV_PIPE2);
+        newov->initPipe(rot2, utils::OV_PIPE2);
     }
 
     // All pipes are copied or deleted so no more need for previous ovimpl
@@ -224,7 +225,7 @@ OverlayImplBase* OverlayState::handle_xxx_to_3D_2DTV(
     //===========================================================
     // For each pipe:
     //    - If pipe matches, copy from previous into new ovimpl
-    //    - Otherwise open for new and delete from previous ovimpl
+    //    - Otherwise init for new and delete from previous ovimpl
     //===========================================================
 
     // pipe0/rot0 (M3DPrimaryPipe)
@@ -232,10 +233,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_3D_2DTV(
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe0 (M3DPrimaryPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE0);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe0 (M3DPrimaryPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe0 (M3DPrimaryPipe)", __FUNCTION__);
         RotatorBase* rot0 = new NewState::rot0;
         ov->closePipe(utils::OV_PIPE0);
-        newov->openPipe(rot0, utils::OV_PIPE0);
+        newov->initPipe(rot0, utils::OV_PIPE0);
     }
 
     // pipe1/rot1 (M3DExtPipe)
@@ -243,10 +244,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_3D_2DTV(
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe1 (M3DExtPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE1);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe1 (M3DExtPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe1 (M3DExtPipe)", __FUNCTION__);
         RotatorBase* rot1 = new NewState::rot1;
         ov->closePipe(utils::OV_PIPE1);
-        newov->openPipe(rot1, utils::OV_PIPE1);
+        newov->initPipe(rot1, utils::OV_PIPE1);
     }
 
     // pipe2/rot2 (NullPipe)
@@ -254,10 +255,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_3D_2DTV(
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe2 (NullPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE2);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe2 (NullPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe2 (NullPipe)", __FUNCTION__);
         RotatorBase* rot2 = new NewState::rot2;
         ov->closePipe(utils::OV_PIPE2);
-        newov->openPipe(rot2, utils::OV_PIPE2);
+        newov->initPipe(rot2, utils::OV_PIPE2);
     }
 
     // All pipes are copied or deleted so no more need for previous ovimpl
@@ -283,7 +284,7 @@ OverlayImplBase* OverlayState::handle_xxx_to_2D_trueUI_Mirror(
     //===========================================================
     // For each pipe:
     //    - If pipe matches, copy from previous into new ovimpl
-    //    - Otherwise open for new and delete from previous ovimpl
+    //    - Otherwise init for new and delete from previous ovimpl
     //===========================================================
 
     // pipe0/rot0 (GenericPipe)
@@ -291,21 +292,21 @@ OverlayImplBase* OverlayState::handle_xxx_to_2D_trueUI_Mirror(
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe0 (GenericPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE0);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe0 (GenericPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe0 (GenericPipe)", __FUNCTION__);
         RotatorBase* rot0 = new NewState::rot0;
         ov->closePipe(utils::OV_PIPE0);
-        newov->openPipe(rot0, utils::OV_PIPE0);
+        newov->initPipe(rot0, utils::OV_PIPE0);
     }
 
-    // pipe1/rot1 (HdmiPipe)
-    if (ov->getOvPipeType(utils::OV_PIPE1) == utils::OV_PIPE_TYPE_HDMI) {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe1 (HdmiPipe)", __FUNCTION__);
+    // pipe1/rot1 (VideoExtPipe)
+    if (ov->getOvPipeType(utils::OV_PIPE1) == utils::OV_PIPE_TYPE_VIDEO_EXT) {
+        ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe1 (VideoExtPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE1);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe1 (HdmiPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe1 (VideoExtPipe)", __FUNCTION__);
         RotatorBase* rot1 = new NewState::rot1;
         ov->closePipe(utils::OV_PIPE1);
-        newov->openPipe(rot1, utils::OV_PIPE1);
+        newov->initPipe(rot1, utils::OV_PIPE1);
     }
 
     // pipe2/rot2 (UIMirrorPipe)
@@ -313,10 +314,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_2D_trueUI_Mirror(
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe2 (UIMirrorPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE2);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe2 (UIMirrorPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe2 (UIMirrorPipe)", __FUNCTION__);
         RotatorBase* rot2 = new NewState::rot2;
         ov->closePipe(utils::OV_PIPE2);
-        newov->openPipe(rot2, utils::OV_PIPE2);
+        newov->initPipe(rot2, utils::OV_PIPE2);
     }
 
     // All pipes are copied or deleted so no more need for previous ovimpl
@@ -341,7 +342,7 @@ OverlayImplBase* OverlayState::handle_xxx_to_bypass1(OverlayImplBase* ov)
     //===========================================================
     // For each pipe:
     //    - If pipe matches, copy from previous into new ovimpl
-    //    - Otherwise open for new and delete from previous ovimpl
+    //    - Otherwise init for new and delete from previous ovimpl
     //===========================================================
 
     // pipe0/rot0 (BypassPipe)
@@ -349,10 +350,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_bypass1(OverlayImplBase* ov)
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe0 (BypassPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE0);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe0 (BypassPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe0 (BypassPipe)", __FUNCTION__);
         RotatorBase* rot0 = new NewState::rot0;
         ov->closePipe(utils::OV_PIPE0);
-        newov->openPipe(rot0, utils::OV_PIPE0);
+        newov->initPipe(rot0, utils::OV_PIPE0);
     }
 
     // pipe1/rot1 (NullPipe)
@@ -360,10 +361,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_bypass1(OverlayImplBase* ov)
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe1 (NullPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE1);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe1 (NullPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe1 (NullPipe)", __FUNCTION__);
         RotatorBase* rot1 = new NewState::rot1;
         ov->closePipe(utils::OV_PIPE1);
-        newov->openPipe(rot1, utils::OV_PIPE1);
+        newov->initPipe(rot1, utils::OV_PIPE1);
     }
 
     // pipe2/rot2 (NullPipe)
@@ -371,10 +372,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_bypass1(OverlayImplBase* ov)
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe2 (NullPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE2);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe2 (NullPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe2 (NullPipe)", __FUNCTION__);
         RotatorBase* rot2 = new NewState::rot2;
         ov->closePipe(utils::OV_PIPE2);
-        newov->openPipe(rot2, utils::OV_PIPE2);
+        newov->initPipe(rot2, utils::OV_PIPE2);
     }
 
     // All pipes are copied or deleted so no more need for previous ovimpl
@@ -399,7 +400,7 @@ OverlayImplBase* OverlayState::handle_xxx_to_bypass2(OverlayImplBase* ov)
     //===========================================================
     // For each pipe:
     //    - If pipe matches, copy from previous into new ovimpl
-    //    - Otherwise open for new and delete from previous ovimpl
+    //    - Otherwise init for new and delete from previous ovimpl
     //===========================================================
 
     // pipe0/rot0 (BypassPipe)
@@ -407,10 +408,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_bypass2(OverlayImplBase* ov)
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe0 (BypassPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE0);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe0 (BypassPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe0 (BypassPipe)", __FUNCTION__);
         RotatorBase* rot0 = new NewState::rot0;
         ov->closePipe(utils::OV_PIPE0);
-        newov->openPipe(rot0, utils::OV_PIPE0);
+        newov->initPipe(rot0, utils::OV_PIPE0);
     }
 
     // pipe1/rot1 (BypassPipe)
@@ -418,10 +419,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_bypass2(OverlayImplBase* ov)
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe1 (BypassPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE1);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe1 (BypassPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe1 (BypassPipe)", __FUNCTION__);
         RotatorBase* rot1 = new NewState::rot1;
         ov->closePipe(utils::OV_PIPE1);
-        newov->openPipe(rot1, utils::OV_PIPE1);
+        newov->initPipe(rot1, utils::OV_PIPE1);
     }
 
     // pipe2/rot2 (NullPipe)
@@ -429,10 +430,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_bypass2(OverlayImplBase* ov)
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe2 (NullPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE2);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe2 (NullPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe2 (NullPipe)", __FUNCTION__);
         RotatorBase* rot2 = new NewState::rot2;
         ov->closePipe(utils::OV_PIPE2);
-        newov->openPipe(rot2, utils::OV_PIPE2);
+        newov->initPipe(rot2, utils::OV_PIPE2);
     }
 
     // All pipes are copied or deleted so no more need for previous ovimpl
@@ -457,7 +458,7 @@ OverlayImplBase* OverlayState::handle_xxx_to_bypass3(OverlayImplBase* ov)
     //===========================================================
     // For each pipe:
     //    - If pipe matches, copy from previous into new ovimpl
-    //    - Otherwise open for new and delete from previous ovimpl
+    //    - Otherwise init for new and delete from previous ovimpl
     //===========================================================
 
     // pipe0/rot0 (BypassPipe)
@@ -465,10 +466,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_bypass3(OverlayImplBase* ov)
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe0 (BypassPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE0);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe0 (BypassPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe0 (BypassPipe)", __FUNCTION__);
         RotatorBase* rot0 = new NewState::rot0;
         ov->closePipe(utils::OV_PIPE0);
-        newov->openPipe(rot0, utils::OV_PIPE0);
+        newov->initPipe(rot0, utils::OV_PIPE0);
     }
 
     // pipe1/rot1 (BypassPipe)
@@ -476,10 +477,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_bypass3(OverlayImplBase* ov)
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe1 (BypassPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE1);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe1 (BypassPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe1 (BypassPipe)", __FUNCTION__);
         RotatorBase* rot1 = new NewState::rot1;
         ov->closePipe(utils::OV_PIPE1);
-        newov->openPipe(rot1, utils::OV_PIPE1);
+        newov->initPipe(rot1, utils::OV_PIPE1);
     }
 
     // pipe2/rot2 (BypassPipe)
@@ -487,10 +488,10 @@ OverlayImplBase* OverlayState::handle_xxx_to_bypass3(OverlayImplBase* ov)
         ALOGE_IF(DEBUG_OVERLAY, "%s: Copy pipe2 (BypassPipe)", __FUNCTION__);
         newov->copyOvPipe(ov, utils::OV_PIPE2);
     } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: Open pipe2 (BypassPipe)", __FUNCTION__);
+        ALOGE_IF(DEBUG_OVERLAY, "%s: init pipe2 (BypassPipe)", __FUNCTION__);
         RotatorBase* rot2 = new NewState::rot2;
         ov->closePipe(utils::OV_PIPE2);
-        newov->openPipe(rot2, utils::OV_PIPE2);
+        newov->initPipe(rot2, utils::OV_PIPE2);
     }
 
     // All pipes are copied or deleted so no more need for previous ovimpl

@@ -137,14 +137,6 @@ bool prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
                 ovutils::OV_PIPE0 | ovutils::OV_PIPE1);
         }
 
-        // Order order order
-        // setSource - just setting source
-        // setParameter - changes src w/h/f accordingly
-        // setCrop - ROI - that is src_rect
-        // setPosition - need to do scaling
-        // commit - commit changes to mdp driver
-        // queueBuffer - not here, happens when draw is called
-
         ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_FLAGS_NONE;
         if (hnd->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
             ovutils::setMdpFlags(mdpFlags,
@@ -167,36 +159,22 @@ bool prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
         }
 
         ovutils::PipeArgs parg(mdpFlags,
-                               orient,
                                info,
                                waitFlag,
                                ovutils::ZORDER_0,
                                isFgFlag,
                                ovutils::ROT_FLAG_DISABLED);
         ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
-        ret = ov.setSource(pargs, dest);
-        if (!ret) {
-            ALOGE("%s: setSource failed", __FUNCTION__);
-            return ret;
-        }
-
-        const ovutils::Params prms (ovutils::OVERLAY_TRANSFORM, orient);
-        ret = ov.setParameter(prms, dest);
-        if (!ret) {
-            ALOGE("%s: setParameter failed transform %x", __FUNCTION__, orient);
-            return ret;
-        }
+        ov.setSource(pargs, dest);
 
         hwc_rect_t sourceCrop = layer->sourceCrop;
         // x,y,w,h
         ovutils::Dim dcrop(sourceCrop.left, sourceCrop.top, // x, y
                            sourceCrop.right - sourceCrop.left, // w
                            sourceCrop.bottom - sourceCrop.top);// h
-        ret = ov.setCrop(dcrop, dest);
-        if (!ret) {
-            ALOGE("%s: setCrop failed", __FUNCTION__);
-            return ret;
-        }
+        ov.setCrop(dcrop, dest);
+
+        ov.setTransform(orient, dest);
 
         int orientation = 0;
         ovutils::Dim dim;
@@ -207,11 +185,8 @@ bool prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
         dim.h = (displayFrame.bottom - displayFrame.top);
         dim.o = orientation;
 
-        ret = ov.setPosition(dim, dest);
-        if (!ret) {
-            ALOGE("%s: setPosition failed", __FUNCTION__);
-            return ret;
-        }
+        ov.setPosition(dim, dest);
+
         if (!ov.commit(dest)) {
             ALOGE("%s: commit fails", __FUNCTION__);
             return false;
@@ -247,18 +222,14 @@ bool drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
             //           - external RGB = OV_PIPE2
             //             - Only in true UI mirroring case, played by fb
 
-            // Same FD for both primary and external VG pipes
-            ov.setMemoryId(hnd->fd, static_cast<ovutils::eDest>(
-                    ovutils::OV_PIPE0 | ovutils::OV_PIPE1));
-
             // Play external
-            if (!ov.queueBuffer(hnd->offset, ovutils::OV_PIPE1)) {
+            if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE1)) {
                 ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
                 ret = false;
             }
 
             // Play primary
-            if (!ov.queueBuffer(hnd->offset, ovutils::OV_PIPE0)) {
+            if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE0)) {
                 ALOGE("%s: queueBuffer failed for primary", __FUNCTION__);
                 ret = false;
             }
@@ -272,8 +243,7 @@ bool drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer)
         default:
             // In most cases, displaying only to one (primary or external)
             // so use OV_PIPE_ALL since overlay will ignore NullPipes
-            ov.setMemoryId(hnd->fd, ovutils::OV_PIPE_ALL);
-            if (!ov.queueBuffer(hnd->offset, ovutils::OV_PIPE_ALL)) {
+            if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE_ALL)) {
                 ALOGE("%s: queueBuffer failed", __FUNCTION__);
                 ret = false;
             }

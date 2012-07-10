@@ -43,31 +43,22 @@ public:
 
     /* Overlay related func */
 
-    /* We need an empty open to just open the bare minimum for
-     * business. */
-    bool open();
-
-    /* close rotator, state, overlayimpl*/
-    bool close();
-
     /* Following is the same as the pure virt interface in ov impl  */
 
-    bool commit(utils::eDest dest = utils::OV_PIPE_ALL);
-
-    bool queueBuffer(uint32_t offset,
+    bool setSource(const utils::PipeArgs args[utils::MAX_PIPES],
             utils::eDest dest = utils::OV_PIPE_ALL);
-    bool dequeueBuffer(void*& buf,
-            utils::eDest dest = utils::OV_PIPE_ALL);
-    bool waitForVsync(utils::eDest dest = utils::OV_PIPE1);
     bool setCrop(const utils::Dim& d,
+            utils::eDest dest = utils::OV_PIPE_ALL);
+    bool setTransform(const int orientation,
             utils::eDest dest = utils::OV_PIPE_ALL);
     bool setPosition(const utils::Dim& dim,
             utils::eDest dest = utils::OV_PIPE_ALL);
-    bool setParameter(const utils::Params& param,
+    bool commit(utils::eDest dest = utils::OV_PIPE_ALL);
+
+    bool queueBuffer(int fd, uint32_t offset,
             utils::eDest dest = utils::OV_PIPE_ALL);
-    bool setSource(const utils::PipeArgs args[utils::MAX_PIPES],
-            utils::eDest dest = utils::OV_PIPE_ALL);
-    void setMemoryId(int id, utils::eDest dest = utils::OV_PIPE_ALL);
+    bool waitForVsync(utils::eDest dest = utils::OV_PIPE1);
+
     void dump() const;
 
     /* state related functions */

@@ -22,11 +22,8 @@
 
 #include "overlayUtils.h"
 #include "mdpWrapper.h"
-#include "overlayRotator.h"
 
 namespace overlay{
-
-class RotatorBase;
 
 /*
 * Mdp Ctrl holds corresponding fd and MDP related struct.
@@ -40,20 +37,20 @@ public:
     /* dtor close */
     ~MdpCtrl();
 
-    /* Open underlying device using fbnum */
-    bool open(uint32_t fbnum);
+    /* init underlying device using fbnum */
+    bool init(uint32_t fbnum);
 
     /* unset overlay, reset and close fd */
     bool close();
 
-    /* reset and set ov id to -1*/
+    /* reset and set ov id to -1 / MSMFB_NEW_REQUEST */
     void reset();
 
     /* get orient / user_data[0] */
     int getOrient() const;
 
     /* returns session id */
-    int getId() const;
+    int getPipeId() const;
 
     /* returns the fd associated to ctrl*/
     int getFd() const;
@@ -70,16 +67,6 @@ public:
 
     /* set flags to mdp structure */
     void setFlags(int f);
-
-    /* code taken from OverlayControlChannel::setOverlayInformation  */
-    bool setInfo(RotatorBase* r,
-            const utils::PipeArgs& args,
-            const utils::ScreenInfo& info);
-
-    /* given whf, update src */
-    void updateSource(RotatorBase* r,
-            const utils::PipeArgs& args,
-            const utils::ScreenInfo& info);
 
     /* set z order */
     void setZ(utils::eZorder z);
@@ -102,8 +89,8 @@ public:
     /* set src whf */
     void setSrcWhf(const utils::Whf& whf);
 
-    /* set source format based on rot info */
-    void setSrcFormat(const utils::Whf& whf);
+    /* adjust source width height format based on rot info */
+    void adjustSrcWhf(const bool& rotUsed);
 
     /* swap src w/h*/
     void swapSrcWH();
@@ -128,7 +115,7 @@ public:
     void setUserData(int v);
 
     /* return true if current overlay is different
-     * than lask known good overlay */
+     * than last known good overlay */
     bool ovChanged() const;
 
     /* save mOVInfo to be last known good ov*/
@@ -137,12 +124,17 @@ public:
     /* restore last known good ov to be the current */
     void restore();
 
+    /* Sets the source total width, height, format */
+    bool setSource(const utils::PipeArgs& pargs);
+
     /*
      * Sets ROI, the unpadded region, for source buffer.
      * Should be called before a setPosition, for small clips.
      * Dim - ROI dimensions.
      */
     bool setCrop(const utils::Dim& d);
+
+    bool setTransform(const utils::eTransform& orient, const bool& rotUsed);
 
     /* given a dim and w/h, set overlay dim */
     bool setPosition(const utils::Dim& dim, int w, int h);
@@ -152,7 +144,12 @@ public:
 
     /* dump state of the object */
     void dump() const;
+
 private:
+
+    /* helper functions for overlayTransform */
+    void overlayTransFlipRot90();
+    void overlayTransFlipRot270();
 
     /* last good known ov info */
     mdp_overlay   mLkgo;
@@ -162,9 +159,6 @@ private:
 
     /* FD for the mdp fbnum */
     OvFD          mFd;
-
-    /* cached size FIXME do we need it? */
-    uint32_t mSize;
 };
 
 
@@ -201,8 +195,8 @@ public:
     /* dtor close*/
     ~MdpData();
 
-    /* open FD */
-    bool open(uint32_t fbnum);
+    /* init FD */
+    bool init(uint32_t fbnum);
 
     /* memset0 the underlying mdp object */
     void reset();
@@ -210,29 +204,23 @@ public:
     /* close fd, and reset */
     bool close();
 
-    /* Set FD / memid */
-    void setMemoryId(int id);
-
     /* set id of mdp data */
-    void setId(int id);
+    void setPipeId(int id);
 
     /* return ses id of data */
-    int getId() const;
+    int getPipeId() const;
 
     /* get underlying fd*/
     int getFd() const;
 
     /* get memory_id */
-    int getMemoryId() const;
-
-    /* set offset in underlying mdp obj */
-    void setOffset(uint32_t o);
+    int getSrcMemoryId() const;
 
     /* calls wrapper play */
-    bool play();
+    bool play(int fd, uint32_t offset);
 
-    /* calls wrapper playWait */
-    bool playWait();
+    /* calls wrapper waitForVsync */
+    bool waitForVsync();
 
     /* dump state of the object */
     void dump() const;
@@ -247,21 +235,22 @@ private:
 
 //--------------Inlines---------------------------------
 namespace utils {
-    inline bool openDev(OvFD& fd, int fb,
-            const char* const s,
-            int flags) {
-        return overlay::open(fd, fb, Res::devTemplate, O_RDWR);
-    }
+inline bool openDev(OvFD& fd, int fbnum,
+        const char* const devpath,
+        int flags) {
+    return overlay::open(fd, fbnum, devpath, flags);
 }
-
-template <class T>
-        inline void init(T& t) {
-            memset(&t, 0, sizeof(T));
-        }
+}
+namespace {
+// just a helper func for common operations x-(y+z)
+int compute(uint32_t x, uint32_t y, uint32_t z) {
+    return x-(y+z);
+}
+}
 
 /////   MdpCtrl  //////
 
-inline MdpCtrl::MdpCtrl() : mSize(0) {
+inline MdpCtrl::MdpCtrl() {
     reset();
 }
 
@@ -273,7 +262,7 @@ inline int MdpCtrl::getOrient() const {
     return getUserData();
 }
 
-inline int MdpCtrl::getId() const {
+inline int MdpCtrl::getPipeId() const {
     return mOVInfo.id;
 }
 
@@ -310,27 +299,25 @@ inline bool MdpCtrl::ovChanged() const {
 }
 
 inline void MdpCtrl::save() {
-    if(static_cast<ssize_t>(mOVInfo.id) == -1) {
+    if(static_cast<ssize_t>(mOVInfo.id) == MSMFB_NEW_REQUEST) {
         ALOGE("MdpCtrl current ov has id -1, will not save");
-        // FIXME dump both?
         return;
     }
     mLkgo = mOVInfo;
 }
 
 inline void MdpCtrl::restore() {
-    if(static_cast<ssize_t>(mLkgo.id) == -1) {
+    if(static_cast<ssize_t>(mLkgo.id) == MSMFB_NEW_REQUEST) {
         ALOGE("MdpCtrl Lkgo ov has id -1, will not restore");
-        // FIXME dump both?
         return;
     }
     mOVInfo = mLkgo;
 }
 
 inline overlay::utils::Whf MdpCtrl::getSrcWhf() const {
-    return utils::Whf(mOVInfo.src.width,
-            mOVInfo.src.height,
-            mOVInfo.src.format);
+    return utils::Whf(  mOVInfo.src.width,
+                        mOVInfo.src.height,
+                        mOVInfo.src.format);
 }
 
 inline void MdpCtrl::setSrcWhf(const overlay::utils::Whf& whf) {
@@ -340,10 +327,10 @@ inline void MdpCtrl::setSrcWhf(const overlay::utils::Whf& whf) {
 }
 
 inline overlay::utils::Dim MdpCtrl::getSrcRectDim() const {
-    return utils::Dim(mOVInfo.src_rect.x,
-            mOVInfo.src_rect.y,
-            mOVInfo.src_rect.w,
-            mOVInfo.src_rect.h);
+    return utils::Dim(  mOVInfo.src_rect.x,
+                        mOVInfo.src_rect.y,
+                        mOVInfo.src_rect.w,
+                        mOVInfo.src_rect.h);
 }
 
 inline void MdpCtrl::setSrcRectDim(const overlay::utils::Dim d) {
@@ -354,10 +341,10 @@ inline void MdpCtrl::setSrcRectDim(const overlay::utils::Dim d) {
 }
 
 inline overlay::utils::Dim MdpCtrl::getDstRectDim() const {
-    return utils::Dim(mOVInfo.dst_rect.x,
-            mOVInfo.dst_rect.y,
-            mOVInfo.dst_rect.w,
-            mOVInfo.dst_rect.h);
+    return utils::Dim(  mOVInfo.dst_rect.x,
+                        mOVInfo.dst_rect.y,
+                        mOVInfo.dst_rect.w,
+                        mOVInfo.dst_rect.h);
 }
 
 inline void MdpCtrl::setDstRectDim(const overlay::utils::Dim d) {
@@ -379,14 +366,15 @@ inline void MdpCtrl::setRotationFlags() {
         mOVInfo.flags &= ~MDP_SOURCE_ROTATED_90;
 }
 
-
 inline void MdpCtrl::swapSrcWH() {
     utils::swap(mOVInfo.src.width,
-            mOVInfo.src.height); }
+            mOVInfo.src.height);
+}
 
 inline void MdpCtrl::swapSrcRectWH() {
-    utils::swap(mOVInfo.src_rect.h,
-            mOVInfo.src_rect.w); }
+    utils::swap(mOVInfo.src_rect.w,
+            mOVInfo.src_rect.h);
+}
 
 ///////    MdpCtrl3D //////
 
@@ -434,10 +422,10 @@ inline MdpData::MdpData() { reset(); }
 
 inline MdpData::~MdpData() { close(); }
 
-inline bool MdpData::open(uint32_t fbnum) {
-    // FD open
-    if(!utils::openDev(mFd, fbnum, Res::devTemplate, O_RDWR)){
-        ALOGE("Ctrl failed to open fbnum=%d", fbnum);
+inline bool MdpData::init(uint32_t fbnum) {
+    // FD init
+    if(!utils::openDev(mFd, fbnum, Res::fbPath, O_RDWR)){
+        ALOGE("Ctrl failed to init fbnum=%d", fbnum);
         return false;
     }
     return true;
@@ -457,28 +445,29 @@ inline bool MdpData::close() {
     return true;
 }
 
-inline void MdpData::setMemoryId(int id) { mOvData.data.memory_id = id; }
-inline int MdpData::getMemoryId() const { return mOvData.data.memory_id; }
+inline int MdpData::getSrcMemoryId() const { return mOvData.data.memory_id; }
 
-inline void MdpData::setId(int id) { mOvData.id = id; }
+inline void MdpData::setPipeId(int id) { mOvData.id = id; }
 
-inline int MdpData::getId() const { return mOvData.id; }
+inline int MdpData::getPipeId() const { return mOvData.id; }
 
 inline int MdpData::getFd() const { return mFd.getFD(); }
 
-inline void MdpData::setOffset(uint32_t o) { mOvData.data.offset = o; }
-
-inline bool MdpData::play() {
+inline bool MdpData::play(int fd, uint32_t offset) {
+    mOvData.data.memory_id = fd;
+    mOvData.data.offset = offset;
     if(!mdp_wrapper::play(mFd.getFD(), mOvData)){
         ALOGE("MdpData failed to play");
+        dump();
         return false;
     }
     return true;
 }
 
-inline bool MdpData::playWait() {
-    if(!mdp_wrapper::playWait(mFd.getFD(), mOvData)){
-        ALOGE("MdpData failed to playWait");
+inline bool MdpData::waitForVsync() {
+    if(!mdp_wrapper::waitForVsync(mFd.getFD(), mOvData)){
+        ALOGE("%s failed", __FUNCTION__);
+        dump();
         return false;
     }
     return true;

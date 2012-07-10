@@ -23,11 +23,11 @@
 
 namespace ovutils = overlay::utils;
 namespace overlay {
-bool MdpCtrl::open(uint32_t fbnum) {
-    // FD open
+bool MdpCtrl::init(uint32_t fbnum) {
+    // FD init
     if(!utils::openDev(mFd, fbnum,
-                Res::devTemplate, O_RDWR)){
-        ALOGE("Ctrl failed to open fbnum=%d", fbnum);
+                Res::fbPath, O_RDWR)){
+        ALOGE("Ctrl failed to init fbnum=%d", fbnum);
         return false;
     }
     return true;
@@ -36,12 +36,13 @@ bool MdpCtrl::open(uint32_t fbnum) {
 void MdpCtrl::reset() {
     utils::memset0(mOVInfo);
     utils::memset0(mLkgo);
-    mOVInfo.id = -1;
-    mLkgo.id = -1;
+    mOVInfo.id = MSMFB_NEW_REQUEST;
+    mLkgo.id = MSMFB_NEW_REQUEST;
 }
 
 bool MdpCtrl::close() {
-    if(-1 == static_cast<int>(mOVInfo.id)) return true;
+    if(MSMFB_NEW_REQUEST == static_cast<int>(mOVInfo.id))
+        return true;
     if(!mdp_wrapper::unsetOverlay(mFd.getFD(), mOVInfo.id)) {
         ALOGE("MdpCtrl close error in unset");
         return false;
@@ -81,41 +82,112 @@ bool MdpCtrl::get() {
     return true;
 }
 
-// that is the second part of original setParameter function
-void MdpCtrl::setSrcFormat(const utils::Whf& whf) {
-
-    //By default mdp src format is the same as buffer's
-    mOVInfo.src.format = whf.format;
-
-    //If rotation is used and input formats are tiled then output of rotator is
-    //non-tiled.
-    // FIXME mRotInfo.enable = 1; for enable
-    if (getUserData()) { // if rotations enabled in MdpCtrl
-        if (whf.format == MDP_Y_CRCB_H2V2_TILE)
-            mOVInfo.src.format = MDP_Y_CRCB_H2V2;
-        else if (whf.format == MDP_Y_CBCR_H2V2_TILE)
-            mOVInfo.src.format = MDP_Y_CBCR_H2V2;
-        return;
+//Adjust width, height, format if rotator is used.
+void MdpCtrl::adjustSrcWhf(const bool& rotUsed) {
+    if(rotUsed) {
+        utils::Whf whf = getSrcWhf();
+        if(whf.format == MDP_Y_CRCB_H2V2_TILE ||
+                whf.format == MDP_Y_CBCR_H2V2_TILE) {
+            whf.w = utils::alignup(whf.w, 64);
+            whf.h = utils::alignup(whf.h, 32);
+        }
+        //For example: If original format is tiled, rotator outputs non-tiled,
+        //so update mdp's src fmt to that.
+        whf.format = utils::getRotOutFmt(whf.format);
+        setSrcWhf(whf);
     }
-
 }
 
 bool MdpCtrl::set() {
-    if(!this->ovChanged()) {
-        return true; // nothing todo here.
-    }
-
     if(!mdp_wrapper::setOverlay(mFd.getFD(), mOVInfo)) {
         ALOGE("MdpCtrl failed to setOverlay, restoring last known "
                 "good ov info");
         mdp_wrapper::dump("== Bad OVInfo is: ", mOVInfo);
         mdp_wrapper::dump("== Last good known OVInfo is: ", mLkgo);
         this->restore();
-        // FIXME, do we need to set the old one?
         return false;
     }
     this->save();
     return true;
+}
+
+bool MdpCtrl::setSource(const utils::PipeArgs& args) {
+
+    setSrcWhf(args.whf);
+
+    //TODO These are hardcoded. Can be moved out of setSource.
+    mOVInfo.alpha = 0xff;
+    mOVInfo.transp_mask = 0xffffffff;
+
+    //TODO These calls should ideally be a part of setPipeParams API
+    setFlags(args.mdpFlags);
+    setZ(args.zorder);
+    setWait(args.wait);
+    setIsFg(args.isFg);
+    return true;
+}
+
+bool MdpCtrl::setCrop(const utils::Dim& d) {
+    setSrcRectDim(d);
+    return true;
+}
+
+bool MdpCtrl::setTransform(const utils::eTransform& orient,
+        const bool& rotUsed) {
+
+    int rot = utils::getMdpOrient(orient);
+    setUserData(rot);
+    adjustSrcWhf(rotUsed);
+    setRotationFlags();
+
+    switch(static_cast<int>(orient)) {
+        case utils::OVERLAY_TRANSFORM_0:
+        case utils::OVERLAY_TRANSFORM_FLIP_H:
+        case utils::OVERLAY_TRANSFORM_FLIP_V:
+        case utils::OVERLAY_TRANSFORM_ROT_180:
+            //No calculations required
+            break;
+        case utils::OVERLAY_TRANSFORM_ROT_90:
+        case (utils::OVERLAY_TRANSFORM_ROT_90|utils::OVERLAY_TRANSFORM_FLIP_H):
+        case (utils::OVERLAY_TRANSFORM_ROT_90|utils::OVERLAY_TRANSFORM_FLIP_V):
+            overlayTransFlipRot90();
+            break;
+        case utils::OVERLAY_TRANSFORM_ROT_270:
+            overlayTransFlipRot270();
+            break;
+        default:
+            ALOGE("%s: Error due to unknown rot value", __FUNCTION__);
+            return false;
+    }
+    return true;
+}
+
+void MdpCtrl::overlayTransFlipRot90()
+{
+    utils::Dim d   = getSrcRectDim();
+    utils::Whf whf = getSrcWhf();
+    int tmp = d.x;
+    d.x = compute(whf.h,
+            d.y,
+            d.h);
+    d.y = tmp;
+    setSrcRectDim(d);
+    swapSrcWH();
+    swapSrcRectWH();
+}
+
+void MdpCtrl::overlayTransFlipRot270()
+{
+    utils::Dim d   = getSrcRectDim();
+    utils::Whf whf = getSrcWhf();
+    int tmp = d.y;
+    d.y = compute(whf.w,
+            d.x,
+            d.w);
+    d.x = tmp;
+    setSrcRectDim(d);
+    swapSrcWH();
+    swapSrcRectWH();
 }
 
 bool MdpCtrl::setPosition(const overlay::utils::Dim& d,
@@ -129,7 +201,7 @@ bool MdpCtrl::setPosition(const overlay::utils::Dim& d,
 
     ovutils::Dim dim(d);
     ovutils::Dim ovsrcdim = getSrcRectDim();
-    // Scaling of upto a max of 8 times supported
+    // Scaling of upto a max of 20 times supported
     if(dim.w >(ovsrcdim.w * ovutils::HW_OV_MAGNIFICATION_LIMIT)){
         dim.w = ovutils::HW_OV_MAGNIFICATION_LIMIT * ovsrcdim.w;
         dim.x = (fbw - dim.w) / 2;
@@ -139,135 +211,12 @@ bool MdpCtrl::setPosition(const overlay::utils::Dim& d,
         dim.y = (fbh - dim.h) / 2;
     }
 
-    //dim.even_out();
     setDstRectDim(dim);
-    return true;
-}
-
-void MdpCtrl::updateSource(RotatorBase* r,
-        const utils::PipeArgs& args,
-        const utils::ScreenInfo& info) {
-    utils::Whf whf(args.whf);
-    mOVInfo.src.width  = whf.w;
-    mOVInfo.src.height = whf.h;
-    mOVInfo.src_rect.x = 0;
-    mOVInfo.src_rect.y = 0;
-    mOVInfo.dst_rect.x = 0;
-    mOVInfo.dst_rect.y = 0;
-    mOVInfo.dst_rect.w = whf.w;
-    mOVInfo.dst_rect.h = whf.h;
-    mOVInfo.src.format = whf.format;
-
-    if(whf.format == MDP_Y_CRCB_H2V2_TILE ||
-        (whf.format == MDP_Y_CBCR_H2V2_TILE)) {
-        // passing by value, setInfo fills it and return by val
-        mOVInfo = r->setInfo(args, mOVInfo);
-    } else {
-        mOVInfo.src_rect.w = whf.w;
-        mOVInfo.src_rect.h = whf.h;
-    }
-
-    if (whf.w > info.mFBWidth)
-        mOVInfo.dst_rect.w = info.mFBWidth;
-    if (whf.h > info.mFBHeight)
-        mOVInfo.dst_rect.h = info.mFBHeight;
-    mSize = whf.size;
-}
-
-
-bool MdpCtrl::setInfo(RotatorBase* r,
-        const utils::PipeArgs& args,
-        const utils::ScreenInfo& info)
-{
-    // new request
-    utils::Whf whf(args.whf);
-    mOVInfo.id = MSMFB_NEW_REQUEST;
-
-    updateSource(r, args, info);
-
-    setUserData(0);
-    mOVInfo.alpha = 0xff;
-    mOVInfo.transp_mask = 0xffffffff;
-    setZ(args.zorder);
-    setFlags(args.mdpFlags);
-    setWait(args.wait);
-    setIsFg(args.isFg);
-    mSize = whf.size;
-    return true;
-}
-
-bool MdpCtrl::setCrop(const utils::Dim& cdim) {
-    utils::Dim d(cdim);
-    const utils::Whf ovwhf = getSrcWhf();
-    int udata = getUserData();
-    switch(udata) {
-        case MDP_ROT_NOP:
-            break; // nothing to do here
-        case MDP_ROT_90:
-        case MDP_ROT_90 | MDP_FLIP_UD:
-        case MDP_ROT_90 | MDP_FLIP_LR:
-            {
-                if (ovwhf.w < (d.y + d.h)) {
-                    ALOGE("MdpCtrl setCrop failed ROT 90 udata=%d",
-                            udata);
-                    d.dump();
-                    this->dump();
-                    return false;
-                }
-                uint32_t tmp = d.x;
-                d.x = ovwhf.w - (d.y + d.h);
-                d.y = tmp;
-                utils::swap(d.w, d.h);
-            }break;
-        case MDP_ROT_270:
-            {
-                if (ovwhf.h < (d.x + d.w)) {
-                    ALOGE("MdpCtrl setCrop failed ROT 270 udata=%d",
-                            udata);
-                    d.dump();
-                    this->dump();
-                    return false;
-                }
-                uint32_t tmp = d.y;
-                d.y = ovwhf.h - (d.x + d.w);
-                d.x = tmp;
-                utils::swap(d.w, d.h);
-            }break;
-        case MDP_ROT_180:
-            {
-                if ((ovwhf.h < (d.y + d.h)) ||
-                        (ovwhf.w < ( d.x + d.w))) {
-                    ALOGE("MdpCtrl setCrop failed ROT 180 udata=%d",
-                            udata);
-                    d.dump();
-                    this->dump();
-                    return false;
-                }
-                d.x = ovwhf.w - (d.x + d.w);
-                d.y = ovwhf.h - (d.y + d.h);
-            }break;
-        default:
-            if(!(udata & (MDP_FLIP_UD | MDP_FLIP_LR))) {
-                ALOGE("MdpCtrl setCrop unknown rot %d", udata);
-                return false;
-            }
-    }
-
-    if(getSrcRectDim() == d) {
-        return true; // Nothing to do here
-    }
-
-    utils::normalizeCrop(d.x, d.w);
-    utils::normalizeCrop(d.y, d.h);
-
-    setSrcRectDim(d);
-
     return true;
 }
 
 void MdpCtrl::dump() const {
     ALOGE("== Dump MdpCtrl start ==");
-    ALOGE("size=%d", mSize);
     mFd.dump();
     mdp_wrapper::dump("mOVInfo", mOVInfo);
     ALOGE("== Dump MdpCtrl end ==");

@@ -49,20 +49,15 @@ public:
     /* Please look at overlayGenPipe.h for info */
     explicit BypassPipe();
     ~BypassPipe();
-    bool open(RotatorBase* rot);
+    bool init(RotatorBase* rot);
     bool close();
     bool commit();
-    void setId(int id);
-    void setMemoryId(int id);
-    bool queueBuffer(uint32_t offset);
-    bool dequeueBuffer(void*& buf);
+    bool queueBuffer(int fd, uint32_t offset);
     bool waitForVsync();
     bool setCrop(const utils::Dim& dim);
-    bool start(const utils::PipeArgs& args);
     bool setPosition(const utils::Dim& dim);
-    bool setParameter(const utils::Params& param);
+    bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    const utils::PipeArgs& getArgs() const;
     utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
@@ -83,9 +78,9 @@ inline BypassPipe<PipeType, IsFg, Wait, Zorder>::~BypassPipe() {
 
 template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,
     utils::eZorder Zorder>
-inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::open(RotatorBase* rot) {
-    ALOGE_IF(DEBUG_OVERLAY, "BypassPipe open");
-    return mBypass.open(rot);
+inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::init(RotatorBase* rot) {
+    ALOGE_IF(DEBUG_OVERLAY, "BypassPipe init");
+    return mBypass.init(rot);
 }
 
 template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,
@@ -102,28 +97,9 @@ inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::commit() {
 
 template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,
     utils::eZorder Zorder>
-inline void BypassPipe<PipeType, IsFg, Wait, Zorder>::setId(int id) {
-    mBypass.setId(id);
-}
-
-template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,
-    utils::eZorder Zorder>
-inline void BypassPipe<PipeType, IsFg, Wait, Zorder>::setMemoryId(int id) {
-    mBypass.setMemoryId(id);
-}
-
-template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,
-    utils::eZorder Zorder>
-inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::queueBuffer(
+inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::queueBuffer(int fd,
         uint32_t offset) {
-    return mBypass.queueBuffer(offset);
-}
-
-template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,
-    utils::eZorder Zorder>
-inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::dequeueBuffer(
-        void*& buf) {
-    return mBypass.dequeueBuffer(buf);
+    return mBypass.queueBuffer(fd, offset);
 }
 
 template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,
@@ -141,13 +117,6 @@ inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::setCrop(
 
 template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,
     utils::eZorder Zorder>
-inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::start(
-        const utils::PipeArgs& args) {
-    return mBypass.start(args);
-}
-
-template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,
-    utils::eZorder Zorder>
 inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::setPosition(
         const utils::Dim& dim) {
     return mBypass.setPosition(dim);
@@ -155,9 +124,9 @@ inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::setPosition(
 
 template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,
     utils::eZorder Zorder>
-inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::setParameter(
-        const utils::Params& param) {
-    return mBypass.setParameter(param);
+inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::setTransform(
+        const utils::eTransform& param) {
+    return mBypass.setTransform(param);
 }
 
 template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,
@@ -185,13 +154,6 @@ inline bool BypassPipe<PipeType, IsFg, Wait, Zorder>::setSource(
     arg.zorder = Zorder;
 
     return mBypass.setSource(arg);
-}
-
-template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,
-    utils::eZorder Zorder>
-inline const utils::PipeArgs& BypassPipe<PipeType, IsFg, Wait,
-        Zorder>::getArgs() const {
-    return mBypass.getArgs();
 }
 
 template <utils::eMdpPipeType PipeType, utils::eIsFg IsFg, utils::eWait Wait,

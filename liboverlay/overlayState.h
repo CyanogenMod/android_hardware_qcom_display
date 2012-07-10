@@ -35,20 +35,15 @@
 #include "overlayRotator.h"
 #include "pipes/overlayGenPipe.h"
 #include "pipes/overlayBypassPipe.h"
-#include "pipes/overlayHdmiPipe.h"
+#include "pipes/overlayVideoExtPipe.h"
 #include "pipes/overlayUIMirrorPipe.h"
 #include "pipes/overlay3DPipe.h"
-
-// FIXME make int to be uint32 whenever possible
 
 namespace overlay {
 
 /*
 * Used by Overlay class. Invokes each event
 * */
-
-/* TODO case of RGBx will call mOv open with diff
-* params customized for RGBx pipes */
 
 class OverlayState : utils::NoCopy {
 public:
@@ -153,11 +148,11 @@ template <> struct StateTraits<utils::OV_2D_VIDEO_ON_PANEL>
 template <> struct StateTraits<utils::OV_2D_VIDEO_ON_PANEL_TV>
 {
     typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
-    typedef overlay::HdmiPipe pipe1;
+    typedef overlay::VideoExtPipe pipe1;
     typedef overlay::NullPipe pipe2;   // place holder
 
     typedef Rotator rot0;
-    typedef NullRotator rot1;
+    typedef Rotator rot1;
     typedef NullRotator rot2;
 
     typedef overlay::OverlayImpl<pipe0, pipe1> ovimpl;
@@ -231,11 +226,11 @@ template <> struct StateTraits<utils::OV_UI_MIRROR>
 template <> struct StateTraits<utils::OV_2D_TRUE_UI_MIRROR>
 {
     typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
-    typedef overlay::HdmiPipe pipe1;
+    typedef overlay::VideoExtPipe pipe1;
     typedef overlay::UIMirrorPipe pipe2;
 
     typedef Rotator rot0;
-    typedef NullRotator rot1;
+    typedef Rotator rot1;
     typedef Rotator rot2;
 
     typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
@@ -310,8 +305,8 @@ inline OverlayImplBase* handle_closed_to_xxx()
     RotatorBase* rot0 = new typename StateTraits<STATE>::rot0;
     RotatorBase* rot1 = new typename StateTraits<STATE>::rot1;
     RotatorBase* rot2 = new typename StateTraits<STATE>::rot2;
-    if(!ov->open(rot0, rot1, rot2)) {
-        ALOGE("Overlay failed to open in state %d", STATE);
+    if(!ov->init(rot0, rot1, rot2)) {
+        ALOGE("Overlay failed to init in state %d", STATE);
         return 0;
     }
     return ov;
@@ -329,7 +324,7 @@ inline OverlayImplBase* handle_xxx_to_closed(OverlayImplBase* ov)
     return 0;
 }
 
-/* Hard transitions from any state to any state will close and then open */
+/* Hard transitions from any state to any state will close and then init */
 template <int STATE>
 inline OverlayImplBase* handle_xxx_to_xxx(OverlayImplBase* ov)
 {
@@ -392,6 +387,7 @@ inline OverlayImplBase* OverlayState::handleEvent(utils::eOverlayState newState,
 
     // FIXME, how to communicate bad transition?
     // Should we have bool returned from transition func?
+    // This is also a very good interview question.
 
     return newov;
 }
