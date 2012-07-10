@@ -36,8 +36,10 @@
 #include <errno.h>
 #include <EGL/eglext.h>
 #include <sys/stat.h>
+#if 0
 #include <SkBitmap.h>
 #include <SkImageEncoder.h>
+#endif
 #include <Transform.h>
 
 #include <EGL/egl.h>
@@ -726,6 +728,7 @@ void dumpLayer(int moduleCompositionType, int listFlags, size_t layerIndex,
         }
 
         if ((sfdump_counter_png <= sfdump_countlimit_png) && hnd->base) {
+#if 0
             bool bResult = false;
             char sfdumpfile_name[256];
             SkBitmap *tempSkBmp = new SkBitmap();
@@ -763,6 +766,7 @@ void dumpLayer(int moduleCompositionType, int listFlags, size_t layerIndex,
                                             pixelformatstr);
             }
             delete tempSkBmp; // Calls SkBitmap::freePixels() internally.
+#endif
         }
 
         if ((sfdump_counter_raw <= sfdump_countlimit_raw) && hnd->base) {
