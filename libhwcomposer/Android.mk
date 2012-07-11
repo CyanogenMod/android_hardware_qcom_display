@@ -5,7 +5,7 @@ LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware libutils
 LOCAL_SHARED_LIBRARIES += libEGL liboverlay libgenlock libqdutils
 LOCAL_SRC_FILES :=  hwc.cpp          \
-                    hwc_overlay.cpp  \
+                    hwc_video.cpp  \
                     hwc_utils.cpp
 LOCAL_MODULE := hwcomposer.$(TARGET_BOARD_PLATFORM)
 LOCAL_C_INCLUDES := hardware/qcom/display/libgralloc
