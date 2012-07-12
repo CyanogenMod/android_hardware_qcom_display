@@ -30,6 +30,18 @@
 
 #include <cutils/log.h>
 
+#ifdef QCOM_BSP
+#define GRALLOC_HEAP_MASK   (GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP |\
+                             GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP    |\
+                             GRALLOC_USAGE_PRIVATE_IOMMU_HEAP     |\
+                             GRALLOC_USAGE_PRIVATE_MM_HEAP        |\
+                             GRALLOC_USAGE_PRIVATE_CAMERA_HEAP)
+#endif
+
+
+#define ROUND_UP_PAGESIZE(x) ( (((unsigned long)(x)) + PAGE_SIZE-1)  & \
+                               (~(PAGE_SIZE-1)) )
+
 enum {
     /* gralloc usage bits indicating the type
      * of allocation that should be used */
@@ -199,6 +211,12 @@ enum {
 
 /*****************************************************************************/
 
+#ifdef QCOM_BSP
+typedef struct {
+    int32_t paramType;
+    float   paramValue;
+} MetaData_t;
+#endif
 #ifdef __cplusplus
 struct private_handle_t : public native_handle {
 #else
@@ -234,6 +252,9 @@ struct private_handle_t : public native_handle {
         int     fd;
         // genlock handle to be dup'd by the binder
         int     genlockHandle;
+#ifdef QCOM_BSP
+        int     fd_metadata;          // fd for the meta-data
+#endif
         // ints
         int     magic;
         int     flags;
@@ -241,6 +262,9 @@ struct private_handle_t : public native_handle {
         int     offset;
         int     bufferType;
         int     base;
+#ifdef QCOM_BSP
+        int     offset_metadata;
+#endif
         // The gpu address mapped into the mmu.
         // If using ashmem, set to 0, they don't care
         int     gpuaddr;
@@ -250,19 +274,37 @@ struct private_handle_t : public native_handle {
         int     height;
         // local fd of the genlock device.
         int     genlockPrivFd;
+#ifdef QCOM_BSP
+        int     base_metadata;
+#endif
 
 #ifdef __cplusplus
+#ifdef QCOM_BSP
+        static const int sNumInts = 14;
+        static const int sNumFds = 3;
+#else
         static const int sNumInts = 12;
         static const int sNumFds = 2;
+#endif
         static const int sMagic = 'gmsm';
 
         private_handle_t(int fd, int size, int flags, int bufferType,
+#ifdef QCOM_BSP
+                         int format,int width, int height, int eFd = -1,
+                         int eOffset = 0, int eBase = 0) :
+            fd(fd), genlockHandle(-1), fd_metadata(eFd), magic(sMagic),
+            flags(flags), size(size), offset(0), bufferType(bufferType),
+            base(0), offset_metadata(eOffset), gpuaddr(0), pid(getpid()),
+            format(format), width(width), height(height), genlockPrivFd(-1),
+            base_metadata(eBase)
+#else
                          int format,int width, int height) :
             fd(fd), genlockHandle(-1), magic(sMagic),
             flags(flags), size(size), offset(0),
             bufferType(bufferType), base(0), gpuaddr(0),
             pid(getpid()), format(format),
             width(width), height(height), genlockPrivFd(-1)
+#endif
         {
             version = sizeof(native_handle);
             numInts = sNumInts;

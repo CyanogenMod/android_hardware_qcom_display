@@ -85,6 +85,26 @@ static int gralloc_map(gralloc_module_t const* module,
         hnd->base = intptr_t(mappedAddress) + hnd->offset;
         //LOGD("gralloc_map() succeeded fd=%d, off=%d, size=%d, vaddr=%p",
         //        hnd->fd, hnd->offset, hnd->size, mappedAddress);
+#ifdef QCOM_BSP
+        mappedAddress = MAP_FAILED;
+        size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
+        err = memalloc->map_buffer(&mappedAddress, size,
+                                       hnd->offset_metadata, hnd->fd_metadata);
+        if(err) {
+            ALOGE("Could not mmap handle %p, fd=%d (%s)",
+                  handle, hnd->fd_metadata, strerror(errno));
+            hnd->base_metadata = 0;
+            return -errno;
+        }
+
+        if (mappedAddress == MAP_FAILED) {
+            ALOGE("Could not mmap handle %p, fd=%d (%s)",
+                  handle, hnd->fd_metadata, strerror(errno));
+            hnd->base_metadata = 0;
+            return -errno;
+        }
+        hnd->base_metadata = intptr_t(mappedAddress) + hnd->offset_metadata;
+#endif
     }
     *vaddr = (void*)hnd->base;
     return 0;
@@ -99,10 +119,19 @@ static int gralloc_unmap(gralloc_module_t const* module,
         void* base = (void*)hnd->base;
         size_t size = hnd->size;
         sp<IMemAlloc> memalloc = getAllocator(hnd->flags) ;
-        if(memalloc != NULL)
+        if(memalloc != NULL) {
             err = memalloc->unmap_buffer(base, size, hnd->offset);
-        if (err) {
-            ALOGE("Could not unmap memory at address %p", base);
+            if (err) {
+                ALOGE("Could not unmap memory at address %p", base);
+            }
+#ifdef QCOM_BSP
+            base = (void*)hnd->base_metadata;
+            size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
+            err = memalloc->unmap_buffer(base, size, hnd->offset_metadata);
+            if (err) {
+                ALOGE("Could not unmap memory at address %p", base);
+            }
+#endif
         }
     }
     hnd->base = 0;
@@ -289,6 +318,14 @@ int gralloc_unlock(gralloc_module_t const* module,
                                      hnd->size, hnd->offset, hnd->fd);
         ALOGE_IF(err < 0, "cannot flush handle %p (offs=%x len=%x, flags = 0x%x) err=%s\n",
                  hnd, hnd->offset, hnd->size, hnd->flags, strerror(errno));
+#ifdef QCOM_BSP
+        unsigned long size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
+        err = memalloc->clean_buffer((void*)hnd->base_metadata, size,
+                hnd->offset_metadata, hnd->fd_metadata);
+        ALOGE_IF(err < 0, "cannot flush handle %p (offs=%x len=%lu, "
+                "flags = 0x%x) err=%s\n", hnd, hnd->offset_metadata, size,
+                hnd->flags, strerror(errno));
+#endif
         hnd->flags &= ~private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
     }
 
