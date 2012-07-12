@@ -1,14 +1,13 @@
 LOCAL_PATH := $(call my-dir)
-
+include $(LOCAL_PATH)/../common.mk
 include $(CLEAR_VARS)
-LOCAL_PRELINK_MODULE := false
-LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)
-LOCAL_SHARED_LIBRARIES := liblog libcutils
-LOCAL_C_INCLUDES := hardware/qcom/display/libgralloc
-LOCAL_ADDITIONAL_DEPENDENCIES :=
-LOCAL_SRC_FILES := genlock.cpp
-LOCAL_CFLAGS:= -DLOG_TAG=\"libgenlock\"
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE := libgenlock
+
+LOCAL_MODULE                  := libgenlock
+LOCAL_MODULE_TAGS             := optional
+LOCAL_C_INCLUDES              := $(common_includes)
+LOCAL_SHARED_LIBRARIES        := liblog libcutils
+LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"libgenlock\"
+LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
+LOCAL_SRC_FILES               := genlock.cpp
 include $(BUILD_SHARED_LIBRARY)
 
