@@ -11,4 +11,6 @@ endif
 
 endif
 
+display-hals += libtilerenderer
+
 include $(call all-named-subdir-makefiles,$(display-hals))
