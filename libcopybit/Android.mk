@@ -12,47 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 LOCAL_PATH:= $(call my-dir)
-# HAL module implemenation, not prelinked and stored in
-# hw/<COPYPIX_HARDWARE_MODULE_ID>.<ro.board.platform>.so
+include $(LOCAL_PATH)/../common.mk
+include $(CLEAR_VARS)
+LOCAL_MODULE                  := copybit.$(TARGET_BOARD_PLATFORM)
+LOCAL_MODULE_PATH             := $(TARGET_OUT_SHARED_LIBRARIES)/hw
+LOCAL_MODULE_TAGS             := optional
+LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
+LOCAL_SHARED_LIBRARIES        := $(common_libs) libdl libmemalloc
+LOCAL_CFLAGS                  := $(common_flags)
+LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
+
 
 ifeq ($(TARGET_USES_C2D_COMPOSITION),true)
-    include $(CLEAR_VARS)
-    LOCAL_PRELINK_MODULE := false
-    LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
-    LOCAL_SHARED_LIBRARIES := liblog libdl libcutils libmemalloc libutils
-    LOCAL_SRC_FILES := copybit_c2d.cpp software_converter.cpp
-    LOCAL_MODULE := copybit.$(TARGET_BOARD_PLATFORM)
-    LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
     LOCAL_CFLAGS += -DCOPYBIT_Z180=1 -DC2D_SUPPORT_DISPLAY=1
-    LOCAL_MODULE_TAGS := optional
+    LOCAL_SRC_FILES := copybit_c2d.cpp software_converter.cpp
     include $(BUILD_SHARED_LIBRARY)
 else
     ifneq ($(call is-chipset-in-board-platform,msm7630),true)
         ifeq ($(call is-board-platform-in-list,$(MSM7K_BOARD_PLATFORMS)),true)
-            include $(CLEAR_VARS)
-            ifeq ($(ARCH_ARM_HAVE_NEON),true)
-                LOCAL_CFLAGS += -D__ARM_HAVE_NEON
-            endif
-            ifeq ($(call is-board-platform,msm7627a),true)
-                LOCAL_CFLAGS += -DTARGET_7x27A
-            endif
-            ifeq ($(TARGET_GRALLOC_USES_ASHMEM),true)
-                LOCAL_CFLAGS += -DUSE_ASHMEM
-                ifeq ($(call is-chipset-prefix-in-board-platform,msm7627),true)
-                   LOCAL_CFLAGS += -DTARGET_7x27
-                endif
-            endif
-
-            LOCAL_PRELINK_MODULE := false
-            LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
-            LOCAL_SHARED_LIBRARIES := liblog libmemalloc
-            LOCAL_SRC_FILES := software_converter.cpp copybit.cpp
-            LOCAL_MODULE := copybit.$(TARGET_BOARD_PLATFORM)
-            LOCAL_MODULE_TAGS := optional
-            LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/qcom/display/libgralloc
             LOCAL_CFLAGS += -DCOPYBIT_MSM7K=1
+            LOCAL_SRC_FILES := software_converter.cpp copybit.cpp
             include $(BUILD_SHARED_LIBRARY)
         endif
     endif
