@@ -291,6 +291,15 @@ int gpu_context_t::free_impl(private_handle_t const* hnd) {
                                         hnd->offset, hnd->fd);
         if(err)
             return err;
+#ifdef QCOM_BSP
+        // free the metadata space
+        unsigned long size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
+        err = memalloc->free_buffer((void*)hnd->base_metadata,
+                                    (size_t) size, hnd->offset_metadata,
+                                    hnd->fd_metadata);
+        if (err)
+            return err;
+#endif
     }
 
     // Release the genlock
