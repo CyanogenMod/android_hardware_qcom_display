@@ -51,7 +51,7 @@ LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)
 LOCAL_C_INCLUDES := hardware/qcom/display/libqdutils
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils
 LOCAL_SRC_FILES :=  alloc_controller.cpp
-LOCAL_CFLAGS:= -DLOG_TAG=\"memalloc\" -DLOG_NDDEBUG=0
+LOCAL_CFLAGS:= -DLOG_TAG=\"memalloc\"
 
 ifeq ($(TARGET_USES_ION),true)
     LOCAL_SRC_FILES += ionalloc.cpp
@@ -62,7 +62,6 @@ else
                     pmem_bestfit_alloc.cpp
 endif
 
-LOCAL_CFLAGS:= -DLOG_TAG=\"memalloc\"
 LOCAL_MODULE := libmemalloc
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_SHARED_LIBRARY)
