@@ -62,7 +62,7 @@ else
                     pmem_bestfit_alloc.cpp
 endif
 
-LOCAL_CFLAGS:= -DLOG_TAG=\"memalloc\"
+
 LOCAL_MODULE := libmemalloc
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_SHARED_LIBRARY)
