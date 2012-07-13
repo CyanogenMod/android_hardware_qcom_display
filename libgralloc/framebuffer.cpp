@@ -39,6 +39,7 @@
 #include "gralloc_priv.h"
 #include "fb_priv.h"
 #include "gr.h"
+#include <genlock.h>
 #include <cutils/properties.h>
 #include <profiler.h>
 
@@ -502,20 +503,19 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
     if (private_handle_t::validate(buffer) < 0)
         return -EINVAL;
 
-    fb_context_t* ctx = (fb_context_t*)dev;
+    fb_context_t* ctx = (fb_context_t*) dev;
 
-    private_handle_t const* hnd =
-        reinterpret_cast<private_handle_t const*>(buffer);
+    private_handle_t *hnd = static_cast<private_handle_t*>
+                            (const_cast<native_handle_t*>(buffer));
+
     private_module_t* m =
         reinterpret_cast<private_module_t*>(dev->common.module);
 
     if (hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
-        m->base.lock(&m->base, buffer,
-                     PRIV_USAGE_LOCKED_FOR_POST,
-                     0, 0, m->info.xres, m->info.yres, NULL);
+        genlock_lock_buffer(hnd, GENLOCK_READ_LOCK, GENLOCK_MAX_TIMEOUT);
 
         if (m->currentBuffer) {
-            m->base.unlock(&m->base, m->currentBuffer);
+            genlock_unlock_buffer(m->currentBuffer);
             m->currentBuffer = 0;
         }
 
@@ -524,11 +524,11 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
         m->info.yoffset = offset / m->finfo.line_length;
         if (ioctl(m->framebuffer->fd, FBIOPUT_VSCREENINFO, &m->info) == -1) {
             ALOGE("FBIOPUT_VSCREENINFO failed");
-            m->base.unlock(&m->base, buffer);
+            genlock_unlock_buffer(hnd);
             return -errno;
         }
         CALC_FPS();
-        m->currentBuffer = buffer;
+        m->currentBuffer = hnd;
     }
     return 0;
 }
