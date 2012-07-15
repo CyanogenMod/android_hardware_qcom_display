@@ -55,7 +55,11 @@ int gpu_context_t::gralloc_alloc_framebuffer_locked(size_t size, int usage,
     private_module_t* m = reinterpret_cast<private_module_t*>(common.module);
 
     // we don't support allocations with both the FB and PMEM_ADSP flags
+#ifdef QCOM_BSP
+    if (usage & GRALLOC_HEAP_MASK) {
+#else
     if (usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP) {
+#endif
         return -EINVAL;
     }
 

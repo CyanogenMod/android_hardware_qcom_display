@@ -118,8 +118,11 @@ int IonAlloc::alloc_buffer(alloc_data& data)
         return err;
     }
 
-    if(!(data.flags & ION_SECURE) &&
-       !(data.allocType & private_handle_t::PRIV_FLAGS_NOT_MAPPED)) {
+    if(!(data.flags & ION_SECURE) 
+#ifndef QCOM_BSP
+       && !(data.allocType & private_handle_t::PRIV_FLAGS_NOT_MAPPED)
+#endif
+      ) {
 
         base = mmap(0, ionAllocData.len, PROT_READ|PROT_WRITE,
                     MAP_SHARED, fd_data.fd, 0);

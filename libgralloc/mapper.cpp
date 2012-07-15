@@ -328,6 +328,7 @@ int gralloc_perform(struct gralloc_module_t const* module,
                     private_handle_t::sNumFds, private_handle_t::sNumInts);
                 hnd->magic = private_handle_t::sMagic;
                 hnd->fd = fd;
+#ifndef QCOM_BSP
                 unsigned int contigFlags = GRALLOC_USAGE_PRIVATE_ADSP_HEAP |
                     GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP |
                     GRALLOC_USAGE_PRIVATE_SMI_HEAP;
@@ -346,6 +347,9 @@ int gralloc_perform(struct gralloc_module_t const* module,
                     else
                         hnd->flags =  private_handle_t::PRIV_FLAGS_USES_ASHMEM;
                 }
+#else
+                hnd->flags =  private_handle_t::PRIV_FLAGS_USES_ION;
+#endif
 
                 hnd->size = size;
                 hnd->offset = offset;

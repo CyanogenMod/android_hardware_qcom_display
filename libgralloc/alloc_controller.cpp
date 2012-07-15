@@ -43,6 +43,7 @@ using namespace gralloc;
 using namespace qdutils;
 using android::sp;
 
+#ifndef QCOM_BSP
 const int GRALLOC_HEAP_MASK  =  GRALLOC_USAGE_PRIVATE_ADSP_HEAP      |
                                 GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP |
                                 GRALLOC_USAGE_PRIVATE_SMI_HEAP       |
@@ -51,6 +52,7 @@ const int GRALLOC_HEAP_MASK  =  GRALLOC_USAGE_PRIVATE_ADSP_HEAP      |
                                 GRALLOC_USAGE_PRIVATE_MM_HEAP        |
                                 GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP |
                                 GRALLOC_USAGE_PRIVATE_CAMERA_HEAP;
+#endif
 
 
 //Common functions
