@@ -182,10 +182,6 @@ inline bool GenericPipe<PANEL>::setSource(
         const utils::PipeArgs& args)
 {
     utils::PipeArgs newargs(args);
-    //Interlace video handling.
-    if(newargs.whf.format & INTERLACE_MASK) {
-        setMdpFlags(newargs.mdpFlags, utils::OV_MDP_DEINTERLACE);
-    }
     utils::Whf whf(newargs.whf);
     //Extract HAL format from lower bytes. Deinterlace if interlaced.
     whf.format = utils::getColorFormat(whf.format);
