@@ -17,7 +17,6 @@
 
 #include "overlayRotator.h"
 #include "overlayUtils.h"
-#include "overlayMdp.h"
 
 namespace ovutils = overlay::utils;
 
@@ -73,19 +72,29 @@ void MdpRot::setSource(const overlay::utils::Whf& awhf) {
     mBufSize = awhf.size;
 }
 
+void MdpRot::setFlags(const utils::eMdpFlags& flags) {
+    mRotImgInfo.secure = 0;
+    if(flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
+        mRotImgInfo.secure = 1;
+}
+
 void MdpRot::setTransform(const utils::eTransform& rot, const bool& rotUsed)
 {
+    mOrientation = rot;
     int r = utils::getMdpOrient(rot);
     ALOGE_IF(DEBUG_OVERLAY, "%s: r=%d", __FUNCTION__, r);
-    this->setRotations(r);
-    this->setDisable();
+    setRotations(r);
+    setDisable();
     if(rotUsed) {
-        this->setEnable();
+        setEnable();
     }
-    switch(static_cast<int>(rot)) {
+}
+
+void MdpRot::doTransform() {
+    switch(mOrientation) {
         case utils::OVERLAY_TRANSFORM_ROT_90:
-        case (utils::OVERLAY_TRANSFORM_ROT_90|utils::OVERLAY_TRANSFORM_FLIP_H):
-        case (utils::OVERLAY_TRANSFORM_ROT_90|utils::OVERLAY_TRANSFORM_FLIP_V):
+        case utils::OVERLAY_TRANSFORM_ROT_90_FLIP_H:
+        case utils::OVERLAY_TRANSFORM_ROT_90_FLIP_V:
         case utils::OVERLAY_TRANSFORM_ROT_270:
             utils::swap(mRotImgInfo.dst.width, mRotImgInfo.dst.height);
             break;
@@ -95,6 +104,7 @@ void MdpRot::setTransform(const utils::eTransform& rot, const bool& rotUsed)
 }
 
 bool MdpRot::commit() {
+    doTransform();
     if(!overlay::mdp_wrapper::startRotator(mFd.getFD(), mRotImgInfo)) {
         ALOGE("MdpRot commit failed");
         dump();
@@ -110,7 +120,7 @@ bool MdpRot::open_i(uint32_t numbufs, uint32_t bufsz)
 
     OVASSERT(MAP_FAILED == mem.addr(), "MAP failed in open_i");
 
-    if(!mem.open(numbufs, bufsz)){
+    if(!mem.open(numbufs, bufsz, mRotImgInfo.secure)){
         ALOGE("%s: Failed to open", __func__);
         mem.close();
         return false;
@@ -176,6 +186,7 @@ void MdpRot::reset() {
     mMem.curr().mCurrOffset = 0;
     mMem.prev().mCurrOffset = 0;
     mBufSize = 0;
+    mOrientation = utils::OVERLAY_TRANSFORM_0;
 }
 
 bool MdpRot::queueBuffer(int fd, uint32_t offset) {

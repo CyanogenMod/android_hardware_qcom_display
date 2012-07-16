@@ -107,8 +107,6 @@ bool VideoOverlay::configure(hwc_context_t *ctx, hwc_layer_t *layer)
                                  ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
         }
 
-        ovutils::eWait waitFlag = ovutils::NO_WAIT;
-
         ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
         if (ctx->numHwLayers == 1) {
             isFgFlag = ovutils::IS_FG_SET;
@@ -116,7 +114,6 @@ bool VideoOverlay::configure(hwc_context_t *ctx, hwc_layer_t *layer)
 
         ovutils::PipeArgs parg(mdpFlags,
                                info,
-                               waitFlag,
                                ovutils::ZORDER_0,
                                isFgFlag,
                                ovutils::ROT_FLAG_DISABLED);

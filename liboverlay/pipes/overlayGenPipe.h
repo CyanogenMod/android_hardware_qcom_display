@@ -102,12 +102,6 @@ private:
     /* Ctrl/Data aggregator */
     CtrlData mCtrlData;
 
-    /* caching startup params. useful when need
-     * to have the exact copy of that pipe.
-     * For example when HDMI is connected, and we would
-     * like to open/start the pipe with the args */
-    utils::PipeArgs mArgs;
-
     /* rotator mdp base
      * Can point to NullRotator or to Rotator*/
     RotatorBase* mRot;
@@ -207,6 +201,7 @@ inline bool GenericPipe<PANEL>::setSource(
     //Cache if user wants 0-rotation
     mRotUsed = newargs.rotFlags & utils::ROT_FLAG_ENABLED;
     mRot->setSource(newargs.whf);
+    mRot->setFlags(newargs.mdpFlags);
     return mCtrlData.ctrl.setSource(newargs);
 }
 

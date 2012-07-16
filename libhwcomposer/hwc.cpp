@@ -93,8 +93,6 @@ static int hwc_set(hwc_composer_device_t *dev,
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     if (LIKELY(list)) {
         VideoOverlay::draw(ctx, list);
-        //XXX: Handle vsync with FBIO_WAITFORVSYNC ioctl
-        //All other operations (including pan display) should be NOWAIT
         EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
     } else {
         ctx->mOverlay->setState(ovutils::OV_CLOSED);

@@ -35,7 +35,7 @@
 #include <fcntl.h> // open, O_RDWR, etc
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h> // buffer_handle_t
-#include <linux/msm_mdp.h> // MDP_OV_PLAY_NOWAIT etc ...
+#include <linux/msm_mdp.h> // flags
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -250,15 +250,6 @@ enum eRotFlags {
     ROT_FLAG_ENABLED = 1 // needed in rot
 };
 
-/* Wait/No wait for waiting for vsync
- * WAIT - wait for vsync, ignore fb (no need to compose w/ fb)
- * NO_WAIT - do not wait for vsync and return immediatly since
- * we need to run composition code */
-enum eWait {
-    WAIT,
-    NO_WAIT
-};
-
 /* The values for is_fg flag for control alpha and transp
  * IS_FG_OFF means is_fg = 0
  * IS_FG_SET means is_fg = 1
@@ -277,7 +268,7 @@ enum eMdpFlags {
     OV_MDP_FLAGS_NONE = 0,
     OV_MDP_PIPE_SHARE =  MDP_OV_PIPE_SHARE,
     OV_MDP_DEINTERLACE = MDP_DEINTERLACE,
-    OV_MDP_PLAY_NOWAIT = MDP_OV_PLAY_NOWAIT,
+    OV_MDP_PLAY_NOWAIT = MDP_OV_PLAY_NOWAIT, //deprecated
     OV_MDP_SECURE_OVERLAY_SESSION = MDP_SECURE_OVERLAY_SESSION,
     OV_MDP_SOURCE_ROTATED_90 = MDP_SOURCE_ROTATED_90,
     OV_MDP_MEMORY_ID_TYPE_FB = MDP_MEMORY_ID_TYPE_FB,
@@ -308,24 +299,12 @@ enum eMdpPipeType {
     OV_MDP_PIPE_VG
 };
 
-/* Corresponds to pipes in eDest */
-enum eChannel {
-    CHANNEL_0,
-    CHANNEL_1,
-    CHANNEL_2
-};
-
 // Max pipes via overlay (VG0, VG1, RGB1)
 enum { MAX_PIPES = 3 };
 
 /* Used to identify destination channels and
  * also 3D channels e.g. when in 3D mode with 2
  * pipes opened and it is used in get crop/pos 3D
- *
- * PLEASE NOTE : DO NOT USE eDest FOR ARRAYS
- * i.e. args[OV_PIPE1] since it is a BIT MASK
- * use CHANNELS enum instead. Each OV_PIPEX is
- * not specific to a display (primary/external).
  * */
 enum eDest {
     OV_PIPE0 = 1 << 0,
@@ -337,61 +316,51 @@ enum eDest {
 /* values for copybit_set_parameter(OVERLAY_TRANSFORM) */
 enum eTransform {
     /* No rot */
-    OVERLAY_TRANSFORM_0         = 0x0,
-    /* flip source image horizontally */
-    OVERLAY_TRANSFORM_FLIP_H    = HAL_TRANSFORM_FLIP_H,
-    /* flip source image vertically */
-    OVERLAY_TRANSFORM_FLIP_V    = HAL_TRANSFORM_FLIP_V,
-    /* rotate source image 90 degrees */
-    OVERLAY_TRANSFORM_ROT_90    = HAL_TRANSFORM_ROT_90,
+    OVERLAY_TRANSFORM_0 = 0x0,
+    /* flip source image horizontally 0x1 */
+    OVERLAY_TRANSFORM_FLIP_H = HAL_TRANSFORM_FLIP_H,
+    /* flip source image vertically 0x2 */
+    OVERLAY_TRANSFORM_FLIP_V = HAL_TRANSFORM_FLIP_V,
     /* rotate source image 180 degrees
      * It is basically bit-or-ed  H | V == 0x3 */
-    OVERLAY_TRANSFORM_ROT_180   = HAL_TRANSFORM_ROT_180,
+    OVERLAY_TRANSFORM_ROT_180 = HAL_TRANSFORM_ROT_180,
+    /* rotate source image 90 degrees 0x4 */
+    OVERLAY_TRANSFORM_ROT_90 = HAL_TRANSFORM_ROT_90,
+    /* rotate source image 90 degrees and flip horizontally 0x5 */
+    OVERLAY_TRANSFORM_ROT_90_FLIP_H = HAL_TRANSFORM_ROT_90 |
+                                      HAL_TRANSFORM_FLIP_H,
+    /* rotate source image 90 degrees and flip vertically 0x6 */
+    OVERLAY_TRANSFORM_ROT_90_FLIP_V = HAL_TRANSFORM_ROT_90 |
+                                      HAL_TRANSFORM_FLIP_V,
     /* rotate source image 270 degrees
      * Basically 180 | 90 == 0x7 */
-    OVERLAY_TRANSFORM_ROT_270   = HAL_TRANSFORM_ROT_270,
+    OVERLAY_TRANSFORM_ROT_270 = HAL_TRANSFORM_ROT_270,
     /* rotate invalid like in Transform.h */
-    OVERLAY_TRANSFORM_INV       = 0x80
-};
-
-/* offset and fd are play info */
-struct PlayInfo {
-    PlayInfo() : fd(-1), offset(0) {}
-    PlayInfo(int _fd, uint32_t _offset) :
-        fd(_fd), offset(_offset) {}
-    bool operator==(const PlayInfo& p) {
-        return (fd == p.fd && offset == p.offset);
-    }
-    int fd;
-    uint32_t offset;
+    OVERLAY_TRANSFORM_INV = 0x80
 };
 
 // Used to consolidate pipe params
 struct PipeArgs {
     PipeArgs() : mdpFlags(OV_MDP_FLAGS_NONE),
-        wait(NO_WAIT),
         zorder(Z_SYSTEM_ALLOC),
         isFg(IS_FG_OFF),
         rotFlags(ROT_FLAG_DISABLED){
     }
 
-    PipeArgs(eMdpFlags f, Whf _whf, eWait w,
+    PipeArgs(eMdpFlags f, Whf _whf,
             eZorder z, eIsFg fg, eRotFlags r) :
         mdpFlags(f),
         whf(_whf),
-        wait(w),
         zorder(z),
         isFg(fg),
         rotFlags(r) {
     }
 
-    eMdpFlags mdpFlags; // for mdp_overlay flags PIPE_SHARE, NO_WAIT, etc
+    eMdpFlags mdpFlags; // for mdp_overlay flags
     Whf whf;
-    eWait wait; // flags WAIT/NO_WAIT
     eZorder zorder; // stage number
     eIsFg isFg; // control alpha & transp
     eRotFlags rotFlags;
-    PlayInfo play;
 };
 
 enum eOverlayState{
@@ -441,21 +410,13 @@ enum {
     WFD = 2
 };
 
+//TODO Make this a part of some appropriate class
 static int sExtType = HDMI; //HDMI or WFD
-
 //Set by client as HDMI/WFD
-static inline void setExtType(const int& type) {
-    if(type != HDMI || type != WFD) {
-        ALOGE("%s: Unrecognized type %d", __func__, type);
-        return;
-    }
-    sExtType = type;
-}
-
+void setExtType(const int& type);
 //Return External panel type set by client.
-static inline int getExtType() {
-    return sExtType;
-}
+int getExtType();
+
 
 //Gets the FB number for the external type.
 //As of now, HDMI always has fb1, WFD could use fb1 or fb2
@@ -480,6 +441,7 @@ static int getFBForPanel(int panel) { // PRIMARY OR EXTERNAL
 }
 
 // number of rgb pipes bufs (max)
+
 // 2 for rgb0/1 double bufs
 enum { RGB_PIPE_NUM_BUFS = 2 };
 
@@ -503,12 +465,6 @@ int getRotOutFmt(uint32_t format);
 int getMdpOrient(eTransform rotation);
 const char* getFormatString(uint32_t format);
 const char* getStateString(eOverlayState state);
-
-inline int setWait(eWait wait, int flags) {
-    return (wait == WAIT) ?
-            flags &= ~MDP_OV_PLAY_NOWAIT :
-            flags |= MDP_OV_PLAY_NOWAIT;
-}
 
 // Cannot use HW_OVERLAY_MAGNIFICATION_LIMIT, since at the time
 // of integration, HW_OVERLAY_MAGNIFICATION_LIMIT was a define
@@ -685,18 +641,18 @@ inline void Dim::dump() const {
 
 inline int getMdpOrient(eTransform rotation) {
     ALOGE_IF(DEBUG_OVERLAY, "%s: rot=%d", __FUNCTION__, rotation);
-    switch(static_cast<int>(rotation))
+    switch(rotation)
     {
         case OVERLAY_TRANSFORM_0 : return 0;
-        case HAL_TRANSFORM_FLIP_V:  return MDP_FLIP_UD;
-        case HAL_TRANSFORM_FLIP_H:  return MDP_FLIP_LR;
-        case HAL_TRANSFORM_ROT_90:  return MDP_ROT_90;
-        case HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V:
-                                    return MDP_ROT_90|MDP_FLIP_LR;
-        case HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H:
-                                    return MDP_ROT_90|MDP_FLIP_UD;
-        case HAL_TRANSFORM_ROT_180: return MDP_ROT_180;
-        case HAL_TRANSFORM_ROT_270: return MDP_ROT_270;
+        case OVERLAY_TRANSFORM_FLIP_V:  return MDP_FLIP_UD;
+        case OVERLAY_TRANSFORM_FLIP_H:  return MDP_FLIP_LR;
+        case OVERLAY_TRANSFORM_ROT_90:  return MDP_ROT_90;
+        case OVERLAY_TRANSFORM_ROT_90_FLIP_V:
+                return MDP_ROT_90 | MDP_FLIP_UD;
+        case OVERLAY_TRANSFORM_ROT_90_FLIP_H:
+                return MDP_ROT_90 | MDP_FLIP_LR;
+        case OVERLAY_TRANSFORM_ROT_180: return MDP_ROT_180;
+        case OVERLAY_TRANSFORM_ROT_270: return MDP_ROT_270;
         default:
             ALOGE("%s: invalid rotation value (value = 0x%x",
                     __FUNCTION__, rotation);

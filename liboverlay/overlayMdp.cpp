@@ -38,6 +38,8 @@ void MdpCtrl::reset() {
     utils::memset0(mLkgo);
     mOVInfo.id = MSMFB_NEW_REQUEST;
     mLkgo.id = MSMFB_NEW_REQUEST;
+    mOrientation = utils::OVERLAY_TRANSFORM_0;
+    mRotUsed = false;
 }
 
 bool MdpCtrl::close() {
@@ -51,6 +53,86 @@ bool MdpCtrl::close() {
     if(!mFd.close()) {
         return false;
     }
+    return true;
+}
+
+bool MdpCtrl::setSource(const utils::PipeArgs& args) {
+
+    setSrcWhf(args.whf);
+
+    //TODO These are hardcoded. Can be moved out of setSource.
+    mOVInfo.alpha = 0xff;
+    mOVInfo.transp_mask = 0xffffffff;
+
+    //TODO These calls should ideally be a part of setPipeParams API
+    setFlags(args.mdpFlags);
+    setZ(args.zorder);
+    setIsFg(args.isFg);
+    return true;
+}
+
+bool MdpCtrl::setCrop(const utils::Dim& d) {
+    setSrcRectDim(d);
+    return true;
+}
+
+bool MdpCtrl::setPosition(const overlay::utils::Dim& d,
+        int fbw, int fbh)
+{
+    ovutils::Dim dim(d);
+    ovutils::Dim ovsrcdim = getSrcRectDim();
+    // Scaling of upto a max of 20 times supported
+    if(dim.w >(ovsrcdim.w * ovutils::HW_OV_MAGNIFICATION_LIMIT)){
+        dim.w = ovutils::HW_OV_MAGNIFICATION_LIMIT * ovsrcdim.w;
+        dim.x = (fbw - dim.w) / 2;
+    }
+    if(dim.h >(ovsrcdim.h * ovutils::HW_OV_MAGNIFICATION_LIMIT)) {
+        dim.h = ovutils::HW_OV_MAGNIFICATION_LIMIT * ovsrcdim.h;
+        dim.y = (fbh - dim.h) / 2;
+    }
+
+    setDstRectDim(dim);
+    return true;
+}
+
+bool MdpCtrl::setTransform(const utils::eTransform& orient,
+        const bool& rotUsed) {
+    mOrientation = orient;
+    int rot = utils::getMdpOrient(orient);
+    setUserData(rot);
+    //Rotator can be requested by client even if layer has 0 orientation.
+    mRotUsed = rotUsed;
+    return true;
+}
+
+void MdpCtrl::doTransform() {
+    adjustSrcWhf(mRotUsed);
+    setRotationFlags();
+    //180 will be H + V
+    //270 will be H + V + 90
+    if(mOrientation & utils::OVERLAY_TRANSFORM_FLIP_H) {
+            overlayTransFlipH();
+    }
+    if(mOrientation & utils::OVERLAY_TRANSFORM_FLIP_V) {
+            overlayTransFlipV();
+    }
+    if(mOrientation & utils::OVERLAY_TRANSFORM_ROT_90) {
+            overlayTransRot90();
+    }
+}
+
+bool MdpCtrl::set() {
+    //deferred calcs, so APIs could be called in any order.
+    doTransform();
+    if(!mdp_wrapper::setOverlay(mFd.getFD(), mOVInfo)) {
+        ALOGE("MdpCtrl failed to setOverlay, restoring last known "
+                "good ov info");
+        mdp_wrapper::dump("== Bad OVInfo is: ", mOVInfo);
+        mdp_wrapper::dump("== Last good known OVInfo is: ", mLkgo);
+        this->restore();
+        return false;
+    }
+    this->save();
     return true;
 }
 
@@ -96,123 +178,6 @@ void MdpCtrl::adjustSrcWhf(const bool& rotUsed) {
         whf.format = utils::getRotOutFmt(whf.format);
         setSrcWhf(whf);
     }
-}
-
-bool MdpCtrl::set() {
-    if(!mdp_wrapper::setOverlay(mFd.getFD(), mOVInfo)) {
-        ALOGE("MdpCtrl failed to setOverlay, restoring last known "
-                "good ov info");
-        mdp_wrapper::dump("== Bad OVInfo is: ", mOVInfo);
-        mdp_wrapper::dump("== Last good known OVInfo is: ", mLkgo);
-        this->restore();
-        return false;
-    }
-    this->save();
-    return true;
-}
-
-bool MdpCtrl::setSource(const utils::PipeArgs& args) {
-
-    setSrcWhf(args.whf);
-
-    //TODO These are hardcoded. Can be moved out of setSource.
-    mOVInfo.alpha = 0xff;
-    mOVInfo.transp_mask = 0xffffffff;
-
-    //TODO These calls should ideally be a part of setPipeParams API
-    setFlags(args.mdpFlags);
-    setZ(args.zorder);
-    setWait(args.wait);
-    setIsFg(args.isFg);
-    return true;
-}
-
-bool MdpCtrl::setCrop(const utils::Dim& d) {
-    setSrcRectDim(d);
-    return true;
-}
-
-bool MdpCtrl::setTransform(const utils::eTransform& orient,
-        const bool& rotUsed) {
-
-    int rot = utils::getMdpOrient(orient);
-    setUserData(rot);
-    adjustSrcWhf(rotUsed);
-    setRotationFlags();
-
-    switch(static_cast<int>(orient)) {
-        case utils::OVERLAY_TRANSFORM_0:
-        case utils::OVERLAY_TRANSFORM_FLIP_H:
-        case utils::OVERLAY_TRANSFORM_FLIP_V:
-        case utils::OVERLAY_TRANSFORM_ROT_180:
-            //No calculations required
-            break;
-        case utils::OVERLAY_TRANSFORM_ROT_90:
-        case (utils::OVERLAY_TRANSFORM_ROT_90|utils::OVERLAY_TRANSFORM_FLIP_H):
-        case (utils::OVERLAY_TRANSFORM_ROT_90|utils::OVERLAY_TRANSFORM_FLIP_V):
-            overlayTransFlipRot90();
-            break;
-        case utils::OVERLAY_TRANSFORM_ROT_270:
-            overlayTransFlipRot270();
-            break;
-        default:
-            ALOGE("%s: Error due to unknown rot value", __FUNCTION__);
-            return false;
-    }
-    return true;
-}
-
-void MdpCtrl::overlayTransFlipRot90()
-{
-    utils::Dim d   = getSrcRectDim();
-    utils::Whf whf = getSrcWhf();
-    int tmp = d.x;
-    d.x = compute(whf.h,
-            d.y,
-            d.h);
-    d.y = tmp;
-    setSrcRectDim(d);
-    swapSrcWH();
-    swapSrcRectWH();
-}
-
-void MdpCtrl::overlayTransFlipRot270()
-{
-    utils::Dim d   = getSrcRectDim();
-    utils::Whf whf = getSrcWhf();
-    int tmp = d.y;
-    d.y = compute(whf.w,
-            d.x,
-            d.w);
-    d.x = tmp;
-    setSrcRectDim(d);
-    swapSrcWH();
-    swapSrcRectWH();
-}
-
-bool MdpCtrl::setPosition(const overlay::utils::Dim& d,
-        int fbw, int fbh)
-{
-    // Validatee against FB size
-    if(!d.check(fbw, fbh)) {
-        ALOGE("MdpCtrl setPosition failed dest dim violate screen limits");
-        return false;
-    }
-
-    ovutils::Dim dim(d);
-    ovutils::Dim ovsrcdim = getSrcRectDim();
-    // Scaling of upto a max of 20 times supported
-    if(dim.w >(ovsrcdim.w * ovutils::HW_OV_MAGNIFICATION_LIMIT)){
-        dim.w = ovutils::HW_OV_MAGNIFICATION_LIMIT * ovsrcdim.w;
-        dim.x = (fbw - dim.w) / 2;
-    }
-    if(dim.h >(ovsrcdim.h * ovutils::HW_OV_MAGNIFICATION_LIMIT)) {
-        dim.h = ovutils::HW_OV_MAGNIFICATION_LIMIT * ovsrcdim.h;
-        dim.y = (fbh - dim.h) / 2;
-    }
-
-    setDstRectDim(dim);
-    return true;
 }
 
 void MdpCtrl::dump() const {

@@ -61,8 +61,7 @@ public:
     /* overlay get */
     bool get();
 
-    /* returns flags from mdp structure.
-     * Flags are WAIT/NOWAIT/PIPE SHARED*/
+    /* returns flags from mdp structure */
     int getFlags() const;
 
     /* set flags to mdp structure */
@@ -70,9 +69,6 @@ public:
 
     /* set z order */
     void setZ(utils::eZorder z);
-
-    /* set Wait/nowait */
-    void setWait(utils::eWait wait);
 
     /* set isFg flag */
     void setIsFg(utils::eIsFg isFg);
@@ -148,8 +144,14 @@ public:
 private:
 
     /* helper functions for overlayTransform */
-    void overlayTransFlipRot90();
-    void overlayTransFlipRot270();
+    void doTransform();
+    void overlayTransFlipH();
+    void overlayTransFlipV();
+    void overlayTransRot90();
+
+    utils::eTransform mOrientation; //Holds requested orientation
+    bool mRotUsed; //whether rotator should be used even if requested
+                   //orientation is 0.
 
     /* last good known ov info */
     mdp_overlay   mLkgo;
@@ -282,10 +284,6 @@ inline void MdpCtrl::setZ(overlay::utils::eZorder z) {
     mOVInfo.z_order = z;
 }
 
-inline void MdpCtrl::setWait(overlay::utils::eWait wait) {
-    mOVInfo.flags = utils::setWait(wait, mOVInfo.flags);
-}
-
 inline void MdpCtrl::setIsFg(overlay::utils::eIsFg isFg) {
     mOVInfo.is_fg = isFg;
 }
@@ -375,6 +373,37 @@ inline void MdpCtrl::swapSrcRectWH() {
     utils::swap(mOVInfo.src_rect.w,
             mOVInfo.src_rect.h);
 }
+
+inline void MdpCtrl::overlayTransFlipH()
+{
+    utils::Dim d   = getSrcRectDim();
+    utils::Whf whf = getSrcWhf();
+    d.x = compute(whf.w, d.x, d.w);
+    setSrcRectDim(d);
+}
+
+inline void MdpCtrl::overlayTransFlipV()
+{
+    utils::Dim d   = getSrcRectDim();
+    utils::Whf whf = getSrcWhf();
+    d.y = compute(whf.h, d.y, d.h);
+    setSrcRectDim(d);
+}
+
+inline void MdpCtrl::overlayTransRot90()
+{
+    utils::Dim d   = getSrcRectDim();
+    utils::Whf whf = getSrcWhf();
+    int tmp = d.x;
+    d.x = compute(whf.h,
+            d.y,
+            d.h);
+    d.y = tmp;
+    setSrcRectDim(d);
+    swapSrcWH();
+    swapSrcRectWH();
+}
+
 
 ///////    MdpCtrl3D //////
 

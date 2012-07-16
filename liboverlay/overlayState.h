@@ -34,7 +34,6 @@
 #include "overlayImpl.h"
 #include "overlayRotator.h"
 #include "pipes/overlayGenPipe.h"
-#include "pipes/overlayBypassPipe.h"
 #include "pipes/overlayVideoExtPipe.h"
 #include "pipes/overlayUIMirrorPipe.h"
 #include "pipes/overlay3DPipe.h"
@@ -238,7 +237,7 @@ template <> struct StateTraits<utils::OV_2D_TRUE_UI_MIRROR>
 
 template <> struct StateTraits<utils::OV_BYPASS_1_LAYER>
 {
-    typedef overlay::BypassPipe<utils::OV_MDP_PIPE_VG, utils::IS_FG_SET, utils::WAIT, utils::ZORDER_0> pipe0;
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
     typedef overlay::NullPipe pipe1;   // place holder
     typedef overlay::NullPipe pipe2;   // place holder
 
@@ -251,8 +250,8 @@ template <> struct StateTraits<utils::OV_BYPASS_1_LAYER>
 
 template <> struct StateTraits<utils::OV_BYPASS_2_LAYER>
 {
-    typedef overlay::BypassPipe<utils::OV_MDP_PIPE_VG, utils::IS_FG_SET, utils::NO_WAIT, utils::ZORDER_0> pipe0;
-    typedef overlay::BypassPipe<utils::OV_MDP_PIPE_VG, utils::IS_FG_OFF, utils::WAIT, utils::ZORDER_1> pipe1;
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe1;
     typedef overlay::NullPipe pipe2;   // place holder
 
     typedef NullRotator rot0;
@@ -264,9 +263,9 @@ template <> struct StateTraits<utils::OV_BYPASS_2_LAYER>
 
 template <> struct StateTraits<utils::OV_BYPASS_3_LAYER>
 {
-    typedef overlay::BypassPipe<utils::OV_MDP_PIPE_VG, utils::IS_FG_SET, utils::NO_WAIT, utils::ZORDER_0> pipe0;
-    typedef overlay::BypassPipe<utils::OV_MDP_PIPE_VG, utils::IS_FG_OFF, utils::NO_WAIT, utils::ZORDER_1> pipe1;
-    typedef overlay::BypassPipe<utils::OV_MDP_PIPE_RGB, utils::IS_FG_OFF, utils::WAIT, utils::ZORDER_2> pipe2;
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe1;
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe2;
 
     typedef NullRotator rot0;
     typedef NullRotator rot1;

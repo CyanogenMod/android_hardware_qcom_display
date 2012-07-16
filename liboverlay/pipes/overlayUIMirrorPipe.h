@@ -71,7 +71,7 @@ inline bool UIMirrorPipe::init(RotatorBase* rot) {
     bool ret = mUI.init(rot);
     //If source to rotator is FB, which is the case with UI Mirror pipe,
     //we need to inform driver during playback, since FB does not use ION.
-    rot->setSrcFB(true);
+    rot->setSrcFB();
     return ret;
 }
 inline bool UIMirrorPipe::close() { return mUI.close(); }

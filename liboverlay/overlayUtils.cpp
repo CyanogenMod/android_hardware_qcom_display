@@ -177,11 +177,18 @@ int getMdpFormat(int format) {
     return -1;
 }
 
-bool isHDMIConnected () {
-    char value[PROPERTY_VALUE_MAX] = {0};
-    property_get("hw.hdmiON", value, "0");
-    int isHDMI = atoi(value);
-    return isHDMI ? true : false;
+//Set by client as HDMI/WFD
+void setExtType(const int& type) {
+    if(type != HDMI && type != WFD) {
+        ALOGE("%s: Unrecognized type %d", __func__, type);
+        return;
+    }
+    sExtType = type;
+}
+
+//Return External panel type set by client.
+int getExtType() {
+    return sExtType;
 }
 
 bool is3DTV() {

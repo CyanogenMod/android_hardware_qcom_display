@@ -50,6 +50,7 @@ public:
     virtual bool init() = 0;
     virtual bool close() = 0;
     virtual void setSource(const utils::Whf& wfh) = 0;
+    virtual void setFlags(const utils::eMdpFlags& flags) = 0;
     virtual void setTransform(const utils::eTransform& rot,
             const bool& rotUsed) = 0;
     virtual bool commit() = 0;
@@ -58,7 +59,7 @@ public:
     virtual void setEnable() = 0;
     virtual void setDisable() = 0;
     virtual void setRotations(uint32_t r) = 0;
-    virtual void setSrcFB(bool) = 0;
+    virtual void setSrcFB() = 0;
 
     virtual bool enabled() const = 0;
     virtual int getSessId() const = 0;
@@ -85,6 +86,8 @@ public:
     virtual bool close() = 0;
     /* set src */
     virtual void setSource(const utils::Whf& wfh) = 0;
+    /* set mdp flags, will use only stuff necessary for rotator */
+    virtual void setFlags(const utils::eMdpFlags& flags) = 0;
     /* Set rotation and calculate */
     virtual void setTransform(const utils::eTransform& rot,
             const bool& rotUsed) = 0;
@@ -98,7 +101,7 @@ public:
     /* set rotator flag*/
     virtual void setRotations(uint32_t r) = 0;
     /* Mark src as FB (non-ION) */
-    virtual void setSrcFB(bool) = 0;
+    virtual void setSrcFB() = 0;
     /* Retusn true if rotator enabled */
     virtual bool enabled() const = 0;
     /* returns rotator session id */
@@ -125,11 +128,12 @@ public:
     virtual bool init();
     virtual bool close();
     virtual void setSource(const utils::Whf& wfh);
+    virtual void setFlags(const utils::eMdpFlags& flags);
     virtual void setTransform(const utils::eTransform& rot,
             const bool& rotUsed);
     virtual bool commit();
     virtual void setRotations(uint32_t r);
-    virtual void setSrcFB(bool);
+    virtual void setSrcFB();
     virtual int getDstMemId() const;
     virtual uint32_t getDstOffset() const;
     virtual void setEnable();
@@ -150,6 +154,7 @@ public:
     virtual bool init();
     virtual bool close();
     virtual void setSource(const utils::Whf& wfh);
+    virtual void setFlags(const utils::eMdpFlags& flags);
     virtual void setTransform(const utils::eTransform& rot,
             const bool& rotUsed);
     virtual bool commit();
@@ -158,7 +163,7 @@ public:
     virtual void setEnable();
     virtual void setDisable();
     virtual bool enabled () const;
-    virtual void setSrcFB(bool);
+    virtual void setSrcFB();
     virtual int getSessId() const;
     virtual int getDstMemId() const;
     virtual uint32_t getDstOffset() const;
@@ -211,6 +216,7 @@ public:
     bool init();
     bool close();
     void setSource(const utils::Whf& whf);
+    virtual void setFlags(const utils::eMdpFlags& flags);
     void setTransform(const utils::eTransform& rot,
             const bool& rotUsed);
     bool commit();
@@ -218,7 +224,7 @@ public:
     void setEnable();
     void setDisable();
     void setRotations(uint32_t r);
-    void setSrcFB(bool);
+    void setSrcFB();
     bool enabled() const;
     int getSessId() const;
     int getDstMemId() const;
@@ -229,6 +235,8 @@ private:
     /* remap rot buffers */
     bool remap(uint32_t numbufs);
     bool open_i(uint32_t numbufs, uint32_t bufsz);
+    /* Deferred transform calculations */
+    void doTransform();
     /* reset underlying data, basically memset 0 */
     void reset();
 
@@ -236,6 +244,8 @@ private:
     msm_rotator_img_info mRotImgInfo;
     /* rot data */
     msm_rotator_data_info mRotDataInfo;
+    /* Orientation */
+    utils::eTransform mOrientation;
     /* rotator fd */
     OvFD mFd;
     /* Rotator memory manager */
@@ -274,6 +284,9 @@ inline bool Rotator::close() {
 inline void Rotator::setSource(const utils::Whf& whf) {
     mRot->setSource(whf);
 }
+inline void Rotator::setFlags(const utils::eMdpFlags& flags) {
+    mRot->setFlags(flags);
+}
 inline void Rotator::setTransform(const utils::eTransform& rot,
         const bool& rotUsed)
 {
@@ -285,7 +298,7 @@ inline bool Rotator::commit() {
 inline void Rotator::setEnable(){ mRot->setEnable(); }
 inline void Rotator::setDisable(){ mRot->setDisable(); }
 inline bool Rotator::enabled() const { return mRot->enabled(); }
-inline void Rotator::setSrcFB(bool mark) { mRot->setSrcFB(mark); }
+inline void Rotator::setSrcFB() { mRot->setSrcFB(); }
 inline int Rotator::getDstMemId() const {
     return mRot->getDstMemId();
 }
@@ -314,6 +327,7 @@ inline bool NullRotator::init() { return true; }
 inline bool NullRotator::close() { return true; }
 inline bool NullRotator::commit() { return true; }
 inline void NullRotator::setSource(const utils::Whf& wfh) {}
+inline void NullRotator::setFlags(const utils::eMdpFlags& flags) {}
 inline void NullRotator::setTransform(const utils::eTransform& rot, const bool&)
 {}
 inline void NullRotator::setRotations(uint32_t) {}
@@ -322,7 +336,7 @@ inline void NullRotator::setDisable() {}
 inline bool NullRotator::enabled() const { return false; }
 inline int NullRotator::getSessId() const { return -1; }
 inline bool NullRotator::queueBuffer(int fd, uint32_t offset) { return true; }
-inline void NullRotator::setSrcFB(bool) {}
+inline void NullRotator::setSrcFB() {}
 inline int NullRotator::getDstMemId() const { return -1; }
 inline uint32_t NullRotator::getDstOffset() const { return 0;}
 inline void NullRotator::dump() const {
@@ -344,11 +358,9 @@ inline uint32_t MdpRot::getDstOffset() const {
     return mRotDataInfo.dst.offset;
 }
 inline int MdpRot::getSessId() const { return mRotImgInfo.session_id; }
-inline void MdpRot::setSrcFB(bool set) {
-    if(set)
-        mRotDataInfo.src.flags |= MDP_MEMORY_ID_TYPE_FB;
+inline void MdpRot::setSrcFB() {
+    mRotDataInfo.src.flags |= MDP_MEMORY_ID_TYPE_FB;
 }
-
 
 } // overlay
 

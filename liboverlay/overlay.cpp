@@ -247,25 +247,15 @@ bool Overlay::setSource(const utils::PipeArgs args[utils::MAX_PIPES],
         case utils::OV_BYPASS_1_LAYER:
         case utils::OV_BYPASS_2_LAYER:
         case utils::OV_BYPASS_3_LAYER:
-            // no tweaking
             break;
         case utils::OV_3D_VIDEO_ON_3D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_TV:
-            margs[utils::CHANNEL_1].zorder = utils::ZORDER_1;
-            break;
+            //TODO set zorder for channel 1 as 1 in 3D pipe
         case utils::OV_2D_VIDEO_ON_PANEL_TV:
         case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            // If displaying on both, external VG pipe set to be no wait
-            margs[utils::CHANNEL_1].wait = utils::NO_WAIT;
             break;
         case utils::OV_2D_TRUE_UI_MIRROR:
-            // Set zorder, external VG pipe (video) gets 0, RGB pipe (UI) gets 1
-            margs[utils::CHANNEL_1].zorder = utils::ZORDER_0;
-            margs[utils::CHANNEL_2].zorder = utils::ZORDER_1;
-            // External VG (video) and RGB (UI) pipe set to be no wait
-            margs[utils::CHANNEL_0].wait = utils::WAIT;
-            margs[utils::CHANNEL_1].wait = utils::NO_WAIT;
-            margs[utils::CHANNEL_2].wait = utils::NO_WAIT;
+            // TODO Set zorder, external VG pipe (video) gets 0, RGB pipe (UI) gets 1
             break;
         default:
             OVASSERT(false, "%s Unknown state %d", __FUNCTION__, st);
