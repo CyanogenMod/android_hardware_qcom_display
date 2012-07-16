@@ -118,7 +118,7 @@ inline bool OvMem::open(uint32_t numbufs,
         uint32_t bufSz, int flags)
 {
     alloc_data data;
-    int allocFlags = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+    int allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP | GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
     int err = 0;
 
     OVASSERT(numbufs && bufSz, "numbufs=%d bufSz=%d", numbufs, bufSz);
