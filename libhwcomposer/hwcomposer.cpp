@@ -1753,9 +1753,9 @@ static int hwc_set(hwc_composer_device_t *dev,
             if(ctx->bypassState == BYPASS_OFF_PENDING)
               ctx->bypassState = BYPASS_OFF;
 #endif
-
-            CALC_FPS();
         }
+    } else {
+       CALC_FPS();
     }
 
 #ifdef COMPOSITION_BYPASS
