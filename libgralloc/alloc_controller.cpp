@@ -152,7 +152,7 @@ int IonController::allocate(alloc_data& data, int usage)
 
 IMemAlloc* IonController::getAllocator(int flags)
 {
-    IMemAlloc* memalloc;
+    IMemAlloc* memalloc = NULL;
     if (flags & private_handle_t::PRIV_FLAGS_USES_ION) {
         memalloc = mIonAlloc;
     } else {
