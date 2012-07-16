@@ -445,7 +445,7 @@ static int set_image( uint32 surfaceId, const struct copybit_image_t *rhs,
         info.height = rhs->h;
         info.format = rhs->format;
 
-        yuvPlaneInfo yuvInfo;
+        yuvPlaneInfo yuvInfo = {0};
         status = calculate_yuv_offset_and_stride(info, yuvInfo);
         if(status != COPYBIT_SUCCESS) {
             ALOGE("%s: calculate_yuv_offset_and_stride error", __FUNCTION__);
@@ -700,7 +700,7 @@ static void set_rects(struct copybit_context_t *ctx,
 /** copy the bits */
 static int msm_copybit(struct copybit_context_t *dev, blitlist *list, uint32 target)
 {
-    int objects;
+    unsigned int objects;
 
     for(objects = 0; objects < list->count; objects++) {
         list->blitObjects[objects].next = &(list->blitObjects[objects+1]);
