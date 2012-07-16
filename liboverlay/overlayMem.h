@@ -39,6 +39,12 @@
 #include "gralloc_priv.h"
 #include "overlayUtils.h"
 
+#ifdef NO_IOMMU
+#define HEAP_ID GRALLOC_USAGE_PRIVATE_MM_HEAP
+#else
+#define HEAP_ID GRALLOC_USAGE_PRIVATE_IOMMU_HEAP
+#endif
+
 namespace overlay {
 
 /*
@@ -117,7 +123,7 @@ inline bool OvMem::open(uint32_t numbufs,
         uint32_t bufSz, bool isSecure)
 {
     alloc_data data;
-    int allocFlags = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+    int allocFlags = HEAP_ID;
     if(isSecure) {
         allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP;
         allocFlags |= GRALLOC_USAGE_PROTECTED;
