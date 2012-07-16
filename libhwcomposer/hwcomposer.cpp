@@ -353,6 +353,26 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst, int hw_w, int hw_h)
                      crop_x, crop_y, crop_w, crop_h,dst_x, dst_y, dst_w, dst_h);
 }
 
+//If displayframe is out of screen bounds, calculates
+//valid displayFrame & source crop corresponding to it.
+static void correct_crop_rects(const framebuffer_device_t* fbDev,
+                        hwc_rect_t& sourceCrop, hwc_rect_t& displayFrame,
+                        int transform) {
+    if (!isValidDestination(fbDev,displayFrame)) {
+        if (transform & HWC_TRANSFORM_ROT_90) {
+            swap(sourceCrop.left,sourceCrop.top);
+            swap(sourceCrop.right,sourceCrop.bottom);
+            calculate_crop_rects(sourceCrop,displayFrame,
+                                    fbDev->width,fbDev->height);
+            swap(sourceCrop.left,sourceCrop.top);
+            swap(sourceCrop.right,sourceCrop.bottom);
+        } else {
+            calculate_crop_rects(sourceCrop,displayFrame,
+                    fbDev->width,fbDev->height);
+        }
+    }
+}
+
 #ifdef COMPOSITION_BYPASS
 /*
  * Configures pipe(s) for composition bypass
@@ -803,21 +823,6 @@ static int prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer, const int flag
 
         hwc_rect_t sourceCrop = layer->sourceCrop;
         hwc_rect_t displayFrame = layer->displayFrame;
-        if(!isValidDestination(hwcModule->fbDevice, layer->displayFrame)) {
-            if(layer->transform & HWC_TRANSFORM_ROT_90) {
-                swap(layer->sourceCrop.left,layer->sourceCrop.top);
-                swap(layer->sourceCrop.right,layer->sourceCrop.bottom);
-                calculate_crop_rects(layer->sourceCrop,layer->displayFrame,
-                                        hwcModule->fbDevice->width,
-                                        hwcModule->fbDevice->height);
-                swap(layer->sourceCrop.left,layer->sourceCrop.top);
-                swap(layer->sourceCrop.right,layer->sourceCrop.bottom);
-            } else {
-                calculate_crop_rects(layer->sourceCrop,layer->displayFrame,
-                                        hwcModule->fbDevice->width,
-                                        hwcModule->fbDevice->height);
-            }
-        }
 
         ret = ovLibObject->setCrop(sourceCrop.left, sourceCrop.top,
                                   (sourceCrop.right - sourceCrop.left),
@@ -1200,6 +1205,10 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
                 flags |= (1 == list->numHwLayers) ? DISABLE_FRAMEBUFFER_FETCH : 0;
                 int videoStarted = VIDEO_2D_OVERLAY_STARTED;
                 setVideoOverlayStatusInGralloc(ctx, videoStarted);
+                correct_crop_rects(hwcModule->fbDevice,
+                                        list->hwLayers[i].sourceCrop,
+                                        list->hwLayers[i].displayFrame,
+                                        list->hwLayers[i].transform);
 #ifdef USE_OVERLAY
 		if(prepareOverlay(ctx, &(list->hwLayers[i]), flags) == 0) {
 		      list->hwLayers[i].compositionType = HWC_USE_OVERLAY;
