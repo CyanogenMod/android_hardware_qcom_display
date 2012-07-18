@@ -430,6 +430,7 @@ int qcomuiClearRegion(Region region, EGLDisplay dpy, EGLSurface sur)
 
     if ((COMPOSITION_TYPE_MDP != sCompositionType) &&
         (COMPOSITION_TYPE_C2D != sCompositionType) &&
+        (COMPOSITION_TYPE_DYN != sCompositionType) &&
         (COMPOSITION_TYPE_CPU != sCompositionType)) {
         // For non CPU/C2D/MDP composition, return an error, so that SF can use
         // the GPU to draw the wormhole.
