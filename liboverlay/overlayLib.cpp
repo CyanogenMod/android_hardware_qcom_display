@@ -1289,7 +1289,6 @@ bool OverlayControlChannel::setOverlayInformation(const overlay_buffer_info& inf
     }
     mOVInfo.flags = 0;
     setInformationFromFlags(flags, mOVInfo);
-    mOVInfo.dpp.sharp_strength = 0;
     return true;
 }
 
@@ -1312,7 +1311,6 @@ void OverlayControlChannel::setInformationFromFlags(int flags, mdp_overlay& ov)
          mOVInfo.flags &= ~MDP_SECURE_OVERLAY_SESSION;
 
     //set the default sharpening settings
-    mOVInfo.flags |= MDP_SHARPENING;
 
     if (flags & DISABLE_FRAMEBUFFER_FETCH)
         mOVInfo.is_fg = 1;
@@ -2321,17 +2319,11 @@ bool OverlayControlChannel::setVisualParam(int8_t paramType, float paramValue)
             reportError("setVisualParam, overlay GET failed");
             return false;
         }
-        if (overlay.dpp.sharp_strength != value) {
-            mOVInfo.flags |= MDP_SHARPENING;
-            mOVInfo.dpp.sharp_strength = value;
-            setFlag = true;
-        }
         break;
     case RESET_ALL:
         //set all visual params to a default value
         //passed in from the app
         mOVInfo.flags |= MDP_SHARPENING;
-        mOVInfo.dpp.sharp_strength = value;
         setFlag = true;
         break;
     default:
