@@ -527,6 +527,9 @@ bool MdpRot::start(const utils::PipeArgs& args) {
     // either utils::getRotOutFmt(whf.format); or supplied fmt
     // utils::RotOutFmt<ROT_OUT_FMT_DEFAULT>::fmt;
     mRotImgInfo.dst.format = utils::RotOutFmt<ROT_OUT_FMT>::fmt(whf.format);
+#ifndef QCOM_ROTATOR_KERNEL_FORMATS
+    mRotImgInfo.dst.format = get_rot_output_format(whf.format);
+#endif
     mRotImgInfo.dst_x = 0;
     mRotImgInfo.dst_y = 0;
     mRotImgInfo.src_rect.x = 0;
