@@ -112,7 +112,7 @@ enum {
     HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED     = 0x7FA30C03,
 #endif
     HAL_PIXEL_FORMAT_YCbCr_420_SP           = 0x109,
-    HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO    = 0x10A,
+    HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO    = 0x7FA30C01,
     HAL_PIXEL_FORMAT_YCrCb_422_SP           = 0x10B,
     HAL_PIXEL_FORMAT_R_8                    = 0x10D,
     HAL_PIXEL_FORMAT_RG_88                  = 0x10E,
