@@ -25,11 +25,6 @@
 #define NO_SURFACEFLINGER_SWAPINTERVAL
 #define COLOR_FORMAT(x) (x & 0xFFF) // Max range for colorFormats is 0 - FFF
 
-enum hdmi_mirroring_state {
-    HDMI_NO_MIRRORING,
-    HDMI_UI_MIRRORING,
-};
-
 struct private_handle_t;
 
 enum {
@@ -54,21 +49,11 @@ struct private_module_t {
     float ydpi;
     float fps;
     uint32_t swapInterval;
-#if defined(__cplusplus) && defined(HDMI_DUAL_DISPLAY)
-    int orientation;
-    int videoOverlay; // VIDEO_OVERLAY - 2D or 3D
-    int secureVideoOverlay; // VideoOverlay is secure
     uint32_t currentOffset;
-    int enableHDMIOutput; // holds the type of external display
-    bool trueMirrorSupport;
-    bool exitHDMIUILoop;
-    float actionsafeWidthRatio;
-    float actionsafeHeightRatio;
-    bool hdmiStateChanged;
-    hdmi_mirroring_state hdmiMirroringState;
-    pthread_mutex_t overlayLock;
-    pthread_cond_t overlayPost;
-#endif
+    bool fbPostDone;
+    pthread_mutex_t fbPostLock;
+    //Condition to inform HWC that fb_post called
+    pthread_cond_t fbPostCond;
 };
 
 
