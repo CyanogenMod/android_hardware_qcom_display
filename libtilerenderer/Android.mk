@@ -15,7 +15,7 @@ LOCAL_C_INCLUDES += \
 	external/skia/src/ports \
 	external/skia/include/utils \
 	hardware/libhardware/include/hardware \
-	frameworks/base/opengl/include/GLES2
+	frameworks/native/opengl/include/GLES2
 
 LOCAL_SRC_FILES := 	\
 	tilerenderer.cpp
