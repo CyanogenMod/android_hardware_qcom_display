@@ -320,9 +320,11 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_t *layer,
     // TODO : alpha not defined , fix this
   //  copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA,
     //             (layer->blending == HWC_BLENDING_NONE) ? -1 : layer->alpha);
+#ifdef COPYBIT_QSD8K
     copybit->set_parameter(copybit, COPYBIT_PREMULTIPLIED_ALPHA,
                       (layer->blending == HWC_BLENDING_PREMULT)?
                                              COPYBIT_ENABLE : COPYBIT_DISABLE);
+#endif
     copybit->set_parameter(copybit, COPYBIT_DITHER,
                              (dst.format == HAL_PIXEL_FORMAT_RGB_565)?
                                              COPYBIT_ENABLE : COPYBIT_DISABLE);
