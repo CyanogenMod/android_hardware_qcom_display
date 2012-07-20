@@ -7,7 +7,7 @@ LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)
 LOCAL_SHARED_LIBRARIES := libutils libcutils libGLESv2 libhwui
 
 LOCAL_C_INCLUDES += \
-	frameworks/base/include/utils \
+	frameworks/native/include/utils \
 	frameworks/base/libs/hwui \
 	external/skia/include/core \
 	external/skia/include/effects \
@@ -15,7 +15,7 @@ LOCAL_C_INCLUDES += \
 	external/skia/src/ports \
 	external/skia/include/utils \
 	hardware/libhardware/include/hardware \
-	frameworks/base/opengl/include/GLES2
+	frameworks/native/opengl/include/GLES2
 
 LOCAL_SRC_FILES := 	\
 	tilerenderer.cpp
