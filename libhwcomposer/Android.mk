@@ -9,6 +9,6 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL liboverlay libgenlock \
                                  libqdutils
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"hwcomposer\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
-LOCAL_SRC_FILES               :=  hwc.cpp hwc_overlay.cpp hwc_utils.cpp
+LOCAL_SRC_FILES               :=  hwc.cpp hwc_video.cpp hwc_utils.cpp
 
 include $(BUILD_SHARED_LIBRARY)

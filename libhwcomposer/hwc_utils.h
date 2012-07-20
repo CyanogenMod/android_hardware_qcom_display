@@ -47,10 +47,12 @@ enum external_display_type {
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_t const* l);
 void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list);
-void handleYUV(hwc_context_t *ctx, hwc_layer_t *layer);
 void initContext(hwc_context_t *ctx);
 void closeContext(hwc_context_t *ctx);
 void openFramebufferDevice(hwc_context_t *ctx);
+//Crops source buffer against destination and FB boundaries
+void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
+        const int fbWidth, const int fbHeight);
 
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_t* l) {
@@ -67,27 +69,7 @@ static inline bool isBufferLocked(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags));
 }
 
-// -----------------------------------------------------------------------------
-// Overlay specific functions - inline or implemented in hwc_overlay.cpp
-bool prepareOverlay(hwc_context_t *ctx, hwc_layer_t *layer);
-//XXX: Refine draw functions
-bool drawLayerUsingOverlay(hwc_context_t *ctx, hwc_layer_t *layer);
-//XXX: Refine
-void cleanOverlays(hwc_context_t *ctx );
-void setOverlayState(hwc_context_t* ctx, ovutils::eOverlayState state);
-
-// -----------------------------------------------------------------------------
-// Copybit specific functions - inline or implemented in hwc_copybit.cpp
-
-
-
-// -----------------------------------------------------------------------------
-// HDMI specific functions - inline or implemented in hwc_hdmi.cpp
-
-
-
-} //qhwc namespace
-
+}; //qhwc namespace
 
 
 // -----------------------------------------------------------------------------
@@ -95,13 +77,11 @@ void setOverlayState(hwc_context_t* ctx, ovutils::eOverlayState state);
 // This structure contains overall state
 struct hwc_context_t {
     hwc_composer_device_t device;
-    // Layer variables
-    int yuvBufferCount;
     int hdmiEnabled;
     int numHwLayers;
     int mdpVersion;
     bool hasOverlay;
-    bool skipComposition;
+    int overlayInUse;
 
     //Framebuffer device
     framebuffer_device_t *fbDev;
@@ -112,8 +92,5 @@ struct hwc_context_t {
     //QueuedBufferStore to hold buffers for overlay
     qhwc::QueuedBufferStore *qbuf;
 };
-
-
-
 
 #endif //HWC_UTILS_H

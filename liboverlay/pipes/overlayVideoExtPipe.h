@@ -27,8 +27,8 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef OVERLAY_HDMI_PIPE_H
-#define OVERLAY_HDMI_PIPE_H
+#ifndef OVERLAY_VIDEO_EXT_PIPE_H
+#define OVERLAY_VIDEO_EXT_PIPE_H
 
 #include "overlayGenPipe.h"
 #include "overlayUtils.h"
@@ -41,88 +41,79 @@ namespace overlay {
 /* A specific impl of GenericPipe
 * Whenever needed to have a pass through - we do it.
 * If there is a special need for a different behavior - do it here */
-class HdmiPipe : utils::NoCopy {
+class VideoExtPipe : utils::NoCopy {
 public:
     /* Please look at overlayGenPipe.h for info */
-    explicit HdmiPipe();
-    ~HdmiPipe();
-    bool open(RotatorBase* rot);
+    explicit VideoExtPipe();
+    ~VideoExtPipe();
+    bool init(RotatorBase* rot);
     bool close();
     bool commit();
-    void setId(int id);
-    void setMemoryId(int id);
-    bool queueBuffer(uint32_t offset);
-    bool dequeueBuffer(void*& buf);
+    bool queueBuffer(int fd, uint32_t offset);
     bool waitForVsync();
     bool setCrop(const utils::Dim& dim);
-    bool start(const utils::PipeArgs& args);
     bool setPosition(const utils::Dim& dim);
-    bool setParameter(const utils::Params& param);
+    bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    const utils::PipeArgs& getArgs() const;
     utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
-    overlay::GenericPipe<ovutils::EXTERNAL> mHdmi;
+    overlay::GenericPipe<ovutils::EXTERNAL> mVideoExt;
 };
 
 //------------------Inlines -----------------------------
 
-inline HdmiPipe::HdmiPipe() {}
-inline HdmiPipe::~HdmiPipe() { close(); }
-inline bool HdmiPipe::open(RotatorBase* rot) {
-    ALOGE_IF(DEBUG_OVERLAY, "HdmiPipe open");
-    return mHdmi.open(rot);
+inline VideoExtPipe::VideoExtPipe() {}
+inline VideoExtPipe::~VideoExtPipe() { close(); }
+inline bool VideoExtPipe::init(RotatorBase* rot) {
+    ALOGE_IF(DEBUG_OVERLAY, "VideoExtPipe init");
+    return mVideoExt.init(rot);
 }
-inline bool HdmiPipe::close() { return mHdmi.close(); }
-inline bool HdmiPipe::commit() { return mHdmi.commit(); }
-inline void HdmiPipe::setId(int id) { mHdmi.setId(id); }
-inline void HdmiPipe::setMemoryId(int id) { mHdmi.setMemoryId(id); }
-inline bool HdmiPipe::queueBuffer(uint32_t offset) {
-    return mHdmi.queueBuffer(offset); }
-inline bool HdmiPipe::dequeueBuffer(void*& buf) {
-    return mHdmi.dequeueBuffer(buf); }
-inline bool HdmiPipe::waitForVsync() {
-    return mHdmi.waitForVsync(); }
-inline bool HdmiPipe::setCrop(const utils::Dim& dim) {
-    return mHdmi.setCrop(dim); }
-inline bool HdmiPipe::start(const utils::PipeArgs& args) {
-    return mHdmi.start(args); }
-inline bool HdmiPipe::setPosition(const utils::Dim& dim)
+inline bool VideoExtPipe::close() { return mVideoExt.close(); }
+inline bool VideoExtPipe::commit() { return mVideoExt.commit(); }
+inline bool VideoExtPipe::queueBuffer(int fd, uint32_t offset) {
+    return mVideoExt.queueBuffer(fd, offset);
+}
+inline bool VideoExtPipe::waitForVsync() {
+    return mVideoExt.waitForVsync();
+}
+inline bool VideoExtPipe::setCrop(const utils::Dim& dim) {
+    return mVideoExt.setCrop(dim);
+}
+inline bool VideoExtPipe::setPosition(const utils::Dim& dim)
 {
     utils::Dim d;
     // Need to change dim to aspect ratio
     if (utils::FrameBufferInfo::getInstance()->supportTrueMirroring()) {
         // Use dim info to calculate aspect ratio for true UI mirroring
-        d = mHdmi.getAspectRatio(dim);
+        d = mVideoExt.getAspectRatio(dim);
     } else {
         // Use cached crop data to get aspect ratio
-        utils::Dim crop = mHdmi.getCrop();
+        utils::Dim crop = mVideoExt.getCrop();
         utils::Whf whf(crop.w, crop.h, 0);
-        d = mHdmi.getAspectRatio(whf);
+        d = mVideoExt.getAspectRatio(whf);
     }
-    ALOGE_IF(DEBUG_OVERLAY, "Calculated aspect ratio for HDMI: x=%d, y=%d, w=%d, h=%d, o=%d",
+    ALOGE_IF(DEBUG_OVERLAY, "Calculated aspect ratio for EXT: x=%d, y=%d, w=%d,"
+            "h=%d, o=%d",
             d.x, d.y, d.w, d.h, d.o);
-    return mHdmi.setPosition(d);
+    return mVideoExt.setPosition(d);
 }
-inline bool HdmiPipe::setParameter(const utils::Params& param) {
-    return mHdmi.setParameter(param); }
-inline bool HdmiPipe::setSource(const utils::PipeArgs& args) {
+inline bool VideoExtPipe::setTransform(const utils::eTransform& param) {
+    return mVideoExt.setTransform(param);
+}
+inline bool VideoExtPipe::setSource(const utils::PipeArgs& args) {
     utils::PipeArgs arg(args);
-    return mHdmi.setSource(arg);
+    return mVideoExt.setSource(arg);
 }
-inline const utils::PipeArgs& HdmiPipe::getArgs() const {
-    return mHdmi.getArgs();
+inline utils::eOverlayPipeType VideoExtPipe::getOvPipeType() const {
+    return utils::OV_PIPE_TYPE_VIDEO_EXT;
 }
-inline utils::eOverlayPipeType HdmiPipe::getOvPipeType() const {
-    return utils::OV_PIPE_TYPE_HDMI;
-}
-inline void HdmiPipe::dump() const {
-    ALOGE("HDMI Pipe");
-    mHdmi.dump();
+inline void VideoExtPipe::dump() const {
+    ALOGE("Video Ext Pipe");
+    mVideoExt.dump();
 }
 
 
 } // overlay
 
-#endif // OVERLAY_HDMI_PIPE_H
+#endif // OVERLAY_VIDEO_EXT_PIPE_H

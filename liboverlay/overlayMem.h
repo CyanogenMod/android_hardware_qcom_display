@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -54,7 +54,7 @@ public:
 
     /* Use libgralloc to retrieve fd, base addr, alloc type */
     bool open(uint32_t numbufs,
-            uint32_t bufSz, int flags = O_RDWR);
+            uint32_t bufSz, bool isSecure);
 
     /* close fd. assign base address to invalid*/
     bool close();
@@ -115,14 +115,16 @@ inline OvMem::OvMem() {
 inline OvMem::~OvMem() { }
 
 inline bool OvMem::open(uint32_t numbufs,
-        uint32_t bufSz, int flags)
+        uint32_t bufSz, bool isSecure)
 {
     alloc_data data;
-    //XXX: secure buffers and IOMMU heap
-    int allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP |
-                     GRALLOC_USAGE_PRIVATE_DO_NOT_MAP;
-    int err = 0;
+    int allocFlags = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+    if(isSecure) {
+        allocFlags |= GRALLOC_USAGE_PRIVATE_MM_HEAP;
+        allocFlags |= GRALLOC_USAGE_PRIVATE_DO_NOT_MAP;
+    }
 
+    int err = 0;
     OVASSERT(numbufs && bufSz, "numbufs=%d bufSz=%d", numbufs, bufSz);
 
     mBufSz = bufSz;
@@ -138,6 +140,7 @@ inline bool OvMem::open(uint32_t numbufs,
     err = mAlloc->allocate(data, allocFlags, 0);
     if (err != 0) {
         ALOGE("OvMem: error allocating memory");
+        return false;
     }
 
     mFd = data.fd;
@@ -159,6 +162,7 @@ inline bool OvMem::close()
     ret = memalloc->free_buffer(mBaseAddr, mBufSz * mNumBuffers, 0, mFd);
     if (ret != 0) {
         ALOGE("OvMem: error freeing buffer");
+        return false;
     }
 
     mFd = -1;
@@ -166,7 +170,7 @@ inline bool OvMem::close()
     mAllocType = 0;
     mBufSz = 0;
     mNumBuffers = 0;
-    return ret;
+    return true;
 }
 
 inline bool OvMem::valid() const
@@ -196,8 +200,9 @@ inline uint32_t OvMem::numBufs() const
 
 inline void OvMem::dump() const
 {
-    ALOGE("%s: fd=%d addr=%p type=%d bufsz=%u",
-          __FUNCTION__, mFd, mBaseAddr, mAllocType, mBufSz);
+    ALOGE("== Dump OvMem start ==");
+    ALOGE("fd=%d addr=%p type=%d bufsz=%u", mFd, mBaseAddr, mAllocType, mBufSz);
+    ALOGE("== Dump OvMem end ==");
 }
 
 } // overlay

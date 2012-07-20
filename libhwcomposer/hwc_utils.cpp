@@ -17,6 +17,7 @@
 
 #include "hwc_utils.h"
 #include "mdp_version.h"
+#include "hwc_video.h"
 
 namespace qhwc {
 void initContext(hwc_context_t *ctx)
@@ -37,6 +38,7 @@ void closeContext(hwc_context_t *ctx)
         delete ctx->mOverlay;
         ctx->mOverlay = NULL;
     }
+
     if(ctx->fbDev) {
         framebuffer_close(ctx->fbDev);
         ctx->fbDev = NULL;
@@ -73,28 +75,90 @@ void dumpLayer(hwc_layer_t const* l)
 
 void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
 {
-    int yuvBufCount = 0;
-    int layersNotUpdatingCount = 0;
-    for (size_t i=0 ; i<list->numHwLayers; i++) {
-        private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
+    //Video specific stats
+    int yuvCount = 0;
+    int yuvLayerIndex = -1;
+    bool isYuvLayerSkip = false;
+
+    for (size_t i = 0; i < list->numHwLayers; i++) {
+        private_handle_t *hnd =
+            (private_handle_t *)list->hwLayers[i].handle;
+
         if (isYuvBuffer(hnd)) {
-            yuvBufCount++;
+            yuvCount++;
+            yuvLayerIndex = i;
+            //Animating
+            if (isSkipLayer(&list->hwLayers[i])) {
+                isYuvLayerSkip = true;
+            }
+        } else if (isSkipLayer(&list->hwLayers[i])) { //Popups
+            //If video layer is below a skip layer
+            if(yuvLayerIndex != -1 && yuvLayerIndex < (ssize_t)i) {
+                isYuvLayerSkip = true;
+            }
         }
     }
-    // Number of video/camera layers drawable with overlay
-    ctx->yuvBufferCount = yuvBufCount;
+
+    VideoOverlay::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip);
+
     ctx->numHwLayers = list->numHwLayers;
     return;
 }
 
-void handleYUV(hwc_context_t *ctx, hwc_layer_t *layer)
-{
-    private_handle_t *hnd =
-                   (private_handle_t *)layer->handle;
-    //XXX: Handle targets not using overlay
-    if(prepareOverlay(ctx, layer)) {
-        layer->compositionType = HWC_OVERLAY;
-        layer->hints |= HWC_HINT_CLEAR_FB;
+//Crops source buffer against destination and FB boundaries
+void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
+        const int fbWidth, const int fbHeight) {
+
+    int& crop_x = crop.left;
+    int& crop_y = crop.top;
+    int& crop_r = crop.right;
+    int& crop_b = crop.bottom;
+    int crop_w = crop.right - crop.left;
+    int crop_h = crop.bottom - crop.top;
+
+    int& dst_x = dst.left;
+    int& dst_y = dst.top;
+    int& dst_r = dst.right;
+    int& dst_b = dst.bottom;
+    int dst_w = dst.right - dst.left;
+    int dst_h = dst.bottom - dst.top;
+
+    if(dst_x < 0) {
+        float scale_x =  crop_w * 1.0f / dst_w;
+        float diff_factor = (scale_x * abs(dst_x));
+        crop_x = crop_x + (int)diff_factor;
+        crop_w = crop_r - crop_x;
+
+        dst_x = 0;
+        dst_w = dst_r - dst_x;;
+    }
+    if(dst_r > fbWidth) {
+        float scale_x = crop_w * 1.0f / dst_w;
+        float diff_factor = scale_x * (dst_r - fbWidth);
+        crop_r = crop_r - diff_factor;
+        crop_w = crop_r - crop_x;
+
+        dst_r = fbWidth;
+        dst_w = dst_r - dst_x;
+    }
+    if(dst_y < 0) {
+        float scale_y = crop_h * 1.0f / dst_h;
+        float diff_factor = scale_y * abs(dst_y);
+        crop_y = crop_y + diff_factor;
+        crop_h = crop_b - crop_y;
+
+        dst_y = 0;
+        dst_h = dst_b - dst_y;
+    }
+    if(dst_b > fbHeight) {
+        float scale_y = crop_h * 1.0f / dst_h;
+        float diff_factor = scale_y * (dst_b - fbHeight);
+        crop_b = crop_b - diff_factor;
+        crop_h = crop_b - crop_y;
+
+        dst_b = fbHeight;
+        dst_h = dst_b - dst_y;
     }
 }
+
 };//namespace
