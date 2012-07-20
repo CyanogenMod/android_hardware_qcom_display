@@ -11,8 +11,7 @@ LOCAL_SRC_FILES := \
       overlayCtrl.cpp \
       overlayUtils.cpp \
       overlayMdp.cpp \
-      overlayRotator.cpp \
-      overlayTransitions.cpp
+      overlayRotator.cpp
 
 LOCAL_CFLAGS:= -DLOG_TAG=\"overlay2\"
 LOCAL_MODULE := liboverlay

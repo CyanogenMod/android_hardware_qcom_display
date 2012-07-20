@@ -39,11 +39,15 @@ bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
        ALOGD_IF(VIDEO_DEBUG,"%s, this hw doesnt support overlay", __FUNCTION__);
        return false;
     }
+    if(sYuvLayerIndex == -1) {
+        return false;
+    }
     chooseState(ctx);
     //if the state chosen above is CLOSED, skip this block.
     if(sState != ovutils::OV_CLOSED) {
         if(configure(ctx, &list->hwLayers[sYuvLayerIndex])) {
             markFlags(&list->hwLayers[sYuvLayerIndex]);
+            sIsModeOn = true;
         }
     }
 
@@ -65,8 +69,7 @@ void VideoOverlay::chooseState(hwc_context_t *ctx) {
     if(sYuvCount == 1) {
         //Skip on primary, display on ext.
         if(sIsLayerSkip && ctx->mExtDisplay->getExternalDisplay()) {
-            //TODO
-            //VIDEO_ON_TV_ONLY
+            newState = ovutils::OV_2D_VIDEO_ON_TV;
         } else if(sIsLayerSkip) { //skip on primary, no ext
             newState = ovutils::OV_CLOSED;
         } else if(ctx->mExtDisplay->getExternalDisplay()) {
@@ -88,110 +91,169 @@ void VideoOverlay::markFlags(hwc_layer_t *layer) {
             layer->compositionType = HWC_OVERLAY;
             layer->hints |= HWC_HINT_CLEAR_FB;
             break;
-        //TODO
-        //case ovutils::OV_2D_VIDEO_ON_TV:
-            //just break, dont update flags.
+        case ovutils::OV_2D_VIDEO_ON_TV:
+            break; //dont update flags.
         default:
             break;
     }
 }
 
-bool VideoOverlay::configure(hwc_context_t *ctx, hwc_layer_t *layer)
-{
-    if (LIKELY(ctx->mOverlay)) {
+/* Helpers */
+bool configPrimVid(hwc_context_t *ctx, hwc_layer_t *layer) {
+    overlay::Overlay& ov = *(ctx->mOverlay);
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
 
-        overlay::Overlay& ov = *(ctx->mOverlay);
-        // Set overlay state
-        ov.setState(sState);
+    ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_FLAGS_NONE;
+    if (hnd->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
+    }
 
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
+    ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
+    if (ctx->numHwLayers == 1) {
+        isFgFlag = ovutils::IS_FG_SET;
+    }
 
-        //TODO change this based on state.
-        ovutils::eDest dest = ovutils::OV_PIPE_ALL;
+    ovutils::PipeArgs parg(mdpFlags,
+            info,
+            ovutils::ZORDER_0,
+            isFgFlag,
+            ovutils::ROT_FLAG_DISABLED);
+    ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
+    ov.setSource(pargs, ovutils::OV_PIPE0);
 
-        ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_FLAGS_NONE;
-        if (hnd->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
-            ovutils::setMdpFlags(mdpFlags,
-                                 ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
-        }
+    hwc_rect_t sourceCrop = layer->sourceCrop;
+    // x,y,w,h
+    ovutils::Dim dcrop(sourceCrop.left, sourceCrop.top,
+            sourceCrop.right - sourceCrop.left,
+            sourceCrop.bottom - sourceCrop.top);
 
-        ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
-        if (ctx->numHwLayers == 1) {
-            isFgFlag = ovutils::IS_FG_SET;
-        }
+    ovutils::Dim dpos;
+    hwc_rect_t displayFrame = layer->displayFrame;
+    dpos.x = displayFrame.left;
+    dpos.y = displayFrame.top;
+    dpos.w = (displayFrame.right - displayFrame.left);
+    dpos.h = (displayFrame.bottom - displayFrame.top);
 
-        ovutils::PipeArgs parg(mdpFlags,
-                               info,
-                               ovutils::ZORDER_0,
-                               isFgFlag,
-                               ovutils::ROT_FLAG_DISABLED);
-        ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
-        ov.setSource(pargs, dest);
-
-        hwc_rect_t sourceCrop = layer->sourceCrop;
-        // x,y,w,h
-        ovutils::Dim dcrop(sourceCrop.left, sourceCrop.top,
-                           sourceCrop.right - sourceCrop.left,
-                           sourceCrop.bottom - sourceCrop.top);
-        //Only for External
-        ov.setCrop(dcrop, ovutils::OV_PIPE1);
-
-        // FIXME: Use source orientation for TV when source is portrait
-        //Only for External
-        ov.setTransform(0, dest);
-
-        ovutils::Dim dpos;
-        hwc_rect_t displayFrame = layer->displayFrame;
-        dpos.x = displayFrame.left;
-        dpos.y = displayFrame.top;
-        dpos.w = (displayFrame.right - displayFrame.left);
-        dpos.h = (displayFrame.bottom - displayFrame.top);
-
-        //Only for External
-        ov.setPosition(dpos, ovutils::OV_PIPE1);
-
-        //Calculate the rect for primary based on whether the supplied position
-        //is within or outside bounds.
-        const int fbWidth =
+    //Calculate the rect for primary based on whether the supplied position
+    //is within or outside bounds.
+    const int fbWidth =
             ovutils::FrameBufferInfo::getInstance()->getWidth();
-        const int fbHeight =
+    const int fbHeight =
             ovutils::FrameBufferInfo::getInstance()->getHeight();
 
-        if( displayFrame.left < 0 ||
+    if( displayFrame.left < 0 ||
             displayFrame.top < 0 ||
             displayFrame.right > fbWidth ||
             displayFrame.bottom > fbHeight) {
 
-            calculate_crop_rects(sourceCrop, displayFrame, fbWidth, fbHeight);
+        calculate_crop_rects(sourceCrop, displayFrame, fbWidth, fbHeight);
 
-            //Update calculated width and height
-            dcrop.w = sourceCrop.right - sourceCrop.left;
-            dcrop.h = sourceCrop.bottom - sourceCrop.top;
+        //Update calculated width and height
+        dcrop.w = sourceCrop.right - sourceCrop.left;
+        dcrop.h = sourceCrop.bottom - sourceCrop.top;
 
-            dpos.w = displayFrame.right - displayFrame.left;
-            dpos.h = displayFrame.bottom - displayFrame.top;
-        }
-
-        //Only for Primary
-        ov.setCrop(dcrop, ovutils::OV_PIPE0);
-
-        int transform = layer->transform & FINAL_TRANSFORM_MASK;
-        ovutils::eTransform orient =
-            static_cast<ovutils::eTransform>(transform);
-        ov.setTransform(orient, ovutils::OV_PIPE0);
-
-        ov.setPosition(dpos, ovutils::OV_PIPE0);
-
-        //Both prim and external
-        if (!ov.commit(dest)) {
-            ALOGE("%s: commit fails", __FUNCTION__);
-            return false;
-        }
-
-        sIsModeOn = true;
+        dpos.w = displayFrame.right - displayFrame.left;
+        dpos.h = displayFrame.bottom - displayFrame.top;
     }
-    return sIsModeOn;
+
+    //Only for Primary
+    ov.setCrop(dcrop, ovutils::OV_PIPE0);
+
+    int transform = layer->transform & FINAL_TRANSFORM_MASK;
+    ovutils::eTransform orient =
+            static_cast<ovutils::eTransform>(transform);
+    ov.setTransform(orient, ovutils::OV_PIPE0);
+
+    ov.setPosition(dpos, ovutils::OV_PIPE0);
+
+    if (!ov.commit(ovutils::OV_PIPE0)) {
+        ALOGE("%s: commit fails", __FUNCTION__);
+        return false;
+    }
+    return true;
+}
+
+bool configExtVid(hwc_context_t *ctx, hwc_layer_t *layer) {
+    overlay::Overlay& ov = *(ctx->mOverlay);
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
+
+    ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_FLAGS_NONE;
+    if (hnd->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
+    }
+
+    ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
+    if (ctx->numHwLayers == 1) {
+        isFgFlag = ovutils::IS_FG_SET;
+    }
+
+    ovutils::PipeArgs parg(mdpFlags,
+            info,
+            ovutils::ZORDER_0,
+            isFgFlag,
+            ovutils::ROT_FLAG_DISABLED);
+    ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
+    ov.setSource(pargs, ovutils::OV_PIPE1);
+
+    hwc_rect_t sourceCrop = layer->sourceCrop;
+    // x,y,w,h
+    ovutils::Dim dcrop(sourceCrop.left, sourceCrop.top,
+            sourceCrop.right - sourceCrop.left,
+            sourceCrop.bottom - sourceCrop.top);
+    //Only for External
+    ov.setCrop(dcrop, ovutils::OV_PIPE1);
+
+    // FIXME: Use source orientation for TV when source is portrait
+    //Only for External
+    ov.setTransform(0, ovutils::OV_PIPE1);
+
+    ovutils::Dim dpos;
+    hwc_rect_t displayFrame = layer->displayFrame;
+    dpos.x = displayFrame.left;
+    dpos.y = displayFrame.top;
+    dpos.w = (displayFrame.right - displayFrame.left);
+    dpos.h = (displayFrame.bottom - displayFrame.top);
+
+    //Only for External
+    ov.setPosition(dpos, ovutils::OV_PIPE1);
+
+    if (!ov.commit(ovutils::OV_PIPE1)) {
+        ALOGE("%s: commit fails", __FUNCTION__);
+        return false;
+    }
+    return true;
+}
+
+bool VideoOverlay::configure(hwc_context_t *ctx, hwc_layer_t *yuvLayer)
+{
+    bool ret = true;
+    if (LIKELY(ctx->mOverlay)) {
+        overlay::Overlay& ov = *(ctx->mOverlay);
+        // Set overlay state
+        ov.setState(sState);
+        switch(sState) {
+            case ovutils::OV_2D_VIDEO_ON_PANEL:
+                ret &= configPrimVid(ctx, yuvLayer);
+                break;
+            case ovutils::OV_2D_VIDEO_ON_PANEL_TV:
+                ret &= configExtVid(ctx, yuvLayer);
+                ret &= configPrimVid(ctx, yuvLayer);
+                break;
+            case ovutils::OV_2D_VIDEO_ON_TV:
+                ret &= configExtVid(ctx, yuvLayer);
+                break;
+            default:
+                return false;
+        }
+    } else {
+        //Ov null
+        return false;
+    }
+    return ret;
 }
 
 bool VideoOverlay::draw(hwc_context_t *ctx, hwc_layer_list_t *list)
@@ -211,37 +273,47 @@ bool VideoOverlay::draw(hwc_context_t *ctx, hwc_layer_list_t *list)
 
     switch (state) {
         case ovutils::OV_2D_VIDEO_ON_PANEL_TV:
-        case ovutils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
             // Play external
             if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE1)) {
                 ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
                 ret = false;
             }
-
             // Play primary
             if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE0)) {
                 ALOGE("%s: queueBuffer failed for primary", __FUNCTION__);
                 ret = false;
             }
-
             // Wait for external vsync to be done
             if (!ov.waitForVsync(ovutils::OV_PIPE1)) {
                 ALOGE("%s: waitForVsync failed for external", __FUNCTION__);
                 ret = false;
             }
             break;
-        default:
-            // In most cases, displaying only to one (primary or external)
-            // so use OV_PIPE_ALL since overlay will ignore NullPipes
-            if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE_ALL)) {
-                ALOGE("%s: queueBuffer failed", __FUNCTION__);
+        case ovutils::OV_2D_VIDEO_ON_PANEL:
+            // Play primary
+            if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE0)) {
+                ALOGE("%s: queueBuffer failed for primary", __FUNCTION__);
                 ret = false;
             }
+            break;
+        case ovutils::OV_2D_VIDEO_ON_TV:
+            // Play external
+            if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE1)) {
+                ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
+                ret = false;
+            }
+            // Wait for external vsync to be done
+            if (!ov.waitForVsync(ovutils::OV_PIPE1)) {
+                ALOGE("%s: waitForVsync failed for external", __FUNCTION__);
+                ret = false;
+            }
+        default:
+            ALOGE("%s Unused state %s", __FUNCTION__,
+                    ovutils::getStateString(state));
             break;
     }
 
     return ret;
 }
-
 
 }; //namespace qhwc
