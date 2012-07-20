@@ -36,13 +36,7 @@
 struct hwc_context_t;
 namespace qhwc {
 
-enum external_display_type {
-    EXT_TYPE_NONE,
-    EXT_TYPE_HDMI,
-    EXT_TYPE_WIFI
-};
-
-
+class ExtDisplayObserver;
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_t const* l);
@@ -77,7 +71,6 @@ static inline bool isBufferLocked(const private_handle_t* hnd) {
 // This structure contains overall state
 struct hwc_context_t {
     hwc_composer_device_t device;
-    int hdmiEnabled;
     int numHwLayers;
     int mdpVersion;
     bool hasOverlay;
@@ -91,6 +84,9 @@ struct hwc_context_t {
 
     //QueuedBufferStore to hold buffers for overlay
     qhwc::QueuedBufferStore *qbuf;
+
+    // External display related information
+    qhwc::ExtDisplayObserver*mExtDisplayObserver;
 };
 
 #endif //HWC_UTILS_H
