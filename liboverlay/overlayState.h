@@ -46,16 +46,14 @@ namespace overlay {
 
 class OverlayState : utils::NoCopy {
 public:
-    /**/
+    /*ctor*/
     explicit OverlayState();
 
-    /**/
+    /*dtor*/
     ~OverlayState();
 
     /* return current state */
     utils::eOverlayState state() const;
-
-    /* Overlay Event */
 
     /* Hard reset to a new state. If the state is the same
      * as the current one, it would be a no-op */
@@ -68,54 +66,31 @@ public:
     OverlayImplBase* handleEvent(utils::eOverlayState s,
             OverlayImplBase* ov);
 
-    /* Transitions from XXX to XXX */
-    OverlayImplBase* handle_closed(utils::eOverlayState s);
-    OverlayImplBase* handle_2D_2DPanel(utils::eOverlayState s,
-            OverlayImplBase* ov);
-    OverlayImplBase* handle_2D_2DTV(utils::eOverlayState s,
-            OverlayImplBase* ov);
-    OverlayImplBase* handle_3D_2DPanel(utils::eOverlayState s,
-            OverlayImplBase* ov);
-    OverlayImplBase* handle_3D_3DPanel(utils::eOverlayState s,
-            OverlayImplBase* ov);
-    OverlayImplBase* handle_3D_3DTV(utils::eOverlayState s,
-            OverlayImplBase* ov);
-    OverlayImplBase* handle_3D_2DTV(utils::eOverlayState s,
-            OverlayImplBase* ov);
-    OverlayImplBase* handle_UI_Mirror(utils::eOverlayState s,
-            OverlayImplBase* ov);
-    OverlayImplBase* handle_2D_trueUI_Mirror(utils::eOverlayState s,
-            OverlayImplBase* ov);
-    OverlayImplBase* handle_bypass(utils::eOverlayState s,
-            OverlayImplBase* ov);
-
-    /* Transition from any state to 2D video on 2D panel */
-    OverlayImplBase* handle_xxx_to_2D_2DPanel(OverlayImplBase* ov);
-
-    /* Transition from any state to 2D video on 2D panel and 2D TV */
-    OverlayImplBase* handle_xxx_to_2D_2DTV(OverlayImplBase* ov);
-
-    /* Transition from any state to 3D video on 2D panel */
-    OverlayImplBase* handle_xxx_to_3D_2DPanel(OverlayImplBase* ov);
-
-    /* Transition from any state to 3D video on 2D panel and 2D TV */
-    OverlayImplBase* handle_xxx_to_3D_2DTV(OverlayImplBase* ov);
-
-    /* Transition from any state to 2D video true UI mirroring (2D video + UI) */
-    OverlayImplBase* handle_xxx_to_2D_trueUI_Mirror(OverlayImplBase* ov);
-
-    /* Transitions from any state to 1 layer composition bypass */
-    OverlayImplBase* handle_xxx_to_bypass1(OverlayImplBase* ov);
-
-    /* Transitions from any state to 2 layers composition bypass */
-    OverlayImplBase* handle_xxx_to_bypass2(OverlayImplBase* ov);
-
-    /* Transitions from any state to 3 layers composition bypass */
-    OverlayImplBase* handle_xxx_to_bypass3(OverlayImplBase* ov);
-
     /* Dump */
     void dump() const;
+
 private:
+
+    /* Transitions from a state to a state. Default behavior is to move from an
+     * old state to CLOSED and from CLOSED to a new state. Any impl wishing to
+     * copy pipes should specialize this call */
+    template<utils::eOverlayState FROM_STATE, utils::eOverlayState TO_STATE>
+    OverlayImplBase* handle_from_to(OverlayImplBase* ov);
+
+    /* Just a convenient intermediate function to bring down the number of
+     * combinations arising from multiple states */
+    template<utils::eOverlayState FROM_STATE>
+    OverlayImplBase* handle_from(utils::eOverlayState toState,
+            OverlayImplBase* ov);
+
+    /* Substitues for partially specialized templated handle functions since the
+     * standard doesn't allow partial specialization of functions */
+    template<utils::eOverlayState FROM_STATE>
+    OverlayImplBase* handle_xxx_to_CLOSED(OverlayImplBase* ov);
+
+    template<utils::eOverlayState TO_STATE>
+    OverlayImplBase* handle_CLOSED_to_xxx(OverlayImplBase* ov);
+
     /* States here */
     utils::eOverlayState mState;
 };
@@ -133,7 +108,7 @@ template <int STATE> struct StateTraits {};
 
 template <> struct StateTraits<utils::OV_2D_VIDEO_ON_PANEL>
 {
-    typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe0; //prim video
     typedef overlay::NullPipe pipe1;   // place holder
     typedef overlay::NullPipe pipe2;   // place holder
 
@@ -141,20 +116,33 @@ template <> struct StateTraits<utils::OV_2D_VIDEO_ON_PANEL>
     typedef NullRotator rot1;
     typedef NullRotator rot2;
 
-    typedef overlay::OverlayImpl<pipe0> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_2D_VIDEO_ON_PANEL_TV>
 {
-    typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
-    typedef overlay::VideoExtPipe pipe1;
-    typedef overlay::NullPipe pipe2;   // place holder
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe0; //prim video
+    typedef overlay::VideoExtPipe pipe1; //ext video
+    typedef overlay::GenericPipe<utils::EXTERNAL> pipe2; //ext subtitle
 
     typedef Rotator rot0;
     typedef Rotator rot1;
     typedef NullRotator rot2;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
+};
+
+template <> struct StateTraits<utils::OV_2D_VIDEO_ON_TV>
+{
+    typedef overlay::NullPipe pipe0; //nothing on primary with mdp
+    typedef overlay::VideoExtPipe pipe1; //ext video
+    typedef overlay::GenericPipe<utils::EXTERNAL> pipe2; //ext subtitle
+
+    typedef NullRotator rot0;
+    typedef Rotator rot1;
+    typedef NullRotator rot2;
+
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_3D_VIDEO_ON_2D_PANEL>
@@ -219,7 +207,7 @@ template <> struct StateTraits<utils::OV_UI_MIRROR>
     typedef NullRotator rot1;
     typedef NullRotator rot2;
 
-    typedef overlay::OverlayImpl<pipe0> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_2D_TRUE_UI_MIRROR>
@@ -245,7 +233,7 @@ template <> struct StateTraits<utils::OV_BYPASS_1_LAYER>
     typedef NullRotator rot1;
     typedef NullRotator rot2;
 
-    typedef overlay::OverlayImpl<pipe0> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_BYPASS_2_LAYER>
@@ -258,7 +246,7 @@ template <> struct StateTraits<utils::OV_BYPASS_2_LAYER>
     typedef NullRotator rot1;
     typedef NullRotator rot2;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_BYPASS_3_LAYER>
@@ -274,47 +262,197 @@ template <> struct StateTraits<utils::OV_BYPASS_3_LAYER>
     typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
 };
 
+template <> struct StateTraits<utils::OV_DUAL_DISP>
+{
+    typedef overlay::GenericPipe<utils::EXTERNAL> pipe0;
+    typedef overlay::GenericPipe<utils::EXTERNAL> pipe1;
+    typedef overlay::NullPipe pipe2;
+
+    typedef NullRotator rot0;
+    typedef NullRotator rot1;
+    typedef NullRotator rot2;
+
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
+};
+
 
 //------------------------Inlines --------------------------------
 
-inline OverlayState::OverlayState() : mState(utils::OV_CLOSED)
-{}
 
+inline OverlayState::OverlayState() : mState(utils::OV_CLOSED){}
 inline OverlayState::~OverlayState() {}
-
-inline utils::eOverlayState OverlayState::state() const
-{
-    return mState;
-}
-
-inline OverlayImplBase* OverlayState::reset(utils::eOverlayState s)
-{
+inline utils::eOverlayState OverlayState::state() const { return mState; }
+inline OverlayImplBase* OverlayState::reset(utils::eOverlayState s) {
     return handleEvent(s, 0);
 }
-
-inline void OverlayState::dump() const
-{
+inline void OverlayState::dump() const {
     ALOGE("== Dump state %d start/end ==", mState);
 }
 
-template <int STATE>
-inline OverlayImplBase* handle_closed_to_xxx()
+inline OverlayImplBase* OverlayState::handleEvent(utils::eOverlayState toState,
+        OverlayImplBase* ov)
 {
-    OverlayImplBase* ov = new typename StateTraits<STATE>::ovimpl;
-    RotatorBase* rot0 = new typename StateTraits<STATE>::rot0;
-    RotatorBase* rot1 = new typename StateTraits<STATE>::rot1;
-    RotatorBase* rot2 = new typename StateTraits<STATE>::rot2;
+    OverlayImplBase* newov = ov; // at least, we return the same
+    if (mState != toState) {
+        ALOGD_IF(DEBUG_OVERLAY, "%s: state changed %s-->%s",
+                __FUNCTION__, getStateString(mState), getStateString(toState));
+    } else {
+        ALOGD_IF(DEBUG_OVERLAY, "%s: no state change, state=%s",
+                __FUNCTION__, getStateString(toState));
+        return newov;
+    }
+
+    switch(mState)
+    {
+        case utils::OV_CLOSED:
+            newov = handle_from<utils::OV_CLOSED>(toState, ov);
+            break;
+        case utils::OV_2D_VIDEO_ON_PANEL:
+            newov = handle_from<utils::OV_2D_VIDEO_ON_PANEL>(toState, ov);
+            break;
+        case utils::OV_2D_VIDEO_ON_PANEL_TV:
+            newov = handle_from<utils::OV_2D_VIDEO_ON_PANEL_TV>(toState, ov);
+            break;
+        case utils::OV_2D_VIDEO_ON_TV:
+            newov = handle_from<utils::OV_2D_VIDEO_ON_TV>(toState, ov);
+            break;
+        case utils::OV_3D_VIDEO_ON_2D_PANEL:
+            newov = handle_from<utils::OV_3D_VIDEO_ON_2D_PANEL>(toState, ov);
+            break;
+        case utils::OV_3D_VIDEO_ON_3D_PANEL:
+            newov = handle_from<utils::OV_3D_VIDEO_ON_3D_PANEL>(toState, ov);
+            break;
+        case utils::OV_3D_VIDEO_ON_3D_TV:
+            newov = handle_from<utils::OV_3D_VIDEO_ON_3D_TV>(toState, ov);
+            break;
+        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
+            newov = handle_from<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>(toState,
+                                                                      ov);
+            break;
+        case utils::OV_UI_MIRROR:
+            newov = handle_from<utils::OV_UI_MIRROR>(toState, ov);
+            break;
+        case utils::OV_2D_TRUE_UI_MIRROR:
+            newov = handle_from<utils::OV_2D_TRUE_UI_MIRROR>(toState, ov);
+            break;
+        case utils::OV_BYPASS_1_LAYER:
+            newov = handle_from<utils::OV_BYPASS_1_LAYER>(toState, ov);
+            break;
+        case utils::OV_BYPASS_2_LAYER:
+            newov = handle_from<utils::OV_BYPASS_2_LAYER>(toState, ov);
+            break;
+        case utils::OV_BYPASS_3_LAYER:
+            newov = handle_from<utils::OV_BYPASS_3_LAYER>(toState, ov);
+            break;
+        case utils::OV_DUAL_DISP:
+            newov = handle_from<utils::OV_DUAL_DISP>(toState, ov);
+            break;
+        default:
+            OVASSERT(1 == 0, "%s: unknown state = %d", __FUNCTION__, mState);
+
+    }
+    return newov;
+}
+
+template <utils::eOverlayState FROM_STATE>
+inline OverlayImplBase* OverlayState::handle_from(utils::eOverlayState toState,
+        OverlayImplBase* ov) {
+
+    switch(toState)
+    {
+        case utils::OV_CLOSED:
+            ov = handle_xxx_to_CLOSED<FROM_STATE>(ov);
+            break;
+        case utils::OV_2D_VIDEO_ON_PANEL:
+            ov = handle_from_to<FROM_STATE, utils::OV_2D_VIDEO_ON_PANEL>(ov);
+            break;
+        case utils::OV_2D_VIDEO_ON_PANEL_TV:
+            ov = handle_from_to<FROM_STATE, utils::OV_2D_VIDEO_ON_PANEL_TV>(ov);
+            break;
+        case utils::OV_2D_VIDEO_ON_TV:
+            ov = handle_from_to<FROM_STATE, utils::OV_2D_VIDEO_ON_TV>(ov);
+            break;
+        case utils::OV_3D_VIDEO_ON_2D_PANEL:
+            ov = handle_from_to<FROM_STATE, utils::OV_3D_VIDEO_ON_2D_PANEL>(ov);
+            break;
+        case utils::OV_3D_VIDEO_ON_3D_PANEL:
+            ov = handle_from_to<FROM_STATE, utils::OV_3D_VIDEO_ON_3D_PANEL>(ov);
+            break;
+        case utils::OV_3D_VIDEO_ON_3D_TV:
+            ov = handle_from_to<FROM_STATE, utils::OV_3D_VIDEO_ON_3D_TV>(ov);
+            break;
+        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
+            ov = handle_from_to<FROM_STATE,
+                        utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>(ov);
+            break;
+        case utils::OV_UI_MIRROR:
+            ov = handle_from_to<FROM_STATE, utils::OV_UI_MIRROR>(ov);
+            break;
+        case utils::OV_2D_TRUE_UI_MIRROR:
+            ov = handle_from_to<FROM_STATE, utils::OV_2D_TRUE_UI_MIRROR>(ov);
+            break;
+        case utils::OV_BYPASS_1_LAYER:
+            ov = handle_from_to<FROM_STATE, utils::OV_BYPASS_1_LAYER>(ov);
+            break;
+        case utils::OV_BYPASS_2_LAYER:
+            ov = handle_from_to<FROM_STATE, utils::OV_BYPASS_2_LAYER>(ov);
+            break;
+        case utils::OV_BYPASS_3_LAYER:
+            ov = handle_from_to<FROM_STATE, utils::OV_BYPASS_3_LAYER>(ov);
+            break;
+        case utils::OV_DUAL_DISP:
+            ov = handle_from_to<FROM_STATE, utils::OV_DUAL_DISP>(ov);
+            break;
+        default:
+            OVASSERT(1 == 0, "%s: unknown state = %d", __FUNCTION__, toState);
+    }
+    mState = toState;
+    return ov;
+}
+
+
+/* Transition default from any to any. Does in two steps.
+ * Moves from OLD to CLOSED and then from CLOSED to NEW
+ */
+template<utils::eOverlayState FROM_STATE, utils::eOverlayState TO_STATE>
+inline OverlayImplBase* OverlayState::handle_from_to(OverlayImplBase* ov) {
+    handle_xxx_to_CLOSED<FROM_STATE>(ov);
+    return handle_CLOSED_to_xxx<TO_STATE>(ov);
+}
+
+//---------------Specializations-------------
+
+
+/* Transition from CLOSED to ANY */
+template<utils::eOverlayState TO_STATE>
+inline OverlayImplBase* OverlayState::handle_CLOSED_to_xxx(
+            OverlayImplBase* /*ignored*/) {
+    //If going from CLOSED to CLOSED, nothing to do.
+    if(TO_STATE == utils::OV_CLOSED) return NULL;
+    ALOGD("FROM_STATE = %s TO_STATE = %s",
+            utils::getStateString(utils::OV_CLOSED),
+            utils::getStateString(TO_STATE));
+    OverlayImplBase* ov = new typename StateTraits<TO_STATE>::ovimpl;
+    RotatorBase* rot0 = new typename StateTraits<TO_STATE>::rot0;
+    RotatorBase* rot1 = new typename StateTraits<TO_STATE>::rot1;
+    RotatorBase* rot2 = new typename StateTraits<TO_STATE>::rot2;
     if(!ov->init(rot0, rot1, rot2)) {
-        ALOGE("Overlay failed to init in state %d", STATE);
+        ALOGE("Overlay failed to init in state %d", TO_STATE);
         return 0;
     }
     return ov;
 }
 
-inline OverlayImplBase* handle_xxx_to_closed(OverlayImplBase* ov)
+/* Transition from ANY to CLOSED */
+template<utils::eOverlayState FROM_STATE>
+inline OverlayImplBase* OverlayState::handle_xxx_to_CLOSED(OverlayImplBase* ov)
 {
+    //If going from CLOSED to CLOSED, nothing to do.
+    if(FROM_STATE == utils::OV_CLOSED) return NULL;
+    ALOGD("FROM_STATE = %s TO_STATE = %s",
+            utils::getStateString(FROM_STATE),
+            utils::getStateString(utils::OV_CLOSED));
     OVASSERT(ov, "%s: ov is null", __FUNCTION__);
-
     if(!ov->close()) {
         ALOGE("%s: Failed to ov close", __FUNCTION__);
     }
@@ -323,579 +461,124 @@ inline OverlayImplBase* handle_xxx_to_closed(OverlayImplBase* ov)
     return 0;
 }
 
-/* Hard transitions from any state to any state will close and then init */
-template <int STATE>
-inline OverlayImplBase* handle_xxx_to_xxx(OverlayImplBase* ov)
-{
+/* Transition from 2D_VIDEO_ON_PANEL to 2D_VIDEO_ON_PANEL_TV */
+template<>
+inline OverlayImplBase* OverlayState::handle_from_to<
+        utils::OV_2D_VIDEO_ON_PANEL,
+        utils::OV_2D_VIDEO_ON_PANEL_TV>(
+        OverlayImplBase* ov) {
     OVASSERT(ov, "%s: ov is null", __FUNCTION__);
+    ALOGD("FROM_STATE = %s TO_STATE = %s",
+            utils::getStateString(utils::OV_2D_VIDEO_ON_PANEL),
+            utils::getStateString(utils::OV_2D_VIDEO_ON_PANEL_TV));
+    // Create new ovimpl based on new state
+    typedef StateTraits<utils::OV_2D_VIDEO_ON_PANEL_TV> NewState;
+    OverlayImplBase* newov = new NewState::ovimpl;
 
-    handle_xxx_to_closed(ov);
-    return handle_closed_to_xxx<STATE>();
-}
-
-inline OverlayImplBase* OverlayState::handleEvent(utils::eOverlayState newState,
-        OverlayImplBase* ov)
-{
-    OverlayImplBase* newov = ov; // at least, we return the same
-    if (mState != newState) {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: state changed %s-->%s",
-                __FUNCTION__, getStateString(mState), getStateString(newState));
-    } else {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: no state change, state=%s",
-                __FUNCTION__, getStateString(newState));
-        return newov;
-    }
-
-    switch(mState)
-    {
-        case utils::OV_CLOSED:
-            newov = handle_closed(newState);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL:
-            newov = handle_2D_2DPanel(newState, ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-            newov = handle_2D_2DTV(newState, ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-            newov = handle_3D_2DPanel(newState, ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-            newov = handle_3D_3DPanel(newState, ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-            newov = handle_3D_3DTV(newState, ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            newov = handle_3D_2DTV(newState, ov);
-            break;
-        case utils::OV_UI_MIRROR:
-            newov = handle_UI_Mirror(newState, ov);
-            break;
-        case utils::OV_2D_TRUE_UI_MIRROR:
-            newov = handle_2D_trueUI_Mirror(newState, ov);
-            break;
-        case utils::OV_BYPASS_1_LAYER:
-        case utils::OV_BYPASS_2_LAYER:
-        case utils::OV_BYPASS_3_LAYER:
-            newov = handle_bypass(newState, ov);
-            break;
-        default:
-            ALOGE("%s: unknown state=%d", __FUNCTION__, mState);
-    }
-
-    // FIXME, how to communicate bad transition?
-    // Should we have bool returned from transition func?
-    // This is also a very good interview question.
-
+    //copy pipe0/rot0 (primary video)
+    newov->copyOvPipe(ov, utils::OV_PIPE0);
+    //close old pipe1, create new pipe1
+    ov->closePipe(utils::OV_PIPE1);
+    RotatorBase* rot1 = new NewState::rot1;
+    newov->initPipe(rot1, utils::OV_PIPE1);
+    //close old pipe2, create new pipe2
+    ov->closePipe(utils::OV_PIPE2);
+    RotatorBase* rot2 = new NewState::rot2;
+    newov->initPipe(rot2, utils::OV_PIPE2);
+    // All pipes are copied or deleted so no more need for previous ovimpl
+    delete ov;
+    ov = 0;
     return newov;
 }
 
-// Transitions from closed to XXX
-inline OverlayImplBase* OverlayState::handle_closed(utils::eOverlayState s)
-{
-    OverlayImplBase* ov = 0;
-    switch(s)
-    {
-        case utils::OV_CLOSED:
-            // no state change
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL:
-            ov = handle_closed_to_xxx<utils::OV_2D_VIDEO_ON_PANEL>();
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-            ov = handle_closed_to_xxx<utils::OV_2D_VIDEO_ON_PANEL_TV>();
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-            ov = handle_closed_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL>();
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-            ov = handle_closed_to_xxx<utils::OV_3D_VIDEO_ON_3D_PANEL>();
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-            ov = handle_closed_to_xxx<utils::OV_3D_VIDEO_ON_3D_TV>();
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            ov = handle_closed_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>();
-            break;
-        case utils::OV_UI_MIRROR:
-            ov = handle_closed_to_xxx<utils::OV_UI_MIRROR>();
-            break;
-        case utils::OV_2D_TRUE_UI_MIRROR:
-            ov = handle_closed_to_xxx<utils::OV_2D_TRUE_UI_MIRROR>();
-            break;
-        case utils::OV_BYPASS_1_LAYER:
-            ov = handle_closed_to_xxx<utils::OV_BYPASS_1_LAYER>();
-            break;
-        case utils::OV_BYPASS_2_LAYER:
-            ov = handle_closed_to_xxx<utils::OV_BYPASS_2_LAYER>();
-            break;
-        case utils::OV_BYPASS_3_LAYER:
-            ov = handle_closed_to_xxx<utils::OV_BYPASS_3_LAYER>();
-            break;
-        default:
-            ALOGE("%s: unknown state=%d", __FUNCTION__, s);
-    }
-    mState = s;
-    return ov;
-}
+/* Transition from 2D_VIDEO_ON_PANEL_TV to 2D_VIDEO_ON_PANEL */
+template<>
+inline OverlayImplBase* OverlayState::handle_from_to<
+        utils::OV_2D_VIDEO_ON_PANEL_TV,
+        utils::OV_2D_VIDEO_ON_PANEL>(
+        OverlayImplBase* ov) {
+    OVASSERT(ov, "%s: ov is null", __FUNCTION__);
+    ALOGD("FROM_STATE = %s TO_STATE = %s",
+            utils::getStateString(utils::OV_2D_VIDEO_ON_PANEL_TV),
+            utils::getStateString(utils::OV_2D_VIDEO_ON_PANEL));
 
-// Transitions from 2D video on 2D panel to XXX
-inline OverlayImplBase* OverlayState::handle_2D_2DPanel(
-        utils::eOverlayState s,
-        OverlayImplBase* ov)
-{
-    OverlayImplBase* newov = ov;
-    switch(s)
-    {
-        case utils::OV_CLOSED:
-            newov = handle_xxx_to_closed(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL:
-            // no state change
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-            newov = handle_xxx_to_2D_2DTV(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>(ov);
-            break;
-        case utils::OV_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_UI_MIRROR>(ov);
-            break;
-        case utils::OV_2D_TRUE_UI_MIRROR:
-            newov = handle_xxx_to_2D_trueUI_Mirror(ov);
-            break;
-        case utils::OV_BYPASS_1_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_1_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_2_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_2_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_3_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_3_LAYER>(ov);
-            break;
-        default:
-            ALOGE("%s: unknown state=%d", __FUNCTION__, s);
-    }
-    mState = s;
+    // Create new ovimpl based on new state
+    typedef StateTraits<utils::OV_2D_VIDEO_ON_PANEL> NewState;
+    OverlayImplBase* newov = new NewState::ovimpl;
+
+    //copy pipe0/rot0 (primary video)
+    newov->copyOvPipe(ov, utils::OV_PIPE0);
+    //close old pipe1, create new pipe1
+    ov->closePipe(utils::OV_PIPE1);
+    RotatorBase* rot1 = new NewState::rot1;
+    newov->initPipe(rot1, utils::OV_PIPE1);
+    //close old pipe2, create new pipe2
+    ov->closePipe(utils::OV_PIPE2);
+    RotatorBase* rot2 = new NewState::rot2;
+    newov->initPipe(rot2, utils::OV_PIPE2);
+    // All pipes are copied or deleted so no more need for previous ovimpl
+    delete ov;
+    ov = 0;
     return newov;
 }
 
-// Transitions from 2D video on 2D panel and 2D TV to XXX
-inline OverlayImplBase* OverlayState::handle_2D_2DTV(
-        utils::eOverlayState s,
-        OverlayImplBase* ov)
-{
-    OverlayImplBase* newov = ov;
-    switch(s)
-    {
-        case utils::OV_CLOSED:
-            newov = handle_xxx_to_closed(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL:
-            newov = handle_xxx_to_2D_2DPanel(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-            // no state change
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>(ov);
-            break;
-        case utils::OV_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_UI_MIRROR>(ov);
-            break;
-        case utils::OV_2D_TRUE_UI_MIRROR:
-            newov = handle_xxx_to_2D_trueUI_Mirror(ov);
-            break;
-        case utils::OV_BYPASS_1_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_1_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_2_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_2_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_3_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_3_LAYER>(ov);
-            break;
-        default:
-            ALOGE("%s: unknown state=%d", __FUNCTION__, s);
-    }
-    mState = s;
+/* Transition from 2D_VIDEO_ON_PANEL_TV to 2D_VIDEO_ON_TV */
+template<>
+inline OverlayImplBase* OverlayState::handle_from_to<
+        utils::OV_2D_VIDEO_ON_PANEL_TV,
+        utils::OV_2D_VIDEO_ON_TV>(
+        OverlayImplBase* ov) {
+    OVASSERT(ov, "%s: ov is null", __FUNCTION__);
+    ALOGD("FROM_STATE = %s TO_STATE = %s",
+            utils::getStateString(utils::OV_2D_VIDEO_ON_PANEL_TV),
+            utils::getStateString(utils::OV_2D_VIDEO_ON_TV));
+
+    // Create new ovimpl based on new state
+    typedef StateTraits<utils::OV_2D_VIDEO_ON_TV> NewState;
+    OverlayImplBase* newov = new NewState::ovimpl;
+
+    //close old pipe0, create new pipe0
+    ov->closePipe(utils::OV_PIPE0);
+    RotatorBase* rot0 = new NewState::rot0;
+    newov->initPipe(rot0, utils::OV_PIPE0);
+    //copy pipe1/rot1 (ext video)
+    newov->copyOvPipe(ov, utils::OV_PIPE1);
+    //copy pipe2/rot2 (ext cc)
+    newov->copyOvPipe(ov, utils::OV_PIPE2);
+    // All pipes are copied or deleted so no more need for previous ovimpl
+    delete ov;
+    ov = 0;
     return newov;
 }
 
-// Transitions from 3D video on 2D panel to XXX
-inline OverlayImplBase* OverlayState::handle_3D_2DPanel(
-        utils::eOverlayState s,
-        OverlayImplBase* ov)
-{
-    OverlayImplBase* newov = ov;
-    switch(s)
-    {
-        case utils::OV_CLOSED:
-            newov = handle_xxx_to_closed(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_2D_VIDEO_ON_PANEL>(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-            newov = handle_xxx_to_xxx<utils::OV_2D_VIDEO_ON_PANEL_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-            // no state change
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            newov = handle_xxx_to_3D_2DTV(ov);
-            break;
-        case utils::OV_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_UI_MIRROR>(ov);
-            break;
-        case utils::OV_2D_TRUE_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_2D_TRUE_UI_MIRROR>(ov);
-            break;
-        case utils::OV_BYPASS_1_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_1_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_2_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_2_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_3_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_3_LAYER>(ov);
-            break;
-        default:
-            ALOGE("%s: unknown state=%d", __FUNCTION__, s);
-    }
-    mState = s;
+/* Transition from 2D_VIDEO_ON_TV to 2D_VIDEO_ON_PANEL_TV */
+template<>
+inline OverlayImplBase* OverlayState::handle_from_to<
+        utils::OV_2D_VIDEO_ON_TV,
+        utils::OV_2D_VIDEO_ON_PANEL_TV>(
+        OverlayImplBase* ov) {
+    OVASSERT(ov, "%s: ov is null", __FUNCTION__);
+    ALOGD("FROM_STATE = %s TO_STATE = %s",
+            utils::getStateString(utils::OV_2D_VIDEO_ON_TV),
+            utils::getStateString(utils::OV_2D_VIDEO_ON_PANEL_TV));
+
+    // Create new ovimpl based on new state
+    typedef StateTraits<utils::OV_2D_VIDEO_ON_PANEL_TV> NewState;
+    OverlayImplBase* newov = new NewState::ovimpl;
+
+    //close old pipe0, create new pipe0
+    ov->closePipe(utils::OV_PIPE0);
+    RotatorBase* rot0 = new NewState::rot0;
+    newov->initPipe(rot0, utils::OV_PIPE0);
+    //copy pipe1/rot1 (ext video)
+    newov->copyOvPipe(ov, utils::OV_PIPE1);
+    //copy pipe2/rot2 (ext cc)
+    newov->copyOvPipe(ov, utils::OV_PIPE2);
+    // All pipes are copied or deleted so no more need for previous ovimpl
+    delete ov;
+    ov = 0;
     return newov;
 }
-
-// Transitions from 3D video on 3D panel to XXX
-inline OverlayImplBase* OverlayState::handle_3D_3DPanel(
-        utils::eOverlayState s,
-        OverlayImplBase* ov)
-{
-    OverlayImplBase* newov = ov;
-    switch(s)
-    {
-        case utils::OV_CLOSED:
-            newov = handle_xxx_to_closed(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_2D_VIDEO_ON_PANEL>(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-            newov = handle_xxx_to_xxx<utils::OV_2D_VIDEO_ON_PANEL_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-            // no state change
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>(ov);
-            break;
-        case utils::OV_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_UI_MIRROR>(ov);
-            break;
-        case utils::OV_2D_TRUE_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_2D_TRUE_UI_MIRROR>(ov);
-            break;
-        case utils::OV_BYPASS_1_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_1_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_2_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_2_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_3_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_3_LAYER>(ov);
-            break;
-        default:
-            ALOGE("%s: unknown state=%d", __FUNCTION__, s);
-    }
-    mState = s;
-    return newov;
-}
-
-// Transitions from 3D video on 3D TV to XXX
-inline OverlayImplBase* OverlayState::handle_3D_3DTV(
-        utils::eOverlayState s,
-        OverlayImplBase* ov)
-{
-    OverlayImplBase* newov = ov;
-    switch(s)
-    {
-        case utils::OV_CLOSED:
-            newov = handle_xxx_to_closed(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_2D_VIDEO_ON_PANEL>(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-            newov = handle_xxx_to_xxx<utils::OV_2D_VIDEO_ON_PANEL_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-            // no state change
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>(ov);
-            break;
-        case utils::OV_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_UI_MIRROR>(ov);
-            break;
-        case utils::OV_2D_TRUE_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_2D_TRUE_UI_MIRROR>(ov);
-            break;
-        case utils::OV_BYPASS_1_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_1_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_2_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_2_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_3_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_3_LAYER>(ov);
-            break;
-        default:
-            ALOGE("%s: unknown state=%d", __FUNCTION__, s);
-    }
-    mState = s;
-    return newov;
-}
-
-// Transitions from 3D video on 2D panel and 2D TV to XXX
-inline OverlayImplBase* OverlayState::handle_3D_2DTV(
-        utils::eOverlayState s,
-        OverlayImplBase* ov)
-{
-    OverlayImplBase* newov = ov;
-    switch(s)
-    {
-        case utils::OV_CLOSED:
-            newov = handle_xxx_to_closed(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_2D_VIDEO_ON_PANEL>(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-            newov = handle_xxx_to_xxx<utils::OV_2D_VIDEO_ON_PANEL_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-            newov = handle_xxx_to_3D_2DPanel(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            // no state change
-            break;
-        case utils::OV_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_UI_MIRROR>(ov);
-            break;
-        case utils::OV_2D_TRUE_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_2D_TRUE_UI_MIRROR>(ov);
-            break;
-        case utils::OV_BYPASS_1_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_1_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_2_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_2_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_3_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_3_LAYER>(ov);
-            break;
-        default:
-            ALOGE("%s: unknown state=%d", __FUNCTION__, s);
-    }
-    mState = s;
-    return newov;
-}
-
-// Transitions from UI mirroring to XXX
-inline OverlayImplBase* OverlayState::handle_UI_Mirror(utils::eOverlayState s,
-        OverlayImplBase* ov)
-{
-    OverlayImplBase* newov = ov;
-    switch(s)
-    {
-        case utils::OV_CLOSED:
-            newov = handle_xxx_to_closed(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_2D_VIDEO_ON_PANEL>(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-            newov = handle_xxx_to_xxx<utils::OV_2D_VIDEO_ON_PANEL_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>(ov);
-            break;
-        case utils::OV_UI_MIRROR:
-            // no state change
-            break;
-        case utils::OV_2D_TRUE_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_2D_TRUE_UI_MIRROR>(ov);
-            break;
-        case utils::OV_BYPASS_1_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_1_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_2_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_2_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_3_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_3_LAYER>(ov);
-            break;
-        default:
-            ALOGE("%s: unknown state=%d", __FUNCTION__, s);
-    }
-    mState = s;
-    return newov;
-}
-
-// Transitions from 2D video true UI mirroring (2D video + UI) to XXX
-inline OverlayImplBase* OverlayState::handle_2D_trueUI_Mirror(utils::eOverlayState s,
-        OverlayImplBase* ov)
-{
-    OverlayImplBase* newov = ov;
-    switch(s)
-    {
-        case utils::OV_CLOSED:
-            newov = handle_xxx_to_closed(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL:
-            newov = handle_xxx_to_2D_2DPanel(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-            newov = handle_xxx_to_2D_2DTV(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>(ov);
-            break;
-        case utils::OV_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_UI_MIRROR>(ov);
-            break;
-        case utils::OV_2D_TRUE_UI_MIRROR:
-            // no state change
-            break;
-        case utils::OV_BYPASS_1_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_1_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_2_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_2_LAYER>(ov);
-            break;
-        case utils::OV_BYPASS_3_LAYER:
-            newov = handle_xxx_to_xxx<utils::OV_BYPASS_3_LAYER>(ov);
-            break;
-        default:
-            ALOGE("%s: unknown state=%d", __FUNCTION__, s);
-    }
-    mState = s;
-    return newov;
-}
-
-// Transitions from composition bypass to XXX
-inline OverlayImplBase* OverlayState::handle_bypass(utils::eOverlayState s,
-        OverlayImplBase* ov)
-{
-    OverlayImplBase* newov = ov;
-    switch(s)
-    {
-        case utils::OV_CLOSED:
-            newov = handle_xxx_to_closed(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_2D_VIDEO_ON_PANEL>(ov);
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-            newov = handle_xxx_to_xxx<utils::OV_2D_VIDEO_ON_PANEL_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_PANEL>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_3D_TV>(ov);
-            break;
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            newov = handle_xxx_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>(ov);
-            break;
-        case utils::OV_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_UI_MIRROR>(ov);
-            break;
-        case utils::OV_2D_TRUE_UI_MIRROR:
-            newov = handle_xxx_to_xxx<utils::OV_2D_TRUE_UI_MIRROR>(ov);
-            break;
-        case utils::OV_BYPASS_1_LAYER:
-            newov = handle_xxx_to_bypass1(ov);
-            break;
-        case utils::OV_BYPASS_2_LAYER:
-            newov = handle_xxx_to_bypass2(ov);
-            break;
-        case utils::OV_BYPASS_3_LAYER:
-            newov = handle_xxx_to_bypass3(ov);
-            break;
-        default:
-            ALOGE("%s: unknown state=%d", __FUNCTION__, s);
-    }
-    mState = s;
-    return newov;
-}
-
 
 } // overlay
 

@@ -370,6 +370,7 @@ enum eOverlayState{
     /* 2D Video */
     OV_2D_VIDEO_ON_PANEL,
     OV_2D_VIDEO_ON_PANEL_TV,
+    OV_2D_VIDEO_ON_TV,
 
     /* 3D Video on one display (panel or TV) */
     OV_3D_VIDEO_ON_2D_PANEL,
@@ -382,12 +383,14 @@ enum eOverlayState{
     /* UI Mirroring */
     OV_UI_MIRROR,
     OV_2D_TRUE_UI_MIRROR,
-    OV_M3D_TRUE_UI_MIRROR,  // Not yet supported
 
     /* Composition Bypass */
     OV_BYPASS_1_LAYER,
     OV_BYPASS_2_LAYER,
     OV_BYPASS_3_LAYER,
+
+    /* External only for dual-disp */
+    OV_DUAL_DISP,
 };
 
 inline void setMdpFlags(eMdpFlags& f, eMdpFlags v) {
@@ -606,6 +609,8 @@ inline const char* getStateString(eOverlayState state){
             return "OV_2D_VIDEO_ON_PANEL";
         case OV_2D_VIDEO_ON_PANEL_TV:
             return "OV_2D_VIDEO_ON_PANEL_TV";
+        case OV_2D_VIDEO_ON_TV:
+            return "OV_2D_VIDEO_ON_TV";
         case OV_3D_VIDEO_ON_2D_PANEL:
             return "OV_3D_VIDEO_ON_2D_PANEL";
         case OV_3D_VIDEO_ON_3D_PANEL:
@@ -624,6 +629,8 @@ inline const char* getStateString(eOverlayState state){
             return "OV_BYPASS_2_LAYER";
         case OV_BYPASS_3_LAYER:
             return "OV_BYPASS_3_LAYER";
+        case OV_DUAL_DISP:
+            return "OV_DUAL_DISP";
         default:
             return "UNKNOWN_STATE";
     }
