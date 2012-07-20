@@ -277,7 +277,6 @@ static void *hdmi_ui_loop(void *ptr)
             ovutils::PipeArgs parg(mdpFlags,
                                    ovutils::OVERLAY_TRANSFORM_0,
                                    whf,
-                                   ovutils::WAIT,
                                    ovutils::ZORDER_0,
                                    ovutils::IS_FG_OFF,
                                    ovutils::ROT_FLAG_ENABLED);

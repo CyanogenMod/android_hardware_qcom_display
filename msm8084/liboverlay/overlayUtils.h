@@ -35,14 +35,14 @@
 #include <fcntl.h> // open, O_RDWR, etc
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h> // buffer_handle_t
-#include <linux/msm_mdp.h> // MDP_OV_PLAY_NOWAIT etc ...
+#include <linux/msm_mdp.h> // flags
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <utils/Log.h>
-
+#include "gralloc_priv.h" //for interlace
 /*
 *
 * Collection of utilities functions/structs/enums etc...
@@ -70,12 +70,6 @@ class Overlay;
 namespace utils {
 struct Whf;
 struct Dim;
-template <class T>
-        inline void even_out(T& x) { if (x & 0x0001) --x; }
-
-inline uint32_t getBit(uint32_t x, uint32_t mask) {
-    return (x & mask);
-}
 
 inline uint32_t setBit(uint32_t x, uint32_t mask) {
     return (x | mask);
@@ -89,7 +83,7 @@ inline uint32_t clrBit(uint32_t x, uint32_t mask) {
 * and assignment operator private
 *
 * Usage:
-* *    class SomeClass : utils::NoCopy {...};
+*    class SomeClass : utils::NoCopy {...};
 */
 class NoCopy {
 protected:
@@ -147,7 +141,14 @@ enum { BARRIER_LAND = 1,
     BARRIER_PORT = 2 };
 
 inline uint32_t format3D(uint32_t x) { return x & 0xFF000; }
-inline uint32_t colorFormat(uint32_t x) { return x & 0xFFF; }
+inline uint32_t colorFormat(uint32_t fmt) {
+    /*TODO enable this block only if format has interlace / 3D info in top bits.
+    if(fmt & INTERLACE_MASK) {
+        fmt = fmt ^ HAL_PIXEL_FORMAT_INTERLACE;
+    }
+    fmt = fmt & 0xFFF;*/
+    return fmt;
+}
 inline uint32_t format3DOutput(uint32_t x) {
     return (x & 0xF000) >> SHIFT_OUT_3D; }
 inline uint32_t format3DInput(uint32_t x) { return x & 0xF0000; }
@@ -160,12 +161,15 @@ bool usePanel3D();
 bool send3DInfoPacket (uint32_t fmt);
 bool enableBarrier (uint32_t orientation);
 uint32_t getS3DFormat(uint32_t fmt);
+
 template <int CHAN>
-        bool getPositionS3D(const Whf& whf, Dim& out);
+bool getPositionS3D(const Whf& whf, Dim& out);
+
 template <int CHAN>
-        bool getCropS3D(const Dim& in, Dim& out, uint32_t fmt);
+bool getCropS3D(const Dim& in, Dim& out, uint32_t fmt);
+
 template <class Type>
-        void swapWidthHeight(Type& width, Type& height);
+void swapWidthHeight(Type& width, Type& height);
 
 struct Dim {
     Dim () : x(0), y(0),
@@ -191,13 +195,6 @@ struct Dim {
 
     bool operator!=(const Dim& d) const {
         return !operator==(d);
-    }
-
-    void even_out() {
-        utils::even_out(x);
-        utils::even_out(y);
-        utils::even_out(w);
-        utils::even_out(h);
     }
 
     void dump() const;
@@ -227,25 +224,11 @@ struct Whf {
     void dump() const;
     uint32_t w;
     uint32_t h;
-    // FIXME need to be int32_t ?
     uint32_t format;
     uint32_t size;
 };
 
 enum { MAX_PATH_LEN = 256 };
-
-enum eParams {
-    OVERLAY_DITHER,
-    OVERLAY_TRANSFORM,
-    OVERLAY_TRANSFORM_UI
-};
-
-struct Params{
-    Params(eParams p, int v) : param(p), value(v) {}
-    eParams param;
-    int value;
-};
-
 
 /**
  * Rotator flags: not to be confused with orientation flags.
@@ -267,19 +250,6 @@ enum eRotFlags {
     ROT_FLAG_ENABLED = 1 // needed in rot
 };
 
-/* Used for rotator open.
- * FIXME that is default, might be configs */
-enum { ROT_NUM_BUFS = 2 };
-
-/* Wait/No wait for waiting for vsync
- * WAIT - wait for vsync, ignore fb (no need to compose w/ fb)
- * NO_WAIT - do not wait for vsync and return immediatly since
- * we need to run composition code */
-enum eWait {
-    WAIT,
-    NO_WAIT
-};
-
 /* The values for is_fg flag for control alpha and transp
  * IS_FG_OFF means is_fg = 0
  * IS_FG_SET means is_fg = 1
@@ -298,15 +268,17 @@ enum eMdpFlags {
     OV_MDP_FLAGS_NONE = 0,
     OV_MDP_PIPE_SHARE =  MDP_OV_PIPE_SHARE,
     OV_MDP_DEINTERLACE = MDP_DEINTERLACE,
-    OV_MDP_PLAY_NOWAIT = MDP_OV_PLAY_NOWAIT,
-    OV_MDP_SECURE_OVERLAY_SESSION = MDP_SECURE_OVERLAY_SESSION
+    OV_MDP_PLAY_NOWAIT = MDP_OV_PLAY_NOWAIT, //deprecated
+    OV_MDP_SECURE_OVERLAY_SESSION = MDP_SECURE_OVERLAY_SESSION,
+    OV_MDP_SOURCE_ROTATED_90 = MDP_SOURCE_ROTATED_90,
+    OV_MDP_MEMORY_ID_TYPE_FB = MDP_MEMORY_ID_TYPE_FB,
 };
 
 enum eOverlayPipeType {
     OV_PIPE_TYPE_NULL,
     OV_PIPE_TYPE_BYPASS,
     OV_PIPE_TYPE_GENERIC,
-    OV_PIPE_TYPE_HDMI,
+    OV_PIPE_TYPE_VIDEO_EXT,
     OV_PIPE_TYPE_M3D_EXTERNAL,
     OV_PIPE_TYPE_M3D_PRIMARY,
     OV_PIPE_TYPE_RGB,
@@ -327,24 +299,12 @@ enum eMdpPipeType {
     OV_MDP_PIPE_VG
 };
 
-/* Corresponds to pipes in eDest */
-enum eChannel {
-    CHANNEL_0,
-    CHANNEL_1,
-    CHANNEL_2
-};
-
 // Max pipes via overlay (VG0, VG1, RGB1)
 enum { MAX_PIPES = 3 };
 
 /* Used to identify destination channels and
  * also 3D channels e.g. when in 3D mode with 2
  * pipes opened and it is used in get crop/pos 3D
- *
- * PLEASE NOTE : DO NOT USE eDest FOR ARRAYS
- * i.e. args[OV_PIPE1] since it is a BIT MASK
- * use CHANNELS enum instead. Each OV_PIPEX is
- * not specific to a display (primary/external).
  * */
 enum eDest {
     OV_PIPE0 = 1 << 0,
@@ -356,65 +316,51 @@ enum eDest {
 /* values for copybit_set_parameter(OVERLAY_TRANSFORM) */
 enum eTransform {
     /* No rot */
-    OVERLAY_TRANSFORM_0         = 0x0,
-    /* flip source image horizontally */
-    OVERLAY_TRANSFORM_FLIP_H    = HAL_TRANSFORM_FLIP_H,
-    /* flip source image vertically */
-    OVERLAY_TRANSFORM_FLIP_V    = HAL_TRANSFORM_FLIP_V,
-    /* rotate source image 90 degrees */
-    OVERLAY_TRANSFORM_ROT_90    = HAL_TRANSFORM_ROT_90,
+    OVERLAY_TRANSFORM_0 = 0x0,
+    /* flip source image horizontally 0x1 */
+    OVERLAY_TRANSFORM_FLIP_H = HAL_TRANSFORM_FLIP_H,
+    /* flip source image vertically 0x2 */
+    OVERLAY_TRANSFORM_FLIP_V = HAL_TRANSFORM_FLIP_V,
     /* rotate source image 180 degrees
      * It is basically bit-or-ed  H | V == 0x3 */
-    OVERLAY_TRANSFORM_ROT_180   = HAL_TRANSFORM_ROT_180,
+    OVERLAY_TRANSFORM_ROT_180 = HAL_TRANSFORM_ROT_180,
+    /* rotate source image 90 degrees 0x4 */
+    OVERLAY_TRANSFORM_ROT_90 = HAL_TRANSFORM_ROT_90,
+    /* rotate source image 90 degrees and flip horizontally 0x5 */
+    OVERLAY_TRANSFORM_ROT_90_FLIP_H = HAL_TRANSFORM_ROT_90 |
+                                      HAL_TRANSFORM_FLIP_H,
+    /* rotate source image 90 degrees and flip vertically 0x6 */
+    OVERLAY_TRANSFORM_ROT_90_FLIP_V = HAL_TRANSFORM_ROT_90 |
+                                      HAL_TRANSFORM_FLIP_V,
     /* rotate source image 270 degrees
      * Basically 180 | 90 == 0x7 */
-    OVERLAY_TRANSFORM_ROT_270   = HAL_TRANSFORM_ROT_270,
+    OVERLAY_TRANSFORM_ROT_270 = HAL_TRANSFORM_ROT_270,
     /* rotate invalid like in Transform.h */
-    OVERLAY_TRANSFORM_INV       = 0x80
-};
-
-/* offset and fd are play info */
-struct PlayInfo {
-    PlayInfo() : fd(-1), offset(0) {}
-    PlayInfo(int _fd, uint32_t _offset) :
-        fd(_fd), offset(_offset) {}
-    bool operator==(const PlayInfo& p) {
-        return (fd == p.fd && offset == p.offset);
-    }
-    int fd;
-    uint32_t offset;
+    OVERLAY_TRANSFORM_INV = 0x80
 };
 
 // Used to consolidate pipe params
 struct PipeArgs {
     PipeArgs() : mdpFlags(OV_MDP_FLAGS_NONE),
-        orientation(OVERLAY_TRANSFORM_0),
-        wait(NO_WAIT),
         zorder(Z_SYSTEM_ALLOC),
         isFg(IS_FG_OFF),
         rotFlags(ROT_FLAG_DISABLED){
     }
 
-    PipeArgs(eMdpFlags f, eTransform o,
-            Whf _whf, eWait w,
+    PipeArgs(eMdpFlags f, Whf _whf,
             eZorder z, eIsFg fg, eRotFlags r) :
         mdpFlags(f),
-        orientation(o),
         whf(_whf),
-        wait(w),
         zorder(z),
         isFg(fg),
         rotFlags(r) {
     }
 
-    eMdpFlags mdpFlags; // for mdp_overlay flags PIPE_SHARE, NO_WAIT, etc
-    eTransform orientation; // FIXME docs
+    eMdpFlags mdpFlags; // for mdp_overlay flags
     Whf whf;
-    eWait wait; // flags WAIT/NO_WAIT
     eZorder zorder; // stage number
     eIsFg isFg; // control alpha & transp
     eRotFlags rotFlags;
-    PlayInfo play;
 };
 
 enum eOverlayState{
@@ -464,21 +410,13 @@ enum {
     WFD = 2
 };
 
+//TODO Make this a part of some appropriate class
 static int sExtType = HDMI; //HDMI or WFD
-
 //Set by client as HDMI/WFD
-static inline void setExtType(const int& type) {
-    if(type != HDMI || type != WFD) {
-        ALOGE("%s: Unrecognized type %d", __func__, type);
-        return;
-    }
-    sExtType = type;
-}
-
+void setExtType(const int& type);
 //Return External panel type set by client.
-static inline int getExtType() {
-    return sExtType;
-}
+int getExtType();
+
 
 //Gets the FB number for the external type.
 //As of now, HDMI always has fb1, WFD could use fb1 or fb2
@@ -503,6 +441,7 @@ static int getFBForPanel(int panel) { // PRIMARY OR EXTERNAL
 }
 
 // number of rgb pipes bufs (max)
+
 // 2 for rgb0/1 double bufs
 enum { RGB_PIPE_NUM_BUFS = 2 };
 
@@ -524,26 +463,8 @@ int getRotOutFmt(uint32_t format);
  * rotation is 90, 180 etc
  * It returns MDP related enum/define that match rot+flip*/
 int getMdpOrient(eTransform rotation);
-uint32_t getSize(const Whf& whf);
-uint32_t getSizeByMdp(const Whf& whf);
 const char* getFormatString(uint32_t format);
 const char* getStateString(eOverlayState state);
-
-inline int setWait(eWait wait, int flags) {
-    return (wait == WAIT) ?
-            flags &= ~MDP_OV_PLAY_NOWAIT :
-            flags |= MDP_OV_PLAY_NOWAIT;
-}
-/* possible overlay formats libhardware/include/hardware/hardware.h */
-enum eFormat {
-    OVERLAY_FORMAT_RGBA_8888    = HAL_PIXEL_FORMAT_RGBA_8888,
-    OVERLAY_FORMAT_RGB_565      = HAL_PIXEL_FORMAT_RGB_565,
-    OVERLAY_FORMAT_BGRA_8888    = HAL_PIXEL_FORMAT_BGRA_8888,
-    OVERLAY_FORMAT_YCbYCr_422_I = 0x14,
-    OVERLAY_FORMAT_CbYCrY_422_I = 0x16,
-    OVERLAY_FORMAT_DEFAULT      = 99 // The actual color format is
-            // determined by the overlay
-};
 
 // Cannot use HW_OVERLAY_MAGNIFICATION_LIMIT, since at the time
 // of integration, HW_OVERLAY_MAGNIFICATION_LIMIT was a define
@@ -551,25 +472,8 @@ enum { HW_OV_MAGNIFICATION_LIMIT = 20,
     HW_OV_MINIFICATION_LIMIT  = 8
 };
 
-inline bool rotated(int orie) {
-    return (orie == OVERLAY_TRANSFORM_ROT_90 ||
-            orie == OVERLAY_TRANSFORM_ROT_270);
-}
-
-/* used by crop funcs in order to
- * normalizes the crop values to be all even */
-void normalizeCrop(uint32_t& xy, uint32_t& wh);
-
 template <class T>
-        inline void memset0(T& t) { ::memset(&t, 0, sizeof(T)); }
-
-template <class ROT, class MDP>
-        inline void swapOVRotWidthHeight(ROT& rot, MDP& mdp)
-        {
-            mdp.swapSrcWH();
-            mdp.swapSrcRectWH();
-            rot.swapDstWH();
-        }
+inline void memset0(T& t) { ::memset(&t, 0, sizeof(T)); }
 
 template <class T> inline void swap ( T& a, T& b )
 {
@@ -585,35 +489,6 @@ inline int alignup(int value, int a) {
 inline int align(int value, int a) {
     //if align = 0, return the value. Else, do alignment.
     return a ? ((value + (a-1)) & ~(a-1)) : value;
-}
-
-
-template <class MDP>
-inline utils::Dim getSrcRectDim(const MDP& ov) {
-    return utils::Dim(ov.src_rect.x,
-            ov.src_rect.y,
-            ov.src_rect.w,
-            ov.src_rect.h);
-}
-
-template <class MDP>
-inline utils::Whf getSrcWhf(const MDP& ov) {
-    return utils::Whf(ov.src.width,
-            ov.src.height,
-            ov.src.format);
-}
-template <class MDP>
-inline void setSrcRectDim(MDP& ov, const utils::Dim& d) {
-    ov.src_rect.x = d.x;
-    ov.src_rect.y = d.y;
-    ov.src_rect.w = d.w;
-    ov.src_rect.h = d.h;
-}
-template <class MDP>
-inline void setSrcWhf(MDP& ov, const utils::Whf& whf) {
-    ov.src.width  = whf.w;
-    ov.src.height = whf.h;
-    ov.src.format = whf.format;
 }
 
 enum eRotOutFmt {
@@ -691,21 +566,30 @@ inline const char* getFormatString(uint32_t format){
         "MDP_RGB_565",
         "MDP_XRGB_8888",
         "MDP_Y_CBCR_H2V2",
+        "MDP_Y_CBCR_H2V2_ADRENO",
         "MDP_ARGB_8888",
         "MDP_RGB_888",
         "MDP_Y_CRCB_H2V2",
         "MDP_YCRYCB_H2V1",
         "MDP_Y_CRCB_H2V1",
         "MDP_Y_CBCR_H2V1",
+        "MDP_Y_CRCB_H1V2",
+        "MDP_Y_CBCR_H1V2",
         "MDP_RGBA_8888",
         "MDP_BGRA_8888",
         "MDP_RGBX_8888",
         "MDP_Y_CRCB_H2V2_TILE",
         "MDP_Y_CBCR_H2V2_TILE",
         "MDP_Y_CR_CB_H2V2",
+        "MDP_Y_CR_CB_GH2V2",
         "MDP_Y_CB_CR_H2V2",
-        "MDP_IMGTYPE_LIMIT",
+        "MDP_Y_CRCB_H1V1",
+        "MDP_Y_CBCR_H1V1",
+        "MDP_YCRCB_H1V1",
+        "MDP_YCBCR_H1V1",
         "MDP_BGR_565",
+        "MDP_IMGTYPE_LIMIT",
+        "MDP_RGB_BORDERFILL",
         "MDP_FB_FORMAT",
         "MDP_IMGTYPE_LIMIT2"
     };
@@ -746,15 +630,6 @@ inline const char* getStateString(eOverlayState state){
     return "BAD_STATE";
 }
 
-inline uint32_t getSizeByMdp(const Whf& whf) {
-    Whf _whf(whf);
-    int fmt = getMdpFormat(whf.format);
-    OVASSERT(-1 != fmt, "getSizeByMdp error in format %d",
-            whf.format);
-    _whf.format = fmt;
-    return getSize(_whf);
-}
-
 inline void Whf::dump() const {
     ALOGE("== Dump WHF w=%d h=%d f=%d s=%d start/end ==",
             w, h, format, size);
@@ -766,21 +641,21 @@ inline void Dim::dump() const {
 
 inline int getMdpOrient(eTransform rotation) {
     ALOGE_IF(DEBUG_OVERLAY, "%s: rot=%d", __FUNCTION__, rotation);
-    switch(int(rotation))
+    switch(rotation)
     {
         case OVERLAY_TRANSFORM_0 : return 0;
-        case HAL_TRANSFORM_FLIP_V:  return MDP_FLIP_UD;
-        case HAL_TRANSFORM_FLIP_H:  return MDP_FLIP_LR;
-        case HAL_TRANSFORM_ROT_90:  return MDP_ROT_90;
-        case HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V:
-                                    return MDP_ROT_90|MDP_FLIP_LR;
-        case HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H:
-                                    return MDP_ROT_90|MDP_FLIP_UD;
-        case HAL_TRANSFORM_ROT_180: return MDP_ROT_180;
-        case HAL_TRANSFORM_ROT_270: return MDP_ROT_270;
+        case OVERLAY_TRANSFORM_FLIP_V:  return MDP_FLIP_UD;
+        case OVERLAY_TRANSFORM_FLIP_H:  return MDP_FLIP_LR;
+        case OVERLAY_TRANSFORM_ROT_90:  return MDP_ROT_90;
+        case OVERLAY_TRANSFORM_ROT_90_FLIP_V:
+                return MDP_ROT_90 | MDP_FLIP_UD;
+        case OVERLAY_TRANSFORM_ROT_90_FLIP_H:
+                return MDP_ROT_90 | MDP_FLIP_LR;
+        case OVERLAY_TRANSFORM_ROT_180: return MDP_ROT_180;
+        case OVERLAY_TRANSFORM_ROT_270: return MDP_ROT_270;
         default:
-                                    ALOGE("%s: invalid rotation value (value = 0x%x",
-                                            __FUNCTION__, rotation);
+            ALOGE("%s: invalid rotation value (value = 0x%x",
+                    __FUNCTION__, rotation);
     }
     return -1;
 }
@@ -801,28 +676,11 @@ inline int getRotOutFmt(uint32_t format) {
     return -1;
 }
 
-template<>
-struct RotOutFmt<ROT_OUT_FMT_DEFAULT>
-{
-    static inline int fmt(uint32_t format) {
-        return getRotOutFmt(format);
-    }
-};
-
-template<>
-struct RotOutFmt<ROT_OUT_FMT_Y_CRCB_H2V2>
-{
-    static inline int fmt(uint32_t) {
-        return MDP_Y_CRCB_H2V2;
-    }
-};
 
 inline uint32_t getColorFormat(uint32_t format)
 {
-    //XXX: Earlier this used to mask the format
-    //to check for interlaced or 3D. Just return
-    //the format now
-    return format;
+    return (format == HAL_PIXEL_FORMAT_YV12) ?
+            format : colorFormat(format);
 }
 
 // FB0
@@ -937,43 +795,6 @@ inline void ScreenInfo::dump(const char* const s) const {
             s, mFBWidth, mFBHeight, mFBbpp, mFBystride);
 }
 
-inline void setSrcRectDim(const overlay::utils::Dim d,
-        mdp_overlay& ov) {
-    ov.src_rect.x = d.x;
-    ov.src_rect.y = d.y;
-    ov.src_rect.w = d.w;
-    ov.src_rect.h = d.h;
-}
-
-inline void setDstRectDim(const overlay::utils::Dim d,
-        mdp_overlay& ov) {
-    ov.dst_rect.x = d.x;
-    ov.dst_rect.y = d.y;
-    ov.dst_rect.w = d.w;
-    ov.dst_rect.h = d.h;
-}
-
-inline overlay::utils::Whf getSrcWhf(const mdp_overlay& ov) {
-    return overlay::utils::Whf(ov.src.width,
-            ov.src.height,
-            ov.src.format);
-}
-
-inline overlay::utils::Dim getSrcRectDim(const mdp_overlay& ov) {
-    return overlay::utils::Dim(ov.src_rect.x,
-            ov.src_rect.y,
-            ov.src_rect.w,
-            ov.src_rect.h);
-}
-
-inline overlay::utils::Dim getDstRectDim(const mdp_overlay& ov) {
-    return overlay::utils::Dim(ov.dst_rect.x,
-            ov.dst_rect.y,
-            ov.dst_rect.w,
-            ov.dst_rect.h);
-}
-
-
 } // namespace utils ends
 
 //--------------------Class Res stuff (namespace overlay only) -----------
@@ -981,7 +802,7 @@ inline overlay::utils::Dim getDstRectDim(const mdp_overlay& ov) {
 class Res {
 public:
     // /dev/graphics/fb%u
-    static const char* const devTemplate;
+    static const char* const fbPath;
     // /dev/msm_rotator
     static const char* const rotPath;
     // /sys/class/graphics/fb1/format_3d
@@ -1060,7 +881,9 @@ inline OvFD::OvFD() : mFD (INVAL) {
     mPath[0] = 0;
 }
 
-inline OvFD::~OvFD() { /* no op in the meantime */ }
+inline OvFD::~OvFD() {
+    //no op since copy() can be used to share fd, in 3d cases.
+}
 
 inline bool OvFD::open(const char* const dev, int flags)
 {

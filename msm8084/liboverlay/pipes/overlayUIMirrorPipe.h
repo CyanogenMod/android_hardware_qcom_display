@@ -46,74 +46,61 @@ public:
     /* Please look at overlayGenPipe.h for info */
     explicit UIMirrorPipe();
     ~UIMirrorPipe();
-    bool open(RotatorBase* rot);
+    bool init(RotatorBase* rot);
     bool close();
     bool commit();
-    void setId(int id);
-    void setMemoryId(int id);
-    bool queueBuffer(uint32_t offset);
-    bool dequeueBuffer(void*& buf);
+    bool queueBuffer(int fd, uint32_t offset);
     bool waitForVsync();
     bool setCrop(const utils::Dim& dim);
-    bool start(const utils::PipeArgs& args);
     bool setPosition(const utils::Dim& dim);
-    bool setParameter(const utils::Params& param);
+    bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    const utils::PipeArgs& getArgs() const;
     utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
     overlay::GenericPipe<ovutils::EXTERNAL> mUI;
+    utils::eTransform mPrimFBOr; //Primary FB's orientation
 };
 
 //----------------------------Inlines -----------------------------
 
-inline UIMirrorPipe::UIMirrorPipe() {}
+inline UIMirrorPipe::UIMirrorPipe() { mPrimFBOr = utils::OVERLAY_TRANSFORM_0; }
 inline UIMirrorPipe::~UIMirrorPipe() { close(); }
-inline bool UIMirrorPipe::open(RotatorBase* rot) {
-    ALOGE_IF(DEBUG_OVERLAY, "UIMirrorPipe open");
-    bool ret = mUI.open(rot);
-    //If source to rotator is framebuffer, which is the case we UI Mirror pipe,
-    //we need to inform driver during playback. Since FB does not use ION.
-    rot->setSrcFB(true);
+inline bool UIMirrorPipe::init(RotatorBase* rot) {
+    ALOGE_IF(DEBUG_OVERLAY, "UIMirrorPipe init");
+    bool ret = mUI.init(rot);
+    //If source to rotator is FB, which is the case with UI Mirror pipe,
+    //we need to inform driver during playback, since FB does not use ION.
+    rot->setSrcFB();
     return ret;
 }
 inline bool UIMirrorPipe::close() { return mUI.close(); }
 inline bool UIMirrorPipe::commit() { return mUI.commit(); }
-inline void UIMirrorPipe::setId(int id) { mUI.setId(id); }
-inline void UIMirrorPipe::setMemoryId(int id) { mUI.setMemoryId(id); }
-inline bool UIMirrorPipe::queueBuffer(uint32_t offset) {
-    return mUI.queueBuffer(offset); }
-inline bool UIMirrorPipe::dequeueBuffer(void*& buf) {
-    return mUI.dequeueBuffer(buf); }
+inline bool UIMirrorPipe::queueBuffer(int fd, uint32_t offset) {
+    return mUI.queueBuffer(fd, offset);
+}
 inline bool UIMirrorPipe::waitForVsync() {
     return mUI.waitForVsync(); }
 inline bool UIMirrorPipe::setCrop(const utils::Dim& dim) {
     return mUI.setCrop(dim); }
-inline bool UIMirrorPipe::start(const utils::PipeArgs& args) {
-    if(!mUI.start(args)) {
-        ALOGE("%s failed to start", __FUNCTION__);
-        return false;
-    }
-    return true;
-}
-inline bool UIMirrorPipe::setPosition(const utils::Dim& dim) {
 
+inline bool UIMirrorPipe::setPosition(const utils::Dim& dim) {
     ovutils::Dim pdim;
-    switch (dim.o) {
-        case 0:
-        case HAL_TRANSFORM_ROT_180:
+    //using utils::eTransform;
+    switch (mPrimFBOr) {
+        case utils::OVERLAY_TRANSFORM_0:
+        case utils::OVERLAY_TRANSFORM_ROT_180:
             {
-                ovutils::Whf whf(dim.x, dim.y, 0);
+                ovutils::Whf whf(dim.w, dim.h, 0);
                 pdim = mUI.getAspectRatio(whf);
                 break;
             }
-        case HAL_TRANSFORM_ROT_90:
-        case HAL_TRANSFORM_ROT_270:
+        case utils::OVERLAY_TRANSFORM_ROT_90:
+        case utils::OVERLAY_TRANSFORM_ROT_270:
             {
                 // Calculate the Aspectratio for the UI in the landscape mode
                 // Width and height will be swapped as there is rotation
-                ovutils::Whf whf(dim.y, dim.x, 0);
+                ovutils::Whf whf(dim.h, dim.w, 0);
                 pdim = mUI.getAspectRatio(whf);
                 break;
             }
@@ -121,43 +108,43 @@ inline bool UIMirrorPipe::setPosition(const utils::Dim& dim) {
             ALOGE("%s: Unknown orientation %d", __FUNCTION__, dim.o);
             return false;
     }
-
-    ovutils::even_out(pdim.x);
-    ovutils::even_out(pdim.y);
-    ovutils::even_out(pdim.w);
-    ovutils::even_out(pdim.h);
     return mUI.setPosition(pdim);
 }
-inline bool UIMirrorPipe::setParameter(const utils::Params& param) {
 
-    OVASSERT(utils::OVERLAY_TRANSFORM_UI == param.param,
-            "%p Expecting OVERLAY_TRANSFORM_UI", __FUNCTION__);
+inline bool UIMirrorPipe::setTransform(const utils::eTransform& param) {
 
-    int orientation = param.value;
+    //Cache the primary FB orientation, since the TV's will be 0, we need this
+    //info to translate later.
+    mPrimFBOr = param;
+    utils::eTransform transform = param;
 
     // Figure out orientation to transform to
-    switch (param.value) {
-        case 0:
-            orientation = 0;
+    switch (param) {
+        case utils::OVERLAY_TRANSFORM_0:
+            transform = utils::OVERLAY_TRANSFORM_0;
             break;
-        case HAL_TRANSFORM_ROT_180:
-            orientation = HAL_TRANSFORM_ROT_180;
+        case utils::OVERLAY_TRANSFORM_ROT_180:
+        //If prim FB is drawn 180 rotated, rotate by additional 180 to make
+        //it to 0, which is TV's orientation.
+            transform = utils::OVERLAY_TRANSFORM_ROT_180;
             break;
-        case HAL_TRANSFORM_ROT_90:
-            orientation = HAL_TRANSFORM_ROT_270;
+        case utils::OVERLAY_TRANSFORM_ROT_90:
+        //If prim FB is drawn 90 rotated, rotate by additional 270 to make
+        //it to 0, which is TV's orientation.
+            transform = utils::OVERLAY_TRANSFORM_ROT_270;
             break;
-        case HAL_TRANSFORM_ROT_270:
-            orientation = HAL_TRANSFORM_ROT_90;
+        case utils::OVERLAY_TRANSFORM_ROT_270:
+        //If prim FB is drawn 270 rotated, rotate by additional 90 to make
+        //it to 0, which is TV's orientation.
+            transform = utils::OVERLAY_TRANSFORM_ROT_90;
             break;
         default:
-            ALOGE("%s: Unknown orientation %d", __FUNCTION__, param.value);
+            ALOGE("%s: Unknown orientation %d", __FUNCTION__,
+                    static_cast<int>(param));
             return false;
     }
 
-    ovutils::eTransform transform =
-            static_cast<ovutils::eTransform>(orientation);
-    const ovutils::Params prms (ovutils::OVERLAY_TRANSFORM, transform);
-    return mUI.setParameter(prms);
+    return mUI.setTransform(transform);
 }
 
 inline bool UIMirrorPipe::setSource(const utils::PipeArgs& args) {
@@ -174,9 +161,6 @@ inline bool UIMirrorPipe::setSource(const utils::PipeArgs& args) {
     }
 
     return mUI.setSource(arg);
-}
-inline const utils::PipeArgs& UIMirrorPipe::getArgs() const {
-    return mUI.getArgs();
 }
 inline utils::eOverlayPipeType UIMirrorPipe::getOvPipeType() const {
     return utils::OV_PIPE_TYPE_UI_MIRROR;

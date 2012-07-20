@@ -34,64 +34,37 @@
 #include "overlayRotator.h"
 #include "overlayCtrlData.h"
 
-// FIXME make int to be uint32 whenever possible
-
 namespace overlay {
 
 template <int PANEL>
 class GenericPipe : utils::NoCopy {
 public:
-    /* ctor init */
+    /* ctor */
     explicit GenericPipe();
-
-    /* dtor close */
+    /* dtor */
     ~GenericPipe();
-
-    /* CTRL/DATA/ROT open */
-    bool open(RotatorBase* rot);
-
+    /* CTRL/DATA init. Not owning rotator, will not  init it */
+    bool init(RotatorBase* rot);
     /* CTRL/DATA close. Not owning rotator, will not close it */
     bool close();
 
+    /* Control APIs */
+    /* set source using whf, orient and wait flag */
+    bool setSource(const utils::PipeArgs& args);
+    /* set crop a.k.a the region of interest */
+    bool setCrop(const utils::Dim& d);
+    /* set orientation*/
+    bool setTransform(const utils::eTransform& param);
+    /* set mdp posision using dim */
+    bool setPosition(const utils::Dim& dim);
     /* commit changes to the overlay "set"*/
     bool commit();
 
-    /* "Data" related interface */
-
-    /* set ID directly to data channel */
-    void setId(int id);
-
-    /* Set FD / memid */
-    void setMemoryId(int id);
-
+    /* Data APIs */
     /* queue buffer to the overlay */
-    bool queueBuffer(uint32_t offset);
-
-    /* dequeue buffer to the overlay NOTSUPPORTED */
-    bool dequeueBuffer(void*& buf);
-
+    bool queueBuffer(int fd, uint32_t offset);
     /* wait for vsync to be done */
     bool waitForVsync();
-
-    /* set crop data FIXME setROI (Region Of Intrest) */
-    bool setCrop(const utils::Dim& d);
-
-    /* "Ctrl" related interface */
-
-    /*
-     * Start a session, opens the rotator
-     * FIXME, we might want to open the rotator separately
-     */
-    bool start(const utils::PipeArgs& args);
-
-    /* set mdp posision using dim */
-    bool setPosition(const utils::Dim& dim);
-
-    /* set param using Params (param,value pair) */
-    bool setParameter(const utils::Params& param);
-
-    /* set source using whf, orient and wait flag */
-    bool setSource(const utils::PipeArgs& args);
 
     /* return cached startup args */
     const utils::PipeArgs& getArgs() const;
@@ -123,33 +96,33 @@ public:
     /* dump the state of the object */
     void dump() const;
 private:
-    /* set Closed channel */
+    /* set Closed pipe */
     bool setClosed();
-    // kick off rotator.
-    bool startRotator();
 
     /* Ctrl/Data aggregator */
     CtrlData mCtrlData;
-
-    /* caching startup params. useful when need
-     * to have the exact copy of that pipe.
-     * For example when HDMI is connected, and we would
-     * like to open/start the pipe with the args */
-    utils::PipeArgs mArgs;
 
     /* rotator mdp base
      * Can point to NullRotator or to Rotator*/
     RotatorBase* mRot;
 
-    /* my flags */
-    enum { CLOSED = 1<<0 };
-    uint32_t mFlags;
+    //Whether rotator is used for 0-rot or otherwise
+    bool mRotUsed;
+
+    /* Pipe open or closed */
+    enum ePipeState {
+        CLOSED,
+        OPEN
+    };
+    ePipeState pipeState;
 };
 
 //------------------------Inlines and Templates ----------------------
 
 template <int PANEL>
-GenericPipe<PANEL>::GenericPipe() : mRot(0), mFlags(CLOSED) {}
+GenericPipe<PANEL>::GenericPipe() : mRot(0), mRotUsed(false),
+        pipeState(CLOSED) {
+}
 
 template <int PANEL>
 GenericPipe<PANEL>::~GenericPipe() {
@@ -157,33 +130,42 @@ GenericPipe<PANEL>::~GenericPipe() {
 }
 
 template <int PANEL>
-bool GenericPipe<PANEL>::open(RotatorBase* rot)
+bool GenericPipe<PANEL>::init(RotatorBase* rot)
 {
+    ALOGE_IF(DEBUG_OVERLAY, "GenericPipe init");
     OVASSERT(rot, "rot is null");
-    // open ctrl and data
+
+    // init ctrl and data
     uint32_t fbnum = utils::getFBForPanel(PANEL);
-    ALOGE_IF(DEBUG_OVERLAY, "GenericPipe open");
-    if(!mCtrlData.ctrl.open(fbnum, rot)) {
-        ALOGE("GenericPipe failed to open ctrl");
+
+    if(!mCtrlData.ctrl.init(fbnum)) {
+        ALOGE("GenericPipe failed to init ctrl");
         return false;
     }
-    if(!mCtrlData.data.open(fbnum, rot)) {
-        ALOGE("GenericPipe failed to open data");
+
+    if(!mCtrlData.data.init(fbnum)) {
+        ALOGE("GenericPipe failed to init data");
         return false;
     }
+
+    //Cache the rot ref. Ownership is with OverlayImpl.
     mRot = rot;
 
-    // NOTE: we won't have the flags as non CLOSED since we
-    // consider the pipe opened for business only when we call
-    // start()
+    mRotUsed = false;
+
+    // NOTE:init() on the rot is called by OverlayImpl
+    // Pipes only have to worry about using rot, and not init or close.
 
     return true;
 }
 
 template <int PANEL>
 bool GenericPipe<PANEL>::close() {
-    if(isClosed()) return true;
+    if(isClosed())
+        return true;
+
     bool ret = true;
+
     if(!mCtrlData.ctrl.close()) {
         ALOGE("GenericPipe failed to close ctrl");
         ret = false;
@@ -192,25 +174,106 @@ bool GenericPipe<PANEL>::close() {
         ALOGE("GenericPipe failed to close data");
         ret = false;
     }
+
+    // NOTE:close() on the rot is called by OverlayImpl
+    // Pipes only have to worry about using rot, and not init or close.
+
     setClosed();
     return ret;
 }
 
 template <int PANEL>
-inline bool GenericPipe<PANEL>::commit(){
-    OVASSERT(isOpen(), "State is closed, cannot commit");
-    return mCtrlData.ctrl.commit();
+inline bool GenericPipe<PANEL>::setSource(
+        const utils::PipeArgs& args)
+{
+    utils::PipeArgs newargs(args);
+    //Interlace video handling.
+    if(newargs.whf.format & INTERLACE_MASK) {
+        setMdpFlags(newargs.mdpFlags, utils::OV_MDP_DEINTERLACE);
+    }
+    utils::Whf whf(newargs.whf);
+    //Extract HAL format from lower bytes. Deinterlace if interlaced.
+    whf.format = utils::getColorFormat(whf.format);
+    //Get MDP equivalent of HAL format.
+    whf.format = utils::getMdpFormat(whf.format);
+    newargs.whf = whf;
+
+    //Cache if user wants 0-rotation
+    mRotUsed = newargs.rotFlags & utils::ROT_FLAG_ENABLED;
+    mRot->setSource(newargs.whf);
+    mRot->setFlags(newargs.mdpFlags);
+    return mCtrlData.ctrl.setSource(newargs);
 }
 
 template <int PANEL>
-inline void GenericPipe<PANEL>::setMemoryId(int id) {
-    OVASSERT(isOpen(), "State is closed, cannot setMemoryId");
-    mCtrlData.data.setMemoryId(id);
+inline bool GenericPipe<PANEL>::setCrop(
+        const overlay::utils::Dim& d) {
+    return mCtrlData.ctrl.setCrop(d);
 }
 
 template <int PANEL>
-inline void GenericPipe<PANEL>::setId(int id) {
-    mCtrlData.data.setId(id); }
+inline bool GenericPipe<PANEL>::setTransform(
+        const utils::eTransform& orient)
+{
+    //Rotation could be enabled by user for zero-rot or the layer could have
+    //some transform. Mark rotation enabled in either case.
+    mRotUsed |= (orient != utils::OVERLAY_TRANSFORM_0);
+    mRot->setTransform(orient, mRotUsed);
+
+    return mCtrlData.ctrl.setTransform(orient, mRotUsed);
+}
+
+template <int PANEL>
+inline bool GenericPipe<PANEL>::setPosition(const utils::Dim& d)
+{
+    return mCtrlData.ctrl.setPosition(d);
+}
+
+template <int PANEL>
+inline bool GenericPipe<PANEL>::commit() {
+    bool ret = false;
+    //If wanting to use rotator, start it.
+    if(mRotUsed) {
+        if(!mRot->commit()) {
+            ALOGE("GenPipe Rotator commit failed");
+            return false;
+        }
+    }
+    ret = mCtrlData.ctrl.commit();
+    pipeState = ret ? OPEN : CLOSED;
+    return ret;
+}
+
+template <int PANEL>
+inline bool GenericPipe<PANEL>::queueBuffer(int fd, uint32_t offset) {
+    //TODO Move pipe-id transfer to CtrlData class. Make ctrl and data private.
+    OVASSERT(isOpen(), "State is closed, cannot queueBuffer");
+    int pipeId = mCtrlData.ctrl.getPipeId();
+    OVASSERT(-1 != pipeId, "Ctrl ID should not be -1");
+    // set pipe id from ctrl to data
+    mCtrlData.data.setPipeId(pipeId);
+
+    int finalFd = fd;
+    uint32_t finalOffset = offset;
+    //If rotator is to be used, queue to it, so it can ROTATE.
+    if(mRotUsed) {
+        if(!mRot->queueBuffer(fd, offset)) {
+            ALOGE("GenPipe Rotator play failed");
+            return false;
+        }
+        //Configure MDP's source buffer as the current output buffer of rotator
+        if(mRot->getDstMemId() != -1) {
+            finalFd = mRot->getDstMemId();
+            finalOffset = mRot->getDstOffset();
+        } else {
+            //Could be -1 for NullRotator, if queue above succeeds.
+            //Need an actual rotator. Modify overlay State Traits.
+            //Not fatal, keep queuing to MDP without rotation.
+            ALOGE("Null rotator in use, where an actual is required");
+        }
+    }
+    return mCtrlData.data.queueBuffer(finalFd, finalOffset);
+}
 
 template <int PANEL>
 inline int GenericPipe<PANEL>::getCtrlFd() const {
@@ -218,125 +281,9 @@ inline int GenericPipe<PANEL>::getCtrlFd() const {
 }
 
 template <int PANEL>
-inline bool GenericPipe<PANEL>::setCrop(
-        const overlay::utils::Dim& d) {
-    OVASSERT(isOpen(), "State is closed, cannot setCrop");
-    return mCtrlData.ctrl.setCrop(d);
-}
-
-template <int PANEL>
-bool GenericPipe<PANEL>::start(const utils::PipeArgs& args)
-{
-    /* open before your start control rotator */
-    uint32_t sz = args.whf.size; //utils::getSizeByMdp(args.whf);
-    OVASSERT(sz, "GenericPipe sz=%d", sz);
-    if(!mRot->open()) {
-        ALOGE("GenericPipe start failed to open rot");
-        return false;
-    }
-
-    if(!mCtrlData.ctrl.start(args)){
-        ALOGE("GenericPipe failed to start");
-        return false;
-    }
-
-    int ctrlId = mCtrlData.ctrl.getId();
-    OVASSERT(-1 != ctrlId, "Ctrl ID should not be -1");
-    // set ID requeset to assoc ctrl to data
-    setId(ctrlId);
-    // set ID request to assoc MDP data to ROT MDP data
-    mRot->setDataReqId(mCtrlData.data.getId());
-
-    // cache the args for future reference.
-    mArgs = args;
-
-    // we got here so we are open+start and good to go
-    mFlags = 0; // clear flags from CLOSED
-    // TODO make it more robust when more flags
-    // are added
-
-    return true;
-}
-
-template <int PANEL>
-inline const utils::PipeArgs& GenericPipe<PANEL>::getArgs() const
-{
-    return mArgs;
-}
-
-template <int PANEL>
-bool GenericPipe<PANEL>::startRotator() {
-    // kick off rotator
-    if(!mRot->start()) {
-        ALOGE("GenericPipe failed to start rotator");
-        return false;
-    }
-    return true;
-}
-
-template <int PANEL>
-inline bool GenericPipe<PANEL>::queueBuffer(uint32_t offset) {
-    OVASSERT(isOpen(), "State is closed, cannot queueBuffer");
-    return mCtrlData.data.queueBuffer(offset);
-}
-
-template <int PANEL>
-inline bool GenericPipe<PANEL>::dequeueBuffer(void*&) {
-    OVASSERT(isOpen(), "State is closed, cannot dequeueBuffer");
-    // can also set error to NOTSUPPORTED in the future
-    return false;
-}
-
-template <int PANEL>
 inline bool GenericPipe<PANEL>::waitForVsync() {
     OVASSERT(isOpen(), "State is closed, cannot waitForVsync");
-
     return mCtrlData.data.waitForVsync();
-}
-
-template <int PANEL>
-inline bool GenericPipe<PANEL>::setPosition(const utils::Dim& dim)
-{
-    OVASSERT(isOpen(), "State is closed, cannot setPosition");
-    return mCtrlData.ctrl.setPosition(dim);
-}
-
-template <int PANEL>
-inline bool GenericPipe<PANEL>::setParameter(
-        const utils::Params& param)
-{
-    OVASSERT(isOpen(), "State is closed, cannot setParameter");
-    // Currently setParameter would start rotator
-    if(!mCtrlData.ctrl.setParameter(param)) {
-        ALOGE("GenericPipe failed to setparam");
-        return false;
-    }
-    // if rot flags are ENABLED it means we would always
-    // like to have rot. Even with 0 rot. (solves tearing)
-    if(utils::ROT_FLAG_ENABLED == mArgs.rotFlags) {
-        mRot->setEnable();
-    }
-    return startRotator();
-}
-
-template <int PANEL>
-inline bool GenericPipe<PANEL>::setSource(
-        const utils::PipeArgs& args)
-{
-    // cache the recent args.
-    mArgs = args;
-    // setSource is the 1st thing that is being called on a pipe.
-    // If pipe is closed, we should start everything.
-    // we assume it is being opened with the correct FDs.
-    if(isClosed()) {
-        if(!this->start(args)) {
-            ALOGE("GenericPipe setSource failed to start");
-            return false;
-        }
-        return true;
-    }
-
-    return mCtrlData.ctrl.setSource(args);
 }
 
 template <int PANEL>
@@ -374,7 +321,7 @@ template <int PANEL>
 void GenericPipe<PANEL>::dump() const
 {
     ALOGE("== Dump Generic pipe start ==");
-    ALOGE("flags=0x%x", mFlags);
+    ALOGE("pipe state = %d", (int)pipeState);
     OVASSERT(mRot, "GenericPipe should have a valid Rot");
     mCtrlData.ctrl.dump();
     mCtrlData.data.dump();
@@ -384,19 +331,19 @@ void GenericPipe<PANEL>::dump() const
 
 template <int PANEL>
 inline bool GenericPipe<PANEL>::isClosed() const  {
-    return utils::getBit(mFlags, CLOSED);
+    return (pipeState == CLOSED);
 }
 
 template <int PANEL>
 inline bool GenericPipe<PANEL>::isOpen() const  {
-    return !isClosed();
+    return (pipeState == OPEN);
 }
 
 template <int PANEL>
 inline bool GenericPipe<PANEL>::setClosed() {
-    return utils::setBit(mFlags, CLOSED);
+    pipeState = CLOSED;
+    return true;
 }
-
 
 } //namespace overlay
 

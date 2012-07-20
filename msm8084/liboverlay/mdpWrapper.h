@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -76,7 +76,7 @@ bool getOverlay(int fd, mdp_overlay& ov);
 bool play(int fd, msmfb_overlay_data& od);
 
 /* MSMFB_OVERLAY_PLAY_WAIT */
-bool playWait(int fd, msmfb_overlay_data& od);
+bool waitForVsync(int fd, msmfb_overlay_data& od);
 
 /* MSMFB_OVERLAY_3D */
 bool set3D(int fd, msmfb_overlay_3d& ov);
@@ -102,96 +102,108 @@ void dump(const char* const s, const fb_var_screeninfo& vinfo);
 //---------------Inlines -------------------------------------
 
 inline bool getFScreenInfo(int fd, fb_fix_screeninfo& finfo) {
-    if (ioctl(fd, FBIOGET_FSCREENINFO, &finfo) == -1) {
-        ALOGE("Failed to call ioctl FBIOGET_FSCREENINFO err=%d", errno);
+    if (ioctl(fd, FBIOGET_FSCREENINFO, &finfo) < 0) {
+        ALOGE("Failed to call ioctl FBIOGET_FSCREENINFO err=%s",
+                strerror(errno));
         return false;
     }
     return true;
 }
 
 inline bool getVScreenInfo(int fd, fb_var_screeninfo& vinfo) {
-    if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) == -1) {
-        ALOGE("Failed to call ioctl FBIOGET_VSCREENINFO err=%d", errno);
+    if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) < 0) {
+        ALOGE("Failed to call ioctl FBIOGET_VSCREENINFO err=%s",
+                strerror(errno));
         return false;
     }
     return true;
 }
 
 inline bool setVScreenInfo(int fd, fb_var_screeninfo& vinfo) {
-    if (ioctl(fd, FBIOPUT_VSCREENINFO, &vinfo) == -1) {
-        ALOGE("Failed to call ioctl FBIOPUT_VSCREENINFO err=%d", errno);
+    if (ioctl(fd, FBIOPUT_VSCREENINFO, &vinfo) < 0) {
+        ALOGE("Failed to call ioctl FBIOPUT_VSCREENINFO err=%s",
+                strerror(errno));
         return false;
     }
     return true;
 }
 
 inline bool startRotator(int fd, msm_rotator_img_info& rot) {
-    if (ioctl(fd, MSM_ROTATOR_IOCTL_START, &rot) == -1){
-        ALOGE("Failed to call ioctl MSM_ROTATOR_IOCTL_START err=%d", errno);
+    if (ioctl(fd, MSM_ROTATOR_IOCTL_START, &rot) < 0){
+        ALOGE("Failed to call ioctl MSM_ROTATOR_IOCTL_START err=%s",
+                strerror(errno));
         return false;
     }
     return true;
 }
 
 inline bool rotate(int fd, msm_rotator_data_info& rot) {
-    if (ioctl(fd, MSM_ROTATOR_IOCTL_ROTATE, &rot) == -1) {
-        ALOGE("Failed to call ioctl MSM_ROTATOR_IOCTL_ROTATE err=%d", errno);
+    if (ioctl(fd, MSM_ROTATOR_IOCTL_ROTATE, &rot) < 0) {
+        ALOGE("Failed to call ioctl MSM_ROTATOR_IOCTL_ROTATE err=%s",
+                strerror(errno));
         return false;
     }
     return true;
 }
 
 inline bool setOverlay(int fd, mdp_overlay& ov) {
-    if (ioctl(fd, MSMFB_OVERLAY_SET, &ov) == -1) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_SET err=%d", errno);
+    if (ioctl(fd, MSMFB_OVERLAY_SET, &ov) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_OVERLAY_SET err=%s",
+                strerror(errno));
         return false;
     }
     return true;
 }
 
 inline bool endRotator(int fd, int sessionId) {
-    if (ioctl(fd, MSM_ROTATOR_IOCTL_FINISH, &sessionId) == -1) {
-        ALOGE("Failed to call ioctl MSM_ROTATOR_IOCTL_FINISH err=%d", errno);
+    if (ioctl(fd, MSM_ROTATOR_IOCTL_FINISH, &sessionId) < 0) {
+        ALOGE("Failed to call ioctl MSM_ROTATOR_IOCTL_FINISH err=%s",
+                strerror(errno));
         return false;
     }
     return true;
 }
 
 inline bool unsetOverlay(int fd, int ovId) {
-    if (ioctl(fd, MSMFB_OVERLAY_UNSET, &ovId) == -1) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_UNSET err=%d", errno);
+    if (ioctl(fd, MSMFB_OVERLAY_UNSET, &ovId) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_OVERLAY_UNSET err=%s",
+                strerror(errno));
         return false;
     }
     return true;
 }
 
 inline bool getOverlay(int fd, mdp_overlay& ov) {
-    if (ioctl(fd, MSMFB_OVERLAY_GET, &ov) == -1) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_GET err=%d", errno);
+    if (ioctl(fd, MSMFB_OVERLAY_GET, &ov) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_OVERLAY_GET err=%s",
+                strerror(errno));
         return false;
     }
     return true;
 }
 
 inline bool play(int fd, msmfb_overlay_data& od) {
-    if (ioctl(fd, MSMFB_OVERLAY_PLAY, &od) == -1) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_PLAY err=%d", errno);
+    if (ioctl(fd, MSMFB_OVERLAY_PLAY, &od) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_OVERLAY_PLAY err=%s",
+                strerror(errno));
         return false;
     }
     return true;
 }
 
-inline bool playWait(int fd, msmfb_overlay_data& od) {
-    if (ioctl(fd, MSMFB_OVERLAY_PLAY_WAIT, &od) == -1) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_PLAY_WAIT err=%d", errno);
+inline bool waitForVsync(int fd, msmfb_overlay_data& od) {
+    if (ioctl(fd, MSMFB_OVERLAY_PLAY_WAIT, &od) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_OVERLAY_PLAY_WAIT err=%s",
+                strerror(errno));
         return false;
     }
     return true;
 }
 
 inline bool set3D(int fd, msmfb_overlay_3d& ov) {
-    if (ioctl(fd, MSMFB_OVERLAY_3D, &ov) == -1) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_3D err=%d", errno);
+    if (ioctl(fd, MSMFB_OVERLAY_3D, &ov) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_OVERLAY_3D err=%s",
+                strerror(errno));
         return false;
     }
     return true;
@@ -261,7 +273,6 @@ inline void dump(const char* const s, const fb_var_screeninfo& vinfo) {
     ALOGE("%s fb_var_screeninfo xres=%d yres=%d",
             s, vinfo.xres, vinfo.yres);
 }
-
 
 } // mdp_wrapper
 
