@@ -18,8 +18,9 @@
  * limitations under the License.
  */
 
+#include <copybit.h>
+#include <genlock.h>
 #include "hwc_copybit.h"
-#include "hwc_copybitEngine.h"
 
 namespace qhwc {
 
@@ -70,6 +71,23 @@ int CopyBit::sYuvLayerIndex = -1;
 bool CopyBit::sIsModeOn = false;
 bool CopyBit::sIsLayerSkip = false;
 void* CopyBit::egl_lib = NULL;
+
+void CopyBit::openEglLibAndGethandle()
+{
+    egl_lib = ::dlopen("libEGL_adreno200.so", RTLD_GLOBAL | RTLD_LAZY);
+    if (!egl_lib) {
+        return;
+    }
+    updateEglHandles(egl_lib);
+}
+void CopyBit::closeEglLib()
+{
+    if(egl_lib)
+        ::dlclose(egl_lib);
+
+    egl_lib = NULL;
+    updateEglHandles(NULL);
+}
 
 void CopyBit::updateEglHandles(void* egl_lib)
 {
@@ -365,7 +383,7 @@ bool CopyBit::canUseCopybit(hwc_context_t *ctx, const hwc_layer_list_t* list,
     if(ctx->hasOverlay)
         return false;
 
-    framebuffer_device_t* fbDev = ctx->mFbDevice->getFb();
+    framebuffer_device_t* fbDev = ctx->mFbDev;
     if(!fbDev) {
         ALOGE("ERROR: canUseCopybit : fb device is invalid");
         return false;
@@ -402,27 +420,11 @@ bool CopyBit::canUseCopybit(hwc_context_t *ctx, const hwc_layer_list_t* list,
 
     return (renderArea <= (2 * fb_w * fb_h));
 }
-void CopyBit::openEglLibAndGethandle()
-{
-    egl_lib = ::dlopen("libEGL_adreno200.so", RTLD_GLOBAL | RTLD_LAZY);
-    if (!egl_lib) {
-        return;
-    }
-    updateEglHandles(egl_lib);
-}
-void CopyBit::closeEglLib()
-{
-    if(egl_lib)
-        ::dlclose(egl_lib);
-
-    egl_lib = NULL;
-    updateEglHandles(NULL);
-}
 
 
 
 //CopybitEngine Class functions
-CopybitEngine* CopybitEngine::sInstance = 0;;
+CopybitEngine* CopybitEngine::sInstance = 0;
 
 struct copybit_device_t* CopybitEngine::getEngine() {
    return sEngine;
@@ -440,9 +442,11 @@ CopybitEngine::CopybitEngine(){
     } else {
        ALOGE("FATAL ERROR: copybit open failed.");
     }
+    CopyBit::openEglLibAndGethandle();
 }
 CopybitEngine::~CopybitEngine()
 {
+    CopyBit::closeEglLib();
     if(sEngine)
     {
         copybit_close(sEngine);

@@ -20,6 +20,7 @@
 #ifndef HWC_UIMIRROR_H
 #define HWC_UIMIRROR_H
 #include "hwc_utils.h"
+#include "overlay.h"
 
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
