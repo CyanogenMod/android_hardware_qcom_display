@@ -15,6 +15,9 @@
  * limitations under the License.
  */
 
+#include <gralloc_priv.h>
+#include <genlock.h>
+
 // -----------------------------------------------------------------------------
 // QueuedBufferStore
 //This class holds currently and previously queued buffers.

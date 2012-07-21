@@ -9,7 +9,8 @@ LOCAL_SRC_FILES :=  hwc.cpp          \
                     hwc_video.cpp  \
                     hwc_utils.cpp  \
 					hwc_uimirror.cpp \
-					hwc_ext_observer.cpp \
+					hwc_external.cpp \
+					hwc_uevents.cpp \
 					hwc_copybit.cpp
 LOCAL_MODULE := hwcomposer.$(TARGET_BOARD_PLATFORM)
 LOCAL_C_INCLUDES := hardware/qcom/display/libgralloc

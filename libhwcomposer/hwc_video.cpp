@@ -15,13 +15,15 @@
  * limitations under the License.
  */
 
+#define VIDEO_DEBUG 0
+#include <overlay.h>
+#include "hwc_qbuf.h"
 #include "hwc_video.h"
-#include "hwc_ext_observer.h"
+#include "hwc_external.h"
 
 namespace qhwc {
 
 #define FINAL_TRANSFORM_MASK 0x000F
-#define VIDEO_DEBUG 0
 
 //Static Members
 ovutils::eOverlayState VideoOverlay::sState = ovutils::OV_CLOSED;
@@ -62,12 +64,12 @@ void VideoOverlay::chooseState(hwc_context_t *ctx) {
     //Support 1 video layer
     if(sYuvCount == 1) {
         //Skip on primary, display on ext.
-        if(sIsLayerSkip && ctx->mExtDisplayObserver->getExternalDisplay()) {
+        if(sIsLayerSkip && ctx->mExtDisplay->getExternalDisplay()) {
             //TODO
             //VIDEO_ON_TV_ONLY
         } else if(sIsLayerSkip) { //skip on primary, no ext
             newState = ovutils::OV_CLOSED;
-        } else if(ctx->mExtDisplayObserver->getExternalDisplay()) {
+        } else if(ctx->mExtDisplay->getExternalDisplay()) {
             //display on both
             newState = ovutils::OV_2D_VIDEO_ON_PANEL_TV;
         } else { //display on primary only

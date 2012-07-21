@@ -31,6 +31,11 @@
 
 namespace qhwc {
 //Feature for using Copybit to display RGB layers.
+typedef EGLClientBuffer (*functype_eglGetRenderBufferANDROID) (
+                                              EGLDisplay dpy,
+                                              EGLSurface draw);
+typedef EGLSurface (*functype_eglGetCurrentSurface)(EGLint readdraw);
+
 class CopyBit {
 public:
     //Sets up members and prepares copybit if conditions are met
@@ -74,6 +79,20 @@ private:
                                                            int& height);
 
 };
+
+class CopybitEngine {
+public:
+    ~CopybitEngine();
+    // API to get copybit engine(non static)
+    struct copybit_device_t *getEngine();
+    // API to get singleton
+    static CopybitEngine* getInstance();
+private:
+    CopybitEngine();
+    struct copybit_device_t *sEngine;
+    static CopybitEngine* sInstance; // singleton
+};
+
 
 inline void CopyBit::setStats(int yuvCount, int yuvLayerIndex,
         bool isYuvLayerSkip) {
