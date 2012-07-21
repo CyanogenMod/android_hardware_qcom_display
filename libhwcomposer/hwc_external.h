@@ -18,16 +18,14 @@
  * limitations under the License.
  */
 
-#ifndef HWC_EXT_OBSERVER_H
-#define HWC_EXT_OBSERVER_H
-
-#include <utils/threads.h>
+#ifndef HWC_EXTERNAL_DISPLAY_H
+#define HWC_EXTERNAL_DISPLAY_H
 
 struct hwc_context_t;
 
 namespace qhwc {
 
-class ExtDisplayObserver : public android::Thread
+class ExternalDisplay
 {
     //Type of external display -  OFF, HDMI, WFD
     enum external_display_type {
@@ -42,39 +40,31 @@ class ExtDisplayObserver : public android::Thread
         EXT_MIRRORING_ON,
     };
     public:
-        /*Overrides*/
-        virtual bool        threadLoop();
-        virtual int         readyToRun();
-        virtual void        onFirstRef();
-
-        virtual ~ExtDisplayObserver();
-        static ExtDisplayObserver *getInstance();
-        int getExternalDisplay() const;
-        void setHwcContext(hwc_context_t* hwcCtx);
+    ExternalDisplay(hwc_context_t* ctx);
+    ~ExternalDisplay();
+    int getExternalDisplay() const;
+    void setExternalDisplayStatus(int connected);
 
     private:
-        ExtDisplayObserver();
-        void setExternalDisplayStatus(int connected);
-        bool readResolution();
-        int parseResolution(char* edidStr, int* edidModes, int len);
-        void setResolution(int ID);
-        bool openFramebuffer();
-        bool writeHPDOption(int userOption) const;
-        bool isValidMode(int ID);
-        void handleUEvent(char* str);
-        int getModeOrder(int mode);
-        int getBestMode();
+    bool readResolution();
+    int parseResolution(char* edidStr, int* edidModes, int len);
+    void setResolution(int ID);
+    bool openFramebuffer();
+    bool writeHPDOption(int userOption) const;
+    bool isValidMode(int ID);
+    void handleUEvent(char* str, int len);
+    int getModeOrder(int mode);
+    int getBestMode();
 
-        int fd;
-        int mExternalDisplay;
-        int mCurrentID;
-        char mEDIDs[128];
-        int mEDIDModes[64];
-        int mModeCount;
-        hwc_context_t *mHwcContext;
-        static android::sp<ExtDisplayObserver> sExtDisplayObserverInstance;
+    int fd;
+    int mExternalDisplay;
+    int mCurrentID;
+    char mEDIDs[128];
+    int mEDIDModes[64];
+    int mModeCount;
+    hwc_context_t *mHwcContext;
 };
 
 }; //qhwc
 // ---------------------------------------------------------------------------
-#endif //HWC_EXT_OBSERVER_H
+#endif //HWC_EXTERNAL_DISPLAY_H

@@ -18,10 +18,9 @@
  * limitations under the License.
  */
 
-#define EXT_OBSERVER_DEBUG 0
+#define DEBUG 0
 #include <ctype.h>
-#include <binder/IPCThreadState.h>
-#include <binder/IServiceManager.h>
+#include <fcntl.h>
 #include <media/IAudioPolicyService.h>
 #include <media/AudioSystem.h>
 #include <utils/threads.h>
@@ -32,11 +31,10 @@
 #include <linux/fb.h>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
-
-#include <hardware_legacy/uevent.h>
+#include <sys/resource.h>
 #include <cutils/properties.h>
 #include "hwc_utils.h"
-#include "hwc_ext_observer.h"
+#include "hwc_external.h"
 
 namespace qhwc {
 
@@ -49,86 +47,17 @@ namespace qhwc {
 #define SYSFS_HPD               DEVICE_ROOT "/" DEVICE_NODE "/hpd"
 
 
-android::sp<ExtDisplayObserver> ExtDisplayObserver::
-                                         sExtDisplayObserverInstance(0);
-
-ExtDisplayObserver::ExtDisplayObserver() : Thread(false),
-    fd(-1), mCurrentID(-1), mHwcContext(NULL)
+ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):fd(-1),
+    mCurrentID(-1), mHwcContext(ctx)
 {
     //Enable HPD for HDMI
     writeHPDOption(1);
 }
 
-ExtDisplayObserver::~ExtDisplayObserver() {
+ExternalDisplay::~ExternalDisplay()
+{
     if (fd > 0)
         close(fd);
-}
-
-ExtDisplayObserver *ExtDisplayObserver::getInstance() {
-    ALOGD_IF(EXT_OBSERVER_DEBUG, "%s ", __FUNCTION__);
-    if(sExtDisplayObserverInstance.get() == NULL)
-        sExtDisplayObserverInstance = new ExtDisplayObserver();
-    return sExtDisplayObserverInstance.get();
-}
-
-void ExtDisplayObserver::setHwcContext(hwc_context_t* hwcCtx) {
-    ALOGD_IF(EXT_OBSERVER_DEBUG, "%s", __FUNCTION__);
-    if(hwcCtx) {
-        mHwcContext = hwcCtx;
-    }
-    return;
-}
-void ExtDisplayObserver::onFirstRef() {
-    ALOGD_IF(EXT_OBSERVER_DEBUG, "%s", __FUNCTION__);
-    run("ExtDisplayObserver", ANDROID_PRIORITY_DISPLAY);
-}
-
-int ExtDisplayObserver::readyToRun() {
-    //Initialize the uevent
-    uevent_init();
-    ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: success", __FUNCTION__);
-    return android::NO_ERROR;
-}
-
-void ExtDisplayObserver::handleUEvent(char* str){
-    int connected = 0;
-    // TODO: check for fb2(WFD) driver also
-    if(!strcasestr(str, DEVICE_NODE))
-    {
-        ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: Not Ext Disp Event ", __FUNCTION__);
-        return;
-    }
-    // Event will be of the form:
-    // change@/devices/virtual/graphics/fb1 ACTION=change
-    // DEVPATH=/devices/virtual/graphics/fb1
-    // SUBSYSTEM=graphics HDCP_STATE=FAIL MAJOR=29
-    // for now just parse the online or offline are important for us.
-    if(!(strncmp(str,"online@",strlen("online@")))) {
-        ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: external disp online", __FUNCTION__);
-        connected = 1;
-        readResolution();
-        //Get the best mode and set
-        // TODO: DO NOT call this for WFD
-        setResolution(getBestMode());
-    } else if(!(strncmp(str,"offline@",strlen("offline@")))) {
-        ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: external disp online", __FUNCTION__);
-        connected = 0;
-        close(fd);
-    }
-    setExternalDisplayStatus(connected);
-}
-
-bool ExtDisplayObserver::threadLoop()
-{
-    static char uEventString[1024];
-    memset(uEventString, 0, sizeof(uEventString));
-    int count = uevent_next_event(uEventString, sizeof(uEventString));
-    if(count) {
-        ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: UeventString: %s len = %d",
-                                          __FUNCTION__, uEventString, count);
-        handleUEvent(uEventString);
-    }
-    return true;
 }
 
 struct disp_mode_timing_type {
@@ -213,7 +142,8 @@ static struct disp_mode_timing_type supported_video_mode_lut[] = {
     {m1920x1080p25_16_9, 1920, 1080, 528,  44, 148,  4, 5, 36,  74250, false},
     {m1920x1080p30_16_9, 1920, 1080,  88,  44, 148,  4, 5, 36,  74250, false},
 };
-int ExtDisplayObserver::parseResolution(char* edidStr, int* edidModes, int len)
+
+int ExternalDisplay::parseResolution(char* edidStr, int* edidModes, int len)
 {
     char delim = ',';
     int count = 0;
@@ -233,7 +163,7 @@ int ExtDisplayObserver::parseResolution(char* edidStr, int* edidModes, int len)
     }
     return count;
 }
-bool ExtDisplayObserver::readResolution()
+bool ExternalDisplay::readResolution()
 {
     int hdmiEDIDFile = open(SYSFS_EDID_MODES, O_RDONLY, 0);
     int len = -1;
@@ -242,16 +172,16 @@ bool ExtDisplayObserver::readResolution()
     memset(mEDIDModes, 0, sizeof(mEDIDModes));
     mModeCount = 0;
     if (hdmiEDIDFile < 0) {
-        ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: edid_modes file '%s' not found",
-                                          __FUNCTION__, SYSFS_EDID_MODES);
+        ALOGD_IF(DEBUG, "%s: edid_modes file '%s' not found",
+                 __FUNCTION__, SYSFS_EDID_MODES);
         return false;
     } else {
         len = read(hdmiEDIDFile, mEDIDs, sizeof(mEDIDs)-1);
-        ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: EDID string: %s length = %d",
-                                               __FUNCTION__, mEDIDs, len);
+        ALOGD_IF(DEBUG, "%s: EDID string: %s length = %d",
+                 __FUNCTION__, mEDIDs, len);
         if ( len <= 0) {
-            ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: edid_modes file empty '%s'",
-                                           __FUNCTION__, SYSFS_EDID_MODES);
+            ALOGD_IF(DEBUG, "%s: edid_modes file empty '%s'",
+                     __FUNCTION__, SYSFS_EDID_MODES);
         }
         else {
             while (len > 1 && isspace(mEDIDs[len-1]))
@@ -263,26 +193,26 @@ bool ExtDisplayObserver::readResolution()
     if(len > 0) {
         // GEt EDID modes from the EDID strings
         mModeCount = parseResolution(mEDIDs, mEDIDModes, len);
-        ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: mModeCount = %d", __FUNCTION__,
-                                                                  mModeCount);
+        ALOGD_IF(DEBUG, "%s: mModeCount = %d", __FUNCTION__,
+                 mModeCount);
     }
 
     return (strlen(mEDIDs) > 0);
 }
 
-bool ExtDisplayObserver::openFramebuffer()
+bool ExternalDisplay::openFramebuffer()
 {
     if (fd == -1) {
         fd = open("/dev/graphics/fb1", O_RDWR);
         if (fd < 0)
-            ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: /dev/graphics/fb1 not available"
-                                               "\n", __FUNCTION__);
+            ALOGD_IF(DEBUG, "%s: /dev/graphics/fb1 not available"
+                     "\n", __FUNCTION__);
     }
     return (fd > 0);
 }
 
 
-int ExtDisplayObserver::getModeOrder(int mode)
+int ExternalDisplay::getModeOrder(int mode)
 {
     switch (mode) {
         default:
@@ -320,11 +250,11 @@ int ExtDisplayObserver::getModeOrder(int mode)
             return 16; //1080p@50Hz
         case m1920x1080p60_16_9:
             return 17; //1080p@60Hz
-        }
+    }
 }
 
 // Get the best mode for the current HD TV
-int ExtDisplayObserver::getBestMode() {
+int ExternalDisplay::getBestMode() {
     int bestOrder = 0;
     int bestMode = m640x480p60_4_3;
 
@@ -338,14 +268,14 @@ int ExtDisplayObserver::getBestMode() {
         }
     }
     return bestMode;
-    }
+}
 
-inline bool ExtDisplayObserver::isValidMode(int ID)
+inline bool ExternalDisplay::isValidMode(int ID)
 {
     return ((ID >= m640x480p60_4_3) && (ID <= m1920x1080p30_16_9));
 }
 
-void ExtDisplayObserver::setResolution(int ID)
+void ExternalDisplay::setResolution(int ID)
 {
     struct fb_var_screeninfo info;
     if (!openFramebuffer())
@@ -353,29 +283,29 @@ void ExtDisplayObserver::setResolution(int ID)
     //If its a valid mode and its a new ID - update var_screeninfo
     if ((isValidMode(ID)) && mCurrentID != ID) {
         const struct disp_mode_timing_type *mode =
-                                                  &supported_video_mode_lut[0];
+            &supported_video_mode_lut[0];
         unsigned count =  sizeof(supported_video_mode_lut)/sizeof
-                                                   (*supported_video_mode_lut);
+            (*supported_video_mode_lut);
         for (unsigned int i = 0; i < count; ++i) {
             const struct disp_mode_timing_type *cur =
-                                                 &supported_video_mode_lut[i];
+                &supported_video_mode_lut[i];
             if (cur->video_format == ID)
                 mode = cur;
         }
         ioctl(fd, FBIOGET_VSCREENINFO, &info);
-        ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: GET Info<ID=%d %dx%d (%d,%d,%d),"
-                "(%d,%d,%d) %dMHz>", __FUNCTION__,
-                info.reserved[3], info.xres, info.yres,
-                info.right_margin, info.hsync_len, info.left_margin,
-                info.lower_margin, info.vsync_len, info.upper_margin,
-                info.pixclock/1000/1000);
+        ALOGD_IF(DEBUG, "%s: GET Info<ID=%d %dx%d (%d,%d,%d),"
+                 "(%d,%d,%d) %dMHz>", __FUNCTION__,
+                 info.reserved[3], info.xres, info.yres,
+                 info.right_margin, info.hsync_len, info.left_margin,
+                 info.lower_margin, info.vsync_len, info.upper_margin,
+                 info.pixclock/1000/1000);
         mode->set_info(info);
-        ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: SET Info<ID=%d => Info<ID=%d %dx%d"
-                "(%d,%d,%d), (%d,%d,%d) %dMHz>", __FUNCTION__, ID,
-                info.reserved[3], info.xres, info.yres,
-                info.right_margin, info.hsync_len, info.left_margin,
-                info.lower_margin, info.vsync_len, info.upper_margin,
-                info.pixclock/1000/1000);
+        ALOGD_IF(DEBUG, "%s: SET Info<ID=%d => Info<ID=%d %dx%d"
+                 "(%d,%d,%d), (%d,%d,%d) %dMHz>", __FUNCTION__, ID,
+                 info.reserved[3], info.xres, info.yres,
+                 info.right_margin, info.hsync_len, info.left_margin,
+                 info.lower_margin, info.vsync_len, info.upper_margin,
+                 info.pixclock/1000/1000);
         info.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_ALL | FB_ACTIVATE_FORCE;
         ioctl(fd, FBIOPUT_VSCREENINFO, &info);
         mCurrentID = ID;
@@ -389,53 +319,61 @@ void ExtDisplayObserver::setResolution(int ID)
 }
 
 
-int  ExtDisplayObserver::getExternalDisplay() const
+int  ExternalDisplay::getExternalDisplay() const
 {
- return mExternalDisplay;
+    return mExternalDisplay;
 }
 
-void ExtDisplayObserver::setExternalDisplayStatus(int connected)
+void ExternalDisplay::setExternalDisplayStatus(int connected)
 {
 
     hwc_context_t* ctx = mHwcContext;
     if(ctx) {
-        ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: status = %d", __FUNCTION__,
-                                                        connected);
+        ALOGD_IF(DEBUG, "%s: status = %d", __FUNCTION__,
+                 connected);
+        if(connected) {
+            readResolution();
+            //Get the best mode and set
+            // TODO: DO NOT call this for WFD
+            setResolution(getBestMode());
+        } else {
+            close(fd);
+        }
         // Store the external display
-        mExternalDisplay = connected;//(external_display_type)value;
+        mExternalDisplay = connected;
         //Invalidate
         hwc_procs* proc = (hwc_procs*)ctx->device.reserved_proc[0];
         if(!proc) {
-            ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: HWC proc not registered",
-                                                                __FUNCTION__);
+            ALOGD_IF(DEBUG, "%s: HWC proc not registered",
+                     __FUNCTION__);
         } else {
             /* Trigger redraw */
-            ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: Invalidate !!", __FUNCTION__);
+            ALOGD_IF(DEBUG, "%s: Invalidate !!", __FUNCTION__);
             proc->invalidate(proc);
         }
     }
     return;
 }
 
-bool ExtDisplayObserver::writeHPDOption(int userOption) const
+bool ExternalDisplay::writeHPDOption(int userOption) const
 {
     bool ret = true;
     int hdmiHPDFile = open(SYSFS_HPD,O_RDWR, 0);
     if (hdmiHPDFile < 0) {
-        ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: state file '%s' not found : ret%d"
-        "err str: %s",  __FUNCTION__, SYSFS_HPD, hdmiHPDFile, strerror(errno));
+        ALOGD_IF(DEBUG, "%s: state file '%s' not found : ret%d"
+                 "err str: %s",  __FUNCTION__, SYSFS_HPD, hdmiHPDFile, strerror(errno));
         ret = false;
     } else {
         int err = -1;
-        ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: option = %d", __FUNCTION__,
-                                                            userOption);
+        ALOGD_IF(DEBUG, "%s: option = %d", __FUNCTION__,
+                 userOption);
         if(userOption)
             err = write(hdmiHPDFile, "1", 2);
         else
             err = write(hdmiHPDFile, "0" , 2);
         if (err <= 0) {
-            ALOGD_IF(EXT_OBSERVER_DEBUG, "%s: file write failed '%s'",
-                                                __FUNCTION__, SYSFS_HPD);
+            ALOGD_IF(DEBUG, "%s: file write failed '%s'",
+                     __FUNCTION__, SYSFS_HPD);
             ret = false;
         }
         close(hdmiHPDFile);

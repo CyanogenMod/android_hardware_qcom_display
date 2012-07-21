@@ -18,12 +18,14 @@
  * limitations under the License.
  */
 
+#define HWC_UI_MIRROR 0
+#include <gralloc_priv.h>
+#include <fb_priv.h>
 #include "hwc_uimirror.h"
-#include "hwc_ext_observer.h"
+#include "hwc_external.h"
 
 namespace qhwc {
 
-#define HWC_UI_MIRROR 0
 
 // Function to get the primary device orientation
 // Loops thru the hardware layers and returns the orientation of the max.
@@ -59,7 +61,7 @@ bool UIMirrorOverlay::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
     sState = ovutils::OV_CLOSED;
     sIsUiMirroringOn = false;
     // If external display is connected
-    if(ctx->mExtDisplayObserver->getExternalDisplay()) {
+    if(ctx->mExtDisplay->getExternalDisplay()) {
         sState = ovutils::OV_UI_MIRROR;
         configure(ctx, list);
     }
@@ -73,7 +75,7 @@ bool UIMirrorOverlay::configure(hwc_context_t *ctx, hwc_layer_list_t *list)
         overlay::Overlay& ov = *(ctx->mOverlay);
         // Set overlay state
         ov.setState(sState);
-        framebuffer_device_t *fbDev = ctx->mFbDevice->getFb();
+        framebuffer_device_t *fbDev = ctx->mFbDev;
         if(fbDev) {
             private_module_t* m = reinterpret_cast<private_module_t*>(
                     fbDev->common.module);
@@ -143,7 +145,7 @@ bool UIMirrorOverlay::draw(hwc_context_t *ctx)
     overlay::Overlay& ov = *(ctx->mOverlay);
     ovutils::eOverlayState state = ov.getState();
     ovutils::eDest dest = ovutils::OV_PIPE_ALL;
-    framebuffer_device_t *fbDev = ctx->mFbDevice->getFb();
+    framebuffer_device_t *fbDev = ctx->mFbDev;
     if(fbDev) {
         private_module_t* m = reinterpret_cast<private_module_t*>(
                               fbDev->common.module);
