@@ -9,6 +9,6 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL liboverlay libgenlock \
                                  libqdutils libhardware_legacy libdl libmemalloc
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"hwcomposer\"
 LOCAL_SRC_FILES               :=  hwc.cpp hwc_video.cpp hwc_utils.cpp \
-                                  hwc_uimirror.cpp hwc_ext_observer.cpp \
-                                  hwc_copybit.cpp
+                                  hwc_uimirror.cpp hwc_external.cpp \
+                                  hwc_uevents.cpp hwc_copybit.cpp
 include $(BUILD_SHARED_LIBRARY)
