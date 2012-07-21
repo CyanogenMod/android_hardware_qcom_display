@@ -17,28 +17,26 @@
 
 #ifndef HWC_UTILS_H
 #define HWC_UTILS_H
-#include <cutils/log.h>
-#include <gralloc_priv.h>
+
 #include <hardware/hwcomposer.h>
-#include <hardware/hardware.h>
-#include <hardware/gralloc.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fb_priv.h>
-#include <overlay.h>
-#include <copybit.h>
-#include <hwc_copybitEngine.h>
-#include <genlock.h>
-#include "hwc_qbuf.h"
-#include <EGL/egl.h>
+#include <gralloc_priv.h>
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 #define FINAL_TRANSFORM_MASK 0x000F
 
+//Fwrd decls
 struct hwc_context_t;
+struct framebuffer_device_t;
+
+namespace overlay {
+class Overlay;
+}
+
 namespace qhwc {
+//fwrd decl
+class QueuedBufferStore;
 
 enum external_display_type {
     EXT_TYPE_NONE,
@@ -53,7 +51,8 @@ enum HWCCompositionType {
 };
 
 
-class ExtDisplayObserver;
+class ExternalDisplay;
+class CopybitEngine;
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_t const* l);
@@ -78,31 +77,11 @@ static inline bool isYuvBuffer(const private_handle_t* hnd) {
 static inline bool isBufferLocked(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags));
 }
-// -----------------------------------------------------------------------------
-// Copybit specific - inline or implemented in hwc_copybit.cpp
-typedef EGLClientBuffer (*functype_eglGetRenderBufferANDROID) (
-                                                     EGLDisplay dpy,
-                                                    EGLSurface draw);
-typedef EGLSurface (*functype_eglGetCurrentSurface)(EGLint readdraw);
 
-// -----------------------------------------------------------------------------
-// Singleton for Framebuffer device
-class FbDevice{
-public:
-    ~FbDevice();
-    // API to get Fb device(non static)
-    struct framebuffer_device_t *getFb();
-    // API to get singleton
-    static FbDevice* getInstance();
-
-private:
-    FbDevice();
-    struct framebuffer_device_t *sFb;
-    static FbDevice* sInstance; // singleton
-};
+// Initialize uevent thread
+void init_uevent_thread(hwc_context_t* ctx);
 
 }; //qhwc namespace
-
 
 // -----------------------------------------------------------------------------
 // HWC context
@@ -115,7 +94,7 @@ struct hwc_context_t {
     int overlayInUse;
 
     //Framebuffer device
-    qhwc::FbDevice* mFbDevice;
+    framebuffer_device_t *mFbDev;
 
     //Copybit Engine
     qhwc::CopybitEngine* mCopybitEngine;
@@ -127,7 +106,8 @@ struct hwc_context_t {
     qhwc::QueuedBufferStore *qbuf;
 
     // External display related information
-    qhwc::ExtDisplayObserver*mExtDisplayObserver;
+    qhwc::ExternalDisplay *mExtDisplay;
+
 };
 
 #endif //HWC_UTILS_H
