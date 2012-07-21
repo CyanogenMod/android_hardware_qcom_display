@@ -86,6 +86,8 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)
         ExtOnly::reset();
 
         getLayerStats(ctx, list);
+        // Mark all layers to COPYBIT initially
+        CopyBit::prepare(ctx, list);
         if(VideoOverlay::prepare(ctx, list)) {
             ctx->overlayInUse = true;
             //Nothing here
@@ -102,7 +104,6 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)
                  // fail in non-overlay targets.
             ctx->overlayInUse = false;
         }
-        CopyBit::prepare(ctx, list);
     }
 
     return 0;
