@@ -8,8 +8,15 @@ LOCAL_C_INCLUDES              := $(common_includes)
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL liboverlay libgenlock \
                                  libqdutils libhardware_legacy libdl libmemalloc
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"hwcomposer\"
-LOCAL_SRC_FILES               :=  hwc.cpp hwc_video.cpp hwc_utils.cpp \
-                                  hwc_uimirror.cpp hwc_external.cpp \
-                                  hwc_uevents.cpp hwc_copybit.cpp \
-                                  hwc_mdpcomp.cpp
+LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
+LOCAL_SRC_FILES               := hwc.cpp          \
+                                 hwc_video.cpp    \
+                                 hwc_utils.cpp    \
+                                 hwc_uimirror.cpp \
+                                 hwc_external.cpp \
+                                 hwc_uevents.cpp  \
+                                 hwc_copybit.cpp  \
+                                 hwc_mdpcomp.cpp  \
+                                 hwc_extonly.cpp
+
 include $(BUILD_SHARED_LIBRARY)

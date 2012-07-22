@@ -265,7 +265,7 @@ template <> struct StateTraits<utils::OV_BYPASS_3_LAYER>
 template <> struct StateTraits<utils::OV_DUAL_DISP>
 {
     typedef overlay::GenericPipe<utils::EXTERNAL> pipe0;
-    typedef overlay::GenericPipe<utils::EXTERNAL> pipe1;
+    typedef overlay::NullPipe pipe1;
     typedef overlay::NullPipe pipe2;
 
     typedef NullRotator rot0;
