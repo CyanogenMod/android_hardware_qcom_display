@@ -14,68 +14,69 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef HWC_VIDEO_H
-#define HWC_VIDEO_H
+#ifndef HWC_EXTONLY_H
+#define HWC_EXTONLY_H
+
+#include <overlay.h>
 #include "hwc_utils.h"
 
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 
 namespace qhwc {
-//Feature for using overlay to display videos.
-class VideoOverlay {
+//Feature for using overlay to display external-only layers on HDTV
+class ExtOnly {
 public:
     //Sets up members and prepares overlay if conditions are met
     static bool prepare(hwc_context_t *ctx, hwc_layer_list_t *list);
     //Draws layer if this feature is on
     static bool draw(hwc_context_t *ctx, hwc_layer_list_t *list);
     //Receives data from hwc
-    static void setStats(int yuvCount, int yuvLayerIndex, bool isYuvLayerSkip,
-            int ccLayerIndex);
+    static void setStats(int extCount, int extIndex, bool isExtBlock);
     //resets values
     static void reset();
 private:
     //Choose an appropriate overlay state based on conditions
     static void chooseState(hwc_context_t *ctx);
-    //Configures overlay for video prim and ext
-    static bool configure(hwc_context_t *ctx, hwc_layer_t *yuvlayer,
-            hwc_layer_t *ccLayer);
+    //Configures overlay
+    static bool configure(hwc_context_t *ctx, hwc_layer_t *layer);
     //Marks layer flags if this feature is used
     static void markFlags(hwc_layer_t *layer);
-    //returns yuv count
-    static int getYuvCount();
+    //returns ext-only count
+    static int getExtCount();
 
     //The chosen overlay state.
     static ovutils::eOverlayState sState;
-    //Number of yuv layers in this drawing round
-    static int sYuvCount;
-    //Index of YUV layer, relevant only if count is 1
-    static int sYuvLayerIndex;
-    //Flags if a yuv layer is animating or below something that is animating
-    static bool sIsYuvLayerSkip;
-    //Holds the closed caption layer index, -1 by default
-    static int sCCLayerIndex;
+    //Number of ext-only layers in this drawing round. Used for stats/debugging.
+    //This does not reflect the closed caption layer count even though its
+    //ext-only.
+    static int sExtCount;
+    //Index of ext-only layer. If there are 2 such layers with 1 marked as BLOCK
+    //then this will hold the index of BLOCK layer.
+    static int sExtIndex;
+    //Flags if ext-only layer is BLOCK, which means only this layer (sExtIndex)
+    //is displayed even if other ext-only layers are present to block their
+    //content. This is used for stats / debugging only.
+    static bool sIsExtBlock;
     //Flags if this feature is on.
     static bool sIsModeOn;
 };
 
-inline void VideoOverlay::setStats(int yuvCount, int yuvLayerIndex,
-        bool isYuvLayerSkip, int ccLayerIndex) {
-    sYuvCount = yuvCount;
-    sYuvLayerIndex = yuvLayerIndex;
-    sIsYuvLayerSkip = isYuvLayerSkip;
-    sCCLayerIndex = ccLayerIndex;
+inline void ExtOnly::setStats(int extCount, int extIndex, bool isExtBlock) {
+    sExtCount = extCount;
+    sExtIndex = extIndex;
+    sIsExtBlock = isExtBlock;
 }
 
-inline int VideoOverlay::getYuvCount() { return sYuvCount; }
-inline void VideoOverlay::reset() {
-    sYuvCount = 0;
-    sYuvLayerIndex = -1;
-    sIsYuvLayerSkip = false;
-    sCCLayerIndex = -1;
+inline int ExtOnly::getExtCount() { return sExtCount; }
+inline void ExtOnly::reset() {
+    sExtCount = 0;
+    sExtIndex = -1;
+    sIsExtBlock = false;
     sIsModeOn = false;
     sState = ovutils::OV_CLOSED;
 }
+
 }; //namespace qhwc
 
-#endif //HWC_VIDEO_H
+#endif //HWC_EXTONLY_H
