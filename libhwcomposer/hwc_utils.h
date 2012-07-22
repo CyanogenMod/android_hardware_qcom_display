@@ -90,6 +90,21 @@ static inline bool isBufferLocked(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags));
 }
 
+//Return true if buffer is for external display only
+static inline bool isExtOnly(const private_handle_t* hnd) {
+    return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_ONLY));
+}
+
+//Return true if buffer is for external display only with a BLOCK flag.
+static inline bool isExtBlock(const private_handle_t* hnd) {
+    return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_BLOCK));
+}
+
+//Return true if buffer is for external display only with a Close Caption flag.
+static inline bool isExtCC(const private_handle_t* hnd) {
+    return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_CC));
+}
+
 // Initialize uevent thread
 void init_uevent_thread(hwc_context_t* ctx);
 
