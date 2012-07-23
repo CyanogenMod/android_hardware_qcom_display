@@ -100,7 +100,6 @@ struct hwc_context_t {
 #if defined HDMI_DUAL_DISPLAY
     external_display_type mHDMIEnabled; // Type of external display
     bool pendingHDMI;
-    bool forceComposition; //Used to force composition on HDMI connection.
 #endif
     int previousLayerCount;
     eHWCOverlayStatus hwcOverlayStatus;
@@ -821,13 +820,6 @@ bool canSkipComposition(hwc_context_t* ctx, int yuvBufferCount, int currentLayer
         return false;
     }
 
-#if defined HDMI_DUAL_DISPLAY
-    if(ctx->forceComposition) {
-        ctx->forceComposition = false;
-        return false;
-    }
-#endif
-
     hwc_composer_device_t* dev = (hwc_composer_device_t *)(ctx);
     private_hwc_module_t* hwcModule = reinterpret_cast<private_hwc_module_t*>(
                                                            dev->common.module);
@@ -895,6 +887,8 @@ static void handleHDMIStateChange(hwc_composer_device_t *dev, int externaltype) 
         if (fbDev) {
             fbDev->perform(fbDev, EVENT_EXTERNAL_DISPLAY, externaltype);
         }
+        // Yield - Allows the UI channel(with zorder 0) to be opened first
+        sched_yield();
         if(ctx && ctx->mOverlayLibObject) {
             overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
             if (!externaltype) {
@@ -1743,7 +1737,6 @@ static int hwc_set(hwc_composer_device_t *dev,
              * Used when the video is paused and external
              * display is connected
              */
-            ctx->forceComposition = true;
             proc->invalidate(proc);
         }
     }
