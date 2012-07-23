@@ -46,7 +46,7 @@ class IdleTimer
     static TimerHandler mHandler;
 
 public:
-    IdleTimer();
+    IdleTimer():mID(-1){};
     /* create timer obj */
     int create(TimerHandler reg_handler, void* user_data);
     /* arm timer with given value */
