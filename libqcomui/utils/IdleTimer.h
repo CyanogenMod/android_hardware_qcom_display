@@ -27,32 +27,36 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef INCLUDE_IDLEINVALIDATOR
-#define INCLUDE_IDLEINVALIDATOR
+#ifndef INCLUDE_IDLETIMER
+#define INCLUDE_IDLETIMER
 
+#include <signal.h>
+#include <time.h>
 #include <cutils/log.h>
-#include <utils/threads.h>
 
-typedef void (*InvalidatorHandler)(void*);
+typedef void (*TimerFP)(int, siginfo_t *, void*);
+typedef void (*TimerHandler)(void*);
 
-class IdleInvalidator : public android::Thread {
-    void *mHwcContext;
-    bool mSleepAgain;
-    unsigned int mSleepTime;
-    static InvalidatorHandler mHandler;
-    static android::sp<IdleInvalidator> sInstance;
+class IdleTimer
+{
+    struct sigaction mSAction;
+    struct sigevent mSEvent;
+    struct itimerspec mSpec;
+    timer_t mID;
+    static TimerHandler mHandler;
 
 public:
-    IdleInvalidator();
-    /* init timer obj */
-    int init(InvalidatorHandler reg_handler, void* user_data, unsigned int
-            idleSleepTime);
-    void markForSleep();
-    /*Overrides*/
-    virtual bool        threadLoop();
-    virtual int         readyToRun();
-    virtual void        onFirstRef();
-    static IdleInvalidator *getInstance();
+    IdleTimer();
+    /* create timer obj */
+    int create(TimerHandler reg_handler, void* user_data);
+    /* arm timer with given value */
+    int reset();
+    /* set timeout period */
+    void setFreq(unsigned long freq_msecs);
+    /* internal timeout callback function before
+     * invoking user registered handler */
+    static void timer_cb(int sig, siginfo_t* si, void* uc);
 };
 
-#endif // INCLUDE_IDLEINVALIDATOR
+
+#endif // INCLUDE_IDLETIMER
