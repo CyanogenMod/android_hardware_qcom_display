@@ -22,6 +22,7 @@
 #include "hwc_qbuf.h"
 #include "hwc_copybit.h"
 #include "hwc_external.h"
+#include "hwc_mdpcomp.h"
 
 namespace qhwc {
 
@@ -43,6 +44,7 @@ void initContext(hwc_context_t *ctx)
     ctx->hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mCopybitEngine = CopybitEngine::getInstance();
     ctx->mExtDisplay = new ExternalDisplay(ctx);
+    MDPComp::init(ctx);
 
     init_uevent_thread(ctx);
 
@@ -103,6 +105,7 @@ void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
     int yuvCount = 0;
     int yuvLayerIndex = -1;
     bool isYuvLayerSkip = false;
+    int skipCount = 0;
 
     for (size_t i = 0; i < list->numHwLayers; i++) {
         private_handle_t *hnd =
@@ -120,11 +123,13 @@ void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
             if(yuvLayerIndex != -1 && yuvLayerIndex < (ssize_t)i) {
                 isYuvLayerSkip = true;
             }
+            skipCount++;
         }
     }
 
     VideoOverlay::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip);
     CopyBit::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip);
+    MDPComp::setStats(skipCount);
 
     ctx->numHwLayers = list->numHwLayers;
     return;

@@ -27,10 +27,10 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "IdleInvalidator.h"
+#include "idle_invalidator.h"
 #include <unistd.h>
 
-#define II_DEBUG 1
+#define II_DEBUG 0
 
 static const char *threadName = "Invalidator";
 InvalidatorHandler IdleInvalidator::mHandler = NULL;
@@ -38,12 +38,12 @@ android::sp<IdleInvalidator> IdleInvalidator::sInstance(0);
 
 IdleInvalidator::IdleInvalidator(): Thread(false), mHwcContext(0),
     mSleepAgain(false), mSleepTime(0) {
-        ALOGE_IF(II_DEBUG, "shs %s", __func__);
+        ALOGD_IF(II_DEBUG, "%s", __func__);
     }
 
 int IdleInvalidator::init(InvalidatorHandler reg_handler, void* user_data,
                           unsigned int idleSleepTime) {
-    ALOGE_IF(II_DEBUG, "shs %s", __func__);
+    ALOGD_IF(II_DEBUG, "%s", __func__);
 
     /* store registered handler */
     mHandler = reg_handler;
@@ -53,8 +53,8 @@ int IdleInvalidator::init(InvalidatorHandler reg_handler, void* user_data,
 }
 
 bool IdleInvalidator::threadLoop() {
-    ALOGE_IF(II_DEBUG, "shs %s", __func__);
-    usleep(mSleepTime * 1000);
+    ALOGD_IF(II_DEBUG, "%s", __func__);
+    usleep(mSleepTime * 500);
     if(mSleepAgain) {
         //We need to sleep again!
         mSleepAgain = false;
@@ -66,12 +66,12 @@ bool IdleInvalidator::threadLoop() {
 }
 
 int IdleInvalidator::readyToRun() {
-    ALOGE_IF(II_DEBUG, "shs %s", __func__);
+    ALOGD_IF(II_DEBUG, "%s", __func__);
     return 0; /*NO_ERROR*/
 }
 
 void IdleInvalidator::onFirstRef() {
-    ALOGE_IF(II_DEBUG, "shs %s", __func__);
+    ALOGD_IF(II_DEBUG, "%s", __func__);
 }
 
 void IdleInvalidator::markForSleep() {
@@ -81,7 +81,7 @@ void IdleInvalidator::markForSleep() {
 }
 
 IdleInvalidator *IdleInvalidator::getInstance() {
-    ALOGE_IF(II_DEBUG, "shs %s", __func__);
+    ALOGD_IF(II_DEBUG, "%s", __func__);
     if(sInstance.get() == NULL)
         sInstance = new IdleInvalidator();
     return sInstance.get();
