@@ -895,8 +895,6 @@ static void handleHDMIStateChange(hwc_composer_device_t *dev, int externaltype) 
         if (fbDev) {
             fbDev->perform(fbDev, EVENT_EXTERNAL_DISPLAY, externaltype);
         }
-        // Yield - Allows the UI channel(with zorder 0) to be opened first
-        sched_yield();
         if(ctx && ctx->mOverlayLibObject) {
             overlay::Overlay *ovLibObject = ctx->mOverlayLibObject;
             if (!externaltype) {
