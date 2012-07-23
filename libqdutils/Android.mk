@@ -1,7 +1,8 @@
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES := profiler.cpp mdp_version.cpp
+LOCAL_SRC_FILES := profiler.cpp mdp_version.cpp \
+                   idle_invalidator.cpp
 LOCAL_SHARED_LIBRARIES := libutils libcutils
 LOCAL_C_INCLUDES := hardware/qcom/display/libgralloc
 
