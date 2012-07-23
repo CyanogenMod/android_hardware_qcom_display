@@ -1360,10 +1360,12 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
         genlock_unlock_buffer(hnd);
         return -1;
     }
-
-    // Set the copybit source:
+    int alignment = 32;
+    if( HAL_PIXEL_FORMAT_RGB_565 == fbHandle->format )
+        alignment = 16;
+     // Set the copybit source:
     copybit_image_t src;
-    src.w = hnd->width;
+    src.w = ALIGN(hnd->width, alignment);
     src.h = hnd->height;
     src.format = hnd->format;
     src.base = (void *)hnd->base;
@@ -1390,7 +1392,7 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
 
     // Copybit dst
     copybit_image_t dst;
-    dst.w = fbHandle->width;
+    dst.w = ALIGN(fbHandle->width,alignment);
     dst.h = fbHandle->height;
     dst.format = fbHandle->format;
     dst.base = (void *)fbHandle->base;
