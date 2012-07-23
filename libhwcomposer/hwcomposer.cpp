@@ -166,15 +166,6 @@ static inline int min(const int& a, const int& b) {
 static inline int max(const int& a, const int& b) {
     return (a > b) ? a : b;
 }
-
-inline void getLayerResolution(const hwc_layer_t* layer, int& width, int& height)
-{
-   hwc_rect_t displayFrame  = layer->displayFrame;
-
-   width = displayFrame.right - displayFrame.left;
-   height = displayFrame.bottom - displayFrame.top;
-}
-
 #ifdef COMPOSITION_BYPASS
 static void timeout_handler(void *udata) {
     LOGD("Comp bypass timeout_handler...");
@@ -391,12 +382,7 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer,
 
         int fbnum = 0;
         int orientation = layer->transform;
-        const bool useVGPipe =
-#ifdef NO_BYPASS_CROPPING
-                (nPipeIndex != (MAX_BYPASS_LAYERS - 2));
-#else
-                (nPipeIndex != (MAX_BYPASS_LAYERS - 1));
-#endif
+        const bool useVGPipe =  (nPipeIndex != (MAX_BYPASS_LAYERS-1));
         //only last layer should wait for vsync
         const bool waitForVsync = vsync_wait;
         const bool isFg = isFG;
@@ -421,23 +407,6 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer,
     }
     return 0;
 }
-
-#ifdef NO_BYPASS_CROPPING
-inline bool isLayerCropped(const hwc_layer_t* layer, int hw_w, int hw_h) {
-
-    int dst_w, dst_h;
-    getLayerResolution(layer, dst_w, dst_h);
-
-    hwc_rect_t sourceCrop = layer->sourceCrop;
-    const int src_w = sourceCrop.right - sourceCrop.left;
-    const int src_h = sourceCrop.bottom - sourceCrop.top;
-
-    hwc_rect_t dst = layer->displayFrame;
-
-    return dst.left < 0 || dst.top < 0 || dst.right > hw_w || dst.bottom > hw_h ||
-            src_w > dst_w || src_h > dst_h;
-}
-#endif
 
 /*
  * Checks if doing comp. bypass is possible.
@@ -482,11 +451,6 @@ inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount
         return false;
     }
 
-#ifdef NO_BYPASS_CROPPING
-    int hw_w = hwcModule->fbDevice->width;
-    int hw_h = hwcModule->fbDevice->height;
-#endif
-
     //Bypass is not efficient if rotation or asynchronous mode is needed.
     for(int i = 0; i < list->numHwLayers; ++i) {
         if(list->hwLayers[i].transform) {
@@ -496,11 +460,6 @@ inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount
             if (ctx->swapInterval > 0)
                 return false;
         }
-#ifdef NO_BYPASS_CROPPING
-        if (isLayerCropped(&(list->hwLayers[i]), hw_w, hw_h)) {
-            return false;
-        }
-#endif
     }
 
     return (yuvCount == 0) && (ctx->hwcOverlayStatus == HWC_OVERLAY_CLOSED)
@@ -845,6 +804,14 @@ bool canSkipComposition(hwc_context_t* ctx, int yuvBufferCount, int currentLayer
         ctx->previousLayerCount = -1;
     }
     return false;
+}
+
+inline void getLayerResolution(const hwc_layer_t* layer, int& width, int& height)
+{
+   hwc_rect_t displayFrame  = layer->displayFrame;
+
+   width = displayFrame.right - displayFrame.left;
+   height = displayFrame.bottom - displayFrame.top;
 }
 
 static bool canUseCopybit(const framebuffer_device_t* fbDev, const hwc_layer_list_t* list) {
