@@ -28,7 +28,6 @@
 #include <cutils/atomic.h>
 #include <cutils/properties.h>
 
-#include <gralloc_priv.h>
 #include <hardware/hwcomposer.h>
 #include <overlayLib.h>
 #include <overlayLibUI.h>
@@ -37,6 +36,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <ui/android_native_buffer.h>
+#include <gralloc_priv.h>
 #include <genlock.h>
 #include <qcom_ui.h>
 #include <gr.h>
@@ -148,7 +148,7 @@ struct private_hwc_module_t HAL_MODULE_INFO_SYM = {
 
 static void dump_layer(hwc_layer_t const* l) {
     LOGD("\ttype=%d, flags=%08x, handle=%p, tr=%02x, blend=%04x, {%d,%d,%d,%d}, {%d,%d,%d,%d}",
-            l->compositionType, l->flags, l->handle, l->transform & FINAL_TRANSFORM_MASK, l->blending,
+            l->compositionType, l->flags, l->handle, l->transform, l->blending,
             l->sourceCrop.left,
             l->sourceCrop.top,
             l->sourceCrop.right,
@@ -390,7 +390,7 @@ static int prepareBypass(hwc_context_t *ctx, hwc_layer_t *layer,
         info.size = hnd->size;
 
         int fbnum = 0;
-        int orientation = layer->transform & FINAL_TRANSFORM_MASK;
+        int orientation = layer->transform;
         const bool useVGPipe =
 #ifdef NO_BYPASS_CROPPING
                 (nPipeIndex != (MAX_BYPASS_LAYERS - 2));
@@ -489,7 +489,7 @@ inline static bool isBypassDoable(hwc_composer_device_t *dev, const int yuvCount
 
     //Bypass is not efficient if rotation or asynchronous mode is needed.
     for(int i = 0; i < list->numHwLayers; ++i) {
-        if(list->hwLayers[i].transform & FINAL_TRANSFORM_MASK) {
+        if(list->hwLayers[i].transform) {
             return false;
         }
         if(list->hwLayers[i].flags & HWC_LAYER_ASYNCHRONOUS) {
