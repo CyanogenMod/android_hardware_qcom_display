@@ -30,21 +30,30 @@
 
 namespace qhwc {
 
-const char* MSMFB_DEVICE_CHANGE = "change@/devices/virtual/graphics/fb0";
+const char* MSMFB_DEVICE_FB0 = "change@/devices/virtual/graphics/fb0";
+const char* MSMFB_DEVICE_FB1 = "change@/devices/virtual/graphics/fb1";
 const char* MSMFB_HDMI_NODE = "fb1";
 
 static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 {
-    int vsync;
+    int vsync = 0;
     char* hdmi;
     int64_t timestamp = 0;
     const char *str = udata;
-    hwc_procs* proc = reinterpret_cast<hwc_procs*>(ctx->device.reserved_proc[0]);
+    hwc_procs* proc = (hwc_procs*)ctx->device.reserved_proc[0];
+    int hdmiconnected = ctx->mExtDisplay->getExternalDisplay();
 
-    vsync = !strncmp(str, MSMFB_DEVICE_CHANGE, strlen(MSMFB_DEVICE_CHANGE));
-    hdmi = strcasestr(str, MSMFB_HDMI_NODE);
-    if(!vsync && !hdmi)
+    if(!strcasestr(str, "@/devices/virtual/graphics/fb")) {
+        ALOGD_IF(DEBUG, "%s: Not Ext Disp Event ", __FUNCTION__);
         return;
+    }
+
+    if(hdmiconnected)
+        vsync = !strncmp(str, MSMFB_DEVICE_FB1, strlen(MSMFB_DEVICE_FB1));
+    else
+        vsync = !strncmp(str, MSMFB_DEVICE_FB0, strlen(MSMFB_DEVICE_FB0));
+
+    hdmi = strcasestr(str, MSMFB_HDMI_NODE);
     if(vsync) {
         str += strlen(str) + 1;
         while(*str) {
@@ -56,6 +65,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             if(str - udata >= len)
                 break;
         }
+        return;
     }
 
     if(hdmi) {
@@ -72,7 +82,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         } else if(!(strncmp(str,"offline@",strlen("offline@")))) {
             connected = 0;
         }
-        ctx->mExtDisplay->setExternalDisplayStatus(connected);
+        ctx->mExtDisplay->setExternalDisplay(connected);
     }
 
 }
