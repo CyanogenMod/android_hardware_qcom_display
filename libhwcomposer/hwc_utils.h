@@ -50,6 +50,12 @@ enum HWCCompositionType {
     HWC_USE_COPYBIT                // This layer is to be handled by copybit
 };
 
+enum {
+    HWC_MDPCOMP = 0x00000002,
+    HWC_LAYER_RESERVED_0 = 0x00000004,
+    HWC_LAYER_RESERVED_1 = 0x00000008
+};
+
 
 class ExternalDisplay;
 class CopybitEngine;
@@ -81,6 +87,13 @@ static inline bool isBufferLocked(const private_handle_t* hnd) {
 // Initialize uevent thread
 void init_uevent_thread(hwc_context_t* ctx);
 
+inline void getLayerResolution(const hwc_layer_t* layer,
+                                         int& width, int& height)
+{
+    hwc_rect_t displayFrame  = layer->displayFrame;
+    width = displayFrame.right - displayFrame.left;
+    height = displayFrame.bottom - displayFrame.top;
+}
 }; //qhwc namespace
 
 // -----------------------------------------------------------------------------

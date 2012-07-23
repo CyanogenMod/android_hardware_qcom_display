@@ -10,5 +10,6 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL liboverlay libgenlock \
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"hwcomposer\"
 LOCAL_SRC_FILES               :=  hwc.cpp hwc_video.cpp hwc_utils.cpp \
                                   hwc_uimirror.cpp hwc_external.cpp \
-                                  hwc_uevents.cpp hwc_copybit.cpp
+                                  hwc_uevents.cpp hwc_copybit.cpp \
+                                  hwc_mdpcomp.cpp
 include $(BUILD_SHARED_LIBRARY)
