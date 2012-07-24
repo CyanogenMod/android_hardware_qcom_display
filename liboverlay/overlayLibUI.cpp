@@ -110,8 +110,10 @@ status_t Display::openDisplay(int fbnum) {
 }
 
 void Display::closeDisplay() {
-    close(mFD);
-    mFD = NO_INIT;
+    if(mFD > 0) {
+        close(mFD);
+        mFD = NO_INIT;
+    }
 }
 
 Rotator::Rotator() : mFD(NO_INIT), mSessionID(NO_INIT), mPmemFD(NO_INIT)
@@ -430,6 +432,12 @@ status_t OverlayUI::startOVSession() {
 status_t OverlayUI::closeOVSession() {
     status_t ret = NO_ERROR;
     int err = 0;
+
+    if (mSessionID == NO_INIT) {
+        mobjDisplay.closeDisplay();
+        LOGE("%s : session is not initialized", __FUNCTION__);
+        return ret;
+    }
     if(err = ioctl(mobjDisplay.getFD(), MSMFB_OVERLAY_UNSET, &mSessionID)) {
         LOGE("%s: MSMFB_OVERLAY_UNSET failed. (%d)", __FUNCTION__, err);
         ret = BAD_VALUE;
@@ -445,6 +453,11 @@ status_t OverlayUI::queueBuffer(buffer_handle_t buffer) {
 
     if (mChannelState != UP)
         return ret;
+
+    if (mSessionID == NO_INIT) {
+        LOGE("%s : session is not inited", __FUNCTION__);
+        return BAD_VALUE;
+    }
 
     msmfb_overlay_data ovData;
     memset(&ovData, 0, sizeof(ovData));
