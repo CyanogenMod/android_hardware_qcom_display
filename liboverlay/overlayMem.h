@@ -120,7 +120,7 @@ inline bool OvMem::open(uint32_t numbufs,
     alloc_data data;
 
     int err = 0;
-    int allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP | GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+    int allocFlags = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
     if(isSecure) {
         allocFlags |= GRALLOC_USAGE_PRIVATE_MM_HEAP;
         allocFlags |= GRALLOC_USAGE_PRIVATE_DO_NOT_MAP;
@@ -140,10 +140,20 @@ inline bool OvMem::open(uint32_t numbufs,
     data.uncached = true;
 
     err = mAlloc->allocate(data, allocFlags, 0);
-    if (err != 0) {
-        ALOGE("OvMem: error allocating memory");
+    //see if we can fallback to other heap
+    //we can try MM_HEAP once if it's not secure playback
+    if (err != 0 && !isSecure) {
+        allocFlags |= GRALLOC_USAGE_PRIVATE_MM_HEAP;
+        err = mAlloc->allocate(data, allocFlags, 0);
+        if (err != 0) {
+            ALOGE(" could not allocate from fallback heap");
+            return false;
+        }
+    } else if (err != 0) {
+        ALOGE("OvMem: error allocating memory can not fall back");
         return false;
     }
+
 
     mFd = data.fd;
     mBaseAddr = data.base;
