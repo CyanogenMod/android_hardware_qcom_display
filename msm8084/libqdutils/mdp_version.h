@@ -52,15 +52,29 @@ enum mdp_version {
     MDSS_V5     = 500,
 };
 
+#define MDDI_PANEL       '1'
+#define EBI2_PANEL       '2'
+#define LCDC_PANEL       '3'
+#define EXT_MDDI_PANEL   '4'
+#define TV_PANEL         '5'
+#define DTV_PANEL        '7'
+#define MIPI_VIDEO_PANEL '8'
+#define MIPI_CMD_PANEL   '9'
+#define WRITEBACK_PANEL  'a'
+#define LVDS_PANEL       'b'
+
+
 class MDPVersion : public Singleton <MDPVersion>
 {
 public:
     MDPVersion();
     ~MDPVersion() { }
     int getMDPVersion() {return mMDPVersion;}
+    char getPanelType() {return mPanelType;}
     bool hasOverlay() {return mHasOverlay;}
 private:
     int mMDPVersion;
+    char mPanelType;
     bool mHasOverlay;
 };
 }; //namespace qdutils
