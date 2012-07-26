@@ -24,6 +24,7 @@
 
 #include <overlay.h>
 #include <fb_priv.h>
+#include <mdp_version.h>
 #include "hwc_utils.h"
 #include "hwc_qbuf.h"
 #include "hwc_video.h"

@@ -35,7 +35,7 @@ bool VideoOverlay::sIsLayerSkip = false;
 //Cache stats, figure out the state, config overlay
 bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
     sIsModeOn = false;
-    if(!ctx->hasOverlay) {
+    if(!ctx->mMDP.hasOverlay) {
        ALOGD_IF(VIDEO_DEBUG,"%s, this hw doesnt support overlay", __FUNCTION__);
        return false;
     }

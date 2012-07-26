@@ -37,6 +37,14 @@ class Overlay;
 namespace qhwc {
 //fwrd decl
 class QueuedBufferStore;
+class ExternalDisplay;
+class CopybitEngine;
+
+struct MDPInfo {
+    int version;
+    char panel;
+    bool hasOverlay;
+};
 
 enum external_display_type {
     EXT_TYPE_NONE,
@@ -57,8 +65,6 @@ enum {
 };
 
 
-class ExternalDisplay;
-class CopybitEngine;
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_t const* l);
@@ -102,8 +108,6 @@ inline void getLayerResolution(const hwc_layer_t* layer,
 struct hwc_context_t {
     hwc_composer_device_t device;
     int numHwLayers;
-    int mdpVersion;
-    bool hasOverlay;
     int overlayInUse;
 
     //Framebuffer device
@@ -120,6 +124,8 @@ struct hwc_context_t {
 
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
+
+    qhwc::MDPInfo mMDP;
 
 };
 
