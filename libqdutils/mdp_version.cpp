@@ -34,10 +34,11 @@
 ANDROID_SINGLETON_STATIC_INSTANCE(qdutils::MDPVersion);
 namespace qdutils {
 
-static int getMDPVersionFromFB()
+MDPVersion::MDPVersion()
 {
     int fb_fd = open("/dev/graphics/fb0", O_RDWR);
     int mdp_version = MDP_V_UNKNOWN;
+    char panel_type = 0;
     struct fb_fix_screeninfo fb_finfo;
     if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &fb_finfo) < 0) {
         ALOGE("FBIOGET_FSCREENINFO failed");
@@ -61,18 +62,18 @@ static int getMDPVersionFromFB()
         } else {
             mdp_version = MDP_V_UNKNOWN;
         }
+        int len = strlen("msmfbXX_");
+        if (mdp_version == MDP_V3_0_3)
+            len++;
+        panel_type = fb_finfo.id[len];
+
     }
     close(fb_fd);
-    return mdp_version;
-}
-
-MDPVersion::MDPVersion()
-{
-    mMDPVersion = getMDPVersionFromFB();
+    mMDPVersion = mdp_version;
+    mHasOverlay = false;
     if((mMDPVersion >= MDP_V4_0) || (mMDPVersion == MDP_V_UNKNOWN))
         mHasOverlay = true;
-    else
-        mHasOverlay = false;
+    mPanelType = panel_type;
 }
 }; //namespace qdutils
 
