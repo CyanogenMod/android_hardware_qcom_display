@@ -73,9 +73,11 @@ void MdpRot::setSource(const overlay::utils::Whf& awhf) {
 }
 
 void MdpRot::setFlags(const utils::eMdpFlags& flags) {
+#ifndef QCOM_NO_SECURE_PLAYBACK
     mRotImgInfo.secure = 0;
     if(flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
         mRotImgInfo.secure = 1;
+#endif
 }
 
 void MdpRot::setTransform(const utils::eTransform& rot, const bool& rotUsed)
@@ -117,10 +119,15 @@ bool MdpRot::commit() {
 bool MdpRot::open_i(uint32_t numbufs, uint32_t bufsz)
 {
     OvMem mem;
+    int secureFlag = 0;
 
     OVASSERT(MAP_FAILED == mem.addr(), "MAP failed in open_i");
 
-    if(!mem.open(numbufs, bufsz, mRotImgInfo.secure)){
+#ifndef QCOM_NO_SECURE_PLAYBACK
+    secureFlag = mRotImgInfo.secure;
+#endif
+
+    if(!mem.open(numbufs, bufsz, secureFlag)){
         ALOGE("%s: Failed to open", __func__);
         mem.close();
         return false;
