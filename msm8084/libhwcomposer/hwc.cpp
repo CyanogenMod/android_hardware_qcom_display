@@ -71,6 +71,7 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)
 
     //Prepare is called after a vsync, so unlock previous buffers here.
     ctx->qbuf->unlockAllPrevious();
+    return 0;
 
     if (LIKELY(list)) {
         getLayerStats(ctx, list);
