@@ -120,12 +120,27 @@ inline bool OvMem::open(uint32_t numbufs,
     alloc_data data;
 
     int err = 0;
-    int allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP | GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+#ifdef HAVE_IOMMU
+    int allocFlags = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+#else
+    int allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP |
+                     GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP |
+                     GRALLOC_USAGE_PRIVATE_DO_NOT_MAP;
+#endif
+
     if(isSecure) {
+#ifdef HAVE_IOMMU
         allocFlags |= GRALLOC_USAGE_PRIVATE_MM_HEAP;
         allocFlags |= GRALLOC_USAGE_PRIVATE_DO_NOT_MAP;
+#endif
         allocFlags |= GRALLOC_USAGE_PRIVATE_CP_BUFFER;
     }
+#ifndef HAVE_IOMMU
+    else {
+        allocFlags |= GRALLOC_USAGE_PRIVATE_ADSP_HEAP |
+                      GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+    }
+#endif
 
     OVASSERT(numbufs && bufSz, "numbufs=%d bufSz=%d", numbufs, bufSz);
 
