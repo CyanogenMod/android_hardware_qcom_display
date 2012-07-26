@@ -40,8 +40,9 @@ void initContext(hwc_context_t *ctx)
     openFramebufferDevice(ctx);
     ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->qbuf = new QueuedBufferStore();
-    ctx->mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
-    ctx->hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
+    ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
+    ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
+    ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
     ctx->mCopybitEngine = CopybitEngine::getInstance();
     ctx->mExtDisplay = new ExternalDisplay(ctx);
     MDPComp::init(ctx);
@@ -49,7 +50,7 @@ void initContext(hwc_context_t *ctx)
     init_uevent_thread(ctx);
 
     ALOGI("Initializing Qualcomm Hardware Composer");
-    ALOGI("MDP version: %d", ctx->mdpVersion);
+    ALOGI("MDP version: %d", ctx->mMDP.version);
 }
 
 void closeContext(hwc_context_t *ctx)
