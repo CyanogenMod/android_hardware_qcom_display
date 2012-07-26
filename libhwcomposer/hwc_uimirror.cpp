@@ -61,7 +61,7 @@ bool UIMirrorOverlay::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
     sState = ovutils::OV_CLOSED;
     sIsUiMirroringOn = false;
 
-    if(!ctx->hasOverlay) {
+    if(!ctx->mMDP.hasOverlay) {
        ALOGD_IF(HWC_UI_MIRROR, "%s, this hw doesnt support mirroring",
                                                                __FUNCTION__);
        return false;

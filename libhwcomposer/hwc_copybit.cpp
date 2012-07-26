@@ -380,7 +380,7 @@ bool CopyBit::canUseCopybit(hwc_context_t *ctx, const hwc_layer_list_t* list,
 {
     // XXX : TODO , currently returning false for MDP4 targets,
     // This has to be modified after adding C2D support.
-    if(ctx->hasOverlay)
+    if(ctx->mMDP.hasOverlay)
         return false;
 
     framebuffer_device_t* fbDev = ctx->mFbDev;
@@ -397,7 +397,7 @@ bool CopyBit::canUseCopybit(hwc_context_t *ctx, const hwc_layer_list_t* list,
             LINK_eglGetCurrentSurface == NULL )
         return false;
 
-    if(!ctx->hasOverlay) {
+    if(!ctx->mMDP.hasOverlay) {
         if (numYUVBuffers)
             return true;
     }
