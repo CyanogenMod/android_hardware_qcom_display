@@ -149,31 +149,50 @@ bool FrameBufferInfo::supportTrueMirroring() const {
 }
 
 //--------------------------------------------------------
-
+//Refer to graphics.h, gralloc_priv.h, msm_mdp.h
 int getMdpFormat(int format) {
     switch (format) {
+        //From graphics.h
         case HAL_PIXEL_FORMAT_RGBA_8888 :
             return MDP_RGBA_8888;
-        case HAL_PIXEL_FORMAT_BGRA_8888:
-            return MDP_BGRA_8888;
-        case HAL_PIXEL_FORMAT_RGB_565:
-            return MDP_RGB_565;
         case HAL_PIXEL_FORMAT_RGBX_8888:
             return MDP_RGBX_8888;
-        case HAL_PIXEL_FORMAT_YCbCr_422_SP:
-            return MDP_Y_CBCR_H2V1;
-        case HAL_PIXEL_FORMAT_YCrCb_422_SP:
-            return MDP_Y_CRCB_H2V1;
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-            return MDP_Y_CBCR_H2V2;
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-            return MDP_Y_CRCB_H2V2;
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
-            return MDP_Y_CBCR_H2V2_TILE;
+        case HAL_PIXEL_FORMAT_RGB_888:
+            return MDP_RGB_888;
+        case HAL_PIXEL_FORMAT_RGB_565:
+            return MDP_RGB_565;
+        case HAL_PIXEL_FORMAT_BGRA_8888:
+            return MDP_BGRA_8888;
         case HAL_PIXEL_FORMAT_YV12:
             return MDP_Y_CR_CB_H2V2;
+        case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+            return MDP_Y_CBCR_H2V1;
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+            return MDP_Y_CRCB_H2V2;
+
+        //From gralloc_priv.h
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
+            return MDP_Y_CBCR_H2V2_TILE;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+            return MDP_Y_CBCR_H2V2;
+        case HAL_PIXEL_FORMAT_YCrCb_422_SP:
+            return MDP_Y_CRCB_H2V1;
+        case HAL_PIXEL_FORMAT_YCbCr_444_SP:
+            return MDP_Y_CBCR_H1V1;
+        case HAL_PIXEL_FORMAT_YCrCb_444_SP:
+            return MDP_Y_CRCB_H1V1;
+
         default:
-            ALOGE("Error getMdpFormat format=0x%x", format);
+            //Unsupported by MDP
+            //---graphics.h--------
+            //HAL_PIXEL_FORMAT_RGBA_5551
+            //HAL_PIXEL_FORMAT_RGBA_4444
+            //HAL_PIXEL_FORMAT_YCbCr_422_I
+            //---gralloc_priv.h-----
+            //HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO    = 0x7FA30C01
+            //HAL_PIXEL_FORMAT_R_8                    = 0x10D
+            //HAL_PIXEL_FORMAT_RG_88                  = 0x10E
+            ALOGE("%s: Unsupported format = 0x%x", __func__, format);
             return -1;
     }
     // not reached
