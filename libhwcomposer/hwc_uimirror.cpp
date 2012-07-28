@@ -27,30 +27,6 @@
 namespace qhwc {
 
 
-// Function to get the primary device orientation
-// Loops thru the hardware layers and returns the orientation of the max.
-// number of layers
-int getDeviceOrientation(hwc_context_t* ctx,  hwc_layer_list_t *list) {
-    int orientation =  list->hwLayers[0].transform;
-    if(!ctx) {
-         ALOGE("In %s: ctx is NULL!!", __FUNCTION__);
-        return -1;
-    }
-    for(size_t i=0; i <= list->numHwLayers;i++ )
-    {
-        for(size_t j=i+1; j <= list->numHwLayers; j++)
-        {
-            // Should we not check for the video layer orientation as it might
-            // source orientation(?)
-            if(list->hwLayers[i].transform == list->hwLayers[j].transform)
-            {
-                orientation = list->hwLayers[i].transform;
-            }
-        }
-    }
-    return orientation;
-}
-
 //Static Members
 ovutils::eOverlayState UIMirrorOverlay::sState = ovutils::OV_CLOSED;
 bool UIMirrorOverlay::sIsUiMirroringOn = false;
@@ -120,10 +96,8 @@ bool UIMirrorOverlay::configure(hwc_context_t *ctx, hwc_layer_list_t *list)
             // x,y,w,h
             ovutils::Dim dcrop(0, 0, m->info.xres, m->info.yres);
             ov.setCrop(dcrop, dest);
-            //Get the current orientation on primary panel
-            int transform = getDeviceOrientation(ctx, list);
             ovutils::eTransform orient =
-                    static_cast<ovutils::eTransform>(transform);
+                    static_cast<ovutils::eTransform>(ctx->deviceOrientation);
             ov.setTransform(orient, dest);
 
             ovutils::Dim dim;
