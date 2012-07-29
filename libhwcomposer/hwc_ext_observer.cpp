@@ -39,7 +39,7 @@
 
 namespace qhwc {
 
-#define EXT_OBSERVER_DEBUG 1
+#define EXT_OBSERVER_DEBUG 0
 
 #define DEVICE_ROOT "/sys/devices/virtual/graphics"
 #define DEVICE_NODE "fb1"
@@ -443,4 +443,3 @@ bool ExtDisplayObserver::writeHPDOption(int userOption) const
     return ret;
 }
 };
-
