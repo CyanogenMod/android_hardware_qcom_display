@@ -36,6 +36,35 @@
 
 namespace overlay {
 
+//Helper
+bool isStateValid(const utils::eOverlayState& st) {
+    switch (st) {
+        case utils::OV_CLOSED:
+            ALOGE("Overlay %s failed, state is OV_CLOSED; set state first",
+                    __FUNCTION__);
+            return false;
+            break;
+        case utils::OV_2D_VIDEO_ON_PANEL:
+        case utils::OV_2D_VIDEO_ON_PANEL_TV:
+        case utils::OV_2D_VIDEO_ON_TV:
+        case utils::OV_3D_VIDEO_ON_2D_PANEL:
+        case utils::OV_3D_VIDEO_ON_3D_PANEL:
+        case utils::OV_3D_VIDEO_ON_3D_TV:
+        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
+        case utils::OV_UI_MIRROR:
+        case utils::OV_2D_TRUE_UI_MIRROR:
+        case utils::OV_BYPASS_1_LAYER:
+        case utils::OV_BYPASS_2_LAYER:
+        case utils::OV_BYPASS_3_LAYER:
+        case utils::OV_DUAL_DISP:
+            break;
+        default:
+            OVASSERT(false, "%s Unknown state %d", __FUNCTION__, st);
+            return false;
+    }
+    return true;
+}
+
 Overlay::Overlay(): mOv(0) {
 }
 
@@ -51,28 +80,11 @@ bool Overlay::commit(utils::eDest dest)
             "%s Overlay and Rotator should be init at this point",
             __FUNCTION__);
     utils::eOverlayState st = mState.state();
-    switch (st) {
-        case utils::OV_2D_VIDEO_ON_PANEL:
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-        case utils::OV_2D_VIDEO_ON_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-        case utils::OV_UI_MIRROR:
-        case utils::OV_2D_TRUE_UI_MIRROR:
-        case utils::OV_BYPASS_1_LAYER:
-        case utils::OV_BYPASS_2_LAYER:
-        case utils::OV_BYPASS_3_LAYER:
-        case utils::OV_DUAL_DISP:
-            if(!mOv->commit(dest)) {
-                ALOGE("Overlay %s failed", __FUNCTION__);
-                return false;
-            }
-            break;
-        default:
-            OVASSERT(false, "%s Unknown state %d", __FUNCTION__, st);
+    if(isStateValid(st)) {
+        if(!mOv->commit(dest)) {
+            ALOGE("Overlay %s failed", __FUNCTION__);
             return false;
+        }
     }
     return true;
 }
@@ -84,60 +96,11 @@ bool Overlay::queueBuffer(int fd, uint32_t offset,
             "%s Overlay and Rotator should be init at this point",
             __FUNCTION__);
     utils::eOverlayState st = mState.state();
-    switch (st) {
-        case utils::OV_2D_VIDEO_ON_PANEL:
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-        case utils::OV_2D_VIDEO_ON_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-        case utils::OV_UI_MIRROR:
-        case utils::OV_2D_TRUE_UI_MIRROR:
-        case utils::OV_BYPASS_1_LAYER:
-        case utils::OV_BYPASS_2_LAYER:
-        case utils::OV_BYPASS_3_LAYER:
-        case utils::OV_DUAL_DISP:
-            if(!mOv->queueBuffer(fd, offset, dest)) {
-                ALOGE("Overlay %s failed", __FUNCTION__);
-                return false;
-            }
-            break;
-        default:
-            OVASSERT(false, "%s Unknown state %d", __FUNCTION__, st);
+    if(isStateValid(st)) {
+        if(!mOv->queueBuffer(fd, offset, dest)) {
+            ALOGE("Overlay %s failed", __FUNCTION__);
             return false;
-    }
-    return true;
-}
-
-bool Overlay::waitForVsync(utils::eDest dest)
-{
-    OVASSERT(mOv,
-            "%s Overlay and Rotator should be init at this point",
-            __FUNCTION__);
-    utils::eOverlayState st = mState.state();
-    switch (st) {
-        case utils::OV_2D_VIDEO_ON_PANEL:
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-        case utils::OV_2D_VIDEO_ON_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-        case utils::OV_UI_MIRROR:
-        case utils::OV_2D_TRUE_UI_MIRROR:
-        case utils::OV_BYPASS_1_LAYER:
-        case utils::OV_BYPASS_2_LAYER:
-        case utils::OV_BYPASS_3_LAYER:
-        case utils::OV_DUAL_DISP:
-            if(!mOv->waitForVsync(dest)) {
-                ALOGE("Overlay %s failed", __FUNCTION__);
-                return false;
-            }
-            break;
-        default:
-            OVASSERT(false, "%s Unknown state %d", __FUNCTION__, st);
-            return false;
+        }
     }
     return true;
 }
@@ -149,28 +112,11 @@ bool Overlay::setCrop(const utils::Dim& d,
             "%s Overlay and Rotator should be init at this point",
             __FUNCTION__);
     utils::eOverlayState st = mState.state();
-    switch (st) {
-        case utils::OV_2D_VIDEO_ON_PANEL:
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-        case utils::OV_2D_VIDEO_ON_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-        case utils::OV_UI_MIRROR:
-        case utils::OV_2D_TRUE_UI_MIRROR:
-        case utils::OV_BYPASS_1_LAYER:
-        case utils::OV_BYPASS_2_LAYER:
-        case utils::OV_BYPASS_3_LAYER:
-        case utils::OV_DUAL_DISP:
-            if(!mOv->setCrop(d, dest)) {
-                ALOGE("Overlay %s failed", __FUNCTION__);
-                return false;
-            }
-            break;
-        default:
-            OVASSERT(false, "%s Unknown state %d", __FUNCTION__, st);
+    if(isStateValid(st)) {
+        if(!mOv->setCrop(d, dest)) {
+            ALOGE("Overlay %s failed", __FUNCTION__);
             return false;
+        }
     }
     return true;
 }
@@ -181,28 +127,11 @@ bool Overlay::setPosition(const utils::Dim& d,
             "%s Overlay and Rotator should be init at this point",
             __FUNCTION__);
     utils::eOverlayState st = mState.state();
-    switch (st) {
-        case utils::OV_2D_VIDEO_ON_PANEL:
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-        case utils::OV_2D_VIDEO_ON_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-        case utils::OV_UI_MIRROR:
-        case utils::OV_2D_TRUE_UI_MIRROR:
-        case utils::OV_BYPASS_1_LAYER:
-        case utils::OV_BYPASS_2_LAYER:
-        case utils::OV_BYPASS_3_LAYER:
-        case utils::OV_DUAL_DISP:
-            if(!mOv->setPosition(d, dest)) {
-                ALOGE("Overlay %s failed", __FUNCTION__);
-                return false;
-            }
-            break;
-        default:
-            OVASSERT(false, "setPos Unknown state %d", st);
+    if(isStateValid(st)) {
+        if(!mOv->setPosition(d, dest)) {
+            ALOGE("Overlay %s failed", __FUNCTION__);
             return false;
+        }
     }
     return true;
 }
@@ -214,28 +143,11 @@ bool Overlay::setTransform(const int orient,
             static_cast<utils::eTransform>(orient);
 
     utils::eOverlayState st = mState.state();
-    switch (st) {
-        case utils::OV_2D_VIDEO_ON_PANEL:
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-        case utils::OV_2D_VIDEO_ON_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-        case utils::OV_UI_MIRROR:
-        case utils::OV_2D_TRUE_UI_MIRROR:
-        case utils::OV_BYPASS_1_LAYER:
-        case utils::OV_BYPASS_2_LAYER:
-        case utils::OV_BYPASS_3_LAYER:
-        case utils::OV_DUAL_DISP:
-            if(!mOv->setTransform(transform, dest)) {
-                ALOGE("Overlay %s failed", __FUNCTION__);
-                return false;
-            }
-            break;
-        default:
-            OVASSERT(false, "%s Unknown state %d", __FUNCTION__ , st);
+    if(isStateValid(st)) {
+        if(!mOv->setTransform(transform, dest)) {
+            ALOGE("Overlay %s failed", __FUNCTION__);
             return false;
+        }
     }
     return true;
 }
@@ -247,40 +159,12 @@ bool Overlay::setSource(const utils::PipeArgs args[utils::MAX_PIPES],
         args[0], args[1], args[2] };
     utils::eOverlayState st = mState.state();
 
-    switch (st) {
-        case utils::OV_CLOSED:
-            ALOGE("Overlay %s failed, state is OV_CLOSED, set state first",
-                    __FUNCTION__);
+    if(isStateValid(st)) {
+        if (!mOv->setSource(margs, dest)) {
+            ALOGE("Overlay %s failed", __FUNCTION__);
             return false;
-            break;
-        case utils::OV_2D_VIDEO_ON_PANEL:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL:
-        case utils::OV_UI_MIRROR:
-        case utils::OV_BYPASS_1_LAYER:
-        case utils::OV_BYPASS_2_LAYER:
-        case utils::OV_BYPASS_3_LAYER:
-        case utils::OV_DUAL_DISP:
-            break;
-        case utils::OV_3D_VIDEO_ON_3D_PANEL:
-        case utils::OV_3D_VIDEO_ON_3D_TV:
-            //TODO set zorder for channel 1 as 1 in 3D pipe
-        case utils::OV_2D_VIDEO_ON_PANEL_TV:
-        case utils::OV_2D_VIDEO_ON_TV:
-        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
-            break;
-        case utils::OV_2D_TRUE_UI_MIRROR:
-            // TODO Set zorder, external VG pipe (video) gets 0, RGB pipe (UI) gets 1
-            break;
-        default:
-            OVASSERT(false, "%s Unknown state %d", __FUNCTION__, st);
-            return false;
+        }
     }
-
-    if (!mOv->setSource(margs, dest)) {
-        ALOGE("Overlay %s failed", __FUNCTION__);
-        return false;
-    }
-
     return true;
 }
 
