@@ -119,9 +119,6 @@ public:
     /* queue buffer to the overlay */
     bool queueBuffer(int fd, uint32_t offset);
 
-    /* wait for vsync to be done */
-    bool waitForVsync();
-
     /* sump the state of the obj */
     void dump() const;
 
@@ -216,15 +213,6 @@ inline bool Data::close() {
 
 inline bool Data::queueBuffer(int fd, uint32_t offset) {
     return mMdp.play(fd, offset);
-}
-
-inline bool Data::waitForVsync() {
-    // Call mdp waitForVsync
-    if(!mMdp.waitForVsync()){
-        ALOGE("Error in MDP %s", __FUNCTION__);
-        return false;
-    }
-    return true;
 }
 
 inline void Data::dump() const {
