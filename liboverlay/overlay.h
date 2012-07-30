@@ -57,7 +57,6 @@ public:
 
     bool queueBuffer(int fd, uint32_t offset,
             utils::eDest dest = utils::OV_PIPE_ALL);
-    bool waitForVsync(utils::eDest dest = utils::OV_PIPE1);
 
     void dump() const;
 

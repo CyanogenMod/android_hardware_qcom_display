@@ -143,11 +143,6 @@ bool ExtOnly::draw(hwc_context_t *ctx, hwc_layer_list_t *list)
                 ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
                 ret = false;
             }
-            // Wait for external vsync to be done
-            if (!ov.waitForVsync(ovutils::OV_PIPE0)) {
-                ALOGE("%s: waitForVsync failed for external", __FUNCTION__);
-                ret = false;
-            }
             break;
         default:
             ALOGE("%s Unused state %s", __FUNCTION__,

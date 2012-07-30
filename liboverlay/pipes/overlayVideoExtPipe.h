@@ -50,12 +50,10 @@ public:
     bool close();
     bool commit();
     bool queueBuffer(int fd, uint32_t offset);
-    bool waitForVsync();
     bool setCrop(const utils::Dim& dim);
     bool setPosition(const utils::Dim& dim);
     bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
     overlay::GenericPipe<ovutils::EXTERNAL> mVideoExt;
@@ -73,9 +71,6 @@ inline bool VideoExtPipe::close() { return mVideoExt.close(); }
 inline bool VideoExtPipe::commit() { return mVideoExt.commit(); }
 inline bool VideoExtPipe::queueBuffer(int fd, uint32_t offset) {
     return mVideoExt.queueBuffer(fd, offset);
-}
-inline bool VideoExtPipe::waitForVsync() {
-    return mVideoExt.waitForVsync();
 }
 inline bool VideoExtPipe::setCrop(const utils::Dim& dim) {
     return mVideoExt.setCrop(dim);
@@ -104,9 +99,6 @@ inline bool VideoExtPipe::setTransform(const utils::eTransform& param) {
 inline bool VideoExtPipe::setSource(const utils::PipeArgs& args) {
     utils::PipeArgs arg(args);
     return mVideoExt.setSource(arg);
-}
-inline utils::eOverlayPipeType VideoExtPipe::getOvPipeType() const {
-    return utils::OV_PIPE_TYPE_VIDEO_EXT;
 }
 inline void VideoExtPipe::dump() const {
     ALOGE("Video Ext Pipe");
