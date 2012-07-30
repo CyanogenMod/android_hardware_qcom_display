@@ -220,6 +220,9 @@ public:
     /* get underlying fd*/
     int getFd() const;
 
+    /* set mdp flags */
+    void setFlags(int mdpFlags);
+
     /* get memory_id */
     int getSrcMemoryId() const;
 
@@ -485,6 +488,14 @@ inline int MdpData::getSrcMemoryId() const { return mOvData.data.memory_id; }
 inline void MdpData::setPipeId(int id) { mOvData.id = id; }
 
 inline int MdpData::getPipeId() const { return mOvData.id; }
+
+inline void MdpData::setFlags(int mdpFlags) {
+    if(mdpFlags & utils::OV_MDP_MEMORY_ID_TYPE_FB) {
+        mOvData.data.flags |= utils::OV_MDP_MEMORY_ID_TYPE_FB;
+    } else {
+        mOvData.data.flags &= ~utils::OV_MDP_MEMORY_ID_TYPE_FB;
+    }
+}
 
 inline int MdpData::getFd() const { return mFd.getFD(); }
 

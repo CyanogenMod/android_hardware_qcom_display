@@ -98,8 +98,7 @@ bool ExtOnly::configure(hwc_context_t *ctx, hwc_layer_t *layer) {
             ovutils::ZORDER_0,
             isFgFlag,
             ovutils::ROT_FLAGS_NONE);
-    ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
-    ov.setSource(pargs, ovutils::OV_PIPE0);
+    ov.setSource(parg, ovutils::OV_PIPE0);
 
     hwc_rect_t sourceCrop = layer->sourceCrop;
     // x,y,w,h

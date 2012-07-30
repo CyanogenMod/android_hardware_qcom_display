@@ -37,6 +37,7 @@
 #include "pipes/overlayVideoExtPipe.h"
 #include "pipes/overlayUIMirrorPipe.h"
 #include "pipes/overlay3DPipe.h"
+#include "pipes/overlayFloatingPipe.h"
 
 namespace overlay {
 
@@ -77,10 +78,12 @@ private:
     template<utils::eOverlayState FROM_STATE, utils::eOverlayState TO_STATE>
     OverlayImplBase* handle_from_to(OverlayImplBase* ov);
 
-    /* Just a convenient intermediate function to bring down the number of
+    /* Just convenient intermediate functions to bring down the number of
      * combinations arising from multiple states */
     template<utils::eOverlayState FROM_STATE>
     OverlayImplBase* handle_from(utils::eOverlayState toState,
+            OverlayImplBase* ov);
+    OverlayImplBase* handle_CLOSED_to(utils::eOverlayState toState,
             OverlayImplBase* ov);
 
     /* Substitues for partially specialized templated handle functions since the
@@ -111,12 +114,14 @@ template <> struct StateTraits<utils::OV_2D_VIDEO_ON_PANEL>
     typedef overlay::GenericPipe<utils::PRIMARY> pipe0; //prim video
     typedef overlay::NullPipe pipe1;   // place holder
     typedef overlay::NullPipe pipe2;   // place holder
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef Rotator rot0;
     typedef NullRotator rot1;
     typedef NullRotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_2D_VIDEO_ON_PANEL_TV>
@@ -124,12 +129,14 @@ template <> struct StateTraits<utils::OV_2D_VIDEO_ON_PANEL_TV>
     typedef overlay::GenericPipe<utils::PRIMARY> pipe0; //prim video
     typedef overlay::VideoExtPipe pipe1; //ext video
     typedef overlay::GenericPipe<utils::EXTERNAL> pipe2; //ext subtitle
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef Rotator rot0;
     typedef Rotator rot1;
     typedef NullRotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_2D_VIDEO_ON_TV>
@@ -137,12 +144,14 @@ template <> struct StateTraits<utils::OV_2D_VIDEO_ON_TV>
     typedef overlay::NullPipe pipe0; //nothing on primary with mdp
     typedef overlay::VideoExtPipe pipe1; //ext video
     typedef overlay::GenericPipe<utils::EXTERNAL> pipe2; //ext subtitle
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef NullRotator rot0;
     typedef Rotator rot1;
     typedef NullRotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_3D_VIDEO_ON_2D_PANEL>
@@ -150,12 +159,14 @@ template <> struct StateTraits<utils::OV_3D_VIDEO_ON_2D_PANEL>
     typedef overlay::M3DPrimaryPipe<utils::OV_PIPE0> pipe0;
     typedef overlay::NullPipe pipe1;   // place holder
     typedef overlay::NullPipe pipe2;   // place holder
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef Rotator rot0;
     typedef NullRotator rot1;
     typedef NullRotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_3D_VIDEO_ON_3D_PANEL>
@@ -163,12 +174,14 @@ template <> struct StateTraits<utils::OV_3D_VIDEO_ON_3D_PANEL>
     typedef overlay::S3DPrimaryPipe<utils::OV_PIPE0> pipe0;
     typedef overlay::S3DPrimaryPipe<utils::OV_PIPE1> pipe1;
     typedef overlay::NullPipe pipe2;   // place holder
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef Rotator rot0;
     typedef Rotator rot1;
     typedef NullRotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_3D_VIDEO_ON_3D_TV>
@@ -176,12 +189,14 @@ template <> struct StateTraits<utils::OV_3D_VIDEO_ON_3D_TV>
     typedef overlay::S3DExtPipe<utils::OV_PIPE0> pipe0;
     typedef overlay::S3DExtPipe<utils::OV_PIPE1> pipe1;
     typedef overlay::NullPipe pipe2;   // place holder
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef NullRotator rot0;
     typedef NullRotator rot1;
     typedef NullRotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>
@@ -189,12 +204,14 @@ template <> struct StateTraits<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>
     typedef overlay::M3DPrimaryPipe<utils::OV_PIPE0> pipe0;
     typedef overlay::M3DExtPipe<utils::OV_PIPE1> pipe1;
     typedef overlay::NullPipe pipe2;   // place holder
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef Rotator rot0;
     typedef NullRotator rot1;
     typedef NullRotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_2D_PIP_VIDEO_ON_PANEL>
@@ -215,12 +232,14 @@ template <> struct StateTraits<utils::OV_UI_MIRROR>
     typedef overlay::UIMirrorPipe pipe0;
     typedef overlay::NullPipe pipe1;   // place holder
     typedef overlay::NullPipe pipe2;   // place holder
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef Rotator rot0;
     typedef NullRotator rot1;
     typedef NullRotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_2D_TRUE_UI_MIRROR>
@@ -228,12 +247,14 @@ template <> struct StateTraits<utils::OV_2D_TRUE_UI_MIRROR>
     typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
     typedef overlay::VideoExtPipe pipe1;
     typedef overlay::UIMirrorPipe pipe2;
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef Rotator rot0;
     typedef Rotator rot1;
     typedef Rotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_BYPASS_1_LAYER>
@@ -241,12 +262,14 @@ template <> struct StateTraits<utils::OV_BYPASS_1_LAYER>
     typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
     typedef overlay::NullPipe pipe1;   // place holder
     typedef overlay::NullPipe pipe2;   // place holder
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef NullRotator rot0;
     typedef NullRotator rot1;
     typedef NullRotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_BYPASS_2_LAYER>
@@ -254,12 +277,14 @@ template <> struct StateTraits<utils::OV_BYPASS_2_LAYER>
     typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
     typedef overlay::GenericPipe<utils::PRIMARY> pipe1;
     typedef overlay::NullPipe pipe2;   // place holder
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef NullRotator rot0;
     typedef NullRotator rot1;
     typedef NullRotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_BYPASS_3_LAYER>
@@ -267,12 +292,29 @@ template <> struct StateTraits<utils::OV_BYPASS_3_LAYER>
     typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
     typedef overlay::GenericPipe<utils::PRIMARY> pipe1;
     typedef overlay::GenericPipe<utils::PRIMARY> pipe2;
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef NullRotator rot0;
     typedef NullRotator rot1;
     typedef NullRotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
+};
+
+template <> struct StateTraits<utils::OV_BYPASS_4_LAYER>
+{
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe1;
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe2;
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
+
+    typedef NullRotator rot0;
+    typedef NullRotator rot1;
+    typedef NullRotator rot2;
+    typedef NullRotator rot3;
+
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
 template <> struct StateTraits<utils::OV_DUAL_DISP>
@@ -280,14 +322,30 @@ template <> struct StateTraits<utils::OV_DUAL_DISP>
     typedef overlay::GenericPipe<utils::EXTERNAL> pipe0;
     typedef overlay::NullPipe pipe1;
     typedef overlay::NullPipe pipe2;
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
 
     typedef NullRotator rot0;
     typedef NullRotator rot1;
     typedef NullRotator rot2;
+    typedef NullRotator rot3;
 
-    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
 };
 
+template <> struct StateTraits<utils::OV_FB>
+{
+    typedef overlay::NullPipe pipe0;
+    typedef overlay::NullPipe pipe1;
+    typedef overlay::NullPipe pipe2;
+    typedef overlay::FloatingPipe pipe3;   // FB pipe
+
+    typedef NullRotator rot0;
+    typedef NullRotator rot1;
+    typedef NullRotator rot2;
+    typedef NullRotator rot3;
+
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2, pipe3> ovimpl;
+};
 
 //------------------------Inlines --------------------------------
 
@@ -318,7 +376,7 @@ inline OverlayImplBase* OverlayState::handleEvent(utils::eOverlayState toState,
     switch(mState)
     {
         case utils::OV_CLOSED:
-            newov = handle_from<utils::OV_CLOSED>(toState, ov);
+            newov = handle_CLOSED_to(toState, ov);
             break;
         case utils::OV_2D_VIDEO_ON_PANEL:
             newov = handle_from<utils::OV_2D_VIDEO_ON_PANEL>(toState, ov);
@@ -360,8 +418,14 @@ inline OverlayImplBase* OverlayState::handleEvent(utils::eOverlayState toState,
         case utils::OV_BYPASS_3_LAYER:
             newov = handle_from<utils::OV_BYPASS_3_LAYER>(toState, ov);
             break;
+        case utils::OV_BYPASS_4_LAYER:
+            newov = handle_from<utils::OV_BYPASS_4_LAYER>(toState, ov);
+            break;
         case utils::OV_DUAL_DISP:
             newov = handle_from<utils::OV_DUAL_DISP>(toState, ov);
+            break;
+        case utils::OV_FB:
+            newov = handle_from<utils::OV_FB>(toState, ov);
             break;
         default:
             OVASSERT(1 == 0, "%s: unknown state = %d", __FUNCTION__, mState);
@@ -419,8 +483,14 @@ inline OverlayImplBase* OverlayState::handle_from(utils::eOverlayState toState,
         case utils::OV_BYPASS_3_LAYER:
             ov = handle_from_to<FROM_STATE, utils::OV_BYPASS_3_LAYER>(ov);
             break;
+        case utils::OV_BYPASS_4_LAYER:
+            ov = handle_from_to<FROM_STATE, utils::OV_BYPASS_4_LAYER>(ov);
+            break;
         case utils::OV_DUAL_DISP:
             ov = handle_from_to<FROM_STATE, utils::OV_DUAL_DISP>(ov);
+            break;
+        case utils::OV_FB:
+            ov = handle_from_to<FROM_STATE, utils::OV_FB>(ov);
             break;
         default:
             OVASSERT(1 == 0, "%s: unknown state = %d", __FUNCTION__, toState);
@@ -429,14 +499,89 @@ inline OverlayImplBase* OverlayState::handle_from(utils::eOverlayState toState,
     return ov;
 }
 
+inline OverlayImplBase* OverlayState::handle_CLOSED_to(
+        utils::eOverlayState toState, OverlayImplBase* ov) {
 
-/* Transition default from any to any. Does in two steps.
- * Moves from OLD to CLOSED and then from CLOSED to NEW
- */
+    switch(toState)
+    {
+        case utils::OV_CLOSED:
+            break;
+        case utils::OV_2D_VIDEO_ON_PANEL:
+            ov = handle_CLOSED_to_xxx<utils::OV_2D_VIDEO_ON_PANEL>(ov);
+            break;
+        case utils::OV_2D_VIDEO_ON_PANEL_TV:
+            ov = handle_CLOSED_to_xxx<utils::OV_2D_VIDEO_ON_PANEL_TV>(ov);
+            break;
+        case utils::OV_2D_VIDEO_ON_TV:
+            ov = handle_CLOSED_to_xxx<utils::OV_2D_VIDEO_ON_TV>(ov);
+            break;
+        case utils::OV_3D_VIDEO_ON_2D_PANEL:
+            ov = handle_CLOSED_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL>(ov);
+            break;
+        case utils::OV_3D_VIDEO_ON_3D_PANEL:
+            ov = handle_CLOSED_to_xxx<utils::OV_3D_VIDEO_ON_3D_PANEL>(ov);
+            break;
+        case utils::OV_3D_VIDEO_ON_3D_TV:
+            ov = handle_CLOSED_to_xxx<utils::OV_3D_VIDEO_ON_3D_TV>(ov);
+            break;
+        case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
+            ov = handle_CLOSED_to_xxx<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>(ov);
+            break;
+        case utils::OV_UI_MIRROR:
+            ov = handle_CLOSED_to_xxx<utils::OV_UI_MIRROR>(ov);
+            break;
+        case utils::OV_2D_TRUE_UI_MIRROR:
+            ov = handle_CLOSED_to_xxx<utils::OV_2D_TRUE_UI_MIRROR>(ov);
+            break;
+        case utils::OV_BYPASS_1_LAYER:
+            ov = handle_CLOSED_to_xxx<utils::OV_BYPASS_1_LAYER>(ov);
+            break;
+        case utils::OV_BYPASS_2_LAYER:
+            ov = handle_CLOSED_to_xxx<utils::OV_BYPASS_2_LAYER>(ov);
+            break;
+        case utils::OV_BYPASS_3_LAYER:
+            ov = handle_CLOSED_to_xxx<utils::OV_BYPASS_3_LAYER>(ov);
+            break;
+        case utils::OV_BYPASS_4_LAYER:
+            ov = handle_CLOSED_to_xxx<utils::OV_BYPASS_4_LAYER>(ov);
+            break;
+        case utils::OV_DUAL_DISP:
+            ov = handle_CLOSED_to_xxx<utils::OV_DUAL_DISP>(ov);
+            break;
+        case utils::OV_FB:
+            ov = handle_CLOSED_to_xxx<utils::OV_FB>(ov);
+            break;
+        default:
+            OVASSERT(1 == 0, "%s: unknown state = %d", __FUNCTION__, toState);
+    }
+    mState = toState;
+    return ov;
+}
+
+/* Transition default from any to any. */
 template<utils::eOverlayState FROM_STATE, utils::eOverlayState TO_STATE>
 inline OverlayImplBase* OverlayState::handle_from_to(OverlayImplBase* ov) {
-    handle_xxx_to_CLOSED<FROM_STATE>(ov);
-    return handle_CLOSED_to_xxx<TO_STATE>(ov);
+    // Create new ovimpl based on new state
+    OverlayImplBase* newov = new typename StateTraits<TO_STATE>::ovimpl;
+
+    //close old pipe0, create new pipe0
+    ov->closePipe(utils::OV_PIPE0);
+    RotatorBase* rot0 = new typename StateTraits<TO_STATE>::rot0;
+    newov->initPipe(rot0, utils::OV_PIPE0);
+    //close old pipe1, create new pipe1
+    ov->closePipe(utils::OV_PIPE1);
+    RotatorBase* rot1 = new typename StateTraits<TO_STATE>::rot1;
+    newov->initPipe(rot1, utils::OV_PIPE1);
+    //close old pipe2, create new pipe2
+    ov->closePipe(utils::OV_PIPE2);
+    RotatorBase* rot2 = new typename StateTraits<TO_STATE>::rot2;
+    newov->initPipe(rot2, utils::OV_PIPE2);
+    //copy pipe3/rot3 (FB)
+    newov->copyOvPipe(ov, utils::OV_PIPE3);
+    // All pipes are copied or deleted so no more need for previous ovimpl
+    delete ov;
+    ov = 0;
+    return newov;
 }
 
 //---------------Specializations-------------
@@ -455,7 +600,8 @@ inline OverlayImplBase* OverlayState::handle_CLOSED_to_xxx(
     RotatorBase* rot0 = new typename StateTraits<TO_STATE>::rot0;
     RotatorBase* rot1 = new typename StateTraits<TO_STATE>::rot1;
     RotatorBase* rot2 = new typename StateTraits<TO_STATE>::rot2;
-    if(!ov->init(rot0, rot1, rot2)) {
+    RotatorBase* rot3 = new typename StateTraits<TO_STATE>::rot3;
+    if(!ov->init(rot0, rot1, rot2, rot3)) {
         ALOGE("Overlay failed to init in state %d", TO_STATE);
         return 0;
     }
@@ -504,6 +650,8 @@ inline OverlayImplBase* OverlayState::handle_from_to<
     ov->closePipe(utils::OV_PIPE2);
     RotatorBase* rot2 = new NewState::rot2;
     newov->initPipe(rot2, utils::OV_PIPE2);
+    //copy pipe3/rot3 (FB)
+    newov->copyOvPipe(ov, utils::OV_PIPE3);
     // All pipes are copied or deleted so no more need for previous ovimpl
     delete ov;
     ov = 0;
@@ -535,6 +683,8 @@ inline OverlayImplBase* OverlayState::handle_from_to<
     ov->closePipe(utils::OV_PIPE2);
     RotatorBase* rot2 = new NewState::rot2;
     newov->initPipe(rot2, utils::OV_PIPE2);
+    //copy pipe3/rot3 (FB)
+    newov->copyOvPipe(ov, utils::OV_PIPE3);
     // All pipes are copied or deleted so no more need for previous ovimpl
     delete ov;
     ov = 0;
@@ -564,6 +714,8 @@ inline OverlayImplBase* OverlayState::handle_from_to<
     newov->copyOvPipe(ov, utils::OV_PIPE1);
     //copy pipe2/rot2 (ext cc)
     newov->copyOvPipe(ov, utils::OV_PIPE2);
+    //copy pipe3/rot3 (FB)
+    newov->copyOvPipe(ov, utils::OV_PIPE3);
     // All pipes are copied or deleted so no more need for previous ovimpl
     delete ov;
     ov = 0;
@@ -593,6 +745,8 @@ inline OverlayImplBase* OverlayState::handle_from_to<
     newov->copyOvPipe(ov, utils::OV_PIPE1);
     //copy pipe2/rot2 (ext cc)
     newov->copyOvPipe(ov, utils::OV_PIPE2);
+    //copy pipe3/rot3 (FB)
+    newov->copyOvPipe(ov, utils::OV_PIPE3);
     // All pipes are copied or deleted so no more need for previous ovimpl
     delete ov;
     ov = 0;

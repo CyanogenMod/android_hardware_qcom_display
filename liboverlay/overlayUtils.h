@@ -59,6 +59,7 @@
 #else
 # define OVASSERT(x, ...) ALOGE_IF(!(x), __VA_ARGS__)
 #endif // OVERLAY_HAS_ASSERT
+#define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 
 #define DEBUG_OVERLAY 0
 #define PROFILE_OVERLAY 0
@@ -320,6 +321,7 @@ enum eZorder {
     ZORDER_0,
     ZORDER_1,
     ZORDER_2,
+    ZORDER_3,
     Z_SYSTEM_ALLOC = 0xFFFF
 };
 
@@ -328,8 +330,8 @@ enum eMdpPipeType {
     OV_MDP_PIPE_VG
 };
 
-// Max pipes via overlay (VG0, VG1, RGB1)
-enum { MAX_PIPES = 3 };
+// Max pipes via overlay (VG0, VG1, RGB0, RGB1)
+enum { MAX_PIPES = 4 };
 
 /* Used to identify destination channels and
  * also 3D channels e.g. when in 3D mode with 2
@@ -339,7 +341,8 @@ enum eDest {
     OV_PIPE0 = 1 << 0,
     OV_PIPE1 = 1 << 1,
     OV_PIPE2 = 1 << 2,
-    OV_PIPE_ALL  = (OV_PIPE0 | OV_PIPE1 | OV_PIPE2)
+    OV_PIPE3 = 1 << 3,
+    OV_PIPE_ALL  = (OV_PIPE0 | OV_PIPE1 | OV_PIPE2 | OV_PIPE3)
 };
 
 /* values for copybit_set_parameter(OVERLAY_TRANSFORM) */
@@ -420,9 +423,13 @@ enum eOverlayState{
     OV_BYPASS_1_LAYER,
     OV_BYPASS_2_LAYER,
     OV_BYPASS_3_LAYER,
+    OV_BYPASS_4_LAYER,
 
     /* External only for dual-disp */
     OV_DUAL_DISP,
+
+    /* Primary Framebuffer via overlay */
+    OV_FB,
 };
 
 inline void setMdpFlags(eMdpFlags& f, eMdpFlags v) {
@@ -593,7 +600,8 @@ inline bool isValidDest(eDest dest)
 {
     if ((OV_PIPE0 & dest) ||
             (OV_PIPE1 & dest) ||
-            (OV_PIPE2 & dest)) {
+            (OV_PIPE2 & dest) ||
+            (OV_PIPE3 & dest)) {
         return true;
     }
     return false;
@@ -668,8 +676,12 @@ inline const char* getStateString(eOverlayState state){
             return "OV_BYPASS_2_LAYER";
         case OV_BYPASS_3_LAYER:
             return "OV_BYPASS_3_LAYER";
+        case OV_BYPASS_4_LAYER:
+            return "OV_BYPASS_4_LAYER";
         case OV_DUAL_DISP:
             return "OV_DUAL_DISP";
+        case OV_FB:
+            return "OV_FB";
         default:
             return "UNKNOWN_STATE";
     }

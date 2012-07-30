@@ -57,7 +57,9 @@ bool isStateValid(const utils::eOverlayState& st) {
         case utils::OV_BYPASS_1_LAYER:
         case utils::OV_BYPASS_2_LAYER:
         case utils::OV_BYPASS_3_LAYER:
+        case utils::OV_BYPASS_4_LAYER:
         case utils::OV_DUAL_DISP:
+        case utils::OV_FB:
             break;
         default:
             OVASSERT(false, "%s Unknown state %d", __FUNCTION__, st);
@@ -153,15 +155,12 @@ bool Overlay::setTransform(const int orient,
     return true;
 }
 
-bool Overlay::setSource(const utils::PipeArgs args[utils::MAX_PIPES],
+bool Overlay::setSource(const utils::PipeArgs args,
         utils::eDest dest)
 {
-    utils::PipeArgs margs[utils::MAX_PIPES] = {
-        args[0], args[1], args[2] };
     utils::eOverlayState st = mState.state();
-
     if(isStateValid(st)) {
-        if (!mOv->setSource(margs, dest)) {
+        if (!mOv->setSource(args, dest)) {
             ALOGE("Overlay %s failed", __FUNCTION__);
             return false;
         }
