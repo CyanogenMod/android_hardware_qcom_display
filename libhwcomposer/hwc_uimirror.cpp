@@ -160,6 +160,7 @@ bool UIMirrorOverlay::draw(hwc_context_t *ctx)
         while(m->fbPostDone == false) {
             pthread_cond_wait(&(m->fbPostCond), &(m->fbPostLock));
         }
+        m->fbPostDone = false;
         pthread_mutex_unlock(&m->fbPostLock);
         switch (state) {
             case ovutils::OV_UI_MIRROR:

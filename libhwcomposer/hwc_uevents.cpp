@@ -79,10 +79,11 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         int connected = 0;
         if(!(strncmp(str,"online@",strlen("online@")))) {
             connected = 1;
+            ctx->mExtDisplay->setExternalDisplay(connected);
         } else if(!(strncmp(str,"offline@",strlen("offline@")))) {
             connected = 0;
+            ctx->mExtDisplay->setExternalDisplay(connected);
         }
-        ctx->mExtDisplay->setExternalDisplay(connected);
     }
 
 }
