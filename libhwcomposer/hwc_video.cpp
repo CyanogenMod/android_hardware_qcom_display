@@ -160,6 +160,8 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_t *layer) {
         dcrop.w = sourceCrop.right - sourceCrop.left;
         dcrop.h = sourceCrop.bottom - sourceCrop.top;
 
+        dpos.x = displayFrame.left;
+        dpos.y = displayFrame.top;
         dpos.w = displayFrame.right - displayFrame.left;
         dpos.h = displayFrame.bottom - displayFrame.top;
     }
