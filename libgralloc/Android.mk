@@ -22,7 +22,7 @@ LOCAL_MODULE_PATH             := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := $(common_includes)
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libmemalloc libgenlock
-LOCAL_SHARED_LIBRARIES        += libqdutils libGLESv1_CM
+LOCAL_SHARED_LIBRARIES        += libqdutils libGLESv1_CM liboverlay
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"gralloc\"
 LOCAL_SRC_FILES               :=  gpu.cpp gralloc.cpp framebuffer.cpp mapper.cpp
 include $(BUILD_SHARED_LIBRARY)

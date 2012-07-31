@@ -22,8 +22,6 @@
 #include "hwc_qbuf.h"
 #include "hwc_external.h"
 
-#define SUPPORT_4LAYER 0
-
 namespace qhwc {
 
 /****** Class PipeMgr ***********/
@@ -102,6 +100,7 @@ bool MDPComp::sIdleFallBack = false;
 bool MDPComp::sDebugLogs = false;
 int MDPComp::sSkipCount = 0;
 int MDPComp::sMaxLayers = 0;
+ovutils::eOverlayState MDPComp::ov_state = ovutils::OV_FB;
 
 bool MDPComp::deinit() {
     //XXX: Tear down MDP comp state
@@ -130,6 +129,7 @@ void MDPComp::timeout_handler(void *udata) {
 void MDPComp::reset( hwc_context_t *ctx, hwc_layer_list_t* list ) {
     //Reset flags and states
     unsetMDPCompLayerFlags(ctx, list);
+    overlay::Overlay& ov = *(ctx->mOverlay);
 
     sCurrentFrame.count = 0;
     if(sCurrentFrame.pipe_layer) {
@@ -141,9 +141,7 @@ void MDPComp::reset( hwc_context_t *ctx, hwc_layer_list_t* list ) {
     sPipeMgr.reset();
     sPipeMgr.setStatus(VAR_INDEX, PIPE_IN_FB_MODE);
 
-#if SUPPORT_4LAYER
-    configure_var_pipe(ctx);
-#endif
+    ov.setState(ovutils::OV_FB);
 }
 
 void MDPComp::setLayerIndex(hwc_layer_t* layer, const int pipe_index)
@@ -258,6 +256,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_layer_t *layer,
             dest = ovutils::OV_PIPE1;
         } else if (nPipeIndex == 2) {
             dest = ovutils::OV_PIPE2;
+        } else if (nPipeIndex == 3) {
+            dest = ovutils::OV_PIPE3;
         }
 
         ovutils::eZorder zOrder = ovutils::ZORDER_0;
@@ -268,6 +268,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_layer_t *layer,
             zOrder = ovutils::ZORDER_1;
         } else if(mdp_info.z_order == 2 ) {
             zOrder = ovutils::ZORDER_2;
+        } else if(mdp_info.z_order == 3 ) {
+            zOrder = ovutils::ZORDER_3;
         }
 
         // Order order order
@@ -324,9 +326,10 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_layer_t *layer,
         }
 
         ALOGD_IF(isDebug(),"%s: MDP set: crop[%d,%d,%d,%d] dst[%d,%d,%d,%d] \
-                       nPipe: %d isFG: %d zorder: %d",__FUNCTION__, dcrop.x,
-                       dcrop.y,dcrop.w, dcrop.h, dim.x, dim.y, dim.w, dim.h,
-                       nPipeIndex,mdp_info.isFG, mdp_info.z_order);
+                       nPipe: %d isFG: %d isVG: %d zorder: %d",__FUNCTION__,
+                       dcrop.x, dcrop.y,dcrop.w, dcrop.h, dim.x, dim.y,
+                       dim.w, dim.h, nPipeIndex,mdp_info.isFG,
+                       mdp_info.isVG, mdp_info.z_order);
 
         if (!ov.commit(dest)) {
             ALOGE("%s: commit failed", __FUNCTION__);
@@ -568,42 +571,6 @@ bool MDPComp::parse_and_allocate(hwc_context_t* ctx, hwc_layer_list_t* list,
     free(bp_layer_info);
     return true;
 }
-#if SUPPORT_4LAYER
-int MDPComp::configure_var_pipe(hwc_context_t* ctx) {
-
-    if(!ctx) {
-       ALOGE("%s: invalid context", __FUNCTION__);
-       return -1;
-    }
-
-    framebuffer_device_t *fbDev = ctx->fbDev;
-    if (!fbDev) {
-        ALOGE("%s: fbDev is NULL", __FUNCTION__);
-        return -1;
-    }
-
-    int new_mode = -1, cur_mode;
-    fbDev->perform(fbDev,EVENT_GET_VAR_PIPE_MODE, (void*)&cur_mode);
-
-    if(sPipeMgr.getStatus(VAR_INDEX) == PIPE_IN_FB_MODE) {
-        new_mode = VAR_PIPE_FB_ATTACH;
-    } else if(sPipeMgr.getStatus(VAR_INDEX) == PIPE_IN_BYP_MODE) {
-        new_mode = VAR_PIPE_FB_DETACH;
-        fbDev->perform(fbDev,EVENT_WAIT_POSTBUFFER,NULL);
-    }
-
-    ALOGD_IF(isDebug(),"%s: old_mode: %d new_mode: %d", __FUNCTION__,
-                                                      cur_mode, new_mode);
-
-    if((new_mode != cur_mode) && (new_mode >= 0)) {
-       if(fbDev->perform(fbDev,EVENT_SET_VAR_PIPE_MODE,(void*)&new_mode) < 0) {
-           ALOGE("%s: Setting var pipe mode failed", __FUNCTION__);
-       }
-    }
-
-    return 0;
-}
-#endif
 
 bool MDPComp::setup(hwc_context_t* ctx, hwc_layer_list_t* list) {
     int nPipeIndex, vsync_wait, isFG;
@@ -617,6 +584,8 @@ bool MDPComp::setup(hwc_context_t* ctx, hwc_layer_list_t* list) {
         current_frame.pipe_layer = NULL;
     }
 
+    overlay::Overlay& ov = *(ctx->mOverlay);
+
     if(!ctx) {
        ALOGE("%s: invalid context", __FUNCTION__);
        return -1;
@@ -629,20 +598,11 @@ bool MDPComp::setup(hwc_context_t* ctx, hwc_layer_list_t* list) {
     }
 
     if(!parse_and_allocate(ctx, list, current_frame)) {
-#if SUPPORT_4LAYER
-       int mode = VAR_PIPE_FB_ATTACH;
-       if(fbDev->perform(fbDev,EVENT_SET_VAR_PIPE_MODE,(void*)&mode) < 0 ) {
-           ALOGE("%s: setting var pipe mode failed", __FUNCTION__);
-       }
-#endif
+       ov.setState(ovutils::OV_FB);
        ALOGD_IF(isDebug(), "%s: Falling back to FB", __FUNCTION__);
        return false;
     }
-#if SUPPORT_4LAYER
-    configure_var_pipe(ctx);
-#endif
 
-    overlay::Overlay& ov = *(ctx->mOverlay);
     ovutils::eOverlayState state = ov.getState();
 
     if (current_frame.count == 1) {
@@ -651,10 +611,23 @@ bool MDPComp::setup(hwc_context_t* ctx, hwc_layer_list_t* list) {
          state = ovutils::OV_BYPASS_2_LAYER;
     } else if (current_frame.count == 3) {
          state = ovutils::OV_BYPASS_3_LAYER;
-   }
+    } else if (current_frame.count == 4) {
+         state = ovutils::OV_BYPASS_4_LAYER;
+    } else if (current_frame.count == 0) {
+         state = ovutils::OV_FB;
+    }
 
-      ov.setState(state);
+    //Fallback to framebuffer when bypass state changes
+    //but not FROM OV_FB
+    if(ov_state != state && ov_state != ovutils::OV_FB) {
+        ov.setState(ovutils::OV_FB);
+        ov_state = state;
+        return false;
+    }
 
+    ov_state = state;
+
+    ov.setState(state);
 
     for (int index = 0 ; index < current_frame.count; index++) {
         int layer_index = current_frame.pipe_layer[index].layer_index;
@@ -728,7 +701,7 @@ int MDPComp::draw(hwc_context_t *ctx, hwc_layer_list_t* list) {
         if(idleInvalidator)
            idleInvalidator->markForSleep();
 
-        ovutils::eDest dest;
+        ovutils::eDest dest = ovutils::OV_PIPE0;
 
         if (index == 0) {
             dest = ovutils::OV_PIPE0;
@@ -736,6 +709,8 @@ int MDPComp::draw(hwc_context_t *ctx, hwc_layer_list_t* list) {
             dest = ovutils::OV_PIPE1;
         } else if (index == 2) {
             dest = ovutils::OV_PIPE2;
+        } else if (index == 3) {
+            dest = ovutils::OV_PIPE3;
         }
 
         if (ctx ) {
@@ -773,23 +748,7 @@ bool MDPComp::init(hwc_context_t *dev) {
         return false;
     }
 
-#if SUPPORT_4LAYER
-    if(MAX_MDPCOMP_LAYERS > MAX_STATIC_PIPES) {
-        framebuffer_device_t *fbDev = dev->fbDevice;
-        if(fbDev == NULL) {
-            ALOGE("%s: FATAL: framebuffer device is NULL", __FUNCTION__);
-            return false;
-        }
-
-        //Receive VAR pipe object from framebuffer
-        if(fbDev->perform(fbDev,EVENT_GET_VAR_PIPE,(void*)&ov) < 0) {
-            ALOGE("%s: FATAL: getVariablePipe failed!!", __FUNCTION__);
-            return false;
-        }
-
-        sPipeMgr.setStatus(VAR_INDEX, PIPE_IN_FB_MODE);
-    }
-#endif
+    sPipeMgr.setStatus(VAR_INDEX, PIPE_IN_FB_MODE);
     char property[PROPERTY_VALUE_MAX];
 
     sMaxLayers = 0;

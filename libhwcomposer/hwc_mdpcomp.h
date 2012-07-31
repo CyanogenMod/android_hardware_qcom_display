@@ -143,6 +143,7 @@ class MDPComp {
     static int sMaxLayers;
     static bool sDebugLogs;
     static bool sIdleFallBack;
+    static ovutils::eOverlayState ov_state;
 
 public:
     /* Handler to invoke frame redraw on Idle Timer expiry */
@@ -179,7 +180,8 @@ private:
                         mdp_pipe_info& mdp_info);
 
     /* checks for conditions where mdpcomp is not possible */
-    static bool is_doable(hwc_composer_device_t *dev, hwc_layer_list_t* list);
+    static bool is_doable(hwc_composer_device_t *dev,
+                           hwc_layer_list_t* list);
 
     static bool setup(hwc_context_t* ctx, hwc_layer_list_t* list);
 
@@ -199,9 +201,6 @@ private:
     static bool alloc_layer_pipes(hwc_layer_list_t* list,
                                   layer_mdp_info* layer_info,
                                   frame_info& current_frame);
-    /* updates variable pipe mode for the current frame */
-    static int  configure_var_pipe(hwc_context_t* ctx);
-
     /* get/set states */
     static State get_state() { return sMDPCompState; };
     static void set_state(State state) { sMDPCompState = state; };

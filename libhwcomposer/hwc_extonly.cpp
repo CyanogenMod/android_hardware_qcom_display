@@ -24,7 +24,7 @@ namespace qhwc {
 #define EXTONLY_DEBUG 0
 
 //Static Members
-ovutils::eOverlayState ExtOnly::sState = ovutils::OV_CLOSED;
+ovutils::eOverlayState ExtOnly::sState = ovutils::OV_FB;
 int ExtOnly::sExtCount = 0;
 int ExtOnly::sExtIndex = -1;
 bool ExtOnly::sIsExtBlock = false;
@@ -43,7 +43,7 @@ bool ExtOnly::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
     }
     chooseState(ctx);
     //if the state chosen above is CLOSED, skip this block.
-    if(sState != ovutils::OV_CLOSED) {
+    if(sState != ovutils::OV_FB) {
         hwc_layer_t *extLayer = &list->hwLayers[sExtIndex];
         if(configure(ctx, extLayer)) {
             markFlags(extLayer);
@@ -63,7 +63,7 @@ void ExtOnly::chooseState(hwc_context_t *ctx) {
     ALOGD_IF(EXTONLY_DEBUG, "%s: old state = %s", __FUNCTION__,
             ovutils::getStateString(sState));
 
-    ovutils::eOverlayState newState = ovutils::OV_CLOSED;
+    ovutils::eOverlayState newState = ovutils::OV_FB;
 
     if(sExtCount > 0 &&
         ctx->mExtDisplay->getExternalDisplay()) {

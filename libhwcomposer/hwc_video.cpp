@@ -25,7 +25,7 @@
 namespace qhwc {
 
 //Static Members
-ovutils::eOverlayState VideoOverlay::sState = ovutils::OV_CLOSED;
+ovutils::eOverlayState VideoOverlay::sState = ovutils::OV_FB;
 int VideoOverlay::sYuvCount = 0;
 int VideoOverlay::sYuvLayerIndex = -1;
 bool VideoOverlay::sIsYuvLayerSkip = false;
@@ -45,8 +45,8 @@ bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
         return false;
     }
     chooseState(ctx);
-    //if the state chosen above is CLOSED, skip this block.
-    if(sState != ovutils::OV_CLOSED) {
+    //if the state chosen above is OV_FB, skip this block.
+    if(sState != ovutils::OV_FB) {
         hwc_layer_t *yuvLayer = &list->hwLayers[sYuvLayerIndex];
         hwc_layer_t *ccLayer = NULL;
         if(sCCLayerIndex != -1)
@@ -70,7 +70,7 @@ void VideoOverlay::chooseState(hwc_context_t *ctx) {
     ALOGD_IF(VIDEO_DEBUG, "%s: old state = %s", __FUNCTION__,
             ovutils::getStateString(sState));
 
-    ovutils::eOverlayState newState = ovutils::OV_CLOSED;
+    ovutils::eOverlayState newState = ovutils::OV_FB;
 
     //Support 1 video layer
     if(sYuvCount == 1) {
@@ -78,7 +78,7 @@ void VideoOverlay::chooseState(hwc_context_t *ctx) {
         if(sIsYuvLayerSkip && ctx->mExtDisplay->getExternalDisplay()) {
             newState = ovutils::OV_2D_VIDEO_ON_TV;
         } else if(sIsYuvLayerSkip) { //skip on primary, no ext
-            newState = ovutils::OV_CLOSED;
+            newState = ovutils::OV_FB;
         } else if(ctx->mExtDisplay->getExternalDisplay()) {
             //display on both
             newState = ovutils::OV_2D_VIDEO_ON_PANEL_TV;
@@ -122,6 +122,7 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_t *layer) {
     }
 
     ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
+
     if (ctx->numHwLayers == 1) {
         isFgFlag = ovutils::IS_FG_SET;
     }
@@ -133,7 +134,7 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_t *layer) {
 
     ovutils::PipeArgs parg(mdpFlags,
             info,
-            ovutils::ZORDER_0,
+            ovutils::ZORDER_1,
             isFgFlag,
             ovutils::ROT_DOWNSCALE_ENABLED);
     ov.setSource(parg, ovutils::OV_PIPE0);

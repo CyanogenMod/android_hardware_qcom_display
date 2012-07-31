@@ -42,6 +42,7 @@
 #include <genlock.h>
 #include <cutils/properties.h>
 #include <profiler.h>
+#include <overlay.h>
 
 #define EVEN_OUT(x) if (x & 0x0001) {x--;}
 /** min of int a, b */
@@ -61,7 +62,8 @@ enum {
 struct fb_context_t {
     framebuffer_device_t  device;
 };
-
+static void update_framebuffer(struct private_module_t* m);
+static int setupFloatingPipe(struct private_module_t* module);
 
 static int fb_setSwapInterval(struct framebuffer_device_t* dev,
                               int interval)
@@ -124,6 +126,9 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
         pthread_cond_signal(&m->fbPostCond);
         pthread_mutex_unlock(&m->fbPostLock);
 
+        //Queue FB
+        update_framebuffer(m);
+
         m->info.activate = FB_ACTIVATE_VBL;
         m->info.yoffset = offset / m->finfo.line_length;
         if (ioctl(m->framebuffer->fd, FBIOPUT_VSCREENINFO, &m->info) == -1) {
@@ -147,6 +152,38 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
         m->currentBuffer = hnd;
     }
     return 0;
+}
+static bool  isBypassState(struct private_module_t* m) {
+
+    ovutils::eOverlayState state = m->overlay->getState();
+    return (state == ovutils::OV_BYPASS_1_LAYER ||
+            state == ovutils::OV_BYPASS_2_LAYER ||
+            state == ovutils::OV_BYPASS_3_LAYER ||
+            state == ovutils::OV_BYPASS_4_LAYER);
+}
+
+//Queue current framebuffer to overlay
+//before calling commit (PAN_DISPLAY)
+static void update_framebuffer(struct private_module_t* m) {
+
+    if(m->overlay) {
+        ovutils::eOverlayState state = m->overlay->getState();
+
+        if(isBypassState(m)){
+            //operating in non FB mode
+            return;
+        }
+        if(setupFloatingPipe(m) < 0) {
+            ALOGD("%s: setupFloatingPipe failed.", __FUNCTION__);
+            return;
+        }
+
+        if(!m->overlay->queueBuffer(m->framebuffer->fd, m->currentOffset,
+                                ovutils::OV_PIPE3)) {
+            ALOGE("%s: Failed to Queue", __FUNCTION__);
+            return;
+        }
+    }
 }
 
 static int fb_compositionComplete(struct framebuffer_device_t* dev)
@@ -394,7 +431,54 @@ int mapFrameBufferLocked(struct private_module_t* module)
     module->fbPanDone = false;
     pthread_mutex_init(&(module->fbPanLock), NULL);
     pthread_cond_init(&(module->fbPanCond), NULL);
+
+    //Set overlay default state as OV_FB.
+    //If MDP Comp is not enabled RGB0 will
+    //remain to be used in FB mode.
+    if(!module->overlay) {
+        module->overlay = overlay::Overlay::getInstance();
+        module->overlay->setState(ovutils::OV_FB);
+    }
+
     return 0;
+}
+
+//Sets BorderFill as base pipe and acquires RGB0
+//to update FB using PLAY
+static int setupFloatingPipe(struct private_module_t* module) {
+        ovutils::eDest dest = ovutils::OV_PIPE3;
+        ovutils::eZorder zOrder = ovutils::ZORDER_0;
+        ovutils::eTransform orient = ovutils::OVERLAY_TRANSFORM_0;
+
+        private_handle_t const* fb_hnd =
+             reinterpret_cast<private_handle_t const*> (module->framebuffer);
+
+        int fb_stride =  module->finfo.line_length/
+                                (module->info.bits_per_pixel >> 3);
+        ovutils::Whf info(fb_stride, fb_hnd->height,
+                                fb_hnd->format, fb_hnd->size);
+        ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_MEMORY_ID_TYPE_FB;
+        ovutils::eIsFg isFG = ovutils::IS_FG_OFF;
+        ovutils::PipeArgs parg(mdpFlags, info, zOrder, isFG,
+                                            ovutils::ROT_FLAGS_NONE);
+
+
+        module->overlay->setTransform(orient, dest);
+        module->overlay->setSource(parg, dest);
+
+        ovutils::Dim dcrop(0,0,fb_hnd->width, fb_hnd->height);
+        module->overlay->setCrop(dcrop, dest);
+
+        ovutils::Dim dim(0,0,fb_hnd->width, fb_hnd->height);
+        if (!module->overlay->setPosition(dim, dest)) {
+            ALOGE("%s: setPosition failed", __FUNCTION__);
+            return -1;
+        }
+        if (!module->overlay->commit(dest)) {
+            ALOGE("%s: commit failed", __FUNCTION__);
+            return -1;
+        }
+        return 0;
 }
 
 static int mapFrameBuffer(struct private_module_t* module)

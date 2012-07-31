@@ -28,13 +28,13 @@ namespace qhwc {
 
 
 //Static Members
-ovutils::eOverlayState UIMirrorOverlay::sState = ovutils::OV_CLOSED;
+ovutils::eOverlayState UIMirrorOverlay::sState = ovutils::OV_FB;
 bool UIMirrorOverlay::sIsUiMirroringOn = false;
 
 
 //Prepare the overlay for the UI mirroring
 bool UIMirrorOverlay::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
-    sState = ovutils::OV_CLOSED;
+    sState = ovutils::OV_FB;
     sIsUiMirroringOn = false;
 
     if(!ctx->mMDP.hasOverlay) {
