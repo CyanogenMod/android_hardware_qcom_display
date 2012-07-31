@@ -87,8 +87,6 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)
         ExtOnly::reset();
 
         getLayerStats(ctx, list);
-        // Mark all layers to COPYBIT initially
-        CopyBit::prepare(ctx, list);
         if(VideoOverlay::prepare(ctx, list)) {
             ctx->overlayInUse = true;
             //Nothing here
@@ -165,7 +163,6 @@ static int hwc_set(hwc_composer_device_t *dev,
     if (LIKELY(list)) {
         VideoOverlay::draw(ctx, list);
         ExtOnly::draw(ctx, list);
-        CopyBit::draw(ctx, list, (EGLDisplay)dpy, (EGLSurface)sur);
         MDPComp::draw(ctx, list);
         EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
         UIMirrorOverlay::draw(ctx);
