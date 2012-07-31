@@ -213,13 +213,15 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_layer_list_t *list, EGLDisplay dpy,
                                                                EGLSurface sur){
     // draw layers marked for COPYBIT
     int retVal = true;
+    EGLSurface eglSurface = LINK_eglGetCurrentSurface(EGL_DRAW);
+    android_native_buffer_t *renderBuffer =
+     (android_native_buffer_t *)LINK_eglGetRenderBufferANDROID(dpy, eglSurface);
     for (size_t i=0; i<list->numHwLayers; i++) {
         if (list->hwLayers[i].compositionType == HWC_USE_COPYBIT) {
             retVal = drawLayerUsingCopybit(ctx, &(list->hwLayers[i]),
                                                      (EGLDisplay)dpy,
                                                      (EGLSurface)sur,
-                                      LINK_eglGetRenderBufferANDROID,
-                                          LINK_eglGetCurrentSurface);
+                                                        renderBuffer);
            if(retVal<0) {
               ALOGE("%s : drawLayerUsingCopybit failed", __FUNCTION__);
            }
@@ -231,8 +233,7 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_layer_list_t *list, EGLDisplay dpy,
 int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_t *layer,
                                                             EGLDisplay dpy,
                                                         EGLSurface surface,
-        functype_eglGetRenderBufferANDROID& LINK_eglGetRenderBufferANDROID,
-                    functype_eglGetCurrentSurface LINK_eglGetCurrentSurface)
+                                     android_native_buffer_t *renderBuffer)
 {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     if(!ctx) {
@@ -254,9 +255,6 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_t *layer,
         return -1;
     }
     //render buffer
-    EGLSurface eglSurface = LINK_eglGetCurrentSurface(EGL_DRAW);
-    android_native_buffer_t *renderBuffer =
-     (android_native_buffer_t *)LINK_eglGetRenderBufferANDROID(dpy, eglSurface);
     if (!renderBuffer) {
         ALOGE("%s: eglGetRenderBuffer returned NULL buffer", __FUNCTION__);
         genlock_unlock_buffer(hnd);
