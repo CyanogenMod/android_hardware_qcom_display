@@ -343,7 +343,7 @@ bool MDPComp::is_doable(hwc_composer_device_t *dev,
     }
 
     //Number of layers
-    if(list->numHwLayers < 1 || list->numHwLayers > sMaxLayers) {
+    if(list->numHwLayers < 1 || list->numHwLayers > (uint32_t)sMaxLayers) {
         ALOGD_IF(isDebug(), "%s: Unsupported number of layers",__FUNCTION__);
         return false;
     }
