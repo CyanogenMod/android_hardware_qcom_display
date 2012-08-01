@@ -29,8 +29,9 @@ namespace qhwc {
 ovutils::eOverlayState VideoOverlay::sState = ovutils::OV_CLOSED;
 int VideoOverlay::sYuvCount = 0;
 int VideoOverlay::sYuvLayerIndex = -1;
+bool VideoOverlay::sIsYuvLayerSkip = false;
+int VideoOverlay::sCCLayerIndex = -1;
 bool VideoOverlay::sIsModeOn = false;
-bool VideoOverlay::sIsLayerSkip = false;
 
 //Cache stats, figure out the state, config overlay
 bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
@@ -45,15 +46,21 @@ bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
     chooseState(ctx);
     //if the state chosen above is CLOSED, skip this block.
     if(sState != ovutils::OV_CLOSED) {
-        if(configure(ctx, &list->hwLayers[sYuvLayerIndex])) {
+        hwc_layer_t *yuvLayer = &list->hwLayers[sYuvLayerIndex];
+        hwc_layer_t *ccLayer = NULL;
+        if(sCCLayerIndex != -1)
+            ccLayer = &list->hwLayers[sCCLayerIndex];
+
+        if(configure(ctx, yuvLayer, ccLayer)) {
             markFlags(&list->hwLayers[sYuvLayerIndex]);
             sIsModeOn = true;
         }
     }
 
     ALOGD_IF(VIDEO_DEBUG, "%s: stats: yuvCount = %d, yuvIndex = %d,"
-            "IsModeOn = %d, IsSkipLayer = %d", __FUNCTION__, sYuvCount,
-            sYuvLayerIndex, sIsModeOn, sIsLayerSkip);
+            "IsYuvLayerSkip = %d, ccLayerIndex = %d, IsModeOn = %d",
+            __FUNCTION__, sYuvCount, sYuvLayerIndex,
+            sIsYuvLayerSkip, sCCLayerIndex, sIsModeOn);
 
     return sIsModeOn;
 }
@@ -63,14 +70,13 @@ void VideoOverlay::chooseState(hwc_context_t *ctx) {
             ovutils::getStateString(sState));
 
     ovutils::eOverlayState newState = ovutils::OV_CLOSED;
-    //TODO check if device supports overlay and hdmi
 
     //Support 1 video layer
     if(sYuvCount == 1) {
         //Skip on primary, display on ext.
-        if(sIsLayerSkip && ctx->mExtDisplay->getExternalDisplay()) {
+        if(sIsYuvLayerSkip && ctx->mExtDisplay->getExternalDisplay()) {
             newState = ovutils::OV_2D_VIDEO_ON_TV;
-        } else if(sIsLayerSkip) { //skip on primary, no ext
+        } else if(sIsYuvLayerSkip) { //skip on primary, no ext
             newState = ovutils::OV_CLOSED;
         } else if(ctx->mExtDisplay->getExternalDisplay()) {
             //display on both
@@ -228,8 +234,49 @@ bool configExtVid(hwc_context_t *ctx, hwc_layer_t *layer) {
     return true;
 }
 
-bool VideoOverlay::configure(hwc_context_t *ctx, hwc_layer_t *yuvLayer)
-{
+bool configExtCC(hwc_context_t *ctx, hwc_layer_t *layer) {
+    if(layer == NULL)
+        return true;
+
+    overlay::Overlay& ov = *(ctx->mOverlay);
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
+    ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
+    ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_FLAGS_NONE;
+    ovutils::PipeArgs parg(mdpFlags,
+            info,
+            ovutils::ZORDER_1,
+            isFgFlag,
+            ovutils::ROT_FLAG_DISABLED);
+    ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
+    ov.setSource(pargs, ovutils::OV_PIPE2);
+
+    hwc_rect_t sourceCrop = layer->sourceCrop;
+    // x,y,w,h
+    ovutils::Dim dcrop(sourceCrop.left, sourceCrop.top,
+            sourceCrop.right - sourceCrop.left,
+            sourceCrop.bottom - sourceCrop.top);
+    //Only for External
+    ov.setCrop(dcrop, ovutils::OV_PIPE2);
+
+    // FIXME: Use source orientation for TV when source is portrait
+    //Only for External
+    ov.setTransform(0, ovutils::OV_PIPE2);
+
+    //Setting position same as crop
+    //FIXME stretch to full screen
+    ov.setPosition(dcrop, ovutils::OV_PIPE2);
+
+    if (!ov.commit(ovutils::OV_PIPE2)) {
+        ALOGE("%s: commit fails", __FUNCTION__);
+        return false;
+    }
+    return true;
+}
+
+bool VideoOverlay::configure(hwc_context_t *ctx, hwc_layer_t *yuvLayer,
+        hwc_layer_t *ccLayer) {
+
     bool ret = true;
     if (LIKELY(ctx->mOverlay)) {
         overlay::Overlay& ov = *(ctx->mOverlay);
@@ -241,10 +288,12 @@ bool VideoOverlay::configure(hwc_context_t *ctx, hwc_layer_t *yuvLayer)
                 break;
             case ovutils::OV_2D_VIDEO_ON_PANEL_TV:
                 ret &= configExtVid(ctx, yuvLayer);
+                ret &= configExtCC(ctx, ccLayer);
                 ret &= configPrimVid(ctx, yuvLayer);
                 break;
             case ovutils::OV_2D_VIDEO_ON_TV:
                 ret &= configExtVid(ctx, yuvLayer);
+                ret &= configExtCC(ctx, ccLayer);
                 break;
             default:
                 return false;
@@ -262,11 +311,18 @@ bool VideoOverlay::draw(hwc_context_t *ctx, hwc_layer_list_t *list)
         return true;
     }
 
-    private_handle_t *hnd =
-            (private_handle_t *)list->hwLayers[sYuvLayerIndex].handle;
+    private_handle_t *hnd = (private_handle_t *)
+            list->hwLayers[sYuvLayerIndex].handle;
+
+    private_handle_t *cchnd = NULL;
+    if(sCCLayerIndex != -1) {
+        cchnd = (private_handle_t *)list->hwLayers[sCCLayerIndex].handle;
+        ctx->qbuf->lockAndAdd(cchnd);
+    }
 
     // Lock this buffer for read.
     ctx->qbuf->lockAndAdd(hnd);
+
     bool ret = true;
     overlay::Overlay& ov = *(ctx->mOverlay);
     ovutils::eOverlayState state = ov.getState();
@@ -276,6 +332,12 @@ bool VideoOverlay::draw(hwc_context_t *ctx, hwc_layer_list_t *list)
             // Play external
             if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE1)) {
                 ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
+                ret = false;
+            }
+            //Play CC on external
+            if (cchnd && !ov.queueBuffer(cchnd->fd, cchnd->offset,
+                        ovutils::OV_PIPE2)) {
+                ALOGE("%s: queueBuffer failed for cc external", __FUNCTION__);
                 ret = false;
             }
             // Play primary
@@ -302,11 +364,18 @@ bool VideoOverlay::draw(hwc_context_t *ctx, hwc_layer_list_t *list)
                 ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
                 ret = false;
             }
+            //Play CC on external
+            if (cchnd && !ov.queueBuffer(cchnd->fd, cchnd->offset,
+                        ovutils::OV_PIPE2)) {
+                ALOGE("%s: queueBuffer failed for cc external", __FUNCTION__);
+                ret = false;
+            }
             // Wait for external vsync to be done
             if (!ov.waitForVsync(ovutils::OV_PIPE1)) {
                 ALOGE("%s: waitForVsync failed for external", __FUNCTION__);
                 ret = false;
             }
+            break;
         default:
             ALOGE("%s Unused state %s", __FUNCTION__,
                     ovutils::getStateString(state));

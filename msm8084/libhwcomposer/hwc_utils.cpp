@@ -23,6 +23,7 @@
 #include "hwc_copybit.h"
 #include "hwc_external.h"
 #include "hwc_mdpcomp.h"
+#include "hwc_extonly.h"
 
 namespace qhwc {
 
@@ -107,18 +108,32 @@ void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
     int yuvLayerIndex = -1;
     bool isYuvLayerSkip = false;
     int skipCount = 0;
+    int ccLayerIndex = -1; //closed caption
+    int extLayerIndex = -1; //ext-only or block except closed caption
+    int extCount = 0; //ext-only except closed caption
+    bool isExtBlockPresent = false; //is BLOCK layer present
 
     for (size_t i = 0; i < list->numHwLayers; i++) {
         private_handle_t *hnd =
             (private_handle_t *)list->hwLayers[i].handle;
 
-        if (isYuvBuffer(hnd)) {
+        if (UNLIKELY(isYuvBuffer(hnd))) {
             yuvCount++;
             yuvLayerIndex = i;
             //Animating
             if (isSkipLayer(&list->hwLayers[i])) {
                 isYuvLayerSkip = true;
             }
+        } else if(UNLIKELY(isExtCC(hnd))) {
+            ccLayerIndex = i;
+        } else if(UNLIKELY(isExtBlock(hnd))) {
+            extCount++;
+            extLayerIndex = i;
+            isExtBlockPresent = true;
+        } else if(UNLIKELY(isExtOnly(hnd))) {
+            extCount++;
+            //If BLOCK layer present, dont cache index, display BLOCK only.
+            if(isExtBlockPresent == false) extLayerIndex = i;
         } else if (isSkipLayer(&list->hwLayers[i])) { //Popups
             //If video layer is below a skip layer
             if(yuvLayerIndex != -1 && yuvLayerIndex < (ssize_t)i) {
@@ -128,7 +143,9 @@ void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
         }
     }
 
-    VideoOverlay::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip);
+    VideoOverlay::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip,
+            ccLayerIndex);
+    ExtOnly::setStats(extCount, extLayerIndex, isExtBlockPresent);
     CopyBit::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip);
     MDPComp::setStats(skipCount);
 
