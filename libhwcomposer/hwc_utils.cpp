@@ -19,11 +19,11 @@
 #include "mdp_version.h"
 #include "hwc_video.h"
 #include "hwc_ext_observer.h"
+#include "hwc_copybit.h"
 namespace qhwc {
 void initContext(hwc_context_t *ctx)
 {
     //XXX: target specific initializations here
-    openFramebufferDevice(ctx);
     ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->qbuf = new QueuedBufferStore();
     ctx->mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
@@ -32,6 +32,9 @@ void initContext(hwc_context_t *ctx)
 
     ctx->mExtDisplayObserver = ExtDisplayObserver::getInstance();
     ctx->mExtDisplayObserver->setHwcContext(ctx);
+    ctx->mFbDevice = FbDevice::getInstance();
+    ctx->mCopybitEngine = CopybitEngine::getInstance();
+    CopyBit::openEglLibAndGethandle();
 }
 
 void closeContext(hwc_context_t *ctx)
@@ -41,23 +44,19 @@ void closeContext(hwc_context_t *ctx)
         ctx->mOverlay = NULL;
     }
 
-    if(ctx->fbDev) {
-        framebuffer_close(ctx->fbDev);
-        ctx->fbDev = NULL;
+    if(ctx->mCopybitEngine) {
+        delete ctx->mCopybitEngine;
+        ctx->mCopybitEngine = NULL;
     }
-
+    if(ctx->mFbDevice) {
+        delete ctx->mFbDevice;
+        ctx->mFbDevice = NULL;
+    }
     if(ctx->qbuf) {
         delete ctx->qbuf;
         ctx->qbuf = NULL;
     }
-}
-
-// Opens Framebuffer device
-void openFramebufferDevice(hwc_context_t *ctx) {
-    hw_module_t const *module;
-    if (hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &module) == 0) {
-        framebuffer_open(module, &(ctx->fbDev));
-    }
+    CopyBit::closeEglLib();
 }
 
 void dumpLayer(hwc_layer_t const* l)
@@ -102,6 +101,7 @@ void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
     }
 
     VideoOverlay::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip);
+    CopyBit::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip);
 
     ctx->numHwLayers = list->numHwLayers;
     return;
@@ -160,6 +160,35 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
 
         dst_b = fbHeight;
         dst_h = dst_b - dst_y;
+    }
+}
+
+//FbDevice class functions
+FbDevice* FbDevice::sInstance = 0;;
+struct framebuffer_device_t* FbDevice::getFb() {
+   return sFb;
+}
+
+FbDevice* FbDevice::getInstance() {
+   if(sInstance == NULL)
+       sInstance = new FbDevice();
+   return sInstance;
+}
+
+FbDevice::FbDevice(){
+    hw_module_t const *module;
+    if (hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &module) == 0) {
+        framebuffer_open(module, &sFb);
+    } else {
+       ALOGE("FATAL ERROR: framebuffer open failed.");
+    }
+}
+FbDevice::~FbDevice()
+{
+    if(sFb)
+    {
+       framebuffer_close(sFb);
+       sFb = NULL;
     }
 }
 

@@ -26,15 +26,32 @@
 #include <string.h>
 #include <fb_priv.h>
 #include <overlay.h>
+#include <copybit.h>
+#include <hwc_copybitEngine.h>
 #include <genlock.h>
 #include "hwc_qbuf.h"
+#include <EGL/egl.h>
 
-#define ALIGN(x, align)     (((x) + ((align)-1)) & ~((align)-1))
+#define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
+#define FINAL_TRANSFORM_MASK 0x000F
 
 struct hwc_context_t;
 namespace qhwc {
+
+enum external_display_type {
+    EXT_TYPE_NONE,
+    EXT_TYPE_HDMI,
+    EXT_TYPE_WIFI
+};
+enum HWCCompositionType {
+    HWC_USE_GPU = HWC_FRAMEBUFFER, // This layer is to be handled by
+                                   //                 Surfaceflinger
+    HWC_USE_OVERLAY = HWC_OVERLAY, // This layer is to be handled by the overlay
+    HWC_USE_COPYBIT                // This layer is to be handled by copybit
+};
+
 
 class ExtDisplayObserver;
 // -----------------------------------------------------------------------------
@@ -43,7 +60,6 @@ void dumpLayer(hwc_layer_t const* l);
 void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list);
 void initContext(hwc_context_t *ctx);
 void closeContext(hwc_context_t *ctx);
-void openFramebufferDevice(hwc_context_t *ctx);
 //Crops source buffer against destination and FB boundaries
 void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
         const int fbWidth, const int fbHeight);
@@ -62,6 +78,28 @@ static inline bool isYuvBuffer(const private_handle_t* hnd) {
 static inline bool isBufferLocked(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags));
 }
+// -----------------------------------------------------------------------------
+// Copybit specific - inline or implemented in hwc_copybit.cpp
+typedef EGLClientBuffer (*functype_eglGetRenderBufferANDROID) (
+                                                     EGLDisplay dpy,
+                                                    EGLSurface draw);
+typedef EGLSurface (*functype_eglGetCurrentSurface)(EGLint readdraw);
+
+// -----------------------------------------------------------------------------
+// Singleton for Framebuffer device
+class FbDevice{
+public:
+    ~FbDevice();
+    // API to get Fb device(non static)
+    struct framebuffer_device_t *getFb();
+    // API to get singleton
+    static FbDevice* getInstance();
+
+private:
+    FbDevice();
+    struct framebuffer_device_t *sFb;
+    static FbDevice* sInstance; // singleton
+};
 
 }; //qhwc namespace
 
@@ -77,7 +115,10 @@ struct hwc_context_t {
     int overlayInUse;
 
     //Framebuffer device
-    framebuffer_device_t *fbDev;
+    qhwc::FbDevice* mFbDevice;
+
+    //Copybit Engine
+    qhwc::CopybitEngine* mCopybitEngine;
 
     //Overlay object - NULL for non overlay devices
     overlay::Overlay *mOverlay;
