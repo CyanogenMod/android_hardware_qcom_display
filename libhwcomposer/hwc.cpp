@@ -30,6 +30,7 @@
 #include "hwc_uimirror.h"
 #include "hwc_copybit.h"
 #include "hwc_external.h"
+#include "hwc_mdpcomp.h"
 
 using namespace qhwc;
 
@@ -84,6 +85,8 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)
             ctx->overlayInUse = true;
             //Nothing here
         } else if(UIMirrorOverlay::prepare(ctx, list)) {
+            ctx->overlayInUse = true;
+        } else if(MDPComp::configure(dev, list)) {
             ctx->overlayInUse = true;
         } else if (0) {
             //Other features
@@ -153,6 +156,7 @@ static int hwc_set(hwc_composer_device_t *dev,
     if (LIKELY(list)) {
         VideoOverlay::draw(ctx, list);
         CopyBit::draw(ctx, list, (EGLDisplay)dpy, (EGLSurface)sur);
+        MDPComp::draw(ctx, list);
         EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
         UIMirrorOverlay::draw(ctx);
         if(ctx->mExtDisplay->getExternalDisplay())
