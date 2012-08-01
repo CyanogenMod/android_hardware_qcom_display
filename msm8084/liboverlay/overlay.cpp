@@ -54,6 +54,7 @@ bool Overlay::commit(utils::eDest dest)
     switch (st) {
         case utils::OV_2D_VIDEO_ON_PANEL:
         case utils::OV_2D_VIDEO_ON_PANEL_TV:
+        case utils::OV_2D_VIDEO_ON_TV:
         case utils::OV_3D_VIDEO_ON_2D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_TV:
@@ -63,6 +64,7 @@ bool Overlay::commit(utils::eDest dest)
         case utils::OV_BYPASS_1_LAYER:
         case utils::OV_BYPASS_2_LAYER:
         case utils::OV_BYPASS_3_LAYER:
+        case utils::OV_DUAL_DISP:
             if(!mOv->commit(dest)) {
                 ALOGE("Overlay %s failed", __FUNCTION__);
                 return false;
@@ -85,6 +87,7 @@ bool Overlay::queueBuffer(int fd, uint32_t offset,
     switch (st) {
         case utils::OV_2D_VIDEO_ON_PANEL:
         case utils::OV_2D_VIDEO_ON_PANEL_TV:
+        case utils::OV_2D_VIDEO_ON_TV:
         case utils::OV_3D_VIDEO_ON_2D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_TV:
@@ -94,6 +97,7 @@ bool Overlay::queueBuffer(int fd, uint32_t offset,
         case utils::OV_BYPASS_1_LAYER:
         case utils::OV_BYPASS_2_LAYER:
         case utils::OV_BYPASS_3_LAYER:
+        case utils::OV_DUAL_DISP:
             if(!mOv->queueBuffer(fd, offset, dest)) {
                 ALOGE("Overlay %s failed", __FUNCTION__);
                 return false;
@@ -115,6 +119,7 @@ bool Overlay::waitForVsync(utils::eDest dest)
     switch (st) {
         case utils::OV_2D_VIDEO_ON_PANEL:
         case utils::OV_2D_VIDEO_ON_PANEL_TV:
+        case utils::OV_2D_VIDEO_ON_TV:
         case utils::OV_3D_VIDEO_ON_2D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_TV:
@@ -124,6 +129,7 @@ bool Overlay::waitForVsync(utils::eDest dest)
         case utils::OV_BYPASS_1_LAYER:
         case utils::OV_BYPASS_2_LAYER:
         case utils::OV_BYPASS_3_LAYER:
+        case utils::OV_DUAL_DISP:
             if(!mOv->waitForVsync(dest)) {
                 ALOGE("Overlay %s failed", __FUNCTION__);
                 return false;
@@ -146,6 +152,7 @@ bool Overlay::setCrop(const utils::Dim& d,
     switch (st) {
         case utils::OV_2D_VIDEO_ON_PANEL:
         case utils::OV_2D_VIDEO_ON_PANEL_TV:
+        case utils::OV_2D_VIDEO_ON_TV:
         case utils::OV_3D_VIDEO_ON_2D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_TV:
@@ -155,6 +162,7 @@ bool Overlay::setCrop(const utils::Dim& d,
         case utils::OV_BYPASS_1_LAYER:
         case utils::OV_BYPASS_2_LAYER:
         case utils::OV_BYPASS_3_LAYER:
+        case utils::OV_DUAL_DISP:
             if(!mOv->setCrop(d, dest)) {
                 ALOGE("Overlay %s failed", __FUNCTION__);
                 return false;
@@ -176,6 +184,7 @@ bool Overlay::setPosition(const utils::Dim& d,
     switch (st) {
         case utils::OV_2D_VIDEO_ON_PANEL:
         case utils::OV_2D_VIDEO_ON_PANEL_TV:
+        case utils::OV_2D_VIDEO_ON_TV:
         case utils::OV_3D_VIDEO_ON_2D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_TV:
@@ -185,6 +194,7 @@ bool Overlay::setPosition(const utils::Dim& d,
         case utils::OV_BYPASS_1_LAYER:
         case utils::OV_BYPASS_2_LAYER:
         case utils::OV_BYPASS_3_LAYER:
+        case utils::OV_DUAL_DISP:
             if(!mOv->setPosition(d, dest)) {
                 ALOGE("Overlay %s failed", __FUNCTION__);
                 return false;
@@ -207,6 +217,7 @@ bool Overlay::setTransform(const int orient,
     switch (st) {
         case utils::OV_2D_VIDEO_ON_PANEL:
         case utils::OV_2D_VIDEO_ON_PANEL_TV:
+        case utils::OV_2D_VIDEO_ON_TV:
         case utils::OV_3D_VIDEO_ON_2D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_TV:
@@ -216,6 +227,7 @@ bool Overlay::setTransform(const int orient,
         case utils::OV_BYPASS_1_LAYER:
         case utils::OV_BYPASS_2_LAYER:
         case utils::OV_BYPASS_3_LAYER:
+        case utils::OV_DUAL_DISP:
             if(!mOv->setTransform(transform, dest)) {
                 ALOGE("Overlay %s failed", __FUNCTION__);
                 return false;
@@ -247,11 +259,13 @@ bool Overlay::setSource(const utils::PipeArgs args[utils::MAX_PIPES],
         case utils::OV_BYPASS_1_LAYER:
         case utils::OV_BYPASS_2_LAYER:
         case utils::OV_BYPASS_3_LAYER:
+        case utils::OV_DUAL_DISP:
             break;
         case utils::OV_3D_VIDEO_ON_3D_PANEL:
         case utils::OV_3D_VIDEO_ON_3D_TV:
             //TODO set zorder for channel 1 as 1 in 3D pipe
         case utils::OV_2D_VIDEO_ON_PANEL_TV:
+        case utils::OV_2D_VIDEO_ON_TV:
         case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
             break;
         case utils::OV_2D_TRUE_UI_MIRROR:
