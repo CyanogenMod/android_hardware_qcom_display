@@ -125,6 +125,7 @@ struct copybit_context_t {
     int fb_width;
     int fb_height;
     bool isPremultipliedAlpha;
+    bool mBlitToFB;
 };
 
 struct blitlist{
@@ -781,6 +782,16 @@ static int set_parameter_copybit(
             break;
         case COPYBIT_FRAMEBUFFER_HEIGHT:
             ctx->fb_height = value;
+            break;
+        case COPYBIT_BLIT_TO_FRAMEBUFFER:
+            if (COPYBIT_ENABLE == value) {
+                ctx->mBlitToFB = value;
+            } else if (COPYBIT_DISABLE == value) {
+                ctx->mBlitToFB = value;
+            } else {
+              ALOGE ("%s:Invalid input for COPYBIT_BLIT_TO_FRAMEBUFFER : %d",
+                                                         __FUNCTION__, value);
+            }
             break;
         default:
             ALOGE("%s: default case param=0x%x", __FUNCTION__, name);
