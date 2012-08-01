@@ -51,8 +51,11 @@ public:
                                         EGLDisplay dpy, EGLSurface surface,
         functype_eglGetRenderBufferANDROID& LINK_eglGetRenderBufferANDROID,
                   functype_eglGetCurrentSurface LINK_eglGetCurrentSurface);
-    static bool canUseCopybit(hwc_context_t* ctx, const hwc_layer_list_t* list,
-                                                      const int numYUVBuffers);
+    static bool canUseCopybitForYUV (hwc_context_t *ctx);
+    static bool canUseCopybitForRGB (hwc_context_t *ctx,
+                                     hwc_layer_list_t *list);
+    static bool validateParams (hwc_context_t *ctx,
+                                const hwc_layer_list_t *list);
     static void closeEglLib();
     static void openEglLibAndGethandle();
 private:
@@ -75,9 +78,10 @@ private:
     static functype_eglGetRenderBufferANDROID LINK_eglGetRenderBufferANDROID;
     static functype_eglGetCurrentSurface LINK_eglGetCurrentSurface;
 
-    static void getLayerResolution(const hwc_layer_t* layer, int& width,
-                                                           int& height);
+    static  unsigned int getRGBRenderingArea (const hwc_layer_list_t *list);
 
+    static void getLayerResolution(const hwc_layer_t* layer,
+                                   unsigned int &width, unsigned int& height);
 };
 
 class CopybitEngine {
