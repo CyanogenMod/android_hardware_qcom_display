@@ -54,12 +54,10 @@ public:
     bool close();
     bool commit();
     bool queueBuffer(int fd, uint32_t offset);
-    bool waitForVsync();
     bool setCrop(const utils::Dim& d);
     bool setPosition(const utils::Dim& dim);
     bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
     overlay::GenericPipe<utils::EXTERNAL> mM3d;
@@ -86,12 +84,10 @@ public:
     bool close();
     bool commit();
     bool queueBuffer(int fd, uint32_t offset);
-    bool waitForVsync();
     bool setCrop(const utils::Dim& d);
     bool setPosition(const utils::Dim& dim);
     bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
     overlay::GenericPipe<utils::PRIMARY> mM3d;
@@ -118,12 +114,10 @@ public:
     bool close();
     bool commit();
     bool queueBuffer(int fd, uint32_t offset);
-    bool waitForVsync();
     bool setCrop(const utils::Dim& d);
     bool setPosition(const utils::Dim& dim);
     bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
     overlay::GenericPipe<utils::EXTERNAL> mS3d;
@@ -150,12 +144,10 @@ public:
     bool close();
     bool commit();
     bool queueBuffer(int fd, uint32_t offset);
-    bool waitForVsync();
     bool setCrop(const utils::Dim& d);
     bool setPosition(const utils::Dim& dim);
     bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
     /* needed for 3D related IOCTL */
@@ -196,9 +188,6 @@ inline bool M3DExtPipe<CHAN>::queueBuffer(int fd, uint32_t offset) {
     return mM3d.queueBuffer(fd, offset);
 }
 template <int CHAN>
-inline bool M3DExtPipe<CHAN>::waitForVsync() {
-    return mM3d.waitForVsync(); }
-template <int CHAN>
 inline bool M3DExtPipe<CHAN>::setCrop(const utils::Dim& d) {
     utils::Dim _dim;
     if(!utils::getCropS3D<CHAN>(d, _dim, mM3Dfmt)){
@@ -237,10 +226,6 @@ inline bool M3DExtPipe<CHAN>::setSource(const utils::PipeArgs& args)
     return mM3d.setSource(args);
 }
 template <int CHAN>
-inline utils::eOverlayPipeType M3DExtPipe<CHAN>::getOvPipeType() const {
-    return utils::OV_PIPE_TYPE_M3D_EXTERNAL;
-}
-template <int CHAN>
 inline void M3DExtPipe<CHAN>::dump() const {
     ALOGE("M3DExtPipe Pipe fmt=%d", mM3Dfmt);
     mM3d.dump();
@@ -272,9 +257,6 @@ inline bool M3DPrimaryPipe<CHAN>::queueBuffer(int fd, uint32_t offset) {
     return mM3d.queueBuffer(fd, offset);
 }
 template <int CHAN>
-inline bool M3DPrimaryPipe<CHAN>::waitForVsync() {
-    return mM3d.waitForVsync(); }
-template <int CHAN>
 inline bool M3DPrimaryPipe<CHAN>::setCrop(const utils::Dim& d) {
     utils::Dim _dim;
     if(!utils::getCropS3D<CHAN>(d, _dim, mM3Dfmt)){
@@ -298,10 +280,6 @@ inline bool M3DPrimaryPipe<CHAN>::setSource(const utils::PipeArgs& args)
     mM3Dfmt = utils::format3DInput(utils::getS3DFormat(args.whf.format)) |
             utils::HAL_3D_OUT_MONOS_MASK;
     return mM3d.setSource(args);
-}
-template <int CHAN>
-inline utils::eOverlayPipeType M3DPrimaryPipe<CHAN>::getOvPipeType() const {
-    return utils::OV_PIPE_TYPE_M3D_PRIMARY;
 }
 template <int CHAN>
 inline void M3DPrimaryPipe<CHAN>::dump() const {
@@ -337,9 +315,6 @@ inline bool S3DExtPipe<CHAN>::queueBuffer(int fd, uint32_t offset) {
     return mS3d.queueBuffer(fd, offset);
 }
 template <int CHAN>
-inline bool S3DExtPipe<CHAN>::waitForVsync() {
-    return mS3d.waitForVsync(); }
-template <int CHAN>
 inline bool S3DExtPipe<CHAN>::setCrop(const utils::Dim& d) {
     utils::Dim _dim;
     if(!utils::getCropS3D<CHAN>(d, _dim, mS3Dfmt)){
@@ -369,10 +344,6 @@ template <int CHAN>
 inline bool S3DExtPipe<CHAN>::setSource(const utils::PipeArgs& args) {
     mS3Dfmt = utils::getS3DFormat(args.whf.format);
     return mS3d.setSource(args);
-}
-template <int CHAN>
-inline utils::eOverlayPipeType S3DExtPipe<CHAN>::getOvPipeType() const {
-    return utils::OV_PIPE_TYPE_S3D_EXTERNAL;
 }
 template <int CHAN>
 inline void S3DExtPipe<CHAN>::dump() const {
@@ -418,9 +389,6 @@ template <int CHAN>
 inline bool S3DPrimaryPipe<CHAN>::queueBuffer(int fd, uint32_t offset) {
     return mS3d.queueBuffer(fd, offset);
 }
-template <int CHAN>
-inline bool S3DPrimaryPipe<CHAN>::waitForVsync() {
-    return mS3d.waitForVsync(); }
 template <int CHAN>
 inline bool S3DPrimaryPipe<CHAN>::setCrop(const utils::Dim& d) {
     utils::Dim _dim;
@@ -485,10 +453,6 @@ inline bool S3DPrimaryPipe<CHAN>::setSource(const utils::PipeArgs& args)
 {
     mS3Dfmt = utils::getS3DFormat(args.whf.format);
     return mS3d.setSource(args);
-}
-template <int CHAN>
-inline utils::eOverlayPipeType S3DPrimaryPipe<CHAN>::getOvPipeType() const {
-    return utils::OV_PIPE_TYPE_S3D_PRIMARY;
 }
 template <int CHAN>
 inline void S3DPrimaryPipe<CHAN>::dump() const {

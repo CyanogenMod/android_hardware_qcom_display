@@ -347,11 +347,6 @@ bool VideoOverlay::draw(hwc_context_t *ctx, hwc_layer_list_t *list)
                 ALOGE("%s: queueBuffer failed for primary", __FUNCTION__);
                 ret = false;
             }
-            // Wait for external vsync to be done
-            if (!ov.waitForVsync(ovutils::OV_PIPE1)) {
-                ALOGE("%s: waitForVsync failed for external", __FUNCTION__);
-                ret = false;
-            }
             break;
         case ovutils::OV_2D_VIDEO_ON_PANEL:
             // Play primary
@@ -370,11 +365,6 @@ bool VideoOverlay::draw(hwc_context_t *ctx, hwc_layer_list_t *list)
             if (cchnd && !ov.queueBuffer(cchnd->fd, cchnd->offset,
                         ovutils::OV_PIPE2)) {
                 ALOGE("%s: queueBuffer failed for cc external", __FUNCTION__);
-                ret = false;
-            }
-            // Wait for external vsync to be done
-            if (!ov.waitForVsync(ovutils::OV_PIPE1)) {
-                ALOGE("%s: waitForVsync failed for external", __FUNCTION__);
                 ret = false;
             }
             break;

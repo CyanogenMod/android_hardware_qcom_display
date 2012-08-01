@@ -63,8 +63,6 @@ public:
     /* Data APIs */
     /* queue buffer to the overlay */
     bool queueBuffer(int fd, uint32_t offset);
-    /* wait for vsync to be done */
-    bool waitForVsync();
 
     /* return cached startup args */
     const utils::PipeArgs& getArgs() const;
@@ -89,9 +87,6 @@ public:
 
     /* return Ctrl fd. Used for S3D */
     int getCtrlFd() const;
-
-    /* Get the overlay pipe type */
-    utils::eOverlayPipeType getOvPipeType() const;
 
     /* dump the state of the object */
     void dump() const;
@@ -281,12 +276,6 @@ inline int GenericPipe<PANEL>::getCtrlFd() const {
 }
 
 template <int PANEL>
-inline bool GenericPipe<PANEL>::waitForVsync() {
-    OVASSERT(isOpen(), "State is closed, cannot waitForVsync");
-    return mCtrlData.data.waitForVsync();
-}
-
-template <int PANEL>
 inline utils::Dim GenericPipe<PANEL>::getAspectRatio(
         const utils::Whf& whf) const
 {
@@ -310,11 +299,6 @@ template <int PANEL>
 inline utils::Dim GenericPipe<PANEL>::getCrop() const
 {
     return mCtrlData.ctrl.getCrop();
-}
-
-template <int PANEL>
-inline utils::eOverlayPipeType GenericPipe<PANEL>::getOvPipeType() const {
-    return utils::OV_PIPE_TYPE_GENERIC;
 }
 
 template <int PANEL>

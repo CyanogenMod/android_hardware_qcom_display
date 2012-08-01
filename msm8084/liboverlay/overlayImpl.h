@@ -72,9 +72,6 @@ public:
     virtual bool queueBuffer(int fd, uint32_t offset,
             utils::eDest dest = utils::OV_PIPE_ALL) = 0;
 
-    /* Wait for vsync to be done on dest */
-    virtual bool waitForVsync(utils::eDest dest = utils::OV_PIPE1) = 0;
-
     /* Crop existing destination using Dim coordinates */
     virtual bool setCrop(const utils::Dim& d,
             utils::eDest dest = utils::OV_PIPE_ALL) = 0;
@@ -92,9 +89,6 @@ public:
     virtual bool setSource(const utils::PipeArgs[utils::MAX_PIPES],
             utils::eDest dest = utils::OV_PIPE_ALL) = 0;
 
-    /* Get the overlay pipe type */
-    virtual utils::eOverlayPipeType getOvPipeType(utils::eDest dest) const = 0;
-
     /* Dump underlying state */
     virtual void dump() const = 0;
 };
@@ -110,11 +104,6 @@ public:
     bool setTransform(const utils::eTransform& param) { return true; }
     bool setSource(const utils::PipeArgs& args) { return true; }
     bool queueBuffer(int fd, uint32_t offset) { return true; }
-    bool waitForVsync() { return true; }
-    // NullPipe will return by val here as opposed to other Pipes.
-    utils::eOverlayPipeType getOvPipeType() const {
-        return utils::OV_PIPE_TYPE_NULL;
-    }
     void dump() const {}
 };
 
@@ -157,8 +146,6 @@ public:
             utils::eDest dest = utils::OV_PIPE_ALL);
     virtual bool queueBuffer(int fd, uint32_t offset,
             utils::eDest dest = utils::OV_PIPE_ALL);
-    virtual bool waitForVsync(utils::eDest dest = utils::OV_PIPE1);
-    virtual utils::eOverlayPipeType getOvPipeType(utils::eDest dest) const;
     virtual void dump() const;
 
 private:
@@ -613,63 +600,6 @@ bool OverlayImpl<P0, P1, P2>::queueBuffer(int fd, uint32_t offset,
     }
 
     return true;
-}
-
-template <class P0, class P1, class P2>
-bool OverlayImpl<P0, P1, P2>::waitForVsync(utils::eDest dest)
-{
-    OVASSERT(mPipe0 && mPipe1 && mPipe2,
-            "%s: Pipes are null p0=%p p1=%p p2=%p",
-            __FUNCTION__, mPipe0, mPipe1, mPipe2);
-
-    if (utils::OV_PIPE0 & dest) {
-        if(!mPipe0->waitForVsync()) {
-            ALOGE("OverlayImpl p0 failed to waitForVsync");
-            return false;
-        }
-    }
-
-    if (utils::OV_PIPE1 & dest) {
-        if(!mPipe1->waitForVsync()) {
-            ALOGE("OverlayImpl p1 failed to waitForVsync");
-            return false;
-        }
-    }
-
-    if (utils::OV_PIPE2 & dest) {
-        if(!mPipe2->waitForVsync()) {
-            ALOGE("OverlayImpl p2 failed to waitForVsync");
-            return false;
-        }
-    }
-
-    return true;
-}
-
-template <class P0, class P1, class P2>
-utils::eOverlayPipeType OverlayImpl<P0, P1, P2>::getOvPipeType(
-        utils::eDest dest) const
-{
-    OVASSERT(utils::isValidDest(dest), "%s: OverlayImpl invalid dest=%d",
-            __FUNCTION__, dest);
-
-    if (utils::OV_PIPE0 & dest) {
-        OVASSERT(mPipe0, "%s: OverlayImpl pipe0 is null", __FUNCTION__);
-        return mPipe0->getOvPipeType();
-    }
-
-    if (utils::OV_PIPE1 & dest) {
-        OVASSERT(mPipe1, "%s: OverlayImpl pipe1 is null", __FUNCTION__);
-        return mPipe1->getOvPipeType();
-    }
-
-    if (utils::OV_PIPE2 & dest) {
-        OVASSERT(mPipe2, "%s: OverlayImpl pipe2 is null", __FUNCTION__);
-        return mPipe2->getOvPipeType();
-    }
-
-    // Should never get here
-    return utils::OV_PIPE_TYPE_NULL;
 }
 
 template <class P0, class P1, class P2>
