@@ -32,6 +32,7 @@
 #include "hwc_copybit.h"
 #include "hwc_external.h"
 #include "hwc_mdpcomp.h"
+#include "hwc_extonly.h"
 
 using namespace qhwc;
 
@@ -81,10 +82,16 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)
     return 0;
 
     if (LIKELY(list)) {
+        //reset for this draw round
+        VideoOverlay::reset();
+        ExtOnly::reset();
+
         getLayerStats(ctx, list);
         if(VideoOverlay::prepare(ctx, list)) {
             ctx->overlayInUse = true;
             //Nothing here
+        } else if(ExtOnly::prepare(ctx, list)) {
+            ctx->overlayInUse = true;
         } else if(UIMirrorOverlay::prepare(ctx, list)) {
             ctx->overlayInUse = true;
         } else if(MDPComp::configure(dev, list)) {
@@ -156,6 +163,7 @@ static int hwc_set(hwc_composer_device_t *dev,
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     if (LIKELY(list)) {
         VideoOverlay::draw(ctx, list);
+        ExtOnly::draw(ctx, list);
         CopyBit::draw(ctx, list, (EGLDisplay)dpy, (EGLSurface)sur);
         MDPComp::draw(ctx, list);
         EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
