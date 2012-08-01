@@ -13,7 +13,6 @@ LOCAL_SRC_FILES := \
       overlayCtrl.cpp \
       overlayUtils.cpp \
       overlayMdp.cpp \
-      overlayRotator.cpp \
-      overlayTransitions.cpp
+      overlayRotator.cpp
 
 include $(BUILD_SHARED_LIBRARY)
