@@ -29,6 +29,7 @@
 #include "hwc_video.h"
 #include "hwc_uimirror.h"
 #include "hwc_copybit.h"
+#include "hwc_external.h"
 
 using namespace qhwc;
 
@@ -108,6 +109,10 @@ static int hwc_eventControl(struct hwc_composer_device* dev,
         case HWC_EVENT_VSYNC:
             if(ioctl(m->framebuffer->fd, MSMFB_OVERLAY_VSYNC_CTRL, &enabled) < 0)
                 ret = -errno;
+
+            if(ctx->mExtDisplay->getExternalDisplay()) {
+                ret = ctx->mExtDisplay->enableHDMIVsync(enabled);
+            }
            break;
         default:
             ret = -EINVAL;
@@ -150,6 +155,8 @@ static int hwc_set(hwc_composer_device_t *dev,
         CopyBit::draw(ctx, list, (EGLDisplay)dpy, (EGLSurface)sur);
         EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
         UIMirrorOverlay::draw(ctx);
+        if(ctx->mExtDisplay->getExternalDisplay())
+           ctx->mExtDisplay->commit();
     } else {
         ctx->mOverlay->setState(ovutils::OV_CLOSED);
         ctx->qbuf->unlockAllPrevious();
