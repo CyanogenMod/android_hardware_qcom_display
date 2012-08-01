@@ -50,12 +50,10 @@ public:
     bool close();
     bool commit();
     bool queueBuffer(int fd, uint32_t offset);
-    bool waitForVsync();
     bool setCrop(const utils::Dim& dim);
     bool setPosition(const utils::Dim& dim);
     bool setTransform(const utils::eTransform& param);
     bool setSource(const utils::PipeArgs& args);
-    utils::eOverlayPipeType getOvPipeType() const;
     void dump() const;
 private:
     overlay::GenericPipe<ovutils::EXTERNAL> mUI;
@@ -79,8 +77,6 @@ inline bool UIMirrorPipe::commit() { return mUI.commit(); }
 inline bool UIMirrorPipe::queueBuffer(int fd, uint32_t offset) {
     return mUI.queueBuffer(fd, offset);
 }
-inline bool UIMirrorPipe::waitForVsync() {
-    return mUI.waitForVsync(); }
 inline bool UIMirrorPipe::setCrop(const utils::Dim& dim) {
     return mUI.setCrop(dim); }
 
@@ -161,9 +157,6 @@ inline bool UIMirrorPipe::setSource(const utils::PipeArgs& args) {
     }
 
     return mUI.setSource(arg);
-}
-inline utils::eOverlayPipeType UIMirrorPipe::getOvPipeType() const {
-    return utils::OV_PIPE_TYPE_UI_MIRROR;
 }
 inline void UIMirrorPipe::dump() const {
     ALOGE("UI Mirror Pipe");

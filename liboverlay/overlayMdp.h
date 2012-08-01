@@ -221,9 +221,6 @@ public:
     /* calls wrapper play */
     bool play(int fd, uint32_t offset);
 
-    /* calls wrapper waitForVsync */
-    bool waitForVsync();
-
     /* dump state of the object */
     void dump() const;
 private:
@@ -487,15 +484,6 @@ inline bool MdpData::play(int fd, uint32_t offset) {
     mOvData.data.offset = offset;
     if(!mdp_wrapper::play(mFd.getFD(), mOvData)){
         ALOGE("MdpData failed to play");
-        dump();
-        return false;
-    }
-    return true;
-}
-
-inline bool MdpData::waitForVsync() {
-    if(!mdp_wrapper::waitForVsync(mFd.getFD(), mOvData)){
-        ALOGE("%s failed", __FUNCTION__);
         dump();
         return false;
     }
