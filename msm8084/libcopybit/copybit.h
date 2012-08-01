@@ -52,6 +52,10 @@ enum {
 
 /* name for copybit_set_parameter */
 enum {
+    /* Default blit destination is offline buffer */
+    /* clients to set this to '1', if blitting to framebuffer */
+    /* and reset to '0', after calling blit/stretch */
+    COPYBIT_BLIT_TO_FRAMEBUFFER = 0,
     /* rotation of the source image in degrees (0 to 359) */
     COPYBIT_ROTATION_DEG    = 1,
     /* plane alpha value */

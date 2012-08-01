@@ -20,11 +20,11 @@
 
 #include <cutils/log.h>
 #include <cutils/atomic.h>
-#include <EGL/egl.h>
 
 #include "hwc_utils.h"
 #include "hwc_video.h"
 #include "hwc_uimirror.h"
+#include "hwc_copybit.h"
 
 using namespace qhwc;
 
@@ -83,7 +83,11 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)
         } else if (0) {
             //Other features
             ctx->overlayInUse = true;
+        } else { // Else set this flag to false, otherwise video cases
+                 // fail in non-overlay targets.
+            ctx->overlayInUse = false;
         }
+        CopyBit::prepare(ctx, list);
     }
 
     return 0;
@@ -98,6 +102,7 @@ static int hwc_set(hwc_composer_device_t *dev,
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     if (LIKELY(list)) {
         VideoOverlay::draw(ctx, list);
+        CopyBit::draw(ctx, list, (EGLDisplay)dpy, (EGLSurface)sur);
         EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
         UIMirrorOverlay::draw(ctx);
     } else {

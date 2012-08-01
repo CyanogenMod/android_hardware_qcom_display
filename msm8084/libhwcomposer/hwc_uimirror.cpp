@@ -73,11 +73,11 @@ bool UIMirrorOverlay::configure(hwc_context_t *ctx, hwc_layer_list_t *list)
         overlay::Overlay& ov = *(ctx->mOverlay);
         // Set overlay state
         ov.setState(sState);
-        framebuffer_device_t *fbDev = ctx->fbDev;
+        framebuffer_device_t *fbDev = ctx->mFbDevice->getFb();
         if(fbDev) {
             private_module_t* m = reinterpret_cast<private_module_t*>(
                     fbDev->common.module);
-            int alignedW = ALIGN(m->info.xres, 32);
+            int alignedW = ALIGN_TO(m->info.xres, 32);
 
             private_handle_t const* hnd =
                     reinterpret_cast<private_handle_t const*>(m->framebuffer);
@@ -143,7 +143,7 @@ bool UIMirrorOverlay::draw(hwc_context_t *ctx)
     overlay::Overlay& ov = *(ctx->mOverlay);
     ovutils::eOverlayState state = ov.getState();
     ovutils::eDest dest = ovutils::OV_PIPE_ALL;
-    framebuffer_device_t *fbDev = ctx->fbDev;
+    framebuffer_device_t *fbDev = ctx->mFbDevice->getFb();
     if(fbDev) {
         private_module_t* m = reinterpret_cast<private_module_t*>(
                               fbDev->common.module);

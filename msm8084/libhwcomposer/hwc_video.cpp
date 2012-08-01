@@ -33,6 +33,10 @@ bool VideoOverlay::sIsLayerSkip = false;
 //Cache stats, figure out the state, config overlay
 bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
     sIsModeOn = false;
+    if(!ctx->hasOverlay) {
+       ALOGD_IF(VIDEO_DEBUG,"%s, this hw doesnt support overlay", __FUNCTION__);
+       return false;
+    }
     chooseState(ctx);
     //if the state chosen above is CLOSED, skip this block.
     if(sState != ovutils::OV_CLOSED) {

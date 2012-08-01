@@ -2,6 +2,7 @@
 common_includes := hardware/qcom/display/libgralloc
 common_includes += hardware/qcom/display/libgenlock
 common_includes += hardware/qcom/display/liboverlay
+common_includes += hardware/qcom/display/libcopybit
 common_includes += hardware/qcom/display/libqdutils
 
 ifeq ($(TARGET_USES_POST_PROCESSING),true)
