@@ -154,10 +154,10 @@ public:
     static bool deinit();
 
     /*sets up mdp comp for the current frame */
-    static bool configure(hwc_composer_device_t *ctx,  hwc_layer_list_t* list);
+    static bool configure(hwc_composer_device_1_t *ctx,  hwc_display_contents_1_t* list);
 
     /* draw */
-    static int draw(hwc_context_t *ctx, hwc_layer_list_t *list);
+    static int draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
 
     /* store frame stats */
     static void setStats(int skipCt) { sSkipCount  = skipCt;};
@@ -165,40 +165,40 @@ public:
 private:
 
     /* get/set pipe index associated with overlay layers */
-    static void setLayerIndex(hwc_layer_t* layer, const int pipe_index);
-    static int  getLayerIndex(hwc_layer_t* layer);
+    static void setLayerIndex(hwc_layer_1_t* layer, const int pipe_index);
+    static int  getLayerIndex(hwc_layer_1_t* layer);
 
     /* set/reset flags for MDPComp */
-    static void setMDPCompLayerFlags(hwc_layer_list_t* list);
+    static void setMDPCompLayerFlags(hwc_display_contents_1_t* list);
     static void unsetMDPCompLayerFlags(hwc_context_t* ctx,
-                                       hwc_layer_list_t* list);
+                                       hwc_display_contents_1_t* list);
 
-    static void print_info(hwc_layer_t* layer);
+    static void print_info(hwc_layer_1_t* layer);
 
     /* configure's overlay pipes for the frame */
-    static int  prepare(hwc_context_t *ctx, hwc_layer_t *layer,
+    static int  prepare(hwc_context_t *ctx, hwc_layer_1_t *layer,
                         mdp_pipe_info& mdp_info);
 
     /* checks for conditions where mdpcomp is not possible */
-    static bool is_doable(hwc_composer_device_t *dev,
-                           const hwc_layer_list_t* list);
+    static bool is_doable(hwc_composer_device_1_t *dev,
+                           const hwc_display_contents_1_t* list);
 
-    static bool setup(hwc_context_t* ctx, hwc_layer_list_t* list);
+    static bool setup(hwc_context_t* ctx, hwc_display_contents_1_t* list);
 
     /* parses layer for properties affecting mdp comp */
-    static void get_layer_info(hwc_layer_t* layer, int& flags);
+    static void get_layer_info(hwc_layer_1_t* layer, int& flags);
 
     /* iterates through layer list to choose candidate to use overlay */
-    static int  mark_layers(hwc_layer_list_t* list, layer_mdp_info* layer_info,
+    static int  mark_layers(hwc_display_contents_1_t* list, layer_mdp_info* layer_info,
                                                   frame_info& current_frame);
-    static bool parse_and_allocate(hwc_context_t* ctx, hwc_layer_list_t* list,
+    static bool parse_and_allocate(hwc_context_t* ctx, hwc_display_contents_1_t* list,
                                                   frame_info& current_frame );
 
     /* clears layer info struct */
     static void reset_layer_mdp_info(layer_mdp_info* layer_mdp_info,int count);
 
     /* allocates pipes to selected candidates */
-    static bool alloc_layer_pipes(hwc_layer_list_t* list,
+    static bool alloc_layer_pipes(hwc_display_contents_1_t* list,
                                   layer_mdp_info* layer_info,
                                   frame_info& current_frame);
     /* updates variable pipe mode for the current frame */
@@ -209,7 +209,7 @@ private:
     static void set_state(State state) { sMDPCompState = state; };
 
     /* reset state */
-    static void reset( hwc_context_t *ctx, hwc_layer_list_t* list );
+    static void reset( hwc_context_t *ctx, hwc_display_contents_1_t* list );
 
     /* Is feature enabled */
     static bool isEnabled() { return sMaxLayers ? true : false; };

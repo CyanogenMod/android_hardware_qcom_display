@@ -31,7 +31,7 @@ bool ExtOnly::sIsExtBlock = false;
 bool ExtOnly::sIsModeOn = false;
 
 //Cache stats, figure out the state, config overlay
-bool ExtOnly::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
+bool ExtOnly::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
     sIsModeOn = false;
     if(!ctx->mMDP.hasOverlay) {
        ALOGD_IF(EXTONLY_DEBUG,"%s, this hw doesnt support overlay",
@@ -44,7 +44,7 @@ bool ExtOnly::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
     chooseState(ctx);
     //if the state chosen above is CLOSED, skip this block.
     if(sState != ovutils::OV_CLOSED) {
-        hwc_layer_t *extLayer = &list->hwLayers[sExtIndex];
+        hwc_layer_1_t *extLayer = &list->hwLayers[sExtIndex];
         if(configure(ctx, extLayer)) {
             markFlags(extLayer);
             sIsModeOn = true;
@@ -75,7 +75,7 @@ void ExtOnly::chooseState(hwc_context_t *ctx) {
             ovutils::getStateString(sState));
 }
 
-void ExtOnly::markFlags(hwc_layer_t *layer) {
+void ExtOnly::markFlags(hwc_layer_1_t *layer) {
     switch(sState) {
         case ovutils::OV_DUAL_DISP:
             layer->compositionType = HWC_OVERLAY;
@@ -85,7 +85,7 @@ void ExtOnly::markFlags(hwc_layer_t *layer) {
     }
 }
 
-bool ExtOnly::configure(hwc_context_t *ctx, hwc_layer_t *layer) {
+bool ExtOnly::configure(hwc_context_t *ctx, hwc_layer_1_t *layer) {
 
     overlay::Overlay& ov = *(ctx->mOverlay);
     ov.setState(sState);
@@ -121,7 +121,7 @@ bool ExtOnly::configure(hwc_context_t *ctx, hwc_layer_t *layer) {
     return true;
 }
 
-bool ExtOnly::draw(hwc_context_t *ctx, hwc_layer_list_t *list)
+bool ExtOnly::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list)
 {
     if(!sIsModeOn || sExtIndex == -1) {
         return true;

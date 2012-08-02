@@ -28,9 +28,9 @@ namespace qhwc {
 class ExtOnly {
 public:
     //Sets up members and prepares overlay if conditions are met
-    static bool prepare(hwc_context_t *ctx, hwc_layer_list_t *list);
+    static bool prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list);
     //Draws layer if this feature is on
-    static bool draw(hwc_context_t *ctx, hwc_layer_list_t *list);
+    static bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
     //Receives data from hwc
     static void setStats(int extCount, int extIndex, bool isExtBlock);
     //resets values
@@ -39,9 +39,9 @@ private:
     //Choose an appropriate overlay state based on conditions
     static void chooseState(hwc_context_t *ctx);
     //Configures overlay
-    static bool configure(hwc_context_t *ctx, hwc_layer_t *layer);
+    static bool configure(hwc_context_t *ctx, hwc_layer_1_t *layer);
     //Marks layer flags if this feature is used
-    static void markFlags(hwc_layer_t *layer);
+    static void markFlags(hwc_layer_1_t *layer);
     //returns ext-only count
     static int getExtCount();
 
