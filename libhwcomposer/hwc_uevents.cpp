@@ -18,8 +18,8 @@
  * limitations under the License.
  */
 #define DEBUG 0
-#ifndef HWC_OBSERVER_H
-#define HWC_OBSERVER_H
+#ifndef HWC_UEVENTS_H
+#define HWC_UEVENTS_H
 #include <hardware_legacy/uevent.h>
 #include <utils/Log.h>
 #include <sys/resource.h>
@@ -32,12 +32,11 @@ namespace qhwc {
 
 const char* MSMFB_DEVICE_FB0 = "change@/devices/virtual/graphics/fb0";
 const char* MSMFB_DEVICE_FB1 = "change@/devices/virtual/graphics/fb1";
-const char* MSMFB_HDMI_NODE = "fb1";
+const char* MSMFB_FB_NODE = "fb";
 
 static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 {
     int vsync = 0;
-    char* hdmi;
     int64_t timestamp = 0;
     const char *str = udata;
     hwc_procs* proc = (hwc_procs*)ctx->device.reserved_proc[0];
@@ -48,12 +47,12 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         return;
     }
 
-    if(hdmiconnected)
+    if(ctx->mExtDisplay->isHDMIConfigured() &&
+            (hdmiconnected == EXTERN_DISPLAY_FB1))
         vsync = !strncmp(str, MSMFB_DEVICE_FB1, strlen(MSMFB_DEVICE_FB1));
     else
         vsync = !strncmp(str, MSMFB_DEVICE_FB0, strlen(MSMFB_DEVICE_FB0));
 
-    hdmi = strcasestr(str, MSMFB_HDMI_NODE);
     if(vsync) {
         str += strlen(str) + 1;
         while(*str) {
@@ -68,24 +67,18 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         return;
     }
 
-    if(hdmi) {
-        // parse HDMI events
-        // The event will be of the form:
-        // change@/devices/virtual/graphics/fb1 ACTION=change
-        // DEVPATH=/devices/virtual/graphics/fb1
-        // SUBSYSTEM=graphics HDCP_STATE=FAIL MAJOR=29
-        // for now just parsing onlin/offline info is enough
-        str = udata;
-        int connected = 0;
-        if(!(strncmp(str,"online@",strlen("online@")))) {
-            connected = 1;
-            ctx->mExtDisplay->setExternalDisplay(connected);
-        } else if(!(strncmp(str,"offline@",strlen("offline@")))) {
-            connected = 0;
-            ctx->mExtDisplay->setExternalDisplay(connected);
-        }
+    // parse HDMI events
+    // The event will be of the form:
+    // change@/devices/virtual/graphics/fb1 ACTION=change
+    // DEVPATH=/devices/virtual/graphics/fb1
+    // SUBSYSTEM=graphics HDCP_STATE=FAIL MAJOR=29
+    // for now just parsing onlin/offline info is enough
+    str = udata;
+    if(!(strncmp(str,"online@",strlen("online@")))) {
+        ctx->mExtDisplay->processUEventOnline(str);
+    } else if(!(strncmp(str,"offline@",strlen("offline@")))) {
+        ctx->mExtDisplay->processUEventOffline(str);
     }
-
 }
 
 static void *uevent_loop(void *param)
@@ -113,4 +106,4 @@ void init_uevent_thread(hwc_context_t* ctx)
 }
 
 }; //namespace
-#endif //HWC_OBSERVER_H
+#endif //HWC_UEVENTS_H

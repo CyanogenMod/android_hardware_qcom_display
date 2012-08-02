@@ -77,6 +77,9 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     ctx->overlayInUse = false;
 
+    if(ctx->mExtDisplay->getExternalDisplay())
+        ovutils::setExtType(ctx->mExtDisplay->getExternalDisplay());
+
     //Prepare is called after a vsync, so unlock previous buffers here.
     ctx->qbuf->unlockAllPrevious();
 

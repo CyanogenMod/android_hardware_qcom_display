@@ -38,19 +38,20 @@
 
 namespace qhwc {
 
-#define DEVICE_ROOT "/sys/devices/virtual/graphics"
-#define DEVICE_NODE "fb1"
-
-#define SYSFS_EDID_MODES        DEVICE_ROOT "/" DEVICE_NODE "/edid_modes"
-#define SYSFS_HPD               DEVICE_ROOT "/" DEVICE_NODE "/hpd"
-
+static const char *extPanelName[MAX_DISPLAY_EXTERNAL_DEVICES] = {
+    HDMI_PANEL,
+    WFD_PANEL
+};
 
 ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
     mCurrentMode(-1), mHwcContext(ctx)
 {
     memset(&mVInfo, 0, sizeof(mVInfo));
+
     //Enable HPD for HDMI
-    writeHPDOption(1);
+    if(isHDMIConfigured()) {
+        writeHPDOption(1);
+    }
 }
 
 ExternalDisplay::~ExternalDisplay()
@@ -196,12 +197,16 @@ bool ExternalDisplay::readResolution()
     return (strlen(mEDIDs) > 0);
 }
 
-bool ExternalDisplay::openFramebuffer()
+const char* msmFbDevicePath[2] = {  "/dev/graphics/fb1",
+                                    "/dev/graphics/fb2"};
+
+
+bool ExternalDisplay::openFrameBuffer(int fbNum)
 {
     if (mFd == -1) {
-        mFd = open("/dev/graphics/fb1", O_RDWR);
+        mFd = open(msmFbDevicePath[fbNum-1], O_RDWR);
         if (mFd < 0)
-            ALOGE("%s: /dev/graphics/fb1 not available", __FUNCTION__);
+            ALOGE("%s: %s not available", __FUNCTION__, msmFbDevicePath[fbNum-1]);
     }
     return (mFd > 0);
 }
@@ -293,7 +298,7 @@ void ExternalDisplay::setResolution(int ID)
 {
     struct fb_var_screeninfo info;
     int ret = 0;
-    if (!openFramebuffer())
+    if (!openFrameBuffer(EXTERN_DISPLAY_FB1))
         return;
     ret = ioctl(mFd, FBIOGET_VSCREENINFO, &mVInfo);
     if(ret < 0) {
@@ -353,32 +358,85 @@ void ExternalDisplay::setResolution(int ID)
     }
 }
 
+/*
+ * This function queries the msm_fb_type for fb1 and checks whether it is
+ * HDMI or not
+ *
+ * Returns:
+ *          0 -> WFD device
+ *          1 -> HDMI device
+ */
+bool ExternalDisplay::isHDMIConfigured() {
+    bool configured = false;
+    FILE *displayDeviceFP = NULL;
+    char fbType[MAX_FRAME_BUFFER_NAME_SIZE];
 
-int  ExternalDisplay::getExternalDisplay() const
-{
-    return mExternalDisplay;
+    displayDeviceFP = fopen("/sys/class/graphics/fb1/msm_fb_type", "r");
+
+    if(displayDeviceFP) {
+        fread(fbType, sizeof(char), MAX_FRAME_BUFFER_NAME_SIZE, displayDeviceFP);
+
+        if(!strncmp(fbType, extPanelName[0], sizeof(extPanelName[0]))) {
+            configured  = true;
+        }
+        fclose(displayDeviceFP);
+    }
+    return configured;
+}
+
+void ExternalDisplay::processUEventOffline(const char *str) {
+    const char *s1 = str + (strlen(str)-strlen(DEVICE_NODE_FB1));
+    // check if it is for FB1
+    if(strncmp(s1,DEVICE_NODE_FB1, strlen(DEVICE_NODE_FB1))== 0) {
+        enableHDMIVsync(EXTERN_DISPLAY_NONE);
+        closeFrameBuffer();
+        resetInfo();
+        setExternalDisplay(EXTERN_DISPLAY_NONE);
+    }
+    else if(strncmp(s1, DEVICE_NODE_FB2, strlen(DEVICE_NODE_FB2)) == 0) {
+        closeFrameBuffer();
+        setExternalDisplay(EXTERN_DISPLAY_NONE);
+    }
+}
+
+
+void ExternalDisplay::processUEventOnline(const char *str) {
+    const char *s1 = str + (strlen(str)-strlen(DEVICE_NODE_FB1));
+    // check if it is for FB1
+    if(strncmp(s1,DEVICE_NODE_FB1, strlen(DEVICE_NODE_FB1))== 0) {
+        if(isHDMIConfigured()) {
+            // HDMI connect event.
+            // Tear-down WFD if it is active.
+            if(mExternalDisplay == EXTERN_DISPLAY_FB2) {
+                closeFrameBuffer();
+                setExternalDisplay(EXTERN_DISPLAY_NONE);
+            }
+        }
+        readResolution();
+        //Get the best mode and set
+        setResolution(getBestMode());
+        enableHDMIVsync(EXTERN_DISPLAY_FB1);
+        setExternalDisplay(EXTERN_DISPLAY_FB1);
+    }
+    else if(strncmp(s1, DEVICE_NODE_FB2, strlen(DEVICE_NODE_FB2)) == 0) {
+        // WFD connect event
+        if(mExternalDisplay  == EXTERN_DISPLAY_FB1) {
+            // HDMI has higher priority.
+            // Do Not Override.
+        }else {
+            // WFD is connected
+            openFrameBuffer(EXTERN_DISPLAY_FB2);
+            setExternalDisplay(EXTERN_DISPLAY_FB2);
+        }
+    }
 }
 
 void ExternalDisplay::setExternalDisplay(int connected)
 {
-
     hwc_context_t* ctx = mHwcContext;
     if(ctx) {
         ALOGD_IF(DEBUG, "%s: status = %d", __FUNCTION__,
                  connected);
-        if(connected) {
-            readResolution();
-            //Get the best mode and set
-            // TODO: DO NOT call this for WFD
-            setResolution(getBestMode());
-            //enable hdmi vsync
-            enableHDMIVsync(connected);
-        } else {
-            // Disable the hdmi vsync
-            enableHDMIVsync(connected);
-            closeFrameBuffer();
-            resetInfo();
-        }
         // Store the external display
         mExternalDisplay = connected;
         const char* prop = (connected) ? "1" : "0";
@@ -387,8 +445,7 @@ void ExternalDisplay::setExternalDisplay(int connected)
         //Invalidate
         hwc_procs* proc = (hwc_procs*)ctx->device.reserved_proc[0];
         if(!proc) {
-            ALOGE("%s: HWC proc not registered",
-                     __FUNCTION__);
+            ALOGE("%s: HWC proc not registered", __FUNCTION__);
         } else {
             /* Trigger redraw */
             ALOGD_IF(DEBUG, "%s: Invalidate !!", __FUNCTION__);
