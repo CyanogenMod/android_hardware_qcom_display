@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include <EGL/egl.h>
 #include <overlay.h>
 #include "hwc_utils.h"
 #include "mdp_version.h"
@@ -46,6 +47,7 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
     ctx->mCopybitEngine = CopybitEngine::getInstance();
     ctx->mExtDisplay = new ExternalDisplay(ctx);
+    memset(ctx->dpys,(int)EGL_NO_DISPLAY, MAX_NUM_DISPLAYS);
     MDPComp::init(ctx);
 
     init_uevent_thread(ctx);
@@ -82,11 +84,11 @@ void closeContext(hwc_context_t *ctx)
     }
 
 
-    free(const_cast<hwc_methods_t *>(ctx->device.methods));
+    free(const_cast<hwc_methods_1_t *>(ctx->device.methods));
 
 }
 
-void dumpLayer(hwc_layer_t const* l)
+void dumpLayer(hwc_layer_1_t const* l)
 {
     ALOGD("\ttype=%d, flags=%08x, handle=%p, tr=%02x, blend=%04x, {%d,%d,%d,%d}"
           ", {%d,%d,%d,%d}",
@@ -101,7 +103,7 @@ void dumpLayer(hwc_layer_t const* l)
           l->displayFrame.bottom);
 }
 
-void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
+void getLayerStats(hwc_context_t *ctx, const hwc_display_contents_1_t *list)
 {
     //Video specific stats
     int yuvCount = 0;

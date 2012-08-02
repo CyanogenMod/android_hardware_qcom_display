@@ -34,7 +34,7 @@ int VideoOverlay::sCCLayerIndex = -1;
 bool VideoOverlay::sIsModeOn = false;
 
 //Cache stats, figure out the state, config overlay
-bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
+bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
     sIsModeOn = false;
     if(!ctx->mMDP.hasOverlay) {
        ALOGD_IF(VIDEO_DEBUG,"%s, this hw doesnt support overlay", __FUNCTION__);
@@ -46,8 +46,8 @@ bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
     chooseState(ctx);
     //if the state chosen above is CLOSED, skip this block.
     if(sState != ovutils::OV_CLOSED) {
-        hwc_layer_t *yuvLayer = &list->hwLayers[sYuvLayerIndex];
-        hwc_layer_t *ccLayer = NULL;
+        hwc_layer_1_t *yuvLayer = &list->hwLayers[sYuvLayerIndex];
+        hwc_layer_1_t *ccLayer = NULL;
         if(sCCLayerIndex != -1)
             ccLayer = &list->hwLayers[sCCLayerIndex];
 
@@ -90,7 +90,7 @@ void VideoOverlay::chooseState(hwc_context_t *ctx) {
             ovutils::getStateString(sState));
 }
 
-void VideoOverlay::markFlags(hwc_layer_t *layer) {
+void VideoOverlay::markFlags(hwc_layer_1_t *layer) {
     switch(sState) {
         case ovutils::OV_2D_VIDEO_ON_PANEL:
         case ovutils::OV_2D_VIDEO_ON_PANEL_TV:
@@ -105,7 +105,7 @@ void VideoOverlay::markFlags(hwc_layer_t *layer) {
 }
 
 /* Helpers */
-bool configPrimVid(hwc_context_t *ctx, hwc_layer_t *layer) {
+bool configPrimVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     overlay::Overlay& ov = *(ctx->mOverlay);
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
@@ -183,7 +183,7 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_t *layer) {
     return true;
 }
 
-bool configExtVid(hwc_context_t *ctx, hwc_layer_t *layer) {
+bool configExtVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     overlay::Overlay& ov = *(ctx->mOverlay);
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
@@ -236,7 +236,7 @@ bool configExtVid(hwc_context_t *ctx, hwc_layer_t *layer) {
     return true;
 }
 
-bool configExtCC(hwc_context_t *ctx, hwc_layer_t *layer) {
+bool configExtCC(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     if(layer == NULL)
         return true;
 
@@ -276,8 +276,8 @@ bool configExtCC(hwc_context_t *ctx, hwc_layer_t *layer) {
     return true;
 }
 
-bool VideoOverlay::configure(hwc_context_t *ctx, hwc_layer_t *yuvLayer,
-        hwc_layer_t *ccLayer) {
+bool VideoOverlay::configure(hwc_context_t *ctx, hwc_layer_1_t *yuvLayer,
+        hwc_layer_1_t *ccLayer) {
 
     bool ret = true;
     if (LIKELY(ctx->mOverlay)) {
@@ -307,7 +307,7 @@ bool VideoOverlay::configure(hwc_context_t *ctx, hwc_layer_t *yuvLayer,
     return ret;
 }
 
-bool VideoOverlay::draw(hwc_context_t *ctx, hwc_layer_list_t *list)
+bool VideoOverlay::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list)
 {
     if(!sIsModeOn || sYuvLayerIndex == -1) {
         return true;

@@ -30,12 +30,12 @@ namespace qhwc {
 class UIMirrorOverlay {
     public:
         // Sets up members and prepares overlay if conditions are met
-        static bool prepare(hwc_context_t *ctx, hwc_layer_list_t *list);
+        static bool prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list);
         // Draws layer if this feature is on
         static bool draw(hwc_context_t *ctx);
     private:
         //Configures overlay
-        static bool configure(hwc_context_t *ctx, hwc_layer_list_t *list);
+        static bool configure(hwc_context_t *ctx, hwc_display_contents_1_t *list);
         //The chosen overlay state.
         static ovutils::eOverlayState sState;
         //Flags if this feature is on.

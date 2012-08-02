@@ -59,7 +59,8 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         while(*str) {
             if (!strncmp(str, "VSYNC=", strlen("VSYNC="))) {
                 timestamp = strtoull(str + strlen("VSYNC="), NULL, 0);
-                proc->vsync(proc, 0, timestamp);
+                //XXX: Handle vsync from multiple displays
+                proc->vsync(proc, (int)ctx->dpys[0], timestamp);
             }
             str += strlen(str) + 1;
             if(str - udata >= len)
