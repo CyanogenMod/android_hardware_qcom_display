@@ -180,8 +180,7 @@ private:
                         mdp_pipe_info& mdp_info);
 
     /* checks for conditions where mdpcomp is not possible */
-    static bool is_doable(hwc_composer_device_t *dev,
-                           const hwc_layer_list_t* list);
+    static bool is_doable(hwc_composer_device_t *dev, hwc_layer_list_t* list);
 
     static bool setup(hwc_context_t* ctx, hwc_layer_list_t* list);
 
@@ -210,6 +209,8 @@ private:
 
     /* reset state */
     static void reset( hwc_context_t *ctx, hwc_layer_list_t* list );
+    /* reset compostiion type to default */
+    static void reset_comp_type(hwc_layer_list_t* list);
 
     /* Is feature enabled */
     static bool isEnabled() { return sMaxLayers ? true : false; };
