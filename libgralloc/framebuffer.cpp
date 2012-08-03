@@ -115,11 +115,6 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
     if (hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
         genlock_lock_buffer(hnd, GENLOCK_READ_LOCK, GENLOCK_MAX_TIMEOUT);
 
-        if (m->currentBuffer) {
-            genlock_unlock_buffer(m->currentBuffer);
-            m->currentBuffer = 0;
-        }
-
         const size_t offset = hnd->base - m->framebuffer->base;
         // frame ready to be posted, signal so that hwc can update External
         // display
@@ -136,6 +131,12 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
             genlock_unlock_buffer(hnd);
             return -errno;
         }
+
+        if (m->currentBuffer) {
+            genlock_unlock_buffer(m->currentBuffer);
+            m->currentBuffer = 0;
+        }
+
         CALC_FPS();
         m->currentBuffer = hnd;
     }
