@@ -52,6 +52,18 @@ char const*const BLUE_LED_FILE
 char const*const LCD_FILE
         = "/sys/class/leds/lcd-backlight/brightness";
 
+char const*const RED_FREQ_FILE
+        = "/sys/class/leds/red/device/grpfreq";
+
+char const*const RED_PWM_FILE
+        = "/sys/class/leds/red/device/grppwm";
+
+char const*const RED_BLINK_FILE
+        = "/sys/class/leds/red/device/blink";
+
+char const*const LED_LOCK_UPDATE_FILE
+        = "/sys/class/leds/red/device/lock";
+
 /**
  * device methods
  */
@@ -135,27 +147,14 @@ set_speaker_light_locked(struct light_device_t* dev,
     colorRGB = state->color;
 
 #if 0
-    ALOGD("set_speaker_light_locked colorRGB=%08X, onMS=%d, offMS=%d\n",
-            colorRGB, onMS, offMS);
+    ALOGD("set_speaker_light_locked mode %d, colorRGB=%08X, onMS=%d, offMS=%d\n",
+            state->flashMode, colorRGB, onMS, offMS);
 #endif
 
     red = (colorRGB >> 16) & 0xFF;
     green = (colorRGB >> 8) & 0xFF;
     blue = colorRGB & 0xFF;
 
-    // R, G, B value is among 0, 1, 2
-    if (red > 128)  red = 2;
-    else if (red <= 128 && red > 0) red = 1;
-    if (green > 128)  green = 2;
-    else if (green <= 128 && green > 0) green = 1;
-    if (blue > 128)  blue = 2;
-    else if (blue <= 128 && blue > 0) red = 1;
-
-    write_int(RED_LED_FILE, red);
-    write_int(GREEN_LED_FILE, green);
-    write_int(BLUE_LED_FILE, blue);
-
-    // TODO
     if (onMS > 0 && offMS > 0) {
         int totalMS = onMS + offMS;
 
@@ -178,9 +177,19 @@ set_speaker_light_locked(struct light_device_t* dev,
         pwm = 0;
     }
 
+    write_int(LED_LOCK_UPDATE_FILE, 1); // for LED On/Off synchronization
+
+    write_int(RED_LED_FILE, red);
+    write_int(GREEN_LED_FILE, green);
+    write_int(BLUE_LED_FILE, blue);
+
     if (blink) {
-        write_int(RED_LED_FILE, freq);
+        write_int(RED_FREQ_FILE, freq);
+        write_int(RED_PWM_FILE, pwm);
     }
+    write_int(RED_BLINK_FILE, blink);
+
+    write_int(LED_LOCK_UPDATE_FILE, 0);
 
     return 0;
 }
