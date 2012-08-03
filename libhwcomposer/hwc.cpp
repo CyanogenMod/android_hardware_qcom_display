@@ -229,7 +229,7 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
 #ifndef NO_HW_VSYNC
         //XXX: This disables hardware vsync on 8x55
         // Fix when HW vsync is available on 8x55
-        if(dev->mMDP.version < 400) {
+        if(dev->mMDP.version == 400) {
 #endif
             dev->device.common.version = 0;
             ALOGI("%s: Hardware VSYNC not supported", __FUNCTION__);
