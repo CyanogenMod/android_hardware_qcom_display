@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+#include <cutils/properties.h>
 #include "hwc_mdpcomp.h"
 #include "hwc_qbuf.h"
 #include "hwc_external.h"
@@ -726,7 +727,9 @@ int MDPComp::draw(hwc_context_t *ctx, hwc_layer_list_t* list) {
 
             //lock buffer before queue
             //XXX: Handle lock failure
-            ctx->qbuf->lockAndAdd(hnd);
+            if (ctx->swapInterval != 0) {
+                ctx->qbuf->lockAndAdd(hnd);
+            }
 
             ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
                                  using  pipe: %d", __FUNCTION__, layer,
@@ -811,6 +814,10 @@ bool MDPComp::configure(hwc_composer_device_t *dev,  hwc_layer_list_t* list) {
     bool doable = is_doable(dev, list);
 
     if(doable) {
+        char value[PROPERTY_VALUE_MAX];
+        property_get("debug.egl.swapinterval", value, "1");
+        ctx->swapInterval = atoi(value);
+
         if(setup(ctx, list)) {
             setMDPCompLayerFlags(list);
             sMDPCompState = MDPCOMP_ON;

@@ -129,6 +129,7 @@ struct hwc_context_t {
     int numHwLayers;
     int overlayInUse;
     int deviceOrientation;
+    int swapInterval;
 
     //Framebuffer device
     framebuffer_device_t *mFbDev;

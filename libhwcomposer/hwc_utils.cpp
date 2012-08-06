@@ -16,6 +16,7 @@
  */
 
 #include <overlay.h>
+#include <cutils/properties.h>
 #include "hwc_utils.h"
 #include "mdp_version.h"
 #include "hwc_video.h"
@@ -52,6 +53,10 @@ void initContext(hwc_context_t *ctx)
     MDPComp::init(ctx);
 
     init_uevent_thread(ctx);
+
+    char value[PROPERTY_VALUE_MAX];
+    property_get("debug.egl.swapinterval", value, "1");
+    ctx->swapInterval = atoi(value);
 
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
