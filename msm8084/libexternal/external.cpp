@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -34,7 +34,10 @@
 #include <sys/resource.h>
 #include <cutils/properties.h>
 #include "hwc_utils.h"
-#include "hwc_external.h"
+#include "external.h"
+#include "overlayUtils.h"
+
+using namespace android;
 
 namespace qhwc {
 
@@ -47,11 +50,53 @@ namespace qhwc {
 
 
 ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
-    mCurrentMode(-1), mHwcContext(ctx)
+    mCurrentMode(-1), mExternalDisplay(0), mModeCount(0), mHwcContext(ctx)
 {
     memset(&mVInfo, 0, sizeof(mVInfo));
     //Enable HPD for HDMI
     writeHPDOption(1);
+}
+
+void ExternalDisplay::setEDIDMode(int resMode) {
+    ALOGD_IF(DEBUG,"resMode=%d ", resMode);
+    int extDispType;
+    {
+        Mutex::Autolock lock(mExtDispLock);
+        extDispType = mExternalDisplay;
+        setExternalDisplay(0);
+        setResolution(resMode);
+    }
+    setExternalDisplay(extDispType);
+}
+
+void ExternalDisplay::setHPD(uint32_t startEnd) {
+    ALOGD_IF(DEBUG,"HPD enabled=%d", startEnd);
+    writeHPDOption(startEnd);
+}
+
+void ExternalDisplay::setActionSafeDimension(int w, int h) {
+    ALOGD_IF(DEBUG,"ActionSafe w=%d h=%d", w, h);
+    Mutex::Autolock lock(mExtDispLock);
+    overlay::utils::ActionSafe::getInstance()->setDimension(w, h);
+    setExternalDisplay(mExternalDisplay);
+}
+
+int ExternalDisplay::getModeCount() const {
+    ALOGD_IF(DEBUG,"HPD mModeCount=%d", mModeCount);
+    Mutex::Autolock lock(mExtDispLock);
+    return mModeCount;
+}
+
+void ExternalDisplay::getEDIDModes(int *out) const {
+    Mutex::Autolock lock(mExtDispLock);
+    for(int i = 0;i < mModeCount;i++) {
+        out[i] = mEDIDModes[i];
+    }
+}
+
+int ExternalDisplay::getExternalDisplay() const {
+    Mutex::Autolock lock(mExtDispLock);
+    return mExternalDisplay;
 }
 
 ExternalDisplay::~ExternalDisplay()
@@ -84,7 +129,7 @@ void disp_mode_timing_type::set_info(struct fb_var_screeninfo &info) const
     info.reserved[0] = 0;
     info.reserved[1] = 0;
     info.reserved[2] = 0;
-    info.reserved[3] = info.reserved[3] | (video_format << 16);
+    info.reserved[3] = (info.reserved[3] & 0xFFFF) | (video_format << 16);
 
     info.xoffset = 0;
     info.yoffset = 0;
@@ -272,7 +317,7 @@ int ExternalDisplay::getModeOrder(int mode)
 int ExternalDisplay::getBestMode() {
     int bestOrder = 0;
     int bestMode = m640x480p60_4_3;
-
+    Mutex::Autolock lock(mExtDispLock);
     // for all the edid read, get the best mode
     for(int i = 0; i < mModeCount; i++) {
         int mode = mEDIDModes[i];
@@ -352,12 +397,6 @@ void ExternalDisplay::setResolution(int ID)
         ALOGD("In %s: FBIOPAN_DISPLAY  failed Err Str = %s", __FUNCTION__,
                                                             strerror(errno));
     }
-}
-
-
-int  ExternalDisplay::getExternalDisplay() const
-{
-    return mExternalDisplay;
 }
 
 void ExternalDisplay::setExternalDisplay(int connected)

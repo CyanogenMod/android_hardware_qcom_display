@@ -4,6 +4,9 @@ common_includes += hardware/qcom/display/libgenlock
 common_includes += hardware/qcom/display/liboverlay
 common_includes += hardware/qcom/display/libcopybit
 common_includes += hardware/qcom/display/libqdutils
+common_includes += hardware/qcom/display/libhwcomposer
+common_includes += hardware/qcom/display/libexternal
+common_includes += hardware/qcom/display/libqservice
 
 ifeq ($(TARGET_USES_POST_PROCESSING),true)
     common_flags     += -DUSES_POST_PROCESSING
@@ -24,10 +27,9 @@ endif
 
 common_deps  :=
 kernel_includes :=
-#Kernel includes
+
+#Kernel includes. Not being executed on JB+
 ifeq ($(call is-vendor-board-platform,QCOM),true)
     common_deps += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
     kernel_includes += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 endif
-
-

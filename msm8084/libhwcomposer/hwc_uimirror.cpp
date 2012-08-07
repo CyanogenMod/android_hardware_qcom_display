@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -22,7 +22,7 @@
 #include <gralloc_priv.h>
 #include <fb_priv.h>
 #include "hwc_uimirror.h"
-#include "hwc_external.h"
+#include "external.h"
 
 namespace qhwc {
 
@@ -54,6 +54,10 @@ int getDeviceOrientation() {
 ovutils::eOverlayState UIMirrorOverlay::sState = ovutils::OV_CLOSED;
 bool UIMirrorOverlay::sIsUiMirroringOn = false;
 
+void UIMirrorOverlay::reset() {
+    sIsUiMirroringOn = false;
+    sState = ovutils::OV_CLOSED;
+}
 
 //Prepare the overlay for the UI mirroring
 bool UIMirrorOverlay::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
@@ -101,12 +105,10 @@ bool UIMirrorOverlay::configure(hwc_context_t *ctx, hwc_display_contents_1_t *li
             }
 
             ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_FLAGS_NONE;
-            /* - TODO: Secure content
-               if (hnd->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
-               ovutils::setMdpFlags(mdpFlags,
-               ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
-               }
-             */
+            if(ctx->mSecureMode) {
+                ovutils::setMdpFlags(mdpFlags,
+                        ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
+            }
 
             ovutils::PipeArgs parg(mdpFlags,
                     info,

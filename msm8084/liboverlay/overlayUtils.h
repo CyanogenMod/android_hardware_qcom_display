@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -236,6 +236,28 @@ struct Whf {
     uint32_t h;
     uint32_t format;
     uint32_t size;
+};
+
+class ActionSafe {
+private:
+    ActionSafe() : mWidth(0.0f), mHeight(0.0f) { };
+    float mWidth;
+    float mHeight;
+    static ActionSafe *sActionSafe;
+public:
+    ~ActionSafe() { };
+    static ActionSafe* getInstance() {
+        if(!sActionSafe) {
+            sActionSafe = new ActionSafe();
+        }
+        return sActionSafe;
+    }
+    void setDimension(int w, int h) {
+        mWidth = (float)w;
+        mHeight = (float)h;
+    }
+    float getWidth() { return mWidth; }
+    float getHeight() { return mHeight; }
 };
 
 enum { MAX_PATH_LEN = 256 };

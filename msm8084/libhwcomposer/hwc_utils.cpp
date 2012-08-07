@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012, The Linux Foundation All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,9 +25,10 @@
 #include "hwc_video.h"
 #include "hwc_qbuf.h"
 #include "hwc_copybit.h"
-#include "hwc_external.h"
+#include "external.h"
 #include "hwc_mdpcomp.h"
 #include "hwc_extonly.h"
+#include "QService.h"
 
 namespace qhwc {
 
@@ -44,6 +45,7 @@ void initContext(hwc_context_t *ctx)
 {
     openFramebufferDevice(ctx);
     ctx->mOverlay = overlay::Overlay::getInstance();
+    ctx->mQService = qService::QService::getInstance(ctx);
     ctx->qbuf = new QueuedBufferStore();
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();

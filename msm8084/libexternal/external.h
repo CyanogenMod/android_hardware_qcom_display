@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -21,7 +21,8 @@
 #ifndef HWC_EXTERNAL_DISPLAY_H
 #define HWC_EXTERNAL_DISPLAY_H
 
-#include <fb_priv.h>
+#include <utils/threads.h>
+#include <linux/fb.h>
 
 struct hwc_context_t;
 
@@ -41,15 +42,20 @@ class ExternalDisplay
         EXT_MIRRORING_OFF,
         EXT_MIRRORING_ON,
     };
-    public:
+public:
     ExternalDisplay(hwc_context_t* ctx);
     ~ExternalDisplay();
+    int getModeCount() const;
+    void getEDIDModes(int *out) const;
     int getExternalDisplay() const;
     void setExternalDisplay(int connected);
     bool commit();
     int enableHDMIVsync(int enable);
+    void setHPD(uint32_t startEnd);
+    void setEDIDMode(int resMode);
+    void setActionSafeDimension(int w, int h);
 
-    private:
+private:
     bool readResolution();
     int parseResolution(char* edidStr, int* edidModes);
     void setResolution(int ID);
@@ -62,9 +68,11 @@ class ExternalDisplay
     int getBestMode();
     void resetInfo();
 
+    mutable android::Mutex mExtDispLock;
     int mFd;
-    int mExternalDisplay;
     int mCurrentMode;
+    int mExternalDisplay;
+    int mResolutionMode;
     char mEDIDs[128];
     int mEDIDModes[64];
     int mModeCount;
