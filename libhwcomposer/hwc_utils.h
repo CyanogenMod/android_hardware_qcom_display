@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,10 @@
 //Fwrd decls
 struct hwc_context_t;
 struct framebuffer_device_t;
+
+namespace qService {
+class QService;
+}
 
 namespace overlay {
 class Overlay;
@@ -151,12 +155,21 @@ struct hwc_context_t {
     //QueuedBufferStore to hold buffers for overlay
     qhwc::QueuedBufferStore *qbuf;
 
+    //QService object
+    qService::QService *mQService;
+
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
 
     qhwc::MDPInfo mMDP;
 
     bool isPoweredDown;
+
+    //Securing in progress indicator
+    bool mSecuring;
+
+    //Display in secure mode indicator
+    bool mSecureMode;
 };
 
 #endif //HWC_UTILS_H
