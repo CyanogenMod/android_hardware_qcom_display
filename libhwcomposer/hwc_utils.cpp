@@ -24,6 +24,7 @@
 #include "hwc_external.h"
 #include "hwc_mdpcomp.h"
 #include "hwc_extonly.h"
+#include "hwc_service.h"
 
 namespace qhwc {
 
@@ -40,6 +41,8 @@ void initContext(hwc_context_t *ctx)
 {
     openFramebufferDevice(ctx);
     ctx->mOverlay = overlay::Overlay::getInstance();
+    ctx->mHwcService = hwcService::HWComposerService::getInstance();
+    ctx->mHwcService->setHwcContext(ctx);
     ctx->qbuf = new QueuedBufferStore();
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();

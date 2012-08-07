@@ -35,6 +35,9 @@
 #include <cutils/properties.h>
 #include "hwc_utils.h"
 #include "hwc_external.h"
+#include "overlayUtils.h"
+
+using namespace android;
 
 namespace qhwc {
 
@@ -44,7 +47,7 @@ static const char *extPanelName[MAX_DISPLAY_EXTERNAL_DEVICES] = {
 };
 
 ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
-    mCurrentMode(-1), mHwcContext(ctx)
+    mCurrentMode(-1), mExternalDisplay(0), mModeCount(0), mHwcContext(ctx)
 {
     memset(&mVInfo, 0, sizeof(mVInfo));
 
@@ -52,6 +55,48 @@ ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
     if(isHDMIConfigured()) {
         writeHPDOption(1);
     }
+}
+
+void ExternalDisplay::setEDIDMode(int resMode) {
+    ALOGD_IF(DEBUG,"resMode=%d ", resMode);
+    int extDispType;
+    {
+        Mutex::Autolock lock(mExtDispLock);
+        extDispType = mExternalDisplay;
+        setExternalDisplay(0);
+        setResolution(resMode);
+    }
+    setExternalDisplay(extDispType);
+}
+
+void ExternalDisplay::setHPDStatus(int enabled) {
+    ALOGD_IF(DEBUG,"HPD enabled=%d", enabled);
+    writeHPDOption(enabled);
+}
+
+void ExternalDisplay::setActionSafeDimension(int w, int h) {
+    ALOGD_IF(DEBUG,"ActionSafe w=%d h=%d", w, h);
+    Mutex::Autolock lock(mExtDispLock);
+    overlay::utils::ActionSafe::getInstance()->setDimension(w, h);
+    setExternalDisplay(mExternalDisplay);
+}
+
+int ExternalDisplay::getModeCount() const {
+    ALOGD_IF(DEBUG,"HPD mModeCount=%d", mModeCount);
+    Mutex::Autolock lock(mExtDispLock);
+    return mModeCount;
+}
+
+void ExternalDisplay::getEDIDModes(int *out) const {
+    Mutex::Autolock lock(mExtDispLock);
+    for(int i = 0;i < mModeCount;i++) {
+        out[i] = mEDIDModes[i];
+    }
+}
+
+int ExternalDisplay::getExternalDisplay() const {
+    Mutex::Autolock lock(mExtDispLock);
+    return mExternalDisplay;
 }
 
 ExternalDisplay::~ExternalDisplay()
@@ -276,7 +321,7 @@ int ExternalDisplay::getModeOrder(int mode)
 int ExternalDisplay::getBestMode() {
     int bestOrder = 0;
     int bestMode = m640x480p60_4_3;
-
+    Mutex::Autolock lock(mExtDispLock);
     // for all the edid read, get the best mode
     for(int i = 0; i < mModeCount; i++) {
         int mode = mEDIDModes[i];

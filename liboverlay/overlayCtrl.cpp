@@ -75,6 +75,8 @@ bool Ctrl::setCrop(const utils::Dim& d)
     return true;
 }
 
+utils::ActionSafe* utils::ActionSafe::sActionSafe = NULL;
+
 utils::Dim Ctrl::getAspectRatio(const utils::Whf& whf) const
 {
     utils::Whf inWhf(whf.w, whf.h, mMdp.getSrcWhf().format);
@@ -107,11 +109,9 @@ utils::Dim Ctrl::getAspectRatio(const utils::Whf& whf) const
     if (inWhf.w > fbWidth) inWhf.w = fbWidth;
     if (inWhf.h > fbHeight) inWhf.h = fbHeight;
 
-    char value[PROPERTY_VALUE_MAX];
-    property_get("hw.actionsafe.width", value, "0");
-    float asWidth = atof(value);
-    property_get("hw.actionsafe.height", value, "0");
-    float asHeight = atof(value);
+    float asWidth = utils::ActionSafe::getInstance()->getHeight();
+    float asHeight = utils::ActionSafe::getInstance()->getWidth();
+
     inWhf.w = inWhf.w * (1.0f - asWidth / 100.0f);
     inWhf.h = inWhf.h * (1.0f - asHeight / 100.0f);
 

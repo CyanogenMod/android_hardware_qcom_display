@@ -21,7 +21,8 @@
 #ifndef HWC_EXTERNAL_DISPLAY_H
 #define HWC_EXTERNAL_DISPLAY_H
 
-#include <fb_priv.h>
+#include <utils/threads.h>
+#include <linux/fb.h>
 
 struct hwc_context_t;
 
@@ -63,10 +64,15 @@ class ExternalDisplay
     public:
     ExternalDisplay(hwc_context_t* ctx);
     ~ExternalDisplay();
-    inline int getExternalDisplay() { return mExternalDisplay; }
+    int getModeCount() const;
+    void getEDIDModes(int *out) const;
+    int getExternalDisplay() const;
     void setExternalDisplay(int connected);
     bool commit();
     int enableHDMIVsync(int enable);
+    void setHPDStatus(int enabled);
+    void setEDIDMode(int resMode);
+    void setActionSafeDimension(int w, int h);
     void processUEventOnline(const char *str);
     void processUEventOffline(const char *str);
     bool isHDMIConfigured();
@@ -84,9 +90,11 @@ class ExternalDisplay
     int getBestMode();
     void resetInfo();
 
+    mutable android::Mutex mExtDispLock;
     int mFd;
-    int mExternalDisplay;
     int mCurrentMode;
+    int mExternalDisplay;
+    int mResolutionMode;
     char mEDIDs[128];
     int mEDIDModes[64];
     int mModeCount;

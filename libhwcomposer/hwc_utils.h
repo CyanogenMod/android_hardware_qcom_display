@@ -30,6 +30,10 @@
 struct hwc_context_t;
 struct framebuffer_device_t;
 
+namespace hwcService {
+class HWComposerService;
+}
+
 namespace overlay {
 class Overlay;
 }
@@ -137,6 +141,9 @@ struct hwc_context_t {
 
     //QueuedBufferStore to hold buffers for overlay
     qhwc::QueuedBufferStore *qbuf;
+
+    //HWComposerService object
+    hwcService::HWComposerService *mHwcService;
 
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
