@@ -25,6 +25,7 @@
 
 #include <cutils/log.h>
 #include <cutils/ashmem.h>
+#include <utils/RefBase.h>
 
 #include "gralloc_priv.h"
 #include <fb_priv.h>
@@ -34,7 +35,7 @@ class IAllocController;
 class gpu_context_t : public alloc_device_t {
     public:
     gpu_context_t(const private_module_t* module,
-                  IAllocController* alloc_ctrl);
+                  android::sp<IAllocController>alloc_ctrl);
 
     int gralloc_alloc_framebuffer_locked(size_t size, int usage,
                                          buffer_handle_t* pHandle);
@@ -68,7 +69,7 @@ class gpu_context_t : public alloc_device_t {
     static int gralloc_close(struct hw_device_t *dev);
 
     private:
-   IAllocController* mAllocCtrl;
+    android::sp<IAllocController> mAllocCtrl;
     void getGrallocInformationFromFormat(int inputFormat,
                                          int *colorFormat,
                                          int *bufferType);

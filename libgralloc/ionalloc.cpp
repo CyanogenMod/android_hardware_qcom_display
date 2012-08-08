@@ -27,7 +27,7 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define DEBUG 0
+
 #include <linux/ioctl.h>
 #include <sys/mman.h>
 #include <stdlib.h>
@@ -118,7 +118,9 @@ int IonAlloc::alloc_buffer(alloc_data& data)
         return err;
     }
 
-    if(!(data.flags & ION_SECURE)) {
+    if(!(data.flags & ION_SECURE) &&
+       !(data.allocType & private_handle_t::PRIV_FLAGS_NOT_MAPPED)) {
+
         base = mmap(0, ionAllocData.len, PROT_READ|PROT_WRITE,
                     MAP_SHARED, fd_data.fd, 0);
         if(base == MAP_FAILED) {
@@ -142,7 +144,7 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     data.base = base;
     data.fd = fd_data.fd;
     ioctl(mIonFd, ION_IOC_FREE, &handle_data);
-    ALOGD_IF(DEBUG, "ion: Allocated buffer base:%p size:%d fd:%d",
+    ALOGD("ion: Allocated buffer base:%p size:%d fd:%d",
           data.base, ionAllocData.len, data.fd);
     return 0;
 }
@@ -151,7 +153,7 @@ int IonAlloc::alloc_buffer(alloc_data& data)
 int IonAlloc::free_buffer(void* base, size_t size, int offset, int fd)
 {
     Locker::Autolock _l(mLock);
-    ALOGD_IF(DEBUG, "ion: Freeing buffer base:%p size:%d fd:%d",
+    ALOGD("ion: Freeing buffer base:%p size:%d fd:%d",
           base, size, fd);
     int err = 0;
     err = open_device();
@@ -179,10 +181,10 @@ int IonAlloc::map_buffer(void **pBase, size_t size, int offset, int fd)
     *pBase = base;
     if(base == MAP_FAILED) {
         err = -errno;
-        ALOGE("ion: Failed to map memory in the client: %s",
+        ALOGD("ion: Failed to map memory in the client: %s",
               strerror(errno));
     } else {
-        ALOGD_IF(DEBUG, "ion: Mapped buffer base:%p size:%d offset:%d fd:%d",
+        ALOGD("ion: Mapped buffer base:%p size:%d offset:%d fd:%d",
               base, size, offset, fd);
     }
     return err;
@@ -190,7 +192,7 @@ int IonAlloc::map_buffer(void **pBase, size_t size, int offset, int fd)
 
 int IonAlloc::unmap_buffer(void *base, size_t size, int offset)
 {
-    ALOGD_IF(DEBUG, "ion: Unmapping buffer  base:%p size:%d", base, size);
+    ALOGD("ion: Unmapping buffer  base:%p size:%d", base, size);
     int err = 0;
     if(munmap(base, size)) {
         err = -errno;

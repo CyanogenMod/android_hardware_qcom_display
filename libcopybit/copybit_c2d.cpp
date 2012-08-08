@@ -49,6 +49,7 @@
 using gralloc::IMemAlloc;
 using gralloc::IonController;
 using gralloc::alloc_data;
+using android::sp;
 
 C2D_STATUS (*LINK_c2dCreateSurface)( uint32 *surface_id,
                                      uint32 surface_bits,
@@ -109,7 +110,7 @@ enum eC2DFlags {
     FLAGS_YUV_DESTINATION     = 1<<1
 };
 
-static gralloc::IAllocController* sAlloc = 0;
+static android::sp<gralloc::IAllocController> sAlloc = 0;
 /******************************************************************************/
 
 /** State information for each device instance */
@@ -932,7 +933,7 @@ static int get_temp_buffer(const bufferInfo& info, alloc_data& data)
     int allocFlags = GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP;
 
     if (sAlloc == 0) {
-        sAlloc = gralloc::IAllocController::getInstance();
+        sAlloc = gralloc::IAllocController::getInstance(false);
     }
 
     if (sAlloc == 0) {
@@ -940,7 +941,7 @@ static int get_temp_buffer(const bufferInfo& info, alloc_data& data)
         return COPYBIT_FAILURE;
     }
 
-    int err = sAlloc->allocate(data, allocFlags);
+    int err = sAlloc->allocate(data, allocFlags, 0);
     if (0 != err) {
         ALOGE("%s: allocate failed", __FUNCTION__);
         return COPYBIT_FAILURE;
@@ -954,7 +955,7 @@ static int get_temp_buffer(const bufferInfo& info, alloc_data& data)
 static void free_temp_buffer(alloc_data &data)
 {
     if (-1 != data.fd) {
-        IMemAlloc* memalloc = sAlloc->getAllocator(data.allocType);
+        sp<IMemAlloc> memalloc = sAlloc->getAllocator(data.allocType);
         memalloc->free_buffer(data.base, data.size, 0, data.fd);
     }
 }
@@ -1173,7 +1174,7 @@ static int stretch_copybit_internal(
         copy_image((private_handle_t *)src->handle, &src_image, CONVERT_TO_C2D_FORMAT);
 
         // Flush the cache
-        IMemAlloc* memalloc = sAlloc->getAllocator(src_hnd->flags);
+        sp<IMemAlloc> memalloc = sAlloc->getAllocator(src_hnd->flags);
         if (memalloc->clean_buffer((void *)(src_hnd->base), src_hnd->size,
                                    src_hnd->offset, src_hnd->fd)) {
             ALOGE("%s: clean_buffer failed", __FUNCTION__);
@@ -1244,7 +1245,7 @@ static int stretch_copybit_internal(
         // copy the temp. destination without the alignment to the actual destination.
         copy_image(dst_hnd, dst, CONVERT_TO_ANDROID_FORMAT);
         // Invalidate the cache.
-        IMemAlloc* memalloc = sAlloc->getAllocator(dst_hnd->flags);
+        sp<IMemAlloc> memalloc = sAlloc->getAllocator(dst_hnd->flags);
         memalloc->clean_buffer((void *)(dst_hnd->base), dst_hnd->size,
                                dst_hnd->offset, dst_hnd->fd);
     }
