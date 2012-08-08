@@ -21,3 +21,7 @@ common_flags += -Werror
 ifeq ($(ARCH_ARM_HAVE_NEON),true)
     common_flags += -D__ARM_HAVE_NEON
 endif
+
+ifeq ($(TARGET_NO_HW_VSYNC),true)
+    common_flags += -DNO_HW_VSYNC
+endif
