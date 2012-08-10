@@ -97,9 +97,12 @@ bool MdpCtrl::setPosition(const overlay::utils::Dim& d,
 
 bool MdpCtrl::setTransform(const utils::eTransform& orient,
         const bool& rotUsed) {
-    mOrientation = orient;
     int rot = utils::getMdpOrient(orient);
     setUserData(rot);
+    //getMdpOrient will switch the flips if the source is 90 rotated.
+    //Clients in Android dont factor in 90 rotation while deciding the flip.
+    mOrientation = static_cast<utils::eTransform>(rot);
+
     //Rotator can be requested by client even if layer has 0 orientation.
     mRotUsed = rotUsed;
     return true;

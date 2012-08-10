@@ -80,10 +80,13 @@ void MdpRot::setFlags(const utils::eMdpFlags& flags) {
 
 void MdpRot::setTransform(const utils::eTransform& rot, const bool& rotUsed)
 {
-    mOrientation = rot;
     int r = utils::getMdpOrient(rot);
-    ALOGE_IF(DEBUG_OVERLAY, "%s: r=%d", __FUNCTION__, r);
     setRotations(r);
+    //getMdpOrient will switch the flips if the source is 90 rotated.
+    //Clients in Android dont factor in 90 rotation while deciding the flip.
+    mOrientation = static_cast<utils::eTransform>(r);
+    ALOGE_IF(DEBUG_OVERLAY, "%s: r=%d", __FUNCTION__, r);
+
     setDisable();
     if(rotUsed) {
         setEnable();
