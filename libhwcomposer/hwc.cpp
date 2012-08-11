@@ -80,7 +80,6 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 
     //Prepare is called after a vsync, so unlock previous buffers here.
     ctx->qbuf->unlockAllPrevious();
-    return 0;
 
     for (uint32_t i = 0; i <numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
