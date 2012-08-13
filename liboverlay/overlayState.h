@@ -197,6 +197,19 @@ template <> struct StateTraits<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>
     typedef overlay::OverlayImpl<pipe0, pipe1> ovimpl;
 };
 
+template <> struct StateTraits<utils::OV_2D_PIP_VIDEO_ON_PANEL>
+{
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe0; //prim video
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe1; //PIP video
+    typedef overlay::NullPipe pipe2;   // place holder
+
+    typedef Rotator rot0;
+    typedef Rotator rot1;
+    typedef NullRotator rot2;
+
+    typedef overlay::OverlayImpl<pipe0, pipe1> ovimpl;
+};
+
 template <> struct StateTraits<utils::OV_UI_MIRROR>
 {
     typedef overlay::UIMirrorPipe pipe0;
@@ -329,6 +342,9 @@ inline OverlayImplBase* OverlayState::handleEvent(utils::eOverlayState toState,
             newov = handle_from<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>(toState,
                                                                       ov);
             break;
+        case utils::OV_2D_PIP_VIDEO_ON_PANEL:
+            newov = handle_from<utils::OV_2D_PIP_VIDEO_ON_PANEL>(toState,ov);
+            break;
         case utils::OV_UI_MIRROR:
             newov = handle_from<utils::OV_UI_MIRROR>(toState, ov);
             break;
@@ -384,6 +400,9 @@ inline OverlayImplBase* OverlayState::handle_from(utils::eOverlayState toState,
         case utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
             ov = handle_from_to<FROM_STATE,
                         utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>(ov);
+            break;
+        case utils::OV_2D_PIP_VIDEO_ON_PANEL:
+            ov = handle_from_to<FROM_STATE, utils::OV_2D_PIP_VIDEO_ON_PANEL>(ov);
             break;
         case utils::OV_UI_MIRROR:
             ov = handle_from_to<FROM_STATE, utils::OV_UI_MIRROR>(ov);

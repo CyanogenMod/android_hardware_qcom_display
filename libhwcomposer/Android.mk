@@ -13,6 +13,7 @@ LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"hwcomposer\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := hwc.cpp          \
                                  hwc_video.cpp    \
+                                 hwc_pip.cpp    \
                                  hwc_utils.cpp    \
                                  hwc_uimirror.cpp \
                                  hwc_uevents.cpp  \

@@ -22,6 +22,7 @@
 #include "hwc_utils.h"
 #include "mdp_version.h"
 #include "hwc_video.h"
+#include "hwc_pip.h"
 #include "hwc_qbuf.h"
 #include "hwc_copybit.h"
 #include "hwc_external.h"
@@ -114,6 +115,7 @@ void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
     //Video specific stats
     int yuvCount = 0;
     int yuvLayerIndex = -1;
+    int pipLayerIndex = -1; //2nd video in pip scenario
     bool isYuvLayerSkip = false;
     int skipCount = 0;
     int ccLayerIndex = -1; //closed caption
@@ -127,7 +129,16 @@ void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
 
         if (UNLIKELY(isYuvBuffer(hnd))) {
             yuvCount++;
-            yuvLayerIndex = i;
+            if(yuvCount==1) {
+                //Set the primary video to the video layer in
+                //lower z-order
+                yuvLayerIndex = i;
+            }
+            if(yuvCount == 2) {
+                //In case of two videos, set the pipLayerIndex to the
+                //second video
+                pipLayerIndex = i;
+            }
             //Animating
             if (isSkipLayer(&list->hwLayers[i])) {
                 isYuvLayerSkip = true;
@@ -153,6 +164,8 @@ void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
 
     VideoOverlay::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip,
             ccLayerIndex);
+    VideoPIP::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip,
+            pipLayerIndex);
     ExtOnly::setStats(extCount, extLayerIndex, isExtBlockPresent);
     CopyBit::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip);
     MDPComp::setStats(skipCount);

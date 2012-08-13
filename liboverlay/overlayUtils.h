@@ -389,6 +389,9 @@ enum eOverlayState{
     /* 3D Video on two displays (panel and TV) */
     OV_3D_VIDEO_ON_2D_PANEL_2D_TV,
 
+    /* PIP, two videos on TV or primary panel */
+    OV_2D_PIP_VIDEO_ON_PANEL,
+
     /* UI Mirroring */
     OV_UI_MIRROR,
     OV_2D_TRUE_UI_MIRROR,
@@ -631,6 +634,8 @@ inline const char* getStateString(eOverlayState state){
             return "OV_3D_VIDEO_ON_3D_TV";
         case OV_3D_VIDEO_ON_2D_PANEL_2D_TV:
             return "OV_3D_VIDEO_ON_2D_PANEL_2D_TV";
+        case OV_2D_PIP_VIDEO_ON_PANEL:
+            return "OV_2D_PIP_VIDEO_ON_PANEL";
         case OV_UI_MIRROR:
             return "OV_UI_MIRROR";
         case OV_2D_TRUE_UI_MIRROR:
