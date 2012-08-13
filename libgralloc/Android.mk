@@ -32,7 +32,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE           := libmemalloc
 LOCAL_MODULE_TAGS      := optional
 LOCAL_C_INCLUDES       := $(common_includes)
-LOCAL_SHARED_LIBRARIES := $(common_libs) libgenlock
+LOCAL_SHARED_LIBRARIES := $(common_libs) libgenlock libqdutils
 LOCAL_CFLAGS           := $(common_flags) -DLOG_TAG=\"memalloc\"
 LOCAL_SRC_FILES        := alloc_controller.cpp
 ifeq ($(TARGET_USES_ION),true)

@@ -33,7 +33,7 @@
 #include <stdint.h>
 #include <utils/Singleton.h>
 #include <cutils/properties.h>
-
+#include <mdp_version.h>
 using namespace android;
 namespace qdutils {
 // Enum containing the supported composition types
@@ -74,11 +74,12 @@ inline QCCompositionType::QCCompositionType()
             } else if ((strncmp(property, "c2d", 3)) == 0) {
                 mCompositionType = COMPOSITION_TYPE_C2D;
             } else if ((strncmp(property, "dyn", 3)) == 0) {
-#ifdef USE_MDP3
-                mCompositionType = COMPOSITION_TYPE_DYN | COMPOSITION_TYPE_MDP;
-#else
-                mCompositionType = COMPOSITION_TYPE_DYN | COMPOSITION_TYPE_C2D;
-#endif
+                 if (qdutils::MDPVersion::getInstance().getMDPVersion() < 400)
+                     mCompositionType =
+                         COMPOSITION_TYPE_DYN |COMPOSITION_TYPE_MDP;
+                 else
+                     mCompositionType =
+                         COMPOSITION_TYPE_DYN|COMPOSITION_TYPE_C2D;
             } else {
                 mCompositionType = COMPOSITION_TYPE_GPU;
             }
