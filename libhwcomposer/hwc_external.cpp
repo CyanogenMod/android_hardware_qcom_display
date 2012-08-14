@@ -415,7 +415,6 @@ bool ExternalDisplay::isHDMIConfigured() {
     bool configured = false;
     FILE *displayDeviceFP = NULL;
     char fbType[MAX_FRAME_BUFFER_NAME_SIZE];
-
     displayDeviceFP = fopen("/sys/class/graphics/fb1/msm_fb_type", "r");
 
     if(displayDeviceFP) {
@@ -433,15 +432,18 @@ void ExternalDisplay::processUEventOffline(const char *str) {
     const char *s1 = str + (strlen(str)-strlen(DEVICE_NODE_FB1));
     // check if it is for FB1
     if(strncmp(s1,DEVICE_NODE_FB1, strlen(DEVICE_NODE_FB1))== 0) {
-        enableHDMIVsync(EXTERN_DISPLAY_NONE);
-        closeFrameBuffer();
-        resetInfo();
-        setExternalDisplay(EXTERN_DISPLAY_NONE);
+        if(isHDMIConfigured()) {
+            enableHDMIVsync(EXTERN_DISPLAY_NONE);
+            closeFrameBuffer();
+            resetInfo();
+        } else {
+            closeFrameBuffer();
+        }
     }
     else if(strncmp(s1, DEVICE_NODE_FB2, strlen(DEVICE_NODE_FB2)) == 0) {
         closeFrameBuffer();
-        setExternalDisplay(EXTERN_DISPLAY_NONE);
     }
+    setExternalDisplay(EXTERN_DISPLAY_NONE);
 }
 
 
@@ -456,11 +458,13 @@ void ExternalDisplay::processUEventOnline(const char *str) {
                 closeFrameBuffer();
                 setExternalDisplay(EXTERN_DISPLAY_NONE);
             }
+            readResolution();
+            //Get the best mode and set
+            setResolution(getBestMode());
+            enableHDMIVsync(EXTERN_DISPLAY_FB1);
+        } else {
+            openFrameBuffer(EXTERN_DISPLAY_FB1);
         }
-        readResolution();
-        //Get the best mode and set
-        setResolution(getBestMode());
-        enableHDMIVsync(EXTERN_DISPLAY_FB1);
         setExternalDisplay(EXTERN_DISPLAY_FB1);
     }
     else if(strncmp(s1, DEVICE_NODE_FB2, strlen(DEVICE_NODE_FB2)) == 0) {
