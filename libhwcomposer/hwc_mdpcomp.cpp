@@ -126,16 +126,10 @@ void MDPComp::timeout_handler(void *udata) {
     proc->invalidate(proc);
 }
 
-void MDPComp::reset_comp_type(hwc_layer_list_t* list) {
-    for(uint32_t i = 0 ; i < list->numHwLayers; i++ ) {
-        hwc_layer_t* l = &list->hwLayers[i];
-
-        if(l->compositionType == HWC_OVERLAY)
-            l->compositionType = HWC_FRAMEBUFFER;
-    }
-}
-
 void MDPComp::reset( hwc_context_t *ctx, hwc_layer_list_t* list ) {
+    //Reset flags and states
+    unsetMDPCompLayerFlags(ctx, list);
+
     sCurrentFrame.count = 0;
     free(sCurrentFrame.pipe_layer);
     sCurrentFrame.pipe_layer = NULL;
@@ -147,12 +141,6 @@ void MDPComp::reset( hwc_context_t *ctx, hwc_layer_list_t* list ) {
 #if SUPPORT_4LAYER
     configure_var_pipe(ctx);
 #endif
-
-    //Reset flags and states
-    unsetMDPCompLayerFlags(ctx, list);
-    if(sMDPCompState == MDPCOMP_ON) {
-        sMDPCompState = MDPCOMP_OFF_PENDING;
-    }
 }
 
 void MDPComp::setLayerIndex(hwc_layer_t* layer, const int pipe_index)
@@ -372,7 +360,6 @@ bool MDPComp::is_doable(hwc_composer_device_t *dev, hwc_layer_list_t* list) {
 
     //FB composition on idle timeout
     if(sIdleFallBack) {
-        reset_comp_type(list);
         ALOGD_IF(isDebug(), "%s: idle fallback",__FUNCTION__);
         return false;
     }
@@ -674,6 +661,10 @@ void MDPComp::unsetMDPCompLayerFlags(hwc_context_t* ctx, hwc_layer_list_t* list)
         int l_index = sCurrentFrame.pipe_layer[index].layer_index;
         if(list->hwLayers[l_index].flags & HWC_MDPCOMP) {
             list->hwLayers[l_index].flags &= ~HWC_MDPCOMP;
+        }
+
+        if(list->hwLayers[l_index].compositionType == HWC_OVERLAY) {
+            list->hwLayers[l_index].compositionType = HWC_FRAMEBUFFER;
         }
     }
 }

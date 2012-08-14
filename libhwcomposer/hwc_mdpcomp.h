@@ -101,7 +101,6 @@ class MDPComp {
     enum State {
         MDPCOMP_ON = 0,
         MDPCOMP_OFF,
-        MDPCOMP_OFF_PENDING,
     };
 
     enum {
@@ -209,8 +208,6 @@ private:
 
     /* reset state */
     static void reset( hwc_context_t *ctx, hwc_layer_list_t* list );
-    /* reset compostiion type to default */
-    static void reset_comp_type(hwc_layer_list_t* list);
 
     /* Is feature enabled */
     static bool isEnabled() { return sMaxLayers ? true : false; };
