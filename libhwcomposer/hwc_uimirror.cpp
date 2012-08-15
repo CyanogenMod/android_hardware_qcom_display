@@ -27,26 +27,25 @@
 namespace qhwc {
 
 
-// Function to get the primary device orientation
-// Loops thru the hardware layers and returns the orientation of the max.
-// number of layers
-int getDeviceOrientation(hwc_context_t* ctx,  hwc_display_contents_1_t *list) {
-    int orientation =  list->hwLayers[0].transform;
-    if(!ctx) {
-         ALOGE("In %s: ctx is NULL!!", __FUNCTION__);
-        return -1;
-    }
-    for(size_t i=0; i <= list->numHwLayers;i++ )
-    {
-        for(size_t j=i+1; j <= list->numHwLayers; j++)
-        {
-            // Should we not check for the video layer orientation as it might
-            // source orientation(?)
-            if(list->hwLayers[i].transform == list->hwLayers[j].transform)
-            {
-                orientation = list->hwLayers[i].transform;
-            }
-        }
+// Function to get the orientation of UI on primary.
+// When external display is connected, the primary UI is
+// fixed to landscape by the phone window manager.
+// Return the landscape orientation based on w and hw of primary
+int getDeviceOrientation() {
+    int orientation = 0;
+    //Calculate the rect for primary based on whether the supplied
+    //position
+    //is within or outside bounds.
+    const int fbWidth =
+        ovutils::FrameBufferInfo::getInstance()->getWidth();
+    const int fbHeight =
+        ovutils::FrameBufferInfo::getInstance()->getHeight();
+    if(fbWidth >= fbHeight) {
+        // landscape panel
+        orientation = overlay::utils::OVERLAY_TRANSFORM_0;
+    } else {
+        // portrait panel
+        orientation = overlay::utils::OVERLAY_TRANSFORM_ROT_90;
     }
     return orientation;
 }
@@ -121,7 +120,7 @@ bool UIMirrorOverlay::configure(hwc_context_t *ctx, hwc_display_contents_1_t *li
             ovutils::Dim dcrop(0, 0, m->info.xres, m->info.yres);
             ov.setCrop(dcrop, dest);
             //Get the current orientation on primary panel
-            int transform = getDeviceOrientation(ctx, list);
+            int transform = getDeviceOrientation();
             ovutils::eTransform orient =
                     static_cast<ovutils::eTransform>(transform);
             ov.setTransform(orient, dest);
