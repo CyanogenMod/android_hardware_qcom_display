@@ -463,12 +463,8 @@ inline void MdpData::reset() {
 }
 
 inline bool MdpData::close() {
-    if(-1 == mOvData.data.memory_id) return true;
     reset();
-    if(!mFd.close()) {
-        return false;
-    }
-    return true;
+    return mFd.close();
 }
 
 inline int MdpData::getSrcMemoryId() const { return mOvData.data.memory_id; }

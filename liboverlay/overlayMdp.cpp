@@ -43,17 +43,21 @@ void MdpCtrl::reset() {
 }
 
 bool MdpCtrl::close() {
-    if(MSMFB_NEW_REQUEST == static_cast<int>(mOVInfo.id))
-        return true;
-    if(!mdp_wrapper::unsetOverlay(mFd.getFD(), mOVInfo.id)) {
-        ALOGE("MdpCtrl close error in unset");
-        return false;
+    bool result = true;
+
+    if(MSMFB_NEW_REQUEST != static_cast<int>(mOVInfo.id)) {
+        if(!mdp_wrapper::unsetOverlay(mFd.getFD(), mOVInfo.id)) {
+            ALOGE("MdpCtrl close error in unset");
+            result = false;
+        }
     }
+
     reset();
     if(!mFd.close()) {
-        return false;
+        result = false;
     }
-    return true;
+
+    return result;
 }
 
 bool MdpCtrl::setSource(const utils::PipeArgs& args) {
