@@ -143,6 +143,10 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
     ov.setSource(pargs, ovutils::OV_PIPE0);
 
+    int transform = layer->transform & FINAL_TRANSFORM_MASK;
+    ovutils::eTransform orient =
+            static_cast<ovutils::eTransform>(transform);
+
     hwc_rect_t sourceCrop = layer->sourceCrop;
     hwc_rect_t displayFrame = layer->displayFrame;
 
@@ -157,7 +161,8 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
             displayFrame.top < 0 ||
             displayFrame.right > fbWidth ||
             displayFrame.bottom > fbHeight) {
-        calculate_crop_rects(sourceCrop, displayFrame, fbWidth, fbHeight);
+        calculate_crop_rects(sourceCrop, displayFrame, fbWidth, fbHeight,
+                transform);
     }
 
     // source crop x,y,w,h
@@ -167,9 +172,6 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     //Only for Primary
     ov.setCrop(dcrop, ovutils::OV_PIPE0);
 
-    int transform = layer->transform;
-    ovutils::eTransform orient =
-            static_cast<ovutils::eTransform>(transform);
     ov.setTransform(orient, ovutils::OV_PIPE0);
 
     // position x,y,w,h

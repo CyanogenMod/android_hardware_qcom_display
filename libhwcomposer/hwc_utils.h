@@ -91,7 +91,7 @@ void initContext(hwc_context_t *ctx);
 void closeContext(hwc_context_t *ctx);
 //Crops source buffer against destination and FB boundaries
 void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
-        const int fbWidth, const int fbHeight);
+        const int fbWidth, const int fbHeight, int orient);
 
 bool isExternalActive(hwc_context_t* ctx);
 
@@ -152,6 +152,13 @@ static inline int openFb(int dpy) {
     snprintf(name, 64, devtmpl, dpy);
     fd = open(name, O_RDWR);
     return fd;
+}
+
+template <class T>
+inline void swap(T& a, T& b) {
+    T tmp = a;
+    a = b;
+    b = tmp;
 }
 
 }; //qhwc namespace
