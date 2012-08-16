@@ -84,7 +84,7 @@ void disp_mode_timing_type::set_info(struct fb_var_screeninfo &info) const
     info.reserved[0] = 0;
     info.reserved[1] = 0;
     info.reserved[2] = 0;
-    info.reserved[3] = video_format;
+    info.reserved[3] = info.reserved[3] | (video_format << 16);
 
     info.xoffset = 0;
     info.yoffset = 0;
