@@ -147,7 +147,7 @@ inline bool UIMirrorPipe::setSource(const utils::PipeArgs& args) {
     utils::PipeArgs arg(args);
 
     // Rotator flag enabled because buffer comes from fb
-    arg.rotFlags = utils::ROT_FLAG_ENABLED;
+    arg.rotFlags = utils::ROT_0_ENABLED;
 
     // For true UI mirroring, want the UI to go through available RGB pipe
     // so do not set the PIPE SHARE flag which allocates VG pipe

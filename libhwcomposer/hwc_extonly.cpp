@@ -97,7 +97,7 @@ bool ExtOnly::configure(hwc_context_t *ctx, hwc_layer_t *layer) {
             info,
             ovutils::ZORDER_0,
             isFgFlag,
-            ovutils::ROT_FLAG_DISABLED);
+            ovutils::ROT_FLAGS_NONE);
     ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
     ov.setSource(pargs, ovutils::OV_PIPE0);
 
