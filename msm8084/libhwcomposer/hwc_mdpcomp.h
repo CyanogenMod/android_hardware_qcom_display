@@ -181,7 +181,7 @@ private:
 
     /* checks for conditions where mdpcomp is not possible */
     static bool is_doable(hwc_composer_device_1_t *dev,
-                           const hwc_display_contents_1_t* list);
+                          hwc_display_contents_1_t* list);
 
     static bool setup(hwc_context_t* ctx, hwc_display_contents_1_t* list);
 
