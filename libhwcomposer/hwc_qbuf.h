@@ -33,7 +33,10 @@ class QueuedBufferStore {
     }
     ~QueuedBufferStore() {}
     void lockAndAdd(private_handle_t*);
+    //Unlocks only previous and makes the current as previous
     void unlockAllPrevious();
+    //Unlocks previous as well as current, useful in suspend case
+    void unlockAll();
 
     private:
     QueuedBufferStore& operator=(const QueuedBufferStore&);
@@ -68,6 +71,13 @@ inline void QueuedBufferStore::unlockAllPrevious() {
     mvCurrToPrev();
     //Clear current
     clearCurrent();
+}
+
+inline void QueuedBufferStore::unlockAll() {
+    //Unlocks prev and moves current to prev
+    unlockAllPrevious();
+    //Unlocks the newly populated prev if any.
+    unlockAllPrevious();
 }
 
 //Clear currentbuf store
