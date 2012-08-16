@@ -125,7 +125,13 @@ void MDPComp::timeout_handler(void *udata) {
     proc->invalidate(proc);
 }
 
-void MDPComp::reset( hwc_context_t *ctx, hwc_display_contents_1_t* list ) {
+void MDPComp::reset(hwc_context_t *ctx, hwc_display_contents_1_t* list ) {
+    //Reset flags and states
+    unsetMDPCompLayerFlags(ctx, list);
+    if(sMDPCompState == MDPCOMP_ON) {
+        sMDPCompState = MDPCOMP_OFF_PENDING;
+    }
+
     sCurrentFrame.count = 0;
     free(sCurrentFrame.pipe_layer);
     sCurrentFrame.pipe_layer = NULL;
@@ -137,12 +143,6 @@ void MDPComp::reset( hwc_context_t *ctx, hwc_display_contents_1_t* list ) {
 #if SUPPORT_4LAYER
     configure_var_pipe(ctx);
 #endif
-
-    //Reset flags and states
-    unsetMDPCompLayerFlags(ctx, list);
-    if(sMDPCompState == MDPCOMP_ON) {
-        sMDPCompState = MDPCOMP_OFF_PENDING;
-    }
 }
 
 void MDPComp::setLayerIndex(hwc_layer_1_t* layer, const int pipe_index)
@@ -334,7 +334,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_layer_1_t *layer,
  */
 
 bool MDPComp::is_doable(hwc_composer_device_1_t *dev,
-                                                const hwc_display_contents_1_t* list) {
+                        hwc_display_contents_1_t* list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
 
     if(!ctx) {
@@ -656,6 +656,10 @@ void MDPComp::unsetMDPCompLayerFlags(hwc_context_t* ctx, hwc_display_contents_1_
         int l_index = sCurrentFrame.pipe_layer[index].layer_index;
         if(list->hwLayers[l_index].flags & HWC_MDPCOMP) {
             list->hwLayers[l_index].flags &= ~HWC_MDPCOMP;
+        }
+
+        if(list->hwLayers[l_index].compositionType == HWC_OVERLAY) {
+            list->hwLayers[l_index].compositionType = HWC_FRAMEBUFFER;
         }
     }
 }
