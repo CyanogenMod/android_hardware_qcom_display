@@ -195,7 +195,7 @@ static int hwc_set(hwc_composer_device_1 *dev,
                 ctx->mExtDisplay->commit();
         } else {
             ctx->mOverlay->setState(ovutils::OV_CLOSED);
-            ctx->qbuf->unlockAllPrevious();
+            ctx->qbuf->unlockAll();
         }
 
         if(!ctx->overlayInUse)
