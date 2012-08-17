@@ -35,6 +35,7 @@
 #include "fb_priv.h"
 #include "overlayUtils.h"
 #include "mdpWrapper.h"
+#include "mdp_version.h"
 
 // just a helper static thingy
 namespace {
@@ -109,21 +110,26 @@ FrameBufferInfo::FrameBufferInfo() {
         return;
     }
 
-    mdp_overlay ov;
-    memset(&ov, 0, sizeof(ov));
-    ov.id = 1;
-    if (!mdp_wrapper::getOverlay(mFd.getFD(), ov)) {
-        ALOGE("FrameBufferInfo: failed getOverlay on fb0");
-        mFd.close();
-        return;
+    int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
+    if (mdpVersion < qdutils::MDSS_V5) {
+        mdp_overlay ov;
+        memset(&ov, 0, sizeof(ov));
+        ov.id = 1;
+        if (!mdp_wrapper::getOverlay(mFd.getFD(), ov)) {
+            ALOGE("FrameBufferInfo: failed getOverlay on fb0");
+            mFd.close();
+            return;
+        }
+        mBorderFillSupported = (ov.flags & MDP_BORDERFILL_SUPPORTED) ?
+                               true : false;
+    } else {
+        // badger always support border fill
+        mBorderFillSupported = true;
     }
 
     mFd.close();
-
     mFBWidth = vinfo.xres;
     mFBHeight = vinfo.yres;
-    mBorderFillSupported = (ov.flags & MDP_BORDERFILL_SUPPORTED) ?
-            true : false;
 }
 
 FrameBufferInfo* FrameBufferInfo::getInstance() {
