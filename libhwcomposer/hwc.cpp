@@ -139,10 +139,15 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
 static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
 {
     //XXX: Handle based on dpy
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+    private_module_t* m = reinterpret_cast<private_module_t*>(
+        ctx->mFbDev->common.module);
     if(blank) {
-        hwc_context_t* ctx = (hwc_context_t*)(dev);
         ctx->mOverlay->setState(ovutils::OV_CLOSED);
         ctx->qbuf->unlockAllPrevious();
+        ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_POWERDOWN);
+    } else {
+        ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_UNBLANK);
     }
     return 0;
 }
