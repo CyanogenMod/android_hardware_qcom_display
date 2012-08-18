@@ -132,6 +132,12 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
             return -errno;
         }
 
+        //Signals the composition thread to unblock and loop over if necessary
+        pthread_mutex_lock(&m->fbPanLock);
+        m->fbPanDone = true;
+        pthread_cond_signal(&m->fbPanCond);
+        pthread_mutex_unlock(&m->fbPanLock);
+
         if (m->currentBuffer) {
             genlock_unlock_buffer(m->currentBuffer);
             m->currentBuffer = 0;
@@ -373,6 +379,9 @@ int mapFrameBufferLocked(struct private_module_t* module)
     module->fbPostDone = false;
     pthread_mutex_init(&(module->fbPostLock), NULL);
     pthread_cond_init(&(module->fbPostCond), NULL);
+    module->fbPanDone = false;
+    pthread_mutex_init(&(module->fbPanLock), NULL);
+    pthread_cond_init(&(module->fbPanCond), NULL);
     return 0;
 }
 
