@@ -131,15 +131,17 @@ void MdpCtrl::doTransform() {
 bool MdpCtrl::set() {
     //deferred calcs, so APIs could be called in any order.
     doTransform();
-    if(!mdp_wrapper::setOverlay(mFd.getFD(), mOVInfo)) {
-        ALOGE("MdpCtrl failed to setOverlay, restoring last known "
-                "good ov info");
-        mdp_wrapper::dump("== Bad OVInfo is: ", mOVInfo);
-        mdp_wrapper::dump("== Last good known OVInfo is: ", mLkgo);
-        this->restore();
-        return false;
+    if(this->ovChanged()) {
+        if(!mdp_wrapper::setOverlay(mFd.getFD(), mOVInfo)) {
+            ALOGE("MdpCtrl failed to setOverlay, restoring last known "
+                  "good ov info");
+            mdp_wrapper::dump("== Bad OVInfo is: ", mOVInfo);
+            mdp_wrapper::dump("== Last good known OVInfo is: ", mLkgo);
+            this->restore();
+            return false;
+        }
+        this->save();
     }
-    this->save();
     return true;
 }
 
