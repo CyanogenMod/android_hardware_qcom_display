@@ -233,13 +233,6 @@ private:
 };
 
 //--------------Inlines---------------------------------
-namespace utils {
-inline bool openDev(OvFD& fd, int fbnum,
-        const char* const devpath,
-        int flags) {
-    return overlay::open(fd, fbnum, devpath, flags);
-}
-}
 namespace {
 // just a helper func for common operations x-(y+z)
 int compute(uint32_t x, uint32_t y, uint32_t z) {
