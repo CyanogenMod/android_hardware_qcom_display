@@ -254,6 +254,56 @@ private:
     uint32_t mBufSize;
 };
 
+/*
++* MDSS Rot holds MDSS's rotation related structures.
++*
++* */
+class MdssRot : public IRotatorHw {
+public:
+    explicit MdssRot();
+    ~MdssRot();
+    bool init();
+    bool close();
+    void setSource(const utils::Whf& whf);
+    virtual void setFlags(const utils::eMdpFlags& flags);
+    void setTransform(const utils::eTransform& rot,
+            const bool& rotUsed);
+    bool commit();
+    bool queueBuffer(int fd, uint32_t offset);
+    void setEnable();
+    void setDisable();
+    void setRotations(uint32_t r);
+    void setSrcFB();
+    bool enabled() const;
+    int getSessId() const;
+    int getDstMemId() const;
+    uint32_t getDstOffset() const;
+    void dump() const;
+
+private:
+    /* remap rot buffers */
+    bool remap(uint32_t numbufs);
+    bool open_i(uint32_t numbufs, uint32_t bufsz);
+    /* Deferred transform calculations */
+    void doTransform();
+    /* reset underlying data, basically memset 0 */
+    void reset();
+
+    /* MdssRot info structure */
+    mdp_overlay   mRotInfo;
+    /* MdssRot data structure */
+    msmfb_overlay_data mRotData;
+    /* Orientation */
+    utils::eTransform mOrientation;
+    /* rotator fd */
+    OvFD mFd;
+    /* Rotator memory manager */
+    RotMem mMem;
+    /* Single Rotator buffer size */
+    uint32_t mBufSize;
+    /* Enable/Disable Mdss Rot*/
+    bool mEnabled;
+};
 
 //--------------inlines------------------------------------
 
@@ -263,7 +313,7 @@ inline Rotator::Rotator() {
     if(type == IRotatorHw::TYPE_MDP) {
         mRot = new MdpRot(); //will do reset
     } else if(type == IRotatorHw::TYPE_MDSS) {
-        //TODO create mdss specific rotator
+        mRot = new MdssRot();
     } else {
         ALOGE("%s Unknown h/w type %d", __FUNCTION__, type);
     }
@@ -360,6 +410,25 @@ inline uint32_t MdpRot::getDstOffset() const {
 inline int MdpRot::getSessId() const { return mRotImgInfo.session_id; }
 inline void MdpRot::setSrcFB() {
     mRotDataInfo.src.flags |= MDP_MEMORY_ID_TYPE_FB;
+}
+
+
+//// MdssRot ////
+inline MdssRot::MdssRot() { reset(); }
+inline MdssRot::~MdssRot() { close(); }
+inline void MdssRot::setEnable() { mEnabled = true; }
+inline void MdssRot::setDisable() { mEnabled = false; }
+inline bool MdssRot::enabled() const { return mEnabled; }
+inline void MdssRot::setRotations(uint32_t flags) { mRotInfo.flags |= flags; }
+inline int MdssRot::getDstMemId() const {
+    return mRotData.dst_data.memory_id;
+}
+inline uint32_t MdssRot::getDstOffset() const {
+    return mRotData.dst_data.offset;
+}
+inline int MdssRot::getSessId() const { return mRotInfo.id; }
+inline void MdssRot::setSrcFB() {
+    mRotData.data.flags |= MDP_MEMORY_ID_TYPE_FB;
 }
 
 } // overlay
