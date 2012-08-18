@@ -154,12 +154,6 @@ bool UIMirrorOverlay::draw(hwc_context_t *ctx)
     if(fbDev) {
         private_module_t* m = reinterpret_cast<private_module_t*>(
                               fbDev->common.module);
-        //wait for the fb_post to be called
-        pthread_mutex_lock(&m->fbPostLock);
-        while(m->fbPostDone == false) {
-            pthread_cond_wait(&(m->fbPostCond), &(m->fbPostLock));
-        }
-        pthread_mutex_unlock(&m->fbPostLock);
         switch (state) {
             case ovutils::OV_UI_MIRROR:
                 if (!ov.queueBuffer(m->framebuffer->fd, m->currentOffset,

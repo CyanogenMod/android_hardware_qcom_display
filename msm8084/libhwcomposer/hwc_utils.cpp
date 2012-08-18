@@ -17,6 +17,9 @@
 
 #include <EGL/egl.h>
 #include <overlay.h>
+#include <cutils/properties.h>
+#include <gralloc_priv.h>
+#include <fb_priv.h>
 #include "hwc_utils.h"
 #include "mdp_version.h"
 #include "hwc_video.h"
@@ -205,4 +208,33 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
     }
 }
 
+void wait4fbPost(hwc_context_t* ctx) {
+    framebuffer_device_t *fbDev = ctx->mFbDev;
+    if(fbDev) {
+        private_module_t* m = reinterpret_cast<private_module_t*>(
+                              fbDev->common.module);
+        //wait for the fb_post to be called
+        pthread_mutex_lock(&m->fbPostLock);
+        while(m->fbPostDone == false) {
+            pthread_cond_wait(&(m->fbPostCond), &(m->fbPostLock));
+        }
+        m->fbPostDone = false;
+        pthread_mutex_unlock(&m->fbPostLock);
+    }
+}
+
+void wait4Pan(hwc_context_t* ctx) {
+    framebuffer_device_t *fbDev = ctx->mFbDev;
+    if(fbDev) {
+        private_module_t* m = reinterpret_cast<private_module_t*>(
+                              fbDev->common.module);
+        //wait for the fb_post's PAN to finish
+        pthread_mutex_lock(&m->fbPanLock);
+        while(m->fbPanDone == false) {
+            pthread_cond_wait(&(m->fbPanCond), &(m->fbPanLock));
+        }
+        m->fbPanDone = false;
+        pthread_mutex_unlock(&m->fbPanLock);
+    }
+}
 };//namespace

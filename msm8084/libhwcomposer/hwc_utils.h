@@ -77,6 +77,12 @@ void closeContext(hwc_context_t *ctx);
 void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
         const int fbWidth, const int fbHeight);
 
+// Waits for the fb_post to be called
+void wait4fbPost(hwc_context_t* ctx);
+
+// Waits for the fb_post to finish PAN (primary commit)
+void wait4Pan(hwc_context_t* ctx);
+
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
     return (UNLIKELY(l && (l->flags & HWC_SKIP_LAYER)));
