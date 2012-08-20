@@ -125,6 +125,11 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
                 ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
     }
 
+    if(layer->blending == HWC_BLENDING_PREMULT) {
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_BLEND_FG_PREMULT);
+    }
+
     ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
     if (ctx->numHwLayers == 1) {
         isFgFlag = ovutils::IS_FG_SET;
@@ -190,6 +195,11 @@ bool configExtVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     if (isSecureBuffer(hnd)) {
         ovutils::setMdpFlags(mdpFlags,
                 ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
+    }
+
+    if(layer->blending == HWC_BLENDING_PREMULT) {
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_BLEND_FG_PREMULT);
     }
 
     ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
