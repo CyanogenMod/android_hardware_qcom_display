@@ -23,6 +23,21 @@
 
 namespace ovutils = overlay::utils;
 namespace overlay {
+
+//Helper to even out x,w and y,h pairs
+//x,y are always evened to ceil and w,h are evened to floor
+static void normalizeCrop(uint32_t& xy, uint32_t& wh) {
+    if(xy & 1) {
+        utils::even_ceil(xy);
+        if(wh & 1)
+            utils::even_floor(wh);
+        else
+            wh -= 2;
+    } else {
+        utils::even_floor(wh);
+    }
+}
+
 bool MdpCtrl::init(uint32_t fbnum) {
     // FD init
     if(!utils::openDev(mFd, fbnum,
@@ -131,6 +146,14 @@ void MdpCtrl::doTransform() {
 bool MdpCtrl::set() {
     //deferred calcs, so APIs could be called in any order.
     doTransform();
+    utils::Whf whf = getSrcWhf();
+    if(utils::isYuv(whf.format)) {
+        normalizeCrop(mOVInfo.src_rect.x, mOVInfo.src_rect.w);
+        normalizeCrop(mOVInfo.src_rect.y, mOVInfo.src_rect.h);
+        utils::even_floor(mOVInfo.dst_rect.w);
+        utils::even_floor(mOVInfo.dst_rect.h);
+    }
+
     if(this->ovChanged()) {
         if(!mdp_wrapper::setOverlay(mFd.getFD(), mOVInfo)) {
             ALOGE("MdpCtrl failed to setOverlay, restoring last known "
@@ -142,6 +165,7 @@ bool MdpCtrl::set() {
         }
         this->save();
     }
+
     return true;
 }
 

@@ -523,8 +523,11 @@ inline bool isYuv(uint32_t format) {
         case MDP_Y_CBCR_H2V1:
         case MDP_Y_CBCR_H2V2:
         case MDP_Y_CRCB_H2V2:
+        case MDP_Y_CRCB_H1V1:
+        case MDP_Y_CRCB_H2V1:
         case MDP_Y_CRCB_H2V2_TILE:
         case MDP_Y_CBCR_H2V2_TILE:
+        case MDP_Y_CR_CB_H2V2:
             return true;
         default:
             return false;
@@ -798,6 +801,18 @@ inline void ScreenInfo::dump(const char* const s) const {
 inline bool openDev(OvFD& fd, int fbnum,
     const char* const devpath, int flags) {
     return overlay::open(fd, fbnum, devpath, flags);
+}
+
+template <class T>
+inline void even_ceil(T& value) {
+    if(value & 1)
+        value++;
+}
+
+template <class T>
+inline void even_floor(T& value) {
+    if(value & 1)
+        value--;
 }
 
 } // namespace utils ends
