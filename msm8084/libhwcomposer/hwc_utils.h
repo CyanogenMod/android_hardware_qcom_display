@@ -124,6 +124,7 @@ inline void getLayerResolution(const hwc_layer_1_t* layer,
 // This structure contains overall state
 struct hwc_context_t {
     hwc_composer_device_1_t device;
+    const hwc_procs_t* proc;
     int numHwLayers;
     int overlayInUse;
     hwc_display_t dpys[MAX_NUM_DISPLAYS];

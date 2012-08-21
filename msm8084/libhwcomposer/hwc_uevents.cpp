@@ -40,7 +40,6 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
     char* hdmi;
     int64_t timestamp = 0;
     const char *str = udata;
-    hwc_procs* proc = (hwc_procs*)ctx->device.reserved_proc[0];
     int hdmiconnected = ctx->mExtDisplay->getExternalDisplay();
 
     if(!strcasestr(str, "@/devices/virtual/graphics/fb")) {
@@ -60,7 +59,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             if (!strncmp(str, "VSYNC=", strlen("VSYNC="))) {
                 timestamp = strtoull(str + strlen("VSYNC="), NULL, 0);
                 //XXX: Handle vsync from multiple displays
-                proc->vsync(proc, (int)ctx->dpys[0], timestamp);
+                ctx->proc->vsync(ctx->proc, (int)ctx->dpys[0], timestamp);
             }
             str += strlen(str) + 1;
             if(str - udata >= len)

@@ -385,16 +385,9 @@ void ExternalDisplay::setExternalDisplay(int connected)
         const char* prop = (connected) ? "1" : "0";
         // set system property
         property_set("hw.hdmiON", prop);
-        //Invalidate
-        hwc_procs* proc = (hwc_procs*)ctx->device.reserved_proc[0];
-        if(!proc) {
-            ALOGE("%s: HWC proc not registered",
-                     __FUNCTION__);
-        } else {
-            /* Trigger redraw */
-            ALOGD_IF(DEBUG, "%s: Invalidate !!", __FUNCTION__);
-            proc->invalidate(proc);
-        }
+        /* Trigger redraw */
+        ALOGD_IF(DEBUG, "%s: Invalidate !!", __FUNCTION__);
+        ctx->proc->invalidate(ctx->proc);
     }
     return;
 }

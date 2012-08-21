@@ -114,15 +114,13 @@ void MDPComp::timeout_handler(void *udata) {
         return;
     }
 
-    hwc_procs* proc = (hwc_procs*)ctx->device.reserved_proc[0];
-
-    if(!proc) {
+    if(!ctx->proc) {
         ALOGE("%s: HWC proc not registered", __FUNCTION__);
         return;
     }
     sIdleFallBack = true;
     /* Trigger SF to redraw the current frame */
-    proc->invalidate(proc);
+    ctx->proc->invalidate(ctx->proc);
 }
 
 void MDPComp::reset(hwc_context_t *ctx, hwc_display_contents_1_t* list ) {

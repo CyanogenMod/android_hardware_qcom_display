@@ -50,8 +50,6 @@ void initContext(hwc_context_t *ctx)
     memset(ctx->dpys,(int)EGL_NO_DISPLAY, MAX_NUM_DISPLAYS);
     MDPComp::init(ctx);
 
-    init_uevent_thread(ctx);
-
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
 }
@@ -82,10 +80,6 @@ void closeContext(hwc_context_t *ctx)
         delete ctx->mExtDisplay;
         ctx->mExtDisplay = NULL;
     }
-
-
-    free(const_cast<hwc_methods_1_t *>(ctx->device.methods));
-
 }
 
 void dumpLayer(hwc_layer_1_t const* l)
