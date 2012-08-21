@@ -540,8 +540,11 @@ inline bool isYuv(uint32_t format) {
         case MDP_Y_CBCR_H2V1:
         case MDP_Y_CBCR_H2V2:
         case MDP_Y_CRCB_H2V2:
+        case MDP_Y_CRCB_H1V1:
+        case MDP_Y_CRCB_H2V1:
         case MDP_Y_CRCB_H2V2_TILE:
         case MDP_Y_CBCR_H2V2_TILE:
+        case MDP_Y_CR_CB_H2V2:
             return true;
         default:
             return false;
@@ -810,6 +813,18 @@ inline void ScreenInfo::dump(const char* const s) const {
     ALOGE("== Dump %s ScreenInfo w=%d h=%d"
             " bpp=%d stride=%d start/end ==",
             s, mFBWidth, mFBHeight, mFBbpp, mFBystride);
+}
+
+template <class T>
+inline void even_ceil(T& value) {
+    if(value & 1)
+        value++;
+}
+
+template <class T>
+inline void even_floor(T& value) {
+    if(value & 1)
+        value--;
 }
 
 } // namespace utils ends
