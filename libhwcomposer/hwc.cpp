@@ -69,7 +69,10 @@ static void hwc_registerProcs(struct hwc_composer_device_1* dev,
         ALOGE("%s: Invalid context", __FUNCTION__);
         return;
     }
-    ctx->device.reserved_proc[0] = (void*)procs;
+    ctx->proc = procs;
+
+    // don't start listening for events until we can do something with them
+    init_uevent_thread(ctx);
 }
 
 static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
@@ -230,21 +233,16 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
         initContext(dev);
 
         //Setup HWC methods
-        hwc_methods_1_t *methods;
-        methods = (hwc_methods_1_t *) malloc(sizeof(*methods));
-        memset(methods, 0, sizeof(*methods));
-        methods->eventControl = hwc_eventControl;
-        methods->blank = hwc_blank;
-
         dev->device.common.tag     = HARDWARE_DEVICE_TAG;
         dev->device.common.version = HWC_DEVICE_API_VERSION_1_0;
         dev->device.common.module  = const_cast<hw_module_t*>(module);
         dev->device.common.close   = hwc_device_close;
         dev->device.prepare        = hwc_prepare;
         dev->device.set            = hwc_set;
-        dev->device.registerProcs  = hwc_registerProcs;
+        dev->device.eventControl   = hwc_eventControl;
+        dev->device.blank          = hwc_blank;
         dev->device.query          = hwc_query;
-        dev->device.methods        = methods;
+        dev->device.registerProcs  = hwc_registerProcs;
         *device                    = &dev->device.common;
         status = 0;
     }
