@@ -152,6 +152,18 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
         }
     }
 
+    if (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER ) {
+        flags |= private_handle_t::PRIV_FLAGS_VIDEO_ENCODER;
+    }
+
+    if (usage & GRALLOC_USAGE_HW_CAMERA_WRITE) {
+        flags |= private_handle_t::PRIV_FLAGS_CAMERA_WRITE;
+    }
+
+    if (usage & GRALLOC_USAGE_HW_CAMERA_READ) {
+        flags |= private_handle_t::PRIV_FLAGS_CAMERA_READ;
+    }
+
     if (err == 0) {
         flags |= data.allocType;
         private_handle_t* hnd = new private_handle_t(data.fd, size, flags,
@@ -168,19 +180,15 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
 }
 
 void gpu_context_t::getGrallocInformationFromFormat(int inputFormat,
-                                                    int *colorFormat,
                                                     int *bufferType)
 {
     *bufferType = BUFFER_TYPE_VIDEO;
-    *colorFormat = inputFormat;
 
     if (inputFormat < 0x7) {
         // RGB formats
-        *colorFormat = inputFormat;
         *bufferType = BUFFER_TYPE_UI;
     } else if ((inputFormat == HAL_PIXEL_FORMAT_R_8) ||
                (inputFormat == HAL_PIXEL_FORMAT_RG_88)) {
-        *colorFormat = inputFormat;
         *bufferType = BUFFER_TYPE_UI;
     }
 }
@@ -193,9 +201,20 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
 
     size_t size;
     int alignedw, alignedh;
-    int colorFormat, bufferType;
-    getGrallocInformationFromFormat(format, &colorFormat, &bufferType);
-    size = getBufferSizeAndDimensions(w, h, colorFormat, alignedw, alignedh);
+    int grallocFormat = format;
+    int bufferType;
+    getGrallocInformationFromFormat(format, &bufferType);
+
+    //XXX: This should only be done if format is
+    // HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED
+    if(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
+        grallocFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP; //NV12
+    if(usage & GRALLOC_USAGE_HW_CAMERA_READ)
+        grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
+    if(usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
+        grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
+
+    size = getBufferSizeAndDimensions(w, h, grallocFormat, alignedw, alignedh);
 
     if ((ssize_t)size <= 0)
         return -EINVAL;
@@ -213,7 +232,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
         err = gralloc_alloc_framebuffer(size, usage, pHandle);
     } else {
         err = gralloc_alloc_buffer(size, usage, pHandle, bufferType,
-                                   format, alignedw, alignedh);
+                                   grallocFormat, alignedw, alignedh);
     }
 
     if (err < 0) {

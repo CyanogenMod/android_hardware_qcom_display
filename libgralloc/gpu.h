@@ -70,7 +70,6 @@ class gpu_context_t : public alloc_device_t {
     private:
    IAllocController* mAllocCtrl;
     void getGrallocInformationFromFormat(int inputFormat,
-                                         int *colorFormat,
                                          int *bufferType);
 };
 }
