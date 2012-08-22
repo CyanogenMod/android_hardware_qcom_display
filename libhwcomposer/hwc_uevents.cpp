@@ -23,6 +23,7 @@
 #include <hardware_legacy/uevent.h>
 #include <utils/Log.h>
 #include <sys/resource.h>
+#include <sys/prctl.h>
 #include <string.h>
 #include <stdlib.h>
 #include "hwc_utils.h"
@@ -88,6 +89,8 @@ static void *uevent_loop(void *param)
     memset(udata, 0, sizeof(udata));
     hwc_context_t * ctx = reinterpret_cast<hwc_context_t *>(param);
 
+    char thread_name[64] = "hwcUeventThread";
+    prctl(PR_SET_NAME, (unsigned long) &thread_name, 0, 0, 0);
     setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY);
     uevent_init();
 
@@ -102,6 +105,7 @@ static void *uevent_loop(void *param)
 void init_uevent_thread(hwc_context_t* ctx)
 {
     pthread_t uevent_thread;
+    ALOGI("Initializing UEvent Listener Thread");
     pthread_create(&uevent_thread, NULL, uevent_loop, (void*) ctx);
 }
 

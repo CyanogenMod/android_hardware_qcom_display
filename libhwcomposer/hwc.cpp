@@ -70,6 +70,9 @@ static void hwc_registerProcs(struct hwc_composer_device* dev,
         return;
     }
     ctx->device.reserved_proc[0] = (void*)procs;
+
+    // Now that we have the functions needed, kick off the uevent thread
+    init_uevent_thread(ctx);
 }
 
 static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)

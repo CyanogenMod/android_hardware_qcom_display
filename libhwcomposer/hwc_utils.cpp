@@ -54,8 +54,6 @@ void initContext(hwc_context_t *ctx)
     ctx->mExtDisplay = new ExternalDisplay(ctx);
     MDPComp::init(ctx);
 
-    init_uevent_thread(ctx);
-
     char value[PROPERTY_VALUE_MAX];
     property_get("debug.egl.swapinterval", value, "1");
     ctx->swapInterval = atoi(value);
