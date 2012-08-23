@@ -81,9 +81,6 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     ctx->overlayInUse = false;
 
-    //Prepare is called after a vsync, so unlock previous buffers here.
-    ctx->qbuf->unlockAllPrevious();
-
     for (uint32_t i = 0; i <numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
         ctx->dpys[i] = list->dpy;
@@ -209,6 +206,7 @@ static int hwc_set(hwc_composer_device_1 *dev,
         if(!ctx->overlayInUse)
             ctx->mOverlay->setState(ovutils::OV_CLOSED);
     }
+    ctx->qbuf->unlockAllPrevious();
     return ret;
 }
 
