@@ -83,9 +83,6 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)
     if(ctx->mExtDisplay->getExternalDisplay())
         ovutils::setExtType(ctx->mExtDisplay->getExternalDisplay());
 
-    //Prepare is called after a vsync, so unlock previous buffers here.
-    ctx->qbuf->unlockAllPrevious();
-
     if (LIKELY(list)) {
         //reset for this draw round
         VideoOverlay::reset();
@@ -194,6 +191,7 @@ static int hwc_set(hwc_composer_device_t *dev,
     if(!ctx->overlayInUse)
         ctx->mOverlay->setState(ovutils::OV_CLOSED);
 
+    ctx->qbuf->unlockAllPrevious();
     return ret;
 }
 
