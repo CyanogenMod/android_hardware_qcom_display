@@ -52,6 +52,8 @@
 #define MAX_DISPLAY_DEVICES 3
 #define MAX_DISPLAY_EXTERNAL_DEVICES (MAX_DISPLAY_DEVICES - 1)
 
+#define MAX_COPYBIT_RECT 12
+
 #ifdef COMPOSITION_BYPASS
 #define MAX_BYPASS_LAYERS 3
 #define BYPASS_DEBUG 0
@@ -1597,6 +1599,19 @@ static int drawLayerUsingCopybit(hwc_composer_device_t *dev, hwc_layer_t *layer,
     hwc_region_t region = layer->visibleRegionScreen;
     region_iterator copybitRegion(region);
 
+    // Since blitting region by region is serial,
+    // If a layer has long list of dirty regions,
+    // better if we draw the full layer
+    if(region.numRects > MAX_COPYBIT_RECT) {
+        //create one clip region
+        hwc_rect display_rect = { layer->displayFrame.left,
+                                  layer->displayFrame.top,
+                                  layer->displayFrame.right,
+                                  layer->displayFrame.bottom };
+        hwc_region_t display_region = { 1, (hwc_rect_t const*)&display_rect };
+        region_iterator copyRegion(display_region);
+        copybitRegion = copyRegion;
+    }
     copybit->set_parameter(copybit, COPYBIT_FRAMEBUFFER_WIDTH, renderBuffer->width);
     copybit->set_parameter(copybit, COPYBIT_FRAMEBUFFER_HEIGHT, renderBuffer->height);
     copybit->set_parameter(copybit, COPYBIT_TRANSFORM, layer->transform);
