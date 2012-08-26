@@ -457,7 +457,7 @@ int getRotOutFmt(uint32_t format);
  * rotation is 90, 180 etc
  * It returns MDP related enum/define that match rot+flip*/
 int getMdpOrient(eTransform rotation);
-const char* getFormatString(uint32_t format);
+const char* getFormatString(int format);
 const char* getStateString(eOverlayState state);
 
 // Cannot use HW_OVERLAY_MAGNIFICATION_LIMIT, since at the time
@@ -558,7 +558,7 @@ inline bool isValidDest(eDest dest)
     return false;
 }
 
-inline const char* getFormatString(uint32_t format){
+inline const char* getFormatString(int format){
     static const char* const formats[] = {
         "MDP_RGB_565",
         "MDP_XRGB_8888",
@@ -590,8 +590,10 @@ inline const char* getFormatString(uint32_t format){
         "MDP_FB_FORMAT",
         "MDP_IMGTYPE_LIMIT2"
     };
-    OVASSERT(format < sizeof(formats) / sizeof(formats[0]),
-            "getFormatString wrong fmt %d", format);
+    if(format < 0 || format >= (int)(sizeof(formats) / sizeof(formats[0]))) {
+        ALOGE("%s wrong fmt %d", __FUNCTION__, format);
+        return "Unsupported format";
+    }
     return formats[format];
 }
 
