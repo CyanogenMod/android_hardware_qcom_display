@@ -82,8 +82,7 @@ bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx, hwc_layer_list_t *list) {
     int compositionType =
         qdutils::QCCompositionType::getInstance().getCompositionType();
 
-    if ((compositionType & qdutils::COMPOSITION_TYPE_C2D) ||
-        (compositionType & qdutils::COMPOSITION_TYPE_DYN)) {
+    if (compositionType & qdutils::COMPOSITION_TYPE_C2D){
          if (sYuvCount) {
              //Overlay up & running. Dont use COPYBIT for RGB layers.
              // TODO need to implement blending with C2D
