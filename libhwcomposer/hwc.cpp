@@ -173,19 +173,21 @@ static int hwc_set(hwc_composer_device_t *dev,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    if (LIKELY(list)) {
-        VideoOverlay::draw(ctx, list);
-        VideoPIP::draw(ctx,list);
-        ExtOnly::draw(ctx, list);
-        CopyBit::draw(ctx, list, (EGLDisplay)dpy, (EGLSurface)sur);
-        MDPComp::draw(ctx, list);
-        EGLBoolean sucess = eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
+    if (dpy && sur) {
+        if (LIKELY(list)) {
+            VideoOverlay::draw(ctx, list);
+            VideoPIP::draw(ctx,list);
+            ExtOnly::draw(ctx, list);
+            CopyBit::draw(ctx, list, (EGLDisplay)dpy, (EGLSurface)sur);
+            MDPComp::draw(ctx, list);
+        }
+        eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
         wait4fbPost(ctx);
         //Can draw to HDMI only when fb_post is reached
         UIMirrorOverlay::draw(ctx);
         //HDMI commit and primary commit (PAN) happening in parallel
         if(ctx->mExtDisplay->getExternalDisplay())
-           ctx->mExtDisplay->commit();
+            ctx->mExtDisplay->commit();
         //Virtual barrier for threads to finish
         wait4Pan(ctx);
     } else {
