@@ -59,8 +59,16 @@ void initContext(hwc_context_t *ctx)
     property_get("debug.egl.swapinterval", value, "1");
     ctx->swapInterval = atoi(value);
 
+    //Initialize dyn threshold to 2.0
+    //system property can override this value
+    ctx->dynThreshold = 2.0;
+
+    property_get("debug.hwc.dynThreshold", value, "3");
+    ctx->dynThreshold = atof(value);
+
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
+    ALOGI("DYN composition threshold : %f", ctx->dynThreshold);
 }
 
 void closeContext(hwc_context_t *ctx)
