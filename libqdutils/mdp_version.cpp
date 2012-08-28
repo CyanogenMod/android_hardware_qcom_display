@@ -63,7 +63,7 @@ MDPVersion::MDPVersion()
             mdp_version = MDP_V_UNKNOWN;
         }
         int len = strlen("msmfbXX_");
-        if (mdp_version == MDP_V3_0_3)
+        if (mdp_version == MDP_V3_0_2 || mdp_version == MDP_V3_0_3)
             len++;
         panel_type = fb_finfo.id[len];
 

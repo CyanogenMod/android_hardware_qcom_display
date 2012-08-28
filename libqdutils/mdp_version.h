@@ -42,6 +42,7 @@ enum mdp_version {
     MDP_V_UNKNOWN = 0,
     MDP_V2_2    = 220,
     MDP_V3_0    = 300,
+    MDP_V3_0_2  = 302,
     MDP_V3_0_3  = 303,
     MDP_V3_1    = 310,
     MDP_V4_0    = 400,
