@@ -23,8 +23,6 @@
 
 namespace qhwc {
 
-#define FINAL_TRANSFORM_MASK 0x000F
-
 //Static Members
 ovutils::eOverlayState VideoOverlay::sState = ovutils::OV_CLOSED;
 int VideoOverlay::sYuvCount = 0;
@@ -157,9 +155,8 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_t *layer) {
     //Only for Primary
     ov.setCrop(dcrop, ovutils::OV_PIPE0);
 
-    int transform = layer->transform & FINAL_TRANSFORM_MASK;
     ovutils::eTransform orient =
-            static_cast<ovutils::eTransform>(transform);
+            static_cast<ovutils::eTransform>(layer->transform);
     ov.setTransform(orient, ovutils::OV_PIPE0);
 
     // position x,y,w,h

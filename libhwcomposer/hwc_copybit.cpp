@@ -252,8 +252,6 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_t *layer,
     // this needs to change to accomodate vertical stride
     // if needed in the future
     src.vert_padding = 0;
-    // Remove the srcBufferTransform if any
-    layer->transform = (layer->transform & FINAL_TRANSFORM_MASK);
 
     // Copybit source rect
     hwc_rect_t sourceCrop = layer->sourceCrop;

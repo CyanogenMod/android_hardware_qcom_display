@@ -74,13 +74,6 @@ enum {
 };
 
 /*
- * Layer Transformation - refers to Layer::setGeometry()
- */
-#define SHIFT_SRC_TRANSFORM  4
-#define SRC_TRANSFORM_MASK   0x00F0
-#define FINAL_TRANSFORM_MASK 0x000F
-
-/*
  * Flags set by the layer and sent to HWC
  */
 enum {
