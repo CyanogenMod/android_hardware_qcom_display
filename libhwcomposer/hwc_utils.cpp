@@ -166,14 +166,7 @@ void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
             //If BLOCK layer present, dont cache index, display BLOCK only.
             if(isExtBlockPresent == false) extLayerIndex = i;
         } else if (isSkipLayer(&list->hwLayers[i])) { //Popups
-            //If video layer is below a skip layer
-            if(yuvLayerIndex != -1 && yuvLayerIndex < (ssize_t)i) {
-                //Do not mark as SKIP if it is secure buffer
-                if (!yuvSecure) {
-                    isYuvLayerSkip = true;
-                    skipCount++;
-                }
-            }
+            skipCount++;
         }
     }
 
@@ -182,7 +175,7 @@ void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
     VideoPIP::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip,
             pipLayerIndex);
     ExtOnly::setStats(extCount, extLayerIndex, isExtBlockPresent);
-    CopyBit::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip);
+    CopyBit::setStats(skipCount);
     MDPComp::setStats(skipCount);
 
     ctx->numHwLayers = list->numHwLayers;

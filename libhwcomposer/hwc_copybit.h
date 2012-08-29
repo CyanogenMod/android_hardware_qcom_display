@@ -39,7 +39,7 @@ public:
     static bool draw(hwc_context_t *ctx, hwc_layer_list_t *list, EGLDisplay dpy,
                                                                 EGLSurface sur);
     //Receives data from hwc
-    static void setStats(int yuvCount, int yuvLayerIndex, bool isYuvLayerSkip);
+    static void setStats(int skipCount);
 
     static void updateEglHandles(void*);
     static int  drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_t *layer,
@@ -55,15 +55,8 @@ public:
 private:
     //Marks layer flags if this feature is used
     static void markFlags(hwc_layer_t *layer);
-    //returns yuv count
-    static int getYuvCount();
-
-    //Number of yuv layers in this drawing round
-    static int sYuvCount;
-    //Index of YUV layer, relevant only if count is 1
-    static int sYuvLayerIndex;
-    //Flags if a yuv layer is animating or below something that is animating
-    static bool sIsLayerSkip;
+    //Flags on animation
+    static bool sIsSkipLayerPresent;
     //Flags if this feature is on.
     static bool sIsModeOn;
     // flag that indicates whether CopyBit is enabled or not
@@ -88,17 +81,9 @@ private:
     static CopybitEngine* sInstance; // singleton
 };
 
-
-inline void CopyBit::setStats(int yuvCount, int yuvLayerIndex,
-        bool isYuvLayerSkip) {
-    sYuvCount = yuvCount;
-    sYuvLayerIndex = yuvLayerIndex;
-    sIsLayerSkip = isYuvLayerSkip;
+inline void CopyBit::setStats(int skipCount) {
+    sIsSkipLayerPresent = (skipCount != 0);
 }
-
-inline int CopyBit::getYuvCount() { return sYuvCount; }
-
-
 }; //namespace qhwc
 
 #endif //HWC_COPYBIT_H

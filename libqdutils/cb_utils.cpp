@@ -24,15 +24,52 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef QCOM_CLEARREGIONS_H
-#define QCOM_CLEARREGIONS_H
 
 #include <gralloc_priv.h>
-#include <cutils/memory.h>
+#include "stdio.h"
 #include <comptype.h>
-#include "egl_handles.h"
+#include "hwc_utils.h"
+#include "qcom_ui.h"
+#include <cutils/memory.h>
 
 namespace qdutils {
+
+bool CBUtils::sGPUlayerpresent = 0;
+
+void CBUtils::checkforGPULayer(const hwc_layer_list_t* list) {
+    sGPUlayerpresent =  true;
+    for(uint32_t index = 0; index < list->numHwLayers; index++) {
+        const hwc_layer_t* layer = &list->hwLayers[index];
+        if(layer->compositionType == HWC_FRAMEBUFFER) {
+           sGPUlayerpresent =  true;
+           break;
+        }
+        if(layer->flags & HWC_SKIP_LAYER) {
+           sGPUlayerpresent =  true;
+           break;
+        }
+    }
+}
+
+/*
+ * Checks if FB is updated by this composition type
+ *
+ * @param: composition type
+ * @return: true if FB is updated, false if not
+ */
+
+bool CBUtils::isUpdatingFB(int Type)
+{
+    switch((qhwc::HWCCompositionType)Type)
+    {
+        case qhwc::HWC_USE_COPYBIT:
+            return true;
+        default:
+            ALOGE("%s: invalid composition type(%d)", __FUNCTION__, Type);
+            return false;
+    };
+};
+
 /*
  * Clear Region implementation for C2D/MDP versions.
  *
@@ -42,23 +79,28 @@ namespace qdutils {
  *
  * @return 0 on success
  */
-static int qcomuiClearRegion(Region region, EGLDisplay dpy){
+
+int CBUtils::qcomuiClearRegion(Region region, EGLDisplay dpy){
 
     int ret = 0;
     int compositionType = QCCompositionType::getInstance().getCompositionType();
-    if (compositionType == COMPOSITION_TYPE_GPU){
-         //SF can use the GPU to draw the wormhole.
+    if ((compositionType == COMPOSITION_TYPE_GPU) || sGPUlayerpresent) {
+        //return ERROR when GPU composition is used or any layer is flagged
+        //for GPU composition.
         return -1;
     }
 
+
+
     android_native_buffer_t *renderBuffer =
           qdutils::eglHandles::getInstance().getAndroidNativeRenderBuffer(dpy);
+
     if (!renderBuffer) {
         ALOGE("%s: eglGetRenderBufferANDROID returned NULL buffer",
              __FUNCTION__);
         return -1;
     }
-    private_handle_t *fbHandle = (private_handle_t *)renderBuffer->handle;
+   private_handle_t *fbHandle = (private_handle_t *)renderBuffer->handle;
     if(!fbHandle) {
         ALOGE("%s: Framebuffer handle is NULL", __FUNCTION__);
         return -1;
@@ -78,15 +120,16 @@ static int qcomuiClearRegion(Region region, EGLDisplay dpy){
             (r.left + r.top*renderBuffer->stride)*bytesPerPixel;
         int w = r.width()*bytesPerPixel;
         int h = r.height();
+
         do {
-            if(4 == bytesPerPixel)
+            if(4 == bytesPerPixel){
                 android_memset32((uint32_t*)dst, 0, w);
-            else
+            } else {
                 android_memset16((uint16_t*)dst, 0, w);
+            }
             dst += stride;
         } while(--h);
     }
     return 0;
 }
-}; //namespace qdutils
-#endif /* end of include guard: QCOM_CLEARREGIONS_H*/
+} //namespace

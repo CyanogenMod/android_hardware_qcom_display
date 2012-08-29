@@ -65,11 +65,10 @@ private:
     mutable range r;
 };
 
-int CopyBit::sYuvCount = 0;
-int CopyBit::sYuvLayerIndex = -1;
 bool CopyBit::sIsModeOn = false;
-bool CopyBit::sIsLayerSkip = false;
+bool CopyBit::sIsSkipLayerPresent = false;
 bool CopyBit::sCopyBitDraw = false;
+
 bool CopyBit::canUseCopybitForYUV(hwc_context_t *ctx) {
     // return true for non-overlay targets
     if(ctx->mMDP.hasOverlay) {
@@ -81,14 +80,6 @@ bool CopyBit::canUseCopybitForYUV(hwc_context_t *ctx) {
 bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx, hwc_layer_list_t *list) {
     int compositionType =
         qdutils::QCCompositionType::getInstance().getCompositionType();
-
-    if (compositionType & qdutils::COMPOSITION_TYPE_C2D){
-         if (sYuvCount) {
-             //Overlay up & running. Dont use COPYBIT for RGB layers.
-             // TODO need to implement blending with C2D
-             return false;
-         }
-    }
 
     if (compositionType & qdutils::COMPOSITION_TYPE_DYN) {
         // DYN Composition:
@@ -134,29 +125,34 @@ unsigned int CopyBit::getRGBRenderingArea(const hwc_layer_list_t *list) {
 
 bool CopyBit::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
 
+    sCopyBitDraw = false;
+
     int compositionType =
         qdutils::QCCompositionType::getInstance().getCompositionType();
 
-    if ((compositionType & qdutils::COMPOSITION_TYPE_GPU) ||
-        (compositionType & qdutils::COMPOSITION_TYPE_CPU))   {
+    if ((compositionType == qdutils::COMPOSITION_TYPE_GPU) ||
+        (compositionType == qdutils::COMPOSITION_TYPE_CPU))   {
         //GPU/CPU composition, don't change layer composition type
         return true;
     }
-
-    bool useCopybitForYUV = canUseCopybitForYUV(ctx);
-    bool useCopybitForRGB = canUseCopybitForRGB(ctx, list);
 
     if(!(validateParams(ctx, list))) {
        ALOGE("%s:Invalid Params", __FUNCTION__);
        return false;
     }
-    sCopyBitDraw = false;
+
+    if(sIsSkipLayerPresent) {
+        //GPU will be anyways used
+        return false;
+    }
+
+    bool useCopybitForYUV = canUseCopybitForYUV(ctx);
+    bool useCopybitForRGB = canUseCopybitForRGB(ctx, list);
+
     for (int i=list->numHwLayers-1; i >= 0 ; i--) {
         private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
 
-        if (isSkipLayer(&list->hwLayers[i])) {
-            return true;
-        } else if (hnd->bufferType == BUFFER_TYPE_VIDEO) {
+        if (hnd->bufferType == BUFFER_TYPE_VIDEO) {
           //YUV layer, check, if copybit can be used
           if (useCopybitForYUV) {
               list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
