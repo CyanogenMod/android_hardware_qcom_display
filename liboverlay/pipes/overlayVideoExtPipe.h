@@ -57,11 +57,13 @@ public:
     void dump() const;
 private:
     overlay::GenericPipe<ovutils::EXTERNAL> mVideoExt;
+    utils::eTransform mSrcTransform;
 };
 
 //------------------Inlines -----------------------------
 
-inline VideoExtPipe::VideoExtPipe() {}
+inline VideoExtPipe::VideoExtPipe() :
+                     mSrcTransform(utils::OVERLAY_TRANSFORM_0) {}
 inline VideoExtPipe::~VideoExtPipe() { close(); }
 inline bool VideoExtPipe::init(RotatorBase* rot) {
     ALOGE_IF(DEBUG_OVERLAY, "VideoExtPipe init");
@@ -86,6 +88,10 @@ inline bool VideoExtPipe::setPosition(const utils::Dim& dim)
         // Use cached crop data to get aspect ratio
         utils::Dim crop = mVideoExt.getCrop();
         utils::Whf whf(crop.w, crop.h, 0);
+        // Swap width and height when there is a 90/270 deg rotation
+        if(mSrcTransform & HAL_TRANSFORM_ROT_90)
+            utils::swap(whf.w, whf.h);
+
         d = mVideoExt.getAspectRatio(whf);
     }
     ALOGE_IF(DEBUG_OVERLAY, "Calculated aspect ratio for EXT: x=%d, y=%d, w=%d,"
@@ -94,6 +100,7 @@ inline bool VideoExtPipe::setPosition(const utils::Dim& dim)
     return mVideoExt.setPosition(d);
 }
 inline bool VideoExtPipe::setTransform(const utils::eTransform& param) {
+    mSrcTransform = param;
     return mVideoExt.setTransform(param);
 }
 inline bool VideoExtPipe::setSource(const utils::PipeArgs& args) {
