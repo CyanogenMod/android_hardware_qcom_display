@@ -128,6 +128,8 @@ int IonAlloc::alloc_buffer(alloc_data& data)
             LOGE("%s: Failed to map the allocated memory: %s",
                                     __FUNCTION__, strerror(errno));
             ioctl(mIonFd, ION_IOC_FREE, &handle_data);
+            if(ionSyncFd >= 0)
+                close(ionSyncFd);
             ionSyncFd = FD_INIT;
             return err;
         }
