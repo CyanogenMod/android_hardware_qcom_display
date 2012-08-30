@@ -165,7 +165,7 @@ static int hwc_query(struct hwc_composer_device_1* dev,
         value[0] = 0;
         break;
     case HWC_VSYNC_PERIOD:
-        value[0] = 1000000000.0 / m->fps;
+        value[0] = m->fps;
         ALOGI("fps: %d", value[0]);
         break;
     default:
