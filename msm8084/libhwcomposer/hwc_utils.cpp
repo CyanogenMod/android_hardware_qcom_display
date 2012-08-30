@@ -48,7 +48,6 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
-    ctx->mCopybitEngine = CopybitEngine::getInstance();
     ctx->mExtDisplay = new ExternalDisplay(ctx);
     memset(ctx->dpys,(int)EGL_NO_DISPLAY, MAX_NUM_DISPLAYS);
     MDPComp::init(ctx);

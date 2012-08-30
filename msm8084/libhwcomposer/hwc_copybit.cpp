@@ -510,16 +510,17 @@ CopybitEngine::CopybitEngine(){
     hw_module_t const *module;
     if (hw_get_module(COPYBIT_HARDWARE_MODULE_ID, &module) == 0) {
         copybit_open(module, &sEngine);
+        CopyBit::openEglLibAndGethandle();
     } else {
        ALOGE("FATAL ERROR: copybit open failed.");
     }
-    CopyBit::openEglLibAndGethandle();
 }
+
 CopybitEngine::~CopybitEngine()
 {
-    CopyBit::closeEglLib();
     if(sEngine)
     {
+        CopyBit::closeEglLib();
         copybit_close(sEngine);
         sEngine = NULL;
     }
