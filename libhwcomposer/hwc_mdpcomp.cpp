@@ -282,6 +282,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_layer_1_t *layer,
         ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
         ovutils::eMdpFlags mdpFlags = mdp_info.isVG ? ovutils::OV_MDP_PIPE_SHARE
                                                    : ovutils::OV_MDP_FLAGS_NONE;
+        ovutils::setMdpFlags(mdpFlags,ovutils::OV_MDP_BACKEND_COMPOSITION);
         ovutils::eIsFg isFG = mdp_info.isFG ? ovutils::IS_FG_SET
                                                            : ovutils::IS_FG_OFF;
         ovutils::PipeArgs parg(mdpFlags,
