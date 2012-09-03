@@ -439,12 +439,10 @@ status_t OverlayUI::closeOVSession() {
         return ret;
     }
     if(err = ioctl(mobjDisplay.getFD(), MSMFB_OVERLAY_UNSET, &mSessionID)) {
-        LOGE("%s: MSMFB_OVERLAY_UNSET failed. (%d)", __FUNCTION__, err);
-        ret = BAD_VALUE;
-    } else {
-        mobjDisplay.closeDisplay();
-        mSessionID = NO_INIT;
+        LOGW("%s: MSMFB_OVERLAY_UNSET failed. (%d)", __FUNCTION__, err);
     }
+    mobjDisplay.closeDisplay();
+    mSessionID = NO_INIT;
     return ret;
 }
 
