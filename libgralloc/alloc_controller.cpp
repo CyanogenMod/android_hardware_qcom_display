@@ -59,15 +59,17 @@ const int GRALLOC_HEAP_MASK  =  GRALLOC_USAGE_PRIVATE_ADSP_HEAP      |
 static bool canFallback(int usage, bool triedSystem)
 {
     // Fallback to system heap when alloc fails unless
-    // 1. Composition type is MDP
-    // 2. Alloc from system heap was already tried
-    // 3. The heap type is requsted explicitly
-    // 4. The heap type is protected
-    // 5. The buffer is meant for external display only
-
+    // 1. Alloc from system heap was already tried
+    // 2. The heap type is requsted explicitly
+    // 3. The heap type is protected
+    // 4. The buffer is meant for external display only
+#ifndef QCOM_BSP
+    // 5. Composition type is MDP
     if(QCCompositionType::getInstance().getCompositionType() &
        COMPOSITION_TYPE_MDP)
         return false;
+#endif
+
     if(triedSystem)
         return false;
     if(usage & (GRALLOC_HEAP_MASK | GRALLOC_USAGE_PROTECTED |

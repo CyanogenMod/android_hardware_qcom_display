@@ -77,9 +77,33 @@ bool CopyBit::canUseCopybitForYUV(hwc_context_t *ctx) {
     return true;
 }
 
+#ifdef QCOM_BSP
+bool CopyBit::canUseContiguousMemory(const hwc_layer_list_t* list) {
+    if(!list) return false;
+    for (unsigned int i=0; i<list->numHwLayers; i++) {
+         private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
+        if(hnd != NULL && (hnd->flags &
+            private_handle_t::PRIV_FLAGS_NONCONTIGUOUS_MEM )) {
+             return false;
+        }
+    }
+    return true;
+}
+#endif
+
 bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx, hwc_layer_list_t *list) {
     int compositionType =
         qdutils::QCCompositionType::getInstance().getCompositionType();
+
+#ifdef QCOM_BSP
+    if(compositionType & qdutils::COMPOSITION_TYPE_MDP){
+        // in MDP composition fall back to gpu if Buffers are not contiguous
+        if(! canUseContiguousMemory(list)) {
+            ALOGW("canUseContiguousMemory returned false, fallback to GPU");
+            return false;
+        }
+    }
+#endif
 
     if (compositionType & qdutils::COMPOSITION_TYPE_DYN) {
         // DYN Composition:
@@ -165,7 +189,10 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
           if (useCopybitForRGB) {
               list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
               sCopyBitDraw = true;
-          }
+#ifdef QCOM_BSP
+          } else
+              list->hwLayers[i].compositionType = HWC_USE_GPU;
+#endif
        }
     }
     return true;
