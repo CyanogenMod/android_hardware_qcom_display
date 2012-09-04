@@ -209,9 +209,9 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
     // HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED
     if(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
         grallocFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP; //NV12
-    if(usage & GRALLOC_USAGE_HW_CAMERA_READ)
+    else if(usage & GRALLOC_USAGE_HW_CAMERA_READ)
         grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
-    if(usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
+    else if(usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
         grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
 
     size = getBufferSizeAndDimensions(w, h, grallocFormat, alignedw, alignedh);
