@@ -63,7 +63,7 @@ void initContext(hwc_context_t *ctx)
     //system property can override this value
     ctx->dynThreshold = 2.0;
 
-    property_get("debug.hwc.dynThreshold", value, "3");
+    property_get("debug.hwc.dynThreshold", value, "2");
     ctx->dynThreshold = atof(value);
 
     ALOGI("Initializing Qualcomm Hardware Composer");
