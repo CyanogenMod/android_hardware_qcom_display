@@ -203,17 +203,19 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
     int alignedw, alignedh;
     int grallocFormat = format;
     int bufferType;
-    getGrallocInformationFromFormat(format, &bufferType);
 
-    //XXX: This should only be done if format is
-    // HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED
-    if(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
-        grallocFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP; //NV12
-    else if(usage & GRALLOC_USAGE_HW_CAMERA_READ)
-        grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
-    else if(usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
-        grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
+    //If input format is HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED then based on
+    //the usage bits, gralloc assigns a format.
+    if(format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+        if(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
+            grallocFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP; //NV12
+        else if(usage & GRALLOC_USAGE_HW_CAMERA_READ)
+            grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
+        else if(usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
+            grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
+    }
 
+    getGrallocInformationFromFormat(grallocFormat, &bufferType);
     size = getBufferSizeAndDimensions(w, h, grallocFormat, alignedw, alignedh);
 
     if ((ssize_t)size <= 0)
