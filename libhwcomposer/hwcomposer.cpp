@@ -728,13 +728,17 @@ static int getLayerS3DFormat (hwc_layer_t &layer) {
 }
 
 //Mark layers for GPU composition but not if it is a 3D layer.
-static inline void markForGPUComp(const hwc_context_t *ctx,
+static inline void markForGPUComp(hwc_context_t *ctx,
     hwc_layer_list_t* list, const int limit) {
     for(int i = 0; i < limit; i++) {
         if( getLayerS3DFormat( list->hwLayers[i] ) ) {
             continue;
         }
         else {
+            if(list->hwLayers[i].compositionType == HWC_USE_OVERLAY) {
+                if (ctx->hwcOverlayStatus == HWC_OVERLAY_OPEN)
+                    ctx->hwcOverlayStatus =  HWC_OVERLAY_PREPARE_TO_CLOSE;
+            }
             list->hwLayers[i].compositionType = HWC_FRAMEBUFFER;
             list->hwLayers[i].hints &= ~HWC_HINT_CLEAR_FB;
         }
