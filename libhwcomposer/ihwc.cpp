@@ -72,6 +72,40 @@ public:
         result = reply.readInt32();
         return result;
     }
+    virtual status_t setOpenSecureStart() {
+        Parcel data, reply;
+        data.writeInterfaceToken(IHWComposer::getInterfaceDescriptor());
+        status_t result = remote()->transact(SET_OPEN_SECURE_START,
+                                             data, &reply);
+        result = reply.readInt32();
+        return result;
+    }
+
+    virtual status_t setOpenSecureEnd() {
+        Parcel data, reply;
+        data.writeInterfaceToken(IHWComposer::getInterfaceDescriptor());
+        status_t result = remote()->transact(SET_OPEN_SECURE_END,
+                                             data, &reply);
+        result = reply.readInt32();
+        return result;
+    }
+
+    virtual status_t setCloseSecureStart() {
+        Parcel data, reply;
+        data.writeInterfaceToken(IHWComposer::getInterfaceDescriptor());
+        status_t result = remote()->transact(SET_CLOSE_SECURE_START,
+                                             data, &reply);
+        result = reply.readInt32();
+        return result;
+    }
+    virtual status_t setCloseSecureEnd() {
+        Parcel data, reply;
+        data.writeInterfaceToken(IHWComposer::getInterfaceDescriptor());
+        status_t result = remote()->transact(SET_CLOSE_SECURE_END,
+                                             data, &reply);
+        result = reply.readInt32();
+        return result;
+    }
 
     virtual status_t getExternalDisplay(int *extDispType) {
         Parcel data, reply;
@@ -138,6 +172,30 @@ status_t BnHWComposer::onTransact(
             reply->writeInt32(res);
             return NO_ERROR;
         } break;
+        case SET_OPEN_SECURE_START: {
+            CHECK_INTERFACE(IHWComposer, data, reply);
+            status_t res = setOpenSecureStart();
+            reply->writeInt32(res);
+            return NO_ERROR;
+        }break;
+        case SET_OPEN_SECURE_END: {
+            CHECK_INTERFACE(IHWComposer, data, reply);
+            status_t res = setOpenSecureEnd();
+            reply->writeInt32(res);
+            return NO_ERROR;
+        }break;
+        case SET_CLOSE_SECURE_START: {
+            CHECK_INTERFACE(IHWComposer, data, reply);
+            status_t res = setCloseSecureStart();
+            reply->writeInt32(res);
+            return NO_ERROR;
+        }break;
+        case SET_CLOSE_SECURE_END: {
+            CHECK_INTERFACE(IHWComposer, data, reply);
+            status_t res = setCloseSecureEnd();
+            reply->writeInt32(res);
+            return NO_ERROR;
+        }break;
         case GET_EXT_DISPLAY_TYPE: {
             CHECK_INTERFACE(IHWComposer, data, reply);
             int extDispType;

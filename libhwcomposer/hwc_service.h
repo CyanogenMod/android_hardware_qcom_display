@@ -59,8 +59,13 @@ public:
     virtual android::status_t setHPDStatus(int enable);
     virtual android::status_t setResolutionMode(int resMode);
     virtual android::status_t setActionSafeDimension(int w, int h);
-    void setHwcContext(hwc_context_t *hwcCtx);
 
+    // Secure Intent Hooks
+    virtual android::status_t setOpenSecureStart();
+    virtual android::status_t setOpenSecureEnd();
+    virtual android::status_t setCloseSecureStart();
+    virtual android::status_t setCloseSecureEnd();
+    void setHwcContext(hwc_context_t *hwcCtx);
 private:
     static HWComposerService *sHwcService;
     hwc_context_t *mHwcContext;

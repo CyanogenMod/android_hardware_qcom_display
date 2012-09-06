@@ -36,6 +36,10 @@ enum {
     SET_EXT_HPD_ENABLE = 0,
     SET_EXT_DISPLAY_RESOLUTION_MODE,
     SET_EXT_DISPLAY_ACTIONSAFE_DIMENSIONS,
+    SET_OPEN_SECURE_START,
+    SET_OPEN_SECURE_END,
+    SET_CLOSE_SECURE_START,
+    SET_CLOSE_SECURE_END,
     GET_EXT_DISPLAY_TYPE,
     GET_EXT_DISPLAY_RESOLUTION_MODES,
     GET_EXT_DISPLAY_RESOLUTION_MODE_COUNT,
@@ -54,6 +58,11 @@ public:
     virtual android::status_t setHPDStatus(int enable) = 0;
     virtual android::status_t setResolutionMode(int resMode) = 0;
     virtual android::status_t setActionSafeDimension(int w, int h) = 0;
+    // Secure Intent Hooks
+    virtual android::status_t setOpenSecureStart() = 0;
+    virtual android::status_t setOpenSecureEnd() = 0;
+    virtual android::status_t setCloseSecureStart() = 0;
+    virtual android::status_t setCloseSecureEnd() = 0;
 };
 
 // ----------------------------------------------------------------------------

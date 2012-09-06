@@ -81,6 +81,63 @@ status_t HWComposerService::setActionSafeDimension(int w, int h) {
     }
     return NO_ERROR;
 }
+status_t HWComposerService::setOpenSecureStart( ) {
+    mHwcContext->mSecureConfig = true;
+    //Invalidate
+    hwc_procs* proc = (hwc_procs*)mHwcContext->device.reserved_proc[0];
+    if(!proc) {
+        ALOGE("%s: HWC proc not registered", __FUNCTION__);
+    } else {
+        /* Trigger redraw */
+        ALOGD_IF(HWC_SERVICE_DEBUG, "%s: Invalidate !!", __FUNCTION__);
+        proc->invalidate(proc);
+    }
+    return NO_ERROR;
+}
+
+status_t HWComposerService::setOpenSecureEnd( ) {
+    mHwcContext->mSecure = true;
+    mHwcContext->mSecureConfig = false;
+    //Invalidate
+    hwc_procs* proc = (hwc_procs*)mHwcContext->device.reserved_proc[0];
+    if(!proc) {
+        ALOGE("%s: HWC proc not registered", __FUNCTION__);
+    } else {
+        /* Trigger redraw */
+        ALOGD_IF(HWC_SERVICE_DEBUG, "%s: Invalidate !!", __FUNCTION__);
+        proc->invalidate(proc);
+    }
+    return NO_ERROR;
+}
+
+status_t HWComposerService::setCloseSecureStart( ) {
+    mHwcContext->mSecureConfig = true;
+    //Invalidate
+    hwc_procs* proc = (hwc_procs*)mHwcContext->device.reserved_proc[0];
+    if(!proc) {
+        ALOGE("%s: HWC proc not registered", __FUNCTION__);
+    } else {
+        /* Trigger redraw */
+        ALOGD_IF(HWC_SERVICE_DEBUG, "%s: Invalidate !!", __FUNCTION__);
+        proc->invalidate(proc);
+    }
+    return NO_ERROR;
+}
+
+status_t HWComposerService::setCloseSecureEnd( ) {
+    mHwcContext->mSecure = false;
+    mHwcContext->mSecureConfig = false;
+    //Invalidate
+    hwc_procs* proc = (hwc_procs*)mHwcContext->device.reserved_proc[0];
+    if(!proc) {
+        ALOGE("%s: HWC proc not registered", __FUNCTION__);
+    } else {
+        /* Trigger redraw */
+        ALOGD_IF(HWC_SERVICE_DEBUG, "%s: Invalidate !!", __FUNCTION__);
+        proc->invalidate(proc);
+    }
+    return NO_ERROR;
+}
 
 status_t HWComposerService::getResolutionModeCount(int *resModeCount) {
     qhwc::ExternalDisplay *externalDisplay = mHwcContext->mExtDisplay;

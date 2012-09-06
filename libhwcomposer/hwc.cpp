@@ -85,6 +85,11 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     ctx->overlayInUse = false;
 
+    if(ctx->mSecureConfig == true) {
+        // This will tear down External Display Device.
+        return 0;
+    }
+
     if(ctx->mExtDisplay->getExternalDisplay())
         ovutils::setExtType(ctx->mExtDisplay->getExternalDisplay());
 
