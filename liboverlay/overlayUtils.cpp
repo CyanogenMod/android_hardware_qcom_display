@@ -151,6 +151,51 @@ bool FrameBufferInfo::supportTrueMirroring() const {
     return (trueMirroringSupported && mBorderFillSupported);
 }
 
+/* clears any VG pipes allocated to the fb devices */
+int initOverlay() {
+    msmfb_mixer_info_req  req;
+    mdp_mixer_info *minfo = NULL;
+    char fb_dev_name[PATH_MAX];
+    int fd = -1;
+    // loop upto FB_MAX devices
+    for(int i = 0; i < FB_MAX; i++) {
+        snprintf(fb_dev_name, PATH_MAX, Res::fbPath, i);
+        ALOGD("initoverlay:: opening the device:: %s", fb_dev_name);
+        fd = ::open(fb_dev_name, O_RDWR, 0);
+        if(fd < 0) {
+            // break out of this loop when there is no framebuffer node exists
+            break;
+        }
+        //Get the mixer configuration */
+        req.mixer_num = i;
+        if (ioctl(fd, MSMFB_MIXER_INFO, &req) == -1) {
+            ALOGE("ERROR: MSMFB_MIXER_INFO ioctl failed");
+            close(fd);
+            continue;
+        }
+        minfo = req.info;
+        for (int j = 0; j < req.cnt; j++) {
+            ALOGD("ndx=%d num=%d z_order=%d", minfo->pndx, minfo->pnum,
+                    minfo->z_order);
+            // except the RGB base layer with z_order of -1, clear any
+            // other pipes connected to mixer.
+            if((minfo->z_order) != -1) {
+                int index = minfo->pndx;
+                ALOGD("Unset overlay with index: %d at mixer %d", index, i);
+                if(ioctl(fd, MSMFB_OVERLAY_UNSET, &index) == -1) {
+                    ALOGE("ERROR: MSMFB_OVERLAY_UNSET failed");
+                    close(fd);
+                    return -1;
+                }
+            }
+            minfo++;
+        }
+        close(fd);
+        fd = -1;
+    }
+    return 0;
+}
+
 //--------------------------------------------------------
 //Refer to graphics.h, gralloc_priv.h, msm_mdp.h
 int getMdpFormat(int format) {
