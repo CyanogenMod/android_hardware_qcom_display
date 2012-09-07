@@ -190,8 +190,12 @@ utils::eOverlayState Overlay::getState() const {
 Overlay *Overlay::sInstance = 0;
 
 Overlay* Overlay::getInstance() {
-    if(sInstance == NULL)
+    if(sInstance == NULL) {
+        if(utils::initOverlay() == -1) {
+            ALOGE("utils::initOverlay() ERROR!!");
+        }
         sInstance = new Overlay();
+    }
     return sInstance;
 }
 
