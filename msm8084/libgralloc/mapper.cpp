@@ -129,35 +129,32 @@ int gralloc_register_buffer(gralloc_module_t const* module,
      * out-of-line
      */
 
-    // if this handle was created in this process, then we keep it as is.
     private_handle_t* hnd = (private_handle_t*)handle;
-    if (hnd->pid != getpid()) {
+    hnd->base = 0;
+    void *vaddr;
+    int err = gralloc_map(module, handle, &vaddr);
+    if (err) {
+        ALOGE("%s: gralloc_map failed", __FUNCTION__);
+        return err;
+    }
+
+    // Reset the genlock private fd flag in the handle
+    hnd->genlockPrivFd = -1;
+
+    // Check if there is a valid lock attached to the handle.
+    if (-1 == hnd->genlockHandle) {
+        ALOGE("%s: the lock is invalid.", __FUNCTION__);
+        gralloc_unmap(module, handle);
         hnd->base = 0;
-        void *vaddr;
-        int err = gralloc_map(module, handle, &vaddr);
-        if (err) {
-            ALOGE("%s: gralloc_map failed", __FUNCTION__);
-            return err;
-        }
+        return -EINVAL;
+    }
 
-        // Reset the genlock private fd flag in the handle
-        hnd->genlockPrivFd = -1;
-
-        // Check if there is a valid lock attached to the handle.
-        if (-1 == hnd->genlockHandle) {
-            ALOGE("%s: the lock is invalid.", __FUNCTION__);
-            gralloc_unmap(module, handle);
-            hnd->base = 0;
-            return -EINVAL;
-        }
-
-        // Attach the genlock handle
-        if (GENLOCK_NO_ERROR != genlock_attach_lock((native_handle_t *)handle)) {
-            ALOGE("%s: genlock_attach_lock failed", __FUNCTION__);
-            gralloc_unmap(module, handle);
-            hnd->base = 0;
-            return -EINVAL;
-        }
+    // Attach the genlock handle
+    if (GENLOCK_NO_ERROR != genlock_attach_lock((native_handle_t *)handle)) {
+        ALOGE("%s: genlock_attach_lock failed", __FUNCTION__);
+        gralloc_unmap(module, handle);
+        hnd->base = 0;
+        return -EINVAL;
     }
     return 0;
 }
@@ -176,19 +173,16 @@ int gralloc_unregister_buffer(gralloc_module_t const* module,
 
     private_handle_t* hnd = (private_handle_t*)handle;
 
-    // never unmap buffers that were created in this process
-    if (hnd->pid != getpid()) {
-        if (hnd->base != 0) {
-            gralloc_unmap(module, handle);
-        }
-        hnd->base = 0;
-        // Release the genlock
-        if (-1 != hnd->genlockHandle) {
-            return genlock_release_lock((native_handle_t *)handle);
-        } else {
-            ALOGE("%s: there was no genlock attached to this buffer", __FUNCTION__);
-            return -EINVAL;
-        }
+    if (hnd->base != 0) {
+        gralloc_unmap(module, handle);
+    }
+    hnd->base = 0;
+    // Release the genlock
+    if (-1 != hnd->genlockHandle) {
+        return genlock_release_lock((native_handle_t *)handle);
+    } else {
+        ALOGE("%s: there was no genlock attached to this buffer", __FUNCTION__);
+        return -EINVAL;
     }
     return 0;
 }
@@ -207,12 +201,7 @@ int terminateBuffer(gralloc_module_t const* module,
                           private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP |
                           private_handle_t::PRIV_FLAGS_USES_ASHMEM |
                           private_handle_t::PRIV_FLAGS_USES_ION)) {
-            if (hnd->pid != getpid()) {
-                // ... unless it's a "master" pmem buffer, that is a buffer
-                // mapped in the process it's been allocated.
-                // (see gralloc_alloc_buffer())
                 gralloc_unmap(module, hnd);
-            }
         } else {
             ALOGE("terminateBuffer: unmapping a non pmem/ashmem buffer flags = 0x%x",
                   hnd->flags);
