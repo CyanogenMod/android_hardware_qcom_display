@@ -176,7 +176,10 @@ void gpu_context_t::getGrallocInformationFromFormat(int inputFormat,
     *bufferType = BUFFER_TYPE_VIDEO;
     *colorFormat = inputFormat;
 
-    if (inputFormat < 0x7) {
+    // HAL_PIXEL_FORMAT_RGB_888 is MPQ color format for VCAP videos
+    // value of RGB_888 is less than 0x7 and this format is not supported
+    // by the GPU
+    if ((inputFormat < 0x7) && (inputFormat != HAL_PIXEL_FORMAT_RGB_888)) {
         // RGB formats
         *colorFormat = inputFormat;
         *bufferType = BUFFER_TYPE_UI;
