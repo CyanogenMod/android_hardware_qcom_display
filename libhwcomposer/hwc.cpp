@@ -182,14 +182,16 @@ static int hwc_set(hwc_composer_device_t *dev,
             MDPComp::draw(ctx, list);
         }
         eglSwapBuffers((EGLDisplay)dpy, (EGLSurface)sur);
-        wait4fbPost(ctx);
-        //Can draw to HDMI only when fb_post is reached
-        UIMirrorOverlay::draw(ctx);
-        //HDMI commit and primary commit (PAN) happening in parallel
-        if(ctx->mExtDisplay->getExternalDisplay())
-            ctx->mExtDisplay->commit();
-        //Virtual barrier for threads to finish
-        wait4Pan(ctx);
+        if (ctx->mMDP.hasOverlay) {
+            wait4fbPost(ctx);
+            //Can draw to HDMI only when fb_post is reached
+            UIMirrorOverlay::draw(ctx);
+            //HDMI commit and primary commit (PAN) happening in parallel
+            if(ctx->mExtDisplay->getExternalDisplay())
+                ctx->mExtDisplay->commit();
+            //Virtual barrier for threads to finish
+            wait4Pan(ctx);
+        }
     } else {
         ctx->mOverlay->setState(ovutils::OV_CLOSED);
         ctx->qbuf->unlockAll();
