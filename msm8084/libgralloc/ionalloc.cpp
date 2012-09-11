@@ -225,9 +225,15 @@ int IonAlloc::clean_buffer(void *base, size_t size, int offset, int fd)
     flush_data.vaddr   = base;
     flush_data.offset  = offset;
     flush_data.length  = size;
-    if(ioctl(mIonFd, ION_IOC_CLEAN_INV_CACHES, &flush_data)) {
+
+    struct ion_custom_data d;
+    d.cmd = ION_IOC_CLEAN_INV_CACHES;
+    d.arg = (unsigned long int)&flush_data;
+
+    if(ioctl(mIonFd, ION_IOC_CUSTOM, &d)) {
         err = -errno;
         ALOGE("%s: ION_IOC_CLEAN_INV_CACHES failed with error - %s",
+
               __FUNCTION__, strerror(errno));
         ioctl(mIonFd, ION_IOC_FREE, &handle_data);
         return err;
