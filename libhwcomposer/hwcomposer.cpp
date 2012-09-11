@@ -735,6 +735,10 @@ static inline void markForGPUComp(hwc_context_t *ctx,
             continue;
         }
         else {
+            private_handle_t *hnd = (private_handle_t *)
+                    list->hwLayers[i].handle;
+            if (isYuvBuffer(hnd))
+                continue;
             if(list->hwLayers[i].compositionType == HWC_USE_OVERLAY) {
                 if (ctx->hwcOverlayStatus == HWC_OVERLAY_OPEN)
                     ctx->hwcOverlayStatus =  HWC_OVERLAY_PREPARE_TO_CLOSE;
