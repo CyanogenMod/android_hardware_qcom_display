@@ -156,6 +156,7 @@ struct hwc_context_t {
 
     qhwc::MDPInfo mMDP;
 
+    bool isPoweredDown;
 };
 
 #endif //HWC_UTILS_H
