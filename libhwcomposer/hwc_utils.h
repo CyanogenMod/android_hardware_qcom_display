@@ -121,6 +121,9 @@ static inline bool isExtCC(const private_handle_t* hnd) {
 // Initialize uevent thread
 void init_uevent_thread(hwc_context_t* ctx);
 
+// Initialize vsync thread
+void init_vsync_thread(hwc_context_t* ctx);
+
 inline void getLayerResolution(const hwc_layer_t* layer,
                                          int& width, int& height)
 {

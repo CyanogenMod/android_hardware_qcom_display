@@ -17,6 +17,7 @@ LOCAL_SRC_FILES               := hwc.cpp          \
                                  hwc_utils.cpp    \
                                  hwc_uimirror.cpp \
                                  hwc_uevents.cpp  \
+                                 hwc_vsync.cpp    \
                                  hwc_copybit.cpp  \
                                  hwc_mdpcomp.cpp  \
                                  hwc_extonly.cpp

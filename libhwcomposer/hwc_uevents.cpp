@@ -18,8 +18,6 @@
  * limitations under the License.
  */
 #define DEBUG 0
-#ifndef HWC_UEVENTS_H
-#define HWC_UEVENTS_H
 #include <hardware_legacy/uevent.h>
 #include <utils/Log.h>
 #include <sys/resource.h>
@@ -29,42 +27,18 @@
 #include "hwc_utils.h"
 #include "hwc_external.h"
 
-namespace qhwc {
+#define PAGE_SIZE 4096
 
-const char* MSMFB_DEVICE_FB0 = "change@/devices/virtual/graphics/fb0";
-const char* MSMFB_DEVICE_FB1 = "change@/devices/virtual/graphics/fb1";
-const char* MSMFB_FB_NODE = "fb";
+namespace qhwc {
 
 static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 {
     int vsync = 0;
     int64_t timestamp = 0;
     const char *str = udata;
-    hwc_procs* proc = (hwc_procs*)ctx->device.reserved_proc[0];
-    int hdmiconnected = ctx->mExtDisplay->getExternalDisplay();
 
     if(!strcasestr(str, "@/devices/virtual/graphics/fb")) {
         ALOGD_IF(DEBUG, "%s: Not Ext Disp Event ", __FUNCTION__);
-        return;
-    }
-
-    if(ctx->mExtDisplay->isHDMIConfigured() &&
-            (hdmiconnected == EXTERN_DISPLAY_FB1))
-        vsync = !strncmp(str, MSMFB_DEVICE_FB1, strlen(MSMFB_DEVICE_FB1));
-    else
-        vsync = !strncmp(str, MSMFB_DEVICE_FB0, strlen(MSMFB_DEVICE_FB0));
-
-    if(vsync) {
-        str += strlen(str) + 1;
-        while(*str) {
-            if (!strncmp(str, "VSYNC=", strlen("VSYNC="))) {
-                timestamp = strtoull(str + strlen("VSYNC="), NULL, 0);
-                proc->vsync(proc, 0, timestamp);
-            }
-            str += strlen(str) + 1;
-            if(str - udata >= len)
-                break;
-        }
         return;
     }
 
@@ -85,8 +59,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 static void *uevent_loop(void *param)
 {
     int len = 0;
-    static char udata[4096];
-    memset(udata, 0, sizeof(udata));
+    static char udata[PAGE_SIZE];
     hwc_context_t * ctx = reinterpret_cast<hwc_context_t *>(param);
 
     char thread_name[64] = "hwcUeventThread";
@@ -110,4 +83,3 @@ void init_uevent_thread(hwc_context_t* ctx)
 }
 
 }; //namespace
-#endif //HWC_UEVENTS_H
