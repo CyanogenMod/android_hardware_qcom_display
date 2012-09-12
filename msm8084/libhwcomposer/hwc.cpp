@@ -81,6 +81,10 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     ctx->overlayInUse = false;
 
+    if(ctx->isPoweredDown) {
+        ALOGW("SurfaceFlinger called %s after a POWERDOWN", __FUNCTION__);
+    }
+
     for (uint32_t i = 0; i <numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
         ctx->dpys[i] = list->dpy;
@@ -145,9 +149,13 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
     if(blank) {
         ctx->mOverlay->setState(ovutils::OV_CLOSED);
         ctx->qbuf->unlockAllPrevious();
+        ALOGD("HWC Calling POWERDOWN ...");
         ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_POWERDOWN);
+        ctx->isPoweredDown = true;
     } else {
+        ALOGD("HWC Calling UNBLANK ...");
         ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_UNBLANK);
+        ctx->isPoweredDown = false;
     }
     return 0;
 }
