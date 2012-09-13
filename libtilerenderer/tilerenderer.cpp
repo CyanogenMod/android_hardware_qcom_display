@@ -247,11 +247,11 @@ void TileRenderer::endTileRendering() {
 #endif
 }
 
-void TileRenderer::startTiling(int fbo, int left, int top,
+void TileRenderer::startTiling(int fbo, int prevfbo, int left, int top,
                                int right, int bottom,
                                int width, int height, bool preserve) {
 #ifdef QCOM_APP_TILE_RENDER
-    if (!isReady() || isTiled())
+    if ((fbo == prevfbo) || !isReady() || isTiled())
         return;
 
     mTileCacheMgr.set(fbo, left, top, right, bottom, width, height);
@@ -267,13 +267,13 @@ void TileRenderer::startTiling(int fbo, int left, int top,
     return;
 }
 
-void TileRenderer::startTiling(int fbo, bool preserve) {
+void TileRenderer::startTiling(int fbo, int prevfbo, bool preserve) {
 #ifdef QCOM_APP_TILE_RENDER
     int left, top;
     int right, bottom;
     int width, height;
 
-    if (!isReady() || isTiled())
+    if ((fbo == prevfbo) || !isReady() || isTiled())
         return;
 
     mTileCacheMgr.peek(fbo, left, top, right, bottom, width, height);
@@ -287,9 +287,9 @@ void TileRenderer::startTiling(int fbo, bool preserve) {
     return;
 }
 
-void TileRenderer::endTiling(int fbo, bool bClear) {
+void TileRenderer::endTiling(int fbo, int nextfbo, bool bClear) {
 #ifdef QCOM_APP_TILE_RENDER
-    if (!isTiled()) {
+    if ((fbo == nextfbo) || !isTiled()) {
         return;
     }
     TILE_RENDERER_LOGD("TileRenderer::end fbo=%d", fbo);
