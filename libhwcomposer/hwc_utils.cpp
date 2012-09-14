@@ -126,6 +126,7 @@ void getLayerStats(hwc_context_t *ctx, const hwc_display_contents_1_t *list)
             //Do not mark as SKIP if it is secure buffer
             if (isSkipLayer(&list->hwLayers[i]) && !yuvSecure) {
                 isYuvLayerSkip = true;
+                skipCount++;
             }
         } else if(UNLIKELY(isExtCC(hnd))) {
             ccLayerIndex = i;
@@ -137,15 +138,8 @@ void getLayerStats(hwc_context_t *ctx, const hwc_display_contents_1_t *list)
             extCount++;
             //If BLOCK layer present, dont cache index, display BLOCK only.
             if(isExtBlockPresent == false) extLayerIndex = i;
-        } else if (isSkipLayer(&list->hwLayers[i])) { //Popups
-            //If video layer is below a skip layer
-            if(yuvLayerIndex != -1 && yuvLayerIndex < (ssize_t)i) {
-                //Do not mark as SKIP if it is secure buffer
-                if (!yuvSecure) {
-                    isYuvLayerSkip = true;
-                    skipCount++;
-                }
-            }
+        } else if (isSkipLayer(&list->hwLayers[i])) {
+            skipCount++;
         }
     }
 
