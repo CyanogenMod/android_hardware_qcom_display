@@ -112,6 +112,10 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)
             ctx->overlayInUse = false;
             ctx->mOverlay->setState(ovutils::OV_CLOSED);
         }
+    } else {
+        ctx->overlayInUse = false;
+        ctx->mOverlay->setState(ovutils::OV_CLOSED);
+        ctx->qbuf->unlockAll();
     }
 
     return 0;
