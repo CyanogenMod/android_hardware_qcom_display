@@ -42,7 +42,8 @@ static void *vsync_loop(void *param)
 
     char thread_name[64] = "hwcVsyncThread";
     prctl(PR_SET_NAME, (unsigned long) &thread_name, 0, 0, 0);
-    setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY);
+    setpriority(PRIO_PROCESS, 0, 
+                HAL_PRIORITY_URGENT_DISPLAY + ANDROID_PRIORITY_MORE_FAVORABLE);
 
     static char vdata[PAGE_SIZE];
 
@@ -51,12 +52,17 @@ static void *vsync_loop(void *param)
     bool fb1_vsync = false;
 
     /* Currently read vsync timestamp from drivers
-    VSYNC=41800875994
+       e.g. VSYNC=41800875994
     */
 
     hwc_procs* proc = (hwc_procs*)ctx->device.reserved_proc[0];
 
     do {
+        pthread_mutex_lock(&ctx->vstate.lock);
+        if(ctx->vstate.enable == false) {
+          pthread_cond_wait(&ctx->vstate.cond, &ctx->vstate.lock);
+        }
+        pthread_mutex_unlock(&ctx->vstate.lock);
 
        int hdmiconnected = ctx->mExtDisplay->getExternalDisplay();
 
@@ -78,15 +84,15 @@ static void *vsync_loop(void *param)
            ALOGE ("FATAL:%s:not able to open file:%s, %s",  __FUNCTION__,
                  (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
                                                          strerror(errno));
-         return NULL;
+           return NULL;
        }
-
        // Open success - read now
        len = read(fd_timestamp, vdata, PAGE_SIZE);
        if (len < 0){
            ALOGE ("FATAL:%s:not able to read file:%s, %s", __FUNCTION__,
                 (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
                                                         strerror(errno));
+           fd_timestamp = -1;
            return NULL;
        }
 

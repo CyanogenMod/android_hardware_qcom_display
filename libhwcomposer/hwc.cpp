@@ -36,6 +36,7 @@
 #include "hwc_extonly.h"
 #include "qcom_ui.h"
 
+#define VSYNC_DEBUG 0
 using namespace qhwc;
 
 static int hwc_device_open(const struct hw_module_t* module,
@@ -130,19 +131,46 @@ static int hwc_eventControl(struct hwc_composer_device* dev,
                              int event, int value)
 {
     int ret = 0;
+    static int prev_value, temp;
+
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     private_module_t* m = reinterpret_cast<private_module_t*>(
                 ctx->mFbDev->common.module);
     switch(event) {
 #ifndef NO_HW_VSYNC
         case HWC_EVENT_VSYNC:
+            if (value == prev_value){
+                //TODO see why HWC gets repeated events
+                ALOGD_IF(VSYNC_DEBUG, "%s - VSYNC is already %s",
+                        __FUNCTION__, (value)?"ENABLED":"DISABLED");
+            }
+            temp = ctx->vstate.enable;
             if(ioctl(m->framebuffer->fd, MSMFB_OVERLAY_VSYNC_CTRL, &value) < 0)
                 ret = -errno;
 
-            if(ctx->mExtDisplay->isHDMIConfigured() &&
-                 (ctx->mExtDisplay->getExternalDisplay()==EXTERN_DISPLAY_FB1)) {
-                ret = ctx->mExtDisplay->enableHDMIVsync(value);
+            /* vsync state change logic */
+            if (value == 1) {
+                //unblock vsync thread
+                pthread_mutex_lock(&ctx->vstate.lock);
+                ctx->vstate.enable = true;
+                pthread_cond_signal(&ctx->vstate.cond);
+                pthread_mutex_unlock(&ctx->vstate.lock);
             }
+            if (value == 0 && temp) {
+                //vsync thread will block
+                pthread_mutex_lock(&ctx->vstate.lock);
+                ctx->vstate.enable = false;
+                pthread_mutex_unlock(&ctx->vstate.lock);
+            }
+            ALOGD_IF (VSYNC_DEBUG, "VSYNC state changed from %s to %s",
+              (prev_value)?"ENABLED":"DISABLED", (value)?"ENABLED":"DISABLED");
+            prev_value = value;
+            /* vsync state change logic - end*/
+
+             if(ctx->mExtDisplay->isHDMIConfigured() &&
+                (ctx->mExtDisplay->getExternalDisplay()==EXTERN_DISPLAY_FB1)) {
+                ret = ctx->mExtDisplay->enableHDMIVsync(value);
+             }
            break;
 #endif
        case HWC_EVENT_ORIENTATION:
