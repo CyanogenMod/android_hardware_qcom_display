@@ -180,6 +180,7 @@ struct hwc_context_t {
 
     // flag that indicate whether secure/desecure session in progress
     bool mSecureConfig;
+
     bool hdmi_pending;
     char  mHDMIEvent[512];
 };
