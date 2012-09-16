@@ -333,6 +333,10 @@ inline void MdpCtrl::setSrcRectDim(const overlay::utils::Dim d) {
     mOVInfo.src_rect.y = d.y;
     mOVInfo.src_rect.w = d.w;
     mOVInfo.src_rect.h = d.h;
+    utils::even_ceil(mOVInfo.src_rect.x);
+    utils::even_ceil(mOVInfo.src_rect.y);
+    utils::even_floor(mOVInfo.src_rect.w);
+    utils::even_floor(mOVInfo.src_rect.h);
 }
 
 inline overlay::utils::Dim MdpCtrl::getDstRectDim() const {
@@ -347,6 +351,10 @@ inline void MdpCtrl::setDstRectDim(const overlay::utils::Dim d) {
     mOVInfo.dst_rect.y = d.y;
     mOVInfo.dst_rect.w = d.w;
     mOVInfo.dst_rect.h = d.h;
+    utils::even_ceil(mOVInfo.dst_rect.x);
+    utils::even_ceil(mOVInfo.dst_rect.y);
+    utils::even_floor(mOVInfo.dst_rect.w);
+    utils::even_floor(mOVInfo.dst_rect.h);
 }
 
 inline int MdpCtrl::getUserData() const { return mOVInfo.user_data[0]; }
