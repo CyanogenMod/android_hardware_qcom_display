@@ -75,16 +75,23 @@ static void hwc_registerProcs(struct hwc_composer_device_1* dev,
     init_uevent_thread(ctx);
 }
 
+//Helper
+static void reset() {
+    //reset for this draw round
+    VideoOverlay::reset();
+    ExtOnly::reset();
+    UIMirrorOverlay::reset();
+    ExtOnly::reset();
+    //TODO MDPComp
+}
+
 static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
                        hwc_display_contents_1_t** displays)
 {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     ctx->overlayInUse = false;
 
-    //reset for this draw round
-    VideoOverlay::reset();
-    ExtOnly::reset();
-    UIMirrorOverlay::reset();
+    reset();
 
     //If securing of h/w in progress skip comp using overlay.
     if(ctx->mSecuring == true) return 0;
