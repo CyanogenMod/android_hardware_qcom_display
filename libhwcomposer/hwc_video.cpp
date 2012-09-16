@@ -52,7 +52,7 @@ bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
             ccLayer = &list->hwLayers[sCCLayerIndex];
 
         if(configure(ctx, yuvLayer, ccLayer)) {
-            markFlags(&list->hwLayers[sYuvLayerIndex]);
+            markFlags(yuvLayer, ccLayer);
             sIsModeOn = true;
         }
     }
@@ -90,15 +90,23 @@ void VideoOverlay::chooseState(hwc_context_t *ctx) {
             ovutils::getStateString(sState));
 }
 
-void VideoOverlay::markFlags(hwc_layer_1_t *layer) {
+void VideoOverlay::markFlags(hwc_layer_1_t *yuvLayer, hwc_layer_1_t *ccLayer) {
     switch(sState) {
         case ovutils::OV_2D_VIDEO_ON_PANEL:
         case ovutils::OV_2D_VIDEO_ON_PANEL_TV:
-            layer->compositionType = HWC_OVERLAY;
-            layer->hints |= HWC_HINT_CLEAR_FB;
+            if(yuvLayer) {
+                yuvLayer->compositionType = HWC_OVERLAY;
+                yuvLayer->hints |= HWC_HINT_CLEAR_FB;
+            }
+            if(ccLayer) {
+                ccLayer->compositionType = HWC_OVERLAY;
+            }
             break;
         case ovutils::OV_2D_VIDEO_ON_TV:
-            break; //dont update flags.
+            if(ccLayer) {
+                ccLayer->compositionType = HWC_OVERLAY;
+            }
+            break; //dont update video layer flags.
         default:
             break;
     }

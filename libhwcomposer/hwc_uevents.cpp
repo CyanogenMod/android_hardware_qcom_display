@@ -17,9 +17,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#define DEBUG 0
-#ifndef HWC_OBSERVER_H
-#define HWC_OBSERVER_H
+#define UEVENT_DEBUG 0
 #include <hardware_legacy/uevent.h>
 #include <utils/Log.h>
 #include <sys/resource.h>
@@ -43,7 +41,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
     int hdmiconnected = ctx->mExtDisplay->getExternalDisplay();
 
     if(!strcasestr(str, "@/devices/virtual/graphics/fb")) {
-        ALOGD_IF(DEBUG, "%s: Not Ext Disp Event ", __FUNCTION__);
+        ALOGD_IF(UEVENT_DEBUG, "%s: Not Ext Disp Event ", __FUNCTION__);
         return;
     }
 
@@ -113,4 +111,3 @@ void init_uevent_thread(hwc_context_t* ctx)
 }
 
 }; //namespace
-#endif //HWC_OBSERVER_H

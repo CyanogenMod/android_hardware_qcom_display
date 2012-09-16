@@ -41,7 +41,7 @@ private:
     static bool configure(hwc_context_t *ctx, hwc_layer_1_t *yuvlayer,
             hwc_layer_1_t *ccLayer);
     //Marks layer flags if this feature is used
-    static void markFlags(hwc_layer_1_t *layer);
+    static void markFlags(hwc_layer_1_t *yuvLayer, hwc_layer_1_t *ccLayer);
     //returns yuv count
     static int getYuvCount();
 
