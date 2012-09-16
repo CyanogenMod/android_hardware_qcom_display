@@ -329,6 +329,10 @@ inline overlay::utils::Dim MdpCtrl::getSrcRectDim() const {
 }
 
 inline void MdpCtrl::setSrcRectDim(const overlay::utils::Dim d) {
+    utils::even_ceil(mOVInfo.src_rect.x);
+    utils::even_ceil(mOVInfo.src_rect.y);
+    utils::even_floor(mOVInfo.src_rect.w);
+    utils::even_floor(mOVInfo.src_rect.h);
     mOVInfo.src_rect.x = d.x;
     mOVInfo.src_rect.y = d.y;
     mOVInfo.src_rect.w = d.w;
@@ -343,6 +347,10 @@ inline overlay::utils::Dim MdpCtrl::getDstRectDim() const {
 }
 
 inline void MdpCtrl::setDstRectDim(const overlay::utils::Dim d) {
+    utils::even_ceil(mOVInfo.dst_rect.x);
+    utils::even_ceil(mOVInfo.dst_rect.y);
+    utils::even_floor(mOVInfo.dst_rect.w);
+    utils::even_floor(mOVInfo.dst_rect.h);
     mOVInfo.dst_rect.x = d.x;
     mOVInfo.dst_rect.y = d.y;
     mOVInfo.dst_rect.w = d.w;
