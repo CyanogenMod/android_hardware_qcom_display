@@ -38,26 +38,30 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
     char* hdmi;
     int64_t timestamp = 0;
     const char *str = udata;
-    int hdmiconnected = ctx->mExtDisplay->getExternalDisplay();
+    int display = HWC_DISPLAY_PRIMARY;
 
     if(!strcasestr(str, "@/devices/virtual/graphics/fb")) {
         ALOGD_IF(UEVENT_DEBUG, "%s: Not Ext Disp Event ", __FUNCTION__);
         return;
     }
 
-    if(hdmiconnected)
+    //Check if its primary vsync
+    vsync = !strncmp(str, MSMFB_DEVICE_FB0, strlen(MSMFB_DEVICE_FB0));
+    //If not primary vsync, see if its an external vsync
+    if(isExternalActive(ctx) && !vsync) {
         vsync = !strncmp(str, MSMFB_DEVICE_FB1, strlen(MSMFB_DEVICE_FB1));
-    else
-        vsync = !strncmp(str, MSMFB_DEVICE_FB0, strlen(MSMFB_DEVICE_FB0));
+        display = HWC_DISPLAY_EXTERNAL;
+    }
 
     hdmi = strcasestr(str, MSMFB_HDMI_NODE);
+
     if(vsync) {
         str += strlen(str) + 1;
         while(*str) {
             if (!strncmp(str, "VSYNC=", strlen("VSYNC="))) {
                 timestamp = strtoull(str + strlen("VSYNC="), NULL, 0);
                 //XXX: Handle vsync from multiple displays
-                ctx->proc->vsync(ctx->proc, (int)ctx->dpys[0], timestamp);
+                ctx->proc->vsync(ctx->proc, display, timestamp);
             }
             str += strlen(str) + 1;
             if(str - udata >= len)

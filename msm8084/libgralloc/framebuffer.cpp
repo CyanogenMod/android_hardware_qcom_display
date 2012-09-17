@@ -100,51 +100,22 @@ static int fb_setUpdateRect(struct framebuffer_device_t* dev,
 
 static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
 {
-    if (private_handle_t::validate(buffer) < 0)
-        return -EINVAL;
 
     fb_context_t* ctx = (fb_context_t*) dev;
 
     private_handle_t *hnd = static_cast<private_handle_t*>
-                            (const_cast<native_handle_t*>(buffer));
-
+            (const_cast<native_handle_t*>(buffer));
     private_module_t* m =
         reinterpret_cast<private_module_t*>(dev->common.module);
 
-
-    if (hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
-        genlock_lock_buffer(hnd, GENLOCK_READ_LOCK, GENLOCK_MAX_TIMEOUT);
-
-        if (m->currentBuffer) {
-            genlock_unlock_buffer(m->currentBuffer);
-            m->currentBuffer = 0;
-        }
-
-        const size_t offset = hnd->base - m->framebuffer->base;
-        // frame ready to be posted, signal so that hwc can update External
-        // display
-        pthread_mutex_lock(&m->fbPostLock);
-        m->currentOffset = offset;
-        m->fbPostDone = true;
-        pthread_cond_signal(&m->fbPostCond);
-        pthread_mutex_unlock(&m->fbPostLock);
-
-        m->info.activate = FB_ACTIVATE_VBL;
-        m->info.yoffset = offset / m->finfo.line_length;
+    if (hnd && hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
+        m->info.activate = FB_ACTIVATE_VBL | FB_ACTIVATE_FORCE;
+        m->info.yoffset = hnd->offset / m->finfo.line_length;
         if (ioctl(m->framebuffer->fd, FBIOPUT_VSCREENINFO, &m->info) == -1) {
-            ALOGE("FBIOPUT_VSCREENINFO failed");
-            genlock_unlock_buffer(hnd);
+            ALOGE("%s: FBIOPUT_VSCREENINFO failed for external, err: %s", __FUNCTION__,
+                    strerror(errno));
             return -errno;
         }
-
-        //Signals the composition thread to unblock and loop over if necessary
-        pthread_mutex_lock(&m->fbPanLock);
-        m->fbPanDone = true;
-        pthread_cond_signal(&m->fbPanCond);
-        pthread_mutex_unlock(&m->fbPanLock);
-
-        CALC_FPS();
-        m->currentBuffer = hnd;
     }
     return 0;
 }
@@ -387,7 +358,9 @@ static int fb_close(struct hw_device_t *dev)
 {
     fb_context_t* ctx = (fb_context_t*)dev;
     if (ctx) {
-        free(ctx);
+        //Hack until fbdev is removed. Framework could close this causing hwc a
+        //pain.
+        //free(ctx);
     }
     return 0;
 }

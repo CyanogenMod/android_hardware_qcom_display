@@ -17,7 +17,6 @@
 
 #include "hwc_extonly.h"
 #include "external.h"
-#include "hwc_qbuf.h"
 
 namespace qhwc {
 
@@ -130,8 +129,6 @@ bool ExtOnly::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list)
     private_handle_t *hnd = (private_handle_t *)
             list->hwLayers[sExtIndex].handle;
 
-    // Lock this buffer for read.
-    ctx->qbuf->lockAndAdd(hnd);
     bool ret = true;
     overlay::Overlay& ov = *(ctx->mOverlay);
     ovutils::eOverlayState state = ov.getState();

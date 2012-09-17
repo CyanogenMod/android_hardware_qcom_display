@@ -60,25 +60,25 @@ void UIMirrorOverlay::reset() {
 }
 
 //Prepare the overlay for the UI mirroring
-bool UIMirrorOverlay::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
+bool UIMirrorOverlay::prepare(hwc_context_t *ctx, hwc_layer_1_t *fblayer) {
     sState = ovutils::OV_CLOSED;
     sIsUiMirroringOn = false;
 
     if(!ctx->mMDP.hasOverlay) {
-       ALOGD_IF(HWC_UI_MIRROR, "%s, this hw doesnt support mirroring",
-                                                               __FUNCTION__);
+        ALOGD_IF(HWC_UI_MIRROR, "%s, this hw doesnt support mirroring",
+                __FUNCTION__);
        return false;
     }
-    // If external display is connected
-    if(ctx->mExtDisplay->getExternalDisplay()) {
+    // If external display is active
+    if(isExternalActive(ctx)) {
         sState = ovutils::OV_UI_MIRROR;
-        configure(ctx, list);
+        configure(ctx, fblayer);
     }
     return sIsUiMirroringOn;
 }
 
 // Configure
-bool UIMirrorOverlay::configure(hwc_context_t *ctx, hwc_display_contents_1_t *list)
+bool UIMirrorOverlay::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
 {
     if (LIKELY(ctx->mOverlay)) {
         overlay::Overlay& ov = *(ctx->mOverlay);
@@ -86,14 +86,8 @@ bool UIMirrorOverlay::configure(hwc_context_t *ctx, hwc_display_contents_1_t *li
         ov.setState(sState);
         framebuffer_device_t *fbDev = ctx->mFbDev;
         if(fbDev) {
-            private_module_t* m = reinterpret_cast<private_module_t*>(
-                    fbDev->common.module);
-            int alignedW = ALIGN_TO(m->info.xres, 32);
-
-            private_handle_t const* hnd =
-                    reinterpret_cast<private_handle_t const*>(m->framebuffer);
-            unsigned int size = hnd->size/m->numBuffers;
-            ovutils::Whf info(alignedW, hnd->height, hnd->format, size);
+            private_handle_t *hnd = (private_handle_t *)layer->handle;
+            ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
             // Determine the RGB pipe for UI depending on the state
             ovutils::eDest dest = ovutils::OV_PIPE_ALL;
             if (sState == ovutils::OV_2D_TRUE_UI_MIRROR) {
@@ -118,21 +112,26 @@ bool UIMirrorOverlay::configure(hwc_context_t *ctx, hwc_display_contents_1_t *li
             ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
             ov.setSource(pargs, dest);
 
+            hwc_rect_t sourceCrop = layer->sourceCrop;
             // x,y,w,h
-            ovutils::Dim dcrop(0, 0, m->info.xres, m->info.yres);
+            ovutils::Dim dcrop(sourceCrop.left, sourceCrop.top,
+                sourceCrop.right - sourceCrop.left,
+                sourceCrop.bottom - sourceCrop.top);
             ov.setCrop(dcrop, dest);
+
             //Get the current orientation on primary panel
             int transform = getDeviceOrientation();
             ovutils::eTransform orient =
                     static_cast<ovutils::eTransform>(transform);
             ov.setTransform(orient, dest);
 
-            ovutils::Dim dim;
-            dim.x = 0;
-            dim.y = 0;
-            dim.w = m->info.xres;
-            dim.h = m->info.yres;
-            ov.setPosition(dim, dest);
+            hwc_rect_t displayFrame = layer->displayFrame;
+            ovutils::Dim dpos(displayFrame.left,
+                displayFrame.top,
+                displayFrame.right - displayFrame.left,
+                displayFrame.bottom - displayFrame.top);
+            ov.setPosition(dpos, dest);
+
             if (!ov.commit(dest)) {
                 ALOGE("%s: commit fails", __FUNCTION__);
                 return false;
@@ -143,7 +142,7 @@ bool UIMirrorOverlay::configure(hwc_context_t *ctx, hwc_display_contents_1_t *li
     return sIsUiMirroringOn;
 }
 
-bool UIMirrorOverlay::draw(hwc_context_t *ctx)
+bool UIMirrorOverlay::draw(hwc_context_t *ctx, hwc_layer_1_t *layer)
 {
     if(!sIsUiMirroringOn) {
         return true;
@@ -156,17 +155,21 @@ bool UIMirrorOverlay::draw(hwc_context_t *ctx)
     if(fbDev) {
         private_module_t* m = reinterpret_cast<private_module_t*>(
                               fbDev->common.module);
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
         switch (state) {
             case ovutils::OV_UI_MIRROR:
-                if (!ov.queueBuffer(m->framebuffer->fd, m->currentOffset,
-                                                           ovutils::OV_PIPE0)) {
+                //TODO why is this primary fd
+                if (!ov.queueBuffer(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd,
+                            hnd->offset,  //div by line_length like in PAN?
+                            ovutils::OV_PIPE0)) {
                     ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
                     ret = false;
                 }
                 break;
             case ovutils::OV_2D_TRUE_UI_MIRROR:
-                if (!ov.queueBuffer(m->framebuffer->fd, m->currentOffset,
-                                                           ovutils::OV_PIPE2)) {
+                if (!ov.queueBuffer(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd,
+                            hnd->offset,
+                            ovutils::OV_PIPE2)) {
                     ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
                     ret = false;
                 }

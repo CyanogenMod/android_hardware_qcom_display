@@ -30,27 +30,13 @@ namespace qhwc {
 
 class ExternalDisplay
 {
-    //Type of external display -  OFF, HDMI, WFD
-    enum external_display_type {
-        EXT_TYPE_NONE,
-        EXT_TYPE_HDMI,
-        EXT_TYPE_WIFI
-    };
-
-    // Mirroring state
-    enum external_mirroring_state {
-        EXT_MIRRORING_OFF,
-        EXT_MIRRORING_ON,
-    };
 public:
     ExternalDisplay(hwc_context_t* ctx);
     ~ExternalDisplay();
     int getModeCount() const;
     void getEDIDModes(int *out) const;
-    int getExternalDisplay() const;
     void setExternalDisplay(int connected);
-    bool commit();
-    int enableHDMIVsync(int enable);
+    bool post();
     void setHPD(uint32_t startEnd);
     void setEDIDMode(int resMode);
     void setActionSafeDimension(int w, int h);
@@ -67,6 +53,8 @@ private:
     int getModeOrder(int mode);
     int getBestMode();
     void resetInfo();
+    void setDpyAttr();
+    void getAttrForMode(int& width, int& height, int& fps);
 
     mutable android::Mutex mExtDispLock;
     int mFd;

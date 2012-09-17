@@ -17,7 +17,6 @@
  */
 
 #include "hwc_mdpcomp.h"
-#include "hwc_qbuf.h"
 #include "external.h"
 
 #define SUPPORT_4LAYER 0
@@ -332,23 +331,16 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_layer_1_t *layer,
  * 5. Overlay in use
  */
 
-bool MDPComp::is_doable(hwc_composer_device_1_t *dev,
-                        hwc_display_contents_1_t* list) {
-    hwc_context_t* ctx = (hwc_context_t*)(dev);
-
-    if(!ctx) {
-        ALOGE("%s: hwc context is NULL", __FUNCTION__);
-        return false;
-    }
-
+bool MDPComp::is_doable(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     //Number of layers
-    if(list->numHwLayers < 1 || list->numHwLayers > (uint32_t)sMaxLayers) {
+    int numAppLayers = ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers;
+    if(numAppLayers < 1 || numAppLayers > (uint32_t)sMaxLayers) {
         ALOGD_IF(isDebug(), "%s: Unsupported number of layers",__FUNCTION__);
         return false;
     }
 
     //Disable MDPComp when ext display connected
-    if(ctx->mExtDisplay->getExternalDisplay()) {
+    if(isExternalActive(ctx)) {
         ALOGD_IF(isDebug(), "%s: External display connected.", __FUNCTION__);
         return false;
     }
@@ -360,7 +352,7 @@ bool MDPComp::is_doable(hwc_composer_device_1_t *dev,
     }
 
     //MDP composition is not efficient if rotation is needed.
-    for(unsigned int i = 0; i < list->numHwLayers; ++i) {
+    for(int i = 0; i < numAppLayers; ++i) {
         if(list->hwLayers[i].transform) {
                 ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
                 return false;
@@ -410,10 +402,11 @@ void MDPComp::get_layer_info(hwc_layer_1_t* layer, int& flags) {
     }
 }
 
-int MDPComp::mark_layers(hwc_display_contents_1_t* list, layer_mdp_info* layer_info,
-                                                    frame_info& current_frame) {
+int MDPComp::mark_layers(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list, layer_mdp_info* layer_info,
+        frame_info& current_frame) {
 
-    int layer_count = list->numHwLayers;
+    int layer_count = ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers;
 
     if(layer_count > sMaxLayers) {
         if(!sPipeMgr.req_for_pipe(PIPE_REQ_FB)) {
@@ -476,10 +469,11 @@ void MDPComp::reset_layer_mdp_info(layer_mdp_info* layer_info, int count) {
     }
 }
 
-bool MDPComp::alloc_layer_pipes(hwc_display_contents_1_t* list,
-                        layer_mdp_info* layer_info, frame_info& current_frame) {
+bool MDPComp::alloc_layer_pipes(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list,
+        layer_mdp_info* layer_info, frame_info& current_frame) {
 
-    int layer_count = list->numHwLayers;
+    int layer_count = ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers;
     int mdp_count = current_frame.count;
     int fallback_count = layer_count - mdp_count;
     int frame_pipe_count = 0;
@@ -518,10 +512,10 @@ bool MDPComp::alloc_layer_pipes(hwc_display_contents_1_t* list,
 }
 
 //returns array of layers and their allocated pipes
-bool MDPComp::parse_and_allocate(hwc_context_t* ctx, hwc_display_contents_1_t* list,
-                                                  frame_info& current_frame ) {
+bool MDPComp::parse_and_allocate(hwc_context_t* ctx,
+        hwc_display_contents_1_t* list, frame_info& current_frame ) {
 
-    int layer_count = list->numHwLayers;
+    int layer_count = ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers;
 
     /* clear pipe status */
     sPipeMgr.reset();
@@ -532,7 +526,7 @@ bool MDPComp::parse_and_allocate(hwc_context_t* ctx, hwc_display_contents_1_t* l
     reset_layer_mdp_info(bp_layer_info, layer_count);
 
     /* iterate through layer list to mark candidate */
-    if(mark_layers(list, bp_layer_info, current_frame) == MDPCOMP_ABORT) {
+    if(mark_layers(ctx, list, bp_layer_info, current_frame) == MDPCOMP_ABORT) {
         free(bp_layer_info);
         current_frame.count = 0;
         ALOGE_IF(isDebug(), "%s:mark_layers failed!!", __FUNCTION__);
@@ -542,7 +536,7 @@ bool MDPComp::parse_and_allocate(hwc_context_t* ctx, hwc_display_contents_1_t* l
                           malloc(sizeof(pipe_layer_pair) * current_frame.count);
 
     /* allocate MDP pipes for marked layers */
-    alloc_layer_pipes( list, bp_layer_info, current_frame);
+    alloc_layer_pipes(ctx, list, bp_layer_info, current_frame);
 
     free(bp_layer_info);
     return true;
@@ -586,7 +580,7 @@ int MDPComp::configure_var_pipe(hwc_context_t* ctx) {
 
 bool MDPComp::setup(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
     int nPipeIndex, vsync_wait, isFG;
-    int numHwLayers = list->numHwLayers;
+    int numHwLayers = ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers;
 
     frame_info &current_frame = sCurrentFrame;
     current_frame.count = 0;
@@ -649,9 +643,6 @@ bool MDPComp::setup(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
 
 void MDPComp::unsetMDPCompLayerFlags(hwc_context_t* ctx, hwc_display_contents_1_t* list)
 {
-    if (!list)
-        return;
-
     for (int index = 0 ; index < sCurrentFrame.count; index++) {
         int l_index = sCurrentFrame.pipe_layer[index].layer_index;
         if(list->hwLayers[l_index].flags & HWC_MDPCOMP) {
@@ -678,7 +669,8 @@ int MDPComp::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
     overlay::Overlay& ov = *(ctx->mOverlay);
 
-    for(unsigned int i = 0; i < list->numHwLayers; i++ )
+    int numHwLayers = ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers;
+    for(int i = 0; i < numHwLayers; i++ )
     {
         hwc_layer_1_t *layer = &list->hwLayers[i];
 
@@ -718,10 +710,6 @@ int MDPComp::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                 ALOGE("%s handle null", __FUNCTION__);
                 return -1;
             }
-
-            //lock buffer before queue
-            //XXX: Handle lock failure
-            ctx->qbuf->lockAndAdd(hnd);
 
             ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
                                  using  pipe: %d", __FUNCTION__, layer,
@@ -793,17 +781,15 @@ bool MDPComp::init(hwc_context_t *dev) {
     return true;
 }
 
-bool MDPComp::configure(hwc_composer_device_1_t *dev,  hwc_display_contents_1_t* list) {
+bool MDPComp::configure(hwc_context_t *ctx,  hwc_display_contents_1_t* list) {
 
     if(!isEnabled()) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. not enabled.", __FUNCTION__);
         return false;
     }
 
-    hwc_context_t* ctx = (hwc_context_t*)(dev);
-
     bool isMDPCompUsed = true;
-    bool doable = is_doable(dev, list);
+    bool doable = is_doable(ctx, list);
 
     if(doable) {
         if(setup(ctx, list)) {

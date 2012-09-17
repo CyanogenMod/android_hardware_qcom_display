@@ -154,7 +154,7 @@ public:
     static bool deinit();
 
     /*sets up mdp comp for the current frame */
-    static bool configure(hwc_composer_device_1_t *ctx,  hwc_display_contents_1_t* list);
+    static bool configure(hwc_context_t *ctx,  hwc_display_contents_1_t* list);
 
     /* draw */
     static int draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
@@ -180,8 +180,7 @@ private:
                         mdp_pipe_info& mdp_info);
 
     /* checks for conditions where mdpcomp is not possible */
-    static bool is_doable(hwc_composer_device_1_t *dev,
-                          hwc_display_contents_1_t* list);
+    static bool is_doable(hwc_context_t *ctx, hwc_display_contents_1_t* list);
 
     static bool setup(hwc_context_t* ctx, hwc_display_contents_1_t* list);
 
@@ -189,8 +188,9 @@ private:
     static void get_layer_info(hwc_layer_1_t* layer, int& flags);
 
     /* iterates through layer list to choose candidate to use overlay */
-    static int  mark_layers(hwc_display_contents_1_t* list, layer_mdp_info* layer_info,
-                                                  frame_info& current_frame);
+    static int  mark_layers(hwc_context_t *ctx, hwc_display_contents_1_t* list,
+            layer_mdp_info* layer_info, frame_info& current_frame);
+
     static bool parse_and_allocate(hwc_context_t* ctx, hwc_display_contents_1_t* list,
                                                   frame_info& current_frame );
 
@@ -198,9 +198,10 @@ private:
     static void reset_layer_mdp_info(layer_mdp_info* layer_mdp_info,int count);
 
     /* allocates pipes to selected candidates */
-    static bool alloc_layer_pipes(hwc_display_contents_1_t* list,
-                                  layer_mdp_info* layer_info,
-                                  frame_info& current_frame);
+    static bool alloc_layer_pipes(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list,
+            layer_mdp_info* layer_info,
+            frame_info& current_frame);
     /* updates variable pipe mode for the current frame */
     static int  configure_var_pipe(hwc_context_t* ctx);
 
