@@ -14,10 +14,7 @@ LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := hwc.cpp          \
                                  hwc_video.cpp    \
                                  hwc_utils.cpp    \
-                                 hwc_uimirror.cpp \
                                  hwc_uevents.cpp  \
-                                 hwc_copybit.cpp  \
                                  hwc_mdpcomp.cpp  \
-                                 hwc_extonly.cpp
 
 include $(BUILD_SHARED_LIBRARY)

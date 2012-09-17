@@ -19,6 +19,7 @@
 #define HWC_UTILS_H
 
 #define HWC_REMOVE_DEPRECATED_VERSIONS 1
+#include <fcntl.h>
 #include <hardware/hwcomposer.h>
 #include <gralloc_priv.h>
 
@@ -44,7 +45,6 @@ namespace qhwc {
 //fwrd decl
 class QueuedBufferStore;
 class ExternalDisplay;
-class CopybitEngine;
 
 struct MDPInfo {
     int version;
@@ -52,16 +52,23 @@ struct MDPInfo {
     bool hasOverlay;
 };
 
-enum external_display_type {
-    EXT_TYPE_NONE,
-    EXT_TYPE_HDMI,
-    EXT_TYPE_WIFI
+struct DisplayAttributes {
+    uint32_t vsync_period; //nanos
+    uint32_t xres;
+    uint32_t yres;
+    uint32_t xdpi;
+    uint32_t ydpi;
+    int fd;
+    bool isActive;
 };
-enum HWCCompositionType {
-    HWC_USE_GPU = HWC_FRAMEBUFFER, // This layer is to be handled by
-                                   //                 Surfaceflinger
-    HWC_USE_OVERLAY = HWC_OVERLAY, // This layer is to be handled by the overlay
-    HWC_USE_COPYBIT                // This layer is to be handled by copybit
+
+struct ListStats {
+    int numAppLayers; //Total - 1, excluding FB layer.
+    int skipCount;
+    int fbLayerIndex; //Always last for now. = numAppLayers
+    //Video specific
+    int yuvCount;
+    int yuvIndex;
 };
 
 enum {
@@ -74,21 +81,18 @@ enum {
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_1_t const* l);
-void getLayerStats(hwc_context_t *ctx, const hwc_display_contents_1_t *list);
+void setListStats(hwc_context_t *ctx, const hwc_display_contents_1_t *list,
+        int dpy);
 void initContext(hwc_context_t *ctx);
 void closeContext(hwc_context_t *ctx);
 //Crops source buffer against destination and FB boundaries
 void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
         const int fbWidth, const int fbHeight);
 
-// Waits for the fb_post to be called
-void wait4fbPost(hwc_context_t* ctx);
-
-// Waits for the fb_post to finish PAN (primary commit)
-void wait4Pan(hwc_context_t* ctx);
+bool isExternalActive(hwc_context_t* ctx);
 
 //Sync point impl.
-int hwc_sync(hwc_display_contents_1_t* list);
+int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy);
 
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
@@ -134,6 +138,16 @@ inline void getLayerResolution(const hwc_layer_1_t* layer,
     width = displayFrame.right - displayFrame.left;
     height = displayFrame.bottom - displayFrame.top;
 }
+
+static inline int openFb(int dpy) {
+    int fd = -1;
+    const char *devtmpl = "/dev/graphics/fb%u";
+    char name[64] = {0};
+    snprintf(name, 64, devtmpl, dpy);
+    fd = open(name, O_RDWR);
+    return fd;
+}
+
 }; //qhwc namespace
 
 // -----------------------------------------------------------------------------
@@ -144,19 +158,12 @@ struct hwc_context_t {
     const hwc_procs_t* proc;
     int numHwLayers;
     int overlayInUse;
-    hwc_display_t dpys[MAX_NUM_DISPLAYS];
 
     //Framebuffer device
     framebuffer_device_t *mFbDev;
 
-    //Copybit Engine
-    qhwc::CopybitEngine* mCopybitEngine;
-
     //Overlay object - NULL for non overlay devices
     overlay::Overlay *mOverlay;
-
-    //QueuedBufferStore to hold buffers for overlay
-    qhwc::QueuedBufferStore *qbuf;
 
     //QService object
     qService::QService *mQService;
@@ -166,7 +173,9 @@ struct hwc_context_t {
 
     qhwc::MDPInfo mMDP;
 
-    bool isPoweredDown;
+    qhwc::DisplayAttributes dpyAttr[HWC_NUM_DISPLAY_TYPES];
+
+    qhwc::ListStats listStats[HWC_NUM_DISPLAY_TYPES];
 
     //Securing in progress indicator
     bool mSecuring;

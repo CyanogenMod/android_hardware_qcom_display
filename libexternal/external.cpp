@@ -94,11 +94,6 @@ void ExternalDisplay::getEDIDModes(int *out) const {
     }
 }
 
-int ExternalDisplay::getExternalDisplay() const {
-    Mutex::Autolock lock(mExtDispLock);
-    return mExternalDisplay;
-}
-
 ExternalDisplay::~ExternalDisplay()
 {
     closeFrameBuffer();
@@ -249,6 +244,9 @@ bool ExternalDisplay::openFramebuffer()
         if (mFd < 0)
             ALOGE("%s: /dev/graphics/fb1 not available", __FUNCTION__);
     }
+    if(mHwcContext) {
+        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].fd = mFd;
+    }
     return (mFd > 0);
 }
 
@@ -258,6 +256,9 @@ bool ExternalDisplay::closeFrameBuffer()
     if(mFd > 0) {
         ret = close(mFd);
         mFd = -1;
+    }
+    if(mHwcContext) {
+        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].fd = mFd;
     }
     return (ret == 0);
 }
@@ -411,11 +412,10 @@ void ExternalDisplay::setExternalDisplay(int connected)
             //Get the best mode and set
             // TODO: DO NOT call this for WFD
             setResolution(getBestMode());
+            setDpyAttr();
             //enable hdmi vsync
-            enableHDMIVsync(connected);
         } else {
             // Disable the hdmi vsync
-            enableHDMIVsync(connected);
             closeFrameBuffer();
             resetInfo();
         }
@@ -424,9 +424,9 @@ void ExternalDisplay::setExternalDisplay(int connected)
         const char* prop = (connected) ? "1" : "0";
         // set system property
         property_set("hw.hdmiON", prop);
-        /* Trigger redraw */
-        ALOGD_IF(DEBUG, "%s: Invalidate !!", __FUNCTION__);
-        ctx->proc->invalidate(ctx->proc);
+        //Inform SF
+        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
+        ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL, connected);
     }
     return;
 }
@@ -458,7 +458,7 @@ bool ExternalDisplay::writeHPDOption(int userOption) const
     return ret;
 }
 
-bool ExternalDisplay::commit()
+bool ExternalDisplay::post()
 {
     if(mFd == -1) {
         return false;
@@ -470,16 +470,73 @@ bool ExternalDisplay::commit()
     return true;
 }
 
-int ExternalDisplay::enableHDMIVsync(int enable)
-{
-    if(mFd > 0) {
-        int ret = ioctl(mFd, MSMFB_OVERLAY_VSYNC_CTRL, &enable);
-        if (ret<0) {
-            ALOGE("%s: enabling HDMI vsync failed, str: %s", __FUNCTION__,
-                                                            strerror(errno));
-        }
+void ExternalDisplay::setDpyAttr() {
+    int width = 0, height = 0, fps = 0;
+    getAttrForMode(width, height, fps);
+    if(mHwcContext) {
+        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = width;
+        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = height;
+        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].vsync_period = 1000000000l /
+        fps;
     }
-    return -errno;
+}
+
+void ExternalDisplay::getAttrForMode(int& width, int& height,
+int& fps) {
+    switch (mCurrentMode) {
+        case m640x480p60_4_3:
+            width = 640;
+            height = 480;
+            fps = 60;
+            break;
+        case m720x480p60_4_3:
+        case m720x480p60_16_9:
+            width = 720;
+            height = 480;
+            fps = 60;
+            break;
+        case m720x576p50_4_3:
+        case m720x576p50_16_9:
+            width = 720;
+            height = 576;
+            fps = 50;
+            break;
+        case m1280x720p50_16_9:
+            width = 1280;
+            height = 720;
+            fps = 50;
+            break;
+        case m1280x720p60_16_9:
+            width = 1280;
+            height = 720;
+            fps = 60;
+            break;
+        case m1920x1080p24_16_9:
+            width = 1920;
+            height = 1080;
+            fps = 24;
+            break;
+        case m1920x1080p25_16_9:
+            width = 1920;
+            height = 1080;
+            fps = 25;
+            break;
+        case m1920x1080p30_16_9:
+            width = 1920;
+            height = 1080;
+            fps = 30;
+            break;
+        case m1920x1080p50_16_9:
+            width = 1920;
+            height = 1080;
+            fps = 50;
+            break;
+        case m1920x1080p60_16_9:
+            width = 1920;
+            height = 1080;
+            fps = 60;
+            break;
+    }
 }
 
 };

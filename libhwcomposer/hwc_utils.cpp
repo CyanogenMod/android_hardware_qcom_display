@@ -23,11 +23,8 @@
 #include "hwc_utils.h"
 #include "mdp_version.h"
 #include "hwc_video.h"
-#include "hwc_qbuf.h"
-#include "hwc_copybit.h"
 #include "external.h"
 #include "hwc_mdpcomp.h"
-#include "hwc_extonly.h"
 #include "QService.h"
 
 namespace qhwc {
@@ -38,6 +35,16 @@ static void openFramebufferDevice(hwc_context_t *ctx)
     hw_module_t const *module;
     if (hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &module) == 0) {
         framebuffer_open(module, &(ctx->mFbDev));
+        private_module_t* m = reinterpret_cast<private_module_t*>(
+                ctx->mFbDev->common.module);
+        //xres, yres may not be 32 aligned
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres = m->info.xres;
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres = m->info.yres;
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xdpi = ctx->mFbDev->xdpi;
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].ydpi = ctx->mFbDev->ydpi;
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period =
+                1000000000l / ctx->mFbDev->fps;
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd = openFb(HWC_DISPLAY_PRIMARY);
     }
 }
 
@@ -46,12 +53,10 @@ void initContext(hwc_context_t *ctx)
     openFramebufferDevice(ctx);
     ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->mQService = qService::QService::getInstance(ctx);
-    ctx->qbuf = new QueuedBufferStore();
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
     ctx->mExtDisplay = new ExternalDisplay(ctx);
-    memset(ctx->dpys,(int)EGL_NO_DISPLAY, MAX_NUM_DISPLAYS);
     MDPComp::init(ctx);
 
     ALOGI("Initializing Qualcomm Hardware Composer");
@@ -65,19 +70,11 @@ void closeContext(hwc_context_t *ctx)
         ctx->mOverlay = NULL;
     }
 
-    if(ctx->mCopybitEngine) {
-        delete ctx->mCopybitEngine;
-        ctx->mCopybitEngine = NULL;
-    }
-
     if(ctx->mFbDev) {
         framebuffer_close(ctx->mFbDev);
         ctx->mFbDev = NULL;
-    }
-
-    if(ctx->qbuf) {
-        delete ctx->qbuf;
-        ctx->qbuf = NULL;
+        close(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd);
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd = -1;
     }
 
     if(ctx->mExtDisplay) {
@@ -101,56 +98,28 @@ void dumpLayer(hwc_layer_1_t const* l)
           l->displayFrame.bottom);
 }
 
-void getLayerStats(hwc_context_t *ctx, const hwc_display_contents_1_t *list)
-{
-    //Video specific stats
-    int yuvCount = 0;
-    int yuvLayerIndex = -1;
-    bool isYuvLayerSkip = false;
-    int skipCount = 0;
-    int ccLayerIndex = -1; //closed caption
-    int extLayerIndex = -1; //ext-only or block except closed caption
-    int extCount = 0; //ext-only except closed caption
-    bool isExtBlockPresent = false; //is BLOCK layer present
-    bool yuvSecure = false;
+void setListStats(hwc_context_t *ctx,
+        const hwc_display_contents_1_t *list, int dpy) {
+
+    ctx->listStats[dpy].numAppLayers = list->numHwLayers - 1;
+    ctx->listStats[dpy].fbLayerIndex = list->numHwLayers - 1;
 
     for (size_t i = 0; i < list->numHwLayers; i++) {
         private_handle_t *hnd =
             (private_handle_t *)list->hwLayers[i].handle;
 
-        if (UNLIKELY(isYuvBuffer(hnd))) {
-            yuvCount++;
-            yuvLayerIndex = i;
-            yuvSecure = isSecureBuffer(hnd);
-            //Animating
-            //Do not mark as SKIP if it is secure buffer
-            if (isSkipLayer(&list->hwLayers[i]) && !yuvSecure) {
-                isYuvLayerSkip = true;
-                skipCount++;
-            }
-        } else if(UNLIKELY(isExtCC(hnd))) {
-            ccLayerIndex = i;
-        } else if(UNLIKELY(isExtBlock(hnd))) {
-            extCount++;
-            extLayerIndex = i;
-            isExtBlockPresent = true;
-        } else if(UNLIKELY(isExtOnly(hnd))) {
-            extCount++;
-            //If BLOCK layer present, dont cache index, display BLOCK only.
-            if(isExtBlockPresent == false) extLayerIndex = i;
+        if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
+            continue;
+        //We disregard FB being skip for now! so the else if
         } else if (isSkipLayer(&list->hwLayers[i])) {
-            skipCount++;
+            ctx->listStats[dpy].skipCount++;
+        }
+
+        if (UNLIKELY(isYuvBuffer(hnd))) {
+            ctx->listStats[dpy].yuvCount++;
+            ctx->listStats[dpy].yuvIndex = i;
         }
     }
-
-    VideoOverlay::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip,
-            ccLayerIndex);
-    ExtOnly::setStats(extCount, extLayerIndex, isExtBlockPresent);
-    CopyBit::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip);
-    MDPComp::setStats(skipCount);
-
-    ctx->numHwLayers = list->numHwLayers;
-    return;
 }
 
 //Crops source buffer against destination and FB boundaries
@@ -209,41 +178,15 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
     }
 }
 
-void wait4fbPost(hwc_context_t* ctx) {
-    framebuffer_device_t *fbDev = ctx->mFbDev;
-    if(fbDev) {
-        private_module_t* m = reinterpret_cast<private_module_t*>(
-                              fbDev->common.module);
-        //wait for the fb_post to be called
-        pthread_mutex_lock(&m->fbPostLock);
-        while(m->fbPostDone == false) {
-            pthread_cond_wait(&(m->fbPostCond), &(m->fbPostLock));
-        }
-        m->fbPostDone = false;
-        pthread_mutex_unlock(&m->fbPostLock);
-    }
+bool isExternalActive(hwc_context_t* ctx) {
+    return ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive;
 }
 
-void wait4Pan(hwc_context_t* ctx) {
-    framebuffer_device_t *fbDev = ctx->mFbDev;
-    if(fbDev) {
-        private_module_t* m = reinterpret_cast<private_module_t*>(
-                              fbDev->common.module);
-        //wait for the fb_post's PAN to finish
-        pthread_mutex_lock(&m->fbPanLock);
-        while(m->fbPanDone == false) {
-            pthread_cond_wait(&(m->fbPanCond), &(m->fbPanLock));
-        }
-        m->fbPanDone = false;
-        pthread_mutex_unlock(&m->fbPanLock);
-    }
-}
-
-int hwc_sync(hwc_display_contents_1_t* list) {
+int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy) {
     int ret = 0;
 #ifdef USE_FENCE_SYNC
     struct mdp_buf_sync data;
-    int acquireFd[10];
+    int acquireFd[4];
     int count = 0;
     int releaseFd = -1;
     int fbFd = -1;
@@ -252,7 +195,8 @@ int hwc_sync(hwc_display_contents_1_t* list) {
     data.rel_fen_fd = &releaseFd;
     //Accumulate acquireFenceFds
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
-        if(list->hwLayers[i].compositionType == HWC_OVERLAY &&
+        if((list->hwLayers[i].compositionType == HWC_OVERLAY ||
+            list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) &&
             list->hwLayers[i].acquireFenceFd != -1) {
             acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
         }
@@ -260,13 +204,7 @@ int hwc_sync(hwc_display_contents_1_t* list) {
 
     if (count) {
         data.acq_fen_fd_cnt = count;
-
-        //Open fb0 for ioctl
-        fbFd = open("/dev/graphics/fb0", O_RDWR);
-        if (fbFd < 0) {
-            ALOGE("%s: /dev/graphics/fb0 not available", __FUNCTION__);
-            return -1;
-        }
+        fbFd = ctx->dpyAttr[dpy].fd;
 
         //Waits for acquire fences, returns a release fence
         ret = ioctl(fbFd, MSMFB_BUFFER_SYNC, &data);
@@ -274,22 +212,20 @@ int hwc_sync(hwc_display_contents_1_t* list) {
             ALOGE("ioctl MSMFB_BUFFER_SYNC failed, err=%s",
                     strerror(errno));
         }
-        close(fbFd);
 
         for(uint32_t i = 0; i < list->numHwLayers; i++) {
-            if(list->hwLayers[i].compositionType == HWC_OVERLAY) {
+            if((list->hwLayers[i].compositionType == HWC_OVERLAY ||
+                list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET)) {
                 //Close the acquireFenceFds
                 if(list->hwLayers[i].acquireFenceFd > 0) {
                     close(list->hwLayers[i].acquireFenceFd);
                     list->hwLayers[i].acquireFenceFd = -1;
                 }
                 //Populate releaseFenceFds.
-                if (releaseFd != -1)
-                    list->hwLayers[i].releaseFenceFd = dup(releaseFd);
+                list->hwLayers[i].releaseFenceFd = dup(releaseFd);
             }
         }
-        if (releaseFd != -1)
-            close(releaseFd);
+        list->retireFenceFd = releaseFd;
     }
 #endif
     return ret;
