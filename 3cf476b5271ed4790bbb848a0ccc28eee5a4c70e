@@ -1,0 +1,8 @@
+Change-Id: I3cf476b5271ed4790bbb848a0ccc28eee5a4c70e
+Code-Review+2: Steve Kondik <shade@chemlab.org>
+Verified+1: Steve Kondik <shade@chemlab.org>
+Submitted-by: Steve Kondik <shade@chemlab.org>
+Submitted-at: Tue, 18 Sep 2012 02:32:15 -0400
+Reviewed-on: http://review.cyanogenmod.com/23496
+Project: CyanogenMod/android_hardware_qcom_display
+Branch: refs/heads/jellybean
