@@ -150,10 +150,12 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
         ctx->qbuf->unlockAllPrevious();
         ALOGD("HWC Calling POWERDOWN ...");
         ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_POWERDOWN);
+        ALOGD("HWC Done POWERDOWN ...");
         ctx->isPoweredDown = true;
     } else {
         ALOGD("HWC Calling UNBLANK ...");
         ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_UNBLANK);
+        ALOGD("HWC Done UNBLANK ...");
         ctx->isPoweredDown = false;
     }
     return 0;
