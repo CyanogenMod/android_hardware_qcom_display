@@ -87,6 +87,9 @@ void wait4fbPost(hwc_context_t* ctx);
 // Waits for the fb_post to finish PAN (primary commit)
 void wait4Pan(hwc_context_t* ctx);
 
+//Sync point impl.
+int hwc_sync(hwc_display_contents_1_t* list);
+
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
     return (UNLIKELY(l && (l->flags & HWC_SKIP_LAYER)));

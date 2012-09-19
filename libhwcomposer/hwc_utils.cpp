@@ -238,4 +238,61 @@ void wait4Pan(hwc_context_t* ctx) {
         pthread_mutex_unlock(&m->fbPanLock);
     }
 }
+
+int hwc_sync(hwc_display_contents_1_t* list) {
+    int ret = 0;
+#ifdef USE_FENCE_SYNC
+    struct mdp_buf_sync data;
+    int acquireFd[10];
+    int count = 0;
+    int releaseFd = -1;
+    int fbFd = -1;
+    data.flags = 0;
+    data.acq_fen_fd = acquireFd;
+    data.rel_fen_fd = &releaseFd;
+    //Accumulate acquireFenceFds
+    for(uint32_t i = 0; i < list->numHwLayers; i++) {
+        if(list->hwLayers[i].compositionType == HWC_OVERLAY &&
+            list->hwLayers[i].acquireFenceFd != -1) {
+            acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
+        }
+    }
+
+    if (count) {
+        data.acq_fen_fd_cnt = count;
+
+        //Open fb0 for ioctl
+        fbFd = open("/dev/graphics/fb0", O_RDWR);
+        if (fbFd < 0) {
+            ALOGE("%s: /dev/graphics/fb0 not available", __FUNCTION__);
+            return -1;
+        }
+
+        //Waits for acquire fences, returns a release fence
+        ret = ioctl(fbFd, MSMFB_BUFFER_SYNC, &data);
+        if(ret < 0) {
+            ALOGE("ioctl MSMFB_BUFFER_SYNC failed, err=%s",
+                    strerror(errno));
+        }
+        close(fbFd);
+
+        for(uint32_t i = 0; i < list->numHwLayers; i++) {
+            if(list->hwLayers[i].compositionType == HWC_OVERLAY) {
+                //Close the acquireFenceFds
+                if(list->hwLayers[i].acquireFenceFd > 0) {
+                    close(list->hwLayers[i].acquireFenceFd);
+                    list->hwLayers[i].acquireFenceFd = -1;
+                }
+                //Populate releaseFenceFds.
+                if (releaseFd != -1)
+                    list->hwLayers[i].releaseFenceFd = dup(releaseFd);
+            }
+        }
+        if (releaseFd != -1)
+            close(releaseFd);
+    }
+#endif
+    return ret;
+}
+
 };//namespace
