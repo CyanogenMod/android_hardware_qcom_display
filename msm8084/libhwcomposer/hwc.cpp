@@ -209,6 +209,10 @@ static int hwc_set(hwc_composer_device_1 *dev,
             VideoOverlay::draw(ctx, list);
             ExtOnly::draw(ctx, list);
             MDPComp::draw(ctx, list);
+
+            //Sync TODO better error handling.
+            hwc_sync(list);
+
             EGLBoolean success = eglSwapBuffers((EGLDisplay)list->dpy,
                                                 (EGLSurface)list->sur);
             wait4fbPost(ctx);
