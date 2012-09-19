@@ -38,10 +38,6 @@
 
 #define GENLOCK_DEVICE "/dev/genlock"
 
-#ifndef USE_GENLOCK
-#define USE_GENLOCK
-#endif
-
 namespace {
 /* Internal function to map the userspace locks to the kernel lock types */
     int get_kernel_lock_type(genlock_lock_type lockType)
