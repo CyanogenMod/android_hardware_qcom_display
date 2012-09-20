@@ -431,7 +431,8 @@ static int stretch_copybit(
             int usage = GRALLOC_USAGE_PRIVATE_ADSP_HEAP |
                 GRALLOC_USAGE_PRIVATE_MM_HEAP;
 #else
-            int usage = GRALLOC_USAGE_PRIVATE_CAMERA_HEAP;
+            int usage =
+            GRALLOC_USAGE_PRIVATE_CAMERA_HEAP|GRALLOC_USAGE_PRIVATE_UNCACHED;
 #endif
             if (0 == alloc_buffer(&yv12_handle,src->w,src->h,
                                   src->format, usage)){

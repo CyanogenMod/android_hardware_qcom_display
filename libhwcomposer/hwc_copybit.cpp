@@ -352,7 +352,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_t *layer,
        int usage = GRALLOC_USAGE_PRIVATE_MM_HEAP;
 #ifdef QCOM_BSP
        if(dev->mMDP.version < 400)
-          usage = GRALLOC_USAGE_PRIVATE_CAMERA_HEAP;
+          usage = GRALLOC_USAGE_PRIVATE_CAMERA_HEAP|GRALLOC_USAGE_PRIVATE_UNCACHED;
 #endif
        if (0 == alloc_buffer(&tmpHnd, tmp_w, tmp_h, fbHandle->format, usage)){
             copybit_image_t tmp_dst;
