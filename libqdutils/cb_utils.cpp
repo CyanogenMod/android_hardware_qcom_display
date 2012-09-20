@@ -37,7 +37,7 @@ namespace qdutils {
 bool CBUtils::sGPUlayerpresent = 0;
 
 void CBUtils::checkforGPULayer(const hwc_layer_list_t* list) {
-    sGPUlayerpresent =  true;
+    sGPUlayerpresent =  false;
     for(uint32_t index = 0; index < list->numHwLayers; index++) {
         const hwc_layer_t* layer = &list->hwLayers[index];
         if(layer->compositionType == HWC_FRAMEBUFFER) {
