@@ -21,6 +21,7 @@
 #define DEBUG_COPYBIT 0
 #include <copybit.h>
 #include <genlock.h>
+#include <GLES/gl.h>
 #include "hwc_copybit.h"
 #include "comptype.h"
 #include "egl_handles.h"
@@ -190,6 +191,12 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list, EGLDispla
              __FUNCTION__);
         return -1;
     }
+
+    // Invoke a glFinish if we are rendering any layers using copybit.
+    // We call glFinish instead of locking the renderBuffer because the
+    // GPU could take longer than the genlock timeout value to complete
+    // rendering
+    glFinish();
 
     for (size_t i=0; i<list->numHwLayers; i++) {
         if (list->hwLayers[i].compositionType == HWC_USE_COPYBIT) {

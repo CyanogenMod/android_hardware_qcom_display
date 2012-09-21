@@ -7,7 +7,7 @@ LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL liboverlay libgenlock \
                                  libexternal libqdutils libhardware_legacy \
-                                 libdl libmemalloc libqservice
+                                 libdl libmemalloc libqservice libGLESv1_CM
 
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"hwcomposer\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
