@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2010 The Android Open Source Project
  * Copyright (C) 2012, The Linux Foundation. All rights reserved.
@@ -421,6 +422,8 @@ void ExternalDisplay::setExternalDisplay(int connected)
         }
         // Store the external display
         mExternalDisplay = connected;
+        ALOGD_IF(DEBUG, "In %s: mExternalDisplay = %d", __FUNCTION__,
+                                                         mExternalDisplay);
         const char* prop = (connected) ? "1" : "0";
         // set system property
         property_set("hw.hdmiON", prop);
@@ -461,12 +464,16 @@ bool ExternalDisplay::writeHPDOption(int userOption) const
     return ret;
 }
 
+/*
+ * commits the changes to the external display
+ * mExternalDisplay has the mixer number(1-> HDMI 2-> WFD)
+ */
 bool ExternalDisplay::post()
 {
     if(mFd == -1) {
         return false;
-    } else if(ioctl(mFd, FBIOPUT_VSCREENINFO, &mVInfo) == -1) {
-         ALOGE("%s: FBIOPUT_VSCREENINFO failed, str: %s", __FUNCTION__,
+    } else if(ioctl(mFd, MSMFB_OVERLAY_COMMIT, &mExternalDisplay) == -1) {
+         ALOGE("%s: MSMFB_OVERLAY_COMMIT failed, str: %s", __FUNCTION__,
                                                           strerror(errno));
          return false;
     }
