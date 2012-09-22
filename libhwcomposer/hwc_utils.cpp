@@ -70,6 +70,8 @@ void initContext(hwc_context_t *ctx)
     pthread_cond_init(&(ctx->vstate.cond), NULL);
     ctx->vstate.enable = false;
 
+    ctx->hdmi_pending = false;
+
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
     ALOGI("DYN composition threshold : %f", ctx->dynThreshold);
