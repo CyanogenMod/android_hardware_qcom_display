@@ -26,6 +26,7 @@
 #include <binder/IInterface.h>
 #include <binder/IPCThreadState.h>
 #include <utils/Errors.h>
+#include <private/android_filesystem_config.h>
 
 #include <IQService.h>
 
@@ -68,25 +69,32 @@ status_t BnQService::onTransact(
     // IPC should be from mediaserver only
     IPCThreadState* ipc = IPCThreadState::self();
     const int callerPid = ipc->getCallingPid();
+    const int callerUid = ipc->getCallingUid();
     const size_t MAX_BUF_SIZE = 1024;
-    const char *mediaServer = "/system/bin/mediaserver";
     char callingProcName[MAX_BUF_SIZE] = {0};
 
     getProcName(callerPid, callingProcName, MAX_BUF_SIZE);
-    if(strcmp(callingProcName, mediaServer) != 0 ) { //Some rogue process
-        ALOGE("No Permission:can't access display.qservice pid=%d process=%s",
-                callerPid, callingProcName);
-        return PERMISSION_DENIED;
-    }
+
+    const bool permission = (callerUid == AID_MEDIA);
 
     switch(code) {
         case SECURING: {
+            if(!permission) {
+                ALOGE("display.qservice SECURING access denied: pid=%d uid=%d process=%s",
+                      callerPid, callerUid, callingProcName);
+                return PERMISSION_DENIED;
+            }
             CHECK_INTERFACE(IQService, data, reply);
             uint32_t startEnd = data.readInt32();
             securing(startEnd);
             return NO_ERROR;
         } break;
         case UNSECURING: {
+            if(!permission) {
+                ALOGE("display.qservice UNSECURING access denied: pid=%d uid=%d process=%s",
+                      callerPid, callerUid, callingProcName);
+                return PERMISSION_DENIED;
+            }
             CHECK_INTERFACE(IQService, data, reply);
             uint32_t startEnd = data.readInt32();
             unsecuring(startEnd);
