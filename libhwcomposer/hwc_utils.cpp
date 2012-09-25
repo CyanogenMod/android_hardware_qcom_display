@@ -154,7 +154,6 @@ void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
                 //second video
                 pipLayerIndex = i;
             }
-            yuvLayerIndex = i;
             yuvSecure = isSecureBuffer(hnd);
             //Animating
             //Do not mark as SKIP if it is secure buffer
