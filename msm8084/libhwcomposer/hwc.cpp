@@ -27,6 +27,7 @@
 #include <mdp_version.h>
 #include "hwc_utils.h"
 #include "hwc_video.h"
+#include "hwc_uimirror.h"
 #include "external.h"
 #include "hwc_mdpcomp.h"
 
@@ -83,8 +84,12 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     if (LIKELY(list && list->numHwLayers)) {
+        uint32_t last = list->numHwLayers - 1;
+        hwc_layer_1_t *fblayer = &list->hwLayers[last];
         setListStats(ctx, list, HWC_DISPLAY_PRIMARY);
         if(VideoOverlay::prepare(ctx, list, HWC_DISPLAY_PRIMARY)) {
+            ctx->overlayInUse = true;
+        } else if(UIMirrorOverlay::prepare(ctx, fblayer)) {
             ctx->overlayInUse = true;
         } else if(MDPComp::configure(ctx, list)) {
             ctx->overlayInUse = true;
@@ -100,7 +105,7 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     if (LIKELY(list && list->numHwLayers)) {
-        setListStats(ctx, list, HWC_DISPLAY_EXTERNAL);
+        //setListStats(ctx, list, HWC_DISPLAY_EXTERNAL);
         //Nothing to do for now
     }
     return 0;
@@ -210,7 +215,7 @@ static int hwc_query(struct hwc_composer_device_1* dev,
         ALOGI("fps: %d", value[0]);
         break;
     case HWC_DISPLAY_TYPES_SUPPORTED:
-        //Enable later
+        //TODO Enable later
         //if(ctx->mMDP.hasOverlay)
             //supported |= HWC_DISPLAY_EXTERNAL_BIT;
         value[0] = supported;
@@ -226,10 +231,17 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if (LIKELY(list && list->numHwLayers)) {
         VideoOverlay::draw(ctx, list, HWC_DISPLAY_PRIMARY);
         MDPComp::draw(ctx, list);
+        uint32_t last = list->numHwLayers - 1;
+        hwc_layer_1_t *fblayer = &list->hwLayers[last];
+        if(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive) {
+            UIMirrorOverlay::draw(ctx, fblayer);
+        }
         hwc_sync(ctx, list, HWC_DISPLAY_PRIMARY);
+        if(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive) {
+            ctx->mExtDisplay->post();
+        }
         //TODO We dont check for SKIP flag on this layer because we need PAN
         //always. Last layer is always FB
-        uint32_t last = list->numHwLayers - 1;
         if(list->hwLayers[last].compositionType == HWC_FRAMEBUFFER_TARGET) {
             ctx->mFbDev->post(ctx->mFbDev, list->hwLayers[last].handle);
         }
@@ -240,7 +252,7 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 static int hwc_set_external(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
     if (LIKELY(list && list->numHwLayers)) {
-        hwc_sync(ctx, list, HWC_DISPLAY_EXTERNAL);
+        //hwc_sync(ctx, list, HWC_DISPLAY_EXTERNAL);
         uint32_t last = list->numHwLayers - 1;
         if(list->hwLayers[last].compositionType == HWC_FRAMEBUFFER_TARGET &&
             ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive) {
