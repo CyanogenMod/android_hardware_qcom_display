@@ -26,6 +26,7 @@
 #include <sys/prctl.h>
 #include <string.h>
 #include <stdlib.h>
+#include <fcntl.h>
 #include "hwc_utils.h"
 #include "hwc_external.h"
 
@@ -102,11 +103,48 @@ static void *uevent_loop(void *param)
     return NULL;
 }
 
+static void *vsync_loop(void *param)
+{
+    static char buf[4096];
+    int fb0_vsync_fd;
+    fd_set exceptfds;
+    int res;
+    int64_t timestamp = 0;
+    hwc_context_t * ctx = reinterpret_cast<hwc_context_t *>(param);
+    hwc_procs* proc = (hwc_procs*)ctx->device.reserved_proc[0];
+
+    fb0_vsync_fd = open("/sys/devices/virtual/graphics/fb0/vsync_time", O_RDONLY);
+    if (!fb0_vsync_fd)
+        return NULL;
+
+    char thread_name[64] = "hwcVsyncThread";
+    prctl(PR_SET_NAME, (unsigned long) &thread_name, 0, 0, 0);
+    setpriority(PRIO_PROCESS, 0, -20);
+    memset(buf, 0, sizeof(buf));
+
+    ALOGI("Using sysfs mechanism for VSYNC notification");
+
+    FD_ZERO(&exceptfds);
+    FD_SET(fb0_vsync_fd, &exceptfds);
+
+    do {
+        ssize_t len = read(fb0_vsync_fd, buf, sizeof(buf));
+        timestamp = strtoull(buf, NULL, 0);
+        proc->vsync(proc, 0, timestamp);
+        select(fb0_vsync_fd + 1, NULL, NULL, &exceptfds, NULL);
+        lseek(fb0_vsync_fd, 0, SEEK_SET);
+    } while (1);
+
+    return NULL;
+}
+
 void init_uevent_thread(hwc_context_t* ctx)
 {
     pthread_t uevent_thread;
+    pthread_t vsync_thread;
     ALOGI("Initializing UEvent Listener Thread");
     pthread_create(&uevent_thread, NULL, uevent_loop, (void*) ctx);
+    pthread_create(&vsync_thread, NULL, vsync_loop, (void*) ctx);
 }
 
 }; //namespace
