@@ -125,15 +125,20 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 
     for (uint32_t i = 0; i < numDisplays; i++) {
         hwc_display_contents_1_t *list = displays[i];
-        switch(i) {
-            case HWC_DISPLAY_PRIMARY:
-                ret = hwc_prepare_primary(dev, list);
-                break;
-            case HWC_DISPLAY_EXTERNAL:
-                ret = hwc_prepare_external(dev, list);
-                break;
-            default:
-                ret = -EINVAL;
+        if(list && list->numHwLayers) {
+            uint32_t last = list->numHwLayers - 1;
+            if(list->hwLayers[last].handle != NULL) {
+                switch(i) {
+                case HWC_DISPLAY_PRIMARY:
+                    ret = hwc_prepare_primary(dev, list);
+                    break;
+                case HWC_DISPLAY_EXTERNAL:
+                    ret = hwc_prepare_external(dev, list);
+                    break;
+                default:
+                    ret = -EINVAL;
+                }
+            }
         }
     }
     return ret;
