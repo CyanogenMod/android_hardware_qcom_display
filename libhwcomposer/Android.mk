@@ -16,5 +16,6 @@ LOCAL_SRC_FILES               := hwc.cpp          \
                                  hwc_utils.cpp    \
                                  hwc_uevents.cpp  \
                                  hwc_mdpcomp.cpp  \
+                                 hwc_uimirror.cpp \
 
 include $(BUILD_SHARED_LIBRARY)

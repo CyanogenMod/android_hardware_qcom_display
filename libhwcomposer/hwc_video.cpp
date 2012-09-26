@@ -65,9 +65,11 @@ void VideoOverlay::chooseState(hwc_context_t *ctx, int dpy,
     switch(dpy) {
         case HWC_DISPLAY_PRIMARY:
             if(ctx->listStats[dpy].yuvCount == 1) {
-                newState = ovutils::OV_2D_VIDEO_ON_PANEL;
+                newState = isExternalActive(ctx) ?
+                    ovutils::OV_2D_VIDEO_ON_PANEL_TV : ovutils::OV_2D_VIDEO_ON_PANEL;
                 if(isSkipLayer(yuvLayer) && !isSecureBuffer(hnd)) {
-                    newState = ovutils::OV_CLOSED;
+                    newState = isExternalActive(ctx) ?
+                        ovutils::OV_2D_VIDEO_ON_TV : ovutils::OV_CLOSED;
                 }
             }
             break;
@@ -237,6 +239,13 @@ bool VideoOverlay::configure(hwc_context_t *ctx, int dpy,
                 case ovutils::OV_2D_VIDEO_ON_PANEL:
                     ret &= configPrimVid(ctx, yuvLayer);
                     break;
+                case ovutils::OV_2D_VIDEO_ON_PANEL_TV:
+                    ret &= configPrimVid(ctx, yuvLayer);
+                    ret &= configExtVid(ctx, yuvLayer);
+                    break;
+                case ovutils::OV_2D_VIDEO_ON_TV:
+                    ret &= configExtVid(ctx, yuvLayer);
+                    break;
                 default:
                     return false;
             }
@@ -278,6 +287,24 @@ bool VideoOverlay::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
                     // Play primary
                     if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE0)) {
                         ALOGE("%s: queueBuffer failed for primary", __FUNCTION__);
+                        ret = false;
+                    }
+                    break;
+                case ovutils::OV_2D_VIDEO_ON_PANEL_TV:
+                    if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE0)) {
+                        ALOGE("%s: queueBuffer failed for primary", __FUNCTION__);
+                        ret = false;
+                    }
+                    // Play external
+                    if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE1)) {
+                        ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
+                        ret = false;
+                    }
+                    break;
+                case ovutils::OV_2D_VIDEO_ON_TV:
+                    // Play external
+                    if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE1)) {
+                        ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
                         ret = false;
                     }
                     break;

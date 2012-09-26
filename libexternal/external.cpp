@@ -426,7 +426,10 @@ void ExternalDisplay::setExternalDisplay(int connected)
         property_set("hw.hdmiON", prop);
         //Inform SF
         ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
-        ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL, connected);
+        //TODO remove invalidate send hotplug
+        //ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL, connected);
+        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = connected;
+        ctx->proc->invalidate(ctx->proc);
     }
     return;
 }
