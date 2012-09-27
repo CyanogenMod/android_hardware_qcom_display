@@ -275,6 +275,9 @@ static int hwc_set(hwc_composer_device_1 *dev,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    if(!ctx->overlayInUse)
+        ctx->mOverlay->setState(ovutils::OV_CLOSED);
+
     for (uint32_t i = 0; i < numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
         switch(i) {
@@ -286,9 +289,6 @@ static int hwc_set(hwc_composer_device_1 *dev,
                 ret = -EINVAL;
         }
     }
-    if(!ctx->overlayInUse)
-        ctx->mOverlay->setState(ovutils::OV_CLOSED);
-
     return ret;
 }
 
