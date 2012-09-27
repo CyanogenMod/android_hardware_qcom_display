@@ -235,6 +235,8 @@ static int hwc_query(struct hwc_composer_device_1* dev,
 static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if (LIKELY(list && list->numHwLayers)) {
         ctx->mFbDev->compositionComplete(ctx->mFbDev);
+        hwc_sync(ctx, list, HWC_DISPLAY_PRIMARY);
+
         VideoOverlay::draw(ctx, list, HWC_DISPLAY_PRIMARY);
         MDPComp::draw(ctx, list);
         uint32_t last = list->numHwLayers - 1;
@@ -242,7 +244,6 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         if(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive) {
             UIMirrorOverlay::draw(ctx, fblayer);
         }
-        hwc_sync(ctx, list, HWC_DISPLAY_PRIMARY);
         if(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive) {
             ctx->mExtDisplay->post();
         }
