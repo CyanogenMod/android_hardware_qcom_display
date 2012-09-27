@@ -56,8 +56,8 @@ struct DisplayAttributes {
     uint32_t vsync_period; //nanos
     uint32_t xres;
     uint32_t yres;
-    uint32_t xdpi;
-    uint32_t ydpi;
+    float xdpi;
+    float ydpi;
     int fd;
     bool isActive;
 };
