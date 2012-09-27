@@ -60,6 +60,9 @@ struct DisplayAttributes {
     float xdpi;
     float ydpi;
     int fd;
+    bool connected; //Applies only to pluggable disp.
+    //Connected does not mean it ready to use.
+    //It should be active also. (UNBLANKED)
     bool isActive;
 };
 
@@ -166,13 +169,13 @@ struct hwc_context_t {
     hwc_composer_device_1_t device;
     const hwc_procs_t* proc;
     int numHwLayers;
-    int overlayInUse;
+    int overlayInUse[HWC_NUM_DISPLAY_TYPES];
 
     //Framebuffer device
     framebuffer_device_t *mFbDev;
 
     //Overlay object - NULL for non overlay devices
-    overlay::Overlay *mOverlay;
+    overlay::Overlay *mOverlay[HWC_NUM_DISPLAY_TYPES];
 
     //QService object
     qService::QService *mQService;

@@ -402,6 +402,8 @@ enum eOverlayState{
     /* UI Mirroring */
     OV_UI_MIRROR,
     OV_2D_TRUE_UI_MIRROR,
+    /* Dual display with video */
+    OV_UI_VIDEO_TV,
 
     /* Composition Bypass */
     OV_BYPASS_1_LAYER,
@@ -648,6 +650,8 @@ inline const char* getStateString(eOverlayState state){
             return "OV_UI_MIRROR";
         case OV_2D_TRUE_UI_MIRROR:
             return "OV_2D_TRUE_UI_MIRROR";
+        case OV_UI_VIDEO_TV:
+            return "OV_UI_VIDEO_TV";
         case OV_BYPASS_1_LAYER:
             return "OV_BYPASS_1_LAYER";
         case OV_BYPASS_2_LAYER:

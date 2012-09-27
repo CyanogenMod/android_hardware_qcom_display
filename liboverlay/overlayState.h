@@ -145,6 +145,19 @@ template <> struct StateTraits<utils::OV_2D_VIDEO_ON_TV>
     typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
 };
 
+template <> struct StateTraits<utils::OV_UI_VIDEO_TV>
+{
+    typedef overlay::GenericPipe<utils::EXTERNAL> pipe0; //ext UI
+    typedef overlay::GenericPipe<utils::EXTERNAL> pipe1; //ext video
+    typedef overlay::NullPipe pipe2;
+
+    typedef Rotator rot0;
+    typedef Rotator rot1;
+    typedef NullRotator rot2;
+
+    typedef overlay::OverlayImpl<pipe0, pipe1, pipe2> ovimpl;
+};
+
 template <> struct StateTraits<utils::OV_3D_VIDEO_ON_2D_PANEL>
 {
     typedef overlay::M3DPrimaryPipe<utils::OV_PIPE0> pipe0;
@@ -199,7 +212,7 @@ template <> struct StateTraits<utils::OV_3D_VIDEO_ON_2D_PANEL_2D_TV>
 
 template <> struct StateTraits<utils::OV_UI_MIRROR>
 {
-    typedef overlay::UIMirrorPipe pipe0;
+    typedef overlay::GenericPipe<ovutils::EXTERNAL> pipe0; //Ext UI
     typedef overlay::NullPipe pipe1;   // place holder
     typedef overlay::NullPipe pipe2;   // place holder
 
@@ -212,9 +225,9 @@ template <> struct StateTraits<utils::OV_UI_MIRROR>
 
 template <> struct StateTraits<utils::OV_2D_TRUE_UI_MIRROR>
 {
-    typedef overlay::GenericPipe<utils::PRIMARY> pipe0;
+    typedef overlay::GenericPipe<utils::PRIMARY> pipe0; //Vid prim
     typedef overlay::VideoExtPipe pipe1;
-    typedef overlay::UIMirrorPipe pipe2;
+    typedef overlay::GenericPipe<ovutils::EXTERNAL> pipe2; //EXT UI
 
     typedef Rotator rot0;
     typedef Rotator rot1;
@@ -335,6 +348,9 @@ inline OverlayImplBase* OverlayState::handleEvent(utils::eOverlayState toState,
         case utils::OV_2D_TRUE_UI_MIRROR:
             newov = handle_from<utils::OV_2D_TRUE_UI_MIRROR>(toState, ov);
             break;
+        case utils::OV_UI_VIDEO_TV:
+            newov = handle_from<utils::OV_UI_VIDEO_TV>(toState, ov);
+            break;
         case utils::OV_BYPASS_1_LAYER:
             newov = handle_from<utils::OV_BYPASS_1_LAYER>(toState, ov);
             break;
@@ -390,6 +406,9 @@ inline OverlayImplBase* OverlayState::handle_from(utils::eOverlayState toState,
             break;
         case utils::OV_2D_TRUE_UI_MIRROR:
             ov = handle_from_to<FROM_STATE, utils::OV_2D_TRUE_UI_MIRROR>(ov);
+            break;
+        case utils::OV_UI_VIDEO_TV:
+            ov = handle_from_to<FROM_STATE, utils::OV_UI_VIDEO_TV>(ov);
             break;
         case utils::OV_BYPASS_1_LAYER:
             ov = handle_from_to<FROM_STATE, utils::OV_BYPASS_1_LAYER>(ov);
@@ -580,6 +599,69 @@ inline OverlayImplBase* OverlayState::handle_from_to<
     return newov;
 }
 
+/* Transition from OV_UI_MIRROR to OV_UI_VIDEO_TV */
+template<>
+inline OverlayImplBase* OverlayState::handle_from_to<
+        utils::OV_UI_MIRROR,
+        utils::OV_UI_VIDEO_TV>(
+        OverlayImplBase* ov) {
+    OVASSERT(ov, "%s: ov is null", __FUNCTION__);
+    ALOGD("FROM_STATE = %s TO_STATE = %s",
+            utils::getStateString(utils::OV_UI_MIRROR),
+            utils::getStateString(utils::OV_UI_VIDEO_TV));
+
+    // Create new ovimpl based on new state
+    typedef StateTraits<utils::OV_UI_VIDEO_TV> NewState;
+    OverlayImplBase* newov = new NewState::ovimpl;
+
+    //copy pipe0/rot0 (ext video)
+    newov->copyOvPipe(ov, utils::OV_PIPE0);
+
+    ov->closePipe(utils::OV_PIPE1);
+    RotatorBase* rot1 = new NewState::rot1;
+    newov->initPipe(rot1, utils::OV_PIPE1);
+
+    ov->closePipe(utils::OV_PIPE2);
+    RotatorBase* rot2 = new NewState::rot2;
+    newov->initPipe(rot2, utils::OV_PIPE2);
+
+    // All pipes are copied or deleted so no more need for previous ovimpl
+    delete ov;
+    ov = 0;
+    return newov;
+}
+
+/* Transition from OV_UI_VIDEO_TV to OV_UI_MIRROR */
+template<>
+inline OverlayImplBase* OverlayState::handle_from_to<
+        utils::OV_UI_VIDEO_TV,
+        utils::OV_UI_MIRROR>(
+        OverlayImplBase* ov) {
+    OVASSERT(ov, "%s: ov is null", __FUNCTION__);
+    ALOGD("FROM_STATE = %s TO_STATE = %s",
+            utils::getStateString(utils::OV_UI_VIDEO_TV),
+            utils::getStateString(utils::OV_UI_MIRROR));
+
+    // Create new ovimpl based on new state
+    typedef StateTraits<utils::OV_UI_MIRROR> NewState;
+    OverlayImplBase* newov = new NewState::ovimpl;
+
+    //copy pipe0/rot0 (ext video)
+    newov->copyOvPipe(ov, utils::OV_PIPE0);
+
+    ov->closePipe(utils::OV_PIPE1);
+    RotatorBase* rot1 = new NewState::rot1;
+    newov->initPipe(rot1, utils::OV_PIPE1);
+
+    ov->closePipe(utils::OV_PIPE2);
+    RotatorBase* rot2 = new NewState::rot2;
+    newov->initPipe(rot2, utils::OV_PIPE2);
+
+    // All pipes are copied or deleted so no more need for previous ovimpl
+    delete ov;
+    ov = 0;
+    return newov;
+}
 } // overlay
 
 #endif // OVERLAY_STATE_H
