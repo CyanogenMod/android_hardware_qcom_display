@@ -336,10 +336,10 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
             ALOGD("%s height = %d",__FUNCTION__, ctx->dpyAttr[disp].yres);
             break;
         case HWC_DISPLAY_DPI_X:
-            values[i] = ctx->dpyAttr[disp].xdpi;
+            values[i] = (int32_t) (ctx->dpyAttr[disp].xdpi*1000.0);
             break;
         case HWC_DISPLAY_DPI_Y:
-            values[i] = ctx->dpyAttr[disp].ydpi;
+            values[i] = (int32_t) (ctx->dpyAttr[disp].ydpi*1000.0);
             break;
         default:
             ALOGE("Unknown display attribute %d",
