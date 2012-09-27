@@ -234,6 +234,7 @@ static int hwc_query(struct hwc_composer_device_1* dev,
 
 static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if (LIKELY(list && list->numHwLayers)) {
+        ctx->mFbDev->compositionComplete(ctx->mFbDev);
         VideoOverlay::draw(ctx, list, HWC_DISPLAY_PRIMARY);
         MDPComp::draw(ctx, list);
         uint32_t last = list->numHwLayers - 1;
