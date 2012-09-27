@@ -194,7 +194,8 @@ bool configExtVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
             info,
             ovutils::ZORDER_0,
             isFgFlag,
-            ovutils::ROT_FLAG_DISABLED);
+            ovutils::ROT_FLAG_ENABLED); //TODO remove this hack when sync for
+            //ext is done
     ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
     ov.setSource(pargs, ovutils::OV_PIPE1);
 
