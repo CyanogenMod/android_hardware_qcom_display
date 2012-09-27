@@ -155,7 +155,9 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
 
         if (hnd->bufferType == BUFFER_TYPE_VIDEO) {
           //YUV layer, check, if copybit can be used
-          if (useCopybitForYUV) {
+          // mark the video layer to gpu when all layer is
+          // going to gpu in case of dynamic composition.
+          if (useCopybitForYUV && useCopybitForRGB) {
               list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
               sCopyBitDraw = true;
           }
