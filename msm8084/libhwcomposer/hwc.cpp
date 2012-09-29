@@ -176,6 +176,7 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
     switch(dpy) {
         case HWC_DISPLAY_PRIMARY:
             if(blank) {
+                Locker::Autolock _l(ctx->mBlankLock);
                 ctx->mOverlay->setState(ovutils::OV_CLOSED);
                 ret = ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_POWERDOWN);
             } else {
@@ -275,6 +276,7 @@ static int hwc_set(hwc_composer_device_1 *dev,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    Locker::Autolock _l(ctx->mBlankLock);
     if(!ctx->overlayInUse)
         ctx->mOverlay->setState(ovutils::OV_CLOSED);
 
