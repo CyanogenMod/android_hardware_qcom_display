@@ -21,6 +21,7 @@
 #define HWC_REMOVE_DEPRECATED_VERSIONS 1
 #include <fcntl.h>
 #include <hardware/hwcomposer.h>
+#include <gr.h>
 #include <gralloc_priv.h>
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
@@ -182,6 +183,9 @@ struct hwc_context_t {
 
     //Display in secure mode indicator
     bool mSecureMode;
+
+    //Lock to prevent set from being called while blanking
+    mutable Locker mBlankLock;
 };
 
 #endif //HWC_UTILS_H
