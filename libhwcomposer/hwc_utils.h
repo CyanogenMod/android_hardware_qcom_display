@@ -131,9 +131,11 @@ static inline bool isExtCC(const private_handle_t* hnd) {
 
 // Initialize uevent thread
 void init_uevent_thread(hwc_context_t* ctx);
+// Initialize vsync thread
+void init_vsync_thread(hwc_context_t* ctx);
 
 inline void getLayerResolution(const hwc_layer_1_t* layer,
-                                         int& width, int& height)
+                               int& width, int& height)
 {
     hwc_rect_t displayFrame  = layer->displayFrame;
     width = displayFrame.right - displayFrame.left;
@@ -150,6 +152,12 @@ static inline int openFb(int dpy) {
 }
 
 }; //qhwc namespace
+
+struct vsync_state {
+    pthread_mutex_t lock;
+    pthread_cond_t  cond;
+    bool enable;
+};
 
 // -----------------------------------------------------------------------------
 // HWC context
@@ -186,6 +194,9 @@ struct hwc_context_t {
 
     //Lock to prevent set from being called while blanking
     mutable Locker mBlankLock;
+    //Vsync
+    struct vsync_state vstate;
+
 };
 
 #endif //HWC_UTILS_H
