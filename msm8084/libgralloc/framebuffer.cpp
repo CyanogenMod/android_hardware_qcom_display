@@ -111,7 +111,8 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
     if (hnd && hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
         m->info.activate = FB_ACTIVATE_VBL | FB_ACTIVATE_FORCE;
         m->info.yoffset = hnd->offset / m->finfo.line_length;
-        if (ioctl(m->framebuffer->fd, FBIOPUT_VSCREENINFO, &m->info) == -1) {
+        m->commit.var = m->info;
+        if (ioctl(m->framebuffer->fd, MSMFB_DISPLAY_COMMIT, &m->commit) == -1) {
             ALOGE("%s: FBIOPUT_VSCREENINFO failed for external, err: %s", __FUNCTION__,
                     strerror(errno));
             return -errno;
@@ -151,6 +152,9 @@ int mapFrameBufferLocked(struct private_module_t* module)
     }
     if (fd < 0)
         return -errno;
+
+    memset(&module->fence, 0, sizeof(struct mdp_buf_fence));
+    memset(&module->commit, 0, sizeof(struct mdp_display_commit));
 
     struct fb_fix_screeninfo finfo;
     if (ioctl(fd, FBIOGET_FSCREENINFO, &finfo) == -1)
