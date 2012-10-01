@@ -32,9 +32,7 @@
 
 #include "memalloc.h"
 #include "gr.h"
-//#include <linux/ion.h>
-//XXX: Move to bionic
-#include "ion_msm.h"
+#include <linux/ion.h>
 
 namespace gralloc {
 
