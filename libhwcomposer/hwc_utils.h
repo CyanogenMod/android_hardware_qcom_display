@@ -56,8 +56,10 @@ enum external_display_type {
 };
 enum HWCCompositionType {
     HWC_USE_GPU = HWC_FRAMEBUFFER, // This layer is to be handled by
-                                   //                 Surfaceflinger
+                                   // Surfaceflinger
     HWC_USE_OVERLAY = HWC_OVERLAY, // This layer is to be handled by the overlay
+    HWC_USE_BACKGROUND
+                = HWC_BACKGROUND,  // This layer is to be handled by TBD
     HWC_USE_COPYBIT                // This layer is to be handled by copybit
 };
 
