@@ -191,7 +191,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
-        overlay::Overlay& ov = *(ctx->mOverlay);
+        overlay::Overlay& ov = *(ctx->mOverlay[HWC_DISPLAY_PRIMARY]);
 
         if(!hnd) {
             ALOGE("%s: layer handle is NULL", __FUNCTION__);
@@ -610,7 +610,7 @@ bool MDPComp::setup(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
     configure_var_pipe(ctx);
 #endif
 
-    overlay::Overlay& ov = *(ctx->mOverlay);
+    overlay::Overlay& ov = *(ctx->mOverlay[HWC_DISPLAY_PRIMARY]);
     ovutils::eOverlayState state = ov.getState();
 
     if (current_frame.count == 1) {
@@ -667,7 +667,7 @@ int MDPComp::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         return -1;
     }
 
-    overlay::Overlay& ov = *(ctx->mOverlay);
+    overlay::Overlay& ov = *(ctx->mOverlay[HWC_DISPLAY_PRIMARY]);
 
     int numHwLayers = ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers;
     for(int i = 0; i < numHwLayers; i++ )

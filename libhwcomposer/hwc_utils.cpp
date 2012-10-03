@@ -51,7 +51,10 @@ static void openFramebufferDevice(hwc_context_t *ctx)
 void initContext(hwc_context_t *ctx)
 {
     openFramebufferDevice(ctx);
-    ctx->mOverlay = overlay::Overlay::getInstance();
+    overlay::Overlay::initOverlay();
+    for(uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+        ctx->mOverlay[i] = overlay::Overlay::getInstance(i);
+    }
     ctx->mQService = qService::QService::getInstance(ctx);
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
@@ -69,9 +72,11 @@ void initContext(hwc_context_t *ctx)
 
 void closeContext(hwc_context_t *ctx)
 {
-    if(ctx->mOverlay) {
-        delete ctx->mOverlay;
-        ctx->mOverlay = NULL;
+    for(uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+        if(ctx->mOverlay[i]) {
+            delete ctx->mOverlay[i];
+            ctx->mOverlay[i] = NULL;
+        }
     }
 
     if(ctx->mFbDev) {
@@ -111,6 +116,9 @@ void setListStats(hwc_context_t *ctx,
 
     ctx->listStats[dpy].numAppLayers = list->numHwLayers - 1;
     ctx->listStats[dpy].fbLayerIndex = list->numHwLayers - 1;
+    ctx->listStats[dpy].yuvCount = 0;
+    ctx->listStats[dpy].yuvIndex = -1;
+    ctx->listStats[dpy].skipCount = 0;
 
     for (size_t i = 0; i < list->numHwLayers; i++) {
         private_handle_t *hnd =
@@ -198,7 +206,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy) {
     int count = 0;
     int releaseFd = -1;
     int fbFd = -1;
-    data.flags = 0;
+    data.flags = MDP_BUF_SYNC_FLAG_WAIT;
     data.acq_fen_fd = acquireFd;
     data.rel_fen_fd = &releaseFd;
     //Accumulate acquireFenceFds
