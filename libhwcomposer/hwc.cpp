@@ -86,18 +86,17 @@ static void reset(hwc_context_t *ctx, int numDisplays) {
 static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = false;
     if (LIKELY(list && list->numHwLayers)) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fblayer = &list->hwLayers[last];
         setListStats(ctx, list, HWC_DISPLAY_PRIMARY);
         if(VideoOverlay::prepare(ctx, list, HWC_DISPLAY_PRIMARY)) {
-            ctx->overlayInUse = true;
-        } else if(UIMirrorOverlay::prepare(ctx, fblayer)) {
-            ctx->overlayInUse = true;
+            ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = true;
         } else if(MDPComp::configure(ctx, list)) {
-            ctx->overlayInUse = true;
+            ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = true;
         } else {
-            ctx->overlayInUse = false;
+            ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = false;
         }
     }
     return 0;
@@ -107,9 +106,25 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    if (LIKELY(list && list->numHwLayers)) {
-        //setListStats(ctx, list, HWC_DISPLAY_EXTERNAL);
-        //Nothing to do for now
+    ctx->overlayInUse[HWC_DISPLAY_EXTERNAL] = false;
+
+    if (LIKELY(list && list->numHwLayers) &&
+        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive &&
+        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected) {
+
+        setListStats(ctx, list, HWC_DISPLAY_EXTERNAL);
+
+        uint32_t last = list->numHwLayers - 1;
+        hwc_layer_1_t *fblayer = &list->hwLayers[last];
+        if(UIMirrorOverlay::prepare(ctx, fblayer)) {
+            ctx->overlayInUse[HWC_DISPLAY_EXTERNAL] = true;
+        }
+
+        if(VideoOverlay::prepare(ctx, list, HWC_DISPLAY_EXTERNAL)) {
+            ctx->overlayInUse[HWC_DISPLAY_EXTERNAL] = true;
+        } else {
+            ctx->mOverlay[HWC_DISPLAY_EXTERNAL]->setState(ovutils::OV_UI_MIRROR);
+        }
     }
     return 0;
 }
@@ -119,7 +134,6 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    ctx->overlayInUse = false;
 
     reset(ctx, numDisplays);
 
@@ -200,7 +214,7 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
         case HWC_DISPLAY_PRIMARY:
             if(blank) {
                 Locker::Autolock _l(ctx->mBlankLock);
-                ctx->mOverlay->setState(ovutils::OV_CLOSED);
+                ctx->mOverlay[dpy]->setState(ovutils::OV_CLOSED);
                 ret = ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_POWERDOWN);
             } else {
                 ret = ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_UNBLANK);
@@ -244,9 +258,8 @@ static int hwc_query(struct hwc_composer_device_1* dev,
         ALOGI("fps: %d", value[0]);
         break;
     case HWC_DISPLAY_TYPES_SUPPORTED:
-        //TODO Enable later
-        //if(ctx->mMDP.hasOverlay)
-            //supported |= HWC_DISPLAY_EXTERNAL_BIT;
+        if(ctx->mMDP.hasOverlay)
+            supported |= HWC_DISPLAY_EXTERNAL_BIT;
         value[0] = supported;
         break;
     default:
@@ -257,24 +270,22 @@ static int hwc_query(struct hwc_composer_device_1* dev,
 }
 
 static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
+    if(!ctx->overlayInUse[HWC_DISPLAY_PRIMARY])
+        ctx->mOverlay[HWC_DISPLAY_PRIMARY]->setState(ovutils::OV_CLOSED);
+
     if (LIKELY(list && list->numHwLayers)) {
-        ctx->mFbDev->compositionComplete(ctx->mFbDev);
+        uint32_t last = list->numHwLayers - 1;
+        hwc_layer_1_t *fbLayer = &list->hwLayers[last];
+
         hwc_sync(ctx, list, HWC_DISPLAY_PRIMARY);
 
         VideoOverlay::draw(ctx, list, HWC_DISPLAY_PRIMARY);
         MDPComp::draw(ctx, list);
-        uint32_t last = list->numHwLayers - 1;
-        hwc_layer_1_t *fblayer = &list->hwLayers[last];
-        if(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive) {
-            UIMirrorOverlay::draw(ctx, fblayer);
-        }
-        if(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive) {
-            ctx->mExtDisplay->post();
-        }
+
         //TODO We dont check for SKIP flag on this layer because we need PAN
         //always. Last layer is always FB
         if(list->hwLayers[last].compositionType == HWC_FRAMEBUFFER_TARGET) {
-            ctx->mFbDev->post(ctx->mFbDev, list->hwLayers[last].handle);
+            ctx->mFbDev->post(ctx->mFbDev, fbLayer->handle);
         }
     }
     return 0;
@@ -282,15 +293,47 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
 static int hwc_set_external(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-    if (LIKELY(list && list->numHwLayers)) {
-        //hwc_sync(ctx, list, HWC_DISPLAY_EXTERNAL);
+
+    if(!ctx->overlayInUse[HWC_DISPLAY_EXTERNAL])
+        ctx->mOverlay[HWC_DISPLAY_EXTERNAL]->setState(ovutils::OV_CLOSED);
+
+    if (LIKELY(list && list->numHwLayers) &&
+        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive &&
+        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected) {
         uint32_t last = list->numHwLayers - 1;
-        if(list->hwLayers[last].compositionType == HWC_FRAMEBUFFER_TARGET &&
-            ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive) {
-            //ctx->mExtDisplay->post(list->hwLayers[last].handle);
+        hwc_layer_1_t *fbLayer = &list->hwLayers[last];
+
+        hwc_sync(ctx, list, HWC_DISPLAY_EXTERNAL);
+
+        VideoOverlay::draw(ctx, list, HWC_DISPLAY_EXTERNAL);
+
+        private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
+        if(fbLayer->compositionType == HWC_FRAMEBUFFER_TARGET && hnd) {
+            UIMirrorOverlay::draw(ctx, fbLayer);
+            ctx->mExtDisplay->post();
         }
     }
     return 0;
+}
+
+static bool isGpuUsed(hwc_context_t *ctx,
+        size_t numDisplays,
+        hwc_display_contents_1_t** displays)
+{
+    bool isUsed = false;
+    for (uint32_t i = 0; i < numDisplays; i++) {
+        hwc_display_contents_1_t* list = displays[i];
+        if (list && list->numHwLayers) {
+            uint32_t last = list->numHwLayers - 1;
+            hwc_layer_1_t *fbLayer = &list->hwLayers[last];
+            if(!(fbLayer->flags & HWC_SKIP_LAYER)) {
+                isUsed = true;
+                break;
+            }
+
+        }
+    }
+    return isUsed;
 }
 
 static int hwc_set(hwc_composer_device_1 *dev,
@@ -300,16 +343,21 @@ static int hwc_set(hwc_composer_device_1 *dev,
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     Locker::Autolock _l(ctx->mBlankLock);
-    if(!ctx->overlayInUse)
-        ctx->mOverlay->setState(ovutils::OV_CLOSED);
+
+    if(isGpuUsed(ctx, numDisplays, displays)) {
+        //Call glFinish, only if gpu is used
+        ctx->mFbDev->compositionComplete(ctx->mFbDev);
+    }
 
     for (uint32_t i = 0; i < numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
         switch(i) {
             case HWC_DISPLAY_PRIMARY:
                 ret = hwc_set_primary(ctx, list);
+                break;
             case HWC_DISPLAY_EXTERNAL:
                 ret = hwc_set_external(ctx, list);
+                break;
             default:
                 ret = -EINVAL;
         }
@@ -320,18 +368,26 @@ static int hwc_set(hwc_composer_device_1 *dev,
 int hwc_getDisplayConfigs(struct hwc_composer_device_1* dev, int disp,
         uint32_t* configs, size_t* numConfigs) {
     int ret = 0;
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
     //in 1.1 there is no way to choose a config, report as config id # 0
     //This config is passed to getDisplayAttributes. Ignore for now.
-    if(*numConfigs == 1)
-        *configs = 0;
     switch(disp) {
         case HWC_DISPLAY_PRIMARY:
-            ret = 0;
+            if(*numConfigs > 0) {
+                configs[0] = 0;
+                *numConfigs = 1;
+            }
+            ret = 0; //NO_ERROR
             break;
         case HWC_DISPLAY_EXTERNAL:
-            //Hack until hotplug is supported.
-            //This makes framework ignore external display.
-            ret = -1;
+            ret = -1; //Not connected
+            if(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected) {
+                ret = 0; //NO_ERROR
+                if(*numConfigs > 0) {
+                    configs[0] = 0;
+                    *numConfigs = 1;
+                }
+            }
             break;
     }
     return ret;
@@ -341,6 +397,11 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         uint32_t config, const uint32_t* attributes, int32_t* values) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    //If hotpluggable displays are inactive return error
+    if(disp == HWC_DISPLAY_EXTERNAL && !ctx->dpyAttr[disp].connected) {
+        return -1;
+    }
+
     //From HWComposer
     static const uint32_t DISPLAY_ATTRIBUTES[] = {
         HWC_DISPLAY_VSYNC_PERIOD,
@@ -361,11 +422,13 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
             break;
         case HWC_DISPLAY_WIDTH:
             values[i] = ctx->dpyAttr[disp].xres;
-            ALOGD("%s width = %d",__FUNCTION__, ctx->dpyAttr[disp].xres);
+            ALOGD("%s disp = %d, width = %d",__FUNCTION__, disp,
+                    ctx->dpyAttr[disp].xres);
             break;
         case HWC_DISPLAY_HEIGHT:
             values[i] = ctx->dpyAttr[disp].yres;
-            ALOGD("%s height = %d",__FUNCTION__, ctx->dpyAttr[disp].yres);
+            ALOGD("%s disp = %d, height = %d",__FUNCTION__, disp,
+                    ctx->dpyAttr[disp].yres);
             break;
         case HWC_DISPLAY_DPI_X:
             values[i] = (int32_t) (ctx->dpyAttr[disp].xdpi*1000.0);
