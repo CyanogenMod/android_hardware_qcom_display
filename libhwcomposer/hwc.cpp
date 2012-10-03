@@ -31,6 +31,7 @@
 #include "external.h"
 #include "hwc_mdpcomp.h"
 
+#define VSYNC_DEBUG 0
 using namespace qhwc;
 
 static int hwc_device_open(const struct hw_module_t* module,
@@ -68,8 +69,10 @@ static void hwc_registerProcs(struct hwc_composer_device_1* dev,
     }
     ctx->proc = procs;
 
-    // don't start listening for events until we can do something with them
+    // Now that we have the functions needed, kick off
+    // the uevent & vsync threads
     init_uevent_thread(ctx);
+    init_vsync_thread(ctx);
 }
 
 //Helper
@@ -148,18 +151,38 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
                              int event, int enabled)
 {
     int ret = 0;
+    static int prev_value;
+
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     private_module_t* m = reinterpret_cast<private_module_t*>(
                 ctx->mFbDev->common.module);
     switch(event) {
         case HWC_EVENT_VSYNC:
             if(ioctl(ctx->dpyAttr[dpy].fd, MSMFB_OVERLAY_VSYNC_CTRL,
-                    &enabled) < 0) {
+                     &enabled) < 0) {
                 ALOGE("%s: vsync control failed. Dpy=%d, enabled=%d : %s",
-                        __FUNCTION__, dpy, enabled, strerror(errno));
+                      __FUNCTION__, dpy, enabled, strerror(errno));
+
                 ret = -errno;
             }
-            break;
+            /* vsync state change logic */
+            if (enabled == 1) {
+                //unblock vsync thread
+                pthread_mutex_lock(&ctx->vstate.lock);
+                ctx->vstate.enable = true;
+                pthread_cond_signal(&ctx->vstate.cond);
+                pthread_mutex_unlock(&ctx->vstate.lock);
+            } else if (enabled == 0 && ctx->vstate.enable) {
+                //vsync thread will block
+                pthread_mutex_lock(&ctx->vstate.lock);
+                ctx->vstate.enable = false;
+                pthread_mutex_unlock(&ctx->vstate.lock);
+            }
+            ALOGD_IF (VSYNC_DEBUG, "VSYNC state changed from %s to %s",
+              (prev_value)?"ENABLED":"DISABLED", (enabled)?"ENABLED":"DISABLED");
+            prev_value = enabled;
+            /* vsync state change logic - end*/
+           break;
         default:
             ret = -EINVAL;
     }
