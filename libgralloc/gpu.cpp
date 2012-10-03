@@ -230,7 +230,10 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
         bufferType = BUFFER_TYPE_VIDEO;
     }
     int err;
-    if (usage & GRALLOC_USAGE_HW_FB) {
+    private_module_t* m = reinterpret_cast<private_module_t*>(common.module);
+    uint32_t bufferMask = m->bufferMask;
+    uint32_t numBuffers = m->numBuffers;
+    if (usage & GRALLOC_USAGE_HW_FB && (bufferMask < ((1LU << numBuffers) - 1))) {
         err = gralloc_alloc_framebuffer(size, usage, pHandle);
     } else {
         err = gralloc_alloc_buffer(size, usage, pHandle, bufferType,
