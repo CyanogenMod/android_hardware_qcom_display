@@ -48,7 +48,8 @@ static void *vsync_loop(void *param)
     static char vdata[PAGE_SIZE];
 
     uint64_t cur_timestamp=0;
-    int32_t len = -1, fd_timestamp = -1;
+    ssize_t len = -1;
+    int fd_timestamp = -1;
     bool fb1_vsync = false;
 
     /* Currently read vsync timestamp from drivers
@@ -57,49 +58,43 @@ static void *vsync_loop(void *param)
 
     do {
         pthread_mutex_lock(&ctx->vstate.lock);
-        if(ctx->vstate.enable == false) {
-          pthread_cond_wait(&ctx->vstate.cond, &ctx->vstate.lock);
-        }
+        while (ctx->vstate.enable == false)
+            pthread_cond_wait(&ctx->vstate.cond, &ctx->vstate.lock);
         pthread_mutex_unlock(&ctx->vstate.lock);
 
-
-       // try to open timestamp sysfs
         fd_timestamp = open(vsync_timestamp_fb0, O_RDONLY);
-       if (fd_timestamp < 0) {
-           ALOGE ("FATAL:%s:not able to open file:%s, %s",  __FUNCTION__,
-                 (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
-                                                         strerror(errno));
-           return NULL;
+        if (fd_timestamp < 0) {
+            ALOGE ("FATAL:%s:not able to open file:%s, %s",  __FUNCTION__,
+                   (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
+                                                     strerror(errno));
+            return NULL;
        }
        // Open success - read now
        len = read(fd_timestamp, vdata, PAGE_SIZE);
        if (len < 0){
            ALOGE ("FATAL:%s:not able to read file:%s, %s", __FUNCTION__,
                   vsync_timestamp_fb0, strerror(errno));
-           fd_timestamp = -1;
+           close (fd_timestamp);
            return NULL;
        }
 
-      // extract timestamp
-      const char *str = vdata;
-      if (!strncmp(str, "VSYNC=", strlen("VSYNC="))) {
+       // extract timestamp
+       const char *str = vdata;
+       if (!strncmp(str, "VSYNC=", strlen("VSYNC="))) {
           cur_timestamp = strtoull(str + strlen("VSYNC="), NULL, 0);
-      } else {
-        ALOGE ("FATAL:%s:timestamp data not in correct format",
+       } else {
+          ALOGE ("FATAL:%s:timestamp data not in correct format",
                                                  __FUNCTION__);
-      }
-      // send timestamp to HAL
-      ALOGD_IF (VSYNC_DEBUG, "%s: timestamp %llu sent to HWC for %s",
+       }
+       // send timestamp to HAL
+       ALOGD_IF (VSYNC_DEBUG, "%s: timestamp %llu sent to HWC for %s",
             __FUNCTION__, cur_timestamp, "fb0");
-      ctx->proc->vsync(ctx->proc, display, cur_timestamp);
+       ctx->proc->vsync(ctx->proc, display, cur_timestamp);
 
-      // close open fds
-      close (fd_timestamp);
-
-      // reset fd
-      fd_timestamp = -1;
-
+       close (fd_timestamp);
     } while (true);
+
+    return NULL;
 }
 
 void init_vsync_thread(hwc_context_t* ctx)

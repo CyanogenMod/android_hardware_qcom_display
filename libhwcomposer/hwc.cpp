@@ -165,11 +165,11 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
                              int event, int enabled)
 {
     int ret = 0;
-    static int prev_value;
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     private_module_t* m = reinterpret_cast<private_module_t*>(
                 ctx->mFbDev->common.module);
+    pthread_mutex_lock(&ctx->vstate.lock);
     switch(event) {
         case HWC_EVENT_VSYNC:
             if (ctx->vstate.enable == enabled)
@@ -178,30 +178,18 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
                      &enabled) < 0) {
                 ALOGE("%s: vsync control failed. Dpy=%d, enabled=%d : %s",
                       __FUNCTION__, dpy, enabled, strerror(errno));
-
                 ret = -errno;
             }
-            /* vsync state change logic */
-            if (enabled == 1) {
-                //unblock vsync thread
-                pthread_mutex_lock(&ctx->vstate.lock);
-                ctx->vstate.enable = true;
+            ctx->vstate.enable = !!enabled;
+            if (enabled)
                 pthread_cond_signal(&ctx->vstate.cond);
-                pthread_mutex_unlock(&ctx->vstate.lock);
-            } else if (enabled == 0 && ctx->vstate.enable) {
-                //vsync thread will block
-                pthread_mutex_lock(&ctx->vstate.lock);
-                ctx->vstate.enable = false;
-                pthread_mutex_unlock(&ctx->vstate.lock);
-            }
-            ALOGD_IF (VSYNC_DEBUG, "VSYNC state changed from %s to %s",
-              (prev_value)?"ENABLED":"DISABLED", (enabled)?"ENABLED":"DISABLED");
-            prev_value = enabled;
-            /* vsync state change logic - end*/
-           break;
+            ALOGD_IF (VSYNC_DEBUG, "VSYNC state changed to %s",
+                      (enabled)?"ENABLED":"DISABLED");
+            break;
         default:
             ret = -EINVAL;
     }
+    pthread_mutex_unlock(&ctx->vstate.lock);
     return ret;
 }
 
