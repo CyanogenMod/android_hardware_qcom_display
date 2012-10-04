@@ -47,11 +47,17 @@ bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     //index guaranteed to be not -1 at this point
     hwc_layer_1_t *yuvLayer = &list->hwLayers[yuvIndex];
 
+    private_handle_t *hnd = (private_handle_t *)yuvLayer->handle;
     if(ctx->mSecureMode) {
-        private_handle_t *hnd = (private_handle_t *)yuvLayer->handle;
         if (! isSecureBuffer(hnd)) {
             ALOGD_IF(VIDEO_DEBUG, "%s: Handle non-secure video layer"
                      "during secure playback gracefully", __FUNCTION__);
+            return false;
+        }
+    } else {
+        if (isSecureBuffer(hnd)) {
+            ALOGD_IF(VIDEO_DEBUG, "%s: Handle secure video layer"
+                     "during non-secure playback gracefully", __FUNCTION__);
             return false;
         }
     }
