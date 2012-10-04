@@ -174,15 +174,8 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
         case HWC_EVENT_VSYNC:
             if (ctx->vstate.enable == enabled)
                 break;
-            if(ioctl(ctx->dpyAttr[dpy].fd, MSMFB_OVERLAY_VSYNC_CTRL,
-                     &enabled) < 0) {
-                ALOGE("%s: vsync control failed. Dpy=%d, enabled=%d : %s",
-                      __FUNCTION__, dpy, enabled, strerror(errno));
-                ret = -errno;
-            }
             ctx->vstate.enable = !!enabled;
-            if (enabled)
-                pthread_cond_signal(&ctx->vstate.cond);
+            pthread_cond_signal(&ctx->vstate.cond);
             ALOGD_IF (VSYNC_DEBUG, "VSYNC state changed to %s",
                       (enabled)?"ENABLED":"DISABLED");
             break;
