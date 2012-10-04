@@ -23,6 +23,8 @@
 
 #include <utils/Log.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/msm_mdp.h>
 #include <sys/resource.h>
 #include <sys/prctl.h>
 #include "hwc_utils.h"
@@ -36,7 +38,7 @@ static void *vsync_loop(void *param)
 {
     const char* vsync_timestamp_fb0 = "/sys/class/graphics/fb0/vsync_event";
     const char* vsync_timestamp_fb1 = "/sys/class/graphics/fb1/vsync_event";
-    int display = HWC_DISPLAY_PRIMARY;
+    int dpy = HWC_DISPLAY_PRIMARY;
 
     hwc_context_t * ctx = reinterpret_cast<hwc_context_t *>(param);
 
@@ -50,7 +52,9 @@ static void *vsync_loop(void *param)
     uint64_t cur_timestamp=0;
     ssize_t len = -1;
     int fd_timestamp = -1;
+    int ret = 0;
     bool fb1_vsync = false;
+    bool enabled = false;
 
     /* Currently read vsync timestamp from drivers
        e.g. VSYNC=41800875994
@@ -58,9 +62,31 @@ static void *vsync_loop(void *param)
 
     do {
         pthread_mutex_lock(&ctx->vstate.lock);
-        while (ctx->vstate.enable == false)
+        while (ctx->vstate.enable == false) {
+            if(enabled) {
+                int e = 0;
+                if(ioctl(ctx->dpyAttr[dpy].fd, MSMFB_OVERLAY_VSYNC_CTRL,
+                         &e) < 0) {
+                    ALOGE("%s: vsync control failed. Dpy=%d, enabled=%d : %s",
+                          __FUNCTION__, dpy, enabled, strerror(errno));
+                    ret = -errno;
+                }
+                enabled = false;
+            }
             pthread_cond_wait(&ctx->vstate.cond, &ctx->vstate.lock);
+        }
         pthread_mutex_unlock(&ctx->vstate.lock);
+
+        if (!enabled) {
+            int e = 1;
+            if(ioctl(ctx->dpyAttr[dpy].fd, MSMFB_OVERLAY_VSYNC_CTRL,
+                                          &e) < 0) {
+                ALOGE("%s: vsync control failed. Dpy=%d, enabled=%d : %s",
+                      __FUNCTION__, dpy, enabled, strerror(errno));
+                ret = -errno;
+            }
+            enabled = true;
+        }
 
         fd_timestamp = open(vsync_timestamp_fb0, O_RDONLY);
         if (fd_timestamp < 0) {
@@ -89,7 +115,7 @@ static void *vsync_loop(void *param)
        // send timestamp to HAL
        ALOGD_IF (VSYNC_DEBUG, "%s: timestamp %llu sent to HWC for %s",
             __FUNCTION__, cur_timestamp, "fb0");
-       ctx->proc->vsync(ctx->proc, display, cur_timestamp);
+       ctx->proc->vsync(ctx->proc, dpy, cur_timestamp);
 
        close (fd_timestamp);
     } while (true);
