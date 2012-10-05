@@ -387,23 +387,6 @@ void ExternalDisplay::setResolution(int ID)
         }
         mCurrentMode = ID;
     }
-    //Powerup
-    ret = ioctl(mFd, FBIOBLANK, FB_BLANK_UNBLANK);
-    if(ret < 0) {
-        ALOGD("In %s: FBIOBLANK failed Err Str = %s", __FUNCTION__,
-                                                            strerror(errno));
-    }
-    ret = ioctl(mFd, FBIOGET_VSCREENINFO, &mVInfo);
-    if(ret < 0) {
-        ALOGD("In %s: FBIOGET_VSCREENINFO failed Err Str = %s", __FUNCTION__,
-                                                            strerror(errno));
-    }
-    //Pan_Display
-    ret = ioctl(mFd, FBIOPAN_DISPLAY, &mVInfo);
-    if(ret < 0) {
-        ALOGD("In %s: FBIOPAN_DISPLAY  failed Err Str = %s", __FUNCTION__,
-                                                            strerror(errno));
-    }
 }
 
 /*
