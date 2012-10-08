@@ -47,7 +47,9 @@ static void *vsync_loop(void *param)
     setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY +
                 android::PRIORITY_MORE_FAVORABLE);
 
-    static char vdata[PAGE_SIZE];
+    const int MAX_DATA = 64;
+    const int MAX_RETRY_COUNT = 100;
+    static char vdata[MAX_DATA];
 
     uint64_t cur_timestamp=0;
     ssize_t len = -1;
@@ -88,15 +90,29 @@ static void *vsync_loop(void *param)
             enabled = true;
         }
 
-        fd_timestamp = open(vsync_timestamp_fb0, O_RDONLY);
-        if (fd_timestamp < 0) {
-            ALOGE ("FATAL:%s:not able to open file:%s, %s",  __FUNCTION__,
-                   (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
-                                                     strerror(errno));
-            return NULL;
-       }
+        if(fd_timestamp < 0) {
+            fd_timestamp = open(vsync_timestamp_fb0, O_RDONLY);
+            if (fd_timestamp < 0) {
+                ALOGE ("FATAL:%s:not able to open file:%s, %s",  __FUNCTION__,
+                       (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
+                       strerror(errno));
+                return NULL;
+            }
+        }
+
        // Open success - read now
-       len = read(fd_timestamp, vdata, PAGE_SIZE);
+       lseek(fd_timestamp, 0, SEEK_SET);
+       for(int i = 0; i < MAX_RETRY_COUNT; i++) {
+           len = read(fd_timestamp, vdata, MAX_DATA);
+           if(len < 0 && errno == EAGAIN) {
+               ALOGW("%s: vsync read: EAGAIN, retry (%d/%d).",
+                     __FUNCTION__, i, MAX_RETRY_COUNT);
+               continue;
+           } else {
+               break;
+           }
+       }
+
        if (len < 0){
            ALOGE ("FATAL:%s:not able to read file:%s, %s", __FUNCTION__,
                   vsync_timestamp_fb0, strerror(errno));
@@ -118,8 +134,9 @@ static void *vsync_loop(void *param)
             __FUNCTION__, cur_timestamp, "fb0");
        ctx->proc->vsync(ctx->proc, dpy, cur_timestamp);
 
-       close (fd_timestamp);
     } while (true);
+    if(fd_timestamp >= 0)
+        close (fd_timestamp);
 
     return NULL;
 }
