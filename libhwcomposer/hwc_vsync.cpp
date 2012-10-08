@@ -109,8 +109,9 @@ static void *vsync_loop(void *param)
        if (!strncmp(str, "VSYNC=", strlen("VSYNC="))) {
           cur_timestamp = strtoull(str + strlen("VSYNC="), NULL, 0);
        } else {
-          ALOGE ("FATAL:%s:timestamp data not in correct format",
-                                                 __FUNCTION__);
+          ALOGE ("FATAL: %s: vsync timestamp not in correct format: [%s]",
+                  __FUNCTION__,
+                  str);
        }
        // send timestamp to HAL
        ALOGD_IF (VSYNC_DEBUG, "%s: timestamp %llu sent to HWC for %s",

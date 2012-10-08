@@ -87,7 +87,7 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = false;
-    if (LIKELY(list && list->numHwLayers)) {
+    if (LIKELY(list && list->numHwLayers > 1)) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fblayer = &list->hwLayers[last];
         setListStats(ctx, list, HWC_DISPLAY_PRIMARY);
@@ -108,7 +108,7 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     ctx->overlayInUse[HWC_DISPLAY_EXTERNAL] = false;
 
-    if (LIKELY(list && list->numHwLayers) &&
+    if (LIKELY(list && list->numHwLayers > 1) &&
         ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive &&
         ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected) {
 
@@ -256,7 +256,8 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if(!ctx->overlayInUse[HWC_DISPLAY_PRIMARY])
         ctx->mOverlay[HWC_DISPLAY_PRIMARY]->setState(ovutils::OV_CLOSED);
 
-    if (LIKELY(list && list->numHwLayers)) {
+    if (LIKELY(list && list->numHwLayers > 1) &&
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isActive) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
 
@@ -280,7 +281,7 @@ static int hwc_set_external(hwc_context_t *ctx,
     if(!ctx->overlayInUse[HWC_DISPLAY_EXTERNAL])
         ctx->mOverlay[HWC_DISPLAY_EXTERNAL]->setState(ovutils::OV_CLOSED);
 
-    if (LIKELY(list && list->numHwLayers) &&
+    if (LIKELY(list && list->numHwLayers > 1) &&
         ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive &&
         ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected) {
         uint32_t last = list->numHwLayers - 1;

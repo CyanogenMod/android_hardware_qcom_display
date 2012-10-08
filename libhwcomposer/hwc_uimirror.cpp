@@ -63,6 +63,10 @@ bool UIMirrorOverlay::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
         // Set overlay state
         ov.setState(sState);
         private_handle_t *hnd = (private_handle_t *)layer->handle;
+        if (!hnd) {
+            ALOGE("%s:NULL private handle for layer!", __FUNCTION__);
+            return false;
+        }
         ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
         // Determine the RGB pipe for UI depending on the state
         ovutils::eDest dest = ovutils::OV_PIPE0;
