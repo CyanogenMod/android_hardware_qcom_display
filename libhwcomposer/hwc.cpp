@@ -299,26 +299,6 @@ static int hwc_set_external(hwc_context_t *ctx,
     return 0;
 }
 
-static bool isGpuUsed(hwc_context_t *ctx,
-        size_t numDisplays,
-        hwc_display_contents_1_t** displays)
-{
-    bool isUsed = false;
-    for (uint32_t i = 0; i < numDisplays; i++) {
-        hwc_display_contents_1_t* list = displays[i];
-        if (list && list->numHwLayers) {
-            uint32_t last = list->numHwLayers - 1;
-            hwc_layer_1_t *fbLayer = &list->hwLayers[last];
-            if(!(fbLayer->flags & HWC_SKIP_LAYER)) {
-                isUsed = true;
-                break;
-            }
-
-        }
-    }
-    return isUsed;
-}
-
 static int hwc_set(hwc_composer_device_1 *dev,
                    size_t numDisplays,
                    hwc_display_contents_1_t** displays)
@@ -326,11 +306,6 @@ static int hwc_set(hwc_composer_device_1 *dev,
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     Locker::Autolock _l(ctx->mBlankLock);
-
-    if(isGpuUsed(ctx, numDisplays, displays)) {
-        //Call glFinish, only if gpu is used
-        ctx->mFbDev->compositionComplete(ctx->mFbDev);
-    }
 
     for (uint32_t i = 0; i < numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
