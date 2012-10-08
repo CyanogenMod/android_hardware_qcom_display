@@ -113,7 +113,7 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
         m->info.yoffset = hnd->offset / m->finfo.line_length;
         m->commit.var = m->info;
         if (ioctl(m->framebuffer->fd, MSMFB_DISPLAY_COMMIT, &m->commit) == -1) {
-            ALOGE("%s: FBIOPUT_VSCREENINFO failed for external, err: %s", __FUNCTION__,
+            ALOGE("%s: MSMFB_DISPLAY_COMMIT ioctl failed, err: %s", __FUNCTION__,
                     strerror(errno));
             return -errno;
         }
