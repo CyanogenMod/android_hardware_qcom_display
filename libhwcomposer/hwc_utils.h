@@ -168,6 +168,15 @@ struct vsync_state {
 struct hwc_context_t {
     hwc_composer_device_1_t device;
     const hwc_procs_t* proc;
+
+    //Private hwc handlers
+    struct Callbacks {
+        void (*onExtDisconnect)(const Callbacks& priv_proc);
+        hwc_context_t *ctx;
+    };
+
+    Callbacks priv_proc;
+
     int numHwLayers;
     int overlayInUse[HWC_NUM_DISPLAY_TYPES];
 
@@ -199,7 +208,6 @@ struct hwc_context_t {
     mutable Locker mBlankLock;
     //Vsync
     struct vsync_state vstate;
-
 };
 
 #endif //HWC_UTILS_H

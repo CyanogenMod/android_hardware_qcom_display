@@ -415,6 +415,9 @@ void ExternalDisplay::setExternalDisplay(int connected)
 
         //TODO ideally should be done on "connected" not "online"
         ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL, connected);
+
+        if(connected == false)
+            ctx->priv_proc.onExtDisconnect(ctx->priv_proc);
     }
     return;
 }
