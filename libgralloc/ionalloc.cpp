@@ -80,6 +80,11 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     if (data.flags & ION_SECURE)
         ionAllocData.flags |= ION_SECURE;
 
+    // ToDo: replace usage of alloc data structure with
+    //  ionallocdata structure.
+    if (data.flags & ION_SECURE)
+        ionAllocData.flags |= ION_SECURE;
+
     err = open_device();
     if (err)
         return err;
