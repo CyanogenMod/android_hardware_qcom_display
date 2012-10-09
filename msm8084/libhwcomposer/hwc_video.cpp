@@ -131,7 +131,7 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     }
 
     ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
-    if (ctx->numHwLayers == 1) {
+    if (ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers == 1) {
         isFgFlag = ovutils::IS_FG_SET;
     }
 
@@ -203,7 +203,7 @@ bool configExtVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     }
 
     ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
-    if (ctx->numHwLayers == 1) {
+    if (ctx->listStats[HWC_DISPLAY_EXTERNAL].numAppLayers == 1) {
         isFgFlag = ovutils::IS_FG_SET;
     }
 

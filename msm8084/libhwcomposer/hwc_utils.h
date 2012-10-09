@@ -177,7 +177,6 @@ struct hwc_context_t {
 
     Callbacks priv_proc;
 
-    int numHwLayers;
     int overlayInUse[HWC_NUM_DISPLAY_TYPES];
 
     //Framebuffer device
