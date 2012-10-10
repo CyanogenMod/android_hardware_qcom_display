@@ -278,7 +278,7 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
 static int hwc_set_external(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-
+    Locker::Autolock _l(ctx->mExtSetLock);
     if(!ctx->overlayInUse[HWC_DISPLAY_EXTERNAL])
         ctx->mOverlay[HWC_DISPLAY_EXTERNAL]->setState(ovutils::OV_CLOSED);
 

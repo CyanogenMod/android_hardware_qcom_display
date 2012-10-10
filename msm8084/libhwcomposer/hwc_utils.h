@@ -212,6 +212,8 @@ struct hwc_context_t {
 
     //Lock to prevent set from being called while blanking
     mutable Locker mBlankLock;
+    //Lock to protect set when detaching external disp
+    mutable Locker mExtSetLock;
     //Vsync
     struct vsync_state vstate;
 };
