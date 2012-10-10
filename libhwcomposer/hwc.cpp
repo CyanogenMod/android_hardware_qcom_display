@@ -292,10 +292,11 @@ static int hwc_set_external(hwc_context_t *ctx,
         VideoOverlay::draw(ctx, list, HWC_DISPLAY_EXTERNAL);
 
         private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
-        if(fbLayer->compositionType == HWC_FRAMEBUFFER_TARGET && hnd) {
+        if(fbLayer->compositionType == HWC_FRAMEBUFFER_TARGET &&
+                !(fbLayer->flags & HWC_SKIP_LAYER) && hnd) {
             UIMirrorOverlay::draw(ctx, fbLayer);
-            ctx->mExtDisplay->post();
         }
+        ctx->mExtDisplay->post();
     }
     return 0;
 }
