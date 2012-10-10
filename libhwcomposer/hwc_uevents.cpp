@@ -59,6 +59,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             ctx->mExtDisplay->setExternalDisplay(connected);;
         } else if(!(strncmp(str,"offline@",strlen("offline@")))) {
             connected = 0;
+            Locker::Autolock _l(ctx->mExtSetLock);
             ctx->mExtDisplay->setExternalDisplay(connected);;
         }
     }
