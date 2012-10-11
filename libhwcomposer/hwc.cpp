@@ -254,6 +254,8 @@ static int hwc_query(struct hwc_composer_device_1* dev,
 }
 
 static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
+    int ret = 0;
+
     if (LIKELY(list && list->numHwLayers > 1) &&
         ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isActive) {
         uint32_t last = list->numHwLayers - 1;
@@ -261,20 +263,29 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
         hwc_sync(ctx, list, HWC_DISPLAY_PRIMARY);
 
-        VideoOverlay::draw(ctx, list, HWC_DISPLAY_PRIMARY);
-        MDPComp::draw(ctx, list);
-
+        if (!VideoOverlay::draw(ctx, list, HWC_DISPLAY_PRIMARY)) {
+            ALOGE("%s: VideoOverlay::draw fail!", __FUNCTION__);
+            ret = -1;
+        }
+        if (MDPComp::draw(ctx, list)) {
+            ALOGE("%s: MDPComp::draw fail!", __FUNCTION__);
+            ret = -1;
+        }
         //TODO We dont check for SKIP flag on this layer because we need PAN
         //always. Last layer is always FB
         if(list->hwLayers[last].compositionType == HWC_FRAMEBUFFER_TARGET) {
-            ctx->mFbDev->post(ctx->mFbDev, fbLayer->handle);
+            if (ctx->mFbDev->post(ctx->mFbDev, fbLayer->handle)) {
+                ALOGE("%s: ctx->mFbDev->post fail!", __FUNCTION__);
+                return -1;
+            }
         }
     }
-    return 0;
+    return ret;
 }
 
 static int hwc_set_external(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
+    int ret = 0;
     Locker::Autolock _l(ctx->mExtSetLock);
 
     if (LIKELY(list && list->numHwLayers > 1) &&
@@ -285,16 +296,25 @@ static int hwc_set_external(hwc_context_t *ctx,
 
         hwc_sync(ctx, list, HWC_DISPLAY_EXTERNAL);
 
-        VideoOverlay::draw(ctx, list, HWC_DISPLAY_EXTERNAL);
+        if (!VideoOverlay::draw(ctx, list, HWC_DISPLAY_EXTERNAL)) {
+            ALOGE("%s: VideoOverlay::draw fail!", __FUNCTION__);
+            ret = -1;
+        }
 
         private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
         if(fbLayer->compositionType == HWC_FRAMEBUFFER_TARGET &&
                 !(fbLayer->flags & HWC_SKIP_LAYER) && hnd) {
-            UIMirrorOverlay::draw(ctx, fbLayer);
+            if (!UIMirrorOverlay::draw(ctx, fbLayer)) {
+                ALOGE("%s: UIMirrorOverlay::draw fail!", __FUNCTION__);
+                ret = -1;
+            }
         }
-        ctx->mExtDisplay->post();
+        if (!ctx->mExtDisplay->post()) {
+            ALOGE("%s: ctx->mExtDisplay->post fail!", __FUNCTION__);
+            return -1;
+        }
     }
-    return 0;
+    return ret;
 }
 
 static int hwc_set(hwc_composer_device_1 *dev,
