@@ -148,21 +148,21 @@ void setListStats(hwc_context_t *ctx,
     }
 }
 
-static inline void calc_cut(float& leftCut, float& topCut, float& rightCut,
-        float& bottomCut, int orient) {
+static inline void calc_cut(float& leftCutRatio, float& topCutRatio,
+        float& rightCutRatio, float& bottomCutRatio, int orient) {
     if(orient & HAL_TRANSFORM_FLIP_H) {
-        swap(leftCut, rightCut);
+        swap(leftCutRatio, rightCutRatio);
     }
     if(orient & HAL_TRANSFORM_FLIP_V) {
-        swap(topCut, bottomCut);
+        swap(topCutRatio, bottomCutRatio);
     }
     if(orient & HAL_TRANSFORM_ROT_90) {
         //Anti clock swapping
-        float tmpCut = leftCut;
-        leftCut = topCut;
-        topCut = rightCut;
-        rightCut = bottomCut;
-        bottomCut = tmpCut;
+        float tmpCutRatio = leftCutRatio;
+        leftCutRatio = topCutRatio;
+        topCutRatio = rightCutRatio;
+        rightCutRatio = bottomCutRatio;
+        bottomCutRatio = tmpCutRatio;
     }
 }
 
@@ -183,30 +183,31 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
     int dst_w = abs(dst.right - dst.left);
     int dst_h = abs(dst.bottom - dst.top);
 
-    float leftCut = 0.0f, rightCut = 0.0f, topCut = 0.0f, bottomCut = 0.0f;
+    float leftCutRatio = 0.0f, rightCutRatio = 0.0f, topCutRatio = 0.0f,
+            bottomCutRatio = 0.0f;
 
     if(dst_l < 0) {
-        leftCut = (float)(0.0f - dst_l) / (float)dst_w;
+        leftCutRatio = (float)(0.0f - dst_l) / (float)dst_w;
         dst_l = 0;
     }
     if(dst_r > fbWidth) {
-        rightCut = (float)(dst_r - fbWidth) / (float)dst_w;
+        rightCutRatio = (float)(dst_r - fbWidth) / (float)dst_w;
         dst_r = fbWidth;
     }
     if(dst_t < 0) {
-        topCut = (float)(0 - dst_t) / (float)dst_h;
+        topCutRatio = (float)(0 - dst_t) / (float)dst_h;
         dst_t = 0;
     }
     if(dst_b > fbHeight) {
-        bottomCut = (float)(dst_b - fbHeight) / (float)dst_h;
+        bottomCutRatio = (float)(dst_b - fbHeight) / (float)dst_h;
         dst_b = fbHeight;
     }
 
-    calc_cut(leftCut, topCut, rightCut, bottomCut, orient);
-    crop_l += crop_w * leftCut;
-    crop_t += crop_h * topCut;
-    crop_r -= crop_w * rightCut;
-    crop_b -= crop_h * bottomCut;
+    calc_cut(leftCutRatio, topCutRatio, rightCutRatio, bottomCutRatio, orient);
+    crop_l += crop_w * leftCutRatio;
+    crop_t += crop_h * topCutRatio;
+    crop_r -= crop_w * rightCutRatio;
+    crop_b -= crop_h * bottomCutRatio;
 }
 
 bool isExternalActive(hwc_context_t* ctx) {
