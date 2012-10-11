@@ -34,6 +34,8 @@
 
 namespace qhwc {
 
+#define HWC_VSYNC_THREAD_NAME "hwcVsyncThread"
+
 static void *vsync_loop(void *param)
 {
     const char* vsync_timestamp_fb0 = "/sys/class/graphics/fb0/vsync_event";
@@ -42,7 +44,7 @@ static void *vsync_loop(void *param)
 
     hwc_context_t * ctx = reinterpret_cast<hwc_context_t *>(param);
 
-    char thread_name[64] = "hwcVsyncThread";
+    char thread_name[64] = HWC_VSYNC_THREAD_NAME;
     prctl(PR_SET_NAME, (unsigned long) &thread_name, 0, 0, 0);
     setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY +
                 android::PRIORITY_MORE_FAVORABLE);
@@ -100,11 +102,9 @@ static void *vsync_loop(void *param)
             }
         }
 
-       // Open success - read now
-       lseek(fd_timestamp, 0, SEEK_SET);
        for(int i = 0; i < MAX_RETRY_COUNT; i++) {
-           len = read(fd_timestamp, vdata, MAX_DATA);
-           if(len < 0 && errno == EAGAIN) {
+           len = pread(fd_timestamp, vdata, MAX_DATA, 0);
+           if(len < 0 && (errno == EAGAIN || errno == EINTR)) {
                ALOGW("%s: vsync read: EAGAIN, retry (%d/%d).",
                      __FUNCTION__, i, MAX_RETRY_COUNT);
                continue;
@@ -113,7 +113,7 @@ static void *vsync_loop(void *param)
            }
        }
 
-       if (len < 0){
+       if (len < 0) {
            ALOGE ("FATAL:%s:not able to read file:%s, %s", __FUNCTION__,
                   vsync_timestamp_fb0, strerror(errno));
            close (fd_timestamp);
@@ -143,9 +143,14 @@ static void *vsync_loop(void *param)
 
 void init_vsync_thread(hwc_context_t* ctx)
 {
+    int ret;
     pthread_t vsync_thread;
     ALOGI("Initializing VSYNC Thread");
-    pthread_create(&vsync_thread, NULL, vsync_loop, (void*) ctx);
+    ret = pthread_create(&vsync_thread, NULL, vsync_loop, (void*) ctx);
+    if (ret) {
+        ALOGE("%s: failed to create %s: %s", __FUNCTION__,
+            HWC_VSYNC_THREAD_NAME, strerror(ret));
+    }
 }
 
 }; //namespace
