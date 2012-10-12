@@ -152,10 +152,8 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
 
     //Calculate the rect for primary based on whether the supplied position
     //is within or outside bounds.
-    const int fbWidth =
-            ovutils::FrameBufferInfo::getInstance()->getWidth();
-    const int fbHeight =
-            ovutils::FrameBufferInfo::getInstance()->getHeight();
+    const int fbWidth = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
+    const int fbHeight = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
 
     if( displayFrame.left < 0 ||
             displayFrame.top < 0 ||
@@ -217,7 +215,26 @@ bool configExtVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
     ov.setSource(pargs, ovutils::OV_PIPE1);
 
+    int transform = layer->transform;
+    ovutils::eTransform orient =
+            static_cast<ovutils::eTransform>(transform);
+
     hwc_rect_t sourceCrop = layer->sourceCrop;
+    hwc_rect_t displayFrame = layer->displayFrame;
+
+    //Calculate the rect for primary based on whether the supplied position
+    //is within or outside bounds.
+    const int fbWidth = ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].xres;
+    const int fbHeight = ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].yres;
+
+    if( displayFrame.left < 0 ||
+            displayFrame.top < 0 ||
+            displayFrame.right > fbWidth ||
+            displayFrame.bottom > fbHeight) {
+        calculate_crop_rects(sourceCrop, displayFrame, fbWidth, fbHeight,
+                transform);
+    }
+
     // x,y,w,h
     ovutils::Dim dcrop(sourceCrop.left, sourceCrop.top,
             sourceCrop.right - sourceCrop.left,
@@ -225,17 +242,12 @@ bool configExtVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     //Only for External
     ov.setCrop(dcrop, ovutils::OV_PIPE1);
 
-    int transform = layer->transform;
-    ovutils::eTransform orient =
-            static_cast<ovutils::eTransform>(transform);
     ov.setTransform(orient, ovutils::OV_PIPE1);
 
-    ovutils::Dim dpos;
-    hwc_rect_t displayFrame = layer->displayFrame;
-    dpos.x = displayFrame.left;
-    dpos.y = displayFrame.top;
-    dpos.w = (displayFrame.right - displayFrame.left);
-    dpos.h = (displayFrame.bottom - displayFrame.top);
+    ovutils::Dim dpos(displayFrame.left,
+            displayFrame.top,
+            (displayFrame.right - displayFrame.left),
+            (displayFrame.bottom - displayFrame.top));
 
     //Only for External
     ov.setPosition(dpos, ovutils::OV_PIPE1);
