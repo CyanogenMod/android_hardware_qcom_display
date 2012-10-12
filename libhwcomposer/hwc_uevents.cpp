@@ -29,6 +29,8 @@
 
 namespace qhwc {
 
+#define HWC_UEVENT_THREAD_NAME "hwcUeventThread"
+
 const char* MSMFB_HDMI_NODE = "fb1";
 
 static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
@@ -67,7 +69,7 @@ static void *uevent_loop(void *param)
     int len = 0;
     static char udata[PAGE_SIZE];
     hwc_context_t * ctx = reinterpret_cast<hwc_context_t *>(param);
-    char thread_name[64] = "hwcUeventThread";
+    char thread_name[64] = HWC_UEVENT_THREAD_NAME;
     prctl(PR_SET_NAME, (unsigned long) &thread_name, 0, 0, 0);
     setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY);
     uevent_init();
@@ -83,7 +85,14 @@ static void *uevent_loop(void *param)
 void init_uevent_thread(hwc_context_t* ctx)
 {
     pthread_t uevent_thread;
-    pthread_create(&uevent_thread, NULL, uevent_loop, (void*) ctx);
+    int ret;
+
+    ALOGI("Initializing UEVENT Thread");
+    ret = pthread_create(&uevent_thread, NULL, uevent_loop, (void*) ctx);
+    if (ret) {
+        ALOGE("%s: failed to create %s: %s", __FUNCTION__,
+            HWC_UEVENT_THREAD_NAME, strerror(ret));
+    }
 }
 
 }; //namespace
