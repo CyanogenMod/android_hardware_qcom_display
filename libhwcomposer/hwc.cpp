@@ -62,6 +62,7 @@ hwc_module_t HAL_MODULE_INFO_SYM = {
 static void hwc_registerProcs(struct hwc_composer_device_1* dev,
                               hwc_procs_t const* procs)
 {
+    ALOGI("%s", __FUNCTION__);
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     if(!ctx) {
         ALOGE("%s: Invalid context", __FUNCTION__);
