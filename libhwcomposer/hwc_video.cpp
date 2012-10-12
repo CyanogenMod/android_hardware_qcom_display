@@ -126,6 +126,11 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_t *layer) {
         isFgFlag = ovutils::IS_FG_SET;
     }
 
+    //Ensure that VG pipe is allocated in cases where buffer-type
+    //is video while format is RGB
+    ovutils::setMdpFlags(mdpFlags,
+            ovutils::OV_MDP_PIPE_SHARE);
+
     ovutils::PipeArgs parg(mdpFlags,
             info,
             ovutils::ZORDER_0,
@@ -191,6 +196,11 @@ bool configExtVid(hwc_context_t *ctx, hwc_layer_t *layer) {
     if (ctx->numHwLayers == 1) {
         isFgFlag = ovutils::IS_FG_SET;
     }
+
+    //Ensure that VG pipe is allocated in cases where buffer-type
+    //is video while format is RGB
+    ovutils::setMdpFlags(mdpFlags,
+            ovutils::OV_MDP_PIPE_SHARE);
 
     ovutils::PipeArgs parg(mdpFlags,
             info,

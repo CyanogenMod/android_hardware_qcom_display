@@ -115,6 +115,11 @@ bool configPrimaryVideo(hwc_context_t *ctx, hwc_layer_t *layer) {
         isFgFlag = ovutils::IS_FG_SET;
     }
 
+    //Ensure that VG pipe is allocated in cases where buffer-type
+    //is video while format is RGB
+    ovutils::setMdpFlags(mdpFlags,
+            ovutils::OV_MDP_PIPE_SHARE);
+
     ovutils::PipeArgs parg(mdpFlags,
             info,
             ovutils::ZORDER_0,
@@ -190,6 +195,11 @@ bool configPIPVideo(hwc_context_t *ctx, hwc_layer_t *layer) {
     }
 
     ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
+
+    //Ensure that VG pipe is allocated in cases where buffer-type
+    //is video while format is RGB
+    ovutils::setMdpFlags(mdpFlags,
+            ovutils::OV_MDP_PIPE_SHARE);
 
     //Set z-order 1 since this video is on top of the
     //primary video
