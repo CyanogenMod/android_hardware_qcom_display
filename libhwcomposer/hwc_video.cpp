@@ -20,6 +20,7 @@
 #include "hwc_qbuf.h"
 #include "hwc_video.h"
 #include "hwc_external.h"
+#include <mdp_version.h>
 
 namespace qhwc {
 
@@ -34,7 +35,9 @@ bool VideoOverlay::sIsModeOn = false;
 //Cache stats, figure out the state, config overlay
 bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
     sIsModeOn = false;
-    if(!ctx->mMDP.hasOverlay) {
+    if((!ctx->mMDP.hasOverlay) ||
+                            (qdutils::MDPVersion::getInstance().getMDPVersion()
+                             <= qdutils::MDP_V4_0)) {
        ALOGD_IF(VIDEO_DEBUG,"%s, this hw doesnt support overlay", __FUNCTION__);
        return false;
     }
