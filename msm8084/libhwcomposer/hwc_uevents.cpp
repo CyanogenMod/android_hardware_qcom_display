@@ -53,14 +53,23 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
     // for now just parsing onlin/offline info is enough
     if (hdmi) {
         str = udata;
-        int connected = 0;
+        int connected = -1; //some event other than online and offline .. e.g
         if(!(strncmp(str,"online@",strlen("online@")))) {
+            //Disabled until SF calls unblank
+            ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
             connected = 1;
-            ctx->mExtDisplay->setExternalDisplay(connected);;
         } else if(!(strncmp(str,"offline@",strlen("offline@")))) {
+            //Disabled until SF calls unblank
+            ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
             connected = 0;
-            Locker::Autolock _l(ctx->mExtSetLock);
-            ctx->mExtDisplay->setExternalDisplay(connected);;
+        }
+        if(connected != -1) { //either we got online or offline
+            ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = connected;
+            ctx->mExtDisplay->setExternalDisplay(connected);
+            ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,connected);
+            Locker::Autolock _l(ctx->mExtSetLock); //hwc comp could be on
+            //TODO ideally should be done on "connected" not "online"
+            ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL, connected);
         }
     }
 }
