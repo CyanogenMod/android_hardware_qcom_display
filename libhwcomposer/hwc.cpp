@@ -79,7 +79,8 @@ static void hwc_registerProcs(struct hwc_composer_device_1* dev,
 //Helper
 static void reset(hwc_context_t *ctx, int numDisplays) {
     memset(ctx->listStats, 0, sizeof(ctx->listStats));
-    for(int i = 0; i < numDisplays; i++){
+    for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++){
+        ctx->overlayInUse[i] = false;
         ctx->listStats[i].yuvIndex = -1;
     }
 }
@@ -87,17 +88,21 @@ static void reset(hwc_context_t *ctx, int numDisplays) {
 static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = false;
-    if (LIKELY(list && list->numHwLayers > 1)) {
+
+    if (LIKELY(list && list->numHwLayers > 1) &&
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isActive) {
+
         uint32_t last = list->numHwLayers - 1;
-        hwc_layer_1_t *fblayer = &list->hwLayers[last];
-        setListStats(ctx, list, HWC_DISPLAY_PRIMARY);
-        if(VideoOverlay::prepare(ctx, list, HWC_DISPLAY_PRIMARY)) {
-            ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = true;
-        } else if(MDPComp::configure(ctx, list)) {
-            ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = true;
-        } else {
-            ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = false;
+        hwc_layer_1_t *fbLayer = &list->hwLayers[last];
+        if(fbLayer->handle) {
+            setListStats(ctx, list, HWC_DISPLAY_PRIMARY);
+            if(VideoOverlay::prepare(ctx, list, HWC_DISPLAY_PRIMARY)) {
+                ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = true;
+            } else if(MDPComp::configure(ctx, list)) {
+                ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = true;
+            } else {
+                ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = false;
+            }
         }
     }
     return 0;
@@ -105,9 +110,7 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
 
 static int hwc_prepare_external(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
-
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    ctx->overlayInUse[HWC_DISPLAY_EXTERNAL] = false;
 
     if (LIKELY(list && list->numHwLayers > 1) &&
         ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive &&
@@ -116,15 +119,18 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
         setListStats(ctx, list, HWC_DISPLAY_EXTERNAL);
 
         uint32_t last = list->numHwLayers - 1;
-        hwc_layer_1_t *fblayer = &list->hwLayers[last];
-        if(UIMirrorOverlay::prepare(ctx, fblayer)) {
-            ctx->overlayInUse[HWC_DISPLAY_EXTERNAL] = true;
-        }
+        hwc_layer_1_t *fbLayer = &list->hwLayers[last];
+        if(fbLayer->handle) {
+            if(UIMirrorOverlay::prepare(ctx, fbLayer)) {
+                ctx->overlayInUse[HWC_DISPLAY_EXTERNAL] = true;
+            }
 
-        if(VideoOverlay::prepare(ctx, list, HWC_DISPLAY_EXTERNAL)) {
-            ctx->overlayInUse[HWC_DISPLAY_EXTERNAL] = true;
-        } else {
-            ctx->mOverlay[HWC_DISPLAY_EXTERNAL]->setState(ovutils::OV_UI_MIRROR);
+            if(VideoOverlay::prepare(ctx, list, HWC_DISPLAY_EXTERNAL)) {
+                ctx->overlayInUse[HWC_DISPLAY_EXTERNAL] = true;
+            } else {
+                ctx->mOverlay[HWC_DISPLAY_EXTERNAL]->setState(
+                        ovutils::OV_UI_MIRROR);
+            }
         }
     }
     return 0;
@@ -135,7 +141,6 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-
     reset(ctx, numDisplays);
 
     //If securing of h/w in progress skip comp using overlay.
@@ -143,20 +148,15 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 
     for (uint32_t i = 0; i < numDisplays; i++) {
         hwc_display_contents_1_t *list = displays[i];
-        if(list && list->numHwLayers) {
-            uint32_t last = list->numHwLayers - 1;
-            if(list->hwLayers[last].handle != NULL) {
-                switch(i) {
-                case HWC_DISPLAY_PRIMARY:
-                    ret = hwc_prepare_primary(dev, list);
-                    break;
-                case HWC_DISPLAY_EXTERNAL:
-                    ret = hwc_prepare_external(dev, list);
-                    break;
-                default:
-                    ret = -EINVAL;
-                }
-            }
+        switch(i) {
+            case HWC_DISPLAY_PRIMARY:
+                ret = hwc_prepare_primary(dev, list);
+                break;
+            case HWC_DISPLAY_EXTERNAL:
+                ret = hwc_prepare_external(dev, list);
+                break;
+            default:
+                ret = -EINVAL;
         }
     }
     return ret;
@@ -254,9 +254,6 @@ static int hwc_query(struct hwc_composer_device_1* dev,
 }
 
 static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
-    if(!ctx->overlayInUse[HWC_DISPLAY_PRIMARY])
-        ctx->mOverlay[HWC_DISPLAY_PRIMARY]->setState(ovutils::OV_CLOSED);
-
     if (LIKELY(list && list->numHwLayers > 1) &&
         ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isActive) {
         uint32_t last = list->numHwLayers - 1;
@@ -279,8 +276,6 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 static int hwc_set_external(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
     Locker::Autolock _l(ctx->mExtSetLock);
-    if(!ctx->overlayInUse[HWC_DISPLAY_EXTERNAL])
-        ctx->mOverlay[HWC_DISPLAY_EXTERNAL]->setState(ovutils::OV_CLOSED);
 
     if (LIKELY(list && list->numHwLayers > 1) &&
         ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive &&
@@ -309,6 +304,11 @@ static int hwc_set(hwc_composer_device_1 *dev,
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     Locker::Autolock _l(ctx->mBlankLock);
+
+    for(uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+        if(!ctx->overlayInUse[i])
+            ctx->mOverlay[i]->setState(ovutils::OV_CLOSED);
+    }
 
     for (uint32_t i = 0; i < numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
