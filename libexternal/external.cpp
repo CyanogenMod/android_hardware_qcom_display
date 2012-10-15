@@ -408,16 +408,6 @@ void ExternalDisplay::setExternalDisplay(int connected)
         const char* prop = (connected) ? "1" : "0";
         // set system property
         property_set("hw.hdmiON", prop);
-        ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,connected);
-        //Inform SF. Disabled until SF calls unblank
-        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
-        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = connected;
-
-        //TODO ideally should be done on "connected" not "online"
-        ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL, connected);
-
-        if(connected == false)
-            ctx->priv_proc.onExtDisconnect(ctx->priv_proc);
     }
     return;
 }
