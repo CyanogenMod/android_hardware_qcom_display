@@ -34,7 +34,9 @@
 #include "hwc_external.h"
 #include "hwc_mdpcomp.h"
 #include "hwc_extonly.h"
+#ifndef USES_LEGACY_GRAPHICS
 #include "qcom_ui.h"
+#endif
 
 #define VSYNC_DEBUG 0
 using namespace qhwc;
@@ -133,7 +135,9 @@ static int hwc_prepare(hwc_composer_device_t *dev, hwc_layer_list_t* list)
         ctx->mOverlay->setState(ovutils::OV_CLOSED);
         ctx->qbuf->unlockAll();
 
+#ifndef USES_LEGACY_GRAPHICS
         qdutils::CBUtils::checkforGPULayer(list);
+#endif
     }
     return 0;
 }

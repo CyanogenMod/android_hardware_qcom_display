@@ -66,8 +66,16 @@ private:
     mutable range r;
 };
 
+#ifdef USES_LEGACY_GRAPHICS
+int CopyBit::sYuvCount = 0;
+int CopyBit::sYuvLayerIndex = -1;
+#endif
 bool CopyBit::sIsModeOn = false;
+#ifdef USES_LEGACY_GRAPHICS
+bool CopyBit::sIsLayerSkip = false;
+#else
 bool CopyBit::sIsSkipLayerPresent = false;
+#endif
 bool CopyBit::sCopyBitDraw = false;
 
 bool CopyBit::canUseCopybitForYUV(hwc_context_t *ctx) {
@@ -81,6 +89,16 @@ bool CopyBit::canUseCopybitForYUV(hwc_context_t *ctx) {
 bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx, hwc_layer_list_t *list) {
     int compositionType =
         qdutils::QCCompositionType::getInstance().getCompositionType();
+
+#ifdef USES_LEGACY_GRAPHICS
+    if (compositionType & qdutils::COMPOSITION_TYPE_C2D){
+        if (sYuvCount) {
+            //Overlay up & running. Dont use COPYBIT for RGB layers.
+            // TODO need to implement blending with C2D
+            return false;
+        }
+    }
+#endif
 
     if (compositionType & qdutils::COMPOSITION_TYPE_DYN) {
         // DYN Composition:
@@ -126,22 +144,38 @@ unsigned int CopyBit::getRGBRenderingArea(const hwc_layer_list_t *list) {
 
 bool CopyBit::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
 
+#ifndef USES_LEGACY_GRAPHICS
     sCopyBitDraw = false;
+#endif
 
     int compositionType =
         qdutils::QCCompositionType::getInstance().getCompositionType();
 
+#ifdef USES_LEGACY_GRAPHICS
+    if ((compositionType & qdutils::COMPOSITION_TYPE_GPU) ||
+        (compositionType & qdutils::COMPOSITION_TYPE_CPU))   {
+#else
     if ((compositionType == qdutils::COMPOSITION_TYPE_GPU) ||
         (compositionType == qdutils::COMPOSITION_TYPE_CPU))   {
+#endif
         //GPU/CPU composition, don't change layer composition type
         return true;
     }
+        
+#ifdef USES_LEGACY_GRAPHICS
+    bool useCopybitForYUV = canUseCopybitForYUV(ctx);
+    bool useCopybitForRGB = canUseCopybitForRGB(ctx, list);
+#endif
 
     if(!(validateParams(ctx, list))) {
        ALOGE("%s:Invalid Params", __FUNCTION__);
        return false;
     }
+#ifdef USES_LEGACY_GRAPHICS  
+    sCopyBitDraw = false;
+#endif
 
+#ifndef USES_LEGACY_GRAPHICS
     if(sIsSkipLayerPresent) {
         //GPU will be anyways used
         return false;
@@ -149,11 +183,18 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
 
     bool useCopybitForYUV = canUseCopybitForYUV(ctx);
     bool useCopybitForRGB = canUseCopybitForRGB(ctx, list);
+#endif
 
     for (int i=list->numHwLayers-1; i >= 0 ; i--) {
         private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
 
+#ifdef USES_LEGACY_GRAPHICS
+        if (isSkipLayer(&list->hwLayers[i])) {
+            return true;
+      } else if (hnd->bufferType == BUFFER_TYPE_VIDEO) {
+#else
         if (hnd->bufferType == BUFFER_TYPE_VIDEO) {
+#endif
           //YUV layer, check, if copybit can be used
           // mark the video layer to gpu when all layer is
           // going to gpu in case of dynamic composition.
@@ -489,5 +530,4 @@ CopybitEngine::~CopybitEngine()
         sEngine = NULL;
     }
 }
-
 }; //namespace qhwc
