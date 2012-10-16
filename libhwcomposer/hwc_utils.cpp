@@ -224,31 +224,29 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy) {
         }
     }
 
-    if (count) {
-        data.acq_fen_fd_cnt = count;
-        fbFd = ctx->dpyAttr[dpy].fd;
+    data.acq_fen_fd_cnt = count;
+    fbFd = ctx->dpyAttr[dpy].fd;
 
-        //Waits for acquire fences, returns a release fence
-        ret = ioctl(fbFd, MSMFB_BUFFER_SYNC, &data);
-        if(ret < 0) {
-            ALOGE("ioctl MSMFB_BUFFER_SYNC failed, err=%s",
-                    strerror(errno));
-        }
-
-        for(uint32_t i = 0; i < list->numHwLayers; i++) {
-            if((list->hwLayers[i].compositionType == HWC_OVERLAY ||
-                list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET)) {
-                //Close the acquireFenceFds
-                if(list->hwLayers[i].acquireFenceFd > 0) {
-                    close(list->hwLayers[i].acquireFenceFd);
-                    list->hwLayers[i].acquireFenceFd = -1;
-                }
-                //Populate releaseFenceFds.
-                list->hwLayers[i].releaseFenceFd = dup(releaseFd);
-            }
-        }
-        list->retireFenceFd = releaseFd;
+    //Waits for acquire fences, returns a release fence
+    ret = ioctl(fbFd, MSMFB_BUFFER_SYNC, &data);
+    if(ret < 0) {
+        ALOGE("ioctl MSMFB_BUFFER_SYNC failed, err=%s",
+                strerror(errno));
     }
+
+    for(uint32_t i = 0; i < list->numHwLayers; i++) {
+        if((list->hwLayers[i].compositionType == HWC_OVERLAY ||
+            list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET)) {
+            //Close the acquireFenceFds
+            if(list->hwLayers[i].acquireFenceFd > 0) {
+                close(list->hwLayers[i].acquireFenceFd);
+                list->hwLayers[i].acquireFenceFd = -1;
+            }
+            //Populate releaseFenceFds.
+            list->hwLayers[i].releaseFenceFd = dup(releaseFd);
+        }
+    }
+    list->retireFenceFd = releaseFd;
 #endif
     return ret;
 }
