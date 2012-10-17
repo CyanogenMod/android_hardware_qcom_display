@@ -197,7 +197,7 @@ bool configPIPVideo(hwc_context_t *ctx, hwc_layer_t *layer) {
             info,
             ovutils::ZORDER_1,
             isFgFlag,
-            ovutils::ROT_FLAGS_NONE);
+            ovutils::ROT_DOWNSCALE_ENABLED);
     ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
 
     // Use pipe 1, pipe 0 is used for primary video
