@@ -29,6 +29,7 @@
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 #define FINAL_TRANSFORM_MASK 0x000F
 #define MAX_NUM_DISPLAYS 4 //Yes, this is ambitious
+#define MAX_NUM_LAYERS 32
 
 //Fwrd decls
 struct hwc_context_t;
@@ -79,6 +80,26 @@ enum {
     HWC_MDPCOMP = 0x00000002,
     HWC_LAYER_RESERVED_0 = 0x00000004,
     HWC_LAYER_RESERVED_1 = 0x00000008
+};
+
+class LayerCache {
+    public:
+    LayerCache() {
+        canUseLayerCache = false;
+        numHwLayers = 0;
+        for(uint32_t i = 0; i < MAX_NUM_LAYERS; i++) {
+            hnd[i] = NULL;
+        }
+    }
+    //LayerCache optimization
+    void updateLayerCache(hwc_display_contents_1_t* list);
+    void resetLayerCache(int num);
+    void markCachedLayersAsOverlay(hwc_display_contents_1_t* list);
+    private:
+    uint32_t numHwLayers;
+    bool canUseLayerCache;
+    buffer_handle_t hnd[MAX_NUM_LAYERS];
+
 };
 
 
@@ -195,6 +216,8 @@ struct hwc_context_t {
     qhwc::DisplayAttributes dpyAttr[HWC_NUM_DISPLAY_TYPES];
 
     qhwc::ListStats listStats[HWC_NUM_DISPLAY_TYPES];
+
+    qhwc::LayerCache *mLayerCache;
 
     //Securing in progress indicator
     bool mSecuring;

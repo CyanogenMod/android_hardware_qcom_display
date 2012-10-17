@@ -77,11 +77,23 @@ static void hwc_registerProcs(struct hwc_composer_device_1* dev,
 }
 
 //Helper
-static void reset(hwc_context_t *ctx, int numDisplays) {
+static void reset(hwc_context_t *ctx, int numDisplays,
+                  hwc_display_contents_1_t** displays) {
     memset(ctx->listStats, 0, sizeof(ctx->listStats));
     for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++){
         ctx->overlayInUse[i] = false;
         ctx->listStats[i].yuvIndex = -1;
+        hwc_display_contents_1_t *list = displays[i];
+        // XXX:SurfaceFlinger no longer guarantees that this
+        // value is reset on every prepare. However, for the layer
+        // cache we need to reset it.
+        // We can probably rethink that later on
+        if (LIKELY(list && list->numHwLayers > 1)) {
+            for(uint32_t j = 0; j < list->numHwLayers; j++) {
+                if(list->hwLayers[j].compositionType != HWC_FRAMEBUFFER_TARGET)
+                    list->hwLayers[j].compositionType = HWC_FRAMEBUFFER;
+            }
+        }
     }
 }
 
@@ -103,6 +115,7 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
             } else {
                 ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = false;
             }
+            ctx->mLayerCache->updateLayerCache(list);
         }
     }
     return 0;
@@ -141,7 +154,7 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    reset(ctx, numDisplays);
+    reset(ctx, numDisplays, displays);
 
     //If securing of h/w in progress skip comp using overlay.
     if(ctx->mSecuring == true) return 0;
