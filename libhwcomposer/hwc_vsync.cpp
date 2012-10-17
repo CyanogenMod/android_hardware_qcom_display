@@ -63,6 +63,13 @@ static void *vsync_loop(void *param)
     /* Currently read vsync timestamp from drivers
        e.g. VSYNC=41800875994
     */
+    fd_timestamp = open(vsync_timestamp_fb0, O_RDONLY);
+    if (fd_timestamp < 0) {
+        ALOGE ("FATAL:%s:not able to open file:%s, %s",  __FUNCTION__,
+               (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
+               strerror(errno));
+        return NULL;
+    }
 
     do {
         pthread_mutex_lock(&ctx->vstate.lock);
@@ -90,16 +97,6 @@ static void *vsync_loop(void *param)
                 ret = -errno;
             }
             enabled = true;
-        }
-
-        if(fd_timestamp < 0) {
-            fd_timestamp = open(vsync_timestamp_fb0, O_RDONLY);
-            if (fd_timestamp < 0) {
-                ALOGE ("FATAL:%s:not able to open file:%s, %s",  __FUNCTION__,
-                       (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
-                       strerror(errno));
-                return NULL;
-            }
         }
 
        for(int i = 0; i < MAX_RETRY_COUNT; i++) {
