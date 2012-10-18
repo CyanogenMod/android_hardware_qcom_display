@@ -43,14 +43,16 @@ private:
     //Marks layer flags if this feature is used
     static void markFlags(hwc_layer_1_t *yuvLayer);
     //The chosen overlay state.
-    static ovutils::eOverlayState sState;
+    static ovutils::eOverlayState sState[HWC_NUM_DISPLAY_TYPES];
     //Flags if this feature is on.
-    static bool sIsModeOn;
+    static bool sIsModeOn[HWC_NUM_DISPLAY_TYPES];
 };
 
 inline void VideoOverlay::reset() {
-    sIsModeOn = false;
-    sState = ovutils::OV_CLOSED;
+    for(uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+        sIsModeOn[i] = false;
+        sState[i] = ovutils::OV_CLOSED;
+    }
 }
 }; //namespace qhwc
 

@@ -66,8 +66,11 @@ public:
     /* expose state */
     utils::eOverlayState getState() const;
 
-    /* Returns the singleton instance of overlay */
-    static Overlay* getInstance();
+    /* Closes open pipes */
+    static void initOverlay();
+
+    /* Returns the per-display singleton instance of overlay */
+    static Overlay* getInstance(int disp);
 
 private:
     /* Ctor setup */
@@ -84,8 +87,8 @@ private:
     /* Holds the actual overlay impl, set when changing state*/
     OverlayImplBase *mOv;
 
-    /* Singleton Instance*/
-    static Overlay *sInstance;
+    /* Per-display Singleton Instance HWC_NUM_DISPLAY_TYPES */
+    static Overlay *sInstance[2];
 };
 
 } // overlay

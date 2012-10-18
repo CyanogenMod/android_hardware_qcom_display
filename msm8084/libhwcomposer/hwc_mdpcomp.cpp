@@ -130,8 +130,10 @@ void MDPComp::reset(hwc_context_t *ctx, hwc_display_contents_1_t* list ) {
     }
 
     sCurrentFrame.count = 0;
-    free(sCurrentFrame.pipe_layer);
-    sCurrentFrame.pipe_layer = NULL;
+    if(sCurrentFrame.pipe_layer) {
+        free(sCurrentFrame.pipe_layer);
+        sCurrentFrame.pipe_layer = NULL;
+    }
 
     //Reset MDP pipes
     sPipeMgr.reset();
@@ -191,7 +193,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
-        overlay::Overlay& ov = *(ctx->mOverlay);
+        overlay::Overlay& ov = *(ctx->mOverlay[HWC_DISPLAY_PRIMARY]);
 
         if(!hnd) {
             ALOGE("%s: layer handle is NULL", __FUNCTION__);
@@ -229,7 +231,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_layer_1_t *layer,
             ALOGD_IF(isDebug(),"%s: Destination has negative coordinates",
                                                                   __FUNCTION__);
 
-            qhwc::calculate_crop_rects(crop, dst, hw_w, hw_h);
+            qhwc::calculate_crop_rects(crop, dst, hw_w, hw_h, 0);
 
             //Update calulated width and height
             crop_w = crop.right - crop.left;
@@ -283,7 +285,13 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_layer_1_t *layer,
                                                    : ovutils::OV_MDP_FLAGS_NONE;
         ovutils::setMdpFlags(mdpFlags,ovutils::OV_MDP_BACKEND_COMPOSITION);
         ovutils::eIsFg isFG = mdp_info.isFG ? ovutils::IS_FG_SET
-                                                           : ovutils::IS_FG_OFF;
+                                                    : ovutils::IS_FG_OFF;
+
+        if(layer->blending == HWC_BLENDING_PREMULT) {
+            ovutils::setMdpFlags(mdpFlags,
+                    ovutils::OV_MDP_BLEND_FG_PREMULT);
+        }
+
         ovutils::PipeArgs parg(mdpFlags,
                                info,
                                zOrder,
@@ -585,6 +593,11 @@ bool MDPComp::setup(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
     frame_info &current_frame = sCurrentFrame;
     current_frame.count = 0;
 
+    if(current_frame.pipe_layer) {
+        free(current_frame.pipe_layer);
+        current_frame.pipe_layer = NULL;
+    }
+
     if(!ctx) {
        ALOGE("%s: invalid context", __FUNCTION__);
        return -1;
@@ -610,7 +623,7 @@ bool MDPComp::setup(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
     configure_var_pipe(ctx);
 #endif
 
-    overlay::Overlay& ov = *(ctx->mOverlay);
+    overlay::Overlay& ov = *(ctx->mOverlay[HWC_DISPLAY_PRIMARY]);
     ovutils::eOverlayState state = ov.getState();
 
     if (current_frame.count == 1) {
@@ -667,7 +680,7 @@ int MDPComp::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         return -1;
     }
 
-    overlay::Overlay& ov = *(ctx->mOverlay);
+    overlay::Overlay& ov = *(ctx->mOverlay[HWC_DISPLAY_PRIMARY]);
 
     int numHwLayers = ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers;
     for(int i = 0; i < numHwLayers; i++ )

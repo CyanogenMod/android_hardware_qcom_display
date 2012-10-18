@@ -21,6 +21,7 @@
 #define HWC_REMOVE_DEPRECATED_VERSIONS 1
 #include <fcntl.h>
 #include <hardware/hwcomposer.h>
+#include <gr.h>
 #include <gralloc_priv.h>
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
@@ -59,6 +60,9 @@ struct DisplayAttributes {
     float xdpi;
     float ydpi;
     int fd;
+    bool connected; //Applies only to pluggable disp.
+    //Connected does not mean it ready to use.
+    //It should be active also. (UNBLANKED)
     bool isActive;
 };
 
@@ -87,7 +91,7 @@ void initContext(hwc_context_t *ctx);
 void closeContext(hwc_context_t *ctx);
 //Crops source buffer against destination and FB boundaries
 void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
-        const int fbWidth, const int fbHeight);
+        const int fbWidth, const int fbHeight, int orient);
 
 bool isExternalActive(hwc_context_t* ctx);
 
@@ -130,9 +134,11 @@ static inline bool isExtCC(const private_handle_t* hnd) {
 
 // Initialize uevent thread
 void init_uevent_thread(hwc_context_t* ctx);
+// Initialize vsync thread
+void init_vsync_thread(hwc_context_t* ctx);
 
 inline void getLayerResolution(const hwc_layer_1_t* layer,
-                                         int& width, int& height)
+                               int& width, int& height)
 {
     hwc_rect_t displayFrame  = layer->displayFrame;
     width = displayFrame.right - displayFrame.left;
@@ -148,7 +154,20 @@ static inline int openFb(int dpy) {
     return fd;
 }
 
+template <class T>
+inline void swap(T& a, T& b) {
+    T tmp = a;
+    a = b;
+    b = tmp;
+}
+
 }; //qhwc namespace
+
+struct vsync_state {
+    pthread_mutex_t lock;
+    pthread_cond_t  cond;
+    bool enable;
+};
 
 // -----------------------------------------------------------------------------
 // HWC context
@@ -156,14 +175,14 @@ static inline int openFb(int dpy) {
 struct hwc_context_t {
     hwc_composer_device_1_t device;
     const hwc_procs_t* proc;
-    int numHwLayers;
-    int overlayInUse;
+
+    int overlayInUse[HWC_NUM_DISPLAY_TYPES];
 
     //Framebuffer device
     framebuffer_device_t *mFbDev;
 
     //Overlay object - NULL for non overlay devices
-    overlay::Overlay *mOverlay;
+    overlay::Overlay *mOverlay[HWC_NUM_DISPLAY_TYPES];
 
     //QService object
     qService::QService *mQService;
@@ -182,6 +201,13 @@ struct hwc_context_t {
 
     //Display in secure mode indicator
     bool mSecureMode;
+
+    //Lock to prevent set from being called while blanking
+    mutable Locker mBlankLock;
+    //Lock to protect set when detaching external disp
+    mutable Locker mExtSetLock;
+    //Vsync
+    struct vsync_state vstate;
 };
 
 #endif //HWC_UTILS_H

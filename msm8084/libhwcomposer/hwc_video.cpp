@@ -25,37 +25,55 @@ namespace qhwc {
 #define FINAL_TRANSFORM_MASK 0x000F
 
 //Static Members
-ovutils::eOverlayState VideoOverlay::sState = ovutils::OV_CLOSED;
-bool VideoOverlay::sIsModeOn = false;
+ovutils::eOverlayState VideoOverlay::sState[] = {ovutils::OV_CLOSED};
+bool VideoOverlay::sIsModeOn[] = {false};
 
 //Cache stats, figure out the state, config overlay
 bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         int dpy) {
+
     int yuvIndex =  ctx->listStats[dpy].yuvIndex;
+    sIsModeOn[dpy] = false;
 
     if(!ctx->mMDP.hasOverlay) {
        ALOGD_IF(VIDEO_DEBUG,"%s, this hw doesnt support overlay", __FUNCTION__);
        return false;
     }
-    if(yuvIndex == -1) {
+
+    if(yuvIndex == -1 || ctx->listStats[dpy].yuvCount != 1) {
         return false;
     }
 
     //index guaranteed to be not -1 at this point
     hwc_layer_1_t *yuvLayer = &list->hwLayers[yuvIndex];
+
+    private_handle_t *hnd = (private_handle_t *)yuvLayer->handle;
+    if(ctx->mSecureMode) {
+        if (! isSecureBuffer(hnd)) {
+            ALOGD_IF(VIDEO_DEBUG, "%s: Handle non-secure video layer"
+                     "during secure playback gracefully", __FUNCTION__);
+            return false;
+        }
+    } else {
+        if (isSecureBuffer(hnd)) {
+            ALOGD_IF(VIDEO_DEBUG, "%s: Handle secure video layer"
+                     "during non-secure playback gracefully", __FUNCTION__);
+            return false;
+        }
+    }
     chooseState(ctx, dpy, yuvLayer);
     if(configure(ctx, dpy, yuvLayer)) {
         markFlags(yuvLayer);
-        sIsModeOn = true;
+        sIsModeOn[dpy] = true;
     }
 
-    return sIsModeOn;
+    return sIsModeOn[dpy];
 }
 
 void VideoOverlay::chooseState(hwc_context_t *ctx, int dpy,
         hwc_layer_1_t *yuvLayer) {
     ALOGD_IF(VIDEO_DEBUG, "%s: old state = %s", __FUNCTION__,
-            ovutils::getStateString(sState));
+            ovutils::getStateString(sState[dpy]));
 
     private_handle_t *hnd = NULL;
     if(yuvLayer) {
@@ -65,38 +83,27 @@ void VideoOverlay::chooseState(hwc_context_t *ctx, int dpy,
     switch(dpy) {
         case HWC_DISPLAY_PRIMARY:
             if(ctx->listStats[dpy].yuvCount == 1) {
-                newState = isExternalActive(ctx) ?
-                    ovutils::OV_2D_VIDEO_ON_PANEL_TV : ovutils::OV_2D_VIDEO_ON_PANEL;
+                newState = ovutils::OV_2D_VIDEO_ON_PANEL;
                 if(isSkipLayer(yuvLayer) && !isSecureBuffer(hnd)) {
-                    newState = isExternalActive(ctx) ?
-                        ovutils::OV_2D_VIDEO_ON_TV : ovutils::OV_CLOSED;
+                    newState = ovutils::OV_CLOSED;
                 }
             }
             break;
         case HWC_DISPLAY_EXTERNAL:
-        //TODO needs overlay state change for UI also
-            newState = sState; //Previously set by HWC_DISPLAY_PRIMARY
-            /*if(ctx->listStats[dpy].yuvCount == 1 && isExternalActive(ctx)) {
+            newState = ctx->mOverlay[HWC_DISPLAY_EXTERNAL]->getState(); //If we are here, external is active
+            if(ctx->listStats[dpy].yuvCount == 1) {
                 if(!isSkipLayer(yuvLayer) || isSecureBuffer(hnd)) {
-                    switch(sState) { //set by primary chooseState
-                        case ovutils::OV_2D_VIDEO_ON_PANEL:
-                            //upgrade
-                            sState = ovutils::OV_2D_VIDEO_PANEL_TV;
-                            break;
-                        case ovutils::OV_CLOSED:
-                            sState = ovutils::OV_2D_VIDEO_ON_TV;
-                            break;
-                    }
+                    newState = ovutils::OV_UI_VIDEO_TV;
                 }
-            }*/
+            }
             break;
         default:
             break;
     }
 
-    sState = newState;
+    sState[dpy] = newState;
     ALOGD_IF(VIDEO_DEBUG, "%s: new chosen state = %s", __FUNCTION__,
-            ovutils::getStateString(sState));
+            ovutils::getStateString(sState[dpy]));
 }
 
 void VideoOverlay::markFlags(hwc_layer_1_t *yuvLayer) {
@@ -108,7 +115,7 @@ void VideoOverlay::markFlags(hwc_layer_1_t *yuvLayer) {
 
 /* Helpers */
 bool configPrimVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
-    overlay::Overlay& ov = *(ctx->mOverlay);
+    overlay::Overlay& ov = *(ctx->mOverlay[HWC_DISPLAY_PRIMARY]);
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
 
@@ -118,8 +125,13 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
                 ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
     }
 
+    if(layer->blending == HWC_BLENDING_PREMULT) {
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_BLEND_FG_PREMULT);
+    }
+
     ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
-    if (ctx->numHwLayers == 1) {
+    if (ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers == 1) {
         isFgFlag = ovutils::IS_FG_SET;
     }
 
@@ -131,21 +143,24 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
     ov.setSource(pargs, ovutils::OV_PIPE0);
 
+    int transform = layer->transform & FINAL_TRANSFORM_MASK;
+    ovutils::eTransform orient =
+            static_cast<ovutils::eTransform>(transform);
+
     hwc_rect_t sourceCrop = layer->sourceCrop;
     hwc_rect_t displayFrame = layer->displayFrame;
 
     //Calculate the rect for primary based on whether the supplied position
     //is within or outside bounds.
-    const int fbWidth =
-            ovutils::FrameBufferInfo::getInstance()->getWidth();
-    const int fbHeight =
-            ovutils::FrameBufferInfo::getInstance()->getHeight();
+    const int fbWidth = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
+    const int fbHeight = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
 
     if( displayFrame.left < 0 ||
             displayFrame.top < 0 ||
             displayFrame.right > fbWidth ||
             displayFrame.bottom > fbHeight) {
-        calculate_crop_rects(sourceCrop, displayFrame, fbWidth, fbHeight);
+        calculate_crop_rects(sourceCrop, displayFrame, fbWidth, fbHeight,
+                transform);
     }
 
     // source crop x,y,w,h
@@ -155,9 +170,6 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     //Only for Primary
     ov.setCrop(dcrop, ovutils::OV_PIPE0);
 
-    int transform = layer->transform;
-    ovutils::eTransform orient =
-            static_cast<ovutils::eTransform>(transform);
     ov.setTransform(orient, ovutils::OV_PIPE0);
 
     // position x,y,w,h
@@ -175,7 +187,7 @@ bool configPrimVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
 }
 
 bool configExtVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
-    overlay::Overlay& ov = *(ctx->mOverlay);
+    overlay::Overlay& ov = *(ctx->mOverlay[HWC_DISPLAY_EXTERNAL]);
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
 
@@ -185,21 +197,44 @@ bool configExtVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
                 ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
     }
 
+    if(layer->blending == HWC_BLENDING_PREMULT) {
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_BLEND_FG_PREMULT);
+    }
+
     ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
-    if (ctx->numHwLayers == 1) {
+    if (ctx->listStats[HWC_DISPLAY_EXTERNAL].numAppLayers == 1) {
         isFgFlag = ovutils::IS_FG_SET;
     }
 
     ovutils::PipeArgs parg(mdpFlags,
             info,
-            ovutils::ZORDER_0,
+            ovutils::ZORDER_1,
             isFgFlag,
-            ovutils::ROT_FLAG_ENABLED); //TODO remove this hack when sync for
-            //ext is done
+            ovutils::ROT_FLAG_DISABLED);
     ovutils::PipeArgs pargs[ovutils::MAX_PIPES] = { parg, parg, parg };
     ov.setSource(pargs, ovutils::OV_PIPE1);
 
+    int transform = layer->transform;
+    ovutils::eTransform orient =
+            static_cast<ovutils::eTransform>(transform);
+
     hwc_rect_t sourceCrop = layer->sourceCrop;
+    hwc_rect_t displayFrame = layer->displayFrame;
+
+    //Calculate the rect for primary based on whether the supplied position
+    //is within or outside bounds.
+    const int fbWidth = ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].xres;
+    const int fbHeight = ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].yres;
+
+    if( displayFrame.left < 0 ||
+            displayFrame.top < 0 ||
+            displayFrame.right > fbWidth ||
+            displayFrame.bottom > fbHeight) {
+        calculate_crop_rects(sourceCrop, displayFrame, fbWidth, fbHeight,
+                transform);
+    }
+
     // x,y,w,h
     ovutils::Dim dcrop(sourceCrop.left, sourceCrop.top,
             sourceCrop.right - sourceCrop.left,
@@ -207,16 +242,12 @@ bool configExtVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     //Only for External
     ov.setCrop(dcrop, ovutils::OV_PIPE1);
 
-    // FIXME: Use source orientation for TV when source is portrait
-    //Only for External
-    ov.setTransform(0, ovutils::OV_PIPE1);
+    ov.setTransform(orient, ovutils::OV_PIPE1);
 
-    ovutils::Dim dpos;
-    hwc_rect_t displayFrame = layer->displayFrame;
-    dpos.x = displayFrame.left;
-    dpos.y = displayFrame.top;
-    dpos.w = (displayFrame.right - displayFrame.left);
-    dpos.h = (displayFrame.bottom - displayFrame.top);
+    ovutils::Dim dpos(displayFrame.left,
+            displayFrame.top,
+            (displayFrame.right - displayFrame.left),
+            (displayFrame.bottom - displayFrame.top));
 
     //Only for External
     ov.setPosition(dpos, ovutils::OV_PIPE1);
@@ -231,31 +262,23 @@ bool configExtVid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
 bool VideoOverlay::configure(hwc_context_t *ctx, int dpy,
         hwc_layer_1_t *yuvLayer) {
     bool ret = true;
-    overlay::Overlay& ov = *(ctx->mOverlay);
+    overlay::Overlay& ov = *(ctx->mOverlay[dpy]);
     switch(dpy) {
         case HWC_DISPLAY_PRIMARY:
             // Set overlay state
-            ov.setState(sState);
-            switch(sState) {
+            ov.setState(sState[dpy]);
+            switch(sState[dpy]) {
                 case ovutils::OV_2D_VIDEO_ON_PANEL:
                     ret &= configPrimVid(ctx, yuvLayer);
-                    break;
-                case ovutils::OV_2D_VIDEO_ON_PANEL_TV:
-                    ret &= configPrimVid(ctx, yuvLayer);
-                    ret &= configExtVid(ctx, yuvLayer);
-                    break;
-                case ovutils::OV_2D_VIDEO_ON_TV:
-                    ret &= configExtVid(ctx, yuvLayer);
                     break;
                 default:
                     return false;
             }
             break;
         case HWC_DISPLAY_EXTERNAL:
-            ov.setState(sState);
-            switch(sState) {
-                case ovutils::OV_2D_VIDEO_ON_PANEL_TV:
-                case ovutils::OV_2D_VIDEO_ON_TV:
+            ov.setState(sState[dpy]);
+            switch(sState[dpy]) {
+                case ovutils::OV_UI_VIDEO_TV:
                     ret = configExtVid(ctx, yuvLayer);
                     break;
                 default:
@@ -269,8 +292,12 @@ bool VideoOverlay::configure(hwc_context_t *ctx, int dpy,
 bool VideoOverlay::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         int dpy)
 {
+    if(!sIsModeOn[dpy]) {
+        return true;
+    }
+
     int yuvIndex = ctx->listStats[dpy].yuvIndex;
-    if(!sIsModeOn || yuvIndex == -1) {
+    if(yuvIndex == -1) {
         return true;
     }
 
@@ -278,7 +305,7 @@ bool VideoOverlay::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             list->hwLayers[yuvIndex].handle;
 
     bool ret = true;
-    overlay::Overlay& ov = *(ctx->mOverlay);
+    overlay::Overlay& ov = *(ctx->mOverlay[dpy]);
     ovutils::eOverlayState state = ov.getState();
 
     switch(dpy) {
@@ -291,24 +318,6 @@ bool VideoOverlay::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
                         ret = false;
                     }
                     break;
-                case ovutils::OV_2D_VIDEO_ON_PANEL_TV:
-                    if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE0)) {
-                        ALOGE("%s: queueBuffer failed for primary", __FUNCTION__);
-                        ret = false;
-                    }
-                    // Play external
-                    if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE1)) {
-                        ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
-                        ret = false;
-                    }
-                    break;
-                case ovutils::OV_2D_VIDEO_ON_TV:
-                    // Play external
-                    if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE1)) {
-                        ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
-                        ret = false;
-                    }
-                    break;
                 default:
                     ret = false;
                     break;
@@ -316,8 +325,7 @@ bool VideoOverlay::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             break;
         case HWC_DISPLAY_EXTERNAL:
             switch(state) {
-                case ovutils::OV_2D_VIDEO_ON_PANEL_TV:
-                case ovutils::OV_2D_VIDEO_ON_TV:
+                case ovutils::OV_UI_VIDEO_TV:
                     // Play external
                     if (!ov.queueBuffer(hnd->fd, hnd->offset, ovutils::OV_PIPE1)) {
                         ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
