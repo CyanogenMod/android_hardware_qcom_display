@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2010 The Android Open Source Project
  * Copyright (C) 2012, The Linux Foundation. All rights reserved.
@@ -381,23 +382,6 @@ void ExternalDisplay::setResolution(int ID)
         }
         mCurrentMode = ID;
     }
-    //Powerup
-    ret = ioctl(mFd, FBIOBLANK, FB_BLANK_UNBLANK);
-    if(ret < 0) {
-        ALOGD("In %s: FBIOBLANK failed Err Str = %s", __FUNCTION__,
-                                                            strerror(errno));
-    }
-    ret = ioctl(mFd, FBIOGET_VSCREENINFO, &mVInfo);
-    if(ret < 0) {
-        ALOGD("In %s: FBIOGET_VSCREENINFO failed Err Str = %s", __FUNCTION__,
-                                                            strerror(errno));
-    }
-    //Pan_Display
-    ret = ioctl(mFd, FBIOPAN_DISPLAY, &mVInfo);
-    if(ret < 0) {
-        ALOGD("In %s: FBIOPAN_DISPLAY  failed Err Str = %s", __FUNCTION__,
-                                                            strerror(errno));
-    }
 }
 
 void ExternalDisplay::setExternalDisplay(int connected)
@@ -410,7 +394,7 @@ void ExternalDisplay::setExternalDisplay(int connected)
         if(connected) {
             readResolution();
             //Get the best mode and set
-            // TODO: DO NOT call this for WFD
+            // TODO: Move this to activate
             setResolution(getBestMode());
             setDpyAttr();
             //enable hdmi vsync
@@ -424,12 +408,6 @@ void ExternalDisplay::setExternalDisplay(int connected)
         const char* prop = (connected) ? "1" : "0";
         // set system property
         property_set("hw.hdmiON", prop);
-        //Inform SF
-        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
-        //TODO remove invalidate send hotplug
-        //ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL, connected);
-        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = connected;
-        ctx->proc->invalidate(ctx->proc);
     }
     return;
 }
@@ -461,12 +439,16 @@ bool ExternalDisplay::writeHPDOption(int userOption) const
     return ret;
 }
 
+/*
+ * commits the changes to the external display
+ * mExternalDisplay has the mixer number(1-> HDMI 2-> WFD)
+ */
 bool ExternalDisplay::post()
 {
     if(mFd == -1) {
         return false;
-    } else if(ioctl(mFd, FBIOPUT_VSCREENINFO, &mVInfo) == -1) {
-         ALOGE("%s: FBIOPUT_VSCREENINFO failed, str: %s", __FUNCTION__,
+    } else if(ioctl(mFd, MSMFB_OVERLAY_COMMIT, &mExternalDisplay) == -1) {
+         ALOGE("%s: MSMFB_OVERLAY_COMMIT failed, str: %s", __FUNCTION__,
                                                           strerror(errno));
          return false;
     }
@@ -477,10 +459,11 @@ void ExternalDisplay::setDpyAttr() {
     int width = 0, height = 0, fps = 0;
     getAttrForMode(width, height, fps);
     if(mHwcContext) {
+        ALOGD("ExtDisplay setting xres = %d, yres = %d", width, height);
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = width;
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = height;
-        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].vsync_period = 1000000000l /
-        fps;
+        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].vsync_period =
+            1000000000l / fps;
     }
 }
 

@@ -18,6 +18,7 @@
 #ifndef FB_PRIV_H
 #define FB_PRIV_H
 #include <linux/fb.h>
+#include <linux/msm_mdp.h>
 
 #define NUM_FRAMEBUFFERS_MIN  2
 #define NUM_FRAMEBUFFERS_MAX  3
@@ -44,6 +45,8 @@ struct private_module_t {
     pthread_mutex_t lock;
     private_handle_t *currentBuffer;
     struct fb_var_screeninfo info;
+    struct mdp_buf_fence fence;
+    struct mdp_display_commit commit;
     struct fb_fix_screeninfo finfo;
     float xdpi;
     float ydpi;
