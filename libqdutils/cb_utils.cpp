@@ -84,10 +84,8 @@ bool CBUtils::isUpdatingFB(int Type)
 int CBUtils::qcomuiClearRegion(Region region, EGLDisplay dpy){
 
     int ret = 0;
-    int compositionType = QCCompositionType::getInstance().getCompositionType();
-    if ((compositionType == COMPOSITION_TYPE_GPU) || sGPUlayerpresent) {
-        //return ERROR when GPU composition is used or any layer is flagged
-        //for GPU composition.
+    if (sGPUlayerpresent) {
+        //return ERROR when any layer is flagged for GPU composition.
         return -1;
     }
 
