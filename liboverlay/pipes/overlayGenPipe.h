@@ -200,9 +200,13 @@ inline bool GenericPipe<PANEL>::setSource(
 
     //Cache if user wants 0-rotation
     mRotUsed = newargs.rotFlags & utils::ROT_0_ENABLED;
-    //Use rotator for downscale optimization
-    mRotUsed |= newargs.rotFlags & utils::ROT_DOWNSCALE_ENABLED;
-    mRotDownscaleOpt = newargs.rotFlags & utils::ROT_DOWNSCALE_ENABLED;
+
+    int version = qdutils::MDPVersion::getInstance().getMDPVersion();
+    if ((version >= qdutils::MDP_V4_2) && (version < qdutils::MDSS_V5)) {
+        //Use rotator for downscale optimization
+        mRotUsed |= newargs.rotFlags & utils::ROT_DOWNSCALE_ENABLED;
+        mRotDownscaleOpt = newargs.rotFlags & utils::ROT_DOWNSCALE_ENABLED;
+    }
 
     mRot->setSource(newargs.whf);
     mRot->setFlags(newargs.mdpFlags);
