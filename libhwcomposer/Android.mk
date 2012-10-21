@@ -36,6 +36,10 @@ LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"hwcexternal\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := hwc_external.cpp
 
+ifeq ($(TARGET_QCOM_HDMI_RESOLUTION_AUTO),true)
+    LOCAL_CFLAGS += -DFORCE_AUTO_RESOLUTION
+endif
+
 include $(BUILD_SHARED_LIBRARY)
 
 #libhwcservice library

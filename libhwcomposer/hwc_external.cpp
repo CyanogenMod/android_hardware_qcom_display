@@ -353,7 +353,9 @@ void ExternalDisplay::setResolution(int ID)
         ALOGD("In %s: FBIOGET_VSCREENINFO failed Err Str = %s", __FUNCTION__,
                                                             strerror(errno));
     }
-
+#ifdef FORCE_AUTO_RESOLUTION
+    ID = 0;
+#endif
     ALOGD_IF(DEBUG, "%s: GET Info<ID=%d %dx%d (%d,%d,%d),"
             "(%d,%d,%d) %dMHz>", __FUNCTION__,
             mVInfo.reserved[3], mVInfo.xres, mVInfo.yres,
