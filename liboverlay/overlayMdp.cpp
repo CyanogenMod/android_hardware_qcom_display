@@ -97,12 +97,12 @@ bool MdpCtrl::setPosition(const overlay::utils::Dim& d,
     ovutils::Dim dim(d);
     ovutils::Dim ovsrcdim = getSrcRectDim();
     // Scaling of upto a max of 20 times supported
-    if(dim.w >(ovsrcdim.w * ovutils::HW_OV_MAGNIFICATION_LIMIT)){
-        dim.w = ovutils::HW_OV_MAGNIFICATION_LIMIT * ovsrcdim.w;
+    if(dim.w >(ovsrcdim.w * ovutils::getOverlayMagnificationLimit())){
+        dim.w = ovutils::getOverlayMagnificationLimit() * ovsrcdim.w;
         dim.x = (fbw - dim.w) / 2;
     }
-    if(dim.h >(ovsrcdim.h * ovutils::HW_OV_MAGNIFICATION_LIMIT)) {
-        dim.h = ovutils::HW_OV_MAGNIFICATION_LIMIT * ovsrcdim.h;
+    if(dim.h >(ovsrcdim.h * ovutils::getOverlayMagnificationLimit())) {
+        dim.h = ovutils::getOverlayMagnificationLimit() * ovsrcdim.h;
         dim.y = (fbh - dim.h) / 2;
     }
 

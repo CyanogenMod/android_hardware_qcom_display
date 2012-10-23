@@ -42,6 +42,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <utils/Log.h>
+#include <mdp_version.h>
 #include "gralloc_priv.h" //for interlace
 /*
 *
@@ -479,12 +480,11 @@ int getRotOutFmt(uint32_t format);
  * rotation is 90, 180 etc
  * It returns MDP related enum/define that match rot+flip*/
 int getMdpOrient(eTransform rotation);
+int getOverlayMagnificationLimit();
 const char* getFormatString(int format);
 const char* getStateString(eOverlayState state);
 
-// Cannot use HW_OVERLAY_MAGNIFICATION_LIMIT, since at the time
-// of integration, HW_OVERLAY_MAGNIFICATION_LIMIT was a define
-enum { HW_OV_MAGNIFICATION_LIMIT = 20,
+enum {
     HW_OV_MINIFICATION_LIMIT  = 8
 };
 

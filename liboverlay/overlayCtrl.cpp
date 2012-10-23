@@ -100,11 +100,11 @@ utils::Dim Ctrl::getAspectRatio(const utils::Whf& whf) const
         inWhf.h = fbHeight;
     }
     /* Scaling of upto a max of 8 times supported */
-    if (inWhf.w > (tmpwhf.w * utils::HW_OV_MAGNIFICATION_LIMIT)){
-        inWhf.w = utils::HW_OV_MAGNIFICATION_LIMIT * tmpwhf.w;
+    if (inWhf.w > (tmpwhf.w * utils::getOverlayMagnificationLimit())){
+        inWhf.w = utils::getOverlayMagnificationLimit() * tmpwhf.w;
     }
-    if(inWhf.h > (tmpwhf.h * utils::HW_OV_MAGNIFICATION_LIMIT)) {
-        inWhf.h = utils::HW_OV_MAGNIFICATION_LIMIT * tmpwhf.h;
+    if(inWhf.h > (tmpwhf.h * utils::getOverlayMagnificationLimit())) {
+        inWhf.h = utils::getOverlayMagnificationLimit() * tmpwhf.h;
     }
     if (inWhf.w > fbWidth) inWhf.w = fbWidth;
     if (inWhf.h > fbHeight) inWhf.h = fbHeight;
