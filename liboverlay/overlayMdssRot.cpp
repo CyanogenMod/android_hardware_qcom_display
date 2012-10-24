@@ -93,7 +93,10 @@ void MdssRot::setSource(const overlay::utils::Whf& awhf) {
 }
 
 void MdssRot::setFlags(const utils::eMdpFlags& flags) {
-    // TODO
+    mRotInfo.flags &= ~utils::OV_MDP_SECURE_OVERLAY_SESSION;
+    if (flags & utils::OV_MDP_SECURE_OVERLAY_SESSION) {
+        mRotInfo.flags |= utils::OV_MDP_SECURE_OVERLAY_SESSION;
+    }
 }
 
 void MdssRot::setTransform(const utils::eTransform& rot, const bool& rotUsed)
@@ -167,8 +170,9 @@ bool MdssRot::open_i(uint32_t numbufs, uint32_t bufsz)
 {
     OvMem mem;
     OVASSERT(MAP_FAILED == mem.addr(), "MAP failed in open_i");
+    bool isSecure = mRotInfo.flags & utils::OV_MDP_SECURE_OVERLAY_SESSION;
 
-    if(!mem.open(numbufs, bufsz, false)){ // TODO: secure for badger
+    if(!mem.open(numbufs, bufsz, isSecure)){
         ALOGE("%s: Failed to open", __func__);
         mem.close();
         return false;
