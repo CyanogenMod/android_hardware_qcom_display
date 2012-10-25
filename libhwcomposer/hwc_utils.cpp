@@ -175,6 +175,12 @@ void getLayerStats(hwc_context_t *ctx, const hwc_layer_list_t *list)
         } else if (isSkipLayer(&list->hwLayers[i])) { //Popups
             skipCount++;
         }
+        // check if video layer is below skip layer
+        if((isSkipLayer(&list->hwLayers[i]))) {
+            if((yuvLayerIndex >= 0) && ((unsigned int)yuvLayerIndex<i)) {
+               isYuvLayerSkip = true;
+            }
+        }
     }
 
     VideoOverlay::setStats(yuvCount, yuvLayerIndex, isYuvLayerSkip,
