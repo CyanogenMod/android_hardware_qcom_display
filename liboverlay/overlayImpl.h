@@ -271,6 +271,7 @@ bool OverlayImpl<P0, P1, P2>::closePipe(utils::eDest dest)
 {
     OVASSERT(utils::isValidDest(dest), "%s: OverlayImpl invalid dest=%d",
             __FUNCTION__, dest);
+    bool ret = true;
 
     if (utils::OV_PIPE0 & dest) {
         // Close pipe0
@@ -278,7 +279,7 @@ bool OverlayImpl<P0, P1, P2>::closePipe(utils::eDest dest)
         ALOGE_IF(DEBUG_OVERLAY, "Close pipe0");
         if (!mPipe0->close()) {
             ALOGE("%s: OverlayImpl failed to close pipe0", __FUNCTION__);
-            return false;
+            ret = false;
         }
         delete mPipe0;
         mPipe0 = 0;
@@ -286,7 +287,9 @@ bool OverlayImpl<P0, P1, P2>::closePipe(utils::eDest dest)
         // Close the rotator for pipe0
         OVASSERT(mRotP0, "%s: OverlayImpl rot0 is null", __FUNCTION__);
         if (!mRotP0->close()) {
-            ALOGE("%s: OverlayImpl failed to close rot for pipe0", __FUNCTION__);
+            ALOGE("%s: OverlayImpl failed to close rot for pipe0",
+                                    __FUNCTION__);
+            ret = false;
         }
         delete mRotP0;
         mRotP0 = 0;
@@ -298,7 +301,7 @@ bool OverlayImpl<P0, P1, P2>::closePipe(utils::eDest dest)
         ALOGE_IF(DEBUG_OVERLAY, "Close pipe1");
         if (!mPipe1->close()) {
             ALOGE("%s: OverlayImpl failed to close pipe1", __FUNCTION__);
-            return false;
+            ret = false;
         }
         delete mPipe1;
         mPipe1 = 0;
@@ -306,7 +309,9 @@ bool OverlayImpl<P0, P1, P2>::closePipe(utils::eDest dest)
         // Close the rotator for pipe1
         OVASSERT(mRotP1, "%s: OverlayImpl rot1 is null", __FUNCTION__);
         if (!mRotP1->close()) {
-            ALOGE("%s: OverlayImpl failed to close rot for pipe1", __FUNCTION__);
+            ALOGE("%s: OverlayImpl failed to close rot for pipe1",
+                                    __FUNCTION__);
+            ret = false;
         }
         delete mRotP1;
         mRotP1 = 0;
@@ -318,7 +323,7 @@ bool OverlayImpl<P0, P1, P2>::closePipe(utils::eDest dest)
         ALOGE_IF(DEBUG_OVERLAY, "Close pipe2");
         if (!mPipe2->close()) {
             ALOGE("%s: OverlayImpl failed to close pipe2", __FUNCTION__);
-            return false;
+            ret = false;
         }
         delete mPipe2;
         mPipe2 = 0;
@@ -326,13 +331,15 @@ bool OverlayImpl<P0, P1, P2>::closePipe(utils::eDest dest)
         // Close the rotator for pipe2
         OVASSERT(mRotP2, "%s: OverlayImpl rot2 is null", __FUNCTION__);
         if (!mRotP2->close()) {
-            ALOGE("%s: OverlayImpl failed to close rot for pipe2", __FUNCTION__);
+            ALOGE("%s: OverlayImpl failed to close rot for pipe2",
+                                    __FUNCTION__);
+            ret = false;
         }
         delete mRotP2;
         mRotP2 = 0;
     }
 
-    return true;
+    return ret;
 }
 
 /* Copy pipe/rot from ov for all specified dest */
