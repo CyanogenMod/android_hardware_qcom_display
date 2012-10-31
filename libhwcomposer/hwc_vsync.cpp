@@ -47,7 +47,7 @@ static void *vsync_loop(void *param)
                 ctx->mFbDev->common.module);
     char thread_name[64] = "hwcVsyncThread";
     prctl(PR_SET_NAME, (unsigned long) &thread_name, 0, 0, 0);
-    setpriority(PRIO_PROCESS, 0, 
+    setpriority(PRIO_PROCESS, 0,
                 HAL_PRIORITY_URGENT_DISPLAY + ANDROID_PRIORITY_MORE_FAVORABLE);
 
     const int MAX_DATA = 64;
@@ -121,7 +121,7 @@ static void *vsync_loop(void *param)
             ALOGE ("FATAL:%s:not able to open file:%s, %s",  __FUNCTION__,
                   (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
                                                          strerror(errno));
-            return NULL;
+            continue;
         }
         for(int i = 0; i < MAX_RETRY_COUNT; i++) {
             len = pread(fd_timestamp, vdata, MAX_DATA, 0);
@@ -138,9 +138,11 @@ static void *vsync_loop(void *param)
             ALOGE ("FATAL:%s:not able to read file:%s, %s", __FUNCTION__,
                    (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
                                                           strerror(errno));
-            close (fd_timestamp);
-            fd_timestamp = -1;
-            return NULL;
+            // TODO
+            // continue;
+            // we need to continue from here as we dont have a valid vsync
+            // string, but in the current implementation, the SF needs a
+            // vsync signal to compose
         }
 
         // extract timestamp
