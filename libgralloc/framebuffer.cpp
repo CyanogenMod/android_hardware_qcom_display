@@ -152,7 +152,9 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
 static int fb_compositionComplete(struct framebuffer_device_t* dev)
 {
     // TODO: Properly implement composition complete callback
-
+#ifdef ANCIENT_GL
+    glFinish();
+#endif
     return 0;
 }
 
