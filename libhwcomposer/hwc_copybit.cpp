@@ -188,11 +188,13 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_layer_list_t *list, EGLDisplay dpy,
         return -1;
     }
 
+#ifndef ANCIENT_GL
     // Invoke a glFinish if we are rendering any layers using copybit.
     // We call glFinish instead of locking the renderBuffer because the
     // GPU could take longer than the genlock timeout value to complete
     // rendering
     glFinish();
+#endif
 
     for (size_t i=0; i<list->numHwLayers; i++) {
         if (list->hwLayers[i].compositionType == HWC_USE_COPYBIT) {
