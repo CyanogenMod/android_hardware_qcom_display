@@ -30,6 +30,9 @@
 
 #include <cutils/log.h>
 
+#define ROUND_UP_PAGESIZE(x) ( (((unsigned long)(x)) + PAGE_SIZE-1)  & \
+                               (~(PAGE_SIZE-1)) )
+
 enum {
     /* gralloc usage bits indicating the type
      * of allocation that should be used */
@@ -167,6 +170,7 @@ struct private_handle_t : public native_handle {
         int     fd;
         // genlock handle to be dup'd by the binder
         int     genlockHandle;
+        int     fd_metadata;          // fd for the meta-data
         // ints
         int     magic;
         int     flags;
@@ -174,6 +178,7 @@ struct private_handle_t : public native_handle {
         int     offset;
         int     bufferType;
         int     base;
+        int     offset_metadata;
         // The gpu address mapped into the mmu.
         // If using ashmem, set to 0, they don't care
         int     gpuaddr;
@@ -183,19 +188,21 @@ struct private_handle_t : public native_handle {
         int     height;
         // local fd of the genlock device.
         int     genlockPrivFd;
+        int     base_metadata;
 
 #ifdef __cplusplus
-        static const int sNumInts = 12;
-        static const int sNumFds = 2;
+        static const int sNumInts = 14;
+        static const int sNumFds = 3;
         static const int sMagic = 'gmsm';
 
         private_handle_t(int fd, int size, int flags, int bufferType,
-                         int format,int width, int height) :
-            fd(fd), genlockHandle(-1), magic(sMagic),
-            flags(flags), size(size), offset(0),
-            bufferType(bufferType), base(0), gpuaddr(0),
-            pid(0), format(format),
-            width(width), height(height), genlockPrivFd(-1)
+                         int format,int width, int height, int eFd = -1,
+                         int eOffset = 0, int eBase = 0) :
+            fd(fd), genlockHandle(-1), fd_metadata(eFd), magic(sMagic),
+            flags(flags), size(size), offset(0), bufferType(bufferType),
+            base(0), offset_metadata(eOffset), gpuaddr(0), pid(getpid()),
+            format(format), width(width), height(height), genlockPrivFd(-1),
+            base_metadata(eBase)
         {
             version = sizeof(native_handle);
             numInts = sNumInts;

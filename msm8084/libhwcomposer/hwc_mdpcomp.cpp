@@ -19,6 +19,7 @@
 #include "hwc_mdpcomp.h"
 #include <sys/ioctl.h>
 #include "external.h"
+#include "qdMetaData.h"
 
 namespace qhwc {
 
@@ -96,10 +97,14 @@ void MDPComp::print_info(hwc_layer_1_t* layer)
 
 void MDPComp::setVidInfo(hwc_layer_1_t *layer, ovutils::eMdpFlags &mdpFlags) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
+    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
 
     if(isSecureBuffer(hnd)) {
         ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
         sSecuredVid = true;
+    }
+    if((metadata->operation & PP_PARAM_INTERLACED) && metadata->interlaced) {
+        ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_DEINTERLACE);
     }
 }
 
