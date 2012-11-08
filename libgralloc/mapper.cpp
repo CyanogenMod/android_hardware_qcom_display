@@ -329,6 +329,21 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 break;
 
             }
+        case GRALLOC_MODULE_PERFORM_UPDATE_BUFFER_GEOMETRY:
+            {
+                int width = va_arg(args, int);
+                int height = va_arg(args, int);
+                int format = va_arg(args, int);
+                private_handle_t* hnd =  va_arg(args, private_handle_t*);
+                if (private_handle_t::validate(hnd)) {
+                    return res;
+                }
+                hnd->width = width;
+                hnd->height = height;
+                hnd->format = format;
+                res = 0;
+            }
+            break;
         default:
             break;
     }
