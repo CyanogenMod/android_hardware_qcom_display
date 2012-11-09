@@ -113,8 +113,8 @@ static void *vsync_loop(void *param)
        if (len < 0) {
            ALOGE ("FATAL:%s:not able to read file:%s, %s", __FUNCTION__,
                   vsync_timestamp_fb0, strerror(errno));
-           close (fd_timestamp);
-           return NULL;
+           //XXX: Need to continue here since SF needs vsync signal to compose
+           continue;
        }
 
        // extract timestamp
