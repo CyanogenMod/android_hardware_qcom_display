@@ -18,9 +18,6 @@
 #include "overlayUtils.h"
 #include "overlayMdp.h"
 
-#undef ALOG_TAG
-#define ALOG_TAG "overlay"
-
 namespace ovutils = overlay::utils;
 namespace overlay {
 
