@@ -27,7 +27,6 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define LOG_TAG "copybit"
 #include <cutils/log.h>
 #include <stdlib.h>
 #include <errno.h>
