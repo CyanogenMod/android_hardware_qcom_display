@@ -236,6 +236,8 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
             size = ALIGN(alignedw * alignedh * 2, 4096);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+            alignedw = VENUS_Y_STRIDE(COLOR_FMT_NV12, width);
+            alignedh = VENUS_Y_SCANLINES(COLOR_FMT_NV12, height);
             size = VENUS_BUFFER_SIZE(COLOR_FMT_NV12, width, height);
             break;
         default:
