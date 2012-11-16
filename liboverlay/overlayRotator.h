@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011, The Linux Foundation. All rights reserved.
+* Copyright (c) 2011,2013 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -55,6 +55,7 @@ public:
     virtual void setDownscale(int ds) = 0;
     virtual int getDstMemId() const = 0;
     virtual uint32_t getDstOffset() const = 0;
+    virtual uint32_t getDstFormat() const = 0;
     virtual void setEnable() = 0;
     virtual void setDisable() = 0;
     virtual bool enabled () const = 0;
@@ -125,6 +126,7 @@ public:
     virtual void setDownscale(int ds);
     virtual int getDstMemId() const;
     virtual uint32_t getDstOffset() const;
+    virtual uint32_t getDstFormat() const;
     virtual void setEnable();
     virtual void setDisable();
     virtual bool enabled () const;
@@ -186,6 +188,7 @@ public:
     virtual void setDownscale(int ds);
     virtual int getDstMemId() const;
     virtual uint32_t getDstOffset() const;
+    virtual uint32_t getDstFormat() const;
     virtual void setEnable();
     virtual void setDisable();
     virtual bool enabled () const;
