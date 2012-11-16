@@ -471,6 +471,16 @@ int ExternalDisplay::getModeOrder(int mode)
             return 17; //1080p@50Hz
         case HDMI_VFRMT_1920x1080p60_16_9:
             return 18; //1080p@60Hz
+        case HDMI_VFRMT_2560x1600p60_16_9:
+            return 19; //WQXGA@60Hz541
+        case HDMI_VFRMT_3840x2160p24_16_9:
+            return 20;//2160@24Hz
+        case HDMI_VFRMT_3840x2160p25_16_9:
+            return 21;//2160@25Hz
+        case HDMI_VFRMT_3840x2160p30_16_9:
+            return 22; //2160@30Hz
+        case HDMI_VFRMT_4096x2160p24_16_9:
+            return 23; //4kx2k@24Hz
     }
 }
 
@@ -718,6 +728,27 @@ void ExternalDisplay::getAttrForMode(int& width, int& height, int& fps) {
             height = 1080;
             fps = 60;
             break;
+        case HDMI_VFRMT_2560x1600p60_16_9:
+            width = 2560;
+            height = 1600;
+            fps = 60;
+            break;
+        case HDMI_VFRMT_3840x2160p24_16_9:
+            width = 3840;
+            height = 2160;
+            fps = 24;
+            break;
+        case HDMI_VFRMT_3840x2160p30_16_9:
+            width = 3840;
+            height = 2160;
+            fps = 30;
+            break;
+        case HDMI_VFRMT_4096x2160p24_16_9:
+            width = 4096;
+            height = 2160;
+            fps = 24;
+            break;
+
     }
 }
 
