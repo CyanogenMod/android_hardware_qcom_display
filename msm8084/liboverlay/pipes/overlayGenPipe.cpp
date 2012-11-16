@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -166,6 +166,11 @@ bool GenericPipe::commit() {
             pipeState = CLOSED;
             return false;
         }
+        /* Set the mdp src format to the output format of the rotator.
+         * The output format of the rotator might be different depending on
+         * whether fastyuv mode is enabled in the rotator.
+         */
+        mCtrlData.ctrl.updateSrcformat(mRot->getDstFormat());
     }
 
     ret = mCtrlData.ctrl.commit();

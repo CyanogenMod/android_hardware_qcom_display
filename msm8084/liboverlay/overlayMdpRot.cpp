@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
  *
@@ -31,25 +31,29 @@ MdpRot::MdpRot() {
 
 MdpRot::~MdpRot() { close(); }
 
-void MdpRot::setEnable() { mRotImgInfo.enable = 1; }
+inline void MdpRot::setEnable() { mRotImgInfo.enable = 1; }
 
-void MdpRot::setDisable() { mRotImgInfo.enable = 0; }
+inline void MdpRot::setDisable() { mRotImgInfo.enable = 0; }
 
-bool MdpRot::enabled() const { return mRotImgInfo.enable; }
+inline bool MdpRot::enabled() const { return mRotImgInfo.enable; }
 
-void MdpRot::setRotations(uint32_t r) { mRotImgInfo.rotations = r; }
+inline void MdpRot::setRotations(uint32_t r) { mRotImgInfo.rotations = r; }
 
-int MdpRot::getDstMemId() const {
+inline int MdpRot::getDstMemId() const {
     return mRotDataInfo.dst.memory_id;
 }
 
-uint32_t MdpRot::getDstOffset() const {
+inline uint32_t MdpRot::getDstOffset() const {
     return mRotDataInfo.dst.offset;
 }
 
-uint32_t MdpRot::getSessId() const { return mRotImgInfo.session_id; }
+inline uint32_t MdpRot::getDstFormat() const {
+    return mRotImgInfo.dst.format;
+}
 
-void MdpRot::setSrcFB() {
+inline uint32_t MdpRot::getSessId() const { return mRotImgInfo.session_id; }
+
+inline void MdpRot::setSrcFB() {
     mRotDataInfo.src.flags |= MDP_MEMORY_ID_TYPE_FB;
 }
 
@@ -67,11 +71,11 @@ void MdpRot::setDownscale(int ds) {
     mRotImgInfo.downscale_ratio = ds;
 }
 
-void MdpRot::save() {
+inline void MdpRot::save() {
     mLSRotImgInfo = mRotImgInfo;
 }
 
-bool MdpRot::rotConfChanged() const {
+inline bool MdpRot::rotConfChanged() const {
     // 0 means same
     if(0 == ::memcmp(&mRotImgInfo, &mLSRotImgInfo,
                 sizeof (msm_rotator_img_info))) {
@@ -111,13 +115,13 @@ void MdpRot::setSource(const overlay::utils::Whf& awhf) {
     mBufSize = awhf.size;
 }
 
-void MdpRot::setFlags(const utils::eMdpFlags& flags) {
+inline void MdpRot::setFlags(const utils::eMdpFlags& flags) {
     mRotImgInfo.secure = 0;
     if(flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
         mRotImgInfo.secure = 1;
 }
 
-void MdpRot::setTransform(const utils::eTransform& rot)
+inline void MdpRot::setTransform(const utils::eTransform& rot)
 {
     int r = utils::getMdpOrient(rot);
     setRotations(r);
@@ -127,14 +131,14 @@ void MdpRot::setTransform(const utils::eTransform& rot)
     ALOGE_IF(DEBUG_OVERLAY, "%s: r=%d", __FUNCTION__, r);
 }
 
-void MdpRot::setRotatorUsed(const bool& rotUsed) {
+inline void MdpRot::setRotatorUsed(const bool& rotUsed) {
     setDisable();
     if(rotUsed) {
         setEnable();
     }
 }
 
-void MdpRot::doTransform() {
+inline void MdpRot::doTransform() {
     if(mOrientation & utils::OVERLAY_TRANSFORM_ROT_90)
         utils::swap(mRotImgInfo.dst.width, mRotImgInfo.dst.height);
 }
