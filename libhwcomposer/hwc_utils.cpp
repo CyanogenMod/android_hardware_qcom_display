@@ -92,22 +92,15 @@ void closeContext(hwc_context_t *ctx)
 
     pthread_mutex_destroy(&(ctx->vstate.lock));
     pthread_cond_destroy(&(ctx->vstate.cond));
-
 }
 
-void dumpLayer(hwc_layer_1_t const* l)
+
+void dumpsys_log(android::String8& buf, const char* fmt, ...)
 {
-    ALOGD("\ttype=%d, flags=%08x, handle=%p, tr=%02x, blend=%04x, {%d,%d,%d,%d}"
-          ", {%d,%d,%d,%d}",
-          l->compositionType, l->flags, l->handle, l->transform, l->blending,
-          l->sourceCrop.left,
-          l->sourceCrop.top,
-          l->sourceCrop.right,
-          l->sourceCrop.bottom,
-          l->displayFrame.left,
-          l->displayFrame.top,
-          l->displayFrame.right,
-          l->displayFrame.bottom);
+    va_list varargs;
+    va_start(varargs, fmt);
+    buf.appendFormatV(fmt, varargs);
+    va_end(varargs);
 }
 
 static inline bool isAlphaScaled(hwc_layer_1_t const* layer) {

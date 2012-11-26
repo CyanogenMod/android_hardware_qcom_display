@@ -82,6 +82,8 @@ public:
     /* draw */
     static bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
 
+    static void dump(android::String8& buf);
+
 private:
     /* set/reset flags for MDPComp */
     static void setMDPCompLayerFlags(hwc_context_t *ctx,

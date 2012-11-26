@@ -23,6 +23,7 @@
 #include <hardware/hwcomposer.h>
 #include <gr.h>
 #include <gralloc_priv.h>
+#include <utils/String8.h>
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
@@ -124,6 +125,9 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
         const int fbWidth, const int fbHeight, int orient);
 bool isSecuring(hwc_context_t* ctx);
 bool isExternalActive(hwc_context_t* ctx);
+
+//Helper function to dump logs
+void dumpsys_log(android::String8& buf, const char* fmt, ...);
 
 //Sync point impl.
 int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy);
