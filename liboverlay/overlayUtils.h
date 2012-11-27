@@ -145,10 +145,12 @@ enum { INPUT_3D_MASK = 0xFFFF0000,
 enum { BARRIER_LAND = 1,
     BARRIER_PORT = 2 };
 
+#ifndef NO_HW_OVERLAY
 /* if SurfaceFlinger process gets killed in bypass mode, In initOverlay()
  * close all the pipes if it is opened after reboot.
  */
 int initOverlay(void);
+#endif
 
 inline uint32_t format3D(uint32_t x) { return x & 0xFF000; }
 inline uint32_t colorFormat(uint32_t fmt) {
