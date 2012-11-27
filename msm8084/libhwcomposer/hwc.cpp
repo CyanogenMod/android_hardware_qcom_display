@@ -236,6 +236,9 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
         default:
             return -EINVAL;
     }
+    // Enable HPD here, as during bootup unblank is called
+    // when SF is completely initialized
+    ctx->mExtDisplay->setHPD(1);
 
     if(ret < 0) {
         ALOGE("%s: failed. Dpy=%d, blank=%d : %s",
