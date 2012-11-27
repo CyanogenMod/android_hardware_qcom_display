@@ -51,7 +51,9 @@ static void openFramebufferDevice(hwc_context_t *ctx)
 void initContext(hwc_context_t *ctx)
 {
     openFramebufferDevice(ctx);
+#ifndef NO_HW_OVERLAY
     overlay::Overlay::initOverlay();
+#endif
     for(uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         ctx->mOverlay[i] = overlay::Overlay::getInstance(i);
     }
@@ -59,7 +61,9 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
+#ifdef BOARD_USES_HDMI
     ctx->mExtDisplay = new ExternalDisplay(ctx);
+#endif
     MDPComp::init(ctx);
 
     pthread_mutex_init(&(ctx->vstate.lock), NULL);
