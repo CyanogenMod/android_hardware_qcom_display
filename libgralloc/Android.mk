@@ -41,6 +41,6 @@ ifeq ($(TARGET_USES_ION),true)
 else
     LOCAL_SRC_FILES += ashmemalloc.cpp \
                        pmemalloc.cpp \
-		       pmem_bestfit_alloc.cpp	
+		       pmem_bestfit_alloc.cpp
 endif
 include $(BUILD_SHARED_LIBRARY)
