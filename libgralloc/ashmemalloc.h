@@ -27,58 +27,30 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef GRALLOC_MEMALLOC_H
-#define GRALLOC_MEMALLOC_H
+#ifndef GRALLOC_ASHMEMALLOC_H
+#define GRALLOC_ASHMEMALLOC_H
 
-#include <stdlib.h>
-#include <utils/RefBase.h>
+#include "memalloc.h"
+#include <linux/ion.h>
 
 namespace gralloc {
-
-struct alloc_data {
-    void           *base;
-    int            fd;
-    int            offset;
-    size_t         size;
-    size_t         align;
-    unsigned int   pHandle;
-    bool           uncached;
-    unsigned int   flags;
-    int            allocType;
-};
-
-class IMemAlloc : public android::RefBase {
+class AshmemAlloc : public IMemAlloc  {
 
     public:
-    // Allocate buffer - fill in the alloc_data
-    // structure and pass it in. Mapped address
-    // and fd are returned in the alloc_data struct
-    virtual int alloc_buffer(alloc_data& data) = 0;
+    virtual int alloc_buffer(alloc_data& data);
 
-    // Free buffer
     virtual int free_buffer(void *base, size_t size,
-                            int offset, int fd) = 0;
+                            int offset, int fd);
 
-    // Map buffer
     virtual int map_buffer(void **pBase, size_t size,
-                           int offset, int fd) = 0;
+                           int offset, int fd);
 
-    // Unmap buffer
     virtual int unmap_buffer(void *base, size_t size,
-                             int offset) = 0;
+                             int offset);
 
-    // Clean and invalidate
-    virtual int clean_buffer(void *base, size_t size,
-                             int offset, int fd) = 0;
-
-    // Destructor
-    virtual ~IMemAlloc() {};
-
-    enum {
-        FD_INIT = -1,
-    };
+    virtual int clean_buffer(void*base, size_t size,
+                             int offset, int fd);
 
 };
-
-} // end gralloc namespace
-#endif // GRALLOC_MEMALLOC_H
+}
+#endif /* GRALLOC_ASHMEMALLOC_H */
