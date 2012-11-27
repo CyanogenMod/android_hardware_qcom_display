@@ -66,8 +66,10 @@ public:
     /* expose state */
     utils::eOverlayState getState() const;
 
+#ifndef NO_HW_OVERLAY
     /* Closes open pipes */
     static void initOverlay();
+#endif
 
     /* Returns the per-display singleton instance of overlay */
     static Overlay* getInstance(int disp);
