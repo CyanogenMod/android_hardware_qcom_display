@@ -108,7 +108,7 @@ inline OvMem::OvMem() {
     mAllocType = 0;
     mBufSz = 0;
     mNumBuffers = 0;
-    mAlloc = gralloc::IAllocController::getInstance();
+    mAlloc = gralloc::IAllocController::getInstance(false);
 }
 
 inline OvMem::~OvMem() { }
@@ -136,12 +136,12 @@ inline bool OvMem::open(uint32_t numbufs,
     data.align = getpagesize();
     data.uncached = true;
 
-    err = mAlloc->allocate(data, allocFlags);
+    err = mAlloc->allocate(data, allocFlags, 0);
     //see if we can fallback to other heap
     //we can try MM_HEAP once if it's not secure playback
     if (err != 0 && !isSecure) {
         allocFlags |= GRALLOC_USAGE_PRIVATE_MM_HEAP;
-        err = mAlloc->allocate(data, allocFlags);
+        err = mAlloc->allocate(data, allocFlags, 0);
         if (err != 0) {
             ALOGE(" could not allocate from fallback heap");
             return false;
