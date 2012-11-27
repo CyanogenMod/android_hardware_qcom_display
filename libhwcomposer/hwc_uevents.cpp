@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2010 The Android Open Source Project
  * Copyright (C) 2012, The Linux Foundation. All rights reserved.
@@ -31,46 +32,39 @@ namespace qhwc {
 
 #define HWC_UEVENT_THREAD_NAME "hwcUeventThread"
 
-const char* MSMFB_HDMI_NODE = "fb1";
-
 static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 {
     int vsync = 0;
-    char* hdmi;
     int64_t timestamp = 0;
     const char *str = udata;
 
-    if(!strcasestr(str, "@/devices/virtual/graphics/fb")) {
+    if(!strcasestr(str, "change@/devices/virtual/switch/hdmi")) {
         ALOGD_IF(UEVENT_DEBUG, "%s: Not Ext Disp Event ", __FUNCTION__);
         return;
     }
-    hdmi = strcasestr(str, MSMFB_HDMI_NODE);
-    // parse HDMI events
+    int connected = -1; // initial value - will be set to  1/0 based on hotplug
+    // parse HDMI switch state for connect/disconnect
     // The event will be of the form:
-    // change@/devices/virtual/graphics/fb1 ACTION=change
-    // DEVPATH=/devices/virtual/graphics/fb1
-    // SUBSYSTEM=graphics HDCP_STATE=FAIL MAJOR=29
-    // for now just parsing onlin/offline info is enough
-    if (hdmi) {
-        str = udata;
-        int connected = -1; //some event other than online and offline .. e.g
-        if(!(strncmp(str,"online@",strlen("online@")))) {
+    // change@/devices/virtual/switch/hdmi ACTION=change
+    // SWITCH_STATE=1 or SWITCH_STATE=0
+    while(*str) {
+        if (!strncmp(str, "SWITCH_STATE=", strlen("SWITCH_STATE="))) {
+            connected = atoi(str + strlen("SWITCH_STATE="));
             //Disabled until SF calls unblank
             ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
-            connected = 1;
-        } else if(!(strncmp(str,"offline@",strlen("offline@")))) {
-            //Disabled until SF calls unblank
-            ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
-            connected = 0;
+            break;
         }
-        if(connected != -1) { //either we got online or offline
-            ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = connected;
-            ctx->mExtDisplay->setExternalDisplay(connected);
-            ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,connected);
-            Locker::Autolock _l(ctx->mExtSetLock); //hwc comp could be on
-            //TODO ideally should be done on "connected" not "online"
-            ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL, connected);
-        }
+        str += strlen(str) + 1;
+        if (str - udata >= len)
+            break;
+    }
+
+    if(connected != -1) { //either we got switch_state connected or disconnect
+        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = connected;
+        ctx->mExtDisplay->setExternalDisplay(connected);
+        ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,connected);
+        Locker::Autolock _l(ctx->mExtSetLock); //hwc comp could be on
+        ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL, connected);
     }
 }
 

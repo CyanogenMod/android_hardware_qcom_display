@@ -54,8 +54,6 @@ ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
     mCurrentMode(-1), mExternalDisplay(0), mModeCount(0), mHwcContext(ctx)
 {
     memset(&mVInfo, 0, sizeof(mVInfo));
-    //Enable HPD for HDMI
-    writeHPDOption(1);
 }
 
 void ExternalDisplay::setEDIDMode(int resMode) {
