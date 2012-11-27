@@ -192,15 +192,14 @@ Overlay *Overlay::sInstance[] = {0};
 
 Overlay* Overlay::getInstance(int disp) {
     if(sInstance[disp] == NULL) {
+#ifndef NO_HW_OVERLAY
+	if(utils::initOverlay() == -1) {
+            ALOGE("utils::initOverlay() ERROR!!");
+        }
+#endif
         sInstance[disp] = new Overlay();
     }
     return sInstance[disp];
-}
-
-void Overlay::initOverlay() {
-    if(utils::initOverlay() == -1) {
-        ALOGE("utils::initOverlay() ERROR!!");
-    }
 }
 
 } // overlay
