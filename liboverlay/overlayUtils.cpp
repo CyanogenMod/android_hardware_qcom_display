@@ -158,6 +158,7 @@ bool FrameBufferInfo::supportTrueMirroring() const {
     return (trueMirroringSupported && mBorderFillSupported);
 }
 
+#ifndef NO_HW_OVERLAY
 /* clears any VG pipes allocated to the fb devices */
 int initOverlay() {
     msmfb_mixer_info_req  req;
@@ -201,7 +202,7 @@ int initOverlay() {
     }
     return 0;
 }
-
+#endif
 //--------------------------------------------------------
 //Refer to graphics.h, gralloc_priv.h, msm_mdp.h
 int getMdpFormat(int format) {

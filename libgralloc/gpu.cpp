@@ -29,6 +29,7 @@
 #include "alloc_controller.h"
 
 using namespace gralloc;
+using android::sp;
 
 gpu_context_t::gpu_context_t(const private_module_t* module,
                              IAllocController* alloc_ctrl ) :
@@ -43,6 +44,7 @@ gpu_context_t::gpu_context_t(const private_module_t* module,
     common.module  = const_cast<hw_module_t*>(&module->base.common);
     common.close   = gralloc_close;
     alloc          = gralloc_alloc;
+    allocSize      = gralloc_alloc_size;
     free           = gralloc_free;
 
 }
@@ -136,7 +138,7 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
     else
         data.align = getpagesize();
     data.pHandle = (unsigned int) pHandle;
-    err = mAllocCtrl->allocate(data, usage);
+    err = mAllocCtrl->allocate(data, usage, 0);
 
     if (usage & GRALLOC_USAGE_PRIVATE_UNSYNCHRONIZED) {
         flags |= private_handle_t::PRIV_FLAGS_UNSYNCHRONIZED;
@@ -183,8 +185,10 @@ void gpu_context_t::getGrallocInformationFromFormat(int inputFormat,
                                                     int *bufferType)
 {
     *bufferType = BUFFER_TYPE_VIDEO;
-
-    if (inputFormat < 0x7) {
+    // HAL_PIXEL_FORMAT_RGB_888 is MPQ color format for VCAP videos
+    // value of RGB_888 is less than 0x7 and this format is not supported
+    // by the GPU
+    if ((inputFormat < 0x7) && (inputFormat != HAL_PIXEL_FORMAT_RGB_888)) {
         // RGB formats
         *bufferType = BUFFER_TYPE_UI;
     } else if ((inputFormat == HAL_PIXEL_FORMAT_R_8) ||
@@ -201,27 +205,15 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
 
     size_t size;
     int alignedw, alignedh;
-    int grallocFormat = format;
+
     int bufferType;
-
-    //If input format is HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED then based on
-    //the usage bits, gralloc assigns a format.
-    if(format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
-        if(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
-            grallocFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP; //NV12
-        else if(usage & GRALLOC_USAGE_HW_CAMERA_READ)
-            grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
-        else if(usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
-            grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
-    }
-
-    getGrallocInformationFromFormat(grallocFormat, &bufferType);
-    size = getBufferSizeAndDimensions(w, h, grallocFormat, alignedw, alignedh);
+    getGrallocInformationFromFormat(format, &bufferType);
+    size = getBufferSizeAndDimensions(w, h, format, alignedw, alignedh);
 
     if ((ssize_t)size <= 0)
         return -EINVAL;
-    size = (bufferSize >= size)? bufferSize : size;
 
+    size = bufferSize != 0 ? bufferSize : size;
     // All buffers marked as protected or for external
     // display need to go to overlay
     if ((usage & GRALLOC_USAGE_EXTERNAL_DISP) ||
@@ -237,7 +229,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
         err = gralloc_alloc_framebuffer(size, usage, pHandle);
     } else {
         err = gralloc_alloc_buffer(size, usage, pHandle, bufferType,
-                                   grallocFormat, alignedw, alignedh);
+                                   format, alignedw, alignedh);
     }
 
     if (err < 0) {

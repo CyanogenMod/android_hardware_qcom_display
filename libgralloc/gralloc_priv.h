@@ -34,16 +34,22 @@ enum {
     /* gralloc usage bits indicating the type
      * of allocation that should be used */
 
-    /* SYSTEM heap comes from kernel vmalloc,
-     * can never be uncached, is not secured*/
-    GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP     =       GRALLOC_USAGE_PRIVATE_0,
+    /* ADSP heap is deprecated, use only if using pmem */
+    GRALLOC_USAGE_PRIVATE_ADSP_HEAP       =       GRALLOC_USAGE_PRIVATE_0,
     /* SF heap is used for application buffers, is not secured */
     GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP  =       GRALLOC_USAGE_PRIVATE_1,
+    /* SMI heap is deprecated, use only if using pmem */
+    GRALLOC_USAGE_PRIVATE_SMI_HEAP        =       GRALLOC_USAGE_PRIVATE_2,
+    /* SYSTEM heap comes from kernel vmalloc,
+     * can never be uncached, is not secured*/
+    GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP     =       GRALLOC_USAGE_PRIVATE_3,
     /* IOMMU heap comes from manually allocated pages,
      * can be cached/uncached, is not secured */
     GRALLOC_USAGE_PRIVATE_IOMMU_HEAP      =       GRALLOC_USAGE_PRIVATE_2,
     /* MM heap is a carveout heap for video, can be secured*/
     GRALLOC_USAGE_PRIVATE_MM_HEAP         =       GRALLOC_USAGE_PRIVATE_3,
+    /* WRITEBACK heap is a carveout heap for writeback, can be secured*/
+    GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP  =       0x04000000,
     /* CAMERA heap is a carveout heap for camera, is not secured*/
     GRALLOC_USAGE_PRIVATE_CAMERA_HEAP     =       0x01000000,
 
@@ -51,6 +57,10 @@ enum {
      * cannot be used with noncontiguous heaps */
     GRALLOC_USAGE_PRIVATE_UNCACHED        =       0x02000000,
 
+    /* This flag needs to be set when using a non-contiguous heap from ION.
+     * If not set, the system heap is assumed to be coming from ashmem
+     */
+    GRALLOC_USAGE_PRIVATE_ION             =       0x00200000,
     /* This flag can be set to disable genlock synchronization
      * for the gralloc buffer. If this flag is set the caller
      * is required to perform explicit synchronization.
@@ -92,11 +102,18 @@ enum {
 
 #define INTERLACE_MASK 0x80
 #define S3D_FORMAT_MASK 0xFF000
+#define DEVICE_PMEM "/dev/pmem"
+#define DEVICE_PMEM_ADSP "/dev/pmem_adsp"
+#define DEVICE_PMEM_SMIPOOL "/dev/pmem_smipool"
 /*****************************************************************************/
 enum {
     /* OEM specific HAL formats */
     HAL_PIXEL_FORMAT_NV12_ENCODEABLE        = 0x102,
+#ifdef QCOM_ICS_COMPAT
+    HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED     = 0x108,
+#else
     HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED     = 0x7FA30C03,
+#endif
     HAL_PIXEL_FORMAT_YCbCr_420_SP           = 0x109,
     HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO    = 0x7FA30C01,
     HAL_PIXEL_FORMAT_YCrCb_422_SP           = 0x10B,
@@ -193,7 +210,7 @@ struct private_handle_t : public native_handle {
             fd(fd), genlockHandle(-1), magic(sMagic),
             flags(flags), size(size), offset(0),
             bufferType(bufferType), base(0), gpuaddr(0),
-            pid(0), format(format),
+            pid(getpid()), format(format),
             width(width), height(height), genlockPrivFd(-1)
         {
             version = sizeof(native_handle);
