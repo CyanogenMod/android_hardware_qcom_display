@@ -17,8 +17,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef HWC_UIMIRROR_H
-#define HWC_UIMIRROR_H
+#ifndef HWC_FBUPDATE_H
+#define HWC_FBUPDATE_H
 #include "hwc_utils.h"
 #include "overlay.h"
 
@@ -26,24 +26,26 @@
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 
 namespace qhwc {
-//Feature for Mirroring UI on the External display
-class UIMirrorOverlay {
+namespace ovutils = overlay::utils;
+
+//Framebuffer update
+class FBUpdate {
     public:
         // Sets up members and prepares overlay if conditions are met
-        static bool prepare(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
+        static bool prepare(hwc_context_t *ctx, hwc_layer_1_t *fblayer, int dpy);
         // Draws layer if this feature is on
-        static bool draw(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
+        static bool draw(hwc_context_t *ctx, hwc_layer_1_t *fblayer, int dpy);
         //Reset values
         static void reset();
     private:
         //Configures overlay
-        static bool configure(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
-        //The chosen overlay state.
-        static ovutils::eOverlayState sState;
+        static bool configure(hwc_context_t *ctx, hwc_layer_1_t *fblayer,
+            int dpy);
         //Flags if this feature is on.
-        static bool sIsUiMirroringOn;
+        static bool sModeOn[HWC_NUM_DISPLAY_TYPES];
+        static ovutils::eDest sDest[HWC_NUM_DISPLAY_TYPES];
 };
 
 }; //namespace qhwc
 
-#endif //HWC_UIMIRROR_H
+#endif //HWC_FBUPDATE_H
