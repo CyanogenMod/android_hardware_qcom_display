@@ -445,13 +445,17 @@ bool ExternalDisplay::writeHPDOption(int userOption) const
  */
 bool ExternalDisplay::post()
 {
-    if(mFd == -1) {
+    if(mFd == -1)
         return false;
-    } else if(ioctl(mFd, MSMFB_OVERLAY_COMMIT, &mExternalDisplay) == -1) {
-         ALOGE("%s: MSMFB_OVERLAY_COMMIT failed, str: %s", __FUNCTION__,
-                                                          strerror(errno));
+
+    struct mdp_display_commit ext_commit;
+    ext_commit.flags |= MDP_DISPLAY_COMMIT_OVERLAY;
+    if (ioctl(mFd, MSMFB_DISPLAY_COMMIT, &ext_commit) == -1) {
+         ALOGE("%s: MSMFB_DISPLAY_COMMIT for external failed, str: %s",
+                                                __FUNCTION__, strerror(errno));
          return false;
     }
+
     return true;
 }
 

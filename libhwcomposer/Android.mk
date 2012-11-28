@@ -17,5 +17,6 @@ LOCAL_SRC_FILES               := hwc.cpp          \
                                  hwc_uevents.cpp  \
                                  hwc_vsync.cpp    \
                                  hwc_fbupdate.cpp \
+                                 hwc_mdpcomp.cpp  \
 
 include $(BUILD_SHARED_LIBRARY)

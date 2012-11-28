@@ -28,6 +28,7 @@
 #include "hwc_utils.h"
 #include "hwc_video.h"
 #include "hwc_fbupdate.h"
+#include "hwc_mdpcomp.h"
 #include "external.h"
 
 using namespace qhwc;
@@ -97,6 +98,20 @@ static void reset(hwc_context_t *ctx, int numDisplays,
     FBUpdate::reset();
 }
 
+//clear prev layer prop flags and realloc for current frame
+static void reset_layer_prop(hwc_context_t* ctx, int dpy) {
+    int layer_count = ctx->listStats[dpy].numAppLayers;
+
+    if(ctx->layerProp[dpy]) {
+       delete[] ctx->layerProp[dpy];
+       ctx->layerProp[dpy] = NULL;
+    }
+
+    if(layer_count) {
+       ctx->layerProp[dpy] = new LayerProp[layer_count];
+    }
+}
+
 static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
@@ -109,7 +124,11 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         if(fbLayer->handle) {
             setListStats(ctx, list, HWC_DISPLAY_PRIMARY);
             ctx->mLayerCache->updateLayerCache(list);
-            VideoOverlay::prepare(ctx, list, HWC_DISPLAY_PRIMARY);
+            reset_layer_prop(ctx, HWC_DISPLAY_PRIMARY);
+            if(!MDPComp::configure(ctx, list)) {
+                VideoOverlay::prepare(ctx, list, HWC_DISPLAY_PRIMARY);
+                FBUpdate::prepare(ctx, fbLayer, HWC_DISPLAY_PRIMARY);
+            }
         }
     }
     return 0;
@@ -123,13 +142,14 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
         ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive &&
         ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected) {
 
-        setListStats(ctx, list, HWC_DISPLAY_EXTERNAL);
-
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         if(fbLayer->handle) {
-            FBUpdate::prepare(ctx, fbLayer, HWC_DISPLAY_EXTERNAL);
+            setListStats(ctx, list, HWC_DISPLAY_EXTERNAL);
+            reset_layer_prop(ctx, HWC_DISPLAY_EXTERNAL);
+
             VideoOverlay::prepare(ctx, list, HWC_DISPLAY_EXTERNAL);
+            FBUpdate::prepare(ctx, fbLayer, HWC_DISPLAY_EXTERNAL);
         }
     }
     return 0;
@@ -145,24 +165,20 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 
     ctx->mOverlay->configBegin();
 
-    //If securing of h/w in progress skip comp using overlay.
-    //TODO remove from here when sending FB via overlay
-    if(ctx->mSecuring == false) {
-        for (uint32_t i = 0; i < numDisplays; i++) {
-            hwc_display_contents_1_t *list = displays[i];
-            switch(i) {
-                case HWC_DISPLAY_PRIMARY:
-                    ret = hwc_prepare_primary(dev, list);
-                    break;
-                case HWC_DISPLAY_EXTERNAL:
-                    ret = hwc_prepare_external(dev, list);
-                    break;
-                default:
-                    ret = -EINVAL;
-            }
+    for (int32_t i = numDisplays - 1; i >= 0; i--) {
+        hwc_display_contents_1_t *list = displays[i];
+        switch(i) {
+            case HWC_DISPLAY_PRIMARY:
+                ret = hwc_prepare_primary(dev, list);
+                break;
+            case HWC_DISPLAY_EXTERNAL:
+
+                ret = hwc_prepare_external(dev, list);
+                break;
+            default:
+                ret = -EINVAL;
         }
     }
-
     ctx->mOverlay->configDone();
 
     return ret;
@@ -269,14 +285,25 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
 
         hwc_sync(ctx, list, HWC_DISPLAY_PRIMARY);
-
         if (!VideoOverlay::draw(ctx, list, HWC_DISPLAY_PRIMARY)) {
             ALOGE("%s: VideoOverlay::draw fail!", __FUNCTION__);
             ret = -1;
         }
+        if (!MDPComp::draw(ctx, list)) {
+            ALOGE("%s: MDPComp::draw fail!", __FUNCTION__);
+            ret = -1;
+        }
+
         //TODO We dont check for SKIP flag on this layer because we need PAN
         //always. Last layer is always FB
-        if(list->hwLayers[last].compositionType == HWC_FRAMEBUFFER_TARGET) {
+        private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
+        if(fbLayer->compositionType == HWC_FRAMEBUFFER_TARGET && hnd) {
+            if(!(fbLayer->flags & HWC_SKIP_LAYER)) {
+                if (!FBUpdate::draw(ctx, fbLayer, HWC_DISPLAY_PRIMARY)) {
+                    ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
+                    ret = -1;
+                }
+            }
             if (ctx->mFbDev->post(ctx->mFbDev, fbLayer->handle)) {
                 ALOGE("%s: ctx->mFbDev->post fail!", __FUNCTION__);
                 return -1;
