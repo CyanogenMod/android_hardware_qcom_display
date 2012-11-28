@@ -1,6 +1,9 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,6 +54,7 @@ class QueuedBufferStore;
 class ExternalDisplay;
 class IFBUpdate;
 class MDPComp;
+class CopyBit;
 
 struct MDPInfo {
     int version;
@@ -81,7 +85,6 @@ struct ListStats {
     int yuvIndex;
     bool needsAlphaScale;
 };
-
 
 struct LayerProp {
     uint32_t mFlags; //qcom specific layer flags
@@ -133,7 +136,8 @@ bool isExternalActive(hwc_context_t* ctx);
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
 
 //Sync point impl.
-int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy);
+int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
+                                                    int fd);
 
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
@@ -214,6 +218,10 @@ struct hwc_context_t {
     const hwc_procs_t* proc;
     //Framebuffer device
     framebuffer_device_t *mFbDev;
+
+    //CopyBit objects
+    qhwc::CopyBit *mCopyBit[HWC_NUM_DISPLAY_TYPES];
+
     //Overlay object - NULL for non overlay devices
     overlay::Overlay *mOverlay;
     //QService object
