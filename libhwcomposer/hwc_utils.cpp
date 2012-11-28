@@ -60,6 +60,7 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
     ctx->mExtDisplay = new ExternalDisplay(ctx);
+    ctx->mLayerCache = new LayerCache();
     MDPComp::init(ctx);
 
     pthread_mutex_init(&(ctx->vstate.lock), NULL);
@@ -208,7 +209,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy) {
     int ret = 0;
 #ifdef USE_FENCE_SYNC
     struct mdp_buf_sync data;
-    int acquireFd[4];
+    int acquireFd[MAX_NUM_LAYERS];
     int count = 0;
     int releaseFd = -1;
     int fbFd = -1;
@@ -219,7 +220,8 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy) {
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if((list->hwLayers[i].compositionType == HWC_OVERLAY ||
             list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) &&
-            list->hwLayers[i].acquireFenceFd != -1) {
+            list->hwLayers[i].acquireFenceFd != -1 &&
+            (list->hwLayers[i].flags & HWC_MDPCOMP)) {
             acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
         }
     }
@@ -249,6 +251,73 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy) {
     list->retireFenceFd = releaseFd;
 #endif
     return ret;
+}
+
+void LayerCache::resetLayerCache(int num) {
+    for(uint32_t i = 0; i < MAX_NUM_LAYERS; i++) {
+        hnd[i] = NULL;
+    }
+    numHwLayers = num;
+}
+
+void LayerCache::updateLayerCache(hwc_display_contents_1_t* list) {
+
+    int numFbLayers = 0;
+    int numCacheableLayers = 0;
+
+    canUseLayerCache = false;
+    //Bail if geometry changed or num of layers changed
+    if(list->flags & HWC_GEOMETRY_CHANGED ||
+       list->numHwLayers != numHwLayers ) {
+        resetLayerCache(list->numHwLayers);
+        return;
+    }
+
+    for(uint32_t i = 0; i < list->numHwLayers; i++) {
+        //Bail on skip layers
+        if(list->hwLayers[i].flags & HWC_SKIP_LAYER) {
+            resetLayerCache(list->numHwLayers);
+            return;
+        }
+
+        if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER) {
+            numFbLayers++;
+            if(hnd[i] == NULL) {
+                hnd[i] = list->hwLayers[i].handle;
+            } else if (hnd[i] ==
+                       list->hwLayers[i].handle) {
+                numCacheableLayers++;
+            } else {
+                hnd[i] = NULL;
+                return;
+            }
+        } else {
+            hnd[i] = NULL;
+        }
+    }
+    if(numFbLayers == numCacheableLayers)
+        canUseLayerCache = true;
+
+    //XXX: The marking part is separate, if MDP comp wants
+    // to use it in the future. Right now getting MDP comp
+    // to use this is more trouble than it is worth.
+    markCachedLayersAsOverlay(list);
+}
+
+void LayerCache::markCachedLayersAsOverlay(hwc_display_contents_1_t* list) {
+    //This optimization only works if ALL the layer handles
+    //that were on the framebuffer didn't change.
+    if(canUseLayerCache){
+        for(uint32_t i = 0; i < list->numHwLayers; i++) {
+            if (list->hwLayers[i].handle &&
+                list->hwLayers[i].handle == hnd[i] &&
+                list->hwLayers[i].compositionType != HWC_FRAMEBUFFER_TARGET)
+            {
+                list->hwLayers[i].compositionType = HWC_OVERLAY;
+            }
+        }
+    }
+
 }
 
 };//namespace
