@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -10,7 +10,7 @@
 *      copyright notice, this list of conditions and the following
 *      disclaimer in the documentation and/or other materials provided
 *      with the distribution.
-*    * Neither the name of Code Aurora Forum, Inc. nor the names of its
+*    * Neither the name of The Linux Foundation nor the names of its
 *      contributors may be used to endorse or promote products derived
 *      from this software without specific prior written permission.
 *
@@ -151,13 +151,6 @@ int FrameBufferInfo::getHeight() const {
     return mFBHeight;
 }
 
-bool FrameBufferInfo::supportTrueMirroring() const {
-    char value[PROPERTY_VALUE_MAX] = {0};
-    property_get("hw.trueMirrorSupported", value, "0");
-    int trueMirroringSupported = atoi(value);
-    return (trueMirroringSupported && mBorderFillSupported);
-}
-
 /* clears any VG pipes allocated to the fb devices */
 int initOverlay() {
     msmfb_mixer_info_req  req;
@@ -251,20 +244,6 @@ int getMdpFormat(int format) {
     }
     // not reached
     return -1;
-}
-
-//Set by client as HDMI/WFD
-void setExtType(const int& type) {
-    if(type != HDMI && type != WFD) {
-        ALOGE("%s: Unrecognized type %d", __func__, type);
-        return;
-    }
-    sExtType = type;
-}
-
-//Return External panel type set by client.
-int getExtType() {
-    return sExtType;
 }
 
 bool is3DTV() {

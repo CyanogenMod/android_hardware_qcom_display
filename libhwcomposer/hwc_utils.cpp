@@ -15,16 +15,15 @@
  * limitations under the License.
  */
 
+#include <sys/ioctl.h>
 #include <EGL/egl.h>
-#include <overlay.h>
 #include <cutils/properties.h>
 #include <gralloc_priv.h>
 #include <fb_priv.h>
+#include <overlay.h>
 #include "hwc_utils.h"
 #include "mdp_version.h"
-#include "hwc_video.h"
 #include "external.h"
-#include "hwc_mdpcomp.h"
 #include "QService.h"
 
 namespace qhwc {
@@ -52,16 +51,13 @@ void initContext(hwc_context_t *ctx)
 {
     openFramebufferDevice(ctx);
     overlay::Overlay::initOverlay();
-    for(uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
-        ctx->mOverlay[i] = overlay::Overlay::getInstance(i);
-    }
+    ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->mQService = qService::QService::getInstance(ctx);
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
     ctx->mExtDisplay = new ExternalDisplay(ctx);
     ctx->mLayerCache = new LayerCache();
-    MDPComp::init(ctx);
 
     pthread_mutex_init(&(ctx->vstate.lock), NULL);
     pthread_cond_init(&(ctx->vstate.cond), NULL);
@@ -73,11 +69,9 @@ void initContext(hwc_context_t *ctx)
 
 void closeContext(hwc_context_t *ctx)
 {
-    for(uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
-        if(ctx->mOverlay[i]) {
-            delete ctx->mOverlay[i];
-            ctx->mOverlay[i] = NULL;
-        }
+    if(ctx->mOverlay) {
+        delete ctx->mOverlay;
+        ctx->mOverlay = NULL;
     }
 
     if(ctx->mFbDev) {

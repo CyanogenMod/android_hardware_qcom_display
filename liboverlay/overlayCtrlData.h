@@ -72,8 +72,6 @@ public:
     int  getPipeId() const;
     /* ctrl fd */
     int  getFd() const;
-    utils::Dim getAspectRatio(const utils::Whf& whf) const;
-    utils::Dim getAspectRatio(const utils::Dim& dim) const;
 
     /* access for screen info */
     utils::ScreenInfo getScreenInfo() const;

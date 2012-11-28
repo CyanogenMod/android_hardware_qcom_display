@@ -197,13 +197,11 @@ struct hwc_context_t {
     hwc_composer_device_1_t device;
     const hwc_procs_t* proc;
 
-    int overlayInUse[HWC_NUM_DISPLAY_TYPES];
-
     //Framebuffer device
     framebuffer_device_t *mFbDev;
 
     //Overlay object - NULL for non overlay devices
-    overlay::Overlay *mOverlay[HWC_NUM_DISPLAY_TYPES];
+    overlay::Overlay *mOverlay;
 
     //QService object
     qService::QService *mQService;

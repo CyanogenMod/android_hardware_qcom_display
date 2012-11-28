@@ -14,7 +14,8 @@ LOCAL_SRC_FILES := \
       overlayUtils.cpp \
       overlayMdp.cpp \
       overlayRotator.cpp \
-      mdpRotator.cpp \
-      mdssRotator.cpp
+      overlayMdpRot.cpp \
+      overlayMdssRot.cpp \
+      pipes/overlayGenPipe.cpp
 
 include $(BUILD_SHARED_LIBRARY)
