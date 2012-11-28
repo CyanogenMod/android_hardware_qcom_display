@@ -58,6 +58,7 @@ struct DisplayAttributes {
     uint32_t vsync_period; //nanos
     uint32_t xres;
     uint32_t yres;
+    uint32_t stride;
     float xdpi;
     float ydpi;
     int fd;
@@ -76,10 +77,15 @@ struct ListStats {
     int yuvIndex;
 };
 
+
+struct LayerProp {
+    uint32_t mFlags; //qcom specific layer flags
+    LayerProp():mFlags(0) {};
+};
+
+// LayerProp::flag values
 enum {
-    HWC_MDPCOMP = 0x00000002,
-    HWC_LAYER_RESERVED_0 = 0x00000004,
-    HWC_LAYER_RESERVED_1 = 0x00000008
+    HWC_MDPCOMP = 0x00000001,
 };
 
 class LayerCache {
@@ -103,6 +109,8 @@ class LayerCache {
 };
 
 
+
+
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_1_t const* l);
@@ -113,7 +121,7 @@ void closeContext(hwc_context_t *ctx);
 //Crops source buffer against destination and FB boundaries
 void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
         const int fbWidth, const int fbHeight, int orient);
-
+bool isSecuring(hwc_context_t* ctx);
 bool isExternalActive(hwc_context_t* ctx);
 
 //Sync point impl.
@@ -196,33 +204,24 @@ struct vsync_state {
 struct hwc_context_t {
     hwc_composer_device_1_t device;
     const hwc_procs_t* proc;
-
     //Framebuffer device
     framebuffer_device_t *mFbDev;
-
     //Overlay object - NULL for non overlay devices
     overlay::Overlay *mOverlay;
-
     //QService object
     qService::QService *mQService;
-
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
-
     qhwc::MDPInfo mMDP;
-
     qhwc::DisplayAttributes dpyAttr[HWC_NUM_DISPLAY_TYPES];
-
     qhwc::ListStats listStats[HWC_NUM_DISPLAY_TYPES];
-
     qhwc::LayerCache *mLayerCache;
+    qhwc::LayerProp *layerProp[HWC_NUM_DISPLAY_TYPES];
 
     //Securing in progress indicator
     bool mSecuring;
-
     //Display in secure mode indicator
     bool mSecureMode;
-
     //Lock to prevent set from being called while blanking
     mutable Locker mBlankLock;
     //Lock to protect set when detaching external disp

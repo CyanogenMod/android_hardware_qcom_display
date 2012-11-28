@@ -22,6 +22,7 @@
 #include <fb_priv.h>
 #include <overlay.h>
 #include "hwc_utils.h"
+#include "hwc_mdpcomp.h"
 #include "mdp_version.h"
 #include "external.h"
 #include "QService.h"
@@ -37,6 +38,8 @@ static void openFramebufferDevice(hwc_context_t *ctx)
         private_module_t* m = reinterpret_cast<private_module_t*>(
                 ctx->mFbDev->common.module);
         //xres, yres may not be 32 aligned
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].stride = m->finfo.line_length /
+                                                (m->info.xres/8);
         ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres = m->info.xres;
         ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres = m->info.yres;
         ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xdpi = ctx->mFbDev->xdpi;
@@ -58,6 +61,7 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
     ctx->mExtDisplay = new ExternalDisplay(ctx);
     ctx->mLayerCache = new LayerCache();
+    MDPComp::init(ctx);
 
     pthread_mutex_init(&(ctx->vstate.lock), NULL);
     pthread_cond_init(&(ctx->vstate.cond), NULL);
@@ -151,6 +155,16 @@ static inline void calc_cut(float& leftCutRatio, float& topCutRatio,
     }
 }
 
+bool isSecuring(hwc_context_t* ctx) {
+    if((ctx->mMDP.version < qdutils::MDSS_V5) &&
+       (ctx->mMDP.version > qdutils::MDP_V3_0) &&
+        ctx->mSecuring) {
+        return true;
+    }
+    return false;
+}
+
+
 //Crops source buffer against destination and FB boundaries
 void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
         const int fbWidth, const int fbHeight, int orient) {
@@ -214,8 +228,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy) {
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if((list->hwLayers[i].compositionType == HWC_OVERLAY ||
             list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) &&
-            list->hwLayers[i].acquireFenceFd != -1 &&
-            (list->hwLayers[i].flags & HWC_MDPCOMP)) {
+            list->hwLayers[i].acquireFenceFd != -1 ){
             acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
         }
     }
