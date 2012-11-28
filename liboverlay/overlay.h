@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -10,7 +10,7 @@
 *      copyright notice, this list of conditions and the following
 *      disclaimer in the documentation and/or other materials provided
 *      with the distribution.
-*    * Neither the name of Code Aurora Forum, Inc. nor the names of its
+*    * Neither the name of The Linux Foundation. nor the names of its
 *      contributors may be used to endorse or promote products derived
 *      from this software without specific prior written permission.
 *
@@ -31,66 +31,174 @@
 #define OVERLAY_H
 
 #include "overlayUtils.h"
-#include "overlayState.h"
-#include "overlayImpl.h"
 
 namespace overlay {
-/**/
+class GenericPipe;
+
 class Overlay : utils::NoCopy {
 public:
     /* dtor close */
     ~Overlay();
 
-    /* Overlay related func */
+    /* Marks the beginning of a drawing round, resets usage bits on pipes
+     * Should be called when drawing begins before any pipe config is done.
+     */
+    void configBegin();
 
-    /* Following is the same as the pure virt interface in ov impl  */
+    /* Marks the end of config for this drawing round
+     * Will do garbage collection of pipe objects and thus calling UNSETs,
+     * closing FDs, removing rotator objects and memory, if allocated.
+     * Should be called after all pipe configs are done.
+     */
+    void configDone();
 
-    bool setSource(const utils::PipeArgs args[utils::MAX_PIPES],
-            utils::eDest dest = utils::OV_PIPE_ALL);
-    bool setCrop(const utils::Dim& d,
-            utils::eDest dest = utils::OV_PIPE_ALL);
-    bool setTransform(const int orientation,
-            utils::eDest dest = utils::OV_PIPE_ALL);
-    bool setPosition(const utils::Dim& dim,
-            utils::eDest dest = utils::OV_PIPE_ALL);
-    bool commit(utils::eDest dest = utils::OV_PIPE_ALL);
+    /* Returns an available pipe based on the type of pipe requested. When ANY
+     * is requested, the first available VG or RGB is returned. If no pipe is
+     * available for the display "dpy" then INV is returned. Note: If a pipe is
+     * assigned to a certain display, then it cannot be assigned to another
+     * display without being garbage-collected once */
+    utils::eDest nextPipe(utils::eMdpPipeType, int dpy);
 
-    bool queueBuffer(int fd, uint32_t offset,
-            utils::eDest dest = utils::OV_PIPE_ALL);
+    void setSource(const utils::PipeArgs args, utils::eDest dest);
+    void setCrop(const utils::Dim& d, utils::eDest dest);
+    void setTransform(const int orientation, utils::eDest dest);
+    void setPosition(const utils::Dim& dim, utils::eDest dest);
+    bool commit(utils::eDest dest);
+    bool queueBuffer(int fd, uint32_t offset, utils::eDest dest);
 
-    void dump() const;
-
-    /* state related functions */
-    void setState(utils::eOverlayState s);
-
-    /* expose state */
-    utils::eOverlayState getState() const;
-
-    /* Closes open pipes */
+    /* Closes open pipes, called during startup */
     static void initOverlay();
-
-    /* Returns the per-display singleton instance of overlay */
-    static Overlay* getInstance(int disp);
+    /* Returns the singleton instance of overlay */
+    static Overlay* getInstance();
+    /* Returns total of available ("unallocated") pipes */
+    static int availablePipes();
 
 private:
     /* Ctor setup */
-    Overlay();
+    explicit Overlay();
+    /*Validate index range, abort if invalid */
+    void validate(int index);
+    void dump() const;
 
-    /* reset all pointers */
-    void reset();
+    /* Just like a Facebook for pipes, but much less profile info */
+    struct PipeBook {
+        enum { DPY_PRIMARY, DPY_EXTERNAL, DPY_UNUSED };
 
-    /* Holds the state, state transition logic
-     * In the meantime, using simple enum rather than
-     * a class */
-    OverlayState mState;
+        void init();
+        void destroy();
+        /* Check if pipe exists and return true, false otherwise */
+        bool valid();
 
-    /* Holds the actual overlay impl, set when changing state*/
-    OverlayImplBase *mOv;
+        /* Hardware pipe wrapper */
+        GenericPipe *mPipe;
+        /* Display using this pipe. Refer to enums above */
+        int mDisplay;
 
-    /* Per-display Singleton Instance HWC_NUM_DISPLAY_TYPES */
-    static Overlay *sInstance[2];
+        /* operations on bitmap */
+        static bool pipeUsageUnchanged();
+        static void setUse(int index);
+        static void resetUse(int index);
+        static bool isUsed(int index);
+        static bool isNotUsed(int index);
+        static void save();
+
+        static void setAllocation(int index);
+        static void resetAllocation(int index);
+        static bool isAllocated(int index);
+        static bool isNotAllocated(int index);
+        /* Returns total of available ("unallocated") pipes */
+        static int availablePipes();
+
+        static int NUM_PIPES;
+
+    private:
+        //usage tracks if a successful commit happened. So a pipe could be
+        //allocated to a display, but it may not end up using it for various
+        //reasons. If one display actually uses a pipe then it amy not be
+        //used by another display, without an UNSET in between.
+        static int sPipeUsageBitmap;
+        static int sLastUsageBitmap;
+        //Tracks which pipe objects are allocated. This does not imply that they
+        //will actually be used. For example, a display might choose to acquire
+        //3 pipe objects in one shot and proceed with config only if it gets all
+        //3. The bitmap helps allocate different pipe objects on each request.
+        static int sAllocatedBitmap;
+    };
+
+    PipeBook mPipeBook[utils::OV_INVALID]; //Used as max
+
+    /* Dump string */
+    char mDumpStr[256];
+
+    /* Singleton Instance*/
+    static Overlay *sInstance;
 };
 
-} // overlay
+inline void Overlay::validate(int index) {
+    OVASSERT(index >=0 && index < PipeBook::NUM_PIPES, \
+        "%s, Index out of bounds: %d", __FUNCTION__, index);
+    OVASSERT(mPipeBook[index].valid(), "Pipe does not exist %s",
+            utils::getDestStr((utils::eDest)index));
+}
+
+inline int Overlay::availablePipes() {
+    return PipeBook::availablePipes();
+}
+
+inline int Overlay::PipeBook::availablePipes() {
+    int used = 0;
+    int bmp = sAllocatedBitmap;
+    for(; bmp; used++) {
+        //clearing from lsb
+        bmp = bmp & (bmp - 1);
+    }
+    return NUM_PIPES - used;
+}
+
+inline bool Overlay::PipeBook::valid() {
+    return (mPipe != NULL);
+}
+
+inline bool Overlay::PipeBook::pipeUsageUnchanged() {
+    return (sPipeUsageBitmap == sLastUsageBitmap);
+}
+
+inline void Overlay::PipeBook::setUse(int index) {
+    sPipeUsageBitmap |= (1 << index);
+}
+
+inline void Overlay::PipeBook::resetUse(int index) {
+    sPipeUsageBitmap &= ~(1 << index);
+}
+
+inline bool Overlay::PipeBook::isUsed(int index) {
+    return sPipeUsageBitmap & (1 << index);
+}
+
+inline bool Overlay::PipeBook::isNotUsed(int index) {
+    return !isUsed(index);
+}
+
+inline void Overlay::PipeBook::save() {
+    sLastUsageBitmap = sPipeUsageBitmap;
+}
+
+inline void Overlay::PipeBook::setAllocation(int index) {
+    sAllocatedBitmap |= (1 << index);
+}
+
+inline void Overlay::PipeBook::resetAllocation(int index) {
+    sAllocatedBitmap &= ~(1 << index);
+}
+
+inline bool Overlay::PipeBook::isAllocated(int index) {
+    return sAllocatedBitmap & (1 << index);
+}
+
+inline bool Overlay::PipeBook::isNotAllocated(int index) {
+    return !isAllocated(index);
+}
+
+}; // overlay
 
 #endif // OVERLAY_H

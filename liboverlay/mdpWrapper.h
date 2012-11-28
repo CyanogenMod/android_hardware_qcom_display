@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+* Copyright (c) 2011, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -10,7 +10,7 @@
 *      copyright notice, this list of conditions and the following
 *      disclaimer in the documentation and/or other materials provided
 *      with the distribution.
-*    * Neither the name of Code Aurora Forum, Inc. nor the names of its
+*    * Neither the name of The Linux Foundation nor the names of its
 *      contributors may be used to endorse or promote products derived
 *      from this software without specific prior written permission.
 *
@@ -152,7 +152,7 @@ inline bool setOverlay(int fd, mdp_overlay& ov) {
     return true;
 }
 
-inline bool endRotator(int fd, int sessionId) {
+inline bool endRotator(int fd, uint32_t sessionId) {
     if (ioctl(fd, MSM_ROTATOR_IOCTL_FINISH, &sessionId) < 0) {
         ALOGE("Failed to call ioctl MSM_ROTATOR_IOCTL_FINISH err=%s",
                 strerror(errno));
@@ -214,8 +214,12 @@ inline void dump(const char* const s, const mdp_overlay& ov) {
     dump("src", ov.src);
     dump("src_rect", ov.src_rect);
     dump("dst_rect", ov.dst_rect);
+    /*
+    Commented off to prevent verbose logging, since user_data could have 8 or so
+    fields which are mostly 0
     dump("user_data", ov.user_data,
             sizeof(ov.user_data)/sizeof(ov.user_data[0]));
+    */
 }
 inline void dump(const char* const s, const msmfb_img& ov) {
     ALOGE("%s msmfb_img w=%d h=%d format=%d %s",
@@ -239,7 +243,7 @@ inline void dump(const char* const s, const uint32_t u[], uint32_t cnt) {
     }
 }
 inline void dump(const char* const s, const msm_rotator_img_info& rot) {
-    ALOGE("%s msm_rotator_img_info sessid=%d dstx=%d dsty=%d rot=%d, ena=%d",
+    ALOGE("%s msm_rotator_img_info sessid=%u dstx=%d dsty=%d rot=%d, ena=%d",
             s, rot.session_id, rot.dst_x, rot.dst_y,
             rot.rotations, rot.enable);
     dump("src", rot.src);
@@ -247,7 +251,7 @@ inline void dump(const char* const s, const msm_rotator_img_info& rot) {
     dump("src_rect", rot.src_rect);
 }
 inline void dump(const char* const s, const msm_rotator_data_info& rot) {
-    ALOGE("%s msm_rotator_data_info sessid=%d verkey=%d",
+    ALOGE("%s msm_rotator_data_info sessid=%u verkey=%d",
             s, rot.session_id, rot.version_key);
     dump("src", rot.src);
     dump("dst", rot.dst);

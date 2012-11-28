@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+* Copyright (c) 2011, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -10,7 +10,7 @@
 *      copyright notice, this list of conditions and the following
 *      disclaimer in the documentation and/or other materials provided
 *      with the distribution.
-*    * Neither the name of Code Aurora Forum, Inc. nor the names of its
+*    * Neither the name of The Linux Foundation. nor the names of its
 *      contributors may be used to endorse or promote products derived
 *      from this software without specific prior written permission.
 *
@@ -38,136 +38,36 @@
 
 namespace overlay {
 
-class IRotatorHw;
-/*
-* RotatorBase. No members, just interface.
-* can also be =0 with empty impl in cpp.
-* */
-class RotatorBase {
-public:
-    /* Most of the below are No op funcs for RotatorBase */
-    virtual ~RotatorBase() {}
-    virtual bool init() = 0;
-    virtual bool close() = 0;
-    virtual void setSource(const utils::Whf& wfh) = 0;
-    virtual void setFlags(const utils::eMdpFlags& flags) = 0;
-    virtual void setTransform(const utils::eTransform& rot,
-            const bool& rotUsed) = 0;
-    virtual bool commit() = 0;
-    virtual bool queueBuffer(int fd, uint32_t offset) = 0;
-
-    virtual void setEnable() = 0;
-    virtual void setDisable() = 0;
-    virtual void setRotations(uint32_t r) = 0;
-    virtual void setSrcFB() = 0;
-
-    virtual bool enabled() const = 0;
-    virtual uint32_t getSessId() const = 0;
-    virtual int getDstMemId() const = 0;
-    virtual uint32_t getDstOffset() const = 0;
-    virtual void dump() const = 0;
-
-protected:
-    //Hardware specific rotator impl.
-    IRotatorHw *mRot;
-};
-
-/*
- * Rotator Hw Interface. Any hardware specific implementation should inherit
- * from this.
- */
-class IRotatorHw {
-public:
-    /* Most of the below are No op funcs for RotatorBase */
-    virtual ~IRotatorHw() {}
-    /* init fd for rotator. map bufs is defered */
-    virtual bool init() = 0;
-    /* close fd, mem */
-    virtual bool close() = 0;
-    /* set src */
-    virtual void setSource(const utils::Whf& wfh) = 0;
-    /* set mdp flags, will use only stuff necessary for rotator */
-    virtual void setFlags(const utils::eMdpFlags& flags) = 0;
-    /* Set rotation and calculate */
-    virtual void setTransform(const utils::eTransform& rot,
-            const bool& rotUsed) = 0;
-    /* calls underlying wrappers to start rotator */
-    virtual bool commit() = 0;
-    /* Lazy buffer allocation. queue buffer */
-    virtual bool queueBuffer(int fd, uint32_t offset) = 0;
-    /* set enable/disable flag */
-    virtual void setEnable() = 0;
-    virtual void setDisable() = 0;
-    /* set rotator flag*/
-    virtual void setRotations(uint32_t r) = 0;
-    /* Mark src as FB (non-ION) */
-    virtual void setSrcFB() = 0;
-    /* Retusn true if rotator enabled */
-    virtual bool enabled() const = 0;
-    /* returns rotator session id */
-    virtual uint32_t getSessId() const = 0;
-    /* get dst (for offset and memory id) non-virt */
-    virtual int getDstMemId() const = 0;
-    virtual uint32_t getDstOffset() const = 0;
-    /* dump the state of the object */
-    virtual void dump() const = 0;
-
-    enum { TYPE_MDP, TYPE_MDSS };
-    /*Returns rotator h/w type */
-    static int getRotatorHwType();
-};
-
-/*
-* Actual Rotator impl.
-* */
-class Rotator : public RotatorBase
+class Rotator
 {
 public:
-    explicit Rotator();
+    enum { TYPE_MDP, TYPE_MDSS };
     virtual ~Rotator();
-    virtual bool init();
-    virtual bool close();
-    virtual void setSource(const utils::Whf& wfh);
-    virtual void setFlags(const utils::eMdpFlags& flags);
+    virtual bool init() = 0;
+    virtual bool close() = 0;
+    virtual void setSource(const utils::Whf& wfh) = 0;
+    virtual void setFlags(const utils::eMdpFlags& flags) = 0;
     virtual void setTransform(const utils::eTransform& rot,
-            const bool& rotUsed);
-    virtual bool commit();
-    virtual void setRotations(uint32_t r);
-    virtual void setSrcFB();
-    virtual int getDstMemId() const;
-    virtual uint32_t getDstOffset() const;
-    virtual void setEnable();
-    virtual void setDisable();
-    virtual bool enabled () const;
-    virtual uint32_t getSessId() const;
-    virtual bool queueBuffer(int fd, uint32_t offset);
-    virtual void dump() const;
-};
+            const bool& rotUsed) = 0;
+    virtual bool commit() = 0;
+    virtual void setRotations(uint32_t r) = 0;
+    virtual void setSrcFB() = 0;
+    virtual int getDstMemId() const = 0;
+    virtual uint32_t getDstOffset() const = 0;
+    virtual void setEnable() = 0;
+    virtual void setDisable() = 0;
+    virtual bool enabled () const = 0;
+    virtual uint32_t getSessId() const = 0;
+    virtual bool queueBuffer(int fd, uint32_t offset) = 0;
+    virtual void dump() const = 0;
+    static Rotator *getRotator();
 
-/*
-* Null/Empty impl of RotatorBase
-* */
-class NullRotator : public RotatorBase {
-public:
-    /* Most of the below are No op funcs for RotatorBase */
-    virtual ~NullRotator();
-    virtual bool init();
-    virtual bool close();
-    virtual void setSource(const utils::Whf& wfh);
-    virtual void setFlags(const utils::eMdpFlags& flags);
-    virtual void setTransform(const utils::eTransform& rot,
-            const bool& rotUsed);
-    virtual bool commit();
-    virtual void setRotations(uint32_t r);
-    virtual bool queueBuffer(int fd, uint32_t offset);
-    virtual void setEnable();
-    virtual void setDisable();
-    virtual bool enabled () const;
-    virtual void setSrcFB();
-    virtual uint32_t getSessId() const;
-    virtual int getDstMemId() const;
-    virtual uint32_t getDstOffset() const;
-    virtual void dump() const;
+protected:
+    explicit Rotator() {}
+
+private:
+    /*Returns rotator h/w type */
+    static int getRotatorHwType();
 };
 
 /*
@@ -209,29 +109,29 @@ struct RotMem {
 * MDP rot holds MDP's rotation related structures.
 *
 * */
-class MdpRot : public IRotatorHw {
+class MdpRot : public Rotator {
 public:
-    explicit MdpRot();
-    ~MdpRot();
-    bool init();
-    bool close();
-    void setSource(const utils::Whf& whf);
+    virtual ~MdpRot();
+    virtual bool init();
+    virtual bool close();
+    virtual void setSource(const utils::Whf& wfh);
     virtual void setFlags(const utils::eMdpFlags& flags);
-    void setTransform(const utils::eTransform& rot,
+    virtual void setTransform(const utils::eTransform& rot,
             const bool& rotUsed);
-    bool commit();
-    bool queueBuffer(int fd, uint32_t offset);
-    void setEnable();
-    void setDisable();
-    void setRotations(uint32_t r);
-    void setSrcFB();
-    bool enabled() const;
-    uint32_t getSessId() const;
-    int getDstMemId() const;
-    uint32_t getDstOffset() const;
-    void dump() const;
+    virtual bool commit();
+    virtual void setRotations(uint32_t r);
+    virtual void setSrcFB();
+    virtual int getDstMemId() const;
+    virtual uint32_t getDstOffset() const;
+    virtual void setEnable();
+    virtual void setDisable();
+    virtual bool enabled () const;
+    virtual uint32_t getSessId() const;
+    virtual bool queueBuffer(int fd, uint32_t offset);
+    virtual void dump() const;
 
 private:
+    explicit MdpRot();
     /* remap rot buffers */
     bool remap(uint32_t numbufs);
     bool open_i(uint32_t numbufs, uint32_t bufsz);
@@ -261,35 +161,37 @@ private:
     RotMem mMem;
     /* Single Rotator buffer size */
     uint32_t mBufSize;
+
+    friend Rotator* Rotator::getRotator();
 };
 
 /*
 +* MDSS Rot holds MDSS's rotation related structures.
 +*
 +* */
-class MdssRot : public IRotatorHw {
+class MdssRot : public Rotator {
 public:
-    explicit MdssRot();
-    ~MdssRot();
-    bool init();
-    bool close();
-    void setSource(const utils::Whf& whf);
+    virtual ~MdssRot();
+    virtual bool init();
+    virtual bool close();
+    virtual void setSource(const utils::Whf& wfh);
     virtual void setFlags(const utils::eMdpFlags& flags);
-    void setTransform(const utils::eTransform& rot,
+    virtual void setTransform(const utils::eTransform& rot,
             const bool& rotUsed);
-    bool commit();
-    bool queueBuffer(int fd, uint32_t offset);
-    void setEnable();
-    void setDisable();
-    void setRotations(uint32_t r);
-    void setSrcFB();
-    bool enabled() const;
-    uint32_t getSessId() const;
-    int getDstMemId() const;
-    uint32_t getDstOffset() const;
-    void dump() const;
+    virtual bool commit();
+    virtual void setRotations(uint32_t r);
+    virtual void setSrcFB();
+    virtual int getDstMemId() const;
+    virtual uint32_t getDstOffset() const;
+    virtual void setEnable();
+    virtual void setDisable();
+    virtual bool enabled () const;
+    virtual uint32_t getSessId() const;
+    virtual bool queueBuffer(int fd, uint32_t offset);
+    virtual void dump() const;
 
 private:
+    explicit MdssRot();
     /* remap rot buffers */
     bool remap(uint32_t numbufs);
     bool open_i(uint32_t numbufs, uint32_t bufsz);
@@ -312,144 +214,9 @@ private:
     uint32_t mBufSize;
     /* Enable/Disable Mdss Rot*/
     bool mEnabled;
+
+    friend Rotator* Rotator::getRotator();
 };
-
-//--------------inlines------------------------------------
-
-///// Rotator /////
-inline Rotator::Rotator() {
-    int type = IRotatorHw::getRotatorHwType();
-    if(type == IRotatorHw::TYPE_MDP) {
-        mRot = new MdpRot(); //will do reset
-    } else if(type == IRotatorHw::TYPE_MDSS) {
-        mRot = new MdssRot();
-    } else {
-        ALOGE("%s Unknown h/w type %d", __FUNCTION__, type);
-    }
-}
-inline Rotator::~Rotator() {
-    delete mRot; //will do close
-}
-inline bool Rotator::init() {
-    if(!mRot->init()) {
-        ALOGE("Rotator::init failed");
-        return false;
-    }
-    return true;
-}
-inline bool Rotator::close() {
-    return mRot->close();
-}
-inline void Rotator::setSource(const utils::Whf& whf) {
-    mRot->setSource(whf);
-}
-inline void Rotator::setFlags(const utils::eMdpFlags& flags) {
-    mRot->setFlags(flags);
-}
-inline void Rotator::setTransform(const utils::eTransform& rot,
-        const bool& rotUsed)
-{
-    mRot->setTransform(rot, rotUsed);
-}
-inline bool Rotator::commit() {
-    return mRot->commit();
-}
-inline void Rotator::setEnable(){ mRot->setEnable(); }
-inline void Rotator::setDisable(){ mRot->setDisable(); }
-inline bool Rotator::enabled() const { return mRot->enabled(); }
-inline void Rotator::setSrcFB() { mRot->setSrcFB(); }
-inline int Rotator::getDstMemId() const {
-    return mRot->getDstMemId();
-}
-inline uint32_t Rotator::getDstOffset() const {
-    return mRot->getDstOffset();
-}
-inline void Rotator::setRotations(uint32_t rot) {
-    mRot->setRotations (rot);
-}
-inline uint32_t Rotator::getSessId() const {
-    return mRot->getSessId();
-}
-inline void Rotator::dump() const {
-    ALOGE("== Dump Rotator start ==");
-    mRot->dump();
-    ALOGE("== Dump Rotator end ==");
-}
-inline bool Rotator::queueBuffer(int fd, uint32_t offset) {
-    return mRot->queueBuffer(fd, offset);
-}
-
-
-///// Null Rotator /////
-inline NullRotator::~NullRotator() {}
-inline bool NullRotator::init() { return true; }
-inline bool NullRotator::close() { return true; }
-inline bool NullRotator::commit() { return true; }
-inline void NullRotator::setSource(const utils::Whf& wfh) {}
-inline void NullRotator::setFlags(const utils::eMdpFlags& flags) {}
-inline void NullRotator::setTransform(const utils::eTransform& rot, const bool&)
-{}
-inline void NullRotator::setRotations(uint32_t) {}
-inline void NullRotator::setEnable() {}
-inline void NullRotator::setDisable() {}
-inline bool NullRotator::enabled() const { return false; }
-inline uint32_t NullRotator::getSessId() const { return 0; }
-inline bool NullRotator::queueBuffer(int fd, uint32_t offset) { return true; }
-inline void NullRotator::setSrcFB() {}
-inline int NullRotator::getDstMemId() const { return -1; }
-inline uint32_t NullRotator::getDstOffset() const { return 0;}
-inline void NullRotator::dump() const {
-    ALOGE("== Dump NullRotator dump (null) start/end ==");
-}
-
-
-//// MdpRot ////
-inline MdpRot::MdpRot() { reset(); }
-inline MdpRot::~MdpRot() { close(); }
-inline void MdpRot::setEnable() { mRotImgInfo.enable = 1; }
-inline void MdpRot::setDisable() { mRotImgInfo.enable = 0; }
-inline bool MdpRot::enabled() const { return mRotImgInfo.enable; }
-inline void MdpRot::setRotations(uint32_t r) { mRotImgInfo.rotations = r; }
-inline int MdpRot::getDstMemId() const {
-    return mRotDataInfo.dst.memory_id;
-}
-inline uint32_t MdpRot::getDstOffset() const {
-    return mRotDataInfo.dst.offset;
-}
-inline uint32_t MdpRot::getSessId() const { return mRotImgInfo.session_id; }
-inline void MdpRot::setSrcFB() {
-    mRotDataInfo.src.flags |= MDP_MEMORY_ID_TYPE_FB;
-}
-inline void MdpRot::save() {
-    mLSRotImgInfo = mRotImgInfo;
-}
-inline bool MdpRot::rotConfChanged() const {
-    // 0 means same
-    if(0 == ::memcmp(&mRotImgInfo, &mLSRotImgInfo,
-                sizeof (msm_rotator_img_info))) {
-        return false;
-    }
-    return true;
-}
-
-
-//// MdssRot ////
-inline MdssRot::MdssRot() { reset(); }
-inline MdssRot::~MdssRot() { close(); }
-inline void MdssRot::setEnable() { mEnabled = true; }
-inline void MdssRot::setDisable() { mEnabled = false; }
-inline bool MdssRot::enabled() const { return mEnabled; }
-inline void MdssRot::setRotations(uint32_t flags) { mRotInfo.flags |= flags; }
-inline int MdssRot::getDstMemId() const {
-    return mRotData.dst_data.memory_id;
-}
-inline uint32_t MdssRot::getDstOffset() const {
-    return mRotData.dst_data.offset;
-}
-inline uint32_t MdssRot::getSessId() const { return mRotInfo.id; }
-inline void MdssRot::setSrcFB() {
-    mRotData.data.flags |= MDP_MEMORY_ID_TYPE_FB;
-}
 
 } // overlay
 

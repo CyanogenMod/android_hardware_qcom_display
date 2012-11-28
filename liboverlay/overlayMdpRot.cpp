@@ -1,18 +1,20 @@
 /*
-* Copyright (C) 2008 The Android Open Source Project
-* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
+ * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
 */
 
 #include "overlayUtils.h"
@@ -21,6 +23,48 @@
 namespace ovutils = overlay::utils;
 
 namespace overlay {
+
+MdpRot::MdpRot() {
+    reset();
+    init();
+}
+
+MdpRot::~MdpRot() { close(); }
+
+void MdpRot::setEnable() { mRotImgInfo.enable = 1; }
+
+void MdpRot::setDisable() { mRotImgInfo.enable = 0; }
+
+bool MdpRot::enabled() const { return mRotImgInfo.enable; }
+
+void MdpRot::setRotations(uint32_t r) { mRotImgInfo.rotations = r; }
+
+int MdpRot::getDstMemId() const {
+    return mRotDataInfo.dst.memory_id;
+}
+
+uint32_t MdpRot::getDstOffset() const {
+    return mRotDataInfo.dst.offset;
+}
+
+uint32_t MdpRot::getSessId() const { return mRotImgInfo.session_id; }
+
+void MdpRot::setSrcFB() {
+    mRotDataInfo.src.flags |= MDP_MEMORY_ID_TYPE_FB;
+}
+
+void MdpRot::save() {
+    mLSRotImgInfo = mRotImgInfo;
+}
+
+bool MdpRot::rotConfChanged() const {
+    // 0 means same
+    if(0 == ::memcmp(&mRotImgInfo, &mLSRotImgInfo,
+                sizeof (msm_rotator_img_info))) {
+        return false;
+    }
+    return true;
+}
 
 bool MdpRot::init()
 {
@@ -116,9 +160,9 @@ bool MdpRot::open_i(uint32_t numbufs, uint32_t bufsz)
 
 bool MdpRot::close() {
     bool success = true;
-    if(mFd.valid() && (getSessId() > 0)) {
+    if(mFd.valid() && (getSessId() != 0)) {
         if(!mdp_wrapper::endRotator(mFd.getFD(), getSessId())) {
-            ALOGE("Mdp Rot error endRotator, fd=%d sessId=%d",
+            ALOGE("Mdp Rot error endRotator, fd=%d sessId=%u",
                     mFd.getFD(), getSessId());
             success = false;
         }
