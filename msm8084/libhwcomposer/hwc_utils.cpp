@@ -1,6 +1,9 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, The Linux Foundation All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +17,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#define HWC_UTILS_DEBUG 0
 #include <sys/ioctl.h>
 #include <EGL/egl.h>
 #include <cutils/properties.h>
@@ -25,9 +28,10 @@
 #include "hwc_mdpcomp.h"
 #include "hwc_fbupdate.h"
 #include "mdp_version.h"
+#include "hwc_copybit.h"
 #include "external.h"
 #include "QService.h"
-
+#include "comptype.h"
 namespace qhwc {
 
 // Opens Framebuffer device
@@ -66,6 +70,19 @@ void initContext(hwc_context_t *ctx)
     ctx->mFBUpdate[HWC_DISPLAY_PRIMARY] =
         IFBUpdate::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
         HWC_DISPLAY_PRIMARY);
+
+    char value[PROPERTY_VALUE_MAX];
+    // Check if the target supports copybit compostion (dyn/mdp/c2d) to
+    // decide if we need to open the copybit module.
+    int compositionType =
+        qdutils::QCCompositionType::getInstance().getCompositionType();
+
+    if (compositionType & (qdutils::COMPOSITION_TYPE_DYN |
+                           qdutils::COMPOSITION_TYPE_MDP |
+                           qdutils::COMPOSITION_TYPE_C2D)) {
+            ctx->mCopyBit[HWC_DISPLAY_PRIMARY] = new CopyBit();
+    }
+
     ctx->mExtDisplay = new ExternalDisplay(ctx);
     for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++)
         ctx->mLayerCache[i] = new LayerCache();
@@ -85,6 +102,13 @@ void closeContext(hwc_context_t *ctx)
     if(ctx->mOverlay) {
         delete ctx->mOverlay;
         ctx->mOverlay = NULL;
+    }
+
+    for(int i = 0; i< HWC_NUM_DISPLAY_TYPES; i++) {
+        if(ctx->mCopyBit[i]) {
+            delete ctx->mCopyBit[i];
+            ctx->mCopyBit[i] = NULL;
+        }
     }
 
     if(ctx->mFbDev) {
@@ -251,13 +275,15 @@ bool isExternalActive(hwc_context_t* ctx) {
     return ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive;
 }
 
-int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy) {
+int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
+                                                        int fd) {
     int ret = 0;
     struct mdp_buf_sync data;
     int acquireFd[MAX_NUM_LAYERS];
     int count = 0;
     int releaseFd = -1;
     int fbFd = -1;
+    memset(&data, 0, sizeof(data));
     bool swapzero = false;
     data.flags = MDP_BUF_SYNC_FLAG_WAIT;
     data.acq_fen_fd = acquireFd;
@@ -270,34 +296,51 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy) {
 
     //Accumulate acquireFenceFds
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
-        if((list->hwLayers[i].compositionType == HWC_OVERLAY ||
-            list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) &&
-            list->hwLayers[i].acquireFenceFd != -1 ){
+        if(list->hwLayers[i].compositionType == HWC_OVERLAY &&
+                        list->hwLayers[i].acquireFenceFd != -1) {
             if(UNLIKELY(swapzero))
                 acquireFd[count++] = -1;
             else
+                acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
+        }
+        if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
+            if(UNLIKELY(swapzero))
+                acquireFd[count++] = -1;
+            else if(fd != -1) {
+                //set the acquireFD from fd - which is coming from c2d
+                acquireFd[count++] = fd;
+                // Buffer sync IOCTL should be async when using c2d fence is
+                // used
+                data.flags &= ~MDP_BUF_SYNC_FLAG_WAIT;
+            } else if(list->hwLayers[i].acquireFenceFd != -1)
                 acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
         }
     }
 
     data.acq_fen_fd_cnt = count;
     fbFd = ctx->dpyAttr[dpy].fd;
-
     //Waits for acquire fences, returns a release fence
-    if(LIKELY(!swapzero))
+    if(LIKELY(!swapzero)) {
+        uint64_t start = systemTime();
         ret = ioctl(fbFd, MSMFB_BUFFER_SYNC, &data);
+        ALOGD_IF(HWC_UTILS_DEBUG, "%s: time taken for MSMFB_BUFFER_SYNC IOCTL = %d",
+                            __FUNCTION__, (size_t) ns2ms(systemTime() - start));
+    }
     if(ret < 0) {
         ALOGE("ioctl MSMFB_BUFFER_SYNC failed, err=%s",
                 strerror(errno));
     }
-
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
-        if((list->hwLayers[i].compositionType == HWC_OVERLAY ||
-            list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET)) {
+        if(list->hwLayers[i].compositionType == HWC_OVERLAY ||
+           list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             //Close the acquireFenceFds
             if(list->hwLayers[i].acquireFenceFd > 0) {
                 close(list->hwLayers[i].acquireFenceFd);
                 list->hwLayers[i].acquireFenceFd = -1;
+            }
+            if(fd > 0) {
+                close(fd);
+                fd = -1;
             }
             //Populate releaseFenceFds.
             if(UNLIKELY(swapzero))
