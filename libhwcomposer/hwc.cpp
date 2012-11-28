@@ -27,12 +27,11 @@
 #include <mdp_version.h>
 #include "hwc_utils.h"
 #include "hwc_video.h"
-#include "hwc_uimirror.h"
+#include "hwc_fbupdate.h"
 #include "external.h"
-#include "hwc_mdpcomp.h"
 
-#define VSYNC_DEBUG 0
 using namespace qhwc;
+#define VSYNC_DEBUG 0
 
 static int hwc_device_open(const struct hw_module_t* module,
                            const char* name,
@@ -81,7 +80,6 @@ static void reset(hwc_context_t *ctx, int numDisplays,
                   hwc_display_contents_1_t** displays) {
     memset(ctx->listStats, 0, sizeof(ctx->listStats));
     for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++){
-        ctx->overlayInUse[i] = false;
         ctx->listStats[i].yuvIndex = -1;
         hwc_display_contents_1_t *list = displays[i];
         // XXX:SurfaceFlinger no longer guarantees that this
@@ -95,6 +93,8 @@ static void reset(hwc_context_t *ctx, int numDisplays,
             }
         }
     }
+    VideoOverlay::reset();
+    FBUpdate::reset();
 }
 
 static int hwc_prepare_primary(hwc_composer_device_1 *dev,
@@ -108,14 +108,8 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         if(fbLayer->handle) {
             setListStats(ctx, list, HWC_DISPLAY_PRIMARY);
-            if(VideoOverlay::prepare(ctx, list, HWC_DISPLAY_PRIMARY)) {
-                ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = true;
-            } else if(MDPComp::configure(ctx, list)) {
-                ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = true;
-            } else {
-                ctx->overlayInUse[HWC_DISPLAY_PRIMARY] = false;
-            }
             ctx->mLayerCache->updateLayerCache(list);
+            VideoOverlay::prepare(ctx, list, HWC_DISPLAY_PRIMARY);
         }
     }
     return 0;
@@ -134,16 +128,8 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         if(fbLayer->handle) {
-            if(UIMirrorOverlay::prepare(ctx, fbLayer)) {
-                ctx->overlayInUse[HWC_DISPLAY_EXTERNAL] = true;
-            }
-
-            if(VideoOverlay::prepare(ctx, list, HWC_DISPLAY_EXTERNAL)) {
-                ctx->overlayInUse[HWC_DISPLAY_EXTERNAL] = true;
-            } else {
-                ctx->mOverlay[HWC_DISPLAY_EXTERNAL]->setState(
-                        ovutils::OV_UI_MIRROR);
-            }
+            FBUpdate::prepare(ctx, fbLayer, HWC_DISPLAY_EXTERNAL);
+            VideoOverlay::prepare(ctx, list, HWC_DISPLAY_EXTERNAL);
         }
     }
     return 0;
@@ -154,24 +140,31 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    Locker::Autolock _l(ctx->mBlankLock);
     reset(ctx, numDisplays, displays);
 
-    //If securing of h/w in progress skip comp using overlay.
-    if(ctx->mSecuring == true) return 0;
+    ctx->mOverlay->configBegin();
 
-    for (uint32_t i = 0; i < numDisplays; i++) {
-        hwc_display_contents_1_t *list = displays[i];
-        switch(i) {
-            case HWC_DISPLAY_PRIMARY:
-                ret = hwc_prepare_primary(dev, list);
-                break;
-            case HWC_DISPLAY_EXTERNAL:
-                ret = hwc_prepare_external(dev, list);
-                break;
-            default:
-                ret = -EINVAL;
+    //If securing of h/w in progress skip comp using overlay.
+    //TODO remove from here when sending FB via overlay
+    if(ctx->mSecuring == false) {
+        for (uint32_t i = 0; i < numDisplays; i++) {
+            hwc_display_contents_1_t *list = displays[i];
+            switch(i) {
+                case HWC_DISPLAY_PRIMARY:
+                    ret = hwc_prepare_primary(dev, list);
+                    break;
+                case HWC_DISPLAY_EXTERNAL:
+                    ret = hwc_prepare_external(dev, list);
+                    break;
+                default:
+                    ret = -EINVAL;
+            }
         }
     }
+
+    ctx->mOverlay->configDone();
+
     return ret;
 }
 
@@ -205,13 +198,14 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     private_module_t* m = reinterpret_cast<private_module_t*>(
         ctx->mFbDev->common.module);
+    Locker::Autolock _l(ctx->mBlankLock);
     int ret = 0;
     ALOGD("%s: Doing Dpy=%d, blank=%d", __FUNCTION__, dpy, blank);
     switch(dpy) {
         case HWC_DISPLAY_PRIMARY:
             if(blank) {
-                Locker::Autolock _l(ctx->mBlankLock);
-                ctx->mOverlay[dpy]->setState(ovutils::OV_CLOSED);
+                ctx->mOverlay->configBegin();
+                ctx->mOverlay->configDone();
                 ret = ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_POWERDOWN);
             } else {
                 ret = ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_UNBLANK);
@@ -280,10 +274,6 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ALOGE("%s: VideoOverlay::draw fail!", __FUNCTION__);
             ret = -1;
         }
-        if (MDPComp::draw(ctx, list)) {
-            ALOGE("%s: MDPComp::draw fail!", __FUNCTION__);
-            ret = -1;
-        }
         //TODO We dont check for SKIP flag on this layer because we need PAN
         //always. Last layer is always FB
         if(list->hwLayers[last].compositionType == HWC_FRAMEBUFFER_TARGET) {
@@ -317,8 +307,8 @@ static int hwc_set_external(hwc_context_t *ctx,
         private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
         if(fbLayer->compositionType == HWC_FRAMEBUFFER_TARGET &&
                 !(fbLayer->flags & HWC_SKIP_LAYER) && hnd) {
-            if (!UIMirrorOverlay::draw(ctx, fbLayer)) {
-                ALOGE("%s: UIMirrorOverlay::draw fail!", __FUNCTION__);
+            if (!FBUpdate::draw(ctx, fbLayer, HWC_DISPLAY_EXTERNAL)) {
+                ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
                 ret = -1;
             }
         }
@@ -337,11 +327,6 @@ static int hwc_set(hwc_composer_device_1 *dev,
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     Locker::Autolock _l(ctx->mBlankLock);
-
-    for(uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
-        if(!ctx->overlayInUse[i])
-            ctx->mOverlay[i]->setState(ovutils::OV_CLOSED);
-    }
 
     for (uint32_t i = 0; i < numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
