@@ -16,12 +16,16 @@
  */
 #ifndef HWC_VIDEO_H
 #define HWC_VIDEO_H
+
 #include "hwc_utils.h"
+#include "overlayUtils.h"
 
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 
 namespace qhwc {
+namespace ovutils = overlay::utils;
+
 //Feature for using overlay to display videos.
 class VideoOverlay {
 public:
@@ -34,24 +38,21 @@ public:
     //resets values
     static void reset();
 private:
-    //Choose an appropriate overlay state based on conditions
-    static void chooseState(hwc_context_t *ctx, int dpy,
-        hwc_layer_1_t *yuvLayer);
     //Configures overlay for video prim and ext
     static bool configure(hwc_context_t *ctx, int dpy,
             hwc_layer_1_t *yuvlayer);
+
     //Marks layer flags if this feature is used
     static void markFlags(hwc_layer_1_t *yuvLayer);
-    //The chosen overlay state.
-    static ovutils::eOverlayState sState[HWC_NUM_DISPLAY_TYPES];
     //Flags if this feature is on.
     static bool sIsModeOn[HWC_NUM_DISPLAY_TYPES];
+    static ovutils::eDest sDest[HWC_NUM_DISPLAY_TYPES];
 };
 
 inline void VideoOverlay::reset() {
     for(uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         sIsModeOn[i] = false;
-        sState[i] = ovutils::OV_CLOSED;
+        sDest[i] = ovutils::OV_INVALID;
     }
 }
 }; //namespace qhwc
