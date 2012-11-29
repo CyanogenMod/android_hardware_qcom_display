@@ -28,8 +28,11 @@
 #include "memalloc.h"
 #include "alloc_controller.h"
 #include <qdMetaData.h>
+#include "mdp_version.h"
 
 using namespace gralloc;
+
+#define SZ_1M 0x100000
 
 gpu_context_t::gpu_context_t(const private_module_t* module,
                              IAllocController* alloc_ctrl ) :
@@ -130,11 +133,18 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
     data.offset = 0;
     data.fd = -1;
     data.base = 0;
-    data.size = size;
     if(format == HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED)
         data.align = 8192;
     else
         data.align = getpagesize();
+
+    /* force 1MB alignment selectively for secure buffers, MDP5 onwards */
+    if ((qdutils::MDPVersion::getInstance().getMDPVersion() >= \
+         qdutils::MDSS_V5) && (usage & GRALLOC_USAGE_PROTECTED)) {
+        data.align = ALIGN(data.align, SZ_1M);
+        size = ALIGN(size, data.align);
+    }
+    data.size = size;
     data.pHandle = (unsigned int) pHandle;
     err = mAllocCtrl->allocate(data, usage);
 
