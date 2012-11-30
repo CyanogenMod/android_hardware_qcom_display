@@ -427,7 +427,8 @@ void MDPComp::unsetMDPCompLayerFlags(hwc_context_t* ctx,
 {
     LayerProp *layerProp = ctx->layerProp[HWC_DISPLAY_PRIMARY];
 
-    for (int index = 0 ; index < sCurrentFrame.count; index++) {
+    for (int index = 0 ;
+         index < ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers; index++) {
         if(layerProp[index].mFlags & HWC_MDPCOMP) {
             layerProp[index].mFlags &= ~HWC_MDPCOMP;
         }
