@@ -35,6 +35,10 @@ ifeq ($(TARGET_NO_HW_OVERLAY),true)
     common_flags += -DNO_HW_OVERLAY
 endif
 
+ifeq ($(BOARD_HAS_NO_HDMI),true)
+    common_flags += -DNO_HDMI
+endif
+
 common_deps  :=
 kernel_includes :=
 

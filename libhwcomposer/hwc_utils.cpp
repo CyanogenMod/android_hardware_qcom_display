@@ -61,7 +61,9 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
+#ifdef NO_HDMI
     ctx->mExtDisplay = new ExternalDisplay(ctx);
+#endif
     MDPComp::init(ctx);
 
     pthread_mutex_init(&(ctx->vstate.lock), NULL);
