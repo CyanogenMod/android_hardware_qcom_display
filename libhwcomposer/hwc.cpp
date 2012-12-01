@@ -73,7 +73,9 @@ static void hwc_registerProcs(struct hwc_composer_device_1* dev,
     // Now that we have the functions needed, kick off
     // the uevent & vsync threads
     init_uevent_thread(ctx);
+#ifndef NO_HW_VSYNC
     init_vsync_thread(ctx);
+#endif
 }
 
 //Helper
@@ -458,7 +460,11 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
 
         //Setup HWC methods
         dev->device.common.tag          = HARDWARE_DEVICE_TAG;
+#ifdef NO_HW_VSYNC
+        dev->device.common.version      = 0;
+#else
         dev->device.common.version      = HWC_DEVICE_API_VERSION_1_1;
+#endif
         dev->device.common.module       = const_cast<hw_module_t*>(module);
         dev->device.common.close        = hwc_device_close;
         dev->device.prepare             = hwc_prepare;
