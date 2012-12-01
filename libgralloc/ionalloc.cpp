@@ -26,8 +26,8 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 #define DEBUG 0
+
 #include <linux/ioctl.h>
 #include <sys/mman.h>
 #include <stdlib.h>
@@ -118,7 +118,11 @@ int IonAlloc::alloc_buffer(alloc_data& data)
         return err;
     }
 
-    if(!(data.flags & ION_SECURE)) {
+    if(!(data.flags & ION_SECURE)
+#ifdef QCOM_ICS_COMPAT
+        && !(data.allocType & private_handle_t::PRIV_FLAGS_NOT_MAPPED)
+#endif
+    ) {
         base = mmap(0, ionAllocData.len, PROT_READ|PROT_WRITE,
                     MAP_SHARED, fd_data.fd, 0);
         if(base == MAP_FAILED) {
