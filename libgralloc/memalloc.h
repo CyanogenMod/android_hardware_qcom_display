@@ -31,6 +31,7 @@
 #define GRALLOC_MEMALLOC_H
 
 #include <stdlib.h>
+#include <utils/RefBase.h>
 
 namespace gralloc {
 
@@ -46,7 +47,7 @@ struct alloc_data {
     int            allocType;
 };
 
-class IMemAlloc {
+class IMemAlloc : public android::RefBase {
 
     public:
     // Allocate buffer - fill in the alloc_data

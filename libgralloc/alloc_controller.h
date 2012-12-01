@@ -29,25 +29,27 @@
 #ifndef GRALLOC_ALLOCCONTROLLER_H
 #define GRALLOC_ALLOCCONTROLLER_H
 
+#include <utils/RefBase.h>
+
 namespace gralloc {
 
 struct alloc_data;
 class IMemAlloc;
 class IonAlloc;
 
-class IAllocController {
+class IAllocController : public android::RefBase {
 
     public:
     /* Allocate using a suitable method
      * Returns the type of buffer allocated
      */
-    virtual int allocate(alloc_data& data, int usage) = 0;
+    virtual int allocate(alloc_data& data, int usage, int compositionType) = 0;
 
     virtual IMemAlloc* getAllocator(int flags) = 0;
 
     virtual ~IAllocController() {};
 
-    static IAllocController* getInstance(void);
+    static IAllocController* getInstance(bool useMasterHeap);
 
     private:
     static IAllocController* sController;
@@ -57,15 +59,55 @@ class IAllocController {
 class IonController : public IAllocController {
 
     public:
-    virtual int allocate(alloc_data& data, int usage);
+    virtual int allocate(alloc_data& data, int usage,
+                         int compositionType);
 
     virtual IMemAlloc* getAllocator(int flags);
 
     IonController();
 
     private:
-    IonAlloc* mIonAlloc;
+    IMemAlloc* mIonAlloc;
 
 };
+
+class PmemKernelController : public IAllocController {
+
+    public:
+    virtual int allocate(alloc_data& data, int usage,
+                         int compositionType);
+
+    virtual IMemAlloc* getAllocator(int flags);
+
+    PmemKernelController ();
+
+    ~PmemKernelController ();
+
+    private:
+    IMemAlloc* mPmemAdspAlloc;
+
+};
+
+// Main pmem controller - this should only
+// be used within gralloc
+class PmemAshmemController : public IAllocController {
+
+    public:
+    virtual int allocate(alloc_data& data, int usage,
+                         int compositionType);
+
+    virtual IMemAlloc* getAllocator(int flags);
+
+    PmemAshmemController();
+
+    ~PmemAshmemController();
+
+    private:
+    IMemAlloc* mPmemUserspaceAlloc;
+    IMemAlloc* mAshmemAlloc;
+    IAllocController* mPmemKernelCtrl;
+
+};
+
 } //end namespace gralloc
 #endif // GRALLOC_ALLOCCONTROLLER_H
