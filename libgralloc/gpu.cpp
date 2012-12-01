@@ -52,8 +52,13 @@ int gpu_context_t::gralloc_alloc_framebuffer_locked(size_t size, int usage,
                                                     buffer_handle_t* pHandle)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(common.module);
+#ifdef QCOM_ICS_COMPAT
+    // we don't support allocations with both the FB and PMEM_ADSP flags
+    if (usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP) {
+#else
     // we don't support framebuffer allocations with graphics heap flags
     if (usage & GRALLOC_HEAP_MASK) {
+#endif
         return -EINVAL;
     }
 
@@ -183,7 +188,11 @@ void gpu_context_t::getGrallocInformationFromFormat(int inputFormat,
                                                     int *bufferType)
 {
     *bufferType = BUFFER_TYPE_VIDEO;
-    if (inputFormat < 0x7) {
+    if (inputFormat < 0x7
+#ifdef QCOM_ICS_COMPAT
+        && inputFormat != HAL_PIXEL_FORMAT_RGB_888
+#endif
+    ) {
         // RGB formats
         *bufferType = BUFFER_TYPE_UI;
     } else if ((inputFormat == HAL_PIXEL_FORMAT_R_8) ||
@@ -203,6 +212,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
     int grallocFormat = format;
     int bufferType;
 
+#ifndef QCOM_ICS_COMPAT
     //If input format is HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED then based on
     //the usage bits, gralloc assigns a format.
     if(format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
@@ -213,7 +223,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
         else if(usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
             grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
     }
-
+#endif
     getGrallocInformationFromFormat(grallocFormat, &bufferType);
     size = getBufferSizeAndDimensions(w, h, grallocFormat, alignedw, alignedh);
 
