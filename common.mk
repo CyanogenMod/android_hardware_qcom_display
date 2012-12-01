@@ -34,6 +34,10 @@ ifeq ($(TARGET_USES_ION), true)
     common_flags += -DUSE_ION
 endif
 
+ifeq ($(BOARD_HAS_NO_HDMI),true)
+    common_flags += -DNO_HDMI
+endif
+
 common_deps  :=
 kernel_includes :=
 
