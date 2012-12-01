@@ -266,8 +266,10 @@ static uint32 c2d_get_gpuaddr( struct private_handle_t *handle)
         memtype = KGSL_USER_MEM_TYPE_PMEM;
     else if (handle->flags & private_handle_t::PRIV_FLAGS_USES_ASHMEM)
         memtype = KGSL_USER_MEM_TYPE_ASHMEM;
+#ifdef USE_ION
     else if (handle->flags & private_handle_t::PRIV_FLAGS_USES_ION)
         memtype = KGSL_USER_MEM_TYPE_ION;
+#endif
     else {
         ALOGE("Invalid handle flags: 0x%x", handle->flags);
         return 0;
@@ -932,7 +934,7 @@ static int get_temp_buffer(const bufferInfo& info, alloc_data& data)
     int allocFlags = GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP;
 
     if (sAlloc == 0) {
-        sAlloc = gralloc::IAllocController::getInstance();
+        sAlloc = gralloc::IAllocController::getInstance(false);
     }
 
     if (sAlloc == 0) {
@@ -940,7 +942,7 @@ static int get_temp_buffer(const bufferInfo& info, alloc_data& data)
         return COPYBIT_FAILURE;
     }
 
-    int err = sAlloc->allocate(data, allocFlags);
+    int err = sAlloc->allocate(data, allocFlags, 0);
     if (0 != err) {
         ALOGE("%s: allocate failed", __FUNCTION__);
         return COPYBIT_FAILURE;
