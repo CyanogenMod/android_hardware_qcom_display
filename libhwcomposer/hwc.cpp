@@ -123,11 +123,11 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         if(fbLayer->handle) {
             setListStats(ctx, list, HWC_DISPLAY_PRIMARY);
-            ctx->mLayerCache->updateLayerCache(list);
             reset_layer_prop(ctx, HWC_DISPLAY_PRIMARY);
             if(!MDPComp::configure(ctx, list)) {
                 VideoOverlay::prepare(ctx, list, HWC_DISPLAY_PRIMARY);
                 FBUpdate::prepare(ctx, fbLayer, HWC_DISPLAY_PRIMARY);
+                ctx->mLayerCache->updateLayerCache(list);
             }
         }
     }
