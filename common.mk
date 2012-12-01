@@ -34,6 +34,10 @@ ifeq ($(TARGET_USES_ION), true)
     common_flags += -DUSE_ION
 endif
 
+ifeq ($(TARGET_NO_HW_OVERLAY),true)
+    common_flags += -DNO_HW_OVERLAY
+endif
+
 common_deps  :=
 kernel_includes :=
 

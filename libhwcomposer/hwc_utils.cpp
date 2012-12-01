@@ -51,7 +51,9 @@ static void openFramebufferDevice(hwc_context_t *ctx)
 void initContext(hwc_context_t *ctx)
 {
     openFramebufferDevice(ctx);
+#ifndef NO_HW_OVERLAY
     overlay::Overlay::initOverlay();
+#endif
     for(uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         ctx->mOverlay[i] = overlay::Overlay::getInstance(i);
     }
