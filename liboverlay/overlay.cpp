@@ -197,10 +197,11 @@ Overlay* Overlay::getInstance(int disp) {
     return sInstance[disp];
 }
 
+#ifndef NO_HW_OVERLAY
 void Overlay::initOverlay() {
     if(utils::initOverlay() == -1) {
         ALOGE("utils::initOverlay() ERROR!!");
     }
 }
-
+#endif
 } // overlay
