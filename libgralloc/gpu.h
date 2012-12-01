@@ -25,6 +25,7 @@
 
 #include <cutils/log.h>
 #include <cutils/ashmem.h>
+#include <utils/RefBase.h>
 
 #include "gralloc_priv.h"
 #include <fb_priv.h>
