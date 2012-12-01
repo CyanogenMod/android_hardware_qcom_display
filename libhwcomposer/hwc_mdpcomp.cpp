@@ -264,6 +264,9 @@ bool MDPComp::isDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         return false;
     }
 
+    if(ctx->mSecureMode)
+        return false;
+
     //Check for skip layers
     if(isSkipPresent(ctx)) {
         ALOGD_IF(isDebug(), "%s: Skip layers are present",__FUNCTION__);
