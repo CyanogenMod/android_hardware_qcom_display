@@ -72,7 +72,9 @@ static void hwc_registerProcs(struct hwc_composer_device_1* dev,
 
     // Now that we have the functions needed, kick off
     // the uevent & vsync threads
+#ifdef NO_HDMI
     init_uevent_thread(ctx);
+#endif
 #ifndef NO_HW_VSYNC
     init_vsync_thread(ctx);
 #endif
