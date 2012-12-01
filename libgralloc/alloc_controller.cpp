@@ -113,11 +113,14 @@ int IonController::allocate(alloc_data& data, int usage,
 
     if(usage & GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP)
         ionFlags |= ION_HEAP(ION_SF_HEAP_ID);
+#ifdef QCOM_ICS_COMPAT
+    if(usage & GRALLOC_USAGE_PRIVATE_WRITEBACK_HEAP)
+        ionFlags |= ION_HEAP(ION_CP_WB_HEAP_ID);
+#endif
     if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP) {
         ionFlags |= ION_HEAP(ION_SYSTEM_HEAP_ID);
         noncontig = true;
     }
-
     if(usage & GRALLOC_USAGE_PRIVATE_IOMMU_HEAP)
         ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
 
@@ -129,6 +132,13 @@ int IonController::allocate(alloc_data& data, int usage,
 
     if(usage & GRALLOC_USAGE_PRIVATE_CP_BUFFER)
         ionFlags |= ION_SECURE;
+#ifdef QCOM_ICS_COMPAT
+    if(usage & GRALLOC_USAGE_PRIVATE_DO_NOT_MAP)
+        data.allocType  |=  private_handle_t::PRIV_FLAGS_NOT_MAPPED;
+    else
+        data.allocType  &=  ~(private_handle_t::PRIV_FLAGS_NOT_MAPPED);
+#endif
+
     // if no flags are set, default to
     // SF + IOMMU heaps, so that bypass can work
     // we can fall back to system heap if
