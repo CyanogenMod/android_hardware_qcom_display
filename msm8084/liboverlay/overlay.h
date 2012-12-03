@@ -31,6 +31,7 @@
 #define OVERLAY_H
 
 #include "overlayUtils.h"
+#include "utils/threads.h"
 
 namespace overlay {
 class GenericPipe;
@@ -72,6 +73,10 @@ public:
     static Overlay* getInstance();
     /* Returns total of available ("unallocated") pipes */
     static int availablePipes();
+    /* set the framebuffer index for external display */
+    void setExtFbNum(int fbNum);
+    /* Returns framebuffer index of the current external display */
+    int getExtFbNum();
 
 private:
     /* Ctor setup */
@@ -130,8 +135,11 @@ private:
     /* Dump string */
     char mDumpStr[256];
 
+    mutable android::Mutex mOvExtFbLock;
+
     /* Singleton Instance*/
     static Overlay *sInstance;
+    static int sExtFbIndex;
 };
 
 inline void Overlay::validate(int index) {
@@ -143,6 +151,16 @@ inline void Overlay::validate(int index) {
 
 inline int Overlay::availablePipes() {
     return PipeBook::availablePipes();
+}
+
+inline void Overlay::setExtFbNum(int fbNum) {
+    android::Mutex::Autolock lock(mOvExtFbLock);
+    sExtFbIndex = fbNum;
+}
+
+inline int Overlay::getExtFbNum() {
+    android::Mutex::Autolock lock(mOvExtFbLock);
+    return sExtFbIndex;
 }
 
 inline int Overlay::PipeBook::availablePipes() {

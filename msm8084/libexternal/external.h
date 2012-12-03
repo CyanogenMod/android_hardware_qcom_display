@@ -28,6 +28,7 @@ struct hwc_context_t;
 
 namespace qhwc {
 
+
 class ExternalDisplay
 {
 public:
@@ -35,37 +36,50 @@ public:
     ~ExternalDisplay();
     int getModeCount() const;
     void getEDIDModes(int *out) const;
-    void setExternalDisplay(int connected);
+    void setExternalDisplay(bool connected, int extFbNum = 0);
+    bool isExternalConnected() { return mConnected;};
     bool post();
     void setHPD(uint32_t startEnd);
     void setEDIDMode(int resMode);
     void setActionSafeDimension(int w, int h);
+    void processUEventOnline(const char *str);
+    void processUEventOffline(const char *str);
 
 private:
     bool readResolution();
-    int parseResolution(char* edidStr, int* edidModes);
+    int  parseResolution(char* edidStr, int* edidModes);
     void setResolution(int ID);
-    bool openFramebuffer();
+    bool openFrameBuffer(int fbNum);
     bool closeFrameBuffer();
     bool writeHPDOption(int userOption) const;
     bool isValidMode(int ID);
     void handleUEvent(char* str, int len);
-    int getModeOrder(int mode);
-    int getBestMode();
+    int  getModeOrder(int mode);
+    int  getBestMode();
     void resetInfo();
-    void setDpyAttr();
+    void setDpyHdmiAttr();
+    void setDpyWfdAttr();
     void getAttrForMode(int& width, int& height, int& fps);
+    void updateExtDispDevFbIndex();
+    int  configureHDMIDisplay();
+    int  configureWFDDisplay();
+    int  teardownHDMIDisplay();
+    int  teardownWFDDisplay();
+    int  getExtFbNum(int &fbNum);
 
     mutable android::Mutex mExtDispLock;
     int mFd;
     int mCurrentMode;
-    int mExternalDisplay;
+    int mConnected;
+    int mConnectedFbNum;
     int mResolutionMode;
     char mEDIDs[128];
     int mEDIDModes[64];
     int mModeCount;
     hwc_context_t *mHwcContext;
     fb_var_screeninfo mVInfo;
+    int mHdmiFbNum;
+    int mWfdFbNum;
 };
 
 }; //qhwc

@@ -220,6 +220,7 @@ void Overlay::PipeBook::destroy() {
 }
 
 Overlay* Overlay::sInstance = 0;
+int Overlay::sExtFbIndex = 1;
 int Overlay::PipeBook::NUM_PIPES = 0;
 int Overlay::PipeBook::sPipeUsageBitmap = 0;
 int Overlay::PipeBook::sLastUsageBitmap = 0;
