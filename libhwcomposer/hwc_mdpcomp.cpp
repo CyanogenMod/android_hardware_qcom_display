@@ -273,6 +273,11 @@ bool MDPComp::isDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         return false;
     }
 
+    if(ctx->listStats[HWC_DISPLAY_PRIMARY].needsAlphaScale) {
+        ALOGD_IF(isDebug(), "%s: frame needs alpha downscaling",__FUNCTION__);
+        return false;
+    }
+
     //FB composition on idle timeout
     if(sIdleFallBack) {
         sIdleFallBack = false;

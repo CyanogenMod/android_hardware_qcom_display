@@ -75,6 +75,7 @@ struct ListStats {
     //Video specific
     int yuvCount;
     int yuvIndex;
+    bool needsAlphaScale;
 };
 
 
