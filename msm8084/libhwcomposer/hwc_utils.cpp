@@ -239,7 +239,6 @@ bool isExternalActive(hwc_context_t* ctx) {
 
 int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy) {
     int ret = 0;
-#ifdef USE_FENCE_SYNC
     struct mdp_buf_sync data;
     int acquireFd[MAX_NUM_LAYERS];
     int count = 0;
@@ -280,7 +279,6 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy) {
         }
     }
     list->retireFenceFd = releaseFd;
-#endif
     return ret;
 }
 
