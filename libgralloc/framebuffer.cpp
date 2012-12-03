@@ -154,7 +154,6 @@ int mapFrameBufferLocked(struct private_module_t* module)
     if (fd < 0)
         return -errno;
 
-    memset(&module->fence, 0, sizeof(struct mdp_buf_fence));
     memset(&module->commit, 0, sizeof(struct mdp_display_commit));
 
     struct fb_fix_screeninfo finfo;
