@@ -1,4 +1,4 @@
-ifneq ($(filter msm8960,$(TARGET_BOARD_PLATFORM)),)
+ifeq ($(call is-vendor-board-platform,QCOM),true)
 
 display-hals := libgralloc libgenlock libcopybit liblight
 display-hals += libhwcomposer liboverlay libqdutils libexternal libqservice
