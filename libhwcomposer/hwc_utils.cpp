@@ -110,6 +110,25 @@ void dumpLayer(hwc_layer_1_t const* l)
           l->displayFrame.bottom);
 }
 
+static inline bool isAlphaScaled(hwc_layer_1_t const* layer) {
+    int dst_w, dst_h, src_w, src_h;
+
+    hwc_rect_t displayFrame  = layer->displayFrame;
+    hwc_rect_t sourceCrop = layer->sourceCrop;
+
+    dst_w = displayFrame.right - displayFrame.left;
+    dst_h = displayFrame.bottom - displayFrame.top;
+
+    src_w = sourceCrop.right - sourceCrop.left;
+    src_h = sourceCrop.bottom - sourceCrop.top;
+
+    if(((src_w != dst_w) || (src_h != dst_h))) {
+        if(layer->blending != HWC_BLENDING_NONE)
+            return true;
+    }
+    return false;
+}
+
 void setListStats(hwc_context_t *ctx,
         const hwc_display_contents_1_t *list, int dpy) {
 
@@ -118,10 +137,11 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].yuvCount = 0;
     ctx->listStats[dpy].yuvIndex = -1;
     ctx->listStats[dpy].skipCount = 0;
+    ctx->listStats[dpy].needsAlphaScale = false;
 
     for (size_t i = 0; i < list->numHwLayers; i++) {
-        private_handle_t *hnd =
-            (private_handle_t *)list->hwLayers[i].handle;
+        hwc_layer_1_t const* layer = &list->hwLayers[i];
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
 
         if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             continue;
@@ -130,12 +150,16 @@ void setListStats(hwc_context_t *ctx,
             ctx->listStats[dpy].skipCount++;
         }
 
+        if(!ctx->listStats[dpy].needsAlphaScale)
+            ctx->listStats[dpy].needsAlphaScale = isAlphaScaled(layer);
+
         if (UNLIKELY(isYuvBuffer(hnd))) {
             ctx->listStats[dpy].yuvCount++;
             ctx->listStats[dpy].yuvIndex = i;
         }
     }
 }
+
 
 static inline void calc_cut(float& leftCutRatio, float& topCutRatio,
         float& rightCutRatio, float& bottomCutRatio, int orient) {
