@@ -28,6 +28,7 @@
 */
 
 #include "overlayGenPipe.h"
+#include "overlay.h"
 
 namespace overlay {
 
@@ -44,6 +45,10 @@ bool GenericPipe::init()
 {
     ALOGE_IF(DEBUG_OVERLAY, "GenericPipe init");
     mRotUsed = false;
+    if(mFbNum)
+        mFbNum = Overlay::getInstance()->getExtFbNum();
+
+    ALOGD_IF(DEBUG_OVERLAY,"%s: mFbNum:%d",__FUNCTION__, mFbNum);
 
     if(!mCtrlData.ctrl.init(mFbNum)) {
         ALOGE("GenericPipe failed to init ctrl");
