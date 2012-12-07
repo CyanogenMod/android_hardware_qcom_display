@@ -220,7 +220,7 @@ struct hwc_context_t {
     qhwc::MDPInfo mMDP;
     qhwc::DisplayAttributes dpyAttr[HWC_NUM_DISPLAY_TYPES];
     qhwc::ListStats listStats[HWC_NUM_DISPLAY_TYPES];
-    qhwc::LayerCache *mLayerCache;
+    qhwc::LayerCache *mLayerCache[HWC_NUM_DISPLAY_TYPES];
     qhwc::LayerProp *layerProp[HWC_NUM_DISPLAY_TYPES];
 
     //Securing in progress indicator
