@@ -254,7 +254,7 @@ bool MDPComp::isDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     //Number of layers
     int numAppLayers = ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers;
 
-    if(numAppLayers < 1 || numAppLayers > (uint32_t)sActiveMax) {
+    if(numAppLayers < 1 || numAppLayers > sActiveMax) {
         ALOGD_IF(isDebug(), "%s: Unsupported number of layers",__FUNCTION__);
         return false;
     }
