@@ -449,6 +449,7 @@ bool ExternalDisplay::post()
         return false;
 
     struct mdp_display_commit ext_commit;
+    memset(&ext_commit, 0, sizeof(ext_commit));
     ext_commit.flags = MDP_DISPLAY_COMMIT_OVERLAY;
     if (ioctl(mFd, MSMFB_DISPLAY_COMMIT, &ext_commit) == -1) {
          ALOGE("%s: MSMFB_DISPLAY_COMMIT for external failed, str: %s",
