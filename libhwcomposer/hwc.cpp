@@ -127,7 +127,7 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
             if(!MDPComp::configure(ctx, list)) {
                 VideoOverlay::prepare(ctx, list, HWC_DISPLAY_PRIMARY);
                 FBUpdate::prepare(ctx, fbLayer, HWC_DISPLAY_PRIMARY);
-                ctx->mLayerCache->updateLayerCache(list);
+                ctx->mLayerCache[HWC_DISPLAY_PRIMARY]->updateLayerCache(list);
             }
         }
     }
@@ -150,6 +150,7 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
 
             VideoOverlay::prepare(ctx, list, HWC_DISPLAY_EXTERNAL);
             FBUpdate::prepare(ctx, fbLayer, HWC_DISPLAY_EXTERNAL);
+            ctx->mLayerCache[HWC_DISPLAY_EXTERNAL]->updateLayerCache(list);
         }
     }
     return 0;
