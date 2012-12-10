@@ -55,7 +55,9 @@ private:
     bool isValidMode(int ID);
     void handleUEvent(char* str, int len);
     int  getModeOrder(int mode);
+    int  getUserMode();
     int  getBestMode();
+    bool isInterlacedMode(int mode);
     void resetInfo();
     void setDpyHdmiAttr();
     void setDpyWfdAttr();
