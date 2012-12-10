@@ -86,9 +86,16 @@ int ExternalDisplay::configureHDMIDisplay() {
     if(mFd == -1)
         return -1;
     readResolution();
-    //Get the best mode and set
     // TODO: Move this to activate
-    setResolution(getBestMode());
+    /* Used for changing the resolution
+     * getUserMode will get the preferred
+     * mode set thru adb shell */
+    int mode = getUserMode();
+    if (mode == -1) {
+        //Get the best mode and set
+        mode = getBestMode();
+    }
+    setResolution(mode);
     setDpyHdmiAttr();
     setExternalDisplay(true, mHdmiFbNum);
     return 0;
@@ -385,6 +392,8 @@ void ExternalDisplay::resetInfo()
 
 int ExternalDisplay::getModeOrder(int mode)
 {
+    // XXX: We dont support interlaced modes but having
+    // it here for for future
     switch (mode) {
         default:
         case m1440x480i60_4_3:
@@ -424,6 +433,20 @@ int ExternalDisplay::getModeOrder(int mode)
     }
 }
 
+/// Returns the user mode set(if any) using adb shell
+int ExternalDisplay::getUserMode() {
+    /* Based on the property set the resolution */
+    char property_value[PROPERTY_VALUE_MAX];
+    property_get("hdmi.resolution", property_value, "-1");
+    int mode = atoi(property_value);
+    // We dont support interlaced modes
+    if(isValidMode(mode) && !isInterlacedMode(mode)) {
+        ALOGD_IF("%s: setting the HDMI mode = %d", __FUNCTION__, mode);
+        return mode;
+    }
+    return -1;
+}
+
 // Get the best mode for the current HD TV
 int ExternalDisplay::getBestMode() {
     int bestOrder = 0;
@@ -443,7 +466,30 @@ int ExternalDisplay::getBestMode() {
 
 inline bool ExternalDisplay::isValidMode(int ID)
 {
-    return ((ID >= m640x480p60_4_3) && (ID <= m1920x1080p30_16_9));
+    bool valid = false;
+    for (int i = 0; i < mModeCount; i++) {
+        if(ID == mEDIDModes[i]) {
+            valid = true;
+            break;
+        }
+    }
+    return valid;
+}
+
+// returns true if the mode(ID) is interlaced mode format
+bool ExternalDisplay::isInterlacedMode(int ID) {
+    bool interlaced = false;
+    switch(ID) {
+        case m1440x480i60_4_3:
+        case m1440x480i60_16_9:
+        case m1440x576i50_4_3:
+        case m1440x576i50_16_9:
+        case m1920x1080i60_16_9:
+            interlaced = true;
+        default:
+            interlaced = false;
+    }
+    return interlaced;
 }
 
 void ExternalDisplay::setResolution(int ID)
@@ -462,7 +508,7 @@ void ExternalDisplay::setResolution(int ID)
             mVInfo.right_margin, mVInfo.hsync_len, mVInfo.left_margin,
             mVInfo.lower_margin, mVInfo.vsync_len, mVInfo.upper_margin,
             mVInfo.pixclock/1000/1000);
-    //If its a valid mode and its a new ID - update var_screeninfo
+    //If its a new ID - update var_screeninfo
     if ((isValidMode(ID)) && mCurrentMode != ID) {
         const struct disp_mode_timing_type *mode =
             &supported_video_mode_lut[0];
