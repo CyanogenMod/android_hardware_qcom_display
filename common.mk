@@ -25,6 +25,10 @@ ifeq ($(ARCH_ARM_HAVE_NEON),true)
     common_flags += -D__ARM_HAVE_NEON
 endif
 
+ifeq ($(TARGET_BOARD_PLATFORM), msm8974)
+    common_flags += -DVENUS_COLOR_FORMAT
+endif
+
 common_deps  :=
 kernel_includes :=
 
