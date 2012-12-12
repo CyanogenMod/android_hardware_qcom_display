@@ -200,12 +200,12 @@ bool MdssRot::remap(uint32_t numbufs) {
 
 bool MdssRot::close() {
     bool success = true;
-    if(mFd.valid() && (getSessId() > 0)) {
+    if(mFd.valid() && (getSessId() != (uint32_t) MSMFB_NEW_REQUEST)) {
         if(!mdp_wrapper::unsetOverlay(mFd.getFD(), getSessId())) {
             ALOGE("MdssRot::close unsetOverlay failed, fd=%d sessId=%d",
                   mFd.getFD(), getSessId());
-		    success = false;
-	    }
+            success = false;
+        }
     }
 
     if (!mFd.close()) {
