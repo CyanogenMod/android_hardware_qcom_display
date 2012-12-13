@@ -60,7 +60,8 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
     ctx->mExtDisplay = new ExternalDisplay(ctx);
-    ctx->mLayerCache = new LayerCache();
+    for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++)
+        ctx->mLayerCache[i] = new LayerCache();
     MDPComp::init(ctx);
 
     pthread_mutex_init(&(ctx->vstate.lock), NULL);
