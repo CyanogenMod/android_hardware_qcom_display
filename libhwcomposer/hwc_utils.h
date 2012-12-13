@@ -31,6 +31,7 @@
 #define FINAL_TRANSFORM_MASK 0x000F
 #define MAX_NUM_DISPLAYS 4 //Yes, this is ambitious
 #define MAX_NUM_LAYERS 32
+#define MAX_DISPLAY_DIM 2048
 
 //Fwrd decls
 struct hwc_context_t;
@@ -48,6 +49,7 @@ namespace qhwc {
 //fwrd decl
 class QueuedBufferStore;
 class ExternalDisplay;
+class IFBUpdate;
 
 struct MDPInfo {
     int version;
@@ -215,6 +217,9 @@ struct hwc_context_t {
     overlay::Overlay *mOverlay;
     //QService object
     qService::QService *mQService;
+
+    //Primary and external FB updater
+    qhwc::IFBUpdate *mFBUpdate[HWC_NUM_DISPLAY_TYPES];
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
     qhwc::MDPInfo mMDP;
