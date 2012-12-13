@@ -28,22 +28,50 @@
 namespace qhwc {
 namespace ovutils = overlay::utils;
 
-//Framebuffer update
-class FBUpdate {
-    public:
-        // Sets up members and prepares overlay if conditions are met
-        static bool prepare(hwc_context_t *ctx, hwc_layer_1_t *fblayer, int dpy);
-        // Draws layer if this feature is on
-        static bool draw(hwc_context_t *ctx, hwc_layer_1_t *fblayer, int dpy);
-        //Reset values
-        static void reset();
-    private:
-        //Configures overlay
-        static bool configure(hwc_context_t *ctx, hwc_layer_1_t *fblayer,
-            int dpy);
-        //Flags if this feature is on.
-        static bool sModeOn[HWC_NUM_DISPLAY_TYPES];
-        static ovutils::eDest sDest[HWC_NUM_DISPLAY_TYPES];
+//Framebuffer update Interface
+class IFBUpdate {
+public:
+    explicit IFBUpdate(const int& dpy) : mDpy(dpy) {}
+    virtual ~IFBUpdate() {};
+    // Sets up members and prepares overlay if conditions are met
+    virtual bool prepare(hwc_context_t *ctx, hwc_layer_1_t *fblayer) = 0;
+    // Draws layer
+    virtual bool draw(hwc_context_t *ctx, hwc_layer_1_t *fblayer) = 0;
+    //Reset values
+    virtual void reset();
+    //Factory method that returns a low-res or high-res version
+    static IFBUpdate *getObject(const int& width, const int& dpy);
+
+protected:
+    const int mDpy; // display to update
+    bool mModeOn; // if prepare happened
+};
+
+//Low resolution (<= 2048) panel handler.
+class FBUpdateLowRes : public IFBUpdate {
+public:
+    explicit FBUpdateLowRes(const int& dpy);
+    virtual ~FBUpdateLowRes() {};
+    bool prepare(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
+    bool draw(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
+    void reset();
+private:
+    bool configure(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
+    ovutils::eDest mDest; //pipe to draw on
+};
+
+//High resolution (> 2048) panel handler.
+class FBUpdateHighRes : public IFBUpdate {
+public:
+    explicit FBUpdateHighRes(const int& dpy);
+    virtual ~FBUpdateHighRes() {};
+    bool prepare(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
+    bool draw(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
+    void reset();
+private:
+    bool configure(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
+    ovutils::eDest mDestLeft; //left pipe to draw on
+    ovutils::eDest mDestRight; //right pipe to draw on
 };
 
 }; //namespace qhwc
