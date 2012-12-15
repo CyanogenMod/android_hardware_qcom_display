@@ -20,6 +20,12 @@
 #include "overlayUtils.h"
 #include "overlayRotator.h"
 
+#ifdef VENUS_COLOR_FORMAT
+#include <media/msm_media_info.h>
+#else
+#define VENUS_BUFFER_SIZE(args...) 0
+#endif
+
 #ifndef MDSS_MDP_ROT_ONLY
 #define MDSS_MDP_ROT_ONLY 0x80
 #endif
