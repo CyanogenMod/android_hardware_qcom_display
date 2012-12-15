@@ -97,6 +97,7 @@ PipeMgr MDPComp::sPipeMgr;
 IdleInvalidator *MDPComp::idleInvalidator = NULL;
 bool MDPComp::sIdleFallBack = false;
 bool MDPComp::sDebugLogs = false;
+bool MDPComp::sPreRotation = true;
 int MDPComp::sSkipCount = 0;
 int MDPComp::sMaxLayers = 0;
 
@@ -288,17 +289,24 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_layer_1_t *layer,
                     ovutils::OV_MDP_BLEND_FG_PREMULT);
         }
 
-        if(layer->transform & HAL_TRANSFORM_FLIP_H) {
-            ovutils::setMdpFlags(mdpFlags,
-                    ovutils::OV_MDP_FLIP_H);
-        }
+        if (sPreRotation) {
+            if(layer->transform & HAL_TRANSFORM_FLIP_H) {
+                ovutils::setMdpFlags(mdpFlags,
+                        ovutils::OV_MDP_FLIP_H);
+            }
 
-        if(layer->transform & HAL_TRANSFORM_FLIP_V) {
-            ovutils::setMdpFlags(mdpFlags,
-                    ovutils::OV_MDP_FLIP_V);
-        }
+            if(layer->transform & HAL_TRANSFORM_FLIP_V) {
+                ovutils::setMdpFlags(mdpFlags,
+                        ovutils::OV_MDP_FLIP_V);
+            }
 
-        ov.setTransform(0, dest);
+            ov.setTransform(0, dest);
+        } else {
+            ovutils::eTransform orient =
+                static_cast<ovutils::eTransform>(layer->transform);
+
+            ov.setTransform(orient, dest);
+        }
 
         ovutils::PipeArgs parg(mdpFlags,
                                info,
@@ -371,7 +379,9 @@ bool MDPComp::is_doable(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     for(int i = 0; i < numAppLayers; ++i) {
         // As MDP h/w supports flip operation, use MDP comp only for
         // 180 transforms. Fail for any transform involving 90 (90, 270).
-        if(list->hwLayers[i].transform & HWC_TRANSFORM_ROT_90) {
+        if(sPreRotation ? 
+           (list->hwLayers[i].transform & HWC_TRANSFORM_ROT_90) :
+           (list->hwLayers[i].transform) ) {
                 ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
                 return false;
         }
@@ -791,6 +801,12 @@ bool MDPComp::init(hwc_context_t *dev) {
     if(property_get("debug.mdpcomp.idletime", property, NULL) > 0) {
         if(atoi(property) != 0)
            idle_timeout = atoi(property);
+    }
+
+    sPreRotation = true;
+    if(property_get("debug.prerotation.disable", property, NULL) > 0) {
+        if(atoi(property) != 0)
+           sPreRotation = false;
     }
 
     //create Idle Invalidator
