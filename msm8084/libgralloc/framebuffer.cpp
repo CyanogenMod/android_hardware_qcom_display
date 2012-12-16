@@ -328,7 +328,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
     size_t fbSize = roundUpToPageSize(finfo.line_length * info.yres)*
                     module->numBuffers;
     module->framebuffer = new private_handle_t(fd, fbSize,
-                                        private_handle_t::PRIV_FLAGS_USES_PMEM,
+                                        private_handle_t::PRIV_FLAGS_USES_ION,
                                         BUFFER_TYPE_UI,
                                         module->fbFormat, info.xres, info.yres);
     void* vaddr = mmap(0, fbSize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
