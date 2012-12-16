@@ -15,9 +15,6 @@
  * limitations under the License.
  */
 
-
-#define LOG_TAG "copybit"
-
 #include <cutils/log.h>
 
 #include <linux/msm_mdp.h>

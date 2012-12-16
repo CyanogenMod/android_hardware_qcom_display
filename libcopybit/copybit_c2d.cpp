@@ -15,8 +15,6 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "copybit_c2d"
-
 #include <cutils/log.h>
 
 #include <stdint.h>
