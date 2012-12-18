@@ -17,8 +17,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 #include <cutils/log.h>
+#include <sys/resource.h>
+#include <sys/prctl.h>
 
 #include <stdint.h>
 #include <string.h>
@@ -85,6 +86,10 @@ C2D_STATUS (*LINK_c2dMapAddr) ( int mem_fd, void * hostptr, uint32 len,
 C2D_STATUS (*LINK_c2dUnMapAddr) ( void * gpuaddr);
 
 C2D_STATUS (*LINK_c2dGetDriverCapabilities) ( C2D_DRIVER_INFO * driver_info);
+
+/* create a fence fd for the timestamp */
+C2D_STATUS (*LINK_c2dCreateFenceFD) ( uint32 target_id, c2d_ts_handle timestamp,
+                                                            int32 *fd);
 /******************************************************************************/
 
 #if defined(COPYBIT_Z180)
@@ -150,6 +155,15 @@ struct copybit_context_t {
     int config_mask;
     int dst_surface_type;
     bool is_premultiplied_alpha;
+    void* time_stamp;
+
+    // used for signaling the wait thread
+    bool wait_timestamp;
+    pthread_t wait_thread_id;
+    bool stop_thread;
+    pthread_mutex_t wait_cleanup_lock;
+    pthread_cond_t wait_cleanup_cond;
+
 };
 
 struct bufferInfo {
@@ -191,6 +205,46 @@ tag: HARDWARE_MODULE_TAG,
      methods: &copybit_module_methods
         }
 };
+
+
+/* thread function which waits on the timeStamp and cleans up the surfaces */
+static void* c2d_wait_loop(void* ptr) {
+    copybit_context_t* ctx = (copybit_context_t*)(ptr);
+    char thread_name[64] = "copybitWaitThr";
+    prctl(PR_SET_NAME, (unsigned long) &thread_name, 0, 0, 0);
+    setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY);
+
+    while(ctx->stop_thread == false) {
+        pthread_mutex_lock(&ctx->wait_cleanup_lock);
+        while(ctx->wait_timestamp == false && !ctx->stop_thread) {
+            pthread_cond_wait(&(ctx->wait_cleanup_cond),
+                              &(ctx->wait_cleanup_lock));
+        }
+        if(ctx->wait_timestamp) {
+            if(LINK_c2dWaitTimestamp(ctx->time_stamp)) {
+                ALOGE("%s: LINK_c2dWaitTimeStamp ERROR!!", __FUNCTION__);
+            }
+            ctx->wait_timestamp = false;
+            // Unmap any mapped addresses.
+            for (int i = 0; i < MAX_SURFACES; i++) {
+                if (ctx->mapped_gpu_addr[i]) {
+                    LINK_c2dUnMapAddr( (void*)ctx->mapped_gpu_addr[i]);
+                    ctx->mapped_gpu_addr[i] = 0;
+                }
+            }
+            // Reset the counts after the draw.
+            ctx->blit_rgb_count = 0;
+            ctx->blit_yuv_2_plane_count = 0;
+            ctx->blit_yuv_3_plane_count = 0;
+            ctx->blit_count = 0;
+        }
+        pthread_mutex_unlock(&ctx->wait_cleanup_lock);
+        if(ctx->stop_thread)
+            break;
+    }
+    pthread_exit(NULL);
+    return NULL;
+}
 
 
 /* convert COPYBIT_FORMAT to C2D format */
@@ -545,17 +599,45 @@ static int msm_copybit(struct copybit_context_t *ctx, unsigned int target)
     {
         ctx->blit_list[i].next = &(ctx->blit_list[i+1]);
     }
-
     ctx->blit_list[ctx->blit_count-1].next = NULL;
     if(LINK_c2dDraw(target,ctx->trg_transform, 0x0, 0, 0, ctx->blit_list,
                     ctx->blit_count)) {
         ALOGE("%s: LINK_c2dDraw ERROR", __FUNCTION__);
         return COPYBIT_FAILURE;
     }
-
     return COPYBIT_SUCCESS;
 }
 
+
+
+static int flush_get_fence_copybit (struct copybit_device_t *dev, int* fd)
+{
+    struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
+    int status = COPYBIT_FAILURE;
+    if (!ctx)
+        return COPYBIT_FAILURE;
+    pthread_mutex_lock(&ctx->wait_cleanup_lock);
+    status = msm_copybit(ctx, ctx->dst[ctx->dst_surface_type]);
+
+    if(LINK_c2dFlush(ctx->dst[ctx->dst_surface_type], &ctx->time_stamp)) {
+        ALOGE("%s: LINK_c2dFlush ERROR", __FUNCTION__);
+        // unlock the mutex and return failure
+        pthread_mutex_unlock(&ctx->wait_cleanup_lock);
+        return COPYBIT_FAILURE;
+    }
+    if(LINK_c2dCreateFenceFD(ctx->dst[ctx->dst_surface_type], ctx->time_stamp,
+                                                                        fd)) {
+        ALOGE("%s: LINK_c2dCreateFenceFD ERROR", __FUNCTION__);
+        status = COPYBIT_FAILURE;
+    }
+    if(status == COPYBIT_SUCCESS) {
+        //signal the wait_thread
+        ctx->wait_timestamp = true;
+        pthread_cond_signal(&ctx->wait_cleanup_cond);
+    }
+    pthread_mutex_unlock(&ctx->wait_cleanup_lock);
+    return status;
+}
 
 static int finish_copybit(struct copybit_device_t *dev)
 {
@@ -647,11 +729,13 @@ static int set_parameter_copybit(
     int value)
 {
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
+    int status = COPYBIT_SUCCESS;
     if (!ctx) {
         ALOGE("%s: null context", __FUNCTION__);
         return -EINVAL;
     }
 
+    pthread_mutex_lock(&ctx->wait_cleanup_lock);
     switch(name) {
         case COPYBIT_PLANE_ALPHA:
         {
@@ -729,11 +813,11 @@ static int set_parameter_copybit(
             break;
         default:
             ALOGE("%s: default case param=0x%x", __FUNCTION__, name);
-            return -EINVAL;
+            status = -EINVAL;
             break;
     }
-
-    return COPYBIT_SUCCESS;
+    pthread_mutex_unlock(&ctx->wait_cleanup_lock);
+    return status;
 }
 
 /** Get a static info value */
@@ -1211,7 +1295,7 @@ static int stretch_copybit_internal(
         set_rects(ctx, &(src_surface), dst_rect, src_rect, &clip);
         if (ctx->blit_count == MAX_BLIT_OBJECT_COUNT) {
             ALOGW("Reached end of blit count");
-            finish_copybit(dev);;
+            finish_copybit(dev);
         }
         ctx->blit_list[ctx->blit_count] = src_surface;
         ctx->blit_count++;
@@ -1261,9 +1345,13 @@ static int stretch_copybit(
     struct copybit_region_t const *region)
 {
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
+    int status = COPYBIT_SUCCESS;
     bool needsBlending = (ctx->src_global_alpha != 0);
-    return stretch_copybit_internal(dev, dst, src, dst_rect, src_rect,
+    pthread_mutex_lock(&ctx->wait_cleanup_lock);
+    status = stretch_copybit_internal(dev, dst, src, dst_rect, src_rect,
                                     region, needsBlending);
+    pthread_mutex_unlock(&ctx->wait_cleanup_lock);
+    return status;
 }
 
 /** Perform a blit type operation */
@@ -1282,8 +1370,20 @@ static int blit_copybit(
 
 static void clean_up(copybit_context_t* ctx)
 {
+    void* ret;
     if (!ctx)
         return;
+
+    // stop the wait_cleanup_thread
+    pthread_mutex_lock(&ctx->wait_cleanup_lock);
+    ctx->stop_thread = true;
+    // Signal waiting thread
+    pthread_cond_signal(&ctx->wait_cleanup_cond);
+    pthread_mutex_unlock(&ctx->wait_cleanup_lock);
+    // waits for the cleanup thread to exit
+    pthread_join(ctx->wait_thread_id, &ret);
+    pthread_mutex_destroy(&ctx->wait_cleanup_lock);
+    pthread_cond_destroy (&ctx->wait_cleanup_cond);
 
     for (int i = 0; i < NUM_SURFACE_TYPES; i++) {
         if (ctx->dst[i])
@@ -1370,11 +1470,13 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
                                            "c2dUnMapAddr");
     *(void **)&LINK_c2dGetDriverCapabilities = ::dlsym(ctx->libc2d2,
                                            "c2dGetDriverCapabilities");
+    *(void **)&LINK_c2dCreateFenceFD = ::dlsym(ctx->libc2d2,
+                                           "c2dCreateFenceFD");
 
     if (!LINK_c2dCreateSurface || !LINK_c2dUpdateSurface || !LINK_c2dReadSurface
         || !LINK_c2dDraw || !LINK_c2dFlush || !LINK_c2dWaitTimestamp ||
         !LINK_c2dFinish  || !LINK_c2dDestroySurface ||
-        !LINK_c2dGetDriverCapabilities) {
+        !LINK_c2dGetDriverCapabilities || !LINK_c2dCreateFenceFD) {
         ALOGE("%s: dlsym ERROR", __FUNCTION__);
         clean_up(ctx);
         status = COPYBIT_FAILURE;
@@ -1391,6 +1493,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->device.blit = blit_copybit;
     ctx->device.stretch = stretch_copybit;
     ctx->device.finish = finish_copybit;
+    ctx->device.flush_get_fence = flush_get_fence_copybit;
 
     /* Create RGB Surface */
     surfDefinition.buffer = (void*)0xdddddddd;
@@ -1559,6 +1662,19 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->blit_yuv_2_plane_count = 0;
     ctx->blit_yuv_3_plane_count = 0;
     ctx->blit_count = 0;
+
+    ctx->wait_timestamp = false;
+    ctx->stop_thread = false;
+    pthread_mutex_init(&(ctx->wait_cleanup_lock), NULL);
+    pthread_cond_init(&(ctx->wait_cleanup_cond), NULL);
+    /* Start the wait thread */
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+    pthread_create(&ctx->wait_thread_id, &attr, &c2d_wait_loop,
+                                                            (void *)ctx);
+    pthread_attr_destroy(&attr);
 
     *device = &ctx->device.common;
     return status;
