@@ -69,13 +69,17 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     struct ion_handle_data handle_data;
     struct ion_fd_data fd_data;
     struct ion_allocation_data ionAllocData;
-
     void *base = 0;
 
     ionAllocData.len = data.size;
     ionAllocData.align = data.align;
-    ionAllocData.heap_mask = data.flags;
+    ionAllocData.heap_mask = data.flags & ~ION_SECURE;
     ionAllocData.flags = data.uncached ? 0 : ION_FLAG_CACHED;
+
+    // ToDo: replace usage of alloc data structure with
+    //  ionallocdata structure.
+    if (data.flags & ION_SECURE)
+        ionAllocData.flags |= ION_SECURE;
 
     err = open_device();
     if (err)
