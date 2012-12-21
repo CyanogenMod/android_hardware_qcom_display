@@ -235,6 +235,11 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
             alignedh = height;
             size = ALIGN(alignedw * alignedh * 2, 4096);
             break;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+            size = alignedw*alignedh +
+                  (ALIGN(alignedw/2, 32) * (alignedh/2))*2;
+            size = ALIGN(size, 4096);
+            break;
         default:
             ALOGE("unrecognized pixel format: 0x%x", format);
             return -EINVAL;
