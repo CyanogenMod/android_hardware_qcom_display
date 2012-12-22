@@ -26,6 +26,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "hwc_utils.h"
+#include "hwc_fbupdate.h"
 #include "external.h"
 
 namespace qhwc {
@@ -65,10 +66,18 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 
     if(connected != -1) { //either we got switch_state connected or disconnect
         ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = connected;
-        if(connected) {
+        if (connected) {
             ctx->mExtDisplay->processUEventOnline(udata);
-        }else {
+            ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL] =
+                IFBUpdate::getObject(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].xres,
+                HWC_DISPLAY_EXTERNAL);
+        } else {
             ctx->mExtDisplay->processUEventOffline(udata);
+            if(ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL]) {
+                Locker::Autolock _l(ctx->mExtSetLock);
+                delete ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL];
+                ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL] = NULL;
+            }
         }
         ALOGD("%s sending hotplug: connected = %d", __FUNCTION__, connected);
         Locker::Autolock _l(ctx->mExtSetLock); //hwc comp could be on

@@ -23,6 +23,7 @@
 #include <overlay.h>
 #include "hwc_utils.h"
 #include "hwc_mdpcomp.h"
+#include "hwc_fbupdate.h"
 #include "mdp_version.h"
 #include "external.h"
 #include "QService.h"
@@ -59,6 +60,12 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
+    //Is created and destroyed only once for primary
+    //For external it could get created and destroyed multiple times depending
+    //on what external we connect to.
+    ctx->mFBUpdate[HWC_DISPLAY_PRIMARY] =
+        IFBUpdate::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
+        HWC_DISPLAY_PRIMARY);
     ctx->mExtDisplay = new ExternalDisplay(ctx);
     for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++)
         ctx->mLayerCache[i] = new LayerCache();
@@ -89,6 +96,13 @@ void closeContext(hwc_context_t *ctx)
     if(ctx->mExtDisplay) {
         delete ctx->mExtDisplay;
         ctx->mExtDisplay = NULL;
+    }
+
+    for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+        if(ctx->mFBUpdate[i]) {
+            delete ctx->mFBUpdate[i];
+            ctx->mFBUpdate[i] = NULL;
+        }
     }
 
     pthread_mutex_destroy(&(ctx->vstate.lock));
