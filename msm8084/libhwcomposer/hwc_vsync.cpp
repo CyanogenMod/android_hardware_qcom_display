@@ -112,9 +112,11 @@ static void *vsync_loop(void *param)
         if(!fakevsync) {
             for(int i = 0; i < MAX_RETRY_COUNT; i++) {
                 len = pread(fd_timestamp, vdata, MAX_DATA, 0);
-                if(len < 0 && (errno == EAGAIN || errno == EINTR)) {
-                    ALOGW("%s: vsync read: EAGAIN, retry (%d/%d).",
-                          __FUNCTION__, i, MAX_RETRY_COUNT);
+                if(len < 0 && (errno == EAGAIN ||
+                               errno == EINTR  ||
+                               errno == EBUSY)) {
+                    ALOGW("%s: vsync read: %s, retry (%d/%d).",
+                          __FUNCTION__, strerror(errno), i, MAX_RETRY_COUNT);
                     continue;
                 } else {
                     break;
