@@ -93,9 +93,11 @@ static void reset(hwc_context_t *ctx, int numDisplays,
                     list->hwLayers[j].compositionType = HWC_FRAMEBUFFER;
             }
         }
+
+        if(ctx->mFBUpdate[i])
+            ctx->mFBUpdate[i]->reset();
     }
     VideoOverlay::reset();
-    FBUpdate::reset();
 }
 
 //clear prev layer prop flags and realloc for current frame
@@ -115,20 +117,21 @@ static void reset_layer_prop(hwc_context_t* ctx, int dpy) {
 static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    const int dpy = HWC_DISPLAY_PRIMARY;
 
     if (LIKELY(list && list->numHwLayers > 1) &&
-        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isActive) {
+        ctx->dpyAttr[dpy].isActive) {
 
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         if(fbLayer->handle) {
-            setListStats(ctx, list, HWC_DISPLAY_PRIMARY);
-            reset_layer_prop(ctx, HWC_DISPLAY_PRIMARY);
+            setListStats(ctx, list, dpy);
+            reset_layer_prop(ctx, dpy);
             if(!MDPComp::configure(ctx, list)) {
-                VideoOverlay::prepare(ctx, list, HWC_DISPLAY_PRIMARY);
-                FBUpdate::prepare(ctx, fbLayer, HWC_DISPLAY_PRIMARY);
+                VideoOverlay::prepare(ctx, list, dpy);
+                ctx->mFBUpdate[dpy]->prepare(ctx, fbLayer);
             }
-            ctx->mLayerCache[HWC_DISPLAY_PRIMARY]->updateLayerCache(list);
+            ctx->mLayerCache[dpy]->updateLayerCache(list);
         }
     }
     return 0;
@@ -137,20 +140,20 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
 static int hwc_prepare_external(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    const int dpy = HWC_DISPLAY_EXTERNAL;
 
     if (LIKELY(list && list->numHwLayers > 1) &&
-        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive &&
-        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected) {
+        ctx->dpyAttr[dpy].isActive &&
+        ctx->dpyAttr[dpy].connected) {
 
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         if(fbLayer->handle) {
-            setListStats(ctx, list, HWC_DISPLAY_EXTERNAL);
-            reset_layer_prop(ctx, HWC_DISPLAY_EXTERNAL);
-
-            VideoOverlay::prepare(ctx, list, HWC_DISPLAY_EXTERNAL);
-            FBUpdate::prepare(ctx, fbLayer, HWC_DISPLAY_EXTERNAL);
-            ctx->mLayerCache[HWC_DISPLAY_EXTERNAL]->updateLayerCache(list);
+            setListStats(ctx, list, dpy);
+            reset_layer_prop(ctx, dpy);
+            VideoOverlay::prepare(ctx, list, dpy);
+            ctx->mFBUpdate[dpy]->prepare(ctx, fbLayer);
+            ctx->mLayerCache[dpy]->updateLayerCache(list);
         }
     }
     return 0;
@@ -173,15 +176,14 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
                 ret = hwc_prepare_primary(dev, list);
                 break;
             case HWC_DISPLAY_EXTERNAL:
-
                 ret = hwc_prepare_external(dev, list);
                 break;
             default:
                 ret = -EINVAL;
         }
     }
-    ctx->mOverlay->configDone();
 
+    ctx->mOverlay->configDone();
     return ret;
 }
 
@@ -282,14 +284,15 @@ static int hwc_query(struct hwc_composer_device_1* dev,
 
 static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int ret = 0;
+    const int dpy = HWC_DISPLAY_PRIMARY;
 
     if (LIKELY(list && list->numHwLayers > 1) &&
-        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isActive) {
+        ctx->dpyAttr[dpy].isActive) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
 
-        hwc_sync(ctx, list, HWC_DISPLAY_PRIMARY);
-        if (!VideoOverlay::draw(ctx, list, HWC_DISPLAY_PRIMARY)) {
+        hwc_sync(ctx, list, dpy);
+        if (!VideoOverlay::draw(ctx, list, dpy)) {
             ALOGE("%s: VideoOverlay::draw fail!", __FUNCTION__);
             ret = -1;
         }
@@ -303,7 +306,7 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
         if(fbLayer->compositionType == HWC_FRAMEBUFFER_TARGET && hnd) {
             if(!(fbLayer->flags & HWC_SKIP_LAYER)) {
-                if (!FBUpdate::draw(ctx, fbLayer, HWC_DISPLAY_PRIMARY)) {
+                if (!ctx->mFBUpdate[dpy]->draw(ctx, fbLayer)) {
                     ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
                     ret = -1;
                 }
@@ -320,17 +323,19 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 static int hwc_set_external(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
     int ret = 0;
+    const int dpy = HWC_DISPLAY_EXTERNAL;
+
     Locker::Autolock _l(ctx->mExtSetLock);
 
     if (LIKELY(list && list->numHwLayers > 1) &&
-        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive &&
-        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected) {
+        ctx->dpyAttr[dpy].isActive &&
+        ctx->dpyAttr[dpy].connected) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
 
-        hwc_sync(ctx, list, HWC_DISPLAY_EXTERNAL);
+        hwc_sync(ctx, list, dpy);
 
-        if (!VideoOverlay::draw(ctx, list, HWC_DISPLAY_EXTERNAL)) {
+        if (!VideoOverlay::draw(ctx, list, dpy)) {
             ALOGE("%s: VideoOverlay::draw fail!", __FUNCTION__);
             ret = -1;
         }
@@ -338,7 +343,7 @@ static int hwc_set_external(hwc_context_t *ctx,
         private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
         if(fbLayer->compositionType == HWC_FRAMEBUFFER_TARGET &&
                 !(fbLayer->flags & HWC_SKIP_LAYER) && hnd) {
-            if (!FBUpdate::draw(ctx, fbLayer, HWC_DISPLAY_EXTERNAL)) {
+            if (!ctx->mFBUpdate[dpy]->draw(ctx, fbLayer)) {
                 ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
                 ret = -1;
             }
