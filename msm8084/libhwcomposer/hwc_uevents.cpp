@@ -39,8 +39,8 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
     int64_t timestamp = 0;
     const char *str = udata;
 
-    if(!strcasestr(str, "change@/devices/virtual/switch/hdmi") &&
-       !strcasestr(str, "change@/devices/virtual/switch/wfd")) {
+    if(!strcasestr("change@/devices/virtual/switch/hdmi", str) &&
+       !strcasestr("change@/devices/virtual/switch/wfd", str)) {
         ALOGD_IF(UEVENT_DEBUG, "%s: Not Ext Disp Event ", __FUNCTION__);
         return;
     }
