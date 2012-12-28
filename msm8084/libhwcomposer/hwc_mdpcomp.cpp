@@ -264,6 +264,12 @@ bool MDPComp::isDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         return false;
     }
 
+    if(ctx->mExtDispConfiguring) {
+        ALOGD_IF( isDebug(),"%s: External Display connection is pending",
+                __FUNCTION__);
+        return false;
+    }
+
     if(isSecuring(ctx)) {
         ALOGD_IF(isDebug(), "%s: MDP securing is active", __FUNCTION__);
         return false;
