@@ -154,6 +154,7 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
             VideoOverlay::prepare(ctx, list, dpy);
             ctx->mFBUpdate[dpy]->prepare(ctx, fbLayer);
             ctx->mLayerCache[dpy]->updateLayerCache(list);
+            ctx->mExtDispConfiguring = false;
         }
     }
     return 0;

@@ -230,6 +230,8 @@ struct hwc_context_t {
 
     //Securing in progress indicator
     bool mSecuring;
+    //External Display configuring progress indicator
+    bool mExtDispConfiguring;
     //Display in secure mode indicator
     bool mSecureMode;
     //Lock to prevent set from being called while blanking

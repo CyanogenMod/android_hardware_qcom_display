@@ -67,6 +67,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
     if(connected != -1) { //either we got switch_state connected or disconnect
         ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = connected;
         if (connected) {
+            ctx->mExtDispConfiguring = true;
             ctx->mExtDisplay->processUEventOnline(udata);
             ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL] =
                 IFBUpdate::getObject(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].xres,
