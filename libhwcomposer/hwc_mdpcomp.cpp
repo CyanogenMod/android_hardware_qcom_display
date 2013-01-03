@@ -369,7 +369,7 @@ bool MDPCompLowRes::isDoable(hwc_context_t *ctx,
     int numAppLayers = ctx->listStats[dpy].numAppLayers;
 
     overlay::Overlay& ov = *ctx->mOverlay;
-    int availablePipes = ov.availablePipes();
+    int availablePipes = ov.availablePipes(dpy);
 
     if(numAppLayers < 1 || numAppLayers > (uint32_t)availablePipes) {
         ALOGD_IF(isDebug(), "%s: Unsupported number of layers",__FUNCTION__);
