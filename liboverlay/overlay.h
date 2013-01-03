@@ -71,8 +71,8 @@ public:
     static void initOverlay();
     /* Returns the singleton instance of overlay */
     static Overlay* getInstance();
-    /* Returns total of available ("unallocated") pipes */
-    static int availablePipes();
+    /* Returns available ("unallocated") pipes for a display */
+    int availablePipes(int dpy);
     /* set the framebuffer index for external display */
     void setExtFbNum(int fbNum);
     /* Returns framebuffer index of the current external display */
@@ -111,8 +111,6 @@ private:
         static void resetAllocation(int index);
         static bool isAllocated(int index);
         static bool isNotAllocated(int index);
-        /* Returns total of available ("unallocated") pipes */
-        static int availablePipes();
 
         static int NUM_PIPES;
 
@@ -149,8 +147,15 @@ inline void Overlay::validate(int index) {
             utils::getDestStr((utils::eDest)index));
 }
 
-inline int Overlay::availablePipes() {
-    return PipeBook::availablePipes();
+inline int Overlay::availablePipes(int dpy) {
+     int avail = 0;
+     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
+       if((mPipeBook[i].mDisplay == PipeBook::DPY_UNUSED ||
+           mPipeBook[i].mDisplay == dpy) && PipeBook::isNotAllocated(i)) {
+                avail++;
+        }
+    }
+    return avail;
 }
 
 inline void Overlay::setExtFbNum(int fbNum) {
@@ -161,16 +166,6 @@ inline void Overlay::setExtFbNum(int fbNum) {
 inline int Overlay::getExtFbNum() {
     android::Mutex::Autolock lock(mOvExtFbLock);
     return sExtFbIndex;
-}
-
-inline int Overlay::PipeBook::availablePipes() {
-    int used = 0;
-    int bmp = sAllocatedBitmap;
-    for(; bmp; used++) {
-        //clearing from lsb
-        bmp = bmp & (bmp - 1);
-    }
-    return NUM_PIPES - used;
 }
 
 inline bool Overlay::PipeBook::valid() {
