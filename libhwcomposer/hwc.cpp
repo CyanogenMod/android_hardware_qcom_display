@@ -127,7 +127,7 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         if(fbLayer->handle) {
             setListStats(ctx, list, dpy);
             reset_layer_prop(ctx, dpy);
-            if(!MDPComp::configure(ctx, list)) {
+            if(!ctx->mMDPComp->prepare(ctx, list)) {
                 VideoOverlay::prepare(ctx, list, dpy);
                 ctx->mFBUpdate[dpy]->prepare(ctx, fbLayer);
             }
@@ -296,7 +296,7 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ALOGE("%s: VideoOverlay::draw fail!", __FUNCTION__);
             ret = -1;
         }
-        if (!MDPComp::draw(ctx, list)) {
+        if (!ctx->mMDPComp->draw(ctx, list)) {
             ALOGE("%s: MDPComp::draw fail!", __FUNCTION__);
             ret = -1;
         }
@@ -467,7 +467,7 @@ void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
     dumpsys_log(buf, "Qualcomm HWC state:\n");
     dumpsys_log(buf, "  MDPVersion=%d\n", ctx->mMDP.version);
     dumpsys_log(buf, "  DisplayPanel=%c\n", ctx->mMDP.panel);
-    MDPComp::dump(buf);
+    ctx->mMDPComp->dump(buf);
     //XXX: Call Other dump functions
     strlcpy(buff, buf.string(), buff_len);
 }

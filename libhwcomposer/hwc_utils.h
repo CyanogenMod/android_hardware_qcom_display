@@ -50,6 +50,7 @@ namespace qhwc {
 class QueuedBufferStore;
 class ExternalDisplay;
 class IFBUpdate;
+class MDPComp;
 
 struct MDPInfo {
     int version;
@@ -227,6 +228,7 @@ struct hwc_context_t {
     qhwc::ListStats listStats[HWC_NUM_DISPLAY_TYPES];
     qhwc::LayerCache *mLayerCache[HWC_NUM_DISPLAY_TYPES];
     qhwc::LayerProp *layerProp[HWC_NUM_DISPLAY_TYPES];
+    qhwc::MDPComp *mMDPComp;
 
     //Securing in progress indicator
     bool mSecuring;
@@ -239,5 +241,13 @@ struct hwc_context_t {
     //Vsync
     struct vsync_state vstate;
 };
+
+static inline bool isSkipPresent (hwc_context_t *ctx, int dpy) {
+    return  ctx->listStats[dpy].skipCount;
+}
+
+static inline bool isYuvPresent (hwc_context_t *ctx, int dpy) {
+    return  ctx->listStats[dpy].yuvCount;
+}
 
 #endif //HWC_UTILS_H

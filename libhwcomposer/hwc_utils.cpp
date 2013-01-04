@@ -69,6 +69,7 @@ void initContext(hwc_context_t *ctx)
     ctx->mExtDisplay = new ExternalDisplay(ctx);
     for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++)
         ctx->mLayerCache[i] = new LayerCache();
+    ctx->mMDPComp = MDPComp::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres);
     MDPComp::init(ctx);
 
     pthread_mutex_init(&(ctx->vstate.lock), NULL);
@@ -103,6 +104,11 @@ void closeContext(hwc_context_t *ctx)
             delete ctx->mFBUpdate[i];
             ctx->mFBUpdate[i] = NULL;
         }
+    }
+
+    if(ctx->mMDPComp) {
+        delete ctx->mMDPComp;
+        ctx->mMDPComp = NULL;
     }
 
     pthread_mutex_destroy(&(ctx->vstate.lock));
