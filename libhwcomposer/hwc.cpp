@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -233,7 +233,12 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
             break;
         case HWC_DISPLAY_EXTERNAL:
             if(blank) {
-                //TODO actual
+                // External Display post commits the changes to display
+                // Call this on blank, so that any pipe unsets gets committed
+                if (!ctx->mExtDisplay->post()) {
+                    ret = -1;
+                    ALOGE("%s:ctx->mExtDisplay->post fail!! ", __FUNCTION__);
+                }
             } else {
             }
             break;
