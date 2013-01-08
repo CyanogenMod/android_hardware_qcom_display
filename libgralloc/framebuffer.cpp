@@ -267,9 +267,20 @@ int mapFrameBufferLocked(struct private_module_t* module)
 
     float xdpi = (info.xres * 25.4f) / info.width;
     float ydpi = (info.yres * 25.4f) / info.height;
+#ifdef MSMFB_METADATA_GET
+    struct msmfb_metadata metadata;
+    memset(&metadata, 0 , sizeof(metadata));
+    metadata.op = metadata_op_frame_rate;
+    if (ioctl(fd, MSMFB_METADATA_GET, &metadata) == -1) {
+        ALOGE("Error retrieving panel frame rate");
+        return -errno;
+    }
+    float fps  = metadata.data.panel_frame_rate;
+#else
+    //XXX: Remove reserved field usage on all baselines
     //The reserved[3] field is used to store FPS by the driver.
     float fps  = info.reserved[3] & 0xFF;
-
+#endif
     ALOGI("using (fd=%d)\n"
           "id           = %s\n"
           "xres         = %d px\n"
