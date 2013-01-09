@@ -226,6 +226,12 @@ bool isSecuring(hwc_context_t* ctx) {
     return false;
 }
 
+bool isSecureModePolicy(int mdpVersion) {
+    if (mdpVersion < qdutils::MDSS_V5)
+        return true;
+    else
+        return false;
+}
 
 //Crops source buffer against destination and FB boundaries
 void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,

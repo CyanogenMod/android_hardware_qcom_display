@@ -130,6 +130,7 @@ void closeContext(hwc_context_t *ctx);
 void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
         const int fbWidth, const int fbHeight, int orient);
 bool isSecuring(hwc_context_t* ctx);
+bool isSecureModePolicy(int mdpVersion);
 bool isExternalActive(hwc_context_t* ctx);
 
 //Helper function to dump logs
