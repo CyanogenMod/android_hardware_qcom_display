@@ -108,7 +108,8 @@ bool VideoOverlay::configure(hwc_context_t *ctx, int dpy,
     }
 
     MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
-    if ((metadata->operation & PP_PARAM_INTERLACED) && metadata->interlaced) {
+    if (metadata && (metadata->operation & PP_PARAM_INTERLACED) &&
+                                             metadata->interlaced) {
         ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_DEINTERLACE);
     }
 

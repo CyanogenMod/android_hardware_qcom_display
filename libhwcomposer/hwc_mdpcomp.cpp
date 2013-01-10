@@ -215,7 +215,8 @@ void MDPCompLowRes::setVidInfo(hwc_layer_1_t *layer,
     if(isSecureBuffer(hnd)) {
         ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
     }
-    if((metadata->operation & PP_PARAM_INTERLACED) && metadata->interlaced) {
+    if(metadata && (metadata->operation & PP_PARAM_INTERLACED) &&
+                                              metadata->interlaced) {
         ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_DEINTERLACE);
     }
 }
