@@ -27,6 +27,8 @@
 #include <stdlib.h>
 #include "hwc_utils.h"
 #include "hwc_fbupdate.h"
+#include "hwc_copybit.h"
+#include "comptype.h"
 #include "external.h"
 
 namespace qhwc {
@@ -38,6 +40,16 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
     int vsync = 0;
     int64_t timestamp = 0;
     const char *str = udata;
+    bool usecopybit = false;
+    int compositionType =
+        qdutils::QCCompositionType::getInstance().getCompositionType();
+
+    if (compositionType & (qdutils::COMPOSITION_TYPE_DYN |
+                           qdutils::COMPOSITION_TYPE_MDP |
+                           qdutils::COMPOSITION_TYPE_C2D)) {
+        usecopybit = true;
+
+    }
 
     if(!strcasestr("change@/devices/virtual/switch/hdmi", str) &&
        !strcasestr("change@/devices/virtual/switch/wfd", str)) {
@@ -72,12 +84,19 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL] =
                 IFBUpdate::getObject(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].xres,
                 HWC_DISPLAY_EXTERNAL);
+            if(usecopybit)
+                ctx->mCopyBit[HWC_DISPLAY_EXTERNAL] = new CopyBit();
         } else {
             ctx->mExtDisplay->processUEventOffline(udata);
             if(ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL]) {
                 Locker::Autolock _l(ctx->mExtSetLock);
                 delete ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL];
                 ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL] = NULL;
+            }
+            if(ctx->mCopyBit[HWC_DISPLAY_EXTERNAL]){
+                Locker::Autolock _l(ctx->mExtSetLock);
+                delete ctx->mCopyBit[HWC_DISPLAY_EXTERNAL];
+                ctx->mCopyBit[HWC_DISPLAY_EXTERNAL] = NULL;
             }
         }
         ALOGD("%s sending hotplug: connected = %d", __FUNCTION__, connected);
