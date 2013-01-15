@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -9,7 +9,7 @@
  *       copyright notice, this list of conditions and the following
  *       disclaimer in the documentation and/or other materials provided
  *       with the distribution.
- *     * Neither the name of Code Aurora Forum, Inc. nor the names of its
+ *     * Neither the name of The Linux Foundation. nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
  *
@@ -232,6 +232,7 @@ typedef enum {
     C2D_DRAW_LINE_NOLAST     = (1 << 17), /* disable last pixel draw for line */
 } C2D_SOURCE_CONFIG;
 
+
 /* Target configuration bits, defines rotation + mirroring.
  * Mirror is applied prior to rotation if enabled. */
 typedef enum {
@@ -272,6 +273,18 @@ typedef enum {
     C2D_ALPHA_BLEND_INVERTC    = (16 << 20), /* Invert color */
     C2D_ALPHA_BLEND_NONE       = (1  << 25), /* disables alpha blending */
 } C2D_ALPHA_BLEND_MODE;
+
+/* Configuration bits, used in the config_mask field of C2D_OBJECT struct */
+typedef enum {
+    C2D_OVERRIDE_GLOBAL_TARGET_ROTATE_CONFIG = (1 << 27), /* Overrides TARGET Config */
+    C2D_OVERRIDE_TARGET_ROTATE_0             = (0 << 28), /* no rotation             */
+    C2D_OVERRIDE_TARGET_ROTATE_90            = (1 << 28), /* 90 degree rotation      */
+    C2D_OVERRIDE_TARGET_ROTATE_180           = (2 << 28), /* 180 degree rotation     */
+    C2D_OVERRIDE_TARGET_ROTATE_270           = (3 << 28), /* 270 degree rotation     */
+} C2D_SOURCE_TARGET_CONFIG;
+
+#define C2D_OVERRIDE_SOURCE_CONFIG_TARGET_ROTATION_SHIFT_MASK  28
+#define C2D_OVERRIDE_TARGET_CONFIG_TARGET_ROTATION_SHIFT_MASK  2
 
 
 /* Surface caps enumeration */
@@ -375,6 +388,51 @@ typedef struct C2D_OBJECT_STR {
     struct C2D_OBJECT_STR *next; /* pointer to the next object or NULL */
 } C2D_OBJECT;
 
+/* Configuration bits, driver capabilities used by 2Dapplications */
+typedef enum {
+    C2D_DRIVER_SUPPORTS_GLOBAL_ALPHA_OP           = (1 << 0),
+    C2D_DRIVER_SUPPORTS_TILE_OP                   = (1 << 1),
+    C2D_DRIVER_SUPPORTS_COLOR_KEY_OP              = (1 << 2),
+    C2D_DRIVER_SUPPORTS_NO_PIXEL_ALPHA_OP         = (1 << 3),
+    C2D_DRIVER_SUPPORTS_TARGET_ROTATE_OP          = (1 << 4),
+    C2D_DRIVER_SUPPORTS_ANTI_ALIASING_OP          = (1 << 5), /* antialiasing */
+    C2D_DRIVER_SUPPORTS_BILINEAR_FILTER_OP        = (1 << 6),
+    C2D_DRIVER_SUPPORTS_LENS_CORRECTION_OP        = (1 << 7),
+    C2D_DRIVER_SUPPORTS_OVERRIDE_TARGET_ROTATE_OP = (1 << 8),
+    C2D_DRIVER_SUPPORTS_SHADER_BLOB_OP            = (1 << 9),
+    C2D_DRIVER_SUPPORTS_MASK_SURFACE_OP           = (1 << 10), /* mask surface */
+    C2D_DRIVER_SUPPORTS_MIRROR_H_OP               = (1 << 11), /* horizontal flip */
+    C2D_DRIVER_SUPPORTS_MIRROR_V_OP               = (1 << 12), /* vertical flip */
+    C2D_DRIVER_SUPPORTS_SCISSOR_RECT_OP           = (1 << 13),
+    C2D_DRIVER_SUPPORTS_SOURCE_RECT_OP            = (1 << 14),
+    C2D_DRIVER_SUPPORTS_TARGET_RECT_OP            = (1 << 15),
+    C2D_DRIVER_SUPPORTS_ROTATE_OP                 = (1 << 16), /* all rotations */
+    C2D_DRIVER_SUPPORTS_FLUSH_WITH_FENCE_FD_OP    = (1 << 17), /* all rotations */
+    C2D_DRIVER_SUPPORTS_ALL_CAPABILITIES_OP       = ((0xFFFFFFFF) >> (31 - 17)) /* mask for all capabilities supported */
+} C2D_DRIVER_CAPABILITIES;
+
+/* 2D driver workaround bits used by the 2D applications */
+typedef enum {
+    C2D_DRIVER_WORKAROUND_NONE  = 0, /* NO workaround */
+    C2D_DRIVER_WORKAROUND_SWAP_UV_FOR_YUV_TARGET  = (1 << 0), /* Swap UV when this flag set */
+} C2D_DRIVER_WORKAROUND;
+
+/* Structure to query Driver information */
+typedef struct {
+    uint32 capabilities_mask;
+    uint32 workaround_mask;
+    uint32 reserved1;
+    uint32 reserved2;
+    uint32 reserved3;
+} C2D_DRIVER_INFO;
+
+/* Structure to query Driver information */
+typedef struct {
+    uint32          max_surface_template_needed;
+    uint32          reserved1;
+    uint32          reserved2;
+    uint32          reserved3;
+} C2D_DRIVER_SETUP_INFO;
 
 /*****************************************************************************/
 /**************************** C2D API 2.0 ********************************/
@@ -608,6 +666,13 @@ C2D_API C2D_STATUS c2dMapAddr ( int mem_fd, void * hostptr, uint32 len, uint32 o
 /* allows user to unmap memory region mapped by c2dMapAddr.
  * gpaddr is the gpuaddr to unmap */
 C2D_API C2D_STATUS c2dUnMapAddr (void * gpuaddr);
+
+/* allows user to query driver capabilities.
+ * driver_info is the information about driver */
+C2D_API C2D_STATUS c2dGetDriverCapabilities( C2D_DRIVER_INFO * driver_info);
+
+/* create a fence fd for the timestamp */
+C2D_API C2D_STATUS c2dCreateFenceFD( uint32 target_id, c2d_ts_handle timestamp, int32 *fd);
 
 /*****************************************************************************/
 
