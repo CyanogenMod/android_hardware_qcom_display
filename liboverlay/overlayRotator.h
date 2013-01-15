@@ -47,11 +47,12 @@ public:
     virtual bool close() = 0;
     virtual void setSource(const utils::Whf& wfh) = 0;
     virtual void setFlags(const utils::eMdpFlags& flags) = 0;
-    virtual void setTransform(const utils::eTransform& rot,
-            const bool& rotUsed) = 0;
+    virtual void setTransform(const utils::eTransform& rot) = 0;
+    virtual void setRotatorUsed(const bool& rotUsed) = 0;
     virtual bool commit() = 0;
     virtual void setRotations(uint32_t r) = 0;
     virtual void setSrcFB() = 0;
+    virtual void setDownscale(int ds) = 0;
     virtual int getDstMemId() const = 0;
     virtual uint32_t getDstOffset() const = 0;
     virtual void setEnable() = 0;
@@ -116,11 +117,12 @@ public:
     virtual bool close();
     virtual void setSource(const utils::Whf& wfh);
     virtual void setFlags(const utils::eMdpFlags& flags);
-    virtual void setTransform(const utils::eTransform& rot,
-            const bool& rotUsed);
+    virtual void setTransform(const utils::eTransform& rot);
+    virtual void setRotatorUsed(const bool& rotUsed);
     virtual bool commit();
     virtual void setRotations(uint32_t r);
     virtual void setSrcFB();
+    virtual void setDownscale(int ds);
     virtual int getDstMemId() const;
     virtual uint32_t getDstOffset() const;
     virtual void setEnable();
@@ -176,11 +178,12 @@ public:
     virtual bool close();
     virtual void setSource(const utils::Whf& wfh);
     virtual void setFlags(const utils::eMdpFlags& flags);
-    virtual void setTransform(const utils::eTransform& rot,
-            const bool& rotUsed);
+    virtual void setTransform(const utils::eTransform& rot);
+    virtual void setRotatorUsed(const bool& rotUsed);
     virtual bool commit();
     virtual void setRotations(uint32_t r);
     virtual void setSrcFB();
+    virtual void setDownscale(int ds);
     virtual int getDstMemId() const;
     virtual uint32_t getDstOffset() const;
     virtual void setEnable();

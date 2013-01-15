@@ -53,6 +53,20 @@ void MdpRot::setSrcFB() {
     mRotDataInfo.src.flags |= MDP_MEMORY_ID_TYPE_FB;
 }
 
+void MdpRot::setDownscale(int ds) {
+    if (mRotImgInfo.src.format == MDP_Y_CR_CB_GH2V2 &&
+                            (mRotImgInfo.src_rect.h & 0xF)) {
+        mRotImgInfo.src_rect.h = utils::aligndown(mRotImgInfo.src_rect.h, 16);
+    } else if ((utils::ROT_DS_EIGHTH == ds) && (mRotImgInfo.src_rect.h & 0xF)) {
+        // Ensure src_rect.h is a multiple of 16 for 1/8 downscaling.
+        // This is an undocumented MDP Rotator constraint.
+        // Note that src_rect.h is already ensured to be 32 pixel height aligned
+        // for MDP_Y_CRCB_H2V2_TILE and MDP_Y_CBCR_H2V2_TILE formats.
+        mRotImgInfo.src_rect.h = utils::alignup(mRotImgInfo.src_rect.h, 16);
+    }
+    mRotImgInfo.downscale_ratio = ds;
+}
+
 void MdpRot::save() {
     mLSRotImgInfo = mRotImgInfo;
 }
@@ -103,7 +117,7 @@ void MdpRot::setFlags(const utils::eMdpFlags& flags) {
         mRotImgInfo.secure = 1;
 }
 
-void MdpRot::setTransform(const utils::eTransform& rot, const bool& rotUsed)
+void MdpRot::setTransform(const utils::eTransform& rot)
 {
     int r = utils::getMdpOrient(rot);
     setRotations(r);
@@ -111,7 +125,9 @@ void MdpRot::setTransform(const utils::eTransform& rot, const bool& rotUsed)
     //Clients in Android dont factor in 90 rotation while deciding the flip.
     mOrientation = static_cast<utils::eTransform>(r);
     ALOGE_IF(DEBUG_OVERLAY, "%s: r=%d", __FUNCTION__, r);
+}
 
+void MdpRot::setRotatorUsed(const bool& rotUsed) {
     setDisable();
     if(rotUsed) {
         setEnable();
