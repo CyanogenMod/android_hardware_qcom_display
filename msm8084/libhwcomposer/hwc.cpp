@@ -2,6 +2,9 @@
  * Copyright (C) 2010 The Android Open Source Project
  * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
  *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -30,6 +33,7 @@
 #include "hwc_fbupdate.h"
 #include "hwc_mdpcomp.h"
 #include "external.h"
+#include "hwc_copybit.h"
 
 using namespace qhwc;
 #define VSYNC_DEBUG 0
@@ -96,6 +100,9 @@ static void reset(hwc_context_t *ctx, int numDisplays,
 
         if(ctx->mFBUpdate[i])
             ctx->mFBUpdate[i]->reset();
+
+        if(ctx->mCopyBit[i])
+            ctx->mCopyBit[i]->reset();
     }
     VideoOverlay::reset();
 }
@@ -127,11 +134,16 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         if(fbLayer->handle) {
             setListStats(ctx, list, dpy);
             reset_layer_prop(ctx, dpy);
-            if(!ctx->mMDPComp->prepare(ctx, list)) {
+            int ret = ctx->mMDPComp->prepare(ctx, list);
+            if(!ret) {
+                // IF MDPcomp fails use this route
                 VideoOverlay::prepare(ctx, list, dpy);
                 ctx->mFBUpdate[dpy]->prepare(ctx, fbLayer);
             }
             ctx->mLayerCache[dpy]->updateLayerCache(list);
+            // Use Copybit, when MDP comp fails
+            if(!ret && ctx->mCopyBit[dpy])
+                ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
         }
     }
     return 0;
@@ -154,6 +166,8 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
             VideoOverlay::prepare(ctx, list, dpy);
             ctx->mFBUpdate[dpy]->prepare(ctx, fbLayer);
             ctx->mLayerCache[dpy]->updateLayerCache(list);
+            if(ctx->mCopyBit[dpy])
+                ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
             ctx->mExtDispConfiguring = false;
         }
     }
@@ -296,8 +310,10 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         ctx->dpyAttr[dpy].isActive) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
-
-        hwc_sync(ctx, list, dpy);
+        int fd = -1; //FenceFD from the Copybit(valid in async mode)
+        if(ctx->mCopyBit[dpy])
+            ctx->mCopyBit[dpy]->draw(ctx, list, dpy, &fd);
+        hwc_sync(ctx, list, dpy, fd);
         if (!VideoOverlay::draw(ctx, list, dpy)) {
             ALOGE("%s: VideoOverlay::draw fail!", __FUNCTION__);
             ret = -1;
@@ -338,8 +354,11 @@ static int hwc_set_external(hwc_context_t *ctx,
         ctx->dpyAttr[dpy].connected) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
+        int fd = -1; //FenceFD from the Copybit(valid in async mode)
+        if(ctx->mCopyBit[dpy])
+            ctx->mCopyBit[dpy]->draw(ctx, list, dpy, &fd);
 
-        hwc_sync(ctx, list, dpy);
+        hwc_sync(ctx, list, dpy, fd);
 
         if (!VideoOverlay::draw(ctx, list, dpy)) {
             ALOGE("%s: VideoOverlay::draw fail!", __FUNCTION__);
@@ -369,7 +388,6 @@ static int hwc_set(hwc_composer_device_1 *dev,
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     Locker::Autolock _l(ctx->mBlankLock);
-
     for (uint32_t i = 0; i < numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
         switch(i) {
