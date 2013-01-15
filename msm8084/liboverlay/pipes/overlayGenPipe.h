@@ -88,6 +88,9 @@ private:
     /* set Closed pipe */
     bool setClosed();
 
+    /* Set whether rotator can be used */
+    void setRotatorUsed(const bool& rotUsed);
+
     int mFbNum;
 
     /* Ctrl/Data aggregator */
@@ -97,6 +100,10 @@ private:
 
     //Whether rotator is used for 0-rot or otherwise
     bool mRotUsed;
+
+    //Whether we will do downscale opt. This is just a request. If the frame is
+    //not a candidate, we might not do it.
+    bool mRotDownscaleOpt;
 
     /* Pipe open or closed */
     enum ePipeState {

@@ -130,7 +130,10 @@ public:
      */
     bool setCrop(const utils::Dim& d);
 
-    bool setTransform(const utils::eTransform& orient, const bool& rotUsed);
+    bool setTransform(const utils::eTransform& orient);
+
+    /* set whether rotator can be used */
+    void setRotatorUsed(const bool& rotUsed);
 
     /* given a dim and w/h, set overlay dim */
     bool setPosition(const utils::Dim& dim, int w, int h);
@@ -141,10 +144,18 @@ public:
     /* dump state of the object */
     void dump() const;
 
+    /* Perform transformation calculations */
+    void doTransform();
+
+    /* Performs downscale calculations */
+    void doDownscale(int dscale_factor);
+
+    /* Get downscale factor */
+    int getDownscalefactor();
+
 private:
 
     /* helper functions for overlayTransform */
-    void doTransform();
     void overlayTransFlipH();
     void overlayTransFlipV();
     void overlayTransRot90();

@@ -57,13 +57,17 @@ bool Ctrl::setPosition(const utils::Dim& dim)
     return true;
 }
 
-bool Ctrl::setTransform(const utils::eTransform& orient, const bool& rotUsed)
+bool Ctrl::setTransform(const utils::eTransform& orient)
 {
-    if(!mMdp.setTransform(orient, rotUsed)) {
+    if(!mMdp.setTransform(orient)) {
         ALOGE("Ctrl setTransform failed for Mdp");
         return false;
     }
     return true;
+}
+
+void Ctrl::setRotatorUsed(const bool& rotUsed) {
+    mMdp.setRotatorUsed(rotUsed);
 }
 
 bool Ctrl::setCrop(const utils::Dim& d)
