@@ -236,8 +236,9 @@ void disp_mode_timing_type::set_info(struct fb_var_screeninfo &info) const
     info.reserved[0] = 0;
     info.reserved[1] = 0;
     info.reserved[2] = 0;
+#ifndef FB_METADATA_VIDEO_INFO_CODE_SUPPORT
     info.reserved[3] = (info.reserved[3] & 0xFFFF) | (video_format << 16);
-
+#endif
     info.xoffset = 0;
     info.yoffset = 0;
     info.xres = active_h;
@@ -533,6 +534,16 @@ void ExternalDisplay::setResolution(int ID)
             ALOGD("In %s: FBIOPUT_VSCREENINFO failed Err Str = %s",
                                                  __FUNCTION__, strerror(errno));
         }
+#ifdef FB_METADATA_VIDEO_INFO_CODE_SUPPORT
+        struct msmfb_metadata metadata;
+        memset(&metadata, 0 , sizeof(metadata));
+        metadata.op = metadata_op_vic;
+        metadata.data.video_info_code = mode->video_format;
+        if (ioctl(mFd, MSMFB_METADATA_SET, &metadata) == -1) {
+            ALOGD("In %s: MSMFB_METADATA_SET failed Err Str = %s",
+                                                 __FUNCTION__, strerror(errno));
+        }
+#endif
         mCurrentMode = ID;
     }
 }
