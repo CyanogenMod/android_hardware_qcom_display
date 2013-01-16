@@ -62,8 +62,7 @@ static bool canFallback(int usage, bool triedSystem)
         return false;
     if(triedSystem)
         return false;
-    if(usage & (GRALLOC_HEAP_MASK | GRALLOC_USAGE_PROTECTED |
-                GRALLOC_USAGE_PRIVATE_CP_BUFFER))
+    if(usage & (GRALLOC_HEAP_MASK | GRALLOC_USAGE_PROTECTED))
         return false;
     if(usage & (GRALLOC_HEAP_MASK | GRALLOC_USAGE_PRIVATE_EXTERNAL_ONLY))
         return false;
@@ -124,7 +123,7 @@ int IonController::allocate(alloc_data& data, int usage)
     if(usage & GRALLOC_USAGE_PRIVATE_CAMERA_HEAP)
         ionFlags |= ION_HEAP(ION_CAMERA_HEAP_ID);
 
-    if(usage & GRALLOC_USAGE_PRIVATE_CP_BUFFER)
+    if(usage & GRALLOC_USAGE_PROTECTED)
         ionFlags |= ION_SECURE;
 
     // if no flags are set, default to
