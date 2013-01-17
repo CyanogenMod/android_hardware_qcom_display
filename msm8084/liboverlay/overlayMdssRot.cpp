@@ -31,6 +31,7 @@
 #endif
 
 #define SIZE_1M 0x00100000
+#define MDSS_ROT_MASK (MDP_ROT_90 | MDP_FLIP_UD | MDP_FLIP_LR)
 
 namespace ovutils = overlay::utils;
 
@@ -129,8 +130,8 @@ bool MdssRot::commit() {
         return false;
     }
     mRotData.id = mRotInfo.id;
-    //reset flags to avoid stale orientation values
-    mRotInfo.flags = 0;
+    // reset rotation flags to avoid stale orientation values
+    mRotInfo.flags &= ~MDSS_ROT_MASK;
     return true;
 }
 
