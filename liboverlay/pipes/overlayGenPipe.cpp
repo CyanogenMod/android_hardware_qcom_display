@@ -29,11 +29,12 @@
 
 #include "overlayGenPipe.h"
 #include "overlay.h"
+#include "mdp_version.h"
 
 namespace overlay {
 
 GenericPipe::GenericPipe(int dpy) : mFbNum(dpy), mRot(0), mRotUsed(false),
-        pipeState(CLOSED) {
+        mRotDownscaleOpt(false), pipeState(CLOSED) {
     init();
 }
 
@@ -45,6 +46,7 @@ bool GenericPipe::init()
 {
     ALOGE_IF(DEBUG_OVERLAY, "GenericPipe init");
     mRotUsed = false;
+    mRotDownscaleOpt = false;
     if(mFbNum)
         mFbNum = Overlay::getInstance()->getExtFbNum();
 
@@ -101,7 +103,9 @@ bool GenericPipe::setSource(
     newargs.whf = whf;
 
     //Cache if user wants 0-rotation
-    mRotUsed = newargs.rotFlags & utils::ROT_FLAG_ENABLED;
+    mRotUsed = newargs.rotFlags & utils::ROT_0_ENABLED;
+    mRotDownscaleOpt = newargs.rotFlags & utils::ROT_DOWNSCALE_ENABLED;
+
     mRot->setSource(newargs.whf);
     mRot->setFlags(newargs.mdpFlags);
     return mCtrlData.ctrl.setSource(newargs);
@@ -118,9 +122,9 @@ bool GenericPipe::setTransform(
     //Rotation could be enabled by user for zero-rot or the layer could have
     //some transform. Mark rotation enabled in either case.
     mRotUsed |= (orient != utils::OVERLAY_TRANSFORM_0);
-    mRot->setTransform(orient, mRotUsed);
+    mRot->setTransform(orient);
 
-    return mCtrlData.ctrl.setTransform(orient, mRotUsed);
+    return mCtrlData.ctrl.setTransform(orient);
 }
 
 bool GenericPipe::setPosition(const utils::Dim& d)
@@ -128,10 +132,31 @@ bool GenericPipe::setPosition(const utils::Dim& d)
     return mCtrlData.ctrl.setPosition(d);
 }
 
+void GenericPipe::setRotatorUsed(const bool& rotUsed) {
+    mRot->setRotatorUsed(rotUsed);
+    mCtrlData.ctrl.setRotatorUsed(rotUsed);
+}
+
 bool GenericPipe::commit() {
     bool ret = false;
-    //If wanting to use rotator, start it.
+    int downscale_factor = utils::ROT_DS_NONE;
+
+    if(mRotDownscaleOpt) {
+        /* Can go ahead with calculation of downscale_factor since
+         * we consider area when calculating it */
+        downscale_factor = mCtrlData.ctrl.getDownscalefactor();
+        if(downscale_factor)
+            mRotUsed = true;
+    }
+
+    setRotatorUsed(mRotUsed);
+    mCtrlData.ctrl.doTransform();
+
+    mCtrlData.ctrl.doDownscale(downscale_factor);
+    mRot->setDownscale(downscale_factor);
+
     if(mRotUsed) {
+        //If wanting to use rotator, start it.
         if(!mRot->commit()) {
             ALOGE("GenPipe Rotator commit failed");
             //If rot commit fails, flush rotator session, memory, fd and create
@@ -223,5 +248,6 @@ bool GenericPipe::setClosed() {
     pipeState = CLOSED;
     return true;
 }
+
 
 } //namespace overlay
