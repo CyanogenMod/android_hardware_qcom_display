@@ -146,6 +146,8 @@ void ExternalDisplay::processUEventOnline(const char *str) {
     if(!strncmp(s1,"hdmi",strlen(s1))) {
         // hdmi online event..!
         configureHDMIDisplay();
+        // set system property
+        property_set("hw.hdmiON", "1");
     }else if(!strncmp(s1,"wfd",strlen(s1))) {
         // wfd online event..!
         configureWFDDisplay();
@@ -156,6 +158,8 @@ void ExternalDisplay::processUEventOffline(const char *str) {
     const char *s1 = str + strlen("change@/devices/virtual/switch/");
     if(!strncmp(s1,"hdmi",strlen(s1))) {
         teardownHDMIDisplay();
+        // unset system property
+        property_set("hw.hdmiON", "0");
     }else if(!strncmp(s1,"wfd",strlen(s1))) {
         teardownWFDDisplay();
     }
