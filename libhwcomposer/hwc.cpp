@@ -125,7 +125,6 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     const int dpy = HWC_DISPLAY_PRIMARY;
-
     if (LIKELY(list && list->numHwLayers > 1) &&
         ctx->dpyAttr[dpy].isActive) {
 
@@ -306,14 +305,14 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int ret = 0;
     const int dpy = HWC_DISPLAY_PRIMARY;
 
-    if (LIKELY(list && list->numHwLayers > 1) &&
-        ctx->dpyAttr[dpy].isActive) {
+    if (LIKELY(list) && ctx->dpyAttr[dpy].isActive) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         int fd = -1; //FenceFD from the Copybit(valid in async mode)
         if(ctx->mCopyBit[dpy])
             ctx->mCopyBit[dpy]->draw(ctx, list, dpy, &fd);
-        hwc_sync(ctx, list, dpy, fd);
+        if(list->numHwLayers > 1)
+            hwc_sync(ctx, list, dpy, fd);
         if (!VideoOverlay::draw(ctx, list, dpy)) {
             ALOGE("%s: VideoOverlay::draw fail!", __FUNCTION__);
             ret = -1;
@@ -327,7 +326,8 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         //always. Last layer is always FB
         private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
         if(fbLayer->compositionType == HWC_FRAMEBUFFER_TARGET && hnd) {
-            if(!(fbLayer->flags & HWC_SKIP_LAYER)) {
+            if(!(fbLayer->flags & HWC_SKIP_LAYER) &&
+                (list->numHwLayers > 1)) {
                 if (!ctx->mFBUpdate[dpy]->draw(ctx, fbLayer)) {
                     ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
                     ret = -1;
@@ -349,8 +349,7 @@ static int hwc_set_external(hwc_context_t *ctx,
 
     Locker::Autolock _l(ctx->mExtSetLock);
 
-    if (LIKELY(list && list->numHwLayers > 1) &&
-        ctx->dpyAttr[dpy].isActive &&
+    if (LIKELY(list) && ctx->dpyAttr[dpy].isActive &&
         ctx->dpyAttr[dpy].connected) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
@@ -358,7 +357,8 @@ static int hwc_set_external(hwc_context_t *ctx,
         if(ctx->mCopyBit[dpy])
             ctx->mCopyBit[dpy]->draw(ctx, list, dpy, &fd);
 
-        hwc_sync(ctx, list, dpy, fd);
+        if(list->numHwLayers > 1)
+            hwc_sync(ctx, list, dpy, fd);
 
         if (!VideoOverlay::draw(ctx, list, dpy)) {
             ALOGE("%s: VideoOverlay::draw fail!", __FUNCTION__);
@@ -367,7 +367,8 @@ static int hwc_set_external(hwc_context_t *ctx,
 
         private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
         if(fbLayer->compositionType == HWC_FRAMEBUFFER_TARGET &&
-                !(fbLayer->flags & HWC_SKIP_LAYER) && hnd) {
+                !(fbLayer->flags & HWC_SKIP_LAYER) && hnd &&
+                (list->numHwLayers > 1)) {
             if (!ctx->mFBUpdate[dpy]->draw(ctx, fbLayer)) {
                 ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
                 ret = -1;
