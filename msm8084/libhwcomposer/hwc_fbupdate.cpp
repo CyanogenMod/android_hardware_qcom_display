@@ -89,7 +89,7 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
                 info,
                 ovutils::ZORDER_0,
                 ovutils::IS_FG_SET,
-                ovutils::ROT_FLAG_DISABLED);
+                ovutils::ROT_FLAGS_NONE);
         ov.setSource(parg, dest);
 
         hwc_rect_t sourceCrop = layer->sourceCrop;
@@ -193,7 +193,7 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
                 info,
                 ovutils::ZORDER_0,
                 ovutils::IS_FG_SET,
-                ovutils::ROT_FLAG_DISABLED);
+                ovutils::ROT_FLAGS_NONE);
         ov.setSource(pargL, destL);
 
         ovutils::eMdpFlags mdpFlagsR = mdpFlagsL;
@@ -202,7 +202,7 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
                 info,
                 ovutils::ZORDER_0,
                 ovutils::IS_FG_SET,
-                ovutils::ROT_FLAG_DISABLED);
+                ovutils::ROT_FLAGS_NONE);
         ov.setSource(pargR, destR);
 
         hwc_rect_t sourceCrop = layer->sourceCrop;

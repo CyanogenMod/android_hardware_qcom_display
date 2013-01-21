@@ -111,17 +111,20 @@ bool MdpCtrl::setPosition(const overlay::utils::Dim& d,
     return true;
 }
 
-bool MdpCtrl::setTransform(const utils::eTransform& orient,
-        const bool& rotUsed) {
+bool MdpCtrl::setTransform(const utils::eTransform& orient) {
     int rot = utils::getMdpOrient(orient);
     setUserData(rot);
     //getMdpOrient will switch the flips if the source is 90 rotated.
     //Clients in Android dont factor in 90 rotation while deciding the flip.
     mOrientation = static_cast<utils::eTransform>(rot);
 
-    //Rotator can be requested by client even if layer has 0 orientation.
-    mRotUsed = rotUsed;
     return true;
+}
+
+void MdpCtrl::setRotatorUsed(const bool& rotUsed) {
+    //rotUsed dictates whether rotator hardware can be used.
+    //It is set if transformation or downscaling is required.
+    mRotUsed = rotUsed;
 }
 
 void MdpCtrl::doTransform() {
@@ -140,9 +143,52 @@ void MdpCtrl::doTransform() {
     }
 }
 
+int MdpCtrl::getDownscalefactor() {
+    int dscale_factor = utils::ROT_DS_NONE;
+    int src_w = mOVInfo.src_rect.w;
+    int src_h = mOVInfo.src_rect.h;
+    int dst_w = mOVInfo.dst_rect.w;
+    int dst_h = mOVInfo.dst_rect.h;
+    // We need this check to engage the rotator whenever possible to assist MDP
+    // in performing video downscale.
+    // This saves bandwidth and avoids causing the driver to make too many panel
+    // -mode switches between BLT (writeback) and non-BLT (Direct) modes.
+    // Use-case: Video playback [with downscaling and rotation].
+
+    if (dst_w && dst_h)
+    {
+        uint32_t dscale = (src_w * src_h) / (dst_w * dst_h);
+
+        if(dscale < 2) {
+            // Down-scale to > 50% of orig.
+            dscale_factor = utils::ROT_DS_NONE;
+        } else if(dscale < 4) {
+            // Down-scale to between > 25% to <= 50% of orig.
+            dscale_factor = utils::ROT_DS_HALF;
+        } else if(dscale < 8) {
+            // Down-scale to between > 12.5% to <= 25% of orig.
+            dscale_factor = utils::ROT_DS_FOURTH;
+        } else {
+            // Down-scale to <= 12.5% of orig.
+            dscale_factor = utils::ROT_DS_EIGHTH;
+        }
+    }
+
+    return dscale_factor;
+}
+
+void MdpCtrl::doDownscale(int dscale_factor) {
+
+    if( dscale_factor ) {
+        mOVInfo.src_rect.x >>= dscale_factor;
+        mOVInfo.src_rect.y >>= dscale_factor;
+        mOVInfo.src_rect.w >>= dscale_factor;
+        mOVInfo.src_rect.h >>= dscale_factor;
+    }
+}
+
 bool MdpCtrl::set() {
     //deferred calcs, so APIs could be called in any order.
-    doTransform();
     utils::Whf whf = getSrcWhf();
     if(utils::isYuv(whf.format)) {
         normalizeCrop(mOVInfo.src_rect.x, mOVInfo.src_rect.w);

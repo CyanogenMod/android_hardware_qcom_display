@@ -243,9 +243,9 @@ inline void dump(const char* const s, const uint32_t u[], uint32_t cnt) {
     }
 }
 inline void dump(const char* const s, const msm_rotator_img_info& rot) {
-    ALOGE("%s msm_rotator_img_info sessid=%u dstx=%d dsty=%d rot=%d, ena=%d",
+    ALOGE("%s msm_rotator_img_info sessid=%u dstx=%d dsty=%d rot=%d, ena=%d scale=%d",
             s, rot.session_id, rot.dst_x, rot.dst_y,
-            rot.rotations, rot.enable);
+            rot.rotations, rot.enable, rot.downscale_ratio);
     dump("src", rot.src);
     dump("dst", rot.dst);
     dump("src_rect", rot.src_rect);

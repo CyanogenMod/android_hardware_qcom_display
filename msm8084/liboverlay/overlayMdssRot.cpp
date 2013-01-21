@@ -95,11 +95,14 @@ void MdssRot::setSource(const overlay::utils::Whf& awhf) {
     mBufSize = awhf.size;
 }
 
+void MdssRot::setDownscale(int ds) {
+}
+
 void MdssRot::setFlags(const utils::eMdpFlags& flags) {
     mRotInfo.flags |= flags;
 }
 
-void MdssRot::setTransform(const utils::eTransform& rot, const bool& rotUsed)
+void MdssRot::setTransform(const utils::eTransform& rot)
 {
     int flags = utils::getMdpOrient(rot);
     if (flags != -1)
@@ -108,7 +111,9 @@ void MdssRot::setTransform(const utils::eTransform& rot, const bool& rotUsed)
     //Clients in Android dont factor in 90 rotation while deciding the flip.
     mOrientation = static_cast<utils::eTransform>(flags);
     ALOGE_IF(DEBUG_OVERLAY, "%s: rot=%d", __FUNCTION__, flags);
+}
 
+void MdssRot::setRotatorUsed(const bool& rotUsed) {
     setDisable();
     if(rotUsed) {
         setEnable();
