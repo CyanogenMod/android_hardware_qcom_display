@@ -82,7 +82,7 @@ struct ListStats {
     int fbLayerIndex; //Always last for now. = numAppLayers
     //Video specific
     int yuvCount;
-    int yuvIndex;
+    int yuvIndices[MAX_NUM_LAYERS];
     bool needsAlphaScale;
 };
 
