@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -36,7 +36,6 @@
 
 namespace overlay {
 
-
 class GenericPipe : utils::NoCopy {
 public:
     /* ctor */
@@ -54,6 +53,8 @@ public:
     void setTransform(const utils::eTransform& param);
     /* set mdp posision using dim */
     void setPosition(const utils::Dim& dim);
+    /* set visual param */
+    bool setVisualParams(const MetaData_t &metadata);
     /* commit changes to the overlay "set"*/
     bool commit();
     /* Data APIs */

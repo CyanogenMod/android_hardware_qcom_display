@@ -30,6 +30,7 @@
 #include "overlay.h"
 #include "pipes/overlayGenPipe.h"
 #include "mdp_version.h"
+#include "qdMetaData.h"
 
 #define PIPE_DEBUG 0
 
@@ -192,6 +193,12 @@ void Overlay::setSource(const utils::PipeArgs args,
     }
 
     mPipeBook[index].mPipe->setSource(newArgs);
+}
+
+void Overlay::setVisualParams(const MetaData_t& metadata, utils::eDest dest) {
+    int index = (int)dest;
+    validate(index);
+    mPipeBook[index].mPipe->setVisualParams(metadata);
 }
 
 Overlay* Overlay::getInstance() {
