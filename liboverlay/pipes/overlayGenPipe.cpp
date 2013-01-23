@@ -115,6 +115,11 @@ void GenericPipe::setPosition(const utils::Dim& d) {
     mCtrlData.ctrl.setPosition(d);
 }
 
+bool GenericPipe::setVisualParams(const MetaData_t &metadata)
+{
+        return mCtrlData.ctrl.setVisualParams(metadata);
+}
+
 bool GenericPipe::commit() {
     bool ret = false;
     int downscale_factor = utils::ROT_DS_NONE;

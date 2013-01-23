@@ -261,6 +261,7 @@ enum eMdpFlags {
     OV_MDP_FLIP_H = MDP_FLIP_LR,
     OV_MDP_FLIP_V = MDP_FLIP_UD,
     OV_MDSS_MDP_RIGHT_MIXER = MDSS_MDP_RIGHT_MIXER,
+    OV_MDP_PP_EN = MDP_OVERLAY_PP_CFG_EN,
 };
 
 enum eZorder {
