@@ -20,6 +20,8 @@
 #include "overlayUtils.h"
 #include "overlayRotator.h"
 
+#define DEBUG_MDSS_ROT 0
+
 #ifdef VENUS_COLOR_FORMAT
 #include <media/msm_media_info.h>
 #else
@@ -252,7 +254,11 @@ uint32_t MdssRot::calcOutputBufSize() {
     ovutils::Whf destWhf(mRotInfo.dst_rect.w, mRotInfo.dst_rect.h,
             mRotInfo.src.format); //mdss src and dst formats are same.
 
-    opBufSize = Rotator::calcOutputBufSize(destWhf);
+    if (mRotInfo.flags & ovutils::OV_MDSS_MDP_BWC_EN) {
+        opBufSize = calcCompressedBufSize();
+    } else {
+        opBufSize = Rotator::calcOutputBufSize(destWhf);
+    }
 
     if (mRotInfo.flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
         opBufSize = utils::align(opBufSize, SIZE_1M);
@@ -263,6 +269,25 @@ uint32_t MdssRot::calcOutputBufSize() {
 void MdssRot::getDump(char *buf, size_t len) const {
     ovutils::getDump(buf, len, "MdssRotCtrl", mRotInfo);
     ovutils::getDump(buf, len, "MdssRotData", mRotData);
+}
+
+// Calculate the compressed o/p buffer size for BWC
+uint32_t MdssRot::calcCompressedBufSize() {
+    uint32_t bufSize = 0;
+    int aWidth = ovutils::align(mRotInfo.src_rect.w, 64);
+    int aHeight = ovutils::align(mRotInfo.src_rect.h, 4);
+    int rau_cnt = aWidth/64;
+    int stride0 = (64 * 4 * rau_cnt) + rau_cnt/8;
+    int stride1 = (64 * 2 * rau_cnt) + rau_cnt/8;
+    int stride0_off = (aHeight/4);
+    int stride1_off = (aHeight/2);
+
+    //New o/p size for BWC
+    bufSize = (stride0 * stride0_off + stride1 * stride1_off) +
+                (rau_cnt * 2 * (stride0_off + stride1_off));
+    ALOGD_IF(DEBUG_MDSS_ROT, "%s: width = %d, height = %d raucount = %d"
+         "opBufSize = %d ", __FUNCTION__, aWidth, aHeight, rau_cnt, bufSize);
+    return bufSize;
 }
 
 } // namespace overlay

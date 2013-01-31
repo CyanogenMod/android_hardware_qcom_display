@@ -117,5 +117,9 @@ uint32_t MDPVersion::getMaxMDPDownscale() {
     return mMDPDownscale;
 }
 
+bool MDPVersion::supportsBWC() {
+    // BWC - Bandwidth Compression
+    return (mFeatures & MDP_BWC_EN);
+}
 }; //namespace qdutils
 
