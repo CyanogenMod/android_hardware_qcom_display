@@ -79,8 +79,6 @@ bool Ctrl::setCrop(const utils::Dim& d)
     return true;
 }
 
-utils::ActionSafe* utils::ActionSafe::sActionSafe = NULL;
-
 utils::FrameBufferInfo* utils::FrameBufferInfo::sFBInfoInstance = 0;
 
 void Ctrl::dump() const {
