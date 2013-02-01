@@ -104,6 +104,9 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
                 displayFrame.top,
                 displayFrame.right - displayFrame.left,
                 displayFrame.bottom - displayFrame.top);
+        // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
+        if(mDpy)
+            getActionSafePosition(ctx, mDpy, dpos.x, dpos.y, dpos.w, dpos.h);
         ov.setPosition(dpos, dest);
 
         ret = true;
