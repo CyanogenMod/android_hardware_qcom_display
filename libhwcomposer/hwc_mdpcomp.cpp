@@ -471,24 +471,30 @@ bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
             malloc(sizeof(PipeLayerPair) * currentFrame.count);
 
     if(isYuvPresent(ctx, dpy)) {
-        int nYuvIndex = ctx->listStats[dpy].yuvIndex;
-        hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
-        PipeLayerPair& info = currentFrame.pipeLayer[nYuvIndex];
-        MdpPipeInfo& pipe_info = info.pipeIndex;
-        pipe_info.index = getMdpPipe(ctx, MDPCOMP_OV_VG);
-        if(pipe_info.index < 0) {
-            ALOGD_IF(isDebug(), "%s: Unable to get pipe for Videos",
-                    __FUNCTION__);
-            return false;
+        int nYuvCount = ctx->listStats[dpy].yuvCount;
+
+        for(int index = 0; index < nYuvCount; index ++) {
+            int nYuvIndex = ctx->listStats[dpy].yuvIndices[index];
+            hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
+            PipeLayerPair& info = currentFrame.pipeLayer[nYuvIndex];
+            MdpPipeInfo& pipe_info = info.pipeIndex;
+            pipe_info.index = getMdpPipe(ctx, MDPCOMP_OV_VG);
+            if(pipe_info.index < 0) {
+                ALOGD_IF(isDebug(), "%s: Unable to get pipe for Videos",
+                        __FUNCTION__);
+                return false;
+            }
+            pipe_info.zOrder = nYuvIndex;
         }
-        pipe_info.zOrder = nYuvIndex;
     }
 
     for(int index = 0 ; index < layer_count ; index++ ) {
-        if(index  == ctx->listStats[dpy].yuvIndex )
+        hwc_layer_1_t* layer = &list->hwLayers[index];
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
+
+        if(isYuvBuffer(hnd))
             continue;
 
-        hwc_layer_1_t* layer = &list->hwLayers[index];
         PipeLayerPair& info = currentFrame.pipeLayer[index];
         MdpPipeInfo& pipe_info = info.pipeIndex;
         pipe_info.index = getMdpPipe(ctx, MDPCOMP_OV_ANY);
