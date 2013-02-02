@@ -172,14 +172,16 @@ void setListStats(hwc_context_t *ctx,
 
     ctx->listStats[dpy].numAppLayers = list->numHwLayers - 1;
     ctx->listStats[dpy].fbLayerIndex = list->numHwLayers - 1;
-    ctx->listStats[dpy].yuvCount = 0;
-    ctx->listStats[dpy].yuvIndex = -1;
     ctx->listStats[dpy].skipCount = 0;
     ctx->listStats[dpy].needsAlphaScale = false;
+    ctx->listStats[dpy].yuvCount = 0;
 
     for (size_t i = 0; i < list->numHwLayers; i++) {
         hwc_layer_1_t const* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
+
+        //reset stored yuv index
+        ctx->listStats[dpy].yuvIndices[i] = -1;
 
         if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             continue;
@@ -192,8 +194,9 @@ void setListStats(hwc_context_t *ctx,
             ctx->listStats[dpy].needsAlphaScale = isAlphaScaled(layer);
 
         if (UNLIKELY(isYuvBuffer(hnd))) {
-            ctx->listStats[dpy].yuvCount++;
-            ctx->listStats[dpy].yuvIndex = i;
+            int& yuvCount = ctx->listStats[dpy].yuvCount;
+            ctx->listStats[dpy].yuvIndices[yuvCount] = i;
+            yuvCount++;
         }
     }
 }

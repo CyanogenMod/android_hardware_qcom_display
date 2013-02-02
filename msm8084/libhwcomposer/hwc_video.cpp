@@ -34,7 +34,10 @@ ovutils::eDest VideoOverlay::sDest[] = {ovutils::OV_INVALID};
 bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         int dpy) {
 
-    int yuvIndex =  ctx->listStats[dpy].yuvIndex;
+    if(ctx->listStats[dpy].yuvCount > 1)
+        return false;
+
+    int yuvIndex =  ctx->listStats[dpy].yuvIndices[0];
     sIsModeOn[dpy] = false;
 
     if(!ctx->mMDP.hasOverlay) {
@@ -184,7 +187,7 @@ bool VideoOverlay::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         return true;
     }
 
-    int yuvIndex = ctx->listStats[dpy].yuvIndex;
+    int yuvIndex = ctx->listStats[dpy].yuvIndices[0];
     if(yuvIndex == -1) {
         return true;
     }
