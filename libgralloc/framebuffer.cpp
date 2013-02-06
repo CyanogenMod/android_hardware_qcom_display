@@ -86,24 +86,15 @@ static int fb_setSwapInterval(struct framebuffer_device_t* dev,
 
 static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
 {
-
-    fb_context_t* ctx = (fb_context_t*) dev;
-
-    private_handle_t *hnd = static_cast<private_handle_t*>
-            (const_cast<native_handle_t*>(buffer));
     private_module_t* m =
         reinterpret_cast<private_module_t*>(dev->common.module);
-
-    if (hnd) {
-        m->info.activate = FB_ACTIVATE_VBL | FB_ACTIVATE_FORCE;
-        m->info.yoffset = hnd->offset / m->finfo.line_length;
-        m->commit.var = m->info;
-        m->commit.flags |= MDP_DISPLAY_COMMIT_OVERLAY;
-        if (ioctl(m->framebuffer->fd, MSMFB_DISPLAY_COMMIT, &m->commit) == -1) {
-            ALOGE("%s: MSMFB_DISPLAY_COMMIT ioctl failed, err: %s", __FUNCTION__,
-                    strerror(errno));
-            return -errno;
-        }
+    struct mdp_display_commit prim_commit;
+    memset(&prim_commit, 0, sizeof(struct mdp_display_commit));
+    prim_commit.flags = MDP_DISPLAY_COMMIT_OVERLAY;
+    if (ioctl(m->framebuffer->fd, MSMFB_DISPLAY_COMMIT, &prim_commit) == -1) {
+        ALOGE("%s: MSMFB_DISPLAY_COMMIT for primary failed, str: %s",
+                __FUNCTION__, strerror(errno));
+        return -errno;
     }
     return 0;
 }
