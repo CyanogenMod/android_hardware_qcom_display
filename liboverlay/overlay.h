@@ -133,8 +133,6 @@ private:
     /* Dump string */
     char mDumpStr[256];
 
-    mutable android::Mutex mOvExtFbLock;
-
     /* Singleton Instance*/
     static Overlay *sInstance;
     static int sExtFbIndex;
@@ -159,12 +157,10 @@ inline int Overlay::availablePipes(int dpy) {
 }
 
 inline void Overlay::setExtFbNum(int fbNum) {
-    android::Mutex::Autolock lock(mOvExtFbLock);
     sExtFbIndex = fbNum;
 }
 
 inline int Overlay::getExtFbNum() {
-    android::Mutex::Autolock lock(mOvExtFbLock);
     return sExtFbIndex;
 }
 
