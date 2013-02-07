@@ -62,6 +62,12 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     bool ret = false;
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
+        int extOnlyLayerIndex = ctx->listStats[mDpy].extOnlyLayerIndex;
+        // ext only layer present..
+        if(extOnlyLayerIndex != -1) {
+            layer = &list->hwLayers[extOnlyLayerIndex];
+            layer->compositionType = HWC_OVERLAY;
+        }
         overlay::Overlay& ov = *(ctx->mOverlay);
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         ovutils::Whf info(hnd->width, hnd->height,
@@ -92,8 +98,13 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
                 (ovutils::eBlending) getBlending(layer->blending));
         ov.setSource(parg, dest);
 
-        hwc_rect_t sourceCrop;
-        getNonWormholeRegion(list, sourceCrop);
+        hwc_rect_t sourceCrop = layer->sourceCrop;
+        hwc_rect_t displayFrame = layer->displayFrame;
+        if(extOnlyLayerIndex == -1) {
+            getNonWormholeRegion(list, sourceCrop);
+            displayFrame = sourceCrop;
+        }
+
         // x,y,w,h
         ovutils::Dim dcrop(sourceCrop.left, sourceCrop.top,
                            sourceCrop.right - sourceCrop.left,
@@ -105,7 +116,6 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             static_cast<ovutils::eTransform>(transform);
         ov.setTransform(orient, dest);
 
-        hwc_rect_t displayFrame = sourceCrop;
         ovutils::Dim dpos(displayFrame.left,
                           displayFrame.top,
                           displayFrame.right - displayFrame.left,
@@ -166,6 +176,12 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
     bool ret = false;
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
+        int extOnlyLayerIndex = ctx->listStats[mDpy].extOnlyLayerIndex;
+        // ext only layer present..
+        if(extOnlyLayerIndex != -1) {
+            layer = &list->hwLayers[extOnlyLayerIndex];
+            layer->compositionType = HWC_OVERLAY;
+        }
         overlay::Overlay& ov = *(ctx->mOverlay);
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         ovutils::Whf info(hnd->width, hnd->height,
@@ -215,8 +231,12 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
                 (ovutils::eBlending) getBlending(layer->blending));
         ov.setSource(pargR, destR);
 
-        hwc_rect_t sourceCrop;
-        getNonWormholeRegion(list, sourceCrop);
+        hwc_rect_t sourceCrop = layer->sourceCrop;
+        hwc_rect_t displayFrame = layer->displayFrame;
+        if(extOnlyLayerIndex == -1) {
+            getNonWormholeRegion(list, sourceCrop);
+            displayFrame = sourceCrop;
+        }
         ovutils::Dim dcropL(sourceCrop.left, sourceCrop.top,
                             (sourceCrop.right - sourceCrop.left) / 2,
                             sourceCrop.bottom - sourceCrop.top);
@@ -234,7 +254,6 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
         ov.setTransform(orient, destL);
         ov.setTransform(orient, destR);
 
-        hwc_rect_t displayFrame = sourceCrop;
         //For FB left, top will always be 0
         //That should also be the case if using 2 mixers for single display
         ovutils::Dim dposL(displayFrame.left,

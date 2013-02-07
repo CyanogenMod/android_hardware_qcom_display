@@ -92,6 +92,7 @@ struct ListStats {
     //Video specific
     int yuvCount;
     int yuvIndices[MAX_NUM_LAYERS];
+    int extOnlyLayerIndex;
     bool needsAlphaScale;
     bool preMultipliedAlpha;
     bool planeAlpha;
