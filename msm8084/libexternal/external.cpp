@@ -528,16 +528,10 @@ void ExternalDisplay::setResolution(int ID)
         mode->set_info(mVInfo);
         ALOGD_IF(DEBUG, "%s: SET Info<ID=%d => Info<ID=%d %dx %d"
                  "(%d,%d,%d), (%d,%d,%d) %dMHz>", __FUNCTION__, ID,
-                 mVInfo.reserved[3], mVInfo.xres, mVInfo.yres,
+                 mode->video_format, mVInfo.xres, mVInfo.yres,
                  mVInfo.right_margin, mVInfo.hsync_len, mVInfo.left_margin,
                  mVInfo.lower_margin, mVInfo.vsync_len, mVInfo.upper_margin,
                  mVInfo.pixclock/1000/1000);
-        mVInfo.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_ALL | FB_ACTIVATE_FORCE;
-        ret = ioctl(mFd, FBIOPUT_VSCREENINFO, &mVInfo);
-        if(ret < 0) {
-            ALOGD("In %s: FBIOPUT_VSCREENINFO failed Err Str = %s",
-                                                 __FUNCTION__, strerror(errno));
-        }
 #ifdef FB_METADATA_VIDEO_INFO_CODE_SUPPORT
         struct msmfb_metadata metadata;
         memset(&metadata, 0 , sizeof(metadata));
@@ -548,6 +542,12 @@ void ExternalDisplay::setResolution(int ID)
                                                  __FUNCTION__, strerror(errno));
         }
 #endif
+        mVInfo.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_ALL | FB_ACTIVATE_FORCE;
+        ret = ioctl(mFd, FBIOPUT_VSCREENINFO, &mVInfo);
+        if(ret < 0) {
+            ALOGD("In %s: FBIOPUT_VSCREENINFO failed Err Str = %s",
+                                                 __FUNCTION__, strerror(errno));
+        }
         mCurrentMode = ID;
     }
 }
