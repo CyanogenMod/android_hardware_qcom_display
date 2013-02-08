@@ -99,6 +99,8 @@ int ExternalDisplay::configureHDMIDisplay() {
     setResolution(mode);
     setDpyHdmiAttr();
     setExternalDisplay(true, mHdmiFbNum);
+    // set system property
+    property_set("hw.hdmiON", "1");
     return 0;
 }
 
@@ -128,6 +130,8 @@ int ExternalDisplay::teardownHDMIDisplay() {
         closeFrameBuffer();
         resetInfo();
         setExternalDisplay(false);
+        // unset system property
+        property_set("hw.hdmiON", "0");
     }
     return 0;
 }
@@ -142,29 +146,17 @@ int ExternalDisplay::teardownWFDDisplay() {
     return 0;
 }
 
-void ExternalDisplay::processUEventOnline(const char *str) {
+int ExternalDisplay::ignoreRequest(const char *str) {
     const char *s1 = str + strlen("change@/devices/virtual/switch/");
-    if(!strncmp(s1,"hdmi",strlen(s1))) {
-        // hdmi online event..!
-        configureHDMIDisplay();
-        // set system property
-        property_set("hw.hdmiON", "1");
-    }else if(!strncmp(s1,"wfd",strlen(s1))) {
-        // wfd online event..!
-        configureWFDDisplay();
+    if(!strncmp(s1,"wfd",strlen(s1))) {
+        if(mConnectedFbNum == mHdmiFbNum) {
+            ALOGE("Ignore wfd event when HDMI is active");
+            return true;
+        }
     }
+    return false;
 }
 
-void ExternalDisplay::processUEventOffline(const char *str) {
-    const char *s1 = str + strlen("change@/devices/virtual/switch/");
-    if(!strncmp(s1,"hdmi",strlen(s1))) {
-        teardownHDMIDisplay();
-        // unset system property
-        property_set("hw.hdmiON", "0");
-    }else if(!strncmp(s1,"wfd",strlen(s1))) {
-        teardownWFDDisplay();
-    }
-}
 
 ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
     mCurrentMode(-1), mConnected(0), mConnectedFbNum(0), mModeCount(0),
