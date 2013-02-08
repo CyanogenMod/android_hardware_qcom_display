@@ -18,41 +18,27 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_IQSERVICE_H
-#define ANDROID_IQSERVICE_H
+#ifndef ANDROID_IQCLIENT_H
+#define ANDROID_IQCLIENT_H
 
 #include <stdint.h>
 #include <sys/types.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 #include <binder/IInterface.h>
-#include <binder/IBinder.h>
-#include <IQClient.h>
 
-namespace qService {
+namespace qClient {
 // ----------------------------------------------------------------------------
-class IQService : public android::IInterface
+class IQClient : public android::IInterface
 {
 public:
-    DECLARE_META_INTERFACE(QService);
-    enum {
-        // Hardware securing start/end notification
-        SECURING = android::IBinder::FIRST_CALL_TRANSACTION,
-        UNSECURING, // Hardware unsecuring start/end notification
-        CONNECT,
-    };
-    enum {
-        END = 0,
-        START,
-    };
-    virtual void securing(uint32_t startEnd) = 0;
-    virtual void unsecuring(uint32_t startEnd) = 0;
-    virtual void connect(const android::sp<qClient::IQClient>& client) = 0;
+    DECLARE_META_INTERFACE(QClient);
+    virtual void notifyCallback(uint32_t msg, uint32_t value) = 0;
 };
 
 // ----------------------------------------------------------------------------
 
-class BnQService : public android::BnInterface<IQService>
+class BnQClient : public android::BnInterface<IQClient>
 {
 public:
     virtual android::status_t onTransact( uint32_t code,
@@ -62,6 +48,6 @@ public:
 };
 
 // ----------------------------------------------------------------------------
-}; // namespace qService
+}; // namespace qClient
 
-#endif // ANDROID_IQSERVICE_H
+#endif // ANDROID_IQCLIENT_H

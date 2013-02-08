@@ -40,10 +40,6 @@
 struct hwc_context_t;
 struct framebuffer_device_t;
 
-namespace qService {
-class QService;
-}
-
 namespace overlay {
 class Overlay;
 }
@@ -229,8 +225,6 @@ struct hwc_context_t {
 
     //Overlay object - NULL for non overlay devices
     overlay::Overlay *mOverlay;
-    //QService object
-    qService::QService *mQService;
 
     //Primary and external FB updater
     qhwc::IFBUpdate *mFBUpdate[HWC_NUM_DISPLAY_TYPES];
