@@ -222,6 +222,45 @@ void MDPCompLowRes::setVidInfo(hwc_layer_1_t *layer,
     }
 }
 
+bool MDPCompLowRes::isWidthValid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
+
+    const int dpy = HWC_DISPLAY_PRIMARY;
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+
+    if(!hnd) {
+        ALOGE("%s: layer handle is NULL", __FUNCTION__);
+        return false;
+    }
+
+    int hw_w = ctx->dpyAttr[dpy].xres;
+    int hw_h = ctx->dpyAttr[dpy].yres;
+
+    hwc_rect_t sourceCrop = layer->sourceCrop;
+    hwc_rect_t displayFrame = layer->displayFrame;
+
+    hwc_rect_t crop =  sourceCrop;
+    int crop_w = crop.right - crop.left;
+    int crop_h = crop.bottom - crop.top;
+
+    hwc_rect_t dst = displayFrame;
+    int dst_w = dst.right - dst.left;
+    int dst_h = dst.bottom - dst.top;
+
+    if(dst.left < 0 || dst.top < 0 || dst.right > hw_w || dst.bottom > hw_h) {
+       qhwc::calculate_crop_rects(crop, dst, hw_w, hw_h, layer->transform);
+       crop_w = crop.right - crop.left;
+       crop_h = crop.bottom - crop.top;
+    }
+
+    //Workaround for MDP HW limitation in DSI command mode panels where
+    //FPS will not go beyond 30 if buffers on RGB pipes are of width < 5
+
+    if(crop_w < 5)
+        return false;
+
+    return true;
+}
+
 /*
  * Configures pipe(s) for MDP composition
  */
@@ -416,6 +455,7 @@ bool MDPCompLowRes::isDoable(hwc_context_t *ctx,
         return false;
     }
 
+
     //MDP composition is not efficient if layer needs rotator.
     for(int i = 0; i < numAppLayers; ++i) {
         // As MDP h/w supports flip operation, use MDP comp only for
@@ -426,6 +466,9 @@ bool MDPCompLowRes::isDoable(hwc_context_t *ctx,
             ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
             return false;
         }
+
+        if(!isYuvBuffer(hnd) && !isWidthValid(ctx,layer))
+            return false;
     }
     return true;
 }
