@@ -19,6 +19,7 @@
  */
 #define HWC_UTILS_DEBUG 0
 #include <sys/ioctl.h>
+#include <binder/IServiceManager.h>
 #include <EGL/egl.h>
 #include <cutils/properties.h>
 #include <gralloc_priv.h>
@@ -30,8 +31,14 @@
 #include "mdp_version.h"
 #include "hwc_copybit.h"
 #include "external.h"
+#include "hwc_qclient.h"
 #include "QService.h"
 #include "comptype.h"
+
+using namespace qClient;
+using namespace qService;
+using namespace android;
+
 namespace qhwc {
 
 // Opens Framebuffer device
@@ -60,7 +67,6 @@ void initContext(hwc_context_t *ctx)
     openFramebufferDevice(ctx);
     overlay::Overlay::initOverlay();
     ctx->mOverlay = overlay::Overlay::getInstance();
-    ctx->mQService = qService::QService::getInstance(ctx);
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
@@ -93,6 +99,15 @@ void initContext(hwc_context_t *ctx)
     pthread_cond_init(&(ctx->vstate.cond), NULL);
     ctx->vstate.enable = false;
     ctx->mExtDispConfiguring = false;
+
+    //Right now hwc starts the service but anybody could do it, or it could be
+    //independent process as well.
+    QService::init();
+    sp<IQClient> client = new QClient(ctx);
+    interface_cast<IQService>(
+            defaultServiceManager()->getService(
+            String16("display.qservice")))->connect(client);
+
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
 }
