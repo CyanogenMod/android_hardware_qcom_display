@@ -31,6 +31,7 @@
 #include <errno.h>
 
 #include <cutils/native_handle.h>
+#include <utils/Singleton.h>
 
 /*****************************************************************************/
 
@@ -79,4 +80,16 @@ class Locker {
     inline void unlock()   { pthread_mutex_unlock(&mutex); }
 };
 
+
+class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
+{
+    public:
+    AdrenoMemInfo() {}
+
+    ~AdrenoMemInfo() {}
+
+    int getStride(int width, int format);
+
+    private:
+};
 #endif /* GR_H_ */
