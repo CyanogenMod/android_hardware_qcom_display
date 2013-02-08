@@ -258,7 +258,7 @@ int MDPCompLowRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
             dst.right > hw_w || dst.bottom > hw_h) {
         ALOGD_IF(isDebug(),"%s: Destination has negative coordinates",
                 __FUNCTION__);
-        qhwc::calculate_crop_rects(crop, dst, hw_w, hw_h, 0);
+        qhwc::calculate_crop_rects(crop, dst, hw_w, hw_h, layer->transform);
 
         //Update calulated width and height
         crop_w = crop.right - crop.left;
