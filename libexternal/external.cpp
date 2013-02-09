@@ -446,7 +446,7 @@ int ExternalDisplay::getUserMode() {
     int mode = atoi(property_value);
     // We dont support interlaced modes
     if(isValidMode(mode) && !isInterlacedMode(mode)) {
-        ALOGD_IF("%s: setting the HDMI mode = %d", __FUNCTION__, mode);
+        ALOGD_IF(DEBUG, "%s: setting the HDMI mode = %d", __FUNCTION__, mode);
         return mode;
     }
     return -1;
