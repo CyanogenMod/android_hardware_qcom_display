@@ -24,6 +24,11 @@
 #include "hwc_copybit.h"
 #include "comptype.h"
 
+//XXX: Remove HWC_BLIT
+#ifndef QCOM_BSP
+#define HWC_BLIT 4
+#endif
+
 namespace qhwc {
 
 struct range {
