@@ -29,6 +29,7 @@
 
 #include <cutils/log.h>
 #include <fcntl.h>
+#include <dlfcn.h>
 #include "gralloc_priv.h"
 #include "alloc_controller.h"
 #include "memalloc.h"
@@ -84,29 +85,72 @@ static bool useUncached(int usage)
 }
 
 //-------------- AdrenoMemInfo-----------------------//
+AdrenoMemInfo::AdrenoMemInfo()
+{
+    libadreno_utils = ::dlopen("libadreno_utils.so", RTLD_NOW);
+    if (libadreno_utils) {
+        *(void **)&LINK_adreno_compute_padding = ::dlsym(libadreno_utils,
+                                           "compute_surface_padding");
+    }
+}
+
+AdrenoMemInfo::~AdrenoMemInfo()
+{
+    if (libadreno_utils) {
+        ::dlclose(libadreno_utils);
+    }
+}
+
 int AdrenoMemInfo::getStride(int width, int format)
 {
     int stride = ALIGN(width, 32);
-    switch (format)
-    {
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
-            stride = ALIGN(width, 32);
-            break;
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
-            stride = ALIGN(width, 128);
-            break;
-        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-        case HAL_PIXEL_FORMAT_YV12:
-        case HAL_PIXEL_FORMAT_YCbCr_422_SP:
-        case HAL_PIXEL_FORMAT_YCrCb_422_SP:
-            stride = ALIGN(width, 16);
-            break;
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
-            stride = VENUS_Y_STRIDE(COLOR_FMT_NV12, width);
-            break;
-        default: break;
+    // Currently surface padding is only computed for RGB* surfaces.
+    if (format < 0x7) {
+        int bpp = 4;
+        switch(format)
+        {
+            case HAL_PIXEL_FORMAT_RGB_888:
+                bpp = 3;
+                break;
+            case HAL_PIXEL_FORMAT_RGB_565:
+            case HAL_PIXEL_FORMAT_RGBA_5551:
+            case HAL_PIXEL_FORMAT_RGBA_4444:
+                bpp = 2;
+                break;
+            default: break;
+        }
+        if ((libadreno_utils) && (LINK_adreno_compute_padding)) {
+            int surface_tile_height = 1;   // Linear surface
+            int raster_mode         = 1;   // Adreno TW raster mode.
+            int padding_threshold   = 512; // Threshold for padding surfaces.
+            // the function below expects the width to be a multiple of
+            // 32 pixels, hence we pass stride instead of width.
+            stride = LINK_adreno_compute_padding(stride, bpp,
+                                      surface_tile_height, raster_mode,
+                                      padding_threshold);
+        }
+    } else {
+        switch (format)
+        {
+            case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
+                stride = ALIGN(width, 32);
+                break;
+            case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
+                stride = ALIGN(width, 128);
+                break;
+            case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+            case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+            case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+            case HAL_PIXEL_FORMAT_YV12:
+            case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+            case HAL_PIXEL_FORMAT_YCrCb_422_SP:
+                stride = ALIGN(width, 16);
+                break;
+            case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+                stride = VENUS_Y_STRIDE(COLOR_FMT_NV12, width);
+                break;
+            default: break;
+        }
     }
     return stride;
 }
