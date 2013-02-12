@@ -85,6 +85,7 @@ int ExternalDisplay::configureHDMIDisplay() {
     openFrameBuffer(mHdmiFbNum);
     if(mFd == -1)
         return -1;
+    readCEUnderscanInfo();
     readResolution();
     // TODO: Move this to activate
     /* Used for changing the resolution
@@ -167,7 +168,7 @@ void ExternalDisplay::processUEventOffline(const char *str) {
 
 ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
     mCurrentMode(-1), mConnected(0), mConnectedFbNum(0), mModeCount(0),
-    mHwcContext(ctx), mHdmiFbNum(-1), mWfdFbNum(-1)
+     mUnderscanSupported(false), mHwcContext(ctx), mHdmiFbNum(-1), mWfdFbNum(-1)
 {
     memset(&mVInfo, 0, sizeof(mVInfo));
     //Determine the fb index for external display devices.
@@ -193,7 +194,12 @@ void ExternalDisplay::setHPD(uint32_t startEnd) {
 void ExternalDisplay::setActionSafeDimension(int w, int h) {
     ALOGD_IF(DEBUG,"ActionSafe w=%d h=%d", w, h);
     Mutex::Autolock lock(mExtDispLock);
-    overlay::utils::ActionSafe::getInstance()->setDimension(w, h);
+    char actionsafeWidth[PROPERTY_VALUE_MAX];
+    char actionsafeHeight[PROPERTY_VALUE_MAX];
+    sprintf(actionsafeWidth, "%d", w);
+    property_set("hw.actionsafe.width", actionsafeWidth);
+    sprintf(actionsafeHeight, "%d", h);
+    property_set("hw.actionsafe.height", actionsafeHeight);
     setExternalDisplay(true, mHdmiFbNum);
 }
 
@@ -208,6 +214,75 @@ void ExternalDisplay::getEDIDModes(int *out) const {
     for(int i = 0;i < mModeCount;i++) {
         out[i] = mEDIDModes[i];
     }
+}
+
+void ExternalDisplay::readCEUnderscanInfo()
+{
+    int hdmiScanInfoFile = -1;
+    int len = -1;
+    char scanInfo[17];
+    char *ce_info_str = NULL;
+    const char token[] = ", \n";
+    int ce_info = -1;
+    char sysFsScanInfoFilePath[128];
+    sprintf(sysFsScanInfoFilePath, "/sys/devices/virtual/graphics/fb%d/"
+                                   "scan_info", mHdmiFbNum);
+
+    memset(scanInfo, 0, sizeof(scanInfo));
+    hdmiScanInfoFile = open(sysFsScanInfoFilePath, O_RDONLY, 0);
+    if (hdmiScanInfoFile < 0) {
+        ALOGD_IF(DEBUG, "%s: scan_info file '%s' not found",
+                                __FUNCTION__, sysFsScanInfoFilePath);
+        return;
+    } else {
+        len = read(hdmiScanInfoFile, scanInfo, sizeof(scanInfo)-1);
+        ALOGD("%s: Scan Info string: %s length = %d",
+                 __FUNCTION__, scanInfo, len);
+        if (len <= 0) {
+            close(hdmiScanInfoFile);
+            ALOGE("%s: Scan Info file empty '%s'",
+                                __FUNCTION__, sysFsScanInfoFilePath);
+            return;
+        }
+        scanInfo[len] = '\0';  /* null terminate the string */
+    }
+    close(hdmiScanInfoFile);
+
+    /*
+     * The scan_info contains the three fields
+     * PT - preferred video format
+     * IT - video format
+     * CE video format - containing the underscan support information
+     */
+
+    /* PT */
+    ce_info_str = strtok(scanInfo, token);
+    if (ce_info_str) {
+        /* IT */
+        ce_info_str = strtok(NULL, token);
+        if (ce_info_str) {
+            /* CE */
+            ce_info_str = strtok(NULL, token);
+            if (ce_info_str)
+                ce_info = atoi(ce_info_str);
+        }
+    }
+
+    if (ce_info_str) {
+        // ce_info contains the underscan information
+        if (ce_info == EXT_SCAN_ALWAYS_UNDERSCANED ||
+            ce_info == EXT_SCAN_BOTH_SUPPORTED)
+            // if TV supported underscan, then driver will always underscan
+            // hence no need to apply action safe rectangle
+            mUnderscanSupported = true;
+    } else {
+        ALOGE("%s: scan_info string error", __FUNCTION__);
+    }
+
+    // Store underscan support info in a system property
+    const char* prop = (mUnderscanSupported) ? "1" : "0";
+    property_set("hw.underscan_supported", prop);
+    return;
 }
 
 ExternalDisplay::~ExternalDisplay()
@@ -393,6 +468,10 @@ void ExternalDisplay::resetInfo()
     memset(mEDIDModes, 0, sizeof(mEDIDModes));
     mModeCount = 0;
     mCurrentMode = -1;
+    mUnderscanSupported = false;
+    // Reset the underscan supported system property
+    const char* prop = "0";
+    property_set("hw.underscan_supported", prop);
 }
 
 int ExternalDisplay::getModeOrder(int mode)
