@@ -39,7 +39,6 @@
 #include "gralloc_priv.h"
 #include "fb_priv.h"
 #include "gr.h"
-#include <genlock.h>
 #include <cutils/properties.h>
 #include <profiler.h>
 
