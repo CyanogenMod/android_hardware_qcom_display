@@ -261,10 +261,22 @@ void MdssRot::dump() const {
 }
 
 void MdssRot::setBufSize(int format) {
-    if (format == MDP_Y_CBCR_H2V2_VENUS) {
-        mBufSize = VENUS_BUFFER_SIZE(COLOR_FMT_NV12, mRotInfo.dst_rect.w,
-                                     mRotInfo.dst_rect.h);
+
+    switch (format) {
+        case MDP_Y_CBCR_H2V2_VENUS:
+            mBufSize = VENUS_BUFFER_SIZE(COLOR_FMT_NV12, mRotInfo.dst_rect.w,
+                                         mRotInfo.dst_rect.h);
+            break;
+
+        case MDP_Y_CR_CB_GH2V2:
+            int alignedw = utils::align(mRotInfo.dst_rect.w, 16);
+            int alignedh = mRotInfo.dst_rect.h;
+            mBufSize = (alignedw*alignedh) +
+                (utils::align(alignedw/2, 16) * (alignedh/2))*2;
+            mBufSize = utils::align(mBufSize, 4096);
+            break;
     }
+
     if (mRotInfo.flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
         mBufSize = utils::align(mBufSize, SIZE_1M);
 }
