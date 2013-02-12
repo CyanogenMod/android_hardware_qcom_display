@@ -55,6 +55,7 @@ public:
     void processUEventOffline(const char *str);
 
 private:
+    void setSPDInfo(const char* node, const char* property);
     void readCEUnderscanInfo();
     bool readResolution();
     int  parseResolution(char* edidStr, int* edidModes);
