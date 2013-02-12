@@ -245,28 +245,6 @@ struct Whf {
     uint32_t size;
 };
 
-class ActionSafe {
-private:
-    ActionSafe() : mWidth(0.0f), mHeight(0.0f) { };
-    float mWidth;
-    float mHeight;
-    static ActionSafe *sActionSafe;
-public:
-    ~ActionSafe() { };
-    static ActionSafe* getInstance() {
-        if(!sActionSafe) {
-            sActionSafe = new ActionSafe();
-        }
-        return sActionSafe;
-    }
-    void setDimension(int w, int h) {
-        mWidth = (float)w;
-        mHeight = (float)h;
-    }
-    float getWidth() { return mWidth; }
-    float getHeight() { return mHeight; }
-};
-
 enum { MAX_PATH_LEN = 256 };
 
 /**
