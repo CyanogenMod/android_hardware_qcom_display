@@ -332,10 +332,10 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                     ret = -1;
                 }
             }
-            if (ctx->mFbDev->post(ctx->mFbDev, fbLayer->handle)) {
-                ALOGE("%s: ctx->mFbDev->post fail!", __FUNCTION__);
-                return -1;
-            }
+        }
+        if (ctx->mFbDev->post(ctx->mFbDev, fbLayer->handle)) {
+            ALOGE("%s: ctx->mFbDev->post fail!", __FUNCTION__);
+            return -1;
         }
     }
     return ret;
