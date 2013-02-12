@@ -105,6 +105,8 @@ private:
         struct PipeLayerPair* pipeLayer;
 
     };
+    /* checks for mdp comp width limitation */
+    bool isWidthValid(hwc_context_t *ctx, hwc_layer_1_t *layer);
     /* configure's overlay pipes for the frame */
     int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
                         MdpPipeInfo& mdp_info);
