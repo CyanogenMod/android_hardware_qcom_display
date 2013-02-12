@@ -178,6 +178,7 @@ bool usePanel3D();
 bool send3DInfoPacket (uint32_t fmt);
 bool enableBarrier (uint32_t orientation);
 uint32_t getS3DFormat(uint32_t fmt);
+bool isMdssRotator();
 
 template <int CHAN>
 bool getPositionS3D(const Whf& whf, Dim& out);
@@ -587,6 +588,10 @@ inline int getMdpOrient(eTransform rotation) {
 }
 
 inline int getRotOutFmt(uint32_t format) {
+
+    if (isMdssRotator())
+        return format;
+
     switch (format) {
         case MDP_Y_CRCB_H2V2_TILE:
             return MDP_Y_CRCB_H2V2;
