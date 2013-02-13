@@ -77,6 +77,10 @@ public:
     void setExtFbNum(int fbNum);
     /* Returns framebuffer index of the current external display */
     int getExtFbNum();
+    /* Returns pipe dump. Expects a NULL terminated buffer of big enough size
+     * to populate.
+     */
+    void getDump(char *buf, size_t len);
 
 private:
     /* Ctor setup */
