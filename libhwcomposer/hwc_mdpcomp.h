@@ -25,6 +25,7 @@
 #include <overlay.h>
 
 #define DEFAULT_IDLE_TIME 2000
+#define MAX_PIPES_PER_MIXER 4
 
 namespace qhwc {
 namespace ovutils = overlay::utils;
