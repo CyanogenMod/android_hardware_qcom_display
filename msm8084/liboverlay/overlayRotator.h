@@ -62,6 +62,7 @@ public:
     virtual uint32_t getSessId() const = 0;
     virtual bool queueBuffer(int fd, uint32_t offset) = 0;
     virtual void dump() const = 0;
+    virtual void getDump(char *buf, size_t len) const = 0;
     static Rotator *getRotator();
 
 protected:
@@ -133,6 +134,7 @@ public:
     virtual uint32_t getSessId() const;
     virtual bool queueBuffer(int fd, uint32_t offset);
     virtual void dump() const;
+    virtual void getDump(char *buf, size_t len) const;
 
 private:
     explicit MdpRot();
@@ -195,6 +197,7 @@ public:
     virtual uint32_t getSessId() const;
     virtual bool queueBuffer(int fd, uint32_t offset);
     virtual void dump() const;
+    virtual void getDump(char *buf, size_t len) const;
 
 private:
     explicit MdssRot();
