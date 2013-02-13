@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -93,6 +93,8 @@ public:
     /* Get downscale factor */
     int getDownscalefactor();
 
+    /* Update the src format */
+    void updateSrcformat(const uint32_t& inputsrcFormat);
 
 private:
     /* Retrieve screen info from underlying mdp */
@@ -185,6 +187,10 @@ inline int Ctrl::getPipeId() const {
 
 inline int Ctrl::getFd() const {
     return mMdp.getFd();
+}
+
+inline void Ctrl::updateSrcformat(const uint32_t& inputsrcFormat) {
+    mMdp.updateSrcformat(inputsrcFormat);
 }
 
 inline utils::ScreenInfo Ctrl::getScreenInfo() const {
