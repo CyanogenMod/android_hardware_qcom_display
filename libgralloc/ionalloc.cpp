@@ -40,6 +40,9 @@
 using gralloc::IonAlloc;
 
 #define ION_DEVICE "/dev/ion"
+#ifdef QCOM_BSP
+#define NEW_ION_API
+#endif
 
 int IonAlloc::open_device()
 {
@@ -66,6 +69,10 @@ int IonAlloc::alloc_buffer(alloc_data& data)
 {
     Locker::Autolock _l(mLock);
     int err = 0;
+#ifndef NEW_ION_API
+    int ionSyncFd = FD_INIT;
+    int iFd = FD_INIT;
+#endif
     struct ion_handle_data handle_data;
     struct ion_fd_data fd_data;
     struct ion_allocation_data ionAllocData;
@@ -73,9 +80,12 @@ int IonAlloc::alloc_buffer(alloc_data& data)
 
     ionAllocData.len = data.size;
     ionAllocData.align = data.align;
+#ifndef NEW_ION_API
+    ionAllocData.flags = data.flags;
+#else
     ionAllocData.heap_mask = data.flags & ~ION_SECURE;
     ionAllocData.flags = data.uncached ? 0 : ION_FLAG_CACHED;
-
+#endif
     // ToDo: replace usage of alloc data structure with
     //  ionallocdata structure.
     if (data.flags & ION_SECURE)
@@ -84,10 +94,32 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     err = open_device();
     if (err)
         return err;
+#ifndef NEW_ION_API
+    if(data.uncached) {
+        // Use the sync FD to alloc and map 93
+        // when we need uncached memory 94
+        ionSyncFd = open(ION_DEVICE, O_RDONLY|O_DSYNC);
+        if(ionSyncFd < 0) {
+            ALOGE("%s: Failed to open ion device - %s",
+                  __FUNCTION__, strerror(errno));
+            return -errno;
+        }
+        iFd = ionSyncFd;
+    } else {
+        iFd = mIonFd;
+    }
 
+    if(ioctl(iFd, ION_IOC_ALLOC, &ionAllocData)) {
+#else
     if(ioctl(mIonFd, ION_IOC_ALLOC, &ionAllocData)) {
+#endif
         err = -errno;
         ALOGE("ION_IOC_ALLOC failed with error - %s", strerror(errno));
+#ifndef NEW_ION_API
+        if(ionSyncFd >= 0)
+            close(ionSyncFd);
+        ionSyncFd = FD_INIT;
+#endif
         return err;
     }
 
@@ -203,11 +235,15 @@ int IonAlloc::clean_buffer(void *base, size_t size, int offset, int fd)
     flush_data.offset  = offset;
     flush_data.length  = size;
 
+#ifdef NEW_ION_API
     struct ion_custom_data d;
     d.cmd = ION_IOC_CLEAN_INV_CACHES;
     d.arg = (unsigned long int)&flush_data;
 
     if(ioctl(mIonFd, ION_IOC_CUSTOM, &d)) {
+#else
+    if(ioctl(mIonFd, ION_IOC_CLEAN_INV_CACHES, &flush_data)) {
+#endif
         err = -errno;
         ALOGE("%s: ION_IOC_CLEAN_INV_CACHES failed with error - %s",
 
