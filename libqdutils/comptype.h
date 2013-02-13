@@ -61,32 +61,21 @@ class QCCompositionType : public Singleton <QCCompositionType>
 inline QCCompositionType::QCCompositionType()
 {
     char property[PROPERTY_VALUE_MAX];
-    mCompositionType = 0;
-    if (property_get("debug.sf.hw", property, NULL) > 0) {
-        if(atoi(property) == 0) {
-            mCompositionType = COMPOSITION_TYPE_CPU;
-        } else { //debug.sf.hw = 1
-            property_get("debug.composition.type", property, NULL);
-            if (property == NULL) {
-                mCompositionType = COMPOSITION_TYPE_GPU;
-            } else if ((strncmp(property, "mdp", 3)) == 0) {
-                mCompositionType = COMPOSITION_TYPE_MDP;
-            } else if ((strncmp(property, "c2d", 3)) == 0) {
-                mCompositionType = COMPOSITION_TYPE_C2D;
-            } else if ((strncmp(property, "dyn", 3)) == 0) {
+    mCompositionType = COMPOSITION_TYPE_GPU;
+    if (property_get("debug.composition.type", property, "gpu") > 0) {
+        if ((strncmp(property, "mdp", 3)) == 0) {
+            mCompositionType = COMPOSITION_TYPE_MDP;
+        } else if ((strncmp(property, "c2d", 3)) == 0) {
+            mCompositionType = COMPOSITION_TYPE_C2D;
+        } else if ((strncmp(property, "dyn", 3)) == 0) {
 #ifdef USE_MDP3
-                mCompositionType = COMPOSITION_TYPE_DYN | COMPOSITION_TYPE_MDP;
+            mCompositionType = COMPOSITION_TYPE_DYN | COMPOSITION_TYPE_MDP;
 #else
-                mCompositionType = COMPOSITION_TYPE_DYN | COMPOSITION_TYPE_C2D;
+            mCompositionType = COMPOSITION_TYPE_DYN | COMPOSITION_TYPE_C2D;
 #endif
-            } else {
-                mCompositionType = COMPOSITION_TYPE_GPU;
-            }
         }
-    } else { //debug.sf.hw is not set. Use cpu composition
-        mCompositionType = COMPOSITION_TYPE_CPU;
     }
-
 }
+
 }; //namespace qdutils
 #endif //INCLUDE_LIBQCOM_COMPTYPES
