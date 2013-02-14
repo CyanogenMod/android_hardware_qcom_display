@@ -34,9 +34,9 @@ public:
     explicit IFBUpdate(const int& dpy) : mDpy(dpy) {}
     virtual ~IFBUpdate() {};
     // Sets up members and prepares overlay if conditions are met
-    virtual bool prepare(hwc_context_t *ctx, hwc_layer_1_t *fblayer) = 0;
+    virtual bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list) = 0;
     // Draws layer
-    virtual bool draw(hwc_context_t *ctx, hwc_layer_1_t *fblayer) = 0;
+    virtual bool draw(hwc_context_t *ctx, private_handle_t *hnd) = 0;
     //Reset values
     virtual void reset();
     //Factory method that returns a low-res or high-res version
@@ -52,11 +52,12 @@ class FBUpdateLowRes : public IFBUpdate {
 public:
     explicit FBUpdateLowRes(const int& dpy);
     virtual ~FBUpdateLowRes() {};
-    bool prepare(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
-    bool draw(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
+    bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list);
+
+    bool draw(hwc_context_t *ctx, private_handle_t *hnd);
     void reset();
 private:
-    bool configure(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
+    bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list);
     ovutils::eDest mDest; //pipe to draw on
 };
 
@@ -65,11 +66,11 @@ class FBUpdateHighRes : public IFBUpdate {
 public:
     explicit FBUpdateHighRes(const int& dpy);
     virtual ~FBUpdateHighRes() {};
-    bool prepare(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
-    bool draw(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
+    bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list);
+    bool draw(hwc_context_t *ctx, private_handle_t *hnd);
     void reset();
 private:
-    bool configure(hwc_context_t *ctx, hwc_layer_1_t *fblayer);
+    bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list);
     ovutils::eDest mDestLeft; //left pipe to draw on
     ovutils::eDest mDestRight; //right pipe to draw on
 };
