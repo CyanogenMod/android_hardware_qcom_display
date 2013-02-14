@@ -21,8 +21,7 @@
 #define HWC_COPYBIT_H
 #include "hwc_utils.h"
 
-#define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
-#define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
+#define NUM_RENDER_BUFFERS 2
 
 namespace qhwc {
 
@@ -40,6 +39,11 @@ public:
                                                         int dpy, int* fd);
     // resets the values
     void reset();
+
+    private_handle_t * getCurrentRenderBuffer();
+
+    void setReleaseFd(int fd);
+
 private:
     // holds the copybit device
     struct copybit_device_t *mEngine;
@@ -61,6 +65,19 @@ private:
 
     void getLayerResolution(const hwc_layer_1_t* layer,
                                    unsigned int &width, unsigned int& height);
+
+    int allocRenderBuffers(int w, int h, int f);
+
+    void freeRenderBuffers();
+
+    private_handle_t* mRenderBuffer[NUM_RENDER_BUFFERS];
+
+    // Index of the current intermediate render buffer
+    int mCurRenderBufferIndex;
+
+    //These are the the release FDs of the T-2 and T-1 round
+    //We wait on the T-2 fence
+    int mRelFd[2];
 };
 
 }; //namespace qhwc
