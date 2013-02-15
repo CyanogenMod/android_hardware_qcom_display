@@ -10,6 +10,7 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libexternal libbinder
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdqservice\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := QService.cpp \
-                                 IQService.cpp
+                                 IQService.cpp \
+                                 IQClient.cpp
 
 include $(BUILD_SHARED_LIBRARY)

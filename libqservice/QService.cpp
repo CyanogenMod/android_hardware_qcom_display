@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,7 +28,6 @@
  */
 
 #include <QService.h>
-#include <hwc_utils.h>
 
 #define QSERVICE_DEBUG 0
 
@@ -38,7 +37,7 @@ namespace qService {
 
 QService* QService::sQService = NULL;
 // ----------------------------------------------------------------------------
-QService::QService(hwc_context_t *ctx):mHwcContext(ctx)
+QService::QService()
 {
     ALOGD_IF(QSERVICE_DEBUG, "QService Constructor invoked");
 }
@@ -49,27 +48,25 @@ QService::~QService()
 }
 
 void QService::securing(uint32_t startEnd) {
-    mHwcContext->mSecuring = startEnd;
-    //We're done securing
-    if(startEnd == END)
-        mHwcContext->mSecureMode = true;
-    if(mHwcContext->proc)
-        mHwcContext->proc->invalidate(mHwcContext->proc);
+    if(mClient.get()) {
+        mClient->notifyCallback(SECURING, startEnd);
+    }
 }
 
 void QService::unsecuring(uint32_t startEnd) {
-    mHwcContext->mSecuring = startEnd;
-    //We're done unsecuring
-    if(startEnd == END)
-        mHwcContext->mSecureMode = false;
-    if(mHwcContext->proc)
-        mHwcContext->proc->invalidate(mHwcContext->proc);
+    if(mClient.get()) {
+        mClient->notifyCallback(UNSECURING, startEnd);
+    }
 }
 
-QService* QService::getInstance(hwc_context_t *ctx)
+void QService::connect(const sp<qClient::IQClient>& client) {
+    mClient = client;
+}
+
+void QService::init()
 {
     if(!sQService) {
-        sQService = new QService(ctx);
+        sQService = new QService();
         sp<IServiceManager> sm = defaultServiceManager();
         sm->addService(String16("display.qservice"), sQService);
         if(sm->checkService(String16("display.qservice")) != NULL)
@@ -77,7 +74,6 @@ QService* QService::getInstance(hwc_context_t *ctx)
         else
             ALOGD_IF(QSERVICE_DEBUG, "adding display.qservice failed");
     }
-    return sQService;
 }
 
 }
