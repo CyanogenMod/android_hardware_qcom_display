@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -31,6 +31,7 @@
 #include <IQService.h>
 
 using namespace android;
+using namespace qClient;
 
 // ---------------------------------------------------------------------------
 
@@ -54,6 +55,13 @@ public:
         data.writeInterfaceToken(IQService::getInterfaceDescriptor());
         data.writeInt32(startEnd);
         remote()->transact(UNSECURING, data, &reply);
+    }
+
+    virtual void connect(const sp<IQClient>& client) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
+        data.writeStrongBinder(client->asBinder());
+        remote()->transact(CONNECT, data, &reply);
     }
 };
 
@@ -98,6 +106,18 @@ status_t BnQService::onTransact(
             CHECK_INTERFACE(IQService, data, reply);
             uint32_t startEnd = data.readInt32();
             unsecuring(startEnd);
+            return NO_ERROR;
+        } break;
+        case CONNECT: {
+            CHECK_INTERFACE(IQService, data, reply);
+            if(callerUid != AID_GRAPHICS) {
+                ALOGE("display.qservice CONNECT access denied: pid=%d uid=%d process=%s",
+                      callerPid, callerUid, callingProcName);
+                return PERMISSION_DENIED;
+            }
+            sp<IQClient> client =
+                interface_cast<IQClient>(data.readStrongBinder());
+            connect(client);
             return NO_ERROR;
         } break;
         default:
