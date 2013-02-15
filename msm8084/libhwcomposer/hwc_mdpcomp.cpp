@@ -401,7 +401,7 @@ int MDPCompLowRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
 /*
  * MDPComp not possible when
- * 1. We have more than sMaxLayers
+ * 1. App layers > available pipes
  * 2. External display connected
  * 3. Composition is triggered by
  *    Idle timer expiry
@@ -417,6 +417,8 @@ bool MDPCompLowRes::isDoable(hwc_context_t *ctx,
 
     overlay::Overlay& ov = *ctx->mOverlay;
     int availablePipes = ov.availablePipes(dpy);
+    if (availablePipes > MAX_PIPES_PER_MIXER)
+        availablePipes = MAX_PIPES_PER_MIXER;
 
     if(numAppLayers < 1 || numAppLayers > availablePipes) {
         ALOGD_IF(isDebug(), "%s: Unsupported number of layers",__FUNCTION__);
