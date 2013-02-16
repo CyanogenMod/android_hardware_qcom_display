@@ -390,11 +390,11 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         if(list->hwLayers[i].compositionType == HWC_OVERLAY ||
            list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             //Close the acquireFenceFds
-            if(list->hwLayers[i].acquireFenceFd > 0) {
+            if(list->hwLayers[i].acquireFenceFd >= 0) {
                 close(list->hwLayers[i].acquireFenceFd);
                 list->hwLayers[i].acquireFenceFd = -1;
             }
-            if(fd > 0) {
+            if(fd >= 0) {
                 close(fd);
                 fd = -1;
             }
