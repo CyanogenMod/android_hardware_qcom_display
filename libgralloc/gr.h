@@ -84,12 +84,25 @@ class Locker {
 class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
 {
     public:
-    AdrenoMemInfo() {}
+    AdrenoMemInfo();
 
-    ~AdrenoMemInfo() {}
+    ~AdrenoMemInfo();
 
+    /*
+     * Function to compute the adreno stride based on the width and format.
+     *
+     * @return stride.
+     */
     int getStride(int width, int format);
 
     private:
+        // Pointer to the padding library.
+        void *libadreno_utils;
+
+        // link to the surface padding library.
+        int (*LINK_adreno_compute_padding) (int width, int bpp,
+                                                int surface_tile_height,
+                                                int screen_tile_height,
+                                                int padding_threshold);
 };
 #endif /* GR_H_ */
