@@ -20,7 +20,6 @@
 
 #define DEBUG_FBUPDATE 0
 #include <gralloc_priv.h>
-#include <fb_priv.h>
 #include "hwc_fbupdate.h"
 
 namespace qhwc {
