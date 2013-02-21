@@ -141,9 +141,6 @@ public:
     /* using user_data, sets/unsets roationvalue in mdp flags */
     void setRotationFlags();
 
-    /* dump state of the object */
-    void dump() const;
-
     /* Perform transformation calculations */
     void doTransform();
 
@@ -155,6 +152,12 @@ public:
 
     /* Update the src format */
     void updateSrcformat(const uint32_t& inputsrcFormat);
+
+    /* dump state of the object */
+    void dump() const;
+
+    /* Return the dump in the specified buffer */
+    void getDump(char *buf, size_t len);
 
 private:
 
@@ -237,6 +240,10 @@ public:
 
     /* dump state of the object */
     void dump() const;
+
+    /* Return the dump in the specified buffer */
+    void getDump(char *buf, size_t len);
+
 private:
 
     /* actual overlay mdp data */

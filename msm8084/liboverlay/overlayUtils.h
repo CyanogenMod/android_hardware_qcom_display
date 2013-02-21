@@ -36,6 +36,7 @@
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h> // buffer_handle_t
 #include <linux/msm_mdp.h> // flags
+#include <linux/msm_rotator.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -773,6 +774,17 @@ inline eMdpPipeType getPipeType(eDest dest) {
     }
     return OV_MDP_PIPE_ANY;
 }
+
+void getDump(char *buf, size_t len, const char *prefix, const mdp_overlay& ov);
+void getDump(char *buf, size_t len, const char *prefix, const msmfb_img& ov);
+void getDump(char *buf, size_t len, const char *prefix, const mdp_rect& ov);
+void getDump(char *buf, size_t len, const char *prefix,
+        const msmfb_overlay_data& ov);
+void getDump(char *buf, size_t len, const char *prefix, const msmfb_data& ov);
+void getDump(char *buf, size_t len, const char *prefix,
+        const msm_rotator_img_info& ov);
+void getDump(char *buf, size_t len, const char *prefix,
+        const msm_rotator_data_info& ov);
 
 } // namespace utils ends
 

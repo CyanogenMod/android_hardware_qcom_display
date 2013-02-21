@@ -487,13 +487,15 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
 void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
 {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    android::String8 buf("");
-    dumpsys_log(buf, "Qualcomm HWC state:\n");
-    dumpsys_log(buf, "  MDPVersion=%d\n", ctx->mMDP.version);
-    dumpsys_log(buf, "  DisplayPanel=%c\n", ctx->mMDP.panel);
-    ctx->mMDPComp->dump(buf);
-    //XXX: Call Other dump functions
-    strlcpy(buff, buf.string(), buff_len);
+    android::String8 aBuf("");
+    dumpsys_log(aBuf, "Qualcomm HWC state:\n");
+    dumpsys_log(aBuf, "  MDPVersion=%d\n", ctx->mMDP.version);
+    dumpsys_log(aBuf, "  DisplayPanel=%c\n", ctx->mMDP.panel);
+    ctx->mMDPComp->dump(aBuf);
+    char ovDump[2048] = {'\0'};
+    ctx->mOverlay->getDump(ovDump, 2048);
+    dumpsys_log(aBuf, ovDump);
+    strlcpy(buff, aBuf.string(), buff_len);
 }
 
 static int hwc_device_close(struct hw_device_t *dev)

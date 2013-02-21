@@ -241,6 +241,13 @@ void GenericPipe::dump() const
     ALOGE("== Dump Generic pipe end ==");
 }
 
+void GenericPipe::getDump(char *buf, size_t len) {
+    mCtrlData.ctrl.getDump(buf, len);
+    mCtrlData.data.getDump(buf, len);
+    if(mRotUsed && mRot)
+        mRot->getDump(buf, len);
+}
+
 bool GenericPipe::isClosed() const  {
     return (pipeState == CLOSED);
 }

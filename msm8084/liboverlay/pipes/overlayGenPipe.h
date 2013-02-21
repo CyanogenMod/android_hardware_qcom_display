@@ -84,6 +84,10 @@ public:
 
     /* dump the state of the object */
     void dump() const;
+
+    /* Return the dump in the specified buffer */
+    void getDump(char *buf, size_t len);
+
 private:
     /* set Closed pipe */
     bool setClosed();
