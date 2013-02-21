@@ -81,9 +81,6 @@ public:
     /* retrieve cached crop data */
     utils::Dim getCrop() const;
 
-    /* dump the state of the object */
-    void dump() const;
-
     /* Perform transformation calculations */
     void doTransform();
 
@@ -95,6 +92,12 @@ public:
 
     /* Update the src format */
     void updateSrcformat(const uint32_t& inputsrcFormat);
+
+    /* dump the state of the object */
+    void dump() const;
+
+    /* Return the dump in the specified buffer */
+    void getDump(char *buf, size_t len);
 
 private:
     /* Retrieve screen info from underlying mdp */
@@ -133,6 +136,9 @@ public:
 
     /* sump the state of the obj */
     void dump() const;
+
+    /* Return the dump in the specified buffer */
+    void getDump(char *buf, size_t len);
 
 private:
     // mdp data struct
@@ -213,6 +219,10 @@ inline int Ctrl::getDownscalefactor() {
     return mMdp.getDownscalefactor();
 }
 
+inline void Ctrl::getDump(char *buf, size_t len) {
+    mMdp.getDump(buf, len);
+}
+
 inline Data::Data() {
     mMdp.reset();
 }
@@ -249,6 +259,9 @@ inline void Data::dump() const {
     ALOGE("== Dump Data MDP end ==");
 }
 
+inline void Data::getDump(char *buf, size_t len) {
+    mMdp.getDump(buf, len);
+}
 
 } // overlay
 

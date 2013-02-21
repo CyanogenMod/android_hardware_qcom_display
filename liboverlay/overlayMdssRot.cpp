@@ -284,4 +284,10 @@ void MdssRot::setBufSize(int format) {
     if (mRotInfo.flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
         mBufSize = utils::align(mBufSize, SIZE_1M);
 }
+
+void MdssRot::getDump(char *buf, size_t len) const {
+    ovutils::getDump(buf, len, "MdssRotCtrl(mdp_overlay)", mRotInfo);
+    ovutils::getDump(buf, len, "MdssRotData(msmfb_overlay_data)", mRotData);
+}
+
 } // namespace overlay

@@ -202,8 +202,26 @@ void Overlay::initOverlay() {
 
 void Overlay::dump() const {
     if(strlen(mDumpStr)) { //dump only on state change
-        ALOGD("%s\n", mDumpStr);
+        ALOGD_IF(PIPE_DEBUG, "%s\n", mDumpStr);
     }
+}
+
+void Overlay::getDump(char *buf, size_t len) {
+    int totalPipes = 0;
+    const char *str = "\nOverlay State\n==========================\n";
+    strncat(buf, str, strlen(str));
+    for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
+        if(mPipeBook[i].valid()) {
+            mPipeBook[i].mPipe->getDump(buf, len);
+            char str[64] = {'\0'};
+            snprintf(str, 64, "Attached to dpy=%d\n\n", mPipeBook[i].mDisplay);
+            strncat(buf, str, strlen(str));
+            totalPipes++;
+        }
+    }
+    char str_pipes[64] = {'\0'};
+    snprintf(str_pipes, 64, "Pipes used=%d\n\n", totalPipes);
+    strncat(buf, str_pipes, strlen(str_pipes));
 }
 
 void Overlay::PipeBook::init() {

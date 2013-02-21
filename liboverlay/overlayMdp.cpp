@@ -278,11 +278,19 @@ void MdpCtrl::dump() const {
     ALOGE("== Dump MdpCtrl end ==");
 }
 
+void MdpCtrl::getDump(char *buf, size_t len) {
+    ovutils::getDump(buf, len, "Ctrl(mdp_overlay)", mOVInfo);
+}
+
 void MdpData::dump() const {
     ALOGE("== Dump MdpData start ==");
     mFd.dump();
     mdp_wrapper::dump("mOvData", mOvData);
     ALOGE("== Dump MdpData end ==");
+}
+
+void MdpData::getDump(char *buf, size_t len) {
+    ovutils::getDump(buf, len, "Data(msmfb_overlay_data)", mOvData);
 }
 
 void MdpCtrl3D::dump() const {
