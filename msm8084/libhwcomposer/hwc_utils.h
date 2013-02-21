@@ -29,6 +29,7 @@
 #include <utils/String8.h>
 #include "qdMetaData.h"
 #include <overlayUtils.h>
+#include <linux/fb.h>
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
@@ -44,7 +45,6 @@
 
 //Fwrd decls
 struct hwc_context_t;
-struct framebuffer_device_t;
 
 namespace ovutils = overlay::utils;
 
@@ -262,8 +262,6 @@ struct vsync_state {
 struct hwc_context_t {
     hwc_composer_device_1_t device;
     const hwc_procs_t* proc;
-    //Framebuffer device
-    framebuffer_device_t *mFbDev;
 
     //CopyBit objects
     qhwc::CopyBit *mCopyBit[MAX_DISPLAYS];

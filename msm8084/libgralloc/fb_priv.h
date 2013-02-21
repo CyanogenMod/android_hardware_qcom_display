@@ -52,13 +52,6 @@ struct private_module_t {
     float fps;
     uint32_t swapInterval;
     uint32_t currentOffset;
-    bool fbPostDone;
-    pthread_mutex_t fbPostLock;
-    //Condition to inform HWC that fb_post called
-    pthread_cond_t fbPostCond;
-    bool fbPanDone;
-    pthread_mutex_t fbPanLock;
-    pthread_cond_t fbPanCond;
 };
 
 
