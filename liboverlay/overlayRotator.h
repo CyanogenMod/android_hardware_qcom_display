@@ -67,6 +67,7 @@ public:
 
 protected:
     explicit Rotator() {}
+    static uint32_t calcOutputBufSize(const utils::Whf& destWhf);
 
 private:
     /*Returns rotator h/w type */
@@ -145,13 +146,14 @@ private:
     void doTransform();
     /* reset underlying data, basically memset 0 */
     void reset();
-
     /* return true if current rotator config is different
      * than last known config */
     bool rotConfChanged() const;
-
     /* save mRotImgInfo to be last known good config*/
     void save();
+    /* Calculates the rotator's o/p buffer size post the transform calcs and
+     * knowing the o/p format depending on whether fastYuv is enabled or not */
+    uint32_t calcOutputBufSize();
 
     /* rot info*/
     msm_rotator_img_info mRotImgInfo;
@@ -165,8 +167,6 @@ private:
     OvFD mFd;
     /* Rotator memory manager */
     RotMem mMem;
-    /* Single Rotator buffer size */
-    uint32_t mBufSize;
 
     friend Rotator* Rotator::getRotator();
 };
@@ -208,7 +208,9 @@ private:
     void doTransform();
     /* reset underlying data, basically memset 0 */
     void reset();
-    void setBufSize(int format);
+    /* Calculates the rotator's o/p buffer size post the transform calcs and
+     * knowing the o/p format depending on whether fastYuv is enabled or not */
+    uint32_t calcOutputBufSize();
 
     /* MdssRot info structure */
     mdp_overlay   mRotInfo;
@@ -220,8 +222,6 @@ private:
     OvFD mFd;
     /* Rotator memory manager */
     RotMem mMem;
-    /* Single Rotator buffer size */
-    uint32_t mBufSize;
     /* Enable/Disable Mdss Rot*/
     bool mEnabled;
 

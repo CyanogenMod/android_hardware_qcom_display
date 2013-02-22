@@ -413,7 +413,8 @@ struct ScreenInfo {
 };
 
 int getMdpFormat(int format);
-int getRotOutFmt(uint32_t format);
+int getHALFormat(int mdpFormat);
+
 /* flip is upside down and such. V, H flip
  * rotation is 90, 180 etc
  * It returns MDP related enum/define that match rot+flip*/
@@ -587,29 +588,6 @@ inline int getMdpOrient(eTransform rotation) {
     }
     return -1;
 }
-
-inline int getRotOutFmt(uint32_t format) {
-
-    if (isMdssRotator())
-        return format;
-
-    switch (format) {
-        case MDP_Y_CRCB_H2V2_TILE:
-            return MDP_Y_CRCB_H2V2;
-        case MDP_Y_CBCR_H2V2_TILE:
-            return MDP_Y_CBCR_H2V2;
-        case MDP_Y_CB_CR_H2V2:
-            return MDP_Y_CBCR_H2V2;
-        case MDP_Y_CR_CB_GH2V2:
-            return MDP_Y_CRCB_H2V2;
-        default:
-            return format;
-    }
-    // not reached
-    OVASSERT(false, "%s not reached", __FUNCTION__);
-    return -1;
-}
-
 
 inline uint32_t getColorFormat(uint32_t format)
 {

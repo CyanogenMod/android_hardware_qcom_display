@@ -20,6 +20,7 @@
 #include "overlayRotator.h"
 #include "overlayUtils.h"
 #include "mdp_version.h"
+#include "gr.h"
 
 namespace ovutils = overlay::utils;
 
@@ -37,6 +38,15 @@ Rotator* Rotator::getRotator() {
         ALOGE("%s Unknown h/w type %d", __FUNCTION__, type);
         return NULL;
     }
+}
+
+uint32_t Rotator::calcOutputBufSize(const utils::Whf& destWhf) {
+    //dummy aligned w & h.
+    int alW = 0, alH = 0;
+    int halFormat = ovutils::getHALFormat(destWhf.format);
+    //A call into gralloc/memalloc
+    return getBufferSizeAndDimensions(
+            destWhf.w, destWhf.h, halFormat, alW, alH);
 }
 
 int Rotator::getRotatorHwType() {

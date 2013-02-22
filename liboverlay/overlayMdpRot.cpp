@@ -108,8 +108,6 @@ void MdpRot::setSource(const overlay::utils::Whf& awhf) {
 
     mRotImgInfo.dst.width = whf.w;
     mRotImgInfo.dst.height = whf.h;
-
-    mBufSize = awhf.size;
 }
 
 inline void MdpRot::setFlags(const utils::eMdpFlags& flags) {
@@ -152,6 +150,12 @@ bool MdpRot::commit() {
         mRotDataInfo.session_id = mRotImgInfo.session_id;
     }
     return true;
+}
+
+uint32_t MdpRot::calcOutputBufSize() {
+    ovutils::Whf destWhf(mRotImgInfo.dst.width,
+            mRotImgInfo.dst.height, mRotImgInfo.dst.format);
+    return Rotator::calcOutputBufSize(destWhf);
 }
 
 bool MdpRot::open_i(uint32_t numbufs, uint32_t bufsz)
@@ -198,8 +202,9 @@ bool MdpRot::close() {
 
 bool MdpRot::remap(uint32_t numbufs) {
     // if current size changed, remap
-    if(mBufSize == mMem.curr().size()) {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: same size %d", __FUNCTION__, mBufSize);
+    uint32_t opBufSize = calcOutputBufSize();
+    if(opBufSize == mMem.curr().size()) {
+        ALOGE_IF(DEBUG_OVERLAY, "%s: same size %d", __FUNCTION__, opBufSize);
         return true;
     }
 
@@ -208,12 +213,12 @@ bool MdpRot::remap(uint32_t numbufs) {
 
     // ++mMem will make curr to be prev, and prev will be curr
     ++mMem;
-    if(!open_i(numbufs, mBufSize)) {
+    if(!open_i(numbufs, opBufSize)) {
         ALOGE("%s Error could not open", __FUNCTION__);
         return false;
     }
     for (uint32_t i = 0; i < numbufs; ++i) {
-        mMem.curr().mRotOffset[i] = i * mBufSize;
+        mMem.curr().mRotOffset[i] = i * opBufSize;
     }
     return true;
 }
@@ -226,7 +231,6 @@ void MdpRot::reset() {
     ovutils::memset0(mMem.prev().mRotOffset);
     mMem.curr().mCurrOffset = 0;
     mMem.prev().mCurrOffset = 0;
-    mBufSize = 0;
     mOrientation = utils::OVERLAY_TRANSFORM_0;
 }
 
