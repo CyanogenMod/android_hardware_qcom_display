@@ -96,8 +96,6 @@ void MdssRot::setSource(const overlay::utils::Whf& awhf) {
 
     mRotInfo.dst_rect.w = whf.w;
     mRotInfo.dst_rect.h = whf.h;
-
-    mBufSize = awhf.size;
 }
 
 inline void MdssRot::setDownscale(int ds) {}
@@ -131,7 +129,6 @@ inline void MdssRot::doTransform() {
 
 bool MdssRot::commit() {
     doTransform();
-    setBufSize(mRotInfo.src.format);
     mRotInfo.flags |= MDSS_MDP_ROT_ONLY;
     if(!overlay::mdp_wrapper::setOverlay(mFd.getFD(), mRotInfo)) {
         ALOGE("MdssRot commit failed!");
@@ -199,9 +196,11 @@ bool MdssRot::open_i(uint32_t numbufs, uint32_t bufsz)
 }
 
 bool MdssRot::remap(uint32_t numbufs) {
-    // if current size changed, remap
-    if(mBufSize == mMem.curr().size()) {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: same size %d", __FUNCTION__, mBufSize);
+    // Calculate the size based on rotator's dst format, w and h.
+    uint32_t opBufSize = calcOutputBufSize();
+    // If current size changed, remap
+    if(opBufSize == mMem.curr().size()) {
+        ALOGE_IF(DEBUG_OVERLAY, "%s: same size %d", __FUNCTION__, opBufSize);
         return true;
     }
 
@@ -210,12 +209,12 @@ bool MdssRot::remap(uint32_t numbufs) {
 
     // ++mMem will make curr to be prev, and prev will be curr
     ++mMem;
-    if(!open_i(numbufs, mBufSize)) {
+    if(!open_i(numbufs, opBufSize)) {
         ALOGE("%s Error could not open", __FUNCTION__);
         return false;
     }
     for (uint32_t i = 0; i < numbufs; ++i) {
-        mMem.curr().mRotOffset[i] = i * mBufSize;
+        mMem.curr().mRotOffset[i] = i * opBufSize;
     }
     return true;
 }
@@ -251,7 +250,6 @@ void MdssRot::reset() {
     ovutils::memset0(mMem.prev().mRotOffset);
     mMem.curr().mCurrOffset = 0;
     mMem.prev().mCurrOffset = 0;
-    mBufSize = 0;
     mOrientation = utils::OVERLAY_TRANSFORM_0;
 }
 
@@ -264,25 +262,17 @@ void MdssRot::dump() const {
     ALOGE("== Dump MdssRot end ==");
 }
 
-void MdssRot::setBufSize(int format) {
+uint32_t MdssRot::calcOutputBufSize() {
+    uint32_t opBufSize = 0;
+    ovutils::Whf destWhf(mRotInfo.dst_rect.w, mRotInfo.dst_rect.h,
+            mRotInfo.src.format); //mdss src and dst formats are same.
 
-    switch (format) {
-        case MDP_Y_CBCR_H2V2_VENUS:
-            mBufSize = VENUS_BUFFER_SIZE(COLOR_FMT_NV12, mRotInfo.dst_rect.w,
-                                         mRotInfo.dst_rect.h);
-            break;
-
-        case MDP_Y_CR_CB_GH2V2:
-            int alignedw = utils::align(mRotInfo.dst_rect.w, 16);
-            int alignedh = mRotInfo.dst_rect.h;
-            mBufSize = (alignedw*alignedh) +
-                (utils::align(alignedw/2, 16) * (alignedh/2))*2;
-            mBufSize = utils::align(mBufSize, 4096);
-            break;
-    }
+    opBufSize = Rotator::calcOutputBufSize(destWhf);
 
     if (mRotInfo.flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
-        mBufSize = utils::align(mBufSize, SIZE_1M);
+        opBufSize = utils::align(opBufSize, SIZE_1M);
+
+    return opBufSize;
 }
 
 void MdssRot::getDump(char *buf, size_t len) const {
