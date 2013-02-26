@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include "hwc_utils.h"
 #include "hwc_fbupdate.h"
-#include "hwc_video.h"
+#include "hwc_mdpcomp.h"
 #include "hwc_copybit.h"
 #include "comptype.h"
 #include "external.h"
@@ -116,15 +116,14 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                     delete ctx->mFBUpdate[dpy];
                     ctx->mFBUpdate[dpy] = NULL;
                 }
-                if(ctx->mVidOv[dpy]) {
-                    Locker::Autolock _l(ctx->mExtSetLock);
-                    delete ctx->mVidOv[dpy];
-                    ctx->mVidOv[dpy] = NULL;
-                }
                 if(ctx->mCopyBit[dpy]){
                     Locker::Autolock _l(ctx->mExtSetLock);
                     delete ctx->mCopyBit[dpy];
                     ctx->mCopyBit[dpy] = NULL;
+                }
+                if(ctx->mMDPComp[dpy]) {
+                    delete ctx->mMDPComp[dpy];
+                    ctx->mMDPComp[dpy] = NULL;
                 }
                 ALOGD("%s sending hotplug: connected = %d and dpy:%d",
                       __FUNCTION__, connected, dpy);
@@ -140,11 +139,11 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 ctx->mExtDisplay->processUEventOnline(udata);
                 ctx->mFBUpdate[dpy] =
                         IFBUpdate::getObject(ctx->dpyAttr[dpy].xres, dpy);
-                ctx->mVidOv[dpy] =
-                        IVideoOverlay::getObject(ctx->dpyAttr[dpy].xres, dpy);
                 ctx->dpyAttr[dpy].isPause = false;
                 if(usecopybit)
                     ctx->mCopyBit[dpy] = new CopyBit();
+                ctx->mMDPComp[dpy] =  MDPComp::getObject(
+                        ctx->dpyAttr[dpy].xres, dpy);
                 ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,
                         connected);
                 ctx->dpyAttr[dpy].connected = true;
