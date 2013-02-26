@@ -523,7 +523,7 @@ int ExternalDisplay::getModeOrder(int mode)
 int ExternalDisplay::getUserMode() {
     /* Based on the property set the resolution */
     char property_value[PROPERTY_VALUE_MAX];
-    property_get("hdmi.resolution", property_value, "-1");
+    property_get("hw.hdmi.resolution", property_value, "-1");
     int mode = atoi(property_value);
     // We dont support interlaced modes
     if(isValidMode(mode) && !isInterlacedMode(mode)) {
