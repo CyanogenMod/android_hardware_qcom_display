@@ -21,10 +21,13 @@
 #include "external.h"
 #include "qdMetaData.h"
 #include "mdp_version.h"
+#include <overlayRotator.h>
+
+using overlay::Rotator;
+using namespace overlay::utils;
+namespace ovutils = overlay::utils;
 
 namespace qhwc {
-
-namespace ovutils = overlay::utils;
 
 //==============MDPComp========================================================
 
@@ -188,26 +191,14 @@ void MDPComp::reset(hwc_context_t *ctx,
             if(mCurrentFrame.pipeLayer[i].pipeInfo) {
                 delete mCurrentFrame.pipeLayer[i].pipeInfo;
                 mCurrentFrame.pipeLayer[i].pipeInfo = NULL;
+                //We dont own the rotator
+                mCurrentFrame.pipeLayer[i].rot = NULL;
             }
         }
         free(mCurrentFrame.pipeLayer);
         mCurrentFrame.pipeLayer = NULL;
     }
     mCurrentFrame.count = 0;
-}
-
-void MDPComp::setVidInfo(hwc_layer_1_t *layer,
-        ovutils::eMdpFlags &mdpFlags) {
-    private_handle_t *hnd = (private_handle_t *)layer->handle;
-    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
-
-    if(isSecureBuffer(hnd)) {
-        ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
-    }
-    if(metadata && (metadata->operation & PP_PARAM_INTERLACED) &&
-                                              metadata->interlaced) {
-        ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_DEINTERLACE);
-    }
 }
 
 bool MDPComp::isWidthValid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
@@ -363,9 +354,7 @@ bool MDPComp::setup(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
 
     for (int index = 0 ; index < mCurrentFrame.count; index++) {
         hwc_layer_1_t* layer = &list->hwLayers[index];
-        MdpPipeInfo* cur_pipe = mCurrentFrame.pipeLayer[index].pipeInfo;
-
-        if(configure(ctx, layer, cur_pipe) != 0 ) {
+        if(configure(ctx, layer, mCurrentFrame.pipeLayer[index]) != 0 ) {
             ALOGD_IF(isDebug(), "%s: MDPComp failed to configure overlay for \
                     layer %d",__FUNCTION__, index);
             return false;
@@ -417,134 +406,17 @@ bool MDPComp::prepare(hwc_context_t *ctx,
  * Configures pipe(s) for MDP composition
  */
 int MDPCompLowRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
-        MdpPipeInfo* mdpInfo) {
+        PipeLayerPair& pipeLayerPair) {
     const int dpy = HWC_DISPLAY_PRIMARY;
-    private_handle_t *hnd = (private_handle_t *)layer->handle;
-    overlay::Overlay& ov = *ctx->mOverlay;
+    MdpPipeInfoLowRes& mdp_info =
+            *(static_cast<MdpPipeInfoLowRes*>(pipeLayerPair.pipeInfo));
+    eMdpFlags mdpFlags = OV_MDP_BACKEND_COMPOSITION;
+    eZorder zOrder = static_cast<eZorder>(mdp_info.zOrder);
+    eIsFg isFg = IS_FG_OFF;
+    eDest dest = mdp_info.index;
 
-    if(!hnd) {
-        ALOGE("%s: layer handle is NULL", __FUNCTION__);
-        return -1;
-    }
-
-    MdpPipeInfoLowRes& mdp_info = *(MdpPipeInfoLowRes*)mdpInfo;
-
-    int hw_w = ctx->dpyAttr[dpy].xres;
-    int hw_h = ctx->dpyAttr[dpy].yres;
-
-    hwc_rect_t crop = layer->sourceCrop;
-    hwc_rect_t dst = layer->displayFrame;
-
-    int crop_w = crop.right - crop.left;
-    int crop_h = crop.bottom - crop.top;
-
-    int dst_w = dst.right - dst.left;
-    int dst_h = dst.bottom - dst.top;
-
-    if(dst.left < 0 || dst.top < 0 ||
-            dst.right > hw_w || dst.bottom > hw_h) {
-        ALOGD_IF(isDebug(),"%s: Destination has negative coordinates",
-                __FUNCTION__);
-        hwc_rect_t scissor = {0, 0, hw_w, hw_h };
-        qhwc::calculate_crop_rects(crop, dst, scissor, layer->transform);
-
-        //Update calulated width and height
-        crop_w = crop.right - crop.left;
-        crop_h = crop.bottom - crop.top;
-
-        dst_w = dst.right - dst.left;
-        dst_h = dst.bottom - dst.top;
-    }
-
-    if( (dst_w > hw_w)|| (dst_h > hw_h)) {
-        ALOGD_IF(isDebug(),"%s: Dest rect exceeds FB", __FUNCTION__);
-        dst_w = hw_w;
-        dst_h = hw_h;
-    }
-
-    // Determine pipe to set based on pipe index
-    ovutils::eDest dest = mdp_info.index;
-
-    ovutils::eZorder zOrder = ovutils::ZORDER_0;
-
-    if(mdp_info.zOrder == 0 ) {
-        zOrder = ovutils::ZORDER_0;
-    } else if(mdp_info.zOrder == 1 ) {
-        zOrder = ovutils::ZORDER_1;
-    } else if(mdp_info.zOrder == 2 ) {
-        zOrder = ovutils::ZORDER_2;
-    } else if(mdp_info.zOrder == 3) {
-        zOrder = ovutils::ZORDER_3;
-    }
-
-    // Order order order
-    // setSource - just setting source
-    // setParameter - changes src w/h/f accordingly
-    // setCrop - ROI - src_rect
-    // setPosition - dst_rect
-    // commit - commit changes to mdp driver
-    // queueBuffer - not here, happens when draw is called
-
-    ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
-
-    ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_FLAGS_NONE;
-
-    if(isYuvBuffer(hnd))
-        setVidInfo(layer, mdpFlags);
-
-    ovutils::setMdpFlags(mdpFlags,ovutils::OV_MDP_BACKEND_COMPOSITION);
-
-    if(layer->blending == HWC_BLENDING_PREMULT) {
-        ovutils::setMdpFlags(mdpFlags,
-                ovutils::OV_MDP_BLEND_FG_PREMULT);
-    }
-
-    ovutils::eTransform orient = overlay::utils::OVERLAY_TRANSFORM_0 ;
-
-    if(!(layer->transform & HWC_TRANSFORM_ROT_90)) {
-        if(layer->transform & HWC_TRANSFORM_FLIP_H) {
-            ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_FLIP_H);
-        }
-
-        if(layer->transform & HWC_TRANSFORM_FLIP_V) {
-            ovutils::setMdpFlags(mdpFlags,  ovutils::OV_MDP_FLIP_V);
-        }
-    } else {
-        orient = static_cast<ovutils::eTransform>(layer->transform);
-    }
-
-    ovutils::eRotFlags rotFlags = ovutils::ROT_FLAGS_NONE;
-    if(isYuvBuffer(hnd) && (ctx->mMDP.version >= qdutils::MDP_V4_2 &&
-                           ctx->mMDP.version < qdutils::MDSS_V5)) {
-        rotFlags = ovutils::ROT_DOWNSCALE_ENABLED;
-    }
-
-    ovutils::PipeArgs parg(mdpFlags,
-            info,
-            zOrder,
-            ovutils::IS_FG_OFF,
-            rotFlags);
-
-    ov.setSource(parg, dest);
-
-    ov.setTransform(orient, dest);
-
-    ovutils::Dim dcrop(crop.left, crop.top, crop_w, crop_h);
-    ov.setCrop(dcrop, dest);
-
-    ovutils::Dim dim(dst.left, dst.top, dst_w, dst_h);
-    ov.setPosition(dim, dest);
-
-    ALOGD_IF(isDebug(),"%s: MDP set: crop[%d,%d,%d,%d] dst[%d,%d,%d,%d] \
-            nPipe: %d zorder: %d",__FUNCTION__, dcrop.x,
-            dcrop.y,dcrop.w, dcrop.h, dim.x, dim.y, dim.w, dim.h,
-            mdp_info.index, mdp_info.zOrder);
-
-    if (!ov.commit(dest)) {
-        ALOGE("%s: commit failed", __FUNCTION__);
-        return -1;
-    }
-    return 0;
+    return configureLowRes(ctx, layer, dpy, mdpFlags, zOrder, isFg, dest,
+            &pipeLayerPair.rot);
 }
 
 int MDPCompLowRes::pipesNeeded(hwc_context_t *ctx,
@@ -572,6 +444,7 @@ bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
             hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
             PipeLayerPair& info = currentFrame.pipeLayer[nYuvIndex];
             info.pipeInfo = new MdpPipeInfoLowRes;
+            info.rot = NULL;
             MdpPipeInfoLowRes& pipe_info = *(MdpPipeInfoLowRes*)info.pipeInfo;
             pipe_info.index = getMdpPipe(ctx, MDPCOMP_OV_VG);
             if(pipe_info.index == ovutils::OV_INVALID) {
@@ -592,6 +465,7 @@ bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
 
         PipeLayerPair& info = currentFrame.pipeLayer[index];
         info.pipeInfo = new MdpPipeInfoLowRes;
+        info.rot = NULL;
         MdpPipeInfoLowRes& pipe_info = *(MdpPipeInfoLowRes*)info.pipeInfo;
 
         pipe_info.index = getMdpPipe(ctx, MDPCOMP_OV_ANY);
@@ -628,35 +502,41 @@ bool MDPCompLowRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     for(int i = 0; i < numHwLayers; i++ )
     {
         hwc_layer_1_t *layer = &list->hwLayers[i];
-
-        if(!(layerProp[i].mFlags & HWC_MDPCOMP)) {
-            continue;
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
+        if(!hnd) {
+            ALOGE("%s handle null", __FUNCTION__);
+            return false;
         }
 
         MdpPipeInfoLowRes& pipe_info =
                 *(MdpPipeInfoLowRes*)mCurrentFrame.pipeLayer[i].pipeInfo;
         ovutils::eDest dest = pipe_info.index;
-
         if(dest == ovutils::OV_INVALID) {
             ALOGE("%s: Invalid pipe index (%d)", __FUNCTION__, dest);
             return false;
         }
 
-        if (ctx ) {
-            private_handle_t *hnd = (private_handle_t *)layer->handle;
-            if(!hnd) {
-                ALOGE("%s handle null", __FUNCTION__);
-                return false;
-            }
+        if(!(layerProp[i].mFlags & HWC_MDPCOMP)) {
+            continue;
+        }
 
-            ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
-                    using  pipe: %d", __FUNCTION__, layer,
-                    hnd, dest );
+        ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
+                using  pipe: %d", __FUNCTION__, layer,
+                hnd, dest );
 
-            if (!ov.queueBuffer(hnd->fd, hnd->offset, dest)) {
-                ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
+        int fd = hnd->fd;
+        uint32_t offset = hnd->offset;
+        Rotator *rot = mCurrentFrame.pipeLayer[i].rot;
+        if(rot) {
+            if(!rot->queueBuffer(fd, offset))
                 return false;
-            }
+            fd = rot->getDstMemId();
+            offset = rot->getDstOffset();
+        }
+
+        if (!ov.queueBuffer(fd, offset, dest)) {
+            ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
+            return false;
         }
 
         layerProp[i].mFlags &= ~HWC_MDPCOMP;
@@ -774,212 +654,17 @@ bool MDPCompHighRes::allocLayerPipes(hwc_context_t *ctx,
  * Configures pipe(s) for MDP composition
  */
 int MDPCompHighRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
-        MdpPipeInfo* mdpInfo) {
+        PipeLayerPair& pipeLayerPair) {
     const int dpy = HWC_DISPLAY_PRIMARY;
-    private_handle_t *hnd = (private_handle_t *)layer->handle;
-    overlay::Overlay& ov = *ctx->mOverlay;
-
-    if(!hnd) {
-        ALOGE("%s: layer handle is NULL", __FUNCTION__);
-        return -1;
-    }
-
-    MdpPipeInfoHighRes& mdp_info = *(MdpPipeInfoHighRes*)mdpInfo;
-
-    int hw_w = ctx->dpyAttr[dpy].xres;
-    int hw_h = ctx->dpyAttr[dpy].yres;
-
-    hwc_rect_t crop = layer->sourceCrop;
-    hwc_rect_t dst = layer->displayFrame;
-
-    int crop_w = crop.right - crop.left;
-    int crop_h = crop.bottom - crop.top;
-
-    int dst_w = dst.right - dst.left;
-    int dst_h = dst.bottom - dst.top;
-
-    if(dst.left < 0 || dst.top < 0 ||
-            dst.right > hw_w || dst.bottom > hw_h) {
-        ALOGD_IF(isDebug(),"%s: Destination has negative coordinates",
-                __FUNCTION__);
-        hwc_rect_t scissor = {0, 0, hw_w, hw_h };
-        qhwc::calculate_crop_rects(crop, dst, scissor, 0);
-
-        //Update calulated width and height
-        crop_w = crop.right - crop.left;
-        crop_h = crop.bottom - crop.top;
-
-        dst_w = dst.right - dst.left;
-        dst_h = dst.bottom - dst.top;
-    }
-
-    if( (dst_w > hw_w)|| (dst_h > hw_h)) {
-        ALOGD_IF(isDebug(),"%s: Dest rect exceeds FB", __FUNCTION__);
-        dst_w = hw_w;
-        dst_h = hw_h;
-    }
-
-    // Determine pipe to set based on pipe index
-    ovutils::eDest l_dest = mdp_info.lIndex;
-    ovutils::eDest r_dest = mdp_info.rIndex;
-
-    ovutils::eZorder zOrder = ovutils::ZORDER_0;
-
-    if(mdp_info.zOrder == 0 ) {
-        zOrder = ovutils::ZORDER_0;
-    } else if(mdp_info.zOrder == 1 ) {
-        zOrder = ovutils::ZORDER_1;
-    } else if(mdp_info.zOrder == 2 ) {
-        zOrder = ovutils::ZORDER_2;
-    } else if(mdp_info.zOrder == 3) {
-        zOrder = ovutils::ZORDER_3;
-    }
-
-    // Order order order
-    // setSource - just setting source
-    // setParameter - changes src w/h/f accordingly
-    // setCrop - ROI - src_rect
-    // setPosition - dst_rect
-    // commit - commit changes to mdp driver
-    // queueBuffer - not here, happens when draw is called
-
-    ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
-
-    ovutils::eMdpFlags mdpFlagsL = ovutils::OV_MDP_FLAGS_NONE;
-
-    if(isYuvBuffer(hnd))
-        setVidInfo(layer, mdpFlagsL);
-
-    ovutils::setMdpFlags(mdpFlagsL,ovutils::OV_MDP_BACKEND_COMPOSITION);
-
-    if(layer->blending == HWC_BLENDING_PREMULT) {
-        ovutils::setMdpFlags(mdpFlagsL,
-                ovutils::OV_MDP_BLEND_FG_PREMULT);
-    }
-
-    ovutils::eTransform orient = overlay::utils::OVERLAY_TRANSFORM_0 ;
-
-    if(!(layer->transform & HWC_TRANSFORM_ROT_90)) {
-        if(layer->transform & HWC_TRANSFORM_FLIP_H) {
-            ovutils::setMdpFlags(mdpFlagsL, ovutils::OV_MDP_FLIP_H);
-        }
-
-        if(layer->transform & HWC_TRANSFORM_FLIP_V) {
-            ovutils::setMdpFlags(mdpFlagsL,  ovutils::OV_MDP_FLIP_V);
-        }
-    } else {
-        orient = static_cast<ovutils::eTransform>(layer->transform);
-    }
-
-    ovutils::eMdpFlags mdpFlagsR = mdpFlagsL;
-    ovutils::setMdpFlags(mdpFlagsR, ovutils::OV_MDSS_MDP_RIGHT_MIXER);
-
-    hwc_rect_t tmp_cropL, tmp_dstL;
-    hwc_rect_t tmp_cropR, tmp_dstR;
-
-    if(l_dest != ovutils::OV_INVALID) {
-        tmp_cropL = crop;
-        tmp_dstL = dst;
-        hwc_rect_t scissor = {0, 0, hw_w/2, hw_h };
-        qhwc::calculate_crop_rects(tmp_cropL, tmp_dstL, scissor, 0);
-    }
-    if(r_dest != ovutils::OV_INVALID) {
-        tmp_cropR = crop;
-        tmp_dstR = dst;
-        hwc_rect_t scissor = {hw_w/2, 0, hw_w, hw_h };
-        qhwc::calculate_crop_rects(tmp_cropR, tmp_dstR, scissor, 0);
-    }
-
-    //When buffer is flipped, contents of mixer config also needs to swapped.
-    //Not needed if the layer is confined to one half of the screen.
-    if(layer->transform & HWC_TRANSFORM_FLIP_V &&
-       l_dest != ovutils::OV_INVALID  && r_dest != ovutils::OV_INVALID ) {
-        hwc_rect_t new_cropR;
-        new_cropR.left = tmp_cropL.left;
-        new_cropR.right = new_cropR.left + (tmp_cropR.right - tmp_cropR.left);
-
-        hwc_rect_t new_cropL;
-        new_cropL.left  = new_cropR.right;
-        new_cropL.right = tmp_cropR.right;
-
-        tmp_cropL.left =  new_cropL.left;
-        tmp_cropL.right =  new_cropL.right;
-
-        tmp_cropR.left = new_cropR.left;
-        tmp_cropR.right =  new_cropR.right;
-
-        ALOGD_IF(isDebug(),"rects on V flip: \
-                 cropL(%d,%d,%d,%d) dstL(%d,%d,%d,%d) \
-                 cropR(%d,%d,%d,%d) dstR(%d,%d,%d,%d)",
-          tmp_cropL.left, tmp_cropL.top, tmp_cropL.right, tmp_cropL.bottom,
-          tmp_dstL.left, tmp_dstL.top, tmp_dstL.right, tmp_dstL.bottom,
-          tmp_cropR.left, tmp_cropR.top, tmp_cropR.right, tmp_cropR.bottom,
-          tmp_dstR.left, tmp_dstR.top, tmp_dstR.right, tmp_dstR.bottom);
-    }
-
-    //**** configure left mixer ****
-    if(l_dest != ovutils::OV_INVALID) {
-        ovutils::PipeArgs pargL(mdpFlagsL,
-                                info,
-                                zOrder,
-                                ovutils::IS_FG_OFF,
-                                ovutils::ROT_FLAGS_NONE);
-
-        ov.setSource(pargL, l_dest);
-        ov.setTransform(orient, l_dest);
-        ovutils::Dim dcropL(tmp_cropL.left, tmp_cropL.top,
-                            tmp_cropL.right - tmp_cropL.left,
-                            tmp_cropL.bottom - tmp_cropL.top);
-        ov.setCrop(dcropL, l_dest);
-        ovutils::Dim dimL(tmp_dstL.left , tmp_dstL.top,
-                          tmp_dstL.right - tmp_dstL.left,
-                          tmp_dstL.bottom - tmp_dstL.top);
-        ov.setPosition(dimL, l_dest);
-
-        ALOGD_IF(isDebug(),"%s: MDP set: LEFT: \
-                 crop[%d,%d,%d,%d] dst[%d,%d,%d,%d] pipeIndexL: %d  zorder: %d",
-                 __FUNCTION__, dcropL.x, dcropL.y,dcropL.w, dcropL.h,
-                 dimL.x, dimL.y, dimL.w, dimL.h,
-                 mdp_info.lIndex, mdp_info.zOrder);
-
-        if (!ov.commit(l_dest)) {
-            ALOGE("%s: commit failed for left mixer config", __FUNCTION__);
-            return -1;
-        }
-    }
-
-    //**** configure right mixer ****
-    if(r_dest != ovutils::OV_INVALID) {
-        ovutils::PipeArgs pargR(mdpFlagsR,
-                                info,
-                                zOrder,
-                                ovutils::IS_FG_OFF,
-                                ovutils::ROT_FLAGS_NONE);
-
-        ov.setSource(pargR, r_dest);
-        ov.setTransform(orient, r_dest);
-        ovutils::Dim dcropR(tmp_cropR.left, tmp_cropR.top,
-                            tmp_cropR.right - tmp_cropR.left,
-                            tmp_cropR.bottom - tmp_cropR.top);
-        ov.setCrop(dcropR, r_dest);
-        ovutils::Dim dimR(tmp_dstR.left - hw_w/2, tmp_dstR.top,
-                          tmp_dstR.right - tmp_dstR.left,
-                          tmp_dstR.bottom - tmp_dstR.top);
-        ov.setPosition(dimR, r_dest);
-
-        ALOGD_IF(isDebug(),"%s: MDP set: RIGHT: \
-                 crop[%d,%d,%d,%d] dst[%d,%d,%d,%d] pipeIndexR: %d zorder: %d",
-                 __FUNCTION__, dcropR.x, dcropR.y,dcropR.w, dcropR.h,
-                 dimR.x, dimR.y, dimR.w, dimR.h,
-                 mdp_info.rIndex, mdp_info.zOrder);
-
-        if (!ov.commit(r_dest)) {
-            ALOGE("%s: commit failed for right mixer config", __FUNCTION__);
-            return -1;
-        }
-    }
-
-    return 0;
+    MdpPipeInfoHighRes& mdp_info =
+            *(static_cast<MdpPipeInfoHighRes*>(pipeLayerPair.pipeInfo));
+    eZorder zOrder = static_cast<eZorder>(mdp_info.zOrder);
+    eIsFg isFg = IS_FG_OFF;
+    eMdpFlags mdpFlagsL = OV_MDP_BACKEND_COMPOSITION;
+    eDest lDest = mdp_info.lIndex;
+    eDest rDest = mdp_info.rIndex;
+    return configureHighRes(ctx, layer, dpy, mdpFlagsL, zOrder, isFg, lDest,
+            rDest, &pipeLayerPair.rot);
 }
 
 bool MDPCompHighRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
@@ -1006,6 +691,11 @@ bool MDPCompHighRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     for(int i = 0; i < numHwLayers; i++ )
     {
         hwc_layer_1_t *layer = &list->hwLayers[i];
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
+        if(!hnd) {
+            ALOGE("%s handle null", __FUNCTION__);
+            return false;
+        }
 
         if(!(layerProp[i].mFlags & HWC_MDPCOMP)) {
             continue;
@@ -1013,50 +703,44 @@ bool MDPCompHighRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
         MdpPipeInfoHighRes& pipe_info =
                 *(MdpPipeInfoHighRes*)mCurrentFrame.pipeLayer[i].pipeInfo;
+        Rotator *rot = mCurrentFrame.pipeLayer[i].rot;
+
         ovutils::eDest indexL = pipe_info.lIndex;
         ovutils::eDest indexR = pipe_info.rIndex;
+        int fd = hnd->fd;
+        int offset = hnd->offset;
+
+        if(rot) {
+            rot->queueBuffer(fd, offset);
+            fd = rot->getDstMemId();
+            offset = rot->getDstOffset();
+        }
 
         //************* play left mixer **********
         if(indexL != ovutils::OV_INVALID) {
             ovutils::eDest destL = (ovutils::eDest)indexL;
-            if (ctx ) {
-                private_handle_t *hnd = (private_handle_t *)layer->handle;
-                if(!hnd) {
-                    ALOGE("%s handle null", __FUNCTION__);
-                    return false;
-                }
-
-                ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
-                        using  pipe: %d", __FUNCTION__, layer, hnd, indexL );
-
-                if (!ov.queueBuffer(hnd->fd, hnd->offset, destL)) {
-                    ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
-                    return false;
-                }
+            ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
+                    using  pipe: %d", __FUNCTION__, layer, hnd, indexL );
+            if (!ov.queueBuffer(fd, offset, destL)) {
+                ALOGE("%s: queueBuffer failed for left mixer", __FUNCTION__);
+                return false;
             }
         }
 
         //************* play right mixer **********
         if(indexR != ovutils::OV_INVALID) {
             ovutils::eDest destR = (ovutils::eDest)indexR;
-            if (ctx ) {
-                private_handle_t *hnd = (private_handle_t *)layer->handle;
-                if(!hnd) {
-                    ALOGE("%s handle null", __FUNCTION__);
-                    return false;
-                }
-
-                ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
-                        using  pipe: %d", __FUNCTION__, layer, hnd, indexR );
-
-                if (!ov.queueBuffer(hnd->fd, hnd->offset, destR)) {
-                    ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
-                    return false;
-                }
+            ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
+                    using  pipe: %d", __FUNCTION__, layer, hnd, indexR );
+            if (!ov.queueBuffer(fd, offset, destR)) {
+                ALOGE("%s: queueBuffer failed for right mixer", __FUNCTION__);
+                return false;
             }
         }
+
         layerProp[i].mFlags &= ~HWC_MDPCOMP;
     }
+
     return true;
 }
 }; //namespace

@@ -43,48 +43,34 @@ public:
     explicit GenericPipe(int dpy);
     /* dtor */
     ~GenericPipe();
-    /* CTRL/DATA init. Not owning rotator, will not  init it */
     bool init();
-    /* CTRL/DATA close. Not owning rotator, will not close it */
     bool close();
-
     /* Control APIs */
     /* set source using whf, orient and wait flag */
-    bool setSource(const utils::PipeArgs& args);
+    void setSource(const utils::PipeArgs& args);
     /* set crop a.k.a the region of interest */
-    bool setCrop(const utils::Dim& d);
+    void setCrop(const utils::Dim& d);
     /* set orientation*/
-    bool setTransform(const utils::eTransform& param);
+    void setTransform(const utils::eTransform& param);
     /* set mdp posision using dim */
-    bool setPosition(const utils::Dim& dim);
+    void setPosition(const utils::Dim& dim);
     /* commit changes to the overlay "set"*/
     bool commit();
-
     /* Data APIs */
     /* queue buffer to the overlay */
     bool queueBuffer(int fd, uint32_t offset);
-
     /* return cached startup args */
     const utils::PipeArgs& getArgs() const;
-
-    /* retrieve screen info */
-    utils::ScreenInfo getScreenInfo() const;
-
     /* retrieve cached crop data */
     utils::Dim getCrop() const;
-
     /* is closed */
     bool isClosed() const;
-
     /* is open */
     bool isOpen() const;
-
     /* return Ctrl fd. Used for S3D */
     int getCtrlFd() const;
-
     /* dump the state of the object */
     void dump() const;
-
     /* Return the dump in the specified buffer */
     void getDump(char *buf, size_t len);
 
@@ -92,23 +78,17 @@ private:
     /* set Closed pipe */
     bool setClosed();
 
-    /* Set whether rotator can be used */
-    void setRotatorUsed(const bool& rotUsed);
-
     int mFbNum;
-
     /* Ctrl/Data aggregator */
     CtrlData mCtrlData;
-
     Rotator* mRot;
-
     //Whether rotator is used for 0-rot or otherwise
     bool mRotUsed;
-
     //Whether we will do downscale opt. This is just a request. If the frame is
     //not a candidate, we might not do it.
     bool mRotDownscaleOpt;
-
+    //Whether the source is prerotated.
+    bool mPreRotated;
     /* Pipe open or closed */
     enum ePipeState {
         CLOSED,
