@@ -246,18 +246,34 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
                 ctx->mOverlay->configBegin();
                 ctx->mOverlay->configDone();
                 ret = ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_POWERDOWN);
+
+                if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected == true) {
+                    // Surfaceflinger does not send Blank/unblank event to hwc
+                    // for virtual display, handle it explicitly when blank for
+                    // primary is invoked, so that any pipes unset get committed
+                    if (!ctx->mExtDisplay->post()) {
+                        ret = -1;
+                        ALOGE("%s:post failed for virtual display !!",
+                                                            __FUNCTION__);
+                    } else {
+                        ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = !blank;
+                    }
+                }
             } else {
                 ret = ioctl(m->framebuffer->fd, FBIOBLANK, FB_BLANK_UNBLANK);
+                if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected == true) {
+                    ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = !blank;
+                }
             }
             break;
         case HWC_DISPLAY_EXTERNAL:
-        case HWC_DISPLAY_VIRTUAL:
             if(blank) {
-                // External/Virtual Display post commits the changes to display
+                // External post commits the changes to display
                 // Call this on blank, so that any pipe unsets gets committed
                 if (!ctx->mExtDisplay->post()) {
                     ret = -1;
-                    ALOGE("%s:ctx->mExtDisplay->post fail!! ", __FUNCTION__);
+                    ALOGE("%s:post failed for external display !! ",
+                                                           __FUNCTION__);
                 }
             } else {
             }
@@ -311,7 +327,6 @@ static int hwc_query(struct hwc_composer_device_1* dev,
 static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int ret = 0;
     const int dpy = HWC_DISPLAY_PRIMARY;
-
     if (LIKELY(list) && ctx->dpyAttr[dpy].isActive) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
