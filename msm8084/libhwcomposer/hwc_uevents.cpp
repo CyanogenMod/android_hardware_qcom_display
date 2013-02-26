@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include "hwc_utils.h"
 #include "hwc_fbupdate.h"
-#include "hwc_video.h"
+#include "hwc_mdpcomp.h"
 #include "hwc_copybit.h"
 #include "comptype.h"
 #include "external.h"
@@ -53,12 +53,10 @@ static bool isHDMI(const char* str)
 
 static void setup(hwc_context_t* ctx, int dpy, bool usecopybit)
 {
-    ctx->mFBUpdate[dpy] =
-            IFBUpdate::getObject(ctx->dpyAttr[dpy].xres, dpy);
+    ctx->mFBUpdate[dpy] = IFBUpdate::getObject(ctx->dpyAttr[dpy].xres, dpy);
+    ctx->mMDPComp[dpy] =  MDPComp::getObject(ctx->dpyAttr[dpy].xres, dpy);
     if(usecopybit)
         ctx->mCopyBit[dpy] = new CopyBit();
-    ctx->mVidOv[dpy] =
-            IVideoOverlay::getObject(ctx->dpyAttr[dpy].xres, dpy);
 }
 
 static void clear(hwc_context_t* ctx, int dpy)
@@ -71,9 +69,9 @@ static void clear(hwc_context_t* ctx, int dpy)
         delete ctx->mCopyBit[dpy];
         ctx->mCopyBit[dpy] = NULL;
     }
-    if(ctx->mVidOv[dpy]) {
-        delete ctx->mVidOv[dpy];
-        ctx->mVidOv[dpy] = NULL;
+    if(ctx->mMDPComp[dpy]) {
+        delete ctx->mMDPComp[dpy];
+        ctx->mMDPComp[dpy] = NULL;
     }
 }
 
