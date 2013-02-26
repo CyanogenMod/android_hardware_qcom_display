@@ -25,9 +25,11 @@
 #include <gralloc_priv.h>
 #include <fb_priv.h>
 #include <overlay.h>
+#include <overlayRotator.h>
 #include "hwc_utils.h"
 #include "hwc_mdpcomp.h"
 #include "hwc_fbupdate.h"
+#include "hwc_video.h"
 #include "mdp_version.h"
 #include "hwc_copybit.h"
 #include "external.h"
@@ -38,6 +40,9 @@
 using namespace qClient;
 using namespace qService;
 using namespace android;
+using namespace overlay;
+using namespace overlay::utils;
+namespace ovutils = overlay::utils;
 
 namespace qhwc {
 
@@ -67,6 +72,7 @@ void initContext(hwc_context_t *ctx)
     openFramebufferDevice(ctx);
     overlay::Overlay::initOverlay();
     ctx->mOverlay = overlay::Overlay::getInstance();
+    ctx->mRotMgr = new RotMgr();
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
@@ -75,6 +81,10 @@ void initContext(hwc_context_t *ctx)
     //on what external we connect to.
     ctx->mFBUpdate[HWC_DISPLAY_PRIMARY] =
         IFBUpdate::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
+        HWC_DISPLAY_PRIMARY);
+
+    ctx->mVidOv[HWC_DISPLAY_PRIMARY] =
+        IVideoOverlay::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
         HWC_DISPLAY_PRIMARY);
 
     char value[PROPERTY_VALUE_MAX];
@@ -120,6 +130,11 @@ void closeContext(hwc_context_t *ctx)
         ctx->mOverlay = NULL;
     }
 
+    if(ctx->mRotMgr) {
+        delete ctx->mRotMgr;
+        ctx->mRotMgr = NULL;
+    }
+
     for(int i = 0; i < MAX_DISPLAYS; i++) {
         if(ctx->mCopyBit[i]) {
             delete ctx->mCopyBit[i];
@@ -143,6 +158,10 @@ void closeContext(hwc_context_t *ctx)
         if(ctx->mFBUpdate[i]) {
             delete ctx->mFBUpdate[i];
             ctx->mFBUpdate[i] = NULL;
+        }
+        if(ctx->mVidOv[i]) {
+            delete ctx->mVidOv[i];
+            ctx->mVidOv[i] = NULL;
         }
     }
 
@@ -492,6 +511,263 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     return ret;
 }
 
+void trimLayer(hwc_context_t *ctx, const int& dpy, const int& transform,
+        hwc_rect_t& crop, hwc_rect_t& dst) {
+    int hw_w = ctx->dpyAttr[dpy].xres;
+    int hw_h = ctx->dpyAttr[dpy].yres;
+    if(dst.left < 0 || dst.top < 0 ||
+            dst.right > hw_w || dst.bottom > hw_h) {
+        hwc_rect_t scissor = {0, 0, hw_w, hw_h };
+        qhwc::calculate_crop_rects(crop, dst, scissor, transform);
+    }
+}
+
+void setMdpFlags(hwc_layer_1_t *layer,
+        ovutils::eMdpFlags &mdpFlags,
+        int rotDownscale) {
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+    const int& transform = layer->transform;
+
+    if(layer->blending == HWC_BLENDING_PREMULT) {
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_BLEND_FG_PREMULT);
+    }
+
+    if(isYuvBuffer(hnd)) {
+        if(isSecureBuffer(hnd)) {
+            ovutils::setMdpFlags(mdpFlags,
+                    ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
+        }
+        if(metadata && (metadata->operation & PP_PARAM_INTERLACED) &&
+                metadata->interlaced) {
+            ovutils::setMdpFlags(mdpFlags,
+                    ovutils::OV_MDP_DEINTERLACE);
+        }
+        //Pre-rotation will be used using rotator.
+        if(transform & HWC_TRANSFORM_ROT_90) {
+            ovutils::setMdpFlags(mdpFlags,
+                    ovutils::OV_MDP_SOURCE_ROTATED_90);
+        }
+    }
+
+    //No 90 component and no rot-downscale then flips done by MDP
+    //If we use rot then it might as well do flips
+    if(!(layer->transform & HWC_TRANSFORM_ROT_90) && !rotDownscale) {
+        if(layer->transform & HWC_TRANSFORM_FLIP_H) {
+            ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_FLIP_H);
+        }
+
+        if(layer->transform & HWC_TRANSFORM_FLIP_V) {
+            ovutils::setMdpFlags(mdpFlags,  ovutils::OV_MDP_FLIP_V);
+        }
+    }
+}
+
+static inline int configRotator(Rotator *rot, const Whf& whf,
+        const eMdpFlags& mdpFlags, const eTransform& orient,
+        const int& downscale) {
+    rot->setSource(whf);
+    rot->setFlags(mdpFlags);
+    rot->setTransform(orient);
+    rot->setDownscale(downscale);
+    if(!rot->commit()) return -1;
+    return 0;
+}
+
+static inline int configMdp(Overlay *ov, const PipeArgs& parg,
+        const eTransform& orient, const hwc_rect_t& crop,
+        const hwc_rect_t& pos, const eDest& dest) {
+    ov->setSource(parg, dest);
+    ov->setTransform(orient, dest);
+
+    int crop_w = crop.right - crop.left;
+    int crop_h = crop.bottom - crop.top;
+    Dim dcrop(crop.left, crop.top, crop_w, crop_h);
+    ov->setCrop(dcrop, dest);
+
+    int posW = pos.right - pos.left;
+    int posH = pos.bottom - pos.top;
+    Dim position(pos.left, pos.top, posW, posH);
+    ov->setPosition(position, dest);
+
+    if (!ov->commit(dest)) {
+        return -1;
+    }
+    return 0;
+}
+
+static inline void updateSource(eTransform& orient, Whf& whf,
+        hwc_rect_t& crop) {
+    Dim srcCrop(crop.left, crop.top,
+            crop.right - crop.left,
+            crop.bottom - crop.top);
+    preRotateSource(orient, whf, srcCrop);
+    crop.left = srcCrop.x;
+    crop.top = srcCrop.y;
+    crop.right = srcCrop.x + srcCrop.w;
+    crop.bottom = srcCrop.y + srcCrop.h;
+}
+
+int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
+        const int& dpy, eMdpFlags& mdpFlags, const eZorder& z,
+        const eIsFg& isFg, const eDest& dest, Rotator **rot) {
+
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    if(!hnd) {
+        ALOGE("%s: layer handle is NULL", __FUNCTION__);
+        return -1;
+    }
+
+    hwc_rect_t crop = layer->sourceCrop;
+    hwc_rect_t dst = layer->displayFrame;
+    int transform = layer->transform;
+    eTransform orient = static_cast<eTransform>(transform);
+    int downscale = 0;
+    int rotFlags = ovutils::ROT_FLAGS_NONE;
+    Whf whf(hnd->width, hnd->height,
+            getMdpFormat(hnd->format), hnd->size);
+
+    if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
+                ctx->mMDP.version < qdutils::MDSS_V5) {
+        downscale = getDownscaleFactor(
+                crop.right - crop.left,
+                crop.bottom - crop.top,
+                dst.right - dst.left,
+                dst.bottom - dst.top);
+        if(downscale) {
+            rotFlags = ROT_DOWNSCALE_ENABLED;
+        }
+    }
+
+    setMdpFlags(layer, mdpFlags, downscale);
+    trimLayer(ctx, dpy, transform, crop, dst);
+
+    if(isYuvBuffer(hnd) && //if 90 component or downscale, use rot
+            ((transform & HWC_TRANSFORM_ROT_90) || downscale)) {
+        *rot = ctx->mRotMgr->getNext();
+        if(*rot == NULL) return -1;
+        //Configure rotator for pre-rotation
+        if(configRotator(*rot, whf, mdpFlags, orient, downscale) < 0)
+            return -1;
+        whf.format = (*rot)->getDstFormat();
+        updateSource(orient, whf, crop);
+        //For the mdp, since we are pre-rotating
+        transform = 0;
+        rotFlags |= ovutils::ROT_PREROTATED;
+    }
+
+    PipeArgs parg(mdpFlags, whf, z, isFg, static_cast<eRotFlags>(rotFlags));
+    if(configMdp(ctx->mOverlay, parg, orient, crop, dst, dest) < 0) {
+        ALOGE("%s: commit failed for low res panel", __FUNCTION__);
+        return -1;
+    }
+    return 0;
+}
+
+int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
+        const int& dpy, eMdpFlags& mdpFlagsL, const eZorder& z,
+        const eIsFg& isFg, const eDest& lDest, const eDest& rDest,
+        Rotator **rot) {
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    if(!hnd) {
+        ALOGE("%s: layer handle is NULL", __FUNCTION__);
+        return -1;
+    }
+
+    int hw_w = ctx->dpyAttr[dpy].xres;
+    int hw_h = ctx->dpyAttr[dpy].yres;
+    hwc_rect_t crop = layer->sourceCrop;
+    hwc_rect_t dst = layer->displayFrame;
+    int transform = layer->transform;
+    eTransform orient = static_cast<eTransform>(transform);
+    const int downscale = 0;
+    int rotFlags = ROT_FLAGS_NONE;
+
+    Whf whf(hnd->width, hnd->height,
+            getMdpFormat(hnd->format), hnd->size);
+
+    setMdpFlags(layer, mdpFlagsL);
+    trimLayer(ctx, dpy, transform, crop, dst);
+
+    if(isYuvBuffer(hnd) && (transform & HWC_TRANSFORM_ROT_90)) {
+        (*rot) = ctx->mRotMgr->getNext();
+        if((*rot) == NULL) return -1;
+        //Configure rotator for pre-rotation
+        if(configRotator(*rot, whf, mdpFlagsL, orient, downscale) < 0)
+            return -1;
+        whf.format = (*rot)->getDstFormat();
+        updateSource(orient, whf, crop);
+        //For the mdp, since we are pre-rotating
+        transform = 0;
+        rotFlags |= ROT_PREROTATED;
+    }
+
+    eMdpFlags mdpFlagsR = mdpFlagsL;
+    setMdpFlags(mdpFlagsR, OV_MDSS_MDP_RIGHT_MIXER);
+
+    hwc_rect_t tmp_cropL, tmp_dstL;
+    hwc_rect_t tmp_cropR, tmp_dstR;
+
+    if(lDest != OV_INVALID) {
+        tmp_cropL = crop;
+        tmp_dstL = dst;
+        hwc_rect_t scissor = {0, 0, hw_w/2, hw_h };
+        qhwc::calculate_crop_rects(tmp_cropL, tmp_dstL, scissor, 0);
+    }
+    if(rDest != OV_INVALID) {
+        tmp_cropR = crop;
+        tmp_dstR = dst;
+        hwc_rect_t scissor = {hw_w/2, 0, hw_w, hw_h };
+        qhwc::calculate_crop_rects(tmp_cropR, tmp_dstR, scissor, 0);
+    }
+
+    //When buffer is flipped, contents of mixer config also needs to swapped.
+    //Not needed if the layer is confined to one half of the screen.
+    //If rotator has been used then it has also done the flips, so ignore them.
+    if(layer->transform & HWC_TRANSFORM_FLIP_V && lDest != OV_INVALID
+            && rDest != OV_INVALID && rot == NULL) {
+        hwc_rect_t new_cropR;
+        new_cropR.left = tmp_cropL.left;
+        new_cropR.right = new_cropR.left + (tmp_cropR.right - tmp_cropR.left);
+
+        hwc_rect_t new_cropL;
+        new_cropL.left  = new_cropR.right;
+        new_cropL.right = tmp_cropR.right;
+
+        tmp_cropL.left =  new_cropL.left;
+        tmp_cropL.right =  new_cropL.right;
+
+        tmp_cropR.left = new_cropR.left;
+        tmp_cropR.right =  new_cropR.right;
+
+    }
+
+    //configure left mixer
+    if(lDest != OV_INVALID) {
+        PipeArgs pargL(mdpFlagsL, whf, z, isFg,
+                static_cast<eRotFlags>(rotFlags));
+        if(configMdp(ctx->mOverlay, pargL, orient,
+                tmp_cropL, tmp_dstL, lDest) < 0) {
+            ALOGE("%s: commit failed for left mixer config", __FUNCTION__);
+            return -1;
+        }
+    }
+
+    //configure right mixer
+    if(rDest != OV_INVALID) {
+        PipeArgs pargR(mdpFlagsR, whf, z, isFg,
+                static_cast<eRotFlags>(rotFlags));
+        if(configMdp(ctx->mOverlay, pargR, orient,
+                tmp_cropR, tmp_dstR, rDest) < 0) {
+            ALOGE("%s: commit failed for right mixer config", __FUNCTION__);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 void LayerCache::resetLayerCache(int num) {
     for(uint32_t i = 0; i < MAX_NUM_LAYERS; i++) {
         hnd[i] = NULL;
@@ -556,7 +832,6 @@ void LayerCache::markCachedLayersAsOverlay(hwc_display_contents_1_t* list) {
             }
         }
     }
-
 }
 
-};//namespace
+};//namespace qhwc

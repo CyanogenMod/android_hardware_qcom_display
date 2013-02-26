@@ -24,26 +24,36 @@
 #include "hwc_utils.h"
 #include "qdMetaData.h"
 #include "mdp_version.h"
+#include <overlayRotator.h>
+
+using overlay::Rotator;
 
 namespace qhwc {
 
 namespace ovutils = overlay::utils;
 
-//Static Members
-bool VideoOverlay::sIsModeOn[] = {false};
-ovutils::eDest VideoOverlay::sDest[] = {ovutils::OV_INVALID};
+//===========IVideoOverlay=========================
+IVideoOverlay* IVideoOverlay::getObject(const int& width, const int& dpy) {
+    if(width > MAX_DISPLAY_DIM) {
+        return new VideoOverlayHighRes(dpy);
+    }
+    return new VideoOverlayLowRes(dpy);
+}
+
+//===========VideoOverlayLowRes=========================
+
+VideoOverlayLowRes::VideoOverlayLowRes(const int& dpy): IVideoOverlay(dpy) {}
 
 //Cache stats, figure out the state, config overlay
-bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
-        int dpy) {
+bool VideoOverlayLowRes::prepare(hwc_context_t *ctx,
+        hwc_display_contents_1_t *list) {
 
-    if(ctx->listStats[dpy].yuvCount > 1)
+    if(ctx->listStats[mDpy].yuvCount > 1)
         return false;
 
-    int yuvIndex =  ctx->listStats[dpy].yuvIndices[0];
-    sIsModeOn[dpy] = false;
-
-    int hw_w = ctx->dpyAttr[dpy].xres;
+    int yuvIndex =  ctx->listStats[mDpy].yuvIndices[0];
+    int hw_w = ctx->dpyAttr[mDpy].xres;
+    mModeOn = false;
 
     if(hw_w > MAX_DISPLAY_DIM) {
        ALOGD_IF(VIDEO_DEBUG,"%s, \
@@ -61,7 +71,7 @@ bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
        return false;
     }
 
-    if(yuvIndex == -1 || ctx->listStats[dpy].yuvCount != 1) {
+    if(yuvIndex == -1 || ctx->listStats[mDpy].yuvCount != 1) {
         return false;
     }
 
@@ -83,126 +93,55 @@ bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             }
         }
     }
-    if(configure(ctx, dpy, layer)) {
+
+    if(configure(ctx, layer)) {
         markFlags(layer);
-        sIsModeOn[dpy] = true;
+        mModeOn = true;
     }
 
-    return sIsModeOn[dpy];
+    return mModeOn;
 }
 
-void VideoOverlay::markFlags(hwc_layer_1_t *layer) {
+void VideoOverlayLowRes::markFlags(hwc_layer_1_t *layer) {
     if(layer) {
         layer->compositionType = HWC_OVERLAY;
         layer->hints |= HWC_HINT_CLEAR_FB;
     }
 }
 
-bool VideoOverlay::configure(hwc_context_t *ctx, int dpy,
+bool VideoOverlayLowRes::configure(hwc_context_t *ctx,
         hwc_layer_1_t *layer) {
+
     overlay::Overlay& ov = *(ctx->mOverlay);
     private_handle_t *hnd = (private_handle_t *)layer->handle;
-    ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
+    ovutils::Whf info(hnd->width, hnd->height,
+            ovutils::getMdpFormat(hnd->format), hnd->size);
 
     //Request a VG pipe
-    ovutils::eDest dest = ov.nextPipe(ovutils::OV_MDP_PIPE_VG, dpy);
+    ovutils::eDest dest = ov.nextPipe(ovutils::OV_MDP_PIPE_VG, mDpy);
     if(dest == ovutils::OV_INVALID) { //None available
         return false;
     }
 
-    sDest[dpy] = dest;
-
+    mDest = dest;
     ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_FLAGS_NONE;
-    if (isSecureBuffer(hnd)) {
-        ovutils::setMdpFlags(mdpFlags,
-                ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
+    ovutils::eZorder zOrder = ovutils::ZORDER_1;
+    ovutils::eIsFg isFg = ovutils::IS_FG_OFF;
+    if (ctx->listStats[mDpy].numAppLayers == 1) {
+        isFg = ovutils::IS_FG_SET;
     }
 
-    if(layer->blending == HWC_BLENDING_PREMULT) {
-        ovutils::setMdpFlags(mdpFlags,
-                ovutils::OV_MDP_BLEND_FG_PREMULT);
-    }
-
-    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
-    if (metadata && (metadata->operation & PP_PARAM_INTERLACED) &&
-                                             metadata->interlaced) {
-        ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_DEINTERLACE);
-    }
-
-    ovutils::eIsFg isFgFlag = ovutils::IS_FG_OFF;
-    if (ctx->listStats[dpy].numAppLayers == 1) {
-        isFgFlag = ovutils::IS_FG_SET;
-    }
-
-    ovutils::eRotFlags rotFlags = ovutils::ROT_FLAGS_NONE;
-    if(ctx->mMDP.version >= qdutils::MDP_V4_2 &&
-                ctx->mMDP.version < qdutils::MDSS_V5) {
-        rotFlags = ovutils::ROT_DOWNSCALE_ENABLED;
-    }
-
-    ovutils::PipeArgs parg(mdpFlags,
-            info,
-            ovutils::ZORDER_1,
-            isFgFlag,
-            rotFlags);
-
-    ov.setSource(parg, dest);
-
-    int transform = layer->transform;
-    ovutils::eTransform orient =
-            static_cast<ovutils::eTransform>(transform);
-
-    hwc_rect_t sourceCrop = layer->sourceCrop;
-    hwc_rect_t displayFrame = layer->displayFrame;
-
-    //Calculate the rect for primary based on whether the supplied position
-    //is within or outside bounds.
-    const int fbWidth = ctx->dpyAttr[dpy].xres;
-    const int fbHeight = ctx->dpyAttr[dpy].yres;
-
-    if( displayFrame.left < 0 ||
-            displayFrame.top < 0 ||
-            displayFrame.right > fbWidth ||
-            displayFrame.bottom > fbHeight) {
-        hwc_rect_t scissor = {0, 0, fbWidth, fbHeight};
-        calculate_crop_rects(sourceCrop, displayFrame, scissor, transform);
-    }
-
-    // source crop x,y,w,h
-    ovutils::Dim dcrop(sourceCrop.left, sourceCrop.top,
-            sourceCrop.right - sourceCrop.left,
-            sourceCrop.bottom - sourceCrop.top);
-    //Only for Primary
-    ov.setCrop(dcrop, dest);
-
-    ov.setTransform(orient, dest);
-
-    // position x,y,w,h
-    ovutils::Dim dpos(displayFrame.left,
-            displayFrame.top,
-            displayFrame.right - displayFrame.left,
-            displayFrame.bottom - displayFrame.top);
-    // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
-    if(dpy)
-        getActionSafePosition(ctx, dpy, dpos.x, dpos.y, dpos.w, dpos.h);
-
-    ov.setPosition(dpos, dest);
-
-    if (!ov.commit(dest)) {
-        ALOGE("%s: commit fails", __FUNCTION__);
-        return false;
-    }
-    return true;
+    return (configureLowRes(ctx, layer, mDpy, mdpFlags, zOrder, isFg, dest,
+            &mRot) == 0 );
 }
 
-bool VideoOverlay::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
-        int dpy)
-{
-    if(!sIsModeOn[dpy]) {
+bool VideoOverlayLowRes::draw(hwc_context_t *ctx,
+        hwc_display_contents_1_t *list) {
+    if(!mModeOn) {
         return true;
     }
 
-    int yuvIndex = ctx->listStats[dpy].yuvIndices[0];
+    int yuvIndex = ctx->listStats[mDpy].yuvIndices[0];
     if(yuvIndex == -1) {
         return true;
     }
@@ -210,16 +149,148 @@ bool VideoOverlay::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     private_handle_t *hnd = (private_handle_t *)
             list->hwLayers[yuvIndex].handle;
 
-    bool ret = true;
     overlay::Overlay& ov = *(ctx->mOverlay);
+    int fd = hnd->fd;
+    uint32_t offset = hnd->offset;
+    Rotator *rot = mRot;
 
-    if (!ov.queueBuffer(hnd->fd, hnd->offset,
-                sDest[dpy])) {
-        ALOGE("%s: queueBuffer failed for dpy=%d", __FUNCTION__, dpy);
-        ret = false;
+    if(rot) {
+        if(!rot->queueBuffer(fd, offset))
+            return false;
+        fd = rot->getDstMemId();
+        offset = rot->getDstOffset();
     }
 
-    return ret;
+    if (!ov.queueBuffer(fd, offset, mDest)) {
+        ALOGE("%s: queueBuffer failed for dpy=%d", __FUNCTION__, mDpy);
+        return false;
+    }
+
+    return true;
 }
+
+//===========VideoOverlayHighRes=========================
+
+VideoOverlayHighRes::VideoOverlayHighRes(const int& dpy): IVideoOverlay(dpy) {}
+
+//Cache stats, figure out the state, config overlay
+bool VideoOverlayHighRes::prepare(hwc_context_t *ctx,
+        hwc_display_contents_1_t *list) {
+
+    int yuvIndex =  ctx->listStats[mDpy].yuvIndices[0];
+    int hw_w = ctx->dpyAttr[mDpy].xres;
+    mModeOn = false;
+
+    if(!ctx->mMDP.hasOverlay) {
+       ALOGD_IF(VIDEO_DEBUG,"%s, this hw doesnt support overlay", __FUNCTION__);
+       return false;
+    }
+
+    if(yuvIndex == -1 || ctx->listStats[mDpy].yuvCount != 1) {
+        return false;
+    }
+
+    //index guaranteed to be not -1 at this point
+    hwc_layer_1_t *layer = &list->hwLayers[yuvIndex];
+    if(configure(ctx, layer)) {
+        markFlags(layer);
+        mModeOn = true;
+    }
+
+    return mModeOn;
+}
+
+void VideoOverlayHighRes::markFlags(hwc_layer_1_t *layer) {
+    if(layer) {
+        layer->compositionType = HWC_OVERLAY;
+        layer->hints |= HWC_HINT_CLEAR_FB;
+    }
+}
+
+bool VideoOverlayHighRes::configure(hwc_context_t *ctx,
+        hwc_layer_1_t *layer) {
+
+    int hw_w = ctx->dpyAttr[mDpy].xres;
+    overlay::Overlay& ov = *(ctx->mOverlay);
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    ovutils::Whf info(hnd->width, hnd->height,
+            ovutils::getMdpFormat(hnd->format), hnd->size);
+
+    //Request a VG pipe
+    mDestL = ovutils::OV_INVALID;
+    mDestR = ovutils::OV_INVALID;
+    hwc_rect_t dst = layer->displayFrame;
+    if(dst.left > hw_w/2) {
+        mDestR = ov.nextPipe(ovutils::OV_MDP_PIPE_VG, mDpy);
+        if(mDestR == ovutils::OV_INVALID)
+            return false;
+    } else if (dst.right <= hw_w/2) {
+        mDestL = ov.nextPipe(ovutils::OV_MDP_PIPE_VG, mDpy);
+        if(mDestL == ovutils::OV_INVALID)
+            return false;
+    } else {
+        mDestL = ov.nextPipe(ovutils::OV_MDP_PIPE_VG, mDpy);
+        mDestR = ov.nextPipe(ovutils::OV_MDP_PIPE_VG, mDpy);
+        if(mDestL == ovutils::OV_INVALID ||
+                mDestR == ovutils::OV_INVALID)
+            return false;
+    }
+
+    ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_FLAGS_NONE;
+    ovutils::eZorder zOrder = ovutils::ZORDER_1;
+    ovutils::eIsFg isFg = ovutils::IS_FG_OFF;
+    if (ctx->listStats[mDpy].numAppLayers == 1) {
+        isFg = ovutils::IS_FG_SET;
+    }
+
+    return (configureHighRes(ctx, layer, mDpy, mdpFlags, zOrder, isFg, mDestL,
+            mDestR, &mRot) == 0 );
+}
+
+bool VideoOverlayHighRes::draw(hwc_context_t *ctx,
+        hwc_display_contents_1_t *list) {
+    if(!mModeOn) {
+        return true;
+    }
+
+    int yuvIndex = ctx->listStats[mDpy].yuvIndices[0];
+    if(yuvIndex == -1) {
+        return true;
+    }
+
+    private_handle_t *hnd = (private_handle_t *)
+            list->hwLayers[yuvIndex].handle;
+
+    overlay::Overlay& ov = *(ctx->mOverlay);
+    int fd = hnd->fd;
+    uint32_t offset = hnd->offset;
+    Rotator *rot = mRot;
+
+    if(rot) {
+        if(!rot->queueBuffer(fd, offset))
+            return false;
+        fd = rot->getDstMemId();
+        offset = rot->getDstOffset();
+    }
+
+    if(mDestL != ovutils::OV_INVALID) {
+        if (!ov.queueBuffer(fd, offset, mDestL)) {
+            ALOGE("%s: queueBuffer failed for dpy=%d's left mixer",
+                    __FUNCTION__, mDpy);
+            return false;
+        }
+    }
+
+    if(mDestR != ovutils::OV_INVALID) {
+        if (!ov.queueBuffer(fd, offset, mDestR)) {
+            ALOGE("%s: queueBuffer failed for dpy=%d's right mixer"
+                    , __FUNCTION__, mDpy);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 
 }; //namespace qhwc
