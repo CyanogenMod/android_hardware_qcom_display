@@ -23,38 +23,80 @@
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 
+namespace overlay {
+    class Rotator;
+}
+
 namespace qhwc {
 namespace ovutils = overlay::utils;
 
-//Feature for using overlay to display videos.
-class VideoOverlay {
+class IVideoOverlay {
 public:
-    //Sets up members and prepares overlay if conditions are met
-    static bool prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
-            int dpy);
-    //Draws layer if this feature is on
-    static bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
-            int dpy);
-    //resets values
-    static void reset();
-private:
-    //Configures overlay for video prim and ext
-    static bool configure(hwc_context_t *ctx, int dpy,
-            hwc_layer_1_t *yuvlayer);
-
-    //Marks layer flags if this feature is used
-    static void markFlags(hwc_layer_1_t *yuvLayer);
-    //Flags if this feature is on.
-    static bool sIsModeOn[MAX_DISPLAYS];
-    static ovutils::eDest sDest[MAX_DISPLAYS];
+    explicit IVideoOverlay(const int& dpy) : mDpy(dpy), mModeOn(false),
+            mRot(NULL) {}
+    virtual ~IVideoOverlay() {};
+    virtual bool prepare(hwc_context_t *ctx,
+            hwc_display_contents_1_t *list) = 0;
+    virtual bool draw(hwc_context_t *ctx,
+            hwc_display_contents_1_t *list) = 0;
+    virtual void reset() = 0;
+    //Factory method that returns a low-res or high-res version
+    static IVideoOverlay *getObject(const int& width, const int& dpy);
+protected:
+    const int mDpy; // display to update
+    bool mModeOn; // if prepare happened
+    overlay::Rotator *mRot;
 };
 
-inline void VideoOverlay::reset() {
-    for(uint32_t i = 0; i < MAX_DISPLAYS; i++) {
-        sIsModeOn[i] = false;
-        sDest[i] = ovutils::OV_INVALID;
-    }
+class VideoOverlayLowRes : public IVideoOverlay {
+public:
+    explicit VideoOverlayLowRes(const int& dpy);
+    virtual ~VideoOverlayLowRes() {};
+    bool prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list);
+    bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
+    void reset();
+private:
+    //Configures overlay for video prim and ext
+    bool configure(hwc_context_t *ctx, hwc_layer_1_t *yuvlayer);
+    //Marks layer flags if this feature is used
+    void markFlags(hwc_layer_1_t *yuvLayer);
+    //Flags if this feature is on.
+    bool mModeOn;
+    ovutils::eDest mDest;
+};
+
+class VideoOverlayHighRes : public IVideoOverlay {
+public:
+    explicit VideoOverlayHighRes(const int& dpy);
+    virtual ~VideoOverlayHighRes() {};
+    bool prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list);
+    bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
+    void reset();
+private:
+    //Configures overlay for video prim and ext
+    bool configure(hwc_context_t *ctx, hwc_layer_1_t *yuvlayer);
+    //Marks layer flags if this feature is used
+    void markFlags(hwc_layer_1_t *yuvLayer);
+    //Flags if this feature is on.
+    bool mModeOn;
+    ovutils::eDest mDestL;
+    ovutils::eDest mDestR;
+};
+
+//=================Inlines======================
+inline void VideoOverlayLowRes::reset() {
+    mModeOn = false;
+    mDest = ovutils::OV_INVALID;
+    mRot = NULL;
 }
+
+inline void VideoOverlayHighRes::reset() {
+    mModeOn = false;
+    mDestL = ovutils::OV_INVALID;
+    mDestR = ovutils::OV_INVALID;
+    mRot = NULL;
+}
+
 }; //namespace qhwc
 
 #endif //HWC_VIDEO_H

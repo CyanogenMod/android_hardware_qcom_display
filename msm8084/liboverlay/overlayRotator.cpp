@@ -70,4 +70,65 @@ bool RotMem::close() {
     return ret;
 }
 
+RotMgr::RotMgr() {
+    for(int i = 0; i < MAX_ROT_SESS; i++) {
+        mRot[i] = 0;
+    }
+    mUseCount = 0;
+}
+
+RotMgr::~RotMgr() {
+    clear();
+}
+
+void RotMgr::configBegin() {
+    //Reset the number of objects used
+    mUseCount = 0;
+}
+
+void RotMgr::configDone() {
+    //Remove the top most unused objects. Videos come and go.
+    for(int i = mUseCount; i < MAX_ROT_SESS; i++) {
+        if(mRot[i]) {
+            delete mRot[i];
+            mRot[i] = 0;
+        }
+    }
+}
+
+Rotator* RotMgr::getNext() {
+    //Return a rot object, creating one if necessary
+    overlay::Rotator *rot = NULL;
+    if(mUseCount >= MAX_ROT_SESS) {
+        ALOGE("%s, MAX rotator sessions reached", __func__);
+    } else {
+        if(mRot[mUseCount] == NULL)
+            mRot[mUseCount] = overlay::Rotator::getRotator();
+        rot = mRot[mUseCount++];
+    }
+    return rot;
+}
+
+void RotMgr::clear() {
+    //Brute force obj destruction, helpful in suspend.
+    for(int i = 0; i < MAX_ROT_SESS; i++) {
+        if(mRot[i]) {
+            delete mRot[i];
+            mRot[i] = 0;
+        }
+    }
+    mUseCount = 0;
+}
+
+void RotMgr::getDump(char *buf, size_t len) {
+    for(int i = 0; i < MAX_ROT_SESS; i++) {
+        if(mRot[i]) {
+            mRot[i]->getDump(buf, len);
+        }
+    }
+    char str[32] = {'\0'};
+    snprintf(str, 32, "\n================\n");
+    strncat(buf, str, strlen(str));
+}
+
 }

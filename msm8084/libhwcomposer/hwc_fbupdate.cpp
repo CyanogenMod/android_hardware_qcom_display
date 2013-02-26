@@ -71,7 +71,8 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx,
             ALOGE("%s:NULL private handle for layer!", __FUNCTION__);
             return false;
         }
-        ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
+        ovutils::Whf info(hnd->width, hnd->height,
+                ovutils::getMdpFormat(hnd->format), hnd->size);
 
         //Request an RGB pipe
         ovutils::eDest dest = ov.nextPipe(ovutils::OV_MDP_PIPE_RGB, mDpy);
@@ -171,7 +172,8 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
             ALOGE("%s:NULL private handle for layer!", __FUNCTION__);
             return false;
         }
-        ovutils::Whf info(hnd->width, hnd->height, hnd->format, hnd->size);
+        ovutils::Whf info(hnd->width, hnd->height,
+                ovutils::getMdpFormat(hnd->format), hnd->size);
 
         //Request left RGB pipe
         ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_RGB, mDpy);

@@ -89,67 +89,6 @@ namespace utils {
 #define NUM_FB_DEVICES 3
 
 //--------------------------------------------------------
-FrameBufferInfo::FrameBufferInfo() {
-    mFBWidth = 0;
-    mFBHeight = 0;
-    mBorderFillSupported = false;
-
-    OvFD mFd;
-
-    // Use open defined in overlayFD file to open fd for fb0
-    if(!overlay::open(mFd, 0, Res::fbPath)) {
-        ALOGE("FrameBufferInfo: failed to open fd");
-        return;
-    }
-
-    if (!mFd.valid()) {
-        ALOGE("FrameBufferInfo: FD not valid");
-        return;
-    }
-
-    fb_var_screeninfo vinfo;
-    if (!mdp_wrapper::getVScreenInfo(mFd.getFD(), vinfo)) {
-        ALOGE("FrameBufferInfo: failed getVScreenInfo on fb0");
-        mFd.close();
-        return;
-    }
-
-    int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
-    if (mdpVersion < qdutils::MDSS_V5) {
-        mdp_overlay ov;
-        memset(&ov, 0, sizeof(ov));
-        ov.id = 1;
-        if (!mdp_wrapper::getOverlay(mFd.getFD(), ov)) {
-            ALOGE("FrameBufferInfo: failed getOverlay on fb0");
-            mFd.close();
-            return;
-        }
-        mBorderFillSupported = (ov.flags & MDP_BORDERFILL_SUPPORTED) ?
-                               true : false;
-    } else {
-        // badger always support border fill
-        mBorderFillSupported = true;
-    }
-
-    mFd.close();
-    mFBWidth = vinfo.xres;
-    mFBHeight = vinfo.yres;
-}
-
-FrameBufferInfo* FrameBufferInfo::getInstance() {
-    if (!sFBInfoInstance) {
-        sFBInfoInstance = new FrameBufferInfo;
-    }
-    return sFBInfoInstance;
-}
-
-int FrameBufferInfo::getWidth() const {
-    return mFBWidth;
-}
-
-int FrameBufferInfo::getHeight() const {
-    return mFBHeight;
-}
 
 /* clears any VG pipes allocated to the fb devices */
 int initOverlay() {
@@ -291,6 +230,58 @@ int getHALFormat(int mdpFormat) {
     }
     // not reached
     return -1;
+}
+
+int getDownscaleFactor(const int& src_w, const int& src_h,
+        const int& dst_w, const int& dst_h) {
+    int dscale_factor = utils::ROT_DS_NONE;
+    // We need this check to engage the rotator whenever possible to assist MDP
+    // in performing video downscale.
+    // This saves bandwidth and avoids causing the driver to make too many panel
+    // -mode switches between BLT (writeback) and non-BLT (Direct) modes.
+    // Use-case: Video playback [with downscaling and rotation].
+    if (dst_w && dst_h)
+    {
+        uint32_t dscale = (src_w * src_h) / (dst_w * dst_h);
+        if(dscale < 2) {
+            // Down-scale to > 50% of orig.
+            dscale_factor = utils::ROT_DS_NONE;
+        } else if(dscale < 4) {
+            // Down-scale to between > 25% to <= 50% of orig.
+            dscale_factor = utils::ROT_DS_HALF;
+        } else if(dscale < 8) {
+            // Down-scale to between > 12.5% to <= 25% of orig.
+            dscale_factor = utils::ROT_DS_FOURTH;
+        } else {
+            // Down-scale to <= 12.5% of orig.
+            dscale_factor = utils::ROT_DS_EIGHTH;
+        }
+    }
+    return dscale_factor;
+}
+
+static inline int compute(const uint32_t& x, const uint32_t& y,
+        const uint32_t& z) {
+    return x - ( y + z );
+}
+
+void preRotateSource(eTransform& tr, Whf& whf, Dim& srcCrop) {
+    if(tr & OVERLAY_TRANSFORM_FLIP_H) {
+        srcCrop.x = compute(whf.w, srcCrop.x, srcCrop.w);
+    }
+    if(tr & OVERLAY_TRANSFORM_FLIP_V) {
+        srcCrop.y = compute(whf.h, srcCrop.y, srcCrop.h);
+    }
+    if(tr & OVERLAY_TRANSFORM_ROT_90) {
+        int tmp = srcCrop.x;
+        srcCrop.x = compute(whf.h,
+                srcCrop.y,
+                srcCrop.h);
+        srcCrop.y = tmp;
+        swap(whf.w, whf.h);
+        swap(srcCrop.w, srcCrop.h);
+    }
+    tr = OVERLAY_TRANSFORM_0;
 }
 
 bool is3DTV() {
