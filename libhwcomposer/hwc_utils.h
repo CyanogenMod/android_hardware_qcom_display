@@ -143,6 +143,9 @@ void dumpsys_log(android::String8& buf, const char* fmt, ...);
 void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
                                         uint32_t& y, uint32_t& w, uint32_t& h);
 
+//Close acquireFenceFds of all layers of incoming list
+void closeAcquireFds(hwc_display_contents_1_t* list);
+
 //Sync point impl.
 int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
                                                     int fd);

@@ -343,9 +343,11 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         }
         if (ctx->mFbDev->post(ctx->mFbDev, fbLayer->handle)) {
             ALOGE("%s: ctx->mFbDev->post fail!", __FUNCTION__);
-            return -1;
+            ret = -1;
         }
     }
+
+    closeAcquireFds(list);
     return ret;
 }
 
@@ -382,9 +384,11 @@ static int hwc_set_external(hwc_context_t *ctx,
         }
         if (!ctx->mExtDisplay->post()) {
             ALOGE("%s: ctx->mExtDisplay->post fail!", __FUNCTION__);
-            return -1;
+            ret = -1;
         }
     }
+
+    closeAcquireFds(list);
     return ret;
 }
 
