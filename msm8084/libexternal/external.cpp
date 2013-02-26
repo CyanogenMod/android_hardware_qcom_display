@@ -168,11 +168,13 @@ void ExternalDisplay::processUEventOffline(const char *str) {
 
 ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
     mCurrentMode(-1), mConnected(0), mConnectedFbNum(0), mModeCount(0),
-     mUnderscanSupported(false), mHwcContext(ctx), mHdmiFbNum(-1), mWfdFbNum(-1)
+    mUnderscanSupported(false), mHwcContext(ctx), mHdmiFbNum(-1),
+    mWfdFbNum(-1), mExtDpyNum(HWC_DISPLAY_EXTERNAL)
 {
     memset(&mVInfo, 0, sizeof(mVInfo));
     //Determine the fb index for external display devices.
     updateExtDispDevFbIndex();
+
 }
 
 void ExternalDisplay::setEDIDMode(int resMode) {
@@ -441,7 +443,7 @@ bool ExternalDisplay::openFrameBuffer(int fbNum)
             ALOGE("%s: %s is not available", __FUNCTION__,
                                             msmFbDevicePath[fbNum-1]);
         if(mHwcContext) {
-            mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].fd = mFd;
+            mHwcContext->dpyAttr[mExtDpyNum].fd = mFd;
         }
     }
     return (mFd > 0);
@@ -455,7 +457,7 @@ bool ExternalDisplay::closeFrameBuffer()
         mFd = -1;
     }
     if(mHwcContext) {
-        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].fd = mFd;
+        mHwcContext->dpyAttr[mExtDpyNum].fd = mFd;
     }
     return (ret == 0);
 }
@@ -639,7 +641,7 @@ void ExternalDisplay::setExternalDisplay(bool connected, int extFbNum)
         // Store the external display
         mConnected = connected;
         mConnectedFbNum = extFbNum;
-        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = connected;
+        mHwcContext->dpyAttr[mExtDpyNum].connected = connected;
         // Update external fb number in Overlay context
         overlay::Overlay::getInstance()->setExtFbNum(extFbNum);
     }
@@ -688,6 +690,7 @@ bool ExternalDisplay::post()
 {
     if(mFd == -1)
         return false;
+
     struct mdp_display_commit ext_commit;
     memset(&ext_commit, 0, sizeof(struct mdp_display_commit));
     ext_commit.flags = MDP_DISPLAY_COMMIT_OVERLAY;
@@ -701,9 +704,9 @@ bool ExternalDisplay::post()
 
 void ExternalDisplay::setDpyWfdAttr() {
     if(mHwcContext) {
-        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = mVInfo.xres;
-        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = mVInfo.yres;
-        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].vsync_period =
+        mHwcContext->dpyAttr[mExtDpyNum].xres = mVInfo.xres;
+        mHwcContext->dpyAttr[mExtDpyNum].yres = mVInfo.yres;
+        mHwcContext->dpyAttr[mExtDpyNum].vsync_period =
                 1000000000l /60;
         ALOGD_IF(DEBUG,"%s: wfd...connected..!",__FUNCTION__);
     }
