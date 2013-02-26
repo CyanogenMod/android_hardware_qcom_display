@@ -39,9 +39,14 @@ using namespace qService;
 namespace qClient {
 
 // ----------------------------------------------------------------------------
-QClient::QClient(hwc_context_t *ctx) : mHwcContext(ctx)
+QClient::QClient(hwc_context_t *ctx) : mHwcContext(ctx),
+        mMPDeathNotifier(new MPDeathNotifier(ctx))
 {
+
     ALOGD_IF(QCLIENT_DEBUG, "QClient Constructor invoked");
+    //The only way to make this class in this process subscribe to media
+    //player's death.
+    IMediaDeathNotifier::getMediaPlayerService();
 }
 
 QClient::~QClient()
@@ -76,6 +81,14 @@ void QClient::unsecuring(uint32_t startEnd) {
     //We're done unsecuring
     if(startEnd == IQService::END)
         mHwcContext->mSecureMode = false;
+    if(mHwcContext->proc)
+        mHwcContext->proc->invalidate(mHwcContext->proc);
+}
+
+void QClient::MPDeathNotifier::died() {
+    ALOGD_IF(QCLIENT_DEBUG, "Media Player died");
+    mHwcContext->mSecuring = false;
+    mHwcContext->mSecureMode = false;
     if(mHwcContext->proc)
         mHwcContext->proc->invalidate(mHwcContext->proc);
 }
