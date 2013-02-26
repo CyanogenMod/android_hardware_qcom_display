@@ -13,7 +13,6 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL liboverlay \
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhwcomposer\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := hwc.cpp          \
-                                 hwc_video.cpp    \
                                  hwc_utils.cpp    \
                                  hwc_uevents.cpp  \
                                  hwc_vsync.cpp    \
