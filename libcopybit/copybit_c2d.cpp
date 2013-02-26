@@ -600,7 +600,13 @@ static int msm_copybit(struct copybit_context_t *ctx, unsigned int target)
         ctx->blit_list[i].next = &(ctx->blit_list[i+1]);
     }
     ctx->blit_list[ctx->blit_count-1].next = NULL;
-    if(LINK_c2dDraw(target,ctx->trg_transform, 0x0, 0, 0, ctx->blit_list,
+    uint32_t target_transform = ctx->trg_transform;
+    if (ctx->c2d_driver_info.capabilities_mask &
+        C2D_DRIVER_SUPPORTS_OVERRIDE_TARGET_ROTATE_OP) {
+        // For A3xx - set 0x0 as the transform is set in the config_mask
+        target_transform = 0x0;
+    }
+    if(LINK_c2dDraw(target, target_transform, 0x0, 0, 0, ctx->blit_list,
                     ctx->blit_count)) {
         ALOGE("%s: LINK_c2dDraw ERROR", __FUNCTION__);
         return COPYBIT_FAILURE;
@@ -784,17 +790,15 @@ static int set_parameter_copybit(
                 }
             }
 
-            if (transform != ctx->trg_transform) {
-                if (ctx->c2d_driver_info.capabilities_mask &
-                    C2D_DRIVER_SUPPORTS_OVERRIDE_TARGET_ROTATE_OP) {
-                    ctx->config_mask |= config_mask;
-                } else {
-                    // The transform for this surface does not match the current
-                    // target transform. Draw all previous surfaces. This will be
-                    // changed once we have a new mechanism to send different
-                    // target rotations to c2d.
-                    finish_copybit(dev);
-                }
+            if (ctx->c2d_driver_info.capabilities_mask &
+                C2D_DRIVER_SUPPORTS_OVERRIDE_TARGET_ROTATE_OP) {
+                ctx->config_mask |= config_mask;
+            } else {
+                // The transform for this surface does not match the current
+                // target transform. Draw all previous surfaces. This will be
+                // changed once we have a new mechanism to send different
+                // target rotations to c2d.
+                finish_copybit(dev);
             }
             ctx->trg_transform = transform;
         }
