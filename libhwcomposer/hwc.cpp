@@ -84,7 +84,7 @@ static void hwc_registerProcs(struct hwc_composer_device_1* dev,
 static void reset(hwc_context_t *ctx, int numDisplays,
                   hwc_display_contents_1_t** displays) {
     memset(ctx->listStats, 0, sizeof(ctx->listStats));
-    for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++){
+    for(int i = 0; i < MAX_DISPLAYS; i++) {
         hwc_display_contents_1_t *list = displays[i];
         // XXX:SurfaceFlinger no longer guarantees that this
         // value is reset on every prepare. However, for the layer
@@ -148,25 +148,31 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
 }
 
 static int hwc_prepare_external(hwc_composer_device_1 *dev,
-        hwc_display_contents_1_t *list) {
+        hwc_display_contents_1_t *list, int dpy) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    const int dpy = HWC_DISPLAY_EXTERNAL;
 
     if (LIKELY(list && list->numHwLayers > 1) &&
         ctx->dpyAttr[dpy].isActive &&
         ctx->dpyAttr[dpy].connected) {
-
         uint32_t last = list->numHwLayers - 1;
-        hwc_layer_1_t *fbLayer = &list->hwLayers[last];
-        if(fbLayer->handle) {
-            setListStats(ctx, list, dpy);
-            reset_layer_prop(ctx, dpy);
-            VideoOverlay::prepare(ctx, list, dpy);
-            ctx->mFBUpdate[dpy]->prepare(ctx, fbLayer);
-            ctx->mLayerCache[dpy]->updateLayerCache(list);
-            if(ctx->mCopyBit[dpy])
-                ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
-            ctx->mExtDispConfiguring = false;
+        if(!ctx->dpyAttr[dpy].isPause) {
+            hwc_layer_1_t *fbLayer = &list->hwLayers[last];
+            if(fbLayer->handle) {
+                setListStats(ctx, list, dpy);
+                reset_layer_prop(ctx, dpy);
+                VideoOverlay::prepare(ctx, list, dpy);
+                ctx->mFBUpdate[dpy]->prepare(ctx, fbLayer);
+                ctx->mLayerCache[dpy]->updateLayerCache(list);
+                if(ctx->mCopyBit[dpy])
+                    ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
+                ctx->mExtDispConfiguring = false;
+            }
+        } else {
+            // External Display is in Pause state.
+            // ToDo:
+            // Mark all application layers as OVERLAY so that
+            // GPU will not compose. This is done for power
+            // optimization
         }
     }
     return 0;
@@ -182,14 +188,15 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 
     ctx->mOverlay->configBegin();
 
-    for (int32_t i = numDisplays - 1; i >= 0; i--) {
+    for (int32_t i = numDisplays; i >= 0; i--) {
         hwc_display_contents_1_t *list = displays[i];
         switch(i) {
             case HWC_DISPLAY_PRIMARY:
                 ret = hwc_prepare_primary(dev, list);
                 break;
             case HWC_DISPLAY_EXTERNAL:
-                ret = hwc_prepare_external(dev, list);
+            case HWC_DISPLAY_VIRTUAL:
+                ret = hwc_prepare_external(dev, list, i);
                 break;
             default:
                 ret = -EINVAL;
@@ -244,8 +251,9 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
             }
             break;
         case HWC_DISPLAY_EXTERNAL:
+        case HWC_DISPLAY_VIRTUAL:
             if(blank) {
-                // External Display post commits the changes to display
+                // External/Virtual Display post commits the changes to display
                 // Call this on blank, so that any pipe unsets gets committed
                 if (!ctx->mExtDisplay->post()) {
                     ret = -1;
@@ -342,13 +350,12 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 }
 
 static int hwc_set_external(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list) {
+        hwc_display_contents_1_t* list, int dpy) {
     int ret = 0;
-    const int dpy = HWC_DISPLAY_EXTERNAL;
-
     Locker::Autolock _l(ctx->mExtSetLock);
 
     if (LIKELY(list) && ctx->dpyAttr[dpy].isActive &&
+        !ctx->dpyAttr[dpy].isPause &&
         ctx->dpyAttr[dpy].connected) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
@@ -388,14 +395,19 @@ static int hwc_set(hwc_composer_device_1 *dev,
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     Locker::Autolock _l(ctx->mBlankLock);
-    for (uint32_t i = 0; i < numDisplays; i++) {
+    for (uint32_t i = 0; i <= numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
         switch(i) {
             case HWC_DISPLAY_PRIMARY:
                 ret = hwc_set_primary(ctx, list);
                 break;
             case HWC_DISPLAY_EXTERNAL:
-                ret = hwc_set_external(ctx, list);
+            case HWC_DISPLAY_VIRTUAL:
+            /* ToDo: We are using hwc_set_external path for both External and
+                     Virtual displays on HWC1.1. Eventually, we will have
+                     separate functions when we move to HWC1.2
+            */
+                ret = hwc_set_external(ctx, list, i);
                 break;
             default:
                 ret = -EINVAL;

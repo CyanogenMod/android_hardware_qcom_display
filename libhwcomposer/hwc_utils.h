@@ -36,6 +36,10 @@
 #define MAX_NUM_LAYERS 32
 #define MAX_DISPLAY_DIM 2048
 
+// For support of virtual displays
+#define HWC_DISPLAY_VIRTUAL     (HWC_DISPLAY_EXTERNAL+1)
+#define MAX_DISPLAYS            (HWC_NUM_DISPLAY_TYPES+1)
+
 //Fwrd decls
 struct hwc_context_t;
 struct framebuffer_device_t;
@@ -70,6 +74,9 @@ struct DisplayAttributes {
     //Connected does not mean it ready to use.
     //It should be active also. (UNBLANKED)
     bool isActive;
+    // In pause state, composition is bypassed
+    // used for WFD displays only
+    bool isPause;
 };
 
 struct ListStats {
@@ -221,20 +228,20 @@ struct hwc_context_t {
     framebuffer_device_t *mFbDev;
 
     //CopyBit objects
-    qhwc::CopyBit *mCopyBit[HWC_NUM_DISPLAY_TYPES];
+    qhwc::CopyBit *mCopyBit[MAX_DISPLAYS];
 
     //Overlay object - NULL for non overlay devices
     overlay::Overlay *mOverlay;
 
     //Primary and external FB updater
-    qhwc::IFBUpdate *mFBUpdate[HWC_NUM_DISPLAY_TYPES];
+    qhwc::IFBUpdate *mFBUpdate[MAX_DISPLAYS];
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
     qhwc::MDPInfo mMDP;
-    qhwc::DisplayAttributes dpyAttr[HWC_NUM_DISPLAY_TYPES];
-    qhwc::ListStats listStats[HWC_NUM_DISPLAY_TYPES];
-    qhwc::LayerCache *mLayerCache[HWC_NUM_DISPLAY_TYPES];
-    qhwc::LayerProp *layerProp[HWC_NUM_DISPLAY_TYPES];
+    qhwc::DisplayAttributes dpyAttr[MAX_DISPLAYS];
+    qhwc::ListStats listStats[MAX_DISPLAYS];
+    qhwc::LayerCache *mLayerCache[MAX_DISPLAYS];
+    qhwc::LayerProp *layerProp[MAX_DISPLAYS];
     qhwc::MDPComp *mMDPComp;
 
     //Securing in progress indicator

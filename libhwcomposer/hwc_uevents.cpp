@@ -35,6 +35,21 @@ namespace qhwc {
 
 #define HWC_UEVENT_THREAD_NAME "hwcUeventThread"
 
+/* External Display states */
+enum {
+    EXTERNAL_OFFLINE = 0,
+    EXTERNAL_ONLINE,
+    EXTERNAL_PAUSE,
+    EXTERNAL_RESUME
+};
+
+static bool isHDMI(const char* str)
+{
+    if(strcasestr("change@/devices/virtual/switch/hdmi", str))
+        return true;
+    return false;
+}
+
 static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 {
     int vsync = 0;
@@ -48,7 +63,6 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                            qdutils::COMPOSITION_TYPE_MDP |
                            qdutils::COMPOSITION_TYPE_C2D)) {
         usecopybit = true;
-
     }
 
     if(!strcasestr("change@/devices/virtual/switch/hdmi", str) &&
@@ -56,19 +70,35 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         ALOGD_IF(UEVENT_DEBUG, "%s: Not Ext Disp Event ", __FUNCTION__);
         return;
     }
-
     int connected = -1; // initial value - will be set to  1/0 based on hotplug
+    int extDpyNum = HWC_DISPLAY_EXTERNAL;
+    char property[PROPERTY_VALUE_MAX];
+    if((property_get("persist.sys.wfd.virtual", property, NULL) > 0) &&
+            (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+             (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+        // This means we are using Google API to trigger WFD Display
+        extDpyNum = HWC_DISPLAY_VIRTUAL;
+
+    }
+
+    int dpy = isHDMI(str) ? HWC_DISPLAY_EXTERNAL : extDpyNum;
+
+    // update extDpyNum
+    ctx->mExtDisplay->setExtDpyNum(dpy);
+
     // parse HDMI/WFD switch state for connect/disconnect
     // for HDMI:
     // The event will be of the form:
     // change@/devices/virtual/switch/hdmi ACTION=change
     // SWITCH_STATE=1 or SWITCH_STATE=0
-
     while(*str) {
         if (!strncmp(str, "SWITCH_STATE=", strlen("SWITCH_STATE="))) {
             connected = atoi(str + strlen("SWITCH_STATE="));
             //Disabled until SF calls unblank
             ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
+            //Ignored for Virtual Displays
+            //ToDo: we can do this in a much better way
+            ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = true;
             break;
         }
         str += strlen(str) + 1;
@@ -76,32 +106,63 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             break;
     }
 
-    if(connected != -1) { //either we got switch_state connected or disconnect
-        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = connected;
-        if (connected) {
-            ctx->mExtDispConfiguring = true;
-            ctx->mExtDisplay->processUEventOnline(udata);
-            ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL] =
-                IFBUpdate::getObject(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].xres,
-                HWC_DISPLAY_EXTERNAL);
-            if(usecopybit)
-                ctx->mCopyBit[HWC_DISPLAY_EXTERNAL] = new CopyBit();
-        } else {
-            ctx->mExtDisplay->processUEventOffline(udata);
-            if(ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL]) {
+    switch(connected) {
+        case EXTERNAL_OFFLINE:
+            {   // disconnect event
+                ctx->mExtDisplay->processUEventOffline(udata);
+                if(ctx->mFBUpdate[dpy]) {
+                    Locker::Autolock _l(ctx->mExtSetLock);
+                    delete ctx->mFBUpdate[dpy];
+                    ctx->mFBUpdate[dpy] = NULL;
+                }
+                if(ctx->mCopyBit[dpy]){
+                    Locker::Autolock _l(ctx->mExtSetLock);
+                    delete ctx->mCopyBit[dpy];
+                    ctx->mCopyBit[dpy] = NULL;
+                }
+                ALOGD("%s sending hotplug: connected = %d and dpy:%d",
+                      __FUNCTION__, connected, dpy);
+                ctx->dpyAttr[dpy].connected = false;
                 Locker::Autolock _l(ctx->mExtSetLock);
-                delete ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL];
-                ctx->mFBUpdate[HWC_DISPLAY_EXTERNAL] = NULL;
+                //hwc comp could be on
+                ctx->proc->hotplug(ctx->proc, dpy, connected);
+                break;
             }
-            if(ctx->mCopyBit[HWC_DISPLAY_EXTERNAL]){
-                Locker::Autolock _l(ctx->mExtSetLock);
-                delete ctx->mCopyBit[HWC_DISPLAY_EXTERNAL];
-                ctx->mCopyBit[HWC_DISPLAY_EXTERNAL] = NULL;
+        case EXTERNAL_ONLINE:
+            {   // connect case
+                ctx->mExtDispConfiguring = true;
+                ctx->mExtDisplay->processUEventOnline(udata);
+                ctx->mFBUpdate[dpy] =
+                        IFBUpdate::getObject(ctx->dpyAttr[dpy].xres, dpy);
+                ctx->dpyAttr[dpy].isPause = false;
+                if(usecopybit)
+                    ctx->mCopyBit[dpy] = new CopyBit();
+                ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,
+                        connected);
+                ctx->dpyAttr[dpy].connected = true;
+                Locker::Autolock _l(ctx->mExtSetLock); //hwc comp could be on
+                ctx->proc->hotplug(ctx->proc, dpy, connected);
+                break;
             }
-        }
-        ALOGD("%s sending hotplug: connected = %d", __FUNCTION__, connected);
-        Locker::Autolock _l(ctx->mExtSetLock); //hwc comp could be on
-        ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL, connected);
+        case EXTERNAL_PAUSE:
+            {   // pause case
+                ALOGD("%s Received Pause event",__FUNCTION__);
+                ctx->dpyAttr[dpy].isActive = true;
+                ctx->dpyAttr[dpy].isPause = true;
+                break;
+            }
+        case EXTERNAL_RESUME:
+            {  // resume case
+                ALOGD("%s Received resume event",__FUNCTION__);
+                ctx->dpyAttr[dpy].isActive = true;
+                ctx->dpyAttr[dpy].isPause = false;
+                break;
+            }
+        default:
+            {
+                ALOGE("ignore event and connected:%d",connected);
+                break;
+            }
     }
 }
 
