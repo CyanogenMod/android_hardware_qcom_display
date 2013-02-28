@@ -48,6 +48,7 @@ public:
     virtual void securing(uint32_t startEnd);
     virtual void unsecuring(uint32_t startEnd);
     virtual void connect(const android::sp<qClient::IQClient>& client);
+    virtual android::status_t screenRefresh();
     static void init();
 private:
     QService();
