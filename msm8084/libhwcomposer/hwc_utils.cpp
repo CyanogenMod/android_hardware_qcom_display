@@ -346,6 +346,17 @@ bool isExternalActive(hwc_context_t* ctx) {
     return ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive;
 }
 
+void closeAcquireFds(hwc_display_contents_1_t* list) {
+    for(uint32_t i = 0; list && i < list->numHwLayers; i++) {
+        //Close the acquireFenceFds
+        //HWC_FRAMEBUFFER are -1 already by SF, rest we close.
+        if(list->hwLayers[i].acquireFenceFd >= 0) {
+            close(list->hwLayers[i].acquireFenceFd);
+            list->hwLayers[i].acquireFenceFd = -1;
+        }
+    }
+}
+
 int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
                                                         int fd) {
     int ret = 0;
@@ -397,22 +408,15 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         ALOGD_IF(HWC_UTILS_DEBUG, "%s: time taken for MSMFB_BUFFER_SYNC IOCTL = %d",
                             __FUNCTION__, (size_t) ns2ms(systemTime() - start));
     }
+
     if(ret < 0) {
         ALOGE("ioctl MSMFB_BUFFER_SYNC failed, err=%s",
                 strerror(errno));
     }
+
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(list->hwLayers[i].compositionType == HWC_OVERLAY ||
            list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
-            //Close the acquireFenceFds
-            if(list->hwLayers[i].acquireFenceFd >= 0) {
-                close(list->hwLayers[i].acquireFenceFd);
-                list->hwLayers[i].acquireFenceFd = -1;
-            }
-            if(fd >= 0) {
-                close(fd);
-                fd = -1;
-            }
             //Populate releaseFenceFds.
             if(UNLIKELY(swapzero))
                 list->hwLayers[i].releaseFenceFd = -1;
@@ -420,12 +424,19 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
                 list->hwLayers[i].releaseFenceFd = dup(releaseFd);
         }
     }
+
+    if(fd >= 0) {
+        close(fd);
+        fd = -1;
+    }
+
     if(UNLIKELY(swapzero)){
         list->retireFenceFd = -1;
         close(releaseFd);
     } else {
         list->retireFenceFd = releaseFd;
     }
+
     return ret;
 }
 
