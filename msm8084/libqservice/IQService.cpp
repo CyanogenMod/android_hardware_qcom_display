@@ -63,6 +63,14 @@ public:
         data.writeStrongBinder(client->asBinder());
         remote()->transact(CONNECT, data, &reply);
     }
+
+    virtual status_t screenRefresh() {
+        Parcel data, reply;
+        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
+        remote()->transact(SCREEN_REFRESH, data, &reply);
+        status_t result = reply.readInt32();
+        return result;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(QService, "android.display.IQService");
@@ -88,7 +96,8 @@ status_t BnQService::onTransact(
     switch(code) {
         case SECURING: {
             if(!permission) {
-                ALOGE("display.qservice SECURING access denied: pid=%d uid=%d process=%s",
+                ALOGE("display.qservice SECURING access denied: \
+                      pid=%d uid=%d process=%s",
                       callerPid, callerUid, callingProcName);
                 return PERMISSION_DENIED;
             }
@@ -99,7 +108,8 @@ status_t BnQService::onTransact(
         } break;
         case UNSECURING: {
             if(!permission) {
-                ALOGE("display.qservice UNSECURING access denied: pid=%d uid=%d process=%s",
+                ALOGE("display.qservice UNSECURING access denied: \
+                      pid=%d uid=%d process=%s",
                       callerPid, callerUid, callingProcName);
                 return PERMISSION_DENIED;
             }
@@ -111,7 +121,8 @@ status_t BnQService::onTransact(
         case CONNECT: {
             CHECK_INTERFACE(IQService, data, reply);
             if(callerUid != AID_GRAPHICS) {
-                ALOGE("display.qservice CONNECT access denied: pid=%d uid=%d process=%s",
+                ALOGE("display.qservice CONNECT access denied: \
+                      pid=%d uid=%d process=%s",
                       callerPid, callerUid, callingProcName);
                 return PERMISSION_DENIED;
             }
@@ -119,6 +130,16 @@ status_t BnQService::onTransact(
                 interface_cast<IQClient>(data.readStrongBinder());
             connect(client);
             return NO_ERROR;
+        } break;
+        case SCREEN_REFRESH: {
+            CHECK_INTERFACE(IQService, data, reply);
+            if(callerUid != AID_GRAPHICS) {
+                ALOGE("display.qservice SCREEN_REFRESH access denied: \
+                      pid=%d uid=%d process=%s",callerPid,
+                      callerUid, callingProcName);
+                return PERMISSION_DENIED;
+            }
+            return screenRefresh();
         } break;
         default:
             return BBinder::onTransact(code, data, reply, flags);

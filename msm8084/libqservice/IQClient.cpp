@@ -41,12 +41,14 @@ public:
     BpQClient(const sp<IBinder>& impl)
         : BpInterface<IQClient>(impl) {}
 
-    virtual void notifyCallback(uint32_t msg, uint32_t value) {
+    virtual status_t notifyCallback(uint32_t msg, uint32_t value) {
         Parcel data, reply;
         data.writeInterfaceToken(IQClient::getInterfaceDescriptor());
         data.writeInt32(msg);
         data.writeInt32(value);
         remote()->transact(NOTIFY_CALLBACK, data, &reply);
+        status_t result = reply.readInt32();
+        return result;
     }
 };
 
