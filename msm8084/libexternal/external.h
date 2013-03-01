@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -25,6 +25,7 @@
 #include <linux/fb.h>
 
 struct hwc_context_t;
+struct msm_hdmi_mode_timing_info;
 
 namespace qhwc {
 
@@ -94,6 +95,8 @@ private:
     int mHdmiFbNum;
     int mWfdFbNum;
     int mExtDpyNum;
+    // Holds all the HDMI modes and timing info supported by driver
+    msm_hdmi_mode_timing_info* supported_video_mode_lut;
 };
 
 }; //qhwc
