@@ -73,6 +73,10 @@
 #define MDSS_MDP_RIGHT_MIXER 0x100
 #endif
 
+#ifndef MDP_OV_PIPE_FORCE_DMA
+#define MDP_OV_PIPE_FORCE_DMA 0x4000
+#endif
+
 namespace overlay {
 
 // fwd
@@ -290,6 +294,7 @@ enum eIsFg {
 enum eMdpFlags {
     OV_MDP_FLAGS_NONE = 0,
     OV_MDP_PIPE_SHARE =  MDP_OV_PIPE_SHARE,
+    OV_MDP_PIPE_FORCE_DMA = MDP_OV_PIPE_FORCE_DMA,
     OV_MDP_DEINTERLACE = MDP_DEINTERLACE,
     OV_MDP_SECURE_OVERLAY_SESSION = MDP_SECURE_OVERLAY_SESSION,
     OV_MDP_SOURCE_ROTATED_90 = MDP_SOURCE_ROTATED_90,
@@ -312,6 +317,7 @@ enum eZorder {
 enum eMdpPipeType {
     OV_MDP_PIPE_RGB,
     OV_MDP_PIPE_VG,
+    OV_MDP_PIPE_DMA,
     OV_MDP_PIPE_ANY, //Any
 };
 
@@ -324,6 +330,8 @@ enum eDest {
     OV_RGB1,
     OV_VG2,
     OV_RGB2,
+    OV_DMA0,
+    OV_DMA1,
     OV_INVALID,
 };
 
@@ -732,6 +740,8 @@ inline const char* getDestStr(eDest dest) {
         case OV_RGB1: return "RGB1";
         case OV_VG2: return "VG2";
         case OV_RGB2: return "RGB2";
+        case OV_DMA0: return "DMA0";
+        case OV_DMA1: return "DMA1";
         default: return "Invalid";
     }
     return "Invalid";
@@ -747,6 +757,9 @@ inline eMdpPipeType getPipeType(eDest dest) {
         case OV_RGB1:
         case OV_RGB2:
             return OV_MDP_PIPE_RGB;
+        case OV_DMA0:
+        case OV_DMA1:
+            return OV_MDP_PIPE_DMA;
         default:
             return OV_MDP_PIPE_ANY;
     }
