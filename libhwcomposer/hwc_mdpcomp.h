@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
  *
@@ -30,14 +31,15 @@
 namespace qhwc {
 namespace ovutils = overlay::utils;
 
+
 class MDPComp {
 public:
-    virtual ~MDPComp() {}
+    virtual ~MDPComp(){};
     /*sets up mdp comp for the current frame */
-    virtual bool prepare(hwc_context_t *ctx,
-            hwc_display_contents_1_t* list) = 0;
+    bool prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* draw */
     virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list) = 0;
+
     void dump(android::String8& buf);
     bool isUsed() { return (mState == MDPCOMP_ON); };
 
@@ -55,24 +57,62 @@ protected:
     enum ePipeType {
         MDPCOMP_OV_RGB = ovutils::OV_MDP_PIPE_RGB,
         MDPCOMP_OV_VG = ovutils::OV_MDP_PIPE_VG,
+        MDPCOMP_OV_DMA = ovutils::OV_MDP_PIPE_DMA,
         MDPCOMP_OV_ANY,
     };
+    struct MdpPipeInfo {
+        int zOrder;
+        virtual ~MdpPipeInfo(){};
+    };
+    struct PipeLayerPair {
+        MdpPipeInfo *pipeInfo;
+        native_handle_t* handle;
+    };
+
+    /* introduced for mixed mode implementation */
+    struct FrameInfo {
+        int count;
+        struct PipeLayerPair* pipeLayer;
+    };
+
+    /* calculates pipes needed for the panel */
+    virtual int pipesNeeded(hwc_context_t *ctx,
+                            hwc_display_contents_1_t* list) = 0;
+    /* allocates pipe from pipe book */
+    virtual bool allocLayerPipes(hwc_context_t *ctx,
+                hwc_display_contents_1_t* list,FrameInfo& current_frame) = 0;
+    /* configures MPD pipes */
+    virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
+                        MdpPipeInfo* mdp_info) = 0;
+    /* Is rotation supported */
+    virtual bool canRotate(){ return true; };
+
 
     /* set/reset flags for MDPComp */
     void setMDPCompLayerFlags(hwc_context_t *ctx,
                                        hwc_display_contents_1_t* list);
     void unsetMDPCompLayerFlags(hwc_context_t* ctx,
                                        hwc_display_contents_1_t* list);
-    void printInfo(hwc_layer_1_t* layer);
     /* get/set states */
     eState getState() { return mState; };
-
+    /* reset state */
+    void reset( hwc_context_t *ctx, hwc_display_contents_1_t* list );
+    /* configure MDP flags for video buffers */
+    void setVidInfo(hwc_layer_1_t *layer, ovutils::eMdpFlags &mdpFlags);
+    /* allocate MDP pipes from overlay */
+    ovutils::eDest getMdpPipe(hwc_context_t *ctx, ePipeType type);
+    /* checks for conditions where mdpcomp is not possible */
+    bool isDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    /* sets up MDP comp for current frame */
+    bool setup(hwc_context_t* ctx, hwc_display_contents_1_t* list);
     /* set up Border fill as Base pipe */
     static bool setupBasePipe(hwc_context_t*);
     /* Is debug enabled */
     static bool isDebug() { return sDebugLogs ? true : false; };
     /* Is feature enabled */
     static bool isEnabled() { return sEnabled; };
+    /* checks for mdp comp width limitation */
+    bool isWidthValid(hwc_context_t *ctx, hwc_layer_1_t *layer);
 
     eState mState;
 
@@ -80,63 +120,58 @@ protected:
     static bool sDebugLogs;
     static bool sIdleFallBack;
     static IdleInvalidator *idleInvalidator;
-
+    struct FrameInfo mCurrentFrame;
 };
 
 class MDPCompLowRes : public MDPComp {
 public:
-    virtual ~MDPCompLowRes() {}
-    virtual bool prepare(hwc_context_t *ctx,
-            hwc_display_contents_1_t* list);
-    virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
+     virtual ~MDPCompLowRes(){};
+     virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
 
 private:
-    struct MdpPipeInfo {
-        int index;
-        int zOrder;
+    struct MdpPipeInfoLowRes : public MdpPipeInfo {
+        ovutils::eDest index;
+        virtual ~MdpPipeInfoLowRes() {};
     };
 
-    struct PipeLayerPair {
-        MdpPipeInfo pipeIndex;
-        native_handle_t* handle;
-    };
-
-    struct FrameInfo {
-        int count;
-        struct PipeLayerPair* pipeLayer;
-
-    };
-    /* checks for mdp comp width limitation */
-    bool isWidthValid(hwc_context_t *ctx, hwc_layer_1_t *layer);
     /* configure's overlay pipes for the frame */
-    int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
-                        MdpPipeInfo& mdp_info);
-    /* checks for conditions where mdpcomp is not possible */
-    bool isDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list);
-    bool setup(hwc_context_t* ctx, hwc_display_contents_1_t* list);
+    virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
+                        MdpPipeInfo* mdp_info);
+
     /* allocates pipes to selected candidates */
-    bool allocLayerPipes(hwc_context_t *ctx,
+    virtual bool allocLayerPipes(hwc_context_t *ctx,
             hwc_display_contents_1_t* list,
             FrameInfo& current_frame);
-    /* reset state */
-    void reset( hwc_context_t *ctx, hwc_display_contents_1_t* list );
-    /* configure MDP flags for video buffers */
-    void setVidInfo(hwc_layer_1_t *layer, ovutils::eMdpFlags &mdpFlags);
-    /* allocate MDP pipes from overlay */
-    int getMdpPipe(hwc_context_t *ctx, ePipeType type);
 
-    struct FrameInfo mCurrentFrame;
+    virtual int pipesNeeded(hwc_context_t *ctx,
+                        hwc_display_contents_1_t* list);
 };
 
 class MDPCompHighRes : public MDPComp {
 public:
-    virtual ~MDPCompHighRes() {}
-    virtual bool prepare(hwc_context_t *ctx,
-            hwc_display_contents_1_t* list) { return false; }
-    virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
-        return true;
-    }
-};
+    virtual ~MDPCompHighRes(){};
+    virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
+private:
+    struct MdpPipeInfoHighRes : public MdpPipeInfo {
+        ovutils::eDest lIndex;
+        ovutils::eDest rIndex;
+        virtual ~MdpPipeInfoHighRes() {};
+    };
 
+    bool acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
+                        MdpPipeInfoHighRes& pipe_info, ePipeType type);
+
+    /* configure's overlay pipes for the frame */
+    virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
+                        MdpPipeInfo* mdp_info);
+
+    /* allocates pipes to selected candidates */
+    virtual bool allocLayerPipes(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list,
+            FrameInfo& current_frame);
+
+    virtual int pipesNeeded(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    virtual bool canRotate(){ return false; };
+};
 }; //namespace
 #endif
