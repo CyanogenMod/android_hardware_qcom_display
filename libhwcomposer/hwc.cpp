@@ -225,19 +225,22 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 }
 
 static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
-                             int event, int enabled)
+                             int event, int enable)
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     pthread_mutex_lock(&ctx->vstate.lock);
     switch(event) {
         case HWC_EVENT_VSYNC:
-            if (ctx->vstate.enable == enabled)
+            if (ctx->vstate.enable == enable)
                 break;
-            ctx->vstate.enable = !!enabled;
-            pthread_cond_signal(&ctx->vstate.cond);
+            ret = hwc_vsync_control(ctx, dpy, enable);
+            if(ret == 0) {
+                ctx->vstate.enable = !!enable;
+                pthread_cond_signal(&ctx->vstate.cond);
+            }
             ALOGD_IF (VSYNC_DEBUG, "VSYNC state changed to %s",
-                      (enabled)?"ENABLED":"DISABLED");
+                      (enable)?"ENABLED":"DISABLED");
             break;
         default:
             ret = -EINVAL;
@@ -253,7 +256,8 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
 
     Locker::Autolock _l(ctx->mBlankLock);
     int ret = 0;
-    ALOGD("%s: Doing Dpy=%d, blank=%d", __FUNCTION__, dpy, blank);
+    ALOGD("%s: %s display: %d", __FUNCTION__,
+          blank==1 ? "Blanking":"Unblanking", dpy);
     switch(dpy) {
         case HWC_DISPLAY_PRIMARY:
             if(blank) {
@@ -282,14 +286,16 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
     // Enable HPD here, as during bootup unblank is called
     // when SF is completely initialized
     ctx->mExtDisplay->setHPD(1);
-
-    if(ret < 0) {
-        ALOGE("%s: failed. Dpy=%d, blank=%d : %s",
-                __FUNCTION__, dpy, blank, strerror(errno));
+    if(ret == 0){
+        ctx->dpyAttr[dpy].isActive = !blank;
+    } else {
+        ALOGE("%s: Failed in %s display: %d error:%s", __FUNCTION__,
+              blank==1 ? "blanking":"unblanking", dpy, strerror(errno));
         return ret;
     }
-    ALOGD("%s: Done Dpy=%d, blank=%d", __FUNCTION__, dpy, blank);
-    ctx->dpyAttr[dpy].isActive = !blank;
+
+    ALOGD("%s: Done %s display: %d", __FUNCTION__,
+          blank==1 ? "blanking":"unblanking", dpy);
     return 0;
 }
 
