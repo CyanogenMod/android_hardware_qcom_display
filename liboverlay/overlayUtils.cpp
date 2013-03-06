@@ -84,58 +84,6 @@ const char* const Res::barrierFile =
 
 
 namespace utils {
-//------------------ defines -----------------------------
-#define FB_DEVICE_TEMPLATE "/dev/graphics/fb%u"
-#define NUM_FB_DEVICES 3
-
-//--------------------------------------------------------
-
-/* clears any VG pipes allocated to the fb devices */
-int initOverlay() {
-    int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
-    if (mdpVersion < qdutils::MDSS_V5) {
-        msmfb_mixer_info_req  req;
-        mdp_mixer_info *minfo = NULL;
-        char name[64];
-        int fd = -1;
-        for(int i = 0; i < NUM_FB_DEVICES; i++) {
-            snprintf(name, 64, FB_DEVICE_TEMPLATE, i);
-            ALOGD("initoverlay:: opening the device:: %s", name);
-            fd = ::open(name, O_RDWR, 0);
-            if(fd < 0) {
-                ALOGE("cannot open framebuffer(%d)", i);
-                return -1;
-            }
-            //Get the mixer configuration */
-            req.mixer_num = i;
-            if (ioctl(fd, MSMFB_MIXER_INFO, &req) == -1) {
-                ALOGE("ERROR: MSMFB_MIXER_INFO ioctl failed");
-                close(fd);
-                return -1;
-            }
-            minfo = req.info;
-            for (int j = 0; j < req.cnt; j++) {
-                ALOGD("ndx=%d num=%d z_order=%d", minfo->pndx, minfo->pnum,
-                      minfo->z_order);
-                // except the RGB base layer with z_order of -1, clear any
-                // other pipes connected to mixer.
-                if((minfo->z_order) != -1) {
-                    int index = minfo->pndx;
-                    ALOGD("Unset overlay with index: %d at mixer %d", index, i);
-                    if(ioctl(fd, MSMFB_OVERLAY_UNSET, &index) == -1) {
-                        ALOGE("ERROR: MSMFB_OVERLAY_UNSET failed");
-                        close(fd);
-                        return -1;
-                    }
-                }
-                minfo++;
-            }
-            close(fd);
-            fd = -1;
-        }
-    }
-    return 0;
-}
 
 //--------------------------------------------------------
 //Refer to graphics.h, gralloc_priv.h, msm_mdp.h

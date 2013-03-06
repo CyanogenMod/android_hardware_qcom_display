@@ -77,6 +77,9 @@
 #define MDP_OV_PIPE_FORCE_DMA 0x4000
 #endif
 
+#define FB_DEVICE_TEMPLATE "/dev/graphics/fb%u"
+#define NUM_FB_DEVICES 3
+
 namespace overlay {
 
 // fwd
@@ -126,11 +129,6 @@ enum { INPUT_3D_MASK = 0xFFFF0000,
     OUTPUT_3D_MASK = 0x0000FFFF };
 enum { BARRIER_LAND = 1,
     BARRIER_PORT = 2 };
-
-/* if SurfaceFlinger process gets killed in bypass mode, In initOverlay()
- * close all the pipes if it is opened after reboot.
- */
-int initOverlay(void);
 
 inline uint32_t format3D(uint32_t x) { return x & 0xFF000; }
 inline uint32_t format3DOutput(uint32_t x) {
@@ -274,24 +272,27 @@ enum eZorder {
 };
 
 enum eMdpPipeType {
-    OV_MDP_PIPE_RGB,
+    OV_MDP_PIPE_RGB = 0,
     OV_MDP_PIPE_VG,
     OV_MDP_PIPE_DMA,
     OV_MDP_PIPE_ANY, //Any
 };
 
-/* Used to identify destination pipes
- */
+// Identify destination pipes
+// TODO Names useless, replace with int and change all interfaces
 enum eDest {
-    OV_VG0 = 0,
-    OV_RGB0,
-    OV_VG1,
-    OV_RGB1,
-    OV_VG2,
-    OV_RGB2,
-    OV_DMA0,
-    OV_DMA1,
+    OV_P0 = 0,
+    OV_P1,
+    OV_P2,
+    OV_P3,
+    OV_P4,
+    OV_P5,
+    OV_P6,
+    OV_P7,
+    OV_P8,
+    OV_P9,
     OV_INVALID,
+    OV_MAX = OV_INVALID,
 };
 
 /* Used when a buffer is split over 2 pipes and sent to display */
@@ -350,6 +351,12 @@ struct PipeArgs {
     eRotFlags rotFlags;
 };
 
+// Cannot use HW_OVERLAY_MAGNIFICATION_LIMIT, since at the time
+// of integration, HW_OVERLAY_MAGNIFICATION_LIMIT was a define
+enum { HW_OV_MAGNIFICATION_LIMIT = 20,
+    HW_OV_MINIFICATION_LIMIT  = 8
+};
+
 inline void setMdpFlags(eMdpFlags& f, eMdpFlags v) {
     f = static_cast<eMdpFlags>(setBit(f, v));
 }
@@ -389,12 +396,6 @@ int getDownscaleFactor(const int& src_w, const int& src_h,
  * It returns MDP related enum/define that match rot+flip*/
 int getMdpOrient(eTransform rotation);
 const char* getFormatString(int format);
-
-// Cannot use HW_OVERLAY_MAGNIFICATION_LIMIT, since at the time
-// of integration, HW_OVERLAY_MAGNIFICATION_LIMIT was a define
-enum { HW_OV_MAGNIFICATION_LIMIT = 20,
-    HW_OV_MINIFICATION_LIMIT  = 8
-};
 
 template <class T>
 inline void memset0(T& t) { ::memset(&t, 0, sizeof(T)); }
@@ -685,40 +686,6 @@ template <class T>
 inline void even_floor(T& value) {
     if(value & 1)
         value--;
-}
-
-inline const char* getDestStr(eDest dest) {
-    switch(dest) {
-        case OV_VG0: return "VG0";
-        case OV_RGB0: return "RGB0";
-        case OV_VG1: return "VG1";
-        case OV_RGB1: return "RGB1";
-        case OV_VG2: return "VG2";
-        case OV_RGB2: return "RGB2";
-        case OV_DMA0: return "DMA0";
-        case OV_DMA1: return "DMA1";
-        default: return "Invalid";
-    }
-    return "Invalid";
-}
-
-inline eMdpPipeType getPipeType(eDest dest) {
-    switch(dest) {
-        case OV_VG0:
-        case OV_VG1:
-        case OV_VG2:
-            return OV_MDP_PIPE_VG;
-        case OV_RGB0:
-        case OV_RGB1:
-        case OV_RGB2:
-            return OV_MDP_PIPE_RGB;
-        case OV_DMA0:
-        case OV_DMA1:
-            return OV_MDP_PIPE_DMA;
-        default:
-            return OV_MDP_PIPE_ANY;
-    }
-    return OV_MDP_PIPE_ANY;
 }
 
 void preRotateSource(eTransform& tr, Whf& whf, Dim& srcCrop);
