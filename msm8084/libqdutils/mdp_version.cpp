@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,7 +28,9 @@
  */
 #include <cutils/log.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
 #include <linux/fb.h>
+#include <linux/msm_mdp.h>
 #include "mdp_version.h"
 
 ANDROID_SINGLETON_STATIC_INSTANCE(qdutils::MDPVersion);
@@ -40,6 +42,11 @@ MDPVersion::MDPVersion()
     int mdp_version = MDP_V_UNKNOWN;
     char panel_type = 0;
     struct fb_fix_screeninfo fb_finfo;
+
+    mMdpRev = 0;
+    mRGBPipes = mVGPipes = 0;
+    mDMAPipes = 0;
+
     if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &fb_finfo) < 0) {
         ALOGE("FBIOGET_FSCREENINFO failed");
         mdp_version =  MDP_V_UNKNOWN;
@@ -57,8 +64,24 @@ MDPVersion::MDPVersion()
             if (mdp_version < 100)
                 mdp_version *= 10;
 
+            mRGBPipes = mVGPipes = 2;
+
         } else if (!strncmp(fb_finfo.id, "mdssfb", 6)) {
             mdp_version = MDSS_V5;
+#ifdef MDSS_TARGET
+            struct msmfb_metadata metadata;
+            memset(&metadata, 0 , sizeof(metadata));
+            metadata.op = metadata_op_get_caps;
+            if (ioctl(fb_fd, MSMFB_METADATA_GET, &metadata) == -1) {
+                ALOGE("Error retrieving MDP revision and pipes info");
+                mdp_version = MDP_V_UNKNOWN;
+            } else {
+                mMdpRev = metadata.data.caps.mdp_rev;
+                mRGBPipes = metadata.data.caps.rgb_pipes;
+                mVGPipes = metadata.data.caps.vig_pipes;
+                mDMAPipes = metadata.data.caps.dma_pipes;
+            }
+#endif
         } else {
             mdp_version = MDP_V_UNKNOWN;
         }
