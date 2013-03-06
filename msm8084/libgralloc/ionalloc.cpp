@@ -85,11 +85,11 @@ int IonAlloc::alloc_buffer(alloc_data& data)
 #else
     ionAllocData.heap_mask = data.flags & ~ION_SECURE;
     ionAllocData.flags = data.uncached ? 0 : ION_FLAG_CACHED;
-#endif
     // ToDo: replace usage of alloc data structure with
     //  ionallocdata structure.
     if (data.flags & ION_SECURE)
         ionAllocData.flags |= ION_SECURE;
+#endif
 
     err = open_device();
     if (err)
