@@ -25,7 +25,7 @@ ifeq ($(ARCH_ARM_HAVE_NEON),true)
     common_flags += -D__ARM_HAVE_NEON
 endif
 
-ifeq ($(TARGET_BOARD_PLATFORM), msm8974)
+ifeq ($(call is-board-platform-in-list, msm8974 msm8226), true)
     common_flags += -DVENUS_COLOR_FORMAT
 endif
 

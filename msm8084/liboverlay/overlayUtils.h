@@ -45,11 +45,6 @@
 #include <utils/Log.h>
 #include "gralloc_priv.h" //for interlace
 
-// Older platforms do not support Venus.
-#ifndef VENUS_COLOR_FORMAT
-#define MDP_Y_CBCR_H2V2_VENUS (MDP_IMGTYPE_LIMIT2 + 1)
-#endif
-
 /*
 *
 * Collection of utilities functions/structs/enums etc...
