@@ -124,9 +124,8 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     const int dpy = HWC_DISPLAY_PRIMARY;
-    if (LIKELY(list && list->numHwLayers > 1) &&
-        ctx->dpyAttr[dpy].isActive) {
-
+    if (LIKELY(list && list->numHwLayers > 1 &&
+        list->numHwLayers <= MAX_NUM_LAYERS) && ctx->dpyAttr[dpy].isActive) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         if(fbLayer->handle) {
@@ -151,7 +150,8 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list, int dpy) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
 
-    if (LIKELY(list && list->numHwLayers > 1) &&
+    if (LIKELY(list && list->numHwLayers > 1 &&
+        list->numHwLayers <= MAX_NUM_LAYERS) &&
         ctx->dpyAttr[dpy].isActive &&
         ctx->dpyAttr[dpy].connected) {
         uint32_t last = list->numHwLayers - 1;
