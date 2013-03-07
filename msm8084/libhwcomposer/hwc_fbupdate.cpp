@@ -46,21 +46,24 @@ inline void FBUpdateLowRes::reset() {
     mDest = ovutils::OV_INVALID;
 }
 
-bool FBUpdateLowRes::prepare(hwc_context_t *ctx, hwc_layer_1_t *fblayer) {
+bool FBUpdateLowRes::prepare(hwc_context_t *ctx, hwc_display_contents_1 *list)
+{
     if(!ctx->mMDP.hasOverlay) {
         ALOGD_IF(DEBUG_FBUPDATE, "%s, this hw doesnt support overlays",
                 __FUNCTION__);
        return false;
     }
-    mModeOn = configure(ctx, fblayer);
+    mModeOn = configure(ctx, list);
     ALOGD_IF(DEBUG_FBUPDATE, "%s, mModeOn = %d", __FUNCTION__, mModeOn);
     return mModeOn;
 }
 
 // Configure
-bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
+bool FBUpdateLowRes::configure(hwc_context_t *ctx,
+                               hwc_display_contents_1 *list)
 {
     bool ret = false;
+    hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
         overlay::Overlay& ov = *(ctx->mOverlay);
         private_handle_t *hnd = (private_handle_t *)layer->handle;
@@ -87,7 +90,8 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
                 ovutils::ROT_FLAGS_NONE);
         ov.setSource(parg, dest);
 
-        hwc_rect_t sourceCrop = layer->sourceCrop;
+        hwc_rect_t sourceCrop;
+        getNonWormholeRegion(list, sourceCrop);
         // x,y,w,h
         ovutils::Dim dcrop(sourceCrop.left, sourceCrop.top,
                 sourceCrop.right - sourceCrop.left,
@@ -99,7 +103,7 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
                 static_cast<ovutils::eTransform>(transform);
         ov.setTransform(orient, dest);
 
-        hwc_rect_t displayFrame = layer->displayFrame;
+        hwc_rect_t displayFrame = sourceCrop;
         ovutils::Dim dpos(displayFrame.left,
                 displayFrame.top,
                 displayFrame.right - displayFrame.left,
@@ -118,7 +122,7 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
     return ret;
 }
 
-bool FBUpdateLowRes::draw(hwc_context_t *ctx, hwc_layer_1_t *layer)
+bool FBUpdateLowRes::draw(hwc_context_t *ctx, private_handle_t *hnd)
 {
     if(!mModeOn) {
         return true;
@@ -126,7 +130,6 @@ bool FBUpdateLowRes::draw(hwc_context_t *ctx, hwc_layer_1_t *layer)
     bool ret = true;
     overlay::Overlay& ov = *(ctx->mOverlay);
     ovutils::eDest dest = mDest;
-    private_handle_t *hnd = (private_handle_t *)layer->handle;
     if (!ov.queueBuffer(hnd->fd, hnd->offset, dest)) {
         ALOGE("%s: queueBuffer failed for FBUpdate", __FUNCTION__);
         ret = false;
@@ -143,21 +146,24 @@ inline void FBUpdateHighRes::reset() {
     mDestRight = ovutils::OV_INVALID;
 }
 
-bool FBUpdateHighRes::prepare(hwc_context_t *ctx, hwc_layer_1_t *fblayer) {
+bool FBUpdateHighRes::prepare(hwc_context_t *ctx, hwc_display_contents_1 *list)
+{
     if(!ctx->mMDP.hasOverlay) {
         ALOGD_IF(DEBUG_FBUPDATE, "%s, this hw doesnt support overlays",
                 __FUNCTION__);
        return false;
     }
     ALOGD_IF(DEBUG_FBUPDATE, "%s, mModeOn = %d", __FUNCTION__, mModeOn);
-    mModeOn = configure(ctx, fblayer);
+    mModeOn = configure(ctx, list);
     return mModeOn;
 }
 
 // Configure
-bool FBUpdateHighRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
+bool FBUpdateHighRes::configure(hwc_context_t *ctx,
+                                hwc_display_contents_1 *list)
 {
     bool ret = false;
+    hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
         overlay::Overlay& ov = *(ctx->mOverlay);
         private_handle_t *hnd = (private_handle_t *)layer->handle;
@@ -199,7 +205,8 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
                 ovutils::ROT_FLAGS_NONE);
         ov.setSource(pargR, destR);
 
-        hwc_rect_t sourceCrop = layer->sourceCrop;
+        hwc_rect_t sourceCrop;
+        getNonWormholeRegion(list, sourceCrop);
         ovutils::Dim dcropL(sourceCrop.left, sourceCrop.top,
                 (sourceCrop.right - sourceCrop.left) / 2,
                 sourceCrop.bottom - sourceCrop.top);
@@ -217,7 +224,7 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
         ov.setTransform(orient, destL);
         ov.setTransform(orient, destR);
 
-        hwc_rect_t displayFrame = layer->displayFrame;
+        hwc_rect_t displayFrame = sourceCrop;
         //For FB left, top will always be 0
         //That should also be the case if using 2 mixers for single display
         ovutils::Dim dpos(displayFrame.left,
@@ -240,7 +247,7 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer)
     return ret;
 }
 
-bool FBUpdateHighRes::draw(hwc_context_t *ctx, hwc_layer_1_t *layer)
+bool FBUpdateHighRes::draw(hwc_context_t *ctx, private_handle_t *hnd)
 {
     if(!mModeOn) {
         return true;
@@ -249,7 +256,6 @@ bool FBUpdateHighRes::draw(hwc_context_t *ctx, hwc_layer_1_t *layer)
     overlay::Overlay& ov = *(ctx->mOverlay);
     ovutils::eDest destL = mDestLeft;
     ovutils::eDest destR = mDestRight;
-    private_handle_t *hnd = (private_handle_t *)layer->handle;
     if (!ov.queueBuffer(hnd->fd, hnd->offset, destL)) {
         ALOGE("%s: queue failed for left of dpy = %d",
                 __FUNCTION__, mDpy);
