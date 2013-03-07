@@ -76,8 +76,7 @@ static bool canFallback(int usage, bool triedSystem)
 static bool useUncached(int usage)
 {
     // System heaps cannot be uncached
-    if(usage & (GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP |
-                GRALLOC_USAGE_PRIVATE_IOMMU_HEAP))
+    if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP)
         return false;
     if (usage & GRALLOC_USAGE_PRIVATE_UNCACHED)
         return true;
