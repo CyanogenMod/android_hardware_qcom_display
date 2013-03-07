@@ -17,13 +17,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#define ATRACE_TAG ATRACE_TAG_GRAPHICS
 #include <fcntl.h>
 #include <errno.h>
 
 #include <cutils/log.h>
 #include <cutils/atomic.h>
 #include <EGL/egl.h>
+#include <utils/Trace.h>
 
 #include <overlay.h>
 #include <fb_priv.h>
@@ -135,7 +136,7 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
             if(!ret) {
                 // IF MDPcomp fails use this route
                 VideoOverlay::prepare(ctx, list, dpy);
-                ctx->mFBUpdate[dpy]->prepare(ctx, fbLayer);
+                ctx->mFBUpdate[dpy]->prepare(ctx, list);
             }
             ctx->mLayerCache[dpy]->updateLayerCache(list);
             // Use Copybit, when MDP comp fails
@@ -161,7 +162,7 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
                 setListStats(ctx, list, dpy);
                 reset_layer_prop(ctx, dpy);
                 VideoOverlay::prepare(ctx, list, dpy);
-                ctx->mFBUpdate[dpy]->prepare(ctx, fbLayer);
+                ctx->mFBUpdate[dpy]->prepare(ctx, list);
                 ctx->mLayerCache[dpy]->updateLayerCache(list);
                 if(ctx->mCopyBit[dpy])
                     ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
@@ -234,6 +235,7 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
 
 static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
 {
+    ATRACE_CALL();
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     private_module_t* m = reinterpret_cast<private_module_t*>(
         ctx->mFbDev->common.module);
@@ -309,6 +311,7 @@ static int hwc_query(struct hwc_composer_device_1* dev,
 }
 
 static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
+    ATRACE_CALL();
     int ret = 0;
     const int dpy = HWC_DISPLAY_PRIMARY;
 
@@ -316,8 +319,9 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         int fd = -1; //FenceFD from the Copybit(valid in async mode)
+        bool copybitDone = false;
         if(ctx->mCopyBit[dpy])
-            ctx->mCopyBit[dpy]->draw(ctx, list, dpy, &fd);
+            copybitDone = ctx->mCopyBit[dpy]->draw(ctx, list, dpy, &fd);
         if(list->numHwLayers > 1)
             hwc_sync(ctx, list, dpy, fd);
         if (!VideoOverlay::draw(ctx, list, dpy)) {
@@ -331,11 +335,16 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
         //TODO We dont check for SKIP flag on this layer because we need PAN
         //always. Last layer is always FB
-        private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
+        private_handle_t *hnd = NULL;
+        if(copybitDone) {
+            hnd = ctx->mCopyBit[dpy]->getCurrentRenderBuffer();
+        } else {
+            hnd = (private_handle_t *)fbLayer->handle;
+        }
         if(fbLayer->compositionType == HWC_FRAMEBUFFER_TARGET && hnd) {
             if(!(fbLayer->flags & HWC_SKIP_LAYER) &&
                 (list->numHwLayers > 1)) {
-                if (!ctx->mFBUpdate[dpy]->draw(ctx, fbLayer)) {
+                if (!ctx->mFBUpdate[dpy]->draw(ctx, hnd)) {
                     ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
                     ret = -1;
                 }
@@ -352,7 +361,9 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 }
 
 static int hwc_set_external(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list, int dpy) {
+                            hwc_display_contents_1_t* list, int dpy)
+{
+    ATRACE_CALL();
     int ret = 0;
     Locker::Autolock _l(ctx->mExtSetLock);
 
@@ -362,8 +373,9 @@ static int hwc_set_external(hwc_context_t *ctx,
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         int fd = -1; //FenceFD from the Copybit(valid in async mode)
+        bool copybitDone = false;
         if(ctx->mCopyBit[dpy])
-            ctx->mCopyBit[dpy]->draw(ctx, list, dpy, &fd);
+            copybitDone = ctx->mCopyBit[dpy]->draw(ctx, list, dpy, &fd);
 
         if(list->numHwLayers > 1)
             hwc_sync(ctx, list, dpy, fd);
@@ -373,11 +385,17 @@ static int hwc_set_external(hwc_context_t *ctx,
             ret = -1;
         }
 
-        private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
+        private_handle_t *hnd = NULL;
+        if(copybitDone) {
+            hnd = ctx->mCopyBit[dpy]->getCurrentRenderBuffer();
+        } else {
+            hnd = (private_handle_t *)fbLayer->handle;
+        }
+
         if(fbLayer->compositionType == HWC_FRAMEBUFFER_TARGET &&
                 !(fbLayer->flags & HWC_SKIP_LAYER) && hnd &&
                 (list->numHwLayers > 1)) {
-            if (!ctx->mFBUpdate[dpy]->draw(ctx, fbLayer)) {
+            if (!ctx->mFBUpdate[dpy]->draw(ctx, hnd)) {
                 ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
                 ret = -1;
             }
