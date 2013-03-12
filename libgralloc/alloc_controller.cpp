@@ -215,8 +215,8 @@ int IonController::allocate(alloc_data& data, int usage)
         ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
     }
 
-    if(usage & GRALLOC_USAGE_PRIVATE_CAMERA_HEAP)
-        ionFlags |= ION_HEAP(ION_CAMERA_HEAP_ID);
+    if(usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP)
+        ionFlags |= ION_HEAP(ION_ADSP_HEAP_ID);
 
     if(ionFlags & ION_SECURE)
          data.allocType |= private_handle_t::PRIV_FLAGS_SECURE_BUFFER;
