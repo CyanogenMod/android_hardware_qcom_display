@@ -43,22 +43,14 @@ class Rotator
 public:
     enum { TYPE_MDP, TYPE_MDSS };
     virtual ~Rotator();
-    virtual bool init() = 0;
-    virtual bool close() = 0;
     virtual void setSource(const utils::Whf& wfh) = 0;
     virtual void setFlags(const utils::eMdpFlags& flags) = 0;
     virtual void setTransform(const utils::eTransform& rot) = 0;
-    virtual void setRotatorUsed(const bool& rotUsed) = 0;
     virtual bool commit() = 0;
-    virtual void setRotations(uint32_t r) = 0;
-    virtual void setSrcFB() = 0;
     virtual void setDownscale(int ds) = 0;
     virtual int getDstMemId() const = 0;
     virtual uint32_t getDstOffset() const = 0;
     virtual uint32_t getDstFormat() const = 0;
-    virtual void setEnable() = 0;
-    virtual void setDisable() = 0;
-    virtual bool enabled () const = 0;
     virtual uint32_t getSessId() const = 0;
     virtual bool queueBuffer(int fd, uint32_t offset) = 0;
     virtual void dump() const = 0;
@@ -116,22 +108,14 @@ struct RotMem {
 class MdpRot : public Rotator {
 public:
     virtual ~MdpRot();
-    virtual bool init();
-    virtual bool close();
     virtual void setSource(const utils::Whf& wfh);
     virtual void setFlags(const utils::eMdpFlags& flags);
     virtual void setTransform(const utils::eTransform& rot);
-    virtual void setRotatorUsed(const bool& rotUsed);
     virtual bool commit();
-    virtual void setRotations(uint32_t r);
-    virtual void setSrcFB();
     virtual void setDownscale(int ds);
     virtual int getDstMemId() const;
     virtual uint32_t getDstOffset() const;
     virtual uint32_t getDstFormat() const;
-    virtual void setEnable();
-    virtual void setDisable();
-    virtual bool enabled () const;
     virtual uint32_t getSessId() const;
     virtual bool queueBuffer(int fd, uint32_t offset);
     virtual void dump() const;
@@ -139,6 +123,10 @@ public:
 
 private:
     explicit MdpRot();
+    bool init();
+    bool close();
+    void setRotations(uint32_t r);
+    bool enabled () const;
     /* remap rot buffers */
     bool remap(uint32_t numbufs);
     bool open_i(uint32_t numbufs, uint32_t bufsz);
@@ -178,22 +166,14 @@ private:
 class MdssRot : public Rotator {
 public:
     virtual ~MdssRot();
-    virtual bool init();
-    virtual bool close();
     virtual void setSource(const utils::Whf& wfh);
     virtual void setFlags(const utils::eMdpFlags& flags);
     virtual void setTransform(const utils::eTransform& rot);
-    virtual void setRotatorUsed(const bool& rotUsed);
     virtual bool commit();
-    virtual void setRotations(uint32_t r);
-    virtual void setSrcFB();
     virtual void setDownscale(int ds);
     virtual int getDstMemId() const;
     virtual uint32_t getDstOffset() const;
     virtual uint32_t getDstFormat() const;
-    virtual void setEnable();
-    virtual void setDisable();
-    virtual bool enabled () const;
     virtual uint32_t getSessId() const;
     virtual bool queueBuffer(int fd, uint32_t offset);
     virtual void dump() const;
@@ -201,6 +181,10 @@ public:
 
 private:
     explicit MdssRot();
+    bool init();
+    bool close();
+    void setRotations(uint32_t r);
+    bool enabled () const;
     /* remap rot buffers */
     bool remap(uint32_t numbufs);
     bool open_i(uint32_t numbufs, uint32_t bufsz);
@@ -227,6 +211,28 @@ private:
 
     friend Rotator* Rotator::getRotator();
 };
+
+// Holder of rotator objects. Manages lifetimes
+class RotMgr {
+public:
+    //Maximum sessions based on VG pipes, since rotator is used only for videos.
+    //Even though we can have 4 mixer stages, that much may be unnecessary.
+    enum { MAX_ROT_SESS = 3 };
+    RotMgr();
+    ~RotMgr();
+    void configBegin();
+    void configDone();
+    overlay::Rotator *getNext();
+    void clear(); //Removes all instances
+    /* Returns rot dump.
+     * Expects a NULL terminated buffer of big enough size.
+     */
+    void getDump(char *buf, size_t len);
+private:
+    overlay::Rotator *mRot[MAX_ROT_SESS];
+    int mUseCount;
+};
+
 
 } // overlay
 

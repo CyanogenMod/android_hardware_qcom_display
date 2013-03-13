@@ -28,9 +28,12 @@
 #define DEFAULT_IDLE_TIME 2000
 #define MAX_PIPES_PER_MIXER 4
 
+namespace overlay {
+    class Rotator;
+};
+
 namespace qhwc {
 namespace ovutils = overlay::utils;
-
 
 class MDPComp {
 public:
@@ -67,6 +70,7 @@ protected:
     struct PipeLayerPair {
         MdpPipeInfo *pipeInfo;
         native_handle_t* handle;
+        overlay::Rotator* rot;
     };
 
     /* introduced for mixed mode implementation */
@@ -83,7 +87,7 @@ protected:
                 hwc_display_contents_1_t* list,FrameInfo& current_frame) = 0;
     /* configures MPD pipes */
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
-                        MdpPipeInfo* mdp_info) = 0;
+                PipeLayerPair& pipeLayerPair) = 0;
     /* Is rotation supported */
     virtual bool canRotate(){ return true; };
 
@@ -97,8 +101,6 @@ protected:
     eState getState() { return mState; };
     /* reset state */
     void reset( hwc_context_t *ctx, hwc_display_contents_1_t* list );
-    /* configure MDP flags for video buffers */
-    void setVidInfo(hwc_layer_1_t *layer, ovutils::eMdpFlags &mdpFlags);
     /* allocate MDP pipes from overlay */
     ovutils::eDest getMdpPipe(hwc_context_t *ctx, ePipeType type);
     /* checks for conditions where mdpcomp is not possible */
@@ -136,7 +138,7 @@ private:
 
     /* configure's overlay pipes for the frame */
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
-                        MdpPipeInfo* mdp_info);
+            PipeLayerPair& pipeLayerPair);
 
     /* allocates pipes to selected candidates */
     virtual bool allocLayerPipes(hwc_context_t *ctx,
@@ -144,7 +146,7 @@ private:
             FrameInfo& current_frame);
 
     virtual int pipesNeeded(hwc_context_t *ctx,
-                        hwc_display_contents_1_t* list);
+            hwc_display_contents_1_t* list);
 };
 
 class MDPCompHighRes : public MDPComp {
@@ -163,7 +165,7 @@ private:
 
     /* configure's overlay pipes for the frame */
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
-                        MdpPipeInfo* mdp_info);
+            PipeLayerPair& pipeLayerPair);
 
     /* allocates pipes to selected candidates */
     virtual bool allocLayerPipes(hwc_context_t *ctx,

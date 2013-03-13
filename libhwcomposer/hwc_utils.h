@@ -27,6 +27,8 @@
 #include <gr.h>
 #include <gralloc_priv.h>
 #include <utils/String8.h>
+#include "qdMetaData.h"
+#include <overlayUtils.h>
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
@@ -44,8 +46,12 @@
 struct hwc_context_t;
 struct framebuffer_device_t;
 
+namespace ovutils = overlay::utils;
+
 namespace overlay {
 class Overlay;
+class Rotator;
+class RotMgr;
 }
 
 namespace qhwc {
@@ -53,6 +59,7 @@ namespace qhwc {
 class QueuedBufferStore;
 class ExternalDisplay;
 class IFBUpdate;
+class IVideoOverlay;
 class MDPComp;
 class CopyBit;
 
@@ -121,9 +128,6 @@ class LayerCache {
 
 };
 
-
-
-
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_1_t const* l);
@@ -154,7 +158,28 @@ void closeAcquireFds(hwc_display_contents_1_t* list);
 
 //Sync point impl.
 int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
-                                                    int fd);
+        int fd);
+
+//Trims a layer's source crop which is outside of screen boundary.
+void trimLayer(hwc_context_t *ctx, const int& dpy, const int& transform,
+        hwc_rect_t& crop, hwc_rect_t& dst);
+
+//Sets appropriate mdp flags for a layer.
+void setMdpFlags(hwc_layer_1_t *layer,
+        ovutils::eMdpFlags &mdpFlags,
+        int rotDownscale = 0);
+
+//Routine to configure low resolution panels (<= 2048 width)
+int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
+        ovutils::eMdpFlags& mdpFlags, const ovutils::eZorder& z,
+        const ovutils::eIsFg& isFg, const ovutils::eDest& dest,
+        overlay::Rotator **rot);
+
+//Routine to configure high resolution panels (> 2048 width)
+int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
+        ovutils::eMdpFlags& mdpFlags, const ovutils::eZorder& z,
+        const ovutils::eIsFg& isFg, const ovutils::eDest& lDest,
+        const ovutils::eDest& rDest, overlay::Rotator **rot);
 
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
@@ -245,9 +270,12 @@ struct hwc_context_t {
 
     //Overlay object - NULL for non overlay devices
     overlay::Overlay *mOverlay;
+    //Holds a few rot objects
+    overlay::RotMgr *mRotMgr;
 
     //Primary and external FB updater
     qhwc::IFBUpdate *mFBUpdate[MAX_DISPLAYS];
+    qhwc::IVideoOverlay *mVidOv[MAX_DISPLAYS];
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
     qhwc::MDPInfo mMDP;
@@ -273,6 +301,7 @@ struct hwc_context_t {
     bool mDMAInUse;
 };
 
+namespace qhwc {
 static inline bool isSkipPresent (hwc_context_t *ctx, int dpy) {
     return  ctx->listStats[dpy].skipCount;
 }
@@ -280,5 +309,6 @@ static inline bool isSkipPresent (hwc_context_t *ctx, int dpy) {
 static inline bool isYuvPresent (hwc_context_t *ctx, int dpy) {
     return  ctx->listStats[dpy].yuvCount;
 }
+};
 
 #endif //HWC_UTILS_H

@@ -11,7 +11,6 @@ LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdoverlay\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES := \
       overlay.cpp \
-      overlayCtrl.cpp \
       overlayUtils.cpp \
       overlayMdp.cpp \
       overlayRotator.cpp \
