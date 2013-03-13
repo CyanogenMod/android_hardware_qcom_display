@@ -33,151 +33,92 @@ class MdpCtrl {
 public:
     /* ctor reset */
     explicit MdpCtrl();
-
     /* dtor close */
     ~MdpCtrl();
-
     /* init underlying device using fbnum */
     bool init(uint32_t fbnum);
-
     /* unset overlay, reset and close fd */
     bool close();
-
     /* reset and set ov id to -1 / MSMFB_NEW_REQUEST */
     void reset();
-
-    /* get orient / user_data[0] */
-    int getOrient() const;
-
-    /* returns session id */
-    int getPipeId() const;
-
-    /* returns the fd associated to ctrl*/
-    int getFd() const;
-
-    /* Get screen info. out: info*/
-    bool getScreenInfo(utils::ScreenInfo& info);
-
-    /* overlay get */
-    bool get();
-
-    /* returns flags from mdp structure */
-    int getFlags() const;
-
-    /* set flags to mdp structure */
-    void setFlags(int f);
-
-    /* set z order */
-    void setZ(utils::eZorder z);
-
-    /* set isFg flag */
-    void setIsFg(utils::eIsFg isFg);
-
     /* calls overlay set
      * Set would always consult last good known ov instance.
      * Only if it is different, set would actually exectue ioctl.
      * On a sucess ioctl. last good known ov instance is updated */
     bool set();
-
-    /* return a copy of src whf*/
-    utils::Whf getSrcWhf() const;
-
-    /* set src whf */
-    void setSrcWhf(const utils::Whf& whf);
-
-    /* adjust source width height format based on rot info */
-    void adjustSrcWhf(const bool& rotUsed);
-
-    /* swap src w/h*/
-    void swapSrcWH();
-
-    /* swap src rect w/h */
-    void swapSrcRectWH();
-
-    /* returns a copy to src rect dim */
-    utils::Dim getSrcRectDim() const;
-
-    /* set src/dst rect dim */
-    void setSrcRectDim(const utils::Dim d);
-    void setDstRectDim(const utils::Dim d);
-
-    /* returns a copy ro dst rect dim */
-    utils::Dim getDstRectDim() const;
-
-    /* returns user_data[0]*/
-    int getUserData() const;
-
-    /* sets user_data[0] */
-    void setUserData(int v);
-
-    /* return true if current overlay is different
-     * than last known good overlay */
-    bool ovChanged() const;
-
-    /* save mOVInfo to be last known good ov*/
-    void save();
-
-    /* restore last known good ov to be the current */
-    void restore();
-
     /* Sets the source total width, height, format */
-    bool setSource(const utils::PipeArgs& pargs);
-
+    void setSource(const utils::PipeArgs& pargs);
     /*
      * Sets ROI, the unpadded region, for source buffer.
-     * Should be called before a setPosition, for small clips.
      * Dim - ROI dimensions.
      */
-    bool setCrop(const utils::Dim& d);
-
-    bool setTransform(const utils::eTransform& orient);
-
-    /* set whether rotator can be used */
-    void setRotatorUsed(const bool& rotUsed);
-
+    void setCrop(const utils::Dim& d);
+    void setTransform(const utils::eTransform& orient);
     /* given a dim and w/h, set overlay dim */
-    bool setPosition(const utils::Dim& dim, int w, int h);
-
+    void setPosition(const utils::Dim& dim);
     /* using user_data, sets/unsets roationvalue in mdp flags */
     void setRotationFlags();
-
-    /* Perform transformation calculations */
-    void doTransform();
-
     /* Performs downscale calculations */
-    void doDownscale(int dscale_factor);
-
-    /* Get downscale factor */
-    int getDownscalefactor();
-
-    /* Update the src format */
-    void updateSrcformat(const uint32_t& inputsrcFormat);
-
+    void setDownscale(int dscale_factor);
+    /* Update the src format with rotator's dest*/
+    void updateSrcFormat(const uint32_t& rotDstFormat);
     /* dump state of the object */
     void dump() const;
-
     /* Return the dump in the specified buffer */
     void getDump(char *buf, size_t len);
 
-private:
+    /* returns session id */
+    int getPipeId() const;
+    /* returns the fd associated to ctrl*/
+    int getFd() const;
+    /* returns a copy ro dst rect dim */
+    utils::Dim getDstRectDim() const;
+    /* returns a copy to src rect dim */
+    utils::Dim getSrcRectDim() const;
 
-    /* helper functions for overlayTransform */
-    void overlayTransFlipH();
-    void overlayTransFlipV();
-    void overlayTransRot90();
+private:
+    /* Perform transformation calculations */
+    void doTransform();
+    void doDownscale();
+    /* get orient / user_data[0] */
+        int getOrient() const;
+    /* overlay get */
+    bool get();
+    /* returns flags from mdp structure */
+    int getFlags() const;
+    /* set flags to mdp structure */
+    void setFlags(int f);
+    /* set z order */
+    void setZ(utils::eZorder z);
+    /* set isFg flag */
+    void setIsFg(utils::eIsFg isFg);
+        /* return a copy of src whf*/
+    utils::Whf getSrcWhf() const;
+    /* set src whf */
+    void setSrcWhf(const utils::Whf& whf);
+    /* set src/dst rect dim */
+    void setSrcRectDim(const utils::Dim d);
+    void setDstRectDim(const utils::Dim d);
+    /* returns user_data[0]*/
+    int getUserData() const;
+    /* sets user_data[0] */
+    void setUserData(int v);
+    /* return true if current overlay is different
+     * than last known good overlay */
+    bool ovChanged() const;
+    /* save mOVInfo to be last known good ov*/
+    void save();
+    /* restore last known good ov to be the current */
+    void restore();
 
     utils::eTransform mOrientation; //Holds requested orientation
-    bool mRotUsed; //whether rotator should be used even if requested
-                   //orientation is 0.
-
     /* last good known ov info */
     mdp_overlay   mLkgo;
-
     /* Actual overlay mdp structure */
     mdp_overlay   mOVInfo;
-
     /* FD for the mdp fbnum */
     OvFD          mFd;
+    int mDownscale;
 };
 
 
@@ -210,37 +151,26 @@ class MdpData {
 public:
     /* ctor reset data */
     explicit MdpData();
-
     /* dtor close*/
     ~MdpData();
-
     /* init FD */
     bool init(uint32_t fbnum);
-
     /* memset0 the underlying mdp object */
     void reset();
-
     /* close fd, and reset */
     bool close();
-
     /* set id of mdp data */
     void setPipeId(int id);
-
     /* return ses id of data */
     int getPipeId() const;
-
     /* get underlying fd*/
     int getFd() const;
-
     /* get memory_id */
     int getSrcMemoryId() const;
-
     /* calls wrapper play */
     bool play(int fd, uint32_t offset);
-
     /* dump state of the object */
     void dump() const;
-
     /* Return the dump in the specified buffer */
     void getDump(char *buf, size_t len);
 
@@ -248,18 +178,11 @@ private:
 
     /* actual overlay mdp data */
     msmfb_overlay_data mOvData;
-
     /* fd to mdp fbnum */
     OvFD mFd;
 };
 
 //--------------Inlines---------------------------------
-namespace {
-// just a helper func for common operations x-(y+z)
-int compute(uint32_t x, uint32_t y, uint32_t z) {
-    return x-(y+z);
-}
-}
 
 /////   MdpCtrl  //////
 
@@ -297,6 +220,10 @@ inline void MdpCtrl::setZ(overlay::utils::eZorder z) {
 
 inline void MdpCtrl::setIsFg(overlay::utils::eIsFg isFg) {
     mOVInfo.is_fg = isFg;
+}
+
+inline void MdpCtrl::setDownscale(int dscale) {
+    mDownscale = dscale;
 }
 
 inline bool MdpCtrl::ovChanged() const {
@@ -374,47 +301,6 @@ inline void MdpCtrl::setRotationFlags() {
     else
         mOVInfo.flags &= ~MDP_SOURCE_ROTATED_90;
 }
-
-inline void MdpCtrl::swapSrcWH() {
-    utils::swap(mOVInfo.src.width,
-            mOVInfo.src.height);
-}
-
-inline void MdpCtrl::swapSrcRectWH() {
-    utils::swap(mOVInfo.src_rect.w,
-            mOVInfo.src_rect.h);
-}
-
-inline void MdpCtrl::overlayTransFlipH()
-{
-    utils::Dim d   = getSrcRectDim();
-    utils::Whf whf = getSrcWhf();
-    d.x = compute(whf.w, d.x, d.w);
-    setSrcRectDim(d);
-}
-
-inline void MdpCtrl::overlayTransFlipV()
-{
-    utils::Dim d   = getSrcRectDim();
-    utils::Whf whf = getSrcWhf();
-    d.y = compute(whf.h, d.y, d.h);
-    setSrcRectDim(d);
-}
-
-inline void MdpCtrl::overlayTransRot90()
-{
-    utils::Dim d   = getSrcRectDim();
-    utils::Whf whf = getSrcWhf();
-    int tmp = d.x;
-    d.x = compute(whf.h,
-            d.y,
-            d.h);
-    d.y = tmp;
-    setSrcRectDim(d);
-    swapSrcWH();
-    swapSrcRectWH();
-}
-
 
 ///////    MdpCtrl3D //////
 
