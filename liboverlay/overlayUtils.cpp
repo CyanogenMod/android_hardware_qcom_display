@@ -264,7 +264,10 @@ static inline int compute(const uint32_t& x, const uint32_t& y,
     return x - ( y + z );
 }
 
-void preRotateSource(eTransform& tr, Whf& whf, Dim& srcCrop) {
+//Expects transform to be adjusted for clients of Android.
+//i.e flips switched if 90 component present.
+//See getMdpOrient()
+void preRotateSource(const eTransform& tr, Whf& whf, Dim& srcCrop) {
     if(tr & OVERLAY_TRANSFORM_FLIP_H) {
         srcCrop.x = compute(whf.w, srcCrop.x, srcCrop.w);
     }
@@ -280,7 +283,6 @@ void preRotateSource(eTransform& tr, Whf& whf, Dim& srcCrop) {
         swap(whf.w, whf.h);
         swap(srcCrop.w, srcCrop.h);
     }
-    tr = OVERLAY_TRANSFORM_0;
 }
 
 bool is3DTV() {

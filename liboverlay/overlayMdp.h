@@ -296,10 +296,8 @@ inline void MdpCtrl::setUserData(int v) { mOVInfo.user_data[0] = v; }
 
 inline void MdpCtrl::setRotationFlags() {
     const int u = getUserData();
-    if (u == MDP_ROT_90 || u == MDP_ROT_270)
+    if (u & MDP_ROT_90)
         mOVInfo.flags |= MDP_SOURCE_ROTATED_90;
-    else
-        mOVInfo.flags &= ~MDP_SOURCE_ROTATED_90;
 }
 
 ///////    MdpCtrl3D //////
