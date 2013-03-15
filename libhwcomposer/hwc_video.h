@@ -40,8 +40,10 @@ public:
     virtual bool draw(hwc_context_t *ctx,
             hwc_display_contents_1_t *list) = 0;
     virtual void reset() = 0;
+    virtual bool isModeOn() = 0;
     //Factory method that returns a low-res or high-res version
     static IVideoOverlay *getObject(const int& width, const int& dpy);
+
 protected:
     const int mDpy; // display to update
     bool mModeOn; // if prepare happened
@@ -55,6 +57,7 @@ public:
     bool prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list);
     bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
     void reset();
+    bool isModeOn();
 private:
     //Configures overlay for video prim and ext
     bool configure(hwc_context_t *ctx, hwc_layer_1_t *yuvlayer);
@@ -72,6 +75,7 @@ public:
     bool prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list);
     bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
     void reset();
+    bool isModeOn();
 private:
     //Configures overlay for video prim and ext
     bool configure(hwc_context_t *ctx, hwc_layer_1_t *yuvlayer);
