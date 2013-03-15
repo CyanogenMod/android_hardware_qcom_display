@@ -93,7 +93,7 @@ bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx,
 
     if (compositionType & qdutils::COMPOSITION_TYPE_DYN) {
         // DYN Composition:
-        // use copybit, if (TotalRGBRenderArea < 2 * FB Area)
+        // use copybit, if (TotalRGBRenderArea < threashold * FB Area)
         // this is done based on perf inputs in ICS
         // TODO: Above condition needs to be re-evaluated in JB
         int fbWidth =  ctx->dpyAttr[dpy].xres;
@@ -102,7 +102,7 @@ bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx,
         unsigned int renderArea = getRGBRenderingArea(list);
             ALOGD_IF (DEBUG_COPYBIT, "%s:renderArea %u, fbArea %u",
                                   __FUNCTION__, renderArea, fbArea);
-        if (renderArea <= (2 * fbArea)) {
+        if (renderArea < (mDynThreshold * fbArea)) {
             return true;
         }
     } else if ((compositionType & qdutils::COMPOSITION_TYPE_MDP)) {
@@ -554,6 +554,11 @@ CopyBit::CopyBit():mIsModeOn(false), mCopyBitDraw(false),
         mRenderBuffer[i] = NULL;
     mRelFd[0] = -1;
     mRelFd[1] = -1;
+
+    char value[PROPERTY_VALUE_MAX];
+    property_get("debug.hwc.dynThreshold", value, "2");
+    mDynThreshold = atof(value);
+
     if (hw_get_module(COPYBIT_HARDWARE_MODULE_ID, &module) == 0) {
         if(copybit_open(module, &mEngine) < 0) {
             ALOGE("FATAL ERROR: copybit open failed.");

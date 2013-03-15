@@ -80,6 +80,9 @@ private:
     //These are the the release FDs of the T-2 and T-1 round
     //We wait on the T-2 fence
     int mRelFd[2];
+
+    //Dynamic composition threshold for deciding copybit usage.
+    double mDynThreshold;
 };
 
 }; //namespace qhwc
