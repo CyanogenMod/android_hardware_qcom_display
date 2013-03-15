@@ -68,7 +68,7 @@ public:
     bool queueBuffer(int fd, uint32_t offset, utils::eDest dest);
 
     /* Closes open pipes, called during startup */
-    static void initOverlay();
+    static int initOverlay();
     /* Returns the singleton instance of overlay */
     static Overlay* getInstance();
     /* Returns available ("unallocated") pipes for a display */
@@ -116,7 +116,12 @@ private:
         static bool isAllocated(int index);
         static bool isNotAllocated(int index);
 
+        static utils::eMdpPipeType getPipeType(utils::eDest dest);
+        static const char* getDestStr(utils::eDest dest);
+
         static int NUM_PIPES;
+        static utils::eMdpPipeType pipeTypeLUT[utils::OV_MAX];
+
 
     private:
         //usage tracks if a successful commit happened. So a pipe could be
@@ -146,7 +151,7 @@ inline void Overlay::validate(int index) {
     OVASSERT(index >=0 && index < PipeBook::NUM_PIPES, \
         "%s, Index out of bounds: %d", __FUNCTION__, index);
     OVASSERT(mPipeBook[index].valid(), "Pipe does not exist %s",
-            utils::getDestStr((utils::eDest)index));
+            PipeBook::getDestStr((utils::eDest)index));
 }
 
 inline int Overlay::availablePipes(int dpy) {
@@ -210,6 +215,20 @@ inline bool Overlay::PipeBook::isAllocated(int index) {
 
 inline bool Overlay::PipeBook::isNotAllocated(int index) {
     return !isAllocated(index);
+}
+
+inline utils::eMdpPipeType Overlay::PipeBook::getPipeType(utils::eDest dest) {
+    return pipeTypeLUT[(int)dest];
+}
+
+inline const char* Overlay::PipeBook::getDestStr(utils::eDest dest) {
+    switch(getPipeType(dest)) {
+        case utils::OV_MDP_PIPE_RGB: return "RGB";
+        case utils::OV_MDP_PIPE_VG: return "VG";
+        case utils::OV_MDP_PIPE_DMA: return "DMA";
+        default: return "Invalid";
+    }
+    return "Invalid";
 }
 
 }; // overlay
