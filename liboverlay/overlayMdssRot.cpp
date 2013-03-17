@@ -30,6 +30,8 @@
 #define MDSS_MDP_ROT_ONLY 0x80
 #endif
 
+#define SIZE_1M 0x00100000
+
 namespace ovutils = overlay::utils;
 
 namespace overlay {
@@ -258,5 +260,7 @@ void MdssRot::setBufSize(int format) {
         mBufSize = VENUS_BUFFER_SIZE(COLOR_FMT_NV12, mRotInfo.dst_rect.w,
                                      mRotInfo.dst_rect.h);
     }
+    if (mRotInfo.flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
+        mBufSize = utils::align(mBufSize, SIZE_1M);
 }
 } // namespace overlay
