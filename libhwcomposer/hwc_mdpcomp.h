@@ -30,6 +30,22 @@ namespace qhwc {
 namespace ovutils = overlay::utils;
 
 class MDPComp {
+public:
+    virtual ~MDPComp() {}
+    /*sets up mdp comp for the current frame */
+    virtual bool prepare(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list) = 0;
+    /* draw */
+    virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list) = 0;
+    void dump(android::String8& buf);
+    bool isUsed() { return (mState == MDPCOMP_ON); };
+
+    static MDPComp* getObject(const int& width);
+    /* Handler to invoke frame redraw on Idle Timer expiry */
+    static void timeout_handler(void *udata);
+    static bool init(hwc_context_t *ctx);
+
+protected:
     enum eState {
         MDPCOMP_ON = 0,
         MDPCOMP_OFF,
@@ -41,6 +57,39 @@ class MDPComp {
         MDPCOMP_OV_ANY,
     };
 
+    /* set/reset flags for MDPComp */
+    void setMDPCompLayerFlags(hwc_context_t *ctx,
+                                       hwc_display_contents_1_t* list);
+    void unsetMDPCompLayerFlags(hwc_context_t* ctx,
+                                       hwc_display_contents_1_t* list);
+    void printInfo(hwc_layer_1_t* layer);
+    /* get/set states */
+    eState getState() { return mState; };
+
+    /* set up Border fill as Base pipe */
+    static bool setupBasePipe(hwc_context_t*);
+    /* Is debug enabled */
+    static bool isDebug() { return sDebugLogs ? true : false; };
+    /* Is feature enabled */
+    static bool isEnabled() { return sEnabled; };
+
+    eState mState;
+
+    static bool sEnabled;
+    static bool sDebugLogs;
+    static bool sIdleFallBack;
+    static IdleInvalidator *idleInvalidator;
+
+};
+
+class MDPCompLowRes : public MDPComp {
+public:
+    virtual ~MDPCompLowRes() {}
+    virtual bool prepare(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+    virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
+
+private:
     struct MdpPipeInfo {
         int index;
         int zOrder;
@@ -56,81 +105,35 @@ class MDPComp {
         struct PipeLayerPair* pipeLayer;
 
     };
-
-    static eState sMDPCompState;
-    static IdleInvalidator *idleInvalidator;
-    static struct FrameInfo sCurrentFrame;
-    static bool sEnabled;
-    static bool sDebugLogs;
-    static bool sIdleFallBack;
-    static int sActiveMax;
-    static bool sSecuredVid;
-
-public:
-    /* Handler to invoke frame redraw on Idle Timer expiry */
-    static void timeout_handler(void *udata);
-
-    /* configure/tear-down MDPComp params*/
-    static bool init(hwc_context_t *ctx);
-    static bool deinit();
-    static bool isUsed() { return (sMDPCompState == MDPCOMP_ON); };
-
-    /*sets up mdp comp for the current frame */
-    static bool configure(hwc_context_t *ctx,
-                            hwc_display_contents_1_t* list);
-
-    /* draw */
-    static bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
-
-    static void dump(android::String8& buf);
-
-private:
-    /* set/reset flags for MDPComp */
-    static void setMDPCompLayerFlags(hwc_context_t *ctx,
-                                       hwc_display_contents_1_t* list);
-    static void unsetMDPCompLayerFlags(hwc_context_t* ctx,
-                                       hwc_display_contents_1_t* list);
-
-    static void print_info(hwc_layer_1_t* layer);
-
     /* configure's overlay pipes for the frame */
-    static int  prepare(hwc_context_t *ctx, hwc_layer_1_t *layer,
+    int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
                         MdpPipeInfo& mdp_info);
-
     /* checks for conditions where mdpcomp is not possible */
-    static bool isDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list);
-
-    static bool setup(hwc_context_t* ctx, hwc_display_contents_1_t* list);
-
+    bool isDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    bool setup(hwc_context_t* ctx, hwc_display_contents_1_t* list);
     /* allocates pipes to selected candidates */
-    static bool allocLayerPipes(hwc_context_t *ctx,
+    bool allocLayerPipes(hwc_context_t *ctx,
             hwc_display_contents_1_t* list,
             FrameInfo& current_frame);
-
-    /* get/set states */
-    static eState getState() { return sMDPCompState; };
-
     /* reset state */
-    static void reset( hwc_context_t *ctx, hwc_display_contents_1_t* list );
-
-    /* Is feature enabled */
-    static bool isEnabled() { return sEnabled; };
-
-    /* Is debug enabled */
-    static bool isDebug() { return sDebugLogs ? true : false; };
-
-    /* check layer state */
-    static bool isSkipPresent (hwc_context_t *ctx);
-    static bool isYuvPresent (hwc_context_t *ctx);
-
+    void reset( hwc_context_t *ctx, hwc_display_contents_1_t* list );
     /* configure MDP flags for video buffers */
-    static void setVidInfo(hwc_layer_1_t *layer, ovutils::eMdpFlags &mdpFlags);
-
-    /* set up Border fill as Base pipe */
-    static bool setupBasePipe(hwc_context_t*);
-
+    void setVidInfo(hwc_layer_1_t *layer, ovutils::eMdpFlags &mdpFlags);
     /* allocate MDP pipes from overlay */
-    static int getMdpPipe(hwc_context_t *ctx, ePipeType type);
+    int getMdpPipe(hwc_context_t *ctx, ePipeType type);
+
+    struct FrameInfo mCurrentFrame;
 };
+
+class MDPCompHighRes : public MDPComp {
+public:
+    virtual ~MDPCompHighRes() {}
+    virtual bool prepare(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list) { return false; }
+    virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
+        return true;
+    }
+};
+
 }; //namespace
 #endif
