@@ -38,15 +38,19 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
     int64_t timestamp = 0;
     const char *str = udata;
 
-    if(!strcasestr(str, "change@/devices/virtual/switch/hdmi")) {
+    if(!strcasestr(str, "change@/devices/virtual/switch/hdmi") &&
+       !strcasestr(str, "change@/devices/virtual/switch/wfd")) {
         ALOGD_IF(UEVENT_DEBUG, "%s: Not Ext Disp Event ", __FUNCTION__);
         return;
     }
+
     int connected = -1; // initial value - will be set to  1/0 based on hotplug
-    // parse HDMI switch state for connect/disconnect
+    // parse HDMI/WFD switch state for connect/disconnect
+    // for HDMI:
     // The event will be of the form:
     // change@/devices/virtual/switch/hdmi ACTION=change
     // SWITCH_STATE=1 or SWITCH_STATE=0
+
     while(*str) {
         if (!strncmp(str, "SWITCH_STATE=", strlen("SWITCH_STATE="))) {
             connected = atoi(str + strlen("SWITCH_STATE="));
@@ -61,8 +65,12 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 
     if(connected != -1) { //either we got switch_state connected or disconnect
         ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = connected;
-        ctx->mExtDisplay->setExternalDisplay(connected);
-        ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,connected);
+        if(connected) {
+            ctx->mExtDisplay->processUEventOnline(udata);
+        }else {
+            ctx->mExtDisplay->processUEventOffline(udata);
+        }
+        ALOGD("%s sending hotplug: connected = %d", __FUNCTION__, connected);
         Locker::Autolock _l(ctx->mExtSetLock); //hwc comp could be on
         ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL, connected);
     }
