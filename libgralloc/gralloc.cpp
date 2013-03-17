@@ -33,9 +33,6 @@
 
 using namespace gralloc;
 
-int fb_device_open(const hw_module_t* module, const char* name,
-                   hw_device_t** device);
-
 static int gralloc_device_open(const hw_module_t* module, const char* name,
                                hw_device_t** device);
 
@@ -82,13 +79,6 @@ base: {
     perform: gralloc_perform,
     reserved_proc: {0},
       },
-framebuffer: 0,
-fbFormat: 0,
-flags: 0,
-numBuffers: 0,
-bufferMask: 0,
-lock: PTHREAD_MUTEX_INITIALIZER,
-currentBuffer: 0,
 };
 
 // Open Gralloc device
@@ -104,8 +94,6 @@ int gralloc_device_open(const hw_module_t* module, const char* name,
         dev = new gpu_context_t(m, alloc_ctrl);
         *device = &dev->common;
         status = 0;
-    } else {
-        status = fb_device_open(module, name, device);
     }
     return status;
 }
