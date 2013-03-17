@@ -27,7 +27,6 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define LOG_TAG "CALCFPS"
 #define LOG_NDDEBUG 0
 #include "profiler.h"
 
