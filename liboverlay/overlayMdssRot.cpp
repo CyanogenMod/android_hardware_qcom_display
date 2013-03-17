@@ -43,29 +43,34 @@ MdssRot::MdssRot() {
 
 MdssRot::~MdssRot() { close(); }
 
-void MdssRot::setEnable() { mEnabled = true; }
+inline void MdssRot::setEnable() { mEnabled = true; }
 
-void MdssRot::setDisable() { mEnabled = false; }
+inline void MdssRot::setDisable() { mEnabled = false; }
 
-bool MdssRot::enabled() const { return mEnabled; }
+inline bool MdssRot::enabled() const { return mEnabled; }
 
-void MdssRot::setRotations(uint32_t flags) { mRotInfo.flags |= flags; }
+inline void MdssRot::setRotations(uint32_t flags) { mRotInfo.flags |= flags; }
 
-int MdssRot::getDstMemId() const {
+inline int MdssRot::getDstMemId() const {
     return mRotData.dst_data.memory_id;
 }
 
-uint32_t MdssRot::getDstOffset() const {
+inline uint32_t MdssRot::getDstOffset() const {
     return mRotData.dst_data.offset;
 }
 
-uint32_t MdssRot::getSessId() const { return mRotInfo.id; }
+inline uint32_t MdssRot::getDstFormat() const {
+    //For mdss src and dst formats are same
+    return mRotInfo.src.format;
+}
 
-void MdssRot::setSrcFB() {
+inline uint32_t MdssRot::getSessId() const { return mRotInfo.id; }
+
+inline void MdssRot::setSrcFB() {
     mRotData.data.flags |= MDP_MEMORY_ID_TYPE_FB;
 }
 
-bool MdssRot::init() {
+inline bool MdssRot::init() {
     if(!utils::openDev(mFd, 0, Res::fbPath, O_RDWR)) {
         ALOGE("MdssRot failed to init fb0");
         return false;
@@ -95,14 +100,13 @@ void MdssRot::setSource(const overlay::utils::Whf& awhf) {
     mBufSize = awhf.size;
 }
 
-void MdssRot::setDownscale(int ds) {
-}
+inline void MdssRot::setDownscale(int ds) {}
 
-void MdssRot::setFlags(const utils::eMdpFlags& flags) {
+inline void MdssRot::setFlags(const utils::eMdpFlags& flags) {
     mRotInfo.flags |= flags;
 }
 
-void MdssRot::setTransform(const utils::eTransform& rot)
+inline void MdssRot::setTransform(const utils::eTransform& rot)
 {
     int flags = utils::getMdpOrient(rot);
     if (flags != -1)
@@ -113,14 +117,14 @@ void MdssRot::setTransform(const utils::eTransform& rot)
     ALOGE_IF(DEBUG_OVERLAY, "%s: rot=%d", __FUNCTION__, flags);
 }
 
-void MdssRot::setRotatorUsed(const bool& rotUsed) {
+inline void MdssRot::setRotatorUsed(const bool& rotUsed) {
     setDisable();
     if(rotUsed) {
         setEnable();
     }
 }
 
-void MdssRot::doTransform() {
+inline void MdssRot::doTransform() {
     if(mOrientation & utils::OVERLAY_TRANSFORM_ROT_90)
         utils::swap(mRotInfo.dst_rect.w, mRotInfo.dst_rect.h);
 }
