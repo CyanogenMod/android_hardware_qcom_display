@@ -171,6 +171,10 @@ bool VideoOverlay::configure(hwc_context_t *ctx, int dpy,
             displayFrame.top,
             displayFrame.right - displayFrame.left,
             displayFrame.bottom - displayFrame.top);
+    // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
+    if(dpy)
+        getActionSafePosition(ctx, dpy, dpos.x, dpos.y, dpos.w, dpos.h);
+
     ov.setPosition(dpos, dest);
 
     if (!ov.commit(dest)) {

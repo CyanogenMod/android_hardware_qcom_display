@@ -148,6 +148,55 @@ void dumpsys_log(android::String8& buf, const char* fmt, ...)
     va_end(varargs);
 }
 
+/* Calculates the destination position based on the action safe rectangle */
+void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
+                           uint32_t& y, uint32_t& w, uint32_t& h) {
+
+    // if external supports underscan, do nothing
+    // it will be taken care in the driver
+    if(ctx->mExtDisplay->isCEUnderscanSupported())
+        return;
+
+    float wRatio = 1.0;
+    float hRatio = 1.0;
+    float xRatio = 1.0;
+    float yRatio = 1.0;
+
+    float fbWidth = ctx->dpyAttr[dpy].xres;
+    float fbHeight = ctx->dpyAttr[dpy].yres;
+
+    float asX = 0;
+    float asY = 0;
+    float asW = fbWidth;
+    float asH= fbHeight;
+    char value[PROPERTY_VALUE_MAX];
+
+    // Apply action safe parameters
+    property_get("hw.actionsafe.width", value, "0");
+    int asWidthRatio = atoi(value);
+    property_get("hw.actionsafe.height", value, "0");
+    int asHeightRatio = atoi(value);
+    // based on the action safe ratio, get the Action safe rectangle
+    asW = fbWidth * (1.0f -  asWidthRatio / 100.0f);
+    asH = fbHeight * (1.0f -  asHeightRatio / 100.0f);
+    asX = (fbWidth - asW) / 2;
+    asY = (fbHeight - asH) / 2;
+
+    // calculate the position ratio
+    xRatio = (float)x/fbWidth;
+    yRatio = (float)y/fbHeight;
+    wRatio = (float)w/fbWidth;
+    hRatio = (float)h/fbHeight;
+
+    //Calculate the position...
+    x = (xRatio * asW) + asX;
+    y = (yRatio * asH) + asY;
+    w = (wRatio * asW);
+    h = (hRatio * asH);
+
+    return;
+}
+
 static inline bool isAlphaScaled(hwc_layer_1_t const* layer) {
     int dst_w, dst_h, src_w, src_h;
 
