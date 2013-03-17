@@ -1,6 +1,9 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained for
+ * attribution purposes only
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +42,14 @@ bool VideoOverlay::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
 
     int yuvIndex =  ctx->listStats[dpy].yuvIndices[0];
     sIsModeOn[dpy] = false;
+
+    int hw_w = ctx->dpyAttr[dpy].xres;
+
+    if(hw_w > MAX_DISPLAY_DIM) {
+       ALOGD_IF(VIDEO_DEBUG,"%s, \
+                      Cannot use video path for High Res Panels", __FUNCTION__);
+       return false;
+    }
 
     if(!ctx->mMDP.hasOverlay) {
        ALOGD_IF(VIDEO_DEBUG,"%s, this hw doesnt support overlay", __FUNCTION__);
@@ -153,8 +164,8 @@ bool VideoOverlay::configure(hwc_context_t *ctx, int dpy,
             displayFrame.top < 0 ||
             displayFrame.right > fbWidth ||
             displayFrame.bottom > fbHeight) {
-        calculate_crop_rects(sourceCrop, displayFrame, fbWidth, fbHeight,
-                transform);
+        hwc_rect_t scissor = {0, 0, fbWidth, fbHeight};
+        calculate_crop_rects(sourceCrop, displayFrame, scissor, transform);
     }
 
     // source crop x,y,w,h

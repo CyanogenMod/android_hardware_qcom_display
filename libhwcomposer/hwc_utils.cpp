@@ -212,7 +212,7 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
     return;
 }
 
-static inline bool isAlphaScaled(hwc_layer_1_t const* layer) {
+bool needsScaling(hwc_layer_1_t const* layer) {
     int dst_w, dst_h, src_w, src_h;
 
     hwc_rect_t displayFrame  = layer->displayFrame;
@@ -224,7 +224,14 @@ static inline bool isAlphaScaled(hwc_layer_1_t const* layer) {
     src_w = sourceCrop.right - sourceCrop.left;
     src_h = sourceCrop.bottom - sourceCrop.top;
 
-    if(((src_w != dst_w) || (src_h != dst_h))) {
+    if(((src_w != dst_w) || (src_h != dst_h)))
+        return true;
+
+    return false;
+}
+
+bool isAlphaScaled(hwc_layer_1_t const* layer) {
+    if(needsScaling(layer)) {
         if(layer->blending != HWC_BLENDING_NONE)
             return true;
     }
@@ -239,6 +246,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].skipCount = 0;
     ctx->listStats[dpy].needsAlphaScale = false;
     ctx->listStats[dpy].yuvCount = 0;
+    ctx->mDMAInUse = false;
 
     for (size_t i = 0; i < list->numHwLayers; i++) {
         hwc_layer_1_t const* layer = &list->hwLayers[i];
@@ -256,6 +264,9 @@ void setListStats(hwc_context_t *ctx,
             int& yuvCount = ctx->listStats[dpy].yuvCount;
             ctx->listStats[dpy].yuvIndices[yuvCount] = i;
             yuvCount++;
+
+            if((layer->transform & HWC_TRANSFORM_ROT_90) && !ctx->mDMAInUse)
+                ctx->mDMAInUse = true;
         }
 
         if(!ctx->listStats[dpy].needsAlphaScale)
@@ -300,7 +311,8 @@ bool isSecureModePolicy(int mdpVersion) {
 
 //Crops source buffer against destination and FB boundaries
 void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
-        const int fbWidth, const int fbHeight, int orient) {
+                          const hwc_rect_t& scissor, int orient) {
+
     int& crop_l = crop.left;
     int& crop_t = crop.top;
     int& crop_r = crop.right;
@@ -315,24 +327,34 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
     int dst_w = abs(dst.right - dst.left);
     int dst_h = abs(dst.bottom - dst.top);
 
+    const int& sci_l = scissor.left;
+    const int& sci_t = scissor.top;
+    const int& sci_r = scissor.right;
+    const int& sci_b = scissor.bottom;
+    int sci_w = abs(sci_r - sci_l);
+    int sci_h = abs(sci_b - sci_t);
+
     float leftCutRatio = 0.0f, rightCutRatio = 0.0f, topCutRatio = 0.0f,
             bottomCutRatio = 0.0f;
 
-    if(dst_l < 0) {
-        leftCutRatio = (float)(0.0f - dst_l) / (float)dst_w;
-        dst_l = 0;
+    if(dst_l < sci_l) {
+        leftCutRatio = (float)(sci_l - dst_l) / (float)dst_w;
+        dst_l = sci_l;
     }
-    if(dst_r > fbWidth) {
-        rightCutRatio = (float)(dst_r - fbWidth) / (float)dst_w;
-        dst_r = fbWidth;
+
+    if(dst_r > sci_r) {
+        rightCutRatio = (float)(dst_r - sci_r) / (float)dst_w;
+        dst_r = sci_r;
     }
-    if(dst_t < 0) {
-        topCutRatio = (float)(0 - dst_t) / (float)dst_h;
-        dst_t = 0;
+
+    if(dst_t < sci_t) {
+        topCutRatio = (float)(sci_t - dst_t) / (float)dst_h;
+        dst_t = sci_t;
     }
-    if(dst_b > fbHeight) {
-        bottomCutRatio = (float)(dst_b - fbHeight) / (float)dst_h;
-        dst_b = fbHeight;
+
+    if(dst_b > sci_b) {
+        bottomCutRatio = (float)(dst_b - sci_b) / (float)dst_h;
+        dst_b = sci_b;
     }
 
     calc_cut(leftCutRatio, topCutRatio, rightCutRatio, bottomCutRatio, orient);
