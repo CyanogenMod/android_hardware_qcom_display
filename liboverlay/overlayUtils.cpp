@@ -330,6 +330,11 @@ uint32_t getS3DFormat(uint32_t fmt) {
     return fmt3D;
 }
 
+bool isMdssRotator() {
+    int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
+    return (mdpVersion >= qdutils::MDSS_V5);
+}
+
 } // utils
 
 } // overlay
