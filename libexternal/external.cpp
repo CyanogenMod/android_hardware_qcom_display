@@ -450,7 +450,7 @@ bool ExternalDisplay::openFrameBuffer(int fbNum)
 bool ExternalDisplay::closeFrameBuffer()
 {
     int ret = 0;
-    if(mFd > 0) {
+    if(mFd >= 0) {
         ret = close(mFd);
         mFd = -1;
     }
