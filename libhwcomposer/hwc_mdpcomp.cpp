@@ -628,5 +628,15 @@ bool MDPComp::configure(hwc_context_t *ctx,
 
      return isMDPCompUsed;
 }
+
+void MDPComp::dump(android::String8& buf)
+{
+    dumpsys_log(buf, "  MDP Composition: ");
+    dumpsys_log(buf, "MDPCompState=%d\n", sMDPCompState);
+    //XXX: Log more info
+
+}
+
+
 }; //namespace
 
