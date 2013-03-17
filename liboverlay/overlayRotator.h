@@ -199,6 +199,7 @@ private:
     void doTransform();
     /* reset underlying data, basically memset 0 */
     void reset();
+    void setBufSize(int format);
 
     /* MdssRot info structure */
     mdp_overlay   mRotInfo;
