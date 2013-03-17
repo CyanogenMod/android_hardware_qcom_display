@@ -132,6 +132,10 @@ bool Overlay::commit(utils::eDest dest) {
         PipeBook::setUse((int)dest);
     } else {
         PipeBook::resetUse((int)dest);
+        int dpy = mPipeBook[index].mDisplay;
+        for(int i = 0; i < PipeBook::NUM_PIPES; i++)
+            if (mPipeBook[i].mDisplay == dpy)
+                PipeBook::resetAllocation(i);
     }
     return ret;
 }
