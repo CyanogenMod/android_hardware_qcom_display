@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -32,7 +32,7 @@
 #include "string.h"
 #include "external.h"
 
-
+using android::LogIfSlow;
 namespace qhwc {
 
 #define HWC_VSYNC_THREAD_NAME "hwcVsyncThread"
@@ -61,6 +61,7 @@ static void *vsync_loop(void *param)
     bool fb1_vsync = false;
     bool enabled = false;
     bool fakevsync = false;
+    uint32_t log_threshold = ns2ms(ctx->dpyAttr[dpy].vsync_period)*2;
 
     char property[PROPERTY_VALUE_MAX];
     if(property_get("debug.hwc.fakevsync", property, NULL) > 0) {
@@ -111,6 +112,7 @@ static void *vsync_loop(void *param)
 
         if(!fakevsync) {
             for(int i = 0; i < MAX_RETRY_COUNT; i++) {
+                ALOGD_IF_SLOW(log_threshold, "Excessive delay reading vsync");
                 len = pread(fd_timestamp, vdata, MAX_DATA, 0);
                 if(len < 0 && (errno == EAGAIN ||
                                errno == EINTR  ||
