@@ -63,6 +63,14 @@ void QService::connect(const sp<qClient::IQClient>& client) {
     mClient = client;
 }
 
+android::status_t QService::screenRefresh() {
+    status_t result = NO_ERROR;
+    if(mClient.get()) {
+        result = mClient->notifyCallback(SCREEN_REFRESH, 0);
+    }
+    return result;
+}
+
 void QService::init()
 {
     if(!sQService) {
