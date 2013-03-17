@@ -120,7 +120,7 @@ inline bool OvMem::open(uint32_t numbufs,
     int allocFlags = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
     if(isSecure) {
         allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP;
-        allocFlags |= GRALLOC_USAGE_PRIVATE_CP_BUFFER;
+        allocFlags |= GRALLOC_USAGE_PROTECTED;
         allocFlags |= GRALLOC_USAGE_PRIVATE_UNCACHED;
     }
 
