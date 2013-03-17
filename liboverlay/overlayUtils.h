@@ -67,6 +67,10 @@
 #define DEBUG_OVERLAY 0
 #define PROFILE_OVERLAY 0
 
+#ifndef MDSS_MDP_RIGHT_MIXER
+#define MDSS_MDP_RIGHT_MIXER 0x100
+#endif
+
 namespace overlay {
 
 // fwd
@@ -301,6 +305,7 @@ enum eMdpFlags {
     OV_MDP_BLEND_FG_PREMULT = MDP_BLEND_FG_PREMULT,
     OV_MDP_FLIP_H = MDP_FLIP_LR,
     OV_MDP_FLIP_V = MDP_FLIP_UD,
+    OV_MDSS_MDP_RIGHT_MIXER = MDSS_MDP_RIGHT_MIXER,
 };
 
 enum eZorder {
