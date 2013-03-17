@@ -364,6 +364,33 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
     crop_b -= crop_h * bottomCutRatio;
 }
 
+void getNonWormholeRegion(hwc_display_contents_1_t* list,
+                              hwc_rect_t& nwr)
+{
+    uint32_t last = list->numHwLayers - 1;
+    hwc_rect_t fbDisplayFrame = list->hwLayers[last].displayFrame;
+    //Initiliaze nwr to first frame
+    nwr.left =  list->hwLayers[0].displayFrame.left;
+    nwr.top =  list->hwLayers[0].displayFrame.top;
+    nwr.right =  list->hwLayers[0].displayFrame.right;
+    nwr.bottom =  list->hwLayers[0].displayFrame.bottom;
+
+    for (uint32_t i = 1; i < last; i++) {
+        hwc_rect_t displayFrame = list->hwLayers[i].displayFrame;
+        nwr.left   = min(nwr.left, displayFrame.left);
+        nwr.top    = min(nwr.top, displayFrame.top);
+        nwr.right  = max(nwr.right, displayFrame.right);
+        nwr.bottom = max(nwr.bottom, displayFrame.bottom);
+    }
+
+    //Intersect with the framebuffer
+    nwr.left   = max(nwr.left, fbDisplayFrame.left);
+    nwr.top    = max(nwr.top, fbDisplayFrame.top);
+    nwr.right  = min(nwr.right, fbDisplayFrame.right);
+    nwr.bottom = min(nwr.bottom, fbDisplayFrame.bottom);
+
+}
+
 bool isExternalActive(hwc_context_t* ctx) {
     return ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive;
 }
@@ -452,6 +479,8 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         fd = -1;
     }
 
+    if (ctx->mCopyBit[dpy])
+        ctx->mCopyBit[dpy]->setReleaseFd(releaseFd);
     if(UNLIKELY(swapzero)){
         list->retireFenceFd = -1;
         close(releaseFd);
