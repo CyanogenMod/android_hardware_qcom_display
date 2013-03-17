@@ -1,6 +1,9 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010 - 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010 - 2013, The Linux Foundation. All rights reserved.
+ *
+ * Not a Contribution, Apache license notifications and license are retained
+ * for attribution purposes only.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -129,6 +132,7 @@ static int get_format(int format) {
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:  return MDP_Y_CRCB_H2V1;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:  return MDP_Y_CRCB_H2V2;
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO: return MDP_Y_CBCR_H2V2_ADRENO;
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE: return MDP_Y_CBCR_H2V2;
     }
     return -1;
 }
@@ -313,10 +317,10 @@ static int set_parameter_copybit(
                     ctx->mFlags &= ~MDP_BLUR;
                 }
                 break;
-            case COPYBIT_PREMULTIPLIED_ALPHA:
-                if(value == COPYBIT_ENABLE) {
+            case COPYBIT_BLEND_MODE:
+                if(value == COPYBIT_BLENDING_PREMULT) {
                     ctx->mFlags |= MDP_BLEND_FG_PREMULT;
-                } else if (value == COPYBIT_DISABLE) {
+                } else {
                     ctx->mFlags &= ~MDP_BLEND_FG_PREMULT;
                 }
                 break;
@@ -403,8 +407,8 @@ static int stretch_copybit(
             }
         }
 
-        if (src_rect->l < 0 || src_rect->r > (int)src->w ||
-            src_rect->t < 0 || src_rect->b > (int)src->h) {
+        if (src_rect->l < 0 || (uint32_t)src_rect->r > src->w ||
+            src_rect->t < 0 || (uint32_t)src_rect->b > src->h) {
             // this is always invalid
             ALOGE ("%s : Invalid source rectangle : src_rect l %d t %d r %d b %d",\
                    __FUNCTION__, src_rect->l, src_rect->t, src_rect->r, src_rect->b);
@@ -423,7 +427,8 @@ static int stretch_copybit(
         }
 
         if(src->format ==  HAL_PIXEL_FORMAT_YV12) {
-            int usage = GRALLOC_USAGE_PRIVATE_MM_HEAP;
+            int usage =
+            GRALLOC_USAGE_PRIVATE_CAMERA_HEAP|GRALLOC_USAGE_PRIVATE_UNCACHED;
             if (0 == alloc_buffer(&yv12_handle,src->w,src->h,
                                   src->format, usage)){
                 if(0 == convertYV12toYCrCb420SP(src,yv12_handle)){
@@ -501,6 +506,11 @@ static int blit_copybit(
     return stretch_copybit(dev, dst, src, &dr, &sr, region);
 }
 
+static int finish_copybit(struct copybit_device_t *dev)
+{
+    // NOP for MDP copybit
+}
+
 /*****************************************************************************/
 
 /** Close the copybit device */
@@ -531,6 +541,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->device.get = get;
     ctx->device.blit = blit_copybit;
     ctx->device.stretch = stretch_copybit;
+    ctx->device.finish = finish_copybit;
     ctx->mAlpha = MDP_ALPHA_NOP;
     ctx->mFlags = 0;
     ctx->mFD = open("/dev/graphics/fb0", O_RDWR, 0);
