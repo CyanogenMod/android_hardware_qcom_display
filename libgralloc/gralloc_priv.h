@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,14 +53,6 @@ enum {
     /* Set this for allocating uncached memory (using O_DSYNC)
      * cannot be used with noncontiguous heaps */
     GRALLOC_USAGE_PRIVATE_UNCACHED        =       0x02000000,
-
-    /* This flag can be set to disable genlock synchronization
-     * for the gralloc buffer. If this flag is set the caller
-     * is required to perform explicit synchronization.
-     * WARNING - flag is outside the standard PRIVATE region
-     * and may need to be moved if the gralloc API changes
-     */
-    GRALLOC_USAGE_PRIVATE_UNSYNCHRONIZED  =       0X04000000,
 
     /* Buffer content should be displayed on an external display only */
     GRALLOC_USAGE_PRIVATE_EXTERNAL_ONLY   =       0x08000000,
@@ -169,8 +161,6 @@ struct private_handle_t : public native_handle {
 
         // file-descriptors
         int     fd;
-        // genlock handle to be dup'd by the binder
-        int     genlockHandle;
         int     fd_metadata;          // fd for the meta-data
         // ints
         int     magic;
@@ -181,28 +171,24 @@ struct private_handle_t : public native_handle {
         int     base;
         int     offset_metadata;
         // The gpu address mapped into the mmu.
-        // If using ashmem, set to 0, they don't care
         int     gpuaddr;
-        int     pid;   // deprecated
         int     format;
         int     width;
         int     height;
-        // local fd of the genlock device.
-        int     genlockPrivFd;
         int     base_metadata;
 
 #ifdef __cplusplus
-        static const int sNumInts = 14;
-        static const int sNumFds = 3;
+        static const int sNumInts = 12;
+        static const int sNumFds = 2;
         static const int sMagic = 'gmsm';
 
         private_handle_t(int fd, int size, int flags, int bufferType,
                          int format,int width, int height, int eFd = -1,
                          int eOffset = 0, int eBase = 0) :
-            fd(fd), genlockHandle(-1), fd_metadata(eFd), magic(sMagic),
+            fd(fd), fd_metadata(eFd), magic(sMagic),
             flags(flags), size(size), offset(0), bufferType(bufferType),
-            base(0), offset_metadata(eOffset), gpuaddr(0), pid(getpid()),
-            format(format), width(width), height(height), genlockPrivFd(-1),
+            base(0), offset_metadata(eOffset), gpuaddr(0),
+            format(format), width(width), height(height),
             base_metadata(eBase)
         {
             version = sizeof(native_handle);
