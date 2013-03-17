@@ -20,6 +20,7 @@
 #include "hwc_video.h"
 #include "hwc_utils.h"
 #include "qdMetaData.h"
+#include "mdp_version.h"
 
 namespace qhwc {
 
@@ -119,11 +120,17 @@ bool VideoOverlay::configure(hwc_context_t *ctx, int dpy,
         isFgFlag = ovutils::IS_FG_SET;
     }
 
+    ovutils::eRotFlags rotFlags = ovutils::ROT_FLAGS_NONE;
+    if(ctx->mMDP.version >= qdutils::MDP_V4_2 &&
+                ctx->mMDP.version < qdutils::MDSS_V5) {
+        rotFlags = ovutils::ROT_DOWNSCALE_ENABLED;
+    }
+
     ovutils::PipeArgs parg(mdpFlags,
             info,
             ovutils::ZORDER_1,
             isFgFlag,
-            ovutils::ROT_FLAG_DISABLED);
+            rotFlags);
 
     ov.setSource(parg, dest);
 

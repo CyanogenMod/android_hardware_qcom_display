@@ -276,9 +276,21 @@ enum { MAX_PATH_LEN = 256 };
  * ROT_FLAG_DISABLED: Rotator not used unless required.
  * ROT_FLAG_ENABLED: Rotator used even if not required.
  * */
-enum eRotFlags {
-    ROT_FLAG_DISABLED = 0,
-    ROT_FLAG_ENABLED = 1 // needed in rot
+ enum eRotFlags {
+    ROT_FLAGS_NONE = 0,
+    //Use rotator for 0 rotation. It is used anyway for others.
+    ROT_0_ENABLED = 1 << 0,
+    //Enable rotator downscale optimization for hardware bugs not handled in
+    //driver. If downscale optimizatation is required,
+    //then rotator will be used even if its 0 rotation case.
+    ROT_DOWNSCALE_ENABLED = 1 << 1,
+};
+
+enum eRotDownscale {
+    ROT_DS_NONE = 0,
+    ROT_DS_HALF = 1,
+    ROT_DS_FOURTH = 2,
+    ROT_DS_EIGHTH = 3,
 };
 
 /* The values for is_fg flag for control alpha and transp
@@ -372,7 +384,7 @@ struct PipeArgs {
     PipeArgs() : mdpFlags(OV_MDP_FLAGS_NONE),
         zorder(Z_SYSTEM_ALLOC),
         isFg(IS_FG_OFF),
-        rotFlags(ROT_FLAG_DISABLED){
+        rotFlags(ROT_FLAGS_NONE){
     }
 
     PipeArgs(eMdpFlags f, Whf _whf,
@@ -445,6 +457,11 @@ template <class T> inline void swap ( T& a, T& b )
 inline int alignup(int value, int a) {
     //if align = 0, return the value. Else, do alignment.
     return a ? ((((value - 1) / a) + 1) * a) : value;
+}
+
+inline int aligndown(int value, int a) {
+    //if align = 0, return the value. Else, do alignment.
+    return a ? ((value) & ~(a-1)) : value;
 }
 
 // FIXME that align should replace the upper one.
