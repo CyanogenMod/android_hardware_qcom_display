@@ -603,6 +603,9 @@ static inline void updateSource(eTransform& orient, Whf& whf,
     Dim srcCrop(crop.left, crop.top,
             crop.right - crop.left,
             crop.bottom - crop.top);
+    //getMdpOrient will switch the flips if the source is 90 rotated.
+    //Clients in Android dont factor in 90 rotation while deciding the flip.
+    orient = static_cast<eTransform>(ovutils::getMdpOrient(orient));
     preRotateSource(orient, whf, srcCrop);
     crop.left = srcCrop.x;
     crop.top = srcCrop.y;
@@ -653,10 +656,12 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
             return -1;
         whf.format = (*rot)->getDstFormat();
         updateSource(orient, whf, crop);
-        //For the mdp, since we are pre-rotating
-        transform = 0;
         rotFlags |= ovutils::ROT_PREROTATED;
     }
+
+    //For the mdp, since either we are pre-rotating or MDP does flips
+    orient = OVERLAY_TRANSFORM_0;
+    transform = 0;
 
     PipeArgs parg(mdpFlags, whf, z, isFg, static_cast<eRotFlags>(rotFlags));
     if(configMdp(ctx->mOverlay, parg, orient, crop, dst, dest) < 0) {
@@ -699,8 +704,6 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
             return -1;
         whf.format = (*rot)->getDstFormat();
         updateSource(orient, whf, crop);
-        //For the mdp, since we are pre-rotating
-        transform = 0;
         rotFlags |= ROT_PREROTATED;
     }
 
@@ -726,7 +729,7 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     //When buffer is flipped, contents of mixer config also needs to swapped.
     //Not needed if the layer is confined to one half of the screen.
     //If rotator has been used then it has also done the flips, so ignore them.
-    if(layer->transform & HWC_TRANSFORM_FLIP_V && lDest != OV_INVALID
+    if((orient & OVERLAY_TRANSFORM_FLIP_V) && lDest != OV_INVALID
             && rDest != OV_INVALID && rot == NULL) {
         hwc_rect_t new_cropR;
         new_cropR.left = tmp_cropL.left;
@@ -743,6 +746,10 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         tmp_cropR.right =  new_cropR.right;
 
     }
+
+    //For the mdp, since either we are pre-rotating or MDP does flips
+    orient = OVERLAY_TRANSFORM_0;
+    transform = 0;
 
     //configure left mixer
     if(lDest != OV_INVALID) {

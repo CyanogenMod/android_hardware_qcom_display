@@ -688,7 +688,7 @@ inline void even_floor(T& value) {
         value--;
 }
 
-void preRotateSource(eTransform& tr, Whf& whf, Dim& srcCrop);
+void preRotateSource(const eTransform& tr, Whf& whf, Dim& srcCrop);
 void getDump(char *buf, size_t len, const char *prefix, const mdp_overlay& ov);
 void getDump(char *buf, size_t len, const char *prefix, const msmfb_img& ov);
 void getDump(char *buf, size_t len, const char *prefix, const mdp_rect& ov);
