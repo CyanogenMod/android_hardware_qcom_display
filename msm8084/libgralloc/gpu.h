@@ -27,7 +27,7 @@
 #include <cutils/ashmem.h>
 
 #include "gralloc_priv.h"
-#include <fb_priv.h>
+#include "fb_priv.h"
 
 namespace gralloc {
 class IAllocController;
@@ -35,12 +35,6 @@ class gpu_context_t : public alloc_device_t {
     public:
     gpu_context_t(const private_module_t* module,
                   IAllocController* alloc_ctrl);
-
-    int gralloc_alloc_framebuffer_locked(size_t size, int usage,
-                                         buffer_handle_t* pHandle);
-
-    int gralloc_alloc_framebuffer(size_t size, int usage,
-                                  buffer_handle_t* pHandle);
 
     int gralloc_alloc_buffer(size_t size, int usage,
                              buffer_handle_t* pHandle,
