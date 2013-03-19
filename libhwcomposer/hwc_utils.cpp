@@ -23,7 +23,6 @@
 #include <EGL/egl.h>
 #include <cutils/properties.h>
 #include <gralloc_priv.h>
-#include <fb_priv.h>
 #include <overlay.h>
 #include <overlayRotator.h>
 #include "hwc_utils.h"
@@ -46,25 +45,59 @@ namespace ovutils = overlay::utils;
 
 namespace qhwc {
 
-// Opens Framebuffer device
-static void openFramebufferDevice(hwc_context_t *ctx)
+static int openFramebufferDevice(hwc_context_t *ctx)
 {
-    hw_module_t const *module;
-    if (hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &module) == 0) {
-        framebuffer_open(module, &(ctx->mFbDev));
-        private_module_t* m = reinterpret_cast<private_module_t*>(
-                ctx->mFbDev->common.module);
-        //xres, yres may not be 32 aligned
-        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].stride = m->finfo.line_length /
-                                                (m->info.xres/8);
-        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres = m->info.xres;
-        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres = m->info.yres;
-        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xdpi = ctx->mFbDev->xdpi;
-        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].ydpi = ctx->mFbDev->ydpi;
-        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period =
-                1000000000l / ctx->mFbDev->fps;
-        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd = openFb(HWC_DISPLAY_PRIMARY);
+    struct fb_fix_screeninfo finfo;
+    struct fb_var_screeninfo info;
+
+    int fb_fd = openFb(HWC_DISPLAY_PRIMARY);
+
+    if (ioctl(fb_fd, FBIOGET_VSCREENINFO, &info) == -1)
+        return -errno;
+
+    if (int(info.width) <= 0 || int(info.height) <= 0) {
+        // the driver doesn't return that information
+        // default to 160 dpi
+        info.width  = ((info.xres * 25.4f)/160.0f + 0.5f);
+        info.height = ((info.yres * 25.4f)/160.0f + 0.5f);
     }
+
+    float xdpi = (info.xres * 25.4f) / info.width;
+    float ydpi = (info.yres * 25.4f) / info.height;
+
+#ifdef MSMFB_METADATA_GET
+    struct msmfb_metadata metadata;
+    memset(&metadata, 0 , sizeof(metadata));
+    metadata.op = metadata_op_frame_rate;
+
+    if (ioctl(fb_fd, MSMFB_METADATA_GET, &metadata) == -1) {
+        ALOGE("Error retrieving panel frame rate");
+        return -errno;
+    }
+
+    float fps  = metadata.data.panel_frame_rate;
+#else
+    //XXX: Remove reserved field usage on all baselines
+    //The reserved[3] field is used to store FPS by the driver.
+    float fps  = info.reserved[3] & 0xFF;
+#endif
+
+    if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo) == -1)
+        return -errno;
+
+    if (finfo.smem_len <= 0)
+        return -errno;
+
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd = fb_fd;
+    //xres, yres may not be 32 aligned
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].stride = finfo.line_length /(info.xres/8);
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres = info.xres;
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres = info.yres;
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xdpi = xdpi;
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].ydpi = ydpi;
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period = 1000000000l / fps;
+
+    return 0;
 }
 
 void initContext(hwc_context_t *ctx)
@@ -143,9 +176,7 @@ void closeContext(hwc_context_t *ctx)
         }
     }
 
-    if(ctx->mFbDev) {
-        framebuffer_close(ctx->mFbDev);
-        ctx->mFbDev = NULL;
+    if(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd) {
         close(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd);
         ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd = -1;
     }

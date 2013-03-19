@@ -47,7 +47,6 @@ public:
     void setExternalDisplay(bool connected, int extFbNum = 0);
     bool isExternalConnected() { return mConnected;};
     void  setExtDpyNum(int extDpyNum) { mExtDpyNum = extDpyNum;};
-    bool post();
     void setHPD(uint32_t startEnd);
     void setEDIDMode(int resMode);
     void setActionSafeDimension(int w, int h);

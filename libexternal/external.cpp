@@ -683,25 +683,6 @@ bool ExternalDisplay::writeHPDOption(int userOption) const
     return ret;
 }
 
-/*
- * commits the changes to the external display
- */
-bool ExternalDisplay::post()
-{
-    if(mFd == -1)
-        return false;
-
-    struct mdp_display_commit ext_commit;
-    memset(&ext_commit, 0, sizeof(struct mdp_display_commit));
-    ext_commit.flags = MDP_DISPLAY_COMMIT_OVERLAY;
-    if (ioctl(mFd, MSMFB_DISPLAY_COMMIT, &ext_commit) == -1) {
-        ALOGE("%s: MSMFB_DISPLAY_COMMIT for external failed, str: %s",
-                __FUNCTION__, strerror(errno));
-        return false;
-    }
-    return true;
-}
-
 void ExternalDisplay::setDpyWfdAttr() {
     if(mHwcContext) {
         mHwcContext->dpyAttr[mExtDpyNum].xres = mVInfo.xres;

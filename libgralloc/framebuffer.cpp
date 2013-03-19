@@ -54,7 +54,6 @@ static inline int max(int a, int b) {
 
 enum {
     PAGE_FLIP = 0x00000001,
-    LOCKED    = 0x00000002
 };
 
 struct fb_context_t {
@@ -88,8 +87,8 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
     private_module_t* m =
         reinterpret_cast<private_module_t*>(dev->common.module);
     struct mdp_display_commit prim_commit;
+    prim_commit.wait_for_finish = 1;
     memset(&prim_commit, 0, sizeof(struct mdp_display_commit));
-    prim_commit.flags = MDP_DISPLAY_COMMIT_OVERLAY;
     if (ioctl(m->framebuffer->fd, MSMFB_DISPLAY_COMMIT, &prim_commit) == -1) {
         ALOGE("%s: MSMFB_DISPLAY_COMMIT for primary failed, str: %s",
                 __FUNCTION__, strerror(errno));
@@ -326,12 +325,6 @@ int mapFrameBufferLocked(struct private_module_t* module)
     module->framebuffer->base = intptr_t(vaddr);
     memset(vaddr, 0, fbSize);
     module->currentOffset = 0;
-    module->fbPostDone = false;
-    pthread_mutex_init(&(module->fbPostLock), NULL);
-    pthread_cond_init(&(module->fbPostCond), NULL);
-    module->fbPanDone = false;
-    pthread_mutex_init(&(module->fbPanLock), NULL);
-    pthread_cond_init(&(module->fbPanCond), NULL);
     return 0;
 }
 
