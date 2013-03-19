@@ -99,8 +99,13 @@ private:
     void setZ(utils::eZorder z);
     /* set isFg flag */
     void setIsFg(utils::eIsFg isFg);
-        /* return a copy of src whf*/
+    /* return a copy of src whf*/
     utils::Whf getSrcWhf() const;
+    /* set plane alpha */
+    void setPlaneAlpha(int planeAlpha);
+    /* set blending method */
+    void setBlending(overlay::utils::eBlending blending);
+
     /* set src whf */
     void setSrcWhf(const utils::Whf& whf);
     /* set src/dst rect dim */
@@ -239,6 +244,24 @@ inline void MdpCtrl::setIsFg(overlay::utils::eIsFg isFg) {
 
 inline void MdpCtrl::setDownscale(int dscale) {
     mDownscale = dscale;
+}
+
+inline void MdpCtrl::setPlaneAlpha(int planeAlpha) {
+    mOVInfo.alpha = planeAlpha;
+}
+
+inline void MdpCtrl::setBlending(overlay::utils::eBlending blending) {
+    switch((int) blending) {
+    case utils::OVERLAY_BLENDING_OPAQUE:
+        mOVInfo.blend_op = BLEND_OP_OPAQUE;
+        break;
+    case utils::OVERLAY_BLENDING_PREMULT:
+        mOVInfo.blend_op = BLEND_OP_PREMULTIPLIED;
+        break;
+    case utils::OVERLAY_BLENDING_COVERAGE:
+    default:
+        mOVInfo.blend_op = BLEND_OP_COVERAGE;
+    }
 }
 
 inline bool MdpCtrl::ovChanged() const {
