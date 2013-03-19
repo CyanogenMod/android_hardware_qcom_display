@@ -94,13 +94,14 @@ void MdpCtrl::setSource(const utils::PipeArgs& args) {
     setSrcWhf(args.whf);
 
     //TODO These are hardcoded. Can be moved out of setSource.
-    mOVInfo.alpha = 0xff;
     mOVInfo.transp_mask = 0xffffffff;
 
     //TODO These calls should ideally be a part of setPipeParams API
     setFlags(args.mdpFlags);
     setZ(args.zorder);
     setIsFg(args.isFg);
+    setPlaneAlpha(args.planeAlpha);
+    setBlending(args.blending);
 }
 
 void MdpCtrl::setCrop(const utils::Dim& d) {
