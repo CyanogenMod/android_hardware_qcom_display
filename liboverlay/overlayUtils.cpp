@@ -28,6 +28,7 @@
 */
 
 #include <stdlib.h>
+#include <math.h>
 #include <utils/Log.h>
 #include <linux/msm_mdp.h>
 #include <cutils/properties.h>
@@ -189,7 +190,9 @@ int getDownscaleFactor(const int& src_w, const int& src_h,
     // Use-case: Video playback [with downscaling and rotation].
     if (dst_w && dst_h)
     {
-        uint32_t dscale = (src_w * src_h) / (dst_w * dst_h);
+        float fDscale =  (float)(src_w * src_h) / (float)(dst_w * dst_h);
+        uint32_t dscale = (int)sqrtf(fDscale);
+
         if(dscale < 2) {
             // Down-scale to > 50% of orig.
             dscale_factor = utils::ROT_DS_NONE;
