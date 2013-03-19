@@ -284,9 +284,21 @@ bool needsScaling(hwc_layer_1_t const* layer) {
 }
 
 bool isAlphaScaled(hwc_layer_1_t const* layer) {
-    if(needsScaling(layer)) {
-        if(layer->blending != HWC_BLENDING_NONE)
+    if(needsScaling(layer) && isAlphaPresent(layer)) {
+        return true;
+    }
+    return false;
+}
+
+bool isAlphaPresent(hwc_layer_1_t const* layer) {
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    int format = hnd->format;
+    switch(format) {
+        case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_BGRA_8888:
+            // In any more formats with Alpha go here..
             return true;
+        default : return false;
     }
     return false;
 }
