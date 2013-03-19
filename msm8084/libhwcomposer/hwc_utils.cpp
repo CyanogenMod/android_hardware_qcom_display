@@ -798,6 +798,8 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     if(rDest != OV_INVALID) {
         PipeArgs pargR(mdpFlagsR, whf, z, isFg,
                 static_cast<eRotFlags>(rotFlags));
+        tmp_dstR.right = tmp_dstR.right - tmp_dstR.left;
+        tmp_dstR.left = 0;
         if(configMdp(ctx->mOverlay, pargR, orient,
                 tmp_cropR, tmp_dstR, rDest) < 0) {
             ALOGE("%s: commit failed for right mixer config", __FUNCTION__);
