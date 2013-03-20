@@ -105,6 +105,8 @@ static void reset(hwc_context_t *ctx, int numDisplays,
             ctx->mFBUpdate[i]->reset();
         if(ctx->mCopyBit[i])
             ctx->mCopyBit[i]->reset();
+        if(ctx->mLayerRotMap[i])
+            ctx->mLayerRotMap[i]->reset();
     }
 }
 

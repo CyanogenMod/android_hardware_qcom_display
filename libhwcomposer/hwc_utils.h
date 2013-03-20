@@ -121,6 +121,36 @@ enum {
     HWC_COPYBIT = 0x00000002,
 };
 
+class LayerRotMap {
+public:
+    LayerRotMap() { reset(); }
+    enum { MAX_SESS = 3 };
+    void add(hwc_layer_1_t* layer, overlay::Rotator *rot);
+    void reset();
+    uint32_t getCount() const;
+    hwc_layer_1_t* getLayer(uint32_t index) const;
+    overlay::Rotator* getRot(uint32_t index) const;
+    void setReleaseFd(const int& fence);
+private:
+    hwc_layer_1_t* mLayer[MAX_SESS];
+    overlay::Rotator* mRot[MAX_SESS];
+    uint32_t mCount;
+};
+
+inline uint32_t LayerRotMap::getCount() const {
+    return mCount;
+}
+
+inline hwc_layer_1_t* LayerRotMap::getLayer(uint32_t index) const {
+    if(index >= mCount) return NULL;
+    return mLayer[index];
+}
+
+inline overlay::Rotator* LayerRotMap::getRot(uint32_t index) const {
+    if(index >= mCount) return NULL;
+    return mRot[index];
+}
+
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_1_t const* l);
@@ -301,7 +331,6 @@ struct hwc_context_t {
     hwc_rect_t mPrevCropVideo;
     hwc_rect_t mPrevDestVideo;
     int mPrevTransformVideo;
-
     //Securing in progress indicator
     bool mSecuring;
     //External Display configuring progress indicator
@@ -318,6 +347,7 @@ struct hwc_context_t {
     int mExtOrientation;
     //Flags the transition of a video session
     bool mVideoTransFlag;
+    qhwc::LayerRotMap *mLayerRotMap[MAX_DISPLAYS];
 };
 
 namespace qhwc {
