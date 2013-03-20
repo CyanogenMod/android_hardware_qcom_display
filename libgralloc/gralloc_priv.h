@@ -241,8 +241,4 @@ struct private_handle_t : public native_handle {
 #endif
     };
 
-    struct private_module_t {
-          gralloc_module_t base;
-    };
-
 #endif /* GRALLOC_PRIV_H_ */
