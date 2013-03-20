@@ -1258,8 +1258,7 @@ static int stretch_copybit_internal(
         return COPYBIT_FAILURE;
     }
 
-    src_surface.config_mask = C2D_NO_BILINEAR_BIT | C2D_NO_ANTIALIASING_BIT |
-                              ctx->config_mask;
+    src_surface.config_mask = C2D_NO_ANTIALIASING_BIT | ctx->config_mask;
     src_surface.global_alpha = ctx->src_global_alpha;
     if (enableBlend) {
         if(src_surface.config_mask & C2D_GLOBAL_ALPHA_BIT) {
