@@ -25,7 +25,7 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libmemalloc
 LOCAL_SHARED_LIBRARIES        += libqdutils libGLESv1_CM
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps) $(kernel_deps)
-LOCAL_SRC_FILES               :=  gpu.cpp gralloc.cpp mapper.cpp
+LOCAL_SRC_FILES               :=  gpu.cpp gralloc.cpp framebuffer.cpp mapper.cpp
 
 include $(BUILD_SHARED_LIBRARY)
 
