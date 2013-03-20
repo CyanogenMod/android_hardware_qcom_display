@@ -19,6 +19,7 @@
  */
 #define HWC_UTILS_DEBUG 0
 #include <sys/ioctl.h>
+#include <linux/fb.h>
 #include <binder/IServiceManager.h>
 #include <EGL/egl.h>
 #include <cutils/properties.h>
