@@ -29,7 +29,6 @@
 #include <utils/String8.h>
 #include "qdMetaData.h"
 #include <overlayUtils.h>
-#include <linux/fb.h>
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
