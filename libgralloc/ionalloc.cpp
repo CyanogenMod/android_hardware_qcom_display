@@ -111,7 +111,8 @@ int IonAlloc::alloc_buffer(alloc_data& data)
         }
         memset(base, 0, ionAllocData.len);
         // Clean cache after memset
-        clean_buffer(base, data.size, data.offset, fd_data.fd);
+        clean_buffer(base, data.size, data.offset, fd_data.fd,
+                     CACHE_CLEAN_AND_INVALIDATE);
     }
 
     data.base = base;
@@ -175,7 +176,7 @@ int IonAlloc::unmap_buffer(void *base, size_t size, int offset)
     return err;
 
 }
-int IonAlloc::clean_buffer(void *base, size_t size, int offset, int fd)
+int IonAlloc::clean_buffer(void *base, size_t size, int offset, int fd, int op)
 {
     struct ion_flush_data flush_data;
     struct ion_fd_data fd_data;
@@ -202,7 +203,18 @@ int IonAlloc::clean_buffer(void *base, size_t size, int offset, int fd)
     flush_data.length  = size;
 
     struct ion_custom_data d;
-    d.cmd = ION_IOC_CLEAN_INV_CACHES;
+    switch(op) {
+    case CACHE_CLEAN:
+        d.cmd = ION_IOC_CLEAN_CACHES;
+        break;
+    case CACHE_INVALIDATE:
+            d.cmd = ION_IOC_INV_CACHES;
+        break;
+    case CACHE_CLEAN_AND_INVALIDATE:
+    default:
+        d.cmd = ION_IOC_CLEAN_INV_CACHES;
+    }
+
     d.arg = (unsigned long int)&flush_data;
 
     if(ioctl(mIonFd, ION_IOC_CUSTOM, &d)) {

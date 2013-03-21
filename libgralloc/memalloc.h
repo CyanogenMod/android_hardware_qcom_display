@@ -34,6 +34,12 @@
 
 namespace gralloc {
 
+enum {
+    CACHE_CLEAN = 0x1,
+    CACHE_INVALIDATE,
+    CACHE_CLEAN_AND_INVALIDATE,
+};
+
 struct alloc_data {
     void           *base;
     int            fd;
@@ -68,7 +74,7 @@ class IMemAlloc {
 
     // Clean and invalidate
     virtual int clean_buffer(void *base, size_t size,
-                             int offset, int fd) = 0;
+                             int offset, int fd, int op) = 0;
 
     // Destructor
     virtual ~IMemAlloc() {};
