@@ -112,6 +112,10 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
+    overlay::Overlay::initOverlay();
+    ctx->mOverlay = overlay::Overlay::getInstance();
+    ctx->mRotMgr = new RotMgr();
+
     //Is created and destroyed only once for primary
     //For external it could get created and destroyed multiple times depending
     //on what external we connect to.
