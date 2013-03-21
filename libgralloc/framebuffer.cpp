@@ -87,8 +87,8 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
     private_module_t* m =
         reinterpret_cast<private_module_t*>(dev->common.module);
     struct mdp_display_commit prim_commit;
-    prim_commit.wait_for_finish = 1;
     memset(&prim_commit, 0, sizeof(struct mdp_display_commit));
+    prim_commit.wait_for_finish = 1;
     if (ioctl(m->framebuffer->fd, MSMFB_DISPLAY_COMMIT, &prim_commit) == -1) {
         ALOGE("%s: MSMFB_DISPLAY_COMMIT for primary failed, str: %s",
                 __FUNCTION__, strerror(errno));
