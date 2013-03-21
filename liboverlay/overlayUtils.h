@@ -114,36 +114,6 @@ private:
     const NoCopy& operator=(const NoCopy&);
 };
 
-/*
-* Utility class to query the framebuffer info for primary display
-*
-* Usage:
-*    Outside of functions:
-*       utils::FrameBufferInfo* utils::FrameBufferInfo::sFBInfoInstance = 0;
-*    Inside functions:
-*       utils::FrameBufferInfo::getInstance()->supportTrueMirroring()
-*/
-class FrameBufferInfo {
-
-public:
-    /* ctor init */
-    explicit FrameBufferInfo();
-
-    /* Gets an instance if one does not already exist */
-    static FrameBufferInfo* getInstance();
-
-    /* Gets width of primary framebuffer */
-    int getWidth() const;
-
-    /* Gets height of primary framebuffer */
-    int getHeight() const;
-
-private:
-    int mFBWidth;
-    int mFBHeight;
-    bool mBorderFillSupported;
-    static FrameBufferInfo *sFBInfoInstance;
-};
 
 /* 3D related utils, defines etc...
  * The compound format passed to the overlay is
@@ -163,18 +133,9 @@ enum { BARRIER_LAND = 1,
 int initOverlay(void);
 
 inline uint32_t format3D(uint32_t x) { return x & 0xFF000; }
-inline uint32_t colorFormat(uint32_t fmt) {
-    /*TODO enable this block only if format has interlace / 3D info in top bits.
-    if(fmt & INTERLACE_MASK) {
-        fmt = fmt ^ HAL_PIXEL_FORMAT_INTERLACE;
-    }
-    fmt = fmt & 0xFFF;*/
-    return fmt;
-}
 inline uint32_t format3DOutput(uint32_t x) {
     return (x & 0xF000) >> SHIFT_OUT_3D; }
 inline uint32_t format3DInput(uint32_t x) { return x & 0xF0000; }
-uint32_t getColorFormat(uint32_t format);
 
 bool isHDMIConnected ();
 bool is3DTV();
@@ -255,10 +216,8 @@ enum { MAX_PATH_LEN = 256 };
 
 /**
  * Rotator flags: not to be confused with orientation flags.
- * Ususally, you want to open the rotator to make sure it is
+ * Usually, you want to open the rotator to make sure it is
  * ready for business.
- * ROT_FLAG_DISABLED: Rotator not used unless required.
- * ROT_FLAG_ENABLED: Rotator used even if not required.
  * */
  enum eRotFlags {
     ROT_FLAGS_NONE = 0,
@@ -268,6 +227,7 @@ enum { MAX_PATH_LEN = 256 };
     //driver. If downscale optimizatation is required,
     //then rotator will be used even if its 0 rotation case.
     ROT_DOWNSCALE_ENABLED = 1 << 1,
+    ROT_PREROTATED = 1 << 2,
 };
 
 enum eRotDownscale {
@@ -298,7 +258,6 @@ enum eMdpFlags {
     OV_MDP_DEINTERLACE = MDP_DEINTERLACE,
     OV_MDP_SECURE_OVERLAY_SESSION = MDP_SECURE_OVERLAY_SESSION,
     OV_MDP_SOURCE_ROTATED_90 = MDP_SOURCE_ROTATED_90,
-    OV_MDP_MEMORY_ID_TYPE_FB = MDP_MEMORY_ID_TYPE_FB,
     OV_MDP_BACKEND_COMPOSITION = MDP_BACKEND_COMPOSITION,
     OV_MDP_BLEND_FG_PREMULT = MDP_BLEND_FG_PREMULT,
     OV_MDP_FLIP_H = MDP_FLIP_LR,
@@ -307,7 +266,7 @@ enum eMdpFlags {
 };
 
 enum eZorder {
-    ZORDER_0,
+    ZORDER_0 = 0,
     ZORDER_1,
     ZORDER_2,
     ZORDER_3,
@@ -422,6 +381,8 @@ struct ScreenInfo {
 
 int getMdpFormat(int format);
 int getHALFormat(int mdpFormat);
+int getDownscaleFactor(const int& src_w, const int& src_h,
+        const int& dst_w, const int& dst_h);
 
 /* flip is upside down and such. V, H flip
  * rotation is 90, 180 etc
@@ -597,12 +558,6 @@ inline int getMdpOrient(eTransform rotation) {
     return -1;
 }
 
-inline uint32_t getColorFormat(uint32_t format)
-{
-    return (format == HAL_PIXEL_FORMAT_YV12) ?
-            format : colorFormat(format);
-}
-
 // FB0
 template <int CHAN>
 inline Dim getPositionS3DImpl(const Whf& whf)
@@ -766,6 +721,7 @@ inline eMdpPipeType getPipeType(eDest dest) {
     return OV_MDP_PIPE_ANY;
 }
 
+void preRotateSource(eTransform& tr, Whf& whf, Dim& srcCrop);
 void getDump(char *buf, size_t len, const char *prefix, const mdp_overlay& ov);
 void getDump(char *buf, size_t len, const char *prefix, const msmfb_img& ov);
 void getDump(char *buf, size_t len, const char *prefix, const mdp_rect& ov);
