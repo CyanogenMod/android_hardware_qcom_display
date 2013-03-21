@@ -253,14 +253,6 @@ bool MDPComp::isDoable(hwc_context_t *ctx,
         return false;
     }
 
-    if(isSecuring(ctx)) {
-        ALOGD_IF(isDebug(), "%s: MDP securing is active", __FUNCTION__);
-        return false;
-    }
-
-    if(ctx->mSecureMode)
-        return false;
-
     //Check for skip layers
     if(isSkipPresent(ctx, dpy)) {
         ALOGD_IF(isDebug(), "%s: Skip layers are present",__FUNCTION__);
@@ -292,15 +284,21 @@ bool MDPComp::isDoable(hwc_context_t *ctx,
         // 180 transforms. Fail for any transform involving 90 (90, 270).
         hwc_layer_1_t* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-
-        if(layer->transform & HWC_TRANSFORM_ROT_90 && !isYuvBuffer(hnd)) {
-            ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
-            return false;
-        }
-
-        if(!isYuvBuffer(hnd) && !isWidthValid(ctx,layer)) {
-            ALOGD_IF(isDebug(), "%s: Buffer is of invalid width",__FUNCTION__);
-            return false;
+        if(isYuvBuffer(hnd) ) {
+            if(isSecuring(ctx, layer)) {
+                ALOGD_IF(isDebug(), "%s: MDP securing is active", __FUNCTION__);
+                return false;
+            }
+        } else {
+            if(layer->transform & HWC_TRANSFORM_ROT_90) {
+                ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
+                return false;
+            }
+            if(!isWidthValid(ctx,layer)) {
+                ALOGD_IF(isDebug(), "%s: Buffer is of invalid width",
+                                    __FUNCTION__);
+                return false;
+            }
         }
     }
     return true;

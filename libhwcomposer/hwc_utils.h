@@ -169,7 +169,7 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
                          const hwc_rect_t& scissor, int orient);
 void getNonWormholeRegion(hwc_display_contents_1_t* list,
                               hwc_rect_t& nwr);
-bool isSecuring(hwc_context_t* ctx);
+bool isSecuring(hwc_context_t* ctx, hwc_layer_1_t const* layer);
 bool isSecureModePolicy(int mdpVersion);
 bool isExternalActive(hwc_context_t* ctx);
 bool needsScaling(hwc_layer_1_t const* layer);
