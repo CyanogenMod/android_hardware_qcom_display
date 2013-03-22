@@ -90,6 +90,10 @@ C2D_STATUS (*LINK_c2dGetDriverCapabilities) ( C2D_DRIVER_INFO * driver_info);
 /* create a fence fd for the timestamp */
 C2D_STATUS (*LINK_c2dCreateFenceFD) ( uint32 target_id, c2d_ts_handle timestamp,
                                                             int32 *fd);
+
+C2D_STATUS (*LINK_c2dFillSurface) ( uint32 surface_id, uint32 fill_color,
+                                    C2D_RECT * fill_rect);
+
 /******************************************************************************/
 
 #if defined(COPYBIT_Z180)
@@ -673,6 +677,28 @@ static int finish_copybit(struct copybit_device_t *dev)
     ctx->blit_count = 0;
     return status;
 }
+
+static int clear_copybit(struct copybit_device_t *dev,
+                         struct copybit_image_t const *buf,
+                         struct copybit_rect_t *rect)
+{
+    int ret = 0;
+    int flags = FLAGS_PREMULTIPLIED_ALPHA;
+    int mapped_dst_idx = -1;
+    struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
+    C2D_RECT c2drect = {rect->l, rect->t, rect->r - rect->l, rect->b - rect->t};
+    ret = set_image(ctx, ctx->dst[RGB_SURFACE], buf,
+                       (eC2DFlags)flags, mapped_dst_idx);
+    if(ret) {
+        ALOGE("%s: set_image error", __FUNCTION__);
+        unmap_gpuaddr(ctx, mapped_dst_idx);
+        return COPYBIT_FAILURE;
+    }
+
+    ret = LINK_c2dFillSurface(ctx->dst[RGB_SURFACE], 0x0, &c2drect);
+    return ret;
+}
+
 
 /** setup rectangles */
 static void set_rects(struct copybit_context_t *ctx,
@@ -1476,11 +1502,14 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
                                            "c2dGetDriverCapabilities");
     *(void **)&LINK_c2dCreateFenceFD = ::dlsym(ctx->libc2d2,
                                            "c2dCreateFenceFD");
+    *(void **)&LINK_c2dFillSurface = ::dlsym(ctx->libc2d2,
+                                           "c2dFillSurface");
 
     if (!LINK_c2dCreateSurface || !LINK_c2dUpdateSurface || !LINK_c2dReadSurface
         || !LINK_c2dDraw || !LINK_c2dFlush || !LINK_c2dWaitTimestamp ||
         !LINK_c2dFinish  || !LINK_c2dDestroySurface ||
-        !LINK_c2dGetDriverCapabilities || !LINK_c2dCreateFenceFD) {
+        !LINK_c2dGetDriverCapabilities || !LINK_c2dCreateFenceFD ||
+        !LINK_c2dFillSurface) {
         ALOGE("%s: dlsym ERROR", __FUNCTION__);
         clean_up(ctx);
         status = COPYBIT_FAILURE;
@@ -1498,6 +1527,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->device.stretch = stretch_copybit;
     ctx->device.finish = finish_copybit;
     ctx->device.flush_get_fence = flush_get_fence_copybit;
+    ctx->device.clear = clear_copybit;
 
     /* Create RGB Surface */
     surfDefinition.buffer = (void*)0xdddddddd;
