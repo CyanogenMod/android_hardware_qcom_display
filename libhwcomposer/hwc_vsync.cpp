@@ -136,9 +136,11 @@ static void *vsync_loop(void *param)
             cur_timestamp = systemTime();
         }
         // send timestamp to HAL
-        ALOGD_IF (logvsync, "%s: timestamp %llu sent to HWC for %s",
-                  __FUNCTION__, cur_timestamp, "fb0");
-        ctx->proc->vsync(ctx->proc, dpy, cur_timestamp);
+        if(ctx->vstate.enable) {
+            ALOGD_IF (logvsync, "%s: timestamp %llu sent to HWC for %s",
+                      __FUNCTION__, cur_timestamp, "fb0");
+            ctx->proc->vsync(ctx->proc, dpy, cur_timestamp);
+        }
 
     } while (true);
     if(fd_timestamp >= 0)
