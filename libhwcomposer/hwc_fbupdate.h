@@ -41,7 +41,10 @@ public:
     virtual void reset();
     //Factory method that returns a low-res or high-res version
     static IFBUpdate *getObject(const int& width, const int& dpy);
-
+    //To know if configuring FbUpdate is needed.
+    static bool needFbUpdate(hwc_context_t *ctx,
+           const hwc_display_contents_1_t *list,
+                                       int dpy);
 protected:
     const int mDpy; // display to update
     bool mModeOn; // if prepare happened
