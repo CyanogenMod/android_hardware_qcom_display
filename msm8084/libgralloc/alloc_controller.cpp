@@ -175,7 +175,6 @@ int IonController::allocate(alloc_data& data, int usage)
 {
     int ionFlags = 0;
     int ret;
-    bool noncontig = false;
 
     data.uncached = useUncached(usage);
     data.allocType = 0;
@@ -183,24 +182,33 @@ int IonController::allocate(alloc_data& data, int usage)
     if(usage & GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP)
         ionFlags |= ION_HEAP(ION_SF_HEAP_ID);
 
-    if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP) {
+    if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP)
         ionFlags |= ION_HEAP(ION_SYSTEM_HEAP_ID);
-        noncontig = true;
-    }
 
-    if(usage & GRALLOC_USAGE_PRIVATE_IOMMU_HEAP) {
+    if(usage & GRALLOC_USAGE_PRIVATE_IOMMU_HEAP)
         ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
-        noncontig = true;
-    }
 
-    if(usage & GRALLOC_USAGE_PRIVATE_MM_HEAP)
-        ionFlags |= ION_HEAP(ION_CP_MM_HEAP_ID);
+    //MM Heap is exclusively a secure heap.
+    if(usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
+        //XXX: Right now the MM heap is the only secure heap we have. When we
+        //have other secure heaps, we can change this.
+        if(usage & GRALLOC_USAGE_PROTECTED) {
+            ionFlags |= ION_HEAP(ION_CP_MM_HEAP_ID);
+            ionFlags |= ION_SECURE;
+        }
+        else {
+            ALOGW("GRALLOC_USAGE_PRIVATE_MM_HEAP \
+                  cannot be used as an insecure heap!\
+                  trying to use IOMMU instead !!");
+            ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
+        }
+    }
 
     if(usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP)
         ionFlags |= ION_HEAP(ION_ADSP_HEAP_ID);
 
-    if(usage & GRALLOC_USAGE_PROTECTED && !noncontig)
-        ionFlags |= ION_SECURE;
+    if(usage & GRALLOC_USAGE_PROTECTED)
+         data.allocType |= private_handle_t::PRIV_FLAGS_SECURE_BUFFER;
 
     // if no flags are set, default to
     // SF + IOMMU heaps, so that bypass can work
@@ -218,16 +226,11 @@ int IonController::allocate(alloc_data& data, int usage)
     {
         ALOGW("Falling back to system heap");
         data.flags = ION_HEAP(ION_SYSTEM_HEAP_ID);
-        noncontig = true;
         ret = mIonAlloc->alloc_buffer(data);
     }
 
     if(ret >= 0 ) {
         data.allocType |= private_handle_t::PRIV_FLAGS_USES_ION;
-        if(noncontig)
-            data.allocType |= private_handle_t::PRIV_FLAGS_NONCONTIGUOUS_MEM;
-        if(ionFlags & ION_SECURE)
-            data.allocType |= private_handle_t::PRIV_FLAGS_SECURE_BUFFER;
     }
 
     return ret;
