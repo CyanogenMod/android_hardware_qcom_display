@@ -228,12 +228,16 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
         hwc_rect_t displayFrame = sourceCrop;
         //For FB left, top will always be 0
         //That should also be the case if using 2 mixers for single display
-        ovutils::Dim dpos(displayFrame.left,
+        ovutils::Dim dposL(displayFrame.left,
                 displayFrame.top,
                 (displayFrame.right - displayFrame.left) / 2,
                 displayFrame.bottom - displayFrame.top);
-        ov.setPosition(dpos, destL);
-        ov.setPosition(dpos, destR);
+        ov.setPosition(dposL, destL);
+        ovutils::Dim dposR(0,
+                displayFrame.top,
+                (displayFrame.right - displayFrame.left) / 2,
+                displayFrame.bottom - displayFrame.top);
+        ov.setPosition(dposR, destR);
 
         ret = true;
         if (!ov.commit(destL)) {
