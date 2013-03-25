@@ -250,6 +250,7 @@ ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type) {
         case MDPCOMP_OV_DMA:
             mdp_pipe = ov.nextPipe(ovutils::OV_MDP_PIPE_DMA, dpy);
             if(mdp_pipe != ovutils::OV_INVALID) {
+                ctx->mDMAInUse = true;
                 return mdp_pipe;
             }
         case MDPCOMP_OV_ANY:
@@ -277,9 +278,13 @@ bool MDPComp::isDoable(hwc_context_t *ctx,
     //Number of layers
     const int dpy = HWC_DISPLAY_PRIMARY;
     int numAppLayers = ctx->listStats[dpy].numAppLayers;
+    int numDMAPipes = qdutils::MDPVersion::getInstance().getDMAPipes();
 
     overlay::Overlay& ov = *ctx->mOverlay;
     int availablePipes = ov.availablePipes(dpy);
+
+    if(ctx->mNeedsRotator)
+        availablePipes -= numDMAPipes;
 
     if(numAppLayers < 1 || numAppLayers > MAX_PIPES_PER_MIXER ||
                            pipesNeeded(ctx, list) > availablePipes) {
@@ -320,14 +325,19 @@ bool MDPComp::isDoable(hwc_context_t *ctx,
         return false;
     }
 
+    if(ctx->mNeedsRotator && ctx->mDMAInUse) {
+        ALOGD_IF(isDebug(), "%s: DMA not available for Rotator",__FUNCTION__);
+        return false;
+    }
+
     //MDP composition is not efficient if layer needs rotator.
     for(int i = 0; i < numAppLayers; ++i) {
         // As MDP h/w supports flip operation, use MDP comp only for
         // 180 transforms. Fail for any transform involving 90 (90, 270).
         hwc_layer_1_t* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-        if((layer->transform & HWC_TRANSFORM_ROT_90)  && (!isYuvBuffer(hnd)
-                                                            || !canRotate())) {
+
+        if(layer->transform & HWC_TRANSFORM_ROT_90 && !isYuvBuffer(hnd)) {
             ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
             return false;
         }
@@ -347,6 +357,7 @@ bool MDPComp::setup(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
         return -1;
     }
 
+    ctx->mDMAInUse = false;
     if(!allocLayerPipes(ctx, list, mCurrentFrame)) {
         ALOGD_IF(isDebug(), "%s: Falling back to FB", __FUNCTION__);
         return false;
@@ -468,7 +479,14 @@ bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
         info.rot = NULL;
         MdpPipeInfoLowRes& pipe_info = *(MdpPipeInfoLowRes*)info.pipeInfo;
 
-        pipe_info.index = getMdpPipe(ctx, MDPCOMP_OV_ANY);
+        ePipeType type = MDPCOMP_OV_ANY;
+
+        if(!qhwc::needsScaling(layer) && !ctx->mNeedsRotator
+                             && ctx->mMDP.version >= qdutils::MDSS_V5) {
+            type = MDPCOMP_OV_DMA;
+        }
+
+        pipe_info.index = getMdpPipe(ctx, type);
         if(pipe_info.index == ovutils::OV_INVALID) {
             ALOGD_IF(isDebug(), "%s: Unable to get pipe for UI", __FUNCTION__);
             return false;
@@ -637,7 +655,7 @@ bool MDPCompHighRes::allocLayerPipes(hwc_context_t *ctx,
 
         ePipeType type = MDPCOMP_OV_ANY;
 
-        if(!qhwc::needsScaling(layer) && !ctx->mDMAInUse
+        if(!qhwc::needsScaling(layer) && !ctx->mNeedsRotator
                              && ctx->mMDP.version >= qdutils::MDSS_V5)
             type = MDPCOMP_OV_DMA;
 

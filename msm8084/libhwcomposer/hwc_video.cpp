@@ -94,6 +94,13 @@ bool VideoOverlayLowRes::prepare(hwc_context_t *ctx,
         }
     }
 
+    if((layer->transform & HWC_TRANSFORM_ROT_90) && ctx->mDMAInUse) {
+        ctx->mDMAInUse = false;
+        ALOGD_IF(VIDEO_DEBUG, "%s: Rotator not available since \
+                  DMA Pipe(s) are in use",__FUNCTION__);
+        return false;
+    }
+
     if(configure(ctx, layer)) {
         markFlags(layer);
         mModeOn = true;
