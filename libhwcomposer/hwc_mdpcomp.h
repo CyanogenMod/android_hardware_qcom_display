@@ -88,8 +88,6 @@ protected:
     /* configures MPD pipes */
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
                 PipeLayerPair& pipeLayerPair) = 0;
-    /* Is rotation supported */
-    virtual bool canRotate(){ return true; };
 
 
     /* set/reset flags for MDPComp */
@@ -173,7 +171,6 @@ private:
             FrameInfo& current_frame);
 
     virtual int pipesNeeded(hwc_context_t *ctx, hwc_display_contents_1_t* list);
-    virtual bool canRotate(){ return false; };
 };
 }; //namespace
 #endif
