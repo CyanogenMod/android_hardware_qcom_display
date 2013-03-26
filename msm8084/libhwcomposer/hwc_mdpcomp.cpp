@@ -631,6 +631,7 @@ bool MDPCompHighRes::allocLayerPipes(hwc_context_t *ctx,
             hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
             PipeLayerPair& info = currentFrame.pipeLayer[nYuvIndex];
             info.pipeInfo = new MdpPipeInfoHighRes;
+            info.rot = NULL;
             MdpPipeInfoHighRes& pipe_info = *(MdpPipeInfoHighRes*)info.pipeInfo;
             if(!acquireMDPPipes(ctx, layer, pipe_info,MDPCOMP_OV_VG)) {
                 ALOGD_IF(isDebug(),"%s: Unable to get pipe for videos",
@@ -651,6 +652,7 @@ bool MDPCompHighRes::allocLayerPipes(hwc_context_t *ctx,
 
         PipeLayerPair& info = currentFrame.pipeLayer[index];
         info.pipeInfo = new MdpPipeInfoHighRes;
+        info.rot = NULL;
         MdpPipeInfoHighRes& pipe_info = *(MdpPipeInfoHighRes*)info.pipeInfo;
 
         ePipeType type = MDPCOMP_OV_ANY;
