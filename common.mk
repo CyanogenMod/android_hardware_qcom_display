@@ -24,8 +24,12 @@ ifeq ($(ARCH_ARM_HAVE_NEON),true)
     common_flags += -D__ARM_HAVE_NEON
 endif
 
-ifeq ($(TARGET_BOARD_PLATFORM), msm8974)
-    common_flags += -DVENUS_COLOR_FORMAT
+ifneq ($(filter msm8974 msm8x74,$(TARGET_BOARD_PLATFORM)),)
+    # TODO: This define makes us pick a few inline functions
+    # from the kernel header media/msm_media_info.h. However,
+    # the bionic clean_headers utility scrubs them out.
+    # Figure out a way to import those macros correctly
+    # common_flags += -DVENUS_COLOR_FORMAT
     common_flags += -DMDSS_TARGET
 endif
 
