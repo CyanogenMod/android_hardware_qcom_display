@@ -291,13 +291,15 @@ bool isAlphaScaled(hwc_layer_1_t const* layer) {
 
 bool isAlphaPresent(hwc_layer_1_t const* layer) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
-    int format = hnd->format;
-    switch(format) {
+    if(hnd) {
+        int format = hnd->format;
+        switch(format) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_BGRA_8888:
             // In any more formats with Alpha go here..
             return true;
         default : return false;
+        }
     }
     return false;
 }
