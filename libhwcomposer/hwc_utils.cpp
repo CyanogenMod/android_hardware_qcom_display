@@ -122,7 +122,6 @@ void initContext(hwc_context_t *ctx)
         IVideoOverlay::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
         HWC_DISPLAY_PRIMARY);
 
-    char value[PROPERTY_VALUE_MAX];
     // Check if the target supports copybit compostion (dyn/mdp/c2d) to
     // decide if we need to open the copybit module.
     int compositionType =
