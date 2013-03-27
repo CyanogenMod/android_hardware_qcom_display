@@ -283,8 +283,6 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
             size += ALIGN( alignedw * ALIGN(height/2, 32), 8192);
             break;
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         case HAL_PIXEL_FORMAT_YV12:
             if ((format == HAL_PIXEL_FORMAT_YV12) && ((width&1) || (height&1))) {
                 ALOGE("w or h is odd for the YV12 format");
@@ -300,6 +298,11 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
                     (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
             }
             size = ALIGN(size, 4096);
+            break;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+            alignedh = height;
+            size = ALIGN((alignedw*alignedh) + (alignedw* alignedh)/2, 4096);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
         case HAL_PIXEL_FORMAT_YCrCb_422_SP:
