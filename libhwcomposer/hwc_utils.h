@@ -33,9 +33,7 @@
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
-#define FINAL_TRANSFORM_MASK 0x000F
-#define MAX_NUM_DISPLAYS 4 //Yes, this is ambitious
-#define MAX_NUM_LAYERS 32
+#define MAX_NUM_LAYERS 32 //includes fb layer
 #define MAX_DISPLAY_DIM 2048
 
 // For support of virtual displays

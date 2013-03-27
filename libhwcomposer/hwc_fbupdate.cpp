@@ -66,10 +66,6 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx,
     if (LIKELY(ctx->mOverlay)) {
         overlay::Overlay& ov = *(ctx->mOverlay);
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-        if (!hnd) {
-            ALOGE("%s:NULL private handle for layer!", __FUNCTION__);
-            return false;
-        }
         ovutils::Whf info(hnd->width, hnd->height,
                 ovutils::getMdpFormat(hnd->format), hnd->size);
 
@@ -167,10 +163,6 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
     if (LIKELY(ctx->mOverlay)) {
         overlay::Overlay& ov = *(ctx->mOverlay);
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-        if (!hnd) {
-            ALOGE("%s:NULL private handle for layer!", __FUNCTION__);
-            return false;
-        }
         ovutils::Whf info(hnd->width, hnd->height,
                 ovutils::getMdpFormat(hnd->format), hnd->size);
 
