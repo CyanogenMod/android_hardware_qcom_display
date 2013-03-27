@@ -22,6 +22,10 @@
 
 #include "overlayUtils.h"
 #include "mdpWrapper.h"
+#include "qdMetaData.h"
+#ifdef USES_POST_PROCESSING
+#include "lib-postproc.h"
+#endif
 
 namespace overlay{
 
@@ -75,6 +79,8 @@ public:
     utils::Dim getDstRectDim() const;
     /* returns a copy to src rect dim */
     utils::Dim getSrcRectDim() const;
+    /* setVisualParam */
+    bool setVisualParams(const MetaData_t& data);
 
 private:
     /* Perform transformation calculations */
@@ -119,6 +125,12 @@ private:
     /* FD for the mdp fbnum */
     OvFD          mFd;
     int mDownscale;
+#ifdef USES_POST_PROCESSING
+    /* PP Compute Params */
+    struct compute_params mParams;
+    /* indicate if PP params have been changed */
+    bool mPPChanged;
+#endif
 };
 
 
@@ -227,6 +239,13 @@ inline void MdpCtrl::setDownscale(int dscale) {
 }
 
 inline bool MdpCtrl::ovChanged() const {
+#ifdef USES_POST_PROCESSING
+    // Some pp params are stored as pointer address,
+    // so can't compare their content directly.
+    if (mPPChanged) {
+        return true;
+    }
+#endif
     // 0 means same
     if(0 == ::memcmp(&mOVInfo, &mLkgo, sizeof (mdp_overlay))) {
         return false;

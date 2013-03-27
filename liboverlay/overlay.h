@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -33,6 +33,8 @@
 #include "overlayUtils.h"
 #include "utils/threads.h"
 
+struct MetaData_t;
+
 namespace overlay {
 class GenericPipe;
 
@@ -64,6 +66,7 @@ public:
     void setCrop(const utils::Dim& d, utils::eDest dest);
     void setTransform(const int orientation, utils::eDest dest);
     void setPosition(const utils::Dim& dim, utils::eDest dest);
+    void setVisualParams(const MetaData_t& data, utils::eDest dest);
     bool commit(utils::eDest dest);
     bool queueBuffer(int fd, uint32_t offset, utils::eDest dest);
 

@@ -605,6 +605,13 @@ void setMdpFlags(hwc_layer_1_t *layer,
             ovutils::setMdpFlags(mdpFlags,  ovutils::OV_MDP_FLIP_V);
         }
     }
+
+    if(metadata &&
+        ((metadata->operation & PP_PARAM_HSIC)
+        || (metadata->operation & PP_PARAM_IGC)
+        || (metadata->operation & PP_PARAM_SHARP2))) {
+        ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_PP_EN);
+    }
 }
 
 static inline int configRotator(Rotator *rot, const Whf& whf,
@@ -620,7 +627,8 @@ static inline int configRotator(Rotator *rot, const Whf& whf,
 
 static inline int configMdp(Overlay *ov, const PipeArgs& parg,
         const eTransform& orient, const hwc_rect_t& crop,
-        const hwc_rect_t& pos, const eDest& dest) {
+        const hwc_rect_t& pos, const MetaData_t *metadata,
+        const eDest& dest) {
     ov->setSource(parg, dest);
     ov->setTransform(orient, dest);
 
@@ -633,6 +641,9 @@ static inline int configMdp(Overlay *ov, const PipeArgs& parg,
     int posH = pos.bottom - pos.top;
     Dim position(pos.left, pos.top, posW, posH);
     ov->setPosition(position, dest);
+
+    if (metadata)
+        ov->setVisualParams(*metadata, dest);
 
     if (!ov->commit(dest)) {
         return -1;
@@ -664,6 +675,8 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         ALOGE("%s: layer handle is NULL", __FUNCTION__);
         return -1;
     }
+
+    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
 
     hwc_rect_t crop = layer->sourceCrop;
     hwc_rect_t dst = layer->displayFrame;
@@ -706,7 +719,7 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     transform = 0;
 
     PipeArgs parg(mdpFlags, whf, z, isFg, static_cast<eRotFlags>(rotFlags));
-    if(configMdp(ctx->mOverlay, parg, orient, crop, dst, dest) < 0) {
+    if(configMdp(ctx->mOverlay, parg, orient, crop, dst, metadata, dest) < 0) {
         ALOGE("%s: commit failed for low res panel", __FUNCTION__);
         return -1;
     }
@@ -722,6 +735,8 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         ALOGE("%s: layer handle is NULL", __FUNCTION__);
         return -1;
     }
+
+    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
 
     int hw_w = ctx->dpyAttr[dpy].xres;
     int hw_h = ctx->dpyAttr[dpy].yres;
@@ -798,7 +813,7 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         PipeArgs pargL(mdpFlagsL, whf, z, isFg,
                 static_cast<eRotFlags>(rotFlags));
         if(configMdp(ctx->mOverlay, pargL, orient,
-                tmp_cropL, tmp_dstL, lDest) < 0) {
+                tmp_cropL, tmp_dstL, metadata, lDest) < 0) {
             ALOGE("%s: commit failed for left mixer config", __FUNCTION__);
             return -1;
         }
@@ -811,7 +826,7 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         tmp_dstR.right = tmp_dstR.right - tmp_dstR.left;
         tmp_dstR.left = 0;
         if(configMdp(ctx->mOverlay, pargR, orient,
-                tmp_cropR, tmp_dstR, rDest) < 0) {
+                tmp_cropR, tmp_dstR, metadata, rDest) < 0) {
             ALOGE("%s: commit failed for right mixer config", __FUNCTION__);
             return -1;
         }
