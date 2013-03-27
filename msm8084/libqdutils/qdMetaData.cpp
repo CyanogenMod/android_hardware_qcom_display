@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -43,6 +43,10 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
         ALOGE("%s: Bad fd for extra data!", __func__);
         return -1;
     }
+    if (!param) {
+        ALOGE("%s: input param is null!", __func__);
+        return -1;
+    }
     unsigned long size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
     void *base = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED,
         handle->fd_metadata, 0);
@@ -64,6 +68,12 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
             break;
         case PP_PARAM_INTERLACED:
             data->interlaced = *((int32_t *)param);
+            break;
+        case PP_PARAM_IGC:
+            memcpy((void *)&data->igcData, param, sizeof(IGCData_t));
+            break;
+        case PP_PARAM_SHARP2:
+            memcpy((void *)&data->Sharp2Data, param, sizeof(Sharp2Data_t));
             break;
         default:
             ALOGE("Unknown paramType %d", paramType);

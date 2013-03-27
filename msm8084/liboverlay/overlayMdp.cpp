@@ -18,6 +18,13 @@
 #include <mdp_version.h>
 #include "overlayUtils.h"
 #include "overlayMdp.h"
+#include "mdp_version.h"
+
+#define HSIC_SETTINGS_DEBUG 0
+
+static inline bool isEqual(float f1, float f2) {
+        return ((int)(f1*100) == (int)(f2*100)) ? true : false;
+}
 
 namespace ovutils = overlay::utils;
 namespace overlay {
@@ -53,6 +60,15 @@ void MdpCtrl::reset() {
     mLkgo.id = MSMFB_NEW_REQUEST;
     mOrientation = utils::OVERLAY_TRANSFORM_0;
     mDownscale = 0;
+#ifdef USES_POST_PROCESSING
+    mPPChanged = false;
+    memset(&mParams, 0, sizeof(struct compute_params));
+    mParams.params.conv_params.order = hsic_order_hsc_i;
+    mParams.params.conv_params.interface = interface_rec601;
+    mParams.params.conv_params.cc_matrix[0][0] = 1;
+    mParams.params.conv_params.cc_matrix[1][1] = 1;
+    mParams.params.conv_params.cc_matrix[2][2] = 1;
+#endif
 }
 
 bool MdpCtrl::close() {
@@ -63,7 +79,11 @@ bool MdpCtrl::close() {
             result = false;
         }
     }
-
+#ifdef USES_POST_PROCESSING
+    /* free allocated memory in PP */
+    if (mOVInfo.overlay_pp_cfg.igc_cfg.c0_c1_data)
+            free(mOVInfo.overlay_pp_cfg.igc_cfg.c0_c1_data);
+#endif
     reset();
 
     if(!mFd.close()) {
@@ -189,6 +209,122 @@ void MdpCtrl3D::dump() const {
     ALOGE("== Dump MdpCtrl start ==");
     mFd.dump();
     ALOGE("== Dump MdpCtrl end ==");
+}
+
+bool MdpCtrl::setVisualParams(const MetaData_t& data) {
+    bool needUpdate = false;
+#ifdef USES_POST_PROCESSING
+    /* calculate the data */
+    if (data.operation & PP_PARAM_HSIC) {
+        if (mParams.params.pa_params.hue != data.hsicData.hue) {
+            ALOGD_IF(HSIC_SETTINGS_DEBUG,
+                "Hue has changed from %d to %d",
+                mParams.params.pa_params.hue,data.hsicData.hue);
+            needUpdate = true;
+        }
+
+        if (!isEqual(mParams.params.pa_params.sat,
+            data.hsicData.saturation)) {
+            ALOGD_IF(HSIC_SETTINGS_DEBUG,
+                "Saturation has changed from %f to %f",
+                mParams.params.pa_params.sat,
+                data.hsicData.saturation);
+            needUpdate = true;
+        }
+
+        if (mParams.params.pa_params.intensity != data.hsicData.intensity) {
+            ALOGD_IF(HSIC_SETTINGS_DEBUG,
+                "Intensity has changed from %d to %d",
+                mParams.params.pa_params.intensity,
+                data.hsicData.intensity);
+            needUpdate = true;
+        }
+
+        if (!isEqual(mParams.params.pa_params.contrast,
+            data.hsicData.contrast)) {
+            ALOGD_IF(HSIC_SETTINGS_DEBUG,
+                "Contrast has changed from %f to %f",
+                mParams.params.pa_params.contrast,
+                data.hsicData.contrast);
+            needUpdate = true;
+        }
+
+        if (needUpdate) {
+            mParams.params.pa_params.hue = data.hsicData.hue;
+            mParams.params.pa_params.sat = data.hsicData.saturation;
+            mParams.params.pa_params.intensity = data.hsicData.intensity;
+            mParams.params.pa_params.contrast = data.hsicData.contrast;
+            mParams.params.pa_params.ops = MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;
+            mParams.operation |= PP_OP_PA;
+        }
+    }
+
+    if (data.operation & PP_PARAM_SHARP2) {
+        if (mParams.params.sharp_params.strength != data.Sharp2Data.strength) {
+            needUpdate = true;
+        }
+        if (mParams.params.sharp_params.edge_thr != data.Sharp2Data.edge_thr) {
+            needUpdate = true;
+        }
+        if (mParams.params.sharp_params.smooth_thr !=
+                data.Sharp2Data.smooth_thr) {
+            needUpdate = true;
+        }
+        if (mParams.params.sharp_params.noise_thr !=
+                data.Sharp2Data.noise_thr) {
+            needUpdate = true;
+        }
+
+        if (needUpdate) {
+            mParams.params.sharp_params.strength = data.Sharp2Data.strength;
+            mParams.params.sharp_params.edge_thr = data.Sharp2Data.edge_thr;
+            mParams.params.sharp_params.smooth_thr =
+                data.Sharp2Data.smooth_thr;
+            mParams.params.sharp_params.noise_thr = data.Sharp2Data.noise_thr;
+            mParams.params.sharp_params.ops =
+                MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;
+            mParams.operation |= PP_OP_SHARP;
+        }
+    }
+
+    if (data.operation & PP_PARAM_IGC) {
+        if (mOVInfo.overlay_pp_cfg.igc_cfg.c0_c1_data == NULL){
+            uint32_t *igcData
+                = (uint32_t *)malloc(2 * MAX_IGC_LUT_ENTRIES * sizeof(uint32_t));
+            if (!igcData) {
+                ALOGE("IGC storage allocated failed");
+                return false;
+            }
+            mOVInfo.overlay_pp_cfg.igc_cfg.c0_c1_data = igcData;
+            mOVInfo.overlay_pp_cfg.igc_cfg.c2_data
+                = igcData + MAX_IGC_LUT_ENTRIES;
+        }
+
+        memcpy(mParams.params.igc_lut_params.c0,
+            data.igcData.c0, sizeof(uint16_t) * MAX_IGC_LUT_ENTRIES);
+        memcpy(mParams.params.igc_lut_params.c1,
+            data.igcData.c1, sizeof(uint16_t) * MAX_IGC_LUT_ENTRIES);
+        memcpy(mParams.params.igc_lut_params.c2,
+            data.igcData.c2, sizeof(uint16_t) * MAX_IGC_LUT_ENTRIES);
+
+        mParams.params.igc_lut_params.ops
+            = MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;
+        mParams.operation |= PP_OP_IGC;
+        needUpdate = true;
+    }
+
+    if (data.operation & PP_PARAM_VID_INTFC) {
+        mParams.params.conv_params.interface =
+            (interface_type) data.video_interface;
+        needUpdate = true;
+    }
+
+    if (needUpdate) {
+        display_pp_compute_params(&mParams, &mOVInfo.overlay_pp_cfg);
+        mPPChanged = true;
+    }
+#endif
+    return true;
 }
 
 } // overlay
