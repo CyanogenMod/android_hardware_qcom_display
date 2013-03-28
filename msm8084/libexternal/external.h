@@ -47,11 +47,16 @@ public:
     void setExternalDisplay(bool connected, int extFbNum = 0);
     bool isExternalConnected() { return mConnected;};
     void  setExtDpyNum(int extDpyNum) { mExtDpyNum = extDpyNum;};
+    int  getExternalType() {return mConnectedFbNum;};
+    bool isWFDActive() {return (mConnectedFbNum == mWfdFbNum);};
     void setHPD(uint32_t startEnd);
     void setEDIDMode(int resMode);
     void setActionSafeDimension(int w, int h);
-    void processUEventOnline(const char *str);
-    void processUEventOffline(const char *str);
+    int ignoreRequest(const char *str);
+    int  configureHDMIDisplay();
+    int  configureWFDDisplay();
+    int  teardownHDMIDisplay();
+    int  teardownWFDDisplay();
 
 private:
     void readCEUnderscanInfo();
@@ -72,10 +77,6 @@ private:
     void setDpyWfdAttr();
     void getAttrForMode(int& width, int& height, int& fps);
     void updateExtDispDevFbIndex();
-    int  configureHDMIDisplay();
-    int  configureWFDDisplay();
-    int  teardownHDMIDisplay();
-    int  teardownWFDDisplay();
     int  getExtFbNum(int &fbNum);
 
     mutable android::Mutex mExtDispLock;
