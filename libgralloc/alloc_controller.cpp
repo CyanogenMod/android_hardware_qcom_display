@@ -120,7 +120,7 @@ int AdrenoMemInfo::getStride(int width, int format)
         }
         if ((libadreno_utils) && (LINK_adreno_compute_padding)) {
             int surface_tile_height = 1;   // Linear surface
-            int raster_mode         = 1;   // Adreno TW raster mode.
+            int raster_mode         = 0;   // Adreno unknown raster mode.
             int padding_threshold   = 512; // Threshold for padding surfaces.
             // the function below expects the width to be a multiple of
             // 32 pixels, hence we pass stride instead of width.
