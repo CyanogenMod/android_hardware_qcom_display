@@ -155,6 +155,9 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         case EXTERNAL_PAUSE:
             {   // pause case
                 ALOGD("%s Received Pause event",__FUNCTION__);
+                // This is required to ensure that composition
+                // fall back to FB, closing all MDP pipes.
+                ctx->mExtDispConfiguring = true;
                 ctx->dpyAttr[dpy].isActive = true;
                 ctx->dpyAttr[dpy].isPause = true;
                 break;
