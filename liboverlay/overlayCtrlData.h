@@ -65,6 +65,8 @@ public:
     void setTransform(const utils::eTransform& p);
     /* set mdp position using dim */
     void setPosition(const utils::Dim& dim);
+    /* set mdp visual params using metadata */
+    bool setVisualParams(const MetaData_t &metadata);
     /* mdp set overlay/commit changes */
     bool commit();
 
@@ -169,6 +171,15 @@ inline void Ctrl::setTransform(const utils::eTransform& orient)
 inline void Ctrl::setCrop(const utils::Dim& d)
 {
     mMdp.setCrop(d);
+}
+
+inline bool Ctrl::setVisualParams(const MetaData_t &metadata)
+{
+    if (!mMdp.setVisualParams(metadata)) {
+        ALOGE("Ctrl setVisualParams failed in MDP setVisualParams");
+        return false;
+    }
+    return true;
 }
 
 inline void Ctrl::dump() const {
