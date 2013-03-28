@@ -174,6 +174,10 @@ ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
     memset(&mVInfo, 0, sizeof(mVInfo));
     //Determine the fb index for external display devices.
     updateExtDispDevFbIndex();
+    // disable HPD at start, it will be enabled later
+    // when the display powers on
+    // This helps for framework reboot or adb shell stop/start
+    writeHPDOption(0);
 
 }
 
