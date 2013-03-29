@@ -259,12 +259,17 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
     int ret = 0;
     ALOGD("%s: %s display: %d", __FUNCTION__,
           blank==1 ? "Blanking":"Unblanking", dpy);
+    if(blank) {
+        // free up all the overlay pipes in use
+        // when we get a blank for either display
+        // makes sure that all pipes are freed
+        ctx->mOverlay->configBegin();
+        ctx->mOverlay->configDone();
+        ctx->mRotMgr->clear();
+    }
     switch(dpy) {
         case HWC_DISPLAY_PRIMARY:
             if(blank) {
-                ctx->mOverlay->configBegin();
-                ctx->mOverlay->configDone();
-                ctx->mRotMgr->clear();
                 ret = ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK,FB_BLANK_POWERDOWN);
 
                 if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected == true) {
