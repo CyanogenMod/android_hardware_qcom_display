@@ -35,6 +35,7 @@
 #include "hwc_mdpcomp.h"
 #include "external.h"
 #include "hwc_copybit.h"
+#include "profiler.h"
 
 using namespace qhwc;
 #define VSYNC_DEBUG 0
@@ -458,6 +459,9 @@ static int hwc_set(hwc_composer_device_1 *dev,
                 ret = -EINVAL;
         }
     }
+    // This is only indicative of how many times SurfaceFlinger posts
+    // frames to the display.
+    CALC_FPS();
     return ret;
 }
 
