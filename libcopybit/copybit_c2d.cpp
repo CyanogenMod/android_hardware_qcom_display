@@ -682,20 +682,23 @@ static int clear_copybit(struct copybit_device_t *dev,
                          struct copybit_image_t const *buf,
                          struct copybit_rect_t *rect)
 {
-    int ret = 0;
+    int ret = COPYBIT_SUCCESS;
     int flags = FLAGS_PREMULTIPLIED_ALPHA;
     int mapped_dst_idx = -1;
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
     C2D_RECT c2drect = {rect->l, rect->t, rect->r - rect->l, rect->b - rect->t};
+    pthread_mutex_lock(&ctx->wait_cleanup_lock);
     ret = set_image(ctx, ctx->dst[RGB_SURFACE], buf,
                        (eC2DFlags)flags, mapped_dst_idx);
     if(ret) {
         ALOGE("%s: set_image error", __FUNCTION__);
         unmap_gpuaddr(ctx, mapped_dst_idx);
+        pthread_mutex_unlock(&ctx->wait_cleanup_lock);
         return COPYBIT_FAILURE;
     }
 
     ret = LINK_c2dFillSurface(ctx->dst[RGB_SURFACE], 0x0, &c2drect);
+    pthread_mutex_unlock(&ctx->wait_cleanup_lock);
     return ret;
 }
 
@@ -1386,9 +1389,14 @@ static int blit_copybit(
     struct copybit_image_t const *src,
     struct copybit_region_t const *region)
 {
+    int status = COPYBIT_SUCCESS;
+    struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
     struct copybit_rect_t dr = { 0, 0, dst->w, dst->h };
     struct copybit_rect_t sr = { 0, 0, src->w, src->h };
-    return stretch_copybit_internal(dev, dst, src, &dr, &sr, region, false);
+    pthread_mutex_lock(&ctx->wait_cleanup_lock);
+    status = stretch_copybit_internal(dev, dst, src, &dr, &sr, region, false);
+    pthread_mutex_unlock(&ctx->wait_cleanup_lock);
+    return status;
 }
 
 /*****************************************************************************/
