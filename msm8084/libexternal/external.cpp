@@ -45,7 +45,9 @@ namespace qhwc {
 
 #define MAX_FRAME_BUFFER_NAME_SIZE      (80)
 #define MAX_DISPLAY_DEVICES             (3)
-
+#define MAX_SYSFS_FILE_PATH             255
+#define UNKNOWN_STRING                  "unknown"
+#define SPD_NAME_LENGTH                 16
 
 const char* msmFbDevicePath[] = {  "/dev/graphics/fb1",
                                    "/dev/graphics/fb2"};
@@ -62,7 +64,8 @@ void ExternalDisplay::updateExtDispDevFbIndex()
     char msmFbTypePath[MAX_FRAME_BUFFER_NAME_SIZE];
 
     for(int j = 1; j < MAX_DISPLAY_DEVICES; j++) {
-        sprintf (msmFbTypePath,"/sys/class/graphics/fb%d/msm_fb_type", j);
+        snprintf (msmFbTypePath, sizeof(msmFbTypePath),
+                  "/sys/class/graphics/fb%d/msm_fb_type", j);
         displayDeviceFP = fopen(msmFbTypePath, "r");
         if(displayDeviceFP){
             fread(fbType, sizeof(char), MAX_FRAME_BUFFER_NAME_SIZE,
@@ -180,6 +183,45 @@ ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
         MSM_HDMI_MODES_INIT_TIMINGS(supported_video_mode_lut);
         MSM_HDMI_MODES_SET_SUPP_TIMINGS(supported_video_mode_lut,
                                         MSM_HDMI_MODES_ALL);
+        // Update the Source Product Information
+        // Vendor Name
+        setSPDInfo("vendor_name", "ro.product.manufacturer");
+        // Product Description
+        setSPDInfo("product_description", "ro.product.name");
+    }
+}
+/* gets the product manufacturer and product name and writes it
+ * to the sysfs node, so that the driver can get that information
+ * Used to show QCOM 8974 instead of Input 1 for example
+ */
+void ExternalDisplay::setSPDInfo(const char* node, const char* property) {
+    int err = -1;
+    char info[PROPERTY_VALUE_MAX];
+    char sysFsSPDFilePath[MAX_SYSFS_FILE_PATH];
+    memset(sysFsSPDFilePath, 0, sizeof(sysFsSPDFilePath));
+    snprintf(sysFsSPDFilePath , sizeof(sysFsSPDFilePath),
+                 "/sys/devices/virtual/graphics/fb%d/%s",
+                 mHdmiFbNum, node);
+    int spdFile = open(sysFsSPDFilePath, O_RDWR, 0);
+    if (spdFile < 0) {
+        ALOGE("%s: file '%s' not found : ret = %d"
+              "err str: %s",  __FUNCTION__, sysFsSPDFilePath,
+              spdFile, strerror(errno));
+    } else {
+        memset(info, 0, sizeof(info));
+        property_get(property, info, UNKNOWN_STRING);
+        ALOGD_IF(DEBUG, "In %s: %s = %s", __FUNCTION__, property, info);
+        if (strncmp(info, UNKNOWN_STRING, SPD_NAME_LENGTH)) {
+            err = write(spdFile, info, strlen(info));
+            if (err <= 0) {
+                ALOGE("%s: file write failed for '%s'"
+                      "err no = %d", __FUNCTION__, sysFsSPDFilePath, errno);
+            }
+        } else {
+            ALOGD_IF(DEBUG, "%s: property_get failed for SPD %s",
+                         __FUNCTION__, node);
+        }
+        close(spdFile);
     }
 }
 
@@ -204,9 +246,9 @@ void ExternalDisplay::setActionSafeDimension(int w, int h) {
     Mutex::Autolock lock(mExtDispLock);
     char actionsafeWidth[PROPERTY_VALUE_MAX];
     char actionsafeHeight[PROPERTY_VALUE_MAX];
-    sprintf(actionsafeWidth, "%d", w);
+    snprintf(actionsafeWidth, sizeof(actionsafeWidth), "%d", w);
     property_set("hw.actionsafe.width", actionsafeWidth);
-    sprintf(actionsafeHeight, "%d", h);
+    snprintf(actionsafeHeight, sizeof(actionsafeHeight), "%d", h);
     property_set("hw.actionsafe.height", actionsafeHeight);
     setExternalDisplay(true, mHdmiFbNum);
 }
@@ -232,8 +274,9 @@ void ExternalDisplay::readCEUnderscanInfo()
     char *ce_info_str = NULL;
     const char token[] = ", \n";
     int ce_info = -1;
-    char sysFsScanInfoFilePath[128];
-    sprintf(sysFsScanInfoFilePath, "/sys/devices/virtual/graphics/fb%d/"
+    char sysFsScanInfoFilePath[MAX_SYSFS_FILE_PATH];
+    snprintf(sysFsScanInfoFilePath, sizeof(sysFsScanInfoFilePath),
+            "/sys/devices/virtual/graphics/fb%d/"
                                    "scan_info", mHdmiFbNum);
 
     memset(scanInfo, 0, sizeof(scanInfo));
@@ -352,9 +395,9 @@ int ExternalDisplay::parseResolution(char* edidStr, int* edidModes)
 
 bool ExternalDisplay::readResolution()
 {
-    char sysFsEDIDFilePath[255];
-    sprintf(sysFsEDIDFilePath , "/sys/devices/virtual/graphics/fb%d/edid_modes",
-            mHdmiFbNum);
+    char sysFsEDIDFilePath[MAX_SYSFS_FILE_PATH];
+    snprintf(sysFsEDIDFilePath , sizeof(sysFsEDIDFilePath),
+            "/sys/devices/virtual/graphics/fb%d/edid_modes", mHdmiFbNum);
 
     int hdmiEDIDFile = open(sysFsEDIDFilePath, O_RDONLY, 0);
     int len = -1;
@@ -623,9 +666,9 @@ int ExternalDisplay::getExtFbNum(int &fbNum) {
 bool ExternalDisplay::writeHPDOption(int userOption) const
 {
     bool ret = true;
-    char sysFsHPDFilePath[255];
-    sprintf(sysFsHPDFilePath ,"/sys/devices/virtual/graphics/fb%d/hpd",
-                                mHdmiFbNum);
+    char sysFsHPDFilePath[MAX_SYSFS_FILE_PATH];
+    snprintf(sysFsHPDFilePath ,sizeof(sysFsHPDFilePath),
+            "/sys/devices/virtual/graphics/fb%d/hpd", mHdmiFbNum);
     int hdmiHPDFile = open(sysFsHPDFilePath,O_RDWR, 0);
     if (hdmiHPDFile < 0) {
         ALOGE("%s: state file '%s' not found : ret%d err str: %s", __FUNCTION__,
