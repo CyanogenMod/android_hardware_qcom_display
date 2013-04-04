@@ -36,7 +36,7 @@
 #include <alloc_controller.h>
 #include <memalloc.h>
 
-#include "gralloc_priv.h"
+#include <gralloc_priv.h>
 #include "overlayUtils.h"
 
 namespace overlay {

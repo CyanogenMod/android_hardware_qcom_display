@@ -32,7 +32,7 @@
 #include <utils/Log.h>
 #include <linux/msm_mdp.h>
 #include <cutils/properties.h>
-#include "gralloc_priv.h"
+#include <gralloc_priv.h>
 #include "overlayUtils.h"
 #include "mdpWrapper.h"
 #include "mdp_version.h"
