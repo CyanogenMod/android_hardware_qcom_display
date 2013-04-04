@@ -21,6 +21,9 @@
 #define DEBUG_FBUPDATE 0
 #include <gralloc_priv.h>
 #include "hwc_fbupdate.h"
+#include "mdp_version.h"
+
+using namespace qdutils;
 
 namespace qhwc {
 

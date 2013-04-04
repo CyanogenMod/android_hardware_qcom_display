@@ -25,6 +25,7 @@
 #include <overlayRotator.h>
 
 using namespace overlay;
+using namespace qdutils;
 using namespace overlay::utils;
 namespace ovutils = overlay::utils;
 
@@ -292,15 +293,18 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     if((crop_w < 5)||(crop_h < 5))
         return false;
 
+    const uint32_t downscale =
+            qdutils::MDPVersion::getInstance().getMaxMDPDownscale();
     if(ctx->mMDP.version >= qdutils::MDSS_V5) {
-        /* Workaround for downscales larger than 4x.
-         * Will be removed once decimator block is enabled for MDSS
-         */
-        if(w_dscale > 4.0f || h_dscale > 4.0f)
+        if(!qdutils::MDPVersion::getInstance().supportsDecimation()) {
+            if(crop_w > MAX_DISPLAY_DIM || w_dscale > downscale ||
+                    h_dscale > downscale)
+                return false;
+        } else if(w_dscale > 64 || h_dscale > 64) {
             return false;
-    } else {
-        if(w_dscale > 8.0f || h_dscale > 8.0f)
-            // MDP 4 supports 1/8 downscale
+        }
+    } else { //A-family
+        if(w_dscale > downscale || h_dscale > downscale)
             return false;
     }
 
