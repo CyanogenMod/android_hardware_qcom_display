@@ -443,32 +443,34 @@ int ExternalDisplay::getModeOrder(int mode)
             return 3; // i576i 4:3
         case HDMI_VFRMT_1440x576i50_16_9:
             return 4; // 576i 16:9
-        case HDMI_VFRMT_640x480p60_4_3:
-            return 5; // 640x480 4:3
-        case HDMI_VFRMT_720x480p60_4_3:
-            return 6; // 480p 4:3
-        case HDMI_VFRMT_720x480p60_16_9:
-            return 7; // 480p 16:9
-        case HDMI_VFRMT_720x576p50_4_3:
-            return 8; // 576p 4:3
-        case HDMI_VFRMT_720x576p50_16_9:
-            return 9; // 576p 16:9
         case HDMI_VFRMT_1920x1080i60_16_9:
-            return 10; // 1080i 16:9
+            return 5; // 1080i 16:9
+        case HDMI_VFRMT_640x480p60_4_3:
+            return 6; // 640x480 4:3
+        case HDMI_VFRMT_720x480p60_4_3:
+            return 7; // 480p 4:3
+        case HDMI_VFRMT_720x480p60_16_9:
+            return 8; // 480p 16:9
+        case HDMI_VFRMT_720x576p50_4_3:
+            return 9; // 576p 4:3
+        case HDMI_VFRMT_720x576p50_16_9:
+            return 10; // 576p 16:9
+        case HDMI_VFRMT_1280x1024p60_5_4:
+            return 11; // 1024p; Vesa format
         case HDMI_VFRMT_1280x720p50_16_9:
-            return 11; // 720p@50Hz
+            return 12; // 720p@50Hz
         case HDMI_VFRMT_1280x720p60_16_9:
-            return 12; // 720p@60Hz
+            return 13; // 720p@60Hz
         case HDMI_VFRMT_1920x1080p24_16_9:
-            return 13; //1080p@24Hz
+            return 14; //1080p@24Hz
         case HDMI_VFRMT_1920x1080p25_16_9:
-            return 14; //108-p@25Hz
+            return 15; //108-p@25Hz
         case HDMI_VFRMT_1920x1080p30_16_9:
-            return 15; //1080p@30Hz
+            return 16; //1080p@30Hz
         case HDMI_VFRMT_1920x1080p50_16_9:
-            return 16; //1080p@50Hz
+            return 17; //1080p@50Hz
         case HDMI_VFRMT_1920x1080p60_16_9:
-            return 17; //1080p@60Hz
+            return 18; //1080p@60Hz
     }
 }
 
@@ -684,6 +686,11 @@ void ExternalDisplay::getAttrForMode(int& width, int& height, int& fps) {
         case HDMI_VFRMT_1280x720p60_16_9:
             width = 1280;
             height = 720;
+            fps = 60;
+            break;
+        case HDMI_VFRMT_1280x1024p60_5_4:
+            width = 1280;
+            height = 1024;
             fps = 60;
             break;
         case HDMI_VFRMT_1920x1080p24_16_9:
