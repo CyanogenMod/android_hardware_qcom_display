@@ -30,6 +30,11 @@
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 
 namespace qhwc {
+//Feature for using Copybit to display RGB layers.
+typedef EGLClientBuffer (*functype_eglGetRenderBufferANDROID) (
+                                              EGLDisplay dpy,
+                                              EGLSurface draw);
+typedef EGLSurface (*functype_eglGetCurrentSurface)(EGLint readdraw);
 
 class CopyBit {
 public:
@@ -67,8 +72,11 @@ private:
     static bool sIsLayerSkip;
     //Flags if this feature is on.
     static bool sIsModeOn;
-    // flag that indicates whether CopyBit is enabled or not
-    static bool sCopyBitDraw;
+    //handle for adreno lib
+    static void* egl_lib;
+
+    static functype_eglGetRenderBufferANDROID LINK_eglGetRenderBufferANDROID;
+    static functype_eglGetCurrentSurface LINK_eglGetCurrentSurface;
 
     static  unsigned int getRGBRenderingArea (const hwc_display_contents_1_t *list);
 

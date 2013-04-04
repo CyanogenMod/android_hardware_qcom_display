@@ -36,7 +36,7 @@
 
 #include <GLES/gl.h>
 
-#include "gralloc_priv.h"
+#include <gralloc_priv.h>
 #include "fb_priv.h"
 #include "gr.h"
 #include <genlock.h>
@@ -108,10 +108,11 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
     private_module_t* m =
         reinterpret_cast<private_module_t*>(dev->common.module);
 
-    if (hnd && hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
+    if (hnd) {
         m->info.activate = FB_ACTIVATE_VBL | FB_ACTIVATE_FORCE;
         m->info.yoffset = hnd->offset / m->finfo.line_length;
         m->commit.var = m->info;
+        m->commit.flags |= MDP_DISPLAY_COMMIT_OVERLAY;
         if (ioctl(m->framebuffer->fd, MSMFB_DISPLAY_COMMIT, &m->commit) == -1) {
             ALOGE("%s: MSMFB_DISPLAY_COMMIT ioctl failed, err: %s", __FUNCTION__,
                     strerror(errno));
@@ -124,6 +125,7 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
 static int fb_compositionComplete(struct framebuffer_device_t* dev)
 {
     // TODO: Properly implement composition complete callback
+    glFinish();
 
     return 0;
 }

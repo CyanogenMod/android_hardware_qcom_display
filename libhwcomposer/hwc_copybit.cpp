@@ -21,10 +21,9 @@
 #define DEBUG_COPYBIT 0
 #include <copybit.h>
 #include <genlock.h>
-#include <GLES/gl.h>
+#include "hwc_copybit.h"
 #include "hwc_copybit.h"
 #include "comptype.h"
-#include "egl_handles.h"
 
 namespace qhwc {
 
@@ -66,11 +65,46 @@ private:
     mutable range r;
 };
 
+// Initialize CopyBit Class Static Mmembers.
+functype_eglGetRenderBufferANDROID CopyBit::LINK_eglGetRenderBufferANDROID
+                                                                   = NULL;
+functype_eglGetCurrentSurface CopyBit::LINK_eglGetCurrentSurface = NULL;
 int CopyBit::sYuvCount = 0;
 int CopyBit::sYuvLayerIndex = -1;
 bool CopyBit::sIsModeOn = false;
 bool CopyBit::sIsLayerSkip = false;
-bool CopyBit::sCopyBitDraw = false;
+void* CopyBit::egl_lib = NULL;
+
+void CopyBit::openEglLibAndGethandle()
+{
+    egl_lib = ::dlopen("libEGL_adreno200.so", RTLD_GLOBAL | RTLD_LAZY);
+    if (!egl_lib) {
+        return;
+    }
+    updateEglHandles(egl_lib);
+}
+void CopyBit::closeEglLib()
+{
+    if(egl_lib)
+        ::dlclose(egl_lib);
+
+    egl_lib = NULL;
+    updateEglHandles(NULL);
+}
+
+void CopyBit::updateEglHandles(void* egl_lib)
+{
+    if(egl_lib != NULL) {
+        *(void **)&CopyBit::LINK_eglGetRenderBufferANDROID =
+                             ::dlsym(egl_lib, "eglGetRenderBufferANDROID");
+        *(void **)&CopyBit::LINK_eglGetCurrentSurface =
+                                  ::dlsym(egl_lib, "eglGetCurrentSurface");
+   }else {
+        LINK_eglGetCurrentSurface = NULL;
+        LINK_eglGetCurrentSurface = NULL;
+   }
+}
+
 bool CopyBit::canUseCopybitForYUV(hwc_context_t *ctx) {
     // return true for non-overlay targets
     if(ctx->mMDP.hasOverlay) {
@@ -83,7 +117,8 @@ bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx, hwc_display_contents_1_t *
     int compositionType =
         qdutils::QCCompositionType::getInstance().getCompositionType();
 
-    if (compositionType & qdutils::COMPOSITION_TYPE_C2D){
+    if ((compositionType & qdutils::COMPOSITION_TYPE_C2D) ||
+        (compositionType & qdutils::COMPOSITION_TYPE_DYN)) {
          if (sYuvCount) {
              //Overlay up & running. Dont use COPYBIT for RGB layers.
              // TODO need to implement blending with C2D
@@ -153,7 +188,7 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
        ALOGE("%s:Invalid Params", __FUNCTION__);
        return false;
     }
-    sCopyBitDraw = false;
+
     for (int i=list->numHwLayers-1; i >= 0 ; i--) {
         private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
 
@@ -163,13 +198,11 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
           //YUV layer, check, if copybit can be used
           if (useCopybitForYUV) {
               list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
-              sCopyBitDraw = true;
           }
        } else if (hnd->bufferType == BUFFER_TYPE_UI) {
           //RGB layer, check, if copybit can be used
           if (useCopybitForRGB) {
               list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
-              sCopyBitDraw = true;
           }
        }
     }
@@ -180,24 +213,6 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list, EGLDispla
                                                                EGLSurface sur){
     // draw layers marked for COPYBIT
     int retVal = true;
-
-    if(sCopyBitDraw == false) // there is no any layer marked for copybit
-       return true ;
-
-    android_native_buffer_t *renderBuffer =
-          qdutils::eglHandles::getInstance().getAndroidNativeRenderBuffer(dpy);
-    if (!renderBuffer) {
-        ALOGE("%s: eglGetRenderBufferANDROID returned NULL buffer",
-             __FUNCTION__);
-        return -1;
-    }
-
-    // Invoke a glFinish if we are rendering any layers using copybit.
-    // We call glFinish instead of locking the renderBuffer because the
-    // GPU could take longer than the genlock timeout value to complete
-    // rendering
-    glFinish();
-
     for (size_t i=0; i<list->numHwLayers; i++) {
         if (list->hwLayers[i].compositionType == HWC_USE_COPYBIT) {
             retVal = drawLayerUsingCopybit(ctx, &(list->hwLayers[i]),
@@ -469,6 +484,13 @@ bool CopyBit::validateParams(hwc_context_t *ctx, const hwc_display_contents_1_t 
        ALOGE("%s:Invalid FB device", __FUNCTION__);
        return false;
    }
+
+   if (LINK_eglGetRenderBufferANDROID == NULL ||
+            LINK_eglGetCurrentSurface == NULL) {
+       ALOGE("%s:Not able to link to ADRENO", __FUNCTION__);
+       return false;
+   }
+
    return true;
 }
 

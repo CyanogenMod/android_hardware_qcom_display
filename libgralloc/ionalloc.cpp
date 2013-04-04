@@ -34,7 +34,7 @@
 #include <fcntl.h>
 #include <cutils/log.h>
 #include <errno.h>
-#include "gralloc_priv.h"
+#include <gralloc_priv.h>
 #include "ionalloc.h"
 
 using gralloc::IonAlloc;
@@ -126,8 +126,6 @@ int IonAlloc::alloc_buffer(alloc_data& data)
             ALOGE("%s: Failed to map the allocated memory: %s",
                   __FUNCTION__, strerror(errno));
             ioctl(mIonFd, ION_IOC_FREE, &handle_data);
-            if(ionSyncFd >= 0)
-                close(ionSyncFd);
             ionSyncFd = FD_INIT;
             return err;
         }

@@ -38,7 +38,7 @@
 
 #include <linux/android_pmem.h>
 
-#include "gralloc_priv.h"
+#include <gralloc_priv.h>
 #include "gr.h"
 #include "alloc_controller.h"
 #include "memalloc.h"

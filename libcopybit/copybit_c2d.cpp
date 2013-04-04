@@ -1170,14 +1170,7 @@ static int stretch_copybit_internal(
         src_image.handle = src_hnd;
 
         // Copy the source.
-        status = copy_image((private_handle_t *)src->handle, &src_image,
-                                CONVERT_TO_C2D_FORMAT);
-        if (status == COPYBIT_FAILURE) {
-            ALOGE("%s:copy_image failed in temp source",__FUNCTION__);
-            delete_handle(dst_hnd);
-            delete_handle(src_hnd);
-            return status;
-        }
+        copy_image((private_handle_t *)src->handle, &src_image, CONVERT_TO_C2D_FORMAT);
 
         // Flush the cache
         IMemAlloc* memalloc = sAlloc->getAllocator(src_hnd->flags);
@@ -1249,13 +1242,7 @@ static int stretch_copybit_internal(
                  trg_mapped);
     if (needTempDestination) {
         // copy the temp. destination without the alignment to the actual destination.
-        status = copy_image(dst_hnd, dst, CONVERT_TO_ANDROID_FORMAT);
-        if (status == COPYBIT_FAILURE) {
-            ALOGE("%s:copy_image failed in temp Dest",__FUNCTION__);
-            delete_handle(dst_hnd);
-            delete_handle(src_hnd);
-            return status;
-        }
+        copy_image(dst_hnd, dst, CONVERT_TO_ANDROID_FORMAT);
         // Invalidate the cache.
         IMemAlloc* memalloc = sAlloc->getAllocator(dst_hnd->flags);
         memalloc->clean_buffer((void *)(dst_hnd->base), dst_hnd->size,
