@@ -105,8 +105,6 @@ protected:
     bool isDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* sets up MDP comp for current frame */
     bool setup(hwc_context_t* ctx, hwc_display_contents_1_t* list);
-    /* set up Border fill as Base pipe */
-    static bool setupBasePipe(hwc_context_t*);
     /* Is debug enabled */
     static bool isDebug() { return sDebugLogs ? true : false; };
     /* Is feature enabled */

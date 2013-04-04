@@ -144,6 +144,7 @@ bool isSecureModePolicy(int mdpVersion);
 bool isExternalActive(hwc_context_t* ctx);
 bool needsScaling(hwc_layer_1_t const* layer);
 bool isAlphaPresent(hwc_layer_1_t const* layer);
+bool setupBasePipe(hwc_context_t *ctx);
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable);
 
 //Helper function to dump logs
@@ -299,6 +300,8 @@ struct hwc_context_t {
     bool mDMAInUse;
     //MDP rotater needed
     bool mNeedsRotator;
+    //Check if base pipe is set up
+    bool mBasePipeSetup;
 };
 
 namespace qhwc {

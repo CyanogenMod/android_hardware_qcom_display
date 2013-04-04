@@ -58,11 +58,6 @@ bool MDPComp::init(hwc_context_t *ctx) {
         return false;
     }
 
-    if(!setupBasePipe(ctx)) {
-        ALOGE("%s: Failed to setup primary base pipe", __FUNCTION__);
-        return false;
-    }
-
     char property[PROPERTY_VALUE_MAX];
 
     sEnabled = false;
@@ -140,46 +135,6 @@ void MDPComp::unsetMDPCompLayerFlags(hwc_context_t* ctx,
             list->hwLayers[index].compositionType = HWC_FRAMEBUFFER;
         }
     }
-}
-
-/*
- * Sets up BORDERFILL as default base pipe and detaches RGB0.
- * Framebuffer is always updated using PLAY ioctl.
- */
-bool MDPComp::setupBasePipe(hwc_context_t *ctx) {
-    const int dpy = HWC_DISPLAY_PRIMARY;
-    int fb_stride = ctx->dpyAttr[dpy].stride;
-    int fb_width = ctx->dpyAttr[dpy].xres;
-    int fb_height = ctx->dpyAttr[dpy].yres;
-    int fb_fd = ctx->dpyAttr[dpy].fd;
-
-    mdp_overlay ovInfo;
-    msmfb_overlay_data ovData;
-    memset(&ovInfo, 0, sizeof(mdp_overlay));
-    memset(&ovData, 0, sizeof(msmfb_overlay_data));
-
-    ovInfo.src.format = MDP_RGB_BORDERFILL;
-    ovInfo.src.width  = fb_width;
-    ovInfo.src.height = fb_height;
-    ovInfo.src_rect.w = fb_width;
-    ovInfo.src_rect.h = fb_height;
-    ovInfo.dst_rect.w = fb_width;
-    ovInfo.dst_rect.h = fb_height;
-    ovInfo.id = MSMFB_NEW_REQUEST;
-
-    if (ioctl(fb_fd, MSMFB_OVERLAY_SET, &ovInfo) < 0) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_SET err=%s",
-                strerror(errno));
-        return false;
-    }
-
-    ovData.id = ovInfo.id;
-    if (ioctl(fb_fd, MSMFB_OVERLAY_PLAY, &ovData) < 0) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_PLAY err=%s",
-                strerror(errno));
-        return false;
-    }
-    return true;
 }
 
 void MDPComp::reset(hwc_context_t *ctx,
