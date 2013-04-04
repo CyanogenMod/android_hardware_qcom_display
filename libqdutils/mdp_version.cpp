@@ -44,8 +44,12 @@ MDPVersion::MDPVersion()
     struct fb_fix_screeninfo fb_finfo;
 
     mMdpRev = 0;
-    mRGBPipes = mVGPipes = 0;
+    mRGBPipes = 0;
+    mVGPipes = 0;
     mDMAPipes = 0;
+    mFeatures = 0;
+    //TODO get this from driver, default for A-fam to 8
+    mMDPDownscale = 8;
 
     if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &fb_finfo) < 0) {
         ALOGE("FBIOGET_FSCREENINFO failed");
@@ -80,6 +84,7 @@ MDPVersion::MDPVersion()
                 mRGBPipes = metadata.data.caps.rgb_pipes;
                 mVGPipes = metadata.data.caps.vig_pipes;
                 mDMAPipes = metadata.data.caps.dma_pipes;
+                mFeatures = metadata.data.caps.features;
             }
 #endif
         } else {
@@ -96,7 +101,21 @@ MDPVersion::MDPVersion()
     mHasOverlay = false;
     if((mMDPVersion >= MDP_V4_0) || (mMDPVersion == MDP_V_UNKNOWN))
         mHasOverlay = true;
+    if(mMDPVersion >= MDSS_V5) {
+        //TODO get this from driver
+        mMDPDownscale = 4;
+    }
+
     mPanelType = panel_type;
 }
+
+bool MDPVersion::supportsDecimation() {
+    return mFeatures & MDP_DECIMATION_EN;
+}
+
+uint32_t MDPVersion::getMaxMDPDownscale() {
+    return mMDPDownscale;
+}
+
 }; //namespace qdutils
 
