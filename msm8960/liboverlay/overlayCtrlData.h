@@ -32,7 +32,7 @@
 
 #include "overlayUtils.h"
 #include "overlayMdp.h"
-#include "gralloc_priv.h" // INTERLACE_MASK
+#include <gralloc_priv.h> // INTERLACE_MASK
 
 namespace ovutils = overlay::utils;
 
