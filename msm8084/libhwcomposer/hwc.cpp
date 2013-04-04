@@ -39,6 +39,7 @@
 
 using namespace qhwc;
 #define VSYNC_DEBUG 0
+#define BLANK_DEBUG 0
 
 static int hwc_device_open(const struct hw_module_t* module,
                            const char* name,
@@ -258,7 +259,7 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
 
     Locker::Autolock _l(ctx->mBlankLock);
     int ret = 0;
-    ALOGD("%s: %s display: %d", __FUNCTION__,
+    ALOGD_IF(BLANK_DEBUG, "%s: %s display: %d", __FUNCTION__,
           blank==1 ? "Blanking":"Unblanking", dpy);
     if(blank) {
         // free up all the overlay pipes in use
@@ -317,7 +318,7 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
         return ret;
     }
 
-    ALOGD("%s: Done %s display: %d", __FUNCTION__,
+    ALOGD_IF(BLANK_DEBUG, "%s: Done %s display: %d", __FUNCTION__,
           blank==1 ? "blanking":"unblanking", dpy);
     return 0;
 }
