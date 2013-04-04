@@ -43,7 +43,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <utils/Log.h>
-#include "gralloc_priv.h" //for interlace
+#include <gralloc_priv.h> //for interlace
 
 // Older platforms do not support Venus.
 #ifndef VENUS_COLOR_FORMAT
