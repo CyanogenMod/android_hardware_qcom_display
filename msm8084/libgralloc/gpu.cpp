@@ -115,6 +115,10 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
             flags |= private_handle_t::PRIV_FLAGS_CAMERA_READ;
         }
 
+        if (usage & GRALLOC_USAGE_HW_COMPOSER) {
+            flags |= private_handle_t::PRIV_FLAGS_HW_COMPOSER;
+        }
+
         flags |= data.allocType;
         int eBaseAddr = int(eData.base) + eData.offset;
         private_handle_t *hnd = new private_handle_t(data.fd, size, flags,
