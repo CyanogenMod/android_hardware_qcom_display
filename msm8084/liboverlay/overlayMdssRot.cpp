@@ -93,6 +93,8 @@ void MdssRot::setFlags(const utils::eMdpFlags& flags) {
 
 void MdssRot::setTransform(const utils::eTransform& rot)
 {
+    // reset rotation flags to avoid stale orientation values
+    mRotInfo.flags &= ~MDSS_ROT_MASK;
     int flags = utils::getMdpOrient(rot);
     if (flags != -1)
         setRotations(flags);
@@ -117,8 +119,6 @@ bool MdssRot::commit() {
         return (mEnabled = false);
     }
     mRotData.id = mRotInfo.id;
-    // reset rotation flags to avoid stale orientation values
-    mRotInfo.flags &= ~MDSS_ROT_MASK;
     return true;
 }
 
