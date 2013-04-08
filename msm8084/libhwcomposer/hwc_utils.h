@@ -106,26 +106,6 @@ enum {
     HWC_COPYBIT = 0x00000002,
 };
 
-class LayerCache {
-    public:
-    LayerCache() {
-        canUseLayerCache = false;
-        numHwLayers = 0;
-        for(uint32_t i = 0; i < MAX_NUM_LAYERS; i++) {
-            hnd[i] = NULL;
-        }
-    }
-    //LayerCache optimization
-    void updateLayerCache(hwc_display_contents_1_t* list);
-    void resetLayerCache(int num);
-    void markCachedLayersAsOverlay(hwc_display_contents_1_t* list);
-    private:
-    uint32_t numHwLayers;
-    bool canUseLayerCache;
-    buffer_handle_t hnd[MAX_NUM_LAYERS];
-
-};
-
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_1_t const* l);
@@ -138,7 +118,7 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
                          const hwc_rect_t& scissor, int orient);
 void getNonWormholeRegion(hwc_display_contents_1_t* list,
                               hwc_rect_t& nwr);
-bool isSecuring(hwc_context_t* ctx);
+bool isSecuring(hwc_context_t* ctx, hwc_layer_1_t const* layer);
 bool isSecureModePolicy(int mdpVersion);
 bool isExternalActive(hwc_context_t* ctx);
 bool needsScaling(hwc_layer_1_t const* layer);
@@ -272,15 +252,13 @@ struct hwc_context_t {
 
     //Primary and external FB updater
     qhwc::IFBUpdate *mFBUpdate[MAX_DISPLAYS];
-    qhwc::IVideoOverlay *mVidOv[MAX_DISPLAYS];
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
     qhwc::MDPInfo mMDP;
     qhwc::DisplayAttributes dpyAttr[MAX_DISPLAYS];
     qhwc::ListStats listStats[MAX_DISPLAYS];
-    qhwc::LayerCache *mLayerCache[MAX_DISPLAYS];
     qhwc::LayerProp *layerProp[MAX_DISPLAYS];
-    qhwc::MDPComp *mMDPComp;
+    qhwc::MDPComp *mMDPComp[MAX_DISPLAYS];
 
     //Securing in progress indicator
     bool mSecuring;
