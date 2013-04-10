@@ -167,6 +167,7 @@ void initContext(hwc_context_t *ctx)
     ctx->vstate.fakevsync = false;
     ctx->mExtDispConfiguring = false;
     ctx->mBasePipeSetup = false;
+    ctx->mExtOrientation = 0;
 
     //Right now hwc starts the service but anybody could do it, or it could be
     //independent process as well.
@@ -243,6 +244,18 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
     if(ctx->mExtDisplay->isCEUnderscanSupported())
         return;
 
+    char value[PROPERTY_VALUE_MAX];
+    // Read action safe properties
+    property_get("persist.sys.actionsafe.width", value, "0");
+    int asWidthRatio = atoi(value);
+    property_get("persist.sys.actionsafe.height", value, "0");
+    int asHeightRatio = atoi(value);
+
+    if(!asWidthRatio && !asHeightRatio) {
+        //No action safe ratio set, return
+        return;
+    }
+
     float wRatio = 1.0;
     float hRatio = 1.0;
     float xRatio = 1.0;
@@ -251,17 +264,15 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
     float fbWidth = ctx->dpyAttr[dpy].xres;
     float fbHeight = ctx->dpyAttr[dpy].yres;
 
+    // Since external is rotated 90, need to swap width/height
+    if(ctx->mExtOrientation & HWC_TRANSFORM_ROT_90)
+        swap(fbWidth, fbHeight);
+
     float asX = 0;
     float asY = 0;
     float asW = fbWidth;
     float asH= fbHeight;
-    char value[PROPERTY_VALUE_MAX];
 
-    // Apply action safe parameters
-    property_get("persist.sys.actionsafe.width", value, "0");
-    int asWidthRatio = atoi(value);
-    property_get("persist.sys.actionsafe.height", value, "0");
-    int asHeightRatio = atoi(value);
     // based on the action safe ratio, get the Action safe rectangle
     asW = fbWidth * (1.0f -  asWidthRatio / 100.0f);
     asH = fbHeight * (1.0f -  asHeightRatio / 100.0f);
@@ -282,6 +293,31 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
 
     return;
 }
+
+/* Calculates the aspect ratio for external based on the primary */
+void getAspectRatioPosition(hwc_context_t *ctx, int dpy, int orientation,
+                        uint32_t& x, uint32_t& y, uint32_t& w, uint32_t& h) {
+    int fbWidth  = ctx->dpyAttr[dpy].xres;
+    int fbHeight = ctx->dpyAttr[dpy].yres;
+
+    switch(orientation) {
+        case HAL_TRANSFORM_ROT_90:
+        case HAL_TRANSFORM_ROT_270:
+            x = (fbWidth - (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres
+                        * fbHeight/ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres))/2;
+            y = 0;
+            w = (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres *
+                    fbHeight/ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres);
+            h = fbHeight;
+            break;
+        default:
+            //Do nothing
+            break;
+     }
+    ALOGD_IF(HWC_UTILS_DEBUG, "%s: Position: x = %d, y = %d w = %d h = %d",
+                    __FUNCTION__, x, y, w ,h);
+}
+
 
 bool needsScaling(hwc_layer_1_t const* layer) {
     int dst_w, dst_h, src_w, src_h;
@@ -384,7 +420,22 @@ void setListStats(hwc_context_t *ctx,
             ctx->listStats[dpy].extOnlyLayerIndex = i;
         }
     }
+
     setYUVProp(ctx->listStats[dpy].yuvCount);
+    /*
+     * Uncomment the below code for testing purposes
+    if(dpy) {
+        char value[PROPERTY_VALUE_MAX];
+        property_get("sys.ext_orientation", value, "0");
+        //Assuming the orientation value is in terms of HAL_TRANSFORM,
+        //This needs mapping to HAL, if its in different convention
+        ctx->mExtOrientation = atoi(value);
+        if(ctx->mExtOrientation) {
+            ALOGD_IF(HWC_UTILS_DEBUG, "%s: ext orientation = %d",
+                    __FUNCTION__, ctx->mExtOrientation);
+        }
+    }
+    */
 }
 
 
@@ -754,7 +805,7 @@ void setMdpFlags(hwc_layer_1_t *layer,
     }
 }
 
-static inline int configRotator(Rotator *rot, Whf& whf,
+inline int configRotator(Rotator *rot, Whf& whf,
         const eMdpFlags& mdpFlags, const eTransform& orient,
         const int& downscale) {
     // Fix alignments for TILED format
@@ -813,7 +864,7 @@ bool setupBasePipe(hwc_context_t *ctx) {
 }
 
 
-static inline int configMdp(Overlay *ov, const PipeArgs& parg,
+inline int configMdp(Overlay *ov, const PipeArgs& parg,
         const eTransform& orient, const hwc_rect_t& crop,
         const hwc_rect_t& pos, const MetaData_t *metadata,
         const eDest& dest) {
@@ -839,7 +890,7 @@ static inline int configMdp(Overlay *ov, const PipeArgs& parg,
     return 0;
 }
 
-static inline void updateSource(eTransform& orient, Whf& whf,
+inline void updateSource(eTransform& orient, Whf& whf,
         hwc_rect_t& crop) {
     Dim srcCrop(crop.left, crop.top,
             crop.right - crop.left,
@@ -879,14 +930,17 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     uint32_t w = dst.right - dst.left;
     uint32_t h = dst.bottom - dst.top;
 
-    //check for actionsafe for video on external
-    if(dpy && isYuvBuffer(hnd)) {
+    if(dpy) {
+        // Just need to set the position to portrait as the transformation
+        // will already be set to required orientation on TV
+        getAspectRatioPosition(ctx, dpy, ctx->mExtOrientation, x, y, w, h);
+        // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
         getActionSafePosition(ctx, dpy, x, y, w, h);
-        // Convert dim to hwc_rect_t
+        // Convert position to hwc_rect_t
         dst.left = x;
         dst.top = y;
-        dst.right = w + x;
-        dst.bottom = h + y;
+        dst.right = w + dst.left;
+        dst.bottom = h + dst.top;
     }
 
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&

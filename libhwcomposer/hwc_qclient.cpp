@@ -61,6 +61,9 @@ status_t QClient::notifyCallback(uint32_t msg, uint32_t value) {
         case IQService::SCREEN_REFRESH:
             return screenRefresh();
             break;
+        case IQService::EXTERNAL_ORIENTATION:
+            setExtOrientation(value);
+            break;
         default:
             return NO_ERROR;
     }
@@ -105,4 +108,9 @@ android::status_t QClient::screenRefresh() {
     }
     return result;
 }
+
+void QClient::setExtOrientation(uint32_t orientation) {
+    mHwcContext->mExtOrientation = orientation;
+}
+
 }
