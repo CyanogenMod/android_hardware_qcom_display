@@ -104,8 +104,6 @@ void MdpRot::setTransform(const utils::eTransform& rot)
 {
     int r = utils::getMdpOrient(rot);
     setRotations(r);
-    //getMdpOrient will switch the flips if the source is 90 rotated.
-    //Clients in Android dont factor in 90 rotation while deciding the flip.
     mOrientation = static_cast<utils::eTransform>(r);
     ALOGE_IF(DEBUG_OVERLAY, "%s: r=%d", __FUNCTION__, r);
 }
