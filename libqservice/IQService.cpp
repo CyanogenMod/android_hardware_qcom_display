@@ -71,6 +71,13 @@ public:
         status_t result = reply.readInt32();
         return result;
     }
+
+    virtual void setExtOrientation(uint32_t orientation) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
+        data.writeInt32(orientation);
+        remote()->transact(EXTERNAL_ORIENTATION, data, &reply);
+    }
 };
 
 IMPLEMENT_META_INTERFACE(QService, "android.display.IQService");

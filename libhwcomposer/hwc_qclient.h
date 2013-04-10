@@ -60,6 +60,7 @@ private:
     void securing(uint32_t startEnd);
     void unsecuring(uint32_t startEnd);
     android::status_t screenRefresh();
+    void setExtOrientation(uint32_t orientation);
 
     hwc_context_t *mHwcContext;
     const android::sp<android::IMediaDeathNotifier> mMPDeathNotifier;
