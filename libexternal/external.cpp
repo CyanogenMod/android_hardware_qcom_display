@@ -781,6 +781,11 @@ void ExternalDisplay::getAttrForMode(int& width, int& height, int& fps) {
             height = 2160;
             fps = 24;
             break;
+        case HDMI_VFRMT_3840x2160p25_16_9:
+            width = 3840;
+            height = 2160;
+            fps = 25;
+            break;
         case HDMI_VFRMT_3840x2160p30_16_9:
             width = 3840;
             height = 2160;
