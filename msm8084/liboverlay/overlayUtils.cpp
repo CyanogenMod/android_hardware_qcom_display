@@ -361,9 +361,9 @@ void getDump(char *buf, size_t len, const char *prefix,
             prefix, ov.id, ov.z_order, ov.is_fg, ov.alpha,
             ov.transp_mask, ov.flags, ov.horz_deci, ov.vert_deci);
     strncat(buf, str, strlen(str));
-    getDump(buf, len, "\tsrc(msmfb_img)", ov.src);
-    getDump(buf, len, "\tsrc_rect(mdp_rect)", ov.src_rect);
-    getDump(buf, len, "\tdst_rect(mdp_rect)", ov.dst_rect);
+    getDump(buf, len, "\tsrc", ov.src);
+    getDump(buf, len, "\tsrc_rect", ov.src_rect);
+    getDump(buf, len, "\tdst_rect", ov.dst_rect);
 }
 
 void getDump(char *buf, size_t len, const char *prefix,
@@ -392,7 +392,7 @@ void getDump(char *buf, size_t len, const char *prefix,
             "%s id=%d\n",
             prefix, ov.id);
     strncat(buf, str, strlen(str));
-    getDump(buf, len, "\tdata(msmfb_data)", ov.data);
+    getDump(buf, len, "\tdata", ov.data);
 }
 
 void getDump(char *buf, size_t len, const char *prefix,
@@ -421,13 +421,11 @@ void getDump(char *buf, size_t len, const char *prefix,
         const msm_rotator_data_info& rot) {
     char str[256] = {'\0'};
     snprintf(str, 256,
-            "%s sessid=%u verkey=%d\n",
-            prefix, rot.session_id, rot.version_key);
+            "%s sessid=%u\n",
+            prefix, rot.session_id);
     strncat(buf, str, strlen(str));
     getDump(buf, len, "\tsrc", rot.src);
     getDump(buf, len, "\tdst", rot.dst);
-    getDump(buf, len, "\tsrc_chroma", rot.src_chroma);
-    getDump(buf, len, "\tdst_chroma", rot.dst_chroma);
 }
 
 } // utils
