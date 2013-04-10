@@ -133,6 +133,10 @@ void dumpsys_log(android::String8& buf, const char* fmt, ...);
 void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
                                         uint32_t& y, uint32_t& w, uint32_t& h);
 
+
+void getAspectRatioPosition(hwc_context_t *ctx, int dpy, int orientation,
+                        uint32_t& x, uint32_t& y, uint32_t& w, uint32_t& h);
+
 //Close acquireFenceFds of all layers of incoming list
 void closeAcquireFds(hwc_display_contents_1_t* list);
 
@@ -148,6 +152,20 @@ void trimLayer(hwc_context_t *ctx, const int& dpy, const int& transform,
 void setMdpFlags(hwc_layer_1_t *layer,
         ovutils::eMdpFlags &mdpFlags,
         int rotDownscale = 0);
+
+int configRotator(overlay::Rotator *rot, const ovutils::Whf& whf,
+        const hwc_rect_t& crop, const ovutils::eMdpFlags& mdpFlags,
+        const ovutils::eTransform& orient, const int& downscale);
+
+int configMdp(overlay::Overlay *ov, const ovutils::PipeArgs& parg,
+        const ovutils::eTransform& orient, const hwc_rect_t& crop,
+        const hwc_rect_t& pos, const MetaData_t *metadata,
+        const ovutils::eDest& dest);
+
+void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
+        hwc_rect_t& crop);
+
+
 
 //Routine to configure low resolution panels (<= 2048 width)
 int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
@@ -276,6 +294,8 @@ struct hwc_context_t {
     struct vsync_state vstate;
     //Drawing round when we use GPU
     bool isPaddingRound;
+    // External Orientation
+    int mExtOrientation;
 };
 
 namespace qhwc {
