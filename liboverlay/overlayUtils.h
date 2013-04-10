@@ -537,29 +537,6 @@ inline void Dim::dump() const {
     ALOGE("== Dump Dim x=%d y=%d w=%d h=%d start/end ==", x, y, w, h);
 }
 
-inline int getMdpOrient(eTransform rotation) {
-    ALOGE_IF(DEBUG_OVERLAY, "%s: rot=%d", __FUNCTION__, rotation);
-    switch(rotation)
-    {
-        case OVERLAY_TRANSFORM_0 : return 0;
-        case OVERLAY_TRANSFORM_FLIP_V:  return MDP_FLIP_UD;
-        case OVERLAY_TRANSFORM_FLIP_H:  return MDP_FLIP_LR;
-        case OVERLAY_TRANSFORM_ROT_90:  return MDP_ROT_90;
-        //getMdpOrient will switch the flips if the source is 90 rotated.
-        //Clients in Android dont factor in 90 rotation while deciding flip.
-        case OVERLAY_TRANSFORM_ROT_90_FLIP_V:
-                return MDP_ROT_90 | MDP_FLIP_LR;
-        case OVERLAY_TRANSFORM_ROT_90_FLIP_H:
-                return MDP_ROT_90 | MDP_FLIP_UD;
-        case OVERLAY_TRANSFORM_ROT_180: return MDP_ROT_180;
-        case OVERLAY_TRANSFORM_ROT_270: return MDP_ROT_270;
-        default:
-            ALOGE("%s: invalid rotation value (value = 0x%x",
-                    __FUNCTION__, rotation);
-    }
-    return -1;
-}
-
 // FB0
 template <int CHAN>
 inline Dim getPositionS3DImpl(const Whf& whf)
