@@ -47,7 +47,7 @@
 
 // Older platforms do not support Venus
 #ifndef VENUS_COLOR_FORMAT
-#define MDP_Y_CBCR_H2V2_VENUS (MDP_IMGTYPE_LIMIT2 + 1)
+#define MDP_Y_CBCR_H2V2_VENUS MDP_IMGTYPE_LIMIT
 #endif
 
 /*
@@ -488,42 +488,46 @@ inline bool isRgb(uint32_t format) {
 }
 
 inline const char* getFormatString(int format){
-    static const char* const formats[] = {
-        "MDP_RGB_565",
-        "MDP_XRGB_8888",
-        "MDP_Y_CBCR_H2V2",
-        "MDP_Y_CBCR_H2V2_ADRENO",
-        "MDP_ARGB_8888",
-        "MDP_RGB_888",
-        "MDP_Y_CRCB_H2V2",
-        "MDP_YCRYCB_H2V1",
-        "MDP_Y_CRCB_H2V1",
-        "MDP_Y_CBCR_H2V1",
-        "MDP_Y_CRCB_H1V2",
-        "MDP_Y_CBCR_H1V2",
-        "MDP_RGBA_8888",
-        "MDP_BGRA_8888",
-        "MDP_RGBX_8888",
-        "MDP_Y_CRCB_H2V2_TILE",
-        "MDP_Y_CBCR_H2V2_TILE",
-        "MDP_Y_CR_CB_H2V2",
-        "MDP_Y_CR_CB_GH2V2",
-        "MDP_Y_CB_CR_H2V2",
-        "MDP_Y_CRCB_H1V1",
-        "MDP_Y_CBCR_H1V1",
-        "MDP_YCRCB_H1V1",
-        "MDP_YCBCR_H1V1",
-        "MDP_BGR_565",
-        "MDP_BGR_888",
-        "MDP_Y_CBCR_H2V2_VENUS",
-        "MDP_IMGTYPE_LIMIT",
-        "MDP_RGB_BORDERFILL",
-        "MDP_FB_FORMAT",
-        "MDP_IMGTYPE_LIMIT2"
-    };
-    if(format < 0 || format >= (int)(sizeof(formats) / sizeof(formats[0]))) {
+    #define STR(f) #f;
+    static const char* formats[MDP_IMGTYPE_LIMIT + 1] = {0};
+    formats[MDP_RGB_565] = STR(MDP_RGB_565);
+    formats[MDP_XRGB_8888] = STR(MDP_XRGB_8888);
+    formats[MDP_Y_CBCR_H2V2] = STR(MDP_Y_CBCR_H2V2);
+    formats[MDP_Y_CBCR_H2V2_ADRENO] = STR(MDP_Y_CBCR_H2V2_ADRENO);
+    formats[MDP_ARGB_8888] = STR(MDP_ARGB_8888);
+    formats[MDP_RGB_888] = STR(MDP_RGB_888);
+    formats[MDP_Y_CRCB_H2V2] = STR(MDP_Y_CRCB_H2V2);
+    formats[MDP_YCRYCB_H2V1] = STR(MDP_YCRYCB_H2V1);
+    formats[MDP_CBYCRY_H2V1] = STR(MDP_CBYCRY_H2V1);
+    formats[MDP_Y_CRCB_H2V1] = STR(MDP_Y_CRCB_H2V1);
+    formats[MDP_Y_CBCR_H2V1] = STR(MDP_Y_CBCR_H2V1);
+    formats[MDP_Y_CRCB_H1V2] = STR(MDP_Y_CRCB_H1V2);
+    formats[MDP_Y_CBCR_H1V2] = STR(MDP_Y_CBCR_H1V2);
+    formats[MDP_RGBA_8888] = STR(MDP_RGBA_8888);
+    formats[MDP_BGRA_8888] = STR(MDP_BGRA_8888);
+    formats[MDP_RGBX_8888] = STR(MDP_RGBX_8888);
+    formats[MDP_Y_CRCB_H2V2_TILE] = STR(MDP_Y_CRCB_H2V2_TILE);
+    formats[MDP_Y_CBCR_H2V2_TILE] = STR(MDP_Y_CBCR_H2V2_TILE);
+    formats[MDP_Y_CR_CB_H2V2] = STR(MDP_Y_CR_CB_H2V2);
+    formats[MDP_Y_CR_CB_GH2V2] = STR(MDP_Y_CR_CB_GH2V2);
+    formats[MDP_Y_CB_CR_H2V2] = STR(MDP_Y_CB_CR_H2V2);
+    formats[MDP_Y_CRCB_H1V1] = STR(MDP_Y_CRCB_H1V1);
+    formats[MDP_Y_CBCR_H1V1] = STR(MDP_Y_CBCR_H1V1);
+    formats[MDP_YCRCB_H1V1] = STR(MDP_YCRCB_H1V1);
+    formats[MDP_YCBCR_H1V1] = STR(MDP_YCBCR_H1V1);
+    formats[MDP_BGR_565] = STR(MDP_BGR_565);
+    formats[MDP_BGR_888] = STR(MDP_BGR_888);
+    formats[MDP_Y_CBCR_H2V2_VENUS] = STR(MDP_Y_CBCR_H2V2_VENUS);
+    formats[MDP_BGRX_8888] = STR(MDP_BGRX_8888);
+    formats[MDP_IMGTYPE_LIMIT] = STR(MDP_IMGTYPE_LIMIT);
+
+    if(format < 0 || format >= MDP_IMGTYPE_LIMIT) {
         ALOGE("%s wrong fmt %d", __FUNCTION__, format);
         return "Unsupported format";
+    }
+    if(formats[format] == 0) {
+        ALOGE("%s: table missing format %d from header", __FUNCTION__, format);
+        return "";
     }
     return formats[format];
 }
