@@ -86,11 +86,13 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
 {
     private_module_t* m =
         reinterpret_cast<private_module_t*>(dev->common.module);
-    struct mdp_display_commit prim_commit;
-    memset(&prim_commit, 0, sizeof(struct mdp_display_commit));
-    prim_commit.wait_for_finish = 1;
-    if (ioctl(m->framebuffer->fd, MSMFB_DISPLAY_COMMIT, &prim_commit) == -1) {
-        ALOGE("%s: MSMFB_DISPLAY_COMMIT for primary failed, str: %s",
+    private_handle_t *hnd = static_cast<private_handle_t*>
+        (const_cast<native_handle_t*>(buffer));
+    const size_t offset = hnd->base - m->framebuffer->base;
+    m->info.activate = FB_ACTIVATE_VBL;
+    m->info.yoffset = offset / m->finfo.line_length;
+    if (ioctl(m->framebuffer->fd, FBIOPUT_VSCREENINFO, &m->info) == -1) {
+        ALOGE("%s: FBIOPUT_VSCREENINFO for primary failed, str: %s",
                 __FUNCTION__, strerror(errno));
         return -errno;
     }
@@ -308,7 +310,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
      */
 
     int err;
-    module->numBuffers = 2;
+    module->numBuffers = info.yres_virtual / info.yres;
     module->bufferMask = 0;
     //adreno needs page aligned offsets. Align the fbsize to pagesize.
     size_t fbSize = roundUpToPageSize(finfo.line_length * info.yres)*
@@ -325,6 +327,10 @@ int mapFrameBufferLocked(struct private_module_t* module)
     module->framebuffer->base = intptr_t(vaddr);
     memset(vaddr, 0, fbSize);
     module->currentOffset = 0;
+    //Enable vsync
+    int enable = 1;
+    ioctl(module->framebuffer->fd, MSMFB_OVERLAY_VSYNC_CTRL,
+             &enable);
     return 0;
 }
 
