@@ -151,6 +151,76 @@ void gpu_context_t::getGrallocInformationFromFormat(int inputFormat,
     }
 }
 
+int gpu_context_t::gralloc_alloc_framebuffer_locked(size_t size, int usage,
+                                                    buffer_handle_t* pHandle)
+{
+    private_module_t* m = reinterpret_cast<private_module_t*>(common.module);
+
+    // we don't support framebuffer allocations with graphics heap flags
+    if (usage & GRALLOC_HEAP_MASK) {
+        return -EINVAL;
+    }
+
+    if (m->framebuffer == NULL) {
+        ALOGE("%s: Invalid framebuffer", __FUNCTION__);
+        return -EINVAL;
+    }
+
+    const uint32_t bufferMask = m->bufferMask;
+    const uint32_t numBuffers = m->numBuffers;
+    size_t bufferSize = m->finfo.line_length * m->info.yres;
+
+    //adreno needs FB size to be page aligned
+    bufferSize = roundUpToPageSize(bufferSize);
+
+    if (numBuffers == 1) {
+        // If we have only one buffer, we never use page-flipping. Instead,
+        // we return a regular buffer which will be memcpy'ed to the main
+        // screen when post is called.
+        int newUsage = (usage & ~GRALLOC_USAGE_HW_FB) | GRALLOC_USAGE_HW_2D;
+        return gralloc_alloc_buffer(bufferSize, newUsage, pHandle, BUFFER_TYPE_UI,
+                                    m->fbFormat, m->info.xres, m->info.yres);
+    }
+
+    if (bufferMask >= ((1LU<<numBuffers)-1)) {
+        // We ran out of buffers.
+        return -ENOMEM;
+    }
+
+    // create a "fake" handle for it
+    intptr_t vaddr = intptr_t(m->framebuffer->base);
+    private_handle_t* hnd = new private_handle_t(
+        dup(m->framebuffer->fd), bufferSize,
+        private_handle_t::PRIV_FLAGS_USES_PMEM |
+        private_handle_t::PRIV_FLAGS_FRAMEBUFFER,
+        BUFFER_TYPE_UI, m->fbFormat, m->info.xres,
+        m->info.yres);
+
+    // find a free slot
+    for (uint32_t i=0 ; i<numBuffers ; i++) {
+        if ((bufferMask & (1LU<<i)) == 0) {
+            m->bufferMask |= (1LU<<i);
+            break;
+        }
+        vaddr += bufferSize;
+    }
+    hnd->base = vaddr;
+    hnd->offset = vaddr - intptr_t(m->framebuffer->base);
+    *pHandle = hnd;
+    return 0;
+}
+
+
+int gpu_context_t::gralloc_alloc_framebuffer(size_t size, int usage,
+                                             buffer_handle_t* pHandle)
+{
+    private_module_t* m = reinterpret_cast<private_module_t*>(common.module);
+    pthread_mutex_lock(&m->lock);
+    int err = gralloc_alloc_framebuffer_locked(size, usage, pHandle);
+    pthread_mutex_unlock(&m->lock);
+    return err;
+}
+
 int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
                               buffer_handle_t* pHandle, int* pStride,
                               size_t bufferSize) {
@@ -187,8 +257,22 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
         bufferType = BUFFER_TYPE_VIDEO;
     }
 
-    int err = gralloc_alloc_buffer(size, usage, pHandle, bufferType,
-            grallocFormat, alignedw, alignedh);
+    bool useFbMem = false;
+    char property[PROPERTY_VALUE_MAX];
+    if((usage & GRALLOC_USAGE_HW_FB) &&
+       (property_get("debug.gralloc.map_fb_memory", property, NULL) > 0) &&
+       (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+        (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+        useFbMem = true;
+    }
+
+    int err = 0;
+    if(useFbMem) {
+        err = gralloc_alloc_framebuffer(size, usage, pHandle);
+    } else {
+        err = gralloc_alloc_buffer(size, usage, pHandle, bufferType,
+                                   grallocFormat, alignedw, alignedh);
+    }
 
     if (err < 0) {
         return err;
@@ -200,21 +284,26 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
 
 int gpu_context_t::free_impl(private_handle_t const* hnd) {
     private_module_t* m = reinterpret_cast<private_module_t*>(common.module);
+    if (hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
+        const size_t bufferSize = m->finfo.line_length * m->info.yres;
+        int index = (hnd->base - m->framebuffer->base) / bufferSize;
+        m->bufferMask &= ~(1<<index);
+    } else {
 
-    terminateBuffer(&m->base, const_cast<private_handle_t*>(hnd));
-    IMemAlloc* memalloc = mAllocCtrl->getAllocator(hnd->flags);
-    int err = memalloc->free_buffer((void*)hnd->base, (size_t) hnd->size,
-                                    hnd->offset, hnd->fd);
-    if(err)
-        return err;
-    // free the metadata space
-    unsigned long size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
-    err = memalloc->free_buffer((void*)hnd->base_metadata,
-                                (size_t) size, hnd->offset_metadata,
-                                hnd->fd_metadata);
-    if (err)
-        return err;
-
+        terminateBuffer(&m->base, const_cast<private_handle_t*>(hnd));
+        IMemAlloc* memalloc = mAllocCtrl->getAllocator(hnd->flags);
+        int err = memalloc->free_buffer((void*)hnd->base, (size_t) hnd->size,
+                                        hnd->offset, hnd->fd);
+        if(err)
+            return err;
+        // free the metadata space
+        unsigned long size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
+        err = memalloc->free_buffer((void*)hnd->base_metadata,
+                                    (size_t) size, hnd->offset_metadata,
+                                    hnd->fd_metadata);
+        if (err)
+            return err;
+    }
     delete hnd;
     return 0;
 }
