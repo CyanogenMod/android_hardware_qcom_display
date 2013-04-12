@@ -320,6 +320,7 @@ bool MDPComp::isDoable(hwc_context_t *ctx,
 
     //FB composition on idle timeout
     if(sIdleFallBack) {
+        ctx->mLayerCache[dpy]->resetLayerCache(list->numHwLayers);
         sIdleFallBack = false;
         ALOGD_IF(isDebug(), "%s: idle fallback",__FUNCTION__);
         return false;
