@@ -31,6 +31,7 @@
 #include "hwc_fbupdate.h"
 #include "mdp_version.h"
 #include "hwc_copybit.h"
+#include "hwc_dump_layers.h"
 #include "external.h"
 #include "hwc_qclient.h"
 #include "QService.h"
@@ -134,6 +135,9 @@ void initContext(hwc_context_t *ctx)
          MDPComp::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
          HWC_DISPLAY_PRIMARY);
 
+    for (uint32_t i = 0; i < MAX_DISPLAYS; i++) {
+        ctx->mHwcDebug[i] = new HwcDebug(i);
+    }
     MDPComp::init(ctx);
 
     pthread_mutex_init(&(ctx->vstate.lock), NULL);
@@ -191,6 +195,10 @@ void closeContext(hwc_context_t *ctx)
         if(ctx->mMDPComp[i]) {
             delete ctx->mMDPComp[i];
             ctx->mMDPComp[i] = NULL;
+        }
+        if(ctx->mHwcDebug[i]) {
+            delete ctx->mHwcDebug[i];
+            ctx->mHwcDebug[i] = NULL;
         }
     }
 
