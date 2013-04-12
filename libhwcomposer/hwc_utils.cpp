@@ -559,8 +559,11 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     }
 
     if(ret < 0) {
-        ALOGE("ioctl MSMFB_BUFFER_SYNC failed, err=%s",
-                strerror(errno));
+        ALOGE("%s: ioctl MSMFB_BUFFER_SYNC failed, err=%s",
+                  __FUNCTION__, strerror(errno));
+        ALOGE("%s: acq_fen_fd_cnt=%d flags=%d fd=%d dpy=%d numHwLayers=%d",
+              __FUNCTION__, data.acq_fen_fd_cnt, data.flags, fbFd,
+              dpy, list->numHwLayers);
     }
 
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
