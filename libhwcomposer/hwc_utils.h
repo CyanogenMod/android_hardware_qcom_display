@@ -94,6 +94,7 @@ struct ListStats {
     int yuvIndices[MAX_NUM_LAYERS];
     bool needsAlphaScale;
     bool preMultipliedAlpha;
+    bool planeAlpha;
 };
 
 struct LayerProp {
