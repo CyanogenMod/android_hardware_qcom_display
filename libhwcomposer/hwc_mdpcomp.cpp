@@ -265,6 +265,13 @@ bool MDPComp::isDoable(hwc_context_t *ctx,
         return false;
     }
 
+    if(ctx->listStats[dpy].planeAlpha
+                     && ctx->mMDP.version >= qdutils::MDSS_V5) {
+        ALOGD_IF(isDebug(), "%s: plane alpha not implemented on MDSS",
+                 __FUNCTION__);
+        return false;
+    }
+
     //FB composition on idle timeout
     if(sIdleFallBack) {
         ctx->mLayerCache[dpy]->resetLayerCache(list->numHwLayers);

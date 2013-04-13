@@ -325,6 +325,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].skipCount = 0;
     ctx->listStats[dpy].needsAlphaScale = false;
     ctx->listStats[dpy].preMultipliedAlpha = false;
+    ctx->listStats[dpy].planeAlpha = false;
     ctx->listStats[dpy].yuvCount = 0;
 
     for (size_t i = 0; i < list->numHwLayers; i++) {
@@ -349,7 +350,8 @@ void setListStats(hwc_context_t *ctx,
         }
         if(layer->blending == HWC_BLENDING_PREMULT)
             ctx->listStats[dpy].preMultipliedAlpha = true;
-
+        if(layer->planeAlpha < 0xFF)
+            ctx->listStats[dpy].planeAlpha = true;
         if(!ctx->listStats[dpy].needsAlphaScale)
             ctx->listStats[dpy].needsAlphaScale = isAlphaScaled(layer);
     }
@@ -564,6 +566,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
             swapzero = true;
     }
 
+#ifndef MDSS_TARGET
     //Send acquireFenceFds to rotator
     if(mdpVersion < qdutils::MDSS_V5) {
         //A-family
@@ -589,6 +592,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         //TODO B-family
     }
 
+#endif
     //Accumulate acquireFenceFds for MDP
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(list->hwLayers[i].compositionType == HWC_OVERLAY &&
