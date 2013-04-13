@@ -40,6 +40,8 @@ class GenericPipe;
 
 class Overlay : utils::NoCopy {
 public:
+    enum { DMA_BLOCK_MODE, DMA_LINE_MODE };
+
     /* dtor close */
     ~Overlay();
 
@@ -84,6 +86,8 @@ public:
      * to populate.
      */
     void getDump(char *buf, size_t len);
+    static void setDMAMode(const int& mode);
+    static int getDMAMode();
 
 private:
     /* Ctor setup */
@@ -148,6 +152,7 @@ private:
     /* Singleton Instance*/
     static Overlay *sInstance;
     static int sExtFbIndex;
+    static int sDMAMode;
 };
 
 inline void Overlay::validate(int index) {
@@ -174,6 +179,15 @@ inline void Overlay::setExtFbNum(int fbNum) {
 
 inline int Overlay::getExtFbNum() {
     return sExtFbIndex;
+}
+
+inline void Overlay::setDMAMode(const int& mode) {
+    if(mode == DMA_LINE_MODE || mode == DMA_BLOCK_MODE)
+        sDMAMode = mode;
+}
+
+inline int Overlay::getDMAMode() {
+    return sDMAMode;
 }
 
 inline bool Overlay::PipeBook::valid() {
