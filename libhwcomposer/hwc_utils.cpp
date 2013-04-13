@@ -520,12 +520,19 @@ bool isExternalActive(hwc_context_t* ctx) {
 }
 
 void closeAcquireFds(hwc_display_contents_1_t* list) {
-    for(uint32_t i = 0; list && i < list->numHwLayers; i++) {
-        //Close the acquireFenceFds
-        //HWC_FRAMEBUFFER are -1 already by SF, rest we close.
-        if(list->hwLayers[i].acquireFenceFd >= 0) {
-            close(list->hwLayers[i].acquireFenceFd);
-            list->hwLayers[i].acquireFenceFd = -1;
+    if(LIKELY(list)) {
+        for(uint32_t i = 0; i < list->numHwLayers; i++) {
+            //Close the acquireFenceFds
+            //HWC_FRAMEBUFFER are -1 already by SF, rest we close.
+            if(list->hwLayers[i].acquireFenceFd >= 0) {
+                close(list->hwLayers[i].acquireFenceFd);
+                list->hwLayers[i].acquireFenceFd = -1;
+            }
+        }
+
+        if (list->outbufAcquireFenceFd >= 0 ) {
+            close(list->outbufAcquireFenceFd);
+            list->outbufAcquireFenceFd = -1;
         }
     }
 }
