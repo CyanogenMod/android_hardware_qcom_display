@@ -303,10 +303,6 @@ struct hwc_context_t {
     mutable Locker mBlankLock;
     //Lock to protect set when detaching external disp
     mutable Locker mExtSetLock;
-    //DMA used for rotator
-    bool mDMAInUse;
-    //MDP rotater needed
-    bool mNeedsRotator;
     //Check if base pipe is set up
     bool mBasePipeSetup;
 };
