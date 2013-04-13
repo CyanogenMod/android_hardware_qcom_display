@@ -26,6 +26,8 @@ namespace ovutils = overlay::utils;
 
 namespace overlay {
 
+//============Rotator=========================
+
 Rotator::~Rotator() {}
 
 Rotator* Rotator::getRotator() {
@@ -56,6 +58,9 @@ int Rotator::getRotatorHwType() {
     return TYPE_MDP;
 }
 
+
+//============RotMem=========================
+
 bool RotMem::close() {
     bool ret = true;
     for(uint32_t i=0; i < RotMem::MAX_ROT_MEM; ++i) {
@@ -70,11 +75,46 @@ bool RotMem::close() {
     return ret;
 }
 
+RotMem::Mem::Mem() : mCurrOffset(0) {
+    utils::memset0(mRotOffset);
+    for(int i = 0; i < ROT_NUM_BUFS; i++) {
+        mRelFence[i] = -1;
+    }
+}
+
+RotMem::Mem::~Mem() {
+    for(int i = 0; i < ROT_NUM_BUFS; i++) {
+        ::close(mRelFence[i]);
+        mRelFence[i] = -1;
+    }
+}
+
+void RotMem::Mem::setReleaseFd(const int& fence) {
+    int ret = 0;
+
+    if(mRelFence[mCurrOffset] >= 0) {
+        //Wait for previous usage of this buffer to be over.
+        //Can happen if rotation takes > vsync and a fast producer. i.e queue
+        //happens in subsequent vsyncs either because content is 60fps or
+        //because the producer is hasty sometimes.
+        ret = sync_wait(mRelFence[mCurrOffset], 1000);
+        if(ret < 0) {
+            ALOGE("%s: sync_wait error!! error no = %d err str = %s",
+                __FUNCTION__, errno, strerror(errno));
+        }
+        ::close(mRelFence[mCurrOffset]);
+    }
+    mRelFence[mCurrOffset] = fence;
+}
+
+//============RotMgr=========================
+
 RotMgr::RotMgr() {
     for(int i = 0; i < MAX_ROT_SESS; i++) {
         mRot[i] = 0;
     }
     mUseCount = 0;
+    mRotDevFd = -1;
 }
 
 RotMgr::~RotMgr() {
@@ -118,6 +158,8 @@ void RotMgr::clear() {
         }
     }
     mUseCount = 0;
+    ::close(mRotDevFd);
+    mRotDevFd = -1;
 }
 
 void RotMgr::getDump(char *buf, size_t len) {
@@ -129,6 +171,17 @@ void RotMgr::getDump(char *buf, size_t len) {
     char str[32] = {'\0'};
     snprintf(str, 32, "\n================\n");
     strncat(buf, str, strlen(str));
+}
+
+int RotMgr::getRotDevFd() {
+    //2nd check just in case
+    if(mRotDevFd < 0 && Rotator::getRotatorHwType() == Rotator::TYPE_MDP) {
+        mRotDevFd = ::open("/dev/msm_rotator", O_RDWR, 0);
+        if(mRotDevFd < 0) {
+            ALOGE("%s failed to open rotator device", __FUNCTION__);
+        }
+    }
+    return mRotDevFd;
 }
 
 }
