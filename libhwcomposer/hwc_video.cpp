@@ -66,32 +66,15 @@ bool VideoOverlayLowRes::prepare(hwc_context_t *ctx,
        return false;
     }
 
-    if(isSecuring(ctx)) {
-       ALOGD_IF(VIDEO_DEBUG,"%s: MDP Secure is active", __FUNCTION__);
-       return false;
-    }
-
     if(yuvIndex == -1 || ctx->listStats[mDpy].yuvCount != 1) {
         return false;
     }
 
-    //index guaranteed to be not -1 at this point
     hwc_layer_1_t *layer = &list->hwLayers[yuvIndex];
-    if (isSecureModePolicy(ctx->mMDP.version)) {
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        if(ctx->mSecureMode) {
-            if (! isSecureBuffer(hnd)) {
-                ALOGD_IF(VIDEO_DEBUG, "%s: Handle non-secure video layer"
-                         "during secure playback gracefully", __FUNCTION__);
-                return false;
-            }
-        } else {
-            if (isSecureBuffer(hnd)) {
-                ALOGD_IF(VIDEO_DEBUG, "%s: Handle secure video layer"
-                         "during non-secure playback gracefully", __FUNCTION__);
-                return false;
-            }
-        }
+
+    if(isSecuring(ctx, layer)) {
+       ALOGD_IF(VIDEO_DEBUG,"%s: MDP Secure is active", __FUNCTION__);
+       return false;
     }
 
     if((layer->transform & HWC_TRANSFORM_ROT_90) && ctx->mDMAInUse) {

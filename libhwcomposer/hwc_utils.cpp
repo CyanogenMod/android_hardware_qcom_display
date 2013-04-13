@@ -374,11 +374,42 @@ static inline void calc_cut(float& leftCutRatio, float& topCutRatio,
     }
 }
 
-bool isSecuring(hwc_context_t* ctx) {
+bool isSecuring(hwc_context_t* ctx, hwc_layer_1_t const* layer) {
     if((ctx->mMDP.version < qdutils::MDSS_V5) &&
        (ctx->mMDP.version > qdutils::MDP_V3_0) &&
         ctx->mSecuring) {
         return true;
+    }
+    //  On A-Family, Secure policy is applied system wide and not on
+    //  buffers.
+    if (isSecureModePolicy(ctx->mMDP.version)) {
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
+        if(ctx->mSecureMode) {
+            if (! isSecureBuffer(hnd)) {
+                // This code path executes for the following usecase:
+                // Some Apps in which first few seconds, framework
+                // sends non-secure buffer and with out destroying
+                // surfaces, switches to secure buffer thereby exposing
+                // vulnerability on A-family devices. Catch this situation
+                // and handle it gracefully by allowing it to be composed by
+                // GPU.
+                ALOGD_IF(HWC_UTILS_DEBUG, "%s: Handle non-secure video layer"
+                         "during secure playback gracefully", __FUNCTION__);
+                return true;
+            }
+        } else {
+            if (isSecureBuffer(hnd)) {
+                // This code path executes for the following usecase:
+                // For some Apps, when User terminates playback, Framework
+                // doesnt destroy video surface and video surface still
+                // comes to Display HAL. This exposes vulnerability on
+                // A-family. Catch this situation and handle it gracefully
+                // by allowing it to be composed by GPU.
+                ALOGD_IF(HWC_UTILS_DEBUG, "%s: Handle secure video layer"
+                         "during non-secure playback gracefully", __FUNCTION__);
+                return true;
+            }
+        }
     }
     return false;
 }
