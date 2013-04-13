@@ -332,8 +332,9 @@ void setListStats(hwc_context_t *ctx,
             ctx->listStats[dpy].yuvIndices[yuvCount] = i;
             yuvCount++;
 
-            if(layer->transform & HWC_TRANSFORM_ROT_90)
-                ctx->mNeedsRotator = true;
+            if(layer->transform & HWC_TRANSFORM_ROT_90) {
+                Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
+            }
         }
         if(layer->blending == HWC_BLENDING_PREMULT)
             ctx->listStats[dpy].preMultipliedAlpha = true;
