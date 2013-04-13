@@ -678,8 +678,6 @@ static inline void updateSource(eTransform& orient, Whf& whf,
     Dim srcCrop(crop.left, crop.top,
             crop.right - crop.left,
             crop.bottom - crop.top);
-    //getMdpOrient will switch the flips if the source is 90 rotated.
-    //Clients in Android dont factor in 90 rotation while deciding the flip.
     orient = static_cast<eTransform>(ovutils::getMdpOrient(orient));
     preRotateSource(orient, whf, srcCrop);
     crop.left = srcCrop.x;

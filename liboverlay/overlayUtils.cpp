@@ -180,6 +180,40 @@ int getHALFormat(int mdpFormat) {
     return -1;
 }
 
+int getMdpOrient(eTransform rotation) {
+    int retTrans = 0;
+    bool trans90 = false;
+    int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
+    bool aFamily = (mdpVersion < qdutils::MDSS_V5);
+
+    ALOGD_IF(DEBUG_OVERLAY, "%s: In rotation = %d", __FUNCTION__, rotation);
+    if(rotation & OVERLAY_TRANSFORM_ROT_90) {
+        retTrans |= MDP_ROT_90;
+        trans90 = true;
+    }
+
+    if(rotation & OVERLAY_TRANSFORM_FLIP_H) {
+        if(trans90 && aFamily) {
+            //Swap for a-family, since its driver does 90 first
+            retTrans |= MDP_FLIP_UD;
+        } else {
+            retTrans |= MDP_FLIP_LR;
+        }
+    }
+
+    if(rotation & OVERLAY_TRANSFORM_FLIP_V) {
+        if(trans90 && aFamily) {
+            //Swap for a-family, since its driver does 90 first
+            retTrans |= MDP_FLIP_LR;
+        } else {
+            retTrans |= MDP_FLIP_UD;
+        }
+    }
+
+    ALOGD_IF(DEBUG_OVERLAY, "%s: Out rotation = %d", __FUNCTION__, retTrans);
+    return retTrans;
+}
+
 int getDownscaleFactor(const int& src_w, const int& src_h,
         const int& dst_w, const int& dst_h) {
     int dscale_factor = utils::ROT_DS_NONE;
@@ -215,9 +249,6 @@ static inline int compute(const uint32_t& x, const uint32_t& y,
     return x - ( y + z );
 }
 
-//Expects transform to be adjusted for clients of Android.
-//i.e flips switched if 90 component present.
-//See getMdpOrient()
 void preRotateSource(const eTransform& tr, Whf& whf, Dim& srcCrop) {
     if(tr & OVERLAY_TRANSFORM_FLIP_H) {
         srcCrop.x = compute(whf.w, srcCrop.x, srcCrop.w);
