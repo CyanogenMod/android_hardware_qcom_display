@@ -191,6 +191,14 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
                 if((fbZOrder >= 0) && ctx->mCopyBit[dpy])
                     ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
                 */
+                if(ctx->listStats[dpy].isDisplayAnimating) {
+                    // Mark all app layers as HWC_OVERLAY for external during
+                    // animation, so that SF doesnt draw it on FB
+                    for(int i = 0 ;i < ctx->listStats[dpy].numAppLayers; i++) {
+                        hwc_layer_1_t *layer = &list->hwLayers[i];
+                        layer->compositionType = HWC_OVERLAY;
+                    }
+                }
             }
         } else {
             // External Display is in Pause state.
@@ -267,6 +275,16 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
             ALOGD_IF (VSYNC_DEBUG, "VSYNC state changed to %s",
                       (enable)?"ENABLED":"DISABLED");
             break;
+#ifdef QCOM_BSP
+        case  HWC_EVENT_ORIENTATION:
+            if(dpy == HWC_DISPLAY_PRIMARY) {
+                // store the primary display orientation
+                // will be used in hwc_video::configure to disable
+                // rotation animation on external display
+                ctx->deviceOrientation = enable;
+            }
+            break;
+#endif
         default:
             ret = -EINVAL;
     }
@@ -293,8 +311,8 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
     switch(dpy) {
         case HWC_DISPLAY_PRIMARY:
             if(blank) {
-                ret = ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK,
-                            FB_BLANK_POWERDOWN);
+                ret = ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK,FB_BLANK_POWERDOWN);
+
                 if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected == true) {
                     // Surfaceflinger does not send Blank/unblank event to hwc
                     // for virtual display, handle it explicitly when blank for
@@ -373,7 +391,6 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     ATRACE_CALL();
     int ret = 0;
     const int dpy = HWC_DISPLAY_PRIMARY;
-
     if (LIKELY(list) && ctx->dpyAttr[dpy].isActive) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
