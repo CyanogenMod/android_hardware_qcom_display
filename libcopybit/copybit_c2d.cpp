@@ -105,7 +105,7 @@ C2D_STATUS (*LINK_c2dFillSurface) ( uint32 surface_id, uint32 fill_color,
 
 // The following defines can be changed as required i.e. as we encounter
 // complex use cases.
-#define MAX_RGB_SURFACES 8        // Max. RGB layers currently supported per draw
+#define MAX_RGB_SURFACES 12        // Max. RGB layers currently supported per draw
 #define MAX_YUV_2_PLANE_SURFACES 4// Max. 2-plane YUV layers currently supported per draw
 #define MAX_YUV_3_PLANE_SURFACES 1// Max. 3-plane YUV layers currently supported per draw
 // +1 for the destination surface. We cannot have multiple destination surfaces.
@@ -160,6 +160,8 @@ struct copybit_context_t {
     int dst_surface_type;
     bool is_premultiplied_alpha;
     void* time_stamp;
+    bool dst_surface_mapped; // Set when dst surface is mapped to GPU addr
+    void* dst_surface_base; // Stores the dst surface addr
 
     // used for signaling the wait thread
     bool wait_timestamp;
@@ -241,6 +243,8 @@ static void* c2d_wait_loop(void* ptr) {
             ctx->blit_yuv_2_plane_count = 0;
             ctx->blit_yuv_3_plane_count = 0;
             ctx->blit_count = 0;
+            ctx->dst_surface_mapped = false;
+            ctx->dst_surface_base = 0;
         }
         pthread_mutex_unlock(&ctx->wait_cleanup_lock);
         if(ctx->stop_thread)
@@ -332,11 +336,13 @@ int c2diGetBpp(int32 colorformat)
     return c2dBpp;
 }
 
-static uint32 c2d_get_gpuaddr(copybit_context_t* ctx, struct private_handle_t *handle,
-                              int &mapped_idx)
+static uint32 c2d_get_gpuaddr(copybit_context_t* ctx,
+                              struct private_handle_t *handle, int &mapped_idx)
 {
-    uint32 memtype, *gpuaddr;
+    uint32 memtype, *gpuaddr = 0;
     C2D_STATUS rc;
+    int freeindex = 0;
+    bool mapaddr = false;
 
     if(!handle)
         return 0;
@@ -353,23 +359,28 @@ static uint32 c2d_get_gpuaddr(copybit_context_t* ctx, struct private_handle_t *h
         return 0;
     }
 
-    rc = LINK_c2dMapAddr(handle->fd, (void*)handle->base, handle->size,
-                                      handle->offset, memtype, (void**)&gpuaddr);
-
-    if (rc == C2D_STATUS_OK) {
-        // We have mapped the GPU address inside copybit. We need to unmap this
-        // address after the blit. Store this address
-        for (int i = 0; i < MAX_SURFACES; i++) {
-            if (ctx->mapped_gpu_addr[i] == 0) {
-                ctx->mapped_gpu_addr[i] = (uint32) gpuaddr;
-                mapped_idx = i;
-                break;
-            }
+    // Check for a freeindex in the mapped_gpu_addr list
+    for (freeindex = 0; freeindex < MAX_SURFACES; freeindex++) {
+        if (ctx->mapped_gpu_addr[freeindex] == 0) {
+            // free index is available
+            // map GPU addr and use this as mapped_idx
+            mapaddr = true;
+            break;
         }
-
-        return (uint32) gpuaddr;
     }
-    return 0;
+
+    if(mapaddr) {
+        rc = LINK_c2dMapAddr(handle->fd, (void*)handle->base, handle->size,
+                             handle->offset, memtype, (void**)&gpuaddr);
+
+        if (rc == C2D_STATUS_OK) {
+            // We have mapped the GPU address inside copybit. We need to unmap
+            // this address after the blit. Store this address
+            ctx->mapped_gpu_addr[freeindex] = (uint32) gpuaddr;
+            mapped_idx = freeindex;
+        }
+    }
+    return (uint32) gpuaddr;
 }
 
 static void unmap_gpuaddr(copybit_context_t* ctx, int mapped_idx)
@@ -688,16 +699,21 @@ static int clear_copybit(struct copybit_device_t *dev,
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
     C2D_RECT c2drect = {rect->l, rect->t, rect->r - rect->l, rect->b - rect->t};
     pthread_mutex_lock(&ctx->wait_cleanup_lock);
-    ret = set_image(ctx, ctx->dst[RGB_SURFACE], buf,
-                       (eC2DFlags)flags, mapped_dst_idx);
-    if(ret) {
-        ALOGE("%s: set_image error", __FUNCTION__);
-        unmap_gpuaddr(ctx, mapped_dst_idx);
-        pthread_mutex_unlock(&ctx->wait_cleanup_lock);
-        return COPYBIT_FAILURE;
+    if(!ctx->dst_surface_mapped) {
+        ret = set_image(ctx, ctx->dst[RGB_SURFACE], buf,
+                        (eC2DFlags)flags, mapped_dst_idx);
+        if(ret) {
+            ALOGE("%s: set_image error", __FUNCTION__);
+            unmap_gpuaddr(ctx, mapped_dst_idx);
+            pthread_mutex_unlock(&ctx->wait_cleanup_lock);
+            return COPYBIT_FAILURE;
+        }
+        //clear_copybit is the first call made by HWC for each composition
+        //with the dest surface, hence set dst_surface_mapped.
+        ctx->dst_surface_mapped = true;
+        ctx->dst_surface_base = buf->base;
+        ret = LINK_c2dFillSurface(ctx->dst[RGB_SURFACE], 0x0, &c2drect);
     }
-
-    ret = LINK_c2dFillSurface(ctx->dst[RGB_SURFACE], 0x0, &c2drect);
     pthread_mutex_unlock(&ctx->wait_cleanup_lock);
     return ret;
 }
@@ -1175,14 +1191,23 @@ static int stretch_copybit_internal(
         dst_hnd->gpuaddr = 0;
         dst_image.handle = dst_hnd;
     }
-
-    status = set_image(ctx, ctx->dst[ctx->dst_surface_type], &dst_image,
-                       (eC2DFlags)flags, mapped_dst_idx);
-    if(status) {
-        ALOGE("%s: dst: set_image error", __FUNCTION__);
-        delete_handle(dst_hnd);
-        unmap_gpuaddr(ctx, mapped_dst_idx);
-        return COPYBIT_FAILURE;
+    if(!ctx->dst_surface_mapped) {
+        //map the destination surface to GPU address
+        status = set_image(ctx, ctx->dst[ctx->dst_surface_type], &dst_image,
+                           (eC2DFlags)flags, mapped_dst_idx);
+        if(status) {
+            ALOGE("%s: dst: set_image error", __FUNCTION__);
+            delete_handle(dst_hnd);
+            unmap_gpuaddr(ctx, mapped_dst_idx);
+            return COPYBIT_FAILURE;
+        }
+        ctx->dst_surface_mapped = true;
+        ctx->dst_surface_base = dst->base;
+    } else if(ctx->dst_surface_mapped && ctx->dst_surface_base != dst->base) {
+        // Destination surface for the operation should be same for multiple
+        // requests, this check is catch if there is any case when the
+        // destination changes
+        ALOGE("%s: a different destination surface!!", __FUNCTION__);
     }
 
     // Update the source
