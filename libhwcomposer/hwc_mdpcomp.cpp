@@ -515,7 +515,7 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
 /* Checks for conditions where YUV layers cannot be bypassed */
 bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
 
-    if(isSkipLayer(layer)) {
+    if(isSkipLayer(layer) && mDpy == HWC_DISPLAY_PRIMARY) {
         ALOGE("%s: Unable to bypass skipped YUV", __FUNCTION__);
         return false;
     }
@@ -626,6 +626,15 @@ int MDPComp::getAvailablePipes(hwc_context_t* ctx) {
 void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
 
     int nYuvCount = ctx->listStats[mDpy].yuvCount;
+    if(!nYuvCount && mDpy) {
+        //Reset "No animation on external display" related  parameters.
+        ctx->mPrevCropVideo.left = ctx->mPrevCropVideo.top =
+            ctx->mPrevCropVideo.right = ctx->mPrevCropVideo.bottom = 0;
+        ctx->mPrevDestVideo.left = ctx->mPrevDestVideo.top =
+            ctx->mPrevDestVideo.right = ctx->mPrevDestVideo.bottom = 0;
+        ctx->mPrevTransformVideo = 0;
+        return;
+     }
     for(int index = 0;index < nYuvCount; index++){
         int nYuvIndex = ctx->listStats[mDpy].yuvIndices[index];
         hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];

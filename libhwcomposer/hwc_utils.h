@@ -94,6 +94,9 @@ struct ListStats {
     int extOnlyLayerIndex;
     bool needsAlphaScale;
     bool preMultipliedAlpha;
+    // Notifies hwcomposer about the start and end of animation
+    // This will be set to true during animation, otherwise false.
+    bool isDisplayAnimating;
 };
 
 struct LayerProp {
@@ -151,7 +154,7 @@ void trimLayer(hwc_context_t *ctx, const int& dpy, const int& transform,
 //Sets appropriate mdp flags for a layer.
 void setMdpFlags(hwc_layer_1_t *layer,
         ovutils::eMdpFlags &mdpFlags,
-        int rotDownscale = 0);
+        int rotDownscale = 0, int transform = 0);
 
 int configRotator(overlay::Rotator *rot, const ovutils::Whf& whf,
         const hwc_rect_t& crop, const ovutils::eMdpFlags& mdpFlags,
@@ -169,14 +172,14 @@ void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
 
 //Routine to configure low resolution panels (<= 2048 width)
 int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
-        ovutils::eMdpFlags& mdpFlags, const ovutils::eZorder& z,
-        const ovutils::eIsFg& isFg, const ovutils::eDest& dest,
+        ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
+        ovutils::eIsFg& isFg, const ovutils::eDest& dest,
         overlay::Rotator **rot);
 
 //Routine to configure high resolution panels (> 2048 width)
 int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
-        ovutils::eMdpFlags& mdpFlags, const ovutils::eZorder& z,
-        const ovutils::eIsFg& isFg, const ovutils::eDest& lDest,
+        ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
+        ovutils::eIsFg& isFg, const ovutils::eDest& lDest,
         const ovutils::eDest& rDest, overlay::Rotator **rot);
 
 // Inline utility functions
@@ -279,6 +282,14 @@ struct hwc_context_t {
     qhwc::LayerProp *layerProp[MAX_DISPLAYS];
     qhwc::MDPComp *mMDPComp[MAX_DISPLAYS];
     qhwc::HwcDebug *mHwcDebug[MAX_DISPLAYS];
+
+    // No animation on External display feature
+    // Notifies hwcomposer about the device orientation before animation.
+    int deviceOrientation;
+    // Stores the crop, dest rect and transform value of video before animation.
+    hwc_rect_t mPrevCropVideo;
+    hwc_rect_t mPrevDestVideo;
+    int mPrevTransformVideo;
 
     //Securing in progress indicator
     bool mSecuring;

@@ -111,8 +111,13 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             orient = static_cast<ovutils::eTransform >(ctx->mExtOrientation);
         }
 
+        // Do not use getNonWormholeRegion() function to calculate the
+        // sourceCrop during animation on external display and
         // Dont do wormhole calculation when extorientation is set on External
-        if((!mDpy || (mDpy && !ctx->mExtOrientation))
+        if(ctx->listStats[mDpy].isDisplayAnimating && mDpy) {
+            sourceCrop = layer->displayFrame;
+            displayFrame = sourceCrop;
+        } else if((!mDpy || (mDpy && !ctx->mExtOrientation))
                                && extOnlyLayerIndex == -1) {
             getNonWormholeRegion(list, sourceCrop);
             displayFrame = sourceCrop;
@@ -266,7 +271,12 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
 
         hwc_rect_t sourceCrop = layer->sourceCrop;
         hwc_rect_t displayFrame = layer->displayFrame;
-        if(extOnlyLayerIndex == -1) {
+        // Do not use getNonWormholeRegion() function to calculate the
+        // sourceCrop during animation on external display.
+        if(ctx->listStats[mDpy].isDisplayAnimating && mDpy) {
+            sourceCrop = layer->displayFrame;
+            displayFrame = sourceCrop;
+        } else if(extOnlyLayerIndex == -1) {
             getNonWormholeRegion(list, sourceCrop);
             displayFrame = sourceCrop;
         }
