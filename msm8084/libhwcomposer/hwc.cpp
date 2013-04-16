@@ -38,6 +38,8 @@
 #include "profiler.h"
 
 using namespace qhwc;
+using namespace overlay;
+
 #define VSYNC_DEBUG 0
 #define BLANK_DEBUG 0
 
@@ -200,7 +202,7 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 
     ctx->mOverlay->configBegin();
     ctx->mRotMgr->configBegin();
-    ctx->mNeedsRotator = false;
+    Overlay::setDMAMode(Overlay::DMA_LINE_MODE);
 
     for (int32_t i = numDisplays; i >= 0; i--) {
         hwc_display_contents_1_t *list = displays[i];
