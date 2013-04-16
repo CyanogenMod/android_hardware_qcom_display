@@ -51,6 +51,11 @@ class gpu_context_t : public alloc_device_t {
                              int format, int usage,
                              buffer_handle_t* pHandle,
                              int* pStride);
+    int gralloc_alloc_framebuffer_locked(size_t size, int usage,
+                                         buffer_handle_t* pHandle);
+
+    int gralloc_alloc_framebuffer(size_t size, int usage,
+                                  buffer_handle_t* pHandle);
 
     static int gralloc_free(alloc_device_t* dev, buffer_handle_t handle);
 
