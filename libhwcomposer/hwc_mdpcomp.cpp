@@ -23,7 +23,7 @@
 #include "mdp_version.h"
 #include <overlayRotator.h>
 
-using overlay::Rotator;
+using namespace overlay;
 using namespace overlay::utils;
 namespace ovutils = overlay::utils;
 
@@ -103,9 +103,10 @@ bool MDPComp::init(hwc_context_t *ctx) {
     }
 
     sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
-    if(property_get("debug.mdpcomp.maxpermixer", property, NULL) > 0) {
-        if(atoi(property) != 0)
-            sMaxPipesPerMixer = true;
+    if(property_get("debug.mdpcomp.maxpermixer", property, "-1") > 0) {
+        int val = atoi(property);
+        if(val >= 0)
+            sMaxPipesPerMixer = min(val, MAX_PIPES_PER_MIXER);
     }
 
     unsigned long idle_timeout = DEFAULT_IDLE_TIME;
@@ -289,7 +290,6 @@ ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type) {
     case MDPCOMP_OV_DMA:
         mdp_pipe = ov.nextPipe(ovutils::OV_MDP_PIPE_DMA, mDpy);
         if(mdp_pipe != ovutils::OV_INVALID) {
-            ctx->mDMAInUse = true;
             return mdp_pipe;
         }
     case MDPCOMP_OV_ANY:
@@ -350,7 +350,7 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
         return false;
     }
 
-    if(mdpCount > (sMaxPipesPerMixer-fbNeeded)) {
+    if(mdpCount > (sMaxPipesPerMixer - fbNeeded)) {
         ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
         return false;
     }
@@ -397,11 +397,6 @@ bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
 
     if(isSkipLayer(layer)) {
         ALOGE("%s: Unable to bypass skipped YUV", __FUNCTION__);
-        return false;
-    }
-
-    if(ctx->mNeedsRotator && ctx->mDMAInUse) {
-        ALOGE("%s: No DMA for Rotator",__FUNCTION__);
         return false;
     }
 
@@ -468,6 +463,7 @@ void  MDPComp::batchLayers() {
     ALOGD_IF(isDebug(),"%s: cached count: %d",__FUNCTION__,
              mCurrentFrame.fbCount);
 }
+
 void MDPComp::updateLayerCache(hwc_context_t* ctx,
                                hwc_display_contents_1_t* list) {
 
@@ -501,7 +497,7 @@ int MDPComp::getAvailablePipes(hwc_context_t* ctx) {
     int numAvailable = ov.availablePipes(mDpy);
 
     //Reserve DMA for rotator
-    if(ctx->mNeedsRotator)
+    if(Overlay::getDMAMode() == Overlay::DMA_BLOCK_MODE)
         numAvailable -= numDMAPipes;
 
     //Reserve pipe(s)for FB
@@ -544,7 +540,6 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
 
 int MDPComp::programMDP(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int fbZOrder = -1;
-    ctx->mDMAInUse = false;
 
     if(!allocLayerPipes(ctx, list)) {
         ALOGD_IF(isDebug(), "%s: Unable to allocate MDP pipes", __FUNCTION__);
@@ -718,8 +713,9 @@ bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
 
         ePipeType type = MDPCOMP_OV_ANY;
 
-        if(!qhwc::needsScaling(layer) && !ctx->mNeedsRotator
-           && ctx->mMDP.version >= qdutils::MDSS_V5) {
+        if(!qhwc::needsScaling(layer)
+            && Overlay::getDMAMode() != Overlay::DMA_BLOCK_MODE
+            && ctx->mMDP.version >= qdutils::MDSS_V5) {
             type = MDPCOMP_OV_DMA;
         }
 
@@ -889,8 +885,9 @@ bool MDPCompHighRes::allocLayerPipes(hwc_context_t *ctx,
 
         ePipeType type = MDPCOMP_OV_ANY;
 
-        if(!qhwc::needsScaling(layer) && !ctx->mNeedsRotator
-           && ctx->mMDP.version >= qdutils::MDSS_V5)
+        if(!qhwc::needsScaling(layer)
+            && Overlay::getDMAMode() != Overlay::DMA_BLOCK_MODE
+            && ctx->mMDP.version >= qdutils::MDSS_V5)
             type = MDPCOMP_OV_DMA;
 
         if(!acquireMDPPipes(ctx, layer, pipe_info, type)) {

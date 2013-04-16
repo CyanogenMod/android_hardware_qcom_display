@@ -92,6 +92,11 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy) {
             if((mPipeBook[i].mDisplay == PipeBook::DPY_UNUSED ||
                     mPipeBook[i].mDisplay == dpy) &&
                     PipeBook::isNotAllocated(i)) {
+                //In block mode we don't allow line operations
+                if(sDMAMode == DMA_BLOCK_MODE &&
+                    PipeBook::getPipeType((eDest)i) == OV_MDP_PIPE_DMA)
+                    continue;
+
                 dest = (eDest)i;
                 PipeBook::setAllocation(i);
                 break;
@@ -311,6 +316,7 @@ void Overlay::PipeBook::destroy() {
 
 Overlay* Overlay::sInstance = 0;
 int Overlay::sExtFbIndex = 1;
+int Overlay::sDMAMode = DMA_LINE_MODE;
 int Overlay::PipeBook::NUM_PIPES = 0;
 int Overlay::PipeBook::sPipeUsageBitmap = 0;
 int Overlay::PipeBook::sLastUsageBitmap = 0;
