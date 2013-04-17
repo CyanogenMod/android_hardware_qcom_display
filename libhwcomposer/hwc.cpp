@@ -450,6 +450,13 @@ static int hwc_set_virtual(hwc_context_t *ctx,
 {
     //XXX: Implement set.
     closeAcquireFds(list);
+    if (list) {
+        // SF assumes HWC waits for the acquire fence and returns a new fence
+        // that signals when we're done. Since we don't wait, and also don't
+        // touch the buffer, we can just handle the acquire fence back to SF
+        // as the retire fence.
+        list->retireFenceFd = list->outbufAcquireFenceFd;
+    }
     return 0;
 }
 
