@@ -416,6 +416,10 @@ bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
         int dWidth = dst.right - dst.left;
         int dHeight = dst.bottom - dst.top;
 
+        if(layer->transform & HAL_TRANSFORM_ROT_90) {
+            swap(cWidth, cHeight);
+        }
+
         if((cWidth/dWidth) > 4 || (cHeight/dHeight) > 4)
             return false;
     }
