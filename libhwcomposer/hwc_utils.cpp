@@ -531,11 +531,6 @@ void closeAcquireFds(hwc_display_contents_1_t* list) {
                 list->hwLayers[i].acquireFenceFd = -1;
             }
         }
-
-        if (list->outbufAcquireFenceFd >= 0 ) {
-            close(list->outbufAcquireFenceFd);
-            list->outbufAcquireFenceFd = -1;
-        }
     }
 }
 
