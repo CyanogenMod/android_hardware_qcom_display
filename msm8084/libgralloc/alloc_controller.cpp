@@ -132,6 +132,7 @@ int AdrenoMemInfo::getStride(int width, int format)
         switch (format)
         {
             case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
+            case HAL_PIXEL_FORMAT_RAW_SENSOR:
                 stride = ALIGN(width, 32);
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
@@ -147,6 +148,9 @@ int AdrenoMemInfo::getStride(int width, int format)
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
                 stride = VENUS_Y_STRIDE(COLOR_FMT_NV12, width);
+                break;
+            case HAL_PIXEL_FORMAT_BLOB:
+                stride = width;
                 break;
             default: break;
         }
@@ -267,6 +271,7 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
         case HAL_PIXEL_FORMAT_RGB_565:
         case HAL_PIXEL_FORMAT_RGBA_5551:
         case HAL_PIXEL_FORMAT_RGBA_4444:
+        case HAL_PIXEL_FORMAT_RAW_SENSOR:
             size = alignedw * alignedh * 2;
             break;
 
@@ -316,6 +321,16 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
             alignedh = VENUS_Y_SCANLINES(COLOR_FMT_NV12, height);
             size = VENUS_BUFFER_SIZE(COLOR_FMT_NV12, width, height);
+            break;
+        case HAL_PIXEL_FORMAT_BLOB:
+            if(height != 1) {
+                ALOGE("%s: Buffers with format HAL_PIXEL_FORMAT_BLOB \
+                      must have height==1 ", __FUNCTION__);
+                return -EINVAL;
+            }
+            alignedh = height;
+            alignedw = width;
+            size = width;
             break;
         default:
             ALOGE("unrecognized pixel format: 0x%x", format);
