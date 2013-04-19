@@ -24,6 +24,7 @@
 #include <overlayRotator.h>
 
 using namespace overlay;
+using namespace qdutils;
 using namespace overlay::utils;
 namespace ovutils = overlay::utils;
 
@@ -405,12 +406,11 @@ bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
         return false;
     }
 
-    /* Workaround for downscales larger than 4x. Will be removed once decimator
-     * block is enabled for MDSS*/
-    if(ctx->mMDP.version == qdutils::MDSS_V5) {
+    if(!qdutils::MDPVersion::getInstance().supportsDecimation()) {
+        const uint32_t downscale =
+                qdutils::MDPVersion::getInstance().getMaxMDPDownscale();
         hwc_rect_t crop = layer->sourceCrop;
         hwc_rect_t dst = layer->displayFrame;
-
         int cWidth = crop.right - crop.left;
         int cHeight = crop.bottom - crop.top;
         int dWidth = dst.right - dst.left;
@@ -420,7 +420,8 @@ bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
             swap(cWidth, cHeight);
         }
 
-        if((cWidth/dWidth) > 4 || (cHeight/dHeight) > 4)
+        if(cWidth > MAX_DISPLAY_DIM || (cWidth/dWidth) > downscale ||
+                    (cHeight/dHeight) > downscale)
             return false;
     }
     return true;

@@ -356,9 +356,10 @@ void getDump(char *buf, size_t len, const char *prefix,
         const mdp_overlay& ov) {
     char str[256] = {'\0'};
     snprintf(str, 256,
-            "%s id=%d z=%d fg=%d alpha=%d mask=%d flags=0x%x\n",
+            "%s id=%d z=%d fg=%d alpha=%d mask=%d flags=0x%x H.Deci=%d,"
+            "V.Deci=%d\n",
             prefix, ov.id, ov.z_order, ov.is_fg, ov.alpha,
-            ov.transp_mask, ov.flags);
+            ov.transp_mask, ov.flags, ov.horz_deci, ov.vert_deci);
     strncat(buf, str, strlen(str));
     getDump(buf, len, "\tsrc(msmfb_img)", ov.src);
     getDump(buf, len, "\tsrc_rect(mdp_rect)", ov.src_rect);
