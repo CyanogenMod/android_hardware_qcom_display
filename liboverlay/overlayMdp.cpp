@@ -15,6 +15,7 @@
 * limitations under the License.
 */
 
+#include <math.h>
 #include <mdp_version.h>
 #include "overlayUtils.h"
 #include "overlayMdp.h"
@@ -22,8 +23,15 @@
 
 #define HSIC_SETTINGS_DEBUG 0
 
+using namespace qdutils;
+
 static inline bool isEqual(float f1, float f2) {
         return ((int)(f1*100) == (int)(f2*100)) ? true : false;
+}
+
+//Since this is unavailable on Android, defining it in terms of base 10
+static inline float log2f(const float& x) {
+    return log(x) / log(2);
 }
 
 namespace ovutils = overlay::utils;
@@ -130,14 +138,52 @@ void MdpCtrl::doTransform() {
 }
 
 void MdpCtrl::doDownscale() {
-    mOVInfo.src_rect.x >>= mDownscale;
-    mOVInfo.src_rect.y >>= mDownscale;
-    mOVInfo.src_rect.w >>= mDownscale;
-    mOVInfo.src_rect.h >>= mDownscale;
+    int mdpVersion = MDPVersion::getInstance().getMDPVersion();
+    if(mdpVersion < MDSS_V5) {
+        mOVInfo.src_rect.x >>= mDownscale;
+        mOVInfo.src_rect.y >>= mDownscale;
+        mOVInfo.src_rect.w >>= mDownscale;
+        mOVInfo.src_rect.h >>= mDownscale;
+    } else if(MDPVersion::getInstance().supportsDecimation()) {
+        //Decimation + MDP Downscale
+        mOVInfo.horz_deci = 0;
+        mOVInfo.vert_deci = 0;
+        int minHorDeci = 0;
+        if(mOVInfo.src_rect.w > 2048) {
+            //If the client sends us something > what a layer mixer supports
+            //then it means it doesn't want to use split-pipe but wants us to
+            //decimate. A minimum decimation of 2 will ensure that the width is
+            //always within layer mixer limits.
+            minHorDeci = 2;
+        }
+
+        float horDscale = ceilf((float)mOVInfo.src_rect.w /
+                (float)mOVInfo.dst_rect.w);
+        float verDscale = ceilf((float)mOVInfo.src_rect.h /
+                (float)mOVInfo.dst_rect.h);
+
+        //Next power of 2, if not already
+        horDscale = powf(2.0f, ceilf(log2f(horDscale)));
+        verDscale = powf(2.0f, ceilf(log2f(verDscale)));
+
+        //Since MDP can do 1/4 dscale and has better quality, split the task
+        //between decimator and MDP downscale
+        horDscale /= 4.0f;
+        verDscale /= 4.0f;
+
+        if(horDscale < minHorDeci)
+            horDscale = minHorDeci;
+
+        if((int)horDscale)
+            mOVInfo.horz_deci = (int)log2f(horDscale);
+
+        if((int)verDscale)
+            mOVInfo.vert_deci = (int)log2f(verDscale);
+    }
 }
 
 bool MdpCtrl::set() {
-    int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
+    int mdpVersion = MDPVersion::getInstance().getMDPVersion();
     //deferred calcs, so APIs could be called in any order.
     doTransform();
     doDownscale();
@@ -145,7 +191,7 @@ bool MdpCtrl::set() {
     if(utils::isYuv(whf.format)) {
         normalizeCrop(mOVInfo.src_rect.x, mOVInfo.src_rect.w);
         normalizeCrop(mOVInfo.src_rect.y, mOVInfo.src_rect.h);
-        if(mdpVersion < qdutils::MDSS_V5) {
+        if(mdpVersion < MDSS_V5) {
             utils::even_floor(mOVInfo.dst_rect.w);
             utils::even_floor(mOVInfo.dst_rect.h);
         }

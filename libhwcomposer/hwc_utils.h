@@ -34,7 +34,6 @@
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 #define MAX_NUM_LAYERS 32 //includes fb layer
-#define MAX_DISPLAY_DIM 2048
 
 // For support of virtual displays
 #define HWC_DISPLAY_VIRTUAL     (HWC_DISPLAY_EXTERNAL+1)

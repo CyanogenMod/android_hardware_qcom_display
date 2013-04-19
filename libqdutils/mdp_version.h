@@ -52,6 +52,10 @@ enum mdp_version {
     MDSS_V5     = 500,
 };
 
+enum {
+    MAX_DISPLAY_DIM = 2048,
+};
+
 #define MDDI_PANEL       '1'
 #define EBI2_PANEL       '2'
 #define LCDC_PANEL       '3'
@@ -76,6 +80,8 @@ public:
     uint8_t getRGBPipes() { return mRGBPipes; }
     uint8_t getVGPipes() { return mVGPipes; }
     uint8_t getDMAPipes() { return mDMAPipes; }
+    bool supportsDecimation();
+    uint32_t getMaxMDPDownscale();
 private:
     int mMDPVersion;
     char mPanelType;
@@ -84,6 +90,8 @@ private:
     uint8_t mRGBPipes;
     uint8_t mVGPipes;
     uint8_t mDMAPipes;
+    uint32_t mFeatures;
+    uint32_t mMDPDownscale;
 };
 }; //namespace qdutils
 #endif //INCLUDE_LIBQCOMUTILS_MDPVER
