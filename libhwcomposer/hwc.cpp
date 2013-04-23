@@ -570,7 +570,7 @@ void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
     ctx->mOverlay->getDump(ovDump, 2048);
     dumpsys_log(aBuf, ovDump);
     ovDump[0] = '\0';
-    ctx->mRotMgr->getDump(ovDump, 2048);
+    ctx->mRotMgr->getDump(ovDump, 1024);
     dumpsys_log(aBuf, ovDump);
     strlcpy(buff, aBuf.string(), buff_len);
 }
