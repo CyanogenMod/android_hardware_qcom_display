@@ -352,6 +352,10 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ALOGD_IF( isDebug(),"%s: External Display connection is pending",
                   __FUNCTION__);
         ret = false;
+    } else if(ctx->isPaddingRound) {
+        ctx->isPaddingRound = false;
+        ALOGD_IF(isDebug(), "%s: padding round",__FUNCTION__);
+        ret = false;
     }
     return ret;
 }

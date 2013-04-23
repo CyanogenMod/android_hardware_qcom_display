@@ -304,6 +304,8 @@ struct hwc_context_t {
     mutable Locker mExtSetLock;
     //Check if base pipe is set up
     bool mBasePipeSetup;
+    //Drawing round when we use GPU
+    bool isPaddingRound;
 };
 
 namespace qhwc {
