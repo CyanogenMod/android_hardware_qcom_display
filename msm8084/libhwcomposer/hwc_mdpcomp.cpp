@@ -333,6 +333,12 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         return false;
     }
 
+    if(ctx->isPaddingRound) {
+        ctx->isPaddingRound = false;
+        ALOGD_IF(isDebug(), "%s: padding round",__FUNCTION__);
+        return false;
+    }
+
     return true;
 }
 
