@@ -254,8 +254,8 @@ void MdpRot::dump() const {
 }
 
 void MdpRot::getDump(char *buf, size_t len) const {
-    ovutils::getDump(buf, len, "MdpRotCtrl(msm_rotator_img_info)", mRotImgInfo);
-    ovutils::getDump(buf, len, "MdpRotData(msm_rotator_data_info)", mRotDataInfo);
+    ovutils::getDump(buf, len, "MdpRotCtrl", mRotImgInfo);
+    ovutils::getDump(buf, len, "MdpRotData", mRotDataInfo);
 }
 
 } // namespace overlay

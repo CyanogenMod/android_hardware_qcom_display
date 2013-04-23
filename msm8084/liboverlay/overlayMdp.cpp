@@ -238,7 +238,7 @@ void MdpCtrl::dump() const {
 }
 
 void MdpCtrl::getDump(char *buf, size_t len) {
-    ovutils::getDump(buf, len, "Ctrl(mdp_overlay)", mOVInfo);
+    ovutils::getDump(buf, len, "Ctrl", mOVInfo);
 }
 
 void MdpData::dump() const {
@@ -249,7 +249,7 @@ void MdpData::dump() const {
 }
 
 void MdpData::getDump(char *buf, size_t len) {
-    ovutils::getDump(buf, len, "Data(msmfb_overlay_data)", mOvData);
+    ovutils::getDump(buf, len, "Data", mOvData);
 }
 
 void MdpCtrl3D::dump() const {

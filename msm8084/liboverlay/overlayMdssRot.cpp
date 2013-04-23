@@ -255,8 +255,8 @@ uint32_t MdssRot::calcOutputBufSize() {
 }
 
 void MdssRot::getDump(char *buf, size_t len) const {
-    ovutils::getDump(buf, len, "MdssRotCtrl(mdp_overlay)", mRotInfo);
-    ovutils::getDump(buf, len, "MdssRotData(msmfb_overlay_data)", mRotData);
+    ovutils::getDump(buf, len, "MdssRotCtrl", mRotInfo);
+    ovutils::getDump(buf, len, "MdssRotData", mRotData);
 }
 
 } // namespace overlay
