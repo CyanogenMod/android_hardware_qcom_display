@@ -251,9 +251,9 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
     char value[PROPERTY_VALUE_MAX];
 
     // Apply action safe parameters
-    property_get("hw.actionsafe.width", value, "0");
+    property_get("persist.sys.actionsafe.width", value, "0");
     int asWidthRatio = atoi(value);
-    property_get("hw.actionsafe.height", value, "0");
+    property_get("persist.sys.actionsafe.height", value, "0");
     int asHeightRatio = atoi(value);
     // based on the action safe ratio, get the Action safe rectangle
     asW = fbWidth * (1.0f -  asWidthRatio / 100.0f);
