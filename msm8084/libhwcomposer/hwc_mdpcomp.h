@@ -150,8 +150,8 @@ protected:
     static bool isDebug() { return sDebugLogs ? true : false; };
     /* Is feature enabled */
     static bool isEnabled() { return sEnabled; };
-    /* checks for mdp comp width limitation */
-    bool isWidthValid(hwc_context_t *ctx, hwc_layer_1_t *layer);
+    /* checks for mdp comp dimension limitation */
+    bool isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer);
     /* tracks non updating layers*/
     void updateLayerCache(hwc_context_t* ctx, hwc_display_contents_1_t* list);
     /* optimize layers for mdp comp*/
