@@ -78,6 +78,10 @@ public:
     static Overlay* getInstance();
     /* Returns available ("unallocated") pipes for a display */
     int availablePipes(int dpy);
+    /* Returns if any of the requested pipe type is attached to any of the
+     * displays
+     */
+    bool isPipeTypeAttached(utils::eMdpPipeType type);
     /* set the framebuffer index for external display */
     void setExtFbNum(int fbNum);
     /* Returns framebuffer index of the current external display */
