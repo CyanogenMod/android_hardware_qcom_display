@@ -344,6 +344,9 @@ void setListStats(hwc_context_t *ctx,
             yuvCount++;
 
             if(layer->transform & HWC_TRANSFORM_ROT_90) {
+                if(ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA)) {
+                    ctx->isPaddingRound = true;
+                }
                 Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
             }
         }

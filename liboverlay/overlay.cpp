@@ -124,6 +124,16 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy) {
     return dest;
 }
 
+bool Overlay::isPipeTypeAttached(eMdpPipeType type) {
+    for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
+        if(type == PipeBook::getPipeType((eDest)i) &&
+                mPipeBook[i].mDisplay != PipeBook::DPY_UNUSED) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool Overlay::commit(utils::eDest dest) {
     bool ret = false;
     int index = (int)dest;

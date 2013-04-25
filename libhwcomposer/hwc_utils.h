@@ -273,6 +273,8 @@ struct hwc_context_t {
     mutable Locker mExtSetLock;
     //Vsync
     struct vsync_state vstate;
+    //Drawing round when we use GPU
+    bool isPaddingRound;
 };
 
 namespace qhwc {
