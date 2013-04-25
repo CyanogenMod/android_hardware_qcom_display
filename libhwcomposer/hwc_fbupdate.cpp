@@ -70,6 +70,8 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         //Request an RGB pipe
         ovutils::eDest dest = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy);
         if(dest == ovutils::OV_INVALID) { //None available
+            ALOGE("%s: No pipes available to configure framebuffer",
+                __FUNCTION__);
             return false;
         }
 
@@ -172,11 +174,15 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
         //Request left RGB pipe
         ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_RGB, mDpy);
         if(destL == ovutils::OV_INVALID) { //None available
+            ALOGE("%s: No pipes available to configure framebuffer",
+                __FUNCTION__);
             return false;
         }
         //Request right RGB pipe
         ovutils::eDest destR = ov.nextPipe(ovutils::OV_MDP_PIPE_RGB, mDpy);
         if(destR == ovutils::OV_INVALID) { //None available
+            ALOGE("%s: No pipes available to configure framebuffer",
+                __FUNCTION__);
             return false;
         }
 
