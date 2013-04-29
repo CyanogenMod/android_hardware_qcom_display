@@ -41,7 +41,7 @@ using namespace qhwc;
 using namespace overlay;
 
 #define VSYNC_DEBUG 0
-#define BLANK_DEBUG 0
+#define BLANK_DEBUG 1
 
 static int hwc_device_open(const struct hw_module_t* module,
                            const char* name,
