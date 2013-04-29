@@ -74,15 +74,21 @@ void MdssRot::setSource(const overlay::utils::Whf& awhf) {
     utils::Whf whf(awhf);
 
     mRotInfo.src.format = whf.format;
-
     mRotInfo.src.width = whf.w;
     mRotInfo.src.height = whf.h;
+}
 
-    mRotInfo.src_rect.w = whf.w;
-    mRotInfo.src_rect.h = whf.h;
+void MdssRot::setCrop(const utils::Dim& crop) {
 
-    mRotInfo.dst_rect.w = whf.w;
-    mRotInfo.dst_rect.h = whf.h;
+    mRotInfo.src_rect.x = crop.x;
+    mRotInfo.src_rect.y = crop.y;
+    mRotInfo.src_rect.w = crop.w;
+    mRotInfo.src_rect.h = crop.h;
+
+    mRotInfo.dst_rect.x = 0;
+    mRotInfo.dst_rect.y = 0;
+    mRotInfo.dst_rect.w = crop.w;
+    mRotInfo.dst_rect.h = crop.h;
 }
 
 void MdssRot::setDownscale(int ds) {}

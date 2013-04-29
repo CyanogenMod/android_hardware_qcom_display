@@ -44,6 +44,7 @@ public:
     enum { TYPE_MDP, TYPE_MDSS };
     virtual ~Rotator();
     virtual void setSource(const utils::Whf& wfh) = 0;
+    virtual void setCrop(const utils::Dim& crop) = 0;
     virtual void setFlags(const utils::eMdpFlags& flags) = 0;
     virtual void setTransform(const utils::eTransform& rot) = 0;
     virtual bool commit() = 0;
@@ -109,6 +110,7 @@ class MdpRot : public Rotator {
 public:
     virtual ~MdpRot();
     virtual void setSource(const utils::Whf& wfh);
+    virtual void setCrop(const utils::Dim& crop);
     virtual void setFlags(const utils::eMdpFlags& flags);
     virtual void setTransform(const utils::eTransform& rot);
     virtual bool commit();
@@ -167,6 +169,7 @@ class MdssRot : public Rotator {
 public:
     virtual ~MdssRot();
     virtual void setSource(const utils::Whf& wfh);
+    virtual void setCrop(const utils::Dim& crop);
     virtual void setFlags(const utils::eMdpFlags& flags);
     virtual void setTransform(const utils::eTransform& rot);
     virtual bool commit();
