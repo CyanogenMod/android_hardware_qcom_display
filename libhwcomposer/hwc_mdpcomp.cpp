@@ -156,7 +156,7 @@ void MDPComp::reset(hwc_context_t *ctx,
     mCurrentFrame.count = 0;
 }
 
-bool MDPComp::isWidthValid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
+bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
 
     const int dpy = HWC_DISPLAY_PRIMARY;
     private_handle_t *hnd = (private_handle_t *)layer->handle;
@@ -191,6 +191,11 @@ bool MDPComp::isWidthValid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     //FPS will not go beyond 30 if buffers on RGB pipes are of width < 5
 
     if(crop_w < 5)
+        return false;
+
+    // There is a HW limilation in MDP, minmum block size is 2x2
+    // Fallback to GPU if height is less than 2.
+    if(crop_h < 2)
         return false;
 
     return true;
@@ -301,7 +306,7 @@ bool MDPComp::isDoable(hwc_context_t *ctx,
                 ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
                 return false;
             }
-            if(!isWidthValid(ctx,layer)) {
+            if(!isValidDimension(ctx,layer)) {
                 ALOGD_IF(isDebug(), "%s: Buffer is of invalid width",
                                     __FUNCTION__);
                 return false;

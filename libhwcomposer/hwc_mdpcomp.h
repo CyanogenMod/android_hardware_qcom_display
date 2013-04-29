@@ -110,7 +110,7 @@ protected:
     /* Is feature enabled */
     static bool isEnabled() { return sEnabled; };
     /* checks for mdp comp width limitation */
-    bool isWidthValid(hwc_context_t *ctx, hwc_layer_1_t *layer);
+    bool isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer);
 
     eState mState;
 
