@@ -94,6 +94,10 @@ void MdpRot::setSource(const overlay::utils::Whf& awhf) {
     mRotImgInfo.dst.height = whf.h;
 }
 
+void MdpRot::setCrop(const utils::Dim& crop) {
+    // NO-OP for non-mdss rotator due to possible h/w limitations
+}
+
 void MdpRot::setFlags(const utils::eMdpFlags& flags) {
     mRotImgInfo.secure = 0;
     if(flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)

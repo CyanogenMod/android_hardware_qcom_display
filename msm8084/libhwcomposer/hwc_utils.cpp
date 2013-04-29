@@ -652,9 +652,12 @@ void setMdpFlags(hwc_layer_1_t *layer,
 }
 
 static inline int configRotator(Rotator *rot, const Whf& whf,
-        const eMdpFlags& mdpFlags, const eTransform& orient,
-        const int& downscale) {
+        const hwc_rect_t& crop, const eMdpFlags& mdpFlags,
+        const eTransform& orient, const int& downscale) {
+    Dim rotCrop(crop.left, crop.top, (crop.right - crop.left),
+        (crop.bottom - crop.top));
     rot->setSource(whf);
+    rot->setCrop(rotCrop);
     rot->setFlags(mdpFlags);
     rot->setTransform(orient);
     rot->setDownscale(downscale);
@@ -695,10 +698,22 @@ static inline void updateSource(eTransform& orient, Whf& whf,
             crop.bottom - crop.top);
     orient = static_cast<eTransform>(ovutils::getMdpOrient(orient));
     preRotateSource(orient, whf, srcCrop);
-    crop.left = srcCrop.x;
-    crop.top = srcCrop.y;
-    crop.right = srcCrop.x + srcCrop.w;
-    crop.bottom = srcCrop.y + srcCrop.h;
+    if (qdutils::MDPVersion::getInstance().getMDPVersion() >=
+        qdutils::MDSS_V5) {
+        // Source for overlay will be the cropped (and rotated)
+        crop.left = 0;
+        crop.top = 0;
+        crop.right = srcCrop.w;
+        crop.bottom = srcCrop.h;
+        // Set width & height equal to sourceCrop w & h
+        whf.w = srcCrop.w;
+        whf.h = srcCrop.h;
+    } else {
+        crop.left = srcCrop.x;
+        crop.top = srcCrop.y;
+        crop.right = srcCrop.x + srcCrop.w;
+        crop.bottom = srcCrop.y + srcCrop.h;
+    }
 }
 
 int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
@@ -742,8 +757,10 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         *rot = ctx->mRotMgr->getNext();
         if(*rot == NULL) return -1;
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, mdpFlags, orient, downscale) < 0)
+        if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale) < 0) {
+            ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
+        }
         whf.format = (*rot)->getDstFormat();
         updateSource(orient, whf, crop);
         rotFlags |= ovutils::ROT_PREROTATED;
@@ -792,8 +809,10 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, mdpFlagsL, orient, downscale) < 0)
+        if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
+            ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
+        }
         whf.format = (*rot)->getDstFormat();
         updateSource(orient, whf, crop);
         rotFlags |= ROT_PREROTATED;
