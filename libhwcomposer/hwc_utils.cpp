@@ -822,7 +822,7 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     //Not needed if the layer is confined to one half of the screen.
     //If rotator has been used then it has also done the flips, so ignore them.
     if((orient & OVERLAY_TRANSFORM_FLIP_V) && lDest != OV_INVALID
-            && rDest != OV_INVALID && rot == NULL) {
+            && rDest != OV_INVALID && (*rot) == NULL) {
         hwc_rect_t new_cropR;
         new_cropR.left = tmp_cropL.left;
         new_cropR.right = new_cropR.left + (tmp_cropR.right - tmp_cropR.left);
