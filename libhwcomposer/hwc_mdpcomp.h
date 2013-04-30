@@ -93,7 +93,8 @@ protected:
         /* c'tor */
         FrameInfo();
         /* clear old frame data */
-        void reset();
+        void reset(const int& numLayers);
+        void map();
     };
 
     /* cached data */
@@ -101,12 +102,15 @@ protected:
         int layerCount;
         int mdpCount;
         int cacheCount;
+        int fbZ;
         buffer_handle_t hnd[MAX_NUM_LAYERS];
 
         /* c'tor */
         LayerCache();
         /* clear caching info*/
         void reset();
+        void cacheAll(hwc_display_contents_1_t* list);
+        void updateCounts(const FrameInfo&);
     };
 
     /* No of pipes needed for Framebuffer */
@@ -121,7 +125,6 @@ protected:
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
                           PipeLayerPair& pipeLayerPair) = 0;
 
-
     /* set/reset flags for MDPComp */
     void setMDPCompLayerFlags(hwc_context_t *ctx,
                               hwc_display_contents_1_t* list);
@@ -132,6 +135,12 @@ protected:
     bool isFrameDoable(hwc_context_t *ctx);
     /* checks for conditions where RGB layers cannot be bypassed */
     bool isFullFrameDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    /* checks if full MDP comp can be done */
+    bool fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    /* check if we can use layer cache to do at least partial MDP comp */
+    bool partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    /* checks for conditions where only video can be bypassed */
+    bool isOnlyVideoDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* checks for conditions where YUV layers cannot be bypassed */
     bool isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer);
 
@@ -145,16 +154,14 @@ protected:
     bool isWidthValid(hwc_context_t *ctx, hwc_layer_1_t *layer);
     /* tracks non updating layers*/
     void updateLayerCache(hwc_context_t* ctx, hwc_display_contents_1_t* list);
-    /* resets cache for complete fallback */
-    void resetFrameForFB(hwc_context_t* ctx, hwc_display_contents_1_t* list);
     /* optimize layers for mdp comp*/
     void batchLayers();
     /* gets available pipes for mdp comp */
     int getAvailablePipes(hwc_context_t* ctx);
     /* updates cache map with YUV info */
     void updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list);
-    int programMDP(hwc_context_t *ctx, hwc_display_contents_1_t* list);
-
+    bool programMDP(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    bool programYUV(hwc_context_t *ctx, hwc_display_contents_1_t* list);
 
     int mDpy;
     static bool sEnabled;
