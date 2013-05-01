@@ -82,6 +82,7 @@ public:
     uint8_t getDMAPipes() { return mDMAPipes; }
     bool supportsDecimation();
     uint32_t getMaxMDPDownscale();
+    bool supportsBWC();
 private:
     int mMDPVersion;
     char mPanelType;

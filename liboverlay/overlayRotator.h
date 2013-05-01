@@ -198,6 +198,8 @@ private:
     /* Calculates the rotator's o/p buffer size post the transform calcs and
      * knowing the o/p format depending on whether fastYuv is enabled or not */
     uint32_t calcOutputBufSize();
+    // Calculate the compressed o/p buffer size for BWC
+    uint32_t calcCompressedBufSize();
 
     /* MdssRot info structure */
     mdp_overlay   mRotInfo;
