@@ -156,51 +156,6 @@ void MDPComp::reset(hwc_context_t *ctx,
     mCurrentFrame.count = 0;
 }
 
-bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
-
-    const int dpy = HWC_DISPLAY_PRIMARY;
-    private_handle_t *hnd = (private_handle_t *)layer->handle;
-
-    if(!hnd) {
-        ALOGE("%s: layer handle is NULL", __FUNCTION__);
-        return false;
-    }
-
-    int hw_w = ctx->dpyAttr[dpy].xres;
-    int hw_h = ctx->dpyAttr[dpy].yres;
-
-    hwc_rect_t sourceCrop = layer->sourceCrop;
-    hwc_rect_t displayFrame = layer->displayFrame;
-
-    hwc_rect_t crop =  sourceCrop;
-    int crop_w = crop.right - crop.left;
-    int crop_h = crop.bottom - crop.top;
-
-    hwc_rect_t dst = displayFrame;
-    int dst_w = dst.right - dst.left;
-    int dst_h = dst.bottom - dst.top;
-
-    if(dst.left < 0 || dst.top < 0 || dst.right > hw_w || dst.bottom > hw_h) {
-       hwc_rect_t scissor = {0, 0, hw_w, hw_h };
-       qhwc::calculate_crop_rects(crop, dst, scissor, layer->transform);
-       crop_w = crop.right - crop.left;
-       crop_h = crop.bottom - crop.top;
-    }
-
-    //Workaround for MDP HW limitation in DSI command mode panels where
-    //FPS will not go beyond 30 if buffers on RGB pipes are of width < 5
-
-    if(crop_w < 5)
-        return false;
-
-    // There is a HW limilation in MDP, minmum block size is 2x2
-    // Fallback to GPU if height is less than 2.
-    if(crop_h < 2)
-        return false;
-
-    return true;
-}
-
 ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type) {
     const int dpy = HWC_DISPLAY_PRIMARY;
     overlay::Overlay& ov = *ctx->mOverlay;
@@ -301,16 +256,15 @@ bool MDPComp::isDoable(hwc_context_t *ctx,
                 ALOGD_IF(isDebug(), "%s: MDP securing is active", __FUNCTION__);
                 return false;
             }
-        } else {
-            if(layer->transform & HWC_TRANSFORM_ROT_90) {
-                ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
-                return false;
-            }
-            if(!isValidDimension(ctx,layer)) {
-                ALOGD_IF(isDebug(), "%s: Buffer is of invalid width",
-                                    __FUNCTION__);
-                return false;
-            }
+        } else if(layer->transform & HWC_TRANSFORM_ROT_90) {
+            ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
+            return false;
+        }
+
+        if(!isValidDimension(ctx, layer, dpy)) {
+            ALOGD_IF(isDebug(), "%s: Buffer is of invalid width",
+                __FUNCTION__);
+            return false;
         }
     }
     return true;
