@@ -631,6 +631,12 @@ void setMdpFlags(hwc_layer_1_t *layer,
         if(transform & HWC_TRANSFORM_ROT_90) {
             ovutils::setMdpFlags(mdpFlags,
                     ovutils::OV_MDP_SOURCE_ROTATED_90);
+            // enable bandwidth compression only if src width < 2048
+            if(qdutils::MDPVersion::getInstance().supportsBWC() &&
+                hnd->width < qdutils::MAX_DISPLAY_DIM) {
+                ovutils::setMdpFlags(mdpFlags,
+                                 ovutils::OV_MDSS_MDP_BWC_EN);
+            }
         }
     }
 
