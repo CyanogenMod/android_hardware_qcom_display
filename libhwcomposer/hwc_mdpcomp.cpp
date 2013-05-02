@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+#include <math.h>
 #include "hwc_mdpcomp.h"
 #include <sys/ioctl.h>
 #include "external.h"
@@ -258,7 +259,7 @@ void MDPComp::LayerCache::updateCounts(const FrameInfo& curFrame) {
 }
 
 bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
-
+    const int dpy = HWC_DISPLAY_PRIMARY;
     private_handle_t *hnd = (private_handle_t *)layer->handle;
 
     if(!hnd) {
@@ -269,36 +270,38 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     int hw_w = ctx->dpyAttr[mDpy].xres;
     int hw_h = ctx->dpyAttr[mDpy].yres;
 
-    hwc_rect_t sourceCrop = layer->sourceCrop;
-    hwc_rect_t displayFrame = layer->displayFrame;
-
-    hwc_rect_t crop =  sourceCrop;
-    int crop_w = crop.right - crop.left;
-    int crop_h = crop.bottom - crop.top;
-
-    hwc_rect_t dst = displayFrame;
-    int dst_w = dst.right - dst.left;
-    int dst_h = dst.bottom - dst.top;
+    hwc_rect_t crop = layer->sourceCrop;
+    hwc_rect_t dst = layer->displayFrame;
 
     if(dst.left < 0 || dst.top < 0 || dst.right > hw_w || dst.bottom > hw_h) {
-        hwc_rect_t scissor = {0, 0, hw_w, hw_h };
-        qhwc::calculate_crop_rects(crop, dst, scissor, layer->transform);
-        crop_w = crop.right - crop.left;
-        crop_h = crop.bottom - crop.top;
+       hwc_rect_t scissor = {0, 0, hw_w, hw_h };
+       qhwc::calculate_crop_rects(crop, dst, scissor, layer->transform);
     }
 
-    /* Workaround for MDP HW limitation in DSI command mode panels where
-     * FPS will not go beyond 30 if buffers on RGB pipes are of width or height
-     * less than 5 pixels
-     * */
+    int crop_w = crop.right - crop.left;
+    int crop_h = crop.bottom - crop.top;
+    int dst_w = dst.right - dst.left;
+    int dst_h = dst.bottom - dst.top;
+    float w_dscale = ceilf((float)crop_w / (float)dst_w);
+    float h_dscale = ceilf((float)crop_h / (float)dst_h);
+
+    //Workaround for MDP HW limitation in DSI command mode panels where
+    //FPS will not go beyond 30 if buffers on RGB pipes are of width < 5
 
     if((crop_w < 5)||(crop_h < 5))
         return false;
 
-    // There is a HW limilation in MDP, minmum block size is 2x2
-    // Fallback to GPU if height is less than 2.
-    if(crop_h < 2)
-        return false;
+    if(ctx->mMDP.version >= qdutils::MDSS_V5) {
+        /* Workaround for downscales larger than 4x.
+         * Will be removed once decimator block is enabled for MDSS
+         */
+        if(w_dscale > 4.0f || h_dscale > 4.0f)
+            return false;
+    } else {
+        if(w_dscale > 8.0f || h_dscale > 8.0f)
+            // MDP 4 supports 1/8 downscale
+            return false;
+    }
 
     return true;
 }
@@ -396,16 +399,15 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
                 ALOGD_IF(isDebug(), "%s: MDP securing is active", __FUNCTION__);
                 return false;
             }
-        } else {
-            if(layer->transform & HWC_TRANSFORM_ROT_90) {
-                ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
-                return false;
-            }
-            if(!isValidDimension(ctx,layer)) {
-                ALOGD_IF(isDebug(), "%s: Buffer is of invalid width",
-                                    __FUNCTION__);
-                return false;
-            }
+        } else if(layer->transform & HWC_TRANSFORM_ROT_90) {
+            ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
+            return false;
+        }
+
+        if(!isValidDimension(ctx,layer)) {
+            ALOGD_IF(isDebug(), "%s: Buffer is of invalid width",
+                __FUNCTION__);
+            return false;
         }
     }
 
@@ -476,12 +478,15 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     mCurrentFrame.reset(numAppLayers);
     updateYUV(ctx, list);
-    int mdpCount = mCurrentFrame.layerCount - mCurrentFrame.fbCount;
+    int mdpCount = mCurrentFrame.mdpCount;
     int fbNeeded = int(mCurrentFrame.fbCount != 0);
 
     if(!isYuvPresent(ctx, mDpy)) {
         return false;
     }
+
+    if(!mdpCount)
+        return false;
 
     if(mdpCount > (sMaxPipesPerMixer - fbNeeded)) {
         ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
@@ -517,20 +522,12 @@ bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
         return false;
     }
 
-    /* Workaround for downscales larger than 4x. Will be removed once decimator
-     * block is enabled for MDSS*/
-    if(ctx->mMDP.version == qdutils::MDSS_V5) {
-        hwc_rect_t crop = layer->sourceCrop;
-        hwc_rect_t dst = layer->displayFrame;
-
-        int cWidth = crop.right - crop.left;
-        int cHeight = crop.bottom - crop.top;
-        int dWidth = dst.right - dst.left;
-        int dHeight = dst.bottom - dst.top;
-
-        if((cWidth/dWidth) > 4 || (cHeight/dHeight) > 4)
-            return false;
+    if(!isValidDimension(ctx, layer)) {
+        ALOGD_IF(isDebug(), "%s: Buffer is of invalid width",
+            __FUNCTION__);
+        return false;
     }
+
     return true;
 }
 
