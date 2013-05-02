@@ -105,7 +105,7 @@ C2D_STATUS (*LINK_c2dFillSurface) ( uint32 surface_id, uint32 fill_color,
 
 // The following defines can be changed as required i.e. as we encounter
 // complex use cases.
-#define MAX_RGB_SURFACES 12        // Max. RGB layers currently supported per draw
+#define MAX_RGB_SURFACES 32       // Max. RGB layers currently supported per draw
 #define MAX_YUV_2_PLANE_SURFACES 4// Max. 2-plane YUV layers currently supported per draw
 #define MAX_YUV_3_PLANE_SURFACES 1// Max. 3-plane YUV layers currently supported per draw
 // +1 for the destination surface. We cannot have multiple destination surfaces.
