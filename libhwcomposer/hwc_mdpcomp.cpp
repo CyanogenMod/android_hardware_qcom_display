@@ -223,7 +223,7 @@ void MDPComp::FrameInfo::reset(const int& numLayers) {
     layerCount = numLayers;
     fbCount = numLayers;
     mdpCount = 0;
-    needsRedraw = false;
+    needsRedraw = true;
     fbZ = 0;
 }
 
@@ -723,12 +723,23 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
     //Check whether layers marked for MDP Composition is actually doable.
     if(isFullFrameDoable(ctx, list)){
-        if(mCurrentFrame.mdpCount) {
-            mCurrentFrame.map();
-            //Acquire and Program MDP pipes
-            if(!programMDP(ctx, list)) {
-                mCurrentFrame.reset(numLayers);
-                mCachedFrame.cacheAll(list);
+        mCurrentFrame.map();
+        //Acquire and Program MDP pipes
+        if(!programMDP(ctx, list)) {
+            mCurrentFrame.reset(numLayers);
+            mCachedFrame.cacheAll(list);
+        } else { //Success
+            //Any change in composition types needs an FB refresh
+            mCurrentFrame.needsRedraw = false;
+            if(mCurrentFrame.fbCount &&
+                    ((mCurrentFrame.mdpCount != mCachedFrame.mdpCount) ||
+                     (mCurrentFrame.fbCount != mCachedFrame.cacheCount) ||
+                     (mCurrentFrame.fbZ != mCachedFrame.fbZ) ||
+                     (!mCurrentFrame.mdpCount) ||
+                     (list->flags & HWC_GEOMETRY_CHANGED) ||
+                     isSkipPresent(ctx, mDpy) ||
+                     (mDpy > HWC_DISPLAY_PRIMARY))) {
+                mCurrentFrame.needsRedraw = true;
             }
         }
     } else if(isOnlyVideoDoable(ctx, list)) {
@@ -748,18 +759,6 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     } else {
         mCurrentFrame.reset(numLayers);
         mCachedFrame.cacheAll(list);
-    }
-
-    /* Any change in composition types needs an FB refresh*/
-    if(mCurrentFrame.fbCount &&
-            ((mCurrentFrame.mdpCount != mCachedFrame.mdpCount) ||
-            (mCurrentFrame.fbCount != mCachedFrame.cacheCount) ||
-            (mCurrentFrame.fbZ != mCachedFrame.fbZ) ||
-            (!mCurrentFrame.mdpCount) ||
-            (list->flags & HWC_GEOMETRY_CHANGED) ||
-            isSkipPresent(ctx, mDpy) ||
-            (mDpy > HWC_DISPLAY_PRIMARY))) {
-        mCurrentFrame.needsRedraw = true;
     }
 
     //UpdateLayerFlags
