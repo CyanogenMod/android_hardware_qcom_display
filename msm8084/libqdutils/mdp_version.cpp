@@ -85,6 +85,9 @@ MDPVersion::MDPVersion()
                 mVGPipes = metadata.data.caps.vig_pipes;
                 mDMAPipes = metadata.data.caps.dma_pipes;
                 mFeatures = metadata.data.caps.features;
+                if (metadata.data.caps.mdp_rev == MDP_V3_0_4){
+                    mdp_version = MDP_V3_0_4;
+                }
             }
 #endif
         } else {
@@ -99,7 +102,9 @@ MDPVersion::MDPVersion()
     close(fb_fd);
     mMDPVersion = mdp_version;
     mHasOverlay = false;
-    if((mMDPVersion >= MDP_V4_0) || (mMDPVersion == MDP_V_UNKNOWN))
+    if((mMDPVersion >= MDP_V4_0) ||
+       (mMDPVersion == MDP_V_UNKNOWN) ||
+       (mMDPVersion == MDP_V3_0_4))
         mHasOverlay = true;
     if(mMDPVersion >= MDSS_V5) {
         //TODO get this from driver
