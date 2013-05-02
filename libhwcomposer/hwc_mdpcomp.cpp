@@ -91,6 +91,10 @@ bool MDPComp::init(hwc_context_t *ctx) {
        (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
         (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
         sEnabled = true;
+        if(!setupBasePipe(ctx)) {
+            ALOGE("%s: Failed to setup primary base pipe", __FUNCTION__);
+            return false;
+        }
     }
 
     sDebugLogs = false;
