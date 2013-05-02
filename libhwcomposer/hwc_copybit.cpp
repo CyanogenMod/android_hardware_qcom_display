@@ -125,7 +125,8 @@ unsigned int CopyBit::getRGBRenderingArea
     for (unsigned int i=0; i<(list->numHwLayers)-1; i++) {
          private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
          if (hnd) {
-             if (BUFFER_TYPE_UI == hnd->bufferType) {
+             if (BUFFER_TYPE_UI == hnd->bufferType &&
+                 list->hwLayers[i].compositionType != HWC_FRAMEBUFFER_TARGET) {
                  getLayerResolution(&list->hwLayers[i], w, h);
                  renderArea += (w*h);
              }
