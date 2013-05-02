@@ -243,7 +243,7 @@ int Overlay::initOverlay() {
         }
     }
 
-    if (mdpVersion < qdutils::MDSS_V5) {
+    if (mdpVersion < qdutils::MDSS_V5 && mdpVersion != qdutils::MDP_V3_0_4) {
         msmfb_mixer_info_req  req;
         mdp_mixer_info *minfo = NULL;
         char name[64];
