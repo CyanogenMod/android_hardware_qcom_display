@@ -109,6 +109,8 @@ protected:
     static bool isDebug() { return sDebugLogs ? true : false; };
     /* Is feature enabled */
     static bool isEnabled() { return sEnabled; };
+    /* checks for mdp comp width limitation */
+    bool isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer);
 
     eState mState;
 

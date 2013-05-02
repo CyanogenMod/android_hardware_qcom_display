@@ -84,12 +84,6 @@ bool VideoOverlayLowRes::prepare(hwc_context_t *ctx,
         return false;
     }
 
-    if(!isValidDimension(ctx, layer, mDpy)) {
-        ALOGD_IF(VIDEO_DEBUG, "%s: Buffer is of invalid width",
-                __FUNCTION__);
-        return false;
-    }
-
     if(configure(ctx, layer)) {
         markFlags(layer);
         mModeOn = true;
