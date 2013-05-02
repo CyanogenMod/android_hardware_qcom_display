@@ -108,26 +108,6 @@ enum {
     HWC_COPYBIT = 0x00000002,
 };
 
-class LayerCache {
-    public:
-    LayerCache() {
-        canUseLayerCache = false;
-        numHwLayers = 0;
-        for(uint32_t i = 0; i < MAX_NUM_LAYERS; i++) {
-            hnd[i] = NULL;
-        }
-    }
-    //LayerCache optimization
-    void updateLayerCache(hwc_display_contents_1_t* list);
-    void resetLayerCache(int num);
-    void markCachedLayersAsOverlay(hwc_display_contents_1_t* list);
-    private:
-    uint32_t numHwLayers;
-    bool canUseLayerCache;
-    buffer_handle_t hnd[MAX_NUM_LAYERS];
-
-};
-
 class LayerRotMap {
 public:
     LayerRotMap() { reset(); }
@@ -305,16 +285,14 @@ struct hwc_context_t {
 
     //Primary and external FB updater
     qhwc::IFBUpdate *mFBUpdate[MAX_DISPLAYS];
-    qhwc::IVideoOverlay *mVidOv[MAX_DISPLAYS];
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
     qhwc::MDPInfo mMDP;
     qhwc::DisplayAttributes dpyAttr[MAX_DISPLAYS];
     qhwc::ListStats listStats[MAX_DISPLAYS];
-    qhwc::LayerCache *mLayerCache[MAX_DISPLAYS];
     qhwc::LayerProp *layerProp[MAX_DISPLAYS];
-    qhwc::MDPComp *mMDPComp;
     qhwc::LayerRotMap *mLayerRotMap[MAX_DISPLAYS];
+    qhwc::MDPComp *mMDPComp[MAX_DISPLAYS];
 
     //Securing in progress indicator
     bool mSecuring;

@@ -34,17 +34,15 @@ public:
     explicit IFBUpdate(const int& dpy) : mDpy(dpy) {}
     virtual ~IFBUpdate() {};
     // Sets up members and prepares overlay if conditions are met
-    virtual bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list) = 0;
+    virtual bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
+                                                       int fbZorder) = 0;
     // Draws layer
     virtual bool draw(hwc_context_t *ctx, private_handle_t *hnd) = 0;
     //Reset values
     virtual void reset();
     //Factory method that returns a low-res or high-res version
     static IFBUpdate *getObject(const int& width, const int& dpy);
-    //To know if configuring FbUpdate is needed.
-    static bool needFbUpdate(hwc_context_t *ctx,
-           const hwc_display_contents_1_t *list,
-                                       int dpy);
+
 protected:
     const int mDpy; // display to update
     bool mModeOn; // if prepare happened
@@ -55,12 +53,13 @@ class FBUpdateLowRes : public IFBUpdate {
 public:
     explicit FBUpdateLowRes(const int& dpy);
     virtual ~FBUpdateLowRes() {};
-    bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list);
-
+    bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
+                                                          int fbZorder);
     bool draw(hwc_context_t *ctx, private_handle_t *hnd);
     void reset();
 private:
-    bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list);
+    bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
+                                                               int fbZorder);
     ovutils::eDest mDest; //pipe to draw on
 };
 
@@ -69,11 +68,13 @@ class FBUpdateHighRes : public IFBUpdate {
 public:
     explicit FBUpdateHighRes(const int& dpy);
     virtual ~FBUpdateHighRes() {};
-    bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list);
+    bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
+                                                             int fbZorder);
     bool draw(hwc_context_t *ctx, private_handle_t *hnd);
     void reset();
 private:
-    bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list);
+    bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
+                                                            int fbZorder);
     ovutils::eDest mDestLeft; //left pipe to draw on
     ovutils::eDest mDestRight; //right pipe to draw on
 };

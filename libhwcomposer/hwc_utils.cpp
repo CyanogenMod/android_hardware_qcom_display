@@ -28,7 +28,6 @@
 #include "hwc_utils.h"
 #include "hwc_mdpcomp.h"
 #include "hwc_fbupdate.h"
-#include "hwc_video.h"
 #include "mdp_version.h"
 #include "hwc_copybit.h"
 #include "external.h"
@@ -123,10 +122,6 @@ void initContext(hwc_context_t *ctx)
         IFBUpdate::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
         HWC_DISPLAY_PRIMARY);
 
-    ctx->mVidOv[HWC_DISPLAY_PRIMARY] =
-        IVideoOverlay::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
-        HWC_DISPLAY_PRIMARY);
-
     // Check if the target supports copybit compostion (dyn/mdp/c2d) to
     // decide if we need to open the copybit module.
     int compositionType =
@@ -139,12 +134,15 @@ void initContext(hwc_context_t *ctx)
     }
 
     ctx->mExtDisplay = new ExternalDisplay(ctx);
+
     for (uint32_t i = 0; i < MAX_DISPLAYS; i++) {
-        ctx->mLayerCache[i] = new LayerCache();
         ctx->mLayerRotMap[i] = new LayerRotMap();
     }
 
-    ctx->mMDPComp = MDPComp::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres);
+    ctx->mMDPComp[HWC_DISPLAY_PRIMARY] =
+         MDPComp::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
+         HWC_DISPLAY_PRIMARY);
+
     MDPComp::init(ctx);
 
     pthread_mutex_init(&(ctx->vstate.lock), NULL);
@@ -200,9 +198,9 @@ void closeContext(hwc_context_t *ctx)
             delete ctx->mFBUpdate[i];
             ctx->mFBUpdate[i] = NULL;
         }
-        if(ctx->mVidOv[i]) {
-            delete ctx->mVidOv[i];
-            ctx->mVidOv[i] = NULL;
+        if(ctx->mMDPComp[i]) {
+            delete ctx->mMDPComp[i];
+            ctx->mMDPComp[i] = NULL;
         }
         if(ctx->mLayerRotMap[i]) {
             delete ctx->mLayerRotMap[i];
@@ -210,10 +208,6 @@ void closeContext(hwc_context_t *ctx)
         }
     }
 
-    if(ctx->mMDPComp) {
-        delete ctx->mMDPComp;
-        ctx->mMDPComp = NULL;
-    }
 
     pthread_mutex_destroy(&(ctx->vstate.lock));
     pthread_cond_destroy(&(ctx->vstate.cond));
@@ -840,12 +834,12 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
             getMdpFormat(hnd->format), hnd->size);
 
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
-                ctx->mMDP.version < qdutils::MDSS_V5) {
-        downscale = getDownscaleFactor(
-                crop.right - crop.left,
-                crop.bottom - crop.top,
-                dst.right - dst.left,
-                dst.bottom - dst.top);
+       ctx->mMDP.version < qdutils::MDSS_V5) {
+        downscale =  getDownscaleFactor(
+            crop.right - crop.left,
+            crop.bottom - crop.top,
+            dst.right - dst.left,
+            dst.bottom - dst.top);
         if(downscale) {
             rotFlags = ROT_DOWNSCALE_ENABLED;
         }
@@ -994,72 +988,6 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     }
 
     return 0;
-}
-
-void LayerCache::resetLayerCache(int num) {
-    for(uint32_t i = 0; i < MAX_NUM_LAYERS; i++) {
-        hnd[i] = NULL;
-    }
-    numHwLayers = num;
-}
-
-void LayerCache::updateLayerCache(hwc_display_contents_1_t* list) {
-
-    int numFbLayers = 0;
-    int numCacheableLayers = 0;
-
-    canUseLayerCache = false;
-    //Bail if geometry changed or num of layers changed
-    if(list->flags & HWC_GEOMETRY_CHANGED ||
-       list->numHwLayers != numHwLayers ) {
-        resetLayerCache(list->numHwLayers);
-        return;
-    }
-
-    for(uint32_t i = 0; i < list->numHwLayers; i++) {
-        //Bail on skip layers
-        if(list->hwLayers[i].flags & HWC_SKIP_LAYER) {
-            resetLayerCache(list->numHwLayers);
-            return;
-        }
-
-        if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER) {
-            numFbLayers++;
-            if(hnd[i] == NULL) {
-                hnd[i] = list->hwLayers[i].handle;
-            } else if (hnd[i] ==
-                       list->hwLayers[i].handle) {
-                numCacheableLayers++;
-            } else {
-                hnd[i] = NULL;
-                return;
-            }
-        } else {
-            hnd[i] = NULL;
-        }
-    }
-    if(numFbLayers == numCacheableLayers)
-        canUseLayerCache = true;
-
-    //XXX: The marking part is separate, if MDP comp wants
-    // to use it in the future. Right now getting MDP comp
-    // to use this is more trouble than it is worth.
-    markCachedLayersAsOverlay(list);
-}
-
-void LayerCache::markCachedLayersAsOverlay(hwc_display_contents_1_t* list) {
-    //This optimization only works if ALL the layer handles
-    //that were on the framebuffer didn't change.
-    if(canUseLayerCache){
-        for(uint32_t i = 0; i < list->numHwLayers; i++) {
-            if (list->hwLayers[i].handle &&
-                list->hwLayers[i].handle == hnd[i] &&
-                list->hwLayers[i].compositionType != HWC_FRAMEBUFFER_TARGET)
-            {
-                list->hwLayers[i].compositionType = HWC_OVERLAY;
-            }
-        }
-    }
 }
 
 void LayerRotMap::add(hwc_layer_1_t* layer, Rotator *rot) {
