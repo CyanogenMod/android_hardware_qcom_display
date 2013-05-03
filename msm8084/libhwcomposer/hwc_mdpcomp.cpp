@@ -363,10 +363,6 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ALOGD_IF( isDebug(),"%s: External Display connection is pending",
                   __FUNCTION__);
         ret = false;
-    } else if(ctx->listStats[mDpy].needsAlphaScale
-       && ctx->mMDP.version < qdutils::MDSS_V5) {
-        ALOGD_IF(isDebug(), "%s: frame needs alpha downscaling",__FUNCTION__);
-        ret = false;
     } else if(ctx->isPaddingRound) {
         ctx->isPaddingRound = false;
         ALOGD_IF(isDebug(), "%s: padding round",__FUNCTION__);
@@ -397,6 +393,12 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
         ALOGD_IF(isDebug(),"%s: SKIP present: %d",
                 __FUNCTION__,
                 isSkipPresent(ctx, mDpy));
+        return false;
+    }
+
+    if(ctx->listStats[mDpy].needsAlphaScale
+       && ctx->mMDP.version < qdutils::MDSS_V5) {
+        ALOGD_IF(isDebug(), "%s: frame needs alpha downscaling",__FUNCTION__);
         return false;
     }
 
