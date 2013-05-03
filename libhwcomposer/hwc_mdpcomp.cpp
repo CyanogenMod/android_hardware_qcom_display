@@ -263,7 +263,7 @@ void MDPComp::LayerCache::updateCounts(const FrameInfo& curFrame) {
     fbZ = curFrame.fbZ;
 }
 
-bool MDPComp::isWidthValid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
+bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
 
     private_handle_t *hnd = (private_handle_t *)layer->handle;
 
@@ -296,8 +296,9 @@ bool MDPComp::isWidthValid(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     /* Workaround for MDP HW limitation in DSI command mode panels where
      * FPS will not go beyond 30 if buffers on RGB pipes are of width or height
      * less than 5 pixels
-     * */
-
+     * There also is a HW limilation in MDP, minimum block size is 2x2
+     * Fallback to GPU if height is less than 2.
+     */
     if((crop_w < 5)||(crop_h < 5))
         return false;
 
@@ -394,7 +395,7 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
             return false;
         }
 
-        if(!isYuvBuffer(hnd) && !isWidthValid(ctx,layer)) {
+        if(!isYuvBuffer(hnd) && !isValidDimension(ctx,layer)) {
             ALOGD_IF(isDebug(), "%s: Buffer is of invalid width",__FUNCTION__);
             return false;
         }
