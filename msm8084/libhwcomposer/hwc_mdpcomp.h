@@ -51,6 +51,7 @@ public:
     static void timeout_handler(void *udata);
     /* Initialize MDP comp*/
     static bool init(hwc_context_t *ctx);
+    static void resetIdleFallBack() { sIdleFallBack = false; }
 
 protected:
     enum ePipeType {
