@@ -368,7 +368,6 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ALOGD_IF(isDebug(), "%s: padding round",__FUNCTION__);
         ret = false;
     } else if(sIdleFallBack) {
-        sIdleFallBack = false;
         ALOGD_IF(isDebug(), "%s: idle fallback",__FUNCTION__);
         ret = false;
     }
