@@ -348,10 +348,6 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ALOGD_IF( isDebug(),"%s: External Display connection is pending",
                   __FUNCTION__);
         ret = false;
-    } else if(ctx->listStats[mDpy].needsAlphaScale
-       && ctx->mMDP.version < qdutils::MDSS_V5) {
-        ALOGD_IF(isDebug(), "%s: frame needs alpha downscaling",__FUNCTION__);
-        ret = false;
     } else if(sIdleFallBack) {
         sIdleFallBack = false;
         ALOGD_IF(isDebug(), "%s: idle fallback",__FUNCTION__);
@@ -385,6 +381,12 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
                      && ctx->mMDP.version >= qdutils::MDSS_V5) {
         ALOGD_IF(isDebug(), "%s: plane alpha not implemented on MDSS",
                  __FUNCTION__);
+        return false;
+    }
+
+    if(ctx->listStats[mDpy].needsAlphaScale
+       && ctx->mMDP.version < qdutils::MDSS_V5) {
+        ALOGD_IF(isDebug(), "%s: frame needs alpha downscaling",__FUNCTION__);
         return false;
     }
 
