@@ -231,7 +231,8 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
         const int halfWidth = (displayFrame.right - displayFrame.left) / 2;
         const int height = displayFrame.bottom - displayFrame.top;
 
-        ovutils::Dim dposL(MAX_DISPLAY_DIM - halfWidth,
+        const int halfDpy = ctx->dpyAttr[mDpy].xres / 2;
+        ovutils::Dim dposL(halfDpy - halfWidth,
                            displayFrame.top,
                            halfWidth,
                            height);
