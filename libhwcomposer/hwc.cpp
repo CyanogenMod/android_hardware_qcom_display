@@ -245,6 +245,7 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    Locker::Autolock _l(ctx->mBlankLock);
     pthread_mutex_lock(&ctx->vstate.lock);
     switch(event) {
         case HWC_EVENT_VSYNC:
