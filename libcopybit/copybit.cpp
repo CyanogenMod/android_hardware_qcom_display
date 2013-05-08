@@ -428,7 +428,7 @@ static int stretch_copybit(
 
         if(src->format ==  HAL_PIXEL_FORMAT_YV12) {
             int usage =
-            GRALLOC_USAGE_PRIVATE_CAMERA_HEAP|GRALLOC_USAGE_PRIVATE_UNCACHED;
+            GRALLOC_USAGE_PRIVATE_ADSP_HEAP|GRALLOC_USAGE_PRIVATE_UNCACHED;
             if (0 == alloc_buffer(&yv12_handle,src->w,src->h,
                                   src->format, usage)){
                 if(0 == convertYV12toYCrCb420SP(src,yv12_handle)){
