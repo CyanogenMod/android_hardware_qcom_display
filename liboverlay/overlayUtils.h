@@ -143,6 +143,7 @@ bool send3DInfoPacket (uint32_t fmt);
 bool enableBarrier (uint32_t orientation);
 uint32_t getS3DFormat(uint32_t fmt);
 bool isMdssRotator();
+void normalizeCrop(uint32_t& xy, uint32_t& wh);
 
 template <int CHAN>
 bool getPositionS3D(const Whf& whf, Dim& out);
