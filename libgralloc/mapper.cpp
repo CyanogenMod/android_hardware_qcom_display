@@ -56,8 +56,7 @@ static IMemAlloc* getAllocator(int flags)
 }
 
 static int gralloc_map(gralloc_module_t const* module,
-                       buffer_handle_t handle,
-                       void** vaddr)
+                       buffer_handle_t handle)
 {
     private_handle_t* hnd = (private_handle_t*)handle;
     void *mappedAddress;
@@ -75,8 +74,6 @@ static int gralloc_map(gralloc_module_t const* module,
         }
 
         hnd->base = intptr_t(mappedAddress) + hnd->offset;
-        //LOGD("gralloc_map() succeeded fd=%d, off=%d, size=%d, vaddr=%p",
-        //        hnd->fd, hnd->offset, hnd->size, mappedAddress);
         mappedAddress = MAP_FAILED;
         size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
         err = memalloc->map_buffer(&mappedAddress, size,
@@ -89,7 +86,6 @@ static int gralloc_map(gralloc_module_t const* module,
         }
         hnd->base_metadata = intptr_t(mappedAddress) + hnd->offset_metadata;
     }
-    *vaddr = (void*)hnd->base;
     return 0;
 }
 
@@ -146,8 +142,7 @@ int gralloc_register_buffer(gralloc_module_t const* module,
     private_handle_t* hnd = (private_handle_t*)handle;
     hnd->base = 0;
     hnd->base_metadata = 0;
-    void *vaddr;
-    int err = gralloc_map(module, handle, &vaddr);
+    int err = gralloc_map(module, handle);
     if (err) {
         ALOGE("%s: gralloc_map failed", __FUNCTION__);
         return err;
@@ -203,10 +198,8 @@ int terminateBuffer(gralloc_module_t const* module,
     return 0;
 }
 
-int gralloc_lock(gralloc_module_t const* module,
-                 buffer_handle_t handle, int usage,
-                 int l, int t, int w, int h,
-                 void** vaddr)
+static int gralloc_map_and_invalidate (gralloc_module_t const* module,
+                                       buffer_handle_t handle, int usage)
 {
     if (private_handle_t::validate(handle) < 0)
         return -EINVAL;
@@ -218,10 +211,9 @@ int gralloc_lock(gralloc_module_t const* module,
             // we need to map for real
             pthread_mutex_t* const lock = &sMapLock;
             pthread_mutex_lock(lock);
-            err = gralloc_map(module, handle, vaddr);
+            err = gralloc_map(module, handle);
             pthread_mutex_unlock(lock);
         }
-        *vaddr = (void*)hnd->base;
         if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_ION) {
             //Invalidate if reading in software. No need to do this for the
             //metadata buffer as it is only read/written in software.
@@ -236,6 +228,50 @@ int gralloc_lock(gralloc_module_t const* module,
         }
     } else {
         hnd->flags |= private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
+    }
+    return err;
+}
+
+int gralloc_lock(gralloc_module_t const* module,
+                 buffer_handle_t handle, int usage,
+                 int /*l*/, int /*t*/, int /*w*/, int /*h*/,
+                 void** vaddr)
+{
+    private_handle_t* hnd = (private_handle_t*)handle;
+    int err = gralloc_map_and_invalidate(module, handle, usage);
+    if(!err)
+        *vaddr = (void*)hnd->base;
+    return err;
+}
+
+int gralloc_lock_ycbcr(gralloc_module_t const* module,
+                 buffer_handle_t handle, int usage,
+                 int /*l*/, int /*t*/, int /*w*/, int /*h*/,
+                 struct android_ycbcr *ycbcr)
+{
+    private_handle_t* hnd = (private_handle_t*)handle;
+    int err = gralloc_map_and_invalidate(module, handle, usage);
+    int ystride;
+    if(!err) {
+        //hnd->format holds our implementation defined format
+        //HAL_PIXEL_FORMAT_YCrCb_420_SP is the only one set right now.
+        switch (hnd->format) {
+            case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+                ystride = ALIGN(hnd->width, 16);
+                ycbcr->y  = (void*)hnd->base;
+                ycbcr->cr = (void*)(hnd->base + ystride * hnd->height);
+                ycbcr->cb = (void*)(hnd->base + ystride * hnd->height + 1);
+                ycbcr->ystride = ystride;
+                ycbcr->cstride = ystride;
+                ycbcr->chroma_step = 2;
+                for (uint32_t i = 0; i < sizeof(ycbcr->reserved); i++)
+                    ycbcr->reserved[i] = 0;
+                break;
+            default:
+                ALOGD("%s: Invalid format passed: 0x%x", __FUNCTION__,
+                      hnd->format);
+                err = -EINVAL;
+        }
     }
     return err;
 }
