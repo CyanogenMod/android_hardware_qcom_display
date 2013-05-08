@@ -266,7 +266,8 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
 
     //If input format is HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED then based on
     //the usage bits, gralloc assigns a format.
-    if(format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+    if(format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED ||
+       format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
         if(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
             grallocFormat = HAL_PIXEL_FORMAT_NV12_ENCODEABLE; //NV12
         else if((usage & GRALLOC_USAGE_HW_CAMERA_MASK)
