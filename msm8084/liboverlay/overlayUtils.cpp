@@ -428,6 +428,20 @@ void getDump(char *buf, size_t len, const char *prefix,
     getDump(buf, len, "\tdst", rot.dst);
 }
 
+//Helper to even out x,w and y,h pairs
+//x,y are always evened to ceil and w,h are evened to floor
+void normalizeCrop(uint32_t& xy, uint32_t& wh) {
+    if(xy & 1) {
+        even_ceil(xy);
+        if(wh & 1)
+            even_floor(wh);
+        else
+            wh -= 2;
+    } else {
+        even_floor(wh);
+    }
+}
+
 } // utils
 
 } // overlay
