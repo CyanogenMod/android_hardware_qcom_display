@@ -45,6 +45,10 @@
 #define VENUS_BUFFER_SIZE(args...) 0
 #endif
 
+#ifndef ION_ADSP_HEAP_ID
+#define ION_ADSP_HEAP_ID ION_CAMERA_HEAP_ID
+#endif
+
 using namespace gralloc;
 using namespace qdutils;
 
