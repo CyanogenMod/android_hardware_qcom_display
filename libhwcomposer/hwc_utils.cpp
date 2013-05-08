@@ -754,12 +754,23 @@ void setMdpFlags(hwc_layer_1_t *layer,
 }
 
 inline int configRotator(Rotator *rot, const Whf& whf,
-        const hwc_rect_t& crop, const eMdpFlags& mdpFlags,
+        hwc_rect_t& crop, const eMdpFlags& mdpFlags,
         const eTransform& orient, const int& downscale) {
-    Dim rotCrop(crop.left, crop.top, (crop.right - crop.left),
-        (crop.bottom - crop.top));
+
     rot->setSource(whf);
-    rot->setCrop(rotCrop);
+
+    if (qdutils::MDPVersion::getInstance().getMDPVersion() >=
+        qdutils::MDSS_V5) {
+        uint32_t crop_w = (crop.right - crop.left);
+        uint32_t crop_h = (crop.bottom - crop.top);
+        ovutils::normalizeCrop((uint32_t&)crop.left, crop_w);
+        ovutils::normalizeCrop((uint32_t&)crop.top, crop_h);
+        crop.right = crop.left + crop_w;
+        crop.bottom = crop.top + crop_h;
+        Dim rotCrop(crop.left, crop.top, crop_w, crop_h);
+        rot->setCrop(rotCrop);
+    }
+
     rot->setFlags(mdpFlags);
     rot->setTransform(orient);
     rot->setDownscale(downscale);

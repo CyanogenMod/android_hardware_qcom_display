@@ -37,20 +37,6 @@ static inline float log2f(const float& x) {
 namespace ovutils = overlay::utils;
 namespace overlay {
 
-//Helper to even out x,w and y,h pairs
-//x,y are always evened to ceil and w,h are evened to floor
-static void normalizeCrop(uint32_t& xy, uint32_t& wh) {
-    if(xy & 1) {
-        utils::even_ceil(xy);
-        if(wh & 1)
-            utils::even_floor(wh);
-        else
-            wh -= 2;
-    } else {
-        utils::even_floor(wh);
-    }
-}
-
 bool MdpCtrl::init(uint32_t fbnum) {
     // FD init
     if(!utils::openDev(mFd, fbnum,
@@ -189,8 +175,8 @@ bool MdpCtrl::set() {
     doDownscale();
     utils::Whf whf = getSrcWhf();
     if(utils::isYuv(whf.format)) {
-        normalizeCrop(mOVInfo.src_rect.x, mOVInfo.src_rect.w);
-        normalizeCrop(mOVInfo.src_rect.y, mOVInfo.src_rect.h);
+        utils::normalizeCrop(mOVInfo.src_rect.x, mOVInfo.src_rect.w);
+        utils::normalizeCrop(mOVInfo.src_rect.y, mOVInfo.src_rect.h);
         if(mdpVersion < MDSS_V5) {
             utils::even_floor(mOVInfo.dst_rect.w);
             utils::even_floor(mOVInfo.dst_rect.h);
