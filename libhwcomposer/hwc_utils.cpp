@@ -325,6 +325,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].needsAlphaScale = false;
     ctx->listStats[dpy].preMultipliedAlpha = false;
     ctx->listStats[dpy].yuvCount = 0;
+    char property[PROPERTY_VALUE_MAX];
 
     for (size_t i = 0; i < list->numHwLayers; i++) {
         hwc_layer_1_t const* layer = &list->hwLayers[i];
@@ -355,6 +356,19 @@ void setListStats(hwc_context_t *ctx,
 
         if(!ctx->listStats[dpy].needsAlphaScale)
             ctx->listStats[dpy].needsAlphaScale = isAlphaScaled(layer);
+    }
+    if(ctx->listStats[dpy].yuvCount > 0) {
+        if (property_get("hw.cabl.yuv", property, NULL) > 0) {
+            if (atoi(property) != 1) {
+                property_set("hw.cabl.yuv", "1");
+            }
+        }
+    } else {
+        if (property_get("hw.cabl.yuv", property, NULL) > 0) {
+            if (atoi(property) != 0) {
+                property_set("hw.cabl.yuv", "0");
+            }
+        }
     }
 }
 
