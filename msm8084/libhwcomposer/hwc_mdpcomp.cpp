@@ -802,52 +802,23 @@ int MDPCompLowRes::pipesNeeded(hwc_context_t *ctx,
 }
 
 bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
-                                    hwc_display_contents_1_t* list) {
-    if(isYuvPresent(ctx, mDpy)) {
-        int nYuvCount = ctx->listStats[mDpy].yuvCount;
+        hwc_display_contents_1_t* list) {
+    for(int index = 0; index < mCurrentFrame.layerCount; index++) {
 
-        for(int index = 0; index < nYuvCount ; index ++) {
-            int nYuvIndex = ctx->listStats[mDpy].yuvIndices[index];
-
-            if(mCurrentFrame.isFBComposed[nYuvIndex])
-                continue;
-
-            hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
-
-            int mdpIndex = mCurrentFrame.layerToMDP[nYuvIndex];
-
-            PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
-            info.pipeInfo = new MdpPipeInfoLowRes;
-            info.rot = NULL;
-            MdpPipeInfoLowRes& pipe_info = *(MdpPipeInfoLowRes*)info.pipeInfo;
-
-            pipe_info.index = getMdpPipe(ctx, MDPCOMP_OV_VG);
-            if(pipe_info.index == ovutils::OV_INVALID) {
-                ALOGD_IF(isDebug(), "%s: Unable to get pipe for Videos",
-                         __FUNCTION__);
-                return false;
-            }
-        }
-    }
-
-    for(int index = 0 ; index < mCurrentFrame.layerCount; index++ ) {
         if(mCurrentFrame.isFBComposed[index]) continue;
+
         hwc_layer_1_t* layer = &list->hwLayers[index];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-
-        if(isYuvBuffer(hnd))
-            continue;
-
         int mdpIndex = mCurrentFrame.layerToMDP[index];
-
         PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
         info.pipeInfo = new MdpPipeInfoLowRes;
         info.rot = NULL;
         MdpPipeInfoLowRes& pipe_info = *(MdpPipeInfoLowRes*)info.pipeInfo;
-
         ePipeType type = MDPCOMP_OV_ANY;
 
-        if(!qhwc::needsScaling(layer)
+        if(isYuvBuffer(hnd)) {
+            type = MDPCOMP_OV_VG;
+        } else if(!qhwc::needsScaling(layer)
             && Overlay::getDMAMode() != Overlay::DMA_BLOCK_MODE
             && ctx->mMDP.version >= qdutils::MDSS_V5) {
             type = MDPCOMP_OV_DMA;
@@ -855,7 +826,8 @@ bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
 
         pipe_info.index = getMdpPipe(ctx, type);
         if(pipe_info.index == ovutils::OV_INVALID) {
-            ALOGD_IF(isDebug(), "%s: Unable to get pipe for UI", __FUNCTION__);
+            ALOGD_IF(isDebug(), "%s: Unable to get pipe type = %d",
+                __FUNCTION__, (int) type);
             return false;
         }
     }
@@ -981,55 +953,32 @@ bool MDPCompHighRes::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
 }
 
 bool MDPCompHighRes::allocLayerPipes(hwc_context_t *ctx,
-                                     hwc_display_contents_1_t* list) {
-    overlay::Overlay& ov = *ctx->mOverlay;
-    int layer_count = ctx->listStats[mDpy].numAppLayers;
+        hwc_display_contents_1_t* list) {
+    for(int index = 0 ; index < mCurrentFrame.layerCount; index++) {
 
-    if(isYuvPresent(ctx, mDpy)) {
-        int nYuvCount = ctx->listStats[mDpy].yuvCount;
+        if(mCurrentFrame.isFBComposed[index]) continue;
 
-        for(int index = 0; index < nYuvCount; index ++) {
-            int nYuvIndex = ctx->listStats[mDpy].yuvIndices[index];
-            hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
-            PipeLayerPair& info = mCurrentFrame.mdpToLayer[nYuvIndex];
-            info.pipeInfo = new MdpPipeInfoHighRes;
-            info.rot = NULL;
-            MdpPipeInfoHighRes& pipe_info = *(MdpPipeInfoHighRes*)info.pipeInfo;
-            if(!acquireMDPPipes(ctx, layer, pipe_info,MDPCOMP_OV_VG)) {
-                ALOGD_IF(isDebug(),"%s: Unable to get pipe for videos",
-                         __FUNCTION__);
-                //TODO: windback pipebook data on fail
-                return false;
-            }
-            pipe_info.zOrder = nYuvIndex;
-        }
-    }
-
-    for(int index = 0 ; index < layer_count ; index++ ) {
         hwc_layer_1_t* layer = &list->hwLayers[index];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-
-        if(isYuvBuffer(hnd))
-            continue;
-
         PipeLayerPair& info = mCurrentFrame.mdpToLayer[index];
         info.pipeInfo = new MdpPipeInfoHighRes;
         info.rot = NULL;
         MdpPipeInfoHighRes& pipe_info = *(MdpPipeInfoHighRes*)info.pipeInfo;
-
         ePipeType type = MDPCOMP_OV_ANY;
 
-        if(!qhwc::needsScaling(layer)
+        if(isYuvBuffer(hnd)) {
+            type = MDPCOMP_OV_VG;
+        } else if(!qhwc::needsScaling(layer)
             && Overlay::getDMAMode() != Overlay::DMA_BLOCK_MODE
-            && ctx->mMDP.version >= qdutils::MDSS_V5)
+            && ctx->mMDP.version >= qdutils::MDSS_V5) {
             type = MDPCOMP_OV_DMA;
+        }
 
         if(!acquireMDPPipes(ctx, layer, pipe_info, type)) {
-            ALOGD_IF(isDebug(), "%s: Unable to get pipe for UI", __FUNCTION__);
-            //TODO: windback pipebook data on fail
+            ALOGD_IF(isDebug(), "%s: Unable to get pipe for type = %d",
+                    __FUNCTION__, (int) type);
             return false;
         }
-        pipe_info.zOrder = index;
     }
     return true;
 }
