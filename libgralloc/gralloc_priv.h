@@ -159,6 +159,9 @@ struct private_handle_t : public native_handle {
             PRIV_FLAGS_CAMERA_READ        = 0x00040000,
             PRIV_FLAGS_HW_COMPOSER        = 0x00080000,
             PRIV_FLAGS_HW_TEXTURE         = 0x00100000,
+            PRIV_FLAGS_ITU_R_601          = 0x00200000,
+            PRIV_FLAGS_ITU_R_601_FR       = 0x00400000,
+            PRIV_FLAGS_ITU_R_709          = 0x00800000,
         };
 
         // file-descriptors
