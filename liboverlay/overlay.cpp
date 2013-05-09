@@ -252,16 +252,13 @@ int Overlay::initOverlay() {
             for (int j = 0; j < req.cnt; j++) {
                 ALOGD("ndx=%d num=%d z_order=%d", minfo->pndx, minfo->pnum,
                       minfo->z_order);
-                // except the RGB base layer with z_order of -1, clear any
-                // other pipes connected to mixer.
-                if((minfo->z_order) != -1) {
-                    int index = minfo->pndx;
-                    ALOGD("Unset overlay with index: %d at mixer %d", index, i);
-                    if(ioctl(fd, MSMFB_OVERLAY_UNSET, &index) == -1) {
-                        ALOGE("ERROR: MSMFB_OVERLAY_UNSET failed");
-                        close(fd);
-                        return -1;
-                    }
+                // clear any pipe connected to mixer including base pipe.
+                int index = minfo->pndx;
+                ALOGD("Unset overlay with index: %d at mixer %d", index, i);
+                if(ioctl(fd, MSMFB_OVERLAY_UNSET, &index) == -1) {
+                    ALOGE("ERROR: MSMFB_OVERLAY_UNSET failed");
+                    close(fd);
+                    return -1;
                 }
                 minfo++;
             }
