@@ -93,10 +93,14 @@ MDPVersion::MDPVersion()
         } else {
             mdp_version = MDP_V_UNKNOWN;
         }
-        int len = strlen("msmfbXX_");
-        if (mdp_version == MDP_V3_0_3)
-            len++;
-        panel_type = fb_finfo.id[len];
+
+        /* Assumes panel type is 2nd element in '_' delimited id string */
+        char * ptype = strstr(fb_finfo.id, "_");
+        if (!ptype || (*(++ptype) == '\0')) {
+            ALOGE("Invalid framebuffer info string: %s", fb_finfo.id);
+            ptype = fb_finfo.id;
+        }
+        panel_type = *ptype;
 
     }
     close(fb_fd);
