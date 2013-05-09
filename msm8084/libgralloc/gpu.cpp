@@ -103,6 +103,23 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
             }
         }
 
+        if (bufferType == BUFFER_TYPE_VIDEO) {
+            if (usage & GRALLOC_USAGE_HW_CAMERA_WRITE) {
+                if ((qdutils::MDPVersion::getInstance().getMDPVersion() <
+                     qdutils::MDSS_V5)) { //A-Family
+                    flags |= private_handle_t::PRIV_FLAGS_ITU_R_601_FR;
+                } else {
+                    if (usage & (GRALLOC_USAGE_HW_TEXTURE |
+                                 GRALLOC_USAGE_HW_VIDEO_ENCODER))
+                        flags |= private_handle_t::PRIV_FLAGS_ITU_R_709;
+                    else if (usage & GRALLOC_USAGE_HW_CAMERA_ZSL)
+                        flags |= private_handle_t::PRIV_FLAGS_ITU_R_601_FR;
+                }
+            } else {
+                flags |= private_handle_t::PRIV_FLAGS_ITU_R_601;
+            }
+        }
+
         if (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER ) {
             flags |= private_handle_t::PRIV_FLAGS_VIDEO_ENCODER;
         }
