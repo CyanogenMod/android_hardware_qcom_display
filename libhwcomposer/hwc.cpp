@@ -236,6 +236,7 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 
     ctx->mOverlay->configDone();
     ctx->mRotMgr->configDone();
+    MDPComp::resetIdleFallBack();
 
     return ret;
 }
