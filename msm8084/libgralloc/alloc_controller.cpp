@@ -105,6 +105,15 @@ int AdrenoMemInfo::getStride(int width, int format)
     int stride = ALIGN(width, 32);
     // Currently surface padding is only computed for RGB* surfaces.
     if (format < 0x7) {
+        // Don't add any additional padding if debug.gralloc.map_fb_memory
+        // is enabled
+        char property[PROPERTY_VALUE_MAX];
+        if((property_get("debug.gralloc.map_fb_memory", property, NULL) > 0) &&
+           (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+           (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+              return stride;
+        }
+
         int bpp = 4;
         switch(format)
         {
