@@ -100,6 +100,11 @@ struct LayerProp {
     LayerProp():mFlags(0) {};
 };
 
+struct VsyncState {
+    bool enable;
+    bool fakevsync;
+};
+
 // LayerProp::flag values
 enum {
     HWC_MDPCOMP = 0x00000001,
@@ -228,13 +233,6 @@ inline void swap(T& a, T& b) {
 
 }; //qhwc namespace
 
-struct vsync_state {
-    pthread_mutex_t lock;
-    pthread_cond_t  cond;
-    bool enable;
-    bool fakevsync;
-};
-
 // -----------------------------------------------------------------------------
 // HWC context
 // This structure contains overall state
@@ -255,6 +253,7 @@ struct hwc_context_t {
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
     qhwc::MDPInfo mMDP;
+    qhwc::VsyncState vstate;
     qhwc::DisplayAttributes dpyAttr[MAX_DISPLAYS];
     qhwc::ListStats listStats[MAX_DISPLAYS];
     qhwc::LayerProp *layerProp[MAX_DISPLAYS];
@@ -271,8 +270,6 @@ struct hwc_context_t {
     mutable Locker mBlankLock;
     //Lock to protect prepare & set when detaching external disp
     mutable Locker mExtLock;
-    //Vsync
-    struct vsync_state vstate;
     //Drawing round when we use GPU
     bool isPaddingRound;
 };
