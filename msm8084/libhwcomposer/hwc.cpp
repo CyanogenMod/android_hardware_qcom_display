@@ -233,23 +233,20 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    pthread_mutex_lock(&ctx->vstate.lock);
+    Locker::Autolock _l(ctx->mBlankLock);
     switch(event) {
         case HWC_EVENT_VSYNC:
             if (ctx->vstate.enable == enable)
                 break;
             ret = hwc_vsync_control(ctx, dpy, enable);
-            if(ret == 0) {
+            if(ret == 0)
                 ctx->vstate.enable = !!enable;
-                pthread_cond_signal(&ctx->vstate.cond);
-            }
             ALOGD_IF (VSYNC_DEBUG, "VSYNC state changed to %s",
                       (enable)?"ENABLED":"DISABLED");
             break;
         default:
             ret = -EINVAL;
     }
-    pthread_mutex_unlock(&ctx->vstate.lock);
     return ret;
 }
 
