@@ -189,8 +189,9 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_layer_list_t *list) {
           if (useCopybitForRGB) {
               list->hwLayers[i].compositionType = HWC_USE_COPYBIT;
               sCopyBitDraw = true;
+          }
 #ifdef QCOM_BSP
-          } else
+          else
               list->hwLayers[i].compositionType = HWC_USE_GPU;
 #endif
        }
