@@ -388,7 +388,7 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
         if (display_commit(ctx, dpy) < 0) {
             ALOGE("%s: display commit fail!", __FUNCTION__);
-            return -1;
+            ret = -1;
         }
     }
 
