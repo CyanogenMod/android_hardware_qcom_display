@@ -264,8 +264,7 @@ int gralloc_lock_ycbcr(gralloc_module_t const* module,
                 ycbcr->ystride = ystride;
                 ycbcr->cstride = ystride;
                 ycbcr->chroma_step = 2;
-                for (uint32_t i = 0; i < sizeof(ycbcr->reserved); i++)
-                    ycbcr->reserved[i] = 0;
+                memset(ycbcr->reserved, 0, sizeof(ycbcr->reserved));
                 break;
             default:
                 ALOGD("%s: Invalid format passed: 0x%x", __FUNCTION__,
