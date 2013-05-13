@@ -107,4 +107,9 @@ android::status_t QClient::screenRefresh() {
 #endif
     return result;
 }
+
+void QClient::setExtOrientation(uint32_t orientation) {
+    mHwcContext->mExtOrientation = orientation;
+}
+
 }

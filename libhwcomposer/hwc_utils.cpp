@@ -156,6 +156,7 @@ void initContext(hwc_context_t *ctx)
     ctx->vstate.enable = false;
     ctx->vstate.fakevsync = false;
     ctx->mExtDispConfiguring = false;
+    ctx->mExtOrientation = 0;
 
     //Right now hwc starts the service but anybody could do it, or it could be
     //independent process as well.
@@ -276,6 +277,31 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
     return;
 }
 
+/* Calculates the aspect ratio for external based on the primary */
+void getAspectRatioPosition(hwc_context_t *ctx, int dpy, int orientation,
+                        uint32_t& x, uint32_t& y, uint32_t& w, uint32_t& h) {
+    int fbWidth  = ctx->dpyAttr[dpy].xres;
+    int fbHeight = ctx->dpyAttr[dpy].yres;
+
+    switch(orientation) {
+        case HAL_TRANSFORM_ROT_90:
+        case HAL_TRANSFORM_ROT_270:
+            x = (fbWidth - (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres
+                        * fbHeight/ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres))/2;
+            y = 0;
+            w = (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres *
+                    fbHeight/ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres);
+            h = fbHeight;
+            break;
+        default:
+            //Do nothing
+            break;
+     }
+    ALOGD_IF(HWC_UTILS_DEBUG, "%s: Position: x = %d, y = %d w = %d h = %d",
+                    __FUNCTION__, x, y, w ,h);
+}
+
+
 bool needsScaling(hwc_layer_1_t const* layer) {
     int dst_w, dst_h, src_w, src_h;
 
@@ -373,6 +399,24 @@ void setListStats(hwc_context_t *ctx,
             if (atoi(property) != 0) {
                 property_set("hw.cabl.yuv", "0");
             }
+        }
+    }
+    if(dpy) {
+        //uncomment the below code for testing purpose.
+        /* char value[PROPERTY_VALUE_MAX];
+        property_get("sys.ext_orientation", value, "0");
+        // Assuming the orientation value is in terms of HAL_TRANSFORM,
+        // This needs mapping to HAL, if its in different convention
+        ctx->mExtOrientation = atoi(value); */
+        // Assuming the orientation value is in terms of HAL_TRANSFORM,
+        // This needs mapping to HAL, if its in different convention
+        if(ctx->mExtOrientation) {
+            ALOGD_IF(HWC_UTILS_DEBUG, "%s: ext orientation = %d",
+                     __FUNCTION__, ctx->mExtOrientation);
+            if(ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA)) {
+                ctx->isPaddingRound = true;
+            }
+            Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
         }
     }
 }
@@ -679,7 +723,7 @@ void setMdpFlags(hwc_layer_1_t *layer,
     }
 }
 
-static inline int configRotator(Rotator *rot, const Whf& whf,
+inline int configRotator(Rotator *rot, const Whf& whf,
         const hwc_rect_t& crop, const eMdpFlags& mdpFlags,
         const eTransform& orient, const int& downscale) {
     Dim rotCrop(crop.left, crop.top, (crop.right - crop.left),
@@ -693,7 +737,7 @@ static inline int configRotator(Rotator *rot, const Whf& whf,
     return 0;
 }
 
-static inline int configMdp(Overlay *ov, const PipeArgs& parg,
+inline int configMdp(Overlay *ov, const PipeArgs& parg,
         const eTransform& orient, const hwc_rect_t& crop,
         const hwc_rect_t& pos, const MetaData_t *metadata,
         const eDest& dest) {
@@ -719,7 +763,7 @@ static inline int configMdp(Overlay *ov, const PipeArgs& parg,
     return 0;
 }
 
-static inline void updateSource(eTransform& orient, Whf& whf,
+inline void updateSource(eTransform& orient, Whf& whf,
         hwc_rect_t& crop) {
     Dim srcCrop(crop.left, crop.top,
             crop.right - crop.left,
@@ -764,6 +808,21 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     int rotFlags = ovutils::ROT_FLAGS_NONE;
     Whf whf(hnd->width, hnd->height,
             getMdpFormat(hnd->format), hnd->size);
+
+    uint32_t x = dst.left, y  = dst.right;
+    uint32_t w = dst.right - dst.left;
+    uint32_t h = dst.bottom - dst.top;
+
+    if(dpy && ctx->mExtOrientation) {
+        // Just need to set the position to portrait as the transformation
+        // will already be set to required orientation on TV
+        getAspectRatioPosition(ctx, dpy, ctx->mExtOrientation, x, y, w, h);
+        // Convert position to hwc_rect_t
+        dst.left = x;
+        dst.top = y;
+        dst.right = w + dst.left;
+        dst.bottom = h + dst.top;
+    }
 
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
        ctx->mMDP.version < qdutils::MDSS_V5) {
