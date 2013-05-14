@@ -969,7 +969,7 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     Whf whf(hnd->width, hnd->height,
             getMdpFormat(hnd->format), hnd->size);
 
-    setMdpFlags(layer, mdpFlagsL);
+    setMdpFlags(layer, mdpFlagsL, 0);
     trimLayer(ctx, dpy, transform, crop, dst);
 
     if(isYuvBuffer(hnd) && (transform & HWC_TRANSFORM_ROT_90)) {
