@@ -99,12 +99,10 @@ void QClient::MPDeathNotifier::died() {
 
 android::status_t QClient::screenRefresh() {
     status_t result = NO_INIT;
-#ifdef QCOM_BSP
     if(mHwcContext->proc) {
         mHwcContext->proc->invalidate(mHwcContext->proc);
         result = NO_ERROR;
     }
-#endif
     return result;
 }
 }
