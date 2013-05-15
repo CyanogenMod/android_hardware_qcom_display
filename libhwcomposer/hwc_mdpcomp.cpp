@@ -520,7 +520,6 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
 
 /* Checks for conditions where YUV layers cannot be bypassed */
 bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
-
     if(isSkipLayer(layer)) {
         ALOGE("%s: Unable to bypass skipped YUV", __FUNCTION__);
         return false;

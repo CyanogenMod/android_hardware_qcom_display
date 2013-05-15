@@ -369,7 +369,8 @@ void setListStats(hwc_context_t *ctx,
             ctx->listStats[dpy].yuvIndices[yuvCount] = i;
             yuvCount++;
 
-            if(layer->transform & HWC_TRANSFORM_ROT_90) {
+            if((layer->transform & HWC_TRANSFORM_ROT_90) &&
+                    canUseRotator(ctx)) {
                 if(ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA)) {
                     ctx->isPaddingRound = true;
                 }
@@ -387,7 +388,7 @@ void setListStats(hwc_context_t *ctx,
 }
 
 
-static inline void calc_cut(float& leftCutRatio, float& topCutRatio,
+static void calc_cut(float& leftCutRatio, float& topCutRatio,
         float& rightCutRatio, float& bottomCutRatio, int orient) {
     if(orient & HAL_TRANSFORM_FLIP_H) {
         swap(leftCutRatio, rightCutRatio);
@@ -827,7 +828,6 @@ bool setupBasePipe(hwc_context_t *ctx) {
     return true;
 }
 
-
 int configMdp(Overlay *ov, const PipeArgs& parg,
         const eTransform& orient, const hwc_rect_t& crop,
         const hwc_rect_t& pos, const MetaData_t *metadata,
@@ -1060,6 +1060,14 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     }
 
     return 0;
+}
+
+bool canUseRotator(hwc_context_t *ctx) {
+    if(qdutils::MDPVersion::getInstance().is8x26() &&
+            ctx->mExtDisplay->isExternalConnected()) {
+        return false;
+    }
+    return true;
 }
 
 void LayerRotMap::add(hwc_layer_1_t* layer, Rotator *rot) {

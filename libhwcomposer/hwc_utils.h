@@ -210,6 +210,14 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
         const ovutils::eIsFg& isFg, const ovutils::eDest& lDest,
         const ovutils::eDest& rDest, overlay::Rotator **rot);
 
+//On certain targets DMA pipes are used for rotation and they won't be available
+//for line operations. On a per-target basis we can restrict certain use cases
+//from using rotator, since we know before-hand that such scenarios can lead to
+//extreme unavailability of pipes. This can also be done via hybrid calculations
+//also involving many more variables like number of write-back interfaces etc,
+//but the variety of scenarios is too high to warrant that.
+bool canUseRotator(hwc_context_t *ctx);
+
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
     return (UNLIKELY(l && (l->flags & HWC_SKIP_LAYER)));
