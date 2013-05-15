@@ -348,11 +348,7 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ALOGD_IF( isDebug(),"%s: External Display connection is pending",
                   __FUNCTION__);
         ret = false;
-    } else if(sIdleFallBack) {
-        ALOGD_IF(isDebug(), "%s: idle fallback",__FUNCTION__);
-        ret = false;
     }
-
     return ret;
 }
 
@@ -362,6 +358,11 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
                                 hwc_display_contents_1_t* list){
 
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+
+    if(sIdleFallBack) {
+        ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
+        return false;
+    }
 
     if(mDpy > HWC_DISPLAY_PRIMARY){
         ALOGD_IF(isDebug(), "%s: Cannot support External display(s)",
@@ -873,7 +874,7 @@ bool MDPCompLowRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     }
 
     /* reset Invalidator */
-    if(idleInvalidator && mCurrentFrame.mdpCount)
+    if(idleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount)
         idleInvalidator->markForSleep();
 
     overlay::Overlay& ov = *ctx->mOverlay;
@@ -1063,7 +1064,7 @@ bool MDPCompHighRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     }
 
     /* reset Invalidator */
-    if(idleInvalidator && mCurrentFrame.mdpCount)
+    if(idleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount)
         idleInvalidator->markForSleep();
 
     overlay::Overlay& ov = *ctx->mOverlay;
