@@ -96,7 +96,7 @@ void MdssRot::setCrop(const utils::Dim& crop) {
 void MdssRot::setDownscale(int ds) {}
 
 void MdssRot::setFlags(const utils::eMdpFlags& flags) {
-    mRotInfo.flags |= flags;
+    mRotInfo.flags = flags;
 }
 
 void MdssRot::setTransform(const utils::eTransform& rot)
@@ -111,6 +111,7 @@ void MdssRot::setTransform(const utils::eTransform& rot)
 }
 
 void MdssRot::doTransform() {
+    mRotInfo.flags |= mOrientation;
     if(mOrientation & utils::OVERLAY_TRANSFORM_ROT_90)
         utils::swap(mRotInfo.dst_rect.w, mRotInfo.dst_rect.h);
 }
