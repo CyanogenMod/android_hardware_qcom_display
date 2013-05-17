@@ -248,6 +248,18 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
     if(ctx->mExtDisplay->isCEUnderscanSupported())
         return;
 
+    char value[PROPERTY_VALUE_MAX];
+    // Read action safe properties
+    property_get("persist.sys.actionsafe.width", value, "0");
+    int asWidthRatio = atoi(value);
+    property_get("persist.sys.actionsafe.height", value, "0");
+    int asHeightRatio = atoi(value);
+
+    if(!asWidthRatio && !asHeightRatio) {
+        //No action safe ratio set, return
+        return;
+    }
+
     float wRatio = 1.0;
     float hRatio = 1.0;
     float xRatio = 1.0;
@@ -256,17 +268,15 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
     float fbWidth = ctx->dpyAttr[dpy].xres;
     float fbHeight = ctx->dpyAttr[dpy].yres;
 
+    // Since external is rotated 90, need to swap width/height
+    if(ctx->mExtOrientation & HWC_TRANSFORM_ROT_90)
+        swap(fbWidth, fbHeight);
+
     float asX = 0;
     float asY = 0;
     float asW = fbWidth;
     float asH= fbHeight;
-    char value[PROPERTY_VALUE_MAX];
 
-    // Apply action safe parameters
-    property_get("persist.sys.actionsafe.width", value, "0");
-    int asWidthRatio = atoi(value);
-    property_get("persist.sys.actionsafe.height", value, "0");
-    int asHeightRatio = atoi(value);
     // based on the action safe ratio, get the Action safe rectangle
     asW = fbWidth * (1.0f -  asWidthRatio / 100.0f);
     asH = fbHeight * (1.0f -  asHeightRatio / 100.0f);
@@ -880,14 +890,16 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         }
     }
 
-    uint32_t x = dst.left, y  = dst.right;
+    uint32_t x = dst.left, y  = dst.top;
     uint32_t w = dst.right - dst.left;
     uint32_t h = dst.bottom - dst.top;
 
-    if(dpy && ctx->mExtOrientation) {
+    if(dpy) {
         // Just need to set the position to portrait as the transformation
         // will already be set to required orientation on TV
         getAspectRatioPosition(ctx, dpy, ctx->mExtOrientation, x, y, w, h);
+        // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
+        getActionSafePosition(ctx, dpy, x, y, w, h);
         // Convert position to hwc_rect_t
         dst.left = x;
         dst.top = y;

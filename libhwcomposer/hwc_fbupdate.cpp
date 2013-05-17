@@ -126,13 +126,13 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
                           displayFrame.top,
                           displayFrame.right - displayFrame.left,
                           displayFrame.bottom - displayFrame.top);
-        // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
-        if(mDpy && !ctx->mExtOrientation)
-            getActionSafePosition(ctx, mDpy, dpos.x, dpos.y, dpos.w, dpos.h);
 
         if(mDpy) {
+            // Get Aspect Ratio for external
             getAspectRatioPosition(ctx, mDpy, ctx->mExtOrientation, dpos.x,
                                     dpos.y, dpos.w, dpos.h);
+            // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
+            getActionSafePosition(ctx, mDpy, dpos.x, dpos.y, dpos.w, dpos.h);
             // Convert dim to hwc_rect_t
             displayFrame.left = dpos.x;
             displayFrame.top = dpos.y;
