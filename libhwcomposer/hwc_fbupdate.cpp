@@ -139,7 +139,7 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             displayFrame.right = dpos.w + displayFrame.left;
             displayFrame.bottom = dpos.h + displayFrame.top;
         }
-        setMdpFlags(layer, mdpFlags, 0);
+        setMdpFlags(layer, mdpFlags, 0, transform);
         // For External use rotator if there is a rotation value set
         if(mDpy && (ctx->mExtOrientation & HWC_TRANSFORM_ROT_90)) {
             mRot = ctx->mRotMgr->getNext();
