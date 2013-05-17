@@ -60,7 +60,6 @@ static void *vsync_loop(void *param)
                 android::PRIORITY_MORE_FAVORABLE);
 
     const int MAX_DATA = 64;
-    const int MAX_RETRY_COUNT = 100;
     static char vdata[MAX_DATA];
 
     uint64_t cur_timestamp=0;
@@ -86,6 +85,8 @@ static void *vsync_loop(void *param)
        */
     fd_timestamp = open(vsync_timestamp_fb0, O_RDONLY);
     if (fd_timestamp < 0) {
+        // Make sure fb device is opened before starting this thread so this
+        // never happens.
         ALOGE ("FATAL:%s:not able to open file:%s, %s",  __FUNCTION__,
                (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
                strerror(errno));
@@ -93,46 +94,27 @@ static void *vsync_loop(void *param)
     }
 
     do {
-        pthread_mutex_lock(&ctx->vstate.lock);
-        while (ctx->vstate.enable == false) {
-            pthread_cond_wait(&ctx->vstate.cond, &ctx->vstate.lock);
-        }
-        pthread_mutex_unlock(&ctx->vstate.lock);
-
-        if (!ctx->vstate.fakevsync) {
-            for(int i = 0; i < MAX_RETRY_COUNT; i++) {
-                len = pread(fd_timestamp, vdata, MAX_DATA, 0);
-                if(len < 0 && (errno == EAGAIN ||
-                               errno == EINTR  ||
-                               errno == EBUSY)) {
-                    ALOGW("%s: vsync read: %s, retry (%d/%d).",
-                          __FUNCTION__, strerror(errno), i, MAX_RETRY_COUNT);
-                    continue;
-                } else {
-                    break;
-                }
-            }
-
+        if (LIKELY(!ctx->vstate.fakevsync)) {
+            len = pread(fd_timestamp, vdata, MAX_DATA, 0);
             if (len < 0) {
-                ALOGE ("FATAL:%s:not able to read file:%s, %s", __FUNCTION__,
-                       vsync_timestamp_fb0, strerror(errno));
-                close (fd_timestamp);
-                ctx->vstate.fakevsync = true;
+                // If the read was just interrupted - it is not a fatal error
+                // In either case, just continue.
+                if (errno != EAGAIN &&
+                    errno != EINTR  &&
+                    errno != EBUSY) {
+                    ALOGE ("FATAL:%s:not able to read file:%s, %s",
+                           __FUNCTION__,
+                           vsync_timestamp_fb0, strerror(errno));
+                }
+                continue;
             }
-
             // extract timestamp
             const char *str = vdata;
             if (!strncmp(str, "VSYNC=", strlen("VSYNC="))) {
                 cur_timestamp = strtoull(str + strlen("VSYNC="), NULL, 0);
-            } else {
-                ALOGE ("FATAL: %s: vsync timestamp not in correct format: [%s]",
-                       __FUNCTION__,
-                       str);
-                ctx->vstate.fakevsync = true;
             }
-
         } else {
-            usleep(16000);
+            usleep(16666);
             cur_timestamp = systemTime();
         }
         // send timestamp to HAL
