@@ -245,6 +245,18 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
     if(ctx->mExtDisplay->isCEUnderscanSupported())
         return;
 
+    char value[PROPERTY_VALUE_MAX];
+    // Read action safe properties
+    property_get("persist.sys.actionsafe.width", value, "0");
+    int asWidthRatio = atoi(value);
+    property_get("persist.sys.actionsafe.height", value, "0");
+    int asHeightRatio = atoi(value);
+
+    if(!asWidthRatio && !asHeightRatio) {
+        //No action safe ratio set, return
+        return;
+    }
+
     float wRatio = 1.0;
     float hRatio = 1.0;
     float xRatio = 1.0;
@@ -257,13 +269,7 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
     float asY = 0;
     float asW = fbWidth;
     float asH= fbHeight;
-    char value[PROPERTY_VALUE_MAX];
 
-    // Apply action safe parameters
-    property_get("hw.actionsafe.width", value, "0");
-    int asWidthRatio = atoi(value);
-    property_get("hw.actionsafe.height", value, "0");
-    int asHeightRatio = atoi(value);
     // based on the action safe ratio, get the Action safe rectangle
     asW = fbWidth * (1.0f -  asWidthRatio / 100.0f);
     asH = fbHeight * (1.0f -  asHeightRatio / 100.0f);
@@ -910,6 +916,20 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     int rotFlags = ovutils::ROT_FLAGS_NONE;
     Whf whf(hnd->width, hnd->height,
             getMdpFormat(hnd->format), hnd->size);
+
+    uint32_t x = dst.left, y  = dst.top;
+    uint32_t w = dst.right - dst.left;
+    uint32_t h = dst.bottom - dst.top;
+
+    if(dpy) {
+        // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
+        getActionSafePosition(ctx, dpy, x, y, w, h);
+        // Convert position to hwc_rect_t
+        dst.left = x;
+        dst.top = y;
+        dst.right = w + dst.left;
+        dst.bottom = h + dst.top;
+    }
 
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
        ctx->mMDP.version < qdutils::MDSS_V5) {
