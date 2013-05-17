@@ -853,6 +853,20 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     Whf whf(hnd->width, hnd->height,
             getMdpFormat(hnd->format), hnd->size);
 
+    uint32_t x = dst.left, y  = dst.top;
+    uint32_t w = dst.right - dst.left;
+    uint32_t h = dst.bottom - dst.top;
+
+    //check for actionsafe for video on external
+    if(dpy && isYuvBuffer(hnd)) {
+        getActionSafePosition(ctx, dpy, x, y, w, h);
+        // Convert dim to hwc_rect_t
+        dst.left = x;
+        dst.top = y;
+        dst.right = w + x;
+        dst.bottom = h + y;
+    }
+
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
        ctx->mMDP.version < qdutils::MDSS_V5) {
         downscale =  getDownscaleFactor(
