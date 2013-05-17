@@ -90,6 +90,8 @@ public:
      * to populate.
      */
     void getDump(char *buf, size_t len);
+    /* Reset usage and allocation bits on all pipes for given display */
+    void clear(int dpy);
     static void setDMAMode(const int& mode);
     static int getDMAMode();
 

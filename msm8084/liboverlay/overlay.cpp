@@ -311,6 +311,16 @@ void Overlay::getDump(char *buf, size_t len) {
     strncat(buf, str_pipes, strlen(str_pipes));
 }
 
+void Overlay::clear(int dpy) {
+    for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
+        if (mPipeBook[i].mDisplay == dpy) {
+            // Mark as available for this round
+            PipeBook::resetUse(i);
+            PipeBook::resetAllocation(i);
+        }
+    }
+}
+
 void Overlay::PipeBook::init() {
     mPipe = NULL;
     mDisplay = DPY_UNUSED;
