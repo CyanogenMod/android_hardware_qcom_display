@@ -130,5 +130,10 @@ bool MDPVersion::supportsBWC() {
     // BWC - Bandwidth Compression
     return (mFeatures & MDP_BWC_EN);
 }
+
+bool MDPVersion::is8x26() {
+    return mMdpRev == MDSS_MDP_HW_REV_101;
+}
+
 }; //namespace qdutils
 

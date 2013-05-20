@@ -515,9 +515,10 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
 
 /* Checks for conditions where YUV layers cannot be bypassed */
 bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
+    bool extAnimBlockFeature = mDpy && ctx->listStats[mDpy].isDisplayAnimating;
 
-    if(isSkipLayer(layer) && mDpy == HWC_DISPLAY_PRIMARY) {
-        ALOGE("%s: Unable to bypass skipped YUV", __FUNCTION__);
+    if(isSkipLayer(layer) && !extAnimBlockFeature) {
+        ALOGD_IF(isDebug(), "%s: Video marked SKIP dpy %d", __FUNCTION__, mDpy);
         return false;
     }
 

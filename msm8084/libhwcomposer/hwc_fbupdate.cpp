@@ -162,7 +162,7 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         ret = true;
         if(configMdp(ctx->mOverlay, parg, orient, sourceCrop, displayFrame,
                     NULL, mDest) < 0) {
-            ALOGE("%s: ConfigMdp failed for low res", __FUNCTION__);
+            ALOGE("%s: configMdp failed for dpy %d", __FUNCTION__, mDpy);
             ret = false;
         }
     }
