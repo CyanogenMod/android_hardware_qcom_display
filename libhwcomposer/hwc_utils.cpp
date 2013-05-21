@@ -1063,6 +1063,8 @@ bool canUseRotator(hwc_context_t *ctx) {
             ctx->mExtDisplay->isExternalConnected()) {
         return false;
     }
+    if(ctx->mMDP.version == qdutils::MDP_V3_0_4)
+        return false;
     return true;
 }
 
