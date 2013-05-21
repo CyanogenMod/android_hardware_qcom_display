@@ -21,6 +21,7 @@
 #define DEBUG_COPYBIT 0
 #include <copybit.h>
 #include <utils/Timers.h>
+#include <mdp_version.h>
 #include "hwc_copybit.h"
 #include "comptype.h"
 #include "gr.h"
@@ -249,11 +250,13 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         mRelFd[0] = -1;
     }
 
-    //Clear the visible region on the render buffer
-    //XXX: Do this only when needed.
-    hwc_rect_t clearRegion;
-    getNonWormholeRegion(list, clearRegion);
-    clear(renderBuffer, clearRegion);
+    if (ctx->mMDP.version >= qdutils::MDP_V4_0) {
+        //Clear the visible region on the render buffer
+        //XXX: Do this only when needed.
+        hwc_rect_t clearRegion;
+        getNonWormholeRegion(list, clearRegion);
+        clear(renderBuffer, clearRegion);
+    }
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
     for (int i = 0; i <= (ctx->listStats[dpy].numAppLayers-1); i++) {
         hwc_layer_1_t *layer = &list->hwLayers[i];

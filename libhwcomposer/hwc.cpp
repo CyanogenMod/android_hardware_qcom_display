@@ -144,13 +144,10 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
             if(fbZOrder >= 0)
                 ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZOrder);
 
-            /* Temporarily commenting out C2D until we support partial
-               copybit composition for mixed mode MDP
-
-            // Use Copybit, when MDP comp fails
-            if((fbZOrder >= 0) && ctx->mCopyBit[dpy])
-                ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
-            */
+            if (ctx->mMDP.version < qdutils::MDP_V4_0) {
+                if((fbZOrder >= 0) && ctx->mCopyBit[dpy])
+                    ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
+            }
         }
     }
     return 0;
