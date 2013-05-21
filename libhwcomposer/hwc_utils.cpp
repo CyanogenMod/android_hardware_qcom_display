@@ -760,10 +760,12 @@ int configRotator(Rotator *rot, const Whf& whf,
         qdutils::MDSS_V5) {
         uint32_t crop_w = (crop.right - crop.left);
         uint32_t crop_h = (crop.bottom - crop.top);
-        ovutils::normalizeCrop((uint32_t&)crop.left, crop_w);
-        ovutils::normalizeCrop((uint32_t&)crop.top, crop_h);
-        crop.right = crop.left + crop_w;
-        crop.bottom = crop.top + crop_h;
+        if (ovutils::isYuv(whf.format)) {
+            ovutils::normalizeCrop((uint32_t&)crop.left, crop_w);
+            ovutils::normalizeCrop((uint32_t&)crop.top, crop_h);
+            crop.right = crop.left + crop_w;
+            crop.bottom = crop.top + crop_h;
+        }
         Dim rotCrop(crop.left, crop.top, crop_w, crop_h);
         rot->setCrop(rotCrop);
     }
