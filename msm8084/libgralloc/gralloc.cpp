@@ -80,7 +80,6 @@ base: {
     lock: gralloc_lock,
     unlock: gralloc_unlock,
     perform: gralloc_perform,
-    reserved_proc: {0},
       },
 framebuffer: 0,
 fbFormat: 0,
