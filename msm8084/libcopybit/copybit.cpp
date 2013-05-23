@@ -46,6 +46,11 @@
 #define MAX_DIMENSION       (4096)
 
 /******************************************************************************/
+struct blitReq{
+    struct  mdp_buf_sync sync;
+    uint32_t count;
+    struct mdp_blit_req req[10];
+};
 
 /** State information for each device instance */
 struct copybit_context_t {
@@ -54,6 +59,10 @@ struct copybit_context_t {
     uint8_t mAlpha;
     int     mFlags;
     bool    mBlitToFB;
+    int     acqFence[MDP_MAX_FENCE_FD];
+    int     relFence;
+    struct  mdp_buf_sync sync;
+    struct  blitReq list;
 };
 
 /**
@@ -219,15 +228,15 @@ static void set_infos(struct copybit_context_t *dev,
 /** copy the bits */
 static int msm_copybit(struct copybit_context_t *dev, void const *list)
 {
-    int err = ioctl(dev->mFD, MSMFB_BLIT,
-                    (struct mdp_blit_req_list const*)list);
+    int err = ioctl(dev->mFD, MSMFB_ASYNC_BLIT,
+                    (struct mdp_async_blit_req_list const*)list);
     ALOGE_IF(err<0, "copyBits failed (%s)", strerror(errno));
     if (err == 0) {
         return 0;
     } else {
 #if DEBUG_MDP_ERRORS
-        struct mdp_blit_req_list const* l =
-            (struct mdp_blit_req_list const*)list;
+        struct mdp_async_blit_req_list const* l =
+            (struct mdp_async_blit_req_list const*)list;
         for (unsigned int i=0 ; i<l->count ; i++) {
             ALOGE("%d: src={w=%d, h=%d, f=%d, rect={%d,%d,%d,%d}}\n"
                   "    dst={w=%d, h=%d, f=%d, rect={%d,%d,%d,%d}}\n"
@@ -369,6 +378,33 @@ static int get(struct copybit_device_t *dev, int name)
     return value;
 }
 
+static int set_sync_copybit(struct copybit_device_t *dev,
+    int acquireFenceFd)
+{
+    struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
+    if (acquireFenceFd != -1) {
+        if (ctx->sync.acq_fen_fd_cnt < (MDP_MAX_FENCE_FD - 1)) {
+            ctx->acqFence[ctx->sync.acq_fen_fd_cnt++] = acquireFenceFd;
+        } else {
+            int ret = -EINVAL;
+            struct blitReq *list = &ctx->list;
+
+            // Since fence is full kick off what is already in the list
+            ret = msm_copybit(ctx, list);
+            if (ret < 0) {
+                ALOGE("%s: Blit call failed", __FUNCTION__);
+                return -EINVAL;
+            }
+            list->count = 0;
+            ctx->sync.acq_fen_fd_cnt = 0;
+            ctx->acqFence[ctx->sync.acq_fen_fd_cnt++] = ctx->relFence;
+            ctx->acqFence[ctx->sync.acq_fen_fd_cnt++] = acquireFenceFd;
+            ctx->relFence = -1;
+        }
+    }
+    return 0;
+}
+
 /** do a stretch blit type operation */
 static int stretch_copybit(
     struct copybit_device_t *dev,
@@ -379,15 +415,13 @@ static int stretch_copybit(
     struct copybit_region_t const *region)
 {
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
+    struct blitReq *list;
     int status = 0;
     private_handle_t *yv12_handle = NULL;
-    if (ctx) {
-        struct {
-            uint32_t count;
-            struct mdp_blit_req req[12];
-        } list;
 
-        memset(&list, 0, sizeof(list));
+    if (ctx) {
+        list = &ctx->list;
+
         if (ctx->mAlpha < 255) {
             switch (src->format) {
                 // we don't support plane alpha with RGBA formats
@@ -445,14 +479,13 @@ static int stretch_copybit(
                 return -EINVAL;
             }
         }
-        const uint32_t maxCount = sizeof(list.req)/sizeof(list.req[0]);
+        const uint32_t maxCount = sizeof(list->req)/sizeof(list->req[0]);
         const struct copybit_rect_t bounds = { 0, 0, dst->w, dst->h };
         struct copybit_rect_t clip;
-        list.count = 0;
         status = 0;
         while ((status == 0) && region->next(region, &clip)) {
             intersect(&clip, &bounds, &clip);
-            mdp_blit_req* req = &list.req[list.count];
+            mdp_blit_req* req = &list->req[list->count];
             int flags = 0;
 
             private_handle_t* src_hnd = (private_handle_t*)src->handle;
@@ -471,13 +504,16 @@ static int stretch_copybit(
             if (req->dst_rect.w<=0 || req->dst_rect.h<=0)
                 continue;
 
-            if (++list.count == maxCount) {
-                status = msm_copybit(ctx, &list);
-                list.count = 0;
+            if (++list->count == maxCount) {
+                status = msm_copybit(ctx, list);
+                if (ctx->relFence != -1) {
+                    ctx->sync.acq_fen_fd_cnt = 1;
+                    ctx->sync.acq_fen_fd[0] = ctx->relFence;
+                } else {
+                    ctx->sync.acq_fen_fd_cnt = 0;
+                }
+                list->count = 0;
             }
-        }
-        if ((status == 0) && list.count) {
-            status = msm_copybit(ctx, &list);
         }
     } else {
         ALOGE ("%s : Invalid COPYBIT context", __FUNCTION__);
@@ -521,7 +557,20 @@ static int close_copybit(struct hw_device_t *dev)
 
 static int flush_get_fence(struct copybit_device_t *dev, int* fd)
 {
-    return -1;
+    struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
+    struct blitReq *list = &ctx->list;
+    int ret = -EINVAL;
+
+    if (list->count) {
+        ret = msm_copybit(ctx, list);
+        if (ret < 0)
+            ALOGE("%s: Blit call failed", __FUNCTION__);
+        list->count = 0;
+        ctx->sync.acq_fen_fd_cnt = 0;
+    }
+    *fd = ctx->relFence;
+    ctx->relFence = -1;
+    return ret;
 }
 
 /** Open a new instance of a copybit device using name */
@@ -540,11 +589,19 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->device.set_parameter = set_parameter_copybit;
     ctx->device.get = get;
     ctx->device.blit = blit_copybit;
+    ctx->device.set_sync = set_sync_copybit;
     ctx->device.stretch = stretch_copybit;
     ctx->device.finish = finish_copybit;
     ctx->device.flush_get_fence = flush_get_fence;
     ctx->mAlpha = MDP_ALPHA_NOP;
     ctx->mFlags = 0;
+    ctx->sync.flags = 0;
+    ctx->sync.acq_fen_fd_cnt = 0;
+    ctx->sync.acq_fen_fd = ctx->acqFence;
+    ctx->sync.rel_fen_fd = &ctx->relFence;
+    ctx->list.count = 0;
+    ctx->list.sync.rel_fen_fd = ctx->sync.rel_fen_fd;
+    ctx->list.sync.acq_fen_fd = ctx->sync.acq_fen_fd;
     ctx->mFD = open("/dev/graphics/fb0", O_RDWR, 0);
     if (ctx->mFD < 0) {
         status = errno;

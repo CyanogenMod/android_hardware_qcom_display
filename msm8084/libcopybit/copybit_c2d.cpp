@@ -1388,6 +1388,11 @@ static int stretch_copybit_internal(
     return status;
 }
 
+static int set_sync_copybit(struct copybit_device_t *dev,
+    int acquireFenceFd)
+{
+    return 0;
+}
 
 static int stretch_copybit(
     struct copybit_device_t *dev,
@@ -1552,6 +1557,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->device.set_parameter = set_parameter_copybit;
     ctx->device.get = get;
     ctx->device.blit = blit_copybit;
+    ctx->device.set_sync = set_sync_copybit;
     ctx->device.stretch = stretch_copybit;
     ctx->device.finish = finish_copybit;
     ctx->device.flush_get_fence = flush_get_fence_copybit;
