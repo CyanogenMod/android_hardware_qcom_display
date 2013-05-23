@@ -236,5 +236,8 @@ bool GenericPipe::setClosed() {
     return true;
 }
 
+void GenericPipe::forceSet() {
+    mCtrlData.ctrl.forceSet();
+}
 
 } //namespace overlay
