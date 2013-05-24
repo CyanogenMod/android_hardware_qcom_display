@@ -763,6 +763,9 @@ int configRotator(Rotator *rot, const Whf& whf,
         if (ovutils::isYuv(whf.format)) {
             ovutils::normalizeCrop((uint32_t&)crop.left, crop_w);
             ovutils::normalizeCrop((uint32_t&)crop.top, crop_h);
+            // For interlaced, crop.h should be 4-aligned
+            if ((mdpFlags & ovutils::OV_MDP_DEINTERLACE) && (crop_h % 4))
+                crop_h = ovutils::aligndown(crop_h, 4);
             crop.right = crop.left + crop_w;
             crop.bottom = crop.top + crop_h;
         }

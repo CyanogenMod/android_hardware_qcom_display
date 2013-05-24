@@ -180,6 +180,11 @@ bool MdpCtrl::set() {
         if(mdpVersion < MDSS_V5) {
             utils::even_floor(mOVInfo.dst_rect.w);
             utils::even_floor(mOVInfo.dst_rect.h);
+        } else if (mOVInfo.flags & MDP_DEINTERLACE) {
+            // For interlaced, crop.h should be 4-aligned
+            if (!(mOVInfo.flags & MDP_SOURCE_ROTATED_90) &&
+                (mOVInfo.src_rect.h % 4))
+                mOVInfo.src_rect.h = utils::aligndown(mOVInfo.src_rect.h, 4);
         }
     }
 
