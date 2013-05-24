@@ -166,6 +166,7 @@ protected:
 
     int mDpy;
     static bool sEnabled;
+    static bool sEnableMixedMode;
     static bool sDebugLogs;
     static bool sIdleFallBack;
     static int sMaxPipesPerMixer;
