@@ -9,19 +9,10 @@ common_includes += $(call project-path-for,qcom-display)/$(TARGET_BOARD_PLATFORM
 common_includes += $(call project-path-for,qcom-display)/$(TARGET_BOARD_PLATFORM)/libvirtual
 common_includes += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 
-ifeq ($(TARGET_USES_POST_PROCESSING),true)
-    common_flags     += -DUSES_POST_PROCESSING
-    common_includes += $(TARGET_OUT_HEADERS)/pp/inc
-endif
-
 common_header_export_path := qcom/display
 
 #Common libraries external to display HAL
 common_libs := liblog libutils libcutils libhardware
-
-ifeq ($(TARGET_USES_POST_PROCESSING),true)
-    common_libs += libmm-abl
-endif
 
 #Common C flags
 common_flags := -DDEBUG_CALC_FPS -Wno-missing-field-initializers
