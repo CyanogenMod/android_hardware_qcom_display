@@ -250,6 +250,22 @@ int getDownscaleFactor(const int& src_w, const int& src_h,
     return dscale_factor;
 }
 
+void getDecimationFactor(const int& src_w, const int& src_h,
+        const int& dst_w, const int& dst_h, float& horDscale,
+        float& verDscale) {
+    horDscale = ceilf((float)src_w / (float)dst_w);
+    verDscale = ceilf((float)src_h / (float)dst_h);
+
+    //Next power of 2, if not already
+    horDscale = powf(2.0f, ceilf(log2f(horDscale)));
+    verDscale = powf(2.0f, ceilf(log2f(verDscale)));
+
+    //Since MDP can do 1/4 dscale and has better quality, split the task
+    //between decimator and MDP downscale
+    horDscale /= 4.0f;
+    verDscale /= 4.0f;
+}
+
 static inline int compute(const uint32_t& x, const uint32_t& y,
         const uint32_t& z) {
     return x - ( y + z );
