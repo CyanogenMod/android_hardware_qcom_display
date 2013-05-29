@@ -393,6 +393,9 @@ int getMdpFormat(int format);
 int getHALFormat(int mdpFormat);
 int getDownscaleFactor(const int& src_w, const int& src_h,
         const int& dst_w, const int& dst_h);
+void getDecimationFactor(const int& src_w, const int& src_h,
+        const int& dst_w, const int& dst_h, float& horDscale,
+        float& verDscale);
 
 /* flip is upside down and such. V, H flip
  * rotation is 90, 180 etc
