@@ -252,6 +252,7 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
             ALOGD_IF (VSYNC_DEBUG, "VSYNC state changed to %s",
                       (enable)?"ENABLED":"DISABLED");
             break;
+#ifdef QCOM_BSP
         case  HWC_EVENT_ORIENTATION:
             if(dpy == HWC_DISPLAY_PRIMARY) {
                 // store the primary display orientation
@@ -260,6 +261,7 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
                 ctx->deviceOrientation = enable;
             }
             break;
+#endif
         default:
             ret = -EINVAL;
     }
