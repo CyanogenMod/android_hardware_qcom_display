@@ -402,9 +402,11 @@ void setListStats(hwc_context_t *ctx,
         if(UNLIKELY(isExtOnly(hnd))){
             ctx->listStats[dpy].extOnlyLayerIndex = i;
         }
+#ifdef QCOM_BSP
         if (layer->flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
             ctx->listStats[dpy].isDisplayAnimating = true;
         }
+#endif
     }
     if(ctx->listStats[dpy].yuvCount > 0) {
         if (property_get("hw.cabl.yuv", property, NULL) > 0) {
