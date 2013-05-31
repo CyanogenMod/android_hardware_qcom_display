@@ -872,6 +872,7 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
             crop = ctx->mPrevCropVideo;
             dst = ctx->mPrevDestVideo;
             transform = ctx->mPrevTransformVideo;
+            orient = static_cast<eTransform>(transform);
             //In you tube use case when a device rotated from landscape to
             // portrait, set the isFg flag and zOrder to avoid displaying UI on
             // hdmi during animation
@@ -973,6 +974,7 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
             crop = ctx->mPrevCropVideo;
             dst = ctx->mPrevDestVideo;
             transform = ctx->mPrevTransformVideo;
+            orient = static_cast<eTransform>(transform);
             //In you tube use case when a device rotated from landscape to
             // portrait, set the isFg flag and zOrder to avoid displaying UI on
             // hdmi during animation
