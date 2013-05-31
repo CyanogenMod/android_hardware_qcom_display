@@ -829,7 +829,7 @@ bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
 
         if(isYuvBuffer(hnd)) {
             type = MDPCOMP_OV_VG;
-        } else if(!qhwc::needsScaling(layer)
+        } else if(!qhwc::needsScaling(ctx, layer, mDpy)
             && Overlay::getDMAMode() != Overlay::DMA_BLOCK_MODE
             && ctx->mMDP.version >= qdutils::MDSS_V5) {
             type = MDPCOMP_OV_DMA;
@@ -979,7 +979,7 @@ bool MDPCompHighRes::allocLayerPipes(hwc_context_t *ctx,
 
         if(isYuvBuffer(hnd)) {
             type = MDPCOMP_OV_VG;
-        } else if(!qhwc::needsScaling(layer)
+        } else if(!qhwc::needsScaling(ctx, layer, mDpy)
             && Overlay::getDMAMode() != Overlay::DMA_BLOCK_MODE
             && ctx->mMDP.version >= qdutils::MDSS_V5) {
             type = MDPCOMP_OV_DMA;
