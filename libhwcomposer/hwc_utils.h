@@ -109,6 +109,12 @@ struct VsyncState {
     bool fakevsync;
 };
 
+struct BwcPM {
+    static void setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
+            const hwc_rect_t& dst, const int& transform,
+            ovutils::eMdpFlags& mdpFlags);
+};
+
 // LayerProp::flag values
 enum {
     HWC_MDPCOMP = 0x00000001,
