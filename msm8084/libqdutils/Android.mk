@@ -10,7 +10,7 @@ LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdutils\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := profiler.cpp mdp_version.cpp \
                                  idle_invalidator.cpp \
-                                 comptype.cpp
+                                 comptype.cpp qd_utils.cpp
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
