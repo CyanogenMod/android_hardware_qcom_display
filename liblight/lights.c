@@ -33,6 +33,8 @@
 
 /******************************************************************************/
 
+#define MAX_PATH_SIZE 80
+
 static pthread_once_t g_init = PTHREAD_ONCE_INIT;
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct light_state_t g_notification;
@@ -48,20 +50,23 @@ char const*const GREEN_LED_FILE
 char const*const BLUE_LED_FILE
         = "/sys/class/leds/blue/brightness";
 
+char const*const WHITE_LED_FILE
+        = "/sys/class/leds/white/brightness";
+
 char const*const LCD_FILE
         = "/sys/class/leds/lcd-backlight/brightness";
 
-char const*const RED_FREQ_FILE
-        = "/sys/class/leds/red/device/grpfreq";
+char const*const LED_FREQ_FILE
+        = "/sys/class/leds/%s/device/grpfreq";
 
-char const*const RED_PWM_FILE
-        = "/sys/class/leds/red/device/grppwm";
+char const*const LED_PWM_FILE
+        = "/sys/class/leds/%s/device/grppwm";
 
-char const*const RED_BLINK_FILE
-        = "/sys/class/leds/red/device/blink";
+char const*const LED_BLINK_FILE
+        = "/sys/class/leds/%s/device/blink";
 
 char const*const LED_LOCK_UPDATE_FILE
-        = "/sys/class/leds/red/device/lock";
+        = "/sys/class/leds/%s/device/lock";
 
 /**
  * device methods
@@ -96,6 +101,18 @@ write_int(char const* path, int value)
 }
 
 static int
+is_avail(char const* path)
+{
+    int fd = open(path, O_RDWR);
+    if (fd >= 0) {
+        close(fd);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+static int
 is_lit(struct light_state_t const* state)
 {
     return state->color & 0x00ffffff;
@@ -126,7 +143,7 @@ set_speaker_light_locked(struct light_device_t* dev,
         struct light_state_t const* state)
 {
     int len;
-    int alpha, red, green, blue;
+    int alpha, rgb;
     int blink, freq, pwm;
     int onMS, offMS;
     unsigned int colorRGB;
@@ -150,10 +167,6 @@ set_speaker_light_locked(struct light_device_t* dev,
             state->flashMode, colorRGB, onMS, offMS);
 #endif
 
-    red = (colorRGB >> 16) & 0xFF;
-    green = (colorRGB >> 8) & 0xFF;
-    blue = colorRGB & 0xFF;
-
     if (onMS > 0 && offMS > 0) {
         int totalMS = onMS + offMS;
 
@@ -176,19 +189,39 @@ set_speaker_light_locked(struct light_device_t* dev,
         pwm = 0;
     }
 
-    write_int(LED_LOCK_UPDATE_FILE, 1); // for LED On/Off synchronization
+    // Prefer RGB LEDs, fallback to white LED
+    rgb = is_avail(RED_LED_FILE) && is_avail(GREEN_LED_FILE) && is_avail(BLUE_LED_FILE);
 
-    write_int(RED_LED_FILE, red);
-    write_int(GREEN_LED_FILE, green);
-    write_int(BLUE_LED_FILE, blue);
+    char lock_update_file[MAX_PATH_SIZE];
+    char freq_file[MAX_PATH_SIZE];
+    char pwm_file[MAX_PATH_SIZE];
+    char blink_file[MAX_PATH_SIZE];
+    sprintf(lock_update_file, LED_LOCK_UPDATE_FILE, rgb ? "red" : "white");
+    sprintf(freq_file, LED_FREQ_FILE, rgb ? "red" : "white");
+    sprintf(pwm_file, LED_PWM_FILE, rgb ? "red" : "white");
+    sprintf(blink_file, LED_BLINK_FILE, rgb ? "red" : "white");
+
+    write_int(lock_update_file, 1); // for LED On/Off synchronization
+
+    if (rgb) {
+        write_int(RED_LED_FILE, (colorRGB >> 16) & 0xFF);
+        write_int(GREEN_LED_FILE, (colorRGB >> 8) & 0xFF);
+        write_int(BLUE_LED_FILE, colorRGB & 0xFF);
+    } else {
+        // See hardware/libhardware/include/hardware/lights.h
+        int brightness = ((77 * ((colorRGB >> 16) & 0xFF)) +
+                          (150 * ((colorRGB >> 8) & 0xFF)) +
+                          (29 * (colorRGB & 0xFF))) >> 8;
+        write_int(WHITE_LED_FILE, (int) brightness);
+    }
 
     if (blink) {
-        write_int(RED_FREQ_FILE, freq);
-        write_int(RED_PWM_FILE, pwm);
+        write_int(freq_file, freq);
+        write_int(pwm_file, pwm);
     }
-    write_int(RED_BLINK_FILE, blink);
+    write_int(blink_file, blink);
 
-    write_int(LED_LOCK_UPDATE_FILE, 0);
+    write_int(lock_update_file, 0);
 
     return 0;
 }
