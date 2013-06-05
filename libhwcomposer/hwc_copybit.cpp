@@ -120,7 +120,8 @@ unsigned int CopyBit::getRGBRenderingArea
     //Calculates total rendering area for RGB layers
     unsigned int renderArea = 0;
     unsigned int w=0, h=0;
-    for (unsigned int i=0; i<list->numHwLayers; i++) {
+    //Do not include Framebuffer area in calculating total area
+    for (unsigned int i=0; i<(list->numHwLayers)-1; i++) {
          private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
          if (hnd) {
              if (BUFFER_TYPE_UI == hnd->bufferType) {
