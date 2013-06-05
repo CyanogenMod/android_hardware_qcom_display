@@ -236,7 +236,7 @@ void HwcDebug::logLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
     // Log Line 1
     ALOGI("Display[%s] Layer[%d] SrcBuff[%dx%d] SrcCrop[%dl, %dt, %dr, %db] "
         "DispFrame[%dl, %dt, %dr, %db] VisRegsScr%s", mDisplayName, layerIndex,
-        (hnd)? hnd->width : -1, (hnd)? hnd->height : -1,
+        (hnd)? getWidth(hnd) : -1, (hnd)? getHeight(hnd) : -1,
         sourceCrop.left, sourceCrop.top,
         sourceCrop.right, sourceCrop.bottom,
         displayFrame.left, displayFrame.top,
@@ -328,7 +328,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
                 break;
         }
         if (SkBitmap::kNo_Config != tempSkBmpConfig) {
-            tempSkBmp->setConfig(tempSkBmpConfig, hnd->width, hnd->height);
+            tempSkBmp->setConfig(tempSkBmpConfig, getWidth(hnd), getHeight(hnd));
             tempSkBmp->setPixels((void*)hnd->base);
             bResult = SkImageEncoder::EncodeFile(dumpFilename,
                                     *tempSkBmp, SkImageEncoder::kPNG_Type, 100);
@@ -348,7 +348,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         bool bResult = false;
         sprintf(dumpFilename, "%s/sfdump%03d.layer%d.%dx%d.%s.%s.raw",
             mDumpDirRaw, mDumpCntrRaw,
-            layerIndex, hnd->width, hnd->height,
+            layerIndex, getWidth(hnd), getHeight(hnd),
             pixFormatStr, mDisplayName);
         FILE* fp = fopen(dumpFilename, "w+");
         if (NULL != fp) {
