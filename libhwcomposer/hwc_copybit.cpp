@@ -246,8 +246,8 @@ int CopyBit::clear (private_handle_t* hnd, hwc_rect_t& rect)
         rect.bottom};
 
     copybit_image_t buf;
-    buf.w = ALIGN(hnd->width,32);
-    buf.h = hnd->height;
+    buf.w = ALIGN(getWidth(hnd),32);
+    buf.h = getHeight(hnd);
     buf.format = hnd->format;
     buf.base = (void *)hnd->base;
     buf.handle = (native_handle_t *)hnd;
@@ -347,8 +347,8 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
 
     // Set the copybit source:
     copybit_image_t src;
-    src.w = hnd->width;
-    src.h = hnd->height;
+    src.w = getWidth(hnd);
+    src.h = getHeight(hnd);
     src.format = hnd->format;
 
     // Handle R/B swap
@@ -362,7 +362,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
 
     src.base = (void *)hnd->base;
     src.handle = (native_handle_t *)layer->handle;
-    src.horiz_padding = src.w - hnd->width;
+    src.horiz_padding = src.w - getWidth(hnd);
     // Initialize vertical padding to zero for now,
     // this needs to change to accomodate vertical stride
     // if needed in the future
