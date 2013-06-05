@@ -18,6 +18,7 @@
  * limitations under the License.
  */
 #define HWC_UTILS_DEBUG 0
+#include <math.h>
 #include <sys/ioctl.h>
 #include <linux/fb.h>
 #include <binder/IServiceManager.h>
@@ -1109,9 +1110,16 @@ void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
         }
         float horDscale = 0.0f;
         float verDscale = 0.0f;
+        int horzDeci = 0;
+        int vertDeci = 0;
         ovutils::getDecimationFactor(src_w, src_h, dst_w, dst_h, horDscale,
                 verDscale);
-        if(horDscale || verDscale) return;
+        //TODO Use log2f once math.h has it
+        if((int)horDscale)
+            horzDeci = (int)(log(horDscale) / log(2));
+        if((int)verDscale)
+            vertDeci = (int)(log(verDscale) / log(2));
+        if(horzDeci || vertDeci) return;
     }
     //Property
     char value[PROPERTY_VALUE_MAX];
