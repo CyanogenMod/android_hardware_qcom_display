@@ -368,12 +368,21 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].extOnlyLayerIndex = -1;
     ctx->listStats[dpy].isDisplayAnimating = false;
 
-    for (size_t i = 0; i < list->numHwLayers; i++) {
+    //reset yuv indices
+    memset(ctx->listStats[dpy].yuvIndices, -1, MAX_NUM_APP_LAYERS);
+
+    for (size_t i = 0; i < (list->numHwLayers - 1); i++) {
         hwc_layer_1_t const* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
-        //reset stored yuv index
-        ctx->listStats[dpy].yuvIndices[i] = -1;
+#ifdef QCOM_BSP
+        if (layer->flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
+            ctx->listStats[dpy].isDisplayAnimating = true;
+        }
+#endif
+        // continue if i reaches MAX_NUM_APP_LAYERS
+        if(i >= MAX_NUM_APP_LAYERS)
+            continue;
 
         if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             continue;
@@ -405,11 +414,6 @@ void setListStats(hwc_context_t *ctx,
         if(UNLIKELY(isExtOnly(hnd))){
             ctx->listStats[dpy].extOnlyLayerIndex = i;
         }
-#ifdef QCOM_BSP
-        if (layer->flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
-            ctx->listStats[dpy].isDisplayAnimating = true;
-        }
-#endif
     }
     if(ctx->listStats[dpy].yuvCount > 0) {
         if (property_get("hw.cabl.yuv", property, NULL) > 0) {
@@ -596,7 +600,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
                                                         int fd) {
     int ret = 0;
     struct mdp_buf_sync data;
-    int acquireFd[MAX_NUM_LAYERS];
+    int acquireFd[MAX_NUM_APP_LAYERS];
     int count = 0;
     int releaseFd = -1;
     int fbFd = -1;
