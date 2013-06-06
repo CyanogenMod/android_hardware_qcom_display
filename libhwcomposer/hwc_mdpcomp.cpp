@@ -348,6 +348,10 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ALOGD_IF( isDebug(),"%s: External Display connection is pending",
                   __FUNCTION__);
         ret = false;
+    } else if(numAppLayers > MAX_NUM_APP_LAYERS) {
+        ALOGD_IF(isDebug(), "%s: Number of App layers exceeded the limit ",
+                 __FUNCTION__);
+        ret = false;
     }
     return ret;
 }
