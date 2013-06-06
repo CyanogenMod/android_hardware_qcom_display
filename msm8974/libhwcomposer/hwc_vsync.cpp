@@ -25,6 +25,7 @@
 #include <linux/msm_mdp.h>
 #include <sys/resource.h>
 #include <sys/prctl.h>
+#include <poll.h>
 #include "hwc_utils.h"
 #include "string.h"
 #include "external.h"
@@ -61,10 +62,11 @@ static void *vsync_loop(void *param)
 
     const int MAX_DATA = 64;
     static char vdata[MAX_DATA];
+    struct pollfd pfd;
 
     uint64_t cur_timestamp=0;
     ssize_t len = -1;
-    int fd_timestamp = -1;
+    int fb0_fd = -1;
     int ret = 0;
     bool fb1_vsync = false;
     bool logvsync = false;
@@ -83,8 +85,11 @@ static void *vsync_loop(void *param)
     /* Currently read vsync timestamp from drivers
        e.g. VSYNC=41800875994
        */
-    fd_timestamp = open(vsync_timestamp_fb0, O_RDONLY);
-    if (fd_timestamp < 0) {
+    fb0_fd = open(vsync_timestamp_fb0, O_RDONLY);
+    pfd.fd = fb0_fd;
+    pfd.events = POLLPRI | POLLERR;
+
+    if (fb0_fd < 0) {
         // Make sure fb device is opened before starting this thread so this
         // never happens.
         ALOGE ("FATAL:%s:not able to open file:%s, %s",  __FUNCTION__,
@@ -95,23 +100,29 @@ static void *vsync_loop(void *param)
 
     do {
         if (LIKELY(!ctx->vstate.fakevsync)) {
-            len = pread(fd_timestamp, vdata, MAX_DATA, 0);
-            if (len < 0) {
-                // If the read was just interrupted - it is not a fatal error
-                // In either case, just continue.
-                if (errno != EAGAIN &&
-                    errno != EINTR  &&
-                    errno != EBUSY) {
-                    ALOGE ("FATAL:%s:not able to read file:%s, %s",
-                           __FUNCTION__,
-                           vsync_timestamp_fb0, strerror(errno));
+            int err = poll(&pfd, 1, -1);
+            if(err > 0) {
+                if (pfd.revents & POLLPRI) {
+                    len = pread(fb0_fd, vdata, MAX_DATA, 0);
+                    if (UNLIKELY(len < 0)) {
+                        // If the read was just interrupted - it is not a fatal
+                        // error. Just continue in this case
+                        ALOGE ("FATAL:%s:not able to read file:%s, %s",
+                               __FUNCTION__,
+                               vsync_timestamp_fb0, strerror(errno));
+                        continue;
+                    }
+                    // extract timestamp
+                    const char *str = vdata;
+                    if (!strncmp(str, "VSYNC=", strlen("VSYNC="))) {
+                        cur_timestamp = strtoull(str + strlen("VSYNC="),
+                                                 NULL, 0);
+                    }
                 }
+            } else {
+                ALOGE("%s: vsync poll failed errno: %s", __FUNCTION__,
+                      strerror(errno));
                 continue;
-            }
-            // extract timestamp
-            const char *str = vdata;
-            if (!strncmp(str, "VSYNC=", strlen("VSYNC="))) {
-                cur_timestamp = strtoull(str + strlen("VSYNC="), NULL, 0);
             }
         } else {
             usleep(16666);
@@ -125,8 +136,8 @@ static void *vsync_loop(void *param)
         }
 
     } while (true);
-    if(fd_timestamp >= 0)
-        close (fd_timestamp);
+    if(fb0_fd >= 0)
+        close (fb0_fd);
 
     return NULL;
 }
