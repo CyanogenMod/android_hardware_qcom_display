@@ -263,7 +263,8 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             continue;
         }
         int ret = -1;
-        if (list->hwLayers[i].acquireFenceFd != -1 ) {
+        if (list->hwLayers[i].acquireFenceFd != -1
+                && ctx->mMDP.version >= qdutils::MDP_V4_0) {
             // Wait for acquire Fence on the App buffers.
             ret = sync_wait(list->hwLayers[i].acquireFenceFd, 1000);
             if(ret < 0) {
@@ -293,7 +294,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                                      private_handle_t *renderBuffer, int dpy)
 {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    int err = 0;
+    int err = 0, acquireFd;
     if(!ctx) {
          ALOGE("%s: null context ", __FUNCTION__);
          return -1;
@@ -387,6 +388,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                                           scaleLimitMax,1/scaleLimitMin);
         return -1;
     }
+    acquireFd = layer->acquireFenceFd;
     if(dsdx > copybitsMaxScale ||
         dtdy > copybitsMaxScale ||
         dsdx < 1/copybitsMinScale ||
@@ -442,6 +444,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
             copybit->set_parameter(copybit,COPYBIT_TRANSFORM,0);
             //TODO: once, we are able to read layer alpha, update this
             copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, 255);
+            copybit->set_sync(copybit, acquireFd);
             err = copybit->stretch(copybit,&tmp_dst, &src, &tmp_rect,
                                                            &srcRect, &tmp_it);
             if(err < 0){
@@ -451,6 +454,9 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                     free_buffer(tmpHnd);
                 return err;
             }
+            // use release fence as aquire fd for next stretch
+            if (ctx->mMDP.version < qdutils::MDP_V4_0)
+                copybit->flush_get_fence(copybit, &acquireFd);
             // copy new src and src rect crop
             src = tmp_dst;
             srcRect = tmp_rect;
@@ -475,13 +481,26 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                                              COPYBIT_ENABLE : COPYBIT_DISABLE);
     copybit->set_parameter(copybit, COPYBIT_BLIT_TO_FRAMEBUFFER,
                                                 COPYBIT_ENABLE);
+    copybit->set_sync(copybit, acquireFd);
     err = copybit->stretch(copybit, &dst, &src, &dstRect, &srcRect,
                                                    &copybitRegion);
     copybit->set_parameter(copybit, COPYBIT_BLIT_TO_FRAMEBUFFER,
                                                COPYBIT_DISABLE);
 
-    if(tmpHnd)
+    if(tmpHnd) {
+        if (ctx->mMDP.version < qdutils::MDP_V4_0){
+            int ret = -1, releaseFd;
+            // we need to wait for the buffer before freeing
+            copybit->flush_get_fence(copybit, &releaseFd);
+            ret = sync_wait(releaseFd, 1000);
+            if(ret < 0) {
+                ALOGE("%s: sync_wait error!! error no = %d err str = %s",
+                    __FUNCTION__, errno, strerror(errno));
+            }
+            close(releaseFd);
+        }
         free_buffer(tmpHnd);
+    }
 
     if(err < 0)
         ALOGE("%s: copybit stretch failed",__FUNCTION__);
