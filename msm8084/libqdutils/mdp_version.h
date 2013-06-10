@@ -74,6 +74,16 @@ enum {
 #define WRITEBACK_PANEL  'a'
 #define LVDS_PANEL       'b'
 
+class MDPVersion;
+
+struct Split {
+    int mLeft;
+    int mRight;
+    Split() : mLeft(0), mRight(0){}
+    int left() { return mLeft; }
+    int right() { return mRight; }
+    friend class MDPVersion;
+};
 
 class MDPVersion : public Singleton <MDPVersion>
 {
@@ -91,6 +101,8 @@ public:
     uint32_t getMaxMDPDownscale();
     bool supportsBWC();
     bool is8x26();
+    int getLeftSplit() { return mSplit.left(); }
+    int getRightSplit() { return mSplit.right(); }
 private:
     int mMDPVersion;
     char mPanelType;
@@ -101,6 +113,7 @@ private:
     uint8_t mDMAPipes;
     uint32_t mFeatures;
     uint32_t mMDPDownscale;
+    Split mSplit;
 };
 }; //namespace qdutils
 #endif //INCLUDE_LIBQCOMUTILS_MDPVER

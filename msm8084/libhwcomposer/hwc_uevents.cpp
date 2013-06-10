@@ -31,6 +31,7 @@
 #include "hwc_copybit.h"
 #include "comptype.h"
 #include "external.h"
+#include "mdp_version.h"
 
 namespace qhwc {
 #define HWC_UEVENT_SWITCH_STR  "change@/devices/virtual/switch/"
@@ -53,8 +54,11 @@ static bool isHDMI(const char* str)
 
 static void setup(hwc_context_t* ctx, int dpy, bool usecopybit)
 {
-    ctx->mFBUpdate[dpy] = IFBUpdate::getObject(ctx->dpyAttr[dpy].xres, dpy);
-    ctx->mMDPComp[dpy] =  MDPComp::getObject(ctx->dpyAttr[dpy].xres, dpy);
+    const int rSplit = 0; //Even split for external if at all
+    ctx->mFBUpdate[dpy] = IFBUpdate::getObject(ctx->dpyAttr[dpy].xres,
+            rSplit, dpy);
+    ctx->mMDPComp[dpy] =  MDPComp::getObject(ctx->dpyAttr[dpy].xres,
+            rSplit, dpy);
     if(usecopybit)
         ctx->mCopyBit[dpy] = new CopyBit();
 }

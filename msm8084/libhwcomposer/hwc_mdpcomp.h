@@ -46,7 +46,8 @@ public:
     /* dumpsys */
     void dump(android::String8& buf);
 
-    static MDPComp* getObject(const int& width, const int dpy);
+    static MDPComp* getObject(const int& width, const int& rightSplit,
+            const int& dpy);
     /* Handler to invoke frame redraw on Idle Timer expiry */
     static void timeout_handler(void *udata);
     /* Initialize MDP comp*/
