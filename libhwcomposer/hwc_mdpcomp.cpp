@@ -37,6 +37,7 @@ IdleInvalidator *MDPComp::idleInvalidator = NULL;
 bool MDPComp::sIdleFallBack = false;
 bool MDPComp::sDebugLogs = false;
 bool MDPComp::sEnabled = false;
+bool MDPComp::sEnableMixedMode = true;
 int MDPComp::sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
 
 MDPComp* MDPComp::getObject(const int& width, int dpy) {
@@ -95,6 +96,13 @@ bool MDPComp::init(hwc_context_t *ctx) {
             ALOGE("%s: Failed to setup primary base pipe", __FUNCTION__);
             return false;
         }
+    }
+
+    sEnableMixedMode = true;
+    if((property_get("debug.mdpcomp.mixedmode.disable", property, NULL) > 0) &&
+       (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+        (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+        sEnableMixedMode = false;
     }
 
     sDebugLogs = false;
@@ -352,8 +360,8 @@ ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type) {
 }
 
 bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
-    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     bool ret = true;
+    const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
 
     if(!isEnabled()) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. not enabled.", __FUNCTION__);
@@ -428,7 +436,7 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
     bool ret = false;
     if(fullMDPComp(ctx, list)) {
         ret = true;
-    } else if (partialMDPComp(ctx, list)) {
+    } else if(partialMDPComp(ctx, list)) {
         ret = true;
     }
     return ret;
@@ -462,6 +470,12 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
 {
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+
+    if(!sEnableMixedMode) {
+        //Mixed mode is disabled. No need to even try caching.
+        return false;
+    }
+
     //Setup mCurrentFrame
     mCurrentFrame.reset(numAppLayers);
     updateLayerCache(ctx, list);
