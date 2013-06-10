@@ -31,6 +31,7 @@
 #include "hwc_copybit.h"
 #include "comptype.h"
 #include "external.h"
+#include "mdp_version.h"
 
 namespace qhwc {
 
@@ -135,13 +136,15 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             {   // connect case
                 ctx->mExtDispConfiguring = true;
                 ctx->mExtDisplay->processUEventOnline(udata);
+                const int rSplit = 0;
                 ctx->mFBUpdate[dpy] =
-                        IFBUpdate::getObject(ctx->dpyAttr[dpy].xres, dpy);
+                        IFBUpdate::getObject(ctx->dpyAttr[dpy].xres, rSplit,
+                                             dpy);
                 ctx->dpyAttr[dpy].isPause = false;
                 if(usecopybit)
                     ctx->mCopyBit[dpy] = new CopyBit();
                 ctx->mMDPComp[dpy] =  MDPComp::getObject(
-                        ctx->dpyAttr[dpy].xres, dpy);
+                        ctx->dpyAttr[dpy].xres, rSplit, dpy);
                 ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,
                         connected);
                 ctx->dpyAttr[dpy].connected = true;
