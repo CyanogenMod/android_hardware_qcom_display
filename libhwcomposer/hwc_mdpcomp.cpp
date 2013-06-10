@@ -40,12 +40,12 @@ bool MDPComp::sEnabled = false;
 bool MDPComp::sEnableMixedMode = true;
 int MDPComp::sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
 
-MDPComp* MDPComp::getObject(const int& width, int dpy) {
-    if(width <= MAX_DISPLAY_DIM) {
-        return new MDPCompLowRes(dpy);
-    } else {
+MDPComp* MDPComp::getObject(const int& width, const int& rightSplit,
+        const int& dpy) {
+    if(width > MAX_DISPLAY_DIM || rightSplit) {
         return new MDPCompHighRes(dpy);
     }
+    return new MDPCompLowRes(dpy);
 }
 
 MDPComp::MDPComp(int dpy):mDpy(dpy){};
@@ -954,17 +954,24 @@ bool MDPCompLowRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 //=============MDPCompHighRes===================================================
 
 int MDPCompHighRes::pipesNeeded(hwc_context_t *ctx,
-                                hwc_display_contents_1_t* list) {
+        hwc_display_contents_1_t* list) {
     int pipesNeeded = 0;
-    int hw_w = ctx->dpyAttr[mDpy].xres;
+    const int xres = ctx->dpyAttr[mDpy].xres;
+    //Default even split for all displays with high res
+    int lSplit = xres / 2;
+    if(mDpy == HWC_DISPLAY_PRIMARY &&
+            qdutils::MDPVersion::getInstance().getLeftSplit()) {
+        //Override if split published by driver for primary
+        lSplit = qdutils::MDPVersion::getInstance().getLeftSplit();
+    }
 
     for(int i = 0; i < mCurrentFrame.layerCount; ++i) {
         if(!mCurrentFrame.isFBComposed[i]) {
             hwc_layer_1_t* layer = &list->hwLayers[i];
             hwc_rect_t dst = layer->displayFrame;
-            if(dst.left > hw_w/2) {
+            if(dst.left > lSplit) {
                 pipesNeeded++;
-            } else if(dst.right <= hw_w/2) {
+            } else if(dst.right <= lSplit) {
                 pipesNeeded++;
             } else {
                 pipesNeeded += 2;
@@ -975,17 +982,24 @@ int MDPCompHighRes::pipesNeeded(hwc_context_t *ctx,
 }
 
 bool MDPCompHighRes::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
-                                     MdpPipeInfoHighRes& pipe_info,
-                                     ePipeType type) {
-    int hw_w = ctx->dpyAttr[mDpy].xres;
+        MdpPipeInfoHighRes& pipe_info,
+        ePipeType type) {
+    const int xres = ctx->dpyAttr[mDpy].xres;
+    //Default even split for all displays with high res
+    int lSplit = xres / 2;
+    if(mDpy == HWC_DISPLAY_PRIMARY &&
+            qdutils::MDPVersion::getInstance().getLeftSplit()) {
+        //Override if split published by driver for primary
+        lSplit = qdutils::MDPVersion::getInstance().getLeftSplit();
+    }
 
     hwc_rect_t dst = layer->displayFrame;
-    if(dst.left > hw_w/2) {
+    if(dst.left > lSplit) {
         pipe_info.lIndex = ovutils::OV_INVALID;
         pipe_info.rIndex = getMdpPipe(ctx, type);
         if(pipe_info.rIndex == ovutils::OV_INVALID)
             return false;
-    } else if (dst.right <= hw_w/2) {
+    } else if (dst.right <= lSplit) {
         pipe_info.rIndex = ovutils::OV_INVALID;
         pipe_info.lIndex = getMdpPipe(ctx, type);
         if(pipe_info.lIndex == ovutils::OV_INVALID)
@@ -1035,7 +1049,7 @@ bool MDPCompHighRes::allocLayerPipes(hwc_context_t *ctx,
  * Configures pipe(s) for MDP composition
  */
 int MDPCompHighRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
-                              PipeLayerPair& PipeLayerPair) {
+        PipeLayerPair& PipeLayerPair) {
     MdpPipeInfoHighRes& mdp_info =
         *(static_cast<MdpPipeInfoHighRes*>(PipeLayerPair.pipeInfo));
     eZorder zOrder = static_cast<eZorder>(mdp_info.zOrder);

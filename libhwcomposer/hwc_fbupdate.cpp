@@ -34,8 +34,9 @@ namespace qhwc {
 
 namespace ovutils = overlay::utils;
 
-IFBUpdate* IFBUpdate::getObject(const int& width, const int& dpy) {
-    if(width > MAX_DISPLAY_DIM) {
+IFBUpdate* IFBUpdate::getObject(const int& width, const int& rightSplit,
+        const int& dpy) {
+    if(width > MAX_DISPLAY_DIM || rightSplit) {
         return new FBUpdateHighRes(dpy);
     }
     return new FBUpdateLowRes(dpy);
@@ -223,7 +224,7 @@ bool FBUpdateHighRes::prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
 
 // Configure
 bool FBUpdateHighRes::configure(hwc_context_t *ctx,
-                                hwc_display_contents_1 *list, int fbZorder) {
+        hwc_display_contents_1 *list, int fbZorder) {
     bool ret = false;
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
@@ -287,14 +288,33 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
             getNonWormholeRegion(list, sourceCrop);
             displayFrame = sourceCrop;
         }
-        ovutils::Dim dcropL(sourceCrop.left, sourceCrop.top,
-                            (sourceCrop.right - sourceCrop.left) / 2,
-                            sourceCrop.bottom - sourceCrop.top);
+
+        const float xres = ctx->dpyAttr[mDpy].xres;
+        //Default even split for all displays with high res
+        float lSplit = xres / 2;
+        if(mDpy == HWC_DISPLAY_PRIMARY &&
+                qdutils::MDPVersion::getInstance().getLeftSplit()) {
+            //Override if split published by driver for primary
+            lSplit = qdutils::MDPVersion::getInstance().getLeftSplit();
+        }
+
+        const float lSplitRatio = lSplit / xres;
+
+        const float lCropWidth =
+                (sourceCrop.right - sourceCrop.left) * lSplitRatio;
+
+        ovutils::Dim dcropL(
+                sourceCrop.left,
+                sourceCrop.top,
+                lCropWidth,
+                sourceCrop.bottom - sourceCrop.top);
+
         ovutils::Dim dcropR(
-            sourceCrop.left + (sourceCrop.right - sourceCrop.left) / 2,
-            sourceCrop.top,
-            (sourceCrop.right - sourceCrop.left) / 2,
-            sourceCrop.bottom - sourceCrop.top);
+                sourceCrop.left + lCropWidth,
+                sourceCrop.top,
+                (sourceCrop.right - sourceCrop.left) - lCropWidth,
+                sourceCrop.bottom - sourceCrop.top);
+
         ov.setCrop(dcropL, destL);
         ov.setCrop(dcropR, destR);
 
@@ -304,19 +324,19 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
         ov.setTransform(orient, destL);
         ov.setTransform(orient, destR);
 
-        const int halfWidth = (displayFrame.right - displayFrame.left) / 2;
+        const int lWidth = (lSplit - displayFrame.left);
+        const int rWidth = (displayFrame.right - lSplit);
         const int height = displayFrame.bottom - displayFrame.top;
 
-        const int halfDpy = ctx->dpyAttr[mDpy].xres / 2;
-        ovutils::Dim dposL(halfDpy - halfWidth,
+        ovutils::Dim dposL(displayFrame.left,
                            displayFrame.top,
-                           halfWidth,
+                           lWidth,
                            height);
         ov.setPosition(dposL, destL);
 
         ovutils::Dim dposR(0,
                            displayFrame.top,
-                           halfWidth,
+                           rWidth,
                            height);
         ov.setPosition(dposR, destR);
 

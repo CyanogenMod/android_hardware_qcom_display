@@ -126,6 +126,7 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
+    const int rightSplit = qdutils::MDPVersion::getInstance().getRightSplit();
     overlay::Overlay::initOverlay();
     ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->mRotMgr = new RotMgr();
@@ -135,7 +136,7 @@ void initContext(hwc_context_t *ctx)
     //on what external we connect to.
     ctx->mFBUpdate[HWC_DISPLAY_PRIMARY] =
         IFBUpdate::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
-        HWC_DISPLAY_PRIMARY);
+                rightSplit, HWC_DISPLAY_PRIMARY);
 
     // Check if the target supports copybit compostion (dyn/mdp/c2d) to
     // decide if we need to open the copybit module.
@@ -152,7 +153,7 @@ void initContext(hwc_context_t *ctx)
 
     ctx->mMDPComp[HWC_DISPLAY_PRIMARY] =
          MDPComp::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
-         HWC_DISPLAY_PRIMARY);
+                rightSplit, HWC_DISPLAY_PRIMARY);
 
     for (uint32_t i = 0; i < MAX_DISPLAYS; i++) {
         ctx->mHwcDebug[i] = new HwcDebug(i);
@@ -1035,16 +1036,17 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     hwc_rect_t tmp_cropL, tmp_dstL;
     hwc_rect_t tmp_cropR, tmp_dstR;
 
+    const int lSplit = qdutils::MDPVersion::getInstance().getLeftSplit();
     if(lDest != OV_INVALID) {
         tmp_cropL = crop;
         tmp_dstL = dst;
-        hwc_rect_t scissor = {0, 0, hw_w/2, hw_h };
+        hwc_rect_t scissor = {0, 0, lSplit, hw_h };
         qhwc::calculate_crop_rects(tmp_cropL, tmp_dstL, scissor, 0);
     }
     if(rDest != OV_INVALID) {
         tmp_cropR = crop;
         tmp_dstR = dst;
-        hwc_rect_t scissor = {hw_w/2, 0, hw_w, hw_h };
+        hwc_rect_t scissor = {lSplit, 0, hw_w, hw_h };
         qhwc::calculate_crop_rects(tmp_cropR, tmp_dstR, scissor, 0);
     }
 
@@ -1088,8 +1090,8 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     if(rDest != OV_INVALID) {
         PipeArgs pargR(mdpFlagsR, whf, z, isFg,
                 static_cast<eRotFlags>(rotFlags));
-        tmp_dstR.right = tmp_dstR.right - hw_w/2;
-        tmp_dstR.left = tmp_dstR.left - hw_w/2;
+        tmp_dstR.right = tmp_dstR.right - lSplit;
+        tmp_dstR.left = tmp_dstR.left - lSplit;
         if(configMdp(ctx->mOverlay, pargR, orient,
                 tmp_cropR, tmp_dstR, metadata, rDest) < 0) {
             ALOGE("%s: commit failed for right mixer config", __FUNCTION__);
