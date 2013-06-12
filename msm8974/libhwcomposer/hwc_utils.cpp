@@ -888,6 +888,7 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     if(!hnd) {
         ALOGE("%s: layer handle is NULL", __FUNCTION__);
+        ctx->mLayerRotMap[dpy]->reset();
         return -1;
     }
 
