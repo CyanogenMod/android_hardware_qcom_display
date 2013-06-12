@@ -217,17 +217,15 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
     ctx->mRotMgr->configBegin();
     ctx->mNeedsRotator = false;
 
-    for (int32_t i = numDisplays - 1; i >= 0; i--) {
+    for (int32_t i = numDisplays; i >= 0; i--) {
         hwc_display_contents_1_t *list = displays[i];
         switch(i) {
             case HWC_DISPLAY_PRIMARY:
                 ret = hwc_prepare_primary(dev, list);
                 break;
             case HWC_DISPLAY_EXTERNAL:
-                ret = hwc_prepare_external(dev, list, i);
-                break;
             case HWC_DISPLAY_VIRTUAL:
-                ret = hwc_prepare_virtual(dev, list, i);
+                ret = hwc_prepare_external(dev, list, i);
                 break;
             default:
                 ret = -EINVAL;
@@ -470,17 +468,15 @@ static int hwc_set(hwc_composer_device_1 *dev,
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     Locker::Autolock _l(ctx->mBlankLock);
-    for (uint32_t i = 0; i < numDisplays; i++) {
+    for (uint32_t i = 0; i <= numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
         switch(i) {
             case HWC_DISPLAY_PRIMARY:
                 ret = hwc_set_primary(ctx, list);
                 break;
             case HWC_DISPLAY_EXTERNAL:
-                ret = hwc_set_external(ctx, list, i);
-                break;
             case HWC_DISPLAY_VIRTUAL:
-                ret = hwc_set_virtual(ctx, list, i);
+                ret = hwc_set_external(ctx, list, i);
                 break;
             default:
                 ret = -EINVAL;
