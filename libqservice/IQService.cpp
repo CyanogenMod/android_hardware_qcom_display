@@ -148,6 +148,18 @@ status_t BnQService::onTransact(
             }
             return screenRefresh();
         } break;
+        case EXTERNAL_ORIENTATION: {
+            CHECK_INTERFACE(IQService, data, reply);
+            if(callerUid != AID_SYSTEM) {
+                ALOGE("display.qservice EXTERNAL_ORIENTATION access denied: \
+                      pid=%d uid=%d process=%s",callerPid,
+                      callerUid, callingProcName);
+                return PERMISSION_DENIED;
+            }
+            uint32_t orientation = data.readInt32();
+            setExtOrientation(orientation);
+            return NO_ERROR;
+        } break;
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }
