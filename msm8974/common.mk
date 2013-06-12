@@ -1,11 +1,11 @@
 #Common headers
-common_includes := hardware/qcom/display/libgralloc
-common_includes += hardware/qcom/display/liboverlay
-common_includes += hardware/qcom/display/libcopybit
-common_includes += hardware/qcom/display/libqdutils
-common_includes += hardware/qcom/display/libhwcomposer
-common_includes += hardware/qcom/display/libexternal
-common_includes += hardware/qcom/display/libqservice
+common_includes := hardware/qcom/display/msm8974/libgralloc
+common_includes += hardware/qcom/display/msm8974/liboverlay
+common_includes += hardware/qcom/display/msm8974/libcopybit
+common_includes += hardware/qcom/display/msm8974/libqdutils
+common_includes += hardware/qcom/display/msm8974/libhwcomposer
+common_includes += hardware/qcom/display/msm8974/libexternal
+common_includes += hardware/qcom/display/msm8974/libqservice
 
 #Common libraries external to display HAL
 common_libs := liblog libutils libcutils libhardware
