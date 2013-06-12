@@ -180,6 +180,40 @@ int getHALFormat(int mdpFormat) {
     return -1;
 }
 
+int getMdpOrient(eTransform rotation) {
+    int retTrans = 0;
+    bool trans90 = false;
+    int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
+    bool aFamily = (mdpVersion < qdutils::MDSS_V5);
+
+    ALOGD_IF(DEBUG_OVERLAY, "%s: In rotation = %d", __FUNCTION__, rotation);
+    if(rotation & OVERLAY_TRANSFORM_ROT_90) {
+        retTrans |= MDP_ROT_90;
+        trans90 = true;
+    }
+
+    if(rotation & OVERLAY_TRANSFORM_FLIP_H) {
+        if(trans90 && aFamily) {
+            //Swap for a-family, since its driver does 90 first
+            retTrans |= MDP_FLIP_UD;
+        } else {
+            retTrans |= MDP_FLIP_LR;
+        }
+    }
+
+    if(rotation & OVERLAY_TRANSFORM_FLIP_V) {
+        if(trans90 && aFamily) {
+            //Swap for a-family, since its driver does 90 first
+            retTrans |= MDP_FLIP_LR;
+        } else {
+            retTrans |= MDP_FLIP_UD;
+        }
+    }
+
+    ALOGD_IF(DEBUG_OVERLAY, "%s: Out rotation = %d", __FUNCTION__, retTrans);
+    return retTrans;
+}
+
 int getDownscaleFactor(const int& src_w, const int& src_h,
         const int& dst_w, const int& dst_h) {
     int dscale_factor = utils::ROT_DS_NONE;
@@ -225,9 +259,6 @@ static inline int compute(const uint32_t& x, const uint32_t& y,
     return x - ( y + z );
 }
 
-//Expects transform to be adjusted for clients of Android.
-//i.e flips switched if 90 component present.
-//See getMdpOrient()
 void preRotateSource(const eTransform& tr, Whf& whf, Dim& srcCrop) {
     if(tr & OVERLAY_TRANSFORM_FLIP_H) {
         srcCrop.x = compute(whf.w, srcCrop.x, srcCrop.w);
@@ -330,13 +361,14 @@ void getDump(char *buf, size_t len, const char *prefix,
         const mdp_overlay& ov) {
     char str[256] = {'\0'};
     snprintf(str, 256,
-            "%s id=%d z=%d fg=%d alpha=%d mask=%d flags=0x%x\n",
+            "%s id=%d z=%d fg=%d alpha=%d mask=%d flags=0x%x H.Deci=%d,"
+            "V.Deci=%d\n",
             prefix, ov.id, ov.z_order, ov.is_fg, ov.alpha,
-            ov.transp_mask, ov.flags);
+            ov.transp_mask, ov.flags, ov.horz_deci, ov.vert_deci);
     strncat(buf, str, strlen(str));
-    getDump(buf, len, "\tsrc(msmfb_img)", ov.src);
-    getDump(buf, len, "\tsrc_rect(mdp_rect)", ov.src_rect);
-    getDump(buf, len, "\tdst_rect(mdp_rect)", ov.dst_rect);
+    getDump(buf, len, "\tsrc", ov.src);
+    getDump(buf, len, "\tsrc_rect", ov.src_rect);
+    getDump(buf, len, "\tdst_rect", ov.dst_rect);
 }
 
 void getDump(char *buf, size_t len, const char *prefix,
@@ -365,7 +397,7 @@ void getDump(char *buf, size_t len, const char *prefix,
             "%s id=%d\n",
             prefix, ov.id);
     strncat(buf, str, strlen(str));
-    getDump(buf, len, "\tdata(msmfb_data)", ov.data);
+    getDump(buf, len, "\tdata", ov.data);
 }
 
 void getDump(char *buf, size_t len, const char *prefix,
@@ -394,13 +426,25 @@ void getDump(char *buf, size_t len, const char *prefix,
         const msm_rotator_data_info& rot) {
     char str[256] = {'\0'};
     snprintf(str, 256,
-            "%s sessid=%u verkey=%d\n",
-            prefix, rot.session_id, rot.version_key);
+            "%s sessid=%u\n",
+            prefix, rot.session_id);
     strncat(buf, str, strlen(str));
     getDump(buf, len, "\tsrc", rot.src);
     getDump(buf, len, "\tdst", rot.dst);
-    getDump(buf, len, "\tsrc_chroma", rot.src_chroma);
-    getDump(buf, len, "\tdst_chroma", rot.dst_chroma);
+}
+
+//Helper to even out x,w and y,h pairs
+//x,y are always evened to ceil and w,h are evened to floor
+void normalizeCrop(uint32_t& xy, uint32_t& wh) {
+    if(xy & 1) {
+        even_ceil(xy);
+        if(wh & 1)
+            even_floor(wh);
+        else
+            wh -= 2;
+    } else {
+        even_floor(wh);
+    }
 }
 
 } // utils

@@ -21,6 +21,9 @@
 #define DEBUG_FBUPDATE 0
 #include <gralloc_priv.h>
 #include "hwc_fbupdate.h"
+#include "mdp_version.h"
+
+using namespace qdutils;
 
 namespace qhwc {
 
@@ -235,17 +238,20 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
         ov.setTransform(orient, destR);
 
         hwc_rect_t displayFrame = sourceCrop;
-        //For FB left, top will always be 0
-        //That should also be the case if using 2 mixers for single display
-        ovutils::Dim dposL(displayFrame.left,
+        const int halfWidth = (displayFrame.right - displayFrame.left) / 2;
+        const int height = displayFrame.bottom - displayFrame.top;
+
+        const int halfDpy = ctx->dpyAttr[mDpy].xres / 2;
+        ovutils::Dim dposL(halfDpy - halfWidth,
                            displayFrame.top,
-                           (displayFrame.right - displayFrame.left) / 2,
-                           displayFrame.bottom - displayFrame.top);
+                           halfWidth,
+                           height);
         ov.setPosition(dposL, destL);
+
         ovutils::Dim dposR(0,
                            displayFrame.top,
-                           (displayFrame.right - displayFrame.left) / 2,
-                           displayFrame.bottom - displayFrame.top);
+                           halfWidth,
+                           height);
         ov.setPosition(dposR, destR);
 
         ret = true;

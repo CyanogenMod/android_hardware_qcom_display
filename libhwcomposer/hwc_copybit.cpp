@@ -21,6 +21,7 @@
 #define DEBUG_COPYBIT 0
 #include <copybit.h>
 #include <utils/Timers.h>
+#include <mdp_version.h>
 #include "hwc_copybit.h"
 #include "comptype.h"
 #include "gr.h"
@@ -120,7 +121,9 @@ unsigned int CopyBit::getRGBRenderingArea
     //Calculates total rendering area for RGB layers
     unsigned int renderArea = 0;
     unsigned int w=0, h=0;
-    for (unsigned int i=0; i<list->numHwLayers; i++) {
+    // Skipping last layer since FrameBuffer layer should not affect
+    // which composition to choose
+    for (unsigned int i=0; i<list->numHwLayers -1; i++) {
          private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
          if (hnd) {
              if (BUFFER_TYPE_UI == hnd->bufferType) {
@@ -155,6 +158,11 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
 
     if(ctx->listStats[dpy].skipCount) {
         //GPU will be anyways used
+        return false;
+    }
+
+    if (ctx->listStats[dpy].numAppLayers > MAX_NUM_LAYERS) {
+        // Reached max layers supported by HWC.
         return false;
     }
 
@@ -244,11 +252,13 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         mRelFd[0] = -1;
     }
 
-    //Clear the visible region on the render buffer
-    //XXX: Do this only when needed.
-    hwc_rect_t clearRegion;
-    getNonWormholeRegion(list, clearRegion);
-    clear(renderBuffer, clearRegion);
+    if (ctx->mMDP.version >= qdutils::MDP_V4_0) {
+        //Clear the visible region on the render buffer
+        //XXX: Do this only when needed.
+        hwc_rect_t clearRegion;
+        getNonWormholeRegion(list, clearRegion);
+        clear(renderBuffer, clearRegion);
+    }
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
     for (int i = 0; i <= (ctx->listStats[dpy].numAppLayers-1); i++) {
         hwc_layer_1_t *layer = &list->hwLayers[i];

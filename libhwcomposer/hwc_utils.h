@@ -35,7 +35,6 @@
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 #define MAX_NUM_LAYERS 32 //includes fb layer
-#define MAX_DISPLAY_DIM 2048
 
 // For support of virtual displays
 #define HWC_DISPLAY_VIRTUAL     (HWC_DISPLAY_EXTERNAL+1)
@@ -158,7 +157,7 @@ void getNonWormholeRegion(hwc_display_contents_1_t* list,
 bool isSecuring(hwc_context_t* ctx, hwc_layer_1_t const* layer);
 bool isSecureModePolicy(int mdpVersion);
 bool isExternalActive(hwc_context_t* ctx);
-bool needsScaling(hwc_layer_1_t const* layer);
+bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer, const int& dpy);
 bool isAlphaPresent(hwc_layer_1_t const* layer);
 bool setupBasePipe(hwc_context_t *ctx);
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable);
@@ -185,7 +184,19 @@ void trimLayer(hwc_context_t *ctx, const int& dpy, const int& transform,
 //Sets appropriate mdp flags for a layer.
 void setMdpFlags(hwc_layer_1_t *layer,
         ovutils::eMdpFlags &mdpFlags,
-        int rotDownscale = 0);
+        int rotDownscale);
+
+int configRotator(overlay::Rotator *rot, const ovutils::Whf& whf,
+        hwc_rect_t& crop, const ovutils::eMdpFlags& mdpFlags,
+        const ovutils::eTransform& orient, const int& downscale);
+
+int configMdp(overlay::Overlay *ov, const ovutils::PipeArgs& parg,
+        const ovutils::eTransform& orient, const hwc_rect_t& crop,
+        const hwc_rect_t& pos, const MetaData_t *metadata,
+        const ovutils::eDest& dest);
+
+void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
+        hwc_rect_t& crop);
 
 //Routine to configure low resolution panels (<= 2048 width)
 int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
@@ -198,6 +209,14 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
         ovutils::eMdpFlags& mdpFlags, const ovutils::eZorder& z,
         const ovutils::eIsFg& isFg, const ovutils::eDest& lDest,
         const ovutils::eDest& rDest, overlay::Rotator **rot);
+
+//On certain targets DMA pipes are used for rotation and they won't be available
+//for line operations. On a per-target basis we can restrict certain use cases
+//from using rotator, since we know before-hand that such scenarios can lead to
+//extreme unavailability of pipes. This can also be done via hybrid calculations
+//also involving many more variables like number of write-back interfaces etc,
+//but the variety of scenarios is too high to warrant that.
+bool canUseRotator(hwc_context_t *ctx);
 
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
@@ -301,14 +320,12 @@ struct hwc_context_t {
     bool mSecureMode;
     //Lock to prevent set from being called while blanking
     mutable Locker mBlankLock;
-    //Lock to protect set when detaching external disp
-    mutable Locker mExtSetLock;
-    //DMA used for rotator
-    bool mDMAInUse;
-    //MDP rotater needed
-    bool mNeedsRotator;
+    //Lock to protect prepare & set when detaching external disp
+    mutable Locker mExtLock;
     //Check if base pipe is set up
     bool mBasePipeSetup;
+    //Drawing round when we use GPU
+    bool isPaddingRound;
 };
 
 namespace qhwc {

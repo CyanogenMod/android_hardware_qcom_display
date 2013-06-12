@@ -37,8 +37,10 @@
 #include "profiler.h"
 
 using namespace qhwc;
+using namespace overlay;
+
 #define VSYNC_DEBUG 0
-#define BLANK_DEBUG 0
+#define BLANK_DEBUG 1
 
 static int hwc_device_open(const struct hw_module_t* module,
                            const char* name,
@@ -151,13 +153,10 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
             if(fbZOrder >= 0)
                 ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZOrder);
 
-            /* Temporarily commenting out C2D until we support partial
-               copybit composition for mixed mode MDP
-
-            // Use Copybit, when MDP comp fails
-            if((fbZOrder >= 0) && ctx->mCopyBit[dpy])
-                ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
-            */
+            if (ctx->mMDP.version < qdutils::MDP_V4_0) {
+                if((fbZOrder >= 0) && ctx->mCopyBit[dpy])
+                    ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
+            }
         }
     }
     return 0;
@@ -165,7 +164,9 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
 
 static int hwc_prepare_external(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list, int dpy) {
+
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    Locker::Autolock _l(ctx->mExtLock);
 
     if (LIKELY(list && list->numHwLayers > 1) &&
             ctx->dpyAttr[dpy].isActive &&
@@ -215,7 +216,7 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 
     ctx->mOverlay->configBegin();
     ctx->mRotMgr->configBegin();
-    ctx->mNeedsRotator = false;
+    Overlay::setDMAMode(Overlay::DMA_LINE_MODE);
 
     for (int32_t i = numDisplays - 1; i >= 0; i--) {
         hwc_display_contents_1_t *list = displays[i];
@@ -386,7 +387,7 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
         if (display_commit(ctx, dpy) < 0) {
             ALOGE("%s: display commit fail!", __FUNCTION__);
-            return -1;
+            ret = -1;
         }
     }
 
@@ -399,7 +400,7 @@ static int hwc_set_external(hwc_context_t *ctx,
 {
     ATRACE_CALL();
     int ret = 0;
-    Locker::Autolock _l(ctx->mExtSetLock);
+    Locker::Autolock _l(ctx->mExtLock);
 
     if (LIKELY(list) && ctx->dpyAttr[dpy].isActive &&
         !ctx->dpyAttr[dpy].isPause &&
@@ -582,7 +583,7 @@ void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
     ctx->mOverlay->getDump(ovDump, 2048);
     dumpsys_log(aBuf, ovDump);
     ovDump[0] = '\0';
-    ctx->mRotMgr->getDump(ovDump, 2048);
+    ctx->mRotMgr->getDump(ovDump, 1024);
     dumpsys_log(aBuf, ovDump);
     strlcpy(buff, aBuf.string(), buff_len);
 }

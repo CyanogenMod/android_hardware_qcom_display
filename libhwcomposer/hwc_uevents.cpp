@@ -111,13 +111,12 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         case EXTERNAL_OFFLINE:
             {   // disconnect event
                 ctx->mExtDisplay->processUEventOffline(udata);
+                Locker::Autolock _l(ctx->mExtLock);
                 if(ctx->mFBUpdate[dpy]) {
-                    Locker::Autolock _l(ctx->mExtSetLock);
                     delete ctx->mFBUpdate[dpy];
                     ctx->mFBUpdate[dpy] = NULL;
                 }
                 if(ctx->mCopyBit[dpy]){
-                    Locker::Autolock _l(ctx->mExtSetLock);
                     delete ctx->mCopyBit[dpy];
                     ctx->mCopyBit[dpy] = NULL;
                 }
@@ -128,7 +127,6 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 ALOGD("%s sending hotplug: connected = %d and dpy:%d",
                       __FUNCTION__, connected, dpy);
                 ctx->dpyAttr[dpy].connected = false;
-                Locker::Autolock _l(ctx->mExtSetLock);
                 //hwc comp could be on
                 ctx->proc->hotplug(ctx->proc, dpy, connected);
                 break;
@@ -147,7 +145,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,
                         connected);
                 ctx->dpyAttr[dpy].connected = true;
-                Locker::Autolock _l(ctx->mExtSetLock); //hwc comp could be on
+                Locker::Autolock _l(ctx->mExtLock); //hwc comp could be on
                 ctx->proc->hotplug(ctx->proc, dpy, connected);
                 break;
             }

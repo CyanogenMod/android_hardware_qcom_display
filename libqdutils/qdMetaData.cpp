@@ -75,6 +75,9 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
         case PP_PARAM_SHARP2:
             memcpy((void *)&data->Sharp2Data, param, sizeof(Sharp2Data_t));
             break;
+        case PP_PARAM_TIMESTAMP:
+            data->timestamp = *((int64_t *)param);
+            break;
         default:
             ALOGE("Unknown paramType %d", paramType);
             break;

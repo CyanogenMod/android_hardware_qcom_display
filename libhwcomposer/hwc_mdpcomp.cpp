@@ -24,7 +24,8 @@
 #include "mdp_version.h"
 #include <overlayRotator.h>
 
-using overlay::Rotator;
+using namespace overlay;
+using namespace qdutils;
 using namespace overlay::utils;
 namespace ovutils = overlay::utils;
 
@@ -90,6 +91,10 @@ bool MDPComp::init(hwc_context_t *ctx) {
        (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
         (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
         sEnabled = true;
+        if(!setupBasePipe(ctx)) {
+            ALOGE("%s: Failed to setup primary base pipe", __FUNCTION__);
+            return false;
+        }
     }
 
     sDebugLogs = false;
@@ -99,9 +104,10 @@ bool MDPComp::init(hwc_context_t *ctx) {
     }
 
     sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
-    if(property_get("debug.mdpcomp.maxpermixer", property, NULL) > 0) {
-        if(atoi(property) != 0)
-            sMaxPipesPerMixer = true;
+    if(property_get("debug.mdpcomp.maxpermixer", property, "-1") > 0) {
+        int val = atoi(property);
+        if(val >= 0)
+            sMaxPipesPerMixer = min(val, MAX_PIPES_PER_MIXER);
     }
 
     unsigned long idle_timeout = DEFAULT_IDLE_TIME;
@@ -291,15 +297,18 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     if((crop_w < 5)||(crop_h < 5))
         return false;
 
+    const uint32_t downscale =
+            qdutils::MDPVersion::getInstance().getMaxMDPDownscale();
     if(ctx->mMDP.version >= qdutils::MDSS_V5) {
-        /* Workaround for downscales larger than 4x.
-         * Will be removed once decimator block is enabled for MDSS
-         */
-        if(w_dscale > 4.0f || h_dscale > 4.0f)
+        if(!qdutils::MDPVersion::getInstance().supportsDecimation()) {
+            if(crop_w > MAX_DISPLAY_DIM || w_dscale > downscale ||
+                    h_dscale > downscale)
+                return false;
+        } else if(w_dscale > 64 || h_dscale > 64) {
             return false;
-    } else {
-        if(w_dscale > 8.0f || h_dscale > 8.0f)
-            // MDP 4 supports 1/8 downscale
+        }
+    } else { //A-family
+        if(w_dscale > downscale || h_dscale > downscale)
             return false;
     }
 
@@ -314,7 +323,6 @@ ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type) {
     case MDPCOMP_OV_DMA:
         mdp_pipe = ov.nextPipe(ovutils::OV_MDP_PIPE_DMA, mDpy);
         if(mdp_pipe != ovutils::OV_INVALID) {
-            ctx->mDMAInUse = true;
             return mdp_pipe;
         }
     case MDPCOMP_OV_ANY:
@@ -347,6 +355,10 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     } else if(ctx->mExtDispConfiguring) {
         ALOGD_IF( isDebug(),"%s: External Display connection is pending",
                   __FUNCTION__);
+        ret = false;
+    } else if(ctx->isPaddingRound) {
+        ctx->isPaddingRound = false;
+        ALOGD_IF(isDebug(), "%s: padding round",__FUNCTION__);
         ret = false;
     }
     return ret;
@@ -508,14 +520,8 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
 
 /* Checks for conditions where YUV layers cannot be bypassed */
 bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
-
     if(isSkipLayer(layer)) {
         ALOGE("%s: Unable to bypass skipped YUV", __FUNCTION__);
-        return false;
-    }
-
-    if(ctx->mNeedsRotator && ctx->mDMAInUse) {
-        ALOGE("%s: No DMA for Rotator",__FUNCTION__);
         return false;
     }
 
@@ -612,7 +618,7 @@ int MDPComp::getAvailablePipes(hwc_context_t* ctx) {
     int numAvailable = ov.availablePipes(mDpy);
 
     //Reserve DMA for rotator
-    if(ctx->mNeedsRotator)
+    if(Overlay::getDMAMode() == Overlay::DMA_BLOCK_MODE)
         numAvailable -= numDMAPipes;
 
     //Reserve pipe(s)for FB
@@ -649,7 +655,6 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
 }
 
 bool MDPComp::programMDP(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
-    ctx->mDMAInUse = false;
     if(!allocLayerPipes(ctx, list)) {
         ALOGD_IF(isDebug(), "%s: Unable to allocate MDP pipes", __FUNCTION__);
         return false;
@@ -802,59 +807,32 @@ int MDPCompLowRes::pipesNeeded(hwc_context_t *ctx,
 }
 
 bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
-                                    hwc_display_contents_1_t* list) {
-    if(isYuvPresent(ctx, mDpy)) {
-        int nYuvCount = ctx->listStats[mDpy].yuvCount;
+        hwc_display_contents_1_t* list) {
+    for(int index = 0; index < mCurrentFrame.layerCount; index++) {
 
-        for(int index = 0; index < nYuvCount ; index ++) {
-            int nYuvIndex = ctx->listStats[mDpy].yuvIndices[index];
-
-            if(mCurrentFrame.isFBComposed[nYuvIndex])
-                continue;
-
-            hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
-
-            int mdpIndex = mCurrentFrame.layerToMDP[nYuvIndex];
-
-            PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
-            info.pipeInfo = new MdpPipeInfoLowRes;
-            info.rot = NULL;
-            MdpPipeInfoLowRes& pipe_info = *(MdpPipeInfoLowRes*)info.pipeInfo;
-
-            pipe_info.index = getMdpPipe(ctx, MDPCOMP_OV_VG);
-            if(pipe_info.index == ovutils::OV_INVALID) {
-                ALOGD_IF(isDebug(), "%s: Unable to get pipe for Videos",
-                         __FUNCTION__);
-                return false;
-            }
-        }
-    }
-
-    for(int index = 0 ; index < mCurrentFrame.layerCount; index++ ) {
         if(mCurrentFrame.isFBComposed[index]) continue;
+
         hwc_layer_1_t* layer = &list->hwLayers[index];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-
-        if(isYuvBuffer(hnd))
-            continue;
-
         int mdpIndex = mCurrentFrame.layerToMDP[index];
-
         PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
         info.pipeInfo = new MdpPipeInfoLowRes;
         info.rot = NULL;
         MdpPipeInfoLowRes& pipe_info = *(MdpPipeInfoLowRes*)info.pipeInfo;
-
         ePipeType type = MDPCOMP_OV_ANY;
 
-        if(!qhwc::needsScaling(layer) && !ctx->mNeedsRotator
-           && ctx->mMDP.version >= qdutils::MDSS_V5) {
+        if(isYuvBuffer(hnd)) {
+            type = MDPCOMP_OV_VG;
+        } else if(!qhwc::needsScaling(ctx, layer, mDpy)
+            && Overlay::getDMAMode() != Overlay::DMA_BLOCK_MODE
+            && ctx->mMDP.version >= qdutils::MDSS_V5) {
             type = MDPCOMP_OV_DMA;
         }
 
         pipe_info.index = getMdpPipe(ctx, type);
         if(pipe_info.index == ovutils::OV_INVALID) {
-            ALOGD_IF(isDebug(), "%s: Unable to get pipe for UI", __FUNCTION__);
+            ALOGD_IF(isDebug(), "%s: Unable to get pipe type = %d",
+                __FUNCTION__, (int) type);
             return false;
         }
     }
@@ -980,54 +958,32 @@ bool MDPCompHighRes::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
 }
 
 bool MDPCompHighRes::allocLayerPipes(hwc_context_t *ctx,
-                                     hwc_display_contents_1_t* list) {
-    overlay::Overlay& ov = *ctx->mOverlay;
-    int layer_count = ctx->listStats[mDpy].numAppLayers;
+        hwc_display_contents_1_t* list) {
+    for(int index = 0 ; index < mCurrentFrame.layerCount; index++) {
 
-    if(isYuvPresent(ctx, mDpy)) {
-        int nYuvCount = ctx->listStats[mDpy].yuvCount;
+        if(mCurrentFrame.isFBComposed[index]) continue;
 
-        for(int index = 0; index < nYuvCount; index ++) {
-            int nYuvIndex = ctx->listStats[mDpy].yuvIndices[index];
-            hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
-            PipeLayerPair& info = mCurrentFrame.mdpToLayer[nYuvIndex];
-            info.pipeInfo = new MdpPipeInfoHighRes;
-            info.rot = NULL;
-            MdpPipeInfoHighRes& pipe_info = *(MdpPipeInfoHighRes*)info.pipeInfo;
-            if(!acquireMDPPipes(ctx, layer, pipe_info,MDPCOMP_OV_VG)) {
-                ALOGD_IF(isDebug(),"%s: Unable to get pipe for videos",
-                         __FUNCTION__);
-                //TODO: windback pipebook data on fail
-                return false;
-            }
-            pipe_info.zOrder = nYuvIndex;
-        }
-    }
-
-    for(int index = 0 ; index < layer_count ; index++ ) {
         hwc_layer_1_t* layer = &list->hwLayers[index];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-
-        if(isYuvBuffer(hnd))
-            continue;
-
         PipeLayerPair& info = mCurrentFrame.mdpToLayer[index];
         info.pipeInfo = new MdpPipeInfoHighRes;
         info.rot = NULL;
         MdpPipeInfoHighRes& pipe_info = *(MdpPipeInfoHighRes*)info.pipeInfo;
-
         ePipeType type = MDPCOMP_OV_ANY;
 
-        if(!qhwc::needsScaling(layer) && !ctx->mNeedsRotator
-           && ctx->mMDP.version >= qdutils::MDSS_V5)
+        if(isYuvBuffer(hnd)) {
+            type = MDPCOMP_OV_VG;
+        } else if(!qhwc::needsScaling(ctx, layer, mDpy)
+            && Overlay::getDMAMode() != Overlay::DMA_BLOCK_MODE
+            && ctx->mMDP.version >= qdutils::MDSS_V5) {
             type = MDPCOMP_OV_DMA;
+        }
 
         if(!acquireMDPPipes(ctx, layer, pipe_info, type)) {
-            ALOGD_IF(isDebug(), "%s: Unable to get pipe for UI", __FUNCTION__);
-            //TODO: windback pipebook data on fail
+            ALOGD_IF(isDebug(), "%s: Unable to get pipe for type = %d",
+                    __FUNCTION__, (int) type);
             return false;
         }
-        pipe_info.zOrder = index;
     }
     return true;
 }

@@ -43,6 +43,7 @@ enum mdp_version {
     MDP_V2_2    = 220,
     MDP_V3_0    = 300,
     MDP_V3_0_3  = 303,
+    MDP_V3_0_4  = 304,
     MDP_V3_1    = 310,
     MDP_V4_0    = 400,
     MDP_V4_1    = 410,
@@ -50,6 +51,16 @@ enum mdp_version {
     MDP_V4_3    = 430,
     MDP_V4_4    = 440,
     MDSS_V5     = 500,
+};
+
+enum mdp_rev {
+    MDSS_MDP_HW_REV_100 = 0x10000000,
+    MDSS_MDP_HW_REV_101 = 0x10010000, //8x26
+    MDSS_MDP_HW_REV_102 = 0x10020000,
+};
+
+enum {
+    MAX_DISPLAY_DIM = 2048,
 };
 
 #define MDDI_PANEL       '1'
@@ -76,6 +87,10 @@ public:
     uint8_t getRGBPipes() { return mRGBPipes; }
     uint8_t getVGPipes() { return mVGPipes; }
     uint8_t getDMAPipes() { return mDMAPipes; }
+    bool supportsDecimation();
+    uint32_t getMaxMDPDownscale();
+    bool supportsBWC();
+    bool is8x26();
 private:
     int mMDPVersion;
     char mPanelType;
@@ -84,6 +99,8 @@ private:
     uint8_t mRGBPipes;
     uint8_t mVGPipes;
     uint8_t mDMAPipes;
+    uint32_t mFeatures;
+    uint32_t mMDPDownscale;
 };
 }; //namespace qdutils
 #endif //INCLUDE_LIBQCOMUTILS_MDPVER

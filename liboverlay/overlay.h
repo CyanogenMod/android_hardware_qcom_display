@@ -40,6 +40,8 @@ class GenericPipe;
 
 class Overlay : utils::NoCopy {
 public:
+    enum { DMA_BLOCK_MODE, DMA_LINE_MODE };
+
     /* dtor close */
     ~Overlay();
 
@@ -76,6 +78,10 @@ public:
     static Overlay* getInstance();
     /* Returns available ("unallocated") pipes for a display */
     int availablePipes(int dpy);
+    /* Returns if any of the requested pipe type is attached to any of the
+     * displays
+     */
+    bool isPipeTypeAttached(utils::eMdpPipeType type);
     /* set the framebuffer index for external display */
     void setExtFbNum(int fbNum);
     /* Returns framebuffer index of the current external display */
@@ -84,6 +90,10 @@ public:
      * to populate.
      */
     void getDump(char *buf, size_t len);
+    /* Reset usage and allocation bits on all pipes for given display */
+    void clear(int dpy);
+    static void setDMAMode(const int& mode);
+    static int getDMAMode();
 
 private:
     /* Ctor setup */
@@ -148,6 +158,7 @@ private:
     /* Singleton Instance*/
     static Overlay *sInstance;
     static int sExtFbIndex;
+    static int sDMAMode;
 };
 
 inline void Overlay::validate(int index) {
@@ -174,6 +185,15 @@ inline void Overlay::setExtFbNum(int fbNum) {
 
 inline int Overlay::getExtFbNum() {
     return sExtFbIndex;
+}
+
+inline void Overlay::setDMAMode(const int& mode) {
+    if(mode == DMA_LINE_MODE || mode == DMA_BLOCK_MODE)
+        sDMAMode = mode;
+}
+
+inline int Overlay::getDMAMode() {
+    return sDMAMode;
 }
 
 inline bool Overlay::PipeBook::valid() {
