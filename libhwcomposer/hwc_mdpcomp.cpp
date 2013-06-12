@@ -778,7 +778,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         //Destination over
         mCurrentFrame.fbZ = -1;
         if(mCurrentFrame.fbCount)
-            mCurrentFrame.fbZ = ctx->listStats[mDpy].yuvCount;
+            mCurrentFrame.fbZ = mCurrentFrame.mdpCount;
 
         mCurrentFrame.map();
         if(!programYUV(ctx, list)) {
