@@ -29,10 +29,12 @@ static inline bool isEqual(float f1, float f2) {
         return ((int)(f1*100) == (int)(f2*100)) ? true : false;
 }
 
-//Since this is unavailable on Android, defining it in terms of base 10
+#ifdef ANDROID_JELLYBEAN_MR1
+//Since this is unavailable on Android 4.2.2, defining it in terms of base 10
 static inline float log2f(const float& x) {
     return log(x) / log(2);
 }
+#endif
 
 namespace ovutils = overlay::utils;
 namespace overlay {
