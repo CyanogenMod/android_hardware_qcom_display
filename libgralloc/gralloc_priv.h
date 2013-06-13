@@ -54,6 +54,9 @@ enum {
      * cannot be used with noncontiguous heaps */
     GRALLOC_USAGE_PRIVATE_UNCACHED        =       0x02000000,
 
+    /* Buffer content should be displayed on an primary display only */
+    GRALLOC_USAGE_PRIVATE_INTERNAL_ONLY   =       0x04000000,
+
     /* Buffer content should be displayed on an external display only */
     GRALLOC_USAGE_PRIVATE_EXTERNAL_ONLY   =       0x08000000,
 

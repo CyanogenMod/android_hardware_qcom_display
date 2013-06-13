@@ -351,6 +351,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].preMultipliedAlpha = false;
     ctx->listStats[dpy].planeAlpha = false;
     ctx->listStats[dpy].yuvCount = 0;
+    ctx->listStats[dpy].extOnlyLayerIndex = -1;
 
     for (size_t i = 0; i < list->numHwLayers; i++) {
         hwc_layer_1_t const* layer = &list->hwLayers[i];
@@ -378,6 +379,10 @@ void setListStats(hwc_context_t *ctx,
             ctx->listStats[dpy].planeAlpha = true;
         if(!ctx->listStats[dpy].needsAlphaScale)
             ctx->listStats[dpy].needsAlphaScale = isAlphaScaled(layer);
+
+        if(UNLIKELY(isExtOnly(hnd))){
+            ctx->listStats[dpy].extOnlyLayerIndex = i;
+        }
     }
     setYUVProp(ctx->listStats[dpy].yuvCount);
 }
