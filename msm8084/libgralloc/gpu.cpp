@@ -26,7 +26,6 @@
 #include "memalloc.h"
 #include "alloc_controller.h"
 #include <qdMetaData.h>
-#include "mdp_version.h"
 
 using namespace gralloc;
 
@@ -69,11 +68,13 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
         data.align = getpagesize();
 
     /* force 1MB alignment selectively for secure buffers, MDP5 onwards */
-    if ((qdutils::MDPVersion::getInstance().getMDPVersion() >= \
-         qdutils::MDSS_V5) && (usage & GRALLOC_USAGE_PROTECTED)) {
+#ifdef MDSS_TARGET
+    if (usage & GRALLOC_USAGE_PROTECTED) {
         data.align = ALIGN(data.align, SZ_1M);
         size = ALIGN(size, data.align);
     }
+#endif
+
     data.size = size;
     data.pHandle = (unsigned int) pHandle;
     err = mAllocCtrl->allocate(data, usage);
@@ -105,16 +106,15 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
 
         if (bufferType == BUFFER_TYPE_VIDEO) {
             if (usage & GRALLOC_USAGE_HW_CAMERA_WRITE) {
-                if ((qdutils::MDPVersion::getInstance().getMDPVersion() <
-                     qdutils::MDSS_V5)) { //A-Family
-                    flags |= private_handle_t::PRIV_FLAGS_ITU_R_601_FR;
-                } else {
+#ifndef MDSS_TARGET
+                flags |= private_handle_t::PRIV_FLAGS_ITU_R_601_FR;
+#else
                     if (usage & (GRALLOC_USAGE_HW_TEXTURE |
                                  GRALLOC_USAGE_HW_VIDEO_ENCODER))
                         flags |= private_handle_t::PRIV_FLAGS_ITU_R_709;
                     else if (usage & GRALLOC_USAGE_HW_CAMERA_ZSL)
                         flags |= private_handle_t::PRIV_FLAGS_ITU_R_601_FR;
-                }
+#endif
             } else {
                 flags |= private_handle_t::PRIV_FLAGS_ITU_R_601;
             }
