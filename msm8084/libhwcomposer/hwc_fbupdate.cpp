@@ -231,15 +231,15 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
         ovutils::Whf info(hnd->width, hnd->height,
                           ovutils::getMdpFormat(hnd->format), hnd->size);
 
-        //Request left RGB pipe
-        ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_RGB, mDpy);
+        //Request left pipe
+        ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy);
         if(destL == ovutils::OV_INVALID) { //None available
             ALOGE("%s: No pipes available to configure fb for dpy %d's left"
                     " mixer", __FUNCTION__, mDpy);
             return false;
         }
-        //Request right RGB pipe
-        ovutils::eDest destR = ov.nextPipe(ovutils::OV_MDP_PIPE_RGB, mDpy);
+        //Request right pipe
+        ovutils::eDest destR = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy);
         if(destR == ovutils::OV_INVALID) { //None available
             ALOGE("%s: No pipes available to configure fb for dpy %d's right"
                     " mixer", __FUNCTION__, mDpy);
