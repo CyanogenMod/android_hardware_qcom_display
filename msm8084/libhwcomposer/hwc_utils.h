@@ -316,6 +316,8 @@ struct hwc_context_t {
     bool isPaddingRound;
     // External Orientation
     int mExtOrientation;
+    //Flags the transition of a video session
+    bool mVideoTransFlag;
 };
 
 namespace qhwc {
