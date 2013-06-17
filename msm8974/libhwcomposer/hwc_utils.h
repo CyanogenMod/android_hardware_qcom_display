@@ -332,6 +332,8 @@ struct hwc_context_t {
     bool mBasePipeSetup;
     //Drawing round when we use GPU
     bool isPaddingRound;
+    //Flags the transition of a video session
+    bool mVideoTransFlag;
 };
 
 namespace qhwc {

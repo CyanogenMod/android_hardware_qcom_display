@@ -70,8 +70,13 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         ovutils::Whf info(hnd->width, hnd->height,
                           ovutils::getMdpFormat(hnd->format), hnd->size);
 
-        //Request an RGB pipe
-        ovutils::eDest dest = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy);
+        //Request a pipe
+        ovutils::eMdpPipeType type = ovutils::OV_MDP_PIPE_ANY;
+        if(qdutils::MDPVersion::getInstance().is8x26() && mDpy) {
+            //For 8x26 external always use DMA pipe
+            type = ovutils::OV_MDP_PIPE_DMA;
+        }
+        ovutils::eDest dest = ov.nextPipe(type, mDpy);
         if(dest == ovutils::OV_INVALID) { //None available
             ALOGE("%s: No pipes available to configure framebuffer",
                 __FUNCTION__);
@@ -108,13 +113,18 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             static_cast<ovutils::eTransform>(transform);
         ov.setTransform(orient, dest);
 
+        if(!qdutils::MDPVersion::getInstance().is8x26()) {
+            getNonWormholeRegion(list, sourceCrop);
+        }
+
         hwc_rect_t displayFrame = sourceCrop;
         ovutils::Dim dpos(displayFrame.left,
                           displayFrame.top,
                           displayFrame.right - displayFrame.left,
                           displayFrame.bottom - displayFrame.top);
-        // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
-        if(mDpy)
+
+        if(mDpy && !qdutils::MDPVersion::getInstance().is8x26())
+            // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
             getActionSafePosition(ctx, mDpy, dpos.x, dpos.y, dpos.w, dpos.h);
         ov.setPosition(dpos, dest);
 

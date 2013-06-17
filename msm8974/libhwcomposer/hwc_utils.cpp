@@ -346,7 +346,8 @@ static void setYUVProp(int yuvCount) {
 
 void setListStats(hwc_context_t *ctx,
         const hwc_display_contents_1_t *list, int dpy) {
-
+    const int prevYuvCount = ctx->listStats[dpy].yuvCount;
+    memset(&ctx->listStats[dpy], 0, sizeof(ListStats));
     ctx->listStats[dpy].numAppLayers = list->numHwLayers - 1;
     ctx->listStats[dpy].fbLayerIndex = list->numHwLayers - 1;
     ctx->listStats[dpy].skipCount = 0;
@@ -390,6 +391,11 @@ void setListStats(hwc_context_t *ctx,
                     isAlphaScaled(ctx, layer, dpy);
     }
     setYUVProp(ctx->listStats[dpy].yuvCount);
+    //The marking of video begin/end is useful on some targets where we need
+    //to have a padding round to be able to shift pipes across mixers.
+    if(prevYuvCount != ctx->listStats[dpy].yuvCount) {
+        ctx->mVideoTransFlag = true;
+    }
 }
 
 
