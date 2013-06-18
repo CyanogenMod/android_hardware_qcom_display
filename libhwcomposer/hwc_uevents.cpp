@@ -150,7 +150,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 }else if(!strncmp(s1,"wfd",strlen(s1))) {
                     ctx->mExtDisplay->teardownWFDDisplay();
                 }
-                Locker::Autolock _l(ctx->mExtSetLock);
+                Locker::Autolock _l(ctx->mExtLock);
                 clear(ctx, dpy);
                 ALOGD("%s sending hotplug: connected = %d and dpy:%d",
                       __FUNCTION__, connected, dpy);
@@ -172,7 +172,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                         // teardown Active WFD Display
                         ctx->mExtDisplay->teardownWFDDisplay();
                         {
-                            Locker::Autolock _l(ctx->mExtSetLock);
+                            Locker::Autolock _l(ctx->mExtLock);
                             clear(ctx, dpy);
                             //send hotplug disconnect event
                             ALOGD_IF(UEVENT_DEBUG, "sending hotplug: disconnect"
@@ -197,7 +197,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,
                         connected);
                 ctx->dpyAttr[dpy].connected = true;
-                Locker::Autolock _l(ctx->mExtSetLock); //hwc comp could be on
+                Locker::Autolock _l(ctx->mExtLock); //hwc comp could be on
                 ctx->proc->hotplug(ctx->proc, dpy, connected);
                 break;
             }
