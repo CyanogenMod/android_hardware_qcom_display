@@ -430,6 +430,14 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
                 __FUNCTION__);
             return false;
         }
+
+        //For 8x26 with panel width>1k, if RGB layer needs HFLIP fail mdp comp
+        // may not need it if Gfx pre-rotation can handle all flips & rotations
+        if(qdutils::MDPVersion::getInstance().is8x26() &&
+                                (ctx->dpyAttr[mDpy].xres > 1024) &&
+                                (layer->transform & HWC_TRANSFORM_FLIP_H) &&
+                                (!isYuvBuffer(hnd)))
+                   return false;
     }
 
     //If all above hard conditions are met we can do full or partial MDP comp.
