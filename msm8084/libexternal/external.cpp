@@ -498,32 +498,34 @@ int ExternalDisplay::getModeOrder(int mode)
             return 9; // 576p 4:3
         case HDMI_VFRMT_720x576p50_16_9:
             return 10; // 576p 16:9
+        case HDMI_VFRMT_1024x768p60_4_3:
+            return 11; // 768p 4:3 Vesa format
         case HDMI_VFRMT_1280x1024p60_5_4:
-            return 11; // 1024p; Vesa format
+            return 12; // 1024p Vesa format
         case HDMI_VFRMT_1280x720p50_16_9:
-            return 12; // 720p@50Hz
+            return 13; // 720p@50Hz
         case HDMI_VFRMT_1280x720p60_16_9:
-            return 13; // 720p@60Hz
+            return 14; // 720p@60Hz
         case HDMI_VFRMT_1920x1080p24_16_9:
-            return 14; //1080p@24Hz
+            return 15; //1080p@24Hz
         case HDMI_VFRMT_1920x1080p25_16_9:
-            return 15; //108-p@25Hz
+            return 16; //108-p@25Hz
         case HDMI_VFRMT_1920x1080p30_16_9:
-            return 16; //1080p@30Hz
+            return 17; //1080p@30Hz
         case HDMI_VFRMT_1920x1080p50_16_9:
-            return 17; //1080p@50Hz
+            return 18; //1080p@50Hz
         case HDMI_VFRMT_1920x1080p60_16_9:
-            return 18; //1080p@60Hz
+            return 19; //1080p@60Hz
         case HDMI_VFRMT_2560x1600p60_16_9:
-            return 19; //WQXGA@60Hz541
+            return 20; //WQXGA@60Hz541
         case HDMI_VFRMT_3840x2160p24_16_9:
-            return 20;//2160@24Hz
+            return 21;//2160@24Hz
         case HDMI_VFRMT_3840x2160p25_16_9:
-            return 21;//2160@25Hz
+            return 22;//2160@25Hz
         case HDMI_VFRMT_3840x2160p30_16_9:
-            return 22; //2160@30Hz
+            return 23; //2160@30Hz
         case HDMI_VFRMT_4096x2160p24_16_9:
-            return 23; //4kx2k@24Hz
+            return 24; //4kx2k@24Hz
     }
 }
 
@@ -580,8 +582,10 @@ bool ExternalDisplay::isInterlacedMode(int ID) {
         case HDMI_VFRMT_1440x576i50_16_9:
         case HDMI_VFRMT_1920x1080i60_16_9:
             interlaced = true;
+            break;
         default:
             interlaced = false;
+            break;
     }
     return interlaced;
 }
