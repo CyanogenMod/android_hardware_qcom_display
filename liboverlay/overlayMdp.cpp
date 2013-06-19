@@ -167,7 +167,6 @@ bool MdpCtrl::set() {
     int mdpVersion = MDPVersion::getInstance().getMDPVersion();
     //deferred calcs, so APIs could be called in any order.
     doTransform();
-    doDownscale();
     utils::Whf whf = getSrcWhf();
     if(utils::isYuv(whf.format)) {
         utils::normalizeCrop(mOVInfo.src_rect.x, mOVInfo.src_rect.w);
@@ -181,7 +180,17 @@ bool MdpCtrl::set() {
                 (mOVInfo.src_rect.h % 4))
                 mOVInfo.src_rect.h = utils::aligndown(mOVInfo.src_rect.h, 4);
         }
+    } else {
+        if (mdpVersion >= MDSS_V5) {
+            // Check for 1-pixel down-scaling
+            if (mOVInfo.src_rect.w - mOVInfo.dst_rect.w == 1)
+                mOVInfo.src_rect.w -= 1;
+            if (mOVInfo.src_rect.h - mOVInfo.dst_rect.h == 1)
+                mOVInfo.src_rect.h -= 1;
+        }
     }
+
+    doDownscale();
 
     if(this->ovChanged() || mForceSet) {
         mForceSet = false;
