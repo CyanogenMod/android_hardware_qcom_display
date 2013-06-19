@@ -222,16 +222,17 @@ int gralloc_lock(gralloc_module_t const* module,
             pthread_mutex_unlock(lock);
         }
         *vaddr = (void*)hnd->base;
-        //Invalidate if reading in software. No need to do this for the metadata
-        //buffer as it is only read/written in software.
-        IMemAlloc* memalloc = getAllocator(hnd->flags) ;
-        err = memalloc->clean_buffer((void*)hnd->base,
-                                     hnd->size, hnd->offset, hnd->fd,
-                                     CACHE_INVALIDATE);
-        if ((usage & GRALLOC_USAGE_SW_WRITE_MASK) &&
-            !(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
-            // Mark the buffer to be flushed after cpu read/write
-            hnd->flags |= private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
+        if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_ION) {
+            //Invalidate if reading in software. No need to do this for the
+            //metadata buffer as it is only read/written in software.
+            IMemAlloc* memalloc = getAllocator(hnd->flags) ;
+            err = memalloc->clean_buffer((void*)hnd->base,
+                                         hnd->size, hnd->offset, hnd->fd,
+                                         CACHE_INVALIDATE);
+            if (usage & GRALLOC_USAGE_SW_WRITE_MASK) {
+                // Mark the buffer to be flushed after cpu read/write
+                hnd->flags |= private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
+            }
         }
     } else {
         hnd->flags |= private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
@@ -248,19 +249,21 @@ int gralloc_unlock(gralloc_module_t const* module,
     private_handle_t* hnd = (private_handle_t*)handle;
     IMemAlloc* memalloc = getAllocator(hnd->flags);
 
-    if (hnd->flags & private_handle_t::PRIV_FLAGS_NEEDS_FLUSH) {
-        err = memalloc->clean_buffer((void*)hnd->base,
-                                     hnd->size, hnd->offset, hnd->fd,
-                                     CACHE_CLEAN_AND_INVALIDATE);
-        hnd->flags &= ~private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
-    } else if(hnd->flags & private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH) {
-        hnd->flags &= ~private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
-    } else {
-        //Probably a round about way to do this, but this avoids adding new
-        //flags
-        err = memalloc->clean_buffer((void*)hnd->base,
-                                     hnd->size, hnd->offset, hnd->fd,
-                                     CACHE_INVALIDATE);
+    if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_ION) {
+        if (hnd->flags & private_handle_t::PRIV_FLAGS_NEEDS_FLUSH) {
+            err = memalloc->clean_buffer((void*)hnd->base,
+                                         hnd->size, hnd->offset, hnd->fd,
+                                         CACHE_CLEAN_AND_INVALIDATE);
+            hnd->flags &= ~private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
+        } else if(hnd->flags & private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH) {
+            hnd->flags &= ~private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
+        } else {
+            //Probably a round about way to do this, but this avoids adding new
+            //flags
+            err = memalloc->clean_buffer((void*)hnd->base,
+                                         hnd->size, hnd->offset, hnd->fd,
+                                         CACHE_INVALIDATE);
+        }
     }
 
     return err;
