@@ -30,6 +30,7 @@
 #include <linux/fb.h>
 #include "qdMetaData.h"
 #include <overlayUtils.h>
+#include <cutils/sockets.h>
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
@@ -40,7 +41,7 @@
 // For support of virtual displays
 #define HWC_DISPLAY_VIRTUAL     (HWC_DISPLAY_EXTERNAL+1)
 #define MAX_DISPLAYS            (HWC_NUM_DISPLAY_TYPES+1)
-
+#define DAEMON_SOCKET "pps"
 //Fwrd decls
 struct hwc_context_t;
 
@@ -105,6 +106,14 @@ struct LayerProp {
 struct VsyncState {
     bool enable;
     bool fakevsync;
+};
+
+struct CablProp {
+    bool enabled;
+    bool start;
+    bool videoOnly;
+    //daemon_socket for connection to pp-daemon
+    int daemon_socket;
 };
 
 // LayerProp::flag values
@@ -312,6 +321,7 @@ struct hwc_context_t {
     qhwc::LayerProp *layerProp[MAX_DISPLAYS];
     qhwc::LayerRotMap *mLayerRotMap[MAX_DISPLAYS];
     qhwc::MDPComp *mMDPComp[MAX_DISPLAYS];
+    qhwc::CablProp mCablProp;
 
     //Securing in progress indicator
     bool mSecuring;
