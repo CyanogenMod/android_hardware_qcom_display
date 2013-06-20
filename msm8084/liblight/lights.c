@@ -51,17 +51,8 @@ char const*const BLUE_LED_FILE
 char const*const LCD_FILE
         = "/sys/class/leds/lcd-backlight/brightness";
 
-char const*const RED_FREQ_FILE
-        = "/sys/class/leds/red/device/grpfreq";
-
-char const*const RED_PWM_FILE
-        = "/sys/class/leds/red/device/grppwm";
-
 char const*const RED_BLINK_FILE
-        = "/sys/class/leds/red/device/blink";
-
-char const*const LED_LOCK_UPDATE_FILE
-        = "/sys/class/leds/red/device/lock";
+        = "/sys/class/leds/red/blink";
 
 /**
  * device methods
@@ -127,7 +118,7 @@ set_speaker_light_locked(struct light_device_t* dev,
 {
     int len;
     int alpha, red, green, blue;
-    int blink, freq, pwm;
+    int blink;
     int onMS, offMS;
     unsigned int colorRGB;
 
@@ -155,40 +146,18 @@ set_speaker_light_locked(struct light_device_t* dev,
     blue = colorRGB & 0xFF;
 
     if (onMS > 0 && offMS > 0) {
-        int totalMS = onMS + offMS;
-
-        // the LED appears to blink about once per second if freq is 20
-        // 1000ms / 20 = 50
-        freq = totalMS / 50;
-        // pwm specifies the ratio of ON versus OFF
-        // pwm = 0 -> always off
-        // pwm = 255 => always on
-        pwm = (onMS * 255) / totalMS;
-
-        // the low 4 bits are ignored, so round up if necessary
-        if (pwm > 0 && pwm < 16)
-            pwm = 16;
-
         blink = 1;
     } else {
         blink = 0;
-        freq = 0;
-        pwm = 0;
     }
-
-    write_int(LED_LOCK_UPDATE_FILE, 1); // for LED On/Off synchronization
-
-    write_int(RED_LED_FILE, red);
-    write_int(GREEN_LED_FILE, green);
-    write_int(BLUE_LED_FILE, blue);
 
     if (blink) {
-        write_int(RED_FREQ_FILE, freq);
-        write_int(RED_PWM_FILE, pwm);
+        write_int(RED_BLINK_FILE, blink);
+    } else {
+        write_int(RED_LED_FILE, red);
+        write_int(GREEN_LED_FILE, green);
+        write_int(BLUE_LED_FILE, blue);
     }
-    write_int(RED_BLINK_FILE, blink);
-
-    write_int(LED_LOCK_UPDATE_FILE, 0);
 
     return 0;
 }
