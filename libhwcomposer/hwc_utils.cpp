@@ -308,12 +308,19 @@ void getAspectRatioPosition(hwc_context_t *ctx, int dpy, int orientation,
     switch(orientation) {
         case HAL_TRANSFORM_ROT_90:
         case HAL_TRANSFORM_ROT_270:
-            x = (fbWidth - (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres
-                        * fbHeight/ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres))/2;
             y = 0;
-            w = (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres *
-                    fbHeight/ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres);
             h = fbHeight;
+            if (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres <
+                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres) {
+                // Portrait primary panel
+                w = (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres *
+                     fbHeight/ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres);
+            } else {
+                //Landscape primary panel
+                w = (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres *
+                     fbHeight/ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres);
+            }
+            x = (fbWidth - w)/2;
             break;
         default:
             //Do nothing
