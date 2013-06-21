@@ -450,7 +450,7 @@ static int stretch_copybit(
             }
         }
         const uint32_t maxCount = sizeof(list.req)/sizeof(list.req[0]);
-        const struct copybit_rect_t bounds = { 0, 0, dst->w, dst->h };
+        const struct copybit_rect_t bounds = { 0, 0, (int)dst->w, (int)dst->h };
         struct copybit_rect_t clip;
         list.count = 0;
         status = 0;
@@ -499,8 +499,8 @@ static int blit_copybit(
     struct copybit_image_t const *src,
     struct copybit_region_t const *region)
 {
-    struct copybit_rect_t dr = { 0, 0, dst->w, dst->h };
-    struct copybit_rect_t sr = { 0, 0, src->w, src->h };
+    struct copybit_rect_t dr = { 0, 0, (int)dst->w, (int)dst->h };
+    struct copybit_rect_t sr = { 0, 0, (int)src->w, (int)src->h };
     return stretch_copybit(dev, dst, src, &dr, &sr, region);
 }
 
