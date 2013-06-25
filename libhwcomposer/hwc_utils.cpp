@@ -387,10 +387,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].extOnlyLayerIndex = -1;
     ctx->listStats[dpy].isDisplayAnimating = false;
 
-    //reset yuv indices
-    memset(ctx->listStats[dpy].yuvIndices, -1, MAX_NUM_APP_LAYERS);
-
-    for (size_t i = 0; i < (list->numHwLayers - 1); i++) {
+    for (size_t i = 0; i < (size_t)ctx->listStats[dpy].numAppLayers; i++) {
         hwc_layer_1_t const* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
@@ -399,14 +396,14 @@ void setListStats(hwc_context_t *ctx,
             ctx->listStats[dpy].isDisplayAnimating = true;
         }
 #endif
-        // continue if i reaches MAX_NUM_APP_LAYERS
-        if(i >= MAX_NUM_APP_LAYERS)
+        // continue if number of app layers exceeds MAX_NUM_APP_LAYERS
+        if(ctx->listStats[dpy].numAppLayers > MAX_NUM_APP_LAYERS)
             continue;
 
-        if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
-            continue;
-        //We disregard FB being skip for now! so the else if
-        } else if (isSkipLayer(&list->hwLayers[i])) {
+        //reset yuv indices
+        ctx->listStats[dpy].yuvIndices[i] = -1;
+
+        if (isSkipLayer(&list->hwLayers[i])) {
             ctx->listStats[dpy].skipCount++;
         }
 
