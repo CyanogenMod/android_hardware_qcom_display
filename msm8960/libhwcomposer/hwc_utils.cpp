@@ -850,7 +850,7 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     eTransform orient = static_cast<eTransform>(transform);
     int downscale = 0;
     int rotFlags = ovutils::ROT_FLAGS_NONE;
-    Whf whf(hnd->width, hnd->height,
+    Whf whf(getWidth(hnd), getHeight(hnd),
             getMdpFormat(hnd->format), hnd->size);
 
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
@@ -918,7 +918,7 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     const int downscale = 0;
     int rotFlags = ROT_FLAGS_NONE;
 
-    Whf whf(hnd->width, hnd->height,
+    Whf whf(getWidth(hnd), getHeight(hnd),
             getMdpFormat(hnd->format), hnd->size);
 
     setMdpFlags(layer, mdpFlagsL);
