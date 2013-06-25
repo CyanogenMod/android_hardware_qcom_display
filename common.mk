@@ -37,10 +37,9 @@ kernel_includes :=
 
 # Executed only on QCOM BSPs
 ifeq ($(TARGET_USES_QCOM_BSP),true)
-# On jb_mr2- dont enable QCOM Display features
-ifneq ($(call is-platform-sdk-version-at-least,18),true)
-# This flag is used to compile out any features that depend on framework changes
+# Enable QCOM Display features
     common_flags += -DQCOM_BSP
+ifneq ($(call is-platform-sdk-version-at-least,18),true)
     common_flags += -DANDROID_JELLYBEAN_MR1=1
 endif
 endif
