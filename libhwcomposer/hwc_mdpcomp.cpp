@@ -795,7 +795,7 @@ int MDPCompLowRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
         *(static_cast<MdpPipeInfoLowRes*>(PipeLayerPair.pipeInfo));
     eMdpFlags mdpFlags = OV_MDP_BACKEND_COMPOSITION;
     eZorder zOrder = static_cast<eZorder>(mdp_info.zOrder);
-    eIsFg isFg = IS_FG_OFF;
+    eIsFg isFg = (zOrder == ovutils::ZORDER_0)?IS_FG_SET:IS_FG_OFF;
     eDest dest = mdp_info.index;
 
     ALOGD_IF(isDebug(),"%s: configuring: layer: %p z_order: %d dest_pipe: %d",
@@ -1048,7 +1048,7 @@ int MDPCompHighRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
     MdpPipeInfoHighRes& mdp_info =
         *(static_cast<MdpPipeInfoHighRes*>(PipeLayerPair.pipeInfo));
     eZorder zOrder = static_cast<eZorder>(mdp_info.zOrder);
-    eIsFg isFg = IS_FG_OFF;
+    eIsFg isFg = (zOrder == ovutils::ZORDER_0)?IS_FG_SET:IS_FG_OFF;
     eMdpFlags mdpFlagsL = OV_MDP_BACKEND_COMPOSITION;
     eDest lDest = mdp_info.lIndex;
     eDest rDest = mdp_info.rIndex;
