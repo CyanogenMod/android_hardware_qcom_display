@@ -106,6 +106,51 @@ static int openFramebufferDevice(hwc_context_t *ctx)
     return 0;
 }
 
+static int ppdComm(const char* cmd, hwc_context_t *ctx) {
+    int ret = -1;
+    ret = write(ctx->mCablProp.daemon_socket, cmd, strlen(cmd));
+    if(ret < 0) {
+        ALOGE("Failed to send data over socket: %s",
+                strerror(errno));
+        return ret;
+    }
+    ALOGD_IF(HWC_UTILS_DEBUG, "%s: Sent command: %s", __FUNCTION__, cmd);
+    return 0;
+}
+
+static void connectPPDaemon(hwc_context_t *ctx)
+{
+    int ret = -1;
+    char property[PROPERTY_VALUE_MAX];
+    if ((property_get("ro.qualcomm.cabl", property, NULL) > 0) &&
+        (atoi(property) == 1)) {
+        ALOGD("%s: CABL is enabled", __FUNCTION__);
+        ctx->mCablProp.enabled = true;
+    } else {
+        ALOGD("%s: CABL is disabled", __FUNCTION__);
+        ctx->mCablProp.enabled = false;
+        return;
+    }
+
+    if ((property_get("persist.qcom.cabl.video_only", property, NULL) > 0) &&
+        (atoi(property) == 1)) {
+        ALOGD("%s: CABL is in video only mode", __FUNCTION__);
+        ctx->mCablProp.videoOnly = true;
+    } else {
+        ctx->mCablProp.videoOnly = false;
+    }
+
+    int daemon_socket = socket_local_client(DAEMON_SOCKET,
+                                            ANDROID_SOCKET_NAMESPACE_RESERVED,
+                                            SOCK_STREAM);
+    if(!daemon_socket) {
+        ALOGE("Connecting to socket failed: %s", strerror(errno));
+        ctx->mCablProp.enabled = false;
+        return;
+    }
+    ctx->mCablProp.daemon_socket = daemon_socket;
+}
+
 void initContext(hwc_context_t *ctx)
 {
     if(openFramebufferDevice(ctx) < 0) {
@@ -167,6 +212,8 @@ void initContext(hwc_context_t *ctx)
 
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
+
+    connectPPDaemon(ctx);
 }
 
 void closeContext(hwc_context_t *ctx)
@@ -312,21 +359,25 @@ bool isAlphaPresent(hwc_layer_1_t const* layer) {
     return false;
 }
 
-// Let CABL know we have a YUV layer
-static void setYUVProp(int yuvCount) {
-    static char property[PROPERTY_VALUE_MAX];
-    if(yuvCount > 0) {
-        if (property_get("hw.cabl.yuv", property, NULL) > 0) {
-            if (atoi(property) != 1) {
-                property_set("hw.cabl.yuv", "1");
-            }
-        }
-    } else {
-        if (property_get("hw.cabl.yuv", property, NULL) > 0) {
-            if (atoi(property) != 0) {
-                property_set("hw.cabl.yuv", "0");
-            }
-        }
+// Switch ppd on/off for YUV
+static void setYUVProp(hwc_context_t *ctx, int yuvCount) {
+    if (!ctx->mCablProp.enabled)
+        return;
+
+    if (yuvCount > 0 && !ctx->mCablProp.start) {
+        ctx->mCablProp.start = true;
+        if(ctx->mCablProp.videoOnly)
+            ppdComm("cabl:on", ctx);
+        else
+            ppdComm("cabl:yuv_on", ctx);
+
+    } else if (yuvCount == 0 && ctx->mCablProp.start) {
+        ctx->mCablProp.start = false;
+        if(ctx->mCablProp.videoOnly)
+            ppdComm("cabl:off", ctx);
+        else
+            ppdComm("cabl:yuv_off", ctx);
+        return;
     }
 }
 
@@ -368,7 +419,7 @@ void setListStats(hwc_context_t *ctx,
         if(!ctx->listStats[dpy].needsAlphaScale)
             ctx->listStats[dpy].needsAlphaScale = isAlphaScaled(layer);
     }
-    setYUVProp(ctx->listStats[dpy].yuvCount);
+    setYUVProp(ctx, ctx->listStats[dpy].yuvCount);
 }
 
 
