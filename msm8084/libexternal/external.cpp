@@ -670,26 +670,28 @@ int ExternalDisplay::getExtFbNum(int &fbNum) {
 bool ExternalDisplay::writeHPDOption(int userOption) const
 {
     bool ret = true;
-    char sysFsHPDFilePath[MAX_SYSFS_FILE_PATH];
-    snprintf(sysFsHPDFilePath ,sizeof(sysFsHPDFilePath),
-            "/sys/devices/virtual/graphics/fb%d/hpd", mHdmiFbNum);
-    int hdmiHPDFile = open(sysFsHPDFilePath,O_RDWR, 0);
-    if (hdmiHPDFile < 0) {
-        ALOGE("%s: state file '%s' not found : ret%d err str: %s", __FUNCTION__,
-                                sysFsHPDFilePath, hdmiHPDFile, strerror(errno));
-        ret = false;
-    } else {
-        int err = -1;
-        ALOGD_IF(DEBUG, "%s: option = %d", __FUNCTION__, userOption);
-        if(userOption)
-            err = write(hdmiHPDFile, "1", 2);
-        else
-            err = write(hdmiHPDFile, "0" , 2);
-        if (err <= 0) {
-            ALOGE("%s: file write failed '%s'", __FUNCTION__, sysFsHPDFilePath);
+    if(mHdmiFbNum != -1) {
+        char sysFsHPDFilePath[MAX_SYSFS_FILE_PATH];
+        snprintf(sysFsHPDFilePath ,sizeof(sysFsHPDFilePath),
+                 "/sys/devices/virtual/graphics/fb%d/hpd", mHdmiFbNum);
+        int hdmiHPDFile = open(sysFsHPDFilePath,O_RDWR, 0);
+        if (hdmiHPDFile < 0) {
+            ALOGE("%s: state file '%s' not found : ret%d err str: %s", __FUNCTION__,
+                  sysFsHPDFilePath, hdmiHPDFile, strerror(errno));
             ret = false;
+        } else {
+            int err = -1;
+            ALOGD_IF(DEBUG, "%s: option = %d", __FUNCTION__, userOption);
+            if(userOption)
+                err = write(hdmiHPDFile, "1", 2);
+            else
+                err = write(hdmiHPDFile, "0" , 2);
+            if (err <= 0) {
+                ALOGE("%s: file write failed '%s'", __FUNCTION__, sysFsHPDFilePath);
+                ret = false;
+            }
+            close(hdmiHPDFile);
         }
-        close(hdmiHPDFile);
     }
     return ret;
 }
