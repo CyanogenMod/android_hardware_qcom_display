@@ -41,6 +41,12 @@ class GenericPipe;
 class Overlay : utils::NoCopy {
 public:
     enum { DMA_BLOCK_MODE, DMA_LINE_MODE };
+    //Abstract Display types. Each backed by a LayerMixer,
+    //represented by a fb node.
+    //High res panels can be backed by 2 layer mixers and a single fb node.
+    enum { DPY_PRIMARY, DPY_EXTERNAL, DPY_WRITEBACK, DPY_UNUSED };
+    enum { DPY_MAX = DPY_UNUSED };
+    enum { MAX_FB_DEVICES = DPY_MAX };
 
     /* dtor close */
     ~Overlay();
@@ -85,6 +91,7 @@ public:
     /* set the framebuffer index for external display */
     void setExtFbNum(int fbNum);
     /* Returns framebuffer index of the current external display */
+    /* TODO Deprecate */
     int getExtFbNum();
     /* Returns pipe dump. Expects a NULL terminated buffer of big enough size
      * to populate.
@@ -94,6 +101,9 @@ public:
     void clear(int dpy);
     static void setDMAMode(const int& mode);
     static int getDMAMode();
+    /* Returns the framebuffer node backing up the display */
+    static int getFbForDpy(const int& dpy);
+    static bool displayCommit(const int& fd);
 
 private:
     /* Ctor setup */
@@ -104,8 +114,6 @@ private:
 
     /* Just like a Facebook for pipes, but much less profile info */
     struct PipeBook {
-        enum { DPY_PRIMARY, DPY_EXTERNAL, DPY_UNUSED };
-
         void init();
         void destroy();
         /* Check if pipe exists and return true, false otherwise */
@@ -157,7 +165,9 @@ private:
 
     /* Singleton Instance*/
     static Overlay *sInstance;
+    //TODO Deprecate
     static int sExtFbIndex;
+    static int sDpyFbMap[DPY_MAX];
     static int sDMAMode;
 };
 
@@ -171,7 +181,7 @@ inline void Overlay::validate(int index) {
 inline int Overlay::availablePipes(int dpy) {
      int avail = 0;
      for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
-       if((mPipeBook[i].mDisplay == PipeBook::DPY_UNUSED ||
+       if((mPipeBook[i].mDisplay == DPY_UNUSED ||
            mPipeBook[i].mDisplay == dpy) && PipeBook::isNotAllocated(i)) {
                 avail++;
         }
@@ -194,6 +204,11 @@ inline void Overlay::setDMAMode(const int& mode) {
 
 inline int Overlay::getDMAMode() {
     return sDMAMode;
+}
+
+inline int Overlay::getFbForDpy(const int& dpy) {
+    OVASSERT(dpy >= 0 && dpy < DPY_MAX, "Invalid dpy %d", dpy);
+    return sDpyFbMap[dpy];
 }
 
 inline bool Overlay::PipeBook::valid() {
