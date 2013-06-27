@@ -606,6 +606,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     int acquireFd[MAX_NUM_LAYERS];
     int count = 0;
     int releaseFd = -1;
+    int retireFd = -1;
     int fbFd = -1;
     int rotFd = -1;
     bool swapzero = false;
@@ -619,6 +620,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     }
     data.acq_fen_fd = acquireFd;
     data.rel_fen_fd = &releaseFd;
+    data.retire_fen_fd = &retireFd;
 
     char property[PROPERTY_VALUE_MAX];
     if(property_get("debug.egl.swapinterval", property, "1") > 0) {
@@ -718,14 +720,11 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         //Signals when MDP finishes reading rotator buffers.
         ctx->mLayerRotMap[dpy]->setReleaseFd(releaseFd);
     }
-
-    if(UNLIKELY(swapzero)){
+    close(releaseFd);
+    if(UNLIKELY(swapzero))
         list->retireFenceFd = -1;
-        close(releaseFd);
-    } else {
-        list->retireFenceFd = releaseFd;
-    }
-
+    else
+        list->retireFenceFd = retireFd;
     return ret;
 }
 
