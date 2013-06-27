@@ -108,7 +108,7 @@ static int openFramebufferDevice(hwc_context_t *ctx)
 
 static int ppdComm(const char* cmd, hwc_context_t *ctx) {
     int ret = -1;
-    ret = write(ctx->mCablProp.daemon_socket, cmd, strlen(cmd));
+    ret = send(ctx->mCablProp.daemon_socket, cmd, strlen(cmd), MSG_NOSIGNAL);
     if(ret < 0) {
         ALOGE("Failed to send data over socket: %s",
                 strerror(errno));
