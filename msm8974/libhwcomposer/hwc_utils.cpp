@@ -600,16 +600,11 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     int count = 0;
     int releaseFd = -1;
     int fbFd = -1;
-    int rotFd = -1;
     bool swapzero = false;
     int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
 
     struct mdp_buf_sync data;
     memset(&data, 0, sizeof(data));
-    //Until B-family supports sync for rotator
-    if(mdpVersion >= qdutils::MDSS_V5) {
-        data.flags = MDP_BUF_SYNC_FLAG_WAIT;
-    }
     data.acq_fen_fd = acquireFd;
     data.rel_fen_fd = &releaseFd;
 
@@ -619,33 +614,32 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
             swapzero = true;
     }
 
-#ifndef MDSS_TARGET
-    //Send acquireFenceFds to rotator
-    if(mdpVersion < qdutils::MDSS_V5) {
-        //A-family
+    for(uint32_t i = 0; i < ctx->mLayerRotMap[dpy]->getCount(); i++) {
         int rotFd = ctx->mRotMgr->getRotDevFd();
-        struct msm_rotator_buf_sync rotData;
-
-        for(uint32_t i = 0; i < ctx->mLayerRotMap[dpy]->getCount(); i++) {
-            memset(&rotData, 0, sizeof(rotData));
-            int& acquireFenceFd =
-                ctx->mLayerRotMap[dpy]->getLayer(i)->acquireFenceFd;
-            rotData.acq_fen_fd = acquireFenceFd;
-            rotData.session_id = ctx->mLayerRotMap[dpy]->getRot(i)->getSessId();
-            ioctl(rotFd, MSM_ROTATOR_IOCTL_BUFFER_SYNC, &rotData);
-            close(acquireFenceFd);
-             //For MDP to wait on.
-            acquireFenceFd = dup(rotData.rel_fen_fd);
+        int rotReleaseFd = -1;
+        struct mdp_buf_sync rotData;
+        memset(&rotData, 0, sizeof(rotData));
+        rotData.acq_fen_fd =
+                &ctx->mLayerRotMap[dpy]->getLayer(i)->acquireFenceFd;
+        rotData.rel_fen_fd = &rotReleaseFd; //driver to populate this
+        rotData.session_id = ctx->mLayerRotMap[dpy]->getRot(i)->getSessId();
+        int ret = 0;
+        ret = ioctl(rotFd, MSMFB_BUFFER_SYNC, &rotData);
+        if(ret < 0) {
+            ALOGE("%s: ioctl MSMFB_BUFFER_SYNC failed for rot sync, err=%s",
+                    __FUNCTION__, strerror(errno));
+        } else {
+            close(ctx->mLayerRotMap[dpy]->getLayer(i)->acquireFenceFd);
+            //For MDP to wait on.
+            ctx->mLayerRotMap[dpy]->getLayer(i)->acquireFenceFd =
+                    dup(rotReleaseFd);
             //A buffer is free to be used by producer as soon as its copied to
-            //rotator.
+            //rotator
             ctx->mLayerRotMap[dpy]->getLayer(i)->releaseFenceFd =
-                    rotData.rel_fen_fd;
+                    rotReleaseFd;
         }
-    } else {
-        //TODO B-family
     }
 
-#endif
     //Accumulate acquireFenceFds for MDP
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(list->hwLayers[i].compositionType == HWC_OVERLAY &&
@@ -709,11 +703,8 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     if (ctx->mCopyBit[dpy])
         ctx->mCopyBit[dpy]->setReleaseFd(releaseFd);
 
-    //A-family
-    if(mdpVersion < qdutils::MDSS_V5) {
-        //Signals when MDP finishes reading rotator buffers.
-        ctx->mLayerRotMap[dpy]->setReleaseFd(releaseFd);
-    }
+    //Signals when MDP finishes reading rotator buffers.
+    ctx->mLayerRotMap[dpy]->setReleaseFd(releaseFd);
 
     if(UNLIKELY(swapzero)){
         list->retireFenceFd = -1;

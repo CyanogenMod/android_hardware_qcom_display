@@ -237,11 +237,11 @@ public:
      * Expects a NULL terminated buffer of big enough size.
      */
     void getDump(char *buf, size_t len);
-    int getRotDevFd(); //Called on A-fam only
+    int getRotDevFd();
 private:
     overlay::Rotator *mRot[MAX_ROT_SESS];
     int mUseCount;
-    int mRotDevFd; //A-fam
+    int mRotDevFd;
 };
 
 
