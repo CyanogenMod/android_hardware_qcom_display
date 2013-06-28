@@ -360,9 +360,18 @@ bool isAlphaPresent(hwc_layer_1_t const* layer) {
 }
 
 // Switch ppd on/off for YUV
-static void setYUVProp(hwc_context_t *ctx, int yuvCount) {
+static void configurePPD(hwc_context_t *ctx, int yuvCount) {
     if (!ctx->mCablProp.enabled)
         return;
+
+    // No PPD for external
+    if (ctx->mExtDisplay->isExternalConnected()) {
+        if (ctx->mCablProp.start) {
+            ppdComm("cabl:off", ctx);
+            ctx->mCablProp.start = false;
+        }
+        return;
+    }
 
     if (yuvCount > 0 && !ctx->mCablProp.start) {
         ctx->mCablProp.start = true;
@@ -419,7 +428,8 @@ void setListStats(hwc_context_t *ctx,
         if(!ctx->listStats[dpy].needsAlphaScale)
             ctx->listStats[dpy].needsAlphaScale = isAlphaScaled(layer);
     }
-    setYUVProp(ctx, ctx->listStats[dpy].yuvCount);
+    if (dpy == HWC_DISPLAY_PRIMARY)
+        configurePPD(ctx, ctx->listStats[dpy].yuvCount);
 }
 
 
