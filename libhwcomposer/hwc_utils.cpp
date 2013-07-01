@@ -153,7 +153,7 @@ void initContext(hwc_context_t *ctx)
 
     ctx->mExtDisplay = new ExternalDisplay(ctx);
 
-    for (uint32_t i = 0; i < MAX_DISPLAYS; i++) {
+    for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         ctx->mLayerRotMap[i] = new LayerRotMap();
     }
 
@@ -193,7 +193,7 @@ void closeContext(hwc_context_t *ctx)
         ctx->mRotMgr = NULL;
     }
 
-    for(int i = 0; i < MAX_DISPLAYS; i++) {
+    for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         if(ctx->mCopyBit[i]) {
             delete ctx->mCopyBit[i];
             ctx->mCopyBit[i] = NULL;
@@ -210,7 +210,7 @@ void closeContext(hwc_context_t *ctx)
         ctx->mExtDisplay = NULL;
     }
 
-    for(int i = 0; i < MAX_DISPLAYS; i++) {
+    for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         if(ctx->mFBUpdate[i]) {
             delete ctx->mFBUpdate[i];
             ctx->mFBUpdate[i] = NULL;

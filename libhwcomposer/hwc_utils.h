@@ -37,10 +37,6 @@
 #define MAX_NUM_APP_LAYERS 32
 #define MAX_DISPLAY_DIM 2048
 
-// For support of virtual displays
-#define HWC_DISPLAY_VIRTUAL     (HWC_DISPLAY_EXTERNAL+1)
-#define MAX_DISPLAYS            (HWC_NUM_DISPLAY_TYPES+1)
-
 //Fwrd decls
 struct hwc_context_t;
 
@@ -293,7 +289,7 @@ struct hwc_context_t {
     const hwc_procs_t* proc;
 
     //CopyBit objects
-    qhwc::CopyBit *mCopyBit[MAX_DISPLAYS];
+    qhwc::CopyBit *mCopyBit[HWC_NUM_DISPLAY_TYPES];
 
     //Overlay object - NULL for non overlay devices
     overlay::Overlay *mOverlay;
@@ -301,16 +297,17 @@ struct hwc_context_t {
     overlay::RotMgr *mRotMgr;
 
     //Primary and external FB updater
-    qhwc::IFBUpdate *mFBUpdate[MAX_DISPLAYS];
+    qhwc::IFBUpdate *mFBUpdate[HWC_NUM_DISPLAY_TYPES];
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
     qhwc::MDPInfo mMDP;
     qhwc::VsyncState vstate;
-    qhwc::DisplayAttributes dpyAttr[MAX_DISPLAYS];
-    qhwc::ListStats listStats[MAX_DISPLAYS];
-    qhwc::LayerProp *layerProp[MAX_DISPLAYS];
-    qhwc::LayerRotMap *mLayerRotMap[MAX_DISPLAYS];
-    qhwc::MDPComp *mMDPComp[MAX_DISPLAYS];
+
+    qhwc::DisplayAttributes dpyAttr[HWC_NUM_DISPLAY_TYPES];
+    qhwc::ListStats listStats[HWC_NUM_DISPLAY_TYPES];
+    qhwc::LayerProp *layerProp[HWC_NUM_DISPLAY_TYPES];
+    qhwc::LayerRotMap *mLayerRotMap[HWC_NUM_DISPLAY_TYPES];
+    qhwc::MDPComp *mMDPComp[HWC_NUM_DISPLAY_TYPES];
 
     //Securing in progress indicator
     bool mSecuring;
