@@ -45,7 +45,8 @@ public:
     //Reset values
     virtual void reset();
     //Factory method that returns a low-res or high-res version
-    static IFBUpdate *getObject(const int& width, const int& dpy);
+    static IFBUpdate *getObject(const int& width, const int& rightSplit,
+            const int& dpy);
 
 protected:
     const int mDpy; // display to update
@@ -59,12 +60,12 @@ public:
     explicit FBUpdateLowRes(const int& dpy);
     virtual ~FBUpdateLowRes() {};
     bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
-                                                          int fbZorder);
+            int fbZorder);
     bool draw(hwc_context_t *ctx, private_handle_t *hnd);
     void reset();
 private:
     bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
-                                                               int fbZorder);
+            int fbZorder);
     ovutils::eDest mDest; //pipe to draw on
 };
 
@@ -74,12 +75,12 @@ public:
     explicit FBUpdateHighRes(const int& dpy);
     virtual ~FBUpdateHighRes() {};
     bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
-                                                             int fbZorder);
+            int fbZorder);
     bool draw(hwc_context_t *ctx, private_handle_t *hnd);
     void reset();
 private:
     bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
-                                                            int fbZorder);
+            int fbZorder);
     ovutils::eDest mDestLeft; //left pipe to draw on
     ovutils::eDest mDestRight; //right pipe to draw on
 };
