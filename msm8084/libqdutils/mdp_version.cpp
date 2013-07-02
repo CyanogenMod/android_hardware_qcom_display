@@ -101,8 +101,8 @@ MDPVersion::MDPVersion()
             ptype = fb_finfo.id;
         }
         panel_type = *ptype;
-
     }
+    mPanelType = panel_type;
     close(fb_fd);
     mMDPVersion = mdp_version;
     mHasOverlay = false;
@@ -113,9 +113,26 @@ MDPVersion::MDPVersion()
     if(mMDPVersion >= MDSS_V5) {
         //TODO get this from driver
         mMDPDownscale = 4;
-    }
 
-    mPanelType = panel_type;
+        char split[64];
+        FILE* fp = fopen("/sys/class/graphics/fb0/msm_fb_split", "r");
+        if(fp){
+            //Format "left right" space as delimiter
+            if(fread(split, sizeof(char), 64, fp)) {
+                mSplit.mLeft = atoi(split);
+                ALOGI_IF(mSplit.mLeft, "Left Split=%d", mSplit.mLeft);
+                char *rght = strpbrk(split, " ");
+                if(rght)
+                    mSplit.mRight = atoi(rght + 1);
+                ALOGI_IF(rght, "Right Split=%d", mSplit.mRight);
+            }
+        } else {
+            ALOGE("Failed to open mdss_fb_split node");
+        }
+
+        if(fp)
+            fclose(fp);
+    }
 }
 
 bool MDPVersion::supportsDecimation() {
