@@ -50,6 +50,7 @@ MDPComp::MDPComp(int dpy):mDpy(dpy){};
 
 void MDPComp::dump(android::String8& buf)
 {
+    Locker::Autolock _l(mMdpCompLock);
     dumpsys_log(buf,"HWC Map for Dpy: %s \n",
                 mDpy ? "\"EXTERNAL\"" : "\"PRIMARY\"");
     dumpsys_log(buf,"PREV_FRAME: layerCount:%2d    mdpCount:%2d \
@@ -707,6 +708,8 @@ bool MDPComp::programYUV(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
 int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
+    Locker::Autolock _l(mMdpCompLock);
+
     const int numLayers = ctx->listStats[mDpy].numAppLayers;
 
     //reset old data
@@ -881,6 +884,8 @@ bool MDPCompLowRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         ALOGE("%s: invalid contxt or list",__FUNCTION__);
         return false;
     }
+
+    Locker::Autolock _l(mMdpCompLock);
 
     /* reset Invalidator */
     if(idleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount)
@@ -1071,6 +1076,8 @@ bool MDPCompHighRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         ALOGE("%s: invalid contxt or list",__FUNCTION__);
         return false;
     }
+
+    Locker::Autolock _l(mMdpCompLock);
 
     /* reset Invalidator */
     if(idleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount)
