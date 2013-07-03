@@ -35,6 +35,7 @@
 #include "hwc_mdpcomp.h"
 #include "external.h"
 #include "hwc_copybit.h"
+#include "hwc_ad.h"
 #include "profiler.h"
 
 using namespace qhwc;
@@ -108,6 +109,8 @@ static void reset(hwc_context_t *ctx, int numDisplays,
         if(ctx->mLayerRotMap[i])
             ctx->mLayerRotMap[i]->reset();
     }
+
+    ctx->mAD->reset();
 }
 
 //clear prev layer prop flags and realloc for current frame

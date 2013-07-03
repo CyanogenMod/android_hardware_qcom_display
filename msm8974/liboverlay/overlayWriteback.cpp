@@ -73,12 +73,13 @@ bool WritebackMem::dealloc() {
 }
 
 //=========== class Writeback =================================================
-Writeback::Writeback() : mXres(0), mYres(0) {
+Writeback::Writeback() : mXres(0), mYres(0), mOpFmt(-1) {
     int fbNum = Overlay::getFbForDpy(Overlay::DPY_WRITEBACK);
     if(!utils::openDev(mFd, fbNum, Res::fbPath, O_RDWR)) {
         ALOGE("%s failed to init %s", __func__, Res::fbPath);
         return;
     }
+    queryOutputFormat();
     startSession();
 }
 
@@ -182,6 +183,17 @@ bool Writeback::writeSync(int opFd, uint32_t opOffset) {
 bool Writeback::writeSync() {
     mWbMem.useNextBuffer();
     return writeSync(mWbMem.getDstFd(), mWbMem.getOffset());
+}
+
+void Writeback::queryOutputFormat() {
+    struct msmfb_metadata metadata;
+    memset(&metadata, 0 , sizeof(metadata));
+    metadata.op = metadata_op_wb_format;
+    if (ioctl(mFd.getFD(), MSMFB_METADATA_GET, &metadata) < 0) {
+        ALOGE("Error retrieving MDP Writeback format");
+        return;
+    }
+    mOpFmt = metadata.data.mixer_cfg.writeback_format;
 }
 
 //static

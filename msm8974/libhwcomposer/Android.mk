@@ -19,6 +19,7 @@ LOCAL_SRC_FILES               := hwc.cpp          \
                                  hwc_fbupdate.cpp \
                                  hwc_mdpcomp.cpp  \
                                  hwc_copybit.cpp  \
-                                 hwc_qclient.cpp
+                                 hwc_qclient.cpp  \
+                                 hwc_ad.cpp
 
 include $(BUILD_SHARED_LIBRARY)

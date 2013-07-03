@@ -59,6 +59,7 @@ class IFBUpdate;
 class IVideoOverlay;
 class MDPComp;
 class CopyBit;
+class AssertiveDisplay;
 
 
 struct MDPInfo {
@@ -319,6 +320,7 @@ struct hwc_context_t {
     qhwc::LayerProp *layerProp[MAX_DISPLAYS];
     qhwc::LayerRotMap *mLayerRotMap[MAX_DISPLAYS];
     qhwc::MDPComp *mMDPComp[MAX_DISPLAYS];
+    qhwc::AssertiveDisplay *mAD;
 
     //Securing in progress indicator
     bool mSecuring;
