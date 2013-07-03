@@ -23,6 +23,7 @@
 #include "qdMetaData.h"
 #include "mdp_version.h"
 #include "hwc_fbupdate.h"
+#include "hwc_ad.h"
 #include <overlayRotator.h>
 
 using namespace overlay;
@@ -451,6 +452,10 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
                                 (layer->transform & HWC_TRANSFORM_FLIP_H) &&
                                 (!isYuvBuffer(hnd)))
                    return false;
+    }
+
+    if(ctx->mAD->isDoable()) {
+        return false;
     }
 
     //If all above hard conditions are met we can do full or partial MDP comp.
@@ -955,6 +960,14 @@ bool MDPCompLowRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
         int fd = hnd->fd;
         uint32_t offset = hnd->offset;
+
+        if(ctx->mAD->isModeOn()) {
+            if(ctx->mAD->draw(ctx, fd, offset)) {
+                fd = ctx->mAD->getDstFd(ctx);
+                offset = ctx->mAD->getDstOffset(ctx);
+            }
+        }
+
         Rotator *rot = mCurrentFrame.mdpToLayer[mdpIndex].rot;
         if(rot) {
             if(!rot->queueBuffer(fd, offset))
@@ -1160,6 +1173,13 @@ bool MDPCompHighRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
         int fd = hnd->fd;
         int offset = hnd->offset;
+
+        if(ctx->mAD->isModeOn()) {
+            if(ctx->mAD->draw(ctx, fd, offset)) {
+                fd = ctx->mAD->getDstFd(ctx);
+                offset = ctx->mAD->getDstOffset(ctx);
+            }
+        }
 
         if(rot) {
             rot->queueBuffer(fd, offset);
