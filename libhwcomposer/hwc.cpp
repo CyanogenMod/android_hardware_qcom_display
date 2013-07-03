@@ -291,12 +291,26 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
             if(blank) {
                 ret = ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK,
                             FB_BLANK_POWERDOWN);
+                if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected == true) {
+                    // Surfaceflinger does not send Blank/unblank event to hwc
+                    // for virtual display, handle it explicitly when blank for
+                    // primary is invoked, so that any pipes unset get committed
+                    if (display_commit(ctx, HWC_DISPLAY_VIRTUAL) < 0) {
+                        ret = -1;
+                        ALOGE("%s:post failed for virtual display !!",
+                                                            __FUNCTION__);
+                    } else {
+                        ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = !blank;
+                    }
+                }
             } else {
-                ret = ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK,FB_BLANK_UNBLANK);
+                ret = ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK, FB_BLANK_UNBLANK);
+                if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected == true) {
+                    ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = !blank;
+                }
             }
             break;
         case HWC_DISPLAY_EXTERNAL:
-        case HWC_DISPLAY_VIRTUAL:
             if(blank) {
                 // call external framebuffer commit on blank,
                 // so that any pipe unsets gets committed
@@ -387,7 +401,7 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
         if (display_commit(ctx, dpy) < 0) {
             ALOGE("%s: display commit fail!", __FUNCTION__);
-            return -1;
+            ret = -1;
         }
     }
 
@@ -479,6 +493,10 @@ static int hwc_set(hwc_composer_device_1 *dev,
                 break;
             case HWC_DISPLAY_EXTERNAL:
             case HWC_DISPLAY_VIRTUAL:
+            /* ToDo: We are using hwc_set_external path for both External and
+                     Virtual displays. Eventually, we will have
+                     separate functions
+            */
                 ret = hwc_set_external(ctx, list, i);
                 break;
             default:
