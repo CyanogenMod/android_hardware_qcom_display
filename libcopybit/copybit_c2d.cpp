@@ -686,6 +686,9 @@ static int finish_copybit(struct copybit_device_t *dev)
     ctx->blit_yuv_2_plane_count = 0;
     ctx->blit_yuv_3_plane_count = 0;
     ctx->blit_count = 0;
+    ctx->dst_surface_mapped = false;
+    ctx->dst_surface_base = 0;
+
     return status;
 }
 
