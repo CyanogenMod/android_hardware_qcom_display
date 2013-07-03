@@ -22,6 +22,7 @@ LOCAL_SRC_FILES               := hwc.cpp          \
                                  hwc_mdpcomp.cpp  \
                                  hwc_copybit.cpp  \
                                  hwc_qclient.cpp  \
-                                 hwc_dump_layers.cpp
+                                 hwc_dump_layers.cpp \
+                                 hwc_ad.cpp
 
 include $(BUILD_SHARED_LIBRARY)
