@@ -50,6 +50,7 @@ MDPVersion::MDPVersion()
     mFeatures = 0;
     //TODO get this from driver, default for A-fam to 8
     mMDPDownscale = 8;
+    mFd = fb_fd;
 
     if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &fb_finfo) < 0) {
         ALOGE("FBIOGET_FSCREENINFO failed");
@@ -103,7 +104,6 @@ MDPVersion::MDPVersion()
         panel_type = *ptype;
     }
     mPanelType = panel_type;
-    close(fb_fd);
     mMDPVersion = mdp_version;
     mHasOverlay = false;
     if((mMDPVersion >= MDP_V4_0) ||
@@ -133,6 +133,10 @@ MDPVersion::MDPVersion()
         if(fp)
             fclose(fp);
     }
+}
+
+MDPVersion::~MDPVersion() {
+    close(mFd);
 }
 
 bool MDPVersion::supportsDecimation() {
