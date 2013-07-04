@@ -1050,10 +1050,10 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         qhwc::calculate_crop_rects(tmp_cropR, tmp_dstR, scissor, 0);
     }
 
-    //When buffer is flipped, contents of mixer config also needs to swapped.
+    //When buffer is H-flipped, contents of mixer config also needs to swapped
     //Not needed if the layer is confined to one half of the screen.
     //If rotator has been used then it has also done the flips, so ignore them.
-    if((orient & OVERLAY_TRANSFORM_FLIP_V) && lDest != OV_INVALID
+    if((orient & OVERLAY_TRANSFORM_FLIP_H) && lDest != OV_INVALID
             && rDest != OV_INVALID && (*rot) == NULL) {
         hwc_rect_t new_cropR;
         new_cropR.left = tmp_cropL.left;
