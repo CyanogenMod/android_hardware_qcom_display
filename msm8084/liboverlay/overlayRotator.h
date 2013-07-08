@@ -38,6 +38,45 @@
 
 namespace overlay {
 
+/*
+   Manages the case where new rotator memory needs to be
+   allocated, before previous is freed, due to resolution change etc. If we make
+   rotator memory to be always max size, irrespctive of source resolution then
+   we don't need this RotMem wrapper. The inner class is sufficient.
+*/
+struct RotMem {
+    // Max rotator memory allocations
+    enum { MAX_ROT_MEM = 2};
+
+    //Manages the rotator buffer offsets.
+    struct Mem {
+        Mem();
+        ~Mem();
+        bool valid() { return m.valid(); }
+        bool close() { return m.close(); }
+        uint32_t size() const { return m.bufSz(); }
+        void setReleaseFd(const int& fence);
+        // Max rotator buffers
+        enum { ROT_NUM_BUFS = 2 };
+        // rotator data info dst offset
+        uint32_t mRotOffset[ROT_NUM_BUFS];
+        int mRelFence[ROT_NUM_BUFS];
+        // current offset slot from mRotOffset
+        uint32_t mCurrOffset;
+        OvMem m;
+    };
+
+    RotMem() : _curr(0) {}
+    Mem& curr() { return m[_curr % MAX_ROT_MEM]; }
+    const Mem& curr() const { return m[_curr % MAX_ROT_MEM]; }
+    Mem& prev() { return m[(_curr+1) % MAX_ROT_MEM]; }
+    RotMem& operator++() { ++_curr; return *this; }
+    void setReleaseFd(const int& fence) { curr().setReleaseFd(fence); }
+    bool close();
+    uint32_t _curr;
+    Mem m[MAX_ROT_MEM];
+};
+
 class Rotator
 {
 public:
@@ -56,50 +95,19 @@ public:
     virtual bool queueBuffer(int fd, uint32_t offset) = 0;
     virtual void dump() const = 0;
     virtual void getDump(char *buf, size_t len) const = 0;
+    void setReleaseFd(const int& fence) { mMem.setReleaseFd(fence); }
     static Rotator *getRotator();
 
 protected:
+    /* Rotator memory manager */
+    RotMem mMem;
     explicit Rotator() {}
     static uint32_t calcOutputBufSize(const utils::Whf& destWhf);
 
 private:
     /*Returns rotator h/w type */
     static int getRotatorHwType();
-};
-
-/*
-   Manages the case where new rotator memory needs to be
-   allocated, before previous is freed, due to resolution change etc. If we make
-   rotator memory to be always max size, irrespctive of source resolution then
-   we don't need this RotMem wrapper. The inner class is sufficient.
-*/
-struct RotMem {
-    // Max rotator memory allocations
-    enum { MAX_ROT_MEM = 2};
-
-    //Manages the rotator buffer offsets.
-    struct Mem {
-        Mem() : mCurrOffset(0) {utils::memset0(mRotOffset); }
-        bool valid() { return m.valid(); }
-        bool close() { return m.close(); }
-        uint32_t size() const { return m.bufSz(); }
-        // Max rotator buffers
-        enum { ROT_NUM_BUFS = 2 };
-        // rotator data info dst offset
-        uint32_t mRotOffset[ROT_NUM_BUFS];
-        // current offset slot from mRotOffset
-        uint32_t mCurrOffset;
-        OvMem m;
-    };
-
-    RotMem() : _curr(0) {}
-    Mem& curr() { return m[_curr % MAX_ROT_MEM]; }
-    const Mem& curr() const { return m[_curr % MAX_ROT_MEM]; }
-    Mem& prev() { return m[(_curr+1) % MAX_ROT_MEM]; }
-    RotMem& operator++() { ++_curr; return *this; }
-    bool close();
-    uint32_t _curr;
-    Mem m[MAX_ROT_MEM];
+    friend class RotMgr;
 };
 
 /*
@@ -155,8 +163,6 @@ private:
     utils::eTransform mOrientation;
     /* rotator fd */
     OvFD mFd;
-    /* Rotator memory manager */
-    RotMem mMem;
 
     friend Rotator* Rotator::getRotator();
 };
@@ -209,8 +215,6 @@ private:
     utils::eTransform mOrientation;
     /* rotator fd */
     OvFD mFd;
-    /* Rotator memory manager */
-    RotMem mMem;
     /* Enable/Disable Mdss Rot*/
     bool mEnabled;
 
@@ -233,9 +237,11 @@ public:
      * Expects a NULL terminated buffer of big enough size.
      */
     void getDump(char *buf, size_t len);
+    int getRotDevFd(); //Called on A-fam only
 private:
     overlay::Rotator *mRot[MAX_ROT_SESS];
     int mUseCount;
+    int mRotDevFd; //A-fam
 };
 
 
