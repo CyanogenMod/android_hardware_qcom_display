@@ -368,11 +368,6 @@ uint32_t getS3DFormat(uint32_t fmt) {
     return fmt3D;
 }
 
-bool isMdssRotator() {
-    int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
-    return (mdpVersion >= qdutils::MDSS_V5);
-}
-
 void getDump(char *buf, size_t len, const char *prefix,
         const mdp_overlay& ov) {
     char str[256] = {'\0'};
