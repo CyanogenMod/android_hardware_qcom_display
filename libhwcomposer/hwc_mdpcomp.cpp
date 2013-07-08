@@ -856,7 +856,7 @@ bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
 
         ePipeType type = MDPCOMP_OV_ANY;
 
-        if(!qhwc::needsScaling(layer) && !ctx->mNeedsRotator
+        if(!qhwc::needsScaling(ctx,layer,mDpy) && !ctx->mNeedsRotator
            && ctx->mMDP.version >= qdutils::MDSS_V5) {
             type = MDPCOMP_OV_DMA;
         }
@@ -1027,7 +1027,7 @@ bool MDPCompHighRes::allocLayerPipes(hwc_context_t *ctx,
 
         ePipeType type = MDPCOMP_OV_ANY;
 
-        if(!qhwc::needsScaling(layer) && !ctx->mNeedsRotator
+        if(!qhwc::needsScaling(ctx,layer,mDpy) && !ctx->mNeedsRotator
            && ctx->mMDP.version >= qdutils::MDSS_V5)
             type = MDPCOMP_OV_DMA;
 
