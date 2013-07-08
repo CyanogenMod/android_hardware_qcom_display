@@ -963,8 +963,11 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         *rot = ctx->mRotMgr->getNext();
         if(*rot == NULL) return -1;
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, mdpFlags, orient, downscale) < 0)
+        if(configRotator(*rot, whf, mdpFlags, orient, downscale) < 0){
+            ALOGE("%s: configRotator failed!", __FUNCTION__);
+            ctx->mOverlay->clear(dpy);
             return -1;
+        }
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
         whf.format = (*rot)->getDstFormat();
         updateSource(orient, whf, crop);
@@ -1017,8 +1020,11 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, mdpFlagsL, orient, downscale) < 0)
+        if(configRotator(*rot, whf, mdpFlagsL, orient, downscale) < 0){
+            ALOGE("%s: configRotator failed!", __FUNCTION__);
+            ctx->mOverlay->clear(dpy);
             return -1;
+        }
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
         whf.format = (*rot)->getDstFormat();
         updateSource(orient, whf, crop);
