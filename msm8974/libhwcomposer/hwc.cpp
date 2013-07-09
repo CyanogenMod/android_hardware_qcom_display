@@ -245,15 +245,14 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    Locker::Autolock _l(ctx->mBlankLock);
-    if(!ctx->dpyAttr[dpy].isActive) {
-        ALOGE("Display is blanked - Cannot %s vsync",
-              enable ? "enable" : "disable");
-        return -EINVAL;
-    }
-
     switch(event) {
         case HWC_EVENT_VSYNC:
+            if(!ctx->dpyAttr[dpy].isActive) {
+                ALOGE("Display is blanked - Cannot %s vsync",
+                        enable ? "enable" : "disable");
+                return -EINVAL;
+            }
+
             if (ctx->vstate.enable == enable)
                 break;
             ret = hwc_vsync_control(ctx, dpy, enable);
