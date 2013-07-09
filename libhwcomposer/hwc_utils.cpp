@@ -478,8 +478,8 @@ void setListStats(hwc_context_t *ctx,
 }
 
 
-static void calc_cut(float& leftCutRatio, float& topCutRatio,
-        float& rightCutRatio, float& bottomCutRatio, int orient) {
+static void calc_cut(double& leftCutRatio, double& topCutRatio,
+        double& rightCutRatio, double& bottomCutRatio, int orient) {
     if(orient & HAL_TRANSFORM_FLIP_H) {
         swap(leftCutRatio, rightCutRatio);
     }
@@ -488,7 +488,7 @@ static void calc_cut(float& leftCutRatio, float& topCutRatio,
     }
     if(orient & HAL_TRANSFORM_ROT_90) {
         //Anti clock swapping
-        float tmpCutRatio = leftCutRatio;
+        double tmpCutRatio = leftCutRatio;
         leftCutRatio = topCutRatio;
         topCutRatio = rightCutRatio;
         rightCutRatio = bottomCutRatio;
@@ -553,26 +553,26 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
     int sci_w = abs(sci_r - sci_l);
     int sci_h = abs(sci_b - sci_t);
 
-    float leftCutRatio = 0.0f, rightCutRatio = 0.0f, topCutRatio = 0.0f,
-            bottomCutRatio = 0.0f;
+    double leftCutRatio = 0.0, rightCutRatio = 0.0, topCutRatio = 0.0,
+            bottomCutRatio = 0.0;
 
     if(dst_l < sci_l) {
-        leftCutRatio = (float)(sci_l - dst_l) / (float)dst_w;
+        leftCutRatio = (double)(sci_l - dst_l) / (double)dst_w;
         dst_l = sci_l;
     }
 
     if(dst_r > sci_r) {
-        rightCutRatio = (float)(dst_r - sci_r) / (float)dst_w;
+        rightCutRatio = (double)(dst_r - sci_r) / (double)dst_w;
         dst_r = sci_r;
     }
 
     if(dst_t < sci_t) {
-        topCutRatio = (float)(sci_t - dst_t) / (float)dst_h;
+        topCutRatio = (double)(sci_t - dst_t) / (double)dst_h;
         dst_t = sci_t;
     }
 
     if(dst_b > sci_b) {
-        bottomCutRatio = (float)(dst_b - sci_b) / (float)dst_h;
+        bottomCutRatio = (double)(dst_b - sci_b) / (double)dst_h;
         dst_b = sci_b;
     }
 
