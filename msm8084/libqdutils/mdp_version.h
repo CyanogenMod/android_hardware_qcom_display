@@ -89,7 +89,7 @@ class MDPVersion : public Singleton <MDPVersion>
 {
 public:
     MDPVersion();
-    ~MDPVersion() { }
+    ~MDPVersion();
     int getMDPVersion() {return mMDPVersion;}
     char getPanelType() {return mPanelType;}
     bool hasOverlay() {return mHasOverlay;}
@@ -104,6 +104,7 @@ public:
     int getLeftSplit() { return mSplit.left(); }
     int getRightSplit() { return mSplit.right(); }
 private:
+    int mFd;
     int mMDPVersion;
     char mPanelType;
     bool mHasOverlay;
