@@ -32,6 +32,7 @@
 
 #include <cutils/log.h>
 #include <utils/threads.h>
+#include <gr.h>
 
 typedef void (*InvalidatorHandler)(void*);
 
@@ -41,6 +42,7 @@ class IdleInvalidator : public android::Thread {
     unsigned int mSleepTime;
     static InvalidatorHandler mHandler;
     static android::sp<IdleInvalidator> sInstance;
+    mutable Locker mLock;
 
     public:
     IdleInvalidator();
