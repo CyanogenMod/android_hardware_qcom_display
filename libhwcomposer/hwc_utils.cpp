@@ -148,6 +148,14 @@ static void connectPPDaemon(hwc_context_t *ctx)
         ctx->mCablProp.enabled = false;
         return;
     }
+    struct timeval timeout;
+    timeout.tv_sec = 1; //wait 1 second before timeout
+    timeout.tv_usec = 0;
+
+    if (setsockopt(daemon_socket, SOL_SOCKET, SO_SNDTIMEO,
+        (char*)&timeout, sizeof(timeout )) < 0)
+        ALOGE("setsockopt failed");
+
     ctx->mCablProp.daemon_socket = daemon_socket;
 }
 
