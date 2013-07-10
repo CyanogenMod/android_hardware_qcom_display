@@ -503,6 +503,18 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
         return false;
     }
 
+    int nYuvCount = ctx->listStats[mDpy].yuvCount;
+    for(int index = 0; index < nYuvCount ; index ++) {
+        int nYuvIndex = ctx->listStats[mDpy].yuvIndices[index];
+        hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
+        if(layer->planeAlpha < 0xFF) {
+            ALOGD_IF(isDebug(), "%s: Cannot handle YUV layer with plane alpha\
+                    when sandwiched",
+                    __FUNCTION__);
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -511,12 +523,6 @@ bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
 
     if(isSkipLayer(layer)) {
         ALOGE("%s: Unable to bypass skipped YUV", __FUNCTION__);
-        return false;
-    }
-
-    if(layer->planeAlpha < 0xFF) {
-        ALOGD_IF(isDebug(), "%s: Cannot handle YUV layer with plane alpha",
-                 __FUNCTION__);
         return false;
     }
 
