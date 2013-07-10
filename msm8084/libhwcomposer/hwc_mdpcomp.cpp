@@ -750,18 +750,19 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
     const int numLayers = ctx->listStats[mDpy].numAppLayers;
 
-    //number of app layers exceeds MAX_NUM_APP_LAYERS fall back to GPU
-    //do not cache the information for next draw cycle.
-    if(numLayers > MAX_NUM_APP_LAYERS) {
-        ALOGD_IF(isDebug(), "%s: Number of App layers exceeded the limit ",
-                 __FUNCTION__);
-        return 0;
-    }
-
     Locker::Autolock _l(mMdpCompLock);
 
     //reset old data
     mCurrentFrame.reset(numLayers);
+
+    //number of app layers exceeds MAX_NUM_APP_LAYERS fall back to GPU
+    //do not cache the information for next draw cycle.
+    if(numLayers > MAX_NUM_APP_LAYERS) {
+        mCachedFrame.updateCounts(mCurrentFrame);
+        ALOGD_IF(isDebug(), "%s: Number of App layers exceeded the limit ",
+                 __FUNCTION__);
+        return 0;
+    }
 
     //Hard conditions, if not met, cannot do MDP comp
     if(!isFrameDoable(ctx)) {
@@ -898,6 +899,11 @@ bool MDPCompLowRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         return false;
     }
 
+    if(ctx->listStats[mDpy].numAppLayers > MAX_NUM_APP_LAYERS) {
+        ALOGD_IF(isDebug(),"%s: Exceeding max layer count", __FUNCTION__);
+        return true;
+    }
+
     Locker::Autolock _l(mMdpCompLock);
 
     /* reset Invalidator */
@@ -948,7 +954,7 @@ bool MDPCompLowRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         }
 
         if (!ov.queueBuffer(fd, offset, dest)) {
-            ALOGE("%s: queueBuffer failed for external", __FUNCTION__);
+            ALOGE("%s: queueBuffer failed for display:%d ", __FUNCTION__, mDpy);
             return false;
         }
 
@@ -1081,6 +1087,11 @@ bool MDPCompHighRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if(!ctx || !list) {
         ALOGE("%s: invalid contxt or list",__FUNCTION__);
         return false;
+    }
+
+    if(ctx->listStats[mDpy].numAppLayers > MAX_NUM_APP_LAYERS) {
+        ALOGD_IF(isDebug(),"%s: Exceeding max layer count", __FUNCTION__);
+        return true;
     }
 
     Locker::Autolock _l(mMdpCompLock);
