@@ -7,6 +7,8 @@ common_includes += hardware/qcom/display/msm8960/libhwcomposer
 common_includes += hardware/qcom/display/msm8960/libexternal
 common_includes += hardware/qcom/display/msm8960/libqservice
 
+common_header_export_path := qcom/display
+
 #Common libraries external to display HAL
 common_libs := liblog libutils libcutils libhardware
 
