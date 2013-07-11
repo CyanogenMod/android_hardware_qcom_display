@@ -16,6 +16,11 @@ LOCAL_PATH:= $(call my-dir)
 include $(LOCAL_PATH)/../common.mk
 include $(CLEAR_VARS)
 
+LOCAL_COPY_HEADERS_TO         := $(common_header_export_path)
+LOCAL_COPY_HEADERS            := copybit.h copybit_priv.h
+#Copy the headers regardless of whether copybit is built
+include $(BUILD_COPY_HEADERS)
+
 LOCAL_MODULE                  := copybit.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_PATH             := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_MODULE_TAGS             := optional
