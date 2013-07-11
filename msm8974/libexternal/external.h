@@ -53,6 +53,7 @@ public:
     void setActionSafeDimension(int w, int h);
     void processUEventOnline(const char *str);
     void processUEventOffline(const char *str);
+    int getHDMIIndex() { return mHdmiFbNum; }
 
 private:
     void setSPDInfo(const char* node, const char* property);
