@@ -33,6 +33,7 @@
 namespace qhwc {
 
 #define HWC_VSYNC_THREAD_NAME "hwcVsyncThread"
+#define MAX_SYSFS_FILE_PATH             255
 
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable)
 {
@@ -49,10 +50,6 @@ int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable)
 
 static void *vsync_loop(void *param)
 {
-    const char* vsync_timestamp_fb0 = "/sys/class/graphics/fb0/vsync_event";
-    const char* vsync_timestamp_fb1 = "/sys/class/graphics/fb1/vsync_event";
-    int dpy = HWC_DISPLAY_PRIMARY;
-
     hwc_context_t * ctx = reinterpret_cast<hwc_context_t *>(param);
 
     char thread_name[64] = HWC_VSYNC_THREAD_NAME;
@@ -61,15 +58,13 @@ static void *vsync_loop(void *param)
                 android::PRIORITY_MORE_FAVORABLE);
 
     const int MAX_DATA = 64;
-    static char vdata[MAX_DATA];
-    struct pollfd pfd;
-
-    uint64_t cur_timestamp=0;
-    ssize_t len = -1;
-    int fb0_fd = -1;
-    int ret = 0;
-    bool fb1_vsync = false;
+    char vdata[MAX_DATA];
     bool logvsync = false;
+
+    struct pollfd pfd[2];
+    int fb_fd[2];
+    uint64_t timestamp[2];
+    int num_displays;
 
     char property[PROPERTY_VALUE_MAX];
     if(property_get("debug.hwc.fakevsync", property, NULL) > 0) {
@@ -82,62 +77,91 @@ static void *vsync_loop(void *param)
             logvsync = true;
     }
 
-    /* Currently read vsync timestamp from drivers
-       e.g. VSYNC=41800875994
-       */
-    fb0_fd = open(vsync_timestamp_fb0, O_RDONLY);
-    pfd.fd = fb0_fd;
-    pfd.events = POLLPRI | POLLERR;
+    if (ctx->mExtDisplay->getHDMIIndex() > 0)
+        num_displays = 2;
+    else
+        num_displays = 1;
 
-    if (fb0_fd < 0) {
-        // Make sure fb device is opened before starting this thread so this
-        // never happens.
-        ALOGE ("FATAL:%s:not able to open file:%s, %s",  __FUNCTION__,
-               (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
-               strerror(errno));
-        ctx->vstate.fakevsync = true;
+    char vsync_node_path[MAX_SYSFS_FILE_PATH];
+    for (int dpy = HWC_DISPLAY_PRIMARY; dpy < num_displays; dpy++) {
+        snprintf(vsync_node_path, sizeof(vsync_node_path),
+                "/sys/class/graphics/fb%d/vsync_event",
+                dpy == HWC_DISPLAY_PRIMARY ? 0 :
+                ctx->mExtDisplay->getHDMIIndex());
+        ALOGI("%s: Reading vsync for dpy=%d from %s", __FUNCTION__, dpy,
+                vsync_node_path);
+        fb_fd[dpy] = open(vsync_node_path, O_RDONLY);
+
+        if (fb_fd[dpy] < 0) {
+            // Make sure fb device is opened before starting this thread so this
+            // never happens.
+            ALOGE ("%s:not able to open vsync node for dpy=%d, %s",
+                    __FUNCTION__, dpy, strerror(errno));
+            if (dpy == HWC_DISPLAY_PRIMARY) {
+                ctx->vstate.fakevsync = true;
+                break;
+            }
+        }
+
+        pfd[dpy].fd = fb_fd[dpy];
+        if (pfd[dpy].fd >= 0)
+            pfd[dpy].events = POLLPRI | POLLERR;
     }
 
-    do {
-        if (LIKELY(!ctx->vstate.fakevsync)) {
-            int err = poll(&pfd, 1, -1);
+    if (LIKELY(!ctx->vstate.fakevsync)) {
+        do {
+            int err = poll(pfd, num_displays, -1);
             if(err > 0) {
-                if (pfd.revents & POLLPRI) {
-                    len = pread(fb0_fd, vdata, MAX_DATA, 0);
-                    if (UNLIKELY(len < 0)) {
-                        // If the read was just interrupted - it is not a fatal
-                        // error. Just continue in this case
-                        ALOGE ("FATAL:%s:not able to read file:%s, %s",
-                               __FUNCTION__,
-                               vsync_timestamp_fb0, strerror(errno));
-                        continue;
-                    }
-                    // extract timestamp
-                    const char *str = vdata;
-                    if (!strncmp(str, "VSYNC=", strlen("VSYNC="))) {
-                        cur_timestamp = strtoull(str + strlen("VSYNC="),
-                                                 NULL, 0);
+                for (int dpy = HWC_DISPLAY_PRIMARY; dpy < num_displays; dpy++) {
+                    if (pfd[dpy].revents & POLLPRI) {
+                        int len = pread(pfd[dpy].fd, vdata, MAX_DATA, 0);
+                        if (UNLIKELY(len < 0)) {
+                            // If the read was just interrupted - it is not a
+                            // fatal error. Just continue in this case
+                            ALOGE ("%s:Unable to read vsync for dpy=%d :%s",
+                                    __FUNCTION__, dpy, strerror(errno));
+                            continue;
+                        }
+                        // extract timestamp
+                        if (!strncmp(vdata, "VSYNC=", strlen("VSYNC="))) {
+                            timestamp[dpy] = strtoull(vdata + strlen("VSYNC="),
+                                    NULL, 0);
+                        }
+                        // send timestamp to SurfaceFlinger
+                        ALOGD_IF (logvsync,
+                                "%s: timestamp %llu sent to SF for dpy=%d",
+                                __FUNCTION__, timestamp[dpy], dpy);
+                        ctx->proc->vsync(ctx->proc, dpy, timestamp[dpy]);
                     }
                 }
+
             } else {
                 ALOGE("%s: vsync poll failed errno: %s", __FUNCTION__,
-                      strerror(errno));
+                        strerror(errno));
                 continue;
             }
-        } else {
-            usleep(16666);
-            cur_timestamp = systemTime();
-        }
-        // send timestamp to HAL
-        if(ctx->vstate.enable) {
-            ALOGD_IF (logvsync, "%s: timestamp %llu sent to HWC for %s",
-                      __FUNCTION__, cur_timestamp, "fb0");
-            ctx->proc->vsync(ctx->proc, dpy, cur_timestamp);
-        }
+        } while (true);
 
-    } while (true);
-    if(fb0_fd >= 0)
-        close (fb0_fd);
+    } else {
+
+        //Fake vsync is used only when set explicitly through a property or when
+        //the vsync timestamp node cannot be opened at bootup. There is no
+        //fallback to fake vsync from the true vsync loop, ever, as the
+        //condition can easily escape detection.
+        //Also, fake vsync is delivered only for the primary display.
+        do {
+            usleep(16666);
+            timestamp[HWC_DISPLAY_PRIMARY] = systemTime();
+            ctx->proc->vsync(ctx->proc, HWC_DISPLAY_PRIMARY,
+                    timestamp[HWC_DISPLAY_PRIMARY]);
+
+        } while (true);
+    }
+
+    for (int dpy = HWC_DISPLAY_PRIMARY; dpy <= HWC_DISPLAY_EXTERNAL; dpy++ ) {
+        if(fb_fd[dpy] >= 0)
+            close (fb_fd[dpy]);
+    }
 
     return NULL;
 }
