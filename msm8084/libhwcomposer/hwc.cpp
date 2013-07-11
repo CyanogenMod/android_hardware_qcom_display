@@ -158,7 +158,6 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list, int dpy) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    Locker::Autolock _l(ctx->mExtLock);
 
     if (LIKELY(list && list->numHwLayers > 1) &&
             ctx->dpyAttr[dpy].isActive &&
@@ -209,7 +208,8 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    Locker::Autolock _l(ctx->mBlankLock);
+    Locker::Autolock _bl(ctx->mBlankLock);
+    Locker::Autolock _el(ctx->mExtLock);
     reset(ctx, numDisplays, displays);
 
     ctx->mOverlay->configBegin();
@@ -417,7 +417,6 @@ static int hwc_set_external(hwc_context_t *ctx,
 {
     ATRACE_CALL();
     int ret = 0;
-    Locker::Autolock _l(ctx->mExtLock);
 
     if (LIKELY(list) && ctx->dpyAttr[dpy].isActive &&
         ctx->dpyAttr[dpy].connected) {
@@ -477,7 +476,8 @@ static int hwc_set(hwc_composer_device_1 *dev,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    Locker::Autolock _l(ctx->mBlankLock);
+    Locker::Autolock _bl(ctx->mBlankLock);
+    Locker::Autolock _el(ctx->mExtLock);
     for (uint32_t i = 0; i <= numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
         switch(i) {
