@@ -279,7 +279,7 @@ uint32_t MdssRot::calcCompressedBufSize() {
     int aHeight = ovutils::align(mRotInfo.src_rect.h, 4);
     int rau_cnt = aWidth/64;
     int stride0 = (64 * 4 * rau_cnt) + rau_cnt/8;
-    int stride1 = (64 * 2 * rau_cnt) + rau_cnt/8;
+    int stride1 = ((64 * 2 * rau_cnt) + rau_cnt/8) * 2;
     int stride0_off = (aHeight/4);
     int stride1_off = (aHeight/2);
 
