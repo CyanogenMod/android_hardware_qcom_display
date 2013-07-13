@@ -206,6 +206,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         case EXTERNAL_PAUSE:
             {   // pause case
                 ALOGD("%s Received Pause event",__FUNCTION__);
+                Locker::Autolock _l(ctx->mExtLock);
                 ctx->dpyAttr[dpy].isActive = true;
                 ctx->dpyAttr[dpy].isPause = true;
                 break;
@@ -214,9 +215,11 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             {  // resume case
                 ALOGD("%s Received resume event",__FUNCTION__);
                 // treat Resume as Online event
+                Locker::Autolock _l(ctx->mExtLock);
                 ctx->mExtDispConfiguring = true;
                 ctx->dpyAttr[dpy].isActive = true;
                 ctx->dpyAttr[dpy].isPause = false;
+                ctx->proc->invalidate(ctx->proc);
                 break;
             }
         default:
