@@ -121,8 +121,9 @@ inline bool OvMem::open(uint32_t numbufs,
     if(isSecure) {
         allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP;
         allocFlags |= GRALLOC_USAGE_PROTECTED;
-        allocFlags |= GRALLOC_USAGE_PRIVATE_UNCACHED;
     }
+    // Allocate uncached rotator buffers
+    allocFlags |= GRALLOC_USAGE_PRIVATE_UNCACHED;
 
     int err = 0;
     OVASSERT(numbufs && bufSz, "numbufs=%d bufSz=%d", numbufs, bufSz);
