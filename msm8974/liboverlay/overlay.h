@@ -161,7 +161,7 @@ private:
     PipeBook mPipeBook[utils::OV_INVALID]; //Used as max
 
     /* Dump string */
-    char mDumpStr[256];
+    char mDumpStr[1024];
 
     /* Singleton Instance*/
     static Overlay *sInstance;
