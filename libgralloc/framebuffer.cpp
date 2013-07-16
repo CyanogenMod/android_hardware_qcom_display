@@ -336,7 +336,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
 
 static int mapFrameBuffer(struct private_module_t* module)
 {
-    int err = 0;
+    int err = -1;
     char property[PROPERTY_VALUE_MAX];
     if((property_get("debug.gralloc.map_fb_memory", property, NULL) > 0) &&
        (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
