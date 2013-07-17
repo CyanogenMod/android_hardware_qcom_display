@@ -455,8 +455,11 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                 return err;
             }
             // use release fence as aquire fd for next stretch
-            if (ctx->mMDP.version < qdutils::MDP_V4_0)
+            if (ctx->mMDP.version < qdutils::MDP_V4_0) {
                 copybit->flush_get_fence(copybit, &acquireFd);
+                close(acquireFd);
+                acquireFd = -1;
+            }
             // copy new src and src rect crop
             src = tmp_dst;
             srcRect = tmp_rect;
