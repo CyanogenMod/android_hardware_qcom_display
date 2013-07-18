@@ -346,6 +346,13 @@ struct hwc_context_t {
     mutable Locker mBlankLock;
     //Lock to protect prepare & set when detaching external disp
     mutable Locker mExtLock;
+    /*Lock to set both mSecureMode and mSecuring as part
+      of binder thread without context switch to composition
+      thread. This lock is needed only for A-family targets
+      since the state of mSecureMode and mSecuring variables
+      are not checked in B-family targets.
+    */
+    mutable Locker mSecureLock;
     //Drawing round when we use GPU
     bool isPaddingRound;
     // External Orientation
