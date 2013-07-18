@@ -134,22 +134,41 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             }
         case EXTERNAL_ONLINE:
             {   // connect case
-                ctx->mExtDispConfiguring = true;
+                {
+                    //Force composition to give up resources like pipes and
+                    //close fb. For example if assertive display is going on,
+                    //fb2 could be open, thus connecting Layer Mixer#0 to
+                    //WriteBack module. If HDMI attempts to open fb1, the driver
+                    //will try to attach Layer Mixer#0 to HDMI INT, which will
+                    //fail, since Layer Mixer#0 is still connected to WriteBack.
+                    //This block will force composition to close fb2 in above
+                    //example.
+                    Locker::Autolock _l(ctx->mExtLock);
+                    ctx->mExtDispConfiguring = true;
+                    ctx->dpyAttr[dpy].connected = false;
+                    ctx->proc->invalidate(ctx->proc);
+                }
+                //2 cycles for slower content
+                usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+                        * 2 / 1000);
                 ctx->mExtDisplay->processUEventOnline(udata);
-                const int rSplit = 0;
-                ctx->mFBUpdate[dpy] =
+                {
+                    Locker::Autolock _l(ctx->mExtLock);
+                    ctx->dpyAttr[dpy].isPause = false;
+                    const int rSplit = 0;
+                    ctx->mFBUpdate[dpy] =
                         IFBUpdate::getObject(ctx->dpyAttr[dpy].xres, rSplit,
-                                             dpy);
-                ctx->dpyAttr[dpy].isPause = false;
-                if(usecopybit)
-                    ctx->mCopyBit[dpy] = new CopyBit();
-                ctx->mMDPComp[dpy] =  MDPComp::getObject(
+                            dpy);
+                    ctx->dpyAttr[dpy].isPause = false;
+                    if(usecopybit)
+                        ctx->mCopyBit[dpy] = new CopyBit();
+                    ctx->mMDPComp[dpy] =  MDPComp::getObject(
                         ctx->dpyAttr[dpy].xres, rSplit, dpy);
-                ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,
-                        connected);
-                ctx->dpyAttr[dpy].connected = true;
-                Locker::Autolock _l(ctx->mExtLock); //hwc comp could be on
-                ctx->proc->hotplug(ctx->proc, dpy, connected);
+                    ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,
+                            connected);
+                    ctx->dpyAttr[dpy].connected = true;
+                    ctx->proc->hotplug(ctx->proc, dpy, connected);
+                }
                 break;
             }
         case EXTERNAL_PAUSE:
@@ -163,12 +182,23 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         case EXTERNAL_RESUME:
             {  // resume case
                 ALOGD("%s Received resume event",__FUNCTION__);
-                // treat Resume as Online event
-                Locker::Autolock _l(ctx->mExtLock);
-                ctx->mExtDispConfiguring = true;
-                ctx->dpyAttr[dpy].isActive = true;
-                ctx->dpyAttr[dpy].isPause = false;
-                ctx->proc->invalidate(ctx->proc);
+                //Treat Resume as Online event
+                //Since external didnt have any pipes, force primary to give up
+                //its pipes; we don't allow inter-mixer pipe transfers.
+                {
+                    Locker::Autolock _l(ctx->mExtLock);
+                    ctx->mExtDispConfiguring = true;
+                    ctx->dpyAttr[dpy].isActive = true;
+                    ctx->proc->invalidate(ctx->proc);
+                }
+                usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+                        * 2 / 1000);
+                //At this point external has all the pipes it would need.
+                {
+                    Locker::Autolock _l(ctx->mExtLock);
+                    ctx->dpyAttr[dpy].isPause = false;
+                    ctx->proc->invalidate(ctx->proc);
+                }
                 break;
             }
         default:
