@@ -48,6 +48,8 @@ public:
     void setSource(const utils::PipeArgs& args);
     /* set crop a.k.a the region of interest */
     void setCrop(const utils::Dim& d);
+    /* set color for mdp pipe */
+    void setColor(const uint32_t color);
     /* set orientation*/
     void setTransform(const utils::eTransform& param);
     /* set mdp posision using dim */

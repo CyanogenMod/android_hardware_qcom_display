@@ -76,6 +76,7 @@ public:
 
     void setSource(const utils::PipeArgs args, utils::eDest dest);
     void setCrop(const utils::Dim& d, utils::eDest dest);
+    void setColor(const uint32_t color, utils::eDest dest);
     void setTransform(const int orientation, utils::eDest dest);
     void setPosition(const utils::Dim& dim, utils::eDest dest);
     void setVisualParams(const MetaData_t& data, utils::eDest dest);

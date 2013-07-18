@@ -61,6 +61,8 @@ public:
     void setSource(const utils::PipeArgs& args);
     /* set crop info and pass it down to mdp */
     void setCrop(const utils::Dim& d);
+    /* set color for mdp pipe */
+    void setColor(const uint32_t color);
     /* set orientation */
     void setTransform(const utils::eTransform& p);
     /* set mdp position using dim */
@@ -172,6 +174,11 @@ inline void Ctrl::setTransform(const utils::eTransform& orient)
 inline void Ctrl::setCrop(const utils::Dim& d)
 {
     mMdp.setCrop(d);
+}
+
+inline void Ctrl::setColor(const uint32_t color)
+{
+    mMdp.setColor(color);
 }
 
 inline bool Ctrl::setVisualParams(const MetaData_t &metadata)
