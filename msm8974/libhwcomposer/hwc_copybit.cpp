@@ -423,8 +423,14 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
        ALOGE("%s:%d::tmp_w = %d,tmp_h = %d",__FUNCTION__,__LINE__,tmp_w,tmp_h);
 
        int usage = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+       int format = fbHandle->format;
 
-       if (0 == alloc_buffer(&tmpHnd, tmp_w, tmp_h, fbHandle->format, usage)){
+       // We do not want copybit to generate alpha values from nothing
+       if (format == HAL_PIXEL_FORMAT_RGBA_8888 &&
+               src.format != HAL_PIXEL_FORMAT_RGBA_8888) {
+           format = HAL_PIXEL_FORMAT_RGBX_8888;
+       }
+       if (0 == alloc_buffer(&tmpHnd, tmp_w, tmp_h, format, usage)){
             copybit_image_t tmp_dst;
             copybit_rect_t tmp_rect;
             tmp_dst.w = tmp_w;
