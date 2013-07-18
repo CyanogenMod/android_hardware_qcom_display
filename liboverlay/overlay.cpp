@@ -177,6 +177,13 @@ void Overlay::setCrop(const utils::Dim& d,
     mPipeBook[index].mPipe->setCrop(d);
 }
 
+void Overlay::setColor(const uint32_t color,
+        utils::eDest dest) {
+    int index = (int)dest;
+    validate(index);
+    mPipeBook[index].mPipe->setColor(color);
+}
+
 void Overlay::setPosition(const utils::Dim& d,
         utils::eDest dest) {
     int index = (int)dest;
