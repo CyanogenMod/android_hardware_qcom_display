@@ -89,7 +89,7 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy) {
         if(type == OV_MDP_PIPE_ANY || type == PipeBook::getPipeType((eDest)i)) {
             //If the pipe is not allocated to any display or used by the
             //requesting display already in previous round.
-            if((mPipeBook[i].mDisplay == PipeBook::DPY_UNUSED ||
+            if((mPipeBook[i].mDisplay == DPY_UNUSED ||
                     mPipeBook[i].mDisplay == dpy) &&
                     PipeBook::isNotAllocated(i)) {
                 //In block mode we don't allow line operations
@@ -127,7 +127,7 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy) {
 bool Overlay::isPipeTypeAttached(eMdpPipeType type) {
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
         if(type == PipeBook::getPipeType((eDest)i) &&
-                mPipeBook[i].mDisplay != PipeBook::DPY_UNUSED) {
+                mPipeBook[i].mDisplay != DPY_UNUSED) {
             return true;
         }
     }
@@ -252,7 +252,7 @@ int Overlay::initOverlay() {
         mdp_mixer_info *minfo = NULL;
         char name[64];
         int fd = -1;
-        for(int i = 0; i < NUM_FB_DEVICES; i++) {
+        for(int i = 0; i < MAX_FB_DEVICES; i++) {
             snprintf(name, 64, FB_DEVICE_TEMPLATE, i);
             ALOGD("initoverlay:: opening the device:: %s", name);
             fd = ::open(name, O_RDWR, 0);
@@ -288,7 +288,46 @@ int Overlay::initOverlay() {
             fd = -1;
         }
     }
+
+    FILE *displayDeviceFP = NULL;
+    const int MAX_FRAME_BUFFER_NAME_SIZE = 128;
+    char fbType[MAX_FRAME_BUFFER_NAME_SIZE];
+    char msmFbTypePath[MAX_FRAME_BUFFER_NAME_SIZE];
+    const char *strDtvPanel = "dtv panel";
+    const char *strWbPanel = "writeback panel";
+
+    for(int num = 1; num < MAX_FB_DEVICES; num++) {
+        snprintf (msmFbTypePath, sizeof(msmFbTypePath),
+                "/sys/class/graphics/fb%d/msm_fb_type", num);
+        displayDeviceFP = fopen(msmFbTypePath, "r");
+
+        if(displayDeviceFP){
+            fread(fbType, sizeof(char), MAX_FRAME_BUFFER_NAME_SIZE,
+                    displayDeviceFP);
+
+            if(strncmp(fbType, strDtvPanel, strlen(strDtvPanel)) == 0) {
+                sDpyFbMap[DPY_EXTERNAL] = num;
+            } else if(strncmp(fbType, strWbPanel, strlen(strWbPanel)) == 0) {
+                sDpyFbMap[DPY_WRITEBACK] = num;
+            }
+
+            fclose(displayDeviceFP);
+        }
+    }
+
     return 0;
+}
+
+bool Overlay::displayCommit(const int& fd) {
+    //Commit
+    struct mdp_display_commit info;
+    memset(&info, 0, sizeof(struct mdp_display_commit));
+    info.flags = MDP_DISPLAY_COMMIT_OVERLAY;
+    if(!mdp_wrapper::displayCommit(fd, info)) {
+       ALOGE("%s: commit failed", __func__);
+       return false;
+    }
+    return true;
 }
 
 void Overlay::dump() const {
@@ -343,6 +382,7 @@ void Overlay::PipeBook::destroy() {
 
 Overlay* Overlay::sInstance = 0;
 int Overlay::sExtFbIndex = 1;
+int Overlay::sDpyFbMap[DPY_MAX] = {0, -1, -1};
 int Overlay::sDMAMode = DMA_LINE_MODE;
 int Overlay::PipeBook::NUM_PIPES = 0;
 int Overlay::PipeBook::sPipeUsageBitmap = 0;

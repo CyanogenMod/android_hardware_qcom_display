@@ -33,7 +33,7 @@
 
 namespace overlay {
 
-GenericPipe::GenericPipe(int dpy) : mFbNum(dpy), mRotDownscaleOpt(false),
+GenericPipe::GenericPipe(int dpy) : mDpy(dpy), mRotDownscaleOpt(false),
     pipeState(CLOSED) {
     init();
 }
@@ -46,17 +46,24 @@ bool GenericPipe::init()
 {
     ALOGE_IF(DEBUG_OVERLAY, "GenericPipe init");
     mRotDownscaleOpt = false;
-    if(mFbNum)
-        mFbNum = Overlay::getInstance()->getExtFbNum();
 
-    ALOGD_IF(DEBUG_OVERLAY,"%s: mFbNum:%d",__FUNCTION__, mFbNum);
+    int fbNum = 0;
+    //TODO Remove the if block. What's in else block should be the standard way
+    //EXTERNAL's meaning has been overloaded in hwc to mean WFD also!
+    if(mDpy == Overlay::DPY_EXTERNAL) {
+        fbNum = Overlay::getInstance()->getExtFbNum();
+    } else if(mDpy == Overlay::DPY_WRITEBACK) {
+        fbNum = Overlay::getFbForDpy(mDpy);
+    }
 
-    if(!mCtrlData.ctrl.init(mFbNum)) {
+    ALOGD_IF(DEBUG_OVERLAY,"%s: mFbNum:%d",__FUNCTION__, fbNum);
+
+    if(!mCtrlData.ctrl.init(fbNum)) {
         ALOGE("GenericPipe failed to init ctrl");
         return false;
     }
 
-    if(!mCtrlData.data.init(mFbNum)) {
+    if(!mCtrlData.data.init(fbNum)) {
         ALOGE("GenericPipe failed to init data");
         return false;
     }
