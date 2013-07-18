@@ -71,6 +71,7 @@ status_t QClient::notifyCallback(uint32_t msg, uint32_t value) {
 }
 
 void QClient::securing(uint32_t startEnd) {
+    Locker::Autolock _sl(mHwcContext->mSecureLock);
     //The only way to make this class in this process subscribe to media
     //player's death.
     IMediaDeathNotifier::getMediaPlayerService();
@@ -84,6 +85,7 @@ void QClient::securing(uint32_t startEnd) {
 }
 
 void QClient::unsecuring(uint32_t startEnd) {
+    Locker::Autolock _sl(mHwcContext->mSecureLock);
     mHwcContext->mSecuring = startEnd;
     //We're done unsecuring
     if(startEnd == IQService::END)
@@ -93,6 +95,7 @@ void QClient::unsecuring(uint32_t startEnd) {
 }
 
 void QClient::MPDeathNotifier::died() {
+    Locker::Autolock _sl(mHwcContext->mSecureLock);
     ALOGD_IF(QCLIENT_DEBUG, "Media Player died");
     mHwcContext->mSecuring = false;
     mHwcContext->mSecureMode = false;
