@@ -78,6 +78,21 @@ bool play(int fd, msmfb_overlay_data& od);
 /* MSMFB_OVERLAY_3D */
 bool set3D(int fd, msmfb_overlay_3d& ov);
 
+/* MSMFB_DISPLAY_COMMIT */
+bool displayCommit(int fd);
+
+/* MSMFB_WRITEBACK_INIT, MSMFB_WRITEBACK_START */
+bool wbInitStart(int fbfd);
+
+/* MSMFB_WRITEBACK_STOP, MSMFB_WRITEBACK_TERMINATE */
+bool wbStopTerminate(int fbfd);
+
+/* MSMFB_WRITEBACK_QUEUE_BUFFER */
+bool wbQueueBuffer(int fbfd, struct msmfb_data& fbData);
+
+/* MSMFB_WRITEBACK_DEQUEUE_BUFFER */
+bool wbDequeueBuffer(int fbfd, struct msmfb_data& fbData);
+
 /* the following are helper functions for dumping
  * msm_mdp and friends*/
 void dump(const char* const s, const msmfb_overlay_data& ov);
@@ -191,6 +206,61 @@ inline bool play(int fd, msmfb_overlay_data& od) {
 inline bool set3D(int fd, msmfb_overlay_3d& ov) {
     if (ioctl(fd, MSMFB_OVERLAY_3D, &ov) < 0) {
         ALOGE("Failed to call ioctl MSMFB_OVERLAY_3D err=%s",
+                strerror(errno));
+        return false;
+    }
+    return true;
+}
+
+inline bool displayCommit(int fd, mdp_display_commit& info) {
+    if(ioctl(fd, MSMFB_DISPLAY_COMMIT, &info) == -1) {
+        ALOGE("Failed to call ioctl MSMFB_DISPLAY_COMMIT err=%s",
+                strerror(errno));
+        return false;
+    }
+    return true;
+}
+
+inline bool wbInitStart(int fbfd) {
+    if(ioctl(fbfd, MSMFB_WRITEBACK_INIT, NULL) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_WRITEBACK_INIT err=%s",
+                strerror(errno));
+        return false;
+    }
+    if(ioctl(fbfd, MSMFB_WRITEBACK_START, NULL) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_WRITEBACK_START err=%s",
+                strerror(errno));
+        return false;
+    }
+    return true;
+}
+
+inline bool wbStopTerminate(int fbfd) {
+    if(ioctl(fbfd, MSMFB_WRITEBACK_STOP, NULL) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_WRITEBACK_STOP err=%s",
+                strerror(errno));
+        return false;
+    }
+    if(ioctl(fbfd, MSMFB_WRITEBACK_TERMINATE, NULL) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_WRITEBACK_TERMINATE err=%s",
+                strerror(errno));
+        return false;
+    }
+    return true;
+}
+
+inline bool wbQueueBuffer(int fbfd, struct msmfb_data& fbData) {
+    if(ioctl(fbfd, MSMFB_WRITEBACK_QUEUE_BUFFER, &fbData) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_WRITEBACK_QUEUE_BUFFER err=%s",
+                strerror(errno));
+        return false;
+    }
+    return true;
+}
+
+inline bool wbDequeueBuffer(int fbfd, struct msmfb_data& fbData) {
+    if(ioctl(fbfd, MSMFB_WRITEBACK_DEQUEUE_BUFFER, &fbData) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_WRITEBACK_DEQUEUE_BUFFER err=%s",
                 strerror(errno));
         return false;
     }
