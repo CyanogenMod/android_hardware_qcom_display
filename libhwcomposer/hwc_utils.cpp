@@ -131,7 +131,14 @@ static int ppdComm(const char* cmd, hwc_context_t *ctx) {
                 ALOGE("setsockopt failed");
 
             ctx->mCablProp.daemon_socket = daemon_socket;
-
+            //resend the cmd after connection is re-established
+            ret = send(ctx->mCablProp.daemon_socket, cmd, strlen(cmd),
+                       MSG_NOSIGNAL);
+            if (ret < 0) {
+                ALOGE("Failed to send data over socket: %s",
+                        strerror(errno));
+                return ret;
+            }
         } else {
             ALOGE("Failed to send data over socket: %s",
                     strerror(errno));
