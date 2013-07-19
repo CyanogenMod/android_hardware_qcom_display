@@ -246,7 +246,6 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    Locker::Autolock _l(ctx->mBlankLock);
     switch(event) {
         case HWC_EVENT_VSYNC:
             if (ctx->vstate.enable == enable)
@@ -260,6 +259,7 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
 #ifdef QCOM_BSP
         case  HWC_EVENT_ORIENTATION:
             if(dpy == HWC_DISPLAY_PRIMARY) {
+                Locker::Autolock _l(ctx->mBlankLock);
                 // store the primary display orientation
                 // will be used in hwc_video::configure to disable
                 // rotation animation on external display
