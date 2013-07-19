@@ -70,9 +70,11 @@ void Overlay::configDone() {
             //fds
             if(mPipeBook[i].valid()) {
                 char str[32];
-                sprintf(str, "Unset pipe=%s dpy=%d; ",
+                sprintf(str, "Unset=%s dpy=%d; ",
                         PipeBook::getDestStr((eDest)i), mPipeBook[i].mDisplay);
+#if PIPE_DEBUG
                 strncat(mDumpStr, str, strlen(str));
+#endif
             }
             mPipeBook[i].destroy();
         }
@@ -112,9 +114,11 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy) {
         if(not mPipeBook[index].valid()) {
             mPipeBook[index].mPipe = new GenericPipe(dpy);
             char str[32];
-            snprintf(str, 32, "Set pipe=%s dpy=%d; ",
+            snprintf(str, 32, "Set=%s dpy=%d; ",
                      PipeBook::getDestStr(dest), dpy);
+#if PIPE_DEBUG
             strncat(mDumpStr, str, strlen(str));
+#endif
         }
     } else {
         ALOGD_IF(PIPE_DEBUG, "Pipe unavailable type=%d display=%d",
@@ -331,9 +335,11 @@ bool Overlay::displayCommit(const int& fd) {
 }
 
 void Overlay::dump() const {
+#if PIPE_DEBUG
     if(strlen(mDumpStr)) { //dump only on state change
-        ALOGD_IF(PIPE_DEBUG, "%s\n", mDumpStr);
+        ALOGD("%s\n", mDumpStr);
     }
+#endif
 }
 
 void Overlay::getDump(char *buf, size_t len) {
