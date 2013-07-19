@@ -110,9 +110,33 @@ static int ppdComm(const char* cmd, hwc_context_t *ctx) {
     int ret = -1;
     ret = send(ctx->mCablProp.daemon_socket, cmd, strlen(cmd), MSG_NOSIGNAL);
     if(ret < 0) {
-        ALOGE("Failed to send data over socket: %s",
-                strerror(errno));
-        return ret;
+        if (errno == EPIPE) {
+            //For broken pipe case, we will close the socket and
+            //re-establish the connection
+            close(ctx->mCablProp.daemon_socket);
+            int daemon_socket = socket_local_client(DAEMON_SOCKET,
+                    ANDROID_SOCKET_NAMESPACE_RESERVED,
+                    SOCK_STREAM);
+            if(!daemon_socket) {
+                ALOGE("Connecting to socket failed: %s", strerror(errno));
+                ctx->mCablProp.enabled = false;
+                return -1;
+            }
+            struct timeval timeout;
+            timeout.tv_sec = 1;//wait 1 second before timeout
+            timeout.tv_usec = 0;
+
+            if (setsockopt(daemon_socket, SOL_SOCKET, SO_SNDTIMEO,
+                        (char*)&timeout, sizeof(timeout )) < 0)
+                ALOGE("setsockopt failed");
+
+            ctx->mCablProp.daemon_socket = daemon_socket;
+
+        } else {
+            ALOGE("Failed to send data over socket: %s",
+                    strerror(errno));
+            return ret;
+        }
     }
     ALOGD_IF(HWC_UTILS_DEBUG, "%s: Sent command: %s", __FUNCTION__, cmd);
     return 0;
