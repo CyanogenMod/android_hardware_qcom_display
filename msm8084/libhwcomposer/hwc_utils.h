@@ -427,6 +427,9 @@ struct hwc_context_t {
     bool mBufferMirrorMode;
 
     qhwc::LayerRotMap *mLayerRotMap[HWC_NUM_DISPLAY_TYPES];
+
+    // Panel reset flag will be set if BTA check fails
+    bool mPanelResetStatus;
 };
 
 namespace qhwc {
