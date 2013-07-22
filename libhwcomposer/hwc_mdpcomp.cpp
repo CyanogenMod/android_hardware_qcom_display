@@ -22,6 +22,7 @@
 #include "external.h"
 #include "qdMetaData.h"
 #include "mdp_version.h"
+#include "hwc_fbupdate.h"
 #include <overlayRotator.h>
 
 using namespace overlay;
@@ -135,6 +136,12 @@ bool MDPComp::init(hwc_context_t *ctx) {
         idleInvalidator->init(timeout_handler, ctx, idle_timeout);
     }
     return true;
+}
+
+void MDPComp::reset(const int& numLayers, hwc_display_contents_1_t* list) {
+    mCurrentFrame.reset(numLayers);
+    mCachedFrame.cacheAll(list);
+    mCachedFrame.updateCounts(mCurrentFrame);
 }
 
 void MDPComp::timeout_handler(void *udata) {
@@ -748,7 +755,6 @@ bool MDPComp::programYUV(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 }
 
 int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
-
     const int numLayers = ctx->listStats[mDpy].numAppLayers;
 
     { //LOCK SCOPE BEGIN
@@ -763,26 +769,33 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             mCachedFrame.updateCounts(mCurrentFrame);
             ALOGD_IF(isDebug(), "%s: Number of App layers exceeded the limit ",
                                     __FUNCTION__);
-            return 0;
+            return -1;
         }
 
         //Hard conditions, if not met, cannot do MDP comp
         if(!isFrameDoable(ctx)) {
             ALOGD_IF( isDebug(),"%s: MDP Comp not possible for this frame",
                                     __FUNCTION__);
-            mCurrentFrame.reset(numLayers);
-            mCachedFrame.cacheAll(list);
-            mCachedFrame.updateCounts(mCurrentFrame);
-            return 0;
+            reset(numLayers, list);
+            return -1;
         }
 
         //Check whether layers marked for MDP Composition is actually doable.
         if(isFullFrameDoable(ctx, list)){
             mCurrentFrame.map();
+            //Configure framebuffer first if applicable
+            if(mCurrentFrame.fbZ >= 0) {
+                if(!ctx->mFBUpdate[mDpy]->prepare(ctx, list,
+                        mCurrentFrame.fbZ)) {
+                    ALOGE("%s configure framebuffer failed", __func__);
+                    reset(numLayers, list);
+                    return -1;
+                }
+            }
             //Acquire and Program MDP pipes
             if(!programMDP(ctx, list)) {
-                mCurrentFrame.reset(numLayers);
-                mCachedFrame.cacheAll(list);
+                reset(numLayers, list);
+                return -1;
             } else { //Success
                 //Any change in composition types needs an FB refresh
                 mCurrentFrame.needsRedraw = false;
@@ -807,13 +820,22 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                 mCurrentFrame.fbZ = mCurrentFrame.mdpCount;
 
             mCurrentFrame.map();
+
+            //Configure framebuffer first if applicable
+            if(mCurrentFrame.fbZ >= 0) {
+                if(!ctx->mFBUpdate[mDpy]->prepare(ctx, list, mCurrentFrame.fbZ)) {
+                    ALOGE("%s configure framebuffer failed", __func__);
+                    reset(numLayers, list);
+                    return -1;
+                }
+            }
             if(!programYUV(ctx, list)) {
-                mCurrentFrame.reset(numLayers);
-                mCachedFrame.cacheAll(list);
+                reset(numLayers, list);
+                return -1;
             }
         } else {
-            mCurrentFrame.reset(numLayers);
-            mCachedFrame.cacheAll(list);
+            reset(numLayers, list);
+            return -1;
         }
 
         //UpdateLayerFlags
@@ -829,7 +851,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         ALOGE("%s",sDump.string());
     }
 
-    return mCurrentFrame.fbZ;
+    return 0;
 }
 
 //=============MDPCompLowRes===================================================
