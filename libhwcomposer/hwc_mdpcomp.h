@@ -163,6 +163,7 @@ protected:
     void updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list);
     bool programMDP(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     bool programYUV(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    void reset(const int& numAppLayers, hwc_display_contents_1_t* list);
 
     int mDpy;
     static bool sEnabled;
@@ -226,5 +227,6 @@ private:
 
     virtual int pipesNeeded(hwc_context_t *ctx, hwc_display_contents_1_t* list);
 };
+
 }; //namespace
 #endif
