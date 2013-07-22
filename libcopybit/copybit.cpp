@@ -134,7 +134,7 @@ static int get_format(int format) {
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:  return MDP_Y_CBCR_H2V1;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:  return MDP_Y_CBCR_H2V2;
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO: return MDP_Y_CBCR_H2V2_ADRENO;
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS: return MDP_Y_CBCR_H2V2_ADRENO;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS: return MDP_Y_CBCR_H2V2_VENUS;
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE: return MDP_Y_CBCR_H2V2;
     }
     return -1;
