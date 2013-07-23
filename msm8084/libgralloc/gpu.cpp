@@ -267,7 +267,10 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
     //the usage bits, gralloc assigns a format.
     if(format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
         if(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
-            grallocFormat = HAL_PIXEL_FORMAT_NV12_ENCODEABLE; //NV12
+            grallocFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS;
+        else if((usage & GRALLOC_USAGE_HW_CAMERA_MASK)
+                == GRALLOC_USAGE_HW_CAMERA_ZSL)
+            grallocFormat = HAL_PIXEL_FORMAT_NV21_ZSL; //NV21 ZSL
         else if(usage & GRALLOC_USAGE_HW_CAMERA_READ)
             grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
         else if(usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
