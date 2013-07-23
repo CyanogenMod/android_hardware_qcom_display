@@ -89,7 +89,7 @@ static void hwc_registerProcs(struct hwc_composer_device_1* dev,
 //Helper
 static void reset(hwc_context_t *ctx, int numDisplays,
                   hwc_display_contents_1_t** displays) {
-    for(int i = 0; i < MAX_DISPLAYS; i++) {
+    for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         hwc_display_contents_1_t *list = displays[i];
         // XXX:SurfaceFlinger no longer guarantees that this
         // value is reset on every prepare. However, for the layer
@@ -106,8 +106,6 @@ static void reset(hwc_context_t *ctx, int numDisplays,
             ctx->mFBUpdate[i]->reset();
         if(ctx->mCopyBit[i])
             ctx->mCopyBit[i]->reset();
-        if(ctx->mLayerRotMap[i])
-            ctx->mLayerRotMap[i]->reset();
     }
 }
 
@@ -524,8 +522,9 @@ int hwc_getDisplayConfigs(struct hwc_composer_device_1* dev, int disp,
             ret = 0; //NO_ERROR
             break;
         case HWC_DISPLAY_EXTERNAL:
+        case HWC_DISPLAY_VIRTUAL:
             ret = -1; //Not connected
-            if(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected) {
+            if(ctx->dpyAttr[disp].connected) {
                 ret = 0; //NO_ERROR
                 if(*numConfigs > 0) {
                     configs[0] = 0;
@@ -541,8 +540,8 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         uint32_t config, const uint32_t* attributes, int32_t* values) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    //If hotpluggable displays are inactive return error
-    if(disp == HWC_DISPLAY_EXTERNAL && !ctx->dpyAttr[disp].connected) {
+    //If hotpluggable displays(i.e, HDMI, WFD) are inactive return error
+    if( (disp >= HWC_DISPLAY_EXTERNAL) && !ctx->dpyAttr[disp].connected) {
         return -1;
     }
 
@@ -596,7 +595,7 @@ void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
     dumpsys_log(aBuf, "Qualcomm HWC state:\n");
     dumpsys_log(aBuf, "  MDPVersion=%d\n", ctx->mMDP.version);
     dumpsys_log(aBuf, "  DisplayPanel=%c\n", ctx->mMDP.panel);
-    for(int dpy = 0; dpy < MAX_DISPLAYS; dpy++) {
+    for(int dpy = 0; dpy < HWC_NUM_DISPLAY_TYPES; dpy++) {
         if(ctx->mMDPComp[dpy])
             ctx->mMDPComp[dpy]->dump(aBuf);
     }
