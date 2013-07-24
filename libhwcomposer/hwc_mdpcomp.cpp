@@ -119,14 +119,15 @@ bool MDPComp::init(hwc_context_t *ctx) {
             sMaxPipesPerMixer = min(val, MAX_PIPES_PER_MIXER);
     }
 
-    unsigned long idle_timeout = DEFAULT_IDLE_TIME;
+    long idle_timeout = DEFAULT_IDLE_TIME;
     if(property_get("debug.mdpcomp.idletime", property, NULL) > 0) {
         if(atoi(property) != 0)
             idle_timeout = atoi(property);
     }
 
-    //create Idle Invalidator
-    idleInvalidator = IdleInvalidator::getInstance();
+    //create Idle Invalidator only when not disabled through property
+    if(idle_timeout != -1)
+        idleInvalidator = IdleInvalidator::getInstance();
 
     if(idleInvalidator == NULL) {
         ALOGE("%s: failed to instantiate idleInvalidator object", __FUNCTION__);
