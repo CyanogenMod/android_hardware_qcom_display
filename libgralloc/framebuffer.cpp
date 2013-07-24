@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2012 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2013 The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,6 @@
 #include <gralloc_priv.h>
 #include "fb_priv.h"
 #include "gr.h"
-#include <genlock.h>
 #include <cutils/properties.h>
 #include <profiler.h>
 
@@ -55,7 +54,6 @@ static inline int max(int a, int b) {
 
 enum {
     PAGE_FLIP = 0x00000001,
-    LOCKED    = 0x00000002
 };
 
 struct fb_context_t {
@@ -84,40 +82,19 @@ static int fb_setSwapInterval(struct framebuffer_device_t* dev,
     return 0;
 }
 
-static int fb_setUpdateRect(struct framebuffer_device_t* dev,
-                            int l, int t, int w, int h)
-{
-    if (((w|h) <= 0) || ((l|t)<0))
-        return -EINVAL;
-    fb_context_t* ctx = (fb_context_t*)dev;
-    private_module_t* m = reinterpret_cast<private_module_t*>(
-        dev->common.module);
-    m->info.reserved[0] = 0x54445055; // "UPDT";
-    m->info.reserved[1] = (uint16_t)l | ((uint32_t)t << 16);
-    m->info.reserved[2] = (uint16_t)(l+w) | ((uint32_t)(t+h) << 16);
-    return 0;
-}
-
 static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
 {
-
-    fb_context_t* ctx = (fb_context_t*) dev;
-
-    private_handle_t *hnd = static_cast<private_handle_t*>
-            (const_cast<native_handle_t*>(buffer));
     private_module_t* m =
         reinterpret_cast<private_module_t*>(dev->common.module);
-
-    if (hnd) {
-        m->info.activate = FB_ACTIVATE_VBL | FB_ACTIVATE_FORCE;
-        m->info.yoffset = hnd->offset / m->finfo.line_length;
-        m->commit.var = m->info;
-        m->commit.flags |= MDP_DISPLAY_COMMIT_OVERLAY;
-        if (ioctl(m->framebuffer->fd, MSMFB_DISPLAY_COMMIT, &m->commit) == -1) {
-            ALOGE("%s: MSMFB_DISPLAY_COMMIT ioctl failed, err: %s", __FUNCTION__,
-                    strerror(errno));
-            return -errno;
-        }
+    private_handle_t *hnd = static_cast<private_handle_t*>
+        (const_cast<native_handle_t*>(buffer));
+    const size_t offset = hnd->base - m->framebuffer->base;
+    m->info.activate = FB_ACTIVATE_VBL;
+    m->info.yoffset = offset / m->finfo.line_length;
+    if (ioctl(m->framebuffer->fd, FBIOPUT_VSCREENINFO, &m->info) == -1) {
+        ALOGE("%s: FBIOPUT_VSCREENINFO for primary failed, str: %s",
+                __FUNCTION__, strerror(errno));
+        return -errno;
     }
     return 0;
 }
@@ -154,7 +131,6 @@ int mapFrameBufferLocked(struct private_module_t* module)
     if (fd < 0)
         return -errno;
 
-    memset(&module->fence, 0, sizeof(struct mdp_buf_fence));
     memset(&module->commit, 0, sizeof(struct mdp_display_commit));
 
     struct fb_fix_screeninfo finfo;
@@ -268,9 +244,20 @@ int mapFrameBufferLocked(struct private_module_t* module)
 
     float xdpi = (info.xres * 25.4f) / info.width;
     float ydpi = (info.yres * 25.4f) / info.height;
+#ifdef MSMFB_METADATA_GET
+    struct msmfb_metadata metadata;
+    memset(&metadata, 0 , sizeof(metadata));
+    metadata.op = metadata_op_frame_rate;
+    if (ioctl(fd, MSMFB_METADATA_GET, &metadata) == -1) {
+        ALOGE("Error retrieving panel frame rate");
+        return -errno;
+    }
+    float fps  = metadata.data.panel_frame_rate;
+#else
+    //XXX: Remove reserved field usage on all baselines
     //The reserved[3] field is used to store FPS by the driver.
     float fps  = info.reserved[3] & 0xFF;
-
+#endif
     ALOGI("using (fd=%d)\n"
           "id           = %s\n"
           "xres         = %d px\n"
@@ -323,13 +310,13 @@ int mapFrameBufferLocked(struct private_module_t* module)
      */
 
     int err;
-    module->numBuffers = 2;
+    module->numBuffers = info.yres_virtual / info.yres;
     module->bufferMask = 0;
     //adreno needs page aligned offsets. Align the fbsize to pagesize.
     size_t fbSize = roundUpToPageSize(finfo.line_length * info.yres)*
                     module->numBuffers;
     module->framebuffer = new private_handle_t(fd, fbSize,
-                                        private_handle_t::PRIV_FLAGS_USES_PMEM,
+                                        private_handle_t::PRIV_FLAGS_USES_ION,
                                         BUFFER_TYPE_UI,
                                         module->fbFormat, info.xres, info.yres);
     void* vaddr = mmap(0, fbSize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
@@ -340,12 +327,10 @@ int mapFrameBufferLocked(struct private_module_t* module)
     module->framebuffer->base = intptr_t(vaddr);
     memset(vaddr, 0, fbSize);
     module->currentOffset = 0;
-    module->fbPostDone = false;
-    pthread_mutex_init(&(module->fbPostLock), NULL);
-    pthread_cond_init(&(module->fbPostCond), NULL);
-    module->fbPanDone = false;
-    pthread_mutex_init(&(module->fbPanLock), NULL);
-    pthread_cond_init(&(module->fbPanCond), NULL);
+    //Enable vsync
+    int enable = 1;
+    ioctl(module->framebuffer->fd, MSMFB_OVERLAY_VSYNC_CTRL,
+             &enable);
     return 0;
 }
 
@@ -363,9 +348,7 @@ static int fb_close(struct hw_device_t *dev)
 {
     fb_context_t* ctx = (fb_context_t*)dev;
     if (ctx) {
-        //Hack until fbdev is removed. Framework could close this causing hwc a
-        //pain.
-        //free(ctx);
+        free(ctx);
     }
     return 0;
 }
@@ -411,11 +394,7 @@ int fb_device_open(hw_module_t const* module, const char* name,
             const_cast<int&>(dev->device.maxSwapInterval) =
                                                         PRIV_MAX_SWAP_INTERVAL;
             const_cast<int&>(dev->device.numFramebuffers) = m->numBuffers;
-            if (m->finfo.reserved[0] == 0x5444 &&
-                m->finfo.reserved[1] == 0x5055) {
-                dev->device.setUpdateRect = fb_setUpdateRect;
-                ALOGD("UPDATE_ON_DEMAND supported");
-            }
+            dev->device.setUpdateRect = 0;
 
             *device = &dev->device.common;
         }

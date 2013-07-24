@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -10,7 +10,7 @@
 *      copyright notice, this list of conditions and the following
 *      disclaimer in the documentation and/or other materials provided
 *      with the distribution.
-*    * Neither the name of Code Aurora Forum, Inc. nor the names of its
+*    * Neither the name of The Linux Foundation nor the names of its
 *      contributors may be used to endorse or promote products derived
 *      from this software without specific prior written permission.
 *
@@ -36,6 +36,7 @@
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h> // buffer_handle_t
 #include <linux/msm_mdp.h> // flags
+#include <linux/msm_rotator.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,6 +44,11 @@
 #include <sys/types.h>
 #include <utils/Log.h>
 #include "gralloc_priv.h" //for interlace
+
+// Older platforms do not support Venus.
+#ifndef VENUS_COLOR_FORMAT
+#define MDP_Y_CBCR_H2V2_VENUS (MDP_IMGTYPE_LIMIT2 + 1)
+#endif
 
 /*
 *
@@ -62,6 +68,17 @@
 
 #define DEBUG_OVERLAY 0
 #define PROFILE_OVERLAY 0
+
+#ifndef MDSS_MDP_RIGHT_MIXER
+#define MDSS_MDP_RIGHT_MIXER 0x100
+#endif
+
+#ifndef MDP_OV_PIPE_FORCE_DMA
+#define MDP_OV_PIPE_FORCE_DMA 0x4000
+#endif
+
+#define FB_DEVICE_TEMPLATE "/dev/graphics/fb%u"
+#define NUM_FB_DEVICES 3
 
 namespace overlay {
 
@@ -100,36 +117,6 @@ private:
     const NoCopy& operator=(const NoCopy&);
 };
 
-/*
-* Utility class to query the framebuffer info for primary display
-*
-* Usage:
-*    Outside of functions:
-*       utils::FrameBufferInfo* utils::FrameBufferInfo::sFBInfoInstance = 0;
-*    Inside functions:
-*       utils::FrameBufferInfo::getInstance()->supportTrueMirroring()
-*/
-class FrameBufferInfo {
-
-public:
-    /* ctor init */
-    explicit FrameBufferInfo();
-
-    /* Gets an instance if one does not already exist */
-    static FrameBufferInfo* getInstance();
-
-    /* Gets width of primary framebuffer */
-    int getWidth() const;
-
-    /* Gets height of primary framebuffer */
-    int getHeight() const;
-
-private:
-    int mFBWidth;
-    int mFBHeight;
-    bool mBorderFillSupported;
-    static FrameBufferInfo *sFBInfoInstance;
-};
 
 /* 3D related utils, defines etc...
  * The compound format passed to the overlay is
@@ -143,24 +130,10 @@ enum { INPUT_3D_MASK = 0xFFFF0000,
 enum { BARRIER_LAND = 1,
     BARRIER_PORT = 2 };
 
-/* if SurfaceFlinger process gets killed in bypass mode, In initOverlay()
- * close all the pipes if it is opened after reboot.
- */
-int initOverlay(void);
-
 inline uint32_t format3D(uint32_t x) { return x & 0xFF000; }
-inline uint32_t colorFormat(uint32_t fmt) {
-    /*TODO enable this block only if format has interlace / 3D info in top bits.
-    if(fmt & INTERLACE_MASK) {
-        fmt = fmt ^ HAL_PIXEL_FORMAT_INTERLACE;
-    }
-    fmt = fmt & 0xFFF;*/
-    return fmt;
-}
 inline uint32_t format3DOutput(uint32_t x) {
     return (x & 0xF000) >> SHIFT_OUT_3D; }
 inline uint32_t format3DInput(uint32_t x) { return x & 0xF0000; }
-uint32_t getColorFormat(uint32_t format);
 
 bool isHDMIConnected ();
 bool is3DTV();
@@ -169,6 +142,7 @@ bool usePanel3D();
 bool send3DInfoPacket (uint32_t fmt);
 bool enableBarrier (uint32_t orientation);
 uint32_t getS3DFormat(uint32_t fmt);
+bool isMdssRotator();
 
 template <int CHAN>
 bool getPositionS3D(const Whf& whf, Dim& out);
@@ -236,40 +210,31 @@ struct Whf {
     uint32_t size;
 };
 
-class ActionSafe {
-private:
-    ActionSafe() : mWidth(0.0f), mHeight(0.0f) { };
-    float mWidth;
-    float mHeight;
-    static ActionSafe *sActionSafe;
-public:
-    ~ActionSafe() { };
-    static ActionSafe* getInstance() {
-        if(!sActionSafe) {
-            sActionSafe = new ActionSafe();
-        }
-        return sActionSafe;
-    }
-    void setDimension(int w, int h) {
-        mWidth = (float)w;
-        mHeight = (float)h;
-    }
-    float getWidth() { return mWidth; }
-    float getHeight() { return mHeight; }
-};
-
 enum { MAX_PATH_LEN = 256 };
+
+enum { DEFAULT_PLANE_ALPHA = 0xFF };
 
 /**
  * Rotator flags: not to be confused with orientation flags.
- * Ususally, you want to open the rotator to make sure it is
+ * Usually, you want to open the rotator to make sure it is
  * ready for business.
- * ROT_FLAG_DISABLED: Rotator not used unless required.
- * ROT_FLAG_ENABLED: Rotator used even if not required.
  * */
-enum eRotFlags {
-    ROT_FLAG_DISABLED = 0,
-    ROT_FLAG_ENABLED = 1 // needed in rot
+ enum eRotFlags {
+    ROT_FLAGS_NONE = 0,
+    //Use rotator for 0 rotation. It is used anyway for others.
+    ROT_0_ENABLED = 1 << 0,
+    //Enable rotator downscale optimization for hardware bugs not handled in
+    //driver. If downscale optimizatation is required,
+    //then rotator will be used even if its 0 rotation case.
+    ROT_DOWNSCALE_ENABLED = 1 << 1,
+    ROT_PREROTATED = 1 << 2,
+};
+
+enum eRotDownscale {
+    ROT_DS_NONE = 0,
+    ROT_DS_HALF = 1,
+    ROT_DS_FOURTH = 2,
+    ROT_DS_EIGHTH = 3,
 };
 
 /* The values for is_fg flag for control alpha and transp
@@ -289,18 +254,20 @@ enum eIsFg {
 enum eMdpFlags {
     OV_MDP_FLAGS_NONE = 0,
     OV_MDP_PIPE_SHARE =  MDP_OV_PIPE_SHARE,
+    OV_MDP_PIPE_FORCE_DMA = MDP_OV_PIPE_FORCE_DMA,
     OV_MDP_DEINTERLACE = MDP_DEINTERLACE,
     OV_MDP_SECURE_OVERLAY_SESSION = MDP_SECURE_OVERLAY_SESSION,
     OV_MDP_SOURCE_ROTATED_90 = MDP_SOURCE_ROTATED_90,
-    OV_MDP_MEMORY_ID_TYPE_FB = MDP_MEMORY_ID_TYPE_FB,
     OV_MDP_BACKEND_COMPOSITION = MDP_BACKEND_COMPOSITION,
     OV_MDP_BLEND_FG_PREMULT = MDP_BLEND_FG_PREMULT,
     OV_MDP_FLIP_H = MDP_FLIP_LR,
     OV_MDP_FLIP_V = MDP_FLIP_UD,
+    OV_MDSS_MDP_RIGHT_MIXER = MDSS_MDP_RIGHT_MIXER,
+    OV_MDP_PP_EN = MDP_OVERLAY_PP_CFG_EN,
 };
 
 enum eZorder {
-    ZORDER_0,
+    ZORDER_0 = 0,
     ZORDER_1,
     ZORDER_2,
     ZORDER_3,
@@ -308,21 +275,27 @@ enum eZorder {
 };
 
 enum eMdpPipeType {
-    OV_MDP_PIPE_RGB,
+    OV_MDP_PIPE_RGB = 0,
     OV_MDP_PIPE_VG,
+    OV_MDP_PIPE_DMA,
     OV_MDP_PIPE_ANY, //Any
 };
 
-/* Used to identify destination pipes
- */
+// Identify destination pipes
+// TODO Names useless, replace with int and change all interfaces
 enum eDest {
-    OV_VG0 = 0,
-    OV_RGB0,
-    OV_VG1,
-    OV_RGB1,
-    OV_VG2,
-    OV_RGB2,
+    OV_P0 = 0,
+    OV_P1,
+    OV_P2,
+    OV_P3,
+    OV_P4,
+    OV_P5,
+    OV_P6,
+    OV_P7,
+    OV_P8,
+    OV_P9,
     OV_INVALID,
+    OV_MAX = OV_INVALID,
 };
 
 /* Used when a buffer is split over 2 pipes and sent to display */
@@ -357,21 +330,36 @@ enum eTransform {
     OVERLAY_TRANSFORM_INV = 0x80
 };
 
+enum eBlending {
+    OVERLAY_BLENDING_UNDEFINED = 0x0,
+    /* No blending */
+    OVERLAY_BLENDING_OPAQUE,
+    /* src.rgb + dst.rgb*(1-src_alpha) */
+    OVERLAY_BLENDING_PREMULT,
+    /* src.rgb * src_alpha + dst.rgb (1 - src_alpha) */
+    OVERLAY_BLENDING_COVERAGE,
+};
+
 // Used to consolidate pipe params
 struct PipeArgs {
     PipeArgs() : mdpFlags(OV_MDP_FLAGS_NONE),
         zorder(Z_SYSTEM_ALLOC),
         isFg(IS_FG_OFF),
-        rotFlags(ROT_FLAG_DISABLED){
+        rotFlags(ROT_FLAGS_NONE),
+        planeAlpha(DEFAULT_PLANE_ALPHA),
+        blending(OVERLAY_BLENDING_COVERAGE){
     }
 
     PipeArgs(eMdpFlags f, Whf _whf,
-            eZorder z, eIsFg fg, eRotFlags r) :
+            eZorder z, eIsFg fg, eRotFlags r,
+            int pA, eBlending b) :
         mdpFlags(f),
         whf(_whf),
         zorder(z),
         isFg(fg),
-        rotFlags(r) {
+        rotFlags(r),
+        planeAlpha(pA),
+        blending(b){
     }
 
     eMdpFlags mdpFlags; // for mdp_overlay flags
@@ -379,6 +367,14 @@ struct PipeArgs {
     eZorder zorder; // stage number
     eIsFg isFg; // control alpha & transp
     eRotFlags rotFlags;
+    int planeAlpha;
+    eBlending blending;
+};
+
+// Cannot use HW_OVERLAY_MAGNIFICATION_LIMIT, since at the time
+// of integration, HW_OVERLAY_MAGNIFICATION_LIMIT was a define
+enum { HW_OV_MAGNIFICATION_LIMIT = 20,
+    HW_OV_MINIFICATION_LIMIT  = 8
 };
 
 inline void setMdpFlags(eMdpFlags& f, eMdpFlags v) {
@@ -411,18 +407,15 @@ struct ScreenInfo {
 };
 
 int getMdpFormat(int format);
-int getRotOutFmt(uint32_t format);
+int getHALFormat(int mdpFormat);
+int getDownscaleFactor(const int& src_w, const int& src_h,
+        const int& dst_w, const int& dst_h);
+
 /* flip is upside down and such. V, H flip
  * rotation is 90, 180 etc
  * It returns MDP related enum/define that match rot+flip*/
 int getMdpOrient(eTransform rotation);
 const char* getFormatString(int format);
-
-// Cannot use HW_OVERLAY_MAGNIFICATION_LIMIT, since at the time
-// of integration, HW_OVERLAY_MAGNIFICATION_LIMIT was a define
-enum { HW_OV_MAGNIFICATION_LIMIT = 20,
-    HW_OV_MINIFICATION_LIMIT  = 8
-};
 
 template <class T>
 inline void memset0(T& t) { ::memset(&t, 0, sizeof(T)); }
@@ -435,6 +428,11 @@ template <class T> inline void swap ( T& a, T& b )
 inline int alignup(int value, int a) {
     //if align = 0, return the value. Else, do alignment.
     return a ? ((((value - 1) / a) + 1) * a) : value;
+}
+
+inline int aligndown(int value, int a) {
+    //if align = 0, return the value. Else, do alignment.
+    return a ? ((value) & ~(a-1)) : value;
 }
 
 // FIXME that align should replace the upper one.
@@ -487,6 +485,7 @@ inline bool isYuv(uint32_t format) {
         case MDP_Y_CBCR_H2V2_TILE:
         case MDP_Y_CR_CB_H2V2:
         case MDP_Y_CR_CB_GH2V2:
+        case MDP_Y_CBCR_H2V2_VENUS:
             return true;
         default:
             return false;
@@ -534,6 +533,8 @@ inline const char* getFormatString(int format){
         "MDP_YCRCB_H1V1",
         "MDP_YCBCR_H1V1",
         "MDP_BGR_565",
+        "MDP_BGR_888",
+        "MDP_Y_CBCR_H2V2_VENUS",
         "MDP_IMGTYPE_LIMIT",
         "MDP_RGB_BORDERFILL",
         "MDP_FB_FORMAT",
@@ -576,31 +577,6 @@ inline int getMdpOrient(eTransform rotation) {
                     __FUNCTION__, rotation);
     }
     return -1;
-}
-
-inline int getRotOutFmt(uint32_t format) {
-    switch (format) {
-        case MDP_Y_CRCB_H2V2_TILE:
-            return MDP_Y_CRCB_H2V2;
-        case MDP_Y_CBCR_H2V2_TILE:
-            return MDP_Y_CBCR_H2V2;
-        case MDP_Y_CB_CR_H2V2:
-            return MDP_Y_CBCR_H2V2;
-        case MDP_Y_CR_CB_GH2V2:
-            return MDP_Y_CRCB_H2V2;
-        default:
-            return format;
-    }
-    // not reached
-    OVASSERT(false, "%s not reached", __FUNCTION__);
-    return -1;
-}
-
-
-inline uint32_t getColorFormat(uint32_t format)
-{
-    return (format == HAL_PIXEL_FORMAT_YV12) ?
-            format : colorFormat(format);
 }
 
 // FB0
@@ -732,34 +708,17 @@ inline void even_floor(T& value) {
         value--;
 }
 
-inline const char* getDestStr(eDest dest) {
-    switch(dest) {
-        case OV_VG0: return "VG0";
-        case OV_RGB0: return "RGB0";
-        case OV_VG1: return "VG1";
-        case OV_RGB1: return "RGB1";
-        case OV_VG2: return "VG2";
-        case OV_RGB2: return "RGB2";
-        default: return "Invalid";
-    }
-    return "Invalid";
-}
-
-inline eMdpPipeType getPipeType(eDest dest) {
-    switch(dest) {
-        case OV_VG0:
-        case OV_VG1:
-        case OV_VG2:
-            return OV_MDP_PIPE_VG;
-        case OV_RGB0:
-        case OV_RGB1:
-        case OV_RGB2:
-            return OV_MDP_PIPE_RGB;
-        default:
-            return OV_MDP_PIPE_ANY;
-    }
-    return OV_MDP_PIPE_ANY;
-}
+void preRotateSource(const eTransform& tr, Whf& whf, Dim& srcCrop);
+void getDump(char *buf, size_t len, const char *prefix, const mdp_overlay& ov);
+void getDump(char *buf, size_t len, const char *prefix, const msmfb_img& ov);
+void getDump(char *buf, size_t len, const char *prefix, const mdp_rect& ov);
+void getDump(char *buf, size_t len, const char *prefix,
+        const msmfb_overlay_data& ov);
+void getDump(char *buf, size_t len, const char *prefix, const msmfb_data& ov);
+void getDump(char *buf, size_t len, const char *prefix,
+        const msm_rotator_img_info& ov);
+void getDump(char *buf, size_t len, const char *prefix,
+        const msm_rotator_data_info& ov);
 
 } // namespace utils ends
 

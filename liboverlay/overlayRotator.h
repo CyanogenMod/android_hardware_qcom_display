@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011, The Linux Foundation. All rights reserved.
+* Copyright (c) 2011,2013 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -38,38 +38,6 @@
 
 namespace overlay {
 
-class Rotator
-{
-public:
-    enum { TYPE_MDP, TYPE_MDSS };
-    virtual ~Rotator();
-    virtual bool init() = 0;
-    virtual bool close() = 0;
-    virtual void setSource(const utils::Whf& wfh) = 0;
-    virtual void setFlags(const utils::eMdpFlags& flags) = 0;
-    virtual void setTransform(const utils::eTransform& rot,
-            const bool& rotUsed) = 0;
-    virtual bool commit() = 0;
-    virtual void setRotations(uint32_t r) = 0;
-    virtual void setSrcFB() = 0;
-    virtual int getDstMemId() const = 0;
-    virtual uint32_t getDstOffset() const = 0;
-    virtual void setEnable() = 0;
-    virtual void setDisable() = 0;
-    virtual bool enabled () const = 0;
-    virtual uint32_t getSessId() const = 0;
-    virtual bool queueBuffer(int fd, uint32_t offset) = 0;
-    virtual void dump() const = 0;
-    static Rotator *getRotator();
-
-protected:
-    explicit Rotator() {}
-
-private:
-    /*Returns rotator h/w type */
-    static int getRotatorHwType();
-};
-
 /*
    Manages the case where new rotator memory needs to be
    allocated, before previous is freed, due to resolution change etc. If we make
@@ -82,14 +50,17 @@ struct RotMem {
 
     //Manages the rotator buffer offsets.
     struct Mem {
-        Mem() : mCurrOffset(0) {utils::memset0(mRotOffset); }
+        Mem();
+        ~Mem();
         bool valid() { return m.valid(); }
         bool close() { return m.close(); }
         uint32_t size() const { return m.bufSz(); }
+        void setReleaseFd(const int& fence);
         // Max rotator buffers
         enum { ROT_NUM_BUFS = 2 };
         // rotator data info dst offset
         uint32_t mRotOffset[ROT_NUM_BUFS];
+        int mRelFence[ROT_NUM_BUFS];
         // current offset slot from mRotOffset
         uint32_t mCurrOffset;
         OvMem m;
@@ -100,9 +71,42 @@ struct RotMem {
     const Mem& curr() const { return m[_curr % MAX_ROT_MEM]; }
     Mem& prev() { return m[(_curr+1) % MAX_ROT_MEM]; }
     RotMem& operator++() { ++_curr; return *this; }
+    void setReleaseFd(const int& fence) { curr().setReleaseFd(fence); }
     bool close();
     uint32_t _curr;
     Mem m[MAX_ROT_MEM];
+};
+
+class Rotator
+{
+public:
+    enum { TYPE_MDP, TYPE_MDSS };
+    virtual ~Rotator();
+    virtual void setSource(const utils::Whf& wfh) = 0;
+    virtual void setFlags(const utils::eMdpFlags& flags) = 0;
+    virtual void setTransform(const utils::eTransform& rot) = 0;
+    virtual bool commit() = 0;
+    virtual void setDownscale(int ds) = 0;
+    virtual int getDstMemId() const = 0;
+    virtual uint32_t getDstOffset() const = 0;
+    virtual uint32_t getDstFormat() const = 0;
+    virtual uint32_t getSessId() const = 0;
+    virtual bool queueBuffer(int fd, uint32_t offset) = 0;
+    virtual void dump() const = 0;
+    virtual void getDump(char *buf, size_t len) const = 0;
+    void setReleaseFd(const int& fence) { mMem.setReleaseFd(fence); }
+    static Rotator *getRotator();
+
+protected:
+    /* Rotator memory manager */
+    RotMem mMem;
+    explicit Rotator() {}
+    static uint32_t calcOutputBufSize(const utils::Whf& destWhf);
+
+private:
+    /*Returns rotator h/w type */
+    static int getRotatorHwType();
+    friend class RotMgr;
 };
 
 /*
@@ -112,26 +116,25 @@ struct RotMem {
 class MdpRot : public Rotator {
 public:
     virtual ~MdpRot();
-    virtual bool init();
-    virtual bool close();
     virtual void setSource(const utils::Whf& wfh);
     virtual void setFlags(const utils::eMdpFlags& flags);
-    virtual void setTransform(const utils::eTransform& rot,
-            const bool& rotUsed);
+    virtual void setTransform(const utils::eTransform& rot);
     virtual bool commit();
-    virtual void setRotations(uint32_t r);
-    virtual void setSrcFB();
+    virtual void setDownscale(int ds);
     virtual int getDstMemId() const;
     virtual uint32_t getDstOffset() const;
-    virtual void setEnable();
-    virtual void setDisable();
-    virtual bool enabled () const;
+    virtual uint32_t getDstFormat() const;
     virtual uint32_t getSessId() const;
     virtual bool queueBuffer(int fd, uint32_t offset);
     virtual void dump() const;
+    virtual void getDump(char *buf, size_t len) const;
 
 private:
     explicit MdpRot();
+    bool init();
+    bool close();
+    void setRotations(uint32_t r);
+    bool enabled () const;
     /* remap rot buffers */
     bool remap(uint32_t numbufs);
     bool open_i(uint32_t numbufs, uint32_t bufsz);
@@ -139,13 +142,14 @@ private:
     void doTransform();
     /* reset underlying data, basically memset 0 */
     void reset();
-
     /* return true if current rotator config is different
      * than last known config */
     bool rotConfChanged() const;
-
     /* save mRotImgInfo to be last known good config*/
     void save();
+    /* Calculates the rotator's o/p buffer size post the transform calcs and
+     * knowing the o/p format depending on whether fastYuv is enabled or not */
+    uint32_t calcOutputBufSize();
 
     /* rot info*/
     msm_rotator_img_info mRotImgInfo;
@@ -157,10 +161,6 @@ private:
     utils::eTransform mOrientation;
     /* rotator fd */
     OvFD mFd;
-    /* Rotator memory manager */
-    RotMem mMem;
-    /* Single Rotator buffer size */
-    uint32_t mBufSize;
 
     friend Rotator* Rotator::getRotator();
 };
@@ -172,26 +172,25 @@ private:
 class MdssRot : public Rotator {
 public:
     virtual ~MdssRot();
-    virtual bool init();
-    virtual bool close();
     virtual void setSource(const utils::Whf& wfh);
     virtual void setFlags(const utils::eMdpFlags& flags);
-    virtual void setTransform(const utils::eTransform& rot,
-            const bool& rotUsed);
+    virtual void setTransform(const utils::eTransform& rot);
     virtual bool commit();
-    virtual void setRotations(uint32_t r);
-    virtual void setSrcFB();
+    virtual void setDownscale(int ds);
     virtual int getDstMemId() const;
     virtual uint32_t getDstOffset() const;
-    virtual void setEnable();
-    virtual void setDisable();
-    virtual bool enabled () const;
+    virtual uint32_t getDstFormat() const;
     virtual uint32_t getSessId() const;
     virtual bool queueBuffer(int fd, uint32_t offset);
     virtual void dump() const;
+    virtual void getDump(char *buf, size_t len) const;
 
 private:
     explicit MdssRot();
+    bool init();
+    bool close();
+    void setRotations(uint32_t r);
+    bool enabled () const;
     /* remap rot buffers */
     bool remap(uint32_t numbufs);
     bool open_i(uint32_t numbufs, uint32_t bufsz);
@@ -199,6 +198,9 @@ private:
     void doTransform();
     /* reset underlying data, basically memset 0 */
     void reset();
+    /* Calculates the rotator's o/p buffer size post the transform calcs and
+     * knowing the o/p format depending on whether fastYuv is enabled or not */
+    uint32_t calcOutputBufSize();
 
     /* MdssRot info structure */
     mdp_overlay   mRotInfo;
@@ -208,15 +210,35 @@ private:
     utils::eTransform mOrientation;
     /* rotator fd */
     OvFD mFd;
-    /* Rotator memory manager */
-    RotMem mMem;
-    /* Single Rotator buffer size */
-    uint32_t mBufSize;
     /* Enable/Disable Mdss Rot*/
     bool mEnabled;
 
     friend Rotator* Rotator::getRotator();
 };
+
+// Holder of rotator objects. Manages lifetimes
+class RotMgr {
+public:
+    //Maximum sessions based on VG pipes, since rotator is used only for videos.
+    //Even though we can have 4 mixer stages, that much may be unnecessary.
+    enum { MAX_ROT_SESS = 3 };
+    RotMgr();
+    ~RotMgr();
+    void configBegin();
+    void configDone();
+    overlay::Rotator *getNext();
+    void clear(); //Removes all instances
+    /* Returns rot dump.
+     * Expects a NULL terminated buffer of big enough size.
+     */
+    void getDump(char *buf, size_t len);
+    int getRotDevFd(); //Called on A-fam only
+private:
+    overlay::Rotator *mRot[MAX_ROT_SESS];
+    int mUseCount;
+    int mRotDevFd; //A-fam
+};
+
 
 } // overlay
 

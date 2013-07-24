@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -28,11 +28,13 @@
 */
 
 #include "overlayGenPipe.h"
+#include "overlay.h"
+#include "mdp_version.h"
 
 namespace overlay {
 
 GenericPipe::GenericPipe(int dpy) : mFbNum(dpy), mRot(0), mRotUsed(false),
-        pipeState(CLOSED) {
+        mRotDownscaleOpt(false), mPreRotated(false), pipeState(CLOSED) {
     init();
 }
 
@@ -44,6 +46,12 @@ bool GenericPipe::init()
 {
     ALOGE_IF(DEBUG_OVERLAY, "GenericPipe init");
     mRotUsed = false;
+    mRotDownscaleOpt = false;
+    mPreRotated = false;
+    if(mFbNum)
+        mFbNum = Overlay::getInstance()->getExtFbNum();
+
+    ALOGD_IF(DEBUG_OVERLAY,"%s: mFbNum:%d",__FUNCTION__, mFbNum);
 
     if(!mCtrlData.ctrl.init(mFbNum)) {
         ALOGE("GenericPipe failed to init ctrl");
@@ -80,53 +88,54 @@ bool GenericPipe::close() {
     return ret;
 }
 
-bool GenericPipe::setSource(
-        const utils::PipeArgs& args)
-{
-    utils::PipeArgs newargs(args);
-    //Interlace video handling.
-    if(newargs.whf.format & INTERLACE_MASK) {
-        setMdpFlags(newargs.mdpFlags, utils::OV_MDP_DEINTERLACE);
-    }
-    utils::Whf whf(newargs.whf);
-    //Extract HAL format from lower bytes. Deinterlace if interlaced.
-    whf.format = utils::getColorFormat(whf.format);
-    //Get MDP equivalent of HAL format.
-    whf.format = utils::getMdpFormat(whf.format);
-    newargs.whf = whf;
-
+void GenericPipe::setSource(const utils::PipeArgs& args) {
     //Cache if user wants 0-rotation
-    mRotUsed = newargs.rotFlags & utils::ROT_FLAG_ENABLED;
-    mRot->setSource(newargs.whf);
-    mRot->setFlags(newargs.mdpFlags);
-    return mCtrlData.ctrl.setSource(newargs);
+    mRotUsed = args.rotFlags & utils::ROT_0_ENABLED;
+    mRotDownscaleOpt = args.rotFlags & utils::ROT_DOWNSCALE_ENABLED;
+    mPreRotated = args.rotFlags & utils::ROT_PREROTATED;
+    if(mPreRotated) mRotUsed = false;
+    mRot->setSource(args.whf);
+    mRot->setFlags(args.mdpFlags);
+    mCtrlData.ctrl.setSource(args);
 }
 
-bool GenericPipe::setCrop(
-        const overlay::utils::Dim& d) {
-    return mCtrlData.ctrl.setCrop(d);
+void GenericPipe::setCrop(const overlay::utils::Dim& d) {
+    mCtrlData.ctrl.setCrop(d);
 }
 
-bool GenericPipe::setTransform(
-        const utils::eTransform& orient)
-{
+void GenericPipe::setTransform(const utils::eTransform& orient) {
     //Rotation could be enabled by user for zero-rot or the layer could have
     //some transform. Mark rotation enabled in either case.
-    mRotUsed |= (orient != utils::OVERLAY_TRANSFORM_0);
-    mRot->setTransform(orient, mRotUsed);
-
-    return mCtrlData.ctrl.setTransform(orient, mRotUsed);
+    mRotUsed |= ((orient & utils::OVERLAY_TRANSFORM_ROT_90) && !mPreRotated);
+    mRot->setTransform(orient);
+    mCtrlData.ctrl.setTransform(orient);
 }
 
-bool GenericPipe::setPosition(const utils::Dim& d)
+void GenericPipe::setPosition(const utils::Dim& d) {
+    mCtrlData.ctrl.setPosition(d);
+}
+
+bool GenericPipe::setVisualParams(const MetaData_t &metadata)
 {
-    return mCtrlData.ctrl.setPosition(d);
+        return mCtrlData.ctrl.setVisualParams(metadata);
 }
 
 bool GenericPipe::commit() {
     bool ret = false;
-    //If wanting to use rotator, start it.
+    int downscale_factor = utils::ROT_DS_NONE;
+
+    if(mRotDownscaleOpt) {
+        ovutils::Dim src(mCtrlData.ctrl.getCrop());
+        ovutils::Dim dst(mCtrlData.ctrl.getPosition());
+        downscale_factor = ovutils::getDownscaleFactor(
+                src.w, src.h, dst.w, dst.h);
+        mRotUsed |= (downscale_factor && !mPreRotated);
+    }
+
+
     if(mRotUsed) {
+        mRot->setDownscale(downscale_factor);
+        //If wanting to use rotator, start it.
         if(!mRot->commit()) {
             ALOGE("GenPipe Rotator commit failed");
             //If rot commit fails, flush rotator session, memory, fd and create
@@ -136,8 +145,14 @@ bool GenericPipe::commit() {
             pipeState = CLOSED;
             return false;
         }
+        /* Set the mdp src format to the output format of the rotator.
+         * The output format of the rotator might be different depending on
+         * whether fastyuv mode is enabled in the rotator.
+         */
+        mCtrlData.ctrl.updateSrcFormat(mRot->getDstFormat());
     }
 
+    mCtrlData.ctrl.setDownscale(downscale_factor);
     ret = mCtrlData.ctrl.commit();
 
     //If mdp commit fails, flush rotator session, memory, fd and create a hollow
@@ -185,11 +200,6 @@ int GenericPipe::getCtrlFd() const {
     return mCtrlData.ctrl.getFd();
 }
 
-utils::ScreenInfo GenericPipe::getScreenInfo() const
-{
-    return mCtrlData.ctrl.getScreenInfo();
-}
-
 utils::Dim GenericPipe::getCrop() const
 {
     return mCtrlData.ctrl.getCrop();
@@ -206,6 +216,13 @@ void GenericPipe::dump() const
     ALOGE("== Dump Generic pipe end ==");
 }
 
+void GenericPipe::getDump(char *buf, size_t len) {
+    mCtrlData.ctrl.getDump(buf, len);
+    mCtrlData.data.getDump(buf, len);
+    if(mRotUsed && mRot)
+        mRot->getDump(buf, len);
+}
+
 bool GenericPipe::isClosed() const  {
     return (pipeState == CLOSED);
 }
@@ -218,5 +235,6 @@ bool GenericPipe::setClosed() {
     pipeState = CLOSED;
     return true;
 }
+
 
 } //namespace overlay

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -18,9 +18,6 @@
  * limitations under the License.
  */
 
-// WARNING : Excessive logging, if VSYNC_DEBUG enabled
-#define VSYNC_DEBUG 0
-
 #include <cutils/properties.h>
 #include <utils/Log.h>
 #include <fcntl.h>
@@ -32,10 +29,22 @@
 #include "string.h"
 #include "external.h"
 
-
 namespace qhwc {
 
 #define HWC_VSYNC_THREAD_NAME "hwcVsyncThread"
+
+int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable)
+{
+    int ret = 0;
+    if(!ctx->vstate.fakevsync &&
+       ioctl(ctx->dpyAttr[dpy].fd, MSMFB_OVERLAY_VSYNC_CTRL,
+             &enable) < 0) {
+        ALOGE("%s: vsync control failed. Dpy=%d, enable=%d : %s",
+              __FUNCTION__, dpy, enable, strerror(errno));
+        ret = -errno;
+    }
+    return ret;
+}
 
 static void *vsync_loop(void *param)
 {
@@ -51,7 +60,6 @@ static void *vsync_loop(void *param)
                 android::PRIORITY_MORE_FAVORABLE);
 
     const int MAX_DATA = 64;
-    const int MAX_RETRY_COUNT = 100;
     static char vdata[MAX_DATA];
 
     uint64_t cur_timestamp=0;
@@ -59,13 +67,17 @@ static void *vsync_loop(void *param)
     int fd_timestamp = -1;
     int ret = 0;
     bool fb1_vsync = false;
-    bool enabled = false;
-    bool fakevsync = false;
+    bool logvsync = false;
 
     char property[PROPERTY_VALUE_MAX];
     if(property_get("debug.hwc.fakevsync", property, NULL) > 0) {
         if(atoi(property) == 1)
-            fakevsync = true;
+            ctx->vstate.fakevsync = true;
+    }
+
+    if(property_get("debug.hwc.logvsync", property, 0) > 0) {
+        if(atoi(property) == 1)
+            logvsync = true;
     }
 
     /* Currently read vsync timestamp from drivers
@@ -73,80 +85,44 @@ static void *vsync_loop(void *param)
        */
     fd_timestamp = open(vsync_timestamp_fb0, O_RDONLY);
     if (fd_timestamp < 0) {
+        // Make sure fb device is opened before starting this thread so this
+        // never happens.
         ALOGE ("FATAL:%s:not able to open file:%s, %s",  __FUNCTION__,
                (fb1_vsync) ? vsync_timestamp_fb1 : vsync_timestamp_fb0,
                strerror(errno));
-        fakevsync = true;
+        ctx->vstate.fakevsync = true;
     }
 
     do {
-        pthread_mutex_lock(&ctx->vstate.lock);
-        while (ctx->vstate.enable == false) {
-            if(enabled) {
-                int e = 0;
-                if(!fakevsync &&
-                   ioctl(ctx->dpyAttr[dpy].fd, MSMFB_OVERLAY_VSYNC_CTRL,
-                         &e) < 0) {
-                    ALOGE("%s: vsync control failed. Dpy=%d, enabled=%d : %s",
-                          __FUNCTION__, dpy, enabled, strerror(errno));
-                    ret = -errno;
-                }
-                enabled = false;
-            }
-            pthread_cond_wait(&ctx->vstate.cond, &ctx->vstate.lock);
-        }
-        pthread_mutex_unlock(&ctx->vstate.lock);
-
-        if (!enabled) {
-            int e = 1;
-            if(!fakevsync &&
-               ioctl(ctx->dpyAttr[dpy].fd, MSMFB_OVERLAY_VSYNC_CTRL,
-                     &e) < 0) {
-                ALOGE("%s: vsync control failed. Dpy=%d, enabled=%d : %s",
-                      __FUNCTION__, dpy, enabled, strerror(errno));
-                ret = -errno;
-            }
-            enabled = true;
-        }
-
-        if(!fakevsync) {
-            for(int i = 0; i < MAX_RETRY_COUNT; i++) {
-                len = pread(fd_timestamp, vdata, MAX_DATA, 0);
-                if(len < 0 && (errno == EAGAIN || errno == EINTR)) {
-                    ALOGW("%s: vsync read: EAGAIN, retry (%d/%d).",
-                          __FUNCTION__, i, MAX_RETRY_COUNT);
-                    continue;
-                } else {
-                    break;
-                }
-            }
-
+        if (LIKELY(!ctx->vstate.fakevsync)) {
+            len = pread(fd_timestamp, vdata, MAX_DATA, 0);
             if (len < 0) {
-                ALOGE ("FATAL:%s:not able to read file:%s, %s", __FUNCTION__,
-                       vsync_timestamp_fb0, strerror(errno));
-                close (fd_timestamp);
-                fakevsync = true;
+                // If the read was just interrupted - it is not a fatal error
+                // In either case, just continue.
+                if (errno != EAGAIN &&
+                    errno != EINTR  &&
+                    errno != EBUSY) {
+                    ALOGE ("FATAL:%s:not able to read file:%s, %s",
+                           __FUNCTION__,
+                           vsync_timestamp_fb0, strerror(errno));
+                }
+                continue;
             }
-
             // extract timestamp
             const char *str = vdata;
             if (!strncmp(str, "VSYNC=", strlen("VSYNC="))) {
                 cur_timestamp = strtoull(str + strlen("VSYNC="), NULL, 0);
-            } else {
-                ALOGE ("FATAL: %s: vsync timestamp not in correct format: [%s]",
-                       __FUNCTION__,
-                       str);
-                fakevsync = true;
             }
-
         } else {
-            usleep(16000);
+            usleep(16666);
             cur_timestamp = systemTime();
         }
         // send timestamp to HAL
-        ALOGD_IF (VSYNC_DEBUG, "%s: timestamp %llu sent to HWC for %s",
-                  __FUNCTION__, cur_timestamp, "fb0");
-        ctx->proc->vsync(ctx->proc, dpy, cur_timestamp);
+        if(ctx->vstate.enable) {
+            ALOGD_IF (logvsync, "%s: timestamp %llu sent to HWC for %s",
+                      __FUNCTION__, cur_timestamp, "fb0");
+            ctx->proc->vsync(ctx->proc, dpy, cur_timestamp);
+        }
 
     } while (true);
     if(fd_timestamp >= 0)

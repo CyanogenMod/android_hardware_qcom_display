@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -27,33 +27,58 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ANDROID_QSERVICE_H
-#define ANDROID_QSERVICE_H
+#ifndef _QDMETADATA_H
+#define _QDMETADATA_H
 
-#include <utils/Errors.h>
-#include <sys/types.h>
-#include <cutils/log.h>
-#include <binder/IServiceManager.h>
-#include <IQService.h>
-#include <IQClient.h>
+#define MAX_IGC_LUT_ENTRIES 256
 
-struct hwc_context_t;
-
-namespace qService {
-// ----------------------------------------------------------------------------
-
-class QService : public BnQService {
-public:
-    virtual ~QService();
-    virtual void securing(uint32_t startEnd);
-    virtual void unsecuring(uint32_t startEnd);
-    virtual void connect(const android::sp<qClient::IQClient>& client);
-    virtual android::status_t screenRefresh();
-    static void init();
-private:
-    QService();
-    android::sp<qClient::IQClient> mClient;
-    static QService *sQService;
+struct HSICData_t {
+    int32_t hue;
+    float   saturation;
+    int32_t intensity;
+    float   contrast;
 };
-}; // namespace qService
-#endif // ANDROID_QSERVICE_H
+
+struct Sharp2Data_t {
+    int32_t strength;
+    uint32_t edge_thr;
+    uint32_t smooth_thr;
+    uint32_t noise_thr;
+};
+
+struct IGCData_t{
+    uint16_t c0[MAX_IGC_LUT_ENTRIES];
+    uint16_t c1[MAX_IGC_LUT_ENTRIES];
+    uint16_t c2[MAX_IGC_LUT_ENTRIES];
+};
+
+struct BufferDim_t {
+    int32_t sliceWidth;
+    int32_t sliceHeight;
+};
+
+struct MetaData_t {
+    int32_t operation;
+    int32_t interlaced;
+    BufferDim_t bufferDim;
+    HSICData_t hsicData;
+    int32_t sharpness;
+    int32_t video_interface;
+    IGCData_t igcData;
+    Sharp2Data_t Sharp2Data;
+};
+
+typedef enum {
+    PP_PARAM_HSIC       = 0x0001,
+    PP_PARAM_SHARPNESS  = 0x0002,
+    PP_PARAM_INTERLACED = 0x0004,
+    PP_PARAM_VID_INTFC  = 0x0008,
+    PP_PARAM_IGC        = 0x0010,
+    PP_PARAM_SHARP2     = 0x0020,
+    UPDATE_BUFFER_GEOMETRY = 0x0080,
+} DispParamType;
+
+int setMetaData(private_handle_t *handle, DispParamType paramType, void *param);
+
+#endif /* _QDMETADATA_H */
+

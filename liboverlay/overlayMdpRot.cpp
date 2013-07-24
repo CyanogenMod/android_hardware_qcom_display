@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
  *
@@ -31,10 +31,6 @@ MdpRot::MdpRot() {
 
 MdpRot::~MdpRot() { close(); }
 
-void MdpRot::setEnable() { mRotImgInfo.enable = 1; }
-
-void MdpRot::setDisable() { mRotImgInfo.enable = 0; }
-
 bool MdpRot::enabled() const { return mRotImgInfo.enable; }
 
 void MdpRot::setRotations(uint32_t r) { mRotImgInfo.rotations = r; }
@@ -47,10 +43,19 @@ uint32_t MdpRot::getDstOffset() const {
     return mRotDataInfo.dst.offset;
 }
 
+uint32_t MdpRot::getDstFormat() const {
+    return mRotImgInfo.dst.format;
+}
+
 uint32_t MdpRot::getSessId() const { return mRotImgInfo.session_id; }
 
-void MdpRot::setSrcFB() {
-    mRotDataInfo.src.flags |= MDP_MEMORY_ID_TYPE_FB;
+void MdpRot::setDownscale(int ds) {
+    if ((utils::ROT_DS_EIGHTH == ds) && (mRotImgInfo.src_rect.h & 0xF)) {
+        // Ensure src_rect.h is a multiple of 16 for 1/8 downscaling.
+        // This is an undocumented MDP Rotator constraint.
+        mRotImgInfo.src_rect.h = utils::aligndown(mRotImgInfo.src_rect.h, 16);
+    }
+    mRotImgInfo.downscale_ratio = ds;
 }
 
 void MdpRot::save() {
@@ -77,13 +82,7 @@ bool MdpRot::init()
 
 void MdpRot::setSource(const overlay::utils::Whf& awhf) {
     utils::Whf whf(awhf);
-
     mRotImgInfo.src.format = whf.format;
-    if(whf.format == MDP_Y_CRCB_H2V2_TILE ||
-        whf.format == MDP_Y_CBCR_H2V2_TILE) {
-        whf.w =  utils::alignup(awhf.w, 64);
-        whf.h = utils::alignup(awhf.h, 32);
-    }
 
     mRotImgInfo.src.width = whf.w;
     mRotImgInfo.src.height = whf.h;
@@ -93,8 +92,6 @@ void MdpRot::setSource(const overlay::utils::Whf& awhf) {
 
     mRotImgInfo.dst.width = whf.w;
     mRotImgInfo.dst.height = whf.h;
-
-    mBufSize = awhf.size;
 }
 
 void MdpRot::setFlags(const utils::eMdpFlags& flags) {
@@ -103,7 +100,7 @@ void MdpRot::setFlags(const utils::eMdpFlags& flags) {
         mRotImgInfo.secure = 1;
 }
 
-void MdpRot::setTransform(const utils::eTransform& rot, const bool& rotUsed)
+void MdpRot::setTransform(const utils::eTransform& rot)
 {
     int r = utils::getMdpOrient(rot);
     setRotations(r);
@@ -111,11 +108,6 @@ void MdpRot::setTransform(const utils::eTransform& rot, const bool& rotUsed)
     //Clients in Android dont factor in 90 rotation while deciding the flip.
     mOrientation = static_cast<utils::eTransform>(r);
     ALOGE_IF(DEBUG_OVERLAY, "%s: r=%d", __FUNCTION__, r);
-
-    setDisable();
-    if(rotUsed) {
-        setEnable();
-    }
 }
 
 void MdpRot::doTransform() {
@@ -126,15 +118,23 @@ void MdpRot::doTransform() {
 bool MdpRot::commit() {
     doTransform();
     if(rotConfChanged()) {
+        mRotImgInfo.enable = 1;
         if(!overlay::mdp_wrapper::startRotator(mFd.getFD(), mRotImgInfo)) {
             ALOGE("MdpRot commit failed");
             dump();
+            mRotImgInfo.enable = 0;
             return false;
         }
         save();
         mRotDataInfo.session_id = mRotImgInfo.session_id;
     }
     return true;
+}
+
+uint32_t MdpRot::calcOutputBufSize() {
+    ovutils::Whf destWhf(mRotImgInfo.dst.width,
+            mRotImgInfo.dst.height, mRotImgInfo.dst.format);
+    return Rotator::calcOutputBufSize(destWhf);
 }
 
 bool MdpRot::open_i(uint32_t numbufs, uint32_t bufsz)
@@ -181,8 +181,9 @@ bool MdpRot::close() {
 
 bool MdpRot::remap(uint32_t numbufs) {
     // if current size changed, remap
-    if(mBufSize == mMem.curr().size()) {
-        ALOGE_IF(DEBUG_OVERLAY, "%s: same size %d", __FUNCTION__, mBufSize);
+    uint32_t opBufSize = calcOutputBufSize();
+    if(opBufSize == mMem.curr().size()) {
+        ALOGE_IF(DEBUG_OVERLAY, "%s: same size %d", __FUNCTION__, opBufSize);
         return true;
     }
 
@@ -191,12 +192,12 @@ bool MdpRot::remap(uint32_t numbufs) {
 
     // ++mMem will make curr to be prev, and prev will be curr
     ++mMem;
-    if(!open_i(numbufs, mBufSize)) {
+    if(!open_i(numbufs, opBufSize)) {
         ALOGE("%s Error could not open", __FUNCTION__);
         return false;
     }
     for (uint32_t i = 0; i < numbufs; ++i) {
-        mMem.curr().mRotOffset[i] = i * mBufSize;
+        mMem.curr().mRotOffset[i] = i * opBufSize;
     }
     return true;
 }
@@ -209,7 +210,6 @@ void MdpRot::reset() {
     ovutils::memset0(mMem.prev().mRotOffset);
     mMem.curr().mCurrOffset = 0;
     mMem.prev().mCurrOffset = 0;
-    mBufSize = 0;
     mOrientation = utils::OVERLAY_TRANSFORM_0;
 }
 
@@ -253,6 +253,11 @@ void MdpRot::dump() const {
     mdp_wrapper::dump("mRotImgInfo", mRotImgInfo);
     mdp_wrapper::dump("mRotDataInfo", mRotDataInfo);
     ALOGE("== Dump MdpRot end ==");
+}
+
+void MdpRot::getDump(char *buf, size_t len) const {
+    ovutils::getDump(buf, len, "MdpRotCtrl(msm_rotator_img_info)", mRotImgInfo);
+    ovutils::getDump(buf, len, "MdpRotData(msm_rotator_data_info)", mRotDataInfo);
 }
 
 } // namespace overlay

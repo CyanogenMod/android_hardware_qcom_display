@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -31,6 +31,9 @@
 #define OVERLAY_H
 
 #include "overlayUtils.h"
+#include "utils/threads.h"
+
+struct MetaData_t;
 
 namespace overlay {
 class GenericPipe;
@@ -63,15 +66,24 @@ public:
     void setCrop(const utils::Dim& d, utils::eDest dest);
     void setTransform(const int orientation, utils::eDest dest);
     void setPosition(const utils::Dim& dim, utils::eDest dest);
+    void setVisualParams(const MetaData_t& data, utils::eDest dest);
     bool commit(utils::eDest dest);
     bool queueBuffer(int fd, uint32_t offset, utils::eDest dest);
 
     /* Closes open pipes, called during startup */
-    static void initOverlay();
+    static int initOverlay();
     /* Returns the singleton instance of overlay */
     static Overlay* getInstance();
-    /* Returns total of available ("unallocated") pipes */
-    static int availablePipes();
+    /* Returns available ("unallocated") pipes for a display */
+    int availablePipes(int dpy);
+    /* set the framebuffer index for external display */
+    void setExtFbNum(int fbNum);
+    /* Returns framebuffer index of the current external display */
+    int getExtFbNum();
+    /* Returns pipe dump. Expects a NULL terminated buffer of big enough size
+     * to populate.
+     */
+    void getDump(char *buf, size_t len);
 
 private:
     /* Ctor setup */
@@ -106,10 +118,13 @@ private:
         static void resetAllocation(int index);
         static bool isAllocated(int index);
         static bool isNotAllocated(int index);
-        /* Returns total of available ("unallocated") pipes */
-        static int availablePipes();
+
+        static utils::eMdpPipeType getPipeType(utils::eDest dest);
+        static const char* getDestStr(utils::eDest dest);
 
         static int NUM_PIPES;
+        static utils::eMdpPipeType pipeTypeLUT[utils::OV_MAX];
+
 
     private:
         //usage tracks if a successful commit happened. So a pipe could be
@@ -132,27 +147,33 @@ private:
 
     /* Singleton Instance*/
     static Overlay *sInstance;
+    static int sExtFbIndex;
 };
 
 inline void Overlay::validate(int index) {
     OVASSERT(index >=0 && index < PipeBook::NUM_PIPES, \
         "%s, Index out of bounds: %d", __FUNCTION__, index);
     OVASSERT(mPipeBook[index].valid(), "Pipe does not exist %s",
-            utils::getDestStr((utils::eDest)index));
+            PipeBook::getDestStr((utils::eDest)index));
 }
 
-inline int Overlay::availablePipes() {
-    return PipeBook::availablePipes();
-}
-
-inline int Overlay::PipeBook::availablePipes() {
-    int used = 0;
-    int bmp = sAllocatedBitmap;
-    for(; bmp; used++) {
-        //clearing from lsb
-        bmp = bmp & (bmp - 1);
+inline int Overlay::availablePipes(int dpy) {
+     int avail = 0;
+     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
+       if((mPipeBook[i].mDisplay == PipeBook::DPY_UNUSED ||
+           mPipeBook[i].mDisplay == dpy) && PipeBook::isNotAllocated(i)) {
+                avail++;
+        }
     }
-    return NUM_PIPES - used;
+    return avail;
+}
+
+inline void Overlay::setExtFbNum(int fbNum) {
+    sExtFbIndex = fbNum;
+}
+
+inline int Overlay::getExtFbNum() {
+    return sExtFbIndex;
 }
 
 inline bool Overlay::PipeBook::valid() {
@@ -197,6 +218,20 @@ inline bool Overlay::PipeBook::isAllocated(int index) {
 
 inline bool Overlay::PipeBook::isNotAllocated(int index) {
     return !isAllocated(index);
+}
+
+inline utils::eMdpPipeType Overlay::PipeBook::getPipeType(utils::eDest dest) {
+    return pipeTypeLUT[(int)dest];
+}
+
+inline const char* Overlay::PipeBook::getDestStr(utils::eDest dest) {
+    switch(getPipeType(dest)) {
+        case utils::OV_MDP_PIPE_RGB: return "RGB";
+        case utils::OV_MDP_PIPE_VG: return "VG";
+        case utils::OV_MDP_PIPE_DMA: return "DMA";
+        default: return "Invalid";
+    }
+    return "Invalid";
 }
 
 }; // overlay

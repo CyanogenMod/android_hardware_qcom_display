@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,9 @@
 
 #include <cutils/log.h>
 
+#define ROUND_UP_PAGESIZE(x) ( (((unsigned long)(x)) + PAGE_SIZE-1)  & \
+                               (~(PAGE_SIZE-1)) )
+
 enum {
     /* gralloc usage bits indicating the type
      * of allocation that should be used */
@@ -50,14 +53,6 @@ enum {
     /* Set this for allocating uncached memory (using O_DSYNC)
      * cannot be used with noncontiguous heaps */
     GRALLOC_USAGE_PRIVATE_UNCACHED        =       0x02000000,
-
-    /* This flag can be set to disable genlock synchronization
-     * for the gralloc buffer. If this flag is set the caller
-     * is required to perform explicit synchronization.
-     * WARNING - flag is outside the standard PRIVATE region
-     * and may need to be moved if the gralloc API changes
-     */
-    GRALLOC_USAGE_PRIVATE_UNSYNCHRONIZED  =       0X04000000,
 
     /* Buffer content should be displayed on an external display only */
     GRALLOC_USAGE_PRIVATE_EXTERNAL_ONLY   =       0x08000000,
@@ -81,7 +76,8 @@ enum {
 enum {
     /* Gralloc perform enums
     */
-    GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER = 0x080000001,
+    GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER = 1,
+    GRALLOC_MODULE_PERFORM_GET_STRIDE,
 };
 
 #define GRALLOC_HEAP_MASK   (GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP |\
@@ -96,6 +92,7 @@ enum {
 enum {
     /* OEM specific HAL formats */
     HAL_PIXEL_FORMAT_NV12_ENCODEABLE        = 0x102,
+    HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS     = 0x7FA30C04,
     HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED     = 0x7FA30C03,
     HAL_PIXEL_FORMAT_YCbCr_420_SP           = 0x109,
     HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO    = 0x7FA30C01,
@@ -160,12 +157,16 @@ struct private_handle_t : public native_handle {
             PRIV_FLAGS_VIDEO_ENCODER      = 0x00010000,
             PRIV_FLAGS_CAMERA_WRITE       = 0x00020000,
             PRIV_FLAGS_CAMERA_READ        = 0x00040000,
+            PRIV_FLAGS_HW_COMPOSER        = 0x00080000,
+            PRIV_FLAGS_HW_TEXTURE         = 0x00100000,
+            PRIV_FLAGS_ITU_R_601          = 0x00200000,
+            PRIV_FLAGS_ITU_R_601_FR       = 0x00400000,
+            PRIV_FLAGS_ITU_R_709          = 0x00800000,
         };
 
         // file-descriptors
         int     fd;
-        // genlock handle to be dup'd by the binder
-        int     genlockHandle;
+        int     fd_metadata;          // fd for the meta-data
         // ints
         int     magic;
         int     flags;
@@ -173,15 +174,13 @@ struct private_handle_t : public native_handle {
         int     offset;
         int     bufferType;
         int     base;
+        int     offset_metadata;
         // The gpu address mapped into the mmu.
-        // If using ashmem, set to 0, they don't care
         int     gpuaddr;
-        int     pid;   // deprecated
         int     format;
         int     width;
         int     height;
-        // local fd of the genlock device.
-        int     genlockPrivFd;
+        int     base_metadata;
 
 #ifdef __cplusplus
         static const int sNumInts = 12;
@@ -189,12 +188,13 @@ struct private_handle_t : public native_handle {
         static const int sMagic = 'gmsm';
 
         private_handle_t(int fd, int size, int flags, int bufferType,
-                         int format,int width, int height) :
-            fd(fd), genlockHandle(-1), magic(sMagic),
-            flags(flags), size(size), offset(0),
-            bufferType(bufferType), base(0), gpuaddr(0),
-            pid(0), format(format),
-            width(width), height(height), genlockPrivFd(-1)
+                         int format,int width, int height, int eFd = -1,
+                         int eOffset = 0, int eBase = 0) :
+            fd(fd), fd_metadata(eFd), magic(sMagic),
+            flags(flags), size(size), offset(0), bufferType(bufferType),
+            base(0), offset_metadata(eOffset), gpuaddr(0),
+            format(format), width(width), height(height),
+            base_metadata(eBase)
         {
             version = sizeof(native_handle);
             numInts = sNumInts;

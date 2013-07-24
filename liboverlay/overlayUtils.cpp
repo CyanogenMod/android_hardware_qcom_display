@@ -28,11 +28,11 @@
 */
 
 #include <stdlib.h>
+#include <math.h>
 #include <utils/Log.h>
 #include <linux/msm_mdp.h>
 #include <cutils/properties.h>
 #include "gralloc_priv.h"
-#include "fb_priv.h"
 #include "overlayUtils.h"
 #include "mdpWrapper.h"
 #include "mdp_version.h"
@@ -84,116 +84,6 @@ const char* const Res::barrierFile =
 
 
 namespace utils {
-//------------------ defines -----------------------------
-#define FB_DEVICE_TEMPLATE "/dev/graphics/fb%u"
-#define NUM_FB_DEVICES 3
-
-//--------------------------------------------------------
-FrameBufferInfo::FrameBufferInfo() {
-    mFBWidth = 0;
-    mFBHeight = 0;
-    mBorderFillSupported = false;
-
-    OvFD mFd;
-
-    // Use open defined in overlayFD file to open fd for fb0
-    if(!overlay::open(mFd, 0, Res::fbPath)) {
-        ALOGE("FrameBufferInfo: failed to open fd");
-        return;
-    }
-
-    if (!mFd.valid()) {
-        ALOGE("FrameBufferInfo: FD not valid");
-        return;
-    }
-
-    fb_var_screeninfo vinfo;
-    if (!mdp_wrapper::getVScreenInfo(mFd.getFD(), vinfo)) {
-        ALOGE("FrameBufferInfo: failed getVScreenInfo on fb0");
-        mFd.close();
-        return;
-    }
-
-    int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
-    if (mdpVersion < qdutils::MDSS_V5) {
-        mdp_overlay ov;
-        memset(&ov, 0, sizeof(ov));
-        ov.id = 1;
-        if (!mdp_wrapper::getOverlay(mFd.getFD(), ov)) {
-            ALOGE("FrameBufferInfo: failed getOverlay on fb0");
-            mFd.close();
-            return;
-        }
-        mBorderFillSupported = (ov.flags & MDP_BORDERFILL_SUPPORTED) ?
-                               true : false;
-    } else {
-        // badger always support border fill
-        mBorderFillSupported = true;
-    }
-
-    mFd.close();
-    mFBWidth = vinfo.xres;
-    mFBHeight = vinfo.yres;
-}
-
-FrameBufferInfo* FrameBufferInfo::getInstance() {
-    if (!sFBInfoInstance) {
-        sFBInfoInstance = new FrameBufferInfo;
-    }
-    return sFBInfoInstance;
-}
-
-int FrameBufferInfo::getWidth() const {
-    return mFBWidth;
-}
-
-int FrameBufferInfo::getHeight() const {
-    return mFBHeight;
-}
-
-/* clears any VG pipes allocated to the fb devices */
-int initOverlay() {
-    msmfb_mixer_info_req  req;
-    mdp_mixer_info *minfo = NULL;
-    char name[64];
-    int fd = -1;
-    for(int i = 0; i < NUM_FB_DEVICES; i++) {
-        snprintf(name, 64, FB_DEVICE_TEMPLATE, i);
-        ALOGD("initoverlay:: opening the device:: %s", name);
-        fd = ::open(name, O_RDWR, 0);
-        if(fd < 0) {
-            ALOGE("cannot open framebuffer(%d)", i);
-            return -1;
-        }
-        //Get the mixer configuration */
-        req.mixer_num = i;
-        if (ioctl(fd, MSMFB_MIXER_INFO, &req) == -1) {
-            ALOGE("ERROR: MSMFB_MIXER_INFO ioctl failed");
-            close(fd);
-            return -1;
-        }
-        minfo = req.info;
-        for (int j = 0; j < req.cnt; j++) {
-            ALOGD("ndx=%d num=%d z_order=%d", minfo->pndx, minfo->pnum,
-                    minfo->z_order);
-            // except the RGB base layer with z_order of -1, clear any
-            // other pipes connected to mixer.
-            if((minfo->z_order) != -1) {
-                int index = minfo->pndx;
-                ALOGD("Unset overlay with index: %d at mixer %d", index, i);
-                if(ioctl(fd, MSMFB_OVERLAY_UNSET, &index) == -1) {
-                    ALOGE("ERROR: MSMFB_OVERLAY_UNSET failed");
-                    close(fd);
-                    return -1;
-                }
-            }
-            minfo++;
-        }
-        close(fd);
-        fd = -1;
-    }
-    return 0;
-}
 
 //--------------------------------------------------------
 //Refer to graphics.h, gralloc_priv.h, msm_mdp.h
@@ -228,7 +118,8 @@ int getMdpFormat(int format) {
             return MDP_Y_CBCR_H1V1;
         case HAL_PIXEL_FORMAT_YCrCb_444_SP:
             return MDP_Y_CRCB_H1V1;
-
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+            return MDP_Y_CBCR_H2V2_VENUS;
         default:
             //Unsupported by MDP
             //---graphics.h--------
@@ -239,11 +130,120 @@ int getMdpFormat(int format) {
             //HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO    = 0x7FA30C01
             //HAL_PIXEL_FORMAT_R_8                    = 0x10D
             //HAL_PIXEL_FORMAT_RG_88                  = 0x10E
-            ALOGE("%s: Unsupported format = 0x%x", __func__, format);
+            ALOGE("%s: Unsupported HAL format = 0x%x", __func__, format);
             return -1;
     }
     // not reached
     return -1;
+}
+
+//Takes mdp format as input and translates to equivalent HAL format
+//Refer to graphics.h, gralloc_priv.h, msm_mdp.h for formats.
+int getHALFormat(int mdpFormat) {
+    switch (mdpFormat) {
+        //From graphics.h
+        case MDP_RGBA_8888:
+            return HAL_PIXEL_FORMAT_RGBA_8888;
+        case MDP_RGBX_8888:
+            return HAL_PIXEL_FORMAT_RGBX_8888;
+        case MDP_RGB_888:
+            return HAL_PIXEL_FORMAT_RGB_888;
+        case MDP_RGB_565:
+            return HAL_PIXEL_FORMAT_RGB_565;
+        case MDP_BGRA_8888:
+            return HAL_PIXEL_FORMAT_BGRA_8888;
+        case MDP_Y_CR_CB_GH2V2:
+            return HAL_PIXEL_FORMAT_YV12;
+        case MDP_Y_CBCR_H2V1:
+            return HAL_PIXEL_FORMAT_YCbCr_422_SP;
+        case MDP_Y_CRCB_H2V2:
+            return HAL_PIXEL_FORMAT_YCrCb_420_SP;
+
+        //From gralloc_priv.h
+        case MDP_Y_CBCR_H2V2_TILE:
+            return HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED;
+        case MDP_Y_CBCR_H2V2:
+            return HAL_PIXEL_FORMAT_YCbCr_420_SP;
+        case MDP_Y_CRCB_H2V1:
+            return HAL_PIXEL_FORMAT_YCrCb_422_SP;
+        case MDP_Y_CBCR_H1V1:
+            return HAL_PIXEL_FORMAT_YCbCr_444_SP;
+        case MDP_Y_CRCB_H1V1:
+            return HAL_PIXEL_FORMAT_YCrCb_444_SP;
+        case MDP_Y_CBCR_H2V2_VENUS:
+            return HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS;
+        default:
+            ALOGE("%s: Unsupported MDP format = 0x%x", __func__, mdpFormat);
+            return -1;
+    }
+    // not reached
+    return -1;
+}
+
+int getDownscaleFactor(const int& src_w, const int& src_h,
+        const int& dst_w, const int& dst_h) {
+    int dscale_factor = utils::ROT_DS_NONE;
+    // The tolerance is an empirical grey area that needs to be adjusted
+    // manually so that we always err on the side of caution
+    float fDscaleTolerance = 0.05;
+    // We need this check to engage the rotator whenever possible to assist MDP
+    // in performing video downscale.
+    // This saves bandwidth and avoids causing the driver to make too many panel
+    // -mode switches between BLT (writeback) and non-BLT (Direct) modes.
+    // Use-case: Video playback [with downscaling and rotation].
+    if (dst_w && dst_h)
+    {
+        float fDscale =  sqrtf((float)(src_w * src_h) / (float)(dst_w * dst_h)) +
+                         fDscaleTolerance;
+
+        // On our MTP 1080p playback case downscale after sqrt is coming to 1.87
+        // we were rounding to 1. So entirely MDP has to do the downscaling.
+        // BW requirement and clock requirement is high across MDP4 targets.
+        // It is unable to downscale 1080p video to panel resolution on 8960.
+        // round(x) will round it to nearest integer and avoids above issue.
+        uint32_t dscale = round(fDscale);
+
+        if(dscale < 2) {
+            // Down-scale to > 50% of orig.
+            dscale_factor = utils::ROT_DS_NONE;
+        } else if(dscale < 4) {
+            // Down-scale to between > 25% to <= 50% of orig.
+            dscale_factor = utils::ROT_DS_HALF;
+        } else if(dscale < 8) {
+            // Down-scale to between > 12.5% to <= 25% of orig.
+            dscale_factor = utils::ROT_DS_FOURTH;
+        } else {
+            // Down-scale to <= 12.5% of orig.
+            dscale_factor = utils::ROT_DS_EIGHTH;
+        }
+    }
+    return dscale_factor;
+}
+
+static inline int compute(const uint32_t& x, const uint32_t& y,
+        const uint32_t& z) {
+    return x - ( y + z );
+}
+
+//Expects transform to be adjusted for clients of Android.
+//i.e flips switched if 90 component present.
+//See getMdpOrient()
+void preRotateSource(const eTransform& tr, Whf& whf, Dim& srcCrop) {
+    if(tr & OVERLAY_TRANSFORM_FLIP_H) {
+        srcCrop.x = compute(whf.w, srcCrop.x, srcCrop.w);
+    }
+    if(tr & OVERLAY_TRANSFORM_FLIP_V) {
+        srcCrop.y = compute(whf.h, srcCrop.y, srcCrop.h);
+    }
+    if(tr & OVERLAY_TRANSFORM_ROT_90) {
+        int tmp = srcCrop.x;
+        srcCrop.x = compute(whf.h,
+                srcCrop.y,
+                srcCrop.h);
+        srcCrop.y = tmp;
+        swap(whf.w, whf.h);
+        swap(srcCrop.w, srcCrop.h);
+    }
 }
 
 bool is3DTV() {
@@ -324,6 +324,83 @@ uint32_t getS3DFormat(uint32_t fmt) {
         }
     }
     return fmt3D;
+}
+
+void getDump(char *buf, size_t len, const char *prefix,
+        const mdp_overlay& ov) {
+    char str[256] = {'\0'};
+    snprintf(str, 256,
+            "%s id=%d z=%d fg=%d alpha=%d mask=%d flags=0x%x\n",
+            prefix, ov.id, ov.z_order, ov.is_fg, ov.alpha,
+            ov.transp_mask, ov.flags);
+    strncat(buf, str, strlen(str));
+    getDump(buf, len, "\tsrc(msmfb_img)", ov.src);
+    getDump(buf, len, "\tsrc_rect(mdp_rect)", ov.src_rect);
+    getDump(buf, len, "\tdst_rect(mdp_rect)", ov.dst_rect);
+}
+
+void getDump(char *buf, size_t len, const char *prefix,
+        const msmfb_img& ov) {
+    char str_src[256] = {'\0'};
+    snprintf(str_src, 256,
+            "%s w=%d h=%d format=%d %s\n",
+            prefix, ov.width, ov.height, ov.format,
+            overlay::utils::getFormatString(ov.format));
+    strncat(buf, str_src, strlen(str_src));
+}
+
+void getDump(char *buf, size_t len, const char *prefix,
+        const mdp_rect& ov) {
+    char str_rect[256] = {'\0'};
+    snprintf(str_rect, 256,
+            "%s x=%d y=%d w=%d h=%d\n",
+            prefix, ov.x, ov.y, ov.w, ov.h);
+    strncat(buf, str_rect, strlen(str_rect));
+}
+
+void getDump(char *buf, size_t len, const char *prefix,
+        const msmfb_overlay_data& ov) {
+    char str[256] = {'\0'};
+    snprintf(str, 256,
+            "%s id=%d\n",
+            prefix, ov.id);
+    strncat(buf, str, strlen(str));
+    getDump(buf, len, "\tdata(msmfb_data)", ov.data);
+}
+
+void getDump(char *buf, size_t len, const char *prefix,
+        const msmfb_data& ov) {
+    char str_data[256] = {'\0'};
+    snprintf(str_data, 256,
+            "%s offset=%d memid=%d id=%d flags=0x%x priv=%d\n",
+            prefix, ov.offset, ov.memory_id, ov.id, ov.flags,
+            ov.priv);
+    strncat(buf, str_data, strlen(str_data));
+}
+
+void getDump(char *buf, size_t len, const char *prefix,
+        const msm_rotator_img_info& rot) {
+    char str[256] = {'\0'};
+    snprintf(str, 256, "%s sessid=%u rot=%d, enable=%d downscale=%d\n",
+            prefix, rot.session_id, rot.rotations, rot.enable,
+            rot.downscale_ratio);
+    strncat(buf, str, strlen(str));
+    getDump(buf, len, "\tsrc", rot.src);
+    getDump(buf, len, "\tdst", rot.dst);
+    getDump(buf, len, "\tsrc_rect", rot.src_rect);
+}
+
+void getDump(char *buf, size_t len, const char *prefix,
+        const msm_rotator_data_info& rot) {
+    char str[256] = {'\0'};
+    snprintf(str, 256,
+            "%s sessid=%u verkey=%d\n",
+            prefix, rot.session_id, rot.version_key);
+    strncat(buf, str, strlen(str));
+    getDump(buf, len, "\tsrc", rot.src);
+    getDump(buf, len, "\tdst", rot.dst);
+    getDump(buf, len, "\tsrc_chroma", rot.src_chroma);
+    getDump(buf, len, "\tdst_chroma", rot.dst_chroma);
 }
 
 } // utils

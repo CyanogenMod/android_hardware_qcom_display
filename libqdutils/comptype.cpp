@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
-
+ * Copyright (C) 2013, The Linux Foundation. All rights reserved.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
@@ -10,7 +10,7 @@
  *     copyright notice, this list of conditions and the following
  *     disclaimer in the documentation and/or other materials provided
  *     with the distribution.
- *   * Neither the name of The Linux Foundation nor the names of its
+ *   * Neither the name of The Linux Foundation or the names of its
  *     contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -27,48 +27,7 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef GRALLOC_IONALLOC_H
-#define GRALLOC_IONALLOC_H
+#include<comptype.h>
 
-#include <linux/msm_ion.h>
-#include "memalloc.h"
-#include "gr.h"
-
-namespace gralloc {
-
-class IonAlloc : public IMemAlloc  {
-
-    public:
-    virtual int alloc_buffer(alloc_data& data);
-
-    virtual int free_buffer(void *base, size_t size,
-                            int offset, int fd);
-
-    virtual int map_buffer(void **pBase, size_t size,
-                           int offset, int fd);
-
-    virtual int unmap_buffer(void *base, size_t size,
-                             int offset);
-
-    virtual int clean_buffer(void*base, size_t size,
-                             int offset, int fd, int op);
-
-    IonAlloc() { mIonFd = FD_INIT; }
-
-    ~IonAlloc() { close_device(); }
-
-    private:
-    int mIonFd;
-
-    int open_device();
-
-    void close_device();
-
-    mutable Locker mLock;
-
-};
-
-}
-
-#endif /* GRALLOC_IONALLOC_H */
-
+//Instanticate the QCCompositionType Singleton
+ANDROID_SINGLETON_STATIC_INSTANCE(qdutils::QCCompositionType);

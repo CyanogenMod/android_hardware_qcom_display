@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,6 @@ struct private_module_t {
     pthread_mutex_t lock;
     private_handle_t *currentBuffer;
     struct fb_var_screeninfo info;
-    struct mdp_buf_fence fence;
     struct mdp_display_commit commit;
     struct fb_fix_screeninfo finfo;
     float xdpi;
@@ -53,13 +52,6 @@ struct private_module_t {
     float fps;
     uint32_t swapInterval;
     uint32_t currentOffset;
-    bool fbPostDone;
-    pthread_mutex_t fbPostLock;
-    //Condition to inform HWC that fb_post called
-    pthread_cond_t fbPostCond;
-    bool fbPanDone;
-    pthread_mutex_t fbPanLock;
-    pthread_cond_t fbPanCond;
 };
 
 

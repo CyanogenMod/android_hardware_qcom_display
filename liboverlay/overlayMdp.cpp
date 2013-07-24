@@ -1,6 +1,6 @@
 /*
 * Copyright (C) 2008 The Android Open Source Project
-* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -15,11 +15,16 @@
 * limitations under the License.
 */
 
+#include <mdp_version.h>
 #include "overlayUtils.h"
 #include "overlayMdp.h"
+#include "mdp_version.h"
 
-#undef ALOG_TAG
-#define ALOG_TAG "overlay"
+#define HSIC_SETTINGS_DEBUG 0
+
+static inline bool isEqual(float f1, float f2) {
+        return ((int)(f1*100) == (int)(f2*100)) ? true : false;
+}
 
 namespace ovutils = overlay::utils;
 namespace overlay {
@@ -54,20 +59,33 @@ void MdpCtrl::reset() {
     mOVInfo.id = MSMFB_NEW_REQUEST;
     mLkgo.id = MSMFB_NEW_REQUEST;
     mOrientation = utils::OVERLAY_TRANSFORM_0;
-    mRotUsed = false;
+    mDownscale = 0;
+#ifdef USES_POST_PROCESSING
+    mPPChanged = false;
+    memset(&mParams, 0, sizeof(struct compute_params));
+    mParams.params.conv_params.order = hsic_order_hsc_i;
+    mParams.params.conv_params.interface = interface_rec601;
+    mParams.params.conv_params.cc_matrix[0][0] = 1;
+    mParams.params.conv_params.cc_matrix[1][1] = 1;
+    mParams.params.conv_params.cc_matrix[2][2] = 1;
+#endif
 }
 
 bool MdpCtrl::close() {
     bool result = true;
-
     if(MSMFB_NEW_REQUEST != static_cast<int>(mOVInfo.id)) {
         if(!mdp_wrapper::unsetOverlay(mFd.getFD(), mOVInfo.id)) {
             ALOGE("MdpCtrl close error in unset");
             result = false;
         }
     }
-
+#ifdef USES_POST_PROCESSING
+    /* free allocated memory in PP */
+    if (mOVInfo.overlay_pp_cfg.igc_cfg.c0_c1_data)
+            free(mOVInfo.overlay_pp_cfg.igc_cfg.c0_c1_data);
+#endif
     reset();
+
     if(!mFd.close()) {
         result = false;
     }
@@ -75,77 +93,56 @@ bool MdpCtrl::close() {
     return result;
 }
 
-bool MdpCtrl::setSource(const utils::PipeArgs& args) {
-
+void MdpCtrl::setSource(const utils::PipeArgs& args) {
     setSrcWhf(args.whf);
 
     //TODO These are hardcoded. Can be moved out of setSource.
-    mOVInfo.alpha = 0xff;
     mOVInfo.transp_mask = 0xffffffff;
 
     //TODO These calls should ideally be a part of setPipeParams API
     setFlags(args.mdpFlags);
     setZ(args.zorder);
     setIsFg(args.isFg);
-    return true;
+    setPlaneAlpha(args.planeAlpha);
+    setBlending(args.blending);
 }
 
-bool MdpCtrl::setCrop(const utils::Dim& d) {
+void MdpCtrl::setCrop(const utils::Dim& d) {
     setSrcRectDim(d);
-    return true;
 }
 
-bool MdpCtrl::setPosition(const overlay::utils::Dim& d,
-        int fbw, int fbh)
-{
-    ovutils::Dim dim(d);
-    ovutils::Dim ovsrcdim = getSrcRectDim();
-    // Scaling of upto a max of 20 times supported
-    if(dim.w >(ovsrcdim.w * ovutils::HW_OV_MAGNIFICATION_LIMIT)){
-        dim.w = ovutils::HW_OV_MAGNIFICATION_LIMIT * ovsrcdim.w;
-        dim.x = (fbw - dim.w) / 2;
-    }
-    if(dim.h >(ovsrcdim.h * ovutils::HW_OV_MAGNIFICATION_LIMIT)) {
-        dim.h = ovutils::HW_OV_MAGNIFICATION_LIMIT * ovsrcdim.h;
-        dim.y = (fbh - dim.h) / 2;
-    }
-
-    setDstRectDim(dim);
-    return true;
+void MdpCtrl::setPosition(const overlay::utils::Dim& d) {
+    setDstRectDim(d);
 }
 
-bool MdpCtrl::setTransform(const utils::eTransform& orient,
-        const bool& rotUsed) {
+void MdpCtrl::setTransform(const utils::eTransform& orient) {
     int rot = utils::getMdpOrient(orient);
     setUserData(rot);
     //getMdpOrient will switch the flips if the source is 90 rotated.
     //Clients in Android dont factor in 90 rotation while deciding the flip.
     mOrientation = static_cast<utils::eTransform>(rot);
-
-    //Rotator can be requested by client even if layer has 0 orientation.
-    mRotUsed = rotUsed;
-    return true;
 }
 
 void MdpCtrl::doTransform() {
-    adjustSrcWhf(mRotUsed);
     setRotationFlags();
-    //180 will be H + V
-    //270 will be H + V + 90
-    if(mOrientation & utils::OVERLAY_TRANSFORM_FLIP_H) {
-            overlayTransFlipH();
-    }
-    if(mOrientation & utils::OVERLAY_TRANSFORM_FLIP_V) {
-            overlayTransFlipV();
-    }
-    if(mOrientation & utils::OVERLAY_TRANSFORM_ROT_90) {
-            overlayTransRot90();
-    }
+    utils::Whf whf = getSrcWhf();
+    utils::Dim dim = getSrcRectDim();
+    utils::preRotateSource(mOrientation, whf, dim);
+    setSrcWhf(whf);
+    setSrcRectDim(dim);
+}
+
+void MdpCtrl::doDownscale() {
+    mOVInfo.src_rect.x >>= mDownscale;
+    mOVInfo.src_rect.y >>= mDownscale;
+    mOVInfo.src_rect.w >>= mDownscale;
+    mOVInfo.src_rect.h >>= mDownscale;
 }
 
 bool MdpCtrl::set() {
     //deferred calcs, so APIs could be called in any order.
     doTransform();
+    doDownscale();
     utils::Whf whf = getSrcWhf();
     if(utils::isYuv(whf.format)) {
         normalizeCrop(mOVInfo.src_rect.x, mOVInfo.src_rect.w);
@@ -169,23 +166,6 @@ bool MdpCtrl::set() {
     return true;
 }
 
-bool MdpCtrl::getScreenInfo(overlay::utils::ScreenInfo& info) {
-    fb_fix_screeninfo finfo;
-    if (!mdp_wrapper::getFScreenInfo(mFd.getFD(), finfo)) {
-        return false;
-    }
-
-    fb_var_screeninfo vinfo;
-    if (!mdp_wrapper::getVScreenInfo(mFd.getFD(), vinfo)) {
-        return false;
-    }
-    info.mFBWidth   = vinfo.xres;
-    info.mFBHeight  = vinfo.yres;
-    info.mFBbpp     = vinfo.bits_per_pixel;
-    info.mFBystride = finfo.line_length;
-    return true;
-}
-
 bool MdpCtrl::get() {
     mdp_overlay ov;
     ov.id = mOVInfo.id;
@@ -197,20 +177,11 @@ bool MdpCtrl::get() {
     return true;
 }
 
-//Adjust width, height, format if rotator is used.
-void MdpCtrl::adjustSrcWhf(const bool& rotUsed) {
-    if(rotUsed) {
-        utils::Whf whf = getSrcWhf();
-        if(whf.format == MDP_Y_CRCB_H2V2_TILE ||
-                whf.format == MDP_Y_CBCR_H2V2_TILE) {
-            whf.w = utils::alignup(whf.w, 64);
-            whf.h = utils::alignup(whf.h, 32);
-        }
-        //For example: If original format is tiled, rotator outputs non-tiled,
-        //so update mdp's src fmt to that.
-        whf.format = utils::getRotOutFmt(whf.format);
-        setSrcWhf(whf);
-    }
+//Update src format based on rotator's destination format.
+void MdpCtrl::updateSrcFormat(const uint32_t& rotDestFmt) {
+    utils::Whf whf = getSrcWhf();
+    whf.format =  rotDestFmt;
+    setSrcWhf(whf);
 }
 
 void MdpCtrl::dump() const {
@@ -220,6 +191,10 @@ void MdpCtrl::dump() const {
     ALOGE("== Dump MdpCtrl end ==");
 }
 
+void MdpCtrl::getDump(char *buf, size_t len) {
+    ovutils::getDump(buf, len, "Ctrl(mdp_overlay)", mOVInfo);
+}
+
 void MdpData::dump() const {
     ALOGE("== Dump MdpData start ==");
     mFd.dump();
@@ -227,10 +202,130 @@ void MdpData::dump() const {
     ALOGE("== Dump MdpData end ==");
 }
 
+void MdpData::getDump(char *buf, size_t len) {
+    ovutils::getDump(buf, len, "Data(msmfb_overlay_data)", mOvData);
+}
+
 void MdpCtrl3D::dump() const {
     ALOGE("== Dump MdpCtrl start ==");
     mFd.dump();
     ALOGE("== Dump MdpCtrl end ==");
+}
+
+bool MdpCtrl::setVisualParams(const MetaData_t& data) {
+    bool needUpdate = false;
+#ifdef USES_POST_PROCESSING
+    /* calculate the data */
+    if (data.operation & PP_PARAM_HSIC) {
+        if (mParams.params.pa_params.hue != data.hsicData.hue) {
+            ALOGD_IF(HSIC_SETTINGS_DEBUG,
+                "Hue has changed from %d to %d",
+                mParams.params.pa_params.hue,data.hsicData.hue);
+            needUpdate = true;
+        }
+
+        if (!isEqual(mParams.params.pa_params.sat,
+            data.hsicData.saturation)) {
+            ALOGD_IF(HSIC_SETTINGS_DEBUG,
+                "Saturation has changed from %f to %f",
+                mParams.params.pa_params.sat,
+                data.hsicData.saturation);
+            needUpdate = true;
+        }
+
+        if (mParams.params.pa_params.intensity != data.hsicData.intensity) {
+            ALOGD_IF(HSIC_SETTINGS_DEBUG,
+                "Intensity has changed from %d to %d",
+                mParams.params.pa_params.intensity,
+                data.hsicData.intensity);
+            needUpdate = true;
+        }
+
+        if (!isEqual(mParams.params.pa_params.contrast,
+            data.hsicData.contrast)) {
+            ALOGD_IF(HSIC_SETTINGS_DEBUG,
+                "Contrast has changed from %f to %f",
+                mParams.params.pa_params.contrast,
+                data.hsicData.contrast);
+            needUpdate = true;
+        }
+
+        if (needUpdate) {
+            mParams.params.pa_params.hue = data.hsicData.hue;
+            mParams.params.pa_params.sat = data.hsicData.saturation;
+            mParams.params.pa_params.intensity = data.hsicData.intensity;
+            mParams.params.pa_params.contrast = data.hsicData.contrast;
+            mParams.params.pa_params.ops = MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;
+            mParams.operation |= PP_OP_PA;
+        }
+    }
+
+    if (data.operation & PP_PARAM_SHARP2) {
+        if (mParams.params.sharp_params.strength != data.Sharp2Data.strength) {
+            needUpdate = true;
+        }
+        if (mParams.params.sharp_params.edge_thr != data.Sharp2Data.edge_thr) {
+            needUpdate = true;
+        }
+        if (mParams.params.sharp_params.smooth_thr !=
+                data.Sharp2Data.smooth_thr) {
+            needUpdate = true;
+        }
+        if (mParams.params.sharp_params.noise_thr !=
+                data.Sharp2Data.noise_thr) {
+            needUpdate = true;
+        }
+
+        if (needUpdate) {
+            mParams.params.sharp_params.strength = data.Sharp2Data.strength;
+            mParams.params.sharp_params.edge_thr = data.Sharp2Data.edge_thr;
+            mParams.params.sharp_params.smooth_thr =
+                data.Sharp2Data.smooth_thr;
+            mParams.params.sharp_params.noise_thr = data.Sharp2Data.noise_thr;
+            mParams.params.sharp_params.ops =
+                MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;
+            mParams.operation |= PP_OP_SHARP;
+        }
+    }
+
+    if (data.operation & PP_PARAM_IGC) {
+        if (mOVInfo.overlay_pp_cfg.igc_cfg.c0_c1_data == NULL){
+            uint32_t *igcData
+                = (uint32_t *)malloc(2 * MAX_IGC_LUT_ENTRIES * sizeof(uint32_t));
+            if (!igcData) {
+                ALOGE("IGC storage allocated failed");
+                return false;
+            }
+            mOVInfo.overlay_pp_cfg.igc_cfg.c0_c1_data = igcData;
+            mOVInfo.overlay_pp_cfg.igc_cfg.c2_data
+                = igcData + MAX_IGC_LUT_ENTRIES;
+        }
+
+        memcpy(mParams.params.igc_lut_params.c0,
+            data.igcData.c0, sizeof(uint16_t) * MAX_IGC_LUT_ENTRIES);
+        memcpy(mParams.params.igc_lut_params.c1,
+            data.igcData.c1, sizeof(uint16_t) * MAX_IGC_LUT_ENTRIES);
+        memcpy(mParams.params.igc_lut_params.c2,
+            data.igcData.c2, sizeof(uint16_t) * MAX_IGC_LUT_ENTRIES);
+
+        mParams.params.igc_lut_params.ops
+            = MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;
+        mParams.operation |= PP_OP_IGC;
+        needUpdate = true;
+    }
+
+    if (data.operation & PP_PARAM_VID_INTFC) {
+        mParams.params.conv_params.interface =
+            (interface_type) data.video_interface;
+        needUpdate = true;
+    }
+
+    if (needUpdate) {
+        display_pp_compute_params(&mParams, &mOVInfo.overlay_pp_cfg);
+        mPPChanged = true;
+    }
+#endif
+    return true;
 }
 
 } // overlay

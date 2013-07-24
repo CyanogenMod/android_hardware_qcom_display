@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+* Copyright (c) 2011, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -10,7 +10,7 @@
 *      copyright notice, this list of conditions and the following
 *      disclaimer in the documentation and/or other materials provided
 *      with the distribution.
-*    * Neither the name of Code Aurora Forum, Inc. nor the names of its
+*    * Neither the name of The Linux Foundation nor the names of its
 *      contributors may be used to endorse or promote products derived
 *      from this software without specific prior written permission.
 *
@@ -119,8 +119,9 @@ inline bool OvMem::open(uint32_t numbufs,
     alloc_data data;
     int allocFlags = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
     if(isSecure) {
-        allocFlags |= GRALLOC_USAGE_PRIVATE_MM_HEAP;
-        allocFlags |= GRALLOC_USAGE_PRIVATE_CP_BUFFER;
+        allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP;
+        allocFlags |= GRALLOC_USAGE_PROTECTED;
+        allocFlags |= GRALLOC_USAGE_PRIVATE_UNCACHED;
     }
 
     int err = 0;
@@ -137,20 +138,10 @@ inline bool OvMem::open(uint32_t numbufs,
     data.uncached = true;
 
     err = mAlloc->allocate(data, allocFlags);
-    //see if we can fallback to other heap
-    //we can try MM_HEAP once if it's not secure playback
-    if (err != 0 && !isSecure) {
-        allocFlags |= GRALLOC_USAGE_PRIVATE_MM_HEAP;
-        err = mAlloc->allocate(data, allocFlags);
-        if (err != 0) {
-            ALOGE(" could not allocate from fallback heap");
-            return false;
-        }
-    } else if (err != 0) {
-        ALOGE("OvMem: error allocating memory can not fall back");
+    if (err != 0) {
+        ALOGE("OvMem: Error allocating memory");
         return false;
     }
-
 
     mFd = data.fd;
     mBaseAddr = data.base;
