@@ -97,6 +97,7 @@ enum {
     HAL_PIXEL_FORMAT_RG_88                  = 0x10E,
     HAL_PIXEL_FORMAT_YCbCr_444_SP           = 0x10F,
     HAL_PIXEL_FORMAT_YCrCb_444_SP           = 0x110,
+    HAL_PIXEL_FORMAT_NV21_ZSL               = 0x111,
     HAL_PIXEL_FORMAT_INTERLACE              = 0x180,
 
 };
