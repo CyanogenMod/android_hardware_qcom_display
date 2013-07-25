@@ -50,6 +50,7 @@ public:
     virtual void connect(const android::sp<qClient::IQClient>& client);
     virtual android::status_t screenRefresh();
     virtual void setExtOrientation(uint32_t orientation);
+    virtual void setBufferMirrorMode(uint32_t enable);
     static void init();
 private:
     QService();
