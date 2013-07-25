@@ -78,6 +78,13 @@ public:
         data.writeInt32(orientation);
         remote()->transact(EXTERNAL_ORIENTATION, data, &reply);
     }
+
+    virtual void setBufferMirrorMode(uint32_t enable) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
+        data.writeInt32(enable);
+        remote()->transact(BUFFER_MIRRORMODE, data, &reply);
+    }
 };
 
 IMPLEMENT_META_INTERFACE(QService, "android.display.IQService");
@@ -158,6 +165,18 @@ status_t BnQService::onTransact(
             }
             uint32_t orientation = data.readInt32();
             setExtOrientation(orientation);
+            return NO_ERROR;
+        } break;
+        case BUFFER_MIRRORMODE: {
+            CHECK_INTERFACE(IQService, data, reply);
+            if(callerUid != AID_SYSTEM) {
+                ALOGE("display.qservice BUFFER_MIRRORMODE access denied: \
+                      pid=%d uid=%d process=%s",callerPid,
+                      callerUid, callingProcName);
+                return PERMISSION_DENIED;
+            }
+            uint32_t enable = data.readInt32();
+            setBufferMirrorMode(enable);
             return NO_ERROR;
         } break;
         default:
