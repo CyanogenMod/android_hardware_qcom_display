@@ -401,8 +401,6 @@ static int stretch_copybit(
                 // we don't support plane alpha with RGBA formats
                 case HAL_PIXEL_FORMAT_RGBA_8888:
                 case HAL_PIXEL_FORMAT_BGRA_8888:
-                case HAL_PIXEL_FORMAT_RGBA_5551:
-                case HAL_PIXEL_FORMAT_RGBA_4444:
                     ALOGE ("%s : Unsupported Pixel format %d", __FUNCTION__,
                            src->format);
                     return -EINVAL;
