@@ -169,10 +169,6 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
                 ctx->mExtDispConfiguring = false;
                 setListStats(ctx, list, dpy);
                 int fbZOrder = ctx->mMDPComp[dpy]->prepare(ctx, list);
-                if(ctx->deviceOrientation &&
-                    ctx->listStats[dpy].isDisplayAnimating) {
-                    fbZOrder = 0;
-                }
                 if(fbZOrder >= 0)
                     ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZOrder);
 
