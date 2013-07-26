@@ -95,8 +95,12 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
                 __FUNCTION__, mDpy);
             return false;
         }
-
         mDest = dest;
+
+        if((mDpy && ctx->deviceOrientation) &&
+            ctx->listStats[mDpy].isDisplayAnimating) {
+            fbZorder = 0;
+        }
 
         ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_BLEND_FG_PREMULT;
         ovutils::eIsFg isFg = ovutils::IS_FG_OFF;
