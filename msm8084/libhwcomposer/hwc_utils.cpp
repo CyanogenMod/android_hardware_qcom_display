@@ -37,6 +37,7 @@
 #include "mdp_version.h"
 #include "hwc_copybit.h"
 #include "hwc_dump_layers.h"
+#include "hwc_vpuclient.h"
 #include "external.h"
 #include "virtual.h"
 #include "hwc_qclient.h"
@@ -194,8 +195,10 @@ void initContext(hwc_context_t *ctx)
     ctx->mPrevDestVideo.left = ctx->mPrevDestVideo.top =
         ctx->mPrevDestVideo.right = ctx->mPrevDestVideo.bottom = 0;
     ctx->mPrevTransformVideo = 0;
-
     ctx->mBufferMirrorMode = false;
+#ifdef VPU_TARGET
+    ctx->mVPUClient = new VPUClient();
+#endif
 
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
@@ -229,6 +232,12 @@ void closeContext(hwc_context_t *ctx)
         delete ctx->mExtDisplay;
         ctx->mExtDisplay = NULL;
     }
+
+#ifdef VPU_TARGET
+    if(ctx->mVPUClient) {
+        delete ctx->mVPUClient;
+    }
+#endif
 
     for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         if(ctx->mFBUpdate[i]) {

@@ -85,6 +85,15 @@ public:
         data.writeInt32(enable);
         remote()->transact(BUFFER_MIRRORMODE, data, &reply);
     }
+
+    virtual status_t vpuCommand(uint32_t command, uint32_t setting) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
+        data.writeInt32(setting);
+        remote()->transact(command, data, &reply);
+        status_t result = reply.readInt32();
+        return result;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(QService, "android.display.IQService");
@@ -106,6 +115,18 @@ status_t BnQService::onTransact(
     getProcName(callerPid, callingProcName, MAX_BUF_SIZE);
 
     const bool permission = (callerUid == AID_MEDIA);
+
+    if (code > VPU_COMMAND_LIST_START && code < VPU_COMMAND_LIST_END) {
+        if(callerUid != AID_SYSTEM && callerUid != AID_ROOT) {
+            ALOGE("display.qservice VPU command access denied: \
+                  pid=%d uid=%d process=%s",callerPid,
+                  callerUid, callingProcName);
+            return PERMISSION_DENIED;
+        }
+        CHECK_INTERFACE(IQService, data, reply);
+        int32_t setting = data.readInt32();
+        return vpuCommand(code, setting);
+    }
 
     switch(code) {
         case SECURING: {

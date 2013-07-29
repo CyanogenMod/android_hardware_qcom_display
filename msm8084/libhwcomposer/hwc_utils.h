@@ -57,6 +57,7 @@ class MDPComp;
 class CopyBit;
 class HwcDebug;
 class AssertiveDisplay;
+class VPUClient;
 
 
 struct MDPInfo {
@@ -351,6 +352,7 @@ struct hwc_context_t {
     qhwc::MDPComp *mMDPComp[HWC_NUM_DISPLAY_TYPES];
     qhwc::HwcDebug *mHwcDebug[HWC_NUM_DISPLAY_TYPES];
     qhwc::AssertiveDisplay *mAD;
+    qhwc::VPUClient *mVPUClient;
 
     // No animation on External display feature
     // Notifies hwcomposer about the device orientation before animation.
