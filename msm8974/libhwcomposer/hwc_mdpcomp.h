@@ -115,24 +115,21 @@ protected:
         void updateCounts(const FrameInfo&);
     };
 
-    /* No of pipes needed for Framebuffer */
-    virtual int pipesForFB() = 0;
-    /* calculates pipes needed for the panel */
-    virtual int pipesNeeded(hwc_context_t *ctx,
-                            hwc_display_contents_1_t* list) = 0;
     /* allocates pipe from pipe book */
     virtual bool allocLayerPipes(hwc_context_t *ctx,
                                  hwc_display_contents_1_t* list) = 0;
+    /* allocate MDP pipes from overlay */
+    ovutils::eDest getMdpPipe(hwc_context_t *ctx, ePipeType type, int mixer);
     /* configures MPD pipes */
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
                           PipeLayerPair& pipeLayerPair) = 0;
+    /* Checks for pipes needed versus pipes available */
+    virtual bool arePipesAvailable(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list) = 0;
 
     /* set/reset flags for MDPComp */
     void setMDPCompLayerFlags(hwc_context_t *ctx,
                               hwc_display_contents_1_t* list);
-    /* allocate MDP pipes from overlay */
-    ovutils::eDest getMdpPipe(hwc_context_t *ctx, ePipeType type);
-
     /* checks for conditions where mdpcomp is not possible */
     bool isFrameDoable(hwc_context_t *ctx);
     /* checks for conditions where RGB layers cannot be bypassed */
@@ -158,8 +155,6 @@ protected:
     void updateLayerCache(hwc_context_t* ctx, hwc_display_contents_1_t* list);
     /* optimize layers for mdp comp*/
     void batchLayers();
-    /* gets available pipes for mdp comp */
-    int getAvailablePipes(hwc_context_t* ctx);
     /* updates cache map with YUV info */
     void updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list);
     bool programMDP(hwc_context_t *ctx, hwc_display_contents_1_t* list);
@@ -190,7 +185,6 @@ private:
         virtual ~MdpPipeInfoLowRes() {};
     };
 
-    virtual int pipesForFB() { return 1; };
     /* configure's overlay pipes for the frame */
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
                           PipeLayerPair& pipeLayerPair);
@@ -199,7 +193,9 @@ private:
     virtual bool allocLayerPipes(hwc_context_t *ctx,
                                  hwc_display_contents_1_t* list);
 
-    virtual int pipesNeeded(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    /* Checks for pipes needed versus pipes available */
+    virtual bool arePipesAvailable(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
 };
 
 class MDPCompHighRes : public MDPComp {
@@ -217,7 +213,6 @@ private:
     bool acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
                          MdpPipeInfoHighRes& pipe_info, ePipeType type);
 
-    virtual int pipesForFB() { return 2; };
     /* configure's overlay pipes for the frame */
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
                           PipeLayerPair& pipeLayerPair);
@@ -226,7 +221,12 @@ private:
     virtual bool allocLayerPipes(hwc_context_t *ctx,
                                  hwc_display_contents_1_t* list);
 
-    virtual int pipesNeeded(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    /* Checks for pipes needed versus pipes available */
+    virtual bool arePipesAvailable(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+
+    int pipesNeeded(hwc_context_t *ctx, hwc_display_contents_1_t* list,
+            int mixer);
 };
 
 }; //namespace
