@@ -229,8 +229,9 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
                 (ovutils::eBlending) getBlending(layer->blending));
         ov.setSource(pargR, destR);
 
-        hwc_rect_t sourceCrop;
-        getNonWormholeRegion(list, sourceCrop);
+        hwc_rect_t sourceCrop = layer->sourceCrop;
+        hwc_rect_t displayFrame = layer->displayFrame;
+
         const float xres = ctx->dpyAttr[mDpy].xres;
         //Default even split for all displays with high res
         float lSplit = xres / 2;
@@ -266,7 +267,6 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
         ov.setTransform(orient, destL);
         ov.setTransform(orient, destR);
 
-        hwc_rect_t displayFrame = sourceCrop;
         const int lWidth = (lSplit - displayFrame.left);
         const int rWidth = (displayFrame.right - lSplit);
         const int height = displayFrame.bottom - displayFrame.top;
