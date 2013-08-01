@@ -494,7 +494,8 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             }
         }
 
-        if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+        if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd,
+                                            ctx->listStats[dpy].roi)) {
             ALOGE("%s: display commit fail for %d dpy!", __FUNCTION__, dpy);
             ret = -1;
         }
