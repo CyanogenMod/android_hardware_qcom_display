@@ -164,7 +164,23 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             }
         case EXTERNAL_ONLINE:
             {   // connect case
-                ctx->mExtDispConfiguring = true;
+                {
+                    //Force composition to give up resources like pipes and
+                    //close fb. For example if assertive display is going on,
+                    //fb2 could be open, thus connecting Layer Mixer#0 to
+                    //WriteBack module. If HDMI attempts to open fb1, the driver
+                    //will try to attach Layer Mixer#0 to HDMI INT, which will
+                    //fail, since Layer Mixer#0 is still connected to WriteBack.
+                    //This block will force composition to close fb2 in above
+                    //example.
+                    Locker::Autolock _l(ctx->mExtLock);
+                    ctx->mExtDispConfiguring = true;
+                    ctx->dpyAttr[dpy].connected = false;
+                    ctx->proc->invalidate(ctx->proc);
+                }
+                //2 cycles for slower content
+                usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+                        * 2 / 1000);
                 const char *s1 = udata + strlen(HWC_UEVENT_SWITCH_STR);
                 if(!strncmp(s1,"hdmi",strlen(s1))) {
                     // hdmi online event..!
@@ -193,16 +209,17 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                     // wfd online event..!
                     ctx->mExtDisplay->configureWFDDisplay();
                 }
-                ctx->dpyAttr[dpy].isPause = false;
-                setup(ctx, dpy, usecopybit);
-                ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,
-                        connected);
-                ctx->dpyAttr[dpy].connected = true;
-                Locker::Autolock _l(ctx->mExtLock);
 
-                //hwc comp could be on
-                if(dpy != HWC_DISPLAY_VIRTUAL)
-                    ctx->proc->hotplug(ctx->proc, dpy, connected);
+                {
+                    Locker::Autolock _l(ctx->mExtLock);
+                    ctx->dpyAttr[dpy].isPause = false;
+                    setup(ctx, dpy, usecopybit);
+                    ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,
+                            connected);
+                    ctx->dpyAttr[dpy].connected = true;
+                    if(dpy != HWC_DISPLAY_VIRTUAL)
+                        ctx->proc->hotplug(ctx->proc, dpy, connected);
+                }
 
                 break;
             }
@@ -217,12 +234,23 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         case EXTERNAL_RESUME:
             {  // resume case
                 ALOGD("%s Received resume event",__FUNCTION__);
-                // treat Resume as Online event
-                Locker::Autolock _l(ctx->mExtLock);
-                ctx->mExtDispConfiguring = true;
-                ctx->dpyAttr[dpy].isActive = true;
-                ctx->dpyAttr[dpy].isPause = false;
-                ctx->proc->invalidate(ctx->proc);
+                //Treat Resume as Online event
+                //Since external didnt have any pipes, force primary to give up
+                //its pipes; we don't allow inter-mixer pipe transfers.
+                {
+                    Locker::Autolock _l(ctx->mExtLock);
+                    ctx->mExtDispConfiguring = true;
+                    ctx->dpyAttr[dpy].isActive = true;
+                    ctx->proc->invalidate(ctx->proc);
+                }
+                usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+                        * 2 / 1000);
+                //At this point external has all the pipes it would need.
+                {
+                    Locker::Autolock _l(ctx->mExtLock);
+                    ctx->dpyAttr[dpy].isPause = false;
+                    ctx->proc->invalidate(ctx->proc);
+                }
                 break;
             }
         default:
