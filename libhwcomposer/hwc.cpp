@@ -148,9 +148,10 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         if(fbLayer->handle) {
             setListStats(ctx, list, dpy);
-            int fbZOrder = ctx->mMDPComp[dpy]->prepare(ctx, list);
-            if(fbZOrder >= 0)
-                ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZOrder);
+            if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
+                const int fbZ = 0;
+                ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
+            }
 
             /* Temporarily commenting out C2D until we support partial
                copybit composition for mixed mode MDP
@@ -179,9 +180,10 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
             if(fbLayer->handle) {
                 ctx->mExtDispConfiguring = false;
                 setListStats(ctx, list, dpy);
-                int fbZOrder = ctx->mMDPComp[dpy]->prepare(ctx, list);
-                if(fbZOrder >= 0)
-                    ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZOrder);
+                if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
+                    const int fbZ = 0;
+                    ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
+                }
 
                 /* Temporarily commenting out C2D until we support partial
                    copybit composition for mixed mode MDP
