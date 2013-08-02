@@ -20,6 +20,7 @@
 #include "hwc_mdpcomp.h"
 #include <sys/ioctl.h>
 #include "external.h"
+#include "virtual.h"
 #include "qdMetaData.h"
 #include "mdp_version.h"
 #include "hwc_fbupdate.h"
@@ -56,7 +57,8 @@ void MDPComp::dump(android::String8& buf)
 {
     Locker::Autolock _l(mMdpCompLock);
     dumpsys_log(buf,"HWC Map for Dpy: %s \n",
-                mDpy ? "\"EXTERNAL\"" : "\"PRIMARY\"");
+                (mDpy == 0) ? "\"PRIMARY\"" :
+                (mDpy == 1) ? "\"EXTERNAL\"" : "\"VIRTUAL\"");
     dumpsys_log(buf,"PREV_FRAME: layerCount:%2d    mdpCount:%2d \
                 cacheCount:%2d \n", mCachedFrame.layerCount,
                 mCachedFrame.mdpCount, mCachedFrame.cacheCount);
@@ -378,13 +380,13 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. not enabled.", __FUNCTION__);
         ret = false;
     } else if(qdutils::MDPVersion::getInstance().is8x26() &&
-            ctx->mVideoTransFlag &&
-            ctx->mExtDisplay->isExternalConnected()) {
+            ctx->mVideoTransFlag && ctx->mVirtualDisplay->isConnected()) {
         //1 Padding round to shift pipes across mixers
         ALOGD_IF(isDebug(),"%s: MDP Comp. video transition padding round",
                 __FUNCTION__);
         ret = false;
-    } else if(ctx->mExtDispConfiguring) {
+    } else if(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isConfiguring ||
+              ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isConfiguring) {
         ALOGD_IF( isDebug(),"%s: External Display connection is pending",
                   __FUNCTION__);
         ret = false;

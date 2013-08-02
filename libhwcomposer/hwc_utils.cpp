@@ -36,6 +36,7 @@
 #include "hwc_copybit.h"
 #include "hwc_dump_layers.h"
 #include "external.h"
+#include "virtual.h"
 #include "hwc_qclient.h"
 #include "QService.h"
 #include "comptype.h"
@@ -152,10 +153,17 @@ void initContext(hwc_context_t *ctx)
     }
 
     ctx->mExtDisplay = new ExternalDisplay(ctx);
+    ctx->mVirtualDisplay = new VirtualDisplay(ctx);
+    ctx->mVirtualonExtActive = false;
+    ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
+    ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = false;
+    ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = false;
+    ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected = false;
 
     ctx->mMDPComp[HWC_DISPLAY_PRIMARY] =
          MDPComp::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
                 rightSplit, HWC_DISPLAY_PRIMARY);
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
 
     for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         ctx->mHwcDebug[i] = new HwcDebug(i);
@@ -167,7 +175,6 @@ void initContext(hwc_context_t *ctx)
 
     ctx->vstate.enable = false;
     ctx->vstate.fakevsync = false;
-    ctx->mExtDispConfiguring = false;
     ctx->mExtOrientation = 0;
 
     //Right now hwc starts the service but anybody could do it, or it could be
@@ -1183,7 +1190,7 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
 bool canUseRotator(hwc_context_t *ctx) {
     if(qdutils::MDPVersion::getInstance().is8x26() &&
-            ctx->mExtDisplay->isExternalConnected()) {
+                       ctx->mVirtualDisplay->isConnected()) {
         return false;
     }
     if(ctx->mMDP.version == qdutils::MDP_V3_0_4)
@@ -1214,7 +1221,7 @@ void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
         return;
     }
     //External connected
-    if(ctx->mExtDisplay->isExternalConnected()) {
+    if(ctx->mExtDisplay->isConnected()|| ctx->mVirtualDisplay->isConnected()) {
         return;
     }
     //Decimation necessary, cannot use BWC. H/W requirement.
