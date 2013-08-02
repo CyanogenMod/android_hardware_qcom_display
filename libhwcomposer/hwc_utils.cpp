@@ -31,6 +31,7 @@
 #include "mdp_version.h"
 #include "hwc_copybit.h"
 #include "external.h"
+#include "virtual.h"
 #include "hwc_qclient.h"
 #include "QService.h"
 #include "comptype.h"
@@ -149,10 +150,18 @@ void initContext(hwc_context_t *ctx)
     }
 
     ctx->mExtDisplay = new ExternalDisplay(ctx);
+    ctx->mVirtualDisplay = new VirtualDisplay(ctx);
+    ctx->mVirtualonExtActive = false;
+    ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
+    ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = false;
+    ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = false;
+    ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected = false;
 
     ctx->mMDPComp[HWC_DISPLAY_PRIMARY] =
          MDPComp::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
          HWC_DISPLAY_PRIMARY);
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
+
     for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         ctx->mLayerRotMap[i] = new LayerRotMap();
     }
@@ -161,7 +170,6 @@ void initContext(hwc_context_t *ctx)
 
     ctx->vstate.enable = false;
     ctx->vstate.fakevsync = false;
-    ctx->mExtDispConfiguring = false;
     ctx->mBasePipeSetup = false;
     ctx->mExtOrientation = 0;
 

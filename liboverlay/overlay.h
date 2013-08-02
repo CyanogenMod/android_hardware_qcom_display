@@ -40,6 +40,13 @@ class GenericPipe;
 
 class Overlay : utils::NoCopy {
 public:
+    //Abstract Display types. Each backed by a LayerMixer,
+    //represented by a fb node.
+    //High res panels can be backed by 2 layer mixers and a single fb node.
+    enum { DPY_PRIMARY, DPY_EXTERNAL, DPY_WRITEBACK, DPY_UNUSED };
+    enum { DPY_MAX = DPY_UNUSED };
+    enum { MAX_FB_DEVICES = DPY_MAX };
+
     /* dtor close */
     ~Overlay();
 
@@ -76,16 +83,15 @@ public:
     static Overlay* getInstance();
     /* Returns available ("unallocated") pipes for a display */
     int availablePipes(int dpy);
-    /* set the framebuffer index for external display */
-    void setExtFbNum(int fbNum);
-    /* Returns framebuffer index of the current external display */
-    int getExtFbNum();
     /* Returns pipe dump. Expects a NULL terminated buffer of big enough size
      * to populate.
      */
     void getDump(char *buf, size_t len);
     /* Reset usage and allocation bits on all pipes for given display */
     void clear(int dpy);
+    /* Returns the framebuffer node backing up the display */
+    static int getFbForDpy(const int& dpy);
+    static bool displayCommit(const int& fd);
 
 private:
     /* Ctor setup */
@@ -96,8 +102,6 @@ private:
 
     /* Just like a Facebook for pipes, but much less profile info */
     struct PipeBook {
-        enum { DPY_PRIMARY, DPY_EXTERNAL, DPY_UNUSED };
-
         void init();
         void destroy();
         /* Check if pipe exists and return true, false otherwise */
@@ -149,7 +153,7 @@ private:
 
     /* Singleton Instance*/
     static Overlay *sInstance;
-    static int sExtFbIndex;
+    static int sDpyFbMap[DPY_MAX];
 };
 
 inline void Overlay::validate(int index) {
@@ -162,7 +166,7 @@ inline void Overlay::validate(int index) {
 inline int Overlay::availablePipes(int dpy) {
      int avail = 0;
      for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
-       if((mPipeBook[i].mDisplay == PipeBook::DPY_UNUSED ||
+       if((mPipeBook[i].mDisplay == DPY_UNUSED ||
            mPipeBook[i].mDisplay == dpy) && PipeBook::isNotAllocated(i)) {
                 avail++;
         }
@@ -170,12 +174,9 @@ inline int Overlay::availablePipes(int dpy) {
     return avail;
 }
 
-inline void Overlay::setExtFbNum(int fbNum) {
-    sExtFbIndex = fbNum;
-}
-
-inline int Overlay::getExtFbNum() {
-    return sExtFbIndex;
+inline int Overlay::getFbForDpy(const int& dpy) {
+    OVASSERT(dpy >= 0 && dpy < DPY_MAX, "Invalid dpy %d", dpy);
+    return sDpyFbMap[dpy];
 }
 
 inline bool Overlay::PipeBook::valid() {

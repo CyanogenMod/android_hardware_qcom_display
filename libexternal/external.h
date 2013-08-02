@@ -21,7 +21,6 @@
 #ifndef HWC_EXTERNAL_DISPLAY_H
 #define HWC_EXTERNAL_DISPLAY_H
 
-#include <utils/threads.h>
 #include <linux/fb.h>
 
 struct hwc_context_t;
@@ -42,60 +41,45 @@ class ExternalDisplay
 public:
     ExternalDisplay(hwc_context_t* ctx);
     ~ExternalDisplay();
-    int getModeCount() const;
-    void getEDIDModes(int *out) const;
-    bool isCEUnderscanSupported() { return mUnderscanSupported; }
-    void setExternalDisplay(bool connected, int extFbNum = 0);
-    bool isExternalConnected() { return mConnected;};
-    void  setExtDpyNum(int extDpyNum) { mExtDpyNum = extDpyNum;};
-    int  getExternalType() {return mConnectedFbNum;};
-    bool isWFDActive() {return (mConnectedFbNum == mWfdFbNum);};
     void setHPD(uint32_t startEnd);
-    void setEDIDMode(int resMode);
     void setActionSafeDimension(int w, int h);
-    int ignoreRequest(const char *str);
-    int  configureHDMIDisplay();
-    int  configureWFDDisplay();
-    int  teardownHDMIDisplay();
-    int  teardownWFDDisplay();
+    bool isCEUnderscanSupported() { return mUnderscanSupported; }
+    int configure();
+    int teardown();
+    bool isConnected() {
+        return  mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].connected;
+    }
 
 private:
+    int getModeCount() const;
+    void getEDIDModes(int *out) const;
+    void setEDIDMode(int resMode);
     void setSPDInfo(const char* node, const char* property);
     void readCEUnderscanInfo();
     bool readResolution();
     int  parseResolution(char* edidStr, int* edidModes);
     void setResolution(int ID);
-    bool openFrameBuffer(int fbNum);
+    bool openFrameBuffer();
     bool closeFrameBuffer();
     bool writeHPDOption(int userOption) const;
     bool isValidMode(int ID);
-    void handleUEvent(char* str, int len);
     int  getModeOrder(int mode);
     int  getUserMode();
     int  getBestMode();
     bool isInterlacedMode(int mode);
     void resetInfo();
-    void setDpyHdmiAttr();
-    void setDpyWfdAttr();
+    void setAttributes();
     void getAttrForMode(int& width, int& height, int& fps);
-    void updateExtDispDevFbIndex();
-    int  getExtFbNum(int &fbNum);
 
-    mutable android::Mutex mExtDispLock;
     int mFd;
+    int mFbNum;
     int mCurrentMode;
-    int mConnected;
-    int mConnectedFbNum;
-    int mResolutionMode;
     char mEDIDs[128];
     int mEDIDModes[64];
     int mModeCount;
     bool mUnderscanSupported;
     hwc_context_t *mHwcContext;
     fb_var_screeninfo mVInfo;
-    int mHdmiFbNum;
-    int mWfdFbNum;
-    int mExtDpyNum;
     // Holds all the HDMI modes and timing info supported by driver
     msm_hdmi_mode_timing_info* supported_video_mode_lut;
 };

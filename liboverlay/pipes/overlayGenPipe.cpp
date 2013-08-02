@@ -33,7 +33,7 @@
 
 namespace overlay {
 
-GenericPipe::GenericPipe(int dpy) : mFbNum(dpy), mRotDownscaleOpt(false),
+GenericPipe::GenericPipe(int dpy) : mDpy(dpy), mRotDownscaleOpt(false),
     pipeState(CLOSED) {
     init();
 }
@@ -46,17 +46,22 @@ bool GenericPipe::init()
 {
     ALOGE_IF(DEBUG_OVERLAY, "GenericPipe init");
     mRotDownscaleOpt = false;
-    if(mFbNum)
-        mFbNum = Overlay::getInstance()->getExtFbNum();
 
-    ALOGD_IF(DEBUG_OVERLAY,"%s: mFbNum:%d",__FUNCTION__, mFbNum);
+    int fbNum = Overlay::getFbForDpy(mDpy);
+    if( fbNum < 0 ) {
+        ALOGE("%s: Invalid FB for the display: %d",__FUNCTION__, mDpy);
+        return false;
+    }
 
-    if(!mCtrlData.ctrl.init(mFbNum)) {
+    ALOGD_IF(DEBUG_OVERLAY,"%s: mFbNum:%d",__FUNCTION__, fbNum);
+
+
+    if(!mCtrlData.ctrl.init(fbNum)) {
         ALOGE("GenericPipe failed to init ctrl");
         return false;
     }
 
-    if(!mCtrlData.data.init(mFbNum)) {
+    if(!mCtrlData.data.init(fbNum)) {
         ALOGE("GenericPipe failed to init data");
         return false;
     }
