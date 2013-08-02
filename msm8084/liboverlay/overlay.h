@@ -92,11 +92,6 @@ public:
      * displays
      */
     bool isPipeTypeAttached(utils::eMdpPipeType type);
-    /* set the framebuffer index for external display */
-    void setExtFbNum(int fbNum);
-    /* Returns framebuffer index of the current external display */
-    /* TODO Deprecate */
-    int getExtFbNum();
     /* Returns pipe dump. Expects a NULL terminated buffer of big enough size
      * to populate.
      */
@@ -171,8 +166,6 @@ private:
 
     /* Singleton Instance*/
     static Overlay *sInstance;
-    //TODO Deprecate
-    static int sExtFbIndex;
     static int sDpyFbMap[DPY_MAX];
     static int sDMAMode;
 };
@@ -199,14 +192,6 @@ inline int Overlay::availablePipes(int dpy, int mixer) {
         }
     }
     return avail;
-}
-
-inline void Overlay::setExtFbNum(int fbNum) {
-    sExtFbIndex = fbNum;
-}
-
-inline int Overlay::getExtFbNum() {
-    return sExtFbIndex;
 }
 
 inline void Overlay::setDMAMode(const int& mode) {
