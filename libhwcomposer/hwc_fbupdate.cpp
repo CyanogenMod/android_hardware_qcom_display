@@ -21,13 +21,14 @@
 #define DEBUG_FBUPDATE 0
 #include <cutils/properties.h>
 #include <gralloc_priv.h>
+#include <overlay.h>
 #include <overlayRotator.h>
 #include "hwc_fbupdate.h"
 #include "mdp_version.h"
 #include "external.h"
 
 using namespace qdutils;
-
+using namespace overlay;
 using overlay::Rotator;
 
 namespace qhwc {
@@ -89,7 +90,7 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             //For 8x26 external always use DMA pipe
             type = ovutils::OV_MDP_PIPE_DMA;
         }
-        ovutils::eDest dest = ov.nextPipe(type, mDpy);
+        ovutils::eDest dest = ov.nextPipe(type, mDpy, Overlay::MIXER_DEFAULT);
         if(dest == ovutils::OV_INVALID) { //None available
             ALOGE("%s: No pipes available to configure fb for dpy %d",
                 __FUNCTION__, mDpy);
@@ -244,14 +245,16 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
                           ovutils::getMdpFormat(hnd->format), hnd->size);
 
         //Request left pipe
-        ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy);
+        ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
+                Overlay::MIXER_LEFT);
         if(destL == ovutils::OV_INVALID) { //None available
             ALOGE("%s: No pipes available to configure fb for dpy %d's left"
                     " mixer", __FUNCTION__, mDpy);
             return false;
         }
         //Request right pipe
-        ovutils::eDest destR = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy);
+        ovutils::eDest destR = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
+                Overlay::MIXER_RIGHT);
         if(destR == ovutils::OV_INVALID) { //None available
             ALOGE("%s: No pipes available to configure fb for dpy %d's right"
                     " mixer", __FUNCTION__, mDpy);

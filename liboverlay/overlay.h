@@ -46,6 +46,8 @@ public:
     //High res panels can be backed by 2 layer mixers and a single fb node.
     enum { DPY_PRIMARY, DPY_EXTERNAL, DPY_WRITEBACK, DPY_UNUSED };
     enum { DPY_MAX = DPY_UNUSED };
+    enum { MIXER_LEFT, MIXER_RIGHT, MIXER_UNUSED };
+    enum { MIXER_DEFAULT = MIXER_LEFT, MIXER_MAX = MIXER_UNUSED };
     enum { MAX_FB_DEVICES = DPY_MAX };
 
     /* dtor close */
@@ -67,8 +69,10 @@ public:
      * is requested, the first available VG or RGB is returned. If no pipe is
      * available for the display "dpy" then INV is returned. Note: If a pipe is
      * assigned to a certain display, then it cannot be assigned to another
-     * display without being garbage-collected once */
-    utils::eDest nextPipe(utils::eMdpPipeType, int dpy);
+     * display without being garbage-collected once. To add if a pipe is
+     * asisgned to a mixer within a display it cannot be reused for another
+     * mixer without being UNSET once*/
+    utils::eDest nextPipe(utils::eMdpPipeType, int dpy, int mixer);
 
     void setSource(const utils::PipeArgs args, utils::eDest dest);
     void setCrop(const utils::Dim& d, utils::eDest dest);
@@ -82,8 +86,8 @@ public:
     static int initOverlay();
     /* Returns the singleton instance of overlay */
     static Overlay* getInstance();
-    /* Returns available ("unallocated") pipes for a display */
-    int availablePipes(int dpy);
+    /* Returns available ("unallocated") pipes for a display's mixer */
+    int availablePipes(int dpy, int mixer);
     /* Returns if any of the requested pipe type is attached to any of the
      * displays
      */
@@ -123,6 +127,8 @@ private:
         GenericPipe *mPipe;
         /* Display using this pipe. Refer to enums above */
         int mDisplay;
+        /* Mixer within a split display this pipe is attached to */
+        int mMixer;
 
         /* operations on bitmap */
         static bool pipeUsageUnchanged();
@@ -178,12 +184,18 @@ inline void Overlay::validate(int index) {
             PipeBook::getDestStr((utils::eDest)index));
 }
 
-inline int Overlay::availablePipes(int dpy) {
-     int avail = 0;
-     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
-       if((mPipeBook[i].mDisplay == DPY_UNUSED ||
-           mPipeBook[i].mDisplay == dpy) && PipeBook::isNotAllocated(i)) {
-                avail++;
+inline int Overlay::availablePipes(int dpy, int mixer) {
+    int avail = 0;
+    for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
+        if( (mPipeBook[i].mDisplay == DPY_UNUSED ||
+             mPipeBook[i].mDisplay == dpy) &&
+            (mPipeBook[i].mMixer == MIXER_UNUSED ||
+             mPipeBook[i].mMixer == mixer) &&
+            PipeBook::isNotAllocated(i) &&
+            !(Overlay::getDMAMode() == Overlay::DMA_BLOCK_MODE &&
+              PipeBook::getPipeType((utils::eDest)i) ==
+              utils::OV_MDP_PIPE_DMA)) {
+            avail++;
         }
     }
     return avail;
