@@ -283,15 +283,6 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
 
         hwc_rect_t sourceCrop = layer->sourceCrop;
         hwc_rect_t displayFrame = layer->displayFrame;
-        // Do not use getNonWormholeRegion() function to calculate the
-        // sourceCrop during animation on external display.
-        if(ctx->listStats[mDpy].isDisplayAnimating && mDpy) {
-            sourceCrop = layer->displayFrame;
-            displayFrame = sourceCrop;
-        } else if(extOnlyLayerIndex == -1) {
-            getNonWormholeRegion(list, sourceCrop);
-            displayFrame = sourceCrop;
-        }
 
         const float xres = ctx->dpyAttr[mDpy].xres;
         //Default even split for all displays with high res
