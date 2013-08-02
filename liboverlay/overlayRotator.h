@@ -205,7 +205,7 @@ private:
      * knowing the o/p format depending on whether fastYuv is enabled or not */
     uint32_t calcOutputBufSize();
     // Calculate the compressed o/p buffer size for BWC
-    uint32_t calcCompressedBufSize();
+    uint32_t calcCompressedBufSize(const utils::Whf& destWhf);
 
     /* MdssRot info structure */
     mdp_overlay   mRotInfo;
