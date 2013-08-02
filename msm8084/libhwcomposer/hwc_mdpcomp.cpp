@@ -338,19 +338,20 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     return true;
 }
 
-ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type) {
+ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type,
+        int mixer) {
     overlay::Overlay& ov = *ctx->mOverlay;
     ovutils::eDest mdp_pipe = ovutils::OV_INVALID;
 
     switch(type) {
     case MDPCOMP_OV_DMA:
-        mdp_pipe = ov.nextPipe(ovutils::OV_MDP_PIPE_DMA, mDpy);
+        mdp_pipe = ov.nextPipe(ovutils::OV_MDP_PIPE_DMA, mDpy, mixer);
         if(mdp_pipe != ovutils::OV_INVALID) {
             return mdp_pipe;
         }
     case MDPCOMP_OV_ANY:
     case MDPCOMP_OV_RGB:
-        mdp_pipe = ov.nextPipe(ovutils::OV_MDP_PIPE_RGB, mDpy);
+        mdp_pipe = ov.nextPipe(ovutils::OV_MDP_PIPE_RGB, mDpy, mixer);
         if(mdp_pipe != ovutils::OV_INVALID) {
             return mdp_pipe;
         }
@@ -360,7 +361,7 @@ ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type) {
             break;
         }
     case  MDPCOMP_OV_VG:
-        return ov.nextPipe(ovutils::OV_MDP_PIPE_VG, mDpy);
+        return ov.nextPipe(ovutils::OV_MDP_PIPE_VG, mDpy, mixer);
     default:
         ALOGE("%s: Invalid pipe type",__FUNCTION__);
         return ovutils::OV_INVALID;
@@ -475,12 +476,7 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         return false;
     }
 
-    int numPipesNeeded = pipesNeeded(ctx, list);
-    int availPipes = getAvailablePipes(ctx);
-
-    if(numPipesNeeded > availPipes) {
-        ALOGD_IF(isDebug(), "%s: Insufficient MDP pipes, needed %d, avail %d",
-                __FUNCTION__, numPipesNeeded, availPipes);
+    if(!arePipesAvailable(ctx, list)) {
         return false;
     }
 
@@ -508,12 +504,7 @@ bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
         return false;
     }
 
-    int numPipesNeeded = pipesNeeded(ctx, list);
-    int availPipes = getAvailablePipes(ctx);
-
-    if(numPipesNeeded > availPipes) {
-        ALOGD_IF(isDebug(), "%s: Insufficient MDP pipes, needed %d, avail %d",
-                __FUNCTION__, numPipesNeeded, availPipes);
+    if(!arePipesAvailable(ctx, list)) {
         return false;
     }
 
@@ -540,11 +531,7 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
         return false;
     }
 
-    int numPipesNeeded = pipesNeeded(ctx, list);
-    int availPipes = getAvailablePipes(ctx);
-    if(numPipesNeeded > availPipes) {
-        ALOGD_IF(isDebug(), "%s: Insufficient MDP pipes, needed %d, avail %d",
-                __FUNCTION__, numPipesNeeded, availPipes);
+    if(!arePipesAvailable(ctx, list)) {
         return false;
     }
 
@@ -644,23 +631,6 @@ void MDPComp::updateLayerCache(hwc_context_t* ctx,
     mCurrentFrame.mdpCount = mCurrentFrame.layerCount -
             mCurrentFrame.fbCount;
     ALOGD_IF(isDebug(),"%s: cached count: %d",__FUNCTION__, numCacheableLayers);
-}
-
-int MDPComp::getAvailablePipes(hwc_context_t* ctx) {
-    int numDMAPipes = qdutils::MDPVersion::getInstance().getDMAPipes();
-    overlay::Overlay& ov = *ctx->mOverlay;
-
-    int numAvailable = ov.availablePipes(mDpy);
-
-    //Reserve DMA for rotator
-    if(Overlay::getDMAMode() == Overlay::DMA_BLOCK_MODE)
-        numAvailable -= numDMAPipes;
-
-    //Reserve pipe(s)for FB
-    if(mCurrentFrame.fbCount)
-        numAvailable -= pipesForFB();
-
-    return numAvailable;
 }
 
 void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
@@ -875,9 +845,23 @@ int MDPCompLowRes::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
                            &PipeLayerPair.rot);
 }
 
-int MDPCompLowRes::pipesNeeded(hwc_context_t *ctx,
-                               hwc_display_contents_1_t* list) {
-    return mCurrentFrame.mdpCount;
+bool MDPCompLowRes::arePipesAvailable(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    overlay::Overlay& ov = *ctx->mOverlay;
+    int numPipesNeeded = mCurrentFrame.mdpCount;
+    int availPipes = ov.availablePipes(mDpy, Overlay::MIXER_DEFAULT);
+
+    //Reserve pipe for FB
+    if(mCurrentFrame.fbCount)
+        availPipes -= 1;
+
+    if(numPipesNeeded > availPipes) {
+        ALOGD_IF(isDebug(), "%s: Insufficient pipes, dpy %d needed %d, avail %d",
+                __FUNCTION__, mDpy, numPipesNeeded, availPipes);
+        return false;
+    }
+
+    return true;
 }
 
 bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
@@ -903,7 +887,7 @@ bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
             type = MDPCOMP_OV_DMA;
         }
 
-        pipe_info.index = getMdpPipe(ctx, type);
+        pipe_info.index = getMdpPipe(ctx, type, Overlay::MIXER_DEFAULT);
         if(pipe_info.index == ovutils::OV_INVALID) {
             ALOGD_IF(isDebug(), "%s: Unable to get pipe type = %d",
                 __FUNCTION__, (int) type);
@@ -992,7 +976,8 @@ bool MDPCompLowRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 //=============MDPCompHighRes===================================================
 
 int MDPCompHighRes::pipesNeeded(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list) {
+        hwc_display_contents_1_t* list,
+        int mixer) {
     int pipesNeeded = 0;
     const int xres = ctx->dpyAttr[mDpy].xres;
     //Default even split for all displays with high res
@@ -1007,16 +992,36 @@ int MDPCompHighRes::pipesNeeded(hwc_context_t *ctx,
         if(!mCurrentFrame.isFBComposed[i]) {
             hwc_layer_1_t* layer = &list->hwLayers[i];
             hwc_rect_t dst = layer->displayFrame;
-            if(dst.left > lSplit) {
+            if(mixer == Overlay::MIXER_LEFT && dst.left < lSplit) {
                 pipesNeeded++;
-            } else if(dst.right <= lSplit) {
+            } else if(mixer == Overlay::MIXER_RIGHT && dst.right > lSplit) {
                 pipesNeeded++;
-            } else {
-                pipesNeeded += 2;
             }
         }
     }
     return pipesNeeded;
+}
+
+bool MDPCompHighRes::arePipesAvailable(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    overlay::Overlay& ov = *ctx->mOverlay;
+
+    for(int i = 0; i < Overlay::MIXER_MAX; i++) {
+        int numPipesNeeded = pipesNeeded(ctx, list, i);
+        int availPipes = ov.availablePipes(mDpy, i);
+
+        //Reserve pipe(s)for FB
+        if(mCurrentFrame.fbCount)
+            availPipes -= 1;
+
+        if(numPipesNeeded > availPipes) {
+            ALOGD_IF(isDebug(), "%s: Insufficient pipes for "
+                     "dpy %d mixer %d needed %d, avail %d",
+                     __FUNCTION__, mDpy, i, numPipesNeeded, availPipes);
+            return false;
+        }
+    }
+    return true;
 }
 
 bool MDPCompHighRes::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
@@ -1032,23 +1037,21 @@ bool MDPCompHighRes::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
     }
 
     hwc_rect_t dst = layer->displayFrame;
-    if(dst.left > lSplit) {
-        pipe_info.lIndex = ovutils::OV_INVALID;
-        pipe_info.rIndex = getMdpPipe(ctx, type);
-        if(pipe_info.rIndex == ovutils::OV_INVALID)
-            return false;
-    } else if (dst.right <= lSplit) {
-        pipe_info.rIndex = ovutils::OV_INVALID;
-        pipe_info.lIndex = getMdpPipe(ctx, type);
+    pipe_info.lIndex = ovutils::OV_INVALID;
+    pipe_info.rIndex = ovutils::OV_INVALID;
+
+    if (dst.left < lSplit) {
+        pipe_info.lIndex = getMdpPipe(ctx, type, Overlay::MIXER_LEFT);
         if(pipe_info.lIndex == ovutils::OV_INVALID)
             return false;
-    } else {
-        pipe_info.rIndex = getMdpPipe(ctx, type);
-        pipe_info.lIndex = getMdpPipe(ctx, type);
-        if(pipe_info.rIndex == ovutils::OV_INVALID ||
-           pipe_info.lIndex == ovutils::OV_INVALID)
+    }
+
+    if(dst.right > lSplit) {
+        pipe_info.rIndex = getMdpPipe(ctx, type, Overlay::MIXER_RIGHT);
+        if(pipe_info.rIndex == ovutils::OV_INVALID)
             return false;
     }
+
     return true;
 }
 
@@ -1083,6 +1086,7 @@ bool MDPCompHighRes::allocLayerPipes(hwc_context_t *ctx,
     }
     return true;
 }
+
 /*
  * Configures pipe(s) for MDP composition
  */
