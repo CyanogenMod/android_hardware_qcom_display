@@ -49,7 +49,7 @@ private:
     struct copybit_device_t *mEngine;
     // Helper functions for copybit composition
     int  drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
-                                       private_handle_t *renderBuffer, int dpy);
+                          private_handle_t *renderBuffer, int dpy, bool isFG);
     bool canUseCopybitForYUV (hwc_context_t *ctx);
     bool canUseCopybitForRGB (hwc_context_t *ctx,
                                      hwc_display_contents_1_t *list, int dpy);
