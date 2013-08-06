@@ -341,6 +341,13 @@ static int set_parameter_copybit(
                             __FUNCTION__, value);
                 }
                 break;
+            case COPYBIT_FG_LAYER:
+                if(value == COPYBIT_ENABLE) {
+                     ctx->mFlags |= MDP_IS_FG;
+                } else if (value == COPYBIT_DISABLE) {
+                    ctx->mFlags &= ~MDP_IS_FG;
+                }
+                break ;
             default:
                 status = -EINVAL;
                 break;
