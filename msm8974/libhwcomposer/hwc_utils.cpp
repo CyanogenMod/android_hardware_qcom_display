@@ -1027,7 +1027,8 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     hwc_rect_t tmp_cropL, tmp_dstL;
     hwc_rect_t tmp_cropR, tmp_dstR;
 
-    const int lSplit = qdutils::MDPVersion::getInstance().getLeftSplit();
+    const int lSplit = getLeftSplit(ctx, dpy);
+
     if(lDest != OV_INVALID) {
         tmp_cropL = crop;
         tmp_dstL = dst;
@@ -1105,6 +1106,17 @@ bool canUseRotator(hwc_context_t *ctx) {
     if(ctx->mMDP.version == qdutils::MDP_V3_0_4)
         return false;
     return true;
+}
+
+int getLeftSplit(hwc_context_t *ctx, const int& dpy) {
+    //Default even split for all displays with high res
+    int lSplit = ctx->dpyAttr[dpy].xres / 2;
+    if(dpy == HWC_DISPLAY_PRIMARY &&
+            qdutils::MDPVersion::getInstance().getLeftSplit()) {
+        //Override if split published by driver for primary
+        lSplit = qdutils::MDPVersion::getInstance().getLeftSplit();
+    }
+    return lSplit;
 }
 
 void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
