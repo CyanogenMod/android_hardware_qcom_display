@@ -114,6 +114,10 @@ int getMdpFormat(int format) {
             return MDP_Y_CBCR_H2V2;
         case HAL_PIXEL_FORMAT_YCrCb_422_SP:
             return MDP_Y_CRCB_H2V1;
+        case HAL_PIXEL_FORMAT_YCbCr_422_I:
+            return MDP_YCBYCR_H2V1;
+        case HAL_PIXEL_FORMAT_YCrCb_422_I:
+            return MDP_YCRYCB_H2V1;
         case HAL_PIXEL_FORMAT_YCbCr_444_SP:
             return MDP_Y_CBCR_H1V1;
         case HAL_PIXEL_FORMAT_YCrCb_444_SP:
@@ -166,7 +170,11 @@ int getHALFormat(int mdpFormat) {
             return HAL_PIXEL_FORMAT_YCbCr_420_SP;
         case MDP_Y_CRCB_H2V1:
             return HAL_PIXEL_FORMAT_YCrCb_422_SP;
-        case MDP_Y_CBCR_H1V1:
+        case MDP_YCBYCR_H2V1:
+            return HAL_PIXEL_FORMAT_YCbCr_422_I;
+        case MDP_YCRYCB_H2V1:
+            return HAL_PIXEL_FORMAT_YCrCb_422_I;
+         case MDP_Y_CBCR_H1V1:
             return HAL_PIXEL_FORMAT_YCbCr_444_SP;
         case MDP_Y_CRCB_H1V1:
             return HAL_PIXEL_FORMAT_YCrCb_444_SP;
