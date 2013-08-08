@@ -509,6 +509,7 @@ static int blit_copybit(
 static int finish_copybit(struct copybit_device_t *dev)
 {
     // NOP for MDP copybit
+    return 0;
 }
 
 /*****************************************************************************/
