@@ -288,16 +288,8 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
         hwc_rect_t displayFrame = layer->displayFrame;
 
         const float xres = ctx->dpyAttr[mDpy].xres;
-        //Default even split for all displays with high res
-        float lSplit = xres / 2;
-        if(mDpy == HWC_DISPLAY_PRIMARY &&
-                qdutils::MDPVersion::getInstance().getLeftSplit()) {
-            //Override if split published by driver for primary
-            lSplit = qdutils::MDPVersion::getInstance().getLeftSplit();
-        }
-
+        const int lSplit = getLeftSplit(ctx, mDpy);
         const float lSplitRatio = lSplit / xres;
-
         const float lCropWidth =
                 (sourceCrop.right - sourceCrop.left) * lSplitRatio;
 
