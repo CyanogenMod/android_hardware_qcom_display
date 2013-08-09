@@ -225,6 +225,8 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
 //but the variety of scenarios is too high to warrant that.
 bool canUseRotator(hwc_context_t *ctx);
 
+int getLeftSplit(hwc_context_t *ctx, const int& dpy);
+
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
     return (UNLIKELY(l && (l->flags & HWC_SKIP_LAYER)));
