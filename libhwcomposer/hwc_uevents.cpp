@@ -196,6 +196,8 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                             //send hotplug disconnect event
                             ALOGD_IF(UEVENT_DEBUG, "sending hotplug: disconnect"
                                     "for WFD");
+                            // hwc comp could be on
+                            ctx->proc->hotplug(ctx->proc, dpy, EXTERNAL_OFFLINE);
                         }
                         //Invalidate
                         ctx->proc->invalidate(ctx->proc);
