@@ -143,8 +143,6 @@ protected:
     /* checks for conditions where YUV layers cannot be bypassed */
     bool isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer);
 
-    /* set up Border fill as Base pipe */
-    static bool setupBasePipe(hwc_context_t*);
     /* Is debug enabled */
     static bool isDebug() { return sDebugLogs ? true : false; };
     /* Is feature enabled */
