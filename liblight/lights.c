@@ -54,6 +54,12 @@ char const*const LCD_FILE
 char const*const RED_BLINK_FILE
         = "/sys/class/leds/red/blink";
 
+char const*const GREEN_BLINK_FILE
+        = "/sys/class/leds/green/blink";
+
+char const*const BLUE_BLINK_FILE
+        = "/sys/class/leds/blue/blink";
+
 /**
  * device methods
  */
@@ -152,7 +158,12 @@ set_speaker_light_locked(struct light_device_t* dev,
     }
 
     if (blink) {
-        write_int(RED_BLINK_FILE, blink);
+        if (red)
+            write_int(RED_BLINK_FILE, blink);
+        if (green)
+            write_int(GREEN_BLINK_FILE, blink);
+        if (blue)
+            write_int(BLUE_BLINK_FILE, blink);
     } else {
         write_int(RED_LED_FILE, red);
         write_int(GREEN_LED_FILE, green);
