@@ -251,7 +251,6 @@ inline void MdpCtrl::setPlaneAlpha(int planeAlpha) {
 }
 
 inline void MdpCtrl::setBlending(overlay::utils::eBlending blending) {
-#ifndef MDSS_TARGET
     switch((int) blending) {
     case utils::OVERLAY_BLENDING_OPAQUE:
         mOVInfo.blend_op = BLEND_OP_OPAQUE;
@@ -263,7 +262,6 @@ inline void MdpCtrl::setBlending(overlay::utils::eBlending blending) {
     default:
         mOVInfo.blend_op = BLEND_OP_COVERAGE;
     }
-#endif
 }
 
 inline bool MdpCtrl::ovChanged() const {
