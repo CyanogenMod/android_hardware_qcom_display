@@ -250,7 +250,6 @@ void ExternalDisplay::setActionSafeDimension(int w, int h) {
     property_set("persist.sys.actionsafe.width", actionsafeWidth);
     snprintf(actionsafeHeight, sizeof(actionsafeHeight), "%d", h);
     property_set("persist.sys.actionsafe.height", actionsafeHeight);
-    setExternalDisplay(true, mHdmiFbNum);
 }
 
 int ExternalDisplay::getModeCount() const {
