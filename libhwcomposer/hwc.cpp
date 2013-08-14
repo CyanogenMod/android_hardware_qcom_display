@@ -217,6 +217,7 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
     Locker::Autolock _bl(ctx->mBlankLock);
     //Will be unlocked at the end of set
     ctx->mExtLock.lock();
+    ctx->mSecureLock.lock();
     reset(ctx, numDisplays, displays);
 
     ctx->mOverlay->configBegin();
@@ -513,6 +514,7 @@ static int hwc_set(hwc_composer_device_1 *dev,
     MDPComp::resetIdleFallBack();
     //Was locked at the beginning of prepare
     ctx->mExtLock.unlock();
+    ctx->mSecureLock.unlock();
     return ret;
 }
 
