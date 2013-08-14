@@ -81,6 +81,7 @@ public:
     bool queueBuffer(int opFd, uint32_t opOffset);
     uint32_t getOffset() const { return mWbMem.getOffset(); }
     int getDstFd() const { return mWbMem.getDstFd(); }
+    int getOutputFormat() const { return mOpFmt; }
 
     static Writeback* getInstance();
     static void configBegin() { sUsed = false; }
@@ -93,11 +94,13 @@ private:
     bool stopSession();
     //Actually block_until_write_done for the usage here.
     bool dequeueBuffer();
+    void queryOutputFormat();
     OvFD mFd;
     WritebackMem mWbMem;
     struct msmfb_data mFbData;
     int mXres;
     int mYres;
+    int mOpFmt;
 
     static bool sUsed;
     static Writeback *sWb;
