@@ -122,6 +122,7 @@ static int openFramebufferDevice(hwc_context_t *ctx)
 
 void initContext(hwc_context_t *ctx)
 {
+    memset(&ctx->dpyAttr, 0, sizeof(ctx->dpyAttr));
     if(openFramebufferDevice(ctx) < 0) {
         ALOGE("%s: failed to open framebuffer!!", __FUNCTION__);
     }
@@ -170,7 +171,6 @@ void initContext(hwc_context_t *ctx)
 
     ctx->vstate.enable = false;
     ctx->vstate.fakevsync = false;
-    ctx->mExtDispConfiguring = false;
     ctx->mBasePipeSetup = false;
 
     //Right now hwc starts the service but anybody could do it, or it could be
@@ -576,8 +576,9 @@ void getNonWormholeRegion(hwc_display_contents_1_t* list,
 
 }
 
-bool isExternalActive(hwc_context_t* ctx) {
-    return ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive;
+bool isSecondaryConfiguring(hwc_context_t* ctx) {
+    return (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isConfiguring |
+            ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isConfiguring);
 }
 
 void closeAcquireFds(hwc_display_contents_1_t* list) {

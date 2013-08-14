@@ -144,7 +144,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                     //This block will force composition to close fb2 in above
                     //example.
                     Locker::Autolock _l(ctx->mExtLock);
-                    ctx->mExtDispConfiguring = true;
+                    ctx->dpyAttr[dpy].isConfiguring = true;
                     ctx->dpyAttr[dpy].connected = false;
                     ctx->proc->invalidate(ctx->proc);
                 }
@@ -187,7 +187,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 //its pipes; we don't allow inter-mixer pipe transfers.
                 {
                     Locker::Autolock _l(ctx->mExtLock);
-                    ctx->mExtDispConfiguring = true;
+                    ctx->dpyAttr[dpy].isConfiguring = true;
                     ctx->dpyAttr[dpy].isActive = true;
                     ctx->proc->invalidate(ctx->proc);
                 }

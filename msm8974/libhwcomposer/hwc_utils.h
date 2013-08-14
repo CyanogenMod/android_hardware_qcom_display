@@ -76,13 +76,16 @@ struct DisplayAttributes {
     float xdpi;
     float ydpi;
     int fd;
-    bool connected; //Applies only to pluggable disp.
+    bool connected; //Applies only to secondary displays
     //Connected does not mean it ready to use.
     //It should be active also. (UNBLANKED)
     bool isActive;
     // In pause state, composition is bypassed
     // used for WFD displays only
     bool isPause;
+    //Secondary displays will have this set until they are able to acquire
+    //pipes.
+    bool isConfiguring;
 };
 
 struct ListStats {
@@ -163,7 +166,9 @@ void getNonWormholeRegion(hwc_display_contents_1_t* list,
                               hwc_rect_t& nwr);
 bool isSecuring(hwc_context_t* ctx, hwc_layer_1_t const* layer);
 bool isSecureModePolicy(int mdpVersion);
-bool isExternalActive(hwc_context_t* ctx);
+//Secondary display hasnt acquired any pipes yet.
+//Secondary stands for external as well as virtual
+bool isSecondaryConfiguring(hwc_context_t* ctx);
 bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer, const int& dpy);
 bool isAlphaPresent(hwc_layer_1_t const* layer);
 bool setupBasePipe(hwc_context_t *ctx);
@@ -324,8 +329,6 @@ struct hwc_context_t {
 
     //Securing in progress indicator
     bool mSecuring;
-    //External Display configuring progress indicator
-    bool mExtDispConfiguring;
     //Display in secure mode indicator
     bool mSecureMode;
     //Lock to prevent set from being called while blanking

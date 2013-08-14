@@ -178,7 +178,7 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         if(!ctx->dpyAttr[dpy].isPause) {
             if(fbLayer->handle) {
-                ctx->mExtDispConfiguring = false;
+                ctx->dpyAttr[dpy].isConfiguring = false;
                 setListStats(ctx, list, dpy);
                 if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
                     const int fbZ = 0;
