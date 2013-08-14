@@ -471,44 +471,42 @@ static int hwc_set_external(hwc_context_t *ctx,
 
 
     if (LIKELY(list) && ctx->dpyAttr[dpy].isActive &&
-        ctx->dpyAttr[dpy].connected) {
+        ctx->dpyAttr[dpy].connected &&
+        !ctx->dpyAttr[dpy].isPause) {
+        uint32_t last = list->numHwLayers - 1;
+        hwc_layer_1_t *fbLayer = &list->hwLayers[last];
+        int fd = -1; //FenceFD from the Copybit(valid in async mode)
+        bool copybitDone = false;
+        if(ctx->mCopyBit[dpy])
+            copybitDone = ctx->mCopyBit[dpy]->draw(ctx, list, dpy, &fd);
 
-        if(!ctx->dpyAttr[dpy].isPause) {
-            uint32_t last = list->numHwLayers - 1;
-            hwc_layer_1_t *fbLayer = &list->hwLayers[last];
-            int fd = -1; //FenceFD from the Copybit(valid in async mode)
-            bool copybitDone = false;
-            if(ctx->mCopyBit[dpy])
-                copybitDone = ctx->mCopyBit[dpy]->draw(ctx, list, dpy, &fd);
+        if(list->numHwLayers > 1)
+            hwc_sync(ctx, list, dpy, fd);
 
-            if(list->numHwLayers > 1)
-                hwc_sync(ctx, list, dpy, fd);
+        // Dump the layers for external
+        if(ctx->mHwcDebug[dpy])
+            ctx->mHwcDebug[dpy]->dumpLayers(list);
 
-            // Dump the layers for external
-            if(ctx->mHwcDebug[dpy])
-                ctx->mHwcDebug[dpy]->dumpLayers(list);
+        if (!ctx->mMDPComp[dpy]->draw(ctx, list)) {
+            ALOGE("%s: MDPComp draw failed", __FUNCTION__);
+            ret = -1;
+        }
 
-            if (!ctx->mMDPComp[dpy]->draw(ctx, list)) {
-                ALOGE("%s: MDPComp draw failed", __FUNCTION__);
+        int extOnlyLayerIndex =
+                ctx->listStats[dpy].extOnlyLayerIndex;
+
+        private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
+        if(extOnlyLayerIndex!= -1) {
+            hwc_layer_1_t *extLayer = &list->hwLayers[extOnlyLayerIndex];
+            hnd = (private_handle_t *)extLayer->handle;
+        } else if(copybitDone) {
+            hnd = ctx->mCopyBit[dpy]->getCurrentRenderBuffer();
+        }
+
+        if(hnd && !isYuvBuffer(hnd)) {
+            if (!ctx->mFBUpdate[dpy]->draw(ctx, hnd)) {
+                ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
                 ret = -1;
-            }
-
-            int extOnlyLayerIndex =
-                    ctx->listStats[dpy].extOnlyLayerIndex;
-
-            private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
-            if(extOnlyLayerIndex!= -1) {
-                hwc_layer_1_t *extLayer = &list->hwLayers[extOnlyLayerIndex];
-                hnd = (private_handle_t *)extLayer->handle;
-            } else if(copybitDone) {
-                hnd = ctx->mCopyBit[dpy]->getCurrentRenderBuffer();
-            }
-
-            if(hnd && !isYuvBuffer(hnd)) {
-                if (!ctx->mFBUpdate[dpy]->draw(ctx, hnd)) {
-                    ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
-                    ret = -1;
-                }
             }
         }
 
