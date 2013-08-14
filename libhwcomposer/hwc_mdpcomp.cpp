@@ -501,6 +501,7 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
         hwc_display_contents_1_t* list){
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     mCurrentFrame.reset(numAppLayers);
+    updateLayerCache(ctx, list);
     updateYUV(ctx, list);
     int mdpCount = mCurrentFrame.mdpCount;
     int fbNeeded = int(mCurrentFrame.fbCount != 0);
@@ -818,6 +819,18 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             if(!programYUV(ctx, list)) {
                 reset(numLayers, list);
                 return -1;
+            } else { //Success
+                //Any change in composition types needs an FB refresh
+                mCurrentFrame.needsRedraw = false;
+                if(mCurrentFrame.fbCount &&
+                    ((mCurrentFrame.mdpCount != mCachedFrame.mdpCount) ||
+                    (mCurrentFrame.fbCount != mCachedFrame.cacheCount) ||
+                    (mCurrentFrame.fbZ != mCachedFrame.fbZ) ||
+                    (!mCurrentFrame.mdpCount) ||
+                    (list->flags & HWC_GEOMETRY_CHANGED) ||
+                    isSkipPresent(ctx, mDpy) )) {
+                        mCurrentFrame.needsRedraw = true;
+                }
             }
         } else {
             reset(numLayers, list);
