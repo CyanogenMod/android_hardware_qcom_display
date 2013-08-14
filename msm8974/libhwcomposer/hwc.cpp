@@ -214,8 +214,8 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    Locker::Autolock _bl(ctx->mBlankLock);
     //Will be unlocked at the end of set
+    ctx->mBlankLock.lock();
     ctx->mExtLock.lock();
     reset(ctx, numDisplays, displays);
 
@@ -471,7 +471,6 @@ static int hwc_set(hwc_composer_device_1 *dev,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    Locker::Autolock _bl(ctx->mBlankLock);
     for (uint32_t i = 0; i < numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
         switch(i) {
@@ -495,6 +494,7 @@ static int hwc_set(hwc_composer_device_1 *dev,
     ctx->mVideoTransFlag = false;
     //Was locked at the beginning of prepare
     ctx->mExtLock.unlock();
+    ctx->mBlankLock.unlock();
     return ret;
 }
 
