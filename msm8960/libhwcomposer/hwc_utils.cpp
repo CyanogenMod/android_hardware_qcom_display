@@ -829,9 +829,10 @@ void setMdpFlags(hwc_layer_1_t *layer,
 }
 
 static inline int configRotator(Rotator *rot, const Whf& whf,
-        const eMdpFlags& mdpFlags, const eTransform& orient,
+        const Whf& origWhf, const eMdpFlags& mdpFlags,
+        const eTransform& orient,
         const int& downscale) {
-    rot->setSource(whf);
+    rot->setSource(whf, origWhf);
     rot->setFlags(mdpFlags);
     rot->setTransform(orient);
     rot->setDownscale(downscale);
@@ -963,7 +964,9 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         *rot = ctx->mRotMgr->getNext();
         if(*rot == NULL) return -1;
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, mdpFlags, orient, downscale) < 0)
+        Whf origWhf(hnd->width, hnd->height,
+                    getMdpFormat(hnd->format), hnd->size);
+        if(configRotator(*rot, whf, origWhf,  mdpFlags, orient, downscale) < 0)
             return -1;
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
         whf.format = (*rot)->getDstFormat();
@@ -1018,7 +1021,9 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, mdpFlagsL, orient, downscale) < 0)
+        Whf origWhf(hnd->width, hnd->height,
+                    getMdpFormat(hnd->format), hnd->size);
+        if(configRotator(*rot, whf, origWhf, mdpFlagsL, orient, downscale) < 0)
             return -1;
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
         whf.format = (*rot)->getDstFormat();
