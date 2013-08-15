@@ -47,13 +47,10 @@ bool GenericPipe::init()
     ALOGE_IF(DEBUG_OVERLAY, "GenericPipe init");
     mRotDownscaleOpt = false;
 
-    int fbNum = 0;
-    //TODO Remove the if block. What's in else block should be the standard way
-    //EXTERNAL's meaning has been overloaded in hwc to mean WFD also!
-    if(mDpy == Overlay::DPY_EXTERNAL) {
-        fbNum = Overlay::getInstance()->getExtFbNum();
-    } else if(mDpy == Overlay::DPY_WRITEBACK) {
-        fbNum = Overlay::getFbForDpy(mDpy);
+    int fbNum = Overlay::getFbForDpy(mDpy);
+    if( fbNum < 0 ) {
+        ALOGE("%s: Invalid FB for the display: %d",__FUNCTION__, mDpy);
+        return false;
     }
 
     ALOGD_IF(DEBUG_OVERLAY,"%s: mFbNum:%d",__FUNCTION__, fbNum);

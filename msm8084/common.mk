@@ -6,6 +6,7 @@ common_includes += hardware/qcom/display/libqdutils
 common_includes += hardware/qcom/display/libhwcomposer
 common_includes += hardware/qcom/display/libexternal
 common_includes += hardware/qcom/display/libqservice
+common_includes += hardware/qcom/display/libvirtual
 
 ifeq ($(TARGET_USES_POST_PROCESSING),true)
     common_flags     += -DUSES_POST_PROCESSING
