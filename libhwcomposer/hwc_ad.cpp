@@ -143,7 +143,7 @@ void AssertiveDisplay::markDoable(hwc_context_t *ctx,
         const hwc_display_contents_1_t* list) {
     mDoable = false;
     if(mFeatureEnabled &&
-        !ctx->mExtDisplay->isExternalConnected() &&
+        !ctx->mExtDisplay->isConnected() &&
         ctx->listStats[HWC_DISPLAY_PRIMARY].yuvCount == 1) {
         int nYuvIndex = ctx->listStats[HWC_DISPLAY_PRIMARY].yuvIndices[0];
         const hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];

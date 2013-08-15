@@ -29,6 +29,7 @@
 #include "hwc_utils.h"
 #include "string.h"
 #include "external.h"
+#include "overlay.h"
 
 namespace qhwc {
 
@@ -63,7 +64,7 @@ static void *vsync_loop(void *param)
 
     struct pollfd pfd[2];
     int fb_fd[2];
-    uint64_t timestamp[2];
+    uint64_t timestamp[2] = {0,0};
     int num_displays;
 
     char property[PROPERTY_VALUE_MAX];
@@ -77,7 +78,7 @@ static void *vsync_loop(void *param)
             logvsync = true;
     }
 
-    if (ctx->mExtDisplay->getHDMIIndex() > 0)
+    if (ctx->mExtDisplay->isConnected())
         num_displays = 2;
     else
         num_displays = 1;
@@ -87,7 +88,8 @@ static void *vsync_loop(void *param)
         snprintf(vsync_node_path, sizeof(vsync_node_path),
                 "/sys/class/graphics/fb%d/vsync_event",
                 dpy == HWC_DISPLAY_PRIMARY ? 0 :
-                ctx->mExtDisplay->getHDMIIndex());
+                overlay::Overlay::getInstance()->
+                                getFbForDpy(HWC_DISPLAY_EXTERNAL));
         ALOGI("%s: Reading vsync for dpy=%d from %s", __FUNCTION__, dpy,
                 vsync_node_path);
         fb_fd[dpy] = open(vsync_node_path, O_RDONLY);
