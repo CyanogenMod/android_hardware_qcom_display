@@ -84,7 +84,6 @@ Writeback::Writeback() : mXres(0), mYres(0), mOpFmt(-1) {
         ALOGE("%s failed to init %s", __func__, Res::fbPath);
         return;
     }
-    queryOutputFormat();
     startSession();
 }
 
@@ -190,15 +189,33 @@ bool Writeback::writeSync() {
     return writeSync(mWbMem.getDstFd(), mWbMem.getOffset());
 }
 
-void Writeback::queryOutputFormat() {
-    struct msmfb_metadata metadata;
-    memset(&metadata, 0 , sizeof(metadata));
-    metadata.op = metadata_op_wb_format;
-    if (ioctl(mFd.getFD(), MSMFB_METADATA_GET, &metadata) < 0) {
-        ALOGE("Error retrieving MDP Writeback format");
-        return;
+bool Writeback::setOutputFormat(int mdpFormat) {
+    if(mdpFormat != mOpFmt) {
+        struct msmfb_metadata metadata;
+        memset(&metadata, 0 , sizeof(metadata));
+        metadata.op = metadata_op_wb_format;
+        metadata.data.mixer_cfg.writeback_format = mdpFormat;
+        if (ioctl(mFd.getFD(), MSMFB_METADATA_SET, &metadata) < 0) {
+            ALOGE("Error setting MDP Writeback format");
+            return false;
+        }
+        mOpFmt = mdpFormat;
     }
-    mOpFmt = metadata.data.mixer_cfg.writeback_format;
+    return true;
+}
+
+int Writeback::getOutputFormat() {
+    if(mOpFmt < 0) {
+        struct msmfb_metadata metadata;
+        memset(&metadata, 0 , sizeof(metadata));
+        metadata.op = metadata_op_wb_format;
+        if (ioctl(mFd.getFD(), MSMFB_METADATA_GET, &metadata) < 0) {
+            ALOGE("Error retrieving MDP Writeback format");
+            return -1;
+        }
+        mOpFmt =  metadata.data.mixer_cfg.writeback_format;
+    }
+    return mOpFmt;
 }
 
 //static
