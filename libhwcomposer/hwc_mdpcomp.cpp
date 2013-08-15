@@ -55,6 +55,9 @@ MDPComp::MDPComp(int dpy):mDpy(dpy){};
 
 void MDPComp::dump(android::String8& buf)
 {
+    if(mCurrentFrame.layerCount > MAX_NUM_APP_LAYERS)
+        return;
+
     dumpsys_log(buf,"HWC Map for Dpy: %s \n",
                 (mDpy == 0) ? "\"PRIMARY\"" :
                 (mDpy == 1) ? "\"EXTERNAL\"" : "\"VIRTUAL\"");
