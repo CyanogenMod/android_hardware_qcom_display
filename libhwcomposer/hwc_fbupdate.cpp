@@ -54,6 +54,7 @@ inline void FBUpdateLowRes::reset() {
 }
 
 bool FBUpdateLowRes::preRotateExtDisplay(hwc_context_t *ctx,
+                                            private_handle_t *hnd,
                                             ovutils::Whf &info,
                                             hwc_rect_t& sourceCrop,
                                             ovutils::eMdpFlags& mdpFlags,
@@ -61,11 +62,14 @@ bool FBUpdateLowRes::preRotateExtDisplay(hwc_context_t *ctx,
 {
     int extOrient = getExtOrientation(ctx);
     ovutils::eTransform orient = static_cast<ovutils::eTransform >(extOrient);
+
     if(mDpy && (extOrient & HWC_TRANSFORM_ROT_90)) {
         mRot = ctx->mRotMgr->getNext();
         if(mRot == NULL) return false;
+        Whf origWhf(hnd->width, hnd->height,
+                    getMdpFormat(hnd->format), hnd->size);
         //Configure rotator for pre-rotation
-        if(configRotator(mRot, info, mdpFlags, orient, 0) < 0) {
+        if(configRotator(mRot, info, origWhf, mdpFlags, orient, 0) < 0) {
             ALOGE("%s: configRotator Failed!", __FUNCTION__);
             mRot = NULL;
             return false;
@@ -152,7 +156,7 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
                                    transform, orient);
         setMdpFlags(layer, mdpFlags, 0, transform);
         // For External use rotator if there is a rotation value set
-        ret = preRotateExtDisplay(ctx, info, sourceCrop, mdpFlags, rotFlags);
+        ret = preRotateExtDisplay(ctx, hnd, info, sourceCrop, mdpFlags, rotFlags);
         if(!ret) {
             ALOGE("%s: preRotate for external Failed!", __FUNCTION__);
             return false;
