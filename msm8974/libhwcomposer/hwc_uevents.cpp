@@ -57,15 +57,6 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
     int vsync = 0;
     int64_t timestamp = 0;
     const char *str = udata;
-    bool usecopybit = false;
-    int compositionType =
-        qdutils::QCCompositionType::getInstance().getCompositionType();
-
-    if (compositionType & (qdutils::COMPOSITION_TYPE_DYN |
-                           qdutils::COMPOSITION_TYPE_MDP |
-                           qdutils::COMPOSITION_TYPE_C2D)) {
-        usecopybit = true;
-    }
 
     if(!strcasestr("change@/devices/virtual/switch/hdmi", str) &&
        !strcasestr("change@/devices/virtual/switch/wfd", str)) {
@@ -113,18 +104,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             {   // disconnect event
                 ctx->mExtDisplay->processUEventOffline(udata);
                 Locker::Autolock _l(ctx->mExtLock);
-                if(ctx->mFBUpdate[dpy]) {
-                    delete ctx->mFBUpdate[dpy];
-                    ctx->mFBUpdate[dpy] = NULL;
-                }
-                if(ctx->mCopyBit[dpy]){
-                    delete ctx->mCopyBit[dpy];
-                    ctx->mCopyBit[dpy] = NULL;
-                }
-                if(ctx->mMDPComp[dpy]) {
-                    delete ctx->mMDPComp[dpy];
-                    ctx->mMDPComp[dpy] = NULL;
-                }
+                clearSecondaryObjs(ctx, dpy);
                 ALOGD("%s sending hotplug: connected = %d and dpy:%d",
                       __FUNCTION__, connected, dpy);
                 ctx->dpyAttr[dpy].connected = false;
@@ -155,15 +135,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 {
                     Locker::Autolock _l(ctx->mExtLock);
                     ctx->dpyAttr[dpy].isPause = false;
-                    const int rSplit = 0;
-                    ctx->mFBUpdate[dpy] =
-                        IFBUpdate::getObject(ctx->dpyAttr[dpy].xres, rSplit,
-                            dpy);
-                    ctx->dpyAttr[dpy].isPause = false;
-                    if(usecopybit)
-                        ctx->mCopyBit[dpy] = new CopyBit();
-                    ctx->mMDPComp[dpy] =  MDPComp::getObject(
-                        ctx->dpyAttr[dpy].xres, rSplit, dpy);
+                    setupSecondaryObjs(ctx, dpy);
                     ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,
                             connected);
                     ctx->dpyAttr[dpy].connected = true;

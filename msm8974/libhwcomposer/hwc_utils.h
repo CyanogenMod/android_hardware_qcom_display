@@ -231,6 +231,11 @@ bool canUseRotator(hwc_context_t *ctx);
 
 int getLeftSplit(hwc_context_t *ctx, const int& dpy);
 
+//Sets up composition objects for secondary displays when they are added.
+//Should be called with extlock held.
+void setupSecondaryObjs(hwc_context_t *ctx, const int& dpy);
+void clearSecondaryObjs(hwc_context_t *ctx, const int& dpy);
+
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
     return (UNLIKELY(l && (l->flags & HWC_SKIP_LAYER)));

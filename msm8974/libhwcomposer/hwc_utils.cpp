@@ -1145,6 +1145,37 @@ int getLeftSplit(hwc_context_t *ctx, const int& dpy) {
     return lSplit;
 }
 
+void setupSecondaryObjs(hwc_context_t *ctx, const int& dpy) {
+    const int rSplit = 0;
+    ctx->mFBUpdate[dpy] =
+            IFBUpdate::getObject(ctx->dpyAttr[dpy].xres, rSplit, dpy);
+    ctx->mMDPComp[dpy] =  MDPComp::getObject(
+            ctx->dpyAttr[dpy].xres, rSplit, dpy);
+
+    int compositionType =
+            qdutils::QCCompositionType::getInstance().getCompositionType();
+    if (compositionType & (qdutils::COMPOSITION_TYPE_DYN |
+                           qdutils::COMPOSITION_TYPE_MDP |
+                           qdutils::COMPOSITION_TYPE_C2D)) {
+        ctx->mCopyBit[dpy] = new CopyBit();
+    }
+}
+
+void clearSecondaryObjs(hwc_context_t *ctx, const int& dpy) {
+    if(ctx->mFBUpdate[dpy]) {
+        delete ctx->mFBUpdate[dpy];
+        ctx->mFBUpdate[dpy] = NULL;
+    }
+    if(ctx->mCopyBit[dpy]){
+        delete ctx->mCopyBit[dpy];
+        ctx->mCopyBit[dpy] = NULL;
+    }
+    if(ctx->mMDPComp[dpy]) {
+        delete ctx->mMDPComp[dpy];
+        ctx->mMDPComp[dpy] = NULL;
+    }
+}
+
 void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
             const hwc_rect_t& dst, const int& transform,
             ovutils::eMdpFlags& mdpFlags) {
