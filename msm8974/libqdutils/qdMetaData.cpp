@@ -78,6 +78,9 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
         case PP_PARAM_TIMESTAMP:
             data->timestamp = *((int64_t *)param);
             break;
+        case UPDATE_BUFFER_GEOMETRY:
+            memcpy((void *)&data->bufferDim, param, sizeof(BufferDim_t));
+            break;
         default:
             ALOGE("Unknown paramType %d", paramType);
             break;
