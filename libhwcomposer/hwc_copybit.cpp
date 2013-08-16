@@ -411,7 +411,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
         dtdy < 1/copybitsMinScale){
         // The requested scale is out of the range the hardware
         // can support.
-       ALOGE("%s:%d::Need to scale twice dsdx=%f, dtdy=%f,copybitsMaxScale=%f,\
+       ALOGD("%s:%d::Need to scale twice dsdx=%f, dtdy=%f,copybitsMaxScale=%f,\
                                  copybitsMinScale=%f,screen_w=%d,screen_h=%d \
                   src_crop_width=%d src_crop_height=%d",__FUNCTION__,__LINE__,
               dsdx,dtdy,copybitsMaxScale,1/copybitsMinScale,screen_w,screen_h,
@@ -436,7 +436,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
          tmp_w  = (tmp_w/2)*2;
          tmp_h = (tmp_h/2)*2;
        }
-       ALOGE("%s:%d::tmp_w = %d,tmp_h = %d",__FUNCTION__,__LINE__,tmp_w,tmp_h);
+       ALOGD("%s:%d::tmp_w = %d,tmp_h = %d",__FUNCTION__,__LINE__,tmp_w,tmp_h);
 
        int usage = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
        int format = fbHandle->format;
