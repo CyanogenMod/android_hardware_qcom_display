@@ -37,8 +37,7 @@
 #define MAX_NUM_APP_LAYERS 32
 
 // For support of virtual displays
-#define HWC_DISPLAY_VIRTUAL     (HWC_DISPLAY_EXTERNAL+1)
-#define MAX_DISPLAYS            (HWC_NUM_DISPLAY_TYPES+1)
+#define MAX_DISPLAYS            (HWC_NUM_DISPLAY_TYPES)
 
 //Fwrd decls
 struct hwc_context_t;
