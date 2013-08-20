@@ -235,7 +235,7 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
 //extreme unavailability of pipes. This can also be done via hybrid calculations
 //also involving many more variables like number of write-back interfaces etc,
 //but the variety of scenarios is too high to warrant that.
-bool canUseRotator(hwc_context_t *ctx);
+bool canUseRotator(hwc_context_t *ctx, int dpy);
 
 int getLeftSplit(hwc_context_t *ctx, const int& dpy);
 
