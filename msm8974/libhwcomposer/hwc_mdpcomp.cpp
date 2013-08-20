@@ -393,16 +393,16 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
         // 180 transforms. Fail for any transform involving 90 (90, 270).
         hwc_layer_1_t* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-        if(isYuvBuffer(hnd) ) {
-            if(isSecuring(ctx, layer)) {
-                ALOGD_IF(isDebug(), "%s: MDP securing is active", __FUNCTION__);
+
+        if(layer->transform & HWC_TRANSFORM_ROT_90) {
+            if(!isYuvBuffer(hnd) ) {
+                ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
+                return false;
+            }else if(!canUseRotator(ctx, mDpy)) {
+                ALOGD_IF(isDebug(), "%s: no free DMA pipe",__FUNCTION__);
                 return false;
             }
-        } else if(layer->transform & HWC_TRANSFORM_ROT_90) {
-            ALOGD_IF(isDebug(), "%s: orientation involved",__FUNCTION__);
-            return false;
         }
-
         if(!isValidDimension(ctx,layer)) {
             ALOGD_IF(isDebug(), "%s: Buffer is of invalid width",
                 __FUNCTION__);
@@ -523,6 +523,11 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
 bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
     if(isSkipLayer(layer)) {
         ALOGE("%s: Unable to bypass skipped YUV", __FUNCTION__);
+        return false;
+    }
+
+    if(layer->transform & HWC_TRANSFORM_ROT_90 && !canUseRotator(ctx,mDpy)) {
+        ALOGD_IF(isDebug(), "%s: no free DMA pipe",__FUNCTION__);
         return false;
     }
 
