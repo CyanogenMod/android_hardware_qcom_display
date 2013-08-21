@@ -47,6 +47,7 @@
 #include "virtual.h"
 #include "overlayUtils.h"
 #include "overlay.h"
+#include "mdp_version.h"
 
 using namespace android;
 
@@ -67,6 +68,11 @@ int VirtualDisplay::configure() {
     return 0;
 }
 
+void VirtualDisplay::getAttributes(int& width, int& height) {
+    width = mVInfo.xres;
+    height = mVInfo.yres;
+}
+
 int VirtualDisplay::teardown() {
     closeFrameBuffer();
     memset(&mVInfo, 0, sizeof(mVInfo));
@@ -85,12 +91,35 @@ VirtualDisplay::~VirtualDisplay()
 }
 
 void VirtualDisplay::setAttributes() {
-    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = mVInfo.xres;
-    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = mVInfo.yres;
-    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].vsync_period =
-        1000000000l /60;
-    ALOGD_IF(DEBUG,"%s: Setting Virtual Attr: res(%d x %d)",__FUNCTION__,
-             mVInfo.xres, mVInfo.yres);
+    if(mHwcContext) {
+        // Always set dpyAttr res to mVInfo res
+        mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = mVInfo.xres;
+        mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = mVInfo.yres;
+        mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = false;
+        if(!qdutils::MDPVersion::getInstance().is8x26()) {
+            uint32_t priW = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
+            uint32_t priH = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
+            // if primary resolution is more than the wfd resolution
+            // configure dpy attr to primary resolution and set
+            // downscale mode
+            if((priW * priH) > (mVInfo.xres * mVInfo.yres)) {
+                mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = priW;
+                mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = priH;
+                // WFD is always in landscape, so always assign the higher
+                // dimension to wfd's xres
+                if(priH > priW) {
+                    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = priH;
+                    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = priW;
+                }
+                // Set External Display MDP Downscale mode indicator
+                mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = true;
+            }
+        }
+        mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].vsync_period =
+                1000000000l /60;
+        ALOGD_IF(DEBUG,"%s: Setting Virtual Attr: res(%d x %d)",__FUNCTION__,
+                 mVInfo.xres, mVInfo.yres);
+    }
 }
 
 bool VirtualDisplay::openFrameBuffer()
