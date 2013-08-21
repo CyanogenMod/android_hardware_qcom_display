@@ -266,6 +266,13 @@ void dumpsys_log(android::String8& buf, const char* fmt, ...)
     va_end(varargs);
 }
 
+int getExtOrientation(hwc_context_t* ctx) {
+    int extOrient = ctx->mExtOrientation;
+    if(ctx->mBufferMirrorMode)
+        extOrient = getMirrorModeOrientation(ctx);
+    return extOrient;
+}
+
 /* Calculates the destination position based on the action safe rectangle */
 void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
     // Position
@@ -299,9 +306,7 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
     float fbHeight = ctx->dpyAttr[dpy].yres;
 
     // Since external is rotated 90, need to swap width/height
-    int extOrient = ctx->mExtOrientation;
-    if(ctx->mBufferMirrorMode)
-        extOrient = getMirrorModeOrientation(ctx);
+    int extOrient = getExtOrientation(ctx);
 
     if(extOrient & HWC_TRANSFORM_ROT_90)
         swap(fbWidth, fbHeight);
@@ -498,54 +503,72 @@ bool isOrientationPortrait(hwc_context_t *ctx) {
     return (ctx->deviceOrientation & 0x1);
 }
 
-void calcExtDisplayPosition(hwc_context_t *ctx, int dpy,
+void calcExtDisplayPosition(hwc_context_t *ctx,
+                               private_handle_t *hnd,
+                               int dpy,
                                hwc_rect_t& sourceCrop,
-                               hwc_rect_t& displayFrame) {
+                               hwc_rect_t& displayFrame,
+                               int& transform,
+                               ovutils::eTransform& orient) {
     // Swap width and height when there is a 90deg transform
-    int extOrient = ctx->mExtOrientation;
-    if(ctx->mBufferMirrorMode)
-        extOrient = getMirrorModeOrientation(ctx);
-    if(extOrient & HWC_TRANSFORM_ROT_90) {
-        int dstWidth = ctx->dpyAttr[dpy].xres;
-        int dstHeight = ctx->dpyAttr[dpy].yres;;
-        int srcWidth = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
-        int srcHeight = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
-        if(!isPrimaryPortrait(ctx)) {
-            swap(srcWidth, srcHeight);
-        }                    // Get Aspect Ratio for external
-        getAspectRatioPosition(dstWidth, dstHeight, srcWidth,
-                            srcHeight, displayFrame);
-        // Crop - this is needed, because for sidesync, the dest fb will
-        // be in portrait orientation, so update the crop to not show the
-        // black side bands.
-        if (isOrientationPortrait(ctx)) {
-            sourceCrop = displayFrame;
-            displayFrame.left = 0;
-            displayFrame.top = 0;
-            displayFrame.right = dstWidth;
-            displayFrame.bottom = dstHeight;
-        }
-    }
-    if(ctx->dpyAttr[dpy].mDownScaleMode) {
-        int extW, extH;
-        // if downscale is enabled, map the co-ordinates to new
-        // domain(downscaled)
-        float fbWidth  = ctx->dpyAttr[dpy].xres;
-        float fbHeight = ctx->dpyAttr[dpy].yres;
-        // query MDP configured attributes
-        if(dpy == HWC_DISPLAY_EXTERNAL)
-            ctx->mExtDisplay->getAttributes(extW, extH);
-        else
-            ctx->mVirtualDisplay->getAttributes(extW, extH);
-        //Calculate the ratio...
-        float wRatio = ((float)extW)/fbWidth;
-        float hRatio = ((float)extH)/fbHeight;
+    int extOrient = getExtOrientation(ctx);
+    if(dpy && !qdutils::MDPVersion::getInstance().is8x26()) {
+        if(!isYuvBuffer(hnd)) {
+            if(extOrient & HWC_TRANSFORM_ROT_90) {
+                int dstWidth = ctx->dpyAttr[dpy].xres;
+                int dstHeight = ctx->dpyAttr[dpy].yres;;
+                int srcWidth = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
+                int srcHeight = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
+                if(!isPrimaryPortrait(ctx)) {
+                    swap(srcWidth, srcHeight);
+                }                    // Get Aspect Ratio for external
+                getAspectRatioPosition(dstWidth, dstHeight, srcWidth,
+                                    srcHeight, displayFrame);
+                // Crop - this is needed, because for sidesync, the dest fb will
+                // be in portrait orientation, so update the crop to not show the
+                // black side bands.
+                if (isOrientationPortrait(ctx)) {
+                    sourceCrop = displayFrame;
+                    displayFrame.left = 0;
+                    displayFrame.top = 0;
+                    displayFrame.right = dstWidth;
+                    displayFrame.bottom = dstHeight;
+                }
+            }
+            if(ctx->dpyAttr[dpy].mDownScaleMode) {
+                int extW, extH;
+                // if downscale is enabled, map the co-ordinates to new
+                // domain(downscaled)
+                float fbWidth  = ctx->dpyAttr[dpy].xres;
+                float fbHeight = ctx->dpyAttr[dpy].yres;
+                // query MDP configured attributes
+                if(dpy == HWC_DISPLAY_EXTERNAL)
+                    ctx->mExtDisplay->getAttributes(extW, extH);
+                else
+                    ctx->mVirtualDisplay->getAttributes(extW, extH);
+                //Calculate the ratio...
+                float wRatio = ((float)extW)/fbWidth;
+                float hRatio = ((float)extH)/fbHeight;
 
-        //convert Dim to hwc_rect_t
-        displayFrame.left *= wRatio;
-        displayFrame.top *= hRatio;
-        displayFrame.right *= wRatio;
-        displayFrame.bottom *= hRatio;
+                //convert Dim to hwc_rect_t
+                displayFrame.left *= wRatio;
+                displayFrame.top *= hRatio;
+                displayFrame.right *= wRatio;
+                displayFrame.bottom *= hRatio;
+            }
+        }else {
+            if(extOrient || ctx->dpyAttr[dpy].mDownScaleMode) {
+                getAspectRatioPosition(ctx, dpy, extOrient,
+                                       displayFrame, displayFrame);
+            }
+        }
+        // If there is a external orientation set, use that
+        if(extOrient) {
+            transform = extOrient;
+            orient = static_cast<ovutils::eTransform >(extOrient);
+        }
+        // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
+        getActionSafePosition(ctx, dpy, displayFrame);
     }
 }
 
@@ -1211,22 +1234,8 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
                 z = ZORDER_1;
             }
         }
-    }
-    if(dpy) {
-        int extOrient = ctx->mExtOrientation;
-        if(ctx->mBufferMirrorMode)
-            extOrient = getMirrorModeOrientation(ctx);
-        // Just need to set the position to portrait as the transformation
-        // will already be set to required orientation on TV
-        if(extOrient || ctx->dpyAttr[dpy].mDownScaleMode) {
-            getAspectRatioPosition(ctx, dpy, extOrient, dst, dst);
-            if(extOrient) {
-                transform = extOrient;
-                orient = static_cast<eTransform>(transform);
-            }
-        }
-        // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
-        getActionSafePosition(ctx, dpy, dst);
+        calcExtDisplayPosition(ctx, hnd, dpy, crop, dst,
+                                           transform, orient);
     }
 
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
