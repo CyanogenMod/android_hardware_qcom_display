@@ -82,10 +82,6 @@ public:
     bool commit(utils::eDest dest);
     bool queueBuffer(int fd, uint32_t offset, utils::eDest dest);
 
-    /* Closes open pipes, called during startup */
-    static int initOverlay();
-    /* Returns the singleton instance of overlay */
-    static Overlay* getInstance();
     /* Returns available ("unallocated") pipes for a display's mixer */
     int availablePipes(int dpy, int mixer);
     /* Returns if any of the requested pipe type is attached to any of the
@@ -98,6 +94,13 @@ public:
     void getDump(char *buf, size_t len);
     /* Reset usage and allocation bits on all pipes for given display */
     void clear(int dpy);
+    /* Marks the display, whose pipes need to be forcibaly configured */
+    void forceSet(const int& dpy);
+
+    /* Closes open pipes, called during startup */
+    static int initOverlay();
+    /* Returns the singleton instance of overlay */
+    static Overlay* getInstance();
     static void setDMAMode(const int& mode);
     static int getDMAMode();
     /* Returns the framebuffer node backing up the display */
@@ -168,6 +171,7 @@ private:
     static Overlay *sInstance;
     static int sDpyFbMap[DPY_MAX];
     static int sDMAMode;
+    static int sForceSetBitmap;
 };
 
 inline void Overlay::validate(int index) {
@@ -206,6 +210,10 @@ inline int Overlay::getDMAMode() {
 inline int Overlay::getFbForDpy(const int& dpy) {
     OVASSERT(dpy >= 0 && dpy < DPY_MAX, "Invalid dpy %d", dpy);
     return sDpyFbMap[dpy];
+}
+
+inline void Overlay::forceSet(const int& dpy) {
+    sForceSetBitmap |= (1 << dpy);
 }
 
 inline bool Overlay::PipeBook::valid() {
