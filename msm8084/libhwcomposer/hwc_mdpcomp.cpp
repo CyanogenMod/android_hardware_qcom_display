@@ -569,6 +569,13 @@ bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
         return false;
     }
 
+    if(layer->planeAlpha < 0xFF) {
+        ALOGD_IF(isDebug(), "%s: Cannot handle YUV layer with plane alpha\
+                 in video only mode",
+                 __FUNCTION__);
+        return false;
+    }
+
     return true;
 }
 
