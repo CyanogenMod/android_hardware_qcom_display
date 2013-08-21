@@ -175,12 +175,18 @@ int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable);
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
 
 /* Calculates the destination position based on the action safe rectangle */
-void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
-                                        uint32_t& y, uint32_t& w, uint32_t& h);
+void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& dst);
 
+void getAspectRatioPosition(int destWidth, int destHeight, int srcWidth,
+                                int srcHeight, hwc_rect_t& rect);
 
-void getAspectRatioPosition(hwc_context_t *ctx, int dpy, int orientation,
-                        uint32_t& x, uint32_t& y, uint32_t& w, uint32_t& h);
+void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
+                                hwc_rect_t& inRect, hwc_rect_t& outRect);
+
+bool isPrimaryPortrait(hwc_context_t *ctx);
+
+void calcExtDisplayPosition(hwc_context_t *ctx,
+                               int dpy, hwc_rect_t& displayFrame);
 
 //Close acquireFenceFds of all layers of incoming list
 void closeAcquireFds(hwc_display_contents_1_t* list);

@@ -110,17 +110,10 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         hwc_rect_t sourceCrop = layer->sourceCrop;
         hwc_rect_t displayFrame = layer->displayFrame;
         int transform = layer->transform;
-        int fbWidth  = ctx->dpyAttr[mDpy].xres;
-        int fbHeight = ctx->dpyAttr[mDpy].yres;
         int rotFlags = ovutils::ROT_FLAGS_NONE;
 
         ovutils::eTransform orient =
                     static_cast<ovutils::eTransform>(transform);
-        if(mDpy && ctx->mExtOrientation) {
-            // If there is a external orientation set, use that
-            transform = ctx->mExtOrientation;
-            orient = static_cast<ovutils::eTransform >(ctx->mExtOrientation);
-        }
 
         // Do not use getNonWormholeRegion() function to calculate the
         // sourceCrop during animation on external display and
@@ -135,23 +128,17 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
                 displayFrame = sourceCrop;
             }
         }
-        ovutils::Dim dpos(displayFrame.left,
-                          displayFrame.top,
-                          displayFrame.right - displayFrame.left,
-                          displayFrame.bottom - displayFrame.top);
 
         if(mDpy && !qdutils::MDPVersion::getInstance().is8x26()) {
-            // Get Aspect Ratio for external
-            getAspectRatioPosition(ctx, mDpy, ctx->mExtOrientation, dpos.x,
-                                    dpos.y, dpos.w, dpos.h);
+            if(ctx->mExtOrientation) {
+                calcExtDisplayPosition(ctx, mDpy, displayFrame);
+                // If there is a external orientation set, use that
+                transform = ctx->mExtOrientation;
+                orient = static_cast<ovutils::eTransform >(ctx->mExtOrientation);
+            }
             // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
-            getActionSafePosition(ctx, mDpy, dpos.x, dpos.y, dpos.w, dpos.h);
-            // Convert dim to hwc_rect_t
-            displayFrame.left = dpos.x;
-            displayFrame.top = dpos.y;
-            displayFrame.right = dpos.w + displayFrame.left;
-            displayFrame.bottom = dpos.h + displayFrame.top;
-        }
+            getActionSafePosition(ctx, mDpy, displayFrame);
+       }
         setMdpFlags(layer, mdpFlags, 0, transform);
         // For External use rotator if there is a rotation value set
         if(mDpy && (ctx->mExtOrientation & HWC_TRANSFORM_ROT_90)) {
