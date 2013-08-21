@@ -146,7 +146,6 @@ int AdrenoMemInfo::getStride(int width, int format)
             case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
                 stride = ALIGN(width, 128);
                 break;
-            case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
             case HAL_PIXEL_FORMAT_YCbCr_420_SP:
             case HAL_PIXEL_FORMAT_YCrCb_420_SP:
             case HAL_PIXEL_FORMAT_YV12:
@@ -155,6 +154,7 @@ int AdrenoMemInfo::getStride(int width, int format)
                 stride = ALIGN(width, 16);
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+            case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
                 stride = VENUS_Y_STRIDE(COLOR_FMT_NV12, width);
                 break;
             case HAL_PIXEL_FORMAT_BLOB:
@@ -306,21 +306,14 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
             size  = ALIGN( alignedw * alignedh, 8192);
             size += ALIGN( alignedw * ALIGN(height/2, 32), 8192);
             break;
-        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
         case HAL_PIXEL_FORMAT_YV12:
             if ((format == HAL_PIXEL_FORMAT_YV12) && ((width&1) || (height&1))) {
                 ALOGE("w or h is odd for the YV12 format");
                 return -EINVAL;
             }
             alignedh = height;
-            if (HAL_PIXEL_FORMAT_NV12_ENCODEABLE == format) {
-                // The encoder requires a 2K aligned chroma offset.
-                size = ALIGN(alignedw*alignedh, 2048) +
+            size = alignedw*alignedh +
                     (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
-            } else {
-                size = alignedw*alignedh +
-                    (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
-            }
             size = ALIGN(size, 4096);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
@@ -338,6 +331,7 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
             size = ALIGN(alignedw * alignedh * 2, 4096);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
             alignedh = VENUS_Y_SCANLINES(COLOR_FMT_NV12, height);
             size = VENUS_BUFFER_SIZE(COLOR_FMT_NV12, width, height);
             break;
