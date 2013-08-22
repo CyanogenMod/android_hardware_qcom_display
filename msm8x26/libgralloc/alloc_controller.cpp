@@ -75,10 +75,9 @@ static bool canFallback(int usage, bool triedSystem)
 
 static bool useUncached(int usage)
 {
-    // System heaps cannot be uncached
-    if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP)
-        return false;
-    if (usage & GRALLOC_USAGE_PRIVATE_UNCACHED)
+    if (usage & GRALLOC_USAGE_PRIVATE_UNCACHED ||
+        usage & GRALLOC_USAGE_SW_WRITE_RARELY  ||
+        usage & GRALLOC_USAGE_SW_READ_RARELY)
         return true;
     return false;
 }
@@ -105,6 +104,15 @@ int AdrenoMemInfo::getStride(int width, int format)
     int stride = ALIGN(width, 32);
     // Currently surface padding is only computed for RGB* surfaces.
     if (format < 0x7) {
+        // Don't add any additional padding if debug.gralloc.map_fb_memory
+        // is enabled
+        char property[PROPERTY_VALUE_MAX];
+        if((property_get("debug.gralloc.map_fb_memory", property, NULL) > 0) &&
+           (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+           (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+              return stride;
+        }
+
         int bpp = 4;
         switch(format)
         {
@@ -171,6 +179,12 @@ IAllocController* IAllocController::getInstance(void)
 IonController::IonController()
 {
     mIonAlloc = new IonAlloc();
+    mUseTZProtection = false;
+    char property[PROPERTY_VALUE_MAX];
+    if ((property_get("persist.gralloc.cp.level3", property, NULL) <= 0) ||
+                            (atoi(property) != 1)) {
+        mUseTZProtection = true;
+    }
 }
 
 int IonController::allocate(alloc_data& data, int usage)
@@ -190,26 +204,31 @@ int IonController::allocate(alloc_data& data, int usage)
     if(usage & GRALLOC_USAGE_PRIVATE_IOMMU_HEAP)
         ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
 
-    //MM Heap is exclusively a secure heap.
-    if(usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
-        //XXX: Right now the MM heap is the only secure heap we have. When we
-        //have other secure heaps, we can change this.
-        if(usage & GRALLOC_USAGE_PROTECTED) {
+    if(usage & GRALLOC_USAGE_PROTECTED) {
+        if ((mUseTZProtection) && (usage & GRALLOC_USAGE_PRIVATE_MM_HEAP)) {
             ionFlags |= ION_HEAP(ION_CP_MM_HEAP_ID);
             ionFlags |= ION_SECURE;
-        }
-        else {
-            ALOGW("GRALLOC_USAGE_PRIVATE_MM_HEAP \
-                  cannot be used as an insecure heap!\
-                  trying to use IOMMU instead !!");
+        } else {
+            // for targets/OEMs which do not need HW level protection
+            // do not set ion secure flag & MM heap. Fallback to IOMMU heap.
             ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
         }
+    } else if(usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
+        //MM Heap is exclusively a secure heap.
+        //If it is used for non secure cases, fallback to IOMMU heap
+        ALOGW("GRALLOC_USAGE_PRIVATE_MM_HEAP \
+                                cannot be used as an insecure heap!\
+                                trying to use IOMMU instead !!");
+        ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
     }
 
     if(usage & GRALLOC_USAGE_PRIVATE_CAMERA_HEAP)
         ionFlags |= ION_HEAP(ION_CAMERA_HEAP_ID);
 
-    if(usage & GRALLOC_USAGE_PROTECTED)
+    if(usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP)
+        ionFlags |= ION_HEAP(ION_ADSP_HEAP_ID);
+
+    if(ionFlags & ION_SECURE)
          data.allocType |= private_handle_t::PRIV_FLAGS_SECURE_BUFFER;
 
     // if no flags are set, default to

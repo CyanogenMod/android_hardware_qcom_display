@@ -18,7 +18,9 @@
  * limitations under the License.
  */
 #define HWC_UTILS_DEBUG 0
+#include <math.h>
 #include <sys/ioctl.h>
+#include <linux/fb.h>
 #include <binder/IServiceManager.h>
 #include <EGL/egl.h>
 #include <cutils/properties.h>
@@ -30,6 +32,7 @@
 #include "hwc_fbupdate.h"
 #include "mdp_version.h"
 #include "hwc_copybit.h"
+#include "hwc_dump_layers.h"
 #include "external.h"
 #include "hwc_qclient.h"
 #include "QService.h"
@@ -50,9 +53,17 @@ static int openFramebufferDevice(hwc_context_t *ctx)
     struct fb_var_screeninfo info;
 
     int fb_fd = openFb(HWC_DISPLAY_PRIMARY);
-
-    if (ioctl(fb_fd, FBIOGET_VSCREENINFO, &info) == -1)
+    if(fb_fd < 0) {
+        ALOGE("%s: Error Opening FB : %s", __FUNCTION__, strerror(errno));
         return -errno;
+    }
+
+    if (ioctl(fb_fd, FBIOGET_VSCREENINFO, &info) == -1) {
+        ALOGE("%s:Error in ioctl FBIOGET_VSCREENINFO: %s", __FUNCTION__,
+                                                       strerror(errno));
+        close(fb_fd);
+        return -errno;
+    }
 
     if (int(info.width) <= 0 || int(info.height) <= 0) {
         // the driver doesn't return that information
@@ -70,7 +81,9 @@ static int openFramebufferDevice(hwc_context_t *ctx)
     metadata.op = metadata_op_frame_rate;
 
     if (ioctl(fb_fd, MSMFB_METADATA_GET, &metadata) == -1) {
-        ALOGE("Error retrieving panel frame rate");
+        ALOGE("%s:Error retrieving panel frame rate: %s", __FUNCTION__,
+                                                      strerror(errno));
+        close(fb_fd);
         return -errno;
     }
 
@@ -81,11 +94,12 @@ static int openFramebufferDevice(hwc_context_t *ctx)
     float fps  = info.reserved[3] & 0xFF;
 #endif
 
-    if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo) == -1)
+    if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &finfo) == -1) {
+        ALOGE("%s:Error in ioctl FBIOGET_FSCREENINFO: %s", __FUNCTION__,
+                                                       strerror(errno));
+        close(fb_fd);
         return -errno;
-
-    if (finfo.smem_len <= 0)
-        return -errno;
+    }
 
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd = fb_fd;
     //xres, yres may not be 32 aligned
@@ -106,63 +120,13 @@ static int openFramebufferDevice(hwc_context_t *ctx)
     return 0;
 }
 
-static int ppdComm(const char* cmd, hwc_context_t *ctx) {
-    int ret = -1;
-    ret = write(ctx->mCablProp.daemon_socket, cmd, strlen(cmd));
-    if(ret < 0) {
-        ALOGE("Failed to send data over socket: %s",
-                strerror(errno));
-        return ret;
-    }
-    ALOGD_IF(HWC_UTILS_DEBUG, "%s: Sent command: %s", __FUNCTION__, cmd);
-    return 0;
-}
-
-static void connectPPDaemon(hwc_context_t *ctx)
-{
-    int ret = -1;
-    char property[PROPERTY_VALUE_MAX];
-    if ((property_get("ro.qualcomm.cabl", property, NULL) > 0) &&
-        (atoi(property) == 1)) {
-        ALOGD("%s: CABL is enabled", __FUNCTION__);
-        ctx->mCablProp.enabled = true;
-    } else {
-        ALOGD("%s: CABL is disabled", __FUNCTION__);
-        ctx->mCablProp.enabled = false;
-        return;
-    }
-
-    if ((property_get("persist.qcom.cabl.video_only", property, NULL) > 0) &&
-        (atoi(property) == 1)) {
-        ALOGD("%s: CABL is in video only mode", __FUNCTION__);
-        ctx->mCablProp.videoOnly = true;
-    } else {
-        ctx->mCablProp.videoOnly = false;
-    }
-
-    int daemon_socket = socket_local_client(DAEMON_SOCKET,
-                                            ANDROID_SOCKET_NAMESPACE_RESERVED,
-                                            SOCK_STREAM);
-    if(!daemon_socket) {
-        ALOGE("Connecting to socket failed: %s", strerror(errno));
-        ctx->mCablProp.enabled = false;
-        return;
-    }
-    ctx->mCablProp.daemon_socket = daemon_socket;
-}
-
 void initContext(hwc_context_t *ctx)
 {
-    if(openFramebufferDevice(ctx) < 0) {
-        ALOGE("%s: failed to open framebuffer!!", __FUNCTION__);
-    }
-
-    overlay::Overlay::initOverlay();
-    ctx->mOverlay = overlay::Overlay::getInstance();
-    ctx->mRotMgr = new RotMgr();
+    openFramebufferDevice(ctx);
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
+    const int rightSplit = qdutils::MDPVersion::getInstance().getRightSplit();
     overlay::Overlay::initOverlay();
     ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->mRotMgr = new RotMgr();
@@ -172,7 +136,7 @@ void initContext(hwc_context_t *ctx)
     //on what external we connect to.
     ctx->mFBUpdate[HWC_DISPLAY_PRIMARY] =
         IFBUpdate::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
-        HWC_DISPLAY_PRIMARY);
+                rightSplit, HWC_DISPLAY_PRIMARY);
 
     // Check if the target supports copybit compostion (dyn/mdp/c2d) to
     // decide if we need to open the copybit module.
@@ -187,20 +151,21 @@ void initContext(hwc_context_t *ctx)
 
     ctx->mExtDisplay = new ExternalDisplay(ctx);
 
-    for (uint32_t i = 0; i < MAX_DISPLAYS; i++) {
-        ctx->mLayerRotMap[i] = new LayerRotMap();
-    }
-
     ctx->mMDPComp[HWC_DISPLAY_PRIMARY] =
          MDPComp::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
-         HWC_DISPLAY_PRIMARY);
+                rightSplit, HWC_DISPLAY_PRIMARY);
+
+    for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+        ctx->mHwcDebug[i] = new HwcDebug(i);
+        ctx->mLayerRotMap[i] = new LayerRotMap();
+    }
 
     MDPComp::init(ctx);
 
     ctx->vstate.enable = false;
     ctx->vstate.fakevsync = false;
     ctx->mExtDispConfiguring = false;
-    ctx->mBasePipeSetup = false;
+    ctx->mExtOrientation = 0;
 
     //Right now hwc starts the service but anybody could do it, or it could be
     //independent process as well.
@@ -210,10 +175,16 @@ void initContext(hwc_context_t *ctx)
             defaultServiceManager()->getService(
             String16("display.qservice")))->connect(client);
 
+    // Initialize "No animation on external display" related  parameters.
+    ctx->deviceOrientation = 0;
+    ctx->mPrevCropVideo.left = ctx->mPrevCropVideo.top =
+        ctx->mPrevCropVideo.right = ctx->mPrevCropVideo.bottom = 0;
+    ctx->mPrevDestVideo.left = ctx->mPrevDestVideo.top =
+        ctx->mPrevDestVideo.right = ctx->mPrevDestVideo.bottom = 0;
+    ctx->mPrevTransformVideo = 0;
+
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
-
-    connectPPDaemon(ctx);
 }
 
 void closeContext(hwc_context_t *ctx)
@@ -228,7 +199,7 @@ void closeContext(hwc_context_t *ctx)
         ctx->mRotMgr = NULL;
     }
 
-    for(int i = 0; i < MAX_DISPLAYS; i++) {
+    for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         if(ctx->mCopyBit[i]) {
             delete ctx->mCopyBit[i];
             ctx->mCopyBit[i] = NULL;
@@ -245,7 +216,7 @@ void closeContext(hwc_context_t *ctx)
         ctx->mExtDisplay = NULL;
     }
 
-    for(int i = 0; i < MAX_DISPLAYS; i++) {
+    for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         if(ctx->mFBUpdate[i]) {
             delete ctx->mFBUpdate[i];
             ctx->mFBUpdate[i] = NULL;
@@ -254,11 +225,17 @@ void closeContext(hwc_context_t *ctx)
             delete ctx->mMDPComp[i];
             ctx->mMDPComp[i] = NULL;
         }
+        if(ctx->mHwcDebug[i]) {
+            delete ctx->mHwcDebug[i];
+            ctx->mHwcDebug[i] = NULL;
+        }
         if(ctx->mLayerRotMap[i]) {
             delete ctx->mLayerRotMap[i];
             ctx->mLayerRotMap[i] = NULL;
         }
     }
+
+
 }
 
 
@@ -279,6 +256,18 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
     if(ctx->mExtDisplay->isCEUnderscanSupported())
         return;
 
+    char value[PROPERTY_VALUE_MAX];
+    // Read action safe properties
+    property_get("persist.sys.actionsafe.width", value, "0");
+    int asWidthRatio = atoi(value);
+    property_get("persist.sys.actionsafe.height", value, "0");
+    int asHeightRatio = atoi(value);
+
+    if(!asWidthRatio && !asHeightRatio) {
+        //No action safe ratio set, return
+        return;
+    }
+
     float wRatio = 1.0;
     float hRatio = 1.0;
     float xRatio = 1.0;
@@ -287,17 +276,15 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
     float fbWidth = ctx->dpyAttr[dpy].xres;
     float fbHeight = ctx->dpyAttr[dpy].yres;
 
+    // Since external is rotated 90, need to swap width/height
+    if(ctx->mExtOrientation & HWC_TRANSFORM_ROT_90)
+        swap(fbWidth, fbHeight);
+
     float asX = 0;
     float asY = 0;
     float asW = fbWidth;
     float asH= fbHeight;
-    char value[PROPERTY_VALUE_MAX];
 
-    // Apply action safe parameters
-    property_get("hw.actionsafe.width", value, "0");
-    int asWidthRatio = atoi(value);
-    property_get("hw.actionsafe.height", value, "0");
-    int asHeightRatio = atoi(value);
     // based on the action safe ratio, get the Action safe rectangle
     asW = fbWidth * (1.0f -  asWidthRatio / 100.0f);
     asH = fbHeight * (1.0f -  asHeightRatio / 100.0f);
@@ -319,15 +306,48 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
     return;
 }
 
-bool needsScaling(hwc_layer_1_t const* layer) {
+/* Calculates the aspect ratio for external based on the primary */
+void getAspectRatioPosition(hwc_context_t *ctx, int dpy, int orientation,
+                        uint32_t& x, uint32_t& y, uint32_t& w, uint32_t& h) {
+    int fbWidth  = ctx->dpyAttr[dpy].xres;
+    int fbHeight = ctx->dpyAttr[dpy].yres;
+
+    switch(orientation) {
+        case HAL_TRANSFORM_ROT_90:
+        case HAL_TRANSFORM_ROT_270:
+            y = 0;
+            h = fbHeight;
+            if (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres <
+                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres) {
+                // Portrait primary panel
+                w = (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres *
+                     fbHeight/ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres);
+            } else {
+                //Landscape primary panel
+                w = (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres *
+                     fbHeight/ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres);
+            }
+            x = (fbWidth - w)/2;
+            break;
+        default:
+            //Do nothing
+            break;
+     }
+    ALOGD_IF(HWC_UTILS_DEBUG, "%s: Position: x = %d, y = %d w = %d h = %d",
+                    __FUNCTION__, x, y, w ,h);
+}
+
+
+bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer,
+        const int& dpy) {
     int dst_w, dst_h, src_w, src_h;
 
     hwc_rect_t displayFrame  = layer->displayFrame;
     hwc_rect_t sourceCrop = layer->sourceCrop;
+    trimLayer(ctx, dpy, layer->transform, sourceCrop, displayFrame);
 
     dst_w = displayFrame.right - displayFrame.left;
     dst_h = displayFrame.bottom - displayFrame.top;
-
     src_w = sourceCrop.right - sourceCrop.left;
     src_h = sourceCrop.bottom - sourceCrop.top;
 
@@ -337,8 +357,9 @@ bool needsScaling(hwc_layer_1_t const* layer) {
     return false;
 }
 
-bool isAlphaScaled(hwc_layer_1_t const* layer) {
-    if(needsScaling(layer) && isAlphaPresent(layer)) {
+bool isAlphaScaled(hwc_context_t* ctx, hwc_layer_1_t const* layer,
+        const int& dpy) {
+    if(needsScaling(ctx, layer, dpy) && isAlphaPresent(layer)) {
         return true;
     }
     return false;
@@ -359,72 +380,106 @@ bool isAlphaPresent(hwc_layer_1_t const* layer) {
     return false;
 }
 
-// Switch ppd on/off for YUV
-static void setYUVProp(hwc_context_t *ctx, int yuvCount) {
-    if (!ctx->mCablProp.enabled)
-        return;
-
-    if (yuvCount > 0 && !ctx->mCablProp.start) {
-        ctx->mCablProp.start = true;
-        if(ctx->mCablProp.videoOnly)
-            ppdComm("cabl:on", ctx);
-        else
-            ppdComm("cabl:yuv_on", ctx);
-
-    } else if (yuvCount == 0 && ctx->mCablProp.start) {
-        ctx->mCablProp.start = false;
-        if(ctx->mCablProp.videoOnly)
-            ppdComm("cabl:off", ctx);
-        else
-            ppdComm("cabl:yuv_off", ctx);
-        return;
-    }
-}
-
 void setListStats(hwc_context_t *ctx,
         const hwc_display_contents_1_t *list, int dpy) {
-
+    const int prevYuvCount = ctx->listStats[dpy].yuvCount;
+    memset(&ctx->listStats[dpy], 0, sizeof(ListStats));
     ctx->listStats[dpy].numAppLayers = list->numHwLayers - 1;
     ctx->listStats[dpy].fbLayerIndex = list->numHwLayers - 1;
     ctx->listStats[dpy].skipCount = 0;
     ctx->listStats[dpy].needsAlphaScale = false;
     ctx->listStats[dpy].preMultipliedAlpha = false;
-    ctx->listStats[dpy].planeAlpha = false;
     ctx->listStats[dpy].yuvCount = 0;
+    char property[PROPERTY_VALUE_MAX];
+    ctx->listStats[dpy].extOnlyLayerIndex = -1;
+    ctx->listStats[dpy].isDisplayAnimating = false;
 
-    for (size_t i = 0; i < list->numHwLayers; i++) {
+    for (size_t i = 0; i < (size_t)ctx->listStats[dpy].numAppLayers; i++) {
         hwc_layer_1_t const* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
-        //reset stored yuv index
+#ifdef QCOM_BSP
+        if (layer->flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
+            ctx->listStats[dpy].isDisplayAnimating = true;
+        }
+#endif
+        // continue if number of app layers exceeds MAX_NUM_APP_LAYERS
+        if(ctx->listStats[dpy].numAppLayers > MAX_NUM_APP_LAYERS)
+            continue;
+
+        //reset yuv indices
         ctx->listStats[dpy].yuvIndices[i] = -1;
 
-        if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
-            continue;
-        //We disregard FB being skip for now! so the else if
-        } else if (isSkipLayer(&list->hwLayers[i])) {
+        if (isSkipLayer(&list->hwLayers[i])) {
             ctx->listStats[dpy].skipCount++;
-        } else if (UNLIKELY(isYuvBuffer(hnd))) {
+        }
+
+        if (UNLIKELY(isYuvBuffer(hnd))) {
             int& yuvCount = ctx->listStats[dpy].yuvCount;
             ctx->listStats[dpy].yuvIndices[yuvCount] = i;
             yuvCount++;
 
-            if(layer->transform & HWC_TRANSFORM_ROT_90)
-                ctx->mNeedsRotator = true;
+            if((layer->transform & HWC_TRANSFORM_ROT_90) &&
+                    canUseRotator(ctx)) {
+                if(ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA)) {
+                    ctx->isPaddingRound = true;
+                }
+                Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
+            }
         }
         if(layer->blending == HWC_BLENDING_PREMULT)
             ctx->listStats[dpy].preMultipliedAlpha = true;
-        if(layer->planeAlpha < 0xFF)
-            ctx->listStats[dpy].planeAlpha = true;
+
         if(!ctx->listStats[dpy].needsAlphaScale)
-            ctx->listStats[dpy].needsAlphaScale = isAlphaScaled(layer);
+            ctx->listStats[dpy].needsAlphaScale =
+                    isAlphaScaled(ctx, layer, dpy);
+
+        if(UNLIKELY(isExtOnly(hnd))){
+            ctx->listStats[dpy].extOnlyLayerIndex = i;
+        }
     }
-    setYUVProp(ctx, ctx->listStats[dpy].yuvCount);
+    if(ctx->listStats[dpy].yuvCount > 0) {
+        if (property_get("hw.cabl.yuv", property, NULL) > 0) {
+            if (atoi(property) != 1) {
+                property_set("hw.cabl.yuv", "1");
+            }
+        }
+    } else {
+        if (property_get("hw.cabl.yuv", property, NULL) > 0) {
+            if (atoi(property) != 0) {
+                property_set("hw.cabl.yuv", "0");
+            }
+        }
+    }
+    if(dpy) {
+        //uncomment the below code for testing purpose.
+        /* char value[PROPERTY_VALUE_MAX];
+        property_get("sys.ext_orientation", value, "0");
+        // Assuming the orientation value is in terms of HAL_TRANSFORM,
+        // This needs mapping to HAL, if its in different convention
+        ctx->mExtOrientation = atoi(value); */
+        // Assuming the orientation value is in terms of HAL_TRANSFORM,
+        // This needs mapping to HAL, if its in different convention
+        if(ctx->mExtOrientation) {
+            ALOGD_IF(HWC_UTILS_DEBUG, "%s: ext orientation = %d",
+                     __FUNCTION__, ctx->mExtOrientation);
+            if(ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA)) {
+                ctx->isPaddingRound = true;
+            }
+            Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
+        }
+    }
+
+    //The marking of video begin/end is useful on some targets where we need
+    //to have a padding round to be able to shift pipes across mixers.
+    if(prevYuvCount != ctx->listStats[dpy].yuvCount) {
+        ctx->mVideoTransFlag = true;
+    }
 }
 
 
-static inline void calc_cut(float& leftCutRatio, float& topCutRatio,
-        float& rightCutRatio, float& bottomCutRatio, int orient) {
+static void calc_cut(double& leftCutRatio, double& topCutRatio,
+        double& rightCutRatio, double& bottomCutRatio, int orient) {
     if(orient & HAL_TRANSFORM_FLIP_H) {
         swap(leftCutRatio, rightCutRatio);
     }
@@ -433,7 +488,7 @@ static inline void calc_cut(float& leftCutRatio, float& topCutRatio,
     }
     if(orient & HAL_TRANSFORM_ROT_90) {
         //Anti clock swapping
-        float tmpCutRatio = leftCutRatio;
+        double tmpCutRatio = leftCutRatio;
         leftCutRatio = topCutRatio;
         topCutRatio = rightCutRatio;
         rightCutRatio = bottomCutRatio;
@@ -447,33 +502,18 @@ bool isSecuring(hwc_context_t* ctx, hwc_layer_1_t const* layer) {
         ctx->mSecuring) {
         return true;
     }
-    //  On A-Family, Secure policy is applied system wide and not on
-    //  buffers.
     if (isSecureModePolicy(ctx->mMDP.version)) {
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         if(ctx->mSecureMode) {
             if (! isSecureBuffer(hnd)) {
-                // This code path executes for the following usecase:
-                // Some Apps in which first few seconds, framework
-                // sends non-secure buffer and with out destroying
-                // surfaces, switches to secure buffer thereby exposing
-                // vulnerability on A-family devices. Catch this situation
-                // and handle it gracefully by allowing it to be composed by
-                // GPU.
-                ALOGD_IF(HWC_UTILS_DEBUG, "%s: Handle non-secure video layer"
-                         "during secure playback gracefully", __FUNCTION__);
+                ALOGD_IF(HWC_UTILS_DEBUG,"%s:Securing Turning ON ...",
+                         __FUNCTION__);
                 return true;
             }
         } else {
             if (isSecureBuffer(hnd)) {
-                // This code path executes for the following usecase:
-                // For some Apps, when User terminates playback, Framework
-                // doesnt destroy video surface and video surface still
-                // comes to Display HAL. This exposes vulnerability on
-                // A-family. Catch this situation and handle it gracefully
-                // by allowing it to be composed by GPU.
-                ALOGD_IF(HWC_UTILS_DEBUG, "%s: Handle secure video layer"
-                         "during non-secure playback gracefully", __FUNCTION__);
+                ALOGD_IF(HWC_UTILS_DEBUG,"%s:Securing Turning OFF ...",
+                         __FUNCTION__);
                 return true;
             }
         }
@@ -486,18 +526,6 @@ bool isSecureModePolicy(int mdpVersion) {
         return true;
     else
         return false;
-}
-
-int getBlending(int blending) {
-    switch(blending) {
-    case HWC_BLENDING_NONE:
-        return overlay::utils::OVERLAY_BLENDING_OPAQUE;
-    case HWC_BLENDING_PREMULT:
-        return overlay::utils::OVERLAY_BLENDING_PREMULT;
-    case HWC_BLENDING_COVERAGE :
-    default:
-        return overlay::utils::OVERLAY_BLENDING_COVERAGE;
-    }
 }
 
 //Crops source buffer against destination and FB boundaries
@@ -525,26 +553,26 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
     int sci_w = abs(sci_r - sci_l);
     int sci_h = abs(sci_b - sci_t);
 
-    float leftCutRatio = 0.0f, rightCutRatio = 0.0f, topCutRatio = 0.0f,
-            bottomCutRatio = 0.0f;
+    double leftCutRatio = 0.0, rightCutRatio = 0.0, topCutRatio = 0.0,
+            bottomCutRatio = 0.0;
 
     if(dst_l < sci_l) {
-        leftCutRatio = (float)(sci_l - dst_l) / (float)dst_w;
+        leftCutRatio = (double)(sci_l - dst_l) / (double)dst_w;
         dst_l = sci_l;
     }
 
     if(dst_r > sci_r) {
-        rightCutRatio = (float)(dst_r - sci_r) / (float)dst_w;
+        rightCutRatio = (double)(dst_r - sci_r) / (double)dst_w;
         dst_r = sci_r;
     }
 
     if(dst_t < sci_t) {
-        topCutRatio = (float)(sci_t - dst_t) / (float)dst_h;
+        topCutRatio = (double)(sci_t - dst_t) / (double)dst_h;
         dst_t = sci_t;
     }
 
     if(dst_b > sci_b) {
-        bottomCutRatio = (float)(dst_b - sci_b) / (float)dst_h;
+        bottomCutRatio = (double)(dst_b - sci_b) / (double)dst_h;
         dst_b = sci_b;
     }
 
@@ -587,14 +615,12 @@ bool isExternalActive(hwc_context_t* ctx) {
 }
 
 void closeAcquireFds(hwc_display_contents_1_t* list) {
-    if(LIKELY(list)) {
-        for(uint32_t i = 0; i < list->numHwLayers; i++) {
-            //Close the acquireFenceFds
-            //HWC_FRAMEBUFFER are -1 already by SF, rest we close.
-            if(list->hwLayers[i].acquireFenceFd >= 0) {
-                close(list->hwLayers[i].acquireFenceFd);
-                list->hwLayers[i].acquireFenceFd = -1;
-            }
+    for(uint32_t i = 0; list && i < list->numHwLayers; i++) {
+        //Close the acquireFenceFds
+        //HWC_FRAMEBUFFER are -1 already by SF, rest we close.
+        if(list->hwLayers[i].acquireFenceFd >= 0) {
+            close(list->hwLayers[i].acquireFenceFd);
+            list->hwLayers[i].acquireFenceFd = -1;
         }
     }
 }
@@ -602,8 +628,7 @@ void closeAcquireFds(hwc_display_contents_1_t* list) {
 int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         int fd) {
     int ret = 0;
-
-    int acquireFd[MAX_NUM_LAYERS];
+    int acquireFd[MAX_NUM_APP_LAYERS];
     int count = 0;
     int releaseFd = -1;
     int fbFd = -1;
@@ -614,9 +639,9 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     struct mdp_buf_sync data;
     memset(&data, 0, sizeof(data));
     //Until B-family supports sync for rotator
-    if(mdpVersion >= qdutils::MDSS_V5) {
-        data.flags = MDP_BUF_SYNC_FLAG_WAIT;
-    }
+#ifdef MDSS_TARGET
+    data.flags = MDP_BUF_SYNC_FLAG_WAIT;
+#endif
     data.acq_fen_fd = acquireFd;
     data.rel_fen_fd = &releaseFd;
 
@@ -625,34 +650,35 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         if(atoi(property) == 0)
             swapzero = true;
     }
+    bool isExtAnimating = false;
+    if(dpy)
+       isExtAnimating = ctx->listStats[dpy].isDisplayAnimating;
 
-#ifndef MDSS_TARGET
     //Send acquireFenceFds to rotator
-    if(mdpVersion < qdutils::MDSS_V5) {
-        //A-family
-        int rotFd = ctx->mRotMgr->getRotDevFd();
-        struct msm_rotator_buf_sync rotData;
+#ifdef MDSS_TARGET
+    //TODO B-family
+#else
+    //A-family
+    int rotFd = ctx->mRotMgr->getRotDevFd();
+    struct msm_rotator_buf_sync rotData;
 
-        for(uint32_t i = 0; i < ctx->mLayerRotMap[dpy]->getCount(); i++) {
-            memset(&rotData, 0, sizeof(rotData));
-            int& acquireFenceFd =
+    for(uint32_t i = 0; i < ctx->mLayerRotMap[dpy]->getCount(); i++) {
+        memset(&rotData, 0, sizeof(rotData));
+        int& acquireFenceFd =
                 ctx->mLayerRotMap[dpy]->getLayer(i)->acquireFenceFd;
-            rotData.acq_fen_fd = acquireFenceFd;
-            rotData.session_id = ctx->mLayerRotMap[dpy]->getRot(i)->getSessId();
-            ioctl(rotFd, MSM_ROTATOR_IOCTL_BUFFER_SYNC, &rotData);
-            close(acquireFenceFd);
-             //For MDP to wait on.
-            acquireFenceFd = dup(rotData.rel_fen_fd);
-            //A buffer is free to be used by producer as soon as its copied to
-            //rotator.
-            ctx->mLayerRotMap[dpy]->getLayer(i)->releaseFenceFd =
-                    rotData.rel_fen_fd;
-        }
-    } else {
-        //TODO B-family
+        rotData.acq_fen_fd = acquireFenceFd;
+        rotData.session_id = ctx->mLayerRotMap[dpy]->getRot(i)->getSessId();
+        ioctl(rotFd, MSM_ROTATOR_IOCTL_BUFFER_SYNC, &rotData);
+        close(acquireFenceFd);
+        //For MDP to wait on.
+        acquireFenceFd = dup(rotData.rel_fen_fd);
+        //A buffer is free to be used by producer as soon as its copied to
+        //rotator.
+        ctx->mLayerRotMap[dpy]->getLayer(i)->releaseFenceFd =
+                rotData.rel_fen_fd;
     }
-
 #endif
+
     //Accumulate acquireFenceFds for MDP
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(list->hwLayers[i].compositionType == HWC_OVERLAY &&
@@ -688,8 +714,11 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     }
 
     if(ret < 0) {
-        ALOGE("ioctl MSMFB_BUFFER_SYNC failed, err=%s",
-                strerror(errno));
+        ALOGE("%s: ioctl MSMFB_BUFFER_SYNC failed, err=%s",
+                  __FUNCTION__, strerror(errno));
+        ALOGE("%s: acq_fen_fd_cnt=%d flags=%d fd=%d dpy=%d numHwLayers=%d",
+              __FUNCTION__, data.acq_fen_fd_cnt, data.flags, fbFd,
+              dpy, list->numHwLayers);
     }
 
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
@@ -698,6 +727,15 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
             //Populate releaseFenceFds.
             if(UNLIKELY(swapzero)) {
                 list->hwLayers[i].releaseFenceFd = -1;
+            } else if(isExtAnimating) {
+                // Release all the app layer fds immediately,
+                // if animation is in progress.
+                hwc_layer_1_t const* layer = &list->hwLayers[i];
+                private_handle_t *hnd = (private_handle_t *)layer->handle;
+                if(isYuvBuffer(hnd)) {
+                    list->hwLayers[i].releaseFenceFd = dup(releaseFd);
+                } else
+                    list->hwLayers[i].releaseFenceFd = -1;
             } else if(list->hwLayers[i].releaseFenceFd < 0) {
                 //If rotator has not already populated this field.
                 list->hwLayers[i].releaseFenceFd = dup(releaseFd);
@@ -713,10 +751,19 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     if (ctx->mCopyBit[dpy])
         ctx->mCopyBit[dpy]->setReleaseFd(releaseFd);
 
+#ifdef MDSS_TARGET
+    //TODO When B is implemented remove #ifdefs from here
+    //The API called applies to RotMem buffers
+#else
     //A-family
-    if(mdpVersion < qdutils::MDSS_V5) {
-        //Signals when MDP finishes reading rotator buffers.
-        ctx->mLayerRotMap[dpy]->setReleaseFd(releaseFd);
+    //Signals when MDP finishes reading rotator buffers.
+    ctx->mLayerRotMap[dpy]->setReleaseFd(releaseFd);
+#endif
+
+    // if external is animating, close the relaseFd
+    if(isExtAnimating) {
+        close(releaseFd);
+        releaseFd = -1;
     }
 
     if(UNLIKELY(swapzero)){
@@ -742,10 +789,9 @@ void trimLayer(hwc_context_t *ctx, const int& dpy, const int& transform,
 
 void setMdpFlags(hwc_layer_1_t *layer,
         ovutils::eMdpFlags &mdpFlags,
-        int rotDownscale) {
+        int rotDownscale, int transform) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
-    const int& transform = layer->transform;
 
     if(layer->blending == HWC_BLENDING_PREMULT) {
         ovutils::setMdpFlags(mdpFlags,
@@ -771,12 +817,12 @@ void setMdpFlags(hwc_layer_1_t *layer,
 
     //No 90 component and no rot-downscale then flips done by MDP
     //If we use rot then it might as well do flips
-    if(!(layer->transform & HWC_TRANSFORM_ROT_90) && !rotDownscale) {
-        if(layer->transform & HWC_TRANSFORM_FLIP_H) {
+    if(!(transform & HWC_TRANSFORM_ROT_90) && !rotDownscale) {
+        if(transform & HWC_TRANSFORM_FLIP_H) {
             ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_FLIP_H);
         }
 
-        if(layer->transform & HWC_TRANSFORM_FLIP_V) {
+        if(transform & HWC_TRANSFORM_FLIP_V) {
             ovutils::setMdpFlags(mdpFlags,  ovutils::OV_MDP_FLIP_V);
         }
     }
@@ -789,10 +835,29 @@ void setMdpFlags(hwc_layer_1_t *layer,
     }
 }
 
-static inline int configRotator(Rotator *rot, const Whf& whf,
-        const eMdpFlags& mdpFlags, const eTransform& orient,
-        const int& downscale) {
+int configRotator(Rotator *rot, const Whf& whf,
+        hwc_rect_t& crop, const eMdpFlags& mdpFlags,
+        const eTransform& orient, const int& downscale) {
+
     rot->setSource(whf);
+
+    if (qdutils::MDPVersion::getInstance().getMDPVersion() >=
+        qdutils::MDSS_V5) {
+        uint32_t crop_w = (crop.right - crop.left);
+        uint32_t crop_h = (crop.bottom - crop.top);
+        if (ovutils::isYuv(whf.format)) {
+            ovutils::normalizeCrop((uint32_t&)crop.left, crop_w);
+            ovutils::normalizeCrop((uint32_t&)crop.top, crop_h);
+            // For interlaced, crop.h should be 4-aligned
+            if ((mdpFlags & ovutils::OV_MDP_DEINTERLACE) && (crop_h % 4))
+                crop_h = ovutils::aligndown(crop_h, 4);
+            crop.right = crop.left + crop_w;
+            crop.bottom = crop.top + crop_h;
+        }
+        Dim rotCrop(crop.left, crop.top, crop_w, crop_h);
+        rot->setCrop(rotCrop);
+    }
+
     rot->setFlags(mdpFlags);
     rot->setTransform(orient);
     rot->setDownscale(downscale);
@@ -800,49 +865,7 @@ static inline int configRotator(Rotator *rot, const Whf& whf,
     return 0;
 }
 
-/*
- * Sets up BORDERFILL as default base pipe and detaches RGB0.
- * Framebuffer is always updated using PLAY ioctl.
- */
-bool setupBasePipe(hwc_context_t *ctx) {
-    const int dpy = HWC_DISPLAY_PRIMARY;
-    int fb_stride = ctx->dpyAttr[dpy].stride;
-    int fb_width = ctx->dpyAttr[dpy].xres;
-    int fb_height = ctx->dpyAttr[dpy].yres;
-    int fb_fd = ctx->dpyAttr[dpy].fd;
-
-    mdp_overlay ovInfo;
-    msmfb_overlay_data ovData;
-    memset(&ovInfo, 0, sizeof(mdp_overlay));
-    memset(&ovData, 0, sizeof(msmfb_overlay_data));
-
-    ovInfo.src.format = MDP_RGB_BORDERFILL;
-    ovInfo.src.width  = fb_width;
-    ovInfo.src.height = fb_height;
-    ovInfo.src_rect.w = fb_width;
-    ovInfo.src_rect.h = fb_height;
-    ovInfo.dst_rect.w = fb_width;
-    ovInfo.dst_rect.h = fb_height;
-    ovInfo.id = MSMFB_NEW_REQUEST;
-
-    if (ioctl(fb_fd, MSMFB_OVERLAY_SET, &ovInfo) < 0) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_SET err=%s",
-                strerror(errno));
-        return false;
-    }
-
-    ovData.id = ovInfo.id;
-    if (ioctl(fb_fd, MSMFB_OVERLAY_PLAY, &ovData) < 0) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_PLAY err=%s",
-                strerror(errno));
-        return false;
-    }
-    ctx->mBasePipeSetup = true;
-    return true;
-}
-
-
-static inline int configMdp(Overlay *ov, const PipeArgs& parg,
+int configMdp(Overlay *ov, const PipeArgs& parg,
         const eTransform& orient, const hwc_rect_t& crop,
         const hwc_rect_t& pos, const MetaData_t *metadata,
         const eDest& dest) {
@@ -868,24 +891,34 @@ static inline int configMdp(Overlay *ov, const PipeArgs& parg,
     return 0;
 }
 
-static inline void updateSource(eTransform& orient, Whf& whf,
+void updateSource(eTransform& orient, Whf& whf,
         hwc_rect_t& crop) {
     Dim srcCrop(crop.left, crop.top,
             crop.right - crop.left,
             crop.bottom - crop.top);
-    //getMdpOrient will switch the flips if the source is 90 rotated.
-    //Clients in Android dont factor in 90 rotation while deciding the flip.
     orient = static_cast<eTransform>(ovutils::getMdpOrient(orient));
     preRotateSource(orient, whf, srcCrop);
-    crop.left = srcCrop.x;
-    crop.top = srcCrop.y;
-    crop.right = srcCrop.x + srcCrop.w;
-    crop.bottom = srcCrop.y + srcCrop.h;
+    if (qdutils::MDPVersion::getInstance().getMDPVersion() >=
+        qdutils::MDSS_V5) {
+        // Source for overlay will be the cropped (and rotated)
+        crop.left = 0;
+        crop.top = 0;
+        crop.right = srcCrop.w;
+        crop.bottom = srcCrop.h;
+        // Set width & height equal to sourceCrop w & h
+        whf.w = srcCrop.w;
+        whf.h = srcCrop.h;
+    } else {
+        crop.left = srcCrop.x;
+        crop.top = srcCrop.y;
+        crop.right = srcCrop.x + srcCrop.w;
+        crop.bottom = srcCrop.y + srcCrop.h;
+    }
 }
 
 int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
-        const int& dpy, eMdpFlags& mdpFlags, const eZorder& z,
-        const eIsFg& isFg, const eDest& dest, Rotator **rot) {
+        const int& dpy, eMdpFlags& mdpFlags, eZorder& z,
+        eIsFg& isFg, const eDest& dest, Rotator **rot) {
 
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     if(!hnd) {
@@ -901,8 +934,47 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     eTransform orient = static_cast<eTransform>(transform);
     int downscale = 0;
     int rotFlags = ovutils::ROT_FLAGS_NONE;
-    Whf whf(getWidth(hnd), getHeight(hnd),
+    Whf whf(hnd->width, hnd->height,
             getMdpFormat(hnd->format), hnd->size);
+
+    if(dpy && isYuvBuffer(hnd)) {
+        if(!ctx->listStats[dpy].isDisplayAnimating) {
+            ctx->mPrevCropVideo = crop;
+            ctx->mPrevDestVideo = dst;
+            ctx->mPrevTransformVideo = transform;
+        } else {
+            // Restore the previous crop, dest rect and transform values, during
+            // animation to avoid displaying videos at random coordinates.
+            crop = ctx->mPrevCropVideo;
+            dst = ctx->mPrevDestVideo;
+            transform = ctx->mPrevTransformVideo;
+            orient = static_cast<eTransform>(transform);
+            //In you tube use case when a device rotated from landscape to
+            // portrait, set the isFg flag and zOrder to avoid displaying UI on
+            // hdmi during animation
+            if(ctx->deviceOrientation) {
+                isFg = ovutils::IS_FG_SET;
+                z = ZORDER_1;
+            }
+        }
+    }
+
+    uint32_t x = dst.left, y  = dst.top;
+    uint32_t w = dst.right - dst.left;
+    uint32_t h = dst.bottom - dst.top;
+
+    if(dpy) {
+        // Just need to set the position to portrait as the transformation
+        // will already be set to required orientation on TV
+        getAspectRatioPosition(ctx, dpy, ctx->mExtOrientation, x, y, w, h);
+        // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
+        getActionSafePosition(ctx, dpy, x, y, w, h);
+        // Convert position to hwc_rect_t
+        dst.left = x;
+        dst.top = y;
+        dst.right = w + dst.left;
+        dst.bottom = h + dst.top;
+    }
 
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
        ctx->mMDP.version < qdutils::MDSS_V5) {
@@ -916,16 +988,20 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         }
     }
 
-    setMdpFlags(layer, mdpFlags, downscale);
+    setMdpFlags(layer, mdpFlags, downscale, transform);
     trimLayer(ctx, dpy, transform, crop, dst);
 
     if(isYuvBuffer(hnd) && //if 90 component or downscale, use rot
             ((transform & HWC_TRANSFORM_ROT_90) || downscale)) {
         *rot = ctx->mRotMgr->getNext();
         if(*rot == NULL) return -1;
+        BwcPM::setBwc(ctx, crop, dst, transform, mdpFlags);
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, mdpFlags, orient, downscale) < 0)
+        if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale) < 0) {
+            ALOGE("%s: configRotator failed!", __FUNCTION__);
+            ctx->mOverlay->clear(dpy);
             return -1;
+        }
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
         whf.format = (*rot)->getDstFormat();
         updateSource(orient, whf, crop);
@@ -935,22 +1011,17 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     //For the mdp, since either we are pre-rotating or MDP does flips
     orient = OVERLAY_TRANSFORM_0;
     transform = 0;
-
-    PipeArgs parg(mdpFlags, whf, z, isFg,
-                  static_cast<eRotFlags>(rotFlags), layer->planeAlpha,
-                  (ovutils::eBlending) getBlending(layer->blending));
-
+    PipeArgs parg(mdpFlags, whf, z, isFg, static_cast<eRotFlags>(rotFlags));
     if(configMdp(ctx->mOverlay, parg, orient, crop, dst, metadata, dest) < 0) {
         ALOGE("%s: commit failed for low res panel", __FUNCTION__);
-        ctx->mLayerRotMap[dpy]->reset();
         return -1;
     }
     return 0;
 }
 
 int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
-        const int& dpy, eMdpFlags& mdpFlagsL, const eZorder& z,
-        const eIsFg& isFg, const eDest& lDest, const eDest& rDest,
+        const int& dpy, eMdpFlags& mdpFlagsL, eZorder& z,
+        eIsFg& isFg, const eDest& lDest, const eDest& rDest,
         Rotator **rot) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     if(!hnd) {
@@ -969,18 +1040,44 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     const int downscale = 0;
     int rotFlags = ROT_FLAGS_NONE;
 
-    Whf whf(getWidth(hnd), getHeight(hnd),
+    Whf whf(hnd->width, hnd->height,
             getMdpFormat(hnd->format), hnd->size);
 
-    setMdpFlags(layer, mdpFlagsL);
+    if(dpy && isYuvBuffer(hnd)) {
+        if(!ctx->listStats[dpy].isDisplayAnimating) {
+            ctx->mPrevCropVideo = crop;
+            ctx->mPrevDestVideo = dst;
+            ctx->mPrevTransformVideo = transform;
+        } else {
+            // Restore the previous crop, dest rect and transform values, during
+            // animation to avoid displaying videos at random coordinates.
+            crop = ctx->mPrevCropVideo;
+            dst = ctx->mPrevDestVideo;
+            transform = ctx->mPrevTransformVideo;
+            orient = static_cast<eTransform>(transform);
+            //In you tube use case when a device rotated from landscape to
+            // portrait, set the isFg flag and zOrder to avoid displaying UI on
+            // hdmi during animation
+            if(ctx->deviceOrientation) {
+                isFg = ovutils::IS_FG_SET;
+                z = ZORDER_1;
+            }
+        }
+    }
+
+
+    setMdpFlags(layer, mdpFlagsL, 0, transform);
     trimLayer(ctx, dpy, transform, crop, dst);
 
     if(isYuvBuffer(hnd) && (transform & HWC_TRANSFORM_ROT_90)) {
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, mdpFlagsL, orient, downscale) < 0)
+        if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
+            ALOGE("%s: configRotator failed!", __FUNCTION__);
+            ctx->mOverlay->clear(dpy);
             return -1;
+        }
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
         whf.format = (*rot)->getDstFormat();
         updateSource(orient, whf, crop);
@@ -993,24 +1090,25 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     hwc_rect_t tmp_cropL, tmp_dstL;
     hwc_rect_t tmp_cropR, tmp_dstR;
 
+    const int lSplit = qdutils::MDPVersion::getInstance().getLeftSplit();
     if(lDest != OV_INVALID) {
         tmp_cropL = crop;
         tmp_dstL = dst;
-        hwc_rect_t scissor = {0, 0, hw_w/2, hw_h };
+        hwc_rect_t scissor = {0, 0, lSplit, hw_h };
         qhwc::calculate_crop_rects(tmp_cropL, tmp_dstL, scissor, 0);
     }
     if(rDest != OV_INVALID) {
         tmp_cropR = crop;
         tmp_dstR = dst;
-        hwc_rect_t scissor = {hw_w/2, 0, hw_w, hw_h };
+        hwc_rect_t scissor = {lSplit, 0, hw_w, hw_h };
         qhwc::calculate_crop_rects(tmp_cropR, tmp_dstR, scissor, 0);
     }
 
-    //When buffer is flipped, contents of mixer config also needs to swapped.
+    //When buffer is H-flipped, contents of mixer config also needs to swapped
     //Not needed if the layer is confined to one half of the screen.
     //If rotator has been used then it has also done the flips, so ignore them.
-    if((orient & OVERLAY_TRANSFORM_FLIP_V) && lDest != OV_INVALID
-            && rDest != OV_INVALID && rot == NULL) {
+    if((orient & OVERLAY_TRANSFORM_FLIP_H) && lDest != OV_INVALID
+            && rDest != OV_INVALID && (*rot) == NULL) {
         hwc_rect_t new_cropR;
         new_cropR.left = tmp_cropL.left;
         new_cropR.right = new_cropR.left + (tmp_cropR.right - tmp_cropR.left);
@@ -1034,9 +1132,7 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     //configure left mixer
     if(lDest != OV_INVALID) {
         PipeArgs pargL(mdpFlagsL, whf, z, isFg,
-                       static_cast<eRotFlags>(rotFlags), layer->planeAlpha,
-                       (ovutils::eBlending) getBlending(layer->blending));
-
+                static_cast<eRotFlags>(rotFlags));
         if(configMdp(ctx->mOverlay, pargL, orient,
                 tmp_cropL, tmp_dstL, metadata, lDest) < 0) {
             ALOGE("%s: commit failed for left mixer config", __FUNCTION__);
@@ -1047,11 +1143,9 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     //configure right mixer
     if(rDest != OV_INVALID) {
         PipeArgs pargR(mdpFlagsR, whf, z, isFg,
-                static_cast<eRotFlags>(rotFlags), layer->planeAlpha,
-                (ovutils::eBlending) getBlending(layer->blending));
-
-        tmp_dstR.right = tmp_dstR.right - tmp_dstR.left;
-        tmp_dstR.left = 0;
+                static_cast<eRotFlags>(rotFlags));
+        tmp_dstR.right = tmp_dstR.right - lSplit;
+        tmp_dstR.left = tmp_dstR.left - lSplit;
         if(configMdp(ctx->mOverlay, pargR, orient,
                 tmp_cropR, tmp_dstR, metadata, rDest) < 0) {
             ALOGE("%s: commit failed for right mixer config", __FUNCTION__);
@@ -1060,6 +1154,62 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     }
 
     return 0;
+}
+
+bool canUseRotator(hwc_context_t *ctx) {
+    if(qdutils::MDPVersion::getInstance().is8x26() &&
+            ctx->mExtDisplay->isExternalConnected()) {
+        return false;
+    }
+    if(ctx->mMDP.version == qdutils::MDP_V3_0_4)
+        return false;
+    return true;
+}
+
+
+void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
+            const hwc_rect_t& dst, const int& transform,
+            ovutils::eMdpFlags& mdpFlags) {
+    //Target doesnt support Bwc
+    if(!qdutils::MDPVersion::getInstance().supportsBWC()) {
+        return;
+    }
+    //src width > MAX mixer supported dim
+    if((crop.right - crop.left) > qdutils::MAX_DISPLAY_DIM) {
+        return;
+    }
+    //External connected
+    if(ctx->mExtDisplay->isExternalConnected()) {
+        return;
+    }
+    //Decimation necessary, cannot use BWC. H/W requirement.
+    if(qdutils::MDPVersion::getInstance().supportsDecimation()) {
+        int src_w = crop.right - crop.left;
+        int src_h = crop.bottom - crop.top;
+        int dst_w = dst.right - dst.left;
+        int dst_h = dst.bottom - dst.top;
+        if(transform & HAL_TRANSFORM_ROT_90) {
+            swap(src_w, src_h);
+        }
+        float horDscale = 0.0f;
+        float verDscale = 0.0f;
+        int horzDeci = 0;
+        int vertDeci = 0;
+        ovutils::getDecimationFactor(src_w, src_h, dst_w, dst_h, horDscale,
+                verDscale);
+        //TODO Use log2f once math.h has it
+        if((int)horDscale)
+            horzDeci = (int)(log(horDscale) / log(2));
+        if((int)verDscale)
+            vertDeci = (int)(log(verDscale) / log(2));
+        if(horzDeci || vertDeci) return;
+    }
+    //Property
+    char value[PROPERTY_VALUE_MAX];
+    property_get("debug.disable.bwc", value, "0");
+     if(atoi(value)) return;
+
+    ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDSS_MDP_BWC_EN);
 }
 
 void LayerRotMap::add(hwc_layer_1_t* layer, Rotator *rot) {

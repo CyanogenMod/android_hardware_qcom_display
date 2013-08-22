@@ -94,6 +94,10 @@ void MdpRot::setSource(const overlay::utils::Whf& awhf) {
     mRotImgInfo.dst.height = whf.h;
 }
 
+void MdpRot::setCrop(const utils::Dim& crop) {
+    // NO-OP for non-mdss rotator due to possible h/w limitations
+}
+
 void MdpRot::setFlags(const utils::eMdpFlags& flags) {
     mRotImgInfo.secure = 0;
     if(flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
@@ -104,8 +108,6 @@ void MdpRot::setTransform(const utils::eTransform& rot)
 {
     int r = utils::getMdpOrient(rot);
     setRotations(r);
-    //getMdpOrient will switch the flips if the source is 90 rotated.
-    //Clients in Android dont factor in 90 rotation while deciding the flip.
     mOrientation = static_cast<utils::eTransform>(r);
     ALOGE_IF(DEBUG_OVERLAY, "%s: r=%d", __FUNCTION__, r);
 }
@@ -256,8 +258,8 @@ void MdpRot::dump() const {
 }
 
 void MdpRot::getDump(char *buf, size_t len) const {
-    ovutils::getDump(buf, len, "MdpRotCtrl(msm_rotator_img_info)", mRotImgInfo);
-    ovutils::getDump(buf, len, "MdpRotData(msm_rotator_data_info)", mRotDataInfo);
+    ovutils::getDump(buf, len, "MdpRotCtrl", mRotImgInfo);
+    ovutils::getDump(buf, len, "MdpRotData", mRotDataInfo);
 }
 
 } // namespace overlay

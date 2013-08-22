@@ -27,20 +27,14 @@
 #include <gr.h>
 #include <gralloc_priv.h>
 #include <utils/String8.h>
-#include <linux/fb.h>
 #include "qdMetaData.h"
 #include <overlayUtils.h>
-#include <cutils/sockets.h>
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
-#define MAX_NUM_LAYERS 32 //includes fb layer
-#define MAX_DISPLAY_DIM 2048
+#define MAX_NUM_APP_LAYERS 32
 
-// For support of virtual displays
-#define MAX_DISPLAYS            (HWC_NUM_DISPLAY_TYPES)
-#define DAEMON_SOCKET "pps"
 //Fwrd decls
 struct hwc_context_t;
 
@@ -60,6 +54,7 @@ class IFBUpdate;
 class IVideoOverlay;
 class MDPComp;
 class CopyBit;
+class HwcDebug;
 
 
 struct MDPInfo {
@@ -91,10 +86,13 @@ struct ListStats {
     int fbLayerIndex; //Always last for now. = numAppLayers
     //Video specific
     int yuvCount;
-    int yuvIndices[MAX_NUM_LAYERS];
+    int yuvIndices[MAX_NUM_APP_LAYERS];
+    int extOnlyLayerIndex;
     bool needsAlphaScale;
     bool preMultipliedAlpha;
-    bool planeAlpha;
+    // Notifies hwcomposer about the start and end of animation
+    // This will be set to true during animation, otherwise false.
+    bool isDisplayAnimating;
 };
 
 struct LayerProp {
@@ -107,12 +105,10 @@ struct VsyncState {
     bool fakevsync;
 };
 
-struct CablProp {
-    bool enabled;
-    bool start;
-    bool videoOnly;
-    //daemon_socket for connection to pp-daemon
-    int daemon_socket;
+struct BwcPM {
+    static void setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
+            const hwc_rect_t& dst, const int& transform,
+            ovutils::eMdpFlags& mdpFlags);
 };
 
 // LayerProp::flag values
@@ -166,11 +162,9 @@ void getNonWormholeRegion(hwc_display_contents_1_t* list,
 bool isSecuring(hwc_context_t* ctx, hwc_layer_1_t const* layer);
 bool isSecureModePolicy(int mdpVersion);
 bool isExternalActive(hwc_context_t* ctx);
-bool needsScaling(hwc_layer_1_t const* layer);
+bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer, const int& dpy);
 bool isAlphaPresent(hwc_layer_1_t const* layer);
-bool setupBasePipe(hwc_context_t *ctx);
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable);
-int getBlending(int blending);
 
 //Helper function to dump logs
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
@@ -178,6 +172,10 @@ void dumpsys_log(android::String8& buf, const char* fmt, ...);
 /* Calculates the destination position based on the action safe rectangle */
 void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
                                         uint32_t& y, uint32_t& w, uint32_t& h);
+
+
+void getAspectRatioPosition(hwc_context_t *ctx, int dpy, int orientation,
+                        uint32_t& x, uint32_t& y, uint32_t& w, uint32_t& h);
 
 //Close acquireFenceFds of all layers of incoming list
 void closeAcquireFds(hwc_display_contents_1_t* list);
@@ -193,19 +191,39 @@ void trimLayer(hwc_context_t *ctx, const int& dpy, const int& transform,
 //Sets appropriate mdp flags for a layer.
 void setMdpFlags(hwc_layer_1_t *layer,
         ovutils::eMdpFlags &mdpFlags,
-        int rotDownscale = 0);
+        int rotDownscale, int transform);
+
+int configRotator(overlay::Rotator *rot, const ovutils::Whf& whf,
+        hwc_rect_t& crop, const ovutils::eMdpFlags& mdpFlags,
+        const ovutils::eTransform& orient, const int& downscale);
+
+int configMdp(overlay::Overlay *ov, const ovutils::PipeArgs& parg,
+        const ovutils::eTransform& orient, const hwc_rect_t& crop,
+        const hwc_rect_t& pos, const MetaData_t *metadata,
+        const ovutils::eDest& dest);
+
+void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
+        hwc_rect_t& crop);
 
 //Routine to configure low resolution panels (<= 2048 width)
 int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
-        ovutils::eMdpFlags& mdpFlags, const ovutils::eZorder& z,
-        const ovutils::eIsFg& isFg, const ovutils::eDest& dest,
+        ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
+        ovutils::eIsFg& isFg, const ovutils::eDest& dest,
         overlay::Rotator **rot);
 
 //Routine to configure high resolution panels (> 2048 width)
 int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
-        ovutils::eMdpFlags& mdpFlags, const ovutils::eZorder& z,
-        const ovutils::eIsFg& isFg, const ovutils::eDest& lDest,
+        ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
+        ovutils::eIsFg& isFg, const ovutils::eDest& lDest,
         const ovutils::eDest& rDest, overlay::Rotator **rot);
+
+//On certain targets DMA pipes are used for rotation and they won't be available
+//for line operations. On a per-target basis we can restrict certain use cases
+//from using rotator, since we know before-hand that such scenarios can lead to
+//extreme unavailability of pipes. This can also be done via hybrid calculations
+//also involving many more variables like number of write-back interfaces etc,
+//but the variety of scenarios is too high to warrant that.
+bool canUseRotator(hwc_context_t *ctx);
 
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
@@ -241,26 +259,6 @@ static inline bool isExtCC(const private_handle_t* hnd) {
     return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_CC));
 }
 
-static inline int getWidth(const private_handle_t* hnd) {
-    if(isYuvBuffer(hnd)) {
-        MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
-        if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
-            return metadata->bufferDim.sliceWidth;
-        }
-    }
-    return hnd->width;
-}
-
-static inline int getHeight(const private_handle_t* hnd) {
-    if(isYuvBuffer(hnd)) {
-        MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
-        if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
-            return metadata->bufferDim.sliceHeight;
-        }
-    }
-    return hnd->height;
-}
-
 template<typename T> inline T max(T a, T b) { return (a > b) ? a : b; }
 template<typename T> inline T min(T a, T b) { return (a < b) ? a : b; }
 
@@ -270,7 +268,8 @@ void init_uevent_thread(hwc_context_t* ctx);
 void init_vsync_thread(hwc_context_t* ctx);
 
 inline void getLayerResolution(const hwc_layer_1_t* layer,
-                               int& width, int& height) {
+                               int& width, int& height)
+{
     hwc_rect_t displayFrame  = layer->displayFrame;
     width = displayFrame.right - displayFrame.left;
     height = displayFrame.bottom - displayFrame.top;
@@ -302,7 +301,7 @@ struct hwc_context_t {
     const hwc_procs_t* proc;
 
     //CopyBit objects
-    qhwc::CopyBit *mCopyBit[MAX_DISPLAYS];
+    qhwc::CopyBit *mCopyBit[HWC_NUM_DISPLAY_TYPES];
 
     //Overlay object - NULL for non overlay devices
     overlay::Overlay *mOverlay;
@@ -310,18 +309,24 @@ struct hwc_context_t {
     overlay::RotMgr *mRotMgr;
 
     //Primary and external FB updater
-    qhwc::IFBUpdate *mFBUpdate[MAX_DISPLAYS];
+    qhwc::IFBUpdate *mFBUpdate[HWC_NUM_DISPLAY_TYPES];
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
     qhwc::MDPInfo mMDP;
     qhwc::VsyncState vstate;
-    qhwc::DisplayAttributes dpyAttr[MAX_DISPLAYS];
-    qhwc::ListStats listStats[MAX_DISPLAYS];
-    qhwc::LayerProp *layerProp[MAX_DISPLAYS];
-    qhwc::LayerRotMap *mLayerRotMap[MAX_DISPLAYS];
-    qhwc::MDPComp *mMDPComp[MAX_DISPLAYS];
-    qhwc::CablProp mCablProp;
+    qhwc::DisplayAttributes dpyAttr[HWC_NUM_DISPLAY_TYPES];
+    qhwc::ListStats listStats[HWC_NUM_DISPLAY_TYPES];
+    qhwc::LayerProp *layerProp[HWC_NUM_DISPLAY_TYPES];
+    qhwc::MDPComp *mMDPComp[HWC_NUM_DISPLAY_TYPES];
+    qhwc::HwcDebug *mHwcDebug[HWC_NUM_DISPLAY_TYPES];
 
+    // No animation on External display feature
+    // Notifies hwcomposer about the device orientation before animation.
+    int deviceOrientation;
+    // Stores the crop, dest rect and transform value of video before animation.
+    hwc_rect_t mPrevCropVideo;
+    hwc_rect_t mPrevDestVideo;
+    int mPrevTransformVideo;
     //Securing in progress indicator
     bool mSecuring;
     //External Display configuring progress indicator
@@ -330,14 +335,15 @@ struct hwc_context_t {
     bool mSecureMode;
     //Lock to prevent set from being called while blanking
     mutable Locker mBlankLock;
-    //Lock to protect set when detaching external disp
-    mutable Locker mExtSetLock;
-    //DMA used for rotator
-    bool mDMAInUse;
-    //MDP rotater needed
-    bool mNeedsRotator;
-    //Check if base pipe is set up
-    bool mBasePipeSetup;
+    //Lock to protect prepare & set when detaching external disp
+    mutable Locker mExtLock;
+    //Drawing round when we use GPU
+    bool isPaddingRound;
+    // External Orientation
+    int mExtOrientation;
+    //Flags the transition of a video session
+    bool mVideoTransFlag;
+    qhwc::LayerRotMap *mLayerRotMap[HWC_NUM_DISPLAY_TYPES];
 };
 
 namespace qhwc {

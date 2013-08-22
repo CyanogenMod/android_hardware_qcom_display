@@ -20,6 +20,8 @@
 #include "overlayUtils.h"
 #include "overlayRotator.h"
 
+#define DEBUG_MDSS_ROT 0
+
 #ifdef VENUS_COLOR_FORMAT
 #include <media/msm_media_info.h>
 #else
@@ -74,21 +76,27 @@ void MdssRot::setSource(const overlay::utils::Whf& awhf) {
     utils::Whf whf(awhf);
 
     mRotInfo.src.format = whf.format;
-
     mRotInfo.src.width = whf.w;
     mRotInfo.src.height = whf.h;
+}
 
-    mRotInfo.src_rect.w = whf.w;
-    mRotInfo.src_rect.h = whf.h;
+void MdssRot::setCrop(const utils::Dim& crop) {
 
-    mRotInfo.dst_rect.w = whf.w;
-    mRotInfo.dst_rect.h = whf.h;
+    mRotInfo.src_rect.x = crop.x;
+    mRotInfo.src_rect.y = crop.y;
+    mRotInfo.src_rect.w = crop.w;
+    mRotInfo.src_rect.h = crop.h;
+
+    mRotInfo.dst_rect.x = 0;
+    mRotInfo.dst_rect.y = 0;
+    mRotInfo.dst_rect.w = crop.w;
+    mRotInfo.dst_rect.h = crop.h;
 }
 
 void MdssRot::setDownscale(int ds) {}
 
 void MdssRot::setFlags(const utils::eMdpFlags& flags) {
-    mRotInfo.flags |= flags;
+    mRotInfo.flags = flags;
 }
 
 void MdssRot::setTransform(const utils::eTransform& rot)
@@ -98,13 +106,12 @@ void MdssRot::setTransform(const utils::eTransform& rot)
     int flags = utils::getMdpOrient(rot);
     if (flags != -1)
         setRotations(flags);
-    //getMdpOrient will switch the flips if the source is 90 rotated.
-    //Clients in Android dont factor in 90 rotation while deciding the flip.
     mOrientation = static_cast<utils::eTransform>(flags);
     ALOGE_IF(DEBUG_OVERLAY, "%s: rot=%d", __FUNCTION__, flags);
 }
 
 void MdssRot::doTransform() {
+    mRotInfo.flags |= mOrientation;
     if(mOrientation & utils::OVERLAY_TRANSFORM_ROT_90)
         utils::swap(mRotInfo.dst_rect.w, mRotInfo.dst_rect.h);
 }
@@ -248,7 +255,11 @@ uint32_t MdssRot::calcOutputBufSize() {
     ovutils::Whf destWhf(mRotInfo.dst_rect.w, mRotInfo.dst_rect.h,
             mRotInfo.src.format); //mdss src and dst formats are same.
 
-    opBufSize = Rotator::calcOutputBufSize(destWhf);
+    if (mRotInfo.flags & ovutils::OV_MDSS_MDP_BWC_EN) {
+        opBufSize = calcCompressedBufSize();
+    } else {
+        opBufSize = Rotator::calcOutputBufSize(destWhf);
+    }
 
     if (mRotInfo.flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
         opBufSize = utils::align(opBufSize, SIZE_1M);
@@ -257,8 +268,27 @@ uint32_t MdssRot::calcOutputBufSize() {
 }
 
 void MdssRot::getDump(char *buf, size_t len) const {
-    ovutils::getDump(buf, len, "MdssRotCtrl(mdp_overlay)", mRotInfo);
-    ovutils::getDump(buf, len, "MdssRotData(msmfb_overlay_data)", mRotData);
+    ovutils::getDump(buf, len, "MdssRotCtrl", mRotInfo);
+    ovutils::getDump(buf, len, "MdssRotData", mRotData);
+}
+
+// Calculate the compressed o/p buffer size for BWC
+uint32_t MdssRot::calcCompressedBufSize() {
+    uint32_t bufSize = 0;
+    int aWidth = ovutils::align(mRotInfo.src_rect.w, 64);
+    int aHeight = ovutils::align(mRotInfo.src_rect.h, 4);
+    int rau_cnt = aWidth/64;
+    int stride0 = (64 * 4 * rau_cnt) + rau_cnt/8;
+    int stride1 = ((64 * 2 * rau_cnt) + rau_cnt/8) * 2;
+    int stride0_off = (aHeight/4);
+    int stride1_off = (aHeight/2);
+
+    //New o/p size for BWC
+    bufSize = (stride0 * stride0_off + stride1 * stride1_off) +
+                (rau_cnt * 2 * (stride0_off + stride1_off));
+    ALOGD_IF(DEBUG_MDSS_ROT, "%s: width = %d, height = %d raucount = %d"
+         "opBufSize = %d ", __FUNCTION__, aWidth, aHeight, rau_cnt, bufSize);
+    return bufSize;
 }
 
 } // namespace overlay

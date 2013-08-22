@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -28,6 +28,7 @@
 #include <utils/Log.h>
 
 #include <linux/msm_mdp.h>
+#include <video/msm_hdmi_modes.h>
 #include <linux/fb.h>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
@@ -44,7 +45,9 @@ namespace qhwc {
 
 #define MAX_FRAME_BUFFER_NAME_SIZE      (80)
 #define MAX_DISPLAY_DEVICES             (3)
-
+#define MAX_SYSFS_FILE_PATH             255
+#define UNKNOWN_STRING                  "unknown"
+#define SPD_NAME_LENGTH                 16
 
 const char* msmFbDevicePath[] = {  "/dev/graphics/fb1",
                                    "/dev/graphics/fb2"};
@@ -61,7 +64,8 @@ void ExternalDisplay::updateExtDispDevFbIndex()
     char msmFbTypePath[MAX_FRAME_BUFFER_NAME_SIZE];
 
     for(int j = 1; j < MAX_DISPLAY_DEVICES; j++) {
-        sprintf (msmFbTypePath,"/sys/class/graphics/fb%d/msm_fb_type", j);
+        snprintf (msmFbTypePath, sizeof(msmFbTypePath),
+                  "/sys/class/graphics/fb%d/msm_fb_type", j);
         displayDeviceFP = fopen(msmFbTypePath, "r");
         if(displayDeviceFP){
             fread(fbType, sizeof(char), MAX_FRAME_BUFFER_NAME_SIZE,
@@ -99,6 +103,8 @@ int ExternalDisplay::configureHDMIDisplay() {
     setResolution(mode);
     setDpyHdmiAttr();
     setExternalDisplay(true, mHdmiFbNum);
+    // set system property
+    property_set("hw.hdmiON", "1");
     return 0;
 }
 
@@ -128,6 +134,8 @@ int ExternalDisplay::teardownHDMIDisplay() {
         closeFrameBuffer();
         resetInfo();
         setExternalDisplay(false);
+        // unset system property
+        property_set("hw.hdmiON", "0");
     }
     return 0;
 }
@@ -142,29 +150,17 @@ int ExternalDisplay::teardownWFDDisplay() {
     return 0;
 }
 
-void ExternalDisplay::processUEventOnline(const char *str) {
+int ExternalDisplay::ignoreRequest(const char *str) {
     const char *s1 = str + strlen("change@/devices/virtual/switch/");
-    if(!strncmp(s1,"hdmi",strlen(s1))) {
-        // hdmi online event..!
-        configureHDMIDisplay();
-        // set system property
-        property_set("hw.hdmiON", "1");
-    }else if(!strncmp(s1,"wfd",strlen(s1))) {
-        // wfd online event..!
-        configureWFDDisplay();
+    if(!strncmp(s1,"wfd",strlen(s1))) {
+        if(mConnectedFbNum == mHdmiFbNum) {
+            ALOGE("Ignore wfd event when HDMI is active");
+            return true;
+        }
     }
+    return false;
 }
 
-void ExternalDisplay::processUEventOffline(const char *str) {
-    const char *s1 = str + strlen("change@/devices/virtual/switch/");
-    if(!strncmp(s1,"hdmi",strlen(s1))) {
-        teardownHDMIDisplay();
-        // unset system property
-        property_set("hw.hdmiON", "0");
-    }else if(!strncmp(s1,"wfd",strlen(s1))) {
-        teardownWFDDisplay();
-    }
-}
 
 ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
     mCurrentMode(-1), mConnected(0), mConnectedFbNum(0), mModeCount(0),
@@ -179,6 +175,54 @@ ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
     // This helps for framework reboot or adb shell stop/start
     writeHPDOption(0);
 
+    // for HDMI - retreive all the modes supported by the driver
+    if(mHdmiFbNum != -1) {
+        supported_video_mode_lut =
+                        new msm_hdmi_mode_timing_info[HDMI_VFRMT_MAX];
+        // Populate the mode table for supported modes
+        MSM_HDMI_MODES_INIT_TIMINGS(supported_video_mode_lut);
+        MSM_HDMI_MODES_SET_SUPP_TIMINGS(supported_video_mode_lut,
+                                        MSM_HDMI_MODES_ALL);
+        // Update the Source Product Information
+        // Vendor Name
+        setSPDInfo("vendor_name", "ro.product.manufacturer");
+        // Product Description
+        setSPDInfo("product_description", "ro.product.name");
+    }
+}
+/* gets the product manufacturer and product name and writes it
+ * to the sysfs node, so that the driver can get that information
+ * Used to show QCOM 8974 instead of Input 1 for example
+ */
+void ExternalDisplay::setSPDInfo(const char* node, const char* property) {
+    int err = -1;
+    char info[PROPERTY_VALUE_MAX];
+    char sysFsSPDFilePath[MAX_SYSFS_FILE_PATH];
+    memset(sysFsSPDFilePath, 0, sizeof(sysFsSPDFilePath));
+    snprintf(sysFsSPDFilePath , sizeof(sysFsSPDFilePath),
+                 "/sys/devices/virtual/graphics/fb%d/%s",
+                 mHdmiFbNum, node);
+    int spdFile = open(sysFsSPDFilePath, O_RDWR, 0);
+    if (spdFile < 0) {
+        ALOGE("%s: file '%s' not found : ret = %d"
+              "err str: %s",  __FUNCTION__, sysFsSPDFilePath,
+              spdFile, strerror(errno));
+    } else {
+        memset(info, 0, sizeof(info));
+        property_get(property, info, UNKNOWN_STRING);
+        ALOGD_IF(DEBUG, "In %s: %s = %s", __FUNCTION__, property, info);
+        if (strncmp(info, UNKNOWN_STRING, SPD_NAME_LENGTH)) {
+            err = write(spdFile, info, strlen(info));
+            if (err <= 0) {
+                ALOGE("%s: file write failed for '%s'"
+                      "err no = %d", __FUNCTION__, sysFsSPDFilePath, errno);
+            }
+        } else {
+            ALOGD_IF(DEBUG, "%s: property_get failed for SPD %s",
+                         __FUNCTION__, node);
+        }
+        close(spdFile);
+    }
 }
 
 void ExternalDisplay::setEDIDMode(int resMode) {
@@ -202,10 +246,10 @@ void ExternalDisplay::setActionSafeDimension(int w, int h) {
     Mutex::Autolock lock(mExtDispLock);
     char actionsafeWidth[PROPERTY_VALUE_MAX];
     char actionsafeHeight[PROPERTY_VALUE_MAX];
-    sprintf(actionsafeWidth, "%d", w);
-    property_set("hw.actionsafe.width", actionsafeWidth);
-    sprintf(actionsafeHeight, "%d", h);
-    property_set("hw.actionsafe.height", actionsafeHeight);
+    snprintf(actionsafeWidth, sizeof(actionsafeWidth), "%d", w);
+    property_set("persist.sys.actionsafe.width", actionsafeWidth);
+    snprintf(actionsafeHeight, sizeof(actionsafeHeight), "%d", h);
+    property_set("persist.sys.actionsafe.height", actionsafeHeight);
     setExternalDisplay(true, mHdmiFbNum);
 }
 
@@ -230,8 +274,9 @@ void ExternalDisplay::readCEUnderscanInfo()
     char *ce_info_str = NULL;
     const char token[] = ", \n";
     int ce_info = -1;
-    char sysFsScanInfoFilePath[128];
-    sprintf(sysFsScanInfoFilePath, "/sys/devices/virtual/graphics/fb%d/"
+    char sysFsScanInfoFilePath[MAX_SYSFS_FILE_PATH];
+    snprintf(sysFsScanInfoFilePath, sizeof(sysFsScanInfoFilePath),
+            "/sys/devices/virtual/graphics/fb%d/"
                                    "scan_info", mHdmiFbNum);
 
     memset(scanInfo, 0, sizeof(scanInfo));
@@ -293,92 +338,39 @@ void ExternalDisplay::readCEUnderscanInfo()
 
 ExternalDisplay::~ExternalDisplay()
 {
+    delete [] supported_video_mode_lut;
     closeFrameBuffer();
 }
 
-struct disp_mode_timing_type {
-    int  video_format;
-
-    int  active_h;
-    int  active_v;
-
-    int  front_porch_h;
-    int  pulse_width_h;
-    int  back_porch_h;
-
-    int  front_porch_v;
-    int  pulse_width_v;
-    int  back_porch_v;
-
-    int  pixel_freq;
-    bool interlaced;
-
-    void set_info(struct fb_var_screeninfo &info) const;
-};
-
-void disp_mode_timing_type::set_info(struct fb_var_screeninfo &info) const
+/*
+ * sets the fb_var_screeninfo from the hdmi_mode_timing_info
+ */
+void setDisplayTiming(struct fb_var_screeninfo &info,
+                                const msm_hdmi_mode_timing_info* mode)
 {
     info.reserved[0] = 0;
     info.reserved[1] = 0;
     info.reserved[2] = 0;
 #ifndef FB_METADATA_VIDEO_INFO_CODE_SUPPORT
-    info.reserved[3] = (info.reserved[3] & 0xFFFF) | (video_format << 16);
+    info.reserved[3] = (info.reserved[3] & 0xFFFF) |
+              (mode->video_format << 16);
 #endif
     info.xoffset = 0;
     info.yoffset = 0;
-    info.xres = active_h;
-    info.yres = active_v;
+    info.xres = mode->active_h;
+    info.yres = mode->active_v;
 
-    info.pixclock = pixel_freq*1000;
-    info.vmode = interlaced ? FB_VMODE_INTERLACED : FB_VMODE_NONINTERLACED;
+    info.pixclock = (mode->pixel_freq)*1000;
+    info.vmode = mode->interlaced ?
+                    FB_VMODE_INTERLACED : FB_VMODE_NONINTERLACED;
 
-    info.right_margin = front_porch_h;
-    info.hsync_len = pulse_width_h;
-    info.left_margin = back_porch_h;
-    info.lower_margin = front_porch_v;
-    info.vsync_len = pulse_width_v;
-    info.upper_margin = back_porch_v;
+    info.right_margin = mode->front_porch_h;
+    info.hsync_len = mode->pulse_width_h;
+    info.left_margin = mode->back_porch_h;
+    info.lower_margin = mode->front_porch_v;
+    info.vsync_len = mode->pulse_width_v;
+    info.upper_margin = mode->back_porch_v;
 }
-
-/* Video formates supported by the HDMI Standard */
-/* Indicates the resolution, pix clock and the aspect ratio */
-#define m640x480p60_4_3         1
-#define m720x480p60_4_3         2
-#define m720x480p60_16_9        3
-#define m1280x720p60_16_9       4
-#define m1920x1080i60_16_9      5
-#define m1440x480i60_4_3        6
-#define m1440x480i60_16_9       7
-#define m1920x1080p60_16_9      16
-#define m720x576p50_4_3         17
-#define m720x576p50_16_9        18
-#define m1280x720p50_16_9       19
-#define m1440x576i50_4_3        21
-#define m1440x576i50_16_9       22
-#define m1920x1080p50_16_9      31
-#define m1920x1080p24_16_9      32
-#define m1920x1080p25_16_9      33
-#define m1920x1080p30_16_9      34
-
-static struct disp_mode_timing_type supported_video_mode_lut[] = {
-    {m640x480p60_4_3,     640,  480,  16,  96,  48, 10, 2, 33,  25200, false},
-    {m720x480p60_4_3,     720,  480,  16,  62,  60,  9, 6, 30,  27030, false},
-    {m720x480p60_16_9,    720,  480,  16,  62,  60,  9, 6, 30,  27030, false},
-    {m1280x720p60_16_9,  1280,  720, 110,  40, 220,  5, 5, 20,  74250, false},
-    {m1920x1080i60_16_9, 1920,  540,  88,  44, 148,  2, 5,  5,  74250, false},
-    {m1440x480i60_4_3,   1440,  240,  38, 124, 114,  4, 3, 15,  27000, true},
-    {m1440x480i60_16_9,  1440,  240,  38, 124, 114,  4, 3, 15,  27000, true},
-    {m1920x1080p60_16_9, 1920, 1080,  88,  44, 148,  4, 5, 36, 148500, false},
-    {m720x576p50_4_3,     720,  576,  12,  64,  68,  5, 5, 39,  27000, false},
-    {m720x576p50_16_9,    720,  576,  12,  64,  68,  5, 5, 39,  27000, false},
-    {m1280x720p50_16_9,  1280,  720, 440,  40, 220,  5, 5, 20,  74250, false},
-    {m1440x576i50_4_3,   1440,  288,  24, 126, 138,  2, 3, 19,  27000, true},
-    {m1440x576i50_16_9,  1440,  288,  24, 126, 138,  2, 3, 19,  27000, true},
-    {m1920x1080p50_16_9, 1920, 1080, 528,  44, 148,  4, 5, 36, 148500, false},
-    {m1920x1080p24_16_9, 1920, 1080, 638,  44, 148,  4, 5, 36,  74250, false},
-    {m1920x1080p25_16_9, 1920, 1080, 528,  44, 148,  4, 5, 36,  74250, false},
-    {m1920x1080p30_16_9, 1920, 1080,  88,  44, 148,  4, 5, 36,  74250, false},
-};
 
 int ExternalDisplay::parseResolution(char* edidStr, int* edidModes)
 {
@@ -403,9 +395,9 @@ int ExternalDisplay::parseResolution(char* edidStr, int* edidModes)
 
 bool ExternalDisplay::readResolution()
 {
-    char sysFsEDIDFilePath[255];
-    sprintf(sysFsEDIDFilePath , "/sys/devices/virtual/graphics/fb%d/edid_modes",
-            mHdmiFbNum);
+    char sysFsEDIDFilePath[MAX_SYSFS_FILE_PATH];
+    snprintf(sysFsEDIDFilePath , sizeof(sysFsEDIDFilePath),
+            "/sys/devices/virtual/graphics/fb%d/edid_modes", mHdmiFbNum);
 
     int hdmiEDIDFile = open(sysFsEDIDFilePath, O_RDONLY, 0);
     int len = -1;
@@ -483,43 +475,57 @@ void ExternalDisplay::resetInfo()
 int ExternalDisplay::getModeOrder(int mode)
 {
     // XXX: We dont support interlaced modes but having
-    // it here for for future
+    // it here for future
     switch (mode) {
         default:
-        case m1440x480i60_4_3:
+        case HDMI_VFRMT_1440x480i60_4_3:
             return 1; // 480i 4:3
-        case m1440x480i60_16_9:
+        case HDMI_VFRMT_1440x480i60_16_9:
             return 2; // 480i 16:9
-        case m1440x576i50_4_3:
+        case HDMI_VFRMT_1440x576i50_4_3:
             return 3; // i576i 4:3
-        case m1440x576i50_16_9:
+        case HDMI_VFRMT_1440x576i50_16_9:
             return 4; // 576i 16:9
-        case m640x480p60_4_3:
-            return 5; // 640x480 4:3
-        case m720x480p60_4_3:
-            return 6; // 480p 4:3
-        case m720x480p60_16_9:
-            return 7; // 480p 16:9
-        case m720x576p50_4_3:
-            return 8; // 576p 4:3
-        case m720x576p50_16_9:
-            return 9; // 576p 16:9
-        case m1920x1080i60_16_9:
-            return 10; // 1080i 16:9
-        case m1280x720p50_16_9:
-            return 11; // 720p@50Hz
-        case m1280x720p60_16_9:
-            return 12; // 720p@60Hz
-        case m1920x1080p24_16_9:
-            return 13; //1080p@24Hz
-        case m1920x1080p25_16_9:
-            return 14; //108-p@25Hz
-        case m1920x1080p30_16_9:
-            return 15; //1080p@30Hz
-        case m1920x1080p50_16_9:
-            return 16; //1080p@50Hz
-        case m1920x1080p60_16_9:
-            return 17; //1080p@60Hz
+        case HDMI_VFRMT_1920x1080i60_16_9:
+            return 5; // 1080i 16:9
+        case HDMI_VFRMT_640x480p60_4_3:
+            return 6; // 640x480 4:3
+        case HDMI_VFRMT_720x480p60_4_3:
+            return 7; // 480p 4:3
+        case HDMI_VFRMT_720x480p60_16_9:
+            return 8; // 480p 16:9
+        case HDMI_VFRMT_720x576p50_4_3:
+            return 9; // 576p 4:3
+        case HDMI_VFRMT_720x576p50_16_9:
+            return 10; // 576p 16:9
+        case HDMI_VFRMT_1024x768p60_4_3:
+            return 11; // 768p 4:3 Vesa format
+        case HDMI_VFRMT_1280x1024p60_5_4:
+            return 12; // 1024p Vesa format
+        case HDMI_VFRMT_1280x720p50_16_9:
+            return 13; // 720p@50Hz
+        case HDMI_VFRMT_1280x720p60_16_9:
+            return 14; // 720p@60Hz
+        case HDMI_VFRMT_1920x1080p24_16_9:
+            return 15; //1080p@24Hz
+        case HDMI_VFRMT_1920x1080p25_16_9:
+            return 16; //108-p@25Hz
+        case HDMI_VFRMT_1920x1080p30_16_9:
+            return 17; //1080p@30Hz
+        case HDMI_VFRMT_1920x1080p50_16_9:
+            return 18; //1080p@50Hz
+        case HDMI_VFRMT_1920x1080p60_16_9:
+            return 19; //1080p@60Hz
+        case HDMI_VFRMT_2560x1600p60_16_9:
+            return 20; //WQXGA@60Hz541
+        case HDMI_VFRMT_3840x2160p24_16_9:
+            return 21;//2160@24Hz
+        case HDMI_VFRMT_3840x2160p25_16_9:
+            return 22;//2160@25Hz
+        case HDMI_VFRMT_3840x2160p30_16_9:
+            return 23; //2160@30Hz
+        case HDMI_VFRMT_4096x2160p24_16_9:
+            return 24; //4kx2k@24Hz
     }
 }
 
@@ -540,7 +546,7 @@ int ExternalDisplay::getUserMode() {
 // Get the best mode for the current HD TV
 int ExternalDisplay::getBestMode() {
     int bestOrder = 0;
-    int bestMode = m640x480p60_4_3;
+    int bestMode = HDMI_VFRMT_640x480p60_4_3;
     Mutex::Autolock lock(mExtDispLock);
     // for all the edid read, get the best mode
     for(int i = 0; i < mModeCount; i++) {
@@ -570,14 +576,16 @@ inline bool ExternalDisplay::isValidMode(int ID)
 bool ExternalDisplay::isInterlacedMode(int ID) {
     bool interlaced = false;
     switch(ID) {
-        case m1440x480i60_4_3:
-        case m1440x480i60_16_9:
-        case m1440x576i50_4_3:
-        case m1440x576i50_16_9:
-        case m1920x1080i60_16_9:
+        case HDMI_VFRMT_1440x480i60_4_3:
+        case HDMI_VFRMT_1440x480i60_16_9:
+        case HDMI_VFRMT_1440x576i50_4_3:
+        case HDMI_VFRMT_1440x576i50_16_9:
+        case HDMI_VFRMT_1920x1080i60_16_9:
             interlaced = true;
+            break;
         default:
             interlaced = false;
+            break;
     }
     return interlaced;
 }
@@ -591,7 +599,6 @@ void ExternalDisplay::setResolution(int ID)
         ALOGD("In %s: FBIOGET_VSCREENINFO failed Err Str = %s", __FUNCTION__,
                                                             strerror(errno));
     }
-
     ALOGD_IF(DEBUG, "%s: GET Info<ID=%d %dx%d (%d,%d,%d),"
             "(%d,%d,%d) %dMHz>", __FUNCTION__,
             mVInfo.reserved[3], mVInfo.xres, mVInfo.yres,
@@ -600,17 +607,17 @@ void ExternalDisplay::setResolution(int ID)
             mVInfo.pixclock/1000/1000);
     //If its a new ID - update var_screeninfo
     if ((isValidMode(ID)) && mCurrentMode != ID) {
-        const struct disp_mode_timing_type *mode =
+        const struct msm_hdmi_mode_timing_info *mode =
             &supported_video_mode_lut[0];
-        unsigned count =  sizeof(supported_video_mode_lut)/sizeof
-            (*supported_video_mode_lut);
-        for (unsigned int i = 0; i < count; ++i) {
-            const struct disp_mode_timing_type *cur =
-                &supported_video_mode_lut[i];
-            if (cur->video_format == ID)
+        for (unsigned int i = 0; i < HDMI_VFRMT_MAX; ++i) {
+            const struct msm_hdmi_mode_timing_info *cur =
+                                        &supported_video_mode_lut[i];
+            if (cur->video_format == (uint32_t)ID) {
                 mode = cur;
+                break;
+            }
         }
-        mode->set_info(mVInfo);
+        setDisplayTiming(mVInfo, mode);
         ALOGD_IF(DEBUG, "%s: SET Info<ID=%d => Info<ID=%d %dx %d"
                  "(%d,%d,%d), (%d,%d,%d) %dMHz>", __FUNCTION__, ID,
                  mode->video_format, mVInfo.xres, mVInfo.yres,
@@ -663,26 +670,28 @@ int ExternalDisplay::getExtFbNum(int &fbNum) {
 bool ExternalDisplay::writeHPDOption(int userOption) const
 {
     bool ret = true;
-    char sysFsHPDFilePath[255];
-    sprintf(sysFsHPDFilePath ,"/sys/devices/virtual/graphics/fb%d/hpd",
-                                mHdmiFbNum);
-    int hdmiHPDFile = open(sysFsHPDFilePath,O_RDWR, 0);
-    if (hdmiHPDFile < 0) {
-        ALOGE("%s: state file '%s' not found : ret%d err str: %s", __FUNCTION__,
-                                sysFsHPDFilePath, hdmiHPDFile, strerror(errno));
-        ret = false;
-    } else {
-        int err = -1;
-        ALOGD_IF(DEBUG, "%s: option = %d", __FUNCTION__, userOption);
-        if(userOption)
-            err = write(hdmiHPDFile, "1", 2);
-        else
-            err = write(hdmiHPDFile, "0" , 2);
-        if (err <= 0) {
-            ALOGE("%s: file write failed '%s'", __FUNCTION__, sysFsHPDFilePath);
+    if(mHdmiFbNum != -1) {
+        char sysFsHPDFilePath[MAX_SYSFS_FILE_PATH];
+        snprintf(sysFsHPDFilePath ,sizeof(sysFsHPDFilePath),
+                 "/sys/devices/virtual/graphics/fb%d/hpd", mHdmiFbNum);
+        int hdmiHPDFile = open(sysFsHPDFilePath,O_RDWR, 0);
+        if (hdmiHPDFile < 0) {
+            ALOGE("%s: state file '%s' not found : ret%d err str: %s", __FUNCTION__,
+                  sysFsHPDFilePath, hdmiHPDFile, strerror(errno));
             ret = false;
+        } else {
+            int err = -1;
+            ALOGD_IF(DEBUG, "%s: option = %d", __FUNCTION__, userOption);
+            if(userOption)
+                err = write(hdmiHPDFile, "1", 2);
+            else
+                err = write(hdmiHPDFile, "0" , 2);
+            if (err <= 0) {
+                ALOGE("%s: file write failed '%s'", __FUNCTION__, sysFsHPDFilePath);
+                ret = false;
+            }
+            close(hdmiHPDFile);
         }
-        close(hdmiHPDFile);
     }
     return ret;
 }
@@ -711,58 +720,94 @@ void ExternalDisplay::setDpyHdmiAttr() {
 
 void ExternalDisplay::getAttrForMode(int& width, int& height, int& fps) {
     switch (mCurrentMode) {
-        case m640x480p60_4_3:
+        case HDMI_VFRMT_640x480p60_4_3:
             width = 640;
             height = 480;
             fps = 60;
             break;
-        case m720x480p60_4_3:
-        case m720x480p60_16_9:
+        case HDMI_VFRMT_720x480p60_4_3:
+        case HDMI_VFRMT_720x480p60_16_9:
             width = 720;
             height = 480;
             fps = 60;
             break;
-        case m720x576p50_4_3:
-        case m720x576p50_16_9:
+        case HDMI_VFRMT_720x576p50_4_3:
+        case HDMI_VFRMT_720x576p50_16_9:
             width = 720;
             height = 576;
             fps = 50;
             break;
-        case m1280x720p50_16_9:
+        case HDMI_VFRMT_1280x720p50_16_9:
             width = 1280;
             height = 720;
             fps = 50;
             break;
-        case m1280x720p60_16_9:
+        case HDMI_VFRMT_1280x720p60_16_9:
             width = 1280;
             height = 720;
             fps = 60;
             break;
-        case m1920x1080p24_16_9:
+        case HDMI_VFRMT_1280x1024p60_5_4:
+            width = 1280;
+            height = 1024;
+            fps = 60;
+            break;
+        case HDMI_VFRMT_1024x768p60_4_3:
+            width = 1024;
+            height = 768;
+            fps = 60;
+            break;
+        case HDMI_VFRMT_1920x1080p24_16_9:
             width = 1920;
             height = 1080;
             fps = 24;
             break;
-        case m1920x1080p25_16_9:
+        case HDMI_VFRMT_1920x1080p25_16_9:
             width = 1920;
             height = 1080;
             fps = 25;
             break;
-        case m1920x1080p30_16_9:
+        case HDMI_VFRMT_1920x1080p30_16_9:
             width = 1920;
             height = 1080;
             fps = 30;
             break;
-        case m1920x1080p50_16_9:
+        case HDMI_VFRMT_1920x1080p50_16_9:
             width = 1920;
             height = 1080;
             fps = 50;
             break;
-        case m1920x1080p60_16_9:
+        case HDMI_VFRMT_1920x1080p60_16_9:
             width = 1920;
             height = 1080;
             fps = 60;
             break;
+        case HDMI_VFRMT_2560x1600p60_16_9:
+            width = 2560;
+            height = 1600;
+            fps = 60;
+            break;
+        case HDMI_VFRMT_3840x2160p24_16_9:
+            width = 3840;
+            height = 2160;
+            fps = 24;
+            break;
+        case HDMI_VFRMT_3840x2160p25_16_9:
+            width = 3840;
+            height = 2160;
+            fps = 25;
+            break;
+        case HDMI_VFRMT_3840x2160p30_16_9:
+            width = 3840;
+            height = 2160;
+            fps = 30;
+            break;
+        case HDMI_VFRMT_4096x2160p24_16_9:
+            width = 4096;
+            height = 2160;
+            fps = 24;
+            break;
+
     }
 }
 
