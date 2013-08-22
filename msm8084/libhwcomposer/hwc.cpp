@@ -257,10 +257,8 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    ctx->mBlankLock.lock();
     //Will be unlocked at the end of set
-    ctx->mExtLock.lock();
-    ctx->mSecureLock.lock();
+    ctx->mDrawLock.lock();
     reset(ctx, numDisplays, displays);
 
     ctx->mOverlay->configBegin();
@@ -312,7 +310,7 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
 #ifdef QCOM_BSP
         case  HWC_EVENT_ORIENTATION:
             if(dpy == HWC_DISPLAY_PRIMARY) {
-                Locker::Autolock _l(ctx->mBlankLock);
+                Locker::Autolock _l(ctx->mDrawLock);
                 // store the primary display orientation
                 // will be used in hwc_video::configure to disable
                 // rotation animation on external display
@@ -331,7 +329,7 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
     ATRACE_CALL();
     hwc_context_t* ctx = (hwc_context_t*)(dev);
 
-    Locker::Autolock _l(ctx->mBlankLock);
+    Locker::Autolock _l(ctx->mDrawLock);
     int ret = 0, value = 0;
     ALOGD_IF(BLANK_DEBUG, "%s: %s display: %d", __FUNCTION__,
           blank==1 ? "Blanking":"Unblanking", dpy);
@@ -615,9 +613,7 @@ static int hwc_set(hwc_composer_device_1 *dev,
     MDPComp::resetIdleFallBack();
     ctx->mVideoTransFlag = false;
     //Was locked at the beginning of prepare
-    ctx->mSecureLock.unlock();
-    ctx->mExtLock.unlock();
-    ctx->mBlankLock.unlock();
+    ctx->mDrawLock.unlock();
     return ret;
 }
 
@@ -707,6 +703,7 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
 void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
 {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    Locker::Autolock _l(ctx->mDrawLock);
     android::String8 aBuf("");
     dumpsys_log(aBuf, "Qualcomm HWC state:\n");
     dumpsys_log(aBuf, "  MDPVersion=%d\n", ctx->mMDP.version);
