@@ -103,7 +103,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         case EXTERNAL_OFFLINE:
             {   // disconnect event
                 ctx->mExtDisplay->processUEventOffline(udata);
-                Locker::Autolock _l(ctx->mExtLock);
+                Locker::Autolock _l(ctx->mDrawLock);
                 clearSecondaryObjs(ctx, dpy);
                 ALOGD("%s sending hotplug: connected = %d and dpy:%d",
                       __FUNCTION__, connected, dpy);
@@ -123,7 +123,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                     //fail, since Layer Mixer#0 is still connected to WriteBack.
                     //This block will force composition to close fb2 in above
                     //example.
-                    Locker::Autolock _l(ctx->mExtLock);
+                    Locker::Autolock _l(ctx->mDrawLock);
                     ctx->dpyAttr[dpy].isConfiguring = true;
                     ctx->dpyAttr[dpy].connected = false;
                     ctx->proc->invalidate(ctx->proc);
@@ -133,7 +133,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                         * 2 / 1000);
                 ctx->mExtDisplay->processUEventOnline(udata);
                 {
-                    Locker::Autolock _l(ctx->mExtLock);
+                    Locker::Autolock _l(ctx->mDrawLock);
                     ctx->dpyAttr[dpy].isPause = false;
                     setupSecondaryObjs(ctx, dpy);
                     ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,
@@ -146,7 +146,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         case EXTERNAL_PAUSE:
             {   // pause case
                 ALOGD("%s Received Pause event",__FUNCTION__);
-                Locker::Autolock _l(ctx->mExtLock);
+                Locker::Autolock _l(ctx->mDrawLock);
                 ctx->dpyAttr[dpy].isActive = true;
                 ctx->dpyAttr[dpy].isPause = true;
                 break;
@@ -158,7 +158,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 //Since external didnt have any pipes, force primary to give up
                 //its pipes; we don't allow inter-mixer pipe transfers.
                 {
-                    Locker::Autolock _l(ctx->mExtLock);
+                    Locker::Autolock _l(ctx->mDrawLock);
                     ctx->dpyAttr[dpy].isConfiguring = true;
                     ctx->dpyAttr[dpy].isActive = true;
                     ctx->proc->invalidate(ctx->proc);
@@ -167,7 +167,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                         * 2 / 1000);
                 //At this point external has all the pipes it would need.
                 {
-                    Locker::Autolock _l(ctx->mExtLock);
+                    Locker::Autolock _l(ctx->mDrawLock);
                     ctx->dpyAttr[dpy].isPause = false;
                     ctx->proc->invalidate(ctx->proc);
                 }

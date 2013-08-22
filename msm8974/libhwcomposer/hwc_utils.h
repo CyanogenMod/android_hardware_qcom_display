@@ -364,10 +364,8 @@ struct hwc_context_t {
     bool mSecuring;
     //Display in secure mode indicator
     bool mSecureMode;
-    //Lock to prevent set from being called while blanking
-    mutable Locker mBlankLock;
-    //Lock to protect prepare & set when detaching external disp
-    mutable Locker mExtLock;
+    //Lock to protect drawing data structures
+    mutable Locker mDrawLock;
     //Drawing round when we use GPU
     bool isPaddingRound;
     //Flags the transition of a video session
