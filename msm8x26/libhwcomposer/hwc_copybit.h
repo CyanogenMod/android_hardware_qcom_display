@@ -21,7 +21,7 @@
 #define HWC_COPYBIT_H
 #include "hwc_utils.h"
 
-#define NUM_RENDER_BUFFERS 2
+#define NUM_RENDER_BUFFERS 3
 
 namespace qhwc {
 

@@ -71,6 +71,13 @@ public:
         status_t result = reply.readInt32();
         return result;
     }
+
+    virtual void setExtOrientation(uint32_t orientation) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
+        data.writeInt32(orientation);
+        remote()->transact(EXTERNAL_ORIENTATION, data, &reply);
+    }
 };
 
 IMPLEMENT_META_INTERFACE(QService, "android.display.IQService");
@@ -140,6 +147,18 @@ status_t BnQService::onTransact(
                 return PERMISSION_DENIED;
             }
             return screenRefresh();
+        } break;
+        case EXTERNAL_ORIENTATION: {
+            CHECK_INTERFACE(IQService, data, reply);
+            if(callerUid != AID_SYSTEM) {
+                ALOGE("display.qservice EXTERNAL_ORIENTATION access denied: \
+                      pid=%d uid=%d process=%s",callerPid,
+                      callerUid, callingProcName);
+                return PERMISSION_DENIED;
+            }
+            uint32_t orientation = data.readInt32();
+            setExtOrientation(orientation);
+            return NO_ERROR;
         } break;
         default:
             return BBinder::onTransact(code, data, reply, flags);

@@ -61,6 +61,9 @@ status_t QClient::notifyCallback(uint32_t msg, uint32_t value) {
         case IQService::SCREEN_REFRESH:
             return screenRefresh();
             break;
+        case IQService::EXTERNAL_ORIENTATION:
+            setExtOrientation(value);
+            break;
         default:
             return NO_ERROR;
     }
@@ -99,10 +102,17 @@ void QClient::MPDeathNotifier::died() {
 
 android::status_t QClient::screenRefresh() {
     status_t result = NO_INIT;
+#ifdef QCOM_BSP
     if(mHwcContext->proc) {
         mHwcContext->proc->invalidate(mHwcContext->proc);
         result = NO_ERROR;
     }
+#endif
     return result;
 }
+
+void QClient::setExtOrientation(uint32_t orientation) {
+    mHwcContext->mExtOrientation = orientation;
+}
+
 }

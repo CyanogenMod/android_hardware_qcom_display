@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -25,6 +25,7 @@
 #include <linux/fb.h>
 
 struct hwc_context_t;
+struct msm_hdmi_mode_timing_info;
 
 namespace qhwc {
 
@@ -47,13 +48,20 @@ public:
     void setExternalDisplay(bool connected, int extFbNum = 0);
     bool isExternalConnected() { return mConnected;};
     void  setExtDpyNum(int extDpyNum) { mExtDpyNum = extDpyNum;};
+    int  getExternalType() {return mConnectedFbNum;};
+    bool isWFDActive() {return (mConnectedFbNum == mWfdFbNum);};
     void setHPD(uint32_t startEnd);
     void setEDIDMode(int resMode);
     void setActionSafeDimension(int w, int h);
-    void processUEventOnline(const char *str);
-    void processUEventOffline(const char *str);
+    int ignoreRequest(const char *str);
+    int  configureHDMIDisplay();
+    int  configureWFDDisplay();
+    int  teardownHDMIDisplay();
+    int  teardownWFDDisplay();
+    int getHDMIIndex() { return mHdmiFbNum; }
 
 private:
+    void setSPDInfo(const char* node, const char* property);
     void readCEUnderscanInfo();
     bool readResolution();
     int  parseResolution(char* edidStr, int* edidModes);
@@ -72,10 +80,6 @@ private:
     void setDpyWfdAttr();
     void getAttrForMode(int& width, int& height, int& fps);
     void updateExtDispDevFbIndex();
-    int  configureHDMIDisplay();
-    int  configureWFDDisplay();
-    int  teardownHDMIDisplay();
-    int  teardownWFDDisplay();
     int  getExtFbNum(int &fbNum);
 
     mutable android::Mutex mExtDispLock;
@@ -93,6 +97,8 @@ private:
     int mHdmiFbNum;
     int mWfdFbNum;
     int mExtDpyNum;
+    // Holds all the HDMI modes and timing info supported by driver
+    msm_hdmi_mode_timing_info* supported_video_mode_lut;
 };
 
 }; //qhwc
