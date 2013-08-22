@@ -21,6 +21,7 @@
 #define DEBUG_COPYBIT 0
 #include <copybit.h>
 #include <utils/Timers.h>
+#include <mdp_version.h>
 #include "hwc_copybit.h"
 #include "comptype.h"
 #include "gr.h"
@@ -71,7 +72,7 @@ void CopyBit::reset() {
 
 bool CopyBit::canUseCopybitForYUV(hwc_context_t *ctx) {
     // return true for non-overlay targets
-    if(ctx->mMDP.hasOverlay) {
+    if(ctx->mMDP.hasOverlay && ctx->mMDP.version >= qdutils::MDP_V4_0) {
        return false;
     }
     return true;
@@ -82,14 +83,6 @@ bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx,
                                         int dpy) {
     int compositionType = qdutils::QCCompositionType::
                                     getInstance().getCompositionType();
-
-    if ((compositionType & qdutils::COMPOSITION_TYPE_C2D) ||
-        (compositionType & qdutils::COMPOSITION_TYPE_DYN)) {
-         if(ctx->listStats[dpy].yuvCount) {
-             //Overlay up & running. Dont use COPYBIT for RGB layers.
-             return false;
-         }
-    }
 
     if (compositionType & qdutils::COMPOSITION_TYPE_DYN) {
         // DYN Composition:
@@ -120,7 +113,9 @@ unsigned int CopyBit::getRGBRenderingArea
     //Calculates total rendering area for RGB layers
     unsigned int renderArea = 0;
     unsigned int w=0, h=0;
-    for (unsigned int i=0; i<list->numHwLayers; i++) {
+    // Skipping last layer since FrameBuffer layer should not affect
+    // which composition to choose
+    for (unsigned int i=0; i<list->numHwLayers -1; i++) {
          private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
          if (hnd) {
              if (BUFFER_TYPE_UI == hnd->bufferType) {
@@ -158,6 +153,11 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         return false;
     }
 
+    if (ctx->listStats[dpy].numAppLayers > MAX_NUM_APP_LAYERS) {
+        // Reached max layers supported by HWC.
+        return false;
+    }
+
     bool useCopybitForYUV = canUseCopybitForYUV(ctx);
     bool useCopybitForRGB = canUseCopybitForRGB(ctx, list, dpy);
     LayerProp *layerProp = ctx->layerProp[dpy];
@@ -166,6 +166,17 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     private_handle_t *fbHnd = (private_handle_t *)fbLayer->handle;
 
 
+    // Avoid issue with mdp3 and rotation by using gpu composition
+    if (qdutils::MDPVersion::getInstance().getMDPVersion() < 400) {
+        for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
+            hwc_layer_1_t *layer = (hwc_layer_1_t *) &list->hwLayers[i];
+            if ((layer->transform & (HAL_TRANSFORM_FLIP_H |
+                   HAL_TRANSFORM_FLIP_V | HAL_TRANSFORM_ROT_90)) &&
+                   ((layer->displayFrame.bottom - layer->displayFrame.top) % 16 ||
+                   (layer->displayFrame.right - layer->displayFrame.left) % 16))
+                return true;
+        }
+    }
 
     //Allocate render buffers if they're not allocated
     if (useCopybitForYUV || useCopybitForRGB) {
@@ -180,6 +191,9 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         }
     }
 
+    // We cannot mix copybit layer with layers marked to be drawn on FB
+    if (!useCopybitForYUV && ctx->listStats[dpy].yuvCount)
+        return true;
 
     // numAppLayers-1, as we iterate till 0th layer index
     for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
@@ -196,6 +210,7 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             mCopyBitDraw = false;
             //There is no need to reset layer properties here as we return in
             //draw if mCopyBitDraw is false
+            break;
         }
     }
     return true;
@@ -209,8 +224,8 @@ int CopyBit::clear (private_handle_t* hnd, hwc_rect_t& rect)
         rect.bottom};
 
     copybit_image_t buf;
-    buf.w = ALIGN(getWidth(hnd),32);
-    buf.h = getHeight(hnd);
+    buf.w = ALIGN(hnd->width,32);
+    buf.h = hnd->height;
     buf.format = hnd->format;
     buf.base = (void *)hnd->base;
     buf.handle = (native_handle_t *)hnd;
@@ -244,11 +259,13 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         mRelFd[0] = -1;
     }
 
-    //Clear the visible region on the render buffer
-    //XXX: Do this only when needed.
-    hwc_rect_t clearRegion;
-    getNonWormholeRegion(list, clearRegion);
-    clear(renderBuffer, clearRegion);
+    if (ctx->mMDP.version >= qdutils::MDP_V4_0) {
+        //Clear the visible region on the render buffer
+        //XXX: Do this only when needed.
+        hwc_rect_t clearRegion;
+        getNonWormholeRegion(list, clearRegion);
+        clear(renderBuffer, clearRegion);
+    }
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
     for (int i = 0; i <= (ctx->listStats[dpy].numAppLayers-1); i++) {
         hwc_layer_1_t *layer = &list->hwLayers[i];
@@ -257,7 +274,8 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             continue;
         }
         int ret = -1;
-        if (list->hwLayers[i].acquireFenceFd != -1 ) {
+        if (list->hwLayers[i].acquireFenceFd != -1
+                && ctx->mMDP.version >= qdutils::MDP_V4_0) {
             // Wait for acquire Fence on the App buffers.
             ret = sync_wait(list->hwLayers[i].acquireFenceFd, 1000);
             if(ret < 0) {
@@ -287,7 +305,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                                      private_handle_t *renderBuffer, int dpy)
 {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    int err = 0;
+    int err = 0, acquireFd;
     if(!ctx) {
          ALOGE("%s: null context ", __FUNCTION__);
          return -1;
@@ -307,12 +325,12 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
 
     // Set the copybit source:
     copybit_image_t src;
-    src.w = getWidth(hnd);
-    src.h = getHeight(hnd);
+    src.w = hnd->width;
+    src.h = hnd->height;
     src.format = hnd->format;
     src.base = (void *)hnd->base;
     src.handle = (native_handle_t *)layer->handle;
-    src.horiz_padding = src.w - getWidth(hnd);
+    src.horiz_padding = src.w - hnd->width;
     // Initialize vertical padding to zero for now,
     // this needs to change to accomodate vertical stride
     // if needed in the future
@@ -381,6 +399,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                                           scaleLimitMax,1/scaleLimitMin);
         return -1;
     }
+    acquireFd = layer->acquireFenceFd;
     if(dsdx > copybitsMaxScale ||
         dtdy > copybitsMaxScale ||
         dsdx < 1/copybitsMinScale ||
@@ -415,8 +434,14 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
        ALOGE("%s:%d::tmp_w = %d,tmp_h = %d",__FUNCTION__,__LINE__,tmp_w,tmp_h);
 
        int usage = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+       int format = fbHandle->format;
 
-       if (0 == alloc_buffer(&tmpHnd, tmp_w, tmp_h, fbHandle->format, usage)){
+       // We do not want copybit to generate alpha values from nothing
+       if (format == HAL_PIXEL_FORMAT_RGBA_8888 &&
+               src.format != HAL_PIXEL_FORMAT_RGBA_8888) {
+           format = HAL_PIXEL_FORMAT_RGBX_8888;
+       }
+       if (0 == alloc_buffer(&tmpHnd, tmp_w, tmp_h, format, usage)){
             copybit_image_t tmp_dst;
             copybit_rect_t tmp_rect;
             tmp_dst.w = tmp_w;
@@ -436,6 +461,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
             copybit->set_parameter(copybit,COPYBIT_TRANSFORM,0);
             //TODO: once, we are able to read layer alpha, update this
             copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, 255);
+            copybit->set_sync(copybit, acquireFd);
             err = copybit->stretch(copybit,&tmp_dst, &src, &tmp_rect,
                                                            &srcRect, &tmp_it);
             if(err < 0){
@@ -444,6 +470,12 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                 if(tmpHnd)
                     free_buffer(tmpHnd);
                 return err;
+            }
+            // use release fence as aquire fd for next stretch
+            if (ctx->mMDP.version < qdutils::MDP_V4_0) {
+                copybit->flush_get_fence(copybit, &acquireFd);
+                close(acquireFd);
+                acquireFd = -1;
             }
             // copy new src and src rect crop
             src = tmp_dst;
@@ -469,13 +501,26 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                                              COPYBIT_ENABLE : COPYBIT_DISABLE);
     copybit->set_parameter(copybit, COPYBIT_BLIT_TO_FRAMEBUFFER,
                                                 COPYBIT_ENABLE);
+    copybit->set_sync(copybit, acquireFd);
     err = copybit->stretch(copybit, &dst, &src, &dstRect, &srcRect,
                                                    &copybitRegion);
     copybit->set_parameter(copybit, COPYBIT_BLIT_TO_FRAMEBUFFER,
                                                COPYBIT_DISABLE);
 
-    if(tmpHnd)
+    if(tmpHnd) {
+        if (ctx->mMDP.version < qdutils::MDP_V4_0){
+            int ret = -1, releaseFd;
+            // we need to wait for the buffer before freeing
+            copybit->flush_get_fence(copybit, &releaseFd);
+            ret = sync_wait(releaseFd, 1000);
+            if(ret < 0) {
+                ALOGE("%s: sync_wait error!! error no = %d err str = %s",
+                    __FUNCTION__, errno, strerror(errno));
+            }
+            close(releaseFd);
+        }
         free_buffer(tmpHnd);
+    }
 
     if(err < 0)
         ALOGE("%s: copybit stretch failed",__FUNCTION__);

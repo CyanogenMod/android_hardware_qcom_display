@@ -45,9 +45,9 @@
 #include <utils/Log.h>
 #include "gralloc_priv.h" //for interlace
 
-// Older platforms do not support Venus.
+// Older platforms do not support Venus
 #ifndef VENUS_COLOR_FORMAT
-#define MDP_Y_CBCR_H2V2_VENUS (MDP_IMGTYPE_LIMIT2 + 1)
+#define MDP_Y_CBCR_H2V2_VENUS MDP_IMGTYPE_LIMIT
 #endif
 
 /*
@@ -78,7 +78,6 @@
 #endif
 
 #define FB_DEVICE_TEMPLATE "/dev/graphics/fb%u"
-#define NUM_FB_DEVICES 3
 
 namespace overlay {
 
@@ -143,6 +142,7 @@ bool send3DInfoPacket (uint32_t fmt);
 bool enableBarrier (uint32_t orientation);
 uint32_t getS3DFormat(uint32_t fmt);
 bool isMdssRotator();
+void normalizeCrop(uint32_t& xy, uint32_t& wh);
 
 template <int CHAN>
 bool getPositionS3D(const Whf& whf, Dim& out);
@@ -212,8 +212,6 @@ struct Whf {
 
 enum { MAX_PATH_LEN = 256 };
 
-enum { DEFAULT_PLANE_ALPHA = 0xFF };
-
 /**
  * Rotator flags: not to be confused with orientation flags.
  * Usually, you want to open the rotator to make sure it is
@@ -264,6 +262,7 @@ enum eMdpFlags {
     OV_MDP_FLIP_V = MDP_FLIP_UD,
     OV_MDSS_MDP_RIGHT_MIXER = MDSS_MDP_RIGHT_MIXER,
     OV_MDP_PP_EN = MDP_OVERLAY_PP_CFG_EN,
+    OV_MDSS_MDP_BWC_EN = MDP_BWC_EN,
 };
 
 enum eZorder {
@@ -330,36 +329,21 @@ enum eTransform {
     OVERLAY_TRANSFORM_INV = 0x80
 };
 
-enum eBlending {
-    OVERLAY_BLENDING_UNDEFINED = 0x0,
-    /* No blending */
-    OVERLAY_BLENDING_OPAQUE,
-    /* src.rgb + dst.rgb*(1-src_alpha) */
-    OVERLAY_BLENDING_PREMULT,
-    /* src.rgb * src_alpha + dst.rgb (1 - src_alpha) */
-    OVERLAY_BLENDING_COVERAGE,
-};
-
 // Used to consolidate pipe params
 struct PipeArgs {
     PipeArgs() : mdpFlags(OV_MDP_FLAGS_NONE),
         zorder(Z_SYSTEM_ALLOC),
         isFg(IS_FG_OFF),
-        rotFlags(ROT_FLAGS_NONE),
-        planeAlpha(DEFAULT_PLANE_ALPHA),
-        blending(OVERLAY_BLENDING_COVERAGE){
+        rotFlags(ROT_FLAGS_NONE){
     }
 
     PipeArgs(eMdpFlags f, Whf _whf,
-            eZorder z, eIsFg fg, eRotFlags r,
-            int pA, eBlending b) :
+            eZorder z, eIsFg fg, eRotFlags r) :
         mdpFlags(f),
         whf(_whf),
         zorder(z),
         isFg(fg),
-        rotFlags(r),
-        planeAlpha(pA),
-        blending(b){
+        rotFlags(r) {
     }
 
     eMdpFlags mdpFlags; // for mdp_overlay flags
@@ -367,8 +351,6 @@ struct PipeArgs {
     eZorder zorder; // stage number
     eIsFg isFg; // control alpha & transp
     eRotFlags rotFlags;
-    int planeAlpha;
-    eBlending blending;
 };
 
 // Cannot use HW_OVERLAY_MAGNIFICATION_LIMIT, since at the time
@@ -385,14 +367,7 @@ inline void clearMdpFlags(eMdpFlags& f, eMdpFlags v) {
     f = static_cast<eMdpFlags>(clrBit(f, v));
 }
 
-// fb 0/1/2
 enum { FB0, FB1, FB2 };
-
-//Panels could be categorized as primary and external
-enum { PRIMARY, EXTERNAL };
-
-// 2 for rgb0/1 double bufs
-enum { RGB_PIPE_NUM_BUFS = 2 };
 
 struct ScreenInfo {
     ScreenInfo() : mFBWidth(0),
@@ -410,6 +385,9 @@ int getMdpFormat(int format);
 int getHALFormat(int mdpFormat);
 int getDownscaleFactor(const int& src_w, const int& src_h,
         const int& dst_w, const int& dst_h);
+void getDecimationFactor(const int& src_w, const int& src_h,
+        const int& dst_w, const int& dst_h, float& horDscale,
+        float& verDscale);
 
 /* flip is upside down and such. V, H flip
  * rotation is 90, 180 etc
@@ -507,42 +485,46 @@ inline bool isRgb(uint32_t format) {
 }
 
 inline const char* getFormatString(int format){
-    static const char* const formats[] = {
-        "MDP_RGB_565",
-        "MDP_XRGB_8888",
-        "MDP_Y_CBCR_H2V2",
-        "MDP_Y_CBCR_H2V2_ADRENO",
-        "MDP_ARGB_8888",
-        "MDP_RGB_888",
-        "MDP_Y_CRCB_H2V2",
-        "MDP_YCRYCB_H2V1",
-        "MDP_Y_CRCB_H2V1",
-        "MDP_Y_CBCR_H2V1",
-        "MDP_Y_CRCB_H1V2",
-        "MDP_Y_CBCR_H1V2",
-        "MDP_RGBA_8888",
-        "MDP_BGRA_8888",
-        "MDP_RGBX_8888",
-        "MDP_Y_CRCB_H2V2_TILE",
-        "MDP_Y_CBCR_H2V2_TILE",
-        "MDP_Y_CR_CB_H2V2",
-        "MDP_Y_CR_CB_GH2V2",
-        "MDP_Y_CB_CR_H2V2",
-        "MDP_Y_CRCB_H1V1",
-        "MDP_Y_CBCR_H1V1",
-        "MDP_YCRCB_H1V1",
-        "MDP_YCBCR_H1V1",
-        "MDP_BGR_565",
-        "MDP_BGR_888",
-        "MDP_Y_CBCR_H2V2_VENUS",
-        "MDP_IMGTYPE_LIMIT",
-        "MDP_RGB_BORDERFILL",
-        "MDP_FB_FORMAT",
-        "MDP_IMGTYPE_LIMIT2"
-    };
-    if(format < 0 || format >= (int)(sizeof(formats) / sizeof(formats[0]))) {
+    #define STR(f) #f;
+    static const char* formats[MDP_IMGTYPE_LIMIT + 1] = {0};
+    formats[MDP_RGB_565] = STR(MDP_RGB_565);
+    formats[MDP_XRGB_8888] = STR(MDP_XRGB_8888);
+    formats[MDP_Y_CBCR_H2V2] = STR(MDP_Y_CBCR_H2V2);
+    formats[MDP_Y_CBCR_H2V2_ADRENO] = STR(MDP_Y_CBCR_H2V2_ADRENO);
+    formats[MDP_ARGB_8888] = STR(MDP_ARGB_8888);
+    formats[MDP_RGB_888] = STR(MDP_RGB_888);
+    formats[MDP_Y_CRCB_H2V2] = STR(MDP_Y_CRCB_H2V2);
+    formats[MDP_YCRYCB_H2V1] = STR(MDP_YCRYCB_H2V1);
+    formats[MDP_CBYCRY_H2V1] = STR(MDP_CBYCRY_H2V1);
+    formats[MDP_Y_CRCB_H2V1] = STR(MDP_Y_CRCB_H2V1);
+    formats[MDP_Y_CBCR_H2V1] = STR(MDP_Y_CBCR_H2V1);
+    formats[MDP_Y_CRCB_H1V2] = STR(MDP_Y_CRCB_H1V2);
+    formats[MDP_Y_CBCR_H1V2] = STR(MDP_Y_CBCR_H1V2);
+    formats[MDP_RGBA_8888] = STR(MDP_RGBA_8888);
+    formats[MDP_BGRA_8888] = STR(MDP_BGRA_8888);
+    formats[MDP_RGBX_8888] = STR(MDP_RGBX_8888);
+    formats[MDP_Y_CRCB_H2V2_TILE] = STR(MDP_Y_CRCB_H2V2_TILE);
+    formats[MDP_Y_CBCR_H2V2_TILE] = STR(MDP_Y_CBCR_H2V2_TILE);
+    formats[MDP_Y_CR_CB_H2V2] = STR(MDP_Y_CR_CB_H2V2);
+    formats[MDP_Y_CR_CB_GH2V2] = STR(MDP_Y_CR_CB_GH2V2);
+    formats[MDP_Y_CB_CR_H2V2] = STR(MDP_Y_CB_CR_H2V2);
+    formats[MDP_Y_CRCB_H1V1] = STR(MDP_Y_CRCB_H1V1);
+    formats[MDP_Y_CBCR_H1V1] = STR(MDP_Y_CBCR_H1V1);
+    formats[MDP_YCRCB_H1V1] = STR(MDP_YCRCB_H1V1);
+    formats[MDP_YCBCR_H1V1] = STR(MDP_YCBCR_H1V1);
+    formats[MDP_BGR_565] = STR(MDP_BGR_565);
+    formats[MDP_BGR_888] = STR(MDP_BGR_888);
+    formats[MDP_Y_CBCR_H2V2_VENUS] = STR(MDP_Y_CBCR_H2V2_VENUS);
+    formats[MDP_BGRX_8888] = STR(MDP_BGRX_8888);
+    formats[MDP_IMGTYPE_LIMIT] = STR(MDP_IMGTYPE_LIMIT);
+
+    if(format < 0 || format >= MDP_IMGTYPE_LIMIT) {
         ALOGE("%s wrong fmt %d", __FUNCTION__, format);
         return "Unsupported format";
+    }
+    if(formats[format] == 0) {
+        ALOGE("%s: table missing format %d from header", __FUNCTION__, format);
+        return "";
     }
     return formats[format];
 }
@@ -554,29 +536,6 @@ inline void Whf::dump() const {
 
 inline void Dim::dump() const {
     ALOGE("== Dump Dim x=%d y=%d w=%d h=%d start/end ==", x, y, w, h);
-}
-
-inline int getMdpOrient(eTransform rotation) {
-    ALOGE_IF(DEBUG_OVERLAY, "%s: rot=%d", __FUNCTION__, rotation);
-    switch(rotation)
-    {
-        case OVERLAY_TRANSFORM_0 : return 0;
-        case OVERLAY_TRANSFORM_FLIP_V:  return MDP_FLIP_UD;
-        case OVERLAY_TRANSFORM_FLIP_H:  return MDP_FLIP_LR;
-        case OVERLAY_TRANSFORM_ROT_90:  return MDP_ROT_90;
-        //getMdpOrient will switch the flips if the source is 90 rotated.
-        //Clients in Android dont factor in 90 rotation while deciding flip.
-        case OVERLAY_TRANSFORM_ROT_90_FLIP_V:
-                return MDP_ROT_90 | MDP_FLIP_LR;
-        case OVERLAY_TRANSFORM_ROT_90_FLIP_H:
-                return MDP_ROT_90 | MDP_FLIP_UD;
-        case OVERLAY_TRANSFORM_ROT_180: return MDP_ROT_180;
-        case OVERLAY_TRANSFORM_ROT_270: return MDP_ROT_270;
-        default:
-            ALOGE("%s: invalid rotation value (value = 0x%x",
-                    __FUNCTION__, rotation);
-    }
-    return -1;
 }
 
 // FB0

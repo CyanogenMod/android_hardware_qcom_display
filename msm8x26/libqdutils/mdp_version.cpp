@@ -44,8 +44,13 @@ MDPVersion::MDPVersion()
     struct fb_fix_screeninfo fb_finfo;
 
     mMdpRev = 0;
-    mRGBPipes = mVGPipes = 0;
+    mRGBPipes = 0;
+    mVGPipes = 0;
     mDMAPipes = 0;
+    mFeatures = 0;
+    //TODO get this from driver, default for A-fam to 8
+    mMDPDownscale = 8;
+    mFd = fb_fd;
 
     if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &fb_finfo) < 0) {
         ALOGE("FBIOGET_FSCREENINFO failed");
@@ -80,23 +85,86 @@ MDPVersion::MDPVersion()
                 mRGBPipes = metadata.data.caps.rgb_pipes;
                 mVGPipes = metadata.data.caps.vig_pipes;
                 mDMAPipes = metadata.data.caps.dma_pipes;
+                mFeatures = metadata.data.caps.features;
+                if (metadata.data.caps.mdp_rev == MDP_V3_0_4){
+                    mdp_version = MDP_V3_0_4;
+                }
             }
 #endif
         } else {
             mdp_version = MDP_V_UNKNOWN;
         }
-        int len = strlen("msmfbXX_");
-        if (mdp_version == MDP_V3_0_3)
-            len++;
-        panel_type = fb_finfo.id[len];
 
+        /* Assumes panel type is 2nd element in '_' delimited id string */
+        char * ptype = strstr(fb_finfo.id, "_");
+        if (!ptype || (*(++ptype) == '\0')) {
+            ALOGE("Invalid framebuffer info string: %s", fb_finfo.id);
+            ptype = fb_finfo.id;
+        }
+        panel_type = *ptype;
     }
-    close(fb_fd);
+    mPanelType = panel_type;
     mMDPVersion = mdp_version;
     mHasOverlay = false;
-    if((mMDPVersion >= MDP_V4_0) || (mMDPVersion == MDP_V_UNKNOWN))
+    if((mMDPVersion >= MDP_V4_0) ||
+       (mMDPVersion == MDP_V_UNKNOWN) ||
+       (mMDPVersion == MDP_V3_0_4))
         mHasOverlay = true;
-    mPanelType = panel_type;
+    if(mMDPVersion >= MDSS_V5) {
+        //TODO get this from driver
+        mMDPDownscale = 4;
+
+        char split[64];
+        FILE* fp = fopen("/sys/class/graphics/fb0/msm_fb_split", "r");
+        if(fp){
+            //Format "left right" space as delimiter
+            if(fread(split, sizeof(char), 64, fp)) {
+                mSplit.mLeft = atoi(split);
+                ALOGI_IF(mSplit.mLeft, "Left Split=%d", mSplit.mLeft);
+                char *rght = strpbrk(split, " ");
+                if(rght)
+                    mSplit.mRight = atoi(rght + 1);
+                ALOGI_IF(rght, "Right Split=%d", mSplit.mRight);
+            }
+        } else {
+            ALOGE("Failed to open mdss_fb_split node");
+        }
+
+        if(fp)
+            fclose(fp);
+    }
 }
+
+MDPVersion::~MDPVersion() {
+    close(mFd);
+}
+
+bool MDPVersion::supportsDecimation() {
+    return mFeatures & MDP_DECIMATION_EN;
+}
+
+uint32_t MDPVersion::getMaxMDPDownscale() {
+    return mMDPDownscale;
+}
+
+bool MDPVersion::supportsBWC() {
+    // BWC - Bandwidth Compression
+    return (mFeatures & MDP_BWC_EN);
+}
+
+bool MDPVersion::is8x26() {
+    // check for 8x26 variants
+    // chip variants have same major number and minor numbers usually vary
+    // for e.g., MDSS_MDP_HW_REV_101 is 0x10010000
+    //                                    1001       -  major number
+    //                                        0000   -  minor number
+    // 8x26 v1 minor number is 0000
+    //      v2 minor number is 0001 etc..
+    if( mMdpRev >= MDSS_MDP_HW_REV_101 && mMdpRev < MDSS_MDP_HW_REV_102) {
+        return true;
+    }
+    return false;
+}
+
 }; //namespace qdutils
 

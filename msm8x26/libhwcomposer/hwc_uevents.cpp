@@ -31,9 +31,10 @@
 #include "hwc_copybit.h"
 #include "comptype.h"
 #include "external.h"
+#include "mdp_version.h"
 
 namespace qhwc {
-
+#define HWC_UEVENT_SWITCH_STR  "change@/devices/virtual/switch/"
 #define HWC_UEVENT_THREAD_NAME "hwcUeventThread"
 
 /* External Display states */
@@ -51,6 +52,33 @@ static bool isHDMI(const char* str)
     return false;
 }
 
+static void setup(hwc_context_t* ctx, int dpy, bool usecopybit)
+{
+    const int rSplit = 0; //Even split for external if at all
+    ctx->mFBUpdate[dpy] = IFBUpdate::getObject(ctx->dpyAttr[dpy].xres,
+            rSplit, dpy);
+    ctx->mMDPComp[dpy] =  MDPComp::getObject(ctx->dpyAttr[dpy].xres,
+            rSplit, dpy);
+    if(usecopybit)
+        ctx->mCopyBit[dpy] = new CopyBit();
+}
+
+static void clear(hwc_context_t* ctx, int dpy)
+{
+    if(ctx->mFBUpdate[dpy]) {
+        delete ctx->mFBUpdate[dpy];
+        ctx->mFBUpdate[dpy] = NULL;
+    }
+    if(ctx->mCopyBit[dpy]){
+        delete ctx->mCopyBit[dpy];
+        ctx->mCopyBit[dpy] = NULL;
+    }
+    if(ctx->mMDPComp[dpy]) {
+        delete ctx->mMDPComp[dpy];
+        ctx->mMDPComp[dpy] = NULL;
+    }
+}
+
 static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 {
     int vsync = 0;
@@ -65,7 +93,6 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                            qdutils::COMPOSITION_TYPE_C2D)) {
         usecopybit = true;
     }
-
     if(!strcasestr("change@/devices/virtual/switch/hdmi", str) &&
        !strcasestr("change@/devices/virtual/switch/wfd", str)) {
         ALOGD_IF(UEVENT_DEBUG, "%s: Not Ext Disp Event ", __FUNCTION__);
@@ -83,9 +110,6 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
     }
 
     int dpy = isHDMI(str) ? HWC_DISPLAY_EXTERNAL : extDpyNum;
-
-    // update extDpyNum
-    ctx->mExtDisplay->setExtDpyNum(dpy);
 
     // parse HDMI/WFD switch state for connect/disconnect
     // for HDMI:
@@ -106,29 +130,33 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         if (str - udata >= len)
             break;
     }
+    ALOGD_IF(UEVENT_DEBUG, "Received str:%s",udata);
 
+    if(connected != EXTERNAL_ONLINE) {
+        if(ctx->mExtDisplay->ignoreRequest(udata)) {
+            ALOGD_IF(UEVENT_DEBUG,"No need to process this connection request"
+                                  "str:%s",udata);
+           ctx->dpyAttr[dpy].isActive = true;
+           return;
+        }
+    }
+
+    // update extDpyNum
+    ctx->mExtDisplay->setExtDpyNum(dpy);
     switch(connected) {
         case EXTERNAL_OFFLINE:
             {   // disconnect event
-                ctx->mExtDisplay->processUEventOffline(udata);
-                if(ctx->mFBUpdate[dpy]) {
-                    Locker::Autolock _l(ctx->mExtSetLock);
-                    delete ctx->mFBUpdate[dpy];
-                    ctx->mFBUpdate[dpy] = NULL;
+                const char *s1 = udata + strlen(HWC_UEVENT_SWITCH_STR);
+                if(!strncmp(s1,"hdmi",strlen(s1))) {
+                    ctx->mExtDisplay->teardownHDMIDisplay();
+                }else if(!strncmp(s1,"wfd",strlen(s1))) {
+                    ctx->mExtDisplay->teardownWFDDisplay();
                 }
-                if(ctx->mCopyBit[dpy]){
-                    Locker::Autolock _l(ctx->mExtSetLock);
-                    delete ctx->mCopyBit[dpy];
-                    ctx->mCopyBit[dpy] = NULL;
-                }
-                if(ctx->mMDPComp[dpy]) {
-                    delete ctx->mMDPComp[dpy];
-                    ctx->mMDPComp[dpy] = NULL;
-                }
+                Locker::Autolock _l(ctx->mExtLock);
+                clear(ctx, dpy);
                 ALOGD("%s sending hotplug: connected = %d and dpy:%d",
                       __FUNCTION__, connected, dpy);
                 ctx->dpyAttr[dpy].connected = false;
-                Locker::Autolock _l(ctx->mExtSetLock);
                 //hwc comp could be on
                 ctx->proc->hotplug(ctx->proc, dpy, connected);
                 break;
@@ -136,27 +164,49 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         case EXTERNAL_ONLINE:
             {   // connect case
                 ctx->mExtDispConfiguring = true;
-                ctx->mExtDisplay->processUEventOnline(udata);
-                ctx->mFBUpdate[dpy] =
-                        IFBUpdate::getObject(ctx->dpyAttr[dpy].xres, dpy);
+                const char *s1 = udata + strlen(HWC_UEVENT_SWITCH_STR);
+                if(!strncmp(s1,"hdmi",strlen(s1))) {
+                    // hdmi online event..!
+                    // check if WFD is configured
+                    if(ctx->mExtDisplay->isWFDActive()) {
+                        ALOGD_IF(UEVENT_DEBUG,"Received HDMI connection request"
+                                "when WFD is active");
+                        // teardown Active WFD Display
+                        ctx->mExtDisplay->teardownWFDDisplay();
+                        {
+                            Locker::Autolock _l(ctx->mExtLock);
+                            clear(ctx, dpy);
+                            //send hotplug disconnect event
+                            ALOGD_IF(UEVENT_DEBUG, "sending hotplug: disconnect"
+                                    "for WFD");
+                            // hwc comp could be on
+                            ctx->proc->hotplug(ctx->proc, dpy, EXTERNAL_OFFLINE);
+                        }
+                        //Invalidate
+                        ctx->proc->invalidate(ctx->proc);
+                        //wait for 1 second
+                        ALOGE_IF(UEVENT_DEBUG, "wait for 1 second -- padding"
+                                "round");
+                        sleep(1);
+                    }
+                    ctx->mExtDisplay->configureHDMIDisplay();
+                } else if(!strncmp(s1,"wfd",strlen(s1))) {
+                    // wfd online event..!
+                    ctx->mExtDisplay->configureWFDDisplay();
+                }
                 ctx->dpyAttr[dpy].isPause = false;
-                if(usecopybit)
-                    ctx->mCopyBit[dpy] = new CopyBit();
-                ctx->mMDPComp[dpy] =  MDPComp::getObject(
-                        ctx->dpyAttr[dpy].xres, dpy);
+                setup(ctx, dpy, usecopybit);
                 ALOGD("%s sending hotplug: connected = %d", __FUNCTION__,
                         connected);
                 ctx->dpyAttr[dpy].connected = true;
-                Locker::Autolock _l(ctx->mExtSetLock); //hwc comp could be on
+                Locker::Autolock _l(ctx->mExtLock); //hwc comp could be on
                 ctx->proc->hotplug(ctx->proc, dpy, connected);
                 break;
             }
         case EXTERNAL_PAUSE:
             {   // pause case
                 ALOGD("%s Received Pause event",__FUNCTION__);
-                // This is required to ensure that composition
-                // fall back to FB, closing all MDP pipes.
-                ctx->mExtDispConfiguring = true;
+                Locker::Autolock _l(ctx->mExtLock);
                 ctx->dpyAttr[dpy].isActive = true;
                 ctx->dpyAttr[dpy].isPause = true;
                 break;
@@ -164,8 +214,12 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         case EXTERNAL_RESUME:
             {  // resume case
                 ALOGD("%s Received resume event",__FUNCTION__);
+                // treat Resume as Online event
+                Locker::Autolock _l(ctx->mExtLock);
+                ctx->mExtDispConfiguring = true;
                 ctx->dpyAttr[dpy].isActive = true;
                 ctx->dpyAttr[dpy].isPause = false;
+                ctx->proc->invalidate(ctx->proc);
                 break;
             }
         default:

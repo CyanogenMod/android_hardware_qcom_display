@@ -46,7 +46,8 @@ public:
     /* dumpsys */
     void dump(android::String8& buf);
 
-    static MDPComp* getObject(const int& width, const int dpy);
+    static MDPComp* getObject(const int& width, const int& rightSplit,
+            const int& dpy);
     /* Handler to invoke frame redraw on Idle Timer expiry */
     static void timeout_handler(void *udata);
     /* Initialize MDP comp*/
@@ -78,7 +79,7 @@ protected:
     struct FrameInfo {
         /* maps layer list to mdp list */
         int layerCount;
-        int layerToMDP[MAX_NUM_LAYERS];
+        int layerToMDP[MAX_NUM_APP_LAYERS];
 
         /* maps mdp list to layer list */
         int mdpCount;
@@ -86,7 +87,7 @@ protected:
 
         /* layer composing on FB? */
         int fbCount;
-        bool isFBComposed[MAX_NUM_LAYERS];
+        bool isFBComposed[MAX_NUM_APP_LAYERS];
 
         bool needsRedraw;
         int fbZ;
@@ -104,7 +105,7 @@ protected:
         int mdpCount;
         int cacheCount;
         int fbZ;
-        buffer_handle_t hnd[MAX_NUM_LAYERS];
+        buffer_handle_t hnd[MAX_NUM_APP_LAYERS];
 
         /* c'tor */
         LayerCache();
@@ -163,15 +164,18 @@ protected:
     void updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list);
     bool programMDP(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     bool programYUV(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    void reset(const int& numAppLayers, hwc_display_contents_1_t* list);
 
     int mDpy;
     static bool sEnabled;
+    static bool sEnableMixedMode;
     static bool sDebugLogs;
     static bool sIdleFallBack;
     static int sMaxPipesPerMixer;
     static IdleInvalidator *idleInvalidator;
     struct FrameInfo mCurrentFrame;
     struct LayerCache mCachedFrame;
+    mutable Locker mMdpCompLock;
 };
 
 class MDPCompLowRes : public MDPComp {
@@ -224,5 +228,6 @@ private:
 
     virtual int pipesNeeded(hwc_context_t *ctx, hwc_display_contents_1_t* list);
 };
+
 }; //namespace
 #endif

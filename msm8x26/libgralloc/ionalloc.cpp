@@ -109,10 +109,6 @@ int IonAlloc::alloc_buffer(alloc_data& data)
             ioctl(mIonFd, ION_IOC_FREE, &handle_data);
             return err;
         }
-        memset(base, 0, ionAllocData.len);
-        // Clean cache after memset
-        clean_buffer(base, data.size, data.offset, fd_data.fd,
-                     CACHE_CLEAN_AND_INVALIDATE);
     }
 
     data.base = base;

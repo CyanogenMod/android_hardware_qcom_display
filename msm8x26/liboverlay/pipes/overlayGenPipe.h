@@ -31,7 +31,6 @@
 #define OVERLAY_GENERIC_PIPE_H
 
 #include "overlayUtils.h"
-#include "overlayRotator.h"
 #include "overlayCtrlData.h"
 
 namespace overlay {
@@ -74,22 +73,21 @@ public:
     void dump() const;
     /* Return the dump in the specified buffer */
     void getDump(char *buf, size_t len);
+    /* Marks the pipe for forcible setting of params
+     * even if they haven't changed
+     */
+    void forceSet();
 
 private:
     /* set Closed pipe */
     bool setClosed();
 
-    int mFbNum;
+    int mDpy;
     /* Ctrl/Data aggregator */
     CtrlData mCtrlData;
-    Rotator* mRot;
-    //Whether rotator is used for 0-rot or otherwise
-    bool mRotUsed;
     //Whether we will do downscale opt. This is just a request. If the frame is
     //not a candidate, we might not do it.
     bool mRotDownscaleOpt;
-    //Whether the source is prerotated.
-    bool mPreRotated;
     /* Pipe open or closed */
     enum ePipeState {
         CLOSED,
