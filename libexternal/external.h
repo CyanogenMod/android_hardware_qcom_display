@@ -45,7 +45,6 @@ public:
     void setActionSafeDimension(int w, int h);
     bool isCEUnderscanSupported() { return mUnderscanSupported; }
     int configure();
-    void getAttributes(int& width, int& height);
     int teardown();
     bool isConnected() {
         return  mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].connected;
