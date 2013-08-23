@@ -75,9 +75,10 @@ static bool canFallback(int usage, bool triedSystem)
 
 static bool useUncached(int usage)
 {
-    if (usage & GRALLOC_USAGE_PRIVATE_UNCACHED ||
-        usage & GRALLOC_USAGE_SW_WRITE_RARELY  ||
-        usage & GRALLOC_USAGE_SW_READ_RARELY)
+    if (usage & GRALLOC_USAGE_PRIVATE_UNCACHED)
+        return true;
+    if(((usage & GRALLOC_USAGE_SW_WRITE_MASK) == GRALLOC_USAGE_SW_WRITE_RARELY)
+       ||((usage & GRALLOC_USAGE_SW_READ_MASK) == GRALLOC_USAGE_SW_READ_RARELY))
         return true;
     return false;
 }
