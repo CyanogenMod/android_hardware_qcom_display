@@ -336,6 +336,27 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
     // if needed in the future
     src.vert_padding = 0;
 
+    int layerTransform = layer->transform ;
+    // When flip and rotation(90) are present alter the flip,
+    // as GPU is doing the flip and rotation in opposite order
+    // to that of MDP3.0
+    // For 270 degrees, we get 90 + (H+V) which is same as doing
+    // flip first and then rotation (H+V) + 90
+    if (qdutils::MDPVersion::getInstance().getMDPVersion() < 400) {
+                if (((layer->transform& HAL_TRANSFORM_FLIP_H) ||
+                (layer->transform & HAL_TRANSFORM_FLIP_V)) &&
+                (layer->transform &  HAL_TRANSFORM_ROT_90) &&
+                !(layer->transform ==  HAL_TRANSFORM_ROT_270)){
+                      if(layer->transform & HAL_TRANSFORM_FLIP_H){
+                                 layerTransform ^= HAL_TRANSFORM_FLIP_H;
+                                 layerTransform |= HAL_TRANSFORM_FLIP_V;
+                      }
+                      if(layer->transform & HAL_TRANSFORM_FLIP_V){
+                                 layerTransform ^= HAL_TRANSFORM_FLIP_V;
+                                 layerTransform |= HAL_TRANSFORM_FLIP_H;
+                      }
+               }
+    }
     // Copybit source rect
     hwc_rect_t sourceCrop = layer->sourceCrop;
     copybit_rect_t srcRect = {sourceCrop.left, sourceCrop.top,
@@ -491,7 +512,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
     copybit->set_parameter(copybit, COPYBIT_FRAMEBUFFER_HEIGHT,
                                           renderBuffer->height);
     copybit->set_parameter(copybit, COPYBIT_TRANSFORM,
-                                              layer->transform);
+                                              layerTransform);
     //TODO: once, we are able to read layer alpha, update this
     copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, 255);
     copybit->set_parameter(copybit, COPYBIT_BLEND_MODE,
