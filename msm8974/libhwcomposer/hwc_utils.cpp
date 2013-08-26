@@ -171,7 +171,6 @@ void initContext(hwc_context_t *ctx)
 
     ctx->vstate.enable = false;
     ctx->vstate.fakevsync = false;
-    ctx->mBasePipeSetup = false;
 
     //Right now hwc starts the service but anybody could do it, or it could be
     //independent process as well.
@@ -813,47 +812,6 @@ int configRotator(Rotator *rot, const Whf& whf,
     rot->setDownscale(downscale);
     if(!rot->commit()) return -1;
     return 0;
-}
-
-/*
- * Sets up BORDERFILL as default base pipe and detaches RGB0.
- * Framebuffer is always updated using PLAY ioctl.
- */
-bool setupBasePipe(hwc_context_t *ctx) {
-    const int dpy = HWC_DISPLAY_PRIMARY;
-    int fb_stride = ctx->dpyAttr[dpy].stride;
-    int fb_width = ctx->dpyAttr[dpy].xres;
-    int fb_height = ctx->dpyAttr[dpy].yres;
-    int fb_fd = ctx->dpyAttr[dpy].fd;
-
-    mdp_overlay ovInfo;
-    msmfb_overlay_data ovData;
-    memset(&ovInfo, 0, sizeof(mdp_overlay));
-    memset(&ovData, 0, sizeof(msmfb_overlay_data));
-
-    ovInfo.src.format = MDP_RGB_BORDERFILL;
-    ovInfo.src.width  = fb_width;
-    ovInfo.src.height = fb_height;
-    ovInfo.src_rect.w = fb_width;
-    ovInfo.src_rect.h = fb_height;
-    ovInfo.dst_rect.w = fb_width;
-    ovInfo.dst_rect.h = fb_height;
-    ovInfo.id = MSMFB_NEW_REQUEST;
-
-    if (ioctl(fb_fd, MSMFB_OVERLAY_SET, &ovInfo) < 0) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_SET err=%s",
-                strerror(errno));
-        return false;
-    }
-
-    ovData.id = ovInfo.id;
-    if (ioctl(fb_fd, MSMFB_OVERLAY_PLAY, &ovData) < 0) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_PLAY err=%s",
-                strerror(errno));
-        return false;
-    }
-    ctx->mBasePipeSetup = true;
-    return true;
 }
 
 int configMdp(Overlay *ov, const PipeArgs& parg,

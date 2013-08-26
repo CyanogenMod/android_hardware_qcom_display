@@ -180,7 +180,6 @@ bool isSecureModePolicy(int mdpVersion);
 bool isSecondaryConfiguring(hwc_context_t* ctx);
 bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer, const int& dpy);
 bool isAlphaPresent(hwc_layer_1_t const* layer);
-bool setupBasePipe(hwc_context_t *ctx);
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable);
 int getBlending(int blending);
 
@@ -369,8 +368,6 @@ struct hwc_context_t {
     mutable Locker mBlankLock;
     //Lock to protect prepare & set when detaching external disp
     mutable Locker mExtLock;
-    //Check if base pipe is set up
-    bool mBasePipeSetup;
     //Drawing round when we use GPU
     bool isPaddingRound;
     //Flags the transition of a video session
