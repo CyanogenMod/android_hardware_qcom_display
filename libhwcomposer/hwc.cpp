@@ -129,7 +129,7 @@ static void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers) {
     ctx->layerProp[dpy] = new LayerProp[numAppLayers];
 }
 
-static int display_commit(hwc_context_t *ctx, int dpy) {
+static int display_commit(hwc_context_t *ctx, int dpy, uint32_t wait_for_finish = 0) {
     int fbFd = ctx->dpyAttr[dpy].fd;
     if(fbFd == -1) {
         ALOGE("%s: Invalid FB fd for display: %d", __FUNCTION__, dpy);
@@ -138,6 +138,7 @@ static int display_commit(hwc_context_t *ctx, int dpy) {
 
     struct mdp_display_commit commit_info;
     memset(&commit_info, 0, sizeof(struct mdp_display_commit));
+    commit_info.wait_for_finish = wait_for_finish;
     commit_info.flags = MDP_DISPLAY_COMMIT_OVERLAY;
     if(ioctl(fbFd, MSMFB_DISPLAY_COMMIT, &commit_info) < 0) {
        ALOGE("%s: MSMFB_DISPLAY_COMMIT for dpy %d failed", __FUNCTION__,dpy);
@@ -360,6 +361,10 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
     }
     switch(dpy) {
     case HWC_DISPLAY_PRIMARY:
+        if(blank) {
+            if( display_commit(ctx,dpy) < 0 )
+                ALOGE("%s : Commit failed for dpy %d",__FUNCTION__,dpy);
+        }
         value = blank ? FB_BLANK_POWERDOWN : FB_BLANK_UNBLANK;
         if(ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK, value) < 0 ) {
             ALOGE("%s: Failed to handle blank event(%d) for Primary!!",
@@ -380,13 +385,13 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
 
         if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected) {
             if(blank)
-                display_commit(ctx, HWC_DISPLAY_VIRTUAL);
+                display_commit(ctx, HWC_DISPLAY_VIRTUAL,1);
             ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = !blank;
         }
         break;
     case HWC_DISPLAY_EXTERNAL:
         if(blank) {
-            display_commit(ctx, HWC_DISPLAY_EXTERNAL);
+            display_commit(ctx, HWC_DISPLAY_EXTERNAL,1);
         }
         break;
     default:
