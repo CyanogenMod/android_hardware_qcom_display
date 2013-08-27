@@ -148,15 +148,13 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
             if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
                 const int fbZ = 0;
                 ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
+
+                // Use Copybit, when MDP comp fails
+                // (only for 8960 which has  dedicated 2D core)
+                if( (ctx->mMDP.version == qdutils::MDP_V4_1) &&
+                                             ctx->mCopyBit[dpy])
+                    ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
             }
-
-            /* Temporarily commenting out C2D until we support partial
-               copybit composition for mixed mode MDP
-
-            // Use Copybit, when MDP comp fails
-            if((fbZOrder >= 0) && ctx->mCopyBit[dpy])
-                ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
-            */
         }
     }
     return 0;
@@ -180,14 +178,14 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
                 if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
                     const int fbZ = 0;
                     ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
+                    // Use Copybit, when MDP comp fails
+                    // (only for 8960 which has  dedicated 2D core)
+                    if((ctx->mMDP.version == qdutils::MDP_V4_1) &&
+                                              ctx->mCopyBit[dpy] &&
+                            !ctx->listStats[dpy].isDisplayAnimating)
+                        ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
                 }
 
-                /* Temporarily commenting out C2D until we support partial
-                   copybit composition for mixed mode MDP
-
-                if((fbZOrder >= 0) && ctx->mCopyBit[dpy])
-                    ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
-                */
                 if(ctx->listStats[dpy].isDisplayAnimating) {
                     // Mark all app layers as HWC_OVERLAY for external during
                     // animation, so that SF doesnt draw it on FB
