@@ -530,8 +530,9 @@ void setListStats(hwc_context_t *ctx,
             yuvCount++;
 
             if((layer->transform & HWC_TRANSFORM_ROT_90) &&
-                    canUseRotator(ctx)) {
-                if(ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA)) {
+                    canUseRotator(ctx, dpy)) {
+                if( (dpy == HWC_DISPLAY_PRIMARY) &&
+                        ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA)) {
                     ctx->isPaddingRound = true;
                 }
                 Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
@@ -1295,10 +1296,14 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     return 0;
 }
 
-bool canUseRotator(hwc_context_t *ctx) {
+bool canUseRotator(hwc_context_t *ctx, int dpy) {
     if(qdutils::MDPVersion::getInstance().is8x26() &&
                        ctx->mVirtualDisplay->isConnected()) {
-        return false;
+        // Allow if YUV needs rotation and DMA is configured to BLOCK mode for
+        // primary. For portrait videos usecase on WFD, Driver supports
+        // multiplexing of DMA pipe in LINE and BLOCK mode.
+        if(dpy == HWC_DISPLAY_PRIMARY)
+            return false;
     }
     if(ctx->mMDP.version == qdutils::MDP_V3_0_4)
         return false;
