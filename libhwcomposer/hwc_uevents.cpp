@@ -33,7 +33,7 @@
 #include "external.h"
 #include "virtual.h"
 #include "mdp_version.h"
-
+using namespace overlay;
 namespace qhwc {
 #define HWC_UEVENT_SWITCH_STR  "change@/devices/virtual/switch/"
 #define HWC_UEVENT_THREAD_NAME "hwcUeventThread"
@@ -233,7 +233,6 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                  * surface for the same. */
                 ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = true;
             }
-
             if(dpy == HWC_DISPLAY_EXTERNAL ||
                ctx->mVirtualonExtActive) {
                 ALOGE_IF(UEVENT_DEBUG, "%s: Sending EXTERNAL_OFFLINE ONLINE"
@@ -243,33 +242,51 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             }
             break;
         }
-    case EXTERNAL_PAUSE:
-        {
-            ctx->dpyAttr[dpy].isActive = true;
-            ctx->dpyAttr[dpy].isPause = true;
-            break;
-        }
-    case EXTERNAL_RESUME:
-        {
-            //Treat Resume as Online event
-            //Since external didnt have any pipes, force primary to give up
-            //its pipes; we don't allow inter-mixer pipe transfers.
-            {
-                Locker::Autolock _l(ctx->mDrawLock);
-                ctx->dpyAttr[dpy].isConfiguring = true;
-                ctx->dpyAttr[dpy].isActive = true;
-                ctx->proc->invalidate(ctx->proc);
+        case EXTERNAL_PAUSE:
+            {   // pause case
+                ALOGD("%s Received Pause event",__FUNCTION__);
+                 {
+                     Locker::Autolock _l(ctx->mDrawLock);
+                     ctx->dpyAttr[dpy].isActive = true;
+                     ctx->dpyAttr[dpy].isPause = true;
+                     ctx->proc->invalidate(ctx->proc);
+                 }
+                 usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+                         * 2 / 1000);
+                 // At this point all the pipes used by External have been
+                 // marked as UNSET.
+                 {
+                     Locker::Autolock _l(ctx->mDrawLock);
+                     // Perform commit to unstage the pipes.
+                     if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+                         ALOGE("%s: display commit fail! for %d dpy",
+                                 __FUNCTION__, dpy);
+                     }
+                 }
+                 break;
             }
-            usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-                   * 2 / 1000);
-            {
-                //At this point external has all the pipes it  would need.
-                Locker::Autolock _l(ctx->mDrawLock);
-                ctx->dpyAttr[dpy].isPause = false;
-                ctx->proc->invalidate(ctx->proc);
+        case EXTERNAL_RESUME:
+            {  // resume case
+                ALOGD("%s Received resume event",__FUNCTION__);
+                //Treat Resume as Online event
+                //Since external didnt have any pipes, force primary to give up
+                //its pipes; we don't allow inter-mixer pipe transfers.
+                {
+                    Locker::Autolock _l(ctx->mDrawLock);
+                    ctx->dpyAttr[dpy].isConfiguring = true;
+                    ctx->dpyAttr[dpy].isActive = true;
+                    ctx->proc->invalidate(ctx->proc);
+                }
+                usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+                        * 2 / 1000);
+                //At this point external has all the pipes it would need.
+                {
+                    Locker::Autolock _l(ctx->mDrawLock);
+                    ctx->dpyAttr[dpy].isPause = false;
+                    ctx->proc->invalidate(ctx->proc);
+                }
+                break;
             }
-            break;
-        }
     default:
         {
             ALOGE("%s: Invalid state to swtich:%d", __FUNCTION__, switch_state);
