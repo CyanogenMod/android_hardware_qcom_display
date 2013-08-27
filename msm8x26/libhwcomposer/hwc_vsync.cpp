@@ -71,6 +71,7 @@ static void *vsync_loop(void *param)
         if(atoi(property) == 1)
             ctx->vstate.fakevsync = true;
     }
+    ctx->vstate.fakevsync = true;
 
     if(property_get("debug.hwc.logvsync", property, 0) > 0) {
         if(atoi(property) == 1)
