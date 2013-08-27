@@ -63,8 +63,6 @@ void Overlay::configBegin() {
 }
 
 void Overlay::configDone() {
-    if(PipeBook::pipeUsageUnchanged()) return;
-
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
         if(PipeBook::isNotUsed(i)) {
             //Forces UNSET on pipes, flushes rotator memory and session, closes
