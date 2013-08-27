@@ -104,6 +104,8 @@ static void *vsync_loop(void *param)
                 break;
             }
         }
+        // Read once from the fds to clear the first notify
+        pread(fb_fd[dpy], vdata , MAX_DATA, 0);
 
         pfd[dpy].fd = fb_fd[dpy];
         if (pfd[dpy].fd >= 0)
@@ -120,7 +122,7 @@ static void *vsync_loop(void *param)
                         if (UNLIKELY(len < 0)) {
                             // If the read was just interrupted - it is not a
                             // fatal error. Just continue in this case
-                            ALOGE ("%s:Unable to read vsync for dpy=%d :%s",
+                            ALOGE ("%s: Unable to read vsync for dpy=%d : %s",
                                     __FUNCTION__, dpy, strerror(errno));
                             continue;
                         }
