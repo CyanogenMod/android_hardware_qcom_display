@@ -78,7 +78,6 @@ void IdleInvalidator::onFirstRef() {
 }
 
 void IdleInvalidator::markForSleep() {
-    Locker::Autolock _l(mLock);
     mSleepAgain = true;
     //Triggers the threadLoop to run, if not already running.
     run(threadName, android::PRIORITY_AUDIO);
