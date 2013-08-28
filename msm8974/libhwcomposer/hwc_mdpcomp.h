@@ -168,7 +168,6 @@ protected:
     static IdleInvalidator *idleInvalidator;
     struct FrameInfo mCurrentFrame;
     struct LayerCache mCachedFrame;
-    mutable Locker mMdpCompLock;
 };
 
 class MDPCompLowRes : public MDPComp {
