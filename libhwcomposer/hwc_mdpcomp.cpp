@@ -785,12 +785,14 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                         mCurrentFrame.fbZ)) {
                 ALOGE("%s configure framebuffer failed", __func__);
                 reset(numLayers, list);
+                ctx->mOverlay->clear(mDpy);
                 return -1;
             }
         }
         //Acquire and Program MDP pipes
         if(!programMDP(ctx, list)) {
             reset(numLayers, list);
+            ctx->mOverlay->clear(mDpy);
             return -1;
         } else { //Success
             //Any change in composition types needs an FB refresh
@@ -822,11 +824,13 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             if(!ctx->mFBUpdate[mDpy]->prepare(ctx, list, mCurrentFrame.fbZ)) {
                 ALOGE("%s configure framebuffer failed", __func__);
                 reset(numLayers, list);
+                ctx->mOverlay->clear(mDpy);
                 return -1;
             }
         }
         if(!programYUV(ctx, list)) {
             reset(numLayers, list);
+            ctx->mOverlay->clear(mDpy);
             return -1;
         }
     } else {
