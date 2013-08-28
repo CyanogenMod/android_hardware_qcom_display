@@ -847,9 +847,7 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
 
 /* Checks for conditions where YUV layers cannot be bypassed */
 bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
-    bool extAnimBlockFeature = mDpy && ctx->listStats[mDpy].isDisplayAnimating;
-
-    if(isSkipLayer(layer) && !extAnimBlockFeature) {
+    if(isSkipLayer(layer)) {
         ALOGD_IF(isDebug(), "%s: Video marked SKIP dpy %d", __FUNCTION__, mDpy);
         return false;
     }
@@ -1069,15 +1067,6 @@ void MDPComp::updateLayerCache(hwc_context_t* ctx,
 void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
         bool secureOnly) {
     int nYuvCount = ctx->listStats[mDpy].yuvCount;
-    if(!nYuvCount && mDpy) {
-        //Reset "No animation on external display" related  parameters.
-        ctx->mPrevCropVideo.left = ctx->mPrevCropVideo.top =
-            ctx->mPrevCropVideo.right = ctx->mPrevCropVideo.bottom = 0;
-        ctx->mPrevDestVideo.left = ctx->mPrevDestVideo.top =
-            ctx->mPrevDestVideo.right = ctx->mPrevDestVideo.bottom = 0;
-        ctx->mPrevTransformVideo = 0;
-        return;
-     }
     for(int index = 0;index < nYuvCount; index++){
         int nYuvIndex = ctx->listStats[mDpy].yuvIndices[index];
         hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
@@ -1240,6 +1229,22 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         __FUNCTION__);
         ret = -1;
         return ret;
+    }
+
+    // Detect the start of animation and fall back to GPU only once to cache
+    // all the layers in FB and display FB content untill animation completes.
+    if(ctx->listStats[mDpy].isDisplayAnimating) {
+        mCurrentFrame.needsRedraw = false;
+        if(ctx->mAnimationState[mDpy] == ANIMATION_STOPPED) {
+            mCurrentFrame.needsRedraw = true;
+            ctx->mAnimationState[mDpy] = ANIMATION_STARTED;
+        }
+        setMDPCompLayerFlags(ctx, list);
+        mCachedFrame.updateCounts(mCurrentFrame);
+        ret = -1;
+        return ret;
+    } else {
+        ctx->mAnimationState[mDpy] = ANIMATION_STOPPED;
     }
 
     //Hard conditions, if not met, cannot do MDP comp
