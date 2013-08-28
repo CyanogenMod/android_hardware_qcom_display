@@ -162,9 +162,7 @@ void initContext(hwc_context_t *ctx)
 
     for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         ctx->mLayerRotMap[i] = new LayerRotMap();
-    }
-
-    for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+        ctx->mAnimationState[i] = ANIMATION_STOPPED;
         ctx->mHwcDebug[i] = new HwcDebug(i);
         ctx->mPrevHwLayerCount[i] = 0;
     }
@@ -184,13 +182,8 @@ void initContext(hwc_context_t *ctx)
             defaultServiceManager()->getService(
             String16("display.qservice")))->connect(client);
 
-    // Initialize "No animation on external display" related  parameters.
+    // Initialize device orientation to its default orientation
     ctx->deviceOrientation = 0;
-    ctx->mPrevCropVideo.left = ctx->mPrevCropVideo.top =
-        ctx->mPrevCropVideo.right = ctx->mPrevCropVideo.bottom = 0;
-    ctx->mPrevDestVideo.left = ctx->mPrevDestVideo.top =
-        ctx->mPrevDestVideo.right = ctx->mPrevDestVideo.bottom = 0;
-    ctx->mPrevTransformVideo = 0;
     ctx->mBufferMirrorMode = false;
     ctx->mSocId = getSocIdFromSystem();
     ALOGI("Initializing Qualcomm Hardware Composer");
@@ -1118,12 +1111,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
             } else if(isExtAnimating) {
                 // Release all the app layer fds immediately,
                 // if animation is in progress.
-                hwc_layer_1_t const* layer = &list->hwLayers[i];
-                private_handle_t *hnd = (private_handle_t *)layer->handle;
-                if(isYuvBuffer(hnd)) {
-                    list->hwLayers[i].releaseFenceFd = dup(releaseFd);
-                } else
-                    list->hwLayers[i].releaseFenceFd = -1;
+                list->hwLayers[i].releaseFenceFd = -1;
             } else if(list->hwLayers[i].releaseFenceFd < 0) {
                 //If rotator has not already populated this field.
                 if(list->hwLayers[i].compositionType == HWC_BLIT) {
@@ -1375,30 +1363,7 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     Whf whf(getWidth(hnd), getHeight(hnd),
             getMdpFormat(hnd->format), hnd->size);
 
-    if(dpy && isYuvBuffer(hnd)) {
-        if(!ctx->listStats[dpy].isDisplayAnimating) {
-            ctx->mPrevCropVideo = crop;
-            ctx->mPrevDestVideo = dst;
-            ctx->mPrevTransformVideo = transform;
-        } else {
-            // Restore the previous crop, dest rect and transform values, during
-            // animation to avoid displaying videos at random coordinates.
-            crop = ctx->mPrevCropVideo;
-            dst = ctx->mPrevDestVideo;
-            transform = ctx->mPrevTransformVideo;
-            orient = static_cast<eTransform>(transform);
-            //In you tube use case when a device rotated from landscape to
-            // portrait, set the isFg flag and zOrder to avoid displaying UI on
-            // hdmi during animation
-            if(ctx->deviceOrientation) {
-                isFg = ovutils::IS_FG_SET;
-                z = ZORDER_1;
-            }
-        }
-    }
-
-    calcExtDisplayPosition(ctx, hnd, dpy, crop, dst,
-                                           transform, orient);
+    calcExtDisplayPosition(ctx, hnd, dpy, crop, dst, transform, orient);
 
     bool forceRot = false;
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
@@ -1473,27 +1438,6 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     Whf whf(getWidth(hnd), getHeight(hnd),
             getMdpFormat(hnd->format), hnd->size);
-    if(dpy && isYuvBuffer(hnd)) {
-        if(!ctx->listStats[dpy].isDisplayAnimating) {
-            ctx->mPrevCropVideo = crop;
-            ctx->mPrevDestVideo = dst;
-            ctx->mPrevTransformVideo = transform;
-        } else {
-            // Restore the previous crop, dest rect and transform values, during
-            // animation to avoid displaying videos at random coordinates.
-            crop = ctx->mPrevCropVideo;
-            dst = ctx->mPrevDestVideo;
-            transform = ctx->mPrevTransformVideo;
-            orient = static_cast<eTransform>(transform);
-            //In you tube use case when a device rotated from landscape to
-            // portrait, set the isFg flag and zOrder to avoid displaying UI on
-            // hdmi during animation
-            if(ctx->deviceOrientation) {
-                isFg = ovutils::IS_FG_SET;
-                z = ZORDER_1;
-            }
-        }
-    }
 
     bool forceRot = false;
     if(isYuvBuffer(hnd)) {
