@@ -247,9 +247,9 @@ int gralloc_unlock(gralloc_module_t const* module,
         return -EINVAL;
     int err = 0;
     private_handle_t* hnd = (private_handle_t*)handle;
-    IMemAlloc* memalloc = getAllocator(hnd->flags);
 
     if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_ION) {
+        IMemAlloc* memalloc = getAllocator(hnd->flags);
         if (hnd->flags & private_handle_t::PRIV_FLAGS_NEEDS_FLUSH) {
             err = memalloc->clean_buffer((void*)hnd->base,
                                          hnd->size, hnd->offset, hnd->fd,
