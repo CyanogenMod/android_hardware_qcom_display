@@ -43,6 +43,7 @@ public:
     VirtualDisplay(hwc_context_t* ctx);
     ~VirtualDisplay();
     int  configure();
+    void getAttributes(int& width, int& height);
     int  teardown();
     bool isConnected() {
         return  mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].connected;
