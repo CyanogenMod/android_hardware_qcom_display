@@ -405,6 +405,11 @@ static inline bool isSkipPresent (hwc_context_t *ctx, int dpy) {
 static inline bool isYuvPresent (hwc_context_t *ctx, int dpy) {
     return  ctx->listStats[dpy].yuvCount;
 }
+
+static inline bool has90Transform(hwc_layer_1_t *layer) {
+    return (layer->transform & HWC_TRANSFORM_ROT_90);
+}
+
 };
 
 #endif //HWC_UTILS_H
