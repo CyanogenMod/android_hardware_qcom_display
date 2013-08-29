@@ -233,7 +233,7 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
                 (ovutils::eBlending) getBlending(layer->blending));
         ov.setSource(pargR, destR);
 
-        hwc_rect_t sourceCrop = layer->sourceCrop;
+        hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
         hwc_rect_t displayFrame = layer->displayFrame;
 
         const float xres = ctx->dpyAttr[mDpy].xres;
