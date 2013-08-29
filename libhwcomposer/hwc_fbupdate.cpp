@@ -116,6 +116,10 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
 
         ovutils::eTransform orient =
                     static_cast<ovutils::eTransform>(transform);
+        // use ext orientation if any
+        int extOrient = ctx->mExtOrientation;
+        if(ctx->mBufferMirrorMode)
+            extOrient = getMirrorModeOrientation(ctx);
 
         // Do not use getNonWormholeRegion() function to calculate the
         // sourceCrop during animation on external display and
@@ -125,7 +129,7 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             sourceCrop = layer->displayFrame;
             displayFrame = sourceCrop;
         } else if((!mDpy ||
-                   (mDpy && !ctx->mExtOrientation
+                   (mDpy && !extOrient
                    && !ctx->dpyAttr[mDpy].mDownScaleMode))
                    && (extOnlyLayerIndex == -1)) {
             if(!qdutils::MDPVersion::getInstance().is8x26()) {
@@ -134,13 +138,12 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             }
         }
         if(mDpy && !qdutils::MDPVersion::getInstance().is8x26()) {
-            if(ctx->mExtOrientation || ctx->dpyAttr[mDpy].mDownScaleMode) {
+            if(extOrient || ctx->dpyAttr[mDpy].mDownScaleMode) {
                 calcExtDisplayPosition(ctx, mDpy, sourceCrop, displayFrame);
                 // If there is a external orientation set, use that
-                if(ctx->mExtOrientation) {
-                    transform = ctx->mExtOrientation;
-                    orient =
-                        static_cast<ovutils::eTransform >(ctx->mExtOrientation);
+                if(extOrient) {
+                    transform = extOrient;
+                    orient = static_cast<ovutils::eTransform >(extOrient);
                 }
             }
             // Calculate the actionsafe dimensions for External(dpy = 1 or 2)
@@ -148,7 +151,7 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         }
         setMdpFlags(layer, mdpFlags, 0, transform);
         // For External use rotator if there is a rotation value set
-        if(mDpy && (ctx->mExtOrientation & HWC_TRANSFORM_ROT_90)) {
+        if(mDpy && (extOrient & HWC_TRANSFORM_ROT_90)) {
             mRot = ctx->mRotMgr->getNext();
             if(mRot == NULL) return -1;
             //Configure rotator for pre-rotation

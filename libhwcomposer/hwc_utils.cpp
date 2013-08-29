@@ -196,6 +196,8 @@ void initContext(hwc_context_t *ctx)
         ctx->mPrevDestVideo.right = ctx->mPrevDestVideo.bottom = 0;
     ctx->mPrevTransformVideo = 0;
 
+    ctx->mBufferMirrorMode = false;
+
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
 }
@@ -297,7 +299,11 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
     float fbHeight = ctx->dpyAttr[dpy].yres;
 
     // Since external is rotated 90, need to swap width/height
-    if(ctx->mExtOrientation & HWC_TRANSFORM_ROT_90)
+    int extOrient = ctx->mExtOrientation;
+    if(ctx->mBufferMirrorMode)
+        extOrient = getMirrorModeOrientation(ctx);
+
+    if(extOrient & HWC_TRANSFORM_ROT_90)
         swap(fbWidth, fbHeight);
 
     float asX = 0;
@@ -496,7 +502,10 @@ void calcExtDisplayPosition(hwc_context_t *ctx, int dpy,
                                hwc_rect_t& sourceCrop,
                                hwc_rect_t& displayFrame) {
     // Swap width and height when there is a 90deg transform
-    if(ctx->mExtOrientation & HWC_TRANSFORM_ROT_90) {
+    int extOrient = ctx->mExtOrientation;
+    if(ctx->mBufferMirrorMode)
+        extOrient = getMirrorModeOrientation(ctx);
+    if(extOrient & HWC_TRANSFORM_ROT_90) {
         int dstWidth = ctx->dpyAttr[dpy].xres;
         int dstHeight = ctx->dpyAttr[dpy].yres;;
         int srcWidth = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
@@ -538,7 +547,26 @@ void calcExtDisplayPosition(hwc_context_t *ctx, int dpy,
         displayFrame.right *= wRatio;
         displayFrame.bottom *= hRatio;
     }
+}
 
+/* Returns the orientation which needs to be set on External for
+ *  SideSync/Buffer Mirrormode
+ */
+int getMirrorModeOrientation(hwc_context_t *ctx) {
+    int extOrientation = 0;
+    int deviceOrientation = ctx->deviceOrientation;
+    if(!isPrimaryPortrait(ctx))
+        deviceOrientation = (deviceOrientation + 1) % 4;
+     if (deviceOrientation == 0)
+         extOrientation = HWC_TRANSFORM_ROT_270;
+     else if (deviceOrientation == 1)//90
+         extOrientation = 0;
+     else if (deviceOrientation == 2)//180
+         extOrientation = HWC_TRANSFORM_ROT_90;
+     else if (deviceOrientation == 3)//270
+         extOrientation = HWC_TRANSFORM_FLIP_V | HWC_TRANSFORM_FLIP_H;
+
+    return extOrientation;
 }
 
 bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer,
@@ -664,9 +692,10 @@ void setListStats(hwc_context_t *ctx,
         ctx->mExtOrientation = atoi(value); */
         // Assuming the orientation value is in terms of HAL_TRANSFORM,
         // This needs mapping to HAL, if its in different convention
-        if(ctx->mExtOrientation) {
-            ALOGD_IF(HWC_UTILS_DEBUG, "%s: ext orientation = %d",
-                     __FUNCTION__, ctx->mExtOrientation);
+        if(ctx->mExtOrientation || ctx->mBufferMirrorMode) {
+            ALOGD_IF(HWC_UTILS_DEBUG, "%s: ext orientation = %d"
+                     "BufferMirrorMode = %d", __FUNCTION__,
+                     ctx->mExtOrientation, ctx->mBufferMirrorMode);
             if(ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA)) {
                 ctx->isPaddingRound = true;
             }
@@ -1184,12 +1213,15 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         }
     }
     if(dpy) {
+        int extOrient = ctx->mExtOrientation;
+        if(ctx->mBufferMirrorMode)
+            extOrient = getMirrorModeOrientation(ctx);
         // Just need to set the position to portrait as the transformation
         // will already be set to required orientation on TV
-        if(ctx->mExtOrientation || ctx->dpyAttr[dpy].mDownScaleMode) {
-            getAspectRatioPosition(ctx, dpy, ctx->mExtOrientation, dst, dst);
-            if(ctx->mExtOrientation) {
-                transform = ctx->mExtOrientation;
+        if(extOrient || ctx->dpyAttr[dpy].mDownScaleMode) {
+            getAspectRatioPosition(ctx, dpy, extOrient, dst, dst);
+            if(extOrient) {
+                transform = extOrient;
                 orient = static_cast<eTransform>(transform);
             }
         }
