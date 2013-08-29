@@ -66,6 +66,11 @@ public:
 private:
     bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             int fbZorder);
+    bool preRotateExtDisplay(hwc_context_t *ctx,
+                                 ovutils::Whf &info,
+                                 hwc_rect_t& sourceCrop,
+                                 ovutils::eMdpFlags& mdpFlags,
+                                 int& rotFlags);
     ovutils::eDest mDest; //pipe to draw on
 };
 
