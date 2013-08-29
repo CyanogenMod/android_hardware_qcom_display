@@ -205,7 +205,7 @@ void setMdpFlags(hwc_layer_1_t *layer,
         ovutils::eMdpFlags &mdpFlags,
         int rotDownscale, int transform);
 
-int configRotator(overlay::Rotator *rot, const ovutils::Whf& whf,
+int configRotator(overlay::Rotator *rot, ovutils::Whf& whf,
         hwc_rect_t& crop, const ovutils::eMdpFlags& mdpFlags,
         const ovutils::eTransform& orient, const int& downscale);
 

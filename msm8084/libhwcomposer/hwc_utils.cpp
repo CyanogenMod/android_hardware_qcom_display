@@ -961,10 +961,16 @@ void setMdpFlags(hwc_layer_1_t *layer,
     }
 }
 
-int configRotator(Rotator *rot, const Whf& whf,
+int configRotator(Rotator *rot, Whf& whf,
         hwc_rect_t& crop, const eMdpFlags& mdpFlags,
         const eTransform& orient, const int& downscale) {
 
+    // Fix alignments for TILED format
+    if(whf.format == MDP_Y_CRCB_H2V2_TILE ||
+                            whf.format == MDP_Y_CBCR_H2V2_TILE) {
+        whf.w =  utils::alignup(whf.w, 64);
+        whf.h = utils::alignup(whf.h, 32);
+    }
     rot->setSource(whf);
 
     if (qdutils::MDPVersion::getInstance().getMDPVersion() >=
