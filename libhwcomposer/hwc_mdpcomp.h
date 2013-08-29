@@ -54,6 +54,8 @@ public:
     static void resetIdleFallBack() { sIdleFallBack = false; }
 
 protected:
+    enum { MAX_SEC_LAYERS = 1 }; //TODO add property support
+
     enum ePipeType {
         MDPCOMP_OV_RGB = ovutils::OV_MDP_PIPE_RGB,
         MDPCOMP_OV_VG = ovutils::OV_MDP_PIPE_VG,
@@ -106,7 +108,6 @@ protected:
         int layerCount;
         int mdpCount;
         int fbCount;
-        int notUpdatingCount;
         int fbZ;
         buffer_handle_t hnd[MAX_NUM_APP_LAYERS];
 
@@ -162,12 +163,13 @@ protected:
     /* gets available pipes for mdp comp */
     int getAvailablePipes(hwc_context_t* ctx);
     /* optimize layers for mdp comp*/
-    bool batchLayers(hwc_display_contents_1_t* list);
+    bool batchLayers(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* updates cache map with YUV info */
     void updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list);
     bool programMDP(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     bool programYUV(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     void reset(const int& numAppLayers, hwc_display_contents_1_t* list);
+    bool isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer);
 
     int mDpy;
     const int mMaxPipesPerLayer;
