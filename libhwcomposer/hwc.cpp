@@ -38,6 +38,7 @@
 
 using namespace qhwc;
 using namespace overlay;
+
 #define VSYNC_DEBUG 0
 #define BLANK_DEBUG 1
 
@@ -129,6 +130,7 @@ static void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers) {
     }
     ctx->layerProp[dpy] = new LayerProp[numAppLayers];
 }
+
 
 static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
@@ -290,7 +292,6 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    Locker::Autolock _l(ctx->mDrawLock);
 
     if(!ctx->dpyAttr[dpy].isActive) {
         ALOGE("Display is blanked - Cannot %s vsync",
@@ -311,6 +312,7 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
 #ifdef QCOM_BSP
         case  HWC_EVENT_ORIENTATION:
             if(dpy == HWC_DISPLAY_PRIMARY) {
+                Locker::Autolock _l(ctx->mDrawLock);
                 // store the primary display orientation
                 // will be used in hwc_video::configure to disable
                 // rotation animation on external display
@@ -436,6 +438,7 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         if(list->numHwLayers > 1)
             hwc_sync(ctx, list, dpy, fd);
 
+
         if (!ctx->mMDPComp[dpy]->draw(ctx, list)) {
             ALOGE("%s: MDPComp draw failed", __FUNCTION__);
             ret = -1;
@@ -486,6 +489,7 @@ static int hwc_set_external(hwc_context_t *ctx,
 
         if(list->numHwLayers > 1)
             hwc_sync(ctx, list, dpy, fd);
+
 
         if (!ctx->mMDPComp[dpy]->draw(ctx, list)) {
             ALOGE("%s: MDPComp draw failed", __FUNCTION__);
@@ -539,6 +543,7 @@ static int hwc_set_virtual(hwc_context_t *ctx,
 
             if(list->numHwLayers > 1)
                 hwc_sync(ctx, list, dpy, fd);
+
 
             if (!ctx->mMDPComp[dpy]->draw(ctx, list)) {
                 ALOGE("%s: MDPComp draw failed", __FUNCTION__);
