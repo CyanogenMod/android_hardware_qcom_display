@@ -166,5 +166,12 @@ bool MDPVersion::is8x26() {
     return false;
 }
 
+bool MDPVersion::is8x74v2() {
+    if( mMdpRev >= MDSS_MDP_HW_REV_102 && mMdpRev < MDSS_MDP_HW_REV_103) {
+        return true;
+    }
+    return false;
+}
+
 }; //namespace qdutils
 
