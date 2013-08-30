@@ -124,7 +124,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 break;
             }
 
-            Locker::Autolock _l(ctx->mExtLock);
+            Locker::Autolock _l(ctx->mDrawLock);
             clear(ctx, dpy);
             ctx->dpyAttr[dpy].connected = false;
             ctx->dpyAttr[dpy].isActive = false;
@@ -163,7 +163,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 //fail, since Layer Mixer#0 is still connected to WriteBack.
                 //This block will force composition to close fb2 in above
                 //example.
-                Locker::Autolock _l(ctx->mExtLock);
+                Locker::Autolock _l(ctx->mDrawLock);
                 ctx->dpyAttr[dpy].isConfiguring = true;
                 ctx->proc->invalidate(ctx->proc);
             }
@@ -176,7 +176,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                     ALOGD_IF(UEVENT_DEBUG,"Received HDMI connection request"
                              "when WFD is active");
                     {
-                        Locker::Autolock _l(ctx->mExtLock);
+                        Locker::Autolock _l(ctx->mDrawLock);
                         clear(ctx, HWC_DISPLAY_VIRTUAL);
                         ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected = false;
                         ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = false;
@@ -192,7 +192,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                         ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL,
                                            EXTERNAL_OFFLINE);
                         {
-                            Locker::Autolock _l(ctx->mExtLock);
+                            Locker::Autolock _l(ctx->mDrawLock);
                             ctx->mVirtualonExtActive = false;
                         }
                     }
@@ -204,7 +204,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 ctx->mExtDisplay->configure();
             } else {
                 {
-                    Locker::Autolock _l(ctx->mExtLock);
+                    Locker::Autolock _l(ctx->mDrawLock);
                     /* TRUE only when we are on proprietary WFD session */
                     ctx->mVirtualonExtActive = true;
                     char property[PROPERTY_VALUE_MAX];
@@ -219,7 +219,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 ctx->mVirtualDisplay->configure();
             }
 
-            Locker::Autolock _l(ctx->mExtLock);
+            Locker::Autolock _l(ctx->mDrawLock);
             setup(ctx, dpy);
             ctx->dpyAttr[dpy].isPause = false;
             ctx->dpyAttr[dpy].connected = true;
@@ -254,7 +254,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             //Since external didnt have any pipes, force primary to give up
             //its pipes; we don't allow inter-mixer pipe transfers.
             {
-                Locker::Autolock _l(ctx->mExtLock);
+                Locker::Autolock _l(ctx->mDrawLock);
                 ctx->dpyAttr[dpy].isConfiguring = true;
                 ctx->dpyAttr[dpy].isActive = true;
                 ctx->proc->invalidate(ctx->proc);
@@ -263,7 +263,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                    * 2 / 1000);
             {
                 //At this point external has all the pipes it  would need.
-                Locker::Autolock _l(ctx->mExtLock);
+                Locker::Autolock _l(ctx->mDrawLock);
                 ctx->dpyAttr[dpy].isPause = false;
                 ctx->proc->invalidate(ctx->proc);
             }

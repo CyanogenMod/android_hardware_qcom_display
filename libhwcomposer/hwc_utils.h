@@ -333,23 +333,14 @@ struct hwc_context_t {
     bool mVirtualonExtActive;
     //Display in secure mode indicator
     bool mSecureMode;
-    //Lock to prevent set from being called while blanking
-    mutable Locker mBlankLock;
-    //Lock to protect prepare & set when detaching external disp
-    mutable Locker mExtLock;
     //DMA used for rotator
     bool mDMAInUse;
     //MDP rotater needed
     bool mNeedsRotator;
     //Check if base pipe is set up
     bool mBasePipeSetup;
-    /*Lock to set both mSecureMode and mSecuring as part
-      of binder thread without context switch to composition
-      thread. This lock is needed only for A-family targets
-      since the state of mSecureMode and mSecuring variables
-      are not checked in B-family targets.
-    */
-    mutable Locker mSecureLock;
+    //Lock to protect drawing data structures
+    mutable Locker mDrawLock;
     // External Orientation
     int mExtOrientation;
     qhwc::LayerRotMap *mLayerRotMap[HWC_NUM_DISPLAY_TYPES];
