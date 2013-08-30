@@ -76,6 +76,10 @@ void VirtualDisplay::getAttributes(int& width, int& height) {
 int VirtualDisplay::teardown() {
     closeFrameBuffer();
     memset(&mVInfo, 0, sizeof(mVInfo));
+    // Reset the resolution when we close the fb for this device. We need
+    // this to distinguish between an ONLINE and RESUME event.
+    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = 0;
+    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = 0;
     return 0;
 }
 
@@ -92,24 +96,41 @@ VirtualDisplay::~VirtualDisplay()
 
 void VirtualDisplay::setAttributes() {
     if(mHwcContext) {
-        // Always set dpyAttr res to mVInfo res
-        mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = mVInfo.xres;
-        mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = mVInfo.yres;
+        unsigned int &w = mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres;
+        unsigned int &h = mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres;
+
+        // Always set dpyAttr res to mVInfo res, only on an ONLINE event. Keep
+        // the original configuration to cater for DRC initiated RESUME events
+        if(w == 0 || h == 0){
+            w = mVInfo.xres;
+            h = mVInfo.yres;
+        }
         mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = false;
+
         if(!qdutils::MDPVersion::getInstance().is8x26()) {
             uint32_t priW = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
             uint32_t priH = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
-            // if primary resolution is more than the wfd resolution
+
+            // Find the maximum resolution between primary and virtual
+            uint32_t maxArea = max((w * h), (priW * priH));
+
+            // If primary resolution is more than the wfd resolution
             // configure dpy attr to primary resolution and set
-            // downscale mode
-            if((priW * priH) > (mVInfo.xres * mVInfo.yres)) {
-                mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = priW;
-                mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = priH;
-                // WFD is always in landscape, so always assign the higher
-                // dimension to wfd's xres
-                if(priH > priW) {
-                    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = priH;
-                    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = priW;
+            // downscale mode.
+            // DRC is only valid when the original resolution on the WiFi
+            // display is greater than the new resolution in mVInfo.
+            if(maxArea > (mVInfo.xres * mVInfo.yres)) {
+                if(maxArea == (priW * priH)) {
+                    // Here we account for the case when primary resolution is
+                    // greater than that of the WiFi display
+                    w = priW;
+                    h = priH;
+                    // WFD is always in landscape, so always assign the higher
+                    // dimension to wfd's xres
+                    if(priH > priW) {
+                        w = priH;
+                        h = priW;
+                    }
                 }
                 // Set External Display MDP Downscale mode indicator
                 mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = true;
