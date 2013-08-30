@@ -300,10 +300,11 @@ int Overlay::initOverlay() {
     return 0;
 }
 
-bool Overlay::displayCommit(const int& fd) {
+bool Overlay::displayCommit(const int& fd, uint32_t wait_for_finish) {
     //Commit
     struct mdp_display_commit info;
     memset(&info, 0, sizeof(struct mdp_display_commit));
+    info.wait_for_finish = wait_for_finish;
     info.flags = MDP_DISPLAY_COMMIT_OVERLAY;
     if(!mdp_wrapper::displayCommit(fd, info)) {
        ALOGE("%s: commit failed", __func__);

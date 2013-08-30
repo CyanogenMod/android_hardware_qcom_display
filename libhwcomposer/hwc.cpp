@@ -37,6 +37,7 @@
 #include "profiler.h"
 
 using namespace qhwc;
+using namespace overlay;
 #define VSYNC_DEBUG 0
 #define BLANK_DEBUG 1
 
@@ -116,8 +117,8 @@ static void reset(hwc_context_t *ctx, int numDisplays,
             ctx->mCopyBit[i]->reset();
         if(ctx->mLayerRotMap[i])
             ctx->mLayerRotMap[i]->reset();
-
     }
+
 }
 
 //clear prev layer prop flags and realloc for current frame
@@ -127,24 +128,6 @@ static void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers) {
        ctx->layerProp[dpy] = NULL;
     }
     ctx->layerProp[dpy] = new LayerProp[numAppLayers];
-}
-
-static int display_commit(hwc_context_t *ctx, int dpy, uint32_t wait_for_finish = 0) {
-    int fbFd = ctx->dpyAttr[dpy].fd;
-    if(fbFd == -1) {
-        ALOGE("%s: Invalid FB fd for display: %d", __FUNCTION__, dpy);
-        return -1;
-    }
-
-    struct mdp_display_commit commit_info;
-    memset(&commit_info, 0, sizeof(struct mdp_display_commit));
-    commit_info.wait_for_finish = wait_for_finish;
-    commit_info.flags = MDP_DISPLAY_COMMIT_OVERLAY;
-    if(ioctl(fbFd, MSMFB_DISPLAY_COMMIT, &commit_info) < 0) {
-       ALOGE("%s: MSMFB_DISPLAY_COMMIT for dpy %d failed", __FUNCTION__,dpy);
-       return -errno;
-    }
-    return 0;
 }
 
 static int hwc_prepare_primary(hwc_composer_device_1 *dev,
@@ -361,8 +344,11 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
     switch(dpy) {
     case HWC_DISPLAY_PRIMARY:
         if(blank) {
-            if( display_commit(ctx,dpy) < 0 )
-                ALOGE("%s : Commit failed for dpy %d",__FUNCTION__,dpy);
+            int dpy = HWC_DISPLAY_PRIMARY;
+            if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)){
+                ALOGE("%s: display commit fail for primary!", __FUNCTION__);
+                ret = -1;
+            }
         }
         value = blank ? FB_BLANK_POWERDOWN : FB_BLANK_UNBLANK;
         if(ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK, value) < 0 ) {
@@ -383,14 +369,22 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
          * activate/deactive VIRTUAL DISPLAY */
 
         if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected) {
-            if(blank)
-                display_commit(ctx, HWC_DISPLAY_VIRTUAL,1);
+            if(blank) {
+                int dpy = HWC_DISPLAY_VIRTUAL;
+                if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd,1)) {
+                    ALOGE("%s: display commit fail for virtual!", __FUNCTION__);
+                    ret = -1;
+                }
+            }
             ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = !blank;
         }
         break;
     case HWC_DISPLAY_EXTERNAL:
         if(blank) {
-            display_commit(ctx, HWC_DISPLAY_EXTERNAL,1);
+            if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd,1)) {
+                ALOGE("%s: display commit fail for external!", __FUNCTION__);
+                ret = -1;
+            }
         }
         break;
     default:
@@ -401,7 +395,7 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
 
     ALOGD_IF(BLANK_DEBUG, "%s: Done %s display: %d", __FUNCTION__,
           blank ? "blanking":"unblanking", dpy);
-    return 0;
+    return ret;
 }
 
 static int hwc_query(struct hwc_composer_device_1* dev,
@@ -461,8 +455,8 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             }
         }
 
-        if (display_commit(ctx, dpy) < 0) {
-            ALOGE("%s: display commit fail!", __FUNCTION__);
+        if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+            ALOGE("%s: display commit fail for %d dpy!", __FUNCTION__, dpy);
             ret = -1;
         }
     }
@@ -516,8 +510,8 @@ static int hwc_set_external(hwc_context_t *ctx,
             }
         }
 
-        if (display_commit(ctx, dpy) < 0) {
-            ALOGE("%s: display commit fail!", __FUNCTION__);
+        if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+            ALOGE("%s: display commit fail for %d dpy!", __FUNCTION__, dpy);
             ret = -1;
         }
     }
@@ -570,8 +564,8 @@ static int hwc_set_virtual(hwc_context_t *ctx,
             }
         }
 
-        if (display_commit(ctx, dpy) < 0) {
-            ALOGE("%s: display commit fail!", __FUNCTION__);
+        if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+            ALOGE("%s: display commit fail for %d dpy!", __FUNCTION__, dpy);
             ret = -1;
         }
     }

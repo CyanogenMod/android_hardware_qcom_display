@@ -91,7 +91,7 @@ public:
     void clear(int dpy);
     /* Returns the framebuffer node backing up the display */
     static int getFbForDpy(const int& dpy);
-    static bool displayCommit(const int& fd);
+    static bool displayCommit(const int& fd, uint32_t wait_for_finish = 0);
 
 private:
     /* Ctor setup */
