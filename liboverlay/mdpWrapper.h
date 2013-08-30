@@ -78,6 +78,9 @@ bool play(int fd, msmfb_overlay_data& od);
 /* MSMFB_OVERLAY_3D */
 bool set3D(int fd, msmfb_overlay_3d& ov);
 
+/* MSMFB_DISPLAY_COMMIT */
+bool displayCommit(int fd);
+
 /* the following are helper functions for dumping
  * msm_mdp and friends*/
 void dump(const char* const s, const msmfb_overlay_data& ov);
@@ -191,6 +194,15 @@ inline bool play(int fd, msmfb_overlay_data& od) {
 inline bool set3D(int fd, msmfb_overlay_3d& ov) {
     if (ioctl(fd, MSMFB_OVERLAY_3D, &ov) < 0) {
         ALOGE("Failed to call ioctl MSMFB_OVERLAY_3D err=%s",
+                strerror(errno));
+        return false;
+    }
+    return true;
+}
+
+inline bool displayCommit(int fd, mdp_display_commit& info) {
+    if(ioctl(fd, MSMFB_DISPLAY_COMMIT, &info) == -1) {
+        ALOGE("Failed to call ioctl MSMFB_DISPLAY_COMMIT err=%s",
                 strerror(errno));
         return false;
     }

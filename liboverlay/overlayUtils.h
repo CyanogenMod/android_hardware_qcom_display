@@ -78,7 +78,6 @@
 #endif
 
 #define FB_DEVICE_TEMPLATE "/dev/graphics/fb%u"
-#define NUM_FB_DEVICES 3
 
 namespace overlay {
 
@@ -385,14 +384,7 @@ inline void clearMdpFlags(eMdpFlags& f, eMdpFlags v) {
     f = static_cast<eMdpFlags>(clrBit(f, v));
 }
 
-// fb 0/1/2
 enum { FB0, FB1, FB2 };
-
-//Panels could be categorized as primary and external
-enum { PRIMARY, EXTERNAL };
-
-// 2 for rgb0/1 double bufs
-enum { RGB_PIPE_NUM_BUFS = 2 };
 
 struct ScreenInfo {
     ScreenInfo() : mFBWidth(0),
