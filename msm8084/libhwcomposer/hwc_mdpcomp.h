@@ -53,6 +53,7 @@ public:
     /* Initialize MDP comp*/
     static bool init(hwc_context_t *ctx);
     static void resetIdleFallBack() { sIdleFallBack = false; }
+    static void reset() { sCompBytesClaimed = 0; };
 
 protected:
     enum ePipeType {
@@ -142,6 +143,11 @@ protected:
     bool isOnlyVideoDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* checks for conditions where YUV layers cannot be bypassed */
     bool isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer);
+    /* calcs bytes read by MDP for a given frame */
+    uint32_t calcMDPBytesRead(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+    /* checks if the required bandwidth exceeds a certain max */
+    bool bandwidthCheck(hwc_context_t *ctx, const uint32_t& size);
 
     /* set up Border fill as Base pipe */
     static bool setupBasePipe(hwc_context_t*);
@@ -167,6 +173,11 @@ protected:
     static bool sDebugLogs;
     static bool sIdleFallBack;
     static int sMaxPipesPerMixer;
+    //Max bandwidth. Value is in GBPS. For ex: 2.3 means 2.3GBPS
+    static float sMaxBw;
+    //Tracks composition bytes claimed. Represented as the total w*h*bpp
+    //going to MDP mixers
+    static uint32_t sCompBytesClaimed;
     static IdleInvalidator *idleInvalidator;
     struct FrameInfo mCurrentFrame;
     struct LayerCache mCachedFrame;
