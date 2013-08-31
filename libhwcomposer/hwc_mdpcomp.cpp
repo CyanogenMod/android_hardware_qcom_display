@@ -480,7 +480,7 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
 
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
 
-    if(sIdleFallBack) {
+    if(sIdleFallBack && !ctx->listStats[mDpy].secureUI) {
         ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
         return false;
     }

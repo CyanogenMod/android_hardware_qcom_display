@@ -102,6 +102,7 @@ struct ListStats {
     // This will be set to true during animation, otherwise false.
     bool isDisplayAnimating;
     ovutils::Dim roi;
+    bool secureUI; // Secure display layer
 };
 
 struct LayerProp {
@@ -302,6 +303,11 @@ static inline bool isExtBlock(const private_handle_t* hnd) {
 //Return true if buffer is for external display only with a Close Caption flag.
 static inline bool isExtCC(const private_handle_t* hnd) {
     return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_CC));
+}
+
+//Return true if the buffer is intended for Secure Display
+static inline bool isSecureDisplayBuffer(const private_handle_t* hnd) {
+    return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_SECURE_DISPLAY));
 }
 
 template<typename T> inline T max(T a, T b) { return (a > b) ? a : b; }
