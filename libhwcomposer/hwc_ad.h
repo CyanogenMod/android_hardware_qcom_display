@@ -39,7 +39,7 @@ namespace qhwc {
 
 class AssertiveDisplay {
 public:
-    AssertiveDisplay();
+    AssertiveDisplay(hwc_context_t *ctx);
     void markDoable(hwc_context_t *ctx, const hwc_display_contents_1_t* list);
     bool prepare(hwc_context_t *ctx, const hwc_rect_t& crop,
             const overlay::utils::Whf& whf,
