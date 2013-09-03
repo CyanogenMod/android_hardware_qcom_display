@@ -223,24 +223,18 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     if (!useCopybitForYUV && ctx->listStats[dpy].yuvCount)
         return true;
 
-    // numAppLayers-1, as we iterate till 0th layer index
-    for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
-        private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
-
-        if ((hnd->bufferType == BUFFER_TYPE_VIDEO && useCopybitForYUV) ||
-            (hnd->bufferType == BUFFER_TYPE_UI && useCopybitForRGB)) {
+    mCopyBitDraw = false;
+    if (useCopybitForRGB &&
+        (useCopybitForYUV || !ctx->listStats[dpy].yuvCount)) {
+        mCopyBitDraw =  true;
+        // numAppLayers-1, as we iterate till 0th layer index
+        // Mark all layers to be drawn by copybit
+        for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
             layerProp[i].mFlags |= HWC_COPYBIT;
             list->hwLayers[i].compositionType = HWC_OVERLAY;
-            mCopyBitDraw = true;
-        } else {
-            // We currently cannot mix copybit layers with layers marked to
-            // be drawn on the framebuffer or that are on the layer cache.
-            mCopyBitDraw = false;
-            //There is no need to reset layer properties here as we return in
-            //draw if mCopyBitDraw is false
-            break;
         }
     }
+
     return true;
 }
 
