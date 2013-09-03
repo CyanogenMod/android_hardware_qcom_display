@@ -437,7 +437,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
         dtdy > scaleLimitMax ||
         dsdx < 1/scaleLimitMin ||
         dtdy < 1/scaleLimitMin) {
-        ALOGE("%s: greater than max supported size dsdx=%f dtdy=%f \
+        ALOGW("%s: greater than max supported size dsdx=%f dtdy=%f \
               scaleLimitMax=%f scaleLimitMin=%f", __FUNCTION__,dsdx,dtdy,
                                           scaleLimitMax,1/scaleLimitMin);
         return -1;
