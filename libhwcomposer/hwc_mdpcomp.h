@@ -46,8 +46,7 @@ public:
     /* dumpsys */
     void dump(android::String8& buf);
 
-    static MDPComp* getObject(const int& width, const int& rightSplit,
-            const int& dpy);
+    static MDPComp* getObject(hwc_context_t *ctx, const int& dpy);
     /* Handler to invoke frame redraw on Idle Timer expiry */
     static void timeout_handler(void *udata);
     /* Initialize MDP comp*/
@@ -183,16 +182,16 @@ protected:
     struct LayerCache mCachedFrame;
 };
 
-class MDPCompLowRes : public MDPComp {
+class MDPCompNonSplit : public MDPComp {
 public:
-    explicit MDPCompLowRes(int dpy):MDPComp(dpy){};
-    virtual ~MDPCompLowRes(){};
+    explicit MDPCompNonSplit(int dpy):MDPComp(dpy){};
+    virtual ~MDPCompNonSplit(){};
     virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
 
 private:
-    struct MdpPipeInfoLowRes : public MdpPipeInfo {
+    struct MdpPipeInfoNonSplit : public MdpPipeInfo {
         ovutils::eDest index;
-        virtual ~MdpPipeInfoLowRes() {};
+        virtual ~MdpPipeInfoNonSplit() {};
     };
 
     /* configure's overlay pipes for the frame */
@@ -208,20 +207,20 @@ private:
             hwc_display_contents_1_t* list);
 };
 
-class MDPCompHighRes : public MDPComp {
+class MDPCompSplit : public MDPComp {
 public:
-    explicit MDPCompHighRes(int dpy):MDPComp(dpy){};
-    virtual ~MDPCompHighRes(){};
+    explicit MDPCompSplit(int dpy):MDPComp(dpy){};
+    virtual ~MDPCompSplit(){};
     virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
 private:
-    struct MdpPipeInfoHighRes : public MdpPipeInfo {
+    struct MdpPipeInfoSplit : public MdpPipeInfo {
         ovutils::eDest lIndex;
         ovutils::eDest rIndex;
-        virtual ~MdpPipeInfoHighRes() {};
+        virtual ~MdpPipeInfoSplit() {};
     };
 
     bool acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
-                         MdpPipeInfoHighRes& pipe_info, ePipeType type);
+                         MdpPipeInfoSplit& pipe_info, ePipeType type);
 
     /* configure's overlay pipes for the frame */
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,

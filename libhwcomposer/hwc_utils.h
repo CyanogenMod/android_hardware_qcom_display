@@ -233,13 +233,13 @@ void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
         hwc_rect_t& crop);
 
 //Routine to configure low resolution panels (<= 2048 width)
-int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
+int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
         ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
         ovutils::eIsFg& isFg, const ovutils::eDest& dest,
         overlay::Rotator **rot);
 
 //Routine to configure high resolution panels (> 2048 width)
-int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
+int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
         ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
         ovutils::eIsFg& isFg, const ovutils::eDest& lDest,
         const ovutils::eDest& rDest, overlay::Rotator **rot);
@@ -253,6 +253,8 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
 bool canUseRotator(hwc_context_t *ctx, int dpy);
 
 int getLeftSplit(hwc_context_t *ctx, const int& dpy);
+
+bool isDisplaySplit(hwc_context_t* ctx, int dpy);
 
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {

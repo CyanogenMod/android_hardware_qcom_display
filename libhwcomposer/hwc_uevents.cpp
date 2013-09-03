@@ -48,11 +48,8 @@ enum {
 
 static void setup(hwc_context_t* ctx, int dpy)
 {
-    const int rSplit = 0; //Even split for external if at all
-    ctx->mFBUpdate[dpy] = IFBUpdate::getObject(ctx->dpyAttr[dpy].xres,
-            rSplit, dpy);
-    ctx->mMDPComp[dpy] =  MDPComp::getObject(ctx->dpyAttr[dpy].xres,
-            rSplit, dpy);
+    ctx->mFBUpdate[dpy] = IFBUpdate::getObject(ctx, dpy);
+    ctx->mMDPComp[dpy] =  MDPComp::getObject(ctx, dpy);
     int compositionType =
                 qdutils::QCCompositionType::getInstance().getCompositionType();
     if (compositionType & (qdutils::COMPOSITION_TYPE_DYN |
