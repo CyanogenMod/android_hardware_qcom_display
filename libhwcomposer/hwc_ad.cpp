@@ -118,7 +118,7 @@ static int adRead() {
         }
         close(adFd);
     } else {
-        ALOGE("%s: Failed to open /sys/class/graphics/fb%d/ad with error %s",
+        ALOGD("%s: /sys/class/graphics/fb%d/ad could not be opened : %s",
                 __func__, wbFbNum, strerror(errno));
     }
     return ret;
