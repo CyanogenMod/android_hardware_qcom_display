@@ -101,6 +101,8 @@ void CalcFps::populate_debug_fps_metadata(void)
     for (unsigned int i = 0; i < MAX_FRAMEARRIVAL_STEPS; i++)
         debug_fps_metadata.accum_framearrivals[i] = 0;
 
+    debug_fps_metadata.curr_frame = 0;
+
     ALOGD("period: %d", debug_fps_metadata.period);
     ALOGD("ignorethresh_us: %lld", debug_fps_metadata.ignorethresh_us);
 }
