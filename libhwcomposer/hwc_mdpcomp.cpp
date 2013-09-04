@@ -42,6 +42,8 @@ bool MDPComp::sDebugLogs = false;
 bool MDPComp::sEnabled = false;
 bool MDPComp::sEnableMixedMode = true;
 int MDPComp::sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
+float MDPComp::sMaxBw = 2.3f;
+uint32_t MDPComp::sCompBytesClaimed = 0;
 
 MDPComp* MDPComp::getObject(const int& width, const int& rightSplit,
         const int& dpy) {
@@ -123,6 +125,13 @@ bool MDPComp::init(hwc_context_t *ctx) {
         int val = atoi(property);
         if(val >= 0)
             sMaxPipesPerMixer = min(val, MAX_PIPES_PER_MIXER);
+    }
+
+    if(property_get("debug.mdpcomp.bw", property, "0") > 0) {
+        float val = atof(property);
+        if(val > 0.0f) {
+            sMaxBw = val;
+        }
     }
 
     if(ctx->mMDP.panel != MIPI_CMD_PANEL) {
@@ -497,6 +506,12 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         return false;
     }
 
+    uint32_t size = calcMDPBytesRead(ctx, list);
+    if(!bandwidthCheck(ctx, size)) {
+        ALOGD_IF(isDebug(), "%s: Exceeds bandwidth",__FUNCTION__);
+        return false;
+    }
+
     return true;
 }
 
@@ -525,6 +540,12 @@ bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
         return false;
     }
 
+    uint32_t size = calcMDPBytesRead(ctx, list);
+    if(!bandwidthCheck(ctx, size)) {
+        ALOGD_IF(isDebug(), "%s: Exceeds bandwidth",__FUNCTION__);
+        return false;
+    }
+
     return true;
 }
 
@@ -549,6 +570,12 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
     }
 
     if(!arePipesAvailable(ctx, list)) {
+        return false;
+    }
+
+    uint32_t size = calcMDPBytesRead(ctx, list);
+    if(!bandwidthCheck(ctx, size)) {
+        ALOGD_IF(isDebug(), "%s: Exceeds bandwidth",__FUNCTION__);
         return false;
     }
 
@@ -753,7 +780,46 @@ bool MDPComp::programYUV(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     return true;
 }
 
+uint32_t MDPComp::calcMDPBytesRead(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    uint32_t size = 0;
+
+    for (uint32_t i = 0; i < list->numHwLayers - 1; i++) {
+        if(!mCurrentFrame.isFBComposed[i]) {
+            hwc_layer_1_t* layer = &list->hwLayers[i];
+            private_handle_t *hnd = (private_handle_t *)layer->handle;
+            hwc_rect_t crop = layer->sourceCrop;
+            float bpp = ((float)hnd->size) / (hnd->width * hnd->height);
+            size += bpp * ((crop.right - crop.left) *
+                    (crop.bottom - crop.top));
+        }
+    }
+
+    if(mCurrentFrame.fbCount) {
+        hwc_layer_1_t* layer = &list->hwLayers[list->numHwLayers - 1];
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
+        size += hnd->size;
+    }
+
+    return size;
+}
+
+bool MDPComp::bandwidthCheck(hwc_context_t *ctx, const uint32_t& size) {
+    //Will be added for other targets if we run into bandwidth issues and when
+    //we have profiling data to set an upper limit.
+    if(qdutils::MDPVersion::getInstance().is8x74v2()) {
+        const uint32_t ONE_GIG = 1024 * 1024 * 1024;
+        double panelRefRate =
+                1000000000.0 / ctx->dpyAttr[mDpy].vsync_period;
+        if((size + sCompBytesClaimed) > ((sMaxBw / panelRefRate) * ONE_GIG)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
+    int ret = 0;
     const int numLayers = ctx->listStats[mDpy].numAppLayers;
 
     //reset old data
@@ -765,7 +831,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         mCachedFrame.updateCounts(mCurrentFrame);
         ALOGD_IF(isDebug(), "%s: Number of App layers exceeded the limit ",
                 __FUNCTION__);
-        return -1;
+        ret = -1;
+        goto exit;
     }
 
     //Hard conditions, if not met, cannot do MDP comp
@@ -773,7 +840,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         ALOGD_IF( isDebug(),"%s: MDP Comp not possible for this frame",
                 __FUNCTION__);
         reset(numLayers, list);
-        return -1;
+        ret = -1;
+        goto exit;
     }
 
     //Check whether layers marked for MDP Composition is actually doable.
@@ -786,14 +854,16 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                 ALOGE("%s configure framebuffer failed", __func__);
                 reset(numLayers, list);
                 ctx->mOverlay->clear(mDpy);
-                return -1;
+                ret = -1;
+                goto exit;
             }
         }
         //Acquire and Program MDP pipes
         if(!programMDP(ctx, list)) {
             reset(numLayers, list);
             ctx->mOverlay->clear(mDpy);
-            return -1;
+            ret = -1;
+            goto exit;
         } else { //Success
             //Any change in composition types needs an FB refresh
             mCurrentFrame.needsRedraw = false;
@@ -825,17 +895,20 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                 ALOGE("%s configure framebuffer failed", __func__);
                 reset(numLayers, list);
                 ctx->mOverlay->clear(mDpy);
-                return -1;
+                ret = -1;
+                goto exit;
             }
         }
         if(!programYUV(ctx, list)) {
             reset(numLayers, list);
             ctx->mOverlay->clear(mDpy);
-            return -1;
+            ret = -1;
+            goto exit;
         }
     } else {
         reset(numLayers, list);
-        return -1;
+        ret = -1;
+        goto exit;
     }
 
     //UpdateLayerFlags
@@ -850,7 +923,9 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         ALOGE("%s",sDump.string());
     }
 
-    return 0;
+exit:
+    sCompBytesClaimed += calcMDPBytesRead(ctx, list);
+    return ret;
 }
 
 //=============MDPCompLowRes===================================================
