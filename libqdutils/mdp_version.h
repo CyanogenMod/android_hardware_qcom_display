@@ -54,9 +54,10 @@ enum mdp_version {
 };
 
 enum mdp_rev {
-    MDSS_MDP_HW_REV_100 = 0x10000000,
+    MDSS_MDP_HW_REV_100 = 0x10000000, //8974 v1
     MDSS_MDP_HW_REV_101 = 0x10010000, //8x26
-    MDSS_MDP_HW_REV_102 = 0x10020000,
+    MDSS_MDP_HW_REV_102 = 0x10020000, //8974 v2
+    MDSS_MDP_HW_REV_103 = 0x10030000, //Future
 };
 
 enum {
@@ -101,6 +102,7 @@ public:
     uint32_t getMaxMDPDownscale();
     bool supportsBWC();
     bool is8x26();
+    bool is8x74v2();
     int getLeftSplit() { return mSplit.left(); }
     int getRightSplit() { return mSplit.right(); }
 private:
