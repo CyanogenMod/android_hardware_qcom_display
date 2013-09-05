@@ -169,7 +169,12 @@ void getNonWormholeRegion(hwc_display_contents_1_t* list,
 bool isSecuring(hwc_context_t* ctx, hwc_layer_1_t const* layer);
 bool isSecureModePolicy(int mdpVersion);
 bool isExternalActive(hwc_context_t* ctx);
-bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer, const int& dpy);
+bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer,
+                  const int& dpy);
+bool needsScalingWithSplit(hwc_context_t* ctx, hwc_layer_1_t const* layer,
+                           const int& dpy);
+void sanitizeSourceCrop(hwc_rect_t& cropL, hwc_rect_t& cropR,
+                        private_handle_t *hnd);
 bool isAlphaPresent(hwc_layer_1_t const* layer);
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable);
 int getBlending(int blending);
