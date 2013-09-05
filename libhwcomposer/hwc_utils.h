@@ -305,7 +305,7 @@ inline void swap(T& a, T& b) {
     a = b;
     b = tmp;
 }
-
+int getSocIdFromSystem();
 }; //qhwc namespace
 
 // -----------------------------------------------------------------------------
@@ -361,7 +361,8 @@ struct hwc_context_t {
     //Used for SideSync feature
     //which overrides the mExtOrientation
     bool mBufferMirrorMode;
-
+    //used for enabling C2D Feature only for 8960 Non Pro Device
+    int mSocId;
     qhwc::LayerRotMap *mLayerRotMap[HWC_NUM_DISPLAY_TYPES];
 };
 
