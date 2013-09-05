@@ -277,13 +277,6 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
         return -EINVAL;
     size = (bufferSize >= size)? bufferSize : size;
 
-    // All buffers marked as protected or for external
-    // display need to go to overlay
-    if ((usage & GRALLOC_USAGE_EXTERNAL_DISP) ||
-        (usage & GRALLOC_USAGE_PROTECTED)) {
-        bufferType = BUFFER_TYPE_VIDEO;
-    }
-
     bool useFbMem = false;
     char property[PROPERTY_VALUE_MAX];
     if((usage & GRALLOC_USAGE_HW_FB) &&
