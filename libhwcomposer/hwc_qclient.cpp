@@ -64,6 +64,9 @@ status_t QClient::notifyCallback(uint32_t msg, uint32_t value) {
         case IQService::EXTERNAL_ORIENTATION:
             setExtOrientation(value);
             break;
+        case IQService::BUFFER_MIRRORMODE:
+            setBufferMirrorMode(value);
+            break;
         default:
             return NO_ERROR;
     }
@@ -114,6 +117,10 @@ android::status_t QClient::screenRefresh() {
 
 void QClient::setExtOrientation(uint32_t orientation) {
     mHwcContext->mExtOrientation = orientation;
+}
+
+void QClient::setBufferMirrorMode(uint32_t enable) {
+    mHwcContext->mBufferMirrorMode = enable;
 }
 
 }
