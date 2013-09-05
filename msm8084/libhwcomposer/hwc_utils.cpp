@@ -608,6 +608,59 @@ bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer,
     return false;
 }
 
+// Checks if layer needs scaling with split
+bool needsScalingWithSplit(hwc_context_t* ctx, hwc_layer_1_t const* layer,
+        const int& dpy) {
+
+    int src_width_l, src_height_l;
+    int src_width_r, src_height_r;
+    int dst_width_l, dst_height_l;
+    int dst_width_r, dst_height_r;
+    int hw_w = ctx->dpyAttr[dpy].xres;
+    int hw_h = ctx->dpyAttr[dpy].yres;
+    hwc_rect_t cropL, dstL, cropR, dstR;
+    const int lSplit = getLeftSplit(ctx, dpy);
+    hwc_rect_t sourceCrop = layer->sourceCrop;
+    hwc_rect_t displayFrame  = layer->displayFrame;
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    trimLayer(ctx, dpy, layer->transform, sourceCrop, displayFrame);
+
+    cropL = sourceCrop;
+    dstL = displayFrame;
+    hwc_rect_t scissorL = { 0, 0, lSplit, hw_h };
+    qhwc::calculate_crop_rects(cropL, dstL, scissorL, 0);
+
+    cropR = sourceCrop;
+    dstR = displayFrame;
+    hwc_rect_t scissorR = { lSplit, 0, hw_w, hw_h };
+    qhwc::calculate_crop_rects(cropR, dstR, scissorR, 0);
+
+    // Sanitize Crop to stitch
+    sanitizeSourceCrop(cropL, cropR, hnd);
+
+    // Calculate the left dst
+    dst_width_l = dstL.right - dstL.left;
+    dst_height_l = dstL.bottom - dstL.top;
+    src_width_l = cropL.right - cropL.left;
+    src_height_l = cropL.bottom - cropL.top;
+
+    // check if there is any scaling on the left
+    if(((src_width_l != dst_width_l) || (src_height_l != dst_height_l)))
+        return true;
+
+    // Calculate the right dst
+    dst_width_r = dstR.right - dstR.left;
+    dst_height_r = dstR.bottom - dstR.top;
+    src_width_r = cropR.right - cropR.left;
+    src_height_r = cropR.bottom - cropR.top;
+
+    // check if there is any scaling on the right
+    if(((src_width_r != dst_width_r) || (src_height_r != dst_height_r)))
+        return true;
+
+    return false;
+}
+
 bool isAlphaScaled(hwc_context_t* ctx, hwc_layer_1_t const* layer,
         const int& dpy) {
     if(needsScaling(ctx, layer, dpy) && isAlphaPresent(layer)) {
@@ -1282,7 +1335,7 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 }
 
 //Helper to 1) Ensure crops dont have gaps 2) Ensure L and W are even
-static void sanitizeSourceCrop(hwc_rect_t& cropL, hwc_rect_t& cropR,
+void sanitizeSourceCrop(hwc_rect_t& cropL, hwc_rect_t& cropR,
         private_handle_t *hnd) {
     if(cropL.right - cropL.left) {
         if(isYuvBuffer(hnd)) {
