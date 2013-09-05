@@ -31,10 +31,15 @@
 #include "overlayWriteback.h"
 #include "mdpWrapper.h"
 
+#define SIZE_1M 0x00100000
+
 namespace overlay {
 
 //=========== class WritebackMem ==============================================
 bool WritebackMem::manageMem(uint32_t size, bool isSecure) {
+    if(isSecure) {
+        size = utils::align(size, SIZE_1M);
+    }
     if(mBuf.bufSz() == size) {
         return true;
     }
