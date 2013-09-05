@@ -124,25 +124,41 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 break;
             }
 
-            Locker::Autolock _l(ctx->mDrawLock);
-            clear(ctx, dpy);
-            ctx->dpyAttr[dpy].connected = false;
-            ctx->dpyAttr[dpy].isActive = false;
+            {
+                Locker::Autolock _l(ctx->mDrawLock);
+                clear(ctx, dpy);
+                ctx->dpyAttr[dpy].connected = false;
+                ctx->dpyAttr[dpy].isActive = false;
 
-            if(dpy == HWC_DISPLAY_EXTERNAL) {
-                ctx->mExtDisplay->teardown();
-            } else {
-                ctx->mVirtualDisplay->teardown();
+                /* We need to send hotplug to SF only when we are disconnecting
+                 * (1) HDMI OR (2) proprietary WFD session */
+                if(dpy == HWC_DISPLAY_EXTERNAL ||
+                        ctx->mVirtualonExtActive) {
+                    ALOGE_IF(UEVENT_DEBUG,"%s:Sending EXTERNAL OFFLINE hotplug"
+                            "event", __FUNCTION__);
+                    ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL,
+                            EXTERNAL_OFFLINE);
+                }
+                ctx->proc->invalidate(ctx->proc);
             }
 
-            /* We need to send hotplug to SF only when we are disconnecting
-             * (1) HDMI OR (2) proprietary WFD session */
-            if(dpy == HWC_DISPLAY_EXTERNAL ||
-               ctx->mVirtualonExtActive) {
-                ALOGE_IF(UEVENT_DEBUG,"%s:Sending EXTERNAL OFFLINE hotplug"
-                         "event", __FUNCTION__);
-                ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL,
-                                   EXTERNAL_OFFLINE);
+            usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+                    * 2 / 1000);
+            // At this point all the pipes used by External have been
+            // marked as UNSET.
+            {
+                Locker::Autolock _l(ctx->mDrawLock);
+                // Perform commit to unstage the pipes.
+                if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+                    ALOGE("%s: display commit fail! for %d dpy",
+                            __FUNCTION__, dpy);
+                }
+
+                if(dpy == HWC_DISPLAY_EXTERNAL) {
+                    ctx->mExtDisplay->teardown();
+                } else {
+                    ctx->mVirtualDisplay->teardown();
+                }
             }
             break;
         }
@@ -180,26 +196,33 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                         clear(ctx, HWC_DISPLAY_VIRTUAL);
                         ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected = false;
                         ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = false;
+
+                        /* Need to send hotplug only when connected WFD in
+                         * proprietary path */
+                        if(ctx->mVirtualonExtActive) {
+                            ALOGE_IF(UEVENT_DEBUG,"%s: Sending EXTERNAL OFFLINE"
+                                    "hotplug event", __FUNCTION__);
+                            ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL,
+                                    EXTERNAL_OFFLINE);
+                            ctx->mVirtualonExtActive = false;
+                        }
+                        ctx->proc->invalidate(ctx->proc);
+                    }
+
+                    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+                            * 2 / 1000);
+                    // At this point all the pipes used by External have been
+                    // marked as UNSET.
+                    {
+                        Locker::Autolock _l(ctx->mDrawLock);
+                        // Perform commit to unstage the pipes.
+                        if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+                            ALOGE("%s: display commit fail! for %d dpy",
+                                    __FUNCTION__, dpy);
+                        }
                     }
 
                     ctx->mVirtualDisplay->teardown();
-
-                    /* Need to send hotplug only when connected WFD in
-                     * proprietary path */
-                    if(ctx->mVirtualonExtActive) {
-                        ALOGE_IF(UEVENT_DEBUG,"%s: Sending EXTERNAL OFFLINE"
-                                 "hotplug event", __FUNCTION__);
-                        ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL,
-                                           EXTERNAL_OFFLINE);
-                        {
-                            Locker::Autolock _l(ctx->mDrawLock);
-                            ctx->mVirtualonExtActive = false;
-                        }
-                    }
-                    /* Wait for few frames for SF to tear down
-                     * the WFD session. */
-                    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-                           * 2 / 1000);
                 }
                 ctx->mExtDisplay->configure();
             } else {
