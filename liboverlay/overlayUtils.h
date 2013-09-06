@@ -77,6 +77,10 @@
 #define MDP_OV_PIPE_FORCE_DMA 0x4000
 #endif
 
+#ifndef MDSS_MDP_DUAL_PIPE
+#define MDSS_MDP_DUAL_PIPE 0x200
+#endif
+
 #define FB_DEVICE_TEMPLATE "/dev/graphics/fb%u"
 
 namespace overlay {
@@ -265,6 +269,7 @@ enum eMdpFlags {
     OV_MDSS_MDP_RIGHT_MIXER = MDSS_MDP_RIGHT_MIXER,
     OV_MDP_PP_EN = MDP_OVERLAY_PP_CFG_EN,
     OV_MDSS_MDP_BWC_EN = MDP_BWC_EN,
+    OV_MDSS_MDP_DUAL_PIPE = MDSS_MDP_DUAL_PIPE,
 };
 
 enum eZorder {

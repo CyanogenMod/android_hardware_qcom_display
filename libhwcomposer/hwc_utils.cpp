@@ -1291,6 +1291,35 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     return 0;
 }
 
+//Helper to 1) Ensure crops dont have gaps 2) Ensure L and W are even
+static void sanitizeSourceCrop(hwc_rect_t& cropL, hwc_rect_t& cropR,
+        private_handle_t *hnd) {
+    if(cropL.right - cropL.left) {
+        if(isYuvBuffer(hnd)) {
+            //Always safe to even down left
+            ovutils::even_floor(cropL.left);
+            //If right is even, automatically width is even, since left is
+            //already even
+            ovutils::even_floor(cropL.right);
+        }
+        //Make sure there are no gaps between left and right splits if the layer
+        //is spread across BOTH halves
+        if(cropR.right - cropR.left) {
+            cropR.left = cropL.right;
+        }
+    }
+
+    if(cropR.right - cropR.left) {
+        if(isYuvBuffer(hnd)) {
+            //Always safe to even down left
+            ovutils::even_floor(cropR.left);
+            //If right is even, automatically width is even, since left is
+            //already even
+            ovutils::even_floor(cropR.right);
+        }
+    }
+}
+
 int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy, eMdpFlags& mdpFlagsL, eZorder& z,
         eIsFg& isFg, const eDest& lDest, const eDest& rDest,
@@ -1339,6 +1368,12 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
 
     setMdpFlags(layer, mdpFlagsL, 0, transform);
+
+    if(lDest != OV_INVALID && rDest != OV_INVALID) {
+        //Enable overfetch
+        setMdpFlags(mdpFlagsL, OV_MDSS_MDP_DUAL_PIPE);
+    }
+
     trimLayer(ctx, dpy, transform, crop, dst);
 
     //Will do something only if feature enabled and conditions suitable
@@ -1366,8 +1401,8 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     eMdpFlags mdpFlagsR = mdpFlagsL;
     setMdpFlags(mdpFlagsR, OV_MDSS_MDP_RIGHT_MIXER);
 
-    hwc_rect_t tmp_cropL, tmp_dstL;
-    hwc_rect_t tmp_cropR, tmp_dstR;
+    hwc_rect_t tmp_cropL = {0}, tmp_dstL = {0};
+    hwc_rect_t tmp_cropR = {0}, tmp_dstR = {0};
 
     const int lSplit = getLeftSplit(ctx, dpy);
 
@@ -1383,6 +1418,8 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         hwc_rect_t scissor = {lSplit, 0, hw_w, hw_h };
         qhwc::calculate_crop_rects(tmp_cropR, tmp_dstR, scissor, 0);
     }
+
+    sanitizeSourceCrop(tmp_cropL, tmp_cropR, hnd);
 
     //When buffer is H-flipped, contents of mixer config also needs to swapped
     //Not needed if the layer is confined to one half of the screen.
