@@ -171,7 +171,7 @@ void initContext(hwc_context_t *ctx)
     }
 
     MDPComp::init(ctx);
-    ctx->mAD = new AssertiveDisplay();
+    ctx->mAD = new AssertiveDisplay(ctx);
 
     ctx->vstate.enable = false;
     ctx->vstate.fakevsync = false;
@@ -1249,13 +1249,6 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     setMdpFlags(layer, mdpFlags, downscale, transform);
     trimLayer(ctx, dpy, transform, crop, dst);
-
-    //Will do something only if feature enabled and conditions suitable
-    //hollow call otherwise
-    if(ctx->mAD->prepare(ctx, crop, whf, hnd)) {
-        overlay::Writeback *wb = overlay::Writeback::getInstance();
-        whf.format = wb->getOutputFormat();
-    }
 
     if(isYuvBuffer(hnd) && //if 90 component or downscale, use rot
             ((transform & HWC_TRANSFORM_ROT_90) || downscale)) {
