@@ -129,7 +129,6 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
-    const int rightSplit = qdutils::MDPVersion::getInstance().getRightSplit();
     overlay::Overlay::initOverlay();
     ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->mRotMgr = new RotMgr();
@@ -138,8 +137,7 @@ void initContext(hwc_context_t *ctx)
     //For external it could get created and destroyed multiple times depending
     //on what external we connect to.
     ctx->mFBUpdate[HWC_DISPLAY_PRIMARY] =
-        IFBUpdate::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
-                rightSplit, HWC_DISPLAY_PRIMARY);
+        IFBUpdate::getObject(ctx, HWC_DISPLAY_PRIMARY);
 
     // Check if the target supports copybit compostion (dyn/mdp/c2d) to
     // decide if we need to open the copybit module.
@@ -164,8 +162,7 @@ void initContext(hwc_context_t *ctx)
     ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = false;
 
     ctx->mMDPComp[HWC_DISPLAY_PRIMARY] =
-         MDPComp::getObject(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres,
-                rightSplit, HWC_DISPLAY_PRIMARY);
+         MDPComp::getObject(ctx, HWC_DISPLAY_PRIMARY);
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
 
     for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
@@ -1193,7 +1190,7 @@ void updateSource(eTransform& orient, Whf& whf,
     }
 }
 
-int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
+int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy, eMdpFlags& mdpFlags, eZorder& z,
         eIsFg& isFg, const eDest& dest, Rotator **rot) {
 
@@ -1320,7 +1317,7 @@ static void sanitizeSourceCrop(hwc_rect_t& cropL, hwc_rect_t& cropR,
     }
 }
 
-int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
+int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy, eMdpFlags& mdpFlagsL, eZorder& z,
         eIsFg& isFg, const eDest& lDest, const eDest& rDest,
         Rotator **rot) {
@@ -1501,6 +1498,18 @@ int getLeftSplit(hwc_context_t *ctx, const int& dpy) {
         lSplit = qdutils::MDPVersion::getInstance().getLeftSplit();
     }
     return lSplit;
+}
+
+bool isDisplaySplit(hwc_context_t* ctx, int dpy) {
+    if(ctx->dpyAttr[dpy].xres > qdutils::MAX_DISPLAY_DIM) {
+        return true;
+    }
+    //For testing we could split primary via device tree values
+    if(dpy == HWC_DISPLAY_PRIMARY &&
+        qdutils::MDPVersion::getInstance().getRightSplit()) {
+        return true;
+    }
+    return false;
 }
 
 void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
