@@ -45,8 +45,7 @@ public:
     //Reset values
     virtual void reset();
     //Factory method that returns a low-res or high-res version
-    static IFBUpdate *getObject(const int& width, const int& rightSplit,
-            const int& dpy);
+    static IFBUpdate *getObject(hwc_context_t *ctx, const int& dpy);
 
 protected:
     const int mDpy; // display to update
@@ -54,11 +53,11 @@ protected:
     overlay::Rotator *mRot;
 };
 
-//Low resolution (<= 2048) panel handler.
-class FBUpdateLowRes : public IFBUpdate {
+//Non-Split panel handler.
+class FBUpdateNonSplit : public IFBUpdate {
 public:
-    explicit FBUpdateLowRes(const int& dpy);
-    virtual ~FBUpdateLowRes() {};
+    explicit FBUpdateNonSplit(const int& dpy);
+    virtual ~FBUpdateNonSplit() {};
     bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
             int fbZorder);
     bool draw(hwc_context_t *ctx, private_handle_t *hnd);
@@ -74,11 +73,11 @@ private:
     ovutils::eDest mDest; //pipe to draw on
 };
 
-//High resolution (> 2048) panel handler.
-class FBUpdateHighRes : public IFBUpdate {
+//Split panel handler.
+class FBUpdateSplit : public IFBUpdate {
 public:
-    explicit FBUpdateHighRes(const int& dpy);
-    virtual ~FBUpdateHighRes() {};
+    explicit FBUpdateSplit(const int& dpy);
+    virtual ~FBUpdateSplit() {};
     bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
             int fbZorder);
     bool draw(hwc_context_t *ctx, private_handle_t *hnd);
