@@ -124,14 +124,28 @@ static int adRead() {
     return ret;
 }
 
-AssertiveDisplay::AssertiveDisplay() :mWbFd(-1), mDoable(false),
-        mFeatureEnabled(false), mDest(overlay::utils::OV_INVALID) {
+AssertiveDisplay::AssertiveDisplay(hwc_context_t *ctx) : mWbFd(-1),
+        mDoable(false), mFeatureEnabled(false),
+        mDest(overlay::utils::OV_INVALID) {
     int fd = openWbFb();
     if(fd >= 0) {
+        //Values in ad node:
         //-1 means feature is disabled on device
         // 0 means feature exists but turned off, will be turned on by hwc
         // 1 means feature is turned on by hwc
-        if(adRead() >= 0) {
+        // Plus, we do this feature only on split primary displays.
+        // Plus, we do this feature only if ro.qcom.ad=2
+
+        char property[PROPERTY_VALUE_MAX];
+        const int ENABLED = 2;
+        int val = 0;
+
+        if(property_get("ro.qcom.ad", property, "0") > 0) {
+            val = atoi(property);
+        }
+
+        if(adRead() >= 0 && isDisplaySplit(ctx, HWC_DISPLAY_PRIMARY) &&
+                val == ENABLED) {
             ALOGD_IF(DEBUG, "Assertive display feature supported");
             mFeatureEnabled = true;
         }

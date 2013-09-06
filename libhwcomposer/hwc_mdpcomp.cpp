@@ -1057,13 +1057,6 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         int fd = hnd->fd;
         uint32_t offset = hnd->offset;
 
-        if(ctx->mAD->isModeOn()) {
-            if(ctx->mAD->draw(ctx, fd, offset)) {
-                fd = ctx->mAD->getDstFd(ctx);
-                offset = ctx->mAD->getDstOffset(ctx);
-            }
-        }
-
         Rotator *rot = mCurrentFrame.mdpToLayer[mdpIndex].rot;
         if(rot) {
             if(!rot->queueBuffer(fd, offset))
