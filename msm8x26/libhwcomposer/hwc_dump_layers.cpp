@@ -303,44 +303,6 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
 
     getHalPixelFormatStr(hnd->format, pixFormatStr);
 
-    if (needDumpPng && hnd->base) {
-        bool bResult = false;
-        char dumpFilename[PATH_MAX];
-        SkBitmap *tempSkBmp = new SkBitmap();
-        SkBitmap::Config tempSkBmpConfig = SkBitmap::kNo_Config;
-        sprintf(dumpFilename, "%s/sfdump%03d.layer%d.%s.png", mDumpDirPng,
-            mDumpCntrPng, layerIndex, mDisplayName);
-
-        switch (hnd->format) {
-            case HAL_PIXEL_FORMAT_RGBA_8888:
-            case HAL_PIXEL_FORMAT_RGBX_8888:
-            case HAL_PIXEL_FORMAT_BGRA_8888:
-                tempSkBmpConfig = SkBitmap::kARGB_8888_Config;
-                break;
-            case HAL_PIXEL_FORMAT_RGB_565:
-                tempSkBmpConfig = SkBitmap::kRGB_565_Config;
-                break;
-            case HAL_PIXEL_FORMAT_RGB_888:
-            default:
-                tempSkBmpConfig = SkBitmap::kNo_Config;
-                break;
-        }
-        if (SkBitmap::kNo_Config != tempSkBmpConfig) {
-            tempSkBmp->setConfig(tempSkBmpConfig, hnd->width, hnd->height);
-            tempSkBmp->setPixels((void*)hnd->base);
-            bResult = SkImageEncoder::EncodeFile(dumpFilename,
-                                    *tempSkBmp, SkImageEncoder::kPNG_Type, 100);
-            ALOGI("Display[%s] Layer[%d] %s Dump to %s: %s",
-                mDisplayName, layerIndex, dumpLogStrPng,
-                dumpFilename, bResult ? "Success" : "Fail");
-        } else {
-            ALOGI("Display[%s] Layer[%d] %s Skipping dump: Unsupported layer"
-                " format %s for png encoder",
-                mDisplayName, layerIndex, dumpLogStrPng, pixFormatStr);
-        }
-        delete tempSkBmp; // Calls SkBitmap::freePixels() internally.
-    }
-
     if (needDumpRaw && hnd->base) {
         char dumpFilename[PATH_MAX];
         bool bResult = false;
