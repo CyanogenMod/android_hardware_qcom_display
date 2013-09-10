@@ -36,8 +36,6 @@
 #include <cutils/log.h>
 #include <sys/stat.h>
 #include <comptype.h>
-#include <SkBitmap.h>
-#include <SkImageEncoder.h>
 
 namespace qhwc {
 
