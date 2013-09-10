@@ -52,20 +52,15 @@ struct IGCData_t{
     uint16_t c2[MAX_IGC_LUT_ENTRIES];
 };
 
-struct BufferDim_t {
-    int32_t sliceWidth;
-    int32_t sliceHeight;
-};
-
 struct MetaData_t {
     int32_t operation;
     int32_t interlaced;
-    BufferDim_t bufferDim;
     HSICData_t hsicData;
     int32_t sharpness;
     int32_t video_interface;
     IGCData_t igcData;
     Sharp2Data_t Sharp2Data;
+    int64_t timestamp;
 };
 
 typedef enum {
@@ -75,7 +70,7 @@ typedef enum {
     PP_PARAM_VID_INTFC  = 0x0008,
     PP_PARAM_IGC        = 0x0010,
     PP_PARAM_SHARP2     = 0x0020,
-    UPDATE_BUFFER_GEOMETRY = 0x0080,
+    PP_PARAM_TIMESTAMP  = 0x0040
 } DispParamType;
 
 int setMetaData(private_handle_t *handle, DispParamType paramType, void *param);

@@ -81,6 +81,7 @@ public:
     utils::Dim getSrcRectDim() const;
     /* setVisualParam */
     bool setVisualParams(const MetaData_t& data);
+    void forceSet();
 
 private:
     /* Perform transformation calculations */
@@ -98,13 +99,8 @@ private:
     void setZ(utils::eZorder z);
     /* set isFg flag */
     void setIsFg(utils::eIsFg isFg);
-    /* return a copy of src whf*/
+        /* return a copy of src whf*/
     utils::Whf getSrcWhf() const;
-    /* set plane alpha */
-    void setPlaneAlpha(int planeAlpha);
-    /* set blending method */
-    void setBlending(overlay::utils::eBlending blending);
-
     /* set src whf */
     void setSrcWhf(const utils::Whf& whf);
     /* set src/dst rect dim */
@@ -130,6 +126,8 @@ private:
     /* FD for the mdp fbnum */
     OvFD          mFd;
     int mDownscale;
+    bool mForceSet;
+
 #ifdef USES_POST_PROCESSING
     /* PP Compute Params */
     struct compute_params mParams;
@@ -243,26 +241,6 @@ inline void MdpCtrl::setDownscale(int dscale) {
     mDownscale = dscale;
 }
 
-inline void MdpCtrl::setPlaneAlpha(int planeAlpha) {
-    mOVInfo.alpha = planeAlpha;
-}
-
-inline void MdpCtrl::setBlending(overlay::utils::eBlending blending) {
-#ifndef MDSS_TARGET
-    switch((int) blending) {
-    case utils::OVERLAY_BLENDING_OPAQUE:
-        mOVInfo.blend_op = BLEND_OP_OPAQUE;
-        break;
-    case utils::OVERLAY_BLENDING_PREMULT:
-        mOVInfo.blend_op = BLEND_OP_PREMULTIPLIED;
-        break;
-    case utils::OVERLAY_BLENDING_COVERAGE:
-    default:
-        mOVInfo.blend_op = BLEND_OP_COVERAGE;
-    }
-#endif
-}
-
 inline bool MdpCtrl::ovChanged() const {
 #ifdef USES_POST_PROCESSING
     // Some pp params are stored as pointer address,
@@ -342,6 +320,10 @@ inline void MdpCtrl::setRotationFlags() {
     const int u = getUserData();
     if (u & MDP_ROT_90)
         mOVInfo.flags |= MDP_SOURCE_ROTATED_90;
+}
+
+inline void MdpCtrl::forceSet() {
+    mForceSet = true;
 }
 
 ///////    MdpCtrl3D //////

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2010-2012 The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -336,9 +336,15 @@ int mapFrameBufferLocked(struct private_module_t* module)
 
 static int mapFrameBuffer(struct private_module_t* module)
 {
-    pthread_mutex_lock(&module->lock);
-    int err = mapFrameBufferLocked(module);
-    pthread_mutex_unlock(&module->lock);
+    int err = -1;
+    char property[PROPERTY_VALUE_MAX];
+    if((property_get("debug.gralloc.map_fb_memory", property, NULL) > 0) &&
+       (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+        (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+        pthread_mutex_lock(&module->lock);
+        err = mapFrameBufferLocked(module);
+        pthread_mutex_unlock(&module->lock);
+    }
     return err;
 }
 
@@ -348,7 +354,9 @@ static int fb_close(struct hw_device_t *dev)
 {
     fb_context_t* ctx = (fb_context_t*)dev;
     if (ctx) {
-        free(ctx);
+        //Hack until fbdev is removed. Framework could close this causing hwc a
+        //pain.
+        //free(ctx);
     }
     return 0;
 }
