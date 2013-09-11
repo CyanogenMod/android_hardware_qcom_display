@@ -148,8 +148,6 @@ protected:
     /* checks if the required bandwidth exceeds a certain max */
     bool bandwidthCheck(hwc_context_t *ctx, const uint32_t& size);
 
-    /* set up Border fill as Base pipe */
-    static bool setupBasePipe(hwc_context_t*);
     /* Is debug enabled */
     static bool isDebug() { return sDebugLogs ? true : false; };
     /* Is feature enabled */
