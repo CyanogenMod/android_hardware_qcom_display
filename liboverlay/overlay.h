@@ -84,6 +84,8 @@ public:
 
     /* Returns available ("unallocated") pipes for a display's mixer */
     int availablePipes(int dpy, int mixer);
+    /* Returns available ("unallocated") pipes for a display */
+    int availablePipes(int dpy);
     /* Returns if any of the requested pipe type is attached to any of the
      * displays
      */
@@ -188,6 +190,21 @@ inline int Overlay::availablePipes(int dpy, int mixer) {
              mPipeBook[i].mDisplay == dpy) &&
             (mPipeBook[i].mMixer == MIXER_UNUSED ||
              mPipeBook[i].mMixer == mixer) &&
+            PipeBook::isNotAllocated(i) &&
+            !(Overlay::getDMAMode() == Overlay::DMA_BLOCK_MODE &&
+              PipeBook::getPipeType((utils::eDest)i) ==
+              utils::OV_MDP_PIPE_DMA)) {
+            avail++;
+        }
+    }
+    return avail;
+}
+
+inline int Overlay::availablePipes(int dpy) {
+    int avail = 0;
+    for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
+        if( (mPipeBook[i].mDisplay == DPY_UNUSED ||
+             mPipeBook[i].mDisplay == dpy) &&
             PipeBook::isNotAllocated(i) &&
             !(Overlay::getDMAMode() == Overlay::DMA_BLOCK_MODE &&
               PipeBook::getPipeType((utils::eDest)i) ==
