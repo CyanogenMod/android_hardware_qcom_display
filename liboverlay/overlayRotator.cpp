@@ -174,11 +174,10 @@ void RotMgr::getDump(char *buf, size_t len) {
 }
 
 int RotMgr::getRotDevFd() {
-    //2nd check just in case
-    if(mRotDevFd < 0 && Rotator::getRotatorHwType() == Rotator::TYPE_MDP) {
-        mRotDevFd = ::open("/dev/msm_rotator", O_RDWR, 0);
+    if(mRotDevFd < 0 && Rotator::getRotatorHwType() == Rotator::TYPE_MDSS) {
+        mRotDevFd = ::open("/dev/graphics/fb0", O_RDWR, 0);
         if(mRotDevFd < 0) {
-            ALOGE("%s failed to open rotator device", __FUNCTION__);
+            ALOGE("%s failed to open fb0", __FUNCTION__);
         }
     }
     return mRotDevFd;
