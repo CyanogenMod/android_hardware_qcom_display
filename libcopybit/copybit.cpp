@@ -229,7 +229,12 @@ static void set_infos(struct copybit_context_t *dev,
 /** copy the bits */
 static int msm_copybit(struct copybit_context_t *dev, void const *list)
 {
-    int err = ioctl(dev->mFD, MSMFB_ASYNC_BLIT,
+    int err;
+    if (dev->relFence != -1) {
+        close(dev->relFence);
+        dev->relFence = -1;
+    }
+    err = ioctl(dev->mFD, MSMFB_ASYNC_BLIT,
                     (struct mdp_async_blit_req_list const*)list);
     ALOGE_IF(err<0, "copyBits failed (%s)", strerror(errno));
     if (err == 0) {
@@ -406,7 +411,6 @@ static int set_sync_copybit(struct copybit_device_t *dev,
             list->count = 0;
             list->sync.acq_fen_fd_cnt = 0;
             ctx->acqFence[list->sync.acq_fen_fd_cnt++] = acquireFenceFd;
-            ctx->relFence = -1;
         }
     }
     return 0;
@@ -513,9 +517,7 @@ static int stretch_copybit(
 
             if (++list->count == maxCount) {
                 status = msm_copybit(ctx, list);
-                if (ctx->relFence != -1) {
-                    list->sync.acq_fen_fd_cnt = 0;
-                }
+                list->sync.acq_fen_fd_cnt = 0;
                 list->count = 0;
             }
         }
@@ -523,9 +525,7 @@ static int stretch_copybit(
             //Before freeing the buffer we need buffer passed through blit call
             if (list->count != 0) {
                 status = msm_copybit(ctx, list);
-                if (ctx->relFence != -1) {
-                    list->sync.acq_fen_fd_cnt = 0;
-                }
+                list->sync.acq_fen_fd_cnt = 0;
                 list->count = 0;
             }
             free_buffer(yv12_handle);
