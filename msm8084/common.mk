@@ -10,7 +10,7 @@ common_includes += hardware/qcom/display/libvirtual
 
 ifeq ($(TARGET_USES_POST_PROCESSING),true)
     common_flags     += -DUSES_POST_PROCESSING
-    common_includes += $(TARGET_OUT_HEADERS)/pp/inc
+    common_includes  += $(TARGET_OUT_HEADERS)/pp/inc
 endif
 
 common_header_export_path := qcom/display
@@ -35,6 +35,12 @@ ifeq ($(call is-board-platform-in-list, msm8974 msm8226 msm8610 apq8084 \
     common_flags += -DVENUS_COLOR_FORMAT
     common_flags += -DMDSS_TARGET
 endif
+
+ifeq ($(call is-board-platform-in-list, mpq8092), true)
+    #XXX: Replace with check from MDP when available
+    common_flags += -DVPU_TARGET
+endif
+
 
 common_deps  :=
 kernel_includes :=
