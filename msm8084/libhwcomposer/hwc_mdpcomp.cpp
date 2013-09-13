@@ -1058,6 +1058,7 @@ int MDPCompSplit::pipesNeeded(hwc_context_t *ctx,
 bool MDPCompSplit::arePipesAvailable(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
     overlay::Overlay& ov = *ctx->mOverlay;
+    int totalPipesNeeded = 0;
 
     for(int i = 0; i < Overlay::MIXER_MAX; i++) {
         int numPipesNeeded = pipesNeeded(ctx, list, i);
@@ -1065,8 +1066,11 @@ bool MDPCompSplit::arePipesAvailable(hwc_context_t *ctx,
 
         //Reserve pipe(s)for FB
         if(mCurrentFrame.fbCount)
-            availPipes -= 1;
+            numPipesNeeded += 1;
 
+        totalPipesNeeded += numPipesNeeded;
+
+        //Per mixer check.
         if(numPipesNeeded > availPipes) {
             ALOGD_IF(isDebug(), "%s: Insufficient pipes for "
                      "dpy %d mixer %d needed %d, avail %d",
@@ -1074,6 +1078,16 @@ bool MDPCompSplit::arePipesAvailable(hwc_context_t *ctx,
             return false;
         }
     }
+
+    //Per display check, since unused pipes can get counted twice.
+    int totalPipesAvailable = ov.availablePipes(mDpy);
+    if(totalPipesNeeded > totalPipesAvailable) {
+        ALOGD_IF(isDebug(), "%s: Insufficient pipes for "
+                "dpy %d needed %d, avail %d",
+                __FUNCTION__, mDpy, totalPipesNeeded, totalPipesAvailable);
+        return false;
+    }
+
     return true;
 }
 
