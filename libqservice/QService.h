@@ -51,6 +51,7 @@ public:
     virtual android::status_t screenRefresh();
     virtual void setExtOrientation(uint32_t orientation);
     virtual void setBufferMirrorMode(uint32_t enable);
+    virtual android::status_t vpuCommand(uint32_t command, uint32_t setting);
     static void init();
 private:
     QService();

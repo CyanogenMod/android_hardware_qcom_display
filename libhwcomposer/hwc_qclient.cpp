@@ -30,6 +30,7 @@
 #include <hwc_qclient.h>
 #include <IQService.h>
 #include <hwc_utils.h>
+#include <hwc_vpuclient.h>
 
 #define QCLIENT_DEBUG 0
 
@@ -51,6 +52,12 @@ QClient::~QClient()
 }
 
 status_t QClient::notifyCallback(uint32_t msg, uint32_t value) {
+
+    if (msg > IQService::VPU_COMMAND_LIST_START &&
+        msg < IQService::VPU_COMMAND_LIST_END) {
+        return vpuCommand(msg, value);
+    }
+
     switch(msg) {
         case IQService::SECURING:
             securing(value);
@@ -113,6 +120,16 @@ android::status_t QClient::screenRefresh() {
         mHwcContext->proc->invalidate(mHwcContext->proc);
         result = NO_ERROR;
     }
+#endif
+    return result;
+}
+
+android::status_t QClient::vpuCommand(uint32_t command, uint32_t setting) {
+    status_t result = NO_INIT;
+#ifdef QCOM_BSP
+#ifdef VPU_TARGET
+    result = mHwcContext->mVPUClient->processCommand(command, setting);
+#endif
 #endif
     return result;
 }

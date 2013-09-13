@@ -38,6 +38,7 @@
 #include "hwc_copybit.h"
 #include "hwc_ad.h"
 #include "profiler.h"
+#include "hwc_vpuclient.h"
 
 using namespace qhwc;
 using namespace overlay;
@@ -155,6 +156,9 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         if(fbLayer->handle) {
             setListStats(ctx, list, dpy);
+#ifdef VPU_TARGET
+            ctx->mVPUClient->prepare(ctx, list);
+#endif
             if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
                 const int fbZ = 0;
                 ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
@@ -441,6 +445,9 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ALOGE("%s: MDPComp draw failed", __FUNCTION__);
             ret = -1;
         }
+#ifdef VPU_TARGET
+        ctx->mVPUClient->draw(ctx, list);
+#endif
 
         //TODO We dont check for SKIP flag on this layer because we need PAN
         //always. Last layer is always FB

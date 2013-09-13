@@ -71,6 +71,15 @@ android::status_t QService::screenRefresh() {
     return result;
 }
 
+android::status_t QService::vpuCommand(uint32_t command, uint32_t setting ) {
+    status_t result = NO_ERROR;
+    if(mClient.get()) {
+        result = mClient->notifyCallback(command, setting);
+    }
+    return result;
+}
+
+
 void QService::setExtOrientation(uint32_t orientation) {
     if(mClient.get()) {
         mClient->notifyCallback(EXTERNAL_ORIENTATION, orientation);
