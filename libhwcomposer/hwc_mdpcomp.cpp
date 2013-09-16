@@ -739,21 +739,27 @@ uint32_t MDPComp::calcMDPBytesRead(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
     uint32_t size = 0;
 
+    if(!qdutils::MDPVersion::getInstance().is8x74v2())
+        return 0;
+
     for (uint32_t i = 0; i < list->numHwLayers - 1; i++) {
         if(!mCurrentFrame.isFBComposed[i]) {
             hwc_layer_1_t* layer = &list->hwLayers[i];
             private_handle_t *hnd = (private_handle_t *)layer->handle;
-            hwc_rect_t crop = layer->sourceCrop;
-            float bpp = ((float)hnd->size) / (hnd->width * hnd->height);
-            size += bpp * ((crop.right - crop.left) *
+            if (hnd) {
+                hwc_rect_t crop = layer->sourceCrop;
+                float bpp = ((float)hnd->size) / (hnd->width * hnd->height);
+                size += bpp * ((crop.right - crop.left) *
                     (crop.bottom - crop.top));
+            }
         }
     }
 
     if(mCurrentFrame.fbCount) {
         hwc_layer_1_t* layer = &list->hwLayers[list->numHwLayers - 1];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-        size += hnd->size;
+        if (hnd)
+            size += hnd->size;
     }
 
     return size;
