@@ -751,9 +751,12 @@ uint32_t MDPComp::calcMDPBytesRead(hwc_context_t *ctx,
             private_handle_t *hnd = (private_handle_t *)layer->handle;
             if (hnd) {
                 hwc_rect_t crop = layer->sourceCrop;
+                hwc_rect_t dst = layer->displayFrame;
+                trimLayer(ctx, mDpy, layer->transform, crop, dst);
                 float bpp = ((float)hnd->size) / (hnd->width * hnd->height);
-                size += bpp * ((crop.right - crop.left) *
-                    (crop.bottom - crop.top));
+                size += bpp * (crop.right - crop.left) *
+                    (crop.bottom - crop.top) *
+                    ctx->dpyAttr[mDpy].yres / (dst.bottom - dst.top);
             }
         }
     }
