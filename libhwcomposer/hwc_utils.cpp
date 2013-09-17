@@ -611,7 +611,7 @@ bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer,
     int dst_w, dst_h, src_w, src_h;
 
     hwc_rect_t displayFrame  = layer->displayFrame;
-    hwc_rect_t sourceCrop = layer->sourceCrop;
+    hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
     trimLayer(ctx, dpy, layer->transform, sourceCrop, displayFrame);
 
     dst_w = displayFrame.right - displayFrame.left;
@@ -637,7 +637,7 @@ bool needsScalingWithSplit(hwc_context_t* ctx, hwc_layer_1_t const* layer,
     int hw_h = ctx->dpyAttr[dpy].yres;
     hwc_rect_t cropL, dstL, cropR, dstR;
     const int lSplit = getLeftSplit(ctx, dpy);
-    hwc_rect_t sourceCrop = layer->sourceCrop;
+    hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
     hwc_rect_t displayFrame  = layer->displayFrame;
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     trimLayer(ctx, dpy, layer->transform, sourceCrop, displayFrame);
@@ -1394,7 +1394,7 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
 
-    hwc_rect_t crop = layer->sourceCrop;
+    hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
     hwc_rect_t dst = layer->displayFrame;
     int transform = layer->transform;
     eTransform orient = static_cast<eTransform>(transform);
@@ -1525,7 +1525,7 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     int hw_w = ctx->dpyAttr[dpy].xres;
     int hw_h = ctx->dpyAttr[dpy].yres;
-    hwc_rect_t crop = layer->sourceCrop;
+    hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
     hwc_rect_t dst = layer->displayFrame;
     int transform = layer->transform;
     eTransform orient = static_cast<eTransform>(transform);
