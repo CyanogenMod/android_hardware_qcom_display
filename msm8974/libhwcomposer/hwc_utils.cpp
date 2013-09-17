@@ -602,7 +602,6 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     int acquireFd[MAX_NUM_APP_LAYERS];
     int count = 0;
     int releaseFd = -1;
-    int retireFd = -1;
     int fbFd = -1;
     bool swapzero = false;
     int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
@@ -611,7 +610,6 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     memset(&data, 0, sizeof(data));
     data.acq_fen_fd = acquireFd;
     data.rel_fen_fd = &releaseFd;
-    data.retire_fen_fd = &retireFd;
 
     char property[PROPERTY_VALUE_MAX];
     if(property_get("debug.egl.swapinterval", property, "1") > 0) {
@@ -622,13 +620,11 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     for(uint32_t i = 0; i < ctx->mLayerRotMap[dpy]->getCount(); i++) {
         int rotFd = ctx->mRotMgr->getRotDevFd();
         int rotReleaseFd = -1;
-        int rotRetireFd = -1;
         struct mdp_buf_sync rotData;
         memset(&rotData, 0, sizeof(rotData));
         rotData.acq_fen_fd =
                 &ctx->mLayerRotMap[dpy]->getLayer(i)->acquireFenceFd;
         rotData.rel_fen_fd = &rotReleaseFd; //driver to populate this
-        rotData.retire_fen_fd = &rotRetireFd;
         rotData.session_id = ctx->mLayerRotMap[dpy]->getRot(i)->getSessId();
         int ret = 0;
         ret = ioctl(rotFd, MSMFB_BUFFER_SYNC, &rotData);
@@ -644,8 +640,6 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
             //rotator
             ctx->mLayerRotMap[dpy]->getLayer(i)->releaseFenceFd =
                     rotReleaseFd;
-            //Not used for rotator
-            close(rotRetireFd);
         }
     }
 
@@ -714,12 +708,14 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
 
     //Signals when MDP finishes reading rotator buffers.
     ctx->mLayerRotMap[dpy]->setReleaseFd(releaseFd);
-    close(releaseFd);
 
-    if(UNLIKELY(swapzero))
+    if(UNLIKELY(swapzero)){
         list->retireFenceFd = -1;
-    else
-        list->retireFenceFd = retireFd;
+        close(releaseFd);
+    } else {
+        list->retireFenceFd = releaseFd;
+    }
+
     return ret;
 }
 
