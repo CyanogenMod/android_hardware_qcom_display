@@ -33,66 +33,55 @@
 #include <linux/msm_mdp.h>
 #include "mdp_version.h"
 
+#define DEBUG 0
+
 ANDROID_SINGLETON_STATIC_INSTANCE(qdutils::MDPVersion);
 namespace qdutils {
+
+#define TOKEN_PARAMS_DELIM  "="
 
 MDPVersion::MDPVersion()
 {
     int fb_fd = open("/dev/graphics/fb0", O_RDWR);
-    int mdp_version = MDP_V_UNKNOWN;
     char panel_type = 0;
     struct fb_fix_screeninfo fb_finfo;
 
+    mMDPVersion = MDP_V_UNKNOWN;
     mMdpRev = 0;
     mRGBPipes = 0;
     mVGPipes = 0;
     mDMAPipes = 0;
     mFeatures = 0;
+    mMDPUpscale = 0;
     //TODO get this from driver, default for A-fam to 8
     mMDPDownscale = 8;
     mFd = fb_fd;
 
     if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &fb_finfo) < 0) {
         ALOGE("FBIOGET_FSCREENINFO failed");
-        mdp_version =  MDP_V_UNKNOWN;
     } else {
         if(!strncmp(fb_finfo.id, "msmfb", 5)) {
             char str_ver[4] = { 0 };
             memcpy(str_ver, &fb_finfo.id[5], 3);
             str_ver[3] = '\0';
-            mdp_version = atoi(str_ver);
-
+            mMDPVersion = atoi(str_ver);
             //Normalize MDP version to ease comparison.
             //This is needed only because
             //MDP 3.0.3 reports value as 303 which
             //is more than all the others
-            if (mdp_version < 100)
-                mdp_version *= 10;
+            if (mMDPVersion < 100)
+                mMDPVersion *= 10;
 
             mRGBPipes = mVGPipes = 2;
 
         } else if (!strncmp(fb_finfo.id, "mdssfb", 6)) {
-            mdp_version = MDSS_V5;
-#ifdef MDSS_TARGET
-            struct msmfb_metadata metadata;
-            memset(&metadata, 0 , sizeof(metadata));
-            metadata.op = metadata_op_get_caps;
-            if (ioctl(fb_fd, MSMFB_METADATA_GET, &metadata) == -1) {
-                ALOGE("Error retrieving MDP revision and pipes info");
-                mdp_version = MDP_V_UNKNOWN;
-            } else {
-                mMdpRev = metadata.data.caps.mdp_rev;
-                mRGBPipes = metadata.data.caps.rgb_pipes;
-                mVGPipes = metadata.data.caps.vig_pipes;
-                mDMAPipes = metadata.data.caps.dma_pipes;
-                mFeatures = metadata.data.caps.features;
-                if (metadata.data.caps.mdp_rev == MDP_V3_0_4){
-                    mdp_version = MDP_V3_0_4;
-                }
+            mMDPVersion = MDSS_V5;
+            if(!updateSysFsInfo()) {
+                ALOGE("Unable to read updateSysFsInfo");
             }
-#endif
-        } else {
-            mdp_version = MDP_V_UNKNOWN;
+            if (mMdpRev == MDP_V3_0_4){
+                mMDPVersion = MDP_V3_0_4;
+            }
         }
 
         /* Assumes panel type is 2nd element in '_' delimited id string */
@@ -104,16 +93,12 @@ MDPVersion::MDPVersion()
         panel_type = *ptype;
     }
     mPanelType = panel_type;
-    mMDPVersion = mdp_version;
     mHasOverlay = false;
     if((mMDPVersion >= MDP_V4_0) ||
        (mMDPVersion == MDP_V_UNKNOWN) ||
        (mMDPVersion == MDP_V3_0_4))
         mHasOverlay = true;
     if(mMDPVersion >= MDSS_V5) {
-        //TODO get this from driver
-        mMDPDownscale = 4;
-
         char split[64] = {0};
         FILE* fp = fopen("/sys/class/graphics/fb0/msm_fb_split", "r");
         if(fp){
@@ -137,6 +122,95 @@ MDPVersion::MDPVersion()
 
 MDPVersion::~MDPVersion() {
     close(mFd);
+}
+
+int MDPVersion::tokenizeParams(char *inputParams, const char *delim,
+                                char* tokenStr[], int *idx) {
+    char *tmp_token = NULL;
+    char *temp_ptr;
+    int ret = 0, index = 0;
+    if (!inputParams) {
+        return -1;
+    }
+    tmp_token = strtok_r(inputParams, delim, &temp_ptr);
+    while (tmp_token != NULL) {
+        tokenStr[index++] = tmp_token;
+        tmp_token = strtok_r(NULL, " ", &temp_ptr);
+    }
+    *idx = index;
+    return 0;
+}
+
+
+// This function reads the sysfs node to read MDP capabilities
+// and parses and updates information accordingly.
+bool MDPVersion::updateSysFsInfo() {
+    FILE *sysfsFd;
+    size_t len = 0;
+    ssize_t read;
+    char *line = NULL;
+    char sysfsPath[255];
+    memset(sysfsPath, 0, sizeof(sysfsPath));
+    snprintf(sysfsPath , sizeof(sysfsPath),
+            "/sys/class/graphics/fb0/mdp/caps");
+
+    sysfsFd = fopen(sysfsPath, "rb");
+
+    if (sysfsFd == NULL) {
+        ALOGE("%s: sysFsFile file '%s' not found",
+                __FUNCTION__, sysfsPath);
+        return false;
+    } else {
+        while((read = getline(&line, &len, sysfsFd)) != -1) {
+            int index=0;
+            char *tokens[10];
+            memset(tokens, 0, sizeof(tokens));
+
+            // parse the line and update information accordingly
+            if(!tokenizeParams(line, TOKEN_PARAMS_DELIM, tokens, &index)) {
+                if(!strncmp(tokens[0], "hw_rev", strlen("hw_rev"))) {
+                    mMdpRev = atoi(tokens[1]);
+                }
+                else if(!strncmp(tokens[0], "rgb_pipes", strlen("rgb_pipes"))) {
+                    mRGBPipes = atoi(tokens[1]);
+                }
+                else if(!strncmp(tokens[0], "vig_pipes", strlen("vig_pipes"))) {
+                    mVGPipes = atoi(tokens[1]);
+                }
+                else if(!strncmp(tokens[0], "dma_pipes", strlen("dma_pipes"))) {
+                    mDMAPipes = atoi(tokens[1]);
+                }
+                else if(!strncmp(tokens[0], "max_downscale_ratio",
+                                strlen("max_downscale_ratio"))) {
+                    mMDPDownscale = atoi(tokens[1]);
+                }
+                else if(!strncmp(tokens[0], "max_upscale_ratio",
+                                strlen("max_upscale_ratio"))) {
+                    mMDPUpscale = atoi(tokens[1]);
+                }
+                else if(!strncmp(tokens[0], "features", strlen("features"))) {
+                    for(int i=1; i<index;i++) {
+                        if(!strncmp(tokens[i], "bwc", strlen("bwc"))) {
+                           mFeatures |= MDP_BWC_EN;
+                        }
+                        else if(!strncmp(tokens[i], "decimation",
+                                    strlen("decimation"))) {
+                           mFeatures |= MDP_DECIMATION_EN;
+                        }
+                    }
+                }
+            }
+            free(line);
+            line = NULL;
+        }
+        fclose(sysfsFd);
+    }
+    ALOGD_IF(DEBUG, "%s: mMDPVersion: %d mMdpRev: %x mRGBPipes:%d,"
+                    "mVGPipes:%d", __FUNCTION__, mMDPVersion, mMdpRev,
+                    mRGBPipes, mVGPipes);
+    ALOGD_IF(DEBUG, "%s:mDMAPipes:%d \t mMDPDownscale:%d, mFeatures:%d",
+                     __FUNCTION__,  mDMAPipes, mMDPDownscale, mFeatures);
+    return true;
 }
 
 bool MDPVersion::supportsDecimation() {
