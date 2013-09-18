@@ -106,6 +106,9 @@ public:
     int getLeftSplit() { return mSplit.left(); }
     int getRightSplit() { return mSplit.right(); }
 private:
+    bool updateSysFsInfo();
+    int tokenizeParams(char *inputParams, const char *delim,
+                        char* tokenStr[], int *idx);
     int mFd;
     int mMDPVersion;
     char mPanelType;
@@ -116,6 +119,7 @@ private:
     uint8_t mDMAPipes;
     uint32_t mFeatures;
     uint32_t mMDPDownscale;
+    uint32_t mMDPUpscale;
     Split mSplit;
 };
 }; //namespace qdutils
