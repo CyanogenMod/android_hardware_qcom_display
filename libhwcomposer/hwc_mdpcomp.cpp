@@ -482,7 +482,7 @@ bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
     //Setup mCurrentFrame
     mCurrentFrame.reset(numAppLayers);
     updateLayerCache(ctx, list);
-    updateYUV(ctx, list);
+    updateYUV(ctx, list, false /*secure only*/);
     batchLayers(); //sets up fbZ also
 
     int mdpCount = mCurrentFrame.mdpCount;
@@ -505,10 +505,10 @@ bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
 }
 
 bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list){
+        hwc_display_contents_1_t* list, bool secureOnly) {
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     mCurrentFrame.reset(numAppLayers);
-    updateYUV(ctx, list);
+    updateYUV(ctx, list, secureOnly);
     int mdpCount = mCurrentFrame.mdpCount;
     int fbNeeded = int(mCurrentFrame.fbCount != 0);
 
@@ -644,8 +644,8 @@ void MDPComp::updateLayerCache(hwc_context_t* ctx,
     ALOGD_IF(isDebug(),"%s: cached count: %d",__FUNCTION__, numCacheableLayers);
 }
 
-void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
-
+void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
+        bool secureOnly) {
     int nYuvCount = ctx->listStats[mDpy].yuvCount;
     if(!nYuvCount && mDpy) {
         //Reset "No animation on external display" related  parameters.
@@ -667,8 +667,11 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
             }
         } else {
             if(mCurrentFrame.isFBComposed[nYuvIndex]) {
-                mCurrentFrame.isFBComposed[nYuvIndex] = false;
-                mCurrentFrame.fbCount--;
+                private_handle_t *hnd = (private_handle_t *)layer->handle;
+                if(!secureOnly || isSecureBuffer(hnd)) {
+                    mCurrentFrame.isFBComposed[nYuvIndex] = false;
+                    mCurrentFrame.fbCount--;
+                }
             }
         }
     }
@@ -839,7 +842,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                 mCurrentFrame.needsRedraw = true;
             }
         }
-    } else if(isOnlyVideoDoable(ctx, list)) {
+    } else if(isOnlyVideoDoable(ctx, list, false /*secure only*/) ||
+            isOnlyVideoDoable(ctx, list, true /*secure only*/)) {
         //All layers marked for MDP comp cannot be bypassed.
         //Try to compose atleast YUV layers through MDP comp and let
         //all the RGB layers compose in FB
@@ -923,6 +927,36 @@ bool MDPCompNonSplit::arePipesAvailable(hwc_context_t *ctx,
     if(numPipesNeeded > availPipes) {
         ALOGD_IF(isDebug(), "%s: Insufficient pipes, dpy %d needed %d, avail %d",
                 __FUNCTION__, mDpy, numPipesNeeded, availPipes);
+        return false;
+    }
+
+    if(not areVGPipesAvailable(ctx, list)) {
+        return false;
+    }
+
+    return true;
+}
+
+bool MDPCompNonSplit::areVGPipesAvailable(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    overlay::Overlay& ov = *ctx->mOverlay;
+    int pipesNeeded = 0;
+    for(int i = 0; i < mCurrentFrame.layerCount; ++i) {
+        if(!mCurrentFrame.isFBComposed[i]) {
+            hwc_layer_1_t* layer = &list->hwLayers[i];
+            hwc_rect_t dst = layer->displayFrame;
+            private_handle_t *hnd = (private_handle_t *)layer->handle;
+            if(isYuvBuffer(hnd)) {
+                pipesNeeded++;
+            }
+        }
+    }
+
+    int availableVGPipes = ov.availablePipes(mDpy, ovutils::OV_MDP_PIPE_VG);
+    if(pipesNeeded > availableVGPipes) {
+        ALOGD_IF(isDebug(), "%s: Insufficient VG pipes for video layers"
+                "dpy %d needed %d, avail %d",
+                __FUNCTION__, mDpy, pipesNeeded, availableVGPipes);
         return false;
     }
 
@@ -1091,6 +1125,42 @@ bool MDPCompSplit::arePipesAvailable(hwc_context_t *ctx,
         ALOGD_IF(isDebug(), "%s: Insufficient pipes for "
                 "dpy %d needed %d, avail %d",
                 __FUNCTION__, mDpy, totalPipesNeeded, totalPipesAvailable);
+        return false;
+    }
+
+    if(not areVGPipesAvailable(ctx, list)) {
+        return false;
+    }
+
+    return true;
+}
+
+bool MDPCompSplit::areVGPipesAvailable(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    overlay::Overlay& ov = *ctx->mOverlay;
+    int pipesNeeded = 0;
+    const int lSplit = getLeftSplit(ctx, mDpy);
+    for(int i = 0; i < mCurrentFrame.layerCount; ++i) {
+        if(!mCurrentFrame.isFBComposed[i]) {
+            hwc_layer_1_t* layer = &list->hwLayers[i];
+            hwc_rect_t dst = layer->displayFrame;
+            private_handle_t *hnd = (private_handle_t *)layer->handle;
+            if(isYuvBuffer(hnd)) {
+                if(dst.left < lSplit) {
+                    pipesNeeded++;
+                }
+                if(dst.right > lSplit) {
+                    pipesNeeded++;
+                }
+            }
+        }
+    }
+
+    int availableVGPipes = ov.availablePipes(mDpy, ovutils::OV_MDP_PIPE_VG);
+    if(pipesNeeded > availableVGPipes) {
+        ALOGD_IF(isDebug(), "%s: Insufficient VG pipes for video layers"
+                "dpy %d needed %d, avail %d",
+                __FUNCTION__, mDpy, pipesNeeded, availableVGPipes);
         return false;
     }
 
