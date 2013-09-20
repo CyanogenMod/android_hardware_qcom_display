@@ -173,7 +173,7 @@ void gpu_context_t::getGrallocInformationFromFormat(int inputFormat,
 {
     *bufferType = BUFFER_TYPE_VIDEO;
 
-    if (inputFormat < 0x7) {
+    if (inputFormat <= HAL_PIXEL_FORMAT_sRGB_888) {
         // RGB formats
         *bufferType = BUFFER_TYPE_UI;
     } else if ((inputFormat == HAL_PIXEL_FORMAT_R_8) ||
