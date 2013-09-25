@@ -185,6 +185,15 @@ void dumpsys_log(android::String8& buf, const char* fmt, ...);
 
 int getExtOrientation(hwc_context_t* ctx);
 
+bool isValidRect(hwc_rect_t& rect);
+void deductRect(const hwc_layer_1_t* layer, hwc_rect_t& irect);
+void getIntersection(hwc_rect_t& rect1,
+                        hwc_rect_t& rect2, hwc_rect_t& irect);
+void getUnion(hwc_rect_t& rect1,
+                        hwc_rect_t& rect2, hwc_rect_t& irect);
+void optimizeLayerRects(hwc_context_t *ctx,
+                        const hwc_display_contents_1_t *list, const int& dpy);
+
 /* Calculates the destination position based on the action safe rectangle */
 void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& dst);
 
