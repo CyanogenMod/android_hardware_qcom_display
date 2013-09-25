@@ -75,7 +75,6 @@ private:
     int mFd;
     int mFbNum;
     int mCurrentMode;
-    char mEDIDs[128];
     int mEDIDModes[64];
     int mModeCount;
     bool mUnderscanSupported;
