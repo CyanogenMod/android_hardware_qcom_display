@@ -186,13 +186,14 @@ int getBlending(int blending);
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
 
 int getExtOrientation(hwc_context_t* ctx);
-
 bool isValidRect(const hwc_rect_t& rect);
 void deductRect(const hwc_layer_1_t* layer, hwc_rect_t& irect);
 hwc_rect_t getIntersection(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 hwc_rect_t getUnion(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 void optimizeLayerRects(hwc_context_t *ctx,
-                        const hwc_display_contents_1_t *list, const int& dpy);
+        const hwc_display_contents_1_t *list, const int& dpy);
+bool areLayersIntersecting(const hwc_layer_1_t* layer1,
+        const hwc_layer_1_t* layer2);
 
 /* Calculates the destination position based on the action safe rectangle */
 void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& dst);
