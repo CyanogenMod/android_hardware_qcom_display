@@ -743,6 +743,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].roi = ovutils::Dim(0, 0,
                       (int)ctx->dpyAttr[dpy].xres, (int)ctx->dpyAttr[dpy].yres);
     ctx->listStats[dpy].secureUI = false;
+    ctx->listStats[dpy].yuv4k2kCount = 0;
 
     trimList(ctx, list, dpy);
     optimizeLayerRects(ctx, list, dpy);
@@ -765,6 +766,7 @@ void setListStats(hwc_context_t *ctx,
 
         //reset yuv indices
         ctx->listStats[dpy].yuvIndices[i] = -1;
+        ctx->listStats[dpy].yuv4k2kIndices[i] = -1;
 
         if (isSecureBuffer(hnd)) {
             ctx->listStats[dpy].isSecurePresent = true;
@@ -778,6 +780,12 @@ void setListStats(hwc_context_t *ctx,
             int& yuvCount = ctx->listStats[dpy].yuvCount;
             ctx->listStats[dpy].yuvIndices[yuvCount] = i;
             yuvCount++;
+
+            if(UNLIKELY(is4kx2kYuvBuffer(hnd))){
+                int& yuv4k2kCount = ctx->listStats[dpy].yuv4k2kCount;
+                ctx->listStats[dpy].yuv4k2kIndices[yuv4k2kCount] = i;
+                yuv4k2kCount++;
+            }
 
             if((layer->transform & HWC_TRANSFORM_ROT_90) &&
                     canUseRotator(ctx, dpy)) {
@@ -1674,6 +1682,129 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         if(configMdp(ctx->mOverlay, pargR, orient,
                 tmp_cropR, tmp_dstR, metadata, rDest) < 0) {
             ALOGE("%s: commit failed for right mixer config", __FUNCTION__);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
+        const int& dpy, eMdpFlags& mdpFlagsL, eZorder& z,
+        eIsFg& isFg, const eDest& lDest, const eDest& rDest,
+        Rotator **rot) {
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    if(!hnd) {
+        ALOGE("%s: layer handle is NULL", __FUNCTION__);
+        return -1;
+    }
+
+    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+
+    int hw_w = ctx->dpyAttr[dpy].xres;
+    int hw_h = ctx->dpyAttr[dpy].yres;
+    hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);;
+    hwc_rect_t dst = layer->displayFrame;
+    int transform = layer->transform;
+    eTransform orient = static_cast<eTransform>(transform);
+    const int downscale = 0;
+    int rotFlags = ROT_FLAGS_NONE;
+    //Splitting only YUV layer on primary panel needs different zorders
+    //for both layers as both the layers are configured to single mixer
+    eZorder lz = z;
+    eZorder rz = (eZorder)(z + 1);
+
+    Whf whf(getWidth(hnd), getHeight(hnd),
+            getMdpFormat(hnd->format), hnd->size);
+
+    setMdpFlags(layer, mdpFlagsL, 0, transform);
+    trimLayer(ctx, dpy, transform, crop, dst);
+
+    if(isYuvBuffer(hnd) && (transform & HWC_TRANSFORM_ROT_90)) {
+        (*rot) = ctx->mRotMgr->getNext();
+        if((*rot) == NULL) return -1;
+        if(!dpy)
+            BwcPM::setBwc(ctx, crop, dst, transform, mdpFlagsL);
+        //Configure rotator for pre-rotation
+        if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
+            ALOGE("%s: configRotator failed!", __FUNCTION__);
+            ctx->mOverlay->clear(dpy);
+            return -1;
+        }
+        ctx->mLayerRotMap[dpy]->add(layer, *rot);
+        whf.format = (*rot)->getDstFormat();
+        updateSource(orient, whf, crop);
+        rotFlags |= ROT_PREROTATED;
+    }
+
+    eMdpFlags mdpFlagsR = mdpFlagsL;
+    int lSplit = dst.left + (dst.right - dst.left)/2;
+
+    hwc_rect_t tmp_cropL = {0}, tmp_dstL = {0};
+    hwc_rect_t tmp_cropR = {0}, tmp_dstR = {0};
+
+    if(lDest != OV_INVALID) {
+        tmp_cropL = crop;
+        tmp_dstL = dst;
+        hwc_rect_t scissor = {dst.left, dst.top, lSplit, dst.bottom };
+        qhwc::calculate_crop_rects(tmp_cropL, tmp_dstL, scissor, 0);
+    }
+    if(rDest != OV_INVALID) {
+        tmp_cropR = crop;
+        tmp_dstR = dst;
+        hwc_rect_t scissor = {lSplit, dst.top, dst.right, dst.bottom };
+        qhwc::calculate_crop_rects(tmp_cropR, tmp_dstR, scissor, 0);
+    }
+
+    sanitizeSourceCrop(tmp_cropL, tmp_cropR, hnd);
+
+    //When buffer is H-flipped, contents of mixer config also needs to swapped
+    //Not needed if the layer is confined to one half of the screen.
+    //If rotator has been used then it has also done the flips, so ignore them.
+    if((orient & OVERLAY_TRANSFORM_FLIP_H) && lDest != OV_INVALID
+            && rDest != OV_INVALID && (*rot) == NULL) {
+        hwc_rect_t new_cropR;
+        new_cropR.left = tmp_cropL.left;
+        new_cropR.right = new_cropR.left + (tmp_cropR.right - tmp_cropR.left);
+
+        hwc_rect_t new_cropL;
+        new_cropL.left  = new_cropR.right;
+        new_cropL.right = tmp_cropR.right;
+
+        tmp_cropL.left =  new_cropL.left;
+        tmp_cropL.right =  new_cropL.right;
+
+        tmp_cropR.left = new_cropR.left;
+        tmp_cropR.right =  new_cropR.right;
+
+    }
+
+    //For the mdp, since either we are pre-rotating or MDP does flips
+    orient = OVERLAY_TRANSFORM_0;
+    transform = 0;
+
+    //configure left half
+    if(lDest != OV_INVALID) {
+        PipeArgs pargL(mdpFlagsL, whf, lz, isFg,
+                static_cast<eRotFlags>(rotFlags), layer->planeAlpha,
+                (ovutils::eBlending) getBlending(layer->blending));
+
+        if(configMdp(ctx->mOverlay, pargL, orient,
+                    tmp_cropL, tmp_dstL, metadata, lDest) < 0) {
+            ALOGE("%s: commit failed for left half config", __FUNCTION__);
+            return -1;
+        }
+    }
+
+    //configure right half
+    if(rDest != OV_INVALID) {
+        PipeArgs pargR(mdpFlagsR, whf, rz, isFg,
+                static_cast<eRotFlags>(rotFlags),
+                layer->planeAlpha,
+                (ovutils::eBlending) getBlending(layer->blending));
+        if(configMdp(ctx->mOverlay, pargR, orient,
+                    tmp_cropR, tmp_dstR, metadata, rDest) < 0) {
+            ALOGE("%s: commit failed for right half config", __FUNCTION__);
             return -1;
         }
     }

@@ -99,6 +99,8 @@ struct ListStats {
     int extOnlyLayerIndex;
     bool needsAlphaScale;
     bool preMultipliedAlpha;
+    int yuv4k2kIndices[MAX_NUM_APP_LAYERS];
+    int yuv4k2kCount;
     // Notifies hwcomposer about the start and end of animation
     // This will be set to true during animation, otherwise false.
     bool isDisplayAnimating;
@@ -283,6 +285,13 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
         ovutils::eIsFg& isFg, const ovutils::eDest& lDest,
         const ovutils::eDest& rDest, overlay::Rotator **rot);
 
+//Routine to split and configure high resolution YUV layer (> 2048 width)
+int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
+        const int& dpy,
+        ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
+        ovutils::eIsFg& isFg, const ovutils::eDest& lDest,
+        const ovutils::eDest& rDest, overlay::Rotator **rot);
+
 //On certain targets DMA pipes are used for rotation and they won't be available
 //for line operations. On a per-target basis we can restrict certain use cases
 //from using rotator, since we know before-hand that such scenarios can lead to
@@ -303,6 +312,12 @@ static inline bool isSkipLayer(const hwc_layer_1_t* l) {
 // Returns true if the buffer is yuv
 static inline bool isYuvBuffer(const private_handle_t* hnd) {
     return (hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO));
+}
+
+// Returns true if the buffer is yuv
+static inline bool is4kx2kYuvBuffer(const private_handle_t* hnd) {
+    return (hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO) &&
+            (hnd->width > 2048));
 }
 
 // Returns true if the buffer is secure
