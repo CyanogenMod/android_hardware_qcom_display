@@ -53,7 +53,7 @@ public:
     /* dtor close */
     ~Ctrl();
     /* init fd etc*/
-    bool init(uint32_t fbnum);
+    bool init(uint32_t dpy);
     /* close underlying mdp */
     bool close();
 
@@ -100,7 +100,7 @@ public:
     /* calls close */
     ~Data();
     /* init fd etc */
-    bool init(uint32_t fbnum);
+    bool init(uint32_t dpy);
     /* calls underlying mdp close */
     bool close();
     /* set overlay pipe id in the mdp struct */
@@ -145,10 +145,10 @@ inline bool Ctrl::close() {
     return true;
 }
 
-inline bool Ctrl::init(uint32_t fbnum) {
+inline bool Ctrl::init(uint32_t dpy) {
     // MDP/FD init
-    if(!mMdp.init(fbnum)) {
-        ALOGE("Ctrl failed to init fbnum=%d", fbnum);
+    if(!mMdp.init(dpy)) {
+        ALOGE("Ctrl failed to init dpy=%d", dpy);
         return false;
     }
     return true;
@@ -239,8 +239,8 @@ inline void Data::setPipeId(int id) { mMdp.setPipeId(id); }
 
 inline int Data::getPipeId() const { return mMdp.getPipeId(); }
 
-inline bool Data::init(uint32_t fbnum) {
-    if(!mMdp.init(fbnum)) {
+inline bool Data::init(uint32_t dpy) {
+    if(!mMdp.init(dpy)) {
         ALOGE("Data cannot init mdp");
         return false;
     }
