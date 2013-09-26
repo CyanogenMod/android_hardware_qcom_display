@@ -20,6 +20,12 @@
 #include "overlayUtils.h"
 #include "overlayMdp.h"
 #include "mdp_version.h"
+#include <overlay.h>
+
+#ifdef USES_QSEED_SCALAR
+#include <scale/scale.h>
+using namespace scale;
+#endif
 
 #define HSIC_SETTINGS_DEBUG 0
 
@@ -39,13 +45,20 @@ static inline float log2f(const float& x) {
 namespace ovutils = overlay::utils;
 namespace overlay {
 
-bool MdpCtrl::init(uint32_t fbnum) {
+bool MdpCtrl::init(uint32_t dpy) {
+    int fbnum = Overlay::getFbForDpy(dpy);
+    if( fbnum < 0 ) {
+        ALOGE("%s: Invalid FB for the display: %d",__FUNCTION__, dpy);
+        return false;
+    }
+
     // FD init
     if(!utils::openDev(mFd, fbnum,
                 Res::fbPath, O_RDWR)){
         ALOGE("Ctrl failed to init fbnum=%d", fbnum);
         return false;
     }
+    mDpy = dpy;
     return true;
 }
 
@@ -57,6 +70,7 @@ void MdpCtrl::reset() {
     mOrientation = utils::OVERLAY_TRANSFORM_0;
     mDownscale = 0;
     mForceSet = false;
+    mDpy = 0;
 #ifdef USES_POST_PROCESSING
     mPPChanged = false;
     memset(&mParams, 0, sizeof(struct compute_params));
@@ -201,10 +215,21 @@ bool MdpCtrl::set() {
             mdp_wrapper::dump("== Bad OVInfo is: ", mOVInfo);
             mdp_wrapper::dump("== Last good known OVInfo is: ", mLkgo);
             this->restore();
+#ifdef USES_QSEED_SCALAR
+            if(Overlay::getScalar()) {
+                Overlay::getScalar()->configAbort(mDpy);
+            }
+#endif
             return false;
         }
         this->save();
     }
+
+#ifdef USES_QSEED_SCALAR
+    if(Overlay::getScalar()) {
+        Overlay::getScalar()->configSet(mOVInfo, mDpy, mFd.getFD());
+    }
+#endif
 
     return true;
 }
@@ -368,6 +393,23 @@ bool MdpCtrl::setVisualParams(const MetaData_t& data) {
         mPPChanged = true;
     }
 #endif
+    return true;
+}
+
+
+//// MdpData ////////////
+bool MdpData::init(uint32_t dpy) {
+    int fbnum = Overlay::getFbForDpy(dpy);
+    if( fbnum < 0 ) {
+        ALOGE("%s: Invalid FB for the display: %d",__FUNCTION__, dpy);
+        return false;
+    }
+
+    // FD init
+    if(!utils::openDev(mFd, fbnum, Res::fbPath, O_RDWR)){
+        ALOGE("Ctrl failed to init fbnum=%d", fbnum);
+        return false;
+    }
     return true;
 }
 
