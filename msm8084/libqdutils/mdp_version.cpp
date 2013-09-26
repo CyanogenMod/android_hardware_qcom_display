@@ -114,7 +114,7 @@ MDPVersion::MDPVersion()
         //TODO get this from driver
         mMDPDownscale = 4;
 
-        char split[64];
+        char split[64] = {0};
         FILE* fp = fopen("/sys/class/graphics/fb0/msm_fb_split", "r");
         if(fp){
             //Format "left right" space as delimiter
