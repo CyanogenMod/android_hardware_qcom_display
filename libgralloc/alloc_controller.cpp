@@ -152,6 +152,8 @@ int AdrenoMemInfo::getStride(int width, int format)
             case HAL_PIXEL_FORMAT_YV12:
             case HAL_PIXEL_FORMAT_YCbCr_422_SP:
             case HAL_PIXEL_FORMAT_YCrCb_422_SP:
+            case HAL_PIXEL_FORMAT_YCbCr_422_I:
+            case HAL_PIXEL_FORMAT_YCrCb_422_I:
                 stride = ALIGN(width, 16);
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
@@ -324,6 +326,8 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
             break;
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
         case HAL_PIXEL_FORMAT_YCrCb_422_SP:
+        case HAL_PIXEL_FORMAT_YCbCr_422_I:
+        case HAL_PIXEL_FORMAT_YCrCb_422_I:
             if(width & 1) {
                 ALOGE("width is odd for the YUV422_SP format");
                 return -EINVAL;

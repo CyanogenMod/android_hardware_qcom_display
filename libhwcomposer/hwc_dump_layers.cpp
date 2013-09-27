@@ -400,6 +400,10 @@ void HwcDebug::getHalPixelFormatStr(int format, char pixFormatStr[])
         case HAL_PIXEL_FORMAT_YCbCr_422_I:
             strcpy(pixFormatStr, "YCbCr_422_I_YUY2");
             break;
+        case HAL_PIXEL_FORMAT_YCrCb_422_I:
+            strlcpy(pixFormatStr, "YCrCb_422_I_YVYU",
+                            sizeof("YCrCb_422_I_YVYU"));
+            break;
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
             strcpy(pixFormatStr, "NV12_ENCODEABLE");
             break;
