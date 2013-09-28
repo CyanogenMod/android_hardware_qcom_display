@@ -145,6 +145,7 @@ struct BwcPM {
 enum {
     HWC_MDPCOMP = 0x00000001,
     HWC_COPYBIT = 0x00000002,
+    HWC_VPUCOMP = 0x00000004,
 };
 
 // HAL specific features

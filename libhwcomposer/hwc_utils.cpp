@@ -232,8 +232,11 @@ void initContext(hwc_context_t *ctx)
     // Initialize device orientation to its default orientation
     ctx->deviceOrientation = 0;
     ctx->mBufferMirrorMode = false;
+    ctx->mVPUClient = NULL;
+
 #ifdef VPU_TARGET
-    ctx->mVPUClient = new VPUClient();
+    if(qdutils::MDPVersion::getInstance().is8092())
+        ctx->mVPUClient = new VPUClient(ctx);
 #endif
 
     ALOGI("Initializing Qualcomm Hardware Composer");
@@ -270,9 +273,8 @@ void closeContext(hwc_context_t *ctx)
     }
 
 #ifdef VPU_TARGET
-    if(ctx->mVPUClient) {
+    if(ctx->mVPUClient != NULL)
         delete ctx->mVPUClient;
-    }
 #endif
 
     for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
@@ -1302,6 +1304,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
               dpy, list->numHwLayers);
     }
 
+    LayerProp *layerProp = ctx->layerProp[dpy];
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(list->hwLayers[i].compositionType == HWC_OVERLAY ||
            list->hwLayers[i].compositionType == HWC_BLIT ||
@@ -1313,8 +1316,10 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
                 // Release all the app layer fds immediately,
                 // if animation is in progress.
                 list->hwLayers[i].releaseFenceFd = -1;
-            } else if(list->hwLayers[i].releaseFenceFd < 0) {
-                //If rotator has not already populated this field.
+            } else if(list->hwLayers[i].releaseFenceFd < 0 &&
+                    !(layerProp[i].mFlags & HWC_VPUCOMP)) {
+                //If rotator has not already populated this field
+                // & if it's a not VPU layer
                 list->hwLayers[i].releaseFenceFd = dup(releaseFd);
             }
         }
@@ -1361,8 +1366,10 @@ void setMdpFlags(hwc_layer_1_t *layer,
             ovutils::setMdpFlags(mdpFlags,
                     ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
         }
+        // in mpq, deinterlacing is done in vpu
         if(metadata && (metadata->operation & PP_PARAM_INTERLACED) &&
-                metadata->interlaced) {
+                metadata->interlaced &&
+                (!qdutils::MDPVersion::getInstance().is8092())) {
             ovutils::setMdpFlags(mdpFlags,
                     ovutils::OV_MDP_DEINTERLACE);
         }
@@ -1549,6 +1556,17 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     int rotFlags = ovutils::ROT_FLAGS_NONE;
     uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
     Whf whf(getWidth(hnd), getHeight(hnd), format, hnd->size);
+    LayerProp *layerProp = ctx->layerProp[dpy];
+
+#ifdef VPU_TARGET
+    if(ctx->mVPUClient != NULL &&
+            ctx->mVPUClient->supportedVPULayer(dpy, layer)) {
+        whf.format = getMdpFormat(
+                ctx->mVPUClient->getLayerFormat(dpy, layer));
+        whf.w = ctx->mVPUClient->getWidth(dpy, layer);
+        whf.h = ctx->mVPUClient->getHeight(dpy, layer);
+    }
+#endif
 
     // Handle R/B swap
     if (layer->flags & HWC_FORMAT_RB_SWAP) {
@@ -1656,6 +1674,17 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     int rotFlags = ROT_FLAGS_NONE;
     uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
     Whf whf(getWidth(hnd), getHeight(hnd), format, hnd->size);
+    LayerProp *layerProp = ctx->layerProp[dpy];
+
+#ifdef VPU_TARGET
+    if(ctx->mVPUClient != NULL &&
+            ctx->mVPUClient->supportedVPULayer(dpy, layer)) {
+        whf.format = getMdpFormat(
+                ctx->mVPUClient->getLayerFormat(dpy, layer));
+        whf.w = ctx->mVPUClient->getWidth(dpy, layer);
+        whf.h = ctx->mVPUClient->getHeight(dpy, layer);
+    }
+#endif
 
     // Handle R/B swap
     if (layer->flags & HWC_FORMAT_RB_SWAP) {
