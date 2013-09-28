@@ -180,6 +180,7 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
     ATRACE_CALL();
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     const int dpy = HWC_DISPLAY_PRIMARY;
+    bool fbComp = false;
     if (LIKELY(list && list->numHwLayers > 1) &&
             ctx->dpyAttr[dpy].isActive) {
 
@@ -188,13 +189,19 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
 
         reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
         setListStats(ctx, list, dpy);
+
+        if (ctx->mVPUClient == NULL)
+            fbComp = (ctx->mMDPComp[dpy]->prepare(ctx, list) < 0);
 #ifdef VPU_TARGET
-        ctx->mVPUClient->prepare(ctx, list);
+        else
+            fbComp = (ctx->mVPUClient->prepare(ctx, dpy, list) < 0);
 #endif
-        if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
+
+        if (fbComp) {
             const int fbZ = 0;
             ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
         }
+
         if (ctx->mMDP.version < qdutils::MDP_V4_0) {
             if(ctx->mCopyBit[dpy])
                 ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
@@ -487,13 +494,15 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         if(ctx->mHwcDebug[dpy])
             ctx->mHwcDebug[dpy]->dumpLayers(list);
 
-        if (!ctx->mMDPComp[dpy]->draw(ctx, list)) {
+        if (ctx->mVPUClient != NULL) {
+#ifdef VPU_TARGET
+            ctx->mVPUClient->predraw(ctx, dpy, list);
+#endif
+        }
+        else if (!ctx->mMDPComp[dpy]->draw(ctx, list)) {
             ALOGE("%s: MDPComp draw failed", __FUNCTION__);
             ret = -1;
         }
-#ifdef VPU_TARGET
-        ctx->mVPUClient->draw(ctx, list);
-#endif
 
         //TODO We dont check for SKIP flag on this layer because we need PAN
         //always. Last layer is always FB
@@ -514,6 +523,11 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ALOGE("%s: display commit fail for %d dpy!", __FUNCTION__, dpy);
             ret = -1;
         }
+
+#ifdef VPU_TARGET
+        if (ctx->mVPUClient != NULL)
+            ctx->mVPUClient->draw(ctx, dpy, list);
+#endif
     }
 
     closeAcquireFds(list);
