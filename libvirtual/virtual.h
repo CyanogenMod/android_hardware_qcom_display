@@ -52,6 +52,10 @@ private:
     bool openFrameBuffer();
     bool closeFrameBuffer();
     void setAttributes();
+    void initResolution(uint32_t &extW, uint32_t &extH);
+    void setToPrimary(uint32_t maxArea, uint32_t priW, uint32_t priH,
+                      uint32_t &extW, uint32_t &extH);
+    void setDownScaleMode(uint32_t maxArea);
 
     int mFd;
     hwc_context_t *mHwcContext;
