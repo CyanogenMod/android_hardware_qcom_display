@@ -612,7 +612,6 @@ bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer,
 
     hwc_rect_t displayFrame  = layer->displayFrame;
     hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
-    trimLayer(ctx, dpy, layer->transform, sourceCrop, displayFrame);
 
     dst_w = displayFrame.right - displayFrame.left;
     dst_h = displayFrame.bottom - displayFrame.top;
@@ -640,7 +639,6 @@ bool needsScalingWithSplit(hwc_context_t* ctx, hwc_layer_1_t const* layer,
     hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
     hwc_rect_t displayFrame  = layer->displayFrame;
     private_handle_t *hnd = (private_handle_t *)layer->handle;
-    trimLayer(ctx, dpy, layer->transform, sourceCrop, displayFrame);
 
     cropL = sourceCrop;
     dstL = displayFrame;
@@ -701,8 +699,35 @@ bool isAlphaPresent(hwc_layer_1_t const* layer) {
     return false;
 }
 
+static void trimLayer(hwc_context_t *ctx, const int& dpy, const int& transform,
+        hwc_rect_t& crop, hwc_rect_t& dst) {
+    int hw_w = ctx->dpyAttr[dpy].xres;
+    int hw_h = ctx->dpyAttr[dpy].yres;
+    if(dst.left < 0 || dst.top < 0 ||
+            dst.right > hw_w || dst.bottom > hw_h) {
+        hwc_rect_t scissor = {0, 0, hw_w, hw_h };
+        qhwc::calculate_crop_rects(crop, dst, scissor, transform);
+    }
+}
+
+static void trimList(hwc_context_t *ctx, hwc_display_contents_1_t *list,
+        const int& dpy) {
+    for(uint32_t i = 0; i < list->numHwLayers - 1; i++) {
+        hwc_layer_1_t *layer = &list->hwLayers[i];
+        hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
+        trimLayer(ctx, dpy,
+                list->hwLayers[i].transform,
+                (hwc_rect_t&)crop,
+                (hwc_rect_t&)list->hwLayers[i].displayFrame);
+        layer->sourceCropf.left = crop.left;
+        layer->sourceCropf.right = crop.right;
+        layer->sourceCropf.top = crop.top;
+        layer->sourceCropf.bottom = crop.bottom;
+    }
+}
+
 void setListStats(hwc_context_t *ctx,
-        const hwc_display_contents_1_t *list, int dpy) {
+        hwc_display_contents_1_t *list, int dpy) {
     const int prevYuvCount = ctx->listStats[dpy].yuvCount;
     memset(&ctx->listStats[dpy], 0, sizeof(ListStats));
     ctx->listStats[dpy].numAppLayers = list->numHwLayers - 1;
@@ -719,6 +744,7 @@ void setListStats(hwc_context_t *ctx,
                       (int)ctx->dpyAttr[dpy].xres, (int)ctx->dpyAttr[dpy].yres);
     ctx->listStats[dpy].secureUI = false;
 
+    trimList(ctx, list, dpy);
     optimizeLayerRects(ctx, list, dpy);
 
     for (size_t i = 0; i < (size_t)ctx->listStats[dpy].numAppLayers; i++) {
@@ -1223,17 +1249,6 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     return ret;
 }
 
-void trimLayer(hwc_context_t *ctx, const int& dpy, const int& transform,
-        hwc_rect_t& crop, hwc_rect_t& dst) {
-    int hw_w = ctx->dpyAttr[dpy].xres;
-    int hw_h = ctx->dpyAttr[dpy].yres;
-    if(dst.left < 0 || dst.top < 0 ||
-            dst.right > hw_w || dst.bottom > hw_h) {
-        hwc_rect_t scissor = {0, 0, hw_w, hw_h };
-        qhwc::calculate_crop_rects(crop, dst, scissor, transform);
-    }
-}
-
 void setMdpFlags(hwc_layer_1_t *layer,
         ovutils::eMdpFlags &mdpFlags,
         int rotDownscale, int transform) {
@@ -1442,7 +1457,6 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     }
 
     setMdpFlags(layer, mdpFlags, downscale, transform);
-    trimLayer(ctx, dpy, transform, crop, dst);
 
     if(isYuvBuffer(hnd) && //if 90 component or downscale, use rot
             ((transform & HWC_TRANSFORM_ROT_90) || downscale)) {
@@ -1559,15 +1573,12 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         }
     }
 
-
     setMdpFlags(layer, mdpFlagsL, 0, transform);
 
     if(lDest != OV_INVALID && rDest != OV_INVALID) {
         //Enable overfetch
         setMdpFlags(mdpFlagsL, OV_MDSS_MDP_DUAL_PIPE);
     }
-
-    trimLayer(ctx, dpy, transform, crop, dst);
 
     //Will do something only if feature enabled and conditions suitable
     //hollow call otherwise
