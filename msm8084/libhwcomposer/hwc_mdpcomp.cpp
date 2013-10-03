@@ -301,12 +301,6 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
 
     hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
     hwc_rect_t dst = layer->displayFrame;
-
-    if(dst.left < 0 || dst.top < 0 || dst.right > hw_w || dst.bottom > hw_h) {
-       hwc_rect_t scissor = {0, 0, hw_w, hw_h };
-       qhwc::calculate_crop_rects(crop, dst, scissor, layer->transform);
-    }
-
     int crop_w = crop.right - crop.left;
     int crop_h = crop.bottom - crop.top;
     int dst_w = dst.right - dst.left;
@@ -429,7 +423,6 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
         hwc_rect_t dstRect = layer->displayFrame;
         hwc_rect_t srcRect = integerizeSourceCrop(layer->sourceCropf);
         int transform = layer->transform;
-        trimLayer(ctx, mDpy, transform, srcRect, dstRect);
 
         hwc_rect_t res  = getIntersection(visibleRect, dstRect);
 
@@ -489,7 +482,6 @@ void MDPComp::generateROI(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             int transform = list->hwLayers[index].transform;
 
             /* Intersect against display boundaries */
-            trimLayer(ctx, mDpy, transform, srcRect, dstRect);
             roi = getUnion(roi, dstRect);
         }
     }
@@ -1122,7 +1114,6 @@ uint32_t MDPComp::calcMDPBytesRead(hwc_context_t *ctx,
             if (hnd) {
                 hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
                 hwc_rect_t dst = layer->displayFrame;
-                trimLayer(ctx, mDpy, layer->transform, crop, dst);
                 float bpp = ((float)hnd->size) / (hnd->width * hnd->height);
                 size += bpp * (crop.right - crop.left) *
                     (crop.bottom - crop.top) *

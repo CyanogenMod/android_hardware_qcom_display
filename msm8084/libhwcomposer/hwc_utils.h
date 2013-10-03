@@ -187,7 +187,7 @@ inline bool isNonIntegralSourceCrop(const hwc_frect_t& cropF) {
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_1_t const* l);
-void setListStats(hwc_context_t *ctx, const hwc_display_contents_1_t *list,
+void setListStats(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         int dpy);
 void initContext(hwc_context_t *ctx);
 void closeContext(hwc_context_t *ctx);
@@ -253,10 +253,6 @@ void closeAcquireFds(hwc_display_contents_1_t* list);
 //Sync point impl.
 int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         int fd);
-
-//Trims a layer's source crop which is outside of screen boundary.
-void trimLayer(hwc_context_t *ctx, const int& dpy, const int& transform,
-        hwc_rect_t& crop, hwc_rect_t& dst);
 
 //Sets appropriate mdp flags for a layer.
 void setMdpFlags(hwc_layer_1_t *layer,
