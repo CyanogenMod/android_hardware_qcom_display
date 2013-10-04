@@ -583,12 +583,7 @@ void getNonWormholeRegion(hwc_display_contents_1_t* list,
 
 }
 
-bool isSecondaryConfiguring(hwc_context_t* ctx) {
-    return (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isConfiguring |
-            ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isConfiguring);
-}
-
-void closeAcquireFds(hwc_display_contents_1_t* list) {
+void closeAcquireFds(hwc_display_contents_1_t* list, int dpy) {
     if(LIKELY(list)) {
         for(uint32_t i = 0; i < list->numHwLayers; i++) {
             //Close the acquireFenceFds
@@ -597,6 +592,12 @@ void closeAcquireFds(hwc_display_contents_1_t* list) {
                 close(list->hwLayers[i].acquireFenceFd);
                 list->hwLayers[i].acquireFenceFd = -1;
             }
+        }
+
+        //Writeback
+        if(dpy > HWC_DISPLAY_EXTERNAL && list->outbufAcquireFenceFd >= 0) {
+            close(list->outbufAcquireFenceFd);
+            list->outbufAcquireFenceFd = -1;
         }
     }
 }
@@ -656,6 +657,11 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     }
 
     //Accumulate acquireFenceFds for MDP
+    if(dpy > HWC_DISPLAY_EXTERNAL && list->outbufAcquireFenceFd >= 0) {
+        //Writeback output buffer
+        acquireFd[count++] = list->outbufAcquireFenceFd;
+    }
+
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(list->hwLayers[i].compositionType == HWC_OVERLAY &&
                         list->hwLayers[i].acquireFenceFd >= 0) {
@@ -1088,7 +1094,7 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
 bool canUseRotator(hwc_context_t *ctx, int dpy) {
     if(qdutils::MDPVersion::getInstance().is8x26() &&
-            ctx->mExtDisplay->isExternalConnected()) {
+            isSecondaryConnected(ctx)) {
         return false;
     }
     if(ctx->mMDP.version == qdutils::MDP_V3_0_4)
@@ -1121,6 +1127,13 @@ void setupSecondaryObjs(hwc_context_t *ctx, const int& dpy) {
                            qdutils::COMPOSITION_TYPE_C2D)) {
         ctx->mCopyBit[dpy] = new CopyBit();
     }
+
+    if(ctx->mFBUpdate[dpy])
+        ctx->mFBUpdate[dpy]->reset();
+    if(ctx->mMDPComp[dpy])
+        ctx->mMDPComp[dpy]->reset();
+    if(ctx->mCopyBit[dpy])
+        ctx->mCopyBit[dpy]->reset();
 }
 
 void clearSecondaryObjs(hwc_context_t *ctx, const int& dpy) {
@@ -1138,6 +1151,13 @@ void clearSecondaryObjs(hwc_context_t *ctx, const int& dpy) {
     }
 }
 
+bool isGLESOnlyComp(hwc_context_t *ctx, const int& dpy) {
+    if(ctx->mMDPComp[dpy]) {
+        return (ctx->mMDPComp[dpy]->getMDPCompCount() == 0);
+    }
+    return true;
+}
+
 void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
             const hwc_rect_t& dst, const int& transform,
             ovutils::eMdpFlags& mdpFlags) {
@@ -1149,8 +1169,8 @@ void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
     if((crop.right - crop.left) > qdutils::MAX_DISPLAY_DIM) {
         return;
     }
-    //External connected
-    if(ctx->mExtDisplay->isExternalConnected()) {
+    //Secondary display connected
+    if(isSecondaryConnected(ctx)) {
         return;
     }
     //Decimation necessary, cannot use BWC. H/W requirement.
