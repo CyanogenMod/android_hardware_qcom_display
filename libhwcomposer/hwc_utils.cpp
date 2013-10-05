@@ -917,26 +917,51 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
     crop_b -= crop_h * bottomCutRatio;
 }
 
-bool isValidRect(hwc_rect_t& rect) {
-    return ((rect.bottom > rect.top) && (rect.right > rect.left)) ;
+bool isValidRect(const hwc_rect& rect)
+{
+   return ((rect.bottom > rect.top) && (rect.right > rect.left)) ;
 }
 
-/* computes intersection of two rects into 3rd arg/rect */
-void getIntersection(hwc_rect_t& rect1,
-                        hwc_rect_t& rect2, hwc_rect_t& irect) {
-    irect.left   = max(rect1.left, rect2.left);
-    irect.top    = max(rect1.top, rect2.top);
-    irect.right  = min(rect1.right, rect2.right);
-    irect.bottom = min(rect1.bottom, rect2.bottom);
+/* computes the intersection of two rects */
+hwc_rect_t getIntersection(const hwc_rect_t& rect1, const hwc_rect_t& rect2)
+{
+   hwc_rect_t res;
+
+   if(!isValidRect(rect1) || !isValidRect(rect2)){
+      return (hwc_rect_t){0, 0, 0, 0};
+   }
+
+
+   res.left = max(rect1.left, rect2.left);
+   res.top = max(rect1.top, rect2.top);
+   res.right = min(rect1.right, rect2.right);
+   res.bottom = min(rect1.bottom, rect2.bottom);
+
+   if(!isValidRect(res))
+      return (hwc_rect_t){0, 0, 0, 0};
+
+   return res;
 }
 
-/* get union of two rects into 3rd rect */
-void getUnion(hwc_rect_t& rect1,
-                        hwc_rect_t& rect2, hwc_rect_t& irect) {
-    irect.left   = min(rect1.left, rect2.left);
-    irect.top    = min(rect1.top, rect2.top);
-    irect.right  = max(rect1.right, rect2.right);
-    irect.bottom = max(rect1.bottom, rect2.bottom);
+/* computes the union of two rects */
+hwc_rect_t getUnion(const hwc_rect &rect1, const hwc_rect &rect2)
+{
+   hwc_rect_t res;
+
+   if(!isValidRect(rect1)){
+      return rect2;
+   }
+
+   if(!isValidRect(rect2)){
+      return rect1;
+   }
+
+   res.left = min(rect1.left, rect2.left);
+   res.top = min(rect1.top, rect2.top);
+   res.right =  max(rect1.right, rect2.right);
+   res.bottom =  max(rect1.bottom, rect2.bottom);
+
+   return res;
 }
 
 /* deducts given rect from layers display-frame and source crop.
@@ -987,7 +1012,8 @@ void optimizeLayerRects(hwc_context_t *ctx,
                 if(!needsScaling(ctx, &list->hwLayers[j], dpy)) {
                     hwc_rect_t& bottomframe =
                         (hwc_rect_t&)list->hwLayers[j].displayFrame;
-                    getIntersection(bottomframe, topframe, (hwc_rect_t&)irect);
+
+                    hwc_rect_t irect = getIntersection(bottomframe, topframe);
                     if(isValidRect(irect)) {
                         //if intersection is valid rect, deduct it
                         deductRect(&list->hwLayers[j], irect);
@@ -1013,11 +1039,11 @@ void getNonWormholeRegion(hwc_display_contents_1_t* list,
 
     for (uint32_t i = 1; i < last; i++) {
         hwc_rect_t displayFrame = list->hwLayers[i].displayFrame;
-        getUnion(nwr, displayFrame, nwr);
+        nwr = getUnion(nwr, displayFrame);
     }
 
     //Intersect with the framebuffer
-    getIntersection(nwr, fbDisplayFrame, nwr);
+    nwr = getIntersection(nwr, fbDisplayFrame);
 }
 
 bool isExternalActive(hwc_context_t* ctx) {
