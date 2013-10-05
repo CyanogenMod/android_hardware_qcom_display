@@ -109,6 +109,7 @@ public:
     static int getDMAMode();
     /* Returns the framebuffer node backing up the display */
     static int getFbForDpy(const int& dpy);
+    static bool displayCommit(const int& fd, const utils::Dim& roi);
     static bool displayCommit(const int& fd);
 
 private:

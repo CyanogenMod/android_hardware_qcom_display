@@ -101,11 +101,12 @@ struct ListStats {
     // Notifies hwcomposer about the start and end of animation
     // This will be set to true during animation, otherwise false.
     bool isDisplayAnimating;
+    ovutils::Dim roi;
 };
 
 struct LayerProp {
     uint32_t mFlags; //qcom specific layer flags
-    LayerProp():mFlags(0) {};
+    LayerProp():mFlags(0){};
 };
 
 struct VsyncState {
