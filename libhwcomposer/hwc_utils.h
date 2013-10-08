@@ -292,6 +292,12 @@ static inline bool isYuvBuffer(const private_handle_t* hnd) {
 static inline bool isSecureBuffer(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_SECURE_BUFFER & hnd->flags));
 }
+
+// Returns true if the buffer is non contiguous
+static inline bool isNonContigBuffer(const private_handle_t* hnd) {
+    return (hnd && (private_handle_t::PRIV_FLAGS_NONCONTIGUOUS_MEM & hnd->flags));
+}
+
 //Return true if buffer is marked locked
 static inline bool isBufferLocked(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags));
