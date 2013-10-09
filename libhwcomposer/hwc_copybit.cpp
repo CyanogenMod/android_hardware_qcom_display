@@ -199,7 +199,8 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     }
 
     //Allocate render buffers if they're not allocated
-    if (useCopybitForYUV || useCopybitForRGB) {
+    if (ctx->mMDP.version != qdutils::MDP_V3_0_4 &&
+            (useCopybitForYUV || useCopybitForRGB)) {
         int ret = allocRenderBuffers(mAlignedFBWidth,
                                      mAlignedFBHeight,
                                      HAL_PIXEL_FORMAT_RGBA_8888);
@@ -223,7 +224,10 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         // Mark all layers to be drawn by copybit
         for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
             layerProp[i].mFlags |= HWC_COPYBIT;
-            list->hwLayers[i].compositionType = HWC_OVERLAY;
+            if (ctx->mMDP.version == qdutils::MDP_V3_0_4)
+                list->hwLayers[i].compositionType = HWC_BLIT;
+            else
+                list->hwLayers[i].compositionType = HWC_OVERLAY;
         }
     }
 
@@ -254,13 +258,20 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     // draw layers marked for COPYBIT
     int retVal = true;
     int copybitLayerCount = 0;
+    uint32_t last = 0;
     LayerProp *layerProp = ctx->layerProp[dpy];
+    private_handle_t *renderBuffer;
 
     if(mCopyBitDraw == false) // there is no layer marked for copybit
         return false ;
 
     //render buffer
-    private_handle_t *renderBuffer = getCurrentRenderBuffer();
+    if (ctx->mMDP.version == qdutils::MDP_V3_0_4) {
+        last = list->numHwLayers - 1;
+        renderBuffer = (private_handle_t *)list->hwLayers[last].handle;
+    } else {
+        renderBuffer = getCurrentRenderBuffer();
+    }
     if (!renderBuffer) {
         ALOGE("%s: Render buffer layer handle is NULL", __FUNCTION__);
         return false;
@@ -274,9 +285,9 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             mRelFd[mCurRenderBufferIndex] = -1;
         }
     } else {
-        if(mRelFd[mCurRenderBufferIndex] >=0) {
+        if(list->hwLayers[last].acquireFenceFd >=0) {
             copybit_device_t *copybit = getCopyBitDevice();
-            copybit->set_sync(copybit, mRelFd[mCurRenderBufferIndex]);
+            copybit->set_sync(copybit, list->hwLayers[last].acquireFenceFd);
         }
     }
 
@@ -316,10 +327,10 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         copybit_device_t *copybit = getCopyBitDevice();
         // Async mode
         copybit->flush_get_fence(copybit, fd);
-        if(mRelFd[mCurRenderBufferIndex] >=0 &&
-           ctx->mMDP.version == qdutils::MDP_V3_0_4) {
-            close(mRelFd[mCurRenderBufferIndex]);
-            mRelFd[mCurRenderBufferIndex] = -1;
+        if(ctx->mMDP.version == qdutils::MDP_V3_0_4 &&
+                list->hwLayers[last].acquireFenceFd >= 0) {
+            close(list->hwLayers[last].acquireFenceFd);
+            list->hwLayers[last].acquireFenceFd = -1;
         }
     }
     return true;
