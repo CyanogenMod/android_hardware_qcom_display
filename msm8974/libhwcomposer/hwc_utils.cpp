@@ -391,8 +391,9 @@ void setListStats(hwc_context_t *ctx,
             yuvCount++;
 
             if((layer->transform & HWC_TRANSFORM_ROT_90) &&
-                    canUseRotator(ctx)) {
-                if(ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA)) {
+                    canUseRotator(ctx, dpy)) {
+                if( (dpy == HWC_DISPLAY_PRIMARY) &&
+                        ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA)) {
                     ctx->isPaddingRound = true;
                 }
                 Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
@@ -1080,7 +1081,7 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     return 0;
 }
 
-bool canUseRotator(hwc_context_t *ctx) {
+bool canUseRotator(hwc_context_t *ctx, int dpy) {
     if(qdutils::MDPVersion::getInstance().is8x26() &&
             ctx->mExtDisplay->isExternalConnected()) {
         return false;
