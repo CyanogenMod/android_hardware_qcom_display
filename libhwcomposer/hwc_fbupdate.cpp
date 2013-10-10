@@ -45,11 +45,14 @@ IFBUpdate* IFBUpdate::getObject(hwc_context_t *ctx, const int& dpy) {
 }
 
 IFBUpdate::IFBUpdate(hwc_context_t *ctx, const int& dpy) : mDpy(dpy) {
-    getBufferSizeAndDimensions(ctx->dpyAttr[dpy].xres,
-            ctx->dpyAttr[dpy].yres,
+    size_t size;
+    getBufferAttributes(ctx->dpyAttr[mDpy].xres,
+            ctx->dpyAttr[mDpy].yres,
             HAL_PIXEL_FORMAT_RGBA_8888,
+            0,
             mAlignedFBWidth,
-            mAlignedFBHeight);
+            mAlignedFBHeight,
+            mTileEnabled, size);
 }
 
 void IFBUpdate::reset() {
@@ -121,9 +124,9 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
         }
         overlay::Overlay& ov = *(ctx->mOverlay);
 
-        ovutils::Whf info(mAlignedFBWidth,
-                mAlignedFBHeight,
-                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888));
+        ovutils::Whf info(mAlignedFBWidth, mAlignedFBHeight,
+                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888,
+                    mTileEnabled));
 
         //Request a pipe
         ovutils::eMdpPipeType type = ovutils::OV_MDP_PIPE_ANY;
@@ -269,8 +272,8 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
 
         ovutils::Whf info(mAlignedFBWidth,
                 mAlignedFBHeight,
-                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888));
-
+                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888,
+                    mTileEnabled));
         //Request left pipe
         ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
                 Overlay::MIXER_LEFT);
