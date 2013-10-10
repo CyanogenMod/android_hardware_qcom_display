@@ -331,10 +331,11 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 int *stride = va_arg(args, int *);
                 int alignedw = 0, alignedh = 0;
                 AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width,
-                                     0, format, alignedw, alignedh);
+                        0, format, false, alignedw, alignedh);
                 *stride = alignedw;
                 res = 0;
             } break;
+
         case GRALLOC_MODULE_PERFORM_GET_CUSTOM_STRIDE_FROM_HANDLE:
             {
                 private_handle_t* hnd =  va_arg(args, private_handle_t*);
@@ -350,6 +351,23 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 }
                 res = 0;
             } break;
+
+        case GRALLOC_MODULE_PERFORM_GET_ATTRIBUTES:
+            {
+                int width   = va_arg(args, int);
+                int height  = va_arg(args, int);
+                int format  = va_arg(args, int);
+                int usage   = va_arg(args, int);
+                int *alignedWidth = va_arg(args, int *);
+                int *alignedHeight = va_arg(args, int *);
+                int *tileEnabled = va_arg(args,int *);
+                *tileEnabled = isMacroTileEnabled(format, usage);
+                AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width,
+                        height, format, *tileEnabled, *alignedWidth,
+                        *alignedHeight);
+                res = 0;
+            } break;
+
         default:
             break;
     }
