@@ -1385,6 +1385,14 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     Whf whf(hnd->width, hnd->height,
             getMdpFormat(hnd->format), hnd->size);
 
+    // Handle R/B swap
+    if (layer->flags & HWC_FORMAT_RB_SWAP) {
+        if (hnd->format == HAL_PIXEL_FORMAT_RGBA_8888)
+            whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRA_8888);
+        else if (hnd->format == HAL_PIXEL_FORMAT_RGBX_8888)
+            whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
+    }
+
     if(dpy && isYuvBuffer(hnd)) {
         if(!ctx->listStats[dpy].isDisplayAnimating) {
             ctx->mPrevCropVideo = crop;
@@ -1507,6 +1515,14 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     Whf whf(hnd->width, hnd->height,
             getMdpFormat(hnd->format), hnd->size);
+
+    // Handle R/B swap
+    if (layer->flags & HWC_FORMAT_RB_SWAP) {
+        if (hnd->format == HAL_PIXEL_FORMAT_RGBA_8888)
+            whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRA_8888);
+        else if (hnd->format == HAL_PIXEL_FORMAT_RGBX_8888)
+            whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
+    }
 
     if(dpy && isYuvBuffer(hnd)) {
         if(!ctx->listStats[dpy].isDisplayAnimating) {
