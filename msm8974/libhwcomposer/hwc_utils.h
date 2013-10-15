@@ -98,6 +98,7 @@ struct ListStats {
     bool needsAlphaScale;
     bool preMultipliedAlpha;
     bool planeAlpha;
+    bool isSecurePresent;
 };
 
 struct LayerProp {
@@ -393,6 +394,10 @@ static inline bool isYuvPresent (hwc_context_t *ctx, int dpy) {
 
 static inline bool has90Transform(hwc_layer_1_t *layer) {
     return (layer->transform & HWC_TRANSFORM_ROT_90);
+}
+
+inline bool isSecurePresent(hwc_context_t *ctx, int dpy) {
+    return ctx->listStats[dpy].isSecurePresent;
 }
 
 };

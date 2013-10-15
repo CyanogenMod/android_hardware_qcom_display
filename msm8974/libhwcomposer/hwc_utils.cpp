@@ -370,6 +370,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].needsAlphaScale = false;
     ctx->listStats[dpy].preMultipliedAlpha = false;
     ctx->listStats[dpy].planeAlpha = false;
+    ctx->listStats[dpy].isSecurePresent = false;
     ctx->listStats[dpy].yuvCount = 0;
 
     for (size_t i = 0; i < (size_t)ctx->listStats[dpy].numAppLayers; i++) {
@@ -382,6 +383,10 @@ void setListStats(hwc_context_t *ctx,
 
         //reset yuv indices
         ctx->listStats[dpy].yuvIndices[i] = -1;
+
+        if (isSecureBuffer(hnd)) {
+            ctx->listStats[dpy].isSecurePresent = true;
+        }
 
         if (isSkipLayer(&list->hwLayers[i])) {
             ctx->listStats[dpy].skipCount++;
