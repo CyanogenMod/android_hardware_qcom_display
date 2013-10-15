@@ -576,14 +576,26 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
 bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
 {
-    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
-
     if(!sEnableMixedMode) {
         //Mixed mode is disabled. No need to even try caching.
         return false;
     }
 
-    //Setup mCurrentFrame
+    bool ret = false;
+    if(isLoadBasedCompDoable(ctx, list)) {
+        ret = loadBasedComp(ctx, list);
+    }
+
+    if(!ret) {
+        ret = cacheBasedComp(ctx, list);
+    }
+
+    return ret;
+}
+
+bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     mCurrentFrame.reset(numAppLayers);
     updateLayerCache(ctx, list);
 
@@ -630,6 +642,77 @@ bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
         return false;
     }
 
+    return true;
+}
+
+bool MDPComp::loadBasedComp(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+    mCurrentFrame.reset(numAppLayers);
+
+    //TODO BatchSize could be optimized further based on available pipes, split
+    //displays etc.
+    const int batchSize = numAppLayers - (sMaxPipesPerMixer - 1);
+    if(batchSize <= 0) {
+        ALOGD_IF(isDebug(), "%s: Not attempting", __FUNCTION__);
+        return false;
+    }
+
+    int minBatchStart = -1;
+    size_t minBatchPixelCount = SIZE_MAX;
+
+    for(int i = 0; i <= numAppLayers - batchSize; i++) {
+        uint32_t batchPixelCount = 0;
+        for(int j = i; j < i + batchSize; j++) {
+            hwc_layer_1_t* layer = &list->hwLayers[j];
+            hwc_rect_t crop = layer->sourceCrop;
+            batchPixelCount += (crop.right - crop.left) *
+                    (crop.bottom - crop.top);
+        }
+
+        if(batchPixelCount < minBatchPixelCount) {
+            minBatchPixelCount = batchPixelCount;
+            minBatchStart = i;
+        }
+    }
+
+    if(minBatchStart < 0) {
+        ALOGD_IF(isDebug(), "%s: No batch found batchSize %d numAppLayers %d",
+                __FUNCTION__, batchSize, numAppLayers);
+        return false;
+    }
+
+    for(int i = 0; i < numAppLayers; i++) {
+        if(i < minBatchStart || i >= minBatchStart + batchSize) {
+            hwc_layer_1_t* layer = &list->hwLayers[i];
+            if(not isSupportedForMDPComp(ctx, layer)) {
+                ALOGD_IF(isDebug(), "%s: MDP unsupported layer found at %d",
+                        __FUNCTION__, i);
+                return false;
+            }
+            mCurrentFrame.isFBComposed[i] = false;
+        }
+    }
+
+    mCurrentFrame.fbZ = minBatchStart;
+    mCurrentFrame.fbCount = batchSize;
+    mCurrentFrame.mdpCount = mCurrentFrame.layerCount - batchSize;
+
+    if(!arePipesAvailable(ctx, list)) {
+        return false;
+    }
+
+    ALOGD_IF(isDebug(), "%s: fbZ %d batchSize %d",
+                __FUNCTION__, mCurrentFrame.fbZ, batchSize);
+    return true;
+}
+
+bool MDPComp::isLoadBasedCompDoable(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    if(mDpy or isSecurePresent(ctx, mDpy) or
+            not (list->flags & HWC_GEOMETRY_CHANGED)) {
+        return false;
+    }
     return true;
 }
 
