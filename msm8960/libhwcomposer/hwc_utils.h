@@ -321,6 +321,7 @@ struct hwc_context_t {
     qhwc::LayerRotMap *mLayerRotMap[MAX_DISPLAYS];
     qhwc::MDPComp *mMDPComp[MAX_DISPLAYS];
     qhwc::CablProp mCablProp;
+    overlay::utils::Whf mPrevWHF[MAX_DISPLAYS];
 
     //Securing in progress indicator
     bool mSecuring;
