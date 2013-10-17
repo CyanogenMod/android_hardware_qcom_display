@@ -286,6 +286,8 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             copybit_device_t *copybit = getCopyBitDevice();
             copybit->set_sync(copybit, mRelFd[0]);
         }
+        hwc_rect_t clearRegion = {0,0,0,0};
+        clear(renderBuffer, clearRegion);
     }
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
     for (int i = 0; i <= (ctx->listStats[dpy].numAppLayers-1); i++) {
