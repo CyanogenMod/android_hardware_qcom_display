@@ -138,6 +138,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                             "event", __FUNCTION__);
                     ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL,
                             EXTERNAL_OFFLINE);
+                    ctx->mVirtualonExtActive = false;
                 }
                 ctx->proc->invalidate(ctx->proc);
             }
