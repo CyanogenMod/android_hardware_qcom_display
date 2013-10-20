@@ -124,7 +124,7 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         ovutils::eIsFg isFg = ovutils::IS_FG_OFF;
         ovutils::eZorder zOrder = static_cast<ovutils::eZorder>(fbZorder);
 
-        hwc_rect_t sourceCrop = layer->sourceCrop;
+        hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
         hwc_rect_t displayFrame = layer->displayFrame;
         int transform = layer->transform;
         int rotFlags = ovutils::ROT_FLAGS_NONE;
@@ -287,7 +287,7 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
                 (ovutils::eBlending) getBlending(layer->blending));
         ov.setSource(pargR, destR);
 
-        hwc_rect_t sourceCrop = layer->sourceCrop;
+        hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
         hwc_rect_t displayFrame = layer->displayFrame;
         // Do not use getNonWormholeRegion() function to calculate the
         // sourceCrop during animation on external display.
