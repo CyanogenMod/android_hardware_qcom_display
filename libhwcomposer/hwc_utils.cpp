@@ -1443,7 +1443,8 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
             ((transform & HWC_TRANSFORM_ROT_90) || downscale)) {
         *rot = ctx->mRotMgr->getNext();
         if(*rot == NULL) return -1;
-        BwcPM::setBwc(ctx, crop, dst, transform, mdpFlags);
+        if(!dpy)
+            BwcPM::setBwc(ctx, crop, dst, transform, mdpFlags);
         //Configure rotator for pre-rotation
         if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
@@ -1711,10 +1712,6 @@ void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
     }
     //src width > MAX mixer supported dim
     if((crop.right - crop.left) > qdutils::MAX_DISPLAY_DIM) {
-        return;
-    }
-    //External connected
-    if(ctx->mExtDisplay->isConnected()|| ctx->mVirtualDisplay->isConnected()) {
         return;
     }
     //Decimation necessary, cannot use BWC. H/W requirement.
