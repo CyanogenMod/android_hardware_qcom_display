@@ -4,13 +4,14 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE                  := libqdutils
 LOCAL_MODULE_TAGS             := optional
-LOCAL_SHARED_LIBRARIES        := $(common_libs)
+LOCAL_SHARED_LIBRARIES        := $(common_libs) libui
 LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdutils\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := profiler.cpp mdp_version.cpp \
                                  idle_invalidator.cpp \
-                                 comptype.cpp qd_utils.cpp
+                                 comptype.cpp qd_utils.cpp \
+                                 cb_utils.cpp
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
