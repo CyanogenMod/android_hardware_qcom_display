@@ -256,6 +256,10 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
 
     if(!hnd) {
+        if (layer->flags & HWC_COLOR_FILL) {
+            // Color layer
+            return true;
+        }
         ALOGE("%s: layer handle is NULL", __FUNCTION__);
         return false;
     }
@@ -1047,8 +1051,13 @@ bool MDPCompLowRes::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         hwc_layer_1_t *layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         if(!hnd) {
-            ALOGE("%s handle null", __FUNCTION__);
-            return false;
+            if (!(layer->flags & HWC_COLOR_FILL)) {
+                ALOGE("%s handle null", __FUNCTION__);
+                return false;
+            }
+            // No PLAY for Color layer
+            layerProp[i].mFlags &= ~HWC_MDPCOMP;
+            continue;
         }
 
         int mdpIndex = mCurrentFrame.layerToMDP[i];

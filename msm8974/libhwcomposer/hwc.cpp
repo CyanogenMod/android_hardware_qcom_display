@@ -390,6 +390,9 @@ static int hwc_query(struct hwc_composer_device_1* dev,
         }
         value[0] = supported;
         break;
+    case HWC_COLOR_FILL:
+        value[0] = 1;
+        break;
     default:
         return -EINVAL;
     }

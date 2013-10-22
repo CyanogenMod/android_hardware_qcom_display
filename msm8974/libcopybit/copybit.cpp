@@ -553,6 +553,51 @@ static int finish_copybit(struct copybit_device_t *dev)
     return 0;
 }
 
+/** Fill the rect on dst with RGBA color **/
+static int fill_color(struct copybit_device_t *dev,
+                      struct copybit_image_t const *dst,
+                      struct copybit_rect_t const *rect,
+                      uint32_t color)
+{
+    struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
+    if (!ctx) {
+        ALOGE("%s: Invalid copybit context", __FUNCTION__);
+        return -EINVAL;
+    }
+
+    if (dst->w > MAX_DIMENSION || dst->h > MAX_DIMENSION) {
+        ALOGE("%s: Invalid DST w=%d h=%d", __FUNCTION__, dst->w, dst->h);
+        return -EINVAL;
+    }
+
+    if (rect->l < 0 || (uint32_t)(rect->r - rect->l) > dst->w ||
+        rect->t < 0 || (uint32_t)(rect->b - rect->t) > dst->h) {
+        ALOGE("%s: Invalid destination rect: l=%d t=%d r=%d b=%d",
+                __FUNCTION__, rect->l, rect->t, rect->r, rect->b);
+        return -EINVAL;
+    }
+
+    struct blitReq* list = &ctx->list;
+    mdp_blit_req* req = &list->req[list->count++];
+    set_infos(ctx, req, MDP_SOLID_FILL);
+    set_image(&req->src, dst);
+    set_image(&req->dst, dst);
+
+    req->dst_rect.x = rect->l;
+    req->dst_rect.y = rect->t;
+    req->dst_rect.w = rect->r - rect->l;
+    req->dst_rect.h = rect->b - rect->t;
+    req->src_rect = req->dst_rect;
+
+    req->const_color.r = (uint32_t)((color >> 0) & 0xff);
+    req->const_color.g = (uint32_t)((color >> 8) & 0xff);
+    req->const_color.b = (uint32_t)((color >> 16) & 0xff);
+    req->const_color.alpha = (uint32_t)((color >> 24) & 0xff);
+
+    int status = msm_copybit(ctx, list);
+    return status;
+}
+
 /*****************************************************************************/
 
 /** Close the copybit device */
@@ -603,6 +648,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->device.set_sync = set_sync_copybit;
     ctx->device.stretch = stretch_copybit;
     ctx->device.finish = finish_copybit;
+    ctx->device.fill_color = fill_color;
     ctx->device.flush_get_fence = flush_get_fence;
     ctx->mAlpha = MDP_ALPHA_NOP;
     ctx->mFlags = 0;
