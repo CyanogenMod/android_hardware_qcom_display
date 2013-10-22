@@ -1428,6 +1428,16 @@ static int blit_copybit(
     return status;
 }
 
+/** Fill the rect on dst with RGBA color **/
+static int fill_color(struct copybit_device_t *dev,
+                      struct copybit_image_t const *dst,
+                      struct copybit_rect_t const *rect,
+                      uint32_t color)
+{
+    // TODO: Implement once c2d driver supports color fill
+    return -EINVAL;
+}
+
 /*****************************************************************************/
 
 static void clean_up(copybit_context_t* ctx)
@@ -1561,6 +1571,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->device.finish = finish_copybit;
     ctx->device.flush_get_fence = flush_get_fence_copybit;
     ctx->device.clear = clear_copybit;
+    ctx->device.fill_color = fill_color;
 
     /* Create RGB Surface */
     surfDefinition.buffer = (void*)0xdddddddd;
