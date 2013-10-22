@@ -923,6 +923,13 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
     crop_b -= crop_h * bottomCutRatio;
 }
 
+bool areLayersIntersecting(const hwc_layer_1_t* layer1,
+        const hwc_layer_1_t* layer2) {
+    hwc_rect_t irect = getIntersection(layer1->displayFrame,
+            layer2->displayFrame);
+    return isValidRect(irect);
+}
+
 bool isValidRect(const hwc_rect& rect)
 {
    return ((rect.bottom > rect.top) && (rect.right > rect.left)) ;
