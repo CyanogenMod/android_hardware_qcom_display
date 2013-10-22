@@ -1685,9 +1685,9 @@ bool canUseRotator(hwc_context_t *ctx, int dpy) {
     if(qdutils::MDPVersion::getInstance().is8x26() &&
             ctx->mVirtualDisplay->isConnected() &&
             !ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isPause) {
-        // Allow if YUV needs rotation and DMA is configured to BLOCK mode for
-        // primary. For portrait videos usecase on WFD, Driver supports
-        // multiplexing of DMA pipe in LINE and BLOCK mode.
+        /* 8x26 mdss driver supports multiplexing of DMA pipe
+         * in LINE and BLOCK modes for writeback panels.
+         */
         if(dpy == HWC_DISPLAY_PRIMARY)
             return false;
     }
