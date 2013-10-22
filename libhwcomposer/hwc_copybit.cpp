@@ -350,6 +350,16 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
     src.w = hnd->width;
     src.h = hnd->height;
     src.format = hnd->format;
+
+    // Handle R/B swap
+    if ((layer->flags & HWC_FORMAT_RB_SWAP)) {
+        if (src.format == HAL_PIXEL_FORMAT_RGBA_8888) {
+            src.format = HAL_PIXEL_FORMAT_BGRA_8888;
+        } else if (src.format == HAL_PIXEL_FORMAT_RGBX_8888) {
+            src.format = HAL_PIXEL_FORMAT_BGRX_8888;
+        }
+    }
+
     src.base = (void *)hnd->base;
     src.handle = (native_handle_t *)layer->handle;
     src.horiz_padding = src.w - hnd->width;

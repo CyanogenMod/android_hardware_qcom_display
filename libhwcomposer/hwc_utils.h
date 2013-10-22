@@ -127,6 +127,11 @@ enum {
     HWC_COPYBIT = 0x00000002,
 };
 
+// HAL specific features
+enum {
+    HWC_FORMAT_RB_SWAP = 0x00000040,
+};
+
 class LayerRotMap {
 public:
     LayerRotMap() { reset(); }
