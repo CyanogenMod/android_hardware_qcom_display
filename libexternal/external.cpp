@@ -588,7 +588,9 @@ void ExternalDisplay::setAttributes() {
             // if primary resolution is more than the hdmi resolution
             // configure dpy attr to primary resolution and set
             // downscale mode
-            if((priW * priH) > (width * height)) {
+            // Restrict this upto 1080p resolution max
+            if(((priW * priH) > (width * height)) &&
+                 (priW <= qdutils::MAX_DISPLAY_DIM )) {
                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = priW;
                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = priH;
                 // HDMI is always in landscape, so always assign the higher
