@@ -401,6 +401,10 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
             }
         }
 
+        if(mDpy > HWC_DISPLAY_PRIMARY && isL3SecureBuffer(hnd)) {
+            return false;
+        }
+
         //For 8x26 with panel width>1k, if RGB layer needs HFLIP fail mdp comp
         // may not need it if Gfx pre-rotation can handle all flips & rotations
         if(qdutils::MDPVersion::getInstance().is8x26() &&
@@ -628,6 +632,10 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
             ALOGD_IF(isDebug(), "%s: Cannot handle YUV layer with plane alpha\
                     in video only mode",
                     __FUNCTION__);
+            return false;
+        }
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
+        if(mDpy > HWC_DISPLAY_PRIMARY && isL3SecureBuffer(hnd)) {
             return false;
         }
     }
