@@ -270,6 +270,12 @@ static inline bool isYuvBuffer(const private_handle_t* hnd) {
 static inline bool isSecureBuffer(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_SECURE_BUFFER & hnd->flags));
 }
+
+// Returns true if the buffer is marked for L3 DRM
+static inline bool isL3SecureBuffer(const private_handle_t* hnd) {
+    return (hnd &&
+            (private_handle_t::PRIV_FLAGS_L3_SECURE_BUFFER & hnd->flags));
+}
 //Return true if buffer is marked locked
 static inline bool isBufferLocked(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags));
