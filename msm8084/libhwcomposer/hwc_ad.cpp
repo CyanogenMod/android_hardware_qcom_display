@@ -192,6 +192,14 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
 
     overlay::Writeback *wb = overlay::Writeback::getInstance();
 
+    //Set Security flag on writeback
+    if(isSecureBuffer(hnd)) {
+        if(!wb->setSecure(isSecureBuffer(hnd))) {
+            ALOGE("Failure in setting WB secure flag for ad");
+            return false;
+        }
+    }
+
     if(!wb->configureDpyInfo(hnd->width, hnd->height)) {
         ALOGE("%s: config display failed", __func__);
         mDoable = false;
@@ -209,7 +217,7 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
     size = getBufferSizeAndDimensions(hnd->width, hnd->height,
                 format, tmpW, tmpH);
 
-    if(!wb->configureMemory(size, isSecureBuffer(hnd))) {
+    if(!wb->configureMemory(size)) {
         ALOGE("%s: config memory failed", __func__);
         mDoable = false;
         return false;
