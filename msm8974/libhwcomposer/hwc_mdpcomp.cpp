@@ -435,6 +435,14 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         return false;
     }
 
+    /* XXX: There is some flicker currently seen with partial
+     * MDP composition on the virtual display.
+     * Disable UI MDP comp on virtual until it is fixed*/
+
+    if(mDpy > HWC_DISPLAY_EXTERNAL) {
+        return false;
+    }
+
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     for(int i = 0; i < numAppLayers; i++) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
@@ -513,6 +521,14 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
     if((mDpy > HWC_DISPLAY_PRIMARY) and
             (mdpCount > MAX_SEC_LAYERS)) {
         ALOGD_IF(isDebug(), "%s: Exceeds max secondary pipes",__FUNCTION__);
+        return false;
+    }
+
+    /* XXX: There is some flicker currently seen with partial
+     * MDP composition on the virtual display.
+     * Disable UI MDP comp on virtual until it is fixed*/
+
+    if(mDpy > HWC_DISPLAY_EXTERNAL) {
         return false;
     }
 
