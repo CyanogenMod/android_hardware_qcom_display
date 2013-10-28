@@ -1203,7 +1203,8 @@ void setMdpFlags(hwc_layer_1_t *layer,
 }
 
 inline int configRotator(Rotator *rot, Whf& whf,
-        const eMdpFlags& mdpFlags, const eTransform& orient,
+        const Whf& origWhf, const eMdpFlags& mdpFlags,
+        const eTransform& orient,
         const int& downscale) {
     // Fix alignments for TILED format
     if(whf.format == MDP_Y_CRCB_H2V2_TILE ||
@@ -1211,7 +1212,7 @@ inline int configRotator(Rotator *rot, Whf& whf,
         whf.w =  utils::alignup(whf.w, 64);
         whf.h = utils::alignup(whf.h, 32);
     }
-    rot->setSource(whf);
+    rot->setSource(whf, origWhf);
     rot->setFlags(mdpFlags);
     rot->setTransform(orient);
     rot->setDownscale(downscale);
@@ -1365,8 +1366,10 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
             ((transform & HWC_TRANSFORM_ROT_90) || downscale)) {
         *rot = ctx->mRotMgr->getNext();
         if(*rot == NULL) return -1;
+        Whf origWhf(hnd->width, hnd->height,
+                    getMdpFormat(hnd->format), hnd->size);
+        if(configRotator(*rot, whf, origWhf,  mdpFlags, orient, downscale) < 0) {
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, mdpFlags, orient, downscale) < 0){
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             ctx->mOverlay->clear(dpy);
             return -1;
@@ -1445,8 +1448,10 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     if(isYuvBuffer(hnd) && (transform & HWC_TRANSFORM_ROT_90)) {
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
+        Whf origWhf(hnd->width, hnd->height,
+                    getMdpFormat(hnd->format), hnd->size);
+        if(configRotator(*rot, whf, origWhf, mdpFlagsL, orient, downscale) < 0) {
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, mdpFlagsL, orient, downscale) < 0){
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             ctx->mOverlay->clear(dpy);
             return -1;

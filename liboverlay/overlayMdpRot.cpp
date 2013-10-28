@@ -94,6 +94,11 @@ void MdpRot::setSource(const overlay::utils::Whf& awhf) {
     mRotImgInfo.dst.height = whf.h;
 }
 
+void MdpRot::setSource(const utils::Whf& awhf, const utils::Whf& owhf) {
+    mOrigWhf = owhf;
+    setSource(awhf);
+}
+
 void MdpRot::setFlags(const utils::eMdpFlags& flags) {
     mRotImgInfo.secure = 0;
     if(flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
@@ -132,8 +137,8 @@ bool MdpRot::commit() {
 }
 
 uint32_t MdpRot::calcOutputBufSize() {
-    ovutils::Whf destWhf(mRotImgInfo.dst.width,
-            mRotImgInfo.dst.height, mRotImgInfo.dst.format);
+    ovutils::Whf destWhf(mOrigWhf.w, mOrigWhf.h,
+                         mRotImgInfo.dst.format);
     return Rotator::calcOutputBufSize(destWhf);
 }
 
