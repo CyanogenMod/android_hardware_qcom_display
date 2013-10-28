@@ -137,8 +137,11 @@ bool MdpRot::commit() {
 }
 
 uint32_t MdpRot::calcOutputBufSize() {
-    ovutils::Whf destWhf(mOrigWhf.w, mOrigWhf.h,
-                         mRotImgInfo.dst.format);
+    if(mOrientation & utils::OVERLAY_TRANSFORM_ROT_90)
+       utils::swap(mOrigWhf.w, mOrigWhf.h);
+
+    ovutils::Whf destWhf(mRotImgInfo.dst.width,
+            mRotImgInfo.dst.height, mRotImgInfo.dst.format);
     return Rotator::calcOutputBufSize(destWhf);
 }
 
