@@ -52,6 +52,12 @@ enum mdp_version {
     MDSS_V5     = 500,
 };
 
+enum mdp_rev {
+    MDSS_MDP_HW_REV_100 = 0x10000000,
+    MDSS_MDP_HW_REV_101 = 0x10010000, //8x26
+    MDSS_MDP_HW_REV_102 = 0x10020000,
+};
+
 #define MDDI_PANEL       '1'
 #define EBI2_PANEL       '2'
 #define LCDC_PANEL       '3'
@@ -76,6 +82,7 @@ public:
     uint8_t getRGBPipes() { return mRGBPipes; }
     uint8_t getVGPipes() { return mVGPipes; }
     uint8_t getDMAPipes() { return mDMAPipes; }
+    bool is8x26();
 private:
     int mMDPVersion;
     char mPanelType;
