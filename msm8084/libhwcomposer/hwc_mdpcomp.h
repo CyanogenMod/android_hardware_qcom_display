@@ -144,6 +144,13 @@ protected:
     bool fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* check if we can use layer cache to do at least partial MDP comp */
     bool partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    /* Partial MDP comp that uses caching to save power as primary goal */
+    bool cacheBasedComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    /* Partial MDP comp that uses number of pixels to optimize perf goal */
+    bool loadBasedComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    /* Checks if its worth doing load based partial comp */
+    bool isLoadBasedCompDoable(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
     /* checks for conditions where only video can be bypassed */
     bool isOnlyVideoDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list,
             bool secureOnly);
