@@ -38,6 +38,7 @@
 
 #include "gralloc_priv.h"
 #include "overlayUtils.h"
+#define SIZE_1M 0x00100000
 
 namespace overlay {
 
@@ -118,24 +119,28 @@ inline bool OvMem::open(uint32_t numbufs,
 {
     alloc_data data;
     int allocFlags = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
-    if(isSecure) {
-        allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP;
-        allocFlags |= GRALLOC_USAGE_PROTECTED;
-    }
-    // Allocate uncached rotator buffers
-    allocFlags |= GRALLOC_USAGE_PRIVATE_UNCACHED;
-
     int err = 0;
     OVASSERT(numbufs && bufSz, "numbufs=%d bufSz=%d", numbufs, bufSz);
 
-    mBufSz = bufSz;
+    if(isSecure) {
+        allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP;
+        allocFlags |= GRALLOC_USAGE_PROTECTED;
+        mBufSz = utils::align(bufSz, SIZE_1M);
+        data.align = SIZE_1M;
+    } else {
+        mBufSz = bufSz;
+        data.align = getpagesize();
+    }
+
+    // Allocate uncached rotator buffers
+    allocFlags |= GRALLOC_USAGE_PRIVATE_UNCACHED;
+
     mNumBuffers = numbufs;
 
     data.base = 0;
     data.fd = -1;
     data.offset = 0;
     data.size = mBufSz * mNumBuffers;
-    data.align = getpagesize();
     data.uncached = true;
 
     err = mAlloc->allocate(data, allocFlags);

@@ -32,7 +32,6 @@
 #define MDSS_MDP_ROT_ONLY 0x80
 #endif
 
-#define SIZE_1M 0x00100000
 #define MDSS_ROT_MASK (MDP_ROT_90 | MDP_FLIP_UD | MDP_FLIP_LR)
 
 namespace ovutils = overlay::utils;
@@ -260,9 +259,6 @@ uint32_t MdssRot::calcOutputBufSize() {
     } else {
         opBufSize = Rotator::calcOutputBufSize(destWhf);
     }
-
-    if (mRotInfo.flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
-        opBufSize = utils::align(opBufSize, SIZE_1M);
 
     return opBufSize;
 }
