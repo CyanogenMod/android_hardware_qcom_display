@@ -19,7 +19,6 @@
 #include <math.h>
 #include "hwc_mdpcomp.h"
 #include <sys/ioctl.h>
-#include "external.h"
 #include "qdMetaData.h"
 #include "mdp_version.h"
 #include "hwc_fbupdate.h"
@@ -347,7 +346,7 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ret = false;
     } else if(qdutils::MDPVersion::getInstance().is8x26() &&
             ctx->mVideoTransFlag &&
-            ctx->mExtDisplay->isExternalConnected()) {
+            isSecondaryConnected(ctx)) {
         //1 Padding round to shift pipes across mixers
         ALOGD_IF(isDebug(),"%s: MDP Comp. video transition padding round",
                 __FUNCTION__);
