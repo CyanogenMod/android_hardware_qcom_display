@@ -39,20 +39,29 @@ namespace ovutils = overlay::utils;
 
 IFBUpdate* IFBUpdate::getObject(hwc_context_t *ctx, const int& dpy) {
     if(isDisplaySplit(ctx, dpy)) {
-        return new FBUpdateSplit(dpy);
+        return new FBUpdateSplit(ctx, dpy);
     }
-    return new FBUpdateNonSplit(dpy);
+    return new FBUpdateNonSplit(ctx, dpy);
 }
 
-inline void IFBUpdate::reset() {
+IFBUpdate::IFBUpdate(hwc_context_t *ctx, const int& dpy) : mDpy(dpy) {
+    getBufferSizeAndDimensions(ctx->dpyAttr[dpy].xres,
+            ctx->dpyAttr[dpy].yres,
+            HAL_PIXEL_FORMAT_RGBA_8888,
+            mAlignedFBWidth,
+            mAlignedFBHeight);
+}
+
+void IFBUpdate::reset() {
     mModeOn = false;
     mRot = NULL;
 }
 
 //================= Low res====================================
-FBUpdateNonSplit::FBUpdateNonSplit(const int& dpy): IFBUpdate(dpy) {}
+FBUpdateNonSplit::FBUpdateNonSplit(hwc_context_t *ctx, const int& dpy):
+        IFBUpdate(ctx, dpy) {}
 
-inline void FBUpdateNonSplit::reset() {
+void FBUpdateNonSplit::reset() {
     IFBUpdate::reset();
     mDest = ovutils::OV_INVALID;
 }
@@ -107,9 +116,10 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
             layer->compositionType = HWC_OVERLAY;
         }
         overlay::Overlay& ov = *(ctx->mOverlay);
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        ovutils::Whf info(getWidth(hnd), getHeight(hnd),
-                          ovutils::getMdpFormat(hnd->format), hnd->size);
+
+        ovutils::Whf info(mAlignedFBWidth,
+                mAlignedFBHeight,
+                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888));
 
         //Request a pipe
         ovutils::eMdpPipeType type = ovutils::OV_MDP_PIPE_ANY;
@@ -160,7 +170,7 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
                 displayFrame = sourceCrop;
             }
         }
-        calcExtDisplayPosition(ctx, hnd, mDpy, sourceCrop, displayFrame,
+        calcExtDisplayPosition(ctx, NULL, mDpy, sourceCrop, displayFrame,
                                    transform, orient);
         setMdpFlags(layer, mdpFlags, 0, transform);
         // For External use rotator if there is a rotation value set
@@ -212,9 +222,10 @@ bool FBUpdateNonSplit::draw(hwc_context_t *ctx, private_handle_t *hnd)
 }
 
 //================= High res====================================
-FBUpdateSplit::FBUpdateSplit(const int& dpy): IFBUpdate(dpy) {}
+FBUpdateSplit::FBUpdateSplit(hwc_context_t *ctx, const int& dpy):
+        IFBUpdate(ctx, dpy) {}
 
-inline void FBUpdateSplit::reset() {
+void FBUpdateSplit::reset() {
     IFBUpdate::reset();
     mDestLeft = ovutils::OV_INVALID;
     mDestRight = ovutils::OV_INVALID;
@@ -246,9 +257,10 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
             layer->compositionType = HWC_OVERLAY;
         }
         overlay::Overlay& ov = *(ctx->mOverlay);
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        ovutils::Whf info(getWidth(hnd), getHeight(hnd),
-                          ovutils::getMdpFormat(hnd->format), hnd->size);
+
+        ovutils::Whf info(mAlignedFBWidth,
+                mAlignedFBHeight,
+                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888));
 
         //Request left pipe
         ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
