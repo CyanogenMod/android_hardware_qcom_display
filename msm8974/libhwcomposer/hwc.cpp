@@ -104,6 +104,8 @@ static void reset(hwc_context_t *ctx, int numDisplays,
 
         if(ctx->mFBUpdate[i])
             ctx->mFBUpdate[i]->reset();
+        if(ctx->mMDPComp[i])
+            ctx->mMDPComp[i]->reset();
         if(ctx->mCopyBit[i])
             ctx->mCopyBit[i]->reset();
         if(ctx->mLayerRotMap[i])
@@ -173,10 +175,11 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
 }
 
 static int hwc_prepare_external(hwc_composer_device_1 *dev,
-        hwc_display_contents_1_t *list, int dpy) {
+        hwc_display_contents_1_t *list) {
 
     ATRACE_CALL();
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    const int dpy = HWC_DISPLAY_EXTERNAL;
 
     if (LIKELY(list && list->numHwLayers > 1) &&
             ctx->dpyAttr[dpy].isActive &&
@@ -213,9 +216,36 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
 }
 
 static int hwc_prepare_virtual(hwc_composer_device_1 *dev,
-                               hwc_display_contents_1_t *list, int dpy) {
+        hwc_display_contents_1_t *list) {
     ATRACE_CALL();
-    //XXX: Fix when framework support is added
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+    const int dpy = HWC_DISPLAY_VIRTUAL;
+
+    if (list && list->numHwLayers > 1) {
+        reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
+        uint32_t last = list->numHwLayers - 1;
+        hwc_layer_1_t *fbLayer = &list->hwLayers[last];
+        if(fbLayer->handle) {
+            int fbWidth = 0, fbHeight = 0;
+            getLayerResolution(fbLayer, fbWidth, fbHeight);
+            ctx->dpyAttr[dpy].xres = fbWidth;
+            ctx->dpyAttr[dpy].yres = fbHeight;
+
+            if(ctx->dpyAttr[dpy].connected == false) {
+                ctx->dpyAttr[dpy].connected = true;
+                setupSecondaryObjs(ctx, dpy);
+            }
+
+            ctx->dpyAttr[dpy].fd = Writeback::getInstance()->getFbFd();
+            Writeback::getInstance()->configureDpyInfo(fbWidth, fbHeight);
+            setListStats(ctx, list, dpy);
+
+            if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
+                const int fbZ = 0;
+                ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
+            }
+        }
+    }
     return 0;
 }
 
@@ -234,6 +264,14 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 
     Overlay::setDMAMode(Overlay::DMA_LINE_MODE);
 
+    //Cleanup virtual display objs, since there is no explicit disconnect
+    if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected &&
+        (numDisplays <= HWC_NUM_PHYSICAL_DISPLAY_TYPES ||
+        displays[HWC_DISPLAY_VIRTUAL] == NULL)) {
+        ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected = false;
+        clearSecondaryObjs(ctx, HWC_DISPLAY_VIRTUAL);
+    }
+
     for (int32_t i = numDisplays - 1; i >= 0; i--) {
         hwc_display_contents_1_t *list = displays[i];
         switch(i) {
@@ -241,10 +279,10 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
                 ret = hwc_prepare_primary(dev, list);
                 break;
             case HWC_DISPLAY_EXTERNAL:
-                ret = hwc_prepare_external(dev, list, i);
+                ret = hwc_prepare_external(dev, list);
                 break;
             case HWC_DISPLAY_VIRTUAL:
-                ret = hwc_prepare_virtual(dev, list, i);
+                ret = hwc_prepare_virtual(dev, list);
                 break;
             default:
                 ret = -EINVAL;
@@ -320,8 +358,8 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
                 // so that any pipe unsets gets committed
                 if (display_commit(ctx, dpy) < 0) {
                     ret = -1;
-                    ALOGE("%s:post failed for external display !! ",
-                          __FUNCTION__);
+                    ALOGE("%s:post failed for dpy %d",
+                          __FUNCTION__, dpy);
                 }
             } else {
             }
@@ -353,9 +391,12 @@ static int hwc_query(struct hwc_composer_device_1* dev,
         // Not supported for now
         value[0] = 0;
         break;
-    case HWC_DISPLAY_TYPES_SUPPORTED:
-        if(ctx->mMDP.hasOverlay)
-            supported |= HWC_DISPLAY_EXTERNAL_BIT;
+    case HWC_DISPLAY_TYPES_SUPPORTED: //Unused by f/w
+        if(ctx->mMDP.hasOverlay) {
+            supported |= HWC_DISPLAY_VIRTUAL_BIT;
+            if(!qdutils::MDPVersion::getInstance().is8x26())
+                supported |= HWC_DISPLAY_EXTERNAL_BIT;
+        }
         value[0] = supported;
         break;
     default:
@@ -406,15 +447,16 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         }
     }
 
-    closeAcquireFds(list);
+    closeAcquireFds(list, dpy);
     return ret;
 }
 
 static int hwc_set_external(hwc_context_t *ctx,
-                            hwc_display_contents_1_t* list, int dpy)
+        hwc_display_contents_1_t* list)
 {
     ATRACE_CALL();
     int ret = 0;
+    const int dpy = HWC_DISPLAY_EXTERNAL;
 
     if (LIKELY(list) && ctx->dpyAttr[dpy].isActive &&
         !ctx->dpyAttr[dpy].isPause &&
@@ -452,23 +494,64 @@ static int hwc_set_external(hwc_context_t *ctx,
         }
     }
 
-    closeAcquireFds(list);
+    closeAcquireFds(list, dpy);
     return ret;
 }
 
 static int hwc_set_virtual(hwc_context_t *ctx,
-                           hwc_display_contents_1_t* list, int dpy)
-{
-    //XXX: Implement set.
-    closeAcquireFds(list);
-    if (list) {
-        // SF assumes HWC waits for the acquire fence and returns a new fence
-        // that signals when we're done. Since we don't wait, and also don't
-        // touch the buffer, we can just handle the acquire fence back to SF
-        // as the retire fence.
-        list->retireFenceFd = list->outbufAcquireFenceFd;
+        hwc_display_contents_1_t* list) {
+    ATRACE_CALL();
+    int ret = 0;
+    const int dpy = HWC_DISPLAY_VIRTUAL;
+
+    if (list && list->outbuf && list->numHwLayers > 1) {
+        uint32_t last = list->numHwLayers - 1;
+        hwc_layer_1_t *fbLayer = &list->hwLayers[last];
+
+        if(fbLayer->handle && ctx->dpyAttr[dpy].connected
+#ifndef FORCE_HWC_FOR_VIRTUAL_DISPLAYS
+                //XXX: If we're not forcing virtual via HWC,
+                //full GLES compositions will not be routed through here.
+                && !isGLESOnlyComp(ctx, dpy)
+#endif
+        ) {
+
+            private_handle_t *ohnd = (private_handle_t *)list->outbuf;
+            Writeback::getInstance()->setOutputFormat(
+                    utils::getMdpFormat(ohnd->format));
+
+            int fd = -1; //FenceFD from the Copybit
+            hwc_sync(ctx, list, dpy, fd);
+
+            if (!ctx->mMDPComp[dpy]->draw(ctx, list)) {
+                ALOGE("%s: MDPComp draw failed", __FUNCTION__);
+                ret = -1;
+            }
+
+            if (!ctx->mFBUpdate[dpy]->draw(ctx,
+                        (private_handle_t *)fbLayer->handle)) {
+                ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
+                ret = -1;
+            }
+
+            Writeback::getInstance()->queueBuffer(ohnd->fd, ohnd->offset);
+            if (display_commit(ctx, dpy) < 0) {
+                ALOGE("%s: display commit fail!", __FUNCTION__);
+                ret = -1;
+            }
+        } else if(list->outbufAcquireFenceFd >= 0) {
+            //If we dont handle the frame, set retireFenceFd to outbufFenceFd,
+            //which will make sure, the framework waits on it and closes it.
+            //The other way is to wait on outbufFenceFd ourselves, close it and
+            //set retireFenceFd to -1. Since we want hwc to be async, choosing
+            //the former.
+            //Also dup because, the closeAcquireFds() will close the outbufFence
+            list->retireFenceFd = dup(list->outbufAcquireFenceFd);
+        }
     }
-    return 0;
+
+    closeAcquireFds(list, dpy);
+    return ret;
 }
 
 
@@ -485,10 +568,10 @@ static int hwc_set(hwc_composer_device_1 *dev,
                 ret = hwc_set_primary(ctx, list);
                 break;
             case HWC_DISPLAY_EXTERNAL:
-                ret = hwc_set_external(ctx, list, i);
+                ret = hwc_set_external(ctx, list);
                 break;
             case HWC_DISPLAY_VIRTUAL:
-                ret = hwc_set_virtual(ctx, list, i);
+                ret = hwc_set_virtual(ctx, list);
                 break;
             default:
                 ret = -EINVAL;

@@ -186,13 +186,11 @@ void getNonWormholeRegion(hwc_display_contents_1_t* list,
                               hwc_rect_t& nwr);
 bool isSecuring(hwc_context_t* ctx, hwc_layer_1_t const* layer);
 bool isSecureModePolicy(int mdpVersion);
-//Secondary display hasnt acquired any pipes yet.
-//Secondary stands for external as well as virtual
-bool isSecondaryConfiguring(hwc_context_t* ctx);
 bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer, const int& dpy);
 bool isAlphaPresent(hwc_layer_1_t const* layer);
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable);
 int getBlending(int blending);
+bool isGLESOnlyComp(hwc_context_t *ctx, const int& dpy);
 
 //Helper function to dump logs
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
@@ -202,7 +200,7 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, uint32_t& x,
                                         uint32_t& y, uint32_t& w, uint32_t& h);
 
 //Close acquireFenceFds of all layers of incoming list
-void closeAcquireFds(hwc_display_contents_1_t* list);
+void closeAcquireFds(hwc_display_contents_1_t* list, int dpy);
 
 //Sync point impl.
 int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
@@ -404,6 +402,16 @@ static inline bool has90Transform(hwc_layer_1_t *layer) {
 
 inline bool isSecurePresent(hwc_context_t *ctx, int dpy) {
     return ctx->listStats[dpy].isSecurePresent;
+}
+
+static inline bool isSecondaryConfiguring(hwc_context_t* ctx) {
+    return (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isConfiguring ||
+            ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isConfiguring);
+}
+
+static inline bool isSecondaryConnected(hwc_context_t* ctx) {
+    return (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected ||
+            ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected);
 }
 
 };

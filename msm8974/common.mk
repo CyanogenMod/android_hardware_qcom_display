@@ -25,6 +25,10 @@ ifneq ($(filter msm8974 msm8x74 msm8226 msm8x26 msm8610 apq8084,$(TARGET_BOARD_P
     common_flags += -DMDSS_TARGET
 endif
 
+ifeq ($(TARGET_FORCE_HWC_FOR_VIRTUAL_DISPLAYS), true)
+    common_flags += -DFORCE_HWC_FOR_VIRTUAL_DISPLAYS
+endif
+
 common_deps  :=
 kernel_includes :=
 
