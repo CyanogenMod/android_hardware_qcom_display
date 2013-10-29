@@ -35,7 +35,7 @@ namespace ovutils = overlay::utils;
 //Framebuffer update Interface
 class IFBUpdate {
 public:
-    explicit IFBUpdate(const int& dpy) : mDpy(dpy) {}
+    explicit IFBUpdate(hwc_context_t *ctx, const int& dpy);
     virtual ~IFBUpdate() {};
     // Sets up members and prepares overlay if conditions are met
     virtual bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
@@ -51,12 +51,14 @@ protected:
     const int mDpy; // display to update
     bool mModeOn; // if prepare happened
     overlay::Rotator *mRot;
+    int mAlignedFBWidth;
+    int mAlignedFBHeight;
 };
 
 //Non-Split panel handler.
 class FBUpdateNonSplit : public IFBUpdate {
 public:
-    explicit FBUpdateNonSplit(const int& dpy);
+    explicit FBUpdateNonSplit(hwc_context_t *ctx, const int& dpy);
     virtual ~FBUpdateNonSplit() {};
     bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
             int fbZorder);
@@ -77,7 +79,7 @@ private:
 //Split panel handler.
 class FBUpdateSplit : public IFBUpdate {
 public:
-    explicit FBUpdateSplit(const int& dpy);
+    explicit FBUpdateSplit(hwc_context_t *ctx, const int& dpy);
     virtual ~FBUpdateSplit() {};
     bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
             int fbZorder);
