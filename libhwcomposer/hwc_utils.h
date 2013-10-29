@@ -317,6 +317,26 @@ static inline bool isSecureDisplayBuffer(const private_handle_t* hnd) {
     return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_SECURE_DISPLAY));
 }
 
+static inline int getWidth(const private_handle_t* hnd) {
+    if(isYuvBuffer(hnd)) {
+        MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+        if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
+            return metadata->bufferDim.sliceWidth;
+        }
+    }
+    return hnd->width;
+}
+
+static inline int getHeight(const private_handle_t* hnd) {
+    if(isYuvBuffer(hnd)) {
+        MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+        if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
+            return metadata->bufferDim.sliceHeight;
+        }
+    }
+    return hnd->height;
+}
+
 template<typename T> inline T max(T a, T b) { return (a > b) ? a : b; }
 template<typename T> inline T min(T a, T b) { return (a < b) ? a : b; }
 
