@@ -33,28 +33,36 @@ namespace qhwc {
 
 namespace ovutils = overlay::utils;
 
-IFBUpdate* IFBUpdate::getObject(const int& width, const int& dpy) {
+IFBUpdate* IFBUpdate::getObject(hwc_context_t *ctx, const int& width, const int& dpy) {
     if(width > MAX_DISPLAY_DIM) {
-        return new FBUpdateHighRes(dpy);
+        return new FBUpdateHighRes(ctx, dpy);
     }
-    return new FBUpdateLowRes(dpy);
+    return new FBUpdateLowRes(ctx, dpy);
 }
 
-inline void IFBUpdate::reset() {
+IFBUpdate::IFBUpdate(hwc_context_t *ctx, const int& dpy) : mDpy(dpy) {
+    getBufferSizeAndDimensions(ctx->dpyAttr[dpy].xres,
+            ctx->dpyAttr[dpy].yres,
+            HAL_PIXEL_FORMAT_RGBA_8888,
+            mAlignedFBWidth,
+            mAlignedFBHeight);
+}
+
+void IFBUpdate::reset() {
     mModeOn = false;
     mRot = NULL;
 }
 
 //================= Low res====================================
-FBUpdateLowRes::FBUpdateLowRes(const int& dpy): IFBUpdate(dpy) {}
+FBUpdateLowRes::FBUpdateLowRes(hwc_context_t *ctx, const int& dpy):
+        IFBUpdate(ctx, dpy) {}
 
-inline void FBUpdateLowRes::reset() {
+void FBUpdateLowRes::reset() {
     IFBUpdate::reset();
     mDest = ovutils::OV_INVALID;
 }
 
 bool FBUpdateLowRes::preRotateExtDisplay(hwc_context_t *ctx,
-                                            private_handle_t *hnd,
                                             ovutils::Whf &info,
                                             hwc_rect_t& sourceCrop,
                                             ovutils::eMdpFlags& mdpFlags,
@@ -66,8 +74,8 @@ bool FBUpdateLowRes::preRotateExtDisplay(hwc_context_t *ctx,
     if(mDpy && (extOrient & HWC_TRANSFORM_ROT_90)) {
         mRot = ctx->mRotMgr->getNext();
         if(mRot == NULL) return false;
-        Whf origWhf(hnd->width, hnd->height,
-                    getMdpFormat(hnd->format), hnd->size);
+        Whf origWhf(mAlignedFBWidth, mAlignedFBHeight,
+                    getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888));
         //Configure rotator for pre-rotation
         if(configRotator(mRot, info, origWhf, mdpFlags, orient, 0) < 0) {
             ALOGE("%s: configRotator Failed!", __FUNCTION__);
@@ -105,9 +113,10 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             layer->compositionType = HWC_OVERLAY;
         }
         overlay::Overlay& ov = *(ctx->mOverlay);
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        ovutils::Whf info(getWidth(hnd), getHeight(hnd),
-                          ovutils::getMdpFormat(hnd->format), hnd->size);
+
+        ovutils::Whf info(mAlignedFBWidth,
+                mAlignedFBHeight,
+                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888));
 
         //Request a pipe
         ovutils::eMdpPipeType type = ovutils::OV_MDP_PIPE_ANY;
@@ -152,11 +161,11 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
                 getNonWormholeRegion(list, sourceCrop);
                 displayFrame = sourceCrop;
         }
-        calcExtDisplayPosition(ctx, hnd, mDpy, sourceCrop, displayFrame,
+        calcExtDisplayPosition(ctx, NULL, mDpy, sourceCrop, displayFrame,
                                    transform, orient);
         setMdpFlags(layer, mdpFlags, 0, transform);
         // For External use rotator if there is a rotation value set
-        ret = preRotateExtDisplay(ctx, hnd, info, sourceCrop, mdpFlags, rotFlags);
+        ret = preRotateExtDisplay(ctx, info, sourceCrop, mdpFlags, rotFlags);
         if(!ret) {
             ALOGE("%s: preRotate for external Failed!", __FUNCTION__);
             return false;
@@ -209,9 +218,10 @@ bool FBUpdateLowRes::draw(hwc_context_t *ctx, private_handle_t *hnd)
 }
 
 //================= High res====================================
-FBUpdateHighRes::FBUpdateHighRes(const int& dpy): IFBUpdate(dpy) {}
+FBUpdateHighRes::FBUpdateHighRes (hwc_context_t *ctx, const int& dpy):
+    IFBUpdate(ctx, dpy) {}
 
-inline void FBUpdateHighRes::reset() {
+void FBUpdateHighRes::reset() {
     IFBUpdate::reset();
     mDestLeft = ovutils::OV_INVALID;
     mDestRight = ovutils::OV_INVALID;
@@ -243,9 +253,10 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
             layer->compositionType = HWC_OVERLAY;
         }
         overlay::Overlay& ov = *(ctx->mOverlay);
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        ovutils::Whf info(getWidth(hnd), getHeight(hnd),
-                          ovutils::getMdpFormat(hnd->format), hnd->size);
+
+        ovutils::Whf info(mAlignedFBWidth,
+                mAlignedFBHeight,
+                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888));
 
         //Request left pipe
         ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy);

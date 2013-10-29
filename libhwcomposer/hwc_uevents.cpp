@@ -49,7 +49,7 @@ enum {
 static void setup(hwc_context_t* ctx, int dpy)
 {
     ctx->mFBUpdate[dpy] =
-        IFBUpdate::getObject(ctx->dpyAttr[dpy].xres, dpy);
+        IFBUpdate::getObject(ctx, ctx->dpyAttr[dpy].xres, dpy);
     ctx->mMDPComp[dpy] =
         MDPComp::getObject(ctx->dpyAttr[dpy].xres, dpy);
     int compositionType =
@@ -57,7 +57,7 @@ static void setup(hwc_context_t* ctx, int dpy)
     if (compositionType & (qdutils::COMPOSITION_TYPE_DYN |
                            qdutils::COMPOSITION_TYPE_MDP |
                            qdutils::COMPOSITION_TYPE_C2D)) {
-        ctx->mCopyBit[dpy] = new CopyBit();
+        ctx->mCopyBit[dpy] = new CopyBit(ctx, dpy);
     }
 }
 
