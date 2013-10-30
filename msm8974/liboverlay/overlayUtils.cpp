@@ -423,9 +423,8 @@ void getDump(char *buf, size_t len, const char *prefix,
         const msmfb_data& ov) {
     char str_data[256] = {'\0'};
     snprintf(str_data, 256,
-            "%s offset=%d memid=%d id=%d flags=0x%x priv=%d\n",
-            prefix, ov.offset, ov.memory_id, ov.id, ov.flags,
-            ov.priv);
+            "%s offset=%d memid=%d id=%d flags=0x%x\n",
+            prefix, ov.offset, ov.memory_id, ov.id, ov.flags);
     strncat(buf, str_data, strlen(str_data));
 }
 
