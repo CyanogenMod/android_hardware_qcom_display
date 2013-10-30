@@ -215,13 +215,6 @@ int Writeback::getOutputFormat() {
     return mOpFmt;
 }
 
-void Writeback::getDump(char *buf, size_t len) const {
-    utils::getDump(buf, len, "WBData", mFbData);
-    char str[4] = {'\0'};
-    snprintf(str, 4, "\n");
-    strncat(buf, str, strlen(str));
-}
-
 //static
 
 Writeback *Writeback::getInstance() {
@@ -245,6 +238,17 @@ void Writeback::clear() {
         delete sWb;
         sWb = NULL;
     }
+}
+
+bool Writeback::getDump(char *buf, size_t len) {
+    if(sWb) {
+        utils::getDump(buf, len, "WBData", sWb->mFbData);
+        char str[4] = {'\0'};
+        snprintf(str, 4, "\n");
+        strncat(buf, str, strlen(str));
+        return true;
+    }
+    return false;
 }
 
 Writeback *Writeback::sWb = 0;
