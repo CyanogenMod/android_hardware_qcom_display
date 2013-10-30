@@ -157,18 +157,14 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
             ctx->dpyAttr[dpy].isActive) {
         reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
         handleGeomChange(ctx, dpy, list);
-        uint32_t last = list->numHwLayers - 1;
-        hwc_layer_1_t *fbLayer = &list->hwLayers[last];
-        if(fbLayer->handle) {
-            setListStats(ctx, list, dpy);
-            if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
-                const int fbZ = 0;
-                ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
-            }
-            if (ctx->mMDP.version < qdutils::MDP_V4_0) {
-                if(ctx->mCopyBit[dpy])
-                    ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
-            }
+        setListStats(ctx, list, dpy);
+        if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
+            const int fbZ = 0;
+            ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
+        }
+        if (ctx->mMDP.version < qdutils::MDP_V4_0) {
+            if(ctx->mCopyBit[dpy])
+                ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
         }
     }
     return 0;
@@ -186,24 +182,20 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
             ctx->dpyAttr[dpy].connected) {
         reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
         handleGeomChange(ctx, dpy, list);
-        uint32_t last = list->numHwLayers - 1;
-        hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         if(!ctx->dpyAttr[dpy].isPause) {
-            if(fbLayer->handle) {
-                ctx->dpyAttr[dpy].isConfiguring = false;
-                setListStats(ctx, list, dpy);
-                if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
-                    const int fbZ = 0;
-                    ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
-                }
-
-                /* Temporarily commenting out C2D until we support partial
-                   copybit composition for mixed mode MDP
-
-                if((fbZOrder >= 0) && ctx->mCopyBit[dpy])
-                    ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
-                */
+            ctx->dpyAttr[dpy].isConfiguring = false;
+            setListStats(ctx, list, dpy);
+            if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
+                const int fbZ = 0;
+                ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
             }
+
+            /* Temporarily commenting out C2D until we support partial
+               copybit composition for mixed mode MDP
+
+               if((fbZOrder >= 0) && ctx->mCopyBit[dpy])
+               ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
+             */
         } else {
             // External Display is in Pause state.
             // ToDo:
@@ -225,25 +217,23 @@ static int hwc_prepare_virtual(hwc_composer_device_1 *dev,
         reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
-        if(fbLayer->handle) {
-            int fbWidth = 0, fbHeight = 0;
-            getLayerResolution(fbLayer, fbWidth, fbHeight);
-            ctx->dpyAttr[dpy].xres = fbWidth;
-            ctx->dpyAttr[dpy].yres = fbHeight;
+        int fbWidth = 0, fbHeight = 0;
+        getLayerResolution(fbLayer, fbWidth, fbHeight);
+        ctx->dpyAttr[dpy].xres = fbWidth;
+        ctx->dpyAttr[dpy].yres = fbHeight;
 
-            if(ctx->dpyAttr[dpy].connected == false) {
-                ctx->dpyAttr[dpy].connected = true;
-                setupSecondaryObjs(ctx, dpy);
-            }
+        if(ctx->dpyAttr[dpy].connected == false) {
+            ctx->dpyAttr[dpy].connected = true;
+            setupSecondaryObjs(ctx, dpy);
+        }
 
-            ctx->dpyAttr[dpy].fd = Writeback::getInstance()->getFbFd();
-            Writeback::getInstance()->configureDpyInfo(fbWidth, fbHeight);
-            setListStats(ctx, list, dpy);
+        ctx->dpyAttr[dpy].fd = Writeback::getInstance()->getFbFd();
+        Writeback::getInstance()->configureDpyInfo(fbWidth, fbHeight);
+        setListStats(ctx, list, dpy);
 
-            if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
-                const int fbZ = 0;
-                ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
-            }
+        if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
+            const int fbZ = 0;
+            ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
         }
     }
     return 0;
