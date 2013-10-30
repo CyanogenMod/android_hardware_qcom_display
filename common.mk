@@ -31,12 +31,12 @@ ifeq ($(ARCH_ARM_HAVE_NEON),true)
 endif
 
 ifeq ($(call is-board-platform-in-list, msm8974 msm8226 msm8610 apq8084 \
-        mpq8092), true)
+        mpq8092 msm_bronze), true)
     common_flags += -DVENUS_COLOR_FORMAT
     common_flags += -DMDSS_TARGET
 endif
 
-ifeq ($(call is-board-platform-in-list, mpq8092), true)
+ifeq ($(call is-board-platform-in-list, mpq8092 msm_bronze), true)
     #XXX: Replace with check from MDP when available
     common_flags += -DVPU_TARGET
 endif

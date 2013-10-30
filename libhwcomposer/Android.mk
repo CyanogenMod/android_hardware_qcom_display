@@ -25,7 +25,7 @@ LOCAL_SRC_FILES               := hwc.cpp          \
                                  hwc_dump_layers.cpp \
                                  hwc_ad.cpp
 
-ifeq ($(call is-board-platform-in-list, mpq8092), true)
+ifeq ($(call is-board-platform-in-list, mpq8092 msm_bronze), true)
     LOCAL_SRC_FILES += hwc_vpuclient.cpp
 endif
 
