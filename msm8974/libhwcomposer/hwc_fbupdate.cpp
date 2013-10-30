@@ -69,9 +69,19 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
         overlay::Overlay& ov = *(ctx->mOverlay);
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        ovutils::Whf info(getWidth(hnd), getHeight(hnd),
-                          ovutils::getMdpFormat(hnd->format), hnd->size);
+        hwc_rect_t displayFrame = layer->displayFrame;
+        int alignedWidth = 0;
+        int alignedHeight = 0;
+
+        getBufferSizeAndDimensions(displayFrame.right - displayFrame.left,
+                displayFrame.bottom - displayFrame.top,
+                HAL_PIXEL_FORMAT_RGBA_8888,
+                alignedWidth,
+                alignedHeight);
+
+        ovutils::Whf info(alignedWidth,
+                alignedHeight,
+                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888));
 
         //Request a pipe
         ovutils::eMdpPipeType type = ovutils::OV_MDP_PIPE_ANY;
@@ -120,7 +130,7 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             getNonWormholeRegion(list, sourceCrop);
         }
 
-        hwc_rect_t displayFrame = sourceCrop;
+        displayFrame = sourceCrop;
         ovutils::Dim dpos(displayFrame.left,
                           displayFrame.top,
                           displayFrame.right - displayFrame.left,
@@ -183,9 +193,19 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
         overlay::Overlay& ov = *(ctx->mOverlay);
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        ovutils::Whf info(getWidth(hnd), getHeight(hnd),
-                          ovutils::getMdpFormat(hnd->format), hnd->size);
+        hwc_rect_t displayFrame = layer->displayFrame;
+        int alignedWidth = 0;
+        int alignedHeight = 0;
+
+        getBufferSizeAndDimensions(displayFrame.right - displayFrame.left,
+                displayFrame.bottom - displayFrame.top,
+                HAL_PIXEL_FORMAT_RGBA_8888,
+                alignedWidth,
+                alignedHeight);
+
+        ovutils::Whf info(alignedWidth,
+                alignedHeight,
+                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888));
 
         //Request left pipe
         ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
@@ -234,7 +254,6 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
         ov.setSource(pargR, destR);
 
         hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
-        hwc_rect_t displayFrame = layer->displayFrame;
 
         const float xres = ctx->dpyAttr[mDpy].xres;
         const int lSplit = getLeftSplit(ctx, mDpy);
