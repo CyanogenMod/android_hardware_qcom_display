@@ -108,10 +108,9 @@ protected:
     /* cached data */
     struct LayerCache {
         int layerCount;
-        int mdpCount;
-        int fbCount;
-        int fbZ;
         buffer_handle_t hnd[MAX_NUM_APP_LAYERS];
+        bool isFBComposed[MAX_NUM_APP_LAYERS];
+        bool drop[MAX_NUM_APP_LAYERS];
 
         /* c'tor */
         LayerCache();
@@ -119,6 +118,7 @@ protected:
         void reset();
         void cacheAll(hwc_display_contents_1_t* list);
         void updateCounts(const FrameInfo&);
+        bool isSameFrame(const FrameInfo& curFrame);
     };
 
     /* allocates pipe from pipe book */
