@@ -87,6 +87,7 @@ public:
     int getFbFd() const { return mFd.getFD(); }
     int getOutputFormat();
     bool setOutputFormat(int mdpFormat);
+    void getDump(char *buf, size_t len) const;
 
     static Writeback* getInstance();
     static void configBegin() { sUsed = false; }
