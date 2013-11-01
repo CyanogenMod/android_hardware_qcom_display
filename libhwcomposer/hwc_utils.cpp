@@ -312,6 +312,12 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
 
     float fbWidth = ctx->dpyAttr[dpy].xres;
     float fbHeight = ctx->dpyAttr[dpy].yres;
+    if(ctx->dpyAttr[dpy].mDownScaleMode) {
+        // if downscale Mode is enabled for external, need to query
+        // the actual width and height, as that is the physical w & h
+        ctx->mExtDisplay->getAttributes((int&)fbWidth, (int&)fbHeight);
+    }
+
 
     // Since external is rotated 90, need to swap width/height
     int extOrient = getExtOrientation(ctx);
