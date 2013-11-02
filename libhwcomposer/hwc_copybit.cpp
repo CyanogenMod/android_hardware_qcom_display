@@ -274,19 +274,24 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         return false;
     }
 
-    //Wait for the previous frame to complete before rendering onto it
-    if(mRelFd[0] >=0) {
-        sync_wait(mRelFd[0], 1000);
-        close(mRelFd[0]);
-        mRelFd[0] = -1;
-    }
-
     if (ctx->mMDP.version >= qdutils::MDP_V4_0) {
+        //Wait for the previous frame to complete before rendering onto it
+        if(mRelFd[0] >=0) {
+            sync_wait(mRelFd[0], 1000);
+            close(mRelFd[0]);
+            mRelFd[0] = -1;
+        }
+
         //Clear the visible region on the render buffer
         //XXX: Do this only when needed.
         hwc_rect_t clearRegion;
         getNonWormholeRegion(list, clearRegion);
         clear(renderBuffer, clearRegion);
+    } else {
+        if(mRelFd[0] >=0) {
+            copybit_device_t *copybit = getCopyBitDevice();
+            copybit->set_sync(copybit, mRelFd[0]);
+        }
     }
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
     for (int i = 0; i <= (ctx->listStats[dpy].numAppLayers-1); i++) {
@@ -319,6 +324,10 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         copybit_device_t *copybit = getCopyBitDevice();
         // Async mode
         copybit->flush_get_fence(copybit, fd);
+        if(mRelFd[0] >=0 && ctx->mMDP.version == qdutils::MDP_V3_0_4) {
+            close(mRelFd[0]);
+            mRelFd[0] = -1;
+        }
     }
     return true;
 }
