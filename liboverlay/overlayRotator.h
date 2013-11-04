@@ -238,6 +238,7 @@ public:
      */
     void getDump(char *buf, size_t len);
     int getRotDevFd();
+    int getNumActiveSessions() { return mUseCount; }
 private:
     overlay::Rotator *mRot[MAX_ROT_SESS];
     int mUseCount;

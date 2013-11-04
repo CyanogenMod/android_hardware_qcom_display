@@ -273,8 +273,6 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
     ctx->mRotMgr->configBegin();
     overlay::Writeback::configBegin();
 
-    Overlay::setDMAMode(Overlay::DMA_LINE_MODE);
-
     for (int32_t i = numDisplays; i >= 0; i--) {
         hwc_display_contents_1_t *list = displays[i];
         int dpy = getDpyforExternalDisplay(ctx, i);
@@ -666,6 +664,8 @@ static int hwc_set(hwc_composer_device_1 *dev,
     CALC_FPS();
     MDPComp::resetIdleFallBack();
     ctx->mVideoTransFlag = false;
+    if(ctx->mRotMgr->getNumActiveSessions() == 0)
+        Overlay::setDMAMode(Overlay::DMA_LINE_MODE);
     //Was locked at the beginning of prepare
     ctx->mDrawLock.unlock();
     return ret;
