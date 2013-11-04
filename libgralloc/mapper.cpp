@@ -329,7 +329,10 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 int width   = va_arg(args, int);
                 int format  = va_arg(args, int);
                 int *stride = va_arg(args, int *);
-                *stride = AdrenoMemInfo::getInstance().getStride(width, format);
+                int alignedw = 0, alignedh = 0;
+                AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width,
+                                     0, format, alignedw, alignedh);
+                *stride = alignedw;
                 res = 0;
             } break;
         case GRALLOC_MODULE_PERFORM_GET_CUSTOM_STRIDE_FROM_HANDLE:

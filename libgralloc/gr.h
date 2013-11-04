@@ -89,12 +89,13 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
     ~AdrenoMemInfo();
 
     /*
-     * Function to compute the adreno stride based on the width and format.
+     * Function to compute the adreno aligned width and aligned height
+     * based on the width and format.
      *
-     * @return stride.
+     * @return aligned width, aligned height
      */
-    int getStride(int width, int format);
-
+    void getAlignedWidthAndHeight(int width, int height, int format,
+                                  int& alignedw, int &alignedh);
     private:
         // Pointer to the padding library.
         void *libadreno_utils;
@@ -104,5 +105,15 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
                                                 int surface_tile_height,
                                                 int screen_tile_height,
                                                 int padding_threshold);
+        // link to the surface padding library.
+        void (*LINK_adreno_compute_aligned_width_and_height) (int width,
+                                                int height,
+                                                int bpp,
+                                                int tile_mode,
+                                                int raster_mode,
+                                                int padding_threshold,
+                                                int *aligned_w,
+                                                int *aligned_h);
+
 };
 #endif /* GR_H_ */

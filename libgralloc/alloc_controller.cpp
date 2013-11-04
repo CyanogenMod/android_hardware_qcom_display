@@ -86,8 +86,13 @@ static bool useUncached(int usage)
 //-------------- AdrenoMemInfo-----------------------//
 AdrenoMemInfo::AdrenoMemInfo()
 {
+    LINK_adreno_compute_aligned_width_and_height = NULL;
+    LINK_adreno_compute_padding = NULL;
+
     libadreno_utils = ::dlopen("libadreno_utils.so", RTLD_NOW);
     if (libadreno_utils) {
+        *(void **)&LINK_adreno_compute_aligned_width_and_height =
+            ::dlsym(libadreno_utils, "compute_aligned_width_and_height");
         *(void **)&LINK_adreno_compute_padding = ::dlsym(libadreno_utils,
                                            "compute_surface_padding");
     }
@@ -100,9 +105,11 @@ AdrenoMemInfo::~AdrenoMemInfo()
     }
 }
 
-int AdrenoMemInfo::getStride(int width, int format)
+void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
+                              int& aligned_w, int& aligned_h)
 {
-    int stride = ALIGN(width, 32);
+    aligned_w = ALIGN(width, 32);
+    aligned_h = ALIGN(height, 32);
     // Currently surface padding is only computed for RGB* surfaces.
     if (format <= HAL_PIXEL_FORMAT_sRGB_X_8888) {
         // Don't add any additional padding if debug.gralloc.map_fb_memory
@@ -111,7 +118,7 @@ int AdrenoMemInfo::getStride(int width, int format)
         if((property_get("debug.gralloc.map_fb_memory", property, NULL) > 0) &&
            (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
            (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
-              return stride;
+              return;
         }
 
         int bpp = 4;
@@ -125,25 +132,39 @@ int AdrenoMemInfo::getStride(int width, int format)
                 break;
             default: break;
         }
-        if ((libadreno_utils) && (LINK_adreno_compute_padding)) {
-            int surface_tile_height = 1;   // Linear surface
+        if (libadreno_utils) {
             int raster_mode         = 0;   // Adreno unknown raster mode.
             int padding_threshold   = 512; // Threshold for padding surfaces.
-            // the function below expects the width to be a multiple of
-            // 32 pixels, hence we pass stride instead of width.
-            stride = LINK_adreno_compute_padding(stride, bpp,
-                                      surface_tile_height, raster_mode,
-                                      padding_threshold);
+            // the function below computes aligned width and aligned height
+            // based on linear or macro tile mode selected.
+            if(LINK_adreno_compute_aligned_width_and_height) {
+               int tile_mode = 0;   // Linear surface
+               LINK_adreno_compute_aligned_width_and_height(width,
+                                     height, bpp, tile_mode,
+                                     raster_mode, padding_threshold,
+                                     &aligned_w, &aligned_h);
+
+            } else if(LINK_adreno_compute_padding) {
+                int surface_tile_height = 1;   // Linear surface
+                aligned_w = LINK_adreno_compute_padding(width, bpp,
+                                     surface_tile_height, raster_mode,
+                                     padding_threshold);
+                ALOGW("%s: Warning!! Old GFX API is used to calculate stride",
+                                                            __FUNCTION__);
+            } else {
+                ALOGW("%s: Warning!! Symbols compute_surface_padding and " \
+                    "compute_aligned_width_and_height not found", __FUNCTION__);
+            }
         }
     } else {
         switch (format)
         {
             case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
             case HAL_PIXEL_FORMAT_RAW_SENSOR:
-                stride = ALIGN(width, 32);
+                aligned_w = ALIGN(width, 32);
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
-                stride = ALIGN(width, 128);
+                aligned_w = ALIGN(width, 128);
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP:
             case HAL_PIXEL_FORMAT_YCrCb_420_SP:
@@ -152,22 +173,21 @@ int AdrenoMemInfo::getStride(int width, int format)
             case HAL_PIXEL_FORMAT_YCrCb_422_SP:
             case HAL_PIXEL_FORMAT_YCbCr_422_I:
             case HAL_PIXEL_FORMAT_YCrCb_422_I:
-                stride = ALIGN(width, 16);
+                aligned_w = ALIGN(width, 16);
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
             case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
-                stride = VENUS_Y_STRIDE(COLOR_FMT_NV12, width);
+                aligned_w = VENUS_Y_STRIDE(COLOR_FMT_NV12, width);
                 break;
             case HAL_PIXEL_FORMAT_BLOB:
-                stride = width;
+                aligned_w = width;
                 break;
             case HAL_PIXEL_FORMAT_NV21_ZSL:
-                stride = ALIGN(width, 64);
+                aligned_w = ALIGN(width, 64);
                 break;
             default: break;
         }
     }
-    return stride;
 }
 
 //-------------- IAllocController-----------------------//
@@ -274,8 +294,11 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
 {
     size_t size;
 
-    alignedw = AdrenoMemInfo::getInstance().getStride(width, format);
-    alignedh = ALIGN(height, 32);
+    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width,
+                                                          height,
+                                                          format,
+                                                          alignedw,
+                                                          alignedh);
     switch (format) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
