@@ -182,16 +182,10 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
 
     // Following are MDP3 limitations for which we
     // need to fallback to GPU composition:
-    // 1. HW issues with mdp3 and rotation.
-    // 2. Plane alpha is not supported by MDP3.
+    // 1. Plane alpha is not supported by MDP3.
     if (qdutils::MDPVersion::getInstance().getMDPVersion() < 400) {
         for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
             hwc_layer_1_t *layer = (hwc_layer_1_t *) &list->hwLayers[i];
-            if ((layer->transform & (HAL_TRANSFORM_FLIP_H |
-                   HAL_TRANSFORM_FLIP_V | HAL_TRANSFORM_ROT_90)) &&
-                   ((layer->displayFrame.bottom - layer->displayFrame.top) % 16 ||
-                   (layer->displayFrame.right - layer->displayFrame.left) % 16))
-                return true;
             if (layer->planeAlpha != 0xFF)
                 return true;
         }
