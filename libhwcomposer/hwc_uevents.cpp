@@ -85,6 +85,24 @@ static int getConnectedDisplay(const char* strUdata)
     return -1;
 }
 
+static bool getPanelResetStatus(hwc_context_t* ctx, const char* strUdata, int len)
+{
+    const char* iter_str = strUdata;
+    if (strcasestr("change@/devices/virtual/graphics/fb0", strUdata)) {
+        while(((iter_str - strUdata) <= len) && (*iter_str)) {
+            char* pstr = strstr(iter_str, "PANEL_ALIVE=0");
+            if (pstr != NULL) {
+                ALOGE("%s: got change event in fb0 with PANEL_ALIVE=0",
+                                                           __FUNCTION__);
+                ctx->mPanelResetStatus = true;
+                return true;
+            }
+            iter_str += strlen(iter_str)+1;
+        }
+    }
+    return false;
+}
+
 /* Parse uevent data for action requested for the display */
 static int getConnectedState(const char* strUdata, int len)
 {
@@ -101,6 +119,11 @@ static int getConnectedState(const char* strUdata, int len)
 
 static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 {
+    bool bpanelReset = getPanelResetStatus(ctx, udata, len);
+    if (bpanelReset) {
+        return;
+    }
+
     int dpy = getConnectedDisplay(udata);
     if(dpy < 0) {
         ALOGD_IF(UEVENT_DEBUG, "%s: Not disp Event ", __FUNCTION__);
