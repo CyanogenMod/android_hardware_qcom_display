@@ -183,11 +183,32 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     // Following are MDP3 limitations for which we
     // need to fallback to GPU composition:
     // 1. Plane alpha is not supported by MDP3.
+    // 2. Scaling is within range
     if (qdutils::MDPVersion::getInstance().getMDPVersion() < 400) {
         for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
+            int dst_h, dst_w, src_h, src_w;
+            float dx, dy;
             hwc_layer_1_t *layer = (hwc_layer_1_t *) &list->hwLayers[i];
             if (layer->planeAlpha != 0xFF)
                 return true;
+
+            if (layer->transform & HAL_TRANSFORM_ROT_90) {
+                src_h = layer->sourceCrop.right - layer->sourceCrop.left;
+                src_w = layer->sourceCrop.bottom - layer->sourceCrop.top;
+            } else {
+                src_h = layer->sourceCrop.bottom - layer->sourceCrop.top;
+                src_w = layer->sourceCrop.right - layer->sourceCrop.left;
+            }
+            dst_h = layer->displayFrame.bottom - layer->displayFrame.top;
+            dst_w = layer->displayFrame.right - layer->displayFrame.left;
+
+            dx = (float)dst_w/src_w;
+            dy = (float)dst_h/src_h;
+            if (dx > MAX_SCALE_FACTOR || dx < MIN_SCALE_FACTOR)
+                return false;
+
+            if (dy > MAX_SCALE_FACTOR || dy < MIN_SCALE_FACTOR)
+                return false;
         }
         /*
          * Fallback to GPU in MDP3 when NonWormholeRegion is not of frame buffer
