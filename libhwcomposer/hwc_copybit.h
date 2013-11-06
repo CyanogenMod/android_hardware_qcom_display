@@ -22,6 +22,11 @@
 #include "hwc_utils.h"
 
 #define NUM_RENDER_BUFFERS 3
+//These scaling factors are specific for MDP3. Normally scaling factor
+//is only 4, but copybit will create temp buffer to let it run through
+//twice
+#define MAX_SCALE_FACTOR 16
+#define MIN_SCALE_FACTOR 0.0625
 
 namespace qhwc {
 
