@@ -98,20 +98,25 @@ void VirtualDisplay::setAttributes() {
         mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = false;
         uint32_t priW = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
         uint32_t priH = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
-        // if primary resolution is more than the wfd resolution
-        // configure dpy attr to primary resolution and set
-        // downscale mode
+        // if primary resolution is more than WFD resolution and
+        // downscale_factor is zero(which corresponds to downscale
+        // to > 50% of orig),then configure dpy attr to primary
+        // resolution and set downscale mode.
         if((priW * priH) > (mVInfo.xres * mVInfo.yres)) {
-            mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = priW;
-            mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = priH;
-            // WFD is always in landscape, so always assign the higher
-            // dimension to wfd's xres
-            if(priH > priW) {
-                mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = priH;
-                mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = priW;
+            int downscale_factor = overlay::utils::getDownscaleFactor(priW, priH,
+                                   mVInfo.xres, mVInfo.yres);
+            if(!downscale_factor) {
+                mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = priW;
+                mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = priH;
+                // WFD is always in landscape, so always assign the higher
+                // dimension to wfd's xres
+                if(priH > priW) {
+                    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = priH;
+                    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = priW;
+                }
+                // Set External Display MDP Downscale mode indicator
+                mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = true;
             }
-            // Set External Display MDP Downscale mode indicator
-            mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = true;
         }
         mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].vsync_period =
                 1000000000l /60;
