@@ -31,6 +31,19 @@
 #define _QDMETADATA_H
 
 #define MAX_IGC_LUT_ENTRIES 256
+#define MAX_VFM_DATA_SIZE   64 //bytes per data buffer
+#define MAX_VFM_DATA_COUNT  16 //number of data buffers
+
+/* This macro finds the index corresponding to a type */
+/* This is equivalent to indx = LOG_2(type) */
+inline int32_t getVfmDataIdx(int32_t type){
+    int32_t indx = 0, x = type;
+    while( x >> 1) {
+        x = (x >> 1);
+        indx++;
+    }
+    return indx;
+}
 
 struct HSICData_t {
     int32_t hue;
@@ -57,6 +70,11 @@ struct BufferDim_t {
     int32_t sliceHeight;
 };
 
+struct VfmData_t {
+    int32_t dataType;
+    char    data[MAX_VFM_DATA_SIZE];
+};
+
 struct MetaData_t {
     int32_t operation;
     int32_t interlaced;
@@ -67,6 +85,8 @@ struct MetaData_t {
     IGCData_t igcData;
     Sharp2Data_t Sharp2Data;
     int64_t timestamp;
+    int32_t vfmDataBitMap;
+    VfmData_t vfmData[MAX_VFM_DATA_COUNT];
 };
 
 typedef enum {
@@ -78,6 +98,7 @@ typedef enum {
     PP_PARAM_SHARP2     = 0x0020,
     PP_PARAM_TIMESTAMP  = 0x0040,
     UPDATE_BUFFER_GEOMETRY = 0x0080,
+    PP_PARAM_VFM_DATA   = 0x0100,
 } DispParamType;
 
 int setMetaData(private_handle_t *handle, DispParamType paramType, void *param);
