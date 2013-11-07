@@ -508,8 +508,11 @@ static int hwc_set_virtual(hwc_context_t *ctx,
         ) {
 
             private_handle_t *ohnd = (private_handle_t *)list->outbuf;
+            int format = ohnd->format;
+            if (format == HAL_PIXEL_FORMAT_RGBA_8888)
+                format = HAL_PIXEL_FORMAT_RGBX_8888;
             Writeback::getInstance()->setOutputFormat(
-                    utils::getMdpFormat(ohnd->format));
+                    utils::getMdpFormat(format));
 
             int fd = -1; //FenceFD from the Copybit
             hwc_sync(ctx, list, dpy, fd);
