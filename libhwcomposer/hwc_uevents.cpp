@@ -92,7 +92,7 @@ static bool getPanelResetStatus(hwc_context_t* ctx, const char* strUdata, int le
         while(((iter_str - strUdata) <= len) && (*iter_str)) {
             char* pstr = strstr(iter_str, "PANEL_ALIVE=0");
             if (pstr != NULL) {
-                ALOGE("%s: got change event in fb0 with PANEL_ALIVE=0",
+                ALOGI("%s: got change event in fb0 with PANEL_ALIVE=0",
                                                            __FUNCTION__);
                 ctx->mPanelResetStatus = true;
                 return true;
