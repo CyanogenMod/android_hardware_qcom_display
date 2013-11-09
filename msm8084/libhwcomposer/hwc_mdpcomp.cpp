@@ -402,6 +402,12 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     return ret;
 }
 
+/*
+ * 1) Identify layers that are not visible in the updating ROI and drop them
+ * from composition.
+ * 2) If we have a scaling layers which needs cropping against generated ROI.
+ * Reset ROI to full resolution.
+ */
 bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
                                hwc_display_contents_1_t* list, hwc_rect_t roi) {
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
@@ -409,7 +415,15 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
     if(!isValidRect(roi))
         return false;
 
-    for(int i = 0; i < numAppLayers; i++){
+    hwc_rect_t visibleRect = roi;
+
+    for(int i = numAppLayers - 1; i >= 0; i--){
+
+        if(!isValidRect(visibleRect)) {
+            mCurrentFrame.drop[i] = true;
+            mCurrentFrame.dropCount++;
+        }
+
         const hwc_layer_1_t* layer =  &list->hwLayers[i];
 
         hwc_rect_t dstRect = layer->displayFrame;
@@ -417,7 +431,7 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
         int transform = layer->transform;
         trimLayer(ctx, mDpy, transform, srcRect, dstRect);
 
-        hwc_rect_t res  = getIntersection(roi, dstRect);
+        hwc_rect_t res  = getIntersection(visibleRect, dstRect);
 
         int res_w = res.right - res.left;
         int res_h = res.bottom - res.top;
@@ -438,6 +452,9 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
                 return false;
             }
         }
+
+        if (layer->blending == HWC_BLENDING_NONE)
+            visibleRect = deductRect(visibleRect, res);
     }
     return true;
 }
@@ -455,6 +472,9 @@ void MDPComp::generateROI(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                  __FUNCTION__);
         return;
     }
+
+    if(isSkipPresent(ctx, mDpy))
+        return;
 
     if(list->flags & HWC_GEOMETRY_CHANGED)
         return;
@@ -1224,10 +1244,11 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         }
     } else {
         reset(numLayers, list);
+        memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
+        mCurrentFrame.dropCount = 0;
         ret = -1;
         goto exit;
     }
-
     //UpdateLayerFlags
     setMDPCompLayerFlags(ctx, list);
     mCachedFrame.cacheAll(list);
