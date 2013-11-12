@@ -413,7 +413,7 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
         const hwc_layer_1_t* layer =  &list->hwLayers[i];
 
         hwc_rect_t dstRect = layer->displayFrame;
-        hwc_rect_t srcRect = layer->sourceCrop;
+        hwc_rect_t srcRect = integerizeSourceCrop(layer->sourceCropf);
         int transform = layer->transform;
         trimLayer(ctx, mDpy, transform, srcRect, dstRect);
 
@@ -464,7 +464,8 @@ void MDPComp::generateROI(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         if ((mCachedFrame.hnd[index] != list->hwLayers[index].handle) ||
             isYuvBuffer((private_handle_t *)list->hwLayers[index].handle)) {
             hwc_rect_t dstRect = list->hwLayers[index].displayFrame;
-            hwc_rect_t srcRect = list->hwLayers[index].sourceCrop;
+            hwc_rect_t srcRect = integerizeSourceCrop(
+                                        list->hwLayers[index].sourceCropf);
             int transform = list->hwLayers[index].transform;
 
             /* Intersect against display boundaries */
@@ -679,7 +680,7 @@ bool MDPComp::loadBasedComp(hwc_context_t *ctx,
         uint32_t batchPixelCount = 0;
         for(int j = i; j < i + batchSize; j++) {
             hwc_layer_1_t* layer = &list->hwLayers[j];
-            hwc_rect_t crop = layer->sourceCrop;
+            hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
             batchPixelCount += (crop.right - crop.left) *
                     (crop.bottom - crop.top);
         }
