@@ -393,7 +393,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                }
     }
     // Copybit source rect
-    hwc_rect_t sourceCrop = layer->sourceCrop;
+    hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
     copybit_rect_t srcRect = {sourceCrop.left, sourceCrop.top,
                               sourceCrop.right,
                               sourceCrop.bottom};
