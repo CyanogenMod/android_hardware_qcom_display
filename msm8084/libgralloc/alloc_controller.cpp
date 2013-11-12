@@ -161,6 +161,9 @@ int AdrenoMemInfo::getStride(int width, int format)
             case HAL_PIXEL_FORMAT_BLOB:
                 stride = width;
                 break;
+            case HAL_PIXEL_FORMAT_NV21_ZSL:
+                stride = ALIGN(width, 64);
+                break;
             default: break;
         }
     }
@@ -339,6 +342,10 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
             alignedh = height;
             alignedw = width;
             size = width;
+            break;
+        case HAL_PIXEL_FORMAT_NV21_ZSL:
+            alignedh = ALIGN(height, 64);
+            size = ALIGN((alignedw*alignedh) + (alignedw* alignedh)/2, 4096);
             break;
         default:
             ALOGE("unrecognized pixel format: 0x%x", format);
