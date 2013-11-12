@@ -36,24 +36,26 @@ class IQService : public android::IInterface
 public:
     DECLARE_META_INTERFACE(QService);
     enum {
-        // Hardware securing start/end notification
-        SECURING = android::IBinder::FIRST_CALL_TRANSACTION,
-        UNSECURING, // Hardware unsecuring start/end notification
-        CONNECT,
-        SCREEN_REFRESH,
-        EXTERNAL_ORIENTATION,
-        BUFFER_MIRRORMODE,
+        COMMAND_LIST_START = android::IBinder::FIRST_CALL_TRANSACTION,
+        SECURING,                // Hardware securing start/end notification
+        UNSECURING,              // Hardware unsecuring start/end notification
+        CONNECT,                 // Connect to qservice
+        SCREEN_REFRESH,          // Refresh screen through SF invalidate
+        EXTERNAL_ORIENTATION,    // Set external orientation
+        BUFFER_MIRRORMODE,       // Buffer mirrormode
+        COMMAND_LIST_END = 400,
+
     };
     enum {
         END = 0,
         START,
     };
-    virtual void securing(uint32_t startEnd) = 0;
-    virtual void unsecuring(uint32_t startEnd) = 0;
     virtual void connect(const android::sp<qClient::IQClient>& client) = 0;
-    virtual android::status_t screenRefresh() = 0;
-    virtual void setExtOrientation(uint32_t orientation) = 0;
-    virtual void setBufferMirrorMode(uint32_t enable) = 0;
+    // Generic function to dispatch binder commands
+    // The type of command decides how the data is parceled
+    virtual android::status_t dispatch(uint32_t command,
+            const android::Parcel* inParcel,
+            android::Parcel* outParcel) = 0;
 };
 
 // ----------------------------------------------------------------------------

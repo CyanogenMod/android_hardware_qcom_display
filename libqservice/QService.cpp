@@ -47,40 +47,19 @@ QService::~QService()
     ALOGD_IF(QSERVICE_DEBUG,"QService Destructor invoked");
 }
 
-void QService::securing(uint32_t startEnd) {
-    if(mClient.get()) {
-        mClient->notifyCallback(SECURING, startEnd);
-    }
-}
-
-void QService::unsecuring(uint32_t startEnd) {
-    if(mClient.get()) {
-        mClient->notifyCallback(UNSECURING, startEnd);
-    }
-}
-
 void QService::connect(const sp<qClient::IQClient>& client) {
+    ALOGD_IF(QSERVICE_DEBUG,"client connected");
     mClient = client;
 }
 
-android::status_t QService::screenRefresh() {
-    status_t result = NO_ERROR;
-    if(mClient.get()) {
-        result = mClient->notifyCallback(SCREEN_REFRESH, 0);
+status_t QService::dispatch(uint32_t command, const Parcel* inParcel,
+        Parcel* outParcel) {
+    status_t err = FAILED_TRANSACTION;
+    if (mClient.get()) {
+        ALOGD_IF(QSERVICE_DEBUG, "Dispatching command: %d", command);
+        err = mClient->notifyCallback(command, inParcel, outParcel);
     }
-    return result;
-}
-
-void QService::setExtOrientation(uint32_t orientation) {
-    if(mClient.get()) {
-        mClient->notifyCallback(EXTERNAL_ORIENTATION, orientation);
-    }
-}
-
-void QService::setBufferMirrorMode(uint32_t enable) {
-    if(mClient.get()) {
-        mClient->notifyCallback(BUFFER_MIRRORMODE, enable);
-    }
+    return err;
 }
 
 void QService::init()
