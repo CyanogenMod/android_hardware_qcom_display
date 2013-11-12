@@ -213,7 +213,7 @@ void HwcDebug::logLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
     }
 
     hwc_layer_1_t *layer = &hwLayers[layerIndex];
-    hwc_rect_t sourceCrop = layer->sourceCrop;
+    hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
     hwc_rect_t displayFrame = layer->displayFrame;
     size_t numHwcRects = layer->visibleRegionScreen.numRects;
     hwc_rect_t const *hwcRects = layer->visibleRegionScreen.rects;

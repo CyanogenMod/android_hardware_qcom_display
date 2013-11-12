@@ -23,6 +23,7 @@
 
 #define HWC_REMOVE_DEPRECATED_VERSIONS 1
 #include <fcntl.h>
+#include <math.h>
 #include <hardware/hwcomposer.h>
 #include <gr.h>
 #include <gralloc_priv.h>
@@ -161,6 +162,15 @@ inline hwc_layer_1_t* LayerRotMap::getLayer(uint32_t index) const {
 inline overlay::Rotator* LayerRotMap::getRot(uint32_t index) const {
     if(index >= mCount) return NULL;
     return mRot[index];
+}
+
+inline hwc_rect_t integerizeSourceCrop(const hwc_frect_t& cropF) {
+    hwc_rect_t cropI = {0};
+    cropI.left = int(ceilf(cropF.left));
+    cropI.top = int(ceilf(cropF.top));
+    cropI.right = int(floorf(cropF.right));
+    cropI.bottom = int(floorf(cropF.bottom));
+    return cropI;
 }
 
 // -----------------------------------------------------------------------------
