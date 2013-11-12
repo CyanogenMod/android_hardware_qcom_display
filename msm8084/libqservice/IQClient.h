@@ -33,7 +33,9 @@ class IQClient : public android::IInterface
 {
 public:
     DECLARE_META_INTERFACE(QClient);
-    virtual android::status_t notifyCallback(uint32_t msg, uint32_t value) = 0;
+    virtual android::status_t notifyCallback(uint32_t command,
+            const android::Parcel* inParcel,
+            android::Parcel* outParcel) = 0;
 };
 
 // ----------------------------------------------------------------------------
