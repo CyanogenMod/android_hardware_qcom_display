@@ -104,7 +104,7 @@ int AdrenoMemInfo::getStride(int width, int format)
 {
     int stride = ALIGN(width, 32);
     // Currently surface padding is only computed for RGB* surfaces.
-    if (format < 0x7) {
+    if (format <= HAL_PIXEL_FORMAT_sRGB_888) {
         // Don't add any additional padding if debug.gralloc.map_fb_memory
         // is enabled
         char property[PROPERTY_VALUE_MAX];
@@ -118,6 +118,7 @@ int AdrenoMemInfo::getStride(int width, int format)
         switch(format)
         {
             case HAL_PIXEL_FORMAT_RGB_888:
+            case HAL_PIXEL_FORMAT_sRGB_888:
                 bpp = 3;
                 break;
             case HAL_PIXEL_FORMAT_RGB_565:
@@ -280,9 +281,11 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_BGRA_8888:
+        case HAL_PIXEL_FORMAT_sRGB_A_8888:
             size = alignedw * alignedh * 4;
             break;
         case HAL_PIXEL_FORMAT_RGB_888:
+        case HAL_PIXEL_FORMAT_sRGB_888:
             size = alignedw * alignedh * 3;
             break;
         case HAL_PIXEL_FORMAT_RGB_565:
