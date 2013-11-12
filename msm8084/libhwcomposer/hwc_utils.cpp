@@ -992,7 +992,7 @@ hwc_rect_t getUnion(const hwc_rect &rect1, const hwc_rect &rect2)
    also it avoid hole creation.*/
 void deductRect(const hwc_layer_1_t* layer, hwc_rect_t& irect) {
     hwc_rect_t& disprect = (hwc_rect_t&)layer->displayFrame;
-    hwc_rect_t& srcrect = (hwc_rect_t&)layer->sourceCrop;
+    hwc_rect_t srcrect = integerizeSourceCrop(layer->sourceCropf);
     int irect_w = irect.right - irect.left;
     int irect_h = irect.bottom - irect.top;
 
