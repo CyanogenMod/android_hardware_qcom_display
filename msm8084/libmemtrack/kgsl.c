@@ -64,14 +64,14 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
     memcpy(records, record_templates,
            sizeof(struct memtrack_record) * allocated_records);
 
-    sprintf(tmp, "/d/kgsl/proc/%d/mem", pid);
+    snprintf(tmp, sizeof(tmp), "/d/kgsl/proc/%d/mem", pid);
     fp = fopen(tmp, "r");
     if (fp == NULL) {
         return -errno;
     }
 
     if (type == MEMTRACK_TYPE_GL) {
-        sprintf(tmp, "/proc/%d/smaps", pid);
+        snprintf(tmp, sizeof(tmp), "/proc/%d/smaps", pid);
         smaps_fp = fopen(tmp, "r");
         if (smaps_fp == NULL) {
             return -errno;
