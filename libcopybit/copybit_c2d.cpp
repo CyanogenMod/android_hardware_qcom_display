@@ -265,8 +265,6 @@ static int get_format(int format) {
         case HAL_PIXEL_FORMAT_RGBA_8888:      return C2D_COLOR_FORMAT_8888_ARGB |
                                               C2D_FORMAT_SWAP_RB;
         case HAL_PIXEL_FORMAT_BGRA_8888:      return C2D_COLOR_FORMAT_8888_ARGB;
-        case HAL_PIXEL_FORMAT_RGBA_5551:      return C2D_COLOR_FORMAT_5551_RGBA;
-        case HAL_PIXEL_FORMAT_RGBA_4444:      return C2D_COLOR_FORMAT_4444_RGBA;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:   return C2D_COLOR_FORMAT_420_NV12;
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:return C2D_COLOR_FORMAT_420_NV12;
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:   return C2D_COLOR_FORMAT_420_NV21;
@@ -400,9 +398,7 @@ static int is_supported_rgb_format(int format)
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_RGB_565:
-        case HAL_PIXEL_FORMAT_BGRA_8888:
-        case HAL_PIXEL_FORMAT_RGBA_5551:
-        case HAL_PIXEL_FORMAT_RGBA_4444: {
+        case HAL_PIXEL_FORMAT_BGRA_8888: {
             return COPYBIT_SUCCESS;
         }
         default:
