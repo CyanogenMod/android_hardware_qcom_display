@@ -173,6 +173,16 @@ inline hwc_rect_t integerizeSourceCrop(const hwc_frect_t& cropF) {
     return cropI;
 }
 
+inline bool isNonIntegralSourceCrop(const hwc_frect_t& cropF) {
+    if(cropF.left - roundf(cropF.left)     ||
+       cropF.top - roundf(cropF.top)       ||
+       cropF.right - roundf(cropF.right)   ||
+       cropF.bottom - roundf(cropF.bottom))
+        return true;
+    else
+        return false;
+}
+
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_1_t const* l);
