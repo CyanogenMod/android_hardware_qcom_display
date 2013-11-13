@@ -20,12 +20,12 @@
 
 #include "memtrack_msm.h"
 
-int exynos5_memtrack_init(const struct memtrack_module *module)
+int msm_memtrack_init(const struct memtrack_module *module)
 {
     return 0;
 }
 
-int exynos5_memtrack_get_memory(const struct memtrack_module *module,
+int msm_memtrack_get_memory(const struct memtrack_module *module,
                                 pid_t pid,
                                 enum memtrack_type type,
                                 struct memtrack_record *records,
@@ -48,12 +48,12 @@ struct memtrack_module HAL_MODULE_INFO_SYM = {
         module_api_version: MEMTRACK_MODULE_API_VERSION_0_1,
         hal_api_version: HARDWARE_HAL_API_VERSION,
         id: MEMTRACK_HARDWARE_MODULE_ID,
-        name: "Exynos5 Memory Tracker HAL",
+        name: "MSM Memory Tracker HAL",
         author: "The Android Open Source Project",
         methods: &memtrack_module_methods,
     },
 
-    init: exynos5_memtrack_init,
-    getMemory: exynos5_memtrack_get_memory,
+    init: msm_memtrack_init,
+    getMemory: msm_memtrack_get_memory,
 };
 
