@@ -43,8 +43,6 @@ using namespace overlay;
 #define VSYNC_DEBUG 0
 #define BLANK_DEBUG 1
 
-#define NON_PRO_8960_SOC_ID 87
-
 static int hwc_device_open(const struct hw_module_t* module,
                            const char* name,
                            struct hw_device_t** device);
@@ -167,7 +165,7 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
 #ifdef USE_COPYBIT_COMPOSITION_FALLBACK
         // Use Copybit, when Full/Partial MDP comp fails
         // (only for 8960 which has  dedicated 2D core)
-        if((ret < 1) && (ctx->mSocId == NON_PRO_8960_SOC_ID) && ctx->mCopyBit[dpy])
+        if((ret < 1) && (ctx->mMDP.version == qdutils::MDP_V4_1) && ctx->mCopyBit[dpy])
             ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
 #endif
     }
@@ -194,7 +192,7 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
 #ifdef USE_COPYBIT_COMPOSITION_FALLBACK
            // Use Copybit, when Full/Partial MDP comp fails
            // (only for 8960 which has  dedicated 2D core)
-           if((ret < 1) && (ctx->mSocId == NON_PRO_8960_SOC_ID) && ctx->mCopyBit[dpy] &&
+           if((ret < 1) && (ctx->mMDP.version == qdutils::MDP_V4_1) && ctx->mCopyBit[dpy] &&
                  !ctx->listStats[dpy].isDisplayAnimating)
                 ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
 #endif
