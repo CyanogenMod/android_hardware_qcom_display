@@ -414,7 +414,7 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
 
     if(ctx->listStats[mDpy].needsAlphaScale
        && (ctx->mMDP.version < qdutils::MDSS_V5)
-       && (ctx->listStats[mDpy].numAppLayers >2)){
+       && ((ctx->listStats[mDpy].numAppLayers >2) || mDpy)){
         ALOGD_IF(isDebug(), "%s: frame needs alpha downscaling",__FUNCTION__);
         return false;
     }
