@@ -164,11 +164,12 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
             const int fbZ = 0;
             ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
         }
-
+#ifdef USE_COPYBIT_COMPOSITION_FALLBACK
         // Use Copybit, when Full/Partial MDP comp fails
         // (only for 8960 which has  dedicated 2D core)
         if((ret < 1) && (ctx->mSocId == NON_PRO_8960_SOC_ID) && ctx->mCopyBit[dpy])
             ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
+#endif
     }
     return 0;
 }
@@ -190,11 +191,13 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
               const int fbZ = 0;
               ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
            }
+#ifdef USE_COPYBIT_COMPOSITION_FALLBACK
            // Use Copybit, when Full/Partial MDP comp fails
            // (only for 8960 which has  dedicated 2D core)
            if((ret < 1) && (ctx->mSocId == NON_PRO_8960_SOC_ID) && ctx->mCopyBit[dpy] &&
                  !ctx->listStats[dpy].isDisplayAnimating)
                 ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
+#endif
         } else {
             /* External Display is in Pause state.
              * Mark all application layers as OVERLAY so that
