@@ -34,8 +34,8 @@ ifeq ($(TARGET_USES_C2D_COMPOSITION),true)
     LOCAL_SRC_FILES := copybit_c2d.cpp software_converter.cpp
     include $(BUILD_SHARED_LIBRARY)
 else
-    ifneq ($(call is-chipset-in-board-platform,msm7630),true)
-        ifeq ($(call is-board-platform-in-list,$(MSM7K_BOARD_PLATFORMS)),true)
+    ifneq ($(TARGET_BOARD_PLATFORM),msm7630)
+    ifneq (,$(filter $(MSM7K_BOARD_PLATFORMS),$(TARGET_BOARD_PLATFORM)))
             LOCAL_CFLAGS += -DCOPYBIT_MSM7K=1
             LOCAL_SRC_FILES := software_converter.cpp copybit.cpp
             include $(BUILD_SHARED_LIBRARY)
