@@ -118,7 +118,8 @@ protected:
         void reset();
         void cacheAll(hwc_display_contents_1_t* list);
         void updateCounts(const FrameInfo&);
-        bool isSameFrame(const FrameInfo& curFrame);
+        bool isSameFrame(const FrameInfo& curFrame,
+                         hwc_display_contents_1_t* list);
     };
 
     /* allocates pipe from pipe book */
