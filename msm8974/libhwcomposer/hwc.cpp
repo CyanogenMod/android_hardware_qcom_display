@@ -213,7 +213,7 @@ static int hwc_prepare_virtual(hwc_composer_device_1 *dev,
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     const int dpy = HWC_DISPLAY_VIRTUAL;
 
-    if (list && list->outbuf && list->numHwLayers > 1) {
+    if (list && list->outbuf && list->numHwLayers > 0) {
         reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
@@ -495,7 +495,7 @@ static int hwc_set_virtual(hwc_context_t *ctx,
     int ret = 0;
     const int dpy = HWC_DISPLAY_VIRTUAL;
 
-    if (list && list->outbuf && list->numHwLayers > 1) {
+    if (list && list->outbuf && list->numHwLayers > 0) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
 
