@@ -260,12 +260,17 @@ void MDPComp::LayerCache::updateCounts(const FrameInfo& curFrame) {
     memcpy(&drop, &curFrame.drop, sizeof(drop));
 }
 
-bool MDPComp::LayerCache::isSameFrame(const FrameInfo& curFrame) {
+bool MDPComp::LayerCache::isSameFrame(const FrameInfo& curFrame,
+                                      hwc_display_contents_1_t* list) {
     if(layerCount != curFrame.layerCount)
         return false;
     for(int i = 0; i < curFrame.layerCount; i++) {
         if((curFrame.isFBComposed[i] != isFBComposed[i]) ||
                 (curFrame.drop[i] != drop[i])) {
+            return false;
+        }
+        if(curFrame.isFBComposed[i] &&
+           (hnd[i] != list->hwLayers[i].handle)){
             return false;
         }
     }
@@ -974,7 +979,6 @@ void MDPComp::updateLayerCache(hwc_context_t* ctx,
             mCurrentFrame.isFBComposed[i] = true;
         } else {
             mCurrentFrame.isFBComposed[i] = false;
-            mCachedFrame.hnd[i] = list->hwLayers[i].handle;
         }
     }
 
@@ -1182,7 +1186,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         } else { //Success
             //Any change in composition types needs an FB refresh
             mCurrentFrame.needsRedraw = false;
-            if(!mCachedFrame.isSameFrame(mCurrentFrame) ||
+            if(!mCachedFrame.isSameFrame(mCurrentFrame, list) ||
                      (list->flags & HWC_GEOMETRY_CHANGED) ||
                      isSkipPresent(ctx, mDpy)) {
                 mCurrentFrame.needsRedraw = true;
