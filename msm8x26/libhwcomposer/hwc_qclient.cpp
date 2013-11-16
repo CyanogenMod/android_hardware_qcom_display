@@ -30,6 +30,7 @@
 #include <hwc_qclient.h>
 #include <IQService.h>
 #include <hwc_utils.h>
+#include <hwc_vpuclient.h>
 
 #define QCLIENT_DEBUG 0
 
@@ -51,6 +52,12 @@ QClient::~QClient()
 }
 
 status_t QClient::notifyCallback(uint32_t msg, uint32_t value) {
+
+    if (msg > IQService::VPU_COMMAND_LIST_START &&
+        msg < IQService::VPU_COMMAND_LIST_END) {
+        return vpuCommand(msg, value);
+    }
+
     switch(msg) {
         case IQService::SECURING:
             securing(value);
@@ -64,6 +71,9 @@ status_t QClient::notifyCallback(uint32_t msg, uint32_t value) {
         case IQService::EXTERNAL_ORIENTATION:
             setExtOrientation(value);
             break;
+        case IQService::BUFFER_MIRRORMODE:
+            setBufferMirrorMode(value);
+            break;
         default:
             return NO_ERROR;
     }
@@ -71,6 +81,7 @@ status_t QClient::notifyCallback(uint32_t msg, uint32_t value) {
 }
 
 void QClient::securing(uint32_t startEnd) {
+    Locker::Autolock _sl(mHwcContext->mDrawLock);
     //The only way to make this class in this process subscribe to media
     //player's death.
     IMediaDeathNotifier::getMediaPlayerService();
@@ -84,6 +95,7 @@ void QClient::securing(uint32_t startEnd) {
 }
 
 void QClient::unsecuring(uint32_t startEnd) {
+    Locker::Autolock _sl(mHwcContext->mDrawLock);
     mHwcContext->mSecuring = startEnd;
     //We're done unsecuring
     if(startEnd == IQService::END)
@@ -93,6 +105,7 @@ void QClient::unsecuring(uint32_t startEnd) {
 }
 
 void QClient::MPDeathNotifier::died() {
+    Locker::Autolock _sl(mHwcContext->mDrawLock);
     ALOGD_IF(QCLIENT_DEBUG, "Media Player died");
     mHwcContext->mSecuring = false;
     mHwcContext->mSecureMode = false;
@@ -111,8 +124,22 @@ android::status_t QClient::screenRefresh() {
     return result;
 }
 
+android::status_t QClient::vpuCommand(uint32_t command, uint32_t setting) {
+    status_t result = NO_INIT;
+#ifdef QCOM_BSP
+#ifdef VPU_TARGET
+    result = mHwcContext->mVPUClient->processCommand(command, setting);
+#endif
+#endif
+    return result;
+}
+
 void QClient::setExtOrientation(uint32_t orientation) {
     mHwcContext->mExtOrientation = orientation;
+}
+
+void QClient::setBufferMirrorMode(uint32_t enable) {
+    mHwcContext->mBufferMirrorMode = enable;
 }
 
 }

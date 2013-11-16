@@ -129,6 +129,8 @@ static int get_format(int format) {
         case HAL_PIXEL_FORMAT_RGB_888:       return MDP_RGB_888;
         case HAL_PIXEL_FORMAT_RGBA_8888:     return MDP_RGBA_8888;
         case HAL_PIXEL_FORMAT_BGRA_8888:     return MDP_BGRA_8888;
+        case HAL_PIXEL_FORMAT_YCrCb_422_I:   return MDP_YCRYCB_H2V1;
+        case HAL_PIXEL_FORMAT_YCbCr_422_I:   return MDP_YCBYCR_H2V1;
         case HAL_PIXEL_FORMAT_YCrCb_422_SP:  return MDP_Y_CRCB_H2V1;
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:  return MDP_Y_CRCB_H2V2;
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:  return MDP_Y_CBCR_H2V1;
@@ -229,7 +231,12 @@ static void set_infos(struct copybit_context_t *dev,
 /** copy the bits */
 static int msm_copybit(struct copybit_context_t *dev, void const *list)
 {
-    int err = ioctl(dev->mFD, MSMFB_ASYNC_BLIT,
+    int err;
+    if (dev->relFence != -1) {
+        close(dev->relFence);
+        dev->relFence = -1;
+    }
+    err = ioctl(dev->mFD, MSMFB_ASYNC_BLIT,
                     (struct mdp_async_blit_req_list const*)list);
     ALOGE_IF(err<0, "copyBits failed (%s)", strerror(errno));
     if (err == 0) {
@@ -341,6 +348,13 @@ static int set_parameter_copybit(
                             __FUNCTION__, value);
                 }
                 break;
+            case COPYBIT_FG_LAYER:
+                if(value == COPYBIT_ENABLE) {
+                     ctx->mFlags |= MDP_IS_FG;
+                } else if (value == COPYBIT_DISABLE) {
+                    ctx->mFlags &= ~MDP_IS_FG;
+                }
+                break ;
             default:
                 status = -EINVAL;
                 break;
@@ -399,7 +413,6 @@ static int set_sync_copybit(struct copybit_device_t *dev,
             list->count = 0;
             list->sync.acq_fen_fd_cnt = 0;
             ctx->acqFence[list->sync.acq_fen_fd_cnt++] = acquireFenceFd;
-            ctx->relFence = -1;
         }
     }
     return 0;
@@ -427,6 +440,8 @@ static int stretch_copybit(
                 // we don't support plane alpha with RGBA formats
                 case HAL_PIXEL_FORMAT_RGBA_8888:
                 case HAL_PIXEL_FORMAT_BGRA_8888:
+                case HAL_PIXEL_FORMAT_RGBA_5551:
+                case HAL_PIXEL_FORMAT_RGBA_4444:
                     ALOGE ("%s : Unsupported Pixel format %d", __FUNCTION__,
                            src->format);
                     return -EINVAL;
@@ -504,9 +519,7 @@ static int stretch_copybit(
 
             if (++list->count == maxCount) {
                 status = msm_copybit(ctx, list);
-                if (ctx->relFence != -1) {
-                    list->sync.acq_fen_fd_cnt = 0;
-                }
+                list->sync.acq_fen_fd_cnt = 0;
                 list->count = 0;
             }
         }
@@ -514,9 +527,7 @@ static int stretch_copybit(
             //Before freeing the buffer we need buffer passed through blit call
             if (list->count != 0) {
                 status = msm_copybit(ctx, list);
-                if (ctx->relFence != -1) {
-                    list->sync.acq_fen_fd_cnt = 0;
-                }
+                list->sync.acq_fen_fd_cnt = 0;
                 list->count = 0;
             }
             free_buffer(yv12_handle);

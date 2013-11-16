@@ -109,11 +109,17 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
 #ifndef MDSS_TARGET
                 flags |= private_handle_t::PRIV_FLAGS_ITU_R_601_FR;
 #else
-                    if (usage & (GRALLOC_USAGE_HW_TEXTURE |
-                                 GRALLOC_USAGE_HW_VIDEO_ENCODER))
+                // Per the camera spec ITU 709 format should be set only for
+                // video encoding.
+                // It should be set to ITU 601 full range format for any other
+                // camera buffer
+                //
+                if (usage & GRALLOC_USAGE_HW_CAMERA_MASK) {
+                    if (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
                         flags |= private_handle_t::PRIV_FLAGS_ITU_R_709;
-                    else if (usage & GRALLOC_USAGE_HW_CAMERA_ZSL)
+                    else
                         flags |= private_handle_t::PRIV_FLAGS_ITU_R_601_FR;
+                }
 #endif
             } else {
                 flags |= private_handle_t::PRIV_FLAGS_ITU_R_601;
@@ -138,6 +144,10 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
 
         if (usage & GRALLOC_USAGE_HW_TEXTURE) {
             flags |= private_handle_t::PRIV_FLAGS_HW_TEXTURE;
+        }
+
+        if(usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY) {
+            flags |= private_handle_t::PRIV_FLAGS_SECURE_DISPLAY;
         }
 
         flags |= data.allocType;
@@ -270,13 +280,6 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
     if ((ssize_t)size <= 0)
         return -EINVAL;
     size = (bufferSize >= size)? bufferSize : size;
-
-    // All buffers marked as protected or for external
-    // display need to go to overlay
-    if ((usage & GRALLOC_USAGE_EXTERNAL_DISP) ||
-        (usage & GRALLOC_USAGE_PROTECTED)) {
-        bufferType = BUFFER_TYPE_VIDEO;
-    }
 
     bool useFbMem = false;
     char property[PROPERTY_VALUE_MAX];

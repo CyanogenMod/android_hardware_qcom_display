@@ -81,6 +81,12 @@ public:
     bool queueBuffer(int opFd, uint32_t opOffset);
     uint32_t getOffset() const { return mWbMem.getOffset(); }
     int getDstFd() const { return mWbMem.getDstFd(); }
+    /* Subject to GC if writeback isnt used for a drawing round.
+     * Get always if caching the value.
+     */
+    int getFbFd() const { return mFd.getFD(); }
+    int getOutputFormat();
+    bool setOutputFormat(int mdpFormat);
 
     static Writeback* getInstance();
     static void configBegin() { sUsed = false; }
@@ -98,6 +104,7 @@ private:
     struct msmfb_data mFbData;
     int mXres;
     int mYres;
+    int mOpFmt;
 
     static bool sUsed;
     static Writeback *sWb;

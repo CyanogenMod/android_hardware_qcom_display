@@ -256,7 +256,7 @@ uint32_t MdssRot::calcOutputBufSize() {
             mRotInfo.src.format); //mdss src and dst formats are same.
 
     if (mRotInfo.flags & ovutils::OV_MDSS_MDP_BWC_EN) {
-        opBufSize = calcCompressedBufSize();
+        opBufSize = calcCompressedBufSize(destWhf);
     } else {
         opBufSize = Rotator::calcOutputBufSize(destWhf);
     }
@@ -273,10 +273,10 @@ void MdssRot::getDump(char *buf, size_t len) const {
 }
 
 // Calculate the compressed o/p buffer size for BWC
-uint32_t MdssRot::calcCompressedBufSize() {
+uint32_t MdssRot::calcCompressedBufSize(const ovutils::Whf& destWhf) {
     uint32_t bufSize = 0;
-    int aWidth = ovutils::align(mRotInfo.src_rect.w, 64);
-    int aHeight = ovutils::align(mRotInfo.src_rect.h, 4);
+    int aWidth = ovutils::align(destWhf.w, 64);
+    int aHeight = ovutils::align(destWhf.h, 4);
     int rau_cnt = aWidth/64;
     int stride0 = (64 * 4 * rau_cnt) + rau_cnt/8;
     int stride1 = ((64 * 2 * rau_cnt) + rau_cnt/8) * 2;
