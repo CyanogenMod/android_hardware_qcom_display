@@ -114,7 +114,7 @@ MDPVersion::MDPVersion()
         //TODO get this from driver
         mMDPDownscale = 4;
 
-        char split[64];
+        char split[64] = {0};
         FILE* fp = fopen("/sys/class/graphics/fb0/msm_fb_split", "r");
         if(fp){
             //Format "left right" space as delimiter
@@ -161,6 +161,13 @@ bool MDPVersion::is8x26() {
     // 8x26 v1 minor number is 0000
     //      v2 minor number is 0001 etc..
     if( mMdpRev >= MDSS_MDP_HW_REV_101 && mMdpRev < MDSS_MDP_HW_REV_102) {
+        return true;
+    }
+    return false;
+}
+
+bool MDPVersion::is8x74v2() {
+    if( mMdpRev >= MDSS_MDP_HW_REV_102 && mMdpRev < MDSS_MDP_HW_REV_103) {
         return true;
     }
     return false;
