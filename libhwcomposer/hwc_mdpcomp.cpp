@@ -370,17 +370,34 @@ ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type) {
     return ovutils::OV_INVALID;
 }
 
-bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
+bool MDPComp::isFrameDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list)
+{
     bool ret = true;
+    bool isSecureYUVLayer = false;
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
 
     if(!isEnabled()) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. not enabled.", __FUNCTION__);
-        ret = false;
-    } else if(ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isConfiguring ||
-              ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isConfiguring) {
-        ALOGD_IF( isDebug(),"%s: External Display connection is pending",
-                  __FUNCTION__);
+        return false;
+    }
+
+    for(int i = 0; i < numAppLayers; ++i) {
+        hwc_layer_1_t* layer = &list->hwLayers[i];
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
+        if(isYuvBuffer(hnd) && isSecureBuffer(hnd)){
+            isSecureYUVLayer = true;
+        }
+    }
+
+    /* Need a check for secureYUVlayers to avoid composing them
+       through FB during pause/resume events */
+    if(!isSecureYUVLayer &&
+       (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isConfiguring ||
+        ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isConfiguring ||
+        ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isPause ||
+        ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isPause)) {
+        ALOGD_IF(isDebug(),"%s: External Display connection is pending",
+              __FUNCTION__);
         ret = false;
     }
     return ret;
@@ -426,6 +443,16 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
         if(isYuvBuffer(hnd) ) {
             if(isSecuring(ctx, layer)) {
                 ALOGD_IF(isDebug(), "%s: MDP securing is active", __FUNCTION__);
+                return false;
+            }
+            if((isSecureBuffer(hnd)) &&
+              (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isConfiguring ||
+               ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isConfiguring ||
+               ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isPause ||
+               ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isPause)) {
+                ALOGD_IF(isDebug(), "%s: Fall back to VideoOnlyComposition for"
+                         "secure YUV layers during external isConfiguring",
+                         __FUNCTION__);
                 return false;
             }
         }
@@ -817,7 +844,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     }
 
     //Hard conditions, if not met, cannot do MDP comp
-    if(!isFrameDoable(ctx)) {
+    if(!isFrameDoable(ctx, list)) {
         ALOGD_IF( isDebug(),"%s: MDP Comp not possible for this frame",
                 __FUNCTION__);
         reset(numLayers, list);

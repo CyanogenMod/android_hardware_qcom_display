@@ -138,7 +138,7 @@ protected:
     ovutils::eDest getMdpPipe(hwc_context_t *ctx, ePipeType type);
 
     /* checks for conditions where mdpcomp is not possible */
-    bool isFrameDoable(hwc_context_t *ctx);
+    bool isFrameDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* checks for conditions where RGB layers cannot be bypassed */
     bool isFullFrameDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* checks if full MDP comp can be done */
