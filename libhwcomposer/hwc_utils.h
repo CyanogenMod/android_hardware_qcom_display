@@ -238,6 +238,10 @@ void getNonWormholeRegion(hwc_display_contents_1_t* list,
                               hwc_rect_t& nwr);
 bool isSecuring(hwc_context_t* ctx, hwc_layer_1_t const* layer);
 bool isSecureModePolicy(int mdpVersion);
+// Returns true, if the input layer format is supported by rotator
+bool isRotatorSupportedFormat(private_handle_t *hnd);
+//Returns true, if the layer is YUV or the layer has been rendered by CPU
+bool isRotationDoable(hwc_context_t *ctx, private_handle_t *hnd);
 bool isExternalActive(hwc_context_t* ctx);
 bool isAlphaScaled(hwc_layer_1_t const* layer);
 bool needsScaling(hwc_layer_1_t const* layer);
@@ -315,7 +319,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         int fd);
 
 //Sets appropriate mdp flags for a layer.
-void setMdpFlags(hwc_layer_1_t *layer,
+void setMdpFlags(hwc_context_t *ctx, hwc_layer_1_t *layer,
         ovutils::eMdpFlags &mdpFlags,
         int rotDownscale, int transform);
 
@@ -395,6 +399,10 @@ static inline bool isSecureBuffer(const private_handle_t* hnd) {
 
 static inline bool isTileRendered(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_TILE_RENDERED & hnd->flags));
+}
+
+static inline bool isCPURendered(const private_handle_t* hnd) {
+    return (hnd && (private_handle_t::PRIV_FLAGS_CPU_RENDERED & hnd->flags));
 }
 
 //Return true if buffer is marked locked
@@ -566,7 +574,7 @@ static inline bool isYuvPresent (hwc_context_t *ctx, int dpy) {
     return  ctx->listStats[dpy].yuvCount;
 }
 
-static inline bool has90Transform(hwc_layer_1_t *layer) {
+static inline bool has90Transform(hwc_layer_1_t const* layer) {
     return ((layer->transform & HWC_TRANSFORM_ROT_90) &&
             !(layer->flags & HWC_COLOR_FILL));
 }

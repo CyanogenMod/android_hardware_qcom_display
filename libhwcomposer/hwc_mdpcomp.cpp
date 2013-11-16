@@ -306,7 +306,7 @@ bool MDPComp::LayerCache::isSameFrame(const FrameInfo& curFrame,
 
 bool MDPComp::isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
-    if((not isYuvBuffer(hnd) and has90Transform(layer)) or
+    if((has90Transform(layer) and (not isRotationDoable(ctx, hnd))) ||
         (not isValidDimension(ctx,layer))
         //More conditions here, SKIP, sRGB+Blend etc
         ) {
@@ -600,8 +600,9 @@ void MDPCompSplit::generateROI(hwc_context_t *ctx,
 
     for(int index = 0; index < numAppLayers; index++ ) {
         hwc_layer_1_t* layer = &list->hwLayers[index];
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
         if ((mCachedFrame.hnd[index] != layer->handle) ||
-                isYuvBuffer((private_handle_t *)layer->handle)) {
+                isYuvBuffer(hnd)) {
             hwc_rect_t dst = layer->displayFrame;
             hwc_rect_t updatingRect = dst;
 
@@ -698,7 +699,7 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         hwc_layer_1_t* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
-        if(isYuvBuffer(hnd) && has90Transform(layer)) {
+        if(has90Transform(layer) && isRotationDoable(ctx, hnd)) {
             if(!canUseRotator(ctx, mDpy)) {
                 ALOGD_IF(isDebug(), "%s: Can't use rotator for dpy %d",
                         __FUNCTION__, mDpy);
@@ -1018,7 +1019,7 @@ bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
         return false;
     }
 
-    if(layer->transform & HWC_TRANSFORM_ROT_90 && !canUseRotator(ctx,mDpy)) {
+    if(has90Transform(layer) && !canUseRotator(ctx, mDpy)) {
         ALOGD_IF(isDebug(), "%s: no free DMA pipe",__FUNCTION__);
         return false;
     }
@@ -1281,7 +1282,7 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
 
     //Capability checks
-    if(!resourceCheck()) {
+    if(!resourceCheck(ctx, list)) {
         ALOGD_IF(isDebug(), "%s: resource check failed", __FUNCTION__);
         return false;
     }
@@ -1355,10 +1356,29 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
     return true;
 }
 
-bool MDPComp::resourceCheck() {
+bool MDPComp::resourceCheck(hwc_context_t* ctx,
+        hwc_display_contents_1_t* list) {
     const bool fbUsed = mCurrentFrame.fbCount;
     if(mCurrentFrame.mdpCount > sMaxPipesPerMixer - fbUsed) {
         ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
+        return false;
+    }
+    // Init rotCount to number of rotate sessions used by other displays
+    int rotCount = ctx->mRotMgr->getNumActiveSessions();
+    // Count the number of rotator sessions required for current display
+    for (int index = 0; index < mCurrentFrame.layerCount; index++) {
+        if(!mCurrentFrame.isFBComposed[index]) {
+            hwc_layer_1_t* layer = &list->hwLayers[index];
+            private_handle_t *hnd = (private_handle_t *)layer->handle;
+            if(has90Transform(layer) && isRotationDoable(ctx, hnd)) {
+                rotCount++;
+            }
+        }
+    }
+    // if number of layers to rotate exceeds max rotator sessions, bail out.
+    if(rotCount > RotMgr::MAX_ROT_SESS) {
+        ALOGD_IF(isDebug(), "%s: Exceeds max rotator sessions  %d",
+                                    __FUNCTION__, mDpy);
         return false;
     }
     return true;
@@ -2108,14 +2128,14 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
     }
 
     eMdpFlags mdpFlags = OV_MDP_BACKEND_COMPOSITION;
-    setMdpFlags(layer, mdpFlags, 0, transform);
+    setMdpFlags(ctx, layer, mdpFlags, 0, transform);
 
     if(lDest != OV_INVALID && rDest != OV_INVALID) {
         //Enable overfetch
         setMdpFlags(mdpFlags, OV_MDSS_MDP_DUAL_PIPE);
     }
 
-    if(isYuvBuffer(hnd) && (transform & HWC_TRANSFORM_ROT_90)) {
+    if(has90Transform(layer) && isRotationDoable(ctx, hnd)) {
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         ctx->mLayerRotMap[mDpy]->add(layer, *rot);

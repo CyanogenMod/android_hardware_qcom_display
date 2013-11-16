@@ -152,6 +152,10 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
             flags |= private_handle_t::PRIV_FLAGS_TILE_RENDERED;
         }
 
+        if(usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK)) {
+            flags |= private_handle_t::PRIV_FLAGS_CPU_RENDERED;
+        }
+
         flags |= data.allocType;
         uintptr_t eBaseAddr = (uintptr_t)(eData.base) + eData.offset;
         private_handle_t *hnd = new private_handle_t(data.fd, size, flags,
