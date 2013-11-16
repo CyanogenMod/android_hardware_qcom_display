@@ -31,10 +31,15 @@
 #include "overlayWriteback.h"
 #include "mdpWrapper.h"
 
+#define SIZE_1M 0x00100000
+
 namespace overlay {
 
 //=========== class WritebackMem ==============================================
 bool WritebackMem::manageMem(uint32_t size, bool isSecure) {
+    if(isSecure) {
+        size = utils::align(size, SIZE_1M);
+    }
     if(mBuf.bufSz() == size) {
         return true;
     }
@@ -73,7 +78,7 @@ bool WritebackMem::dealloc() {
 }
 
 //=========== class Writeback =================================================
-Writeback::Writeback() : mXres(0), mYres(0) {
+Writeback::Writeback() : mXres(0), mYres(0), mOpFmt(-1) {
     int fbNum = Overlay::getFbForDpy(Overlay::DPY_WRITEBACK);
     if(!utils::openDev(mFd, fbNum, Res::fbPath, O_RDWR)) {
         ALOGE("%s failed to init %s", __func__, Res::fbPath);
@@ -182,6 +187,35 @@ bool Writeback::writeSync(int opFd, uint32_t opOffset) {
 bool Writeback::writeSync() {
     mWbMem.useNextBuffer();
     return writeSync(mWbMem.getDstFd(), mWbMem.getOffset());
+}
+
+bool Writeback::setOutputFormat(int mdpFormat) {
+    if(mdpFormat != mOpFmt) {
+        struct msmfb_metadata metadata;
+        memset(&metadata, 0 , sizeof(metadata));
+        metadata.op = metadata_op_wb_format;
+        metadata.data.mixer_cfg.writeback_format = mdpFormat;
+        if (ioctl(mFd.getFD(), MSMFB_METADATA_SET, &metadata) < 0) {
+            ALOGE("Error setting MDP Writeback format");
+            return false;
+        }
+        mOpFmt = mdpFormat;
+    }
+    return true;
+}
+
+int Writeback::getOutputFormat() {
+    if(mOpFmt < 0) {
+        struct msmfb_metadata metadata;
+        memset(&metadata, 0 , sizeof(metadata));
+        metadata.op = metadata_op_wb_format;
+        if (ioctl(mFd.getFD(), MSMFB_METADATA_GET, &metadata) < 0) {
+            ALOGE("Error retrieving MDP Writeback format");
+            return -1;
+        }
+        mOpFmt =  metadata.data.mixer_cfg.writeback_format;
+    }
+    return mOpFmt;
 }
 
 //static

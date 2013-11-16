@@ -77,6 +77,14 @@
 #define MDP_OV_PIPE_FORCE_DMA 0x4000
 #endif
 
+#ifndef MDSS_MDP_DUAL_PIPE
+#define MDSS_MDP_DUAL_PIPE 0x200
+#endif
+
+#ifndef MDP_SECURE_DISPLAY_OVERLAY_SESSION
+#define MDP_SECURE_DISPLAY_OVERLAY_SESSION 0x00002000
+#endif
+
 #define FB_DEVICE_TEMPLATE "/dev/graphics/fb%u"
 
 namespace overlay {
@@ -212,6 +220,8 @@ struct Whf {
 
 enum { MAX_PATH_LEN = 256 };
 
+enum { DEFAULT_PLANE_ALPHA = 0xFF };
+
 /**
  * Rotator flags: not to be confused with orientation flags.
  * Usually, you want to open the rotator to make sure it is
@@ -255,6 +265,7 @@ enum eMdpFlags {
     OV_MDP_PIPE_FORCE_DMA = MDP_OV_PIPE_FORCE_DMA,
     OV_MDP_DEINTERLACE = MDP_DEINTERLACE,
     OV_MDP_SECURE_OVERLAY_SESSION = MDP_SECURE_OVERLAY_SESSION,
+    OV_MDP_SECURE_DISPLAY_OVERLAY_SESSION = MDP_SECURE_DISPLAY_OVERLAY_SESSION,
     OV_MDP_SOURCE_ROTATED_90 = MDP_SOURCE_ROTATED_90,
     OV_MDP_BACKEND_COMPOSITION = MDP_BACKEND_COMPOSITION,
     OV_MDP_BLEND_FG_PREMULT = MDP_BLEND_FG_PREMULT,
@@ -263,6 +274,7 @@ enum eMdpFlags {
     OV_MDSS_MDP_RIGHT_MIXER = MDSS_MDP_RIGHT_MIXER,
     OV_MDP_PP_EN = MDP_OVERLAY_PP_CFG_EN,
     OV_MDSS_MDP_BWC_EN = MDP_BWC_EN,
+    OV_MDSS_MDP_DUAL_PIPE = MDSS_MDP_DUAL_PIPE,
 };
 
 enum eZorder {
@@ -329,21 +341,36 @@ enum eTransform {
     OVERLAY_TRANSFORM_INV = 0x80
 };
 
+enum eBlending {
+    OVERLAY_BLENDING_UNDEFINED = 0x0,
+    /* No blending */
+    OVERLAY_BLENDING_OPAQUE,
+    /* src.rgb + dst.rgb*(1-src_alpha) */
+    OVERLAY_BLENDING_PREMULT,
+    /* src.rgb * src_alpha + dst.rgb (1 - src_alpha) */
+    OVERLAY_BLENDING_COVERAGE,
+};
+
 // Used to consolidate pipe params
 struct PipeArgs {
     PipeArgs() : mdpFlags(OV_MDP_FLAGS_NONE),
         zorder(Z_SYSTEM_ALLOC),
         isFg(IS_FG_OFF),
-        rotFlags(ROT_FLAGS_NONE){
+        rotFlags(ROT_FLAGS_NONE),
+        planeAlpha(DEFAULT_PLANE_ALPHA),
+        blending(OVERLAY_BLENDING_COVERAGE){
     }
 
     PipeArgs(eMdpFlags f, Whf _whf,
-            eZorder z, eIsFg fg, eRotFlags r) :
+            eZorder z, eIsFg fg, eRotFlags r,
+            int pA = DEFAULT_PLANE_ALPHA, eBlending b = OVERLAY_BLENDING_COVERAGE) :
         mdpFlags(f),
         whf(_whf),
         zorder(z),
         isFg(fg),
-        rotFlags(r) {
+        rotFlags(r),
+        planeAlpha(pA),
+        blending(b){
     }
 
     eMdpFlags mdpFlags; // for mdp_overlay flags
@@ -351,6 +378,8 @@ struct PipeArgs {
     eZorder zorder; // stage number
     eIsFg isFg; // control alpha & transp
     eRotFlags rotFlags;
+    int planeAlpha;
+    eBlending blending;
 };
 
 // Cannot use HW_OVERLAY_MAGNIFICATION_LIMIT, since at the time
@@ -464,6 +493,8 @@ inline bool isYuv(uint32_t format) {
         case MDP_Y_CR_CB_H2V2:
         case MDP_Y_CR_CB_GH2V2:
         case MDP_Y_CBCR_H2V2_VENUS:
+        case MDP_YCBYCR_H2V1:
+        case MDP_YCRYCB_H2V1:
             return true;
         default:
             return false;
@@ -494,6 +525,7 @@ inline const char* getFormatString(int format){
     formats[MDP_ARGB_8888] = STR(MDP_ARGB_8888);
     formats[MDP_RGB_888] = STR(MDP_RGB_888);
     formats[MDP_Y_CRCB_H2V2] = STR(MDP_Y_CRCB_H2V2);
+    formats[MDP_YCBYCR_H2V1] = STR(MDP_YCBYCR_H2V1);
     formats[MDP_YCRYCB_H2V1] = STR(MDP_YCRYCB_H2V1);
     formats[MDP_CBYCRY_H2V1] = STR(MDP_CBYCRY_H2V1);
     formats[MDP_Y_CRCB_H2V1] = STR(MDP_Y_CRCB_H2V1);
