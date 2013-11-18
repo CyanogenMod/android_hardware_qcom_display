@@ -128,7 +128,7 @@ public:
     bool supportsMacroTile();
     int getLeftSplit() { return mSplit.left(); }
     int getRightSplit() { return mSplit.right(); }
-    int isPartialUpdateEnabled() { return mPanelInfo.mPartialUpdateEnable; }
+    bool isPartialUpdateEnabled() { return mPanelInfo.mPartialUpdateEnable; }
     int getLeftAlign() { return mPanelInfo.mLeftAlign; }
     int getWidthAlign() { return mPanelInfo.mWidthAlign; }
     int getTopAlign() { return mPanelInfo.mTopAlign; }

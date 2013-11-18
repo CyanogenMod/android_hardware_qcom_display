@@ -144,8 +144,12 @@ public:
     static int getDMAMode();
     /* Returns the framebuffer node backing up the display */
     static int getFbForDpy(const int& dpy);
-    static bool displayCommit(const int& fd, const utils::Dim& roi);
+
     static bool displayCommit(const int& fd);
+    /* Overloads display commit with ROI's of each halves.
+     * Single interface panels will only update left ROI. */
+    static bool displayCommit(const int& fd, const utils::Dim& lRoi,
+                              const utils::Dim& rRoi);
 
 private:
     /* Ctor setup */
