@@ -475,19 +475,24 @@ int Overlay::initOverlay() {
 }
 
 bool Overlay::displayCommit(const int& fd) {
-    utils::Dim roi;
-    return displayCommit(fd, roi);
+    utils::Dim lRoi, rRoi;
+    return displayCommit(fd, lRoi, rRoi);
 }
 
-bool Overlay::displayCommit(const int& fd, const utils::Dim& roi) {
+bool Overlay::displayCommit(const int& fd, const utils::Dim& lRoi,
+        const utils::Dim& rRoi) {
     //Commit
     struct mdp_display_commit info;
     memset(&info, 0, sizeof(struct mdp_display_commit));
     info.flags = MDP_DISPLAY_COMMIT_OVERLAY;
-    info.roi.x = roi.x;
-    info.roi.y = roi.y;
-    info.roi.w = roi.w;
-    info.roi.h = roi.h;
+    info.l_roi.x = lRoi.x;
+    info.l_roi.y = lRoi.y;
+    info.l_roi.w = lRoi.w;
+    info.l_roi.h = lRoi.h;
+    info.r_roi.x = rRoi.x;
+    info.r_roi.y = rRoi.y;
+    info.r_roi.w = rRoi.w;
+    info.r_roi.h = rRoi.h;
 
     if(!mdp_wrapper::displayCommit(fd, info)) {
         ALOGE("%s: commit failed", __func__);

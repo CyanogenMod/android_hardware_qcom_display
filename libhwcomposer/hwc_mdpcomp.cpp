@@ -42,7 +42,6 @@ bool MDPComp::sHandleTimeout = false;
 bool MDPComp::sDebugLogs = false;
 bool MDPComp::sEnabled = false;
 bool MDPComp::sEnableMixedMode = true;
-bool MDPComp::sEnablePartialFrameUpdate = false;
 int MDPComp::sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
 bool MDPComp::sEnable4k2kYUVSplit = false;
 bool MDPComp::sSrcSplitEnabled = false;
@@ -115,14 +114,6 @@ bool MDPComp::init(hwc_context_t *ctx) {
         if(atoi(property) != 0)
             sDebugLogs = true;
     }
-
-    if(property_get("persist.hwc.partialupdate", property, NULL) > 0) {
-        if((atoi(property) != 0) && ctx->mMDP.panel == MIPI_CMD_PANEL &&
-           qdutils::MDPVersion::getInstance().is8x74v2())
-            sEnablePartialFrameUpdate = true;
-    }
-    ALOGE_IF(isDebug(), "%s: Partial Update applicable?: %d",__FUNCTION__,
-                                                    sEnablePartialFrameUpdate);
 
     sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
     if(property_get("debug.mdpcomp.maxpermixer", property, "-1") > 0) {
@@ -416,23 +407,21 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     return ret;
 }
 
-/*
- * 1) Identify layers that are not visible in the updating ROI and drop them
- * from composition.
- * 2) If we have a scaling layers which needs cropping against generated ROI.
- * Reset ROI to full resolution.
- */
-bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
-                               hwc_display_contents_1_t* list, hwc_rect_t roi) {
+void MDPCompNonSplit::trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect) {
+    hwc_rect_t roi = ctx->listStats[mDpy].lRoi;
+    fbRect = getIntersection(fbRect, roi);
+}
+
+/* 1) Identify layers that are not visible or lying outside the updating ROI and
+ *    drop them from composition.
+ * 2) If we have a scaling layer which needs cropping against generated
+ *    ROI, reset ROI to full resolution. */
+bool MDPCompNonSplit::validateAndApplyROI(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
-
-    if(!isValidRect(roi))
-        return false;
-
-    hwc_rect_t visibleRect = roi;
+    hwc_rect_t visibleRect = ctx->listStats[mDpy].lRoi;
 
     for(int i = numAppLayers - 1; i >= 0; i--){
-
         if(!isValidRect(visibleRect)) {
             mCurrentFrame.drop[i] = true;
             mCurrentFrame.dropCount++;
@@ -440,24 +429,16 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
         }
 
         const hwc_layer_1_t* layer =  &list->hwLayers[i];
-
         hwc_rect_t dstRect = layer->displayFrame;
-        hwc_rect_t srcRect = integerizeSourceCrop(layer->sourceCropf);
-
         hwc_rect_t res  = getIntersection(visibleRect, dstRect);
-
-        int res_w = res.right - res.left;
-        int res_h = res.bottom - res.top;
-        int dst_w = dstRect.right - dstRect.left;
-        int dst_h = dstRect.bottom - dstRect.top;
 
         if(!isValidRect(res)) {
             mCurrentFrame.drop[i] = true;
             mCurrentFrame.dropCount++;
-        }else {
+        } else {
             /* Reset frame ROI when any layer which needs scaling also needs ROI
              * cropping */
-            if((res_w != dst_w || res_h != dst_h) && needsScaling (layer)) {
+            if(!isSameRect(res, dstRect) && needsScaling (layer)) {
                 ALOGI("%s: Resetting ROI due to scaling", __FUNCTION__);
                 memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
                 mCurrentFrame.dropCount = 0;
@@ -472,52 +453,167 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
     return true;
 }
 
-bool MDPComp::canDoPartialUpdate(hwc_context_t *ctx,
-                               hwc_display_contents_1_t* list){
-    if(!qdutils::MDPVersion::getInstance().isPartialUpdateEnabled() || mDpy ||
-       isSkipPresent(ctx, mDpy) || (list->flags & HWC_GEOMETRY_CHANGED)||
-       isDisplaySplit(ctx, mDpy)) {
-        return false;
-    }
-    return true;
-}
-
-void MDPComp::generateROI(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
+/* Calculate ROI for the frame by accounting all the layer's dispalyFrame which
+ * are updating. If DirtyRegion is applicable, calculate it by accounting all
+ * the changing layer's dirtyRegion. */
+void MDPCompNonSplit::generateROI(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
-
-    if(!canDoPartialUpdate(ctx, list))
+    if(!canPartialUpdate(ctx, list))
         return;
 
     struct hwc_rect roi = (struct hwc_rect){0, 0, 0, 0};
+    hwc_rect fullFrame = (struct hwc_rect) {0, 0,(int)ctx->dpyAttr[mDpy].xres,
+        (int)ctx->dpyAttr[mDpy].yres};
+
     for(int index = 0; index < numAppLayers; index++ ) {
         hwc_layer_1_t* layer = &list->hwLayers[index];
         if ((mCachedFrame.hnd[index] != layer->handle) ||
-            isYuvBuffer((private_handle_t *)layer->handle)) {
+                isYuvBuffer((private_handle_t *)layer->handle)) {
             hwc_rect_t updatingRect = layer->displayFrame;
+
 #ifdef QCOM_BSP
-            if(!needsScaling(layer))
+            if(!needsScaling(layer) && !layer->transform)
                 updatingRect =  layer->dirtyRect;
 #endif
+
             roi = getUnion(roi, updatingRect);
         }
     }
 
-    hwc_rect fullFrame = (struct hwc_rect) {0, 0,(int)ctx->dpyAttr[mDpy].xres,
-        (int)ctx->dpyAttr[mDpy].yres};
+    /* No layer is updating. Still SF wants a refresh.*/
+    if(!isValidRect(roi))
+        return;
 
     // Align ROI coordinates to panel restrictions
-    roi = sanitizeROI(roi, fullFrame);
+    roi = getSanitizeROI(roi, fullFrame);
 
-    if(!validateAndApplyROI(ctx, list, roi))
-        roi = fullFrame;
-
-    ctx->listStats[mDpy].roi.x = roi.left;
-    ctx->listStats[mDpy].roi.y = roi.top;
-    ctx->listStats[mDpy].roi.w = roi.right - roi.left;
-    ctx->listStats[mDpy].roi.h = roi.bottom - roi.top;
+    ctx->listStats[mDpy].lRoi = roi;
+    if(!validateAndApplyROI(ctx, list))
+        resetROI(ctx, mDpy);
 
     ALOGD_IF(isDebug(),"%s: generated ROI: [%d, %d, %d, %d]", __FUNCTION__,
-                               roi.left, roi.top, roi.right, roi.bottom);
+            ctx->listStats[mDpy].lRoi.left, ctx->listStats[mDpy].lRoi.top,
+            ctx->listStats[mDpy].lRoi.right, ctx->listStats[mDpy].lRoi.bottom);
+}
+
+void MDPCompSplit::trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect) {
+    hwc_rect l_roi = ctx->listStats[mDpy].lRoi;
+    hwc_rect r_roi = ctx->listStats[mDpy].rRoi;
+
+    hwc_rect_t l_fbRect = getIntersection(fbRect, l_roi);
+    hwc_rect_t r_fbRect = getIntersection(fbRect, r_roi);
+    fbRect = getUnion(l_fbRect, r_fbRect);
+}
+/* 1) Identify layers that are not visible or lying outside BOTH the updating
+ *    ROI's and drop them from composition. If a layer is spanning across both
+ *    the halves of the screen but needed by only ROI, the non-contributing
+ *    half will not be programmed for MDP.
+ * 2) If we have a scaling layer which needs cropping against generated
+ *    ROI, reset ROI to full resolution. */
+bool MDPCompSplit::validateAndApplyROI(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+
+    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+
+    hwc_rect_t visibleRectL = ctx->listStats[mDpy].lRoi;
+    hwc_rect_t visibleRectR = ctx->listStats[mDpy].rRoi;
+
+    for(int i = numAppLayers - 1; i >= 0; i--){
+        if(!isValidRect(visibleRectL) && !isValidRect(visibleRectR))
+        {
+            mCurrentFrame.drop[i] = true;
+            mCurrentFrame.dropCount++;
+            continue;
+        }
+
+        const hwc_layer_1_t* layer =  &list->hwLayers[i];
+        hwc_rect_t dstRect = layer->displayFrame;
+
+        hwc_rect_t l_res  = getIntersection(visibleRectL, dstRect);
+        hwc_rect_t r_res  = getIntersection(visibleRectR, dstRect);
+        hwc_rect_t res = getUnion(l_res, r_res);
+
+        if(!isValidRect(l_res) && !isValidRect(r_res)) {
+            mCurrentFrame.drop[i] = true;
+            mCurrentFrame.dropCount++;
+        } else {
+            /* Reset frame ROI when any layer which needs scaling also needs ROI
+             * cropping */
+            if(!isSameRect(res, dstRect) && needsScaling (layer)) {
+                memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
+                mCurrentFrame.dropCount = 0;
+                return false;
+            }
+
+            if (layer->blending == HWC_BLENDING_NONE) {
+                visibleRectL = deductRect(visibleRectL, l_res);
+                visibleRectR = deductRect(visibleRectR, r_res);
+            }
+        }
+    }
+    return true;
+}
+/* Calculate ROI for the frame by accounting all the layer's dispalyFrame which
+ * are updating. If DirtyRegion is applicable, calculate it by accounting all
+ * the changing layer's dirtyRegion. */
+void MDPCompSplit::generateROI(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    if(!canPartialUpdate(ctx, list))
+        return;
+
+    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+    int lSplit = getLeftSplit(ctx, mDpy);
+
+    int hw_h = (int)ctx->dpyAttr[mDpy].yres;
+    int hw_w = (int)ctx->dpyAttr[mDpy].xres;
+
+    struct hwc_rect l_frame = (struct hwc_rect){0, 0, lSplit, hw_h};
+    struct hwc_rect r_frame = (struct hwc_rect){lSplit, 0, hw_w, hw_h};
+
+    struct hwc_rect l_roi = (struct hwc_rect){0, 0, 0, 0};
+    struct hwc_rect r_roi = (struct hwc_rect){0, 0, 0, 0};
+
+    for(int index = 0; index < numAppLayers; index++ ) {
+        hwc_layer_1_t* layer = &list->hwLayers[index];
+        if ((mCachedFrame.hnd[index] != layer->handle) ||
+                isYuvBuffer((private_handle_t *)layer->handle)) {
+            hwc_rect_t updatingRect = layer->displayFrame;
+
+#ifdef QCOM_BSP
+            if(!needsScaling(layer) && !layer->transform)
+                updatingRect =  layer->dirtyRect;
+#endif
+
+            hwc_rect_t l_dst  = getIntersection(l_frame, updatingRect);
+            if(isValidRect(l_dst))
+                l_roi = getUnion(l_roi, l_dst);
+
+            hwc_rect_t r_dst  = getIntersection(r_frame, updatingRect);
+            if(isValidRect(r_dst))
+                r_roi = getUnion(r_roi, r_dst);
+        }
+    }
+
+    /* No layer is updating. Still SF wants a refresh. */
+    if(!isValidRect(l_roi) && !isValidRect(r_roi))
+        return;
+
+    l_roi = getSanitizeROI(l_roi, l_frame);
+    r_roi = getSanitizeROI(r_roi, r_frame);
+
+    ctx->listStats[mDpy].lRoi = l_roi;
+    ctx->listStats[mDpy].rRoi = r_roi;
+
+    if(!validateAndApplyROI(ctx, list))
+        resetROI(ctx, mDpy);
+
+    ALOGD_IF(isDebug(),"%s: generated L_ROI: [%d, %d, %d, %d]"
+            "R_ROI: [%d, %d, %d, %d]", __FUNCTION__,
+            ctx->listStats[mDpy].lRoi.left, ctx->listStats[mDpy].lRoi.top,
+            ctx->listStats[mDpy].lRoi.right, ctx->listStats[mDpy].lRoi.bottom,
+            ctx->listStats[mDpy].rRoi.left, ctx->listStats[mDpy].rRoi.top,
+            ctx->listStats[mDpy].rRoi.right, ctx->listStats[mDpy].rRoi.bottom);
 }
 
 /* Checks for conditions where all the layers marked for MDP comp cannot be
@@ -796,6 +892,16 @@ bool MDPComp::loadBasedComp(hwc_context_t *ctx,
 bool MDPComp::isLoadBasedCompDoable(hwc_context_t *ctx) {
     if(mDpy or isSecurePresent(ctx, mDpy) or
             isYuvPresent(ctx, mDpy)) {
+        return false;
+    }
+    return true;
+}
+
+bool MDPComp::canPartialUpdate(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list){
+    if(!qdutils::MDPVersion::getInstance().isPartialUpdateEnabled() ||
+            isSkipPresent(ctx, mDpy) || (list->flags & HWC_GEOMETRY_CHANGED) ||
+            mDpy ) {
         return false;
     }
     return true;
@@ -1095,7 +1201,8 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
              mCurrentFrame.fbCount);
 }
 
-hwc_rect_t MDPComp::getUpdatingFBRect(hwc_display_contents_1_t* list){
+hwc_rect_t MDPComp::getUpdatingFBRect(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list){
     hwc_rect_t fbRect = (struct hwc_rect){0, 0, 0, 0};
 
     /* Update only the region of FB needed for composition */
@@ -1106,6 +1213,7 @@ hwc_rect_t MDPComp::getUpdatingFBRect(hwc_display_contents_1_t* list){
             fbRect = getUnion(fbRect, dst);
         }
     }
+    trimAgainstROI(ctx, fbRect);
     return fbRect;
 }
 
@@ -1126,7 +1234,7 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
 
     //Configure framebuffer first if applicable
     if(mCurrentFrame.fbZ >= 0) {
-        hwc_rect_t fbRect = getUpdatingFBRect(list);
+        hwc_rect_t fbRect = getUpdatingFBRect(ctx, list);
         if(!ctx->mFBUpdate[mDpy]->prepare(ctx, list, fbRect, mCurrentFrame.fbZ))
         {
             ALOGD_IF(isDebug(), "%s configure framebuffer failed",
@@ -1278,6 +1386,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         if(tryFullFrame(ctx, list) || tryVideoOnly(ctx, list)) {
             setMDPCompLayerFlags(ctx, list);
         } else {
+            resetROI(ctx, mDpy);
             reset(ctx);
             memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
             mCurrentFrame.dropCount = 0;
@@ -1588,13 +1697,17 @@ bool MDPCompSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
     pipeSpecs.mixer = Overlay::MIXER_LEFT;
     pipeSpecs.fb = false;
 
-    if (dst.left < lSplit) {
+    // Acquire pipe only for the updating half
+    hwc_rect_t l_roi = ctx->listStats[mDpy].lRoi;
+    hwc_rect_t r_roi = ctx->listStats[mDpy].rRoi;
+
+    if (dst.left < lSplit && isValidRect(getIntersection(dst, l_roi))) {
         pipe_info.lIndex = ctx->mOverlay->getPipe(pipeSpecs);
         if(pipe_info.lIndex == ovutils::OV_INVALID)
             return false;
     }
 
-    if(dst.right > lSplit) {
+    if(dst.right > lSplit && isValidRect(getIntersection(dst, r_roi))) {
         pipeSpecs.mixer = Overlay::MIXER_RIGHT;
         pipe_info.rIndex = ctx->mOverlay->getPipe(pipeSpecs);
         if(pipe_info.rIndex == ovutils::OV_INVALID)
