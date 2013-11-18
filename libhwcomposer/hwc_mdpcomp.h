@@ -142,6 +142,15 @@ protected:
     /* configures 4kx2k yuv layer*/
     virtual int configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
             PipeLayerPair& PipeLayerPair) = 0;
+    /* generates ROI based on the modified area of the frame */
+    virtual void generateROI(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list) = 0;
+    /* validates the ROI generated for fallback conditions */
+    virtual bool validateAndApplyROI(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list) = 0;
+    /* Trims fbRect calculated against ROI generated */
+    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect) = 0;
+
     /* set/reset flags for MDPComp */
     void setMDPCompLayerFlags(hwc_context_t *ctx,
                               hwc_display_contents_1_t* list);
@@ -173,11 +182,6 @@ protected:
     /* checks if MDP/MDSS can process current list w.r.to HW limitations
      * All peculiar HW limitations should go here */
     bool hwLimitationsCheck(hwc_context_t* ctx, hwc_display_contents_1_t* list);
-    /* generates ROI based on the modified area of the frame */
-    void generateROI(hwc_context_t *ctx, hwc_display_contents_1_t* list);
-    bool validateAndApplyROI(hwc_context_t *ctx, hwc_display_contents_1_t* list,
-                             hwc_rect_t roi);
-
     /* Is debug enabled */
     static bool isDebug() { return sDebugLogs ? true : false; };
     /* Is feature enabled */
@@ -212,14 +216,14 @@ protected:
     void reset(hwc_context_t *ctx);
     bool isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer);
     bool resourceCheck();
-    hwc_rect_t getUpdatingFBRect(hwc_display_contents_1_t* list);
-    bool canDoPartialUpdate(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    hwc_rect_t getUpdatingFBRect(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+    /* checks for conditions to enable partial udpate */
+    bool canPartialUpdate(hwc_context_t *ctx, hwc_display_contents_1_t* list);
 
     int mDpy;
     static bool sEnabled;
     static bool sEnableMixedMode;
-    /* Enables Partial frame composition */
-    static bool sEnablePartialFrameUpdate;
     static bool sDebugLogs;
     static bool sIdleFallBack;
     /* Handles the timeout event from kernel, if the value is set to true */
@@ -262,6 +266,14 @@ private:
     /* configures 4kx2k yuv layer to 2 VG pipes*/
     virtual int configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
             PipeLayerPair& PipeLayerPair);
+    /* generates ROI based on the modified area of the frame */
+    virtual void generateROI(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+    /* validates the ROI generated for fallback conditions */
+    virtual bool validateAndApplyROI(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+    /* Trims fbRect calculated against ROI generated */
+    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect);
 };
 
 class MDPCompSplit : public MDPComp {
@@ -287,7 +299,6 @@ protected:
     /* allocates pipes to selected candidates */
     virtual bool allocLayerPipes(hwc_context_t *ctx,
                                  hwc_display_contents_1_t* list);
-
 private:
     /* Increments mdpCount if 4k2k yuv layer split is enabled.
      * updates framebuffer z order if fb lies above source-split layer */
@@ -297,6 +308,14 @@ private:
     /* configures 4kx2k yuv layer*/
     virtual int configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
             PipeLayerPair& PipeLayerPair);
+    /* generates ROI based on the modified area of the frame */
+    virtual void generateROI(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+    /* validates the ROI generated for fallback conditions */
+    virtual bool validateAndApplyROI(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+    /* Trims fbRect calculated against ROI generated */
+    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect);
 };
 
 class MDPCompSrcSplit : public MDPCompSplit {
