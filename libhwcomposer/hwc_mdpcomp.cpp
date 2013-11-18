@@ -605,7 +605,8 @@ bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
 
     bool ret = false;
     if(isLoadBasedCompDoable(ctx, list)) {
-        ret = loadBasedComp(ctx, list);
+        ret = loadBasedCompPreferGPU(ctx, list) ||
+                loadBasedCompPreferMDP(ctx, list);
     }
 
     if(!ret) {
@@ -657,14 +658,16 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
     return true;
 }
 
-bool MDPComp::loadBasedComp(hwc_context_t *ctx,
+bool MDPComp::loadBasedCompPreferGPU(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     mCurrentFrame.reset(numAppLayers);
 
-    //TODO BatchSize could be optimized further based on available pipes, split
-    //displays etc.
-    const int batchSize = numAppLayers - (sMaxPipesPerMixer - 1);
+    int stagesForMDP = min(sMaxPipesPerMixer, ctx->mOverlay->availablePipes(
+            mDpy, Overlay::MIXER_DEFAULT));
+    //If MDP has X possible stages, it can take X layers.
+    const int batchSize = numAppLayers - (stagesForMDP - 1); //1 for FB
+
     if(batchSize <= 0) {
         ALOGD_IF(isDebug(), "%s: Not attempting", __FUNCTION__);
         return false;
@@ -720,6 +723,59 @@ bool MDPComp::loadBasedComp(hwc_context_t *ctx,
     return true;
 }
 
+bool MDPComp::loadBasedCompPreferMDP(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+    //TODO get the ib from sysfs node.
+    //Full screen is from ib perspective, not actual full screen
+    const int bpp = 4;
+    double panelRefRate =
+                1000000000.0 / ctx->dpyAttr[mDpy].vsync_period;
+
+    double bwLeft = sMaxBw - sBwClaimed;
+
+    const int fullScreenLayers = bwLeft * 1000000000 / (ctx->dpyAttr[mDpy].xres
+            * ctx->dpyAttr[mDpy].yres * bpp * panelRefRate);
+
+    const int fbBatchSize = numAppLayers - (fullScreenLayers - 1);
+    //If batch size is not at least 2, we aren't really preferring MDP, since
+    //only 1 layer going to GPU could actually translate into an entire FB
+    //needed to be fetched by MDP, thus needing more b/w rather than less.
+    if(fbBatchSize < 2 || fbBatchSize > numAppLayers) {
+        ALOGD_IF(isDebug(), "%s: Not attempting", __FUNCTION__);
+        return false;
+    }
+
+    //Top-most layers constitute FB batch
+    const int fbBatchStart = numAppLayers - fbBatchSize;
+
+    //Bottom-most layers constitute MDP batch
+    for(int i = 0; i < fbBatchStart; i++) {
+        hwc_layer_1_t* layer = &list->hwLayers[i];
+        if(not isSupportedForMDPComp(ctx, layer)) {
+            ALOGD_IF(isDebug(), "%s: MDP unsupported layer found at %d",
+                    __FUNCTION__, i);
+            return false;
+        }
+        mCurrentFrame.isFBComposed[i] = false;
+    }
+
+    mCurrentFrame.fbZ = fbBatchStart;
+    mCurrentFrame.fbCount = fbBatchSize;
+    mCurrentFrame.mdpCount = mCurrentFrame.layerCount - fbBatchSize;
+
+    if(!resourceCheck(ctx, list)) {
+        ALOGD_IF(isDebug(), "%s: resource check failed", __FUNCTION__);
+        return false;
+    }
+
+    ALOGD_IF(isDebug(), "%s: FB Z %d, num app layers %d, MDP Batch Size %d",
+                __FUNCTION__, mCurrentFrame.fbZ, numAppLayers,
+                numAppLayers - fbBatchSize);
+
+    return true;
+}
+
 bool MDPComp::isLoadBasedCompDoable(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
     if(mDpy or isSecurePresent(ctx, mDpy) or
@@ -736,7 +792,6 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
     mCurrentFrame.reset(numAppLayers);
     updateYUV(ctx, list, secureOnly);
     int mdpCount = mCurrentFrame.mdpCount;
-    int fbNeeded = (mCurrentFrame.fbCount != 0);
 
     if(!isYuvPresent(ctx, mDpy)) {
         return false;
