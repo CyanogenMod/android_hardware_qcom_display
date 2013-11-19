@@ -988,36 +988,25 @@ hwc_rect_t getUnion(const hwc_rect &rect1, const hwc_rect &rect2)
    return res;
 }
 
-/* deducts given rect from layers display-frame and source crop.
-   also it avoid hole creation.*/
-void deductRect(const hwc_layer_1_t* layer, hwc_rect_t& irect) {
-    hwc_rect_t& disprect = (hwc_rect_t&)layer->displayFrame;
-    hwc_rect_t srcrect = integerizeSourceCrop(layer->sourceCropf);
-    int irect_w = irect.right - irect.left;
-    int irect_h = irect.bottom - irect.top;
+/* Not a geometrical rect deduction. Deducts rect2 from rect1 only if it results
+ * a single rect */
+hwc_rect_t deductRect(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
 
-    if((disprect.left == irect.left) && (disprect.right == irect.right)) {
-        if((disprect.top == irect.top) && (irect.bottom <= disprect.bottom)) {
-            disprect.top = irect.bottom;
-            srcrect.top += irect_h;
-        }
-        else if((disprect.bottom == irect.bottom)
-                                && (irect.top >= disprect.top)) {
-            disprect.bottom = irect.top;
-            srcrect.bottom -= irect_h;
-        }
-    }
-    else if((disprect.top == irect.top) && (disprect.bottom == irect.bottom)) {
-        if((disprect.left == irect.left) && (irect.right <= disprect.right)) {
-            disprect.left = irect.right;
-            srcrect.left += irect_w;
-        }
-        else if((disprect.right == irect.right)
-                                && (irect.left >= disprect.left)) {
-            disprect.right = irect.left;
-            srcrect.right -= irect_w;
-        }
-    }
+   hwc_rect_t res = rect1;
+
+   if((rect1.left == rect2.left) && (rect1.right == rect2.right)) {
+      if((rect1.top == rect2.top) && (rect2.bottom <= rect1.bottom))
+         res.top = rect2.bottom;
+      else if((rect1.bottom == rect2.bottom)&& (rect2.top >= rect1.top))
+         res.bottom = rect2.top;
+   }
+   else if((rect1.top == rect2.top) && (rect1.bottom == rect2.bottom)) {
+      if((rect1.left == rect2.left) && (rect2.right <= rect1.right))
+         res.left = rect2.right;
+      else if((rect1.right == rect2.right)&& (rect2.left >= rect1.left))
+         res.right = rect2.left;
+   }
+   return res;
 }
 
 void optimizeLayerRects(hwc_context_t *ctx,
@@ -1033,17 +1022,22 @@ void optimizeLayerRects(hwc_context_t *ctx,
             hwc_rect_t& topframe =
                 (hwc_rect_t&)list->hwLayers[i].displayFrame;
             while(j >= 0) {
-                if(!needsScaling(ctx, &list->hwLayers[j], dpy)) {
-                    hwc_rect_t& bottomframe =
-                        (hwc_rect_t&)list->hwLayers[j].displayFrame;
+               if(!needsScaling(ctx, &list->hwLayers[j], dpy)) {
+                  hwc_layer_1_t* layer = (hwc_layer_1_t*)&list->hwLayers[j];
+                  hwc_rect_t& bottomframe = layer->displayFrame;
+                  hwc_rect_t& bottomCrop = layer->sourceCrop;
+                  int transform =layer->transform;
 
-                    hwc_rect_t irect = getIntersection(bottomframe, topframe);
-                    if(isValidRect(irect)) {
-                        //if intersection is valid rect, deduct it
-                        deductRect(&list->hwLayers[j], irect);
-                    }
-                }
-                j--;
+                  hwc_rect_t irect = getIntersection(bottomframe, topframe);
+                  if(isValidRect(irect)) {
+                     //if intersection is valid rect, deduct it
+                     bottomframe = deductRect(bottomframe, irect);
+                     qhwc::calculate_crop_rects(bottomCrop, bottomframe,
+                                                bottomframe, transform);
+
+                  }
+               }
+               j--;
             }
         }
         i--;
