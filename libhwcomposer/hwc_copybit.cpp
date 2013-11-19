@@ -128,20 +128,6 @@ unsigned int CopyBit::getRGBRenderingArea
     return renderArea;
 }
 
-bool checkNonWormholeRegion(private_handle_t* hnd, hwc_rect_t& rect)
-{
-    unsigned int height = rect.bottom - rect.top;
-    unsigned int width = rect.right - rect.left;
-    copybit_image_t buf;
-    buf.w = ALIGN(hnd->width, 32);
-    buf.h = hnd->height;
-
-    if (buf.h != height || buf.w != width)
-        return false;
-
-    return true;
-}
-
 bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
                                                             int dpy) {
 
@@ -190,15 +176,6 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             if (layer->planeAlpha != 0xFF)
                 return true;
         }
-        /*
-         * Fallback to GPU in MDP3 when NonWormholeRegion is not of frame buffer
-         * size as artifact is seen in WormholeRegion of previous frame.
-         */
-        hwc_rect_t nonWormHoleRegion;
-        getNonWormholeRegion(list, nonWormHoleRegion);
-        if(!checkNonWormholeRegion(fbHnd, nonWormHoleRegion))
-           return true;
-
     }
 
     //Allocate render buffers if they're not allocated
