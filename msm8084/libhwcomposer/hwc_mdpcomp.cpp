@@ -744,6 +744,12 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
         return false;
     }
 
+    /* Bail out if we are processing only secured video layers
+     * and we dont have any */
+    if(!isSecurePresent(ctx, mDpy) && secureOnly){
+        return false;
+    }
+
     if(!mdpCount)
         return false;
 
