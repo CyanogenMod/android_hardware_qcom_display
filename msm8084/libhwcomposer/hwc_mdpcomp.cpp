@@ -432,7 +432,7 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
              * cropping */
             if((res_w != dst_w || res_h != dst_h) &&
                needsScaling (ctx, layer, mDpy)) {
-                ALOGE("%s: Resetting ROI due to scaling", __FUNCTION__);
+                ALOGI("%s: Resetting ROI due to scaling", __FUNCTION__);
                 memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
                 mCurrentFrame.dropCount = 0;
                 return false;
@@ -1148,7 +1148,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     //do not cache the information for next draw cycle.
     if(numLayers > MAX_NUM_APP_LAYERS) {
         mCachedFrame.updateCounts(mCurrentFrame);
-        ALOGE("%s: Number of App layers exceeded the limit ",
+        ALOGI("%s: Number of App layers exceeded the limit ",
         __FUNCTION__);
         ret = -1;
         return ret;
