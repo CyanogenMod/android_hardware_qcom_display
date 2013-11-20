@@ -591,18 +591,8 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     mCurrentFrame.mdpCount = mCurrentFrame.layerCount - mCurrentFrame.fbCount -
         mCurrentFrame.dropCount;
 
-    if(mCurrentFrame.mdpCount > sMaxPipesPerMixer) {
-        ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
-        return false;
-    }
-
-    if(!arePipesAvailable(ctx, list)) {
-        return false;
-    }
-
-    uint32_t size = calcMDPBytesRead(ctx, list);
-    if(!bandwidthCheck(ctx, size)) {
-        ALOGD_IF(isDebug(), "%s: Exceeds bandwidth",__FUNCTION__);
+    if(!resourceCheck(ctx, list)) {
+        ALOGD_IF(isDebug(), "%s: resource check failed", __FUNCTION__);
         return false;
     }
 
@@ -662,18 +652,8 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
         return false;
     }
 
-    if(mdpCount > (sMaxPipesPerMixer - 1)) { // -1 since FB is used
-        ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
-        return false;
-    }
-
-    if(!arePipesAvailable(ctx, list)) {
-        return false;
-    }
-
-    uint32_t size = calcMDPBytesRead(ctx, list);
-    if(!bandwidthCheck(ctx, size)) {
-        ALOGD_IF(isDebug(), "%s: Exceeds bandwidth",__FUNCTION__);
+    if(!resourceCheck(ctx, list)) {
+        ALOGD_IF(isDebug(), "%s: resource check failed", __FUNCTION__);
         return false;
     }
 
@@ -733,7 +713,8 @@ bool MDPComp::loadBasedComp(hwc_context_t *ctx,
     mCurrentFrame.fbCount = batchSize;
     mCurrentFrame.mdpCount = mCurrentFrame.layerCount - batchSize;
 
-    if(!arePipesAvailable(ctx, list)) {
+    if(!resourceCheck(ctx, list)) {
+        ALOGD_IF(isDebug(), "%s: resource check failed", __FUNCTION__);
         return false;
     }
 
@@ -773,18 +754,8 @@ bool MDPComp::isOnlyVideoDoable(hwc_context_t *ctx,
     if(!mdpCount)
         return false;
 
-    if(mdpCount > (sMaxPipesPerMixer - fbNeeded)) {
-        ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
-        return false;
-    }
-
-    if(!arePipesAvailable(ctx, list)) {
-        return false;
-    }
-
-    uint32_t size = calcMDPBytesRead(ctx, list);
-    if(!bandwidthCheck(ctx, size)) {
-        ALOGD_IF(isDebug(), "%s: Exceeds bandwidth",__FUNCTION__);
+    if(!resourceCheck(ctx, list)) {
+        ALOGD_IF(isDebug(), "%s: resource check failed", __FUNCTION__);
         return false;
     }
 
@@ -1105,6 +1076,27 @@ bool MDPComp::programYUV(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             }
         }
     }
+    return true;
+}
+
+bool MDPComp::resourceCheck(hwc_context_t *ctx,
+        hwc_display_contents_1_t *list) {
+    const bool fbUsed = mCurrentFrame.fbCount;
+    if(mCurrentFrame.mdpCount > sMaxPipesPerMixer - fbUsed) {
+        ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
+        return false;
+    }
+
+    if(!arePipesAvailable(ctx, list)) {
+        return false;
+    }
+
+    uint32_t size = calcMDPBytesRead(ctx, list);
+    if(!bandwidthCheck(ctx, size)) {
+        ALOGD_IF(isDebug(), "%s: Exceeds bandwidth",__FUNCTION__);
+        return false;
+    }
+
     return true;
 }
 
