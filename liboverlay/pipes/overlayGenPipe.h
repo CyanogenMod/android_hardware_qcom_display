@@ -77,6 +77,7 @@ public:
      * even if they haven't changed
      */
     void forceSet();
+    int getPipeId();
 
 private:
     /* set Closed pipe */

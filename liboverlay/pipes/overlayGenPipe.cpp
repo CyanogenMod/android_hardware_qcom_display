@@ -167,4 +167,8 @@ void GenericPipe::forceSet() {
     mCtrlData.ctrl.forceSet();
 }
 
+int GenericPipe::getPipeId() {
+    return mCtrlData.ctrl.getPipeId();
+}
+
 } //namespace overlay

@@ -76,6 +76,15 @@ public:
      * asisgned to a mixer within a display it cannot be reused for another
      * mixer without being UNSET once*/
     utils::eDest nextPipe(utils::eMdpPipeType, int dpy, int mixer);
+    /* Returns the eDest corresponding to an already allocated pipeid.
+     * Useful for the reservation case, when libvpu reserves the pipe at its
+     * end, and expect the overlay to allocate a given pipe for a layer.
+     */
+    utils::eDest reservePipe(int pipeid);
+    /* getting dest for the given pipeid */
+    utils::eDest getDest(int pipeid);
+    /* getting overlay.pipeid for the given dest */
+    int getPipeId(utils::eDest dest);
 
     void setSource(const utils::PipeArgs args, utils::eDest dest);
     void setCrop(const utils::Dim& d, utils::eDest dest);
@@ -85,6 +94,14 @@ public:
     bool commit(utils::eDest dest);
     bool queueBuffer(int fd, uint32_t offset, utils::eDest dest);
 
+    /* pipe reservation session is running */
+    bool sessionInProgress(utils::eDest dest);
+    /* pipe reservation session has ended*/
+    bool isSessionEnded(utils::eDest dest);
+    /* start session for the pipe reservation */
+    void startSession(utils::eDest dest);
+    /* end all started sesisons */
+    void endAllSessions();
     /* Returns available ("unallocated") pipes for a display's mixer */
     int availablePipes(int dpy, int mixer);
     /* Returns available ("unallocated") pipes for a display */
@@ -160,7 +177,13 @@ private:
 
         static int NUM_PIPES;
         static utils::eMdpPipeType pipeTypeLUT[utils::OV_MAX];
-
+        /* Session for reserved pipes */
+        enum Session {
+            NONE,
+            START,
+            END
+        };
+        Session mSession;
 
     private:
         //usage tracks if a successful commit happened. So a pipe could be
@@ -310,6 +333,18 @@ inline bool Overlay::PipeBook::isNotAllocated(int index) {
 
 inline utils::eMdpPipeType Overlay::PipeBook::getPipeType(utils::eDest dest) {
     return pipeTypeLUT[(int)dest];
+}
+
+inline void Overlay::startSession(utils::eDest dest) {
+    mPipeBook[(int)dest].mSession = PipeBook::START;
+}
+
+inline bool Overlay::sessionInProgress(utils::eDest dest) {
+    return (mPipeBook[(int)dest].mSession == PipeBook::START);
+}
+
+inline bool Overlay::isSessionEnded(utils::eDest dest) {
+    return (mPipeBook[(int)dest].mSession == PipeBook::END);
 }
 
 inline const char* Overlay::PipeBook::getDestStr(utils::eDest dest) {
