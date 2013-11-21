@@ -39,8 +39,8 @@ public:
     explicit MdpCtrl();
     /* dtor close */
     ~MdpCtrl();
-    /* init underlying device using fbnum */
-    bool init(uint32_t fbnum);
+    /* init underlying device using fbnum for dpy */
+    bool init(uint32_t dpy);
     /* unset overlay, reset and close fd */
     bool close();
     /* reset and set ov id to -1 / MSMFB_NEW_REQUEST */
@@ -132,6 +132,7 @@ private:
     OvFD          mFd;
     int mDownscale;
     bool mForceSet;
+    int mDpy;
 
 #ifdef USES_POST_PROCESSING
     /* PP Compute Params */
@@ -174,7 +175,7 @@ public:
     /* dtor close*/
     ~MdpData();
     /* init FD */
-    bool init(uint32_t fbnum);
+    bool init(uint32_t dpy);
     /* memset0 the underlying mdp object */
     void reset();
     /* close fd, and reset */
@@ -394,15 +395,6 @@ inline bool MdpCtrl3D::useVirtualFB() {
 inline MdpData::MdpData() { reset(); }
 
 inline MdpData::~MdpData() { close(); }
-
-inline bool MdpData::init(uint32_t fbnum) {
-    // FD init
-    if(!utils::openDev(mFd, fbnum, Res::fbPath, O_RDWR)){
-        ALOGE("Ctrl failed to init fbnum=%d", fbnum);
-        return false;
-    }
-    return true;
-}
 
 inline void MdpData::reset() {
     overlay::utils::memset0(mOvData);
