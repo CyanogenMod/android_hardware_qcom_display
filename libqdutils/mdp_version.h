@@ -38,6 +38,10 @@
 */
 using namespace android;
 namespace qdutils {
+// These panel definitions are available at mdss_mdp.h which is internal header
+// file and is not available at <linux/mdss_mdp.h>.
+// ToDo: once it is available at linux/mdss_mdp.h, these below definitions can
+// be removed.
 enum mdp_version {
     MDP_V_UNKNOWN = 0,
     MDP_V2_2    = 220,
@@ -65,6 +69,7 @@ enum {
     MAX_DISPLAY_DIM = 2048,
 };
 
+#define NO_PANEL         '0'
 #define MDDI_PANEL       '1'
 #define EBI2_PANEL       '2'
 #define LCDC_PANEL       '3'
@@ -75,6 +80,7 @@ enum {
 #define MIPI_CMD_PANEL   '9'
 #define WRITEBACK_PANEL  'a'
 #define LVDS_PANEL       'b'
+#define EDP_PANEL        'c'
 
 class MDPVersion;
 
@@ -109,6 +115,8 @@ public:
     int getRightSplit() { return mSplit.right(); }
 private:
     bool updateSysFsInfo();
+    bool updatePanelInfo();
+    bool updateSplitInfo();
     int tokenizeParams(char *inputParams, const char *delim,
                         char* tokenStr[], int *idx);
     int mFd;
