@@ -34,6 +34,9 @@
 #include "utils/threads.h"
 
 struct MetaData_t;
+namespace scale {
+class Scale;
+};
 
 namespace overlay {
 class GenericPipe;
@@ -111,6 +114,8 @@ public:
     static int getFbForDpy(const int& dpy);
     static bool displayCommit(const int& fd, const utils::Dim& roi);
     static bool displayCommit(const int& fd);
+    /* Returns the scalar object */
+    static scale::Scale *getScalar();
 
 private:
     /* Ctor setup */
@@ -118,6 +123,10 @@ private:
     /*Validate index range, abort if invalid */
     void validate(int index);
     void dump() const;
+    /* Creates a scalar object using libscale.so */
+    static void initScalar();
+    /* Destroys the scalar object using libscale.so */
+    static void destroyScalar();
 
     /* Just like a Facebook for pipes, but much less profile info */
     struct PipeBook {
@@ -177,6 +186,8 @@ private:
     static int sDpyFbMap[DPY_MAX];
     static int sDMAMode;
     static int sForceSetBitmap;
+    static void *sLibScaleHandle;
+    static scale::Scale *sScale;
 };
 
 inline void Overlay::validate(int index) {
@@ -247,6 +258,10 @@ inline int Overlay::getFbForDpy(const int& dpy) {
 
 inline void Overlay::forceSet(const int& dpy) {
     sForceSetBitmap |= (1 << dpy);
+}
+
+inline scale::Scale *Overlay::getScalar() {
+    return sScale;
 }
 
 inline bool Overlay::PipeBook::valid() {
