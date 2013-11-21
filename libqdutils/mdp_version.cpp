@@ -241,11 +241,17 @@ bool MDPVersion::is8x26() {
 }
 
 bool MDPVersion::is8x74v2() {
-    if( mMdpRev >= MDSS_MDP_HW_REV_102 && mMdpRev < MDSS_MDP_HW_REV_103) {
+    if( mMdpRev >= MDSS_MDP_HW_REV_102 && mMdpRev < MDSS_MDP_HW_REV_200) {
         return true;
     }
     return false;
 }
 
+bool MDPVersion::is8x92() {
+    if( mMdpRev >= MDSS_MDP_HW_REV_200 && mMdpRev < MDSS_MDP_HW_REV_206) {
+        return true;
+    }
+    return false;
+}
 }; //namespace qdutils
 
