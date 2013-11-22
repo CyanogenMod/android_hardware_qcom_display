@@ -44,7 +44,7 @@ bool MDPComp::sEnableMixedMode = true;
 bool MDPComp::sEnablePartialFrameUpdate = false;
 int MDPComp::sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
 float MDPComp::sMaxBw = 2.3f;
-uint32_t MDPComp::sCompBytesClaimed = 0;
+double MDPComp::sBwClaimed = 0.0;
 
 MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
     if(isDisplaySplit(ctx, dpy)) {
@@ -1132,10 +1132,10 @@ bool MDPComp::bandwidthCheck(hwc_context_t *ctx, const uint32_t& size) {
     //Will be added for other targets if we run into bandwidth issues and when
     //we have profiling data to set an upper limit.
     if(qdutils::MDPVersion::getInstance().is8x74v2()) {
-        const uint32_t ONE_GIG = 1024 * 1024 * 1024;
+        const uint32_t ONE_GIG = 1000 * 1000 * 1000;
         double panelRefRate =
                 1000000000.0 / ctx->dpyAttr[mDpy].vsync_period;
-        if((size + sCompBytesClaimed) > ((sMaxBw / panelRefRate) * ONE_GIG)) {
+        if((size * panelRefRate) > ((sMaxBw - sBwClaimed) * ONE_GIG)) {
             return false;
         }
     }
@@ -1250,7 +1250,9 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     }
 
 exit:
-    sCompBytesClaimed += calcMDPBytesRead(ctx, list);
+    //gbps (bytes / nanosec = gigabytes / sec)
+    sBwClaimed += calcMDPBytesRead(ctx, list) /
+            (double)ctx->dpyAttr[mDpy].vsync_period;
     return ret;
 }
 

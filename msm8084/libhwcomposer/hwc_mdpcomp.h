@@ -52,7 +52,7 @@ public:
     /* Initialize MDP comp*/
     static bool init(hwc_context_t *ctx);
     static void resetIdleFallBack() { sIdleFallBack = false; }
-    static void reset() { sCompBytesClaimed = 0; };
+    static void reset() { sBwClaimed = 0.0; };
 
 protected:
     enum { MAX_SEC_LAYERS = 1 }; //TODO add property support
@@ -205,9 +205,9 @@ protected:
     static int sMaxPipesPerMixer;
     //Max bandwidth. Value is in GBPS. For ex: 2.3 means 2.3GBPS
     static float sMaxBw;
-    //Tracks composition bytes claimed. Represented as the total w*h*bpp
-    //going to MDP mixers
-    static uint32_t sCompBytesClaimed;
+    //Tracks composition bandwidth claimed. Represented as the total
+    //w*h*bpp*fps (gigabytes-per-second) going to MDP mixers.
+    static double sBwClaimed;
     static IdleInvalidator *idleInvalidator;
     struct FrameInfo mCurrentFrame;
     struct LayerCache mCachedFrame;
