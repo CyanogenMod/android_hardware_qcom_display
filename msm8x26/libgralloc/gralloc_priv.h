@@ -70,6 +70,9 @@ enum {
 
     /* CAMERA heap is a carveout heap for camera, is not secured*/
     GRALLOC_USAGE_PRIVATE_CAMERA_HEAP     =       0x00400000,
+
+    /* This flag is used for SECURE display usecase */
+    GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY  =       0x00800000,
 };
 
 enum {
@@ -100,6 +103,7 @@ enum {
     HAL_PIXEL_FORMAT_RG_88                  = 0x10E,
     HAL_PIXEL_FORMAT_YCbCr_444_SP           = 0x10F,
     HAL_PIXEL_FORMAT_YCrCb_444_SP           = 0x110,
+    HAL_PIXEL_FORMAT_YCrCb_422_I            = 0x111,
     HAL_PIXEL_FORMAT_INTERLACE              = 0x180,
 
 };
@@ -161,6 +165,7 @@ struct private_handle_t : public native_handle {
             PRIV_FLAGS_ITU_R_601          = 0x00200000,
             PRIV_FLAGS_ITU_R_601_FR       = 0x00400000,
             PRIV_FLAGS_ITU_R_709          = 0x00800000,
+            PRIV_FLAGS_SECURE_DISPLAY     = 0x01000000,
         };
 
         // file-descriptors

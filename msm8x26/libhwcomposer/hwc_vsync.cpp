@@ -29,6 +29,7 @@
 #include "hwc_utils.h"
 #include "string.h"
 #include "external.h"
+#include "overlay.h"
 
 namespace qhwc {
 
@@ -63,7 +64,7 @@ static void *vsync_loop(void *param)
 
     struct pollfd pfd[2];
     int fb_fd[2];
-    uint64_t timestamp[2];
+    uint64_t timestamp[2] = {0,0};
     int num_displays;
 
     char property[PROPERTY_VALUE_MAX];
@@ -71,14 +72,13 @@ static void *vsync_loop(void *param)
         if(atoi(property) == 1)
             ctx->vstate.fakevsync = true;
     }
-    ctx->vstate.fakevsync = true;
 
     if(property_get("debug.hwc.logvsync", property, 0) > 0) {
         if(atoi(property) == 1)
             logvsync = true;
     }
 
-    if (ctx->mExtDisplay->getHDMIIndex() > 0)
+    if (ctx->mExtDisplay->isConnected())
         num_displays = 2;
     else
         num_displays = 1;
@@ -88,7 +88,8 @@ static void *vsync_loop(void *param)
         snprintf(vsync_node_path, sizeof(vsync_node_path),
                 "/sys/class/graphics/fb%d/vsync_event",
                 dpy == HWC_DISPLAY_PRIMARY ? 0 :
-                ctx->mExtDisplay->getHDMIIndex());
+                overlay::Overlay::getInstance()->
+                                getFbForDpy(HWC_DISPLAY_EXTERNAL));
         ALOGI("%s: Reading vsync for dpy=%d from %s", __FUNCTION__, dpy,
                 vsync_node_path);
         fb_fd[dpy] = open(vsync_node_path, O_RDONLY);
@@ -103,6 +104,8 @@ static void *vsync_loop(void *param)
                 break;
             }
         }
+        // Read once from the fds to clear the first notify
+        pread(fb_fd[dpy], vdata , MAX_DATA, 0);
 
         pfd[dpy].fd = fb_fd[dpy];
         if (pfd[dpy].fd >= 0)
@@ -119,7 +122,7 @@ static void *vsync_loop(void *param)
                         if (UNLIKELY(len < 0)) {
                             // If the read was just interrupted - it is not a
                             // fatal error. Just continue in this case
-                            ALOGE ("%s:Unable to read vsync for dpy=%d :%s",
+                            ALOGE ("%s: Unable to read vsync for dpy=%d : %s",
                                     __FUNCTION__, dpy, strerror(errno));
                             continue;
                         }
