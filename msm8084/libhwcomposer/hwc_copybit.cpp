@@ -296,9 +296,10 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         copybit_device_t *copybit = getCopyBitDevice();
         // Async mode
         copybit->flush_get_fence(copybit, fd);
-        if(mRelFd[0] >=0 && ctx->mMDP.version == qdutils::MDP_V3_0_4) {
-            close(mRelFd[0]);
-            mRelFd[0] = -1;
+        if(mRelFd[mCurRenderBufferIndex] >=0 &&
+           ctx->mMDP.version == qdutils::MDP_V3_0_4) {
+            close(mRelFd[mCurRenderBufferIndex]);
+            mRelFd[mCurRenderBufferIndex] = -1;
         }
     }
     return true;
