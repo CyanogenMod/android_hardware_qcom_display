@@ -147,8 +147,16 @@ protected:
     bool partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* Partial MDP comp that uses caching to save power as primary goal */
     bool cacheBasedComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
-    /* Partial MDP comp that uses number of pixels to optimize perf goal */
-    bool loadBasedComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    /* Partial MDP comp that prefers GPU perf-wise. Since the GPU's
+     * perf is proportional to the pixels it processes, we use the number of
+     * pixels as a heuristic */
+    bool loadBasedCompPreferGPU(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+    /* Partial MDP comp that prefers MDP perf-wise. Since the MDP's perf is
+     * proportional to the bandwidth, overlaps it sees, we use that as a
+     * heuristic */
+    bool loadBasedCompPreferMDP(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
     /* Checks if its worth doing load based partial comp */
     bool isLoadBasedCompDoable(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
