@@ -48,6 +48,8 @@ MDPVersion::MDPVersion()
     mMDPUpscale = 0;
     mMDPDownscale = 0;
     mPanelType = NO_PANEL;
+    mLowBw = 0;
+    mHighBw = 0;
 
     if(!updatePanelInfo()) {
         ALOGE("Unable to read Primary Panel Information");
@@ -168,8 +170,13 @@ bool MDPVersion::updateSysFsInfo() {
                 else if(!strncmp(tokens[0], "max_upscale_ratio",
                                 strlen("max_upscale_ratio"))) {
                     mMDPUpscale = atoi(tokens[1]);
-                }
-                else if(!strncmp(tokens[0], "features", strlen("features"))) {
+                } else if(!strncmp(tokens[0], "max_bandwidth_low",
+                        strlen("max_bandwidth_low"))) {
+                    mLowBw = atol(tokens[1]);
+                } else if(!strncmp(tokens[0], "max_bandwidth_high",
+                        strlen("max_bandwidth_high"))) {
+                    mHighBw = atol(tokens[1]);
+                } else if(!strncmp(tokens[0], "features", strlen("features"))) {
                     for(int i=1; i<index;i++) {
                         if(!strncmp(tokens[i], "bwc", strlen("bwc"))) {
                            mFeatures |= MDP_BWC_EN;
@@ -191,6 +198,9 @@ bool MDPVersion::updateSysFsInfo() {
                     mRGBPipes, mVGPipes);
     ALOGD_IF(DEBUG, "%s:mDMAPipes:%d \t mMDPDownscale:%d, mFeatures:%d",
                      __FUNCTION__,  mDMAPipes, mMDPDownscale, mFeatures);
+    ALOGD_IF(DEBUG, "%s:mLowBw: %lu mHighBw: %lu", __FUNCTION__,  mLowBw,
+            mHighBw);
+
     return true;
 }
 
