@@ -165,11 +165,11 @@ protected:
             bool secureOnly);
     /* checks for conditions where YUV layers cannot be bypassed */
     bool isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer);
-    /* calcs bytes read by MDP for a given frame */
-    uint32_t calcMDPBytesRead(hwc_context_t *ctx,
+    /* calcs bytes read by MDP in gigs for a given frame */
+    double calcMDPBytesRead(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
     /* checks if the required bandwidth exceeds a certain max */
-    bool bandwidthCheck(hwc_context_t *ctx, const uint32_t& size);
+    bool bandwidthCheck(hwc_context_t *ctx, const double& size);
     /* generates ROI based on the modified area of the frame */
     void generateROI(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     bool validateAndApplyROI(hwc_context_t *ctx, hwc_display_contents_1_t* list,
@@ -212,7 +212,7 @@ protected:
     static bool sIdleFallBack;
     static int sMaxPipesPerMixer;
     //Max bandwidth. Value is in GBPS. For ex: 2.3 means 2.3GBPS
-    static float sMaxBw;
+    static double sMaxBw;
     //Tracks composition bandwidth claimed. Represented as the total
     //w*h*bpp*fps (gigabytes-per-second) going to MDP mixers.
     static double sBwClaimed;
