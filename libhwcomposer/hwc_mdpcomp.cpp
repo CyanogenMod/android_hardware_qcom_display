@@ -586,6 +586,15 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ALOGD_IF(isDebug(), "%s: Unsupported layer in list",__FUNCTION__);
             return false;
         }
+
+        //For 8x26, if there is only one layer which needs scale for secondary
+        //while no scale for primary display, DMA pipe is occupied by primary.
+        //If need to fall back to GLES composition, virtual display lacks DMA
+        //pipe and error is reported.
+        if(qdutils::MDPVersion::getInstance().is8x26() &&
+                                mDpy >= HWC_DISPLAY_EXTERNAL &&
+                                qhwc::needsScaling(ctx, layer, mDpy))
+            return false;
     }
     mCurrentFrame.fbCount = 0;
     mCurrentFrame.fbZ = -1;
