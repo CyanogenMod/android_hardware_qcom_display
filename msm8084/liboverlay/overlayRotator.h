@@ -56,6 +56,7 @@ struct RotMem {
         bool close() { return m.close(); }
         uint32_t size() const { return m.bufSz(); }
         void setReleaseFd(const int& fence);
+        void resetReleaseFd();
         // Max rotator buffers
         enum { ROT_NUM_BUFS = 2 };
         // rotator data info dst offset
@@ -72,6 +73,7 @@ struct RotMem {
     Mem& prev() { return m[(_curr+1) % MAX_ROT_MEM]; }
     RotMem& operator++() { ++_curr; return *this; }
     void setReleaseFd(const int& fence) { curr().setReleaseFd(fence); }
+    void resetReleaseFd() { curr().resetReleaseFd(); }
     bool close();
     uint32_t _curr;
     Mem m[MAX_ROT_MEM];
@@ -96,6 +98,7 @@ public:
     virtual void dump() const = 0;
     virtual void getDump(char *buf, size_t len) const = 0;
     void setReleaseFd(const int& fence) { mMem.setReleaseFd(fence); }
+    void resetReleaseFd() { mMem.resetReleaseFd(); }
     static Rotator *getRotator();
 
 protected:
