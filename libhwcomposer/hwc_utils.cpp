@@ -607,8 +607,21 @@ int getMirrorModeOrientation(hwc_context_t *ctx) {
     return extOrientation;
 }
 
-bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer,
-        const int& dpy) {
+bool isDownscaleRequired(hwc_layer_1_t const* layer) {
+    hwc_rect_t displayFrame  = layer->displayFrame;
+    hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
+    int dst_w, dst_h, src_w, src_h;
+    dst_w = displayFrame.right - displayFrame.left;
+    dst_h = displayFrame.bottom - displayFrame.top;
+    src_w = sourceCrop.right - sourceCrop.left;
+    src_h = sourceCrop.bottom - sourceCrop.top;
+
+    if(((src_w > dst_w) || (src_h > dst_h)))
+        return true;
+
+    return false;
+}
+bool needsScaling(hwc_layer_1_t const* layer) {
     int dst_w, dst_h, src_w, src_h;
 
     hwc_rect_t displayFrame  = layer->displayFrame;
@@ -677,9 +690,8 @@ bool needsScalingWithSplit(hwc_context_t* ctx, hwc_layer_1_t const* layer,
     return false;
 }
 
-bool isAlphaScaled(hwc_context_t* ctx, hwc_layer_1_t const* layer,
-        const int& dpy) {
-    if(needsScaling(ctx, layer, dpy) && isAlphaPresent(layer)) {
+bool isAlphaScaled(hwc_layer_1_t const* layer) {
+    if(needsScaling(layer) && isAlphaPresent(layer)) {
         return true;
     }
     return false;
@@ -734,7 +746,6 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].numAppLayers = list->numHwLayers - 1;
     ctx->listStats[dpy].fbLayerIndex = list->numHwLayers - 1;
     ctx->listStats[dpy].skipCount = 0;
-    ctx->listStats[dpy].needsAlphaScale = false;
     ctx->listStats[dpy].preMultipliedAlpha = false;
     ctx->listStats[dpy].isSecurePresent = false;
     ctx->listStats[dpy].yuvCount = 0;
@@ -800,9 +811,6 @@ void setListStats(hwc_context_t *ctx,
         if(layer->blending == HWC_BLENDING_PREMULT)
             ctx->listStats[dpy].preMultipliedAlpha = true;
 
-        if(!ctx->listStats[dpy].needsAlphaScale)
-            ctx->listStats[dpy].needsAlphaScale =
-                    isAlphaScaled(ctx, layer, dpy);
 
         if(UNLIKELY(isExtOnly(hnd))){
             ctx->listStats[dpy].extOnlyLayerIndex = i;
@@ -1057,7 +1065,7 @@ void optimizeLayerRects(hwc_context_t *ctx,
             hwc_rect_t& topframe =
                 (hwc_rect_t&)list->hwLayers[i].displayFrame;
             while(j >= 0) {
-               if(!needsScaling(ctx, &list->hwLayers[j], dpy)) {
+               if(!needsScaling(&list->hwLayers[j])) {
                   hwc_layer_1_t* layer = (hwc_layer_1_t*)&list->hwLayers[j];
                   hwc_rect_t& bottomframe = layer->displayFrame;
                   hwc_rect_t& bottomCrop = layer->sourceCrop;

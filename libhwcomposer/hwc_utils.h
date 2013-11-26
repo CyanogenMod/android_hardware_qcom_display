@@ -97,7 +97,6 @@ struct ListStats {
     int yuvCount;
     int yuvIndices[MAX_NUM_APP_LAYERS];
     int extOnlyLayerIndex;
-    bool needsAlphaScale;
     bool preMultipliedAlpha;
     int yuv4k2kIndices[MAX_NUM_APP_LAYERS];
     int yuv4k2kCount;
@@ -205,8 +204,9 @@ void getNonWormholeRegion(hwc_display_contents_1_t* list,
 bool isSecuring(hwc_context_t* ctx, hwc_layer_1_t const* layer);
 bool isSecureModePolicy(int mdpVersion);
 bool isExternalActive(hwc_context_t* ctx);
-bool needsScaling(hwc_context_t* ctx, hwc_layer_1_t const* layer,
-                  const int& dpy);
+bool isAlphaScaled(hwc_layer_1_t const* layer);
+bool needsScaling(hwc_layer_1_t const* layer);
+bool isDownscaleRequired(hwc_layer_1_t const* layer);
 bool needsScalingWithSplit(hwc_context_t* ctx, hwc_layer_1_t const* layer,
                            const int& dpy);
 void sanitizeSourceCrop(hwc_rect_t& cropL, hwc_rect_t& cropR,
