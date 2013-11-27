@@ -39,6 +39,9 @@ struct hwc_context_t;
 namespace vpu {
 class VPU;
 };
+namespace android {
+class Parcel;
+};
 
 namespace qhwc {
 
@@ -52,7 +55,8 @@ public:
 
     int draw(hwc_context_t *ctx, hwc_display_contents_1_t* list);
 
-    int processCommand(uint32_t command, uint32_t setting);
+    int processCommand(uint32_t command,
+            const android::Parcel* inParcel, android::Parcel* outParcel);
 
 private:
     vpu::VPU *mVPU;
