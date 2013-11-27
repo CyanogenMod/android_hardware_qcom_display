@@ -27,9 +27,6 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <cutils/log.h>
-#include <fcntl.h>
-#include <sys/ioctl.h>
-#include <linux/fb.h>
 #include <linux/msm_mdp.h>
 #include "mdp_version.h"
 
@@ -42,81 +39,33 @@ namespace qdutils {
 
 MDPVersion::MDPVersion()
 {
-    int fb_fd = open("/dev/graphics/fb0", O_RDWR);
-    char panel_type = 0;
-    struct fb_fix_screeninfo fb_finfo;
-
-    mMDPVersion = MDP_V_UNKNOWN;
+    mMDPVersion = MDSS_V5;
     mMdpRev = 0;
     mRGBPipes = 0;
     mVGPipes = 0;
     mDMAPipes = 0;
     mFeatures = 0;
     mMDPUpscale = 0;
-    //TODO get this from driver, default for A-fam to 8
-    mMDPDownscale = 8;
-    mFd = fb_fd;
+    mMDPDownscale = 0;
+    mPanelType = NO_PANEL;
 
-    if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &fb_finfo) < 0) {
-        ALOGE("FBIOGET_FSCREENINFO failed");
-    } else {
-        if(!strncmp(fb_finfo.id, "msmfb", 5)) {
-            char str_ver[4] = { 0 };
-            memcpy(str_ver, &fb_finfo.id[5], 3);
-            str_ver[3] = '\0';
-            mMDPVersion = atoi(str_ver);
-            //Normalize MDP version to ease comparison.
-            //This is needed only because
-            //MDP 3.0.3 reports value as 303 which
-            //is more than all the others
-            if (mMDPVersion < 100)
-                mMDPVersion *= 10;
-
-            mRGBPipes = mVGPipes = 2;
-
-        } else if (!strncmp(fb_finfo.id, "mdssfb", 6)) {
-            mMDPVersion = MDSS_V5;
-            if(!updateSysFsInfo()) {
-                ALOGE("Unable to read updateSysFsInfo");
-            }
-            if (mMdpRev == MDP_V3_0_4){
-                mMDPVersion = MDP_V3_0_4;
-            }
-        }
-
-        /* Assumes panel type is 2nd element in '_' delimited id string */
-        char * ptype = strstr(fb_finfo.id, "_");
-        if (!ptype || (*(++ptype) == '\0')) {
-            ALOGE("Invalid framebuffer info string: %s", fb_finfo.id);
-            ptype = fb_finfo.id;
-        }
-        panel_type = *ptype;
+    if(!updatePanelInfo()) {
+        ALOGE("Unable to read Primary Panel Information");
     }
-    mPanelType = panel_type;
+    if(!updateSysFsInfo()) {
+        ALOGE("Unable to read display sysfs node");
+    }
+    if (mMdpRev == MDP_V3_0_4){
+        mMDPVersion = MDP_V3_0_4;
+    }
+
     mHasOverlay = false;
     if((mMDPVersion >= MDP_V4_0) ||
        (mMDPVersion == MDP_V_UNKNOWN) ||
        (mMDPVersion == MDP_V3_0_4))
         mHasOverlay = true;
-    if(mMDPVersion >= MDSS_V5) {
-        char split[64] = {0};
-        FILE* fp = fopen("/sys/class/graphics/fb0/msm_fb_split", "r");
-        if(fp){
-            //Format "left right" space as delimiter
-            if(fread(split, sizeof(char), 64, fp)) {
-                mSplit.mLeft = atoi(split);
-                ALOGI_IF(mSplit.mLeft, "Left Split=%d", mSplit.mLeft);
-                char *rght = strpbrk(split, " ");
-                if(rght)
-                    mSplit.mRight = atoi(rght + 1);
-                ALOGI_IF(rght, "Right Split=%d", mSplit.mRight);
-            }
-        } else {
-            ALOGE("Failed to open mdss_fb_split node");
-        }
-
-        if(fp)
-            fclose(fp);
+    if(!updateSplitInfo()) {
+        ALOGE("Unable to read display split node");
     }
 }
 
@@ -140,7 +89,39 @@ int MDPVersion::tokenizeParams(char *inputParams, const char *delim,
     *idx = index;
     return 0;
 }
+// This function reads the sysfs node to read the primary panel type
+// and updates information accordingly
+bool MDPVersion::updatePanelInfo() {
+    FILE *displayDeviceFP = NULL;
+    const int MAX_FRAME_BUFFER_NAME_SIZE = 128;
+    char fbType[MAX_FRAME_BUFFER_NAME_SIZE];
+    const char *strCmdPanel = "mipi dsi cmd panel";
+    const char *strVideoPanel = "mipi dsi video panel";
+    const char *strLVDSPanel = "lvds panel";
+    const char *strEDPPanel = "edp panel";
 
+    displayDeviceFP = fopen("/sys/class/graphics/fb0/msm_fb_type", "r");
+    if(displayDeviceFP){
+        fread(fbType, sizeof(char), MAX_FRAME_BUFFER_NAME_SIZE,
+                displayDeviceFP);
+        if(strncmp(fbType, strCmdPanel, strlen(strCmdPanel)) == 0) {
+            mPanelType = MIPI_CMD_PANEL;
+        }
+        else if(strncmp(fbType, strVideoPanel, strlen(strVideoPanel)) == 0) {
+            mPanelType = MIPI_VIDEO_PANEL;
+        }
+        else if(strncmp(fbType, strLVDSPanel, strlen(strLVDSPanel)) == 0) {
+            mPanelType = LVDS_PANEL;
+        }
+        else if(strncmp(fbType, strEDPPanel, strlen(strEDPPanel)) == 0) {
+            mPanelType = EDP_PANEL;
+        }
+        fclose(displayDeviceFP);
+        return true;
+    }else {
+        return false;
+    }
+}
 
 // This function reads the sysfs node to read MDP capabilities
 // and parses and updates information accordingly.
@@ -212,6 +193,33 @@ bool MDPVersion::updateSysFsInfo() {
                      __FUNCTION__,  mDMAPipes, mMDPDownscale, mFeatures);
     return true;
 }
+
+// This function reads the sysfs node to read MDP capabilities
+// and parses and updates information accordingly.
+bool MDPVersion::updateSplitInfo() {
+    if(mMDPVersion >= MDSS_V5) {
+        char split[64] = {0};
+        FILE* fp = fopen("/sys/class/graphics/fb0/msm_fb_split", "r");
+        if(fp){
+            //Format "left right" space as delimiter
+            if(fread(split, sizeof(char), 64, fp)) {
+                mSplit.mLeft = atoi(split);
+                ALOGI_IF(mSplit.mLeft, "Left Split=%d", mSplit.mLeft);
+                char *rght = strpbrk(split, " ");
+                if(rght)
+                    mSplit.mRight = atoi(rght + 1);
+                ALOGI_IF(mSplit.mRight, "Right Split=%d", mSplit.mRight);
+            }
+        } else {
+            ALOGE("Failed to open mdss_fb_split node");
+            return false;
+        }
+        if(fp)
+            fclose(fp);
+    }
+    return true;
+}
+
 
 bool MDPVersion::supportsDecimation() {
     return mFeatures & MDP_DECIMATION_EN;
