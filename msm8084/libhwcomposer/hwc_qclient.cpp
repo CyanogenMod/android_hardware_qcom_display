@@ -51,57 +51,28 @@ QClient::~QClient()
     ALOGD_IF(QCLIENT_DEBUG,"QClient Destructor invoked");
 }
 
-status_t QClient::notifyCallback(uint32_t msg, uint32_t value) {
-
-    if (msg > IQService::VPU_COMMAND_LIST_START &&
-        msg < IQService::VPU_COMMAND_LIST_END) {
-        return vpuCommand(msg, value);
-    }
-
-    switch(msg) {
-        case IQService::SECURING:
-            securing(value);
-            break;
-        case IQService::UNSECURING:
-            unsecuring(value);
-            break;
-        case IQService::SCREEN_REFRESH:
-            return screenRefresh();
-            break;
-        case IQService::EXTERNAL_ORIENTATION:
-            setExtOrientation(value);
-            break;
-        case IQService::BUFFER_MIRRORMODE:
-            setBufferMirrorMode(value);
-            break;
-        default:
-            return NO_ERROR;
-    }
-    return NO_ERROR;
-}
-
-void QClient::securing(uint32_t startEnd) {
-    Locker::Autolock _sl(mHwcContext->mDrawLock);
+static void securing(hwc_context_t *ctx, uint32_t startEnd) {
+    Locker::Autolock _sl(ctx->mDrawLock);
     //The only way to make this class in this process subscribe to media
     //player's death.
     IMediaDeathNotifier::getMediaPlayerService();
 
-    mHwcContext->mSecuring = startEnd;
+    ctx->mSecuring = startEnd;
     //We're done securing
     if(startEnd == IQService::END)
-        mHwcContext->mSecureMode = true;
-    if(mHwcContext->proc)
-        mHwcContext->proc->invalidate(mHwcContext->proc);
+        ctx->mSecureMode = true;
+    if(ctx->proc)
+        ctx->proc->invalidate(ctx->proc);
 }
 
-void QClient::unsecuring(uint32_t startEnd) {
-    Locker::Autolock _sl(mHwcContext->mDrawLock);
-    mHwcContext->mSecuring = startEnd;
+static void unsecuring(hwc_context_t *ctx, uint32_t startEnd) {
+    Locker::Autolock _sl(ctx->mDrawLock);
+    ctx->mSecuring = startEnd;
     //We're done unsecuring
     if(startEnd == IQService::END)
-        mHwcContext->mSecureMode = false;
-    if(mHwcContext->proc)
-        mHwcContext->proc->invalidate(mHwcContext->proc);
+        ctx->mSecureMode = false;
+    if(ctx->proc)
+        ctx->proc->invalidate(ctx->proc);
 }
 
 void QClient::MPDeathNotifier::died() {
@@ -113,33 +84,68 @@ void QClient::MPDeathNotifier::died() {
         mHwcContext->proc->invalidate(mHwcContext->proc);
 }
 
-android::status_t QClient::screenRefresh() {
+static android::status_t screenRefresh(hwc_context_t *ctx) {
     status_t result = NO_INIT;
 #ifdef QCOM_BSP
-    if(mHwcContext->proc) {
-        mHwcContext->proc->invalidate(mHwcContext->proc);
+    if(ctx->proc) {
+        ctx->proc->invalidate(ctx->proc);
         result = NO_ERROR;
     }
 #endif
     return result;
 }
 
-android::status_t QClient::vpuCommand(uint32_t command, uint32_t setting) {
+static android::status_t vpuCommand(hwc_context_t *ctx,
+        uint32_t command,
+        const Parcel* inParcel,
+        Parcel* outParcel) {
     status_t result = NO_INIT;
 #ifdef QCOM_BSP
 #ifdef VPU_TARGET
-    result = mHwcContext->mVPUClient->processCommand(command, setting);
+    result = ctx->mVPUClient->processCommand(command, inParcel, outParcel);
 #endif
 #endif
     return result;
 }
 
-void QClient::setExtOrientation(uint32_t orientation) {
-    mHwcContext->mExtOrientation = orientation;
+static void setExtOrientation(hwc_context_t *ctx, uint32_t orientation) {
+    ctx->mExtOrientation = orientation;
 }
 
-void QClient::setBufferMirrorMode(uint32_t enable) {
-    mHwcContext->mBufferMirrorMode = enable;
+static void setBufferMirrorMode(hwc_context_t *ctx, uint32_t enable) {
+    ctx->mBufferMirrorMode = enable;
 }
+
+status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
+        Parcel* outParcel) {
+
+    if (command > IQService::VPU_COMMAND_LIST_START &&
+        command < IQService::VPU_COMMAND_LIST_END) {
+        return vpuCommand(mHwcContext, command, inParcel, outParcel);
+    }
+
+    switch(command) {
+        case IQService::SECURING:
+            securing(mHwcContext, inParcel->readInt32());
+            break;
+        case IQService::UNSECURING:
+            unsecuring(mHwcContext, inParcel->readInt32());
+            break;
+        case IQService::SCREEN_REFRESH:
+            return screenRefresh(mHwcContext);
+            break;
+        case IQService::EXTERNAL_ORIENTATION:
+            setExtOrientation(mHwcContext, inParcel->readInt32());
+            break;
+        case IQService::BUFFER_MIRRORMODE:
+            setBufferMirrorMode(mHwcContext, inParcel->readInt32());
+            break;
+        default:
+            return NO_ERROR;
+    }
+    return NO_ERROR;
+}
+
+
 
 }
