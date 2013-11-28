@@ -26,9 +26,10 @@
 */
 
 #include "cb_utils.h"
-
+#include "cb_swap_rect.h"
 /* get union of two rects into 3rd rect */
 void getUnion(hwc_rect_t& rect1,hwc_rect_t& rect2, hwc_rect_t& irect) {
+
     irect.left   = min(rect1.left, rect2.left);
     irect.top    = min(rect1.top, rect2.top);
     irect.right  = max(rect1.right, rect2.right);
@@ -44,11 +45,23 @@ int CBUtils::getuiClearRegion(hwc_display_contents_1_t* list,
 
     uint32_t last = list->numHwLayers - 1;
     hwc_rect_t fbFrame = list->hwLayers[last].displayFrame;
-
     Rect fbFrameRect(fbFrame.left,fbFrame.top,fbFrame.right,fbFrame.bottom);
     Region wormholeRegion(fbFrameRect);
 
-    for (uint32_t i = 0 ; i < last; i++) {
+    if(cb_swap_rect::getInstance().checkSwapRectFeature_on() == true){
+      wormholeRegion.set(0,0);
+      for(uint32_t i = 0 ; i < last; i++) {
+         if((list->hwLayers[i].blending == HWC_BLENDING_NONE) ||
+           !(layerProp[i].mFlags & HWC_COPYBIT) ||
+           (list->hwLayers[i].flags  & HWC_SKIP_HWC_COMPOSITION))
+              continue ;
+         hwc_rect_t displayFrame = list->hwLayers[i].displayFrame;
+         Rect tmpRect(displayFrame.left,displayFrame.top,
+                      displayFrame.right,displayFrame.bottom);
+         wormholeRegion.set(tmpRect);
+      }
+   }else{
+     for (uint32_t i = 0 ; i < last; i++) {
         // need to take care only in per pixel blending.
         // Restrict calculation only for copybit layers.
         if((list->hwLayers[i].blending != HWC_BLENDING_NONE) ||
@@ -59,21 +72,27 @@ int CBUtils::getuiClearRegion(hwc_display_contents_1_t* list,
         displayFrame.bottom);
         Region tmpRegion(tmpRect);
         wormholeRegion.subtractSelf(wormholeRegion.intersect(tmpRegion));
-    }
-    if (wormholeRegion.isEmpty()) {
+     }
+   }
+   if(wormholeRegion.isEmpty()){
         return 0;
-    }
-    //TO DO :- 1. remove union and call clear for each rect.
-    //      :- 2. support swap ract feature.
-    Region::const_iterator it = wormholeRegion.begin();
-    Region::const_iterator const end = wormholeRegion.end();
-    while (it != end) {
-        const Rect& r = *it++;
-        hwc_rect_t tmpWormRect = {r.left,r.top,r.right,r.bottom};
-        getUnion(clearWormholeRect, tmpWormRect, clearWormholeRect);
+   }
+   //TO DO :- 1. remove union and call clear for each rect.
+   Region::const_iterator it = wormholeRegion.begin();
+   Region::const_iterator const end = wormholeRegion.end();
+   while (it != end) {
+       const Rect& r = *it++;
+       hwc_rect_t tmpWormRect = {r.left,r.top,r.right,r.bottom};
+       int dst_w =  clearWormholeRect.right -  clearWormholeRect.left;
+       int dst_h =  clearWormholeRect.bottom -  clearWormholeRect.top;
 
-    }
-    return 1;
+       if (!(dst_w || dst_h))
+             clearWormholeRect = tmpWormRect;
+       else
+             getUnion(clearWormholeRect, tmpWormRect, clearWormholeRect);
+
+   }
+   return 1;
 }
 
 }//namespace qdutils
