@@ -49,6 +49,10 @@ int CBUtils::getuiClearRegion(hwc_display_contents_1_t* list,
     Region wormholeRegion(fbFrameRect);
 
     for (uint32_t i = 0 ; i < last; i++) {
+        //TODO Work on using hwc clear instead of gpu for HWC_BLIT
+        //If layer is marked for HWC_BLIT clear is done by GPU
+        if(list->hwLayers[i].compositionType == HWC_BLIT)
+            return 0;
         // need to take care only in per pixel blending.
         // Restrict calculation only for copybit layers.
         if((list->hwLayers[i].blending != HWC_BLENDING_NONE) ||
