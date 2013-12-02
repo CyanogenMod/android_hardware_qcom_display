@@ -1366,6 +1366,42 @@ int configMdp(Overlay *ov, const PipeArgs& parg,
     return 0;
 }
 
+int configColorLayer(hwc_context_t *ctx, hwc_layer_1_t *layer,
+        const int& dpy, eMdpFlags& mdpFlags, eZorder& z,
+        eIsFg& isFg, const eDest& dest) {
+
+    hwc_rect_t dst = layer->displayFrame;
+    trimLayer(ctx, dpy, 0, dst, dst);
+
+    int w = ctx->dpyAttr[dpy].xres;
+    int h = ctx->dpyAttr[dpy].yres;
+    int dst_w = dst.right - dst.left;
+    int dst_h = dst.bottom - dst.top;
+    uint32_t color = layer->transform;
+    Whf whf(w, h, getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888), 0);
+
+    if (layer->blending == HWC_BLENDING_PREMULT)
+        ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_BLEND_FG_PREMULT);
+
+    PipeArgs parg(mdpFlags, whf, z, isFg, static_cast<eRotFlags>(0),
+                  layer->planeAlpha,
+                  (ovutils::eBlending) getBlending(layer->blending));
+
+    // Configure MDP pipe for Color layer
+    Dim pos(dst.left, dst.top, dst_w, dst_h);
+    ctx->mOverlay->setSource(parg, dest);
+    ctx->mOverlay->setColor(color, dest);
+    ctx->mOverlay->setTransform(0, dest);
+    ctx->mOverlay->setCrop(pos, dest);
+    ctx->mOverlay->setPosition(pos, dest);
+
+    if (!ctx->mOverlay->commit(dest)) {
+        ALOGE("%s: Configure color layer failed!", __FUNCTION__);
+        return -1;
+    }
+    return 0;
+}
+
 void updateSource(eTransform& orient, Whf& whf,
         hwc_rect_t& crop) {
     Dim srcCrop(crop.left, crop.top,
@@ -1396,7 +1432,12 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         eIsFg& isFg, const eDest& dest, Rotator **rot) {
 
     private_handle_t *hnd = (private_handle_t *)layer->handle;
+
     if(!hnd) {
+        if (layer->flags & HWC_COLOR_FILL) {
+            // Configure Color layer
+            return configColorLayer(ctx, layer, dpy, mdpFlags, z, isFg, dest);
+        }
         ALOGE("%s: layer handle is NULL", __FUNCTION__);
         return -1;
     }
