@@ -80,7 +80,8 @@ void Overlay::configBegin() {
 
 void Overlay::configDone() {
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
-        if(PipeBook::isNotUsed(i)) {
+        if((PipeBook::isNotUsed(i) && !sessionInProgress((eDest)i)) ||
+                    isSessionEnded((eDest)i)) {
             //Forces UNSET on pipes, flushes rotator memory and session, closes
             //fds
             if(mPipeBook[i].valid()) {
@@ -104,6 +105,27 @@ void Overlay::configDone() {
         scalar->configDone();
     }
 #endif
+}
+
+int Overlay::getPipeId(utils::eDest dest) {
+    return mPipeBook[(int)dest].mPipe->getPipeId();
+}
+
+eDest Overlay::getDest(int pipeid) {
+    eDest dest = OV_INVALID;
+    // finding the dest corresponding to the given pipe
+    for(int i=0; i < PipeBook::NUM_PIPES; ++i) {
+        if(mPipeBook[i].valid() && mPipeBook[i].mPipe->getPipeId() == pipeid) {
+            return (eDest)i;
+        }
+    }
+    return dest;
+}
+
+eDest Overlay::reservePipe(int pipeid) {
+    eDest dest = getDest(pipeid);
+    PipeBook::setAllocation((int)dest);
+    return dest;
 }
 
 eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
@@ -131,6 +153,7 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
         mPipeBook[index].mMixer = mixer;
         if(not mPipeBook[index].valid()) {
             mPipeBook[index].mPipe = new GenericPipe(dpy);
+            mPipeBook[index].mSession = PipeBook::NONE;
             char str[32];
             snprintf(str, 32, "Set=%s dpy=%d mix=%d; ",
                      PipeBook::getDestStr(dest), dpy, mixer);
@@ -144,6 +167,13 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
     }
 
     return dest;
+}
+
+void Overlay::endAllSessions() {
+    for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
+        if(mPipeBook[i].valid() && mPipeBook[i].mSession==PipeBook::START)
+            mPipeBook[i].mSession = PipeBook::END;
+    }
 }
 
 bool Overlay::isPipeTypeAttached(eMdpPipeType type) {
@@ -460,6 +490,7 @@ void Overlay::PipeBook::destroy() {
     }
     mDisplay = DPY_UNUSED;
     mMixer = MIXER_UNUSED;
+    mSession = NONE;
 }
 
 Overlay* Overlay::sInstance = 0;
