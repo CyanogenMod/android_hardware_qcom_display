@@ -57,6 +57,8 @@ public:
      * Dim - ROI dimensions.
      */
     void setCrop(const utils::Dim& d);
+    /* set color for mdp pipe */
+    void setColor(const uint32_t color);
     void setTransform(const utils::eTransform& orient);
     /* given a dim and w/h, set overlay dim */
     void setPosition(const utils::Dim& dim);
