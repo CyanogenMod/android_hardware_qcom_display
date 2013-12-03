@@ -244,32 +244,5 @@ bool MDPVersion::supportsBWC() {
     return (mFeatures & MDP_BWC_EN);
 }
 
-bool MDPVersion::is8x26() {
-    // check for 8x26 variants
-    // chip variants have same major number and minor numbers usually vary
-    // for e.g., MDSS_MDP_HW_REV_101 is 0x10010000
-    //                                    1001       -  major number
-    //                                        0000   -  minor number
-    // 8x26 v1 minor number is 0000
-    //      v2 minor number is 0001 etc..
-    if( mMdpRev >= MDSS_MDP_HW_REV_101 && mMdpRev < MDSS_MDP_HW_REV_102) {
-        return true;
-    }
-    return false;
-}
-
-bool MDPVersion::is8x74v2() {
-    if( mMdpRev >= MDSS_MDP_HW_REV_102 && mMdpRev < MDSS_MDP_HW_REV_200) {
-        return true;
-    }
-    return false;
-}
-
-bool MDPVersion::is8x92() {
-    if( mMdpRev >= MDSS_MDP_HW_REV_200 && mMdpRev < MDSS_MDP_HW_REV_206) {
-        return true;
-    }
-    return false;
-}
 }; //namespace qdutils
 
