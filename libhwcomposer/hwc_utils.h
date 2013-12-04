@@ -391,6 +391,7 @@ struct hwc_context_t {
     qhwc::LayerProp *layerProp[HWC_NUM_DISPLAY_TYPES];
     qhwc::MDPComp *mMDPComp[HWC_NUM_DISPLAY_TYPES];
     qhwc::HwcDebug *mHwcDebug[HWC_NUM_DISPLAY_TYPES];
+    hwc_rect_t mViewFrame[HWC_NUM_DISPLAY_TYPES];
 
     // No animation on External display feature
     // Notifies hwcomposer about the device orientation before animation.
