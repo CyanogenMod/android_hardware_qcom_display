@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2013 The Linux Foundation. All rights reserved.
+* Copyright (c) 2013-14 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -81,6 +81,10 @@ inline android::status_t setExtOrientation(uint32_t orientation) {
 
 inline android::status_t setBufferMirrorMode(uint32_t enable) {
     return sendSingleParam(qService::IQService::BUFFER_MIRRORMODE, enable);
+}
+
+inline android::status_t pauseWFD(uint32_t pause) {
+    return sendSingleParam(qService::IQService::PAUSE_WFD, pause);
 }
 
 #endif /* end of include guard: QSERVICEUTILS_H */

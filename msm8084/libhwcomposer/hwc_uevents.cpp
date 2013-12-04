@@ -1,7 +1,7 @@
 
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-14, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -115,6 +115,58 @@ static int getConnectedState(const char* strUdata, int len)
         iter_str += strlen(iter_str)+1;
     }
     return -1;
+}
+
+void handle_pause(hwc_context_t* ctx, int dpy) {
+    {
+        Locker::Autolock _l(ctx->mDrawLock);
+        ctx->dpyAttr[dpy].isActive = true;
+        ctx->dpyAttr[dpy].isPause = true;
+        ctx->proc->invalidate(ctx->proc);
+    }
+    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+           * 2 / 1000);
+    // At this point all the pipes used by External have been
+    // marked as UNSET.
+    {
+        Locker::Autolock _l(ctx->mDrawLock);
+        // Perform commit to unstage the pipes.
+        if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+            ALOGE("%s: display commit fail! for %d dpy",
+                  __FUNCTION__, dpy);
+        }
+    }
+    return;
+}
+
+void handle_resume(hwc_context_t* ctx, int dpy) {
+    //Treat Resume as Online event
+    //Since external didnt have any pipes, force primary to give up
+    //its pipes; we don't allow inter-mixer pipe transfers.
+    {
+        Locker::Autolock _l(ctx->mDrawLock);
+
+        // A dynamic resolution change (DRC) can be made for a WiFi
+        // display. In order to support the resolution change, we
+        // need to reconfigure the corresponding display attributes.
+        // Since DRC is only on WiFi display, we only need to call
+        // configure() on the VirtualDisplay device.
+        if(dpy == HWC_DISPLAY_VIRTUAL)
+            ctx->mVirtualDisplay->configure();
+
+        ctx->dpyAttr[dpy].isConfiguring = true;
+        ctx->dpyAttr[dpy].isActive = true;
+        ctx->proc->invalidate(ctx->proc);
+    }
+    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+           * 2 / 1000);
+    //At this point external has all the pipes it would need.
+    {
+        Locker::Autolock _l(ctx->mDrawLock);
+        ctx->dpyAttr[dpy].isPause = false;
+        ctx->proc->invalidate(ctx->proc);
+    }
+    return;
 }
 
 static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
@@ -267,25 +319,8 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         case EXTERNAL_PAUSE:
             {   // pause case
                 ALOGD("%s Received Pause event",__FUNCTION__);
-                 {
-                     Locker::Autolock _l(ctx->mDrawLock);
-                     ctx->dpyAttr[dpy].isActive = true;
-                     ctx->dpyAttr[dpy].isPause = true;
-                     ctx->proc->invalidate(ctx->proc);
-                 }
-                 usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-                         * 2 / 1000);
-                 // At this point all the pipes used by External have been
-                 // marked as UNSET.
-                 {
-                     Locker::Autolock _l(ctx->mDrawLock);
-                     // Perform commit to unstage the pipes.
-                     if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
-                         ALOGE("%s: display commit fail! for %d dpy",
-                                 __FUNCTION__, dpy);
-                     }
-                 }
-                 break;
+                handle_pause(ctx, dpy);
+                break;
             }
         case EXTERNAL_RESUME:
             {  // resume case
@@ -293,29 +328,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 //Treat Resume as Online event
                 //Since external didnt have any pipes, force primary to give up
                 //its pipes; we don't allow inter-mixer pipe transfers.
-                {
-                    Locker::Autolock _l(ctx->mDrawLock);
-
-                    // A dynamic resolution change (DRC) can be made for a WiFi
-                    // display. In order to support the resolution change, we
-                    // need to reconfigure the corresponding display attributes.
-                    // Since DRC is only on WiFi display, we only need to call
-                    // configure() on the VirtualDisplay device.
-                    if(dpy == HWC_DISPLAY_VIRTUAL)
-                        ctx->mVirtualDisplay->configure();
-
-                    ctx->dpyAttr[dpy].isConfiguring = true;
-                    ctx->dpyAttr[dpy].isActive = true;
-                    ctx->proc->invalidate(ctx->proc);
-                }
-                usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-                        * 2 / 1000);
-                //At this point external has all the pipes it would need.
-                {
-                    Locker::Autolock _l(ctx->mDrawLock);
-                    ctx->dpyAttr[dpy].isPause = false;
-                    ctx->proc->invalidate(ctx->proc);
-                }
+                handle_resume(ctx, dpy);
                 break;
             }
     default:

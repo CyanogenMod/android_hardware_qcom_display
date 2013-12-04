@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C)2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C)2012-2014, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -254,6 +254,10 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
 // Returns the orientation that needs to be set on external for
 // BufferMirrirMode(Sidesync)
 int getMirrorModeOrientation(hwc_context_t *ctx);
+
+// Handles wfd Pause and resume events
+void handle_pause(hwc_context_t *ctx, int dpy);
+void handle_resume(hwc_context_t *ctx, int dpy);
 
 //Close acquireFenceFds of all layers of incoming list
 void closeAcquireFds(hwc_display_contents_1_t* list);
