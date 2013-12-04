@@ -745,6 +745,7 @@ void setListStats(hwc_context_t *ctx,
                       (int)ctx->dpyAttr[dpy].xres, (int)ctx->dpyAttr[dpy].yres);
     ctx->listStats[dpy].secureUI = false;
     ctx->listStats[dpy].yuv4k2kCount = 0;
+    ctx->mViewFrame[dpy] = (hwc_rect_t){0, 0, 0, 0};
 
     trimList(ctx, list, dpy);
     optimizeLayerRects(ctx, list, dpy);
@@ -753,6 +754,9 @@ void setListStats(hwc_context_t *ctx,
         hwc_layer_1_t const* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
+        // Calculate view frame of each display from the layer displayframe
+        ctx->mViewFrame[dpy] = getUnion(ctx->mViewFrame[dpy],
+                                        layer->displayFrame);
 #ifdef QCOM_BSP
         if (layer->flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
             ctx->listStats[dpy].isDisplayAnimating = true;
