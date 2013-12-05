@@ -42,6 +42,9 @@ namespace qhwc {
 #define MAX_SYSFS_FILE_PATH             255
 #define UNKNOWN_STRING                  "unknown"
 #define SPD_NAME_LENGTH                 16
+/* Max. resolution assignable to when downscale */
+#define SUPPORTED_DOWNSCALE_EXT_AREA    (1920*1080)
+
 
 int ExternalDisplay::configure() {
     if(!openFrameBuffer()) {
@@ -590,7 +593,7 @@ void ExternalDisplay::setAttributes() {
             // downscale mode
             // Restrict this upto 1080p resolution max
             if(((priW * priH) > (width * height)) &&
-                 (priW <= qdutils::MAX_DISPLAY_DIM )) {
+               ((priW * priH) <= SUPPORTED_DOWNSCALE_EXT_AREA)) {
                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = priW;
                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = priH;
                 // HDMI is always in landscape, so always assign the higher
