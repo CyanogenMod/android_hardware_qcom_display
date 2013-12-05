@@ -113,6 +113,8 @@ public:
     bool is8x92();
     int getLeftSplit() { return mSplit.left(); }
     int getRightSplit() { return mSplit.right(); }
+    unsigned long getLowBw() { return mLowBw; }
+    unsigned long getHighBw() { return mHighBw; }
 private:
     bool updateSysFsInfo();
     bool updatePanelInfo();
@@ -131,6 +133,8 @@ private:
     uint32_t mMDPDownscale;
     uint32_t mMDPUpscale;
     Split mSplit;
+    unsigned long mLowBw; //kbps
+    unsigned long mHighBw; //kbps
 };
 }; //namespace qdutils
 #endif //INCLUDE_LIBQCOMUTILS_MDPVER
