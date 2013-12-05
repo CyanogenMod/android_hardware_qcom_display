@@ -664,11 +664,13 @@ bool needsScalingWithSplit(hwc_context_t* ctx, hwc_layer_1_t const* layer,
     cropL = sourceCrop;
     dstL = displayFrame;
     hwc_rect_t scissorL = { 0, 0, lSplit, hw_h };
+    scissorL = getIntersection(ctx->mViewFrame[dpy], scissorL);
     qhwc::calculate_crop_rects(cropL, dstL, scissorL, 0);
 
     cropR = sourceCrop;
     dstR = displayFrame;
     hwc_rect_t scissorR = { lSplit, 0, hw_w, hw_h };
+    scissorR = getIntersection(ctx->mViewFrame[dpy], scissorR);
     qhwc::calculate_crop_rects(cropR, dstR, scissorR, 0);
 
     // Sanitize Crop to stitch
@@ -726,6 +728,7 @@ static void trimLayer(hwc_context_t *ctx, const int& dpy, const int& transform,
     if(dst.left < 0 || dst.top < 0 ||
             dst.right > hw_w || dst.bottom > hw_h) {
         hwc_rect_t scissor = {0, 0, hw_w, hw_h };
+        scissor = getIntersection(ctx->mViewFrame[dpy], scissor);
         qhwc::calculate_crop_rects(crop, dst, scissor, transform);
     }
 }
@@ -1687,12 +1690,14 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         tmp_cropL = crop;
         tmp_dstL = dst;
         hwc_rect_t scissor = {0, 0, lSplit, hw_h };
+        scissor = getIntersection(ctx->mViewFrame[dpy], scissor);
         qhwc::calculate_crop_rects(tmp_cropL, tmp_dstL, scissor, 0);
     }
     if(rDest != OV_INVALID) {
         tmp_cropR = crop;
         tmp_dstR = dst;
         hwc_rect_t scissor = {lSplit, 0, hw_w, hw_h };
+        scissor = getIntersection(ctx->mViewFrame[dpy], scissor);
         qhwc::calculate_crop_rects(tmp_cropR, tmp_dstR, scissor, 0);
     }
 
