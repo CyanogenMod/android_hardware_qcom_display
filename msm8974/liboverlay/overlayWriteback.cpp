@@ -238,6 +238,17 @@ void Writeback::clear() {
     }
 }
 
+bool Writeback::getDump(char *buf, size_t len) {
+    if(sWb) {
+        utils::getDump(buf, len, "WBData", sWb->mFbData);
+        char str[4] = {'\0'};
+        snprintf(str, 4, "\n");
+        strncat(buf, str, strlen(str));
+        return true;
+    }
+    return false;
+}
+
 Writeback *Writeback::sWb = 0;
 bool Writeback::sUsed = false;
 
