@@ -714,6 +714,10 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->mAlpha = MDP_ALPHA_NOP;
     ctx->mFlags = 0;
     ctx->sync.flags = 0;
+    ctx->relFence = -1;
+    for (int i=0; i < MDP_MAX_FENCE_FD; i++) {
+        ctx->acqFence[i] = -1;
+    }
     ctx->sync.acq_fen_fd = ctx->acqFence;
     ctx->sync.rel_fen_fd = &ctx->relFence;
     ctx->list.count = 0;
