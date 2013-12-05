@@ -43,7 +43,7 @@ bool MDPComp::sEnabled = false;
 bool MDPComp::sEnableMixedMode = true;
 bool MDPComp::sEnablePartialFrameUpdate = false;
 int MDPComp::sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
-float MDPComp::sMaxBw = 2.3f;
+double MDPComp::sMaxBw = 0.0;
 double MDPComp::sBwClaimed = 0.0;
 
 MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
@@ -126,13 +126,6 @@ bool MDPComp::init(hwc_context_t *ctx) {
         int val = atoi(property);
         if(val >= 0)
             sMaxPipesPerMixer = min(val, MAX_PIPES_PER_MIXER);
-    }
-
-    if(property_get("debug.mdpcomp.bw", property, "0") > 0) {
-        float val = atof(property);
-        if(val > 0.0f) {
-            sMaxBw = val;
-        }
     }
 
     if(ctx->mMDP.panel != MIPI_CMD_PANEL) {
@@ -1148,7 +1141,7 @@ bool MDPComp::resourceCheck(hwc_context_t *ctx,
         return false;
     }
 
-    uint32_t size = calcMDPBytesRead(ctx, list);
+    double size = calcMDPBytesRead(ctx, list);
     if(!bandwidthCheck(ctx, size)) {
         ALOGD_IF(isDebug(), "%s: Exceeds bandwidth",__FUNCTION__);
         return false;
@@ -1157,12 +1150,15 @@ bool MDPComp::resourceCheck(hwc_context_t *ctx,
     return true;
 }
 
-uint32_t MDPComp::calcMDPBytesRead(hwc_context_t *ctx,
+double MDPComp::calcMDPBytesRead(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-    uint32_t size = 0;
+    double size = 0;
+    const double GIG = 1000000000.0;
 
-    if(!qdutils::MDPVersion::getInstance().is8x74v2())
-        return 0;
+    //Skip for targets where no device tree value for bw is supplied
+    if(sMaxBw <= 0.0) {
+        return 0.0;
+    }
 
     for (uint32_t i = 0; i < list->numHwLayers - 1; i++) {
         if(!mCurrentFrame.isFBComposed[i]) {
@@ -1172,33 +1168,37 @@ uint32_t MDPComp::calcMDPBytesRead(hwc_context_t *ctx,
                 hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
                 hwc_rect_t dst = layer->displayFrame;
                 float bpp = ((float)hnd->size) / (hnd->width * hnd->height);
-                size += bpp * (crop.right - crop.left) *
-                    (crop.bottom - crop.top) *
-                    ctx->dpyAttr[mDpy].yres / (dst.bottom - dst.top);
+                size += (bpp * (crop.right - crop.left) *
+                        (crop.bottom - crop.top) *
+                        ctx->dpyAttr[mDpy].yres / (dst.bottom - dst.top)) /
+                        GIG;
             }
         }
     }
 
     if(mCurrentFrame.fbCount) {
         hwc_layer_1_t* layer = &list->hwLayers[list->numHwLayers - 1];
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        if (hnd)
-            size += hnd->size;
+        int tempw, temph;
+        size += (getBufferSizeAndDimensions(
+                    layer->displayFrame.right - layer->displayFrame.left,
+                    layer->displayFrame.bottom - layer->displayFrame.top,
+                    HAL_PIXEL_FORMAT_RGBA_8888,
+                    tempw, temph)) / GIG;
     }
 
     return size;
 }
 
-bool MDPComp::bandwidthCheck(hwc_context_t *ctx, const uint32_t& size) {
-    //Will be added for other targets if we run into bandwidth issues and when
-    //we have profiling data to set an upper limit.
-    if(qdutils::MDPVersion::getInstance().is8x74v2()) {
-        const uint32_t ONE_GIG = 1000 * 1000 * 1000;
-        double panelRefRate =
-                1000000000.0 / ctx->dpyAttr[mDpy].vsync_period;
-        if((size * panelRefRate) > ((sMaxBw - sBwClaimed) * ONE_GIG)) {
-            return false;
-        }
+bool MDPComp::bandwidthCheck(hwc_context_t *ctx, const double& size) {
+    //Skip for targets where no device tree value for bw is supplied
+    if(sMaxBw <= 0.0) {
+        return true;
+    }
+
+    double panelRefRate =
+            1000000000.0 / ctx->dpyAttr[mDpy].vsync_period;
+    if((size * panelRefRate) > (sMaxBw - sBwClaimed)) {
+        return false;
     }
     return true;
 }
@@ -1206,6 +1206,7 @@ bool MDPComp::bandwidthCheck(hwc_context_t *ctx, const uint32_t& size) {
 int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int ret = 0;
     const int numLayers = ctx->listStats[mDpy].numAppLayers;
+    MDPVersion& mdpVersion = qdutils::MDPVersion::getInstance();
 
     //reset old data
     mCurrentFrame.reset(numLayers);
@@ -1232,6 +1233,12 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     }
 
     generateROI(ctx, list);
+
+    //Convert from kbps to gbps
+    sMaxBw = mdpVersion.getHighBw() / 1000000.0;
+    if (ctx->mExtDisplay->isConnected() || ctx->mMDP.panel != MIPI_CMD_PANEL) {
+        sMaxBw = mdpVersion.getLowBw() / 1000000.0;
+    }
 
     //Check whether layers marked for MDP Composition is actually doable.
     if(isFullFrameDoable(ctx, list)) {
@@ -1311,9 +1318,9 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     }
 
 exit:
-    //gbps (bytes / nanosec = gigabytes / sec)
-    sBwClaimed += calcMDPBytesRead(ctx, list) /
-            (double)ctx->dpyAttr[mDpy].vsync_period;
+    double panelRefRate =
+            1000000000.0 / ctx->dpyAttr[mDpy].vsync_period;
+    sBwClaimed += calcMDPBytesRead(ctx, list) * panelRefRate;
     return ret;
 }
 
