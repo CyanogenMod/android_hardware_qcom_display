@@ -1461,10 +1461,7 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
     }
 
-    if(dpy && isYuvBuffer(hnd)) {
-        calcExtDisplayPosition(ctx, hnd, dpy, crop, dst,
-                                           transform, orient);
-    }
+    calcExtDisplayPosition(ctx, hnd, dpy, crop, dst, transform, orient);
 
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
        ctx->mMDP.version < qdutils::MDSS_V5) {
