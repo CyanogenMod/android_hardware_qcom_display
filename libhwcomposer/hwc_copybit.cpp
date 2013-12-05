@@ -178,13 +178,14 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             hwc_layer_1_t *layer = (hwc_layer_1_t *) &list->hwLayers[i];
             if (layer->planeAlpha != 0xFF)
                 return true;
+            hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
 
             if (layer->transform & HAL_TRANSFORM_ROT_90) {
-                src_h = layer->sourceCrop.right - layer->sourceCrop.left;
-                src_w = layer->sourceCrop.bottom - layer->sourceCrop.top;
+                src_h = sourceCrop.right - sourceCrop.left;
+                src_w = sourceCrop.bottom - sourceCrop.top;
             } else {
-                src_h = layer->sourceCrop.bottom - layer->sourceCrop.top;
-                src_w = layer->sourceCrop.right - layer->sourceCrop.left;
+                src_h = sourceCrop.bottom - sourceCrop.top;
+                src_w = sourceCrop.right - sourceCrop.left;
             }
             dst_h = layer->displayFrame.bottom - layer->displayFrame.top;
             dst_w = layer->displayFrame.right - layer->displayFrame.left;
