@@ -45,6 +45,7 @@ bool MDPComp::sEnablePartialFrameUpdate = false;
 int MDPComp::sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
 double MDPComp::sMaxBw = 0.0;
 double MDPComp::sBwClaimed = 0.0;
+bool MDPComp::sEnable4k2kYUVSplit = false;
 
 MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
     if(isDisplaySplit(ctx, dpy)) {
@@ -146,6 +147,12 @@ bool MDPComp::init(hwc_context_t *ctx) {
         } else {
             idleInvalidator->init(timeout_handler, ctx, idle_timeout);
         }
+    }
+
+    if((property_get("debug.mdpcomp.4k2kSplit", property, "0") > 0) &&
+            (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+             (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+        sEnable4k2kYUVSplit = true;
     }
     return true;
 }
@@ -587,6 +594,10 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     mCurrentFrame.mdpCount = mCurrentFrame.layerCount - mCurrentFrame.fbCount -
         mCurrentFrame.dropCount;
 
+    if(sEnable4k2kYUVSplit){
+        modifymdpCountfor4k2k(ctx, list);
+    }
+
     if(!resourceCheck(ctx, list)) {
         ALOGD_IF(isDebug(), "%s: resource check failed", __FUNCTION__);
         return false;
@@ -641,6 +652,10 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
     }
 
     int mdpCount = mCurrentFrame.mdpCount;
+
+    if(sEnable4k2kYUVSplit){
+        modifymdpCountfor4k2k(ctx, list);
+    }
 
     //Will benefit cases where a video has non-updating background.
     if((mDpy > HWC_DISPLAY_PRIMARY) and
@@ -712,6 +727,10 @@ bool MDPComp::loadBasedCompPreferGPU(hwc_context_t *ctx,
     mCurrentFrame.fbCount = batchSize;
     mCurrentFrame.mdpCount = mCurrentFrame.layerCount - batchSize;
 
+    if(sEnable4k2kYUVSplit){
+        modifymdpCountfor4k2k(ctx, list);
+    }
+
     if(!resourceCheck(ctx, list)) {
         ALOGD_IF(isDebug(), "%s: resource check failed", __FUNCTION__);
         return false;
@@ -762,6 +781,10 @@ bool MDPComp::loadBasedCompPreferMDP(hwc_context_t *ctx,
     mCurrentFrame.fbZ = fbBatchStart;
     mCurrentFrame.fbCount = fbBatchSize;
     mCurrentFrame.mdpCount = mCurrentFrame.layerCount - fbBatchSize;
+
+    if(sEnable4k2kYUVSplit){
+        modifymdpCountfor4k2k(ctx, list);
+    }
 
     if(!resourceCheck(ctx, list)) {
         ALOGD_IF(isDebug(), "%s: resource check failed", __FUNCTION__);
@@ -1091,10 +1114,23 @@ bool MDPComp::programMDP(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             MdpPipeInfo* cur_pipe = mCurrentFrame.mdpToLayer[mdpIndex].pipeInfo;
             cur_pipe->zOrder = mdpNextZOrder++;
 
-
+            private_handle_t *hnd = (private_handle_t *)layer->handle;
+            if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
+                if(configure4k2kYuv(ctx, layer,
+                            mCurrentFrame.mdpToLayer[mdpIndex])
+                        != 0 ){
+                    ALOGD_IF(isDebug(), "%s: Failed to configure split pipes \
+                            for layer %d",__FUNCTION__, index);
+                    return false;
+                }
+                else{
+                    mdpNextZOrder++;
+                }
+                continue;
+            }
             if(configure(ctx, layer, mCurrentFrame.mdpToLayer[mdpIndex]) != 0 ){
                 ALOGD_IF(isDebug(), "%s: Failed to configure overlay for \
-                         layer %d",__FUNCTION__, index);
+                        layer %d",__FUNCTION__, index);
                 return false;
             }
         }
@@ -1118,6 +1154,20 @@ bool MDPComp::programYUV(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                     mCurrentFrame.mdpToLayer[mdpIndex].pipeInfo;
             cur_pipe->zOrder = mdpIdx++;
 
+            private_handle_t *hnd = (private_handle_t *)layer->handle;
+            if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
+                if(configure4k2kYuv(ctx, layer,
+                            mCurrentFrame.mdpToLayer[mdpIndex])
+                        != 0 ){
+                    ALOGD_IF(isDebug(), "%s: Failed to configure split pipes \
+                            for layer %d",__FUNCTION__, index);
+                    return false;
+                }
+                else{
+                    mdpIdx++;
+                }
+                continue;
+            }
             if(configure(ctx, layer,
                         mCurrentFrame.mdpToLayer[mdpIndex]) != 0 ){
                 ALOGD_IF(isDebug(), "%s: Failed to configure overlay for \
@@ -1245,6 +1295,20 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         mCurrentFrame.map();
         //Configure framebuffer first if applicable
         if(mCurrentFrame.fbZ >= 0) {
+            //If 4k2k Yuv layer split is possible,  and if
+            //fbz is above 4k2k layer, increment fb zorder by 1
+            //as we split 4k2k layer and increment zorder for right half
+            //of the layer
+            if(sEnable4k2kYUVSplit){
+                int n4k2kYuvCount = ctx->listStats[mDpy].yuv4k2kCount;
+                for(int index = 0; index < n4k2kYuvCount; index++){
+                    int n4k2kYuvIndex =
+                            ctx->listStats[mDpy].yuv4k2kIndices[index];
+                    if(mCurrentFrame.fbZ > n4k2kYuvIndex){
+                        mCurrentFrame.fbZ += 1;
+                    }
+                }
+            }
             if(!ctx->mFBUpdate[mDpy]->prepare(ctx, list,
                         mCurrentFrame.fbZ)) {
                 ALOGE("%s configure framebuffer failed", __func__);
@@ -1275,6 +1339,11 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         //Try to compose atleast YUV layers through MDP comp and let
         //all the RGB layers compose in FB
         //Destination over
+
+        if(sEnable4k2kYUVSplit){
+            modifymdpCountfor4k2k(ctx, list);
+        }
+
         mCurrentFrame.fbZ = -1;
         if(mCurrentFrame.fbCount)
             mCurrentFrame.fbZ = mCurrentFrame.mdpCount;
@@ -1324,7 +1393,44 @@ exit:
     return ret;
 }
 
+bool MDPComp::allocSplitVGPipesfor4k2k(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list, int index) {
+
+    bool bRet = true;
+    hwc_layer_1_t* layer = &list->hwLayers[index];
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    int mdpIndex = mCurrentFrame.layerToMDP[index];
+    PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
+    info.pipeInfo = new MdpYUVPipeInfo;
+    info.rot = NULL;
+    MdpYUVPipeInfo& pipe_info = *(MdpYUVPipeInfo*)info.pipeInfo;
+    ePipeType type =  MDPCOMP_OV_VG;
+
+    pipe_info.lIndex = ovutils::OV_INVALID;
+    pipe_info.rIndex = ovutils::OV_INVALID;
+
+    pipe_info.lIndex = getMdpPipe(ctx, type, Overlay::MIXER_DEFAULT);
+    if(pipe_info.lIndex == ovutils::OV_INVALID){
+        bRet = false;
+        ALOGD_IF(isDebug(),"%s: allocating first VG pipe failed",
+                __FUNCTION__);
+    }
+    pipe_info.rIndex = getMdpPipe(ctx, type, Overlay::MIXER_DEFAULT);
+    if(pipe_info.rIndex == ovutils::OV_INVALID){
+        bRet = false;
+        ALOGD_IF(isDebug(),"%s: allocating second VG pipe failed",
+                __FUNCTION__);
+    }
+    return bRet;
+}
 //=============MDPCompNonSplit===================================================
+
+void MDPCompNonSplit::modifymdpCountfor4k2k(hwc_context_t *ctx,
+         hwc_display_contents_1_t* list){
+    //As we split 4kx2k yuv layer and program to 2 VG pipes
+    //(if available) increase mdpcount accordingly
+    mCurrentFrame.mdpCount += ctx->listStats[mDpy].yuv4k2kCount;
+}
 
 /*
  * Configures pipe(s) for MDP composition
@@ -1377,7 +1483,10 @@ bool MDPCompNonSplit::areVGPipesAvailable(hwc_context_t *ctx,
             hwc_layer_1_t* layer = &list->hwLayers[i];
             hwc_rect_t dst = layer->displayFrame;
             private_handle_t *hnd = (private_handle_t *)layer->handle;
-            if(isYuvBuffer(hnd)) {
+            if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
+                pipesNeeded = pipesNeeded + 2;
+            }
+            else if(isYuvBuffer(hnd)) {
                 pipesNeeded++;
             }
         }
@@ -1402,6 +1511,12 @@ bool MDPCompNonSplit::allocLayerPipes(hwc_context_t *ctx,
 
         hwc_layer_1_t* layer = &list->hwLayers[index];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
+        if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
+            if(allocSplitVGPipesfor4k2k(ctx, list, index)){
+                continue;
+            }
+        }
+
         int mdpIndex = mCurrentFrame.layerToMDP[index];
         PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
         info.pipeInfo = new MdpPipeInfoNonSplit;
@@ -1425,6 +1540,20 @@ bool MDPCompNonSplit::allocLayerPipes(hwc_context_t *ctx,
         }
     }
     return true;
+}
+
+int MDPCompNonSplit::configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
+        PipeLayerPair& PipeLayerPair) {
+    MdpYUVPipeInfo& mdp_info =
+            *(static_cast<MdpYUVPipeInfo*>(PipeLayerPair.pipeInfo));
+    eZorder zOrder = static_cast<eZorder>(mdp_info.zOrder);
+    eIsFg isFg = IS_FG_OFF;
+    eMdpFlags mdpFlagsL = OV_MDP_BACKEND_COMPOSITION;
+    eDest lDest = mdp_info.lIndex;
+    eDest rDest = mdp_info.rIndex;
+
+    return configureSourceSplit(ctx, layer, mDpy, mdpFlagsL, zOrder, isFg,
+            lDest, rDest, &PipeLayerPair.rot);
 }
 
 bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
@@ -1470,36 +1599,75 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
         int mdpIndex = mCurrentFrame.layerToMDP[i];
 
-        MdpPipeInfoNonSplit& pipe_info =
+        if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit)
+        {
+            MdpYUVPipeInfo& pipe_info =
+                *(MdpYUVPipeInfo*)mCurrentFrame.mdpToLayer[mdpIndex].pipeInfo;
+            Rotator *rot = mCurrentFrame.mdpToLayer[mdpIndex].rot;
+            ovutils::eDest indexL = pipe_info.lIndex;
+            ovutils::eDest indexR = pipe_info.rIndex;
+            int fd = hnd->fd;
+            uint32_t offset = hnd->offset;
+            if(rot) {
+                rot->queueBuffer(fd, offset);
+                fd = rot->getDstMemId();
+                offset = rot->getDstOffset();
+            }
+            if(indexL != ovutils::OV_INVALID) {
+                ovutils::eDest destL = (ovutils::eDest)indexL;
+                ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
+                        using  pipe: %d", __FUNCTION__, layer, hnd, indexL );
+                if (!ov.queueBuffer(fd, offset, destL)) {
+                    ALOGE("%s: queueBuffer failed for display:%d",
+                            __FUNCTION__, mDpy);
+                    return false;
+                }
+            }
+
+            if(indexR != ovutils::OV_INVALID) {
+                ovutils::eDest destR = (ovutils::eDest)indexR;
+                ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
+                        using  pipe: %d", __FUNCTION__, layer, hnd, indexR );
+                if (!ov.queueBuffer(fd, offset, destR)) {
+                    ALOGE("%s: queueBuffer failed for display:%d",
+                            __FUNCTION__, mDpy);
+                    return false;
+                }
+            }
+        }
+        else{
+            MdpPipeInfoNonSplit& pipe_info =
             *(MdpPipeInfoNonSplit*)mCurrentFrame.mdpToLayer[mdpIndex].pipeInfo;
-        ovutils::eDest dest = pipe_info.index;
-        if(dest == ovutils::OV_INVALID) {
-            ALOGE("%s: Invalid pipe index (%d)", __FUNCTION__, dest);
-            return false;
-        }
-
-        if(!(layerProp[i].mFlags & HWC_MDPCOMP)) {
-            continue;
-        }
-
-        ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
-                 using  pipe: %d", __FUNCTION__, layer,
-                 hnd, dest );
-
-        int fd = hnd->fd;
-        uint32_t offset = hnd->offset;
-
-        Rotator *rot = mCurrentFrame.mdpToLayer[mdpIndex].rot;
-        if(rot) {
-            if(!rot->queueBuffer(fd, offset))
+            ovutils::eDest dest = pipe_info.index;
+            if(dest == ovutils::OV_INVALID) {
+                ALOGE("%s: Invalid pipe index (%d)", __FUNCTION__, dest);
                 return false;
-            fd = rot->getDstMemId();
-            offset = rot->getDstOffset();
-        }
+            }
 
-        if (!ov.queueBuffer(fd, offset, dest)) {
-            ALOGE("%s: queueBuffer failed for display:%d ", __FUNCTION__, mDpy);
-            return false;
+            if(!(layerProp[i].mFlags & HWC_MDPCOMP)) {
+                continue;
+            }
+
+            ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
+                    using  pipe: %d", __FUNCTION__, layer,
+                    hnd, dest );
+
+            int fd = hnd->fd;
+            uint32_t offset = hnd->offset;
+
+            Rotator *rot = mCurrentFrame.mdpToLayer[mdpIndex].rot;
+            if(rot) {
+                if(!rot->queueBuffer(fd, offset))
+                    return false;
+                fd = rot->getDstMemId();
+                offset = rot->getDstOffset();
+            }
+
+            if (!ov.queueBuffer(fd, offset, dest)) {
+                ALOGE("%s: queueBuffer failed for display:%d ",
+                        __FUNCTION__, mDpy);
+                return false;
+            }
         }
 
         layerProp[i].mFlags &= ~HWC_MDPCOMP;
@@ -1508,6 +1676,23 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 }
 
 //=============MDPCompSplit===================================================
+
+void MDPCompSplit::modifymdpCountfor4k2k(hwc_context_t *ctx,
+         hwc_display_contents_1_t* list){
+    //if 4kx2k yuv layer is totally present in either in left half
+    //or right half then try splitting the yuv layer to avoid decimation
+    int n4k2kYuvCount = ctx->listStats[mDpy].yuv4k2kCount;
+    const int lSplit = getLeftSplit(ctx, mDpy);
+    for(int index = 0; index < n4k2kYuvCount; index++){
+        int n4k2kYuvIndex = ctx->listStats[mDpy].yuv4k2kIndices[index];
+        hwc_layer_1_t* layer = &list->hwLayers[n4k2kYuvIndex];
+        hwc_rect_t dst = layer->displayFrame;
+
+        if((dst.left > lSplit)||(dst.right < lSplit)){
+            mCurrentFrame.mdpCount += 1;
+        }
+    }
+}
 
 int MDPCompSplit::pipesNeeded(hwc_context_t *ctx,
         hwc_display_contents_1_t* list,
@@ -1581,6 +1766,12 @@ bool MDPCompSplit::areVGPipesAvailable(hwc_context_t *ctx,
             hwc_layer_1_t* layer = &list->hwLayers[i];
             hwc_rect_t dst = layer->displayFrame;
             private_handle_t *hnd = (private_handle_t *)layer->handle;
+            if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
+                if((dst.left > lSplit)||(dst.right < lSplit)){
+                    pipesNeeded = pipesNeeded + 2;
+                    continue;
+                }
+            }
             if(isYuvBuffer(hnd)) {
                 if(dst.left < lSplit) {
                     pipesNeeded++;
@@ -1636,6 +1827,15 @@ bool MDPCompSplit::allocLayerPipes(hwc_context_t *ctx,
 
         hwc_layer_1_t* layer = &list->hwLayers[index];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
+        hwc_rect_t dst = layer->displayFrame;
+        const int lSplit = getLeftSplit(ctx, mDpy);
+        if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
+            if((dst.left > lSplit)||(dst.right < lSplit)){
+                if(allocSplitVGPipesfor4k2k(ctx, list, index)){
+                    continue;
+                }
+            }
+        }
         int mdpIndex = mCurrentFrame.layerToMDP[index];
         PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
         info.pipeInfo = new MdpPipeInfoSplit;
@@ -1658,6 +1858,27 @@ bool MDPCompSplit::allocLayerPipes(hwc_context_t *ctx,
         }
     }
     return true;
+}
+
+int MDPCompSplit::configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
+        PipeLayerPair& PipeLayerPair) {
+    const int lSplit = getLeftSplit(ctx, mDpy);
+    hwc_rect_t dst = layer->displayFrame;
+    if((dst.left > lSplit)||(dst.right < lSplit)){
+        MdpYUVPipeInfo& mdp_info =
+                *(static_cast<MdpYUVPipeInfo*>(PipeLayerPair.pipeInfo));
+        eZorder zOrder = static_cast<eZorder>(mdp_info.zOrder);
+        eIsFg isFg = IS_FG_OFF;
+        eMdpFlags mdpFlagsL = OV_MDP_BACKEND_COMPOSITION;
+        eDest lDest = mdp_info.lIndex;
+        eDest rDest = mdp_info.rIndex;
+
+        return configureSourceSplit(ctx, layer, mDpy, mdpFlagsL, zOrder, isFg,
+                lDest, rDest, &PipeLayerPair.rot);
+    }
+    else{
+        return configure(ctx, layer, PipeLayerPair);
+    }
 }
 
 /*
@@ -1722,48 +1943,88 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
         int mdpIndex = mCurrentFrame.layerToMDP[i];
 
-        MdpPipeInfoSplit& pipe_info =
-            *(MdpPipeInfoSplit*)mCurrentFrame.mdpToLayer[mdpIndex].pipeInfo;
-        Rotator *rot = mCurrentFrame.mdpToLayer[mdpIndex].rot;
+        if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit)
+        {
+            MdpYUVPipeInfo& pipe_info =
+                *(MdpYUVPipeInfo*)mCurrentFrame.mdpToLayer[mdpIndex].pipeInfo;
+            Rotator *rot = mCurrentFrame.mdpToLayer[mdpIndex].rot;
+            ovutils::eDest indexL = pipe_info.lIndex;
+            ovutils::eDest indexR = pipe_info.rIndex;
+            int fd = hnd->fd;
+            uint32_t offset = hnd->offset;
+            if(rot) {
+                rot->queueBuffer(fd, offset);
+                fd = rot->getDstMemId();
+                offset = rot->getDstOffset();
+            }
+            if(indexL != ovutils::OV_INVALID) {
+                ovutils::eDest destL = (ovutils::eDest)indexL;
+                ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
+                        using  pipe: %d", __FUNCTION__, layer, hnd, indexL );
+                if (!ov.queueBuffer(fd, offset, destL)) {
+                    ALOGE("%s: queueBuffer failed for display:%d",
+                            __FUNCTION__, mDpy);
+                    return false;
+                }
+            }
 
-        ovutils::eDest indexL = pipe_info.lIndex;
-        ovutils::eDest indexR = pipe_info.rIndex;
-
-        int fd = hnd->fd;
-        int offset = hnd->offset;
-
-        if(ctx->mAD->isModeOn()) {
-            if(ctx->mAD->draw(ctx, fd, offset)) {
-                fd = ctx->mAD->getDstFd(ctx);
-                offset = ctx->mAD->getDstOffset(ctx);
+            if(indexR != ovutils::OV_INVALID) {
+                ovutils::eDest destR = (ovutils::eDest)indexR;
+                ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
+                        using  pipe: %d", __FUNCTION__, layer, hnd, indexR );
+                if (!ov.queueBuffer(fd, offset, destR)) {
+                    ALOGE("%s: queueBuffer failed for display:%d",
+                            __FUNCTION__, mDpy);
+                    return false;
+                }
             }
         }
+        else{
+            MdpPipeInfoSplit& pipe_info =
+                *(MdpPipeInfoSplit*)mCurrentFrame.mdpToLayer[mdpIndex].pipeInfo;
+            Rotator *rot = mCurrentFrame.mdpToLayer[mdpIndex].rot;
 
-        if(rot) {
-            rot->queueBuffer(fd, offset);
-            fd = rot->getDstMemId();
-            offset = rot->getDstOffset();
-        }
+            ovutils::eDest indexL = pipe_info.lIndex;
+            ovutils::eDest indexR = pipe_info.rIndex;
 
-        //************* play left mixer **********
-        if(indexL != ovutils::OV_INVALID) {
-            ovutils::eDest destL = (ovutils::eDest)indexL;
-            ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
-                     using  pipe: %d", __FUNCTION__, layer, hnd, indexL );
-            if (!ov.queueBuffer(fd, offset, destL)) {
-                ALOGE("%s: queueBuffer failed for left mixer", __FUNCTION__);
-                return false;
+            int fd = hnd->fd;
+            int offset = hnd->offset;
+
+            if(ctx->mAD->isModeOn()) {
+                if(ctx->mAD->draw(ctx, fd, offset)) {
+                    fd = ctx->mAD->getDstFd(ctx);
+                    offset = ctx->mAD->getDstOffset(ctx);
+                }
             }
-        }
 
-        //************* play right mixer **********
-        if(indexR != ovutils::OV_INVALID) {
-            ovutils::eDest destR = (ovutils::eDest)indexR;
-            ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
-                     using  pipe: %d", __FUNCTION__, layer, hnd, indexR );
-            if (!ov.queueBuffer(fd, offset, destR)) {
-                ALOGE("%s: queueBuffer failed for right mixer", __FUNCTION__);
-                return false;
+            if(rot) {
+                rot->queueBuffer(fd, offset);
+                fd = rot->getDstMemId();
+                offset = rot->getDstOffset();
+            }
+
+            //************* play left mixer **********
+            if(indexL != ovutils::OV_INVALID) {
+                ovutils::eDest destL = (ovutils::eDest)indexL;
+                ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
+                        using  pipe: %d", __FUNCTION__, layer, hnd, indexL );
+                if (!ov.queueBuffer(fd, offset, destL)) {
+                    ALOGE("%s: queueBuffer failed for left mixer",
+                            __FUNCTION__);
+                    return false;
+                }
+            }
+
+            //************* play right mixer **********
+            if(indexR != ovutils::OV_INVALID) {
+                ovutils::eDest destR = (ovutils::eDest)indexR;
+                ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
+                        using  pipe: %d", __FUNCTION__, layer, hnd, indexR );
+                if (!ov.queueBuffer(fd, offset, destR)) {
+                    ALOGE("%s: queueBuffer failed for right mixer",
+                            __FUNCTION__);
+                    return false;
+                }
             }
         }
 
