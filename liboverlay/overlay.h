@@ -120,8 +120,6 @@ public:
     void getDump(char *buf, size_t len);
     /* Reset usage and allocation bits on all pipes for given display */
     void clear(int dpy);
-    /* Marks the display, whose pipes need to be forcibaly configured */
-    void forceSet(const int& dpy);
 
     /* Closes open pipes, called during startup */
     static int initOverlay();
@@ -212,7 +210,6 @@ private:
     static int sDpyFbMap[DPY_MAX];
     static int sDMAMode;
     static bool sDMAMultiplexingSupported;
-    static int sForceSetBitmap;
     static void *sLibScaleHandle;
     static scale::Scale *sScale;
 };
@@ -287,10 +284,6 @@ inline int Overlay::getDMAMode() {
 inline int Overlay::getFbForDpy(const int& dpy) {
     OVASSERT(dpy >= 0 && dpy < DPY_MAX, "Invalid dpy %d", dpy);
     return sDpyFbMap[dpy];
-}
-
-inline void Overlay::forceSet(const int& dpy) {
-    sForceSetBitmap |= (1 << dpy);
 }
 
 inline scale::Scale *Overlay::getScalar() {

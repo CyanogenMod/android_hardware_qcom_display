@@ -87,7 +87,6 @@ public:
     void dump() const;
     /* Return the dump in the specified buffer */
     void getDump(char *buf, size_t len);
-    void forceSet();
 
 private:
     // mdp ctrl struct(info e.g.)
@@ -230,10 +229,6 @@ inline void Ctrl::setDownscale(int dscale_factor) {
 
 inline void Ctrl::getDump(char *buf, size_t len) {
     mMdp.getDump(buf, len);
-}
-
-inline void Ctrl::forceSet() {
-    mMdp.forceSet();
 }
 
 inline Data::Data() {
