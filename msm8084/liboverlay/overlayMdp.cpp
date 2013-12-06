@@ -69,7 +69,6 @@ void MdpCtrl::reset() {
     mLkgo.id = MSMFB_NEW_REQUEST;
     mOrientation = utils::OVERLAY_TRANSFORM_0;
     mDownscale = 0;
-    mForceSet = false;
     mDpy = 0;
 #ifdef USES_POST_PROCESSING
     mPPChanged = false;
@@ -211,8 +210,7 @@ bool MdpCtrl::set() {
 
     doDownscale();
 
-    if(this->ovChanged() || mForceSet) {
-        mForceSet = false;
+    if(this->ovChanged()) {
         if(!mdp_wrapper::setOverlay(mFd.getFD(), mOVInfo)) {
             ALOGE("MdpCtrl failed to setOverlay, restoring last known "
                   "good ov info");

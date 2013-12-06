@@ -75,10 +75,6 @@ public:
     void dump() const;
     /* Return the dump in the specified buffer */
     void getDump(char *buf, size_t len);
-    /* Marks the pipe for forcible setting of params
-     * even if they haven't changed
-     */
-    void forceSet();
     int getPipeId();
 
 private:
