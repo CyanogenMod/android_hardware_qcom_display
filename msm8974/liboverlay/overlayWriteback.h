@@ -92,6 +92,9 @@ public:
     static void configBegin() { sUsed = false; }
     static void configDone();
     static void clear();
+    //Will take a dump of data structure only if there is an instance existing
+    //Returns true if dump is added to the input buffer, false otherwise
+    static bool getDump(char *buf, size_t len);
 
 private:
     explicit Writeback();

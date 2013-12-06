@@ -45,6 +45,8 @@ public:
     virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list) = 0;
     /* dumpsys */
     void dump(android::String8& buf);
+    void reset() { mCurrentFrame.reset(0); }
+    int getMDPCompCount() { return mCurrentFrame.mdpCount; }
 
     static MDPComp* getObject(const int& width, const int& rightSplit,
             const int& dpy);

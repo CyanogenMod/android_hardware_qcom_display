@@ -168,8 +168,8 @@ void RotMgr::getDump(char *buf, size_t len) {
             mRot[i]->getDump(buf, len);
         }
     }
-    char str[32] = {'\0'};
-    snprintf(str, 32, "\n================\n");
+    char str[4] = {'\0'};
+    snprintf(str, 4, "\n");
     strncat(buf, str, strlen(str));
 }
 
