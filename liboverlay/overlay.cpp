@@ -52,6 +52,7 @@ Overlay::Overlay() {
 
     mDumpStr[0] = '\0';
     initScalar();
+    setDMAMultiplexingSupported();
 }
 
 Overlay::~Overlay() {
@@ -139,8 +140,10 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
             (mPipeBook[i].mMixer == MIXER_UNUSED || //Free or same mixer
              mPipeBook[i].mMixer == mixer) &&
             PipeBook::isNotAllocated(i) && //Free pipe
-            !(sDMAMode == DMA_BLOCK_MODE && //DMA pipe in Line mode
-               PipeBook::getPipeType((eDest)i) == OV_MDP_PIPE_DMA)) {
+            ( (sDMAMultiplexingSupported && dpy) ||
+              !(sDMAMode == DMA_BLOCK_MODE && //DMA pipe in Line mode
+               PipeBook::getPipeType((eDest)i) == OV_MDP_PIPE_DMA)) ){
+              //DMA-Multiplexing is only supported for WB on 8x26
             dest = (eDest)i;
             PipeBook::setAllocation(i);
             break;
@@ -496,6 +499,7 @@ void Overlay::PipeBook::destroy() {
 Overlay* Overlay::sInstance = 0;
 int Overlay::sDpyFbMap[DPY_MAX] = {0, -1, -1};
 int Overlay::sDMAMode = DMA_LINE_MODE;
+bool Overlay::sDMAMultiplexingSupported = false;
 int Overlay::sForceSetBitmap = 0;
 int Overlay::PipeBook::NUM_PIPES = 0;
 int Overlay::PipeBook::sPipeUsageBitmap = 0;
