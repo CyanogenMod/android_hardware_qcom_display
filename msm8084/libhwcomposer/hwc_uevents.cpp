@@ -55,7 +55,7 @@ static void setup(hwc_context_t* ctx, int dpy)
     if (compositionType & (qdutils::COMPOSITION_TYPE_DYN |
                            qdutils::COMPOSITION_TYPE_MDP |
                            qdutils::COMPOSITION_TYPE_C2D)) {
-        ctx->mCopyBit[dpy] = new CopyBit();
+        ctx->mCopyBit[dpy] = new CopyBit(ctx, dpy);
     }
 }
 
