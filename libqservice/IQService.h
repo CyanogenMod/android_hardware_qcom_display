@@ -48,6 +48,7 @@ public:
         CHECK_EXTERNAL_STATUS,   // Check status of external display
         GET_DISPLAY_ATTRIBUTES,  // Get display attributes
         SET_HSIC_DATA,           // Set HSIC on dspp
+        GET_DISPLAY_VISIBLE_REGION,  // Get the visibleRegion for dpy
         VPU_COMMAND_LIST_START = 100, //Reserved block for VPU commands
         VPU_COMMAND_LIST_END   = 200,
         COMMAND_LIST_END = 400,

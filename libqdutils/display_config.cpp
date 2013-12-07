@@ -91,4 +91,26 @@ int setHSIC(int dpy, const HSICData_t& hsic_data) {
         ALOGE("%s: Failed to get external status err=%d", __FUNCTION__, err);
     return err;
 }
+
+int getDisplayVisibleRegion(int dpy, hwc_rect_t &rect) {
+    status_t err = FAILED_TRANSACTION;
+    sp<IQService> binder = getBinder();
+    Parcel inParcel, outParcel;
+    inParcel.writeInt32(dpy);
+    if(binder != NULL) {
+        err = binder->dispatch(IQService::GET_DISPLAY_VISIBLE_REGION,
+                &inParcel, &outParcel);
+    }
+    if(!err) {
+        rect.left = outParcel.readInt32();
+        rect.top = outParcel.readInt32();
+        rect.right = outParcel.readInt32();
+        rect.bottom = outParcel.readInt32();
+    } else {
+        ALOGE("%s: Failed to getVisibleRegion for dpy =%d: err = %d",
+              __FUNCTION__, dpy, err);
+    }
+    return err;
+}
+
 }; //namespace
