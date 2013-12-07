@@ -169,15 +169,13 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     LayerProp *layerProp = ctx->layerProp[dpy];
     size_t fbLayerIndex = ctx->listStats[dpy].fbLayerIndex;
     hwc_layer_1_t *fbLayer = &list->hwLayers[fbLayerIndex];
-    private_handle_t *fbHnd = (private_handle_t *)fbLayer->handle;
-
 
 
     //Allocate render buffers if they're not allocated
     if (useCopybitForYUV || useCopybitForRGB) {
-        int ret = allocRenderBuffers(fbHnd->width,
-                                     fbHnd->height,
-                                     fbHnd->format);
+        int ret = allocRenderBuffers(mAlignedFBWidth,
+                                     mAlignedFBHeight,
+                                     HAL_PIXEL_FORMAT_RGBA_8888);
         if (ret < 0) {
             return false;
         } else {
@@ -553,8 +551,15 @@ struct copybit_device_t* CopyBit::getCopyBitDevice() {
     return mEngine;
 }
 
-CopyBit::CopyBit():mIsModeOn(false), mCopyBitDraw(false),
-    mCurRenderBufferIndex(0){
+CopyBit::CopyBit(hwc_context_t *ctx, const int& dpy) : mIsModeOn(false),
+        mCopyBitDraw(false), mCurRenderBufferIndex(0) {
+
+    getBufferSizeAndDimensions(ctx->dpyAttr[dpy].xres,
+            ctx->dpyAttr[dpy].yres,
+            HAL_PIXEL_FORMAT_RGBA_8888,
+            mAlignedFBWidth,
+            mAlignedFBHeight);
+
     hw_module_t const *module;
     for (int i = 0; i < NUM_RENDER_BUFFERS; i++)
         mRenderBuffer[i] = NULL;

@@ -27,7 +27,7 @@ namespace qhwc {
 
 class CopyBit {
 public:
-    CopyBit();
+    CopyBit(hwc_context_t *ctx, const int& dpy);
     ~CopyBit();
     // API to get copybit engine(non static)
     struct copybit_device_t *getCopyBitDevice();
@@ -83,6 +83,8 @@ private:
 
     //Dynamic composition threshold for deciding copybit usage.
     double mDynThreshold;
+    int mAlignedFBWidth;
+    int mAlignedFBHeight;
 };
 
 }; //namespace qhwc
