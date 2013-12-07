@@ -176,6 +176,8 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
         }
         calcExtDisplayPosition(ctx, NULL, mDpy, sourceCrop, displayFrame,
                                    transform, orient);
+        //Store the displayFrame, will be used in getDisplayViewFrame
+        ctx->dpyAttr[mDpy].mDstRect = displayFrame;
         setMdpFlags(layer, mdpFlags, 0, transform);
         // For External use rotator if there is a rotation value set
         ret = preRotateExtDisplay(ctx, layer, info,
