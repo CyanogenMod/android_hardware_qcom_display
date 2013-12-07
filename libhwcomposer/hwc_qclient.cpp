@@ -128,8 +128,35 @@ static void setBufferMirrorMode(hwc_context_t *ctx, uint32_t enable) {
     ctx->mBufferMirrorMode = enable;
 }
 
+static status_t getDisplayVisibleRegion(hwc_context_t* ctx, int dpy,
+                                Parcel* outParcel) {
+    // Get the info only if the dpy is valid
+    if(dpy >= HWC_DISPLAY_PRIMARY && dpy <= HWC_DISPLAY_VIRTUAL) {
+        Locker::Autolock _sl(ctx->mDrawLock);
+        if(dpy && (ctx->mExtOrientation || ctx->mBufferMirrorMode)) {
+            // Return the destRect on external, if external orienation
+            // is enabled
+            outParcel->writeInt32(ctx->dpyAttr[dpy].mDstRect.left);
+           outParcel->writeInt32(ctx->dpyAttr[dpy].mDstRect.top);
+            outParcel->writeInt32(ctx->dpyAttr[dpy].mDstRect.right);
+            outParcel->writeInt32(ctx->dpyAttr[dpy].mDstRect.bottom);
+        } else {
+            outParcel->writeInt32(ctx->mViewFrame[dpy].left);
+            outParcel->writeInt32(ctx->mViewFrame[dpy].top);
+            outParcel->writeInt32(ctx->mViewFrame[dpy].right);
+            outParcel->writeInt32(ctx->mViewFrame[dpy].bottom);
+        }
+        return NO_ERROR;
+    } else {
+        ALOGE("In %s: invalid dpy index %d", __FUNCTION__, dpy);
+        return BAD_VALUE;
+    }
+}
+
+
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
+    status_t ret = NO_ERROR;
 
     switch(command) {
         case IQService::SECURING:
@@ -147,6 +174,10 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         case IQService::BUFFER_MIRRORMODE:
             setBufferMirrorMode(mHwcContext, inParcel->readInt32());
             break;
+        case IQService::GET_DISPLAY_VISIBLE_REGION:
+            ret = getDisplayVisibleRegion(mHwcContext, inParcel->readInt32(),
+                                    outParcel);
+            break;
         case IQService::CHECK_EXTERNAL_STATUS:
             isExternalConnected(mHwcContext, outParcel);
             break;
@@ -157,9 +188,9 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             setHSIC(mHwcContext, inParcel);
             break;
         default:
-            return NO_ERROR;
+            ret = NO_ERROR;
     }
-    return NO_ERROR;
+    return ret;
 }
 
 

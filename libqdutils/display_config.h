@@ -29,6 +29,7 @@
 #include <gralloc_priv.h>
 #include <qdMetaData.h>
 #include <mdp_version.h>
+#include <hardware/hwcomposer.h>
 
 // This header is for clients to use to set/get global display configuration
 // The functions in this header run in the client process and wherever necessary
@@ -69,4 +70,7 @@ int getDisplayAttributes(int dpy, DisplayAttributes_t& dpyattr);
 // Returns 0 on success, negative values on errors
 int setHSIC(int dpy, const HSICData_t& hsic_data);
 
+// get the active visible region for the display
+// Returns 0 on success, negative values on errors
+int getDisplayVisibleRegion(int dpy, hwc_rect_t &rect);
 }; //namespace
