@@ -142,7 +142,11 @@ public:
     LayerRotMap() { reset(); }
     enum { MAX_SESS = 3 };
     void add(hwc_layer_1_t* layer, overlay::Rotator *rot);
+    //Resets the mapping of layer to rotator
     void reset();
+    //Clears mappings and existing rotator fences
+    //Intended to be used during errors
+    void clear();
     uint32_t getCount() const;
     hwc_layer_1_t* getLayer(uint32_t index) const;
     overlay::Rotator* getRot(uint32_t index) const;
