@@ -637,6 +637,7 @@ static int fill_color(struct copybit_device_t *dev,
         return -EINVAL;
     }
 
+    int status = 0;
     struct blitReq* list = &ctx->list;
     mdp_blit_req* req = &list->req[list->count++];
     set_infos(ctx, req, MDP_SOLID_FILL);
@@ -654,7 +655,11 @@ static int fill_color(struct copybit_device_t *dev,
     req->const_color.b = (uint32_t)((color >> 16) & 0xff);
     req->const_color.alpha = (uint32_t)((color >> 24) & 0xff);
 
-    int status = msm_copybit(ctx, list);
+    if (list->count == sizeof(list->req)/sizeof(list->req[0])) {
+        status = msm_copybit(ctx, list);
+        list->sync.acq_fen_fd_cnt = 0;
+        list->count = 0;
+    }
     return status;
 }
 
