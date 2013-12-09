@@ -426,8 +426,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
     float copybitsMinScale =
                        (float)copybit->get(copybit,COPYBIT_MINIFICATION_LIMIT);
 
-    if((layer->transform == HWC_TRANSFORM_ROT_90) ||
-                           (layer->transform == HWC_TRANSFORM_ROT_270)) {
+    if (layer->transform & HWC_TRANSFORM_ROT_90) {
         //swap screen width and height
         int tmp = screen_w;
         screen_w  = screen_h;
