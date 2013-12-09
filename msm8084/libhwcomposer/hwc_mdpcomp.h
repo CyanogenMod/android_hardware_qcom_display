@@ -209,7 +209,6 @@ protected:
     void updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
             bool secureOnly);
     bool programMDP(hwc_context_t *ctx, hwc_display_contents_1_t* list);
-    bool programYUV(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     void reset(const int& numAppLayers, hwc_display_contents_1_t* list);
     bool isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer);
     bool resourceCheck(hwc_context_t *ctx, hwc_display_contents_1_t *list);
