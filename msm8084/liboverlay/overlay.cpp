@@ -68,7 +68,6 @@ void Overlay::configBegin() {
         PipeBook::resetUse(i);
         PipeBook::resetAllocation(i);
     }
-    sForceSetBitmap = 0;
     mDumpStr[0] = '\0';
 
 #ifdef USES_QSEED_SCALAR
@@ -197,19 +196,14 @@ bool Overlay::commit(utils::eDest dest) {
     if(mPipeBook[index].mPipe->commit()) {
         ret = true;
         PipeBook::setUse((int)dest);
-        if(sForceSetBitmap & (1 << mPipeBook[index].mDisplay)) {
-            mPipeBook[index].mPipe->forceSet();
-        }
     } else {
         int dpy = mPipeBook[index].mDisplay;
-        for(int i = 0; i < PipeBook::NUM_PIPES; i++)
+        for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
             if (mPipeBook[i].mDisplay == dpy) {
                 PipeBook::resetAllocation(i);
                 PipeBook::resetUse(i);
-                if(mPipeBook[i].valid()) {
-                    mPipeBook[i].mPipe->forceSet();
-                }
             }
+        }
     }
     return ret;
 }
@@ -437,9 +431,6 @@ void Overlay::clear(int dpy) {
             // Mark as available for this round
             PipeBook::resetUse(i);
             PipeBook::resetAllocation(i);
-            if(mPipeBook[i].valid()) {
-                mPipeBook[i].mPipe->forceSet();
-            }
         }
     }
 }
@@ -500,7 +491,6 @@ Overlay* Overlay::sInstance = 0;
 int Overlay::sDpyFbMap[DPY_MAX] = {0, -1, -1};
 int Overlay::sDMAMode = DMA_LINE_MODE;
 bool Overlay::sDMAMultiplexingSupported = false;
-int Overlay::sForceSetBitmap = 0;
 int Overlay::PipeBook::NUM_PIPES = 0;
 int Overlay::PipeBook::sPipeUsageBitmap = 0;
 int Overlay::PipeBook::sLastUsageBitmap = 0;

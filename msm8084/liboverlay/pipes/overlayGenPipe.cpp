@@ -167,10 +167,6 @@ bool GenericPipe::setClosed() {
     return true;
 }
 
-void GenericPipe::forceSet() {
-    mCtrlData.ctrl.forceSet();
-}
-
 int GenericPipe::getPipeId() {
     return mCtrlData.ctrl.getPipeId();
 }
