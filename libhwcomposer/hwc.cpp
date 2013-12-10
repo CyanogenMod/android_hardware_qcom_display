@@ -192,11 +192,14 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
                 }
             }
         } else {
-            // External Display is in Pause state.
-            // ToDo:
-            // Mark all application layers as OVERLAY so that
-            // GPU will not compose. This is done for power
-            // optimization
+            /* External Display is in Pause state.
+             * Mark all application layers as OVERLAY so that
+             * GPU will not compose.
+             */
+            for(size_t i = 0 ;i < (size_t)(list->numHwLayers - 1); i++) {
+                hwc_layer_1_t *layer = &list->hwLayers[i];
+                layer->compositionType = HWC_OVERLAY;
+            }
         }
     }
     return 0;
@@ -229,11 +232,14 @@ static int hwc_prepare_virtual(hwc_composer_device_1 *dev,
                 }
             }
         } else {
-            // Virtual Display is in Pause state.
-            // ToDo:
-            // Mark all application layers as OVERLAY so that
-            // GPU will not compose. This is done for power
-            // optimization
+            /* Virtual Display is in Pause state.
+             * Mark all application layers as OVERLAY so that
+             * GPU will not compose.
+             */
+            for(size_t i = 0 ;i < (size_t)(list->numHwLayers - 1); i++) {
+                hwc_layer_1_t *layer = &list->hwLayers[i];
+                layer->compositionType = HWC_OVERLAY;
+            }
         }
     }
     return 0;
