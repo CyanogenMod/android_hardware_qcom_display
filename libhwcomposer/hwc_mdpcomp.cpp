@@ -881,6 +881,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         if(!programMDP(ctx, list)) {
             reset(numLayers, list);
             ctx->mOverlay->clear(mDpy);
+            ctx->mLayerRotMap[mDpy]->clear();
             return -1;
         } else { //Success
             //Any change in composition types needs an FB refresh
@@ -918,6 +919,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         if(!programYUV(ctx, list)) {
             reset(numLayers, list);
             ctx->mOverlay->clear(mDpy);
+            ctx->mLayerRotMap[mDpy]->clear();
             return -1;
         }
     } else {
