@@ -1065,10 +1065,11 @@ void optimizeLayerRects(hwc_context_t *ctx,
 
                   hwc_rect_t irect = getIntersection(bottomframe, topframe);
                   if(isValidRect(irect)) {
+                     hwc_rect_t dest_rect;
                      //if intersection is valid rect, deduct it
-                     bottomframe = deductRect(bottomframe, irect);
+                     dest_rect  = deductRect(bottomframe, irect);
                      qhwc::calculate_crop_rects(bottomCrop, bottomframe,
-                                                bottomframe, transform);
+                                                dest_rect, transform);
 
                   }
                }
