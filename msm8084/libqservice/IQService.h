@@ -45,6 +45,9 @@ public:
         SCREEN_REFRESH,          // Refresh screen through SF invalidate
         EXTERNAL_ORIENTATION,    // Set external orientation
         BUFFER_MIRRORMODE,       // Buffer mirrormode
+        CHECK_EXTERNAL_STATUS,   // Check status of external display
+        GET_DISPLAY_ATTRIBUTES,  // Get display attributes
+        SET_HSIC_DATA,           // Set HSIC on dspp
         VPU_COMMAND_LIST_START = 100, //Reserved block for VPU commands
         VPU_COMMAND_LIST_END   = 200,
         COMMAND_LIST_END = 400,
