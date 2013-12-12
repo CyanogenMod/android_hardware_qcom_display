@@ -311,12 +311,12 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
     float xRatio = 1.0;
     float yRatio = 1.0;
 
-    float fbWidth = ctx->dpyAttr[dpy].xres;
-    float fbHeight = ctx->dpyAttr[dpy].yres;
+    int fbWidth = ctx->dpyAttr[dpy].xres;
+    int fbHeight = ctx->dpyAttr[dpy].yres;
     if(ctx->dpyAttr[dpy].mDownScaleMode) {
         // if downscale Mode is enabled for external, need to query
         // the actual width and height, as that is the physical w & h
-        ctx->mExtDisplay->getAttributes((int&)fbWidth, (int&)fbHeight);
+         ctx->mExtDisplay->getAttributes(fbWidth, fbHeight);
     }
 
 
@@ -329,7 +329,7 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
     float asX = 0;
     float asY = 0;
     float asW = fbWidth;
-    float asH= fbHeight;
+    float asH = fbHeight;
 
     // based on the action safe ratio, get the Action safe rectangle
     asW = fbWidth * (1.0f -  asWidthRatio / 100.0f);
