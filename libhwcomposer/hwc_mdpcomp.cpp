@@ -541,6 +541,13 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         return false;
     }
 
+    // check for action safe flag and downscale mode which requires scaling.
+    if(ctx->dpyAttr[mDpy].mActionSafePresent
+            || ctx->dpyAttr[mDpy].mDownScaleMode) {
+        ALOGD_IF(isDebug(), "%s: Scaling needed for this frame",__FUNCTION__);
+        return false;
+    }
+
     for(int i = 0; i < numAppLayers; ++i) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;

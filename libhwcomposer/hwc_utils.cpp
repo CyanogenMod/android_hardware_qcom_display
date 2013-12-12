@@ -173,6 +173,9 @@ void initContext(hwc_context_t *ctx)
         ctx->mHwcDebug[i] = new HwcDebug(i);
         ctx->mLayerRotMap[i] = new LayerRotMap();
         ctx->mAnimationState[i] = ANIMATION_STOPPED;
+        ctx->dpyAttr[i].mActionSafePresent = false;
+        ctx->dpyAttr[i].mAsWidthRatio = 0;
+        ctx->dpyAttr[i].mAsHeightRatio = 0;
     }
 
     MDPComp::init(ctx);
@@ -285,22 +288,11 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
     int w = rect.right - rect.left;
     int h = rect.bottom - rect.top;
 
-    // if external supports underscan, do nothing
-    // it will be taken care in the driver
-    if(ctx->mExtDisplay->isCEUnderscanSupported())
+    if(!ctx->dpyAttr[dpy].mActionSafePresent)
         return;
-
-    char value[PROPERTY_VALUE_MAX];
-    // Read action safe properties
-    property_get("persist.sys.actionsafe.width", value, "0");
-    int asWidthRatio = atoi(value);
-    property_get("persist.sys.actionsafe.height", value, "0");
-    int asHeightRatio = atoi(value);
-
-    if(!asWidthRatio && !asHeightRatio) {
-        //No action safe ratio set, return
-        return;
-    }
+   // Read action safe properties
+    int asWidthRatio = ctx->dpyAttr[dpy].mAsWidthRatio;
+    int asHeightRatio = ctx->dpyAttr[dpy].mAsHeightRatio;
 
     float wRatio = 1.0;
     float hRatio = 1.0;
@@ -626,7 +618,6 @@ bool isDownscaleRequired(hwc_layer_1_t const* layer) {
 }
 bool needsScaling(hwc_layer_1_t const* layer) {
     int dst_w, dst_h, src_w, src_h;
-
     hwc_rect_t displayFrame  = layer->displayFrame;
     hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
 
@@ -763,6 +754,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].secureUI = false;
     ctx->listStats[dpy].yuv4k2kCount = 0;
     ctx->mViewFrame[dpy] = (hwc_rect_t){0, 0, 0, 0};
+    ctx->dpyAttr[dpy].mActionSafePresent = isActionSafePresent(ctx, dpy);
 
     trimList(ctx, list, dpy);
     optimizeLayerRects(ctx, list, dpy);
@@ -918,6 +910,27 @@ bool isSecureModePolicy(int mdpVersion) {
         return true;
     else
         return false;
+}
+
+// returns true if Action safe dimensions are set and target supports Actionsafe
+bool isActionSafePresent(hwc_context_t *ctx, int dpy) {
+    // if external supports underscan, do nothing
+    // it will be taken care in the driver
+    if(!dpy || ctx->mExtDisplay->isCEUnderscanSupported())
+        return false;
+
+    char value[PROPERTY_VALUE_MAX];
+    // Read action safe properties
+    property_get("persist.sys.actionsafe.width", value, "0");
+    ctx->dpyAttr[dpy].mAsWidthRatio = atoi(value);
+    property_get("persist.sys.actionsafe.height", value, "0");
+    ctx->dpyAttr[dpy].mAsHeightRatio = atoi(value);
+
+    if(!ctx->dpyAttr[dpy].mAsWidthRatio && !ctx->dpyAttr[dpy].mAsHeightRatio) {
+        //No action safe ratio set, return
+        return false;
+    }
+    return true;
 }
 
 int getBlending(int blending) {
