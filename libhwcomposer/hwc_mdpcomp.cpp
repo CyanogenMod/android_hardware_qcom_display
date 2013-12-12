@@ -915,7 +915,6 @@ int MDPComp::getBatch(hwc_display_contents_1_t* list,
         int& maxBatchStart, int& maxBatchEnd,
         int& maxBatchCount) {
     int i = 0;
-    int updatingLayersAbove = 0;//Updating layer count in middle of batch
     int fbZOrder =-1;
     while (i < mCurrentFrame.layerCount) {
         int batchCount = 0;
@@ -923,6 +922,7 @@ int MDPComp::getBatch(hwc_display_contents_1_t* list,
         int batchEnd = i;
         int fbZ = batchStart;
         int firstZReverseIndex = -1;
+        int updatingLayersAbove = 0;//Updating layer count in middle of batch
         while(i < mCurrentFrame.layerCount) {
             if(!mCurrentFrame.isFBComposed[i]) {
                 if(!batchCount) {
