@@ -623,13 +623,14 @@ bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
     }
 
     bool ret = false;
-    if(isLoadBasedCompDoable(ctx, list)) {
-        ret = loadBasedCompPreferGPU(ctx, list) ||
+    if(list->flags & HWC_GEOMETRY_CHANGED) { //Try load based first
+        ret =   loadBasedCompPreferGPU(ctx, list) or
+                loadBasedCompPreferMDP(ctx, list) or
+                cacheBasedComp(ctx, list);
+    } else {
+        ret =   cacheBasedComp(ctx, list) or
+                loadBasedCompPreferGPU(ctx, list) or
                 loadBasedCompPreferMDP(ctx, list);
-    }
-
-    if(!ret) {
-        ret = cacheBasedComp(ctx, list);
     }
 
     return ret;
@@ -683,6 +684,10 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
 
 bool MDPComp::loadBasedCompPreferGPU(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
+    if(not isLoadBasedCompDoable(ctx, list)) {
+        return false;
+    }
+
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     mCurrentFrame.reset(numAppLayers);
 
@@ -752,8 +757,13 @@ bool MDPComp::loadBasedCompPreferGPU(hwc_context_t *ctx,
 
 bool MDPComp::loadBasedCompPreferMDP(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
+    if(not isLoadBasedCompDoable(ctx, list)) {
+        return false;
+    }
+
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
-    //TODO get the ib from sysfs node.
+    mCurrentFrame.reset(numAppLayers);
+
     //Full screen is from ib perspective, not actual full screen
     const int bpp = 4;
     double panelRefRate =
@@ -809,8 +819,7 @@ bool MDPComp::loadBasedCompPreferMDP(hwc_context_t *ctx,
 
 bool MDPComp::isLoadBasedCompDoable(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-    if(mDpy or isSecurePresent(ctx, mDpy) or
-            not (list->flags & HWC_GEOMETRY_CHANGED)) {
+    if(mDpy or isSecurePresent(ctx, mDpy)) {
         return false;
     }
     return true;
