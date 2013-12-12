@@ -449,7 +449,7 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
             /* Reset frame ROI when any layer which needs scaling also needs ROI
              * cropping */
             if((res_w != dst_w || res_h != dst_h) &&
-               needsScaling (ctx, layer, mDpy)) {
+                    needsScaling (layer)) {
                 ALOGI("%s: Resetting ROI due to scaling", __FUNCTION__);
                 memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
                 mCurrentFrame.dropCount = 0;
@@ -530,12 +530,6 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
         return false;
     }
 
-    if(ctx->listStats[mDpy].needsAlphaScale
-       && ctx->mMDP.version < qdutils::MDSS_V5) {
-        ALOGD_IF(isDebug(), "%s: frame needs alpha downscaling",__FUNCTION__);
-        return false;
-    }
-
     for(int i = 0; i < numAppLayers; ++i) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
@@ -568,6 +562,12 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
     } else if(partialMDPComp(ctx, list)) {
         ret = true;
     }
+
+    if(!hwLimitationsCheck(ctx, list)) {
+        ALOGD_IF(isDebug(), "%s: HW limitations",__FUNCTION__);
+        return false;
+    }
+
     return ret;
 }
 
@@ -593,7 +593,7 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         //pipe and error is reported.
         if(qdutils::MDPVersion::getInstance().is8x26() &&
                                 mDpy >= HWC_DISPLAY_EXTERNAL &&
-                                qhwc::needsScaling(ctx, layer, mDpy))
+                                qhwc::needsScaling(layer))
             return false;
     }
     mCurrentFrame.fbCount = 0;
@@ -1222,6 +1222,48 @@ bool MDPComp::bandwidthCheck(hwc_context_t *ctx, const double& size) {
     return true;
 }
 
+bool MDPComp::hwLimitationsCheck(hwc_context_t* ctx,
+        hwc_display_contents_1_t* list) {
+
+    //A-family hw limitation:
+    //If a layer need alpha scaling, MDP can not support.
+    if(ctx->mMDP.version < qdutils::MDSS_V5) {
+        for(int i = 0; i < mCurrentFrame.layerCount; ++i) {
+            if(!mCurrentFrame.isFBComposed[i] &&
+                    isAlphaScaled( &list->hwLayers[i])) {
+                ALOGD_IF(isDebug(), "%s:frame needs alphaScaling",__FUNCTION__);
+                return false;
+            }
+        }
+    }
+
+    // On 8x26 & 8974 hw, we have a limitation of downscaling+blending.
+    //If multiple layers requires downscaling and also they are overlapping
+    //fall back to GPU since MDSS can not handle it.
+    if(qdutils::MDPVersion::getInstance().is8x74v2() ||
+            qdutils::MDPVersion::getInstance().is8x26()) {
+        for(int i = 0; i < mCurrentFrame.layerCount-1; ++i) {
+            hwc_layer_1_t* botLayer = &list->hwLayers[i];
+            if(!mCurrentFrame.isFBComposed[i] &&
+                    isDownscaleRequired(botLayer)) {
+                //if layer-i is marked for MDP and needs downscaling
+                //check if any MDP layer on top of i & overlaps with layer-i
+                for(int j = i+1; j < mCurrentFrame.layerCount; ++j) {
+                    hwc_layer_1_t* topLayer = &list->hwLayers[j];
+                    if(!mCurrentFrame.isFBComposed[j] &&
+                            isDownscaleRequired(topLayer)) {
+                        hwc_rect_t r = getIntersection(botLayer->displayFrame,
+                                topLayer->displayFrame);
+                        if(isValidRect(r))
+                            return false;
+                    }
+                }
+            }
+        }
+    }
+    return true;
+}
+
 int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int ret = 0;
     const int numLayers = ctx->listStats[mDpy].numAppLayers;
@@ -1495,7 +1537,7 @@ bool MDPCompNonSplit::allocLayerPipes(hwc_context_t *ctx,
 
         if(isYuvBuffer(hnd)) {
             type = MDPCOMP_OV_VG;
-        } else if(!qhwc::needsScaling(ctx, layer, mDpy)
+        } else if(!qhwc::needsScaling(layer)
             && Overlay::getDMAMode() != Overlay::DMA_BLOCK_MODE
             && ctx->mMDP.version >= qdutils::MDSS_V5) {
             type = MDPCOMP_OV_DMA;

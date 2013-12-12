@@ -181,6 +181,9 @@ protected:
             hwc_display_contents_1_t* list);
     /* checks if the required bandwidth exceeds a certain max */
     bool bandwidthCheck(hwc_context_t *ctx, const double& size);
+    /* checks if MDP/MDSS can process current list w.r.to HW limitations
+     * All peculiar HW limitations should go here */
+    bool hwLimitationsCheck(hwc_context_t* ctx, hwc_display_contents_1_t* list);
     /* generates ROI based on the modified area of the frame */
     void generateROI(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     bool validateAndApplyROI(hwc_context_t *ctx, hwc_display_contents_1_t* list,
