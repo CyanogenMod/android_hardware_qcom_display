@@ -52,7 +52,9 @@
 using namespace gralloc;
 using namespace qdutils;
 
+namespace android {
 ANDROID_SINGLETON_STATIC_INSTANCE(AdrenoMemInfo);
+}
 
 //Common functions
 static bool canFallback(int usage, bool triedSystem)

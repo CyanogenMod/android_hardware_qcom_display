@@ -33,7 +33,10 @@
 #include <linux/msm_mdp.h>
 #include "mdp_version.h"
 
+namespace android {
 ANDROID_SINGLETON_STATIC_INSTANCE(qdutils::MDPVersion);
+}
+
 namespace qdutils {
 
 MDPVersion::MDPVersion()
