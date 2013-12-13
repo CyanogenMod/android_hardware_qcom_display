@@ -1007,6 +1007,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     int rotFd = -1;
     bool swapzero = false;
     int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
+    LayerProp *layerProp = ctx->layerProp[dpy];
 
     struct mdp_buf_sync data;
     memset(&data, 0, sizeof(data));
@@ -1056,12 +1057,14 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     //Accumulate acquireFenceFds for MDP
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(list->hwLayers[i].compositionType == HWC_OVERLAY &&
+                        (layerProp[i].mFlags & HWC_MDPCOMP) &&
                         list->hwLayers[i].acquireFenceFd >= 0) {
             if(UNLIKELY(swapzero))
                 acquireFd[count++] = -1;
             else
                 acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
         }
+
         if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             if(UNLIKELY(swapzero))
                 acquireFd[count++] = -1;
@@ -1078,7 +1081,6 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
 
     data.acq_fen_fd_cnt = count;
     fbFd = ctx->dpyAttr[dpy].fd;
-
     //Waits for acquire fences, returns a release fence
     if(LIKELY(!swapzero)) {
         uint64_t start = systemTime();
@@ -1096,8 +1098,9 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     }
 
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
-        if(list->hwLayers[i].compositionType == HWC_OVERLAY ||
-           list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
+        if(((list->hwLayers[i].compositionType == HWC_OVERLAY) &&
+                (layerProp[i].mFlags & HWC_MDPCOMP)) ||
+                list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             //Populate releaseFenceFds.
             if(UNLIKELY(swapzero)) {
                 list->hwLayers[i].releaseFenceFd = -1;
