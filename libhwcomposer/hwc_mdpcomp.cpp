@@ -604,7 +604,7 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         mCurrentFrame.dropCount;
 
     if(sEnable4k2kYUVSplit){
-        modifymdpCountfor4k2k(ctx, list);
+        adjustForSourceSplit(ctx, list);
     }
 
     if(!resourceCheck(ctx, list)) {
@@ -663,7 +663,7 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
     int mdpCount = mCurrentFrame.mdpCount;
 
     if(sEnable4k2kYUVSplit){
-        modifymdpCountfor4k2k(ctx, list);
+        adjustForSourceSplit(ctx, list);
     }
 
     //Will benefit cases where a video has non-updating background.
@@ -737,7 +737,7 @@ bool MDPComp::loadBasedCompPreferGPU(hwc_context_t *ctx,
     mCurrentFrame.mdpCount = mCurrentFrame.layerCount - batchSize;
 
     if(sEnable4k2kYUVSplit){
-        modifymdpCountfor4k2k(ctx, list);
+        adjustForSourceSplit(ctx, list);
     }
 
     if(!resourceCheck(ctx, list)) {
@@ -792,7 +792,7 @@ bool MDPComp::loadBasedCompPreferMDP(hwc_context_t *ctx,
     mCurrentFrame.mdpCount = mCurrentFrame.layerCount - fbBatchSize;
 
     if(sEnable4k2kYUVSplit){
-        modifymdpCountfor4k2k(ctx, list);
+        adjustForSourceSplit(ctx, list);
     }
 
     if(!resourceCheck(ctx, list)) {
@@ -1105,6 +1105,15 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
 }
 
 bool MDPComp::programMDP(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
+    //Configure framebuffer first if applicable
+    if(mCurrentFrame.fbZ >= 0) {
+        if(!ctx->mFBUpdate[mDpy]->prepare(ctx, list, mCurrentFrame.fbZ)) {
+            ALOGD_IF(isDebug(), "%s configure framebuffer failed",
+                    __FUNCTION__);
+            return false;
+        }
+    }
+
     if(!allocLayerPipes(ctx, list)) {
         ALOGD_IF(isDebug(), "%s: Unable to allocate MDP pipes", __FUNCTION__);
         return false;
@@ -1304,31 +1313,6 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     //Check whether layers marked for MDP Composition is actually doable.
     if(isFullFrameDoable(ctx, list)) {
         mCurrentFrame.map();
-        //Configure framebuffer first if applicable
-        if(mCurrentFrame.fbZ >= 0) {
-            //If 4k2k Yuv layer split is possible,  and if
-            //fbz is above 4k2k layer, increment fb zorder by 1
-            //as we split 4k2k layer and increment zorder for right half
-            //of the layer
-            if(sEnable4k2kYUVSplit){
-                int n4k2kYuvCount = ctx->listStats[mDpy].yuv4k2kCount;
-                for(int index = 0; index < n4k2kYuvCount; index++){
-                    int n4k2kYuvIndex =
-                            ctx->listStats[mDpy].yuv4k2kIndices[index];
-                    if(mCurrentFrame.fbZ > n4k2kYuvIndex){
-                        mCurrentFrame.fbZ += 1;
-                    }
-                }
-            }
-            if(!ctx->mFBUpdate[mDpy]->prepare(ctx, list,
-                        mCurrentFrame.fbZ)) {
-                ALOGE("%s configure framebuffer failed", __func__);
-                reset(numLayers, list);
-                ctx->mOverlay->clear(mDpy);
-                ret = -1;
-                goto exit;
-            }
-        }
         //Acquire and Program MDP pipes
         if(!programMDP(ctx, list)) {
             reset(numLayers, list);
@@ -1351,26 +1335,16 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         //all the RGB layers compose in FB
         //Destination over
 
-        if(sEnable4k2kYUVSplit){
-            modifymdpCountfor4k2k(ctx, list);
-        }
-
         mCurrentFrame.fbZ = -1;
         if(mCurrentFrame.fbCount)
             mCurrentFrame.fbZ = mCurrentFrame.mdpCount;
 
+        if(sEnable4k2kYUVSplit){
+            adjustForSourceSplit(ctx, list);
+        }
+
         mCurrentFrame.map();
 
-        //Configure framebuffer first if applicable
-        if(mCurrentFrame.fbZ >= 0) {
-            if(!ctx->mFBUpdate[mDpy]->prepare(ctx, list, mCurrentFrame.fbZ)) {
-                ALOGE("%s configure framebuffer failed", __func__);
-                reset(numLayers, list);
-                ctx->mOverlay->clear(mDpy);
-                ret = -1;
-                goto exit;
-            }
-        }
         if(!programMDP(ctx, list)) {
             reset(numLayers, list);
             ctx->mOverlay->clear(mDpy);
@@ -1436,11 +1410,26 @@ bool MDPComp::allocSplitVGPipesfor4k2k(hwc_context_t *ctx,
 }
 //=============MDPCompNonSplit===================================================
 
-void MDPCompNonSplit::modifymdpCountfor4k2k(hwc_context_t *ctx,
+void MDPCompNonSplit::adjustForSourceSplit(hwc_context_t *ctx,
          hwc_display_contents_1_t* list){
     //As we split 4kx2k yuv layer and program to 2 VG pipes
     //(if available) increase mdpcount accordingly
     mCurrentFrame.mdpCount += ctx->listStats[mDpy].yuv4k2kCount;
+
+    //If 4k2k Yuv layer split is possible,  and if
+    //fbz is above 4k2k layer, increment fb zorder by 1
+    //as we split 4k2k layer and increment zorder for right half
+    //of the layer
+    if(mCurrentFrame.fbZ >= 0) {
+        int n4k2kYuvCount = ctx->listStats[mDpy].yuv4k2kCount;
+        for(int index = 0; index < n4k2kYuvCount; index++){
+            int n4k2kYuvIndex =
+                    ctx->listStats[mDpy].yuv4k2kIndices[index];
+            if(mCurrentFrame.fbZ > n4k2kYuvIndex){
+                mCurrentFrame.fbZ += 1;
+            }
+        }
+    }
 }
 
 /*
@@ -1688,7 +1677,7 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
 //=============MDPCompSplit===================================================
 
-void MDPCompSplit::modifymdpCountfor4k2k(hwc_context_t *ctx,
+void MDPCompSplit::adjustForSourceSplit(hwc_context_t *ctx,
          hwc_display_contents_1_t* list){
     //if 4kx2k yuv layer is totally present in either in left half
     //or right half then try splitting the yuv layer to avoid decimation
@@ -1698,9 +1687,11 @@ void MDPCompSplit::modifymdpCountfor4k2k(hwc_context_t *ctx,
         int n4k2kYuvIndex = ctx->listStats[mDpy].yuv4k2kIndices[index];
         hwc_layer_1_t* layer = &list->hwLayers[n4k2kYuvIndex];
         hwc_rect_t dst = layer->displayFrame;
-
-        if((dst.left > lSplit)||(dst.right < lSplit)){
+        if((dst.left > lSplit) || (dst.right < lSplit)) {
             mCurrentFrame.mdpCount += 1;
+        }
+        if(mCurrentFrame.fbZ > n4k2kYuvIndex){
+            mCurrentFrame.fbZ += 1;
         }
     }
 }

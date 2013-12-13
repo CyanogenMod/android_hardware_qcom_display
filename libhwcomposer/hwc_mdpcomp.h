@@ -139,8 +139,9 @@ protected:
     /* Checks for pipes needed versus pipes available */
     virtual bool arePipesAvailable(hwc_context_t *ctx,
             hwc_display_contents_1_t* list) = 0;
-    /* increments mdpCount if 4k2k yuv layer split is enabled*/
-    virtual void modifymdpCountfor4k2k(hwc_context_t *ctx,
+    /* Increments mdpCount if 4k2k yuv layer split is enabled.
+     * updates framebuffer z order if fb lies above source-split layer */
+    virtual void adjustForSourceSplit(hwc_context_t *ctx,
             hwc_display_contents_1_t* list) = 0;
     /* configures 4kx2k yuv layer*/
     virtual int configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
@@ -266,8 +267,9 @@ private:
     virtual bool areVGPipesAvailable(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
 
-    /* increments mdpCount if 4k2k yuv layer split is enabled*/
-    virtual void modifymdpCountfor4k2k(hwc_context_t *ctx,
+    /* Increments mdpCount if 4k2k yuv layer split is enabled.
+     * updates framebuffer z order if fb lies above source-split layer */
+    virtual void adjustForSourceSplit(hwc_context_t *ctx,
              hwc_display_contents_1_t* list);
 
     /* configures 4kx2k yuv layer to 2 VG pipes*/
@@ -306,8 +308,9 @@ private:
     virtual bool areVGPipesAvailable(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
 
-    /* increments mdpCount if 4k2k yuv layer split is enabled*/
-    virtual void modifymdpCountfor4k2k(hwc_context_t *ctx,
+    /* Increments mdpCount if 4k2k yuv layer split is enabled.
+     * updates framebuffer z order if fb lies above source-split layer */
+    virtual void adjustForSourceSplit(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
 
     /* configures 4kx2k yuv layer*/
