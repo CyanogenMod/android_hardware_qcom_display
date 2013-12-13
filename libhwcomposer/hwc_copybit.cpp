@@ -242,10 +242,10 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     }
 
     //Wait for the previous frame to complete before rendering onto it
-    if(mRelFd[0] >=0) {
-        sync_wait(mRelFd[0], 1000);
-        close(mRelFd[0]);
-        mRelFd[0] = -1;
+    if(mRelFd[mCurRenderBufferIndex] >=0) {
+        sync_wait(mRelFd[mCurRenderBufferIndex], 1000);
+        close(mRelFd[mCurRenderBufferIndex]);
+        mRelFd[mCurRenderBufferIndex] = -1;
     }
 
     //Clear the visible region on the render buffer
@@ -530,6 +530,11 @@ void CopyBit::freeRenderBuffers()
 {
     for (int i = 0; i < NUM_RENDER_BUFFERS; i++) {
         if(mRenderBuffer[i]) {
+            //Since we are freeing buffer close the fence if it has a valid one.
+            if(mRelFd[i] >= 0) {
+                close(mRelFd[i]);
+                mRelFd[i] = -1;
+            }
             free_buffer(mRenderBuffer[i]);
             mRenderBuffer[i] = NULL;
         }
@@ -541,10 +546,9 @@ private_handle_t * CopyBit::getCurrentRenderBuffer() {
 }
 
 void CopyBit::setReleaseFd(int fd) {
-    if(mRelFd[0] >=0)
-        close(mRelFd[0]);
-    mRelFd[0] = mRelFd[1];
-    mRelFd[1] = dup(fd);
+    if(mRelFd[mCurRenderBufferIndex] >=0)
+        close(mRelFd[mCurRenderBufferIndex]);
+    mRelFd[mCurRenderBufferIndex] = dup(fd);
 }
 
 struct copybit_device_t* CopyBit::getCopyBitDevice() {
@@ -561,10 +565,10 @@ CopyBit::CopyBit(hwc_context_t *ctx, const int& dpy) : mIsModeOn(false),
             mAlignedFBHeight);
 
     hw_module_t const *module;
-    for (int i = 0; i < NUM_RENDER_BUFFERS; i++)
+    for (int i = 0; i < NUM_RENDER_BUFFERS; i++) {
         mRenderBuffer[i] = NULL;
-    mRelFd[0] = -1;
-    mRelFd[1] = -1;
+        mRelFd[i] = -1;
+    }
 
     char value[PROPERTY_VALUE_MAX];
     property_get("debug.hwc.dynThreshold", value, "2");
@@ -582,10 +586,6 @@ CopyBit::CopyBit(hwc_context_t *ctx, const int& dpy) : mIsModeOn(false),
 CopyBit::~CopyBit()
 {
     freeRenderBuffers();
-    if(mRelFd[0] >=0)
-        close(mRelFd[0]);
-    if(mRelFd[1] >=0)
-        close(mRelFd[1]);
     if(mEngine)
     {
         copybit_close(mEngine);
