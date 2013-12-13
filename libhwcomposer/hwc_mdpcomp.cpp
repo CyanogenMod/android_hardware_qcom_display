@@ -1317,6 +1317,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         if(!programMDP(ctx, list)) {
             reset(numLayers, list);
             ctx->mOverlay->clear(mDpy);
+            ctx->mLayerRotMap[mDpy]->clear();
             ret = -1;
             goto exit;
         } else { //Success
@@ -1348,6 +1349,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         if(!programMDP(ctx, list)) {
             reset(numLayers, list);
             ctx->mOverlay->clear(mDpy);
+            ctx->mLayerRotMap[mDpy]->clear();
             ret = -1;
             goto exit;
         }
