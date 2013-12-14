@@ -30,7 +30,9 @@
 #include <cutils/log.h>
 #include <cutils/native_handle.h>
 #include <gralloc_priv.h>
+#ifdef USE_GENLOCK
 #include <linux/genlock.h>
+#endif
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
