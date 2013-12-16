@@ -108,7 +108,8 @@ enum {
     HAL_PIXEL_FORMAT_BGRX_8888              = 0x112,
     HAL_PIXEL_FORMAT_NV21_ZSL               = 0x113,
     HAL_PIXEL_FORMAT_INTERLACE              = 0x180,
-
+    //v4l2_fourcc('Y', 'U', 'Y', 'L'). 24 bpp YUYV 4:2:2 10 bit per component
+    HAL_PIXEL_FORMAT_YCbCr_422_I_10BIT      = 0x4C595559,
 };
 
 /* possible formats for 3D content*/
