@@ -75,6 +75,8 @@ public:
     void getDump(char *buf, size_t len);
     int getPipeId();
 
+    static bool validateAndSet(GenericPipe* pipeArray[], const int& count,
+            const int& fbFd);
 private:
     /* set Closed pipe */
     bool setClosed();
