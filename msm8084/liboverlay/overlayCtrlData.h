@@ -84,6 +84,8 @@ public:
     /* Return the dump in the specified buffer */
     void getDump(char *buf, size_t len);
 
+    static bool validateAndSet(Ctrl* ctrlArray[], const int& count,
+            const int& fbFd);
 private:
     // mdp ctrl struct(info e.g.)
     MdpCtrl *mMdp;
@@ -179,6 +181,19 @@ inline int Ctrl::getFd() const {
 
 inline void Ctrl::updateSrcFormat(const uint32_t& rotDstFmt) {
     mMdp->updateSrcFormat(rotDstFmt);
+}
+
+inline bool Ctrl::validateAndSet(Ctrl* ctrlArray[], const int& count,
+        const int& fbFd) {
+    MdpCtrl* mdpCtrlArray[count];
+    memset(&mdpCtrlArray, 0, sizeof(mdpCtrlArray));
+
+    for(int i = 0; i < count; i++) {
+        mdpCtrlArray[i] = ctrlArray[i]->mMdp;
+    }
+
+    bool ret = MdpCtrl::validateAndSet(mdpCtrlArray, count, fbFd);
+    return ret;
 }
 
 inline utils::Dim Ctrl::getCrop() const {
