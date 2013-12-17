@@ -57,6 +57,12 @@ void IFBUpdate::reset() {
     mRot = NULL;
 }
 
+bool IFBUpdate::prepareAndValidate(hwc_context_t *ctx,
+            hwc_display_contents_1 *list, int fbZorder) {
+    return prepare(ctx, list, fbZorder) &&
+            ctx->mOverlay->validateAndSet(mDpy, ctx->dpyAttr[mDpy].fd);
+}
+
 //================= Low res====================================
 FBUpdateNonSplit::FBUpdateNonSplit(hwc_context_t *ctx, const int& dpy):
         IFBUpdate(ctx, dpy) {}

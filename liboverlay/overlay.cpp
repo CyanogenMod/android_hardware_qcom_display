@@ -69,13 +69,6 @@ void Overlay::configBegin() {
         PipeBook::resetAllocation(i);
     }
     mDumpStr[0] = '\0';
-
-#ifdef USES_QSEED_SCALAR
-    Scale *scalar = getScalar();
-    if(scalar) {
-        scalar->configBegin();
-    }
-#endif
 }
 
 void Overlay::configDone() {
@@ -98,13 +91,6 @@ void Overlay::configDone() {
     }
     dump();
     PipeBook::save();
-
-#ifdef USES_QSEED_SCALAR
-    Scale *scalar = getScalar();
-    if(scalar) {
-        scalar->configDone();
-    }
-#endif
 }
 
 int Overlay::getPipeId(utils::eDest dest) {
@@ -433,6 +419,22 @@ void Overlay::clear(int dpy) {
             PipeBook::resetAllocation(i);
         }
     }
+}
+
+bool Overlay::validateAndSet(const int& dpy, const int& fbFd) {
+    GenericPipe* pipeArray[PipeBook::NUM_PIPES];
+    memset(&pipeArray, 0, sizeof(pipeArray));
+
+    int num = 0;
+    for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
+        if(PipeBook::isUsed(i) && mPipeBook[i].valid() &&
+                mPipeBook[i].mDisplay == dpy) {
+            pipeArray[num++] = mPipeBook[i].mPipe;
+        }
+    }
+
+    //Protect against misbehaving clients
+    return num ? GenericPipe::validateAndSet(pipeArray, num, fbFd) : true;
 }
 
 void Overlay::initScalar() {

@@ -72,7 +72,6 @@ public:
     void dump() const;
     /* Return the dump in the specified buffer */
     void getDump(char *buf, size_t len);
-
     /* returns session id */
     int getPipeId() const;
     /* returns the fd associated to ctrl*/
@@ -84,14 +83,14 @@ public:
     /* setVisualParam */
     bool setVisualParams(const MetaData_t& data);
 
+    static bool validateAndSet(MdpCtrl* mdpCtrlArray[], const int& count,
+            const int& fbFd);
 private:
     /* Perform transformation calculations */
     void doTransform();
     void doDownscale();
     /* get orient / user_data[0] */
-        int getOrient() const;
-    /* overlay get */
-    bool get();
+    int getOrient() const;
     /* returns flags from mdp structure */
     int getFlags() const;
     /* set flags to mdp structure */
