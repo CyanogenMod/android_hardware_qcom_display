@@ -179,15 +179,6 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
                 const int fbZ = 0;
                 ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
             }
-
-            if(ctx->listStats[dpy].isDisplayAnimating) {
-                // Mark all app layers as HWC_OVERLAY for external during
-                // animation, so that SF doesnt draw it on FB
-                for(int i = 0 ;i < ctx->listStats[dpy].numAppLayers; i++) {
-                    hwc_layer_1_t *layer = &list->hwLayers[i];
-                    layer->compositionType = HWC_OVERLAY;
-                }
-            }
         } else {
             /* External Display is in Pause state.
              * Mark all application layers as OVERLAY so that
@@ -219,15 +210,6 @@ static int hwc_prepare_virtual(hwc_composer_device_1 *dev,
             if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
                 const int fbZ = 0;
                 ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
-            }
-
-            if(ctx->listStats[dpy].isDisplayAnimating) {
-                // Mark all app layers as HWC_OVERLAY for virtual during
-                // animation, so that SF doesnt draw it on FB
-                for(int i = 0 ;i < ctx->listStats[dpy].numAppLayers; i++) {
-                    hwc_layer_1_t *layer = &list->hwLayers[i];
-                    layer->compositionType = HWC_OVERLAY;
-                }
             }
         } else {
             /* Virtual Display is in Pause state.
@@ -309,8 +291,6 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
             if(dpy == HWC_DISPLAY_PRIMARY) {
                 Locker::Autolock _l(ctx->mDrawLock);
                 // store the primary display orientation
-                // will be used in hwc_video::configure to disable
-                // rotation animation on external display
                 ctx->deviceOrientation = enable;
             }
             break;
