@@ -46,6 +46,9 @@
 #define VENUS_BUFFER_SIZE(args...) 0
 #endif
 
+#define ASTC_BLOCK_SIZE 16
+#define ASTC_IN_UNITS(n, unit_size)  (((n) + (unit_size) -1) / (unit_size))
+
 using namespace gralloc;
 using namespace qdutils;
 
@@ -198,6 +201,76 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
                 break;
             case HAL_PIXEL_FORMAT_NV21_ZSL:
                 aligned_w = ALIGN(width, 64);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_4x4_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 4);
+                aligned_h = ASTC_IN_UNITS(height, 4);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_5x4_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 5);
+                aligned_h = ASTC_IN_UNITS(height, 4);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_5x5_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 5);
+                aligned_h = ASTC_IN_UNITS(height, 5);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_6x5_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 6);
+                aligned_h = ASTC_IN_UNITS(height, 5);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_6x6_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 6);
+                aligned_h = ASTC_IN_UNITS(height, 6);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_8x5_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 8);
+                aligned_h = ASTC_IN_UNITS(height, 5);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_8x6_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 8);
+                aligned_h = ASTC_IN_UNITS(height, 6);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_8x8_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 8);
+                aligned_h = ASTC_IN_UNITS(height, 8);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_10x5_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 10);
+                aligned_h = ASTC_IN_UNITS(height, 5);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_10x6_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 10);
+                aligned_h = ASTC_IN_UNITS(height, 6);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_10x8_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 10);
+                aligned_h = ASTC_IN_UNITS(height, 8);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_10x10_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 10);
+                aligned_h = ASTC_IN_UNITS(height, 10);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_12x10_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 12);
+                aligned_h = ASTC_IN_UNITS(height, 10);
+                break;
+            case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_12x12_KHR:
+            case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR:
+                aligned_w = ASTC_IN_UNITS(width, 12);
+                aligned_h = ASTC_IN_UNITS(height, 12);
                 break;
             default: break;
         }
@@ -411,6 +484,35 @@ size_t getSize(int format, int width, int height, int alignedw, int alignedh)
         case HAL_PIXEL_FORMAT_NV21_ZSL:
             alignedh = ALIGN(height, 64);
             size = ALIGN((alignedw*alignedh) + (alignedw* alignedh)/2, 4096);
+            break;
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_4x4_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_5x4_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_5x5_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_6x5_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_6x6_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_8x5_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_8x6_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_8x8_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_10x5_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_10x6_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_10x8_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_10x10_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_12x10_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_12x12_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR:
+        case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR:
+            size = alignedw * alignedh * ASTC_BLOCK_SIZE;
             break;
         default:
             ALOGE("unrecognized pixel format: 0x%x", format);
