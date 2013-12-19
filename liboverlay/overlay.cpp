@@ -338,7 +338,7 @@ void Overlay::getDump(char *buf, size_t len) {
     const char *str = "\nOverlay State\n==========================\n";
     strncat(buf, str, strlen(str));
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
-        if(mPipeBook[i].valid()) {
+        if(mPipeBook[i].valid() && mPipeBook[i].isUsed(i)) {
             mPipeBook[i].mPipe->getDump(buf, len);
             char str[64] = {'\0'};
             snprintf(str, 64, "Attached to dpy=%d\n\n", mPipeBook[i].mDisplay);
