@@ -149,10 +149,12 @@ protected:
     /* set/reset flags for MDPComp */
     void setMDPCompLayerFlags(hwc_context_t *ctx,
                               hwc_display_contents_1_t* list);
+    void setRedraw(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
     /* checks for conditions where mdpcomp is not possible */
     bool isFrameDoable(hwc_context_t *ctx);
     /* checks for conditions where RGB layers cannot be bypassed */
-    bool isFullFrameDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    bool tryFullFrame(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* checks if full MDP comp can be done */
     bool fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* check if we can use layer cache to do at least partial MDP comp */
@@ -173,7 +175,8 @@ protected:
     bool isLoadBasedCompDoable(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
     /* checks for conditions where only video can be bypassed */
-    bool isOnlyVideoDoable(hwc_context_t *ctx, hwc_display_contents_1_t* list,
+    bool tryVideoOnly(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    bool videoOnlyComp(hwc_context_t *ctx, hwc_display_contents_1_t* list,
             bool secureOnly);
     /* checks for conditions where YUV layers cannot be bypassed */
     bool isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer);
@@ -212,8 +215,16 @@ protected:
         /* updates cache map with YUV info */
     void updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
             bool secureOnly);
-    bool programMDP(hwc_context_t *ctx, hwc_display_contents_1_t* list);
-    void reset(const int& numAppLayers, hwc_display_contents_1_t* list);
+    /* Validates if the GPU/MDP layer split chosen by a strategy is supported
+     * by MDP.
+     * Sets up MDP comp data structures to reflect covnversion from layers to
+     * overlay pipes.
+     * Configures overlay.
+     * Configures if GPU should redraw.
+     */
+    bool postHeuristicsHandling(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+    void reset(hwc_context_t *ctx);
     bool isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer);
     bool resourceCheck(hwc_context_t *ctx, hwc_display_contents_1_t *list);
 
