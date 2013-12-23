@@ -1358,6 +1358,7 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     calcExtDisplayPosition(ctx, hnd, dpy, crop, dst,
                                            transform, orient);
 
+    bool forceRot = false;
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
        ctx->mMDP.version < qdutils::MDSS_V5) {
         downscale =  getDownscaleFactor(
@@ -1368,13 +1369,25 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         if(downscale) {
             rotFlags = ROT_DOWNSCALE_ENABLED;
         }
+
+        uint32_t& prevWidth = ctx->mPrevWHF[dpy].w;
+        uint32_t& prevHeight = ctx->mPrevWHF[dpy].h;
+        if(prevWidth != (uint32_t)getWidth(hnd) ||
+                prevHeight != (uint32_t)getHeight(hnd)) {
+            uint32_t prevBufArea = prevWidth * prevHeight;
+            if(prevBufArea) {
+                forceRot = true;
+            }
+            prevWidth = (uint32_t)getWidth(hnd);
+            prevHeight = (uint32_t)getHeight(hnd);
+        }
     }
 
     setMdpFlags(layer, mdpFlags, downscale, transform);
     trimLayer(ctx, dpy, transform, crop, dst);
 
     if(isYuvBuffer(hnd) && //if 90 component or downscale, use rot
-            ((transform & HWC_TRANSFORM_ROT_90) || downscale)) {
+            ((transform & HWC_TRANSFORM_ROT_90) || downscale || forceRot)) {
         *rot = ctx->mRotMgr->getNext();
         if(*rot == NULL) return -1;
         Whf origWhf(hnd->width, hnd->height,
@@ -1452,11 +1465,25 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         }
     }
 
+    bool forceRot = false;
+    if(isYuvBuffer(hnd)) {
+        uint32_t& prevWidth = ctx->mPrevWHF[dpy].w;
+        uint32_t& prevHeight = ctx->mPrevWHF[dpy].h;
+        if(prevWidth != (uint32_t)getWidth(hnd) ||
+                prevHeight != (uint32_t)getHeight(hnd)) {
+            uint32_t prevBufArea = (prevWidth * prevHeight);
+            if(prevBufArea) {
+                forceRot = true;
+            }
+            prevWidth = (uint32_t)getWidth(hnd);
+            prevHeight = (uint32_t)getHeight(hnd);
+        }
+    }
 
     setMdpFlags(layer, mdpFlagsL, 0, transform);
     trimLayer(ctx, dpy, transform, crop, dst);
 
-    if(isYuvBuffer(hnd) && (transform & HWC_TRANSFORM_ROT_90)) {
+    if(isYuvBuffer(hnd) && ((transform & HWC_TRANSFORM_ROT_90) || forceRot)) {
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         Whf origWhf(hnd->width, hnd->height,
