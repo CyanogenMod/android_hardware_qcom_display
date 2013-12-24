@@ -1405,6 +1405,7 @@ int configColorLayer(hwc_context_t *ctx, hwc_layer_1_t *layer,
     uint32_t color = layer->transform;
     Whf whf(w, h, getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888), 0);
 
+    ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_SOLID_FILL);
     if (layer->blending == HWC_BLENDING_PREMULT)
         ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_BLEND_FG_PREMULT);
 
