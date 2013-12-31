@@ -44,6 +44,7 @@
 #include "QService.h"
 #include "comptype.h"
 #include "qd_utils.h"
+#include "hwc_virtual.h"
 
 using namespace qClient;
 using namespace qService;
@@ -193,6 +194,7 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDPComp[HWC_DISPLAY_PRIMARY] =
          MDPComp::getObject(ctx, HWC_DISPLAY_PRIMARY);
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
+    ctx->mHWCVirtual = HWCVirtualBase::getObject();
 
     for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         ctx->mHwcDebug[i] = new HwcDebug(i);
@@ -304,6 +306,10 @@ void closeContext(hwc_context_t *ctx)
             delete ctx->mLayerRotMap[i];
             ctx->mLayerRotMap[i] = NULL;
         }
+    }
+    if(ctx->mHWCVirtual) {
+        delete ctx->mHWCVirtual;
+        ctx->mHWCVirtual = NULL;
     }
     if(ctx->mAD) {
         delete ctx->mAD;
@@ -1168,12 +1174,19 @@ bool isExternalActive(hwc_context_t* ctx) {
 }
 
 void closeAcquireFds(hwc_display_contents_1_t* list) {
-    for(uint32_t i = 0; list && i < list->numHwLayers; i++) {
-        //Close the acquireFenceFds
-        //HWC_FRAMEBUFFER are -1 already by SF, rest we close.
-        if(list->hwLayers[i].acquireFenceFd >= 0) {
-            close(list->hwLayers[i].acquireFenceFd);
-            list->hwLayers[i].acquireFenceFd = -1;
+    if(LIKELY(list)) {
+        for(uint32_t i = 0; i < list->numHwLayers; i++) {
+            //Close the acquireFenceFds
+            //HWC_FRAMEBUFFER are -1 already by SF, rest we close.
+            if(list->hwLayers[i].acquireFenceFd >= 0) {
+                close(list->hwLayers[i].acquireFenceFd);
+                list->hwLayers[i].acquireFenceFd = -1;
+            }
+        }
+        //Writeback
+        if(list->outbufAcquireFenceFd >= 0) {
+            close(list->outbufAcquireFenceFd);
+            list->outbufAcquireFenceFd = -1;
         }
     }
 }
@@ -1239,7 +1252,12 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         }
     }
 
-    //Accumulate acquireFenceFds for MDP Overlays
+    //Accumulate acquireFenceFds for MDP
+    if(list->outbufAcquireFenceFd >= 0) {
+        //Writeback output buffer
+        acquireFd[count++] = list->outbufAcquireFenceFd;
+    }
+
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(list->hwLayers[i].compositionType == HWC_OVERLAY &&
                         list->hwLayers[i].acquireFenceFd >= 0) {
@@ -2015,6 +2033,14 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
     return (eqBounds == 3);
 }
 
+//clear prev layer prop flags and realloc for current frame
+void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers) {
+    if(ctx->layerProp[dpy]) {
+       delete[] ctx->layerProp[dpy];
+       ctx->layerProp[dpy] = NULL;
+    }
+    ctx->layerProp[dpy] = new LayerProp[numAppLayers];
+}
 
 void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
             const hwc_rect_t& dst, const int& transform,
