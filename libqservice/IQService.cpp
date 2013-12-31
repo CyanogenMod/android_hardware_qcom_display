@@ -27,8 +27,9 @@
 #include <binder/IPCThreadState.h>
 #include <utils/Errors.h>
 #include <private/android_filesystem_config.h>
-
 #include <IQService.h>
+
+#define QSERVICE_DEBUG 0
 
 using namespace android;
 using namespace qClient;
@@ -43,47 +44,25 @@ public:
     BpQService(const sp<IBinder>& impl)
         : BpInterface<IQService>(impl) {}
 
-    virtual void securing(uint32_t startEnd) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
-        data.writeInt32(startEnd);
-        remote()->transact(SECURING, data, &reply);
-    }
-
-    virtual void unsecuring(uint32_t startEnd) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
-        data.writeInt32(startEnd);
-        remote()->transact(UNSECURING, data, &reply);
-    }
-
     virtual void connect(const sp<IQClient>& client) {
+        ALOGD_IF(QSERVICE_DEBUG, "%s: connect client", __FUNCTION__);
         Parcel data, reply;
         data.writeInterfaceToken(IQService::getInterfaceDescriptor());
         data.writeStrongBinder(client->asBinder());
         remote()->transact(CONNECT, data, &reply);
     }
 
-    virtual status_t screenRefresh() {
-        Parcel data, reply;
+    virtual android::status_t dispatch(uint32_t command, const Parcel* inParcel,
+            Parcel* outParcel) {
+        ALOGD_IF(QSERVICE_DEBUG, "%s: dispatch in:%p", __FUNCTION__, inParcel);
+        status_t err = android::FAILED_TRANSACTION;
+        Parcel data;
+        Parcel *reply = outParcel;
         data.writeInterfaceToken(IQService::getInterfaceDescriptor());
-        remote()->transact(SCREEN_REFRESH, data, &reply);
-        status_t result = reply.readInt32();
-        return result;
-    }
-
-    virtual void setExtOrientation(uint32_t orientation) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
-        data.writeInt32(orientation);
-        remote()->transact(EXTERNAL_ORIENTATION, data, &reply);
-    }
-
-    virtual void setBufferMirrorMode(uint32_t enable) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
-        data.writeInt32(enable);
-        remote()->transact(BUFFER_MIRRORMODE, data, &reply);
+        if (inParcel && inParcel->dataSize() > 0)
+            data.appendFrom(inParcel, 0, inParcel->dataSize());
+        err = remote()->transact(command, data, reply);
+        return err;
     }
 };
 
@@ -96,7 +75,8 @@ static void getProcName(int pid, char *buf, int size);
 status_t BnQService::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
-    // IPC should be from mediaserver only
+    ALOGD_IF(QSERVICE_DEBUG, "%s: code: %d", __FUNCTION__, code);
+    // IPC should be from certain processes only
     IPCThreadState* ipc = IPCThreadState::self();
     const int callerPid = ipc->getCallingPid();
     const int callerUid = ipc->getCallingUid();
@@ -105,82 +85,36 @@ status_t BnQService::onTransact(
 
     getProcName(callerPid, callingProcName, MAX_BUF_SIZE);
 
-    const bool permission = (callerUid == AID_MEDIA);
+    const bool permission = (callerUid == AID_MEDIA ||
+            callerUid == AID_GRAPHICS ||
+            callerUid == AID_ROOT ||
+            callerUid == AID_SYSTEM);
 
-    switch(code) {
-        case SECURING: {
-            if(!permission) {
-                ALOGE("display.qservice SECURING access denied: \
-                      pid=%d uid=%d process=%s",
-                      callerPid, callerUid, callingProcName);
-                return PERMISSION_DENIED;
-            }
-            CHECK_INTERFACE(IQService, data, reply);
-            uint32_t startEnd = data.readInt32();
-            securing(startEnd);
-            return NO_ERROR;
-        } break;
-        case UNSECURING: {
-            if(!permission) {
-                ALOGE("display.qservice UNSECURING access denied: \
-                      pid=%d uid=%d process=%s",
-                      callerPid, callerUid, callingProcName);
-                return PERMISSION_DENIED;
-            }
-            CHECK_INTERFACE(IQService, data, reply);
-            uint32_t startEnd = data.readInt32();
-            unsecuring(startEnd);
-            return NO_ERROR;
-        } break;
-        case CONNECT: {
-            CHECK_INTERFACE(IQService, data, reply);
-            if(callerUid != AID_GRAPHICS) {
-                ALOGE("display.qservice CONNECT access denied: \
-                      pid=%d uid=%d process=%s",
-                      callerPid, callerUid, callingProcName);
-                return PERMISSION_DENIED;
-            }
-            sp<IQClient> client =
+    if (code == CONNECT) {
+        CHECK_INTERFACE(IQService, data, reply);
+        if(callerUid != AID_GRAPHICS) {
+            ALOGE("display.qservice CONNECT access denied: \
+                    pid=%d uid=%d process=%s",
+                    callerPid, callerUid, callingProcName);
+            return PERMISSION_DENIED;
+        }
+        sp<IQClient> client =
                 interface_cast<IQClient>(data.readStrongBinder());
-            connect(client);
-            return NO_ERROR;
-        } break;
-        case SCREEN_REFRESH: {
-            CHECK_INTERFACE(IQService, data, reply);
-            if(callerUid != AID_SYSTEM) {
-                ALOGE("display.qservice SCREEN_REFRESH access denied: \
-                      pid=%d uid=%d process=%s",callerPid,
-                      callerUid, callingProcName);
-                return PERMISSION_DENIED;
-            }
-            return screenRefresh();
-        } break;
-        case EXTERNAL_ORIENTATION: {
-            CHECK_INTERFACE(IQService, data, reply);
-            if(callerUid != AID_SYSTEM) {
-                ALOGE("display.qservice EXTERNAL_ORIENTATION access denied: \
-                      pid=%d uid=%d process=%s",callerPid,
-                      callerUid, callingProcName);
-                return PERMISSION_DENIED;
-            }
-            uint32_t orientation = data.readInt32();
-            setExtOrientation(orientation);
-            return NO_ERROR;
-        } break;
-        case BUFFER_MIRRORMODE: {
-            CHECK_INTERFACE(IQService, data, reply);
-            if(callerUid != AID_SYSTEM) {
-                ALOGE("display.qservice BUFFER_MIRRORMODE access denied: \
-                      pid=%d uid=%d process=%s",callerPid,
-                      callerUid, callingProcName);
-                return PERMISSION_DENIED;
-            }
-            uint32_t enable = data.readInt32();
-            setBufferMirrorMode(enable);
-            return NO_ERROR;
-        } break;
-        default:
-            return BBinder::onTransact(code, data, reply, flags);
+        connect(client);
+        return NO_ERROR;
+    } else if (code > COMMAND_LIST_START && code < COMMAND_LIST_END) {
+        if(!permission) {
+            ALOGE("display.qservice access denied: command=%d\
+                  pid=%d uid=%d process=%s", code, callerPid,
+                   callerUid, callingProcName);
+	    return PERMISSION_DENIED;
+	}
+	CHECK_INTERFACE(IQService, data, reply);
+        dispatch(code, &data, reply);
+        return NO_ERROR;
+    } else {
+        return BBinder::onTransact(code, data, reply, flags);
+
     }
 }
 

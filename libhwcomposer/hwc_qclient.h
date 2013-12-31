@@ -39,6 +39,7 @@
 
 struct hwc_context_t;
 
+class Params;
 namespace qClient {
 // ----------------------------------------------------------------------------
 
@@ -46,7 +47,9 @@ class QClient : public BnQClient {
 public:
     QClient(hwc_context_t *ctx);
     virtual ~QClient();
-    virtual android::status_t notifyCallback(uint32_t msg, uint32_t value);
+    virtual android::status_t notifyCallback(uint32_t command,
+            const android::Parcel* inParcel,
+            android::Parcel* outParcel);
 
 private:
     //Notifies of Media Player death
@@ -56,12 +59,6 @@ private:
         virtual void died();
         hwc_context_t *mHwcContext;
     };
-
-    void securing(uint32_t startEnd);
-    void unsecuring(uint32_t startEnd);
-    android::status_t screenRefresh();
-    void setExtOrientation(uint32_t orientation);
-    void setBufferMirrorMode(uint32_t enable);
 
     hwc_context_t *mHwcContext;
     const android::sp<android::IMediaDeathNotifier> mMPDeathNotifier;
