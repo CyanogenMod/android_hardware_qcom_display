@@ -59,6 +59,7 @@ class CopyBit;
 class HwcDebug;
 class AssertiveDisplay;
 class VPUClient;
+class HWCVirtualBase;
 
 
 struct MDPInfo {
@@ -221,6 +222,8 @@ void sanitizeSourceCrop(hwc_rect_t& cropL, hwc_rect_t& cropR,
 bool isAlphaPresent(hwc_layer_1_t const* layer);
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable);
 int getBlending(int blending);
+bool isGLESOnlyComp(hwc_context_t *ctx, const int& dpy);
+void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers);
 
 //Helper function to dump logs
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
@@ -465,6 +468,7 @@ struct hwc_context_t {
     qhwc::AssertiveDisplay *mAD;
     qhwc::VPUClient *mVPUClient;
     eAnimationState mAnimationState[HWC_NUM_DISPLAY_TYPES];
+    qhwc::HWCVirtualBase *mHWCVirtual;
 
     // stores the primary device orientation
     int deviceOrientation;
@@ -509,6 +513,16 @@ static inline bool has90Transform(hwc_layer_1_t *layer) {
 
 inline bool isSecurePresent(hwc_context_t *ctx, int dpy) {
     return ctx->listStats[dpy].isSecurePresent;
+}
+
+static inline bool isSecondaryConfiguring(hwc_context_t* ctx) {
+    return (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isConfiguring ||
+            ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isConfiguring);
+}
+
+static inline bool isSecondaryConnected(hwc_context_t* ctx) {
+    return (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected ||
+            ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected);
 }
 
 };
