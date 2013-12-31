@@ -96,6 +96,34 @@ static void setExtOrientation(hwc_context_t *ctx, uint32_t orientation) {
     ctx->mExtOrientation = orientation;
 }
 
+static void isExternalConnected(hwc_context_t* ctx, Parcel* outParcel) {
+    int connected;
+    connected = ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected ? 1 : 0;
+    outParcel->writeInt32(connected);
+}
+
+static void getDisplayAttributes(hwc_context_t* ctx, const Parcel* inParcel,
+        Parcel* outParcel) {
+    int dpy = inParcel->readInt32();
+    outParcel->writeInt32(ctx->dpyAttr[dpy].vsync_period);
+    outParcel->writeInt32(ctx->dpyAttr[dpy].xres);
+    outParcel->writeInt32(ctx->dpyAttr[dpy].yres);
+    outParcel->writeFloat(ctx->dpyAttr[dpy].xdpi);
+    outParcel->writeFloat(ctx->dpyAttr[dpy].ydpi);
+    //XXX: Need to check what to return for HDMI
+    outParcel->writeInt32(ctx->mMDP.panel);
+}
+static void setHSIC(hwc_context_t* ctx, const Parcel* inParcel) {
+    int dpy = inParcel->readInt32();
+    HSICData_t hsic_data;
+    hsic_data.hue = inParcel->readInt32();
+    hsic_data.saturation = inParcel->readFloat();
+    hsic_data.intensity = inParcel->readInt32();
+    hsic_data.contrast = inParcel->readFloat();
+    //XXX: Actually set the HSIC data through ABL lib
+}
+
+
 static void setBufferMirrorMode(hwc_context_t *ctx, uint32_t enable) {
     ctx->mBufferMirrorMode = enable;
 }
@@ -118,6 +146,15 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::BUFFER_MIRRORMODE:
             setBufferMirrorMode(mHwcContext, inParcel->readInt32());
+            break;
+        case IQService::CHECK_EXTERNAL_STATUS:
+            isExternalConnected(mHwcContext, outParcel);
+            break;
+        case IQService::GET_DISPLAY_ATTRIBUTES:
+            getDisplayAttributes(mHwcContext, inParcel, outParcel);
+            break;
+        case IQService::SET_HSIC_DATA:
+            setHSIC(mHwcContext, inParcel);
             break;
         default:
             return NO_ERROR;
