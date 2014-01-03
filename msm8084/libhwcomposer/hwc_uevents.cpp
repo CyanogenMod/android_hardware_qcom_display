@@ -50,13 +50,6 @@ static void setup(hwc_context_t* ctx, int dpy)
 {
     ctx->mFBUpdate[dpy] = IFBUpdate::getObject(ctx, dpy);
     ctx->mMDPComp[dpy] =  MDPComp::getObject(ctx, dpy);
-    int compositionType =
-                qdutils::QCCompositionType::getInstance().getCompositionType();
-    if (compositionType & (qdutils::COMPOSITION_TYPE_DYN |
-                           qdutils::COMPOSITION_TYPE_MDP |
-                           qdutils::COMPOSITION_TYPE_C2D)) {
-        ctx->mCopyBit[dpy] = new CopyBit(ctx, dpy);
-    }
 }
 
 static void clear(hwc_context_t* ctx, int dpy)
@@ -64,10 +57,6 @@ static void clear(hwc_context_t* ctx, int dpy)
     if(ctx->mFBUpdate[dpy]) {
         delete ctx->mFBUpdate[dpy];
         ctx->mFBUpdate[dpy] = NULL;
-    }
-    if(ctx->mCopyBit[dpy]){
-        delete ctx->mCopyBit[dpy];
-        ctx->mCopyBit[dpy] = NULL;
     }
     if(ctx->mMDPComp[dpy]) {
         delete ctx->mMDPComp[dpy];
