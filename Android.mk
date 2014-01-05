@@ -5,7 +5,7 @@ ifneq ($(filter msm8974 msm8x74,$(TARGET_BOARD_PLATFORM)),)
 else
 ifneq ($(filter msm8226,$(TARGET_BOARD_PLATFORM)),)
     #This is for 8226 based platforms
-    include $(call all-named-subdir-makefiles,msm8x26)
+    include $(call all-named-subdir-makefiles,msm8974)
 else
     #This is for 8960 based platforms
     include $(call all-named-subdir-makefiles,msm8960)
