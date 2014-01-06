@@ -64,14 +64,11 @@ bool MdpCtrl::init(uint32_t dpy) {
 
 void MdpCtrl::reset() {
     utils::memset0(mOVInfo);
-    utils::memset0(mLkgo);
     mOVInfo.id = MSMFB_NEW_REQUEST;
-    mLkgo.id = MSMFB_NEW_REQUEST;
     mOrientation = utils::OVERLAY_TRANSFORM_0;
     mDownscale = 0;
     mDpy = 0;
 #ifdef USES_POST_PROCESSING
-    mPPChanged = false;
     memset(&mParams, 0, sizeof(struct compute_params));
     mParams.params.conv_params.order = hsic_order_hsc_i;
     mParams.params.conv_params.interface = interface_rec601;
@@ -210,21 +207,15 @@ bool MdpCtrl::set() {
 
     doDownscale();
 
-    if(this->ovChanged()) {
-        if(!mdp_wrapper::setOverlay(mFd.getFD(), mOVInfo)) {
-            ALOGE("MdpCtrl failed to setOverlay, restoring last known "
-                  "good ov info");
-            mdp_wrapper::dump("== Bad OVInfo is: ", mOVInfo);
-            mdp_wrapper::dump("== Last good known OVInfo is: ", mLkgo);
-            this->restore();
+    if(!mdp_wrapper::setOverlay(mFd.getFD(), mOVInfo)) {
+        ALOGE("MdpCtrl failed to setOverlay");
+        mdp_wrapper::dump("== Bad OVInfo is: ", mOVInfo);
 #ifdef USES_QSEED_SCALAR
-            if(Overlay::getScalar()) {
-                Overlay::getScalar()->configAbort(mDpy);
-            }
-#endif
-            return false;
+        if(Overlay::getScalar()) {
+            Overlay::getScalar()->configAbort(mDpy);
         }
-        this->save();
+#endif
+        return false;
     }
 
 #ifdef USES_QSEED_SCALAR
@@ -392,7 +383,6 @@ bool MdpCtrl::setVisualParams(const MetaData_t& data) {
 
     if (needUpdate) {
         display_pp_compute_params(&mParams, &mOVInfo.overlay_pp_cfg);
-        mPPChanged = true;
     }
 #endif
     return true;
