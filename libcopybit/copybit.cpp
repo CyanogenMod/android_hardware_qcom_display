@@ -573,7 +573,9 @@ static int clear_copybit(struct copybit_device_t *dev,
     int rel_fen_fd = -1;
     int my_tmp_get_fence = -1;
 
+    list1.sync.acq_fen_fd  =  ctx->acqFence;
     list1.sync.rel_fen_fd  =  &my_tmp_get_fence;
+    list1.sync.acq_fen_fd_cnt = ctx->list.sync.acq_fen_fd_cnt;
     mdp_blit_req* req = &list1.req[0];
 
     if(!req) {
@@ -607,6 +609,7 @@ static int clear_copybit(struct copybit_device_t *dev,
     req->flags = MDP_SOLID_FILL | MDP_MEMORY_ID_TYPE_FB | MDP_BLEND_FG_PREMULT;
     int status = msm_copybit(ctx, &list1);
 
+    ctx->list.sync.acq_fen_fd_cnt = 0;
     if (my_tmp_get_fence !=  -1)
         close(my_tmp_get_fence);
 
