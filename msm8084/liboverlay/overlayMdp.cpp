@@ -45,7 +45,7 @@ static inline float log2f(const float& x) {
 namespace ovutils = overlay::utils;
 namespace overlay {
 
-bool MdpCtrl::init(uint32_t dpy) {
+bool MdpCtrl::init(const int& dpy) {
     int fbnum = Overlay::getFbForDpy(dpy);
     if( fbnum < 0 ) {
         ALOGE("%s: Invalid FB for the display: %d",__FUNCTION__, dpy);
@@ -390,7 +390,7 @@ bool MdpCtrl::setVisualParams(const MetaData_t& data) {
 
 
 //// MdpData ////////////
-bool MdpData::init(uint32_t dpy) {
+bool MdpData::init(const int& dpy) {
     int fbnum = Overlay::getFbForDpy(dpy);
     if( fbnum < 0 ) {
         ALOGE("%s: Invalid FB for the display: %d",__FUNCTION__, dpy);
