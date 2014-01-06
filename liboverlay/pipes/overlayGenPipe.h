@@ -38,11 +38,9 @@ namespace overlay {
 class GenericPipe : utils::NoCopy {
 public:
     /* ctor */
-    explicit GenericPipe(int dpy);
+    explicit GenericPipe(const int& dpy);
     /* dtor */
     ~GenericPipe();
-    bool init();
-    bool close();
     /* Control APIs */
     /* set source using whf, orient and wait flag */
     void setSource(const utils::PipeArgs& args);
@@ -82,8 +80,6 @@ private:
     bool setClosed();
 
     int mDpy;
-    /* Ctrl/Data aggregator */
-    CtrlData mCtrlData;
     //Whether we will do downscale opt. This is just a request. If the frame is
     //not a candidate, we might not do it.
     bool mRotDownscaleOpt;
@@ -93,6 +89,8 @@ private:
         OPEN
     };
     ePipeState pipeState;
+    Ctrl *mCtrl;
+    Data *mData;
 };
 
 } //namespace overlay
