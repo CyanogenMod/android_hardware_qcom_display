@@ -158,6 +158,35 @@ void handle_resume(hwc_context_t* ctx, int dpy) {
     return;
 }
 
+static void teardownWfd(hwc_context_t* ctx) {
+    // Teardown WFD display
+    ALOGD_IF(UEVENT_DEBUG,"Received HDMI connection request when WFD is "
+            "active");
+    {
+        Locker::Autolock _l(ctx->mDrawLock);
+        clear(ctx, HWC_DISPLAY_VIRTUAL);
+        ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected = false;
+        ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = false;
+    }
+
+    ctx->mVirtualDisplay->teardown();
+
+    /* Need to send hotplug only when connected WFD in proprietary path */
+    if(ctx->mVirtualonExtActive) {
+        ALOGE_IF(UEVENT_DEBUG,"%s: Sending EXTERNAL OFFLINE"
+                "hotplug event for wfd display", __FUNCTION__);
+        ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL,
+                EXTERNAL_OFFLINE);
+        {
+            Locker::Autolock _l(ctx->mDrawLock);
+            ctx->mVirtualonExtActive = false;
+        }
+    }
+    /* Wait for few frames for SF to tear down the WFD session. */
+    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+            * 2 / 1000);
+}
+
 static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 {
     bool bpanelReset = getPanelResetStatus(ctx, udata, len);
@@ -237,33 +266,22 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 
             if(dpy == HWC_DISPLAY_EXTERNAL) {
                 if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected) {
-                    ALOGD_IF(UEVENT_DEBUG,"Received HDMI connection request"
-                             "when WFD is active");
-                    {
-                        Locker::Autolock _l(ctx->mDrawLock);
-                        clear(ctx, HWC_DISPLAY_VIRTUAL);
-                        ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected = false;
-                        ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = false;
+                    // Triple Display is supported on 8084 target
+                    // WFD can be initiated by Wfd-client or Settings app
+                    // 1. wfd-client use hdmi hotplug mechanism.
+                    //    If wfd is connected via wfd-client and if HDMI is
+                    //    connected, we have to teardown wfd session.
+                    //    (as SF support only one active External display
+                    //     at a given time).
+                    //    (ToDo: Once wfd-client migrates using virtual display
+                    //     apis, second condition is redundant).
+                    // 2. Settings app use virtual display mechanism.
+                    //    In this approach, there is no limitation of supporting
+                    //    triple display.
+                    if(!(qdutils::MDPVersion::getInstance().is8084() &&
+                                !ctx->mVirtualonExtActive)) {
+                        teardownWfd(ctx);
                     }
-
-                    ctx->mVirtualDisplay->teardown();
-
-                    /* Need to send hotplug only when connected WFD in
-                     * proprietary path */
-                    if(ctx->mVirtualonExtActive) {
-                        ALOGE_IF(UEVENT_DEBUG,"%s: Sending EXTERNAL OFFLINE"
-                                 "hotplug event", __FUNCTION__);
-                        ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL,
-                                           EXTERNAL_OFFLINE);
-                        {
-                            Locker::Autolock _l(ctx->mDrawLock);
-                            ctx->mVirtualonExtActive = false;
-                        }
-                    }
-                    /* Wait for few frames for SF to tear down
-                     * the WFD session. */
-                    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-                           * 2 / 1000);
                 }
                 ctx->mExtDisplay->configure();
             } else {
