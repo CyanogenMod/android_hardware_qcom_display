@@ -96,15 +96,7 @@ static void *vsync_loop(void *param)
 
     do {
         if (LIKELY(!ctx->vstate.fakevsync)) {
-            nsecs_t vsync_start_time = systemTime();
             len = pread(fd_timestamp, vdata, MAX_DATA, 0);
-            if(ctx->vstate.enable == true) {
-                nsecs_t time_taken = systemTime()-vsync_start_time;
-                nsecs_t  threshold = ctx->dpyAttr[dpy].vsync_period*2;
-                ALOGW_IF(time_taken > threshold,
-                         "Excessive delay reading vsync: took %lld ms",
-                         ns2ms(time_taken));
-            }
             if (len < 0) {
                 // If the read was just interrupted - it is not a fatal error
                 // In either case, just continue.
