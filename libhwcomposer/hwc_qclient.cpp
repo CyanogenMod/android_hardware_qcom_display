@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2013-14, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -36,6 +36,7 @@
 
 using namespace android;
 using namespace qService;
+using namespace qhwc;
 
 namespace qClient {
 
@@ -165,6 +166,17 @@ static status_t getDisplayVisibleRegion(hwc_context_t* ctx, int dpy,
     }
 }
 
+static void pauseWFD(hwc_context_t *ctx, uint32_t pause) {
+    int dpy = HWC_DISPLAY_VIRTUAL;
+    if(pause) {
+        //WFD Pause
+        handle_pause(ctx, dpy);
+    } else {
+        //WFD Resume
+        handle_resume(ctx, dpy);
+    }
+}
+
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t ret = NO_ERROR;
@@ -202,6 +214,8 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::SET_HSIC_DATA:
             setHSIC(mHwcContext, inParcel);
+        case IQService::PAUSE_WFD:
+            pauseWFD(mHwcContext, inParcel->readInt32());
             break;
         default:
             ret = NO_ERROR;
