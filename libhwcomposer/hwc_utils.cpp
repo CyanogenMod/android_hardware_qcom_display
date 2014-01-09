@@ -142,16 +142,18 @@ void initContext(hwc_context_t *ctx)
     ctx->mFBUpdate[HWC_DISPLAY_PRIMARY] =
         IFBUpdate::getObject(ctx, HWC_DISPLAY_PRIMARY);
 
-    // Check if the target supports copybit compostion (dyn/mdp/c2d) to
+    // Check if the target supports copybit compostion (dyn/mdp) to
     // decide if we need to open the copybit module.
     int compositionType =
         qdutils::QCCompositionType::getInstance().getCompositionType();
 
-    if (compositionType & (qdutils::COMPOSITION_TYPE_DYN |
-                           qdutils::COMPOSITION_TYPE_MDP |
-                           qdutils::COMPOSITION_TYPE_C2D)) {
-            ctx->mCopyBit[HWC_DISPLAY_PRIMARY] = new CopyBit(ctx,
-                    HWC_DISPLAY_PRIMARY);
+    // Only MDP copybit is used
+    if ((compositionType & (qdutils::COMPOSITION_TYPE_DYN |
+            qdutils::COMPOSITION_TYPE_MDP)) &&
+            (qdutils::MDPVersion::getInstance().getMDPVersion() ==
+            qdutils::MDP_V3_0_4)) {
+        ctx->mCopyBit[HWC_DISPLAY_PRIMARY] = new CopyBit(ctx,
+                                                         HWC_DISPLAY_PRIMARY);
     }
 
     ctx->mExtDisplay = new ExternalDisplay(ctx);
