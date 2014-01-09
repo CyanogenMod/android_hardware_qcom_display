@@ -36,11 +36,11 @@ namespace overlay{
 class MdpCtrl {
 public:
     /* ctor reset */
-    explicit MdpCtrl();
+    explicit MdpCtrl(const int& dpy);
     /* dtor close */
     ~MdpCtrl();
     /* init underlying device using fbnum for dpy */
-    bool init(uint32_t dpy);
+    bool init(const int& dpy);
     /* unset overlay, reset and close fd */
     bool close();
     /* reset and set ov id to -1 / MSMFB_NEW_REQUEST */
@@ -160,11 +160,11 @@ private:
 class MdpData {
 public:
     /* ctor reset data */
-    explicit MdpData();
+    explicit MdpData(const int& dpy);
     /* dtor close*/
     ~MdpData();
     /* init FD */
-    bool init(uint32_t dpy);
+    bool init(const int& dpy);
     /* memset0 the underlying mdp object */
     void reset();
     /* close fd, and reset */
@@ -196,8 +196,9 @@ private:
 
 /////   MdpCtrl  //////
 
-inline MdpCtrl::MdpCtrl() {
+inline MdpCtrl::MdpCtrl(const int& dpy) {
     reset();
+    init(dpy);
 }
 
 inline MdpCtrl::~MdpCtrl() {
@@ -346,7 +347,10 @@ inline bool MdpCtrl3D::useVirtualFB() {
 
 ///////    MdpData   //////
 
-inline MdpData::MdpData() { reset(); }
+inline MdpData::MdpData(const int& dpy) {
+    reset();
+    init(dpy);
+}
 
 inline MdpData::~MdpData() { close(); }
 
