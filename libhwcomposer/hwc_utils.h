@@ -89,6 +89,11 @@ struct DisplayAttributes {
     bool mDownScaleMode;
     // Ext dst Rect
     hwc_rect_t mDstRect;
+    //Action safe attributes
+    // Flag to indicate the presence of action safe dimensions for external
+    bool mActionSafePresent;
+    int mAsWidthRatio;
+    int mAsHeightRatio;
 };
 
 struct ListStats {
@@ -229,6 +234,9 @@ void optimizeLayerRects(hwc_context_t *ctx,
         const hwc_display_contents_1_t *list, const int& dpy);
 bool areLayersIntersecting(const hwc_layer_1_t* layer1,
         const hwc_layer_1_t* layer2);
+
+// returns true if Action safe dimensions are set and target supports Actionsafe
+bool isActionSafePresent(hwc_context_t *ctx, int dpy);
 
 /* Calculates the destination position based on the action safe rectangle */
 void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& dst);
