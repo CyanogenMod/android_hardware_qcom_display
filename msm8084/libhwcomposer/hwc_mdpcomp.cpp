@@ -541,6 +541,7 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
                                 hwc_display_contents_1_t* list){
 
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+    int priDispW = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
 
     if(sIdleFallBack && !ctx->listStats[mDpy].secureUI) {
         ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
@@ -551,6 +552,17 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         ALOGD_IF(isDebug(),"%s: SKIP present: %d",
                 __FUNCTION__,
                 isSkipPresent(ctx, mDpy));
+        return false;
+    }
+
+    if(mDpy > HWC_DISPLAY_PRIMARY && (priDispW > MAX_DISPLAY_DIM) &&
+                              (ctx->dpyAttr[mDpy].xres < MAX_DISPLAY_DIM)) {
+        // Disable MDP comp on Secondary when the primary is highres panel and
+        // the secondary is a normal 1080p, because, MDP comp on secondary under
+        // in such usecase, decimation gets used for downscale and there will be
+        // a quality mismatch when there will be a fallback to GPU comp
+        ALOGD_IF(isDebug(), "%s: Disable MDP Compositon for Secondary Disp",
+              __FUNCTION__);
         return false;
     }
 
