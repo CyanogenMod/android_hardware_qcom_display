@@ -511,7 +511,7 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         //TODO We dont check for SKIP flag on this layer because we need PAN
         //always. Last layer is always FB
         private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
-        if(copybitDone) {
+        if(copybitDone && ctx->mMDP.version > qdutils::MDP_V4_3) {
             hnd = ctx->mCopyBit[dpy]->getCurrentRenderBuffer();
         }
 
@@ -570,7 +570,7 @@ static int hwc_set_external(hwc_context_t *ctx,
         if(extOnlyLayerIndex!= -1) {
             hwc_layer_1_t *extLayer = &list->hwLayers[extOnlyLayerIndex];
             hnd = (private_handle_t *)extLayer->handle;
-        } else if(copybitDone) {
+        } else if(copybitDone && ctx->mMDP.version > qdutils::MDP_V4_3) {
             hnd = ctx->mCopyBit[dpy]->getCurrentRenderBuffer();
         }
 
