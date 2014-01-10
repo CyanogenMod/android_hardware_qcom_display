@@ -195,11 +195,16 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
                 list->hwLayers[i].compositionType = HWC_OVERLAY;
             mCopyBitDraw = true;
         } else {
+            ALOGD_IF(DEBUG_COPYBIT,"%s:Can not do copybit, Resetting all the layers marked for it", __FUNCTION__);
             // We currently cannot mix copybit layers with layers marked to
             // be drawn on the framebuffer or that are on the layer cache.
             mCopyBitDraw = false;
-            //There is no need to reset layer properties here as we return in
-            //draw if mCopyBitDraw is false
+            //Layer flag should be reset so that SF can compose it on FrameBuffer
+            for(int j = ctx->listStats[dpy].numAppLayers-1; j > i; j--) {
+                private_handle_t *hnd1 = (private_handle_t *)list->hwLayers[j].handle;
+                if(hnd1->bufferType == BUFFER_TYPE_UI)
+                    list->hwLayers[j].compositionType = HWC_FRAMEBUFFER;
+            }
             break;
         }
     }
