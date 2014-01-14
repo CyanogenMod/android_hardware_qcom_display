@@ -117,6 +117,7 @@ public:
     uint8_t getDMAPipes() { return mDMAPipes; }
     bool supportsDecimation();
     uint32_t getMaxMDPDownscale();
+    uint32_t getMaxMDPUpscale();
     bool supportsBWC();
     int getLeftSplit() { return mSplit.left(); }
     int getRightSplit() { return mSplit.right(); }
