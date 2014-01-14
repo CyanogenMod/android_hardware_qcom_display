@@ -188,8 +188,15 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             dst_h = layer->displayFrame.bottom - layer->displayFrame.top;
             dst_w = layer->displayFrame.right - layer->displayFrame.left;
 
+            if(src_w <=0 || src_h<=0 ||dst_w<=0 || dst_h<=0 ) {
+              ALOGE("%s: wrong params for display screen_w=%d \
+                         src_crop_width=%d screen_h=%d src_crop_height=%d",
+                         __FUNCTION__, dst_w,src_w,dst_h,src_h);
+              return false;
+            }
             dx = (float)dst_w/src_w;
             dy = (float)dst_h/src_h;
+
             if (dx > MAX_SCALE_FACTOR || dx < MIN_SCALE_FACTOR)
                 return false;
 
@@ -448,8 +455,8 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
 
     if(screen_w <=0 || screen_h<=0 ||src_crop_width<=0 || src_crop_height<=0 ) {
         ALOGE("%s: wrong params for display screen_w=%d src_crop_width=%d \
-        screen_w=%d src_crop_width=%d", __FUNCTION__, screen_w,
-                                src_crop_width,screen_w,src_crop_width);
+        screen_h=%d src_crop_height=%d", __FUNCTION__, screen_w,
+                                src_crop_width,screen_h,src_crop_height);
         return -1;
     }
 
