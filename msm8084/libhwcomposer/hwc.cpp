@@ -341,7 +341,11 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
         ctx->mOverlay->configBegin();
         ctx->mOverlay->configDone();
         ctx->mRotMgr->clear();
-        overlay::Writeback::clear();
+        // If VDS is connected, do not clear WB object as it
+        // will end up detaching IOMMU. This is required
+        // to send black frame to WFD sink on power suspend.
+        // Note: With this change, we keep the WriteBack object
+        // alive on power suspend for AD use case.
     }
     switch(dpy) {
     case HWC_DISPLAY_PRIMARY:
