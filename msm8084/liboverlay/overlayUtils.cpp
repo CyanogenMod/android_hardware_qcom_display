@@ -36,6 +36,7 @@
 #include "overlayUtils.h"
 #include "mdpWrapper.h"
 #include "mdp_version.h"
+#include <hardware/hwcomposer_defs.h>
 
 // just a helper static thingy
 namespace {
@@ -144,6 +145,34 @@ int getMdpFormat(int format) {
     // not reached
     return -1;
 }
+
+// This function returns corresponding tile format
+// MDSS support following RGB tile formats
+//  32 bit formats
+//  16 bit formats
+int getMdpFormat(int format, bool tileEnabled)
+{
+    if(!tileEnabled) {
+        return getMdpFormat(format);
+    }
+    switch (format) {
+        case HAL_PIXEL_FORMAT_RGBA_8888 :
+            return MDP_RGBA_8888_TILE;
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+            return MDP_RGBX_8888_TILE;
+        case HAL_PIXEL_FORMAT_RGB_565:
+            // Currenty Driver doesnt support 565 tile format
+            return MDP_RGB_565;
+        case HAL_PIXEL_FORMAT_BGRA_8888:
+            return MDP_BGRA_8888_TILE;
+        case HAL_PIXEL_FORMAT_BGRX_8888:
+            return MDP_BGRX_8888_TILE;
+        default:
+            return getMdpFormat(format);
+    }
+}
+
+
 
 //Takes mdp format as input and translates to equivalent HAL format
 //Refer to graphics.h, gralloc_priv.h, msm_mdp.h for formats.

@@ -53,6 +53,7 @@ protected:
     overlay::Rotator *mRot;
     int mAlignedFBWidth;
     int mAlignedFBHeight;
+    int mTileEnabled;
 };
 
 //Non-Split panel handler.
