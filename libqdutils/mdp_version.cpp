@@ -47,6 +47,7 @@ MDPVersion::MDPVersion()
     mFeatures = 0;
     mMDPUpscale = 0;
     mMDPDownscale = 0;
+    mMacroTileEnabled = false;
     mPanelType = NO_PANEL;
     mLowBw = 0;
     mHighBw = 0;
@@ -136,6 +137,14 @@ bool MDPVersion::updateSysFsInfo() {
     memset(sysfsPath, 0, sizeof(sysfsPath));
     snprintf(sysfsPath , sizeof(sysfsPath),
             "/sys/class/graphics/fb0/mdp/caps");
+    char property[PROPERTY_VALUE_MAX];
+    bool enableMacroTile = false;
+
+    if((property_get("persist.hwc.macro_tile_enable", property, NULL) > 0) &&
+       (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+        (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+        enableMacroTile = true;
+    }
 
     sysfsFd = fopen(sysfsPath, "rb");
 
@@ -184,6 +193,11 @@ bool MDPVersion::updateSysFsInfo() {
                         else if(!strncmp(tokens[i], "decimation",
                                     strlen("decimation"))) {
                            mFeatures |= MDP_DECIMATION_EN;
+                        }
+                        else if(!strncmp(tokens[i], "tile_format",
+                                    strlen("tile_format"))) {
+                           if(enableMacroTile)
+                               mMacroTileEnabled = true;
                         }
                     }
                 }
@@ -242,6 +256,11 @@ uint32_t MDPVersion::getMaxMDPDownscale() {
 bool MDPVersion::supportsBWC() {
     // BWC - Bandwidth Compression
     return (mFeatures & MDP_BWC_EN);
+}
+
+bool MDPVersion::supportsMacroTile() {
+    // MACRO TILE support
+    return mMacroTileEnabled;
 }
 
 }; //namespace qdutils

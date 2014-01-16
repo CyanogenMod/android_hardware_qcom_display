@@ -408,6 +408,7 @@ struct ScreenInfo {
 };
 
 int getMdpFormat(int format);
+int getMdpFormat(int format, bool tileEnabled);
 int getHALFormat(int mdpFormat);
 int getDownscaleFactor(const int& src_w, const int& src_h,
         const int& dst_w, const int& dst_h);
@@ -545,6 +546,14 @@ inline const char* getFormatString(int format){
     formats[MDP_BGR_888] = STR(MDP_BGR_888);
     formats[MDP_Y_CBCR_H2V2_VENUS] = STR(MDP_Y_CBCR_H2V2_VENUS);
     formats[MDP_BGRX_8888] = STR(MDP_BGRX_8888);
+    formats[MDP_RGBA_8888_TILE] = STR(MDP_RGBA_8888_TILE);
+    formats[MDP_ARGB_8888_TILE] = STR(MDP_ARGB_8888_TILE);
+    formats[MDP_ABGR_8888_TILE] = STR(MDP_ABGR_8888_TILE);
+    formats[MDP_BGRA_8888_TILE] = STR(MDP_BGRA_8888_TILE);
+    formats[MDP_RGBX_8888_TILE] = STR(MDP_RGBX_8888_TILE);
+    formats[MDP_XRGB_8888_TILE] = STR(MDP_XRGB_8888_TILE);
+    formats[MDP_XBGR_8888_TILE] = STR(MDP_XBGR_8888_TILE);
+    formats[MDP_BGRX_8888_TILE] = STR(MDP_BGRX_8888_TILE);
     formats[MDP_IMGTYPE_LIMIT] = STR(MDP_IMGTYPE_LIMIT);
 
     if(format < 0 || format >= MDP_IMGTYPE_LIMIT) {

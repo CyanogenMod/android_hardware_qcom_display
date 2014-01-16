@@ -79,8 +79,12 @@ enum {
     /* Gralloc perform enums
     */
     GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER = 1,
+    // This will be deprecated from latest graphics drivers. This is kept
+    // for those backward compatibility i.e., newer Display HAL + older graphics
+    // libraries
     GRALLOC_MODULE_PERFORM_GET_STRIDE,
     GRALLOC_MODULE_PERFORM_GET_CUSTOM_STRIDE_FROM_HANDLE,
+    GRALLOC_MODULE_PERFORM_GET_ATTRIBUTES,
 };
 
 #define GRALLOC_HEAP_MASK   (GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP |\
@@ -173,6 +177,8 @@ struct private_handle_t : public native_handle {
             PRIV_FLAGS_ITU_R_601_FR       = 0x00400000,
             PRIV_FLAGS_ITU_R_709          = 0x00800000,
             PRIV_FLAGS_SECURE_DISPLAY     = 0x01000000,
+            // Buffer is rendered in Tile Format
+            PRIV_FLAGS_TILE_RENDERED      = 0x02000000
         };
 
         // file-descriptors

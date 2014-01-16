@@ -51,8 +51,19 @@ inline size_t ALIGN(size_t x, size_t align) {
 
 int mapFrameBufferLocked(struct private_module_t* module);
 int terminateBuffer(gralloc_module_t const* module, private_handle_t* hnd);
+size_t getBufferSizeAndDimensions(int width, int height, int format, int usage,
+                                  int& alignedw, int &alignedh);
 size_t getBufferSizeAndDimensions(int width, int height, int format,
                                   int& alignedw, int &alignedh);
+
+
+// Attributes include aligned width, aligned height, tileEnabled and size of the buffer
+void getBufferAttributes(int width, int height, int format, int usage,
+                           int& alignedw, int &alignedh,
+                           int& tileEnabled, size_t &size);
+
+
+bool isMacroTileEnabled(int format, int usage);
 
 int decideBufferHandlingMechanism(int format, const char *compositionUsed,
                                   int hasBlitEngine, int *needConversion,
@@ -95,7 +106,16 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
      * @return aligned width, aligned height
      */
     void getAlignedWidthAndHeight(int width, int height, int format,
-                                  int& alignedw, int &alignedh);
+                            int tileEnabled, int& alignedw, int &alignedh);
+
+    /*
+     * Function to return whether GPU support MacroTile feature
+     *
+     * @return >0 : supported
+     *          0 : not supported
+     */
+    int isMacroTilingSupportedByGPU();
+
     private:
         // Pointer to the padding library.
         void *libadreno_utils;
@@ -114,6 +134,8 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
                                                 int padding_threshold,
                                                 int *aligned_w,
                                                 int *aligned_h);
+        // link to the surface padding library.
+        int (*LINK_adreno_isMacroTilingSupportedByGpu) (void);
 
 };
 #endif /* GR_H_ */

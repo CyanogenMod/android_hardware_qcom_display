@@ -150,6 +150,10 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
             flags |= private_handle_t::PRIV_FLAGS_SECURE_DISPLAY;
         }
 
+        if(isMacroTileEnabled(format, usage)) {
+            flags |= private_handle_t::PRIV_FLAGS_TILE_RENDERED;
+        }
+
         flags |= data.allocType;
         int eBaseAddr = int(eData.base) + eData.offset;
         private_handle_t *hnd = new private_handle_t(data.fd, size, flags,
@@ -285,7 +289,8 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
     }
 
     getGrallocInformationFromFormat(grallocFormat, &bufferType);
-    size = getBufferSizeAndDimensions(w, h, grallocFormat, alignedw, alignedh);
+    size = getBufferSizeAndDimensions(w, h, grallocFormat, usage, alignedw,
+                   alignedh);
 
     if ((ssize_t)size <= 0)
         return -EINVAL;
