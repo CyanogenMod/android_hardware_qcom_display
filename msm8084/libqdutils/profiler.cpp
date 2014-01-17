@@ -28,6 +28,9 @@
  */
 
 #define LOG_NDDEBUG 0
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
+
 #include "profiler.h"
 
 #ifdef DEBUG_CALC_FPS
@@ -104,7 +107,7 @@ void CalcFps::populate_debug_fps_metadata(void)
     debug_fps_metadata.curr_frame = 0;
 
     ALOGD("period: %d", debug_fps_metadata.period);
-    ALOGD("ignorethresh_us: %lld", debug_fps_metadata.ignorethresh_us);
+    ALOGD("ignorethresh_us: %"PRId64, debug_fps_metadata.ignorethresh_us);
 }
 
 void CalcFps::print_fps(float fps)
@@ -124,7 +127,7 @@ void CalcFps::print_fps(float fps)
         for (unsigned int i = 0;
              i < ((debug_fps_metadata.framearrival_steps / 6) + 1);
              i++) {
-            ALOGD("%lld %lld %lld %lld %lld %lld",
+            ALOGD("%"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64,
                   debug_fps_metadata.accum_framearrivals[i*6],
                   debug_fps_metadata.accum_framearrivals[i*6+1],
                   debug_fps_metadata.accum_framearrivals[i*6+2],
