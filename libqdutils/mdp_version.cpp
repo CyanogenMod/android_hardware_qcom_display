@@ -253,6 +253,10 @@ uint32_t MDPVersion::getMaxMDPDownscale() {
     return mMDPDownscale;
 }
 
+uint32_t MDPVersion::getMaxMDPUpscale() {
+    return mMDPUpscale;
+}
+
 bool MDPVersion::supportsBWC() {
     // BWC - Bandwidth Compression
     return (mFeatures & MDP_BWC_EN);
