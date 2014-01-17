@@ -325,8 +325,8 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     int crop_h = crop.bottom - crop.top;
     int dst_w = dst.right - dst.left;
     int dst_h = dst.bottom - dst.top;
-    float w_dscale = ceilf((float)crop_w / (float)dst_w);
-    float h_dscale = ceilf((float)crop_h / (float)dst_h);
+    float w_scale = ((float)crop_w / (float)dst_w);
+    float h_scale = ((float)crop_h / (float)dst_h);
 
     /* Workaround for MDP HW limitation in DSI command mode panels where
      * FPS will not go beyond 30 if buffers on RGB pipes are of width or height
@@ -337,9 +337,12 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     if((crop_w < 5)||(crop_h < 5))
         return false;
 
-    if((w_dscale > 1.0f) || (h_dscale > 1.0f)) {
+    if((w_scale > 1.0f) || (h_scale > 1.0f)) {
         const uint32_t downscale =
             qdutils::MDPVersion::getInstance().getMaxMDPDownscale();
+        const float w_dscale = w_scale;
+        const float h_dscale = h_scale;
+
         if(ctx->mMDP.version >= qdutils::MDSS_V5) {
             /* Workaround for downscales larger than 4x.
              * Will be removed once decimator block is enabled for MDSS
@@ -356,6 +359,16 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
             if(w_dscale > downscale || h_dscale > downscale)
                 return false;
         }
+    }
+
+    if((w_scale < 1.0f) || (h_scale < 1.0f)) {
+        const uint32_t upscale =
+            qdutils::MDPVersion::getInstance().getMaxMDPUpscale();
+        const float w_uscale = 1.0f / w_scale;
+        const float h_uscale = 1.0f / h_scale;
+
+        if(w_uscale > upscale || h_uscale > upscale)
+            return false;
     }
 
     return true;
