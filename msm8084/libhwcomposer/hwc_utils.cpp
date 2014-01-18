@@ -1093,7 +1093,8 @@ void optimizeLayerRects(hwc_context_t *ctx,
                if(!needsScaling(&list->hwLayers[j])) {
                   hwc_layer_1_t* layer = (hwc_layer_1_t*)&list->hwLayers[j];
                   hwc_rect_t& bottomframe = layer->displayFrame;
-                  hwc_rect_t& bottomCrop = layer->sourceCrop;
+                  hwc_rect_t bottomCrop =
+                      integerizeSourceCrop(layer->sourceCropf);
                   int transform =layer->transform;
 
                   hwc_rect_t irect = getIntersection(bottomframe, topframe);
@@ -1103,7 +1104,11 @@ void optimizeLayerRects(hwc_context_t *ctx,
                      dest_rect  = deductRect(bottomframe, irect);
                      qhwc::calculate_crop_rects(bottomCrop, bottomframe,
                                                 dest_rect, transform);
-
+                     //Update layer sourceCropf
+                     layer->sourceCropf.left = bottomCrop.left;
+                     layer->sourceCropf.top = bottomCrop.top;
+                     layer->sourceCropf.right = bottomCrop.right;
+                     layer->sourceCropf.bottom = bottomCrop.bottom;
                   }
                }
                j--;
