@@ -90,7 +90,7 @@ int HWCVirtualVDS::prepare(hwc_composer_device_1 *dev,
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     const int dpy = HWC_DISPLAY_VIRTUAL;
 
-    if (list && list->numHwLayers > 0) {
+    if (list && list->outbuf && list->numHwLayers > 0) {
         reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
@@ -108,7 +108,8 @@ int HWCVirtualVDS::prepare(hwc_composer_device_1 *dev,
 
         ctx->dpyAttr[dpy].isConfiguring = false;
         ctx->dpyAttr[dpy].fd = Writeback::getInstance()->getFbFd();
-        Writeback::getInstance()->configureDpyInfo(fbWidth, fbHeight);
+        private_handle_t *ohnd = (private_handle_t *)list->outbuf;
+        Writeback::getInstance()->configureDpyInfo(ohnd->width, ohnd->height);
         setListStats(ctx, list, dpy);
 
         if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
