@@ -179,8 +179,6 @@ protected:
     /* calcs bytes read by MDP in gigs for a given frame */
     double calcMDPBytesRead(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
-    /* checks if the required bandwidth exceeds a certain max */
-    bool bandwidthCheck(hwc_context_t *ctx, const double& size);
     /* checks if MDP/MDSS can process current list w.r.to HW limitations
      * All peculiar HW limitations should go here */
     bool hwLimitationsCheck(hwc_context_t* ctx, hwc_display_contents_1_t* list);
