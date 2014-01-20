@@ -13,7 +13,8 @@ LOCAL_COPY_HEADERS            := display_config.h mdp_version.h
 LOCAL_SRC_FILES               := profiler.cpp mdp_version.cpp \
                                  idle_invalidator.cpp \
                                  comptype.cpp qd_utils.cpp \
-                                 cb_utils.cpp display_config.cpp
+                                 cb_utils.cpp display_config.cpp \
+                                 cb_swap_rect.cpp
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)

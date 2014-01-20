@@ -25,7 +25,7 @@
 #include "comptype.h"
 #include "gr.h"
 #include "cb_utils.h"
-
+#include "cb_swap_rect.h"
 using namespace qdutils;
 namespace qhwc {
 
@@ -308,6 +308,9 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         hwc_layer_1_t *layer = &list->hwLayers[i];
         if(!(layerProp[i].mFlags & HWC_COPYBIT)) {
             ALOGD_IF(DEBUG_COPYBIT, "%s: Not Marked for copybit", __FUNCTION__);
+            continue;
+        }
+        if(layer->flags & HWC_SKIP_HWC_COMPOSITION){
             continue;
         }
         int ret = -1;
