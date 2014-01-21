@@ -1,5 +1,8 @@
-display-hals := libgralloc libcopybit liblight libmemtrack libqservice
+display-hals := libgralloc libcopybit libmemtrack libqservice
 display-hals += libhwcomposer liboverlay libqdutils libhdmi
+ifneq ($(TARGET_PROVIDES_LIBLIGHT),true)
+    display-hals += liblight
+endif
 
 ifeq ($(call is-vendor-board-platform,QCOM),true)
     include $(call all-named-subdir-makefiles,$(display-hals))
