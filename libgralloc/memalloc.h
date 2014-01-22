@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -43,10 +43,10 @@ enum {
 struct alloc_data {
     void           *base;
     int            fd;
-    int            offset;
+    size_t         offset;
     size_t         size;
     size_t         align;
-    unsigned int   pHandle;
+    uintptr_t      pHandle;
     bool           uncached;
     unsigned int   flags;
     int            allocType;
@@ -62,19 +62,19 @@ class IMemAlloc {
 
     // Free buffer
     virtual int free_buffer(void *base, size_t size,
-                            int offset, int fd) = 0;
+                            size_t offset, int fd) = 0;
 
     // Map buffer
     virtual int map_buffer(void **pBase, size_t size,
-                           int offset, int fd) = 0;
+                           size_t offset, int fd) = 0;
 
     // Unmap buffer
     virtual int unmap_buffer(void *base, size_t size,
-                             int offset) = 0;
+                             size_t offset) = 0;
 
     // Clean and invalidate
     virtual int clean_buffer(void *base, size_t size,
-                             int offset, int fd, int op) = 0;
+                             size_t offset, int fd, int op) = 0;
 
     // Destructor
     virtual ~IMemAlloc() {};
