@@ -62,7 +62,7 @@ void HWCVirtualVDS::init(hwc_context_t *ctx) {
         ctx->mMDPComp[dpy]->reset();
 }
 
-void HWCVirtualVDS::destroy(hwc_context_t *ctx, size_t numDisplays,
+void HWCVirtualVDS::destroy(hwc_context_t *ctx, size_t /*numDisplays*/,
                        hwc_display_contents_1_t** displays) {
     int dpy = HWC_DISPLAY_VIRTUAL;
 

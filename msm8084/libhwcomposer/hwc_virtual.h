@@ -75,11 +75,11 @@ public:
     // instantiates mdpcomp, copybit and fbupdate objects and initialize those
     // objects for virtual display during virtual display connect. This function
     // is no-op for V4L2 design
-    virtual void init(hwc_context_t *ctx) {};
+    virtual void init(hwc_context_t *) {};
     // Destroys mdpcomp, copybit and fbupdate objects and for virtual display
     // during virtual display disconnect. This function is no-op for V4L2 design
-    virtual void destroy(hwc_context_t *ctx, size_t numDisplays,
-                       hwc_display_contents_1_t** displays){};
+    virtual void destroy(hwc_context_t *, size_t ,
+                       hwc_display_contents_1_t** ) {};
 };
 
 }; //namespace
