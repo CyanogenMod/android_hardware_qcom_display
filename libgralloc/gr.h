@@ -42,7 +42,8 @@ inline size_t roundUpToPageSize(size_t x) {
     return (x + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1);
 }
 
-inline size_t ALIGN(size_t x, size_t align) {
+template <class Type>
+inline Type ALIGN(Type x, Type align) {
     return (x + align-1) & ~(align-1);
 }
 

@@ -209,33 +209,35 @@ struct private_handle_t : public native_handle {
         // ints
         int     magic;
         int     flags;
-        int     size;
-        int     offset;
+        size_t  size;
+        size_t  offset;
         int     bufferType;
-        int     base;
-        int     offset_metadata;
+        uintptr_t base;
+        size_t  offset_metadata;
         // The gpu address mapped into the mmu.
-        int     gpuaddr;
+        uintptr_t gpuaddr;
         int     format;
         int     width;
         int     height;
-        int     base_metadata;
+        uintptr_t base_metadata;
 
 #ifdef __cplusplus
-        static const int sNumInts = 12;
+        //TODO64: Revisit this on 64-bit
+        static const int sNumInts = (6 + (3 * (sizeof(size_t)/sizeof(int))) +
+                                    (3 * (sizeof(uintptr_t)/sizeof(int))));
         static const int sNumFds = 2;
         static const int sMagic = 'gmsm';
 
-        private_handle_t(int fd, int size, int flags, int bufferType,
-                         int format,int width, int height, int eFd = -1,
-                         int eOffset = 0, int eBase = 0) :
+        private_handle_t(int fd, size_t size, int flags, int bufferType,
+                         int format, int width, int height, int eFd = -1,
+                         size_t eOffset = 0, uintptr_t eBase = 0) :
             fd(fd), fd_metadata(eFd), magic(sMagic),
             flags(flags), size(size), offset(0), bufferType(bufferType),
             base(0), offset_metadata(eOffset), gpuaddr(0),
             format(format), width(width), height(height),
             base_metadata(eBase)
         {
-            version = sizeof(native_handle);
+            version = (int) sizeof(native_handle);
             numInts = sNumInts;
             numFds = sNumFds;
         }
@@ -254,7 +256,8 @@ struct private_handle_t : public native_handle {
                 hnd->magic != sMagic)
             {
                 ALOGD("Invalid gralloc handle (at %p): "
-                      "ver(%d/%d) ints(%d/%d) fds(%d/%d) magic(%c%c%c%c/%c%c%c%c)",
+                      "ver(%d/%zu) ints(%d/%d) fds(%d/%d)"
+                      "magic(%c%c%c%c/%c%c%c%c)",
                       h,
                       h ? h->version : -1, sizeof(native_handle),
                       h ? h->numInts : -1, sNumInts,
