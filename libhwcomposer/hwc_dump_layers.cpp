@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -38,6 +38,9 @@
 #include <comptype.h>
 #include <SkBitmap.h>
 #include <SkImageEncoder.h>
+#ifdef STDC_FORMAT_MACROS
+#include <inttypes.h>
+#endif
 
 namespace qhwc {
 
@@ -308,7 +311,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         char dumpFilename[PATH_MAX];
         SkBitmap *tempSkBmp = new SkBitmap();
         SkBitmap::Config tempSkBmpConfig = SkBitmap::kNo_Config;
-        sprintf(dumpFilename, "%s/sfdump%03d.layer%d.%s.png", mDumpDirPng,
+        sprintf(dumpFilename, "%s/sfdump%03d.layer%zu.%s.png", mDumpDirPng,
             mDumpCntrPng, layerIndex, mDisplayName);
 
         switch (hnd->format) {
@@ -344,7 +347,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
     if (needDumpRaw && hnd->base) {
         char dumpFilename[PATH_MAX];
         bool bResult = false;
-        sprintf(dumpFilename, "%s/sfdump%03d.layer%d.%dx%d.%s.%s.raw",
+        sprintf(dumpFilename, "%s/sfdump%03d.layer%zu.%dx%d.%s.%s.raw",
             mDumpDirRaw, mDumpCntrRaw,
             layerIndex, getWidth(hnd), getHeight(hnd),
             pixFormatStr, mDisplayName);

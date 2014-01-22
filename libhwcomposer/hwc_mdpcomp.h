@@ -172,8 +172,7 @@ protected:
     bool loadBasedCompPreferMDP(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
     /* Checks if its worth doing load based partial comp */
-    bool isLoadBasedCompDoable(hwc_context_t *ctx,
-            hwc_display_contents_1_t* list);
+    bool isLoadBasedCompDoable(hwc_context_t *ctx);
     /* checks for conditions where only video can be bypassed */
     bool tryVideoOnly(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     bool videoOnlyComp(hwc_context_t *ctx, hwc_display_contents_1_t* list,
@@ -246,8 +245,7 @@ protected:
     struct LayerCache mCachedFrame;
     //Enable 4kx2k yuv layer split
     static bool sEnable4k2kYUVSplit;
-    bool allocSplitVGPipesfor4k2k(hwc_context_t *ctx,
-            hwc_display_contents_1_t* list, int index);
+    bool allocSplitVGPipesfor4k2k(hwc_context_t *ctx, int index);
 };
 
 class MDPCompNonSplit : public MDPComp {
@@ -281,7 +279,7 @@ private:
     /* Increments mdpCount if 4k2k yuv layer split is enabled.
      * updates framebuffer z order if fb lies above source-split layer */
     virtual void adjustForSourceSplit(hwc_context_t *ctx,
-             hwc_display_contents_1_t* list);
+            hwc_display_contents_1_t* list);
 
     /* configures 4kx2k yuv layer to 2 VG pipes*/
     virtual int configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
