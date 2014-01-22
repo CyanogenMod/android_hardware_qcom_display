@@ -1,6 +1,6 @@
 /*
 * Copyright (C) 2008 The Android Open Source Project
-* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -274,8 +274,9 @@ void MdpCtrl3D::dump() const {
 }
 
 bool MdpCtrl::setVisualParams(const MetaData_t& data) {
-    bool needUpdate = false;
+    ALOGD_IF(0, "In %s: data.operation = %d", __FUNCTION__, data.operation);
 #ifdef USES_POST_PROCESSING
+    bool needUpdate = false;
     /* calculate the data */
     if (data.operation & PP_PARAM_HSIC) {
         if (mParams.params.pa_params.hue != data.hsicData.hue) {
