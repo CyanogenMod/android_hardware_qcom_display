@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2013 The Linux Foundation. All rights reserved.
+* Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -37,7 +37,7 @@ namespace qdutils {
 
 int isExternalConnected(void) {
     int ret;
-    status_t err = FAILED_TRANSACTION;
+    status_t err = (status_t) FAILED_TRANSACTION;
     sp<IQService> binder = getBinder();
     Parcel inParcel, outParcel;
     if(binder != NULL) {
@@ -54,7 +54,7 @@ int isExternalConnected(void) {
 }
 
 int getDisplayAttributes(int dpy, DisplayAttributes_t& dpyattr) {
-    status_t err = FAILED_TRANSACTION;
+    status_t err = (status_t) FAILED_TRANSACTION;
     sp<IQService> binder = getBinder();
     Parcel inParcel, outParcel;
     inParcel.writeInt32(dpy);
@@ -76,7 +76,7 @@ int getDisplayAttributes(int dpy, DisplayAttributes_t& dpyattr) {
 }
 
 int setHSIC(int dpy, const HSICData_t& hsic_data) {
-    status_t err = FAILED_TRANSACTION;
+    status_t err = (status_t) FAILED_TRANSACTION;
     sp<IQService> binder = getBinder();
     Parcel inParcel, outParcel;
     inParcel.writeInt32(dpy);
@@ -93,7 +93,7 @@ int setHSIC(int dpy, const HSICData_t& hsic_data) {
 }
 
 int getDisplayVisibleRegion(int dpy, hwc_rect_t &rect) {
-    status_t err = FAILED_TRANSACTION;
+    status_t err = (status_t) FAILED_TRANSACTION;
     sp<IQService> binder = getBinder();
     Parcel inParcel, outParcel;
     inParcel.writeInt32(dpy);

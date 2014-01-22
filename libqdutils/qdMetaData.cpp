@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,6 +31,8 @@
 #include <sys/mman.h>
 #include <cutils/log.h>
 #include <gralloc_priv.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 #include "qdMetaData.h"
 
 int setMetaData(private_handle_t *handle, DispParamType paramType,
@@ -106,7 +108,7 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
             break;
     }
     if(munmap(base, size))
-        ALOGE("%s: failed to unmap ptr 0x%x, err %d", __func__, (int)base,
+        ALOGE("%s: failed to unmap ptr 0x%"PRIdPTR", err %d", __func__, (intptr_t)base,
                                                                         errno);
     return 0;
 }
