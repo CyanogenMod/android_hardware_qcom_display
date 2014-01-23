@@ -440,6 +440,14 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
         hwc_layer_1_t* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
+        if((layer->planeAlpha < 0xFF) &&
+                qhwc::needsScaling(ctx,layer,mDpy)){
+            ALOGD_IF(isDebug(),
+                "%s: Disable mixed mode if frame needs plane alpha downscaling",
+                __FUNCTION__);
+            return false;
+        }
+
         if(isYuvBuffer(hnd) ) {
             if(isSecuring(ctx, layer)) {
                 ALOGD_IF(isDebug(), "%s: MDP securing is active", __FUNCTION__);
