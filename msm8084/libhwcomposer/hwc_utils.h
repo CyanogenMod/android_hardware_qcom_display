@@ -142,6 +142,7 @@ enum {
 enum {
     HWC_COLOR_FILL = 0x00000008,
     HWC_FORMAT_RB_SWAP = 0x00000040,
+    HWC_VPU_PIPE = 0x00000200,
 };
 
 class LayerRotMap {

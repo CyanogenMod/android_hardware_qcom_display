@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2013, The Linux Foundation All rights reserved.
+ * Copyright (C) 2012-2014, The Linux Foundation All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -1318,6 +1318,10 @@ void setMdpFlags(hwc_layer_1_t *layer,
     if(layer->blending == HWC_BLENDING_PREMULT) {
         ovutils::setMdpFlags(mdpFlags,
                 ovutils::OV_MDP_BLEND_FG_PREMULT);
+    }
+
+    if (layer->flags & HWC_VPU_PIPE) {
+        ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_VPU_PIPE);
     }
 
     if(isYuvBuffer(hnd)) {
