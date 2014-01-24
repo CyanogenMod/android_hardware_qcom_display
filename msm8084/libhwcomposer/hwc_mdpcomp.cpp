@@ -739,7 +739,8 @@ bool MDPComp::loadBasedCompPreferGPU(hwc_context_t *ctx,
     int stagesForMDP = min(sMaxPipesPerMixer, ctx->mOverlay->availablePipes(
             mDpy, Overlay::MIXER_DEFAULT));
     //If MDP has X possible stages, it can take X layers.
-    const int batchSize = numAppLayers - (stagesForMDP - 1); //1 for FB
+    const int batchSize = (numAppLayers - mCurrentFrame.dropCount) -
+                                               (stagesForMDP - 1); //1 for FB
 
     if(batchSize <= 0) {
         ALOGD_IF(isDebug(), "%s: Not attempting", __FUNCTION__);
@@ -747,20 +748,50 @@ bool MDPComp::loadBasedCompPreferGPU(hwc_context_t *ctx,
     }
 
     int minBatchStart = -1;
+    int minBatchEnd = -1;
     size_t minBatchPixelCount = SIZE_MAX;
 
-    for(int i = 0; i <= numAppLayers - batchSize; i++) {
+    /* Iterate through the layer list to find out a contigous batch of batchSize
+     * non-dropped layers with loweest pixel count */
+    for(int i = 0; i <= (numAppLayers - batchSize); i++) {
+        if(mCurrentFrame.drop[i])
+            continue;
+
+        int batchCount = batchSize;
         uint32_t batchPixelCount = 0;
-        for(int j = i; j < i + batchSize; j++) {
-            hwc_layer_1_t* layer = &list->hwLayers[j];
-            hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
-            batchPixelCount += (crop.right - crop.left) *
+        int j = i;
+        for(; j < numAppLayers && batchCount; j++){
+            if(!mCurrentFrame.drop[j]) {
+                hwc_layer_1_t* layer = &list->hwLayers[j];
+                hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
+                hwc_rect_t dst = layer->displayFrame;
+
+                /* If we have a valid ROI, count pixels only for the MDP fetched
+                 * region of the buffer */
+                if((ctx->listStats[mDpy].roi.w != ctx->dpyAttr[mDpy].xres) ||
+                   (ctx->listStats[mDpy].roi.h != ctx->dpyAttr[mDpy].yres)) {
+                    hwc_rect_t roi;
+                    roi.left = ctx->listStats[mDpy].roi.x;
+                    roi.top = ctx->listStats[mDpy].roi.y;
+                    roi.right = roi.left + ctx->listStats[mDpy].roi.w;
+                    roi.bottom = roi.top + ctx->listStats[mDpy].roi.h;
+
+                    /* valid ROI means no scaling layer is composed. So check
+                     * only intersection to find actual fetched pixels */
+                    crop  = getIntersection(roi, dst);
+                }
+
+                batchPixelCount += (crop.right - crop.left) *
                     (crop.bottom - crop.top);
+                batchCount--;
+            }
         }
 
-        if(batchPixelCount < minBatchPixelCount) {
+        /* we dont want to program any batch of size lesser than batchSize */
+        if(!batchCount && (batchPixelCount < minBatchPixelCount)) {
             minBatchPixelCount = batchPixelCount;
             minBatchStart = i;
+            minBatchEnd = j-1;
         }
     }
 
@@ -770,8 +801,10 @@ bool MDPComp::loadBasedCompPreferGPU(hwc_context_t *ctx,
         return false;
     }
 
+    /* non-dropped layers falling ouside the selected batch will be marked for
+     * MDP */
     for(int i = 0; i < numAppLayers; i++) {
-        if(i < minBatchStart || i >= minBatchStart + batchSize) {
+        if((i < minBatchStart || i > minBatchEnd) && !mCurrentFrame.drop[i] ) {
             hwc_layer_1_t* layer = &list->hwLayers[i];
             if(not isSupportedForMDPComp(ctx, layer)) {
                 ALOGD_IF(isDebug(), "%s: MDP unsupported layer found at %d",
@@ -785,10 +818,12 @@ bool MDPComp::loadBasedCompPreferGPU(hwc_context_t *ctx,
 
     mCurrentFrame.fbZ = minBatchStart;
     mCurrentFrame.fbCount = batchSize;
-    mCurrentFrame.mdpCount = mCurrentFrame.layerCount - batchSize;
+    mCurrentFrame.mdpCount = mCurrentFrame.layerCount - mCurrentFrame.fbCount -
+             mCurrentFrame.dropCount;
 
-    ALOGD_IF(isDebug(), "%s: fbZ %d batchSize %d",
-                __FUNCTION__, mCurrentFrame.fbZ, batchSize);
+    ALOGD_IF(isDebug(), "%s: fbZ %d batchSize %d fbStart: %d fbEnd: %d",
+             __FUNCTION__, mCurrentFrame.fbZ, batchSize, minBatchStart,
+             minBatchEnd);
 
     if(sEnable4k2kYUVSplit){
         adjustForSourceSplit(ctx, list);
@@ -822,7 +857,9 @@ bool MDPComp::loadBasedCompPreferMDP(hwc_context_t *ctx,
     const int fullScreenLayers = bwLeft * 1000000000 / (ctx->dpyAttr[mDpy].xres
             * ctx->dpyAttr[mDpy].yres * bpp * panelRefRate);
 
-    const int fbBatchSize = numAppLayers - (fullScreenLayers - 1);
+    const int fbBatchSize = (numAppLayers - mCurrentFrame.dropCount)
+            - (fullScreenLayers - 1);
+
     //If batch size is not at least 2, we aren't really preferring MDP, since
     //only 1 layer going to GPU could actually translate into an entire FB
     //needed to be fetched by MDP, thus needing more b/w rather than less.
@@ -831,28 +868,43 @@ bool MDPComp::loadBasedCompPreferMDP(hwc_context_t *ctx,
         return false;
     }
 
-    //Top-most layers constitute FB batch
-    const int fbBatchStart = numAppLayers - fbBatchSize;
+    //Find top fbBatchSize non-dropped layers to get your batch
+    int fbStart = -1, fbEnd = -1, batchCount = fbBatchSize;
+    for(int i = numAppLayers - 1; i >= 0; i--) {
+        if(mCurrentFrame.drop[i])
+            continue;
 
-    //Bottom-most layers constitute MDP batch
-    for(int i = 0; i < fbBatchStart; i++) {
-        hwc_layer_1_t* layer = &list->hwLayers[i];
-        if(not isSupportedForMDPComp(ctx, layer)) {
-            ALOGD_IF(isDebug(), "%s: MDP unsupported layer found at %d",
-                    __FUNCTION__, i);
-            reset(ctx);
-            return false;
+        if(fbEnd < 0)
+            fbEnd = i;
+
+        if(!(--batchCount)) {
+            fbStart = i;
+            break;
         }
-        mCurrentFrame.isFBComposed[i] = false;
     }
 
-    mCurrentFrame.fbZ = fbBatchStart;
-    mCurrentFrame.fbCount = fbBatchSize;
-    mCurrentFrame.mdpCount = mCurrentFrame.layerCount - fbBatchSize;
+    //Bottom layers constitute MDP batch
+    for(int i = 0; i < fbStart; i++) {
+        if((i < fbStart || i > fbEnd) && !mCurrentFrame.drop[i] ) {
+            hwc_layer_1_t* layer = &list->hwLayers[i];
+            if(not isSupportedForMDPComp(ctx, layer)) {
+                ALOGD_IF(isDebug(), "%s: MDP unsupported layer found at %d",
+                         __FUNCTION__, i);
+                reset(ctx);
+                return false;
+            }
+            mCurrentFrame.isFBComposed[i] = false;
+        }
+    }
 
-    ALOGD_IF(isDebug(), "%s: FB Z %d, num app layers %d, MDP Batch Size %d",
-                __FUNCTION__, mCurrentFrame.fbZ, numAppLayers,
-                numAppLayers - fbBatchSize);
+    mCurrentFrame.fbZ = fbStart;
+    mCurrentFrame.fbCount = fbBatchSize;
+    mCurrentFrame.mdpCount = mCurrentFrame.layerCount - mCurrentFrame.fbCount
+                                                      - mCurrentFrame.dropCount;
+
+    ALOGD_IF(isDebug(), "%s: FB Z %d, app layers %d, non-dropped layers: %d, "
+             "MDP Batch Size %d",__FUNCTION__, mCurrentFrame.fbZ, numAppLayers,
+             numAppLayers - mCurrentFrame.dropCount, mCurrentFrame.mdpCount);
 
     if(sEnable4k2kYUVSplit){
         adjustForSourceSplit(ctx, list);
