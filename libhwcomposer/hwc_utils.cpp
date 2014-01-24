@@ -427,8 +427,8 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
     xRatio = (inPos.x - viewFrame.left)/actualWidth;
     yRatio = (inPos.y - viewFrame.top)/actualHeight;
     // Use viewframe width and height to compute wRatio and hRatio.
-    wRatio = inPos.w/(viewFrame.right - viewFrame.left);
-    hRatio = inPos.h/(viewFrame.bottom - viewFrame.top);
+    wRatio = (float)inPos.w/(float)(viewFrame.right - viewFrame.left);
+    hRatio = (float)inPos.h/(float)(viewFrame.bottom - viewFrame.top);
 
 
     //Calculate the position...
