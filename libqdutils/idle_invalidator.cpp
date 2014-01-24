@@ -54,15 +54,42 @@ int IdleInvalidator::init(InvalidatorHandler reg_handler, void* user_data,
 }
 
 bool IdleInvalidator::threadLoop() {
+    struct timeval lastUpdateTime;
     ALOGD_IF(II_DEBUG, "%s", __func__);
-    usleep(mSleepTime * 500);
+
+    {
+        //If we are here, update(s) happened, i.e mSleepAgain is set
+        Locker::Autolock _l(mLock);
+        mSleepAgain = false;
+        lastUpdateTime = mLastUpdateTime;
+    }
+
+    struct timeval currentTime;
+    gettimeofday(&currentTime, NULL);
+    int timeSinceUpdateUs = (currentTime.tv_sec - lastUpdateTime.tv_sec) *
+            1000000 + (currentTime.tv_usec - lastUpdateTime.tv_usec);
+    int sleepDurationUs = mSleepTime * 1000 - timeSinceUpdateUs;
+
+    //Sleep only if the duration required is > 1ms, otherwise its not worth it.
+    if(sleepDurationUs > 1000) {
+        usleep(sleepDurationUs);
+        ALOGD_IF(II_DEBUG, "Slept for %d ms", sleepDurationUs / 1000);
+    }
 
     Locker::Autolock _l(mLock);
+    //If an update happened while we were asleep, sleep again
     if(mSleepAgain) {
         //We need to sleep again!
         mSleepAgain = false;
         return true;
     }
+
+#if II_DEBUG
+    gettimeofday(&currentTime, NULL);
+    timeSinceUpdateUs = (currentTime.tv_sec - lastUpdateTime.tv_sec) *
+            1000000 + (currentTime.tv_usec - lastUpdateTime.tv_usec);
+    ALOGD("Idle refresh after %dms", timeSinceUpdateUs / 1000);
+#endif
 
     mHandler((void*)mHwcContext);
     return false;
@@ -77,8 +104,9 @@ void IdleInvalidator::onFirstRef() {
     ALOGD_IF(II_DEBUG, "%s", __func__);
 }
 
-void IdleInvalidator::markForSleep() {
+void IdleInvalidator::handleUpdateEvent() {
     Locker::Autolock _l(mLock);
+    gettimeofday(&mLastUpdateTime, NULL);
     mSleepAgain = true;
     //Triggers the threadLoop to run, if not already running.
     run(threadName, android::PRIORITY_AUDIO);
