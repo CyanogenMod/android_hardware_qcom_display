@@ -156,7 +156,7 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
                 aligned_w = LINK_adreno_compute_padding(width, bpp,
                                      surface_tile_height, raster_mode,
                                      padding_threshold);
-                ALOGW("%s: Warning!! Old GFX API is used to calculate stride",
+                ALOGV("%s: Warning!! Old GFX API is used to calculate stride",
                                                             __FUNCTION__);
             } else {
                 ALOGW("%s: Warning!! Symbols compute_surface_padding and " \
