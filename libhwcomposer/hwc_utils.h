@@ -238,6 +238,9 @@ bool isAlphaPresent(hwc_layer_1_t const* layer);
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable);
 int getBlending(int blending);
 
+bool canUseMDPforVirtualDisplay(hwc_context_t* ctx,
+                                const hwc_display_contents_1_t *list);
+
 //Helper function to dump logs
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
 
@@ -483,7 +486,6 @@ struct hwc_context_t {
     int mExtOrientation;
     //Flags the transition of a video session
     bool mVideoTransFlag;
-
     //Used for SideSync feature
     //which overrides the mExtOrientation
     bool mBufferMirrorMode;
@@ -491,13 +493,14 @@ struct hwc_context_t {
     mutable Locker mWfdSyncLock;
 
     qhwc::LayerRotMap *mLayerRotMap[HWC_NUM_DISPLAY_TYPES];
-
     // Panel reset flag will be set if BTA check fails
     bool mPanelResetStatus;
 
     // Downscale feature switch, set via system the property
     // sys.hwc.mdp_downscale_enabled
     bool mMDPDownscaleEnabled;
+    // number of active Displays
+    int numActiveDisplays;
 };
 
 namespace qhwc {
