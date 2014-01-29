@@ -123,6 +123,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 {
     bool bpanelReset = getPanelResetStatus(ctx, udata, len);
     if (bpanelReset) {
+        ctx->proc->invalidate(ctx->proc);
         return;
     }
 
