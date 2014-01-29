@@ -103,6 +103,9 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
             }
         }
         break;
+        case UPDATE_COLOR_SPACE:
+            data->colorSpace = *((ColorSpace_t *)param);
+            break;
         default:
             ALOGE("Unknown paramType %d", paramType);
             break;
