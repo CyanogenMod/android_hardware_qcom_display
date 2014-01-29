@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -167,12 +167,12 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
         // Dont do wormhole calculation when extDownscale is enabled on External
         if(ctx->listStats[mDpy].isDisplayAnimating && mDpy) {
             sourceCrop = layer->displayFrame;
-            displayFrame = sourceCrop;
         } else if((!mDpy ||
-                   (mDpy && !extOrient
-                   && !ctx->dpyAttr[mDpy].mDownScaleMode))
-                   && (extOnlyLayerIndex == -1)) {
-            if(!qdutils::MDPVersion::getInstance().is8x26()) {
+                  (mDpy && !extOrient
+                  && !ctx->dpyAttr[mDpy].mDownScaleMode))
+                  && (extOnlyLayerIndex == -1)) {
+            if(!qdutils::MDPVersion::getInstance().is8x26() &&
+                !ctx->dpyAttr[mDpy].customFBSize) {
                 getNonWormholeRegion(list, sourceCrop);
                 displayFrame = sourceCrop;
             }

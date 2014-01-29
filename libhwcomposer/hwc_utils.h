@@ -35,6 +35,8 @@
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 #define MAX_NUM_APP_LAYERS 32
+#define MIN_DISPLAY_XRES 200
+#define MIN_DISPLAY_YRES 200
 
 //Fwrd decls
 struct hwc_context_t;
@@ -95,6 +97,13 @@ struct DisplayAttributes {
     bool mActionSafePresent;
     int mAsWidthRatio;
     int mAsHeightRatio;
+
+    //If property fbsize set via adb shell debug.hwc.fbsize = XRESxYRES
+    //following fields are used.
+    bool customFBSize;
+    uint32_t xres_orig;
+    uint32_t yres_orig;
+
 };
 
 struct ListStats {
