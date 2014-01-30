@@ -225,6 +225,9 @@ int getBlending(int blending);
 bool isGLESOnlyComp(hwc_context_t *ctx, const int& dpy);
 void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers);
 
+bool canUseMDPforVirtualDisplay(hwc_context_t* ctx,
+                                const hwc_display_contents_1_t *list);
+
 //Helper function to dump logs
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
 
@@ -486,15 +489,14 @@ struct hwc_context_t {
     int mExtOrientation;
     //Flags the transition of a video session
     bool mVideoTransFlag;
-
     //Used for SideSync feature
     //which overrides the mExtOrientation
     bool mBufferMirrorMode;
-
     qhwc::LayerRotMap *mLayerRotMap[HWC_NUM_DISPLAY_TYPES];
-
     // Panel reset flag will be set if BTA check fails
     bool mPanelResetStatus;
+    // number of active Displays
+    int numActiveDisplays;
 };
 
 namespace qhwc {
