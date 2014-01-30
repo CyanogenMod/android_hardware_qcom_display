@@ -451,6 +451,7 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
         if(!isValidRect(visibleRect)) {
             mCurrentFrame.drop[i] = true;
             mCurrentFrame.dropCount++;
+            continue;
         }
 
         const hwc_layer_1_t* layer =  &list->hwLayers[i];
@@ -472,17 +473,17 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
         }else {
             /* Reset frame ROI when any layer which needs scaling also needs ROI
              * cropping */
-            if((res_w != dst_w || res_h != dst_h) &&
-                    needsScaling (layer)) {
+            if((res_w != dst_w || res_h != dst_h) && needsScaling (layer)) {
                 ALOGI("%s: Resetting ROI due to scaling", __FUNCTION__);
                 memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
                 mCurrentFrame.dropCount = 0;
                 return false;
             }
-        }
 
-        if (layer->blending == HWC_BLENDING_NONE)
-            visibleRect = deductRect(visibleRect, res);
+            /* deduct any opaque region from visibleRect */
+            if (layer->blending == HWC_BLENDING_NONE)
+                visibleRect = deductRect(visibleRect, res);
+        }
     }
     return true;
 }
