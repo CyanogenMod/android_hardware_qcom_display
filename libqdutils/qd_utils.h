@@ -42,6 +42,7 @@
 #include <sys/poll.h>
 #include <sys/resource.h>
 #include <cutils/properties.h>
+#include <hardware/hwcomposer.h>
 
 #define EDID_RAW_DATA_SIZE 640
 
