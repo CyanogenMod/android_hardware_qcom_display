@@ -54,6 +54,34 @@ namespace ovutils = overlay::utils;
 
 namespace qhwc {
 
+bool isValidResolution(hwc_context_t *ctx, uint32_t xres, uint32_t yres)
+{
+    return !((xres > qdutils::MAX_DISPLAY_DIM &&
+                !isDisplaySplit(ctx, HWC_DISPLAY_PRIMARY)) ||
+            (xres < MIN_DISPLAY_XRES || yres < MIN_DISPLAY_YRES));
+}
+
+void changeResolution(hwc_context_t *ctx, int xres_orig, int yres_orig) {
+    //Store original display resolution.
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres_orig = xres_orig;
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres_orig = yres_orig;
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].customFBSize = false;
+
+    char property[PROPERTY_VALUE_MAX] = {'\0'};
+    char *yptr = NULL;
+    if (property_get("debug.hwc.fbsize", property, NULL) > 0) {
+        yptr = strcasestr(property,"x");
+        int xres = atoi(property);
+        int yres = atoi(yptr + 1);
+        if (isValidResolution(ctx,xres,yres) &&
+                 xres != xres_orig && yres != yres_orig) {
+            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres = xres;
+            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres = yres;
+            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].customFBSize = true;
+        }
+    }
+}
+
 static int openFramebufferDevice(hwc_context_t *ctx)
 {
     struct fb_fix_screeninfo finfo;
@@ -116,6 +144,9 @@ static int openFramebufferDevice(hwc_context_t *ctx)
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xdpi = xdpi;
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].ydpi = ydpi;
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period = 1000000000l / fps;
+
+    //To change resolution of primary display
+    changeResolution(ctx, info.xres, info.yres);
 
     //Unblank primary on first boot
     if(ioctl(fb_fd, FBIOBLANK,FB_BLANK_UNBLANK) < 0) {
