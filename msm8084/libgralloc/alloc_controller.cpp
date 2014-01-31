@@ -126,10 +126,12 @@ int AdrenoMemInfo::isMacroTilingSupportedByGPU()
 void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
                             int tile_enabled, int& aligned_w, int& aligned_h)
 {
-    aligned_w = ALIGN(width, 32);
-    aligned_h = ALIGN(height, 32);
+    aligned_w = width;
+    aligned_h = height;
     // Currently surface padding is only computed for RGB* surfaces.
     if (format <= HAL_PIXEL_FORMAT_sRGB_X_8888) {
+        aligned_w = ALIGN(width, 32);
+        aligned_h = ALIGN(height, 32);
         // Don't add any additional padding if debug.gralloc.map_fb_memory
         // is enabled
         char property[PROPERTY_VALUE_MAX];
@@ -195,12 +197,13 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
             case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
             case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
                 aligned_w = VENUS_Y_STRIDE(COLOR_FMT_NV12, width);
+                aligned_h = VENUS_Y_SCANLINES(COLOR_FMT_NV12, height);
                 break;
             case HAL_PIXEL_FORMAT_BLOB:
-                aligned_w = width;
                 break;
             case HAL_PIXEL_FORMAT_NV21_ZSL:
                 aligned_w = ALIGN(width, 64);
+                aligned_h = ALIGN(height, 64);
                 break;
             case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_4x4_KHR:
             case HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR:
@@ -408,9 +411,9 @@ bool isMacroTileEnabled(int format, int usage)
 }
 
 // helper function
-size_t getSize(int format, int width, int height, int alignedw, int alignedh)
-{
-    size_t size;
+size_t getSize(int format, int width, int height, const int alignedw,
+        const int alignedh) {
+    size_t size = 0;
 
     switch (format) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
@@ -443,16 +446,14 @@ size_t getSize(int format, int width, int height, int alignedw, int alignedh)
         case HAL_PIXEL_FORMAT_YV12:
             if ((format == HAL_PIXEL_FORMAT_YV12) && ((width&1) || (height&1))) {
                 ALOGE("w or h is odd for the YV12 format");
-                return -EINVAL;
+                return 0;
             }
-            alignedh = height;
             size = alignedw*alignedh +
                     (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
             size = ALIGN(size, 4096);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-            alignedh = height;
             size = ALIGN((alignedw*alignedh) + (alignedw* alignedh)/2 + 1, 4096);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
@@ -461,28 +462,23 @@ size_t getSize(int format, int width, int height, int alignedw, int alignedh)
         case HAL_PIXEL_FORMAT_YCrCb_422_I:
             if(width & 1) {
                 ALOGE("width is odd for the YUV422_SP format");
-                return -EINVAL;
+                return 0;
             }
-            alignedh = height;
             size = ALIGN(alignedw * alignedh * 2, 4096);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
-            alignedh = VENUS_Y_SCANLINES(COLOR_FMT_NV12, height);
             size = VENUS_BUFFER_SIZE(COLOR_FMT_NV12, width, height);
             break;
         case HAL_PIXEL_FORMAT_BLOB:
             if(height != 1) {
                 ALOGE("%s: Buffers with format HAL_PIXEL_FORMAT_BLOB \
                       must have height==1 ", __FUNCTION__);
-                return -EINVAL;
+                return 0;
             }
-            alignedh = height;
-            alignedw = width;
             size = width;
             break;
         case HAL_PIXEL_FORMAT_NV21_ZSL:
-            alignedh = ALIGN(height, 64);
             size = ALIGN((alignedw*alignedh) + (alignedw* alignedh)/2, 4096);
             break;
         case HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_4x4_KHR:
@@ -516,7 +512,7 @@ size_t getSize(int format, int width, int height, int alignedw, int alignedh)
             break;
         default:
             ALOGE("unrecognized pixel format: 0x%x", format);
-            return -EINVAL;
+            return 0;
     }
     return size;
 }
