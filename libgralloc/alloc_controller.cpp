@@ -566,9 +566,7 @@ void getBufferAttributes(int width, int height, int format, int usage,
             tileEnabled,
             alignedw,
             alignedh);
-
-    if(size)
-        size = getSize(format, width, height, alignedw, alignedh);
+    size = getSize(format, width, height, alignedw, alignedh);
 }
 
 
