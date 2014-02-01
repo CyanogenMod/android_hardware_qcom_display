@@ -178,7 +178,7 @@ void RotMgr::getDump(char *buf, size_t len) {
     }
     char str[4] = {'\0'};
     snprintf(str, 4, "\n");
-    strncat(buf, str, strlen(str));
+    strlcat(buf, str, len);
 }
 
 int RotMgr::getRotDevFd() {

@@ -45,7 +45,7 @@ IFBUpdate* IFBUpdate::getObject(hwc_context_t *ctx, const int& dpy) {
 }
 
 IFBUpdate::IFBUpdate(hwc_context_t *ctx, const int& dpy) : mDpy(dpy) {
-    size_t size;
+    size_t size = 0;
     getBufferAttributes(ctx->dpyAttr[mDpy].xres,
             ctx->dpyAttr[mDpy].yres,
             HAL_PIXEL_FORMAT_RGBA_8888,

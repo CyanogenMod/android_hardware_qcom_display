@@ -246,6 +246,7 @@ bool MDPVersion::updateSplitInfo() {
         if(fp){
             //Format "left right" space as delimiter
             if(fread(split, sizeof(char), 64, fp)) {
+                split[sizeof(split) - 1] = '\0';
                 mSplit.mLeft = atoi(split);
                 ALOGI_IF(mSplit.mLeft, "Left Split=%d", mSplit.mLeft);
                 char *rght = strpbrk(split, " ");
