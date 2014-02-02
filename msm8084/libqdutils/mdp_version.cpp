@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -99,7 +99,7 @@ int MDPVersion::tokenizeParams(char *inputParams, const char *delim,
                                 char* tokenStr[], int *idx) {
     char *tmp_token = NULL;
     char *temp_ptr;
-    int ret = 0, index = 0;
+    int index = 0;
     if (!inputParams) {
         return -1;
     }
