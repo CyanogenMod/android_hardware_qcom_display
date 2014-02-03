@@ -1632,6 +1632,10 @@ bool MDPCompNonSplit::allocLayerPipes(hwc_context_t *ctx,
 
         if(isYuvBuffer(hnd)) {
             type = MDPCOMP_OV_VG;
+        } else if(qdutils::MDPVersion::getInstance().is8x26() &&
+                (ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres > 1024)) {
+            if(qhwc::needsScaling(layer))
+                type = MDPCOMP_OV_RGB;
         } else if(!qhwc::needsScaling(layer)
             && Overlay::getDMAMode() != Overlay::DMA_BLOCK_MODE
             && ctx->mMDP.version >= qdutils::MDSS_V5) {
