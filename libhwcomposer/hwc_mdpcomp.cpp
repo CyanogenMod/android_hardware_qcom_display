@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
  *
@@ -300,7 +300,6 @@ bool MDPComp::isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer) {
 }
 
 bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
-    const int dpy = HWC_DISPLAY_PRIMARY;
     private_handle_t *hnd = (private_handle_t *)layer->handle;
 
     if(!hnd) {
@@ -315,9 +314,6 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     //XXX: Investigate doing this with pixel phase on MDSS
     if(!isSecureBuffer(hnd) && isNonIntegralSourceCrop(layer->sourceCropf))
         return false;
-
-    int hw_w = ctx->dpyAttr[mDpy].xres;
-    int hw_h = ctx->dpyAttr[mDpy].yres;
 
     hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
     hwc_rect_t dst = layer->displayFrame;
@@ -407,7 +403,6 @@ ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type,
 
 bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     bool ret = true;
-    const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
 
     if(!isEnabled()) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. not enabled.", __FUNCTION__);
@@ -458,7 +453,6 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
 
         hwc_rect_t dstRect = layer->displayFrame;
         hwc_rect_t srcRect = integerizeSourceCrop(layer->sourceCropf);
-        int transform = layer->transform;
 
         hwc_rect_t res  = getIntersection(visibleRect, dstRect);
 
@@ -515,7 +509,6 @@ void MDPComp::generateROI(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             hwc_rect_t dstRect = list->hwLayers[index].displayFrame;
             hwc_rect_t srcRect = integerizeSourceCrop(
                                         list->hwLayers[index].sourceCropf);
-            int transform = list->hwLayers[index].transform;
 
             /* Intersect against display boundaries */
             roi = getUnion(roi, dstRect);
@@ -729,7 +722,7 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
 
 bool MDPComp::loadBasedCompPreferGPU(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-    if(not isLoadBasedCompDoable(ctx, list)) {
+    if(not isLoadBasedCompDoable(ctx)) {
         return false;
     }
 
@@ -840,7 +833,7 @@ bool MDPComp::loadBasedCompPreferGPU(hwc_context_t *ctx,
 
 bool MDPComp::loadBasedCompPreferMDP(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-    if(not isLoadBasedCompDoable(ctx, list)) {
+    if(not isLoadBasedCompDoable(ctx)) {
         return false;
     }
 
@@ -919,8 +912,7 @@ bool MDPComp::loadBasedCompPreferMDP(hwc_context_t *ctx,
     return true;
 }
 
-bool MDPComp::isLoadBasedCompDoable(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list) {
+bool MDPComp::isLoadBasedCompDoable(hwc_context_t *ctx) {
     if(mDpy or isSecurePresent(ctx, mDpy) or
             isYuvPresent(ctx, mDpy)) {
         return false;
@@ -1174,7 +1166,6 @@ void MDPComp::updateLayerCache(hwc_context_t* ctx,
     int fbCount = 0;
 
     for(int i = 0; i < numAppLayers; i++) {
-        hwc_layer_1_t* layer = &list->hwLayers[i];
         if (mCachedFrame.hnd[i] == list->hwLayers[i].handle) {
             if(!mCurrentFrame.drop[i])
                 fbCount++;
@@ -1484,12 +1475,9 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     return ret;
 }
 
-bool MDPComp::allocSplitVGPipesfor4k2k(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list, int index) {
+bool MDPComp::allocSplitVGPipesfor4k2k(hwc_context_t *ctx, int index) {
 
     bool bRet = true;
-    hwc_layer_1_t* layer = &list->hwLayers[index];
-    private_handle_t *hnd = (private_handle_t *)layer->handle;
     int mdpIndex = mCurrentFrame.layerToMDP[index];
     PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
     info.pipeInfo = new MdpYUVPipeInfo;
@@ -1514,10 +1502,10 @@ bool MDPComp::allocSplitVGPipesfor4k2k(hwc_context_t *ctx,
     }
     return bRet;
 }
-//=============MDPCompNonSplit===================================================
+//=============MDPCompNonSplit==================================================
 
 void MDPCompNonSplit::adjustForSourceSplit(hwc_context_t *ctx,
-         hwc_display_contents_1_t* list){
+        hwc_display_contents_1_t*) {
     //As we split 4kx2k yuv layer and program to 2 VG pipes
     //(if available) increase mdpcount accordingly
     mCurrentFrame.mdpCount += ctx->listStats[mDpy].yuv4k2kCount;
@@ -1618,7 +1606,7 @@ bool MDPCompNonSplit::allocLayerPipes(hwc_context_t *ctx,
         hwc_layer_1_t* layer = &list->hwLayers[index];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
-            if(allocSplitVGPipesfor4k2k(ctx, list, index)){
+            if(allocSplitVGPipesfor4k2k(ctx, index)){
                 continue;
             }
         }
@@ -1810,7 +1798,6 @@ int MDPCompSplit::pipesNeeded(hwc_context_t *ctx,
         hwc_display_contents_1_t* list,
         int mixer) {
     int pipesNeeded = 0;
-    const int xres = ctx->dpyAttr[mDpy].xres;
 
     const int lSplit = getLeftSplit(ctx, mDpy);
 
@@ -1909,7 +1896,6 @@ bool MDPCompSplit::areVGPipesAvailable(hwc_context_t *ctx,
 bool MDPCompSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
         MdpPipeInfoSplit& pipe_info,
         ePipeType type) {
-    const int xres = ctx->dpyAttr[mDpy].xres;
     const int lSplit = getLeftSplit(ctx, mDpy);
 
     hwc_rect_t dst = layer->displayFrame;
@@ -1943,7 +1929,7 @@ bool MDPCompSplit::allocLayerPipes(hwc_context_t *ctx,
         const int lSplit = getLeftSplit(ctx, mDpy);
         if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
             if((dst.left > lSplit)||(dst.right < lSplit)){
-                if(allocSplitVGPipesfor4k2k(ctx, list, index)){
+                if(allocSplitVGPipesfor4k2k(ctx, index)){
                     continue;
                 }
             }
@@ -2104,8 +2090,8 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
             if(ctx->mAD->isModeOn()) {
                 if(ctx->mAD->draw(ctx, fd, offset)) {
-                    fd = ctx->mAD->getDstFd(ctx);
-                    offset = ctx->mAD->getDstOffset(ctx);
+                    fd = ctx->mAD->getDstFd();
+                    offset = ctx->mAD->getDstOffset();
                 }
             }
 

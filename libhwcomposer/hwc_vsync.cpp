@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -30,6 +30,8 @@
 #include "string.h"
 #include "external.h"
 #include "overlay.h"
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 namespace qhwc {
 
@@ -133,8 +135,8 @@ static void *vsync_loop(void *param)
                         }
                         // send timestamp to SurfaceFlinger
                         ALOGD_IF (logvsync,
-                                "%s: timestamp %llu sent to SF for dpy=%d",
-                                __FUNCTION__, timestamp[dpy], dpy);
+                            "%s: timestamp %"PRIu64" sent to SF for dpy=%d",
+                            __FUNCTION__, timestamp[dpy], dpy);
                         ctx->proc->vsync(ctx->proc, dpy, timestamp[dpy]);
                     }
                 }

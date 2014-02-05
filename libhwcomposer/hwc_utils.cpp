@@ -494,7 +494,6 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
         getAspectRatioPosition(width, height, width, height, r);
         xPos = r.left;
         yPos = r.top;
-        float tempWidth = r.right - r.left;
         float tempHeight = r.bottom - r.top;
         yRatio = yPos/height;
         wRatio = outPos.w/width;
@@ -799,7 +798,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->dpyAttr[dpy].mActionSafePresent = isActionSafePresent(ctx, dpy);
 
     trimList(ctx, list, dpy);
-    optimizeLayerRects(ctx, list, dpy);
+    optimizeLayerRects(list);
 
     for (size_t i = 0; i < (size_t)ctx->listStats[dpy].numAppLayers; i++) {
         hwc_layer_1_t const* layer = &list->hwLayers[i];
@@ -1009,8 +1008,6 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
     const int& sci_t = scissor.top;
     const int& sci_r = scissor.right;
     const int& sci_b = scissor.bottom;
-    int sci_w = abs(sci_r - sci_l);
-    int sci_h = abs(sci_b - sci_t);
 
     double leftCutRatio = 0.0, rightCutRatio = 0.0, topCutRatio = 0.0,
             bottomCutRatio = 0.0;
@@ -1117,14 +1114,12 @@ hwc_rect_t deductRect(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
    return res;
 }
 
-void optimizeLayerRects(hwc_context_t *ctx,
-                        const hwc_display_contents_1_t *list, const int& dpy) {
+void optimizeLayerRects(const hwc_display_contents_1_t *list) {
     int i=list->numHwLayers-2;
-    hwc_rect_t irect;
     while(i > 0) {
-
         //see if there is no blending required.
-        //If it is opaque see if we can substract this region from below layers.
+        //If it is opaque see if we can substract this region from below
+        //layers.
         if(list->hwLayers[i].blending == HWC_BLENDING_NONE) {
             int j= i-1;
             hwc_rect_t& topframe =
@@ -1210,7 +1205,6 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     int retireFd = -1;
     int fbFd = -1;
     bool swapzero = false;
-    int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
 
     struct mdp_buf_sync data;
     memset(&data, 0, sizeof(data));
@@ -1556,7 +1550,6 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     int rotFlags = ovutils::ROT_FLAGS_NONE;
     uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
     Whf whf(getWidth(hnd), getHeight(hnd), format, hnd->size);
-    LayerProp *layerProp = ctx->layerProp[dpy];
 
 #ifdef VPU_TARGET
     if(ctx->mVPUClient != NULL &&
@@ -1597,7 +1590,7 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         *rot = ctx->mRotMgr->getNext();
         if(*rot == NULL) return -1;
         if(!dpy)
-            BwcPM::setBwc(ctx, crop, dst, transform, mdpFlags);
+            BwcPM::setBwc(crop, dst, transform, mdpFlags);
         //Configure rotator for pre-rotation
         if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
@@ -1674,7 +1667,6 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     int rotFlags = ROT_FLAGS_NONE;
     uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
     Whf whf(getWidth(hnd), getHeight(hnd), format, hnd->size);
-    LayerProp *layerProp = ctx->layerProp[dpy];
 
 #ifdef VPU_TARGET
     if(ctx->mVPUClient != NULL &&
@@ -1815,8 +1807,6 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
 
-    int hw_w = ctx->dpyAttr[dpy].xres;
-    int hw_h = ctx->dpyAttr[dpy].yres;
     hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);;
     hwc_rect_t dst = layer->displayFrame;
     int transform = layer->transform;
@@ -1838,7 +1828,7 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         if(!dpy)
-            BwcPM::setBwc(ctx, crop, dst, transform, mdpFlagsL);
+            BwcPM::setBwc(crop, dst, transform, mdpFlagsL);
         //Configure rotator for pre-rotation
         if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
@@ -1998,7 +1988,7 @@ bool canUseMDPforVirtualDisplay(hwc_context_t* ctx,
     return true;
 }
 
-void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
+void BwcPM::setBwc(const hwc_rect_t& crop,
             const hwc_rect_t& dst, const int& transform,
             ovutils::eMdpFlags& mdpFlags) {
     //Target doesnt support Bwc

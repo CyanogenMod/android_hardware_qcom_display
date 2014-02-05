@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2013 The Linux Foundation. All rights reserved.
+* Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -270,12 +270,12 @@ bool AssertiveDisplay::draw(hwc_context_t *ctx, int fd, uint32_t offset) {
     return true;
 }
 
-int AssertiveDisplay::getDstFd(hwc_context_t *ctx) const {
+int AssertiveDisplay::getDstFd() const {
     overlay::Writeback *wb = overlay::Writeback::getInstance();
     return wb->getDstFd();
 }
 
-uint32_t AssertiveDisplay::getDstOffset(hwc_context_t *ctx) const {
+uint32_t AssertiveDisplay::getDstOffset() const {
     overlay::Writeback *wb = overlay::Writeback::getInstance();
     return wb->getOffset();
 }
