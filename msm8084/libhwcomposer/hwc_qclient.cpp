@@ -130,8 +130,9 @@ static void getDisplayAttributes(hwc_context_t* ctx, const Parcel* inParcel,
     //XXX: Need to check what to return for HDMI
     outParcel->writeInt32(ctx->mMDP.panel);
 }
-static void setHSIC(hwc_context_t* ctx, const Parcel* inParcel) {
+static void setHSIC(const Parcel* inParcel) {
     int dpy = inParcel->readInt32();
+    ALOGD_IF(0, "In %s: dpy = %d", __FUNCTION__, dpy);
     HSICData_t hsic_data;
     hsic_data.hue = inParcel->readInt32();
     hsic_data.saturation = inParcel->readFloat();
@@ -191,7 +192,6 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         return vpuCommand(mHwcContext, command, inParcel, outParcel);
     }
 #endif
-
     switch(command) {
         case IQService::SECURING:
             securing(mHwcContext, inParcel->readInt32());
@@ -219,7 +219,7 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             getDisplayAttributes(mHwcContext, inParcel, outParcel);
             break;
         case IQService::SET_HSIC_DATA:
-            setHSIC(mHwcContext, inParcel);
+            setHSIC(inParcel);
         case IQService::PAUSE_WFD:
             pauseWFD(mHwcContext, inParcel->readInt32());
             break;

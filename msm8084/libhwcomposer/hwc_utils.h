@@ -136,7 +136,7 @@ struct VsyncState {
 };
 
 struct BwcPM {
-    static void setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
+    static void setBwc(const hwc_rect_t& crop,
             const hwc_rect_t& dst, const int& transform,
             ovutils::eMdpFlags& mdpFlags);
 };
@@ -247,8 +247,7 @@ bool isValidRect(const hwc_rect_t& rect);
 hwc_rect_t deductRect(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 hwc_rect_t getIntersection(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 hwc_rect_t getUnion(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
-void optimizeLayerRects(hwc_context_t *ctx,
-        const hwc_display_contents_1_t *list, const int& dpy);
+void optimizeLayerRects(const hwc_display_contents_1_t *list);
 bool areLayersIntersecting(const hwc_layer_1_t* layer1,
         const hwc_layer_1_t* layer2);
 
@@ -395,7 +394,7 @@ static inline bool isSecureDisplayBuffer(const private_handle_t* hnd) {
 
 static inline int getWidth(const private_handle_t* hnd) {
     if(isYuvBuffer(hnd)) {
-        MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+        MetaData_t *metadata = reinterpret_cast<MetaData_t*>(hnd->base_metadata);
         if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
             return metadata->bufferDim.sliceWidth;
         }
@@ -405,7 +404,7 @@ static inline int getWidth(const private_handle_t* hnd) {
 
 static inline int getHeight(const private_handle_t* hnd) {
     if(isYuvBuffer(hnd)) {
-        MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+        MetaData_t *metadata = reinterpret_cast<MetaData_t*>(hnd->base_metadata);
         if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
             return metadata->bufferDim.sliceHeight;
         }
