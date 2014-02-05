@@ -137,4 +137,16 @@ int GenericPipe::getPipeId() {
     return mCtrl->getPipeId();
 }
 
+bool GenericPipe::validateAndSet(GenericPipe* pipeArray[], const int& count,
+        const int& fbFd) {
+    Ctrl* ctrlArray[count];
+    memset(&ctrlArray, 0, sizeof(ctrlArray));
+
+    for(int i = 0; i < count; i++) {
+        ctrlArray[i] = pipeArray[i]->mCtrl;
+    }
+
+    return Ctrl::validateAndSet(ctrlArray, count, fbFd);
+}
+
 } //namespace overlay
