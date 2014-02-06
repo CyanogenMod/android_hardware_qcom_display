@@ -78,6 +78,11 @@ void HWCVirtualVDS::destroy(hwc_context_t *ctx, size_t /*numDisplays*/,
             delete ctx->mMDPComp[dpy];
             ctx->mMDPComp[dpy] = NULL;
         }
+        // We reset the WB session to non-secure when the virtual display
+        // has been disconnected.
+        if(!Writeback::getInstance()->setSecure(false)) {
+            ALOGE("Failure while attempting to reset WB session.");
+        }
     }
 }
 
@@ -135,6 +140,15 @@ int HWCVirtualVDS::set(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
                 format = HAL_PIXEL_FORMAT_RGBX_8888;
             Writeback::getInstance()->setOutputFormat(
                                     utils::getMdpFormat(format));
+
+            // Configure WB as secure if the output buffer handle is secure.
+            if(isSecureBuffer(ohnd)){
+                if(! Writeback::getInstance()->setSecure(true))
+                {
+                    ALOGE("Failed to set WB as secure for virtual display");
+                    return false;
+                }
+            }
 
             int fd = -1; //FenceFD from the Copybit
             hwc_sync(ctx, list, dpy, fd);
