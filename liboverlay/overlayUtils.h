@@ -422,7 +422,7 @@ int getMdpOrient(eTransform rotation);
 const char* getFormatString(int format);
 
 template <class T>
-inline void memset0(T& t) { ::memset(&t, 0, sizeof(T)); }
+inline void memset0(T& t) { ::memset(&t, 0, sizeof(t)); }
 
 template <class T> inline void swap ( T& a, T& b )
 {
