@@ -106,7 +106,9 @@ static void reset(hwc_context_t *ctx, int numDisplays,
                   hwc_display_contents_1_t** displays) {
 
     ctx->numActiveDisplays = 0;
-    for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+    ctx->isPaddingRound = false;
+
+    for(int i = 0; i < numDisplays; i++) {
         hwc_display_contents_1_t *list = displays[i];
         // XXX:SurfaceFlinger no longer guarantees that this
         // value is reset on every prepare. However, for the layer
@@ -125,6 +127,17 @@ static void reset(hwc_context_t *ctx, int numDisplays,
              * the display device to be active.
              */
             ctx->numActiveDisplays += 1;
+
+            if((ctx->mPrevHwLayerCount[i] == 1) and (list->numHwLayers > 1)) {
+                /* If the previous cycle for dpy 'i' has 0 AppLayers and the
+                 * current cycle has atleast 1 AppLayer, padding round needs
+                 * to be invoked on current cycle to free up the resources.
+                 */
+                ctx->isPaddingRound = true;
+            }
+            ctx->mPrevHwLayerCount[i] = list->numHwLayers;
+        } else {
+            ctx->mPrevHwLayerCount[i] = 0;
         }
 
         if(ctx->mFBUpdate[i])
@@ -133,7 +146,6 @@ static void reset(hwc_context_t *ctx, int numDisplays,
             ctx->mCopyBit[i]->reset();
         if(ctx->mLayerRotMap[i])
             ctx->mLayerRotMap[i]->reset();
-
     }
 
     ctx->mAD->reset();
