@@ -63,48 +63,45 @@ int Rotator::getRotatorHwType() {
 
 bool RotMem::close() {
     bool ret = true;
-    for(uint32_t i=0; i < RotMem::MAX_ROT_MEM; ++i) {
-        // skip current, and if valid, close
-        if(m[i].valid()) {
-            if(m[i].close() == false) {
-                ALOGE("%s error in closing rot mem %d", __FUNCTION__, i);
-                ret = false;
-            }
+    if(valid()) {
+        if(mem.close() == false) {
+            ALOGE("%s error in closing rot mem", __FUNCTION__);
+            ret = false;
         }
     }
     return ret;
 }
 
-RotMem::Mem::Mem() : mCurrOffset(0) {
+RotMem::RotMem() : mCurrIndex(0) {
     utils::memset0(mRotOffset);
     for(int i = 0; i < ROT_NUM_BUFS; i++) {
         mRelFence[i] = -1;
     }
 }
 
-RotMem::Mem::~Mem() {
+RotMem::~RotMem() {
     for(int i = 0; i < ROT_NUM_BUFS; i++) {
         ::close(mRelFence[i]);
         mRelFence[i] = -1;
     }
 }
 
-void RotMem::Mem::setReleaseFd(const int& fence) {
+void RotMem::setReleaseFd(const int& fence) {
     int ret = 0;
 
-    if(mRelFence[mCurrOffset] >= 0) {
+    if(mRelFence[mCurrIndex] >= 0) {
         //Wait for previous usage of this buffer to be over.
         //Can happen if rotation takes > vsync and a fast producer. i.e queue
         //happens in subsequent vsyncs either because content is 60fps or
         //because the producer is hasty sometimes.
-        ret = sync_wait(mRelFence[mCurrOffset], 1000);
+        ret = sync_wait(mRelFence[mCurrIndex], 1000);
         if(ret < 0) {
             ALOGE("%s: sync_wait error!! error no = %d err str = %s",
                 __FUNCTION__, errno, strerror(errno));
         }
-        ::close(mRelFence[mCurrOffset]);
+        ::close(mRelFence[mCurrIndex]);
     }
-    mRelFence[mCurrOffset] = fence;
+    mRelFence[mCurrIndex] = fence;
 }
 
 //============RotMgr=========================
