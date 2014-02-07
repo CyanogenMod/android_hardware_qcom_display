@@ -483,6 +483,10 @@ struct hwc_context_t {
     eAnimationState mAnimationState[HWC_NUM_DISPLAY_TYPES];
     qhwc::HWCVirtualBase *mHWCVirtual;
 
+    // stores the #numHwLayers of the previous frame
+    // for each display device
+    int mPrevHwLayerCount[HWC_NUM_DISPLAY_TYPES];
+
     // stores the primary device orientation
     int deviceOrientation;
     //Securing in progress indicator
