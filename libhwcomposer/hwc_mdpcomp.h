@@ -136,9 +136,6 @@ protected:
     /* configures MPD pipes */
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
                           PipeLayerPair& pipeLayerPair) = 0;
-    /* Checks for pipes needed versus pipes available */
-    virtual bool arePipesAvailable(hwc_context_t *ctx,
-            hwc_display_contents_1_t* list) = 0;
     /* Increments mdpCount if 4k2k yuv layer split is enabled.
      * updates framebuffer z order if fb lies above source-split layer */
     virtual void adjustForSourceSplit(hwc_context_t *ctx,
@@ -270,14 +267,6 @@ private:
     virtual bool allocLayerPipes(hwc_context_t *ctx,
                                  hwc_display_contents_1_t* list);
 
-    /* Checks for pipes needed versus pipes available */
-    virtual bool arePipesAvailable(hwc_context_t *ctx,
-            hwc_display_contents_1_t* list);
-
-    /* Checks for video pipes needed versus pipes available */
-    virtual bool areVGPipesAvailable(hwc_context_t *ctx,
-            hwc_display_contents_1_t* list);
-
     /* Increments mdpCount if 4k2k yuv layer split is enabled.
      * updates framebuffer z order if fb lies above source-split layer */
     virtual void adjustForSourceSplit(hwc_context_t *ctx,
@@ -311,14 +300,6 @@ private:
     virtual bool allocLayerPipes(hwc_context_t *ctx,
                                  hwc_display_contents_1_t* list);
 
-    /* Checks for pipes needed versus pipes available */
-    virtual bool arePipesAvailable(hwc_context_t *ctx,
-            hwc_display_contents_1_t* list);
-
-    /* Checks for video pipes needed versus pipes available */
-    virtual bool areVGPipesAvailable(hwc_context_t *ctx,
-            hwc_display_contents_1_t* list);
-
     /* Increments mdpCount if 4k2k yuv layer split is enabled.
      * updates framebuffer z order if fb lies above source-split layer */
     virtual void adjustForSourceSplit(hwc_context_t *ctx,
@@ -327,9 +308,6 @@ private:
     /* configures 4kx2k yuv layer*/
     virtual int configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
             PipeLayerPair& PipeLayerPair);
-
-    int pipesNeeded(hwc_context_t *ctx, hwc_display_contents_1_t* list,
-            int mixer);
 };
 
 }; //namespace
