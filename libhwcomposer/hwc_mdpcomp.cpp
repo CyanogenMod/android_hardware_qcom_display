@@ -233,7 +233,7 @@ void MDPComp::FrameInfo::reset(const int& numLayers) {
     fbCount = numLayers;
     mdpCount = 0;
     needsRedraw = true;
-    fbZ = 0;
+    fbZ = -1;
 }
 
 void MDPComp::FrameInfo::map() {
@@ -611,7 +611,6 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     }
 
     mCurrentFrame.fbCount = 0;
-    mCurrentFrame.fbZ = -1;
     memcpy(&mCurrentFrame.isFBComposed, &mCurrentFrame.drop,
            sizeof(mCurrentFrame.isFBComposed));
     mCurrentFrame.mdpCount = mCurrentFrame.layerCount - mCurrentFrame.fbCount -
@@ -1047,14 +1046,14 @@ bool  MDPComp::markLayersForCaching(hwc_context_t* ctx,
     int maxBatchCount = 0;
     int fbZ = -1;
 
-    /* All or Nothing is cached. No batching needed */
-    if(!mCurrentFrame.fbCount) {
-        mCurrentFrame.fbZ = -1;
+    /* Nothing is cached. No batching needed */
+    if(mCurrentFrame.fbCount == 0) {
         return true;
     }
-    if(!mCurrentFrame.mdpCount) {
-        mCurrentFrame.fbZ = 0;
-        return true;
+
+    /* No MDP comp layers, try to use other comp modes */
+    if(mCurrentFrame.mdpCount == 0) {
+        return false;
     }
 
     fbZ = getBatch(list, maxBatchStart, maxBatchEnd, maxBatchCount);
