@@ -471,6 +471,9 @@ static int hwc_query(struct hwc_composer_device_1* dev,
     case HWC_COLOR_FILL:
         value[0] = 1;
         break;
+    case HWC_MAX_WRITEBACK_WIDTH:
+        value[0] = qdutils::MAX_DISPLAY_DIM;
+        break;
     default:
         return -EINVAL;
     }
