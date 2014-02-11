@@ -122,7 +122,7 @@ int HWCVirtualVDS::prepare(hwc_composer_device_1 *dev,
 
         if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
             const int fbZ = 0;
-            ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
+            ctx->mFBUpdate[dpy]->prepareAndValidate(ctx, list, fbZ);
         }
     }
     return 0;
@@ -213,7 +213,7 @@ int HWCVirtualV4L2::prepare(hwc_composer_device_1 *dev,
             setListStats(ctx, list, dpy);
             if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
                 const int fbZ = 0;
-                ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
+                ctx->mFBUpdate[dpy]->prepareAndValidate(ctx, list, fbZ);
             }
         } else {
             /* Virtual Display is in Pause state.
