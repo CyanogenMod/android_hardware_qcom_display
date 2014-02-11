@@ -50,10 +50,26 @@ uint32_t MdpRot::getDstFormat() const {
 uint32_t MdpRot::getSessId() const { return mRotImgInfo.session_id; }
 
 void MdpRot::setDownscale(int ds) {
-    if ((utils::ROT_DS_EIGHTH == ds) && (mRotImgInfo.src_rect.h & 0xF)) {
+    if(mRotImgInfo.src.format == MDP_Y_CR_CB_GH2V2){
+        if((utils::ROT_DS_HALF == ds) &&
+                (mRotImgInfo.src_rect.h &0x3))
+            mRotImgInfo.src_rect.h =
+                     utils::aligndown(mRotImgInfo.src_rect.h, 4);
+        else if(((utils::ROT_DS_FOURTH == ds) &&
+                        (mRotImgInfo.src_rect.h &0x7)))
+            mRotImgInfo.src_rect.h =
+                     utils::aligndown(mRotImgInfo.src_rect.h, 8);
+        else if(((utils::ROT_DS_EIGHTH == ds) &&
+                        (mRotImgInfo.src_rect.h &0xf)))
+            mRotImgInfo.src_rect.h =
+                     utils::aligndown(mRotImgInfo.src_rect.h, 16);
+    } else if ((utils::ROT_DS_EIGHTH == ds) &&
+                        (mRotImgInfo.src_rect.h & 0xF)) {
         // Ensure src_rect.h is a multiple of 16 for 1/8 downscaling.
         // This is an undocumented MDP Rotator constraint.
-        mRotImgInfo.src_rect.h = utils::aligndown(mRotImgInfo.src_rect.h, 16);
+        // src_rect.h is already ensured to be 32 pixel height aligned
+        // for MDP_Y_CRCB_H2V2_TILE and MDP_Y_CBCR_H2V2_TILE formats.
+        mRotImgInfo.src_rect.h = utils::alignup(mRotImgInfo.src_rect.h, 16);
     }
     mRotImgInfo.downscale_ratio = ds;
 }
