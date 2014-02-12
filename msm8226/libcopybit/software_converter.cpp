@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011,2014, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -52,7 +52,7 @@ int convertYV12toYCrCb420SP(const copybit_image_t *src, private_handle_t *yv12_h
     unsigned int   width   = src->w - src->horiz_padding;
     unsigned int   height  = src->h;
     unsigned int   y_size  = stride * src->h;
-    unsigned int   c_width = ALIGN(stride/2, 16);
+    unsigned int   c_width = ALIGN(stride/2, (unsigned int)16);
     unsigned int   c_size  = c_width * src->h/2;
     unsigned int   chromaPadding = c_width - width/2;
     unsigned int   chromaSize = c_size * 2;
@@ -128,19 +128,20 @@ struct copyInfo{
     int height;
     int src_stride;
     int dst_stride;
-    int src_plane1_offset;
-    int src_plane2_offset;
-    int dst_plane1_offset;
-    int dst_plane2_offset;
+    size_t src_plane1_offset;
+    size_t src_plane2_offset;
+    size_t dst_plane1_offset;
+    size_t dst_plane2_offset;
 };
 
 /* Internal function to do the actual copy of source to destination */
-static int copy_source_to_destination(const int src_base, const int dst_base,
+static int copy_source_to_destination(const uintptr_t src_base,
+                                      const uintptr_t dst_base,
                                       copyInfo& info)
 {
     if (!src_base || !dst_base) {
-        ALOGE("%s: invalid memory src_base = 0x%x dst_base=0x%x",
-             __FUNCTION__, src_base, dst_base);
+        ALOGE("%s: invalid memory src_base = 0x%p dst_base=0x%p",
+             __FUNCTION__, (void*)src_base, (void*)dst_base);
          return COPYBIT_FAILURE;
     }
 
