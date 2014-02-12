@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010 - 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2010 - 2014, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -154,7 +154,7 @@ static void set_image(struct mdp_img *img, const struct copybit_image_t *rhs)
     img->width      = rhs->w;
     img->height     = rhs->h;
     img->format     = get_format(rhs->format);
-    img->offset     = hnd->offset;
+    img->offset     = (uint32_t)hnd->offset;
     img->memory_id  = hnd->fd;
 }
 /** setup rectangles */
@@ -162,9 +162,7 @@ static void set_rects(struct copybit_context_t *dev,
                       struct mdp_blit_req *e,
                       const struct copybit_rect_t *dst,
                       const struct copybit_rect_t *src,
-                      const struct copybit_rect_t *scissor,
-                      uint32_t horiz_padding,
-                      uint32_t vert_padding) {
+                      const struct copybit_rect_t *scissor) {
     struct copybit_rect_t clip;
     intersect(&clip, scissor, dst);
 
@@ -312,7 +310,7 @@ static int set_parameter_copybit(
             case COPYBIT_PLANE_ALPHA:
                 if (value < 0)      value = MDP_ALPHA_NOP;
                 if (value >= 256)   value = 255;
-                ctx->mAlpha = value;
+                ctx->mAlpha = (uint8_t)value;
                 break;
             case COPYBIT_DITHER:
                 if (value == COPYBIT_ENABLE) {
@@ -491,7 +489,8 @@ static int stretch_copybit(
                 return -EINVAL;
             }
         }
-        const uint32_t maxCount = sizeof(list->req)/sizeof(list->req[0]);
+        const uint32_t maxCount =
+                (uint32_t)(sizeof(list->req)/sizeof(list->req[0]));
         const struct copybit_rect_t bounds = { 0, 0, (int)dst->w, (int)dst->h };
         struct copybit_rect_t clip;
         status = 0;
@@ -508,7 +507,7 @@ static int stretch_copybit(
             set_infos(ctx, req, flags);
             set_image(&req->dst, dst);
             set_image(&req->src, src);
-            set_rects(ctx, req, dst_rect, src_rect, &clip, src->horiz_padding, src->vert_padding);
+            set_rects(ctx, req, dst_rect, src_rect, &clip);
 
             if (req->src_rect.w<=0 || req->src_rect.h<=0)
                 continue;
@@ -553,6 +552,9 @@ static int blit_copybit(
 static int finish_copybit(struct copybit_device_t *dev)
 {
     // NOP for MDP copybit
+    if(!dev)
+       return -EINVAL;
+
     return 0;
 }
 static int clear_copybit(struct copybit_device_t *dev,
@@ -702,6 +704,10 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
                         struct hw_device_t** device)
 {
     int status = -EINVAL;
+
+    if (!strcmp(name, COPYBIT_HARDWARE_COPYBIT0)) {
+        return COPYBIT_FAILURE;
+    }
     copybit_context_t *ctx;
     ctx = (copybit_context_t *)malloc(sizeof(copybit_context_t));
     memset(ctx, 0, sizeof(*ctx));
