@@ -269,14 +269,15 @@ public:
     explicit MDPCompSplit(int dpy):MDPComp(dpy){};
     virtual ~MDPCompSplit(){};
     virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list);
-private:
+
+protected:
     struct MdpPipeInfoSplit : public MdpPipeInfo {
         ovutils::eDest lIndex;
         ovutils::eDest rIndex;
         virtual ~MdpPipeInfoSplit() {};
     };
 
-    bool acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
+    virtual bool acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
                          MdpPipeInfoSplit& pipe_info, ePipeType type);
 
     /* configure's overlay pipes for the frame */
@@ -287,6 +288,7 @@ private:
     virtual bool allocLayerPipes(hwc_context_t *ctx,
                                  hwc_display_contents_1_t* list);
 
+private:
     /* Increments mdpCount if 4k2k yuv layer split is enabled.
      * updates framebuffer z order if fb lies above source-split layer */
     virtual void adjustForSourceSplit(hwc_context_t *ctx,
@@ -295,6 +297,21 @@ private:
     /* configures 4kx2k yuv layer*/
     virtual int configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
             PipeLayerPair& PipeLayerPair);
+};
+
+class MDPCompSrcSplit : public MDPCompSplit {
+public:
+    explicit MDPCompSrcSplit(int dpy) : MDPCompSplit(dpy){};
+    virtual ~MDPCompSrcSplit(){};
+private:
+    virtual bool acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
+            MdpPipeInfoSplit& pipe_info, ePipeType type);
+
+    virtual bool allocLayerPipes(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+
+    virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
+            PipeLayerPair& pipeLayerPair);
 };
 
 }; //namespace

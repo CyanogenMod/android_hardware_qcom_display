@@ -88,11 +88,22 @@ public:
             hwc_rect_t fbUpdatingRect, int fbZorder);
     bool draw(hwc_context_t *ctx, private_handle_t *hnd);
     void reset();
-private:
-    bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
+
+protected:
+    virtual bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             hwc_rect_t fbUpdatingRect, int fbZorder);
     ovutils::eDest mDestLeft; //left pipe to draw on
     ovutils::eDest mDestRight; //right pipe to draw on
+};
+
+//Source Split Handler
+class FBSrcSplit : public FBUpdateSplit {
+public:
+    explicit FBSrcSplit(hwc_context_t *ctx, const int& dpy);
+    virtual ~FBSrcSplit() {};
+private:
+    bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
+            hwc_rect_t fbUpdatingRect, int fbZorder);
 };
 
 }; //namespace qhwc

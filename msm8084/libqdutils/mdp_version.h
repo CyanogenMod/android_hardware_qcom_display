@@ -113,6 +113,7 @@ public:
     int getRightSplit() { return mSplit.right(); }
     unsigned long getLowBw() { return mLowBw; }
     unsigned long getHighBw() { return mHighBw; }
+    bool isSrcSplit() const;
     bool is8x26();
     bool is8x74v2();
     bool is8084();
@@ -139,6 +140,7 @@ private:
     Split mSplit;
     unsigned long mLowBw; //kbps
     unsigned long mHighBw; //kbps
+    bool mSourceSplit;
 };
 }; //namespace qdutils
 #endif //INCLUDE_LIBQCOMUTILS_MDPVER

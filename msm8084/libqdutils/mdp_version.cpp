@@ -70,6 +70,7 @@ MDPVersion::MDPVersion()
     mPanelType = NO_PANEL;
     mLowBw = 0;
     mHighBw = 0;
+    mSourceSplit = false;
 
     if(!updatePanelInfo()) {
         ALOGE("Unable to read Primary Panel Information");
@@ -218,6 +219,9 @@ bool MDPVersion::updateSysFsInfo() {
                                     strlen("tile_format"))) {
                            if(enableMacroTile)
                                mMacroTileEnabled = true;
+                        } else if(!strncmp(tokens[i], "src_split",
+                                    strlen("src_split"))) {
+                            mSourceSplit = true;
                         }
                     }
                 }
@@ -285,6 +289,10 @@ bool MDPVersion::supportsBWC() {
 bool MDPVersion::supportsMacroTile() {
     // MACRO TILE support
     return mMacroTileEnabled;
+}
+
+bool MDPVersion::isSrcSplit() const {
+    return mSourceSplit;
 }
 
 bool MDPVersion::is8x26() {
