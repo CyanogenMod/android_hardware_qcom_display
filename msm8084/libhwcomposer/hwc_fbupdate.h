@@ -39,7 +39,7 @@ public:
     virtual ~IFBUpdate() {};
     // Sets up members and prepares overlay if conditions are met
     virtual bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
-            int fbZorder) = 0;
+            hwc_rect_t fbUpdatingRect, int fbZorder) = 0;
     virtual bool prepareAndValidate(hwc_context_t *ctx,
             hwc_display_contents_1 *list, int fbZorder);
     // Draws layer
@@ -64,12 +64,12 @@ public:
     explicit FBUpdateNonSplit(hwc_context_t *ctx, const int& dpy);
     virtual ~FBUpdateNonSplit() {};
     bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
-            int fbZorder);
+            hwc_rect_t fbUpdatingRect, int fbZorder);
     bool draw(hwc_context_t *ctx, private_handle_t *hnd);
     void reset();
 private:
     bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
-            int fbZorder);
+            hwc_rect_t fbUpdatingRect, int fbZorder);
     bool preRotateExtDisplay(hwc_context_t *ctx,
                                  hwc_layer_1_t *layer,
                                  ovutils::Whf &info,
@@ -85,12 +85,12 @@ public:
     explicit FBUpdateSplit(hwc_context_t *ctx, const int& dpy);
     virtual ~FBUpdateSplit() {};
     bool prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
-            int fbZorder);
+            hwc_rect_t fbUpdatingRect, int fbZorder);
     bool draw(hwc_context_t *ctx, private_handle_t *hnd);
     void reset();
 private:
     bool configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
-            int fbZorder);
+            hwc_rect_t fbUpdatingRect, int fbZorder);
     ovutils::eDest mDestLeft; //left pipe to draw on
     ovutils::eDest mDestRight; //right pipe to draw on
 };
