@@ -45,36 +45,21 @@ namespace overlay {
    we don't need this RotMem wrapper. The inner class is sufficient.
 */
 struct RotMem {
-    // Max rotator memory allocations
-    enum { MAX_ROT_MEM = 2};
-
-    //Manages the rotator buffer offsets.
-    struct Mem {
-        Mem();
-        ~Mem();
-        bool valid() { return m.valid(); }
-        bool close() { return m.close(); }
-        uint32_t size() const { return m.bufSz(); }
-        void setReleaseFd(const int& fence);
-        // Max rotator buffers
-        enum { ROT_NUM_BUFS = 2 };
-        // rotator data info dst offset
-        uint32_t mRotOffset[ROT_NUM_BUFS];
-        int mRelFence[ROT_NUM_BUFS];
-        // current offset slot from mRotOffset
-        uint32_t mCurrOffset;
-        OvMem m;
-    };
-
-    RotMem() : _curr(0) {}
-    Mem& curr() { return m[_curr % MAX_ROT_MEM]; }
-    const Mem& curr() const { return m[_curr % MAX_ROT_MEM]; }
-    Mem& prev() { return m[(_curr+1) % MAX_ROT_MEM]; }
-    RotMem& operator++() { ++_curr; return *this; }
-    void setReleaseFd(const int& fence) { curr().setReleaseFd(fence); }
+    // Max rotator buffers
+    enum { ROT_NUM_BUFS = 2 };
+    RotMem();
+    ~RotMem();
     bool close();
-    uint32_t _curr;
-    Mem m[MAX_ROT_MEM];
+    bool valid() { return mem.valid(); }
+    uint32_t size() const { return mem.bufSz(); }
+    void setReleaseFd(const int& fence);
+
+    // rotator data info dst offset
+    uint32_t mRotOffset[ROT_NUM_BUFS];
+    int mRelFence[ROT_NUM_BUFS];
+    // current slot being used
+    uint32_t mCurrIndex;
+    OvMem mem;
 };
 
 class Rotator
