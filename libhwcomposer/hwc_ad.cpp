@@ -82,7 +82,7 @@ static void adWrite(const int& value) {
     if(adFd >= 0) {
         char opStr[4] = "";
         snprintf(opStr, sizeof(opStr), "%d", value);
-        int ret = write(adFd, opStr, strlen(opStr));
+        ssize_t ret = write(adFd, opStr, strlen(opStr));
         if(ret < 0) {
             ALOGE("%s: Failed to write %d with error %s",
                     __func__, value, strerror(errno));
@@ -206,7 +206,8 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
         return false;
     }
 
-    int tmpW, tmpH, size;
+    int tmpW, tmpH;
+    size_t size;
     int format = ovutils::getHALFormat(wb->getOutputFormat());
     if(format < 0) {
         ALOGE("%s invalid format %d", __func__, format);
@@ -217,7 +218,7 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
     size = getBufferSizeAndDimensions(hnd->width, hnd->height,
                 format, tmpW, tmpH);
 
-    if(!wb->configureMemory(size)) {
+    if(!wb->configureMemory((uint32_t)size)) {
         ALOGE("%s: config memory failed", __func__);
         mDoable = false;
         return false;

@@ -239,7 +239,7 @@ bool FBUpdateNonSplit::draw(hwc_context_t *ctx, private_handle_t *hnd)
     overlay::Overlay& ov = *(ctx->mOverlay);
     ovutils::eDest dest = mDest;
     int fd = hnd->fd;
-    uint32_t offset = hnd->offset;
+    uint32_t offset = (uint32_t)hnd->offset;
     if(mRot) {
         if(!mRot->queueBuffer(fd, offset))
             return false;
@@ -396,14 +396,14 @@ bool FBUpdateSplit::draw(hwc_context_t *ctx, private_handle_t *hnd)
     bool ret = true;
     overlay::Overlay& ov = *(ctx->mOverlay);
     if(mDestLeft != ovutils::OV_INVALID) {
-        if (!ov.queueBuffer(hnd->fd, hnd->offset, mDestLeft)) {
+        if (!ov.queueBuffer(hnd->fd, (uint32_t)hnd->offset, mDestLeft)) {
             ALOGE("%s: queue failed for left of dpy = %d",
                   __FUNCTION__, mDpy);
             ret = false;
         }
     }
     if(mDestRight != ovutils::OV_INVALID) {
-        if (!ov.queueBuffer(hnd->fd, hnd->offset, mDestRight)) {
+        if (!ov.queueBuffer(hnd->fd, (uint32_t)hnd->offset, mDestRight)) {
             ALOGE("%s: queue failed for right of dpy = %d",
                   __FUNCTION__, mDpy);
             ret = false;
