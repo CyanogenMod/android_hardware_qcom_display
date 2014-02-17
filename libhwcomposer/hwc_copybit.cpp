@@ -40,7 +40,7 @@ struct region_iterator : public copybit_region_t {
 
     region_iterator(hwc_region_t region) {
         mRegion = region;
-        r.end = region.numRects;
+        r.end = (int)region.numRects;
         r.current = 0;
         this->next = iterate;
     }
@@ -195,8 +195,8 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
                          __FUNCTION__, dst_w,src_w,dst_h,src_h);
               return false;
             }
-            dx = (float)dst_w/src_w;
-            dy = (float)dst_h/src_h;
+            dx = (float)dst_w/(float)src_w;
+            dy = (float)dst_h/(float)src_h;
 
             if (dx > MAX_SCALE_FACTOR || dx < MIN_SCALE_FACTOR)
                 return false;
@@ -277,7 +277,7 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
 
     //render buffer
     if (ctx->mMDP.version == qdutils::MDP_V3_0_4) {
-        last = list->numHwLayers - 1;
+        last = (uint32_t)list->numHwLayers - 1;
         renderBuffer = (private_handle_t *)list->hwLayers[last].handle;
     } else {
         renderBuffer = getCurrentRenderBuffer();
@@ -466,8 +466,8 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
         return -1;
     }
 
-    float dsdx = (float)screen_w/src_crop_width;
-    float dtdy = (float)screen_h/src_crop_height;
+    float dsdx = (float)screen_w/(float)src_crop_width;
+    float dtdy = (float)screen_h/(float)src_crop_height;
 
     float scaleLimitMax = copybitsMaxScale * copybitsMaxScale;
     float scaleLimitMin = copybitsMinScale * copybitsMinScale;
@@ -498,14 +498,14 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
        int tmp_h =  src_crop_height;
 
        if (dsdx > copybitsMaxScale || dtdy > copybitsMaxScale ){
-         tmp_w = src_crop_width*copybitsMaxScale;
-         tmp_h = src_crop_height*copybitsMaxScale;
+         tmp_w = (int)((float)src_crop_width*copybitsMaxScale);
+         tmp_h = (int)((float)src_crop_height*copybitsMaxScale);
        }else if (dsdx < 1/copybitsMinScale ||dtdy < 1/copybitsMinScale ){
          // ceil the tmp_w and tmp_h value to maintain proper ratio
          // b/w src and dst (should not cross the desired scale limit
          // due to float -> int )
-         tmp_w = ceil(src_crop_width/copybitsMinScale);
-         tmp_h = ceil(src_crop_height/copybitsMinScale);
+         tmp_w = (int)ceil((float)src_crop_width/copybitsMinScale);
+         tmp_h = (int)ceil((float)src_crop_height/copybitsMinScale);
        }
        ALOGD("%s:%d::tmp_w = %d,tmp_h = %d",__FUNCTION__,__LINE__,tmp_w,tmp_h);
 

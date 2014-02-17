@@ -149,7 +149,8 @@ bool MDPComp::init(hwc_context_t *ctx) {
             ALOGE("%s: failed to instantiate idleInvalidator object",
                   __FUNCTION__);
         } else {
-            idleInvalidator->init(timeout_handler, ctx, idle_timeout);
+            idleInvalidator->init(timeout_handler, ctx,
+                                  (unsigned int)idle_timeout);
         }
     }
 
@@ -268,7 +269,7 @@ void MDPComp::LayerCache::reset() {
 }
 
 void MDPComp::LayerCache::cacheAll(hwc_display_contents_1_t* list) {
-    const int numAppLayers = list->numHwLayers - 1;
+    const int numAppLayers = (int)list->numHwLayers - 1;
     for(int i = 0; i < numAppLayers; i++) {
         hnd[i] = list->hwLayers[i].handle;
     }
@@ -1126,10 +1127,8 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
              mCurrentFrame.fbCount);
 }
 
-hwc_rect_t MDPComp::getUpdatingFBRect(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list){
+hwc_rect_t MDPComp::getUpdatingFBRect(hwc_display_contents_1_t* list){
     hwc_rect_t fbRect = (struct hwc_rect){0, 0, 0, 0};
-    hwc_layer_1_t *fbLayer = &list->hwLayers[mCurrentFrame.layerCount];
 
     /* Update only the region of FB needed for composition */
     for(int i = 0; i < mCurrentFrame.layerCount; i++ ) {
@@ -1146,7 +1145,7 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
 
     //Capability checks
-    if(!resourceCheck(ctx, list)) {
+    if(!resourceCheck()) {
         ALOGD_IF(isDebug(), "%s: resource check failed", __FUNCTION__);
         return false;
     }
@@ -1159,7 +1158,7 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
 
     //Configure framebuffer first if applicable
     if(mCurrentFrame.fbZ >= 0) {
-        hwc_rect_t fbRect = getUpdatingFBRect(ctx, list);
+        hwc_rect_t fbRect = getUpdatingFBRect(list);
         if(!ctx->mFBUpdate[mDpy]->prepare(ctx, list, fbRect, mCurrentFrame.fbZ))
         {
             ALOGD_IF(isDebug(), "%s configure framebuffer failed",
@@ -1220,8 +1219,7 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
     return true;
 }
 
-bool MDPComp::resourceCheck(hwc_context_t *ctx,
-        hwc_display_contents_1_t *list) {
+bool MDPComp::resourceCheck() {
     const bool fbUsed = mCurrentFrame.fbCount;
     if(mCurrentFrame.mdpCount > sMaxPipesPerMixer - fbUsed) {
         ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
@@ -1275,7 +1273,6 @@ bool MDPComp::hwLimitationsCheck(hwc_context_t* ctx,
 int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int ret = 0;
     const int numLayers = ctx->listStats[mDpy].numAppLayers;
-    MDPVersion& mdpVersion = qdutils::MDPVersion::getInstance();
 
     //Do not cache the information for next draw cycle.
     if(numLayers > MAX_NUM_APP_LAYERS or (!numLayers)) {
@@ -1520,7 +1517,7 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ovutils::eDest indexL = pipe_info.lIndex;
             ovutils::eDest indexR = pipe_info.rIndex;
             int fd = hnd->fd;
-            uint32_t offset = hnd->offset;
+            uint32_t offset = (uint32_t)hnd->offset;
             if(rot) {
                 rot->queueBuffer(fd, offset);
                 fd = rot->getDstMemId();
@@ -1566,7 +1563,7 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                     hnd, dest );
 
             int fd = hnd->fd;
-            uint32_t offset = hnd->offset;
+            uint32_t offset = (uint32_t)hnd->offset;
 
             Rotator *rot = mCurrentFrame.mdpToLayer[mdpIndex].rot;
             if(rot) {
@@ -1766,7 +1763,7 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ovutils::eDest indexL = pipe_info.lIndex;
             ovutils::eDest indexR = pipe_info.rIndex;
             int fd = hnd->fd;
-            uint32_t offset = hnd->offset;
+            uint32_t offset = (uint32_t)hnd->offset;
             if(rot) {
                 rot->queueBuffer(fd, offset);
                 fd = rot->getDstMemId();
@@ -1803,7 +1800,7 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ovutils::eDest indexR = pipe_info.rIndex;
 
             int fd = hnd->fd;
-            int offset = hnd->offset;
+            int offset = (uint32_t)hnd->offset;
 
             if(ctx->mAD->isModeOn()) {
                 if(ctx->mAD->draw(ctx, fd, offset)) {
