@@ -211,7 +211,7 @@ void HwcDebug::logHwcProps(uint32_t listFlags)
 void HwcDebug::logLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
 {
     if (NULL == hwLayers) {
-        ALOGE("Display[%s] Layer[%d] Error. No hwc layers to log.",
+        ALOGE("Display[%s] Layer[%zu] Error. No hwc layers to log.",
             mDisplayName, layerIndex);
         return;
     }
@@ -238,7 +238,7 @@ void HwcDebug::logLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         getHalPixelFormatStr(hnd->format, pixFormatStr);
 
     // Log Line 1
-    ALOGI("Display[%s] Layer[%d] SrcBuff[%dx%d] SrcCrop[%dl, %dt, %dr, %db] "
+    ALOGI("Display[%s] Layer[%zu] SrcBuff[%dx%d] SrcCrop[%dl, %dt, %dr, %db] "
         "DispFrame[%dl, %dt, %dr, %db] VisRegsScr%s", mDisplayName, layerIndex,
         (hnd)? getWidth(hnd) : -1, (hnd)? getHeight(hnd) : -1,
         sourceCrop.left, sourceCrop.top,
@@ -247,7 +247,7 @@ void HwcDebug::logLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         displayFrame.right, displayFrame.bottom,
         hwcVisRegsScrLog.string());
     // Log Line 2
-    ALOGI("Display[%s] Layer[%d] LayerCompType = %s, Format = %s, "
+    ALOGI("Display[%s] Layer[%zu] LayerCompType = %s, Format = %s, "
         "Orientation = %s, Flags = %s%s%s, Hints = %s%s%s, "
         "Blending = %s%s%s", mDisplayName, layerIndex,
         (layer->compositionType == HWC_FRAMEBUFFER)? "Framebuffer(GPU)":
@@ -292,7 +292,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         return;
 
     if (NULL == hwLayers) {
-        ALOGE("Display[%s] Layer[%d] %s%s Error: No hwc layers to dump.",
+        ALOGE("Display[%s] Layer[%zu] %s%s Error: No hwc layers to dump.",
             mDisplayName, layerIndex, dumpLogStrRaw, dumpLogStrPng);
         return;
     }
@@ -302,7 +302,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
     char pixFormatStr[32] = "None";
 
     if (NULL == hnd) {
-        ALOGI("Display[%s] Layer[%d] %s%s Skipping dump: Bufferless layer.",
+        ALOGI("Display[%s] Layer[%zu] %s%s Skipping dump: Bufferless layer.",
             mDisplayName, layerIndex, dumpLogStrRaw, dumpLogStrPng);
         return;
     }
@@ -315,7 +315,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         SkBitmap *tempSkBmp = new SkBitmap();
         SkBitmap::Config tempSkBmpConfig = SkBitmap::kNo_Config;
         snprintf(dumpFilename, sizeof(dumpFilename),
-            "%s/sfdump%03d.layer%d.%s.png", mDumpDirPng,
+            "%s/sfdump%03d.layer%zu.%s.png", mDumpDirPng,
             mDumpCntrPng, layerIndex, mDisplayName);
 
         switch (hnd->format) {
@@ -337,11 +337,11 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
             tempSkBmp->setPixels((void*)hnd->base);
             bResult = SkImageEncoder::EncodeFile(dumpFilename,
                                     *tempSkBmp, SkImageEncoder::kPNG_Type, 100);
-            ALOGI("Display[%s] Layer[%d] %s Dump to %s: %s",
+            ALOGI("Display[%s] Layer[%zu] %s Dump to %s: %s",
                 mDisplayName, layerIndex, dumpLogStrPng,
                 dumpFilename, bResult ? "Success" : "Fail");
         } else {
-            ALOGI("Display[%s] Layer[%d] %s Skipping dump: Unsupported layer"
+            ALOGI("Display[%s] Layer[%zu] %s Skipping dump: Unsupported layer"
                 " format %s for png encoder",
                 mDisplayName, layerIndex, dumpLogStrPng, pixFormatStr);
         }
@@ -352,7 +352,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         char dumpFilename[PATH_MAX];
         bool bResult = false;
         snprintf(dumpFilename, sizeof(dumpFilename),
-            "%s/sfdump%03d.layer%d.%dx%d.%s.%s.raw",
+            "%s/sfdump%03d.layer%zu.%dx%d.%s.%s.raw",
             mDumpDirRaw, mDumpCntrRaw,
             layerIndex, getWidth(hnd), getHeight(hnd),
             pixFormatStr, mDisplayName);
@@ -361,7 +361,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
             bResult = (bool) fwrite((void*)hnd->base, hnd->size, 1, fp);
             fclose(fp);
         }
-        ALOGI("Display[%s] Layer[%d] %s Dump to %s: %s",
+        ALOGI("Display[%s] Layer[%zu] %s Dump to %s: %s",
             mDisplayName, layerIndex, dumpLogStrRaw,
             dumpFilename, bResult ? "Success" : "Fail");
     }
@@ -432,7 +432,8 @@ void HwcDebug::getHalPixelFormatStr(int format, char pixFormatStr[])
             strlcpy(pixFormatStr, "YCbCr_420_SP_VENUS", sizeof(pixFormatStr));
             break;
         default:
-            snprintf(pixFormatStr, sizeof(pixFormatStr), "Unknown0x%X", format);
+            size_t len = sizeof(pixFormatStr);
+            snprintf(pixFormatStr, len, "Unknown0x%X", format);
             break;
     }
 }
