@@ -211,6 +211,11 @@ inline bool isNonIntegralSourceCrop(const hwc_frect_t& cropF) {
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_1_t const* l);
+
+// Calculate viewframe for external/primary display from primary resolution and
+// primary device orientation
+hwc_rect_t calculateDisplayViewFrame(hwc_context_t *ctx, int dpy);
+
 void setListStats(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         int dpy);
 void initContext(hwc_context_t *ctx);
