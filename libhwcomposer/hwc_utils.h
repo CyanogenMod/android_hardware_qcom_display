@@ -311,16 +311,6 @@ static inline bool isExtOnly(const private_handle_t* hnd) {
     return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_ONLY));
 }
 
-//Return true if buffer is for external display only with a BLOCK flag.
-static inline bool isExtBlock(const private_handle_t* hnd) {
-    return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_BLOCK));
-}
-
-//Return true if buffer is for external display only with a Close Caption flag.
-static inline bool isExtCC(const private_handle_t* hnd) {
-    return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_CC));
-}
-
 static inline int getWidth(const private_handle_t* hnd) {
     if(isYuvBuffer(hnd)) {
         MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
