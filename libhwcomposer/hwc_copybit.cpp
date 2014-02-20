@@ -517,7 +517,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                src.format != HAL_PIXEL_FORMAT_RGBA_8888) {
            format = HAL_PIXEL_FORMAT_RGBX_8888;
        }
-       if (0 == alloc_buffer(&tmpHnd, tmp_w, tmp_h, format, usage)){
+       if (0 == alloc_buffer(&tmpHnd, tmp_w, tmp_h, format, usage) && tmpHnd) {
             copybit_image_t tmp_dst;
             copybit_rect_t tmp_rect;
             tmp_dst.w = tmp_w;
