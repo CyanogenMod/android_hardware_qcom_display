@@ -200,12 +200,16 @@ int getDownscaleFactor(const int& src_w, const int& src_h,
     {
         float fDscale =  (float)(src_w * src_h) / (float)(dst_w * dst_h);
 
+        float tempfDscale = sqrtf(fDscale);
         // On our MTP 1080p playback case downscale after sqrt is coming to 1.87
         // we were rounding to 1. So entirely MDP has to do the downscaling.
         // BW requirement and clock requirement is high across MDP4 targets.
         // It is unable to downscale 1080p video to panel resolution on 8960.
         // round(x) will round it to nearest integer and avoids above issue.
-        uint32_t dscale = round(sqrtf(fDscale));
+        if(tempfDscale > 1.30 && tempfDscale < 1.50)
+            tempfDscale = 1.5;
+
+        uint32_t dscale = round(tempfDscale);
 
         if(dscale < 2) {
             // Down-scale to > 50% of orig.
