@@ -191,7 +191,7 @@ bool VirtualDisplay::openFrameBuffer()
                                    getFbForDpy(HWC_DISPLAY_VIRTUAL);
 
         char strDevPath[MAX_SYSFS_FILE_PATH];
-        sprintf(strDevPath,"/dev/graphics/fb%d", fbNum);
+        snprintf(strDevPath,sizeof(strDevPath), "/dev/graphics/fb%d", fbNum);
 
         mFd = open(strDevPath, O_RDWR);
         if(mFd < 0) {
