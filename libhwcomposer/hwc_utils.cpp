@@ -238,6 +238,14 @@ void initContext(hwc_context_t *ctx)
     ctx->mBufferMirrorMode = false;
     ctx->mVPUClient = NULL;
 
+    // Read the system property to determine if downscale feature is enabled.
+    ctx->mMDPDownscaleEnabled = false;
+    char value[PROPERTY_VALUE_MAX];
+    if(property_get("sys.hwc.mdp_downscale_enabled", value, "false")
+            && !strcmp(value, "true")) {
+        ctx->mMDPDownscaleEnabled = true;
+    }
+
 #ifdef VPU_TARGET
     if(qdutils::MDPVersion::getInstance().is8092())
         ctx->mVPUClient = new VPUClient(ctx);
