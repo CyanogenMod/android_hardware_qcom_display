@@ -506,6 +506,9 @@ struct hwc_context_t {
     bool mPanelResetStatus;
     // number of active Displays
     int numActiveDisplays;
+    // Downscale feature switch, set via system the property
+    // sys.hwc.mdp_downscale_enabled
+    bool mMDPDownscaleEnabled;
 };
 
 namespace qhwc {
