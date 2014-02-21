@@ -481,6 +481,10 @@ struct hwc_context_t {
 
     // Panel reset flag will be set if BTA check fails
     bool mPanelResetStatus;
+
+    // Downscale feature switch, set via system the property
+    // sys.hwc.mdp_downscale_enabled
+    bool mMDPDownscaleEnabled;
 };
 
 namespace qhwc {
