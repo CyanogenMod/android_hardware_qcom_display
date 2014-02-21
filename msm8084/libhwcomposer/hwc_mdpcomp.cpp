@@ -1295,13 +1295,6 @@ bool MDPComp::resourceCheck(hwc_context_t *ctx,
         ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
         return false;
     }
-
-    double size = calcMDPBytesRead(ctx, list);
-    if(!bandwidthCheck(ctx, size)) {
-        ALOGD_IF(isDebug(), "%s: Exceeds bandwidth",__FUNCTION__);
-        return false;
-    }
-
     return true;
 }
 
@@ -1342,20 +1335,6 @@ double MDPComp::calcMDPBytesRead(hwc_context_t *ctx,
     }
 
     return size;
-}
-
-bool MDPComp::bandwidthCheck(hwc_context_t *ctx, const double& size) {
-    //Skip for targets where no device tree value for bw is supplied
-    if(sMaxBw <= 0.0) {
-        return true;
-    }
-
-    double panelRefRate =
-            1000000000.0 / ctx->dpyAttr[mDpy].vsync_period;
-    if((size * panelRefRate) > (sMaxBw - sBwClaimed)) {
-        return false;
-    }
-    return true;
 }
 
 bool MDPComp::hwLimitationsCheck(hwc_context_t* ctx,
