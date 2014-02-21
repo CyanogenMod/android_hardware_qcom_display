@@ -129,7 +129,7 @@ bool MDPVersion::updatePanelInfo() {
 // and parses and updates information accordingly.
 bool MDPVersion::updateSysFsInfo() {
     FILE *sysfsFd;
-    size_t len = 0;
+    size_t len = PAGE_SIZE;
     ssize_t read;
     char *line = NULL;
     char sysfsPath[255];
@@ -144,6 +144,7 @@ bool MDPVersion::updateSysFsInfo() {
                 __FUNCTION__, sysfsPath);
         return false;
     } else {
+        line = (char *) malloc(len);
         while((read = getline(&line, &len, sysfsFd)) != -1) {
             int index=0;
             char *tokens[10];
@@ -188,9 +189,8 @@ bool MDPVersion::updateSysFsInfo() {
                     }
                 }
             }
-            free(line);
-            line = NULL;
         }
+        free(line);
         fclose(sysfsFd);
     }
     ALOGD_IF(DEBUG, "%s: mMDPVersion: %d mMdpRev: %x mRGBPipes:%d,"
