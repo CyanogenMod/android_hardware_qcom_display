@@ -585,7 +585,8 @@ void ExternalDisplay::setAttributes() {
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = width;
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = height;
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode = false;
-        if(!qdutils::MDPVersion::getInstance().is8x26()) {
+        if(!qdutils::MDPVersion::getInstance().is8x26()
+                && mHwcContext->mMDPDownscaleEnabled) {
             int priW = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
             int priH = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
             // if primary resolution is more than the hdmi resolution
