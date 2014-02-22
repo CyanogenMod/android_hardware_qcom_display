@@ -62,7 +62,8 @@ void IFBUpdate::reset() {
 
 bool IFBUpdate::prepareAndValidate(hwc_context_t *ctx,
             hwc_display_contents_1 *list, int fbZorder) {
-    return prepare(ctx, list, fbZorder) &&
+    hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
+    return prepare(ctx, list, layer->displayFrame, fbZorder) &&
             ctx->mOverlay->validateAndSet(mDpy, ctx->dpyAttr[mDpy].fd);
 }
 
@@ -106,19 +107,19 @@ bool FBUpdateNonSplit::preRotateExtDisplay(hwc_context_t *ctx,
 }
 
 bool FBUpdateNonSplit::prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
-                             int fbZorder) {
+                             hwc_rect_t fbUpdatingRect, int fbZorder) {
     if(!ctx->mMDP.hasOverlay) {
         ALOGD_IF(DEBUG_FBUPDATE, "%s, this hw doesnt support overlays",
                  __FUNCTION__);
         return false;
     }
-    mModeOn = configure(ctx, list, fbZorder);
+    mModeOn = configure(ctx, list, fbUpdatingRect, fbZorder);
     return mModeOn;
 }
 
 // Configure
 bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
-                               int fbZorder) {
+                               hwc_rect_t fbUpdatingRect, int fbZorder) {
     bool ret = false;
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
@@ -159,6 +160,15 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
 
         hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
         hwc_rect_t displayFrame = layer->displayFrame;
+
+        // No FB update optimization on (1) Custom FB resolution,
+        // (2) External Mirror mode, (3) External orientation
+        if(!ctx->dpyAttr[mDpy].customFBSize && !ctx->mBufferMirrorMode
+           && !ctx->mExtOrientation) {
+            sourceCrop = fbUpdatingRect;
+            displayFrame = fbUpdatingRect;
+        }
+
         int transform = layer->transform;
         int rotFlags = ovutils::ROT_FLAGS_NONE;
 
@@ -251,20 +261,20 @@ void FBUpdateSplit::reset() {
 }
 
 bool FBUpdateSplit::prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
-                              int fbZorder) {
+                              hwc_rect_t fbUpdatingRect, int fbZorder) {
     if(!ctx->mMDP.hasOverlay) {
         ALOGD_IF(DEBUG_FBUPDATE, "%s, this hw doesnt support overlays",
                  __FUNCTION__);
         return false;
     }
     ALOGD_IF(DEBUG_FBUPDATE, "%s, mModeOn = %d", __FUNCTION__, mModeOn);
-    mModeOn = configure(ctx, list, fbZorder);
+    mModeOn = configure(ctx, list, fbUpdatingRect, fbZorder);
     return mModeOn;
 }
 
 // Configure
 bool FBUpdateSplit::configure(hwc_context_t *ctx,
-        hwc_display_contents_1 *list, int fbZorder) {
+        hwc_display_contents_1 *list, hwc_rect_t fbUpdatingRect, int fbZorder) {
     bool ret = false;
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
@@ -328,8 +338,8 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
                                 getBlending(layer->blending));
         ov.setSource(pargR, destR);
 
-        hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
-        hwc_rect_t displayFrame = layer->displayFrame;
+        hwc_rect_t sourceCrop = fbUpdatingRect;
+        hwc_rect_t displayFrame = fbUpdatingRect;
 
         const float xres = ctx->dpyAttr[mDpy].xres;
         const int lSplit = getLeftSplit(ctx, mDpy);
