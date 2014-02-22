@@ -114,7 +114,7 @@ bool MDPComp::init(hwc_context_t *ctx) {
             sDebugLogs = true;
     }
 
-    if(property_get("persist.hwc.partialupdate.enable", property, NULL) > 0) {
+    if(property_get("persist.hwc.partialupdate", property, NULL) > 0) {
         if((atoi(property) != 0) && ctx->mMDP.panel == MIPI_CMD_PANEL &&
            qdutils::MDPVersion::getInstance().is8x74v2())
             sEnablePartialFrameUpdate = true;
