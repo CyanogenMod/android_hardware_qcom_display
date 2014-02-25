@@ -26,6 +26,7 @@
 #include "gr.h"
 #include "cb_utils.h"
 #include "cb_swap_rect.h"
+#include "math.h"
 using namespace qdutils;
 namespace qhwc {
 
@@ -488,12 +489,6 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
               dsdx,dtdy,copybitsMaxScale,1/copybitsMinScale,screen_w,screen_h,
                                               src_crop_width,src_crop_height);
 
-       //Driver makes width and height as even
-       //that may cause wrong calculation of the ratio
-       //in display and crop.Hence we make
-       //crop width and height as even.
-       src_crop_width  = (src_crop_width/2)*2;
-       src_crop_height = (src_crop_height/2)*2;
 
        int tmp_w =  src_crop_width;
        int tmp_h =  src_crop_height;
@@ -502,10 +497,11 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
          tmp_w = src_crop_width*copybitsMaxScale;
          tmp_h = src_crop_height*copybitsMaxScale;
        }else if (dsdx < 1/copybitsMinScale ||dtdy < 1/copybitsMinScale ){
-         tmp_w = src_crop_width/copybitsMinScale;
-         tmp_h = src_crop_height/copybitsMinScale;
-         tmp_w  = (tmp_w/2)*2;
-         tmp_h = (tmp_h/2)*2;
+         // ceil the tmp_w and tmp_h value to maintain proper ratio
+         // b/w src and dst (should not cross the desired scale limit
+         // due to float -> int )
+         tmp_w = ceil(src_crop_width/copybitsMinScale);
+         tmp_h = ceil(src_crop_height/copybitsMinScale);
        }
        ALOGD("%s:%d::tmp_w = %d,tmp_h = %d",__FUNCTION__,__LINE__,tmp_w,tmp_h);
 
