@@ -125,8 +125,10 @@ static void getProcName(int pid, char *buf, int size) {
     if (fd < 0) {
         strlcpy(buf, "Unknown", size);
     } else {
-        int len = read(fd, buf, size - 1);
-        buf[len] = 0;
+        ssize_t len = read(fd, buf, size - 1);
+        if (len >= 0)
+           buf[len] = 0;
+
         close(fd);
     }
 }

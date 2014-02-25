@@ -184,13 +184,13 @@ bool MDPVersion::updateSysFsInfo() {
                     mMdpRev = atoi(tokens[1]);
                 }
                 else if(!strncmp(tokens[0], "rgb_pipes", strlen("rgb_pipes"))) {
-                    mRGBPipes = atoi(tokens[1]);
+                    mRGBPipes = (uint8_t)atoi(tokens[1]);
                 }
                 else if(!strncmp(tokens[0], "vig_pipes", strlen("vig_pipes"))) {
-                    mVGPipes = atoi(tokens[1]);
+                    mVGPipes = (uint8_t)atoi(tokens[1]);
                 }
                 else if(!strncmp(tokens[0], "dma_pipes", strlen("dma_pipes"))) {
-                    mDMAPipes = atoi(tokens[1]);
+                    mDMAPipes = (uint8_t)atoi(tokens[1]);
                 }
                 else if(!strncmp(tokens[0], "max_downscale_ratio",
                                 strlen("max_downscale_ratio"))) {
