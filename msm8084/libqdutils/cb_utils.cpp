@@ -43,14 +43,14 @@ namespace qdutils {
 int CBUtils::getuiClearRegion(hwc_display_contents_1_t* list,
           hwc_rect_t &clearWormholeRect, LayerProp *layerProp) {
 
-    uint32_t last = list->numHwLayers - 1;
+    size_t last = list->numHwLayers - 1;
     hwc_rect_t fbFrame = list->hwLayers[last].displayFrame;
     Rect fbFrameRect(fbFrame.left,fbFrame.top,fbFrame.right,fbFrame.bottom);
     Region wormholeRegion(fbFrameRect);
 
     if(cb_swap_rect::getInstance().checkSwapRectFeature_on() == true){
       wormholeRegion.set(0,0);
-      for(uint32_t i = 0 ; i < last; i++) {
+      for(size_t i = 0 ; i < last; i++) {
          if((list->hwLayers[i].blending == HWC_BLENDING_NONE) ||
            !(layerProp[i].mFlags & HWC_COPYBIT) ||
            (list->hwLayers[i].flags  & HWC_SKIP_HWC_COMPOSITION))
@@ -61,7 +61,7 @@ int CBUtils::getuiClearRegion(hwc_display_contents_1_t* list,
          wormholeRegion.set(tmpRect);
       }
    }else{
-     for (uint32_t i = 0 ; i < last; i++) {
+     for (size_t i = 0 ; i < last; i++) {
         // need to take care only in per pixel blending.
         // Restrict calculation only for copybit layers.
         if((list->hwLayers[i].blending != HWC_BLENDING_NONE) ||

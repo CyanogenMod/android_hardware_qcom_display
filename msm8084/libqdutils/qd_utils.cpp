@@ -87,7 +87,7 @@ int getEdidRawData(char *buffer)
         return 0;
     }
 
-    size = read(edidFile, (char*)buffer, EDID_RAW_DATA_SIZE);
+    size = (int)read(edidFile, (char*)buffer, EDID_RAW_DATA_SIZE);
     close(edidFile);
     return size;
 }
