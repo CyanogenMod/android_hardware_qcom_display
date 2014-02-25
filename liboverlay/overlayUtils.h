@@ -555,6 +555,7 @@ inline const char* getFormatString(int format){
     formats[MDP_XRGB_8888_TILE] = STR(MDP_XRGB_8888_TILE);
     formats[MDP_XBGR_8888_TILE] = STR(MDP_XBGR_8888_TILE);
     formats[MDP_BGRX_8888_TILE] = STR(MDP_BGRX_8888_TILE);
+    formats[MDP_RGB_565_TILE] = STR(MDP_RGB_565_TILE);
     formats[MDP_IMGTYPE_LIMIT] = STR(MDP_IMGTYPE_LIMIT);
 
     if(format < 0 || format >= MDP_IMGTYPE_LIMIT) {
