@@ -206,35 +206,6 @@ bool MdpCtrl::set() {
     }
 
     doDownscale();
-
-    if(!mdp_wrapper::setOverlay(mFd.getFD(), mOVInfo)) {
-        ALOGE("MdpCtrl failed to setOverlay");
-        mdp_wrapper::dump("== Bad OVInfo is: ", mOVInfo);
-#ifdef USES_QSEED_SCALAR
-        if(Overlay::getScalar()) {
-            Overlay::getScalar()->configAbort(mDpy);
-        }
-#endif
-        return false;
-    }
-
-#ifdef USES_QSEED_SCALAR
-    if(Overlay::getScalar()) {
-        Overlay::getScalar()->configSet(mOVInfo, mDpy, mFd.getFD());
-    }
-#endif
-
-    return true;
-}
-
-bool MdpCtrl::get() {
-    mdp_overlay ov;
-    ov.id = mOVInfo.id;
-    if (!mdp_wrapper::getOverlay(mFd.getFD(), ov)) {
-        ALOGE("MdpCtrl get failed");
-        return false;
-    }
-    mOVInfo = ov;
     return true;
 }
 
@@ -385,6 +356,38 @@ bool MdpCtrl::setVisualParams(const MetaData_t& data) {
         display_pp_compute_params(&mParams, &mOVInfo.overlay_pp_cfg);
     }
 #endif
+    return true;
+}
+
+bool MdpCtrl::validateAndSet(MdpCtrl* mdpCtrlArray[], const int& count,
+        const int& fbFd) {
+    mdp_overlay* ovArray[count];
+    memset(&ovArray, 0, sizeof(ovArray));
+
+    for(int i = 0; i < count; i++) {
+        ovArray[i] = &mdpCtrlArray[i]->mOVInfo;
+    }
+
+    struct mdp_overlay_list list;
+    memset(&list, 0, sizeof(struct mdp_overlay_list));
+    list.num_overlays = count;
+    list.overlay_list = ovArray;
+
+#ifdef USES_QSEED_SCALAR
+    Scale *scalar = Overlay::getScalar();
+    if(scalar) {
+        scalar->applyScale(&list);
+    }
+#endif
+
+    if(!mdp_wrapper::validateAndSet(fbFd, list)) {
+        if(list.processed_overlays < list.num_overlays) {
+            mdp_wrapper::dump("Bad ov dump: ",
+                *list.overlay_list[list.processed_overlays]);
+        }
+        return false;
+    }
+
     return true;
 }
 

@@ -1259,6 +1259,12 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
         }
     }
 
+    if(!ctx->mOverlay->validateAndSet(mDpy, ctx->dpyAttr[mDpy].fd)) {
+        ALOGD_IF(isDebug(), "%s: Failed to validate and set overlay for dpy %d"
+                ,__FUNCTION__, mDpy);
+        return false;
+    }
+
     setRedraw(ctx, list);
     return true;
 }

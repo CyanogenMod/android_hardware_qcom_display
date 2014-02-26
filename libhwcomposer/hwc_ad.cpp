@@ -249,6 +249,14 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
             adWrite(on);
         }
     }
+
+    if(!ctx->mOverlay->validateAndSet(overlay::Overlay::DPY_WRITEBACK,
+            mWbFd)) {
+        ALOGE("%s: Failed to validate and set overlay for dpy %d"
+                ,__FUNCTION__, overlay::Overlay::DPY_WRITEBACK);
+        return false;
+    }
+
     return true;
 }
 
