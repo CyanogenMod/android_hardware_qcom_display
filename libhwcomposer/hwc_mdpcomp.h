@@ -52,7 +52,7 @@ public:
     /* Initialize MDP comp*/
     static bool init(hwc_context_t *ctx);
     static void resetIdleFallBack() { sIdleFallBack = false; }
-    static void reset() { sBwClaimed = 0.0; };
+    static void reset() { sBwClaimed = 0.0; sHandleTimeout = false; };
 
 protected:
     enum { MAX_SEC_LAYERS = 1 }; //TODO add property support
@@ -231,6 +231,8 @@ protected:
     static bool sEnablePartialFrameUpdate;
     static bool sDebugLogs;
     static bool sIdleFallBack;
+    /* Handles the timeout event from kernel, if the value is set to true */
+    static bool sHandleTimeout;
     static int sMaxPipesPerMixer;
     //Max bandwidth. Value is in GBPS. For ex: 2.3 means 2.3GBPS
     static double sMaxBw;
