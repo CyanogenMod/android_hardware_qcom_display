@@ -1332,7 +1332,7 @@ bool needToForceRotator(hwc_context_t *ctx, const int& dpy,
     int nYuvCount = ctx->listStats[dpy].yuvCount;
     bool forceRot = false;
     //Force rotator for resolution change only if 1 yuv layer on primary
-    if(!dpy && (nYuvCount == 1)) {
+    if(nYuvCount == 1) {
         uint32_t& prevWidth = ctx->mPrevWHF[dpy].w;
         uint32_t& prevHeight = ctx->mPrevWHF[dpy].h;
         if((prevWidth != w) || (prevHeight != h)) {
