@@ -156,7 +156,7 @@ bool MdpRot::open_i(uint32_t numbufs, uint32_t bufsz)
 
     mRotDataInfo.dst.memory_id = mem.getFD();
     mRotDataInfo.dst.offset = 0;
-    mMem.curr().m = mem;
+    mMem.mem = mem;
     return true;
 }
 
@@ -184,23 +184,27 @@ bool MdpRot::close() {
 bool MdpRot::remap(uint32_t numbufs) {
     // if current size changed, remap
     uint32_t opBufSize = calcOutputBufSize();
-    if(opBufSize == mMem.curr().size()) {
+    if(opBufSize == mMem.size()) {
         ALOGE_IF(DEBUG_OVERLAY, "%s: same size %d", __FUNCTION__, opBufSize);
         return true;
     }
 
-    ALOGE_IF(DEBUG_OVERLAY, "%s: size changed - remapping", __FUNCTION__);
-    OVASSERT(!mMem.prev().valid(), "Prev should not be valid");
+    if(!mMem.close()) {
+        ALOGE("%s error in closing prev rot mem", __FUNCTION__);
+        return false;
+    }
 
-    // ++mMem will make curr to be prev, and prev will be curr
-    ++mMem;
+    ALOGE_IF(DEBUG_OVERLAY, "%s: size changed - remapping", __FUNCTION__);
+
     if(!open_i(numbufs, opBufSize)) {
         ALOGE("%s Error could not open", __FUNCTION__);
         return false;
     }
+
     for (uint32_t i = 0; i < numbufs; ++i) {
-        mMem.curr().mRotOffset[i] = i * opBufSize;
+        mMem.mRotOffset[i] = i * opBufSize;
     }
+
     return true;
 }
 
@@ -208,10 +212,8 @@ void MdpRot::reset() {
     ovutils::memset0(mRotImgInfo);
     ovutils::memset0(mLSRotImgInfo);
     ovutils::memset0(mRotDataInfo);
-    ovutils::memset0(mMem.curr().mRotOffset);
-    ovutils::memset0(mMem.prev().mRotOffset);
-    mMem.curr().mCurrOffset = 0;
-    mMem.prev().mCurrOffset = 0;
+    ovutils::memset0(mMem.mRotOffset);
+    mMem.mCurrIndex = 0;
     mOrientation = utils::OVERLAY_TRANSFORM_0;
 }
 
@@ -220,29 +222,20 @@ bool MdpRot::queueBuffer(int fd, uint32_t offset) {
         mRotDataInfo.src.memory_id = fd;
         mRotDataInfo.src.offset = offset;
 
-        remap(RotMem::Mem::ROT_NUM_BUFS);
-        OVASSERT(mMem.curr().m.numBufs(),
-                "queueBuffer numbufs is 0");
+        if(false == remap(RotMem::ROT_NUM_BUFS)) {
+            ALOGE("%s Remap failed, not queueing", __FUNCTION__);
+            return false;
+        }
+
         mRotDataInfo.dst.offset =
-                mMem.curr().mRotOffset[mMem.curr().mCurrOffset];
-        mMem.curr().mCurrOffset =
-                (mMem.curr().mCurrOffset + 1) % mMem.curr().m.numBufs();
+                mMem.mRotOffset[mMem.mCurrIndex];
+        mMem.mCurrIndex =
+                (mMem.mCurrIndex + 1) % mMem.mem.numBufs();
 
         if(!overlay::mdp_wrapper::rotate(mFd.getFD(), mRotDataInfo)) {
             ALOGE("MdpRot failed rotate");
             dump();
             return false;
-        }
-
-        // if the prev mem is valid, we need to close
-        if(mMem.prev().valid()) {
-            // FIXME if no wait for vsync the above
-            // play will return immediatly and might cause
-            // tearing when prev.close is called.
-            if(!mMem.prev().close()) {
-                ALOGE("%s error in closing prev rot mem", __FUNCTION__);
-                return false;
-            }
         }
     }
     return true;
@@ -251,7 +244,7 @@ bool MdpRot::queueBuffer(int fd, uint32_t offset) {
 void MdpRot::dump() const {
     ALOGE("== Dump MdpRot start ==");
     mFd.dump();
-    mMem.curr().m.dump();
+    mMem.mem.dump();
     mdp_wrapper::dump("mRotImgInfo", mRotImgInfo);
     mdp_wrapper::dump("mRotDataInfo", mRotDataInfo);
     ALOGE("== Dump MdpRot end ==");
