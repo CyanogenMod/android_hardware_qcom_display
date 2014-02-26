@@ -264,6 +264,12 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             close(mRelFd[mCurRenderBufferIndex]);
             mRelFd[mCurRenderBufferIndex] = -1;
         }
+    } else {
+        if(list->hwLayers[last].acquireFenceFd >=0) {
+            sync_wait(list->hwLayers[last].acquireFenceFd, 1000);
+            close(list->hwLayers[last].acquireFenceFd);
+            list->hwLayers[last].acquireFenceFd = -1;
+        }
     }
 
     //Clear the transparent or left out region on the render buffer
