@@ -161,8 +161,7 @@ int getMdpFormat(int format, bool tileEnabled)
         case HAL_PIXEL_FORMAT_RGBX_8888:
             return MDP_RGBX_8888_TILE;
         case HAL_PIXEL_FORMAT_RGB_565:
-            // Currenty Driver doesnt support 565 tile format
-            return MDP_RGB_565;
+            return MDP_RGB_565_TILE;
         case HAL_PIXEL_FORMAT_BGRA_8888:
             return MDP_BGRA_8888_TILE;
         case HAL_PIXEL_FORMAT_BGRX_8888:

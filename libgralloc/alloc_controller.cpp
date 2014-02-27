@@ -393,6 +393,7 @@ bool isMacroTileEnabled(int format, int usage)
             case  HAL_PIXEL_FORMAT_RGBA_8888:
             case  HAL_PIXEL_FORMAT_RGBX_8888:
             case  HAL_PIXEL_FORMAT_BGRA_8888:
+            case  HAL_PIXEL_FORMAT_RGB_565:
                 {
                     tileEnabled = true;
                     // check the usage flags
