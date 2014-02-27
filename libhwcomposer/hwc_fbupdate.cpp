@@ -281,121 +281,105 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
     bool ret = false;
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
+        /*  External only layer present */
         int extOnlyLayerIndex = ctx->listStats[mDpy].extOnlyLayerIndex;
-        // ext only layer present..
         if(extOnlyLayerIndex != -1) {
             layer = &list->hwLayers[extOnlyLayerIndex];
             layer->compositionType = HWC_OVERLAY;
         }
+        ovutils::Whf info(mAlignedFBWidth, mAlignedFBHeight,
+                          ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888,
+                                                mTileEnabled));
+
         overlay::Overlay& ov = *(ctx->mOverlay);
-
-        ovutils::Whf info(mAlignedFBWidth,
-                mAlignedFBHeight,
-                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888,
-                    mTileEnabled));
-        //Request left pipe
-        ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
-                Overlay::MIXER_LEFT);
-        if(destL == ovutils::OV_INVALID) { //None available
-            ALOGE("%s: No pipes available to configure fb for dpy %d's left"
-                    " mixer", __FUNCTION__, mDpy);
-            return false;
-        }
-        //Request right pipe
-        ovutils::eDest destR = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
-                Overlay::MIXER_RIGHT);
-        if(destR == ovutils::OV_INVALID) { //None available
-            ALOGE("%s: No pipes available to configure fb for dpy %d's right"
-                    " mixer", __FUNCTION__, mDpy);
-            return false;
-        }
-
-        mDestLeft = destL;
-        mDestRight = destR;
-
-        ovutils::eMdpFlags mdpFlagsL = ovutils::OV_MDP_BLEND_FG_PREMULT;
-
+        ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_BLEND_FG_PREMULT;
         ovutils::eZorder zOrder = static_cast<ovutils::eZorder>(fbZorder);
-
-        //XXX: FB layer plane alpha is currently sent as zero from
-        //surfaceflinger
-        ovutils::PipeArgs pargL(mdpFlagsL,
-                                info,
-                                zOrder,
-                                ovutils::IS_FG_OFF,
-                                ovutils::ROT_FLAGS_NONE,
-                                ovutils::DEFAULT_PLANE_ALPHA,
-                                (ovutils::eBlending)
-                                getBlending(layer->blending));
-        ov.setSource(pargL, destL);
-
-        ovutils::eMdpFlags mdpFlagsR = mdpFlagsL;
-        ovutils::setMdpFlags(mdpFlagsR, ovutils::OV_MDSS_MDP_RIGHT_MIXER);
-        ovutils::PipeArgs pargR(mdpFlagsR,
-                                info,
-                                zOrder,
-                                ovutils::IS_FG_OFF,
-                                ovutils::ROT_FLAGS_NONE,
-                                ovutils::DEFAULT_PLANE_ALPHA,
-                                (ovutils::eBlending)
-                                getBlending(layer->blending));
-        ov.setSource(pargR, destR);
+        ovutils::eTransform orient =
+            static_cast<ovutils::eTransform>(layer->transform);
+        const int hw_w = ctx->dpyAttr[mDpy].xres;
+        const int hw_h = ctx->dpyAttr[mDpy].yres;
+        const int lSplit = getLeftSplit(ctx, mDpy);
+        mDestLeft = ovutils::OV_INVALID;
+        mDestRight = ovutils::OV_INVALID;
 
         hwc_rect_t sourceCrop = fbUpdatingRect;
         hwc_rect_t displayFrame = fbUpdatingRect;
 
-        const float xres = ctx->dpyAttr[mDpy].xres;
-        const int lSplit = getLeftSplit(ctx, mDpy);
-        const float lSplitRatio = lSplit / xres;
-        const float lCropWidth =
-                (sourceCrop.right - sourceCrop.left) * lSplitRatio;
-
-        ovutils::Dim dcropL(
-                sourceCrop.left,
-                sourceCrop.top,
-                lCropWidth,
-                sourceCrop.bottom - sourceCrop.top);
-
-        ovutils::Dim dcropR(
-                sourceCrop.left + lCropWidth,
-                sourceCrop.top,
-                (sourceCrop.right - sourceCrop.left) - lCropWidth,
-                sourceCrop.bottom - sourceCrop.top);
-
-        ov.setCrop(dcropL, destL);
-        ov.setCrop(dcropR, destR);
-
-        int transform = layer->transform;
-        ovutils::eTransform orient =
-            static_cast<ovutils::eTransform>(transform);
-        ov.setTransform(orient, destL);
-        ov.setTransform(orient, destR);
-
-        const int lWidth = (lSplit - displayFrame.left);
-        const int rWidth = (displayFrame.right - lSplit);
-        const int height = displayFrame.bottom - displayFrame.top;
-
-        ovutils::Dim dposL(displayFrame.left,
-                           displayFrame.top,
-                           lWidth,
-                           height);
-        ov.setPosition(dposL, destL);
-
-        ovutils::Dim dposR(0,
-                           displayFrame.top,
-                           rWidth,
-                           height);
-        ov.setPosition(dposR, destR);
-
         ret = true;
-        if (!ov.commit(destL)) {
-            ALOGE("%s: commit fails for left", __FUNCTION__);
-            ret = false;
+        /* Configure left pipe */
+        if(displayFrame.left < lSplit) {
+            ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
+                                               Overlay::MIXER_LEFT);
+            if(destL == ovutils::OV_INVALID) { //None available
+                ALOGE("%s: No pipes available to configure fb for dpy %d's left"
+                      " mixer", __FUNCTION__, mDpy);
+                return false;
+            }
+
+            mDestLeft = destL;
+
+            //XXX: FB layer plane alpha is currently sent as zero from
+            //surfaceflinger
+            ovutils::PipeArgs pargL(mdpFlags,
+                                    info,
+                                    zOrder,
+                                    ovutils::IS_FG_OFF,
+                                    ovutils::ROT_FLAGS_NONE,
+                                    ovutils::DEFAULT_PLANE_ALPHA,
+                                    (ovutils::eBlending)
+                                    getBlending(layer->blending));
+            hwc_rect_t cropL = sourceCrop;
+            hwc_rect_t dstL = displayFrame;
+            hwc_rect_t scissorL = {0, 0, lSplit, hw_h };
+            qhwc::calculate_crop_rects(cropL, dstL, scissorL, 0);
+
+            if (configMdp(ctx->mOverlay, pargL, orient, cropL,
+                           dstL, NULL, destL)< 0) {
+                ALOGE("%s: configMdp fails for left FB", __FUNCTION__);
+                ret = false;
+            }
         }
-        if (!ov.commit(destR)) {
-            ALOGE("%s: commit fails for right", __FUNCTION__);
-            ret = false;
+
+        /* Configure right pipe */
+        if(displayFrame.right > lSplit) {
+            ovutils::eDest destR = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
+                                               Overlay::MIXER_RIGHT);
+            if(destR == ovutils::OV_INVALID) { //None available
+                ALOGE("%s: No pipes available to configure fb for dpy %d's"
+                      " right mixer", __FUNCTION__, mDpy);
+                return false;
+            }
+
+            mDestRight = destR;
+            ovutils::eMdpFlags mdpFlagsR = mdpFlags;
+            ovutils::setMdpFlags(mdpFlagsR, ovutils::OV_MDSS_MDP_RIGHT_MIXER);
+
+            //XXX: FB layer plane alpha is currently sent as zero from
+            //surfaceflinger
+            ovutils::PipeArgs pargR(mdpFlagsR,
+                                    info,
+                                    zOrder,
+                                    ovutils::IS_FG_OFF,
+                                    ovutils::ROT_FLAGS_NONE,
+                                    ovutils::DEFAULT_PLANE_ALPHA,
+                                    (ovutils::eBlending)
+                                    getBlending(layer->blending));
+
+            hwc_rect_t cropR = sourceCrop;
+            hwc_rect_t dstR = displayFrame;
+            hwc_rect_t scissorR = {lSplit, 0, hw_w, hw_h };
+            qhwc::calculate_crop_rects(cropR, dstR, scissorR, 0);
+
+            dstR.left -= lSplit;
+            dstR.right -= lSplit;
+
+            if (configMdp(ctx->mOverlay, pargR, orient, cropR,
+                           dstR, NULL, destR) < 0) {
+                ALOGE("%s: configMdp fails for right FB", __FUNCTION__);
+                ret = false;
+            }
         }
+
         if(ret == false) {
             ctx->mLayerRotMap[mDpy]->clear();
         }
@@ -410,17 +394,19 @@ bool FBUpdateSplit::draw(hwc_context_t *ctx, private_handle_t *hnd)
     }
     bool ret = true;
     overlay::Overlay& ov = *(ctx->mOverlay);
-    ovutils::eDest destL = mDestLeft;
-    ovutils::eDest destR = mDestRight;
-    if (!ov.queueBuffer(hnd->fd, hnd->offset, destL)) {
-        ALOGE("%s: queue failed for left of dpy = %d",
-              __FUNCTION__, mDpy);
-        ret = false;
+    if(mDestLeft != ovutils::OV_INVALID) {
+        if (!ov.queueBuffer(hnd->fd, hnd->offset, mDestLeft)) {
+            ALOGE("%s: queue failed for left of dpy = %d",
+                  __FUNCTION__, mDpy);
+            ret = false;
+        }
     }
-    if (!ov.queueBuffer(hnd->fd, hnd->offset, destR)) {
-        ALOGE("%s: queue failed for right of dpy = %d",
-              __FUNCTION__, mDpy);
-        ret = false;
+    if(mDestRight != ovutils::OV_INVALID) {
+        if (!ov.queueBuffer(hnd->fd, hnd->offset, mDestRight)) {
+            ALOGE("%s: queue failed for right of dpy = %d",
+                  __FUNCTION__, mDpy);
+            ret = false;
+        }
     }
     return ret;
 }
