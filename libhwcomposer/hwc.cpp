@@ -685,6 +685,8 @@ static int hwc_set(hwc_composer_device_1 *dev,
     CALC_FPS();
     MDPComp::resetIdleFallBack();
     //Was locked at the beginning of prepare
+    //Composition cycle is complete signal all waiting threads
+    ctx->mDrawLock.signal();
     ctx->mDrawLock.unlock();
     return ret;
 }
