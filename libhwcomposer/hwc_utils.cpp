@@ -1167,6 +1167,11 @@ void optimizeLayerRects(const hwc_display_contents_1_t *list) {
                      layer->sourceCropf.top = (float)bottomCrop.top;
                      layer->sourceCropf.right = (float)bottomCrop.right;
                      layer->sourceCropf.bottom = (float)bottomCrop.bottom;
+#ifdef QCOM_BSP
+                     //Update layer dirtyRect
+                     layer->dirtyRect = getIntersection(bottomCrop,
+                                            layer->dirtyRect);
+#endif
                   }
                }
                j--;
@@ -2145,6 +2150,60 @@ void LayerRotMap::setReleaseFd(const int& fence) {
     for(uint32_t i = 0; i < mCount; i++) {
         mRot[i]->setReleaseFd(dup(fence));
     }
+}
+
+hwc_rect_t sanitizeROI(struct hwc_rect roi, hwc_rect boundary)
+{
+   if(!isValidRect(roi))
+      return roi;
+
+   struct hwc_rect t_roi = roi;
+
+   const int LEFT_ALIGN = qdutils::MDPVersion::getInstance().getLeftAlign();
+   const int WIDTH_ALIGN = qdutils::MDPVersion::getInstance().getWidthAlign();
+   const int TOP_ALIGN = qdutils::MDPVersion::getInstance().getTopAlign();
+   const int HEIGHT_ALIGN = qdutils::MDPVersion::getInstance().getHeightAlign();
+   const int MIN_WIDTH = qdutils::MDPVersion::getInstance().getMinROIWidth();
+
+   /* Align to minimum width recommended by the panel */
+   if((t_roi.right - t_roi.left) < MIN_WIDTH) {
+       if((t_roi.left + MIN_WIDTH) > boundary.right)
+           t_roi.left = t_roi.right - MIN_WIDTH;
+       else
+           t_roi.right = t_roi.left + MIN_WIDTH;
+   }
+
+   /* Align left and width to meet panel restrictions */
+   if(WIDTH_ALIGN) {
+       int width = t_roi.right - t_roi.left;
+       width = WIDTH_ALIGN * ((width + (WIDTH_ALIGN - 1)) / WIDTH_ALIGN);
+       t_roi.right = t_roi.left + width;
+
+       if(t_roi.right > boundary.right) {
+           t_roi.right = boundary.right;
+           t_roi.left = t_roi.right - width;
+       }
+   }
+
+   if(LEFT_ALIGN)
+       t_roi.left = t_roi.left - (t_roi.left % LEFT_ALIGN);
+
+   /* Align top and height to meet panel restrictions */
+   if(HEIGHT_ALIGN) {
+       int height = t_roi.bottom - t_roi.top;
+       height = HEIGHT_ALIGN *  ((height + (HEIGHT_ALIGN - 1)) / HEIGHT_ALIGN);
+       t_roi.bottom = t_roi.top  + height;
+
+       if(t_roi.bottom > boundary.bottom) {
+           t_roi.bottom = boundary.bottom;
+           t_roi.top = t_roi.bottom - height;
+       }
+   }
+
+   if(TOP_ALIGN)
+       t_roi.top = t_roi.top - (t_roi.top % TOP_ALIGN);
+
+   return t_roi;
 }
 
 };//namespace qhwc

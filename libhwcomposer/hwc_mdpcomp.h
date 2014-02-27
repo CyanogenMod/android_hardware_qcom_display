@@ -213,6 +213,7 @@ protected:
     bool isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer);
     bool resourceCheck();
     hwc_rect_t getUpdatingFBRect(hwc_display_contents_1_t* list);
+    bool canDoPartialUpdate(hwc_context_t *ctx, hwc_display_contents_1_t* list);
 
     int mDpy;
     static bool sEnabled;
