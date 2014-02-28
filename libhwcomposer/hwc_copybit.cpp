@@ -183,11 +183,14 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     // numAppLayers-1, as we iterate till 0th layer index
     for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
         private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
+
         if((hnd->bufferType == BUFFER_TYPE_VIDEO) && (layerProp[i].mFlags & HWC_MDPCOMP))
             continue;
 
-        if ((hnd->bufferType == BUFFER_TYPE_VIDEO && useCopybitForYUV) ||
-            (hnd->bufferType == BUFFER_TYPE_UI && useCopybitForRGB)) {
+        hwc_layer_1_t* layer = &list->hwLayers[i];
+        if (!((layer->planeAlpha < 0xFF) && qhwc::needsScaling(ctx,layer,dpy)) &&
+            ((hnd->bufferType == BUFFER_TYPE_VIDEO && useCopybitForYUV) ||
+            (hnd->bufferType == BUFFER_TYPE_UI && useCopybitForRGB))) {
             layerProp[i].mFlags |= HWC_COPYBIT;
             if (ctx->mMDP.version <= qdutils::MDP_V4_3)
                 list->hwLayers[i].compositionType = HWC_BLIT;
