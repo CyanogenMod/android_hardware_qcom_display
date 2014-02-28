@@ -114,6 +114,12 @@ public:
      * displays
      */
     bool isPipeTypeAttached(utils::eMdpPipeType type);
+    /* Compare pipe priorities and return
+     * 1 if 1st pipe has a higher priority
+     * 0 if both have the same priority
+     *-1 if 2nd pipe has a higher priority
+     */
+    int comparePipePriority(utils::eDest pipe1Index, utils::eDest pipe2Index);
     /* Returns pipe dump. Expects a NULL terminated buffer of big enough size
      * to populate.
      */
