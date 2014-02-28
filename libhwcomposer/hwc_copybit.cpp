@@ -85,14 +85,6 @@ bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx,
     int compositionType = qdutils::QCCompositionType::
                                     getInstance().getCompositionType();
 
-    if ((compositionType & qdutils::COMPOSITION_TYPE_C2D) ||
-        (compositionType & qdutils::COMPOSITION_TYPE_DYN)) {
-         if(ctx->listStats[dpy].yuvCount) {
-             //Overlay up & running. Dont use COPYBIT for RGB layers.
-             return false;
-         }
-    }
-
     if (compositionType & qdutils::COMPOSITION_TYPE_DYN) {
         // DYN Composition:
         // use copybit, if (TotalRGBRenderArea < threashold * FB Area)
@@ -191,6 +183,8 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     // numAppLayers-1, as we iterate till 0th layer index
     for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
         private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
+        if((hnd->bufferType == BUFFER_TYPE_VIDEO) && (layerProp[i].mFlags & HWC_MDPCOMP))
+            continue;
 
         if ((hnd->bufferType == BUFFER_TYPE_VIDEO && useCopybitForYUV) ||
             (hnd->bufferType == BUFFER_TYPE_UI && useCopybitForRGB)) {
@@ -206,6 +200,7 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             mCopyBitDraw = false;
             //There is no need to reset layer properties here as we return in
             //draw if mCopyBitDraw is false
+            break;
         }
     }
     return true;

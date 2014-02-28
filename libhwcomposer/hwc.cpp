@@ -153,22 +153,22 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     const int dpy = HWC_DISPLAY_PRIMARY;
+    int ret = -1;
     if(UNLIKELY(!ctx->mBasePipeSetup))
         setupBasePipe(ctx);
     if (LIKELY(list && list->numHwLayers > 1) &&
             ctx->dpyAttr[dpy].isActive) {
         reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
         setListStats(ctx, list, dpy);
-        if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
+        if((ret = ctx->mMDPComp[dpy]->prepare(ctx, list)) < 0) {
             const int fbZ = 0;
             ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
-
-            // Use Copybit, when MDP comp fails
-            // (only for 8960 which has  dedicated 2D core)
-            if( (ctx->mSocId == NON_PRO_8960_SOC_ID) &&
-                                       ctx->mCopyBit[dpy])
-                ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
         }
+
+        // Use Copybit, when Full/Partial MDP comp fails
+        // (only for 8960 which has  dedicated 2D core)
+        if((ret < 1) && (ctx->mSocId == NON_PRO_8960_SOC_ID) && ctx->mCopyBit[dpy])
+            ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
     }
     return 0;
 }
@@ -177,6 +177,7 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     const int dpy = HWC_DISPLAY_EXTERNAL;
+    int ret = -1;
 
     if (LIKELY(list && list->numHwLayers > 1) &&
             ctx->dpyAttr[dpy].isActive &&
@@ -185,16 +186,15 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
         if(!ctx->dpyAttr[dpy].isPause) {
            ctx->dpyAttr[dpy].isConfiguring = false;
            setListStats(ctx, list, dpy);
-           if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
+           if((ret = ctx->mMDPComp[dpy]->prepare(ctx, list)) < 0) {
               const int fbZ = 0;
               ctx->mFBUpdate[dpy]->prepare(ctx, list, fbZ);
-              // Use Copybit, when MDP comp fails
-              // (only for 8960 which has  dedicated 2D core)
-              if((ctx->mSocId == NON_PRO_8960_SOC_ID) &&
-                                   ctx->mCopyBit[dpy] &&
-                 !ctx->listStats[dpy].isDisplayAnimating)
-                    ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
            }
+           // Use Copybit, when Full/Partial MDP comp fails
+           // (only for 8960 which has  dedicated 2D core)
+           if((ret < 1) && (ctx->mSocId == NON_PRO_8960_SOC_ID) && ctx->mCopyBit[dpy] &&
+                 !ctx->listStats[dpy].isDisplayAnimating)
+                ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
 
             if(ctx->listStats[dpy].isDisplayAnimating) {
                 // Mark all app layers as HWC_OVERLAY for external during
