@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -368,6 +368,19 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 res = 0;
             } break;
 
+        case GRALLOC_MODULE_PERFORM_GET_COLOR_SPACE_FROM_HANDLE:
+            {
+                private_handle_t* hnd =  va_arg(args, private_handle_t*);
+                int *color_space = va_arg(args, int *);
+                if (private_handle_t::validate(hnd)) {
+                    return res;
+                }
+                MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+                if(metadata && metadata->operation & UPDATE_COLOR_SPACE) {
+                    *color_space = metadata->colorSpace;
+                    res = 0;
+                }
+            } break;
         default:
             break;
     }
