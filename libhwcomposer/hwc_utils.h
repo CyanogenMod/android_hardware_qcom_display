@@ -400,6 +400,10 @@ struct hwc_context_t {
     qhwc::HwcDebug *mHwcDebug[HWC_NUM_DISPLAY_TYPES];
     hwc_rect_t mViewFrame[HWC_NUM_DISPLAY_TYPES];
 
+    // stores the #numHwLayers of the previous frame
+    // for each display device
+    int mPrevHwLayerCount[HWC_NUM_DISPLAY_TYPES];
+
     // No animation on External display feature
     // Notifies hwcomposer about the device orientation before animation.
     int deviceOrientation;
@@ -421,6 +425,8 @@ struct hwc_context_t {
     bool mBasePipeSetup;
     //Lock to protect drawing data structures
     mutable Locker mDrawLock;
+    //Drawing round when we use GPU
+    bool isPaddingRound;
     // External Orientation
     int mExtOrientation;
     //Used for SideSync feature
