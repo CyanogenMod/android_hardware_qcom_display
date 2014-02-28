@@ -308,9 +308,6 @@ private:
     virtual bool acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
             MdpPipeInfoSplit& pipe_info, ePipeType type);
 
-    virtual bool allocLayerPipes(hwc_context_t *ctx,
-            hwc_display_contents_1_t* list);
-
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
             PipeLayerPair& pipeLayerPair);
 };

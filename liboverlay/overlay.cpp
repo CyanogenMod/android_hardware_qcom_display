@@ -175,6 +175,19 @@ bool Overlay::isPipeTypeAttached(eMdpPipeType type) {
     return false;
 }
 
+int Overlay::comparePipePriority(utils::eDest pipe1Index,
+        utils::eDest pipe2Index) {
+    validate((int)pipe1Index);
+    validate((int)pipe2Index);
+    uint8_t pipe1Prio = mPipeBook[(int)pipe1Index].mPipe->getPriority();
+    uint8_t pipe2Prio = mPipeBook[(int)pipe2Index].mPipe->getPriority();
+    if(pipe1Prio > pipe2Prio)
+        return 1;
+    if(pipe1Prio < pipe2Prio)
+        return -1;
+    return 0;
+}
+
 bool Overlay::commit(utils::eDest dest) {
     bool ret = false;
     int index = (int)dest;

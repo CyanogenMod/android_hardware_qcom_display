@@ -69,6 +69,8 @@ public:
     bool isOpen() const;
     /* return Ctrl fd. Used for S3D */
     int getCtrlFd() const;
+    /* return pipe priority */
+    uint8_t getPriority() const;
     /* dump the state of the object */
     void dump() const;
     /* Return the dump in the specified buffer */
