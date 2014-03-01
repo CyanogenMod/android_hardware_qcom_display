@@ -1280,10 +1280,6 @@ bool MDPComp::resourceCheck(hwc_context_t *ctx,
         return false;
     }
 
-    if(!arePipesAvailable(ctx, list)) {
-        return false;
-    }
-
     double size = calcMDPBytesRead(ctx, list);
     if(!bandwidthCheck(ctx, size)) {
         ALOGD_IF(isDebug(), "%s: Exceeds bandwidth",__FUNCTION__);
@@ -1537,58 +1533,6 @@ int MDPCompNonSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
                            &PipeLayerPair.rot);
 }
 
-bool MDPCompNonSplit::arePipesAvailable(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list) {
-    overlay::Overlay& ov = *ctx->mOverlay;
-    int numPipesNeeded = mCurrentFrame.mdpCount;
-    int availPipes = ov.availablePipes(mDpy, Overlay::MIXER_DEFAULT);
-
-    //Reserve pipe for FB
-    if(mCurrentFrame.fbCount)
-        availPipes -= 1;
-
-    if(numPipesNeeded > availPipes) {
-        ALOGD_IF(isDebug(), "%s: Insufficient pipes, dpy %d needed %d, avail %d",
-                __FUNCTION__, mDpy, numPipesNeeded, availPipes);
-        return false;
-    }
-
-    if(not areVGPipesAvailable(ctx, list)) {
-        return false;
-    }
-
-    return true;
-}
-
-bool MDPCompNonSplit::areVGPipesAvailable(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list) {
-    overlay::Overlay& ov = *ctx->mOverlay;
-    int pipesNeeded = 0;
-    for(int i = 0; i < mCurrentFrame.layerCount; ++i) {
-        if(!mCurrentFrame.isFBComposed[i]) {
-            hwc_layer_1_t* layer = &list->hwLayers[i];
-            hwc_rect_t dst = layer->displayFrame;
-            private_handle_t *hnd = (private_handle_t *)layer->handle;
-            if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
-                pipesNeeded = pipesNeeded + 2;
-            }
-            else if(isYuvBuffer(hnd)) {
-                pipesNeeded++;
-            }
-        }
-    }
-
-    int availableVGPipes = ov.availablePipes(mDpy, ovutils::OV_MDP_PIPE_VG);
-    if(pipesNeeded > availableVGPipes) {
-        ALOGD_IF(isDebug(), "%s: Insufficient VG pipes for video layers"
-                "dpy %d needed %d, avail %d",
-                __FUNCTION__, mDpy, pipesNeeded, availableVGPipes);
-        return false;
-    }
-
-    return true;
-}
-
 bool MDPCompNonSplit::allocLayerPipes(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
     for(int index = 0; index < mCurrentFrame.layerCount; index++) {
@@ -1780,106 +1724,6 @@ void MDPCompSplit::adjustForSourceSplit(hwc_context_t *ctx,
             mCurrentFrame.fbZ += 1;
         }
     }
-}
-
-int MDPCompSplit::pipesNeeded(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list,
-        int mixer) {
-    int pipesNeeded = 0;
-    const int xres = ctx->dpyAttr[mDpy].xres;
-
-    const int lSplit = getLeftSplit(ctx, mDpy);
-
-    for(int i = 0; i < mCurrentFrame.layerCount; ++i) {
-        if(!mCurrentFrame.isFBComposed[i]) {
-            hwc_layer_1_t* layer = &list->hwLayers[i];
-            hwc_rect_t dst = layer->displayFrame;
-            if(mixer == Overlay::MIXER_LEFT && dst.left < lSplit) {
-                pipesNeeded++;
-            } else if(mixer == Overlay::MIXER_RIGHT && dst.right > lSplit) {
-                pipesNeeded++;
-            }
-        }
-    }
-    return pipesNeeded;
-}
-
-bool MDPCompSplit::arePipesAvailable(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list) {
-    overlay::Overlay& ov = *ctx->mOverlay;
-    int totalPipesNeeded = 0;
-
-    for(int i = 0; i < Overlay::MIXER_MAX; i++) {
-        int numPipesNeeded = pipesNeeded(ctx, list, i);
-        int availPipes = ov.availablePipes(mDpy, i);
-
-        //Reserve pipe(s)for FB
-        if(mCurrentFrame.fbCount)
-            numPipesNeeded += 1;
-
-        totalPipesNeeded += numPipesNeeded;
-
-        //Per mixer check.
-        if(numPipesNeeded > availPipes) {
-            ALOGD_IF(isDebug(), "%s: Insufficient pipes for "
-                     "dpy %d mixer %d needed %d, avail %d",
-                     __FUNCTION__, mDpy, i, numPipesNeeded, availPipes);
-            return false;
-        }
-    }
-
-    //Per display check, since unused pipes can get counted twice.
-    int totalPipesAvailable = ov.availablePipes(mDpy);
-    if(totalPipesNeeded > totalPipesAvailable) {
-        ALOGD_IF(isDebug(), "%s: Insufficient pipes for "
-                "dpy %d needed %d, avail %d",
-                __FUNCTION__, mDpy, totalPipesNeeded, totalPipesAvailable);
-        return false;
-    }
-
-    if(not areVGPipesAvailable(ctx, list)) {
-        return false;
-    }
-
-    return true;
-}
-
-bool MDPCompSplit::areVGPipesAvailable(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list) {
-    overlay::Overlay& ov = *ctx->mOverlay;
-    int pipesNeeded = 0;
-    const int lSplit = getLeftSplit(ctx, mDpy);
-    for(int i = 0; i < mCurrentFrame.layerCount; ++i) {
-        if(!mCurrentFrame.isFBComposed[i]) {
-            hwc_layer_1_t* layer = &list->hwLayers[i];
-            hwc_rect_t dst = layer->displayFrame;
-            private_handle_t *hnd = (private_handle_t *)layer->handle;
-            if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
-                if((dst.left > lSplit)||(dst.right < lSplit)){
-                    pipesNeeded = pipesNeeded + 2;
-                    continue;
-                }
-            }
-            if(isYuvBuffer(hnd)) {
-                if(dst.left < lSplit) {
-                    pipesNeeded++;
-                }
-                if(dst.right > lSplit) {
-                    pipesNeeded++;
-                }
-            }
-        }
-    }
-
-    int availableVGPipes = ov.availablePipes(mDpy, ovutils::OV_MDP_PIPE_VG);
-    if(pipesNeeded > availableVGPipes) {
-        ALOGD_IF(isDebug(), "%s: Insufficient VG pipes for video layers"
-                "dpy %d needed %d, avail %d",
-                __FUNCTION__, mDpy, pipesNeeded, availableVGPipes);
-        return false;
-    }
-
-    return true;
 }
 
 bool MDPCompSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
