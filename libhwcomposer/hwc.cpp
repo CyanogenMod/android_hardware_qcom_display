@@ -405,8 +405,11 @@ static void reset_panel(struct hwc_composer_device_1* dev)
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
 
-    if (!ctx->mPanelResetStatus)
+    if (!ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isActive) {
+        ALOGD ("%s : Display OFF - Skip BLANK & UNBLANK", __FUNCTION__);
+        ctx->mPanelResetStatus = false;
         return;
+    }
 
     ALOGD("%s: calling BLANK DISPLAY", __FUNCTION__);
     ret = hwc_blank(dev, HWC_DISPLAY_PRIMARY, 1);
