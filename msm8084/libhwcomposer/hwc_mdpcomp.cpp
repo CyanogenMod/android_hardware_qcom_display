@@ -48,6 +48,9 @@ bool MDPComp::sEnable4k2kYUVSplit = false;
 
 MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
     if(isDisplaySplit(ctx, dpy)) {
+        if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
+            return new MDPCompSrcSplit(dpy);
+        }
         return new MDPCompSplit(dpy);
     }
     return new MDPCompNonSplit(dpy);
@@ -1825,5 +1828,183 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
     return true;
 }
+
+//================MDPCompSrcSplit==============================================
+bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
+        MdpPipeInfoSplit& pipe_info, ePipeType /*type*/) {
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    hwc_rect_t dst = layer->displayFrame;
+    hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
+    pipe_info.lIndex = ovutils::OV_INVALID;
+    pipe_info.rIndex = ovutils::OV_INVALID;
+
+    //If 2 pipes are staged on a single stage of a mixer, then the left pipe
+    //should have a higher priority than the right one. Pipe priorities are
+    //starting with VG0, VG1 ... , RGB0 ..., DMA1
+    //TODO Currently we acquire VG pipes for left side and RGB/DMA for right to
+    //make sure pipe priorities are satisfied. A better way is to have priority
+    //as part of overlay object and acquire any 2 pipes. Assign the higher
+    //priority one to left side and lower to right side.
+
+    //1 pipe by default for a layer
+    pipe_info.lIndex = getMdpPipe(ctx, MDPCOMP_OV_VG, Overlay::MIXER_DEFAULT);
+    if(pipe_info.lIndex == ovutils::OV_INVALID) {
+        if(isYuvBuffer(hnd)) {
+            return false;
+        }
+        pipe_info.lIndex = getMdpPipe(ctx, MDPCOMP_OV_ANY,
+                Overlay::MIXER_DEFAULT);
+        if(pipe_info.lIndex == ovutils::OV_INVALID) {
+            return false;
+        }
+    }
+
+    //If layer's crop width or dest width > 2048, use 2 pipes
+    if((dst.right - dst.left) > qdutils::MAX_DISPLAY_DIM or
+            (crop.right - crop.left) > qdutils::MAX_DISPLAY_DIM) {
+        ePipeType rightType = isYuvBuffer(hnd) ?
+                MDPCOMP_OV_VG : MDPCOMP_OV_ANY;
+        pipe_info.rIndex = getMdpPipe(ctx, rightType, Overlay::MIXER_DEFAULT);
+        if(pipe_info.rIndex == ovutils::OV_INVALID) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool MDPCompSrcSplit::allocLayerPipes(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    for(int index = 0 ; index < mCurrentFrame.layerCount; index++) {
+        if(mCurrentFrame.isFBComposed[index]) continue;
+        hwc_layer_1_t* layer = &list->hwLayers[index];
+        int mdpIndex = mCurrentFrame.layerToMDP[index];
+        PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
+        info.pipeInfo = new MdpPipeInfoSplit;
+        info.rot = NULL;
+        MdpPipeInfoSplit& pipe_info = *(MdpPipeInfoSplit*)info.pipeInfo;
+
+        ePipeType type = MDPCOMP_OV_ANY;
+        if(!acquireMDPPipes(ctx, layer, pipe_info, type)) {
+            ALOGD_IF(isDebug(), "%s: Unable to get pipe for type = %d",
+                    __FUNCTION__, (int) type);
+            return false;
+        }
+    }
+    return true;
+}
+
+int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
+        PipeLayerPair& PipeLayerPair) {
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    if(!hnd) {
+        ALOGE("%s: layer handle is NULL", __FUNCTION__);
+        return -1;
+    }
+    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+    MdpPipeInfoSplit& mdp_info =
+        *(static_cast<MdpPipeInfoSplit*>(PipeLayerPair.pipeInfo));
+    Rotator **rot = &PipeLayerPair.rot;
+    eZorder z = static_cast<eZorder>(mdp_info.zOrder);
+    eIsFg isFg = IS_FG_OFF;
+    eDest lDest = mdp_info.lIndex;
+    eDest rDest = mdp_info.rIndex;
+    hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
+    hwc_rect_t dst = layer->displayFrame;
+    int transform = layer->transform;
+    eTransform orient = static_cast<eTransform>(transform);
+    const int downscale = 0;
+    int rotFlags = ROT_FLAGS_NONE;
+    uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
+    Whf whf(getWidth(hnd), getHeight(hnd), format, hnd->size);
+
+    ALOGD_IF(isDebug(),"%s: configuring: layer: %p z_order: %d dest_pipeL: %d"
+             "dest_pipeR: %d",__FUNCTION__, layer, z, lDest, rDest);
+
+    // Handle R/B swap
+    if (layer->flags & HWC_FORMAT_RB_SWAP) {
+        if (hnd->format == HAL_PIXEL_FORMAT_RGBA_8888)
+            whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRA_8888);
+        else if (hnd->format == HAL_PIXEL_FORMAT_RGBX_8888)
+            whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
+    }
+
+    eMdpFlags mdpFlagsL = OV_MDP_BACKEND_COMPOSITION;
+    setMdpFlags(layer, mdpFlagsL, 0, transform);
+    eMdpFlags mdpFlagsR = mdpFlagsL;
+
+    if(lDest != OV_INVALID && rDest != OV_INVALID) {
+        //Enable overfetch
+        setMdpFlags(mdpFlagsL, OV_MDSS_MDP_DUAL_PIPE);
+    }
+
+    if(isYuvBuffer(hnd) && (transform & HWC_TRANSFORM_ROT_90)) {
+        (*rot) = ctx->mRotMgr->getNext();
+        if((*rot) == NULL) return -1;
+        //Configure rotator for pre-rotation
+        if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
+            ALOGE("%s: configRotator failed!", __FUNCTION__);
+            return -1;
+        }
+        ctx->mLayerRotMap[mDpy]->add(layer, *rot);
+        whf.format = (*rot)->getDstFormat();
+        updateSource(orient, whf, crop);
+        rotFlags |= ROT_PREROTATED;
+    }
+
+    //If 2 pipes being used, divide layer into half, crop and dst
+    hwc_rect_t cropL = crop;
+    hwc_rect_t cropR = crop;
+    hwc_rect_t dstL = dst;
+    hwc_rect_t dstR = dst;
+    if(lDest != OV_INVALID && rDest != OV_INVALID) {
+        cropL.right = (crop.right + crop.left) / 2;
+        cropR.left = cropL.right;
+        sanitizeSourceCrop(cropL, cropR, hnd);
+
+        //Swap crops on H flip since 2 pipes are being used
+        if((orient & OVERLAY_TRANSFORM_FLIP_H) && (*rot) == NULL) {
+            hwc_rect_t tmp = cropL;
+            cropL = cropR;
+            cropR = tmp;
+        }
+
+        dstL.right = (dst.right + dst.left) / 2;
+        dstR.left = dstL.right;
+    }
+
+    //For the mdp, since either we are pre-rotating or MDP does flips
+    orient = OVERLAY_TRANSFORM_0;
+    transform = 0;
+
+    //configure left pipe
+    if(lDest != OV_INVALID) {
+        PipeArgs pargL(mdpFlagsL, whf, z, isFg,
+                static_cast<eRotFlags>(rotFlags), layer->planeAlpha,
+                (ovutils::eBlending) getBlending(layer->blending));
+
+        if(configMdp(ctx->mOverlay, pargL, orient,
+                    cropL, dstL, metadata, lDest) < 0) {
+            ALOGE("%s: commit failed for left mixer config", __FUNCTION__);
+            return -1;
+        }
+    }
+
+    //configure right pipe
+    if(rDest != OV_INVALID) {
+        PipeArgs pargR(mdpFlagsR, whf, z, isFg,
+                static_cast<eRotFlags>(rotFlags),
+                layer->planeAlpha,
+                (ovutils::eBlending) getBlending(layer->blending));
+        if(configMdp(ctx->mOverlay, pargR, orient,
+                    cropR, dstR, metadata, rDest) < 0) {
+            ALOGE("%s: commit failed for right mixer config", __FUNCTION__);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 }; //namespace
 
