@@ -113,7 +113,7 @@ ExternalDisplay::ExternalDisplay(hwc_context_t* ctx):mFd(-1),
  * Used to show QCOM 8974 instead of Input 1 for example
  */
 void ExternalDisplay::setSPDInfo(const char* node, const char* property) {
-    int err = -1;
+    ssize_t err = -1;
     char info[PROPERTY_VALUE_MAX];
     char sysFsSPDFilePath[MAX_SYSFS_FILE_PATH];
     memset(sysFsSPDFilePath, 0, sizeof(sysFsSPDFilePath));
@@ -172,7 +172,7 @@ void ExternalDisplay::getEDIDModes(int *out) const {
 void ExternalDisplay::readCEUnderscanInfo()
 {
     int hdmiScanInfoFile = -1;
-    int len = -1;
+    ssize_t len = -1;
     char scanInfo[17];
     char *ce_info_str = NULL;
     char *save_ptr;
@@ -191,7 +191,7 @@ void ExternalDisplay::readCEUnderscanInfo()
         return;
     } else {
         len = read(hdmiScanInfoFile, scanInfo, sizeof(scanInfo)-1);
-        ALOGD("%s: Scan Info string: %s length = %d",
+        ALOGD("%s: Scan Info string: %s length = %zu",
                  __FUNCTION__, scanInfo, len);
         if (len <= 0) {
             close(hdmiScanInfoFile);
@@ -200,8 +200,8 @@ void ExternalDisplay::readCEUnderscanInfo()
             return;
         }
         scanInfo[len] = '\0';  /* null terminate the string */
+        close(hdmiScanInfoFile);
     }
-    close(hdmiScanInfoFile);
 
     /*
      * The scan_info contains the three fields
@@ -304,7 +304,7 @@ bool ExternalDisplay::readResolution()
             "/sys/devices/virtual/graphics/fb%d/edid_modes", mFbNum);
 
     int hdmiEDIDFile = open(sysFsEDIDFilePath, O_RDONLY, 0);
-    int len = -1;
+    ssize_t len = -1;
     char edidStr[128] = {'\0'};
 
     if (hdmiEDIDFile < 0) {
@@ -313,7 +313,7 @@ bool ExternalDisplay::readResolution()
         return false;
     } else {
         len = read(hdmiEDIDFile, edidStr, sizeof(edidStr)-1);
-        ALOGD_IF(DEBUG, "%s: EDID string: %s length = %d",
+        ALOGD_IF(DEBUG, "%s: EDID string: %s length = %zu",
                  __FUNCTION__, edidStr, len);
         if ( len <= 0) {
             ALOGE("%s: edid_modes file empty '%s'",
@@ -326,8 +326,8 @@ bool ExternalDisplay::readResolution()
             }
             edidStr[len] = '\0';
         }
+        close(hdmiEDIDFile);
     }
-    close(hdmiEDIDFile);
     if(len > 0) {
         // Get EDID modes from the EDID strings
         mModeCount = parseResolution(edidStr, mEDIDModes);
@@ -558,7 +558,7 @@ bool ExternalDisplay::writeHPDOption(int userOption) const
                   __FUNCTION__, sysFsHPDFilePath, hdmiHPDFile, strerror(errno));
             ret = false;
         } else {
-            int err = -1;
+            ssize_t err = -1;
             ALOGD_IF(DEBUG, "%s: option = %d", __FUNCTION__, userOption);
             if(userOption)
                 err = write(hdmiHPDFile, "1", 2);
@@ -607,7 +607,7 @@ void ExternalDisplay::setAttributes() {
             }
         }
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].vsync_period =
-                1000000000l / fps;
+                (int) 1000000000l / fps;
     }
 }
 
