@@ -42,7 +42,7 @@ using namespace scale;
 
 namespace overlay {
 using namespace utils;
-
+using namespace qdutils;
 
 Overlay::Overlay() {
     int numPipes = qdutils::MDPVersion::getInstance().getTotalPipes();
@@ -155,6 +155,103 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
                 (int)type, dpy, mixer);
     }
 
+    return dest;
+}
+
+utils::eDest Overlay::getPipe(const PipeSpecs& pipeSpecs) {
+    if(MDPVersion::getInstance().is8x26()) {
+        return getPipe_8x26(pipeSpecs);
+    } else if(MDPVersion::getInstance().is8x16()) {
+        return getPipe_8x16(pipeSpecs);
+    }
+
+    eDest dest = OV_INVALID;
+
+    //The default behavior is to assume RGB and VG pipes have scalars
+    if(pipeSpecs.formatClass == FORMAT_YUV) {
+        return nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+    } else if(pipeSpecs.fb == false) { //RGB App layers
+        if(not pipeSpecs.needsScaling) {
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+        if(dest == OV_INVALID) {
+            dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+        if(dest == OV_INVALID) {
+            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+    } else { //FB layer
+        dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+        if(dest == OV_INVALID) {
+            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+        //Some features can cause FB to have scaling as well.
+        //If we ever come to this block with FB needing scaling,
+        //the screen will be black for a frame, since the FB won't get a pipe
+        //but atleast this will prevent a hang
+        if(dest == OV_INVALID and (not pipeSpecs.needsScaling)) {
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+    }
+    return dest;
+}
+
+utils::eDest Overlay::getPipe_8x26(const PipeSpecs& pipeSpecs) {
+    //Use this to hide all the 8x26 requirements that cannot be humanly
+    //described in a generic way
+    eDest dest = OV_INVALID;
+    if(pipeSpecs.formatClass == FORMAT_YUV) { //video
+        return nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+    } else if(pipeSpecs.fb == false) { //RGB app layers
+        if(not pipeSpecs.needsScaling) {
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+        if(dest == OV_INVALID) {
+            dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+        if(dest == OV_INVALID) {
+            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+    } else { //FB layer
+        //For 8x26 Secondary we use DMA always for FB for inline rotation
+        if(pipeSpecs.dpy == DPY_PRIMARY) {
+            dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+            if(dest == OV_INVALID) {
+                dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+            }
+        }
+        if(dest == OV_INVALID and (not pipeSpecs.needsScaling)) {
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+    }
+    return dest;
+}
+
+utils::eDest Overlay::getPipe_8x16(const PipeSpecs& pipeSpecs) {
+    //Having such functions help keeping the interface generic but code specific
+    //and rife with assumptions
+    eDest dest = OV_INVALID;
+    if(pipeSpecs.formatClass == FORMAT_YUV or pipeSpecs.needsScaling) {
+        return nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+    } else if(pipeSpecs.fb == false) { //RGB app layers
+        //Since this is a specific func, we can assume stuff like RGB pipe not
+        //having scalar blocks
+        dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+        if(dest == OV_INVALID) {
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+    } else {
+        //For 8x16 Secondary we use DMA always for FB for inline rotation
+        if(pipeSpecs.dpy == DPY_PRIMARY) {
+            dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+            if(dest == OV_INVALID) {
+                dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+            }
+        }
+        if(dest == OV_INVALID) {
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+    }
     return dest;
 }
 
