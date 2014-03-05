@@ -44,6 +44,7 @@
 #include "QService.h"
 #include "comptype.h"
 #include "hwc_virtual.h"
+#include "qd_utils.h"
 
 using namespace qClient;
 using namespace qService;
@@ -390,34 +391,6 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
     rect.bottom = h + rect.top;
 
     return;
-}
-
-/* Calculates the aspect ratio for based on src & dest */
-void getAspectRatioPosition(int destWidth, int destHeight, int srcWidth,
-                                int srcHeight, hwc_rect_t& rect) {
-   int x =0, y =0;
-
-   if (srcWidth * destHeight > destWidth * srcHeight) {
-        srcHeight = destWidth * srcHeight / srcWidth;
-        srcWidth = destWidth;
-    } else if (srcWidth * destHeight < destWidth * srcHeight) {
-        srcWidth = destHeight * srcWidth / srcHeight;
-        srcHeight = destHeight;
-    } else {
-        srcWidth = destWidth;
-        srcHeight = destHeight;
-    }
-    if (srcWidth > destWidth) srcWidth = destWidth;
-    if (srcHeight > destHeight) srcHeight = destHeight;
-    x = (destWidth - srcWidth) / 2;
-    y = (destHeight - srcHeight) / 2;
-    ALOGD_IF(HWC_UTILS_DEBUG, "%s: AS Position: x = %d, y = %d w = %d h = %d",
-             __FUNCTION__, x, y, srcWidth , srcHeight);
-    // Convert it back to hwc_rect_t
-    rect.left = x;
-    rect.top = y;
-    rect.right = srcWidth + rect.left;
-    rect.bottom = srcHeight + rect.top;
 }
 
 // This function gets the destination position for Seconday display
