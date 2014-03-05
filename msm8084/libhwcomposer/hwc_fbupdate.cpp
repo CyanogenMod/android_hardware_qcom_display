@@ -139,14 +139,14 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
                 ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888,
                     mTileEnabled));
 
-        //Request a pipe
-        ovutils::eMdpPipeType type = ovutils::OV_MDP_PIPE_ANY;
-        if((qdutils::MDPVersion::getInstance().is8x26() ||
-                   qdutils::MDPVersion::getInstance().is8x16()) && mDpy) {
-            //For 8x26 external always use DMA pipe
-            type = ovutils::OV_MDP_PIPE_DMA;
-        }
-        ovutils::eDest dest = ov.nextPipe(type, mDpy, Overlay::MIXER_DEFAULT);
+        Overlay::PipeSpecs pipeSpecs;
+        pipeSpecs.formatClass = Overlay::FORMAT_RGB;
+        pipeSpecs.needsScaling = qhwc::needsScaling(layer);
+        pipeSpecs.dpy = mDpy;
+        pipeSpecs.mixer = Overlay::MIXER_DEFAULT;
+        pipeSpecs.fb = true;
+
+        ovutils::eDest dest = ov.getPipe(pipeSpecs);
         if(dest == ovutils::OV_INVALID) { //None available
             ALOGE("%s: No pipes available to configure fb for dpy %d",
                 __FUNCTION__, mDpy);
@@ -308,10 +308,16 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
         hwc_rect_t displayFrame = fbUpdatingRect;
 
         ret = true;
+        Overlay::PipeSpecs pipeSpecs;
+        pipeSpecs.formatClass = Overlay::FORMAT_RGB;
+        pipeSpecs.needsScaling = qhwc::needsScaling(layer);
+        pipeSpecs.dpy = mDpy;
+        pipeSpecs.fb = true;
+
         /* Configure left pipe */
         if(displayFrame.left < lSplit) {
-            ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
-                                               Overlay::MIXER_LEFT);
+            pipeSpecs.mixer = Overlay::MIXER_LEFT;
+            ovutils::eDest destL = ov.getPipe(pipeSpecs);
             if(destL == ovutils::OV_INVALID) { //None available
                 ALOGE("%s: No pipes available to configure fb for dpy %d's left"
                       " mixer", __FUNCTION__, mDpy);
@@ -344,8 +350,8 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
 
         /* Configure right pipe */
         if(displayFrame.right > lSplit) {
-            ovutils::eDest destR = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
-                                               Overlay::MIXER_RIGHT);
+            pipeSpecs.mixer = Overlay::MIXER_RIGHT;
+            ovutils::eDest destR = ov.getPipe(pipeSpecs);
             if(destR == ovutils::OV_INVALID) { //None available
                 ALOGE("%s: No pipes available to configure fb for dpy %d's"
                       " right mixer", __FUNCTION__, mDpy);
@@ -455,8 +461,13 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     hwc_rect_t cropR = fbUpdatingRect;
 
     //Request left pipe (or 1 by default)
-    ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
-            Overlay::MIXER_DEFAULT);
+    Overlay::PipeSpecs pipeSpecs;
+    pipeSpecs.formatClass = Overlay::FORMAT_RGB;
+    pipeSpecs.needsScaling = qhwc::needsScaling(layer);
+    pipeSpecs.dpy = mDpy;
+    pipeSpecs.mixer = Overlay::MIXER_DEFAULT;
+    pipeSpecs.fb = true;
+    ovutils::eDest destL = ov.getPipe(pipeSpecs);
     if(destL == ovutils::OV_INVALID) {
         ALOGE("%s: No pipes available to configure fb for dpy %d's left"
                 " mixer", __FUNCTION__, mDpy);
@@ -468,8 +479,7 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     //Request right pipe (2 pipes needed only if dim > 2048)
     if((fbUpdatingRect.right - fbUpdatingRect.left) >
             qdutils::MAX_DISPLAY_DIM) {
-        destR = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
-                Overlay::MIXER_DEFAULT);
+        destR = ov.getPipe(pipeSpecs);
         if(destR == ovutils::OV_INVALID) {
             ALOGE("%s: No pipes available to configure fb for dpy %d's right"
                     " mixer", __FUNCTION__, mDpy);
