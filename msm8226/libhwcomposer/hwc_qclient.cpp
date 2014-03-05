@@ -30,7 +30,6 @@
 #include <hwc_qclient.h>
 #include <IQService.h>
 #include <hwc_utils.h>
-#include <hwc_vpuclient.h>
 #include <mdp_version.h>
 
 #define QCLIENT_DEBUG 0
@@ -94,20 +93,6 @@ static android::status_t screenRefresh(hwc_context_t *ctx) {
     }
     return result;
 }
-
-#ifdef VPU_TARGET
-static android::status_t vpuCommand(hwc_context_t *ctx,
-        uint32_t command,
-        const Parcel* inParcel,
-        Parcel* outParcel) {
-    status_t result = NO_INIT;
-#ifdef QCOM_BSP
-    if(qdutils::MDPVersion::getInstance().is8092())
-        result = ctx->mVPUClient->processCommand(command, inParcel, outParcel);
-#endif
-    return result;
-}
-#endif
 
 static void setExtOrientation(hwc_context_t *ctx, uint32_t orientation) {
     ctx->mExtOrientation = orientation;
@@ -186,12 +171,6 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t ret = NO_ERROR;
 
-#ifdef VPU_TARGET
-    if (command > IQService::VPU_COMMAND_LIST_START &&
-        command < IQService::VPU_COMMAND_LIST_END) {
-        return vpuCommand(mHwcContext, command, inParcel, outParcel);
-    }
-#endif
     switch(command) {
         case IQService::SECURING:
             securing(mHwcContext, inParcel->readInt32());

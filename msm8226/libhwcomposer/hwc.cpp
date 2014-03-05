@@ -38,7 +38,6 @@
 #include "hwc_copybit.h"
 #include "hwc_ad.h"
 #include "profiler.h"
-#include "hwc_vpuclient.h"
 #include "hwc_virtual.h"
 
 using namespace qhwc;
@@ -202,12 +201,7 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
         setListStats(ctx, list, dpy);
 
-        if (ctx->mVPUClient == NULL)
-            fbComp = (ctx->mMDPComp[dpy]->prepare(ctx, list) < 0);
-#ifdef VPU_TARGET
-        else
-            fbComp = (ctx->mVPUClient->prepare(ctx, dpy, list) < 0);
-#endif
+        fbComp = (ctx->mMDPComp[dpy]->prepare(ctx, list) < 0);
 
         if (fbComp) {
             const int fbZ = 0;
@@ -513,12 +507,7 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         if(ctx->mHwcDebug[dpy])
             ctx->mHwcDebug[dpy]->dumpLayers(list);
 
-        if (ctx->mVPUClient != NULL) {
-#ifdef VPU_TARGET
-            ctx->mVPUClient->predraw(ctx, dpy, list);
-#endif
-        }
-        else if (!ctx->mMDPComp[dpy]->draw(ctx, list)) {
+        if (!ctx->mMDPComp[dpy]->draw(ctx, list)) {
             ALOGE("%s: MDPComp draw failed", __FUNCTION__);
             ret = -1;
         }
@@ -543,10 +532,6 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ret = -1;
         }
 
-#ifdef VPU_TARGET
-        if (ctx->mVPUClient != NULL)
-            ctx->mVPUClient->draw(ctx, dpy, list);
-#endif
     }
 
     closeAcquireFds(list);
