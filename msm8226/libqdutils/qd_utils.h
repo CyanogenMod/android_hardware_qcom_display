@@ -48,4 +48,7 @@
 
 int getEdidRawData(char *buffer);
 
+void getAspectRatioPosition(int destWidth, int destHeight, int srcWidth,
+                                int srcHeight, hwc_rect_t& rect);
+
 #endif
