@@ -67,14 +67,12 @@ MDPVersion::MDPVersion()
     mMDPUpscale = 0;
     mMDPDownscale = 0;
     mMacroTileEnabled = false;
-    mPanelType = NO_PANEL;
     mLowBw = 0;
     mHighBw = 0;
     mSourceSplit = false;
 
-    if(!updatePanelInfo()) {
-        ALOGE("Unable to read Primary Panel Information");
-    }
+    updatePanelInfo();
+
     if(!updateSysFsInfo()) {
         ALOGE("Unable to read display sysfs node");
     }
@@ -114,10 +112,12 @@ int MDPVersion::tokenizeParams(char *inputParams, const char *delim,
 }
 // This function reads the sysfs node to read the primary panel type
 // and updates information accordingly
-bool MDPVersion::updatePanelInfo() {
+void  MDPVersion::updatePanelInfo() {
     FILE *displayDeviceFP = NULL;
+    FILE *panelInfoNodeFP = NULL;
     const int MAX_FRAME_BUFFER_NAME_SIZE = 128;
     char fbType[MAX_FRAME_BUFFER_NAME_SIZE];
+    char panelInfo[MAX_FRAME_BUFFER_NAME_SIZE];
     const char *strCmdPanel = "mipi dsi cmd panel";
     const char *strVideoPanel = "mipi dsi video panel";
     const char *strLVDSPanel = "lvds panel";
@@ -128,21 +128,62 @@ bool MDPVersion::updatePanelInfo() {
         fread(fbType, sizeof(char), MAX_FRAME_BUFFER_NAME_SIZE,
                 displayDeviceFP);
         if(strncmp(fbType, strCmdPanel, strlen(strCmdPanel)) == 0) {
-            mPanelType = MIPI_CMD_PANEL;
+            mPanelInfo.mType = MIPI_CMD_PANEL;
         }
         else if(strncmp(fbType, strVideoPanel, strlen(strVideoPanel)) == 0) {
-            mPanelType = MIPI_VIDEO_PANEL;
+            mPanelInfo.mType = MIPI_VIDEO_PANEL;
         }
         else if(strncmp(fbType, strLVDSPanel, strlen(strLVDSPanel)) == 0) {
-            mPanelType = LVDS_PANEL;
+            mPanelInfo.mType = LVDS_PANEL;
         }
         else if(strncmp(fbType, strEDPPanel, strlen(strEDPPanel)) == 0) {
-            mPanelType = EDP_PANEL;
+            mPanelInfo.mType = EDP_PANEL;
         }
         fclose(displayDeviceFP);
-        return true;
-    }else {
-        return false;
+    } else {
+        ALOGE("Unable to read Primary Panel Information");
+    }
+
+    panelInfoNodeFP = fopen("/sys/class/graphics/fb0/msm_fb_panel_info", "r");
+    if(panelInfoNodeFP){
+        size_t len = PAGE_SIZE;
+        ssize_t read;
+        char *readLine = (char *) malloc (len);
+        while((read = getline((char **)&readLine, &len,
+                              panelInfoNodeFP)) != -1) {
+            int token_ct=0;
+            char *tokens[10];
+            memset(tokens, 0, sizeof(tokens));
+
+            if(!tokenizeParams(readLine, TOKEN_PARAMS_DELIM, tokens,
+                               &token_ct)) {
+                if(!strncmp(tokens[0], "pu_en", strlen("pu_en"))) {
+                    mPanelInfo.mPartialUpdateEnable = atoi(tokens[1]);
+                    ALOGI("PartialUpdate status: %s",
+                          mPanelInfo.mPartialUpdateEnable? "Enabled" :
+                          "Disabled");
+                }
+                if(!strncmp(tokens[0], "xalign", strlen("xalign"))) {
+                    mPanelInfo.mLeftAlign = atoi(tokens[1]);
+                    ALOGI("Left Align: %d", mPanelInfo.mLeftAlign);
+                }
+                if(!strncmp(tokens[0], "walign", strlen("walign"))) {
+                    mPanelInfo.mWidthAlign = atoi(tokens[1]);
+                    ALOGI("Width Align: %d", mPanelInfo.mWidthAlign);
+                }
+                if(!strncmp(tokens[0], "ystart", strlen("ystart"))) {
+                    mPanelInfo.mTopAlign = atoi(tokens[1]);
+                    ALOGI("Top Align: %d", mPanelInfo.mTopAlign);
+                }
+                if(!strncmp(tokens[0], "halign", strlen("halign"))) {
+                    mPanelInfo.mHeightAlign = atoi(tokens[1]);
+                    ALOGI("Height Align: %d", mPanelInfo.mHeightAlign);
+                }
+            }
+        }
+        fclose(panelInfoNodeFP);
+    } else {
+        ALOGE("Failed to open msm_fb_panel_info node");
     }
 }
 
