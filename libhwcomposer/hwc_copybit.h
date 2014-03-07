@@ -57,6 +57,27 @@ public:
 
 
 private:
+    /* cached data */
+    struct LayerCache {
+      int layerCount;
+      buffer_handle_t hnd[MAX_NUM_APP_LAYERS];
+      /* c'tor */
+      LayerCache();
+      /* clear caching info*/
+      void reset();
+      void updateCounts(hwc_context_t *ctx, hwc_display_contents_1_t *list,
+              int dpy);
+    };
+    /* framebuffer cache*/
+    struct FbCache {
+      hwc_rect_t  FbdirtyRect[NUM_RENDER_BUFFERS];
+      int FbIndex;
+      FbCache();
+      void reset();
+      void insertAndUpdateFbCache(hwc_rect_t dirtyRect);
+      int getUnchangedFbDRCount(hwc_rect_t dirtyRect);
+    };
+
     // holds the copybit device
     struct copybit_device_t *mEngine;
     // Helper functions for copybit composition
@@ -102,6 +123,16 @@ private:
     double mDynThreshold;
     int mAlignedWidth;
     int mAlignedHeight;
+    bool mSwapRectEnable;
+    int mAlignedFBWidth;
+    int mAlignedFBHeight;
+    int mDirtyLayerIndex;
+    LayerCache mLayerCache;
+    FbCache mFbCache;
+    int getLayersChanging(hwc_context_t *ctx, hwc_display_contents_1_t *list,
+                  int dpy);
+    int checkDirtyRect(hwc_context_t *ctx, hwc_display_contents_1_t *list,
+                  int dpy);
 };
 
 }; //namespace qhwc
