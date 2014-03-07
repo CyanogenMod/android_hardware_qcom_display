@@ -1777,6 +1777,10 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     Whf whf(getWidth(hnd), getHeight(hnd),
             getMdpFormat(hnd->format), hnd->size);
 
+    /* Calculate the external display position based on MDP downscale,
+       ActionSafe, and extorientation features. */
+    calcExtDisplayPosition(ctx, hnd, dpy, crop, dst, transform, orient);
+
     setMdpFlags(layer, mdpFlagsL, 0, transform);
     trimLayer(ctx, dpy, transform, crop, dst);
 
