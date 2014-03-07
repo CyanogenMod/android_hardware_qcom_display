@@ -1046,6 +1046,13 @@ hwc_rect_t moveRect(const hwc_rect_t& rect, const int& x_off, const int& y_off)
     return res;
 }
 
+bool operator ==(const hwc_rect_t& lhs, const hwc_rect_t& rhs) {
+    if(lhs.left == rhs.left && lhs.top == rhs.top &&
+       lhs.right == rhs.right &&  lhs.bottom == rhs.bottom )
+          return true ;
+    return false;
+}
+
 /* computes the intersection of two rects */
 hwc_rect_t getIntersection(const hwc_rect_t& rect1, const hwc_rect_t& rect2)
 {
