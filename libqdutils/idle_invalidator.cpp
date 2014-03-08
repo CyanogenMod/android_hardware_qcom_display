@@ -29,91 +29,99 @@
 
 #include "idle_invalidator.h"
 #include <unistd.h>
+#include <poll.h>
+#include <string.h>
+#include <fcntl.h>
 
 #define II_DEBUG 0
+#define IDLE_NOTIFY_PATH "/sys/devices/virtual/graphics/fb0/idle_notify"
+#define IDLE_TIME_PATH "/sys/devices/virtual/graphics/fb0/idle_time"
 
-static const char *threadName = "Invalidator";
+
+static const char *threadName = "IdleInvalidator";
 InvalidatorHandler IdleInvalidator::mHandler = NULL;
 android::sp<IdleInvalidator> IdleInvalidator::sInstance(0);
 
 IdleInvalidator::IdleInvalidator(): Thread(false), mHwcContext(0),
-    mSleepAgain(false), mSleepTime(0) {
-        ALOGD_IF(II_DEBUG, "%s", __func__);
-    }
+    mTimeoutEventFd(-1) {
+    ALOGD_IF(II_DEBUG, "IdleInvalidator::%s", __FUNCTION__);
+}
 
 int IdleInvalidator::init(InvalidatorHandler reg_handler, void* user_data,
-                          unsigned int idleSleepTime) {
-    ALOGD_IF(II_DEBUG, "%s", __func__);
-
-    Locker::Autolock _l(mLock);
-    /* store registered handler */
+                         unsigned int idleSleepTime) {
+    ALOGD_IF(II_DEBUG, "IdleInvalidator::%s idleSleepTime %d",
+        __FUNCTION__, idleSleepTime);
     mHandler = reg_handler;
     mHwcContext = user_data;
-    mSleepTime = idleSleepTime; //Time in millis
+
+    // Open a sysfs node to receive the timeout notification from driver.
+    mTimeoutEventFd = open(IDLE_NOTIFY_PATH, O_RDONLY);
+    if (mTimeoutEventFd < 0) {
+        ALOGE ("%s:not able to open %s node %s",
+                __FUNCTION__, IDLE_NOTIFY_PATH, strerror(errno));
+        return -1;
+    }
+
+    // Open a sysfs node to send the timeout value to driver.
+    int fd = open(IDLE_TIME_PATH, O_WRONLY);
+    if (fd < 0) {
+        ALOGE ("%s:not able to open %s node %s",
+                __FUNCTION__, IDLE_TIME_PATH, strerror(errno));
+        close(mTimeoutEventFd);
+        mTimeoutEventFd = -1;
+        return -1;
+    }
+    char strSleepTime[64];
+    snprintf(strSleepTime, sizeof(strSleepTime), "%d", idleSleepTime);
+    // Notify driver about the timeout value
+    ssize_t len = pwrite(fd, strSleepTime, strlen(strSleepTime), 0);
+    if(len < -1) {
+        ALOGE ("%s:not able to write into %s node %s",
+                __FUNCTION__, IDLE_TIME_PATH, strerror(errno));
+        close(mTimeoutEventFd);
+        mTimeoutEventFd = -1;
+        close(fd);
+        return -1;
+    }
+    close(fd);
+
+    //Triggers the threadLoop to run, if not already running.
+    run(threadName, android::PRIORITY_LOWEST);
     return 0;
 }
 
 bool IdleInvalidator::threadLoop() {
-    struct timeval lastUpdateTime;
-    ALOGD_IF(II_DEBUG, "%s", __func__);
-
-    {
-        //If we are here, update(s) happened, i.e mSleepAgain is set
-        Locker::Autolock _l(mLock);
-        mSleepAgain = false;
-        lastUpdateTime = mLastUpdateTime;
+    ALOGD_IF(II_DEBUG, "IdleInvalidator::%s", __FUNCTION__);
+    struct pollfd pFd;
+    pFd.fd = mTimeoutEventFd;
+    if (pFd.fd >= 0)
+        pFd.events = POLLPRI | POLLERR;
+    // Poll for an timeout event from driver
+    int err = poll(&pFd, 1, -1);
+    if(err > 0) {
+        if (pFd.revents & POLLPRI) {
+            char data[64];
+            // Consume the node by reading it
+            ssize_t len = pread(pFd.fd, data, 64, 0);
+            ALOGD_IF(II_DEBUG, "IdleInvalidator::%s Idle Timeout fired len %zu",
+                __FUNCTION__, len);
+            mHandler((void*)mHwcContext);
+        }
     }
-
-    struct timeval currentTime;
-    gettimeofday(&currentTime, NULL);
-    int timeSinceUpdateUs = (currentTime.tv_sec - lastUpdateTime.tv_sec) *
-            1000000 + (currentTime.tv_usec - lastUpdateTime.tv_usec);
-    int sleepDurationUs = mSleepTime * 1000 - timeSinceUpdateUs;
-
-    //Sleep only if the duration required is > 1ms, otherwise its not worth it.
-    if(sleepDurationUs > 1000) {
-        usleep(sleepDurationUs);
-        ALOGD_IF(II_DEBUG, "Slept for %d ms", sleepDurationUs / 1000);
-    }
-
-    Locker::Autolock _l(mLock);
-    //If an update happened while we were asleep, sleep again
-    if(mSleepAgain) {
-        //We need to sleep again!
-        mSleepAgain = false;
-        return true;
-    }
-
-#if II_DEBUG
-    gettimeofday(&currentTime, NULL);
-    timeSinceUpdateUs = (currentTime.tv_sec - lastUpdateTime.tv_sec) *
-            1000000 + (currentTime.tv_usec - lastUpdateTime.tv_usec);
-    ALOGD("Idle refresh after %dms", timeSinceUpdateUs / 1000);
-#endif
-
-    mHandler((void*)mHwcContext);
-    return false;
+    return true;
 }
 
 int IdleInvalidator::readyToRun() {
-    ALOGD_IF(II_DEBUG, "%s", __func__);
+    ALOGD_IF(II_DEBUG, "IdleInvalidator::%s", __FUNCTION__);
     return 0; /*NO_ERROR*/
 }
 
 void IdleInvalidator::onFirstRef() {
-    ALOGD_IF(II_DEBUG, "%s", __func__);
-}
-
-void IdleInvalidator::handleUpdateEvent() {
-    Locker::Autolock _l(mLock);
-    gettimeofday(&mLastUpdateTime, NULL);
-    mSleepAgain = true;
-    //Triggers the threadLoop to run, if not already running.
-    run(threadName, android::PRIORITY_AUDIO);
+    ALOGD_IF(II_DEBUG, "IdleInvalidator::%s", __FUNCTION__);
 }
 
 IdleInvalidator *IdleInvalidator::getInstance() {
-    ALOGD_IF(II_DEBUG, "%s", __func__);
+    ALOGD_IF(II_DEBUG, "IdleInvalidator::%s", __FUNCTION__);
     if(sInstance.get() == NULL)
         sInstance = new IdleInvalidator();
     return sInstance.get();
