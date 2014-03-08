@@ -105,7 +105,10 @@ static void hwc_registerProcs(struct hwc_composer_device_1* dev,
 //Helper
 static void reset(hwc_context_t *ctx, int numDisplays,
                   hwc_display_contents_1_t** displays) {
+
     ctx->numActiveDisplays = 0;
+    ctx->isPaddingRound = false;
+
     for(int i = 0; i < numDisplays; i++) {
         hwc_display_contents_1_t *list = displays[i];
         // XXX:SurfaceFlinger no longer guarantees that this
@@ -125,6 +128,17 @@ static void reset(hwc_context_t *ctx, int numDisplays,
              * the display device to be active.
              */
             ctx->numActiveDisplays += 1;
+
+            if((ctx->mPrevHwLayerCount[i] == 1) and (list->numHwLayers > 1)) {
+                /* If the previous cycle for dpy 'i' has 0 AppLayers and the
+                 * current cycle has atleast 1 AppLayer, padding round needs
+                 * to be invoked on current cycle to free up the resources.
+                 */
+                ctx->isPaddingRound = true;
+            }
+            ctx->mPrevHwLayerCount[i] = list->numHwLayers;
+        } else {
+            ctx->mPrevHwLayerCount[i] = 0;
         }
 
         if(ctx->mFBUpdate[i])
@@ -133,7 +147,6 @@ static void reset(hwc_context_t *ctx, int numDisplays,
             ctx->mCopyBit[i]->reset();
         if(ctx->mLayerRotMap[i])
             ctx->mLayerRotMap[i]->reset();
-
     }
 
     ctx->mAD->reset();
@@ -424,8 +437,11 @@ static void reset_panel(struct hwc_composer_device_1* dev)
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
 
-    if (!ctx->mPanelResetStatus)
+    if (!ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isActive) {
+        ALOGD ("%s : Display OFF - Skip BLANK & UNBLANK", __FUNCTION__);
+        ctx->mPanelResetStatus = false;
         return;
+    }
 
     ALOGD("%s: calling BLANK DISPLAY", __FUNCTION__);
     ret = hwc_blank(dev, HWC_DISPLAY_PRIMARY, 1);
@@ -761,6 +777,8 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
     if (!strcmp(name, HWC_HARDWARE_COMPOSER)) {
         struct hwc_context_t *dev;
         dev = (hwc_context_t*)malloc(sizeof(*dev));
+        if(dev == NULL)
+            return status;
         memset(dev, 0, sizeof(*dev));
 
         //Initialize hwc context

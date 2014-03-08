@@ -103,12 +103,15 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
             }
         }
         break;
+        case UPDATE_COLOR_SPACE:
+            data->colorSpace = *((ColorSpace_t *)param);
+            break;
         default:
             ALOGE("Unknown paramType %d", paramType);
             break;
     }
     if(munmap(base, size))
-        ALOGE("%s: failed to unmap ptr 0x%"PRIdPTR", err %d", __func__, (intptr_t)base,
+        ALOGE("%s: failed to unmap ptr %p, err %d", __func__, (void*)base,
                                                                         errno);
     return 0;
 }

@@ -284,7 +284,7 @@ int HWCVirtualV4L2::set(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
 
     closeAcquireFds(list);
 
-    if (list && !ctx->mVirtualonExtActive && (list->retireFenceFd < 0) ) {
+    if (list && list->outbuf && (list->retireFenceFd < 0) ) {
         // SF assumes HWC waits for the acquire fence and returns a new fence
         // that signals when we're done. Since we don't wait, and also don't
         // touch the buffer, we can just handle the acquire fence back to SF
