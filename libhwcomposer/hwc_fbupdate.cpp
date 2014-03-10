@@ -39,13 +39,16 @@ namespace ovutils = overlay::utils;
 
 IFBUpdate* IFBUpdate::getObject(hwc_context_t *ctx, const int& dpy) {
     if(isDisplaySplit(ctx, dpy)) {
+        if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
+            return new FBSrcSplit(ctx, dpy);
+        }
         return new FBUpdateSplit(ctx, dpy);
     }
     return new FBUpdateNonSplit(ctx, dpy);
 }
 
 IFBUpdate::IFBUpdate(hwc_context_t *ctx, const int& dpy) : mDpy(dpy) {
-    size_t size;
+    size_t size = 0;
     getBufferAttributes(ctx->dpyAttr[mDpy].xres,
             ctx->dpyAttr[mDpy].yres,
             HAL_PIXEL_FORMAT_RGBA_8888,
@@ -62,7 +65,8 @@ void IFBUpdate::reset() {
 
 bool IFBUpdate::prepareAndValidate(hwc_context_t *ctx,
             hwc_display_contents_1 *list, int fbZorder) {
-    return prepare(ctx, list, fbZorder) &&
+    hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
+    return prepare(ctx, list, layer->displayFrame, fbZorder) &&
             ctx->mOverlay->validateAndSet(mDpy, ctx->dpyAttr[mDpy].fd);
 }
 
@@ -106,19 +110,19 @@ bool FBUpdateNonSplit::preRotateExtDisplay(hwc_context_t *ctx,
 }
 
 bool FBUpdateNonSplit::prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
-                             int fbZorder) {
+                             hwc_rect_t fbUpdatingRect, int fbZorder) {
     if(!ctx->mMDP.hasOverlay) {
         ALOGD_IF(DEBUG_FBUPDATE, "%s, this hw doesnt support overlays",
                  __FUNCTION__);
         return false;
     }
-    mModeOn = configure(ctx, list, fbZorder);
+    mModeOn = configure(ctx, list, fbUpdatingRect, fbZorder);
     return mModeOn;
 }
 
 // Configure
 bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
-                               int fbZorder) {
+                               hwc_rect_t fbUpdatingRect, int fbZorder) {
     bool ret = false;
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
@@ -159,6 +163,15 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
 
         hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
         hwc_rect_t displayFrame = layer->displayFrame;
+
+        // No FB update optimization on (1) Custom FB resolution,
+        // (2) External Mirror mode, (3) External orientation
+        if(!ctx->dpyAttr[mDpy].customFBSize && !ctx->mBufferMirrorMode
+           && !ctx->mExtOrientation) {
+            sourceCrop = fbUpdatingRect;
+            displayFrame = fbUpdatingRect;
+        }
+
         int transform = layer->transform;
         int rotFlags = ovutils::ROT_FLAGS_NONE;
 
@@ -251,20 +264,20 @@ void FBUpdateSplit::reset() {
 }
 
 bool FBUpdateSplit::prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
-                              int fbZorder) {
+                              hwc_rect_t fbUpdatingRect, int fbZorder) {
     if(!ctx->mMDP.hasOverlay) {
         ALOGD_IF(DEBUG_FBUPDATE, "%s, this hw doesnt support overlays",
                  __FUNCTION__);
         return false;
     }
     ALOGD_IF(DEBUG_FBUPDATE, "%s, mModeOn = %d", __FUNCTION__, mModeOn);
-    mModeOn = configure(ctx, list, fbZorder);
+    mModeOn = configure(ctx, list, fbUpdatingRect, fbZorder);
     return mModeOn;
 }
 
 // Configure
 bool FBUpdateSplit::configure(hwc_context_t *ctx,
-        hwc_display_contents_1 *list, int fbZorder) {
+        hwc_display_contents_1 *list, hwc_rect_t fbUpdatingRect, int fbZorder) {
     bool ret = false;
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
@@ -328,8 +341,8 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
                                 getBlending(layer->blending));
         ov.setSource(pargR, destR);
 
-        hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
-        hwc_rect_t displayFrame = layer->displayFrame;
+        hwc_rect_t sourceCrop = fbUpdatingRect;
+        hwc_rect_t displayFrame = fbUpdatingRect;
 
         const float xres = ctx->dpyAttr[mDpy].xres;
         const int lSplit = getLeftSplit(ctx, mDpy);
@@ -408,6 +421,103 @@ bool FBUpdateSplit::draw(hwc_context_t *ctx, private_handle_t *hnd)
         ALOGE("%s: queue failed for right of dpy = %d",
               __FUNCTION__, mDpy);
         ret = false;
+    }
+    return ret;
+}
+
+//=================FBSrcSplit====================================
+FBSrcSplit::FBSrcSplit(hwc_context_t *ctx, const int& dpy):
+        FBUpdateSplit(ctx, dpy) {}
+
+bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
+        hwc_rect_t fbUpdatingRect, int fbZorder) {
+    bool ret = false;
+    hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
+    int extOnlyLayerIndex = ctx->listStats[mDpy].extOnlyLayerIndex;
+    // ext only layer present..
+    if(extOnlyLayerIndex != -1) {
+        layer = &list->hwLayers[extOnlyLayerIndex];
+        layer->compositionType = HWC_OVERLAY;
+    }
+    overlay::Overlay& ov = *(ctx->mOverlay);
+
+    ovutils::Whf info(mAlignedFBWidth,
+            mAlignedFBHeight,
+            ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888,
+                mTileEnabled));
+    //Request left pipe, VG first owing to higher prio
+    ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_VG, mDpy,
+            Overlay::MIXER_DEFAULT);
+    if(destL == ovutils::OV_INVALID) {
+        destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
+            Overlay::MIXER_DEFAULT);
+        if(destL == ovutils::OV_INVALID) {
+            ALOGE("%s: No pipes available to configure fb for dpy %d's left"
+                    " mixer", __FUNCTION__, mDpy);
+            return false;
+        }
+    }
+    //Request right pipe
+    ovutils::eDest destR = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
+            Overlay::MIXER_DEFAULT);
+    if(destR == ovutils::OV_INVALID) {
+        ALOGE("%s: No pipes available to configure fb for dpy %d's right"
+                " mixer", __FUNCTION__, mDpy);
+        return false;
+    }
+
+    mDestLeft = destL;
+    mDestRight = destR;
+
+    ovutils::eMdpFlags mdpFlags = OV_MDP_BLEND_FG_PREMULT;
+    ovutils::eZorder zOrder = static_cast<ovutils::eZorder>(fbZorder);
+
+    ovutils::PipeArgs parg(mdpFlags,
+            info,
+            zOrder,
+            ovutils::IS_FG_OFF,
+            ovutils::ROT_FLAGS_NONE,
+            ovutils::DEFAULT_PLANE_ALPHA,
+            (ovutils::eBlending)
+            getBlending(layer->blending));
+    ov.setSource(parg, destL);
+    ov.setSource(parg, destR);
+
+    //Crop and Position are same for FB
+    ovutils::Dim cropPosL(
+            fbUpdatingRect.left,
+            fbUpdatingRect.top,
+            (fbUpdatingRect.right - fbUpdatingRect.left) / 2,
+            fbUpdatingRect.bottom - fbUpdatingRect.top);
+
+    ovutils::Dim cropPosR(
+            cropPosL.x + cropPosL.w,
+            cropPosL.y,
+            cropPosL.w,
+            cropPosL.h);
+
+    ov.setCrop(cropPosL, destL);
+    ov.setCrop(cropPosR, destR);
+    ov.setPosition(cropPosL, destL);
+    ov.setPosition(cropPosR, destR);
+
+    int transform = layer->transform;
+    ovutils::eTransform orient =
+            static_cast<ovutils::eTransform>(transform);
+    ov.setTransform(orient, destL);
+    ov.setTransform(orient, destR);
+
+    ret = true;
+    if (!ov.commit(destL)) {
+        ALOGE("%s: commit fails for left", __FUNCTION__);
+        ret = false;
+    }
+    if (!ov.commit(destR)) {
+        ALOGE("%s: commit fails for right", __FUNCTION__);
+        ret = false;
+    }
+    if(ret == false) {
+        ctx->mLayerRotMap[mDpy]->clear();
     }
     return ret;
 }
