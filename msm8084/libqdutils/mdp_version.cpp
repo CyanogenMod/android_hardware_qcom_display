@@ -70,6 +70,7 @@ MDPVersion::MDPVersion()
     mPanelType = NO_PANEL;
     mLowBw = 0;
     mHighBw = 0;
+    mSourceSplit = false;
 
     if(!updatePanelInfo()) {
         ALOGE("Unable to read Primary Panel Information");
@@ -149,7 +150,7 @@ bool MDPVersion::updatePanelInfo() {
 // and parses and updates information accordingly.
 bool MDPVersion::updateSysFsInfo() {
     FILE *sysfsFd;
-    size_t len = 0;
+    size_t len = PAGE_SIZE;
     ssize_t read;
     char *line = NULL;
     char sysfsPath[255];
@@ -172,6 +173,7 @@ bool MDPVersion::updateSysFsInfo() {
                 __FUNCTION__, sysfsPath);
         return false;
     } else {
+        line = (char *) malloc(len);
         while((read = getline(&line, &len, sysfsFd)) != -1) {
             int index=0;
             char *tokens[10];
@@ -183,13 +185,13 @@ bool MDPVersion::updateSysFsInfo() {
                     mMdpRev = atoi(tokens[1]);
                 }
                 else if(!strncmp(tokens[0], "rgb_pipes", strlen("rgb_pipes"))) {
-                    mRGBPipes = atoi(tokens[1]);
+                    mRGBPipes = (uint8_t)atoi(tokens[1]);
                 }
                 else if(!strncmp(tokens[0], "vig_pipes", strlen("vig_pipes"))) {
-                    mVGPipes = atoi(tokens[1]);
+                    mVGPipes = (uint8_t)atoi(tokens[1]);
                 }
                 else if(!strncmp(tokens[0], "dma_pipes", strlen("dma_pipes"))) {
-                    mDMAPipes = atoi(tokens[1]);
+                    mDMAPipes = (uint8_t)atoi(tokens[1]);
                 }
                 else if(!strncmp(tokens[0], "max_downscale_ratio",
                                 strlen("max_downscale_ratio"))) {
@@ -217,13 +219,15 @@ bool MDPVersion::updateSysFsInfo() {
                                     strlen("tile_format"))) {
                            if(enableMacroTile)
                                mMacroTileEnabled = true;
+                        } else if(!strncmp(tokens[i], "src_split",
+                                    strlen("src_split"))) {
+                            mSourceSplit = true;
                         }
                     }
                 }
             }
-            free(line);
-            line = NULL;
         }
+        free(line);
         fclose(sysfsFd);
     }
     ALOGD_IF(DEBUG, "%s: mMDPVersion: %d mMdpRev: %x mRGBPipes:%d,"
@@ -246,6 +250,7 @@ bool MDPVersion::updateSplitInfo() {
         if(fp){
             //Format "left right" space as delimiter
             if(fread(split, sizeof(char), 64, fp)) {
+                split[sizeof(split) - 1] = '\0';
                 mSplit.mLeft = atoi(split);
                 ALOGI_IF(mSplit.mLeft, "Left Split=%d", mSplit.mLeft);
                 char *rght = strpbrk(split, " ");
@@ -284,6 +289,10 @@ bool MDPVersion::supportsBWC() {
 bool MDPVersion::supportsMacroTile() {
     // MACRO TILE support
     return mMacroTileEnabled;
+}
+
+bool MDPVersion::isSrcSplit() const {
+    return mSourceSplit;
 }
 
 bool MDPVersion::is8x26() {

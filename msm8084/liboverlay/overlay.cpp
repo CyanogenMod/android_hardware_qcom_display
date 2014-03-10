@@ -45,7 +45,8 @@ using namespace utils;
 
 
 Overlay::Overlay() {
-    PipeBook::NUM_PIPES = qdutils::MDPVersion::getInstance().getTotalPipes();
+    int numPipes = qdutils::MDPVersion::getInstance().getTotalPipes();
+    PipeBook::NUM_PIPES = (numPipes <= utils::OV_MAX)? numPipes : utils::OV_MAX;
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
         mPipeBook[i].init();
     }
@@ -79,11 +80,11 @@ void Overlay::configDone() {
             //fds
             if(mPipeBook[i].valid()) {
                 char str[32];
-                sprintf(str, "Unset=%s dpy=%d mix=%d; ",
+                snprintf(str, 32, "Unset=%s dpy=%d mix=%d; ",
                         PipeBook::getDestStr((eDest)i),
                         mPipeBook[i].mDisplay, mPipeBook[i].mMixer);
 #if PIPE_DEBUG
-                strncat(mDumpStr, str, strlen(str));
+                strlcat(mDumpStr, str, sizeof(mDumpStr));
 #endif
             }
             mPipeBook[i].destroy();
@@ -146,7 +147,7 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
             snprintf(str, 32, "Set=%s dpy=%d mix=%d; ",
                      PipeBook::getDestStr(dest), dpy, mixer);
 #if PIPE_DEBUG
-            strncat(mDumpStr, str, strlen(str));
+            strlcat(mDumpStr, str, sizeof(mDumpStr));
 #endif
         }
     } else {
@@ -396,19 +397,19 @@ void Overlay::dump() const {
 void Overlay::getDump(char *buf, size_t len) {
     int totalPipes = 0;
     const char *str = "\nOverlay State\n\n";
-    strncat(buf, str, strlen(str));
+    strlcat(buf, str, len);
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
         if(mPipeBook[i].valid()) {
             mPipeBook[i].mPipe->getDump(buf, len);
             char str[64] = {'\0'};
             snprintf(str, 64, "Display=%d\n\n", mPipeBook[i].mDisplay);
-            strncat(buf, str, strlen(str));
+            strlcat(buf, str, len);
             totalPipes++;
         }
     }
     char str_pipes[64] = {'\0'};
     snprintf(str_pipes, 64, "Pipes=%d\n\n", totalPipes);
-    strncat(buf, str_pipes, strlen(str_pipes));
+    strlcat(buf, str_pipes, len);
 }
 
 void Overlay::clear(int dpy) {

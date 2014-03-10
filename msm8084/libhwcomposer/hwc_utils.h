@@ -211,6 +211,11 @@ inline bool isNonIntegralSourceCrop(const hwc_frect_t& cropF) {
 // -----------------------------------------------------------------------------
 // Utility functions - implemented in hwc_utils.cpp
 void dumpLayer(hwc_layer_1_t const* l);
+
+// Calculate viewframe for external/primary display from primary resolution and
+// primary device orientation
+hwc_rect_t calculateDisplayViewFrame(hwc_context_t *ctx, int dpy);
+
 void setListStats(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         int dpy);
 void initContext(hwc_context_t *ctx);
@@ -377,16 +382,6 @@ static inline bool isExtOnly(const private_handle_t* hnd) {
     return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_ONLY));
 }
 
-//Return true if buffer is for external display only with a BLOCK flag.
-static inline bool isExtBlock(const private_handle_t* hnd) {
-    return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_BLOCK));
-}
-
-//Return true if buffer is for external display only with a Close Caption flag.
-static inline bool isExtCC(const private_handle_t* hnd) {
-    return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_CC));
-}
-
 //Return true if the buffer is intended for Secure Display
 static inline bool isSecureDisplayBuffer(const private_handle_t* hnd) {
     return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_SECURE_DISPLAY));
@@ -482,6 +477,10 @@ struct hwc_context_t {
     qhwc::VPUClient *mVPUClient;
     eAnimationState mAnimationState[HWC_NUM_DISPLAY_TYPES];
     qhwc::HWCVirtualBase *mHWCVirtual;
+
+    // stores the #numHwLayers of the previous frame
+    // for each display device
+    int mPrevHwLayerCount[HWC_NUM_DISPLAY_TYPES];
 
     // stores the primary device orientation
     int deviceOrientation;

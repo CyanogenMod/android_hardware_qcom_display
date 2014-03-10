@@ -424,7 +424,7 @@ int getMdpOrient(eTransform rotation);
 const char* getFormatString(int format);
 
 template <class T>
-inline void memset0(T& t) { ::memset(&t, 0, sizeof(T)); }
+inline void memset0(T& t) { ::memset(&t, 0, sizeof(t)); }
 
 template <class T> inline void swap ( T& a, T& b )
 {
@@ -555,6 +555,7 @@ inline const char* getFormatString(int format){
     formats[MDP_XRGB_8888_TILE] = STR(MDP_XRGB_8888_TILE);
     formats[MDP_XBGR_8888_TILE] = STR(MDP_XBGR_8888_TILE);
     formats[MDP_BGRX_8888_TILE] = STR(MDP_BGRX_8888_TILE);
+    formats[MDP_RGB_565_TILE] = STR(MDP_RGB_565_TILE);
     formats[MDP_IMGTYPE_LIMIT] = STR(MDP_IMGTYPE_LIMIT);
 
     if(format < 0 || format >= MDP_IMGTYPE_LIMIT) {
@@ -816,7 +817,7 @@ inline bool OvFD::open(const char* const dev, int flags)
 
 inline void OvFD::setPath(const char* const dev)
 {
-    ::strncpy(mPath, dev, utils::MAX_PATH_LEN);
+    ::strlcpy(mPath, dev, sizeof(mPath));
 }
 
 inline bool OvFD::close()
