@@ -65,6 +65,14 @@ protected:
         MDPCOMP_OV_ANY,
     };
 
+    //Simulation flags
+    enum {
+        MDPCOMP_AVOID_FULL_MDP = 0x001,
+        MDPCOMP_AVOID_CACHE_MDP = 0x002,
+        MDPCOMP_AVOID_LOAD_MDP = 0x004,
+        MDPCOMP_AVOID_VIDEO_ONLY = 0x008,
+    };
+
     /* mdp pipe data */
     struct MdpPipeInfo {
         int zOrder;
@@ -224,6 +232,7 @@ protected:
     int mDpy;
     static bool sEnabled;
     static bool sEnableMixedMode;
+    static int sSimulationFlags;
     static bool sDebugLogs;
     static bool sIdleFallBack;
     /* Handles the timeout event from kernel, if the value is set to true */
