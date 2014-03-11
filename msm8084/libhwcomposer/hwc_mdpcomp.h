@@ -226,6 +226,7 @@ protected:
     /* Handles the timeout event from kernel, if the value is set to true */
     static bool sHandleTimeout;
     static int sMaxPipesPerMixer;
+    static bool sSrcSplitEnabled;
     static IdleInvalidator *idleInvalidator;
     struct FrameInfo mCurrentFrame;
     struct LayerCache mCachedFrame;
