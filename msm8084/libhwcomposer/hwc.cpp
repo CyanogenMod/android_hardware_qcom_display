@@ -545,7 +545,8 @@ static int hwc_query(struct hwc_composer_device_1* dev,
     case HWC_DISPLAY_TYPES_SUPPORTED:
         if(ctx->mMDP.hasOverlay) {
             supported |= HWC_DISPLAY_VIRTUAL_BIT;
-            if(!qdutils::MDPVersion::getInstance().is8x26())
+            if(!(qdutils::MDPVersion::getInstance().is8x26() ||
+                        qdutils::MDPVersion::getInstance().is8x16()))
                 supported |= HWC_DISPLAY_EXTERNAL_BIT;
         }
         value[0] = supported;
