@@ -51,6 +51,26 @@ using namespace overlay;
 using namespace overlay::utils;
 namespace ovutils = overlay::utils;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+EGLAPI EGLBoolean eglGpuPerfHintQCOM(EGLDisplay dpy, EGLContext ctx,
+                                           EGLint *attrib_list);
+#define EGL_GPU_HINT_1        0x32D0
+#define EGL_GPU_HINT_2        0x32D1
+
+#define EGL_GPU_LEVEL_0       0x0
+#define EGL_GPU_LEVEL_1       0x1
+#define EGL_GPU_LEVEL_2       0x2
+#define EGL_GPU_LEVEL_3       0x3
+#define EGL_GPU_LEVEL_4       0x4
+#define EGL_GPU_LEVEL_5       0x5
+
+#ifdef __cplusplus
+}
+#endif
+
 namespace qhwc {
 
 bool isValidResolution(hwc_context_t *ctx, uint32_t xres, uint32_t yres)
@@ -243,6 +263,15 @@ void initContext(hwc_context_t *ctx)
             && !strcmp(value, "true")) {
         ctx->mMDPDownscaleEnabled = true;
     }
+
+    // Initialize gpu perfomance hint related parameters
+    property_get("sys.hwc.gpu_perf_mode", value, "0");
+    ctx->mGPUHintInfo.mGpuPerfModeEnable = atoi(value)? true : false;
+
+    ctx->mGPUHintInfo.mEGLDisplay = NULL;
+    ctx->mGPUHintInfo.mEGLContext = NULL;
+    ctx->mGPUHintInfo.mPrevCompositionGLES = false;
+    ctx->mGPUHintInfo.mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
 
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
@@ -2006,6 +2035,78 @@ bool canUseMDPforVirtualDisplay(hwc_context_t* ctx,
     }
 
     return true;
+}
+
+bool isGLESComp(hwc_context_t *ctx,
+                     hwc_display_contents_1_t* list) {
+    int numAppLayers = ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers;
+    for(int index = 0; index < numAppLayers; index++) {
+        hwc_layer_1_t* layer = &(list->hwLayers[index]);
+        if(layer->compositionType == HWC_FRAMEBUFFER)
+            return true;
+    }
+    return false;
+}
+
+void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
+    struct gpu_hint_info *gpuHint = &ctx->mGPUHintInfo;
+    if(!gpuHint->mGpuPerfModeEnable)
+        return;
+    /* Set the GPU hint flag to high for MIXED/GPU composition only for
+       first frame after MDP -> GPU/MIXED mode transition. Set the GPU
+       hint to default if the previous composition is GPU or current GPU
+       composition is due to idle fallback */
+    if(!gpuHint->mEGLDisplay || !gpuHint->mEGLContext) {
+        gpuHint->mEGLDisplay = eglGetCurrentDisplay();
+        if(!gpuHint->mEGLDisplay) {
+            ALOGW("%s Warning: EGL current display is NULL", __FUNCTION__);
+            return;
+        }
+        gpuHint->mEGLContext = eglGetCurrentContext();
+        if(!gpuHint->mEGLContext) {
+            ALOGW("%s Warning: EGL current context is NULL", __FUNCTION__);
+            return;
+        }
+    }
+    if(isGLESComp(ctx, list)) {
+        if(!gpuHint->mPrevCompositionGLES && !MDPComp::isIdleFallback()) {
+            EGLint attr_list[] = {EGL_GPU_HINT_1,
+                                  EGL_GPU_LEVEL_3,
+                                  EGL_NONE };
+            if((gpuHint->mCurrGPUPerfMode != EGL_GPU_LEVEL_3) &&
+                !eglGpuPerfHintQCOM(gpuHint->mEGLDisplay,
+                                    gpuHint->mEGLContext, attr_list)) {
+                ALOGW("eglGpuPerfHintQCOM failed for Built in display");
+            } else {
+                gpuHint->mCurrGPUPerfMode = EGL_GPU_LEVEL_3;
+                gpuHint->mPrevCompositionGLES = true;
+            }
+        } else {
+            EGLint attr_list[] = {EGL_GPU_HINT_1,
+                                  EGL_GPU_LEVEL_0,
+                                  EGL_NONE };
+            if((gpuHint->mCurrGPUPerfMode != EGL_GPU_LEVEL_0) &&
+                !eglGpuPerfHintQCOM(gpuHint->mEGLDisplay,
+                                    gpuHint->mEGLContext, attr_list)) {
+                ALOGW("eglGpuPerfHintQCOM failed for Built in display");
+            } else {
+                gpuHint->mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
+            }
+        }
+    } else {
+        /* set the GPU hint flag to default for MDP composition */
+        EGLint attr_list[] = {EGL_GPU_HINT_1,
+                              EGL_GPU_LEVEL_0,
+                              EGL_NONE };
+        if((gpuHint->mCurrGPUPerfMode != EGL_GPU_LEVEL_0) &&
+                !eglGpuPerfHintQCOM(gpuHint->mEGLDisplay,
+                                    gpuHint->mEGLContext, attr_list)) {
+            ALOGW("eglGpuPerfHintQCOM failed for Built in display");
+        } else {
+            gpuHint->mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
+        }
+        gpuHint->mPrevCompositionGLES = false;
+    }
 }
 
 void BwcPM::setBwc(const hwc_rect_t& crop,
