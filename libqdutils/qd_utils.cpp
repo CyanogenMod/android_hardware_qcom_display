@@ -31,6 +31,7 @@
 
 
 #define MAX_FRAME_BUFFER_NAME_SIZE      (80)
+#define QD_UTILS_DEBUG 0
 
 int getHDMINode(void)
 {
@@ -90,5 +91,33 @@ int getEdidRawData(char *buffer)
     size = (int)read(edidFile, (char*)buffer, EDID_RAW_DATA_SIZE);
     close(edidFile);
     return size;
+}
+
+/* Calculates the aspect ratio for based on src & dest */
+void getAspectRatioPosition(int destWidth, int destHeight, int srcWidth,
+                                int srcHeight, hwc_rect_t& rect) {
+   int x =0, y =0;
+
+   if (srcWidth * destHeight > destWidth * srcHeight) {
+        srcHeight = destWidth * srcHeight / srcWidth;
+        srcWidth = destWidth;
+    } else if (srcWidth * destHeight < destWidth * srcHeight) {
+        srcWidth = destHeight * srcWidth / srcHeight;
+        srcHeight = destHeight;
+    } else {
+        srcWidth = destWidth;
+        srcHeight = destHeight;
+    }
+    if (srcWidth > destWidth) srcWidth = destWidth;
+    if (srcHeight > destHeight) srcHeight = destHeight;
+    x = (destWidth - srcWidth) / 2;
+    y = (destHeight - srcHeight) / 2;
+    ALOGD_IF(QD_UTILS_DEBUG, "%s: AS Position: x = %d, y = %d w = %d h = %d",
+             __FUNCTION__, x, y, srcWidth , srcHeight);
+    // Convert it back to hwc_rect_t
+    rect.left = x;
+    rect.top = y;
+    rect.right = srcWidth + rect.left;
+    rect.bottom = srcHeight + rect.top;
 }
 
