@@ -60,7 +60,6 @@ class MDPComp;
 class CopyBit;
 class HwcDebug;
 class AssertiveDisplay;
-class VPUClient;
 class HWCVirtualBase;
 
 
@@ -145,14 +144,12 @@ struct BwcPM {
 enum {
     HWC_MDPCOMP = 0x00000001,
     HWC_COPYBIT = 0x00000002,
-    HWC_VPUCOMP = 0x00000004,
 };
 
 // HAL specific features
 enum {
     HWC_COLOR_FILL = 0x00000008,
     HWC_FORMAT_RB_SWAP = 0x00000040,
-    HWC_VPU_PIPE = 0x00000200,
 };
 
 class LayerRotMap {
@@ -474,7 +471,6 @@ struct hwc_context_t {
     qhwc::HwcDebug *mHwcDebug[HWC_NUM_DISPLAY_TYPES];
     hwc_rect_t mViewFrame[HWC_NUM_DISPLAY_TYPES];
     qhwc::AssertiveDisplay *mAD;
-    qhwc::VPUClient *mVPUClient;
     eAnimationState mAnimationState[HWC_NUM_DISPLAY_TYPES];
     qhwc::HWCVirtualBase *mHWCVirtual;
 
