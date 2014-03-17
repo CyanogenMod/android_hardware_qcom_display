@@ -91,7 +91,6 @@ struct private_module_t HAL_MODULE_INFO_SYM = {
     numBuffers: 0,
     bufferMask: 0,
     lock: PTHREAD_MUTEX_INITIALIZER,
-    currentBuffer: 0,
 };
 
 // Open Gralloc device

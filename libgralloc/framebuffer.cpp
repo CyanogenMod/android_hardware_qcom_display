@@ -58,8 +58,9 @@ enum {
 
 struct fb_context_t {
     framebuffer_device_t  device;
+    //fd - which is returned on open
+    int fbFd;
 };
-
 
 static int fb_setSwapInterval(struct framebuffer_device_t* dev,
                               int interval)
@@ -87,11 +88,12 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
         reinterpret_cast<private_module_t*>(dev->common.module);
     private_handle_t *hnd = static_cast<private_handle_t*>
         (const_cast<native_handle_t*>(buffer));
+    fb_context_t *ctx = reinterpret_cast<fb_context_t*>(dev);
     const unsigned int offset = (unsigned int) (hnd->base -
             m->framebuffer->base);
     m->info.activate = FB_ACTIVATE_VBL;
     m->info.yoffset = (int)(offset / m->finfo.line_length);
-    if (ioctl(m->framebuffer->fd, FBIOPUT_VSCREENINFO, &m->info) == -1) {
+    if (ioctl(ctx->fbFd, FBIOPUT_VSCREENINFO, &m->info) == -1) {
         ALOGE("%s: FBIOPUT_VSCREENINFO for primary failed, str: %s",
                 __FUNCTION__, strerror(errno));
         return -errno;
@@ -110,8 +112,11 @@ static int fb_compositionComplete(struct framebuffer_device_t* dev)
     return 0;
 }
 
-int mapFrameBufferLocked(struct private_module_t* module)
+int mapFrameBufferLocked(framebuffer_device_t *dev)
 {
+    private_module_t* module =
+        reinterpret_cast<private_module_t*>(dev->common.module);
+    fb_context_t *ctx = reinterpret_cast<fb_context_t*>(dev);
     // already initialized...
     if (module->framebuffer) {
         return 0;
@@ -133,8 +138,6 @@ int mapFrameBufferLocked(struct private_module_t* module)
     }
     if (fd < 0)
         return -errno;
-
-    memset(&module->commit, 0, sizeof(struct mdp_display_commit));
 
     struct fb_fix_screeninfo finfo;
     if (ioctl(fd, FBIOGET_FSCREENINFO, &finfo) == -1) {
@@ -329,34 +332,55 @@ int mapFrameBufferLocked(struct private_module_t* module)
     //adreno needs page aligned offsets. Align the fbsize to pagesize.
     unsigned int fbSize = roundUpToPageSize(finfo.line_length * info.yres)*
                     module->numBuffers;
-    module->framebuffer = new private_handle_t(fd, fbSize,
-                                        private_handle_t::PRIV_FLAGS_USES_ION,
-                                        BUFFER_TYPE_UI,
-                                        module->fbFormat, info.xres, info.yres);
     void* vaddr = mmap(0, fbSize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     if (vaddr == MAP_FAILED) {
         ALOGE("Error mapping the framebuffer (%s)", strerror(errno));
         close(fd);
         return -errno;
     }
+    //store the framebuffer fd in the ctx
+    ctx->fbFd = fd;
+#ifdef MSMFB_METADATA_GET
+    memset(&metadata, 0 , sizeof(metadata));
+    metadata.op = metadata_op_get_ion_fd;
+    // get the ION fd for the framebuffer, as GPU needs ION fd
+    if (ioctl(fd, MSMFB_METADATA_GET, &metadata) == -1) {
+        ALOGE("Error getting ION fd (%s)", strerror(errno));
+        close(fd);
+        return -errno;
+    }
+    if(metadata.data.fbmem_ionfd < 0) {
+        ALOGE("Error: Ioctl returned invalid ION fd = %d",
+                                        metadata.data.fbmem_ionfd);
+        close(fd);
+        return -errno;
+    }
+    fd = metadata.data.fbmem_ionfd;
+#endif
+    // Create framebuffer handle using the ION fd
+    module->framebuffer = new private_handle_t(fd, fbSize,
+                                        private_handle_t::PRIV_FLAGS_USES_ION,
+                                        BUFFER_TYPE_UI,
+                                        module->fbFormat, info.xres, info.yres);
     module->framebuffer->base = uint64_t(vaddr);
     memset(vaddr, 0, fbSize);
     //Enable vsync
     int enable = 1;
-    ioctl(module->framebuffer->fd, MSMFB_OVERLAY_VSYNC_CTRL,
-             &enable);
+    ioctl(ctx->fbFd, MSMFB_OVERLAY_VSYNC_CTRL, &enable);
     return 0;
 }
 
-static int mapFrameBuffer(struct private_module_t* module)
+static int mapFrameBuffer(framebuffer_device_t *dev)
 {
     int err = -1;
     char property[PROPERTY_VALUE_MAX];
     if((property_get("debug.gralloc.map_fb_memory", property, NULL) > 0) &&
        (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
         (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+        private_module_t* module =
+            reinterpret_cast<private_module_t*>(dev->common.module);
         pthread_mutex_lock(&module->lock);
-        err = mapFrameBufferLocked(module);
+        err = mapFrameBufferLocked(dev);
         pthread_mutex_unlock(&module->lock);
     }
     return err;
@@ -368,6 +392,11 @@ static int fb_close(struct hw_device_t *dev)
 {
     fb_context_t* ctx = (fb_context_t*)dev;
     if (ctx) {
+#ifdef MSMFB_METADATA_GET
+        if(ctx->fbFd >=0) {
+            close(ctx->fbFd);
+        }
+#endif
         //Hack until fbdev is removed. Framework could close this causing hwc a
         //pain.
         //free(ctx);
@@ -403,8 +432,8 @@ int fb_device_open(hw_module_t const* module, const char* name,
         dev->device.setUpdateRect   = 0;
         dev->device.compositionComplete = fb_compositionComplete;
 
-        private_module_t* m = (private_module_t*)module;
-        status = mapFrameBuffer(m);
+        status = mapFrameBuffer((framebuffer_device_t*)dev);
+        private_module_t* m = (private_module_t*)dev->device.common.module;
         if (status >= 0) {
             int stride = m->finfo.line_length / (m->info.bits_per_pixel >> 3);
             const_cast<uint32_t&>(dev->device.flags) = 0;
