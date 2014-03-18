@@ -66,8 +66,9 @@ void IFBUpdate::reset() {
 bool IFBUpdate::prepareAndValidate(hwc_context_t *ctx,
             hwc_display_contents_1 *list, int fbZorder) {
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
-    return prepare(ctx, list, layer->displayFrame, fbZorder) &&
+    mModeOn = prepare(ctx, list, layer->displayFrame, fbZorder) &&
             ctx->mOverlay->validateAndSet(mDpy, ctx->dpyAttr[mDpy].fd);
+    return mModeOn;
 }
 
 //================= Low res====================================
