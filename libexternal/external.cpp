@@ -35,6 +35,7 @@
 #include "overlayUtils.h"
 #include "overlay.h"
 #include "mdp_version.h"
+#include "qd_utils.h"
 
 using namespace android;
 
@@ -595,14 +596,27 @@ void ExternalDisplay::setAttributes() {
             // Restrict this upto 1080p resolution max
             if(((priW * priH) > (width * height)) &&
                ((priW * priH) <= SUPPORTED_DOWNSCALE_EXT_AREA)) {
-                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = priW;
-                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = priH;
+                // tmpW and tmpH will hold the primary dimensions before we
+                // update the aspect ratio if necessary.
+                int tmpW = priW;
+                int tmpH = priH;
                 // HDMI is always in landscape, so always assign the higher
                 // dimension to hdmi's xres
                 if(priH > priW) {
-                    mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = priH;
-                    mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = priW;
+                    tmpW = priH;
+                    tmpH = priW;
                 }
+                // The aspect ratios of the external and primary displays
+                // can be different. As a result, directly assigning primary
+                // resolution could lead to an incorrect final image.
+                // We get around this by calculating a new resolution by
+                // keeping aspect ratio intact.
+                hwc_rect r = {0, 0, 0, 0};
+                getAspectRatioPosition(tmpW, tmpH, width, height, r);
+                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres =
+                                                              r.right - r.left;
+                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres =
+                                                              r.bottom - r.top;
                 // Set External Display MDP Downscale mode indicator
                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode =true;
             }
