@@ -63,17 +63,6 @@ enum mdp_version {
 //                                        0000   -  minor number
 // 8x26 v1 minor number is 0000
 //      v2 minor number is 0001 etc..
-enum mdp_rev {
-    MDSS_MDP_HW_REV_100 = 0x10000000, //8974 v1
-    MDSS_MDP_HW_REV_101 = 0x10010000, //8x26
-    MDSS_MDP_HW_REV_102 = 0x10020000, //8974 v2
-    MDSS_MDP_HW_REV_103 = 0x10030000, //8084
-    MDSS_MDP_HW_REV_104 = 0x10040000, //Next version
-    MDSS_MDP_HW_REV_105 = 0x10050000, //Next version
-    MDSS_MDP_HW_REV_107 = 0x10070000, //Next version
-    MDSS_MDP_HW_REV_200 = 0x20000000, //8092
-    MDSS_MDP_HW_REV_206 = 0x20060000, //Future
-};
 
 enum {
     MAX_DISPLAY_DIM = 2048,
@@ -122,23 +111,10 @@ public:
     int getRightSplit() { return mSplit.right(); }
     unsigned long getLowBw() { return mLowBw; }
     unsigned long getHighBw() { return mHighBw; }
-
-    bool is8x26() {
-        return (mMdpRev >= MDSS_MDP_HW_REV_101 and
-                mMdpRev < MDSS_MDP_HW_REV_102);
-    }
-    bool is8x74v2() {
-        return (mMdpRev >= MDSS_MDP_HW_REV_102 and
-                mMdpRev < MDSS_MDP_HW_REV_103);
-    }
-    bool is8084() {
-        return (mMdpRev >= MDSS_MDP_HW_REV_103 and
-                mMdpRev < MDSS_MDP_HW_REV_104);
-    }
-    bool is8092() {
-        return (mMdpRev >= MDSS_MDP_HW_REV_200 and
-                mMdpRev < MDSS_MDP_HW_REV_206);
-    }
+    bool is8x26();
+    bool is8x74v2();
+    bool is8084();
+    bool is8092();
 
 private:
     bool updateSysFsInfo();
