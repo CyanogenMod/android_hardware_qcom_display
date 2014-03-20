@@ -140,7 +140,8 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
 
         //Request a pipe
         ovutils::eMdpPipeType type = ovutils::OV_MDP_PIPE_ANY;
-        if(qdutils::MDPVersion::getInstance().is8x26() && mDpy) {
+        if((qdutils::MDPVersion::getInstance().is8x26() ||
+                   qdutils::MDPVersion::getInstance().is8x16()) && mDpy) {
             //For 8x26 external always use DMA pipe
             type = ovutils::OV_MDP_PIPE_DMA;
         }
