@@ -188,7 +188,7 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             continue;
 
         hwc_layer_1_t* layer = &list->hwLayers[i];
-        if (!((layer->planeAlpha < 0xFF) && qhwc::needsScaling(ctx,layer,dpy)) &&
+        if (!(layer->planeAlpha < 0xFF) &&
             ((hnd->bufferType == BUFFER_TYPE_VIDEO && useCopybitForYUV) ||
             (hnd->bufferType == BUFFER_TYPE_UI && useCopybitForRGB))) {
             layerProp[i].mFlags |= HWC_COPYBIT;
