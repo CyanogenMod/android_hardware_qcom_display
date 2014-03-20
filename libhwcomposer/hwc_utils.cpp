@@ -751,8 +751,10 @@ static void trimList(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     for(uint32_t i = 0; i < list->numHwLayers - 1; i++) {
         hwc_layer_1_t *layer = &list->hwLayers[i];
         hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
+        int transform = (list->hwLayers[i].flags & HWC_COLOR_FILL) ? 0 :
+                list->hwLayers[i].transform;
         trimLayer(ctx, dpy,
-                list->hwLayers[i].transform,
+                transform,
                 (hwc_rect_t&)crop,
                 (hwc_rect_t&)list->hwLayers[i].displayFrame);
         layer->sourceCropf.left = crop.left;
@@ -1145,7 +1147,8 @@ void optimizeLayerRects(const hwc_display_contents_1_t *list) {
                   hwc_rect_t& bottomframe = layer->displayFrame;
                   hwc_rect_t bottomCrop =
                       integerizeSourceCrop(layer->sourceCropf);
-                  int transform =layer->transform;
+                  int transform = (layer->flags & HWC_COLOR_FILL) ? 0 :
+                      layer->transform;
 
                   hwc_rect_t irect = getIntersection(bottomframe, topframe);
                   if(isValidRect(irect)) {

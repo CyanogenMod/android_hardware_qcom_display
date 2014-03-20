@@ -603,9 +603,10 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
 
         //For 8x26 with panel width>1k, if RGB layer needs HFLIP fail mdp comp
         // may not need it if Gfx pre-rotation can handle all flips & rotations
+        int transform = (layer->flags & HWC_COLOR_FILL) ? 0 : layer->transform;
         if(qdutils::MDPVersion::getInstance().is8x26() &&
                                 (ctx->dpyAttr[mDpy].xres > 1024) &&
-                                (layer->transform & HWC_TRANSFORM_FLIP_H) &&
+                                (transform & HWC_TRANSFORM_FLIP_H) &&
                                 (!isYuvBuffer(hnd)))
                    return false;
     }

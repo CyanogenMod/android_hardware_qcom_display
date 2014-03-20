@@ -177,7 +177,7 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
                 return true;
             hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
 
-            if (layer->transform & HAL_TRANSFORM_ROT_90) {
+            if (has90Transform(layer)) {
                 src_h = sourceCrop.right - sourceCrop.left;
                 src_w = sourceCrop.bottom - sourceCrop.top;
             } else {
