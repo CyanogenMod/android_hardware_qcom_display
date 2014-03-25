@@ -108,8 +108,13 @@ static void getDisplayAttributes(hwc_context_t* ctx, const Parcel* inParcel,
         Parcel* outParcel) {
     int dpy = inParcel->readInt32();
     outParcel->writeInt32(ctx->dpyAttr[dpy].vsync_period);
-    outParcel->writeInt32(ctx->dpyAttr[dpy].xres);
-    outParcel->writeInt32(ctx->dpyAttr[dpy].yres);
+    if (ctx->dpyAttr[dpy].customFBSize) {
+        outParcel->writeInt32(ctx->dpyAttr[dpy].xres_new);
+        outParcel->writeInt32(ctx->dpyAttr[dpy].yres_new);
+    } else {
+        outParcel->writeInt32(ctx->dpyAttr[dpy].xres);
+        outParcel->writeInt32(ctx->dpyAttr[dpy].yres);
+    }
     outParcel->writeFloat(ctx->dpyAttr[dpy].xdpi);
     outParcel->writeFloat(ctx->dpyAttr[dpy].ydpi);
     //XXX: Need to check what to return for HDMI

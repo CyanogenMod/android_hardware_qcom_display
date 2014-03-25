@@ -49,8 +49,15 @@ IFBUpdate* IFBUpdate::getObject(hwc_context_t *ctx, const int& dpy) {
 
 IFBUpdate::IFBUpdate(hwc_context_t *ctx, const int& dpy) : mDpy(dpy) {
     size_t size = 0;
-    getBufferAttributes(ctx->dpyAttr[mDpy].xres,
-            ctx->dpyAttr[mDpy].yres,
+    uint32_t xres = ctx->dpyAttr[mDpy].xres;
+    uint32_t yres = ctx->dpyAttr[mDpy].yres;
+    if (ctx->dpyAttr[dpy].customFBSize) {
+        //GPU will render and compose at new resolution
+        //So need to have FB at new resolution
+        xres = ctx->dpyAttr[mDpy].xres_new;
+        yres = ctx->dpyAttr[mDpy].yres_new;
+    }
+    getBufferAttributes((int)xres, (int)yres,
             HAL_PIXEL_FORMAT_RGBA_8888,
             0,
             mAlignedFBWidth,

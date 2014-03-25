@@ -104,8 +104,8 @@ struct DisplayAttributes {
     //If property fbsize set via adb shell debug.hwc.fbsize = XRESxYRES
     //following fields are used.
     bool customFBSize;
-    uint32_t xres_orig;
-    uint32_t yres_orig;
+    uint32_t xres_new;
+    uint32_t yres_new;
 
 };
 
