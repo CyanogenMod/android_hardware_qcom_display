@@ -85,20 +85,19 @@ bool isValidResolution(hwc_context_t *ctx, uint32_t xres, uint32_t yres)
 
 void changeResolution(hwc_context_t *ctx, int xres_orig, int yres_orig) {
     //Store original display resolution.
-    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres_orig = xres_orig;
-    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres_orig = yres_orig;
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres_new = xres_orig;
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres_new = yres_orig;
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].customFBSize = false;
-
     char property[PROPERTY_VALUE_MAX] = {'\0'};
     char *yptr = NULL;
     if (property_get("debug.hwc.fbsize", property, NULL) > 0) {
         yptr = strcasestr(property,"x");
-        int xres = atoi(property);
-        int yres = atoi(yptr + 1);
-        if (isValidResolution(ctx,xres,yres) &&
-                 xres != xres_orig && yres != yres_orig) {
-            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres = xres;
-            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres = yres;
+        int xres_new = atoi(property);
+        int yres_new = atoi(yptr + 1);
+        if (isValidResolution(ctx,xres_new,yres_new) &&
+                 xres_new != xres_orig && yres_new != yres_orig) {
+            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres_new = xres_new;
+            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres_new = yres_new;
             ctx->dpyAttr[HWC_DISPLAY_PRIMARY].customFBSize = true;
         }
     }

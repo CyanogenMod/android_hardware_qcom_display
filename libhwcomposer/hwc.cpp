@@ -226,31 +226,20 @@ static void reset(hwc_context_t *ctx, int numDisplays,
         ctx->mHWCVirtual->destroy(ctx, numDisplays, displays);
 }
 
-bool isEqual(float f1, float f2) {
-        return ((int)(f1*100) == (int)(f2*100)) ? true : false;
-}
-
 static void scaleDisplayFrame(hwc_context_t *ctx, int dpy,
                             hwc_display_contents_1_t *list) {
-    uint32_t origXres = ctx->dpyAttr[dpy].xres_orig;
-    uint32_t origYres = ctx->dpyAttr[dpy].yres_orig;
-    uint32_t fakeXres = ctx->dpyAttr[dpy].xres;
-    uint32_t fakeYres = ctx->dpyAttr[dpy].yres;
-    float xresRatio = (float)origXres / (float)fakeXres;
-    float yresRatio = (float)origYres / (float)fakeYres;
+    uint32_t origXres = ctx->dpyAttr[dpy].xres;
+    uint32_t origYres = ctx->dpyAttr[dpy].yres;
+    uint32_t newXres = ctx->dpyAttr[dpy].xres_new;
+    uint32_t newYres = ctx->dpyAttr[dpy].yres_new;
+    float xresRatio = (float)origXres / (float)newXres;
+    float yresRatio = (float)origYres / (float)newYres;
     for (size_t i = 0; i < list->numHwLayers; i++) {
         hwc_layer_1_t *layer = &list->hwLayers[i];
         hwc_rect_t& displayFrame = layer->displayFrame;
         hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
         uint32_t layerWidth = displayFrame.right - displayFrame.left;
         uint32_t layerHeight = displayFrame.bottom - displayFrame.top;
-        uint32_t sourceWidth = sourceCrop.right - sourceCrop.left;
-        uint32_t sourceHeight = sourceCrop.bottom - sourceCrop.top;
-
-        if (isEqual(((float)layerWidth / (float)sourceWidth), xresRatio) &&
-                isEqual(((float)layerHeight / (float)sourceHeight), yresRatio))
-            break;
-
         displayFrame.left = (int)(xresRatio * (float)displayFrame.left);
         displayFrame.top = (int)(yresRatio * (float)displayFrame.top);
         displayFrame.right = (int)((float)displayFrame.left +
@@ -311,7 +300,8 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
     if (LIKELY(list && list->numHwLayers > 1) &&
             ctx->dpyAttr[dpy].isActive) {
 
-        if (ctx->dpyAttr[dpy].customFBSize)
+        if (ctx->dpyAttr[dpy].customFBSize &&
+                list->flags & HWC_GEOMETRY_CHANGED)
             scaleDisplayFrame(ctx, dpy, list);
 
         reset_layer_prop(ctx, dpy, (int)list->numHwLayers - 1);
@@ -824,14 +814,21 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
             values[i] = ctx->dpyAttr[disp].vsync_period;
             break;
         case HWC_DISPLAY_WIDTH:
-            values[i] = ctx->dpyAttr[disp].xres;
+            if (ctx->dpyAttr[disp].customFBSize)
+                values[i] = ctx->dpyAttr[disp].xres_new;
+            else
+                values[i] = ctx->dpyAttr[disp].xres;
+
             ALOGD("%s disp = %d, width = %d",__FUNCTION__, disp,
-                    ctx->dpyAttr[disp].xres);
+                    values[i]);
             break;
         case HWC_DISPLAY_HEIGHT:
-            values[i] = ctx->dpyAttr[disp].yres;
+            if (ctx->dpyAttr[disp].customFBSize)
+                values[i] = ctx->dpyAttr[disp].yres_new;
+            else
+                values[i] = ctx->dpyAttr[disp].yres;
             ALOGD("%s disp = %d, height = %d",__FUNCTION__, disp,
-                    ctx->dpyAttr[disp].yres);
+                    values[i]);
             break;
         case HWC_DISPLAY_DPI_X:
             values[i] = (int32_t) (ctx->dpyAttr[disp].xdpi*1000.0);
