@@ -194,6 +194,10 @@ bool MdpCtrl::set() {
             if (!(mOVInfo.flags & MDP_SOURCE_ROTATED_90) &&
                 (mOVInfo.src_rect.h % 4))
                 mOVInfo.src_rect.h = utils::aligndown(mOVInfo.src_rect.h, 4);
+            // For interlaced, width must be multiple of 4 when rotated 90deg.
+            else if ((mOVInfo.flags & MDP_SOURCE_ROTATED_90) &&
+                (mOVInfo.src_rect.w % 4))
+                mOVInfo.src_rect.w = utils::aligndown(mOVInfo.src_rect.w, 4);
         }
     } else {
         if (mdpVersion >= MDSS_V5) {
