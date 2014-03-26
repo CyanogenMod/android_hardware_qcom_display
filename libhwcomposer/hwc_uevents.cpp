@@ -228,12 +228,12 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                     ctx->proc->invalidate(ctx->proc);
 
                     ctx->mDrawLock.wait();
-                    // At this point all the pipes used by External have been
+                    // At this point all the pipes used by WFD(Virtual) have been
                     // marked as UNSET.
                     // Perform commit to unstage the pipes.
-                    if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+                    if (!Overlay::displayCommit(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].fd)) {
                         ALOGE("%s: display commit fail! for %d dpy",
-                                __FUNCTION__, dpy);
+                                __FUNCTION__, HWC_DISPLAY_VIRTUAL);
                     }
                     ctx->mDrawLock.unlock();
 
