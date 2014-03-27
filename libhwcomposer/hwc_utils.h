@@ -264,7 +264,7 @@ void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
         hwc_rect_t& crop);
 
 bool needToForceRotator(hwc_context_t *ctx, const int& dpy,
-         uint32_t w, uint32_t h);
+         uint32_t w, uint32_t h, int transform);
 
 //Routine to configure low resolution panels (<= 2048 width)
 int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
