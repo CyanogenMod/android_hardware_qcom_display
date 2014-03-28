@@ -567,6 +567,12 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             hnd = ctx->mCopyBit[dpy]->getCurrentRenderBuffer();
         }
 
+        if(isAbcInUse(ctx) == true) {
+            int index = ctx->listStats[dpy].renderBufIndexforABC;
+            hwc_layer_1_t *tempLayer = &list->hwLayers[index];
+            hnd = (private_handle_t *)tempLayer->handle;
+        }
+
         if(hnd) {
             if (!ctx->mFBUpdate[dpy]->draw(ctx, hnd)) {
                 ALOGE("%s: FBUpdate draw failed", __FUNCTION__);

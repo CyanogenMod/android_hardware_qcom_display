@@ -248,6 +248,10 @@ void initContext(hwc_context_t *ctx)
     ctx->mVPUClient = new VPUClient();
 #endif
 
+    ctx->enableABC = false;
+    property_get("debug.sf.hwc.canUseABC", value, "0");
+    ctx->enableABC  = atoi(value) ? true : false;
+
     // Initialize gpu perfomance hint related parameters
     property_get("sys.hwc.gpu_perf_mode", value, "0");
     ctx->mGPUHintInfo.mGpuPerfModeEnable = atoi(value)? true : false;
@@ -798,6 +802,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].secureUI = false;
     ctx->listStats[dpy].yuv4k2kCount = 0;
     ctx->dpyAttr[dpy].mActionSafePresent = isActionSafePresent(ctx, dpy);
+    ctx->listStats[dpy].renderBufIndexforABC = -1;
 
     trimList(ctx, list, dpy);
     optimizeLayerRects(ctx, list, dpy);
@@ -1274,7 +1279,8 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     }
 
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
-        if(list->hwLayers[i].compositionType == HWC_OVERLAY &&
+        if(((isAbcInUse(ctx)== true ) ||
+          (list->hwLayers[i].compositionType == HWC_OVERLAY)) &&
                         list->hwLayers[i].acquireFenceFd >= 0) {
             if(UNLIKELY(swapzero))
                 acquireFd[count++] = -1;
@@ -1331,12 +1337,17 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
                 // if animation is in progress.
                 list->hwLayers[i].releaseFenceFd = -1;
             } else if(list->hwLayers[i].releaseFenceFd < 0) {
-                //If rotator has not already populated this field.
-                if(list->hwLayers[i].compositionType == HWC_BLIT) {
+#ifdef QCOM_BSP
+                //If rotator has not already populated this field
+                // & if it's a not VPU layer
+                if((list->hwLayers[i].compositionType == HWC_BLIT)&&
+                                        (isAbcInUse(ctx) == false)){
                     //For Blit, the app layers should be released when the Blit is
                     //complete. This fd was passed from copybit->draw
                     list->hwLayers[i].releaseFenceFd = dup(fd);
-                } else {
+                } else 
+#endif
+                {
                     list->hwLayers[i].releaseFenceFd = dup(releaseFd);
                 }
             }
@@ -1978,6 +1989,10 @@ void dumpBuffer(private_handle_t *ohnd, char *bufferName) {
         ALOGD("Buffer[%s] Dump to %s: %s",
         bufferName, dumpFilename, bResult ? "Success" : "Fail");
     }
+}
+
+bool isAbcInUse(hwc_context_t *ctx){
+  return (ctx->enableABC && ctx->listStats[0].renderBufIndexforABC == 0);
 }
 
 bool isGLESComp(hwc_context_t *ctx,
