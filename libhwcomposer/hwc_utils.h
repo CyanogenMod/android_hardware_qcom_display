@@ -121,6 +121,10 @@ struct ListStats {
     ovutils::Dim roi;
     bool secureUI; // Secure display layer
     bool isSecurePresent;
+    hwc_rect_t lRoi;  //left ROI
+    hwc_rect_t rRoi;  //right ROI. Unused in single DSI panels.
+    //App Buffer Composition index
+    int  renderBufIndexforABC;
 };
 
 //PTOR Comp info
@@ -257,6 +261,7 @@ int getBlending(int blending);
 bool isGLESOnlyComp(hwc_context_t *ctx, const int& dpy);
 void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers);
 void dumpBuffer(private_handle_t *ohnd, char *bufferName);
+bool isAbcInUse(hwc_context_t *ctx);
 
 //Helper function to dump logs
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
@@ -569,6 +574,8 @@ struct hwc_context_t {
 
    // Stores the hpd enabled status- avoids re-enabling HDP on suspend resume.
     bool mHPDEnabled;
+    //App Buffer Composition
+    bool enableABC;
 };
 
 namespace qhwc {
