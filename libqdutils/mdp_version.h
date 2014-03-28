@@ -92,13 +92,25 @@ struct Split {
     friend class MDPVersion;
 };
 
+struct PanelInfo {
+    char mType;                  // Smart or Dumb
+    int mPartialUpdateEnable;    // Partial update feature
+    int mLeftAlign;              // ROI left alignment restriction
+    int mWidthAlign;             // ROI width alignment restriction
+    int mTopAlign;               // ROI top alignment restriction
+    int mHeightAlign;            // ROI height alignment restriction
+    PanelInfo() : mType(NO_PANEL), mPartialUpdateEnable(0),
+    mLeftAlign(0), mWidthAlign(0), mTopAlign(0), mHeightAlign(0){}
+    friend class MDPVersion;
+};
+
 class MDPVersion : public Singleton <MDPVersion>
 {
 public:
     MDPVersion();
     ~MDPVersion();
     int getMDPVersion() {return mMDPVersion;}
-    char getPanelType() {return mPanelType;}
+    char getPanelType() {return mPanelInfo.mType;}
     bool hasOverlay() {return mHasOverlay;}
     uint8_t getTotalPipes() {
         return (uint8_t)(mRGBPipes + mVGPipes + mDMAPipes);
@@ -113,6 +125,11 @@ public:
     bool supportsMacroTile();
     int getLeftSplit() { return mSplit.left(); }
     int getRightSplit() { return mSplit.right(); }
+    int isPartialUpdateEnabled() { return mPanelInfo.mPartialUpdateEnable; }
+    int getLeftAlign() { return mPanelInfo.mLeftAlign; }
+    int getWidthAlign() { return mPanelInfo.mWidthAlign; }
+    int getTopAlign() { return mPanelInfo.mTopAlign; }
+    int getHeightAlign() { return mPanelInfo.mHeightAlign; }
     unsigned long getLowBw() { return mLowBw; }
     unsigned long getHighBw() { return mHighBw; }
     bool isSrcSplit() const;
@@ -123,13 +140,12 @@ public:
 
 private:
     bool updateSysFsInfo();
-    bool updatePanelInfo();
+    void updatePanelInfo();
     bool updateSplitInfo();
     int tokenizeParams(char *inputParams, const char *delim,
                         char* tokenStr[], int *idx);
     int mFd;
     int mMDPVersion;
-    char mPanelType;
     bool mHasOverlay;
     uint32_t mMdpRev;
     uint8_t mRGBPipes;
@@ -140,6 +156,7 @@ private:
     uint32_t mMDPUpscale;
     bool mMacroTileEnabled;
     Split mSplit;
+    PanelInfo mPanelInfo;
     unsigned long mLowBw; //kbps
     unsigned long mHighBw; //kbps
     bool mSourceSplit;
