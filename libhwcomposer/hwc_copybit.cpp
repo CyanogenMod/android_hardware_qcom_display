@@ -27,6 +27,8 @@
 #include "cb_utils.h"
 #include "cb_swap_rect.h"
 #include "math.h"
+#include "sync/sync.h"
+
 using namespace qdutils;
 namespace qhwc {
 
@@ -230,9 +232,11 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         // Mark all layers to be drawn by copybit
         for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
             layerProp[i].mFlags |= HWC_COPYBIT;
+#ifdef QCOM_BSP
             if (ctx->mMDP.version == qdutils::MDP_V3_0_4)
                 list->hwLayers[i].compositionType = HWC_BLIT;
             else
+#endif
                 list->hwLayers[i].compositionType = HWC_OVERLAY;
         }
     }
