@@ -863,12 +863,10 @@ void setListStats(hwc_context_t *ctx,
             }
 
             if((layer->transform & HWC_TRANSFORM_ROT_90) &&
-                    canUseRotator(ctx, dpy)) {
-                if( (dpy == HWC_DISPLAY_PRIMARY) &&
-                        ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA)) {
-                    ctx->isPaddingRound = true;
-                }
-                Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
+               canUseRotator(ctx, dpy)) {
+               if(ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA))
+                  ctx->isPaddingRound = true;
+               Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
             }
         }
         if(layer->blending == HWC_BLENDING_PREMULT)
