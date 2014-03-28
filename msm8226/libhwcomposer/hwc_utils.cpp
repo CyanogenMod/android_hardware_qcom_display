@@ -1331,6 +1331,9 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
 
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(list->hwLayers[i].compositionType == HWC_OVERLAY ||
+#ifdef QCOM_BSP
+           list->hwLayers[i].compositionType == HWC_BLIT ||
+#endif
            list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             //Populate releaseFenceFds.
             if(UNLIKELY(swapzero)) {
@@ -1340,8 +1343,17 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
                 // if animation is in progress.
                 list->hwLayers[i].releaseFenceFd = -1;
             } else if(list->hwLayers[i].releaseFenceFd < 0 ) {
+#ifdef QCOM_BSP
                 //If rotator has not already populated this field
-                list->hwLayers[i].releaseFenceFd = dup(releaseFd);
+                if(list->hwLayers[i].compositionType == HWC_BLIT) {
+                    //For Blit, the app layers should be released when the Blit is
+                    //complete. This fd was passed from copybit->draw
+                    list->hwLayers[i].releaseFenceFd = dup(fd);
+                } else
+#endif
+                {
+                    list->hwLayers[i].releaseFenceFd = dup(releaseFd);
+                }
             }
         }
     }
