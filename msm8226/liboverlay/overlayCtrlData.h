@@ -49,18 +49,16 @@ class Ctrl : utils::NoCopy {
 public:
 
     /* ctor */
-    explicit Ctrl();
+    explicit Ctrl(const int& dpy);
     /* dtor close */
     ~Ctrl();
-    /* init fd etc*/
-    bool init(uint32_t fbnum);
-    /* close underlying mdp */
-    bool close();
 
     /* set source using whf, orient and wait flag */
     void setSource(const utils::PipeArgs& args);
     /* set crop info and pass it down to mdp */
     void setCrop(const utils::Dim& d);
+    /* set color for mdp pipe */
+    void setColor(const uint32_t color);
     /* set orientation */
     void setTransform(const utils::eTransform& p);
     /* set mdp position using dim */
@@ -85,24 +83,21 @@ public:
     void dump() const;
     /* Return the dump in the specified buffer */
     void getDump(char *buf, size_t len);
-    void forceSet();
 
+    static bool validateAndSet(Ctrl* ctrlArray[], const int& count,
+            const int& fbFd);
 private:
     // mdp ctrl struct(info e.g.)
-    MdpCtrl mMdp;
+    MdpCtrl *mMdp;
 };
 
 
 class Data : utils::NoCopy {
 public:
     /* init, reset */
-    explicit Data();
+    explicit Data(const int& dpy);
     /* calls close */
     ~Data();
-    /* init fd etc */
-    bool init(uint32_t fbnum);
-    /* calls underlying mdp close */
-    bool close();
     /* set overlay pipe id in the mdp struct */
     void setPipeId(int id);
     /* get overlay id in the mdp struct */
@@ -116,67 +111,46 @@ public:
 
 private:
     // mdp data struct
-    MdpData mMdp;
-};
-
-/* This class just creates a Ctrl Data pair to be used by a pipe.
- * Although this was legacy design, this separation still makes sense, since we
- * need to use the Ctrl channel in hwc_prepare (i.e config stage) and Data
- * channel in hwc_set (i.e draw stage)
- */
-struct CtrlData {
-    Ctrl ctrl;
-    Data data;
+    MdpData *mMdp;
 };
 
 //-------------Inlines-------------------------------
 
-inline Ctrl::Ctrl() {
-    mMdp.reset();
+inline Ctrl::Ctrl(const int& dpy) : mMdp(new MdpCtrl(dpy)) {
 }
 
 inline Ctrl::~Ctrl() {
-    close();
-}
-
-inline bool Ctrl::close() {
-    if(!mMdp.close())
-        return false;
-    return true;
-}
-
-inline bool Ctrl::init(uint32_t fbnum) {
-    // MDP/FD init
-    if(!mMdp.init(fbnum)) {
-        ALOGE("Ctrl failed to init fbnum=%d", fbnum);
-        return false;
-    }
-    return true;
+    delete mMdp;
 }
 
 inline void Ctrl::setSource(const utils::PipeArgs& args)
 {
-    mMdp.setSource(args);
+    mMdp->setSource(args);
 }
 
 inline void Ctrl::setPosition(const utils::Dim& dim)
 {
-    mMdp.setPosition(dim);
+    mMdp->setPosition(dim);
 }
 
 inline void Ctrl::setTransform(const utils::eTransform& orient)
 {
-    mMdp.setTransform(orient);
+    mMdp->setTransform(orient);
 }
 
 inline void Ctrl::setCrop(const utils::Dim& d)
 {
-    mMdp.setCrop(d);
+    mMdp->setCrop(d);
+}
+
+inline void Ctrl::setColor(const uint32_t color)
+{
+    mMdp->setColor(color);
 }
 
 inline bool Ctrl::setVisualParams(const MetaData_t &metadata)
 {
-    if (!mMdp.setVisualParams(metadata)) {
+    if (!mMdp->setVisualParams(metadata)) {
         ALOGE("Ctrl setVisualParams failed in MDP setVisualParams");
         return false;
     }
@@ -185,12 +159,12 @@ inline bool Ctrl::setVisualParams(const MetaData_t &metadata)
 
 inline void Ctrl::dump() const {
     ALOGE("== Dump Ctrl start ==");
-    mMdp.dump();
+    mMdp->dump();
     ALOGE("== Dump Ctrl end ==");
 }
 
 inline bool Ctrl::commit() {
-    if(!mMdp.set()) {
+    if(!mMdp->set()) {
         ALOGE("Ctrl commit failed set overlay");
         return false;
     }
@@ -198,75 +172,69 @@ inline bool Ctrl::commit() {
 }
 
 inline int Ctrl::getPipeId() const {
-    return mMdp.getPipeId();
+    return mMdp->getPipeId();
 }
 
 inline int Ctrl::getFd() const {
-    return mMdp.getFd();
+    return mMdp->getFd();
 }
 
 inline void Ctrl::updateSrcFormat(const uint32_t& rotDstFmt) {
-    mMdp.updateSrcFormat(rotDstFmt);
+    mMdp->updateSrcFormat(rotDstFmt);
+}
+
+inline bool Ctrl::validateAndSet(Ctrl* ctrlArray[], const int& count,
+        const int& fbFd) {
+    MdpCtrl* mdpCtrlArray[count];
+    memset(&mdpCtrlArray, 0, sizeof(mdpCtrlArray));
+
+    for(int i = 0; i < count; i++) {
+        mdpCtrlArray[i] = ctrlArray[i]->mMdp;
+    }
+
+    bool ret = MdpCtrl::validateAndSet(mdpCtrlArray, count, fbFd);
+    return ret;
 }
 
 inline utils::Dim Ctrl::getCrop() const {
-    return mMdp.getSrcRectDim();
+    return mMdp->getSrcRectDim();
 }
 
 inline utils::Dim Ctrl::getPosition() const {
-    return mMdp.getDstRectDim();
+    return mMdp->getDstRectDim();
 }
 
 inline void Ctrl::setDownscale(int dscale_factor) {
-    mMdp.setDownscale(dscale_factor);
+    mMdp->setDownscale(dscale_factor);
 }
 
 inline void Ctrl::getDump(char *buf, size_t len) {
-    mMdp.getDump(buf, len);
+    mMdp->getDump(buf, len);
 }
 
-inline void Ctrl::forceSet() {
-    mMdp.forceSet();
+inline Data::Data(const int& dpy) : mMdp(new MdpData(dpy)) {
 }
 
-inline Data::Data() {
-    mMdp.reset();
+inline Data::~Data() {
+    delete mMdp;
 }
 
-inline Data::~Data() { close(); }
+inline void Data::setPipeId(int id) { mMdp->setPipeId(id); }
 
-inline void Data::setPipeId(int id) { mMdp.setPipeId(id); }
-
-inline int Data::getPipeId() const { return mMdp.getPipeId(); }
-
-inline bool Data::init(uint32_t fbnum) {
-    if(!mMdp.init(fbnum)) {
-        ALOGE("Data cannot init mdp");
-        return false;
-    }
-    return true;
-}
-
-inline bool Data::close() {
-    if(!mMdp.close()) {
-        ALOGE("Data close failed");
-        return false;
-    }
-    return true;
-}
+inline int Data::getPipeId() const { return mMdp->getPipeId(); }
 
 inline bool Data::queueBuffer(int fd, uint32_t offset) {
-    return mMdp.play(fd, offset);
+    return mMdp->play(fd, offset);
 }
 
 inline void Data::dump() const {
     ALOGE("== Dump Data MDP start ==");
-    mMdp.dump();
+    mMdp->dump();
     ALOGE("== Dump Data MDP end ==");
 }
 
 inline void Data::getDump(char *buf, size_t len) {
-    mMdp.getDump(buf, len);
+    mMdp->getDump(buf, len);
 }
 
 } // overlay

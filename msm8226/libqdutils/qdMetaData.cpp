@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,6 +31,8 @@
 #include <sys/mman.h>
 #include <cutils/log.h>
 #include <gralloc_priv.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 #include "qdMetaData.h"
 
 int setMetaData(private_handle_t *handle, DispParamType paramType,
@@ -81,12 +83,35 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
         case UPDATE_BUFFER_GEOMETRY:
             memcpy((void *)&data->bufferDim, param, sizeof(BufferDim_t));
             break;
+        case PP_PARAM_VFM_DATA:
+        {
+            int32_t     indx = 0;
+            VfmData_t*  pVfmData = reinterpret_cast <VfmData_t *>(param);
+            int32_t     dataType = pVfmData->dataType;
+
+            if(dataType > 0){
+                indx = getVfmDataIdx(dataType);
+                if(indx < MAX_VFM_DATA_COUNT){
+                    data->vfmDataBitMap |= dataType;
+                    memcpy((void *)&data->vfmData[indx], param,
+                        sizeof(VfmData_t));
+                }else{
+                    ALOGE("unknown dataType %d", dataType);
+                }
+            }else{
+                ALOGE("invalid dataType in PP_PARAM_VFM_DATA %d", dataType);
+            }
+        }
+        break;
+        case UPDATE_COLOR_SPACE:
+            data->colorSpace = *((ColorSpace_t *)param);
+            break;
         default:
             ALOGE("Unknown paramType %d", paramType);
             break;
     }
     if(munmap(base, size))
-        ALOGE("%s: failed to unmap ptr 0x%x, err %d", __func__, (int)base,
+        ALOGE("%s: failed to unmap ptr %p, err %d", __func__, (void*)base,
                                                                         errno);
     return 0;
 }

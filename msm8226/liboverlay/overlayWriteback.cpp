@@ -31,6 +31,8 @@
 #include "overlayWriteback.h"
 #include "mdpWrapper.h"
 
+#define SIZE_1M 0x00100000
+
 namespace overlay {
 
 //=========== class WritebackMem ==============================================
@@ -73,7 +75,7 @@ bool WritebackMem::dealloc() {
 }
 
 //=========== class Writeback =================================================
-Writeback::Writeback() : mXres(0), mYres(0), mOpFmt(-1) {
+Writeback::Writeback() : mXres(0), mYres(0), mOpFmt(-1), mSecure(false) {
     int fbNum = Overlay::getFbForDpy(Overlay::DPY_WRITEBACK);
     if(!utils::openDev(mFd, fbNum, Res::fbPath, O_RDWR)) {
         ALOGE("%s failed to init %s", __func__, Res::fbPath);
@@ -134,8 +136,8 @@ bool Writeback::configureDpyInfo(int xres, int yres) {
     return true;
 }
 
-bool Writeback::configureMemory(uint32_t size, bool isSecure) {
-    if(!mWbMem.manageMem(size, isSecure)) {
+bool Writeback::configureMemory(uint32_t size) {
+    if(!mWbMem.manageMem(size, mSecure)) {
         ALOGE("%s failed, memory failure", __func__);
         return false;
     }
@@ -213,6 +215,22 @@ int Writeback::getOutputFormat() {
     return mOpFmt;
 }
 
+bool Writeback::setSecure(bool isSecure) {
+    if(isSecure != mSecure) {
+        // Call IOCTL to set WB interface as secure
+        struct msmfb_metadata metadata;
+        memset(&metadata, 0 , sizeof(metadata));
+        metadata.op = metadata_op_wb_secure;
+        metadata.data.secure_en = isSecure;
+        if (ioctl(mFd.getFD(), MSMFB_METADATA_SET, &metadata) < 0) {
+            ALOGE("Error setting MDP WB secure");
+            return false;
+        }
+        mSecure = isSecure;
+    }
+    return true;
+}
+
 //static
 
 Writeback *Writeback::getInstance() {
@@ -243,7 +261,7 @@ bool Writeback::getDump(char *buf, size_t len) {
         utils::getDump(buf, len, "WBData", sWb->mFbData);
         char str[4] = {'\0'};
         snprintf(str, 4, "\n");
-        strncat(buf, str, strlen(str));
+        strlcat(buf, str, len);
         return true;
     }
     return false;
