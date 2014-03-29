@@ -323,7 +323,7 @@ static void *uevent_loop(void *param)
     }
 
     while(1) {
-        len = uevent_next_event(udata, sizeof(udata) - 2);
+        len = uevent_next_event(udata, (int)sizeof(udata) - 2);
         handle_uevent(ctx, udata, len);
     }
 
