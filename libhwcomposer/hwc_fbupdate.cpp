@@ -91,6 +91,7 @@ bool FBUpdateNonSplit::preRotateExtDisplay(hwc_context_t *ctx,
     if(mDpy && (extOrient & HWC_TRANSFORM_ROT_90)) {
         mRot = ctx->mRotMgr->getNext();
         if(mRot == NULL) return false;
+        ctx->mLayerRotMap[mDpy]->add(layer, mRot);
         // Composed FB content will have black bars, if the viewFrame of the
         // external is different from {0, 0, fbWidth, fbHeight}, so intersect
         // viewFrame with sourceCrop to avoid those black bars
@@ -101,7 +102,6 @@ bool FBUpdateNonSplit::preRotateExtDisplay(hwc_context_t *ctx,
             mRot = NULL;
             return false;
         }
-        ctx->mLayerRotMap[mDpy]->add(layer, mRot);
         info.format = (mRot)->getDstFormat();
         updateSource(orient, info, sourceCrop);
         rotFlags |= ovutils::ROT_PREROTATED;
