@@ -1958,12 +1958,12 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
     if(isYuvBuffer(hnd) && (transform & HWC_TRANSFORM_ROT_90)) {
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
+        ctx->mLayerRotMap[mDpy]->add(layer, *rot);
         //Configure rotator for pre-rotation
         if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
         }
-        ctx->mLayerRotMap[mDpy]->add(layer, *rot);
         whf.format = (*rot)->getDstFormat();
         updateSource(orient, whf, crop);
         rotFlags |= ROT_PREROTATED;
