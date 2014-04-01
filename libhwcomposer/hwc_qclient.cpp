@@ -198,7 +198,6 @@ static void setWfdStatus(hwc_context_t *ctx, uint32_t wfdStatus) {
     }
 }
 
-
 static status_t setViewFrame(hwc_context_t* ctx, const Parcel* inParcel) {
     int dpy = inParcel->readInt32();
     if(dpy >= HWC_DISPLAY_PRIMARY && dpy <= HWC_DISPLAY_VIRTUAL) {
