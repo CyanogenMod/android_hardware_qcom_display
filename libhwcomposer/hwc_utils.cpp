@@ -1870,7 +1870,7 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
 bool canUseRotator(hwc_context_t *ctx, int dpy) {
     if(qdutils::MDPVersion::getInstance().is8x26() &&
-            ctx->mVirtualDisplay->isConnected() &&
+            isSecondaryConnected(ctx) &&
             !ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isPause) {
         /* 8x26 mdss driver supports multiplexing of DMA pipe
          * in LINE and BLOCK modes for writeback panels.

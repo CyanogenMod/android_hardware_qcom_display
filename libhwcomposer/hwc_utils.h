@@ -502,6 +502,11 @@ inline bool isSecurePresent(hwc_context_t *ctx, int dpy) {
     return ctx->listStats[dpy].isSecurePresent;
 }
 
+static inline bool isSecondaryConnected(hwc_context_t* ctx) {
+    return (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected ||
+    ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected);
+}
+
 };
 
 #endif //HWC_UTILS_H

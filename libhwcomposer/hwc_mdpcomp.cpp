@@ -398,7 +398,8 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. not enabled.", __FUNCTION__);
         ret = false;
     } else if(qdutils::MDPVersion::getInstance().is8x26() &&
-            ctx->mVideoTransFlag && ctx->mVirtualDisplay->isConnected()) {
+            ctx->mVideoTransFlag &&
+            isSecondaryConnected(ctx)) {
         //1 Padding round to shift pipes across mixers
         ALOGD_IF(isDebug(),"%s: MDP Comp. video transition padding round",
                 __FUNCTION__);
