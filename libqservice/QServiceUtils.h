@@ -87,4 +87,7 @@ inline android::status_t pauseWFD(uint32_t pause) {
     return sendSingleParam(qService::IQService::PAUSE_WFD, pause);
 }
 
+inline android::status_t setWfdStatus(uint32_t wfdStatus) {
+    return sendSingleParam(qService::IQService::SET_WFD_STATUS, wfdStatus);
+}
 #endif /* end of include guard: QSERVICEUTILS_H */
