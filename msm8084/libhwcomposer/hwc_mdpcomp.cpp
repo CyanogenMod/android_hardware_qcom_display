@@ -1378,7 +1378,7 @@ void MDPCompNonSplit::adjustForSourceSplit(hwc_context_t *ctx,
         for(int index = 0; index < n4k2kYuvCount; index++){
             int n4k2kYuvIndex =
                     ctx->listStats[mDpy].yuv4k2kIndices[index];
-            if(mCurrentFrame.fbZ > n4k2kYuvIndex){
+            if(mCurrentFrame.fbZ >= n4k2kYuvIndex){
                 mCurrentFrame.fbZ += 1;
             }
         }
@@ -1600,7 +1600,7 @@ void MDPCompSplit::adjustForSourceSplit(hwc_context_t *ctx,
         if((dst.left > lSplit) || (dst.right < lSplit)) {
             mCurrentFrame.mdpCount += 1;
         }
-        if(mCurrentFrame.fbZ > n4k2kYuvIndex){
+        if(mCurrentFrame.fbZ >= n4k2kYuvIndex){
             mCurrentFrame.fbZ += 1;
         }
     }
