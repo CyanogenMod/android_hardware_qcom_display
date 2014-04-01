@@ -74,6 +74,7 @@ void free_buffer(private_handle_t *hnd);
 
 class Locker {
     pthread_mutex_t mutex;
+    pthread_cond_t cond;
     public:
     class Autolock {
         Locker& locker;
@@ -81,10 +82,18 @@ class Locker {
         inline Autolock(Locker& locker) : locker(locker) {  locker.lock(); }
         inline ~Autolock() { locker.unlock(); }
     };
-    inline Locker()        { pthread_mutex_init(&mutex, 0); }
-    inline ~Locker()       { pthread_mutex_destroy(&mutex); }
+    inline Locker()        {
+        pthread_mutex_init(&mutex, 0);
+        pthread_cond_init(&cond, 0);
+    }
+    inline ~Locker()       {
+        pthread_mutex_destroy(&mutex);
+        pthread_cond_destroy(&cond);
+    }
     inline void lock()     { pthread_mutex_lock(&mutex); }
+    inline void wait()     { pthread_cond_wait(&cond, &mutex); }
     inline void unlock()   { pthread_mutex_unlock(&mutex); }
+    inline void signal()   { pthread_cond_signal(&cond); }
 };
 
 
