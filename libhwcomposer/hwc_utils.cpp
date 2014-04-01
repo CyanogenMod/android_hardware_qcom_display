@@ -194,7 +194,14 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDPComp[HWC_DISPLAY_PRIMARY] =
          MDPComp::getObject(ctx, HWC_DISPLAY_PRIMARY);
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
-    ctx->mHWCVirtual = HWCVirtualBase::getObject();
+
+    ctx->mVDSEnabled = false;
+    if((property_get("persist.hwc.enable_vds", value, NULL) > 0)) {
+        if(atoi(value) != 0) {
+            ctx->mVDSEnabled = true;
+        }
+    }
+    ctx->mHWCVirtual = HWCVirtualBase::getObject(ctx->mVDSEnabled);
 
     for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         ctx->mHwcDebug[i] = new HwcDebug(i);
