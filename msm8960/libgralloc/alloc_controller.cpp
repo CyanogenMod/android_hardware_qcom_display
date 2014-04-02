@@ -130,7 +130,6 @@ int AdrenoMemInfo::getStride(int width, int format)
         switch (format)
         {
             case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
-            case HAL_PIXEL_FORMAT_RAW_SENSOR:
                 stride = ALIGN(width, 32);
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
@@ -142,6 +141,8 @@ int AdrenoMemInfo::getStride(int width, int format)
             case HAL_PIXEL_FORMAT_YV12:
             case HAL_PIXEL_FORMAT_YCbCr_422_SP:
             case HAL_PIXEL_FORMAT_YCrCb_422_SP:
+            case HAL_PIXEL_FORMAT_RAW16:
+            case HAL_PIXEL_FORMAT_RAW_OPAQUE:
                 stride = ALIGN(width, 16);
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
@@ -269,7 +270,8 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
             size = alignedw * alignedh * 3;
             break;
         case HAL_PIXEL_FORMAT_RGB_565:
-        case HAL_PIXEL_FORMAT_RAW_SENSOR:
+        case HAL_PIXEL_FORMAT_RAW16:
+        case HAL_PIXEL_FORMAT_RAW_OPAQUE:
             size = alignedw * alignedh * 2;
             break;
 
