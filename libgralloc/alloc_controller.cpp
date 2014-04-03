@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -428,7 +428,7 @@ size_t getSize(int format, int width, int height, const int alignedw,
             }
             size = alignedw*alignedh +
                     (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
-            size = ALIGN(size, 4096);
+            size = ALIGN(size, (size_t)4096);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
@@ -577,7 +577,7 @@ int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage)
     private_handle_t* hnd = new private_handle_t(data.fd, data.size,
                                                  data.allocType, 0, format,
                                                  alignedw, alignedh);
-    hnd->base = (int) data.base;
+    hnd->base = (uintptr_t) data.base;
     hnd->offset = data.offset;
     hnd->gpuaddr = 0;
     *pHnd = hnd;

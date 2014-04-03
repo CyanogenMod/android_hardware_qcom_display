@@ -59,6 +59,9 @@ static int gralloc_map(gralloc_module_t const* module,
                        buffer_handle_t handle,
                        void** vaddr)
 {
+    if(!module)
+        return -EINVAL;
+
     private_handle_t* hnd = (private_handle_t*)handle;
     void *mappedAddress;
     if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) &&
@@ -96,6 +99,9 @@ static int gralloc_map(gralloc_module_t const* module,
 static int gralloc_unmap(gralloc_module_t const* module,
                          buffer_handle_t handle)
 {
+    if(!module)
+        return -EINVAL;
+
     private_handle_t* hnd = (private_handle_t*)handle;
     if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
         int err = -EINVAL;
@@ -131,7 +137,7 @@ static pthread_mutex_t sMapLock = PTHREAD_MUTEX_INITIALIZER;
 int gralloc_register_buffer(gralloc_module_t const* module,
                             buffer_handle_t handle)
 {
-    if (private_handle_t::validate(handle) < 0)
+    if (!module || private_handle_t::validate(handle) < 0)
         return -EINVAL;
 
     // In this implementation, we don't need to do anything here
@@ -159,7 +165,7 @@ int gralloc_register_buffer(gralloc_module_t const* module,
 int gralloc_unregister_buffer(gralloc_module_t const* module,
                               buffer_handle_t handle)
 {
-    if (private_handle_t::validate(handle) < 0)
+    if (!module || private_handle_t::validate(handle) < 0)
         return -EINVAL;
 
     /*
@@ -181,6 +187,9 @@ int gralloc_unregister_buffer(gralloc_module_t const* module,
 int terminateBuffer(gralloc_module_t const* module,
                     private_handle_t* hnd)
 {
+    if(!module)
+        return -EINVAL;
+
     /*
      * If the buffer has been mapped during a lock operation, it's time
      * to un-map it. It's an error to be here with a locked buffer.
@@ -205,10 +214,10 @@ int terminateBuffer(gralloc_module_t const* module,
 
 int gralloc_lock(gralloc_module_t const* module,
                  buffer_handle_t handle, int usage,
-                 int l, int t, int w, int h,
+                 int /*l*/, int /*t*/, int /*w*/, int /*h*/,
                  void** vaddr)
 {
-    if (private_handle_t::validate(handle) < 0)
+    if (!module || private_handle_t::validate(handle) < 0)
         return -EINVAL;
 
     int err = 0;
@@ -243,8 +252,9 @@ int gralloc_lock(gralloc_module_t const* module,
 int gralloc_unlock(gralloc_module_t const* module,
                    buffer_handle_t handle)
 {
-    if (private_handle_t::validate(handle) < 0)
+    if (!module || private_handle_t::validate(handle) < 0)
         return -EINVAL;
+
     int err = 0;
     private_handle_t* hnd = (private_handle_t*)handle;
 
@@ -276,6 +286,9 @@ int gralloc_perform(struct gralloc_module_t const* module,
 {
     int res = -EINVAL;
     va_list args;
+    if(!module)
+        return res;
+
     va_start(args, operation);
     switch (operation) {
         case GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER:
@@ -289,7 +302,6 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 int format = va_arg(args, int);
 
                 native_handle_t** handle = va_arg(args, native_handle_t**);
-                int memoryFlags = va_arg(args, int);
                 private_handle_t* hnd = (private_handle_t*)native_handle_create(
                     private_handle_t::sNumFds, private_handle_t::sNumInts);
                 hnd->magic = private_handle_t::sMagic;

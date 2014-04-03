@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2012 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2010-2014 The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,7 +72,6 @@ static int fb_setSwapInterval(struct framebuffer_device_t* dev,
     if (property_interval >= 0)
         interval = property_interval;
 
-    fb_context_t* ctx = (fb_context_t*)dev;
     private_module_t* m = reinterpret_cast<private_module_t*>(
         dev->common.module);
     if (interval < dev->minSwapInterval || interval > dev->maxSwapInterval)
@@ -90,7 +89,7 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
         (const_cast<native_handle_t*>(buffer));
     const size_t offset = hnd->base - m->framebuffer->base;
     m->info.activate = FB_ACTIVATE_VBL;
-    m->info.yoffset = offset / m->finfo.line_length;
+    m->info.yoffset = (int)(offset / m->finfo.line_length);
     if (ioctl(m->framebuffer->fd, FBIOPUT_VSCREENINFO, &m->info) == -1) {
         ALOGE("%s: FBIOPUT_VSCREENINFO for primary failed, str: %s",
                 __FUNCTION__, strerror(errno));
@@ -102,6 +101,9 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
 static int fb_compositionComplete(struct framebuffer_device_t* dev)
 {
     // TODO: Properly implement composition complete callback
+    if(!dev) {
+        return -1;
+    }
     glFinish();
 
     return 0;
@@ -202,8 +204,8 @@ int mapFrameBufferLocked(struct private_module_t* module)
     }
 
     //adreno needs 4k aligned offsets. Max hole size is 4096-1
-    int  size = roundUpToPageSize(info.yres * info.xres *
-                                                       (info.bits_per_pixel/8));
+    size_t size = roundUpToPageSize(info.yres * info.xres *
+                                               (info.bits_per_pixel/8));
 
     /*
      * Request NUM_BUFFERS screens (at least 2 for page flipping)
@@ -224,13 +226,13 @@ int mapFrameBufferLocked(struct private_module_t* module)
 
     //consider the included hole by 4k alignment
     uint32_t line_length = (info.xres * info.bits_per_pixel / 8);
-    info.yres_virtual = (size * numberOfBuffers) / line_length;
+    info.yres_virtual = (uint32_t) ((size * numberOfBuffers) / line_length);
 
     uint32_t flags = PAGE_FLIP;
 
     if (info.yres_virtual < ((size * 2) / line_length) ) {
         // we need at least 2 for page-flipping
-        info.yres_virtual = size / line_length;
+        info.yres_virtual = (int)(size / line_length);
         flags &= ~PAGE_FLIP;
         ALOGW("page flipping not supported (yres_virtual=%d, requested=%d)",
               info.yres_virtual, info.yres*2);
@@ -244,12 +246,13 @@ int mapFrameBufferLocked(struct private_module_t* module)
     if (int(info.width) <= 0 || int(info.height) <= 0) {
         // the driver doesn't return that information
         // default to 160 dpi
-        info.width  = ((info.xres * 25.4f)/160.0f + 0.5f);
-        info.height = ((info.yres * 25.4f)/160.0f + 0.5f);
+        info.width  = (uint32_t)(((float)(info.xres) * 25.4f)/160.0f + 0.5f);
+        info.height = (uint32_t)(((float)(info.yres) * 25.4f)/160.0f + 0.5f);
     }
 
-    float xdpi = (info.xres * 25.4f) / info.width;
-    float ydpi = (info.yres * 25.4f) / info.height;
+    float xdpi = ((float)(info.xres) * 25.4f) / (float)info.width;
+    float ydpi = ((float)(info.yres) * 25.4f) / (float)info.height;
+
 #ifdef MSMFB_METADATA_GET
     struct msmfb_metadata metadata;
     memset(&metadata, 0 , sizeof(metadata));
@@ -259,7 +262,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
         close(fd);
         return -errno;
     }
-    float fps  = metadata.data.panel_frame_rate;
+    float fps = (float)metadata.data.panel_frame_rate;
 #else
     //XXX: Remove reserved field usage on all baselines
     //The reserved[3] field is used to store FPS by the driver.
@@ -320,7 +323,6 @@ int mapFrameBufferLocked(struct private_module_t* module)
      * map the framebuffer
      */
 
-    int err;
     module->numBuffers = info.yres_virtual / info.yres;
     module->bufferMask = 0;
     //adreno needs page aligned offsets. Align the fbsize to pagesize.
@@ -336,9 +338,8 @@ int mapFrameBufferLocked(struct private_module_t* module)
         close(fd);
         return -errno;
     }
-    module->framebuffer->base = intptr_t(vaddr);
+    module->framebuffer->base = uintptr_t(vaddr);
     memset(vaddr, 0, fbSize);
-    module->currentOffset = 0;
     //Enable vsync
     int enable = 1;
     ioctl(module->framebuffer->fd, MSMFB_OVERLAY_VSYNC_CTRL,
