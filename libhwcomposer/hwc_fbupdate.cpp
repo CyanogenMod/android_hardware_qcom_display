@@ -426,35 +426,13 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         layer = &list->hwLayers[extOnlyLayerIndex];
         layer->compositionType = HWC_OVERLAY;
     }
+
     overlay::Overlay& ov = *(ctx->mOverlay);
 
     ovutils::Whf info(mAlignedFBWidth,
             mAlignedFBHeight,
             ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888,
                 mTileEnabled));
-    //Request left pipe, VG first owing to higher prio
-    ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_VG, mDpy,
-            Overlay::MIXER_DEFAULT);
-    if(destL == ovutils::OV_INVALID) {
-        destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
-            Overlay::MIXER_DEFAULT);
-        if(destL == ovutils::OV_INVALID) {
-            ALOGE("%s: No pipes available to configure fb for dpy %d's left"
-                    " mixer", __FUNCTION__, mDpy);
-            return false;
-        }
-    }
-    //Request right pipe
-    ovutils::eDest destR = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
-            Overlay::MIXER_DEFAULT);
-    if(destR == ovutils::OV_INVALID) {
-        ALOGE("%s: No pipes available to configure fb for dpy %d's right"
-                " mixer", __FUNCTION__, mDpy);
-        return false;
-    }
-
-    mDestLeft = destL;
-    mDestRight = destR;
 
     ovutils::eMdpFlags mdpFlags = OV_MDP_BLEND_FG_PREMULT;
     ovutils::eZorder zOrder = static_cast<ovutils::eZorder>(fbZorder);
@@ -467,46 +445,68 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             ovutils::DEFAULT_PLANE_ALPHA,
             (ovutils::eBlending)
             getBlending(layer->blending));
-    ov.setSource(parg, destL);
-    ov.setSource(parg, destR);
-
-    //Crop and Position are same for FB
-    ovutils::Dim cropPosL(
-            fbUpdatingRect.left,
-            fbUpdatingRect.top,
-            (fbUpdatingRect.right - fbUpdatingRect.left) / 2,
-            fbUpdatingRect.bottom - fbUpdatingRect.top);
-
-    ovutils::Dim cropPosR(
-            cropPosL.x + cropPosL.w,
-            cropPosL.y,
-            cropPosL.w,
-            cropPosL.h);
-
-    ov.setCrop(cropPosL, destL);
-    ov.setCrop(cropPosR, destR);
-    ov.setPosition(cropPosL, destL);
-    ov.setPosition(cropPosR, destR);
 
     int transform = layer->transform;
     ovutils::eTransform orient =
             static_cast<ovutils::eTransform>(transform);
-    ov.setTransform(orient, destL);
-    ov.setTransform(orient, destR);
 
-    ret = true;
-    if (!ov.commit(destL)) {
-        ALOGE("%s: commit fails for left", __FUNCTION__);
-        ret = false;
+    hwc_rect_t cropL = fbUpdatingRect;
+    hwc_rect_t cropR = fbUpdatingRect;
+
+    //Request left pipe (or 1 by default)
+    ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
+            Overlay::MIXER_DEFAULT);
+    if(destL == ovutils::OV_INVALID) {
+        ALOGE("%s: No pipes available to configure fb for dpy %d's left"
+                " mixer", __FUNCTION__, mDpy);
+        return false;
     }
-    if (!ov.commit(destR)) {
-        ALOGE("%s: commit fails for right", __FUNCTION__);
-        ret = false;
+
+    ovutils::eDest destR = ovutils::OV_INVALID;
+
+    //Request right pipe (2 pipes needed only if dim > 2048)
+    if((fbUpdatingRect.right - fbUpdatingRect.left) >
+            qdutils::MAX_DISPLAY_DIM) {
+        destR = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy,
+                Overlay::MIXER_DEFAULT);
+        if(destR == ovutils::OV_INVALID) {
+            ALOGE("%s: No pipes available to configure fb for dpy %d's right"
+                    " mixer", __FUNCTION__, mDpy);
+            return false;
+        }
+
+        if(ctx->mOverlay->comparePipePriority(destL, destR) == -1) {
+            qhwc::swap(destL, destR);
+        }
+
+        //Split crop equally when using 2 pipes
+        cropL.right = (fbUpdatingRect.right + fbUpdatingRect.left) / 2;
+        cropR.left = cropL.right;
     }
-    if(ret == false) {
-        ctx->mLayerRotMap[mDpy]->clear();
+
+    mDestLeft = destL;
+    mDestRight = destR;
+
+    if(destL != OV_INVALID) {
+        if(configMdp(ctx->mOverlay, parg, orient,
+                    cropL, cropL, NULL /*metadata*/, destL) < 0) {
+            ALOGE("%s: commit failed for left mixer config", __FUNCTION__);
+            ctx->mLayerRotMap[mDpy]->clear();
+            return false;
+        }
     }
-    return ret;
+
+    //configure right pipe
+    if(destR != OV_INVALID) {
+        if(configMdp(ctx->mOverlay, parg, orient,
+                    cropR, cropR, NULL /*metadata*/, destR) < 0) {
+            ALOGE("%s: commit failed for right mixer config", __FUNCTION__);
+            ctx->mLayerRotMap[mDpy]->clear();
+            return false;
+        }
+    }
+
+    return true;
 }
 
 //---------------------------------------------------------------------
