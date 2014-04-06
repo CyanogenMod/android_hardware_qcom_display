@@ -38,6 +38,10 @@
 */
 using namespace android;
 namespace qdutils {
+// These panel definitions are available at mdss_mdp.h which is internal header
+// file and is not available at <linux/mdss_mdp.h>.
+// ToDo: once it is available at linux/mdss_mdp.h, these below definitions can
+// be removed.
 enum mdp_version {
     MDP_V_UNKNOWN = 0,
     MDP_V2_2    = 220,
@@ -53,16 +57,18 @@ enum mdp_version {
     MDSS_V5     = 500,
 };
 
-enum mdp_rev {
-    MDSS_MDP_HW_REV_100 = 0x10000000,
-    MDSS_MDP_HW_REV_101 = 0x10010000, //8x26
-    MDSS_MDP_HW_REV_102 = 0x10020000,
-};
+// chip variants have same major number and minor numbers usually vary
+// for e.g., MDSS_MDP_HW_REV_101 is 0x10010000
+//                                    1001       -  major number
+//                                        0000   -  minor number
+// 8x26 v1 minor number is 0000
+//      v2 minor number is 0001 etc..
 
 enum {
     MAX_DISPLAY_DIM = 2048,
 };
 
+#define NO_PANEL         '0'
 #define MDDI_PANEL       '1'
 #define EBI2_PANEL       '2'
 #define LCDC_PANEL       '3'
@@ -73,6 +79,7 @@ enum {
 #define MIPI_CMD_PANEL   '9'
 #define WRITEBACK_PANEL  'a'
 #define LVDS_PANEL       'b'
+#define EDP_PANEL        'c'
 
 class MDPVersion;
 
@@ -93,17 +100,33 @@ public:
     int getMDPVersion() {return mMDPVersion;}
     char getPanelType() {return mPanelType;}
     bool hasOverlay() {return mHasOverlay;}
-    uint8_t getTotalPipes() { return (mRGBPipes + mVGPipes + mDMAPipes);}
+    uint8_t getTotalPipes() {
+        return (uint8_t)(mRGBPipes + mVGPipes + mDMAPipes);
+    }
     uint8_t getRGBPipes() { return mRGBPipes; }
     uint8_t getVGPipes() { return mVGPipes; }
     uint8_t getDMAPipes() { return mDMAPipes; }
     bool supportsDecimation();
     uint32_t getMaxMDPDownscale();
+    uint32_t getMaxMDPUpscale();
     bool supportsBWC();
-    bool is8x26();
+    bool supportsMacroTile();
     int getLeftSplit() { return mSplit.left(); }
     int getRightSplit() { return mSplit.right(); }
+    unsigned long getLowBw() { return mLowBw; }
+    unsigned long getHighBw() { return mHighBw; }
+    bool isSrcSplit() const;
+    bool is8x26();
+    bool is8x74v2();
+    bool is8084();
+    bool is8092();
+
 private:
+    bool updateSysFsInfo();
+    bool updatePanelInfo();
+    bool updateSplitInfo();
+    int tokenizeParams(char *inputParams, const char *delim,
+                        char* tokenStr[], int *idx);
     int mFd;
     int mMDPVersion;
     char mPanelType;
@@ -114,7 +137,12 @@ private:
     uint8_t mDMAPipes;
     uint32_t mFeatures;
     uint32_t mMDPDownscale;
+    uint32_t mMDPUpscale;
+    bool mMacroTileEnabled;
     Split mSplit;
+    unsigned long mLowBw; //kbps
+    unsigned long mHighBw; //kbps
+    bool mSourceSplit;
 };
 }; //namespace qdutils
 #endif //INCLUDE_LIBQCOMUTILS_MDPVER

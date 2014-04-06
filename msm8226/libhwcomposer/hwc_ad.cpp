@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2013 The Linux Foundation. All rights reserved.
+* Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -34,6 +34,7 @@
 #include <mdp_version.h>
 #include "hwc_ad.h"
 #include "hwc_utils.h"
+#include "external.h"
 
 #define DEBUG 0
 using namespace overlay;
@@ -123,14 +124,28 @@ static int adRead() {
     return ret;
 }
 
-AssertiveDisplay::AssertiveDisplay() :mWbFd(-1), mDoable(false),
-        mFeatureEnabled(false), mDest(overlay::utils::OV_INVALID) {
+AssertiveDisplay::AssertiveDisplay(hwc_context_t *ctx) : mWbFd(-1),
+        mDoable(false), mFeatureEnabled(false),
+        mDest(overlay::utils::OV_INVALID) {
     int fd = openWbFb();
     if(fd >= 0) {
+        //Values in ad node:
         //-1 means feature is disabled on device
         // 0 means feature exists but turned off, will be turned on by hwc
         // 1 means feature is turned on by hwc
-        if(adRead() >= 0) {
+        // Plus, we do this feature only on split primary displays.
+        // Plus, we do this feature only if ro.qcom.ad=2
+
+        char property[PROPERTY_VALUE_MAX];
+        const int ENABLED = 2;
+        int val = 0;
+
+        if(property_get("ro.qcom.ad", property, "0") > 0) {
+            val = atoi(property);
+        }
+
+        if(adRead() >= 0 && isDisplaySplit(ctx, HWC_DISPLAY_PRIMARY) &&
+                val == ENABLED) {
             ALOGD_IF(DEBUG, "Assertive display feature supported");
             mFeatureEnabled = true;
         }
@@ -177,6 +192,14 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
 
     overlay::Writeback *wb = overlay::Writeback::getInstance();
 
+    //Set Security flag on writeback
+    if(isSecureBuffer(hnd)) {
+        if(!wb->setSecure(isSecureBuffer(hnd))) {
+            ALOGE("Failure in setting WB secure flag for ad");
+            return false;
+        }
+    }
+
     if(!wb->configureDpyInfo(hnd->width, hnd->height)) {
         ALOGE("%s: config display failed", __func__);
         mDoable = false;
@@ -194,7 +217,7 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
     size = getBufferSizeAndDimensions(hnd->width, hnd->height,
                 format, tmpW, tmpH);
 
-    if(!wb->configureMemory(size, isSecureBuffer(hnd))) {
+    if(!wb->configureMemory(size)) {
         ALOGE("%s: config memory failed", __func__);
         mDoable = false;
         return false;
@@ -207,9 +230,7 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
     }
 
     PipeArgs parg(mdpFlags, whf, ZORDER_0, IS_FG_OFF,
-            ROT_FLAGS_NONE,
-            ovutils::DEFAULT_PLANE_ALPHA,
-            ovutils::OVERLAY_BLENDING_OPAQUE);
+            ROT_FLAGS_NONE);
     hwc_rect_t dst = crop; //input same as output
 
     if(configMdp(ctx->mOverlay, parg, OVERLAY_TRANSFORM_0, crop, dst, NULL,
@@ -228,6 +249,14 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
             adWrite(on);
         }
     }
+
+    if(!ctx->mOverlay->validateAndSet(overlay::Overlay::DPY_WRITEBACK,
+            mWbFd)) {
+        ALOGE("%s: Failed to validate and set overlay for dpy %d"
+                ,__FUNCTION__, overlay::Overlay::DPY_WRITEBACK);
+        return false;
+    }
+
     return true;
 }
 
@@ -249,12 +278,12 @@ bool AssertiveDisplay::draw(hwc_context_t *ctx, int fd, uint32_t offset) {
     return true;
 }
 
-int AssertiveDisplay::getDstFd(hwc_context_t *ctx) const {
+int AssertiveDisplay::getDstFd() const {
     overlay::Writeback *wb = overlay::Writeback::getInstance();
     return wb->getDstFd();
 }
 
-uint32_t AssertiveDisplay::getDstOffset(hwc_context_t *ctx) const {
+uint32_t AssertiveDisplay::getDstOffset() const {
     overlay::Writeback *wb = overlay::Writeback::getInstance();
     return wb->getOffset();
 }
