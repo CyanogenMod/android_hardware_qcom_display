@@ -38,6 +38,7 @@
 
 #include "gralloc_priv.h"
 #include "overlayUtils.h"
+#define SIZE_1M 0x00100000
 
 namespace overlay {
 
@@ -87,7 +88,7 @@ private:
     /* allocated buffer type determined by gralloc (ashmem, ion, etc) */
     int mAllocType;
 
-    /* holds buf size */
+    /* holds buf size sent down by the client */
     uint32_t mBufSz;
 
     /* num of bufs */
@@ -95,6 +96,9 @@ private:
 
     /* gralloc alloc controller */
     gralloc::IAllocController* mAlloc;
+
+    /*Holds the aligned buffer size used for actual allocation*/
+    uint32_t mBufSzAligned;
 };
 
 //-------------------Inlines-----------------------------------
@@ -118,24 +122,29 @@ inline bool OvMem::open(uint32_t numbufs,
 {
     alloc_data data;
     int allocFlags = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+    int err = 0;
+    OVASSERT(numbufs && bufSz, "numbufs=%d bufSz=%d", numbufs, bufSz);
+    mBufSz = bufSz;
+
     if(isSecure) {
         allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP;
         allocFlags |= GRALLOC_USAGE_PROTECTED;
+        mBufSzAligned = utils::align(bufSz, SIZE_1M);
+        data.align = SIZE_1M;
+    } else {
+        mBufSzAligned = bufSz;
+        data.align = getpagesize();
     }
+
     // Allocate uncached rotator buffers
     allocFlags |= GRALLOC_USAGE_PRIVATE_UNCACHED;
 
-    int err = 0;
-    OVASSERT(numbufs && bufSz, "numbufs=%d bufSz=%d", numbufs, bufSz);
-
-    mBufSz = bufSz;
     mNumBuffers = numbufs;
 
     data.base = 0;
     data.fd = -1;
     data.offset = 0;
-    data.size = mBufSz * mNumBuffers;
-    data.align = getpagesize();
+    data.size = mBufSzAligned * mNumBuffers;
     data.uncached = true;
 
     err = mAlloc->allocate(data, allocFlags);
@@ -160,7 +169,7 @@ inline bool OvMem::close()
     }
 
     IMemAlloc* memalloc = mAlloc->getAllocator(mAllocType);
-    ret = memalloc->free_buffer(mBaseAddr, mBufSz * mNumBuffers, 0, mFd);
+    ret = memalloc->free_buffer(mBaseAddr, mBufSzAligned * mNumBuffers, 0, mFd);
     if (ret != 0) {
         ALOGE("OvMem: error freeing buffer");
         return false;
@@ -170,6 +179,7 @@ inline bool OvMem::close()
     mBaseAddr = MAP_FAILED;
     mAllocType = 0;
     mBufSz = 0;
+    mBufSzAligned = 0;
     mNumBuffers = 0;
     return true;
 }
@@ -202,7 +212,8 @@ inline uint32_t OvMem::numBufs() const
 inline void OvMem::dump() const
 {
     ALOGE("== Dump OvMem start ==");
-    ALOGE("fd=%d addr=%p type=%d bufsz=%u", mFd, mBaseAddr, mAllocType, mBufSz);
+    ALOGE("fd=%d addr=%p type=%d bufsz=%u AlignedBufSz=%u",
+           mFd, mBaseAddr, mAllocType, mBufSz, mBufSzAligned);
     ALOGE("== Dump OvMem end ==");
 }
 

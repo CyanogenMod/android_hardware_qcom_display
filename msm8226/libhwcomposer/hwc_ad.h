@@ -39,7 +39,7 @@ namespace qhwc {
 
 class AssertiveDisplay {
 public:
-    AssertiveDisplay();
+    AssertiveDisplay(hwc_context_t *ctx);
     void markDoable(hwc_context_t *ctx, const hwc_display_contents_1_t* list);
     bool prepare(hwc_context_t *ctx, const hwc_rect_t& crop,
             const overlay::utils::Whf& whf,
@@ -51,8 +51,8 @@ public:
     }
     bool isDoable() const { return mDoable; }
     bool isModeOn() const { return (mWbFd >= 0); }
-    int getDstFd(hwc_context_t *ctx) const;
-    uint32_t getDstOffset(hwc_context_t *ctx) const;
+    int getDstFd() const;
+    uint32_t getDstOffset() const;
 
 private:
     //State of feature turned on and off
