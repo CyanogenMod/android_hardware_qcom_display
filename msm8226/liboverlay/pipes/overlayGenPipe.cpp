@@ -28,44 +28,82 @@
 */
 
 #include "overlayGenPipe.h"
+#include "overlay.h"
 #include "mdp_version.h"
 
 namespace overlay {
 
-GenericPipe::GenericPipe(const int& dpy) : mDpy(dpy), mRotDownscaleOpt(false),
-    pipeState(CLOSED), mCtrl(new Ctrl(dpy)), mData(new Data(dpy)) {
+GenericPipe::GenericPipe(int dpy) : mDpy(dpy), mRotDownscaleOpt(false),
+    pipeState(CLOSED) {
+    init();
 }
 
 GenericPipe::~GenericPipe() {
-    delete mCtrl;
-    delete mData;
+    close();
+}
+
+bool GenericPipe::init()
+{
+    ALOGE_IF(DEBUG_OVERLAY, "GenericPipe init");
+    mRotDownscaleOpt = false;
+
+    int fbNum = Overlay::getFbForDpy(mDpy);
+    if(fbNum < 0) {
+        ALOGE("%s: Invalid FB for the display: %d",__FUNCTION__, mDpy);
+        return false;
+    }
+
+    ALOGD_IF(DEBUG_OVERLAY,"%s: mFbNum:%d",__FUNCTION__, fbNum);
+
+    if(!mCtrlData.ctrl.init(fbNum)) {
+        ALOGE("GenericPipe failed to init ctrl");
+        return false;
+    }
+
+    if(!mCtrlData.data.init(fbNum)) {
+        ALOGE("GenericPipe failed to init data");
+        return false;
+    }
+
+    return true;
+}
+
+bool GenericPipe::close() {
+    bool ret = true;
+
+    if(!mCtrlData.ctrl.close()) {
+        ALOGE("GenericPipe failed to close ctrl");
+        ret = false;
+    }
+    if (!mCtrlData.data.close()) {
+        ALOGE("GenericPipe failed to close data");
+        ret = false;
+    }
+
     setClosed();
+    return ret;
 }
 
 void GenericPipe::setSource(const utils::PipeArgs& args) {
     mRotDownscaleOpt = args.rotFlags & utils::ROT_DOWNSCALE_ENABLED;
-    mCtrl->setSource(args);
+    mCtrlData.ctrl.setSource(args);
 }
 
 void GenericPipe::setCrop(const overlay::utils::Dim& d) {
-    mCtrl->setCrop(d);
-}
-
-void GenericPipe::setColor(const uint32_t color) {
-    mCtrl->setColor(color);
+    mCtrlData.ctrl.setCrop(d);
 }
 
 void GenericPipe::setTransform(const utils::eTransform& orient) {
-    mCtrl->setTransform(orient);
+    mCtrlData.ctrl.setTransform(orient);
 }
 
 void GenericPipe::setPosition(const utils::Dim& d) {
-    mCtrl->setPosition(d);
+    mCtrlData.ctrl.setPosition(d);
 }
 
 bool GenericPipe::setVisualParams(const MetaData_t &metadata)
 {
-        return mCtrl->setVisualParams(metadata);
+        return mCtrlData.ctrl.setVisualParams(metadata);
 }
 
 bool GenericPipe::commit() {
@@ -73,14 +111,14 @@ bool GenericPipe::commit() {
     int downscale_factor = utils::ROT_DS_NONE;
 
     if(mRotDownscaleOpt) {
-        ovutils::Dim src(mCtrl->getCrop());
-        ovutils::Dim dst(mCtrl->getPosition());
+        ovutils::Dim src(mCtrlData.ctrl.getCrop());
+        ovutils::Dim dst(mCtrlData.ctrl.getPosition());
         downscale_factor = ovutils::getDownscaleFactor(
                 src.w, src.h, dst.w, dst.h);
     }
 
-    mCtrl->setDownscale(downscale_factor);
-    ret = mCtrl->commit();
+    mCtrlData.ctrl.setDownscale(downscale_factor);
+    ret = mCtrlData.ctrl.commit();
 
     pipeState = ret ? OPEN : CLOSED;
     return ret;
@@ -89,35 +127,36 @@ bool GenericPipe::commit() {
 bool GenericPipe::queueBuffer(int fd, uint32_t offset) {
     //TODO Move pipe-id transfer to CtrlData class. Make ctrl and data private.
     OVASSERT(isOpen(), "State is closed, cannot queueBuffer");
-    int pipeId = mCtrl->getPipeId();
+    int pipeId = mCtrlData.ctrl.getPipeId();
     OVASSERT(-1 != pipeId, "Ctrl ID should not be -1");
     // set pipe id from ctrl to data
-    mData->setPipeId(pipeId);
+    mCtrlData.data.setPipeId(pipeId);
 
-    return mData->queueBuffer(fd, offset);
+    return mCtrlData.data.queueBuffer(fd, offset);
 }
 
 int GenericPipe::getCtrlFd() const {
-    return mCtrl->getFd();
+    return mCtrlData.ctrl.getFd();
 }
 
 utils::Dim GenericPipe::getCrop() const
 {
-    return mCtrl->getCrop();
+    return mCtrlData.ctrl.getCrop();
 }
 
 void GenericPipe::dump() const
 {
     ALOGE("== Dump Generic pipe start ==");
     ALOGE("pipe state = %d", (int)pipeState);
-    mCtrl->dump();
-    mData->dump();
+    mCtrlData.ctrl.dump();
+    mCtrlData.data.dump();
+
     ALOGE("== Dump Generic pipe end ==");
 }
 
 void GenericPipe::getDump(char *buf, size_t len) {
-    mCtrl->getDump(buf, len);
-    mData->getDump(buf, len);
+    mCtrlData.ctrl.getDump(buf, len);
+    mCtrlData.data.getDump(buf, len);
 }
 
 bool GenericPipe::isClosed() const  {
@@ -133,20 +172,8 @@ bool GenericPipe::setClosed() {
     return true;
 }
 
-int GenericPipe::getPipeId() {
-    return mCtrl->getPipeId();
-}
-
-bool GenericPipe::validateAndSet(GenericPipe* pipeArray[], const int& count,
-        const int& fbFd) {
-    Ctrl* ctrlArray[count];
-    memset(&ctrlArray, 0, sizeof(ctrlArray));
-
-    for(int i = 0; i < count; i++) {
-        ctrlArray[i] = pipeArray[i]->mCtrl;
-    }
-
-    return Ctrl::validateAndSet(ctrlArray, count, fbFd);
+void GenericPipe::forceSet() {
+    mCtrlData.ctrl.forceSet();
 }
 
 } //namespace overlay

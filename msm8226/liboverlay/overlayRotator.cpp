@@ -17,11 +17,11 @@
  * limitations under the License.
 */
 
+#include <sync/sync.h>
 #include "overlayRotator.h"
 #include "overlayUtils.h"
 #include "mdp_version.h"
 #include "gr.h"
-#include <sync/sync.h>
 
 namespace ovutils = overlay::utils;
 
@@ -64,56 +64,51 @@ int Rotator::getRotatorHwType() {
 
 bool RotMem::close() {
     bool ret = true;
-    if(valid()) {
-        if(mem.close() == false) {
-            ALOGE("%s error in closing rot mem", __FUNCTION__);
-            ret = false;
+    for(uint32_t i=0; i < RotMem::MAX_ROT_MEM; ++i) {
+        // skip current, and if valid, close
+        if(m[i].valid()) {
+            if(m[i].close() == false) {
+                ALOGE("%s error in closing rot mem %d", __FUNCTION__, i);
+                ret = false;
+            }
         }
     }
     return ret;
 }
 
-RotMem::RotMem() : mCurrIndex(0) {
+RotMem::Mem::Mem() : mCurrOffset(0) {
     utils::memset0(mRotOffset);
     for(int i = 0; i < ROT_NUM_BUFS; i++) {
         mRelFence[i] = -1;
     }
 }
 
-RotMem::~RotMem() {
+RotMem::Mem::~Mem() {
     for(int i = 0; i < ROT_NUM_BUFS; i++) {
         ::close(mRelFence[i]);
         mRelFence[i] = -1;
     }
 }
 
-void RotMem::setReleaseFd(const int& fence) {
+void RotMem::Mem::setReleaseFd(const int& fence) {
     int ret = 0;
 
-    if(mRelFence[mCurrIndex] >= 0) {
+    if(mRelFence[mCurrOffset] >= 0) {
         //Wait for previous usage of this buffer to be over.
         //Can happen if rotation takes > vsync and a fast producer. i.e queue
         //happens in subsequent vsyncs either because content is 60fps or
         //because the producer is hasty sometimes.
-        ret = sync_wait(mRelFence[mCurrIndex], 1000);
+        ret = sync_wait(mRelFence[mCurrOffset], 1000);
         if(ret < 0) {
             ALOGE("%s: sync_wait error!! error no = %d err str = %s",
                 __FUNCTION__, errno, strerror(errno));
         }
-        ::close(mRelFence[mCurrIndex]);
+        ::close(mRelFence[mCurrOffset]);
     }
-    mRelFence[mCurrIndex] = fence;
+    mRelFence[mCurrOffset] = fence;
 }
 
 //============RotMgr=========================
-RotMgr * RotMgr::sRotMgr = NULL;
-
-RotMgr* RotMgr::getInstance() {
-    if(sRotMgr == NULL) {
-        sRotMgr = new RotMgr();
-    }
-    return sRotMgr;
-}
 
 RotMgr::RotMgr() {
     for(int i = 0; i < MAX_ROT_SESS; i++) {
@@ -176,7 +171,7 @@ void RotMgr::getDump(char *buf, size_t len) {
     }
     char str[4] = {'\0'};
     snprintf(str, 4, "\n");
-    strlcat(buf, str, len);
+    strncat(buf, str, strlen(str));
 }
 
 int RotMgr::getRotDevFd() {

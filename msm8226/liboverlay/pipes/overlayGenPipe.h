@@ -38,16 +38,16 @@ namespace overlay {
 class GenericPipe : utils::NoCopy {
 public:
     /* ctor */
-    explicit GenericPipe(const int& dpy);
+    explicit GenericPipe(int dpy);
     /* dtor */
     ~GenericPipe();
+    bool init();
+    bool close();
     /* Control APIs */
     /* set source using whf, orient and wait flag */
     void setSource(const utils::PipeArgs& args);
     /* set crop a.k.a the region of interest */
     void setCrop(const utils::Dim& d);
-    /* set color for mdp pipe */
-    void setColor(const uint32_t color);
     /* set orientation*/
     void setTransform(const utils::eTransform& param);
     /* set mdp posision using dim */
@@ -73,15 +73,18 @@ public:
     void dump() const;
     /* Return the dump in the specified buffer */
     void getDump(char *buf, size_t len);
-    int getPipeId();
+    /* Marks the pipe for forcible setting of params
+     * even if they haven't changed
+     */
+    void forceSet();
 
-    static bool validateAndSet(GenericPipe* pipeArray[], const int& count,
-            const int& fbFd);
 private:
     /* set Closed pipe */
     bool setClosed();
 
     int mDpy;
+    /* Ctrl/Data aggregator */
+    CtrlData mCtrlData;
     //Whether we will do downscale opt. This is just a request. If the frame is
     //not a candidate, we might not do it.
     bool mRotDownscaleOpt;
@@ -91,8 +94,6 @@ private:
         OPEN
     };
     ePipeState pipeState;
-    Ctrl *mCtrl;
-    Data *mData;
 };
 
 } //namespace overlay

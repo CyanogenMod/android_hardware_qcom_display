@@ -62,7 +62,7 @@ class Writeback {
 public:
     ~Writeback();
     bool configureDpyInfo(int xres, int yres);
-    bool configureMemory(uint32_t size);
+    bool configureMemory(uint32_t size, bool isSecure);
     /* Blocking write. (queue, commit, dequeue)
      * This class will do writeback memory management.
      * This class will call display-commit on writeback mixer.
@@ -87,7 +87,6 @@ public:
     int getFbFd() const { return mFd.getFD(); }
     int getOutputFormat();
     bool setOutputFormat(int mdpFormat);
-    bool setSecure(bool isSecure);
 
     static Writeback* getInstance();
     static void configBegin() { sUsed = false; }
@@ -109,7 +108,6 @@ private:
     int mXres;
     int mYres;
     int mOpFmt;
-    bool mSecure;
 
     static bool sUsed;
     static Writeback *sWb;
