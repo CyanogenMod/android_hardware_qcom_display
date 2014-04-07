@@ -95,6 +95,13 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
 
         if (usage & GRALLOC_USAGE_PRIVATE_EXTERNAL_ONLY) {
             flags |= private_handle_t::PRIV_FLAGS_EXTERNAL_ONLY;
+            //The EXTERNAL_BLOCK flag is always an add-on
+            if (usage & GRALLOC_USAGE_PRIVATE_EXTERNAL_BLOCK) {
+                flags |= private_handle_t::PRIV_FLAGS_EXTERNAL_BLOCK;
+            }
+            if (usage & GRALLOC_USAGE_PRIVATE_EXTERNAL_CC) {
+                flags |= private_handle_t::PRIV_FLAGS_EXTERNAL_CC;
+            }
         }
 
         if (bufferType == BUFFER_TYPE_VIDEO) {
@@ -139,14 +146,6 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
             flags |= private_handle_t::PRIV_FLAGS_HW_TEXTURE;
         }
 
-        if(usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY) {
-            flags |= private_handle_t::PRIV_FLAGS_SECURE_DISPLAY;
-        }
-
-        if(isMacroTileEnabled(format, usage)) {
-            flags |= private_handle_t::PRIV_FLAGS_TILE_RENDERED;
-        }
-
         flags |= data.allocType;
         int eBaseAddr = int(eData.base) + eData.offset;
         private_handle_t *hnd = new private_handle_t(data.fd, size, flags,
@@ -169,9 +168,6 @@ void gpu_context_t::getGrallocInformationFromFormat(int inputFormat,
                                                     int *bufferType)
 {
     *bufferType = BUFFER_TYPE_VIDEO;
-
-    if (inputFormat == HAL_PIXEL_FORMAT_RGB_888)
-        return;
 
     if (inputFormat <= HAL_PIXEL_FORMAT_sRGB_X_8888) {
         // RGB formats
@@ -265,7 +261,8 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
 
     //If input format is HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED then based on
     //the usage bits, gralloc assigns a format.
-    if(format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+    if(format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED ||
+       format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
         if(usage & GRALLOC_USAGE_HW_VIDEO_ENCODER)
             grallocFormat = HAL_PIXEL_FORMAT_NV12_ENCODEABLE; //NV12
         else if((usage & GRALLOC_USAGE_HW_CAMERA_MASK)
@@ -275,18 +272,27 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
             grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
         else if(usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
             grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
-        else if(usage & GRALLOC_USAGE_HW_COMPOSER)
-            //XXX: If we still haven't set a format, default to RGBA8888
-            grallocFormat = HAL_PIXEL_FORMAT_RGBA_8888;
+    }
+
+    if (grallocFormat == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED &&
+            (usage & GRALLOC_USAGE_HW_COMPOSER )) {
+        //XXX: If we still haven't set a format, default to RGBA8888
+        grallocFormat = HAL_PIXEL_FORMAT_RGBA_8888;
     }
 
     getGrallocInformationFromFormat(grallocFormat, &bufferType);
-    size = getBufferSizeAndDimensions(w, h, grallocFormat, usage, alignedw,
-                   alignedh);
+    size = getBufferSizeAndDimensions(w, h, grallocFormat, alignedw, alignedh);
 
     if ((ssize_t)size <= 0)
         return -EINVAL;
     size = (bufferSize >= size)? bufferSize : size;
+
+    // All buffers marked as protected or for external
+    // display need to go to overlay
+    if ((usage & GRALLOC_USAGE_EXTERNAL_DISP) ||
+        (usage & GRALLOC_USAGE_PROTECTED)) {
+        bufferType = BUFFER_TYPE_VIDEO;
+    }
 
     bool useFbMem = false;
     char property[PROPERTY_VALUE_MAX];

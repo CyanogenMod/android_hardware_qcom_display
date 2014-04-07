@@ -45,10 +45,10 @@ namespace qService {
 class QService : public BnQService {
 public:
     virtual ~QService();
+    virtual void securing(uint32_t startEnd);
+    virtual void unsecuring(uint32_t startEnd);
     virtual void connect(const android::sp<qClient::IQClient>& client);
-    virtual android::status_t dispatch(uint32_t command,
-            const android::Parcel* data,
-            android::Parcel* reply);
+    virtual android::status_t screenRefresh();
     static void init();
 private:
     QService();

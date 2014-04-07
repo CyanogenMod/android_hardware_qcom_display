@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2013-14, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -30,14 +30,11 @@
 #include <hwc_qclient.h>
 #include <IQService.h>
 #include <hwc_utils.h>
-#include <hwc_vpuclient.h>
-#include <mdp_version.h>
 
 #define QCLIENT_DEBUG 0
 
 using namespace android;
 using namespace qService;
-using namespace qhwc;
 
 namespace qClient {
 
@@ -53,28 +50,45 @@ QClient::~QClient()
     ALOGD_IF(QCLIENT_DEBUG,"QClient Destructor invoked");
 }
 
-static void securing(hwc_context_t *ctx, uint32_t startEnd) {
-    Locker::Autolock _sl(ctx->mDrawLock);
+status_t QClient::notifyCallback(uint32_t msg, uint32_t value) {
+    switch(msg) {
+        case IQService::SECURING:
+            securing(value);
+            break;
+        case IQService::UNSECURING:
+            unsecuring(value);
+            break;
+        case IQService::SCREEN_REFRESH:
+            return screenRefresh();
+            break;
+        default:
+            return NO_ERROR;
+    }
+    return NO_ERROR;
+}
+
+void QClient::securing(uint32_t startEnd) {
+    Locker::Autolock _sl(mHwcContext->mDrawLock);
     //The only way to make this class in this process subscribe to media
     //player's death.
     IMediaDeathNotifier::getMediaPlayerService();
 
-    ctx->mSecuring = startEnd;
+    mHwcContext->mSecuring = startEnd;
     //We're done securing
     if(startEnd == IQService::END)
-        ctx->mSecureMode = true;
-    if(ctx->proc)
-        ctx->proc->invalidate(ctx->proc);
+        mHwcContext->mSecureMode = true;
+    if(mHwcContext->proc)
+        mHwcContext->proc->invalidate(mHwcContext->proc);
 }
 
-static void unsecuring(hwc_context_t *ctx, uint32_t startEnd) {
-    Locker::Autolock _sl(ctx->mDrawLock);
-    ctx->mSecuring = startEnd;
+void QClient::unsecuring(uint32_t startEnd) {
+    Locker::Autolock _sl(mHwcContext->mDrawLock);
+    mHwcContext->mSecuring = startEnd;
     //We're done unsecuring
     if(startEnd == IQService::END)
-        ctx->mSecureMode = false;
-    if(ctx->proc)
-        ctx->proc->invalidate(ctx->proc);
+        mHwcContext->mSecureMode = false;
+    if(mHwcContext->proc)
+        mHwcContext->proc->invalidate(mHwcContext->proc);
 }
 
 void QClient::MPDeathNotifier::died() {
@@ -86,149 +100,12 @@ void QClient::MPDeathNotifier::died() {
         mHwcContext->proc->invalidate(mHwcContext->proc);
 }
 
-static android::status_t screenRefresh(hwc_context_t *ctx) {
+android::status_t QClient::screenRefresh() {
     status_t result = NO_INIT;
-    if(ctx->proc) {
-        ctx->proc->invalidate(ctx->proc);
+    if(mHwcContext->proc) {
+        mHwcContext->proc->invalidate(mHwcContext->proc);
         result = NO_ERROR;
     }
     return result;
 }
-
-#ifdef VPU_TARGET
-static android::status_t vpuCommand(hwc_context_t *ctx,
-        uint32_t command,
-        const Parcel* inParcel,
-        Parcel* outParcel) {
-    status_t result = NO_INIT;
-#ifdef QCOM_BSP
-    if(qdutils::MDPVersion::getInstance().is8092())
-        result = ctx->mVPUClient->processCommand(command, inParcel, outParcel);
-#endif
-    return result;
-}
-#endif
-
-static void setExtOrientation(hwc_context_t *ctx, uint32_t orientation) {
-    ctx->mExtOrientation = orientation;
-}
-
-static void isExternalConnected(hwc_context_t* ctx, Parcel* outParcel) {
-    int connected;
-    connected = ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected ? 1 : 0;
-    outParcel->writeInt32(connected);
-}
-
-static void getDisplayAttributes(hwc_context_t* ctx, const Parcel* inParcel,
-        Parcel* outParcel) {
-    int dpy = inParcel->readInt32();
-    outParcel->writeInt32(ctx->dpyAttr[dpy].vsync_period);
-    outParcel->writeInt32(ctx->dpyAttr[dpy].xres);
-    outParcel->writeInt32(ctx->dpyAttr[dpy].yres);
-    outParcel->writeFloat(ctx->dpyAttr[dpy].xdpi);
-    outParcel->writeFloat(ctx->dpyAttr[dpy].ydpi);
-    //XXX: Need to check what to return for HDMI
-    outParcel->writeInt32(ctx->mMDP.panel);
-}
-static void setHSIC(const Parcel* inParcel) {
-    int dpy = inParcel->readInt32();
-    ALOGD_IF(0, "In %s: dpy = %d", __FUNCTION__, dpy);
-    HSICData_t hsic_data;
-    hsic_data.hue = inParcel->readInt32();
-    hsic_data.saturation = inParcel->readFloat();
-    hsic_data.intensity = inParcel->readInt32();
-    hsic_data.contrast = inParcel->readFloat();
-    //XXX: Actually set the HSIC data through ABL lib
-}
-
-
-static void setBufferMirrorMode(hwc_context_t *ctx, uint32_t enable) {
-    ctx->mBufferMirrorMode = enable;
-}
-
-static status_t getDisplayVisibleRegion(hwc_context_t* ctx, int dpy,
-                                Parcel* outParcel) {
-    // Get the info only if the dpy is valid
-    if(dpy >= HWC_DISPLAY_PRIMARY && dpy <= HWC_DISPLAY_VIRTUAL) {
-        Locker::Autolock _sl(ctx->mDrawLock);
-        if(dpy && (ctx->mExtOrientation || ctx->mBufferMirrorMode)) {
-            // Return the destRect on external, if external orienation
-            // is enabled
-            outParcel->writeInt32(ctx->dpyAttr[dpy].mDstRect.left);
-            outParcel->writeInt32(ctx->dpyAttr[dpy].mDstRect.top);
-            outParcel->writeInt32(ctx->dpyAttr[dpy].mDstRect.right);
-            outParcel->writeInt32(ctx->dpyAttr[dpy].mDstRect.bottom);
-        } else {
-            outParcel->writeInt32(ctx->mViewFrame[dpy].left);
-            outParcel->writeInt32(ctx->mViewFrame[dpy].top);
-            outParcel->writeInt32(ctx->mViewFrame[dpy].right);
-            outParcel->writeInt32(ctx->mViewFrame[dpy].bottom);
-        }
-        return NO_ERROR;
-    } else {
-        ALOGE("In %s: invalid dpy index %d", __FUNCTION__, dpy);
-        return BAD_VALUE;
-    }
-}
-
-static void pauseWFD(hwc_context_t *ctx, uint32_t pause) {
-    int dpy = HWC_DISPLAY_VIRTUAL;
-    if(pause) {
-        //WFD Pause
-        handle_pause(ctx, dpy);
-    } else {
-        //WFD Resume
-        handle_resume(ctx, dpy);
-    }
-}
-
-status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
-        Parcel* outParcel) {
-    status_t ret = NO_ERROR;
-
-#ifdef VPU_TARGET
-    if (command > IQService::VPU_COMMAND_LIST_START &&
-        command < IQService::VPU_COMMAND_LIST_END) {
-        return vpuCommand(mHwcContext, command, inParcel, outParcel);
-    }
-#endif
-    switch(command) {
-        case IQService::SECURING:
-            securing(mHwcContext, inParcel->readInt32());
-            break;
-        case IQService::UNSECURING:
-            unsecuring(mHwcContext, inParcel->readInt32());
-            break;
-        case IQService::SCREEN_REFRESH:
-            return screenRefresh(mHwcContext);
-            break;
-        case IQService::EXTERNAL_ORIENTATION:
-            setExtOrientation(mHwcContext, inParcel->readInt32());
-            break;
-        case IQService::BUFFER_MIRRORMODE:
-            setBufferMirrorMode(mHwcContext, inParcel->readInt32());
-            break;
-        case IQService::GET_DISPLAY_VISIBLE_REGION:
-            ret = getDisplayVisibleRegion(mHwcContext, inParcel->readInt32(),
-                                    outParcel);
-            break;
-        case IQService::CHECK_EXTERNAL_STATUS:
-            isExternalConnected(mHwcContext, outParcel);
-            break;
-        case IQService::GET_DISPLAY_ATTRIBUTES:
-            getDisplayAttributes(mHwcContext, inParcel, outParcel);
-            break;
-        case IQService::SET_HSIC_DATA:
-            setHSIC(inParcel);
-        case IQService::PAUSE_WFD:
-            pauseWFD(mHwcContext, inParcel->readInt32());
-            break;
-        default:
-            ret = NO_ERROR;
-    }
-    return ret;
-}
-
-
-
 }

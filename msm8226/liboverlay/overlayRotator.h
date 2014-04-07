@@ -45,21 +45,36 @@ namespace overlay {
    we don't need this RotMem wrapper. The inner class is sufficient.
 */
 struct RotMem {
-    // Max rotator buffers
-    enum { ROT_NUM_BUFS = 2 };
-    RotMem();
-    ~RotMem();
-    bool close();
-    bool valid() { return mem.valid(); }
-    uint32_t size() const { return mem.bufSz(); }
-    void setReleaseFd(const int& fence);
+    // Max rotator memory allocations
+    enum { MAX_ROT_MEM = 2};
 
-    // rotator data info dst offset
-    uint32_t mRotOffset[ROT_NUM_BUFS];
-    int mRelFence[ROT_NUM_BUFS];
-    // current slot being used
-    uint32_t mCurrIndex;
-    OvMem mem;
+    //Manages the rotator buffer offsets.
+    struct Mem {
+        Mem();
+        ~Mem();
+        bool valid() { return m.valid(); }
+        bool close() { return m.close(); }
+        uint32_t size() const { return m.bufSz(); }
+        void setReleaseFd(const int& fence);
+        // Max rotator buffers
+        enum { ROT_NUM_BUFS = 2 };
+        // rotator data info dst offset
+        uint32_t mRotOffset[ROT_NUM_BUFS];
+        int mRelFence[ROT_NUM_BUFS];
+        // current offset slot from mRotOffset
+        uint32_t mCurrOffset;
+        OvMem m;
+    };
+
+    RotMem() : _curr(0) {}
+    Mem& curr() { return m[_curr % MAX_ROT_MEM]; }
+    const Mem& curr() const { return m[_curr % MAX_ROT_MEM]; }
+    Mem& prev() { return m[(_curr+1) % MAX_ROT_MEM]; }
+    RotMem& operator++() { ++_curr; return *this; }
+    void setReleaseFd(const int& fence) { curr().setReleaseFd(fence); }
+    bool close();
+    uint32_t _curr;
+    Mem m[MAX_ROT_MEM];
 };
 
 class Rotator
@@ -212,29 +227,20 @@ public:
     //Maximum sessions based on VG pipes, since rotator is used only for videos.
     //Even though we can have 4 mixer stages, that much may be unnecessary.
     enum { MAX_ROT_SESS = 3 };
-
+    RotMgr();
     ~RotMgr();
     void configBegin();
     void configDone();
     overlay::Rotator *getNext();
     void clear(); //Removes all instances
-    //Resets the usage of top count objects, making them available for reuse
-    void markUnusedTop(const uint32_t& count) { mUseCount -= count; }
     /* Returns rot dump.
      * Expects a NULL terminated buffer of big enough size.
      */
     void getDump(char *buf, size_t len);
     int getRotDevFd();
-    int getNumActiveSessions() { return mUseCount; }
-
-    static RotMgr *getInstance();
-
 private:
-    RotMgr();
-    static RotMgr *sRotMgr;
-
     overlay::Rotator *mRot[MAX_ROT_SESS];
-    uint32_t mUseCount;
+    int mUseCount;
     int mRotDevFd;
 };
 
