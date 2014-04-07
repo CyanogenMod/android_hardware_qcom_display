@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -29,9 +29,6 @@
 #include "hwc_utils.h"
 #include "string.h"
 #include "external.h"
-#include "overlay.h"
-#define __STDC_FORMAT_MACROS 1
-#include <inttypes.h>
 
 namespace qhwc {
 
@@ -66,7 +63,7 @@ static void *vsync_loop(void *param)
 
     struct pollfd pfd[2];
     int fb_fd[2];
-    uint64_t timestamp[2] = {0,0};
+    uint64_t timestamp[2];
     int num_displays;
 
     char property[PROPERTY_VALUE_MAX];
@@ -80,7 +77,7 @@ static void *vsync_loop(void *param)
             logvsync = true;
     }
 
-    if (ctx->mExtDisplay->isConnected())
+    if (ctx->mExtDisplay->getHDMIIndex() > 0)
         num_displays = 2;
     else
         num_displays = 1;
@@ -90,8 +87,7 @@ static void *vsync_loop(void *param)
         snprintf(vsync_node_path, sizeof(vsync_node_path),
                 "/sys/class/graphics/fb%d/vsync_event",
                 dpy == HWC_DISPLAY_PRIMARY ? 0 :
-                overlay::Overlay::getInstance()->
-                                getFbForDpy(HWC_DISPLAY_EXTERNAL));
+                ctx->mExtDisplay->getHDMIIndex());
         ALOGI("%s: Reading vsync for dpy=%d from %s", __FUNCTION__, dpy,
                 vsync_node_path);
         fb_fd[dpy] = open(vsync_node_path, O_RDONLY);
@@ -135,8 +131,8 @@ static void *vsync_loop(void *param)
                         }
                         // send timestamp to SurfaceFlinger
                         ALOGD_IF (logvsync,
-                            "%s: timestamp %"PRIu64" sent to SF for dpy=%d",
-                            __FUNCTION__, timestamp[dpy], dpy);
+                                "%s: timestamp %llu sent to SF for dpy=%d",
+                                __FUNCTION__, timestamp[dpy], dpy);
                         ctx->proc->vsync(ctx->proc, dpy, timestamp[dpy]);
                     }
                 }

@@ -36,11 +36,11 @@ namespace overlay{
 class MdpCtrl {
 public:
     /* ctor reset */
-    explicit MdpCtrl(const int& dpy);
+    explicit MdpCtrl();
     /* dtor close */
     ~MdpCtrl();
-    /* init underlying device using fbnum for dpy */
-    bool init(const int& dpy);
+    /* init underlying device using fbnum */
+    bool init(uint32_t fbnum);
     /* unset overlay, reset and close fd */
     bool close();
     /* reset and set ov id to -1 / MSMFB_NEW_REQUEST */
@@ -57,8 +57,6 @@ public:
      * Dim - ROI dimensions.
      */
     void setCrop(const utils::Dim& d);
-    /* set color for mdp pipe */
-    void setColor(const uint32_t color);
     void setTransform(const utils::eTransform& orient);
     /* given a dim and w/h, set overlay dim */
     void setPosition(const utils::Dim& dim);
@@ -72,6 +70,7 @@ public:
     void dump() const;
     /* Return the dump in the specified buffer */
     void getDump(char *buf, size_t len);
+
     /* returns session id */
     int getPipeId() const;
     /* returns the fd associated to ctrl*/
@@ -82,15 +81,16 @@ public:
     utils::Dim getSrcRectDim() const;
     /* setVisualParam */
     bool setVisualParams(const MetaData_t& data);
+    void forceSet();
 
-    static bool validateAndSet(MdpCtrl* mdpCtrlArray[], const int& count,
-            const int& fbFd);
 private:
     /* Perform transformation calculations */
     void doTransform();
     void doDownscale();
     /* get orient / user_data[0] */
-    int getOrient() const;
+        int getOrient() const;
+    /* overlay get */
+    bool get();
     /* returns flags from mdp structure */
     int getFlags() const;
     /* set flags to mdp structure */
@@ -115,18 +115,29 @@ private:
     int getUserData() const;
     /* sets user_data[0] */
     void setUserData(int v);
+    /* return true if current overlay is different
+     * than last known good overlay */
+    bool ovChanged() const;
+    /* save mOVInfo to be last known good ov*/
+    void save();
+    /* restore last known good ov to be the current */
+    void restore();
 
     utils::eTransform mOrientation; //Holds requested orientation
+    /* last good known ov info */
+    mdp_overlay   mLkgo;
     /* Actual overlay mdp structure */
     mdp_overlay   mOVInfo;
     /* FD for the mdp fbnum */
     OvFD          mFd;
     int mDownscale;
-    int mDpy;
+    bool mForceSet;
 
 #ifdef USES_POST_PROCESSING
     /* PP Compute Params */
     struct compute_params mParams;
+    /* indicate if PP params have been changed */
+    bool mPPChanged;
 #endif
 };
 
@@ -159,11 +170,11 @@ private:
 class MdpData {
 public:
     /* ctor reset data */
-    explicit MdpData(const int& dpy);
+    explicit MdpData();
     /* dtor close*/
     ~MdpData();
     /* init FD */
-    bool init(const int& dpy);
+    bool init(uint32_t fbnum);
     /* memset0 the underlying mdp object */
     void reset();
     /* close fd, and reset */
@@ -195,9 +206,8 @@ private:
 
 /////   MdpCtrl  //////
 
-inline MdpCtrl::MdpCtrl(const int& dpy) {
+inline MdpCtrl::MdpCtrl() {
     reset();
-    init(dpy);
 }
 
 inline MdpCtrl::~MdpCtrl() {
@@ -254,6 +264,37 @@ inline void MdpCtrl::setBlending(overlay::utils::eBlending blending) {
     }
 }
 
+inline bool MdpCtrl::ovChanged() const {
+#ifdef USES_POST_PROCESSING
+    // Some pp params are stored as pointer address,
+    // so can't compare their content directly.
+    if (mPPChanged) {
+        return true;
+    }
+#endif
+    // 0 means same
+    if(0 == ::memcmp(&mOVInfo, &mLkgo, sizeof (mdp_overlay))) {
+        return false;
+    }
+    return true;
+}
+
+inline void MdpCtrl::save() {
+    if(static_cast<ssize_t>(mOVInfo.id) == MSMFB_NEW_REQUEST) {
+        ALOGE("MdpCtrl current ov has id -1, will not save");
+        return;
+    }
+    mLkgo = mOVInfo;
+}
+
+inline void MdpCtrl::restore() {
+    if(static_cast<ssize_t>(mLkgo.id) == MSMFB_NEW_REQUEST) {
+        ALOGE("MdpCtrl Lkgo ov has id -1, will not restore");
+        return;
+    }
+    mOVInfo = mLkgo;
+}
+
 inline overlay::utils::Whf MdpCtrl::getSrcWhf() const {
     return utils::Whf(  mOVInfo.src.width,
                         mOVInfo.src.height,
@@ -304,6 +345,10 @@ inline void MdpCtrl::setRotationFlags() {
         mOVInfo.flags |= MDP_SOURCE_ROTATED_90;
 }
 
+inline void MdpCtrl::forceSet() {
+    mForceSet = true;
+}
+
 ///////    MdpCtrl3D //////
 
 inline MdpCtrl3D::MdpCtrl3D() { reset(); }
@@ -346,12 +391,18 @@ inline bool MdpCtrl3D::useVirtualFB() {
 
 ///////    MdpData   //////
 
-inline MdpData::MdpData(const int& dpy) {
-    reset();
-    init(dpy);
-}
+inline MdpData::MdpData() { reset(); }
 
 inline MdpData::~MdpData() { close(); }
+
+inline bool MdpData::init(uint32_t fbnum) {
+    // FD init
+    if(!utils::openDev(mFd, fbnum, Res::fbPath, O_RDWR)){
+        ALOGE("Ctrl failed to init fbnum=%d", fbnum);
+        return false;
+    }
+    return true;
+}
 
 inline void MdpData::reset() {
     overlay::utils::memset0(mOvData);

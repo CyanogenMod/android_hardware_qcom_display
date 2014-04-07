@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,33 +54,27 @@ enum {
      * cannot be used with noncontiguous heaps */
     GRALLOC_USAGE_PRIVATE_UNCACHED        =       0x02000000,
 
-    /* Buffer content should be displayed on an primary display only */
-    GRALLOC_USAGE_PRIVATE_INTERNAL_ONLY   =       0x04000000,
-
     /* Buffer content should be displayed on an external display only */
     GRALLOC_USAGE_PRIVATE_EXTERNAL_ONLY   =       0x08000000,
 
-    /* This flag is set for WFD usecase */
-    GRALLOC_USAGE_PRIVATE_WFD             =       0x00200000,
+    /* Only this buffer content should be displayed on external, even if
+     * other EXTERNAL_ONLY buffers are available. Used during suspend.
+     */
+    GRALLOC_USAGE_PRIVATE_EXTERNAL_BLOCK  =       0x00100000,
+
+    /* Close Caption displayed on an external display only */
+    GRALLOC_USAGE_PRIVATE_EXTERNAL_CC     =       0x00200000,
 
     /* CAMERA heap is a carveout heap for camera, is not secured*/
     GRALLOC_USAGE_PRIVATE_CAMERA_HEAP     =       0x00400000,
-
-    /* This flag is used for SECURE display usecase */
-    GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY  =       0x00800000,
 };
 
 enum {
     /* Gralloc perform enums
     */
     GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER = 1,
-    // This will be deprecated from latest graphics drivers. This is kept
-    // for those backward compatibility i.e., newer Display HAL + older graphics
-    // libraries
     GRALLOC_MODULE_PERFORM_GET_STRIDE,
     GRALLOC_MODULE_PERFORM_GET_CUSTOM_STRIDE_FROM_HANDLE,
-    GRALLOC_MODULE_PERFORM_GET_ATTRIBUTES,
-    GRALLOC_MODULE_PERFORM_GET_COLOR_SPACE_FROM_HANDLE,
 };
 
 #define GRALLOC_HEAP_MASK   (GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP |\
@@ -104,45 +98,9 @@ enum {
     HAL_PIXEL_FORMAT_RG_88                  = 0x10E,
     HAL_PIXEL_FORMAT_YCbCr_444_SP           = 0x10F,
     HAL_PIXEL_FORMAT_YCrCb_444_SP           = 0x110,
-    HAL_PIXEL_FORMAT_YCrCb_422_I            = 0x111,
-    HAL_PIXEL_FORMAT_BGRX_8888              = 0x112,
-    HAL_PIXEL_FORMAT_NV21_ZSL               = 0x113,
+    HAL_PIXEL_FORMAT_NV21_ZSL               = 0x111,
     HAL_PIXEL_FORMAT_INTERLACE              = 0x180,
-    //v4l2_fourcc('Y', 'U', 'Y', 'L'). 24 bpp YUYV 4:2:2 10 bit per component
-    HAL_PIXEL_FORMAT_YCbCr_422_I_10BIT      = 0x4C595559,
-    //v4l2_fourcc('Y', 'B', 'W', 'C'). 10 bit per component. This compressed
-    //format reduces the memory access bandwidth
-    HAL_PIXEL_FORMAT_YCbCr_422_I_10BIT_COMPRESSED = 0x43574259,
 
-    //Khronos ASTC formats
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_4x4_KHR    = 0x93B0,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_5x4_KHR    = 0x93B1,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_5x5_KHR    = 0x93B2,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_6x5_KHR    = 0x93B3,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_6x6_KHR    = 0x93B4,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_8x5_KHR    = 0x93B5,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_8x6_KHR    = 0x93B6,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_8x8_KHR    = 0x93B7,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_10x5_KHR   = 0x93B8,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_10x6_KHR   = 0x93B9,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_10x8_KHR   = 0x93BA,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_10x10_KHR  = 0x93BB,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_12x10_KHR  = 0x93BC,
-    HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_12x12_KHR  = 0x93BD,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR    = 0x93D0,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR    = 0x93D1,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR    = 0x93D2,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR    = 0x93D3,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR    = 0x93D4,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR    = 0x93D5,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR    = 0x93D6,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR    = 0x93D7,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR   = 0x93D8,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR   = 0x93D9,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR   = 0x93DA,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR  = 0x93DB,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR  = 0x93DC,
-    HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR  = 0x93DD,
 };
 
 /* possible formats for 3D content*/
@@ -190,6 +148,10 @@ struct private_handle_t : public native_handle {
             PRIV_FLAGS_NOT_MAPPED         = 0x00001000,
             // Display on external only
             PRIV_FLAGS_EXTERNAL_ONLY      = 0x00002000,
+            // Display only this buffer on external
+            PRIV_FLAGS_EXTERNAL_BLOCK     = 0x00004000,
+            // Display this buffer on external as close caption
+            PRIV_FLAGS_EXTERNAL_CC        = 0x00008000,
             PRIV_FLAGS_VIDEO_ENCODER      = 0x00010000,
             PRIV_FLAGS_CAMERA_WRITE       = 0x00020000,
             PRIV_FLAGS_CAMERA_READ        = 0x00040000,
@@ -198,9 +160,7 @@ struct private_handle_t : public native_handle {
             PRIV_FLAGS_ITU_R_601          = 0x00200000,
             PRIV_FLAGS_ITU_R_601_FR       = 0x00400000,
             PRIV_FLAGS_ITU_R_709          = 0x00800000,
-            PRIV_FLAGS_SECURE_DISPLAY     = 0x01000000,
-            // Buffer is rendered in Tile Format
-            PRIV_FLAGS_TILE_RENDERED      = 0x02000000
+            PRIV_FLAGS_L3_SECURE_BUFFER   = 0x01000000,
         };
 
         // file-descriptors

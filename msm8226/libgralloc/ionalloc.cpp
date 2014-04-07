@@ -80,6 +80,11 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     if (data.flags & ION_SECURE)
         ionAllocData.flags |= ION_SECURE;
 
+    // ToDo: replace usage of alloc data structure with
+    //  ionallocdata structure.
+    if (data.flags & ION_SECURE)
+        ionAllocData.flags |= ION_SECURE;
+
     err = open_device();
     if (err)
         return err;
@@ -177,7 +182,7 @@ int IonAlloc::clean_buffer(void *base, size_t size, int offset, int fd, int op)
     struct ion_flush_data flush_data;
     struct ion_fd_data fd_data;
     struct ion_handle_data handle_data;
-    ion_user_handle_t handle;
+    struct ion_handle* handle;
     int err = 0;
 
     err = open_device();

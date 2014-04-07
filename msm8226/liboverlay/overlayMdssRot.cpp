@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
  *
@@ -32,6 +32,7 @@
 #define MDSS_MDP_ROT_ONLY 0x80
 #endif
 
+#define SIZE_1M 0x00100000
 #define MDSS_ROT_MASK (MDP_ROT_90 | MDP_FLIP_UD | MDP_FLIP_LR)
 
 namespace ovutils = overlay::utils;
@@ -92,8 +93,7 @@ void MdssRot::setCrop(const utils::Dim& crop) {
     mRotInfo.dst_rect.h = crop.h;
 }
 
-void MdssRot::setDownscale(int /*ds*/) {
-}
+void MdssRot::setDownscale(int ds) {}
 
 void MdssRot::setFlags(const utils::eMdpFlags& flags) {
     mRotInfo.flags = flags;
@@ -134,20 +134,29 @@ bool MdssRot::queueBuffer(int fd, uint32_t offset) {
         mRotData.data.memory_id = fd;
         mRotData.data.offset = offset;
 
-        if(false == remap(RotMem::ROT_NUM_BUFS)) {
-            ALOGE("%s Remap failed, not queuing", __FUNCTION__);
-            return false;
-        }
+        remap(RotMem::Mem::ROT_NUM_BUFS);
+        OVASSERT(mMem.curr().m.numBufs(), "queueBuffer numbufs is 0");
 
         mRotData.dst_data.offset =
-                mMem.mRotOffset[mMem.mCurrIndex];
-        mMem.mCurrIndex =
-                (mMem.mCurrIndex + 1) % mMem.mem.numBufs();
+                mMem.curr().mRotOffset[mMem.curr().mCurrOffset];
+        mMem.curr().mCurrOffset =
+                (mMem.curr().mCurrOffset + 1) % mMem.curr().m.numBufs();
 
         if(!overlay::mdp_wrapper::play(mFd.getFD(), mRotData)) {
             ALOGE("MdssRot play failed!");
             dump();
             return false;
+        }
+
+        // if the prev mem is valid, we need to close
+        if(mMem.prev().valid()) {
+            // FIXME if no wait for vsync the above
+            // play will return immediatly and might cause
+            // tearing when prev.close is called.
+            if(!mMem.prev().close()) {
+                ALOGE("%s error in closing prev rot mem", __FUNCTION__);
+                return false;
+            }
         }
     }
     return true;
@@ -170,7 +179,7 @@ bool MdssRot::open_i(uint32_t numbufs, uint32_t bufsz)
 
     mRotData.dst_data.memory_id = mem.getFD();
     mRotData.dst_data.offset = 0;
-    mMem.mem = mem;
+    mMem.curr().m = mem;
     return true;
 }
 
@@ -178,27 +187,23 @@ bool MdssRot::remap(uint32_t numbufs) {
     // Calculate the size based on rotator's dst format, w and h.
     uint32_t opBufSize = calcOutputBufSize();
     // If current size changed, remap
-    if(opBufSize == mMem.size()) {
+    if(opBufSize == mMem.curr().size()) {
         ALOGE_IF(DEBUG_OVERLAY, "%s: same size %d", __FUNCTION__, opBufSize);
         return true;
     }
 
     ALOGE_IF(DEBUG_OVERLAY, "%s: size changed - remapping", __FUNCTION__);
+    OVASSERT(!mMem.prev().valid(), "Prev should not be valid");
 
-    if(!mMem.close()) {
-        ALOGE("%s error in closing prev rot mem", __FUNCTION__);
-        return false;
-    }
-
+    // ++mMem will make curr to be prev, and prev will be curr
+    ++mMem;
     if(!open_i(numbufs, opBufSize)) {
         ALOGE("%s Error could not open", __FUNCTION__);
         return false;
     }
-
     for (uint32_t i = 0; i < numbufs; ++i) {
-        mMem.mRotOffset[i] = i * opBufSize;
+        mMem.curr().mRotOffset[i] = i * opBufSize;
     }
-
     return true;
 }
 
@@ -229,15 +234,17 @@ void MdssRot::reset() {
     ovutils::memset0(mRotData);
     mRotData.data.memory_id = -1;
     mRotInfo.id = MSMFB_NEW_REQUEST;
-    ovutils::memset0(mMem.mRotOffset);
-    mMem.mCurrIndex = 0;
+    ovutils::memset0(mMem.curr().mRotOffset);
+    ovutils::memset0(mMem.prev().mRotOffset);
+    mMem.curr().mCurrOffset = 0;
+    mMem.prev().mCurrOffset = 0;
     mOrientation = utils::OVERLAY_TRANSFORM_0;
 }
 
 void MdssRot::dump() const {
     ALOGE("== Dump MdssRot start ==");
     mFd.dump();
-    mMem.mem.dump();
+    mMem.curr().m.dump();
     mdp_wrapper::dump("mRotInfo", mRotInfo);
     mdp_wrapper::dump("mRotData", mRotData);
     ALOGE("== Dump MdssRot end ==");
@@ -253,6 +260,9 @@ uint32_t MdssRot::calcOutputBufSize() {
     } else {
         opBufSize = Rotator::calcOutputBufSize(destWhf);
     }
+
+    if (mRotInfo.flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
+        opBufSize = utils::align(opBufSize, SIZE_1M);
 
     return opBufSize;
 }

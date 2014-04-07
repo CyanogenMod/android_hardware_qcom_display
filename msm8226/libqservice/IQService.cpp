@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -27,9 +27,8 @@
 #include <binder/IPCThreadState.h>
 #include <utils/Errors.h>
 #include <private/android_filesystem_config.h>
-#include <IQService.h>
 
-#define QSERVICE_DEBUG 0
+#include <IQService.h>
 
 using namespace android;
 using namespace qClient;
@@ -44,25 +43,33 @@ public:
     BpQService(const sp<IBinder>& impl)
         : BpInterface<IQService>(impl) {}
 
+    virtual void securing(uint32_t startEnd) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
+        data.writeInt32(startEnd);
+        remote()->transact(SECURING, data, &reply);
+    }
+
+    virtual void unsecuring(uint32_t startEnd) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
+        data.writeInt32(startEnd);
+        remote()->transact(UNSECURING, data, &reply);
+    }
+
     virtual void connect(const sp<IQClient>& client) {
-        ALOGD_IF(QSERVICE_DEBUG, "%s: connect client", __FUNCTION__);
         Parcel data, reply;
         data.writeInterfaceToken(IQService::getInterfaceDescriptor());
         data.writeStrongBinder(client->asBinder());
         remote()->transact(CONNECT, data, &reply);
     }
 
-    virtual android::status_t dispatch(uint32_t command, const Parcel* inParcel,
-            Parcel* outParcel) {
-        ALOGD_IF(QSERVICE_DEBUG, "%s: dispatch in:%p", __FUNCTION__, inParcel);
-        status_t err = (status_t) android::FAILED_TRANSACTION;
-        Parcel data;
-        Parcel *reply = outParcel;
+    virtual status_t screenRefresh() {
+        Parcel data, reply;
         data.writeInterfaceToken(IQService::getInterfaceDescriptor());
-        if (inParcel && inParcel->dataSize() > 0)
-            data.appendFrom(inParcel, 0, inParcel->dataSize());
-        err = remote()->transact(command, data, reply);
-        return err;
+        remote()->transact(SCREEN_REFRESH, data, &reply);
+        status_t result = reply.readInt32();
+        return result;
     }
 };
 
@@ -75,45 +82,67 @@ static void getProcName(int pid, char *buf, int size);
 status_t BnQService::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
-    ALOGD_IF(QSERVICE_DEBUG, "%s: code: %d", __FUNCTION__, code);
-    // IPC should be from certain processes only
+    // IPC should be from mediaserver only
     IPCThreadState* ipc = IPCThreadState::self();
     const int callerPid = ipc->getCallingPid();
     const int callerUid = ipc->getCallingUid();
-    const int MAX_BUF_SIZE = 1024;
+    const size_t MAX_BUF_SIZE = 1024;
     char callingProcName[MAX_BUF_SIZE] = {0};
 
     getProcName(callerPid, callingProcName, MAX_BUF_SIZE);
 
-    const bool permission = (callerUid == AID_MEDIA ||
-            callerUid == AID_GRAPHICS ||
-            callerUid == AID_ROOT ||
-            callerUid == AID_SYSTEM);
+    const bool permission = (callerUid == AID_MEDIA);
 
-    if (code == CONNECT) {
-        CHECK_INTERFACE(IQService, data, reply);
-        if(callerUid != AID_GRAPHICS) {
-            ALOGE("display.qservice CONNECT access denied: \
-                    pid=%d uid=%d process=%s",
-                    callerPid, callerUid, callingProcName);
-            return PERMISSION_DENIED;
-        }
-        sp<IQClient> client =
+    switch(code) {
+        case SECURING: {
+            if(!permission) {
+                ALOGE("display.qservice SECURING access denied: \
+                      pid=%d uid=%d process=%s",
+                      callerPid, callerUid, callingProcName);
+                return PERMISSION_DENIED;
+            }
+            CHECK_INTERFACE(IQService, data, reply);
+            uint32_t startEnd = data.readInt32();
+            securing(startEnd);
+            return NO_ERROR;
+        } break;
+        case UNSECURING: {
+            if(!permission) {
+                ALOGE("display.qservice UNSECURING access denied: \
+                      pid=%d uid=%d process=%s",
+                      callerPid, callerUid, callingProcName);
+                return PERMISSION_DENIED;
+            }
+            CHECK_INTERFACE(IQService, data, reply);
+            uint32_t startEnd = data.readInt32();
+            unsecuring(startEnd);
+            return NO_ERROR;
+        } break;
+        case CONNECT: {
+            CHECK_INTERFACE(IQService, data, reply);
+            if(callerUid != AID_GRAPHICS) {
+                ALOGE("display.qservice CONNECT access denied: \
+                      pid=%d uid=%d process=%s",
+                      callerPid, callerUid, callingProcName);
+                return PERMISSION_DENIED;
+            }
+            sp<IQClient> client =
                 interface_cast<IQClient>(data.readStrongBinder());
-        connect(client);
-        return NO_ERROR;
-    } else if (code > COMMAND_LIST_START && code < COMMAND_LIST_END) {
-        if(!permission) {
-            ALOGE("display.qservice access denied: command=%d\
-                  pid=%d uid=%d process=%s", code, callerPid,
-                  callerUid, callingProcName);
-            return PERMISSION_DENIED;
-        }
-        CHECK_INTERFACE(IQService, data, reply);
-        dispatch(code, &data, reply);
-        return NO_ERROR;
-    } else {
-        return BBinder::onTransact(code, data, reply, flags);
+            connect(client);
+            return NO_ERROR;
+        } break;
+        case SCREEN_REFRESH: {
+            CHECK_INTERFACE(IQService, data, reply);
+            if(callerUid != AID_SYSTEM) {
+                ALOGE("display.qservice SCREEN_REFRESH access denied: \
+                      pid=%d uid=%d process=%s",callerPid,
+                      callerUid, callingProcName);
+                return PERMISSION_DENIED;
+            }
+            return screenRefresh();
+        } break;
+        default:
+            return BBinder::onTransact(code, data, reply, flags);
     }
 }
 
@@ -123,12 +152,10 @@ static void getProcName(int pid, char *buf, int size) {
     snprintf(buf, size, "/proc/%d/cmdline", pid);
     fd = open(buf, O_RDONLY);
     if (fd < 0) {
-        strlcpy(buf, "Unknown", size);
+        strcpy(buf, "Unknown");
     } else {
-        ssize_t len = read(fd, buf, size - 1);
-        if (len >= 0)
-           buf[len] = 0;
-
+        int len = read(fd, buf, size - 1);
+        buf[len] = 0;
         close(fd);
     }
 }

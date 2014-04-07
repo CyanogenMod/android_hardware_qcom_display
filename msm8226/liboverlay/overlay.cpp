@@ -27,40 +27,29 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <dlfcn.h>
 #include "overlay.h"
 #include "pipes/overlayGenPipe.h"
 #include "mdp_version.h"
 #include "qdMetaData.h"
-
-#ifdef USES_QSEED_SCALAR
-#include <scale/scale.h>
-using namespace scale;
-#endif
 
 #define PIPE_DEBUG 0
 
 namespace overlay {
 using namespace utils;
 
-
 Overlay::Overlay() {
-    int numPipes = qdutils::MDPVersion::getInstance().getTotalPipes();
-    PipeBook::NUM_PIPES = (numPipes <= utils::OV_MAX)? numPipes : utils::OV_MAX;
+    PipeBook::NUM_PIPES = qdutils::MDPVersion::getInstance().getTotalPipes();
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
         mPipeBook[i].init();
     }
 
     mDumpStr[0] = '\0';
-    initScalar();
-    setDMAMultiplexingSupported();
 }
 
 Overlay::~Overlay() {
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
         mPipeBook[i].destroy();
     }
-    destroyScalar();
 }
 
 void Overlay::configBegin() {
@@ -69,22 +58,22 @@ void Overlay::configBegin() {
         PipeBook::resetUse(i);
         PipeBook::resetAllocation(i);
     }
+    sForceSetBitmap = 0;
     mDumpStr[0] = '\0';
 }
 
 void Overlay::configDone() {
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
-        if((PipeBook::isNotUsed(i) && !sessionInProgress((eDest)i)) ||
-                    isSessionEnded((eDest)i)) {
+        if(PipeBook::isNotUsed(i)) {
             //Forces UNSET on pipes, flushes rotator memory and session, closes
             //fds
             if(mPipeBook[i].valid()) {
                 char str[32];
-                snprintf(str, 32, "Unset=%s dpy=%d mix=%d; ",
+                sprintf(str, "Unset=%s dpy=%d mix=%d; ",
                         PipeBook::getDestStr((eDest)i),
                         mPipeBook[i].mDisplay, mPipeBook[i].mMixer);
 #if PIPE_DEBUG
-                strlcat(mDumpStr, str, sizeof(mDumpStr));
+                strncat(mDumpStr, str, strlen(str));
 #endif
             }
             mPipeBook[i].destroy();
@@ -92,27 +81,6 @@ void Overlay::configDone() {
     }
     dump();
     PipeBook::save();
-}
-
-int Overlay::getPipeId(utils::eDest dest) {
-    return mPipeBook[(int)dest].mPipe->getPipeId();
-}
-
-eDest Overlay::getDest(int pipeid) {
-    eDest dest = OV_INVALID;
-    // finding the dest corresponding to the given pipe
-    for(int i=0; i < PipeBook::NUM_PIPES; ++i) {
-        if(mPipeBook[i].valid() && mPipeBook[i].mPipe->getPipeId() == pipeid) {
-            return (eDest)i;
-        }
-    }
-    return dest;
-}
-
-eDest Overlay::reservePipe(int pipeid) {
-    eDest dest = getDest(pipeid);
-    PipeBook::setAllocation((int)dest);
-    return dest;
 }
 
 eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
@@ -126,10 +94,8 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
             (mPipeBook[i].mMixer == MIXER_UNUSED || //Free or same mixer
              mPipeBook[i].mMixer == mixer) &&
             PipeBook::isNotAllocated(i) && //Free pipe
-            ( (sDMAMultiplexingSupported && dpy) ||
-              !(sDMAMode == DMA_BLOCK_MODE && //DMA pipe in Line mode
-               PipeBook::getPipeType((eDest)i) == OV_MDP_PIPE_DMA)) ){
-              //DMA-Multiplexing is only supported for WB on 8x26
+            !(sDMAMode == DMA_BLOCK_MODE && //DMA pipe in Line mode
+               PipeBook::getPipeType((eDest)i) == OV_MDP_PIPE_DMA)) {
             dest = (eDest)i;
             PipeBook::setAllocation(i);
             break;
@@ -142,12 +108,11 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
         mPipeBook[index].mMixer = mixer;
         if(not mPipeBook[index].valid()) {
             mPipeBook[index].mPipe = new GenericPipe(dpy);
-            mPipeBook[index].mSession = PipeBook::NONE;
             char str[32];
             snprintf(str, 32, "Set=%s dpy=%d mix=%d; ",
                      PipeBook::getDestStr(dest), dpy, mixer);
 #if PIPE_DEBUG
-            strlcat(mDumpStr, str, sizeof(mDumpStr));
+            strncat(mDumpStr, str, strlen(str));
 #endif
         }
     } else {
@@ -156,13 +121,6 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
     }
 
     return dest;
-}
-
-void Overlay::endAllSessions() {
-    for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
-        if(mPipeBook[i].valid() && mPipeBook[i].mSession==PipeBook::START)
-            mPipeBook[i].mSession = PipeBook::END;
-    }
 }
 
 bool Overlay::isPipeTypeAttached(eMdpPipeType type) {
@@ -183,14 +141,19 @@ bool Overlay::commit(utils::eDest dest) {
     if(mPipeBook[index].mPipe->commit()) {
         ret = true;
         PipeBook::setUse((int)dest);
+        if(sForceSetBitmap & (1 << mPipeBook[index].mDisplay)) {
+            mPipeBook[index].mPipe->forceSet();
+        }
     } else {
         int dpy = mPipeBook[index].mDisplay;
-        for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
+        for(int i = 0; i < PipeBook::NUM_PIPES; i++)
             if (mPipeBook[i].mDisplay == dpy) {
                 PipeBook::resetAllocation(i);
                 PipeBook::resetUse(i);
+                if(mPipeBook[i].valid()) {
+                    mPipeBook[i].mPipe->forceSet();
+                }
             }
-        }
     }
     return ret;
 }
@@ -212,13 +175,6 @@ void Overlay::setCrop(const utils::Dim& d,
     int index = (int)dest;
     validate(index);
     mPipeBook[index].mPipe->setCrop(d);
-}
-
-void Overlay::setColor(const uint32_t color,
-        utils::eDest dest) {
-    int index = (int)dest;
-    validate(index);
-    mPipeBook[index].mPipe->setColor(color);
 }
 
 void Overlay::setPosition(const utils::Dim& d,
@@ -317,16 +273,13 @@ int Overlay::initOverlay() {
             for (int j = 0; j < req.cnt; j++) {
                 ALOGD("ndx=%d num=%d z_order=%d", minfo->pndx, minfo->pnum,
                       minfo->z_order);
-                // except the RGB base layer with z_order of -1, clear any
-                // other pipes connected to mixer.
-                if((minfo->z_order) != -1) {
-                    int index = minfo->pndx;
-                    ALOGD("Unset overlay with index: %d at mixer %d", index, i);
-                    if(ioctl(fd, MSMFB_OVERLAY_UNSET, &index) == -1) {
-                        ALOGE("ERROR: MSMFB_OVERLAY_UNSET failed");
-                        close(fd);
-                        return -1;
-                    }
+                // clear any pipe connected to mixer including base pipe.
+                int index = minfo->pndx;
+                ALOGD("Unset overlay with index: %d at mixer %d", index, i);
+                if(ioctl(fd, MSMFB_OVERLAY_UNSET, &index) == -1) {
+                    ALOGE("ERROR: MSMFB_OVERLAY_UNSET failed");
+                    close(fd);
+                    return -1;
                 }
                 minfo++;
             }
@@ -365,23 +318,13 @@ int Overlay::initOverlay() {
 }
 
 bool Overlay::displayCommit(const int& fd) {
-    utils::Dim roi;
-    return displayCommit(fd, roi);
-}
-
-bool Overlay::displayCommit(const int& fd, const utils::Dim& roi) {
     //Commit
     struct mdp_display_commit info;
     memset(&info, 0, sizeof(struct mdp_display_commit));
     info.flags = MDP_DISPLAY_COMMIT_OVERLAY;
-    info.roi.x = roi.x;
-    info.roi.y = roi.y;
-    info.roi.w = roi.w;
-    info.roi.h = roi.h;
-
     if(!mdp_wrapper::displayCommit(fd, info)) {
-        ALOGE("%s: commit failed", __func__);
-        return false;
+       ALOGE("%s: commit failed", __func__);
+       return false;
     }
     return true;
 }
@@ -397,19 +340,19 @@ void Overlay::dump() const {
 void Overlay::getDump(char *buf, size_t len) {
     int totalPipes = 0;
     const char *str = "\nOverlay State\n\n";
-    strlcat(buf, str, len);
+    strncat(buf, str, strlen(str));
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
         if(mPipeBook[i].valid()) {
             mPipeBook[i].mPipe->getDump(buf, len);
             char str[64] = {'\0'};
             snprintf(str, 64, "Display=%d\n\n", mPipeBook[i].mDisplay);
-            strlcat(buf, str, len);
+            strncat(buf, str, strlen(str));
             totalPipes++;
         }
     }
     char str_pipes[64] = {'\0'};
     snprintf(str_pipes, 64, "Pipes=%d\n\n", totalPipes);
-    strlcat(buf, str_pipes, len);
+    strncat(buf, str_pipes, strlen(str_pipes));
 }
 
 void Overlay::clear(int dpy) {
@@ -418,60 +361,11 @@ void Overlay::clear(int dpy) {
             // Mark as available for this round
             PipeBook::resetUse(i);
             PipeBook::resetAllocation(i);
-        }
-    }
-}
-
-bool Overlay::validateAndSet(const int& dpy, const int& fbFd) {
-    GenericPipe* pipeArray[PipeBook::NUM_PIPES];
-    memset(&pipeArray, 0, sizeof(pipeArray));
-
-    int num = 0;
-    for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
-        if(PipeBook::isUsed(i) && mPipeBook[i].valid() &&
-                mPipeBook[i].mDisplay == dpy) {
-            pipeArray[num++] = mPipeBook[i].mPipe;
-        }
-    }
-
-    //Protect against misbehaving clients
-    return num ? GenericPipe::validateAndSet(pipeArray, num, fbFd) : true;
-}
-
-void Overlay::initScalar() {
-#ifdef USES_QSEED_SCALAR
-    if(sLibScaleHandle == NULL) {
-        sLibScaleHandle = dlopen("libscale.so", RTLD_NOW);
-    }
-
-    if(sLibScaleHandle) {
-        if(sScale == NULL) {
-            Scale* (*getInstance)();
-            *(void **) &getInstance = dlsym(sLibScaleHandle, "getInstance");
-            if(getInstance) {
-                sScale = getInstance();
+            if(mPipeBook[i].valid()) {
+                mPipeBook[i].mPipe->forceSet();
             }
         }
     }
-#endif
-}
-
-void Overlay::destroyScalar() {
-#ifdef USES_QSEED_SCALAR
-    if(sLibScaleHandle) {
-        if(sScale) {
-            void (*destroyInstance)(Scale*);
-            *(void **) &destroyInstance = dlsym(sLibScaleHandle,
-                    "destroyInstance");
-            if(destroyInstance) {
-                destroyInstance(sScale);
-                sScale = NULL;
-            }
-        }
-        dlclose(sLibScaleHandle);
-        sLibScaleHandle = NULL;
-    }
-#endif
 }
 
 void Overlay::PipeBook::init() {
@@ -487,20 +381,17 @@ void Overlay::PipeBook::destroy() {
     }
     mDisplay = DPY_UNUSED;
     mMixer = MIXER_UNUSED;
-    mSession = NONE;
 }
 
 Overlay* Overlay::sInstance = 0;
 int Overlay::sDpyFbMap[DPY_MAX] = {0, -1, -1};
 int Overlay::sDMAMode = DMA_LINE_MODE;
-bool Overlay::sDMAMultiplexingSupported = false;
+int Overlay::sForceSetBitmap = 0;
 int Overlay::PipeBook::NUM_PIPES = 0;
 int Overlay::PipeBook::sPipeUsageBitmap = 0;
 int Overlay::PipeBook::sLastUsageBitmap = 0;
 int Overlay::PipeBook::sAllocatedBitmap = 0;
 utils::eMdpPipeType Overlay::PipeBook::pipeTypeLUT[utils::OV_MAX] =
     {utils::OV_MDP_PIPE_ANY};
-void *Overlay::sLibScaleHandle = NULL;
-scale::Scale *Overlay::sScale = NULL;
 
 }; // namespace overlay

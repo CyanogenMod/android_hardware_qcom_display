@@ -29,6 +29,7 @@
 
 #ifndef MDP_WRAPPER_H
 #define MDP_WRAPPER_H
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 
 /*
 * In order to make overlay::mdp_wrapper shorter, please do something like:
@@ -41,8 +42,7 @@
 #include <utils/Log.h>
 #include <errno.h>
 #include "overlayUtils.h"
-
-#define IOCTL_DEBUG 0
+#include <utils/Trace.h>
 
 namespace overlay{
 
@@ -64,9 +64,6 @@ bool rotate(int fd, msm_rotator_data_info& rot);
 
 /* MSMFB_OVERLAY_SET */
 bool setOverlay(int fd, mdp_overlay& ov);
-
-/* MSMFB_OVERLAY_PREPARE */
-bool validateAndSet(const int& fd, mdp_overlay_list& list);
 
 /* MSM_ROTATOR_IOCTL_FINISH */
 bool endRotator(int fd, int sessionId);
@@ -119,6 +116,7 @@ void dump(const char* const s, const fb_var_screeninfo& vinfo);
 //---------------Inlines -------------------------------------
 
 inline bool getFScreenInfo(int fd, fb_fix_screeninfo& finfo) {
+    ATRACE_CALL();
     if (ioctl(fd, FBIOGET_FSCREENINFO, &finfo) < 0) {
         ALOGE("Failed to call ioctl FBIOGET_FSCREENINFO err=%s",
                 strerror(errno));
@@ -128,6 +126,7 @@ inline bool getFScreenInfo(int fd, fb_fix_screeninfo& finfo) {
 }
 
 inline bool getVScreenInfo(int fd, fb_var_screeninfo& vinfo) {
+    ATRACE_CALL();
     if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) < 0) {
         ALOGE("Failed to call ioctl FBIOGET_VSCREENINFO err=%s",
                 strerror(errno));
@@ -137,6 +136,7 @@ inline bool getVScreenInfo(int fd, fb_var_screeninfo& vinfo) {
 }
 
 inline bool setVScreenInfo(int fd, fb_var_screeninfo& vinfo) {
+    ATRACE_CALL();
     if (ioctl(fd, FBIOPUT_VSCREENINFO, &vinfo) < 0) {
         ALOGE("Failed to call ioctl FBIOPUT_VSCREENINFO err=%s",
                 strerror(errno));
@@ -146,6 +146,7 @@ inline bool setVScreenInfo(int fd, fb_var_screeninfo& vinfo) {
 }
 
 inline bool startRotator(int fd, msm_rotator_img_info& rot) {
+    ATRACE_CALL();
     if (ioctl(fd, MSM_ROTATOR_IOCTL_START, &rot) < 0){
         ALOGE("Failed to call ioctl MSM_ROTATOR_IOCTL_START err=%s",
                 strerror(errno));
@@ -155,6 +156,7 @@ inline bool startRotator(int fd, msm_rotator_img_info& rot) {
 }
 
 inline bool rotate(int fd, msm_rotator_data_info& rot) {
+    ATRACE_CALL();
     if (ioctl(fd, MSM_ROTATOR_IOCTL_ROTATE, &rot) < 0) {
         ALOGE("Failed to call ioctl MSM_ROTATOR_IOCTL_ROTATE err=%s",
                 strerror(errno));
@@ -164,6 +166,7 @@ inline bool rotate(int fd, msm_rotator_data_info& rot) {
 }
 
 inline bool setOverlay(int fd, mdp_overlay& ov) {
+    ATRACE_CALL();
     if (ioctl(fd, MSMFB_OVERLAY_SET, &ov) < 0) {
         ALOGE("Failed to call ioctl MSMFB_OVERLAY_SET err=%s",
                 strerror(errno));
@@ -172,16 +175,8 @@ inline bool setOverlay(int fd, mdp_overlay& ov) {
     return true;
 }
 
-inline bool validateAndSet(const int& fd, mdp_overlay_list& list) {
-    if (ioctl(fd, MSMFB_OVERLAY_PREPARE, &list) < 0) {
-        ALOGD_IF(IOCTL_DEBUG, "Failed to call ioctl MSMFB_OVERLAY_PREPARE "
-                "err=%s", strerror(errno));
-        return false;
-    }
-    return true;
-}
-
 inline bool endRotator(int fd, uint32_t sessionId) {
+    ATRACE_CALL();
     if (ioctl(fd, MSM_ROTATOR_IOCTL_FINISH, &sessionId) < 0) {
         ALOGE("Failed to call ioctl MSM_ROTATOR_IOCTL_FINISH err=%s",
                 strerror(errno));
@@ -191,6 +186,7 @@ inline bool endRotator(int fd, uint32_t sessionId) {
 }
 
 inline bool unsetOverlay(int fd, int ovId) {
+    ATRACE_CALL();
     if (ioctl(fd, MSMFB_OVERLAY_UNSET, &ovId) < 0) {
         ALOGE("Failed to call ioctl MSMFB_OVERLAY_UNSET err=%s",
                 strerror(errno));
@@ -200,6 +196,7 @@ inline bool unsetOverlay(int fd, int ovId) {
 }
 
 inline bool getOverlay(int fd, mdp_overlay& ov) {
+    ATRACE_CALL();
     if (ioctl(fd, MSMFB_OVERLAY_GET, &ov) < 0) {
         ALOGE("Failed to call ioctl MSMFB_OVERLAY_GET err=%s",
                 strerror(errno));
@@ -209,6 +206,7 @@ inline bool getOverlay(int fd, mdp_overlay& ov) {
 }
 
 inline bool play(int fd, msmfb_overlay_data& od) {
+    ATRACE_CALL();
     if (ioctl(fd, MSMFB_OVERLAY_PLAY, &od) < 0) {
         ALOGE("Failed to call ioctl MSMFB_OVERLAY_PLAY err=%s",
                 strerror(errno));
@@ -218,6 +216,7 @@ inline bool play(int fd, msmfb_overlay_data& od) {
 }
 
 inline bool set3D(int fd, msmfb_overlay_3d& ov) {
+    ATRACE_CALL();
     if (ioctl(fd, MSMFB_OVERLAY_3D, &ov) < 0) {
         ALOGE("Failed to call ioctl MSMFB_OVERLAY_3D err=%s",
                 strerror(errno));
@@ -227,6 +226,7 @@ inline bool set3D(int fd, msmfb_overlay_3d& ov) {
 }
 
 inline bool displayCommit(int fd, mdp_display_commit& info) {
+    ATRACE_CALL();
     if(ioctl(fd, MSMFB_DISPLAY_COMMIT, &info) == -1) {
         ALOGE("Failed to call ioctl MSMFB_DISPLAY_COMMIT err=%s",
                 strerror(errno));
@@ -236,6 +236,7 @@ inline bool displayCommit(int fd, mdp_display_commit& info) {
 }
 
 inline bool wbInitStart(int fbfd) {
+    ATRACE_CALL();
     if(ioctl(fbfd, MSMFB_WRITEBACK_INIT, NULL) < 0) {
         ALOGE("Failed to call ioctl MSMFB_WRITEBACK_INIT err=%s",
                 strerror(errno));
@@ -250,6 +251,7 @@ inline bool wbInitStart(int fbfd) {
 }
 
 inline bool wbStopTerminate(int fbfd) {
+    ATRACE_CALL();
     if(ioctl(fbfd, MSMFB_WRITEBACK_STOP, NULL) < 0) {
         ALOGE("Failed to call ioctl MSMFB_WRITEBACK_STOP err=%s",
                 strerror(errno));
@@ -264,6 +266,7 @@ inline bool wbStopTerminate(int fbfd) {
 }
 
 inline bool wbQueueBuffer(int fbfd, struct msmfb_data& fbData) {
+    ATRACE_CALL();
     if(ioctl(fbfd, MSMFB_WRITEBACK_QUEUE_BUFFER, &fbData) < 0) {
         ALOGE("Failed to call ioctl MSMFB_WRITEBACK_QUEUE_BUFFER err=%s",
                 strerror(errno));
@@ -273,6 +276,7 @@ inline bool wbQueueBuffer(int fbfd, struct msmfb_data& fbData) {
 }
 
 inline bool wbDequeueBuffer(int fbfd, struct msmfb_data& fbData) {
+    ATRACE_CALL();
     if(ioctl(fbfd, MSMFB_WRITEBACK_DEQUEUE_BUFFER, &fbData) < 0) {
         ALOGE("Failed to call ioctl MSMFB_WRITEBACK_DEQUEUE_BUFFER err=%s",
                 strerror(errno));
