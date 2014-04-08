@@ -57,12 +57,13 @@ public:
 
     struct PipeSpecs {
         PipeSpecs() : formatClass(FORMAT_RGB), needsScaling(false), fb(false),
-                dpy(DPY_PRIMARY), mixer(MIXER_DEFAULT) {}
+                dpy(DPY_PRIMARY), mixer(MIXER_DEFAULT), numActiveDisplays(1) {}
         int formatClass;
         bool needsScaling;
         bool fb;
         int dpy;
         int mixer;
+        int numActiveDisplays;
     };
 
     /* dtor close */
