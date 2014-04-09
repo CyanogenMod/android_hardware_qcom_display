@@ -424,7 +424,8 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE: //Same as YCbCr_420_SP_VENUS
-            ystride = cstride = hnd->width;
+            ystride = hnd->width;
+            cstride = hnd->width/2;
             ycbcr->y  = (void*)hnd->base;
             ycbcr->cb = (void*)(hnd->base + ystride * hnd->height);
            ycbcr->cr = (void*)(hnd->base + ystride * hnd->height + 1);
@@ -438,7 +439,8 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
         case HAL_PIXEL_FORMAT_NV21_ZSL:
         case HAL_PIXEL_FORMAT_RAW_SENSOR:
-            ystride = cstride = hnd->width;
+            ystride = hnd->width;
+            cstride = hnd->width/2;
             ycbcr->y  = (void*)hnd->base;
             ycbcr->cr = (void*)(hnd->base + ystride * hnd->height);
             ycbcr->cb = (void*)(hnd->base + ystride * hnd->height + 1);
@@ -450,7 +452,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         //Planar
         case HAL_PIXEL_FORMAT_YV12:
             ystride = hnd->width;
-            cstride = ALIGN(hnd->width/2, 16);
+            cstride = hnd->width/2;
             ycbcr->y  = (void*)hnd->base;
             ycbcr->cr = (void*)(hnd->base + ystride * hnd->height);
             ycbcr->cb = (void*)(hnd->base + ystride * hnd->height +
