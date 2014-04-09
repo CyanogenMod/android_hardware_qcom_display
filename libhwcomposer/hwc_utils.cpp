@@ -817,12 +817,12 @@ void setListStats(hwc_context_t *ctx,
     ctx->mViewFrame[dpy] = (hwc_rect_t){0, 0, 0, 0};
     ctx->dpyAttr[dpy].mActionSafePresent = isActionSafePresent(ctx, dpy);
 
-    trimList(ctx, list, dpy);
-    optimizeLayerRects(list);
-
     // Calculate view frame of ext display from primary resolution
     // and primary device orientation.
     ctx->mViewFrame[dpy] = calculateDisplayViewFrame(ctx, dpy);
+
+    trimList(ctx, list, dpy);
+    optimizeLayerRects(list);
 
     for (size_t i = 0; i < (size_t)ctx->listStats[dpy].numAppLayers; i++) {
         hwc_layer_1_t const* layer = &list->hwLayers[i];
