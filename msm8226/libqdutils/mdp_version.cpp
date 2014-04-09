@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -27,117 +27,247 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <cutils/log.h>
-#include <fcntl.h>
-#include <sys/ioctl.h>
-#include <linux/fb.h>
 #include <linux/msm_mdp.h>
 #include "mdp_version.h"
+
+#define DEBUG 0
 
 ANDROID_SINGLETON_STATIC_INSTANCE(qdutils::MDPVersion);
 namespace qdutils {
 
+#define TOKEN_PARAMS_DELIM  "="
+
+#ifndef MDSS_MDP_REV
+enum mdp_rev {
+    MDSS_MDP_HW_REV_100 = 0x10000000, //8974 v1
+    MDSS_MDP_HW_REV_101 = 0x10010000, //8x26
+    MDSS_MDP_HW_REV_102 = 0x10020000, //8974 v2
+    MDSS_MDP_HW_REV_103 = 0x10030000, //8084
+    MDSS_MDP_HW_REV_104 = 0x10040000, //Next version
+    MDSS_MDP_HW_REV_105 = 0x10050000, //Next version
+    MDSS_MDP_HW_REV_107 = 0x10070000, //Next version
+    MDSS_MDP_HW_REV_200 = 0x20000000, //8092
+    MDSS_MDP_HW_REV_206 = 0x20060000, //Future
+};
+#else
+enum mdp_rev {
+    MDSS_MDP_HW_REV_104 = 0x10040000, //Next version
+    MDSS_MDP_HW_REV_206 = 0x20060000, //Future
+};
+#endif
+
 MDPVersion::MDPVersion()
 {
-    int fb_fd = open("/dev/graphics/fb0", O_RDWR);
-    int mdp_version = MDP_V_UNKNOWN;
-    char panel_type = 0;
-    struct fb_fix_screeninfo fb_finfo;
-
+    mMDPVersion = MDSS_V5;
     mMdpRev = 0;
     mRGBPipes = 0;
     mVGPipes = 0;
     mDMAPipes = 0;
     mFeatures = 0;
-    //TODO get this from driver, default for A-fam to 8
-    mMDPDownscale = 8;
-    mFd = fb_fd;
+    mMDPUpscale = 0;
+    mMDPDownscale = 0;
+    mMacroTileEnabled = false;
+    mPanelType = NO_PANEL;
+    mLowBw = 0;
+    mHighBw = 0;
+    mSourceSplit = false;
 
-    if (ioctl(fb_fd, FBIOGET_FSCREENINFO, &fb_finfo) < 0) {
-        ALOGE("FBIOGET_FSCREENINFO failed");
-        mdp_version =  MDP_V_UNKNOWN;
-    } else {
-        if(!strncmp(fb_finfo.id, "msmfb", 5)) {
-            char str_ver[4] = { 0 };
-            memcpy(str_ver, &fb_finfo.id[5], 3);
-            str_ver[3] = '\0';
-            mdp_version = atoi(str_ver);
-
-            //Normalize MDP version to ease comparison.
-            //This is needed only because
-            //MDP 3.0.3 reports value as 303 which
-            //is more than all the others
-            if (mdp_version < 100)
-                mdp_version *= 10;
-
-            mRGBPipes = mVGPipes = 2;
-
-        } else if (!strncmp(fb_finfo.id, "mdssfb", 6)) {
-            mdp_version = MDSS_V5;
-#ifdef MDSS_TARGET
-            struct msmfb_metadata metadata;
-            memset(&metadata, 0 , sizeof(metadata));
-            metadata.op = metadata_op_get_caps;
-            if (ioctl(fb_fd, MSMFB_METADATA_GET, &metadata) == -1) {
-                ALOGE("Error retrieving MDP revision and pipes info");
-                mdp_version = MDP_V_UNKNOWN;
-            } else {
-                mMdpRev = metadata.data.caps.mdp_rev;
-                mRGBPipes = metadata.data.caps.rgb_pipes;
-                mVGPipes = metadata.data.caps.vig_pipes;
-                mDMAPipes = metadata.data.caps.dma_pipes;
-                mFeatures = metadata.data.caps.features;
-                if (metadata.data.caps.mdp_rev == MDP_V3_0_4){
-                    mdp_version = MDP_V3_0_4;
-                }
-            }
-#endif
-        } else {
-            mdp_version = MDP_V_UNKNOWN;
-        }
-
-        /* Assumes panel type is 2nd element in '_' delimited id string */
-        char * ptype = strstr(fb_finfo.id, "_");
-        if (!ptype || (*(++ptype) == '\0')) {
-            ALOGE("Invalid framebuffer info string: %s", fb_finfo.id);
-            ptype = fb_finfo.id;
-        }
-        panel_type = *ptype;
+    if(!updatePanelInfo()) {
+        ALOGE("Unable to read Primary Panel Information");
     }
-    mPanelType = panel_type;
-    mMDPVersion = mdp_version;
+    if(!updateSysFsInfo()) {
+        ALOGE("Unable to read display sysfs node");
+    }
+    if (mMdpRev == MDP_V3_0_4){
+        mMDPVersion = MDP_V3_0_4;
+    }
+
     mHasOverlay = false;
     if((mMDPVersion >= MDP_V4_0) ||
        (mMDPVersion == MDP_V_UNKNOWN) ||
        (mMDPVersion == MDP_V3_0_4))
         mHasOverlay = true;
-    if(mMDPVersion >= MDSS_V5) {
-        //TODO get this from driver
-        mMDPDownscale = 4;
-
-        char split[64];
-        FILE* fp = fopen("/sys/class/graphics/fb0/msm_fb_split", "r");
-        if(fp){
-            //Format "left right" space as delimiter
-            if(fread(split, sizeof(char), 64, fp)) {
-                mSplit.mLeft = atoi(split);
-                ALOGI_IF(mSplit.mLeft, "Left Split=%d", mSplit.mLeft);
-                char *rght = strpbrk(split, " ");
-                if(rght)
-                    mSplit.mRight = atoi(rght + 1);
-                ALOGI_IF(rght, "Right Split=%d", mSplit.mRight);
-            }
-        } else {
-            ALOGE("Failed to open mdss_fb_split node");
-        }
-
-        if(fp)
-            fclose(fp);
+    if(!updateSplitInfo()) {
+        ALOGE("Unable to read display split node");
     }
 }
 
 MDPVersion::~MDPVersion() {
     close(mFd);
 }
+
+int MDPVersion::tokenizeParams(char *inputParams, const char *delim,
+                                char* tokenStr[], int *idx) {
+    char *tmp_token = NULL;
+    char *temp_ptr;
+    int index = 0;
+    if (!inputParams) {
+        return -1;
+    }
+    tmp_token = strtok_r(inputParams, delim, &temp_ptr);
+    while (tmp_token != NULL) {
+        tokenStr[index++] = tmp_token;
+        tmp_token = strtok_r(NULL, " ", &temp_ptr);
+    }
+    *idx = index;
+    return 0;
+}
+// This function reads the sysfs node to read the primary panel type
+// and updates information accordingly
+bool MDPVersion::updatePanelInfo() {
+    FILE *displayDeviceFP = NULL;
+    const int MAX_FRAME_BUFFER_NAME_SIZE = 128;
+    char fbType[MAX_FRAME_BUFFER_NAME_SIZE];
+    const char *strCmdPanel = "mipi dsi cmd panel";
+    const char *strVideoPanel = "mipi dsi video panel";
+    const char *strLVDSPanel = "lvds panel";
+    const char *strEDPPanel = "edp panel";
+
+    displayDeviceFP = fopen("/sys/class/graphics/fb0/msm_fb_type", "r");
+    if(displayDeviceFP){
+        fread(fbType, sizeof(char), MAX_FRAME_BUFFER_NAME_SIZE,
+                displayDeviceFP);
+        if(strncmp(fbType, strCmdPanel, strlen(strCmdPanel)) == 0) {
+            mPanelType = MIPI_CMD_PANEL;
+        }
+        else if(strncmp(fbType, strVideoPanel, strlen(strVideoPanel)) == 0) {
+            mPanelType = MIPI_VIDEO_PANEL;
+        }
+        else if(strncmp(fbType, strLVDSPanel, strlen(strLVDSPanel)) == 0) {
+            mPanelType = LVDS_PANEL;
+        }
+        else if(strncmp(fbType, strEDPPanel, strlen(strEDPPanel)) == 0) {
+            mPanelType = EDP_PANEL;
+        }
+        fclose(displayDeviceFP);
+        return true;
+    }else {
+        return false;
+    }
+}
+
+// This function reads the sysfs node to read MDP capabilities
+// and parses and updates information accordingly.
+bool MDPVersion::updateSysFsInfo() {
+    FILE *sysfsFd;
+    size_t len = PAGE_SIZE;
+    ssize_t read;
+    char *line = NULL;
+    char sysfsPath[255];
+    memset(sysfsPath, 0, sizeof(sysfsPath));
+    snprintf(sysfsPath , sizeof(sysfsPath),
+            "/sys/class/graphics/fb0/mdp/caps");
+    char property[PROPERTY_VALUE_MAX];
+    bool enableMacroTile = false;
+
+    if((property_get("persist.hwc.macro_tile_enable", property, NULL) > 0) &&
+       (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+        (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+        enableMacroTile = true;
+    }
+
+    sysfsFd = fopen(sysfsPath, "rb");
+
+    if (sysfsFd == NULL) {
+        ALOGE("%s: sysFsFile file '%s' not found",
+                __FUNCTION__, sysfsPath);
+        return false;
+    } else {
+        line = (char *) malloc(len);
+        while((read = getline(&line, &len, sysfsFd)) != -1) {
+            int index=0;
+            char *tokens[10];
+            memset(tokens, 0, sizeof(tokens));
+
+            // parse the line and update information accordingly
+            if(!tokenizeParams(line, TOKEN_PARAMS_DELIM, tokens, &index)) {
+                if(!strncmp(tokens[0], "hw_rev", strlen("hw_rev"))) {
+                    mMdpRev = atoi(tokens[1]);
+                }
+                else if(!strncmp(tokens[0], "rgb_pipes", strlen("rgb_pipes"))) {
+                    mRGBPipes = (uint8_t)atoi(tokens[1]);
+                }
+                else if(!strncmp(tokens[0], "vig_pipes", strlen("vig_pipes"))) {
+                    mVGPipes = (uint8_t)atoi(tokens[1]);
+                }
+                else if(!strncmp(tokens[0], "dma_pipes", strlen("dma_pipes"))) {
+                    mDMAPipes = (uint8_t)atoi(tokens[1]);
+                }
+                else if(!strncmp(tokens[0], "max_downscale_ratio",
+                                strlen("max_downscale_ratio"))) {
+                    mMDPDownscale = atoi(tokens[1]);
+                }
+                else if(!strncmp(tokens[0], "max_upscale_ratio",
+                                strlen("max_upscale_ratio"))) {
+                    mMDPUpscale = atoi(tokens[1]);
+                } else if(!strncmp(tokens[0], "max_bandwidth_low",
+                        strlen("max_bandwidth_low"))) {
+                    mLowBw = atol(tokens[1]);
+                } else if(!strncmp(tokens[0], "max_bandwidth_high",
+                        strlen("max_bandwidth_high"))) {
+                    mHighBw = atol(tokens[1]);
+                } else if(!strncmp(tokens[0], "features", strlen("features"))) {
+                    for(int i=1; i<index;i++) {
+                        if(!strncmp(tokens[i], "bwc", strlen("bwc"))) {
+                           mFeatures |= MDP_BWC_EN;
+                        }
+                        else if(!strncmp(tokens[i], "decimation",
+                                    strlen("decimation"))) {
+                           mFeatures |= MDP_DECIMATION_EN;
+                        }
+                        else if(!strncmp(tokens[i], "tile_format",
+                                    strlen("tile_format"))) {
+                           if(enableMacroTile)
+                               mMacroTileEnabled = true;
+                        } else if(!strncmp(tokens[i], "src_split",
+                                    strlen("src_split"))) {
+                            mSourceSplit = true;
+                        }
+                    }
+                }
+            }
+        }
+        free(line);
+        fclose(sysfsFd);
+    }
+    ALOGD_IF(DEBUG, "%s: mMDPVersion: %d mMdpRev: %x mRGBPipes:%d,"
+                    "mVGPipes:%d", __FUNCTION__, mMDPVersion, mMdpRev,
+                    mRGBPipes, mVGPipes);
+    ALOGD_IF(DEBUG, "%s:mDMAPipes:%d \t mMDPDownscale:%d, mFeatures:%d",
+                     __FUNCTION__,  mDMAPipes, mMDPDownscale, mFeatures);
+    ALOGD_IF(DEBUG, "%s:mLowBw: %lu mHighBw: %lu", __FUNCTION__,  mLowBw,
+            mHighBw);
+
+    return true;
+}
+
+// This function reads the sysfs node to read MDP capabilities
+// and parses and updates information accordingly.
+bool MDPVersion::updateSplitInfo() {
+    if(mMDPVersion >= MDSS_V5) {
+        char split[64] = {0};
+        FILE* fp = fopen("/sys/class/graphics/fb0/msm_fb_split", "r");
+        if(fp){
+            //Format "left right" space as delimiter
+            if(fread(split, sizeof(char), 64, fp)) {
+                split[sizeof(split) - 1] = '\0';
+                mSplit.mLeft = atoi(split);
+                ALOGI_IF(mSplit.mLeft, "Left Split=%d", mSplit.mLeft);
+                char *rght = strpbrk(split, " ");
+                if(rght)
+                    mSplit.mRight = atoi(rght + 1);
+                ALOGI_IF(mSplit.mRight, "Right Split=%d", mSplit.mRight);
+            }
+        } else {
+            ALOGE("Failed to open mdss_fb_split node");
+            return false;
+        }
+        if(fp)
+            fclose(fp);
+    }
+    return true;
+}
+
 
 bool MDPVersion::supportsDecimation() {
     return mFeatures & MDP_DECIMATION_EN;
@@ -147,23 +277,42 @@ uint32_t MDPVersion::getMaxMDPDownscale() {
     return mMDPDownscale;
 }
 
+uint32_t MDPVersion::getMaxMDPUpscale() {
+    return mMDPUpscale;
+}
+
 bool MDPVersion::supportsBWC() {
     // BWC - Bandwidth Compression
     return (mFeatures & MDP_BWC_EN);
 }
 
+bool MDPVersion::supportsMacroTile() {
+    // MACRO TILE support
+    return mMacroTileEnabled;
+}
+
+bool MDPVersion::isSrcSplit() const {
+    return mSourceSplit;
+}
+
 bool MDPVersion::is8x26() {
-    // check for 8x26 variants
-    // chip variants have same major number and minor numbers usually vary
-    // for e.g., MDSS_MDP_HW_REV_101 is 0x10010000
-    //                                    1001       -  major number
-    //                                        0000   -  minor number
-    // 8x26 v1 minor number is 0000
-    //      v2 minor number is 0001 etc..
-    if( mMdpRev >= MDSS_MDP_HW_REV_101 && mMdpRev < MDSS_MDP_HW_REV_102) {
-        return true;
-    }
-    return false;
+    return (mMdpRev >= MDSS_MDP_HW_REV_101 and
+            mMdpRev < MDSS_MDP_HW_REV_102);
+}
+
+bool MDPVersion::is8x74v2() {
+    return (mMdpRev >= MDSS_MDP_HW_REV_102 and
+            mMdpRev < MDSS_MDP_HW_REV_103);
+}
+
+bool MDPVersion::is8084() {
+    return (mMdpRev >= MDSS_MDP_HW_REV_103 and
+            mMdpRev < MDSS_MDP_HW_REV_104);
+}
+
+bool MDPVersion::is8092() {
+    return (mMdpRev >= MDSS_MDP_HW_REV_200 and
+            mMdpRev < MDSS_MDP_HW_REV_206);
 }
 
 }; //namespace qdutils

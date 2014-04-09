@@ -38,18 +38,15 @@ typedef void (*InvalidatorHandler)(void*);
 
 class IdleInvalidator : public android::Thread {
     void *mHwcContext;
-    bool mSleepAgain;
-    unsigned int mSleepTime;
+    int mTimeoutEventFd;
     static InvalidatorHandler mHandler;
     static android::sp<IdleInvalidator> sInstance;
-    mutable Locker mLock;
 
     public:
     IdleInvalidator();
     /* init timer obj */
     int init(InvalidatorHandler reg_handler, void* user_data, unsigned int
              idleSleepTime);
-    void markForSleep();
     /*Overrides*/
     virtual bool        threadLoop();
     virtual int         readyToRun();

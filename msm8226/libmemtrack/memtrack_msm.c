@@ -22,6 +22,8 @@
 
 int msm_memtrack_init(const struct memtrack_module *module)
 {
+    if(!module)
+        return -1;
     return 0;
 }
 
@@ -31,6 +33,8 @@ int msm_memtrack_get_memory(const struct memtrack_module *module,
                                 struct memtrack_record *records,
                                 size_t *num_records)
 {
+    if(!module)
+        return -1;
     if (type == MEMTRACK_TYPE_GL || type == MEMTRACK_TYPE_GRAPHICS) {
         return kgsl_memtrack_get_memory(pid, type, records, num_records);
     }
