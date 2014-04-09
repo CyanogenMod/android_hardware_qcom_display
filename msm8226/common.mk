@@ -1,11 +1,17 @@
 #Common headers
-common_includes := hardware/qcom/display/msm8974/libgralloc
-common_includes += hardware/qcom/display/msm8974/liboverlay
-common_includes += hardware/qcom/display/msm8974/libcopybit
-common_includes += hardware/qcom/display/msm8974/libqdutils
-common_includes += hardware/qcom/display/msm8974/libhwcomposer
-common_includes += hardware/qcom/display/msm8974/libexternal
-common_includes += hardware/qcom/display/msm8974/libqservice
+common_includes := hardware/qcom/display/msm8226/libgralloc
+common_includes += hardware/qcom/display/msm8226/liboverlay
+common_includes += hardware/qcom/display/msm8226/libcopybit
+common_includes += hardware/qcom/display/msm8226/libqdutils
+common_includes += hardware/qcom/display/msm8226/libhwcomposer
+common_includes += hardware/qcom/display/msm8226/libexternal
+common_includes += hardware/qcom/display/msm8226/libqservice
+common_includes += hardware/qcom/display/msm8226/libvirtual
+
+ifeq ($(TARGET_USES_POST_PROCESSING),true)
+    common_flags     += -DUSES_POST_PROCESSING
+    common_includes  += $(TARGET_OUT_HEADERS)/pp/inc
+endif
 
 common_header_export_path := qcom/display
 
@@ -14,32 +20,31 @@ common_libs := liblog libutils libcutils libhardware
 
 #Common C flags
 common_flags := -DDEBUG_CALC_FPS -Wno-missing-field-initializers
-#common_flags += -Werror
+#TODO: Add -Werror back once all the current warnings are fixed
+common_flags += -Wconversion -Wall
 
 ifeq ($(ARCH_ARM_HAVE_NEON),true)
     common_flags += -D__ARM_HAVE_NEON
 endif
 
-ifneq ($(filter msm8974 msm8x74 msm8226 msm8x26 msm8610 apq8084,$(TARGET_BOARD_PLATFORM)),)
+ifeq ($(call is-board-platform-in-list, msm8226 msm8610 apq8084 \
+        mpq8092 msm_bronze msm8916), true)
     common_flags += -DVENUS_COLOR_FORMAT
     common_flags += -DMDSS_TARGET
 endif
 
-ifeq ($(TARGET_FORCE_HWC_FOR_VIRTUAL_DISPLAYS), true)
-    common_flags += -DFORCE_HWC_FOR_VIRTUAL_DISPLAYS
+ifeq ($(call is-board-platform-in-list, mpq8092), true)
+    common_flags += -DVPU_TARGET
 endif
+
 
 common_deps  :=
 kernel_includes :=
 
 # Executed only on QCOM BSPs
 ifeq ($(TARGET_USES_QCOM_BSP),true)
-# On jb_mr2- dont enable QCOM Display features
-ifneq ($(call is-platform-sdk-version-at-least,18),true)
-# This flag is used to compile out any features that depend on framework changes
+# Enable QCOM Display features
     common_flags += -DQCOM_BSP
-    common_flags += -DANDROID_JELLYBEAN_MR1=1
-endif
 endif
 ifeq ($(call is-vendor-board-platform,QCOM),true)
 # This check is to pick the kernel headers from the right location.

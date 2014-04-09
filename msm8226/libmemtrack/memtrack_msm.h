@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef _MEMTRACK_QCOM_H_
-#define _MEMTRACK_QCOM_H_
+#ifndef _MEMTRACK_MSM_H_
+#define _MEMTRACK_MSM_H_
 
 int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
                              struct memtrack_record *records,

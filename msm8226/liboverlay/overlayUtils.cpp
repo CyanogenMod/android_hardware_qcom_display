@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -36,6 +36,7 @@
 #include "overlayUtils.h"
 #include "mdpWrapper.h"
 #include "mdp_version.h"
+#include <hardware/hwcomposer_defs.h>
 
 // just a helper static thingy
 namespace {
@@ -100,6 +101,8 @@ int getMdpFormat(int format) {
             return MDP_RGB_565;
         case HAL_PIXEL_FORMAT_BGRA_8888:
             return MDP_BGRA_8888;
+        case HAL_PIXEL_FORMAT_BGRX_8888:
+            return MDP_BGRX_8888;
         case HAL_PIXEL_FORMAT_YV12:
             return MDP_Y_CR_CB_GH2V2;
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
@@ -114,6 +117,10 @@ int getMdpFormat(int format) {
             return MDP_Y_CBCR_H2V2;
         case HAL_PIXEL_FORMAT_YCrCb_422_SP:
             return MDP_Y_CRCB_H2V1;
+        case HAL_PIXEL_FORMAT_YCbCr_422_I:
+            return MDP_YCBYCR_H2V1;
+        case HAL_PIXEL_FORMAT_YCrCb_422_I:
+            return MDP_YCRYCB_H2V1;
         case HAL_PIXEL_FORMAT_YCbCr_444_SP:
             return MDP_Y_CBCR_H1V1;
         case HAL_PIXEL_FORMAT_YCrCb_444_SP:
@@ -128,7 +135,6 @@ int getMdpFormat(int format) {
             //---graphics.h--------
             //HAL_PIXEL_FORMAT_RGBA_5551
             //HAL_PIXEL_FORMAT_RGBA_4444
-            //HAL_PIXEL_FORMAT_YCbCr_422_I
             //---gralloc_priv.h-----
             //HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO    = 0x7FA30C01
             //HAL_PIXEL_FORMAT_R_8                    = 0x10D
@@ -139,6 +145,33 @@ int getMdpFormat(int format) {
     // not reached
     return -1;
 }
+
+// This function returns corresponding tile format
+// MDSS support following RGB tile formats
+//  32 bit formats
+//  16 bit formats
+int getMdpFormat(int format, bool tileEnabled)
+{
+    if(!tileEnabled) {
+        return getMdpFormat(format);
+    }
+    switch (format) {
+        case HAL_PIXEL_FORMAT_RGBA_8888 :
+            return MDP_RGBA_8888_TILE;
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+            return MDP_RGBX_8888_TILE;
+        case HAL_PIXEL_FORMAT_RGB_565:
+            return MDP_RGB_565_TILE;
+        case HAL_PIXEL_FORMAT_BGRA_8888:
+            return MDP_BGRA_8888_TILE;
+        case HAL_PIXEL_FORMAT_BGRX_8888:
+            return MDP_BGRX_8888_TILE;
+        default:
+            return getMdpFormat(format);
+    }
+}
+
+
 
 //Takes mdp format as input and translates to equivalent HAL format
 //Refer to graphics.h, gralloc_priv.h, msm_mdp.h for formats.
@@ -169,7 +202,11 @@ int getHALFormat(int mdpFormat) {
             return HAL_PIXEL_FORMAT_YCbCr_420_SP;
         case MDP_Y_CRCB_H2V1:
             return HAL_PIXEL_FORMAT_YCrCb_422_SP;
-        case MDP_Y_CBCR_H1V1:
+        case MDP_YCBYCR_H2V1:
+            return HAL_PIXEL_FORMAT_YCbCr_422_I;
+        case MDP_YCRYCB_H2V1:
+            return HAL_PIXEL_FORMAT_YCrCb_422_I;
+         case MDP_Y_CBCR_H1V1:
             return HAL_PIXEL_FORMAT_YCbCr_444_SP;
         case MDP_Y_CRCB_H1V1:
             return HAL_PIXEL_FORMAT_YCrCb_444_SP;
@@ -220,9 +257,6 @@ int getMdpOrient(eTransform rotation) {
 int getDownscaleFactor(const int& src_w, const int& src_h,
         const int& dst_w, const int& dst_h) {
     int dscale_factor = utils::ROT_DS_NONE;
-    // The tolerance is an empirical grey area that needs to be adjusted
-    // manually so that we always err on the side of caution
-    float fDscaleTolerance = 0.05;
     // We need this check to engage the rotator whenever possible to assist MDP
     // in performing video downscale.
     // This saves bandwidth and avoids causing the driver to make too many panel
@@ -230,15 +264,8 @@ int getDownscaleFactor(const int& src_w, const int& src_h,
     // Use-case: Video playback [with downscaling and rotation].
     if (dst_w && dst_h)
     {
-        float fDscale =  sqrtf((float)(src_w * src_h) / (float)(dst_w * dst_h)) +
-                         fDscaleTolerance;
-
-        // On our MTP 1080p playback case downscale after sqrt is coming to 1.87
-        // we were rounding to 1. So entirely MDP has to do the downscaling.
-        // BW requirement and clock requirement is high across MDP4 targets.
-        // It is unable to downscale 1080p video to panel resolution on 8960.
-        // round(x) will round it to nearest integer and avoids above issue.
-        uint32_t dscale = round(fDscale);
+        float fDscale =  (float)(src_w * src_h) / (float)(dst_w * dst_h);
+        uint32_t dscale = (int)sqrtf(fDscale);
 
         if(dscale < 2) {
             // Down-scale to > 50% of orig.
@@ -255,6 +282,11 @@ int getDownscaleFactor(const int& src_w, const int& src_h,
         }
     }
     return dscale_factor;
+}
+
+//Since this is unavailable on Android, defining it in terms of base 10
+static inline float log2f(const float& x) {
+    return log(x) / log(2);
 }
 
 void getDecimationFactor(const int& src_w, const int& src_h,
@@ -384,7 +416,7 @@ void getDump(char *buf, size_t len, const char *prefix,
             "V.Deci=%d\n",
             prefix, ov.id, ov.z_order, ov.is_fg, ov.alpha,
             ov.transp_mask, ov.flags, ov.horz_deci, ov.vert_deci);
-    strncat(buf, str, strlen(str));
+    strlcat(buf, str, len);
     getDump(buf, len, "\tsrc", ov.src);
     getDump(buf, len, "\tsrc_rect", ov.src_rect);
     getDump(buf, len, "\tdst_rect", ov.dst_rect);
@@ -397,7 +429,7 @@ void getDump(char *buf, size_t len, const char *prefix,
             "%s w=%d h=%d format=%d %s\n",
             prefix, ov.width, ov.height, ov.format,
             overlay::utils::getFormatString(ov.format));
-    strncat(buf, str_src, strlen(str_src));
+    strlcat(buf, str_src, len);
 }
 
 void getDump(char *buf, size_t len, const char *prefix,
@@ -406,7 +438,7 @@ void getDump(char *buf, size_t len, const char *prefix,
     snprintf(str_rect, 256,
             "%s x=%d y=%d w=%d h=%d\n",
             prefix, ov.x, ov.y, ov.w, ov.h);
-    strncat(buf, str_rect, strlen(str_rect));
+    strlcat(buf, str_rect, len);
 }
 
 void getDump(char *buf, size_t len, const char *prefix,
@@ -415,7 +447,7 @@ void getDump(char *buf, size_t len, const char *prefix,
     snprintf(str, 256,
             "%s id=%d\n",
             prefix, ov.id);
-    strncat(buf, str, strlen(str));
+    strlcat(buf, str, len);
     getDump(buf, len, "\tdata", ov.data);
 }
 
@@ -425,7 +457,7 @@ void getDump(char *buf, size_t len, const char *prefix,
     snprintf(str_data, 256,
             "%s offset=%d memid=%d id=%d flags=0x%x\n",
             prefix, ov.offset, ov.memory_id, ov.id, ov.flags);
-    strncat(buf, str_data, strlen(str_data));
+    strlcat(buf, str_data, len);
 }
 
 void getDump(char *buf, size_t len, const char *prefix,
@@ -434,7 +466,7 @@ void getDump(char *buf, size_t len, const char *prefix,
     snprintf(str, 256, "%s sessid=%u rot=%d, enable=%d downscale=%d\n",
             prefix, rot.session_id, rot.rotations, rot.enable,
             rot.downscale_ratio);
-    strncat(buf, str, strlen(str));
+    strlcat(buf, str, len);
     getDump(buf, len, "\tsrc", rot.src);
     getDump(buf, len, "\tdst", rot.dst);
     getDump(buf, len, "\tsrc_rect", rot.src_rect);
@@ -446,7 +478,7 @@ void getDump(char *buf, size_t len, const char *prefix,
     snprintf(str, 256,
             "%s sessid=%u\n",
             prefix, rot.session_id);
-    strncat(buf, str, strlen(str));
+    strlcat(buf, str, len);
     getDump(buf, len, "\tsrc", rot.src);
     getDump(buf, len, "\tdst", rot.dst);
 }
