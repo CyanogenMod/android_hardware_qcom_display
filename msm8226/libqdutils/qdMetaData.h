@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -30,7 +30,30 @@
 #ifndef _QDMETADATA_H
 #define _QDMETADATA_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define MAX_IGC_LUT_ENTRIES 256
+#define MAX_VFM_DATA_SIZE   64 //bytes per data buffer
+#define MAX_VFM_DATA_COUNT  16 //number of data buffers
+
+/* This macro finds the index corresponding to a type */
+/* This is equivalent to indx = LOG_2(type) */
+inline int32_t getVfmDataIdx(int32_t type){
+    int32_t indx = 0, x = type;
+    while( x >> 1) {
+        x = (x >> 1);
+        indx++;
+    }
+    return indx;
+}
+
+enum ColorSpace_t{
+    ITU_R_601,
+    ITU_R_601_FR,
+    ITU_R_709,
+};
 
 struct HSICData_t {
     int32_t hue;
@@ -57,19 +80,27 @@ struct BufferDim_t {
     int32_t sliceHeight;
 };
 
+struct VfmData_t {
+    int32_t dataType;
+    char    data[MAX_VFM_DATA_SIZE];
+};
+
 struct MetaData_t {
     int32_t operation;
     int32_t interlaced;
-    BufferDim_t bufferDim;
-    HSICData_t hsicData;
+    struct BufferDim_t bufferDim;
+    struct HSICData_t hsicData;
     int32_t sharpness;
     int32_t video_interface;
-    IGCData_t igcData;
-    Sharp2Data_t Sharp2Data;
+    struct IGCData_t igcData;
+    struct Sharp2Data_t Sharp2Data;
     int64_t timestamp;
+    int32_t vfmDataBitMap;
+    struct VfmData_t vfmData[MAX_VFM_DATA_COUNT];
+    enum ColorSpace_t colorSpace;
 };
 
-typedef enum {
+enum DispParamType {
     PP_PARAM_HSIC       = 0x0001,
     PP_PARAM_SHARPNESS  = 0x0002,
     PP_PARAM_INTERLACED = 0x0004,
@@ -78,9 +109,17 @@ typedef enum {
     PP_PARAM_SHARP2     = 0x0020,
     PP_PARAM_TIMESTAMP  = 0x0040,
     UPDATE_BUFFER_GEOMETRY = 0x0080,
-} DispParamType;
+    PP_PARAM_VFM_DATA   = 0x0100,
+    UPDATE_COLOR_SPACE = 0x0200,
+};
 
-int setMetaData(private_handle_t *handle, DispParamType paramType, void *param);
+struct private_handle_t;
+int setMetaData(struct private_handle_t *handle, enum DispParamType paramType,
+        void *param);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _QDMETADATA_H */
 

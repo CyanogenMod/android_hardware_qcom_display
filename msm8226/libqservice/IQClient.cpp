@@ -28,6 +28,9 @@
 using namespace android;
 
 // ---------------------------------------------------------------------------
+// XXX: Since qservice currently runs as part of hwc instead of a standalone
+// process, the implementation below is overridden and the notifyCallback in
+// hwc_qclient is directly called.
 
 namespace qClient {
 
@@ -41,13 +44,17 @@ public:
     BpQClient(const sp<IBinder>& impl)
         : BpInterface<IQClient>(impl) {}
 
-    virtual status_t notifyCallback(uint32_t msg, uint32_t value) {
-        Parcel data, reply;
+    virtual status_t notifyCallback(uint32_t command,
+            const Parcel* inParcel,
+            Parcel* outParcel) {
+        Parcel data;
+        Parcel *reply = outParcel;
         data.writeInterfaceToken(IQClient::getInterfaceDescriptor());
-        data.writeInt32(msg);
-        data.writeInt32(value);
-        remote()->transact(NOTIFY_CALLBACK, data, &reply);
-        status_t result = reply.readInt32();
+        data.writeInt32(command);
+        if (inParcel->dataAvail())
+            data.appendFrom(inParcel, inParcel->dataPosition(),
+                    inParcel->dataAvail());
+        status_t result = remote()->transact(NOTIFY_CALLBACK, data, reply);
         return result;
     }
 };
@@ -55,21 +62,21 @@ public:
 IMPLEMENT_META_INTERFACE(QClient, "android.display.IQClient");
 
 // ----------------------------------------------------------------------
-
+//Stub implementation - nothing needed here
 status_t BnQClient::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
     switch(code) {
         case NOTIFY_CALLBACK: {
             CHECK_INTERFACE(IQClient, data, reply);
-            uint32_t msg = data.readInt32();
-            uint32_t value = data.readInt32();
-            notifyCallback(msg, value);
+            uint32_t command = data.readInt32();
+            notifyCallback(command, &data, reply);
             return NO_ERROR;
         } break;
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }
+
 }
 
 }; // namespace qClient

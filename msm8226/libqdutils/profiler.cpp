@@ -28,6 +28,9 @@
  */
 
 #define LOG_NDDEBUG 0
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
+
 #include "profiler.h"
 
 #ifdef DEBUG_CALC_FPS
@@ -87,7 +90,7 @@ void CalcFps::populate_debug_fps_metadata(void)
     debug_fps_metadata.ignorethresh_us = atoi(prop);
 
     debug_fps_metadata.framearrival_steps =
-        (debug_fps_metadata.ignorethresh_us / 16666);
+        (unsigned int)(debug_fps_metadata.ignorethresh_us / 16666);
 
     if (debug_fps_metadata.framearrival_steps > MAX_FRAMEARRIVAL_STEPS) {
         debug_fps_metadata.framearrival_steps = MAX_FRAMEARRIVAL_STEPS;
@@ -101,8 +104,10 @@ void CalcFps::populate_debug_fps_metadata(void)
     for (unsigned int i = 0; i < MAX_FRAMEARRIVAL_STEPS; i++)
         debug_fps_metadata.accum_framearrivals[i] = 0;
 
-    ALOGD("period: %d", debug_fps_metadata.period);
-    ALOGD("ignorethresh_us: %lld", debug_fps_metadata.ignorethresh_us);
+    debug_fps_metadata.curr_frame = 0;
+
+    ALOGD("period: %u", debug_fps_metadata.period);
+    ALOGD("ignorethresh_us: %"PRId64, debug_fps_metadata.ignorethresh_us);
 }
 
 void CalcFps::print_fps(float fps)
@@ -122,7 +127,7 @@ void CalcFps::print_fps(float fps)
         for (unsigned int i = 0;
              i < ((debug_fps_metadata.framearrival_steps / 6) + 1);
              i++) {
-            ALOGD("%lld %lld %lld %lld %lld %lld",
+            ALOGD("%"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64,
                   debug_fps_metadata.accum_framearrivals[i*6],
                   debug_fps_metadata.accum_framearrivals[i*6+1],
                   debug_fps_metadata.accum_framearrivals[i*6+2],
@@ -160,7 +165,8 @@ void CalcFps::calc_fps(nsecs_t currtime_us)
     debug_fps_metadata.curr_frame++;
 
     if (debug_fps_level > 1) {
-        unsigned int currstep = (diff + debug_fps_metadata.margin_us) / 16666;
+        unsigned int currstep =
+            (unsigned int)(diff + debug_fps_metadata.margin_us) / 16666;
 
         if (currstep < debug_fps_metadata.framearrival_steps) {
             debug_fps_metadata.accum_framearrivals[currstep-1]++;
@@ -173,14 +179,15 @@ void CalcFps::calc_fps(nsecs_t currtime_us)
             nsecs_t sum = 0;
             for (unsigned int i = 0; i < debug_fps_metadata.period; i++)
                 sum += debug_fps_metadata.framearrivals[i];
-            print_fps((debug_fps_metadata.period * float(1000000))/float(sum));
+            print_fps(float(float(debug_fps_metadata.period * 1000000) /
+                                                              (float)sum));
         }
     }
     else if (debug_fps_metadata_t::DFM_TIME == debug_fps_metadata.type) {
-        debug_fps_metadata.time_elapsed += ((float)diff/1000.0);
+        debug_fps_metadata.time_elapsed += (float)((float)diff/1000.0);
         if (debug_fps_metadata.time_elapsed >= debug_fps_metadata.time_period) {
-            float fps = (1000.0 * debug_fps_metadata.curr_frame)/
-                (float)debug_fps_metadata.time_elapsed;
+            float fps = float(1000.0 * debug_fps_metadata.curr_frame/
+                                            debug_fps_metadata.time_elapsed);
             print_fps(fps);
         }
     }
