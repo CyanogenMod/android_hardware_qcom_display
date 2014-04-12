@@ -284,11 +284,6 @@ int getDownscaleFactor(const int& src_w, const int& src_h,
     return dscale_factor;
 }
 
-//Since this is unavailable on Android, defining it in terms of base 10
-static inline float log2f(const float& x) {
-    return log(x) / log(2);
-}
-
 void getDecimationFactor(const int& src_w, const int& src_h,
         const int& dst_w, const int& dst_h, float& horDscale,
         float& verDscale) {
