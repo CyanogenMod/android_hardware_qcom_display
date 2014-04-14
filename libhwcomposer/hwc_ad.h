@@ -50,17 +50,16 @@ public:
             mDest = overlay::utils::OV_INVALID;
     }
     bool isDoable() const { return mDoable; }
-    bool isModeOn() const { return (mWbFd >= 0); }
     int getDstFd() const;
     uint32_t getDstOffset() const;
 
 private:
-    //State of feature turned on and off
-    int mWbFd;
     bool mDoable;
+    bool mTurnedOff;
     //State of feature existence on certain devices and configs.
     bool mFeatureEnabled;
     overlay::utils::eDest mDest;
+    void turnOffAD();
 };
 
 }

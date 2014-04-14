@@ -1769,11 +1769,9 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             int fd = hnd->fd;
             int offset = (uint32_t)hnd->offset;
 
-            if(ctx->mAD->isModeOn()) {
-                if(ctx->mAD->draw(ctx, fd, offset)) {
-                    fd = ctx->mAD->getDstFd();
-                    offset = ctx->mAD->getDstOffset();
-                }
+            if(ctx->mAD->draw(ctx, fd, offset)) {
+                fd = ctx->mAD->getDstFd();
+                offset = ctx->mAD->getDstOffset();
             }
 
             if(rot) {
