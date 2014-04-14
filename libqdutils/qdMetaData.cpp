@@ -27,6 +27,7 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <errno.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <cutils/log.h>
@@ -52,8 +53,8 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
     unsigned long size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
     void *base = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED,
         handle->fd_metadata, 0);
-    if (!base) {
-        ALOGE("%s: mmap() failed: Base addr is NULL!", __func__);
+    if (base == reinterpret_cast<void*>(MAP_FAILED)) {
+        ALOGE("%s: mmap() failed: error is %s!", __func__, strerror(errno));
         return -1;
     }
     MetaData_t *data = reinterpret_cast <MetaData_t *>(base);
