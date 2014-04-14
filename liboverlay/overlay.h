@@ -130,6 +130,10 @@ public:
     /* Returns pipe dump. Expects a NULL terminated buffer of big enough size
      * to populate.
      */
+    /* Returns if DMA pipe multiplexing is supported by the mdss driver */
+    static bool isDMAMultiplexingSupported();
+    /* Returns if UI scaling on external is supported on the targets */
+    static bool isUIScalingOnExternalSupported();
     void getDump(char *buf, size_t len);
     /* Reset usage and allocation bits on all pipes for given display */
     void clear(int dpy);
@@ -304,6 +308,18 @@ inline void Overlay::setDMAMultiplexingSupported() {
     sDMAMultiplexingSupported = false;
     if(qdutils::MDPVersion::getInstance().is8x26())
         sDMAMultiplexingSupported = true;
+}
+
+inline bool Overlay::isDMAMultiplexingSupported() {
+    return sDMAMultiplexingSupported;
+}
+
+inline bool Overlay::isUIScalingOnExternalSupported() {
+    if(qdutils::MDPVersion::getInstance().is8x26() or
+       qdutils::MDPVersion::getInstance().is8x16()) {
+        return false;
+    }
+    return true;
 }
 
 inline int Overlay::getDMAMode() {
