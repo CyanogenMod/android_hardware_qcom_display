@@ -135,6 +135,8 @@ public:
     void clear(int dpy);
     /* Validate the set of pipes for a display and set them in driver */
     bool validateAndSet(const int& dpy, const int& fbFd);
+    /* Returns true if PipeBook has been configured, false otherwise */
+    bool isConfigured();
 
     /* Closes open pipes, called during startup */
     static int initOverlay();
@@ -199,6 +201,7 @@ private:
         static void resetAllocation(int index);
         static bool isAllocated(int index);
         static bool isNotAllocated(int index);
+        static bool isConfigured();
 
         static utils::eMdpPipeType getPipeType(utils::eDest dest);
         static const char* getDestStr(utils::eDest dest);
@@ -387,6 +390,14 @@ inline const char* Overlay::PipeBook::getDestStr(utils::eDest dest) {
         default: return "Invalid";
     }
     return "Invalid";
+}
+
+inline bool Overlay::PipeBook::isConfigured() {
+    return (sAllocatedBitmap != 0);
+}
+
+inline bool Overlay::isConfigured() {
+    return PipeBook::isConfigured();
 }
 
 }; // overlay
