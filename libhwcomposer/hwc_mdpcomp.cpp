@@ -1933,13 +1933,12 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
     }
 
-    eMdpFlags mdpFlagsL = OV_MDP_BACKEND_COMPOSITION;
-    setMdpFlags(layer, mdpFlagsL, 0, transform);
-    eMdpFlags mdpFlagsR = mdpFlagsL;
+    eMdpFlags mdpFlags = OV_MDP_BACKEND_COMPOSITION;
+    setMdpFlags(layer, mdpFlags, 0, transform);
 
     if(lDest != OV_INVALID && rDest != OV_INVALID) {
         //Enable overfetch
-        setMdpFlags(mdpFlagsL, OV_MDSS_MDP_DUAL_PIPE);
+        setMdpFlags(mdpFlags, OV_MDSS_MDP_DUAL_PIPE);
     }
 
     if(isYuvBuffer(hnd) && (transform & HWC_TRANSFORM_ROT_90)) {
@@ -1947,7 +1946,7 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
         if((*rot) == NULL) return -1;
         ctx->mLayerRotMap[mDpy]->add(layer, *rot);
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
+        if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
         }
@@ -1983,7 +1982,7 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     //configure left pipe
     if(lDest != OV_INVALID) {
-        PipeArgs pargL(mdpFlagsL, whf, z, isFg,
+        PipeArgs pargL(mdpFlags, whf, z, isFg,
                 static_cast<eRotFlags>(rotFlags), layer->planeAlpha,
                 (ovutils::eBlending) getBlending(layer->blending));
 
@@ -1996,7 +1995,7 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     //configure right pipe
     if(rDest != OV_INVALID) {
-        PipeArgs pargR(mdpFlagsR, whf, z, isFg,
+        PipeArgs pargR(mdpFlags, whf, z, isFg,
                 static_cast<eRotFlags>(rotFlags),
                 layer->planeAlpha,
                 (ovutils::eBlending) getBlending(layer->blending));
