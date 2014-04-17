@@ -177,12 +177,12 @@ void VirtualDisplay::setAttributes() {
         uint32_t priW = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
         uint32_t priH = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
 
-        initResolution(extW, extH);
-
         // Dynamic Resolution Change depends on MDP downscaling.
         // MDP downscale property will be ignored to exercise DRC use case.
         // If DRC is in progress, ext WxH will have non-zero values.
-        bool isDRC = (extW > 0) && (extH > 0);
+        bool isDRC = (extW > mVInfo.xres) && (extH > mVInfo.yres);
+
+        initResolution(extW, extH);
 
         if(!qdutils::MDPVersion::getInstance().is8x26()
                 && (mHwcContext->mMDPDownscaleEnabled || isDRC)) {
