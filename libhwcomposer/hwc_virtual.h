@@ -33,7 +33,7 @@ public:
     explicit HWCVirtualBase(){};
     virtual ~HWCVirtualBase(){};
     // instantiates and returns the pointer to VDS or V4L2 object.
-    static HWCVirtualBase* getObject();
+    static HWCVirtualBase* getObject(bool isVDSEnabled);
     virtual int prepare(hwc_composer_device_1 *dev,
                           hwc_display_contents_1_t* list) = 0;
     virtual int set(hwc_context_t *ctx, hwc_display_contents_1_t *list) = 0;
