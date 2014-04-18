@@ -605,7 +605,8 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     for(int i = 0; i < numAppLayers; i++) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
-        if(not isSupportedForMDPComp(ctx, layer)) {
+        if(not mCurrentFrame.drop[i] and
+           not isSupportedForMDPComp(ctx, layer)) {
             ALOGD_IF(isDebug(), "%s: Unsupported layer in list",__FUNCTION__);
             return false;
         }
