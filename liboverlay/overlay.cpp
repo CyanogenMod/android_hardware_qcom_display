@@ -279,9 +279,9 @@ int Overlay::comparePipePriority(utils::eDest pipe1Index,
     uint8_t pipe1Prio = mPipeBook[(int)pipe1Index].mPipe->getPriority();
     uint8_t pipe2Prio = mPipeBook[(int)pipe2Index].mPipe->getPriority();
     if(pipe1Prio > pipe2Prio)
-        return 1;
-    if(pipe1Prio < pipe2Prio)
         return -1;
+    if(pipe1Prio < pipe2Prio)
+        return 1;
     return 0;
 }
 
