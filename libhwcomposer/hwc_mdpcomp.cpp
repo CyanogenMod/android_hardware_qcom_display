@@ -815,6 +815,7 @@ bool MDPComp::videoOnlyComp(hwc_context_t *ctx,
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
 
     mCurrentFrame.reset(numAppLayers);
+    mCurrentFrame.fbCount -= mCurrentFrame.dropCount;
     updateYUV(ctx, list, secureOnly);
     int mdpCount = mCurrentFrame.mdpCount;
 
