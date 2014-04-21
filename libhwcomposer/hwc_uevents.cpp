@@ -38,14 +38,6 @@ namespace qhwc {
 #define HWC_UEVENT_SWITCH_STR  "change@/devices/virtual/switch/"
 #define HWC_UEVENT_THREAD_NAME "hwcUeventThread"
 
-/* External Display states */
-enum {
-    EXTERNAL_OFFLINE = 0,
-    EXTERNAL_ONLINE,
-    EXTERNAL_PAUSE,
-    EXTERNAL_RESUME
-};
-
 static void setup(hwc_context_t* ctx, int dpy)
 {
     ctx->mFBUpdate[dpy] = IFBUpdate::getObject(ctx, dpy);
@@ -147,6 +139,7 @@ void handle_resume(hwc_context_t* ctx, int dpy) {
         ctx->dpyAttr[dpy].isActive = true;
         ctx->proc->invalidate(ctx->proc);
     }
+
     usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
            * 2 / 1000);
     //At this point external has all the pipes it would need.
@@ -174,7 +167,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 
     int switch_state = getConnectedState(udata, len);
 
-    ALOGE_IF(UEVENT_DEBUG,"%s: uevent recieved: %s switch state: %d",
+    ALOGE_IF(UEVENT_DEBUG,"%s: uevent received: %s switch state: %d",
              __FUNCTION__,udata, switch_state);
 
     switch(switch_state) {
@@ -260,8 +253,22 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                             ctx->mVirtualonExtActive = false;
                         }
                     }
-                    /* Wait for few frames for SF to tear down
-                     * the WFD session. */
+
+                    /*TODO: Uncomment the below chunk and remove usleep
+                      once wfd module issues binder call on teardown */
+
+                    /*ctx->mWfdSyncLock.lock();
+                    ALOGD_IF(HWC_WFDDISPSYNC_LOG,
+                             "%s: Waiting for wfd-teardown to be signalled",
+                             __FUNCTION__);
+                    ctx->mWfdSyncLock.wait();
+                    ALOGD_IF(HWC_WFDDISPSYNC_LOG,
+                             "%s: Teardown signalled",__FUNCTION__);
+                    ctx->mWfdSyncLock.unlock();*/
+
+                    /* For now, Wait for few frames for SF to tear down
+                     * the WFD session.
+                     */
                     usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
                            * 2 / 1000);
                 }
