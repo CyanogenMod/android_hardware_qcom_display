@@ -1,12 +1,12 @@
 #Common headers
-common_includes := hardware/qcom/display/libgralloc
-common_includes += hardware/qcom/display/liboverlay
-common_includes += hardware/qcom/display/libcopybit
-common_includes += hardware/qcom/display/libqdutils
-common_includes += hardware/qcom/display/libhwcomposer
-common_includes += hardware/qcom/display/libexternal
-common_includes += hardware/qcom/display/libqservice
-common_includes += hardware/qcom/display/libvirtual
+common_includes := $(LOCAL_PATH)/../libgralloc
+common_includes += $(LOCAL_PATH)/../liboverlay
+common_includes += $(LOCAL_PATH)/../libcopybit
+common_includes += $(LOCAL_PATH)/../libqdutils
+common_includes += $(LOCAL_PATH)/../libhwcomposer
+common_includes += $(LOCAL_PATH)/../libexternal
+common_includes += $(LOCAL_PATH)/../libqservice
+common_includes += $(LOCAL_PATH)/../libvirtual
 
 ifeq ($(TARGET_USES_POST_PROCESSING),true)
     common_flags     += -DUSES_POST_PROCESSING
