@@ -114,9 +114,13 @@ bool MDPComp::init(hwc_context_t *ctx) {
             sDebugLogs = true;
     }
 
-    if(property_get("persist.hwc.partialupdate", property, NULL) > 0) {
-        if((atoi(property) != 0) && ctx->mMDP.panel == MIPI_CMD_PANEL &&
-           qdutils::MDPVersion::getInstance().is8x74v2())
+    // We read from drivers if panel supports partial updating
+    // and we enable partial update computations if supported.
+    // Keeping this property to disable partial update for
+    // debugging by setting below property to 0 & only 0.
+    property_get("persist.hwc.partialupdate", property, "-1");
+    if((atoi(property) != 0) &&
+        qdutils::MDPVersion::getInstance().isPartialUpdateEnabled()) {
             sEnablePartialFrameUpdate = true;
     }
     ALOGE_IF(isDebug(), "%s: Partial Update applicable?: %d",__FUNCTION__,
