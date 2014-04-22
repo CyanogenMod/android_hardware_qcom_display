@@ -233,23 +233,15 @@ utils::eDest Overlay::getPipe_8x16(const PipeSpecs& pipeSpecs) {
     eDest dest = OV_INVALID;
     if(pipeSpecs.formatClass == FORMAT_YUV or pipeSpecs.needsScaling) {
         return nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
-    } else if(pipeSpecs.fb == false) { //RGB app layers
+    } else {
         //Since this is a specific func, we can assume stuff like RGB pipe not
         //having scalar blocks
         dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
         if(dest == OV_INVALID) {
             dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
         }
-    } else {
-        //For 8x16 Secondary we use DMA always for FB for inline rotation
-        if(pipeSpecs.dpy == DPY_PRIMARY) {
-            dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
-            if(dest == OV_INVALID) {
-                dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
-            }
-        }
         if(dest == OV_INVALID) {
-            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
         }
     }
     return dest;
