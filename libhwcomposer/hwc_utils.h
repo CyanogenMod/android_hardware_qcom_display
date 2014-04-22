@@ -39,6 +39,8 @@
 #define MAX_NUM_APP_LAYERS 32
 #define MIN_DISPLAY_XRES 200
 #define MIN_DISPLAY_YRES 200
+#define HWC_WFDDISPSYNC_LOG 0
+#define STR(f) #f;
 
 //Fwrd decls
 struct hwc_context_t;
@@ -152,6 +154,15 @@ enum {
 enum {
     HWC_COLOR_FILL = 0x00000008,
     HWC_FORMAT_RB_SWAP = 0x00000040,
+};
+
+/* External Display states */
+enum {
+    EXTERNAL_OFFLINE = 0,
+    EXTERNAL_ONLINE,
+    EXTERNAL_PAUSE,
+    EXTERNAL_RESUME,
+    EXTERNAL_MAXSTATES
 };
 
 class LayerRotMap {
@@ -279,6 +290,9 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
 // Returns the orientation that needs to be set on external for
 // BufferMirrirMode(Sidesync)
 int getMirrorModeOrientation(hwc_context_t *ctx);
+
+/* Get External State names */
+const char* getExternalDisplayState(uint32_t external_state);
 
 // Handles wfd Pause and resume events
 void handle_pause(hwc_context_t *ctx, int dpy);
@@ -516,14 +530,21 @@ struct hwc_context_t {
     //Used for SideSync feature
     //which overrides the mExtOrientation
     bool mBufferMirrorMode;
+    // Used to synchronize between WFD and Display modules
+    mutable Locker mWfdSyncLock;
+
     qhwc::LayerRotMap *mLayerRotMap[HWC_NUM_DISPLAY_TYPES];
     // Panel reset flag will be set if BTA check fails
     bool mPanelResetStatus;
     // number of active Displays
     int numActiveDisplays;
-    // Downscale feature switch, set via system the property
+    // Downscale feature switch, set via system property
     // sys.hwc.mdp_downscale_enabled
     bool mMDPDownscaleEnabled;
+    // Is WFD enabled through VDS solution ?
+    // This can be set via system property
+    // persist.hwc.enable_vds
+    bool mVDSEnabled;
     struct gpu_hint_info mGPUHintInfo;
 };
 
