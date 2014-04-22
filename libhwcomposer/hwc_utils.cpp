@@ -862,13 +862,6 @@ void setListStats(hwc_context_t *ctx,
                 ctx->listStats[dpy].yuv4k2kIndices[yuv4k2kCount] = i;
                 yuv4k2kCount++;
             }
-
-            if((layer->transform & HWC_TRANSFORM_ROT_90) &&
-               canUseRotator(ctx, dpy)) {
-               if(ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA))
-                  ctx->isPaddingRound = true;
-               Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
-            }
         }
         if(layer->blending == HWC_BLENDING_PREMULT)
             ctx->listStats[dpy].preMultipliedAlpha = true;
@@ -889,25 +882,6 @@ void setListStats(hwc_context_t *ctx,
             if (atoi(property) != 0) {
                 property_set("hw.cabl.yuv", "0");
             }
-        }
-    }
-    if(dpy) {
-        //uncomment the below code for testing purpose.
-        /* char value[PROPERTY_VALUE_MAX];
-        property_get("sys.ext_orientation", value, "0");
-        // Assuming the orientation value is in terms of HAL_TRANSFORM,
-        // This needs mapping to HAL, if its in different convention
-        ctx->mExtOrientation = atoi(value); */
-        // Assuming the orientation value is in terms of HAL_TRANSFORM,
-        // This needs mapping to HAL, if its in different convention
-        if(ctx->mExtOrientation || ctx->mBufferMirrorMode) {
-            ALOGD_IF(HWC_UTILS_DEBUG, "%s: ext orientation = %d"
-                     "BufferMirrorMode = %d", __FUNCTION__,
-                     ctx->mExtOrientation, ctx->mBufferMirrorMode);
-            if(ctx->mOverlay->isPipeTypeAttached(OV_MDP_PIPE_DMA)) {
-                ctx->isPaddingRound = true;
-            }
-            Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
         }
     }
 
