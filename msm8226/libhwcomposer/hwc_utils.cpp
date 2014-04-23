@@ -37,7 +37,6 @@
 #include "mdp_version.h"
 #include "hwc_copybit.h"
 #include "hwc_dump_layers.h"
-#include "hwc_vpuclient.h"
 #include "external.h"
 #include "virtual.h"
 #include "hwc_qclient.h"
@@ -237,7 +236,6 @@ void initContext(hwc_context_t *ctx)
     // Initialize device orientation to its default orientation
     ctx->deviceOrientation = 0;
     ctx->mBufferMirrorMode = false;
-    ctx->mVPUClient = NULL;
 
     // Read the system property to determine if downscale feature is enabled.
     ctx->mMDPDownscaleEnabled = false;
@@ -246,11 +244,6 @@ void initContext(hwc_context_t *ctx)
             && !strcmp(value, "true")) {
         ctx->mMDPDownscaleEnabled = true;
     }
-
-#ifdef VPU_TARGET
-    if(qdutils::MDPVersion::getInstance().is8092())
-        ctx->mVPUClient = new VPUClient(ctx);
-#endif
 
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
@@ -284,11 +277,6 @@ void closeContext(hwc_context_t *ctx)
         delete ctx->mExtDisplay;
         ctx->mExtDisplay = NULL;
     }
-
-#ifdef VPU_TARGET
-    if(ctx->mVPUClient != NULL)
-        delete ctx->mVPUClient;
-#endif
 
     for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         if(ctx->mFBUpdate[i]) {
@@ -1328,10 +1316,8 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
                 // Release all the app layer fds immediately,
                 // if animation is in progress.
                 list->hwLayers[i].releaseFenceFd = -1;
-            } else if(list->hwLayers[i].releaseFenceFd < 0 &&
-                    !(layerProp[i].mFlags & HWC_VPUCOMP)) {
+            } else if(list->hwLayers[i].releaseFenceFd < 0 ) {
                 //If rotator has not already populated this field
-                // & if it's a not VPU layer
                 list->hwLayers[i].releaseFenceFd = dup(releaseFd);
             }
         }
@@ -1369,19 +1355,13 @@ void setMdpFlags(hwc_layer_1_t *layer,
                 ovutils::OV_MDP_BLEND_FG_PREMULT);
     }
 
-    if (layer->flags & HWC_VPU_PIPE) {
-        ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_VPU_PIPE);
-    }
-
     if(isYuvBuffer(hnd)) {
         if(isSecureBuffer(hnd)) {
             ovutils::setMdpFlags(mdpFlags,
                     ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
         }
-        // in mpq, deinterlacing is done in vpu
         if(metadata && (metadata->operation & PP_PARAM_INTERLACED) &&
-                metadata->interlaced &&
-                (!qdutils::MDPVersion::getInstance().is8092())) {
+                metadata->interlaced) {
             ovutils::setMdpFlags(mdpFlags,
                     ovutils::OV_MDP_DEINTERLACE);
         }
@@ -1569,16 +1549,6 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
     Whf whf(getWidth(hnd), getHeight(hnd), format, hnd->size);
 
-#ifdef VPU_TARGET
-    if(ctx->mVPUClient != NULL &&
-            ctx->mVPUClient->supportedVPULayer(dpy, layer)) {
-        whf.format = getMdpFormat(
-                ctx->mVPUClient->getLayerFormat(dpy, layer));
-        whf.w = ctx->mVPUClient->getWidth(dpy, layer);
-        whf.h = ctx->mVPUClient->getHeight(dpy, layer);
-    }
-#endif
-
     // Handle R/B swap
     if (layer->flags & HWC_FORMAT_RB_SWAP) {
         if (hnd->format == HAL_PIXEL_FORMAT_RGBA_8888)
@@ -1685,16 +1655,6 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     int rotFlags = ROT_FLAGS_NONE;
     uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
     Whf whf(getWidth(hnd), getHeight(hnd), format, hnd->size);
-
-#ifdef VPU_TARGET
-    if(ctx->mVPUClient != NULL &&
-            ctx->mVPUClient->supportedVPULayer(dpy, layer)) {
-        whf.format = getMdpFormat(
-                ctx->mVPUClient->getLayerFormat(dpy, layer));
-        whf.w = ctx->mVPUClient->getWidth(dpy, layer);
-        whf.h = ctx->mVPUClient->getHeight(dpy, layer);
-    }
-#endif
 
     // Handle R/B swap
     if (layer->flags & HWC_FORMAT_RB_SWAP) {

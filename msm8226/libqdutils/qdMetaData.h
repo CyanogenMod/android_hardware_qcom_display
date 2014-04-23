@@ -35,19 +35,6 @@ extern "C" {
 #endif
 
 #define MAX_IGC_LUT_ENTRIES 256
-#define MAX_VFM_DATA_SIZE   64 //bytes per data buffer
-#define MAX_VFM_DATA_COUNT  16 //number of data buffers
-
-/* This macro finds the index corresponding to a type */
-/* This is equivalent to indx = LOG_2(type) */
-inline int32_t getVfmDataIdx(int32_t type){
-    int32_t indx = 0, x = type;
-    while( x >> 1) {
-        x = (x >> 1);
-        indx++;
-    }
-    return indx;
-}
 
 enum ColorSpace_t{
     ITU_R_601,
@@ -80,11 +67,6 @@ struct BufferDim_t {
     int32_t sliceHeight;
 };
 
-struct VfmData_t {
-    int32_t dataType;
-    char    data[MAX_VFM_DATA_SIZE];
-};
-
 struct MetaData_t {
     int32_t operation;
     int32_t interlaced;
@@ -95,8 +77,6 @@ struct MetaData_t {
     struct IGCData_t igcData;
     struct Sharp2Data_t Sharp2Data;
     int64_t timestamp;
-    int32_t vfmDataBitMap;
-    struct VfmData_t vfmData[MAX_VFM_DATA_COUNT];
     enum ColorSpace_t colorSpace;
 };
 
@@ -109,7 +89,6 @@ enum DispParamType {
     PP_PARAM_SHARP2     = 0x0020,
     PP_PARAM_TIMESTAMP  = 0x0040,
     UPDATE_BUFFER_GEOMETRY = 0x0080,
-    PP_PARAM_VFM_DATA   = 0x0100,
     UPDATE_COLOR_SPACE = 0x0200,
 };
 
