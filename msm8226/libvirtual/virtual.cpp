@@ -167,7 +167,13 @@ void VirtualDisplay::setAttributes() {
 
         initResolution(extW, extH);
 
-        if(!qdutils::MDPVersion::getInstance().is8x26()) {
+        // Dynamic Resolution Change depends on MDP downscaling.
+        // MDP downscale property will be ignored to exercise DRC use case.
+        // If DRC is in progress, ext WxH will have non-zero values.
+        bool isDRC = (extW > 0) && (extH > 0);
+
+        if(!qdutils::MDPVersion::getInstance().is8x26()
+                && (mHwcContext->mMDPDownscaleEnabled || isDRC)) {
 
             // maxArea represents the maximum resolution between
             // primary and virtual display.
