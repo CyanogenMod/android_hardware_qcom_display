@@ -1437,6 +1437,10 @@ bool MDPCompNonSplit::allocLayerPipes(hwc_context_t *ctx,
             && Overlay::getDMAMode() != Overlay::DMA_BLOCK_MODE
             && ctx->mMDP.version >= qdutils::MDSS_V5) {
             type = MDPCOMP_OV_DMA;
+        } else if(qhwc::needsScaling(layer) &&
+                !(ctx->listStats[mDpy].yuvCount) &&
+                ! qdutils::MDPVersion::getInstance().isRGBScalarSupported()){
+            type = MDPCOMP_OV_VG;
         }
 
         pipe_info.index = getMdpPipe(ctx, type, Overlay::MIXER_DEFAULT);
