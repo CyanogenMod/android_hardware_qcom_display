@@ -37,6 +37,10 @@ namespace qhwc {
 
 #define HWC_VSYNC_THREAD_NAME "hwcVsyncThread"
 #define MAX_SYSFS_FILE_PATH             255
+#define PANEL_ON_STR "panel_power_on ="
+#define ARRAY_LENGTH(array) (sizeof((array))/sizeof((array)[0]))
+const int MAX_DATA = 64;
+bool logvsync = false;
 
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable)
 {
@@ -51,6 +55,40 @@ int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable)
     return ret;
 }
 
+static void handle_vsync_event(hwc_context_t* ctx, int dpy, char *data)
+{
+    // extract timestamp
+    uint64_t timestamp = 0;
+    if (!strncmp(data, "VSYNC=", strlen("VSYNC="))) {
+        timestamp = strtoull(data + strlen("VSYNC="), NULL, 0);
+    }
+    // send timestamp to SurfaceFlinger
+    ALOGD_IF (logvsync, "%s: timestamp %"PRIu64" sent to SF for dpy=%d",
+            __FUNCTION__, timestamp, dpy);
+    ctx->proc->vsync(ctx->proc, dpy, timestamp);
+}
+
+static void handle_blank_event(hwc_context_t* ctx, int dpy, char *data)
+{
+    if (!strncmp(data, PANEL_ON_STR, strlen(PANEL_ON_STR))) {
+        uint32_t poweron = strtoul(data + strlen(PANEL_ON_STR), NULL, 0);
+        ALOGI("%s: dpy:%d panel power state: %d", __FUNCTION__, dpy, poweron);
+        ctx->dpyAttr[dpy].isActive = poweron ? true: false;
+    }
+}
+
+struct event {
+    const char* name;
+    void (*callback)(hwc_context_t* ctx, int dpy, char *data);
+};
+
+struct event event_list[] =  {
+    { "vsync_event", handle_vsync_event },
+    { "show_blank_event", handle_blank_event },
+};
+
+#define num_events ARRAY_LENGTH(event_list)
+
 static void *vsync_loop(void *param)
 {
     hwc_context_t * ctx = reinterpret_cast<hwc_context_t *>(param);
@@ -60,14 +98,11 @@ static void *vsync_loop(void *param)
     setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY +
                 android::PRIORITY_MORE_FAVORABLE);
 
-    const int MAX_DATA = 64;
     char vdata[MAX_DATA];
-    bool logvsync = false;
-
-    struct pollfd pfd[2];
-    int fb_fd[2];
-    uint64_t timestamp[2] = {0,0};
-    int num_displays;
+    //Number of physical displays
+    //We poll on all the nodes.
+    int num_displays = HWC_NUM_DISPLAY_TYPES - 1;
+    struct pollfd pfd[num_displays][num_events];
 
     char property[PROPERTY_VALUE_MAX];
     if(property_get("debug.hwc.fakevsync", property, NULL) > 0) {
@@ -80,69 +115,62 @@ static void *vsync_loop(void *param)
             logvsync = true;
     }
 
-    if (ctx->mExtDisplay->isConnected())
-        num_displays = 2;
-    else
-        num_displays = 1;
+    char node_path[MAX_SYSFS_FILE_PATH];
 
-    char vsync_node_path[MAX_SYSFS_FILE_PATH];
     for (int dpy = HWC_DISPLAY_PRIMARY; dpy < num_displays; dpy++) {
-        snprintf(vsync_node_path, sizeof(vsync_node_path),
-                "/sys/class/graphics/fb%d/vsync_event",
-                dpy == HWC_DISPLAY_PRIMARY ? 0 :
-                overlay::Overlay::getInstance()->
-                                getFbForDpy(HWC_DISPLAY_EXTERNAL));
-        ALOGI("%s: Reading vsync for dpy=%d from %s", __FUNCTION__, dpy,
-                vsync_node_path);
-        fb_fd[dpy] = open(vsync_node_path, O_RDONLY);
+        for(size_t ev = 0; ev < num_events; ev++) {
+            snprintf(node_path, sizeof(node_path),
+                    "/sys/class/graphics/fb%d/%s",
+                    dpy == HWC_DISPLAY_PRIMARY ? 0 :
+                    overlay::Overlay::getInstance()->
+                    getFbForDpy(HWC_DISPLAY_EXTERNAL),
+                    event_list[ev].name);
 
-        if (fb_fd[dpy] < 0) {
-            // Make sure fb device is opened before starting this thread so this
-            // never happens.
-            ALOGE ("%s:not able to open vsync node for dpy=%d, %s",
-                    __FUNCTION__, dpy, strerror(errno));
-            if (dpy == HWC_DISPLAY_PRIMARY) {
-                ctx->vstate.fakevsync = true;
-                break;
+            ALOGI("%s: Reading event %zu for dpy %d from %s", __FUNCTION__,
+                    ev, dpy, node_path);
+            pfd[dpy][ev].fd = open(node_path, O_RDONLY);
+
+            if (dpy == HWC_DISPLAY_PRIMARY && pfd[dpy][ev].fd < 0) {
+                // Make sure fb device is opened before starting
+                // this thread so this never happens.
+                ALOGE ("%s:unable to open event node for dpy=%d event=%zu, %s",
+                        __FUNCTION__, dpy, ev, strerror(errno));
+                if (ev == 0) {
+                    ctx->vstate.fakevsync = true;
+                    //XXX: Blank events don't work with fake vsync,
+                    //but we shouldn't be running on fake vsync anyway.
+                    break;
+                }
             }
-        }
-        // Read once from the fds to clear the first notify
-        pread(fb_fd[dpy], vdata , MAX_DATA, 0);
 
-        pfd[dpy].fd = fb_fd[dpy];
-        if (pfd[dpy].fd >= 0)
-            pfd[dpy].events = POLLPRI | POLLERR;
+            pread(pfd[dpy][ev].fd, vdata , MAX_DATA, 0);
+            if (pfd[dpy][ev].fd >= 0)
+                pfd[dpy][ev].events = POLLPRI | POLLERR;
+        }
     }
 
     if (LIKELY(!ctx->vstate.fakevsync)) {
         do {
-            int err = poll(pfd, num_displays, -1);
+            int err = poll(*pfd, num_displays * num_events, -1);
             if(err > 0) {
                 for (int dpy = HWC_DISPLAY_PRIMARY; dpy < num_displays; dpy++) {
-                    if (pfd[dpy].revents & POLLPRI) {
-                        int len = pread(pfd[dpy].fd, vdata, MAX_DATA, 0);
-                        if (UNLIKELY(len < 0)) {
-                            // If the read was just interrupted - it is not a
-                            // fatal error. Just continue in this case
-                            ALOGE ("%s: Unable to read vsync for dpy=%d : %s",
-                                    __FUNCTION__, dpy, strerror(errno));
-                            continue;
+                    for(size_t ev = 0; ev < num_events; ev++) {
+                        if (pfd[dpy][ev].revents & POLLPRI) {
+                            err = pread(pfd[dpy][ev].fd, vdata, MAX_DATA, 0);
+                            if (UNLIKELY(err < 0)) {
+                                // If the read was just interrupted - it is not
+                                // a fatal error. Just continue in this case
+                                ALOGE ("%s: Unable to read event:%zu for \
+                                        dpy=%d : %s",
+                                        __FUNCTION__, ev, dpy, strerror(errno));
+                                continue;
+                            }
+                            event_list[ev].callback(ctx, dpy, vdata);
                         }
-                        // extract timestamp
-                        if (!strncmp(vdata, "VSYNC=", strlen("VSYNC="))) {
-                            timestamp[dpy] = strtoull(vdata + strlen("VSYNC="),
-                                    NULL, 0);
-                        }
-                        // send timestamp to SurfaceFlinger
-                        ALOGD_IF (logvsync,
-                            "%s: timestamp %"PRIu64" sent to SF for dpy=%d",
-                            __FUNCTION__, timestamp[dpy], dpy);
-                        ctx->proc->vsync(ctx->proc, dpy, timestamp[dpy]);
                     }
                 }
-
             } else {
-                ALOGE("%s: vsync poll failed errno: %s", __FUNCTION__,
+                ALOGE("%s: poll failed errno: %s", __FUNCTION__,
                         strerror(errno));
                 continue;
             }
@@ -157,16 +185,17 @@ static void *vsync_loop(void *param)
         //Also, fake vsync is delivered only for the primary display.
         do {
             usleep(16666);
-            timestamp[HWC_DISPLAY_PRIMARY] = systemTime();
-            ctx->proc->vsync(ctx->proc, HWC_DISPLAY_PRIMARY,
-                    timestamp[HWC_DISPLAY_PRIMARY]);
+            uint64_t timestamp = systemTime();
+            ctx->proc->vsync(ctx->proc, HWC_DISPLAY_PRIMARY, timestamp);
 
         } while (true);
     }
 
     for (int dpy = HWC_DISPLAY_PRIMARY; dpy <= HWC_DISPLAY_EXTERNAL; dpy++ ) {
-        if(fb_fd[dpy] >= 0)
-            close (fb_fd[dpy]);
+        for( size_t event = 0; event < num_events; event++) {
+            if(pfd[dpy][event].fd >= 0)
+                close (pfd[dpy][event].fd);
+        }
     }
 
     return NULL;
