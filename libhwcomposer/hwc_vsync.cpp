@@ -156,8 +156,8 @@ static void *vsync_loop(void *param)
                 for (int dpy = HWC_DISPLAY_PRIMARY; dpy < num_displays; dpy++) {
                     for(size_t ev = 0; ev < num_events; ev++) {
                         if (pfd[dpy][ev].revents & POLLPRI) {
-                            err = pread(pfd[dpy][ev].fd, vdata, MAX_DATA, 0);
-                            if (UNLIKELY(err < 0)) {
+                            ssize_t len = pread(pfd[dpy][ev].fd, vdata, MAX_DATA, 0);
+                            if (UNLIKELY(len < 0)) {
                                 // If the read was just interrupted - it is not
                                 // a fatal error. Just continue in this case
                                 ALOGE ("%s: Unable to read event:%zu for \
