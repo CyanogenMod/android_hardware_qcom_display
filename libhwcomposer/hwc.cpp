@@ -321,7 +321,10 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
 
         if (fbComp) {
             const int fbZ = 0;
-            ctx->mFBUpdate[dpy]->prepareAndValidate(ctx, list, fbZ);
+            if(not ctx->mFBUpdate[dpy]->prepareAndValidate(ctx, list, fbZ)) {
+                ctx->mOverlay->clear(dpy);
+                ctx->mLayerRotMap[dpy]->clear();
+            }
         }
 
         if (ctx->mMDP.version < qdutils::MDP_V4_0) {
@@ -348,7 +351,11 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
             setListStats(ctx, list, dpy);
             if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
                 const int fbZ = 0;
-                ctx->mFBUpdate[dpy]->prepareAndValidate(ctx, list, fbZ);
+                if(not ctx->mFBUpdate[dpy]->prepareAndValidate(ctx, list, fbZ))
+                {
+                    ctx->mOverlay->clear(dpy);
+                    ctx->mLayerRotMap[dpy]->clear();
+                }
             }
         } else {
             /* External Display is in Pause state.
