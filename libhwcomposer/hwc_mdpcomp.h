@@ -54,6 +54,9 @@ public:
     static void resetIdleFallBack() { sIdleFallBack = false; }
     static void reset() { sHandleTimeout = false; };
     static bool isIdleFallback() { return sIdleFallBack; }
+    /* set/reset flags for MDPComp */
+    void setMDPCompLayerFlags(hwc_context_t *ctx,
+                              hwc_display_contents_1_t* list);
 
 protected:
     enum { MAX_SEC_LAYERS = 1 }; //TODO add property support
@@ -142,9 +145,6 @@ protected:
     /* configures 4kx2k yuv layer*/
     virtual int configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
             PipeLayerPair& PipeLayerPair) = 0;
-    /* set/reset flags for MDPComp */
-    void setMDPCompLayerFlags(hwc_context_t *ctx,
-                              hwc_display_contents_1_t* list);
     void setRedraw(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
     /* checks for conditions where mdpcomp is not possible */
