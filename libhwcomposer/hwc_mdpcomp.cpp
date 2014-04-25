@@ -478,43 +478,44 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
     return true;
 }
 
+bool MDPComp::canDoPartialUpdate(hwc_context_t *ctx,
+                               hwc_display_contents_1_t* list){
+    if(!qdutils::MDPVersion::getInstance().isPartialUpdateEnabled() || mDpy ||
+       isSkipPresent(ctx, mDpy) || (list->flags & HWC_GEOMETRY_CHANGED)||
+       isDisplaySplit(ctx, mDpy)) {
+        return false;
+    }
+    return true;
+}
+
 void MDPComp::generateROI(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
 
-    if(!sEnablePartialFrameUpdate) {
-        return;
-    }
-
-    if(mDpy || isDisplaySplit(ctx, mDpy)){
-        ALOGE_IF(isDebug(), "%s: ROI not supported for"
-                 "the (1) external / virtual display's (2) dual DSI displays",
-                 __FUNCTION__);
-        return;
-    }
-
-    if(isSkipPresent(ctx, mDpy))
-        return;
-
-    if(list->flags & HWC_GEOMETRY_CHANGED)
+    if(!canDoPartialUpdate(ctx, list))
         return;
 
     struct hwc_rect roi = (struct hwc_rect){0, 0, 0, 0};
     for(int index = 0; index < numAppLayers; index++ ) {
-        if ((mCachedFrame.hnd[index] != list->hwLayers[index].handle) ||
-            isYuvBuffer((private_handle_t *)list->hwLayers[index].handle)) {
-            hwc_rect_t dstRect = list->hwLayers[index].displayFrame;
-            hwc_rect_t srcRect = integerizeSourceCrop(
-                                        list->hwLayers[index].sourceCropf);
-
-            /* Intersect against display boundaries */
-            roi = getUnion(roi, dstRect);
+        hwc_layer_1_t* layer = &list->hwLayers[index];
+        if ((mCachedFrame.hnd[index] != layer->handle) ||
+            isYuvBuffer((private_handle_t *)layer->handle)) {
+            hwc_rect_t updatingRect = layer->displayFrame;
+#ifdef QCOM_BSP
+            if(!needsScaling(layer))
+                updatingRect =  layer->dirtyRect;
+#endif
+            roi = getUnion(roi, updatingRect);
         }
     }
 
-    if(!validateAndApplyROI(ctx, list, roi)){
-        roi = (struct hwc_rect) {0, 0,
-                    (int)ctx->dpyAttr[mDpy].xres, (int)ctx->dpyAttr[mDpy].yres};
-    }
+    hwc_rect fullFrame = (struct hwc_rect) {0, 0,(int)ctx->dpyAttr[mDpy].xres,
+        (int)ctx->dpyAttr[mDpy].yres};
+
+    // Align ROI coordinates to panel restrictions
+    roi = sanitizeROI(roi, fullFrame);
+
+    if(!validateAndApplyROI(ctx, list, roi))
+        roi = fullFrame;
 
     ctx->listStats[mDpy].roi.x = roi.left;
     ctx->listStats[mDpy].roi.y = roi.top;
