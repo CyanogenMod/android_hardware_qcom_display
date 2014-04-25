@@ -595,6 +595,16 @@ void MDPCompSplit::generateROI(hwc_context_t *ctx,
         }
     }
 
+    /* For panels that cannot accept commands in both the interfaces, we cannot
+     * send two ROI's (for each half). We merge them into single ROI and split
+     * them across lSplit for MDP mixer use. The ROI's will be merged again
+     * finally before udpating the panel in the driver. */
+    if(qdutils::MDPVersion::getInstance().needsROIMerge()) {
+        hwc_rect_t temp_roi = getUnion(l_roi, r_roi);
+        l_roi = getIntersection(temp_roi, l_frame);
+        r_roi = getIntersection(temp_roi, r_frame);
+    }
+
     /* No layer is updating. Still SF wants a refresh. */
     if(!isValidRect(l_roi) && !isValidRect(r_roi))
         return;
