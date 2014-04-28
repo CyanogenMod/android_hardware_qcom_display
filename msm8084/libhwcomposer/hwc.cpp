@@ -212,7 +212,6 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
             if(ctx->mCopyBit[dpy])
                 ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
         }
-        setGPUHint(ctx, list);
     }
     return 0;
 }
