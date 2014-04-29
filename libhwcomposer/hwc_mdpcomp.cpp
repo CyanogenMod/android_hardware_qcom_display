@@ -606,15 +606,6 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ALOGD_IF(isDebug(), "%s: Unsupported layer in list",__FUNCTION__);
             return false;
         }
-
-        //For 8x26, if there is only one layer which needs scale for secondary
-        //while no scale for primary display, DMA pipe is occupied by primary.
-        //If need to fall back to GLES composition, virtual display lacks DMA
-        //pipe and error is reported.
-        if(qdutils::MDPVersion::getInstance().is8x26() &&
-                                mDpy >= HWC_DISPLAY_EXTERNAL &&
-                                qhwc::needsScaling(layer))
-            return false;
     }
 
     mCurrentFrame.fbCount = 0;
@@ -1390,6 +1381,17 @@ bool MDPCompNonSplit::allocLayerPipes(hwc_context_t *ctx,
             && Overlay::getDMAMode() != Overlay::DMA_BLOCK_MODE
             && ctx->mMDP.version >= qdutils::MDSS_V5) {
             type = MDPCOMP_OV_DMA;
+        }
+
+        // for 8x26, never allow primary display occupy DMA pipe
+        // when external display is connected
+        if(qdutils::MDPVersion::getInstance().is8x26()
+            && ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive
+            && ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected
+            && !ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isPause
+            && mDpy == HWC_DISPLAY_PRIMARY
+            && type == MDPCOMP_OV_DMA) {
+            type = MDPCOMP_OV_RGB;
         }
 
         pipe_info.index = getMdpPipe(ctx, type, Overlay::MIXER_DEFAULT);
