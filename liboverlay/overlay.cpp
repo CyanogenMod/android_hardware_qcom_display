@@ -203,7 +203,9 @@ utils::eDest Overlay::getPipe_8x26(const PipeSpecs& pipeSpecs) {
     if(pipeSpecs.formatClass == FORMAT_YUV) { //video
         return nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
     } else if(pipeSpecs.fb == false) { //RGB app layers
-        if(not pipeSpecs.needsScaling) {
+        if((not pipeSpecs.needsScaling) and
+          (not (pipeSpecs.numActiveDisplays > 1 &&
+                pipeSpecs.dpy == DPY_PRIMARY))) {
             dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
         }
         if(dest == OV_INVALID) {
@@ -220,7 +222,9 @@ utils::eDest Overlay::getPipe_8x26(const PipeSpecs& pipeSpecs) {
                 dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
             }
         }
-        if(dest == OV_INVALID and (not pipeSpecs.needsScaling)) {
+        if(dest == OV_INVALID and (not pipeSpecs.needsScaling) and
+          (not (pipeSpecs.numActiveDisplays > 1 &&
+                pipeSpecs.dpy == DPY_PRIMARY))) {
             dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
         }
     }
