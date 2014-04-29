@@ -192,7 +192,7 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
                   (mDpy && !extOrient
                   && !ctx->dpyAttr[mDpy].mDownScaleMode))
                   && (extOnlyLayerIndex == -1)) {
-            if(!qdutils::MDPVersion::getInstance().is8x26() &&
+            if(ctx->mOverlay->isUIScalingOnExternalSupported() &&
                 !ctx->dpyAttr[mDpy].customFBSize) {
                 getNonWormholeRegion(list, sourceCrop);
                 displayFrame = sourceCrop;
