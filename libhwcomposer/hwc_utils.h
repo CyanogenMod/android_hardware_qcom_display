@@ -294,6 +294,9 @@ int getMirrorModeOrientation(hwc_context_t *ctx);
 /* Get External State names */
 const char* getExternalDisplayState(uint32_t external_state);
 
+// Aligns updating ROI to panel restrictions
+hwc_rect_t sanitizeROI(struct hwc_rect roi, hwc_rect boundary);
+
 // Handles wfd Pause and resume events
 void handle_pause(hwc_context_t *ctx, int dpy);
 void handle_resume(hwc_context_t *ctx, int dpy);
