@@ -372,7 +372,7 @@ int gralloc_perform(struct gralloc_module_t const* module,
             {
                 private_handle_t* hnd =  va_arg(args, private_handle_t*);
                 android_ycbcr* ycbcr = va_arg(args, struct android_ycbcr *);
-                if (private_handle_t::validate(hnd)) {
+                if (!private_handle_t::validate(hnd)) {
                     res = getYUVPlaneInfo(hnd, ycbcr);
                 }
             } break;
