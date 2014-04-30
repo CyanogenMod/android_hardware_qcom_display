@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2008 The Android Open Source Project.
+ * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,8 +83,8 @@ write_int(char const* path, int value)
     fd = open(path, O_RDWR);
     if (fd >= 0) {
         char buffer[20];
-        int bytes = sprintf(buffer, "%d\n", value);
-        int amt = write(fd, buffer, bytes);
+        int bytes = snprintf(buffer, sizeof(buffer), "%d\n", value);
+        ssize_t amt = write(fd, buffer, (size_t)bytes);
         close(fd);
         return amt == -1 ? -errno : 0;
     } else {
@@ -261,6 +262,10 @@ static int open_lights(const struct hw_module_t* module, char const* name,
     pthread_once(&g_init, init_globals);
 
     struct light_device_t *dev = malloc(sizeof(struct light_device_t));
+
+    if(!dev)
+        return -ENOMEM;
+
     memset(dev, 0, sizeof(*dev));
 
     dev->common.tag = HARDWARE_DEVICE_TAG;
