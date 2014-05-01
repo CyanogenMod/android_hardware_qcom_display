@@ -547,6 +547,71 @@ void getBufferAttributes(int width, int height, int format, int usage,
     size = getSize(format, width, height, alignedw, alignedh);
 }
 
+int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
+{
+    int err = 0;
+    size_t ystride, cstride;
+    memset(ycbcr->reserved, 0, sizeof(ycbcr->reserved));
+
+    // Get the chroma offsets from the handle width/height. We take advantage
+    // of the fact the width _is_ the stride
+    switch (hnd->format) {
+        //Semiplanar
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE: //Same as YCbCr_420_SP_VENUS
+            ystride = hnd->width;
+            cstride = hnd->width/2;
+            ycbcr->y  = (void*)hnd->base;
+            ycbcr->cb = (void*)(hnd->base + ystride * hnd->height);
+            ycbcr->cr = (void*)(hnd->base + ystride * hnd->height + 1);
+            ycbcr->ystride = ystride;
+            ycbcr->cstride = cstride;
+            ycbcr->chroma_step = 2;
+        break;
+
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_422_SP:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
+        case HAL_PIXEL_FORMAT_NV21_ZSL:
+        case HAL_PIXEL_FORMAT_RAW_SENSOR:
+            ystride = hnd->width;
+            cstride = hnd->width/2;
+            ycbcr->y  = (void*)hnd->base;
+            ycbcr->cr = (void*)(hnd->base + ystride * hnd->height);
+            ycbcr->cb = (void*)(hnd->base + ystride * hnd->height + 1);
+            ycbcr->ystride = ystride;
+            ycbcr->cstride = cstride;
+            ycbcr->chroma_step = 2;
+        break;
+
+        //Planar
+        case HAL_PIXEL_FORMAT_YV12:
+            ystride = hnd->width;
+            cstride = hnd->width/2;
+            ycbcr->y  = (void*)hnd->base;
+            ycbcr->cr = (void*)(hnd->base + ystride * hnd->height);
+            ycbcr->cb = (void*)(hnd->base + ystride * hnd->height +
+                    cstride * hnd->height/2);
+            ycbcr->ystride = ystride;
+            ycbcr->cstride = cstride;
+            ycbcr->chroma_step = 1;
+
+        break;
+        //Unsupported formats
+        case HAL_PIXEL_FORMAT_YCbCr_422_I:
+        case HAL_PIXEL_FORMAT_YCrCb_422_I:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
+        default:
+        ALOGD("%s: Invalid format passed: 0x%x", __FUNCTION__,
+                hnd->format);
+        err = -EINVAL;
+    }
+    return err;
+
+}
+
 
 
 // Allocate buffer from width, height and format into a
