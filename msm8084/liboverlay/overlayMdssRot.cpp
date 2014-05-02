@@ -37,6 +37,8 @@
 namespace ovutils = overlay::utils;
 
 namespace overlay {
+using namespace utils;
+
 MdssRot::MdssRot() {
     reset();
     init();
@@ -265,19 +267,52 @@ void MdssRot::getDump(char *buf, size_t len) const {
 // Calculate the compressed o/p buffer size for BWC
 uint32_t MdssRot::calcCompressedBufSize(const ovutils::Whf& destWhf) {
     uint32_t bufSize = 0;
+    //Worst case alignments
     int aWidth = ovutils::align(destWhf.w, 64);
     int aHeight = ovutils::align(destWhf.h, 4);
-    int rau_cnt = aWidth/64;
-    int stride0 = (64 * 4 * rau_cnt) + rau_cnt/8;
-    int stride1 = ((64 * 2 * rau_cnt) + rau_cnt/8) * 2;
-    int stride0_off = (aHeight/4);
-    int stride1_off = (aHeight/2);
+    /*
+       Format           |   RAU size (width x height)
+       ----------------------------------------------
+       ARGB             |       32 pixel x 4 line
+       RGB888           |       32 pixel x 4 line
+       Y (Luma)         |       64 pixel x 4 line
+       CRCB 420         |       32 pixel x 2 line
+       CRCB 422 H2V1    |       32 pixel x 4 line
+       CRCB 422 H1V2    |       64 pixel x 2 line
 
-    //New o/p size for BWC
-    bufSize = (stride0 * stride0_off + stride1 * stride1_off) +
-                (rau_cnt * 2 * (stride0_off + stride1_off));
-    ALOGD_IF(DEBUG_MDSS_ROT, "%s: width = %d, height = %d raucount = %d"
-         "opBufSize = %d ", __FUNCTION__, aWidth, aHeight, rau_cnt, bufSize);
+       Metadata requirements:-
+       1 byte meta data for every 8 RAUs
+       2 byte meta data per RAU
+     */
+
+    //These blocks attempt to allocate for the worst case in each of the
+    //respective format classes, yuv/rgb. The table above is for reference
+    if(utils::isYuv(destWhf.format)) {
+        int yRauCount = aWidth / 64; //Y
+        int cRauCount = aWidth / 32; //C
+        int yStride = (64 * 4 * yRauCount) + alignup(yRauCount, 8) / 8;
+        int cStride = ((32 * 2 * cRauCount) + alignup(cRauCount, 8) / 8) * 2;
+        int yStrideOffset = (aHeight / 4);
+        int cStrideOffset = (aHeight / 2);
+        bufSize = (yStride * yStrideOffset + cStride * cStrideOffset) +
+                (yRauCount * yStrideOffset * 2) +
+                (cRauCount * cStrideOffset * 2) * 2;
+        ALOGD_IF(DEBUG_MDSS_ROT, "%s:YUV Y RAU Count = %d C RAU Count = %d",
+                __FUNCTION__, yRauCount, cRauCount);
+    } else {
+        int rauCount = aWidth / 32;
+        //Single plane
+        int stride = (32 * 4 * rauCount) + alignup(rauCount, 8) / 8;
+        int strideOffset = (aHeight / 4);
+        bufSize = (stride * strideOffset * 4 /*bpp*/) +
+            (rauCount * strideOffset * 2);
+        ALOGD_IF(DEBUG_MDSS_ROT, "%s:RGB RAU count = %d", __FUNCTION__,
+                rauCount);
+    }
+
+    ALOGD_IF(DEBUG_MDSS_ROT, "%s: aligned width = %d, aligned height = %d "
+            "Buf Size = %d", __FUNCTION__, aWidth, aHeight, bufSize);
+
     return bufSize;
 }
 
