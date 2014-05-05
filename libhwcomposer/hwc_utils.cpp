@@ -368,7 +368,6 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
 // based on the position and aspect ratio with orientation
 void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
                             hwc_rect_t& inRect, hwc_rect_t& outRect) {
-    hwc_rect_t viewFrame = ctx->mViewFrame[dpy];
     // Physical display resolution
     float fbWidth  = ctx->dpyAttr[dpy].xres;
     float fbHeight = ctx->dpyAttr[dpy].yres;
@@ -406,17 +405,11 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
         yPos = rect.top;
         width = rect.right - rect.left;
         height = rect.bottom - rect.top;
-        // swap viewframe coordinates for 90 degree rotation.
-        swap(viewFrame.left, viewFrame.top);
-        swap(viewFrame.right, viewFrame.bottom);
     }
-    // if viewframe left and top coordinates are non zero value then exclude it
-    // during the computation of xRatio and yRatio
-    xRatio = (inPos.x - viewFrame.left)/actualWidth;
-    yRatio = (inPos.y - viewFrame.top)/actualHeight;
-    // Use viewframe width and height to compute wRatio and hRatio.
-    wRatio = (float)inPos.w/(float)(viewFrame.right - viewFrame.left);
-    hRatio = (float)inPos.h/(float)(viewFrame.bottom - viewFrame.top);
+    xRatio = inPos.x/actualWidth;
+    yRatio = inPos.y/actualHeight;
+    wRatio = inPos.w/actualWidth;
+    hRatio = inPos.h/actualHeight;
 
 
     //Calculate the position...
