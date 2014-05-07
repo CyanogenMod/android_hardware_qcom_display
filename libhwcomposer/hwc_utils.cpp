@@ -1080,6 +1080,21 @@ bool isValidRect(const hwc_rect& rect)
    return ((rect.bottom > rect.top) && (rect.right > rect.left)) ;
 }
 
+hwc_rect_t moveRect(const hwc_rect_t& rect, const int& x_off, const int& y_off)
+{
+    hwc_rect_t res;
+
+    if(!isValidRect(rect))
+        return (hwc_rect_t){0, 0, 0, 0};
+
+    res.left = rect.left + x_off;
+    res.top = rect.top + y_off;
+    res.right = rect.right + x_off;
+    res.bottom = rect.bottom + y_off;
+
+    return res;
+}
+
 /* computes the intersection of two rects */
 hwc_rect_t getIntersection(const hwc_rect_t& rect1, const hwc_rect_t& rect2)
 {
