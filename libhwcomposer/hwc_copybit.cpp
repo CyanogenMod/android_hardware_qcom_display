@@ -712,8 +712,8 @@ struct copybit_device_t* CopyBit::getCopyBitDevice() {
     return mEngine;
 }
 
-CopyBit::CopyBit(hwc_context_t *ctx, const int& dpy) : mIsModeOn(false),
-        mCopyBitDraw(false), mCurRenderBufferIndex(0) {
+CopyBit::CopyBit(hwc_context_t *ctx, const int& dpy) : mEngine(0),
+        mIsModeOn(false), mCopyBitDraw(false), mCurRenderBufferIndex(0) {
 
     getBufferSizeAndDimensions(ctx->dpyAttr[dpy].xres,
             ctx->dpyAttr[dpy].yres,
