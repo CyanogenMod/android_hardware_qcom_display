@@ -1275,6 +1275,9 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
                 &currLayer->acquireFenceFd;
         rotData.rel_fen_fd = &rotReleaseFd; //driver to populate this
         rotData.session_id = currRot->getSessId();
+        if(currLayer->acquireFenceFd >= 0) {
+            rotData.acq_fen_fd_cnt = 1; //1 ioctl call per rot session
+        }
         int ret = 0;
         ret = ioctl(rotFd, MSMFB_BUFFER_SYNC, &rotData);
         if(ret < 0) {
