@@ -179,6 +179,8 @@ private:
     static void initScalar();
     /* Destroys the scalar object using libscale.so */
     static void destroyScalar();
+    /* Sets the pipe type RGB/VG/DMA*/
+    void setPipeType(utils::eDest pipeIndex, const utils::eMdpPipeType pType);
 
     /* Just like a Facebook for pipes, but much less profile info */
     struct PipeBook {
