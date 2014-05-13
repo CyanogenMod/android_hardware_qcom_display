@@ -35,9 +35,6 @@
 #include "utils/threads.h"
 
 struct MetaData_t;
-namespace scale {
-class Scale;
-};
 
 namespace overlay {
 class GenericPipe;
@@ -171,8 +168,8 @@ private:
     utils::eDest getPipe_8x26(const PipeSpecs& pipeSpecs);
     utils::eDest getPipe_8x16(const PipeSpecs& pipeSpecs);
 
-    /* Returns the scalar object */
-    static scale::Scale *getScalar();
+    /* Returns the handle to libscale.so's programScale function */
+    static int (*getFnProgramScale())(struct mdp_overlay_list *);
     /* Creates a scalar object using libscale.so */
     static void initScalar();
     /* Destroys the scalar object using libscale.so */
@@ -243,7 +240,7 @@ private:
     static int sDMAMode;
     static bool sDMAMultiplexingSupported;
     static void *sLibScaleHandle;
-    static scale::Scale *sScale;
+    static int (*sFnProgramScale)(struct mdp_overlay_list *);
 
     friend class MdpCtrl;
 };
@@ -332,8 +329,8 @@ inline int Overlay::getFbForDpy(const int& dpy) {
     return sDpyFbMap[dpy];
 }
 
-inline scale::Scale *Overlay::getScalar() {
-    return sScale;
+inline int (*Overlay::getFnProgramScale())(struct mdp_overlay_list *) {
+    return sFnProgramScale;
 }
 
 inline bool Overlay::PipeBook::valid() {
