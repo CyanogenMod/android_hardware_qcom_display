@@ -26,11 +26,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <linux/ashmem.h>
 
 #include <cutils/log.h>
 #include <cutils/atomic.h>
-#include <cutils/ashmem.h>
 
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>
