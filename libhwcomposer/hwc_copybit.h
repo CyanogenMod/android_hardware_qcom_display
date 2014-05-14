@@ -49,6 +49,14 @@ public:
 
     void setReleaseFd(int fd);
 
+    void setReleaseFdSync(int fd);
+
+    bool prepareOverlap(hwc_context_t *ctx, hwc_display_contents_1_t *list,
+                        int overlapIndex);
+
+    int drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t *list,
+                    int overlapIndex);
+
 private:
     /* cached data */
     struct LayerCache {
@@ -79,6 +87,8 @@ private:
     // Helper functions for copybit composition
     int  drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                           private_handle_t *renderBuffer, bool isFG);
+    int drawRectUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
+                          private_handle_t *renderBuffer, hwc_rect_t rect);
     int fillColorUsingCopybit(hwc_layer_1_t *layer,
                           private_handle_t *renderBuffer);
     bool canUseCopybitForYUV (hwc_context_t *ctx);
@@ -114,8 +124,8 @@ private:
     //Dynamic composition threshold for deciding copybit usage.
     double mDynThreshold;
     bool mSwapRectEnable;
-    int mAlignedFBWidth;
-    int mAlignedFBHeight;
+    int mAlignedWidth;
+    int mAlignedHeight;
     int mDirtyLayerIndex;
     LayerCache mLayerCache;
     FbCache mFbCache;
