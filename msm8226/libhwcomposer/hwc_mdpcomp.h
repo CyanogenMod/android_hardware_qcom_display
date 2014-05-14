@@ -46,6 +46,8 @@ public:
     /* dumpsys */
     void dump(android::String8& buf, hwc_context_t *ctx);
     bool isGLESOnlyComp() { return (mCurrentFrame.mdpCount == 0); }
+    bool isPTORActive() { return (mOverlapIndex != -1); }
+    int drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     static MDPComp* getObject(hwc_context_t *ctx, const int& dpy);
     /* Handler to invoke frame redraw on Idle Timer expiry */
     static void timeout_handler(void *udata);
@@ -170,6 +172,8 @@ protected:
     bool tryFullFrame(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* checks if full MDP comp can be done */
     bool fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    /* Full MDP Composition with Peripheral Tiny Overlap Removal */
+    bool fullMDPCompWithPTOR(hwc_context_t *ctx,hwc_display_contents_1_t* list);
     /* check if we can use layer cache to do at least partial MDP comp */
     bool partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* Partial MDP comp that uses caching to save power as primary goal */
@@ -244,6 +248,8 @@ protected:
     struct LayerCache mCachedFrame;
     //Enable 4kx2k yuv layer split
     static bool sEnable4k2kYUVSplit;
+    /* Overlap layer index */
+    int mOverlapIndex;
     bool allocSplitVGPipesfor4k2k(hwc_context_t *ctx, int index);
 };
 
