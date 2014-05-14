@@ -1,4 +1,4 @@
-display-hals := libgralloc libgenlock libcopybit liblight libvirtual
+display-hals := libgralloc libcopybit liblight libvirtual
 display-hals += libhwcomposer liboverlay libqdutils libexternal libqservice
 display-hals += libmemtrack
 ifeq ($(call is-vendor-board-platform,QCOM),true)
