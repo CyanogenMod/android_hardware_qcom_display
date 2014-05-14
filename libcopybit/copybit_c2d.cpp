@@ -35,8 +35,6 @@
 
 #include <EGL/eglplatform.h>
 #include <cutils/native_handle.h>
-#include <cutils/ashmem.h>
-#include <linux/ashmem.h>
 #include <gralloc_priv.h>
 
 #include <copybit.h>
