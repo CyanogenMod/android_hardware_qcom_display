@@ -349,6 +349,7 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     int dst_h = dst.bottom - dst.top;
     float w_scale = ((float)crop_w / (float)dst_w);
     float h_scale = ((float)crop_h / (float)dst_h);
+    MDPVersion& mdpHw = MDPVersion::getInstance();
 
     /* Workaround for MDP HW limitation in DSI command mode panels where
      * FPS will not go beyond 30 if buffers on RGB pipes are of width or height
@@ -360,29 +361,29 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
         return false;
 
     if((w_scale > 1.0f) || (h_scale > 1.0f)) {
-        const uint32_t maxMDPDownscale =
-            qdutils::MDPVersion::getInstance().getMaxMDPDownscale();
+        const uint32_t maxMDPDownscale = mdpHw.getMaxMDPDownscale();
         const float w_dscale = w_scale;
         const float h_dscale = h_scale;
 
         if(ctx->mMDP.version >= qdutils::MDSS_V5) {
 
-            if(!qdutils::MDPVersion::getInstance().supportsDecimation()) {
+            if(!mdpHw.supportsDecimation()) {
                 /* On targets that doesnt support Decimation (eg.,8x26)
                  * maximum downscale support is overlay pipe downscale.
                  */
-                if(crop_w > MAX_DISPLAY_DIM || w_dscale > maxMDPDownscale ||
+                if(crop_w > mdpHw.getMaxMixerWidth() ||
+                        w_dscale > maxMDPDownscale ||
                         h_dscale > maxMDPDownscale)
                     return false;
             } else {
                 // Decimation on macrotile format layers is not supported.
                 if(isTileRendered(hnd)) {
-                    /* MDP can read maximum MAX_DISPLAY_DIM width.
-                     * Bail out if
-                     *      1. Src crop > MAX_DISPLAY_DIM on nonsplit MDPComp
+                    /* Bail out if
+                     *      1. Src crop > Mixer limit on nonsplit MDPComp
                      *      2. exceeds maximum downscale limit
                      */
-                    if(((crop_w > MAX_DISPLAY_DIM) && !sSrcSplitEnabled) ||
+                    if(((crop_w > mdpHw.getMaxMixerWidth()) &&
+                                !sSrcSplitEnabled) ||
                             w_dscale > maxMDPDownscale ||
                             h_dscale > maxMDPDownscale) {
                         return false;
@@ -397,8 +398,7 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     }
 
     if((w_scale < 1.0f) || (h_scale < 1.0f)) {
-        const uint32_t upscale =
-            qdutils::MDPVersion::getInstance().getMaxMDPUpscale();
+        const uint32_t upscale = mdpHw.getMaxMDPUpscale();
         const float w_uscale = 1.0f / w_scale;
         const float h_uscale = 1.0f / h_scale;
 
@@ -688,8 +688,10 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         return false;
     }
 
-    if(mDpy > HWC_DISPLAY_PRIMARY && (priDispW > MAX_DISPLAY_DIM) &&
-                              (ctx->dpyAttr[mDpy].xres < MAX_DISPLAY_DIM)) {
+    MDPVersion& mdpHw = MDPVersion::getInstance();
+    if(mDpy > HWC_DISPLAY_PRIMARY &&
+            (priDispW >  mdpHw.getMaxMixerWidth()) &&
+            (ctx->dpyAttr[mDpy].xres <  mdpHw.getMaxMixerWidth())) {
         // Disable MDP comp on Secondary when the primary is highres panel and
         // the secondary is a normal 1080p, because, MDP comp on secondary under
         // in such usecase, decimation gets used for downscale and there will be
@@ -721,11 +723,9 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         //For 8x26 with panel width>1k, if RGB layer needs HFLIP fail mdp comp
         // may not need it if Gfx pre-rotation can handle all flips & rotations
         int transform = (layer->flags & HWC_COLOR_FILL) ? 0 : layer->transform;
-        if(qdutils::MDPVersion::getInstance().is8x26() &&
-                                (ctx->dpyAttr[mDpy].xres > 1024) &&
-                                (transform & HWC_TRANSFORM_FLIP_H) &&
-                                (!isYuvBuffer(hnd)))
-                   return false;
+        if( mdpHw.is8x26() && (ctx->dpyAttr[mDpy].xres > 1024) &&
+                (transform & HWC_TRANSFORM_FLIP_H) && (!isYuvBuffer(hnd)))
+            return false;
     }
 
     if(ctx->mAD->isDoable()) {
@@ -2259,14 +2259,15 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
            if the layer's width is > mixer's width
     */
 
+    MDPVersion& mdpHw = MDPVersion::getInstance();
     bool primarySplitAlways = (mDpy == HWC_DISPLAY_PRIMARY) and
-            qdutils::MDPVersion::getInstance().isSrcSplitAlways();
+            mdpHw.isSrcSplitAlways();
     int lSplit = getLeftSplit(ctx, mDpy);
     int dstWidth = dst.right - dst.left;
     int cropWidth = crop.right - crop.left;
 
-    if(dstWidth > qdutils::MAX_DISPLAY_DIM or
-            cropWidth > qdutils::MAX_DISPLAY_DIM or
+    if(dstWidth > mdpHw.getMaxMixerWidth() or
+            cropWidth > mdpHw.getMaxMixerWidth() or
             (primarySplitAlways and (cropWidth > lSplit))) {
         pipe_info.rIndex = ctx->mOverlay->getPipe(pipeSpecs);
         if(pipe_info.rIndex == ovutils::OV_INVALID) {
