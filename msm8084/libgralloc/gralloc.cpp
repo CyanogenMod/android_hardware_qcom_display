@@ -24,6 +24,8 @@
 #include <sys/ioctl.h>
 #include <cutils/properties.h>
 
+#include <linux/android_pmem.h>
+
 #include "gr.h"
 #include "gpu.h"
 #include "memalloc.h"

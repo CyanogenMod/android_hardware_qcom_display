@@ -19,7 +19,11 @@
 #define GR_H_
 
 #include <stdint.h>
-#include <sys/user.h>
+#ifdef HAVE_ANDROID_OS      // just want PAGE_SIZE define
+# include <asm/page.h>
+#else
+# include <sys/user.h>
+#endif
 #include <limits.h>
 #include <sys/cdefs.h>
 #include <hardware/gralloc.h>

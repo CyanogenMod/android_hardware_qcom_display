@@ -21,7 +21,6 @@
 #include "overlayUtils.h"
 #include "mdp_version.h"
 #include "gr.h"
-#include <sync/sync.h>
 
 namespace ovutils = overlay::utils;
 
