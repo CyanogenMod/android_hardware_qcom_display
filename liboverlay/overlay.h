@@ -170,6 +170,7 @@ private:
     /* Helpers that enfore target specific policies while returning pipes */
     utils::eDest getPipe_8x26(const PipeSpecs& pipeSpecs);
     utils::eDest getPipe_8x16(const PipeSpecs& pipeSpecs);
+    utils::eDest getPipe_8x39(const PipeSpecs& pipeSpecs);
 
     /* Returns the scalar object */
     static scale::Scale *getScalar();
@@ -317,7 +318,8 @@ inline bool Overlay::isDMAMultiplexingSupported() {
 
 inline bool Overlay::isUIScalingOnExternalSupported() {
     if(qdutils::MDPVersion::getInstance().is8x26() or
-       qdutils::MDPVersion::getInstance().is8x16()) {
+       qdutils::MDPVersion::getInstance().is8x16() or
+       qdutils::MDPVersion::getInstance().is8x39()) {
         return false;
     }
     return true;
