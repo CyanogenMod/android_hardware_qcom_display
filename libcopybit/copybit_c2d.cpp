@@ -257,6 +257,7 @@ static void* c2d_wait_loop(void* ptr) {
 static int get_format(int format) {
     switch (format) {
         case HAL_PIXEL_FORMAT_RGB_565:        return C2D_COLOR_FORMAT_565_RGB;
+        case HAL_PIXEL_FORMAT_RGB_888:        return C2D_COLOR_FORMAT_888_RGB;
         case HAL_PIXEL_FORMAT_RGBX_8888:      return C2D_COLOR_FORMAT_8888_ARGB |
                                               C2D_FORMAT_SWAP_RB |
                                                   C2D_FORMAT_DISABLE_ALPHA;
@@ -314,6 +315,9 @@ int c2diGetBpp(int32 colorformat)
         case C2D_COLOR_FORMAT_8888_RGBA:
         case C2D_COLOR_FORMAT_8888_ARGB:
             c2dBpp = 32;
+            break;
+        case C2D_COLOR_FORMAT_888_RGB:
+            c2dBpp = 24;
             break;
         case C2D_COLOR_FORMAT_8_L:
         case C2D_COLOR_FORMAT_8_A:
@@ -396,6 +400,7 @@ static int is_supported_rgb_format(int format)
     switch(format) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
+        case HAL_PIXEL_FORMAT_RGB_888:
         case HAL_PIXEL_FORMAT_RGB_565:
         case HAL_PIXEL_FORMAT_BGRA_8888: {
             return COPYBIT_SUCCESS;
