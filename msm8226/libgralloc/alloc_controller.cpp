@@ -394,9 +394,9 @@ bool isMacroTileEnabled(int format, int usage)
 }
 
 // helper function
-size_t getSize(int format, int width, int height, const int alignedw,
+unsigned int getSize(int format, int width, int height, const int alignedw,
         const int alignedh) {
-    size_t size = 0;
+    unsigned int size = 0;
 
     switch (format) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
@@ -433,7 +433,7 @@ size_t getSize(int format, int width, int height, const int alignedw,
             }
             size = alignedw*alignedh +
                     (ALIGN(alignedw/2, 16) * (alignedh/2))*2;
-            size = ALIGN(size, (size_t)4096);
+            size = ALIGN(size, (unsigned int)4096);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
@@ -501,10 +501,10 @@ size_t getSize(int format, int width, int height, const int alignedw,
     return size;
 }
 
-size_t getBufferSizeAndDimensions(int width, int height, int format,
+unsigned int getBufferSizeAndDimensions(int width, int height, int format,
         int& alignedw, int &alignedh)
 {
-    size_t size;
+    unsigned int size;
 
     AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width,
             height,
@@ -519,10 +519,10 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
 }
 
 
-size_t getBufferSizeAndDimensions(int width, int height, int format, int usage,
-        int& alignedw, int &alignedh)
+unsigned int getBufferSizeAndDimensions(int width, int height, int format,
+        int usage, int& alignedw, int &alignedh)
 {
-    size_t size;
+    unsigned int size;
     int tileEnabled = isMacroTileEnabled(format, usage);
 
     AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width,
@@ -539,7 +539,7 @@ size_t getBufferSizeAndDimensions(int width, int height, int format, int usage,
 
 
 void getBufferAttributes(int width, int height, int format, int usage,
-        int& alignedw, int &alignedh, int& tileEnabled, size_t& size)
+        int& alignedw, int &alignedh, int& tileEnabled, unsigned int& size)
 {
     tileEnabled = isMacroTileEnabled(format, usage);
 
@@ -555,7 +555,7 @@ void getBufferAttributes(int width, int height, int format, int usage,
 int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
 {
     int err = 0;
-    size_t ystride, cstride;
+    unsigned int ystride, cstride;
     memset(ycbcr->reserved, 0, sizeof(ycbcr->reserved));
 
     // Get the chroma offsets from the handle width/height. We take advantage
@@ -647,7 +647,7 @@ int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage)
     private_handle_t* hnd = new private_handle_t(data.fd, data.size,
                                                  data.allocType, 0, format,
                                                  alignedw, alignedh);
-    hnd->base = (uintptr_t) data.base;
+    hnd->base = (uint64_t) data.base;
     hnd->offset = data.offset;
     hnd->gpuaddr = 0;
     *pHnd = hnd;
