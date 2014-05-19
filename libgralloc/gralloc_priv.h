@@ -211,28 +211,29 @@ struct private_handle_t : public native_handle {
         // ints
         int     magic;
         int     flags;
-        size_t  size;
-        size_t  offset;
+        unsigned int  size;
+        unsigned int  offset;
         int     bufferType;
-        uintptr_t base;
-        size_t  offset_metadata;
+        uint64_t base __attribute__((aligned(8)));
+        unsigned int  offset_metadata;
         // The gpu address mapped into the mmu.
-        uintptr_t gpuaddr;
+        uint64_t gpuaddr __attribute__((aligned(8)));
         int     format;
         int     width;
         int     height;
-        uintptr_t base_metadata;
+        uint64_t base_metadata __attribute__((aligned(8)));
 
 #ifdef __cplusplus
-        //TODO64: Revisit this on 64-bit
-        static const int sNumInts = (6 + (3 * (sizeof(size_t)/sizeof(int))) +
-                                    (3 * (sizeof(uintptr_t)/sizeof(int))));
         static const int sNumFds = 2;
+        static inline int sNumInts() {
+            return ((sizeof(private_handle_t) - sizeof(native_handle_t)) /
+                    sizeof(int)) - sNumFds;
+        }
         static const int sMagic = 'gmsm';
 
-        private_handle_t(int fd, size_t size, int flags, int bufferType,
+        private_handle_t(int fd, unsigned int size, int flags, int bufferType,
                          int format, int width, int height, int eFd = -1,
-                         size_t eOffset = 0, uintptr_t eBase = 0) :
+                         unsigned int eOffset = 0, uint64_t eBase = 0) :
             fd(fd), fd_metadata(eFd), magic(sMagic),
             flags(flags), size(size), offset(0), bufferType(bufferType),
             base(0), offset_metadata(eOffset), gpuaddr(0),
@@ -240,7 +241,7 @@ struct private_handle_t : public native_handle {
             base_metadata(eBase)
         {
             version = (int) sizeof(native_handle);
-            numInts = sNumInts;
+            numInts = sNumInts();
             numFds = sNumFds;
         }
         ~private_handle_t() {
@@ -254,15 +255,15 @@ struct private_handle_t : public native_handle {
         static int validate(const native_handle* h) {
             const private_handle_t* hnd = (const private_handle_t*)h;
             if (!h || h->version != sizeof(native_handle) ||
-                h->numInts != sNumInts || h->numFds != sNumFds ||
+                h->numInts != sNumInts() || h->numFds != sNumFds ||
                 hnd->magic != sMagic)
             {
                 ALOGD("Invalid gralloc handle (at %p): "
-                      "ver(%d/%zu) ints(%d/%d) fds(%d/%d)"
+                      "ver(%d/%u) ints(%d/%d) fds(%d/%d)"
                       "magic(%c%c%c%c/%c%c%c%c)",
                       h,
                       h ? h->version : -1, sizeof(native_handle),
-                      h ? h->numInts : -1, sNumInts,
+                      h ? h->numInts : -1, sNumInts(),
                       h ? h->numFds : -1, sNumFds,
                       hnd ? (((hnd->magic >> 24) & 0xFF)?
                              ((hnd->magic >> 24) & 0xFF) : '-') : '?',

@@ -118,16 +118,17 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     data.base = base;
     data.fd = fd_data.fd;
     ioctl(mIonFd, ION_IOC_FREE, &handle_data);
-    ALOGD_IF(DEBUG, "ion: Allocated buffer base:%p size:%zu fd:%d",
+    ALOGD_IF(DEBUG, "ion: Allocated buffer base:%p size:%u fd:%d",
           data.base, ionAllocData.len, data.fd);
     return 0;
 }
 
 
-int IonAlloc::free_buffer(void* base, size_t size, size_t offset, int fd)
+int IonAlloc::free_buffer(void* base, unsigned int size, unsigned int offset,
+        int fd)
 {
     Locker::Autolock _l(mLock);
-    ALOGD_IF(DEBUG, "ion: Freeing buffer base:%p size:%zu fd:%d",
+    ALOGD_IF(DEBUG, "ion: Freeing buffer base:%p size:%u fd:%d",
           base, size, fd);
     int err = 0;
     err = open_device();
@@ -140,7 +141,8 @@ int IonAlloc::free_buffer(void* base, size_t size, size_t offset, int fd)
     return err;
 }
 
-int IonAlloc::map_buffer(void **pBase, size_t size, size_t offset, int fd)
+int IonAlloc::map_buffer(void **pBase, unsigned int size, unsigned int offset,
+        int fd)
 {
     int err = 0;
     void *base = 0;
@@ -158,15 +160,16 @@ int IonAlloc::map_buffer(void **pBase, size_t size, size_t offset, int fd)
         ALOGE("ion: Failed to map memory in the client: %s",
               strerror(errno));
     } else {
-        ALOGD_IF(DEBUG, "ion: Mapped buffer base:%p size:%zu offset:%d fd:%d",
+        ALOGD_IF(DEBUG, "ion: Mapped buffer base:%p size:%u offset:%u fd:%d",
               base, size, offset, fd);
     }
     return err;
 }
 
-int IonAlloc::unmap_buffer(void *base, size_t size, size_t /*offset*/)
+int IonAlloc::unmap_buffer(void *base, unsigned int size,
+        unsigned int /*offset*/)
 {
-    ALOGD_IF(DEBUG, "ion: Unmapping buffer  base:%p size:%zu", base, size);
+    ALOGD_IF(DEBUG, "ion: Unmapping buffer  base:%p size:%u", base, size);
     int err = 0;
     if(munmap(base, size)) {
         err = -errno;
@@ -176,7 +179,8 @@ int IonAlloc::unmap_buffer(void *base, size_t size, size_t /*offset*/)
     return err;
 
 }
-int IonAlloc::clean_buffer(void *base, size_t size, size_t offset, int fd, int op)
+int IonAlloc::clean_buffer(void *base, unsigned int size, unsigned int offset,
+        int fd, int op)
 {
     struct ion_flush_data flush_data;
     struct ion_fd_data fd_data;
@@ -198,9 +202,9 @@ int IonAlloc::clean_buffer(void *base, size_t size, size_t offset, int fd, int o
     handle_data.handle = fd_data.handle;
     flush_data.handle  = fd_data.handle;
     flush_data.vaddr   = base;
-    // offset and length are uint32_t
-    flush_data.offset  = (uint32_t) offset;
-    flush_data.length  = (uint32_t) size;
+    // offset and length are unsigned int
+    flush_data.offset  = offset;
+    flush_data.length  = size;
 
     struct ion_custom_data d;
     switch(op) {

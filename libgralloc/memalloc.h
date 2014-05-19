@@ -43,9 +43,9 @@ enum {
 struct alloc_data {
     void           *base;
     int            fd;
-    size_t         offset;
-    size_t         size;
-    size_t         align;
+    unsigned int   offset;
+    unsigned int   size;
+    unsigned int   align;
     uintptr_t      pHandle;
     bool           uncached;
     unsigned int   flags;
@@ -61,20 +61,20 @@ class IMemAlloc {
     virtual int alloc_buffer(alloc_data& data) = 0;
 
     // Free buffer
-    virtual int free_buffer(void *base, size_t size,
-                            size_t offset, int fd) = 0;
+    virtual int free_buffer(void *base, unsigned int size,
+                            unsigned int offset, int fd) = 0;
 
     // Map buffer
-    virtual int map_buffer(void **pBase, size_t size,
-                           size_t offset, int fd) = 0;
+    virtual int map_buffer(void **pBase, unsigned int size,
+                           unsigned int offset, int fd) = 0;
 
     // Unmap buffer
-    virtual int unmap_buffer(void *base, size_t size,
-                             size_t offset) = 0;
+    virtual int unmap_buffer(void *base, unsigned int size,
+                             unsigned int offset) = 0;
 
     // Clean and invalidate
-    virtual int clean_buffer(void *base, size_t size,
-                             size_t offset, int fd, int op) = 0;
+    virtual int clean_buffer(void *base, unsigned int size,
+                             unsigned int offset, int fd, int op) = 0;
 
     // Destructor
     virtual ~IMemAlloc() {};
