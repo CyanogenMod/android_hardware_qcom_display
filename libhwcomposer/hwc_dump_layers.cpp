@@ -36,9 +36,10 @@
 #include <cutils/log.h>
 #include <sys/stat.h>
 #include <comptype.h>
+#ifdef USES_SKIA
 #include <SkBitmap.h>
 #include <SkImageEncoder.h>
-
+#endif
 namespace qhwc {
 
 // MAX_ALLOWED_FRAMEDUMPS must be capped to (LONG_MAX - 1)
@@ -306,6 +307,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
 
     getHalPixelFormatStr(hnd->format, pixFormatStr);
 
+#ifdef USES_SKIA
     if (needDumpPng && hnd->base) {
         bool bResult = false;
         char dumpFilename[PATH_MAX];
@@ -344,6 +346,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         }
         delete tempSkBmp; // Calls SkBitmap::freePixels() internally.
     }
+#endif
 
     if (needDumpRaw && hnd->base) {
         char dumpFilename[PATH_MAX];
@@ -429,7 +432,8 @@ void HwcDebug::getHalPixelFormatStr(int format, char pixFormatStr[])
             strlcpy(pixFormatStr, "YCbCr_420_SP_VENUS", sizeof(pixFormatStr));
             break;
         default:
-            snprintf(pixFormatStr, sizeof(pixFormatStr), "Unknown0x%X", format);
+            size_t len = sizeof(pixFormatStr);
+            snprintf(pixFormatStr, len, "Unknown0x%X", format);
             break;
     }
 }
