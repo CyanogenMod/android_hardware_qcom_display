@@ -113,4 +113,25 @@ int getDisplayVisibleRegion(int dpy, hwc_rect_t &rect) {
     return err;
 }
 
+int setViewFrame(int dpy, int l, int t, int r, int b) {
+    status_t err = (status_t) FAILED_TRANSACTION;
+    sp<IQService> binder = getBinder();
+    Parcel inParcel, outParcel;
+    inParcel.writeInt32(dpy);
+    inParcel.writeInt32(l);
+    inParcel.writeInt32(t);
+    inParcel.writeInt32(r);
+    inParcel.writeInt32(b);
+
+    if(binder != NULL) {
+        err = binder->dispatch(IQService::SET_VIEW_FRAME,
+                &inParcel, &outParcel);
+    }
+    if(err)
+        ALOGE("%s: Failed to set view frame for dpy %d err=%d",
+                            __FUNCTION__, dpy, err);
+
+    return err;
+}
+
 }; //namespace
