@@ -615,17 +615,17 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         }
 
         int lSplit = getLeftSplit(ctx, dpy);
-        qhwc::ovutils::Dim lRoi = qhwc::ovutils::Dim {
+        qhwc::ovutils::Dim lRoi = qhwc::ovutils::Dim(
             ctx->listStats[dpy].lRoi.left,
             ctx->listStats[dpy].lRoi.top,
             ctx->listStats[dpy].lRoi.right - ctx->listStats[dpy].lRoi.left,
-            ctx->listStats[dpy].lRoi.bottom - ctx->listStats[dpy].lRoi.top };
+            ctx->listStats[dpy].lRoi.bottom - ctx->listStats[dpy].lRoi.top);
 
-        qhwc::ovutils::Dim rRoi = qhwc::ovutils::Dim {
+        qhwc::ovutils::Dim rRoi = qhwc::ovutils::Dim(
             ctx->listStats[dpy].rRoi.left - lSplit,
             ctx->listStats[dpy].rRoi.top,
             ctx->listStats[dpy].rRoi.right - ctx->listStats[dpy].rRoi.left,
-            ctx->listStats[dpy].rRoi.bottom - ctx->listStats[dpy].rRoi.top };
+            ctx->listStats[dpy].rRoi.bottom - ctx->listStats[dpy].rRoi.top);
 
         if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd, lRoi, rRoi)) {
             ALOGE("%s: display commit fail for %d dpy!", __FUNCTION__, dpy);
