@@ -88,6 +88,7 @@ MDPVersion::MDPVersion()
     mLowBw = 0;
     mHighBw = 0;
     mSourceSplit = false;
+    mSourceSplitAlways = false;
     mRGBHasNoScalar = false;
 
     updatePanelInfo();
@@ -306,6 +307,30 @@ bool MDPVersion::updateSysFsInfo() {
         free(line);
         fclose(sysfsFd);
     }
+
+    if(mSourceSplit) {
+        memset(sysfsPath, 0, sizeof(sysfsPath));
+        snprintf(sysfsPath , sizeof(sysfsPath),
+                "/sys/class/graphics/fb0/msm_fb_src_split_info");
+
+        sysfsFd = fopen(sysfsPath, "rb");
+        if (sysfsFd == NULL) {
+            ALOGE("%s: Opening file %s failed with error %s", __FUNCTION__,
+                    sysfsPath, strerror(errno));
+            return false;
+        } else {
+            line = (char *) malloc(len);
+            if((read = getline(&line, &len, sysfsFd)) != -1) {
+                if(!strncmp(line, "src_split_always",
+                        strlen("src_split_always"))) {
+                    mSourceSplitAlways = true;
+                }
+            }
+            free(line);
+            fclose(sysfsFd);
+        }
+    }
+
     ALOGD_IF(DEBUG, "%s: mMDPVersion: %d mMdpRev: %x mRGBPipes:%d,"
                     "mVGPipes:%d", __FUNCTION__, mMDPVersion, mMdpRev,
                     mRGBPipes, mVGPipes);
@@ -369,6 +394,10 @@ bool MDPVersion::supportsMacroTile() {
 
 bool MDPVersion::isSrcSplit() const {
     return mSourceSplit;
+}
+
+bool MDPVersion::isSrcSplitAlways() const {
+    return mSourceSplitAlways;
 }
 
 bool MDPVersion::isRGBScalarSupported() const {
