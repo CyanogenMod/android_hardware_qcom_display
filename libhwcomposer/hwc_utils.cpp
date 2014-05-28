@@ -281,7 +281,7 @@ void initContext(hwc_context_t *ctx)
 
     ctx->mGPUHintInfo.mEGLDisplay = NULL;
     ctx->mGPUHintInfo.mEGLContext = NULL;
-    ctx->mGPUHintInfo.mPrevCompositionGLES = false;
+    ctx->mGPUHintInfo.mCompositionState = COMPOSITION_STATE_MDP;
     ctx->mGPUHintInfo.mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
 #endif
     ALOGI("Initializing Qualcomm Hardware Composer");
@@ -2077,7 +2077,8 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
         }
     }
     if(isGLESComp(ctx, list)) {
-        if(!gpuHint->mPrevCompositionGLES && !MDPComp::isIdleFallback()) {
+        if(gpuHint->mCompositionState != COMPOSITION_STATE_GPU
+            && !MDPComp::isIdleFallback()) {
             EGLint attr_list[] = {EGL_GPU_HINT_1,
                                   EGL_GPU_LEVEL_3,
                                   EGL_NONE };
@@ -2087,7 +2088,7 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
                 ALOGW("eglGpuPerfHintQCOM failed for Built in display");
             } else {
                 gpuHint->mCurrGPUPerfMode = EGL_GPU_LEVEL_3;
-                gpuHint->mPrevCompositionGLES = true;
+                gpuHint->mCompositionState = COMPOSITION_STATE_GPU;
             }
         } else {
             EGLint attr_list[] = {EGL_GPU_HINT_1,
@@ -2099,6 +2100,9 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
                 ALOGW("eglGpuPerfHintQCOM failed for Built in display");
             } else {
                 gpuHint->mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
+            }
+            if(MDPComp::isIdleFallback()) {
+                gpuHint->mCompositionState = COMPOSITION_STATE_IDLE_FALLBACK;
             }
         }
     } else {
@@ -2113,7 +2117,7 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
         } else {
             gpuHint->mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
         }
-        gpuHint->mPrevCompositionGLES = false;
+        gpuHint->mCompositionState = COMPOSITION_STATE_MDP;
     }
 #endif
 }

@@ -471,14 +471,20 @@ enum eAnimationState{
     ANIMATION_STARTED,
 };
 
+enum eCompositionState {
+    COMPOSITION_STATE_MDP = 0,        // Set if composition type is MDP
+    COMPOSITION_STATE_GPU,            // Set if composition type is GPU or MIXED
+    COMPOSITION_STATE_IDLE_FALLBACK,  // Set if it is idlefallback
+};
+
 // Structure holds the information about the GPU hint.
 struct gpu_hint_info {
     // system level flag to enable gpu_perf_mode
     bool mGpuPerfModeEnable;
     // Stores the current GPU performance mode DEFAULT/HIGH
     bool mCurrGPUPerfMode;
-    // true if previous composition used GPU
-    bool mPrevCompositionGLES;
+    // Stores the compositon state GPU, MDP or IDLE_FALLBACK
+    bool mCompositionState;
     // Stores the EGLContext of current process
     EGLContext mEGLContext;
     // Stores the EGLDisplay of current process
