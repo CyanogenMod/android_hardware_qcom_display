@@ -392,7 +392,11 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
             ctx->mOverlay->configBegin();
             ctx->mOverlay->configDone();
             ctx->mRotMgr->clear();
-            overlay::Writeback::clear();
+            // If VDS is connected, do not clear WB object as it
+            // will end up detaching IOMMU. This is required
+            // to send black frame to WFD sink on power suspend.
+            // Note: With this change, we keep the WriteBack object
+            // alive on power suspend for AD use case.
             value = FB_BLANK_POWERDOWN;
             break;
         case HWC_POWER_MODE_DOZE:
@@ -439,18 +443,7 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
                     ret = -1;
                 }
             }
-<<<<<<< HEAD
             ctx->dpyAttr[dpy].isActive = not(mode == HWC_POWER_MODE_OFF);
-=======
-            value = blank ? FB_BLANK_POWERDOWN : FB_BLANK_UNBLANK;
-            if(ioctl(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].fd, FBIOBLANK, value) < 0
-                    ) {
-                ALOGE("%s: Failed to handle blank event(%d) for virtual!!",
-                        __FUNCTION__, blank );
-                return -1;
-            }
-            ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = !blank;
->>>>>>> 2b5d957... hwc: Call blank IOCTL on virtual as well if it is connected.
         }
         break;
     case HWC_DISPLAY_EXTERNAL:

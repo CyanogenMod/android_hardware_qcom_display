@@ -146,6 +146,7 @@ int HWCVirtualVDS::prepare(hwc_composer_device_1 *dev,
              * Mark all application layers as OVERLAY so that
              * GPU will not compose.
              */
+            Writeback::getInstance(); //Ensure that WB is active during pause
             for(size_t i = 0 ;i < (size_t)(list->numHwLayers - 1); i++) {
                 hwc_layer_1_t *layer = &list->hwLayers[i];
                 layer->compositionType = HWC_OVERLAY;
@@ -246,6 +247,16 @@ void HWCVirtualVDS::pause(hwc_context_t* ctx, int dpy) {
     }
     usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
             * 2 / 1000);
+    // At this point all the pipes used by External have been
+    // marked as UNSET.
+    {
+        Locker::Autolock _l(ctx->mDrawLock);
+        // Perform commit to unstage the pipes.
+        if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+            ALOGE("%s: display commit fail! for %d dpy",
+                    __FUNCTION__, dpy);
+        }
+    }
     return;
 }
 
