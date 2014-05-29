@@ -1954,6 +1954,24 @@ bool isDisplaySplit(hwc_context_t* ctx, int dpy) {
     return false;
 }
 
+void dumpBuffer(private_handle_t *ohnd, char *bufferName) {
+    if (ohnd != NULL && ohnd->base) {
+        char dumpFilename[PATH_MAX];
+        bool bResult = false;
+        snprintf(dumpFilename, sizeof(dumpFilename), "/data/%s.%s.%dx%d.raw",
+            bufferName,
+            overlay::utils::getFormatString(utils::getMdpFormat(ohnd->format)),
+            getWidth(ohnd), getHeight(ohnd));
+        FILE* fp = fopen(dumpFilename, "w+");
+        if (NULL != fp) {
+            bResult = (bool) fwrite((void*)ohnd->base, ohnd->size, 1, fp);
+            fclose(fp);
+        }
+        ALOGD("Buffer[%s] Dump to %s: %s",
+        bufferName, dumpFilename, bResult ? "Success" : "Fail");
+    }
+}
+
 bool isGLESComp(hwc_context_t *ctx,
                      hwc_display_contents_1_t* list) {
     int numAppLayers = ctx->listStats[HWC_DISPLAY_PRIMARY].numAppLayers;

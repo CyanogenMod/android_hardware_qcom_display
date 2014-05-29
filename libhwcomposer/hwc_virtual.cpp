@@ -29,6 +29,7 @@
 #include "hwc_dump_layers.h"
 #include "hwc_copybit.h"
 #include "hwc_virtual.h"
+#include "sync/sync.h"
 
 #define HWCVIRTUAL_LOG 0
 
@@ -45,6 +46,16 @@ HWCVirtualBase* HWCVirtualBase::getObject(bool isVDSEnabled) {
         ALOGD_IF(HWCVIRTUAL_LOG, "%s: V4L2 is enabled for Virtual display",
                  __FUNCTION__);
         return new HWCVirtualV4L2();
+    }
+}
+
+HWCVirtualVDS::HWCVirtualVDS() {
+    char value[PROPERTY_VALUE_MAX];
+    mVDSDumpEnabled = false;
+    if((property_get("debug.hwc.enable_vds_dump", value, NULL) > 0)) {
+        if(atoi(value) != 0) {
+            mVDSDumpEnabled = true;
+        }
     }
 }
 
@@ -172,6 +183,10 @@ int HWCVirtualVDS::set(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
             int fd = -1; //FenceFD from the Copybit
             hwc_sync(ctx, list, dpy, fd);
 
+            // Dump the layers for virtual
+            if(ctx->mHwcDebug[dpy])
+                ctx->mHwcDebug[dpy]->dumpLayers(list);
+
             if (!ctx->mMDPComp[dpy]->draw(ctx, list)) {
                 ALOGE("%s: MDPComp draw failed", __FUNCTION__);
                 ret = -1;
@@ -194,6 +209,19 @@ int HWCVirtualVDS::set(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
                 ret = -1;
             }
 
+            if(mVDSDumpEnabled) {
+                char bufferName[128];
+                // Dumping frame buffer
+                sync_wait(fbLayer->acquireFenceFd, 1000);
+                snprintf(bufferName, sizeof(bufferName), "vds.fb");
+                dumpBuffer((private_handle_t *)fbLayer->handle, bufferName);
+                // Dumping WB output for non-secure session
+                if(!isSecureBuffer(ohnd)) {
+                    sync_wait(list->retireFenceFd, 1000);
+                    snprintf(bufferName, sizeof(bufferName), "vds.wb");
+                    dumpBuffer(ohnd, bufferName);
+                }
+            }
         } else if(list->outbufAcquireFenceFd >= 0) {
             //If we dont handle the frame, set retireFenceFd to outbufFenceFd,
             //which will make sure, the framework waits on it and closes it.
