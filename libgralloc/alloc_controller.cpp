@@ -181,6 +181,7 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
     } else {
         switch (format)
         {
+            case HAL_PIXEL_FORMAT_YCrCb_420_SP:
             case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
             case HAL_PIXEL_FORMAT_RAW_SENSOR:
                 aligned_w = ALIGN(width, 32);
@@ -189,7 +190,6 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
                 aligned_w = ALIGN(width, 128);
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-            case HAL_PIXEL_FORMAT_YCrCb_420_SP:
             case HAL_PIXEL_FORMAT_YV12:
             case HAL_PIXEL_FORMAT_YCbCr_422_SP:
             case HAL_PIXEL_FORMAT_YCrCb_422_SP:
