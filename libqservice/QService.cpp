@@ -28,6 +28,8 @@
  */
 
 #include <QService.h>
+#include <binder/Parcel.h>
+#include <binder/IPCThreadState.h>
 
 #define QSERVICE_DEBUG 0
 
@@ -55,6 +57,10 @@ void QService::connect(const sp<qClient::IQClient>& client) {
 status_t QService::dispatch(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t err = (status_t) FAILED_TRANSACTION;
+    IPCThreadState* ipc = IPCThreadState::self();
+    //Rewind parcel in case we're calling from the same process
+    if (ipc->getCallingPid() == getpid())
+        inParcel->setDataPosition(0);
     if (mClient.get()) {
         ALOGD_IF(QSERVICE_DEBUG, "Dispatching command: %d", command);
         err = mClient->notifyCallback(command, inParcel, outParcel);
