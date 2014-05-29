@@ -22,7 +22,7 @@ LOCAL_COPY_HEADERS            := copybit.h copybit_priv.h c2d2.h
 include $(BUILD_COPY_HEADERS)
 
 LOCAL_MODULE                  := copybit.$(TARGET_BOARD_PLATFORM)
-LOCAL_MODULE_PATH             := $(TARGET_OUT_SHARED_LIBRARIES)/hw
+LOCAL_MODULE_RELATIVE_PATH    := hw
 LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libdl libmemalloc
