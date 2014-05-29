@@ -824,7 +824,7 @@ void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
     dumpsys_log(aBuf, "  DisplayPanel=%c\n", ctx->mMDP.panel);
     for(int dpy = 0; dpy < HWC_NUM_DISPLAY_TYPES; dpy++) {
         if(ctx->mMDPComp[dpy])
-            ctx->mMDPComp[dpy]->dump(aBuf);
+            ctx->mMDPComp[dpy]->dump(aBuf, ctx);
     }
     char ovDump[2048] = {'\0'};
     ctx->mOverlay->getDump(ovDump, 2048);
