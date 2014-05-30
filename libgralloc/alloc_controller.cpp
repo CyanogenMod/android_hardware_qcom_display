@@ -207,7 +207,12 @@ IAllocController* IAllocController::getInstance(void)
 //-------------- IonController-----------------------//
 IonController::IonController()
 {
-    mIonAlloc = new IonAlloc();
+    allocateIonMem();
+}
+
+void IonController::allocateIonMem()
+{
+   mIonAlloc = new IonAlloc();
 }
 
 int IonController::allocate(alloc_data& data, int usage)
