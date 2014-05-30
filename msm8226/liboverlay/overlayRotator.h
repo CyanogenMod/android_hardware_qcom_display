@@ -210,9 +210,7 @@ private:
 // Holder of rotator objects. Manages lifetimes
 class RotMgr {
 public:
-    //Maximum sessions based on VG pipes, since rotator is used only for videos.
-    //Even though we can have 4 mixer stages, that much may be unnecessary.
-    enum { MAX_ROT_SESS = 3 };
+    enum { MAX_ROT_SESS = 4 };
 
     ~RotMgr();
     void configBegin();
