@@ -259,7 +259,8 @@ static void* c2d_wait_loop(void* ptr) {
 static int get_format(int format) {
     switch (format) {
         case HAL_PIXEL_FORMAT_RGB_565:        return C2D_COLOR_FORMAT_565_RGB;
-        case HAL_PIXEL_FORMAT_RGB_888:        return C2D_COLOR_FORMAT_888_RGB;
+        case HAL_PIXEL_FORMAT_RGB_888:        return C2D_COLOR_FORMAT_888_RGB |
+                                              C2D_FORMAT_SWAP_RB;
         case HAL_PIXEL_FORMAT_RGBX_8888:      return C2D_COLOR_FORMAT_8888_ARGB |
                                               C2D_FORMAT_SWAP_RB |
                                                   C2D_FORMAT_DISABLE_ALPHA;
