@@ -1931,14 +1931,17 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     const int lSplit = getLeftSplit(ctx, dpy);
 
-    if(lDest != OV_INVALID) {
+    // Calculate Left rects
+    if(dst.left < lSplit) {
         tmp_cropL = crop;
         tmp_dstL = dst;
         hwc_rect_t scissor = {0, 0, lSplit, hw_h };
         scissor = getIntersection(ctx->mViewFrame[dpy], scissor);
         qhwc::calculate_crop_rects(tmp_cropL, tmp_dstL, scissor, 0);
     }
-    if(rDest != OV_INVALID) {
+
+    // Calculate Right rects
+    if(dst.right > lSplit) {
         tmp_cropR = crop;
         tmp_dstR = dst;
         hwc_rect_t scissor = {lSplit, 0, hw_w, hw_h };
@@ -1951,8 +1954,8 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     //When buffer is H-flipped, contents of mixer config also needs to swapped
     //Not needed if the layer is confined to one half of the screen.
     //If rotator has been used then it has also done the flips, so ignore them.
-    if((orient & OVERLAY_TRANSFORM_FLIP_H) && lDest != OV_INVALID
-            && rDest != OV_INVALID && (*rot) == NULL) {
+    if((orient & OVERLAY_TRANSFORM_FLIP_H) && (dst.left < lSplit) &&
+            (dst.right > lSplit) && (*rot) == NULL) {
         hwc_rect_t new_cropR;
         new_cropR.left = tmp_cropL.left;
         new_cropR.right = new_cropR.left + (tmp_cropR.right - tmp_cropR.left);
