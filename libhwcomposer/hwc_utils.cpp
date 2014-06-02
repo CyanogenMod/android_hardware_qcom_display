@@ -1358,6 +1358,11 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         }
     }
 
+    if ((fd >= 0) && !dpy && ctx->mMDPComp[dpy]->isPTORActive()) {
+        // Acquire c2d fence of Overlap render buffer
+        acquireFd[count++] = fd;
+    }
+
     data.acq_fen_fd_cnt = count;
     fbFd = ctx->dpyAttr[dpy].fd;
 
@@ -1418,8 +1423,12 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         fd = -1;
     }
 
-    if (ctx->mCopyBit[dpy])
-        ctx->mCopyBit[dpy]->setReleaseFd(releaseFd);
+    if (!dpy && ctx->mCopyBit[dpy]) {
+        if (ctx->mMDPComp[dpy]->isPTORActive())
+            ctx->mCopyBit[dpy]->setReleaseFdSync(releaseFd);
+        else
+            ctx->mCopyBit[dpy]->setReleaseFd(releaseFd);
+    }
 
     //Signals when MDP finishes reading rotator buffers.
     ctx->mLayerRotMap[dpy]->setReleaseFd(releaseFd);
@@ -2141,6 +2150,20 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
         gpuHint->mPrevCompositionGLES = false;
     }
 #endif
+}
+
+bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
+    // To be peripheral, 3 boundaries should match.
+    uint8_t eqBounds = 0;
+    if (rect1.left == rect2.left)
+        eqBounds++;
+    if (rect1.top == rect2.top)
+        eqBounds++;
+    if (rect1.right == rect2.right)
+        eqBounds++;
+    if (rect1.bottom == rect2.bottom)
+        eqBounds++;
+    return (eqBounds == 3);
 }
 
 void BwcPM::setBwc(const hwc_rect_t& crop,
