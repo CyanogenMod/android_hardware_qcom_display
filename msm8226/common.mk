@@ -33,6 +33,10 @@ ifeq ($(call is-board-platform-in-list, msm8226 msm8610 apq8084 \
     common_flags += -DMDSS_TARGET
 endif
 
+ifeq ($(TARGET_HAS_VSYNC_FAILURE_FALLBACK), true)
+    common_flags += -DVSYNC_FAILURE_FALLBACK
+endif
+
 common_deps  :=
 kernel_includes :=
 

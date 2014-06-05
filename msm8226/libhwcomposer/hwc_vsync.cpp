@@ -88,6 +88,7 @@ struct event event_list[] =  {
 };
 
 #define num_events ARRAY_LENGTH(event_list)
+#define VSYNC_FAILURE_THRESHOLD 2
 
 static void *vsync_loop(void *param)
 {
@@ -116,6 +117,9 @@ static void *vsync_loop(void *param)
     }
 
     char node_path[MAX_SYSFS_FILE_PATH];
+#ifdef VSYNC_FAILURE_FALLBACK
+    int fake_vsync_switch_cnt = 0;
+#endif
 
     for (int dpy = HWC_DISPLAY_PRIMARY; dpy < num_displays; dpy++) {
         for(size_t ev = 0; ev < num_events; ev++) {
@@ -163,6 +167,16 @@ static void *vsync_loop(void *param)
                                 ALOGE ("%s: Unable to read event:%zu for \
                                         dpy=%d : %s",
                                         __FUNCTION__, ev, dpy, strerror(errno));
+#ifdef VSYNC_FAILURE_FALLBACK
+                                fake_vsync_switch_cnt++;
+                                if (fake_vsync_switch_cnt >
+                                        VSYNC_FAILURE_THRESHOLD) {
+                                    ALOGE("%s: Too many errors, falling back to fake vsync ",
+                                            __FUNCTION__);
+                                    ctx->vstate.fakevsync = true;
+                                    goto vsync_failed;
+                                }
+#endif
                                 continue;
                             }
                             event_list[ev].callback(ctx, dpy, vdata);
@@ -178,6 +192,9 @@ static void *vsync_loop(void *param)
 
     } else {
 
+#ifdef VSYNC_FAILURE_FALLBACK
+vsync_failed:
+#endif
         //Fake vsync is used only when set explicitly through a property or when
         //the vsync timestamp node cannot be opened at bootup. There is no
         //fallback to fake vsync from the true vsync loop, ever, as the
