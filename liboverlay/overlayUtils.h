@@ -806,7 +806,7 @@ inline bool OvFD::open(const char* const dev, int flags)
 
 inline void OvFD::setPath(const char* const dev)
 {
-    ::strncpy(mPath, dev, utils::MAX_PATH_LEN);
+    ::strlcpy(mPath, dev, sizeof(mPath));
 }
 
 inline bool OvFD::close()
