@@ -497,11 +497,17 @@ void MDPCompNonSplit::generateROI(hwc_context_t *ctx,
         hwc_layer_1_t* layer = &list->hwLayers[index];
         if ((mCachedFrame.hnd[index] != layer->handle) ||
                 isYuvBuffer((private_handle_t *)layer->handle)) {
-            hwc_rect_t updatingRect = layer->displayFrame;
+            hwc_rect_t dst = layer->displayFrame;
+            hwc_rect_t updatingRect = dst;
 
 #ifdef QCOM_BSP
             if(!needsScaling(layer) && !layer->transform)
-                updatingRect =  layer->dirtyRect;
+            {
+                hwc_rect_t src = integerizeSourceCrop(layer->sourceCropf);
+                int x_off = dst.left - src.left;
+                int y_off = dst.top - src.top;
+                updatingRect = moveRect(layer->dirtyRect, x_off, y_off);
+            }
 #endif
 
             roi = getUnion(roi, updatingRect);
