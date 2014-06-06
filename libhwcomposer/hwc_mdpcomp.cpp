@@ -183,6 +183,11 @@ void MDPComp::reset(hwc_context_t *ctx) {
     ctx->mLayerRotMap[mDpy]->clear();
 }
 
+void MDPComp::reset() {
+    sHandleTimeout = false;
+    mModeOn = false;
+}
+
 void MDPComp::timeout_handler(void *udata) {
     struct hwc_context_t* ctx = (struct hwc_context_t*)(udata);
 
@@ -1541,8 +1546,15 @@ bool MDPComp::hwLimitationsCheck(hwc_context_t* ctx,
 
 int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int ret = 0;
-    const int numLayers = ctx->listStats[mDpy].numAppLayers;
     char property[PROPERTY_VALUE_MAX];
+
+    if(!ctx || !list) {
+        ALOGE("%s: Invalid context or list",__FUNCTION__);
+        mCachedFrame.reset();
+        return -1;
+    }
+
+    const int numLayers = ctx->listStats[mDpy].numAppLayers;
 
     if(property_get("debug.hwc.simulate", property, NULL) > 0) {
         int currentFlags = atoi(property);
@@ -1587,7 +1599,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if(isFrameDoable(ctx)) {
         generateROI(ctx, list);
 
-        if(tryFullFrame(ctx, list) || tryVideoOnly(ctx, list)) {
+        mModeOn = tryFullFrame(ctx, list) || tryVideoOnly(ctx, list);
+        if(mModeOn) {
             setMDPCompLayerFlags(ctx, list);
         } else {
             resetROI(ctx, mDpy);
@@ -1758,18 +1771,8 @@ int MDPCompNonSplit::configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
 bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
-    if(!isEnabled()) {
-        ALOGD_IF(isDebug(),"%s: MDP Comp not configured", __FUNCTION__);
-        return true;
-    }
-
-    if(!ctx || !list) {
-        ALOGE("%s: invalid contxt or list",__FUNCTION__);
-        return false;
-    }
-
-    if(ctx->listStats[mDpy].numAppLayers > MAX_NUM_APP_LAYERS) {
-        ALOGD_IF(isDebug(),"%s: Exceeding max layer count", __FUNCTION__);
+    if(!isEnabled() or !mModeOn) {
+        ALOGD_IF(isDebug(),"%s: MDP Comp not enabled/configured", __FUNCTION__);
         return true;
     }
 
@@ -2013,18 +2016,8 @@ int MDPCompSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
 bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
-    if(!isEnabled()) {
-        ALOGD_IF(isDebug(),"%s: MDP Comp not configured", __FUNCTION__);
-        return true;
-    }
-
-    if(!ctx || !list) {
-        ALOGE("%s: invalid contxt or list",__FUNCTION__);
-        return false;
-    }
-
-    if(ctx->listStats[mDpy].numAppLayers > MAX_NUM_APP_LAYERS) {
-        ALOGD_IF(isDebug(),"%s: Exceeding max layer count", __FUNCTION__);
+    if(!isEnabled() or !mModeOn) {
+        ALOGD_IF(isDebug(),"%s: MDP Comp not enabled/configured", __FUNCTION__);
         return true;
     }
 
