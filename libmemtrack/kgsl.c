@@ -47,7 +47,6 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
     size_t allocated_records = min(*num_records, ARRAY_SIZE(record_templates));
     int i;
     FILE *fp;
-    FILE *smaps_fp = NULL;
     char line[1024];
     char tmp[128];
     size_t accounted_size = 0;
@@ -70,19 +69,14 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
         return -errno;
     }
 
-    if (type == MEMTRACK_TYPE_GL) {
-        snprintf(tmp, sizeof(tmp), "/proc/%d/smaps", pid);
-        smaps_fp = fopen(tmp, "r");
-        if (smaps_fp == NULL) {
-            fclose(fp);
-            return -errno;
-        }
-    }
-
+    /* Go through each line of <pid>/mem file and for every entry of type "gpumem"
+     * check if the gpubuffer entry is usermapped or not. If the entry is usermapped
+     * count the entry as accounted else count the entry as unaccounted.
+     */
     while (1) {
-        unsigned long uaddr;
         unsigned long size;
         char line_type[7];
+        char flags[7];
         int ret;
 
         if (fgets(line, sizeof(line), fp) == NULL) {
@@ -91,49 +85,21 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
 
         /* Format:
          *  gpuaddr useraddr     size    id flags       type            usage sglen
-         * 545ba000 545ba000     4096     1 ----p     gpumem      arraybuffer     1
+         * 545ba000 545ba000     4096     1 ----pY     gpumem      arraybuffer     1
          */
-        ret = sscanf(line, "%*x %lx %lu %*d %*s %6s %*s %*d\n",
-                     &uaddr, &size, line_type);
+        ret = sscanf(line, "%*x %*lx %lu %*d %6s %6s %*s %*d\n",
+                     &size, flags, line_type);
         if (ret != 3) {
             continue;
         }
 
         if (type == MEMTRACK_TYPE_GL && strcmp(line_type, "gpumem") == 0) {
-            bool accounted = false;
-            /*
-             * We need to cross reference the user address against smaps,
-             *  luckily both are sorted.
-             */
-            while (smaps_addr <= uaddr) {
-                unsigned long start;
-                unsigned long end;
-                unsigned long smaps_size;
 
-                if (fgets(line, sizeof(line), smaps_fp) == NULL) {
-                    break;
-                }
-
-                if (sscanf(line, "%8lx-%8lx", &start, &end) == 2) {
-                    smaps_addr = start;
-                    continue;
-                }
-
-                if (smaps_addr != uaddr) {
-                    continue;
-                }
-
-                if (sscanf(line, "Rss: %lu kB", &smaps_size) == 1) {
-                    if (smaps_size) {
-                        accounted = true;
-                        accounted_size += size;
-                        break;
-                    }
-                }
-            }
-            if (!accounted) {
+            if (flags[6] == 'Y')
+                accounted_size += size;
+            else
                 unaccounted_size += size;
-            }
+
         } else if (type == MEMTRACK_TYPE_GRAPHICS && strcmp(line_type, "ion") == 0) {
             unaccounted_size += size;
         }
@@ -146,8 +112,6 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
         records[1].size_in_bytes = unaccounted_size;
     }
 
-    if (smaps_fp)
-        fclose(smaps_fp);
     fclose(fp);
 
     return 0;
