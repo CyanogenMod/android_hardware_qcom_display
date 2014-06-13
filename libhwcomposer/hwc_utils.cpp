@@ -83,7 +83,8 @@ bool isValidResolution(hwc_context_t *ctx, uint32_t xres, uint32_t yres)
             (xres < MIN_DISPLAY_XRES || yres < MIN_DISPLAY_YRES));
 }
 
-void changeResolution(hwc_context_t *ctx, int xres_orig, int yres_orig) {
+void changeResolution(hwc_context_t *ctx, int xres_orig, int yres_orig,
+                      int width, int height) {
     //Store original display resolution.
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres_new = xres_orig;
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres_new = yres_orig;
@@ -99,6 +100,12 @@ void changeResolution(hwc_context_t *ctx, int xres_orig, int yres_orig) {
             ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres_new = xres_new;
             ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres_new = yres_new;
             ctx->dpyAttr[HWC_DISPLAY_PRIMARY].customFBSize = true;
+
+            //Caluculate DPI according to changed resolution.
+            float xdpi = ((float)xres_new * 25.4f) / (float)width;
+            float ydpi = ((float)yres_new * 25.4f) / (float)height;
+            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xdpi = xdpi;
+            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].ydpi = ydpi;
         }
     }
 }
@@ -168,7 +175,7 @@ static int openFramebufferDevice(hwc_context_t *ctx)
             (uint32_t)(1000000000l / fps);
 
     //To change resolution of primary display
-    changeResolution(ctx, info.xres, info.yres);
+    changeResolution(ctx, info.xres, info.yres, info.width, info.height);
 
     //Unblank primary on first boot
     if(ioctl(fb_fd, FBIOBLANK,FB_BLANK_UNBLANK) < 0) {
