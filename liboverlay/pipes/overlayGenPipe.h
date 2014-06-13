@@ -54,6 +54,8 @@ public:
     void setPosition(const utils::Dim& dim);
     /* set visual param */
     bool setVisualParams(const MetaData_t &metadata);
+    /* set pipe type RGB/DMA/VG */
+    void setPipeType(const utils::eMdpPipeType& pType);
     /* commit changes to the overlay "set"*/
     bool commit();
     /* Data APIs */

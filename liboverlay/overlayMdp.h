@@ -82,6 +82,8 @@ public:
     utils::Dim getSrcRectDim() const;
     /* setVisualParam */
     bool setVisualParams(const MetaData_t& data);
+    /* sets pipe type RGB/DMA/VG */
+    void setPipeType(const utils::eMdpPipeType& pType);
 
     static bool validateAndSet(MdpCtrl* mdpCtrlArray[], const int& count,
             const int& fbFd);

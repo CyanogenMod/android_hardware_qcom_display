@@ -132,6 +132,23 @@ void MdpCtrl::setTransform(const utils::eTransform& orient) {
     mOrientation = static_cast<utils::eTransform>(rot);
 }
 
+void MdpCtrl::setPipeType(const utils::eMdpPipeType& pType){
+    switch((int) pType){
+        case utils::OV_MDP_PIPE_RGB:
+            mOVInfo.pipe_type = PIPE_TYPE_RGB;
+            break;
+        case utils::OV_MDP_PIPE_VG:
+            mOVInfo.pipe_type = PIPE_TYPE_VIG;
+            break;
+        case utils::OV_MDP_PIPE_DMA:
+            mOVInfo.pipe_type = PIPE_TYPE_DMA;
+            break;
+        default:
+            mOVInfo.pipe_type = PIPE_TYPE_AUTO;
+            break;
+    }
+}
+
 void MdpCtrl::doTransform() {
     setRotationFlags();
     utils::Whf whf = getSrcWhf();
