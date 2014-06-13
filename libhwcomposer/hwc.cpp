@@ -214,6 +214,8 @@ static void reset(hwc_context_t *ctx, int numDisplays,
 
         }
 
+        if(ctx->mMDPComp[i])
+            ctx->mMDPComp[i]->reset();
         if(ctx->mFBUpdate[i])
             ctx->mFBUpdate[i]->reset();
         if(ctx->mCopyBit[i])
@@ -223,7 +225,6 @@ static void reset(hwc_context_t *ctx, int numDisplays,
     }
 
     ctx->mAD->reset();
-    MDPComp::reset();
     if(ctx->mHWCVirtual)
         ctx->mHWCVirtual->destroy(ctx, numDisplays, displays);
 }
