@@ -474,9 +474,18 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
 
     ovutils::eDest destR = ovutils::OV_INVALID;
 
-    //Request right pipe (2 pipes needed only if dim > 2048)
-    if((fbUpdatingRect.right - fbUpdatingRect.left) >
-            qdutils::MAX_DISPLAY_DIM) {
+    /*  Use 2 pipes IF
+        a) FB's width is > 2048 or
+        b) On primary, driver has indicated with caps to split always. This is
+           based on an empirically derived value of panel height.
+    */
+
+    bool primarySplitAlways = (mDpy == HWC_DISPLAY_PRIMARY) and
+            qdutils::MDPVersion::getInstance().isSrcSplitAlways();
+
+    if(((fbUpdatingRect.right - fbUpdatingRect.left) >
+            qdutils::MAX_DISPLAY_DIM) or
+            primarySplitAlways) {
         destR = ov.getPipe(pipeSpecs);
         if(destR == ovutils::OV_INVALID) {
             ALOGE("%s: No pipes available to configure fb for dpy %d's right"

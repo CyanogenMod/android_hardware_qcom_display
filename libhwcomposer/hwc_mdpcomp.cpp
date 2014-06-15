@@ -2184,9 +2184,23 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
         return false;
     }
 
-    //If layer's crop width or dest width > 2048, use 2 pipes
-    if((dst.right - dst.left) > qdutils::MAX_DISPLAY_DIM or
-            (crop.right - crop.left) > qdutils::MAX_DISPLAY_DIM) {
+    /* Use 2 pipes IF
+        a) Layer's crop width is > 2048 or
+        b) Layer's dest width > 2048 or
+        c) On primary, driver has indicated with caps to split always. This is
+           based on an empirically derived value of panel height. Applied only
+           if the layer's width is > mixer's width
+    */
+
+    bool primarySplitAlways = (mDpy == HWC_DISPLAY_PRIMARY) and
+            qdutils::MDPVersion::getInstance().isSrcSplitAlways();
+    int lSplit = getLeftSplit(ctx, mDpy);
+    int dstWidth = dst.right - dst.left;
+    int cropWidth = crop.right - crop.left;
+
+    if(dstWidth > qdutils::MAX_DISPLAY_DIM or
+            cropWidth > qdutils::MAX_DISPLAY_DIM or
+            (primarySplitAlways and (cropWidth > lSplit))) {
         pipe_info.rIndex = ctx->mOverlay->getPipe(pipeSpecs);
         if(pipe_info.rIndex == ovutils::OV_INVALID) {
             return false;
