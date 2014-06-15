@@ -335,9 +335,9 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 
     //Will be unlocked at the end of set
     ctx->mDrawLock.lock();
-    setPaddingRound(ctx,numDisplays,displays);
-    setDMAState(ctx,numDisplays,displays);
-    setNumActiveDisplays(ctx,numDisplays,displays);
+    setPaddingRound(ctx, (int)numDisplays, displays);
+    setDMAState(ctx, (int)numDisplays, displays);
+    setNumActiveDisplays(ctx, (int)numDisplays, displays);
     reset(ctx, (int)numDisplays, displays);
 
     ctx->mOverlay->configBegin();
