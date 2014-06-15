@@ -384,7 +384,7 @@ bool CopyBit::drawUsingAppBufferComposition(hwc_context_t *ctx,
                                       hwc_display_contents_1_t *list,
                                       int dpy, int *copybitFd) {
      int layerCount = 0;
-     uint32_t last = list->numHwLayers - 1;
+     uint32_t last = (uint32_t)list->numHwLayers - 1;
      hwc_layer_1_t *fbLayer = &list->hwLayers[last];
      private_handle_t *fbhnd = (private_handle_t *)fbLayer->handle;
 
@@ -501,7 +501,6 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
 
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
     for (int i = 0; i <= (ctx->listStats[dpy].numAppLayers-1); i++) {
-        hwc_layer_1_t *layer = &list->hwLayers[i];
         if(!(layerProp[i].mFlags & HWC_COPYBIT)) {
             ALOGD_IF(DEBUG_COPYBIT, "%s: Not Marked for copybit", __FUNCTION__);
             continue;
@@ -1054,8 +1053,8 @@ struct copybit_device_t* CopyBit::getCopyBitDevice() {
     return mEngine;
 }
 
-CopyBit::CopyBit(hwc_context_t *ctx, const int& dpy) : mIsModeOn(false),
-        mCopyBitDraw(false), mCurRenderBufferIndex(0), mEngine(0) {
+CopyBit::CopyBit(hwc_context_t *ctx, const int& dpy) :  mEngine(0),
+    mIsModeOn(false), mCopyBitDraw(false), mCurRenderBufferIndex(0) {
 
     getBufferSizeAndDimensions(ctx->dpyAttr[dpy].xres,
             ctx->dpyAttr[dpy].yres,

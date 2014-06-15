@@ -191,7 +191,7 @@ void ExternalDisplay::readCEUnderscanInfo()
         return;
     } else {
         len = read(hdmiScanInfoFile, scanInfo, sizeof(scanInfo)-1);
-        ALOGD("%s: Scan Info string: %s length = %zu",
+        ALOGD("%s: Scan Info string: %s length = %zd",
                  __FUNCTION__, scanInfo, len);
         if (len <= 0) {
             close(hdmiScanInfoFile);
@@ -313,7 +313,7 @@ bool ExternalDisplay::readResolution()
         return false;
     } else {
         len = read(hdmiEDIDFile, edidStr, sizeof(edidStr)-1);
-        ALOGD_IF(DEBUG, "%s: EDID string: %s length = %zu",
+        ALOGD_IF(DEBUG, "%s: EDID string: %s length = %zd",
                  __FUNCTION__, edidStr, len);
         if ( len <= 0) {
             ALOGE("%s: edid_modes file empty '%s'",

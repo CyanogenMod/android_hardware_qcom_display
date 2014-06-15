@@ -71,8 +71,8 @@ static void handle_vsync_event(hwc_context_t* ctx, int dpy, char *data)
 static void handle_blank_event(hwc_context_t* ctx, int dpy, char *data)
 {
     if (!strncmp(data, PANEL_ON_STR, strlen(PANEL_ON_STR))) {
-        uint32_t poweron = strtoul(data + strlen(PANEL_ON_STR), NULL, 0);
-        ALOGI("%s: dpy:%d panel power state: %d", __FUNCTION__, dpy, poweron);
+        unsigned long int poweron = strtoul(data + strlen(PANEL_ON_STR), NULL, 0);
+        ALOGI("%s: dpy:%d panel power state: %ld", __FUNCTION__, dpy, poweron);
         ctx->dpyAttr[dpy].isActive = poweron ? true: false;
     }
 }
@@ -151,7 +151,7 @@ static void *vsync_loop(void *param)
 
     if (LIKELY(!ctx->vstate.fakevsync)) {
         do {
-            int err = poll(*pfd, num_displays * num_events, -1);
+            int err = poll(*pfd, (int)(num_displays * num_events), -1);
             if(err > 0) {
                 for (int dpy = HWC_DISPLAY_PRIMARY; dpy < num_displays; dpy++) {
                     for(size_t ev = 0; ev < num_events; ev++) {
