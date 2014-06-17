@@ -275,7 +275,7 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
        qhwc::calculate_crop_rects(crop, dst, scissor, layer->transform);
     }
 
-    bool rotated90 = (bool)layer->transform & HAL_TRANSFORM_ROT_90;
+    bool rotated90 = (bool)(layer->transform & HAL_TRANSFORM_ROT_90);
     int crop_w = rotated90 ? crop.bottom - crop.top : crop.right - crop.left;
     int crop_h = rotated90 ? crop.right - crop.left : crop.bottom - crop.top;
     int dst_w = dst.right - dst.left;

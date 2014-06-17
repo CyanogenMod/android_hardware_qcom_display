@@ -128,32 +128,9 @@ void MdpCtrl::doDownscale() {
         mOVInfo.src_rect.w >>= mDownscale;
         mOVInfo.src_rect.h >>= mDownscale;
     } else if(MDPVersion::getInstance().supportsDecimation()) {
-        //Decimation + MDP Downscale
-        mOVInfo.horz_deci = 0;
-        mOVInfo.vert_deci = 0;
-        int minHorDeci = 0;
-        if(mOVInfo.src_rect.w > 2048) {
-            //If the client sends us something > what a layer mixer supports
-            //then it means it doesn't want to use split-pipe but wants us to
-            //decimate. A minimum decimation of 2 will ensure that the width is
-            //always within layer mixer limits.
-            minHorDeci = 2;
-        }
-
-        float horDscale = 0.0f;
-        float verDscale = 0.0f;
-
         utils::getDecimationFactor(mOVInfo.src_rect.w, mOVInfo.src_rect.h,
-                mOVInfo.dst_rect.w, mOVInfo.dst_rect.h, horDscale, verDscale);
-
-        if(horDscale < minHorDeci)
-            horDscale = minHorDeci;
-
-        if((int)horDscale)
-            mOVInfo.horz_deci = (int)log2f(horDscale);
-
-        if((int)verDscale)
-            mOVInfo.vert_deci = (int)log2f(verDscale);
+                mOVInfo.dst_rect.w, mOVInfo.dst_rect.h, mOVInfo.horz_deci,
+                mOVInfo.vert_deci);
     }
 }
 

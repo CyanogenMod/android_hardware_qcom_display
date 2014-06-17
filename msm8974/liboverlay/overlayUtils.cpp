@@ -258,10 +258,12 @@ int getDownscaleFactor(const int& src_w, const int& src_h,
 }
 
 void getDecimationFactor(const int& src_w, const int& src_h,
-        const int& dst_w, const int& dst_h, float& horDscale,
-        float& verDscale) {
-    horDscale = ceilf((float)src_w / (float)dst_w);
-    verDscale = ceilf((float)src_h / (float)dst_h);
+        const int& dst_w, const int& dst_h, uint8_t& horzDeci,
+        uint8_t& vertDeci) {
+    horzDeci = 0;
+    vertDeci = 0;
+    float horDscale = ceilf((float)src_w / (float)dst_w);
+    float verDscale = ceilf((float)src_h / (float)dst_h);
 
     //Next power of 2, if not already
     horDscale = powf(2.0f, ceilf(log2f(horDscale)));
@@ -271,6 +273,21 @@ void getDecimationFactor(const int& src_w, const int& src_h,
     //between decimator and MDP downscale
     horDscale /= 4.0f;
     verDscale /= 4.0f;
+
+    if((int)horDscale)
+        horzDeci = (uint8_t)log2f(horDscale);
+
+    if((int)verDscale)
+        vertDeci = (uint8_t)log2f(verDscale);
+
+    if(src_w > 2048) {
+        //If the client sends us something > what a layer mixer supports
+        //then it means it doesn't want to use split-pipe but wants us to
+        //decimate. A minimum decimation of 2 will ensure that the width is
+        //always within layer mixer limits.
+        if(horzDeci < 2)
+            horzDeci = 2;
+    }
 }
 
 static inline int compute(const uint32_t& x, const uint32_t& y,
