@@ -101,9 +101,10 @@ struct PanelInfo {
     int mHeightAlign;            // ROI height alignment restriction
     int mMinROIWidth;            // Min width needed for ROI
     int mMinROIHeight;           // Min height needed for ROI
+    bool mNeedsROIMerge;         // Merge ROI's of both the DSI's
     PanelInfo() : mType(NO_PANEL), mPartialUpdateEnable(0),
     mLeftAlign(0), mWidthAlign(0), mTopAlign(0), mHeightAlign(0),
-    mMinROIWidth(0), mMinROIHeight(0){}
+    mMinROIWidth(0), mMinROIHeight(0), mNeedsROIMerge(false){}
     friend class MDPVersion;
 };
 
@@ -128,13 +129,14 @@ public:
     bool supportsMacroTile();
     int getLeftSplit() { return mSplit.left(); }
     int getRightSplit() { return mSplit.right(); }
-    int isPartialUpdateEnabled() { return mPanelInfo.mPartialUpdateEnable; }
+    bool isPartialUpdateEnabled() { return mPanelInfo.mPartialUpdateEnable; }
     int getLeftAlign() { return mPanelInfo.mLeftAlign; }
     int getWidthAlign() { return mPanelInfo.mWidthAlign; }
     int getTopAlign() { return mPanelInfo.mTopAlign; }
     int getHeightAlign() { return mPanelInfo.mHeightAlign; }
     int getMinROIWidth() { return mPanelInfo.mMinROIWidth; }
     int getMinROIHeight() { return mPanelInfo.mMinROIHeight; }
+    bool needsROIMerge() { return mPanelInfo.mNeedsROIMerge; }
     unsigned long getLowBw() { return mLowBw; }
     unsigned long getHighBw() { return mHighBw; }
     bool isSrcSplit() const;

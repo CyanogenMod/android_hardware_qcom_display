@@ -833,12 +833,12 @@ void setListStats(hwc_context_t *ctx,
     char property[PROPERTY_VALUE_MAX];
     ctx->listStats[dpy].extOnlyLayerIndex = -1;
     ctx->listStats[dpy].isDisplayAnimating = false;
-    ctx->listStats[dpy].roi = ovutils::Dim(0, 0,
-                      (int)ctx->dpyAttr[dpy].xres, (int)ctx->dpyAttr[dpy].yres);
     ctx->listStats[dpy].secureUI = false;
     ctx->listStats[dpy].yuv4k2kCount = 0;
     ctx->mViewFrame[dpy] = (hwc_rect_t){0, 0, 0, 0};
     ctx->dpyAttr[dpy].mActionSafePresent = isActionSafePresent(ctx, dpy);
+
+    resetROI(ctx, dpy);
 
     // Calculate view frame of ext display from primary resolution
     // and primary device orientation.
@@ -1069,9 +1069,30 @@ bool areLayersIntersecting(const hwc_layer_1_t* layer1,
     return isValidRect(irect);
 }
 
+bool isSameRect(const hwc_rect& rect1, const hwc_rect& rect2)
+{
+   return ((rect1.left == rect2.left) && (rect1.top == rect2.top) &&
+           (rect1.right == rect2.right) && (rect1.bottom == rect2.bottom));
+}
+
 bool isValidRect(const hwc_rect& rect)
 {
    return ((rect.bottom > rect.top) && (rect.right > rect.left)) ;
+}
+
+hwc_rect_t moveRect(const hwc_rect_t& rect, const int& x_off, const int& y_off)
+{
+    hwc_rect_t res;
+
+    if(!isValidRect(rect))
+        return (hwc_rect_t){0, 0, 0, 0};
+
+    res.left = rect.left + x_off;
+    res.top = rect.top + y_off;
+    res.right = rect.right + x_off;
+    res.bottom = rect.bottom + y_off;
+
+    return res;
 }
 
 /* computes the intersection of two rects */
@@ -1743,14 +1764,17 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     const int lSplit = getLeftSplit(ctx, dpy);
 
-    if(lDest != OV_INVALID) {
+    // Calculate Left rects
+    if(dst.left < lSplit) {
         tmp_cropL = crop;
         tmp_dstL = dst;
         hwc_rect_t scissor = {0, 0, lSplit, hw_h };
         scissor = getIntersection(ctx->mViewFrame[dpy], scissor);
         qhwc::calculate_crop_rects(tmp_cropL, tmp_dstL, scissor, 0);
     }
-    if(rDest != OV_INVALID) {
+
+    // Calculate Right rects
+    if(dst.right > lSplit) {
         tmp_cropR = crop;
         tmp_dstR = dst;
         hwc_rect_t scissor = {lSplit, 0, hw_w, hw_h };
@@ -1763,8 +1787,8 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     //When buffer is H-flipped, contents of mixer config also needs to swapped
     //Not needed if the layer is confined to one half of the screen.
     //If rotator has been used then it has also done the flips, so ignore them.
-    if((orient & OVERLAY_TRANSFORM_FLIP_H) && lDest != OV_INVALID
-            && rDest != OV_INVALID && (*rot) == NULL) {
+    if((orient & OVERLAY_TRANSFORM_FLIP_H) && (dst.left < lSplit) &&
+            (dst.right > lSplit) && (*rot) == NULL) {
         hwc_rect_t new_cropR;
         new_cropR.left = tmp_cropL.left;
         new_cropR.right = new_cropR.left + (tmp_cropR.right - tmp_cropR.left);
@@ -2155,7 +2179,20 @@ void LayerRotMap::setReleaseFd(const int& fence) {
     }
 }
 
-hwc_rect_t sanitizeROI(struct hwc_rect roi, hwc_rect boundary)
+void resetROI(hwc_context_t *ctx, const int dpy) {
+    const int fbXRes = (int)ctx->dpyAttr[dpy].xres;
+    const int fbYRes = (int)ctx->dpyAttr[dpy].yres;
+    if(isDisplaySplit(ctx, dpy)) {
+        const int lSplit = getLeftSplit(ctx, dpy);
+        ctx->listStats[dpy].lRoi = (struct hwc_rect){0, 0, lSplit, fbYRes};
+        ctx->listStats[dpy].rRoi = (struct hwc_rect){lSplit, 0, fbXRes, fbYRes};
+    } else  {
+        ctx->listStats[dpy].lRoi = (struct hwc_rect){0, 0,fbXRes, fbYRes};
+        ctx->listStats[dpy].rRoi = (struct hwc_rect){0, 0, 0, 0};
+    }
+}
+
+hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
 {
    if(!isValidRect(roi))
       return roi;
@@ -2167,6 +2204,7 @@ hwc_rect_t sanitizeROI(struct hwc_rect roi, hwc_rect boundary)
    const int TOP_ALIGN = qdutils::MDPVersion::getInstance().getTopAlign();
    const int HEIGHT_ALIGN = qdutils::MDPVersion::getInstance().getHeightAlign();
    const int MIN_WIDTH = qdutils::MDPVersion::getInstance().getMinROIWidth();
+   const int MIN_HEIGHT = qdutils::MDPVersion::getInstance().getMinROIHeight();
 
    /* Align to minimum width recommended by the panel */
    if((t_roi.right - t_roi.left) < MIN_WIDTH) {
@@ -2176,7 +2214,18 @@ hwc_rect_t sanitizeROI(struct hwc_rect roi, hwc_rect boundary)
            t_roi.right = t_roi.left + MIN_WIDTH;
    }
 
+  /* Align to minimum height recommended by the panel */
+   if((t_roi.bottom - t_roi.top) < MIN_HEIGHT) {
+       if((t_roi.top + MIN_HEIGHT) > boundary.bottom)
+           t_roi.top = t_roi.bottom - MIN_HEIGHT;
+       else
+           t_roi.bottom = t_roi.top + MIN_HEIGHT;
+   }
+
    /* Align left and width to meet panel restrictions */
+   if(LEFT_ALIGN)
+       t_roi.left = t_roi.left - (t_roi.left % LEFT_ALIGN);
+
    if(WIDTH_ALIGN) {
        int width = t_roi.right - t_roi.left;
        width = WIDTH_ALIGN * ((width + (WIDTH_ALIGN - 1)) / WIDTH_ALIGN);
@@ -2185,13 +2234,17 @@ hwc_rect_t sanitizeROI(struct hwc_rect roi, hwc_rect boundary)
        if(t_roi.right > boundary.right) {
            t_roi.right = boundary.right;
            t_roi.left = t_roi.right - width;
+
+           if(LEFT_ALIGN)
+               t_roi.left = t_roi.left - (t_roi.left % LEFT_ALIGN);
        }
    }
 
-   if(LEFT_ALIGN)
-       t_roi.left = t_roi.left - (t_roi.left % LEFT_ALIGN);
 
    /* Align top and height to meet panel restrictions */
+   if(TOP_ALIGN)
+       t_roi.top = t_roi.top - (t_roi.top % TOP_ALIGN);
+
    if(HEIGHT_ALIGN) {
        int height = t_roi.bottom - t_roi.top;
        height = HEIGHT_ALIGN *  ((height + (HEIGHT_ALIGN - 1)) / HEIGHT_ALIGN);
@@ -2200,11 +2253,12 @@ hwc_rect_t sanitizeROI(struct hwc_rect roi, hwc_rect boundary)
        if(t_roi.bottom > boundary.bottom) {
            t_roi.bottom = boundary.bottom;
            t_roi.top = t_roi.bottom - height;
+
+           if(TOP_ALIGN)
+               t_roi.top = t_roi.top - (t_roi.top % TOP_ALIGN);
        }
    }
 
-   if(TOP_ALIGN)
-       t_roi.top = t_roi.top - (t_roi.top % TOP_ALIGN);
 
    return t_roi;
 }
