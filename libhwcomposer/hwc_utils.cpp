@@ -736,28 +736,6 @@ static void trimList(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     }
 }
 
-hwc_rect_t calculateDisplayViewFrame(hwc_context_t *ctx, int dpy) {
-    int dstWidth = ctx->dpyAttr[dpy].xres;
-    int dstHeight = ctx->dpyAttr[dpy].yres;
-    int srcWidth = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
-    int srcHeight = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
-    // default we assume viewframe as a full frame for primary display
-    hwc_rect outRect = {0, 0, dstWidth, dstHeight};
-    if(dpy) {
-        // swap srcWidth and srcHeight, if the device orientation is 90 or 270.
-        if(ctx->deviceOrientation & 0x1) {
-            swap(srcWidth, srcHeight);
-        }
-        // Get Aspect Ratio for external
-        getAspectRatioPosition(dstWidth, dstHeight, srcWidth,
-                            srcHeight, outRect);
-    }
-    ALOGD_IF(HWC_UTILS_DEBUG, "%s: view frame for dpy %d is [%d %d %d %d]",
-        __FUNCTION__, dpy, outRect.left, outRect.top,
-        outRect.right, outRect.bottom);
-    return outRect;
-}
-
 void setListStats(hwc_context_t *ctx,
         hwc_display_contents_1_t *list, int dpy) {
     const int prevYuvCount = ctx->listStats[dpy].yuvCount;
@@ -775,12 +753,7 @@ void setListStats(hwc_context_t *ctx,
                       (int)ctx->dpyAttr[dpy].xres, (int)ctx->dpyAttr[dpy].yres);
     ctx->listStats[dpy].secureUI = false;
     ctx->listStats[dpy].yuv4k2kCount = 0;
-    ctx->mViewFrame[dpy] = (hwc_rect_t){0, 0, 0, 0};
     ctx->dpyAttr[dpy].mActionSafePresent = isActionSafePresent(ctx, dpy);
-
-    // Calculate view frame of ext display from primary resolution
-    // and primary device orientation.
-    ctx->mViewFrame[dpy] = calculateDisplayViewFrame(ctx, dpy);
 
     trimList(ctx, list, dpy);
     optimizeLayerRects(ctx, list, dpy);
