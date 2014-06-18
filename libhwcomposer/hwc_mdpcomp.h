@@ -43,6 +43,8 @@ public:
     int prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* draw */
     virtual bool draw(hwc_context_t *ctx, hwc_display_contents_1_t *list) = 0;
+    //Reset values
+    void reset();
     /* dumpsys */
     void dump(android::String8& buf);
 
@@ -52,7 +54,6 @@ public:
     /* Initialize MDP comp*/
     static bool init(hwc_context_t *ctx);
     static void resetIdleFallBack() { sIdleFallBack = false; }
-    static void reset() { sHandleTimeout = false; };
 
 protected:
     enum { MAX_SEC_LAYERS = 1 }; //TODO add property support
@@ -232,6 +233,7 @@ protected:
     static bool sEnable4k2kYUVSplit;
     bool allocSplitVGPipesfor4k2k(hwc_context_t *ctx,
             hwc_display_contents_1_t* list, int index);
+    bool mModeOn; // if prepare happened
 };
 
 class MDPCompNonSplit : public MDPComp {
