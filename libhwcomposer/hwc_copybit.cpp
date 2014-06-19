@@ -433,9 +433,20 @@ bool CopyBit::drawUsingAppBufferComposition(hwc_context_t *ctx,
        if(layerCount == 1)
           return true;
 
-       if(layerCount == MAX_LAYERS_FOR_ABC) {
-          // Pass the Acquire Fence FD to driver for base layer
+       if(layerCount ==  MAX_LAYERS_FOR_ABC) {
           int abcRenderBufIdx = ctx->listStats[dpy].renderBufIndexforABC;
+          //enable ABC only for non intersecting layers.
+          hwc_rect_t displayFrame =
+                  list->hwLayers[abcRenderBufIdx].displayFrame;
+          for (int i = abcRenderBufIdx + 1; i < layerCount; i++) {
+             hwc_rect_t tmpDisplayFrame = list->hwLayers[i].displayFrame;
+             hwc_rect_t result = getIntersection(displayFrame,tmpDisplayFrame);
+             if (isValidRect(result)) {
+                ctx->listStats[dpy].renderBufIndexforABC = -1;
+                return false;
+             }
+          }
+          // Pass the Acquire Fence FD to driver for base layer
           private_handle_t *renderBuffer =
           (private_handle_t *)list->hwLayers[abcRenderBufIdx].handle;
           copybit_device_t *copybit = getCopyBitDevice();
@@ -443,7 +454,7 @@ bool CopyBit::drawUsingAppBufferComposition(hwc_context_t *ctx,
              copybit->set_sync(copybit,
              list->hwLayers[abcRenderBufIdx].acquireFenceFd);
           }
-          for(int i = 1; i < layerCount; i++){
+          for(int i = abcRenderBufIdx + 1; i < layerCount; i++){
              int retVal = drawLayerUsingCopybit(ctx,
                &(list->hwLayers[i]),renderBuffer, 0, !i);
              if(retVal < 0) {
