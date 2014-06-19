@@ -140,6 +140,7 @@ public:
     unsigned long getLowBw() { return mLowBw; }
     unsigned long getHighBw() { return mHighBw; }
     bool isSrcSplit() const;
+    bool isSrcSplitAlways() const;
     bool isRGBScalarSupported() const;
     bool is8x26();
     bool is8x74v2();
@@ -169,6 +170,8 @@ private:
     unsigned long mLowBw; //kbps
     unsigned long mHighBw; //kbps
     bool mSourceSplit;
+    //Additional property on top of source split
+    bool mSourceSplitAlways;
     bool mRGBHasNoScalar;
 };
 }; //namespace qdutils
