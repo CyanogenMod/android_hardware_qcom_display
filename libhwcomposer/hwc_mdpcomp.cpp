@@ -43,7 +43,7 @@ bool MDPComp::sDebugLogs = false;
 bool MDPComp::sEnabled = false;
 bool MDPComp::sEnableMixedMode = true;
 int MDPComp::sSimulationFlags = 0;
-int MDPComp::sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
+int MDPComp::sMaxPipesPerMixer = 0;
 bool MDPComp::sEnableYUVsplit = false;
 bool MDPComp::sSrcSplitEnabled = false;
 bool MDPComp::enablePartialUpdateForMDP3 = false;
@@ -127,11 +127,15 @@ bool MDPComp::init(hwc_context_t *ctx) {
         sEnableMixedMode = false;
     }
 
-    sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
-    if(property_get("debug.mdpcomp.maxpermixer", property, "-1") > 0) {
+    qdutils::MDPVersion &mdpVersion = qdutils::MDPVersion::getInstance();
+
+    /* MDSS_MDP_STAGE_UNUSED and MDSS_MDP_STAGE_BASE are not available for MDP
+     * composition. */
+    sMaxPipesPerMixer = (int)mdpVersion.getBlendStages() - 2;
+    if(property_get("persist.hwc.mdpcomp.maxpermixer", property, "-1") > 0) {
         int val = atoi(property);
         if(val >= 0)
-            sMaxPipesPerMixer = min(val, MAX_PIPES_PER_MIXER);
+            sMaxPipesPerMixer = min(val, sMaxPipesPerMixer);
     }
 
     if(ctx->mMDP.panel != MIPI_CMD_PANEL) {
@@ -213,6 +217,16 @@ void MDPComp::timeout_handler(void *udata) {
     ctx->proc->invalidate(ctx->proc);
 }
 
+void MDPComp::setMaxPipesPerMixer(const uint32_t value) {
+    qdutils::MDPVersion &mdpVersion = qdutils::MDPVersion::getInstance();
+    uint32_t maxSupported = (int)mdpVersion.getBlendStages() - 2;
+    if(value > maxSupported) {
+        ALOGW("%s: Input exceeds max value supported. Setting to"
+                "max value: %d", __FUNCTION__, maxSupported);
+    }
+    sMaxPipesPerMixer = min(value, maxSupported);
+}
+
 void MDPComp::setIdleTimeout(const uint32_t& timeout) {
     enum { ONE_REFRESH_PERIOD_MS = 17, ONE_BILLION_MS = 1000000000 };
 
@@ -268,7 +282,7 @@ MDPComp::FrameInfo::FrameInfo() {
 }
 
 void MDPComp::FrameInfo::reset(const int& numLayers) {
-    for(int i = 0; i < MAX_PIPES_PER_MIXER; i++) {
+    for(int i = 0 ; i < MAX_NUM_BLEND_STAGES; i++ ) {
         if(mdpToLayer[i].pipeInfo) {
             delete mdpToLayer[i].pipeInfo;
             mdpToLayer[i].pipeInfo = NULL;

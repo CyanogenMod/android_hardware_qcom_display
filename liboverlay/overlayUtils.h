@@ -239,6 +239,9 @@ enum eZorder {
     ZORDER_1,
     ZORDER_2,
     ZORDER_3,
+    ZORDER_4,
+    ZORDER_5,
+    ZORDER_6,
     Z_SYSTEM_ALLOC = 0xFFFF
 };
 

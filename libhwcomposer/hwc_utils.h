@@ -41,6 +41,7 @@
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 #define MAX_NUM_APP_LAYERS 32
+#define MAX_NUM_BLEND_STAGES 16
 #define MIN_DISPLAY_XRES 200
 #define MIN_DISPLAY_YRES 200
 #define HWC_WFDDISPSYNC_LOG 0
