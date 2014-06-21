@@ -1702,6 +1702,8 @@ void MDPCompNonSplit::adjustForSourceSplit(hwc_context_t *ctx,
     //fbz is above 4k2k layer, increment fb zorder by 1
     //as we split 4k2k layer and increment zorder for right half
     //of the layer
+    if(!ctx)
+        return;
     if(mCurrentFrame.fbZ >= 0) {
         for (int index = 0, mdpNextZOrder = 0; index < mCurrentFrame.layerCount;
                 index++) {

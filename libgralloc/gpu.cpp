@@ -237,7 +237,7 @@ int gpu_context_t::gralloc_alloc_framebuffer_locked(int usage,
     // find a free slot
     for (uint32_t i=0 ; i<numBuffers ; i++) {
         if ((bufferMask & (1LU<<i)) == 0) {
-            m->bufferMask |= (1LU<<i);
+            m->bufferMask |= (uint32_t)(1LU<<i);
             break;
         }
         vaddr += bufferSize;
@@ -327,7 +327,7 @@ int gpu_context_t::free_impl(private_handle_t const* hnd) {
         const unsigned int bufferSize = m->finfo.line_length * m->info.yres;
         unsigned int index = (unsigned int) ((hnd->base - m->framebuffer->base)
                 / bufferSize);
-        m->bufferMask &= ~(1LU<<index);
+        m->bufferMask &= (uint32_t)~(1LU<<index);
     } else {
 
         terminateBuffer(&m->base, const_cast<private_handle_t*>(hnd));
