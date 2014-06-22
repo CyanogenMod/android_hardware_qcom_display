@@ -53,11 +53,13 @@ enum mdp_version {
     MDSS_V5     = 500,
 };
 
+#ifndef MDSS_MDP_REV
 enum mdp_rev {
     MDSS_MDP_HW_REV_100 = 0x10000000,
     MDSS_MDP_HW_REV_101 = 0x10010000, //8x26
     MDSS_MDP_HW_REV_102 = 0x10020000,
 };
+#endif
 
 enum {
     MAX_DISPLAY_DIM = 2048,
