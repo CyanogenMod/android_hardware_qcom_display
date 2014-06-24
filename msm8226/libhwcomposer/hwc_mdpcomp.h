@@ -56,6 +56,7 @@ public:
     static bool init(hwc_context_t *ctx);
     static void resetIdleFallBack() { sIdleFallBack = false; }
     static bool isIdleFallback() { return sIdleFallBack; }
+    static void dynamicDebug(bool enable){ sDebugLogs = enable; }
 
 protected:
     enum { MAX_SEC_LAYERS = 1 }; //TODO add property support

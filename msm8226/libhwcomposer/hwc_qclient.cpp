@@ -31,6 +31,7 @@
 #include <IQService.h>
 #include <hwc_utils.h>
 #include <mdp_version.h>
+#include <hwc_mdpcomp.h>
 
 #define QCLIENT_DEBUG 0
 
@@ -213,6 +214,26 @@ static status_t setViewFrame(hwc_context_t* ctx, const Parcel* inParcel) {
     }
 }
 
+static void toggleDynamicDebug(hwc_context_t* ctx, const Parcel* inParcel) {
+    int debug_type = inParcel->readInt32();
+    bool enable = !!inParcel->readInt32();
+    ALOGD("%s: debug_type: %d enable:%d",
+            __FUNCTION__, debug_type, enable);
+    Locker::Autolock _sl(ctx->mDrawLock);
+    switch (debug_type) {
+        //break is ignored for DEBUG_ALL to toggle all of them at once
+        case IQService::DEBUG_ALL:
+        case IQService::DEBUG_MDPCOMP:
+            qhwc::MDPComp::dynamicDebug(enable);
+            if (debug_type != IQService::DEBUG_ALL)
+                break;
+        case IQService::DEBUG_VSYNC:
+            ctx->vstate.debug = enable;
+            if (debug_type != IQService::DEBUG_ALL)
+                break;
+    }
+}
+
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t ret = NO_ERROR;
@@ -254,6 +275,9 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::SET_VIEW_FRAME:
             setViewFrame(mHwcContext, inParcel);
+            break;
+        case IQService::DYNAMIC_DEBUG:
+            toggleDynamicDebug(mHwcContext, inParcel);
             break;
         default:
             ret = NO_ERROR;
