@@ -87,7 +87,7 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
          *  gpuaddr useraddr     size    id flags       type            usage sglen
          * 545ba000 545ba000     4096     1 ----pY     gpumem      arraybuffer     1
          */
-        ret = sscanf(line, "%*x %*lx %lu %*d %6s %6s %*s %*d\n",
+        ret = sscanf(line, "%*x %*x %lu %*d %6s %6s %*s %*d\n",
                      &size, flags, line_type);
         if (ret != 3) {
             continue;
