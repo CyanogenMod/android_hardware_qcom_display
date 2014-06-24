@@ -232,6 +232,13 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDPComp[HWC_DISPLAY_PRIMARY] =
          MDPComp::getObject(ctx, HWC_DISPLAY_PRIMARY);
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
+    //Initialize the primary display viewFrame info
+    ctx->mViewFrame[HWC_DISPLAY_PRIMARY].left = 0;
+    ctx->mViewFrame[HWC_DISPLAY_PRIMARY].top = 0;
+    ctx->mViewFrame[HWC_DISPLAY_PRIMARY].right =
+        (int)ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
+    ctx->mViewFrame[HWC_DISPLAY_PRIMARY].bottom =
+         (int)ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
 
     ctx->mVDSEnabled = false;
     if((property_get("persist.hwc.enable_vds", value, NULL) > 0)) {
