@@ -40,7 +40,6 @@ namespace qhwc {
 #define PANEL_ON_STR "panel_power_on ="
 #define ARRAY_LENGTH(array) (sizeof((array))/sizeof((array)[0]))
 const int MAX_DATA = 64;
-bool logvsync = false;
 
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable)
 {
@@ -63,7 +62,7 @@ static void handle_vsync_event(hwc_context_t* ctx, int dpy, char *data)
         timestamp = strtoull(data + strlen("VSYNC="), NULL, 0);
     }
     // send timestamp to SurfaceFlinger
-    ALOGD_IF (logvsync, "%s: timestamp %"PRIu64" sent to SF for dpy=%d",
+    ALOGD_IF (ctx->vstate.debug, "%s: timestamp %"PRIu64" sent to SF for dpy=%d",
             __FUNCTION__, timestamp, dpy);
     ctx->proc->vsync(ctx->proc, dpy, timestamp);
 }
@@ -108,11 +107,6 @@ static void *vsync_loop(void *param)
     if(property_get("debug.hwc.fakevsync", property, NULL) > 0) {
         if(atoi(property) == 1)
             ctx->vstate.fakevsync = true;
-    }
-
-    if(property_get("debug.hwc.logvsync", property, 0) > 0) {
-        if(atoi(property) == 1)
-            logvsync = true;
     }
 
     char node_path[MAX_SYSFS_FILE_PATH];
