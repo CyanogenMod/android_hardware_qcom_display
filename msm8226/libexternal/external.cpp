@@ -620,6 +620,13 @@ void ExternalDisplay::setAttributes() {
                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode =true;
             }
         }
+        //Initialize the display viewFrame info
+        mHwcContext->mViewFrame[HWC_DISPLAY_EXTERNAL].left = 0;
+        mHwcContext->mViewFrame[HWC_DISPLAY_EXTERNAL].top = 0;
+        mHwcContext->mViewFrame[HWC_DISPLAY_EXTERNAL].right =
+            (int)mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres;
+        mHwcContext->mViewFrame[HWC_DISPLAY_EXTERNAL].bottom =
+            (int)mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres;
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].vsync_period =
                 (int) 1000000000l / fps;
     }
