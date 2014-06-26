@@ -442,6 +442,13 @@ bool MDPComp::isFullFrameDoable(hwc_context_t *ctx,
     for(int i = 0; i < numAppLayers; ++i) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
+
+        // check for downscale mode which requires scaling.
+        if(ctx->dpyAttr[mDpy].mDownScaleMode && qhwc::isAlphaPresent(layer)) {
+            ALOGD_IF(isDebug(),"%s: In mDownScaleMode scalling required",__FUNCTION__);
+            return false;
+        }
+
         if((layer->planeAlpha < 0xFF) &&
                 qhwc::needsScaling(ctx,layer,mDpy)){
             ALOGD_IF(isDebug(),
