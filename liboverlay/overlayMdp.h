@@ -64,8 +64,6 @@ public:
     void setPosition(const utils::Dim& dim);
     /* using user_data, sets/unsets roationvalue in mdp flags */
     void setRotationFlags();
-    /* Performs downscale calculations */
-    void setDownscale(int dscale_factor);
     /* Update the src format with rotator's dest*/
     void updateSrcFormat(const uint32_t& rotDstFormat);
     /* dump state of the object */
@@ -125,38 +123,12 @@ private:
     mdp_overlay   mOVInfo;
     /* FD for the mdp fbnum */
     OvFD          mFd;
-    int mDownscale;
     int mDpy;
 
 #ifdef USES_POST_PROCESSING
     /* PP Compute Params */
     struct compute_params mParams;
 #endif
-};
-
-
-/* MDP 3D related ctrl */
-class MdpCtrl3D {
-public:
-    /* ctor reset data */
-    MdpCtrl3D();
-    /* calls MSMFB_OVERLAY_3D */
-    bool close();
-    /* set w/h. format is ignored*/
-    void setWh(const utils::Whf& whf);
-    /* set is_3d calls MSMFB_OVERLAY_3D */
-    bool useVirtualFB();
-    /* set fd to be used in ioctl */
-    void setFd(int fd);
-    /* dump */
-    void dump() const;
-private:
-    /* reset */
-    void reset();
-    /* actual MSM 3D info */
-    msmfb_overlay_3d m3DOVInfo;
-    /* FD for the mdp 3D */
-    OvFD mFd;
 };
 
 /* MDP data */
@@ -236,10 +208,6 @@ inline void MdpCtrl::setIsFg(overlay::utils::eIsFg isFg) {
     mOVInfo.is_fg = isFg;
 }
 
-inline void MdpCtrl::setDownscale(int dscale) {
-    mDownscale = dscale;
-}
-
 inline void MdpCtrl::setPlaneAlpha(int planeAlpha) {
     mOVInfo.alpha = planeAlpha;
 }
@@ -310,46 +278,6 @@ inline void MdpCtrl::setRotationFlags() {
 
 inline uint8_t MdpCtrl::getPriority() const {
     return mOVInfo.priority;
-}
-
-///////    MdpCtrl3D //////
-
-inline MdpCtrl3D::MdpCtrl3D() { reset(); }
-inline bool MdpCtrl3D::close() {
-    if (m3DOVInfo.is_3d) {
-        m3DOVInfo.is_3d = 0;
-        if(!mdp_wrapper::set3D(mFd.getFD(), m3DOVInfo)) {
-            ALOGE("MdpCtrl3D close failed set3D with 0");
-            return false;
-        }
-    }
-    reset();
-    return true;
-}
-inline void MdpCtrl3D::reset() {
-    utils::memset0(m3DOVInfo);
-}
-
-inline void MdpCtrl3D::setFd(int fd) {
-    mFd.copy(fd);
-    OVASSERT(mFd.valid(), "MdpCtrl3D setFd, FD should be valid");
-}
-
-inline void MdpCtrl3D::setWh(const utils::Whf& whf) {
-    // ignore fmt. Needed for useVirtualFB callflow
-    m3DOVInfo.width = whf.w;
-    m3DOVInfo.height = whf.h;
-}
-
-inline bool MdpCtrl3D::useVirtualFB() {
-    if(!m3DOVInfo.is_3d) {
-        m3DOVInfo.is_3d = 1;
-        if(!mdp_wrapper::set3D(mFd.getFD(), m3DOVInfo)) {
-            ALOGE("MdpCtrl3D close failed set3D with 0");
-            return false;
-        }
-    }
-    return true;
 }
 
 ///////    MdpData   //////

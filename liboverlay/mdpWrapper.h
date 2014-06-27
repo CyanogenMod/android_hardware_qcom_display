@@ -83,9 +83,6 @@ bool getOverlay(int fd, mdp_overlay& ov);
 /* MSMFB_OVERLAY_PLAY */
 bool play(int fd, msmfb_overlay_data& od);
 
-/* MSMFB_OVERLAY_3D */
-bool set3D(int fd, msmfb_overlay_3d& ov);
-
 /* MSMFB_DISPLAY_COMMIT */
 bool displayCommit(int fd);
 
@@ -225,16 +222,6 @@ inline bool play(int fd, msmfb_overlay_data& od) {
     ATRACE_CALL();
     if (ioctl(fd, MSMFB_OVERLAY_PLAY, &od) < 0) {
         ALOGE("Failed to call ioctl MSMFB_OVERLAY_PLAY err=%s",
-                strerror(errno));
-        return false;
-    }
-    return true;
-}
-
-inline bool set3D(int fd, msmfb_overlay_3d& ov) {
-    ATRACE_CALL();
-    if (ioctl(fd, MSMFB_OVERLAY_3D, &ov) < 0) {
-        ALOGE("Failed to call ioctl MSMFB_OVERLAY_3D err=%s",
                 strerror(errno));
         return false;
     }
