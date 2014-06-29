@@ -242,6 +242,7 @@ void dumpsys_log(android::String8& buf, const char* fmt, ...);
 int getExtOrientation(hwc_context_t* ctx);
 bool isValidRect(const hwc_rect_t& rect);
 hwc_rect_t deductRect(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
+hwc_rect_t moveRect(const hwc_rect_t& rect, const int& x_off, const int& y_off);
 hwc_rect_t getIntersection(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 hwc_rect_t getUnion(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 void optimizeLayerRects(hwc_context_t *ctx,
