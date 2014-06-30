@@ -1322,6 +1322,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         if(ret < 0) {
             ALOGE("%s: ioctl MSMFB_BUFFER_SYNC failed for rot sync, err=%s",
                     __FUNCTION__, strerror(errno));
+            close(rotReleaseFd);
         } else {
             close(currLayer->acquireFenceFd);
             //For MDP to wait on.
@@ -1390,6 +1391,10 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         ALOGE("%s: acq_fen_fd_cnt=%d flags=%d fd=%d dpy=%d numHwLayers=%zu",
               __FUNCTION__, data.acq_fen_fd_cnt, data.flags, fbFd,
               dpy, list->numHwLayers);
+        close(releaseFd);
+        releaseFd = -1;
+        close(retireFd);
+        retireFd = -1;
     }
 
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
