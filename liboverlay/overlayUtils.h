@@ -696,6 +696,14 @@ inline void even_floor(T& value) {
         value--;
 }
 
+/* Prerotation adjusts crop co-ordinates to the new transformed values within
+ * destination buffer. This is necessary only when the entire buffer is rotated
+ * irrespective of crop (A-family). If only the crop portion of the buffer is
+ * rotated into a destination buffer matching the size of crop, we don't need to
+ * use this helper (B-family).
+ * @Deprecated as of now, retained for the case where a full buffer needs
+ * transform and also as a reference.
+ */
 void preRotateSource(const eTransform& tr, Whf& whf, Dim& srcCrop);
 void getDump(char *buf, size_t len, const char *prefix, const mdp_overlay& ov);
 void getDump(char *buf, size_t len, const char *prefix, const msmfb_img& ov);

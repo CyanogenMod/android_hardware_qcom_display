@@ -61,6 +61,21 @@ uint32_t MdssRot::getDstFormat() const {
     return mRotInfo.src.format;
 }
 
+utils::Whf MdssRot::getDstWhf() const {
+    //For Mdss dst_rect itself represents buffer dimensions. We ignore actual
+    //aligned values during buffer allocation. Also the driver overwrites the
+    //src.format field if destination format is different.
+    //This implementation detail makes it possible to retrieve w,h even before
+    //buffer allocation, which happens in queueBuffer.
+    return utils::Whf(mRotInfo.dst_rect.w, mRotInfo.dst_rect.h,
+            mRotInfo.src.format);
+}
+
+utils::Dim MdssRot::getDstDimensions() const {
+    return utils::Dim(mRotInfo.dst_rect.x, mRotInfo.dst_rect.y,
+            mRotInfo.dst_rect.w, mRotInfo.dst_rect.h);
+}
+
 uint32_t MdssRot::getSessId() const { return mRotInfo.id; }
 
 bool MdssRot::init() {
@@ -80,16 +95,10 @@ void MdssRot::setSource(const overlay::utils::Whf& awhf) {
 }
 
 void MdssRot::setCrop(const utils::Dim& crop) {
-
     mRotInfo.src_rect.x = crop.x;
     mRotInfo.src_rect.y = crop.y;
     mRotInfo.src_rect.w = crop.w;
     mRotInfo.src_rect.h = crop.h;
-
-    mRotInfo.dst_rect.x = 0;
-    mRotInfo.dst_rect.y = 0;
-    mRotInfo.dst_rect.w = crop.w;
-    mRotInfo.dst_rect.h = crop.h;
 }
 
 void MdssRot::setDownscale(int ds) {}
@@ -116,7 +125,22 @@ void MdssRot::doTransform() {
 }
 
 bool MdssRot::commit() {
+    if (utils::isYuv(mRotInfo.src.format)) {
+        utils::normalizeCrop(mRotInfo.src_rect.x, mRotInfo.src_rect.w);
+        utils::normalizeCrop(mRotInfo.src_rect.y, mRotInfo.src_rect.h);
+        // For interlaced, crop.h should be 4-aligned
+        if ((mRotInfo.flags & utils::OV_MDP_DEINTERLACE) and
+                (mRotInfo.src_rect.h % 4))
+            mRotInfo.src_rect.h = utils::aligndown(mRotInfo.src_rect.h, 4);
+    }
+
+    mRotInfo.dst_rect.x = 0;
+    mRotInfo.dst_rect.y = 0;
+    mRotInfo.dst_rect.w = mRotInfo.src_rect.w;
+    mRotInfo.dst_rect.h = mRotInfo.src_rect.h;
+
     doTransform();
+
     mRotInfo.flags |= MDSS_MDP_ROT_ONLY;
     mEnabled = true;
     if(!overlay::mdp_wrapper::setOverlay(mFd.getFD(), mRotInfo)) {
