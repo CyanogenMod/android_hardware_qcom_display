@@ -1639,18 +1639,8 @@ int configRotator(Rotator *rot, Whf& whf,
 
     if (qdutils::MDPVersion::getInstance().getMDPVersion() >=
         qdutils::MDSS_V5) {
-        uint32_t crop_w = (crop.right - crop.left);
-        uint32_t crop_h = (crop.bottom - crop.top);
-        if (ovutils::isYuv(whf.format)) {
-            ovutils::normalizeCrop((uint32_t&)crop.left, crop_w);
-            ovutils::normalizeCrop((uint32_t&)crop.top, crop_h);
-            // For interlaced, crop.h should be 4-aligned
-            if ((mdpFlags & ovutils::OV_MDP_DEINTERLACE) && (crop_h % 4))
-                crop_h = ovutils::aligndown(crop_h, 4);
-            crop.right = crop.left + crop_w;
-            crop.bottom = crop.top + crop_h;
-        }
-        Dim rotCrop(crop.left, crop.top, crop_w, crop_h);
+         Dim rotCrop(crop.left, crop.top, crop.right - crop.left,
+                crop.bottom - crop.top);
         rot->setCrop(rotCrop);
     }
 
@@ -1725,28 +1715,27 @@ int configColorLayer(hwc_context_t *ctx, hwc_layer_1_t *layer,
 }
 
 void updateSource(eTransform& orient, Whf& whf,
-        hwc_rect_t& crop) {
-    Dim srcCrop(crop.left, crop.top,
+        hwc_rect_t& crop, Rotator *rot) {
+    Dim transformedCrop(crop.left, crop.top,
             crop.right - crop.left,
             crop.bottom - crop.top);
-    orient = static_cast<eTransform>(ovutils::getMdpOrient(orient));
-    preRotateSource(orient, whf, srcCrop);
     if (qdutils::MDPVersion::getInstance().getMDPVersion() >=
         qdutils::MDSS_V5) {
-        // Source for overlay will be the cropped (and rotated)
-        crop.left = 0;
-        crop.top = 0;
-        crop.right = srcCrop.w;
-        crop.bottom = srcCrop.h;
-        // Set width & height equal to sourceCrop w & h
-        whf.w = srcCrop.w;
-        whf.h = srcCrop.h;
+        //B-family rotator internally could modify destination dimensions if
+        //downscaling is supported
+        whf = rot->getDstWhf();
+        transformedCrop = rot->getDstDimensions();
     } else {
-        crop.left = srcCrop.x;
-        crop.top = srcCrop.y;
-        crop.right = srcCrop.x + srcCrop.w;
-        crop.bottom = srcCrop.y + srcCrop.h;
+        //A-family rotator rotates entire buffer irrespective of crop, forcing
+        //us to recompute the crop based on transform
+        orient = static_cast<eTransform>(ovutils::getMdpOrient(orient));
+        preRotateSource(orient, whf, transformedCrop);
     }
+
+    crop.left = transformedCrop.x;
+    crop.top = transformedCrop.y;
+    crop.right = transformedCrop.x + transformedCrop.w;
+    crop.bottom = transformedCrop.y + transformedCrop.h;
 }
 
 int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
@@ -1811,8 +1800,7 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
         }
-        whf.format = (*rot)->getDstFormat();
-        updateSource(orient, whf, crop);
+        updateSource(orient, whf, crop, *rot);
         rotFlags |= ovutils::ROT_PREROTATED;
     }
 
@@ -1918,8 +1906,7 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
         }
-        whf.format = (*rot)->getDstFormat();
-        updateSource(orient, whf, crop);
+        updateSource(orient, whf, crop, *rot);
         rotFlags |= ROT_PREROTATED;
     }
 
@@ -2051,8 +2038,7 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
         }
-        whf.format = (*rot)->getDstFormat();
-        updateSource(orient, whf, crop);
+        updateSource(orient, whf, crop, *rot);
         rotFlags |= ROT_PREROTATED;
     }
 

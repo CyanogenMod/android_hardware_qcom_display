@@ -95,8 +95,7 @@ bool FBUpdateNonSplit::preRotateExtDisplay(hwc_context_t *ctx,
             mRot = NULL;
             return false;
         }
-        info.format = (mRot)->getDstFormat();
-        updateSource(orient, info, sourceCrop);
+        updateSource(orient, info, sourceCrop, mRot);
         rotFlags |= ovutils::ROT_PREROTATED;
     }
     return true;

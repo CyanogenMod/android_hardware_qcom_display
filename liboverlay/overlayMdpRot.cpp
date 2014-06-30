@@ -19,6 +19,7 @@
 
 #include "overlayUtils.h"
 #include "overlayRotator.h"
+#include "gr.h"
 
 namespace ovutils = overlay::utils;
 
@@ -45,6 +46,24 @@ uint32_t MdpRot::getDstOffset() const {
 
 uint32_t MdpRot::getDstFormat() const {
     return mRotImgInfo.dst.format;
+}
+
+//Added for completeness. Not expected to be called.
+utils::Whf MdpRot::getDstWhf() const {
+    int alW = 0, alH = 0;
+    int halFormat = ovutils::getHALFormat(mRotImgInfo.dst.format);
+    getBufferSizeAndDimensions(mRotImgInfo.dst.width, mRotImgInfo.dst.height,
+            halFormat, alW, alH);
+    return utils::Whf(alW, alH, mRotImgInfo.dst.format);
+}
+
+//Added for completeness. Not expected to be called.
+utils::Dim MdpRot::getDstDimensions() const {
+    int alW = 0, alH = 0;
+    int halFormat = ovutils::getHALFormat(mRotImgInfo.dst.format);
+    getBufferSizeAndDimensions(mRotImgInfo.dst.width, mRotImgInfo.dst.height,
+            halFormat, alW, alH);
+    return utils::Dim(0, 0, alW, alH);
 }
 
 uint32_t MdpRot::getSessId() const { return mRotImgInfo.session_id; }
