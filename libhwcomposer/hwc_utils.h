@@ -356,7 +356,7 @@ int configColorLayer(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
         ovutils::eIsFg& isFg, const ovutils::eDest& dest);
 
 void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
-        hwc_rect_t& crop);
+        hwc_rect_t& crop, overlay::Rotator *rot);
 
 //Routine to configure low resolution panels (<= 2048 width)
 int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
