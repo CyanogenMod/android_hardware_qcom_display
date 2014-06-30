@@ -74,9 +74,14 @@ public:
     virtual void setTransform(const utils::eTransform& rot) = 0;
     virtual bool commit() = 0;
     virtual void setDownscale(int ds) = 0;
+    //Mem id and offset should be retrieved only after rotator kickoff
     virtual int getDstMemId() const = 0;
     virtual uint32_t getDstOffset() const = 0;
+    //Destination width, height, format, position should be retrieved only after
+    //rotator configuration is committed via commit API
     virtual uint32_t getDstFormat() const = 0;
+    virtual utils::Whf getDstWhf() const = 0;
+    virtual utils::Dim getDstDimensions() const = 0;
     virtual uint32_t getSessId() const = 0;
     virtual bool queueBuffer(int fd, uint32_t offset) = 0;
     virtual void dump() const = 0;
@@ -112,6 +117,8 @@ public:
     virtual int getDstMemId() const;
     virtual uint32_t getDstOffset() const;
     virtual uint32_t getDstFormat() const;
+    virtual utils::Whf getDstWhf() const;
+    virtual utils::Dim getDstDimensions() const;
     virtual uint32_t getSessId() const;
     virtual bool queueBuffer(int fd, uint32_t offset);
     virtual void dump() const;
@@ -169,6 +176,8 @@ public:
     virtual int getDstMemId() const;
     virtual uint32_t getDstOffset() const;
     virtual uint32_t getDstFormat() const;
+    virtual utils::Whf getDstWhf() const;
+    virtual utils::Dim getDstDimensions() const;
     virtual uint32_t getSessId() const;
     virtual bool queueBuffer(int fd, uint32_t offset);
     virtual void dump() const;
