@@ -1285,6 +1285,17 @@ bool setupBasePipe(hwc_context_t *ctx) {
     return true;
 }
 
+ovutils::eDest getPipeForFb(hwc_context_t *ctx, int dpy) {
+    ovutils::eDest dest = ovutils::OV_INVALID;
+    overlay::Overlay& ov = *ctx->mOverlay;
+
+    dest = ov.nextPipe(ovutils::OV_MDP_PIPE_RGB, dpy);
+    if(dest != ovutils::OV_INVALID) {
+        return dest;
+    }
+
+    return ov.nextPipe(ovutils::OV_MDP_PIPE_VG, dpy);
+}
 
 inline int configMdp(Overlay *ov, const PipeArgs& parg,
         const eTransform& orient, const hwc_rect_t& crop,
