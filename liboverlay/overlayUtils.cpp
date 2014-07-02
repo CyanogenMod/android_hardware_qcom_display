@@ -74,12 +74,6 @@ namespace overlay {
 //----------From class Res ------------------------------
 const char* const Res::fbPath = "/dev/graphics/fb%u";
 const char* const Res::rotPath = "/dev/msm_rotator";
-const char* const Res::format3DFile =
-        "/sys/class/graphics/fb1/format_3d";
-const char* const Res::edid3dInfoFile =
-        "/sys/class/graphics/fb1/3d_present";
-const char* const Res::barrierFile =
-        "/sys/devices/platform/mipi_novatek.0/enable_3d_barrier";
 //--------------------------------------------------------
 
 
@@ -338,86 +332,6 @@ void preRotateSource(const eTransform& tr, Whf& whf, Dim& srcCrop) {
         swap(whf.w, whf.h);
         swap(srcCrop.w, srcCrop.h);
     }
-}
-
-bool is3DTV() {
-    char is3DTV = '0';
-    IOFile fp(Res::edid3dInfoFile, "r");
-    (void)fp.read(is3DTV, 1);
-    ALOGI("3DTV EDID flag: %d", is3DTV);
-    return (is3DTV == '0') ? false : true;
-}
-
-bool isPanel3D() {
-    OvFD fd;
-    if(!overlay::open(fd, 0 /*fb*/, Res::fbPath)){
-        ALOGE("isPanel3D Can't open framebuffer 0");
-        return false;
-    }
-    fb_fix_screeninfo finfo;
-    if(!mdp_wrapper::getFScreenInfo(fd.getFD(), finfo)) {
-        ALOGE("isPanel3D read fb0 failed");
-    }
-    fd.close();
-    return (FB_TYPE_3D_PANEL == finfo.type) ? true : false;
-}
-
-bool usePanel3D() {
-    if(!isPanel3D())
-        return false;
-    char value[PROPERTY_VALUE_MAX];
-    property_get("persist.user.panel3D", value, "0");
-    int usePanel3D = atoi(value);
-    return usePanel3D ? true : false;
-}
-
-bool send3DInfoPacket (uint32_t format3D) {
-    IOFile fp(Res::format3DFile, "wb");
-    (void)fp.write("%d", format3D);
-    if(!fp.valid()) {
-        ALOGE("send3DInfoPacket: no sysfs entry for setting 3d mode");
-        return false;
-    }
-    return true;
-}
-
-bool enableBarrier (uint32_t orientation) {
-    IOFile fp(Res::barrierFile, "wb");
-    (void)fp.write("%d", orientation);
-    if(!fp.valid()) {
-        ALOGE("enableBarrier no sysfs entry for "
-                "enabling barriers on 3D panel");
-        return false;
-    }
-    return true;
-}
-
-uint32_t getS3DFormat(uint32_t fmt) {
-    // The S3D is part of the HAL_PIXEL_FORMAT_YV12 value. Add
-    // an explicit check for the format
-    if (fmt == HAL_PIXEL_FORMAT_YV12) {
-        return 0;
-    }
-    uint32_t fmt3D = format3D(fmt);
-    uint32_t fIn3D = format3DInput(fmt3D); // MSB 2 bytes - inp
-    uint32_t fOut3D = format3DOutput(fmt3D); // LSB 2 bytes - out
-    fmt3D = fIn3D | fOut3D;
-    if (!fIn3D) {
-        fmt3D |= fOut3D << SHIFT_TOT_3D; //Set the input format
-    }
-    if (!fOut3D) {
-        switch (fIn3D) {
-            case HAL_3D_IN_SIDE_BY_SIDE_L_R:
-            case HAL_3D_IN_SIDE_BY_SIDE_R_L:
-                // For all side by side formats, set the output
-                // format as Side-by-Side i.e 0x1
-                fmt3D |= HAL_3D_IN_SIDE_BY_SIDE_L_R >> SHIFT_TOT_3D;
-                break;
-            default:
-                fmt3D |= fIn3D >> SHIFT_TOT_3D; //Set the output format
-        }
-    }
-    return fmt3D;
 }
 
 void getDump(char *buf, size_t len, const char *prefix,

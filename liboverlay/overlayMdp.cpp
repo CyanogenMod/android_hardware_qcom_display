@@ -54,7 +54,6 @@ void MdpCtrl::reset() {
     utils::memset0(mOVInfo);
     mOVInfo.id = MSMFB_NEW_REQUEST;
     mOrientation = utils::OVERLAY_TRANSFORM_0;
-    mDownscale = 0;
     mDpy = 0;
 #ifdef USES_POST_PROCESSING
     memset(&mParams, 0, sizeof(struct compute_params));
@@ -147,13 +146,7 @@ void MdpCtrl::doTransform() {
 }
 
 void MdpCtrl::doDownscale() {
-    int mdpVersion = MDPVersion::getInstance().getMDPVersion();
-    if(mdpVersion < MDSS_V5) {
-        mOVInfo.src_rect.x >>= mDownscale;
-        mOVInfo.src_rect.y >>= mDownscale;
-        mOVInfo.src_rect.w >>= mDownscale;
-        mOVInfo.src_rect.h >>= mDownscale;
-    } else if(MDPVersion::getInstance().supportsDecimation()) {
+    if(MDPVersion::getInstance().supportsDecimation()) {
         utils::getDecimationFactor(mOVInfo.src_rect.w, mOVInfo.src_rect.h,
                 mOVInfo.dst_rect.w, mOVInfo.dst_rect.h, mOVInfo.horz_deci,
                 mOVInfo.vert_deci);
@@ -222,12 +215,6 @@ void MdpData::dump() const {
 
 void MdpData::getDump(char *buf, size_t len) {
     ovutils::getDump(buf, len, "Data", mOvData);
-}
-
-void MdpCtrl3D::dump() const {
-    ALOGE("== Dump MdpCtrl start ==");
-    mFd.dump();
-    ALOGE("== Dump MdpCtrl end ==");
 }
 
 bool MdpCtrl::setVisualParams(const MetaData_t& data) {
