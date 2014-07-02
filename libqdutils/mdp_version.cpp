@@ -53,7 +53,7 @@ namespace qdutils {
 #define MDSS_MDP_HW_REV_104 0x10040000 //Next version
 #endif
 #ifndef MDSS_MDP_HW_REV_105
-#define MDSS_MDP_HW_REV_105 0x10050000 //Next version
+#define MDSS_MDP_HW_REV_105 0x10050000 //8994
 #endif
 #ifndef MDSS_MDP_HW_REV_106
 #define MDSS_MDP_HW_REV_106 0x10060000 //8x16
@@ -421,6 +421,11 @@ bool MDPVersion::is8084() {
 bool MDPVersion::is8092() {
     return (mMdpRev >= MDSS_MDP_HW_REV_200 and
             mMdpRev < MDSS_MDP_HW_REV_206);
+}
+
+bool MDPVersion::is8994() {
+    return (mMdpRev >= MDSS_MDP_HW_REV_105 and
+            mMdpRev < MDSS_MDP_HW_REV_106);
 }
 
 bool MDPVersion::is8x16() {
