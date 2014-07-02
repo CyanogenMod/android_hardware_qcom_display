@@ -321,6 +321,10 @@ bool MDPVersion::updateSysFsInfo() {
         fclose(sysfsFd);
     }
 
+    if(mMDPVersion >= qdutils::MDP_V4_2 and mMDPVersion < qdutils::MDSS_V5) {
+        mRotDownscale = true;
+    }
+
     if(mSourceSplit) {
         memset(sysfsPath, 0, sizeof(sysfsPath));
         snprintf(sysfsPath , sizeof(sysfsPath),

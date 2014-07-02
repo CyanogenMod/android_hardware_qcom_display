@@ -17,6 +17,7 @@
  * limitations under the License.
 */
 
+#include <math.h>
 #include "overlayUtils.h"
 #include "overlayRotator.h"
 
@@ -103,7 +104,8 @@ void MdssRot::setCrop(const utils::Dim& crop) {
     mRotInfo.src_rect.h = crop.h;
 }
 
-void MdssRot::setDownscale(int /*ds*/) {
+void MdssRot::setDownscale(int downscale) {
+    mDownscale = downscale;
 }
 
 void MdssRot::setFlags(const utils::eMdpFlags& flags) {
@@ -128,19 +130,25 @@ void MdssRot::doTransform() {
 }
 
 bool MdssRot::commit() {
-    if (utils::isYuv(mRotInfo.src.format)) {
-        utils::normalizeCrop(mRotInfo.src_rect.x, mRotInfo.src_rect.w);
-        utils::normalizeCrop(mRotInfo.src_rect.y, mRotInfo.src_rect.h);
-        // For interlaced, crop.h should be 4-aligned
-        if ((mRotInfo.flags & utils::OV_MDP_DEINTERLACE) and
-                (mRotInfo.src_rect.h % 4))
-            mRotInfo.src_rect.h = utils::aligndown(mRotInfo.src_rect.h, 4);
-    }
+    Dim adjCrop(mRotInfo.src_rect.x,mRotInfo.src_rect.y,
+            mRotInfo.src_rect.w,mRotInfo.src_rect.h);
+    adjCrop = getFormatAdjustedCrop(adjCrop, mRotInfo.src.format,
+            mRotInfo.flags & utils::OV_MDP_DEINTERLACE);
+    adjCrop = getDownscaleAdjustedCrop(adjCrop, mDownscale);
+
+    mRotInfo.src_rect.x = adjCrop.x;
+    mRotInfo.src_rect.y = adjCrop.y;
+    mRotInfo.src_rect.w = adjCrop.w;
+    mRotInfo.src_rect.h = adjCrop.h;
 
     mRotInfo.dst_rect.x = 0;
     mRotInfo.dst_rect.y = 0;
-    mRotInfo.dst_rect.w = mRotInfo.src_rect.w;
-    mRotInfo.dst_rect.h = mRotInfo.src_rect.h;
+    mRotInfo.dst_rect.w = mDownscale ?
+            mRotInfo.src_rect.w / mDownscale : mRotInfo.src_rect.w;
+    mRotInfo.dst_rect.h = mDownscale ?
+            mRotInfo.src_rect.h / mDownscale : mRotInfo.src_rect.h;
+    //Clear for next round
+    mDownscale = 0;
 
     doTransform();
 
@@ -258,6 +266,7 @@ void MdssRot::reset() {
     ovutils::memset0(mMem.mRotOffset);
     mMem.mCurrIndex = 0;
     mOrientation = utils::OVERLAY_TRANSFORM_0;
+    mDownscale = 0;
 }
 
 void MdssRot::dump() const {
@@ -338,6 +347,56 @@ uint32_t MdssRot::calcCompressedBufSize(const ovutils::Whf& destWhf) {
             "Buf Size = %d", __FUNCTION__, aWidth, aHeight, bufSize);
 
     return bufSize;
+}
+
+int MdssRot::getDownscaleFactor(const int& srcW, const int& srcH,
+        const int& dstW, const int& dstH, const uint32_t& mdpFormat,
+        const bool& isInterlaced) {
+    if(not srcW or not srcH or not dstW or not dstH or isInterlaced) return 0;
+
+    Dim crop(0, 0, srcW, srcH);
+    Dim adjCrop = getFormatAdjustedCrop(crop, mdpFormat,
+            false /*isInterlaced */);
+
+    uint32_t downscale = min((adjCrop.w / dstW), (adjCrop.h / dstH));
+    //Reduced to a power of 2
+    downscale = (uint32_t) powf(2.0f, floorf(log2f((float)downscale)));
+
+    if(downscale < 2 or downscale > 32) return 0;
+
+    //Allow only 1 line or pixel to be chopped off since the source needs to
+    //be aligned to downscale. Progressively try with smaller downscale to see
+    //if we can satisfy the threshold
+    //For YUV the loop shouldnt be needed, unless in exceptional cases
+    Dim dsAdjCrop = getDownscaleAdjustedCrop(adjCrop, downscale);
+    while(downscale > 2 and (adjCrop.w > dsAdjCrop.w or
+            adjCrop.h > dsAdjCrop.h)) {
+        downscale /= 2;
+        dsAdjCrop = getDownscaleAdjustedCrop(adjCrop, downscale);
+    }
+
+    if(not dsAdjCrop.w or not dsAdjCrop.h) return 0;
+    return downscale;
+}
+
+Dim MdssRot::getFormatAdjustedCrop(const Dim& crop,
+            const uint32_t& mdpFormat, const bool& isInterlaced) {
+    Dim adjCrop = crop;
+    if (isYuv(mdpFormat)) {
+        normalizeCrop(adjCrop.x, adjCrop.w);
+        normalizeCrop(adjCrop.y, adjCrop.h);
+        // For interlaced, crop.h should be 4-aligned
+        if (isInterlaced and (adjCrop.h % 4))
+            adjCrop.h = aligndown(adjCrop.h, 4);
+    }
+    return adjCrop;
+}
+
+Dim MdssRot::getDownscaleAdjustedCrop(const Dim& crop,
+        const uint32_t& downscale) {
+    uint32_t alignedSrcW = aligndown(crop.w, downscale * 2);
+    uint32_t alignedSrcH = aligndown(crop.h, downscale * 2);
+    return Dim(crop.x, crop.y, alignedSrcW, alignedSrcH);
 }
 
 } // namespace overlay

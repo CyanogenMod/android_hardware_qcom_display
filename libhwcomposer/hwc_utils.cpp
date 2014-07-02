@@ -1633,6 +1633,47 @@ void updateSource(eTransform& orient, Whf& whf,
     crop.bottom = transformedCrop.y + transformedCrop.h;
 }
 
+int getRotDownscale(hwc_context_t *ctx, const hwc_layer_1_t *layer) {
+    if(not qdutils::MDPVersion::getInstance().isRotDownscaleEnabled()) {
+        return 0;
+    }
+
+    int downscale = 0;
+    hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
+    hwc_rect_t dst = layer->displayFrame;
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+
+    if(not hnd) {
+        return 0;
+    }
+
+    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+    bool isInterlaced = metadata && (metadata->operation & PP_PARAM_INTERLACED)
+                && metadata->interlaced;
+    int transform = layer->transform;
+    uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
+
+    if(isYuvBuffer(hnd)) {
+        if(ctx->mMDP.version >= qdutils::MDP_V4_2 &&
+                ctx->mMDP.version < qdutils::MDSS_V5) {
+            downscale = Rotator::getDownscaleFactor(crop.right - crop.left,
+                    crop.bottom - crop.top, dst.right - dst.left,
+                    dst.bottom - dst.top, format, isInterlaced);
+        } else {
+            Dim adjCrop(crop.left, crop.top, crop.right - crop.left,
+                    crop.bottom - crop.top);
+            Dim pos(dst.left, dst.top, dst.right - dst.left,
+                    dst.bottom - dst.top);
+            if(transform & HAL_TRANSFORM_ROT_90) {
+                swap(adjCrop.w, adjCrop.h);
+            }
+            downscale = Rotator::getDownscaleFactor(adjCrop.w, adjCrop.h, pos.w,
+                    pos.h, format, isInterlaced);
+        }
+    }
+    return downscale;
+}
+
 int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy, eMdpFlags& mdpFlags, eZorder& z,
         eIsFg& isFg, const eDest& dest, Rotator **rot) {
@@ -1654,7 +1695,6 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     hwc_rect_t dst = layer->displayFrame;
     int transform = layer->transform;
     eTransform orient = static_cast<eTransform>(transform);
-    int downscale = 0;
     int rotFlags = ovutils::ROT_FLAGS_NONE;
     uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
     Whf whf(getWidth(hnd), getHeight(hnd), format, (uint32_t)hnd->size);
@@ -1668,36 +1708,24 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     }
 
     calcExtDisplayPosition(ctx, hnd, dpy, crop, dst, transform, orient);
-
-    if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
-       ctx->mMDP.version < qdutils::MDSS_V5) {
-        downscale =  getDownscaleFactor(
-            crop.right - crop.left,
-            crop.bottom - crop.top,
-            dst.right - dst.left,
-            dst.bottom - dst.top);
-        if(downscale) {
-            rotFlags = ROT_DOWNSCALE_ENABLED;
-        }
-    }
-
+    int downscale = getRotDownscale(ctx, layer);
     setMdpFlags(ctx, layer, mdpFlags, downscale, transform);
 
     //if 90 component or downscale, use rot
-    if((has90Transform(layer) && isRotationDoable(ctx, hnd)) || downscale) {
+    if((has90Transform(layer) or downscale) and isRotationDoable(ctx, hnd)) {
         *rot = ctx->mRotMgr->getNext();
         if(*rot == NULL) return -1;
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
         // BWC is not tested for other formats So enable it only for YUV format
         if(!dpy && isYuvBuffer(hnd))
-            BwcPM::setBwc(crop, dst, transform, mdpFlags);
+            BwcPM::setBwc(crop, dst, transform, downscale, mdpFlags);
         //Configure rotator for pre-rotation
         if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
         }
         updateSource(orient, whf, crop, *rot);
-        rotFlags |= ovutils::ROT_PREROTATED;
+        rotFlags |= ROT_PREROTATED;
     }
 
     //For the mdp, since either we are pre-rotating or MDP does flips
@@ -1761,7 +1789,6 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     hwc_rect_t dst = layer->displayFrame;
     int transform = layer->transform;
     eTransform orient = static_cast<eTransform>(transform);
-    const int downscale = 0;
     int rotFlags = ROT_FLAGS_NONE;
     uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
     Whf whf(getWidth(hnd), getHeight(hnd), format, (uint32_t)hnd->size);
@@ -1777,8 +1804,8 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     /* Calculate the external display position based on MDP downscale,
        ActionSafe, and extorientation features. */
     calcExtDisplayPosition(ctx, hnd, dpy, crop, dst, transform, orient);
-
-    setMdpFlags(ctx, layer, mdpFlagsL, 0, transform);
+    int downscale = getRotDownscale(ctx, layer);
+    setMdpFlags(ctx, layer, mdpFlagsL, downscale, transform);
 
     if(lDest != OV_INVALID && rDest != OV_INVALID) {
         //Enable overfetch
@@ -1792,7 +1819,7 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         whf.format = wb->getOutputFormat();
     }
 
-    if(has90Transform(layer) && isRotationDoable(ctx, hnd)) {
+    if((has90Transform(layer) or downscale) and isRotationDoable(ctx, hnd)) {
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
@@ -1928,7 +1955,7 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
         // BWC is not tested for other formats So enable it only for YUV format
         if(!dpy && isYuvBuffer(hnd))
-            BwcPM::setBwc(crop, dst, transform, mdpFlagsL);
+            BwcPM::setBwc(crop, dst, transform, downscale, mdpFlagsL);
         //Configure rotator for pre-rotation
         if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
@@ -2175,9 +2202,12 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
     return (eqBounds == 3);
 }
 
-void BwcPM::setBwc(const hwc_rect_t& crop,
-            const hwc_rect_t& dst, const int& transform,
-            ovutils::eMdpFlags& mdpFlags) {
+void BwcPM::setBwc(const hwc_rect_t& crop, const hwc_rect_t& dst,
+        const int& transform,const int& downscale,
+        ovutils::eMdpFlags& mdpFlags) {
+    //BWC not supported with rot-downscale
+    if(downscale) return;
+
     //Target doesnt support Bwc
     qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
     if(!mdpHw.supportsBWC()) {

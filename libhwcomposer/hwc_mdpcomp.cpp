@@ -156,6 +156,7 @@ bool MDPComp::init(hwc_context_t *ctx) {
     }
 
     if(!qdutils::MDPVersion::getInstance().isSrcSplit() &&
+        !qdutils::MDPVersion::getInstance().isRotDownscaleEnabled() &&
             property_get("persist.mdpcomp.4k2kSplit", property, "0") > 0 &&
             (!strncmp(property, "1", PROPERTY_VALUE_MAX) ||
             !strncasecmp(property,"true", PROPERTY_VALUE_MAX))) {
@@ -2311,6 +2312,10 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
     int dstWidth = dst.right - dst.left;
     int cropWidth = crop.right - crop.left;
 
+    //TODO Even if a 4k video is going to be rot-downscaled to dimensions under
+    //pipe line length, we are still using 2 pipes. This is fine just because
+    //this is source split where destination doesn't matter. Evaluate later to
+    //see if going through all the calcs to save a pipe is worth it
     if(dstWidth > mdpHw.getMaxMixerWidth() or
             cropWidth > mdpHw.getMaxMixerWidth() or
             (primarySplitAlways and (cropWidth > lSplit))) {
@@ -2351,7 +2356,6 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
     hwc_rect_t dst = layer->displayFrame;
     int transform = layer->transform;
     eTransform orient = static_cast<eTransform>(transform);
-    const int downscale = 0;
     int rotFlags = ROT_FLAGS_NONE;
     uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
     Whf whf(getWidth(hnd), getHeight(hnd), format, hnd->size);
@@ -2367,21 +2371,22 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
     }
 
+    int downscale = getRotDownscale(ctx, layer);
     eMdpFlags mdpFlags = OV_MDP_BACKEND_COMPOSITION;
-    setMdpFlags(ctx, layer, mdpFlags, 0, transform);
+    setMdpFlags(ctx, layer, mdpFlags, downscale, transform);
 
     if(lDest != OV_INVALID && rDest != OV_INVALID) {
         //Enable overfetch
         setMdpFlags(mdpFlags, OV_MDSS_MDP_DUAL_PIPE);
     }
 
-    if(has90Transform(layer) && isRotationDoable(ctx, hnd)) {
+    if((has90Transform(layer) or downscale) and isRotationDoable(ctx, hnd)) {
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         ctx->mLayerRotMap[mDpy]->add(layer, *rot);
         //If the video is using a single pipe, enable BWC
         if(rDest == OV_INVALID) {
-            BwcPM::setBwc(crop, dst, transform, mdpFlags);
+            BwcPM::setBwc(crop, dst, transform, downscale, mdpFlags);
         }
         //Configure rotator for pre-rotation
         if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale) < 0) {
@@ -2389,7 +2394,7 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
             return -1;
         }
         updateSource(orient, whf, crop, *rot);
-        rotFlags |= ROT_PREROTATED;
+        rotFlags |= ovutils::ROT_PREROTATED;
     }
 
     //If 2 pipes being used, divide layer into half, crop and dst

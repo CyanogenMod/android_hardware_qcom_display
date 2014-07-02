@@ -42,6 +42,17 @@ Rotator* Rotator::getRotator() {
     }
 }
 
+int Rotator::getDownscaleFactor(const int& srcW, const int& srcH,
+        const int& dstW, const int& dstH, const uint32_t& mdpFormat,
+        const bool& isInterlaced) {
+    if(getRotatorHwType() == TYPE_MDSS) {
+        return MdssRot::getDownscaleFactor(srcW, srcH, dstW, dstH,
+                mdpFormat, isInterlaced);
+    }
+    return MdpRot::getDownscaleFactor(srcW, srcH, dstW, dstH,
+            mdpFormat, isInterlaced);
+}
+
 uint32_t Rotator::calcOutputBufSize(const utils::Whf& destWhf) {
     //dummy aligned w & h.
     int alW = 0, alH = 0;

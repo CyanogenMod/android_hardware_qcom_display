@@ -88,6 +88,13 @@ public:
     virtual void getDump(char *buf, size_t len) const = 0;
     void setReleaseFd(const int& fence) { mMem.setReleaseFd(fence); }
     static Rotator *getRotator();
+    /* Returns downscale by successfully applying constraints
+     * Returns 0 if target doesnt support rotator downscaling
+     * or if any of the constraints are not met
+     */
+    static int getDownscaleFactor(const int& srcW, const int& srcH,
+            const int& dstW, const int& dstH, const uint32_t& mdpFormat,
+            const bool& isInterlaced);
 
 protected:
     /* Rotator memory manager */
@@ -146,6 +153,16 @@ private:
      * knowing the o/p format depending on whether fastYuv is enabled or not */
     uint32_t calcOutputBufSize();
 
+    /* Applies downscale by taking areas
+     * Returns a log(downscale)
+     * Constraints applied:
+     * - downscale should be a power of 2
+     * - Max downscale is 1/8
+     */
+    static int getDownscaleFactor(const int& srcW, const int& srcH,
+            const int& dstW, const int& dstH, const uint32_t& mdpFormat,
+            const bool& isInterlaced);
+
     /* rot info*/
     msm_rotator_img_info mRotImgInfo;
     /* Last saved rot info*/
@@ -158,6 +175,9 @@ private:
     OvFD mFd;
 
     friend Rotator* Rotator::getRotator();
+    friend int Rotator::getDownscaleFactor(const int& srcW, const int& srcH,
+            const int& dstW, const int& dstH, const uint32_t& mdpFormat,
+            const bool& isInterlaced);
 };
 
 /*
@@ -202,6 +222,25 @@ private:
     // Calculate the compressed o/p buffer size for BWC
     uint32_t calcCompressedBufSize(const utils::Whf& destWhf);
 
+     /* Caller's responsibility to swap srcW, srcH if there is a 90 transform
+      * Returns actual downscale (not a log value)
+      * Constraints applied:
+      * - downscale should be a power of 2
+      * - Max downscale is 1/32
+      * - Equal downscale is applied in both directions
+      * - {srcW, srcH} mod downscale = 0
+      * - Interlaced content is not supported
+      */
+    static int getDownscaleFactor(const int& srcW, const int& srcH,
+            const int& dstW, const int& dstH, const uint32_t& mdpFormat,
+            const bool& isInterlaced);
+
+    static utils::Dim getFormatAdjustedCrop(const utils::Dim& crop,
+            const uint32_t& mdpFormat, const bool& isInterlaced);
+
+    static utils::Dim getDownscaleAdjustedCrop(const utils::Dim& crop,
+            const uint32_t& downscale);
+
     /* MdssRot info structure */
     mdp_overlay   mRotInfo;
     /* MdssRot data structure */
@@ -212,8 +251,12 @@ private:
     OvFD mFd;
     /* Enable/Disable Mdss Rot*/
     bool mEnabled;
+    int mDownscale;
 
     friend Rotator* Rotator::getRotator();
+    friend int Rotator::getDownscaleFactor(const int& srcW, const int& srcH,
+            const int& dstW, const int& dstH, const uint32_t& mdpFormat,
+            const bool& isInterlaced);
 };
 
 // Holder of rotator objects. Manages lifetimes
