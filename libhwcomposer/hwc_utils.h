@@ -235,9 +235,6 @@ bool isAlphaPresent(hwc_layer_1_t const* layer);
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable);
 int getBlending(int blending);
 
-bool canUseMDPforVirtualDisplay(hwc_context_t* ctx,
-                                const hwc_display_contents_1_t *list);
-
 //Helper function to dump logs
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
 
