@@ -90,6 +90,7 @@ MDPVersion::MDPVersion()
     mSourceSplit = false;
     mSourceSplitAlways = false;
     mRGBHasNoScalar = false;
+    mRotDownscale = false;
 
     updatePanelInfo();
 
@@ -282,22 +283,22 @@ bool MDPVersion::updateSysFsInfo() {
                     for(int i=1; i<index;i++) {
                         if(!strncmp(tokens[i], "bwc", strlen("bwc"))) {
                            mFeatures |= MDP_BWC_EN;
-                        }
-                        else if(!strncmp(tokens[i], "decimation",
+                        } else if(!strncmp(tokens[i], "decimation",
                                     strlen("decimation"))) {
                            mFeatures |= MDP_DECIMATION_EN;
-                        }
-                        else if(!strncmp(tokens[i], "tile_format",
+                        } else if(!strncmp(tokens[i], "tile_format",
                                     strlen("tile_format"))) {
                            if(enableMacroTile)
                                mMacroTileEnabled = true;
                         } else if(!strncmp(tokens[i], "src_split",
                                     strlen("src_split"))) {
                             mSourceSplit = true;
-                        }
-                        else if(!strncmp(tokens[i], "non_scalar_rgb",
+                        } else if(!strncmp(tokens[i], "non_scalar_rgb",
                                     strlen("non_scalar_rgb"))) {
                             mRGBHasNoScalar = true;
+                        } else if(!strncmp(tokens[i], "rotator_downscale",
+                                    strlen("rotator_downscale"))) {
+                            mRotDownscale = true;
                         }
                     }
                 }
