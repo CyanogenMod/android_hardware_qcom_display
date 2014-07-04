@@ -2345,8 +2345,7 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
         }
-        whf.format = (*rot)->getDstFormat();
-        updateSource(orient, whf, crop);
+        updateSource(orient, whf, crop, *rot);
         rotFlags |= ROT_PREROTATED;
     }
 
