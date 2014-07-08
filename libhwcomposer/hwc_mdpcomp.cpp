@@ -127,11 +127,6 @@ bool MDPComp::init(hwc_context_t *ctx) {
         sEnableMixedMode = false;
     }
 
-    if(property_get("debug.mdpcomp.logs", property, NULL) > 0) {
-        if(atoi(property) != 0)
-            sDebugLogs = true;
-    }
-
     sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
     if(property_get("debug.mdpcomp.maxpermixer", property, "-1") > 0) {
         int val = atoi(property);
