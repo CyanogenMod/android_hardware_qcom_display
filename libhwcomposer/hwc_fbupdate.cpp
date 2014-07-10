@@ -120,9 +120,8 @@ bool FBUpdateLowRes::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
                 mAlignedFBHeight,
                 ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888));
 
-        //Request a pipe
-        ovutils::eMdpPipeType type = ovutils::OV_MDP_PIPE_ANY;
-        ovutils::eDest dest = ov.nextPipe(type, mDpy);
+        //Request a fb pipe
+        ovutils::eDest dest = getPipeForFb(ctx, mDpy);
         if(dest == ovutils::OV_INVALID) { //None available
             ALOGE("%s: No pipes available to configure fb for dpy %d",
                 __FUNCTION__, mDpy);
@@ -267,14 +266,14 @@ bool FBUpdateHighRes::configure(hwc_context_t *ctx,
                 ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888));
 
         //Request left pipe
-        ovutils::eDest destL = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy);
+        ovutils::eDest destL = getPipeForFb(ctx, mDpy);
         if(destL == ovutils::OV_INVALID) { //None available
             ALOGE("%s: No pipes available to configure fb for dpy %d's left"
                     " mixer", __FUNCTION__, mDpy);
             return false;
         }
         //Request right pipe
-        ovutils::eDest destR = ov.nextPipe(ovutils::OV_MDP_PIPE_ANY, mDpy);
+        ovutils::eDest destR = getPipeForFb(ctx, mDpy);
         if(destR == ovutils::OV_INVALID) { //None available
             ALOGE("%s: No pipes available to configure fb for dpy %d's right"
                     " mixer", __FUNCTION__, mDpy);
