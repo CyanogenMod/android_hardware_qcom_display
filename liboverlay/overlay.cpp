@@ -356,10 +356,18 @@ bool Overlay::displayCommit(const int& fd, const utils::Dim& roi) {
     struct mdp_display_commit info;
     memset(&info, 0, sizeof(struct mdp_display_commit));
     info.flags = MDP_DISPLAY_COMMIT_OVERLAY;
+
+#ifdef DUAL_DSI // new kernel api
+    info.l_roi.x = roi.x;
+    info.l_roi.y = roi.y;
+    info.l_roi.w = roi.w;
+    info.l_roi.h = roi.h;
+#else
     info.roi.x = roi.x;
     info.roi.y = roi.y;
     info.roi.w = roi.w;
     info.roi.h = roi.h;
+#endif
 
     if(!mdp_wrapper::displayCommit(fd, info)) {
         ALOGE("%s: commit failed", __func__);
