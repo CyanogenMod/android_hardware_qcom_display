@@ -234,9 +234,6 @@ bool CopyBit::prepareOverlap(hwc_context_t *ctx,
         finalW = max(finalW, ALIGN((overlap.right - overlap.left), 32));
         finalH += ALIGN((overlap.bottom - overlap.top), 32);
         if(finalH > ALIGN((overlap.bottom - overlap.top), 32)) {
-            // Calculate the offset for RGBA(4BPP)
-            ptorInfo->mRenderBuffOffset[i] = finalW *
-                (finalH - ALIGN((overlap.bottom - overlap.top), 32)) * 4;
             // Calculate the dest top, left will always be zero
             ptorInfo->displayFrame[i].top = (finalH -
                                 (ALIGN((overlap.bottom - overlap.top), 32)));
@@ -250,6 +247,14 @@ bool CopyBit::prepareOverlap(hwc_context_t *ctx,
 
     getBufferSizeAndDimensions(finalW, finalH, HAL_PIXEL_FORMAT_RGBA_8888,
                                alignW, alignH);
+
+    int heightFromTop = 0;
+    for (int i = 0; i < ptorInfo->count; i++) {
+        // Offset depends on stride calculated by gralloc for RGBA (4 bpp)
+        ptorInfo->mRenderBuffOffset[i] = alignW * heightFromTop * 4;
+        heightFromTop += ALIGN((ptorInfo->displayFrame[i].bottom -
+                            ptorInfo->displayFrame[i].top), 32);
+    }
 
     if ((mAlignedWidth != alignW) || (mAlignedHeight != alignH)) {
         // Overlap rect has changed, so free render buffers
