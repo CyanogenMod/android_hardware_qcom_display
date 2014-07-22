@@ -2058,32 +2058,6 @@ bool isAbcInUse(hwc_context_t *ctx){
   return (ctx->enableABC && ctx->listStats[0].renderBufIndexforABC == 0);
 }
 
-/* Since we fake non-Hybrid WFD solution as external display, this
- * function helps us in determining the priority between external
- * (hdmi/non-Hybrid WFD display) and virtual display devices(SSD/
- * screenrecord). This can be removed once wfd-client migrates to
- * using virtual-display api's.
- */
-bool canUseMDPforVirtualDisplay(hwc_context_t* ctx,
-                                const hwc_display_contents_1_t *list) {
-
-    /* We rely on the fact that for pure virtual display solution
-     * list->outbuf will be a non-NULL handle.
-     *
-     * If there are three active displays (which means there is one
-     * primary, one external and one virtual active display)
-     * we give mdss/mdp hw resources(pipes,smp,etc) for external
-     * display(hdmi/non-Hybrid WFD display) rather than for virtual
-     * display(SSD/screenrecord)
-     */
-
-    if(list->outbuf and (ctx->numActiveDisplays == HWC_NUM_DISPLAY_TYPES)) {
-        return false;
-    }
-
-    return true;
-}
-
 void dumpBuffer(private_handle_t *ohnd, char *bufferName) {
     if (ohnd != NULL && ohnd->base) {
         char dumpFilename[PATH_MAX];
