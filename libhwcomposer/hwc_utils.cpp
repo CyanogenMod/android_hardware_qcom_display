@@ -376,14 +376,15 @@ void initContext(hwc_context_t *ctx)
     //independent process as well.
     QService::init();
     sp<IQClient> client = new QClient(ctx);
-    android::sp<qService::IQService> qservice_sp = interface_cast<IQService>(
+    sp<IQService> iqs = interface_cast<IQService>(
             defaultServiceManager()->getService(
             String16("display.qservice")));
-    if (qservice_sp.get()) {
-      qservice_sp->connect(client);
+    if (iqs.get()) {
+      iqs->connect(client);
+      ctx->mQService = reinterpret_cast<QService* >(iqs.get());
     } else {
       ALOGE("%s: Failed to acquire service pointer", __FUNCTION__);
-      return ;
+      return;
     }
 
     // Initialize device orientation to its default orientation
@@ -479,7 +480,10 @@ void closeContext(hwc_context_t *ctx)
         ctx->mAD = NULL;
     }
 
-
+    if(ctx->mQService) {
+        delete ctx->mQService;
+        ctx->mQService = NULL;
+    }
 }
 
 //Helper to roundoff the refreshrates

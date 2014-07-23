@@ -35,6 +35,7 @@
 #include <overlayUtils.h>
 #include <overlayRotator.h>
 #include <EGL/egl.h>
+#include <QService.h>
 
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
@@ -687,6 +688,8 @@ struct hwc_context_t {
     bool mHPDEnabled;
     //Used to notify that boot has completed
     bool mBootAnimCompleted;
+    // Display binder service
+    qService::QService* mQService;
 };
 
 namespace qhwc {
