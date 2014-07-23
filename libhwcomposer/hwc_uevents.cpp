@@ -173,6 +173,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL,
                                    EXTERNAL_OFFLINE);
                 ctx->mVirtualonExtActive = false;
+                ctx->mQService->onHdmiHotplug((int)ctx->dpyAttr[dpy].connected);
             }
             break;
         }
@@ -286,6 +287,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                          "hotplug event", __FUNCTION__);
                 ctx->proc->hotplug(ctx->proc,HWC_DISPLAY_EXTERNAL,
                                    EXTERNAL_ONLINE);
+                ctx->mQService->onHdmiHotplug(ctx->dpyAttr[dpy].connected);
             } else {
                 /* We wont be getting unblank for VIRTUAL DISPLAY and its
                  * always guaranteed from WFD stack that CONNECT uevent for

@@ -45,12 +45,21 @@ public:
         : BpInterface<IQService>(impl) {}
 
     virtual void connect(const sp<IQClient>& client) {
-        ALOGD_IF(QSERVICE_DEBUG, "%s: connect client", __FUNCTION__);
+        ALOGD_IF(QSERVICE_DEBUG, "%s: connect HWC client", __FUNCTION__);
         Parcel data, reply;
         data.writeInterfaceToken(IQService::getInterfaceDescriptor());
         data.writeStrongBinder(client->asBinder());
-        remote()->transact(CONNECT, data, &reply);
+        remote()->transact(CONNECT_HWC_CLIENT, data, &reply);
     }
+
+    virtual void connect(const sp<IQHDMIClient>& client) {
+        ALOGD_IF(QSERVICE_DEBUG, "%s: connect HDMI client", __FUNCTION__);
+        Parcel data, reply;
+        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
+        data.writeStrongBinder(client->asBinder());
+        remote()->transact(CONNECT_HDMI_CLIENT, data, &reply);
+    }
+
 
     virtual android::status_t dispatch(uint32_t command, const Parcel* inParcel,
             Parcel* outParcel) {
@@ -90,16 +99,28 @@ status_t BnQService::onTransact(
             callerUid == AID_ROOT ||
             callerUid == AID_SYSTEM);
 
-    if (code == CONNECT) {
+    if (code == CONNECT_HWC_CLIENT) {
         CHECK_INTERFACE(IQService, data, reply);
         if(callerUid != AID_GRAPHICS) {
-            ALOGE("display.qservice CONNECT access denied: \
+            ALOGE("display.qservice CONNECT_HWC_CLIENT access denied: \
                     pid=%d uid=%d process=%s",
                     callerPid, callerUid, callingProcName);
             return PERMISSION_DENIED;
         }
         sp<IQClient> client =
                 interface_cast<IQClient>(data.readStrongBinder());
+        connect(client);
+        return NO_ERROR;
+    } else if(code == CONNECT_HDMI_CLIENT) {
+        CHECK_INTERFACE(IQService, data, reply);
+        if(callerUid != AID_SYSTEM && callerUid != AID_ROOT) {
+            ALOGE("display.qservice CONNECT_HDMI_CLIENT access denied: \
+                    pid=%d uid=%d process=%s",
+                    callerPid, callerUid, callingProcName);
+            return PERMISSION_DENIED;
+        }
+        sp<IQHDMIClient> client =
+                interface_cast<IQHDMIClient>(data.readStrongBinder());
         connect(client);
         return NO_ERROR;
     } else if (code > COMMAND_LIST_START && code < COMMAND_LIST_END) {
