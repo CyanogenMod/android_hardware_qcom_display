@@ -28,6 +28,7 @@
 #include <binder/IInterface.h>
 #include <binder/IBinder.h>
 #include <IQClient.h>
+#include <IQHDMIClient.h>
 
 
 namespace qService {
@@ -41,7 +42,7 @@ public:
         COMMAND_LIST_START = android::IBinder::FIRST_CALL_TRANSACTION,
         SECURING,                // Hardware securing start/end notification
         UNSECURING,              // Hardware unsecuring start/end notification
-        CONNECT,                 // Connect to qservice
+        CONNECT_HWC_CLIENT,      // Connect HWC Client to qservice
         SCREEN_REFRESH,          // Refresh screen through SF invalidate
         EXTERNAL_ORIENTATION,    // Set external orientation
         BUFFER_MIRRORMODE,       // Buffer mirrormode
@@ -51,6 +52,7 @@ public:
         GET_DISPLAY_VISIBLE_REGION,  // Get the visibleRegion for dpy
         PAUSE_WFD,               // Pause/Resume WFD
         SET_WFD_STATUS,          // Set if wfd connection is on/off
+        CONNECT_HDMI_CLIENT,     // Connect HDMI Client
         COMMAND_LIST_END = 400,
     };
 
@@ -59,8 +61,13 @@ public:
         START,
     };
 
-    // Register a client that can be notified
+    // Register a HWC client that can be notified
+    // This client is generic and is intended to get
+    // dispatches of all events calling into QService
     virtual void connect(const android::sp<qClient::IQClient>& client) = 0;
+    // Register an HDMI client. This client gets notification of HDMI events
+    // such as plug/unplug and CEC messages
+    virtual void connect(const android::sp<qClient::IQHDMIClient>& client) = 0;
     // Generic function to dispatch binder commands
     // The type of command decides how the data is parceled
     virtual android::status_t dispatch(uint32_t command,
