@@ -74,6 +74,7 @@ protected:
         MDPCOMP_AVOID_CACHE_MDP = 0x002,
         MDPCOMP_AVOID_LOAD_MDP = 0x004,
         MDPCOMP_AVOID_VIDEO_ONLY = 0x008,
+        MDPCOMP_AVOID_MDP_ONLY_LAYERS = 0x010,
     };
 
     /* mdp pipe data */
@@ -190,8 +191,14 @@ protected:
     bool tryVideoOnly(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     bool videoOnlyComp(hwc_context_t *ctx, hwc_display_contents_1_t* list,
             bool secureOnly);
+    /* checks for conditions where only secure RGB and video can be bypassed */
+    bool tryMDPOnlyLayers(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    bool mdpOnlyLayersComp(hwc_context_t *ctx, hwc_display_contents_1_t* list,
+            bool secureOnly);
     /* checks for conditions where YUV layers cannot be bypassed */
     bool isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer);
+    /* checks for conditions where Secure RGB layers cannot be bypassed */
+    bool isSecureRGBDoable(hwc_context_t* ctx, hwc_layer_1_t* layer);
     /* checks if MDP/MDSS can process current list w.r.to HW limitations
      * All peculiar HW limitations should go here */
     bool hwLimitationsCheck(hwc_context_t* ctx, hwc_display_contents_1_t* list);
@@ -217,6 +224,9 @@ protected:
         /* updates cache map with YUV info */
     void updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
             bool secureOnly);
+    /* updates cache map with secure RGB info */
+    void updateSecureRGB(hwc_context_t* ctx,
+            hwc_display_contents_1_t* list);
     /* Validates if the GPU/MDP layer split chosen by a strategy is supported
      * by MDP.
      * Sets up MDP comp data structures to reflect covnversion from layers to
