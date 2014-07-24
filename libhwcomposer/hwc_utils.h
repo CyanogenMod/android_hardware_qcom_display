@@ -595,6 +595,8 @@ struct hwc_context_t {
     bool enableABC;
     // PTOR Info
     qhwc::PtorInfo mPtorInfo;
+    //Running in Thermal burst mode
+    bool mThermalBurstMode;
 };
 
 namespace qhwc {
