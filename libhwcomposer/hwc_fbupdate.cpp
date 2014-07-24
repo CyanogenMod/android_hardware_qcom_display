@@ -474,7 +474,7 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     ovutils::eDest destR = ovutils::OV_INVALID;
 
     /*  Use 2 pipes IF
-        a) FB's width is > 2048 or
+        a) FB's width is > Mixer width or
         b) On primary, driver has indicated with caps to split always. This is
            based on an empirically derived value of panel height.
     */
@@ -483,7 +483,7 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             qdutils::MDPVersion::getInstance().isSrcSplitAlways();
 
     if(((fbUpdatingRect.right - fbUpdatingRect.left) >
-            qdutils::MAX_DISPLAY_DIM) or
+            (int)qdutils::MDPVersion::getInstance().getMaxMixerWidth()) or
             primarySplitAlways) {
         destR = ov.getPipe(pipeSpecs);
         if(destR == ovutils::OV_INVALID) {

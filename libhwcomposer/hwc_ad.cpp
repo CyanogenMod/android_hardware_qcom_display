@@ -130,7 +130,8 @@ void AssertiveDisplay::markDoable(hwc_context_t *ctx,
         int nYuvIndex = ctx->listStats[HWC_DISPLAY_PRIMARY].yuvIndices[0];
         const hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-        if(hnd && hnd->width <= qdutils::MAX_DISPLAY_DIM) {
+        qdutils::MDPVersion& mdpHw =  qdutils::MDPVersion::getInstance();
+        if(hnd && hnd->width <= mdpHw.getMaxMixerWidth()) {
             mDoable = true;
         }
     }
