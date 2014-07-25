@@ -137,7 +137,6 @@ struct ListStats {
 struct PtorInfo {
     int count;
     int layerIndex[MAX_PTOR_LAYERS];
-    int mRenderBuffOffset[MAX_PTOR_LAYERS];
     hwc_rect_t displayFrame[MAX_PTOR_LAYERS];
     bool isActive() { return (count>0); }
     int getPTORArrayIndex(int index) {
