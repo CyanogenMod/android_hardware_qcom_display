@@ -38,7 +38,7 @@
 
 using namespace qhwc;
 #define VSYNC_DEBUG 0
-#define BLANK_DEBUG 0
+#define POWER_MODE_DEBUG 0
 
 static int hwc_device_open(const struct hw_module_t* module,
                            const char* name,
@@ -282,39 +282,51 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
     return ret;
 }
 
-static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
+static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
+        int mode)
 {
     ATRACE_CALL();
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    int ret = 0, value = 0;
 
     if (!validDisplay(dpy)) {
         return -EINVAL;
     }
 
     Locker::Autolock _l(ctx->mBlankLock);
-    int ret = 0;
-    ALOGD_IF(BLANK_DEBUG, "%s: %s display: %d", __FUNCTION__,
-          blank==1 ? "Blanking":"Unblanking", dpy);
-    if(blank) {
-        // free up all the overlay pipes in use
-        // when we get a blank for either display
-        // makes sure that all pipes are freed
-        ctx->mOverlay->configBegin();
-        ctx->mOverlay->configDone();
-        ctx->mRotMgr->clear();
+    ALOGD_IF(POWER_MODE_DEBUG, "%s: Setting mode %d on display: %d", __FUNCTION__,
+            __FUNCTION__, mode, dpy);
+    switch(mode) {
+        case HWC_POWER_MODE_OFF:
+            // free up all the overlay pipes in use
+            // when we get a blank for either display
+            // makes sure that all pipes are freed
+            ctx->mOverlay->configBegin();
+            ctx->mOverlay->configDone();
+            ctx->mRotMgr->clear();
+            // If VDS is connected, do not clear WB object as it
+            // will end up detaching IOMMU. This is required
+            // to send black frame to WFD sink on power suspend.
+            // Note: With this change, we keep the WriteBack object
+            // alive on power suspend for AD use case.
+            value = FB_BLANK_POWERDOWN;
+            break;
+        case HWC_POWER_MODE_DOZE:
+        case HWC_POWER_MODE_DOZE_SUSPEND:
+            value = FB_BLANK_VSYNC_SUSPEND;
+            break;
+        case HWC_POWER_MODE_NORMAL:
+            value = FB_BLANK_UNBLANK;
+            break;
     }
+
     switch(dpy) {
         case HWC_DISPLAY_PRIMARY:
-            if(blank) {
-                ret = ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK,
-                            FB_BLANK_POWERDOWN);
-            } else {
-                ret = ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK,FB_BLANK_UNBLANK);
-            }
+            ret = ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK, value);
             break;
         case HWC_DISPLAY_EXTERNAL:
         case HWC_DISPLAY_VIRTUAL:
-            if(blank) {
+            if(mode == HWC_POWER_MODE_OFF) {
                 // call external framebuffer commit on blank,
                 // so that any pipe unsets gets committed
                 if (display_commit(ctx, dpy) < 0) {
@@ -328,19 +340,19 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
         default:
             return -EINVAL;
     }
-    // Enable HPD here, as during bootup unblank is called
+    // Enable HPD here, as during bootup POWER_MODE_NORMAL is set
     // when SF is completely initialized
     ctx->mExtDisplay->setHPD(1);
     if(ret == 0){
-        ctx->dpyAttr[dpy].isActive = !blank;
+        ctx->dpyAttr[dpy].isActive = not(mode == HWC_POWER_MODE_OFF);
     } else {
-        ALOGE("%s: Failed in %s display: %d error:%s", __FUNCTION__,
-              blank==1 ? "blanking":"unblanking", dpy, strerror(errno));
+        ALOGE("%s: Failed setting mode %s on display: %d error:%s",
+              __FUNCTION__, mode, dpy, strerror(errno));
         return ret;
     }
 
-    ALOGD_IF(BLANK_DEBUG, "%s: Done %s display: %d", __FUNCTION__,
-          blank==1 ? "blanking":"unblanking", dpy);
+    ALOGD_IF(POWER_MODE_DEBUG, "%s: Done setting mode %d on display %d",
+             __FUNCTION__, mode, dpy);
     return 0;
 }
 
@@ -515,8 +527,8 @@ int hwc_getDisplayConfigs(struct hwc_composer_device_1* dev, int disp,
         return -EINVAL;
     }
 
-    //in 1.1 there is no way to choose a config, report as config id # 0
-    //This config is passed to getDisplayAttributes. Ignore for now.
+    //Currently we allow only 1 config, reported as config id # 0
+    //This config is passed in to getDisplayAttributes. Ignored for now.
     switch(disp) {
         case HWC_DISPLAY_PRIMARY:
             if(*numConfigs > 0) {
@@ -616,6 +628,17 @@ void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
     strlcpy(buff, aBuf.string(), buff_len);
 }
 
+int hwc_getActiveConfig(struct hwc_composer_device_1* /*dev*/, int /*disp*/) {
+    //Supports only the default config (0th index) for now
+    return 0;
+}
+
+int hwc_setActiveConfig(struct hwc_composer_device_1* /*dev*/, int /*disp*/,
+        int index) {
+    //Supports only the default config (0th index) for now
+    return (index == 0) ? index : -EINVAL;
+}
+
 static int hwc_device_close(struct hw_device_t *dev)
 {
     if(!dev) {
@@ -643,18 +666,20 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
 
         //Setup HWC methods
         dev->device.common.tag          = HARDWARE_DEVICE_TAG;
-        dev->device.common.version      = HWC_DEVICE_API_VERSION_1_2;
+        dev->device.common.version      = HWC_DEVICE_API_VERSION_1_4;
         dev->device.common.module       = const_cast<hw_module_t*>(module);
         dev->device.common.close        = hwc_device_close;
         dev->device.prepare             = hwc_prepare;
         dev->device.set                 = hwc_set;
         dev->device.eventControl        = hwc_eventControl;
-        dev->device.blank               = hwc_blank;
+        dev->device.setPowerMode        = hwc_setPowerMode;
         dev->device.query               = hwc_query;
         dev->device.registerProcs       = hwc_registerProcs;
         dev->device.dump                = hwc_dump;
         dev->device.getDisplayConfigs   = hwc_getDisplayConfigs;
         dev->device.getDisplayAttributes = hwc_getDisplayAttributes;
+        dev->device.getActiveConfig     = hwc_getActiveConfig;
+        dev->device.setActiveConfig     = hwc_setActiveConfig;
         *device = &dev->device.common;
         status = 0;
     }
