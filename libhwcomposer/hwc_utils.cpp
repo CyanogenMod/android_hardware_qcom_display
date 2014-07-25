@@ -273,9 +273,15 @@ void initContext(hwc_context_t *ctx)
     //independent process as well.
     QService::init();
     sp<IQClient> client = new QClient(ctx);
-    interface_cast<IQService>(
+    android::sp<qService::IQService> qservice_sp = interface_cast<IQService>(
             defaultServiceManager()->getService(
-            String16("display.qservice")))->connect(client);
+            String16("display.qservice")));
+    if (qservice_sp.get()) {
+      qservice_sp->connect(client);
+    } else {
+      ALOGE("%s: Failed to acquire service pointer", __FUNCTION__);
+      return ;
+    }
 
     // Initialize device orientation to its default orientation
     ctx->deviceOrientation = 0;
