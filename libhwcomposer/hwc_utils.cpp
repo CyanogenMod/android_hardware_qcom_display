@@ -285,6 +285,7 @@ void initContext(hwc_context_t *ctx)
     ctx->mGPUHintInfo.mPrevCompositionGLES = false;
     ctx->mGPUHintInfo.mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
 #endif
+    ctx->alwaysOn = false;
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
 }
