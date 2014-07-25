@@ -427,7 +427,8 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
             break;
         case HWC_POWER_MODE_DOZE:
         case HWC_POWER_MODE_DOZE_SUSPEND:
-            //Need to set valid power mode - FB_BLANK_VSYNC_SUSPEND
+            value = FB_BLANK_VSYNC_SUSPEND;
+            break;
         case HWC_POWER_MODE_NORMAL:
             value = FB_BLANK_UNBLANK;
             break;
@@ -461,24 +462,6 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
         //Deliberate fall through since there is no explicit power mode for
         //virtual displays.
     case HWC_DISPLAY_VIRTUAL:
-        /* There are two ways to reach this block of code.
-
-         * Display hal has received unblank call on HWC_DISPLAY_EXTERNAL
-         and ctx->mVirtualonExtActive is true. In this case, non-hybrid
-         WFD is active. If so, getDpyforExternalDisplay will return dpy
-         as HWC_DISPLAY_VIRTUAL.
-
-         * Display hal has received unblank call on HWC_DISPLAY_PRIMARY
-         and since SF is not aware of VIRTUAL DISPLAY being handle by HWC,
-         it wont send blank / unblank events for it. We piggyback on
-         PRIMARY DISPLAY events to release mdp pipes and
-         activate/deactivate VIRTUAL DISPLAY.
-
-         * TODO: This separate case statement is not needed once we have
-         WFD client working on top of Google API's.
-
-         */
-
         if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected) {
             const int dpy = HWC_DISPLAY_VIRTUAL;
             if(mode == HWC_POWER_MODE_OFF and
