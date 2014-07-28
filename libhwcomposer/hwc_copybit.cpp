@@ -25,6 +25,7 @@
 #include "mdp_version.h"
 #include "gr.h"
 #include "cb_utils.h"
+#include "sync/sync.h"
 
 using namespace qdutils;
 namespace qhwc {

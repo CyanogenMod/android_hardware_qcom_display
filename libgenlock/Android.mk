@@ -10,4 +10,4 @@ LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgenlock\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := genlock.cpp
 
-include $(BUILD_SHARED_LIBRARY)
+#include $(BUILD_SHARED_LIBRARY)
