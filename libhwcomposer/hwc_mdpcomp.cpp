@@ -907,6 +907,11 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
     private_handle_t *renderBuf = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
     Whf layerWhf[numPTORLayersFound]; // To store w,h,f of PTOR layers
 
+    // Store the blending mode, planeAlpha, and transform of PTOR layers
+    int32_t blending[numPTORLayersFound];
+    uint8_t planeAlpha[numPTORLayersFound];
+    uint32_t transform[numPTORLayersFound];
+
     for(int j = 0; j < numPTORLayersFound; j++) {
         int index =  ctx->mPtorInfo.layerIndex[j];
 
@@ -924,6 +929,14 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         hnd->width = renderBuf->width;
         hnd->height = renderBuf->height;
         hnd->format = renderBuf->format;
+
+        // Store & update blending mode, planeAlpha and transform of PTOR layer
+        blending[j] = layer->blending;
+        planeAlpha[j] = layer->planeAlpha;
+        transform[j] = layer->transform;
+        layer->blending = HWC_BLENDING_NONE;
+        layer->planeAlpha = 0xFF;
+        layer->transform = 0;
 
         // Remove overlap from crop & displayFrame of below layers
         for (int i = 0; i < index && index !=-1; i++) {
@@ -964,13 +977,17 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         layer->sourceCropf.bottom = (float)sourceCrop[i].bottom;
     }
 
-    // Restore w,h,f of PTOR layers
+    // Restore w,h,f, blending attributes, and transform of PTOR layers
     for (int i = 0; i < numPTORLayersFound; i++) {
         int idx = ctx->mPtorInfo.layerIndex[i];
+        hwc_layer_1_t* layer = &list->hwLayers[idx];
         private_handle_t *hnd = (private_handle_t *)list->hwLayers[idx].handle;
         hnd->width = layerWhf[i].w;
         hnd->height = layerWhf[i].h;
         hnd->format = layerWhf[i].format;
+        layer->blending = blending[i];
+        layer->planeAlpha = planeAlpha[i];
+        layer->transform = transform[i];
     }
 
     if (!result) {
