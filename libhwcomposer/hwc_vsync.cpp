@@ -39,6 +39,7 @@ namespace qhwc {
 #define MAX_SYSFS_FILE_PATH             255
 #define PANEL_ON_STR "panel_power_on ="
 #define ARRAY_LENGTH(array) (sizeof((array))/sizeof((array)[0]))
+#define MAX_THERMAL_LEVEL 3
 const int MAX_DATA = 64;
 
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable)
@@ -76,6 +77,20 @@ static void handle_blank_event(hwc_context_t* ctx, int dpy, char *data)
     }
 }
 
+static void handle_thermal_event(hwc_context_t* ctx, int dpy, char *data)
+{
+    // extract thermal level
+    uint64_t thermalLevel = 0;
+    if (!strncmp(data, "thermal_level=", strlen("thermal_level="))) {
+        thermalLevel = strtoull(data + strlen("thermal_level="), NULL, 0);
+    }
+
+    if (thermalLevel >= MAX_THERMAL_LEVEL)
+        ctx->mThermalBurstMode = true;
+    else
+        ctx->mThermalBurstMode = false;
+}
+
 struct event {
     const char* name;
     void (*callback)(hwc_context_t* ctx, int dpy, char *data);
@@ -84,6 +99,7 @@ struct event {
 struct event event_list[] =  {
     { "vsync_event", handle_vsync_event },
     { "show_blank_event", handle_blank_event },
+    { "msm_fb_thermal_level", handle_thermal_event },
 };
 
 #define num_events ARRAY_LENGTH(event_list)

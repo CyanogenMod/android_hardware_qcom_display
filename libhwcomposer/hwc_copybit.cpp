@@ -281,6 +281,13 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         // No copybit device found - cannot use copybit
         return false;
     }
+
+    if(ctx->mThermalBurstMode) {
+        ALOGD_IF (DEBUG_COPYBIT, "%s:Copybit failed,"
+                "Running in Thermal Burst mode",__FUNCTION__);
+        return false;
+    }
+
     int compositionType = qdutils::QCCompositionType::
                                     getInstance().getCompositionType();
 
