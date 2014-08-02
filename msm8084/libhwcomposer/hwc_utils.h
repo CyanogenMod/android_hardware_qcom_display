@@ -553,10 +553,6 @@ struct hwc_context_t {
     // Downscale feature switch, set via system property
     // sys.hwc.mdp_downscale_enabled
     bool mMDPDownscaleEnabled;
-    // Is WFD enabled through VDS solution ?
-    // This can be set via system property
-    // persist.hwc.enable_vds
-    bool mVDSEnabled;
     struct gpu_hint_info mGPUHintInfo;
 };
 
