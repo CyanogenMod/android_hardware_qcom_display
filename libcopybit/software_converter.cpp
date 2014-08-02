@@ -60,7 +60,7 @@ int convertYV12toYCrCb420SP(const copybit_image_t *src, private_handle_t *yv12_h
     unsigned char* oldChroma = (unsigned char*)(hnd->base + y_size);
     memcpy((char *)yv12_handle->base,(char *)hnd->base,y_size);
 
-#ifdef __ARM_HAVE_NEON
+#if defined(__ARM_HAVE_NEON) && !defined(__aarch64__)
    /* interleave */
     if(!chromaPadding) {
         unsigned char * t1 = newChroma;
