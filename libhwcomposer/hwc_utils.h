@@ -29,7 +29,9 @@
 #include <gralloc_priv.h>
 #include <utils/String8.h>
 #include "qdMetaData.h"
+#include "mdp_version.h"
 #include <overlayUtils.h>
+#include <overlayRotator.h>
 #include <EGL/egl.h>
 
 
@@ -190,7 +192,6 @@ enum {
 class LayerRotMap {
 public:
     LayerRotMap() { reset(); }
-    enum { MAX_SESS = 3 };
     void add(hwc_layer_1_t* layer, overlay::Rotator *rot);
     //Resets the mapping of layer to rotator
     void reset();
@@ -202,8 +203,8 @@ public:
     overlay::Rotator* getRot(uint32_t index) const;
     void setReleaseFd(const int& fence);
 private:
-    hwc_layer_1_t* mLayer[MAX_SESS];
-    overlay::Rotator* mRot[MAX_SESS];
+    hwc_layer_1_t* mLayer[overlay::RotMgr::MAX_ROT_SESS];
+    overlay::Rotator* mRot[overlay::RotMgr::MAX_ROT_SESS];
     uint32_t mCount;
 };
 
@@ -406,10 +407,11 @@ static inline bool isYuvBuffer(const private_handle_t* hnd) {
     return (hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO));
 }
 
-// Returns true if the buffer is yuv
-static inline bool is4kx2kYuvBuffer(const private_handle_t* hnd) {
+// Returns true if the buffer is yuv and exceeds the mixer width
+static inline bool isYUVSplitNeeded(const private_handle_t* hnd) {
+    int maxMixerWidth = qdutils::MDPVersion::getInstance().getMaxMixerWidth();
     return (hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO) &&
-            (hnd->width > 2048));
+            (hnd->width > maxMixerWidth));
 }
 
 // Returns true if the buffer is secure

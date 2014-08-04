@@ -20,6 +20,7 @@
 #include "overlayRotator.h"
 #include "overlayUtils.h"
 #include "mdp_version.h"
+#include "sync/sync.h"
 #include "gr.h"
 
 namespace ovutils = overlay::utils;

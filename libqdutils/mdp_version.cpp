@@ -88,8 +88,8 @@ MDPVersion::MDPVersion()
     mVGPipes = 0;
     mDMAPipes = 0;
     mFeatures = 0;
-    mMDPUpscale = 0;
-    mMDPDownscale = 0;
+    mMDPUpscale = 1;
+    mMDPDownscale = 1;
     mMacroTileEnabled = false;
     mLowBw = 0;
     mHighBw = 0;
