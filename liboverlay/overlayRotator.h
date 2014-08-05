@@ -52,7 +52,8 @@ struct RotMem {
     bool close();
     bool valid() { return mem.valid(); }
     uint32_t size() const { return mem.bufSz(); }
-    void setReleaseFd(const int& fence);
+    void setCurrBufReleaseFd(const int& fence);
+    void setPrevBufReleaseFd(const int& fence);
 
     // rotator data info dst offset
     uint32_t mRotOffset[ROT_NUM_BUFS];
@@ -72,9 +73,20 @@ public:
     virtual void setFlags(const utils::eMdpFlags& flags) = 0;
     virtual void setTransform(const utils::eTransform& rot) = 0;
     virtual bool commit() = 0;
+    /* return true if the current rotator state is cached */
+    virtual bool isRotCached(int fd, uint32_t offset) const;
+    /* return true if current rotator config is same as the last round*/
+    virtual bool rotConfChanged() const = 0;
+    /* return true if the current rotator input buffer fd and offset
+     * are same as the last round */
+    virtual bool rotDataChanged(int fd, uint32_t offset) const;
     virtual void setDownscale(int ds) = 0;
+    /* returns the src buffer of the rotator for the previous/current round,
+     * depending on when it is called(before/after the queuebuffer)*/
+    virtual int getSrcMemId() const = 0;
     //Mem id and offset should be retrieved only after rotator kickoff
     virtual int getDstMemId() const = 0;
+    virtual uint32_t getSrcOffset() const = 0;
     virtual uint32_t getDstOffset() const = 0;
     //Destination width, height, format, position should be retrieved only after
     //rotator configuration is committed via commit API
@@ -85,7 +97,12 @@ public:
     virtual bool queueBuffer(int fd, uint32_t offset) = 0;
     virtual void dump() const = 0;
     virtual void getDump(char *buf, size_t len) const = 0;
-    void setReleaseFd(const int& fence) { mMem.setReleaseFd(fence); }
+    inline void setCurrBufReleaseFd(const int& fence) {
+        mMem.setCurrBufReleaseFd(fence);
+    }
+    inline void setPrevBufReleaseFd(const int& fence) {
+        mMem.setPrevBufReleaseFd(fence);
+    }
     static Rotator *getRotator();
     /* Returns downscale by successfully applying constraints
      * Returns 0 if target doesnt support rotator downscaling
@@ -98,10 +115,11 @@ public:
 protected:
     /* Rotator memory manager */
     RotMem mMem;
-    explicit Rotator() {}
+    Rotator();
     static uint32_t calcOutputBufSize(const utils::Whf& destWhf);
 
 private:
+    bool mRotCacheDisabled;
     /*Returns rotator h/w type */
     static int getRotatorHwType();
     friend class RotMgr;
@@ -119,8 +137,11 @@ public:
     virtual void setFlags(const utils::eMdpFlags& flags);
     virtual void setTransform(const utils::eTransform& rot);
     virtual bool commit();
+    virtual bool rotConfChanged() const;
     virtual void setDownscale(int ds);
+    virtual int getSrcMemId() const;
     virtual int getDstMemId() const;
+    virtual uint32_t getSrcOffset() const;
     virtual uint32_t getDstOffset() const;
     virtual uint32_t getDstFormat() const;
     virtual utils::Whf getDstWhf() const;
@@ -143,9 +164,6 @@ private:
     void doTransform();
     /* reset underlying data, basically memset 0 */
     void reset();
-    /* return true if current rotator config is different
-     * than last known config */
-    bool rotConfChanged() const;
     /* save mRotImgInfo to be last known good config*/
     void save();
     /* Calculates the rotator's o/p buffer size post the transform calcs and
@@ -191,8 +209,11 @@ public:
     virtual void setFlags(const utils::eMdpFlags& flags);
     virtual void setTransform(const utils::eTransform& rot);
     virtual bool commit();
+    virtual bool rotConfChanged() const;
     virtual void setDownscale(int ds);
+    virtual int getSrcMemId() const;
     virtual int getDstMemId() const;
+    virtual uint32_t getSrcOffset() const;
     virtual uint32_t getDstOffset() const;
     virtual uint32_t getDstFormat() const;
     virtual utils::Whf getDstWhf() const;
@@ -215,6 +236,8 @@ private:
     void doTransform();
     /* reset underlying data, basically memset 0 */
     void reset();
+    /* save mRotInfo to be last known good config*/
+    void save();
     /* Calculates the rotator's o/p buffer size post the transform calcs and
      * knowing the o/p format depending on whether fastYuv is enabled or not */
     uint32_t calcOutputBufSize();
@@ -241,7 +264,9 @@ private:
             const uint32_t& downscale);
 
     /* MdssRot info structure */
-    mdp_overlay   mRotInfo;
+    mdp_overlay mRotInfo;
+    /* Last saved MdssRot info structure*/
+    mdp_overlay mLSRotInfo;
     /* MdssRot data structure */
     msmfb_overlay_data mRotData;
     /* Orientation */

@@ -37,8 +37,16 @@ bool MdpRot::enabled() const { return mRotImgInfo.enable; }
 
 void MdpRot::setRotations(uint32_t r) { mRotImgInfo.rotations = (uint8_t)r; }
 
+int MdpRot::getSrcMemId() const {
+    return mRotDataInfo.src.memory_id;
+}
+
 int MdpRot::getDstMemId() const {
     return mRotDataInfo.dst.memory_id;
+}
+
+uint32_t MdpRot::getSrcOffset() const {
+    return mRotDataInfo.src.offset;
 }
 
 uint32_t MdpRot::getDstOffset() const {
@@ -147,7 +155,6 @@ bool MdpRot::commit() {
             mRotImgInfo.enable = 0;
             return false;
         }
-        save();
         mRotDataInfo.session_id = mRotImgInfo.session_id;
     }
     return true;
@@ -238,7 +245,10 @@ void MdpRot::reset() {
 }
 
 bool MdpRot::queueBuffer(int fd, uint32_t offset) {
-    if(enabled()) {
+    if(enabled() and (not isRotCached(fd,offset))) {
+        int prev_fd = getSrcMemId();
+        uint32_t prev_offset = getSrcOffset();
+
         mRotDataInfo.src.memory_id = fd;
         mRotDataInfo.src.offset = offset;
 
@@ -249,14 +259,17 @@ bool MdpRot::queueBuffer(int fd, uint32_t offset) {
 
         mRotDataInfo.dst.offset =
                 mMem.mRotOffset[mMem.mCurrIndex];
-        mMem.mCurrIndex =
-                (mMem.mCurrIndex + 1) % mMem.mem.numBufs();
 
         if(!overlay::mdp_wrapper::rotate(mFd.getFD(), mRotDataInfo)) {
             ALOGE("MdpRot failed rotate");
             dump();
+            mRotDataInfo.src.memory_id = prev_fd;
+            mRotDataInfo.src.offset = prev_offset;
             return false;
         }
+        save();
+        mMem.mCurrIndex =
+                (mMem.mCurrIndex + 1) % mMem.mem.numBufs();
     }
     return true;
 }

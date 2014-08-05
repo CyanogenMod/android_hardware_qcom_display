@@ -29,6 +29,17 @@ namespace overlay {
 
 //============Rotator=========================
 
+Rotator::Rotator() {
+    char property[PROPERTY_VALUE_MAX];
+    mRotCacheDisabled = false;
+    if((property_get("debug.rotcache.disable", property, NULL) > 0) &&
+       (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+        (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+        /* Used in debugging to turnoff rotator caching */
+        mRotCacheDisabled = true;
+    }
+}
+
 Rotator::~Rotator() {}
 
 Rotator* Rotator::getRotator() {
@@ -70,6 +81,20 @@ int Rotator::getRotatorHwType() {
     return TYPE_MDP;
 }
 
+bool Rotator::isRotCached(int fd, uint32_t offset) const {
+    if(mRotCacheDisabled or rotConfChanged() or rotDataChanged(fd,offset))
+        return false;
+    return true;
+}
+
+bool Rotator::rotDataChanged(int fd, uint32_t offset) const {
+    /* fd and offset are the attributes of the current rotator input buffer.
+     * At this instance, getSrcMemId() and getSrcOffset() return the
+     * attributes of the previous rotator input buffer */
+    if( (fd == getSrcMemId()) and (offset == getSrcOffset()) )
+        return false;
+    return true;
+}
 
 //============RotMem=========================
 
@@ -98,7 +123,7 @@ RotMem::~RotMem() {
     }
 }
 
-void RotMem::setReleaseFd(const int& fence) {
+void RotMem::setCurrBufReleaseFd(const int& fence) {
     int ret = 0;
 
     if(mRelFence[mCurrIndex] >= 0) {
@@ -114,6 +139,20 @@ void RotMem::setReleaseFd(const int& fence) {
         ::close(mRelFence[mCurrIndex]);
     }
     mRelFence[mCurrIndex] = fence;
+}
+
+void RotMem::setPrevBufReleaseFd(const int& fence) {
+    uint32_t numRotBufs = mem.numBufs();
+    uint32_t prevIndex = (mCurrIndex + numRotBufs - 1) % (numRotBufs);
+
+    if(mRelFence[prevIndex] >= 0) {
+        /* No need of any wait as nothing will be written into this
+         * buffer by the rotator (this func is called when rotator is
+         * in cache mode) */
+        ::close(mRelFence[prevIndex]);
+    }
+
+    mRelFence[prevIndex] = fence;
 }
 
 //============RotMgr=========================

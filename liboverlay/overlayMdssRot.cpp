@@ -51,8 +51,16 @@ bool MdssRot::enabled() const { return mEnabled; }
 
 void MdssRot::setRotations(uint32_t flags) { mRotInfo.flags |= flags; }
 
+int MdssRot::getSrcMemId() const {
+    return mRotData.data.memory_id;
+}
+
 int MdssRot::getDstMemId() const {
     return mRotData.dst_data.memory_id;
+}
+
+uint32_t MdssRot::getSrcOffset() const {
+    return mRotData.data.offset;
 }
 
 uint32_t MdssRot::getDstOffset() const {
@@ -80,6 +88,19 @@ utils::Dim MdssRot::getDstDimensions() const {
 }
 
 uint32_t MdssRot::getSessId() const { return mRotInfo.id; }
+
+void MdssRot::save() {
+    mLSRotInfo = mRotInfo;
+}
+
+bool MdssRot::rotConfChanged() const {
+    // 0 means same
+    if(0 == ::memcmp(&mRotInfo, &mLSRotInfo,
+                     sizeof (mdp_overlay))) {
+        return false;
+    }
+    return true;
+}
 
 bool MdssRot::init() {
     if(!utils::openDev(mFd, 0, Res::fbPath, O_RDWR)) {
@@ -164,7 +185,10 @@ bool MdssRot::commit() {
 }
 
 bool MdssRot::queueBuffer(int fd, uint32_t offset) {
-    if(enabled()) {
+    if(enabled() and (not isRotCached(fd,offset))) {
+        int prev_fd = getSrcMemId();
+        uint32_t prev_offset = getSrcOffset();
+
         mRotData.data.memory_id = fd;
         mRotData.data.offset = offset;
 
@@ -175,14 +199,17 @@ bool MdssRot::queueBuffer(int fd, uint32_t offset) {
 
         mRotData.dst_data.offset =
                 mMem.mRotOffset[mMem.mCurrIndex];
-        mMem.mCurrIndex =
-                (mMem.mCurrIndex + 1) % mMem.mem.numBufs();
 
         if(!overlay::mdp_wrapper::play(mFd.getFD(), mRotData)) {
             ALOGE("MdssRot play failed!");
             dump();
+            mRotData.data.memory_id = prev_fd;
+            mRotData.data.offset = prev_offset;
             return false;
         }
+        save();
+        mMem.mCurrIndex =
+                (mMem.mCurrIndex + 1) % mMem.mem.numBufs();
     }
     return true;
 }
@@ -260,6 +287,7 @@ bool MdssRot::close() {
 
 void MdssRot::reset() {
     ovutils::memset0(mRotInfo);
+    ovutils::memset0(mLSRotInfo);
     ovutils::memset0(mRotData);
     mRotData.data.memory_id = -1;
     mRotInfo.id = MSMFB_NEW_REQUEST;
