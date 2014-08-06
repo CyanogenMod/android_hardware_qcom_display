@@ -292,9 +292,38 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
         const int lSplit = getLeftSplit(ctx, mDpy);
         mDestLeft = ovutils::OV_INVALID;
         mDestRight = ovutils::OV_INVALID;
+        hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
+        hwc_rect_t displayFrame = layer->displayFrame;
 
-        hwc_rect_t sourceCrop = fbUpdatingRect;
-        hwc_rect_t displayFrame = fbUpdatingRect;
+        // No FB update optimization on (1) Custom FB resolution,
+        // (2) External Mirror mode, (3) External orientation
+        if(!ctx->dpyAttr[mDpy].customFBSize && !ctx->mBufferMirrorMode
+           && !ctx->mExtOrientation) {
+            sourceCrop = fbUpdatingRect;
+            displayFrame = fbUpdatingRect;
+        }
+
+        int transform = layer->transform;
+        // use ext orientation if any
+        int extOrient = getExtOrientation(ctx);
+
+        // Do not use getNonWormholeRegion() function to calculate the
+        // sourceCrop during animation on external display and
+        // Dont do wormhole calculation when extorientation is set on External
+        // Dont do wormhole calculation when extDownscale is enabled on External
+        if(ctx->listStats[mDpy].isDisplayAnimating && mDpy) {
+            sourceCrop = layer->displayFrame;
+        } else if((mDpy && !extOrient
+                  && !ctx->dpyAttr[mDpy].mDownScaleMode)) {
+            if(!qdutils::MDPVersion::getInstance().is8x26() &&
+                !ctx->dpyAttr[mDpy].customFBSize) {
+                getNonWormholeRegion(list, sourceCrop);
+                displayFrame = sourceCrop;
+            }
+        }
+
+        calcExtDisplayPosition(ctx, NULL, mDpy, sourceCrop, displayFrame,
+                                   transform, orient);
 
         ret = true;
         Overlay::PipeSpecs pipeSpecs;
@@ -430,12 +459,44 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             (ovutils::eBlending)
             getBlending(layer->blending));
 
+    hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
+    hwc_rect_t displayFrame = layer->displayFrame;
+
+    // No FB update optimization on (1) Custom FB resolution,
+    // (2) External Mirror mode, (3) External orientation
+    if(!ctx->dpyAttr[mDpy].customFBSize && !ctx->mBufferMirrorMode
+       && !ctx->mExtOrientation) {
+        sourceCrop = fbUpdatingRect;
+        displayFrame = fbUpdatingRect;
+    }
     int transform = layer->transform;
     ovutils::eTransform orient =
             static_cast<ovutils::eTransform>(transform);
 
-    hwc_rect_t cropL = fbUpdatingRect;
-    hwc_rect_t cropR = fbUpdatingRect;
+    // use ext orientation if any
+    int extOrient = getExtOrientation(ctx);
+
+    // Do not use getNonWormholeRegion() function to calculate the
+    // sourceCrop during animation on external display and
+    // Dont do wormhole calculation when extorientation is set on External
+    // Dont do wormhole calculation when extDownscale is enabled on External
+    if(ctx->listStats[mDpy].isDisplayAnimating && mDpy) {
+        sourceCrop = layer->displayFrame;
+    } else if((mDpy && !extOrient
+              && !ctx->dpyAttr[mDpy].mDownScaleMode)) {
+        if(!qdutils::MDPVersion::getInstance().is8x26() &&
+            !ctx->dpyAttr[mDpy].customFBSize) {
+            getNonWormholeRegion(list, sourceCrop);
+            displayFrame = sourceCrop;
+        }
+    }
+
+    calcExtDisplayPosition(ctx, NULL, mDpy, sourceCrop, displayFrame,
+                               transform, orient);
+    hwc_rect_t cropL = sourceCrop;
+    hwc_rect_t cropR = sourceCrop;
+    hwc_rect_t dstL = displayFrame;
+    hwc_rect_t dstR = displayFrame;
 
     //Request left pipe (or 1 by default)
     Overlay::PipeSpecs pipeSpecs;
@@ -462,7 +523,7 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     bool primarySplitAlways = (mDpy == HWC_DISPLAY_PRIMARY) and
             qdutils::MDPVersion::getInstance().isSrcSplitAlways();
 
-    if(((fbUpdatingRect.right - fbUpdatingRect.left) >
+    if(((sourceCrop.right - sourceCrop.left) >
             (int)qdutils::MDPVersion::getInstance().getMaxMixerWidth()) or
             primarySplitAlways) {
         destR = ov.getPipe(pipeSpecs);
@@ -477,8 +538,10 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         }
 
         //Split crop equally when using 2 pipes
-        cropL.right = (fbUpdatingRect.right + fbUpdatingRect.left) / 2;
+        cropL.right = (sourceCrop.right + sourceCrop.left) / 2;
         cropR.left = cropL.right;
+        dstL.right = (displayFrame.right + displayFrame.left) / 2;
+        dstR.left = dstL.right;
     }
 
     mDestLeft = destL;
@@ -486,7 +549,7 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
 
     if(destL != OV_INVALID) {
         if(configMdp(ctx->mOverlay, parg, orient,
-                    cropL, cropL, NULL /*metadata*/, destL) < 0) {
+                    cropL, dstL, NULL /*metadata*/, destL) < 0) {
             ALOGE("%s: commit failed for left mixer config", __FUNCTION__);
             return false;
         }
@@ -495,7 +558,7 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     //configure right pipe
     if(destR != OV_INVALID) {
         if(configMdp(ctx->mOverlay, parg, orient,
-                    cropR, cropR, NULL /*metadata*/, destR) < 0) {
+                    cropR, dstR, NULL /*metadata*/, destR) < 0) {
             ALOGE("%s: commit failed for right mixer config", __FUNCTION__);
             return false;
         }
