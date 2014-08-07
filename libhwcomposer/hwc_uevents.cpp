@@ -280,7 +280,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             if(dpy == HWC_DISPLAY_EXTERNAL ||
                ctx->mVirtualonExtActive) {
                 /* External display is HDMI or non-hybrid WFD solution */
-                ALOGE_IF(UEVENT_DEBUG, "%s: Sending EXTERNAL_OFFLINE ONLINE"
+                ALOGE_IF(UEVENT_DEBUG, "%s: Sending EXTERNAL ONLINE"
                          "hotplug event", __FUNCTION__);
                 ctx->proc->hotplug(ctx->proc,HWC_DISPLAY_EXTERNAL,
                                    EXTERNAL_ONLINE);
