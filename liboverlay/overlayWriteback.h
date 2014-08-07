@@ -81,6 +81,8 @@ public:
     bool queueBuffer(int opFd, uint32_t opOffset);
     uint32_t getOffset() const { return mWbMem.getOffset(); }
     int getDstFd() const { return mWbMem.getDstFd(); }
+    int getWidth() const { return mXres; }
+    int getHeight() const { return mYres; }
     /* Subject to GC if writeback isnt used for a drawing round.
      * Get always if caching the value.
      */

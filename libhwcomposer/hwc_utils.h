@@ -97,8 +97,8 @@ struct DisplayAttributes {
     // To trigger padding round to clean up mdp
     // pipes
     bool isConfiguring;
-    // External Display is in MDP Downscale mode indicator
-    bool mDownScaleMode;
+    // Indicates whether external/virtual display is in MDP scaling mode
+    bool mMDPScalingMode;
     // Ext dst Rect
     hwc_rect_t mDstRect;
     //Action safe attributes
@@ -445,21 +445,17 @@ static inline bool isSecureDisplayBuffer(const private_handle_t* hnd) {
 }
 
 static inline int getWidth(const private_handle_t* hnd) {
-    if(isYuvBuffer(hnd)) {
-        MetaData_t *metadata = reinterpret_cast<MetaData_t*>(hnd->base_metadata);
-        if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
-            return metadata->bufferDim.sliceWidth;
-        }
+    MetaData_t *metadata = reinterpret_cast<MetaData_t*>(hnd->base_metadata);
+    if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
+        return metadata->bufferDim.sliceWidth;
     }
     return hnd->width;
 }
 
 static inline int getHeight(const private_handle_t* hnd) {
-    if(isYuvBuffer(hnd)) {
-        MetaData_t *metadata = reinterpret_cast<MetaData_t*>(hnd->base_metadata);
-        if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
-            return metadata->bufferDim.sliceHeight;
-        }
+    MetaData_t *metadata = reinterpret_cast<MetaData_t*>(hnd->base_metadata);
+    if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
+        return metadata->bufferDim.sliceHeight;
     }
     return hnd->height;
 }

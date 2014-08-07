@@ -40,6 +40,7 @@ bool HWCVirtualVDS::sVDDumpEnabled = false;
 
 void HWCVirtualVDS::init(hwc_context_t *ctx) {
     const int dpy = HWC_DISPLAY_VIRTUAL;
+    mScalingWidth = 0, mScalingHeight = 0;
     ctx->mFBUpdate[dpy] =
             IFBUpdate::getObject(ctx, dpy);
     ctx->mMDPComp[dpy] =  MDPComp::getObject(ctx, dpy);
@@ -106,8 +107,14 @@ int HWCVirtualVDS::prepare(hwc_composer_device_1 *dev,
             ctx->dpyAttr[dpy].isConfiguring = false;
             ctx->dpyAttr[dpy].fd = Writeback::getInstance()->getFbFd();
             private_handle_t *ohnd = (private_handle_t *)list->outbuf;
-            Writeback::getInstance()->configureDpyInfo(ohnd->width,
-                                                          ohnd->height);
+
+            setMDPScalingMode(ctx, ohnd, dpy);
+
+            mScalingWidth = getWidth(ohnd);
+            mScalingHeight = getHeight(ohnd);
+
+            Writeback::getInstance()->configureDpyInfo(mScalingWidth,
+                                                        mScalingHeight);
             setListStats(ctx, list, dpy);
 
             if(ctx->mMDPComp[dpy]->prepare(ctx, list) < 0) {
@@ -257,4 +264,21 @@ void HWCVirtualVDS::resume(hwc_context_t* ctx, int dpy) {
         ctx->proc->invalidate(ctx->proc);
     }
     return;
+}
+
+/* We set scaling mode on the VD if the output handle width and height
+   differs from the virtual frame buffer width and height. */
+void HWCVirtualVDS::setMDPScalingMode(hwc_context_t* ctx,
+        private_handle_t* ohnd, int dpy) {
+    bool scalingMode = false;
+    int fbWidth = ctx->dpyAttr[dpy].xres;
+    int fbHeight =  ctx->dpyAttr[dpy].yres;
+    if((getWidth(ohnd) != fbWidth) || (getHeight(ohnd) != fbHeight)) {
+        scalingMode = true;
+    }
+    ctx->dpyAttr[dpy].mMDPScalingMode = scalingMode;
+
+    ALOGD_IF(HWCVIRTUAL_LOG, "%s fb(%dx%d) outputBuffer(%dx%d) scalingMode=%d",
+            __FUNCTION__, fbWidth, fbHeight,
+            getWidth(ohnd), getHeight(ohnd), scalingMode);
 }

@@ -581,14 +581,14 @@ void ExternalDisplay::setAttributes() {
         // Always set dpyAttr res to mVInfo res
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = width;
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = height;
-        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode = false;
+        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mMDPScalingMode = false;
         if(mHwcContext->mOverlay->isUIScalingOnExternalSupported()
                 && mHwcContext->mMDPDownscaleEnabled) {
             int priW = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
             int priH = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
             // if primary resolution is more than the hdmi resolution
-            // configure dpy attr to primary resolution and set
-            // downscale mode
+            // configure dpy attr to primary resolution and set MDP
+            // scaling mode.
             // Restrict this upto 1080p resolution max, if target does not
             // support source split feature.
             if((priW * priH) > (width * height) &&
@@ -632,16 +632,17 @@ void ExternalDisplay::setAttributes() {
                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = alignedExtW;
                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = alignedExtH;
                 // Set External Display MDP Downscale mode indicator
-                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode =true;
+                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mMDPScalingMode
+                        = true;
             }
         }
         ALOGD_IF(DEBUG_MDPDOWNSCALE, "Selected external resolution [%d X %d] "
-                 "maxMDPDownScale %d MDPDownScaleMode %d srcSplitEnabled %d "
+                 "maxMDPDownScale %d mMDPScalingMode %d srcSplitEnabled %d "
                  "MDPDownscale feature %d",
                  mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres,
                  mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres,
                  qdutils::MDPVersion::getInstance().getMaxMDPDownscale(),
-                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode,
+                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mMDPScalingMode,
                  qdutils::MDPVersion::getInstance().isSrcSplit(),
                  mHwcContext->mMDPDownscaleEnabled);
         //Initialize the display viewFrame info

@@ -223,9 +223,9 @@ void initContext(hwc_context_t *ctx)
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = false;
     ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = false;
     ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected = false;
-    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].mDownScaleMode= false;
-    ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode = false;
-    ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = false;
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].mMDPScalingMode= false;
+    ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].mMDPScalingMode = false;
+    ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].mMDPScalingMode = false;
 
     ctx->mMDPComp[HWC_DISPLAY_PRIMARY] =
          MDPComp::getObject(ctx, HWC_DISPLAY_PRIMARY);
@@ -398,8 +398,8 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
 
     int fbWidth = ctx->dpyAttr[dpy].xres;
     int fbHeight = ctx->dpyAttr[dpy].yres;
-    if(ctx->dpyAttr[dpy].mDownScaleMode) {
-        // if downscale Mode is enabled for external, need to query
+    if(ctx->dpyAttr[dpy].mMDPScalingMode) {
+        // if MDP scaling mode is enabled for external, need to query
         // the actual width and height, as that is the physical w & h
          ctx->mExtDisplay->getAttributes(fbWidth, fbHeight);
     }
@@ -530,9 +530,17 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
                  outPos.x, outPos.y,
                  outPos.w, outPos.h);
     }
-    if(ctx->dpyAttr[dpy].mDownScaleMode) {
-        int extW, extH;
-        ctx->mExtDisplay->getAttributes(extW, extH);
+    if(ctx->dpyAttr[dpy].mMDPScalingMode) {
+        int extW = 0, extH = 0;
+        if(dpy == HWC_DISPLAY_EXTERNAL) {
+            ctx->mExtDisplay->getAttributes(extW, extH);
+        } else if(dpy == HWC_DISPLAY_VIRTUAL) {
+            extW = ctx->mHWCVirtual->getScalingWidth();
+            extH = ctx->mHWCVirtual->getScalingHeight();
+        }
+        ALOGD_IF(HWC_UTILS_DEBUG, "%s: Scaling mode extW=%d extH=%d",
+                __FUNCTION__, extW, extH);
+
         fbWidth  = (float)ctx->dpyAttr[dpy].xres;
         fbHeight = (float)ctx->dpyAttr[dpy].yres;
         //Calculate the position...
@@ -603,14 +611,22 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
                     displayFrame.bottom = dstHeight;
                 }
             }
-            if(ctx->dpyAttr[dpy].mDownScaleMode) {
-                int extW, extH;
-                // if downscale is enabled, map the co-ordinates to new
+            if(ctx->dpyAttr[dpy].mMDPScalingMode) {
+                int extW = 0, extH = 0;
+                // if MDP scaling mode is enabled, map the co-ordinates to new
                 // domain(downscaled)
                 float fbWidth  = (float)ctx->dpyAttr[dpy].xres;
                 float fbHeight = (float)ctx->dpyAttr[dpy].yres;
                 // query MDP configured attributes
-                ctx->mExtDisplay->getAttributes(extW, extH);
+                if(dpy == HWC_DISPLAY_EXTERNAL) {
+                    ctx->mExtDisplay->getAttributes(extW, extH);
+                } else if(dpy == HWC_DISPLAY_VIRTUAL) {
+                    extW = ctx->mHWCVirtual->getScalingWidth();
+                    extH = ctx->mHWCVirtual->getScalingHeight();
+                }
+                ALOGD_IF(HWC_UTILS_DEBUG, "%s: Scaling mode extW=%d extH=%d",
+                        __FUNCTION__, extW, extH);
+
                 //Calculate the ratio...
                 float wRatio = ((float)extW)/fbWidth;
                 float hRatio = ((float)extH)/fbHeight;
@@ -626,7 +642,7 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
                          displayFrame.right, displayFrame.bottom);
             }
         }else {
-            if(extOrient || ctx->dpyAttr[dpy].mDownScaleMode) {
+            if(extOrient || ctx->dpyAttr[dpy].mMDPScalingMode) {
                 getAspectRatioPosition(ctx, dpy, extOrient,
                                        displayFrame, displayFrame);
             }
@@ -1791,7 +1807,7 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
     }
 
-    /* Calculate the external display position based on MDP downscale,
+    /* Calculate the external display position based on MDP scaling mode,
        ActionSafe, and extorientation features. */
     calcExtDisplayPosition(ctx, hnd, dpy, crop, dst, transform, orient);
     int downscale = getRotDownscale(ctx, layer);
@@ -2085,13 +2101,19 @@ void dumpBuffer(private_handle_t *ohnd, char *bufferName) {
     if (ohnd != NULL && ohnd->base) {
         char dumpFilename[PATH_MAX];
         bool bResult = false;
+        int width = getWidth(ohnd);
+        int height = getHeight(ohnd);
+        int format = ohnd->format;
+        //dummy aligned w & h.
+        int alW = 0, alH = 0;
+        int size = getBufferSizeAndDimensions(width, height, format, alW, alH);
         snprintf(dumpFilename, sizeof(dumpFilename), "/data/%s.%s.%dx%d.raw",
             bufferName,
-            overlay::utils::getFormatString(utils::getMdpFormat(ohnd->format)),
-            getWidth(ohnd), getHeight(ohnd));
+            overlay::utils::getFormatString(utils::getMdpFormat(format)),
+            width, height);
         FILE* fp = fopen(dumpFilename, "w+");
         if (NULL != fp) {
-            bResult = (bool) fwrite((void*)ohnd->base, ohnd->size, 1, fp);
+            bResult = (bool) fwrite((void*)ohnd->base, size, 1, fp);
             fclose(fp);
         }
         ALOGD("Buffer[%s] Dump to %s: %s",
