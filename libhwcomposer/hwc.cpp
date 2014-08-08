@@ -344,6 +344,10 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
         reset_panel(dev);
     }
 
+    if(ctx->alwaysOn) {
+        return 0;
+    }
+
     //Will be unlocked at the end of set
     ctx->mDrawLock.lock();
     setPaddingRound(ctx,numDisplays,displays);
@@ -412,6 +416,33 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
     return ret;
 }
 
+static bool getAlwaysOn() {
+    int ret = 0;
+    char alwaysOnPath[256];
+    snprintf (alwaysOnPath, sizeof(alwaysOnPath),
+            "/sys/class/graphics/fb%d/always_on", HWC_DISPLAY_PRIMARY);
+    int fd = open(alwaysOnPath, O_RDONLY);
+    if(fd >= 0) {
+        char opStr[4];
+        int bytesRead = read(fd, opStr, sizeof(opStr) - 1);
+        if(bytesRead > 0) {
+            opStr[bytesRead] = '\0';
+            ret = atoi(opStr);
+        } else if(bytesRead == 0) {
+            ALOGI("%s: No contents found in always_on node",
+                    __func__);
+        } else {
+            ALOGE("%s: Read from always_on node failed with error %s", __func__,
+                    strerror(errno));
+        }
+        close(fd);
+    } else {
+        ALOGI("%s: /sys/class/graphics/fb%d/always_on could not be opened : %s",
+                __func__, HWC_DISPLAY_PRIMARY, strerror(errno));
+    }
+    return (!!ret);
+}
+
 static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
 {
     ATRACE_CALL();
@@ -419,6 +450,9 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
 
     Locker::Autolock _l(ctx->mDrawLock);
     int ret = 0, value = 0;
+
+    bool suspend = false;
+    ctx->alwaysOn = false;
 
     /* In case of non-hybrid WFD session, we are fooling SF by
      * piggybacking on HDMI display ID for virtual.
@@ -430,6 +464,10 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
     ALOGD_IF(BLANK_DEBUG, "%s: %s display: %d", __FUNCTION__,
           blank==1 ? "Blanking":"Unblanking", dpy);
     if(blank) {
+        if(dpy == HWC_DISPLAY_PRIMARY)
+            suspend = getAlwaysOn();
+
+        if(not suspend) {
         // free up all the overlay pipes in use
         // when we get a blank for either display
         // makes sure that all pipes are freed
@@ -441,10 +479,15 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
         // to send black frame to WFD sink on power suspend.
         // Note: With this change, we keep the WriteBack object
         // alive on power suspend for AD use case.
+        } else {
+            ctx->alwaysOn = true;
+        }
     }
     switch(dpy) {
     case HWC_DISPLAY_PRIMARY:
         value = blank ? FB_BLANK_POWERDOWN : FB_BLANK_UNBLANK;
+        if(suspend)
+            value = FB_BLANK_VSYNC_SUSPEND;
         if(ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK, value) < 0 ) {
             ALOGE("%s: Failed to handle blank event(%d) for Primary!!",
                   __FUNCTION__, blank );
