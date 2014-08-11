@@ -45,7 +45,7 @@ bool MDPComp::sEnabled = false;
 bool MDPComp::sEnableMixedMode = true;
 int MDPComp::sSimulationFlags = 0;
 int MDPComp::sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
-bool MDPComp::sEnable4k2kYUVSplit = false;
+bool MDPComp::sEnableYUVsplit = false;
 bool MDPComp::sSrcSplitEnabled = false;
 MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
     if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
@@ -159,7 +159,7 @@ bool MDPComp::init(hwc_context_t *ctx) {
             property_get("persist.mdpcomp.4k2kSplit", property, "0") > 0 &&
             (!strncmp(property, "1", PROPERTY_VALUE_MAX) ||
             !strncasecmp(property,"true", PROPERTY_VALUE_MAX))) {
-        sEnable4k2kYUVSplit = true;
+        sEnableYUVsplit = true;
     }
 
     if ((property_get("persist.hwc.ptor.enable", property, NULL) > 0) &&
@@ -773,7 +773,7 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     mCurrentFrame.mdpCount = mCurrentFrame.layerCount - mCurrentFrame.fbCount -
         mCurrentFrame.dropCount;
 
-    if(sEnable4k2kYUVSplit){
+    if(sEnableYUVsplit){
         adjustForSourceSplit(ctx, list);
     }
 
@@ -1055,7 +1055,7 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
 
     int mdpCount = mCurrentFrame.mdpCount;
 
-    if(sEnable4k2kYUVSplit){
+    if(sEnableYUVsplit){
         adjustForSourceSplit(ctx, list);
     }
 
@@ -1221,7 +1221,7 @@ bool MDPComp::videoOnlyComp(hwc_context_t *ctx,
     if(mCurrentFrame.fbCount)
         mCurrentFrame.fbZ = mCurrentFrame.mdpCount;
 
-    if(sEnable4k2kYUVSplit){
+    if(sEnableYUVsplit){
         adjustForSourceSplit(ctx, list);
     }
 
@@ -1549,7 +1549,7 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
             cur_pipe->zOrder = mdpNextZOrder++;
 
             private_handle_t *hnd = (private_handle_t *)layer->handle;
-            if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
+            if(isYUVSplitNeeded(hnd) && sEnableYUVsplit){
                 if(configure4k2kYuv(ctx, layer,
                             mCurrentFrame.mdpToLayer[mdpIndex])
                         != 0 ){
@@ -1799,7 +1799,7 @@ void MDPCompNonSplit::adjustForSourceSplit(hwc_context_t *ctx,
                 mdpNextZOrder++;
                 hwc_layer_1_t* layer = &list->hwLayers[index];
                 private_handle_t *hnd = (private_handle_t *)layer->handle;
-                if(is4kx2kYuvBuffer(hnd)) {
+                if(isYUVSplitNeeded(hnd)) {
                     if(mdpNextZOrder <= mCurrentFrame.fbZ)
                         mCurrentFrame.fbZ += 1;
                     mdpNextZOrder++;
@@ -1839,7 +1839,7 @@ bool MDPCompNonSplit::allocLayerPipes(hwc_context_t *ctx,
 
         hwc_layer_1_t* layer = &list->hwLayers[index];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-        if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
+        if(isYUVSplitNeeded(hnd) && sEnableYUVsplit){
             if(allocSplitVGPipesfor4k2k(ctx, index)){
                 continue;
             }
@@ -1919,7 +1919,7 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
         int mdpIndex = mCurrentFrame.layerToMDP[i];
 
-        if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit)
+        if(isYUVSplitNeeded(hnd) && sEnableYUVsplit)
         {
             MdpYUVPipeInfo& pipe_info =
                 *(MdpYUVPipeInfo*)mCurrentFrame.mdpToLayer[mdpIndex].pipeInfo;
@@ -2018,7 +2018,7 @@ void MDPCompSplit::adjustForSourceSplit(hwc_context_t *ctx,
                 mdpNextZOrder++;
                 hwc_layer_1_t* layer = &list->hwLayers[index];
                 private_handle_t *hnd = (private_handle_t *)layer->handle;
-                if(is4kx2kYuvBuffer(hnd)) {
+                if(isYUVSplitNeeded(hnd)) {
                     hwc_rect_t dst = layer->displayFrame;
                     if((dst.left > lSplit) || (dst.right < lSplit)) {
                         mCurrentFrame.mdpCount += 1;
@@ -2079,7 +2079,7 @@ bool MDPCompSplit::allocLayerPipes(hwc_context_t *ctx,
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         hwc_rect_t dst = layer->displayFrame;
         const int lSplit = getLeftSplit(ctx, mDpy);
-        if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit){
+        if(isYUVSplitNeeded(hnd) && sEnableYUVsplit){
             if((dst.left > lSplit)||(dst.right < lSplit)){
                 if(allocSplitVGPipesfor4k2k(ctx, index)){
                     continue;
@@ -2175,7 +2175,7 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
         int mdpIndex = mCurrentFrame.layerToMDP[i];
 
-        if(is4kx2kYuvBuffer(hnd) && sEnable4k2kYUVSplit)
+        if(isYUVSplitNeeded(hnd) && sEnableYUVsplit)
         {
             MdpYUVPipeInfo& pipe_info =
                 *(MdpYUVPipeInfo*)mCurrentFrame.mdpToLayer[mdpIndex].pipeInfo;

@@ -879,7 +879,7 @@ void setListStats(hwc_context_t *ctx,
             ctx->listStats[dpy].yuvIndices[yuvCount] = (int)i;
             yuvCount++;
 
-            if(UNLIKELY(is4kx2kYuvBuffer(hnd))){
+            if(UNLIKELY(isYUVSplitNeeded(hnd))){
                 int& yuv4k2kCount = ctx->listStats[dpy].yuv4k2kCount;
                 ctx->listStats[dpy].yuv4k2kIndices[yuv4k2kCount] = (int)i;
                 yuv4k2kCount++;
@@ -2211,14 +2211,14 @@ void BwcPM::setBwc(const hwc_rect_t& crop,
 }
 
 void LayerRotMap::add(hwc_layer_1_t* layer, Rotator *rot) {
-    if(mCount >= MAX_SESS) return;
+    if(mCount >= RotMgr::MAX_ROT_SESS) return;
     mLayer[mCount] = layer;
     mRot[mCount] = rot;
     mCount++;
 }
 
 void LayerRotMap::reset() {
-    for (int i = 0; i < MAX_SESS; i++) {
+    for (int i = 0; i < RotMgr::MAX_ROT_SESS; i++) {
         mLayer[i] = 0;
         mRot[i] = 0;
     }

@@ -285,15 +285,16 @@ void getDecimationFactor(const int& src_w, const int& src_h,
     vertDeci = 0;
     float horDscale = ceilf((float)src_w / (float)dst_w);
     float verDscale = ceilf((float)src_h / (float)dst_h);
+    qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
 
     //Next power of 2, if not already
     horDscale = powf(2.0f, ceilf(log2f(horDscale)));
     verDscale = powf(2.0f, ceilf(log2f(verDscale)));
 
-    //Since MDP can do 1/4 dscale and has better quality, split the task
+    //Since MDP can do downscale and has better quality, split the task
     //between decimator and MDP downscale
-    horDscale /= 4.0f;
-    verDscale /= 4.0f;
+    horDscale /= (float)mdpHw.getMaxMDPDownscale();
+    verDscale /= (float)mdpHw.getMaxMDPDownscale();
 
     if((int)horDscale)
         horzDeci = (uint8_t)log2f(horDscale);
@@ -301,7 +302,7 @@ void getDecimationFactor(const int& src_w, const int& src_h,
     if((int)verDscale)
         vertDeci = (uint8_t)log2f(verDscale);
 
-    if(src_w > 2048) {
+    if(src_w > mdpHw.getMaxMixerWidth()) {
         //If the client sends us something > what a layer mixer supports
         //then it means it doesn't want to use split-pipe but wants us to
         //decimate. A minimum decimation of 2 will ensure that the width is
