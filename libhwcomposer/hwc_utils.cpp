@@ -1359,6 +1359,13 @@ void setMdpFlags(hwc_layer_1_t *layer,
                              ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
         ovutils::setMdpFlags(mdpFlags,
                              ovutils::OV_MDP_SECURE_DISPLAY_OVERLAY_SESSION);
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SMP_FORCE_ALLOC);
+    }
+
+    if(isProtectedBuffer(hnd)) {
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SMP_FORCE_ALLOC);
     }
     //No 90 component and no rot-downscale then flips done by MDP
     //If we use rot then it might as well do flips

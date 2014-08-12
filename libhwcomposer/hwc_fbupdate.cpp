@@ -153,6 +153,8 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
 
         ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_BLEND_FG_PREMULT;
         ovutils::eIsFg isFg = ovutils::IS_FG_OFF;
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SMP_FORCE_ALLOC);
         ovutils::eZorder zOrder = static_cast<ovutils::eZorder>(fbZorder);
 
         hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
@@ -299,7 +301,8 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
         mDestRight = destR;
 
         ovutils::eMdpFlags mdpFlagsL = ovutils::OV_MDP_BLEND_FG_PREMULT;
-
+        ovutils::setMdpFlags(mdpFlagsL,
+                ovutils::OV_MDP_SMP_FORCE_ALLOC);
         ovutils::eZorder zOrder = static_cast<ovutils::eZorder>(fbZorder);
 
         //XXX: FB layer plane alpha is currently sent as zero from
