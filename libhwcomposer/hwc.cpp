@@ -622,18 +622,12 @@ static int hwc_set_external(hwc_context_t *ctx,
             ret = -1;
         }
 
-        int extOnlyLayerIndex =
-                ctx->listStats[dpy].extOnlyLayerIndex;
-
         private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
-        if(extOnlyLayerIndex!= -1) {
-            hwc_layer_1_t *extLayer = &list->hwLayers[extOnlyLayerIndex];
-            hnd = (private_handle_t *)extLayer->handle;
-        } else if(copybitDone) {
+        if(copybitDone) {
             hnd = ctx->mCopyBit[dpy]->getCurrentRenderBuffer();
         }
 
-        if(hnd && !isYuvBuffer(hnd)) {
+        if(hnd) {
             if (!ctx->mFBUpdate[dpy]->draw(ctx, hnd)) {
                 ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
                 ret = -1;
