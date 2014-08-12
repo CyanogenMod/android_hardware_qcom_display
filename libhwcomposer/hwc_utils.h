@@ -458,6 +458,12 @@ static inline bool isSecureBuffer(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_SECURE_BUFFER & hnd->flags));
 }
 
+// Returns true if the buffer is protected
+static inline bool isProtectedBuffer(const private_handle_t* hnd) {
+    return (hnd && (private_handle_t::PRIV_FLAGS_PROTECTED_BUFFER & hnd->flags));
+}
+
+
 static inline bool isTileRendered(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_TILE_RENDERED & hnd->flags));
 }
