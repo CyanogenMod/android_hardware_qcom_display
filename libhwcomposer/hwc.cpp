@@ -147,7 +147,8 @@ static void setDMAState(hwc_context_t *ctx, int numDisplays,
                      * to BLOCK_MODE */
 
                     if (canUseRotator(ctx, dpy) &&
-                        has90Transform(layer) && isRotationDoable(ctx, hnd)) {
+                        (has90Transform(layer) || getRotDownscale(ctx, layer))
+                        && isRotationDoable(ctx, hnd)) {
                         if(not ctx->mOverlay->isDMAMultiplexingSupported()) {
                             if(ctx->mOverlay->isPipeTypeAttached(
                                              overlay::utils::OV_MDP_PIPE_DMA))

@@ -17,6 +17,7 @@
  * limitations under the License.
 */
 
+#include <math.h>
 #include "overlayUtils.h"
 #include "overlayRotator.h"
 #include "gr.h"
@@ -272,6 +273,37 @@ void MdpRot::dump() const {
 void MdpRot::getDump(char *buf, size_t len) const {
     ovutils::getDump(buf, len, "MdpRotCtrl", mRotImgInfo);
     ovutils::getDump(buf, len, "MdpRotData", mRotDataInfo);
+}
+
+int MdpRot::getDownscaleFactor(const int& src_w, const int& src_h,
+        const int& dst_w, const int& dst_h, const uint32_t& /*mdpFormat*/,
+        const bool& /*isInterlaced*/) {
+    int dscale_factor = utils::ROT_DS_NONE;
+    // We need this check to engage the rotator whenever possible to assist MDP
+    // in performing video downscale.
+    // This saves bandwidth and avoids causing the driver to make too many panel
+    // -mode switches between BLT (writeback) and non-BLT (Direct) modes.
+    // Use-case: Video playback [with downscaling and rotation].
+    if (dst_w && dst_h)
+    {
+        float fDscale =  (float)(src_w * src_h) / (float)(dst_w * dst_h);
+        uint32_t dscale = (int)sqrtf(fDscale);
+
+        if(dscale < 2) {
+            // Down-scale to > 50% of orig.
+            dscale_factor = utils::ROT_DS_NONE;
+        } else if(dscale < 4) {
+            // Down-scale to between > 25% to <= 50% of orig.
+            dscale_factor = utils::ROT_DS_HALF;
+        } else if(dscale < 8) {
+            // Down-scale to between > 12.5% to <= 25% of orig.
+            dscale_factor = utils::ROT_DS_FOURTH;
+        } else {
+            // Down-scale to <= 12.5% of orig.
+            dscale_factor = utils::ROT_DS_EIGHTH;
+        }
+    }
+    return dscale_factor;
 }
 
 } // namespace overlay
