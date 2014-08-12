@@ -50,6 +50,7 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
     FILE *smaps_fp = NULL;
     char line[1024];
     char tmp[128];
+    bool is_surfaceflinger = false;
     size_t accounted_size = 0;
     size_t unaccounted_size = 0;
     unsigned long smaps_addr = 0;
@@ -59,6 +60,16 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
     /* fastpath to return the necessary number of records */
     if (allocated_records == 0) {
         return 0;
+    }
+
+    snprintf(tmp, sizeof(tmp), "/proc/%d/cmdline", pid);
+    fp = fopen(tmp, "r");
+    if (fp != NULL) {
+        if (fgets(line, sizeof(line), fp)) {
+            if (strcmp(line, "/system/bin/surfaceflinger") == 0)
+                is_surfaceflinger = true;
+        }
+        fclose(fp);
     }
 
     memcpy(records, record_templates,
@@ -83,6 +94,8 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
         unsigned long uaddr;
         unsigned long size;
         char line_type[7];
+        char flags[7];
+        char line_usage[19];
         int ret;
 
         if (fgets(line, sizeof(line), fp) == NULL) {
@@ -93,9 +106,9 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
          *  gpuaddr useraddr     size    id flags       type            usage sglen
          * 545ba000 545ba000     4096     1 ----p     gpumem      arraybuffer     1
          */
-        ret = sscanf(line, "%*x %lx %lu %*d %*s %6s %*s %*d\n",
-                     &uaddr, &size, line_type);
-        if (ret != 3) {
+        ret = sscanf(line, "%*x %*lx %lu %*d %6s %6s %18s %*d\n",
+                     &size, flags, line_type, line_usage);
+        if (ret != 4) {
             continue;
         }
 
@@ -135,7 +148,10 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
                 unaccounted_size += size;
             }
         } else if (type == MEMTRACK_TYPE_GRAPHICS && strcmp(line_type, "ion") == 0) {
-            unaccounted_size += size;
+            if (!is_surfaceflinger || strcmp(line_usage, "egl_image") != 0) {
+                unaccounted_size += size;
+            }
+
         }
     }
 
