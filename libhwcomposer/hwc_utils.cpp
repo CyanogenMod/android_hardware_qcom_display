@@ -447,8 +447,8 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
     if(extOrientation & HAL_TRANSFORM_ROT_90) {
         // Swap width/height for input position
         swapWidthHeight(actualWidth, actualHeight);
-        getAspectRatioPosition(fbWidth, fbHeight, (int)actualWidth,
-                               (int)actualHeight, rect);
+        qdutils::getAspectRatioPosition((int)fbWidth, (int)fbHeight,
+                                (int)actualWidth, (int)actualHeight, rect);
         xPos = rect.left;
         yPos = rect.top;
         width = rect.right - rect.left;
@@ -480,7 +480,8 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
         xRatio = (outPos.x - xPos)/width;
         // GetaspectRatio -- tricky to get the correct aspect ratio
         // But we need to do this.
-        getAspectRatioPosition(width, height, width, height, r);
+        qdutils::getAspectRatioPosition((int)width, (int)height,
+                               (int)width,(int)height, r);
         xPos = r.left;
         yPos = r.top;
         float tempWidth = r.right - r.left;
@@ -563,7 +564,7 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
                 if(!isPrimaryPortrait(ctx)) {
                     swap(srcWidth, srcHeight);
                 }                    // Get Aspect Ratio for external
-                getAspectRatioPosition(dstWidth, dstHeight, srcWidth,
+                qdutils::getAspectRatioPosition(dstWidth, dstHeight, srcWidth,
                                     srcHeight, displayFrame);
                 // Crop - this is needed, because for sidesync, the dest fb will
                 // be in portrait orientation, so update the crop to not show the
