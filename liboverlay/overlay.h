@@ -172,6 +172,7 @@ private:
     utils::eDest getPipe_8x26(const PipeSpecs& pipeSpecs);
     utils::eDest getPipe_8x16(const PipeSpecs& pipeSpecs);
     utils::eDest getPipe_8x39(const PipeSpecs& pipeSpecs);
+    utils::eDest getPipe_8994(const PipeSpecs& pipeSpecs);
 
     /* Returns the handle to libscale.so's programScale function */
     static int (*getFnProgramScale())(struct mdp_overlay_list *);

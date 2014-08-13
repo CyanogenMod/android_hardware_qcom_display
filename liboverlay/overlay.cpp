@@ -160,6 +160,8 @@ utils::eDest Overlay::getPipe(const PipeSpecs& pipeSpecs) {
         return getPipe_8x16(pipeSpecs);
     } else if(MDPVersion::getInstance().is8x39()) {
         return getPipe_8x39(pipeSpecs);
+    } else if(MDPVersion::getInstance().is8994()) {
+        return getPipe_8994(pipeSpecs);
     }
 
     eDest dest = OV_INVALID;
@@ -252,6 +254,26 @@ utils::eDest Overlay::getPipe_8x39(const PipeSpecs& pipeSpecs) {
     //8x16 & 8x36 has same number of pipes, pipe-types & scaling capabilities.
     //Rely on 8x16 until we see a need to change.
     return getPipe_8x16(pipeSpecs);
+}
+
+utils::eDest Overlay::getPipe_8994(const PipeSpecs& pipeSpecs) {
+    //If DMA pipes need to be used in block mode for downscale, there could be
+    //cases where consecutive rounds need separate modes, which cannot be
+    //supported since we at least need 1 round in between where the DMA is
+    //unused
+    eDest dest = OV_INVALID;
+    if(pipeSpecs.formatClass == FORMAT_YUV) {
+        return nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+    } else {
+        dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+        if(dest == OV_INVALID) {
+            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+        if(dest == OV_INVALID and not pipeSpecs.needsScaling) {
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+        }
+    }
+    return dest;
 }
 
 void Overlay::endAllSessions() {
