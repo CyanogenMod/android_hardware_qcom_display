@@ -221,11 +221,12 @@ void MDPComp::setRedraw(hwc_context_t *ctx,
 }
 
 MDPComp::FrameInfo::FrameInfo() {
+    memset(&mdpToLayer, 0, sizeof(mdpToLayer));
     reset(0);
 }
 
 void MDPComp::FrameInfo::reset(const int& numLayers) {
-    for(int i = 0 ; i < MAX_PIPES_PER_MIXER && numLayers; i++ ) {
+    for(int i = 0; i < MAX_PIPES_PER_MIXER; i++) {
         if(mdpToLayer[i].pipeInfo) {
             delete mdpToLayer[i].pipeInfo;
             mdpToLayer[i].pipeInfo = NULL;
