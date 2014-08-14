@@ -101,8 +101,12 @@ bool Writeback::startSession() {
 
 bool Writeback::stopSession() {
     if(mFd.valid()) {
+        if(!Overlay::displayCommit(mFd.getFD())) {
+            ALOGE("%s: displayCommit failed", __func__);
+            return false;
+        }
         if(!mdp_wrapper::wbStopTerminate(mFd.getFD())) {
-            ALOGE("%s failed", __func__);
+            ALOGE("%s: wbStopTerminate failed", __func__);
             return false;
         }
     } else {
