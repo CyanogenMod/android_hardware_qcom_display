@@ -1574,7 +1574,7 @@ int configMdp(Overlay *ov, const PipeArgs& parg,
 
 int configColorLayer(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy, eMdpFlags& mdpFlags, eZorder& z,
-        eIsFg& isFg, const eDest& dest) {
+        const eDest& dest) {
 
     hwc_rect_t dst = layer->displayFrame;
     trimLayer(ctx, dpy, 0, dst, dst);
@@ -1590,7 +1590,7 @@ int configColorLayer(hwc_context_t *ctx, hwc_layer_1_t *layer,
     if (layer->blending == HWC_BLENDING_PREMULT)
         ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_BLEND_FG_PREMULT);
 
-    PipeArgs parg(mdpFlags, whf, z, isFg, static_cast<eRotFlags>(0),
+    PipeArgs parg(mdpFlags, whf, z, static_cast<eRotFlags>(0),
                   layer->planeAlpha,
                   (ovutils::eBlending) getBlending(layer->blending));
 
@@ -1676,14 +1676,14 @@ int getRotDownscale(hwc_context_t *ctx, const hwc_layer_1_t *layer) {
 
 int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy, eMdpFlags& mdpFlags, eZorder& z,
-        eIsFg& isFg, const eDest& dest, Rotator **rot) {
+        const eDest& dest, Rotator **rot) {
 
     private_handle_t *hnd = (private_handle_t *)layer->handle;
 
     if(!hnd) {
         if (layer->flags & HWC_COLOR_FILL) {
             // Configure Color layer
-            return configColorLayer(ctx, layer, dpy, mdpFlags, z, isFg, dest);
+            return configColorLayer(ctx, layer, dpy, mdpFlags, z, dest);
         }
         ALOGE("%s: layer handle is NULL", __FUNCTION__);
         return -1;
@@ -1731,7 +1731,7 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     //For the mdp, since either we are pre-rotating or MDP does flips
     orient = OVERLAY_TRANSFORM_0;
     transform = 0;
-    PipeArgs parg(mdpFlags, whf, z, isFg,
+    PipeArgs parg(mdpFlags, whf, z,
                   static_cast<eRotFlags>(rotFlags), layer->planeAlpha,
                   (ovutils::eBlending) getBlending(layer->blending));
 
@@ -1773,7 +1773,7 @@ void sanitizeSourceCrop(hwc_rect_t& cropL, hwc_rect_t& cropR,
 
 int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy, eMdpFlags& mdpFlagsL, eZorder& z,
-        eIsFg& isFg, const eDest& lDest, const eDest& rDest,
+        const eDest& lDest, const eDest& rDest,
         Rotator **rot) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     if(!hnd) {
@@ -1887,7 +1887,7 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     //configure left mixer
     if(lDest != OV_INVALID) {
-        PipeArgs pargL(mdpFlagsL, whf, z, isFg,
+        PipeArgs pargL(mdpFlagsL, whf, z,
                        static_cast<eRotFlags>(rotFlags), layer->planeAlpha,
                        (ovutils::eBlending) getBlending(layer->blending));
 
@@ -1900,7 +1900,7 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     //configure right mixer
     if(rDest != OV_INVALID) {
-        PipeArgs pargR(mdpFlagsR, whf, z, isFg,
+        PipeArgs pargR(mdpFlagsR, whf, z,
                        static_cast<eRotFlags>(rotFlags),
                        layer->planeAlpha,
                        (ovutils::eBlending) getBlending(layer->blending));
@@ -1918,7 +1918,7 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
 int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy, eMdpFlags& mdpFlagsL, eZorder& z,
-        eIsFg& isFg, const eDest& lDest, const eDest& rDest,
+        const eDest& lDest, const eDest& rDest,
         Rotator **rot) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     if(!hnd) {
@@ -2013,7 +2013,7 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     //configure left half
     if(lDest != OV_INVALID) {
-        PipeArgs pargL(mdpFlagsL, whf, lz, isFg,
+        PipeArgs pargL(mdpFlagsL, whf, lz,
                 static_cast<eRotFlags>(rotFlags), layer->planeAlpha,
                 (ovutils::eBlending) getBlending(layer->blending));
 
@@ -2026,7 +2026,7 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     //configure right half
     if(rDest != OV_INVALID) {
-        PipeArgs pargR(mdpFlagsR, whf, rz, isFg,
+        PipeArgs pargR(mdpFlagsR, whf, rz,
                 static_cast<eRotFlags>(rotFlags),
                 layer->planeAlpha,
                 (ovutils::eBlending) getBlending(layer->blending));

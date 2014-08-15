@@ -210,15 +210,6 @@ enum eRotDownscale {
     ROT_DS_EIGHTH = 3,
 };
 
-/* The values for is_fg flag for control alpha and transp
- * IS_FG_OFF means is_fg = 0
- * IS_FG_SET means is_fg = 1
- */
-enum eIsFg {
-    IS_FG_OFF = 0,
-    IS_FG_SET = 1
-};
-
 /*
  * Various mdp flags like PIPE SHARE, DEINTERLACE etc...
  * kernel/common/linux/msm_mdp.h
@@ -321,19 +312,17 @@ enum eBlending {
 struct PipeArgs {
     PipeArgs() : mdpFlags(OV_MDP_FLAGS_NONE),
         zorder(Z_SYSTEM_ALLOC),
-        isFg(IS_FG_OFF),
         rotFlags(ROT_FLAGS_NONE),
         planeAlpha(DEFAULT_PLANE_ALPHA),
         blending(OVERLAY_BLENDING_COVERAGE){
     }
 
     PipeArgs(eMdpFlags f, Whf _whf,
-            eZorder z, eIsFg fg, eRotFlags r,
+            eZorder z, eRotFlags r,
             int pA = DEFAULT_PLANE_ALPHA, eBlending b = OVERLAY_BLENDING_COVERAGE) :
         mdpFlags(f),
         whf(_whf),
         zorder(z),
-        isFg(fg),
         rotFlags(r),
         planeAlpha(pA),
         blending(b){
@@ -342,7 +331,6 @@ struct PipeArgs {
     eMdpFlags mdpFlags; // for mdp_overlay flags
     Whf whf;
     eZorder zorder; // stage number
-    eIsFg isFg; // control alpha & transp
     eRotFlags rotFlags;
     int planeAlpha;
     eBlending blending;

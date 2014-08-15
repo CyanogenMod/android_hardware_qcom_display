@@ -299,8 +299,8 @@ inline void dump(const char* const s, const msmfb_data& ov) {
             s, ov.offset, ov.memory_id, ov.id, ov.flags, ov.priv);
 }
 inline void dump(const char* const s, const mdp_overlay& ov) {
-    ALOGE("%s mdp_overlay z=%d fg=%d alpha=%d mask=%d flags=0x%x id=%d",
-            s, ov.z_order, ov.is_fg, ov.alpha,
+    ALOGE("%s mdp_overlay z=%d alpha=%d mask=%d flags=0x%x id=%d",
+            s, ov.z_order, ov.alpha,
             ov.transp_mask, ov.flags, ov.id);
     dump("src", ov.src);
     dump("src_rect", ov.src_rect);
