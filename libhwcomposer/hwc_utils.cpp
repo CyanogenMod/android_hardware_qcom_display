@@ -1324,7 +1324,9 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
             rotData.acq_fen_fd_cnt = 1; //1 ioctl call per rot session
         }
         int ret = 0;
-        ret = ioctl(rotFd, MSMFB_BUFFER_SYNC, &rotData);
+        if(not ctx->mLayerRotMap[dpy]->isRotCached(i))
+            ret = ioctl(rotFd, MSMFB_BUFFER_SYNC, &rotData);
+
         if(ret < 0) {
             ALOGE("%s: ioctl MSMFB_BUFFER_SYNC failed for rot sync, err=%s",
                     __FUNCTION__, strerror(errno));
@@ -2260,9 +2262,27 @@ void LayerRotMap::clear() {
     reset();
 }
 
+bool LayerRotMap::isRotCached(uint32_t index) const {
+    overlay::Rotator* rot = getRot(index);
+    hwc_layer_1_t* layer =  getLayer(index);
+
+    if(rot and layer and layer->handle) {
+        private_handle_t *hnd = (private_handle_t *)(layer->handle);
+        return (rot->isRotCached(hnd->fd,(uint32_t)(hnd->offset)));
+    }
+    return false;
+}
+
 void LayerRotMap::setReleaseFd(const int& fence) {
     for(uint32_t i = 0; i < mCount; i++) {
-        mRot[i]->setReleaseFd(dup(fence));
+        if(mRot[i] and mLayer[i] and mLayer[i]->handle) {
+            /* Ensure that none of the above (Rotator-instance,
+             * layer and layer-handle) are NULL*/
+            if(isRotCached(i))
+                mRot[i]->setPrevBufReleaseFd(dup(fence));
+            else
+                mRot[i]->setCurrBufReleaseFd(dup(fence));
+        }
     }
 }
 
