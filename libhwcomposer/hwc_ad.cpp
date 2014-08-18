@@ -76,11 +76,15 @@ static int adRead() {
             "/sys/class/graphics/fb%d/ad", wbFbNum);
     int adFd = open(wbFbPath, O_RDONLY);
     if(adFd >= 0) {
-        char opStr[4] = {'\0'};
-        if(read(adFd, opStr, strlen(opStr)) >= 0) {
+        char opStr[4];
+        ssize_t bytesRead = read(adFd, opStr, sizeof(opStr) - 1);
+        if(bytesRead > 0) {
+            opStr[bytesRead] = '\0';
             //Should return -1, 0 or 1
             ret = atoi(opStr);
             ALOGD_IF(DEBUG, "%s: Read %d from ad", __func__, ret);
+        } else if(bytesRead == 0) {
+            ALOGE("%s: ad node empty", __func__);
         } else {
             ALOGE("%s: Read from ad node failed with error %s", __func__,
                     strerror(errno));
