@@ -132,12 +132,6 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
     bool ret = false;
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
-        int extOnlyLayerIndex = ctx->listStats[mDpy].extOnlyLayerIndex;
-        // ext only layer present..
-        if(extOnlyLayerIndex != -1) {
-            layer = &list->hwLayers[extOnlyLayerIndex];
-            layer->compositionType = HWC_OVERLAY;
-        }
         overlay::Overlay& ov = *(ctx->mOverlay);
 
         ovutils::Whf info(mAlignedFBWidth, mAlignedFBHeight,
@@ -195,8 +189,7 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
             sourceCrop = layer->displayFrame;
         } else if((!mDpy ||
                   (mDpy && !extOrient
-                  && !ctx->dpyAttr[mDpy].mDownScaleMode))
-                  && (extOnlyLayerIndex == -1)) {
+                  && !ctx->dpyAttr[mDpy].mDownScaleMode))) {
             if(ctx->mOverlay->isUIScalingOnExternalSupported() &&
                 !ctx->dpyAttr[mDpy].customFBSize) {
                 getNonWormholeRegion(list, sourceCrop);
@@ -285,12 +278,6 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
     bool ret = false;
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
-        /*  External only layer present */
-        int extOnlyLayerIndex = ctx->listStats[mDpy].extOnlyLayerIndex;
-        if(extOnlyLayerIndex != -1) {
-            layer = &list->hwLayers[extOnlyLayerIndex];
-            layer->compositionType = HWC_OVERLAY;
-        }
         ovutils::Whf info(mAlignedFBWidth, mAlignedFBHeight,
                           ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888,
                                                 mTileEnabled));
@@ -424,13 +411,6 @@ FBSrcSplit::FBSrcSplit(hwc_context_t *ctx, const int& dpy):
 bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         hwc_rect_t fbUpdatingRect, int fbZorder) {
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
-    int extOnlyLayerIndex = ctx->listStats[mDpy].extOnlyLayerIndex;
-    // ext only layer present..
-    if(extOnlyLayerIndex != -1) {
-        layer = &list->hwLayers[extOnlyLayerIndex];
-        layer->compositionType = HWC_OVERLAY;
-    }
-
     overlay::Overlay& ov = *(ctx->mOverlay);
 
     ovutils::Whf info(mAlignedFBWidth,
