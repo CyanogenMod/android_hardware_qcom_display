@@ -423,6 +423,8 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
             // to send black frame to WFD sink on power suspend.
             // Note: With this change, we keep the WriteBack object
             // alive on power suspend for AD use case.
+            // Instead, we now clear the writeback and associated pipes
+            // when the primary display is unblanking.
             value = FB_BLANK_POWERDOWN;
             break;
         case HWC_POWER_MODE_DOZE:
@@ -438,6 +440,21 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
         case HWC_POWER_MODE_NORMAL:
             value = FB_BLANK_UNBLANK;
             break;
+    }
+
+    // XXX: Workaround
+    // Clear writeback and all overlays when primary is unblanking,
+    // since the kernel may have internally reset writeback in XO shutdown.
+    // This is to maintain consistency with the kernel's internal state and
+    // not assume that we have a valid writeback object when unblanking primary
+    // Ideally, we should get an explicit blank on the virtual display
+    // or, the blank frames when the virtual display is blanking should
+    // be sent _before_ the primary is unblanked
+    if (dpy == HWC_DISPLAY_PRIMARY && not (mode == HWC_POWER_MODE_OFF)) {
+        ctx->mOverlay->configBegin();
+        ctx->mOverlay->configDone();
+        ctx->mRotMgr->clear();
+        Writeback::clear();
     }
 
     switch(dpy) {
