@@ -226,6 +226,19 @@ void  MDPVersion::updatePanelInfo() {
                     mPanelInfo.mNeedsROIMerge = atoi(tokens[1]);
                     ALOGI("Needs ROI Merge: %d", mPanelInfo.mNeedsROIMerge);
                 }
+                if(!strncmp(tokens[0], "dyn_fps_en", strlen("dyn_fps_en"))) {
+                    mPanelInfo.mDynFpsSupported = atoi(tokens[1]);
+                    ALOGI("Dynamic Fps: %s", mPanelInfo.mDynFpsSupported ?
+                                            "Enabled" : "Disabled");
+                }
+                if(!strncmp(tokens[0], "min_fps", strlen("min_fps"))) {
+                    mPanelInfo.mMinFps = atoi(tokens[1]);
+                    ALOGI("Min Panel fps: %d", mPanelInfo.mMinFps);
+                }
+                if(!strncmp(tokens[0], "max_fps", strlen("max_fps"))) {
+                    mPanelInfo.mMaxFps = atoi(tokens[1]);
+                    ALOGI("Max Panel fps: %d", mPanelInfo.mMaxFps);
+                }
             }
         }
         if((property_get("persist.hwc.pubypass", property, 0) > 0) &&
