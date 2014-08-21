@@ -185,6 +185,19 @@ void  MDPVersion::updatePanelInfo() {
                     mPanelInfo.mMinROIHeight = atoi(tokens[1]);
                     ALOGI("Min ROI Height: %d", mPanelInfo.mMinROIHeight);
                 }
+                if(!strncmp(tokens[0], "dyn_fps_en", strlen("dyn_fps_en"))) {
+                    mPanelInfo.mDynFpsSupported = atoi(tokens[1]);
+                    ALOGI("Dynamic Fps: %s", mPanelInfo.mDynFpsSupported ?
+                                            "Enabled" : "Disabled");
+                }
+                if(!strncmp(tokens[0], "min_fps", strlen("min_fps"))) {
+                    mPanelInfo.mMinFps = atoi(tokens[1]);
+                    ALOGI("Min Panel fps: %d", mPanelInfo.mMinFps);
+                }
+                if(!strncmp(tokens[0], "max_fps", strlen("max_fps"))) {
+                    mPanelInfo.mMaxFps = atoi(tokens[1]);
+                    ALOGI("Max Panel fps: %d", mPanelInfo.mMaxFps);
+                }
             }
         }
         fclose(panelInfoNodeFP);

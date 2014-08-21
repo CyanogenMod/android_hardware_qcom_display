@@ -13,6 +13,11 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL liboverlay \
                                  libdl libmemalloc libqservice libsync \
                                  libbinder libmedia libskia libvirtual
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhwcomposer\"
+#Enable Dynamic FPS if PHASE_OFFSET is not set
+ifeq ($(VSYNC_EVENT_PHASE_OFFSET_NS),)
+    LOCAL_CFLAGS += -DDYNAMIC_FPS
+endif
+
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := hwc.cpp          \
                                  hwc_utils.cpp    \

@@ -45,7 +45,7 @@
 #include <hardware/hwcomposer.h>
 
 namespace qdutils {
-#define EDID_RAW_DATA_SIZE              640
+#define EDID_RAW_DATA_SIZE 640
 
 enum qd_utils {
     MAX_FRAME_BUFFER_NAME_SIZE = 128,
