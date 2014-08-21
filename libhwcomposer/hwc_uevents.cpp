@@ -222,22 +222,42 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                    * 2 / 1000);
 
             if(dpy == HWC_DISPLAY_EXTERNAL) {
-                if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected) {
-                    // Triple Display is supported on 8084 target
-                    // WFD can be initiated by Wfd-client or Settings app
-                    // 1. wfd-client use hdmi hotplug mechanism.
-                    //    If wfd is connected via wfd-client and if HDMI is
-                    //    connected, we have to teardown wfd session.
-                    //    (as SF support only one active External display
-                    //     at a given time).
-                    //    (ToDo: Once wfd-client migrates using virtual display
-                    //     apis, second condition is redundant).
-                    // 2. Settings app use virtual display mechanism.
-                    //    In this approach, there is no limitation of supporting
-                    //    triple display.
-                    if(!(qdutils::MDPVersion::getInstance().is8084() &&
-                                !ctx->mVirtualonExtActive)) {
-                        teardownWfd(ctx);
+                if(isVDConnected(ctx)) {
+                    // Do not initiate WFD teardown if WFD architecture is based
+                    // on VDS mechanism.
+                    // WFD Stack listens to HDMI intent and initiates virtual
+                    // display teardown.
+                    // ToDo: Currently non-WFD Virtual display clients do not
+                    // involve HWC. If there is a change, we need to come up
+                    // with mechanism of how to address non-WFD Virtual display
+                    // clients + HDMI
+                    if(isVDSEnabled(ctx)) {
+                        ctx->mWfdSyncLock.lock();
+                        ALOGD_IF(HWC_WFDDISPSYNC_LOG,
+                                "%s: Waiting for wfd-teardown to be signalled",
+                                __FUNCTION__);
+                        ctx->mWfdSyncLock.wait();
+                        ALOGD_IF(HWC_WFDDISPSYNC_LOG,
+                                "%s: Teardown signalled. Completed waiting in"
+                                "uevent thread", __FUNCTION__);
+                        ctx->mWfdSyncLock.unlock();
+                    } else {
+                        // Triple Display is supported on 8084 target
+                        // WFD can be initiated by Wfd-client or Settings app
+                        // 1. wfd-client use hdmi hotplug mechanism.
+                        //    If wfd is connected via wfd-client and if HDMI is
+                        //    connected, we have to teardown wfd session.
+                        //    (as SF support only one active External display
+                        //     at a given time).
+                        //    (ToDo: Once wfd-client migrates using virtual
+                        //     display apis, second condition is redundant).
+                        // 2. Settings app use virtual display mechanism.
+                        //    In this approach, there is no limitation of
+                        //    supporting triple display.
+                        if(!(qdutils::MDPVersion::getInstance().is8084() &&
+                                    !ctx->mVirtualonExtActive)) {
+                            teardownWfd(ctx);
+                        }
                     }
                 }
                 ctx->mExtDisplay->configure();

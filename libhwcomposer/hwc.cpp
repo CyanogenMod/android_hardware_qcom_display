@@ -226,9 +226,6 @@ static void reset(hwc_context_t *ctx, int numDisplays,
     }
 
     ctx->mAD->reset();
-    MDPComp::reset();
-    if(ctx->mHWCVirtual)
-        ctx->mHWCVirtual->destroy(ctx, numDisplays, displays);
 }
 
 bool isEqual(float f1, float f2) {
@@ -379,6 +376,11 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
     ctx->mOverlay->configDone();
     ctx->mRotMgr->configDone();
     overlay::Writeback::configDone();
+    // If VD list is deleted, mdp overlay pipe objects and writeback object
+    // are deleted as part of configDone functions.
+    // Proceed with HWCVirtualVDS object deletion.
+    if(ctx->mHWCVirtual)
+        ctx->mHWCVirtual->destroy(ctx, numDisplays, displays);
 
     return ret;
 }
