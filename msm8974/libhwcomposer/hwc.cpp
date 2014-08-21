@@ -324,7 +324,8 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
     int ret = 0;
     ALOGD_IF(BLANK_DEBUG, "%s: %s display: %d", __FUNCTION__,
           blank==1 ? "Blanking":"Unblanking", dpy);
-    if(blank) {
+    if (blank || (dpy == HWC_DISPLAY_PRIMARY &&
+        !ctx->dpyAttr[dpy].isActive )) {
         // free up all the overlay pipes in use
         // when we get a blank for either display
         // makes sure that all pipes are freed
