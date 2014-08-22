@@ -233,7 +233,7 @@ static void toggleDynamicDebug(hwc_context_t* ctx, const Parcel* inParcel) {
             if (debug_type != IQService::DEBUG_ALL)
                 break;
         case IQService::DEBUG_VD:
-            HWCVirtualBase::dynamicDebug(enable);
+            HWCVirtualVDS::dynamicDebug(enable);
             if (debug_type != IQService::DEBUG_ALL)
                 break;
     }

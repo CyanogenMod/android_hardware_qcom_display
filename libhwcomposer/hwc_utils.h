@@ -68,7 +68,7 @@ class MDPComp;
 class CopyBit;
 class HwcDebug;
 class AssertiveDisplay;
-class HWCVirtualBase;
+class HWCVirtualVDS;
 
 
 struct MDPInfo {
@@ -539,7 +539,6 @@ struct hwc_context_t {
     qhwc::IFBUpdate *mFBUpdate[HWC_NUM_DISPLAY_TYPES];
     // External display related information
     qhwc::ExternalDisplay *mExtDisplay;
-    qhwc::VirtualDisplay *mVirtualDisplay;
     qhwc::MDPInfo mMDP;
     qhwc::VsyncState vstate;
     qhwc::DisplayAttributes dpyAttr[HWC_NUM_DISPLAY_TYPES];
@@ -550,7 +549,7 @@ struct hwc_context_t {
     hwc_rect_t mViewFrame[HWC_NUM_DISPLAY_TYPES];
     qhwc::AssertiveDisplay *mAD;
     eAnimationState mAnimationState[HWC_NUM_DISPLAY_TYPES];
-    qhwc::HWCVirtualBase *mHWCVirtual;
+    qhwc::HWCVirtualVDS *mHWCVirtual;
 
     // stores the #numHwLayers of the previous frame
     // for each display device
@@ -560,8 +559,6 @@ struct hwc_context_t {
     int deviceOrientation;
     //Securing in progress indicator
     bool mSecuring;
-    //WFD on proprietary stack
-    bool mVirtualonExtActive;
     //Display in secure mode indicator
     bool mSecureMode;
     //Lock to protect drawing data structures
@@ -586,10 +583,6 @@ struct hwc_context_t {
     // Downscale feature switch, set via system property
     // sys.hwc.mdp_downscale_enabled
     bool mMDPDownscaleEnabled;
-    // Is WFD enabled through VDS solution ?
-    // This can be set via system property
-    // persist.hwc.enable_vds
-    bool mVDSEnabled;
     struct gpu_hint_info mGPUHintInfo;
     //App Buffer Composition
     bool enableABC;
@@ -625,11 +618,6 @@ static inline bool isSecondaryConfiguring(hwc_context_t* ctx) {
 static inline bool isSecondaryConnected(hwc_context_t* ctx) {
     return (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected ||
             ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected);
-}
-
-/* Return true if HWC supports VirtualDisplaySurface mechanism */
-static inline bool isVDSEnabled(hwc_context_t* ctx) {
-    return ctx->mVDSEnabled;
 }
 
 /* Return Virtual Display connection status */

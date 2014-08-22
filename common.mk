@@ -6,7 +6,6 @@ common_includes += $(LOCAL_PATH)/../libqdutils
 common_includes += $(LOCAL_PATH)/../libhwcomposer
 common_includes += $(LOCAL_PATH)/../libexternal
 common_includes += $(LOCAL_PATH)/../libqservice
-common_includes += $(LOCAL_PATH)/../libvirtual
 
 ifeq ($(TARGET_USES_POST_PROCESSING),true)
     common_flags     += -DUSES_POST_PROCESSING

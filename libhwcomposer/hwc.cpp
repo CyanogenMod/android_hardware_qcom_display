@@ -70,17 +70,6 @@ hwc_module_t HAL_MODULE_INFO_SYM = {
     }
 };
 
-/* In case of non-hybrid WFD session, we are fooling SF by piggybacking on
- * HDMI display ID for virtual. This helper is needed to differentiate their
- * paths in HAL.
- * TODO: Not needed once we have WFD client working on top of Google API's */
-
-static int getDpyforExternalDisplay(hwc_context_t *ctx, int dpy) {
-    if(dpy == HWC_DISPLAY_EXTERNAL && ctx->mVirtualonExtActive)
-        return HWC_DISPLAY_VIRTUAL;
-    return dpy;
-}
-
 /*
  * Save callback functions registered to HWC
  */
@@ -344,9 +333,8 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
     ctx->mRotMgr->configBegin();
     overlay::Writeback::configBegin();
 
-    for (int32_t i = ((int32_t)numDisplays-1); i >=0 ; i--) {
-        hwc_display_contents_1_t *list = displays[i];
-        int dpy = getDpyforExternalDisplay(ctx, i);
+    for (int32_t dpy = ((int32_t)numDisplays-1); dpy >=0 ; dpy--) {
+        hwc_display_contents_1_t *list = displays[dpy];
         resetROI(ctx, dpy);
         switch(dpy) {
             case HWC_DISPLAY_PRIMARY:
@@ -415,13 +403,6 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
     Locker::Autolock _l(ctx->mDrawLock);
     int ret = 0, value = 0;
 
-    /* In case of non-hybrid WFD session, we are fooling SF by
-     * piggybacking on HDMI display ID for virtual.
-     * TODO: Not needed once we have WFD client working on top
-     * of Google API's.
-     */
-    dpy = getDpyforExternalDisplay(ctx,dpy);
-
     ALOGD_IF(BLANK_DEBUG, "%s: %s display: %d", __FUNCTION__,
           blank==1 ? "Blanking":"Unblanking", dpy);
     if(blank) {
@@ -454,31 +435,12 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
 
         ctx->dpyAttr[dpy].isActive = !blank;
 
-        if(ctx->mVirtualonExtActive) {
-            /* if mVirtualonExtActive is true, display hal will
-             * receive unblank calls for non-hybrid WFD solution
-             * since we piggyback on HDMI.
-             * TODO: Not needed once we have WFD client working on top
-             of Google API's */
-            break;
-        }
     case HWC_DISPLAY_VIRTUAL:
-        /* There are two ways to reach this block of code.
-
-         * Display hal has received unblank call on HWC_DISPLAY_EXTERNAL
-         and ctx->mVirtualonExtActive is true. In this case, non-hybrid
-         WFD is active. If so, getDpyforExternalDisplay will return dpy
-         as HWC_DISPLAY_VIRTUAL.
-
-         * Display hal has received unblank call on HWC_DISPLAY_PRIMARY
+        /* Display hal has received unblank call on HWC_DISPLAY_PRIMARY
          and since SF is not aware of VIRTUAL DISPLAY being handle by HWC,
          it wont send blank / unblank events for it. We piggyback on
          PRIMARY DISPLAY events to release mdp pipes and
          activate/deactivate VIRTUAL DISPLAY.
-
-         * TODO: This separate case statement is not needed once we have
-         WFD client working on top of Google API's.
-
          */
 
         if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected) {
@@ -707,9 +669,8 @@ static int hwc_set(hwc_composer_device_1 *dev,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    for (int i = 0; i < (int)numDisplays; i++) {
-        hwc_display_contents_1_t* list = displays[i];
-        int dpy = getDpyforExternalDisplay(ctx, i);
+    for (int dpy = 0; dpy < (int)numDisplays; dpy++) {
+        hwc_display_contents_1_t* list = displays[dpy];
         switch(dpy) {
             case HWC_DISPLAY_PRIMARY:
                 ret = hwc_set_primary(ctx, list);
@@ -739,7 +700,6 @@ int hwc_getDisplayConfigs(struct hwc_composer_device_1* dev, int disp,
         uint32_t* configs, size_t* numConfigs) {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    disp = getDpyforExternalDisplay(ctx, disp);
     //in 1.1 there is no way to choose a config, report as config id # 0
     //This config is passed to getDisplayAttributes. Ignore for now.
     switch(disp) {
@@ -769,7 +729,6 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         uint32_t /*config*/, const uint32_t* attributes, int32_t* values) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    disp = getDpyforExternalDisplay(ctx, disp);
     //If hotpluggable displays(i.e, HDMI, WFD) are inactive return error
     if( (disp != HWC_DISPLAY_PRIMARY) && !ctx->dpyAttr[disp].connected) {
         return -1;

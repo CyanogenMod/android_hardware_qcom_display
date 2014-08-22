@@ -38,7 +38,6 @@
 #include "hwc_copybit.h"
 #include "hwc_dump_layers.h"
 #include "external.h"
-#include "virtual.h"
 #include "hwc_qclient.h"
 #include "QService.h"
 #include "comptype.h"
@@ -219,8 +218,7 @@ void initContext(hwc_context_t *ctx)
     }
 
     ctx->mExtDisplay = new ExternalDisplay(ctx);
-    ctx->mVirtualDisplay = new VirtualDisplay(ctx);
-    ctx->mVirtualonExtActive = false;
+    ctx->mHWCVirtual = new HWCVirtualVDS();
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = false;
     ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = false;
@@ -239,14 +237,6 @@ void initContext(hwc_context_t *ctx)
         (int)ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
     ctx->mViewFrame[HWC_DISPLAY_PRIMARY].bottom =
          (int)ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
-
-    ctx->mVDSEnabled = false;
-    if((property_get("persist.hwc.enable_vds", value, NULL) > 0)) {
-        if(atoi(value) != 0) {
-            ctx->mVDSEnabled = true;
-        }
-    }
-    ctx->mHWCVirtual = HWCVirtualBase::getObject(ctx->mVDSEnabled);
 
     for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         ctx->mHwcDebug[i] = new HwcDebug(i);
@@ -542,10 +532,7 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
     }
     if(ctx->dpyAttr[dpy].mDownScaleMode) {
         int extW, extH;
-        if(dpy == HWC_DISPLAY_EXTERNAL)
-            ctx->mExtDisplay->getAttributes(extW, extH);
-        else
-            ctx->mVirtualDisplay->getAttributes(extW, extH);
+        ctx->mExtDisplay->getAttributes(extW, extH);
         fbWidth  = (float)ctx->dpyAttr[dpy].xres;
         fbHeight = (float)ctx->dpyAttr[dpy].yres;
         //Calculate the position...
@@ -623,10 +610,7 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
                 float fbWidth  = (float)ctx->dpyAttr[dpy].xres;
                 float fbHeight = (float)ctx->dpyAttr[dpy].yres;
                 // query MDP configured attributes
-                if(dpy == HWC_DISPLAY_EXTERNAL)
-                    ctx->mExtDisplay->getAttributes(extW, extH);
-                else
-                    ctx->mVirtualDisplay->getAttributes(extW, extH);
+                ctx->mExtDisplay->getAttributes(extW, extH);
                 //Calculate the ratio...
                 float wRatio = ((float)extW)/fbWidth;
                 float hRatio = ((float)extH)/fbHeight;
@@ -2368,6 +2352,20 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
 
 
    return t_roi;
+}
+
+void handle_pause(hwc_context_t* ctx, int dpy) {
+    if(ctx->mHWCVirtual) {
+        ctx->mHWCVirtual->pause(ctx, dpy);
+    }
+    return;
+}
+
+void handle_resume(hwc_context_t* ctx, int dpy) {
+    if(ctx->mHWCVirtual) {
+        ctx->mHWCVirtual->resume(ctx, dpy);
+    }
+    return;
 }
 
 };//namespace qhwc
