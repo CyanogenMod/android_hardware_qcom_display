@@ -65,7 +65,8 @@ public:
         DEBUG_ALL,
         DEBUG_MDPCOMP,
         DEBUG_VSYNC,
-        DEBUG_VD
+        DEBUG_VD,
+        DEBUG_PIPE_LIFECYCLE,
     };
 
     // Register a client that can be notified

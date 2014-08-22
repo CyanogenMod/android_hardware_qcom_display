@@ -152,6 +152,10 @@ public:
      * Single interface panels will only update left ROI. */
     static bool displayCommit(const int& fd, const utils::Dim& lRoi,
                               const utils::Dim& rRoi);
+    /* Logs pipe lifecycle events like set, unset, commit when enabled */
+    static void debugPipeLifecycle(const bool& enable);
+    /* Returns true if pipe life cycle logging is enabled */
+    static bool isDebugPipeLifecycle();
 
 private:
     /* Ctor setup */
@@ -159,7 +163,6 @@ private:
     /*Validate index range, abort if invalid */
     void validate(int index);
     static void setDMAMultiplexingSupported();
-    void dump() const;
     /* Returns an available pipe based on the type of pipe requested. When ANY
      * is requested, the first available VG or RGB is returned. If no pipe is
      * available for the display "dpy" then INV is returned. Note: If a pipe is
@@ -239,9 +242,6 @@ private:
 
     PipeBook mPipeBook[utils::OV_INVALID]; //Used as max
 
-    /* Dump string */
-    char mDumpStr[1024];
-
     /* Singleton Instance*/
     static Overlay *sInstance;
     static int sDpyFbMap[DPY_MAX];
@@ -249,6 +249,7 @@ private:
     static bool sDMAMultiplexingSupported;
     static void *sLibScaleHandle;
     static int (*sFnProgramScale)(struct mdp_overlay_list *);
+    static bool sDebugPipeLifecycle;
 
     friend class MdpCtrl;
 };
@@ -340,6 +341,14 @@ inline int Overlay::getFbForDpy(const int& dpy) {
 
 inline int (*Overlay::getFnProgramScale())(struct mdp_overlay_list *) {
     return sFnProgramScale;
+}
+
+inline void Overlay::debugPipeLifecycle(const bool& enable) {
+    sDebugPipeLifecycle = enable;
+}
+
+inline bool Overlay::isDebugPipeLifecycle() {
+    return sDebugPipeLifecycle;
 }
 
 inline bool Overlay::PipeBook::valid() {

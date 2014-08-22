@@ -33,8 +33,6 @@
 #include "mdp_version.h"
 #include "qdMetaData.h"
 
-#define PIPE_DEBUG 0
-
 namespace overlay {
 using namespace utils;
 using namespace qdutils;
@@ -46,7 +44,6 @@ Overlay::Overlay() {
         mPipeBook[i].init();
     }
 
-    mDumpStr[0] = '\0';
     initScalar();
     setDMAMultiplexingSupported();
 }
@@ -64,7 +61,6 @@ void Overlay::configBegin() {
         PipeBook::resetUse(i);
         PipeBook::resetAllocation(i);
     }
-    mDumpStr[0] = '\0';
 }
 
 void Overlay::configDone() {
@@ -73,19 +69,9 @@ void Overlay::configDone() {
                     isSessionEnded((eDest)i)) {
             //Forces UNSET on pipes, flushes rotator memory and session, closes
             //fds
-            if(mPipeBook[i].valid()) {
-                char str[32];
-                snprintf(str, 32, "Unset=%s dpy=%d mix=%d; ",
-                        PipeBook::getDestStr((eDest)i),
-                        mPipeBook[i].mDisplay, mPipeBook[i].mMixer);
-#if PIPE_DEBUG
-                strlcat(mDumpStr, str, sizeof(mDumpStr));
-#endif
-            }
             mPipeBook[i].destroy();
         }
     }
-    dump();
     PipeBook::save();
 }
 
@@ -138,16 +124,7 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
         if(not mPipeBook[index].valid()) {
             mPipeBook[index].mPipe = new GenericPipe(dpy);
             mPipeBook[index].mSession = PipeBook::NONE;
-            char str[32];
-            snprintf(str, 32, "Set=%s dpy=%d mix=%d; ",
-                     PipeBook::getDestStr(dest), dpy, mixer);
-#if PIPE_DEBUG
-            strlcat(mDumpStr, str, sizeof(mDumpStr));
-#endif
         }
-    } else {
-        ALOGD_IF(PIPE_DEBUG, "Pipe unavailable type=%d display=%d mixer=%d",
-                (int)type, dpy, mixer);
     }
 
     return dest;
@@ -507,14 +484,6 @@ bool Overlay::displayCommit(const int& fd, const utils::Dim& lRoi,
     return true;
 }
 
-void Overlay::dump() const {
-#if PIPE_DEBUG
-    if(strlen(mDumpStr)) { //dump only on state change
-        ALOGD("%s\n", mDumpStr);
-    }
-#endif
-}
-
 void Overlay::getDump(char *buf, size_t len) {
     int totalPipes = 0;
     const char *str = "\nOverlay State\n\n";
@@ -596,6 +565,7 @@ Overlay* Overlay::sInstance = 0;
 int Overlay::sDpyFbMap[DPY_MAX] = {0, -1, -1};
 int Overlay::sDMAMode = DMA_LINE_MODE;
 bool Overlay::sDMAMultiplexingSupported = false;
+bool Overlay::sDebugPipeLifecycle = false;
 int Overlay::PipeBook::NUM_PIPES = 0;
 int Overlay::PipeBook::sPipeUsageBitmap = 0;
 int Overlay::PipeBook::sLastUsageBitmap = 0;
