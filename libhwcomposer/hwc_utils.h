@@ -74,6 +74,7 @@ struct DisplayAttributes {
     uint32_t stride;
     float xdpi;
     float ydpi;
+    bool secure;
     int fd;
     bool connected; //Applies only to pluggable disp.
     //Connected does not mean it ready to use.

@@ -76,6 +76,7 @@ void VirtualDisplay::getAttributes(int& width, int& height) {
 int VirtualDisplay::teardown() {
     closeFrameBuffer();
     memset(&mVInfo, 0, sizeof(mVInfo));
+    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].secure = 0;
     return 0;
 }
 
@@ -90,6 +91,38 @@ VirtualDisplay::~VirtualDisplay()
     closeFrameBuffer();
 }
 
+bool VirtualDisplay::isSinkSecure() {
+    char sysFsPath[MAX_SYSFS_FILE_PATH];
+    bool ret = false;
+    int fbNum = overlay::Overlay::getInstance()->
+        getFbForDpy(HWC_DISPLAY_VIRTUAL);
+    snprintf(sysFsPath, sizeof(sysFsPath),
+             "/sys/devices/virtual/graphics/fb%d/"
+             "secure", fbNum);
+
+    int fileFd = open(sysFsPath, O_RDONLY, 0);
+    if (fileFd < 0) {
+        ALOGE("In %s: file '%s' not found", __FUNCTION__, sysFsPath);
+        ret = false;
+    } else {
+        char buf;
+        ssize_t err = read(fileFd, &buf, 1);
+        if (err <= 0) {
+            ALOGE("%s: empty file '%s'", __FUNCTION__, sysFsPath);
+        } else {
+            if (buf == '1') {
+                // HDCP Supported: secure
+                ret = true;
+            } else {
+                // NonHDCP: non-secure
+                ret = false;
+            }
+        }
+        close(fileFd);
+    }
+    return ret;
+}
+
 void VirtualDisplay::setAttributes() {
     if(mHwcContext) {
         // Always set dpyAttr res to mVInfo res
@@ -98,6 +131,7 @@ void VirtualDisplay::setAttributes() {
         mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = false;
         uint32_t priW = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
         uint32_t priH = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
+        bool &secure = mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].secure;
         // if primary resolution is more than WFD resolution and
         // downscale_factor is zero(which corresponds to downscale
         // to > 50% of orig),then configure dpy attr to primary
@@ -120,6 +154,11 @@ void VirtualDisplay::setAttributes() {
         }
         mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].vsync_period =
                 1000000000l /60;
+        if(mHwcContext->mVirtualonExtActive) {
+            //For WFD using V4l2 read the sysfs node to determine
+            //if the sink is secure
+            secure = isSinkSecure();
+        }
         ALOGD_IF(DEBUG,"%s: Setting Virtual Attr: res(%d x %d)",__FUNCTION__,
                  mVInfo.xres, mVInfo.yres);
     }
