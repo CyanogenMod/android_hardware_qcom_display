@@ -578,6 +578,11 @@ void ExternalDisplay::setAttributes() {
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = width;
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = height;
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode = false;
+        //FIXME: for now assume HDMI as secure
+        //Will need to read the HDCP status from the driver
+        //and update this accordingly
+        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].secure = true;
+
         int priW = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
         int priH = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
         // if primary resolution is more than HDMI resolution and
