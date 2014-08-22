@@ -128,6 +128,10 @@ void updateDisplayInfo(hwc_context_t* ctx, int dpy) {
     ctx->dpyAttr[dpy].yres = ctx->mHDMIDisplay->getHeight();
     ctx->dpyAttr[dpy].mMDPScalingMode = ctx->mHDMIDisplay->getMDPScalingMode();
     ctx->dpyAttr[dpy].vsync_period = ctx->mHDMIDisplay->getVsyncPeriod();
+    //FIXME: for now assume HDMI as secure
+    //Will need to read the HDCP status from the driver
+    //and update this accordingly
+    ctx->dpyAttr[dpy].secure = true;
     ctx->mViewFrame[dpy].left = 0;
     ctx->mViewFrame[dpy].top = 0;
     ctx->mViewFrame[dpy].right = ctx->dpyAttr[dpy].xres;
@@ -224,6 +228,7 @@ static int openFramebufferDevice(hwc_context_t *ctx)
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].ydpi = ydpi;
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].refreshRate = (uint32_t)fps;
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].dynRefreshRate = (uint32_t)fps;
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].secure = true;
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period =
             (uint32_t)(1000000000l / fps);
 
