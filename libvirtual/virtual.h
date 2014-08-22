@@ -51,6 +51,7 @@ public:
 private:
     bool openFrameBuffer();
     bool closeFrameBuffer();
+    bool isSinkSecure();
     void setAttributes();
 
     int mFd;
