@@ -103,7 +103,6 @@ bool wbDequeueBuffer(int fbfd, struct msmfb_data& fbData);
 void dump(const char* const s, const msmfb_overlay_data& ov);
 void dump(const char* const s, const msmfb_data& ov);
 void dump(const char* const s, const mdp_overlay& ov);
-void dump(const char* const s, const msmfb_overlay_3d& ov);
 void dump(const char* const s, const uint32_t u[], uint32_t cnt);
 void dump(const char* const s, const msmfb_img& ov);
 void dump(const char* const s, const mdp_rect& ov);
@@ -322,11 +321,6 @@ inline void dump(const char* const s, const mdp_rect& ov) {
             s, ov.x, ov.y, ov.w, ov.h);
 }
 
-inline void dump(const char* const s, const msmfb_overlay_3d& ov) {
-    ALOGE("%s msmfb_overlay_3d 3d=%d w=%d h=%d",
-            s, ov.is_3d, ov.width, ov.height);
-
-}
 inline void dump(const char* const s, const uint32_t u[], uint32_t cnt) {
     ALOGE("%s user_data cnt=%d", s, cnt);
     for(uint32_t i=0; i < cnt; ++i) {
