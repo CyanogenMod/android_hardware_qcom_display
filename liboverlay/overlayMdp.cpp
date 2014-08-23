@@ -96,7 +96,6 @@ void MdpCtrl::setSource(const utils::PipeArgs& args) {
     //TODO These calls should ideally be a part of setPipeParams API
     setFlags(args.mdpFlags);
     setZ(args.zorder);
-    setIsFg(args.isFg);
     setPlaneAlpha(args.planeAlpha);
     setBlending(args.blending);
 }

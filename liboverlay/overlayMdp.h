@@ -99,8 +99,6 @@ private:
     void setFlags(int f);
     /* set z order */
     void setZ(utils::eZorder z);
-    /* set isFg flag */
-    void setIsFg(utils::eIsFg isFg);
     /* return a copy of src whf*/
     utils::Whf getSrcWhf() const;
     /* set plane alpha */
@@ -202,10 +200,6 @@ inline void MdpCtrl::setFlags(int f) {
 
 inline void MdpCtrl::setZ(overlay::utils::eZorder z) {
     mOVInfo.z_order = z;
-}
-
-inline void MdpCtrl::setIsFg(overlay::utils::eIsFg isFg) {
-    mOVInfo.is_fg = isFg;
 }
 
 inline void MdpCtrl::setPlaneAlpha(int planeAlpha) {

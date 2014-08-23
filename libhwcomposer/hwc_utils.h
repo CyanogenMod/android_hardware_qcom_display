@@ -352,7 +352,7 @@ int configMdp(overlay::Overlay *ov, const ovutils::PipeArgs& parg,
 
 int configColorLayer(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
         ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
-        ovutils::eIsFg& isFg, const ovutils::eDest& dest);
+        const ovutils::eDest& dest);
 
 void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
         hwc_rect_t& crop, overlay::Rotator *rot);
@@ -360,20 +360,20 @@ void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
 //Routine to configure low resolution panels (<= 2048 width)
 int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
         ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
-        ovutils::eIsFg& isFg, const ovutils::eDest& dest,
+        const ovutils::eDest& dest,
         overlay::Rotator **rot);
 
 //Routine to configure high resolution panels (> 2048 width)
 int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
         ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
-        ovutils::eIsFg& isFg, const ovutils::eDest& lDest,
+        const ovutils::eDest& lDest,
         const ovutils::eDest& rDest, overlay::Rotator **rot);
 
 //Routine to split and configure high resolution YUV layer (> 2048 width)
 int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy,
         ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
-        ovutils::eIsFg& isFg, const ovutils::eDest& lDest,
+        const ovutils::eDest& lDest,
         const ovutils::eDest& rDest, overlay::Rotator **rot);
 
 //On certain targets DMA pipes are used for rotation and they won't be available

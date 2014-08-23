@@ -159,7 +159,6 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
         }
 
         ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_BLEND_FG_PREMULT;
-        ovutils::eIsFg isFg = ovutils::IS_FG_OFF;
         ovutils::eZorder zOrder = static_cast<ovutils::eZorder>(fbZorder);
 
         hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
@@ -211,7 +210,7 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
         //For the mdp, since either we are pre-rotating or MDP does flips
         orient = ovutils::OVERLAY_TRANSFORM_0;
         transform = 0;
-        ovutils::PipeArgs parg(mdpFlags, info, zOrder, isFg,
+        ovutils::PipeArgs parg(mdpFlags, info, zOrder,
                                static_cast<ovutils::eRotFlags>(rotFlags),
                                ovutils::DEFAULT_PLANE_ALPHA,
                                (ovutils::eBlending)
@@ -320,7 +319,6 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
             ovutils::PipeArgs pargL(mdpFlags,
                                     info,
                                     zOrder,
-                                    ovutils::IS_FG_OFF,
                                     ovutils::ROT_FLAGS_NONE,
                                     ovutils::DEFAULT_PLANE_ALPHA,
                                     (ovutils::eBlending)
@@ -356,7 +354,6 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
             ovutils::PipeArgs pargR(mdpFlagsR,
                                     info,
                                     zOrder,
-                                    ovutils::IS_FG_OFF,
                                     ovutils::ROT_FLAGS_NONE,
                                     ovutils::DEFAULT_PLANE_ALPHA,
                                     (ovutils::eBlending)
@@ -424,7 +421,6 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     ovutils::PipeArgs parg(mdpFlags,
             info,
             zOrder,
-            ovutils::IS_FG_OFF,
             ovutils::ROT_FLAGS_NONE,
             ovutils::DEFAULT_PLANE_ALPHA,
             (ovutils::eBlending)
