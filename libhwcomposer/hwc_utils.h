@@ -132,6 +132,9 @@ struct ListStats {
     hwc_rect_t rRoi;  //right ROI. Unused in single DSI panels.
     //App Buffer Composition index
     int  renderBufIndexforABC;
+    // Secure RGB specific
+    int secureRGBCount;
+    int secureRGBIndices[MAX_NUM_APP_LAYERS];
 };
 
 //PTOR Comp info
