@@ -32,6 +32,7 @@
 #include <hwc_utils.h>
 #include <mdp_version.h>
 #include <hwc_mdpcomp.h>
+#include <hwc_virtual.h>
 
 #define QCLIENT_DEBUG 0
 
@@ -229,6 +230,10 @@ static void toggleDynamicDebug(hwc_context_t* ctx, const Parcel* inParcel) {
                 break;
         case IQService::DEBUG_VSYNC:
             ctx->vstate.debug = enable;
+            if (debug_type != IQService::DEBUG_ALL)
+                break;
+        case IQService::DEBUG_VD:
+            HWCVirtualBase::dynamicDebug(enable);
             if (debug_type != IQService::DEBUG_ALL)
                 break;
     }

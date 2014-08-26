@@ -65,6 +65,7 @@ public:
         DEBUG_ALL,
         DEBUG_MDPCOMP,
         DEBUG_VSYNC,
+        DEBUG_VD
     };
 
     // Register a client that can be notified
