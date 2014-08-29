@@ -613,6 +613,10 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
                 displayFrame.top = int(hRatio*(float)displayFrame.top);
                 displayFrame.right = int(wRatio*(float)displayFrame.right);
                 displayFrame.bottom = int(hRatio*(float)displayFrame.bottom);
+                ALOGD_IF(DEBUG_MDPDOWNSCALE, "Calculated external display frame"
+                         " for MDPDownscale feature [%d %d %d %d]",
+                         displayFrame.left, displayFrame.top,
+                         displayFrame.right, displayFrame.bottom);
             }
         }else {
             if(extOrient || ctx->dpyAttr[dpy].mDownScaleMode) {
