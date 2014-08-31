@@ -627,6 +627,16 @@ static inline bool isSecondaryConnected(hwc_context_t* ctx) {
             ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected);
 }
 
+/* Return true if HWC supports VirtualDisplaySurface mechanism */
+static inline bool isVDSEnabled(hwc_context_t* ctx) {
+    return ctx->mVDSEnabled;
+}
+
+/* Return Virtual Display connection status */
+static inline bool isVDConnected(hwc_context_t* ctx) {
+    return ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected;
+}
+
 };
 
 #endif //HWC_UTILS_H
