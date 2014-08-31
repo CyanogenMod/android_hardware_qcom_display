@@ -42,11 +42,17 @@ public:
                        hwc_display_contents_1_t** displays) = 0;
     virtual void pause(hwc_context_t* ctx, int dpy) = 0;
     virtual void resume(hwc_context_t* ctx, int dpy) = 0;
+    // We can dump the frame buffer and WB
+    // output buffer by dynamically enabling
+    // dumping via a binder call:
+    // adb shell service call display.qservice 15 i32 3 i32 1
+    static bool sVDDumpEnabled;
+    static void dynamicDebug(bool enable) {sVDDumpEnabled = enable;};
 };
 
 class HWCVirtualVDS : public HWCVirtualBase {
 public:
-    explicit HWCVirtualVDS();
+    explicit HWCVirtualVDS(){};
     virtual ~HWCVirtualVDS(){};
     // Chooses composition type and configures pipe for each layer in virtual
     // display list
@@ -64,12 +70,6 @@ public:
                        hwc_display_contents_1_t** displays);
     virtual void pause(hwc_context_t* ctx, int dpy);
     virtual void resume(hwc_context_t* ctx, int dpy);
-private:
-    // If WFD is enabled through VDS solution
-    // we can dump the frame buffer and WB
-    // output buffer by setting the property
-    // debug.hwc.enable_vds_dump
-    bool mVDSDumpEnabled;
 };
 
 class HWCVirtualV4L2 : public HWCVirtualBase {

@@ -36,6 +36,7 @@
 using namespace qhwc;
 using namespace overlay;
 
+bool HWCVirtualBase::sVDDumpEnabled = false;
 HWCVirtualBase* HWCVirtualBase::getObject(bool isVDSEnabled) {
 
     if(isVDSEnabled) {
@@ -46,16 +47,6 @@ HWCVirtualBase* HWCVirtualBase::getObject(bool isVDSEnabled) {
         ALOGD_IF(HWCVIRTUAL_LOG, "%s: V4L2 is enabled for Virtual display",
                  __FUNCTION__);
         return new HWCVirtualV4L2();
-    }
-}
-
-HWCVirtualVDS::HWCVirtualVDS() {
-    char value[PROPERTY_VALUE_MAX];
-    mVDSDumpEnabled = false;
-    if((property_get("debug.hwc.enable_vds_dump", value, NULL) > 0)) {
-        if(atoi(value) != 0) {
-            mVDSDumpEnabled = true;
-        }
     }
 }
 
@@ -211,7 +202,7 @@ int HWCVirtualVDS::set(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
                 ret = -1;
             }
 
-            if(mVDSDumpEnabled) {
+            if(sVDDumpEnabled) {
                 char bufferName[128];
                 // Dumping frame buffer
                 sync_wait(fbLayer->acquireFenceFd, 1000);
