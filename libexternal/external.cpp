@@ -37,14 +37,11 @@
 #include "qd_utils.h"
 
 using namespace android;
+using namespace qdutils;
 
 namespace qhwc {
-#define MAX_SYSFS_FILE_PATH             255
 #define UNKNOWN_STRING                  "unknown"
 #define SPD_NAME_LENGTH                 16
-/* Max. resolution assignable to when downscale */
-#define SUPPORTED_DOWNSCALE_EXT_AREA    (1920*1080)
-
 
 int ExternalDisplay::configure() {
     if(!openFrameBuffer()) {
@@ -594,7 +591,7 @@ void ExternalDisplay::setAttributes() {
             // downscale mode
             // Restrict this upto 1080p resolution max
             if(((priW * priH) > (width * height)) &&
-               ((priW * priH) <= SUPPORTED_DOWNSCALE_EXT_AREA)) {
+               ((priW * priH) <= SUPPORTED_DOWNSCALE_AREA)) {
                 // tmpW and tmpH will hold the primary dimensions before we
                 // update the aspect ratio if necessary.
                 int tmpW = priW;
@@ -611,7 +608,7 @@ void ExternalDisplay::setAttributes() {
                 // We get around this by calculating a new resolution by
                 // keeping aspect ratio intact.
                 hwc_rect r = {0, 0, 0, 0};
-                getAspectRatioPosition(tmpW, tmpH, width, height, r);
+                qdutils::getAspectRatioPosition(tmpW, tmpH, width, height, r);
                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres =
                                                               r.right - r.left;
                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres =

@@ -50,13 +50,9 @@
 #include "qd_utils.h"
 
 using namespace android;
+using namespace qdutils;
 
 namespace qhwc {
-
-#define MAX_SYSFS_FILE_PATH             255
-
-/* Max. resolution assignable to virtual display. */
-#define SUPPORTED_VIRTUAL_AREA          (1920*1080)
 
 int VirtualDisplay::configure() {
     if(!openFrameBuffer())
@@ -124,9 +120,9 @@ void VirtualDisplay::setToPrimary(uint32_t maxArea,
     // for eg., primary in 1600p and WFD in 1080p
     // we wont use downscale feature because MAX MDP
     // writeback resolution supported is 1080p (tracked
-    // by SUPPORTED_VIRTUAL_AREA).
+    // by SUPPORTED_DOWNSCALE_AREA).
     if((maxArea == (priW * priH))
-        && (maxArea <= SUPPORTED_VIRTUAL_AREA)) {
+        && (maxArea <= SUPPORTED_DOWNSCALE_AREA)) {
         // tmpW and tmpH will hold the primary dimensions before we
         // update the aspect ratio if necessary.
         uint32_t tmpW = priW;
@@ -143,7 +139,7 @@ void VirtualDisplay::setToPrimary(uint32_t maxArea,
         // We get around this by calculating a new resolution by
         // keeping aspect ratio intact.
         hwc_rect r = {0, 0, 0, 0};
-        getAspectRatioPosition(tmpW, tmpH, extW, extH, r);
+        qdutils::getAspectRatioPosition(tmpW, tmpH, extW, extH, r);
         extW = r.right - r.left;
         extH = r.bottom - r.top;
     }
@@ -156,13 +152,13 @@ void VirtualDisplay::setToPrimary(uint32_t maxArea,
    2. WFD down scale path i.e. when WFD resolution is lower than
       primary resolution.
    Furthermore, downscale mode is only valid when downscaling from
-   SUPPORTED_VIRTUAL_AREA to a lower resolution.
-   (SUPPORTED_VIRTUAL_AREA represents the maximum resolution that
+   SUPPORTED_DOWNSCALE_AREA to a lower resolution.
+   (SUPPORTED_DOWNSCALE_AREA represents the maximum resolution that
    we can configure to the virtual display)
 */
 void VirtualDisplay::setDownScaleMode(uint32_t maxArea) {
     if((maxArea > (mVInfo.xres * mVInfo.yres))
-        && (maxArea <= SUPPORTED_VIRTUAL_AREA)) {
+        && (maxArea <= SUPPORTED_DOWNSCALE_AREA)) {
         mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = true;
     }else {
         mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = false;
@@ -214,7 +210,7 @@ bool VirtualDisplay::openFrameBuffer()
         int fbNum = overlay::Overlay::getInstance()->
                                    getFbForDpy(HWC_DISPLAY_VIRTUAL);
 
-        char strDevPath[MAX_SYSFS_FILE_PATH];
+        char strDevPath[qdutils::MAX_SYSFS_FILE_PATH];
         snprintf(strDevPath,sizeof(strDevPath), "/dev/graphics/fb%d", fbNum);
 
         mFd = open(strDevPath, O_RDWR);
