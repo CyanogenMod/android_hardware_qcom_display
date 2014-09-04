@@ -428,6 +428,21 @@ int CopyBit::drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
     for(int j = 0; j < ptorInfo->count; j++) {
         int ovlapIndex = ptorInfo->layerIndex[j];
         hwc_rect_t overlap = list->hwLayers[ovlapIndex].displayFrame;
+        if(j) {
+            /**
+             * It's possible that 2 PTOR layers might have overlapping.
+             * In such case, remove the intersection(again if peripheral)
+             * from the lower PTOR layer to avoid overlapping.
+             * If intersection is not on peripheral then compromise
+             * by reducing number of PTOR layers.
+             **/
+            int prevOvlapIndex = ptorInfo->layerIndex[0];
+            hwc_rect_t prevOvlap = list->hwLayers[prevOvlapIndex].displayFrame;
+            hwc_rect_t commonRect = getIntersection(prevOvlap, overlap);
+            if(isValidRect(commonRect)) {
+                overlap = deductRect(overlap, commonRect);
+            }
+        }
 
         // Draw overlapped content of layers on render buffer
         for (int i = 0; i <= ovlapIndex; i++) {
