@@ -31,7 +31,6 @@
 #include "hwc_copybit.h"
 #include "comptype.h"
 #include "external.h"
-#include "virtual.h"
 #include "hwc_virtual.h"
 #include "mdp_version.h"
 using namespace overlay;
@@ -62,8 +61,6 @@ static int getConnectedDisplay(const char* strUdata)
 {
     if(strcasestr("change@/devices/virtual/switch/hdmi", strUdata))
         return HWC_DISPLAY_EXTERNAL;
-    if(strcasestr("change@/devices/virtual/switch/wfd", strUdata))
-        return HWC_DISPLAY_VIRTUAL;
     return -1;
 }
 
@@ -97,64 +94,6 @@ static int getConnectedState(const char* strUdata, int len)
         iter_str += strlen(iter_str)+1;
     }
     return -1;
-}
-
-void handle_pause(hwc_context_t* ctx, int dpy) {
-    if(ctx->mHWCVirtual) {
-        ctx->mHWCVirtual->pause(ctx, dpy);
-    }
-    return;
-}
-
-void handle_resume(hwc_context_t* ctx, int dpy) {
-    if(ctx->mHWCVirtual) {
-        ctx->mHWCVirtual->resume(ctx, dpy);
-    }
-    return;
-}
-
-static void teardownWfd(hwc_context_t* ctx) {
-    // Teardown WFD display
-    ALOGD_IF(UEVENT_DEBUG,"Received HDMI connection request when WFD is "
-            "active");
-    {
-        Locker::Autolock _l(ctx->mDrawLock);
-        clear(ctx, HWC_DISPLAY_VIRTUAL);
-        ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected = false;
-        ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = false;
-    }
-
-    ctx->mVirtualDisplay->teardown();
-
-    /* Need to send hotplug only when connected WFD in proprietary path */
-    if(ctx->mVirtualonExtActive) {
-        ALOGE_IF(UEVENT_DEBUG,"%s: Sending EXTERNAL OFFLINE"
-                "hotplug event for wfd display", __FUNCTION__);
-        ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL,
-                EXTERNAL_OFFLINE);
-        {
-            Locker::Autolock _l(ctx->mDrawLock);
-            ctx->mVirtualonExtActive = false;
-        }
-    }
-
-    if(ctx->mVDSEnabled) {
-        ctx->mWfdSyncLock.lock();
-        ALOGD_IF(HWC_WFDDISPSYNC_LOG,
-                 "%s: Waiting for wfd-teardown to be signalled",__FUNCTION__);
-        ctx->mWfdSyncLock.wait();
-        ALOGD_IF(HWC_WFDDISPSYNC_LOG,
-                 "%s: Teardown signalled. Completed waiting in uevent thread",
-                 __FUNCTION__);
-        ctx->mWfdSyncLock.unlock();
-    } else {
-        /*TODO: Remove this else block and have wait rather than usleep
-          once wfd module issues binder call on teardown.*/
-
-        /* For now, Wait for few frames for SF to tear down the WFD session.*/
-        usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-               * 2 / 1000);
-    }
 }
 
 static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
@@ -191,22 +130,13 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             ctx->dpyAttr[dpy].connected = false;
             ctx->dpyAttr[dpy].isActive = false;
 
-            if(dpy == HWC_DISPLAY_EXTERNAL) {
-                ctx->mExtDisplay->teardown();
-            } else {
-                ctx->mVirtualDisplay->teardown();
-            }
+            ctx->mExtDisplay->teardown();
 
             /* We need to send hotplug to SF only when we are disconnecting
-             * (1) HDMI OR (2) proprietary WFD session */
-            if(dpy == HWC_DISPLAY_EXTERNAL ||
-               ctx->mVirtualonExtActive) {
-                ALOGE_IF(UEVENT_DEBUG,"%s:Sending EXTERNAL OFFLINE hotplug"
-                         "event", __FUNCTION__);
-                ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL,
-                                   EXTERNAL_OFFLINE);
-                ctx->mVirtualonExtActive = false;
-            }
+             * HDMI */
+            ALOGE_IF(UEVENT_DEBUG,"%s:Sending EXTERNAL OFFLINE hotplug"
+                    "event", __FUNCTION__);
+            ctx->proc->hotplug(ctx->proc, dpy, EXTERNAL_OFFLINE);
             break;
         }
     case EXTERNAL_ONLINE:
@@ -234,62 +164,26 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
                    * 2 / 1000);
 
-            if(dpy == HWC_DISPLAY_EXTERNAL) {
-                if(isVDConnected(ctx)) {
-                    // Do not initiate WFD teardown if WFD architecture is based
-                    // on VDS mechanism.
-                    // WFD Stack listens to HDMI intent and initiates virtual
-                    // display teardown.
-                    // ToDo: Currently non-WFD Virtual display clients do not
-                    // involve HWC. If there is a change, we need to come up
-                    // with mechanism of how to address non-WFD Virtual display
-                    // clients + HDMI
-                    if(isVDSEnabled(ctx)) {
-                        ctx->mWfdSyncLock.lock();
-                        ALOGD_IF(HWC_WFDDISPSYNC_LOG,
-                                "%s: Waiting for wfd-teardown to be signalled",
-                                __FUNCTION__);
-                        ctx->mWfdSyncLock.wait();
-                        ALOGD_IF(HWC_WFDDISPSYNC_LOG,
-                                "%s: Teardown signalled. Completed waiting in"
-                                "uevent thread", __FUNCTION__);
-                        ctx->mWfdSyncLock.unlock();
-                    } else {
-                        // Triple Display is supported on 8084 target
-                        // WFD can be initiated by Wfd-client or Settings app
-                        // 1. wfd-client use hdmi hotplug mechanism.
-                        //    If wfd is connected via wfd-client and if HDMI is
-                        //    connected, we have to teardown wfd session.
-                        //    (as SF support only one active External display
-                        //     at a given time).
-                        //    (ToDo: Once wfd-client migrates using virtual
-                        //     display apis, second condition is redundant).
-                        // 2. Settings app use virtual display mechanism.
-                        //    In this approach, there is no limitation of
-                        //    supporting triple display.
-                        if(!(qdutils::MDPVersion::getInstance().is8084() &&
-                                    !ctx->mVirtualonExtActive)) {
-                            teardownWfd(ctx);
-                        }
-                    }
-                }
-                ctx->mExtDisplay->configure();
-            } else {
-                {
-                    Locker::Autolock _l(ctx->mDrawLock);
-                    /* TRUE only when we are on proprietary WFD session */
-                    ctx->mVirtualonExtActive = true;
-                    char property[PROPERTY_VALUE_MAX];
-                    if((property_get("persist.sys.wfd.virtual",
-                                                  property, NULL) > 0) &&
-                       (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
-                       (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
-                        // This means we are on Google's WFD session
-                        ctx->mVirtualonExtActive = false;
-                    }
-                }
-                ctx->mVirtualDisplay->configure();
+            if(isVDConnected(ctx)) {
+                // Do not initiate WFD teardown if WFD architecture is based
+                // on VDS mechanism.
+                // WFD Stack listens to HDMI intent and initiates virtual
+                // display teardown.
+                // ToDo: Currently non-WFD Virtual display clients do not
+                // involve HWC. If there is a change, we need to come up
+                // with mechanism of how to address non-WFD Virtual display
+                // clients + HDMI
+                ctx->mWfdSyncLock.lock();
+                ALOGD_IF(HWC_WFDDISPSYNC_LOG,
+                        "%s: Waiting for wfd-teardown to be signalled",
+                        __FUNCTION__);
+                ctx->mWfdSyncLock.wait();
+                ALOGD_IF(HWC_WFDDISPSYNC_LOG,
+                        "%s: Teardown signalled. Completed waiting in"
+                        "uevent thread", __FUNCTION__);
+                ctx->mWfdSyncLock.unlock();
             }
+            ctx->mExtDisplay->configure();
 
             Locker::Autolock _l(ctx->mDrawLock);
             setup(ctx, dpy);
@@ -297,37 +191,12 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             ctx->dpyAttr[dpy].connected = true;
             ctx->dpyAttr[dpy].isConfiguring = true;
 
-            if(dpy == HWC_DISPLAY_EXTERNAL ||
-               ctx->mVirtualonExtActive) {
-                /* External display is HDMI or non-hybrid WFD solution */
-                ALOGE_IF(UEVENT_DEBUG, "%s: Sending EXTERNAL ONLINE"
-                         "hotplug event", __FUNCTION__);
-                ctx->proc->hotplug(ctx->proc,HWC_DISPLAY_EXTERNAL,
-                                   EXTERNAL_ONLINE);
-            } else {
-                /* We wont be getting unblank for VIRTUAL DISPLAY and its
-                 * always guaranteed from WFD stack that CONNECT uevent for
-                 * VIRTUAL DISPLAY will be triggered before creating
-                 * surface for the same. */
-                ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = true;
-            }
+            /* External display is HDMI */
+            ALOGE_IF(UEVENT_DEBUG, "%s: Sending EXTERNAL ONLINE"
+                    "hotplug event", __FUNCTION__);
+            ctx->proc->hotplug(ctx->proc, dpy, EXTERNAL_ONLINE);
             break;
         }
-        case EXTERNAL_PAUSE:
-            {   // pause case
-                ALOGD("%s Received Pause event",__FUNCTION__);
-                handle_pause(ctx, dpy);
-                break;
-            }
-        case EXTERNAL_RESUME:
-            {  // resume case
-                ALOGD("%s Received resume event",__FUNCTION__);
-                //Treat Resume as Online event
-                //Since external didnt have any pipes, force primary to give up
-                //its pipes; we don't allow inter-mixer pipe transfers.
-                handle_resume(ctx, dpy);
-                break;
-            }
     default:
         {
             ALOGE("%s: Invalid state to swtich:%d", __FUNCTION__, switch_state);

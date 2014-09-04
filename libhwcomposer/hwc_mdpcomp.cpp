@@ -20,7 +20,6 @@
 #include "hwc_mdpcomp.h"
 #include <sys/ioctl.h>
 #include "external.h"
-#include "virtual.h"
 #include "qdMetaData.h"
 #include "mdp_version.h"
 #include "hwc_fbupdate.h"

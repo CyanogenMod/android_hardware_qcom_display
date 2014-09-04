@@ -26,7 +26,6 @@
 #include "hwc_fbupdate.h"
 #include "mdp_version.h"
 #include "external.h"
-#include "virtual.h"
 
 using namespace qdutils;
 using namespace overlay;
