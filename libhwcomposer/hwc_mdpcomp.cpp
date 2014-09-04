@@ -874,28 +874,10 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         }
     }
 
-    if(isValidRect(getIntersection(overlapRect[0], overlapRect[1]))) {
-        ALOGD_IF(isDebug(), "%s: Ignore Rect2 its intersects with Rect1",
-                 __FUNCTION__);
-        // reset second minLayerIndex[1];
-        minLayerIndex[1] = -1;
-        numPTORLayersFound--;
-    }
-
     // No overlap layers
     if (!numPTORLayersFound)
         return false;
 
-    ctx->mPtorInfo.count = numPTORLayersFound;
-    for(int i = 0; i < MAX_PTOR_LAYERS; i++) {
-        ctx->mPtorInfo.layerIndex[i] = minLayerIndex[i];
-    }
-
-    if (!ctx->mCopyBit[mDpy]->prepareOverlap(ctx, list)) {
-        // reset PTOR
-        ctx->mPtorInfo.count = 0;
-        return false;
-    }
     // Store the displayFrame and the sourceCrops of the layers
     hwc_rect_t displayFrame[numAppLayers];
     hwc_rect_t sourceCrop[numAppLayers];
@@ -905,6 +887,35 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         sourceCrop[i] = integerizeSourceCrop(layer->sourceCropf);
     }
 
+    /**
+     * It's possible that 2 PTOR layers might have overlapping.
+     * In such case, remove the intersection(again if peripheral)
+     * from the lower PTOR layer to avoid overlapping.
+     * If intersection is not on peripheral then compromise
+     * by reducing number of PTOR layers.
+     **/
+    hwc_rect_t commonRect = getIntersection(overlapRect[0], overlapRect[1]);
+    if(isValidRect(commonRect)) {
+        overlapRect[1] = deductRect(overlapRect[1], commonRect);
+        list->hwLayers[minLayerIndex[1]].displayFrame = overlapRect[1];
+    }
+
+    ctx->mPtorInfo.count = numPTORLayersFound;
+    for(int i = 0; i < MAX_PTOR_LAYERS; i++) {
+        ctx->mPtorInfo.layerIndex[i] = minLayerIndex[i];
+    }
+
+    if (!ctx->mCopyBit[mDpy]->prepareOverlap(ctx, list)) {
+        // reset PTOR
+        ctx->mPtorInfo.count = 0;
+        if(isValidRect(commonRect)) {
+            // If PTORs are intersecting restore displayframe of PTOR[1]
+            // before returning, as we have modified it above.
+            list->hwLayers[minLayerIndex[1]].displayFrame =
+                    displayFrame[minLayerIndex[1]];
+        }
+        return false;
+    }
     private_handle_t *renderBuf = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
     Whf layerWhf[numPTORLayersFound]; // To store w,h,f of PTOR layers
 
