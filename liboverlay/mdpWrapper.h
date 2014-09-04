@@ -44,8 +44,11 @@
 #include <utils/Trace.h>
 #include <errno.h>
 #include "overlayUtils.h"
+#include "overlay.h"
 
 #define IOCTL_DEBUG 0
+#define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
+#define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
 
 namespace overlay{
 
@@ -179,11 +182,33 @@ inline bool setOverlay(int fd, mdp_overlay& ov) {
 
 inline bool validateAndSet(const int& fd, mdp_overlay_list& list) {
     ATRACE_CALL();
+    uint32_t id = 0;
+    if(UNLIKELY(Overlay::isDebugPipeLifecycle())) {
+        for(uint32_t i = 0; i < list.num_overlays; i++) {
+            if(list.overlay_list[i]->id != (uint32_t)MSMFB_NEW_REQUEST) {
+                id |= list.overlay_list[i]->id;
+            }
+        }
+
+        ALOGD("%s Total pipes needed: %d, Exisiting pipe mask 0x%04x",
+                __FUNCTION__, list.num_overlays, id);
+        id = 0;
+    }
+
     if (ioctl(fd, MSMFB_OVERLAY_PREPARE, &list) < 0) {
         ALOGD_IF(IOCTL_DEBUG, "Failed to call ioctl MSMFB_OVERLAY_PREPARE "
                 "err=%s", strerror(errno));
         return false;
     }
+
+    if(UNLIKELY(Overlay::isDebugPipeLifecycle())) {
+        for(uint32_t i = 0; i < list.num_overlays; i++) {
+            id |= list.overlay_list[i]->id;
+        }
+
+        ALOGD("%s Pipe mask after OVERLAY_PREPARE 0x%04x", __FUNCTION__, id);
+    }
+
     return true;
 }
 
@@ -199,6 +224,9 @@ inline bool endRotator(int fd, uint32_t sessionId) {
 
 inline bool unsetOverlay(int fd, int ovId) {
     ATRACE_CALL();
+    ALOGD_IF(Overlay::isDebugPipeLifecycle(), "%s Unsetting pipe 0x%04x",
+            __FUNCTION__, ovId);
+
     if (ioctl(fd, MSMFB_OVERLAY_UNSET, &ovId) < 0) {
         ALOGE("Failed to call ioctl MSMFB_OVERLAY_UNSET err=%s",
                 strerror(errno));
@@ -229,6 +257,8 @@ inline bool play(int fd, msmfb_overlay_data& od) {
 
 inline bool displayCommit(int fd, mdp_display_commit& info) {
     ATRACE_CALL();
+    ALOGD_IF(Overlay::isDebugPipeLifecycle(), "%s", __FUNCTION__);
+
     if(ioctl(fd, MSMFB_DISPLAY_COMMIT, &info) == -1) {
         ALOGE("Failed to call ioctl MSMFB_DISPLAY_COMMIT err=%s",
                 strerror(errno));

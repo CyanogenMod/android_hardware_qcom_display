@@ -33,12 +33,14 @@
 #include <mdp_version.h>
 #include <hwc_mdpcomp.h>
 #include <hwc_virtual.h>
+#include <overlay.h>
 
 #define QCLIENT_DEBUG 0
 
 using namespace android;
 using namespace qService;
 using namespace qhwc;
+using namespace overlay;
 
 namespace qClient {
 
@@ -234,6 +236,10 @@ static void toggleDynamicDebug(hwc_context_t* ctx, const Parcel* inParcel) {
                 break;
         case IQService::DEBUG_VD:
             HWCVirtualBase::dynamicDebug(enable);
+            if (debug_type != IQService::DEBUG_ALL)
+                break;
+        case IQService::DEBUG_PIPE_LIFECYCLE:
+            Overlay::debugPipeLifecycle(enable);
             if (debug_type != IQService::DEBUG_ALL)
                 break;
     }
