@@ -54,6 +54,7 @@ public:
     /* Initialize MDP comp*/
     static bool init(hwc_context_t *ctx);
     static void resetIdleFallBack() { sIdleFallBack = false; }
+    static bool isIdleFallback() { return sIdleFallBack; }
 
 protected:
     enum { MAX_SEC_LAYERS = 1 }; //TODO add property support
