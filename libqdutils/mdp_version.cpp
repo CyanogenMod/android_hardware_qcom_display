@@ -111,11 +111,15 @@ MDPVersion::MDPVersion()
     if (mMdpRev == MDP_V3_0_4){
         mMDPVersion = MDP_V3_0_4;
     }
+    else if (mMdpRev == MDP_V3_0_5){
+        mMDPVersion = MDP_V3_0_5;
+    }
 
     mHasOverlay = false;
     if((mMDPVersion >= MDP_V4_0) ||
        (mMDPVersion == MDP_V_UNKNOWN) ||
-       (mMDPVersion == MDP_V3_0_4))
+       (mMDPVersion == MDP_V3_0_4) ||
+       (mMDPVersion == MDP_V3_0_5))
         mHasOverlay = true;
     if(!updateSplitInfo()) {
         ALOGE("Unable to read display split node");
