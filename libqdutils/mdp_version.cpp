@@ -179,6 +179,7 @@ void  MDPVersion::updatePanelInfo() {
         size_t len = PAGE_SIZE;
         ssize_t read;
         char *readLine = (char *) malloc (len);
+        char property[PROPERTY_VALUE_MAX];
         while((read = getline((char **)&readLine, &len,
                               panelInfoNodeFP)) != -1) {
             int token_ct=0;
@@ -222,6 +223,12 @@ void  MDPVersion::updatePanelInfo() {
                     ALOGI("Needs ROI Merge: %d", mPanelInfo.mNeedsROIMerge);
                 }
             }
+        }
+        if((property_get("persist.hwc.pubypass", property, 0) > 0) &&
+            (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+            (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+                mPanelInfo.mPartialUpdateEnable = 0;
+                ALOGI("PartialUpdate disabled by property");
         }
         fclose(panelInfoNodeFP);
     } else {
