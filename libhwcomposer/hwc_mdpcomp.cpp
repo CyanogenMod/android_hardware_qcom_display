@@ -426,14 +426,21 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. video transition padding round",
                 __FUNCTION__);
         ret = false;
-    } else if(isSecondaryConfiguring(ctx)) {
-        ALOGD_IF( isDebug(),"%s: External Display connection is pending",
-                  __FUNCTION__);
-        ret = false;
-    } else if(ctx->isPaddingRound) {
-        ALOGD_IF(isDebug(), "%s: padding round invoked for dpy %d",
-                 __FUNCTION__,mDpy);
-        ret = false;
+    } else if(qdutils::MDPVersion::getInstance().getTotalPipes() < 8) {
+       /* TODO: freeing up all the resources only for the targets having total
+                number of pipes < 8. Need to analyze number of VIG pipes used
+                for primary in previous draw cycle and accordingly decide
+                whether to fall back to full GPU comp or video only comp
+        */
+        if(isSecondaryConfiguring(ctx)) {
+            ALOGD_IF( isDebug(),"%s: External Display connection is pending",
+                      __FUNCTION__);
+            ret = false;
+        } else if(ctx->isPaddingRound) {
+            ALOGD_IF(isDebug(), "%s: padding round invoked for dpy %d",
+                     __FUNCTION__,mDpy);
+            ret = false;
+        }
     }
     return ret;
 }
@@ -689,6 +696,18 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         ALOGD_IF(isDebug(),"%s: SKIP present: %d",
                 __FUNCTION__,
                 isSkipPresent(ctx, mDpy));
+        return false;
+    }
+
+    // if secondary is configuring or Padding round, fall back to video only
+    // composition and release all assigned non VIG pipes from primary.
+    if(isSecondaryConfiguring(ctx)) {
+        ALOGD_IF( isDebug(),"%s: External Display connection is pending",
+                  __FUNCTION__);
+        return false;
+    } else if(ctx->isPaddingRound) {
+        ALOGD_IF(isDebug(), "%s: padding round invoked for dpy %d",
+                 __FUNCTION__,mDpy);
         return false;
     }
 
