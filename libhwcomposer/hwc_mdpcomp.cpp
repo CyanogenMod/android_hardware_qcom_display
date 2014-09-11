@@ -333,7 +333,7 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
             // Color layer
             return true;
         }
-        ALOGE("%s: layer handle is NULL", __FUNCTION__);
+        ALOGD_IF(isDebug(), "%s: layer handle is NULL", __FUNCTION__);
         return false;
     }
 
