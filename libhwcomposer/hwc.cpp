@@ -148,7 +148,8 @@ static void setDMAState(hwc_context_t *ctx, int numDisplays,
 
                     if (UNLIKELY(isYuvBuffer(hnd)) && canUseRotator(ctx, dpy) &&
                         (layer->transform & HWC_TRANSFORM_ROT_90)) {
-                        if(not qdutils::MDPVersion::getInstance().is8x26()) {
+                        if(not (qdutils::MDPVersion::getInstance().is8x26() &&
+                                             dpy)) {
                             if(ctx->mOverlay->isPipeTypeAttached(
                                              overlay::utils::OV_MDP_PIPE_DMA))
                                 ctx->isPaddingRound = true;
