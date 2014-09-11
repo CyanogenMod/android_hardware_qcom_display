@@ -589,9 +589,11 @@ void ExternalDisplay::setAttributes() {
             // if primary resolution is more than the hdmi resolution
             // configure dpy attr to primary resolution and set
             // downscale mode
-            // Restrict this upto 1080p resolution max
-            if(((priW * priH) > (width * height)) &&
-               ((priW * priH) <= SUPPORTED_DOWNSCALE_AREA)) {
+            // Restrict this upto 1080p resolution max, if target does not
+            // support source split feature.
+            if((priW * priH) > (width * height) &&
+                (((priW * priH) <= SUPPORTED_DOWNSCALE_AREA) ||
+                qdutils::MDPVersion::getInstance().isSrcSplit())) {
                 // tmpW and tmpH will hold the primary dimensions before we
                 // update the aspect ratio if necessary.
                 int tmpW = priW;
@@ -609,14 +611,39 @@ void ExternalDisplay::setAttributes() {
                 // keeping aspect ratio intact.
                 hwc_rect r = {0, 0, 0, 0};
                 qdutils::getAspectRatioPosition(tmpW, tmpH, width, height, r);
-                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres =
-                                                              r.right - r.left;
-                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres =
-                                                              r.bottom - r.top;
+                int newExtW = r.right - r.left;
+                int newExtH = r.bottom - r.top;
+                int alignedExtW;
+                int alignedExtH;
+                // On 8994 and below targets MDP supports only 4X downscaling,
+                // Restricting selected external resolution to be exactly 4X
+                // greater resolution than actual external resolution
+                int maxMDPDownScale =
+                        qdutils::MDPVersion::getInstance().getMaxMDPDownscale();
+                if((width * height * maxMDPDownScale) < (newExtW * newExtH)) {
+                    float upScaleFactor = (float)maxMDPDownScale / 2.0f;
+                    newExtW = (int)((float)width * upScaleFactor);
+                    newExtH = (int)((float)height * upScaleFactor);
+                }
+                // Align it down so that the new aligned resolution does not
+                // exceed the maxMDPDownscale factor
+                alignedExtW = overlay::utils::aligndown(newExtW, 4);
+                alignedExtH = overlay::utils::aligndown(newExtH, 4);
+                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = alignedExtW;
+                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = alignedExtH;
                 // Set External Display MDP Downscale mode indicator
                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode =true;
             }
         }
+        ALOGD_IF(DEBUG_MDPDOWNSCALE, "Selected external resolution [%d X %d] "
+                 "maxMDPDownScale %d MDPDownScaleMode %d srcSplitEnabled %d "
+                 "MDPDownscale feature %d",
+                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres,
+                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres,
+                 qdutils::MDPVersion::getInstance().getMaxMDPDownscale(),
+                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode,
+                 qdutils::MDPVersion::getInstance().isSrcSplit(),
+                 mHwcContext->mMDPDownscaleEnabled);
         //Initialize the display viewFrame info
         mHwcContext->mViewFrame[HWC_DISPLAY_EXTERNAL].left = 0;
         mHwcContext->mViewFrame[HWC_DISPLAY_EXTERNAL].top = 0;

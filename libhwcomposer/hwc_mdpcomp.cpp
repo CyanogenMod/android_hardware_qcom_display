@@ -2481,6 +2481,9 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
         else if (hnd->format == HAL_PIXEL_FORMAT_RGBX_8888)
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
     }
+    /* Calculate the external display position based on MDP downscale,
+       ActionSafe, and extorientation features. */
+    calcExtDisplayPosition(ctx, hnd, mDpy, crop, dst, transform, orient);
 
     int downscale = getRotDownscale(ctx, layer);
     eMdpFlags mdpFlags = OV_MDP_BACKEND_COMPOSITION;
