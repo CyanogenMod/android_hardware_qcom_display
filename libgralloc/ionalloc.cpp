@@ -34,12 +34,14 @@
 #include <fcntl.h>
 #include <cutils/log.h>
 #include <errno.h>
+#include <utils/Trace.h>
 #include "gralloc_priv.h"
 #include "ionalloc.h"
 
 using gralloc::IonAlloc;
 
 #define ION_DEVICE "/dev/ion"
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 
 int IonAlloc::open_device()
 {
@@ -64,6 +66,7 @@ void IonAlloc::close_device()
 
 int IonAlloc::alloc_buffer(alloc_data& data)
 {
+    ATRACE_CALL();
     Locker::Autolock _l(mLock);
     int err = 0;
     struct ion_handle_data handle_data;
@@ -123,6 +126,7 @@ int IonAlloc::alloc_buffer(alloc_data& data)
 int IonAlloc::free_buffer(void* base, unsigned int size, unsigned int offset,
         int fd)
 {
+    ATRACE_CALL();
     Locker::Autolock _l(mLock);
     ALOGD_IF(DEBUG, "ion: Freeing buffer base:%p size:%u fd:%d",
           base, size, fd);
@@ -140,6 +144,7 @@ int IonAlloc::free_buffer(void* base, unsigned int size, unsigned int offset,
 int IonAlloc::map_buffer(void **pBase, unsigned int size, unsigned int offset,
         int fd)
 {
+    ATRACE_CALL();
     int err = 0;
     void *base = 0;
     // It is a (quirky) requirement of ION to have opened the
@@ -165,6 +170,7 @@ int IonAlloc::map_buffer(void **pBase, unsigned int size, unsigned int offset,
 int IonAlloc::unmap_buffer(void *base, unsigned int size,
         unsigned int /*offset*/)
 {
+    ATRACE_CALL();
     ALOGD_IF(DEBUG, "ion: Unmapping buffer  base:%p size:%u", base, size);
     int err = 0;
     if(munmap(base, size)) {
@@ -178,6 +184,8 @@ int IonAlloc::unmap_buffer(void *base, unsigned int size,
 int IonAlloc::clean_buffer(void *base, unsigned int size, unsigned int offset,
         int fd, int op)
 {
+    ATRACE_CALL();
+    ATRACE_INT("operation id", op);
     struct ion_flush_data flush_data;
     struct ion_fd_data fd_data;
     struct ion_handle_data handle_data;
