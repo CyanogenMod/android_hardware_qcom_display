@@ -354,6 +354,9 @@ void initContext(hwc_context_t *ctx)
     ctx->deviceOrientation = 0;
     ctx->mBufferMirrorMode = false;
 
+    property_get("sys.hwc.windowbox_aspect_ratio_tolerance", value, "0");
+    ctx->mAspectRatioToleranceLevel = (((float)atoi(value)) / 100.0f);
+
     ctx->enableABC = false;
     property_get("debug.sf.hwc.canUseABC", value, "0");
     ctx->enableABC  = atoi(value) ? true : false;
@@ -1868,9 +1871,14 @@ void updateDestAIVVideoMode(hwc_context_t *ctx, hwc_rect_t crop,
     int extW = ctx->dpyAttr[dpy].xres;
     int extH = ctx->dpyAttr[dpy].yres;
     // Set the destination coordinates of external display to full screen,
-    // when zoom in mode is enabled or video aspect ratio matches with the
-    // external display aspect ratio
-    if((srcCrop.w * extH == extW * srcCrop.h) || (isZoomModeEnabled(crop))) {
+    // when zoom in mode is enabled or the ratio between video aspect ratio
+    // and external display aspect ratio is below the minimum tolerance level
+    // and above maximum tolerance level
+    float videoAspectRatio = ((float)srcCrop.w / (float)srcCrop.h);
+    float extDisplayAspectRatio = ((float)extW / (float)extH);
+    float videoToExternalRatio = videoAspectRatio / extDisplayAspectRatio;
+    if((fabs(1.0f - videoToExternalRatio) <= ctx->mAspectRatioToleranceLevel) ||
+        (isZoomModeEnabled(crop))) {
         dst.left = 0;
         dst.top = 0;
         dst.right = extW;
