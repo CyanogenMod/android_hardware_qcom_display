@@ -38,24 +38,6 @@ namespace qhwc {
 #define HWC_UEVENT_SWITCH_STR  "change@/devices/virtual/switch/"
 #define HWC_UEVENT_THREAD_NAME "hwcUeventThread"
 
-static void setup(hwc_context_t* ctx, int dpy)
-{
-    ctx->mFBUpdate[dpy] = IFBUpdate::getObject(ctx, dpy);
-    ctx->mMDPComp[dpy] =  MDPComp::getObject(ctx, dpy);
-}
-
-static void clear(hwc_context_t* ctx, int dpy)
-{
-    if(ctx->mFBUpdate[dpy]) {
-        delete ctx->mFBUpdate[dpy];
-        ctx->mFBUpdate[dpy] = NULL;
-    }
-    if(ctx->mMDPComp[dpy]) {
-        delete ctx->mMDPComp[dpy];
-        ctx->mMDPComp[dpy] = NULL;
-    }
-}
-
 /* Parse uevent data for devices which we are interested */
 static int getConnectedDisplay(const char* strUdata)
 {
@@ -126,13 +108,9 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             }
 
             Locker::Autolock _l(ctx->mDrawLock);
-            clear(ctx, dpy);
-            ctx->dpyAttr[dpy].connected = false;
-            ctx->dpyAttr[dpy].isActive = false;
-            /* If disconnect comes before any composition cycle */
-            ctx->dpyAttr[dpy].isConfiguring = false;
-
+            destroyCompositionResources(ctx, dpy);
             ctx->mExtDisplay->teardown();
+            resetDisplayInfo(ctx, dpy);
 
             /* We need to send hotplug to SF only when we are disconnecting
              * HDMI */
@@ -186,9 +164,11 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 ctx->mWfdSyncLock.unlock();
             }
             ctx->mExtDisplay->configure();
+            ctx->mExtDisplay->activateDisplay();
 
             Locker::Autolock _l(ctx->mDrawLock);
-            setup(ctx, dpy);
+            updateDisplayInfo(ctx, dpy);
+            initCompositionResources(ctx, dpy);
             ctx->dpyAttr[dpy].isPause = false;
             ctx->dpyAttr[dpy].connected = true;
             ctx->dpyAttr[dpy].isConfiguring = true;
