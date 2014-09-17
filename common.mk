@@ -4,7 +4,7 @@ common_includes += $(LOCAL_PATH)/../liboverlay
 common_includes += $(LOCAL_PATH)/../libcopybit
 common_includes += $(LOCAL_PATH)/../libqdutils
 common_includes += $(LOCAL_PATH)/../libhwcomposer
-common_includes += $(LOCAL_PATH)/../libexternal
+common_includes += $(LOCAL_PATH)/../libhdmi
 common_includes += $(LOCAL_PATH)/../libqservice
 
 ifeq ($(TARGET_USES_POST_PROCESSING),true)

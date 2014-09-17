@@ -26,7 +26,7 @@
 #include <sys/ioctl.h>
 #include <cutils/properties.h>
 #include "hwc_utils.h"
-#include "external.h"
+#include "hdmi.h"
 #include "overlayUtils.h"
 #include "overlay.h"
 #include "qd_utils.h"
@@ -83,7 +83,7 @@ EDIDData gEDIDData [] = {
 // Number of modes in gEDIDData
 const int gEDIDCount = (sizeof(gEDIDData)/sizeof(gEDIDData)[0]);
 
-int ExternalDisplay::configure() {
+int HDMIDisplay::configure() {
     if(!openFrameBuffer()) {
         ALOGE("%s: Failed to open FB: %d", __FUNCTION__, mFbNum);
         return -1;
@@ -113,12 +113,12 @@ int ExternalDisplay::configure() {
     return 0;
 }
 
-void ExternalDisplay::getAttributes(uint32_t& width, uint32_t& height) {
+void HDMIDisplay::getAttributes(uint32_t& width, uint32_t& height) {
     uint32_t fps = 0;
     getAttrForMode(width, height, fps);
 }
 
-int ExternalDisplay::teardown() {
+int HDMIDisplay::teardown() {
     closeFrameBuffer();
     resetInfo();
     // unset system property
@@ -126,7 +126,7 @@ int ExternalDisplay::teardown() {
     return 0;
 }
 
-ExternalDisplay::ExternalDisplay():mFd(-1),
+HDMIDisplay::HDMIDisplay():mFd(-1),
     mCurrentMode(-1), mModeCount(0), mPrimaryWidth(0), mPrimaryHeight(0),
     mUnderscanSupported(false)
 {
@@ -166,7 +166,7 @@ ExternalDisplay::ExternalDisplay():mFd(-1),
  * to the sysfs node, so that the driver can get that information
  * Used to show QCOM 8974 instead of Input 1 for example
  */
-void ExternalDisplay::setSPDInfo(const char* node, const char* property) {
+void HDMIDisplay::setSPDInfo(const char* node, const char* property) {
     char info[PROPERTY_VALUE_MAX];
     ssize_t err = -1;
     int spdFile = openDeviceNode(node, O_RDWR);
@@ -189,12 +189,12 @@ void ExternalDisplay::setSPDInfo(const char* node, const char* property) {
     }
 }
 
-void ExternalDisplay::setHPD(uint32_t value) {
+void HDMIDisplay::setHPD(uint32_t value) {
     ALOGD_IF(DEBUG,"HPD enabled=%d", value);
     writeHPDOption(value);
 }
 
-void ExternalDisplay::setActionSafeDimension(int w, int h) {
+void HDMIDisplay::setActionSafeDimension(int w, int h) {
     ALOGD_IF(DEBUG,"ActionSafe w=%d h=%d", w, h);
     char actionsafeWidth[PROPERTY_VALUE_MAX];
     char actionsafeHeight[PROPERTY_VALUE_MAX];
@@ -204,12 +204,12 @@ void ExternalDisplay::setActionSafeDimension(int w, int h) {
     property_set("persist.sys.actionsafe.height", actionsafeHeight);
 }
 
-int ExternalDisplay::getModeCount() const {
+int HDMIDisplay::getModeCount() const {
     ALOGD_IF(DEBUG,"HPD mModeCount=%d", mModeCount);
     return mModeCount;
 }
 
-void ExternalDisplay::readCEUnderscanInfo()
+void HDMIDisplay::readCEUnderscanInfo()
 {
     int hdmiScanInfoFile = -1;
     ssize_t len = -1;
@@ -258,8 +258,8 @@ void ExternalDisplay::readCEUnderscanInfo()
 
     if (ce_info_str) {
         // ce_info contains the underscan information
-        if (ce_info == EXT_SCAN_ALWAYS_UNDERSCANED ||
-            ce_info == EXT_SCAN_BOTH_SUPPORTED)
+        if (ce_info == HDMI_SCAN_ALWAYS_UNDERSCANED ||
+            ce_info == HDMI_SCAN_BOTH_SUPPORTED)
             // if TV supported underscan, then driver will always underscan
             // hence no need to apply action safe rectangle
             mUnderscanSupported = true;
@@ -273,7 +273,7 @@ void ExternalDisplay::readCEUnderscanInfo()
     return;
 }
 
-ExternalDisplay::~ExternalDisplay()
+HDMIDisplay::~HDMIDisplay()
 {
     delete [] supported_video_mode_lut;
     closeFrameBuffer();
@@ -309,7 +309,7 @@ void setDisplayTiming(struct fb_var_screeninfo &info,
     info.upper_margin = mode->back_porch_v;
 }
 
-int ExternalDisplay::parseResolution(char* edidStr)
+int HDMIDisplay::parseResolution(char* edidStr)
 {
     char delim = ',';
     int count = 0;
@@ -330,7 +330,7 @@ int ExternalDisplay::parseResolution(char* edidStr)
     return count;
 }
 
-bool ExternalDisplay::readResolution()
+bool HDMIDisplay::readResolution()
 {
     ssize_t len = -1;
     char edidStr[128] = {'\0'};
@@ -364,7 +364,7 @@ bool ExternalDisplay::readResolution()
     return (len > 0);
 }
 
-bool ExternalDisplay::openFrameBuffer()
+bool HDMIDisplay::openFrameBuffer()
 {
     if (mFd == -1) {
         char strDevPath[MAX_SYSFS_FILE_PATH];
@@ -376,7 +376,7 @@ bool ExternalDisplay::openFrameBuffer()
     return (mFd > 0);
 }
 
-bool ExternalDisplay::closeFrameBuffer()
+bool HDMIDisplay::closeFrameBuffer()
 {
     int ret = 0;
     if(mFd >= 0) {
@@ -387,7 +387,7 @@ bool ExternalDisplay::closeFrameBuffer()
 }
 
 // clears the vinfo, edid, best modes
-void ExternalDisplay::resetInfo()
+void HDMIDisplay::resetInfo()
 {
     memset(&mVInfo, 0, sizeof(mVInfo));
     memset(mEDIDModes, 0, sizeof(mEDIDModes));
@@ -403,7 +403,7 @@ void ExternalDisplay::resetInfo()
     property_set("hw.underscan_supported", prop);
 }
 
-int ExternalDisplay::getModeOrder(int mode)
+int HDMIDisplay::getModeOrder(int mode)
 {
     for (int dataIndex = 0; dataIndex < gEDIDCount; dataIndex++) {
         if (gEDIDData[dataIndex].mMode == mode) {
@@ -415,7 +415,7 @@ int ExternalDisplay::getModeOrder(int mode)
 }
 
 /// Returns the user mode set(if any) using adb shell
-int ExternalDisplay::getUserMode() {
+int HDMIDisplay::getUserMode() {
     /* Based on the property set the resolution */
     char property_value[PROPERTY_VALUE_MAX];
     property_get("hw.hdmi.resolution", property_value, "-1");
@@ -429,7 +429,7 @@ int ExternalDisplay::getUserMode() {
 }
 
 // Get the best mode for the current HD TV
-int ExternalDisplay::getBestMode() {
+int HDMIDisplay::getBestMode() {
     int bestOrder = 0;
     int bestMode = HDMI_VFRMT_640x480p60_4_3;
     // for all the edid read, get the best mode
@@ -444,7 +444,7 @@ int ExternalDisplay::getBestMode() {
     return bestMode;
 }
 
-inline bool ExternalDisplay::isValidMode(int ID)
+inline bool HDMIDisplay::isValidMode(int ID)
 {
     bool valid = false;
     for (int i = 0; i < mModeCount; i++) {
@@ -457,7 +457,7 @@ inline bool ExternalDisplay::isValidMode(int ID)
 }
 
 // returns true if the mode(ID) is interlaced mode format
-bool ExternalDisplay::isInterlacedMode(int ID) {
+bool HDMIDisplay::isInterlacedMode(int ID) {
     bool interlaced = false;
     switch(ID) {
         case HDMI_VFRMT_1440x480i60_4_3:
@@ -476,7 +476,7 @@ bool ExternalDisplay::isInterlacedMode(int ID) {
 
 // Does a put_vscreen info on the HDMI interface which will update
 // the configuration (resolution, timing info) to match mCurrentMode
-void ExternalDisplay::activateDisplay()
+void HDMIDisplay::activateDisplay()
 {
     int ret = 0;
     ret = ioctl(mFd, FBIOGET_VSCREENINFO, &mVInfo);
@@ -526,7 +526,7 @@ void ExternalDisplay::activateDisplay()
     }
 }
 
-bool ExternalDisplay::writeHPDOption(int userOption) const
+bool HDMIDisplay::writeHPDOption(int userOption) const
 {
     bool ret = true;
     if(mFbNum != -1) {
@@ -550,7 +550,7 @@ bool ExternalDisplay::writeHPDOption(int userOption) const
 }
 
 
-void ExternalDisplay::setAttributes() {
+void HDMIDisplay::setAttributes() {
     uint32_t fps = 0;
     // Always set dpyAttr res to mVInfo res
     getAttrForMode(mXres, mYres, fps);
@@ -619,7 +619,7 @@ void ExternalDisplay::setAttributes() {
     ALOGD_IF(DEBUG, "%s xres=%d, yres=%d", __FUNCTION__, mXres, mYres);
 }
 
-void ExternalDisplay::getAttrForMode(uint32_t& width, uint32_t& height,
+void HDMIDisplay::getAttrForMode(uint32_t& width, uint32_t& height,
         uint32_t& fps) {
     for (int dataIndex = 0; dataIndex < gEDIDCount; dataIndex++) {
         if (gEDIDData[dataIndex].mMode == mCurrentMode) {
@@ -633,7 +633,7 @@ void ExternalDisplay::getAttrForMode(uint32_t& width, uint32_t& height,
 }
 
 /* returns the fd related to the node specified*/
-int ExternalDisplay::openDeviceNode(const char* node, int fileMode) const {
+int HDMIDisplay::openDeviceNode(const char* node, int fileMode) const {
     char sysFsFilePath[MAX_SYSFS_FILE_PATH];
     memset(sysFsFilePath, 0, sizeof(sysFsFilePath));
     snprintf(sysFsFilePath , sizeof(sysFsFilePath),
@@ -649,12 +649,12 @@ int ExternalDisplay::openDeviceNode(const char* node, int fileMode) const {
     return fd;
 }
 
-bool ExternalDisplay::isHDMIPrimaryDisplay() {
+bool HDMIDisplay::isHDMIPrimaryDisplay() {
     int hdmiNode = qdutils::getHDMINode();
     return (hdmiNode == HWC_DISPLAY_PRIMARY);
 }
 
-int ExternalDisplay::getConnectedState() {
+int HDMIDisplay::getConnectedState() {
     int ret = -1;
     int mFbNum = qdutils::getHDMINode();
     int connectedNode = openDeviceNode("connected", O_RDONLY);
@@ -679,7 +679,7 @@ int ExternalDisplay::getConnectedState() {
     return ret;
 }
 
-void ExternalDisplay::setPrimaryAttributes(uint32_t primaryWidth,
+void HDMIDisplay::setPrimaryAttributes(uint32_t primaryWidth,
         uint32_t primaryHeight) {
     mPrimaryHeight = primaryHeight;
     mPrimaryWidth = primaryWidth;
