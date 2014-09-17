@@ -34,7 +34,7 @@
 #include "hwc_fbupdate.h"
 #include "hwc_mdpcomp.h"
 #include "hwc_dump_layers.h"
-#include "external.h"
+#include "hdmi.h"
 #include "hwc_copybit.h"
 #include "hwc_ad.h"
 #include "profiler.h"
@@ -418,7 +418,7 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
         if(mode == HWC_POWER_MODE_NORMAL && !ctx->mHPDEnabled) {
             // Enable HPD here, as during bootup POWER_MODE_NORMAL is set
             // when SF is completely initialized
-            ctx->mExtDisplay->setHPD(1);
+            ctx->mHDMIDisplay->setHPD(1);
             ctx->mHPDEnabled = true;
         }
 

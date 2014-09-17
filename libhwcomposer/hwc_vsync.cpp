@@ -29,7 +29,6 @@
 #include "hwc_utils.h"
 #include "qd_utils.h"
 #include "string.h"
-#include "external.h"
 #include "overlay.h"
 
 using namespace qdutils;

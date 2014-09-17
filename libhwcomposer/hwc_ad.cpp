@@ -34,7 +34,6 @@
 #include <mdp_version.h>
 #include "hwc_ad.h"
 #include "hwc_utils.h"
-#include "external.h"
 
 #define DEBUG 0
 using namespace overlay;

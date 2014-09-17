@@ -38,7 +38,7 @@
 #include "hwc_copybit.h"
 #include "hwc_dump_layers.h"
 #include "hwc_vpuclient.h"
-#include "external.h"
+#include "hdmi.h"
 #include "virtual.h"
 #include "hwc_qclient.h"
 #include "QService.h"
@@ -77,11 +77,11 @@ namespace qhwc {
 
 // external display class state
 void updateDisplayInfo(hwc_context_t* ctx, int dpy) {
-    ctx->dpyAttr[dpy].fd = ctx->mExtDisplay->getFd();
-    ctx->dpyAttr[dpy].xres = ctx->mExtDisplay->getWidth();
-    ctx->dpyAttr[dpy].yres = ctx->mExtDisplay->getHeight();
-    ctx->dpyAttr[dpy].mDownScaleMode = ctx->mExtDisplay->getMDPScalingMode();
-    ctx->dpyAttr[dpy].vsync_period = ctx->mExtDisplay->getVsyncPeriod();
+    ctx->dpyAttr[dpy].fd = ctx->mHDMIDisplay->getFd();
+    ctx->dpyAttr[dpy].xres = ctx->mHDMIDisplay->getWidth();
+    ctx->dpyAttr[dpy].yres = ctx->mHDMIDisplay->getHeight();
+    ctx->dpyAttr[dpy].mDownScaleMode = ctx->mHDMIDisplay->getMDPScalingMode();
+    ctx->dpyAttr[dpy].vsync_period = ctx->mHDMIDisplay->getVsyncPeriod();
     ctx->mViewFrame[dpy].left = 0;
     ctx->mViewFrame[dpy].top = 0;
     ctx->mViewFrame[dpy].right = ctx->dpyAttr[dpy].xres;
@@ -94,7 +94,7 @@ void updateDisplayInfo(hwc_context_t* ctx, int dpy) {
     }
 }
 
-// Reset external display attributes and list stats structures
+// Reset hdmi display attributes and list stats structures
 void resetDisplayInfo(hwc_context_t* ctx, int dpy) {
     memset(&(ctx->dpyAttr[dpy]), 0, sizeof(ctx->dpyAttr[dpy]));
     memset(&(ctx->listStats[dpy]), 0, sizeof(ctx->listStats[dpy]));
@@ -223,14 +223,14 @@ void initContext(hwc_context_t *ctx)
                                                          HWC_DISPLAY_PRIMARY);
     }
 
-    ctx->mExtDisplay = new ExternalDisplay();
+    ctx->mHDMIDisplay = new HDMIDisplay();
     ctx->mVirtualDisplay = new VirtualDisplay(ctx);
     ctx->mVirtualonExtActive = false;
     // Send the primary resolution to the external display class
     // to be used for MDP scaling functionality
     uint32_t priW = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
     uint32_t priH = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
-    ctx->mExtDisplay->setPrimaryAttributes(priW, priH);
+    ctx->mHDMIDisplay->setPrimaryAttributes(priW, priH);
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = false;
     ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = false;
@@ -336,9 +336,9 @@ void closeContext(hwc_context_t *ctx)
         ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd = -1;
     }
 
-    if(ctx->mExtDisplay) {
-        delete ctx->mExtDisplay;
-        ctx->mExtDisplay = NULL;
+    if(ctx->mHDMIDisplay) {
+        delete ctx->mHDMIDisplay;
+        ctx->mHDMIDisplay = NULL;
     }
 
 #ifdef VPU_TARGET
@@ -410,7 +410,7 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
     if(ctx->dpyAttr[dpy].mDownScaleMode) {
         // if MDP scaling mode is enabled for external, need to query
         // the actual width and height, as that is the physical w & h
-         ctx->mExtDisplay->getAttributes(fbWidth, fbHeight);
+         ctx->mHDMIDisplay->getAttributes(fbWidth, fbHeight);
     }
 
 
@@ -544,7 +544,7 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
     if(ctx->dpyAttr[dpy].mDownScaleMode) {
         uint32_t extW = 0, extH = 0;
         if(dpy == HWC_DISPLAY_EXTERNAL)
-            ctx->mExtDisplay->getAttributes(extW, extH);
+            ctx->mHDMIDisplay->getAttributes(extW, extH);
         else
             ctx->mVirtualDisplay->getAttributes(extW, extH);
         fbWidth  = ctx->dpyAttr[dpy].xres;
@@ -625,7 +625,7 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
                 float fbHeight = ctx->dpyAttr[dpy].yres;
                 // query MDP configured attributes
                 if(dpy == HWC_DISPLAY_EXTERNAL)
-                    ctx->mExtDisplay->getAttributes(extW, extH);
+                    ctx->mHDMIDisplay->getAttributes(extW, extH);
                 else
                     ctx->mVirtualDisplay->getAttributes(extW, extH);
                 //Calculate the ratio...
@@ -975,7 +975,7 @@ bool isActionSafePresent(hwc_context_t *ctx, int dpy) {
     // Disable Actionsafe for non HDMI displays.
     if(!(dpy == HWC_DISPLAY_EXTERNAL) ||
         qdutils::MDPVersion::getInstance().is8x74v2() ||
-        ctx->mExtDisplay->isCEUnderscanSupported()) {
+        ctx->mHDMIDisplay->isCEUnderscanSupported()) {
         return false;
     }
 
