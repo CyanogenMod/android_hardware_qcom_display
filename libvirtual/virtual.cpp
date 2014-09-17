@@ -68,7 +68,7 @@ int VirtualDisplay::configure() {
     return 0;
 }
 
-void VirtualDisplay::getAttributes(int& width, int& height) {
+void VirtualDisplay::getAttributes(uint32_t& width, uint32_t& height) {
     width = mVInfo.xres;
     height = mVInfo.yres;
 }

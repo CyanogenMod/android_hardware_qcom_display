@@ -50,9 +50,7 @@ HWCVirtualBase* HWCVirtualBase::getObject(bool isVDSEnabled) {
 
 void HWCVirtualVDS::init(hwc_context_t *ctx) {
     const int dpy = HWC_DISPLAY_VIRTUAL;
-    ctx->mFBUpdate[dpy] =
-            IFBUpdate::getObject(ctx, dpy);
-    ctx->mMDPComp[dpy] =  MDPComp::getObject(ctx, dpy);
+    initCompositionResources(ctx, dpy);
 
     if(ctx->mFBUpdate[dpy])
         ctx->mFBUpdate[dpy]->reset();
@@ -69,14 +67,8 @@ void HWCVirtualVDS::destroy(hwc_context_t *ctx, size_t /*numDisplays*/,
         ctx->dpyAttr[dpy].connected = false;
         ctx->dpyAttr[dpy].isPause = false;
 
-        if(ctx->mFBUpdate[dpy]) {
-            delete ctx->mFBUpdate[dpy];
-            ctx->mFBUpdate[dpy] = NULL;
-        }
-        if(ctx->mMDPComp[dpy]) {
-            delete ctx->mMDPComp[dpy];
-            ctx->mMDPComp[dpy] = NULL;
-        }
+        destroyCompositionResources(ctx, dpy);
+
         // signal synclock to indicate successful wfd teardown
         ctx->mWfdSyncLock.lock();
         ctx->mWfdSyncLock.signal();
