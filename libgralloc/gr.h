@@ -58,6 +58,10 @@ int decideBufferHandlingMechanism(int format, const char *compositionUsed,
 int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage);
 void free_buffer(private_handle_t *hnd);
 
+// Use uncached for all scenarios except when the CPU needs to read or write
+// often
+bool useUncached(const int& usage);
+
 /*****************************************************************************/
 
 class Locker {

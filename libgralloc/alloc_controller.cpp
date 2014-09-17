@@ -73,16 +73,6 @@ static bool canFallback(int usage, bool triedSystem)
     return true;
 }
 
-static bool useUncached(int usage)
-{
-    if (usage & GRALLOC_USAGE_PRIVATE_UNCACHED)
-        return true;
-    if(((usage & GRALLOC_USAGE_SW_WRITE_MASK) == GRALLOC_USAGE_SW_WRITE_RARELY)
-       ||((usage & GRALLOC_USAGE_SW_READ_MASK) == GRALLOC_USAGE_SW_READ_RARELY))
-        return true;
-    return false;
-}
-
 //-------------- AdrenoMemInfo-----------------------//
 AdrenoMemInfo::AdrenoMemInfo()
 {
@@ -426,4 +416,15 @@ void free_buffer(private_handle_t *hnd)
     if(hnd)
         delete hnd;
 
+}
+
+bool useUncached(const int& usage) {
+    if(usage & GRALLOC_USAGE_PRIVATE_UNCACHED)
+        return true;
+
+    if(not (usage & (GRALLOC_USAGE_SW_WRITE_OFTEN |
+            GRALLOC_USAGE_SW_READ_OFTEN)))
+        return true;
+
+    return false;
 }
