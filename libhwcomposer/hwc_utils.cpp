@@ -75,6 +75,52 @@ EGLAPI EGLBoolean eglGpuPerfHintQCOM(EGLDisplay dpy, EGLContext ctx,
 
 namespace qhwc {
 
+// external display class state
+void updateDisplayInfo(hwc_context_t* ctx, int dpy) {
+    ctx->dpyAttr[dpy].fd = ctx->mExtDisplay->getFd();
+    ctx->dpyAttr[dpy].xres = ctx->mExtDisplay->getWidth();
+    ctx->dpyAttr[dpy].yres = ctx->mExtDisplay->getHeight();
+    ctx->dpyAttr[dpy].mDownScaleMode = ctx->mExtDisplay->getMDPScalingMode();
+    ctx->dpyAttr[dpy].vsync_period = ctx->mExtDisplay->getVsyncPeriod();
+    ctx->mViewFrame[dpy].left = 0;
+    ctx->mViewFrame[dpy].top = 0;
+    ctx->mViewFrame[dpy].right = ctx->dpyAttr[dpy].xres;
+    ctx->mViewFrame[dpy].bottom = ctx->dpyAttr[dpy].yres;
+    //FIXME: for now assume HDMI as secure
+    //Will need to read the HDCP status from the driver
+    //and update this accordingly
+    if (dpy == HWC_DISPLAY_EXTERNAL) {
+        ctx->dpyAttr[dpy].secure = true;
+    }
+}
+
+// Reset external display attributes and list stats structures
+void resetDisplayInfo(hwc_context_t* ctx, int dpy) {
+    memset(&(ctx->dpyAttr[dpy]), 0, sizeof(ctx->dpyAttr[dpy]));
+    memset(&(ctx->listStats[dpy]), 0, sizeof(ctx->listStats[dpy]));
+    // We reset the fd to -1 here but External display class is responsible
+    // for it when the display is disconnected. This is handled as part of
+    // EXTERNAL_OFFLINE event.
+    ctx->dpyAttr[dpy].fd = -1;
+}
+
+// Initialize composition resources
+void initCompositionResources(hwc_context_t* ctx, int dpy) {
+    ctx->mFBUpdate[dpy] = IFBUpdate::getObject(ctx, dpy);
+    ctx->mMDPComp[dpy] = MDPComp::getObject(ctx, dpy);
+}
+
+void destroyCompositionResources(hwc_context_t* ctx, int dpy) {
+    if(ctx->mFBUpdate[dpy]) {
+        delete ctx->mFBUpdate[dpy];
+        ctx->mFBUpdate[dpy] = NULL;
+    }
+    if(ctx->mMDPComp[dpy]) {
+        delete ctx->mMDPComp[dpy];
+        ctx->mMDPComp[dpy] = NULL;
+    }
+}
+
 static int openFramebufferDevice(hwc_context_t *ctx)
 {
     struct fb_fix_screeninfo finfo;
@@ -160,11 +206,8 @@ void initContext(hwc_context_t *ctx)
     ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->mRotMgr = RotMgr::getInstance();
 
-    //Is created and destroyed only once for primary
-    //For external it could get created and destroyed multiple times depending
-    //on what external we connect to.
-    ctx->mFBUpdate[HWC_DISPLAY_PRIMARY] =
-        IFBUpdate::getObject(ctx, HWC_DISPLAY_PRIMARY);
+    // Initialize composition objects for the primary display
+    initCompositionResources(ctx, HWC_DISPLAY_PRIMARY);
 
     // Check if the target supports copybit compostion (dyn/mdp) to
     // decide if we need to open the copybit module.
@@ -180,9 +223,14 @@ void initContext(hwc_context_t *ctx)
                                                          HWC_DISPLAY_PRIMARY);
     }
 
-    ctx->mExtDisplay = new ExternalDisplay(ctx);
+    ctx->mExtDisplay = new ExternalDisplay();
     ctx->mVirtualDisplay = new VirtualDisplay(ctx);
     ctx->mVirtualonExtActive = false;
+    // Send the primary resolution to the external display class
+    // to be used for MDP scaling functionality
+    uint32_t priW = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
+    uint32_t priH = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
+    ctx->mExtDisplay->setPrimaryAttributes(priW, priH);
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = false;
     ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = false;
@@ -191,8 +239,6 @@ void initContext(hwc_context_t *ctx)
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode = false;
     ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = false;
 
-    ctx->mMDPComp[HWC_DISPLAY_PRIMARY] =
-         MDPComp::getObject(ctx, HWC_DISPLAY_PRIMARY);
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
 
     ctx->mVDSEnabled = false;
@@ -302,14 +348,8 @@ void closeContext(hwc_context_t *ctx)
 #endif
 
     for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
-        if(ctx->mFBUpdate[i]) {
-            delete ctx->mFBUpdate[i];
-            ctx->mFBUpdate[i] = NULL;
-        }
-        if(ctx->mMDPComp[i]) {
-            delete ctx->mMDPComp[i];
-            ctx->mMDPComp[i] = NULL;
-        }
+        destroyCompositionResources(ctx, i);
+
         if(ctx->mHwcDebug[i]) {
             delete ctx->mHwcDebug[i];
             ctx->mHwcDebug[i] = NULL;
@@ -365,10 +405,10 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
     float xRatio = 1.0;
     float yRatio = 1.0;
 
-    int fbWidth = ctx->dpyAttr[dpy].xres;
-    int fbHeight = ctx->dpyAttr[dpy].yres;
+    uint32_t fbWidth = ctx->dpyAttr[dpy].xres;
+    uint32_t fbHeight = ctx->dpyAttr[dpy].yres;
     if(ctx->dpyAttr[dpy].mDownScaleMode) {
-        // if downscale Mode is enabled for external, need to query
+        // if MDP scaling mode is enabled for external, need to query
         // the actual width and height, as that is the physical w & h
          ctx->mExtDisplay->getAttributes(fbWidth, fbHeight);
     }
@@ -502,7 +542,7 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
                  outPos.w, outPos.h);
     }
     if(ctx->dpyAttr[dpy].mDownScaleMode) {
-        int extW, extH;
+        uint32_t extW = 0, extH = 0;
         if(dpy == HWC_DISPLAY_EXTERNAL)
             ctx->mExtDisplay->getAttributes(extW, extH);
         else
@@ -578,8 +618,8 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
                 }
             }
             if(ctx->dpyAttr[dpy].mDownScaleMode) {
-                int extW, extH;
-                // if downscale is enabled, map the co-ordinates to new
+                uint32_t extW = 0, extH = 0;
+                // if MDP scaling mode is enabled, map the co-ordinates to new
                 // domain(downscaled)
                 float fbWidth  = ctx->dpyAttr[dpy].xres;
                 float fbHeight = ctx->dpyAttr[dpy].yres;
