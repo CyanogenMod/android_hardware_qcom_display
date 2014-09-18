@@ -301,8 +301,7 @@ static int hwc_prepare_virtual(hwc_composer_device_1 *dev,
 
     if (LIKELY(list && list->numHwLayers > 1) &&
             ctx->dpyAttr[dpy].isActive &&
-            ctx->dpyAttr[dpy].connected &&
-            canUseMDPforVirtualDisplay(ctx,list)) {
+            ctx->dpyAttr[dpy].connected) {
         reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
         if(!ctx->dpyAttr[dpy].isPause) {
             ctx->dpyAttr[dpy].isConfiguring = false;
@@ -684,8 +683,7 @@ static int hwc_set_virtual(hwc_context_t *ctx,
 
     if (LIKELY(list) && ctx->dpyAttr[dpy].isActive &&
             ctx->dpyAttr[dpy].connected &&
-            (!ctx->dpyAttr[dpy].isPause) &&
-            canUseMDPforVirtualDisplay(ctx,list)) {
+            (!ctx->dpyAttr[dpy].isPause)) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         int fd = -1; //FenceFD from the Copybit(valid in async mode)
