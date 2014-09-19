@@ -138,7 +138,8 @@ static void setDMAState(hwc_context_t *ctx, int numDisplays,
                     if (canUseRotator(ctx, dpy) &&
                         (has90Transform(layer) || getRotDownscale(ctx, layer))
                         && isRotationDoable(ctx, hnd)) {
-                        if(not ctx->mOverlay->isDMAMultiplexingSupported()) {
+                        if(not (ctx->mOverlay->isDMAMultiplexingSupported() &&
+                                          dpy)) {
                             if(ctx->mOverlay->isPipeTypeAttached(
                                              overlay::utils::OV_MDP_PIPE_DMA))
                                 ctx->isPaddingRound = true;
