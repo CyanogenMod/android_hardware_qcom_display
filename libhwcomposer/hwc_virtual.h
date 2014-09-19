@@ -45,12 +45,21 @@ public:
                        hwc_display_contents_1_t** displays);
     void pause(hwc_context_t* ctx, int dpy);
     void resume(hwc_context_t* ctx, int dpy);
+    int getScalingHeight() const { return mScalingHeight; };
+    int getScalingWidth() const { return mScalingWidth; };
     // We can dump the frame buffer and WB
     // output buffer by dynamically enabling
     // dumping via a binder call:
     // adb shell service call display.qservice 15 i32 3 i32 1
     static bool sVDDumpEnabled;
     static void dynamicDebug(bool enable) {sVDDumpEnabled = enable;};
+
+private:
+    // These variables store the resolution that WB is being configured to
+    // in the current draw cycle.
+    int mScalingWidth, mScalingHeight;
+    void setMDPScalingMode(hwc_context_t* ctx,
+            private_handle_t* ohnd, int dpy);
 };
 
 }; //namespace

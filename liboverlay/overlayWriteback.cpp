@@ -263,9 +263,12 @@ void Writeback::clear() {
 bool Writeback::getDump(char *buf, size_t len) {
     if(sWb) {
         utils::getDump(buf, len, "WBData", sWb->mFbData);
-        char str[4] = {'\0'};
-        snprintf(str, 4, "\n");
-        strlcat(buf, str, len);
+        char outputBufferInfo[256];
+        snprintf(outputBufferInfo, sizeof(outputBufferInfo),
+                "OutputBuffer xres=%d yres=%d format=%s\n\n",
+                sWb->getWidth(), sWb->getHeight(),
+                utils::getFormatString(sWb->getOutputFormat()));
+        strlcat(buf, outputBufferInfo, len);
         return true;
     }
     return false;

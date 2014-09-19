@@ -182,11 +182,11 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
         // Do not use getNonWormholeRegion() function to calculate the
         // sourceCrop during animation on external display and
         // Dont do wormhole calculation when extorientation is set on External
-        // Dont do wormhole calculation when extDownscale is enabled on External
+        // Dont do wormhole calculation when scaling mode is set on External
         if(ctx->listStats[mDpy].isDisplayAnimating && mDpy) {
             sourceCrop = layer->displayFrame;
         } else if((mDpy && !extOrient
-                  && !ctx->dpyAttr[mDpy].mDownScaleMode)) {
+                  && !ctx->dpyAttr[mDpy].mMDPScalingMode)) {
             if(ctx->mOverlay->isUIScalingOnExternalSupported() &&
                 !ctx->dpyAttr[mDpy].customFBSize) {
                 getNonWormholeRegion(list, sourceCrop);
@@ -307,11 +307,11 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
         // Do not use getNonWormholeRegion() function to calculate the
         // sourceCrop during animation on external display and
         // Dont do wormhole calculation when extorientation is set on External
-        // Dont do wormhole calculation when extDownscale is enabled on External
+        // Dont do wormhole calculation when scaling mode is set on External
         if(ctx->listStats[mDpy].isDisplayAnimating && mDpy) {
             sourceCrop = layer->displayFrame;
         } else if((mDpy && !extOrient
-                  && !ctx->dpyAttr[mDpy].mDownScaleMode)) {
+                  && !ctx->dpyAttr[mDpy].mMDPScalingMode)) {
             if(!qdutils::MDPVersion::getInstance().is8x26() &&
                 !ctx->dpyAttr[mDpy].customFBSize) {
                 getNonWormholeRegion(list, sourceCrop);
@@ -473,11 +473,11 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     // Do not use getNonWormholeRegion() function to calculate the
     // sourceCrop during animation on external display and
     // Dont do wormhole calculation when extorientation is set on External
-    // Dont do wormhole calculation when extDownscale is enabled on External
+    // Dont do wormhole calculation when scaling mode is set on External
     if(ctx->listStats[mDpy].isDisplayAnimating && mDpy) {
         sourceCrop = layer->displayFrame;
     } else if((mDpy && !extOrient
-              && !ctx->dpyAttr[mDpy].mDownScaleMode)) {
+              && !ctx->dpyAttr[mDpy].mMDPScalingMode)) {
         if(!qdutils::MDPVersion::getInstance().is8x26() &&
             !ctx->dpyAttr[mDpy].customFBSize) {
             getNonWormholeRegion(list, sourceCrop);
