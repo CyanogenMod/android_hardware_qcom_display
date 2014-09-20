@@ -83,7 +83,10 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
             break;
         case UPDATE_BUFFER_GEOMETRY:
             memcpy((void *)&data->bufferDim, param, sizeof(BufferDim_t));
-        break;
+            break;
+        case UPDATE_REFRESH_RATE:
+            data->refreshrate = *((uint32_t *)param);
+            break;
         case UPDATE_COLOR_SPACE:
             data->colorSpace = *((ColorSpace_t *)param);
             break;

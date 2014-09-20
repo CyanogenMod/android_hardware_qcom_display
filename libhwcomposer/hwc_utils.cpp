@@ -75,6 +75,9 @@ EGLAPI EGLBoolean eglGpuPerfHintQCOM(EGLDisplay dpy, EGLContext ctx,
 
 namespace qhwc {
 
+//Std refresh rates for digital videos- 24p, 30p and 48p
+uint32_t stdRefreshRates[] = { 30, 24, 48 };
+
 bool isValidResolution(hwc_context_t *ctx, uint32_t xres, uint32_t yres)
 {
     return !((xres > qdutils::MDPVersion::getInstance().getMaxMixerWidth() &&
@@ -170,6 +173,8 @@ static int openFramebufferDevice(hwc_context_t *ctx)
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres = info.yres;
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xdpi = xdpi;
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].ydpi = ydpi;
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].refreshRate = (uint32_t)fps;
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].dynRefreshRate = (uint32_t)fps;
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period =
             (uint32_t)(1000000000l / fps);
 
@@ -362,6 +367,50 @@ void closeContext(hwc_context_t *ctx)
 
 }
 
+//Helper to roundoff the refreshrates
+static uint32_t roundOff(uint32_t refreshRate) {
+    int count =  (int) (sizeof(stdRefreshRates)/sizeof(stdRefreshRates[0]));
+    uint32_t rate = refreshRate;
+    for(int i=0; i< count; i++) {
+        if(abs(stdRefreshRates[i] - refreshRate) < 2) {
+            // Most likely used for video, the fps can fluctuate
+            // Ex: b/w 29 and 30 for 30 fps clip
+            rate = stdRefreshRates[i];
+            break;
+        }
+    }
+    return rate;
+}
+
+//Helper func to set the dyn fps
+void setRefreshRate(hwc_context_t* ctx, int dpy, uint32_t refreshRate) {
+    //Update only if different
+    if(!ctx || refreshRate == ctx->dpyAttr[dpy].dynRefreshRate)
+        return;
+    const int fbNum = Overlay::getFbForDpy(dpy);
+    char sysfsPath[qdutils::MAX_SYSFS_FILE_PATH];
+    snprintf (sysfsPath, sizeof(sysfsPath),
+            "/sys/class/graphics/fb%d/dynamic_fps", fbNum);
+
+    int fd = open(sysfsPath, O_WRONLY);
+    if(fd >= 0) {
+        char str[64];
+        snprintf(str, sizeof(str), "%d", refreshRate);
+        ssize_t ret = write(fd, str, strlen(str));
+        if(ret < 0) {
+            ALOGE("%s: Failed to write %d with error %s",
+                    __FUNCTION__, refreshRate, strerror(errno));
+        } else {
+            ctx->dpyAttr[dpy].dynRefreshRate = refreshRate;
+            ALOGD_IF(HWC_UTILS_DEBUG, "%s: Wrote %d to dynamic_fps",
+                     __FUNCTION__, refreshRate);
+        }
+        close(fd);
+    } else {
+        ALOGE("%s: Failed to open %s with error %s", __FUNCTION__, sysfsPath,
+              strerror(errno));
+    }
+}
 
 void dumpsys_log(android::String8& buf, const char* fmt, ...)
 {
@@ -845,6 +894,9 @@ void setListStats(hwc_context_t *ctx,
     ctx->dpyAttr[dpy].mActionSafePresent = isActionSafePresent(ctx, dpy);
     ctx->listStats[dpy].renderBufIndexforABC = -1;
     ctx->listStats[dpy].secureRGBCount = 0;
+    ctx->listStats[dpy].refreshRateRequest = ctx->dpyAttr[dpy].refreshRate;
+    uint32_t refreshRate = 0;
+    qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
 
     resetROI(ctx, dpy);
 
@@ -898,6 +950,27 @@ void setListStats(hwc_context_t *ctx,
         if(layer->blending == HWC_BLENDING_PREMULT)
             ctx->listStats[dpy].preMultipliedAlpha = true;
 
+#ifdef DYNAMIC_FPS
+        if (dpy == HWC_DISPLAY_PRIMARY && mdpHw.isDynFpsSupported()) {
+            //dyn fps: get refreshrate from metadata
+            //Support multiple refresh rates if they are same
+            //else set to  default
+            MetaData_t *mdata = hnd ? (MetaData_t *)hnd->base_metadata : NULL;
+            if (mdata && (mdata->operation & UPDATE_REFRESH_RATE)) {
+                // Valid refreshRate in metadata and within the range
+                uint32_t rate = roundOff(mdata->refreshrate);
+                if((rate >= mdpHw.getMinFpsSupported() &&
+                                rate <= mdpHw.getMaxFpsSupported())) {
+                    if (!refreshRate) {
+                        refreshRate = rate;
+                    } else if(refreshRate != rate) {
+                        // multiple refreshrate requests, set to default
+                        refreshRate = ctx->dpyAttr[dpy].refreshRate;
+                    }
+                }
+            }
+        }
+#endif
     }
     if(ctx->listStats[dpy].yuvCount > 0) {
         if (property_get("hw.cabl.yuv", property, NULL) > 0) {
@@ -921,6 +994,9 @@ void setListStats(hwc_context_t *ctx,
 
     if(dpy == HWC_DISPLAY_PRIMARY) {
         ctx->mAD->markDoable(ctx, list);
+        //Store the requested fresh rate
+        ctx->listStats[dpy].refreshRateRequest = refreshRate ?
+                                refreshRate : ctx->dpyAttr[dpy].refreshRate;
     }
 }
 

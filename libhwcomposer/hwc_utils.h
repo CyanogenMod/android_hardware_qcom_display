@@ -80,6 +80,8 @@ struct MDPInfo {
 };
 
 struct DisplayAttributes {
+    uint32_t refreshRate;
+    uint32_t dynRefreshRate;
     uint32_t vsync_period; //nanos
     uint32_t xres;
     uint32_t yres;
@@ -137,6 +139,8 @@ struct ListStats {
     // Secure RGB specific
     int secureRGBCount;
     int secureRGBIndices[MAX_NUM_APP_LAYERS];
+    //dyn refresh rate-Client requested refreshrate
+    uint32_t refreshRateRequest;
 };
 
 //PTOR Comp info
@@ -304,6 +308,8 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& dst);
 
 void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
                                 hwc_rect_t& inRect, hwc_rect_t& outRect);
+
+void setRefreshRate(hwc_context_t *ctx, int dpy, uint32_t refreshRate);
 
 bool isPrimaryPortrait(hwc_context_t *ctx);
 

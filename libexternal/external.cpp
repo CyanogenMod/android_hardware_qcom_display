@@ -652,6 +652,8 @@ void ExternalDisplay::setAttributes() {
             (int)mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres;
         mHwcContext->mViewFrame[HWC_DISPLAY_EXTERNAL].bottom =
             (int)mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres;
+        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].refreshRate = fps;
+        mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].dynRefreshRate = fps;
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].vsync_period =
                 (int) 1000000000l / fps;
     }

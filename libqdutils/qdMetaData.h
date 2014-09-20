@@ -77,6 +77,7 @@ struct MetaData_t {
     struct IGCData_t igcData;
     struct Sharp2Data_t Sharp2Data;
     int64_t timestamp;
+    uint32_t refreshrate;
     enum ColorSpace_t colorSpace;
 };
 
@@ -89,6 +90,7 @@ enum DispParamType {
     PP_PARAM_SHARP2     = 0x0020,
     PP_PARAM_TIMESTAMP  = 0x0040,
     UPDATE_BUFFER_GEOMETRY = 0x0080,
+    UPDATE_REFRESH_RATE = 0x0100,
     UPDATE_COLOR_SPACE = 0x0200,
 };
 
