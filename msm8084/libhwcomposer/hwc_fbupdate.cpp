@@ -475,10 +475,12 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
 
     bool primarySplitAlways = (mDpy == HWC_DISPLAY_PRIMARY) and
             qdutils::MDPVersion::getInstance().isSrcSplitAlways();
+    int lSplit = getLeftSplit(ctx, mDpy);
 
     if(((fbUpdatingRect.right - fbUpdatingRect.left) >
             qdutils::MAX_DISPLAY_DIM) or
-            primarySplitAlways) {
+            ((fbUpdatingRect.right - fbUpdatingRect.left) > lSplit and
+                primarySplitAlways)) {
         destR = ov.getPipe(pipeSpecs);
         if(destR == ovutils::OV_INVALID) {
             ALOGE("%s: No pipes available to configure fb for dpy %d's right"
