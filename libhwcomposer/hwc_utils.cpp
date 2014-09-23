@@ -259,12 +259,39 @@ static void changeDefaultAppBufferCount() {
 
 void initContext(hwc_context_t *ctx)
 {
-    openFramebufferDevice(ctx);
+    overlay::Overlay::initOverlay();
+    ctx->mHDMIDisplay = new HDMIDisplay();
+    uint32_t priW = 0, priH = 0;
+    // 1. HDMI as Primary
+    //    -If HDMI cable is connected, read display configs from edid data
+    //    -If HDMI cable is not connected then use default data in vscreeninfo
+    // 2. HDMI as External
+    //    -Initialize HDMI class for use with external display
+    //    -Use vscreeninfo to populate display configs
+    if(ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+        int connected = ctx->mHDMIDisplay->getConnectedState();
+        if(connected == 1) {
+            ctx->mHDMIDisplay->configure();
+            updateDisplayInfo(ctx, HWC_DISPLAY_PRIMARY);
+            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
+        } else {
+            openFramebufferDevice(ctx);
+            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = false;
+        }
+    } else {
+        openFramebufferDevice(ctx);
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
+        // Send the primary resolution to the hdmi display class
+        // to be used for MDP scaling functionality
+        priW = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
+        priH = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
+        ctx->mHDMIDisplay->setPrimaryAttributes(priW, priH);
+    }
+
     char value[PROPERTY_VALUE_MAX];
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
-    overlay::Overlay::initOverlay();
     ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->mRotMgr = RotMgr::getInstance();
 
@@ -291,12 +318,6 @@ void initContext(hwc_context_t *ctx)
                                                          HWC_DISPLAY_PRIMARY);
     }
 
-    ctx->mHDMIDisplay = new HDMIDisplay();
-    // Send the primary resolution to the hdmi display class
-    // to be used for MDP scaling functionality
-    uint32_t priW = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
-    uint32_t priH = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
-    ctx->mHDMIDisplay->setPrimaryAttributes(priW, priH);
     ctx->mHWCVirtual = new HWCVirtualVDS();
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected = false;
@@ -306,7 +327,6 @@ void initContext(hwc_context_t *ctx)
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].mMDPScalingMode = false;
     ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].mMDPScalingMode = false;
 
-    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
     //Initialize the primary display viewFrame info
     ctx->mViewFrame[HWC_DISPLAY_PRIMARY].left = 0;
     ctx->mViewFrame[HWC_DISPLAY_PRIMARY].top = 0;
@@ -2528,6 +2548,56 @@ void handle_resume(hwc_context_t* ctx, int dpy) {
         ctx->mHWCVirtual->resume(ctx, dpy);
     }
     return;
+}
+
+void clearPipeResources(hwc_context_t* ctx, int dpy) {
+    if(ctx->mOverlay) {
+        ctx->mOverlay->configBegin();
+        ctx->mOverlay->configDone();
+    }
+    if(ctx->mRotMgr) {
+        ctx->mRotMgr->clear();
+    }
+    // Call a display commit to ensure that pipes and associated
+    // fd's are cleaned up.
+    if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+        ALOGE("%s: display commit failed for  %d", __FUNCTION__, dpy);
+    }
+}
+
+// Handles online events when HDMI is the primary display. In particular,
+// online events for hdmi connected before AND after boot up and HWC init.
+void handle_online(hwc_context_t* ctx, int dpy) {
+    // Close the current fd if it was opened earlier on when HWC
+    // was initialized.
+    if (ctx->dpyAttr[dpy].fd >= 0) {
+        close(ctx->dpyAttr[dpy].fd);
+        ctx->dpyAttr[dpy].fd = -1;
+    }
+    // TODO: If HDMI is connected after the display has booted up,
+    // and the best configuration is different from the default
+    // then we need to deal with this appropriately.
+    ctx->mHDMIDisplay->configure();
+    updateDisplayInfo(ctx, dpy);
+    initCompositionResources(ctx, dpy);
+    ctx->dpyAttr[dpy].connected = true;
+}
+
+// Handles offline events for HDMI. This can be used for offline events
+// initiated by the HDMI driver and the CEC framework.
+void handle_offline(hwc_context_t* ctx, int dpy) {
+    destroyCompositionResources(ctx, dpy);
+    // Clear all pipe resources and call a display commit to ensure
+    // that all the fd's are closed. This will ensure that the HDMI
+    // core turns off and that we receive an event the next time the
+    // cable is connected.
+    if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+        clearPipeResources(ctx, dpy);
+    }
+    ctx->mHDMIDisplay->teardown();
+    resetDisplayInfo(ctx, dpy);
+    ctx->dpyAttr[dpy].connected = false;
+    ctx->dpyAttr[dpy].isActive = false;
 }
 
 };//namespace qhwc
