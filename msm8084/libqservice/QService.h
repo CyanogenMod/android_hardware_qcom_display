@@ -46,13 +46,17 @@ class QService : public BnQService {
 public:
     virtual ~QService();
     virtual void connect(const android::sp<qClient::IQClient>& client);
+    virtual void connect(const android::sp<qClient::IQHDMIClient>& client);
     virtual android::status_t dispatch(uint32_t command,
             const android::Parcel* data,
             android::Parcel* reply);
+    void onHdmiHotplug(int connected);
+    void onCECMessageReceived(char *msg, ssize_t len);
     static void init();
 private:
     QService();
     android::sp<qClient::IQClient> mClient;
+    android::sp<qClient::IQHDMIClient> mHDMIClient;
     static QService *sQService;
 };
 }; // namespace qService
