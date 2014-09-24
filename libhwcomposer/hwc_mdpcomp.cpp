@@ -162,9 +162,17 @@ bool MDPComp::init(hwc_context_t *ctx) {
         sEnableYUVsplit = true;
     }
 
-    if ((property_get("persist.hwc.ptor.enable", property, NULL) > 0) &&
-            ((!strncasecmp(property, "true", PROPERTY_VALUE_MAX )) ||
-             (!strncmp(property, "1", PROPERTY_VALUE_MAX )))) {
+    bool defaultPTOR = false;
+    //Enable PTOR when "persist.hwc.ptor.enable" is not defined for
+    //8x16 and 8x39 targets by default
+    if((property_get("persist.hwc.ptor.enable", property, NULL) <= 0) &&
+            (qdutils::MDPVersion::getInstance().is8x16() ||
+                qdutils::MDPVersion::getInstance().is8x39())) {
+        defaultPTOR = true;
+    }
+
+    if (defaultPTOR || (!strncasecmp(property, "true", PROPERTY_VALUE_MAX)) ||
+                (!strncmp(property, "1", PROPERTY_VALUE_MAX ))) {
         ctx->mCopyBit[HWC_DISPLAY_PRIMARY] = new CopyBit(ctx,
                                                     HWC_DISPLAY_PRIMARY);
     }
