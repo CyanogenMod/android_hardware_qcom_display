@@ -28,6 +28,7 @@
  */
 
 #define DEBUG 0
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <stdlib.h>
@@ -41,7 +42,6 @@
 using gralloc::IonAlloc;
 
 #define ION_DEVICE "/dev/ion"
-#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 
 int IonAlloc::open_device()
 {

@@ -372,7 +372,7 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
                 /* On targets that doesnt support Decimation (eg.,8x26)
                  * maximum downscale support is overlay pipe downscale.
                  */
-                if(crop_w > mdpHw.getMaxMixerWidth() ||
+                if(crop_w > (int) mdpHw.getMaxMixerWidth() ||
                         w_dscale > maxMDPDownscale ||
                         h_dscale > maxMDPDownscale)
                     return false;
@@ -383,7 +383,7 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
                      *      1. Src crop > Mixer limit on nonsplit MDPComp
                      *      2. exceeds maximum downscale limit
                      */
-                    if(((crop_w > mdpHw.getMaxMixerWidth()) &&
+                    if(((crop_w > (int) mdpHw.getMaxMixerWidth()) &&
                                 !sSrcSplitEnabled) ||
                             w_dscale > maxMDPDownscale ||
                             h_dscale > maxMDPDownscale) {
@@ -712,7 +712,7 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
 
     MDPVersion& mdpHw = MDPVersion::getInstance();
     if(mDpy > HWC_DISPLAY_PRIMARY &&
-            (priDispW >  mdpHw.getMaxMixerWidth()) &&
+            (priDispW >  (int) mdpHw.getMaxMixerWidth()) &&
             (ctx->dpyAttr[mDpy].xres <  mdpHw.getMaxMixerWidth())) {
         // Disable MDP comp on Secondary when the primary is highres panel and
         // the secondary is a normal 1080p, because, MDP comp on secondary under
@@ -2475,8 +2475,8 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
     //pipe line length, we are still using 2 pipes. This is fine just because
     //this is source split where destination doesn't matter. Evaluate later to
     //see if going through all the calcs to save a pipe is worth it
-    if(dstWidth > mdpHw.getMaxMixerWidth() or
-            cropWidth > mdpHw.getMaxMixerWidth() or
+    if(dstWidth > (int) mdpHw.getMaxMixerWidth() or
+            cropWidth > (int) mdpHw.getMaxMixerWidth() or
             (primarySplitAlways and (cropWidth > lSplit))) {
         pipe_info.rIndex = ctx->mOverlay->getPipe(pipeSpecs);
         if(pipe_info.rIndex == ovutils::OV_INVALID) {

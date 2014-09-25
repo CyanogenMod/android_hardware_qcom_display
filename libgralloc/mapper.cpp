@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 #include <limits.h>
 #include <errno.h>
 #include <pthread.h>
@@ -40,7 +41,6 @@
 #include "memalloc.h"
 #include <qdMetaData.h>
 
-#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 
 using namespace gralloc;
 /*****************************************************************************/

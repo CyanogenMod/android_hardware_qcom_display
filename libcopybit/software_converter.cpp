@@ -213,7 +213,7 @@ int convert_yuv_c2d_to_yuv_android(private_handle_t *hnd,
             return COPYBIT_FAILURE;
     }
 
-    ret = copy_source_to_destination(hnd->base, dst_hnd->base, info);
+    ret = copy_source_to_destination((uintptr_t) hnd->base, (uintptr_t) dst_hnd->base, info);
     return ret;
 }
 
@@ -258,6 +258,6 @@ int convert_yuv_android_to_yuv_c2d(private_handle_t *hnd,
             return -1;
     }
 
-    ret = copy_source_to_destination(hnd->base, dst_hnd->base, info);
+    ret = copy_source_to_destination((uintptr_t) hnd->base, (uintptr_t) dst_hnd->base, info);
     return ret;
 }
