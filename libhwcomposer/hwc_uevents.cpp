@@ -184,6 +184,8 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             clear(ctx, dpy);
             ctx->dpyAttr[dpy].connected = false;
             ctx->dpyAttr[dpy].isActive = false;
+            /* If disconnect comes before any composition cycle */
+            ctx->dpyAttr[dpy].isConfiguring = false;
 
             if(dpy == HWC_DISPLAY_EXTERNAL) {
                 ctx->mExtDisplay->teardown();
