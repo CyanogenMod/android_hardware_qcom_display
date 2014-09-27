@@ -284,6 +284,10 @@ void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers);
 bool isAbcInUse(hwc_context_t *ctx);
 
 void dumpBuffer(private_handle_t *ohnd, char *bufferName);
+void updateDisplayInfo(hwc_context_t* ctx, int dpy);
+void resetDisplayInfo(hwc_context_t* ctx, int dpy);
+void initCompositionResources(hwc_context_t* ctx, int dpy);
+void destroyCompositionResources(hwc_context_t* ctx, int dpy);
 
 //Helper function to dump logs
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
@@ -584,9 +588,6 @@ struct hwc_context_t {
     bool mPanelResetStatus;
     // number of active Displays
     int numActiveDisplays;
-    // Downscale feature switch, set via system property
-    // sys.hwc.mdp_downscale_enabled
-    bool mMDPDownscaleEnabled;
     struct gpu_hint_info mGPUHintInfo;
     //App Buffer Composition
     bool enableABC;
