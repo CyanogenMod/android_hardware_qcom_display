@@ -514,12 +514,13 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
            based on an empirically derived value of panel height.
     */
 
-    bool primarySplitAlways = (mDpy == HWC_DISPLAY_PRIMARY) and
+    const bool primarySplitAlways = (mDpy == HWC_DISPLAY_PRIMARY) and
             qdutils::MDPVersion::getInstance().isSrcSplitAlways();
+    const uint32_t lSplit = getLeftSplit(ctx, mDpy);
+    const uint32_t cropWidth = sourceCrop.right - sourceCrop.left;
 
-    if(((sourceCrop.right - sourceCrop.left) >
-            (int)qdutils::MDPVersion::getInstance().getMaxMixerWidth()) or
-            primarySplitAlways) {
+    if((cropWidth > qdutils::MDPVersion::getInstance().getMaxMixerWidth()) or
+            (primarySplitAlways and cropWidth > lSplit)) {
         destR = ov.getPipe(pipeSpecs);
         if(destR == ovutils::OV_INVALID) {
             ALOGE("%s: No pipes available to configure fb for dpy %d's right"

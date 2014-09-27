@@ -138,6 +138,7 @@ public:
     uint32_t getMinFpsSupported() { return mPanelInfo.mMinFps; }
     uint32_t getMaxFpsSupported() { return mPanelInfo.mMaxFps; }
     uint32_t getMaxMixerWidth() const { return mMaxMixerWidth; }
+    bool hasMinCropWidthLimitation() const;
     bool isSrcSplit() const;
     bool isSrcSplitAlways() const;
     bool isRGBScalarSupported() const;
