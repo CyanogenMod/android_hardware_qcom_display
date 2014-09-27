@@ -139,6 +139,7 @@ public:
     bool needsROIMerge() { return mPanelInfo.mNeedsROIMerge; }
     unsigned long getLowBw() { return mLowBw; }
     unsigned long getHighBw() { return mHighBw; }
+    bool hasMinCropWidthLimitation() const;
     bool isSrcSplit() const;
     bool isSrcSplitAlways() const;
     bool isRGBScalarSupported() const;

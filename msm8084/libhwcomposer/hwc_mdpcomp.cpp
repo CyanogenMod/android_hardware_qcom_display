@@ -347,7 +347,8 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
      * There also is a HW limilation in MDP, minimum block size is 2x2
      * Fallback to GPU if height is less than 2.
      */
-    if((crop_w < 5)||(crop_h < 5))
+    if(qdutils::MDPVersion::getInstance().hasMinCropWidthLimitation() and
+            (crop_w < 5 or crop_h < 5))
         return false;
 
     if((w_scale > 1.0f) || (h_scale > 1.0f)) {
@@ -2049,7 +2050,8 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
             qdutils::MDPVersion::getInstance().isSrcSplitAlways();
     int lSplit = getLeftSplit(ctx, mDpy);
     int dstWidth = dst.right - dst.left;
-    int cropWidth = crop.right - crop.left;
+    int cropWidth = has90Transform(layer) ? crop.bottom - crop.top :
+            crop.right - crop.left;
 
     if(dstWidth > qdutils::MAX_DISPLAY_DIM or
             cropWidth > qdutils::MAX_DISPLAY_DIM or
