@@ -2309,7 +2309,7 @@ void BwcPM::setBwc(const hwc_rect_t& crop, const hwc_rect_t& dst,
         swap(src_w, src_h);
     }
     //src width > MAX mixer supported dim
-    if(src_w > qdutils::MDPVersion::getInstance().getMaxMixerWidth()) {
+    if(src_w > (int) qdutils::MDPVersion::getInstance().getMaxMixerWidth()) {
         return;
     }
     //Decimation necessary, cannot use BWC. H/W requirement.

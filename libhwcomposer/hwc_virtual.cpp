@@ -21,7 +21,6 @@
 #include <errno.h>
 
 #include <cutils/log.h>
-#include <utils/Trace.h>
 #include <overlayWriteback.h>
 #include "hwc_utils.h"
 #include "hwc_fbupdate.h"
@@ -30,6 +29,7 @@
 #include "hwc_copybit.h"
 #include "hwc_virtual.h"
 #include "sync/sync.h"
+#include <utils/Trace.h>
 
 #define HWCVIRTUAL_LOG 0
 

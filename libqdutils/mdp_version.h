@@ -137,7 +137,7 @@ public:
     bool isDynFpsSupported() { return mPanelInfo.mDynFpsSupported; }
     uint32_t getMinFpsSupported() { return mPanelInfo.mMinFps; }
     uint32_t getMaxFpsSupported() { return mPanelInfo.mMaxFps; }
-    int getMaxMixerWidth() const { return mMaxMixerWidth; }
+    uint32_t getMaxMixerWidth() const { return mMaxMixerWidth; }
     bool isSrcSplit() const;
     bool isSrcSplitAlways() const;
     bool isRGBScalarSupported() const;

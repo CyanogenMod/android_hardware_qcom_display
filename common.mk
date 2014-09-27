@@ -19,8 +19,7 @@ common_libs := liblog libutils libcutils libhardware
 
 #Common C flags
 common_flags := -DDEBUG_CALC_FPS -Wno-missing-field-initializers
-#TODO: Add -Werror back once all the current warnings are fixed
-common_flags += -Wconversion -Wall
+common_flags += -Wconversion -Wall -Werror
 
 ifeq ($(ARCH_ARM_HAVE_NEON),true)
     common_flags += -D__ARM_HAVE_NEON

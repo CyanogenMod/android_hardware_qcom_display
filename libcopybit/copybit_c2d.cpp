@@ -503,7 +503,7 @@ static int set_image(copybit_context_t* ctx, uint32 surfaceId,
     struct private_handle_t* handle = (struct private_handle_t*)rhs->handle;
     C2D_SURFACE_TYPE surfaceType;
     int status = COPYBIT_SUCCESS;
-    uintptr_t gpuaddr = 0;
+    uint64_t gpuaddr = 0;
     int c2d_format;
     mapped_idx = -1;
 
@@ -1179,7 +1179,7 @@ static int stretch_copybit_internal(
         return COPYBIT_FAILURE;
     }
     if (need_temp_dst) {
-        if (get_size(dst_info) != ctx->temp_dst_buffer.size) {
+        if (get_size(dst_info) != (int) ctx->temp_dst_buffer.size) {
             free_temp_buffer(ctx->temp_dst_buffer);
             // Create a temp buffer and set that as the destination.
             if (COPYBIT_FAILURE == get_temp_buffer(dst_info, ctx->temp_dst_buffer)) {
@@ -1261,7 +1261,7 @@ static int stretch_copybit_internal(
         return COPYBIT_FAILURE;
     }
     if (need_temp_src) {
-        if (get_size(src_info) != ctx->temp_src_buffer.size) {
+        if (get_size(src_info) != (int) ctx->temp_src_buffer.size) {
             free_temp_buffer(ctx->temp_src_buffer);
             // Create a temp buffer and set that as the destination.
             if (COPYBIT_SUCCESS != get_temp_buffer(src_info,

@@ -37,8 +37,12 @@
 #include <sys/stat.h>
 #include <comptype.h>
 #ifdef QCOM_BSP
+// Ignore Wconversion errors for external headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
 #include <SkBitmap.h>
 #include <SkImageEncoder.h>
+#pragma GCC diagnostic pop
 #endif
 #ifdef STDC_FORMAT_MACROS
 #include <inttypes.h>
