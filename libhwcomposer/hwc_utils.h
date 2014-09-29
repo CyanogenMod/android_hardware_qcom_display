@@ -21,7 +21,9 @@
 #ifndef HWC_UTILS_H
 #define HWC_UTILS_H
 
+#define DEBUG_MDPDOWNSCALE 0
 #define HWC_REMOVE_DEPRECATED_VERSIONS 1
+
 #include <fcntl.h>
 #include <math.h>
 #include <hardware/hwcomposer.h>
