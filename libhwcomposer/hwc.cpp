@@ -362,6 +362,7 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
     for (int32_t i = ((int32_t)numDisplays-1); i >=0 ; i--) {
         hwc_display_contents_1_t *list = displays[i];
         int dpy = getDpyforExternalDisplay(ctx, i);
+        resetROI(ctx, dpy);
         switch(dpy) {
             case HWC_DISPLAY_PRIMARY:
                 ret = hwc_prepare_primary(dev, list);
