@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -402,34 +402,56 @@ int ExternalDisplay::getModeOrder(int mode)
             return 9; // 576p 4:3
         case HDMI_VFRMT_720x576p50_16_9:
             return 10; // 576p 16:9
+        case HDMI_VFRMT_800x600p60_4_3:
+            return 11; // 600p 4:3
+        case HDMI_VFRMT_848x480p60_16_9:
+            return 12; // 480p 16:9
         case HDMI_VFRMT_1024x768p60_4_3:
-            return 11; // 768p 4:3 Vesa format
+            return 13; // 768p 4:3 Vesa format
         case HDMI_VFRMT_1280x1024p60_5_4:
-            return 12; // 1024p Vesa format
+            return 14; // 1024p Vesa format
         case HDMI_VFRMT_1280x720p50_16_9:
-            return 13; // 720p@50Hz
+            return 15; // 720p@50Hz
         case HDMI_VFRMT_1280x720p60_16_9:
-            return 14; // 720p@60Hz
+            return 16; // 720p@60Hz
+        case HDMI_VFRMT_1280x800p60_16_10:
+            return 17; // 800p@60Hz
+        case HDMI_VFRMT_1280x960p60_4_3:
+            return 18; // 960p@60Hz
+        case HDMI_VFRMT_1360x768p60_16_9:
+            return 19; // 768p@60Hz
+        case HDMI_VFRMT_1366x768p60_16_10:
+            return 20; // 768p@60Hz
+        case HDMI_VFRMT_1440x900p60_16_10:
+            return 21; // 900p@60Hz
+        case HDMI_VFRMT_1400x1050p60_4_3:
+            return 22; // 1050p@60Hz
+        case HDMI_VFRMT_1680x1050p60_16_10:
+            return 23; // 1050p@60Hz
+        case HDMI_VFRMT_1600x1200p60_4_3:
+            return 24; // 1200p@60Hz
         case HDMI_VFRMT_1920x1080p24_16_9:
-            return 15; //1080p@24Hz
+            return 25; //1080p@24Hz
         case HDMI_VFRMT_1920x1080p25_16_9:
-            return 16; //108-p@25Hz
+            return 26; //1080p@25Hz
         case HDMI_VFRMT_1920x1080p30_16_9:
-            return 17; //1080p@30Hz
+            return 27; //1080p@30Hz
         case HDMI_VFRMT_1920x1080p50_16_9:
-            return 18; //1080p@50Hz
+            return 28; //1080p@50Hz
         case HDMI_VFRMT_1920x1080p60_16_9:
-            return 19; //1080p@60Hz
+            return 29; //1080p@60Hz
+        case HDMI_VFRMT_1920x1200p60_16_10:
+            return 30; //1080p@60Hz
         case HDMI_VFRMT_2560x1600p60_16_9:
-            return 20; //WQXGA@60Hz541
+            return 31; //WQXGA@60Hz541
         case HDMI_VFRMT_3840x2160p24_16_9:
-            return 21;//2160@24Hz
+            return 32;//2160@24Hz
         case HDMI_VFRMT_3840x2160p25_16_9:
-            return 22;//2160@25Hz
+            return 33;//2160@25Hz
         case HDMI_VFRMT_3840x2160p30_16_9:
-            return 23; //2160@30Hz
+            return 34; //2160@30Hz
         case HDMI_VFRMT_4096x2160p24_16_9:
-            return 24; //4kx2k@24Hz
+            return 35; //4kx2k@24Hz
     }
 }
 
@@ -742,7 +764,61 @@ void ExternalDisplay::getAttrForMode(int& width, int& height, int& fps) {
             height = 2160;
             fps = 24;
             break;
-
+         case HDMI_VFRMT_1920x1200p60_16_10:
+            width = 1920;
+            height = 1200;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1680x1050p60_16_10:
+            width = 1680;
+            height = 1050;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1440x900p60_16_10:
+            width = 1440;
+            height = 900;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1280x800p60_16_10:
+            width = 1280;
+            height = 800;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1366x768p60_16_10:
+            width = 1366;
+            height = 768;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1360x768p60_16_9:
+            width = 1360;
+            height = 768;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_848x480p60_16_9:
+            width = 848;
+            height = 480;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1600x1200p60_4_3:
+            width = 1600;
+            height = 1200;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1400x1050p60_4_3:
+            width = 1400;
+            height = 1050;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1280x960p60_4_3:
+            width = 1280;
+            height = 960;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_800x600p60_4_3:
+            width = 800;
+            height = 600;
+            fps = 60;
+            break;
     }
 }
 
