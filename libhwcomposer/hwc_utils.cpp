@@ -43,6 +43,7 @@
 #include "comptype.h"
 #include "hwc_virtual.h"
 #include "qd_utils.h"
+#include <sys/sysinfo.h>
 
 using namespace qClient;
 using namespace qService;
@@ -72,6 +73,11 @@ EGLAPI EGLBoolean eglGpuPerfHintQCOM(EGLDisplay dpy, EGLContext ctx,
 }
 #endif
 #endif
+
+#define PROP_DEFAULT_APPBUFFER  "ro.sf.default_app_buffer"
+#define MAX_RAM_SIZE  512*1024*1024
+#define qHD_WIDTH 540
+
 
 namespace qhwc {
 
@@ -232,6 +238,25 @@ static int openFramebufferDevice(hwc_context_t *ctx)
     return 0;
 }
 
+static void changeDefaultAppBufferCount() {
+    struct sysinfo info;
+    unsigned long int ramSize = 0;
+    if (!sysinfo(&info)) {
+           ramSize = info.totalram ;
+    }
+    int fb_fd = -1;
+    struct fb_var_screeninfo sInfo ={0};
+    fb_fd = open("/dev/graphics/fb0", O_RDONLY);
+    if (fb_fd >=0) {
+        ioctl(fb_fd, FBIOGET_VSCREENINFO, &sInfo);
+        close(fb_fd);
+    }
+    if ((ramSize && ramSize < MAX_RAM_SIZE) &&
+         (sInfo.xres &&  sInfo.xres <= qHD_WIDTH )) {
+                  property_set(PROP_DEFAULT_APPBUFFER, "2");
+    }
+}
+
 void initContext(hwc_context_t *ctx)
 {
     openFramebufferDevice(ctx);
@@ -243,6 +268,10 @@ void initContext(hwc_context_t *ctx)
     ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->mRotMgr = RotMgr::getInstance();
 
+    //default_app_buffer for ferrum
+    if (ctx->mMDP.version ==  qdutils::MDP_V3_0_5) {
+       changeDefaultAppBufferCount();
+    }
     // Initialize composition objects for the primary display
     initCompositionResources(ctx, HWC_DISPLAY_PRIMARY);
 
