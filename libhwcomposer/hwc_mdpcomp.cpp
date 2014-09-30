@@ -19,7 +19,7 @@
 #include <math.h>
 #include "hwc_mdpcomp.h"
 #include <sys/ioctl.h>
-#include "external.h"
+#include "hdmi.h"
 #include "qdMetaData.h"
 #include "mdp_version.h"
 #include "hwc_fbupdate.h"

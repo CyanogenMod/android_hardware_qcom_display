@@ -30,7 +30,7 @@
 #include "hwc_mdpcomp.h"
 #include "hwc_copybit.h"
 #include "comptype.h"
-#include "external.h"
+#include "hdmi.h"
 #include "hwc_virtual.h"
 #include "mdp_version.h"
 using namespace overlay;
@@ -109,7 +109,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 
             Locker::Autolock _l(ctx->mDrawLock);
             destroyCompositionResources(ctx, dpy);
-            ctx->mExtDisplay->teardown();
+            ctx->mHDMIDisplay->teardown();
             resetDisplayInfo(ctx, dpy);
 
             /* We need to send hotplug to SF only when we are disconnecting
@@ -163,8 +163,8 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                         "uevent thread", __FUNCTION__);
                 ctx->mWfdSyncLock.unlock();
             }
-            ctx->mExtDisplay->configure();
-            ctx->mExtDisplay->activateDisplay();
+            ctx->mHDMIDisplay->configure();
+            ctx->mHDMIDisplay->activateDisplay();
 
             Locker::Autolock _l(ctx->mDrawLock);
             updateDisplayInfo(ctx, dpy);

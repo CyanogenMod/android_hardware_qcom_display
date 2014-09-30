@@ -18,8 +18,8 @@
  * limitations under the License.
  */
 
-#ifndef HWC_EXTERNAL_DISPLAY_H
-#define HWC_EXTERNAL_DISPLAY_H
+#ifndef HWC_HDMI_DISPLAY_H
+#define HWC_HDMI_DISPLAY_H
 
 #include <linux/fb.h>
 
@@ -28,11 +28,11 @@ struct msm_hdmi_mode_timing_info;
 namespace qhwc {
 
 //Type of scanning of EDID(Video Capability Data Block)
-enum external_scansupport_type {
-    EXT_SCAN_NOT_SUPPORTED      = 0,
-    EXT_SCAN_ALWAYS_OVERSCANED  = 1,
-    EXT_SCAN_ALWAYS_UNDERSCANED = 2,
-    EXT_SCAN_BOTH_SUPPORTED     = 3
+enum hdmi_scansupport_type {
+    HDMI_SCAN_NOT_SUPPORTED      = 0,
+    HDMI_SCAN_ALWAYS_OVERSCANED  = 1,
+    HDMI_SCAN_ALWAYS_UNDERSCANED = 2,
+    HDMI_SCAN_BOTH_SUPPORTED     = 3
 };
 
 // Structure to store EDID related data
@@ -45,11 +45,11 @@ struct EDIDData {
     { }
 };
 
-class ExternalDisplay
+class HDMIDisplay
 {
 public:
-    ExternalDisplay();
-    ~ExternalDisplay();
+    HDMIDisplay();
+    ~HDMIDisplay();
     void setHPD(uint32_t startEnd);
     void setActionSafeDimension(int w, int h);
     bool isCEUnderscanSupported() { return mUnderscanSupported; }
@@ -107,4 +107,4 @@ private:
 
 }; //qhwc
 // ---------------------------------------------------------------------------
-#endif //HWC_EXTERNAL_DISPLAY_H
+#endif //HWC_HDMI_DISPLAY_H
