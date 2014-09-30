@@ -101,8 +101,8 @@ private:
     // flag that indicates whether CopyBit composition is enabled for this cycle
     bool mCopyBitDraw;
 
-    unsigned int getRGBRenderingArea
-                            (const hwc_display_contents_1_t *list);
+    unsigned int getRGBRenderingArea (const hwc_context_t *ctx,
+                                         const hwc_display_contents_1_t *list);
 
     void getLayerResolution(const hwc_layer_1_t* layer,
                                    unsigned int &width, unsigned int& height);

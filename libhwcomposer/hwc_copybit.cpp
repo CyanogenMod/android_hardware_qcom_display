@@ -96,7 +96,7 @@ bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx,
         int fbWidth =  ctx->dpyAttr[dpy].xres;
         int fbHeight =  ctx->dpyAttr[dpy].yres;
         unsigned int fbArea = (fbWidth * fbHeight);
-        unsigned int renderArea = getRGBRenderingArea(list);
+        unsigned int renderArea = getRGBRenderingArea(ctx, list);
             ALOGD_IF (DEBUG_COPYBIT, "%s:renderArea %u, fbArea %u",
                                   __FUNCTION__, renderArea, fbArea);
         if (renderArea < (mDynThreshold * fbArea)) {
@@ -112,8 +112,8 @@ bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx,
     return false;
 }
 
-unsigned int CopyBit::getRGBRenderingArea
-                                    (const hwc_display_contents_1_t *list) {
+unsigned int CopyBit::getRGBRenderingArea (const hwc_context_t *ctx,
+                                     const hwc_display_contents_1_t *list) {
     //Calculates total rendering area for RGB layers
     unsigned int renderArea = 0;
     unsigned int w=0, h=0;
@@ -122,7 +122,7 @@ unsigned int CopyBit::getRGBRenderingArea
     for (unsigned int i=0; i<list->numHwLayers -1; i++) {
          private_handle_t *hnd = (private_handle_t *)list->hwLayers[i].handle;
          if (hnd) {
-             if (BUFFER_TYPE_UI == hnd->bufferType) {
+             if (BUFFER_TYPE_UI == hnd->bufferType && !ctx->copybitDrop[i]) {
                  getLayerResolution(&list->hwLayers[i], w, h);
                  renderArea += (w*h);
              }
@@ -316,6 +316,9 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
             int dst_h, dst_w, src_h, src_w;
             float dx, dy;
+            if(ctx->copybitDrop[i]) {
+                continue;
+            }
             hwc_layer_1_t *layer = (hwc_layer_1_t *) &list->hwLayers[i];
             if (layer->planeAlpha != 0xFF)
                 return true;
@@ -539,6 +542,9 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     for (int i = 0; i <= (ctx->listStats[dpy].numAppLayers-1); i++) {
         if(!(layerProp[i].mFlags & HWC_COPYBIT)) {
             ALOGD_IF(DEBUG_COPYBIT, "%s: Not Marked for copybit", __FUNCTION__);
+            continue;
+        }
+        if(ctx->copybitDrop[i]) {
             continue;
         }
         //skip non updating layers

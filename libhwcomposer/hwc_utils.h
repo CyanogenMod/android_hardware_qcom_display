@@ -596,6 +596,8 @@ struct hwc_context_t {
     qhwc::PtorInfo mPtorInfo;
     //Running in Thermal burst mode
     bool mThermalBurstMode;
+    //Layers out of ROI
+    bool copybitDrop[MAX_NUM_APP_LAYERS];
 };
 
 namespace qhwc {
