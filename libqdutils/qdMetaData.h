@@ -78,6 +78,13 @@ struct MetaData_t {
     struct Sharp2Data_t Sharp2Data;
     int64_t timestamp;
     enum ColorSpace_t colorSpace;
+     /* Gralloc sets PRIV_SECURE_BUFFER flag to inform that the buffers are from
+      * ION_SECURE. which should not be mapped. However, for GPU post proc
+      * feature, GFX needs to map this buffer, in the client context and in SF
+      * context, it should not. Hence to differentiate, add this metadata field
+      * for clients to set, and GPU will to read and know when to map the
+      * SECURE_BUFFER(ION) */
+    int32_t mapSecureBuffer;
 };
 
 enum DispParamType {
@@ -90,6 +97,7 @@ enum DispParamType {
     PP_PARAM_TIMESTAMP  = 0x0040,
     UPDATE_BUFFER_GEOMETRY = 0x0080,
     UPDATE_COLOR_SPACE = 0x0200,
+    MAP_SECURE_BUFFER = 0x400,
 };
 
 struct private_handle_t;

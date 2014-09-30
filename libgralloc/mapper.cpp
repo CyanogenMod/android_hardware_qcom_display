@@ -59,12 +59,15 @@ static int gralloc_map(gralloc_module_t const* module,
         return -EINVAL;
 
     private_handle_t* hnd = (private_handle_t*)handle;
+    size_t size = 0;
+    int err = 0;
+    IMemAlloc* memalloc = getAllocator(hnd->flags) ;
     void *mappedAddress;
+    // Dont map FRAMEBUFFER and SECURE_BUFFERS
     if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) &&
         !(hnd->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER)) {
-        size_t size = hnd->size;
-        IMemAlloc* memalloc = getAllocator(hnd->flags) ;
-        int err = memalloc->map_buffer(&mappedAddress, size,
+        size = hnd->size;
+        err = memalloc->map_buffer(&mappedAddress, size,
                                        hnd->offset, hnd->fd);
         if(err || mappedAddress == MAP_FAILED) {
             ALOGE("Could not mmap handle %p, fd=%d (%s)",
@@ -74,6 +77,10 @@ static int gralloc_map(gralloc_module_t const* module,
         }
 
         hnd->base = intptr_t(mappedAddress) + hnd->offset;
+    }
+
+    //Allow mapping of metadata for all buffers and SECURE_BUFFER
+    if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
         mappedAddress = MAP_FAILED;
         size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
         err = memalloc->map_buffer(&mappedAddress, size,
