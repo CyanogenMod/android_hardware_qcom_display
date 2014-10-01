@@ -218,6 +218,13 @@ void MdpData::getDump(char *buf, size_t len) {
 
 bool MdpCtrl::setVisualParams(const MetaData_t& data) {
     ALOGD_IF(0, "In %s: data.operation = %d", __FUNCTION__, data.operation);
+
+    // Set Color Space for MDP to configure CSC matrix
+    mOVInfo.color_space = ITU_R_601;
+    if (data.operation & UPDATE_COLOR_SPACE) {
+        mOVInfo.color_space = data.colorSpace;
+    }
+
 #ifdef USES_POST_PROCESSING
     bool needUpdate = false;
     /* calculate the data */
