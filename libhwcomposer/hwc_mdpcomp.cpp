@@ -710,11 +710,8 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     int priDispW = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
 
-    // This is a special mode which needs to be handled separately.
-    // Only AIV tagged layers will be displayed on external in this mode.
-    // This is applicable only for external display , Return false, so that
-    // this will be handled separately
-    if(ctx->mAIVVideoMode[mDpy]) {
+    // Fall back to video only composition, if AIV video mode is enabled
+    if(ctx->listStats[mDpy].mAIVVideoMode) {
         ALOGD_IF(isDebug(), "%s: AIV Video Mode enabled dpy %d",
             __FUNCTION__, mDpy);
         return false;
@@ -1261,55 +1258,8 @@ bool MDPComp::canPartialUpdate(hwc_context_t *ctx,
     return true;
 }
 
-bool MDPComp::tryAIVVideoMode(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list) {
-    if(sSimulationFlags & MDPCOMP_AVOID_AIV_VIDEO_MODE)
-        return false;
-    if(!ctx->mAIVVideoMode[mDpy]) {
-        return false;
-    }
-    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
-
-    mCurrentFrame.reset(numAppLayers);
-    updateAIVLayers(ctx, list);
-    int mdpCount = mCurrentFrame.mdpCount;
-
-    if(mdpCount == 0) {
-        reset(ctx);
-        return false;
-    }
-
-    if(mCurrentFrame.fbCount) {
-        mCurrentFrame.fbZ = mCurrentFrame.mdpCount;
-    }
-
-    if(sEnableYUVsplit){
-        adjustForSourceSplit(ctx, list);
-    }
-
-    if(!postHeuristicsHandling(ctx, list)) {
-        ALOGD_IF(isDebug(), "post heuristic handling failed");
-        reset(ctx);
-        return false;
-    }
-
-    ALOGD_IF(sSimulationFlags,"%s: AIV_VIDEO_MODE_COMP SUCCEEDED",
-             __FUNCTION__);
-    return true;
-}
-
 bool MDPComp::tryVideoOnly(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-    // This is a special mode which needs to be handled separately.
-    // Only AIV tagged layers will be displayed on external in this mode.
-    // This is applicable only for external display , Return false, so that
-    // this will be handled separately
-    if(ctx->mAIVVideoMode[mDpy]) {
-        ALOGD_IF(isDebug(), "%s: AIV Video Mode enabled dpy %d",
-            __FUNCTION__, mDpy);
-        return false;
-    }
-
     const bool secureOnly = true;
     return videoOnlyComp(ctx, list, not secureOnly) or
             videoOnlyComp(ctx, list, secureOnly);
@@ -1359,11 +1309,8 @@ bool MDPComp::videoOnlyComp(hwc_context_t *ctx,
 /* if tryFullFrame fails, try to push all video and secure RGB layers to MDP */
 bool MDPComp::tryMDPOnlyLayers(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-    // This is a special mode which needs to be handled separately.
-    // Only AIV tagged layers will be displayed on external in this mode.
-    // This is applicable only for external display , Return false, so that
-    // this will be handled separately
-    if(ctx->mAIVVideoMode[mDpy]) {
+    // Fall back to video only composition, if AIV video mode is enabled
+    if(ctx->listStats[mDpy].mAIVVideoMode) {
         ALOGD_IF(isDebug(), "%s: AIV Video Mode enabled dpy %d",
             __FUNCTION__, mDpy);
         return false;
@@ -1665,17 +1612,12 @@ void MDPComp::updateLayerCache(hwc_context_t* ctx,
             __FUNCTION__, frame.mdpCount, frame.fbCount, frame.dropCount);
 }
 
-// Mark AIV layers for composition and drop other non-AIV layers.
-void MDPComp::updateAIVLayers(hwc_context_t* ctx,
+// drop other non-AIV layers from external display list.
+void MDPComp::dropNonAIVLayers(hwc_context_t* ctx,
                               hwc_display_contents_1_t* list) {
     for (size_t i = 0; i < (size_t)ctx->listStats[mDpy].numAppLayers; i++) {
         hwc_layer_1_t * layer = &list->hwLayers[i];
-        if(isAIVVideoLayer(layer)) {
-            if(isYUVDoable(ctx, layer)) {
-                mCurrentFrame.isFBComposed[i] = false;
-                mCurrentFrame.fbCount--;
-            }
-        } else if(!isAIVCCLayer(layer)) {
+         if(!(isAIVVideoLayer(layer) || isAIVCCLayer(layer))) {
             mCurrentFrame.dropCount++;
             mCurrentFrame.drop[i] = true;
         }
@@ -1694,6 +1636,10 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
     for(int index = 0;index < nYuvCount; index++){
         int nYuvIndex = ctx->listStats[mDpy].yuvIndices[index];
         hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
+
+        if(mCurrentFrame.drop[nYuvIndex]) {
+            continue;
+        }
 
         if(!isYUVDoable(ctx, layer)) {
             if(!frame.isFBComposed[nYuvIndex]) {
@@ -1963,11 +1909,16 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     //Hard conditions, if not met, cannot do MDP comp
     if(isFrameDoable(ctx)) {
         generateROI(ctx, list);
+        // if AIV Video mode is enabled, drop all non AIV layers from the
+        // external display list.
+        if(ctx->listStats[mDpy].mAIVVideoMode) {
+            dropNonAIVLayers(ctx, list);
+        }
 
         // if tryFullFrame fails, try to push all video and secure RGB layers
         // to MDP for composition.
         mModeOn = tryFullFrame(ctx, list) || tryMDPOnlyLayers(ctx, list) ||
-                  tryVideoOnly(ctx, list) || tryAIVVideoMode(ctx, list);
+                  tryVideoOnly(ctx, list);
         if(mModeOn) {
             setMDPCompLayerFlags(ctx, list);
         } else {
@@ -2655,8 +2606,8 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
     }
     // update source crop and destination position of AIV video layer.
-    if(ctx->mAIVVideoMode[mDpy] &&isYuvBuffer(hnd)) {
-        updateExtDisplayCoordinates(ctx, crop, dst, mDpy);
+    if(ctx->listStats[mDpy].mAIVVideoMode && isYuvBuffer(hnd)) {
+        updateCoordinates(ctx, crop, dst, mDpy);
     }
     /* Calculate the external display position based on MDP downscale,
        ActionSafe, and extorientation features. */

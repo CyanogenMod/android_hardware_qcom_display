@@ -964,7 +964,7 @@ void setListStats(hwc_context_t *ctx,
     uint32_t refreshRate = 0;
     qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
 
-    ctx->mAIVVideoMode[dpy] = false;
+    ctx->listStats[dpy].mAIVVideoMode = false;
     resetROI(ctx, dpy);
 
     trimList(ctx, list, dpy);
@@ -974,8 +974,10 @@ void setListStats(hwc_context_t *ctx,
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
 #ifdef QCOM_BSP
+        // Window boxing feature is applicable obly for external display, So
+        // enable mAIVVideoMode only for external display
         if(ctx->mWindowboxFeature && dpy && isAIVVideoLayer(layer)) {
-            ctx->mAIVVideoMode[dpy] = true;
+            ctx->listStats[dpy].mAIVVideoMode = true;
         }
         if (layer->flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
             ctx->listStats[dpy].isDisplayAnimating = true;
@@ -1880,7 +1882,7 @@ void updateDestAIVVideoMode(hwc_context_t *ctx, hwc_rect_t crop,
              crop.left, crop.top, crop.right, crop.bottom);
 }
 
-void updateExtDisplayCoordinates(hwc_context_t *ctx, hwc_rect_t& crop,
+void updateCoordinates(hwc_context_t *ctx, hwc_rect_t& crop,
                            hwc_rect_t& dst, int dpy) {
     updateCropAIVVideoMode(ctx, crop, dpy);
     updateDestAIVVideoMode(ctx, crop, dst, dpy);
@@ -1919,8 +1921,8 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
     }
     // update source crop and destination position of AIV video layer.
-    if(ctx->mAIVVideoMode[dpy] && isYuvBuffer(hnd)) {
-        updateExtDisplayCoordinates(ctx, crop, dst, dpy);
+    if(ctx->listStats[dpy].mAIVVideoMode && isYuvBuffer(hnd)) {
+        updateCoordinates(ctx, crop, dst, dpy);
     }
     calcExtDisplayPosition(ctx, hnd, dpy, crop, dst, transform, orient);
     int downscale = getRotDownscale(ctx, layer);
@@ -2017,8 +2019,8 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     }
 
     // update source crop and destination position of AIV video layer.
-    if(ctx->mAIVVideoMode[dpy] && isYuvBuffer(hnd)) {
-        updateExtDisplayCoordinates(ctx, crop, dst, dpy);
+    if(ctx->listStats[dpy].mAIVVideoMode && isYuvBuffer(hnd)) {
+        updateCoordinates(ctx, crop, dst, dpy);
     }
 
     /* Calculate the external display position based on MDP downscale,
@@ -2163,8 +2165,8 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
             getMdpFormat(hnd->format), (uint32_t)hnd->size);
 
     // update source crop and destination position of AIV video layer.
-    if(ctx->mAIVVideoMode[dpy] && isYuvBuffer(hnd)) {
-        updateExtDisplayCoordinates(ctx, crop, dst, dpy);
+    if(ctx->listStats[dpy].mAIVVideoMode && isYuvBuffer(hnd)) {
+        updateCoordinates(ctx, crop, dst, dpy);
     }
 
     /* Calculate the external display position based on MDP downscale,
