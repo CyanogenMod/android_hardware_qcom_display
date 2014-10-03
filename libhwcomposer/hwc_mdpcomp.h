@@ -72,7 +72,6 @@ protected:
         MDPCOMP_AVOID_LOAD_MDP = 0x004,
         MDPCOMP_AVOID_VIDEO_ONLY = 0x008,
         MDPCOMP_AVOID_MDP_ONLY_LAYERS = 0x010,
-        MDPCOMP_AVOID_AIV_VIDEO_MODE = 0x020,
     };
 
     /* mdp pipe data */
@@ -183,8 +182,6 @@ protected:
     bool loadBasedComp(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* Checks if its worth doing load based partial comp */
     bool isLoadBasedCompDoable(hwc_context_t *ctx);
-    /* checks for conditions where AIV layers cannot be bypassed */
-    bool tryAIVVideoMode(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     /* checks for conditions where only video can be bypassed */
     bool tryVideoOnly(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     bool videoOnlyComp(hwc_context_t *ctx, hwc_display_contents_1_t* list,
@@ -219,8 +216,8 @@ protected:
     bool intersectingUpdatingLayers(const hwc_display_contents_1_t* list,
             int fromIndex, int toIndex, int targetLayerIndex);
 
-    /* Mark AIV layers for composition and drop other non-AIV layers.*/
-    void updateAIVLayers(hwc_context_t* ctx, hwc_display_contents_1_t* list);
+    /* drop other non-AIV layers from external display list.*/
+    void dropNonAIVLayers(hwc_context_t* ctx, hwc_display_contents_1_t* list);
 
         /* updates cache map with YUV info */
     void updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
