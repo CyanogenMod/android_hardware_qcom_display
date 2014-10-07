@@ -1200,12 +1200,6 @@ private_handle_t * CopyBit::getCurrentRenderBuffer() {
 }
 
 void CopyBit::setReleaseFd(int fd) {
-    if(mRelFd[mCurRenderBufferIndex] >=0)
-        close(mRelFd[mCurRenderBufferIndex]);
-    mRelFd[mCurRenderBufferIndex] = dup(fd);
-}
-
-void CopyBit::setReleaseFdSync(int fd) {
     if (mRelFd[mCurRenderBufferIndex] >=0) {
         int ret = -1;
         ret = sync_wait(mRelFd[mCurRenderBufferIndex], 1000);

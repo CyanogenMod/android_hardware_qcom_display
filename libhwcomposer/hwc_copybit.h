@@ -51,8 +51,6 @@ public:
 
     void setReleaseFd(int fd);
 
-    void setReleaseFdSync(int fd);
-
     bool prepareOverlap(hwc_context_t *ctx, hwc_display_contents_1_t *list);
 
     int drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t *list);

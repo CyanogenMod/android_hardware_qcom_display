@@ -395,6 +395,17 @@ void handle_offline(hwc_context_t* ctx, int dpy);
 //Close acquireFenceFds of all layers of incoming list
 void closeAcquireFds(hwc_display_contents_1_t* list);
 
+//Sync point impl if swapinterval is set to 0
+void hwc_sync_sz(hwc_context_t* ctx, hwc_display_contents_1_t* list, int dpy);
+
+//Sync point impl for rotator
+void hwc_sync_rotator(hwc_context_t *ctx, hwc_display_contents_1_t* list,
+        int dpy);
+
+//Sync point impl for mdss
+int hwc_sync_mdss(hwc_context_t *ctx, hwc_display_contents_1_t *list, int dpy,
+        bool isExtAnimating, int fd);
+
 //Sync point impl.
 int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         int fd);
