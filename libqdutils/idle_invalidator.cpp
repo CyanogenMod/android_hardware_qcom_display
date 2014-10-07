@@ -47,10 +47,13 @@ IdleInvalidator::IdleInvalidator(): Thread(false), mHwcContext(0),
     ALOGD_IF(II_DEBUG, "IdleInvalidator::%s", __FUNCTION__);
 }
 
-int IdleInvalidator::init(InvalidatorHandler reg_handler, void* user_data,
-                         unsigned int idleSleepTime) {
-    ALOGD_IF(II_DEBUG, "IdleInvalidator::%s idleSleepTime %d",
-        __FUNCTION__, idleSleepTime);
+IdleInvalidator::~IdleInvalidator() {
+    if(mTimeoutEventFd >= 0) {
+        close(mTimeoutEventFd);
+    }
+}
+
+int IdleInvalidator::init(InvalidatorHandler reg_handler, void* user_data) {
     mHandler = reg_handler;
     mHwcContext = user_data;
 
@@ -62,32 +65,45 @@ int IdleInvalidator::init(InvalidatorHandler reg_handler, void* user_data,
         return -1;
     }
 
-    // Open a sysfs node to send the timeout value to driver.
-    int fd = open(IDLE_TIME_PATH, O_WRONLY);
-    if (fd < 0) {
-        ALOGE ("%s:not able to open %s node %s",
-                __FUNCTION__, IDLE_TIME_PATH, strerror(errno));
+    enum {DEFAULT_IDLE_TIME = 70}; //ms
+    if(not setIdleTimeout(DEFAULT_IDLE_TIME)) {
         close(mTimeoutEventFd);
         mTimeoutEventFd = -1;
         return -1;
     }
-    char strSleepTime[64];
-    snprintf(strSleepTime, sizeof(strSleepTime), "%d", idleSleepTime);
-    // Notify driver about the timeout value
-    ssize_t len = pwrite(fd, strSleepTime, strlen(strSleepTime), 0);
-    if(len < -1) {
-        ALOGE ("%s:not able to write into %s node %s",
-                __FUNCTION__, IDLE_TIME_PATH, strerror(errno));
-        close(mTimeoutEventFd);
-        mTimeoutEventFd = -1;
-        close(fd);
-        return -1;
-    }
-    close(fd);
 
     //Triggers the threadLoop to run, if not already running.
     run(threadName, android::PRIORITY_LOWEST);
     return 0;
+}
+
+bool IdleInvalidator::setIdleTimeout(const uint32_t& timeout) {
+    ALOGD_IF(II_DEBUG, "IdleInvalidator::%s timeout %d",
+            __FUNCTION__, timeout);
+
+    // Open a sysfs node to send the timeout value to driver.
+    int fd = open(IDLE_TIME_PATH, O_WRONLY);
+
+    if (fd < 0) {
+        ALOGE ("%s:Unable to open %s node %s",
+                __FUNCTION__, IDLE_TIME_PATH, strerror(errno));
+        return false;
+    }
+
+    char strSleepTime[64];
+    snprintf(strSleepTime, sizeof(strSleepTime), "%d", timeout);
+
+    // Notify driver about the timeout value
+    ssize_t len = pwrite(fd, strSleepTime, strlen(strSleepTime), 0);
+    if(len < -1) {
+        ALOGE ("%s:Unable to write into %s node %s",
+                __FUNCTION__, IDLE_TIME_PATH, strerror(errno));
+        close(fd);
+        return false;
+    }
+
+    close(fd);
+    return true;
 }
 
 bool IdleInvalidator::threadLoop() {

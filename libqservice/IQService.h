@@ -53,6 +53,7 @@ public:
         SET_WFD_STATUS,          // Set if wfd connection is on/off
         SET_VIEW_FRAME,          // Set view frame of display
         DYNAMIC_DEBUG,           // Enable more logging on the fly
+        SET_IDLE_TIMEOUT,        // Set idle timeout for GPU fallback
         COMMAND_LIST_END = 400,
     };
 

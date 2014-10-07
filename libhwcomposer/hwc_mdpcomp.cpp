@@ -36,7 +36,7 @@ namespace qhwc {
 
 //==============MDPComp========================================================
 
-IdleInvalidator *MDPComp::idleInvalidator = NULL;
+IdleInvalidator *MDPComp::sIdleInvalidator = NULL;
 bool MDPComp::sIdleFallBack = false;
 bool MDPComp::sHandleTimeout = false;
 bool MDPComp::sDebugLogs = false;
@@ -110,7 +110,7 @@ bool MDPComp::init(hwc_context_t *ctx) {
         return false;
     }
 
-    char property[PROPERTY_VALUE_MAX];
+    char property[PROPERTY_VALUE_MAX] = {0};
 
     sEnabled = false;
     if((property_get("persist.hwc.mdpcomp.enable", property, NULL) > 0) &&
@@ -134,23 +134,10 @@ bool MDPComp::init(hwc_context_t *ctx) {
     }
 
     if(ctx->mMDP.panel != MIPI_CMD_PANEL) {
-        // Idle invalidation is not necessary on command mode panels
-        long idle_timeout = DEFAULT_IDLE_TIME;
-        if(property_get("debug.mdpcomp.idletime", property, NULL) > 0) {
-            if(atoi(property) != 0)
-                idle_timeout = atoi(property);
-        }
-
-        //create Idle Invalidator only when not disabled through property
-        if(idle_timeout != -1)
-            idleInvalidator = IdleInvalidator::getInstance();
-
-        if(idleInvalidator == NULL) {
-            ALOGE("%s: failed to instantiate idleInvalidator object",
-                  __FUNCTION__);
-        } else {
-            idleInvalidator->init(timeout_handler, ctx,
-                                  (unsigned int)idle_timeout);
+        sIdleInvalidator = IdleInvalidator::getInstance();
+        if(sIdleInvalidator->init(timeout_handler, ctx) < 0) {
+            delete sIdleInvalidator;
+            sIdleInvalidator = NULL;
         }
     }
 
@@ -204,6 +191,25 @@ void MDPComp::timeout_handler(void *udata) {
     sIdleFallBack = true;
     /* Trigger SF to redraw the current frame */
     ctx->proc->invalidate(ctx->proc);
+}
+
+void MDPComp::setIdleTimeout(const uint32_t& timeout) {
+    enum { ONE_REFRESH_PERIOD_MS = 17, ONE_BILLION_MS = 1000000000 };
+
+    if(sIdleInvalidator) {
+        if(timeout <= ONE_REFRESH_PERIOD_MS) {
+            //If the specified timeout is < 1 draw cycle worth, "virtually"
+            //disable idle timeout. The ideal way for clients to disable
+            //timeout is to set it to 0
+            sIdleInvalidator->setIdleTimeout(ONE_BILLION_MS);
+            ALOGI("Disabled idle timeout");
+            return;
+        }
+        sIdleInvalidator->setIdleTimeout(timeout);
+        ALOGI("Idle timeout set to %u", timeout);
+    } else {
+        ALOGW("Cannot set idle timeout, IdleInvalidator not enabled");
+    }
 }
 
 void MDPComp::setMDPCompLayerFlags(hwc_context_t *ctx,
@@ -2055,7 +2061,7 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     }
 
     // Set the Handle timeout to true for MDP or MIXED composition.
-    if(idleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount) {
+    if(sIdleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount) {
         sHandleTimeout = true;
     }
 
@@ -2310,7 +2316,7 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     }
 
     // Set the Handle timeout to true for MDP or MIXED composition.
-    if(idleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount) {
+    if(sIdleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount) {
         sHandleTimeout = true;
     }
 

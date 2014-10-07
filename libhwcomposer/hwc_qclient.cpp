@@ -245,6 +245,13 @@ static void toggleDynamicDebug(hwc_context_t* ctx, const Parcel* inParcel) {
     }
 }
 
+static void setIdleTimeout(hwc_context_t* ctx, const Parcel* inParcel) {
+    uint32_t timeout = (uint32_t)inParcel->readInt32();
+    ALOGD("%s :%u ms", __FUNCTION__, timeout);
+    Locker::Autolock _sl(ctx->mDrawLock);
+    MDPComp::setIdleTimeout(timeout);
+}
+
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t ret = NO_ERROR;
@@ -289,6 +296,9 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::DYNAMIC_DEBUG:
             toggleDynamicDebug(mHwcContext, inParcel);
+            break;
+        case IQService::SET_IDLE_TIMEOUT:
+            setIdleTimeout(mHwcContext, inParcel);
             break;
         default:
             ret = NO_ERROR;

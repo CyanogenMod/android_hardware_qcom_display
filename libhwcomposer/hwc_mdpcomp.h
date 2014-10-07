@@ -25,7 +25,6 @@
 #include <cutils/properties.h>
 #include <overlay.h>
 
-#define DEFAULT_IDLE_TIME 70
 #define MAX_PIPES_PER_MIXER 4
 
 namespace overlay {
@@ -57,6 +56,7 @@ public:
     static void resetIdleFallBack() { sIdleFallBack = false; }
     static bool isIdleFallback() { return sIdleFallBack; }
     static void dynamicDebug(bool enable){ sDebugLogs = enable; }
+    static void setIdleTimeout(const uint32_t& timeout);
 
 protected:
     enum { MAX_SEC_LAYERS = 1 }; //TODO add property support
@@ -255,7 +255,7 @@ protected:
     static bool sHandleTimeout;
     static int sMaxPipesPerMixer;
     static bool sSrcSplitEnabled;
-    static IdleInvalidator *idleInvalidator;
+    static IdleInvalidator *sIdleInvalidator;
     struct FrameInfo mCurrentFrame;
     struct LayerCache mCachedFrame;
     //Enable 4kx2k yuv layer split
