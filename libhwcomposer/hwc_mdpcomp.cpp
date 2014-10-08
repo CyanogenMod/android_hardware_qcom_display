@@ -690,9 +690,11 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     int priDispW = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
 
-    // No Idle fall back, if secure display or secure RGB layers are present
+    // No Idle fall back, if secure display or secure RGB layers are present or
+    // if there's only a single layer being composed
     if(sIdleFallBack && (!ctx->listStats[mDpy].secureUI &&
-                    !ctx->listStats[mDpy].secureRGBCount)) {
+                    !ctx->listStats[mDpy].secureRGBCount) &&
+                    (ctx->listStats[mDpy].numAppLayers != 1)) {
         ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
         return false;
     }
