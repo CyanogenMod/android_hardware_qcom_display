@@ -43,8 +43,6 @@ public:
     // during virtual display disconnect.
     void destroy(hwc_context_t *ctx, size_t numDisplays,
                        hwc_display_contents_1_t** displays);
-    void pause(hwc_context_t* ctx, int dpy);
-    void resume(hwc_context_t* ctx, int dpy);
     int getScalingHeight() const { return mScalingHeight; };
     int getScalingWidth() const { return mScalingWidth; };
     // We can dump the frame buffer and WB

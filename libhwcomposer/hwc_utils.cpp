@@ -2635,15 +2635,46 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
 }
 
 void handle_pause(hwc_context_t* ctx, int dpy) {
-    if(ctx->mHWCVirtual) {
-        ctx->mHWCVirtual->pause(ctx, dpy);
+    if(ctx->dpyAttr[dpy].connected) {
+        ctx->mDrawLock.lock();
+        ctx->dpyAttr[dpy].isActive = true;
+        ctx->dpyAttr[dpy].isPause = true;
+        ctx->mDrawLock.unlock();
+        ctx->proc->invalidate(ctx->proc);
+
+        usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+               * 2 / 1000);
+
+        // At this point all the pipes used by External have been
+        // marked as UNSET.
+        ctx->mDrawLock.lock();
+        // Perform commit to unstage the pipes.
+        if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+            ALOGE("%s: display commit fail! for %d dpy",
+                  __FUNCTION__, dpy);
+        }
+        ctx->mDrawLock.unlock();
+        ctx->proc->invalidate(ctx->proc);
     }
     return;
 }
 
 void handle_resume(hwc_context_t* ctx, int dpy) {
-    if(ctx->mHWCVirtual) {
-        ctx->mHWCVirtual->resume(ctx, dpy);
+    if(ctx->dpyAttr[dpy].connected) {
+        ctx->mDrawLock.lock();
+        ctx->dpyAttr[dpy].isConfiguring = true;
+        ctx->dpyAttr[dpy].isActive = true;
+        ctx->mDrawLock.unlock();
+        ctx->proc->invalidate(ctx->proc);
+
+        usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
+               * 2 / 1000);
+
+        //At this point external has all the pipes it would need.
+        ctx->mDrawLock.lock();
+        ctx->dpyAttr[dpy].isPause = false;
+        ctx->mDrawLock.unlock();
+        ctx->proc->invalidate(ctx->proc);
     }
     return;
 }
