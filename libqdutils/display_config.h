@@ -43,6 +43,16 @@ namespace qdutils {
 enum {
     DISPLAY_PRIMARY = 0,
     DISPLAY_EXTERNAL,
+    DISPLAY_VIRTUAL,
+};
+
+// External Display states - used in setSecondaryDisplayStatus()
+// To be consistent with the same defined in hwc_utils.h
+enum {
+    EXTERNAL_OFFLINE = 0,
+    EXTERNAL_ONLINE,
+    EXTERNAL_PAUSE,
+    EXTERNAL_RESUME,
 };
 
 // Display Attributes that are available to clients of this library
@@ -76,4 +86,7 @@ int getDisplayVisibleRegion(int dpy, hwc_rect_t &rect);
 
 // set the view frame information in hwc context from surfaceflinger
 int setViewFrame(int dpy, int l, int t, int r, int b);
+
+// Set the secondary display status(pause/resume/offline etc.,)
+int setSecondaryDisplayStatus(int dpy, uint32_t status);
 }; //namespace

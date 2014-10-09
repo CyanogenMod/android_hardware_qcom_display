@@ -215,36 +215,6 @@ int HWCVirtualVDS::set(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
     return ret;
 }
 
-void HWCVirtualVDS::pause(hwc_context_t* ctx, int dpy) {
-    {
-        Locker::Autolock _l(ctx->mDrawLock);
-        ctx->dpyAttr[dpy].isActive = true;
-        ctx->dpyAttr[dpy].isPause = true;
-        ctx->proc->invalidate(ctx->proc);
-    }
-    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-            * 2 / 1000);
-    return;
-}
-
-void HWCVirtualVDS::resume(hwc_context_t* ctx, int dpy) {
-    {
-        Locker::Autolock _l(ctx->mDrawLock);
-        ctx->dpyAttr[dpy].isConfiguring = true;
-        ctx->dpyAttr[dpy].isActive = true;
-        ctx->proc->invalidate(ctx->proc);
-    }
-    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-            * 2 / 1000);
-    //At this point external has all the pipes it would need.
-    {
-        Locker::Autolock _l(ctx->mDrawLock);
-        ctx->dpyAttr[dpy].isPause = false;
-        ctx->proc->invalidate(ctx->proc);
-    }
-    return;
-}
-
 /* Implementation for HWCVirtualV4L2 class */
 
 int HWCVirtualV4L2::prepare(hwc_composer_device_1 *dev,
@@ -348,57 +318,4 @@ int HWCVirtualV4L2::set(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
     }
 
     return ret;
-}
-
-void HWCVirtualV4L2::pause(hwc_context_t* ctx, int dpy) {
-    {
-        Locker::Autolock _l(ctx->mDrawLock);
-        ctx->dpyAttr[dpy].isActive = true;
-        ctx->dpyAttr[dpy].isPause = true;
-        ctx->proc->invalidate(ctx->proc);
-    }
-    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-            * 2 / 1000);
-    // At this point all the pipes used by External have been
-    // marked as UNSET.
-    {
-        Locker::Autolock _l(ctx->mDrawLock);
-        // Perform commit to unstage the pipes.
-        if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
-            ALOGE("%s: display commit fail! for %d dpy",
-                    __FUNCTION__, dpy);
-        }
-    }
-    return;
-}
-
-void HWCVirtualV4L2::resume(hwc_context_t* ctx, int dpy){
-    //Treat Resume as Online event
-    //Since external didnt have any pipes, force primary to give up
-    //its pipes; we don't allow inter-mixer pipe transfers.
-    {
-        Locker::Autolock _l(ctx->mDrawLock);
-
-        // A dynamic resolution change (DRC) can be made for a WiFi
-        // display. In order to support the resolution change, we
-        // need to reconfigure the corresponding display attributes.
-        // Since DRC is only on WiFi display, we only need to call
-        // configure() on the VirtualDisplay device.
-        //TODO: clean up
-        if(dpy == HWC_DISPLAY_VIRTUAL)
-            ctx->mVirtualDisplay->configure();
-
-        ctx->dpyAttr[dpy].isConfiguring = true;
-        ctx->dpyAttr[dpy].isActive = true;
-        ctx->proc->invalidate(ctx->proc);
-    }
-    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-            * 2 / 1000);
-    //At this point external has all the pipes it would need.
-    {
-        Locker::Autolock _l(ctx->mDrawLock);
-        ctx->dpyAttr[dpy].isPause = false;
-        ctx->proc->invalidate(ctx->proc);
-    }
-    return;
 }
