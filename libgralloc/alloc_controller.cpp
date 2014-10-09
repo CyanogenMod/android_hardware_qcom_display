@@ -151,6 +151,8 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
                 bpp = 3;
                 break;
             case HAL_PIXEL_FORMAT_RGB_565:
+            case HAL_PIXEL_FORMAT_RGBA_5551:
+            case HAL_PIXEL_FORMAT_RGBA_4444:
                 bpp = 2;
                 break;
             default: break;
@@ -405,6 +407,8 @@ size_t getSize(int format, int width, int height, const int alignedw,
             size = alignedw * alignedh * 3;
             break;
         case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_RGBA_5551:
+        case HAL_PIXEL_FORMAT_RGBA_4444:
         case HAL_PIXEL_FORMAT_RAW_SENSOR:
             size = alignedw * alignedh * 2;
             break;
