@@ -156,35 +156,27 @@ static status_t getDisplayVisibleRegion(hwc_context_t* ctx, int dpy,
     }
 }
 
-static void pauseWFD(hwc_context_t *ctx, uint32_t pause) {
-    /* TODO: Will remove pauseWFD once all the clients start using
-     * setWfdStatus to indicate the status of WFD display
-     */
-    int dpy = HWC_DISPLAY_VIRTUAL;
-    if(pause) {
-        //WFD Pause
-        handle_pause(ctx, dpy);
+// USed for setting the secondary(hdmi/wfd) status
+static void setSecondaryDisplayStatus(hwc_context_t *ctx,
+                                      const Parcel* inParcel) {
+    uint32_t dpy = inParcel->readInt32();
+    uint32_t status = inParcel->readInt32();
+    ALOGD_IF(QCLIENT_DEBUG, "%s: dpy = %d status = %s", __FUNCTION__,
+                                        dpy, getExternalDisplayState(status));
+
+    if(dpy > HWC_DISPLAY_PRIMARY && dpy <= HWC_DISPLAY_VIRTUAL) {
+        if(dpy == HWC_DISPLAY_VIRTUAL && status == EXTERNAL_OFFLINE) {
+            ctx->mWfdSyncLock.lock();
+            ctx->mWfdSyncLock.signal();
+            ctx->mWfdSyncLock.unlock();
+        } else if(status == EXTERNAL_PAUSE) {
+            handle_pause(ctx, dpy);
+        } else if(status == EXTERNAL_RESUME) {
+            handle_resume(ctx, dpy);
+        }
     } else {
-        //WFD Resume
-        handle_resume(ctx, dpy);
-    }
-}
-
-static void setWfdStatus(hwc_context_t *ctx, uint32_t wfdStatus) {
-
-    ALOGD_IF(HWC_WFDDISPSYNC_LOG,
-             "%s: Received a binder call that WFD state is %s",
-             __FUNCTION__,getExternalDisplayState(wfdStatus));
-    int dpy = HWC_DISPLAY_VIRTUAL;
-
-    if(wfdStatus == EXTERNAL_OFFLINE) {
-        ctx->mWfdSyncLock.lock();
-        ctx->mWfdSyncLock.signal();
-        ctx->mWfdSyncLock.unlock();
-    } else if(wfdStatus == EXTERNAL_PAUSE) {
-        handle_pause(ctx, dpy);
-    } else if(wfdStatus == EXTERNAL_RESUME) {
-        handle_resume(ctx, dpy);
+        ALOGE("%s: Invalid dpy", __FUNCTION__, dpy);
+        return;
     }
 }
 
@@ -221,11 +213,8 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         case IQService::SET_HSIC_DATA:
             setHSIC(inParcel);
             break;
-        case IQService::PAUSE_WFD:
-            pauseWFD(mHwcContext, inParcel->readInt32());
-            break;
-        case IQService::SET_WFD_STATUS:
-            setWfdStatus(mHwcContext,inParcel->readInt32());
+        case IQService::SET_SECONDARY_DISPLAY_STATUS:
+            setSecondaryDisplayStatus(mHwcContext, inParcel);
             break;
         default:
             ret = NO_ERROR;

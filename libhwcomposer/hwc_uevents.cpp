@@ -99,20 +99,6 @@ static int getConnectedState(const char* strUdata, int len)
     return -1;
 }
 
-void handle_pause(hwc_context_t* ctx, int dpy) {
-    if(ctx->mHWCVirtual) {
-        ctx->mHWCVirtual->pause(ctx, dpy);
-    }
-    return;
-}
-
-void handle_resume(hwc_context_t* ctx, int dpy) {
-    if(ctx->mHWCVirtual) {
-        ctx->mHWCVirtual->resume(ctx, dpy);
-    }
-    return;
-}
-
 static void teardownWfd(hwc_context_t* ctx) {
     // Teardown WFD display
     ALOGD_IF(UEVENT_DEBUG,"Received HDMI connection request when WFD is "

@@ -113,4 +113,22 @@ int getDisplayVisibleRegion(int dpy, hwc_rect_t &rect) {
     return err;
 }
 
+int setSecondaryDisplayStatus(int dpy, uint32_t status) {
+    status_t err = (status_t) FAILED_TRANSACTION;
+    sp<IQService> binder = getBinder();
+    Parcel inParcel, outParcel;
+    inParcel.writeInt32(dpy);
+    inParcel.writeInt32(status);
+
+    if(binder != NULL) {
+        err = binder->dispatch(IQService::SET_SECONDARY_DISPLAY_STATUS,
+                &inParcel, &outParcel);
+    }
+    if(err)
+        ALOGE("%s: Failed for dpy %d status = %d err=%d", __FUNCTION__, dpy,
+                                                        status, err);
+
+    return err;
+}
+
 }; //namespace
