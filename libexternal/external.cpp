@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -402,34 +402,56 @@ int ExternalDisplay::getModeOrder(int mode)
             return 9; // 576p 4:3
         case HDMI_VFRMT_720x576p50_16_9:
             return 10; // 576p 16:9
+        case HDMI_VFRMT_800x600p60_4_3:
+            return 11; // 600p 4:3
+        case HDMI_VFRMT_848x480p60_16_9:
+            return 12; // 480p 16:9
         case HDMI_VFRMT_1024x768p60_4_3:
-            return 11; // 768p 4:3 Vesa format
+            return 13; // 768p 4:3 Vesa format
         case HDMI_VFRMT_1280x1024p60_5_4:
-            return 12; // 1024p Vesa format
+            return 14; // 1024p Vesa format
         case HDMI_VFRMT_1280x720p50_16_9:
-            return 13; // 720p@50Hz
+            return 15; // 720p@50Hz
         case HDMI_VFRMT_1280x720p60_16_9:
-            return 14; // 720p@60Hz
+            return 16; // 720p@60Hz
+        case HDMI_VFRMT_1280x800p60_16_10:
+            return 17; // 800p@60Hz
+        case HDMI_VFRMT_1280x960p60_4_3:
+            return 18; // 960p@60Hz
+        case HDMI_VFRMT_1360x768p60_16_9:
+            return 19; // 768p@60Hz
+        case HDMI_VFRMT_1366x768p60_16_10:
+            return 20; // 768p@60Hz
+        case HDMI_VFRMT_1440x900p60_16_10:
+            return 21; // 900p@60Hz
+        case HDMI_VFRMT_1400x1050p60_4_3:
+            return 22; // 1050p@60Hz
+        case HDMI_VFRMT_1680x1050p60_16_10:
+            return 23; // 1050p@60Hz
+        case HDMI_VFRMT_1600x1200p60_4_3:
+            return 24; // 1200p@60Hz
         case HDMI_VFRMT_1920x1080p24_16_9:
-            return 15; //1080p@24Hz
+            return 25; //1080p@24Hz
         case HDMI_VFRMT_1920x1080p25_16_9:
-            return 16; //108-p@25Hz
+            return 26; //1080p@25Hz
         case HDMI_VFRMT_1920x1080p30_16_9:
-            return 17; //1080p@30Hz
+            return 27; //1080p@30Hz
         case HDMI_VFRMT_1920x1080p50_16_9:
-            return 18; //1080p@50Hz
+            return 28; //1080p@50Hz
         case HDMI_VFRMT_1920x1080p60_16_9:
-            return 19; //1080p@60Hz
+            return 29; //1080p@60Hz
+        case HDMI_VFRMT_1920x1200p60_16_10:
+            return 30; //1080p@60Hz
         case HDMI_VFRMT_2560x1600p60_16_9:
-            return 20; //WQXGA@60Hz541
+            return 31; //WQXGA@60Hz541
         case HDMI_VFRMT_3840x2160p24_16_9:
-            return 21;//2160@24Hz
+            return 32;//2160@24Hz
         case HDMI_VFRMT_3840x2160p25_16_9:
-            return 22;//2160@25Hz
+            return 33;//2160@25Hz
         case HDMI_VFRMT_3840x2160p30_16_9:
-            return 23; //2160@30Hz
+            return 34; //2160@30Hz
         case HDMI_VFRMT_4096x2160p24_16_9:
-            return 24; //4kx2k@24Hz
+            return 35; //4kx2k@24Hz
     }
 }
 
@@ -593,9 +615,11 @@ void ExternalDisplay::setAttributes() {
             // if primary resolution is more than the hdmi resolution
             // configure dpy attr to primary resolution and set
             // downscale mode
-            // Restrict this upto 1080p resolution max
-            if(((priW * priH) > (width * height)) &&
-               ((priW * priH) <= SUPPORTED_DOWNSCALE_EXT_AREA)) {
+            // Restrict this upto 1080p resolution max, if target does not
+            // support source split feature.
+            if((priW * priH) > (width * height) &&
+                (((priW * priH) <= SUPPORTED_DOWNSCALE_EXT_AREA) ||
+                qdutils::MDPVersion::getInstance().isSrcSplit())) {
                 // tmpW and tmpH will hold the primary dimensions before we
                 // update the aspect ratio if necessary.
                 int tmpW = priW;
@@ -613,21 +637,39 @@ void ExternalDisplay::setAttributes() {
                 // keeping aspect ratio intact.
                 hwc_rect r = {0, 0, 0, 0};
                 getAspectRatioPosition(tmpW, tmpH, width, height, r);
-                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres =
-                                                              r.right - r.left;
-                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres =
-                                                              r.bottom - r.top;
+                int newExtW = r.right - r.left;
+                int newExtH = r.bottom - r.top;
+                int alignedExtW;
+                int alignedExtH;
+                // On 8994 and below targets MDP supports only 4X downscaling,
+                // Restricting selected external resolution to be exactly 4X
+                // greater resolution than actual external resolution
+                int maxMDPDownScale =
+                        qdutils::MDPVersion::getInstance().getMaxMDPDownscale();
+                if((width * height * maxMDPDownScale) < (newExtW * newExtH)) {
+                    float upScaleFactor = (float)maxMDPDownScale / 2.0f;
+                    newExtW = (int)((float)width * upScaleFactor);
+                    newExtH = (int)((float)height * upScaleFactor);
+                }
+                // Align it down so that the new aligned resolution does not
+                // exceed the maxMDPDownscale factor
+                alignedExtW = overlay::utils::aligndown(newExtW, 4);
+                alignedExtH = overlay::utils::aligndown(newExtH, 4);
+                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = alignedExtW;
+                mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = alignedExtH;
                 // Set External Display MDP Downscale mode indicator
                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode =true;
             }
         }
-        //Initialize the display viewFrame info
-        mHwcContext->mViewFrame[HWC_DISPLAY_EXTERNAL].left = 0;
-        mHwcContext->mViewFrame[HWC_DISPLAY_EXTERNAL].top = 0;
-        mHwcContext->mViewFrame[HWC_DISPLAY_EXTERNAL].right =
-            (int)mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres;
-        mHwcContext->mViewFrame[HWC_DISPLAY_EXTERNAL].bottom =
-            (int)mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres;
+        ALOGD_IF(DEBUG_MDPDOWNSCALE, "Selected external resolution [%d X %d] "
+                 "maxMDPDownScale %d MDPDownScaleMode %d srcSplitEnabled %d "
+                 "MDPDownscale feature %d",
+                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres,
+                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres,
+                 qdutils::MDPVersion::getInstance().getMaxMDPDownscale(),
+                 mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode,
+                 qdutils::MDPVersion::getInstance().isSrcSplit(),
+                 mHwcContext->mMDPDownscaleEnabled);
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].vsync_period =
                 (int) 1000000000l / fps;
     }
@@ -722,7 +764,61 @@ void ExternalDisplay::getAttrForMode(int& width, int& height, int& fps) {
             height = 2160;
             fps = 24;
             break;
-
+         case HDMI_VFRMT_1920x1200p60_16_10:
+            width = 1920;
+            height = 1200;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1680x1050p60_16_10:
+            width = 1680;
+            height = 1050;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1440x900p60_16_10:
+            width = 1440;
+            height = 900;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1280x800p60_16_10:
+            width = 1280;
+            height = 800;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1366x768p60_16_10:
+            width = 1366;
+            height = 768;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1360x768p60_16_9:
+            width = 1360;
+            height = 768;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_848x480p60_16_9:
+            width = 848;
+            height = 480;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1600x1200p60_4_3:
+            width = 1600;
+            height = 1200;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1400x1050p60_4_3:
+            width = 1400;
+            height = 1050;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_1280x960p60_4_3:
+            width = 1280;
+            height = 960;
+            fps = 60;
+            break;
+         case HDMI_VFRMT_800x600p60_4_3:
+            width = 800;
+            height = 600;
+            fps = 60;
+            break;
     }
 }
 
