@@ -33,6 +33,7 @@
 #include "overlay.h"
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
+#define DEBUG 0
 
 using namespace qdutils;
 namespace qhwc {
@@ -101,7 +102,8 @@ static void handle_thermal_event(hwc_context_t* ctx, int dpy, char *data,
 static void handle_cec_event(hwc_context_t* ctx, int dpy, char *data,
         ssize_t len)
 {
-    ALOGD("%s: Got CEC event from driver dpy:%d", __FUNCTION__, dpy);
+    ALOGD_IF(DEBUG, "%s: Got CEC event from driver dpy:%d",
+            __FUNCTION__, dpy);
     ctx->mQService->onCECMessageReceived(data, len);
 }
 
