@@ -46,6 +46,7 @@ int MDPComp::sSimulationFlags = 0;
 int MDPComp::sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
 bool MDPComp::sEnableYUVsplit = false;
 bool MDPComp::sSrcSplitEnabled = false;
+bool MDPComp::enablePartialUpdateForMDP3 = false;
 MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
     if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
         sSrcSplitEnabled = true;
@@ -162,6 +163,17 @@ bool MDPComp::init(hwc_context_t *ctx) {
                 (!strncmp(property, "1", PROPERTY_VALUE_MAX ))) {
         ctx->mCopyBit[HWC_DISPLAY_PRIMARY] = new CopyBit(ctx,
                                                     HWC_DISPLAY_PRIMARY);
+    }
+
+    if((property_get("persist.mdp3.partialUpdate", property, NULL) <= 0) &&
+          (ctx->mMDP.version == qdutils::MDP_V3_0_5)) {
+       enablePartialUpdateForMDP3 = true;
+    }
+
+    if(!enablePartialUpdateForMDP3 &&
+          (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+           (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+       enablePartialUpdateForMDP3 = true;
     }
 
     return true;
@@ -1878,6 +1890,13 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                     "MDP Composition Strategies Failed");
         }
     } else {
+        if ((ctx->mMDP.version == qdutils::MDP_V3_0_5) && ctx->mCopyBit[mDpy] &&
+                enablePartialUpdateForMDP3) {
+            generateROI(ctx, list);
+            for(int i = 0; i < ctx->listStats[mDpy].numAppLayers; i++) {
+                ctx->copybitDrop[i] = mCurrentFrame.drop[i];
+            }
+        }
         ALOGD_IF( isDebug(),"%s: MDP Comp not possible for this frame",
                 __FUNCTION__);
         ret = -1;
