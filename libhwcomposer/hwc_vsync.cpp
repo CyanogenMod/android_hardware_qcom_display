@@ -85,7 +85,8 @@ static void handle_blank_event(hwc_context_t* ctx, int dpy, char *data,
 static void handle_cec_event(hwc_context_t* ctx, int dpy, char *data,
         ssize_t len)
 {
-    ALOGD("%s: Got CEC event from driver dpy:%d", __FUNCTION__, dpy);
+    ALOGD_IF(logvsync, "%s: Got CEC event from driver dpy:%d",
+            __FUNCTION__, dpy);
     ctx->mQService->onCECMessageReceived(data, len);
 }
 

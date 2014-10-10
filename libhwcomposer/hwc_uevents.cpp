@@ -190,7 +190,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 ctx->mDrawLock.lock();
                 handle_online(ctx, dpy);
                 ctx->mDrawLock.unlock();
-
+                ctx->mQService->onHdmiHotplug(ctx->dpyAttr[dpy].connected);
                 ctx->proc->invalidate(ctx->proc);
                 break;
             } else {
