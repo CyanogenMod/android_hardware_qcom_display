@@ -101,19 +101,21 @@ void changeResolution(hwc_context_t *ctx, int xres_orig, int yres_orig,
     char *yptr = NULL;
     if (property_get("debug.hwc.fbsize", property, NULL) > 0) {
         yptr = strcasestr(property,"x");
-        int xres_new = atoi(property);
-        int yres_new = atoi(yptr + 1);
-        if (isValidResolution(ctx,xres_new,yres_new) &&
-                 xres_new != xres_orig && yres_new != yres_orig) {
-            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres_new = xres_new;
-            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres_new = yres_new;
-            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].customFBSize = true;
+        if(yptr) {
+            int xres_new = atoi(property);
+            int yres_new = atoi(yptr + 1);
+            if (isValidResolution(ctx,xres_new,yres_new) &&
+                xres_new != xres_orig && yres_new != yres_orig) {
+                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres_new = xres_new;
+                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres_new = yres_new;
+                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].customFBSize = true;
 
-            //Caluculate DPI according to changed resolution.
-            float xdpi = ((float)xres_new * 25.4f) / (float)width;
-            float ydpi = ((float)yres_new * 25.4f) / (float)height;
-            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xdpi = xdpi;
-            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].ydpi = ydpi;
+                //Caluculate DPI according to changed resolution.
+                float xdpi = ((float)xres_new * 25.4f) / (float)width;
+                float ydpi = ((float)yres_new * 25.4f) / (float)height;
+                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xdpi = xdpi;
+                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].ydpi = ydpi;
+            }
         }
     }
 }
