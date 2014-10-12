@@ -283,8 +283,10 @@ void initContext(hwc_context_t *ctx)
     // Only MDP copybit is used
     if ((compositionType & (qdutils::COMPOSITION_TYPE_DYN |
             qdutils::COMPOSITION_TYPE_MDP)) &&
+            ((qdutils::MDPVersion::getInstance().getMDPVersion() ==
+            qdutils::MDP_V3_0_4) ||
             (qdutils::MDPVersion::getInstance().getMDPVersion() ==
-            qdutils::MDP_V3_0_4)) {
+            qdutils::MDP_V3_0_5))) {
         ctx->mCopyBit[HWC_DISPLAY_PRIMARY] = new CopyBit(ctx,
                                                          HWC_DISPLAY_PRIMARY);
     }
@@ -2189,7 +2191,8 @@ bool canUseRotator(hwc_context_t *ctx, int dpy) {
         if(dpy == HWC_DISPLAY_PRIMARY)
             return false;
     }
-    if(ctx->mMDP.version == qdutils::MDP_V3_0_4)
+    if((ctx->mMDP.version == qdutils::MDP_V3_0_4)
+          ||(ctx->mMDP.version == qdutils::MDP_V3_0_5))
         return false;
     return true;
 }
