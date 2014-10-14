@@ -37,6 +37,7 @@
 
 #include "gralloc_priv.h"
 #include "software_converter.h"
+#include <qdMetaData.h>
 
 #define DEBUG_MDP_ERRORS 1
 
@@ -502,6 +503,13 @@ static int stretch_copybit(
             private_handle_t* src_hnd = (private_handle_t*)src->handle;
             if(src_hnd != NULL && src_hnd->flags & private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH) {
                 flags |=  MDP_BLIT_NON_CACHED;
+            }
+
+            // Set Color Space for MDP to configure CSC matrix
+            req->color_space = ITU_R_601;
+            MetaData_t *metadata = (MetaData_t *)src_hnd->base_metadata;
+            if (metadata && (metadata->operation & UPDATE_COLOR_SPACE)) {
+                req->color_space = metadata->colorSpace;
             }
 
             set_infos(ctx, req, flags);
