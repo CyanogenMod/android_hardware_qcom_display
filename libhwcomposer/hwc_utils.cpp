@@ -1113,22 +1113,24 @@ bool isSecureModePolicy(int mdpVersion) {
 bool isRotatorSupportedFormat(private_handle_t *hnd) {
     // Following rotator src formats are supported by mdp driver
     // TODO: Add more formats in future, if mdp driver adds support
-    switch(hnd->format) {
-        case HAL_PIXEL_FORMAT_RGBA_8888:
-        case HAL_PIXEL_FORMAT_RGB_565:
-        case HAL_PIXEL_FORMAT_RGB_888:
-        case HAL_PIXEL_FORMAT_BGRA_8888:
-            return true;
-        default:
-            return false;
+    if(hnd != NULL) {
+        switch(hnd->format) {
+            case HAL_PIXEL_FORMAT_RGBA_8888:
+            case HAL_PIXEL_FORMAT_RGB_565:
+            case HAL_PIXEL_FORMAT_RGB_888:
+            case HAL_PIXEL_FORMAT_BGRA_8888:
+                return true;
+            default:
+                return false;
+        }
     }
     return false;
 }
 
 bool isRotationDoable(hwc_context_t *ctx, private_handle_t *hnd) {
-    // Rotate layers, if it is YUV type or rendered by CPU and not
+    // Rotate layers, if it is not secure display buffer and not
     // for the MDP versions below MDP5
-    if((isCPURendered(hnd) && isRotatorSupportedFormat(hnd) &&
+    if((!isSecureDisplayBuffer(hnd) && isRotatorSupportedFormat(hnd) &&
         !ctx->mMDP.version < qdutils::MDSS_V5)
                    || isYuvBuffer(hnd)) {
         return true;

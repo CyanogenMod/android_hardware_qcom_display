@@ -440,10 +440,6 @@ static inline bool isTileRendered(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_TILE_RENDERED & hnd->flags));
 }
 
-static inline bool isCPURendered(const private_handle_t* hnd) {
-    return (hnd && (private_handle_t::PRIV_FLAGS_CPU_RENDERED & hnd->flags));
-}
-
 //Return true if buffer is marked locked
 static inline bool isBufferLocked(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags));
