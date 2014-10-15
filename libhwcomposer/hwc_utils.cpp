@@ -842,6 +842,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].yuv4k2kCount = 0;
     ctx->mViewFrame[dpy] = (hwc_rect_t){0, 0, 0, 0};
     ctx->dpyAttr[dpy].mActionSafePresent = isActionSafePresent(ctx, dpy);
+    ctx->listStats[dpy].secureRGBCount = 0;
 
     resetROI(ctx, dpy);
 
@@ -874,6 +875,12 @@ void setListStats(hwc_context_t *ctx,
 
         if (isSecureBuffer(hnd)) {
             ctx->listStats[dpy].isSecurePresent = true;
+            if(not isYuvBuffer(hnd)) {
+                // cache secureRGB layer parameters like we cache for YUV layers
+                int& secureRGBCount = ctx->listStats[dpy].secureRGBCount;
+                ctx->listStats[dpy].secureRGBIndices[secureRGBCount] = (int)i;
+                secureRGBCount++;
+            }
         }
 
         if (isSkipLayer(&list->hwLayers[i])) {
@@ -1446,22 +1453,20 @@ void setMdpFlags(hwc_context_t *ctx, hwc_layer_1_t *layer,
                 ovutils::OV_MDP_BLEND_FG_PREMULT);
     }
 
-    if(isYuvBuffer(hnd)) {
-        if(isSecureBuffer(hnd)) {
-            ovutils::setMdpFlags(mdpFlags,
-                    ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
-        }
-        if(metadata && (metadata->operation & PP_PARAM_INTERLACED) &&
-                metadata->interlaced) {
-            ovutils::setMdpFlags(mdpFlags,
-                    ovutils::OV_MDP_DEINTERLACE);
-        }
+    if(metadata && (metadata->operation & PP_PARAM_INTERLACED) &&
+            metadata->interlaced) {
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_DEINTERLACE);
+    }
+
+    // Mark MDP flags with SECURE_OVERLAY_SESSION for driver
+    if(isSecureBuffer(hnd)) {
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
     }
 
     if(isSecureDisplayBuffer(hnd)) {
-        // Secure display needs both SECURE_OVERLAY and SECURE_DISPLAY_OV
-        ovutils::setMdpFlags(mdpFlags,
-                             ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
+        // Mark MDP flags with SECURE_DISPLAY_OVERLAY_SESSION for driver
         ovutils::setMdpFlags(mdpFlags,
                              ovutils::OV_MDP_SECURE_DISPLAY_OVERLAY_SESSION);
     }
