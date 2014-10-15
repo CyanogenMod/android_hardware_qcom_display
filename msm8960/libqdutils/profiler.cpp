@@ -32,8 +32,9 @@
 
 #ifdef DEBUG_CALC_FPS
 
-
+namespace android {
 ANDROID_SINGLETON_STATIC_INSTANCE(qdutils::CalcFps) ;
+}
 
 namespace qdutils {
 
