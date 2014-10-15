@@ -339,6 +339,8 @@ struct hwc_context_t {
     bool mNeedsRotator;
     //Check if base pipe is set up
     bool mBasePipeSetup;
+    //Flags the transition of a video session
+    bool mVideoTransFlag;
 };
 
 namespace qhwc {
