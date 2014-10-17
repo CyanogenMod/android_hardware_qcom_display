@@ -622,6 +622,9 @@ struct hwc_context_t {
     bool copybitDrop[MAX_NUM_APP_LAYERS];
     // Flag related to windowboxing feature
     bool mWindowboxFeature;
+    // This denotes the tolerance between video layer and external display
+    // aspect ratio
+    float mAspectRatioToleranceLevel;
 };
 
 namespace qhwc {
