@@ -1915,6 +1915,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if(!mDpy && qdutils::MDPVersion::getInstance().isDynFpsSupported()) {
         FrameInfo frame;
         frame.reset(mCurrentFrame.layerCount);
+        memset(&frame.drop, 0, sizeof(frame.drop));
+        frame.dropCount = 0;
         ALOGD_IF(isDebug(), "%s: Update Cache and YUVInfo for Dyn Refresh Rate",
                  __FUNCTION__);
         updateLayerCache(ctx, list, frame);
