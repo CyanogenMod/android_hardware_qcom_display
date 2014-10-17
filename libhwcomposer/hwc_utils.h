@@ -141,6 +141,8 @@ struct ListStats {
     int secureRGBIndices[MAX_NUM_APP_LAYERS];
     //dyn refresh rate-Client requested refreshrate
     uint32_t refreshRateRequest;
+    // Flag related to windowboxing feature
+    bool mAIVVideoMode;
 };
 
 //PTOR Comp info
@@ -381,7 +383,7 @@ void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
 bool isZoomModeEnabled(hwc_rect_t crop);
 void updateCropAIVVideoMode(hwc_context_t *ctx, hwc_rect_t& crop, int dpy);
 void updateDestAIVVideoMode(hwc_context_t *ctx, hwc_rect_t& dst, int dpy);
-void updateExtDisplayCoordinates(hwc_context_t *ctx, hwc_rect_t& crop,
+void updateCoordinates(hwc_context_t *ctx, hwc_rect_t& crop,
                            hwc_rect_t& dst, int dpy);
 
 //Routine to configure low resolution panels (<= 2048 width)
@@ -618,8 +620,7 @@ struct hwc_context_t {
     bool mThermalBurstMode;
     //Layers out of ROI
     bool copybitDrop[MAX_NUM_APP_LAYERS];
-    // Flags related to windowboxing feature
-    bool mAIVVideoMode[HWC_NUM_DISPLAY_TYPES];
+    // Flag related to windowboxing feature
     bool mWindowboxFeature;
 };
 
