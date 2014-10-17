@@ -1465,7 +1465,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
             rotData.acq_fen_fd_cnt = 1; //1 ioctl call per rot session
         }
         int ret = 0;
-        if(not ctx->mLayerRotMap[dpy]->isRotCached(i))
+        if(LIKELY(!swapzero) and (not ctx->mLayerRotMap[dpy]->isRotCached(i)))
             ret = ioctl(rotFd, MSMFB_BUFFER_SYNC, &rotData);
 
         if(ret < 0) {
@@ -1487,43 +1487,45 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     //Accumulate acquireFenceFds for MDP Overlays
     if(list->outbufAcquireFenceFd >= 0) {
         //Writeback output buffer
-        acquireFd[count++] = list->outbufAcquireFenceFd;
+        if(LIKELY(!swapzero) )
+            acquireFd[count++] = list->outbufAcquireFenceFd;
     }
 
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(((isAbcInUse(ctx)== true ) ||
           (list->hwLayers[i].compositionType == HWC_OVERLAY)) &&
                         list->hwLayers[i].acquireFenceFd >= 0) {
-            if(UNLIKELY(swapzero))
-                acquireFd[count++] = -1;
-            // if ABC is enabled for more than one layer.
-            // renderBufIndexforABC will work as FB.Hence
-            // set the acquireFD from fd - which is coming from copybit
-            else if(fd >= 0 && (isAbcInUse(ctx) == true)) {
-                if(ctx->listStats[dpy].renderBufIndexforABC ==(int32_t)i)
-                   acquireFd[count++] = fd;
-                else
-                   continue;
-            } else
-                acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
+            if(LIKELY(!swapzero) ) {
+                // if ABC is enabled for more than one layer.
+                // renderBufIndexforABC will work as FB.Hence
+                // set the acquireFD from fd - which is coming from copybit
+                if(fd >= 0 && (isAbcInUse(ctx) == true)) {
+                    if(ctx->listStats[dpy].renderBufIndexforABC ==(int32_t)i)
+                        acquireFd[count++] = fd;
+                    else
+                        continue;
+                } else
+                    acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
+            }
         }
         if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
-            if(UNLIKELY(swapzero))
-                acquireFd[count++] = -1;
-            else if(fd >= 0) {
-                //set the acquireFD from fd - which is coming from c2d
-                acquireFd[count++] = fd;
-                // Buffer sync IOCTL should be async when using c2d fence is
-                // used
-                data.flags &= ~MDP_BUF_SYNC_FLAG_WAIT;
-            } else if(list->hwLayers[i].acquireFenceFd >= 0)
-                acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
+            if(LIKELY(!swapzero) ) {
+                if(fd >= 0) {
+                    //set the acquireFD from fd - which is coming from c2d
+                    acquireFd[count++] = fd;
+                    // Buffer sync IOCTL should be async when using c2d fence is
+                    // used
+                    data.flags &= ~MDP_BUF_SYNC_FLAG_WAIT;
+                } else if(list->hwLayers[i].acquireFenceFd >= 0)
+                    acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
+            }
         }
     }
 
     if ((fd >= 0) && !dpy && ctx->mPtorInfo.isActive()) {
         // Acquire c2d fence of Overlap render buffer
-        acquireFd[count++] = fd;
+        if(LIKELY(!swapzero) )
+            acquireFd[count++] = fd;
     }
 
     data.acq_fen_fd_cnt = count;
