@@ -182,6 +182,12 @@ enum {
     HWC_COPYBIT = 0x00000002,
 };
 
+// AIV specific flags
+enum {
+    HWC_AIV_VIDEO = 0x80000000,
+    HWC_AIV_CC    = 0x40000000,
+};
+
 // HAL specific features
 enum {
     HWC_COLOR_FILL = 0x00000008,
@@ -372,6 +378,12 @@ int configColorLayer(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
 void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
         hwc_rect_t& crop, overlay::Rotator *rot);
 
+bool isZoomModeEnabled(hwc_rect_t crop);
+void updateCropAIVVideoMode(hwc_context_t *ctx, hwc_rect_t& crop, int dpy);
+void updateDestAIVVideoMode(hwc_context_t *ctx, hwc_rect_t& dst, int dpy);
+void updateExtDisplayCoordinates(hwc_context_t *ctx, hwc_rect_t& crop,
+                           hwc_rect_t& dst, int dpy);
+
 //Routine to configure low resolution panels (<= 2048 width)
 int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
         ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
@@ -417,6 +429,14 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
     return (UNLIKELY(l && (l->flags & HWC_SKIP_LAYER)));
+}
+
+static inline bool isAIVVideoLayer(const hwc_layer_1_t* l) {
+    return (UNLIKELY(l && (l->flags & HWC_AIV_VIDEO)));
+}
+
+static inline bool isAIVCCLayer(const hwc_layer_1_t* l) {
+    return (UNLIKELY(l && (l->flags & HWC_AIV_CC)));
 }
 
 // Returns true if the buffer is yuv
@@ -598,6 +618,9 @@ struct hwc_context_t {
     bool mThermalBurstMode;
     //Layers out of ROI
     bool copybitDrop[MAX_NUM_APP_LAYERS];
+    // Flags related to windowboxing feature
+    bool mAIVVideoMode[HWC_NUM_DISPLAY_TYPES];
+    bool mWindowboxFeature;
 };
 
 namespace qhwc {
