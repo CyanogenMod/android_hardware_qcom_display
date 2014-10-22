@@ -27,6 +27,7 @@
 #include <sys/prctl.h>
 #include <poll.h>
 #include "hwc_utils.h"
+#include "hdmi.h"
 #include "qd_utils.h"
 #include "string.h"
 #include "overlay.h"
@@ -73,7 +74,9 @@ static void handle_blank_event(hwc_context_t* ctx, int dpy, char *data)
     if (!strncmp(data, PANEL_ON_STR, strlen(PANEL_ON_STR))) {
         unsigned long int poweron = strtoul(data + strlen(PANEL_ON_STR), NULL, 0);
         ALOGI("%s: dpy:%d panel power state: %ld", __FUNCTION__, dpy, poweron);
-        ctx->dpyAttr[dpy].isActive = poweron ? true: false;
+        if (!ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+            ctx->dpyAttr[dpy].isActive = poweron ? true: false;
+        }
     }
 }
 
