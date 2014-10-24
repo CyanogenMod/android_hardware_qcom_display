@@ -49,8 +49,8 @@ public:
         GET_DISPLAY_ATTRIBUTES,  // Get display attributes
         SET_HSIC_DATA,           // Set HSIC on dspp
         GET_DISPLAY_VISIBLE_REGION,  // Get the visibleRegion for dpy
-        PAUSE_WFD,               // Pause/Resume WFD
-        SET_WFD_STATUS,          // Set if wfd connection is on/off
+        SET_SECONDARY_DISPLAY_STATUS,  // Sets secondary display status
+        UNUSED_SLOT,             // XXX: Unsed - New one can go here
         SET_VIEW_FRAME,          // Set view frame of display
         DYNAMIC_DEBUG,           // Enable more logging on the fly
         SET_IDLE_TIMEOUT,        // Set idle timeout for GPU fallback
