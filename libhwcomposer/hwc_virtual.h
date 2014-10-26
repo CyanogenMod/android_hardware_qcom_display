@@ -40,8 +40,6 @@ public:
     virtual void init(hwc_context_t *ctx) = 0;
     virtual void destroy(hwc_context_t *ctx, size_t numDisplays,
                        hwc_display_contents_1_t** displays) = 0;
-    virtual void pause(hwc_context_t* ctx, int dpy) = 0;
-    virtual void resume(hwc_context_t* ctx, int dpy) = 0;
 };
 
 class HWCVirtualVDS : public HWCVirtualBase {
@@ -62,8 +60,6 @@ public:
     // during virtual display disconnect.
     virtual void destroy(hwc_context_t *ctx, size_t numDisplays,
                        hwc_display_contents_1_t** displays);
-    virtual void pause(hwc_context_t* ctx, int dpy);
-    virtual void resume(hwc_context_t* ctx, int dpy);
 };
 
 class HWCVirtualV4L2 : public HWCVirtualBase {
@@ -85,8 +81,6 @@ public:
     // during virtual display disconnect. This function is no-op for V4L2 design
     virtual void destroy(hwc_context_t *, size_t ,
                        hwc_display_contents_1_t** ) {};
-    virtual void pause(hwc_context_t* ctx, int dpy);
-    virtual void resume(hwc_context_t* ctx, int dpy);
 };
 
 }; //namespace
