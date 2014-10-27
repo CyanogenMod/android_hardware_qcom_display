@@ -38,6 +38,8 @@
 
 #include "gralloc_priv.h"
 #include "overlayUtils.h"
+#include "mdpWrapper.h"
+
 #define SIZE_1M 0x00100000
 
 namespace overlay {
@@ -78,6 +80,9 @@ public:
     /* return number of bufs */
     uint32_t numBufs() const ;
 
+    /* Set / unset secure with MDP */
+    bool setSecure(bool enable);
+
 private:
     /* actual os fd */
     int mFd;
@@ -99,6 +104,9 @@ private:
 
     /*Holds the aligned buffer size used for actual allocation*/
     uint32_t mBufSzAligned;
+
+    /* Flags if the buffer has been secured by MDP */
+    bool mSecured;
 };
 
 //-------------------Inlines-----------------------------------
@@ -112,6 +120,7 @@ inline OvMem::OvMem() {
     mAllocType = 0;
     mBufSz = 0;
     mNumBuffers = 0;
+    mSecured = false;
     mAlloc = gralloc::IAllocController::getInstance();
 }
 
@@ -157,6 +166,10 @@ inline bool OvMem::open(uint32_t numbufs,
     mBaseAddr = data.base;
     mAllocType = data.allocType;
 
+    if(isSecure) {
+        setSecure(true);
+    }
+
     return true;
 }
 
@@ -166,6 +179,10 @@ inline bool OvMem::close()
 
     if(!valid()) {
         return true;
+    }
+
+    if(mSecured) {
+        setSecure(false);
     }
 
     IMemAlloc* memalloc = mAlloc->getAllocator(mAllocType);
@@ -181,6 +198,27 @@ inline bool OvMem::close()
     mBufSz = 0;
     mBufSzAligned = 0;
     mNumBuffers = 0;
+    return true;
+}
+
+inline bool OvMem::setSecure(bool enable) {
+    OvFD fbFd;
+    if(!utils::openDev(fbFd, 0, Res::fbPath, O_RDWR)) {
+        ALOGE("OvMem::%s failed to init fb0", __FUNCTION__);
+        return false;
+    }
+    struct msmfb_secure_config config;
+    utils::memset0(config);
+    config.fd = mFd;
+    config.enable = enable;
+    if(!mdp_wrapper::setSecureBuffer(fbFd.getFD(), config)) {
+        ALOGE("OvMem::%s failed enable=%d", __FUNCTION__, enable);
+        fbFd.close();
+        mSecured = false;
+        return false;
+    }
+    fbFd.close();
+    mSecured = enable;
     return true;
 }
 

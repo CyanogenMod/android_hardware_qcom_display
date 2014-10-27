@@ -98,6 +98,9 @@ bool wbQueueBuffer(int fbfd, struct msmfb_data& fbData);
 /* MSMFB_WRITEBACK_DEQUEUE_BUFFER */
 bool wbDequeueBuffer(int fbfd, struct msmfb_data& fbData);
 
+/* MSMFB_SECURE */
+bool setSecureBuffer(int fbFd, struct msmfb_secure_config& config);
+
 /* the following are helper functions for dumping
  * msm_mdp and friends*/
 void dump(const char* const s, const msmfb_overlay_data& ov);
@@ -276,6 +279,15 @@ inline bool wbDequeueBuffer(int fbfd, struct msmfb_data& fbData) {
     if(ioctl(fbfd, MSMFB_WRITEBACK_DEQUEUE_BUFFER, &fbData) < 0) {
         ALOGE("Failed to call ioctl MSMFB_WRITEBACK_DEQUEUE_BUFFER err=%s",
                 strerror(errno));
+        return false;
+    }
+    return true;
+}
+
+inline bool setSecureBuffer(int fbFd, struct msmfb_secure_config& config) {
+    if(ioctl(fbFd, MSMFB_SECURE, &config) < 0) {
+        ALOGE("Failed to call ioctl MSMFB_SECURE err=%s buf_fd=%d enable=%d",
+                strerror(errno), config.fd, config.enable);
         return false;
     }
     return true;
