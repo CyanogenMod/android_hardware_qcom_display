@@ -114,7 +114,8 @@ bool MDPComp::init(hwc_context_t *ctx) {
     char property[PROPERTY_VALUE_MAX] = {0};
 
     sEnabled = false;
-    if((property_get("persist.hwc.mdpcomp.enable", property, NULL) > 0) &&
+    if((ctx->mMDP.version >= qdutils::MDP_V4_0) &&
+       (property_get("persist.hwc.mdpcomp.enable", property, NULL) > 0) &&
        (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
         (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
         sEnabled = true;
