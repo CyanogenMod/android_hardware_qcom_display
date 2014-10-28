@@ -585,9 +585,6 @@ struct hwc_context_t {
     // persist.hwc.enable_vds
     bool mVDSEnabled;
     struct gpu_hint_info mGPUHintInfo;
-    // When this mode is set, no draw cycles are permitted to go through but at
-    // the same time, overlay objects should not be GCed either
-    bool alwaysOn;
     // Flags related to windowboxing feature
     bool mAIVVideoMode[HWC_NUM_DISPLAY_TYPES];
     bool mWindowboxFeature;

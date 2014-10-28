@@ -296,7 +296,6 @@ void initContext(hwc_context_t *ctx)
     ctx->mGPUHintInfo.mPrevCompositionGLES = false;
     ctx->mGPUHintInfo.mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
 #endif
-    ctx->alwaysOn = false;
     // Read the system property to determine if windowboxing feature is enabled.
     ctx->mWindowboxFeature = false;
     if(property_get("sys.hwc.windowbox_feature", value, "false")
