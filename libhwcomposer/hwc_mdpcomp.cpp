@@ -390,9 +390,9 @@ bool MDPComp::LayerCache::isSameFrame(const FrameInfo& curFrame,
 bool MDPComp::isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     if((has90Transform(layer) and (not isRotationDoable(ctx, hnd))) ||
-        (not isValidDimension(ctx,layer))
-        //More conditions here, SKIP, sRGB+Blend etc
-        ) {
+        (not isValidDimension(ctx,layer)) ||
+        isSkipLayer(layer)) {
+        //More conditions here, sRGB+Blend etc
         return false;
     }
     return true;
@@ -782,13 +782,6 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         return false;
     }
 
-    if(isSkipPresent(ctx, mDpy)) {
-        ALOGD_IF(isDebug(),"%s: SKIP present: %d",
-                __FUNCTION__,
-                isSkipPresent(ctx, mDpy));
-        return false;
-    }
-
     // if secondary is configuring or Padding round, fall back to video only
     // composition and release all assigned non VIG pipes from primary.
     if(isSecondaryConfiguring(ctx)) {
@@ -1123,7 +1116,8 @@ bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
     }
 
     bool ret = false;
-    if(list->flags & HWC_GEOMETRY_CHANGED) { //Try load based first
+    if(isSkipPresent(ctx, mDpy) or list->flags & HWC_GEOMETRY_CHANGED) {
+        //Try load based first
         ret =   loadBasedComp(ctx, list) or
                 cacheBasedComp(ctx, list);
     } else {
