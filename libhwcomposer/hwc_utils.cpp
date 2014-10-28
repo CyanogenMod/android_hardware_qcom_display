@@ -286,6 +286,13 @@ void initContext(hwc_context_t *ctx)
     ctx->mGPUHintInfo.mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
 #endif
     ctx->alwaysOn = false;
+    // Read the system property to determine if windowboxing feature is enabled.
+    ctx->mWindowboxFeature = false;
+    if(property_get("sys.hwc.windowbox_feature", value, "false")
+            && !strcmp(value, "true")) {
+        ctx->mWindowboxFeature = true;
+    }
+
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
 }
@@ -844,6 +851,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->dpyAttr[dpy].mActionSafePresent = isActionSafePresent(ctx, dpy);
     ctx->listStats[dpy].secureRGBCount = 0;
 
+    ctx->mAIVVideoMode[dpy] = false;
     resetROI(ctx, dpy);
 
     // Calculate view frame of ext display from primary resolution
@@ -858,6 +866,9 @@ void setListStats(hwc_context_t *ctx,
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
 #ifdef QCOM_BSP
+        if(ctx->mWindowboxFeature && dpy && isAIVVideoLayer(layer)) {
+            ctx->mAIVVideoMode[dpy] = true;
+        }
         if (layer->flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
             ctx->listStats[dpy].isDisplayAnimating = true;
         }
@@ -1620,6 +1631,66 @@ void updateSource(eTransform& orient, Whf& whf,
     }
 }
 
+bool isZoomModeEnabled(hwc_rect_t crop) {
+    // This does not work for zooming in top left corner of the image
+    return(crop.top > 0 || crop.left > 0);
+}
+
+void updateCropAIVVideoMode(hwc_context_t *ctx, hwc_rect_t& crop, int dpy) {
+    ALOGD_IF(HWC_UTILS_DEBUG, "dpy %d Source crop [%d %d %d %d]", dpy,
+             crop.left, crop.top, crop.right, crop.bottom);
+    if(isZoomModeEnabled(crop)) {
+        Dim srcCrop(crop.left, crop.top,
+                crop.right - crop.left,
+                crop.bottom - crop.top);
+        int extW = ctx->dpyAttr[dpy].xres;
+        int extH = ctx->dpyAttr[dpy].yres;
+        //Crop the original video in order to fit external display aspect ratio
+        if(srcCrop.w * extH < extW * srcCrop.h) {
+            int offset = (srcCrop.h - ((srcCrop.w * extH) / extW)) / 2;
+            crop.top += offset;
+            crop.bottom -= offset;
+        } else {
+            int offset = (srcCrop.w - ((extW * srcCrop.h) / extH)) / 2;
+            crop.left += offset;
+            crop.right -= offset;
+        }
+        ALOGD_IF(HWC_UTILS_DEBUG, "External Resolution [%d %d] dpy %d Modified"
+                 " source crop [%d %d %d %d]", extW, extH, dpy,
+                 crop.left, crop.top, crop.right, crop.bottom);
+    }
+}
+
+void updateDestAIVVideoMode(hwc_context_t *ctx, hwc_rect_t crop,
+                           hwc_rect_t& dst, int dpy) {
+    ALOGD_IF(HWC_UTILS_DEBUG, "dpy %d Destination position [%d %d %d %d]", dpy,
+             dst.left, dst.top, dst.right, dst.bottom);
+    Dim srcCrop(crop.left, crop.top,
+            crop.right - crop.left,
+            crop.bottom - crop.top);
+    int extW = ctx->dpyAttr[dpy].xres;
+    int extH = ctx->dpyAttr[dpy].yres;
+    // Set the destination coordinates of external display to full screen,
+    // when zoom in mode is enabled or video aspect ratio matches with the
+    // external display aspect ratio
+    if((srcCrop.w * extH == extW * srcCrop.h) || (isZoomModeEnabled(crop))) {
+        dst.left = 0;
+        dst.top = 0;
+        dst.right = extW;
+        dst.bottom = extH;
+    }
+    ALOGD_IF(HWC_UTILS_DEBUG, "External Resolution [%d %d] dpy %d Modified"
+             " Destination position [%d %d %d %d] Source crop [%d %d %d %d]",
+             extW, extH, dpy, dst.left, dst.top, dst.right, dst.bottom,
+             crop.left, crop.top, crop.right, crop.bottom);
+}
+
+void updateExtDisplayCoordinates(hwc_context_t *ctx, hwc_rect_t& crop,
+                           hwc_rect_t& dst, int dpy) {
+    updateCropAIVVideoMode(ctx, crop, dpy);
+    updateDestAIVVideoMode(ctx, crop, dst, dpy);
+}
+
 int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy, eMdpFlags& mdpFlags, eZorder& z,
         eIsFg& isFg, const eDest& dest, Rotator **rot) {
@@ -1653,7 +1724,10 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         else if (hnd->format == HAL_PIXEL_FORMAT_RGBX_8888)
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
     }
-
+    // update source crop and destination position of AIV video layer.
+    if(ctx->mAIVVideoMode[dpy] && isYuvBuffer(hnd)) {
+        updateExtDisplayCoordinates(ctx, crop, dst, dpy);
+    }
     calcExtDisplayPosition(ctx, hnd, dpy, crop, dst, transform, orient);
 
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
@@ -1760,6 +1834,11 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRA_8888);
         else if (hnd->format == HAL_PIXEL_FORMAT_RGBX_8888)
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
+    }
+
+    // update source crop and destination position of AIV video layer.
+    if(ctx->mAIVVideoMode[dpy] && isYuvBuffer(hnd)) {
+        updateExtDisplayCoordinates(ctx, crop, dst, dpy);
     }
 
     /* Calculate the external display position based on MDP downscale,
@@ -1903,6 +1982,11 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     Whf whf(getWidth(hnd), getHeight(hnd),
             getMdpFormat(hnd->format), (uint32_t)hnd->size);
+
+    // update source crop and destination position of AIV video layer.
+    if(ctx->mAIVVideoMode[dpy] && isYuvBuffer(hnd)) {
+        updateExtDisplayCoordinates(ctx, crop, dst, dpy);
+    }
 
     /* Calculate the external display position based on MDP downscale,
        ActionSafe, and extorientation features. */
