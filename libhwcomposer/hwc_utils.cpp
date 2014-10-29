@@ -74,7 +74,7 @@ EGLAPI EGLBoolean eglGpuPerfHintQCOM(EGLDisplay dpy, EGLContext ctx,
 #endif
 #endif
 
-#define PROP_DEFAULT_APPBUFFER  "ro.sf.default_app_buffer"
+#define PROP_DEFAULT_APPBUFFER  "sf.default.app_buffer_count"
 #define MAX_RAM_SIZE  512*1024*1024
 #define qHD_WIDTH 540
 
