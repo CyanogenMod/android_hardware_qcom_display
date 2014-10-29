@@ -57,7 +57,7 @@ namespace qdutils {
 #define MDSS_MDP_HW_REV_103 0x10030000 //8084
 #endif
 #ifndef MDSS_MDP_HW_REV_104
-#define MDSS_MDP_HW_REV_104 0x10040000 //Next version
+#define MDSS_MDP_HW_REV_104 0x10040000 //Unused
 #endif
 #ifndef MDSS_MDP_HW_REV_105
 #define MDSS_MDP_HW_REV_105 0x10050000 //8994
@@ -66,13 +66,16 @@ namespace qdutils {
 #define MDSS_MDP_HW_REV_106 0x10060000 //8x16
 #endif
 #ifndef MDSS_MDP_HW_REV_107
-#define MDSS_MDP_HW_REV_107 0x10070000 //Next version
+#define MDSS_MDP_HW_REV_107 0x10070000 //Unused
 #endif
 #ifndef MDSS_MDP_HW_REV_108
 #define MDSS_MDP_HW_REV_108 0x10080000 //8x39 & 8x36
 #endif
 #ifndef MDSS_MDP_HW_REV_109
-#define MDSS_MDP_HW_REV_109 0x10090000 //Next version
+#define MDSS_MDP_HW_REV_109 0x10090000 //8994 v2
+#endif
+#ifndef MDSS_MDP_HW_REV_110
+#define MDSS_MDP_HW_REV_110 0x100a0000 //Next version
 #endif
 #ifndef MDSS_MDP_HW_REV_200
 #define MDSS_MDP_HW_REV_200 0x20000000 //8092
@@ -470,8 +473,10 @@ bool MDPVersion::is8092() {
 }
 
 bool MDPVersion::is8994() {
-    return (mMdpRev >= MDSS_MDP_HW_REV_105 and
-            mMdpRev < MDSS_MDP_HW_REV_106);
+    return ((mMdpRev >= MDSS_MDP_HW_REV_105 and
+            mMdpRev < MDSS_MDP_HW_REV_106) or
+            (mMdpRev >= MDSS_MDP_HW_REV_109 and
+            mMdpRev < MDSS_MDP_HW_REV_110));
 }
 
 bool MDPVersion::is8x16() {
