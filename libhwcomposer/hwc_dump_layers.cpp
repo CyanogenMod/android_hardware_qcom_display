@@ -331,6 +331,8 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
                 tempSkBmpConfig = SkBitmap::kARGB_8888_Config;
                 break;
             case HAL_PIXEL_FORMAT_RGB_565:
+            case HAL_PIXEL_FORMAT_RGBA_5551:
+            case HAL_PIXEL_FORMAT_RGBA_4444:
                 tempSkBmpConfig = SkBitmap::kRGB_565_Config;
                 break;
             case HAL_PIXEL_FORMAT_RGB_888:
@@ -393,6 +395,12 @@ void HwcDebug::getHalPixelFormatStr(int format, char pixFormatStr[])
             break;
         case HAL_PIXEL_FORMAT_BGRA_8888:
             strlcpy(pixFormatStr, "BGRA_8888", sizeof(pixFormatStr));
+            break;
+        case HAL_PIXEL_FORMAT_RGBA_5551:
+            strlcpy(pixFormatStr, "RGBA_5551", sizeof(pixFormatStr));
+            break;
+        case HAL_PIXEL_FORMAT_RGBA_4444:
+            strlcpy(pixFormatStr, "RGBA_4444", sizeof(pixFormatStr));
             break;
         case HAL_PIXEL_FORMAT_YV12:
             strlcpy(pixFormatStr, "YV12", sizeof(pixFormatStr));
