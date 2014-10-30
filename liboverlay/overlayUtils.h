@@ -432,6 +432,8 @@ inline bool isRgb(uint32_t format) {
         case MDP_BGRA_8888:
         case MDP_RGBX_8888:
         case MDP_RGB_565:
+        case MDP_RGBA_4444:
+        case MDP_RGBA_5551:
             return true;
         default:
             return false;
@@ -443,6 +445,8 @@ inline const char* getFormatString(int format){
     #define STR(f) #f;
     static const char* formats[MDP_IMGTYPE_LIMIT + 1] = {0};
     formats[MDP_RGB_565] = STR(MDP_RGB_565);
+    formats[MDP_RGBA_5551] = STR(MDP_RGBA_5551);
+    formats[MDP_RGBA_4444] = STR(MDP_RGBA_4444);
     formats[MDP_XRGB_8888] = STR(MDP_XRGB_8888);
     formats[MDP_Y_CBCR_H2V2] = STR(MDP_Y_CBCR_H2V2);
     formats[MDP_Y_CBCR_H2V2_ADRENO] = STR(MDP_Y_CBCR_H2V2_ADRENO);
