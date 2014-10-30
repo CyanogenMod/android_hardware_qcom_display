@@ -104,7 +104,15 @@ struct HWLayersInfo {
                             //!< relies on the total flag count to check the number of strategies
                             //!< that are attempted for this layer stack.
 
-  HWLayersInfo() : stack(NULL), count(0), flags(0) { }
+  HWLayersInfo() {
+    Reset();
+  }
+
+  void Reset() {
+    stack = NULL;
+    count = 0;
+    flags = 0;
+  }
 };
 
 class StrategyInterface {

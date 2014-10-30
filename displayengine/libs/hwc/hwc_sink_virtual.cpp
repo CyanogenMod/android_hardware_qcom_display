@@ -32,7 +32,7 @@
 
 namespace sde {
 
-HWCSinkVirtual::HWCSinkVirtual(CoreInterface *core_intf, hwc_procs_t const *hwc_procs)
+HWCSinkVirtual::HWCSinkVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
   : HWCSink(core_intf, hwc_procs, kVirtual, HWC_DISPLAY_VIRTUAL) {
 }
 

@@ -31,7 +31,7 @@ namespace sde {
 
 class HWCSinkPrimary : public HWCSink {
  public:
-  explicit HWCSinkPrimary(CoreInterface *core_intf, hwc_procs_t const *hwc_procs);
+  explicit HWCSinkPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
   virtual int Init();
   virtual int Deinit();
   virtual int Prepare(hwc_display_contents_1_t *content_list);

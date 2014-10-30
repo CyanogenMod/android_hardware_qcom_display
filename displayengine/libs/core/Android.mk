@@ -17,6 +17,7 @@ LOCAL_SRC_FILES               := core_interface.cpp \
                                  comp_manager.cpp \
                                  strategy_default.cpp \
                                  res_manager.cpp \
+                                 res_config.cpp \
                                  writeback_session.cpp \
                                  hw_interface.cpp \
                                  hw_framebuffer.cpp \

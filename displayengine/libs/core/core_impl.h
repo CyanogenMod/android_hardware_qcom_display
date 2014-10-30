@@ -31,6 +31,7 @@
 
 #include "hw_interface.h"
 #include "comp_manager.h"
+#include "writeback_session.h"
 
 #define SET_REVISION(major, minor) ((major << 8) | minor)
 
@@ -60,6 +61,7 @@ class CoreImpl : public CoreInterface {
   CoreEventHandler *event_handler_;
   HWInterface *hw_intf_;
   CompManager comp_mgr_;
+  WritebackSession wb_session_;
 };
 
 }  // namespace sde

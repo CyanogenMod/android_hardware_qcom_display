@@ -66,41 +66,199 @@ HWCSession::HWCSession(const hw_module_t *module) : core_intf_(NULL), hwc_procs_
 }
 
 int HWCSession::Init() {
+  DisplayError error = CoreInterface::CreateCore(this, &core_intf_);
+  if (UNLIKELY(error != kErrorNone)) {
+    DLOGE("Display core initialization failed. Error = %d", error);
+    return -EINVAL;
+  }
+
+  int status = -EINVAL;
+
+  // Create and power on primary display
+  sink_primary_ = new HWCSinkPrimary(core_intf_, &hwc_procs_);
+  if (UNLIKELY(!sink_primary_)) {
+    CoreInterface::DestroyCore();
+    return -ENOMEM;
+  }
+
+  status = sink_primary_->Init();
+  if (UNLIKELY(status)) {
+    CoreInterface::DestroyCore();
+    delete sink_primary_;
+    return status;
+  }
+
+  status = sink_primary_->PowerOn();
+  if (UNLIKELY(status)) {
+    CoreInterface::DestroyCore();
+    sink_primary_->Deinit();
+    delete sink_primary_;
+    return status;
+  }
+
   return 0;
 }
 
 int HWCSession::Deinit() {
+  sink_primary_->PowerOff();
+  sink_primary_->Deinit();
+  delete sink_primary_;
+
+  DisplayError error = CoreInterface::DestroyCore();
+  if (error != kErrorNone) {
+    DLOGE("Display core de-initialization failed. Error = %d", error);
+  }
+
   return 0;
 }
 
 int HWCSession::Open(const hw_module_t *module, const char *name, hw_device_t **device) {
+  if (UNLIKELY(!module || !name || !device)) {
+    DLOGE("::%s Invalid parameters.", __FUNCTION__);
+    return -EINVAL;
+  }
+
+  if (LIKELY(!strcmp(name, HWC_HARDWARE_COMPOSER))) {
+    HWCSession *hwc_session = new HWCSession(module);
+    if (UNLIKELY(!hwc_session)) {
+      return -ENOMEM;
+    }
+
+    int status = hwc_session->Init();
+    if (UNLIKELY(status != 0)) {
+      delete hwc_session;
+      return status;
+    }
+
+    hwc_composer_device_1_t *composer_device = hwc_session;
+    *device = reinterpret_cast<hw_device_t *>(composer_device);
+  }
+
   return 0;
 }
 
 int HWCSession::Close(hw_device_t *device) {
+  if (UNLIKELY(!device)) {
+    return -EINVAL;
+  }
+
+  hwc_composer_device_1_t *composer_device = reinterpret_cast<hwc_composer_device_1_t *>(device);
+  HWCSession *hwc_session = static_cast<HWCSession *>(composer_device);
+
+  hwc_session->Deinit();
+  delete hwc_session;
+
   return 0;
 }
 
 int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
                         hwc_display_contents_1_t **displays) {
-  return 0;
+  if (UNLIKELY(!device || !displays)) {
+    return -EINVAL;
+  }
+
+  HWCSession *hwc_session = static_cast<HWCSession *>(device);
+  int status = -EINVAL;
+
+  for (size_t i = 0; i < num_displays; i++) {
+    hwc_display_contents_1_t *content_list = displays[i];
+    if (UNLIKELY(!content_list || !content_list->numHwLayers)) {
+      DLOGE("::%s Invalid content list.", __FUNCTION__);
+      return -EINVAL;
+    }
+
+    switch (i) {
+    case HWC_DISPLAY_PRIMARY:
+      status = hwc_session->sink_primary_->Prepare(content_list);
+      break;
+    default:
+      status = -EINVAL;
+    }
+
+    if (UNLIKELY(!status)) {
+      break;
+    }
+  }
+
+  return status;
 }
 
 int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
                     hwc_display_contents_1_t **displays) {
-  return 0;
+  if (UNLIKELY(!device || !displays)) {
+    return -EINVAL;
+  }
+
+  HWCSession *hwc_session = static_cast<HWCSession *>(device);
+  int status = -EINVAL;
+
+  for (size_t i = 0; i < num_displays; i++) {
+    hwc_display_contents_1_t *content_list = displays[i];
+    if (UNLIKELY(!content_list || !content_list->numHwLayers)) {
+      DLOGE("::%s Invalid content list.", __FUNCTION__);
+      return -EINVAL;
+    }
+
+    switch (i) {
+    case HWC_DISPLAY_PRIMARY:
+      status = hwc_session->sink_primary_->Commit(content_list);
+      break;
+    default:
+      status = -EINVAL;
+    }
+
+    if (UNLIKELY(!status)) {
+      break;
+    }
+  }
+
+  return status;
 }
 
 int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event, int enable) {
+  if (UNLIKELY(!device)) {
+    return -EINVAL;
+  }
+
+  HWCSession *hwc_session = static_cast<HWCSession *>(device);
+  int status = -EINVAL;
+
+  switch (disp) {
+  case HWC_DISPLAY_PRIMARY:
+    status = hwc_session->sink_primary_->EventControl(event, enable);
+    break;
+  default:
+    status = -EINVAL;
+  }
+
   return 0;
 }
 
 int HWCSession::Blank(hwc_composer_device_1 *device, int disp, int blank) {
-  return 0;
+  if (UNLIKELY(!device)) {
+    return -EINVAL;
+  }
+
+  HWCSession *hwc_session = static_cast<HWCSession *>(device);
+  int status = -EINVAL;
+
+  switch (disp) {
+  case HWC_DISPLAY_PRIMARY:
+    status = hwc_session->sink_primary_->Blank(blank);
+    break;
+  default:
+    status = -EINVAL;
+  }
+
+  return status;
 }
 
 int HWCSession::Query(hwc_composer_device_1 *device, int param, int *value) {
-  return 0;
+  if (UNLIKELY(!device || !value)) {
+    return -EINVAL;
+  }
+
+  return -EINVAL;
 }
 
 void HWCSession::RegisterProcs(hwc_composer_device_1 *device, hwc_procs_t const *procs) {
@@ -113,16 +271,51 @@ void HWCSession::RegisterProcs(hwc_composer_device_1 *device, hwc_procs_t const 
 }
 
 void HWCSession::Dump(hwc_composer_device_1 *device, char *buffer, int length) {
+  if (UNLIKELY(!device || !buffer || !length)) {
+    return;
+  }
+
+  DebugInterface::GetDump(reinterpret_cast<uint8_t *>(buffer), length);
 }
 
 int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint32_t *configs,
                                   size_t *num_configs) {
-  return 0;
+  if (UNLIKELY(!device || !configs || !num_configs)) {
+    return -EINVAL;
+  }
+
+  HWCSession *hwc_session = static_cast<HWCSession *>(device);
+  int status = -EINVAL;
+
+  switch (disp) {
+  case HWC_DISPLAY_PRIMARY:
+    status = hwc_session->sink_primary_->GetDisplayConfigs(configs, num_configs);
+    break;
+  default:
+    status = -EINVAL;
+  }
+
+  return status;
 }
 
 int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, uint32_t config,
                                      const uint32_t *attributes, int32_t *values) {
-  return 0;
+  if (UNLIKELY(!device || !attributes || !values)) {
+    return -EINVAL;
+  }
+
+  HWCSession *hwc_session = static_cast<HWCSession *>(device);
+  int status = -EINVAL;
+
+  switch (disp) {
+  case HWC_DISPLAY_PRIMARY:
+    status = hwc_session->sink_primary_->GetDisplayAttributes(config, attributes, values);
+    break;
+  default:
+    status = -EINVAL;
+  }
+
+  return status;
 }
 
 DisplayError HWCSession::Hotplug(const CoreEventHotplug &hotplug) {

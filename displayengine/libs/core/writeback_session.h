@@ -33,10 +33,12 @@ namespace sde {
 
 class WritebackSession {
  public:
-  DisplayError Init();
+  WritebackSession();
+  DisplayError Init(HWInterface *hw_intf, HWResourceInfo hw_res_info);
   DisplayError Deinit();
 
  private:
+  HWInterface *hw_intf_;
 };
 
 }  // namespace sde

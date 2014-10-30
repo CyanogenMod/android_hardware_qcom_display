@@ -36,20 +36,39 @@ class HWCSink : public DeviceEventHandler {
   virtual int Deinit();
   virtual int Prepare(hwc_display_contents_1_t *content_list) = 0;
   virtual int Commit(hwc_display_contents_1_t *content_list) = 0;
+  virtual int EventControl(int event, int enable);
   virtual int Blank(int blank);
   virtual int GetDisplayConfigs(uint32_t *configs, size_t *num_configs);
   virtual int GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values);
+  int SetState(DeviceState state);
 
  protected:
-  HWCSink(CoreInterface *core_intf, hwc_procs_t const *hwc_procs, DeviceType type, int id);
+  HWCSink(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DeviceType type, int id);
   virtual ~HWCSink() { }
 
   // DeviceEventHandler methods
   virtual DisplayError VSync(const DeviceEventVSync &vsync);
   virtual DisplayError Refresh();
 
+  virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
+  virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
+  virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
+  inline void SetRect(LayerRect *target, const hwc_rect_t &source);
+  inline void SetRect(LayerRect *target, const hwc_frect_t &source);
+  inline void SetComposition(LayerComposition *target, const int32_t &source);
+  inline void SetComposition(int32_t *target, const LayerComposition &source);
+  inline void SetBlending(LayerBlending *target, const int32_t &source);
+  inline int SetFormat(LayerBufferFormat *target, const int &source);
+
+  // Structure to track memory allocation for layer stack (layers, rectangles) object.
+  struct LayerStackMemory : LayerStack {
+    static const size_t kSizeSteps = 4096;  // Default memory allocation.
+    uint8_t *raw;  // Pointer to byte array.
+    size_t size;  // Current number of allocated bytes.
+  } layer_stack_;
+
   CoreInterface *core_intf_;
-  hwc_procs_t const *hwc_procs_;
+  hwc_procs_t const **hwc_procs_;
   DeviceType type_;
   int id_;
   DeviceInterface *device_intf_;

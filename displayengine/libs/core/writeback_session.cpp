@@ -33,7 +33,11 @@
 
 namespace sde {
 
-DisplayError WritebackSession::Init() {
+WritebackSession::WritebackSession() : hw_intf_(NULL) {
+}
+
+DisplayError WritebackSession::Init(HWInterface *hw_intf, HWResourceInfo hw_res_info) {
+  hw_intf_ = hw_intf;
   return kErrorNone;
 }
 

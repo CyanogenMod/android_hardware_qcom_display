@@ -32,6 +32,8 @@
 
 #include "core_impl.h"
 #include "device_primary.h"
+#include "device_hdmi.h"
+#include "device_virtual.h"
 
 namespace sde {
 
@@ -49,8 +51,22 @@ DisplayError CoreImpl::Init() {
     return error;
   }
 
-  error = comp_mgr_.Init();
+  HWResourceInfo hw_res_info;
+  error = hw_intf_->GetHWCapabilities(&hw_res_info);
   if (UNLIKELY(error != kErrorNone)) {
+    HWInterface::Destroy(hw_intf_);
+    return error;
+  }
+
+  error = comp_mgr_.Init(hw_res_info);
+  if (UNLIKELY(error != kErrorNone)) {
+    HWInterface::Destroy(hw_intf_);
+    return error;
+  }
+
+  error = wb_session_.Init(hw_intf_, hw_res_info);
+  if (UNLIKELY(error != kErrorNone)) {
+    comp_mgr_.Deinit();
     HWInterface::Destroy(hw_intf_);
     return error;
   }
@@ -61,6 +77,7 @@ DisplayError CoreImpl::Init() {
 DisplayError CoreImpl::Deinit() {
   SCOPE_LOCK(locker_);
 
+  wb_session_.Deinit();
   comp_mgr_.Deinit();
   HWInterface::Destroy(hw_intf_);
 
@@ -75,6 +92,36 @@ DisplayError CoreImpl::CreateDevice(DeviceType type, DeviceEventHandler *event_h
     return kErrorParameters;
   }
 
+  DeviceBase *device_base = NULL;
+  switch (type) {
+  case kPrimary:
+    device_base = new DevicePrimary(event_handler, hw_intf_, &comp_mgr_);
+    break;
+
+  case kHWHDMI:
+    device_base = new DeviceHDMI(event_handler, hw_intf_, &comp_mgr_);
+    break;
+
+  case kVirtual:
+    device_base = new DeviceVirtual(event_handler, hw_intf_, &comp_mgr_);
+    break;
+
+  default:
+    DLOGE("Spurious device type %d", type);
+    return kErrorParameters;
+  }
+
+  if (UNLIKELY(!device_base)) {
+    return kErrorMemory;
+  }
+
+  DisplayError error = device_base->Init();
+  if (UNLIKELY(error != kErrorNone)) {
+    delete device_base;
+    return error;
+  }
+
+  *intf = device_base;
   return kErrorNone;
 }
 
@@ -84,6 +131,10 @@ DisplayError CoreImpl::DestroyDevice(DeviceInterface *intf) {
   if (UNLIKELY(!intf)) {
     return kErrorParameters;
   }
+
+  DeviceBase *device_base = static_cast<DeviceBase *>(intf);
+  device_base->Deinit();
+  delete device_base;
 
   return kErrorNone;
 }
