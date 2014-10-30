@@ -129,6 +129,9 @@ struct ListStats {
     bool isSecurePresent;
     hwc_rect_t lRoi;  //left ROI
     hwc_rect_t rRoi;  //right ROI. Unused in single DSI panels.
+    // Secure RGB specific
+    int secureRGBCount;
+    int secureRGBIndices[MAX_NUM_APP_LAYERS];
 };
 
 struct LayerProp {
