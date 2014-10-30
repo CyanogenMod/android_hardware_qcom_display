@@ -547,6 +547,7 @@ struct hwc_context_t {
     struct gpu_hint_info mGPUHintInfo;
     // PTOR Info
     qhwc::PtorInfo mPtorInfo;
+    uint32_t mIsPTOREnabled;
 };
 
 namespace qhwc {

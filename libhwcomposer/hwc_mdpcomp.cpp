@@ -663,7 +663,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
             ctx->mOverlay->availablePipes(mDpy, Overlay::MIXER_DEFAULT));
 
     // Hard checks where we cannot use this mode
-    if (mDpy || !ctx->mCopyBit[mDpy]) {
+    if (mDpy || !ctx->mCopyBit[mDpy] || !ctx->mIsPTOREnabled) {
         ALOGD_IF(isDebug(), "%s: Feature not supported!", __FUNCTION__);
         return false;
     }
