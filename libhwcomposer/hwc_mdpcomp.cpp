@@ -672,7 +672,9 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     int priDispW = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
 
-    if(sIdleFallBack && !ctx->listStats[mDpy].secureUI) {
+    // No Idle fall back, if secure display or secure RGB layers are present
+    if(sIdleFallBack && (!ctx->listStats[mDpy].secureUI &&
+                    !ctx->listStats[mDpy].secureRGBCount)) {
         ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
         return false;
     }
@@ -843,6 +845,8 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
     }
 
     updateYUV(ctx, list, false /*secure only*/);
+    /* mark secure RGB layers for MDP comp */
+    updateSecureRGB(ctx, list);
     bool ret = markLayersForCaching(ctx, list); //sets up fbZ also
     if(!ret) {
         ALOGD_IF(isDebug(),"%s: batching failed, dpy %d",__FUNCTION__, mDpy);
@@ -1031,6 +1035,64 @@ bool MDPComp::videoOnlyComp(hwc_context_t *ctx,
     return true;
 }
 
+/* if tryFullFrame fails, try to push all video and secure RGB layers to MDP */
+bool MDPComp::tryMDPOnlyLayers(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    const bool secureOnly = true;
+    return mdpOnlyLayersComp(ctx, list, not secureOnly) or
+            mdpOnlyLayersComp(ctx, list, secureOnly);
+
+}
+
+bool MDPComp::mdpOnlyLayersComp(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list, bool secureOnly) {
+
+    if(sSimulationFlags & MDPCOMP_AVOID_MDP_ONLY_LAYERS)
+        return false;
+
+    /* Bail out if we are processing only secured video layers
+     * and we dont have any */
+    if(!isSecurePresent(ctx, mDpy) && secureOnly){
+        reset(ctx);
+        return false;
+    }
+
+    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+    mCurrentFrame.reset(numAppLayers);
+    mCurrentFrame.fbCount -= mCurrentFrame.dropCount;
+
+    updateYUV(ctx, list, secureOnly);
+    /* mark secure RGB layers for MDP comp */
+    updateSecureRGB(ctx, list);
+
+    if(mCurrentFrame.mdpCount == 0) {
+        reset(ctx);
+        return false;
+    }
+
+    /* find the maximum batch of layers to be marked for framebuffer */
+    bool ret = markLayersForCaching(ctx, list); //sets up fbZ also
+    if(!ret) {
+        ALOGD_IF(isDebug(),"%s: batching failed, dpy %d",__FUNCTION__, mDpy);
+        reset(ctx);
+        return false;
+    }
+
+    if(sEnable4k2kYUVSplit){
+        adjustForSourceSplit(ctx, list);
+    }
+
+    if(!postHeuristicsHandling(ctx, list)) {
+        ALOGD_IF(isDebug(), "post heuristic handling failed");
+        reset(ctx);
+        return false;
+    }
+
+    ALOGD_IF(sSimulationFlags,"%s: MDP_ONLY_LAYERS_COMP SUCCEEDED",
+             __FUNCTION__);
+    return true;
+}
+
 /* Checks for conditions where YUV layers cannot be bypassed */
 bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
     if(isSkipLayer(layer)) {
@@ -1061,6 +1123,27 @@ bool MDPComp::isYUVDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
         return false;
     }
 
+    return true;
+}
+
+/* Checks for conditions where Secure RGB layers cannot be bypassed */
+bool MDPComp::isSecureRGBDoable(hwc_context_t* ctx, hwc_layer_1_t* layer) {
+    if(isSkipLayer(layer)) {
+        ALOGD_IF(isDebug(), "%s: Secure RGB layer marked SKIP dpy %d",
+            __FUNCTION__, mDpy);
+        return false;
+    }
+
+    if(isSecuring(ctx, layer)) {
+        ALOGD_IF(isDebug(), "%s: MDP securing is active", __FUNCTION__);
+        return false;
+    }
+
+    if(not isSupportedForMDPComp(ctx, layer)) {
+        ALOGD_IF(isDebug(), "%s: Unsupported secure RGB layer",
+            __FUNCTION__);
+        return false;
+    }
     return true;
 }
 
@@ -1271,6 +1354,32 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
                     mCurrentFrame.isFBComposed[nYuvIndex] = false;
                     mCurrentFrame.fbCount--;
                 }
+            }
+        }
+    }
+
+    mCurrentFrame.mdpCount = mCurrentFrame.layerCount -
+            mCurrentFrame.fbCount - mCurrentFrame.dropCount;
+    ALOGD_IF(isDebug(),"%s: fb count: %d",__FUNCTION__,
+             mCurrentFrame.fbCount);
+}
+
+void MDPComp::updateSecureRGB(hwc_context_t* ctx,
+    hwc_display_contents_1_t* list) {
+    int nSecureRGBCount = ctx->listStats[mDpy].secureRGBCount;
+    for(int index = 0;index < nSecureRGBCount; index++){
+        int nSecureRGBIndex = ctx->listStats[mDpy].secureRGBIndices[index];
+        hwc_layer_1_t* layer = &list->hwLayers[nSecureRGBIndex];
+
+        if(!isSecureRGBDoable(ctx, layer)) {
+            if(!mCurrentFrame.isFBComposed[nSecureRGBIndex]) {
+                mCurrentFrame.isFBComposed[nSecureRGBIndex] = true;
+                mCurrentFrame.fbCount++;
+            }
+        } else {
+            if(mCurrentFrame.isFBComposed[nSecureRGBIndex]) {
+                mCurrentFrame.isFBComposed[nSecureRGBIndex] = false;
+                mCurrentFrame.fbCount--;
             }
         }
     }
@@ -1492,7 +1601,10 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if(isFrameDoable(ctx)) {
         generateROI(ctx, list);
 
-        if(tryFullFrame(ctx, list) || tryVideoOnly(ctx, list)) {
+        // if tryFullFrame fails, try to push all video and secure RGB layers
+        // to MDP for composition.
+        if(tryFullFrame(ctx, list) || tryMDPOnlyLayers(ctx, list) 
+            || tryVideoOnly(ctx, list)) {
             setMDPCompLayerFlags(ctx, list);
         } else {
             resetROI(ctx, mDpy);
