@@ -532,7 +532,8 @@ bool MDPCompNonSplit::validateAndApplyROI(hwc_context_t *ctx,
             }
 
             /* deduct any opaque region from visibleRect */
-            if (layer->blending == HWC_BLENDING_NONE)
+            if (layer->blending == HWC_BLENDING_NONE &&
+                    layer->planeAlpha == 0xFF)
                 visibleRect = deductRect(visibleRect, res);
         }
     }
@@ -638,7 +639,8 @@ bool MDPCompSplit::validateAndApplyROI(hwc_context_t *ctx,
                 return false;
             }
 
-            if (layer->blending == HWC_BLENDING_NONE) {
+            if (layer->blending == HWC_BLENDING_NONE &&
+                    layer->planeAlpha == 0xFF) {
                 visibleRectL = deductRect(visibleRectL, l_res);
                 visibleRectR = deductRect(visibleRectR, r_res);
             }
