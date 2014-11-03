@@ -1375,7 +1375,8 @@ void optimizeLayerRects(const hwc_display_contents_1_t *list) {
         //see if there is no blending required.
         //If it is opaque see if we can substract this region from below
         //layers.
-        if(list->hwLayers[i].blending == HWC_BLENDING_NONE) {
+        if(list->hwLayers[i].blending == HWC_BLENDING_NONE &&
+                list->hwLayers[i].planeAlpha == 0xFF) {
             int j= i-1;
             hwc_rect_t& topframe =
                 (hwc_rect_t&)list->hwLayers[i].displayFrame;
