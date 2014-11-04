@@ -35,6 +35,9 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <linux/fb.h>
+#include <sys/resource.h>
+#include <sys/prctl.h>
+#include <pthread.h>
 #include <utils/constants.h>
 
 #include "hw_framebuffer.h"
@@ -45,15 +48,20 @@
 extern int virtual_ioctl(int fd, int cmd, ...);
 extern int virtual_open(const char *file_name, int access, ...);
 extern int virtual_close(int fd);
+extern int virtual_poll(struct pollfd *fds,  nfds_t num, int timeout);
+extern ssize_t virtual_pread(int fd, void *data, size_t count, off_t offset);
 #endif
 
 namespace sde {
 
-HWFrameBuffer::HWFrameBuffer() {
-  // Point to actual driver interfaces.
+HWFrameBuffer::HWFrameBuffer() : event_thread_name_("SDE_EventThread"), fake_vsync_(false),
+                                 exit_threads_(false) {
+  // Pointer to actual driver interfaces.
   ioctl_ = ::ioctl;
   open_ = ::open;
   close_ = ::close;
+  poll_ = ::poll;
+  pread_ = ::pread;
 
 #ifdef DISPLAY_CORE_VIRTUAL_DRIVER
   // If debug property to use virtual driver is set, point to virtual driver interfaces.
@@ -61,15 +69,83 @@ HWFrameBuffer::HWFrameBuffer() {
     ioctl_ = virtual_ioctl;
     open_ = virtual_open;
     close_ = virtual_close;
+    poll_ = virtual_poll;
+    pread_ = virtual_pread;
   }
 #endif
 }
 
 DisplayError HWFrameBuffer::Init() {
+  DisplayError error = kErrorNone;
+
+  // TODO(user): Need to read the fbnode info, hw capabilities here
+
+  // Open nodes for polling
+  char node_path[kMaxStringLength] = {0};
+  char data[kMaxStringLength] = {0};
+  const char* event_name[kNumDisplayEvents] = {"vsync_event", "show_blank_event"};
+
+  for (int display = 0; display < kNumPhysicalDisplays; display++) {
+    for (int event = 0; event < kNumDisplayEvents; event++) {
+      poll_fds_[display][event].fd = -1;
+    }
+  }
+
+  if (!fake_vsync_) {
+    for (int display = 0; display < kNumPhysicalDisplays; display++) {
+      for (int event = 0; event < kNumDisplayEvents; event++) {
+        pollfd &poll_fd = poll_fds_[display][event];
+
+        snprintf(node_path, sizeof(node_path), "/sys/class/graphics/fb%d/%s",
+                (display == 0) ? 0 : 1/*TODO(user): HDMI fb node index*/, event_name[event]);
+
+        poll_fd.fd = open_(node_path, O_RDONLY);
+        if (poll_fd.fd < 0) {
+          DLOGE("open failed for display=%d event=%zu, error=%s", display, event, strerror(errno));
+          error = kErrorHardware;
+          goto CleanupOnError;
+        }
+
+        // Read once on all fds to clear data on all fds.
+        pread_(poll_fd.fd, data , kMaxStringLength, 0);
+        poll_fd.events = POLLPRI | POLLERR;
+      }
+    }
+  }
+
+  // Start the Event thread
+  if (pthread_create(&event_thread_, NULL, &DisplayEventThread, this) < 0) {
+    DLOGE("Failed to start %s, error = %s", event_thread_name_);
+    error = kErrorResources;
+    goto CleanupOnError;
+  }
+
   return kErrorNone;
+
+CleanupOnError:
+  // Close all poll fds
+  for (int display = 0; display < kNumPhysicalDisplays; display++) {
+    for (int event = 0; event < kNumDisplayEvents; event++) {
+      int &fd = poll_fds_[display][event].fd;
+      if (fd >= 0) {
+        close_(fd);
+      }
+    }
+  }
+
+  return error;
 }
 
 DisplayError HWFrameBuffer::Deinit() {
+  exit_threads_ = true;
+  pthread_join(event_thread_, NULL);
+
+  for (int display = 0; display < kNumPhysicalDisplays; display++) {
+    for (int event = 0; event < kNumDisplayEvents; event++) {
+      close(poll_fds_[display][event].fd);
+    }
+  }
+
   return kErrorNone;
 }
 
@@ -91,7 +167,7 @@ DisplayError HWFrameBuffer::GetHWCapabilities(HWResourceInfo *hw_res_info) {
   return kErrorNone;
 }
 
-DisplayError HWFrameBuffer::Open(HWBlockType type, Handle *device) {
+DisplayError HWFrameBuffer::Open(HWBlockType type, Handle *device, HWEventHandler* eventhandler) {
   DisplayError error = kErrorNone;
 
   HWContext *hw_context = new HWContext();
@@ -119,6 +195,8 @@ DisplayError HWFrameBuffer::Open(HWBlockType type, Handle *device) {
   }
 
   *device = hw_context;
+  event_handler_[device_id] = eventhandler;
+
   return error;
 }
 
@@ -212,6 +290,17 @@ DisplayError HWFrameBuffer::Doze(Handle device) {
 
 DisplayError HWFrameBuffer::Standby(Handle device) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+
+  return kErrorNone;
+}
+
+DisplayError HWFrameBuffer::SetVSyncState(Handle device, bool enable) {
+  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+  int vsync_on = enable ? 1 : 0;
+  if (ioctl_(hw_context->device_fd, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) == -1) {
+    IOCTL_LOGE(MSMFB_OVERLAY_VSYNC_CTRL);
+    return kErrorHardware;
+  }
 
   return kErrorNone;
 }
@@ -357,5 +446,86 @@ void HWFrameBuffer::SetRect(mdp_rect *target, const LayerRect &source) {
   target->h = INT(floorf(source.bottom)) - target->y;
 }
 
-}  // namespace sde
+void* HWFrameBuffer::DisplayEventThread(void *context) {
+  if (context) {
+    return reinterpret_cast<HWFrameBuffer *>(context)->DisplayEventThreadHandler();
+  }
 
+  return NULL;
+}
+
+void* HWFrameBuffer::DisplayEventThreadHandler() {
+  char data[kMaxStringLength] = {0};
+
+  prctl(PR_SET_NAME, event_thread_name_, 0, 0, 0);
+  setpriority(PRIO_PROCESS, 0, kThreadPriorityUrgent);
+
+  if (fake_vsync_) {
+    while (!exit_threads_) {
+      // Fake vsync is used only when set explicitly through a property(todo) or when
+      // the vsync timestamp node cannot be opened at bootup. There is no
+      // fallback to fake vsync from the true vsync loop, ever, as the
+      // condition can easily escape detection.
+      // Also, fake vsync is delivered only for the primary display.
+      usleep(16666);
+      STRUCT_VAR(timeval, time_now);
+      gettimeofday(&time_now, NULL);
+      uint64_t ts = uint64_t(time_now.tv_sec)*1000000000LL +uint64_t(time_now.tv_usec)*1000LL;
+
+      // Send Vsync event for primary display(0)
+      event_handler_[0]->VSync(ts);
+    }
+
+    pthread_exit(0);
+  }
+
+  typedef void (HWFrameBuffer::*EventHandler)(int, char*);
+  EventHandler event_handler[kNumDisplayEvents] = { &HWFrameBuffer::HandleVSync,
+                                                    &HWFrameBuffer::HandleBlank };
+
+  while (!exit_threads_) {
+    int error = poll_(poll_fds_[0], kNumPhysicalDisplays * kNumDisplayEvents, -1);
+    if (error < 0) {
+      DLOGE("poll failed errno: %s", strerror(errno));
+      continue;
+    }
+
+    for (int display = 0; display < kNumPhysicalDisplays; display++) {
+      for (int event = 0; event < kNumDisplayEvents; event++) {
+        pollfd &poll_fd = poll_fds_[display][event];
+
+        if (poll_fd.revents & POLLPRI) {
+          ssize_t length = pread_(poll_fd.fd, data, kMaxStringLength, 0);
+          if (length < 0) {
+            // If the read was interrupted - it is not a fatal error, just continue.
+            DLOGE("Failed to read event:%zu for display=%d : %s", event, display, strerror(errno));
+            continue;
+          }
+
+          (this->*event_handler[event])(display, data);
+        }
+      }
+    }
+  }
+
+  pthread_exit(0);
+
+  return NULL;
+}
+
+void HWFrameBuffer::HandleVSync(int display_id, char *data) {
+  int64_t timestamp = 0;
+  if (!strncmp(data, "VSYNC=", strlen("VSYNC="))) {
+    timestamp = strtoull(data + strlen("VSYNC="), NULL, 0);
+  }
+  event_handler_[display_id]->VSync(timestamp);
+
+  return;
+}
+
+void HWFrameBuffer::HandleBlank(int display_id, char* data) {
+  // TODO(user): Need to send blank Event
+  return;
+}
+
+}  // namespace sde

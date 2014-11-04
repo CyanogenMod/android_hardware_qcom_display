@@ -274,7 +274,7 @@ class DeviceInterface {
 
     @return \link DisplayError \endlink
   */
-  virtual DisplayError SetVSyncState(bool enabled) = 0;
+  virtual DisplayError SetVSyncState(bool enable) = 0;
 
  protected:
   virtual ~DeviceInterface() { }

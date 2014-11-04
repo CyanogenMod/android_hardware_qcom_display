@@ -38,7 +38,7 @@ DeviceBase::DeviceBase(DeviceType device_type, DeviceEventHandler *event_handler
   : device_type_(device_type), event_handler_(event_handler), hw_block_type_(hw_block_type),
     hw_intf_(hw_intf), comp_manager_(comp_manager), state_(kStateOff), hw_device_(0),
     comp_mgr_device_(0), device_attributes_(NULL), num_modes_(0), active_mode_index_(0),
-    pending_commit_(false) {
+    pending_commit_(false), vsync_enable_(false) {
 }
 
 DisplayError DeviceBase::Init() {
@@ -46,7 +46,7 @@ DisplayError DeviceBase::Init() {
 
   DisplayError error = kErrorNone;
 
-  error = hw_intf_->Open(hw_block_type_, &hw_device_);
+  error = hw_intf_->Open(hw_block_type_, &hw_device_, this);
   if (UNLIKELY(error != kErrorNone)) {
     return error;
   }
@@ -267,9 +267,30 @@ DisplayError DeviceBase::SetConfig(uint32_t mode) {
   return kErrorNone;
 }
 
-DisplayError DeviceBase::SetVSyncState(bool enabled) {
+DisplayError DeviceBase::SetVSyncState(bool enable) {
   SCOPE_LOCK(locker_);
+  DisplayError error = kErrorNone;
+  if (vsync_enable_ != enable) {
+    error = hw_intf_->SetVSyncState(hw_device_, enable);
+    if (error == kErrorNone) {
+      vsync_enable_ = enable;
+    }
+  }
 
+  return error;
+}
+
+DisplayError DeviceBase::VSync(int64_t timestamp) {
+  if (vsync_enable_) {
+    DeviceEventVSync vsync;
+    vsync.timestamp = timestamp;
+    event_handler_->VSync(vsync);
+  }
+
+  return kErrorNone;
+}
+
+DisplayError DeviceBase::Blank(bool blank) {
   return kErrorNone;
 }
 

@@ -26,6 +26,8 @@
 #define __HW_FRAMEBUFFER_H__
 
 #include <linux/msm_mdp.h>
+#include <poll.h>
+#include <pthread.h>
 #include "hw_interface.h"
 
 namespace sde {
@@ -36,14 +38,15 @@ class HWFrameBuffer : public HWInterface {
   DisplayError Init();
   DisplayError Deinit();
   virtual DisplayError GetHWCapabilities(HWResourceInfo *hw_res_info);
-  virtual DisplayError Open(HWBlockType type, Handle *device);
+  virtual DisplayError Open(HWBlockType type, Handle *device, HWEventHandler *eventhandler);
   virtual DisplayError Close(Handle device);
   virtual DisplayError GetNumDeviceAttributes(Handle device, uint32_t *count);
   virtual DisplayError GetDeviceAttributes(Handle device, HWDeviceAttributes *device_attributes,
-                                       uint32_t mode);
+                                           uint32_t mode);
   virtual DisplayError PowerOn(Handle device);
   virtual DisplayError PowerOff(Handle device);
   virtual DisplayError Doze(Handle device);
+  virtual DisplayError SetVSyncState(Handle device, bool enable);
   virtual DisplayError Standby(Handle device);
   virtual DisplayError Validate(Handle device, HWLayers *hw_layers);
   virtual DisplayError Commit(Handle device, HWLayers *hw_layers);
@@ -54,14 +57,40 @@ class HWFrameBuffer : public HWInterface {
     int device_fd;
   };
 
+  enum {
+    kHWEventVSync,
+    kHWEventBlank,
+  };
+
+  static const int kMaxStringLength = 1024;
+  static const int kNumPhysicalDisplays = 2;
+  static const int kNumDisplayEvents = 2;
+
   inline void SetFormat(uint32_t *target, const LayerBufferFormat &source);
   inline void SetBlending(uint32_t *target, const LayerBlending &source);
   inline void SetRect(mdp_rect *target, const LayerRect &source);
 
-  // For dynamically linking virtual driver
+  // Event Thread to receive vsync/blank events
+  static void* DisplayEventThread(void *context);
+  void* DisplayEventThreadHandler();
+
+  void HandleVSync(int display_id, char *data);
+  void HandleBlank(int display_id, char *data);
+
+  // Pointers to system calls which are either mapped to actual system call or virtual driver.
   int (*ioctl_)(int, int, ...);
   int (*open_)(const char *, int, ...);
   int (*close_)(int);
+  int (*poll_)(struct pollfd *, nfds_t, int);
+  ssize_t (*pread_)(int, void *, size_t, off_t);
+
+  // Store the Device EventHandlers - used for callback
+  HWEventHandler *event_handler_[kNumPhysicalDisplays];
+  pollfd poll_fds_[kNumPhysicalDisplays][kNumDisplayEvents];
+  pthread_t event_thread_;
+  const char *event_thread_name_;
+  bool fake_vsync_;
+  bool exit_threads_;
 };
 
 }  // namespace sde
