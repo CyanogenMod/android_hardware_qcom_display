@@ -46,9 +46,9 @@
 namespace sde {
 
 enum LogTag {
-  kTagNone = 0,   //!< Log tag name is not specified.
-  kTagCore,       //!< Log is tagged for display core.
-  kTagStrategy,   //!< Log is tagged for composition strategy.
+  kTagNone = 0,   // Log tag name is not specified.
+  kTagCore,       // Log is tagged for display core.
+  kTagStrategy,   // Log is tagged for composition strategy.
 };
 
 class Debug {

@@ -51,6 +51,7 @@ class CompManager : public DumpImpl {
   virtual uint32_t GetDump(uint8_t *buffer, uint32_t length);
 
  private:
+  void PrepareStrategyConstraints(Handle device, HWLayers *hw_layers);
   struct CompManagerDevice {
     StrategyConstraints constraints;
     Handle res_mgr_device;
@@ -62,6 +63,11 @@ class CompManager : public DumpImpl {
   StrategyInterface *strategy_intf_;
   StrategyDefault strategy_default_;
   ResManager res_mgr_;
+  uint64_t registered_displays_;        // Stores the bit mask of registered displays
+  uint64_t configured_displays_;        // Stores the bit mask of sucessfully configured displays
+  bool safe_mode_;                      // Flag to notify all displays to be in resource crunch
+                                        // mode, where strategy manager chooses the best strategy
+                                        // that uses optimal number of pipes for each display
 };
 
 }  // namespace sde
