@@ -460,9 +460,27 @@ int CopyBit::drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
                 close(list->hwLayers[i].acquireFenceFd);
                 list->hwLayers[i].acquireFenceFd = -1;
             }
+            /*
+             * Find the intersection of layer display frame with PTOR layer
+             * with respect to screen co-ordinates
+             *
+             * Calculated the destination rect by transforming the overlapping
+             * region of layer display frame with respect to PTOR display frame
+             *
+             * Transform the destination rect on to render buffer
+             * */
+            hwc_rect_t destRect = getIntersection(overlap, layer->displayFrame);
+            destRect.left = destRect.left - overlap.left +
+                                            ptorInfo->displayFrame[j].left;
+            destRect.right = destRect.right- overlap.left +
+                                            ptorInfo->displayFrame[j].left;
+            destRect.top = destRect.top - overlap.top +
+                                            ptorInfo->displayFrame[j].top;
+            destRect.bottom = destRect.bottom - overlap.top +
+                                            ptorInfo->displayFrame[j].top;
 
-            int retVal = drawRectUsingCopybit(ctx, layer, renderBuffer, overlap,
-                                                ptorInfo->displayFrame[j]);
+            int retVal = drawRectUsingCopybit(ctx, layer, renderBuffer,
+                                                          overlap, destRect);
             copybitLayerCount++;
             if(retVal < 0) {
                 ALOGE("%s: drawRectUsingCopybit failed", __FUNCTION__);
