@@ -47,39 +47,14 @@ class HWCDisplay : public DisplayEventHandler {
   static const uint32_t kMaxLayerCount = 32;
 
   // Structure to track memory allocation for layer stack (layers, rectangles) object.
-  struct LayerStackMemory : LayerStack {
-    static const size_t kSizeSteps = 4096;  // Default memory allocation.
+  struct LayerStackMemory {
+    static const size_t kSizeSteps = 1024;  // Default memory allocation.
     uint8_t *raw;  // Pointer to byte array.
     size_t size;  // Current number of allocated bytes.
 
     LayerStackMemory() : raw(NULL), size(0) { }
   };
 
-  HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id);
-  virtual ~HWCDisplay() { }
-
-  // DisplayEventHandler methods
-  virtual DisplayError VSync(const DisplayEventVSync &vsync);
-  virtual DisplayError Refresh();
-
-  virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
-  virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
-  virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
-  inline void SetRect(LayerRect *target, const hwc_rect_t &source);
-  inline void SetRect(LayerRect *target, const hwc_frect_t &source);
-  inline void SetComposition(LayerComposition *target, const int32_t &source);
-  inline void SetComposition(int32_t *target, const LayerComposition &source);
-  inline void SetBlending(LayerBlending *target, const int32_t &source);
-  inline int SetFormat(LayerBufferFormat *target, const int &source);
-
-  LayerStackMemory layer_stack_;
-  CoreInterface *core_intf_;
-  hwc_procs_t const **hwc_procs_;
-  DisplayType type_;
-  int id_;
-  DisplayInterface *display_intf_;
-
- private:
   struct LayerCache {
     buffer_handle_t handle;
     LayerComposition composition;
@@ -94,10 +69,33 @@ class HWCDisplay : public DisplayEventHandler {
     LayerStackCache() : layer_count(0) { }
   };
 
+  HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id);
+  virtual ~HWCDisplay() { }
+
+  // DisplayEventHandler methods
+  virtual DisplayError VSync(const DisplayEventVSync &vsync);
+  virtual DisplayError Refresh();
+
+  virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
+  virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
+  virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
   void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
+  inline void SetRect(const hwc_rect_t &source, LayerRect *target);
+  inline void SetRect(const hwc_frect_t &source, LayerRect *target);
+  inline void SetComposition(const int32_t &source, LayerComposition *target);
+  inline void SetComposition(const int32_t &source, int32_t *target);
+  inline void SetBlending(const int32_t &source, LayerBlending *target);
+  inline int SetFormat(const int32_t &source, LayerBufferFormat *target);
 
+  LayerStackMemory layer_stack_memory_;
+  LayerStack layer_stack_;
   LayerStackCache layer_stack_cache_;
+  CoreInterface *core_intf_;
+  hwc_procs_t const **hwc_procs_;
+  DisplayType type_;
+  int id_;
+  DisplayInterface *display_intf_;
 };
 
 }  // namespace sde

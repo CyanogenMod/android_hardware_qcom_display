@@ -56,8 +56,8 @@ int HWCDisplay::Deinit() {
     return -EINVAL;
   }
 
-  if (LIKELY(layer_stack_.raw)) {
-    delete[] layer_stack_.raw;
+  if (LIKELY(layer_stack_memory_.raw)) {
+    delete[] layer_stack_memory_.raw;
   }
 
   return 0;
@@ -174,27 +174,28 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
 
   // Layer array may be large enough to hold current number of layers.
   // If not, re-allocate it now.
-  if (UNLIKELY(layer_stack_.size < required_size)) {
-    if (LIKELY(layer_stack_.raw)) {
-      delete[] layer_stack_.raw;
-      layer_stack_.size = 0;
+  if (UNLIKELY(layer_stack_memory_.size < required_size)) {
+    if (LIKELY(layer_stack_memory_.raw)) {
+      delete[] layer_stack_memory_.raw;
+      layer_stack_memory_.size = 0;
     }
 
     // Allocate in multiple of kSizeSteps.
-    required_size = ROUND_UP(required_size, layer_stack_.kSizeSteps);
+    required_size = ROUND_UP(required_size, layer_stack_memory_.kSizeSteps);
 
-    layer_stack_.raw = new uint8_t[required_size];
-    if (UNLIKELY(!layer_stack_.raw)) {
+    layer_stack_memory_.raw = new uint8_t[required_size];
+    if (UNLIKELY(!layer_stack_memory_.raw)) {
       return -ENOMEM;
     }
 
-    layer_stack_.size = required_size;
+    layer_stack_memory_.size = required_size;
   }
 
   // Assign memory addresses now.
-  uint8_t *current_address = layer_stack_.raw;
+  uint8_t *current_address = layer_stack_memory_.raw;
 
   // Layer array address
+  layer_stack_ = LayerStack();
   layer_stack_.layers = reinterpret_cast<Layer *>(current_address);
   layer_stack_.layer_count = static_cast<uint32_t>(num_hw_layers);
   current_address += num_hw_layers * sizeof(Layer);
@@ -202,19 +203,25 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     Layer &layer = layer_stack_.layers[i];
+    layer = Layer();
 
     // Layer buffer handle address
     layer.input_buffer = reinterpret_cast<LayerBuffer *>(current_address);
+    *layer.input_buffer = LayerBuffer();
     current_address += sizeof(LayerBuffer);
 
     // Visible rectangle address
     layer.visible_regions.rect = reinterpret_cast<LayerRect *>(current_address);
     layer.visible_regions.count = static_cast<uint32_t>(hwc_layer.visibleRegionScreen.numRects);
+    for (size_t i = 0; i < layer.visible_regions.count; i++) {
+      *layer.visible_regions.rect = LayerRect();
+    }
     current_address += hwc_layer.visibleRegionScreen.numRects * sizeof(LayerRect);
 
     // Dirty rectangle address
     layer.dirty_regions.rect = reinterpret_cast<LayerRect *>(current_address);
     layer.dirty_regions.count = 1;
+    *layer.dirty_regions.rect = LayerRect();
     current_address += sizeof(LayerRect);
   }
 
@@ -223,12 +230,9 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
 
 int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   size_t num_hw_layers = content_list->numHwLayers;
-  if (UNLIKELY(num_hw_layers <= 1)) {
+  if (num_hw_layers <= 1) {
     return 0;
   }
-
-  // Reset Layer stack flags
-  layer_stack_.flags = LayerStackFlags();
 
   // Configure each layer
   for (size_t i = 0; i < num_hw_layers; i++) {
@@ -239,15 +243,12 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     LayerBuffer *layer_buffer = layer.input_buffer;
 
     if (pvt_handle) {
-      if (UNLIKELY(SetFormat(&layer_buffer->format, pvt_handle->format))) {
+      if (SetFormat(pvt_handle->format, &layer_buffer->format)) {
         return -EINVAL;
       }
 
       layer_buffer->width = pvt_handle->width;
       layer_buffer->height = pvt_handle->height;
-      layer_buffer->planes[0].fd = pvt_handle->fd;
-      layer_buffer->planes[0].offset = pvt_handle->offset;
-      layer_buffer->planes[0].stride = pvt_handle->width;
       if (pvt_handle->bufferType == BUFFER_TYPE_VIDEO) {
         layer_stack_.flags.video_present = true;
       }
@@ -256,20 +257,20 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       }
     }
 
-    SetRect(&layer.dst_rect, hwc_layer.displayFrame);
-    SetRect(&layer.src_rect, hwc_layer.sourceCropf);
+    SetRect(hwc_layer.displayFrame, &layer.dst_rect);
+    SetRect(hwc_layer.sourceCropf, &layer.src_rect);
     for (size_t j = 0; j < hwc_layer.visibleRegionScreen.numRects; j++) {
-        SetRect(&layer.visible_regions.rect[j], hwc_layer.visibleRegionScreen.rects[j]);
+        SetRect(hwc_layer.visibleRegionScreen.rects[j], &layer.visible_regions.rect[j]);
     }
-    SetRect(&layer.dirty_regions.rect[0], hwc_layer.dirtyRect);
-    SetComposition(&layer.composition, hwc_layer.compositionType);
-    SetBlending(&layer.blending, hwc_layer.blending);
+    SetRect(hwc_layer.dirtyRect, &layer.dirty_regions.rect[0]);
+    SetComposition(hwc_layer.compositionType, &layer.composition);
+    SetBlending(hwc_layer.blending, &layer.blending);
 
     LayerTransform &layer_transform = layer.transform;
     uint32_t &hwc_transform = hwc_layer.transform;
     layer_transform.flip_horizontal = ((hwc_transform & HWC_TRANSFORM_FLIP_H) > 0);
     layer_transform.flip_vertical = ((hwc_transform & HWC_TRANSFORM_FLIP_V) > 0);
-    layer_transform.rotation = ((hwc_transform& HWC_TRANSFORM_ROT_90) ? 90.0f : 0.0f);
+    layer_transform.rotation = ((hwc_transform & HWC_TRANSFORM_ROT_90) ? 90.0f : 0.0f);
 
     layer.plane_alpha = hwc_layer.planeAlpha;
     layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
@@ -294,10 +295,16 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     Layer &layer = layer_stack_.layers[i];
-    // if current frame does not need frame buffer redraw, then mark them for HWC_OVERLAY
-    LayerComposition composition = needs_fb_refresh ? layer.composition : kCompositionSDE;
-    SetComposition(&hwc_layer.compositionType, composition);
+    LayerComposition composition = layer.composition;
+
+    // If current layer does not need frame buffer redraw, then mark it as HWC_OVERLAY
+    if (!needs_fb_refresh && (composition != kCompositionGPUTarget)) {
+      composition = kCompositionSDE;
+    }
+
+    SetComposition(composition, &hwc_layer.compositionType);
   }
+
   // Cache the current layer stack information like layer_count, composition type and layer handle
   // for the future.
   CacheLayerStackInfo(content_list);
@@ -305,54 +312,32 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
-  uint32_t layer_count = layer_stack_.layer_count;
-
-  for (size_t i = 0; i < layer_count; i++) {
-    Layer &layer = layer_stack_.layers[i];
-    layer_stack_cache_.layer_cache[i].handle = content_list->hwLayers[i].handle;
-    layer_stack_cache_.layer_cache[i].composition = layer.composition;
-  }
-  layer_stack_cache_.layer_count = layer_count;
-}
-
-bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
-  uint32_t layer_count = layer_stack_.layer_count;
-
-  // Frame buffer needs to be refreshed for the following reasons:
-  // 1. Any layer is marked skip in the current layer stack.
-  // 2. Any layer is added/removed/layer properties changes in the current layer stack.
-  // 3. Any layer handle is changed and it is marked for GPU composition
-  // 4. Any layer's current composition is different from previous composition.
-  if ((layer_stack_cache_.layer_count != layer_count) || layer_stack_.flags.skip_present ||
-       layer_stack_.flags.geometry_changed) {
-    return true;
-  }
-
-  for (size_t i = 0; i < layer_count; i++) {
-    hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-    Layer &layer = layer_stack_.layers[i];
-    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
-    if (layer_cache.composition != layer.composition) {
-      return true;
-    }
-    if ((layer.composition == kCompositionGPU) && (layer_cache.handle != hwc_layer.handle)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
   size_t num_hw_layers = content_list->numHwLayers;
-  if (UNLIKELY(num_hw_layers <= 1)) {
+  if (num_hw_layers <= 1) {
+    if (!num_hw_layers) {
+      return 0;
+    }
+
+    // TODO(user): handle if only 1 layer(fb target) is received.
+    int &acquireFenceFd = content_list->hwLayers[0].acquireFenceFd;
+    if (acquireFenceFd >= 0) {
+      close(acquireFenceFd);
+    }
+
     return 0;
   }
 
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
+    const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
     LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
+
+    if (pvt_handle) {
+      layer_buffer->planes[0].fd = pvt_handle->fd;
+      layer_buffer->planes[0].offset = pvt_handle->offset;
+      layer_buffer->planes[0].stride = pvt_handle->width;
+    }
 
     layer_buffer->acquire_fence_fd = hwc_layer.acquireFenceFd;
   }
@@ -380,79 +365,103 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-void HWCDisplay::SetRect(LayerRect *target, const hwc_rect_t &source) {
+bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
+  uint32_t layer_count = layer_stack_.layer_count;
+
+  // Frame buffer needs to be refreshed for the following reasons:
+  // 1. Any layer is marked skip in the current layer stack.
+  // 2. Any layer is added/removed/layer properties changes in the current layer stack.
+  // 3. Any layer handle is changed and it is marked for GPU composition
+  // 4. Any layer's current composition is different from previous composition.
+  if ((layer_stack_cache_.layer_count != layer_count) || layer_stack_.flags.skip_present ||
+       layer_stack_.flags.geometry_changed) {
+    return true;
+  }
+
+  for (uint32_t i = 0; i < layer_count; i++) {
+    hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
+    Layer &layer = layer_stack_.layers[i];
+    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
+
+    if (layer.composition == kCompositionGPUTarget) {
+      continue;
+    }
+
+    if (layer_cache.composition != layer.composition) {
+      return true;
+    }
+
+    if ((layer.composition == kCompositionGPU) && (layer_cache.handle != hwc_layer.handle)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
+  uint32_t layer_count = layer_stack_.layer_count;
+
+  for (uint32_t i = 0; i < layer_count; i++) {
+    Layer &layer = layer_stack_.layers[i];
+
+    if (layer.composition == kCompositionGPUTarget) {
+      continue;
+    }
+
+    layer_stack_cache_.layer_cache[i].handle = content_list->hwLayers[i].handle;
+    layer_stack_cache_.layer_cache[i].composition = layer.composition;
+  }
+
+  layer_stack_cache_.layer_count = layer_count;
+}
+
+void HWCDisplay::SetRect(const hwc_rect_t &source, LayerRect *target) {
   target->left = FLOAT(source.left);
   target->top = FLOAT(source.top);
   target->right = FLOAT(source.right);
   target->bottom = FLOAT(source.bottom);
 }
 
-void HWCDisplay::SetRect(LayerRect *target, const hwc_frect_t &source) {
+void HWCDisplay::SetRect(const hwc_frect_t &source, LayerRect *target) {
   target->left = source.left;
   target->top = source.top;
   target->right = source.right;
   target->bottom = source.bottom;
 }
 
-void HWCDisplay::SetComposition(LayerComposition *target, const int32_t &source) {
+void HWCDisplay::SetComposition(const int32_t &source, LayerComposition *target) {
   switch (source) {
-  case HWC_FRAMEBUFFER_TARGET:
-    *target = kCompositionGPUTarget;
-    break;
-  default:
-    *target = kCompositionSDE;
-    break;
+  case HWC_FRAMEBUFFER_TARGET:  *target = kCompositionGPUTarget;  break;
+  default:                      *target = kCompositionSDE;        break;
   }
 }
 
-void HWCDisplay::SetComposition(int32_t *target, const LayerComposition &source) {
+void HWCDisplay::SetComposition(const int32_t &source, int32_t *target) {
   switch (source) {
-  case kCompositionGPUTarget:
-    *target = HWC_FRAMEBUFFER_TARGET;
-    break;
-  case kCompositionSDE:
-    *target = HWC_OVERLAY;
-    break;
-  default:
-    *target = HWC_FRAMEBUFFER;
-    break;
+  case kCompositionGPUTarget:   *target = HWC_FRAMEBUFFER_TARGET; break;
+  case kCompositionSDE:         *target = HWC_OVERLAY;            break;
+  default:                      *target = HWC_FRAMEBUFFER;        break;
   }
 }
 
-void HWCDisplay::SetBlending(LayerBlending *target, const int32_t &source) {
+void HWCDisplay::SetBlending(const int32_t &source, LayerBlending *target) {
   switch (source) {
-  case HWC_BLENDING_PREMULT:
-    *target = kBlendingPremultiplied;
-    break;
-  case HWC_BLENDING_COVERAGE:
-    *target = kBlendingCoverage;
-    break;
-  default:
-    *target = kBlendingNone;
-    break;
+  case HWC_BLENDING_PREMULT:    *target = kBlendingPremultiplied;   break;
+  case HWC_BLENDING_COVERAGE:   *target = kBlendingCoverage;        break;
+  default:                      *target = kBlendingNone;            break;
   }
 }
 
-int HWCDisplay::SetFormat(LayerBufferFormat *target, const int &source) {
+int HWCDisplay::SetFormat(const int32_t &source, LayerBufferFormat *target) {
   switch (source) {
-  case HAL_PIXEL_FORMAT_RGBA_8888:
-    *target = kFormatRGBA8888;
-    break;
-  case HAL_PIXEL_FORMAT_BGRA_8888:
-    *target = kFormatBGRA8888;
-    break;
-  case HAL_PIXEL_FORMAT_RGBX_8888:
-    *target = kFormatRGBX8888;
-    break;
-  case HAL_PIXEL_FORMAT_BGRX_8888:
-    *target = kFormatBGRX8888;
-    break;
-  case HAL_PIXEL_FORMAT_RGB_888:
-    *target = kFormatRGB888;
-    break;
-  case HAL_PIXEL_FORMAT_RGB_565:
-    *target = kFormatRGB565;
-    break;
+  case HAL_PIXEL_FORMAT_RGBA_8888:            *target = kFormatRGBA8888;                  break;
+  case HAL_PIXEL_FORMAT_BGRA_8888:            *target = kFormatBGRA8888;                  break;
+  case HAL_PIXEL_FORMAT_RGBX_8888:            *target = kFormatRGBX8888;                  break;
+  case HAL_PIXEL_FORMAT_BGRX_8888:            *target = kFormatBGRX8888;                  break;
+  case HAL_PIXEL_FORMAT_RGB_888:              *target = kFormatRGB888;                    break;
+  case HAL_PIXEL_FORMAT_RGB_565:              *target = kFormatRGB565;                    break;
+  case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:   *target = kFormatYCbCr420SemiPlanarVenus;   break;
   default:
     DLOGE("Unsupported format type %d", source);
     return -EINVAL;

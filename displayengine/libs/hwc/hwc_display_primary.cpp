@@ -52,6 +52,8 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
+  layer_stack_.retire_fence_fd = -1;
+
   status = PrepareLayerStack(content_list);
   if (UNLIKELY(status)) {
     return status;

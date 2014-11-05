@@ -233,6 +233,7 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 
   switch (state) {
   case kStateOff:
+    hw_layers_.info.count = 0;
     comp_manager_->Purge(display_comp_ctx_);
     error = hw_intf_->PowerOff(hw_device_);
     break;

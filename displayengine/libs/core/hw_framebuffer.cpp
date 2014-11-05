@@ -53,8 +53,6 @@ extern ssize_t virtual_pread(int fd, void *data, size_t count, off_t offset);
 extern FILE* virtual_fopen(const char *fname, const char *mode);
 extern int virtual_fclose(FILE* fileptr);
 extern ssize_t virtual_getline(char **lineptr, size_t *linelen, FILE *stream);
-
-
 #endif
 
 namespace sde {
@@ -325,28 +323,18 @@ DisplayError HWFrameBuffer::SetVSyncState(Handle device, bool enable) {
 }
 
 DisplayError HWFrameBuffer::Validate(Handle device, HWLayers *hw_layers) {
+  DisplayError error = kErrorNone;
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 
-  return kErrorNone;
-}
-
-DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
-  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+  hw_context->ResetMDPCommit();
 
   HWLayersInfo &hw_layer_info = hw_layers->info;
-
-  // Assuming left & right both pipe are required, maximum possible number of overlays.
-  uint32_t max_overlay_count = hw_layer_info.count * 2;
-
-  int acquire_fences[hw_layer_info.count];  // NOLINT
-  int release_fence = -1;
-  int retire_fence = -1;
-  uint32_t acquire_fence_count = 0;
-  STRUCT_VAR_ARRAY(mdp_overlay, overlay_array, max_overlay_count);
-  STRUCT_VAR_ARRAY(msmfb_overlay_data, data_array, max_overlay_count);
-
   LayerStack *stack = hw_layer_info.stack;
-  uint32_t num_overlays = 0;
+
+  mdp_layer_commit_v1 &mdp_commit = hw_context->mdp_commit.commit_v1;
+  mdp_input_layer *mdp_layers = hw_context->mdp_layers;
+  uint32_t &mdp_layer_count = mdp_commit.input_layer_cnt;
+
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
     Layer &layer = stack->layers[layer_index];
@@ -355,110 +343,135 @@ DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
     HWPipeInfo &left_pipe = config.left_pipe;
 
     // Configure left pipe
-    mdp_overlay &left_overlay = overlay_array[num_overlays];
-    msmfb_overlay_data &left_data = data_array[num_overlays];
+    mdp_input_layer &mdp_layer_left = mdp_layers[mdp_layer_count];
+    mdp_layer_left.alpha = layer.plane_alpha;
+    mdp_layer_left.z_order = static_cast<uint16_t>(i);
+    mdp_layer_left.transp_mask = 0xffffffff;
+    SetBlending(layer.blending, &mdp_layer_left.blend_op);
+    SetRect(left_pipe.src_roi, &mdp_layer_left.src_rect);
+    SetRect(left_pipe.dst_roi, &mdp_layer_left.dst_rect);
+    mdp_layer_left.pipe_ndx = left_pipe.pipe_id;
 
-    left_overlay.id = left_pipe.pipe_id;
-    left_overlay.flags |= MDP_BLEND_FG_PREMULT;
-    left_overlay.transp_mask = 0xffffffff;
-    left_overlay.z_order = i;
-    left_overlay.alpha = layer.plane_alpha;
-    left_overlay.src.width = input_buffer->planes[0].stride;
-    left_overlay.src.height = input_buffer->height;
-    SetBlending(&left_overlay.blend_op, layer.blending);
-    SetFormat(&left_overlay.src.format, layer.input_buffer->format);
-    SetRect(&left_overlay.src_rect, left_pipe.src_roi);
-    SetRect(&left_overlay.dst_rect, left_pipe.dst_roi);
-    left_data.id = left_pipe.pipe_id;
-    left_data.data.memory_id = input_buffer->planes[0].fd;
-    left_data.data.offset = input_buffer->planes[0].offset;
+    mdp_layer_buffer &mdp_buffer_left = mdp_layer_left.buffer;
+    mdp_buffer_left.width = input_buffer->width;
+    mdp_buffer_left.height = input_buffer->height;
 
-    num_overlays++;
+    error = SetFormat(layer.input_buffer->format, &mdp_buffer_left.format);
+    if (error != kErrorNone) {
+      return error;
+    }
+
+    mdp_layer_count++;
 
     // Configure right pipe
     if (config.is_right_pipe) {
       HWPipeInfo &right_pipe = config.right_pipe;
-      mdp_overlay &right_overlay = overlay_array[num_overlays];
-      msmfb_overlay_data &right_data = data_array[num_overlays];
+      mdp_input_layer &mdp_layer_right = mdp_layers[mdp_layer_count];
 
-      right_overlay = left_overlay;
-      right_data = left_data;
-      right_overlay.id = right_pipe.pipe_id;
-      right_data.id = right_pipe.pipe_id;
-      SetRect(&right_overlay.src_rect, right_pipe.src_roi);
-      SetRect(&right_overlay.dst_rect, right_pipe.dst_roi);
+      mdp_layer_right = mdp_layer_left;
 
-      num_overlays++;
-    }
+      mdp_layer_right.pipe_ndx = right_pipe.pipe_id;
+      SetRect(right_pipe.src_roi, &mdp_layer_right.src_rect);
+      SetRect(right_pipe.dst_roi, &mdp_layer_right.dst_rect);
 
-    if (input_buffer->acquire_fence_fd >= 0) {
-      acquire_fences[acquire_fence_count] = input_buffer->acquire_fence_fd;
-      acquire_fence_count++;
+      mdp_layer_count++;
     }
   }
 
-  mdp_overlay *overlay_list[num_overlays];
-  msmfb_overlay_data *data_list[num_overlays];
-  for (uint32_t i = 0; i < num_overlays; i++) {
-    overlay_list[i] = &overlay_array[i];
-    data_list[i] = &data_array[i];
+  mdp_commit.flags |= MDP_VALIDATE_LAYER;
+  if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
+    IOCTL_LOGE("validate:"MSMFB_ATOMIC_COMMIT);
+    return kErrorHardware;
   }
 
-  // TODO(user): Replace with Atomic commit call.
-  STRUCT_VAR(mdp_atomic_commit, atomic_commit);
-  atomic_commit.overlay_list = overlay_list;
-  atomic_commit.data_list = data_list;
-  atomic_commit.num_overlays = num_overlays;
-  atomic_commit.buf_sync.acq_fen_fd = acquire_fences;
-  atomic_commit.buf_sync.acq_fen_fd_cnt = acquire_fence_count;
-  atomic_commit.buf_sync.rel_fen_fd = &release_fence;
-  atomic_commit.buf_sync.retire_fen_fd = &retire_fence;
-  atomic_commit.buf_sync.flags = MDP_BUF_SYNC_FLAG_RETIRE_FENCE;
+  return kErrorNone;
+}
 
-  if (UNLIKELY(ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &atomic_commit) == -1)) {
-    IOCTL_LOGE(MSMFB_ATOMIC_COMMIT);
+DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
+  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+  HWLayersInfo &hw_layer_info = hw_layers->info;
+  LayerStack *stack = hw_layer_info.stack;
+
+  mdp_layer_commit_v1 &mdp_commit = hw_context->mdp_commit.commit_v1;
+  mdp_input_layer *mdp_layers = hw_context->mdp_layers;
+  uint32_t mdp_layer_index = 0;
+
+  for (uint32_t i = 0; i < hw_layer_info.count; i++) {
+    uint32_t layer_index = hw_layer_info.index[i];
+    LayerBuffer *input_buffer = stack->layers[layer_index].input_buffer;
+
+    uint32_t split_count = hw_layers->config[i].is_right_pipe ? 2 : 1;
+    for (uint32_t j = 0; j < split_count; j++) {
+      mdp_layer_buffer &mdp_buffer = mdp_layers[mdp_layer_index].buffer;
+
+      if (input_buffer->planes[0].fd >= 0) {
+        mdp_buffer.plane_count = 1;
+        mdp_buffer.planes[0].fd = input_buffer->planes[0].fd;
+        mdp_buffer.planes[0].offset = input_buffer->planes[0].offset;
+        mdp_buffer.planes[0].stride = input_buffer->planes[0].stride;
+      } else {
+        DLOGW("Invalid buffer fd, setting plane count to 0");
+        mdp_buffer.plane_count = 0;
+      }
+
+      mdp_buffer.fence = input_buffer->acquire_fence_fd;
+      mdp_layer_index++;
+    }
+  }
+
+  mdp_commit.flags |= MDP_COMMIT_RETIRE_FENCE;
+  mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
+  if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
+    IOCTL_LOGE("commit:"MSMFB_ATOMIC_COMMIT);
     return kErrorHardware;
   }
 
   // MDP returns only one release fence for the entire layer stack. Duplicate this fence into all
   // layers being composed by MDP.
-  stack->retire_fence_fd = retire_fence;
+  stack->retire_fence_fd = mdp_commit.retire_fence;
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
-    Layer &layer = stack->layers[layer_index];
-    LayerBuffer *input_buffer = layer.input_buffer;
-    input_buffer->release_fence_fd = dup(release_fence);
+    LayerBuffer *input_buffer = stack->layers[layer_index].input_buffer;
+
+    input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
   }
-  close(release_fence);
+  close(mdp_commit.release_fence);
 
   return kErrorNone;
 }
 
-void HWFrameBuffer::SetFormat(uint32_t *target, const LayerBufferFormat &source) {
+DisplayError HWFrameBuffer::SetFormat(const LayerBufferFormat &source, uint32_t *target) {
   switch (source) {
+  case kFormatARGB8888:                 *target = MDP_ARGB_8888;         break;
+  case kFormatRGBA8888:                 *target = MDP_RGBA_8888;         break;
+  case kFormatBGRA8888:                 *target = MDP_BGRA_8888;         break;
+  case kFormatRGBX8888:                 *target = MDP_RGBX_8888;         break;
+  case kFormatBGRX8888:                 *target = MDP_BGRX_8888;         break;
+  case kFormatRGB888:                   *target = MDP_RGB_888;           break;
+  case kFormatRGB565:                   *target = MDP_RGB_565;           break;
+  case kFormatYCbCr420Planar:           *target = MDP_Y_CB_CR_H2V2;      break;
+  case kFormatYCrCb420Planar:           *target = MDP_Y_CR_CB_H2V2;      break;
+  case kFormatYCbCr420SemiPlanar:       *target = MDP_Y_CBCR_H2V2;       break;
+  case kFormatYCrCb420SemiPlanar:       *target = MDP_Y_CRCB_H2V2;       break;
+  case kFormatYCbCr422Packed:           *target = MDP_YCBYCR_H2V1;       break;
+  case kFormatYCbCr420SemiPlanarVenus:  *target = MDP_Y_CBCR_H2V2_VENUS; break;
   default:
-    *target = MDP_RGBA_8888;
-    break;
+    DLOGE("Unsupported format type %d", source);
+    return kErrorParameters;
+  }
+
+  return kErrorNone;
+}
+
+void HWFrameBuffer::SetBlending(const LayerBlending &source, mdss_mdp_blend_op *target) {
+  switch (source) {
+  case kBlendingPremultiplied:  *target = BLEND_OP_PREMULTIPLIED;   break;
+  case kBlendingCoverage:       *target = BLEND_OP_COVERAGE;        break;
+  default:                      *target = BLEND_OP_NOT_DEFINED;     break;
   }
 }
 
-void HWFrameBuffer::SetBlending(uint32_t *target, const LayerBlending &source) {
-  switch (source) {
-  case kBlendingPremultiplied:
-    *target = BLEND_OP_PREMULTIPLIED;
-    break;
-
-  case kBlendingCoverage:
-    *target = BLEND_OP_COVERAGE;
-    break;
-
-  default:
-    *target = BLEND_OP_NOT_DEFINED;
-    break;
-  }
-}
-
-void HWFrameBuffer::SetRect(mdp_rect *target, const LayerRect &source) {
+void HWFrameBuffer::SetRect(const LayerRect &source, mdp_rect *target) {
   target->x = INT(ceilf(source.left));
   target->y = INT(ceilf(source.top));
   target->w = INT(floorf(source.right)) - target->x;
@@ -498,7 +511,7 @@ void* HWFrameBuffer::DisplayEventThreadHandler() {
     pthread_exit(0);
   }
 
-  typedef void (HWFrameBuffer::*EventHandler)(int, char*);
+  typedef void (HWFrameBuffer::*EventHandler)(int, char *);
   EventHandler event_handler[kNumDisplayEvents] = { &HWFrameBuffer::HandleVSync,
                                                     &HWFrameBuffer::HandleBlank };
 
@@ -538,13 +551,10 @@ void HWFrameBuffer::HandleVSync(int display_id, char *data) {
     timestamp = strtoull(data + strlen("VSYNC="), NULL, 0);
   }
   event_handler_[display_id]->VSync(timestamp);
-
-  return;
 }
 
-void HWFrameBuffer::HandleBlank(int display_id, char* data) {
+void HWFrameBuffer::HandleBlank(int display_id, char *data) {
   // TODO(user): Need to send blank Event
-  return;
 }
 
 void HWFrameBuffer::PopulateFBNodeIndex() {

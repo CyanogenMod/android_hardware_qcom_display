@@ -45,10 +45,33 @@ int HWCDisplayExternal::Deinit() {
 }
 
 int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
+  int status = 0;
+
+  status = AllocateLayerStack(content_list);
+  if (UNLIKELY(status)) {
+    return status;
+  }
+
+  layer_stack_.retire_fence_fd = -1;
+
+  status = PrepareLayerStack(content_list);
+  if (UNLIKELY(status)) {
+    return status;
+  }
+
   return 0;
 }
 
 int HWCDisplayExternal::Commit(hwc_display_contents_1_t *content_list) {
+  int status = 0;
+
+  status = HWCDisplay::CommitLayerStack(content_list);
+  if (UNLIKELY(status)) {
+    return status;
+  }
+
+  content_list->retireFenceFd = layer_stack_.retire_fence_fd;
+
   return 0;
 }
 

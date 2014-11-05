@@ -64,7 +64,7 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     pipe_info = &hw_layers->config[i].right_pipe;
     if ((dstRight.right - dstRight.left) > kMaxInterfaceWidth ||
          crop_width > kMaxInterfaceWidth ||
-        ((hw_block_id == kHWPrimary) && hw_res_info_.is_src_split &&
+        ((hw_block_id == kHWPrimary) &&
          (crop_width > display_attributes.split_left))) {
       scissor.left = FLOAT(display_attributes.split_left);
       scissor.top = 0.0f;
