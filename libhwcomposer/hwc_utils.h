@@ -132,6 +132,8 @@ struct ListStats {
     // Secure RGB specific
     int secureRGBCount;
     int secureRGBIndices[MAX_NUM_APP_LAYERS];
+    // Flag related to windowboxing feature
+    bool mAIVVideoMode;
 };
 
 struct LayerProp {
@@ -348,7 +350,7 @@ void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
 bool isZoomModeEnabled(hwc_rect_t crop);
 void updateCropAIVVideoMode(hwc_context_t *ctx, hwc_rect_t& crop, int dpy);
 void updateDestAIVVideoMode(hwc_context_t *ctx, hwc_rect_t& dst, int dpy);
-void updateExtDisplayCoordinates(hwc_context_t *ctx, hwc_rect_t& crop,
+void updateCoordinates(hwc_context_t *ctx, hwc_rect_t& crop,
                            hwc_rect_t& dst, int dpy);
 
 //Routine to configure low resolution panels (<= 2048 width)
