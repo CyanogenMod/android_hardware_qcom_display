@@ -124,11 +124,12 @@ static void setPaddingRound(hwc_context_t *ctx, int numDisplays,
     }
 }
 
-/* Based on certain conditions, isPaddingRound will be set
+/* Based on certain conditions, isDMAStateChanging will be set
  * to make this function self-contained */
 static void setDMAState(hwc_context_t *ctx, int numDisplays,
                         hwc_display_contents_1_t** displays) {
 
+    ctx->isDMAStateChanging = false;
     if(ctx->mRotMgr->getNumActiveSessions() == 0)
         Overlay::setDMAMode(Overlay::DMA_LINE_MODE);
 
@@ -151,7 +152,7 @@ static void setDMAState(hwc_context_t *ctx, int numDisplays,
                         if(not qdutils::MDPVersion::getInstance().is8x26()) {
                             if(ctx->mOverlay->isPipeTypeAttached(
                                              overlay::utils::OV_MDP_PIPE_DMA))
-                                ctx->isPaddingRound = true;
+                                ctx->isDMAStateChanging = true;
                         }
                         Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
                     }
@@ -169,7 +170,7 @@ static void setDMAState(hwc_context_t *ctx, int numDisplays,
                 if(ctx->mExtOrientation || ctx->mBufferMirrorMode) {
                     if(ctx->mOverlay->isPipeTypeAttached(
                                          overlay::utils::OV_MDP_PIPE_DMA)) {
-                        ctx->isPaddingRound = true;
+                        ctx->isDMAStateChanging = true;
                     }
                     Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
                 }
