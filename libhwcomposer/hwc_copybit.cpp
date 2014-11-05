@@ -603,6 +603,12 @@ int CopyBit::drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
         return fd;
     }
 
+    //Clear the transparent or left out region on the render buffer
+    hwc_rect_t clearRegion = {0,0,0,0};
+    LayerProp *layerProp = ctx->layerProp[0];
+    if(CBUtils::getuiClearRegion(list, clearRegion, layerProp))
+        clear(renderBuffer, clearRegion);
+
     int copybitLayerCount = 0;
     for(int j = 0; j < ptorInfo->count; j++) {
         int ovlapIndex = ptorInfo->layerIndex[j];
