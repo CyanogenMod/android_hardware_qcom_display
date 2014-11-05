@@ -67,7 +67,7 @@ typedef DisplayError (*GetStrategyInterface)(StrategyInterface **interface);
 
 /*! @brief Maximum number of layers that can be handled by hardware in a given layer stack.
 */
-const int kNumLayersMax = 16;
+const int kMaxSDELayers = 16;
 
 /*! @brief This structure defines constraints and device properties that shall be considered for
     deciding a composition strategy.
@@ -81,7 +81,7 @@ struct StrategyConstraints {
   uint32_t max_layers;    //!< Maximum number of layers that shall be programmed on hardware for the
                           //!< given layer stack.
 
-  StrategyConstraints() : safe_mode(false), max_layers(kNumLayersMax) { }
+  StrategyConstraints() : safe_mode(false), max_layers(kMaxSDELayers) { }
 };
 
 /*! @brief Flag to denote that GPU composition is performed for the given layer stack.
@@ -96,7 +96,7 @@ const uint32_t kFlagGPU = 0x1;
 struct HWLayersInfo {
   LayerStack *stack;        //!< Input layer stack. Set by the caller.
 
-  uint32_t index[kNumLayersMax];
+  uint32_t index[kMaxSDELayers];
                             //!< Indexes of the layers from the layer stack which need to be
                             //!< programmed on hardware.
   uint32_t count;           //!< Total number of layers which need to be set on hardware.
