@@ -282,6 +282,10 @@ void initContext(hwc_context_t *ctx)
         ctx->mMDPDownscaleEnabled = true;
     }
 
+    property_get("sys.hwc.windowbox_aspect_ratio_tolerance", value, "0");
+    ctx->mMinToleranceLevel = 1.0f - (((float)(atoi(value))) / 100);
+    ctx->mMaxToleranceLevel = 1.0f + (((float)(atoi(value))) / 100);
+
     // Initialize gpu perfomance hint related parameters
     property_get("sys.hwc.gpu_perf_mode", value, "0");
 #ifdef QCOM_BSP
@@ -1654,9 +1658,14 @@ void updateDestAIVVideoMode(hwc_context_t *ctx, hwc_rect_t crop,
     int extW = ctx->dpyAttr[dpy].xres;
     int extH = ctx->dpyAttr[dpy].yres;
     // Set the destination coordinates of external display to full screen,
-    // when zoom in mode is enabled or video aspect ratio matches with the
-    // external display aspect ratio
-    if((srcCrop.w * extH == extW * srcCrop.h) || (isZoomModeEnabled(crop))) {
+    // when zoom in mode is enabled or the ratio between video aspect ratio
+    // and external display aspect ratio is below the tolerance level
+    float bufferAspectRatio = ((float)srcCrop.w / (float)srcCrop.h);
+    float extDisplayAspectRatio = ((float)extW / (float)extH);
+    float toleranceLevel = bufferAspectRatio / extDisplayAspectRatio;
+    if(((toleranceLevel >= ctx->mMinToleranceLevel) &&
+        (toleranceLevel <= ctx->mMaxToleranceLevel)) ||
+        (isZoomModeEnabled(crop))) {
         dst.left = 0;
         dst.top = 0;
         dst.right = extW;

@@ -591,6 +591,8 @@ struct hwc_context_t {
     // Flags related to windowboxing feature
     bool mAIVVideoMode[HWC_NUM_DISPLAY_TYPES];
     bool mWindowboxFeature;
+    float mMinToleranceLevel;
+    float mMaxToleranceLevel;
 };
 
 namespace qhwc {
