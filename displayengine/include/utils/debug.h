@@ -25,6 +25,24 @@
 #ifndef __DEBUG_H__
 #define __DEBUG_H__
 
+#ifndef SDE_LOG_TAG
+#define SDE_LOG_TAG kLogTagNone
+#endif
+
+#ifndef SDE_MODULE_NAME
+#define SDE_MODULE_NAME "SDE"
+#endif
+
+#define DLOG(method, format, ...) Debug::method(SDE_LOG_TAG, SDE_MODULE_NAME ": " format, \
+                                                ##__VA_ARGS__)
+
+// SDE_LOG_TAG and SDE_MODULE_NAME must be defined before #include this header file in
+// respective module, else default definitions are used.
+#define DLOGE(format, ...) DLOG(Error, format, ##__VA_ARGS__)
+#define DLOGW(format, ...) DLOG(Warning, format, ##__VA_ARGS__)
+#define DLOGI(format, ...) DLOG(Info, format, ##__VA_ARGS__)
+#define DLOGV(format, ...) DLOG(Verbose, format, ##__VA_ARGS__)
+
 namespace sde {
 
 enum LogTag {

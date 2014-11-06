@@ -22,10 +22,10 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// DISPLAY_LOG_TAG definition must precede logger.h include.
-#define DISPLAY_LOG_TAG kTagCore
-#define DISPLAY_MODULE_NAME "CompManager"
-#include <utils/logger.h>
+// SDE_LOG_TAG definition must precede debug.h include.
+#define SDE_LOG_TAG kTagCore
+#define SDE_MODULE_NAME "CompManager"
+#include <utils/debug.h>
 
 #include <dlfcn.h>
 #include <utils/constants.h>
@@ -185,6 +185,12 @@ void CompManager::Purge(Handle device) {
   CompManagerDevice *comp_mgr_device = reinterpret_cast<CompManagerDevice *>(device);
 
   res_mgr_.Purge(comp_mgr_device->res_mgr_device);
+}
+
+uint32_t CompManager::GetDump(uint8_t *buffer, uint32_t length) {
+  SCOPE_LOCK(locker_);
+
+  return 0;
 }
 
 }  // namespace sde

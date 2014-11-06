@@ -22,10 +22,10 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// DISPLAY_LOG_TAG definition must precede logger.h include.
-#define DISPLAY_LOG_TAG kTagCore
-#define DISPLAY_MODULE_NAME "DeviceBase"
-#include <utils/logger.h>
+// SDE_LOG_TAG definition must precede debug.h include.
+#define SDE_LOG_TAG kTagCore
+#define SDE_MODULE_NAME "DeviceBase"
+#include <utils/debug.h>
 
 #include <utils/constants.h>
 
@@ -271,6 +271,12 @@ DisplayError DeviceBase::SetVSyncState(bool enabled) {
   SCOPE_LOCK(locker_);
 
   return kErrorNone;
+}
+
+uint32_t DeviceBase::GetDump(uint8_t *buffer, uint32_t length) {
+  SCOPE_LOCK(locker_);
+
+  return 0;
 }
 
 }  // namespace sde

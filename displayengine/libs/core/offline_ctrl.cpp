@@ -22,26 +22,28 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __WRITEBACK_SESSION_H__
-#define __WRITEBACK_SESSION_H__
+// SDE_LOG_TAG definition must precede debug.h include.
+#define SDE_LOG_TAG kTagCore
+#define SDE_MODULE_NAME "OfflineCtrl"
+#include <utils/debug.h>
 
-#include <utils/locker.h>
+#include <utils/constants.h>
 
-#include "hw_interface.h"
+#include "offline_ctrl.h"
 
 namespace sde {
 
-class WritebackSession {
- public:
-  WritebackSession();
-  DisplayError Init(HWInterface *hw_intf, HWResourceInfo hw_res_info);
-  DisplayError Deinit();
+OfflineCtrl::OfflineCtrl() : hw_intf_(NULL) {
+}
 
- private:
-  HWInterface *hw_intf_;
-};
+DisplayError OfflineCtrl::Init(HWInterface *hw_intf, HWResourceInfo hw_res_info) {
+  hw_intf_ = hw_intf;
+  return kErrorNone;
+}
+
+DisplayError OfflineCtrl::Deinit() {
+  return kErrorNone;
+}
 
 }  // namespace sde
-
-#endif  // __WRITEBACK_SESSION_H__
 

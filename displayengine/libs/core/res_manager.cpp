@@ -22,10 +22,10 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// DISPLAY_LOG_TAG definition must precede logger.h include.
-#define DISPLAY_LOG_TAG kTagCore
-#define DISPLAY_MODULE_NAME "ResManager"
-#include <utils/logger.h>
+// SDE_LOG_TAG definition must precede debug.h include.
+#define SDE_LOG_TAG kTagCore
+#define SDE_MODULE_NAME "ResManager"
+#include <utils/debug.h>
 
 #include <utils/constants.h>
 
@@ -439,6 +439,12 @@ bool ResManager::IsScalingNeeded(const HWPipeInfo *pipe_info) {
 
   return ((dst_roi.right - dst_roi.left) != (src_roi.right - src_roi.left)) ||
           ((dst_roi.bottom - dst_roi.top) != (src_roi.bottom - src_roi.top));
+}
+
+uint32_t ResManager::GetDump(uint8_t *buffer, uint32_t length) {
+  SCOPE_LOCK(locker_);
+
+  return 0;
 }
 
 }  // namespace sde

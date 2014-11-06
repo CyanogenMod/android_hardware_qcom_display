@@ -22,44 +22,37 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-/*! @file debug_interface.h
-  @brief Interface file for debugging options provided by display engine.
+#ifndef __DUMP_IMPL_H__
+#define __DUMP_IMPL_H__
 
-*/
-#ifndef __DEBUG_INTERFACE_H__
-#define __DEBUG_INTERFACE_H__
-
-#include <stdint.h>
-
-#include "display_types.h"
+#include <core/dump_interface.h>
 
 namespace sde {
 
-/*! @brief Display debug interface.
-
-  @details This class defines debugging methods provided by display engine.
-
-*/
-class DebugInterface {
+class DumpImpl {
  public:
-  /*! @brief Method to get debugging information in form of a string.
-
-    @details Client shall use this method to get current snapshot of display engine context in form
-    of a formatted string for logging or dumping purposes.
-
-    @param[out] buffer String buffer allocated by the client. Filled with debugging information
-    upon return.
-    @param[in] length Length of the string buffer. Length shall be offset adjusted if any.
-
-    @return \link DisplayError \endlink
-  */
-  static DisplayError GetDump(uint8_t *buffer, uint32_t length);
+  // To be implemented in the modules which will add dump information to final dump buffer.
+  // buffer address & length will be already adjusted before calling into these modules.
+  virtual uint32_t GetDump(uint8_t *buffer, uint32_t length) = 0;
+  static void GetDump(uint8_t *buffer, uint32_t length, uint32_t *filled);
 
  protected:
-  virtual ~DebugInterface() { }
+  DumpImpl();
+  virtual ~DumpImpl();
+
+ private:
+  static const uint32_t kMaxDumpObjects = 32;
+
+  static void Register(DumpImpl *dump_impl);
+  static void Unregister(DumpImpl *dump_impl);
+
+  static DumpImpl *dump_list_[kMaxDumpObjects];
+  static uint32_t dump_count_;
+
+  friend DumpInterface;
 };
 
 }  // namespace sde
 
-#endif  // __DEBUG_INTERFACE_H__
+#endif  // __DUMP_IMPL_H__
 
