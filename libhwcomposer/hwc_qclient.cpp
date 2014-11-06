@@ -184,7 +184,7 @@ static void setSecondaryDisplayStatus(hwc_context_t *ctx,
             handle_resume(ctx, dpy);
         }
     } else {
-        ALOGE("%s: Invalid dpy", __FUNCTION__, dpy);
+        ALOGE("%s: Invalid dpy %d", __FUNCTION__, dpy);
         return;
     }
 }
