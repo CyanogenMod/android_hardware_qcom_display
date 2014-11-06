@@ -364,6 +364,10 @@ bool MDPVersion::updateSplitInfo() {
 }
 
 
+bool MDPVersion::hasMinCropWidthLimitation() const {
+    return mMdpRev <= MDSS_MDP_HW_REV_102;
+}
+
 bool MDPVersion::supportsDecimation() {
     return mFeatures & MDP_DECIMATION_EN;
 }
