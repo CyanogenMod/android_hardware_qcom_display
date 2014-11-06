@@ -32,6 +32,7 @@
 #include <poll.h>
 #include <string.h>
 #include <fcntl.h>
+#include <cutils/properties.h>
 
 #define II_DEBUG 0
 #define IDLE_NOTIFY_PATH "/sys/devices/virtual/graphics/fb0/idle_notify"
@@ -65,8 +66,12 @@ int IdleInvalidator::init(InvalidatorHandler reg_handler, void* user_data) {
         return -1;
     }
 
-    enum {DEFAULT_IDLE_TIME = 70}; //ms
-    if(not setIdleTimeout(DEFAULT_IDLE_TIME)) {
+    int defaultIdleTime = 70; //ms
+    char property[PROPERTY_VALUE_MAX] = {0};
+    if((property_get("debug.mdpcomp.idletime", property, NULL) > 0)) {
+        defaultIdleTime = atoi(property);
+    }
+    if(not setIdleTimeout(defaultIdleTime)) {
         close(mTimeoutEventFd);
         mTimeoutEventFd = -1;
         return -1;
