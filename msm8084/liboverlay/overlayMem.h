@@ -41,6 +41,7 @@
 #include "mdpWrapper.h"
 
 #define SIZE_1M 0x00100000
+#define SIZE_2M 0x00200000
 
 namespace overlay {
 
@@ -138,8 +139,8 @@ inline bool OvMem::open(uint32_t numbufs,
     if(isSecure) {
         allocFlags = GRALLOC_USAGE_PRIVATE_MM_HEAP;
         allocFlags |= GRALLOC_USAGE_PROTECTED;
-        mBufSzAligned = utils::align(bufSz, SIZE_1M);
-        data.align = SIZE_1M;
+        mBufSzAligned = utils::align(bufSz, SIZE_2M);
+        data.align = SIZE_2M;
     } else {
         mBufSzAligned = bufSz;
         data.align = getpagesize();
