@@ -580,7 +580,6 @@ static int clear_copybit(struct copybit_device_t *dev,
     struct blitReq list1;
     memset((char *)&list1 , 0 ,sizeof (struct blitReq) );
     list1.count = 1;
-    int rel_fen_fd = -1;
     int my_tmp_get_fence = -1;
 
     list1.sync.acq_fen_fd  =  ctx->acqFence;
