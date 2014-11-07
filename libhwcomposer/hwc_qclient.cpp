@@ -244,6 +244,13 @@ static void setIdleTimeout(hwc_context_t* ctx, const Parcel* inParcel) {
     MDPComp::setIdleTimeout(timeout);
 }
 
+static void setMaxPipesPerMixer(hwc_context_t* ctx, const Parcel* inParcel) {
+    uint32_t value = (uint32_t)inParcel->readInt32();
+    ALOGD("%s : setting MaxPipesPerMixer: %d ", __FUNCTION__, value);
+    Locker::Autolock _sl(ctx->mDrawLock);
+    MDPComp::setMaxPipesPerMixer(value);
+}
+
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t ret = NO_ERROR;
@@ -288,6 +295,9 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::SET_IDLE_TIMEOUT:
             setIdleTimeout(mHwcContext, inParcel);
+            break;
+        case IQService::SET_MAX_PIPES_PER_MIXER:
+            setMaxPipesPerMixer(mHwcContext, inParcel);
             break;
         default:
             ret = NO_ERROR;

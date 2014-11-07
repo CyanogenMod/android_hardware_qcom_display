@@ -116,6 +116,7 @@ public:
     uint8_t getRGBPipes() { return mRGBPipes; }
     uint8_t getVGPipes() { return mVGPipes; }
     uint8_t getDMAPipes() { return mDMAPipes; }
+    uint8_t getBlendStages() { return mBlendStages; }
     bool supportsDecimation();
     uint32_t getMaxMDPDownscale();
     uint32_t getMaxMDPUpscale();
@@ -163,6 +164,7 @@ private:
     uint8_t mRGBPipes;
     uint8_t mVGPipes;
     uint8_t mDMAPipes;
+    uint8_t mBlendStages;
     uint32_t mFeatures;
     uint32_t mMDPDownscale;
     uint32_t mMDPUpscale;

@@ -25,8 +25,6 @@
 #include <cutils/properties.h>
 #include <overlay.h>
 
-#define MAX_PIPES_PER_MIXER 4
-
 namespace overlay {
 class Rotator;
 };
@@ -57,6 +55,7 @@ public:
     static bool isIdleFallback() { return sIdleFallBack; }
     static void dynamicDebug(bool enable){ sDebugLogs = enable; }
     static void setIdleTimeout(const uint32_t& timeout);
+    static void setMaxPipesPerMixer(const uint32_t value);
 
 protected:
     enum { MAX_SEC_LAYERS = 1 }; //TODO add property support
@@ -104,7 +103,7 @@ protected:
 
         /* maps mdp list to layer list */
         int mdpCount;
-        struct PipeLayerPair mdpToLayer[MAX_PIPES_PER_MIXER];
+        struct PipeLayerPair mdpToLayer[MAX_NUM_BLEND_STAGES];
 
         /* layer composing on FB? */
         int fbCount;
