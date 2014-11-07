@@ -214,7 +214,7 @@ DisplayError ResManager::Acquire(Handle device, HWLayers *hw_layers) {
   }
 
   for (uint32_t i = 0; i < layer_info.count; i++) {
-    Layer &layer = layer_info.stack->layers.layer[layer_info.index[i]];
+    Layer &layer = layer_info.stack->layers[layer_info.index[i]];
     bool use_non_dma_pipe = hw_layers->config[i].use_non_dma_pipe;
 
     // Temp setting, this should be set by comp_manager

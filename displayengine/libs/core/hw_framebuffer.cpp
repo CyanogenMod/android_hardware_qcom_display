@@ -36,7 +36,6 @@
 #include <sys/ioctl.h>
 #include <linux/fb.h>
 #include <utils/constants.h>
-#include <utils/debug.h>
 
 #include "hw_framebuffer.h"
 
@@ -242,7 +241,7 @@ DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
   uint32_t num_overlays = 0;
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
-    Layer &layer = stack->layers.layer[layer_index];
+    Layer &layer = stack->layers[layer_index];
     LayerBuffer *input_buffer = layer.input_buffer;
     HWLayerConfig &config = hw_layers->config[i];
     HWPipeInfo &left_pipe = config.left_pipe;
@@ -318,7 +317,7 @@ DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
   stack->retire_fence_fd = retire_fence;
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
-    Layer &layer = stack->layers.layer[layer_index];
+    Layer &layer = stack->layers[layer_index];
     LayerBuffer *input_buffer = layer.input_buffer;
     input_buffer->release_fence_fd = dup(release_fence);
   }

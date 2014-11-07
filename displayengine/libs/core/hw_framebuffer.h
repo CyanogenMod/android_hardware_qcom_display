@@ -30,11 +30,6 @@
 
 namespace sde {
 
-struct HWContext {
-  HWBlockType type;
-  int device_fd;
-};
-
 class HWFrameBuffer : public HWInterface {
  public:
   HWFrameBuffer();
@@ -54,6 +49,11 @@ class HWFrameBuffer : public HWInterface {
   virtual DisplayError Commit(Handle device, HWLayers *hw_layers);
 
  private:
+  struct HWContext {
+    HWBlockType type;
+    int device_fd;
+  };
+
   inline void SetFormat(uint32_t *target, const LayerBufferFormat &source);
   inline void SetBlending(uint32_t *target, const LayerBlending &source);
   inline void SetRect(mdp_rect *target, const LayerRect &source);

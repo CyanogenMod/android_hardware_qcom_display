@@ -37,12 +37,12 @@ DisplayError StrategyDefault::GetNextStrategy(StrategyConstraints *constraints,
                                               HWLayersInfo *hw_layers_info) {
   // Mark all layers for GPU composition. Find GPU target buffer and store its index for programming
   // the hardware.
-  LayerArray &layer_array = hw_layers_info->stack->layers;
+  LayerStack *layer_stack = hw_layers_info->stack;
   uint32_t &hw_layer_count = hw_layers_info->count;
 
   hw_layer_count = 0;
-  for (uint32_t i = 0; i < layer_array.count; i++) {
-    LayerComposition &composition = layer_array.layer[i].composition;
+  for (uint32_t i = 0; i < layer_stack->layer_count; i++) {
+    LayerComposition &composition = layer_stack->layers[i].composition;
     if (composition != kCompositionGPUTarget) {
       composition = kCompositionGPU;
     } else {
