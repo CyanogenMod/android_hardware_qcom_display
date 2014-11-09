@@ -3,7 +3,7 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE                  := libsdmutils
 LOCAL_MODULE_TAGS             := optional
-LOCAL_C_INCLUDES              := hardware/qcom/display/sdm/include/
+LOCAL_C_INCLUDES              := $(call project-path-for,qcom-display)/sdm/include/
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
                                  -Wconversion -Wall -Werror \
                                  -DLOG_TAG=\"SDM\"
