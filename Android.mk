@@ -1,3 +1,5 @@
+ifeq ($(call my-dir),$(call project-path-for,qcom-display))
+
 ifeq ($(call is-board-platform-in-list, thulium),true)
     TARGET_USES_SDE = true
 else
@@ -19,4 +21,6 @@ else
 ifneq ($(filter msm% apq%,$(TARGET_BOARD_PLATFORM)),)
     include $(call all-named-subdir-makefiles,$(display-hals))
 endif
+endif
+
 endif
