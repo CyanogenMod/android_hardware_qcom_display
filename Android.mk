@@ -1,3 +1,5 @@
+ifeq ($(call my-dir)/$(TARGET_BOARD_PLATFORM),$(call project-path-for,qcom-display))
+
 # TODO:  Find a better way to separate build configs for ADP vs non-ADP devices
 ifneq ($(TARGET_BOARD_AUTO),true)
   ifneq ($(filter msm8084 msm8x84,$(TARGET_BOARD_PLATFORM)),)
@@ -29,4 +31,6 @@ ifneq ($(TARGET_BOARD_AUTO),true)
       endif
     endif
   endif
+endif
+
 endif
