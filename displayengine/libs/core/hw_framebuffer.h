@@ -25,9 +25,12 @@
 #ifndef __HW_FRAMEBUFFER_H__
 #define __HW_FRAMEBUFFER_H__
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <linux/msm_mdp.h>
 #include <poll.h>
 #include <pthread.h>
+
 #include "hw_interface.h"
 
 namespace sde {
@@ -57,14 +60,45 @@ class HWFrameBuffer : public HWInterface {
     int device_fd;
   };
 
+  enum PanelType {
+    kNoPanel,
+    kCommandModePanel,
+    kVideoModePanel,
+    kDTvPanel,
+    kWriteBackPanel,
+    kLVDSPanel,
+    kEDPPanel,
+  };
+
   enum {
     kHWEventVSync,
     kHWEventBlank,
   };
 
+  // Maps to the msm_fb_panel_info
+  struct PanelInfo {
+    PanelType type;        // Smart or Dumb
+    bool partial_update;   // Partial update feature
+    int left_align;        // ROI left alignment restriction
+    int width_align;       // ROI width alignment restriction
+    int top_align;;        // ROI top alignment restriction
+    int height_align;      // ROI height alignment restriction
+    int min_roi_width;     // Min width needed for ROI
+    int min_roi_height;    // Min height needed for ROI
+    bool needs_roi_merge;  // Merge ROI's of both the DSI's
+    bool dynamic_fps;      // Panel Supports dynamic fps
+    uint32_t min_fps;      // Min fps supported by panel
+    uint32_t max_fps;      // Max fps supported by panel
+
+    PanelInfo() : type(kNoPanel), partial_update(false), left_align(false), width_align(false),
+      top_align(false), height_align(false), min_roi_width(0), min_roi_height(0),
+      needs_roi_merge(false), dynamic_fps(false), min_fps(0), max_fps(0) { }
+  };
+
   static const int kMaxStringLength = 1024;
   static const int kNumPhysicalDisplays = 2;
   static const int kNumDisplayEvents = 2;
+  static const int kHWMdssVersion5 = 500;  // MDSS_V5
 
   inline void SetFormat(uint32_t *target, const LayerBufferFormat &source);
   inline void SetBlending(uint32_t *target, const LayerBlending &source);
@@ -77,12 +111,23 @@ class HWFrameBuffer : public HWInterface {
   void HandleVSync(int display_id, char *data);
   void HandleBlank(int display_id, char *data);
 
+  // Populates HW FrameBuffer Node Index
+  void PopulateFBNodeIndex();
+  // Populates the Panel Info based on node index
+  void PopulatePanelInfo(int fb_index);
+  // Populates HW Capabilities
+  DisplayError PopulateHWCapabilities();
+  int ParseLine(char *input, char *token[], int max_token, int *count);
+
   // Pointers to system calls which are either mapped to actual system call or virtual driver.
   int (*ioctl_)(int, int, ...);
   int (*open_)(const char *, int, ...);
   int (*close_)(int);
   int (*poll_)(struct pollfd *, nfds_t, int);
   ssize_t (*pread_)(int, void *, size_t, off_t);
+  FILE* (*fopen_)( const char *fname, const char *mode );;
+  int (*fclose_)(FILE* fileptr);
+  ssize_t (*getline_)(char **lineptr, size_t *linelen, FILE *stream);
 
   // Store the Device EventHandlers - used for callback
   HWEventHandler *event_handler_[kNumPhysicalDisplays];
@@ -91,6 +136,10 @@ class HWFrameBuffer : public HWInterface {
   const char *event_thread_name_;
   bool fake_vsync_;
   bool exit_threads_;
+  HWResourceInfo hw_resource_;
+  int fb_node_index_[kHWBlockMax];
+  const char* fb_path_;
+  PanelInfo pri_panel_info_;
 };
 
 }  // namespace sde
