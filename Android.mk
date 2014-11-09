@@ -1,3 +1,5 @@
+ifeq ($(call my-dir),$(call project-path-for,qcom-display))
+
 ifneq ($(filter msm8084 msm8x84,$(TARGET_BOARD_PLATFORM)),)
     #This is for 8084 based platforms
     include $(call all-named-subdir-makefiles,msm8084)
@@ -13,4 +15,6 @@ else
     include $(call all-named-subdir-makefiles,msm8960)
 endif
 endif
+endif
+
 endif
