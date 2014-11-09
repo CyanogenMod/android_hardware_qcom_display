@@ -1,3 +1,5 @@
+ifeq ($(call my-dir),$(call project-path-for,qcom-display))
+
 display-hals := libgralloc libcopybit liblight libmemtrack libqservice libqdutils
 display-hals += hdmi_cec
 
@@ -10,4 +12,6 @@ else
 ifneq ($(filter msm% apq%,$(TARGET_BOARD_PLATFORM)),)
     include $(call all-named-subdir-makefiles,$(display-hals))
 endif
+endif
+
 endif

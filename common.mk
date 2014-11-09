@@ -1,8 +1,8 @@
 #Common headers
-common_includes := $(LOCAL_PATH)/../libgralloc
-common_includes += $(LOCAL_PATH)/../libcopybit
-common_includes += $(LOCAL_PATH)/../libqdutils
-common_includes += $(LOCAL_PATH)/../libqservice
+common_includes := $(call project-path-for,qcom-display)/libgralloc
+common_includes += $(call project-path-for,qcom-display)/libcopybit
+common_includes += $(call project-path-for,qcom-display)/libqdutils
+common_includes += $(call project-path-for,qcom-display)/libqservice
 
 common_header_export_path := qcom/display
 
