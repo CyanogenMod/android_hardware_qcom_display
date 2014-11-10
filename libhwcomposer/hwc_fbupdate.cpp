@@ -157,6 +157,8 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
         }
 
         ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_BLEND_FG_PREMULT;
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SMP_FORCE_ALLOC);
         ovutils::eZorder zOrder = static_cast<ovutils::eZorder>(fbZorder);
 
         hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
@@ -280,6 +282,8 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
 
         overlay::Overlay& ov = *(ctx->mOverlay);
         ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_BLEND_FG_PREMULT;
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SMP_FORCE_ALLOC);
         ovutils::eZorder zOrder = static_cast<ovutils::eZorder>(fbZorder);
         ovutils::eTransform orient =
             static_cast<ovutils::eTransform>(layer->transform);
@@ -442,6 +446,8 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
                 mTileEnabled));
 
     ovutils::eMdpFlags mdpFlags = OV_MDP_BLEND_FG_PREMULT;
+    ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SMP_FORCE_ALLOC);
     ovutils::eZorder zOrder = static_cast<ovutils::eZorder>(fbZorder);
 
     ovutils::PipeArgs parg(mdpFlags,

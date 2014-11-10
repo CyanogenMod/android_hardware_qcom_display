@@ -1675,6 +1675,13 @@ void setMdpFlags(hwc_context_t *ctx, hwc_layer_1_t *layer,
     if(isSecureBuffer(hnd)) {
         ovutils::setMdpFlags(mdpFlags,
                 ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SMP_FORCE_ALLOC);
+    }
+
+    if(isProtectedBuffer(hnd)) {
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SMP_FORCE_ALLOC);
     }
 
     if(isSecureDisplayBuffer(hnd)) {
