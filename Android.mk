@@ -4,7 +4,7 @@ sdm-libs := sdm/libs
 display-hals := libqservice libqdutils $(sdm-libs)/utils $(sdm-libs)/core
 
 ifneq ($(TARGET_IS_HEADLESS), true)
-    display-hals += libcopybit liblight libmemtrack hdmi_cec \
+    display-hals += libcopybit libmemtrack hdmi_cec \
                     $(sdm-libs)/hwc $(sdm-libs)/hwc2
 endif
 
@@ -12,6 +12,10 @@ ifneq ($(TARGET_USES_GRALLOC1), true)
     display-hals += libgralloc
 else
     display-hals += libgralloc1
+endif
+
+ifneq ($(TARGET_PROVIDES_LIBLIGHT),true)
+display-hals += liblight
 endif
 
 ifeq ($(call is-vendor-board-platform,QCOM),true)
