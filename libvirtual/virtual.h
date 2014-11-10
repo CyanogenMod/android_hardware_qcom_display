@@ -51,7 +51,6 @@ public:
 private:
     bool openFrameBuffer();
     bool closeFrameBuffer();
-    bool isSinkSecure();
     void setAttributes();
     void initResolution(uint32_t &extW, uint32_t &extH);
     void setToPrimary(uint32_t maxArea, uint32_t priW, uint32_t priH,
