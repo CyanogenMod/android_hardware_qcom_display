@@ -30,7 +30,6 @@
 #include "hwc_fbupdate.h"
 #include "mdp_version.h"
 #include "hwc_copybit.h"
-#include "hwc_dump_layers.h"
 #include "external.h"
 #include "virtual.h"
 #include "hwc_qclient.h"
@@ -163,7 +162,6 @@ void initContext(hwc_context_t *ctx)
     for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         ctx->mLayerRotMap[i] = new LayerRotMap();
         ctx->mAnimationState[i] = ANIMATION_STOPPED;
-        ctx->mHwcDebug[i] = new HwcDebug(i);
         ctx->mPrevHwLayerCount[i] = 0;
     }
 
@@ -231,10 +229,6 @@ void closeContext(hwc_context_t *ctx)
         if(ctx->mLayerRotMap[i]) {
             delete ctx->mLayerRotMap[i];
             ctx->mLayerRotMap[i] = NULL;
-        }
-        if(ctx->mHwcDebug[i]) {
-            delete ctx->mHwcDebug[i];
-            ctx->mHwcDebug[i] = NULL;
         }
     }
 
