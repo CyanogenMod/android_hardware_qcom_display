@@ -39,21 +39,22 @@ public:
     DECLARE_META_INTERFACE(QService);
     enum {
         COMMAND_LIST_START = android::IBinder::FIRST_CALL_TRANSACTION,
-        SECURING,                // Hardware securing start/end notification
-        UNSECURING,              // Hardware unsecuring start/end notification
-        CONNECT,                 // Connect to qservice
-        SCREEN_REFRESH,          // Refresh screen through SF invalidate
-        EXTERNAL_ORIENTATION,    // Set external orientation
-        BUFFER_MIRRORMODE,       // Buffer mirrormode
-        CHECK_EXTERNAL_STATUS,   // Check status of external display
-        GET_DISPLAY_ATTRIBUTES,  // Get display attributes
-        SET_HSIC_DATA,           // Set HSIC on dspp
-        GET_DISPLAY_VISIBLE_REGION,  // Get the visibleRegion for dpy
-        SET_SECONDARY_DISPLAY_STATUS,  // Sets secondary display status
-        SET_MAX_PIPES_PER_MIXER, // Set max pipes per mixer for MDPComp
-        SET_VIEW_FRAME,          // Set view frame of display
-        DYNAMIC_DEBUG,           // Enable more logging on the fly
-        SET_IDLE_TIMEOUT,        // Set idle timeout for GPU fallback
+        SECURING = 2,           // Hardware securing start/end notification
+        UNSECURING = 3,         // Hardware unsecuring start/end notification
+        CONNECT = 4,            // Connect to qservice
+        SCREEN_REFRESH = 5,     // Refresh screen through SF invalidate
+        EXTERNAL_ORIENTATION = 6,// Set external orientation
+        BUFFER_MIRRORMODE = 7,  // Buffer mirrormode
+        CHECK_EXTERNAL_STATUS = 8,// Check status of external display
+        GET_DISPLAY_ATTRIBUTES = 9,// Get display attributes
+        SET_HSIC_DATA = 10,     // Set HSIC on dspp
+        GET_DISPLAY_VISIBLE_REGION = 11,// Get the visibleRegion for dpy
+        SET_SECONDARY_DISPLAY_STATUS = 12,// Sets secondary display status
+        SET_MAX_PIPES_PER_MIXER = 13,// Set max pipes per mixer for MDPComp
+        SET_VIEW_FRAME = 14,    // Set view frame of display
+        DYNAMIC_DEBUG = 15,     // Enable more logging on the fly
+        SET_IDLE_TIMEOUT = 16,  // Set idle timeout for GPU fallback
+        TOGGLE_BWC = 17,           // Toggle BWC On/Off on targets that support
         COMMAND_LIST_END = 400,
     };
 
