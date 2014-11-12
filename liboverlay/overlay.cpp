@@ -186,13 +186,7 @@ bool Overlay::commit(utils::eDest dest) {
         ret = true;
         PipeBook::setUse((int)dest);
     } else {
-        int dpy = mPipeBook[dest].mDisplay;
-        for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
-            if (mPipeBook[i].mDisplay == dpy) {
-                PipeBook::resetAllocation(i);
-                PipeBook::resetUse(i);
-            }
-        }
+        clear(mPipeBook[dest].mDisplay);
     }
     return ret;
 }
@@ -414,6 +408,9 @@ void Overlay::clear(int dpy) {
             // Mark as available for this round
             PipeBook::resetUse(i);
             PipeBook::resetAllocation(i);
+            if(getPipeId((utils::eDest)i) == -1) {
+                mPipeBook[i].destroy();
+            }
         }
     }
 }
