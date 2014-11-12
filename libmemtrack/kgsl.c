@@ -107,7 +107,7 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
 
         if (type == MEMTRACK_TYPE_GL && strcmp(line_type, "gpumem") == 0) {
 
-            if (flags[6] == 'Y')
+            if (flags[5] == 'Y')
                 accounted_size += size;
             else
                 unaccounted_size += size;
