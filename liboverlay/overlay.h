@@ -53,6 +53,7 @@ public:
     enum { MIXER_LEFT, MIXER_RIGHT, MIXER_UNUSED };
     enum { MIXER_DEFAULT = MIXER_LEFT, MIXER_MAX = MIXER_UNUSED };
     enum { MAX_FB_DEVICES = DPY_MAX };
+    enum { FORMAT_YUV, FORMAT_RGB, FORMAT_NONE };
 
     /* dtor close */
     ~Overlay();
@@ -76,7 +77,8 @@ public:
      * display without being garbage-collected once. To add if a pipe is
      * asisgned to a mixer within a display it cannot be reused for another
      * mixer without being UNSET once*/
-    utils::eDest nextPipe(utils::eMdpPipeType, int dpy, int mixer);
+    utils::eDest nextPipe(utils::eMdpPipeType, int dpy, int mixer,
+                          int formatType);
     /* Returns the eDest corresponding to an already allocated pipeid.
      * Useful for the reservation case, when libvpu reserves the pipe at its
      * end, and expect the overlay to allocate a given pipe for a layer.
@@ -163,6 +165,8 @@ private:
         int mDisplay;
         /* Mixer within a split display this pipe is attached to */
         int mMixer;
+        /* Format for which this pipe is attached to the mixer*/
+        int mFormatType;
 
         /* operations on bitmap */
         static bool pipeUsageUnchanged();

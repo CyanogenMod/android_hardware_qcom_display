@@ -115,7 +115,7 @@ eDest Overlay::reservePipe(int pipeid) {
     return dest;
 }
 
-eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
+eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer, int formatType) {
     eDest dest = OV_INVALID;
 
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
@@ -125,6 +125,8 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
              mPipeBook[i].mDisplay == dpy) &&
             (mPipeBook[i].mMixer == MIXER_UNUSED || //Free or same mixer
              mPipeBook[i].mMixer == mixer) &&
+            (mPipeBook[i].mFormatType == FORMAT_NONE|| //Free or same format
+             mPipeBook[i].mFormatType == formatType) &&
             PipeBook::isNotAllocated(i) && //Free pipe
             ( (sDMAMultiplexingSupported && dpy) ||
               !(sDMAMode == DMA_BLOCK_MODE && //DMA pipe in Line mode
@@ -140,6 +142,7 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
         int index = (int)dest;
         mPipeBook[index].mDisplay = dpy;
         mPipeBook[index].mMixer = mixer;
+        mPipeBook[index].mFormatType = formatType;
         if(not mPipeBook[index].valid()) {
             mPipeBook[index].mPipe = new GenericPipe(dpy);
             mPipeBook[index].mSession = PipeBook::NONE;
@@ -471,6 +474,7 @@ void Overlay::PipeBook::init() {
     mPipe = NULL;
     mDisplay = DPY_UNUSED;
     mMixer = MIXER_UNUSED;
+    mFormatType = FORMAT_NONE;
 }
 
 void Overlay::PipeBook::destroy() {
@@ -480,6 +484,7 @@ void Overlay::PipeBook::destroy() {
     }
     mDisplay = DPY_UNUSED;
     mMixer = MIXER_UNUSED;
+    mFormatType = FORMAT_NONE;
     mSession = NONE;
 }
 

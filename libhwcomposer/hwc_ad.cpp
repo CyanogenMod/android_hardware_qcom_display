@@ -158,7 +158,8 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
     }
 
     ovutils::eDest dest = ctx->mOverlay->nextPipe(ovutils::OV_MDP_PIPE_VG,
-            overlay::Overlay::DPY_WRITEBACK, Overlay::MIXER_DEFAULT);
+            overlay::Overlay::DPY_WRITEBACK, Overlay::MIXER_DEFAULT,
+            Overlay::FORMAT_YUV);
     if(dest == OV_INVALID) {
         ALOGE("%s failed: No VG pipe available", __func__);
         mDoable = false;

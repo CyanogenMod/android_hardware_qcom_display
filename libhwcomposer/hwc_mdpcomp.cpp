@@ -391,13 +391,15 @@ ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type,
 
     switch(type) {
     case MDPCOMP_OV_DMA:
-        mdp_pipe = ov.nextPipe(ovutils::OV_MDP_PIPE_DMA, mDpy, mixer);
+        mdp_pipe = ov.nextPipe(ovutils::OV_MDP_PIPE_DMA, mDpy, mixer,
+                               Overlay::FORMAT_RGB);
         if(mdp_pipe != ovutils::OV_INVALID) {
             return mdp_pipe;
         }
     case MDPCOMP_OV_ANY:
     case MDPCOMP_OV_RGB:
-        mdp_pipe = ov.nextPipe(ovutils::OV_MDP_PIPE_RGB, mDpy, mixer);
+        mdp_pipe = ov.nextPipe(ovutils::OV_MDP_PIPE_RGB, mDpy, mixer,
+                               Overlay::FORMAT_RGB);
         if(mdp_pipe != ovutils::OV_INVALID) {
             return mdp_pipe;
         }
@@ -407,7 +409,8 @@ ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type,
             break;
         }
     case  MDPCOMP_OV_VG:
-        return ov.nextPipe(ovutils::OV_MDP_PIPE_VG, mDpy, mixer);
+        return ov.nextPipe(ovutils::OV_MDP_PIPE_VG, mDpy, mixer,
+                           Overlay::FORMAT_YUV);
     default:
         ALOGE("%s: Invalid pipe type",__FUNCTION__);
         return ovutils::OV_INVALID;
