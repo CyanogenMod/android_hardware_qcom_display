@@ -1,3 +1,4 @@
+# invisiblek roolz!
 ifeq ($(call my-dir),$(call project-path-for,qcom-display)/$(TARGET_BOARD_PLATFORM))
 
 display-hals := libgralloc libgenlock libcopybit libvirtual
