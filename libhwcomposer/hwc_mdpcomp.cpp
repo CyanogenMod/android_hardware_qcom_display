@@ -2559,18 +2559,26 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
     MDPVersion& mdpHw = MDPVersion::getInstance();
     bool primarySplitAlways = (mDpy == HWC_DISPLAY_PRIMARY) and
             mdpHw.isSrcSplitAlways();
-    int lSplit = getLeftSplit(ctx, mDpy);
-    int dstWidth = dst.right - dst.left;
-    int cropWidth = has90Transform(layer) ? crop.bottom - crop.top :
+    const uint32_t lSplit = getLeftSplit(ctx, mDpy);
+    const uint32_t dstWidth = dst.right - dst.left;
+    const uint32_t dstHeight = dst.bottom - dst.top;
+    const uint32_t cropWidth = has90Transform(layer) ? crop.bottom - crop.top :
             crop.right - crop.left;
+    const uint32_t cropHeight = has90Transform(layer) ? crop.right - crop.left :
+            crop.bottom - crop.top;
+    //Approximation to actual clock, ignoring the common factors in pipe and
+    //mixer cases like line_time
+    const uint32_t layerClock = getLayerClock(dstWidth, dstHeight, cropHeight);
+    const uint32_t mixerClock = lSplit;
 
     //TODO Even if a 4k video is going to be rot-downscaled to dimensions under
     //pipe line length, we are still using 2 pipes. This is fine just because
     //this is source split where destination doesn't matter. Evaluate later to
     //see if going through all the calcs to save a pipe is worth it
-    if(dstWidth > (int) mdpHw.getMaxMixerWidth() or
-            cropWidth > (int) mdpHw.getMaxMixerWidth() or
-            (primarySplitAlways and (cropWidth > lSplit))) {
+    if(dstWidth > mdpHw.getMaxMixerWidth() or
+            cropWidth > mdpHw.getMaxMixerWidth() or
+            (primarySplitAlways and
+            (cropWidth > lSplit or layerClock > mixerClock))) {
         pipe_info.rIndex = ctx->mOverlay->getPipe(pipeSpecs);
         if(pipe_info.rIndex == ovutils::OV_INVALID) {
             return false;
