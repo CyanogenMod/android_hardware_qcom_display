@@ -441,10 +441,8 @@ bool ResManager::IsScalingNeeded(const HWPipeInfo *pipe_info) {
           ((dst_roi.bottom - dst_roi.top) != (src_roi.bottom - src_roi.top));
 }
 
-uint32_t ResManager::GetDump(uint8_t *buffer, uint32_t length) {
+void ResManager::AppendDump(char *buffer, uint32_t length) {
   SCOPE_LOCK(locker_);
-
-  return 0;
 }
 
 }  // namespace sde

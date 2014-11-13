@@ -47,17 +47,16 @@ class DumpInterface {
     @details Client shall use this method to get current snapshot of display engine context as a
     formatted string for logging or dumping purposes.
 
-    @param[inout] buffer String buffer allocated by the client. Filled with dump information upon
-    return.
+    @param[inout] buffer String buffer allocated by the client. Filled with null terminated dump
+    information upon return.
     @param[in] length Length of the string buffer. Length shall be offset adjusted if any.
-    @param[in] filled Number of bytes filled into the string buffer.
 
     @return \link DisplayError \endlink
 
     @warning Client shall ensure that this interface is not used while a device is being either
     created or destroyed through display core.
   */
-  static DisplayError GetDump(uint8_t *buffer, uint32_t length, uint32_t *filled);
+  static DisplayError GetDump(char *buffer, uint32_t length);
 
  protected:
   virtual ~DumpInterface() { }

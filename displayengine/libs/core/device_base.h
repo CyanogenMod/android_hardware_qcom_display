@@ -34,7 +34,7 @@
 
 namespace sde {
 
-class DeviceBase : public DeviceInterface, DumpImpl, HWEventHandler   {
+class DeviceBase : public DeviceInterface, HWEventHandler, DumpImpl {
  public:
   DeviceBase(DeviceType device_type, DeviceEventHandler *event_handler,
              HWBlockType hw_block_type, HWInterface *hw_intf, CompManager *comp_manager);
@@ -52,12 +52,13 @@ class DeviceBase : public DeviceInterface, DumpImpl, HWEventHandler   {
   virtual DisplayError SetConfig(uint32_t mode);
   virtual DisplayError SetVSyncState(bool enable);
 
-  // DumpImpl method
-  virtual uint32_t GetDump(uint8_t *buffer, uint32_t length);
-
   // Implement the HWEventHandlers
   virtual DisplayError VSync(int64_t timestamp);
   virtual DisplayError Blank(bool blank);
+
+  // DumpImpl method
+  virtual void AppendDump(char *buffer, uint32_t length);
+  void AppendRect(char *buffer, uint32_t length, const char *rect_name, LayerRect *rect);
 
  protected:
   Locker locker_;

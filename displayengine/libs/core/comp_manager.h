@@ -48,7 +48,7 @@ class CompManager : public DumpImpl {
   void Purge(Handle device);
 
   // DumpImpl method
-  virtual uint32_t GetDump(uint8_t *buffer, uint32_t length);
+  virtual void AppendDump(char *buffer, uint32_t length);
 
  private:
   struct CompManagerDevice {
