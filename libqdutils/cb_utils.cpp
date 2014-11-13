@@ -51,7 +51,8 @@ int CBUtils::getuiClearRegion(hwc_display_contents_1_t* list,
     if(cb_swap_rect::getInstance().checkSwapRectFeature_on() == true){
       wormholeRegion.set(0,0);
       for(uint32_t i = 0 ; i < last; i++) {
-         if((list->hwLayers[i].blending == HWC_BLENDING_NONE) ||
+         if(((list->hwLayers[i].blending == HWC_BLENDING_NONE) &&
+           (list->hwLayers[i].planeAlpha == 0xFF)) ||
            !(layerProp[i].mFlags & HWC_COPYBIT) ||
            (list->hwLayers[i].flags  & HWC_SKIP_HWC_COMPOSITION))
               continue ;
@@ -65,6 +66,7 @@ int CBUtils::getuiClearRegion(hwc_display_contents_1_t* list,
         // need to take care only in per pixel blending.
         // Restrict calculation only for copybit layers.
         if((list->hwLayers[i].blending != HWC_BLENDING_NONE) ||
+           (list->hwLayers[i].planeAlpha != 0xFF) ||
            !(layerProp[i].mFlags & HWC_COPYBIT))
             continue ;
         hwc_rect_t displayFrame = list->hwLayers[i].displayFrame;
