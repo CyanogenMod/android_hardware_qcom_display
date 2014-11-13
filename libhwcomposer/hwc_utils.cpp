@@ -256,6 +256,7 @@ static int openFramebufferDevice(hwc_context_t *ctx)
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period =
             (uint32_t)(1000000000l / fps);
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fbformat = getFBformat(info);
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].secure = true;
 
     //To change resolution of primary display
     changeResolution(ctx, info.xres, info.yres, info.width, info.height);

@@ -97,6 +97,7 @@ struct DisplayAttributes {
     float xdpi;
     float ydpi;
     uint32_t fbformat;
+    bool secure;
     int fd;
     bool connected; //Applies only to pluggable disp.
     //Connected does not mean it ready to use.
