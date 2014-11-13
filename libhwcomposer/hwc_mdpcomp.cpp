@@ -478,7 +478,8 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
             }
 
             /* deduct any opaque region from visibleRect */
-            if (layer->blending == HWC_BLENDING_NONE)
+            if (layer->blending == HWC_BLENDING_NONE &&
+                    layer->planeAlpha == 0xFF)
                 visibleRect = deductRect(visibleRect, res);
         }
     }
