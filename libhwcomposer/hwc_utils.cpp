@@ -1314,8 +1314,8 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         fd = -1;
     }
 
-    if (!dpy && ctx->mCopyBit[dpy]) {
-        if (ctx->mPtorInfo.isActive())
+    if (ctx->mCopyBit[dpy]) {
+        if (!dpy && ctx->mPtorInfo.isActive())
             ctx->mCopyBit[dpy]->setReleaseFdSync(releaseFd);
         else
             ctx->mCopyBit[dpy]->setReleaseFd(releaseFd);
