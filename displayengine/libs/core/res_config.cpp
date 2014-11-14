@@ -40,7 +40,7 @@ DisplayError ResManager::Config(ResManagerDevice *res_mgr_device, HWLayers *hw_l
   HWLayersInfo &layer_info = hw_layers->info;
 
   for (uint32_t i = 0; i < layer_info.count; i++) {
-    Layer& layer = layer_info.stack->layers.layer[layer_info.index[i]];
+    Layer& layer = layer_info.stack->layers[layer_info.index[i]];
     float w_scale, h_scale;
     if (!IsValidDimension(layer, &w_scale, &h_scale)) {
       DLOGV("Invalid dimension");

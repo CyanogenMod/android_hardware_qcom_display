@@ -188,13 +188,13 @@ int HWCSink::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   uint8_t *current_address = layer_stack_.raw;
 
   // Layer array address
-  layer_stack_.layers.layer = reinterpret_cast<Layer *>(current_address);
-  layer_stack_.layers.count = num_hw_layers;
+  layer_stack_.layers = reinterpret_cast<Layer *>(current_address);
+  layer_stack_.layer_count = static_cast<uint32_t>(num_hw_layers);
   current_address += num_hw_layers * sizeof(Layer);
 
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-    Layer &layer = layer_stack_.layers.layer[i];
+    Layer &layer = layer_stack_.layers[i];
 
     // Layer buffer handle address
     layer.input_buffer = reinterpret_cast<LayerBuffer *>(current_address);
@@ -202,7 +202,7 @@ int HWCSink::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
 
     // Visible rectangle address
     layer.visible_regions.rect = reinterpret_cast<LayerRect *>(current_address);
-    layer.visible_regions.count = hwc_layer.visibleRegionScreen.numRects;
+    layer.visible_regions.count = static_cast<uint32_t>(hwc_layer.visibleRegionScreen.numRects);
     current_address += hwc_layer.visibleRegionScreen.numRects * sizeof(LayerRect);
 
     // Dirty rectangle address
@@ -225,7 +225,7 @@ int HWCSink::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
 
-    Layer &layer = layer_stack_.layers.layer[i];
+    Layer &layer = layer_stack_.layers[i];
     LayerBuffer *layer_buffer = layer.input_buffer;
 
     if (pvt_handle) {
@@ -271,7 +271,7 @@ int HWCSink::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-    Layer &layer = layer_stack_.layers.layer[i];
+    Layer &layer = layer_stack_.layers[i];
     SetComposition(&hwc_layer.compositionType, layer.composition);
   }
 
@@ -286,7 +286,7 @@ int HWCSink::CommitLayerStack(hwc_display_contents_1_t *content_list) {
 
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-    LayerBuffer *layer_buffer = layer_stack_.layers.layer[i].input_buffer;
+    LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
 
     layer_buffer->acquire_fence_fd = hwc_layer.acquireFenceFd;
   }
@@ -299,8 +299,8 @@ int HWCSink::CommitLayerStack(hwc_display_contents_1_t *content_list) {
 
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-    Layer &layer = layer_stack_.layers.layer[i];
-    LayerBuffer *layer_buffer = layer_stack_.layers.layer[i].input_buffer;
+    Layer &layer = layer_stack_.layers[i];
+    LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
 
     if (layer.composition == kCompositionSDE || layer.composition == kCompositionGPUTarget) {
       hwc_layer.releaseFenceFd = layer_buffer->release_fence_fd;

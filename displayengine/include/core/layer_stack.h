@@ -131,7 +131,7 @@ struct LayerRect {
 */
 struct LayerRectArray {
   LayerRect *rect;  //!< Pointer to first element of array.
-  size_t count;     //!< Number of elements in the array.
+  uint32_t count;   //!< Number of elements in the array.
 
   LayerRectArray() : rect(NULL), count(0) { }
 };
@@ -184,17 +184,6 @@ struct Layer {
             plane_alpha(0) { }
 };
 
-/*! @brief This structure defines an array of display layers.
-
-  @sa LayerStack
-*/
-struct LayerArray {
-  Layer *layer;   //!< Pointer to first element of array.
-  size_t count;   //!< Number of elements in the array.
-
-  LayerArray() : layer(NULL), count(0) { }
-};
-
 /*! @brief This structure defines a layer stack that contains layers which need to be composed and
   rendered onto the target.
 
@@ -215,7 +204,8 @@ struct LayerStack {
                                   //!< NOTE: This field applies to a virtual display only.
   };
 
-  LayerArray layers;      //!< Array of layers.
+  Layer *layers;          //!< Array of layers.
+  uint32_t layer_count;   //!< Total number of layers.
   LayerStackFlags flags;  //!< Flags associated with this layer set.
 
   LayerStack() : output_buffer(NULL) { }
