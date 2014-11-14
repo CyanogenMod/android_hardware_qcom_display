@@ -99,12 +99,21 @@ struct HWDeviceAttributes : DeviceConfigVariableInfo {
   HWDeviceAttributes() : is_device_split(false), split_left(0) { }
 };
 
+// HWEventHandler - Implemented in DeviceBase and HWInterface implementation
+class HWEventHandler {
+ public:
+  virtual DisplayError VSync(int64_t timestamp) = 0;
+  virtual DisplayError Blank(bool blank)= 0;
+ protected:
+  virtual ~HWEventHandler() {}
+};
+
 class HWInterface {
  public:
   static DisplayError Create(HWInterface **intf);
   static DisplayError Destroy(HWInterface *intf);
   virtual DisplayError GetHWCapabilities(HWResourceInfo *hw_res_info) = 0;
-  virtual DisplayError Open(HWBlockType type, Handle *device) = 0;
+  virtual DisplayError Open(HWBlockType type, Handle *device, HWEventHandler *eventhandler) = 0;
   virtual DisplayError Close(Handle device) = 0;
   virtual DisplayError GetNumDeviceAttributes(Handle device, uint32_t *count) = 0;
   virtual DisplayError GetDeviceAttributes(Handle device, HWDeviceAttributes *device_attributes,
@@ -112,6 +121,7 @@ class HWInterface {
   virtual DisplayError PowerOn(Handle device) = 0;
   virtual DisplayError PowerOff(Handle device) = 0;
   virtual DisplayError Doze(Handle device) = 0;
+  virtual DisplayError SetVSyncState(Handle device, bool enable) = 0;
   virtual DisplayError Standby(Handle device) = 0;
   virtual DisplayError Validate(Handle device, HWLayers *hw_layers) = 0;
   virtual DisplayError Commit(Handle device, HWLayers *hw_layers) = 0;

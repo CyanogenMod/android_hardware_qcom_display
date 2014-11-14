@@ -45,6 +45,8 @@
 
 namespace sde {
 
+  const int kThreadPriorityUrgent = -9;
+
   typedef void * Handle;
 
 }  // namespace sde

@@ -144,12 +144,18 @@ int HWCSink::SetState(DeviceState state) {
 }
 
 DisplayError HWCSink::VSync(const DeviceEventVSync &vsync) {
-  (*hwc_procs_)->vsync(*hwc_procs_, id_, vsync.timestamp);
+  if (*hwc_procs_) {
+    (*hwc_procs_)->vsync(*hwc_procs_, id_, vsync.timestamp);
+  }
+
   return kErrorNone;
 }
 
 DisplayError HWCSink::Refresh() {
-  (*hwc_procs_)->invalidate(*hwc_procs_);
+  if (*hwc_procs_) {
+    (*hwc_procs_)->invalidate(*hwc_procs_);
+  }
+
   return kErrorNone;
 }
 
