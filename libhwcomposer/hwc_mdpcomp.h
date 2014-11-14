@@ -47,7 +47,7 @@ public:
     void reset();
     /* dumpsys */
     void dump(android::String8& buf);
-    bool isPTORActive() { return (mOverlapIndex != -1); }
+    bool isGLESOnlyComp() { return (mCurrentFrame.mdpCount == 0); }
     int drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t* list);
 
     static MDPComp* getObject(hwc_context_t *ctx, const int& dpy);
@@ -237,8 +237,6 @@ protected:
     struct LayerCache mCachedFrame;
     //Enable 4kx2k yuv layer split
     static bool sEnable4k2kYUVSplit;
-    /* Overlap layer index */
-    int mOverlapIndex;
     bool allocSplitVGPipesfor4k2k(hwc_context_t *ctx,
             hwc_display_contents_1_t* list, int index);
     bool mModeOn; // if prepare happened
