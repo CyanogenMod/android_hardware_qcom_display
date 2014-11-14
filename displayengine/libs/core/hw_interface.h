@@ -99,15 +99,17 @@ struct HWPipeInfo {
   uint8_t decimation;
 
   HWPipeInfo() : pipe_id(0), decimation(1) { }
+
+  inline void Reset() { *this = HWPipeInfo(); }
 };
 
 struct HWLayerConfig {
-  bool use_non_dma_pipe;
-  bool is_right_pipe;
-  HWPipeInfo left_pipe;
-  HWPipeInfo right_pipe;
+  bool use_non_dma_pipe;  // set by client
+  bool is_right_pipe;  // indicate if right pipe is valid
+  HWPipeInfo left_pipe;  // pipe for left side of the buffer
+  HWPipeInfo right_pipe;  // pipe for right side of the buffer
 
-  HWLayerConfig() : use_non_dma_pipe(false), is_right_pipe(true) { }
+  HWLayerConfig() : use_non_dma_pipe(false), is_right_pipe(false) { }
 };
 
 struct HWLayers {

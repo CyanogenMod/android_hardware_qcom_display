@@ -39,7 +39,7 @@ class ResManager : public DumpImpl {
   DisplayError Init(const HWResourceInfo &hw_res_info);
   DisplayError Deinit();
   DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
-                              Handle *display_ctx);
+                               Handle *display_ctx);
   DisplayError UnregisterDisplay(Handle display_ctx);
   DisplayError Start(Handle display_ctx);
   DisplayError Stop(Handle display_ctx);
@@ -80,11 +80,12 @@ class ResManager : public DumpImpl {
     kPipeStateOwnedByKernel,  // Pipe state when pipe is owned by kernel
   };
 
+  // todo: retrieve all these from kernel
   enum {
     kMaxSourcePipeWidth = 2048,
     kMaxInterfaceWidth = 2048,
-    kMaxCropWidth = 5,
-    kMaxCropHeight = 5,
+    kMaxRotateDownScaleRatio = 8,
+    kMaxNumRotator = 2,
   };
 
   struct SourcePipe {
@@ -96,11 +97,17 @@ class ResManager : public DumpImpl {
     bool at_right;
     uint64_t state_frame_count;
     int priority;
-    bool reserved;
+    HWBlockType reserved_hw_block;
+    HWBlockType dedicated_hw_block;
 
-    SourcePipe() : type(kPipeTypeUnused), mdss_pipe_id(kPipeIdMax), index(0), state(kPipeStateIdle),
-                   hw_block_id(kHWBlockMax), at_right(false), state_frame_count(0), priority(0),
-                   reserved(false) { }
+    SourcePipe() : type(kPipeTypeUnused), mdss_pipe_id(kPipeIdMax), index(0),
+                   state(kPipeStateIdle), hw_block_id(kHWBlockMax), at_right(false),
+                   state_frame_count(0), priority(0), reserved_hw_block(kHWBlockMax),
+                   dedicated_hw_block(kHWBlockMax) { }
+
+    inline void ResetState() { state = kPipeStateIdle; hw_block_id = kHWBlockMax;
+        at_right = false; reserved_hw_block = kHWBlockMax; dedicated_hw_block = kHWBlockMax; }
+
   };
 
   struct DisplayResourceContext {
@@ -109,8 +116,10 @@ class ResManager : public DumpImpl {
     HWBlockType hw_block_id;
     uint64_t frame_count;
     int32_t session_id;  // applicable for virtual display sessions only
-
-    DisplayResourceContext() : hw_block_id(kHWBlockMax), frame_count(0), session_id(-1) { }
+    uint32_t rotate_count;
+    bool frame_start;
+    DisplayResourceContext() : hw_block_id(kHWBlockMax), frame_count(0), session_id(-1),
+                    rotate_count(0), frame_start(false) { }
   };
 
   struct HWBlockContext {
@@ -118,25 +127,46 @@ class ResManager : public DumpImpl {
     HWBlockContext() : is_in_use(false) { }
   };
 
+  struct HWRotator {
+    uint32_t pipe_index;
+    HWBlockType writeback_id;
+    uint32_t client_bit_mask;
+    HWRotator() : pipe_index(0), writeback_id(kHWBlockMax), client_bit_mask(0) { }
+  };
+
+  static const int kPipeIdNeedsAssignment = -1;
+
   uint32_t GetMdssPipeId(PipeType pipe_type, uint32_t index);
   uint32_t NextPipe(PipeType pipe_type, HWBlockType hw_block_id, bool at_right);
+  uint32_t SearchPipe(HWBlockType hw_block_id, SourcePipe *src_pipes, uint32_t num_pipe,
+                      bool at_right);
   uint32_t GetPipe(HWBlockType hw_block_id, bool is_yuv, bool need_scale, bool at_right,
                    bool use_non_dma_pipe);
   bool IsScalingNeeded(const HWPipeInfo *pipe_info);
-  DisplayError Config(DisplayResourceContext *display_resource_ctx, HWLayers *hw_layers);
-  bool IsValidDimension(const Layer &layer, float *width_scale, float *height_scale);
-  void CalculateCut(float *left_cut_ratio, float *top_cut_ratio, float *right_cut_ratio,
-                    float *bottom_cut_ratio, const LayerTransform &transform);
-  void CalculateCropRects(LayerRect *crop, LayerRect *dst,
-                          const LayerRect &scissor, const LayerTransform &transform);
-  bool IsNonIntegralSrcCrop(const LayerRect &crop);
-  void IntegerizeRect(LayerRect *dst_rect, const LayerRect &src_rect);
+  DisplayError Config(DisplayResourceContext *display_resource_ctx, HWLayers *hw_layers,
+                      uint32_t *rotate_count);
+  DisplayError DisplaySplitConfig(DisplayResourceContext *display_resource_ctx,
+                                  const Layer &layer, const LayerRect &src_rect,
+                                  const LayerRect &dst_rect, HWLayerConfig *layer_config);
+  DisplayError ValidateScaling(const Layer &layer, const LayerRect &crop,
+                               const LayerRect &dst, float *rot_scale_x, float *rot_scale_y);
+  void CalculateCut(const LayerTransform &transform, float *left_cut_ratio, float *top_cut_ratio,
+                    float *right_cut_ratio, float *bottom_cut_ratio);
+  void CalculateCropRects(const LayerRect &scissor, const LayerTransform &transform,
+                          LayerRect *crop, LayerRect *dst);
+  bool IsValidDimension(const LayerRect &src, const LayerRect &dst);
   bool CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *hw_layers);
   float GetPipeBw(DisplayResourceContext *display_ctx, HWPipeInfo *pipe, float bpp);
   float GetClockForPipe(DisplayResourceContext *display_ctx, HWPipeInfo *pipe);
   float GetOverlapBw(HWLayers *hw_layers, float *pipe_bw, bool left_mixer);
   void SetDecimationFactor(HWPipeInfo *pipe);
   float GetBpp(LayerBufferFormat format);
+  void SplitRect(bool flip_horizontal, const LayerRect &src_rect, const LayerRect &dst_rect,
+                 LayerRect *src_left, LayerRect *dst_left, LayerRect *src_right,
+                 LayerRect *dst_right);
+  bool IsMacroTileFormat(const LayerBuffer *buffer) { return buffer->flags.macro_tile; }
+  bool IsYuvFormat(LayerBufferFormat format) { return (format >= kFormatYCbCr420Planar); }
+  void LogRectVerbose(const char *prefix, const LayerRect &roi);
 
   template <class T>
   inline void Swap(T &a, T &b) {
@@ -157,6 +187,7 @@ class ResManager : public DumpImpl {
   float bw_claimed_;  // Bandwidth claimed by other display
   float clk_claimed_;  // Clock claimed by other display
   float last_primary_bw_;
+  uint32_t virtual_count_;
 };
 
 }  // namespace sde
