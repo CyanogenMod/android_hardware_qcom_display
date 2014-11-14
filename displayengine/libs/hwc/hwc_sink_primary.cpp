@@ -32,32 +32,53 @@
 
 namespace sde {
 
-HWCSinkPrimary::HWCSinkPrimary(CoreInterface *core_intf, hwc_procs_t const *hwc_procs)
+HWCSinkPrimary::HWCSinkPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
   : HWCSink(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY) {
 }
 
 int HWCSinkPrimary::Init() {
-  return 0;
+  return HWCSink::Init();
 }
 
 int HWCSinkPrimary::Deinit() {
-  return 0;
+  return HWCSink::Deinit();
 }
 
 int HWCSinkPrimary::Prepare(hwc_display_contents_1_t *content_list) {
+  int status = 0;
+
+  status = AllocateLayerStack(content_list);
+  if (UNLIKELY(status)) {
+    return status;
+  }
+
+  status = PrepareLayerStack(content_list);
+  if (UNLIKELY(status)) {
+    return status;
+  }
+
   return 0;
 }
 
 int HWCSinkPrimary::Commit(hwc_display_contents_1_t *content_list) {
+  int status = 0;
+
+  status = HWCSink::CommitLayerStack(content_list);
+  if (UNLIKELY(status)) {
+    return status;
+  }
+
+  content_list->retireFenceFd = layer_stack_.retire_fence_fd;
+
   return 0;
 }
 
 int HWCSinkPrimary::PowerOn() {
-  return 0;
+  return SetState(kStateOn);
 }
 
 int HWCSinkPrimary::PowerOff() {
-  return 0;
+  return SetState(kStateOff);
 }
 
 }  // namespace sde

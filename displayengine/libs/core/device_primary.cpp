@@ -35,7 +35,7 @@ namespace sde {
 
 DevicePrimary::DevicePrimary(DeviceEventHandler *event_handler, HWInterface *hw_intf,
                              CompManager *comp_manager)
-  : DeviceBase(kHWPrimary, event_handler, hw_intf, comp_manager) {
+  : DeviceBase(kPrimary, event_handler, kHWPrimary, hw_intf, comp_manager) {
 }
 
 }  // namespace sde

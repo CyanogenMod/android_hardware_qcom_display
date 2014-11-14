@@ -32,7 +32,7 @@
 
 namespace sde {
 
-HWCSinkExternal::HWCSinkExternal(CoreInterface *core_intf, hwc_procs_t const *hwc_procs)
+HWCSinkExternal::HWCSinkExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
   : HWCSink(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL) {
 }
 

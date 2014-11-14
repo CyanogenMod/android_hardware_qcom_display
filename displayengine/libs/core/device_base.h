@@ -36,8 +36,8 @@ namespace sde {
 
 class DeviceBase : public DeviceInterface {
  public:
-  DeviceBase(HWInterfaceType type, DeviceEventHandler *event_handler, HWInterface *hw_interface,
-             CompManager *comp_manager);
+  DeviceBase(DeviceType device_type, DeviceEventHandler *event_handler,
+             HWBlockType hw_block_type, HWInterface *hw_intf, CompManager *comp_manager);
   virtual ~DeviceBase() { }
   virtual DisplayError Init();
   virtual DisplayError Deinit();
@@ -54,11 +54,19 @@ class DeviceBase : public DeviceInterface {
 
  protected:
   Locker locker_;
-  HWInterfaceType type_;
+  DeviceType device_type_;
   DeviceEventHandler *event_handler_;
+  HWBlockType hw_block_type_;
   HWInterface *hw_intf_;
   CompManager *comp_manager_;
   DeviceState state_;
+  Handle hw_device_;
+  Handle comp_mgr_device_;
+  HWDeviceAttributes *device_attributes_;
+  uint32_t num_modes_;
+  uint32_t active_mode_index_;
+  HWLayers hw_layers_;
+  bool pending_commit_;
 };
 
 }  // namespace sde

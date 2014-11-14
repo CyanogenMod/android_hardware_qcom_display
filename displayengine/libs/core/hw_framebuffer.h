@@ -31,7 +31,7 @@
 namespace sde {
 
 struct HWContext {
-  HWInterfaceType type;
+  HWBlockType type;
   int device_fd;
 };
 
@@ -40,18 +40,24 @@ class HWFrameBuffer : public HWInterface {
   HWFrameBuffer();
   DisplayError Init();
   DisplayError Deinit();
-  virtual DisplayError GetCapabilities(HWResourceInfo *hw_res_info);
-  virtual DisplayError Open(HWInterfaceType type, Handle *device);
+  virtual DisplayError GetHWCapabilities(HWResourceInfo *hw_res_info);
+  virtual DisplayError Open(HWBlockType type, Handle *device);
   virtual DisplayError Close(Handle device);
-  virtual DisplayError GetConfig(Handle device, DeviceConfigVariableInfo *variable_info);
+  virtual DisplayError GetNumDeviceAttributes(Handle device, uint32_t *count);
+  virtual DisplayError GetDeviceAttributes(Handle device, HWDeviceAttributes *device_attributes,
+                                       uint32_t mode);
   virtual DisplayError PowerOn(Handle device);
   virtual DisplayError PowerOff(Handle device);
   virtual DisplayError Doze(Handle device);
   virtual DisplayError Standby(Handle device);
-  virtual DisplayError Prepare(Handle device, HWLayers *hw_layers);
+  virtual DisplayError Validate(Handle device, HWLayers *hw_layers);
   virtual DisplayError Commit(Handle device, HWLayers *hw_layers);
 
  private:
+  inline void SetFormat(uint32_t *target, const LayerBufferFormat &source);
+  inline void SetBlending(uint32_t *target, const LayerBlending &source);
+  inline void SetRect(mdp_rect *target, const LayerRect &source);
+
   // For dynamically linking virtual driver
   int (*ioctl_)(int, int, ...);
   int (*open_)(const char *, int, ...);

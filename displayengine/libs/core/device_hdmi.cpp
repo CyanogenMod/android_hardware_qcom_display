@@ -35,7 +35,7 @@ namespace sde {
 
 DeviceHDMI::DeviceHDMI(DeviceEventHandler *event_handler, HWInterface *hw_intf,
                        CompManager *comp_manager)
-  : DeviceBase(kHWHDMI, event_handler, hw_intf, comp_manager) {
+  : DeviceBase(kHDMI, event_handler, kHWHDMI, hw_intf, comp_manager) {
 }
 
 }  // namespace sde

@@ -36,10 +36,24 @@ namespace sde {
 class CompManager {
  public:
   CompManager();
-  DisplayError Init();
+  DisplayError Init(const HWResourceInfo &hw_res_info_);
   DisplayError Deinit();
+  DisplayError RegisterDevice(DeviceType type, const HWDeviceAttributes &attributes,
+                              Handle *device);
+  DisplayError UnregisterDevice(Handle device);
+  DisplayError Prepare(Handle device, HWLayers *hw_layers);
+  void PostPrepare(Handle device, HWLayers *hw_layers);
+  void PostCommit(Handle device, HWLayers *hw_layers);
+  void Purge(Handle device);
 
  private:
+  struct CompManagerDevice {
+    StrategyConstraints constraints;
+    Handle res_mgr_device;
+    DeviceType device_type;
+  };
+
+  Locker locker_;
   void *strategy_lib_;
   StrategyInterface *strategy_intf_;
   StrategyDefault strategy_default_;

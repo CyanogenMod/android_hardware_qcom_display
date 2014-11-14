@@ -48,7 +48,7 @@ struct CoreSingleton {
 } g_core;
 
 DisplayError CoreInterface::CreateCore(CoreEventHandler *event_handler, CoreInterface **interface,
-                                 uint32_t version) {
+                                 uint32_t client_version) {
   SCOPE_LOCK(g_core.locker);
 
   if (UNLIKELY(!event_handler || !interface)) {
@@ -59,11 +59,11 @@ DisplayError CoreInterface::CreateCore(CoreEventHandler *event_handler, CoreInte
   uint32_t lib_version = CORE_VERSION_TAG;
   if (UNLIKELY(!interface)) {
     return kErrorParameters;
-  } else if (UNLIKELY(GET_REVISION(version) > GET_REVISION(lib_version))) {
+  } else if (UNLIKELY(GET_REVISION(client_version) > GET_REVISION(lib_version))) {
     return kErrorVersion;
-  } else if (UNLIKELY(GET_DATA_ALIGNMENT(version) != GET_DATA_ALIGNMENT(lib_version))) {
+  } else if (UNLIKELY(GET_DATA_ALIGNMENT(client_version) != GET_DATA_ALIGNMENT(lib_version))) {
     return kErrorDataAlignment;
-  } else if (UNLIKELY(GET_INSTRUCTION_SET(version) != GET_INSTRUCTION_SET(lib_version))) {
+  } else if (UNLIKELY(GET_INSTRUCTION_SET(client_version) != GET_INSTRUCTION_SET(lib_version))) {
     return kErrorInstructionSet;
   }
 
@@ -74,7 +74,7 @@ DisplayError CoreInterface::CreateCore(CoreEventHandler *event_handler, CoreInte
   }
 
   // Create appropriate CoreImpl object based on client version.
-  if (GET_REVISION(version) == CoreImpl::kRevision) {
+  if (GET_REVISION(client_version) == CoreImpl::kRevision) {
     core_impl = new CoreImpl(event_handler);
   } else {
     return kErrorNotSupported;
