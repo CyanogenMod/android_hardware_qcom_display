@@ -240,6 +240,7 @@ int IonController::allocate(alloc_data& data, int usage)
             // for targets/OEMs which do not need HW level protection
             // do not set ion secure flag & MM heap. Fallback to IOMMU heap.
             ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
+            data.allocType |= private_handle_t::PRIV_FLAGS_PROTECTED_BUFFER;
         }
     } else if(usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
         //MM Heap is exclusively a secure heap.
