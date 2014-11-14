@@ -22,10 +22,10 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// DISPLAY_LOG_TAG definition must precede logger.h include.
-#define DISPLAY_LOG_TAG kTagCore
-#define DISPLAY_MODULE_NAME "CoreImpl"
-#include <utils/logger.h>
+// SDE_LOG_TAG definition must precede debug.h include.
+#define SDE_LOG_TAG kTagCore
+#define SDE_MODULE_NAME "CoreImpl"
+#include <utils/debug.h>
 
 #include <utils/locker.h>
 #include <utils/constants.h>
@@ -64,7 +64,7 @@ DisplayError CoreImpl::Init() {
     return error;
   }
 
-  error = wb_session_.Init(hw_intf_, hw_res_info);
+  error = offline_ctrl_.Init(hw_intf_, hw_res_info);
   if (UNLIKELY(error != kErrorNone)) {
     comp_mgr_.Deinit();
     HWInterface::Destroy(hw_intf_);
@@ -77,7 +77,7 @@ DisplayError CoreImpl::Init() {
 DisplayError CoreImpl::Deinit() {
   SCOPE_LOCK(locker_);
 
-  wb_session_.Deinit();
+  offline_ctrl_.Deinit();
   comp_mgr_.Deinit();
   HWInterface::Destroy(hw_intf_);
 

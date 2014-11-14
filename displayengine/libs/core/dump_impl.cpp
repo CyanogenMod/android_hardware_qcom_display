@@ -22,27 +22,63 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// DISPLAY_LOG_TAG definition must precede logger.h include.
-#define DISPLAY_LOG_TAG kTagCore
-#define DISPLAY_MODULE_NAME "WritebackSession"
-#include <utils/logger.h>
+// SDE_LOG_TAG definition must precede debug.h include.
+#define SDE_LOG_TAG kTagCore
+#define SDE_MODULE_NAME "DumpInterface"
+#include <utils/debug.h>
 
 #include <utils/constants.h>
 
-#include "writeback_session.h"
+#include "dump_impl.h"
 
 namespace sde {
 
-WritebackSession::WritebackSession() : hw_intf_(NULL) {
-}
+DumpImpl* DumpImpl::dump_list_[] = { 0 };
+uint32_t DumpImpl::dump_count_ = 0;
 
-DisplayError WritebackSession::Init(HWInterface *hw_intf, HWResourceInfo hw_res_info) {
-  hw_intf_ = hw_intf;
+DisplayError DumpInterface::GetDump(uint8_t *buffer, uint32_t length, uint32_t *filled) {
+  if (!buffer || !length || !filled) {
+    return kErrorParameters;
+  }
+
+  DumpImpl::GetDump(buffer, length, filled);
   return kErrorNone;
 }
 
-DisplayError WritebackSession::Deinit() {
-  return kErrorNone;
+DumpImpl::DumpImpl() {
+  Register(this);
+}
+
+DumpImpl::~DumpImpl() {
+  Unregister(this);
+}
+
+// Caller has to ensure that it does not create or destroy devices while using dump interface.
+void DumpImpl::GetDump(uint8_t *buffer, uint32_t length, uint32_t *filled) {
+  *filled = 0;
+  for (uint32_t i = 0; (i < DumpImpl::dump_count_) && (*filled < length); i++) {
+    *filled += DumpImpl::dump_list_[i]->GetDump(buffer + *filled, length - *filled);
+  }
+}
+
+// Every object is created or destroyed through display core only, which itself protects the
+// the access, so no need to protect registration or de-registration.
+void DumpImpl::Register(DumpImpl *dump_impl) {
+  if (dump_count_ < kMaxDumpObjects) {
+    dump_list_[dump_count_] = dump_impl;
+    dump_count_++;
+  }
+}
+
+void DumpImpl::Unregister(DumpImpl *dump_impl) {
+  for (uint32_t i = 0; i < dump_count_; i++) {
+    if (dump_list_[i] == dump_impl) {
+      dump_count_--;
+      for (; i < dump_count_; i++) {
+        dump_list_[i] = dump_list_[i + 1];
+      }
+    }
+  }
 }
 
 }  // namespace sde

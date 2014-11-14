@@ -30,10 +30,11 @@
 #include "hw_interface.h"
 #include "strategy_default.h"
 #include "res_manager.h"
+#include "dump_impl.h"
 
 namespace sde {
 
-class CompManager {
+class CompManager : public DumpImpl {
  public:
   CompManager();
   DisplayError Init(const HWResourceInfo &hw_res_info_);
@@ -45,6 +46,9 @@ class CompManager {
   void PostPrepare(Handle device, HWLayers *hw_layers);
   void PostCommit(Handle device, HWLayers *hw_layers);
   void Purge(Handle device);
+
+  // DumpImpl method
+  virtual uint32_t GetDump(uint8_t *buffer, uint32_t length);
 
  private:
   struct CompManagerDevice {

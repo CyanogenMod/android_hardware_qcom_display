@@ -27,6 +27,7 @@
 
 #include <hardware/hwcomposer.h>
 #include <core/core_interface.h>
+#include <utils/locker.h>
 
 #include "hwc_sink_primary.h"
 
@@ -65,6 +66,7 @@ class HWCSession : public hwc_composer_device_1_t, public CoreEventHandler {
   // CoreEventHandler methods
   virtual DisplayError Hotplug(const CoreEventHotplug &hotplug);
 
+  static Locker locker_;
   CoreInterface *core_intf_;
   hwc_procs_t const *hwc_procs_;
   HWCSinkPrimary *sink_primary_;

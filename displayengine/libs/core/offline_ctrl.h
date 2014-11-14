@@ -22,23 +22,26 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// DISPLAY_LOG_TAG definition must precede logger.h include.
-#define DISPLAY_LOG_TAG kTagCore
-#define DISPLAY_MODULE_NAME "DebugInterface"
-#include <utils/logger.h>
+#ifndef __OFFLINE_CTRL_H__
+#define __OFFLINE_CTRL_H__
 
-#include <core/debug_interface.h>
-#include <utils/constants.h>
+#include <utils/locker.h>
+
+#include "hw_interface.h"
 
 namespace sde {
 
-DisplayError DebugInterface::GetDump(uint8_t *buffer, uint32_t length) {
-  if (UNLIKELY(!buffer || !length)) {
-    return kErrorParameters;
-  }
+class OfflineCtrl {
+ public:
+  OfflineCtrl();
+  DisplayError Init(HWInterface *hw_intf, HWResourceInfo hw_res_info);
+  DisplayError Deinit();
 
-  return kErrorNone;
-}
+ private:
+  HWInterface *hw_intf_;
+};
 
 }  // namespace sde
+
+#endif  // __OFFLINE_CTRL_H__
 

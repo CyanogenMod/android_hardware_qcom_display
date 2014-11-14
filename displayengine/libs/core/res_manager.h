@@ -29,10 +29,11 @@
 #include <utils/locker.h>
 
 #include "hw_interface.h"
+#include "dump_impl.h"
 
 namespace sde {
 
-class ResManager {
+class ResManager : public DumpImpl {
  public:
   ResManager();
   DisplayError Init(const HWResourceInfo &hw_res_info);
@@ -45,6 +46,9 @@ class ResManager {
   DisplayError Acquire(Handle device, HWLayers *hw_layers);
   void PostCommit(Handle device, HWLayers *hw_layers);
   void Purge(Handle device);
+
+  // DumpImpl method
+  virtual uint32_t GetDump(uint8_t *buffer, uint32_t length);
 
  private:
   enum PipeId {

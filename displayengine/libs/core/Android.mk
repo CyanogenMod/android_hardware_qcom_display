@@ -18,9 +18,9 @@ LOCAL_SRC_FILES               := core_interface.cpp \
                                  strategy_default.cpp \
                                  res_manager.cpp \
                                  res_config.cpp \
-                                 writeback_session.cpp \
+                                 offline_ctrl.cpp \
                                  hw_interface.cpp \
                                  hw_framebuffer.cpp \
-                                 debug_interface.cpp
+                                 dump_impl.cpp
 
 include $(BUILD_SHARED_LIBRARY)

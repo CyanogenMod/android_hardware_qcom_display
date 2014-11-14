@@ -22,32 +22,48 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __LOGGER_H__
-#define __LOGGER_H__
+/*! @file dump_interface.h
+  @brief Interface file for dump options provided by display engine.
 
-#include "debug.h"
+*/
+#ifndef __DUMP_INTERFACE_H__
+#define __DUMP_INTERFACE_H__
+
+#include <stdint.h>
+
+#include "display_types.h"
 
 namespace sde {
 
-#ifndef DISPLAY_LOG_TAG
-#define DISPLAY_LOG_TAG kLogTagNone
-#endif
+/*! @brief Display dump interface.
 
-#ifndef DISPLAY_MODULE_NAME
-#define DISPLAY_MODULE_NAME "SDE"
-#endif
+  @details This class defines dump methods provided by display engine.
 
-#define DLOG(method, format, ...) Debug::method(DISPLAY_LOG_TAG, \
-                                                DISPLAY_MODULE_NAME ": " format, ##__VA_ARGS__)
+*/
+class DumpInterface {
+ public:
+  /*! @brief Method to get dump information in form of a string.
 
-// DISPLAY_LOG_TAG and DISPLAY_MODULE_NAME must be defined before #include this header file in
-// respective module, else default definitions are used.
-#define DLOGE(format, ...) DLOG(Error, format, ##__VA_ARGS__)
-#define DLOGW(format, ...) DLOG(Warning, format, ##__VA_ARGS__)
-#define DLOGI(format, ...) DLOG(Info, format, ##__VA_ARGS__)
-#define DLOGV(format, ...) DLOG(Verbose, format, ##__VA_ARGS__)
+    @details Client shall use this method to get current snapshot of display engine context as a
+    formatted string for logging or dumping purposes.
+
+    @param[inout] buffer String buffer allocated by the client. Filled with dump information upon
+    return.
+    @param[in] length Length of the string buffer. Length shall be offset adjusted if any.
+    @param[in] filled Number of bytes filled into the string buffer.
+
+    @return \link DisplayError \endlink
+
+    @warning Client shall ensure that this interface is not used while a device is being either
+    created or destroyed through display core.
+  */
+  static DisplayError GetDump(uint8_t *buffer, uint32_t length, uint32_t *filled);
+
+ protected:
+  virtual ~DumpInterface() { }
+};
 
 }  // namespace sde
 
-#endif  // __LOGGER_H__
+#endif  // __DUMP_INTERFACE_H__
 

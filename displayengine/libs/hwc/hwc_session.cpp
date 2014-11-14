@@ -22,7 +22,7 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <core/debug_interface.h>
+#include <core/dump_interface.h>
 #include <utils/constants.h>
 
 // HWC_MODULE_NAME definition must precede hwc_logger.h include.
@@ -48,6 +48,8 @@ hwc_module_t HAL_MODULE_INFO_SYM = {
 };
 
 namespace sde {
+
+Locker HWCSession::locker_;
 
 HWCSession::HWCSession(const hw_module_t *module) : core_intf_(NULL), hwc_procs_(NULL) {
   hwc_composer_device_1_t::common.tag = HARDWARE_DEVICE_TAG;
@@ -153,6 +155,8 @@ int HWCSession::Close(hw_device_t *device) {
 
 int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
                         hwc_display_contents_1_t **displays) {
+  SCOPE_LOCK(locker_);
+
   if (UNLIKELY(!device || !displays)) {
     return -EINVAL;
   }
@@ -185,6 +189,8 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
 
 int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
                     hwc_display_contents_1_t **displays) {
+  SCOPE_LOCK(locker_);
+
   if (UNLIKELY(!device || !displays)) {
     return -EINVAL;
   }
@@ -216,6 +222,8 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
 }
 
 int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event, int enable) {
+  SCOPE_LOCK(locker_);
+
   if (UNLIKELY(!device)) {
     return -EINVAL;
   }
@@ -235,6 +243,8 @@ int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event,
 }
 
 int HWCSession::Blank(hwc_composer_device_1 *device, int disp, int blank) {
+  SCOPE_LOCK(locker_);
+
   if (UNLIKELY(!device)) {
     return -EINVAL;
   }
@@ -271,11 +281,14 @@ void HWCSession::RegisterProcs(hwc_composer_device_1 *device, hwc_procs_t const 
 }
 
 void HWCSession::Dump(hwc_composer_device_1 *device, char *buffer, int length) {
+  SCOPE_LOCK(locker_);
+
   if (UNLIKELY(!device || !buffer || !length)) {
     return;
   }
 
-  DebugInterface::GetDump(reinterpret_cast<uint8_t *>(buffer), length);
+  uint32_t filled = 0;
+  DumpInterface::GetDump(reinterpret_cast<uint8_t *>(buffer), length, &filled);
 }
 
 int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint32_t *configs,
