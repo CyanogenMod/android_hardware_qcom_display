@@ -51,6 +51,7 @@ public:
         GET_DISPLAY_VISIBLE_REGION,  // Get the visibleRegion for dpy
         PAUSE_WFD,               // Pause/Resume WFD
         SET_WFD_STATUS,          // Set if wfd connection is on/off
+        SET_PTOR_MODE, //set PTOR mode enable or disable
         VPU_COMMAND_LIST_START = 100, //Reserved block for VPU commands
         VPU_COMMAND_LIST_END   = 200,
         SET_VIEW_FRAME,          // Set view frame of display
