@@ -296,6 +296,7 @@ void initContext(hwc_context_t *ctx)
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
     ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->mRotMgr = RotMgr::getInstance();
+    ctx->mBWCEnabled = qdutils::MDPVersion::getInstance().supportsBWC();
 
     //default_app_buffer for ferrum
     if (ctx->mMDP.version ==  qdutils::MDP_V3_0_5) {
@@ -1979,9 +1980,8 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         *rot = ctx->mRotMgr->getNext();
         if(*rot == NULL) return -1;
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
-        // BWC is not tested for other formats So enable it only for YUV format
-        if(!dpy && isYuvBuffer(hnd))
-            BwcPM::setBwc(crop, dst, transform, downscale, mdpFlags);
+        BwcPM::setBwc(ctx, dpy, hnd, crop, dst, transform, downscale,
+                mdpFlags);
         //Configure rotator for pre-rotation
         if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
@@ -2226,9 +2226,8 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
-        // BWC is not tested for other formats So enable it only for YUV format
-        if(!dpy && isYuvBuffer(hnd))
-            BwcPM::setBwc(crop, dst, transform, downscale, mdpFlagsL);
+        BwcPM::setBwc(ctx, dpy, hnd, crop, dst, transform, downscale,
+                mdpFlagsL);
         //Configure rotator for pre-rotation
         if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
@@ -2482,17 +2481,25 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
     return (eqBounds == 3);
 }
 
-void BwcPM::setBwc(const hwc_rect_t& crop, const hwc_rect_t& dst,
+void BwcPM::setBwc(const hwc_context_t *ctx, const int& dpy,
+        const private_handle_t *hnd,
+        const hwc_rect_t& crop, const hwc_rect_t& dst,
         const int& transform,const int& downscale,
         ovutils::eMdpFlags& mdpFlags) {
-    //BWC not supported with rot-downscale
-    if(downscale) return;
-
     //Target doesnt support Bwc
     qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
-    if(!mdpHw.supportsBWC()) {
+    if(not mdpHw.supportsBWC()) {
         return;
     }
+    //Disabled at runtime
+    if(not ctx->mBWCEnabled) return;
+    //BWC not supported with rot-downscale
+    if(downscale) return;
+    //Not enabled for secondary displays
+    if(dpy) return;
+    //Not enabled for non-video buffers
+    if(not isYuvBuffer(hnd)) return;
+
     int src_w = crop.right - crop.left;
     int src_h = crop.bottom - crop.top;
     int dst_w = dst.right - dst.left;
@@ -2512,10 +2519,6 @@ void BwcPM::setBwc(const hwc_rect_t& crop, const hwc_rect_t& dst,
                 vertDeci);
         if(horzDeci || vertDeci) return;
     }
-    //Property
-    char value[PROPERTY_VALUE_MAX];
-    property_get("debug.disable.bwc", value, "0");
-     if(atoi(value)) return;
 
     ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDSS_MDP_BWC_EN);
 }

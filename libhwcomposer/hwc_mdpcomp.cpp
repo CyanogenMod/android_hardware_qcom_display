@@ -2653,7 +2653,8 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
         ctx->mLayerRotMap[mDpy]->add(layer, *rot);
         //If the video is using a single pipe, enable BWC
         if(rDest == OV_INVALID) {
-            BwcPM::setBwc(crop, dst, transform, downscale, mdpFlags);
+            BwcPM::setBwc(ctx, mDpy, hnd, crop, dst, transform, downscale,
+                    mdpFlags);
         }
         //Configure rotator for pre-rotation
         if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale) < 0) {

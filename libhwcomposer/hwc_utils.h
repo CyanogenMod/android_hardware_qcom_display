@@ -174,7 +174,9 @@ struct VsyncState {
 };
 
 struct BwcPM {
-    static void setBwc(const hwc_rect_t& crop, const hwc_rect_t& dst,
+    static void setBwc(const hwc_context_t *ctx, const int& dpy,
+            const private_handle_t *hnd,
+            const hwc_rect_t& crop, const hwc_rect_t& dst,
             const int& transform, const int& downscale,
             ovutils::eMdpFlags& mdpFlags);
 };
@@ -635,6 +637,8 @@ struct hwc_context_t {
     // This denotes the tolerance between video layer and external display
     // aspect ratio
     float mAspectRatioToleranceLevel;
+    // Runtime switch for BWC for targets that support it
+    bool mBWCEnabled;
 };
 
 namespace qhwc {
