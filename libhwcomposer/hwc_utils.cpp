@@ -2714,6 +2714,12 @@ void clearPipeResources(hwc_context_t* ctx, int dpy) {
 // Handles online events when HDMI is the primary display. In particular,
 // online events for hdmi connected before AND after boot up and HWC init.
 void handle_online(hwc_context_t* ctx, int dpy) {
+    //On 8994 due to hardware limitations, we disable bwc completely when HDMI
+    //intf is active
+    if(qdutils::MDPVersion::getInstance().is8994() and
+            qdutils::MDPVersion::getInstance().supportsBWC()) {
+        ctx->mBWCEnabled = false;
+    }
     // Close the current fd if it was opened earlier on when HWC
     // was initialized.
     if (ctx->dpyAttr[dpy].fd >= 0) {
@@ -2744,6 +2750,12 @@ void handle_offline(hwc_context_t* ctx, int dpy) {
     resetDisplayInfo(ctx, dpy);
     ctx->dpyAttr[dpy].connected = false;
     ctx->dpyAttr[dpy].isActive = false;
+    //On 8994 due to hardware limitations, we enable bwc only when HDMI
+    //intf is inactive
+    if(qdutils::MDPVersion::getInstance().is8994() and
+            qdutils::MDPVersion::getInstance().supportsBWC()) {
+        ctx->mBWCEnabled = true;
+    }
 }
 
 };//namespace qhwc
