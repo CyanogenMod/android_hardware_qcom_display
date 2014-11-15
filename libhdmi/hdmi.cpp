@@ -21,7 +21,6 @@
 #define DEBUG 0
 #include <fcntl.h>
 #include <linux/msm_mdp.h>
-#include <video/msm_hdmi_modes.h>
 #include <linux/fb.h>
 #include <sys/ioctl.h>
 #include <cutils/properties.h>
@@ -37,62 +36,6 @@ using namespace qdutils;
 namespace qhwc {
 #define UNKNOWN_STRING                  "unknown"
 #define SPD_NAME_LENGTH                 16
-
-/* The array gEDIDData contains a list of modes currently
- * supported by HDMI and display, and modes that are not
- * supported i.e. interlaced modes.
-
- * In order to add support for a new mode, the mode must be
- * appended to the end of the array.
- *
- * Each new entry must contain the following:
- * -Mode: a video format defined in msm_hdmi_modes.h
- * -Width: x resolution for the mode
- * -Height: y resolution for the mode
- * -FPS: the frame rate for the mode
- * -Mode Order: the priority for the new mode that is used when determining
- *  the best mode when the HDMI display is connected.
- */
-EDIDData gEDIDData [] = {
-    EDIDData(HDMI_VFRMT_1440x480i60_4_3, 1440, 480, 60, 1),
-    EDIDData(HDMI_VFRMT_1440x480i60_16_9, 1440, 480, 60, 2),
-    EDIDData(HDMI_VFRMT_1440x576i50_4_3, 1440, 576, 50, 3),
-    EDIDData(HDMI_VFRMT_1440x576i50_16_9, 1440, 576, 50, 4),
-    EDIDData(HDMI_VFRMT_1920x1080i60_16_9, 1920, 1080, 60, 5),
-    EDIDData(HDMI_VFRMT_640x480p60_4_3, 640, 480, 60, 6),
-    EDIDData(HDMI_VFRMT_720x480p60_4_3, 720, 480, 60, 7),
-    EDIDData(HDMI_VFRMT_720x480p60_16_9, 720, 480, 60, 8),
-    EDIDData(HDMI_VFRMT_720x576p50_4_3, 720, 576, 50, 9),
-    EDIDData(HDMI_VFRMT_720x576p50_16_9, 720, 576, 50, 10),
-    EDIDData(HDMI_VFRMT_800x600p60_4_3, 800, 600, 60, 11),
-    EDIDData(HDMI_VFRMT_848x480p60_16_9, 848, 480, 60, 12),
-    EDIDData(HDMI_VFRMT_1024x768p60_4_3, 1024, 768, 60, 13),
-    EDIDData(HDMI_VFRMT_1280x1024p60_5_4, 1280, 1024, 60, 14),
-    EDIDData(HDMI_VFRMT_1280x720p50_16_9, 1280, 720, 50, 15),
-    EDIDData(HDMI_VFRMT_1280x720p60_16_9, 1280, 720, 60, 16),
-    EDIDData(HDMI_VFRMT_1280x800p60_16_10, 1280, 800, 60, 17),
-    EDIDData(HDMI_VFRMT_1280x960p60_4_3, 1280, 960, 60, 18),
-    EDIDData(HDMI_VFRMT_1360x768p60_16_9, 1360, 768, 60, 19),
-    EDIDData(HDMI_VFRMT_1366x768p60_16_10, 1366, 768, 60, 20),
-    EDIDData(HDMI_VFRMT_1440x900p60_16_10, 1440, 900, 60, 21),
-    EDIDData(HDMI_VFRMT_1400x1050p60_4_3, 1400, 1050, 60, 22),
-    EDIDData(HDMI_VFRMT_1680x1050p60_16_10, 1680, 1050, 60, 23),
-    EDIDData(HDMI_VFRMT_1600x1200p60_4_3, 1600, 1200, 60, 24),
-    EDIDData(HDMI_VFRMT_1920x1080p24_16_9, 1920, 1080, 24, 25),
-    EDIDData(HDMI_VFRMT_1920x1080p25_16_9, 1920, 1080, 25, 26),
-    EDIDData(HDMI_VFRMT_1920x1080p30_16_9, 1920, 1080, 30, 27),
-    EDIDData(HDMI_VFRMT_1920x1080p50_16_9, 1920, 1080, 50, 28),
-    EDIDData(HDMI_VFRMT_1920x1080p60_16_9, 1920, 1080, 60, 29),
-    EDIDData(HDMI_VFRMT_1920x1200p60_16_10, 1920, 1200, 60, 30),
-    EDIDData(HDMI_VFRMT_2560x1600p60_16_9, 2560, 1600, 60, 31),
-    EDIDData(HDMI_VFRMT_3840x2160p24_16_9, 3840, 2160, 24, 32),
-    EDIDData(HDMI_VFRMT_3840x2160p25_16_9, 3840, 2160, 25, 33),
-    EDIDData(HDMI_VFRMT_3840x2160p30_16_9, 3840, 2160, 30, 34),
-    EDIDData(HDMI_VFRMT_4096x2160p24_16_9, 4096, 2160, 24, 35),
-};
-
-// Number of modes in gEDIDData
-const int gEDIDCount = (sizeof(gEDIDData)/sizeof(gEDIDData)[0]);
 
 int HDMIDisplay::configure() {
     if(!openFrameBuffer()) {
@@ -135,8 +78,8 @@ int HDMIDisplay::configure() {
 }
 
 void HDMIDisplay::getAttributes(uint32_t& width, uint32_t& height) {
-    uint32_t fps = 0;
-    getAttrForMode(width, height, fps);
+    uint32_t refresh = 0, fps = 0;
+    getAttrForConfig(mActiveConfig, width, height, refresh, fps);
 }
 
 int HDMIDisplay::teardown() {
@@ -167,14 +110,7 @@ HDMIDisplay::HDMIDisplay():mFd(-1),
         writeHPDOption(0);
     }
 
-    // for HDMI - retreive all the modes supported by the driver
     if(mFbNum != -1) {
-        supported_video_mode_lut =
-                        new msm_hdmi_mode_timing_info[HDMI_VFRMT_MAX];
-        // Populate the mode table for supported modes
-        MSM_HDMI_MODES_INIT_TIMINGS(supported_video_mode_lut);
-        MSM_HDMI_MODES_SET_SUPP_TIMINGS(supported_video_mode_lut,
-                                        MSM_HDMI_MODES_ALL);
         // Update the Source Product Information
         // Vendor Name
         setSPDInfo("vendor_name", "ro.product.manufacturer");
@@ -298,7 +234,6 @@ void HDMIDisplay::readCEUnderscanInfo()
 
 HDMIDisplay::~HDMIDisplay()
 {
-    delete [] supported_video_mode_lut;
     closeFrameBuffer();
 }
 
@@ -356,7 +291,7 @@ int HDMIDisplay::parseResolution(char* edidStr)
 bool HDMIDisplay::readResolution()
 {
     ssize_t len = -1;
-    char edidStr[128] = {'\0'};
+    char edidStr[PAGE_SIZE] = {'\0'};
 
     int hdmiEDIDFile = openDeviceNode("edid_modes", O_RDONLY);
     if (hdmiEDIDFile < 0) {
@@ -382,6 +317,25 @@ bool HDMIDisplay::readResolution()
         mModeCount = parseResolution(edidStr);
         ALOGD_IF(DEBUG, "%s: mModeCount = %d", __FUNCTION__,
                  mModeCount);
+    }
+    // Populate the internal data structure with the timing information
+    // for each edid mode read from the driver
+    if (mModeCount > 0) {
+        mDisplayConfigs = new msm_hdmi_mode_timing_info[mModeCount];
+        readConfigs();
+    } else {
+        // If we fail to read from EDID when HDMI is connected, then
+        // mModeCount will be 0 and bestConfigIndex will be invalid.
+        // In this case, we populate the mEDIDModes structure with
+        // a default mode at config index 0.
+        uint32_t defaultConfigIndex = 0;
+        mModeCount = 1;
+        mEDIDModes[defaultConfigIndex] = HDMI_VFRMT_640x480p60_4_3;
+        struct msm_hdmi_mode_timing_info defaultMode =
+                HDMI_VFRMT_640x480p60_4_3_TIMING;
+        mDisplayConfigs = new msm_hdmi_mode_timing_info[mModeCount];
+        mDisplayConfigs[defaultConfigIndex] = defaultMode;
+        ALOGD("%s Defaulting to HDMI_VFRMT_640x480p60_4_3", __FUNCTION__);
     }
 
     return (len > 0);
@@ -421,20 +375,13 @@ void HDMIDisplay::resetInfo()
     mYres = 0;
     mVsyncPeriod = 0;
     mMDPScalingMode = false;
+    if (mDisplayConfigs) {
+        delete [] mDisplayConfigs;
+        mDisplayConfigs = 0;
+    }
     // Reset the underscan supported system property
     const char* prop = "0";
     property_set("hw.underscan_supported", prop);
-}
-
-int HDMIDisplay::getModeOrder(int mode)
-{
-    for (int dataIndex = 0; dataIndex < gEDIDCount; dataIndex++) {
-        if (gEDIDData[dataIndex].mMode == mode) {
-            return gEDIDData[dataIndex].mModeOrder;
-        }
-    }
-    ALOGE("%s Mode not found: %d", __FUNCTION__, mode);
-    return -1;
 }
 
 /// Returns the index of the user mode set(if any) using adb shell
@@ -443,8 +390,7 @@ int HDMIDisplay::getUserConfig() {
     char property_value[PROPERTY_VALUE_MAX];
     property_get("hw.hdmi.resolution", property_value, "-1");
     int mode = atoi(property_value);
-    // We dont support interlaced modes
-    if(isValidMode(mode) && !isInterlacedMode(mode)) {
+    if(isValidMode(mode)) {
         ALOGD_IF(DEBUG, "%s: setting the HDMI mode = %d", __FUNCTION__, mode);
         return getModeIndex(mode);
     }
@@ -453,59 +399,135 @@ int HDMIDisplay::getUserConfig() {
 
 // Get the index of the best mode for the current HD TV
 int HDMIDisplay::getBestConfig() {
-    int bestOrder = 0;
-    int bestMode = HDMI_VFRMT_640x480p60_4_3;
-    int bestModeIndex = -1;
-    // for all the edid read, get the best mode
-    for(int i = 0; i < mModeCount; i++) {
-        int mode = mEDIDModes[i];
-        int order = getModeOrder(mode);
-        if (order > bestOrder) {
-            bestOrder = order;
-            bestMode = mode;
-            bestModeIndex = i;
+    int bestConfigIndex = 0;
+    int edidMode = -1;
+    struct msm_hdmi_mode_timing_info currentModeInfo = {0};
+    struct msm_hdmi_mode_timing_info bestModeInfo = {0};
+    bestModeInfo.video_format = 0;
+    bestModeInfo.active_v = 0;
+    bestModeInfo.active_h = 0;
+    bestModeInfo.refresh_rate = 0;
+    bestModeInfo.ar = HDMI_RES_AR_INVALID;
+
+    // for all the timing info read, get the best config
+    for (int configIndex = 0; configIndex < mModeCount; configIndex++) {
+        currentModeInfo = mDisplayConfigs[configIndex];
+
+        if (!currentModeInfo.supported) {
+            ALOGD("%s EDID Mode %d is not supported", __FUNCTION__, edidMode);
+            continue;
+        }
+
+        ALOGD_IF(DEBUG, "%s Best (%d) : (%dx%d) @ %d;"
+                " Current (%d) (%dx%d) @ %d",
+                __FUNCTION__, bestConfigIndex, bestModeInfo.active_h,
+                bestModeInfo.active_v, bestModeInfo.refresh_rate, configIndex,
+                currentModeInfo.active_h, currentModeInfo.active_v,
+                currentModeInfo.refresh_rate);
+
+        // Compare two HDMI modes in order of height, width, refresh rate and
+        // aspect ratio.
+        if (currentModeInfo.active_v > bestModeInfo.active_v) {
+            bestConfigIndex = configIndex;
+        } else if (currentModeInfo.active_v == bestModeInfo.active_v) {
+            if (currentModeInfo.active_h > bestModeInfo.active_h) {
+                bestConfigIndex = configIndex;
+            } else if (currentModeInfo.active_h == bestModeInfo.active_h) {
+                if (currentModeInfo.refresh_rate > bestModeInfo.refresh_rate) {
+                    bestConfigIndex = configIndex;
+                } else if (currentModeInfo.refresh_rate ==
+                        bestModeInfo.refresh_rate) {
+                    if (currentModeInfo.ar > bestModeInfo.ar) {
+                        bestConfigIndex = configIndex;
+                    }
+                }
+            }
+        }
+        if (bestConfigIndex == configIndex) {
+            bestModeInfo = mDisplayConfigs[bestConfigIndex];
         }
     }
-    // If we fail to read from EDID when HDMI is connected, then
-    // mModeCount will be 0 and bestModeIndex will be invalid.
-    // In this case, we populate the mEDIDModes structure with
-    // a default mode at index 0.
-    if (bestModeIndex == -1) {
-        bestModeIndex = 0;
-        mModeCount = 1;
-        mEDIDModes[bestModeIndex] = bestMode;
+    return bestConfigIndex;
+}
+
+// Utility function used to request HDMI driver to write a new page of timing
+// info into res_info node
+void HDMIDisplay::requestNewPage(int pageNumber) {
+    char pageString[PAGE_SIZE];
+    int fd = openDeviceNode("res_info", O_WRONLY);
+    if (fd >= 0) {
+        snprintf(pageString, sizeof(pageString), "%d", pageNumber);
+        ALOGD_IF(DEBUG, "%s: page=%s", __FUNCTION__, pageString);
+        ssize_t err = write(fd, pageString, sizeof(pageString));
+        if (err <= 0) {
+            ALOGE("%s: Write to res_info failed (%d)", __FUNCTION__, errno);
+        }
+        close(fd);
     }
-    return bestModeIndex;
+}
+
+// Reads the contents of res_info node into a buffer if the file is not empty
+bool HDMIDisplay::readResFile(char * configBuffer) {
+    bool fileRead = false;
+    size_t bytesRead = 0;
+    int fd = openDeviceNode("res_info", O_RDONLY);
+    if (fd >= 0 && (bytesRead = read(fd, configBuffer, PAGE_SIZE)) != 0) {
+        fileRead = true;
+    }
+    close(fd);
+    ALOGD_IF(DEBUG, "%s: bytesRead=%d fileRead=%d",
+            __FUNCTION__, bytesRead, fileRead);
+    return fileRead;
+}
+
+// Populates the internal timing info structure with the timing info obtained
+// from the HDMI driver
+void HDMIDisplay::readConfigs() {
+    int configIndex = 0;
+    int pageNumber = MSM_HDMI_INIT_RES_PAGE;
+    long unsigned int size = sizeof(msm_hdmi_mode_timing_info);
+
+    while (true) {
+        char configBuffer[PAGE_SIZE] = {0};
+        msm_hdmi_mode_timing_info *info =
+                (msm_hdmi_mode_timing_info*) configBuffer;
+
+        if (!readResFile(configBuffer))
+            break;
+
+        while (info->video_format && size < PAGE_SIZE) {
+            mDisplayConfigs[configIndex] = *info;
+            size += sizeof(msm_hdmi_mode_timing_info);
+            info++;
+            ALOGD_IF(DEBUG, "%s: Config=%d Mode %d: (%dx%d) @ %d",
+                    __FUNCTION__, configIndex,
+                    mDisplayConfigs[configIndex].video_format,
+                    mDisplayConfigs[configIndex].active_h,
+                    mDisplayConfigs[configIndex].active_v,
+                    mDisplayConfigs[configIndex].refresh_rate);
+            configIndex++;
+        }
+        size = sizeof(msm_hdmi_mode_timing_info);
+        // Request HDMI driver to populate res_info with more
+        // timing information
+        pageNumber++;
+        requestNewPage(pageNumber);
+    }
 }
 
 inline bool HDMIDisplay::isValidMode(int ID)
 {
     bool valid = false;
-    for (int i = 0; i < mModeCount; i++) {
-        if(ID == mEDIDModes[i]) {
-            valid = true;
-            break;
-        }
+    int modeIndex = getModeIndex(ID);
+    if (ID <= 0 || modeIndex < 0 || modeIndex > mModeCount) {
+        return false;
+    }
+    struct msm_hdmi_mode_timing_info* mode = &mDisplayConfigs[modeIndex];
+    // We dont support interlaced modes
+    if (mode->supported && !mode->interlaced) {
+        valid = true;
     }
     return valid;
-}
-
-// returns true if the mode(ID) is interlaced mode format
-bool HDMIDisplay::isInterlacedMode(int ID) {
-    bool interlaced = false;
-    switch(ID) {
-        case HDMI_VFRMT_1440x480i60_4_3:
-        case HDMI_VFRMT_1440x480i60_16_9:
-        case HDMI_VFRMT_1440x576i50_4_3:
-        case HDMI_VFRMT_1440x576i50_16_9:
-        case HDMI_VFRMT_1920x1080i60_16_9:
-            interlaced = true;
-            break;
-        default:
-            interlaced = false;
-            break;
-    }
-    return interlaced;
 }
 
 // Does a put_vscreen info on the HDMI interface which will update
@@ -525,16 +547,7 @@ void HDMIDisplay::activateDisplay()
             mVInfo.lower_margin, mVInfo.vsync_len, mVInfo.upper_margin,
             mVInfo.pixclock/1000/1000);
 
-    const struct msm_hdmi_mode_timing_info *mode =
-            &supported_video_mode_lut[0];
-    for (unsigned int i = 0; i < HDMI_VFRMT_MAX; ++i) {
-        const struct msm_hdmi_mode_timing_info *cur =
-                &supported_video_mode_lut[i];
-        if (cur->video_format == (uint32_t)mCurrentMode) {
-            mode = cur;
-            break;
-        }
-    }
+    struct msm_hdmi_mode_timing_info *mode = &mDisplayConfigs[mActiveConfig];
     setDisplayTiming(mVInfo, mode);
     ALOGD_IF(DEBUG, "%s: SET Info<ID=%d => Info<ID=%d %dx %d"
             "(%d,%d,%d), (%d,%d,%d) %dMHz>", __FUNCTION__, mCurrentMode,
@@ -585,9 +598,9 @@ bool HDMIDisplay::writeHPDOption(int userOption) const
 
 
 void HDMIDisplay::setAttributes() {
-    uint32_t fps = 0;
+    uint32_t refresh = 0, fps = 0;
     // Always set dpyAttr res to mVInfo res
-    getAttrForMode(mXres, mYres, fps);
+    getAttrForConfig(mActiveConfig, mXres, mYres, refresh, fps);
     mMDPScalingMode = false;
 
     if(overlay::Overlay::getInstance()->isUIScalingOnExternalSupported()
@@ -651,19 +664,6 @@ void HDMIDisplay::setAttributes() {
             mMDPDownscaleEnabled);
     mVsyncPeriod = (int) 1000000000l / fps;
     ALOGD_IF(DEBUG, "%s xres=%d, yres=%d", __FUNCTION__, mXres, mYres);
-}
-
-void HDMIDisplay::getAttrForMode(uint32_t& width, uint32_t& height,
-        uint32_t& fps) {
-    for (int dataIndex = 0; dataIndex < gEDIDCount; dataIndex++) {
-        if (gEDIDData[dataIndex].mMode == mCurrentMode) {
-            width = gEDIDData[dataIndex].mWidth;
-            height = gEDIDData[dataIndex].mHeight;
-            fps = gEDIDData[dataIndex].mFps;
-            return;
-        }
-    }
-    ALOGE("%s Unable to get attributes for %d", __FUNCTION__, mCurrentMode);
 }
 
 /* returns the fd related to the node specified*/
@@ -743,8 +743,8 @@ int HDMIDisplay::setActiveConfig(int newConfig) {
 // not match the current config
 bool HDMIDisplay::isValidConfigChange(int newConfig) {
     int newMode = mEDIDModes[newConfig];
-    uint32_t width = 0, height = 0, refresh = 0;
-    getAttrForConfig(newConfig, width, height, refresh);
+    uint32_t width = 0, height = 0, refresh = 0, fps = 0;
+    getAttrForConfig(newConfig, width, height, refresh, fps);
     return ((mXres == width) && (mYres == height)) || mEnableResolutionChange;
 }
 
@@ -760,21 +760,16 @@ int HDMIDisplay::getModeIndex(int mode) {
 }
 
 int HDMIDisplay::getAttrForConfig(int config, uint32_t& xres,
-        uint32_t& yres, uint32_t& refresh) const {
+        uint32_t& yres, uint32_t& refresh, uint32_t& fps) const {
     if(config < 0 || config > mModeCount) {
         ALOGE("%s Invalid configuration %d", __FUNCTION__, config);
         return -EINVAL;
     }
-    int mode = mEDIDModes[config];
-    uint32_t fps = 0;
-    // Retrieve the mode attributes from gEDIDData
-    for (int dataIndex = 0; dataIndex < gEDIDCount; dataIndex++) {
-        if (gEDIDData[dataIndex].mMode == mode) {
-            xres = gEDIDData[dataIndex].mWidth;
-            yres = gEDIDData[dataIndex].mHeight;
-            fps = gEDIDData[dataIndex].mFps;
-        }
-    }
+
+    xres = mDisplayConfigs[config].active_h;
+    yres = mDisplayConfigs[config].active_v;
+    fps = (mDisplayConfigs[config].refresh_rate / 1000);
+
     refresh = (uint32_t) 1000000000l / fps;
     ALOGD_IF(DEBUG, "%s xres(%d) yres(%d) fps(%d) refresh(%d)", __FUNCTION__,
             xres, yres, fps, refresh);

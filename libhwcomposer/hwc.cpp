@@ -809,10 +809,11 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
     const size_t NUM_DISPLAY_ATTRIBUTES = (sizeof(DISPLAY_ATTRIBUTES) /
             sizeof(DISPLAY_ATTRIBUTES)[0]);
 
-    uint32_t xres = 0, yres = 0, refresh = 0;
+    uint32_t xres = 0, yres = 0, refresh = 0, fps = 0;
     int ret = 0;
     if (hotPluggable) {
-        ret = ctx->mHDMIDisplay->getAttrForConfig(config, xres, yres, refresh);
+        ret = ctx->mHDMIDisplay->getAttrForConfig(config, xres,
+                yres, refresh, fps);
         if(ret < 0) {
             ALOGE("%s Error getting attributes for config %d",
                     __FUNCTION__, config);
