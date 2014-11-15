@@ -60,7 +60,7 @@ public:
     virtual void connect(const sp<IQClient>& client) {
         Parcel data, reply;
         data.writeInterfaceToken(IQService::getInterfaceDescriptor());
-        data.writeStrongBinder(client->asBinder());
+        data.writeStrongBinder(IInterface::asBinder(client));
         remote()->transact(CONNECT, data, &reply);
     }
 
