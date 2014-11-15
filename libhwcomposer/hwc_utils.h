@@ -674,6 +674,11 @@ static inline bool isVDConnected(hwc_context_t* ctx) {
     return ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected;
 }
 
+inline uint32_t getLayerClock(const uint32_t& dstW, const uint32_t& dstH,
+        const uint32_t& srcH) {
+    return max(dstW, (srcH * dstW) / dstH);
+}
+
 };
 
 #endif //HWC_UTILS_H

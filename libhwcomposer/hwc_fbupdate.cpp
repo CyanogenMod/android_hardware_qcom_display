@@ -523,9 +523,15 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             qdutils::MDPVersion::getInstance().isSrcSplitAlways();
     const uint32_t lSplit = getLeftSplit(ctx, mDpy);
     const uint32_t cropWidth = sourceCrop.right - sourceCrop.left;
+    const uint32_t cropHeight = sourceCrop.bottom - sourceCrop.top;
+    const uint32_t dstWidth = displayFrame.right - displayFrame.left;
+    const uint32_t dstHeight = displayFrame.bottom - displayFrame.top;
+    const uint32_t layerClock = getLayerClock(dstWidth, dstHeight, cropHeight);
+    const uint32_t mixerClock = lSplit;
 
     if((cropWidth > qdutils::MDPVersion::getInstance().getMaxMixerWidth()) or
-            (primarySplitAlways and cropWidth > lSplit)) {
+            (primarySplitAlways and
+            (cropWidth > lSplit or layerClock > mixerClock))) {
         destR = ov.getPipe(pipeSpecs);
         if(destR == ovutils::OV_INVALID) {
             ALOGE("%s: No pipes available to configure fb for dpy %d's right"
