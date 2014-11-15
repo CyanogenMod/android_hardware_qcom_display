@@ -48,7 +48,7 @@ public:
         ALOGD_IF(QSERVICE_DEBUG, "%s: connect client", __FUNCTION__);
         Parcel data, reply;
         data.writeInterfaceToken(IQService::getInterfaceDescriptor());
-        data.writeStrongBinder(client->asBinder());
+        data.writeStrongBinder(IInterface::asBinder(client));
         remote()->transact(CONNECT, data, &reply);
     }
 
