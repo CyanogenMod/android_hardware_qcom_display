@@ -22,7 +22,7 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-/*! @file device_interface.h
+/*! @file display_interface.h
   @brief Interface file for display device which represents a physical panel or an output buffer
   where contents can be rendered.
 
@@ -30,8 +30,8 @@
   the target device. Each display device represents a unique display target which may be either a
   physical panel or an output buffer..
 */
-#ifndef __DEVICE_INTERFACE_H__
-#define __DEVICE_INTERFACE_H__
+#ifndef __DISPLAY_INTERFACE_H__
+#define __DISPLAY_INTERFACE_H__
 
 #include <stdint.h>
 
@@ -42,10 +42,10 @@ namespace sde {
 
 /*! @brief This enum represents display device types where contents can be rendered.
 
-  @sa CoreInterface::CreateDevice
-  @sa CoreInterface::IsDeviceSupported
+  @sa CoreInterface::CreateDisplay
+  @sa CoreInterface::IsDisplaySupported
 */
-enum DeviceType {
+enum DisplayType {
   kPrimary,         //!< Main physical display which is attached to the handheld device.
   kHDMI,            //!< HDMI physical display which is generally detachable.
   kVirtual,         //!< Contents would be rendered into the output buffer provided by the client
@@ -54,10 +54,10 @@ enum DeviceType {
 
 /*! @brief This enum represents states of a display device.
 
-  @sa DisplayInterface::GetDeviceState
-  @sa DisplayInterface::SetDeviceState
+  @sa DisplayInterface::GetDisplayState
+  @sa DisplayInterface::SetDisplayState
 */
-enum DeviceState {
+enum DisplayState {
   kStateOff,        //!< Display is OFF. Contents are not rendered in this state. Client will not
                     //!< receive VSync events in this state. This is default state as well.
 
@@ -75,11 +75,11 @@ enum DeviceState {
   @sa DisplayInterface::GetConfig
   @sa DisplayInterface::SetConfig
 */
-struct DeviceConfigFixedInfo {
+struct DisplayConfigFixedInfo {
   bool underscan;   //!< If display support CE underscan.
   bool secure;      //!< If this display is capable of handling secure content.
 
-  DeviceConfigFixedInfo() : underscan(false), secure(false) { }
+  DisplayConfigFixedInfo() : underscan(false), secure(false) { }
 };
 
 /*! @brief This structure defines configuration for variable properties of a display device.
@@ -87,7 +87,7 @@ struct DeviceConfigFixedInfo {
   @sa DisplayInterface::GetConfig
   @sa DisplayInterface::SetConfig
 */
-struct DeviceConfigVariableInfo {
+struct DisplayConfigVariableInfo {
   uint32_t x_pixels;          //!< Total number of pixels in X-direction on the display panel.
   uint32_t y_pixels;          //!< Total number of pixels in Y-direction on the display panel.
   float x_dpi;                //!< Dots per inch in X-direction.
@@ -95,18 +95,18 @@ struct DeviceConfigVariableInfo {
   float fps;                  //!< Frame rate per second.
   uint32_t vsync_period_ns;   //!< VSync period in nanoseconds.
 
-  DeviceConfigVariableInfo() : x_pixels(0), y_pixels(0), x_dpi(0.0f), y_dpi(0.0f),
+  DisplayConfigVariableInfo() : x_pixels(0), y_pixels(0), x_dpi(0.0f), y_dpi(0.0f),
                                fps(0.0f), vsync_period_ns(0) { }
 };
 
 /*! @brief Event data associated with VSync event.
 
-  @sa DeviceEventHandler::VSync
+  @sa DisplayEventHandler::VSync
 */
-struct DeviceEventVSync {
+struct DisplayEventVSync {
   int64_t timestamp;    //!< System monotonic clock timestamp in nanoseconds.
 
-  DeviceEventVSync() : timestamp(0) { }
+  DisplayEventVSync() : timestamp(0) { }
 };
 
 /*! @brief Display device event handler implemented by the client.
@@ -116,23 +116,23 @@ struct DeviceEventVSync {
   Client must post heavy-weight event handling to a separate thread and unblock display engine
   thread instantly.
 
-  @sa CoreInterface::CreateDevice
+  @sa CoreInterface::CreateDisplay
 */
-class DeviceEventHandler {
+class DisplayEventHandler {
  public:
   /*! @brief Event handler for VSync event.
 
     @details This event is dispatched on every vertical synchronization. The event is disabled by
     default.
 
-    @param[in] vsync \link DeviceEventVSync \endlink
+    @param[in] vsync \link DisplayEventVSync \endlink
 
     @return \link DisplayError \endlink
 
-    @sa DeviceInterface::GetDeviceState
-    @sa DeviceInterface::SetDeviceState
+    @sa DisplayInterface::GetDisplayState
+    @sa DisplayInterface::SetDisplayState
   */
-  virtual DisplayError VSync(const DeviceEventVSync &vsync) = 0;
+  virtual DisplayError VSync(const DisplayEventVSync &vsync) = 0;
 
   /*! @brief Event handler for Refresh event.
 
@@ -142,13 +142,13 @@ class DeviceEventHandler {
 
     @return \link DisplayError \endlink
 
-    @sa DeviceInterface::Prepare
-    @sa DeviceInterface::Commit
+    @sa DisplayInterface::Prepare
+    @sa DisplayInterface::Commit
   */
   virtual DisplayError Refresh() = 0;
 
  protected:
-  virtual ~DeviceEventHandler() { }
+  virtual ~DisplayEventHandler() { }
 };
 
 /*! @brief Display device interface.
@@ -157,10 +157,10 @@ class DeviceEventHandler {
   to configure or submit layers for composition on the display device. This interface is created
   during display device creation and remains valid until destroyed.
 
-  @sa CoreInterface::CreateDevice
-  @sa CoreInterface::DestroyDevice
+  @sa CoreInterface::CreateDisplay
+  @sa CoreInterface::DestroyDisplay
 */
-class DeviceInterface {
+class DisplayInterface {
  public:
   /*! @brief Method to determine hardware capability to compose layers associated with given frame.
 
@@ -212,9 +212,9 @@ class DeviceInterface {
 
     @return \link DisplayError \endlink
 
-    @sa SetDeviceState
+    @sa SetDisplayState
   */
-  virtual DisplayError GetDeviceState(DeviceState *state) = 0;
+  virtual DisplayError GetDisplayState(DisplayState *state) = 0;
 
   /*! @brief Method to get number of configurations(variable properties) supported on the display
     device.
@@ -227,20 +227,20 @@ class DeviceInterface {
 
   /*! @brief Method to get configuration for fixed properties of the display device.
 
-    @param[out] fixed_info \link DeviceConfigFixedInfo \endlink
+    @param[out] fixed_info \link DisplayConfigFixedInfo \endlink
 
     @return \link DisplayError \endlink
   */
-  virtual DisplayError GetConfig(DeviceConfigFixedInfo *fixed_info) = 0;
+  virtual DisplayError GetConfig(DisplayConfigFixedInfo *fixed_info) = 0;
 
   /*! @brief Method to get configuration for variable properties of the display device.
 
     @param[in] mode index of the mode
-    @param[out] variable_info \link DeviceConfigVariableInfo \endlink
+    @param[out] variable_info \link DisplayConfigVariableInfo \endlink
 
     @return \link DisplayError \endlink
   */
-  virtual DisplayError GetConfig(DeviceConfigVariableInfo *variable_info, uint32_t mode) = 0;
+  virtual DisplayError GetConfig(DisplayConfigVariableInfo *variable_info, uint32_t mode) = 0;
 
   /*! @brief Method to get VSync event state. Default event state is disabled.
 
@@ -256,9 +256,9 @@ class DeviceInterface {
 
     @return \link DisplayError \endlink
 
-    @sa SetDeviceState
+    @sa SetDisplayState
   */
-  virtual DisplayError SetDeviceState(DeviceState state) = 0;
+  virtual DisplayError SetDisplayState(DisplayState state) = 0;
 
   /*! @brief Method to set configuration for variable properties of the display device.
 
@@ -277,10 +277,10 @@ class DeviceInterface {
   virtual DisplayError SetVSyncState(bool enable) = 0;
 
  protected:
-  virtual ~DeviceInterface() { }
+  virtual ~DisplayInterface() { }
 };
 
 }  // namespace sde
 
-#endif  // __DEVICE_INTERFACE_H__
+#endif  // __DISPLAY_INTERFACE_H__
 

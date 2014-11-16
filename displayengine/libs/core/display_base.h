@@ -22,10 +22,10 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __DEVICE_BASE_H__
-#define __DEVICE_BASE_H__
+#ifndef __DISPLAY_BASE_H__
+#define __DISPLAY_BASE_H__
 
-#include <core/device_interface.h>
+#include <core/display_interface.h>
 #include <private/strategy_interface.h>
 #include <utils/locker.h>
 
@@ -34,21 +34,21 @@
 
 namespace sde {
 
-class DeviceBase : public DeviceInterface, HWEventHandler, DumpImpl {
+class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
  public:
-  DeviceBase(DeviceType device_type, DeviceEventHandler *event_handler,
+  DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
              HWBlockType hw_block_type, HWInterface *hw_intf, CompManager *comp_manager);
-  virtual ~DeviceBase() { }
+  virtual ~DisplayBase() { }
   virtual DisplayError Init();
   virtual DisplayError Deinit();
   virtual DisplayError Prepare(LayerStack *layer_stack);
   virtual DisplayError Commit(LayerStack *layer_stack);
-  virtual DisplayError GetDeviceState(DeviceState *state);
+  virtual DisplayError GetDisplayState(DisplayState *state);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
-  virtual DisplayError GetConfig(DeviceConfigFixedInfo *fixed_info);
-  virtual DisplayError GetConfig(DeviceConfigVariableInfo *variable_info, uint32_t mode);
+  virtual DisplayError GetConfig(DisplayConfigFixedInfo *fixed_info);
+  virtual DisplayError GetConfig(DisplayConfigVariableInfo *variable_info, uint32_t mode);
   virtual DisplayError GetVSyncState(bool *enabled);
-  virtual DisplayError SetDeviceState(DeviceState state);
+  virtual DisplayError SetDisplayState(DisplayState state);
   virtual DisplayError SetConfig(uint32_t mode);
   virtual DisplayError SetVSyncState(bool enable);
 
@@ -62,15 +62,15 @@ class DeviceBase : public DeviceInterface, HWEventHandler, DumpImpl {
 
  protected:
   Locker locker_;
-  DeviceType device_type_;
-  DeviceEventHandler *event_handler_;
+  DisplayType display_type_;
+  DisplayEventHandler *event_handler_;
   HWBlockType hw_block_type_;
   HWInterface *hw_intf_;
   CompManager *comp_manager_;
-  DeviceState state_;
+  DisplayState state_;
   Handle hw_device_;
-  Handle comp_mgr_device_;
-  HWDeviceAttributes *device_attributes_;
+  Handle display_comp_ctx_;
+  HWDisplayAttributes *display_attributes_;
   uint32_t num_modes_;
   uint32_t active_mode_index_;
   HWLayers hw_layers_;
@@ -80,5 +80,5 @@ class DeviceBase : public DeviceInterface, HWEventHandler, DumpImpl {
 
 }  // namespace sde
 
-#endif  // __DEVICE_BASE_H__
+#endif  // __DISPLAY_BASE_H__
 

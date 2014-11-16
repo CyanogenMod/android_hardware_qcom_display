@@ -25,7 +25,7 @@
 #ifndef __RES_MANAGER_H__
 #define __RES_MANAGER_H__
 
-#include <core/device_interface.h>
+#include <core/display_interface.h>
 #include <utils/locker.h>
 
 #include "hw_interface.h"
@@ -38,14 +38,14 @@ class ResManager : public DumpImpl {
   ResManager();
   DisplayError Init(const HWResourceInfo &hw_res_info);
   DisplayError Deinit();
-  DisplayError RegisterDevice(DeviceType type, const HWDeviceAttributes &attributes,
-                              Handle *device);
-  DisplayError UnregisterDevice(Handle device);
-  DisplayError Start(Handle device);
-  DisplayError Stop(Handle device);
-  DisplayError Acquire(Handle device, HWLayers *hw_layers);
-  void PostCommit(Handle device, HWLayers *hw_layers);
-  void Purge(Handle device);
+  DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
+                              Handle *display_ctx);
+  DisplayError UnregisterDisplay(Handle display_ctx);
+  DisplayError Start(Handle display_ctx);
+  DisplayError Stop(Handle display_ctx);
+  DisplayError Acquire(Handle display_ctx, HWLayers *hw_layers);
+  void PostCommit(Handle display_ctx, HWLayers *hw_layers);
+  void Purge(Handle display_ctx);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);
@@ -103,14 +103,14 @@ class ResManager : public DumpImpl {
                    reserved(false) { }
   };
 
-  struct ResManagerDevice {
-    HWDeviceAttributes device_attributes;
-    DeviceType device_type;
+  struct DisplayResourceContext {
+    HWDisplayAttributes display_attributes;
+    DisplayType display_type;
     HWBlockType hw_block_id;
     uint64_t frame_count;
     int32_t session_id;  // applicable for virtual display sessions only
 
-    ResManagerDevice() : hw_block_id(kHWBlockMax), frame_count(0), session_id(-1) { }
+    DisplayResourceContext() : hw_block_id(kHWBlockMax), frame_count(0), session_id(-1) { }
   };
 
   struct HWBlockContext {
@@ -123,7 +123,7 @@ class ResManager : public DumpImpl {
   uint32_t GetPipe(HWBlockType hw_block_id, bool is_yuv, bool need_scale, bool at_right,
                    bool use_non_dma_pipe);
   bool IsScalingNeeded(const HWPipeInfo *pipe_info);
-  DisplayError Config(ResManagerDevice *res_mgr_device, HWLayers *hw_layers);
+  DisplayError Config(DisplayResourceContext *display_resource_ctx, HWLayers *hw_layers);
   bool IsValidDimension(const Layer &layer, float *width_scale, float *height_scale);
   void CalculateCut(float *left_cut_ratio, float *top_cut_ratio, float *right_cut_ratio,
                     float *bottom_cut_ratio, const LayerTransform &transform);

@@ -227,7 +227,7 @@ DisplayError HWFrameBuffer::Close(Handle device) {
   return kErrorNone;
 }
 
-DisplayError HWFrameBuffer::GetNumDeviceAttributes(Handle device, uint32_t *count) {
+DisplayError HWFrameBuffer::GetNumDisplayAttributes(Handle device, uint32_t *count) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 
   // TODO(user): Query modes
@@ -236,9 +236,9 @@ DisplayError HWFrameBuffer::GetNumDeviceAttributes(Handle device, uint32_t *coun
   return kErrorNone;
 }
 
-DisplayError HWFrameBuffer::GetDeviceAttributes(Handle device,
-                                                HWDeviceAttributes *device_attributes,
-                                                uint32_t mode) {
+DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
+                                                 HWDisplayAttributes *display_attributes,
+                                                 uint32_t mode) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
   int &device_fd = hw_context->device_fd;
 
@@ -265,15 +265,16 @@ DisplayError HWFrameBuffer::GetDeviceAttributes(Handle device,
     var_screeninfo.height = INT((FLOAT(var_screeninfo.yres) * 25.4f)/160.0f + 0.5f);
   }
 
-  device_attributes->x_pixels = var_screeninfo.xres;
-  device_attributes->y_pixels = var_screeninfo.yres;
-  device_attributes->x_dpi = (FLOAT(var_screeninfo.xres) * 25.4f) / FLOAT(var_screeninfo.width);
-  device_attributes->y_dpi = (FLOAT(var_screeninfo.yres) * 25.4f) / FLOAT(var_screeninfo.height);
-  device_attributes->vsync_period_ns = UINT32(1000000000L / FLOAT(meta_data.data.panel_frame_rate));
+  display_attributes->x_pixels = var_screeninfo.xres;
+  display_attributes->y_pixels = var_screeninfo.yres;
+  display_attributes->x_dpi = (FLOAT(var_screeninfo.xres) * 25.4f) / FLOAT(var_screeninfo.width);
+  display_attributes->y_dpi = (FLOAT(var_screeninfo.yres) * 25.4f) / FLOAT(var_screeninfo.height);
+  display_attributes->vsync_period_ns =
+                 UINT32(1000000000L / FLOAT(meta_data.data.panel_frame_rate));
 
   // TODO(user): set panel information from sysfs
-  device_attributes->is_device_split = true;
-  device_attributes->split_left = device_attributes->x_pixels / 2;
+  display_attributes->is_device_split = true;
+  display_attributes->split_left = display_attributes->x_pixels / 2;
 
   return kErrorNone;
 }

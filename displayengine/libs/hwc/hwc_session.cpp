@@ -77,24 +77,24 @@ int HWCSession::Init() {
   int status = -EINVAL;
 
   // Create and power on primary display
-  sink_primary_ = new HWCSinkPrimary(core_intf_, &hwc_procs_);
-  if (UNLIKELY(!sink_primary_)) {
+  display_primary_ = new HWCDisplayPrimary(core_intf_, &hwc_procs_);
+  if (UNLIKELY(!display_primary_)) {
     CoreInterface::DestroyCore();
     return -ENOMEM;
   }
 
-  status = sink_primary_->Init();
+  status = display_primary_->Init();
   if (UNLIKELY(status)) {
     CoreInterface::DestroyCore();
-    delete sink_primary_;
+    delete display_primary_;
     return status;
   }
 
-  status = sink_primary_->PowerOn();
+  status = display_primary_->PowerOn();
   if (UNLIKELY(status)) {
     CoreInterface::DestroyCore();
-    sink_primary_->Deinit();
-    delete sink_primary_;
+    display_primary_->Deinit();
+    delete display_primary_;
     return status;
   }
 
@@ -102,9 +102,9 @@ int HWCSession::Init() {
 }
 
 int HWCSession::Deinit() {
-  sink_primary_->PowerOff();
-  sink_primary_->Deinit();
-  delete sink_primary_;
+  display_primary_->PowerOff();
+  display_primary_->Deinit();
+  delete display_primary_;
 
   DisplayError error = CoreInterface::DestroyCore();
   if (error != kErrorNone) {
@@ -173,7 +173,7 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
 
     switch (i) {
     case HWC_DISPLAY_PRIMARY:
-      status = hwc_session->sink_primary_->Prepare(content_list);
+      status = hwc_session->display_primary_->Prepare(content_list);
       break;
     default:
       status = -EINVAL;
@@ -207,7 +207,7 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
 
     switch (i) {
     case HWC_DISPLAY_PRIMARY:
-      status = hwc_session->sink_primary_->Commit(content_list);
+      status = hwc_session->display_primary_->Commit(content_list);
       break;
     default:
       status = -EINVAL;
@@ -233,7 +233,7 @@ int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event,
 
   switch (disp) {
   case HWC_DISPLAY_PRIMARY:
-    status = hwc_session->sink_primary_->EventControl(event, enable);
+    status = hwc_session->display_primary_->EventControl(event, enable);
     break;
   default:
     status = -EINVAL;
@@ -254,7 +254,7 @@ int HWCSession::Blank(hwc_composer_device_1 *device, int disp, int blank) {
 
   switch (disp) {
   case HWC_DISPLAY_PRIMARY:
-    status = hwc_session->sink_primary_->Blank(blank);
+    status = hwc_session->display_primary_->Blank(blank);
     break;
   default:
     status = -EINVAL;
@@ -301,7 +301,7 @@ int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint3
 
   switch (disp) {
   case HWC_DISPLAY_PRIMARY:
-    status = hwc_session->sink_primary_->GetDisplayConfigs(configs, num_configs);
+    status = hwc_session->display_primary_->GetDisplayConfigs(configs, num_configs);
     break;
   default:
     status = -EINVAL;
@@ -321,7 +321,7 @@ int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, ui
 
   switch (disp) {
   case HWC_DISPLAY_PRIMARY:
-    status = hwc_session->sink_primary_->GetDisplayAttributes(config, attributes, values);
+    status = hwc_session->display_primary_->GetDisplayAttributes(config, attributes, values);
     break;
   default:
     status = -EINVAL;

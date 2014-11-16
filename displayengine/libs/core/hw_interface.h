@@ -25,7 +25,7 @@
 #ifndef __HW_INTERFACE_H__
 #define __HW_INTERFACE_H__
 
-#include <core/device_interface.h>
+#include <core/display_interface.h>
 #include <private/strategy_interface.h>
 #include <utils/constants.h>
 
@@ -103,14 +103,14 @@ struct HWLayers {
   HWLayerConfig config[kMaxSDELayers];
 };
 
-struct HWDeviceAttributes : DeviceConfigVariableInfo {
+struct HWDisplayAttributes : DisplayConfigVariableInfo {
   bool is_device_split;
   uint32_t split_left;
 
-  HWDeviceAttributes() : is_device_split(false), split_left(0) { }
+  HWDisplayAttributes() : is_device_split(false), split_left(0) { }
 };
 
-// HWEventHandler - Implemented in DeviceBase and HWInterface implementation
+// HWEventHandler - Implemented in DisplayBase and HWInterface implementation
 class HWEventHandler {
  public:
   virtual DisplayError VSync(int64_t timestamp) = 0;
@@ -126,9 +126,9 @@ class HWInterface {
   virtual DisplayError GetHWCapabilities(HWResourceInfo *hw_res_info) = 0;
   virtual DisplayError Open(HWBlockType type, Handle *device, HWEventHandler *eventhandler) = 0;
   virtual DisplayError Close(Handle device) = 0;
-  virtual DisplayError GetNumDeviceAttributes(Handle device, uint32_t *count) = 0;
-  virtual DisplayError GetDeviceAttributes(Handle device, HWDeviceAttributes *device_attributes,
-                                       uint32_t mode) = 0;
+  virtual DisplayError GetNumDisplayAttributes(Handle device, uint32_t *count) = 0;
+  virtual DisplayError GetDisplayAttributes(Handle device,
+                            HWDisplayAttributes *display_attributes, uint32_t mode) = 0;
   virtual DisplayError PowerOn(Handle device) = 0;
   virtual DisplayError PowerOff(Handle device) = 0;
   virtual DisplayError Doze(Handle device) = 0;

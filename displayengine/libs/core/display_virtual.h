@@ -22,25 +22,20 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __HWC_SINK_EXTERNAL_H__
-#define __HWC_SINK_EXTERNAL_H__
+#ifndef __DISPLAY_VIRTUAL_H__
+#define __DISPLAY_VIRTUAL_H__
 
-#include "hwc_sink.h"
+#include "display_base.h"
 
 namespace sde {
 
-class HWCSinkExternal : public HWCSink {
+class DisplayVirtual : public DisplayBase {
  public:
-  explicit HWCSinkExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
-  virtual int Init();
-  virtual int Deinit();
-  virtual int Prepare(hwc_display_contents_1_t *content_list);
-  virtual int Commit(hwc_display_contents_1_t *content_list);
-  virtual int PowerOn();
-  virtual int PowerOff();
+  DisplayVirtual(DisplayEventHandler *event_handler, HWInterface *hw_intf,
+                 CompManager *comp_manager);
 };
 
 }  // namespace sde
 
-#endif  // __HWC_SINK_EXTERNAL_H__
+#endif  // __DISPLAY_VIRTUAL_H__
 

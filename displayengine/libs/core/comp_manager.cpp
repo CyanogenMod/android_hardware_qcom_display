@@ -87,48 +87,50 @@ DisplayError CompManager::Deinit() {
   return kErrorNone;
 }
 
-DisplayError CompManager::RegisterDevice(DeviceType type, const HWDeviceAttributes &attributes,
-                                         Handle *device) {
+DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
+                                          Handle *display_ctx) {
   SCOPE_LOCK(locker_);
 
   DisplayError error = kErrorNone;
 
-  CompManagerDevice *comp_mgr_device = new CompManagerDevice();
-  if (!comp_mgr_device) {
+  DisplayCompositionContext *display_comp_ctx = new DisplayCompositionContext();
+  if (!display_comp_ctx) {
     return kErrorMemory;
   }
 
-  error = res_mgr_.RegisterDevice(type, attributes, &comp_mgr_device->res_mgr_device);
+  error = res_mgr_.RegisterDisplay(type, attributes, &display_comp_ctx->display_resource_ctx);
   if (error != kErrorNone) {
-    delete comp_mgr_device;
+    delete display_comp_ctx;
     return error;
   }
   SET_BIT(registered_displays_, type);
-  comp_mgr_device->device_type = type;
-  *device = comp_mgr_device;
-  // New device has been added, so move the composition mode to safe mode until unless resources
-  // for the added display is configured properly.
+  display_comp_ctx->display_type = type;
+  *display_ctx = display_comp_ctx;
+  // New display device has been added, so move the composition mode to safe mode until unless
+  // resources for the added display is configured properly.
   safe_mode_ = true;
 
   return kErrorNone;
 }
 
-DisplayError CompManager::UnregisterDevice(Handle device) {
+DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
   SCOPE_LOCK(locker_);
 
-  CompManagerDevice *comp_mgr_device = reinterpret_cast<CompManagerDevice *>(device);
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(comp_handle);
 
-  res_mgr_.UnregisterDevice(comp_mgr_device->res_mgr_device);
-  CLEAR_BIT(registered_displays_, comp_mgr_device->device_type);
-  CLEAR_BIT(configured_displays_, comp_mgr_device->device_type);
-  delete comp_mgr_device;
+  res_mgr_.UnregisterDisplay(display_comp_ctx->display_resource_ctx);
+  CLEAR_BIT(registered_displays_, display_comp_ctx->display_type);
+  CLEAR_BIT(configured_displays_, display_comp_ctx->display_type);
+  delete display_comp_ctx;
 
   return kErrorNone;
 }
 
-void CompManager::PrepareStrategyConstraints(Handle device, HWLayers *hw_layers) {
-  CompManagerDevice *comp_mgr_device = reinterpret_cast<CompManagerDevice *>(device);
-  StrategyConstraints *constraints = &comp_mgr_device->constraints;
+void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_layers) {
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(comp_handle);
+  StrategyConstraints *constraints = &display_comp_ctx->constraints;
 
   constraints->safe_mode = safe_mode_;
   // If validation for the best available composition strategy with driver has failed, just
@@ -139,20 +141,21 @@ void CompManager::PrepareStrategyConstraints(Handle device, HWLayers *hw_layers)
   }
 }
 
-DisplayError CompManager::Prepare(Handle device, HWLayers *hw_layers) {
+DisplayError CompManager::Prepare(Handle display_ctx, HWLayers *hw_layers) {
   SCOPE_LOCK(locker_);
 
-  CompManagerDevice *comp_mgr_device = reinterpret_cast<CompManagerDevice *>(device);
-  Handle &res_mgr_device = comp_mgr_device->res_mgr_device;
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+  Handle &display_resource_ctx = display_comp_ctx->display_resource_ctx;
 
   DisplayError error = kErrorNone;
 
-  PrepareStrategyConstraints(device, hw_layers);
+  PrepareStrategyConstraints(display_ctx, hw_layers);
 
   // Select a composition strategy, and try to allocate resources for it.
-  res_mgr_.Start(res_mgr_device);
+  res_mgr_.Start(display_resource_ctx);
   while (true) {
-    error = strategy_intf_->GetNextStrategy(&comp_mgr_device->constraints, &hw_layers->info);
+    error = strategy_intf_->GetNextStrategy(&display_comp_ctx->constraints, &hw_layers->info);
     if (UNLIKELY(error != kErrorNone)) {
       // Composition strategies exhausted. Resource Manager could not allocate resources even for
       // GPU composition. This will never happen.
@@ -160,7 +163,7 @@ DisplayError CompManager::Prepare(Handle device, HWLayers *hw_layers) {
       return error;
     }
 
-    error = res_mgr_.Acquire(res_mgr_device, hw_layers);
+    error = res_mgr_.Acquire(display_resource_ctx, hw_layers);
     if (error != kErrorNone) {
       // Not enough resources, try next strategy.
       continue;
@@ -169,33 +172,35 @@ DisplayError CompManager::Prepare(Handle device, HWLayers *hw_layers) {
       break;
     }
   }
-  res_mgr_.Stop(res_mgr_device);
+  res_mgr_.Stop(display_resource_ctx);
 
   return kErrorNone;
 }
 
-void CompManager::PostPrepare(Handle device, HWLayers *hw_layers) {
+void CompManager::PostPrepare(Handle display_ctx, HWLayers *hw_layers) {
   SCOPE_LOCK(locker_);
 }
 
-void CompManager::PostCommit(Handle device, HWLayers *hw_layers) {
+void CompManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   SCOPE_LOCK(locker_);
 
-  CompManagerDevice *comp_mgr_device = reinterpret_cast<CompManagerDevice *>(device);
-  SET_BIT(configured_displays_, comp_mgr_device->device_type);
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+  SET_BIT(configured_displays_, display_comp_ctx->display_type);
   if (configured_displays_ == registered_displays_) {
       safe_mode_ = false;
   }
 
-  res_mgr_.PostCommit(comp_mgr_device->res_mgr_device, hw_layers);
+  res_mgr_.PostCommit(display_comp_ctx->display_resource_ctx, hw_layers);
 }
 
-void CompManager::Purge(Handle device) {
+void CompManager::Purge(Handle display_ctx) {
   SCOPE_LOCK(locker_);
 
-  CompManagerDevice *comp_mgr_device = reinterpret_cast<CompManagerDevice *>(device);
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
 
-  res_mgr_.Purge(comp_mgr_device->res_mgr_device);
+  res_mgr_.Purge(display_comp_ctx->display_resource_ctx);
 }
 
 void CompManager::AppendDump(char *buffer, uint32_t length) {

@@ -22,63 +22,20 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+// SDE_LOG_TAG definition must precede debug.h include.
+#define SDE_LOG_TAG kTagCore
+#define SDE_MODULE_NAME "DisplayPrimary"
+#include <utils/debug.h>
+
 #include <utils/constants.h>
 
-// HWC_MODULE_NAME definition must precede hwc_logger.h include.
-#define HWC_MODULE_NAME "HWCSinkPrimary"
-#include "hwc_logger.h"
-
-#include "hwc_sink_primary.h"
+#include "display_primary.h"
 
 namespace sde {
 
-HWCSinkPrimary::HWCSinkPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCSink(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY) {
-}
-
-int HWCSinkPrimary::Init() {
-  return HWCSink::Init();
-}
-
-int HWCSinkPrimary::Deinit() {
-  return HWCSink::Deinit();
-}
-
-int HWCSinkPrimary::Prepare(hwc_display_contents_1_t *content_list) {
-  int status = 0;
-
-  status = AllocateLayerStack(content_list);
-  if (UNLIKELY(status)) {
-    return status;
-  }
-
-  status = PrepareLayerStack(content_list);
-  if (UNLIKELY(status)) {
-    return status;
-  }
-
-  return 0;
-}
-
-int HWCSinkPrimary::Commit(hwc_display_contents_1_t *content_list) {
-  int status = 0;
-
-  status = HWCSink::CommitLayerStack(content_list);
-  if (UNLIKELY(status)) {
-    return status;
-  }
-
-  content_list->retireFenceFd = layer_stack_.retire_fence_fd;
-
-  return 0;
-}
-
-int HWCSinkPrimary::PowerOn() {
-  return SetState(kStateOn);
-}
-
-int HWCSinkPrimary::PowerOff() {
-  return SetState(kStateOff);
+DisplayPrimary::DisplayPrimary(DisplayEventHandler *event_handler, HWInterface *hw_intf,
+                               CompManager *comp_manager)
+  : DisplayBase(kPrimary, event_handler, kHWPrimary, hw_intf, comp_manager) {
 }
 
 }  // namespace sde

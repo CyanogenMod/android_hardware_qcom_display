@@ -92,8 +92,8 @@ DisplayError ResManager::Deinit() {
   return kErrorNone;
 }
 
-DisplayError ResManager::RegisterDevice(DeviceType type, const HWDeviceAttributes &attributes,
-                                        Handle *device) {
+DisplayError ResManager::RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
+                                        Handle *display_ctx) {
   DisplayError error = kErrorNone;
 
   HWBlockType hw_block_id = kHWBlockMax;
@@ -118,7 +118,7 @@ DisplayError ResManager::RegisterDevice(DeviceType type, const HWDeviceAttribute
     break;
 
   default:
-    DLOGW("RegisterDevice, invalid type %d", type);
+    DLOGW("RegisterDisplay, invalid type %d", type);
     return kErrorParameters;
   }
 
@@ -126,37 +126,39 @@ DisplayError ResManager::RegisterDevice(DeviceType type, const HWDeviceAttribute
     return kErrorResources;
   }
 
-  ResManagerDevice *res_mgr_device = new ResManagerDevice();
-  if (UNLIKELY(!res_mgr_device)) {
+  DisplayResourceContext *display_resource_ctx = new DisplayResourceContext();
+  if (UNLIKELY(!display_resource_ctx)) {
     return kErrorMemory;
   }
 
   hw_block_ctx_[hw_block_id].is_in_use = true;
 
-  res_mgr_device->device_attributes = attributes;
-  res_mgr_device->device_type = type;
-  res_mgr_device->hw_block_id = hw_block_id;
+  display_resource_ctx->display_attributes = attributes;
+  display_resource_ctx->display_type = type;
+  display_resource_ctx->hw_block_id = hw_block_id;
 
-  *device = res_mgr_device;
-
-  return kErrorNone;
-}
-
-DisplayError ResManager::UnregisterDevice(Handle device) {
-  ResManagerDevice *res_mgr_device = reinterpret_cast<ResManagerDevice *>(device);
-
-  Purge(device);
-  hw_block_ctx_[res_mgr_device->hw_block_id].is_in_use = false;
-  delete res_mgr_device;
+  *display_ctx = display_resource_ctx;
 
   return kErrorNone;
 }
 
+DisplayError ResManager::UnregisterDisplay(Handle display_ctx) {
+  DisplayResourceContext *display_resource_ctx =
+                          reinterpret_cast<DisplayResourceContext *>(display_ctx);
 
-DisplayError ResManager::Start(Handle device) {
+  Purge(display_ctx);
+  hw_block_ctx_[display_resource_ctx->hw_block_id].is_in_use = false;
+  delete display_resource_ctx;
+
+  return kErrorNone;
+}
+
+
+DisplayError ResManager::Start(Handle display_ctx) {
   locker_.Lock();
 
-  ResManagerDevice *res_mgr_device = reinterpret_cast<ResManagerDevice *>(device);
+  DisplayResourceContext *display_resource_ctx =
+                          reinterpret_cast<DisplayResourceContext *>(display_ctx);
 
   if (frame_start_) {
     return kErrorNone;  // keep context locked.
@@ -164,10 +166,10 @@ DisplayError ResManager::Start(Handle device) {
 
   // First call in the cycle
   frame_start_ = true;
-  res_mgr_device->frame_count++;
+  display_resource_ctx->frame_count++;
 
   // Release the pipes not used in the previous cycle
-  HWBlockType hw_block_id = res_mgr_device->hw_block_id;
+  HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
   for (uint32_t i = 0; i < num_pipe_; i++) {
     if ((src_pipes_[i].hw_block_id == hw_block_id) &&
         (src_pipes_[i].state == kPipeStateToRelease)) {
@@ -177,16 +179,18 @@ DisplayError ResManager::Start(Handle device) {
   return kErrorNone;
 }
 
-DisplayError ResManager::Stop(Handle device) {
+DisplayError ResManager::Stop(Handle display_ctx) {
   locker_.Unlock();
 
-  ResManagerDevice *res_mgr_device = reinterpret_cast<ResManagerDevice *>(device);
+  DisplayResourceContext *display_resource_ctx =
+                          reinterpret_cast<DisplayResourceContext *>(display_ctx);
 
   return kErrorNone;
 }
 
-DisplayError ResManager::Acquire(Handle device, HWLayers *hw_layers) {
-  ResManagerDevice *res_mgr_device = reinterpret_cast<ResManagerDevice *>(device);
+DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
+  DisplayResourceContext *display_resource_ctx =
+                          reinterpret_cast<DisplayResourceContext *>(display_ctx);
 
   DisplayError error = kErrorNone;
   const struct HWLayersInfo &layer_info = hw_layers->info;
@@ -199,14 +203,14 @@ DisplayError ResManager::Acquire(Handle device, HWLayers *hw_layers) {
     return kErrorResources;
   }
 
-  error = Config(res_mgr_device, hw_layers);
+  error = Config(display_resource_ctx, hw_layers);
   if (UNLIKELY(error != kErrorNone)) {
     return error;
   }
 
   uint32_t left_index = 0;
   bool need_scale = false;
-  HWBlockType hw_block_id = res_mgr_device->hw_block_id;
+  HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
 
   // Clear reserved marking
   for (uint32_t i = 0; i < num_pipe_; i++) {
@@ -274,10 +278,11 @@ Acquire_failed:
   return kErrorResources;
 }
 
-void ResManager::PostCommit(Handle device, HWLayers *hw_layers) {
-  ResManagerDevice *res_mgr_device = reinterpret_cast<ResManagerDevice *>(device);
-  HWBlockType hw_block_id = res_mgr_device->hw_block_id;
-  uint64_t frame_count = res_mgr_device->frame_count;
+void ResManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
+  DisplayResourceContext *display_resource_ctx =
+                          reinterpret_cast<DisplayResourceContext *>(display_ctx);
+  HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
+  uint64_t frame_count = display_resource_ctx->frame_count;
 
   DLOGV("Resource for hw_block=%d frame_count=%d", hw_block_id, frame_count);
 
@@ -310,11 +315,12 @@ void ResManager::PostCommit(Handle device, HWLayers *hw_layers) {
   frame_start_ = false;
 }
 
-void ResManager::Purge(Handle device) {
+void ResManager::Purge(Handle display_ctx) {
   SCOPE_LOCK(locker_);
 
-  ResManagerDevice *res_mgr_device = reinterpret_cast<ResManagerDevice *>(device);
-  HWBlockType hw_block_id = res_mgr_device->hw_block_id;
+  DisplayResourceContext *display_resource_ctx =
+                          reinterpret_cast<DisplayResourceContext *>(display_ctx);
+  HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
 
   for (uint32_t i = 0; i < num_pipe_; i++) {
     if (src_pipes_[i].hw_block_id == hw_block_id)

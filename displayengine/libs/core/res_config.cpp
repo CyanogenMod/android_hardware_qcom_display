@@ -34,9 +34,9 @@
 
 namespace sde {
 
-DisplayError ResManager::Config(ResManagerDevice *res_mgr_device, HWLayers *hw_layers) {
-  HWBlockType hw_block_id = res_mgr_device->hw_block_id;
-  HWDeviceAttributes &device_attributes = res_mgr_device->device_attributes;
+DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HWLayers *hw_layers) {
+  HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
+  HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
   HWLayersInfo &layer_info = hw_layers->info;
 
   for (uint32_t i = 0; i < layer_info.count; i++) {
@@ -48,8 +48,8 @@ DisplayError ResManager::Config(ResManagerDevice *res_mgr_device, HWLayers *hw_l
     }
 
     LayerRect scissor;
-    scissor.right = FLOAT(device_attributes.split_left);
-    scissor.bottom = FLOAT(device_attributes.y_pixels);
+    scissor.right = FLOAT(display_attributes.split_left);
+    scissor.bottom = FLOAT(display_attributes.y_pixels);
     LayerRect crop = layer.src_rect;
     LayerRect dst = layer.dst_rect;
     LayerRect cropRight = crop;
@@ -65,11 +65,11 @@ DisplayError ResManager::Config(ResManagerDevice *res_mgr_device, HWLayers *hw_l
     if ((dstRight.right - dstRight.left) > kMaxInterfaceWidth ||
          crop_width > kMaxInterfaceWidth ||
         ((hw_block_id == kHWPrimary) && hw_res_info_.is_src_split &&
-         (crop_width > device_attributes.split_left))) {
-      scissor.left = FLOAT(device_attributes.split_left);
+         (crop_width > display_attributes.split_left))) {
+      scissor.left = FLOAT(display_attributes.split_left);
       scissor.top = 0.0f;
-      scissor.right = FLOAT(device_attributes.x_pixels);
-      scissor.bottom = FLOAT(device_attributes.y_pixels);
+      scissor.right = FLOAT(display_attributes.x_pixels);
+      scissor.bottom = FLOAT(display_attributes.y_pixels);
       CalculateCropRects(&cropRight, &dstRight, scissor, layer.transform);
       pipe_info->src_roi = cropRight;
       pipe_info->dst_roi = dstRight;

@@ -25,7 +25,7 @@
 #ifndef __STRATEGY_DEFAULT_H__
 #define __STRATEGY_DEFAULT_H__
 
-#include <core/device_interface.h>
+#include <core/display_interface.h>
 #include <private/strategy_interface.h>
 
 namespace sde {

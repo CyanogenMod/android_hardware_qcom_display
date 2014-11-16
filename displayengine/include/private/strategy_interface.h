@@ -69,7 +69,7 @@ typedef DisplayError (*GetStrategyInterface)(StrategyInterface **interface);
 */
 const int kMaxSDELayers = 16;
 
-/*! @brief This structure defines constraints and device properties that shall be considered for
+/*! @brief This structure defines constraints and display properties that shall be considered for
     deciding a composition strategy.
 
     @sa GetNextStrategy

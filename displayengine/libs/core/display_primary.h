@@ -22,43 +22,20 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <utils/constants.h>
+#ifndef __DISPLAY_PRIMARY_H__
+#define __DISPLAY_PRIMARY_H__
 
-// HWC_MODULE_NAME definition must precede hwc_logger.h include.
-#define HWC_MODULE_NAME "HWCSinkVirtual"
-#include "hwc_logger.h"
-
-#include "hwc_sink_virtual.h"
+#include "display_base.h"
 
 namespace sde {
 
-HWCSinkVirtual::HWCSinkVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCSink(core_intf, hwc_procs, kVirtual, HWC_DISPLAY_VIRTUAL) {
-}
-
-int HWCSinkVirtual::Init() {
-  return 0;
-}
-
-int HWCSinkVirtual::Deinit() {
-  return 0;
-}
-
-int HWCSinkVirtual::Prepare(hwc_display_contents_1_t *content_list) {
-  return 0;
-}
-
-int HWCSinkVirtual::Commit(hwc_display_contents_1_t *content_list) {
-  return 0;
-}
-
-int HWCSinkVirtual::PowerOn() {
-  return 0;
-}
-
-int HWCSinkVirtual::PowerOff() {
-  return 0;
-}
+class DisplayPrimary : public DisplayBase {
+ public:
+  DisplayPrimary(DisplayEventHandler *event_handler, HWInterface *hw_intf,
+                 CompManager *comp_manager);
+};
 
 }  // namespace sde
+
+#endif  // __DISPLAY_PRIMARY_H__
 

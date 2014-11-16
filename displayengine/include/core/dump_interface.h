@@ -53,7 +53,7 @@ class DumpInterface {
 
     @return \link DisplayError \endlink
 
-    @warning Client shall ensure that this interface is not used while a device is being either
+    @warning Client shall ensure that this interface is not used while a display is being either
     created or destroyed through display core.
   */
   static DisplayError GetDump(char *buffer, uint32_t length);

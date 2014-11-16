@@ -9,12 +9,12 @@ LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"HWComposer\"
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL libhardware_legacy \
                                  libdl libsync \
-                                 libbinder libmedia libskia libsdecore
+                                 libbinder libmedia libskia libsde
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := hwc_session.cpp \
-                                 hwc_sink.cpp \
-                                 hwc_sink_primary.cpp \
-                                 hwc_sink_external.cpp \
-                                 hwc_sink_virtual.cpp
+                                 hwc_display.cpp \
+                                 hwc_display_primary.cpp \
+                                 hwc_display_external.cpp \
+                                 hwc_display_virtual.cpp
 
 include $(BUILD_SHARED_LIBRARY)

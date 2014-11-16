@@ -22,19 +22,25 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __DEVICE_PRIMARY_H__
-#define __DEVICE_PRIMARY_H__
+#ifndef __HWC_DISPLAY_VIRTUAL_H__
+#define __HWC_DISPLAY_VIRTUAL_H__
 
-#include "device_base.h"
+#include "hwc_display.h"
 
 namespace sde {
 
-class DevicePrimary : public DeviceBase {
+class HWCDisplayVirtual : public HWCDisplay {
  public:
-  DevicePrimary(DeviceEventHandler *event_handler, HWInterface *hw_intf, CompManager *comp_manager);
+  explicit HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
+  virtual int Init();
+  virtual int Deinit();
+  virtual int Prepare(hwc_display_contents_1_t *content_list);
+  virtual int Commit(hwc_display_contents_1_t *content_list);
+  virtual int PowerOn();
+  virtual int PowerOff();
 };
 
 }  // namespace sde
 
-#endif  // __DEVICE_PRIMARY_H__
+#endif  // __HWC_DISPLAY_VIRTUAL_H__
 

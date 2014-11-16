@@ -24,24 +24,24 @@
 
 // SDE_LOG_TAG definition must precede debug.h include.
 #define SDE_LOG_TAG kTagCore
-#define SDE_MODULE_NAME "DeviceBase"
+#define SDE_MODULE_NAME "DisplayBase"
 #include <utils/debug.h>
 
 #include <utils/constants.h>
 
-#include "device_base.h"
+#include "display_base.h"
 
 namespace sde {
 
-DeviceBase::DeviceBase(DeviceType device_type, DeviceEventHandler *event_handler,
-             HWBlockType hw_block_type, HWInterface *hw_intf, CompManager *comp_manager)
-  : device_type_(device_type), event_handler_(event_handler), hw_block_type_(hw_block_type),
+DisplayBase::DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
+                       HWBlockType hw_block_type, HWInterface *hw_intf, CompManager *comp_manager)
+  : display_type_(display_type), event_handler_(event_handler), hw_block_type_(hw_block_type),
     hw_intf_(hw_intf), comp_manager_(comp_manager), state_(kStateOff), hw_device_(0),
-    comp_mgr_device_(0), device_attributes_(NULL), num_modes_(0), active_mode_index_(0),
+    display_comp_ctx_(0), display_attributes_(NULL), num_modes_(0), active_mode_index_(0),
     pending_commit_(false), vsync_enable_(false) {
 }
 
-DisplayError DeviceBase::Init() {
+DisplayError DisplayBase::Init() {
   SCOPE_LOCK(locker_);
 
   DisplayError error = kErrorNone;
@@ -51,19 +51,19 @@ DisplayError DeviceBase::Init() {
     return error;
   }
 
-  error = hw_intf_->GetNumDeviceAttributes(hw_device_, &num_modes_);
+  error = hw_intf_->GetNumDisplayAttributes(hw_device_, &num_modes_);
   if (UNLIKELY(error != kErrorNone)) {
     goto CleanupOnError;
   }
 
-  device_attributes_ = new HWDeviceAttributes[num_modes_];
-  if (!device_attributes_) {
+  display_attributes_ = new HWDisplayAttributes[num_modes_];
+  if (!display_attributes_) {
     error = kErrorMemory;
     goto CleanupOnError;
   }
 
   for (uint32_t i = 0; i < num_modes_; i++) {
-    error = hw_intf_->GetDeviceAttributes(hw_device_, &device_attributes_[i], i);
+    error = hw_intf_->GetDisplayAttributes(hw_device_, &display_attributes_[i], i);
     if (UNLIKELY(error != kErrorNone)) {
       goto CleanupOnError;
     }
@@ -71,8 +71,8 @@ DisplayError DeviceBase::Init() {
 
   active_mode_index_ = 0;
 
-  error = comp_manager_->RegisterDevice(device_type_, device_attributes_[active_mode_index_],
-                                        &comp_mgr_device_);
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_[active_mode_index_],
+                                        &display_comp_ctx_);
   if (UNLIKELY(error != kErrorNone)) {
     goto CleanupOnError;
   }
@@ -80,10 +80,10 @@ DisplayError DeviceBase::Init() {
   return kErrorNone;
 
 CleanupOnError:
-  comp_manager_->UnregisterDevice(comp_mgr_device_);
+  comp_manager_->UnregisterDisplay(display_comp_ctx_);
 
-  if (device_attributes_) {
-    delete[] device_attributes_;
+  if (display_attributes_) {
+    delete[] display_attributes_;
   }
 
   hw_intf_->Close(hw_device_);
@@ -91,17 +91,17 @@ CleanupOnError:
   return error;
 }
 
-DisplayError DeviceBase::Deinit() {
+DisplayError DisplayBase::Deinit() {
   SCOPE_LOCK(locker_);
 
-  comp_manager_->UnregisterDevice(comp_mgr_device_);
-  delete[] device_attributes_;
+  comp_manager_->UnregisterDisplay(display_comp_ctx_);
+  delete[] display_attributes_;
   hw_intf_->Close(hw_device_);
 
   return kErrorNone;
 }
 
-DisplayError DeviceBase::Prepare(LayerStack *layer_stack) {
+DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   SCOPE_LOCK(locker_);
 
   DisplayError error = kErrorNone;
@@ -118,7 +118,7 @@ DisplayError DeviceBase::Prepare(LayerStack *layer_stack) {
     hw_layers_.info.stack = layer_stack;
 
     while (true) {
-      error = comp_manager_->Prepare(comp_mgr_device_, &hw_layers_);
+      error = comp_manager_->Prepare(display_comp_ctx_, &hw_layers_);
       if (UNLIKELY(error != kErrorNone)) {
         break;
       }
@@ -126,7 +126,7 @@ DisplayError DeviceBase::Prepare(LayerStack *layer_stack) {
       error = hw_intf_->Validate(hw_device_, &hw_layers_);
       if (LIKELY(error == kErrorNone)) {
         // Strategy is successful now, wait for Commit().
-        comp_manager_->PostPrepare(comp_mgr_device_, &hw_layers_);
+        comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
         pending_commit_ = true;
         break;
       }
@@ -136,7 +136,7 @@ DisplayError DeviceBase::Prepare(LayerStack *layer_stack) {
   return error;
 }
 
-DisplayError DeviceBase::Commit(LayerStack *layer_stack) {
+DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
   SCOPE_LOCK(locker_);
 
   DisplayError error = kErrorNone;
@@ -153,7 +153,7 @@ DisplayError DeviceBase::Commit(LayerStack *layer_stack) {
   if (LIKELY(state_ == kStateOn)) {
     error = hw_intf_->Commit(hw_device_, &hw_layers_);
     if (LIKELY(error == kErrorNone)) {
-      comp_manager_->PostCommit(comp_mgr_device_, &hw_layers_);
+      comp_manager_->PostCommit(display_comp_ctx_, &hw_layers_);
     } else {
       DLOGE("Unexpected error. Commit failed on driver.");
     }
@@ -164,7 +164,7 @@ DisplayError DeviceBase::Commit(LayerStack *layer_stack) {
   return kErrorNone;
 }
 
-DisplayError DeviceBase::GetDeviceState(DeviceState *state) {
+DisplayError DisplayBase::GetDisplayState(DisplayState *state) {
   SCOPE_LOCK(locker_);
 
   if (UNLIKELY(!state)) {
@@ -175,7 +175,7 @@ DisplayError DeviceBase::GetDeviceState(DeviceState *state) {
   return kErrorNone;
 }
 
-DisplayError DeviceBase::GetNumVariableInfoConfigs(uint32_t *count) {
+DisplayError DisplayBase::GetNumVariableInfoConfigs(uint32_t *count) {
   SCOPE_LOCK(locker_);
 
   if (UNLIKELY(!count)) {
@@ -187,7 +187,7 @@ DisplayError DeviceBase::GetNumVariableInfoConfigs(uint32_t *count) {
   return kErrorNone;
 }
 
-DisplayError DeviceBase::GetConfig(DeviceConfigFixedInfo *fixed_info) {
+DisplayError DisplayBase::GetConfig(DisplayConfigFixedInfo *fixed_info) {
   SCOPE_LOCK(locker_);
 
   if (UNLIKELY(!fixed_info)) {
@@ -197,19 +197,19 @@ DisplayError DeviceBase::GetConfig(DeviceConfigFixedInfo *fixed_info) {
   return kErrorNone;
 }
 
-DisplayError DeviceBase::GetConfig(DeviceConfigVariableInfo *variable_info, uint32_t mode) {
+DisplayError DisplayBase::GetConfig(DisplayConfigVariableInfo *variable_info, uint32_t mode) {
   SCOPE_LOCK(locker_);
 
   if (UNLIKELY(!variable_info || mode >= num_modes_)) {
     return kErrorParameters;
   }
 
-  *variable_info = device_attributes_[mode];
+  *variable_info = display_attributes_[mode];
 
   return kErrorNone;
 }
 
-DisplayError DeviceBase::GetVSyncState(bool *enabled) {
+DisplayError DisplayBase::GetVSyncState(bool *enabled) {
   SCOPE_LOCK(locker_);
 
   if (UNLIKELY(!enabled)) {
@@ -219,7 +219,7 @@ DisplayError DeviceBase::GetVSyncState(bool *enabled) {
   return kErrorNone;
 }
 
-DisplayError DeviceBase::SetDeviceState(DeviceState state) {
+DisplayError DisplayBase::SetDisplayState(DisplayState state) {
   SCOPE_LOCK(locker_);
 
   DisplayError error = kErrorNone;
@@ -233,7 +233,7 @@ DisplayError DeviceBase::SetDeviceState(DeviceState state) {
 
   switch (state) {
   case kStateOff:
-    comp_manager_->Purge(comp_mgr_device_);
+    comp_manager_->Purge(display_comp_ctx_);
     error = hw_intf_->PowerOff(hw_device_);
     break;
 
@@ -261,13 +261,13 @@ DisplayError DeviceBase::SetDeviceState(DeviceState state) {
   return error;
 }
 
-DisplayError DeviceBase::SetConfig(uint32_t mode) {
+DisplayError DisplayBase::SetConfig(uint32_t mode) {
   SCOPE_LOCK(locker_);
 
   return kErrorNone;
 }
 
-DisplayError DeviceBase::SetVSyncState(bool enable) {
+DisplayError DisplayBase::SetVSyncState(bool enable) {
   SCOPE_LOCK(locker_);
   DisplayError error = kErrorNone;
   if (vsync_enable_ != enable) {
@@ -280,9 +280,9 @@ DisplayError DeviceBase::SetVSyncState(bool enable) {
   return error;
 }
 
-DisplayError DeviceBase::VSync(int64_t timestamp) {
+DisplayError DisplayBase::VSync(int64_t timestamp) {
   if (vsync_enable_) {
-    DeviceEventVSync vsync;
+    DisplayEventVSync vsync;
     vsync.timestamp = timestamp;
     event_handler_->VSync(vsync);
   }
@@ -290,20 +290,20 @@ DisplayError DeviceBase::VSync(int64_t timestamp) {
   return kErrorNone;
 }
 
-DisplayError DeviceBase::Blank(bool blank) {
+DisplayError DisplayBase::Blank(bool blank) {
   return kErrorNone;
 }
 
-void DeviceBase::AppendDump(char *buffer, uint32_t length) {
+void DisplayBase::AppendDump(char *buffer, uint32_t length) {
   SCOPE_LOCK(locker_);
 
   AppendString(buffer, length, "\n-----------------------");
-  AppendString(buffer, length, "\ndevice type: %u", device_type_);
+  AppendString(buffer, length, "\ndevice type: %u", display_type_);
   AppendString(buffer, length, "\nstate: %u, vsync on: %u", state_, INT(vsync_enable_));
   AppendString(buffer, length, "\nnum configs: %u, active config index: %u",
                                 num_modes_, active_mode_index_);
 
-  DeviceConfigVariableInfo &info = device_attributes_[active_mode_index_];
+  DisplayConfigVariableInfo &info = display_attributes_[active_mode_index_];
   AppendString(buffer, length, "\nres:%ux%u, dpi:%.2fx%.2f, fps:%.2f, vsync period: %u",
       info.x_pixels, info.y_pixels, info.x_dpi, info.y_dpi, info.fps, info.vsync_period_ns);
 
@@ -344,7 +344,8 @@ void DeviceBase::AppendDump(char *buffer, uint32_t length) {
   }
 }
 
-void DeviceBase::AppendRect(char *buffer, uint32_t length, const char *rect_name, LayerRect *rect) {
+void DisplayBase::AppendRect(char *buffer, uint32_t length, const char *rect_name,
+                             LayerRect *rect) {
   AppendString(buffer, length, "%s %.1f, %.1f, %.1f, %.1f",
                                 rect_name, rect->left, rect->top, rect->right, rect->bottom);
 }

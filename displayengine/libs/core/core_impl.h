@@ -52,9 +52,9 @@ class CoreImpl : public CoreInterface {
   virtual DisplayError Deinit();
 
   // Methods from core interface
-  virtual DisplayError CreateDevice(DeviceType type, DeviceEventHandler *event_handler,
-                                    DeviceInterface **intf);
-  virtual DisplayError DestroyDevice(DeviceInterface *intf);
+  virtual DisplayError CreateDisplay(DisplayType type, DisplayEventHandler *event_handler,
+                                     DisplayInterface **intf);
+  virtual DisplayError DestroyDisplay(DisplayInterface *intf);
 
  protected:
   Locker locker_;
