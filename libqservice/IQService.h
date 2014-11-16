@@ -56,6 +56,7 @@ public:
         SET_IDLE_TIMEOUT,        // Set idle timeout for GPU fallback
         /* Enable/Disable/Set refresh rate dynamically */
         CONFIGURE_DYN_REFRESH_RATE,
+        QDCM_SVC_CMDS,           // request QDCM services.
         COMMAND_LIST_END = 400,
     };
 
