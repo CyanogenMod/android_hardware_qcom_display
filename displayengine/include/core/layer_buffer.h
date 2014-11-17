@@ -106,7 +106,8 @@ struct LayerBufferPlane {
 struct LayerBufferFlags {
   uint64_t secure : 1;  //!< This flag shall be set by client to indicate that the buffer need
                         //!< to be handled securely.
-
+  uint64_t video  : 1;  //!< This flag shall be set by client to indicate that the buffer is
+                        //!< video/ui buffer
   LayerBufferFlags() : secure(0) { }
 };
 

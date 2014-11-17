@@ -75,11 +75,13 @@ const int kNumLayersMax = 16;
     @sa GetNextStrategy
 */
 struct StrategyConstraints {
-  bool gpu_only;          //!< Select GPU only composition for this layer stack.
+  bool safe_mode;         //!< In this mode, strategy manager chooses the composition strategy
+                          //!< that requires minimum number of pipe for the current frame. i.e.,
+                          //!< video only composition, secure only composition or GPU composition
   uint32_t max_layers;    //!< Maximum number of layers that shall be programmed on hardware for the
                           //!< given layer stack.
 
-  StrategyConstraints() : gpu_only(false), max_layers(kNumLayersMax) { }
+  StrategyConstraints() : safe_mode(false), max_layers(kNumLayersMax) { }
 };
 
 /*! @brief Flag to denote that GPU composition is performed for the given layer stack.

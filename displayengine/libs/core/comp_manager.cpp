@@ -34,7 +34,8 @@
 
 namespace sde {
 
-CompManager::CompManager() : strategy_lib_(NULL), strategy_intf_(NULL) {
+CompManager::CompManager() : strategy_lib_(NULL), strategy_intf_(NULL), registered_displays_(0),
+                             configured_displays_(0), safe_mode_(false) {
 }
 
 DisplayError CompManager::Init(const HWResourceInfo &hw_res_info) {
@@ -102,9 +103,12 @@ DisplayError CompManager::RegisterDevice(DeviceType type, const HWDeviceAttribut
     delete comp_mgr_device;
     return error;
   }
-
+  SET_BIT(registered_displays_, type);
   comp_mgr_device->device_type = type;
   *device = comp_mgr_device;
+  // New device has been added, so move the composition mode to safe mode until unless resources
+  // for the added display is configured properly.
+  safe_mode_ = true;
 
   return kErrorNone;
 }
@@ -115,9 +119,24 @@ DisplayError CompManager::UnregisterDevice(Handle device) {
   CompManagerDevice *comp_mgr_device = reinterpret_cast<CompManagerDevice *>(device);
 
   res_mgr_.UnregisterDevice(comp_mgr_device->res_mgr_device);
+  CLEAR_BIT(registered_displays_, comp_mgr_device->device_type);
+  CLEAR_BIT(configured_displays_, comp_mgr_device->device_type);
   delete comp_mgr_device;
 
   return kErrorNone;
+}
+
+void CompManager::PrepareStrategyConstraints(Handle device, HWLayers *hw_layers) {
+  CompManagerDevice *comp_mgr_device = reinterpret_cast<CompManagerDevice *>(device);
+  StrategyConstraints *constraints = &comp_mgr_device->constraints;
+
+  constraints->safe_mode = safe_mode_;
+  // If validation for the best available composition strategy with driver has failed, just
+  // fallback to GPU composition.
+  if (UNLIKELY(hw_layers->info.flags)) {
+    constraints->safe_mode = true;
+    return;
+  }
 }
 
 DisplayError CompManager::Prepare(Handle device, HWLayers *hw_layers) {
@@ -128,19 +147,7 @@ DisplayError CompManager::Prepare(Handle device, HWLayers *hw_layers) {
 
   DisplayError error = kErrorNone;
 
-  comp_mgr_device->constraints.gpu_only = false;
-
-  // If validation for the best available composition strategy with driver has failed, just
-  // fallback to GPU composition.
-  if (UNLIKELY(hw_layers->info.flags)) {
-    // Did driver reject GPU composition as well? This will never happen.
-    if (UNLIKELY(hw_layers->info.flags & kFlagGPU)) {
-      DLOGE("Unexpected error. GPU composition validation failed.");
-      return kErrorHardware;
-    }
-
-    comp_mgr_device->constraints.gpu_only = true;
-  }
+  PrepareStrategyConstraints(device, hw_layers);
 
   // Select a composition strategy, and try to allocate resources for it.
   res_mgr_.Start(res_mgr_device);
@@ -175,6 +182,10 @@ void CompManager::PostCommit(Handle device, HWLayers *hw_layers) {
   SCOPE_LOCK(locker_);
 
   CompManagerDevice *comp_mgr_device = reinterpret_cast<CompManagerDevice *>(device);
+  SET_BIT(configured_displays_, comp_mgr_device->device_type);
+  if (configured_displays_ == registered_displays_) {
+      safe_mode_ = false;
+  }
 
   res_mgr_.PostCommit(comp_mgr_device->res_mgr_device, hw_layers);
 }

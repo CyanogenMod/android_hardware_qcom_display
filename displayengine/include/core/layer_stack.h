@@ -93,10 +93,13 @@ struct LayerTransform {
   @sa LayerBuffer
 */
 struct LayerFlags {
-  uint64_t skip : 1;  //!< This flag shall be set by client to indicate that this layer will be
-                      //!< handled by GPU. Device Device will not consider it for composition.
-
-  LayerFlags() : skip(0) { }
+  uint64_t skip : 1;      //!< This flag shall be set by client to indicate that this layer will be
+                          //!< handled by GPU. Display Device will not consider it for composition.
+  uint64_t updating : 1;  //!< This flag shall be set by client to indicate that this is updating/
+                          //!< non-updating. so strategy manager will mark them for SDE/GPU
+                          //!< composition respectively when the layer stack qualifies for cache
+                          //!< based composition.
+  LayerFlags() : skip(0), updating(0) { }
 };
 
 /*! @brief This structure defines flags associated with a layer stack. The 1-bit flag can be set to

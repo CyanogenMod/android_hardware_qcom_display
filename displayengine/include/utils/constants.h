@@ -43,6 +43,9 @@
 
 #define ROUND_UP(number, step) ((((number) + ((step) - 1)) / (step)) * (step))
 
+#define SET_BIT(value, bit) ((value) | (1 << (bit)))
+#define CLEAR_BIT(value, bit) ((value) & (~(1 << (bit))))
+
 namespace sde {
 
   const int kThreadPriorityUrgent = -9;
