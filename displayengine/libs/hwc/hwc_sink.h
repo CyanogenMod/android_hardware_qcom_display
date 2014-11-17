@@ -43,6 +43,18 @@ class HWCSink : public DeviceEventHandler {
   int SetState(DeviceState state);
 
  protected:
+  // Maximum number of layers supported by display engine.
+  static const uint32_t kMaxLayerCount = 32;
+
+  // Structure to track memory allocation for layer stack (layers, rectangles) object.
+  struct LayerStackMemory : LayerStack {
+    static const size_t kSizeSteps = 4096;  // Default memory allocation.
+    uint8_t *raw;  // Pointer to byte array.
+    size_t size;  // Current number of allocated bytes.
+
+    LayerStackMemory() : raw(NULL), size(0) { }
+  };
+
   HWCSink(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DeviceType type, int id);
   virtual ~HWCSink() { }
 
@@ -60,18 +72,32 @@ class HWCSink : public DeviceEventHandler {
   inline void SetBlending(LayerBlending *target, const int32_t &source);
   inline int SetFormat(LayerBufferFormat *target, const int &source);
 
-  // Structure to track memory allocation for layer stack (layers, rectangles) object.
-  struct LayerStackMemory : LayerStack {
-    static const size_t kSizeSteps = 4096;  // Default memory allocation.
-    uint8_t *raw;  // Pointer to byte array.
-    size_t size;  // Current number of allocated bytes.
-  } layer_stack_;
-
+  LayerStackMemory layer_stack_;
   CoreInterface *core_intf_;
   hwc_procs_t const **hwc_procs_;
   DeviceType type_;
   int id_;
   DeviceInterface *device_intf_;
+
+ private:
+  struct LayerCache {
+    buffer_handle_t handle;
+    LayerComposition composition;
+
+    LayerCache() : handle(NULL), composition(kCompositionGPU) { }
+  };
+
+  struct LayerStackCache {
+    LayerCache layer_cache[kMaxLayerCount];
+    uint32_t layer_count;
+
+    LayerStackCache() : layer_count(0) { }
+  };
+
+  bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
+  void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
+
+  LayerStackCache layer_stack_cache_;
 };
 
 }  // namespace sde

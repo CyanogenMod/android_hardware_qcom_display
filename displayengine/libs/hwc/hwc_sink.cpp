@@ -226,6 +226,9 @@ int HWCSink::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     return 0;
   }
 
+  // Reset Layer stack flags
+  layer_stack_.flags = LayerStackFlags();
+
   // Configure each layer
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
@@ -244,6 +247,12 @@ int HWCSink::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       layer_buffer->planes[0].fd = pvt_handle->fd;
       layer_buffer->planes[0].offset = pvt_handle->offset;
       layer_buffer->planes[0].stride = pvt_handle->width;
+      if (pvt_handle->bufferType == BUFFER_TYPE_VIDEO) {
+        layer_stack_.flags.video_present = true;
+      }
+      if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
+        layer_stack_.flags.secure_present = true;
+      }
     }
 
     SetRect(&layer.dst_rect, hwc_layer.displayFrame);
@@ -252,7 +261,6 @@ int HWCSink::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
         SetRect(&layer.visible_regions.rect[j], hwc_layer.visibleRegionScreen.rects[j]);
     }
     SetRect(&layer.dirty_regions.rect[0], hwc_layer.dirtyRect);
-
     SetComposition(&layer.composition, hwc_layer.compositionType);
     SetBlending(&layer.blending, hwc_layer.blending);
 
@@ -264,6 +272,11 @@ int HWCSink::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
     layer.plane_alpha = hwc_layer.planeAlpha;
     layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
+    layer.flags.updating = (layer_stack_cache_.layer_cache[i].handle != hwc_layer.handle);
+
+    if (layer.flags.skip) {
+      layer_stack_.flags.skip_present = true;
+    }
   }
 
   // Configure layer stack
@@ -275,13 +288,59 @@ int HWCSink::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     return -EINVAL;
   }
 
+  bool needs_fb_refresh = NeedsFrameBufferRefresh(content_list);
+
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     Layer &layer = layer_stack_.layers[i];
-    SetComposition(&hwc_layer.compositionType, layer.composition);
+    // if current frame does not need frame buffer redraw, then mark them for HWC_OVERLAY
+    LayerComposition composition = needs_fb_refresh ? layer.composition : kCompositionSDE;
+    SetComposition(&hwc_layer.compositionType, composition);
   }
+  // Cache the current layer stack information like layer_count, composition type and layer handle
+  // for the future.
+  CacheLayerStackInfo(content_list);
 
   return 0;
+}
+
+void HWCSink::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
+  uint32_t layer_count = layer_stack_.layer_count;
+
+  for (size_t i = 0; i < layer_count; i++) {
+    Layer &layer = layer_stack_.layers[i];
+    layer_stack_cache_.layer_cache[i].handle = content_list->hwLayers[i].handle;
+    layer_stack_cache_.layer_cache[i].composition = layer.composition;
+  }
+  layer_stack_cache_.layer_count = layer_count;
+}
+
+bool HWCSink::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
+  uint32_t layer_count = layer_stack_.layer_count;
+
+  // Frame buffer needs to be refreshed for the following reasons:
+  // 1. Any layer is marked skip in the current layer stack.
+  // 2. Any layer is added/removed/layer properties changes in the current layer stack.
+  // 3. Any layer handle is changed and it is marked for GPU composition
+  // 4. Any layer's current composition is different from previous composition.
+  if ((layer_stack_cache_.layer_count != layer_count) || layer_stack_.flags.skip_present ||
+       layer_stack_.flags.geometry_changed) {
+    return true;
+  }
+
+  for (size_t i = 0; i < layer_count; i++) {
+    hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
+    Layer &layer = layer_stack_.layers[i];
+    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
+    if (layer_cache.composition != layer.composition) {
+      return true;
+    }
+    if ((layer.composition == kCompositionGPU) && (layer_cache.handle != hwc_layer.handle)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 int HWCSink::CommitLayerStack(hwc_display_contents_1_t *content_list) {

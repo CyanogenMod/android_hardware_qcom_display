@@ -111,8 +111,14 @@ struct LayerStackFlags {
   uint64_t geometry_changed : 1;  //!< This flag shall be set by client to indicate that the layer
                                   //!< set passed to Prepare() has changed by more than just the
                                   //!< buffer handles and acquire fences.
+  uint64_t skip_present : 1;      //!< This flag will be set to true, if the current layer stack
+                                  //!< contains skip layers
+  uint64_t video_present : 1;     //!< This flag will be set to true, if current layer stack
+                                  //!< contains video
+  uint64_t secure_present : 1;    //!< This flag will be set to true, if the current layer stack
+                                  //!< contains secure layers
 
-  LayerStackFlags() : geometry_changed(0) { }
+  LayerStackFlags() : geometry_changed(0), skip_present(0), video_present(0), secure_present(0) { }
 };
 
 /*! @brief This structure defines a rectanglular area inside a display layer.

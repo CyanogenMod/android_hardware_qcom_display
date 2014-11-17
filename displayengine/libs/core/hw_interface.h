@@ -89,7 +89,7 @@ struct HWLayerConfig {
 
 struct HWLayers {
   HWLayersInfo info;
-  HWLayerConfig config[kNumLayersMax];
+  HWLayerConfig config[kMaxSDELayers];
 };
 
 struct HWDeviceAttributes : DeviceConfigVariableInfo {
