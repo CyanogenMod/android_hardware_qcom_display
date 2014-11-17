@@ -848,6 +848,7 @@ void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
         dumpsys_log(aBuf, ovDump);
         ovDump[0] = '\0';
     }
+    dumpsys_log(aBuf, "Copybit::isAbcInUse=%d\n\n",isAbcInUse(ctx) ? 1 : 0);
     strlcpy(buff, aBuf.string(), buff_len);
 }
 
