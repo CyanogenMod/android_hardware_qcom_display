@@ -41,11 +41,13 @@ enum HWBlockType {
 };
 
 struct HWResourceInfo {
-  uint32_t mdp_version;
+  uint32_t hw_version;
   uint32_t hw_revision;
   uint32_t num_dma_pipe;
   uint32_t num_vig_pipe;
   uint32_t num_rgb_pipe;
+  uint32_t num_cursor_pipe;
+  uint32_t num_blending_stages;
   uint32_t num_rotator;
   uint32_t num_control;
   uint32_t num_mixer_to_disp;
@@ -54,20 +56,29 @@ struct HWResourceInfo {
   uint32_t num_smp_per_pipe;
   uint32_t max_scale_up;
   uint32_t max_scale_down;
-  uint32_t max_bandwidth_low;
-  uint32_t max_bandwidth_high;
+  uint64_t max_bandwidth_low;
+  uint64_t max_bandwidth_high;
+  uint32_t max_mixer_width;
+  struct SplitInfo {
+    uint32_t left_split;
+    uint32_t right_split;
+    SplitInfo() : left_split(0), right_split(0) { }
+  } split_info;
   bool has_bwc;
   bool has_decimation;
+  bool has_macrotile;
+  bool has_rotator_downscale;
   bool has_non_scalar_rgb;
   bool is_src_split;
-  bool has_microtile;
+  bool always_src_split;
 
   HWResourceInfo()
-    : mdp_version(0), hw_revision(0), num_dma_pipe(0), num_vig_pipe(0),
-      num_rgb_pipe(0), num_rotator(0), num_control(0), num_mixer_to_disp(0), smp_total(0),
-      smp_size(0), num_smp_per_pipe(0), max_scale_up(0), max_scale_down(0), max_bandwidth_low(0),
-      max_bandwidth_high(0), has_bwc(false), has_decimation(false), has_non_scalar_rgb(false),
-      is_src_split(false), has_microtile(false) { }
+    : hw_version(0), hw_revision(0), num_dma_pipe(0), num_vig_pipe(0), num_rgb_pipe(0),
+      num_cursor_pipe(0), num_blending_stages(0), num_rotator(0), num_control(0),
+      num_mixer_to_disp(0), smp_total(0), smp_size(0), num_smp_per_pipe(0), max_scale_up(0),
+      max_scale_down(0), max_bandwidth_low(0), max_bandwidth_high(0), max_mixer_width(2048),
+      has_bwc(false), has_decimation(false), has_macrotile(false), has_rotator_downscale(false),
+      has_non_scalar_rgb(false), is_src_split(false), always_src_split(false) { }
 };
 
 struct HWPipeInfo {
