@@ -33,8 +33,8 @@ class DumpImpl {
  public:
   // To be implemented in the modules which will add dump information to final dump buffer.
   // buffer address & length will be already adjusted before calling into these modules.
-  virtual uint32_t GetDump(uint8_t *buffer, uint32_t length) = 0;
-  static void GetDump(uint8_t *buffer, uint32_t length, uint32_t *filled);
+  virtual void AppendDump(char *buffer, uint32_t length) = 0;
+  static void AppendString(char *buffer, uint32_t length, const char *format, ...);
 
  protected:
   DumpImpl();

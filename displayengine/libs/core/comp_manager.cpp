@@ -198,10 +198,8 @@ void CompManager::Purge(Handle device) {
   res_mgr_.Purge(comp_mgr_device->res_mgr_device);
 }
 
-uint32_t CompManager::GetDump(uint8_t *buffer, uint32_t length) {
+void CompManager::AppendDump(char *buffer, uint32_t length) {
   SCOPE_LOCK(locker_);
-
-  return 0;
 }
 
 }  // namespace sde

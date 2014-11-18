@@ -27,6 +27,9 @@
 #define SDE_MODULE_NAME "DumpInterface"
 #include <utils/debug.h>
 
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
 #include <utils/constants.h>
 
 #include "dump_impl.h"
@@ -36,12 +39,18 @@ namespace sde {
 DumpImpl* DumpImpl::dump_list_[] = { 0 };
 uint32_t DumpImpl::dump_count_ = 0;
 
-DisplayError DumpInterface::GetDump(uint8_t *buffer, uint32_t length, uint32_t *filled) {
-  if (!buffer || !length || !filled) {
+DisplayError DumpInterface::GetDump(char *buffer, uint32_t length) {
+  if (!buffer || !length) {
     return kErrorParameters;
   }
 
-  DumpImpl::GetDump(buffer, length, filled);
+  buffer[0] = '\0';
+  DumpImpl::AppendString(buffer, length, "\n-------- Snapdragon Display Engine --------");
+  for (uint32_t i = 0; i < DumpImpl::dump_count_; i++) {
+    DumpImpl::dump_list_[i]->AppendDump(buffer, length);
+  }
+  DumpImpl::AppendString(buffer, length, "\n-------------------------------------------\n");
+
   return kErrorNone;
 }
 
@@ -53,12 +62,16 @@ DumpImpl::~DumpImpl() {
   Unregister(this);
 }
 
-// Caller has to ensure that it does not create or destroy devices while using dump interface.
-void DumpImpl::GetDump(uint8_t *buffer, uint32_t length, uint32_t *filled) {
-  *filled = 0;
-  for (uint32_t i = 0; (i < DumpImpl::dump_count_) && (*filled < length); i++) {
-    *filled += DumpImpl::dump_list_[i]->GetDump(buffer + *filled, length - *filled);
+void DumpImpl::AppendString(char *buffer, uint32_t length, const char *format, ...) {
+  uint32_t filled = UINT32(strlen(buffer));
+  if (filled >= length) {
+    return;
   }
+  buffer += filled;
+
+  va_list list;
+  va_start(list, format);
+  vsnprintf(buffer, length - filled, format, list);
 }
 
 // Every object is created or destroyed through display core only, which itself protects the

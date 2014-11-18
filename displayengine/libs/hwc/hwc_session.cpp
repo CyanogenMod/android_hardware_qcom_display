@@ -287,8 +287,7 @@ void HWCSession::Dump(hwc_composer_device_1 *device, char *buffer, int length) {
     return;
   }
 
-  uint32_t filled = 0;
-  DumpInterface::GetDump(reinterpret_cast<uint8_t *>(buffer), length, &filled);
+  DumpInterface::GetDump(buffer, length);
 }
 
 int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint32_t *configs,

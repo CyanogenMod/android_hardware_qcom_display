@@ -294,10 +294,59 @@ DisplayError DeviceBase::Blank(bool blank) {
   return kErrorNone;
 }
 
-uint32_t DeviceBase::GetDump(uint8_t *buffer, uint32_t length) {
+void DeviceBase::AppendDump(char *buffer, uint32_t length) {
   SCOPE_LOCK(locker_);
 
-  return 0;
+  AppendString(buffer, length, "\n-----------------------");
+  AppendString(buffer, length, "\ndevice type: %u", device_type_);
+  AppendString(buffer, length, "\nstate: %u, vsync on: %u", state_, INT(vsync_enable_));
+  AppendString(buffer, length, "\nnum configs: %u, active config index: %u",
+                                num_modes_, active_mode_index_);
+
+  DeviceConfigVariableInfo &info = device_attributes_[active_mode_index_];
+  AppendString(buffer, length, "\nres:%ux%u, dpi:%.2fx%.2f, fps:%.2f, vsync period: %u",
+      info.x_pixels, info.y_pixels, info.x_dpi, info.y_dpi, info.fps, info.vsync_period_ns);
+
+  uint32_t num_layers = 0;
+  uint32_t num_hw_layers = 0;
+  if (hw_layers_.info.stack) {
+    num_layers = hw_layers_.info.stack->layer_count;
+    num_hw_layers = hw_layers_.info.count;
+  }
+
+  AppendString(buffer, length, "\n\nnum actual layers: %u, num sde layers: %u",
+                                num_layers, num_hw_layers);
+
+  for (uint32_t i = 0; i < num_hw_layers; i++) {
+    Layer &layer = hw_layers_.info.stack->layers[i];
+    LayerBuffer *input_buffer = layer.input_buffer;
+    HWLayerConfig &layer_config = hw_layers_.config[i];
+    HWPipeInfo &left_pipe = hw_layers_.config[i].left_pipe;
+    HWPipeInfo &right_pipe = hw_layers_.config[i].right_pipe;
+
+    AppendString(buffer, length, "\n\nsde idx: %u, actual idx: %u", i, hw_layers_.info.index[i]);
+    AppendString(buffer, length, "\nw: %u, h: %u, fmt: %u",
+                                  input_buffer->width, input_buffer->height, input_buffer->format);
+    AppendRect(buffer, length, "\nsrc_rect:", &layer.src_rect);
+    AppendRect(buffer, length, "\ndst_rect:", &layer.dst_rect);
+
+    AppendString(buffer, length, "\n\tleft split =>");
+    AppendString(buffer, length, "\n\t  pipe id: 0x%x", left_pipe.pipe_id);
+    AppendRect(buffer, length, "\n\t  src_roi:", &left_pipe.src_roi);
+    AppendRect(buffer, length, "\n\t  dst_roi:", &left_pipe.dst_roi);
+
+    if (layer_config.is_right_pipe) {
+      AppendString(buffer, length, "\n\tright split =>");
+      AppendString(buffer, length, "\n\t  pipe id: 0x%x", right_pipe.pipe_id);
+      AppendRect(buffer, length, "\n\t  src_roi:", &right_pipe.src_roi);
+      AppendRect(buffer, length, "\n\t  dst_roi:", &right_pipe.dst_roi);
+    }
+  }
+}
+
+void DeviceBase::AppendRect(char *buffer, uint32_t length, const char *rect_name, LayerRect *rect) {
+  AppendString(buffer, length, "%s %.1f, %.1f, %.1f, %.1f",
+                                rect_name, rect->left, rect->top, rect->right, rect->bottom);
 }
 
 }  // namespace sde
