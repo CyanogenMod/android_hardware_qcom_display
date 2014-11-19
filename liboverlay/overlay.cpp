@@ -97,9 +97,11 @@ eDest Overlay::reservePipe(int pipeid) {
     return dest;
 }
 
-eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
+eDest Overlay::nextPipe(eMdpPipeType type, const PipeSpecs& pipeSpecs) {
     eDest dest = OV_INVALID;
-
+    int dpy = pipeSpecs.dpy;
+    int mixer = pipeSpecs.mixer;
+    int formatType = pipeSpecs.formatClass;
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
         if( (type == OV_MDP_PIPE_ANY || //Pipe type match
              type == PipeBook::getPipeType((eDest)i)) &&
@@ -107,6 +109,8 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
              mPipeBook[i].mDisplay == dpy) &&
             (mPipeBook[i].mMixer == MIXER_UNUSED || //Free or same mixer
              mPipeBook[i].mMixer == mixer) &&
+            (mPipeBook[i].mFormatType == FORMAT_NONE || //Free or same format
+             mPipeBook[i].mFormatType == formatType) &&
             PipeBook::isNotAllocated(i) && //Free pipe
             ( (sDMAMultiplexingSupported && dpy) ||
               !(sDMAMode == DMA_BLOCK_MODE && //DMA pipe in Line mode
@@ -122,6 +126,7 @@ eDest Overlay::nextPipe(eMdpPipeType type, int dpy, int mixer) {
         int index = (int)dest;
         mPipeBook[index].mDisplay = dpy;
         mPipeBook[index].mMixer = mixer;
+        mPipeBook[index].mFormatType = formatType;
         if(not mPipeBook[index].valid()) {
             mPipeBook[index].mPipe = new GenericPipe(dpy);
             mPipeBook[index].mSession = PipeBook::NONE;
@@ -146,28 +151,28 @@ utils::eDest Overlay::getPipe(const PipeSpecs& pipeSpecs) {
 
     //The default behavior is to assume RGB and VG pipes have scalars
     if(pipeSpecs.formatClass == FORMAT_YUV) {
-        return nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+        return nextPipe(OV_MDP_PIPE_VG, pipeSpecs);
     } else if(pipeSpecs.fb == false) { //RGB App layers
         if(not pipeSpecs.needsScaling) {
-            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs);
         }
         if(dest == OV_INVALID) {
-            dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs);
         }
         if(dest == OV_INVALID) {
-            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs);
         }
     } else { //FB layer
-        dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+        dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs);
         if(dest == OV_INVALID) {
-            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs);
         }
         //Some features can cause FB to have scaling as well.
         //If we ever come to this block with FB needing scaling,
         //the screen will be black for a frame, since the FB won't get a pipe
         //but atleast this will prevent a hang
         if(dest == OV_INVALID and (not pipeSpecs.needsScaling)) {
-            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs);
         }
     }
     return dest;
@@ -178,31 +183,31 @@ utils::eDest Overlay::getPipe_8x26(const PipeSpecs& pipeSpecs) {
     //described in a generic way
     eDest dest = OV_INVALID;
     if(pipeSpecs.formatClass == FORMAT_YUV) { //video
-        return nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+        return nextPipe(OV_MDP_PIPE_VG, pipeSpecs);
     } else if(pipeSpecs.fb == false) { //RGB app layers
         if((not pipeSpecs.needsScaling) and
           (not (pipeSpecs.numActiveDisplays > 1 &&
                 pipeSpecs.dpy == DPY_PRIMARY))) {
-            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs);
         }
         if(dest == OV_INVALID) {
-            dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs);
         }
         if(dest == OV_INVALID) {
-            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs);
         }
     } else { //FB layer
         //For 8x26 Secondary we use DMA always for FB for inline rotation
         if(pipeSpecs.dpy == DPY_PRIMARY) {
-            dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs);
             if(dest == OV_INVALID) {
-                dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+                dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs);
             }
         }
         if(dest == OV_INVALID and (not pipeSpecs.needsScaling) and
           (not (pipeSpecs.numActiveDisplays > 1 &&
                 pipeSpecs.dpy == DPY_PRIMARY))) {
-            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs);
         }
     }
     return dest;
@@ -213,16 +218,16 @@ utils::eDest Overlay::getPipe_8x16(const PipeSpecs& pipeSpecs) {
     //and rife with assumptions
     eDest dest = OV_INVALID;
     if(pipeSpecs.formatClass == FORMAT_YUV or pipeSpecs.needsScaling) {
-        return nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+        return nextPipe(OV_MDP_PIPE_VG, pipeSpecs);
     } else {
         //Since this is a specific func, we can assume stuff like RGB pipe not
         //having scalar blocks
-        dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+        dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs);
         if(dest == OV_INVALID) {
-            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs);
         }
         if(dest == OV_INVALID) {
-            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs);
         }
     }
     return dest;
@@ -241,14 +246,14 @@ utils::eDest Overlay::getPipe_8994(const PipeSpecs& pipeSpecs) {
     //unused
     eDest dest = OV_INVALID;
     if(pipeSpecs.formatClass == FORMAT_YUV) {
-        return nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+        return nextPipe(OV_MDP_PIPE_VG, pipeSpecs);
     } else {
-        dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+        dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs);
         if(dest == OV_INVALID) {
-            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs);
         }
         if(dest == OV_INVALID and not pipeSpecs.needsScaling) {
-            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+            dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs);
         }
     }
     return dest;
@@ -567,6 +572,7 @@ void Overlay::PipeBook::init() {
     mPipe = NULL;
     mDisplay = DPY_UNUSED;
     mMixer = MIXER_UNUSED;
+    mFormatType = FORMAT_NONE;
 }
 
 void Overlay::PipeBook::destroy() {
@@ -576,6 +582,7 @@ void Overlay::PipeBook::destroy() {
     }
     mDisplay = DPY_UNUSED;
     mMixer = MIXER_UNUSED;
+    mFormatType = FORMAT_NONE;
     mSession = NONE;
 }
 
