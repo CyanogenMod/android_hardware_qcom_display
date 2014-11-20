@@ -40,6 +40,13 @@ enum HWBlockType {
   kHWBlockMax
 };
 
+enum HWDeviceType {
+  kDevicePrimary,
+  kDeviceHDMI,
+  kDeviceVirtual,
+  kDeviceMax
+};
+
 struct HWResourceInfo {
   uint32_t hw_version;
   uint32_t hw_revision;
@@ -124,7 +131,7 @@ class HWInterface {
   static DisplayError Create(HWInterface **intf);
   static DisplayError Destroy(HWInterface *intf);
   virtual DisplayError GetHWCapabilities(HWResourceInfo *hw_res_info) = 0;
-  virtual DisplayError Open(HWBlockType type, Handle *device, HWEventHandler *eventhandler) = 0;
+  virtual DisplayError Open(HWDeviceType type, Handle *device, HWEventHandler *eventhandler) = 0;
   virtual DisplayError Close(Handle device) = 0;
   virtual DisplayError GetNumDisplayAttributes(Handle device, uint32_t *count) = 0;
   virtual DisplayError GetDisplayAttributes(Handle device,

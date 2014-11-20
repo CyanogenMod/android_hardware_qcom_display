@@ -70,9 +70,11 @@ int HWCDisplay::EventControl(int event, int enable) {
   case HWC_EVENT_VSYNC:
     error = display_intf_->SetVSyncState(enable);
     break;
-
+  case HWC_EVENT_ORIENTATION:
+    // TODO(user): Need to handle this case
+    break;
   default:
-    DLOGE("Unsupported event control type : %d", event);
+    DLOGW("Unsupported event control type : %d", event);
   }
 
   if (UNLIKELY(error != kErrorNone)) {
@@ -126,7 +128,7 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
       values[i] = INT32(variable_config.y_dpi * 1000.0f);
       break;
     default:
-      DLOGE("Spurious attribute type %d", attributes[i]);
+      DLOGW("Spurious attribute type %d", attributes[i]);
       return -EINVAL;
     }
   }
@@ -463,7 +465,7 @@ int HWCDisplay::SetFormat(const int32_t &source, LayerBufferFormat *target) {
   case HAL_PIXEL_FORMAT_RGB_565:              *target = kFormatRGB565;                    break;
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:   *target = kFormatYCbCr420SemiPlanarVenus;   break;
   default:
-    DLOGE("Unsupported format type %d", source);
+    DLOGW("Unsupported format type %d", source);
     return -EINVAL;
   }
 

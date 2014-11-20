@@ -167,7 +167,7 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
   for (size_t i = 0; i < num_displays; i++) {
     hwc_display_contents_1_t *content_list = displays[i];
     if (UNLIKELY(!content_list || !content_list->numHwLayers)) {
-      DLOGE("::%s Invalid content list.", __FUNCTION__);
+      DLOGW("::%s Invalid content list.", __FUNCTION__);
       return -EINVAL;
     }
 
@@ -201,7 +201,7 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
   for (size_t i = 0; i < num_displays; i++) {
     hwc_display_contents_1_t *content_list = displays[i];
     if (UNLIKELY(!content_list || !content_list->numHwLayers)) {
-      DLOGE("::%s Invalid content list.", __FUNCTION__);
+      DLOGW("::%s Invalid content list.", __FUNCTION__);
       return -EINVAL;
     }
 
