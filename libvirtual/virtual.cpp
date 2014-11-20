@@ -84,6 +84,7 @@ int VirtualDisplay::teardown() {
     // this to distinguish between an ONLINE and RESUME event.
     mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres = 0;
     mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres = 0;
+    mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].secure = 0;
     return 0;
 }
 
@@ -170,12 +171,45 @@ void VirtualDisplay::setDownScaleMode(uint32_t maxArea) {
     }
 }
 
+bool VirtualDisplay::isSinkSecure() {
+    char sysFsPath[MAX_SYSFS_FILE_PATH];
+    bool ret = false;
+    int fbNum = overlay::Overlay::getInstance()->
+        getFbForDpy(HWC_DISPLAY_VIRTUAL);
+    snprintf(sysFsPath, sizeof(sysFsPath),
+             "/sys/devices/virtual/graphics/fb%d/"
+             "secure", fbNum);
+
+    int fileFd = open(sysFsPath, O_RDONLY, 0);
+    if (fileFd < 0) {
+        ALOGE("In %s: file '%s' not found", __FUNCTION__, sysFsPath);
+        ret = false;
+    } else {
+        char buf;
+        ssize_t err = read(fileFd, &buf, 1);
+        if (err <= 0) {
+            ALOGE("%s: empty file '%s'", __FUNCTION__, sysFsPath);
+        } else {
+            if (buf == '1') {
+                // HDCP Supported: secure
+                ret = true;
+            } else {
+                // NonHDCP: non-secure
+                ret = false;
+            }
+        }
+        close(fileFd);
+    }
+    return ret;
+}
+
 void VirtualDisplay::setAttributes() {
     if(mHwcContext) {
         uint32_t &extW = mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres;
         uint32_t &extH = mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres;
         uint32_t priW = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
         uint32_t priH = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
+        bool &secure = mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].secure;
 
         // Dynamic Resolution Change depends on MDP downscaling.
         // MDP downscale property will be ignored to exercise DRC use case.
@@ -197,6 +231,11 @@ void VirtualDisplay::setAttributes() {
         }
         mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].vsync_period =
                 1000000000l /60;
+        if(mHwcContext->mVirtualonExtActive) {
+            //For WFD using V4l2 read the sysfs node to determine
+            //if the sink is secure
+            secure = isSinkSecure();
+        }
         ALOGD_IF(DEBUG,"%s: Setting Virtual Attr: res(%d x %d)",__FUNCTION__,
                  mVInfo.xres, mVInfo.yres);
     }
