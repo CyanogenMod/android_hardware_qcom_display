@@ -35,6 +35,11 @@ namespace sde {
 
 DisplayError StrategyDefault::GetNextStrategy(StrategyConstraints *constraints,
                                               HWLayersInfo *hw_layers_info) {
+  if (hw_layers_info->flags) {
+    DLOGW("All strategies exhausted.");
+    return kErrorUndefined;
+  }
+
   // Mark all layers for GPU composition. Find GPU target buffer and store its index for programming
   // the hardware.
   LayerStack *layer_stack = hw_layers_info->stack;
@@ -55,7 +60,7 @@ DisplayError StrategyDefault::GetNextStrategy(StrategyConstraints *constraints,
     return kErrorParameters;
   }
 
-  hw_layers_info->flags |= kFlagGPU;
+  hw_layers_info->flags = 1;
 
   return kErrorNone;
 }

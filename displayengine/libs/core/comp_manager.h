@@ -52,6 +52,7 @@ class CompManager : public DumpImpl {
 
  private:
   void PrepareStrategyConstraints(Handle display_ctx, HWLayers *hw_layers);
+
   struct DisplayCompositionContext {
     StrategyConstraints constraints;
     Handle display_resource_ctx;

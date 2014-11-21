@@ -38,32 +38,69 @@ namespace sde {
     @details This macro defines name for the composition strategy library. This macro shall be used
     to load library using dlopen().
 
-    @sa GetStrategyInterface
+    @sa CreateStrategyInterface
+    @sa DestoryStrategyInterface
 */
 #define STRATEGY_LIBRARY_NAME "libsdestrategy.so"
 
-/*! @brief Function name to get composer strategy interface
+/*! @brief Function name to create composer strategy interface
 
-    @details This macro defines function name for GetStrategyInterface() which will be implemented
+    @details This macro defines function name for CreateStrategyInterface() which is implemented
     in the composition strategy library. This macro shall be used to specify name of the function
     in dlsym().
 
-    @sa GetStrategyInterface
+    @sa CreateStrategyInterface
 */
-#define GET_STRATEGY_INTERFACE_NAME "GetStrategyInterface"
+#define CREATE_STRATEGY_INTERFACE_NAME "CreateStrategyInterface"
+
+/*! @brief Function name to destroy composer strategy interface
+
+    @details This macro defines function name for DestroyStrategyInterface() which is implemented
+    in the composition strategy library. This macro shall be used to specify name of the function
+    in dlsym().
+
+    @sa DestroyStrategyInterface
+*/
+#define DESTROY_STRATEGY_INTERFACE_NAME "DestroyStrategyInterface"
+
+/*! @brief Strategy interface version.
+
+  @details Strategy interface is version tagged to maintain backward compatibility. This version is
+  supplied as a default argument during strategy library initialization.
+
+  Client may use an older version of interfaces and link to a higher version of strategy library,
+  but vice versa is not allowed.
+
+  @sa CreateStrategyInterface
+*/
+#define STRATEGY_REVISION_MAJOR (1)
+#define STRATEGY_REVISION_MINOR (0)
+
+#define STRATEGY_VERSION_TAG ((uint16_t) ((STRATEGY_REVISION_MAJOR << 8) | STRATEGY_REVISION_MINOR))
 
 class StrategyInterface;
 
-/*! @brief Function to get composer strategy interface.
+/*! @brief Function to create composer strategy interface.
 
-    @details This function is used to get StrategyInterface object which resides in the composer
+    @details This function is used to create StrategyInterface object which resides in the composer
     strategy library loaded at runtime.
 
+    @param[out] version \link STRATEGY_VERSION_TAG \endlink
     @param[out] interface \link StrategyInterface \endlink
 
     @return \link DisplayError \endlink
 */
-typedef DisplayError (*GetStrategyInterface)(StrategyInterface **interface);
+typedef DisplayError (*CreateStrategyInterface)(uint16_t version, StrategyInterface **interface);
+
+/*! @brief Function to destroy composer strategy interface.
+
+    @details This function is used to destroy StrategyInterface object.
+
+    @param[in] interface \link StrategyInterface \endlink
+
+    @return \link DisplayError \endlink
+*/
+typedef DisplayError (*DestroyStrategyInterface)(StrategyInterface *interface);
 
 /*! @brief Maximum number of layers that can be handled by hardware in a given layer stack.
 */
@@ -78,15 +115,12 @@ struct StrategyConstraints {
   bool safe_mode;         //!< In this mode, strategy manager chooses the composition strategy
                           //!< that requires minimum number of pipe for the current frame. i.e.,
                           //!< video only composition, secure only composition or GPU composition
+
   uint32_t max_layers;    //!< Maximum number of layers that shall be programmed on hardware for the
                           //!< given layer stack.
 
   StrategyConstraints() : safe_mode(false), max_layers(kMaxSDELayers) { }
 };
-
-/*! @brief Flag to denote that GPU composition is performed for the given layer stack.
-*/
-const uint32_t kFlagGPU = 0x1;
 
 /*! @brief This structure encapsulates information about the input layer stack and the layers which
     shall be programmed on hardware.
@@ -99,12 +133,13 @@ struct HWLayersInfo {
   uint32_t index[kMaxSDELayers];
                             //!< Indexes of the layers from the layer stack which need to be
                             //!< programmed on hardware.
+
   uint32_t count;           //!< Total number of layers which need to be set on hardware.
-  uint32_t flags;           //!< Strategy flags. There is one flag set for each of the strategy
-                            //!< that has been selected for this layer stack. This flag is preserved
-                            //!< between multiple GetNextStrategy() calls. Composition manager
-                            //!< relies on the total flag count to check the number of strategies
-                            //!< that are attempted for this layer stack.
+
+  uint32_t flags;           //!< Strategy flags. Caller must reset it to 0 for a new layer stack.
+                            //!< A non-zero flag value indicates that a strategy has been selected
+                            //!< previously for the current layer stack. This flag must be
+                            //!< preserved between multiple GetNextStrategy() calls.
 
   HWLayersInfo() {
     Reset();

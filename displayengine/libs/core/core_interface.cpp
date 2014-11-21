@@ -57,9 +57,7 @@ DisplayError CoreInterface::CreateCore(CoreEventHandler *event_handler, CoreInte
 
   // Check compatibility of client and core.
   uint32_t lib_version = CORE_VERSION_TAG;
-  if (UNLIKELY(!interface)) {
-    return kErrorParameters;
-  } else if (UNLIKELY(GET_REVISION(client_version) > GET_REVISION(lib_version))) {
+  if (UNLIKELY(GET_REVISION(client_version) > GET_REVISION(lib_version))) {
     return kErrorVersion;
   } else if (UNLIKELY(GET_DATA_ALIGNMENT(client_version) != GET_DATA_ALIGNMENT(lib_version))) {
     return kErrorDataAlignment;
@@ -84,11 +82,11 @@ DisplayError CoreInterface::CreateCore(CoreEventHandler *event_handler, CoreInte
     return kErrorMemory;
   }
 
-  DisplayError displayError = core_impl->Init();
-  if (UNLIKELY(displayError != kErrorNone)) {
+  DisplayError error = core_impl->Init();
+  if (UNLIKELY(error != kErrorNone)) {
     delete core_impl;
     core_impl = NULL;
-    return displayError;
+    return error;
   }
 
   *interface = core_impl;
