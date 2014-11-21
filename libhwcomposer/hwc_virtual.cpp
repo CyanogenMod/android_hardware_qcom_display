@@ -106,9 +106,14 @@ int HWCVirtualVDS::prepare(hwc_composer_device_1 *dev,
 
         if(ctx->dpyAttr[dpy].connected == false) {
             ctx->dpyAttr[dpy].connected = true;
+            // We set the vsync period to the primary refresh rate, leaving
+            // it up to the consumer to decide how fast to consume frames.
+            ctx->dpyAttr[dpy].vsync_period
+                              = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period;
             init(ctx);
-            //First round, just setup and return so primary can free pipes
-            return 0;
+            // XXX: for architectures with limited resources we would normally
+            // allow one padding round to free up resources but this breaks
+            // certain use cases.
         }
 
         ctx->dpyAttr[dpy].isConfiguring = false;
@@ -133,8 +138,7 @@ int HWCVirtualVDS::set(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
         uint32_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
 
-        if(fbLayer->handle && !isSecondaryConfiguring(ctx) &&
-                !ctx->mMDPComp[dpy]->isGLESOnlyComp()) {
+        if(ctx->dpyAttr[dpy].connected) {
             private_handle_t *ohnd = (private_handle_t *)list->outbuf;
             Writeback::getInstance()->setOutputFormat(
                                     utils::getMdpFormat(ohnd->format));
@@ -155,7 +159,13 @@ int HWCVirtualVDS::set(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
                 ALOGE("%s: MDPComp draw failed", __FUNCTION__);
                 ret = -1;
             }
-            if (!ctx->mFBUpdate[dpy]->draw(ctx,
+            // We need an FB layer handle check to cater for this usecase:
+            // Video is playing in landscape on primary, then launch
+            // ScreenRecord app.
+            // In this scenario, the first VDS draw call will have HWC
+            // composition and VDS does nit involve GPU to get eglSwapBuffer
+            // to get valid fb handle.
+            if (fbLayer->handle && !ctx->mFBUpdate[dpy]->draw(ctx,
                         (private_handle_t *)fbLayer->handle)) {
                 ALOGE("%s: FBUpdate::draw fail!", __FUNCTION__);
                 ret = -1;
