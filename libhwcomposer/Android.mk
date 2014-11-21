@@ -23,7 +23,8 @@ LOCAL_SRC_FILES               := hwc.cpp          \
                                  hwc_copybit.cpp  \
                                  hwc_qclient.cpp  \
                                  hwc_dump_layers.cpp \
-                                 hwc_ad.cpp
+                                 hwc_ad.cpp \
+                                 hwc_virtual.cpp
 
 ifeq ($(call is-board-platform-in-list, mpq8092 msm_bronze msm8916), true)
     LOCAL_SRC_FILES += hwc_vpuclient.cpp
