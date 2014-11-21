@@ -246,7 +246,7 @@ void initContext(hwc_context_t *ctx)
     ctx->mGPUHintInfo.mEGLContext = NULL;
     ctx->mGPUHintInfo.mPrevCompositionGLES = false;
     ctx->mGPUHintInfo.mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
-
+    memset(&(ctx->mPtorInfo), 0, sizeof(ctx->mPtorInfo));
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
 }
@@ -1102,7 +1102,8 @@ void optimizeLayerRects(hwc_context_t *ctx,
 
         //see if there is no blending required.
         //If it is opaque see if we can substract this region from below layers.
-        if(list->hwLayers[i].blending == HWC_BLENDING_NONE) {
+        if(list->hwLayers[i].blending == HWC_BLENDING_NONE &&
+                list->hwLayers[i].planeAlpha == 0xFF) {
             int j= i-1;
             hwc_rect_t& topframe =
                 (hwc_rect_t&)list->hwLayers[i].displayFrame;
@@ -1260,6 +1261,11 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         }
     }
 
+    if ((fd >= 0) && !dpy && ctx->mPtorInfo.isActive()) {
+        // Acquire c2d fence of Overlap render buffer
+        acquireFd[count++] = fd;
+    }
+
     data.acq_fen_fd_cnt = count;
     fbFd = ctx->dpyAttr[dpy].fd;
 
@@ -1308,8 +1314,12 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         fd = -1;
     }
 
-    if (ctx->mCopyBit[dpy])
-        ctx->mCopyBit[dpy]->setReleaseFd(releaseFd);
+    if (ctx->mCopyBit[dpy]) {
+        if (!dpy && ctx->mPtorInfo.isActive())
+            ctx->mCopyBit[dpy]->setReleaseFdSync(releaseFd);
+        else
+            ctx->mCopyBit[dpy]->setReleaseFd(releaseFd);
+    }
 
     //Signals when MDP finishes reading rotator buffers.
     ctx->mLayerRotMap[dpy]->setReleaseFd(releaseFd);
@@ -1358,6 +1368,13 @@ void setMdpFlags(hwc_layer_1_t *layer,
                              ovutils::OV_MDP_SECURE_OVERLAY_SESSION);
         ovutils::setMdpFlags(mdpFlags,
                              ovutils::OV_MDP_SECURE_DISPLAY_OVERLAY_SESSION);
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SMP_FORCE_ALLOC);
+    }
+
+    if(isProtectedBuffer(hnd)) {
+        ovutils::setMdpFlags(mdpFlags,
+                ovutils::OV_MDP_SMP_FORCE_ALLOC);
     }
     //No 90 component and no rot-downscale then flips done by MDP
     //If we use rot then it might as well do flips
@@ -1982,6 +1999,21 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
         gpuHint->mPrevCompositionGLES = false;
     }
 }
+
+bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
+    // To be peripheral, 3 boundaries should match.
+   uint8_t eqBounds = 0;
+    if (rect1.left == rect2.left)
+        eqBounds++;
+    if (rect1.top == rect2.top)
+       eqBounds++;
+    if (rect1.right == rect2.right)
+        eqBounds++;
+    if (rect1.bottom == rect2.bottom)
+        eqBounds++;
+    return (eqBounds == 3);
+}
+
 
 void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
             const hwc_rect_t& dst, const int& transform,

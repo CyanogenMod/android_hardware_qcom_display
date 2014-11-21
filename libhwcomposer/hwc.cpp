@@ -571,8 +571,14 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         int fd = -1; //FenceFD from the Copybit(valid in async mode)
         bool copybitDone = false;
-        if(ctx->mCopyBit[dpy])
-            copybitDone = ctx->mCopyBit[dpy]->draw(ctx, list, dpy, &fd);
+
+        if (ctx->mCopyBit[dpy]) {
+            if (ctx->mMDP.version < qdutils::MDP_V4_0)
+                copybitDone = ctx->mCopyBit[dpy]->draw(ctx, list, dpy, &fd);
+            else
+                fd = ctx->mMDPComp[dpy]->drawOverlap(ctx, list);
+        }
+
         if(list->numHwLayers > 1)
             hwc_sync(ctx, list, dpy, fd);
 

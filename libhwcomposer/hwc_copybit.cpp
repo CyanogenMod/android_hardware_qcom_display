@@ -130,6 +130,66 @@ unsigned int CopyBit::getRGBRenderingArea
     return renderArea;
 }
 
+
+bool CopyBit::prepareOverlap(hwc_context_t *ctx,
+                             hwc_display_contents_1_t *list) {
+
+    if (ctx->mMDP.version < qdutils::MDP_V4_0) {
+        ALOGE("%s: Invalid request", __FUNCTION__);
+        return false;
+    }
+
+    if (mEngine == NULL || !(validateParams(ctx, list))) {
+        ALOGE("%s: Invalid Params", __FUNCTION__);
+        return false;
+    }
+    PtorInfo* ptorInfo = &(ctx->mPtorInfo);
+
+    // Allocate render buffers if they're not allocated
+    int alignW = 0, alignH = 0;
+    int finalW = 0, finalH = 0;
+    for (int i = 0; i < ptorInfo->count; i++) {
+        int ovlapIndex = ptorInfo->layerIndex[i];
+        hwc_rect_t overlap = list->hwLayers[ovlapIndex].displayFrame;
+        // render buffer width will be the max of two layers
+        // Align Widht and height to 32, Mdp would be configured
+        // with Aligned overlap w/h
+        finalW = max(finalW, (int)ALIGN((overlap.right - overlap.left), 32));
+        finalH += ALIGN((overlap.bottom - overlap.top), 32);
+        if(finalH > (int)ALIGN((overlap.bottom - overlap.top), 32)) {
+            // Calculate the dest top, left will always be zero
+            ptorInfo->displayFrame[i].top = (finalH -
+                                (ALIGN((overlap.bottom - overlap.top), 32)));
+        }
+        // calculate the right and bottom values
+        ptorInfo->displayFrame[i].right =  ptorInfo->displayFrame[i].left +
+                                            (overlap.right - overlap.left);
+        ptorInfo->displayFrame[i].bottom = ptorInfo->displayFrame[i].top +
+                                            (overlap.bottom - overlap.top);
+    }
+
+    getBufferSizeAndDimensions(finalW, finalH, HAL_PIXEL_FORMAT_RGBA_8888,
+                               alignW, alignH);
+
+    if ((mAlignedWidth != alignW) || (mAlignedHeight != alignH)) {
+        // Overlap rect has changed, so free render buffers
+        freeRenderBuffers();
+    }
+
+    int ret = allocRenderBuffers(alignW, alignH, HAL_PIXEL_FORMAT_RGBA_8888);
+
+    if (ret < 0) {
+        ALOGE("%s: Render buffer allocation failed", __FUNCTION__);
+        return false;
+    }
+
+    mAlignedWidth = alignW;
+    mAlignedHeight = alignH;
+    mCurRenderBufferIndex = (mCurRenderBufferIndex + 1) % NUM_RENDER_BUFFERS;
+    return true;
+}
+
+
 bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
                                                             int dpy) {
 
@@ -210,8 +270,8 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     //Allocate render buffers if they're not allocated
     if (ctx->mMDP.version != qdutils::MDP_V3_0_4 &&
             (useCopybitForYUV || useCopybitForRGB)) {
-        int ret = allocRenderBuffers(mAlignedFBWidth,
-                                     mAlignedFBHeight,
+        int ret = allocRenderBuffers(mAlignedWidth,
+                                     mAlignedHeight,
                                      HAL_PIXEL_FORMAT_RGBA_8888);
         if (ret < 0) {
             return false;
@@ -347,6 +407,190 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     }
     return true;
 }
+
+int CopyBit::drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
+    int fd = -1;
+    PtorInfo* ptorInfo = &(ctx->mPtorInfo);
+
+    if (ctx->mMDP.version < qdutils::MDP_V4_0) {
+        ALOGE("%s: Invalid request", __FUNCTION__);
+        return fd;
+    }
+
+    private_handle_t *renderBuffer = getCurrentRenderBuffer();
+
+    if (!renderBuffer) {
+        ALOGE("%s: Render buffer layer handle is NULL", __FUNCTION__);
+        return fd;
+    }
+
+    //Clear the transparent or left out region on the render buffer
+    hwc_rect_t clearRegion = {0,0,0,0};
+    LayerProp *layerProp = ctx->layerProp[0];
+    if(CBUtils::getuiClearRegion(list, clearRegion, layerProp))
+        clear(renderBuffer, clearRegion);
+
+    int copybitLayerCount = 0;
+    for(int j = 0; j < ptorInfo->count; j++) {
+        int ovlapIndex = ptorInfo->layerIndex[j];
+        hwc_rect_t overlap = list->hwLayers[ovlapIndex].displayFrame;
+        if(j) {
+            /**
+             * It's possible that 2 PTOR layers might have overlapping.
+             * In such case, remove the intersection(again if peripheral)
+             * from the lower PTOR layer to avoid overlapping.
+             * If intersection is not on peripheral then compromise
+             * by reducing number of PTOR layers.
+             **/
+            int prevOvlapIndex = ptorInfo->layerIndex[0];
+            hwc_rect_t prevOvlap = list->hwLayers[prevOvlapIndex].displayFrame;
+            hwc_rect_t commonRect = getIntersection(prevOvlap, overlap);
+            if(isValidRect(commonRect)) {
+                overlap = deductRect(overlap, commonRect);
+            }
+        }
+
+        // Draw overlapped content of layers on render buffer
+        for (int i = 0; i <= ovlapIndex; i++) {
+            hwc_layer_1_t *layer = &list->hwLayers[i];
+            if(!isValidRect(getIntersection(layer->displayFrame,
+                                               overlap))) {
+                continue;
+            }
+            if ((list->hwLayers[i].acquireFenceFd != -1)) {
+                // Wait for acquire fence on the App buffers.
+                if(sync_wait(list->hwLayers[i].acquireFenceFd, 1000) < 0) {
+                    ALOGE("%s: sync_wait error!! error no = %d err str = %s",
+                          __FUNCTION__, errno, strerror(errno));
+                }
+                close(list->hwLayers[i].acquireFenceFd);
+                list->hwLayers[i].acquireFenceFd = -1;
+            }
+            /*
+             * Find the intersection of layer display frame with PTOR layer
+             * with respect to screen co-ordinates
+             *
+             * Calculated the destination rect by transforming the overlapping
+             * region of layer display frame with respect to PTOR display frame
+             *
+             * Transform the destination rect on to render buffer
+             * */
+            hwc_rect_t destRect = getIntersection(overlap, layer->displayFrame);
+            destRect.left = destRect.left - overlap.left +
+                                            ptorInfo->displayFrame[j].left;
+            destRect.right = destRect.right- overlap.left +
+                                            ptorInfo->displayFrame[j].left;
+            destRect.top = destRect.top - overlap.top +
+                                            ptorInfo->displayFrame[j].top;
+            destRect.bottom = destRect.bottom - overlap.top +
+                                            ptorInfo->displayFrame[j].top;
+
+            int retVal = drawRectUsingCopybit(ctx, layer, renderBuffer,
+                                                          overlap, destRect);
+            copybitLayerCount++;
+            if(retVal < 0) {
+                ALOGE("%s: drawRectUsingCopybit failed", __FUNCTION__);
+                copybitLayerCount = 0;
+            }
+        }
+    }
+
+    if (copybitLayerCount) {
+        copybit_device_t *copybit = getCopyBitDevice();
+        copybit->flush_get_fence(copybit, &fd);
+    }
+
+    ALOGD_IF(DEBUG_COPYBIT, "%s: done! copybitLayerCount = %d", __FUNCTION__,
+             copybitLayerCount);
+    return fd;
+}
+
+int CopyBit::drawRectUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
+                        private_handle_t *renderBuffer, hwc_rect_t overlap,
+                        hwc_rect_t destRect)
+{
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+    if (!ctx) {
+        ALOGE("%s: null context ", __FUNCTION__);
+        return -1;
+    }
+
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    if (!hnd) {
+        ALOGE("%s: invalid handle", __FUNCTION__);
+        return -1;
+    }
+
+    private_handle_t *dstHandle = (private_handle_t *)renderBuffer;
+    if (!dstHandle) {
+        ALOGE("%s: RenderBuffer handle is NULL", __FUNCTION__);
+        return -1;
+    }
+
+    // Set the Copybit Source
+    copybit_image_t src;
+    src.handle = (native_handle_t *)layer->handle;
+    src.w = hnd->width;
+    src.h = hnd->height;
+    src.base = (void *)hnd->base;
+    src.format = hnd->format;
+    src.horiz_padding = 0;
+    src.vert_padding = 0;
+
+
+    hwc_rect_t dispFrame = layer->displayFrame;
+    hwc_rect_t iRect = getIntersection(dispFrame, overlap);
+    hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
+    qhwc::calculate_crop_rects(crop, dispFrame, iRect,
+                               layer->transform);
+
+    // Copybit source rect
+    copybit_rect_t srcRect = {crop.left, crop.top, crop.right,
+        crop.bottom};
+
+    // Copybit destination rect
+    copybit_rect_t dstRect = {destRect.left, destRect.top, destRect.right,
+        destRect.bottom};
+
+    // Copybit dst
+    copybit_image_t dst;
+    dst.handle = (native_handle_t *)dstHandle;
+    dst.w = ALIGN(dstHandle->width, 32);
+    dst.h = dstHandle->height;
+    dst.base = (void *)dstHandle->base;
+    dst.format = dstHandle->format;
+
+    copybit_device_t *copybit = mEngine;
+
+    // Copybit region is the destRect
+    hwc_rect_t regRect = {dstRect.l,dstRect.t, dstRect.r, dstRect.b};
+    hwc_region_t region;
+    region.numRects = 1;
+    region.rects  = &regRect;
+    region_iterator copybitRegion(region);
+    int acquireFd = layer->acquireFenceFd;
+
+    copybit->set_parameter(copybit, COPYBIT_FRAMEBUFFER_WIDTH,
+                           renderBuffer->width);
+    copybit->set_parameter(copybit, COPYBIT_FRAMEBUFFER_HEIGHT,
+                           renderBuffer->height);
+    copybit->set_parameter(copybit, COPYBIT_TRANSFORM, layer->transform);
+    copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, layer->planeAlpha);
+    copybit->set_parameter(copybit, COPYBIT_BLEND_MODE, layer->blending);
+    copybit->set_parameter(copybit, COPYBIT_DITHER,
+        (dst.format == HAL_PIXEL_FORMAT_RGB_565) ? COPYBIT_ENABLE :
+        COPYBIT_DISABLE);
+    copybit->set_sync(copybit, acquireFd);
+    int err = copybit->stretch(copybit, &dst, &src, &dstRect, &srcRect,
+                               &copybitRegion);
+
+    if (err < 0)
+        ALOGE("%s: copybit stretch failed",__FUNCTION__);
+
+    return err;
+}
+
+
 
 int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                           private_handle_t *renderBuffer, int dpy, bool isFG)
@@ -709,6 +953,18 @@ void CopyBit::setReleaseFd(int fd) {
     mRelFd[mCurRenderBufferIndex] = dup(fd);
 }
 
+void CopyBit::setReleaseFdSync(int fd) {
+    if (mRelFd[mCurRenderBufferIndex] >=0) {
+        int ret = -1;
+        ret = sync_wait(mRelFd[mCurRenderBufferIndex], 1000);
+        if (ret < 0)
+            ALOGE("%s: sync_wait error! errno = %d, err str = %s",
+                  __FUNCTION__, errno, strerror(errno));
+        close(mRelFd[mCurRenderBufferIndex]);
+    }
+    mRelFd[mCurRenderBufferIndex] = dup(fd);
+}
+
 struct copybit_device_t* CopyBit::getCopyBitDevice() {
     return mEngine;
 }
@@ -719,8 +975,8 @@ CopyBit::CopyBit(hwc_context_t *ctx, const int& dpy) : mEngine(0),
     getBufferSizeAndDimensions(ctx->dpyAttr[dpy].xres,
             ctx->dpyAttr[dpy].yres,
             HAL_PIXEL_FORMAT_RGBA_8888,
-            mAlignedFBWidth,
-            mAlignedFBHeight);
+            mAlignedWidth,
+            mAlignedHeight);
 
     hw_module_t const *module;
     for (int i = 0; i < NUM_RENDER_BUFFERS; i++) {

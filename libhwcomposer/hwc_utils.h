@@ -39,6 +39,8 @@
 #define MAX_NUM_APP_LAYERS 32
 #define HWC_WFDDISPSYNC_LOG 0
 #define STR(f) #f;
+// Max number of PTOR layers handled
+#define MAX_PTOR_LAYERS 2
 
 //Fwrd decls
 struct hwc_context_t;
@@ -117,6 +119,22 @@ struct ListStats {
     ovutils::Dim roi;
     bool secureUI; // Secure display layer
     bool isSecurePresent;
+};
+
+//PTOR Comp info
+struct PtorInfo {
+    int count;
+    int layerIndex[MAX_PTOR_LAYERS];
+    hwc_rect_t displayFrame[MAX_PTOR_LAYERS];
+    bool isActive() { return (count>0); }
+    int getPTORArrayIndex(int index) {
+        int idx = -1;
+        for(int i = 0; i < count; i++) {
+            if(index == layerIndex[i])
+                idx = i;
+        }
+        return idx;
+    }
 };
 
 struct LayerProp {
@@ -349,6 +367,9 @@ bool isDisplaySplit(hwc_context_t* ctx, int dpy);
 // due to idle fallback or MDP composition.
 void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list);
 
+// Returns true if rect1 is peripheral to rect2, false otherwise.
+bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
+
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
     return (UNLIKELY(l && (l->flags & HWC_SKIP_LAYER)));
@@ -369,6 +390,12 @@ static inline bool is4kx2kYuvBuffer(const private_handle_t* hnd) {
 static inline bool isSecureBuffer(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_SECURE_BUFFER & hnd->flags));
 }
+
+// Returns true if the buffer is protected
+static inline bool isProtectedBuffer(const private_handle_t* hnd) {
+    return (hnd && (private_handle_t::PRIV_FLAGS_PROTECTED_BUFFER & hnd->flags));
+}
+
 //Return true if buffer is marked locked
 static inline bool isBufferLocked(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags));
@@ -524,6 +551,9 @@ struct hwc_context_t {
     // number of active Displays
     int numActiveDisplays;
     struct gpu_hint_info mGPUHintInfo;
+    // PTOR Info
+    qhwc::PtorInfo mPtorInfo;
+    uint32_t mIsPTOREnabled;
 };
 
 namespace qhwc {

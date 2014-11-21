@@ -265,6 +265,9 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         case IQService::SET_VIEW_FRAME:
             setViewFrame(mHwcContext, inParcel);
             break;
+        case IQService::SET_PTOR_MODE:
+            mHwcContext->mIsPTOREnabled = inParcel->readInt32();
+            break;
         default:
             ret = NO_ERROR;
     }

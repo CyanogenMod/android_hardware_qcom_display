@@ -26,6 +26,7 @@
 #include "hwc_fbupdate.h"
 #include "hwc_ad.h"
 #include <overlayRotator.h>
+#include "hwc_copybit.h"
 
 using namespace overlay;
 using namespace qdutils;
@@ -157,6 +158,14 @@ bool MDPComp::init(hwc_context_t *ctx) {
              (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
         sEnable4k2kYUVSplit = true;
     }
+
+    if ((property_get("persist.hwc.ptor.enable", property, NULL) > 0) &&
+            ((!strncasecmp(property, "true", PROPERTY_VALUE_MAX )) ||
+             (!strncmp(property, "1", PROPERTY_VALUE_MAX )))) {
+        ctx->mCopyBit[HWC_DISPLAY_PRIMARY] = new CopyBit(ctx,
+                                                    HWC_DISPLAY_PRIMARY);
+    }
+
     return true;
 }
 
@@ -483,7 +492,8 @@ bool MDPComp::validateAndApplyROI(hwc_context_t *ctx,
             }
 
             /* deduct any opaque region from visibleRect */
-            if (layer->blending == HWC_BLENDING_NONE)
+            if (layer->blending == HWC_BLENDING_NONE &&
+                    layer->planeAlpha == 0xFF)
                 visibleRect = deductRect(visibleRect, res);
         }
     }
@@ -601,6 +611,8 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
     bool ret = false;
     if(fullMDPComp(ctx, list)) {
         ret = true;
+    } else if(fullMDPCompWithPTOR(ctx, list)) {
+        ret = true;
     } else if(partialMDPComp(ctx, list)) {
         ret = true;
     }
@@ -642,6 +654,234 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     }
 
     return true;
+}
+
+/* Full MDP Composition with Peripheral Tiny Overlap Removal.
+ * MDP bandwidth limitations can be avoided, if the overlap region
+ * covered by the smallest layer at a higher z-order, gets composed
+ * by Copybit on a render buffer, which can be queued to MDP.
+ */
+bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
+    hwc_display_contents_1_t* list) {
+
+    const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+    const int stagesForMDP = min(sMaxPipesPerMixer,
+            ctx->mOverlay->availablePipes(mDpy, Overlay::MIXER_DEFAULT));
+
+    // Hard checks where we cannot use this mode
+    if (mDpy || !ctx->mCopyBit[mDpy] || !ctx->mIsPTOREnabled) {
+        ALOGD_IF(isDebug(), "%s: Feature not supported!", __FUNCTION__);
+        return false;
+    }
+
+    // Frame level checks
+    if ((numAppLayers > stagesForMDP) || isSkipPresent(ctx, mDpy) ||
+        isYuvPresent(ctx, mDpy) || mCurrentFrame.dropCount ||
+        isSecurePresent(ctx, mDpy)) {
+        ALOGD_IF(isDebug(), "%s: Frame not supported!", __FUNCTION__);
+        return false;
+    }
+    // MDP comp checks
+    for(int i = 0; i < numAppLayers; i++) {
+        hwc_layer_1_t* layer = &list->hwLayers[i];
+        if(not isSupportedForMDPComp(ctx, layer)) {
+            ALOGD_IF(isDebug(), "%s: Unsupported layer in list",__FUNCTION__);
+            return false;
+        }
+    }
+
+    /* We cannot use this composition mode, if:
+     1. A below layer needs scaling.
+     2. Overlap is not peripheral to display.
+     3. Overlap or a below layer has 90 degree transform.
+     4. Overlap area > (1/3 * FrameBuffer) area, based on Perf inputs.
+     */
+
+    int minLayerIndex[MAX_PTOR_LAYERS] = { -1, -1};
+    hwc_rect_t overlapRect[MAX_PTOR_LAYERS];
+    memset(overlapRect, 0, sizeof(overlapRect));
+    int layerPixelCount, minPixelCount = 0;
+    int numPTORLayersFound = 0;
+    for (int i = numAppLayers-1; (i >= 0 &&
+                                  numPTORLayersFound < MAX_PTOR_LAYERS); i--) {
+        hwc_layer_1_t* layer = &list->hwLayers[i];
+        hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
+        hwc_rect_t dispFrame = layer->displayFrame;
+        layerPixelCount = (crop.right - crop.left) * (crop.bottom - crop.top);
+        // PTOR layer should be peripheral and cannot have transform
+        if (!isPeripheral(dispFrame, ctx->mViewFrame[mDpy]) ||
+                                has90Transform(layer)) {
+            continue;
+        }
+        if((3 * (layerPixelCount + minPixelCount)) >
+                ((int)ctx->dpyAttr[mDpy].xres * (int)ctx->dpyAttr[mDpy].yres)) {
+            // Overlap area > (1/3 * FrameBuffer) area, based on Perf inputs.
+            continue;
+        }
+        bool found = false;
+        for (int j = i-1; j >= 0; j--) {
+            // Check if the layers below this layer qualifies for PTOR comp
+            hwc_layer_1_t* layer = &list->hwLayers[j];
+            hwc_rect_t disFrame = layer->displayFrame;
+            // Layer below PTOR is intersecting and has 90 degree transform or
+            // needs scaling cannot be supported.
+            if (isValidRect(getIntersection(dispFrame, disFrame))) {
+                if (has90Transform(layer) || needsScaling(layer)) {
+                    found = false;
+                    break;
+                }
+                found = true;
+            }
+        }
+        // Store the minLayer Index
+        if(found) {
+            minLayerIndex[numPTORLayersFound] = i;
+            overlapRect[numPTORLayersFound] = list->hwLayers[i].displayFrame;
+            minPixelCount += layerPixelCount;
+            numPTORLayersFound++;
+        }
+    }
+
+    // No overlap layers
+    if (!numPTORLayersFound)
+        return false;
+
+    // Store the displayFrame and the sourceCrops of the layers
+    hwc_rect_t displayFrame[numAppLayers];
+    hwc_rect_t sourceCrop[numAppLayers];
+    for(int i = 0; i < numAppLayers; i++) {
+        hwc_layer_1_t* layer = &list->hwLayers[i];
+        displayFrame[i] = layer->displayFrame;
+        sourceCrop[i] = integerizeSourceCrop(layer->sourceCropf);
+    }
+
+    /**
+     * It's possible that 2 PTOR layers might have overlapping.
+     * In such case, remove the intersection(again if peripheral)
+     * from the lower PTOR layer to avoid overlapping.
+     * If intersection is not on peripheral then compromise
+     * by reducing number of PTOR layers.
+     **/
+    hwc_rect_t commonRect = getIntersection(overlapRect[0], overlapRect[1]);
+    if(isValidRect(commonRect)) {
+        overlapRect[1] = deductRect(overlapRect[1], commonRect);
+        list->hwLayers[minLayerIndex[1]].displayFrame = overlapRect[1];
+    }
+
+    ctx->mPtorInfo.count = numPTORLayersFound;
+    for(int i = 0; i < MAX_PTOR_LAYERS; i++) {
+        ctx->mPtorInfo.layerIndex[i] = minLayerIndex[i];
+    }
+
+    if (!ctx->mCopyBit[mDpy]->prepareOverlap(ctx, list)) {
+        // reset PTOR
+        ctx->mPtorInfo.count = 0;
+        if(isValidRect(commonRect)) {
+            // If PTORs are intersecting restore displayframe of PTOR[1]
+            // before returning, as we have modified it above.
+            list->hwLayers[minLayerIndex[1]].displayFrame =
+                    displayFrame[minLayerIndex[1]];
+        }
+        return false;
+    }
+    private_handle_t *renderBuf = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
+    Whf layerWhf[numPTORLayersFound]; // To store w,h,f of PTOR layers
+
+    // Store the blending mode, planeAlpha, and transform of PTOR layers
+    int32_t blending[numPTORLayersFound];
+    uint8_t planeAlpha[numPTORLayersFound];
+    uint32_t transform[numPTORLayersFound];
+
+    for(int j = 0; j < numPTORLayersFound; j++) {
+        int index =  ctx->mPtorInfo.layerIndex[j];
+
+        // Update src crop of PTOR layer
+        hwc_layer_1_t* layer = &list->hwLayers[index];
+        layer->sourceCropf.left = (float)ctx->mPtorInfo.displayFrame[j].left;
+        layer->sourceCropf.top = (float)ctx->mPtorInfo.displayFrame[j].top;
+        layer->sourceCropf.right = (float)ctx->mPtorInfo.displayFrame[j].right;
+        layer->sourceCropf.bottom =(float)ctx->mPtorInfo.displayFrame[j].bottom;
+
+        // Store & update w, h, format of PTOR layer
+        private_handle_t *hnd = (private_handle_t *)layer->handle;
+        Whf whf(hnd->width, hnd->height, hnd->format, hnd->size);
+        layerWhf[j] = whf;
+        hnd->width = renderBuf->width;
+        hnd->height = renderBuf->height;
+        hnd->format = renderBuf->format;
+
+        // Store & update blending mode, planeAlpha and transform of PTOR layer
+        blending[j] = layer->blending;
+        planeAlpha[j] = layer->planeAlpha;
+        transform[j] = layer->transform;
+        layer->blending = HWC_BLENDING_NONE;
+        layer->planeAlpha = 0xFF;
+        layer->transform = 0;
+
+        // Remove overlap from crop & displayFrame of below layers
+        for (int i = 0; i < index && index !=-1; i++) {
+            layer = &list->hwLayers[i];
+            if(!isValidRect(getIntersection(layer->displayFrame,
+                                            overlapRect[j])))  {
+                continue;
+            }
+            // Update layer attributes
+            hwc_rect_t srcCrop = integerizeSourceCrop(layer->sourceCropf);
+            hwc_rect_t destRect = deductRect(layer->displayFrame,
+                                             overlapRect[j]);
+            qhwc::calculate_crop_rects(srcCrop, layer->displayFrame, destRect,
+                                       layer->transform);
+            layer->sourceCropf.left = (float)srcCrop.left;
+            layer->sourceCropf.top = (float)srcCrop.top;
+            layer->sourceCropf.right = (float)srcCrop.right;
+            layer->sourceCropf.bottom = (float)srcCrop.bottom;
+        }
+    }
+
+    mCurrentFrame.mdpCount = numAppLayers;
+    mCurrentFrame.fbCount = 0;
+    mCurrentFrame.fbZ = -1;
+
+    for (int j = 0; j < numAppLayers; j++)
+        mCurrentFrame.isFBComposed[j] = false;
+
+    bool result = postHeuristicsHandling(ctx, list);
+
+    // Restore layer attributes
+    for(int i = 0; i < numAppLayers; i++) {
+        hwc_layer_1_t* layer = &list->hwLayers[i];
+        layer->displayFrame = displayFrame[i];
+        layer->sourceCropf.left = (float)sourceCrop[i].left;
+        layer->sourceCropf.top = (float)sourceCrop[i].top;
+        layer->sourceCropf.right = (float)sourceCrop[i].right;
+        layer->sourceCropf.bottom = (float)sourceCrop[i].bottom;
+    }
+
+    // Restore w,h,f, blending attributes, and transform of PTOR layers
+    for (int i = 0; i < numPTORLayersFound; i++) {
+        int idx = ctx->mPtorInfo.layerIndex[i];
+        hwc_layer_1_t* layer = &list->hwLayers[idx];
+        private_handle_t *hnd = (private_handle_t *)list->hwLayers[idx].handle;
+        hnd->width = layerWhf[i].w;
+        hnd->height = layerWhf[i].h;
+        hnd->format = layerWhf[i].format;
+        layer->blending = blending[i];
+        layer->planeAlpha = planeAlpha[i];
+        layer->transform = transform[i];
+    }
+
+    if (!result) {
+        // reset PTOR
+        ctx->mPtorInfo.count = 0;
+        reset(ctx);
+    } else {
+        ALOGD_IF(isDebug(), "%s: PTOR Indexes: %d and %d", __FUNCTION__,
+                 ctx->mPtorInfo.layerIndex[0],  ctx->mPtorInfo.layerIndex[1]);
+    }
+
+    ALOGD_IF(isDebug(), "%s: Postheuristics %s!", __FUNCTION__,
+             (result ? "successful" : "failed"));
+    return result;
 }
 
 bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
@@ -1241,6 +1481,9 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     const int numLayers = ctx->listStats[mDpy].numAppLayers;
     MDPVersion& mdpVersion = qdutils::MDPVersion::getInstance();
 
+    // reset PTOR
+    if(!mDpy)
+        memset(&(ctx->mPtorInfo), 0, sizeof(ctx->mPtorInfo));
     //Do not cache the information for next draw cycle.
     if(numLayers > MAX_NUM_APP_LAYERS or (!numLayers)) {
         ALOGI("%s: Unsupported layer count for mdp composition",
@@ -1332,6 +1575,18 @@ bool MDPComp::allocSplitVGPipesfor4k2k(hwc_context_t *ctx,
     }
     return bRet;
 }
+
+int MDPComp::drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
+    int fd = -1;
+    if (ctx->mPtorInfo.isActive()) {
+        fd = ctx->mCopyBit[mDpy]->drawOverlap(ctx, list);
+        if (fd < 0) {
+            ALOGD_IF(isDebug(),"%s: failed", __FUNCTION__);
+        }
+    }
+    return fd;
+}
+
 //=============MDPCompNonSplit===================================================
 
 void MDPCompNonSplit::adjustForSourceSplit(hwc_context_t *ctx,
@@ -1374,7 +1629,7 @@ int MDPCompNonSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
                              PipeLayerPair& PipeLayerPair) {
     MdpPipeInfoNonSplit& mdp_info =
         *(static_cast<MdpPipeInfoNonSplit*>(PipeLayerPair.pipeInfo));
-    eMdpFlags mdpFlags = OV_MDP_BACKEND_COMPOSITION;
+    eMdpFlags mdpFlags = ovutils::OV_MDP_FLAGS_NONE;
     eZorder zOrder = static_cast<eZorder>(mdp_info.zOrder);
     eIsFg isFg = IS_FG_OFF;
     eDest dest = mdp_info.index;
@@ -1446,7 +1701,7 @@ int MDPCompNonSplit::configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
             *(static_cast<MdpYUVPipeInfo*>(PipeLayerPair.pipeInfo));
     eZorder zOrder = static_cast<eZorder>(mdp_info.zOrder);
     eIsFg isFg = IS_FG_OFF;
-    eMdpFlags mdpFlagsL = OV_MDP_BACKEND_COMPOSITION;
+    eMdpFlags mdpFlagsL = ovutils::OV_MDP_FLAGS_NONE;
     eDest lDest = mdp_info.lIndex;
     eDest rDest = mdp_info.rIndex;
 
@@ -1537,12 +1792,18 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                 continue;
             }
 
+            int fd = hnd->fd;
+            uint32_t offset = (uint32_t)hnd->offset;
+            int index = ctx->mPtorInfo.getPTORArrayIndex(i);
+            if (!mDpy && (index != -1)) {
+                hnd = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
+                fd = hnd->fd;
+                offset = 0;
+            }
+
             ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
                     using  pipe: %d", __FUNCTION__, layer,
                     hnd, dest );
-
-            int fd = hnd->fd;
-            uint32_t offset = hnd->offset;
 
             Rotator *rot = mCurrentFrame.mdpToLayer[mdpIndex].rot;
             if(rot) {
@@ -1670,7 +1931,7 @@ int MDPCompSplit::configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
                 *(static_cast<MdpYUVPipeInfo*>(PipeLayerPair.pipeInfo));
         eZorder zOrder = static_cast<eZorder>(mdp_info.zOrder);
         eIsFg isFg = IS_FG_OFF;
-        eMdpFlags mdpFlagsL = OV_MDP_BACKEND_COMPOSITION;
+        eMdpFlags mdpFlagsL = ovutils::OV_MDP_FLAGS_NONE;
         eDest lDest = mdp_info.lIndex;
         eDest rDest = mdp_info.rIndex;
 
@@ -1691,7 +1952,7 @@ int MDPCompSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
         *(static_cast<MdpPipeInfoSplit*>(PipeLayerPair.pipeInfo));
     eZorder zOrder = static_cast<eZorder>(mdp_info.zOrder);
     eIsFg isFg = IS_FG_OFF;
-    eMdpFlags mdpFlagsL = OV_MDP_BACKEND_COMPOSITION;
+    eMdpFlags mdpFlagsL = ovutils::OV_MDP_FLAGS_NONE;
     eDest lDest = mdp_info.lIndex;
     eDest rDest = mdp_info.rIndex;
 
@@ -1780,7 +2041,13 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ovutils::eDest indexR = pipe_info.rIndex;
 
             int fd = hnd->fd;
-            int offset = hnd->offset;
+            uint32_t offset = (uint32_t)hnd->offset;
+            int index = ctx->mPtorInfo.getPTORArrayIndex(i);
+            if (!mDpy && (index != -1)) {
+                hnd = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
+                fd = hnd->fd;
+                offset = 0;
+            }
 
             if(ctx->mAD->draw(ctx, fd, offset)) {
                 fd = ctx->mAD->getDstFd(ctx);

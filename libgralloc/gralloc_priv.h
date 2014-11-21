@@ -155,6 +155,8 @@ struct private_handle_t : public native_handle {
             PRIV_FLAGS_NOT_MAPPED         = 0x00001000,
             // Display on external only
             PRIV_FLAGS_EXTERNAL_ONLY      = 0x00002000,
+            // Set by HWC for protected non secure buffers
+            PRIV_FLAGS_PROTECTED_BUFFER   = 0x00004000,
             PRIV_FLAGS_VIDEO_ENCODER      = 0x00010000,
             PRIV_FLAGS_CAMERA_WRITE       = 0x00020000,
             PRIV_FLAGS_CAMERA_READ        = 0x00040000,
