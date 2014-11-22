@@ -22,19 +22,64 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __DEVICE_VIRTUAL_H__
-#define __DEVICE_VIRTUAL_H__
+#include <utils/constants.h>
 
-#include "device_base.h"
+// HWC_MODULE_NAME definition must precede hwc_logger.h include.
+#define HWC_MODULE_NAME "HWCDisplayPrimary"
+#include "hwc_logger.h"
+
+#include "hwc_display_primary.h"
 
 namespace sde {
 
-class DeviceVirtual : public DeviceBase {
- public:
-  DeviceVirtual(DeviceEventHandler *event_handler, HWInterface *hw_intf, CompManager *comp_manager);
-};
+HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
+  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY) {
+}
+
+int HWCDisplayPrimary::Init() {
+  return HWCDisplay::Init();
+}
+
+int HWCDisplayPrimary::Deinit() {
+  return HWCDisplay::Deinit();
+}
+
+int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
+  int status = 0;
+
+  status = AllocateLayerStack(content_list);
+  if (UNLIKELY(status)) {
+    return status;
+  }
+
+  status = PrepareLayerStack(content_list);
+  if (UNLIKELY(status)) {
+    return status;
+  }
+
+  return 0;
+}
+
+int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
+  int status = 0;
+
+  status = HWCDisplay::CommitLayerStack(content_list);
+  if (UNLIKELY(status)) {
+    return status;
+  }
+
+  content_list->retireFenceFd = layer_stack_.retire_fence_fd;
+
+  return 0;
+}
+
+int HWCDisplayPrimary::PowerOn() {
+  return SetState(kStateOn);
+}
+
+int HWCDisplayPrimary::PowerOff() {
+  return SetState(kStateOff);
+}
 
 }  // namespace sde
-
-#endif  // __DEVICE_VIRTUAL_H__
 

@@ -22,25 +22,21 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __HWC_SINK_PRIMARY_H__
-#define __HWC_SINK_PRIMARY_H__
+// SDE_LOG_TAG definition must precede debug.h include.
+#define SDE_LOG_TAG kTagCore
+#define SDE_MODULE_NAME "DisplayVirtual"
+#include <utils/debug.h>
 
-#include "hwc_sink.h"
+#include <utils/constants.h>
+
+#include "display_virtual.h"
 
 namespace sde {
 
-class HWCSinkPrimary : public HWCSink {
- public:
-  explicit HWCSinkPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
-  virtual int Init();
-  virtual int Deinit();
-  virtual int Prepare(hwc_display_contents_1_t *content_list);
-  virtual int Commit(hwc_display_contents_1_t *content_list);
-  virtual int PowerOn();
-  virtual int PowerOff();
-};
+DisplayVirtual::DisplayVirtual(DisplayEventHandler *event_handler, HWInterface *hw_intf,
+                               CompManager *comp_manager)
+  : DisplayBase(kVirtual, event_handler, kHWBlockMax, hw_intf, comp_manager) {
+}
 
 }  // namespace sde
-
-#endif  // __HWC_SINK_PRIMARY_H__
 

@@ -31,9 +31,9 @@
 #include <utils/constants.h>
 
 #include "core_impl.h"
-#include "device_primary.h"
-#include "device_hdmi.h"
-#include "device_virtual.h"
+#include "display_primary.h"
+#include "display_hdmi.h"
+#include "display_virtual.h"
 
 namespace sde {
 
@@ -84,57 +84,57 @@ DisplayError CoreImpl::Deinit() {
   return kErrorNone;
 }
 
-DisplayError CoreImpl::CreateDevice(DeviceType type, DeviceEventHandler *event_handler,
-                                    DeviceInterface **intf) {
+DisplayError CoreImpl::CreateDisplay(DisplayType type, DisplayEventHandler *event_handler,
+                                    DisplayInterface **intf) {
   SCOPE_LOCK(locker_);
 
   if (UNLIKELY(!event_handler || !intf)) {
     return kErrorParameters;
   }
 
-  DeviceBase *device_base = NULL;
+  DisplayBase *display_base = NULL;
   switch (type) {
   case kPrimary:
-    device_base = new DevicePrimary(event_handler, hw_intf_, &comp_mgr_);
+    display_base = new DisplayPrimary(event_handler, hw_intf_, &comp_mgr_);
     break;
 
-  case kHWHDMI:
-    device_base = new DeviceHDMI(event_handler, hw_intf_, &comp_mgr_);
+  case kHDMI:
+    display_base = new DisplayHDMI(event_handler, hw_intf_, &comp_mgr_);
     break;
 
   case kVirtual:
-    device_base = new DeviceVirtual(event_handler, hw_intf_, &comp_mgr_);
+    display_base = new DisplayVirtual(event_handler, hw_intf_, &comp_mgr_);
     break;
 
   default:
-    DLOGE("Spurious device type %d", type);
+    DLOGE("Spurious display type %d", type);
     return kErrorParameters;
   }
 
-  if (UNLIKELY(!device_base)) {
+  if (UNLIKELY(!display_base)) {
     return kErrorMemory;
   }
 
-  DisplayError error = device_base->Init();
+  DisplayError error = display_base->Init();
   if (UNLIKELY(error != kErrorNone)) {
-    delete device_base;
+    delete display_base;
     return error;
   }
 
-  *intf = device_base;
+  *intf = display_base;
   return kErrorNone;
 }
 
-DisplayError CoreImpl::DestroyDevice(DeviceInterface *intf) {
+DisplayError CoreImpl::DestroyDisplay(DisplayInterface *intf) {
   SCOPE_LOCK(locker_);
 
   if (UNLIKELY(!intf)) {
     return kErrorParameters;
   }
 
-  DeviceBase *device_base = static_cast<DeviceBase *>(intf);
-  device_base->Deinit();
-  delete device_base;
+  DisplayBase *display_base = static_cast<DisplayBase *>(intf);
+  display_base->Deinit();
+  delete display_base;
 
   return kErrorNone;
 }

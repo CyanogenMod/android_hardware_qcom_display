@@ -29,7 +29,7 @@
 #include <core/core_interface.h>
 #include <utils/locker.h>
 
-#include "hwc_sink_primary.h"
+#include "hwc_display_primary.h"
 
 namespace sde {
 
@@ -69,7 +69,7 @@ class HWCSession : public hwc_composer_device_1_t, public CoreEventHandler {
   static Locker locker_;
   CoreInterface *core_intf_;
   hwc_procs_t const *hwc_procs_;
-  HWCSinkPrimary *sink_primary_;
+  HWCDisplayPrimary *display_primary_;
 };
 
 }  // namespace sde

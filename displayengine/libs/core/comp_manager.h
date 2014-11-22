@@ -25,7 +25,7 @@
 #ifndef __COMP_MANAGER_H__
 #define __COMP_MANAGER_H__
 
-#include <core/device_interface.h>
+#include <core/display_interface.h>
 
 #include "hw_interface.h"
 #include "strategy_default.h"
@@ -39,23 +39,23 @@ class CompManager : public DumpImpl {
   CompManager();
   DisplayError Init(const HWResourceInfo &hw_res_info_);
   DisplayError Deinit();
-  DisplayError RegisterDevice(DeviceType type, const HWDeviceAttributes &attributes,
-                              Handle *device);
-  DisplayError UnregisterDevice(Handle device);
-  DisplayError Prepare(Handle device, HWLayers *hw_layers);
-  void PostPrepare(Handle device, HWLayers *hw_layers);
-  void PostCommit(Handle device, HWLayers *hw_layers);
-  void Purge(Handle device);
+  DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
+                               Handle *res_mgr_hnd);
+  DisplayError UnregisterDisplay(Handle res_mgr_hnd);
+  DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
+  void PostPrepare(Handle display_ctx, HWLayers *hw_layers);
+  void PostCommit(Handle display_ctx, HWLayers *hw_layers);
+  void Purge(Handle display_ctx);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);
 
  private:
-  void PrepareStrategyConstraints(Handle device, HWLayers *hw_layers);
-  struct CompManagerDevice {
+  void PrepareStrategyConstraints(Handle display_ctx, HWLayers *hw_layers);
+  struct DisplayCompositionContext {
     StrategyConstraints constraints;
-    Handle res_mgr_device;
-    DeviceType device_type;
+    Handle display_resource_ctx;
+    DisplayType display_type;
   };
 
   Locker locker_;

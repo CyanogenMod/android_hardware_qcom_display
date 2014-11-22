@@ -24,18 +24,18 @@
 
 // SDE_LOG_TAG definition must precede debug.h include.
 #define SDE_LOG_TAG kTagCore
-#define SDE_MODULE_NAME "DevicePrimary"
+#define SDE_MODULE_NAME "DisplayHDMI"
 #include <utils/debug.h>
 
 #include <utils/constants.h>
 
-#include "device_primary.h"
+#include "display_hdmi.h"
 
 namespace sde {
 
-DevicePrimary::DevicePrimary(DeviceEventHandler *event_handler, HWInterface *hw_intf,
-                             CompManager *comp_manager)
-  : DeviceBase(kPrimary, event_handler, kHWPrimary, hw_intf, comp_manager) {
+DisplayHDMI::DisplayHDMI(DisplayEventHandler *event_handler, HWInterface *hw_intf,
+                         CompManager *comp_manager)
+  : DisplayBase(kHDMI, event_handler, kHWHDMI, hw_intf, comp_manager) {
 }
 
 }  // namespace sde

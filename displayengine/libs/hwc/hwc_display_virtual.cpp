@@ -22,19 +22,43 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __DEVICE_HDMI_H__
-#define __DEVICE_HDMI_H__
+#include <utils/constants.h>
 
-#include "device_base.h"
+// HWC_MODULE_NAME definition must precede hwc_logger.h include.
+#define HWC_MODULE_NAME "HWCDisplayVirtual"
+#include "hwc_logger.h"
+
+#include "hwc_display_virtual.h"
 
 namespace sde {
 
-class DeviceHDMI : public DeviceBase {
- public:
-  DeviceHDMI(DeviceEventHandler *event_handler, HWInterface *hw_intf, CompManager *comp_manager);
-};
+HWCDisplayVirtual::HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
+  : HWCDisplay(core_intf, hwc_procs, kVirtual, HWC_DISPLAY_VIRTUAL) {
+}
+
+int HWCDisplayVirtual::Init() {
+  return 0;
+}
+
+int HWCDisplayVirtual::Deinit() {
+  return 0;
+}
+
+int HWCDisplayVirtual::Prepare(hwc_display_contents_1_t *content_list) {
+  return 0;
+}
+
+int HWCDisplayVirtual::Commit(hwc_display_contents_1_t *content_list) {
+  return 0;
+}
+
+int HWCDisplayVirtual::PowerOn() {
+  return 0;
+}
+
+int HWCDisplayVirtual::PowerOff() {
+  return 0;
+}
 
 }  // namespace sde
-
-#endif  // __DEVICE_HDMI_H__
 

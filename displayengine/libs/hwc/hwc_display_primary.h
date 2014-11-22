@@ -22,43 +22,25 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <utils/constants.h>
+#ifndef __HWC_DISPLAY_PRIMARY_H__
+#define __HWC_DISPLAY_PRIMARY_H__
 
-// HWC_MODULE_NAME definition must precede hwc_logger.h include.
-#define HWC_MODULE_NAME "HWCSinkExternal"
-#include "hwc_logger.h"
-
-#include "hwc_sink_external.h"
+#include "hwc_display.h"
 
 namespace sde {
 
-HWCSinkExternal::HWCSinkExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCSink(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL) {
-}
-
-int HWCSinkExternal::Init() {
-  return 0;
-}
-
-int HWCSinkExternal::Deinit() {
-  return 0;
-}
-
-int HWCSinkExternal::Prepare(hwc_display_contents_1_t *content_list) {
-  return 0;
-}
-
-int HWCSinkExternal::Commit(hwc_display_contents_1_t *content_list) {
-  return 0;
-}
-
-int HWCSinkExternal::PowerOn() {
-  return 0;
-}
-
-int HWCSinkExternal::PowerOff() {
-  return 0;
-}
+class HWCDisplayPrimary : public HWCDisplay {
+ public:
+  explicit HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
+  virtual int Init();
+  virtual int Deinit();
+  virtual int Prepare(hwc_display_contents_1_t *content_list);
+  virtual int Commit(hwc_display_contents_1_t *content_list);
+  virtual int PowerOn();
+  virtual int PowerOff();
+};
 
 }  // namespace sde
+
+#endif  // __HWC_DISPLAY_PRIMARY_H__
 

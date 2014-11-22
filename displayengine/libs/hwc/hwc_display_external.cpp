@@ -22,20 +22,42 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// SDE_LOG_TAG definition must precede debug.h include.
-#define SDE_LOG_TAG kTagCore
-#define SDE_MODULE_NAME "DeviceVirtual"
-#include <utils/debug.h>
-
 #include <utils/constants.h>
 
-#include "device_virtual.h"
+// HWC_MODULE_NAME definition must precede hwc_logger.h include.
+#define HWC_MODULE_NAME "HWCDisplayExternal"
+#include "hwc_logger.h"
+
+#include "hwc_display_external.h"
 
 namespace sde {
 
-DeviceVirtual::DeviceVirtual(DeviceEventHandler *event_handler, HWInterface *hw_intf,
-                             CompManager *comp_manager)
-  : DeviceBase(kVirtual, event_handler, kHWBlockMax, hw_intf, comp_manager) {
+HWCDisplayExternal::HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
+  : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL) {
+}
+
+int HWCDisplayExternal::Init() {
+  return 0;
+}
+
+int HWCDisplayExternal::Deinit() {
+  return 0;
+}
+
+int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
+  return 0;
+}
+
+int HWCDisplayExternal::Commit(hwc_display_contents_1_t *content_list) {
+  return 0;
+}
+
+int HWCDisplayExternal::PowerOn() {
+  return 0;
+}
+
+int HWCDisplayExternal::PowerOff() {
+  return 0;
 }
 
 }  // namespace sde

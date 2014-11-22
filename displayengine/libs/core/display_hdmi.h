@@ -22,21 +22,19 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// SDE_LOG_TAG definition must precede debug.h include.
-#define SDE_LOG_TAG kTagCore
-#define SDE_MODULE_NAME "DeviceHDMI"
-#include <utils/debug.h>
+#ifndef __DISPLAY_HDMI_H__
+#define __DISPLAY_HDMI_H__
 
-#include <utils/constants.h>
-
-#include "device_hdmi.h"
+#include "display_base.h"
 
 namespace sde {
 
-DeviceHDMI::DeviceHDMI(DeviceEventHandler *event_handler, HWInterface *hw_intf,
-                       CompManager *comp_manager)
-  : DeviceBase(kHDMI, event_handler, kHWHDMI, hw_intf, comp_manager) {
-}
+class DisplayHDMI : public DisplayBase {
+ public:
+  DisplayHDMI(DisplayEventHandler *event_handler, HWInterface *hw_intf, CompManager *comp_manager);
+};
 
 }  // namespace sde
+
+#endif  // __DISPLAY_HDMI_H__
 

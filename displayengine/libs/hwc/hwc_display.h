@@ -22,15 +22,15 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __HWC_SINK_H__
-#define __HWC_SINK_H__
+#ifndef __HWC_DISPLAY_H__
+#define __HWC_DISPLAY_H__
 
 #include <hardware/hwcomposer.h>
 #include <core/core_interface.h>
 
 namespace sde {
 
-class HWCSink : public DeviceEventHandler {
+class HWCDisplay : public DisplayEventHandler {
  public:
   virtual int Init();
   virtual int Deinit();
@@ -40,7 +40,7 @@ class HWCSink : public DeviceEventHandler {
   virtual int Blank(int blank);
   virtual int GetDisplayConfigs(uint32_t *configs, size_t *num_configs);
   virtual int GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values);
-  int SetState(DeviceState state);
+  int SetState(DisplayState state);
 
  protected:
   // Maximum number of layers supported by display engine.
@@ -55,11 +55,11 @@ class HWCSink : public DeviceEventHandler {
     LayerStackMemory() : raw(NULL), size(0) { }
   };
 
-  HWCSink(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DeviceType type, int id);
-  virtual ~HWCSink() { }
+  HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id);
+  virtual ~HWCDisplay() { }
 
-  // DeviceEventHandler methods
-  virtual DisplayError VSync(const DeviceEventVSync &vsync);
+  // DisplayEventHandler methods
+  virtual DisplayError VSync(const DisplayEventVSync &vsync);
   virtual DisplayError Refresh();
 
   virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
@@ -75,9 +75,9 @@ class HWCSink : public DeviceEventHandler {
   LayerStackMemory layer_stack_;
   CoreInterface *core_intf_;
   hwc_procs_t const **hwc_procs_;
-  DeviceType type_;
+  DisplayType type_;
   int id_;
-  DeviceInterface *device_intf_;
+  DisplayInterface *display_intf_;
 
  private:
   struct LayerCache {
@@ -102,5 +102,5 @@ class HWCSink : public DeviceEventHandler {
 
 }  // namespace sde
 
-#endif  // __HWC_SINK_H__
+#endif  // __HWC_DISPLAY_H__
 

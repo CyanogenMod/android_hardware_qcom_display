@@ -22,16 +22,16 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __HWC_SINK_VIRTUAL_H__
-#define __HWC_SINK_VIRTUAL_H__
+#ifndef __HWC_DISPLAY_EXTERNAL_H__
+#define __HWC_DISPLAY_EXTERNAL_H__
 
-#include "hwc_sink.h"
+#include "hwc_display.h"
 
 namespace sde {
 
-class HWCSinkVirtual : public HWCSink {
+class HWCDisplayExternal : public HWCDisplay {
  public:
-  explicit HWCSinkVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
+  explicit HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
   virtual int Init();
   virtual int Deinit();
   virtual int Prepare(hwc_display_contents_1_t *content_list);
@@ -42,5 +42,5 @@ class HWCSinkVirtual : public HWCSink {
 
 }  // namespace sde
 
-#endif  // __HWC_SINK_VIRTUAL_H__
+#endif  // __HWC_DISPLAY_EXTERNAL_H__
 

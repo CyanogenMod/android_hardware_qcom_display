@@ -34,7 +34,7 @@
 
 #include <stdint.h>
 
-#include "device_interface.h"
+#include "display_interface.h"
 #include "display_types.h"
 
 /*! @brief Display core interface version.
@@ -150,16 +150,16 @@ class CoreInterface {
     interface associated with this object is returned via output parameter which can be used to
     interact further with the display device.
 
-    @param[in] type \link DeviceType \endlink
-    @param[in] event_handler \link DeviceEventHandler \endlink
+    @param[in] type \link DisplayType \endlink
+    @param[in] event_handler \link DisplayEventHandler \endlink
     @param[out] interface \link DisplayInterface \endlink
 
     @return \link DisplayError \endlink
 
-    @sa DestroyDevice
+    @sa DestroyDisplay
   */
-  virtual DisplayError CreateDevice(DeviceType type, DeviceEventHandler *event_handler,
-                                    DeviceInterface **interface) = 0;
+  virtual DisplayError CreateDisplay(DisplayType type, DisplayEventHandler *event_handler,
+                                    DisplayInterface **interface) = 0;
 
   /*! @brief Method to destroy a display device.
 
@@ -169,9 +169,9 @@ class CoreInterface {
 
     @return \link DisplayError \endlink
 
-    @sa CreateDevice
+    @sa CreateDisplay
   */
-  virtual DisplayError DestroyDevice(DeviceInterface *interface) = 0;
+  virtual DisplayError DestroyDisplay(DisplayInterface *interface) = 0;
 
  protected:
   virtual ~CoreInterface() { }

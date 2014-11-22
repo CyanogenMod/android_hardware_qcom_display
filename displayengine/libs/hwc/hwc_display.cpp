@@ -27,19 +27,20 @@
 #include <utils/constants.h>
 
 // HWC_MODULE_NAME definition must precede hwc_logger.h include.
-#define HWC_MODULE_NAME "HWCSink"
+#define HWC_MODULE_NAME "HWCDisplay"
 #include "hwc_logger.h"
 
-#include "hwc_sink.h"
+#include "hwc_display.h"
 
 namespace sde {
 
-HWCSink::HWCSink(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DeviceType type, int id)
-  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), device_intf_(NULL) {
+HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
+                       int id)
+  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL) {
 }
 
-int HWCSink::Init() {
-  DisplayError error = core_intf_->CreateDevice(type_, this, &device_intf_);
+int HWCDisplay::Init() {
+  DisplayError error = core_intf_->CreateDisplay(type_, this, &display_intf_);
   if (UNLIKELY(error != kErrorNone)) {
     DLOGE("Display device create failed. Error = %d", error);
     return -EINVAL;
@@ -48,8 +49,8 @@ int HWCSink::Init() {
   return 0;
 }
 
-int HWCSink::Deinit() {
-  DisplayError error = core_intf_->DestroyDevice(device_intf_);
+int HWCDisplay::Deinit() {
+  DisplayError error = core_intf_->DestroyDisplay(display_intf_);
   if (UNLIKELY(error != kErrorNone)) {
     DLOGE("Display device destroy failed. Error = %d", error);
     return -EINVAL;
@@ -62,12 +63,12 @@ int HWCSink::Deinit() {
   return 0;
 }
 
-int HWCSink::EventControl(int event, int enable) {
+int HWCDisplay::EventControl(int event, int enable) {
   DisplayError error = kErrorNone;
 
   switch (event) {
   case HWC_EVENT_VSYNC:
-    error = device_intf_->SetVSyncState(enable);
+    error = display_intf_->SetVSyncState(enable);
     break;
 
   default:
@@ -82,13 +83,13 @@ int HWCSink::EventControl(int event, int enable) {
   return 0;
 }
 
-int HWCSink::Blank(int blank) {
+int HWCDisplay::Blank(int blank) {
   DLOGI("Blank : %d, display : %d", blank, id_);
-  DeviceState state = blank ? kStateOff : kStateOn;
+  DisplayState state = blank ? kStateOff : kStateOn;
   return SetState(state);
 }
 
-int HWCSink::GetDisplayConfigs(uint32_t *configs, size_t *num_configs) {
+int HWCDisplay::GetDisplayConfigs(uint32_t *configs, size_t *num_configs) {
   if (*num_configs > 0) {
     configs[0] = 0;
     *num_configs = 1;
@@ -97,11 +98,11 @@ int HWCSink::GetDisplayConfigs(uint32_t *configs, size_t *num_configs) {
   return 0;
 }
 
-int HWCSink::GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values) {
+int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values) {
   DisplayError error = kErrorNone;
 
-  DeviceConfigVariableInfo variable_config;
-  error = device_intf_->GetConfig(&variable_config, 0);
+  DisplayConfigVariableInfo variable_config;
+  error = display_intf_->GetConfig(&variable_config, 0);
   if (UNLIKELY(error != kErrorNone)) {
     DLOGE("GetConfig variable info failed. Error = %d", error);
     return -EINVAL;
@@ -133,8 +134,8 @@ int HWCSink::GetDisplayAttributes(uint32_t config, const uint32_t *attributes, i
   return 0;
 }
 
-int HWCSink::SetState(DeviceState state) {
-  DisplayError error = device_intf_->SetDeviceState(state);
+int HWCDisplay::SetState(DisplayState state) {
+  DisplayError error = display_intf_->SetDisplayState(state);
   if (UNLIKELY(error != kErrorNone)) {
     DLOGE("Set state failed. Error = %d", error);
     return -EINVAL;
@@ -143,7 +144,7 @@ int HWCSink::SetState(DeviceState state) {
   return 0;
 }
 
-DisplayError HWCSink::VSync(const DeviceEventVSync &vsync) {
+DisplayError HWCDisplay::VSync(const DisplayEventVSync &vsync) {
   if (*hwc_procs_) {
     (*hwc_procs_)->vsync(*hwc_procs_, id_, vsync.timestamp);
   }
@@ -151,7 +152,7 @@ DisplayError HWCSink::VSync(const DeviceEventVSync &vsync) {
   return kErrorNone;
 }
 
-DisplayError HWCSink::Refresh() {
+DisplayError HWCDisplay::Refresh() {
   if (*hwc_procs_) {
     (*hwc_procs_)->invalidate(*hwc_procs_);
   }
@@ -159,7 +160,7 @@ DisplayError HWCSink::Refresh() {
   return kErrorNone;
 }
 
-int HWCSink::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
+int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   size_t num_hw_layers = content_list->numHwLayers;
 
   // Allocate memory for a) total number of layers b) buffer handle for each layer c) number of
@@ -220,7 +221,7 @@ int HWCSink::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-int HWCSink::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
+int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   size_t num_hw_layers = content_list->numHwLayers;
   if (UNLIKELY(num_hw_layers <= 1)) {
     return 0;
@@ -282,7 +283,7 @@ int HWCSink::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   // Configure layer stack
   layer_stack_.flags.geometry_changed = ((content_list->flags & HWC_GEOMETRY_CHANGED) > 0);
 
-  DisplayError error = device_intf_->Prepare(&layer_stack_);
+  DisplayError error = display_intf_->Prepare(&layer_stack_);
   if (UNLIKELY(error != kErrorNone)) {
     DLOGE("Prepare failed. Error = %d", error);
     return -EINVAL;
@@ -304,7 +305,7 @@ int HWCSink::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-void HWCSink::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
+void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
   for (size_t i = 0; i < layer_count; i++) {
@@ -315,7 +316,7 @@ void HWCSink::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
   layer_stack_cache_.layer_count = layer_count;
 }
 
-bool HWCSink::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
+bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
   // Frame buffer needs to be refreshed for the following reasons:
@@ -343,7 +344,7 @@ bool HWCSink::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
   return false;
 }
 
-int HWCSink::CommitLayerStack(hwc_display_contents_1_t *content_list) {
+int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
   size_t num_hw_layers = content_list->numHwLayers;
   if (UNLIKELY(num_hw_layers <= 1)) {
     return 0;
@@ -356,7 +357,7 @@ int HWCSink::CommitLayerStack(hwc_display_contents_1_t *content_list) {
     layer_buffer->acquire_fence_fd = hwc_layer.acquireFenceFd;
   }
 
-  DisplayError error = device_intf_->Commit(&layer_stack_);
+  DisplayError error = display_intf_->Commit(&layer_stack_);
   if (UNLIKELY(error != kErrorNone)) {
     DLOGE("Commit failed. Error = %d", error);
     return -EINVAL;
@@ -379,21 +380,21 @@ int HWCSink::CommitLayerStack(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-void HWCSink::SetRect(LayerRect *target, const hwc_rect_t &source) {
+void HWCDisplay::SetRect(LayerRect *target, const hwc_rect_t &source) {
   target->left = FLOAT(source.left);
   target->top = FLOAT(source.top);
   target->right = FLOAT(source.right);
   target->bottom = FLOAT(source.bottom);
 }
 
-void HWCSink::SetRect(LayerRect *target, const hwc_frect_t &source) {
+void HWCDisplay::SetRect(LayerRect *target, const hwc_frect_t &source) {
   target->left = source.left;
   target->top = source.top;
   target->right = source.right;
   target->bottom = source.bottom;
 }
 
-void HWCSink::SetComposition(LayerComposition *target, const int32_t &source) {
+void HWCDisplay::SetComposition(LayerComposition *target, const int32_t &source) {
   switch (source) {
   case HWC_FRAMEBUFFER_TARGET:
     *target = kCompositionGPUTarget;
@@ -404,7 +405,7 @@ void HWCSink::SetComposition(LayerComposition *target, const int32_t &source) {
   }
 }
 
-void HWCSink::SetComposition(int32_t *target, const LayerComposition &source) {
+void HWCDisplay::SetComposition(int32_t *target, const LayerComposition &source) {
   switch (source) {
   case kCompositionGPUTarget:
     *target = HWC_FRAMEBUFFER_TARGET;
@@ -418,7 +419,7 @@ void HWCSink::SetComposition(int32_t *target, const LayerComposition &source) {
   }
 }
 
-void HWCSink::SetBlending(LayerBlending *target, const int32_t &source) {
+void HWCDisplay::SetBlending(LayerBlending *target, const int32_t &source) {
   switch (source) {
   case HWC_BLENDING_PREMULT:
     *target = kBlendingPremultiplied;
@@ -432,7 +433,7 @@ void HWCSink::SetBlending(LayerBlending *target, const int32_t &source) {
   }
 }
 
-int HWCSink::SetFormat(LayerBufferFormat *target, const int &source) {
+int HWCDisplay::SetFormat(LayerBufferFormat *target, const int &source) {
   switch (source) {
   case HAL_PIXEL_FORMAT_RGBA_8888:
     *target = kFormatRGBA8888;
