@@ -555,6 +555,11 @@ struct hwc_context_t {
     bool mMDPDownscaleEnabled;
     // number of active Displays
     int numActiveDisplays;
+
+    // Is WFD enabled through VDS solution ?
+    // This can be set via system property
+    // persist.hwc.enable_vds
+    bool mVDSEnabled;
     struct gpu_hint_info mGPUHintInfo;
     // PTOR Info
     qhwc::PtorInfo mPtorInfo;
