@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -422,12 +422,29 @@ int gralloc_perform(struct gralloc_module_t const* module,
                     res = 0;
                 }
             } break;
+
         case GRALLOC_MODULE_PERFORM_GET_YUV_PLANE_INFO:
             {
                 private_handle_t* hnd =  va_arg(args, private_handle_t*);
                 android_ycbcr* ycbcr = va_arg(args, struct android_ycbcr *);
                 if (!private_handle_t::validate(hnd)) {
                     res = getYUVPlaneInfo(hnd, ycbcr);
+                }
+            } break;
+
+        case GRALLOC_MODULE_PERFORM_GET_MAP_SECURE_BUFFER_INFO:
+            {
+                private_handle_t* hnd =  va_arg(args, private_handle_t*);
+                int *map_secure_buffer = va_arg(args, int *);
+                if (private_handle_t::validate(hnd)) {
+                    return res;
+                }
+                MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+                if(metadata && metadata->operation & MAP_SECURE_BUFFER) {
+                    *map_secure_buffer = metadata->mapSecureBuffer;
+                    res = 0;
+                } else {
+                    *map_secure_buffer = 0;
                 }
             } break;
 
