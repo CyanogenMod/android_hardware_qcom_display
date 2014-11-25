@@ -58,8 +58,6 @@ public:
     static void setMaxPipesPerMixer(const uint32_t value);
 
 protected:
-    enum { MAX_SEC_LAYERS = 1 }; //TODO add property support
-
     enum ePipeType {
         MDPCOMP_OV_RGB = ovutils::OV_MDP_PIPE_RGB,
         MDPCOMP_OV_VG = ovutils::OV_MDP_PIPE_VG,
@@ -258,6 +256,7 @@ protected:
     static int sMaxPipesPerMixer;
     static bool sSrcSplitEnabled;
     static IdleInvalidator *sIdleInvalidator;
+    static int sMaxSecLayers;
     struct FrameInfo mCurrentFrame;
     struct LayerCache mCachedFrame;
     //Enable 4kx2k yuv layer split
