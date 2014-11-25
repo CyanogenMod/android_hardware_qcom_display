@@ -58,6 +58,8 @@ public:
     static void setMaxPipesPerMixer(const uint32_t value);
     static int setPartialUpdatePref(hwc_context_t *ctx, bool enable);
     static bool getPartialUpdatePref(hwc_context_t *ctx);
+    void setDynRefreshRate(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+
 protected:
     enum ePipeType {
         MDPCOMP_OV_RGB = ovutils::OV_MDP_PIPE_RGB,
