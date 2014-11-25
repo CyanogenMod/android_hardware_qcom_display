@@ -134,4 +134,22 @@ int setViewFrame(int dpy, int l, int t, int r, int b) {
     return err;
 }
 
+int configureDynRefreshRate(uint32_t op, uint32_t refreshRate) {
+    status_t err = (status_t) FAILED_TRANSACTION;
+    sp<IQService> binder = getBinder();
+    Parcel inParcel, outParcel;
+    inParcel.writeInt32(op);
+    inParcel.writeInt32(refreshRate);
+
+    if(binder != NULL) {
+        err = binder->dispatch(IQService::CONFIGURE_DYN_REFRESH_RATE,
+                               &inParcel, &outParcel);
+    }
+
+    if(err)
+        ALOGE("%s: Failed setting op %d err=%d", __FUNCTION__, op, err);
+
+    return err;
+}
+
 }; //namespace
