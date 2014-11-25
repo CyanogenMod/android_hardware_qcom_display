@@ -1490,6 +1490,33 @@ bool MDPComp::hwLimitationsCheck(hwc_context_t* ctx,
     return true;
 }
 
+void MDPComp::setDynRefreshRate(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
+    //For primary display, set the dynamic refreshrate
+    if(!mDpy && qdutils::MDPVersion::getInstance().isDynFpsSupported() &&
+                                        ctx->mUseMetaDataRefreshRate) {
+        FrameInfo frame;
+        frame.reset(mCurrentFrame.layerCount);
+        memset(&frame.drop, 0, sizeof(frame.drop));
+        frame.dropCount = 0;
+        ALOGD_IF(isDebug(), "%s: Update Cache and YUVInfo for Dyn Refresh Rate",
+                 __FUNCTION__);
+        updateLayerCache(ctx, list, frame);
+        updateYUV(ctx, list, false /*secure only*/, frame);
+        uint32_t refreshRate = ctx->dpyAttr[mDpy].refreshRate;
+        MDPVersion& mdpHw = MDPVersion::getInstance();
+        if(sIdleFallBack) {
+            //Set minimum panel refresh rate during idle timeout
+            refreshRate = mdpHw.getMinFpsSupported();
+        } else if((ctx->listStats[mDpy].yuvCount == frame.mdpCount) ||
+                                (frame.layerCount == 1)) {
+            //Set the new fresh rate, if there is only one updating YUV layer
+            //or there is one single RGB layer with this request
+            refreshRate = ctx->listStats[mDpy].refreshRateRequest;
+        }
+        setRefreshRate(ctx, mDpy, refreshRate);
+    }
+}
+
 int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int ret = 0;
 
@@ -1505,18 +1532,22 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     // reset PTOR
     if(!mDpy)
         memset(&(ctx->mPtorInfo), 0, sizeof(ctx->mPtorInfo));
-    //Do not cache the information for next draw cycle.
-    if(numLayers > MAX_NUM_APP_LAYERS or (!numLayers)) {
-        ALOGI("%s: Unsupported layer count for mdp composition",
-                __FUNCTION__);
-        mCachedFrame.reset();
-        return -1;
-    }
 
     //reset old data
     mCurrentFrame.reset(numLayers);
     memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
     mCurrentFrame.dropCount = 0;
+
+    //Do not cache the information for next draw cycle.
+    if(numLayers > MAX_NUM_APP_LAYERS or (!numLayers)) {
+        ALOGI("%s: Unsupported layer count for mdp composition",
+                __FUNCTION__);
+        mCachedFrame.reset();
+#ifdef DYNAMIC_FPS
+        setDynRefreshRate(ctx, list);
+#endif
+        return -1;
+    }
 
     // Detect the start of animation and fall back to GPU only once to cache
     // all the layers in FB and display FB content untill animation completes.
@@ -1528,6 +1559,9 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         }
         setMDPCompLayerFlags(ctx, list);
         mCachedFrame.updateCounts(mCurrentFrame);
+#ifdef DYNAMIC_FPS
+        setDynRefreshRate(ctx, list);
+#endif
         ret = -1;
         return ret;
     } else {
@@ -1562,24 +1596,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     }
 
 #ifdef DYNAMIC_FPS
-    //For primary display, set the dynamic refreshrate
-    if(!mDpy && qdutils::MDPVersion::getInstance().isDynFpsSupported() &&
-                                        ctx->mUseMetaDataRefreshRate) {
-        FrameInfo frame;
-        frame.reset(mCurrentFrame.layerCount);
-        ALOGD_IF(isDebug(), "%s: Update Cache and YUVInfo for Dyn Refresh Rate",
-                 __FUNCTION__);
-        updateLayerCache(ctx, list, frame);
-        updateYUV(ctx, list, false /*secure only*/, frame);
-        uint32_t refreshRate = ctx->dpyAttr[mDpy].refreshRate;
-        //Set the new fresh rate, if there is only one updating YUV layer
-        //or there is one single RGB layer with this request
-        if((ctx->listStats[mDpy].yuvCount == frame.mdpCount) ||
-                                (frame.layerCount == 1)) {
-            refreshRate = ctx->listStats[mDpy].refreshRateRequest;
-        }
-        setRefreshRate(ctx, mDpy, refreshRate);
-    }
+    setDynRefreshRate(ctx, list);
 #endif
 
     mCachedFrame.cacheAll(list);
