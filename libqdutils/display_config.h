@@ -39,6 +39,12 @@
 
 namespace qdutils {
 
+
+/* TODO: Have all the common enums that need be exposed to clients and which
+ * are also needed in hwc defined here. Remove such definitions we have in
+ * hwc_utils.h
+ */
+
 // Use this enum to specify the dpy parameters where needed
 enum {
     DISPLAY_PRIMARY = 0,
@@ -53,6 +59,12 @@ enum {
     EXTERNAL_ONLINE,
     EXTERNAL_PAUSE,
     EXTERNAL_RESUME,
+};
+
+enum {
+    DISABLE_METADATA_DYN_REFRESH_RATE = 0,
+    ENABLE_METADATA_DYN_REFRESH_RATE,
+    SET_BINDER_DYN_REFRESH_RATE,
 };
 
 // Display Attributes that are available to clients of this library
@@ -89,4 +101,7 @@ int setViewFrame(int dpy, int l, int t, int r, int b);
 
 // Set the secondary display status(pause/resume/offline etc.,)
 int setSecondaryDisplayStatus(int dpy, uint32_t status);
+
+// Enable/Disable/Set refresh rate dynamically
+int configureDynRefreshRate(uint32_t op, uint32_t refreshRate);
 }; //namespace
