@@ -34,6 +34,7 @@
 #include <hwc_mdpcomp.h>
 #include <hwc_virtual.h>
 #include <overlay.h>
+#include <display_config.h>
 
 #define QCLIENT_DEBUG 0
 
@@ -41,6 +42,7 @@ using namespace android;
 using namespace qService;
 using namespace qhwc;
 using namespace overlay;
+using namespace qdutils;
 
 namespace qClient {
 
@@ -174,13 +176,13 @@ static void setSecondaryDisplayStatus(hwc_context_t *ctx,
                                         dpy, getExternalDisplayState(status));
 
     if(dpy > HWC_DISPLAY_PRIMARY && dpy <= HWC_DISPLAY_VIRTUAL) {
-        if(dpy == HWC_DISPLAY_VIRTUAL && status == EXTERNAL_OFFLINE) {
+        if(dpy == HWC_DISPLAY_VIRTUAL && status == qdutils::EXTERNAL_OFFLINE) {
             ctx->mWfdSyncLock.lock();
             ctx->mWfdSyncLock.signal();
             ctx->mWfdSyncLock.unlock();
-        } else if(status == EXTERNAL_PAUSE) {
+        } else if(status == qdutils::EXTERNAL_PAUSE) {
             handle_pause(ctx, dpy);
-        } else if(status == EXTERNAL_RESUME) {
+        } else if(status == qdutils::EXTERNAL_RESUME) {
             handle_resume(ctx, dpy);
         }
     } else {
@@ -244,6 +246,48 @@ static void setIdleTimeout(hwc_context_t* ctx, const Parcel* inParcel) {
     MDPComp::setIdleTimeout(timeout);
 }
 
+static void configureDynRefreshRate(hwc_context_t* ctx,
+                                    const Parcel* inParcel) {
+    uint32_t op = (uint32_t)inParcel->readInt32();
+    uint32_t refresh_rate = (uint32_t)inParcel->readInt32();
+    MDPVersion& mdpHw = MDPVersion::getInstance();
+    uint32_t dpy = HWC_DISPLAY_PRIMARY;
+
+    if(mdpHw.isDynFpsSupported()) {
+        Locker::Autolock _sl(ctx->mDrawLock);
+
+        switch (op) {
+        case DISABLE_METADATA_DYN_REFRESH_RATE:
+            ctx->mUseMetaDataRefreshRate = false;
+            setRefreshRate(ctx, dpy, ctx->dpyAttr[dpy].refreshRate);
+            break;
+        case ENABLE_METADATA_DYN_REFRESH_RATE:
+            ctx->mUseMetaDataRefreshRate = true;
+            setRefreshRate(ctx, dpy, ctx->dpyAttr[dpy].refreshRate);
+            break;
+        case SET_BINDER_DYN_REFRESH_RATE:
+            if(ctx->mUseMetaDataRefreshRate)
+                ALOGW("%s: Ignoring binder request to change refresh-rate",
+                      __FUNCTION__);
+            else {
+                uint32_t rate = roundOff(refresh_rate);
+                if((rate >= mdpHw.getMinFpsSupported() &&
+                    rate <= mdpHw.getMaxFpsSupported())) {
+                    setRefreshRate(ctx, dpy, rate);
+                } else {
+                    ALOGE("%s: Requested refresh-rate should be between \
+                          (%d) and (%d). Given (%d)", __FUNCTION__,
+                          mdpHw.getMinFpsSupported(),
+                          mdpHw.getMaxFpsSupported(), rate);
+                }
+            }
+            break;
+        default:
+            ALOGE("%s: Invalid op %d",__FUNCTION__,op);
+        }
+    }
+}
+
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t ret = NO_ERROR;
@@ -288,6 +332,9 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::SET_IDLE_TIMEOUT:
             setIdleTimeout(mHwcContext, inParcel);
+            break;
+        case IQService::CONFIGURE_DYN_REFRESH_RATE:
+            configureDynRefreshRate(mHwcContext, inParcel);
             break;
         default:
             ret = NO_ERROR;

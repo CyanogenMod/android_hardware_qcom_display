@@ -55,6 +55,12 @@ enum {
     EXTERNAL_RESUME,
 };
 
+enum {
+    DISABLE_METADATA_DYN_REFRESH_RATE = 0,
+    ENABLE_METADATA_DYN_REFRESH_RATE,
+    SET_BINDER_DYN_REFRESH_RATE,
+};
+
 // Display Attributes that are available to clients of this library
 // Not to be confused with a similar struct in hwc_utils (in the hwc namespace)
 struct DisplayAttributes_t {
@@ -89,4 +95,7 @@ int setViewFrame(int dpy, int l, int t, int r, int b);
 
 // Set the secondary display status(pause/resume/offline etc.,)
 int setSecondaryDisplayStatus(int dpy, uint32_t status);
+
+// Enable/Disable/Set refresh rate dynamically
+int configureDynRefreshRate(uint32_t op, uint32_t refreshRate);
 }; //namespace

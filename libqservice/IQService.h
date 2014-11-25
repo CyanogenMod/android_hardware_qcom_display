@@ -54,6 +54,8 @@ public:
         SET_VIEW_FRAME,          // Set view frame of display
         DYNAMIC_DEBUG,           // Enable more logging on the fly
         SET_IDLE_TIMEOUT,        // Set idle timeout for GPU fallback
+        /* Enable/Disable/Set refresh rate dynamically */
+        CONFIGURE_DYN_REFRESH_RATE,
         COMMAND_LIST_END = 400,
     };
 
