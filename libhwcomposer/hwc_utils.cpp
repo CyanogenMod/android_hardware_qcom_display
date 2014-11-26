@@ -81,8 +81,8 @@ EGLAPI EGLBoolean eglGpuPerfHintQCOM(EGLDisplay dpy, EGLContext ctx,
 
 namespace qhwc {
 
-//Std refresh rates for digital videos- 24p, 30p and 48p
-uint32_t stdRefreshRates[] = { 30, 24, 48 };
+// Std refresh rates for digital videos- 24p, 30p, 48p and 60p
+uint32_t stdRefreshRates[] = { 30, 24, 48, 60 };
 
 bool isValidResolution(hwc_context_t *ctx, uint32_t xres, uint32_t yres)
 {
