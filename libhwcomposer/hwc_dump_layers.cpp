@@ -319,7 +319,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         bool bResult = false;
         char dumpFilename[PATH_MAX];
         SkBitmap *tempSkBmp = new SkBitmap();
-        SkBitmap::Config tempSkBmpConfig = SkBitmap::kNo_Config;
+        SkColorType tempSkBmpColor = kUnknown_SkColorType;
         snprintf(dumpFilename, sizeof(dumpFilename),
             "%s/sfdump%03d.layer%zu.%s.png", mDumpDirPng,
             mDumpCntrPng, layerIndex, mDisplayName);
@@ -327,21 +327,24 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         switch (hnd->format) {
             case HAL_PIXEL_FORMAT_RGBA_8888:
             case HAL_PIXEL_FORMAT_RGBX_8888:
+                tempSkBmpColor = kRGBA_8888_SkColorType;
+                break;
             case HAL_PIXEL_FORMAT_BGRA_8888:
-                tempSkBmpConfig = SkBitmap::kARGB_8888_Config;
+                tempSkBmpColor = kBGRA_8888_SkColorType;
                 break;
             case HAL_PIXEL_FORMAT_RGB_565:
+                tempSkBmpColor = kRGB_565_SkColorType;
+                break;
             case HAL_PIXEL_FORMAT_RGBA_5551:
             case HAL_PIXEL_FORMAT_RGBA_4444:
-                tempSkBmpConfig = SkBitmap::kRGB_565_Config;
-                break;
             case HAL_PIXEL_FORMAT_RGB_888:
             default:
-                tempSkBmpConfig = SkBitmap::kNo_Config;
+                tempSkBmpColor = kUnknown_SkColorType;
                 break;
         }
-        if (SkBitmap::kNo_Config != tempSkBmpConfig) {
-            tempSkBmp->setConfig(tempSkBmpConfig, getWidth(hnd), getHeight(hnd));
+        if (kUnknown_SkColorType != tempSkBmpColor) {
+            tempSkBmp->setInfo(SkImageInfo::Make(getWidth(hnd), getHeight(hnd),
+                    tempSkBmpColor, kIgnore_SkAlphaType), 0);
             tempSkBmp->setPixels((void*)hnd->base);
             bResult = SkImageEncoder::EncodeFile(dumpFilename,
                                     *tempSkBmp, SkImageEncoder::kPNG_Type, 100);
