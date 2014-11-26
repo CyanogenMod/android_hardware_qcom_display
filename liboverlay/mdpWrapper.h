@@ -72,7 +72,7 @@ bool rotate(int fd, msm_rotator_data_info& rot);
 bool setOverlay(int fd, mdp_overlay& ov);
 
 /* MSMFB_OVERLAY_PREPARE */
-bool validateAndSet(const int& fd, mdp_overlay_list& list);
+int validateAndSet(const int& fd, mdp_overlay_list& list);
 
 /* MSM_ROTATOR_IOCTL_FINISH */
 bool endRotator(int fd, int sessionId);
@@ -180,7 +180,7 @@ inline bool setOverlay(int fd, mdp_overlay& ov) {
     return true;
 }
 
-inline bool validateAndSet(const int& fd, mdp_overlay_list& list) {
+inline int validateAndSet(const int& fd, mdp_overlay_list& list) {
     ATRACE_CALL();
     uint32_t id = 0;
     if(UNLIKELY(Overlay::isDebugPipeLifecycle())) {
@@ -198,7 +198,7 @@ inline bool validateAndSet(const int& fd, mdp_overlay_list& list) {
     if (ioctl(fd, MSMFB_OVERLAY_PREPARE, &list) < 0) {
         ALOGD_IF(IOCTL_DEBUG, "Failed to call ioctl MSMFB_OVERLAY_PREPARE "
                 "err=%s", strerror(errno));
-        return false;
+        return errno;
     }
 
     if(UNLIKELY(Overlay::isDebugPipeLifecycle())) {
@@ -209,7 +209,7 @@ inline bool validateAndSet(const int& fd, mdp_overlay_list& list) {
         ALOGD("%s Pipe mask after OVERLAY_PREPARE 0x%04x", __FUNCTION__, id);
     }
 
-    return true;
+    return 0;
 }
 
 inline bool endRotator(int fd, uint32_t sessionId) {
