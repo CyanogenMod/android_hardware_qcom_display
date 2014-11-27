@@ -50,7 +50,7 @@ public:
     enum { MIXER_LEFT, MIXER_RIGHT, MIXER_UNUSED };
     enum { MIXER_DEFAULT = MIXER_LEFT, MIXER_MAX = MIXER_UNUSED };
     enum { MAX_FB_DEVICES = DPY_MAX };
-    enum { FORMAT_YUV, FORMAT_RGB };
+    enum { FORMAT_YUV, FORMAT_RGB , FORMAT_NONE };
 
     struct PipeSpecs {
         PipeSpecs() : formatClass(FORMAT_RGB), needsScaling(false), fb(false),
@@ -170,7 +170,7 @@ private:
      * display without being garbage-collected once. To add if a pipe is
      * asisgned to a mixer within a display it cannot be reused for another
      * mixer without being UNSET once*/
-    utils::eDest nextPipe(utils::eMdpPipeType, int dpy, int mixer);
+    utils::eDest nextPipe(utils::eMdpPipeType, const PipeSpecs& pipeSpecs);
     /* Helpers that enfore target specific policies while returning pipes */
     utils::eDest getPipe_8x26(const PipeSpecs& pipeSpecs);
     utils::eDest getPipe_8x16(const PipeSpecs& pipeSpecs);
@@ -199,6 +199,8 @@ private:
         int mDisplay;
         /* Mixer within a split display this pipe is attached to */
         int mMixer;
+        /* Format for which this pipe is attached to the mixer*/
+        int mFormatType;
 
         /* operations on bitmap */
         static bool pipeUsageUnchanged();
