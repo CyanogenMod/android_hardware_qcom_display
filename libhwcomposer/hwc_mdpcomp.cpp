@@ -1961,7 +1961,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
 #ifdef DYNAMIC_FPS
     //For primary display, set the dynamic refreshrate
-    if(!mDpy && qdutils::MDPVersion::getInstance().isDynFpsSupported()) {
+    if(!mDpy && qdutils::MDPVersion::getInstance().isDynFpsSupported() &&
+                                        ctx->mUseMetaDataRefreshRate) {
         FrameInfo frame;
         frame.reset(mCurrentFrame.layerCount);
         memset(&frame.drop, 0, sizeof(frame.drop));
