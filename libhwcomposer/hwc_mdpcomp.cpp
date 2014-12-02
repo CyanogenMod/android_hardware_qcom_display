@@ -46,6 +46,7 @@ int MDPComp::sSimulationFlags = 0;
 int MDPComp::sMaxPipesPerMixer = 0;
 bool MDPComp::sEnableYUVsplit = false;
 bool MDPComp::sSrcSplitEnabled = false;
+int MDPComp::sMaxSecLayers = 1;
 bool MDPComp::enablePartialUpdateForMDP3 = false;
 MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
     if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
@@ -137,6 +138,16 @@ bool MDPComp::init(hwc_context_t *ctx) {
         int val = atoi(property);
         if(val >= 0)
             sMaxPipesPerMixer = min(val, sMaxPipesPerMixer);
+    }
+
+    /* Maximum layers allowed to use MDP on secondary panels. If property
+     * doesn't exist, default to 1. Using the property it can be set to 0 or
+     * more.
+     */
+    if(property_get("persist.hwc.maxseclayers", property, "1") > 0) {
+        int val = atoi(property);
+        sMaxSecLayers = (val >= 0) ? val : 1;
+        sMaxSecLayers = min(sMaxSecLayers, sMaxPipesPerMixer);
     }
 
     if(ctx->mMDP.panel != MIPI_CMD_PANEL) {
@@ -832,13 +843,6 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if(sSimulationFlags & MDPCOMP_AVOID_FULL_MDP)
         return false;
 
-    //Will benefit presentation / secondary-only layer.
-    if((mDpy > HWC_DISPLAY_PRIMARY) &&
-            (list->numHwLayers - 1) > MAX_SEC_LAYERS) {
-        ALOGD_IF(isDebug(), "%s: Exceeds max secondary pipes",__FUNCTION__);
-        return false;
-    }
-
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     for(int i = 0; i < numAppLayers; i++) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
@@ -1158,14 +1162,6 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
 
     if(sEnableYUVsplit){
         adjustForSourceSplit(ctx, list);
-    }
-
-    //Will benefit cases where a video has non-updating background.
-    if((mDpy > HWC_DISPLAY_PRIMARY) and
-            (mdpCount > MAX_SEC_LAYERS)) {
-        ALOGD_IF(isDebug(), "%s: Exceeds max secondary pipes",__FUNCTION__);
-        reset(ctx);
-        return false;
     }
 
     if(!postHeuristicsHandling(ctx, list)) {
@@ -1819,6 +1815,14 @@ bool MDPComp::resourceCheck(hwc_context_t* ctx,
         ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
         return false;
     }
+
+    //Will benefit cases where a video has non-updating background.
+    if((mDpy > HWC_DISPLAY_PRIMARY) and
+            (mCurrentFrame.mdpCount > sMaxSecLayers)) {
+        ALOGD_IF(isDebug(), "%s: Exceeds max secondary pipes",__FUNCTION__);
+        return false;
+    }
+
     // Init rotCount to number of rotate sessions used by other displays
     int rotCount = ctx->mRotMgr->getNumActiveSessions();
     // Count the number of rotator sessions required for current display
