@@ -475,10 +475,11 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
                 return -errno;
             }
 
-            if(mode == HWC_POWER_MODE_NORMAL) {
+            if(mode == HWC_POWER_MODE_NORMAL && !ctx->mHPDEnabled) {
                 // Enable HPD here, as during bootup POWER_MODE_NORMAL is set
                 // when SF is completely initialized
                 ctx->mHDMIDisplay->setHPD(1);
+                ctx->mHPDEnabled = true;
             }
 
             ctx->dpyAttr[dpy].isActive = not(mode == HWC_POWER_MODE_OFF);

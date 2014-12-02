@@ -644,6 +644,8 @@ struct hwc_context_t {
     bool mBWCEnabled;
     // Provides a way for OEM's to disable setting dynfps via metadata.
     bool mUseMetaDataRefreshRate;
+   // Stores the hpd enabled status- avoids re-enabling HDP on suspend resume.
+    bool mHPDEnabled;
 };
 
 namespace qhwc {
