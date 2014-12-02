@@ -405,10 +405,11 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
             return -1;
         }
 
-        if(!blank) {
+        if(!blank && !ctx->mHPDEnabled) {
             // Enable HPD here, as during bootup unblank is called
             // when SF is completely initialized
             ctx->mExtDisplay->setHPD(1);
+            ctx->mHPDEnabled = true;
         }
 
         ctx->dpyAttr[dpy].isActive = !blank;
