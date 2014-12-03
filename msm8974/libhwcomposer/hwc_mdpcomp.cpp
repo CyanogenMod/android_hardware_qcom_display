@@ -253,7 +253,6 @@ bool MDPComp::isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer) {
 }
 
 bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
-    const int dpy = HWC_DISPLAY_PRIMARY;
     private_handle_t *hnd = (private_handle_t *)layer->handle;
 
     if(!hnd) {
@@ -341,7 +340,6 @@ ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type,
 
 bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     bool ret = true;
-    const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
 
     if(!isEnabled()) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. not enabled.", __FUNCTION__);
@@ -750,7 +748,6 @@ void MDPComp::updateLayerCache(hwc_context_t* ctx,
     int fbCount = 0;
 
     for(int i = 0; i < numAppLayers; i++) {
-        hwc_layer_1_t* layer = &list->hwLayers[i];
         if (mCachedFrame.hnd[i] == list->hwLayers[i].handle) {
             fbCount++;
             mCurrentFrame.isFBComposed[i] = true;
@@ -1105,7 +1102,6 @@ int MDPCompHighRes::pipesNeeded(hwc_context_t *ctx,
         hwc_display_contents_1_t* list,
         int mixer) {
     int pipesNeeded = 0;
-    const int xres = ctx->dpyAttr[mDpy].xres;
 
     const int lSplit = getLeftSplit(ctx, mDpy);
 
@@ -1148,7 +1144,6 @@ bool MDPCompHighRes::arePipesAvailable(hwc_context_t *ctx,
 bool MDPCompHighRes::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
         MdpPipeInfoHighRes& pipe_info,
         ePipeType type) {
-    const int xres = ctx->dpyAttr[mDpy].xres;
     const int lSplit = getLeftSplit(ctx, mDpy);
 
     hwc_rect_t dst = layer->displayFrame;
