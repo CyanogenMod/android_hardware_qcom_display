@@ -752,11 +752,11 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         return false;
     }
 
-    // No Idle fall back, if secure display or secure RGB layers are present or
-    // if there's only a single layer being composed
-    if(sIdleFallBack && (!ctx->listStats[mDpy].secureUI &&
-                    !ctx->listStats[mDpy].secureRGBCount) &&
-                    (ctx->listStats[mDpy].numAppLayers != 1)) {
+    /* No Idle fall back if secure display or secure RGB layers are present
+     * or if there is only a single layer being composed */
+    if(sIdleFallBack && !ctx->listStats[mDpy].secureUI &&
+                  !ctx->listStats[mDpy].secureRGBCount &&
+                  (ctx->listStats[mDpy].numAppLayers > 1)) {
         ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
         return false;
     }
@@ -1283,7 +1283,22 @@ bool MDPComp::videoOnlyComp(hwc_context_t *ctx,
         hwc_display_contents_1_t* list, bool secureOnly) {
     if(sSimulationFlags & MDPCOMP_AVOID_VIDEO_ONLY)
         return false;
+
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+    if(!isSecurePresent(ctx, mDpy)) {
+       /* Bail out if we are processing only secured video layers
+        * and we dont have any */
+       if(secureOnly) {
+           ALOGD_IF(isDebug(),"%s: No Secure Video Layers", __FUNCTION__);
+           return false;
+       }
+       /* No Idle fall back for secure video layers and if there is only
+        * single layer being composed. */
+       if(sIdleFallBack && (ctx->listStats[mDpy].numAppLayers > 1)) {
+           ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
+           return false;
+        }
+    }
 
     mCurrentFrame.reset(numAppLayers);
     mCurrentFrame.fbCount -= mCurrentFrame.dropCount;
@@ -1291,13 +1306,6 @@ bool MDPComp::videoOnlyComp(hwc_context_t *ctx,
     int mdpCount = mCurrentFrame.mdpCount;
 
     if(!isYuvPresent(ctx, mDpy) or (mdpCount == 0)) {
-        reset(ctx);
-        return false;
-    }
-
-    /* Bail out if we are processing only secured video layers
-     * and we dont have any */
-    if(!isSecurePresent(ctx, mDpy) && secureOnly){
         reset(ctx);
         return false;
     }
@@ -1342,14 +1350,22 @@ bool MDPComp::mdpOnlyLayersComp(hwc_context_t *ctx,
     if(sSimulationFlags & MDPCOMP_AVOID_MDP_ONLY_LAYERS)
         return false;
 
-    /* Bail out if we are processing only secured video layers
-     * and we dont have any */
-    if(!isSecurePresent(ctx, mDpy) && secureOnly){
-        reset(ctx);
-        return false;
+    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+    if(!isSecurePresent(ctx, mDpy) && !ctx->listStats[mDpy].secureUI) {
+        /* Bail out if we are processing only secured video/ui layers
+         * and we dont have any */
+        if(secureOnly) {
+            ALOGD_IF(isDebug(), "%s: No secure video/ui layers");
+            return false;
+        }
+        /* No Idle fall back for secure video/ui layers and if there is only
+         * single layer being composed. */
+        if(sIdleFallBack && (ctx->listStats[mDpy].numAppLayers > 1)) {
+           ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
+           return false;
+       }
     }
 
-    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     mCurrentFrame.reset(numAppLayers);
     mCurrentFrame.fbCount -= mCurrentFrame.dropCount;
 
