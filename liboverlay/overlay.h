@@ -33,6 +33,9 @@
 #include "overlayUtils.h"
 #include "mdp_version.h"
 #include "utils/threads.h"
+#ifdef USES_POST_PROCESSING
+#include "lib-postproc.h"
+#endif
 
 struct MetaData_t;
 
@@ -186,6 +189,12 @@ private:
     /* Sets the pipe type RGB/VG/DMA*/
     void setPipeType(utils::eDest pipeIndex, const utils::eMdpPipeType pType);
 
+    /* Dynamically link ABL library */
+    static void initPostProc();
+    static void destroyPostProc();
+    static int (*getFnPpParams())(const struct compute_params *,
+                                 struct mdp_overlay_pp_params *);
+
     /* Just like a Facebook for pipes, but much less profile info */
     struct PipeBook {
         void init();
@@ -251,6 +260,10 @@ private:
     static bool sDMAMultiplexingSupported;
     static void *sLibScaleHandle;
     static int (*sFnProgramScale)(struct mdp_overlay_list *);
+    /* Dynamically link ABL library */
+    static void *sLibAblHandle;
+    static int (*sFnppParams)(const struct compute_params *,
+                            struct mdp_overlay_pp_params *);
     static bool sDebugPipeLifecycle;
 
     friend class MdpCtrl;
@@ -343,6 +356,11 @@ inline int Overlay::getFbForDpy(const int& dpy) {
 
 inline int (*Overlay::getFnProgramScale())(struct mdp_overlay_list *) {
     return sFnProgramScale;
+}
+
+inline int (*Overlay::getFnPpParams())(const struct compute_params *,
+                    struct mdp_overlay_pp_params *) {
+    return sFnppParams;
 }
 
 inline void Overlay::debugPipeLifecycle(const bool& enable) {
