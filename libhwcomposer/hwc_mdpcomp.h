@@ -57,7 +57,7 @@ public:
     static void setIdleTimeout(const uint32_t& timeout);
     static void setMaxPipesPerMixer(const uint32_t value);
     static int setPartialUpdatePref(hwc_context_t *ctx, bool enable);
-
+    static bool getPartialUpdatePref(hwc_context_t *ctx);
 protected:
     enum ePipeType {
         MDPCOMP_OV_RGB = ovutils::OV_MDP_PIPE_RGB,

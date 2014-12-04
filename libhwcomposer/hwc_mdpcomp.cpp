@@ -194,6 +194,8 @@ bool MDPComp::init(hwc_context_t *ctx) {
        enablePartialUpdateForMDP3 = true;
     }
 
+    sIsPartialUpdateActive = getPartialUpdatePref(ctx);
+
     return true;
 }
 
@@ -2739,6 +2741,28 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
     return 0;
 }
 
+bool MDPComp::getPartialUpdatePref(hwc_context_t *ctx) {
+    Locker::Autolock _l(ctx->mDrawLock);
+    const int fbNum = Overlay::getFbForDpy(Overlay::DPY_PRIMARY);
+    char path[MAX_SYSFS_FILE_PATH];
+    snprintf (path, sizeof(path), "sys/class/graphics/fb%d/dyn_pu", fbNum);
+    int fd = open(path, O_RDONLY);
+    if(fd < 0) {
+        ALOGE("%s: Failed to open sysfd node: %s", __FUNCTION__, path);
+        return -1;
+    }
+    char value[4];
+    ssize_t size_read = read(fd, value, sizeof(value)-1);
+    if(size_read <= 0) {
+        ALOGE("%s: Failed to read sysfd node: %s", __FUNCTION__, path);
+        close(fd);
+        return -1;
+    }
+    close(fd);
+    value[size_read] = '\0';
+    return atoi(value);
+}
+
 int MDPComp::setPartialUpdatePref(hwc_context_t *ctx, bool enable) {
     Locker::Autolock _l(ctx->mDrawLock);
     const int fbNum = Overlay::getFbForDpy(Overlay::DPY_PRIMARY);
@@ -2746,14 +2770,14 @@ int MDPComp::setPartialUpdatePref(hwc_context_t *ctx, bool enable) {
     snprintf (path, sizeof(path), "sys/class/graphics/fb%d/dyn_pu", fbNum);
     int fd = open(path, O_WRONLY);
     if(fd < 0) {
-        ALOGE("%s: Failed to open sysfd node", __FUNCTION__);
+        ALOGE("%s: Failed to open sysfd node: %s", __FUNCTION__, path);
         return -1;
     }
     char value[4];
     snprintf(value, sizeof(value), "%d", (int)enable);
     ssize_t ret = write(fd, value, strlen(value));
     if(ret <= 0) {
-        ALOGE("%s: Failed to write to sysfd nodes", __FUNCTION__);
+        ALOGE("%s: Failed to write to sysfd nodes: %s", __FUNCTION__, path);
         close(fd);
         return -1;
     }
