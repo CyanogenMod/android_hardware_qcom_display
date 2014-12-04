@@ -125,6 +125,9 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
     case HWC_DISPLAY_DPI_Y:
       values[i] = INT32(variable_config.y_dpi * 1000.0f);
       break;
+    case HWC_DISPLAY_SECURE:
+      values[i] = INT32(true); // For backward compatibility. All Physical displays are secure
+      break;
     default:
       DLOGE("Spurious attribute type %d", attributes[i]);
       return -EINVAL;
