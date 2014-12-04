@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
  *
@@ -178,6 +178,10 @@ bool MDPComp::init(hwc_context_t *ctx) {
            (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
        enablePartialUpdateForMDP3 = true;
     }
+
+    int retPartialUpdatePref = getPartialUpdatePref(ctx);
+    if(retPartialUpdatePref >= 0)
+       sIsPartialUpdateActive = (retPartialUpdatePref != 0);
 
     return true;
 }
@@ -2731,21 +2735,43 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
     return 0;
 }
 
+int MDPComp::getPartialUpdatePref(hwc_context_t *ctx) {
+    Locker::Autolock _l(ctx->mDrawLock);
+    const int fbNum = Overlay::getFbForDpy(Overlay::DPY_PRIMARY);
+    char path[MAX_SYSFS_FILE_PATH];
+    snprintf (path, sizeof(path), "sys/class/graphics/fb%d/dyn_pu", fbNum);
+    int fd = open(path, O_RDONLY);
+    if(fd < 0) {
+        ALOGE("%s: Failed to open sysfs node: %s", __FUNCTION__, path);
+        return -1;
+    }
+    char value[4];
+    ssize_t size_read = read(fd, value, sizeof(value)-1);
+    if(size_read <= 0) {
+        ALOGE("%s: Failed to read sysfs node: %s", __FUNCTION__, path);
+        close(fd);
+        return -1;
+    }
+    close(fd);
+    value[size_read] = '\0';
+    return atoi(value);
+}
+
 int MDPComp::setPartialUpdatePref(hwc_context_t *ctx, bool enable) {
     Locker::Autolock _l(ctx->mDrawLock);
     const int fbNum = Overlay::getFbForDpy(Overlay::DPY_PRIMARY);
     char path[MAX_SYSFS_FILE_PATH];
     snprintf (path, sizeof(path), "sys/class/graphics/fb%d/dyn_pu", fbNum);
-    int fd = open(path, O_RDWR);
+    int fd = open(path, O_WRONLY);
     if(fd < 0) {
-        ALOGE("%s: Failed to open dyn_pu sysfs node", __FUNCTION__);
+        ALOGE("%s: Failed to open sysfs node: %s", __FUNCTION__, path);
         return -1;
     }
     char value[4];
     snprintf(value, sizeof(value), "%d", (int)enable);
     ssize_t ret = write(fd, value, strlen(value));
     if(ret <= 0) {
-        ALOGE("%s: Failed to write to dyn_pu sysfs node", __FUNCTION__);
+        ALOGE("%s: Failed to write to sysfs nodes: %s", __FUNCTION__, path);
         close(fd);
         return -1;
     }
