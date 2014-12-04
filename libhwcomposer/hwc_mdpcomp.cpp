@@ -744,7 +744,6 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
                                 hwc_display_contents_1_t* list){
 
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
-    int priDispW = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
 
     // Fall back to video only composition, if AIV video mode is enabled
     if(ctx->listStats[mDpy].mAIVVideoMode) {
@@ -781,19 +780,6 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         return false;
     }
 
-    MDPVersion& mdpHw = MDPVersion::getInstance();
-    if(mDpy > HWC_DISPLAY_PRIMARY &&
-            (priDispW >  (int) mdpHw.getMaxMixerWidth()) &&
-            (ctx->dpyAttr[mDpy].xres <  mdpHw.getMaxMixerWidth())) {
-        // Disable MDP comp on Secondary when the primary is highres panel and
-        // the secondary is a normal 1080p, because, MDP comp on secondary under
-        // in such usecase, decimation gets used for downscale and there will be
-        // a quality mismatch when there will be a fallback to GPU comp
-        ALOGD_IF(isDebug(), "%s: Disable MDP Compositon for Secondary Disp",
-              __FUNCTION__);
-        return false;
-    }
-
     // check for action safe flag and MDP scaling mode which requires scaling.
     if(ctx->dpyAttr[mDpy].mActionSafePresent
             || ctx->dpyAttr[mDpy].mMDPScalingMode) {
@@ -815,6 +801,7 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
 
         //For 8x26 with panel width>1k, if RGB layer needs HFLIP fail mdp comp
         // may not need it if Gfx pre-rotation can handle all flips & rotations
+        MDPVersion& mdpHw = MDPVersion::getInstance();
         int transform = (layer->flags & HWC_COLOR_FILL) ? 0 : layer->transform;
         if( mdpHw.is8x26() && (ctx->dpyAttr[mDpy].xres > 1024) &&
                 (transform & HWC_TRANSFORM_FLIP_H) && (!isYuvBuffer(hnd)))
