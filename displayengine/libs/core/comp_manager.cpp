@@ -160,7 +160,7 @@ DisplayError CompManager::Prepare(Handle display_ctx, HWLayers *hw_layers) {
       // Composition strategies exhausted. Resource Manager could not allocate resources even for
       // GPU composition. This will never happen.
       DLOGE("Unexpected failure. Composition strategies exhausted.");
-      return error;
+      break;
     }
 
     error = res_mgr_.Acquire(display_resource_ctx, hw_layers);
@@ -174,7 +174,7 @@ DisplayError CompManager::Prepare(Handle display_ctx, HWLayers *hw_layers) {
   }
   res_mgr_.Stop(display_resource_ctx);
 
-  return kErrorNone;
+  return error;
 }
 
 void CompManager::PostPrepare(Handle display_ctx, HWLayers *hw_layers) {
