@@ -88,9 +88,10 @@ static void handle_thermal_event(hwc_context_t* ctx, int dpy, char *data)
         thermalLevel = strtoull(data + strlen("thermal_level="), NULL, 0);
     }
 
-    if (thermalLevel >= MAX_THERMAL_LEVEL)
+    if (thermalLevel >= MAX_THERMAL_LEVEL) {
+        ALOGD("%s: dpy:%d thermal_level=%"PRIu64"",__FUNCTION__,dpy,thermalLevel);
         ctx->mThermalBurstMode = true;
-    else
+    } else
         ctx->mThermalBurstMode = false;
 }
 
