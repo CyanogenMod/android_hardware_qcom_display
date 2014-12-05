@@ -359,9 +359,12 @@ bool MdpCtrl::validateAndSet(MdpCtrl* mdpCtrlArray[], const int& count,
         fnProgramScale(&list);
     }
 
-    if(!mdp_wrapper::validateAndSet(fbFd, list)) {
+    // Error value is based on file errno-base.h
+    // 0 - indicates no error.
+    int errVal = mdp_wrapper::validateAndSet(fbFd, list);
+    if(errVal) {
         /* No dump for failure due to insufficient resource */
-        if(errno != E2BIG) {
+        if(errVal != E2BIG) {
             mdp_wrapper::dump("Bad ov dump: ",
                 *list.overlay_list[list.processed_overlays]);
         }
