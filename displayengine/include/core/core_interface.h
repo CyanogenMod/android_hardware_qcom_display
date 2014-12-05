@@ -35,20 +35,20 @@
 #include <stdint.h>
 
 #include "display_interface.h"
-#include "display_types.h"
+#include "sde_types.h"
 
-/*! @brief Display core interface version.
+/*! @brief Display engine interface version.
 
-  @details Display core interfaces are version tagged to maintain backward compatibility. This
+  @details Display engine interfaces are version tagged to maintain backward compatibility. This
   version is supplied as a default argument during display core initialization.
 
-  Client may use an older version of interfaces and link to a higher version of display core
+  Client may use an older version of interfaces and link to a higher version of display engine
   library, but vice versa is not allowed.
 
   A 32-bit client must use 32-bit display core library and a 64-bit client must use 64-bit display
   core library.
 
-  Display core interfaces follow default data structures alignment. Client must not override the
+  Display engine interfaces follow default data structures alignment. Client must not override the
   default padding rules while using these interfaces.
 
   @warning It is assumed that client upgrades or downgrades display core interface all at once
@@ -57,11 +57,11 @@
 
   @sa CoreInterface::CreateCore
 */
-#define CORE_REVISION_MAJOR (1)
-#define CORE_REVISION_MINOR (0)
+#define SDE_REVISION_MAJOR (1)
+#define SDE_REVISION_MINOR (0)
 
-#define CORE_VERSION_TAG ((uint32_t) ((CORE_REVISION_MAJOR << 24) | (CORE_REVISION_MINOR << 16) \
-                    | (sizeof(DisplayCompatibility) << 8) | sizeof(int *)))
+#define SDE_VERSION_TAG ((uint32_t) ((SDE_REVISION_MAJOR << 24) | (SDE_REVISION_MINOR << 16) | \
+                                    (sizeof(SDECompatibility) << 8) | sizeof(int *)))
 
 namespace sde {
 
@@ -120,15 +120,16 @@ class CoreInterface {
     This interface shall be called only once.
 
     @param[in] event_handler \link CoreEventHandler \endlink
+    @param[in] log_handler \link LogHandler \endlink
     @param[out] interface \link CoreInterface \endlink
-    @param[in] version \link CORE_VERSION_TAG \endlink. Client must not override this argument.
+    @param[in] version \link SDE_VERSION_TAG \endlink. Client must not override this argument.
 
     @return \link DisplayError \endlink
 
     @sa DestroyCore
   */
-  static DisplayError CreateCore(CoreEventHandler *event_handler, CoreInterface **interface,
-                                 uint32_t version = CORE_VERSION_TAG);
+  static DisplayError CreateCore(CoreEventHandler *event_handler, LogHandler *log_handler,
+                                 CoreInterface **interface, uint32_t version = SDE_VERSION_TAG);
 
   /*! @brief Method to release handle to display core interface.
 
@@ -159,7 +160,7 @@ class CoreInterface {
     @sa DestroyDisplay
   */
   virtual DisplayError CreateDisplay(DisplayType type, DisplayEventHandler *event_handler,
-                                    DisplayInterface **interface) = 0;
+                                     DisplayInterface **interface) = 0;
 
   /*! @brief Method to destroy a display device.
 

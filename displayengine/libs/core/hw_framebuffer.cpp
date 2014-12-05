@@ -22,11 +22,7 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// SDE_LOG_TAG definition must precede debug.h include.
-#define SDE_LOG_TAG kTagCore
-#define SDE_MODULE_NAME "HWFrameBuffer"
 #define __STDC_FORMAT_MACROS
-#include <utils/debug.h>
 
 #include <math.h>
 #include <fcntl.h>
@@ -39,8 +35,11 @@
 #include <sys/prctl.h>
 #include <pthread.h>
 #include <utils/constants.h>
+#include <utils/debug.h>
 
 #include "hw_framebuffer.h"
+
+#define __CLASS__ "HWFrameBuffer"
 
 #define IOCTL_LOGE(ioctl) DLOGE("ioctl %s, errno = %d, desc = %s", #ioctl, errno, strerror(errno))
 
@@ -383,7 +382,7 @@ DisplayError HWFrameBuffer::Validate(Handle device, HWLayers *hw_layers) {
 
   mdp_commit.flags |= MDP_VALIDATE_LAYER;
   if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
-    IOCTL_LOGE("validate:"MSMFB_ATOMIC_COMMIT);
+    IOCTL_LOGE(MSMFB_ATOMIC_COMMIT);
     return kErrorHardware;
   }
 
@@ -425,7 +424,7 @@ DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
   mdp_commit.flags |= MDP_COMMIT_RETIRE_FENCE;
   mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
   if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
-    IOCTL_LOGE("commit:"MSMFB_ATOMIC_COMMIT);
+    IOCTL_LOGE(MSMFB_ATOMIC_COMMIT);
     return kErrorHardware;
   }
 
@@ -521,7 +520,7 @@ void* HWFrameBuffer::DisplayEventThreadHandler() {
   while (!exit_threads_) {
     int error = poll_(poll_fds_[0], kNumPhysicalDisplays * kNumDisplayEvents, -1);
     if (error < 0) {
-      DLOGW("poll failed errno: %s", strerror(errno));
+      DLOGW("poll failed. error = %s", strerror(errno));
       continue;
     }
 
@@ -533,7 +532,8 @@ void* HWFrameBuffer::DisplayEventThreadHandler() {
           ssize_t length = pread_(poll_fd.fd, data, kMaxStringLength, 0);
           if (length < 0) {
             // If the read was interrupted - it is not a fatal error, just continue.
-            DLOGW("Failed to read event:%d for display=%d: %s", event, display, strerror(errno));
+            DLOGW("pread failed. event = %d, display = %d, error = %s",
+                                                      event, display, strerror(errno));
             continue;
           }
 
@@ -750,18 +750,18 @@ DisplayError HWFrameBuffer::PopulateHWCapabilities() {
     }
   }
 
-  DLOGI("SDE Version: %d SDE Revision: %x RGB : %d, VIG: %d DMA: %d Cursor: %d",
+  DLOGI("SDE Version = %d, SDE Revision = %x, RGB = %d, VIG = %d, DMA = %d, Cursor = %d",
         hw_resource_.hw_version, hw_resource_.hw_revision, hw_resource_.num_rgb_pipe,
         hw_resource_.num_vig_pipe, hw_resource_.num_dma_pipe, hw_resource_.num_cursor_pipe);
-  DLOGI("Upscale Ratio: %d Downscale Ratio: %d Blending Stages: %d", hw_resource_.max_scale_up,
+  DLOGI("Upscale Ratio = %d, Downscale Ratio = %d, Blending Stages = %d", hw_resource_.max_scale_up,
         hw_resource_.max_scale_down, hw_resource_.num_blending_stages);
-  DLOGI("BWC: %d Decimation: %d Tile Format: %d: Rotator Downscale: %d",  hw_resource_.has_bwc,
+  DLOGI("BWC = %d, Decimation = %d, Tile Format = %d, Rotator Downscale = %d", hw_resource_.has_bwc,
         hw_resource_.has_decimation, hw_resource_.has_macrotile,
         hw_resource_.has_rotator_downscale);
-  DLOGI("Left Split: %d Right Split: %d", hw_resource_.split_info.left_split,
+  DLOGI("Left Split = %d, Right Split = %d", hw_resource_.split_info.left_split,
         hw_resource_.split_info.right_split);
-  DLOGI("SourceSplit: %d Always: %d", hw_resource_.is_src_split, hw_resource_.always_src_split);
-  DLOGI("MaxLowBw: %"PRIu64" MaxHighBw: %"PRIu64"", hw_resource_.max_bandwidth_low,
+  DLOGI("SourceSplit = %d, Always = %d", hw_resource_.is_src_split, hw_resource_.always_src_split);
+  DLOGI("MaxLowBw = %"PRIu64", MaxHighBw = %"PRIu64"", hw_resource_.max_bandwidth_low,
         hw_resource_.max_bandwidth_high);
 
   return error;

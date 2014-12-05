@@ -36,7 +36,7 @@
 #include <stdint.h>
 
 #include "layer_stack.h"
-#include "display_types.h"
+#include "sde_types.h"
 
 namespace sde {
 

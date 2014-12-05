@@ -22,18 +22,18 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-/*! @file display_types.h
+/*! @file sde_types.h
   @brief This file contains miscellaneous data types used across display interfaces.
 */
-#ifndef __DISPLAY_TYPES_H__
-#define __DISPLAY_TYPES_H__
+#ifndef __SDE_TYPES_H__
+#define __SDE_TYPES_H__
 
 namespace sde {
 
 /*! @brief This enum represents different error codes that display interfaces may return.
 */
 enum DisplayError {
-  kErrorNone = 0,         //!< Call executed successfully.
+  kErrorNone,             //!< Call executed successfully.
   kErrorUndefined,        //!< An unspecified error has occured.
   kErrorNotSupported,     //!< Requested operation is not supported.
   kErrorVersion,          //!< Client is using advanced version of interfaces and calling into an
@@ -48,11 +48,64 @@ enum DisplayError {
   kErrorTimeOut,          //!< The operation has timed out to prevent client from waiting forever.
 };
 
+/*! @brief This enum represents different modules/logical unit tags that a log message may be
+  associated with. Client may use this to filter messages for dynamic logging.
+
+  @sa DisplayLogHandler
+*/
+enum LogTag {
+  kTagNone,             //!< Log is not tagged. This type of logs should always be printed.
+  kTagResources,        //!< Log is tagged for resource management.
+  kTagStrategy,         //!< Log is tagged for strategy decisions.
+};
+
+/*! @brief Display log handler class.
+
+  @details This class defines display log handler. The handle contains methods which client should
+  implement to get different levels of logging from display engine. Display engine will call into
+  these methods at appropriate times to send logging information.
+
+  @sa CoreInterface::CreateCore
+*/
+class LogHandler {
+ public:
+  /*! @brief Method to handle error messages.
+
+    @param[in] tag \link LogTag \endlink
+    @param[in] format \link message format with variable argument list \endlink
+  */
+  virtual void Error(LogTag tag, const char *format, ...) = 0;
+
+  /*! @brief Method to handle warning messages.
+
+    @param[in] tag \link LogTag \endlink
+    @param[in] format \link message format with variable argument list \endlink
+  */
+  virtual void Warning(LogTag tag, const char *format, ...) = 0;
+
+  /*! @brief Method to handle informative messages.
+
+    @param[in] tag \link LogTag \endlink
+    @param[in] format \link message format with variable argument list \endlink
+  */
+  virtual void Info(LogTag tag, const char *format, ...) = 0;
+
+  /*! @brief Method to handle verbose messages.
+
+    @param[in] tag \link LogTag \endlink
+    @param[in] format \link message format with variable argument list \endlink
+  */
+  virtual void Verbose(LogTag tag, const char *format, ...) = 0;
+
+ protected:
+  virtual ~LogHandler() { }
+};
+
 /*! @brief This structure is defined for client and library compatibility check purpose only. This
-  structure is used in CORE_VERSION_TAG definition only. Client should not refer it directly for
+  structure is used in SDE_VERSION_TAG definition only. Client should not refer it directly for
   any purpose.
 */
-struct DisplayCompatibility {
+struct SDECompatibility {
   char c1;
   int i1;
   char c2;
@@ -61,5 +114,5 @@ struct DisplayCompatibility {
 
 }  // namespace sde
 
-#endif  // __DISPLAY_TYPES_H__
+#endif  // __SDE_TYPES_H__
 

@@ -22,14 +22,12 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// SDE_LOG_TAG definition must precede debug.h include.
-#define SDE_LOG_TAG kTagCore
-#define SDE_MODULE_NAME "DisplayPrimary"
+#include <utils/constants.h>
 #include <utils/debug.h>
 
-#include <utils/constants.h>
-
 #include "display_primary.h"
+
+#define __CLASS__ "DisplayPrimary"
 
 namespace sde {
 

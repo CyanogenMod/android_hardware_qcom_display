@@ -22,11 +22,6 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// SDE_LOG_TAG definition must precede debug.h include.
-#define SDE_LOG_TAG kTagCore
-#define SDE_MODULE_NAME "HWInterface"
-#include <utils/debug.h>
-
 #include <utils/constants.h>
 
 #include "hw_interface.h"

@@ -22,14 +22,12 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// SDE_LOG_TAG definition must precede debug.h include.
-#define SDE_LOG_TAG kTagCore
-#define SDE_MODULE_NAME "ResManager"
+#include <utils/constants.h>
 #include <utils/debug.h>
 
-#include <utils/constants.h>
-
 #include "res_manager.h"
+
+#define __CLASS__ "ResManager"
 
 namespace sde {
 
@@ -38,8 +36,6 @@ ResManager::ResManager()
 }
 
 DisplayError ResManager::Init(const HWResourceInfo &hw_res_info) {
-  DLOGV("Init");
-
   hw_res_info_ = hw_res_info;
 
   DisplayError error = kErrorNone;
@@ -280,21 +276,21 @@ void ResManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
   uint64_t frame_count = display_resource_ctx->frame_count;
 
-  DLOGV("Resource for hw_block=%d frame_count=%d", hw_block_id, frame_count);
+  DLOGV_IF(kTagResources, "Resource for hw_block = %d, frame_count = %d", hw_block_id, frame_count);
 
   for (uint32_t i = 0; i < num_pipe_; i++) {
     if (src_pipes_[i].reserved) {
       src_pipes_[i].hw_block_id = hw_block_id;
       src_pipes_[i].state = kPipeStateAcquired;
       src_pipes_[i].state_frame_count = frame_count;
-      DLOGV("Pipe acquired index=%d type=%d pipe_id=%x", i, src_pipes_[i].type,
-            src_pipes_[i].mdss_pipe_id);
+      DLOGV_IF(kTagResources, "Pipe acquired index = %d, type = %d, pipe_id = %x", i,
+            src_pipes_[i].type, src_pipes_[i].mdss_pipe_id);
     } else if ((src_pipes_[i].hw_block_id == hw_block_id) &&
                (src_pipes_[i].state == kPipeStateAcquired)) {
       src_pipes_[i].state = kPipeStateToRelease;
       src_pipes_[i].state_frame_count = frame_count;
-      DLOGV("Pipe to release index=%d type=%d pipe_id=%x", i, src_pipes_[i].type,
-            src_pipes_[i].mdss_pipe_id);
+      DLOGV_IF(kTagResources, "Pipe to release index = %d, type = %d, pipe_id = %x", i,
+            src_pipes_[i].type, src_pipes_[i].mdss_pipe_id);
     }
   }
 

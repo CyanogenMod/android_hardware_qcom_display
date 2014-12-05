@@ -29,7 +29,7 @@
 #ifndef __STRATEGY_INTERFACE_H__
 #define __STRATEGY_INTERFACE_H__
 
-#include <core/display_types.h>
+#include <core/sde_types.h>
 
 namespace sde {
 

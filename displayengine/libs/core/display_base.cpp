@@ -22,14 +22,12 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// SDE_LOG_TAG definition must precede debug.h include.
-#define SDE_LOG_TAG kTagCore
-#define SDE_MODULE_NAME "DisplayBase"
+#include <utils/constants.h>
 #include <utils/debug.h>
 
-#include <utils/constants.h>
-
 #include "display_base.h"
+
+#define __CLASS__ "DisplayBase"
 
 namespace sde {
 
@@ -224,7 +222,7 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 
   DisplayError error = kErrorNone;
 
-  DLOGI("Set state: %d", state);
+  DLOGI("Set state = %d", state);
 
   if (UNLIKELY(state == state_)) {
     DLOGI("Same state transition is requested.");
@@ -251,7 +249,7 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
     break;
 
   default:
-    DLOGE("Spurious state %d transition requested.", state);
+    DLOGE("Spurious state = %d transition requested.", state);
     break;
   }
 

@@ -22,15 +22,13 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// SDE_LOG_TAG definition must precede debug.h include.
-#define SDE_LOG_TAG kTagCore
-#define SDE_MODULE_NAME "CoreInterface"
-#include <utils/debug.h>
-
 #include <utils/locker.h>
 #include <utils/constants.h>
+#include <utils/debug.h>
 
 #include "core_impl.h"
+
+#define __CLASS__ "CoreInterface"
 
 #define GET_REVISION(version) (version >> 16)
 #define GET_DATA_ALIGNMENT(version) ((version >> 8) & 0xFF)
@@ -47,16 +45,16 @@ struct CoreSingleton {
   Locker locker;
 } g_core;
 
-DisplayError CoreInterface::CreateCore(CoreEventHandler *event_handler, CoreInterface **interface,
-                                 uint32_t client_version) {
+DisplayError CoreInterface::CreateCore(CoreEventHandler *event_handler, LogHandler *log_handler,
+                                       CoreInterface **interface, uint32_t client_version) {
   SCOPE_LOCK(g_core.locker);
 
-  if (UNLIKELY(!event_handler || !interface)) {
+  if (UNLIKELY(!event_handler || !log_handler || !interface)) {
     return kErrorParameters;
   }
 
   // Check compatibility of client and core.
-  uint32_t lib_version = CORE_VERSION_TAG;
+  uint32_t lib_version = SDE_VERSION_TAG;
   if (UNLIKELY(GET_REVISION(client_version) > GET_REVISION(lib_version))) {
     return kErrorVersion;
   } else if (UNLIKELY(GET_DATA_ALIGNMENT(client_version) != GET_DATA_ALIGNMENT(lib_version))) {
@@ -67,9 +65,10 @@ DisplayError CoreInterface::CreateCore(CoreEventHandler *event_handler, CoreInte
 
   CoreImpl *&core_impl = g_core.core_impl;
   if (UNLIKELY(core_impl)) {
-    DLOGE("Only one display core session is supported at present.");
     return kErrorUndefined;
   }
+
+  Debug::SetLogHandler(log_handler);
 
   // Create appropriate CoreImpl object based on client version.
   if (GET_REVISION(client_version) == CoreImpl::kRevision) {
