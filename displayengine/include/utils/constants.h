@@ -30,6 +30,7 @@
 
 #define INT(exp) static_cast<int>(exp)
 #define FLOAT(exp) static_cast<float>(exp)
+#define UINT8(exp) static_cast<uint8_t>(exp)
 #define UINT32(exp) static_cast<uint32_t>(exp)
 #define INT32(exp) static_cast<int32_t>(exp)
 
@@ -46,6 +47,7 @@
 #define SET_BIT(value, bit) (value |= (1 << (bit)))
 #define CLEAR_BIT(value, bit) (value &= (~(1 << (bit))))
 #define IS_BIT_SET(value, bit) (value & (1 << (bit)))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 namespace sde {
 

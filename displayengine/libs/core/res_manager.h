@@ -131,6 +131,12 @@ class ResManager : public DumpImpl {
                           const LayerRect &scissor, const LayerTransform &transform);
   bool IsNonIntegralSrcCrop(const LayerRect &crop);
   void IntegerizeRect(LayerRect *dst_rect, const LayerRect &src_rect);
+  bool CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *hw_layers);
+  float GetPipeBw(DisplayResourceContext *display_ctx, HWPipeInfo *pipe, float bpp);
+  float GetClockForPipe(DisplayResourceContext *display_ctx, HWPipeInfo *pipe);
+  float GetOverlapBw(HWLayers *hw_layers, float *pipe_bw, bool left_mixer);
+  void SetDecimationFactor(HWPipeInfo *pipe);
+  float GetBpp(LayerBufferFormat format);
 
   template <class T>
   inline void Swap(T &a, T &b) {
@@ -148,6 +154,9 @@ class ResManager : public DumpImpl {
   SourcePipe *rgb_pipes_;
   SourcePipe *dma_pipes_;
   bool frame_start_;
+  float bw_claimed_;  // Bandwidth claimed by other display
+  float clk_claimed_;  // Clock claimed by other display
+  float last_primary_bw_;
 };
 
 }  // namespace sde
