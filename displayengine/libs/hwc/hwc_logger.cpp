@@ -22,11 +22,38 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <utils/constants.h>
+
 #include "hwc_logger.h"
 
 namespace sde {
 
 HWCLogHandler HWCLogHandler::log_handler_;
+uint32_t HWCLogHandler::log_flags_ = 0x1;
+
+void HWCLogHandler::LogAll(bool enable) {
+  if (enable) {
+    log_flags_ = 0xFFFFFFFF;
+  } else {
+    log_flags_ = 0x1;   // kTagNone should always be printed.
+  }
+}
+
+void HWCLogHandler::LogResources(bool enable) {
+  if (enable) {
+    log_flags_ = SET_BIT(log_flags_, kTagResources);
+  } else {
+    log_flags_ = CLEAR_BIT(log_flags_, kTagResources);
+  }
+}
+
+void HWCLogHandler::LogStrategy(bool enable) {
+  if (enable) {
+    log_flags_ = SET_BIT(log_flags_, kTagStrategy);
+  } else {
+    log_flags_ = CLEAR_BIT(log_flags_, kTagStrategy);
+  }
+}
 
 void HWCLogHandler::Error(LogTag /*tag*/, const char *format, ...) {
   va_list list;
@@ -40,16 +67,20 @@ void HWCLogHandler::Warning(LogTag /*tag*/, const char *format, ...) {
   __android_log_vprint(ANDROID_LOG_WARN, LOG_TAG, format, list);
 }
 
-void HWCLogHandler::Info(LogTag /*tag*/, const char *format, ...) {
-  va_list list;
-  va_start(list, format);
-  __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, list);
+void HWCLogHandler::Info(LogTag tag, const char *format, ...) {
+  if (IS_BIT(log_flags_, tag)) {
+    va_list list;
+    va_start(list, format);
+    __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, list);
+  }
 }
 
-void HWCLogHandler::Verbose(LogTag /*tag*/, const char *format, ...) {
-  va_list list;
-  va_start(list, format);
-  __android_log_vprint(ANDROID_LOG_VERBOSE, LOG_TAG, format, list);
+void HWCLogHandler::Verbose(LogTag tag, const char *format, ...) {
+  if (IS_BIT(log_flags_, tag)) {
+    va_list list;
+    va_start(list, format);
+    __android_log_vprint(ANDROID_LOG_VERBOSE, LOG_TAG, format, list);
+  }
 }
 
 }  // namespace sde

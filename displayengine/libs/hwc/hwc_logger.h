@@ -39,15 +39,19 @@ namespace sde {
 
 class HWCLogHandler : public LogHandler {
  public:
+  static inline LogHandler* Get() { return &log_handler_; }
+  static void LogAll(bool enable);
+  static void LogResources(bool enable);
+  static void LogStrategy(bool enable);
+
   virtual void Error(LogTag tag, const char *format, ...);
   virtual void Warning(LogTag tag, const char *format, ...);
   virtual void Info(LogTag tag, const char *format, ...);
   virtual void Verbose(LogTag tag, const char *format, ...);
 
-  static inline LogHandler* Get() { return &log_handler_; }
-
  private:
   static HWCLogHandler log_handler_;
+  static uint32_t log_flags_;
 };
 
 }  // namespace sde

@@ -45,6 +45,7 @@
 
 #define SET_BIT(value, bit) ((value) | (1 << (bit)))
 #define CLEAR_BIT(value, bit) ((value) & (~(1 << (bit))))
+#define IS_BIT(value, bit) ((value) & (1 << (bit)))
 
 namespace sde {
 

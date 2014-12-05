@@ -24,6 +24,9 @@
 
 #include <core/dump_interface.h>
 #include <utils/constants.h>
+#include <utils/String16.h>
+#include <binder/Parcel.h>
+#include <QService.h>
 
 #include "hwc_session.h"
 #include "hwc_logger.h"
@@ -67,13 +70,26 @@ HWCSession::HWCSession(const hw_module_t *module) : core_intf_(NULL), hwc_procs_
 }
 
 int HWCSession::Init() {
+  int status = -EINVAL;
+  const char *qservice_name = "display.qservice";
+
+  // Start QService and connect to it.
+  qService::QService::init();
+  android::sp<qService::IQService> qservice = android::interface_cast<qService::IQService>(
+                android::defaultServiceManager()->getService(android::String16(qservice_name)));
+
+  if (qservice.get()) {
+    qservice->connect(this);
+  } else {
+    DLOGE("Failed to acquire %s", qservice_name);
+    return -EINVAL;
+  }
+
   DisplayError error = CoreInterface::CreateCore(this, HWCLogHandler::Get(), &core_intf_);
   if (UNLIKELY(error != kErrorNone)) {
     DLOGE("Display core initialization failed. Error = %d", error);
     return -EINVAL;
   }
-
-  int status = -EINVAL;
 
   // Create and power on primary display
   display_primary_ = new HWCDisplayPrimary(core_intf_, &hwc_procs_);
@@ -331,6 +347,48 @@ int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, ui
 
 DisplayError HWCSession::Hotplug(const CoreEventHotplug &hotplug) {
   return kErrorNone;
+}
+
+android::status_t HWCSession::notifyCallback(uint32_t command, const android::Parcel *input_parcel,
+                                             android::Parcel */*output_parcel*/) {
+  switch (command) {
+  case qService::IQService::DYNAMIC_DEBUG:
+    DynamicDebug(input_parcel);
+    break;
+
+  case qService::IQService::SCREEN_REFRESH:
+    hwc_procs_->invalidate(hwc_procs_);
+    break;
+
+  default:
+    DLOGW("QService command = %d is not supported", command);
+    return -EINVAL;
+  }
+
+  return 0;
+}
+
+void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {
+  int type = input_parcel->readInt32();
+  bool enable = (input_parcel->readInt32() > 0);
+  DLOGI("type = %d enable = %d", type, enable);
+
+  switch (type) {
+  case qService::IQService::DEBUG_ALL:
+    HWCLogHandler::LogAll(enable);
+    break;
+
+  case qService::IQService::DEBUG_MDPCOMP:
+    HWCLogHandler::LogStrategy(enable);
+    break;
+
+  case qService::IQService::DEBUG_PIPE_LIFECYCLE:
+    HWCLogHandler::LogResources(enable);
+    break;
+
+  default:
+    DLOGW("type = %d is not supported", type);
+  }
 }
 
 }  // namespace sde
