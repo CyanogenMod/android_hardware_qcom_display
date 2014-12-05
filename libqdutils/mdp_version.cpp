@@ -101,7 +101,7 @@ MDPVersion::MDPVersion()
     mSourceSplitAlways = false;
     mRGBHasNoScalar = false;
     mRotDownscale = false;
-    mBlendStages = 6; //min no. of stages supported by MDP.
+    mBlendStages = 4; //min no. of stages supported by MDP.
 
     // this is the default limit of mixer unless driver reports it.
     // For resolutions beyond this, we use dual/split overlay pipes.
