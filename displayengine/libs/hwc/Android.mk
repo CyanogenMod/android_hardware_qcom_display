@@ -6,14 +6,12 @@ LOCAL_MODULE_RELATIVE_PATH    := hw
 LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := hardware/qcom/display/displayengine/include/ \
                                  hardware/qcom/display/libgralloc/ \
-                                 hardware/qcom/display/libqservice/ \
-                                 $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
+                                 hardware/qcom/display/libqservice/
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
                                  -Wconversion -Wall -Werror \
                                  -DLOG_TAG=\"SDE\"
 LOCAL_SHARED_LIBRARIES        := libsde libqservice libbinder libhardware libhardware_legacy \
                                  libutils libcutils
-LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_SRC_FILES               := hwc_session.cpp \
                                  hwc_display.cpp \
                                  hwc_display_primary.cpp \
