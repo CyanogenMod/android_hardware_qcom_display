@@ -31,35 +31,11 @@ namespace sde {
 
 Debug Debug::debug_;
 
-Debug::Debug() : virtual_driver_(false) {
+Debug::Debug() : log_handler_(&default_log_handler_), virtual_driver_(false) {
   char property[PROPERTY_VALUE_MAX];
   if (property_get("displaycore.virtualdriver", property, NULL) > 0) {
     virtual_driver_ = (atoi(property) == 1);
   }
-}
-
-void Debug::Error(const LogTag & /*tag*/, const char *format, ...) {
-  va_list list;
-  va_start(list, format);
-  __android_log_vprint(ANDROID_LOG_ERROR, LOG_TAG, format, list);
-}
-
-void Debug::Warning(const LogTag & /*tag*/, const char *format, ...) {
-  va_list list;
-  va_start(list, format);
-  __android_log_vprint(ANDROID_LOG_WARN, LOG_TAG, format, list);
-}
-
-void Debug::Info(const LogTag & /*tag*/, const char *format, ...) {
-  va_list list;
-  va_start(list, format);
-  __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, list);
-}
-
-void Debug::Verbose(const LogTag & /*tag*/, const char *format, ...) {
-  va_list list;
-  va_start(list, format);
-  __android_log_vprint(ANDROID_LOG_VERBOSE, LOG_TAG, format, list);
 }
 
 }  // namespace sde

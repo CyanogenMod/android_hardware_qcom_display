@@ -26,11 +26,10 @@
 #include <gralloc_priv.h>
 #include <utils/constants.h>
 
-// HWC_MODULE_NAME definition must precede hwc_logger.h include.
-#define HWC_MODULE_NAME "HWCDisplay"
+#include "hwc_display.h"
 #include "hwc_logger.h"
 
-#include "hwc_display.h"
+#define __CLASS__ "HWCDisplay"
 
 namespace sde {
 
@@ -42,7 +41,7 @@ HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, 
 int HWCDisplay::Init() {
   DisplayError error = core_intf_->CreateDisplay(type_, this, &display_intf_);
   if (UNLIKELY(error != kErrorNone)) {
-    DLOGE("Display device create failed. Error = %d", error);
+    DLOGE("Display create failed. Error = %d", error);
     return -EINVAL;
   }
 
@@ -52,7 +51,7 @@ int HWCDisplay::Init() {
 int HWCDisplay::Deinit() {
   DisplayError error = core_intf_->DestroyDisplay(display_intf_);
   if (UNLIKELY(error != kErrorNone)) {
-    DLOGE("Display device destroy failed. Error = %d", error);
+    DLOGE("Display destroy failed. Error = %d", error);
     return -EINVAL;
   }
 
@@ -74,11 +73,11 @@ int HWCDisplay::EventControl(int event, int enable) {
     // TODO(user): Need to handle this case
     break;
   default:
-    DLOGW("Unsupported event control type : %d", event);
+    DLOGW("Unsupported event = %d", event);
   }
 
   if (UNLIKELY(error != kErrorNone)) {
-    DLOGE("EventControl failed. event = %d, enable = %d, error = %d", event, enable, error);
+    DLOGE("Failed. event = %d, enable = %d, error = %d", event, enable, error);
     return -EINVAL;
   }
 
@@ -86,7 +85,7 @@ int HWCDisplay::EventControl(int event, int enable) {
 }
 
 int HWCDisplay::Blank(int blank) {
-  DLOGI("Blank : %d, display : %d", blank, id_);
+  DLOGI("blank = %d, display = %d", blank, id_);
   DisplayState state = blank ? kStateOff : kStateOn;
   return SetState(state);
 }
@@ -131,7 +130,7 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
       values[i] = INT32(true); // For backward compatibility. All Physical displays are secure
       break;
     default:
-      DLOGW("Spurious attribute type %d", attributes[i]);
+      DLOGW("Spurious attribute type = %d", attributes[i]);
       return -EINVAL;
     }
   }
@@ -468,7 +467,7 @@ int HWCDisplay::SetFormat(const int32_t &source, LayerBufferFormat *target) {
   case HAL_PIXEL_FORMAT_RGB_565:              *target = kFormatRGB565;                    break;
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:   *target = kFormatYCbCr420SemiPlanarVenus;   break;
   default:
-    DLOGW("Unsupported format type %d", source);
+    DLOGW("Unsupported format type = %d", source);
     return -EINVAL;
   }
 

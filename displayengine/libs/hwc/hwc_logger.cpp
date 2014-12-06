@@ -22,35 +22,35 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __HWC_LOGGER_H__
-#define __HWC_LOGGER_H__
-
-#include <core/sde_types.h>
-#include <cutils/log.h>
-
-#define DLOG(Macro, format, ...) Macro(__CLASS__ "::%s: " format, __FUNCTION__, ##__VA_ARGS__)
-
-#define DLOGE(format, ...) DLOG(ALOGE, format, ##__VA_ARGS__)
-#define DLOGW(format, ...) DLOG(ALOGW, format, ##__VA_ARGS__)
-#define DLOGI(format, ...) DLOG(ALOGI, format, ##__VA_ARGS__)
-#define DLOGV(format, ...) DLOG(ALOGV, format, ##__VA_ARGS__)
+#include "hwc_logger.h"
 
 namespace sde {
 
-class HWCLogHandler : public LogHandler {
- public:
-  virtual void Error(LogTag tag, const char *format, ...);
-  virtual void Warning(LogTag tag, const char *format, ...);
-  virtual void Info(LogTag tag, const char *format, ...);
-  virtual void Verbose(LogTag tag, const char *format, ...);
+HWCLogHandler HWCLogHandler::log_handler_;
 
-  static inline LogHandler* Get() { return &log_handler_; }
+void HWCLogHandler::Error(LogTag /*tag*/, const char *format, ...) {
+  va_list list;
+  va_start(list, format);
+  __android_log_vprint(ANDROID_LOG_ERROR, LOG_TAG, format, list);
+}
 
- private:
-  static HWCLogHandler log_handler_;
-};
+void HWCLogHandler::Warning(LogTag /*tag*/, const char *format, ...) {
+  va_list list;
+  va_start(list, format);
+  __android_log_vprint(ANDROID_LOG_WARN, LOG_TAG, format, list);
+}
+
+void HWCLogHandler::Info(LogTag /*tag*/, const char *format, ...) {
+  va_list list;
+  va_start(list, format);
+  __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, list);
+}
+
+void HWCLogHandler::Verbose(LogTag /*tag*/, const char *format, ...) {
+  va_list list;
+  va_start(list, format);
+  __android_log_vprint(ANDROID_LOG_VERBOSE, LOG_TAG, format, list);
+}
 
 }  // namespace sde
-
-#endif  // __HWC_LOGGER_H__
 

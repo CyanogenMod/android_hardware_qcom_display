@@ -25,45 +25,44 @@
 #ifndef __DEBUG_H__
 #define __DEBUG_H__
 
-#ifndef SDE_LOG_TAG
-#define SDE_LOG_TAG kLogTagNone
-#endif
+#include <core/sde_types.h>
 
-#ifndef SDE_MODULE_NAME
-#define SDE_MODULE_NAME "SDE"
-#endif
+#define DLOG(tag, method, format, ...) Debug::GetLogHandler()->method(tag, \
+                                            __CLASS__ "::%s: " format, __FUNCTION__, ##__VA_ARGS__)
 
-#define DLOG(method, format, ...) Debug::method(SDE_LOG_TAG, SDE_MODULE_NAME ": " format, \
-                                                ##__VA_ARGS__)
+#define DLOGE_IF(tag, format, ...) DLOG(tag, Error, format, ##__VA_ARGS__)
+#define DLOGW_IF(tag, format, ...) DLOG(tag, Warning, format, ##__VA_ARGS__)
+#define DLOGI_IF(tag, format, ...) DLOG(tag, Info, format, ##__VA_ARGS__)
+#define DLOGV_IF(tag, format, ...) DLOG(tag, Verbose, format, ##__VA_ARGS__)
 
-// SDE_LOG_TAG and SDE_MODULE_NAME must be defined before #include this header file in
-// respective module, else default definitions are used.
-#define DLOGE(format, ...) DLOG(Error, format, ##__VA_ARGS__)
-#define DLOGW(format, ...) DLOG(Warning, format, ##__VA_ARGS__)
-#define DLOGI(format, ...) DLOG(Info, format, ##__VA_ARGS__)
-#define DLOGV(format, ...) DLOG(Verbose, format, ##__VA_ARGS__)
+#define DLOGE(format, ...) DLOGE_IF(kTagNone, format, ##__VA_ARGS__)
+#define DLOGW(format, ...) DLOGW_IF(kTagNone, format, ##__VA_ARGS__)
+#define DLOGI(format, ...) DLOGI_IF(kTagNone, format, ##__VA_ARGS__)
+#define DLOGV(format, ...) DLOGV_IF(kTagNone, format, ##__VA_ARGS__)
 
 namespace sde {
 
-enum LogTag {
-  kTagNone = 0,   // Log tag name is not specified.
-  kTagCore,       // Log is tagged for display core.
-  kTagStrategy,   // Log is tagged for composition strategy.
-};
-
 class Debug {
  public:
-  // Log handlers
-  static void Error(const LogTag &tag, const char *format, ...);
-  static void Warning(const LogTag &tag, const char *format, ...);
-  static void Info(const LogTag &tag, const char *format, ...);
-  static void Verbose(const LogTag &tag, const char *format, ...);
-
-  // Debug properties
-  static bool IsVirtualDriver() { return debug_.virtual_driver_; }
+  static inline void SetLogHandler(LogHandler *log_handler) { debug_.log_handler_ = log_handler; }
+  static inline LogHandler* GetLogHandler() { return debug_.log_handler_; }
+  static inline bool IsVirtualDriver() { return debug_.virtual_driver_; }
 
  private:
   Debug();
+
+  // By default, drop any log messages coming from Display Engine. It will be overriden by Display
+  // Engine client when core is successfully initialized.
+  class DefaultLogHandler : public LogHandler {
+   public:
+    virtual void Error(LogTag /*tag*/, const char */*format*/, ...) { }
+    virtual void Warning(LogTag /*tag*/, const char */*format*/, ...) { }
+    virtual void Info(LogTag /*tag*/, const char */*format*/, ...) { }
+    virtual void Verbose(LogTag /*tag*/, const char */*format*/, ...) { }
+  };
+
+  DefaultLogHandler default_log_handler_;
+  LogHandler *log_handler_;
   bool virtual_driver_;
   static Debug debug_;
 };

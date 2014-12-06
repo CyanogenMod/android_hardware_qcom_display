@@ -24,11 +24,10 @@
 
 #include <utils/constants.h>
 
-// HWC_MODULE_NAME definition must precede hwc_logger.h include.
-#define HWC_MODULE_NAME "HWCDisplayPrimary"
+#include "hwc_display_primary.h"
 #include "hwc_logger.h"
 
-#include "hwc_display_primary.h"
+#define __CLASS__ "HWCDisplayPrimary"
 
 namespace sde {
 

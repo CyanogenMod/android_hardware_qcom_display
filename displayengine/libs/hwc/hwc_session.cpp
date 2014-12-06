@@ -25,11 +25,10 @@
 #include <core/dump_interface.h>
 #include <utils/constants.h>
 
-// HWC_MODULE_NAME definition must precede hwc_logger.h include.
-#define HWC_MODULE_NAME "HWCSession"
+#include "hwc_session.h"
 #include "hwc_logger.h"
 
-#include "hwc_session.h"
+#define __CLASS__ "HWCSession"
 
 static sde::HWCSession::HWCModuleMethods g_hwc_module_methods;
 
@@ -68,7 +67,7 @@ HWCSession::HWCSession(const hw_module_t *module) : core_intf_(NULL), hwc_procs_
 }
 
 int HWCSession::Init() {
-  DisplayError error = CoreInterface::CreateCore(this, &core_intf_);
+  DisplayError error = CoreInterface::CreateCore(this, HWCLogHandler::Get(), &core_intf_);
   if (UNLIKELY(error != kErrorNone)) {
     DLOGE("Display core initialization failed. Error = %d", error);
     return -EINVAL;
@@ -116,7 +115,7 @@ int HWCSession::Deinit() {
 
 int HWCSession::Open(const hw_module_t *module, const char *name, hw_device_t **device) {
   if (UNLIKELY(!module || !name || !device)) {
-    DLOGE("::%s Invalid parameters.", __FUNCTION__);
+    DLOGE("Invalid parameters.");
     return -EINVAL;
   }
 
@@ -167,7 +166,7 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
   for (size_t i = 0; i < num_displays; i++) {
     hwc_display_contents_1_t *content_list = displays[i];
     if (UNLIKELY(!content_list || !content_list->numHwLayers)) {
-      DLOGW("::%s Invalid content list.", __FUNCTION__);
+      DLOGW("Invalid content list.");
       return -EINVAL;
     }
 
@@ -201,7 +200,7 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
   for (size_t i = 0; i < num_displays; i++) {
     hwc_display_contents_1_t *content_list = displays[i];
     if (UNLIKELY(!content_list || !content_list->numHwLayers)) {
-      DLOGW("::%s Invalid content list.", __FUNCTION__);
+      DLOGW("Invalid content list.");
       return -EINVAL;
     }
 

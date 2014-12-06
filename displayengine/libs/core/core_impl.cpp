@@ -22,18 +22,16 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// SDE_LOG_TAG definition must precede debug.h include.
-#define SDE_LOG_TAG kTagCore
-#define SDE_MODULE_NAME "CoreImpl"
-#include <utils/debug.h>
-
 #include <utils/locker.h>
 #include <utils/constants.h>
+#include <utils/debug.h>
 
 #include "core_impl.h"
 #include "display_primary.h"
 #include "display_hdmi.h"
 #include "display_virtual.h"
+
+#define __CLASS__ "CoreImpl"
 
 namespace sde {
 
