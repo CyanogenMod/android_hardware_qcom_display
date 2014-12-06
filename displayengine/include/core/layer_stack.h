@@ -43,7 +43,7 @@ namespace sde {
   @sa Layer
 */
 enum LayerBlending {
-  kBlendingNone = 0,        //!< Blend operation is not specified.
+  kBlendingNone,            //!< Blend operation is not specified.
 
   kBlendingOpaque,          //!< Pixel color is expressed using straight alpha in color tuples. It
                             //!< is constant blend operation. The layer would appear opaque if plane
@@ -217,7 +217,7 @@ struct LayerStack {
   uint32_t layer_count;   //!< Total number of layers.
   LayerStackFlags flags;  //!< Flags associated with this layer set.
 
-  LayerStack() : output_buffer(NULL) { }
+  LayerStack() : output_buffer(NULL), layers(NULL), layer_count(0) { }
 };
 
 }  // namespace sde

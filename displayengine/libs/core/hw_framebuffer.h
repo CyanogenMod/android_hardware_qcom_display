@@ -27,7 +27,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <linux/msm_mdp.h>
+#include <linux/msm_mdp_ext.h>
 #include <poll.h>
 #include <pthread.h>
 
@@ -58,6 +58,19 @@ class HWFrameBuffer : public HWInterface {
   struct HWContext {
     HWBlockType type;
     int device_fd;
+    mdp_layer_commit mdp_commit;
+    mdp_input_layer mdp_layers[kMaxSDELayers * 2];   // split panel (left + right) for worst case
+
+    HWContext() : type(kHWBlockMax), device_fd(-1) {
+      ResetMDPCommit();
+    }
+
+    void ResetMDPCommit() {
+      memset(&mdp_commit, 0, sizeof(mdp_commit));
+      memset(&mdp_layers, 0, sizeof(mdp_layers));
+      mdp_commit.version = MDP_COMMIT_VERSION_1_0;
+      mdp_commit.commit_v1.input_layers = mdp_layers;
+    }
   };
 
   enum PanelType {
@@ -100,9 +113,9 @@ class HWFrameBuffer : public HWInterface {
   static const int kNumDisplayEvents = 2;
   static const int kHWMdssVersion5 = 500;  // MDSS_V5
 
-  inline void SetFormat(uint32_t *target, const LayerBufferFormat &source);
-  inline void SetBlending(uint32_t *target, const LayerBlending &source);
-  inline void SetRect(mdp_rect *target, const LayerRect &source);
+  inline DisplayError SetFormat(const LayerBufferFormat &source, uint32_t *target);
+  inline void SetBlending(const LayerBlending &source, mdss_mdp_blend_op *target);
+  inline void SetRect(const LayerRect &source, mdp_rect *target);
 
   // Event Thread to receive vsync/blank events
   static void* DisplayEventThread(void *context);

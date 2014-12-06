@@ -195,10 +195,6 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
   DisplayError error = kErrorNone;
   const struct HWLayersInfo &layer_info = hw_layers->info;
 
-  if (UNLIKELY(!layer_info.count)) {
-    return kErrorNone;
-  }
-
   if (UNLIKELY(layer_info.count > num_pipe_)) {
     return kErrorResources;
   }

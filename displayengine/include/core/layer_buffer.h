@@ -76,6 +76,10 @@ enum LayerBufferFormat {
                                       //!<    v(0), u(0), v(2), u(2) ... v(n-1), u(n-1)
                                       //!< aka NV21.
 
+  kFormatYCbCr420SemiPlanarVenus,     //!< Y-plane: y(0), y(1), y(2) ... y(n)
+                                      //!< 2x2 subsampled interleaved UV-plane:
+                                      //!<    u(0), v(0), u(2), v(2) ... u(n-1), v(n-1)
+
   /* All YUV-Packed formats, Any new format will be added towards end of this group to maintain
      backward compatibility.
   */
