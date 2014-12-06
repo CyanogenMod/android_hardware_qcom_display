@@ -1,13 +1,15 @@
 LOCAL_PATH := $(call my-dir)
-include hardware/qcom/display/displayengine/libs/common.mk
 include $(CLEAR_VARS)
 
 LOCAL_MODULE                  := libsde
 LOCAL_MODULE_TAGS             := optional
-LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
-LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"SDE\"
-LOCAL_SHARED_LIBRARIES        := $(common_libs) libdl libsdeutils
-LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
+LOCAL_C_INCLUDES              := hardware/qcom/display/displayengine/include/ \
+                                 $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
+LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
+                                 -Wconversion -Wall -Werror \
+                                 -DLOG_TAG=\"SDE\"
+LOCAL_SHARED_LIBRARIES        := libdl libsdeutils
+LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_SRC_FILES               := core_interface.cpp \
                                  core_impl.cpp \
                                  display_base.cpp \

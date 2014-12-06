@@ -28,12 +28,13 @@
 #include <hardware/hwcomposer.h>
 #include <core/core_interface.h>
 #include <utils/locker.h>
+#include <IQClient.h>
 
 #include "hwc_display_primary.h"
 
 namespace sde {
 
-class HWCSession : public hwc_composer_device_1_t, public CoreEventHandler {
+class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::BnQClient {
  public:
   struct HWCModuleMethods : public hw_module_methods_t {
     HWCModuleMethods() {
@@ -65,6 +66,11 @@ class HWCSession : public hwc_composer_device_1_t, public CoreEventHandler {
 
   // CoreEventHandler methods
   virtual DisplayError Hotplug(const CoreEventHotplug &hotplug);
+
+  // QClient methods
+  virtual android::status_t notifyCallback(uint32_t command, const android::Parcel *input_parcel,
+                                           android::Parcel *output_parcel);
+  void DynamicDebug(const android::Parcel *input_parcel);
 
   static Locker locker_;
   CoreInterface *core_intf_;
