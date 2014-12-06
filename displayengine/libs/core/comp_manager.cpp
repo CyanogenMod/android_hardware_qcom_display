@@ -44,27 +44,27 @@ DisplayError CompManager::Init(const HWResourceInfo &hw_res_info) {
   DisplayError error = kErrorNone;
 
   error = res_mgr_.Init(hw_res_info);
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     return error;
   }
 
   // Try to load strategy library & get handle to its interface.
   // Default to GPU only composition on failure.
   strategy_lib_ = ::dlopen(STRATEGY_LIBRARY_NAME, RTLD_NOW);
-  if (UNLIKELY(!strategy_lib_)) {
+  if (!strategy_lib_) {
     DLOGW("Unable to load = %s", STRATEGY_LIBRARY_NAME);
   } else {
-    GetStrategyInterface get_strategy_intf = NULL;
-    void **sym = reinterpret_cast<void **>(&get_strategy_intf);
-    *sym = ::dlsym(strategy_lib_, GET_STRATEGY_INTERFACE_NAME);
-    if (UNLIKELY(!get_strategy_intf)) {
-      DLOGW("Unable to find symbol for %s", GET_STRATEGY_INTERFACE_NAME);
-    } else if (UNLIKELY(get_strategy_intf(&strategy_intf_) != kErrorNone)) {
-      DLOGW("Unable to get handle to strategy interface");
+    CreateStrategyInterface create_strategy_intf = NULL;
+    void **sym = reinterpret_cast<void **>(&create_strategy_intf);
+    *sym = ::dlsym(strategy_lib_, CREATE_STRATEGY_INTERFACE_NAME);
+    if (!create_strategy_intf) {
+      DLOGW("Unable to find symbol for %s", CREATE_STRATEGY_INTERFACE_NAME);
+    } else if (create_strategy_intf(STRATEGY_VERSION_TAG, &strategy_intf_) != kErrorNone) {
+      DLOGW("Unable to create strategy interface");
     }
   }
 
-  if (UNLIKELY(!strategy_intf_)) {
+  if (!strategy_intf_) {
     DLOGI("Using GPU only composition");
     if (strategy_lib_) {
       ::dlclose(strategy_lib_);
@@ -80,8 +80,17 @@ DisplayError CompManager::Deinit() {
   SCOPE_LOCK(locker_);
 
   if (strategy_lib_) {
+    DestroyStrategyInterface destroy_strategy_intf = NULL;
+    void **sym = reinterpret_cast<void **>(&destroy_strategy_intf);
+    *sym = ::dlsym(strategy_lib_, DESTROY_STRATEGY_INTERFACE_NAME);
+    if (!destroy_strategy_intf) {
+      DLOGW("Unable to find symbol for %s", DESTROY_STRATEGY_INTERFACE_NAME);
+    } else if (destroy_strategy_intf(strategy_intf_) != kErrorNone) {
+      DLOGW("Unable to destroy strategy interface");
+    }
     ::dlclose(strategy_lib_);
   }
+
   res_mgr_.Deinit();
 
   return kErrorNone;
@@ -134,7 +143,7 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
 
   constraints->safe_mode = safe_mode_;
   // If validation for the best available composition strategy with driver has failed, just
-  // fallback to GPU composition.
+  // fallback to safe mode composition e.g. GPU or video only.
   if (UNLIKELY(hw_layers->info.flags)) {
     constraints->safe_mode = true;
     return;
