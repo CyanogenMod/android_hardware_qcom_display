@@ -82,7 +82,7 @@ HWFrameBuffer::HWFrameBuffer() : event_thread_name_("SDE_EventThread"), fake_vsy
     getline_ = virtual_getline;
   }
 #endif
-  for (int i = 0; i < kHWBlockMax; i ++) {
+  for (int i = 0; i < kDeviceMax; i++) {
     fb_node_index_[i] = -1;
   }
 }
@@ -180,7 +180,7 @@ DisplayError HWFrameBuffer::GetHWCapabilities(HWResourceInfo *hw_res_info) {
   return kErrorNone;
 }
 
-DisplayError HWFrameBuffer::Open(HWBlockType type, Handle *device, HWEventHandler* eventhandler) {
+DisplayError HWFrameBuffer::Open(HWDeviceType type, Handle *device, HWEventHandler* eventhandler) {
   DisplayError error = kErrorNone;
 
   HWContext *hw_context = new HWContext();
@@ -188,17 +188,20 @@ DisplayError HWFrameBuffer::Open(HWBlockType type, Handle *device, HWEventHandle
     return kErrorMemory;
   }
 
-  int device_id = 0;
-  switch (type) {
-  case kHWPrimary:
-    device_id = 0;
-    break;
-  default:
-    break;
-  }
-
   char device_name[64] = {0};
-  snprintf(device_name, sizeof(device_name), "%s%d", "/dev/graphics/fb", device_id);
+
+  switch (type) {
+    case kDevicePrimary:
+    case kDeviceHDMI:
+      // Store EventHandlers for two Physical displays, i.e., Primary and HDMI
+      // TODO(user): Need to revisit for HDMI as Primary usecase
+      event_handler_[type] = eventhandler;
+    case kDeviceVirtual:
+      snprintf(device_name, sizeof(device_name), "%s%d", "/dev/graphics/fb", fb_node_index_[type]);
+      break;
+    default:
+      break;
+  }
 
   hw_context->device_fd = open_(device_name, O_RDWR);
   if (UNLIKELY(hw_context->device_fd < 0)) {
@@ -206,12 +209,9 @@ DisplayError HWFrameBuffer::Open(HWBlockType type, Handle *device, HWEventHandle
     error = kErrorResources;
     delete hw_context;
   }
+  hw_context->type = type;
 
   *device = hw_context;
-
-  // Store EventHandlers for two Physical displays
-  if (device_id < kNumPhysicalDisplays)
-    event_handler_[device_id] = eventhandler;
 
   return error;
 }
@@ -270,9 +270,12 @@ DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
   display_attributes->vsync_period_ns =
                  UINT32(1000000000L / FLOAT(meta_data.data.panel_frame_rate));
 
-  // TODO(user): set panel information from sysfs
-  display_attributes->is_device_split = true;
-  display_attributes->split_left = display_attributes->x_pixels / 2;
+  display_attributes->is_device_split = ((var_screeninfo.xres > hw_resource_.max_mixer_width) ||
+        (hw_resource_.split_info.right_split)) ? true : false;
+  if (display_attributes->is_device_split) {
+    display_attributes->split_left = hw_resource_.split_info.left_split ?
+        hw_resource_.split_info.left_split : display_attributes->x_pixels / 2;
+  }
 
   return kErrorNone;
 }
@@ -505,7 +508,7 @@ void* HWFrameBuffer::DisplayEventThreadHandler() {
       uint64_t ts = uint64_t(time_now.tv_sec)*1000000000LL +uint64_t(time_now.tv_usec)*1000LL;
 
       // Send Vsync event for primary display(0)
-      event_handler_[0]->VSync(ts);
+      event_handler_[kDevicePrimary]->VSync(ts);
     }
 
     pthread_exit(0);
@@ -518,7 +521,7 @@ void* HWFrameBuffer::DisplayEventThreadHandler() {
   while (!exit_threads_) {
     int error = poll_(poll_fds_[0], kNumPhysicalDisplays * kNumDisplayEvents, -1);
     if (error < 0) {
-      DLOGE("poll failed errno: %s", strerror(errno));
+      DLOGW("poll failed errno: %s", strerror(errno));
       continue;
     }
 
@@ -530,7 +533,7 @@ void* HWFrameBuffer::DisplayEventThreadHandler() {
           ssize_t length = pread_(poll_fd.fd, data, kMaxStringLength, 0);
           if (length < 0) {
             // If the read was interrupted - it is not a fatal error, just continue.
-            DLOGE("Failed to read event:%d for display=%d: %s", event, display, strerror(errno));
+            DLOGW("Failed to read event:%d for display=%d: %s", event, display, strerror(errno));
             continue;
           }
 
@@ -560,17 +563,16 @@ void HWFrameBuffer::HandleBlank(int display_id, char *data) {
 void HWFrameBuffer::PopulateFBNodeIndex() {
   char stringbuffer[kMaxStringLength];
   DisplayError error = kErrorNone;
-  HWBlockType hwblock = kHWPrimary;
   char *line = stringbuffer;
   size_t len = kMaxStringLength;
   ssize_t read;
 
 
-  for (int i = 0; i < kHWBlockMax; i++) {
+  for (int i = 0; i < kDeviceMax; i++) {
     snprintf(stringbuffer, sizeof(stringbuffer), "%s%d/msm_fb_type", fb_path_, i);
     FILE* fileptr = fopen_(stringbuffer, "r");
     if (fileptr == NULL) {
-      DLOGE("File not found %s", stringbuffer);
+      DLOGW("File not found %s", stringbuffer);
       continue;
     }
     read = getline_(&line, &len, fileptr);
@@ -582,24 +584,23 @@ void HWFrameBuffer::PopulateFBNodeIndex() {
     // Need more concrete info from driver
     if ((strncmp(line, "mipi dsi cmd panel", strlen("mipi dsi cmd panel")) == 0)) {
       pri_panel_info_.type = kCommandModePanel;
-      hwblock = kHWPrimary;
+      fb_node_index_[kDevicePrimary] = i;
     } else if ((strncmp(line, "mipi dsi video panel", strlen("mipi dsi video panel")) == 0))  {
       pri_panel_info_.type = kVideoModePanel;
-      hwblock = kHWPrimary;
+      fb_node_index_[kDevicePrimary] = i;
     } else if ((strncmp(line, "lvds panel", strlen("lvds panel")) == 0)) {
       pri_panel_info_.type = kLVDSPanel;
-      hwblock = kHWPrimary;
+      fb_node_index_[kDevicePrimary] = i;
     } else if ((strncmp(line, "edp panel", strlen("edp panel")) == 0)) {
       pri_panel_info_.type = kEDPPanel;
-      hwblock = kHWPrimary;
+      fb_node_index_[kDevicePrimary] = i;
     } else if ((strncmp(line, "dtv panel", strlen("dtv panel")) == 0)) {
-      hwblock = kHWHDMI;
+      fb_node_index_[kDeviceHDMI] = i;
     } else if ((strncmp(line, "writeback panel", strlen("writeback panel")) == 0)) {
-      hwblock = kHWWriteback0;
+      fb_node_index_[kDeviceVirtual] = i;
     } else {
-      DLOGE("Unknown panel type = %s index = %d", line, i);
+      DLOGW("Unknown panel type = %s index = %d", line, i);
     }
-    fb_node_index_[hwblock] = i;
     fclose_(fileptr);
   }
 }
@@ -610,7 +611,7 @@ void HWFrameBuffer::PopulatePanelInfo(int fb_index) {
   snprintf(stringbuffer, sizeof(stringbuffer), "%s%d/msm_fb_panel_info", fb_path_, fb_index);
   fileptr = fopen_(stringbuffer, "r");
   if (fileptr == NULL) {
-    DLOGE("Failed to open msm_fb_panel_info node");
+    DLOGW("Failed to open msm_fb_panel_info node");
     return;
   }
 

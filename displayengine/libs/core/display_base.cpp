@@ -34,8 +34,8 @@
 namespace sde {
 
 DisplayBase::DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
-                       HWBlockType hw_block_type, HWInterface *hw_intf, CompManager *comp_manager)
-  : display_type_(display_type), event_handler_(event_handler), hw_block_type_(hw_block_type),
+             HWDeviceType hw_device_type, HWInterface *hw_intf, CompManager *comp_manager)
+  : display_type_(display_type), event_handler_(event_handler), hw_device_type_(hw_device_type),
     hw_intf_(hw_intf), comp_manager_(comp_manager), state_(kStateOff), hw_device_(0),
     display_comp_ctx_(0), display_attributes_(NULL), num_modes_(0), active_mode_index_(0),
     pending_commit_(false), vsync_enable_(false) {
@@ -46,7 +46,7 @@ DisplayError DisplayBase::Init() {
 
   DisplayError error = kErrorNone;
 
-  error = hw_intf_->Open(hw_block_type_, &hw_device_, this);
+  error = hw_intf_->Open(hw_device_type_, &hw_device_, this);
   if (UNLIKELY(error != kErrorNone)) {
     return error;
   }

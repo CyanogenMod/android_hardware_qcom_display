@@ -35,7 +35,7 @@ namespace sde {
 
 DisplayVirtual::DisplayVirtual(DisplayEventHandler *event_handler, HWInterface *hw_intf,
                                CompManager *comp_manager)
-  : DisplayBase(kVirtual, event_handler, kHWBlockMax, hw_intf, comp_manager) {
+  : DisplayBase(kVirtual, event_handler, kDeviceVirtual, hw_intf, comp_manager) {
 }
 
 }  // namespace sde

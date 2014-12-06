@@ -41,7 +41,7 @@ class HWFrameBuffer : public HWInterface {
   DisplayError Init();
   DisplayError Deinit();
   virtual DisplayError GetHWCapabilities(HWResourceInfo *hw_res_info);
-  virtual DisplayError Open(HWBlockType type, Handle *device, HWEventHandler *eventhandler);
+  virtual DisplayError Open(HWDeviceType type, Handle *device, HWEventHandler *eventhandler);
   virtual DisplayError Close(Handle device);
   virtual DisplayError GetNumDisplayAttributes(Handle device, uint32_t *count);
   virtual DisplayError GetDisplayAttributes(Handle device, HWDisplayAttributes *display_attributes,
@@ -56,12 +56,12 @@ class HWFrameBuffer : public HWInterface {
 
  private:
   struct HWContext {
-    HWBlockType type;
+    HWDeviceType type;
     int device_fd;
     mdp_layer_commit mdp_commit;
     mdp_input_layer mdp_layers[kMaxSDELayers * 2];   // split panel (left + right) for worst case
 
-    HWContext() : type(kHWBlockMax), device_fd(-1) {
+    HWContext() : type(kDeviceMax), device_fd(-1) {
       ResetMDPCommit();
     }
 
@@ -150,7 +150,7 @@ class HWFrameBuffer : public HWInterface {
   bool fake_vsync_;
   bool exit_threads_;
   HWResourceInfo hw_resource_;
-  int fb_node_index_[kHWBlockMax];
+  int fb_node_index_[kDeviceMax];
   const char* fb_path_;
   PanelInfo pri_panel_info_;
 };

@@ -37,7 +37,7 @@ namespace sde {
 class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
  public:
   DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
-             HWBlockType hw_block_type, HWInterface *hw_intf, CompManager *comp_manager);
+              HWDeviceType hw_device_type, HWInterface *hw_intf, CompManager *comp_manager);
   virtual ~DisplayBase() { }
   virtual DisplayError Init();
   virtual DisplayError Deinit();
@@ -64,7 +64,7 @@ class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
   Locker locker_;
   DisplayType display_type_;
   DisplayEventHandler *event_handler_;
-  HWBlockType hw_block_type_;
+  HWDeviceType hw_device_type_;
   HWInterface *hw_intf_;
   CompManager *comp_manager_;
   DisplayState state_;
