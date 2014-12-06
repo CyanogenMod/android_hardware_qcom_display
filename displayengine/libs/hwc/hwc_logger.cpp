@@ -41,17 +41,17 @@ void HWCLogHandler::LogAll(bool enable) {
 
 void HWCLogHandler::LogResources(bool enable) {
   if (enable) {
-    log_flags_ = SET_BIT(log_flags_, kTagResources);
+    SET_BIT(log_flags_, kTagResources);
   } else {
-    log_flags_ = CLEAR_BIT(log_flags_, kTagResources);
+    CLEAR_BIT(log_flags_, kTagResources);
   }
 }
 
 void HWCLogHandler::LogStrategy(bool enable) {
   if (enable) {
-    log_flags_ = SET_BIT(log_flags_, kTagStrategy);
+    SET_BIT(log_flags_, kTagStrategy);
   } else {
-    log_flags_ = CLEAR_BIT(log_flags_, kTagStrategy);
+    CLEAR_BIT(log_flags_, kTagStrategy);
   }
 }
 
@@ -68,7 +68,7 @@ void HWCLogHandler::Warning(LogTag /*tag*/, const char *format, ...) {
 }
 
 void HWCLogHandler::Info(LogTag tag, const char *format, ...) {
-  if (IS_BIT(log_flags_, tag)) {
+  if (IS_BIT_SET(log_flags_, tag)) {
     va_list list;
     va_start(list, format);
     __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, list);
@@ -76,7 +76,7 @@ void HWCLogHandler::Info(LogTag tag, const char *format, ...) {
 }
 
 void HWCLogHandler::Verbose(LogTag tag, const char *format, ...) {
-  if (IS_BIT(log_flags_, tag)) {
+  if (IS_BIT_SET(log_flags_, tag)) {
     va_list list;
     va_start(list, format);
     __android_log_vprint(ANDROID_LOG_VERBOSE, LOG_TAG, format, list);
