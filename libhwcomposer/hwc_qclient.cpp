@@ -35,6 +35,7 @@
 #include <hwc_virtual.h>
 #include <overlay.h>
 #include <display_config.h>
+#include <hwc_qdcm.h>
 
 #define QCLIENT_DEBUG 0
 
@@ -43,6 +44,7 @@ using namespace qService;
 using namespace qhwc;
 using namespace overlay;
 using namespace qdutils;
+using namespace qQdcm;
 
 namespace qClient {
 
@@ -335,6 +337,8 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::CONFIGURE_DYN_REFRESH_RATE:
             configureDynRefreshRate(mHwcContext, inParcel);
+        case IQService::QDCM_SVC_CMDS:
+            qdcmCmdsHandler(mHwcContext, inParcel, outParcel);
             break;
         default:
             ret = NO_ERROR;

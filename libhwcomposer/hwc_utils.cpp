@@ -43,6 +43,7 @@
 #include "comptype.h"
 #include "hwc_virtual.h"
 #include "qd_utils.h"
+#include "hwc_qdcm.h"
 #include <sys/sysinfo.h>
 #include <dlfcn.h>
 
@@ -51,6 +52,7 @@ using namespace qService;
 using namespace android;
 using namespace overlay;
 using namespace overlay::utils;
+using namespace qQdcm;
 namespace ovutils = overlay::utils;
 
 #ifdef QCOM_BSP
@@ -411,12 +413,19 @@ void initContext(hwc_context_t *ctx)
     }
 
     memset(&(ctx->mPtorInfo), 0, sizeof(ctx->mPtorInfo));
+
+    //init qdcm service related context.
+    qdcmInitContext(ctx);
+
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
 }
 
 void closeContext(hwc_context_t *ctx)
 {
+    //close qdcm service related context.
+    qdcmCloseContext(ctx);
+
     if(ctx->mOverlay) {
         delete ctx->mOverlay;
         ctx->mOverlay = NULL;
@@ -2482,8 +2491,6 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
 void processBootAnimCompleted(hwc_context_t *ctx) {
     char value[PROPERTY_VALUE_MAX];
     int boot_finished = 0, ret = -1;
-    int (*applyMode)(int) = NULL;
-    void *modeHandle = NULL;
 
     // Reading property set on boot finish in SF
     property_get("service.bootanim.exit", value, "0");
@@ -2491,22 +2498,11 @@ void processBootAnimCompleted(hwc_context_t *ctx) {
     if (!boot_finished)
         return;
 
-    modeHandle = dlopen("libmm-qdcm.so", RTLD_NOW);
-    if (modeHandle) {
-        *(void **)&applyMode = dlsym(modeHandle, "applyDefaults");
-        if (applyMode) {
-            ret = applyMode(HWC_DISPLAY_PRIMARY);
-            if (ret)
-                ALOGD("%s: Not able to apply default mode", __FUNCTION__);
-        } else {
-            ALOGE("%s: No symbol applyDefaults found", __FUNCTION__);
-        }
-        dlclose(modeHandle);
-    } else {
-        ALOGE("%s: Not able to load libmm-qdcm.so", __FUNCTION__);
-    }
-
     ctx->mBootAnimCompleted = true;
+
+    //one-shot action check if bootanimation completed then apply
+    //default display mode.
+    qdcmApplyDefaultAfterBootAnimationDone(ctx);
 }
 
 void BwcPM::setBwc(const hwc_rect_t& crop, const hwc_rect_t& dst,

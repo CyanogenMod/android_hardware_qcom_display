@@ -53,6 +53,10 @@ struct hwc_context_t;
 
 namespace ovutils = overlay::utils;
 
+namespace qmode {
+class ModeManager;
+}
+
 namespace overlay {
 class Overlay;
 class Rotator;
@@ -560,6 +564,13 @@ struct gpu_hint_info {
     EGLDisplay mEGLDisplay;
 };
 
+//struct holds the information about libmm-qdcm.so
+struct qdcm_info {
+    qmode::ModeManager *mQdcmMode;
+    void *mQdcmLib;
+    bool  mBootAnimCompleted;
+};
+
 // -----------------------------------------------------------------------------
 // HWC context
 // This structure contains overall state
@@ -639,6 +650,8 @@ struct hwc_context_t {
     bool mBootAnimCompleted;
     // Provides a way for OEM's to disable setting dynfps via metadata.
     bool mUseMetaDataRefreshRate;
+    //struct holds the information about display tuning service library.
+    struct qdcm_info mQdcmInfo;
 };
 
 namespace qhwc {
