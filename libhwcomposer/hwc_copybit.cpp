@@ -528,19 +528,21 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     }
 
     mDirtyLayerIndex =  checkDirtyRect(ctx, list, dpy);
-    if( mDirtyLayerIndex != -1){
-          hwc_layer_1_t *layer = &list->hwLayers[mDirtyLayerIndex];
+    hwc_rect_t clearRegion = {0,0,0,0};
+    if (CBUtils::getuiClearRegion(list, clearRegion, layerProp)){
+        if (mDirtyLayerIndex != -1){
+            hwc_layer_1_t *layer = &list->hwLayers[mDirtyLayerIndex];
 #ifdef QCOM_BSP
-          clear(renderBuffer,layer->dirtyRect);
+             hwc_rect_t result = getIntersection(layer->dirtyRect,clearRegion);
+             if(isValidRect(result))
+               clear(renderBuffer,result);
 #else
-          clear(renderBuffer,layer->displayFrame);
+             clear(renderBuffer,clearRegion);
 #endif
-    } else {
-          hwc_rect_t clearRegion = {0,0,0,0};
-          if(CBUtils::getuiClearRegion(list, clearRegion, layerProp))
+        } else {
              clear(renderBuffer, clearRegion);
+        }
     }
-
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
     for (int i = 0; i <= (ctx->listStats[dpy].numAppLayers-1); i++) {
         if(!(layerProp[i].mFlags & HWC_COPYBIT)) {
