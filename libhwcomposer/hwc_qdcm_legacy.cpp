@@ -31,7 +31,7 @@
 #include <hwc_utils.h>
 #include <IQService.h>
 #include <mdp_version.h>
-#include "mode_manager.h"
+#include <dlfcn.h>
 
 using namespace android;
 using namespace qService;
@@ -49,10 +49,24 @@ void qdcmCloseContext(hwc_context_t *ctx)
 
 void qdcmApplyDefaultAfterBootAnimationDone(hwc_context_t *ctx)
 {
-    loadQdcmLibrary(ctx);
-    if (ctx->mQdcmInfo.mQdcmMode)
-        ctx->mQdcmInfo.mQdcmMode->applyDefaultMode(0);
-    unloadQdcmLibrary(ctx);
+    int ret = 0;
+    int (*applyMode)(int) = NULL;
+    void *modeHandle = NULL;
+
+    modeHandle = dlopen("libmm-qdcm.so", RTLD_NOW);
+    if (modeHandle) {
+        *(void **)&applyMode = dlsym(modeHandle, "applyDefaults");
+        if (applyMode) {
+            ret = applyMode(HWC_DISPLAY_PRIMARY);
+            if (ret)
+                ALOGE("%s: Not able to apply default mode", __FUNCTION__);
+        } else {
+            ALOGE("%s: No symbol applyDefaults found", __FUNCTION__);
+        }
+        dlclose(modeHandle);
+    } else {
+        ALOGE("%s: Not able to load libmm-qdcm.so", __FUNCTION__);
+    }
 }
 
 //do nothing in case qdcm legacy implementation.

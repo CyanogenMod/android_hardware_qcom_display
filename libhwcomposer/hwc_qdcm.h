@@ -37,7 +37,6 @@
 #include <dlfcn.h>
 #include <binder/Parcel.h>
 #include <cutils/properties.h>
-#include <mode_manager.h>
 
 #define QDCM_DEBUG 0
 
