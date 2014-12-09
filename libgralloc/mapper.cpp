@@ -238,11 +238,11 @@ static int gralloc_map_and_invalidate (gralloc_module_t const* module,
         }
         if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_ION and
                     not useUncached(usage)) {
-            bool nonCPUWriters = usage & (
-                        GRALLOC_USAGE_HW_RENDER |
-                        GRALLOC_USAGE_HW_FB |
-                        GRALLOC_USAGE_HW_VIDEO_ENCODER |
-                        GRALLOC_USAGE_HW_CAMERA_WRITE);
+            bool nonCPUWriters = hnd->flags & (
+                        private_handle_t::PRIV_FLAGS_HW_RENDER |
+                        private_handle_t::PRIV_FLAGS_HW_FB |
+                        private_handle_t::PRIV_FLAGS_VIDEO_ENCODER |
+                        private_handle_t::PRIV_FLAGS_CAMERA_WRITE);
 
             //Invalidate if CPU reads in software and there are non-CPU
             //writers. No need to do this for the metadata buffer as it is
