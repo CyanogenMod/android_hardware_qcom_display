@@ -53,8 +53,6 @@ static bool isHDMI(const char* str)
 
 static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
 {
-    int vsync = 0;
-    int64_t timestamp = 0;
     const char *str = udata;
     bool usecopybit = false;
     int compositionType =
