@@ -145,10 +145,9 @@ struct private_handle_t : public native_handle {
             PRIV_FLAGS_NEEDS_FLUSH        = 0x00000020,
             // Uncached memory or no CPU writers
             PRIV_FLAGS_DO_NOT_FLUSH       = 0x00000040,
-            PRIV_FLAGS_SW_LOCK            = 0x00000080,
+            PRIV_FLAGS_HW_RENDER          = 0x00000080,
             PRIV_FLAGS_NONCONTIGUOUS_MEM  = 0x00000100,
-            // Set by HWC when storing the handle
-            PRIV_FLAGS_HWC_LOCK           = 0x00000200,
+            PRIV_FLAGS_HW_FB              = 0x00000200,
             PRIV_FLAGS_SECURE_BUFFER      = 0x00000400,
             // For explicit synchronization
             PRIV_FLAGS_UNSYNCHRONIZED     = 0x00000800,
