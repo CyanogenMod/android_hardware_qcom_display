@@ -182,7 +182,6 @@ void MDPComp::setMDPCompLayerFlags(hwc_context_t *ctx,
  */
 bool MDPComp::setupBasePipe(hwc_context_t *ctx) {
     const int dpy = HWC_DISPLAY_PRIMARY;
-    int fb_stride = ctx->dpyAttr[dpy].stride;
     int fb_width = ctx->dpyAttr[dpy].xres;
     int fb_height = ctx->dpyAttr[dpy].yres;
     int fb_fd = ctx->dpyAttr[dpy].fd;
@@ -292,7 +291,6 @@ bool MDPComp::isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer) {
 }
 
 bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
-    const int dpy = HWC_DISPLAY_PRIMARY;
     private_handle_t *hnd = (private_handle_t *)layer->handle;
 
     if(!hnd) {
@@ -1023,8 +1021,6 @@ bool MDPCompLowRes::allocLayerPipes(hwc_context_t *ctx,
 
             if(mCurrentFrame.isFBComposed[nYuvIndex])
                 continue;
-
-            hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
 
             int mdpIndex = mCurrentFrame.layerToMDP[nYuvIndex];
 

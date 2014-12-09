@@ -486,7 +486,6 @@ bool ExternalDisplay::isInterlacedMode(int ID) {
 
 void ExternalDisplay::setResolution(int ID)
 {
-    struct fb_var_screeninfo info;
     int ret = 0;
     ret = ioctl(mFd, FBIOGET_VSCREENINFO, &mVInfo);
     if(ret < 0) {
