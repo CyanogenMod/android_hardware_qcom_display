@@ -237,6 +237,8 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
       // assign single pipe
       hw_layers->config[i].left_pipe.pipe_id = src_pipes_[left_index].mdss_pipe_id;
       src_pipes_[left_index].at_right = false;
+      hw_layers->config[i].is_right_pipe = false;
+      src_pipes_[left_index].at_right = false;
       continue;
     }
 

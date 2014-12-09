@@ -45,12 +45,12 @@ DisplayError DisplayBase::Init() {
   DisplayError error = kErrorNone;
 
   error = hw_intf_->Open(hw_device_type_, &hw_device_, this);
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     return error;
   }
 
   error = hw_intf_->GetNumDisplayAttributes(hw_device_, &num_modes_);
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     goto CleanupOnError;
   }
 
@@ -62,16 +62,21 @@ DisplayError DisplayBase::Init() {
 
   for (uint32_t i = 0; i < num_modes_; i++) {
     error = hw_intf_->GetDisplayAttributes(hw_device_, &display_attributes_[i], i);
-    if (UNLIKELY(error != kErrorNone)) {
+    if (error != kErrorNone) {
       goto CleanupOnError;
     }
   }
 
-  active_mode_index_ = 0;
+  active_mode_index_ = GetBestConfig();
+
+  error = hw_intf_->SetDisplayAttributes(hw_device_, active_mode_index_);
+  if (error != kErrorNone) {
+    goto CleanupOnError;
+  }
 
   error = comp_manager_->RegisterDisplay(display_type_, display_attributes_[active_mode_index_],
                                         &display_comp_ctx_);
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     goto CleanupOnError;
   }
 
@@ -104,25 +109,25 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
 
   DisplayError error = kErrorNone;
 
-  if (UNLIKELY(!layer_stack)) {
+  if (!layer_stack) {
     return kErrorParameters;
   }
 
   pending_commit_ = false;
 
-  if (LIKELY(state_ == kStateOn)) {
+  if ((state_ == kStateOn)) {
     // Clean hw layers for reuse.
     hw_layers_.info.Reset();
     hw_layers_.info.stack = layer_stack;
 
     while (true) {
       error = comp_manager_->Prepare(display_comp_ctx_, &hw_layers_);
-      if (UNLIKELY(error != kErrorNone)) {
+      if (error != kErrorNone) {
         break;
       }
 
       error = hw_intf_->Validate(hw_device_, &hw_layers_);
-      if (LIKELY(error == kErrorNone)) {
+      if (error == kErrorNone) {
         // Strategy is successful now, wait for Commit().
         comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
         pending_commit_ = true;
@@ -139,18 +144,18 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
 
   DisplayError error = kErrorNone;
 
-  if (UNLIKELY(!layer_stack)) {
+  if (!layer_stack) {
     return kErrorParameters;
   }
 
-  if (UNLIKELY(!pending_commit_)) {
+  if (!pending_commit_) {
     DLOGE("Commit: Corresponding Prepare() is not called.");
     return kErrorUndefined;
   }
 
-  if (LIKELY(state_ == kStateOn)) {
+  if (state_ == kStateOn) {
     error = hw_intf_->Commit(hw_device_, &hw_layers_);
-    if (LIKELY(error == kErrorNone)) {
+    if (error == kErrorNone) {
       comp_manager_->PostCommit(display_comp_ctx_, &hw_layers_);
     } else {
       DLOGE("Unexpected error. Commit failed on driver.");
@@ -165,7 +170,7 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
 DisplayError DisplayBase::GetDisplayState(DisplayState *state) {
   SCOPE_LOCK(locker_);
 
-  if (UNLIKELY(!state)) {
+  if (!state) {
     return kErrorParameters;
   }
 
@@ -176,7 +181,7 @@ DisplayError DisplayBase::GetDisplayState(DisplayState *state) {
 DisplayError DisplayBase::GetNumVariableInfoConfigs(uint32_t *count) {
   SCOPE_LOCK(locker_);
 
-  if (UNLIKELY(!count)) {
+  if (!count) {
     return kErrorParameters;
   }
 
@@ -188,7 +193,7 @@ DisplayError DisplayBase::GetNumVariableInfoConfigs(uint32_t *count) {
 DisplayError DisplayBase::GetConfig(DisplayConfigFixedInfo *fixed_info) {
   SCOPE_LOCK(locker_);
 
-  if (UNLIKELY(!fixed_info)) {
+  if (!fixed_info) {
     return kErrorParameters;
   }
 
@@ -198,7 +203,7 @@ DisplayError DisplayBase::GetConfig(DisplayConfigFixedInfo *fixed_info) {
 DisplayError DisplayBase::GetConfig(DisplayConfigVariableInfo *variable_info, uint32_t mode) {
   SCOPE_LOCK(locker_);
 
-  if (UNLIKELY(!variable_info || mode >= num_modes_)) {
+  if (!variable_info || mode >= num_modes_) {
     return kErrorParameters;
   }
 
@@ -210,7 +215,7 @@ DisplayError DisplayBase::GetConfig(DisplayConfigVariableInfo *variable_info, ui
 DisplayError DisplayBase::GetVSyncState(bool *enabled) {
   SCOPE_LOCK(locker_);
 
-  if (UNLIKELY(!enabled)) {
+  if (!enabled) {
     return kErrorParameters;
   }
 
@@ -224,7 +229,7 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 
   DLOGI("Set state = %d", state);
 
-  if (UNLIKELY(state == state_)) {
+  if (state == state_) {
     DLOGI("Same state transition is requested.");
     return kErrorNone;
   }
@@ -253,7 +258,7 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
     break;
   }
 
-  if (UNLIKELY(error == kErrorNone)) {
+  if (error == kErrorNone) {
     state_ = state;
   }
 
@@ -262,8 +267,14 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 
 DisplayError DisplayBase::SetConfig(uint32_t mode) {
   SCOPE_LOCK(locker_);
+  DisplayError error = kErrorNone;
 
-  return kErrorNone;
+  if (mode >= num_modes_) {
+     return kErrorParameters;
+  }
+  error = hw_intf_->SetDisplayAttributes(hw_device_, mode);
+
+  return error;
 }
 
 DisplayError DisplayBase::SetVSyncState(bool enable) {
@@ -347,6 +358,10 @@ void DisplayBase::AppendRect(char *buffer, uint32_t length, const char *rect_nam
                              LayerRect *rect) {
   AppendString(buffer, length, "%s %.1f, %.1f, %.1f, %.1f",
                                 rect_name, rect->left, rect->top, rect->right, rect->bottom);
+}
+
+int DisplayBase::GetBestConfig() {
+  return (num_modes_ == 1) ? 0 : -1;
 }
 
 }  // namespace sde

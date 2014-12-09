@@ -23,7 +23,7 @@
 */
 
 #define __STDC_FORMAT_MACROS
-
+#include <ctype.h>
 #include <math.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -41,7 +41,8 @@
 
 #define __CLASS__ "HWFrameBuffer"
 
-#define IOCTL_LOGE(ioctl) DLOGE("ioctl %s, errno = %d, desc = %s", #ioctl, errno, strerror(errno))
+#define IOCTL_LOGE(ioctl, type) DLOGE("ioctl %s, display = %d errno = %d, desc = %s", #ioctl, \
+                                      type, errno, strerror(errno))
 
 #ifdef DISPLAY_CORE_VIRTUAL_DRIVER
 extern int virtual_ioctl(int fd, int cmd, ...);
@@ -52,12 +53,16 @@ extern ssize_t virtual_pread(int fd, void *data, size_t count, off_t offset);
 extern FILE* virtual_fopen(const char *fname, const char *mode);
 extern int virtual_fclose(FILE* fileptr);
 extern ssize_t virtual_getline(char **lineptr, size_t *linelen, FILE *stream);
+extern ssize_t virtual_read(int fd, void *buf, size_t count);
+extern ssize_t virtual_write(int fd, const void *buf, size_t count);
+
 #endif
 
 namespace sde {
 
 HWFrameBuffer::HWFrameBuffer() : event_thread_name_("SDE_EventThread"), fake_vsync_(false),
-                                 exit_threads_(false), fb_path_("/sys/class/graphics/fb") {
+                                 exit_threads_(false), fb_path_("/sys/devices/virtual/graphics/fb"),
+                                 hotplug_enabled_(false) {
   // Pointer to actual driver interfaces.
   ioctl_ = ::ioctl;
   open_ = ::open;
@@ -67,6 +72,8 @@ HWFrameBuffer::HWFrameBuffer() : event_thread_name_("SDE_EventThread"), fake_vsy
   fopen_ = ::fopen;
   fclose_ = ::fclose;
   getline_ = ::getline;
+  read_ = ::read;
+  write_ = ::write;
 
 #ifdef DISPLAY_CORE_VIRTUAL_DRIVER
   // If debug property to use virtual driver is set, point to virtual driver interfaces.
@@ -79,6 +86,8 @@ HWFrameBuffer::HWFrameBuffer() : event_thread_name_("SDE_EventThread"), fake_vsy
     fopen_ = virtual_fopen;
     fclose_ = virtual_fclose;
     getline_ = virtual_getline;
+    read_ = ::virtual_read;
+    write_ = ::virtual_write;
   }
 #endif
   for (int i = 0; i < kDeviceMax; i++) {
@@ -137,6 +146,16 @@ DisplayError HWFrameBuffer::Init() {
     }
   }
 
+  // Mode look-up table for HDMI
+  supported_video_modes_ = new msm_hdmi_mode_timing_info[HDMI_VFRMT_MAX];
+  if (!supported_video_modes_) {
+    error = kErrorMemory;
+    goto CleanupOnError;
+  }
+  // Populate the mode table for supported modes
+  MSM_HDMI_MODES_INIT_TIMINGS(supported_video_modes_);
+  MSM_HDMI_MODES_SET_SUPP_TIMINGS(supported_video_modes_, MSM_HDMI_MODES_ALL);
+
   // Start the Event thread
   if (pthread_create(&event_thread_, NULL, &DisplayEventThread, this) < 0) {
     DLOGE("Failed to start %s, error = %s", event_thread_name_);
@@ -156,6 +175,9 @@ CleanupOnError:
       }
     }
   }
+  if (supported_video_modes_) {
+    delete supported_video_modes_;
+  }
 
   return error;
 }
@@ -168,6 +190,9 @@ DisplayError HWFrameBuffer::Deinit() {
     for (int event = 0; event < kNumDisplayEvents; event++) {
       close(poll_fds_[display][event].fd);
     }
+  }
+  if (supported_video_modes_) {
+    delete supported_video_modes_;
   }
 
   return kErrorNone;
@@ -183,27 +208,27 @@ DisplayError HWFrameBuffer::Open(HWDeviceType type, Handle *device, HWEventHandl
   DisplayError error = kErrorNone;
 
   HWContext *hw_context = new HWContext();
-  if (UNLIKELY(!hw_context)) {
+  if (!hw_context) {
     return kErrorMemory;
   }
 
   char device_name[64] = {0};
 
   switch (type) {
-    case kDevicePrimary:
-    case kDeviceHDMI:
-      // Store EventHandlers for two Physical displays, i.e., Primary and HDMI
-      // TODO(user): Need to revisit for HDMI as Primary usecase
-      event_handler_[type] = eventhandler;
-    case kDeviceVirtual:
-      snprintf(device_name, sizeof(device_name), "%s%d", "/dev/graphics/fb", fb_node_index_[type]);
-      break;
-    default:
-      break;
+  case kDevicePrimary:
+  case kDeviceHDMI:
+    // Store EventHandlers for two Physical displays, i.e., Primary and HDMI
+    // TODO(user): Need to revisit for HDMI as Primary usecase
+    event_handler_[type] = eventhandler;
+  case kDeviceVirtual:
+    snprintf(device_name, sizeof(device_name), "%s%d", "/dev/graphics/fb", fb_node_index_[type]);
+    break;
+  default:
+    break;
   }
 
   hw_context->device_fd = open_(device_name, O_RDWR);
-  if (UNLIKELY(hw_context->device_fd < 0)) {
+  if (hw_context->device_fd < 0) {
     DLOGE("open %s failed.", device_name);
     error = kErrorResources;
     delete hw_context;
@@ -218,7 +243,19 @@ DisplayError HWFrameBuffer::Open(HWDeviceType type, Handle *device, HWEventHandl
 DisplayError HWFrameBuffer::Close(Handle device) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 
-  close_(hw_context->device_fd);
+  switch (hw_context->type) {
+  case kDevicePrimary:
+    break;
+  case kDeviceHDMI:
+    hdmi_mode_count_ = 0;
+    break;
+  default:
+    break;
+  }
+
+  if (hw_context->device_fd > 0) {
+    close_(hw_context->device_fd);
+  }
   delete hw_context;
 
   return kErrorNone;
@@ -227,8 +264,19 @@ DisplayError HWFrameBuffer::Close(Handle device) {
 DisplayError HWFrameBuffer::GetNumDisplayAttributes(Handle device, uint32_t *count) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 
-  // TODO(user): Query modes
-  *count = 1;
+  switch (hw_context->type) {
+  case kDevicePrimary:
+    *count = 1;
+    break;
+  case kDeviceHDMI:
+    *count = GetHDMIModeCount();
+    if (*count <= 0) {
+      return kErrorHardware;
+    }
+    break;
+  default:
+    return kErrorParameters;
+  }
 
   return kErrorNone;
 }
@@ -238,53 +286,150 @@ DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
                                                  uint32_t mode) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
   int &device_fd = hw_context->device_fd;
-
-  // TODO(user): Query for respective mode index.
-
   // Variable screen info
   STRUCT_VAR(fb_var_screeninfo, var_screeninfo);
-  if (UNLIKELY(ioctl_(device_fd, FBIOGET_VSCREENINFO, &var_screeninfo) == -1)) {
-    IOCTL_LOGE(FBIOGET_VSCREENINFO);
-    return kErrorHardware;
-  }
 
-  // Frame rate
-  STRUCT_VAR(msmfb_metadata, meta_data);
-  meta_data.op = metadata_op_frame_rate;
-  if (UNLIKELY(ioctl_(device_fd, MSMFB_METADATA_GET, &meta_data) == -1)) {
-    IOCTL_LOGE(MSMFB_METADATA_GET);
-    return kErrorHardware;
-  }
+  switch (hw_context->type) {
+  case kDevicePrimary:
+    {
+      if (ioctl_(device_fd, FBIOGET_VSCREENINFO, &var_screeninfo) == -1) {
+        IOCTL_LOGE(FBIOGET_VSCREENINFO, hw_context->type);
+        return kErrorHardware;
+      }
 
-  // If driver doesn't return width/height information, default to 160 dpi
-  if (INT(var_screeninfo.width) <= 0 || INT(var_screeninfo.height) <= 0) {
-    var_screeninfo.width  = INT((FLOAT(var_screeninfo.xres) * 25.4f)/160.0f + 0.5f);
-    var_screeninfo.height = INT((FLOAT(var_screeninfo.yres) * 25.4f)/160.0f + 0.5f);
-  }
+      // Frame rate
+      STRUCT_VAR(msmfb_metadata, meta_data);
+      meta_data.op = metadata_op_frame_rate;
+      if (ioctl_(device_fd, MSMFB_METADATA_GET, &meta_data) == -1) {
+        IOCTL_LOGE(MSMFB_METADATA_GET, hw_context->type);
+        return kErrorHardware;
+      }
 
-  display_attributes->x_pixels = var_screeninfo.xres;
-  display_attributes->y_pixels = var_screeninfo.yres;
-  display_attributes->x_dpi = (FLOAT(var_screeninfo.xres) * 25.4f) / FLOAT(var_screeninfo.width);
-  display_attributes->y_dpi = (FLOAT(var_screeninfo.yres) * 25.4f) / FLOAT(var_screeninfo.height);
-  display_attributes->vsync_period_ns =
-                 UINT32(1000000000L / FLOAT(meta_data.data.panel_frame_rate));
+      // If driver doesn't return width/height information, default to 160 dpi
+      if (INT(var_screeninfo.width) <= 0 || INT(var_screeninfo.height) <= 0) {
+        var_screeninfo.width  = INT(((FLOAT(var_screeninfo.xres) * 25.4f)/160.0f) + 0.5f);
+        var_screeninfo.height = INT(((FLOAT(var_screeninfo.yres) * 25.4f)/160.0f) + 0.5f);
+      }
 
-  display_attributes->is_device_split = ((var_screeninfo.xres > hw_resource_.max_mixer_width) ||
-        (hw_resource_.split_info.right_split)) ? true : false;
-  if (display_attributes->is_device_split) {
-    display_attributes->split_left = hw_resource_.split_info.left_split ?
-        hw_resource_.split_info.left_split : display_attributes->x_pixels / 2;
+      display_attributes->x_pixels = var_screeninfo.xres;
+      display_attributes->y_pixels = var_screeninfo.yres;
+      display_attributes->x_dpi =
+          (FLOAT(var_screeninfo.xres) * 25.4f) / FLOAT(var_screeninfo.width);
+      display_attributes->y_dpi =
+          (FLOAT(var_screeninfo.yres) * 25.4f) / FLOAT(var_screeninfo.height);
+      display_attributes->vsync_period_ns =
+          UINT32(1000000000L / FLOAT(meta_data.data.panel_frame_rate));
+      display_attributes->is_device_split = (hw_resource_.split_info.left_split ||
+          (var_screeninfo.xres > hw_resource_.max_mixer_width)) ? true : false;
+      display_attributes->split_left = hw_resource_.split_info.left_split ?
+          hw_resource_.split_info.left_split : display_attributes->x_pixels / 2;
+    }
+    break;
+
+  case kDeviceHDMI:
+    {
+      // Get the resolution info from the look up table
+      msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[0];
+      for (int i = 0; i < HDMI_VFRMT_MAX; i++) {
+        msm_hdmi_mode_timing_info *cur = &supported_video_modes_[i];
+        if (cur->video_format == hdmi_modes_[mode]) {
+          timing_mode = cur;
+          break;
+        }
+      }
+      display_attributes->x_pixels = timing_mode->active_h;
+      display_attributes->y_pixels = timing_mode->active_v;
+      display_attributes->x_dpi = 0;
+      display_attributes->y_dpi = 0;
+      display_attributes->vsync_period_ns =
+          UINT32(1000000000L / FLOAT(timing_mode->refresh_rate));
+      display_attributes->split_left = display_attributes->x_pixels;
+      if (display_attributes->x_pixels > hw_resource_.max_mixer_width) {
+        display_attributes->is_device_split = true;
+        display_attributes->split_left = display_attributes->x_pixels / 2;
+      }
+    }
+    break;
+
+  default:
+    return kErrorParameters;
   }
 
   return kErrorNone;
 }
 
+DisplayError HWFrameBuffer::SetDisplayAttributes(Handle device, uint32_t mode) {
+  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+  DisplayError error = kErrorNone;
+
+  switch (hw_context->type) {
+  case kDevicePrimary:
+    break;
+
+  case kDeviceHDMI:
+    {
+      // Variable screen info
+      STRUCT_VAR(fb_var_screeninfo, vscreeninfo);
+      if (ioctl_(hw_context->device_fd, FBIOGET_VSCREENINFO, &vscreeninfo) == -1) {
+        IOCTL_LOGE(FBIOGET_VSCREENINFO, hw_context->type);
+        return kErrorHardware;
+      }
+
+      DLOGI("GetInfo<Mode=%d %dx%d (%d,%d,%d),(%d,%d,%d) %dMHz>", vscreeninfo.reserved[3],
+            vscreeninfo.xres, vscreeninfo.yres, vscreeninfo.right_margin, vscreeninfo.hsync_len,
+            vscreeninfo.left_margin, vscreeninfo.lower_margin, vscreeninfo.vsync_len,
+            vscreeninfo.upper_margin, vscreeninfo.pixclock/1000000);
+
+      msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[0];
+      for (int i = 0; i < HDMI_VFRMT_MAX; i++) {
+        msm_hdmi_mode_timing_info *cur = &supported_video_modes_[i];
+        if (cur->video_format == hdmi_modes_[mode]) {
+          timing_mode = cur;
+          break;
+        }
+      }
+      if (MapHDMIDisplayTiming(timing_mode, &vscreeninfo) == false) {
+        return kErrorParameters;
+      }
+      STRUCT_VAR(msmfb_metadata, metadata);
+      memset(&metadata, 0 , sizeof(metadata));
+      metadata.op = metadata_op_vic;
+      metadata.data.video_info_code = timing_mode->video_format;
+      if (ioctl(hw_context->device_fd, MSMFB_METADATA_SET, &metadata) == -1) {
+        IOCTL_LOGE(MSMFB_METADATA_SET, hw_context->type);
+        return kErrorHardware;
+      }
+      DLOGI("SetInfo<Mode=%d %dx%d (%d,%d,%d),(%d,%d,%d) %dMHz>", vscreeninfo.reserved[3] & 0xFF00,
+            vscreeninfo.xres, vscreeninfo.yres, vscreeninfo.right_margin, vscreeninfo.hsync_len,
+            vscreeninfo.left_margin, vscreeninfo.lower_margin, vscreeninfo.vsync_len,
+            vscreeninfo.upper_margin, vscreeninfo.pixclock/1000000);
+
+      vscreeninfo.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_ALL | FB_ACTIVATE_FORCE;
+      if (ioctl_(hw_context->device_fd, FBIOPUT_VSCREENINFO, &vscreeninfo) == -1) {
+        IOCTL_LOGE(FBIOGET_VSCREENINFO, hw_context->type);
+        return kErrorHardware;
+      }
+    }
+    break;
+
+  default:
+    return kErrorParameters;
+  }
+
+  return error;
+}
+
 DisplayError HWFrameBuffer::PowerOn(Handle device) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 
-  if (UNLIKELY(ioctl_(hw_context->device_fd, FBIOBLANK, FB_BLANK_UNBLANK) == -1)) {
-    IOCTL_LOGE(FB_BLANK_UNBLANK);
+  if (ioctl_(hw_context->device_fd, FBIOBLANK, FB_BLANK_UNBLANK) == -1) {
+    IOCTL_LOGE(FB_BLANK_UNBLANK, hw_context->type);
     return kErrorHardware;
+  }
+
+  // Need to turn on HPD
+  if (!hotplug_enabled_) {
+    hotplug_enabled_ = EnableHotPlugDetection(1);
   }
 
   return kErrorNone;
@@ -293,8 +438,8 @@ DisplayError HWFrameBuffer::PowerOn(Handle device) {
 DisplayError HWFrameBuffer::PowerOff(Handle device) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 
-  if (UNLIKELY(ioctl_(hw_context->device_fd, FBIOBLANK, FB_BLANK_POWERDOWN) == -1)) {
-    IOCTL_LOGE(FB_BLANK_POWERDOWN);
+  if (ioctl_(hw_context->device_fd, FBIOBLANK, FB_BLANK_POWERDOWN) == -1) {
+    IOCTL_LOGE(FB_BLANK_POWERDOWN, hw_context->type);
     return kErrorHardware;
   }
 
@@ -317,7 +462,7 @@ DisplayError HWFrameBuffer::SetVSyncState(Handle device, bool enable) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
   int vsync_on = enable ? 1 : 0;
   if (ioctl_(hw_context->device_fd, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) == -1) {
-    IOCTL_LOGE(MSMFB_OVERLAY_VSYNC_CTRL);
+    IOCTL_LOGE(MSMFB_OVERLAY_VSYNC_CTRL, hw_context->type);
     return kErrorHardware;
   }
 
@@ -342,47 +487,35 @@ DisplayError HWFrameBuffer::Validate(Handle device, HWLayers *hw_layers) {
     Layer &layer = stack->layers[layer_index];
     LayerBuffer *input_buffer = layer.input_buffer;
     HWLayerConfig &config = hw_layers->config[i];
-    HWPipeInfo &left_pipe = config.left_pipe;
 
-    // Configure left pipe
-    mdp_input_layer &mdp_layer_left = mdp_layers[mdp_layer_count];
-    mdp_layer_left.alpha = layer.plane_alpha;
-    mdp_layer_left.z_order = static_cast<uint16_t>(i);
-    mdp_layer_left.transp_mask = 0xffffffff;
-    SetBlending(layer.blending, &mdp_layer_left.blend_op);
-    SetRect(left_pipe.src_roi, &mdp_layer_left.src_rect);
-    SetRect(left_pipe.dst_roi, &mdp_layer_left.dst_rect);
-    mdp_layer_left.pipe_ndx = left_pipe.pipe_id;
+    uint32_t split_count = hw_layers->config[i].is_right_pipe ? 2 : 1;
+    for (uint32_t j = 0; j < split_count; j++) {
+      HWPipeInfo &pipe = (j == 0) ? config.left_pipe : config.right_pipe;
+      mdp_input_layer &mdp_layer = mdp_layers[mdp_layer_count];
+      mdp_layer.alpha = layer.plane_alpha;
+      mdp_layer.z_order = static_cast<uint16_t>(i);
+      mdp_layer.transp_mask = 0xffffffff;
+      SetBlending(layer.blending, &mdp_layer.blend_op);
+      SetRect(pipe.src_roi, &mdp_layer.src_rect);
+      SetRect(pipe.dst_roi, &mdp_layer.dst_rect);
 
-    mdp_layer_buffer &mdp_buffer_left = mdp_layer_left.buffer;
-    mdp_buffer_left.width = input_buffer->width;
-    mdp_buffer_left.height = input_buffer->height;
+      mdp_layer.pipe_ndx = pipe.pipe_id;
 
-    error = SetFormat(layer.input_buffer->format, &mdp_buffer_left.format);
-    if (error != kErrorNone) {
-      return error;
-    }
+      mdp_layer_buffer &mdp_buffer_left = mdp_layer.buffer;
+      mdp_buffer_left.width = input_buffer->width;
+      mdp_buffer_left.height = input_buffer->height;
 
-    mdp_layer_count++;
-
-    // Configure right pipe
-    if (config.is_right_pipe) {
-      HWPipeInfo &right_pipe = config.right_pipe;
-      mdp_input_layer &mdp_layer_right = mdp_layers[mdp_layer_count];
-
-      mdp_layer_right = mdp_layer_left;
-
-      mdp_layer_right.pipe_ndx = right_pipe.pipe_id;
-      SetRect(right_pipe.src_roi, &mdp_layer_right.src_rect);
-      SetRect(right_pipe.dst_roi, &mdp_layer_right.dst_rect);
-
+      error = SetFormat(layer.input_buffer->format, &mdp_buffer_left.format);
+      if (error != kErrorNone) {
+        return error;
+      }
       mdp_layer_count++;
     }
   }
 
   mdp_commit.flags |= MDP_VALIDATE_LAYER;
   if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
-    IOCTL_LOGE(MSMFB_ATOMIC_COMMIT);
+    IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, hw_context->type);
     return kErrorHardware;
   }
 
@@ -424,7 +557,7 @@ DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
   mdp_commit.flags |= MDP_COMMIT_RETIRE_FENCE;
   mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
   if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
-    IOCTL_LOGE(MSMFB_ATOMIC_COMMIT);
+    IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, hw_context->type);
     return kErrorHardware;
   }
 
@@ -619,8 +752,8 @@ void HWFrameBuffer::PopulatePanelInfo(int fb_index) {
   ssize_t read;
   char *line = stringbuffer;
   while ((read = getline_(&line, &len, fileptr)) != -1) {
-    int token_count = 0;
-    const int max_count = 10;
+    uint32_t token_count = 0;
+    const uint32_t max_count = 10;
     char *tokens[max_count] = { NULL };
     if (!ParseLine(line, tokens, max_count, &token_count)) {
       if (!strncmp(tokens[0], "pu_en", strlen("pu_en"))) {
@@ -656,8 +789,8 @@ DisplayError HWFrameBuffer::PopulateHWCapabilities() {
   DisplayError error = kErrorNone;
   FILE *fileptr = NULL;
   char stringbuffer[kMaxStringLength];
-  int token_count = 0;
-  const int max_count = 10;
+  uint32_t token_count = 0;
+  const uint32_t max_count = 10;
   char *tokens[max_count] = { NULL };
   snprintf(stringbuffer , sizeof(stringbuffer), "%s%d/mdp/caps", fb_path_,
            fb_node_index_[kHWPrimary]);
@@ -698,7 +831,7 @@ DisplayError HWFrameBuffer::PopulateHWCapabilities() {
       } else if (!strncmp(tokens[0], "max_mixer_width", strlen("max_mixer_width"))) {
         hw_resource_.max_mixer_width = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "features", strlen("features"))) {
-        for (int i = 0; i < token_count; i++) {
+        for (uint32_t i = 0; i < token_count; i++) {
           if (!strncmp(tokens[i], "bwc", strlen("bwc"))) {
             hw_resource_.has_bwc = true;
           } else if (!strncmp(tokens[i], "decimation", strlen("decimation"))) {
@@ -767,10 +900,11 @@ DisplayError HWFrameBuffer::PopulateHWCapabilities() {
   return error;
 }
 
-int HWFrameBuffer::ParseLine(char *input, char *tokens[], int max_token, int *count) {
+int HWFrameBuffer::ParseLine(char *input, char *tokens[], const uint32_t max_token,
+                             uint32_t *count) {
   char *tmp_token = NULL;
   char *temp_ptr;
-  int index = 0;
+  uint32_t index = 0;
   const char *delim = ", =\n";
   if (!input) {
     return -1;
@@ -783,6 +917,89 @@ int HWFrameBuffer::ParseLine(char *input, char *tokens[], int max_token, int *co
   *count = index;
 
   return 0;
+}
+
+bool HWFrameBuffer::EnableHotPlugDetection(int enable) {
+  bool ret_value = true;
+  char hpdpath[kMaxStringLength];
+  snprintf(hpdpath , sizeof(hpdpath), "%s%d/hpd", fb_path_, fb_node_index_[kDeviceHDMI]);
+  int hpdfd = open_(hpdpath, O_RDWR, 0);
+  if (hpdfd < 0) {
+    DLOGE("Open failed = %s", hpdpath);
+    return kErrorHardware;
+  }
+  char value = enable ? '1' : '0';
+  ssize_t length = write_(hpdfd, &value, 1);
+  if (length <= 0) {
+    DLOGE("Write failed 'hpd' = %d", enable);
+    ret_value = false;
+  }
+  close_(hpdfd);
+
+  return ret_value;
+}
+
+int HWFrameBuffer::GetHDMIModeCount() {
+  ssize_t length = -1;
+  char edid_str[256] = {'\0'};
+  char edid_path[kMaxStringLength] = {'\0'};
+  snprintf(edid_path, sizeof(edid_path), "%s%d/edid_modes", fb_path_, fb_node_index_[kHWHDMI]);
+  int edid_file = open_(edid_path, O_RDONLY);
+  if (edid_file < 0) {
+    DLOGE("EDID file open failed.");
+    return -1;
+  }
+
+  length = read_(edid_file, edid_str, sizeof(edid_str)-1);
+  if (length <= 0) {
+    DLOGE("%s: edid_modes file empty");
+    edid_str[0] = '\0';
+  } else {
+    DLOGI("EDID mode string: %s", edid_str);
+    while (length > 1 && isspace(edid_str[length-1])) {
+      --length;
+    }
+    edid_str[length] = '\0';
+  }
+  close_(edid_file);
+
+  if (length > 0) {
+    // Get EDID modes from the EDID string
+    char *ptr = edid_str;
+    const uint32_t edid_count_max = 128;
+    char *tokens[edid_count_max] = { NULL };
+    ParseLine(ptr, tokens, edid_count_max, &hdmi_mode_count_);
+    for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
+      hdmi_modes_[i] = atoi(tokens[i]);
+    }
+  }
+  return (hdmi_mode_count_ > 0) ? hdmi_mode_count_ : 0;
+}
+
+bool HWFrameBuffer::MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
+                                         fb_var_screeninfo *info) {
+  if (!mode || !info) {
+    return false;
+  }
+
+  info->reserved[0] = 0;
+  info->reserved[1] = 0;
+  info->reserved[2] = 0;
+  info->reserved[3] = (info->reserved[3] & 0xFFFF) | (mode->video_format << 16);
+  info->xoffset = 0;
+  info->yoffset = 0;
+  info->xres = mode->active_h;
+  info->yres = mode->active_v;
+  info->pixclock = (mode->pixel_freq) * 1000;
+  info->vmode = mode->interlaced ? FB_VMODE_INTERLACED : FB_VMODE_NONINTERLACED;
+  info->right_margin = mode->front_porch_h;
+  info->hsync_len = mode->pulse_width_h;
+  info->left_margin = mode->back_porch_h;
+  info->lower_margin = mode->front_porch_v;
+  info->vsync_len = mode->pulse_width_v;
+  info->upper_margin = mode->back_porch_v;
+
+  return true;
 }
 
 }  // namespace sde

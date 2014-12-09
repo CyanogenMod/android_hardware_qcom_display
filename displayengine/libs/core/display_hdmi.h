@@ -32,6 +32,7 @@ namespace sde {
 class DisplayHDMI : public DisplayBase {
  public:
   DisplayHDMI(DisplayEventHandler *event_handler, HWInterface *hw_intf, CompManager *comp_manager);
+  virtual int GetBestConfig();
 };
 
 }  // namespace sde

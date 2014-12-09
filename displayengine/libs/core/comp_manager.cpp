@@ -140,6 +140,11 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
   StrategyConstraints *constraints = &display_comp_ctx->constraints;
 
   constraints->safe_mode = safe_mode_;
+
+  // TODO(user): Need to enable SDE Comp on HDMI
+  if (display_comp_ctx->display_type == kHDMI) {
+    constraints->max_layers = 1;
+  }
   // If validation for the best available composition strategy with driver has failed, just
   // fallback to safe mode composition e.g. GPU or video only.
   if (UNLIKELY(hw_layers->info.flags)) {

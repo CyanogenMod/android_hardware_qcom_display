@@ -32,12 +32,11 @@ namespace sde {
 class HWCDisplayExternal : public HWCDisplay {
  public:
   explicit HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
-  virtual int Init();
-  virtual int Deinit();
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
   virtual int PowerOn();
   virtual int PowerOff();
+  virtual int GetDisplayConfigs(uint32_t *configs, size_t *num_configs);
 };
 
 }  // namespace sde

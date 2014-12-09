@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <linux/msm_mdp_ext.h>
+#include <video/msm_hdmi_modes.h>
+
 #include <poll.h>
 #include <pthread.h>
 
@@ -46,6 +48,7 @@ class HWFrameBuffer : public HWInterface {
   virtual DisplayError GetNumDisplayAttributes(Handle device, uint32_t *count);
   virtual DisplayError GetDisplayAttributes(Handle device, HWDisplayAttributes *display_attributes,
                                             uint32_t mode);
+  virtual DisplayError SetDisplayAttributes(Handle device, uint32_t mode);
   virtual DisplayError PowerOn(Handle device);
   virtual DisplayError PowerOff(Handle device);
   virtual DisplayError Doze(Handle device);
@@ -130,7 +133,13 @@ class HWFrameBuffer : public HWInterface {
   void PopulatePanelInfo(int fb_index);
   // Populates HW Capabilities
   DisplayError PopulateHWCapabilities();
-  int ParseLine(char *input, char *token[], int max_token, int *count);
+  int ParseLine(char *input, char *token[], const uint32_t max_token, uint32_t *count);
+
+  // HDMI Related Functions
+  bool EnableHotPlugDetection(int enable);
+  int GetHDMIModeCount();
+  bool MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode, fb_var_screeninfo *info);
+  void ResetHDMIModes();
 
   // Pointers to system calls which are either mapped to actual system call or virtual driver.
   int (*ioctl_)(int, int, ...);
@@ -138,9 +147,12 @@ class HWFrameBuffer : public HWInterface {
   int (*close_)(int);
   int (*poll_)(struct pollfd *, nfds_t, int);
   ssize_t (*pread_)(int, void *, size_t, off_t);
-  FILE* (*fopen_)( const char *fname, const char *mode );;
+  FILE* (*fopen_)( const char *fname, const char *mode);
   int (*fclose_)(FILE* fileptr);
   ssize_t (*getline_)(char **lineptr, size_t *linelen, FILE *stream);
+  ssize_t (*read_)(int fd, void *buf, size_t count);
+  ssize_t (*write_)(int fd, const void *buf, size_t count);
+
 
   // Store the Device EventHandlers - used for callback
   HWEventHandler *event_handler_[kNumPhysicalDisplays];
@@ -153,6 +165,11 @@ class HWFrameBuffer : public HWInterface {
   int fb_node_index_[kDeviceMax];
   const char* fb_path_;
   PanelInfo pri_panel_info_;
+  bool hotplug_enabled_;
+  uint32_t hdmi_mode_count_;
+  uint32_t hdmi_modes_[256];
+  // Holds the hdmi timing information. Ex: resolution, fps etc.,
+  msm_hdmi_mode_timing_info *supported_video_modes_;
 };
 
 }  // namespace sde
