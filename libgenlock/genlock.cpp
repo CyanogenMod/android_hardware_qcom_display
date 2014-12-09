@@ -38,12 +38,15 @@
 
 #define GENLOCK_DEVICE "/dev/genlock"
 
+
+
+#ifdef USE_GENLOCK
+
 namespace {
 /* Internal function to map the userspace locks to the kernel lock types */
     int get_kernel_lock_type(genlock_lock_type lockType)
     {
         int kLockType = 0;
-#ifdef USE_GENLOCK
         // If the user sets both a read and write lock, higher preference is
         // given to the write lock.
         if (lockType & GENLOCK_WRITE_LOCK) {
@@ -55,7 +58,6 @@ namespace {
                   __FUNCTION__, lockType);
             return -1;
         }
-#endif
         return kLockType;
     }
 
@@ -64,7 +66,6 @@ namespace {
                                                    int lockType, int timeout,
                                                    int flags)
     {
-#ifdef USE_GENLOCK
         if (private_handle_t::validate(buffer_handle)) {
             ALOGE("%s: handle is invalid", __FUNCTION__);
             return GENLOCK_FAILURE;
@@ -107,7 +108,6 @@ namespace {
             }
 #endif
         }
-#endif
         return GENLOCK_NO_ERROR;
     }
 
@@ -125,6 +125,11 @@ namespace {
         }
     }
 }
+
+#endif  // USE_GENLOCK
+
+
+
 /*
  * Create a genlock lock. The genlock lock file descriptor and the lock
  * handle are stored in the buffer_handle.
