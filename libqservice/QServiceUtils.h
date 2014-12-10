@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2013-14 The Linux Foundation. All rights reserved.
+* Copyright (c) 2013-15 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -76,6 +76,10 @@ inline android::status_t screenRefresh() {
 
 inline android::status_t setPartialUpdate(uint32_t enable) {
     return sendSingleParam(qService::IQService::SET_PARTIAL_UPDATE, enable);
+}
+
+inline android::status_t toggleScreenUpdate(uint32_t on) {
+    return sendSingleParam(qService::IQService::TOGGLE_SCREEN_UPDATE, on);
 }
 
 inline android::status_t setExtOrientation(uint32_t orientation) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -57,6 +57,7 @@ public:
         /* Enable/Disable/Set refresh rate dynamically */
         CONFIGURE_DYN_REFRESH_RATE,
         QDCM_SVC_CMDS,           // request QDCM services.
+        TOGGLE_SCREEN_UPDATE,    // Provides ability to disable screen updates
         COMMAND_LIST_END = 400,
     };
 
