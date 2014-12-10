@@ -74,6 +74,10 @@ inline android::status_t screenRefresh() {
     return sendSingleParam(qService::IQService::SCREEN_REFRESH, 1);
 }
 
+inline android::status_t toggleScreenUpdate(uint32_t on) {
+    return sendSingleParam(qService::IQService::TOGGLE_SCREEN_UPDATE, on);
+}
+
 inline android::status_t setPartialUpdate(uint32_t enable) {
     return sendSingleParam(qService::IQService::SET_PARTIAL_UPDATE, enable);
 }

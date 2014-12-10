@@ -257,7 +257,8 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
     bool fbComp = false;
     if (LIKELY(list && list->numHwLayers > 1) &&
             (ctx->dpyAttr[dpy].isActive ||
-             ctx->mHDMIDisplay->isHDMIPrimaryDisplay())) {
+             ctx->mHDMIDisplay->isHDMIPrimaryDisplay())
+            && !ctx->dpyAttr[dpy].isPause) {
 
         // When HDMI is primary we should rely on the first valid
         // draw call in order to activate the display
@@ -585,7 +586,8 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     ATRACE_CALL();
     int ret = 0;
     const int dpy = HWC_DISPLAY_PRIMARY;
-    if (LIKELY(list) && ctx->dpyAttr[dpy].isActive) {
+    if (LIKELY(list) && ctx->dpyAttr[dpy].isActive
+            && !ctx->dpyAttr[dpy].isPause) {
         size_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         int fd = -1; //FenceFD from the Copybit(valid in async mode)
