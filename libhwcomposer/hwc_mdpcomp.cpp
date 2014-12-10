@@ -133,9 +133,7 @@ bool MDPComp::init(hwc_context_t *ctx) {
 
     qdutils::MDPVersion &mdpVersion = qdutils::MDPVersion::getInstance();
 
-    /* MDSS_MDP_STAGE_UNUSED and MDSS_MDP_STAGE_BASE are not available for MDP
-     * composition. */
-    sMaxPipesPerMixer = (int)mdpVersion.getBlendStages() - 2;
+    sMaxPipesPerMixer = (int)mdpVersion.getBlendStages();
     if(property_get("persist.hwc.mdpcomp.maxpermixer", property, "-1") > 0) {
         int val = atoi(property);
         if(val >= 0)
@@ -233,7 +231,7 @@ void MDPComp::timeout_handler(void *udata) {
 
 void MDPComp::setMaxPipesPerMixer(const uint32_t value) {
     qdutils::MDPVersion &mdpVersion = qdutils::MDPVersion::getInstance();
-    uint32_t maxSupported = (int)mdpVersion.getBlendStages() - 2;
+    uint32_t maxSupported = (int)mdpVersion.getBlendStages();
     if(value > maxSupported) {
         ALOGW("%s: Input exceeds max value supported. Setting to"
                 "max value: %d", __FUNCTION__, maxSupported);
