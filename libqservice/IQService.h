@@ -55,8 +55,9 @@ public:
         DYNAMIC_DEBUG = 15,     // Enable more logging on the fly
         SET_IDLE_TIMEOUT = 16,  // Set idle timeout for GPU fallback
         TOGGLE_BWC = 17,           // Toggle BWC On/Off on targets that support
+        SET_PARTIAL_UPDATE = 18,   // Preference on partial update feature
         /* Enable/Disable/Set refresh rate dynamically */
-        CONFIGURE_DYN_REFRESH_RATE = 18,
+        CONFIGURE_DYN_REFRESH_RATE = 19,
         COMMAND_LIST_END = 400,
     };
 
