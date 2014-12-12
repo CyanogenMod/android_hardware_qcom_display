@@ -151,7 +151,6 @@ static int ppdComm(const char* cmd, hwc_context_t *ctx) {
 
 static void connectPPDaemon(hwc_context_t *ctx)
 {
-    int ret = -1;
     char property[PROPERTY_VALUE_MAX];
     if ((property_get("ro.qualcomm.cabl", property, NULL) > 0) &&
         (atoi(property) == 1)) {
@@ -569,8 +568,6 @@ void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
     const int& sci_t = scissor.top;
     const int& sci_r = scissor.right;
     const int& sci_b = scissor.bottom;
-    int sci_w = abs(sci_r - sci_l);
-    int sci_h = abs(sci_b - sci_t);
 
     float leftCutRatio = 0.0f, rightCutRatio = 0.0f, topCutRatio = 0.0f,
             bottomCutRatio = 0.0f;
@@ -655,7 +652,6 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     int releaseFd = -1;
     int retireFd = -1;
     int fbFd = -1;
-    int rotFd = -1;
     bool swapzero = false;
     int mdpVersion = qdutils::MDPVersion::getInstance().getMDPVersion();
 
@@ -853,7 +849,6 @@ static inline int configRotator(Rotator *rot, const Whf& whf,
  */
 bool setupBasePipe(hwc_context_t *ctx) {
     const int dpy = HWC_DISPLAY_PRIMARY;
-    int fb_stride = ctx->dpyAttr[dpy].stride;
     int fb_width = ctx->dpyAttr[dpy].xres;
     int fb_height = ctx->dpyAttr[dpy].yres;
     int fb_fd = ctx->dpyAttr[dpy].fd;
