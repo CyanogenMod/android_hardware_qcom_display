@@ -65,7 +65,6 @@ static void *vsync_loop(void *param)
     uint64_t cur_timestamp=0;
     ssize_t len = -1;
     int fd_timestamp = -1;
-    int ret = 0;
     bool fb1_vsync = false;
     bool logvsync = false;
 
