@@ -292,6 +292,11 @@ int IonController::allocate(alloc_data& data, int usage)
         if (usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
             ionFlags |= ION_HEAP(ION_CP_MM_HEAP_ID);
             ionFlags |= ION_SECURE;
+#ifdef ION_FLAG_ALLOW_NON_CONTIG
+            if (!(usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY)) {
+                ionFlags |= ION_FLAG_ALLOW_NON_CONTIG;
+            }
+#endif
         } else {
             // for targets/OEMs which do not need HW level protection
             // do not set ion secure flag & MM heap. Fallback to IOMMU heap.
