@@ -426,7 +426,7 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
                 /* On targets that doesnt support Decimation (eg.,8x26)
                  * maximum downscale support is overlay pipe downscale.
                  */
-                if(crop_w > (int) mdpHw.getMaxMixerWidth() ||
+                if(crop_w > (int) mdpHw.getMaxPipeWidth() ||
                         w_dscale > maxMDPDownscale ||
                         h_dscale > maxMDPDownscale)
                     return false;
@@ -437,7 +437,7 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
                      *      1. Src crop > Mixer limit on nonsplit MDPComp
                      *      2. exceeds maximum downscale limit
                      */
-                    if(((crop_w > (int) mdpHw.getMaxMixerWidth()) &&
+                    if(((crop_w > (int) mdpHw.getMaxPipeWidth()) &&
                                 !sSrcSplitEnabled) ||
                             w_dscale > maxMDPDownscale ||
                             h_dscale > maxMDPDownscale) {
@@ -2415,10 +2415,10 @@ int MDPCompSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
     eDest rDest = mdp_info.rIndex;
 
     ALOGD_IF(isDebug(),"%s: configuring: layer: %p z_order: %d dest_pipeL: %d"
-             "dest_pipeR: %d",__FUNCTION__, layer, zOrder, lDest, rDest);
+            "dest_pipeR: %d",__FUNCTION__, layer, zOrder, lDest, rDest);
 
     return configureSplit(ctx, layer, mDpy, mdpFlagsL, zOrder, lDest,
-                            rDest, &PipeLayerPair.rot);
+            rDest, &PipeLayerPair.rot);
 }
 
 bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
@@ -2602,8 +2602,8 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
     //pipe line length, we are still using 2 pipes. This is fine just because
     //this is source split where destination doesn't matter. Evaluate later to
     //see if going through all the calcs to save a pipe is worth it
-    if(dstWidth > mdpHw.getMaxMixerWidth() or
-            cropWidth > mdpHw.getMaxMixerWidth() or
+    if(dstWidth > mdpHw.getMaxPipeWidth() or
+            cropWidth > mdpHw.getMaxPipeWidth() or
             (primarySplitAlways and
             (cropWidth > lSplit or layerClock > mixerClock))) {
         pipe_info.rIndex = ctx->mOverlay->getPipe(pipeSpecs);

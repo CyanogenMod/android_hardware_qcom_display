@@ -75,7 +75,7 @@ namespace qdutils {
 #define MDSS_MDP_HW_REV_109 0x10090000 //8994 v2
 #endif
 #ifndef MDSS_MDP_HW_REV_110
-#define MDSS_MDP_HW_REV_110 0x100a0000 //Next version
+#define MDSS_MDP_HW_REV_110 0x100a0000 //8992
 #endif
 #ifndef MDSS_MDP_HW_REV_200
 #define MDSS_MDP_HW_REV_200 0x20000000 //8092
@@ -104,8 +104,12 @@ MDPVersion::MDPVersion()
     mBlendStages = 4; //min no. of stages supported by MDP.
 
     // this is the default limit of mixer unless driver reports it.
-    // For resolutions beyond this, we use dual/split overlay pipes.
+    // For resolutions beyond this, we use dual mixer/ping pong split.
     mMaxMixerWidth = 2048;
+
+    // Default width of MDSS SSPP. For layer resolutions beyond this, we drive
+    // using two SSPP's.
+    mMaxPipeWidth = 2048;
 
     updatePanelInfo();
 
@@ -324,6 +328,9 @@ bool MDPVersion::updateSysFsInfo() {
                 } else if(!strncmp(tokens[0], "max_mixer_width",
                         strlen("max_mixer_width"))) {
                     mMaxMixerWidth = atoi(tokens[1]);
+                } else if(!strncmp(tokens[0], "max_pipe_width",
+                        strlen("max_pipe_width"))) {
+                    mMaxPipeWidth = atoi(tokens[1]);
                 } else if(!strncmp(tokens[0], "features", strlen("features"))) {
                     for(int i=1; i<index;i++) {
                         if(!strncmp(tokens[i], "bwc", strlen("bwc"))) {
