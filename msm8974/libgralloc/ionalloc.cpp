@@ -73,7 +73,7 @@ int IonAlloc::alloc_buffer(alloc_data& data)
 
     ionAllocData.len = data.size;
     ionAllocData.align = data.align;
-    ionAllocData.heap_id_mask = data.flags & ~ION_SECURE;
+    ionAllocData.ION_HEAP_MASK = data.flags & ~ION_SECURE;
     ionAllocData.flags = data.uncached ? 0 : ION_FLAG_CACHED;
     // ToDo: replace usage of alloc data structure with
     //  ionallocdata structure.
