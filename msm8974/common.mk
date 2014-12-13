@@ -29,6 +29,10 @@ ifeq ($(TARGET_FORCE_HWC_FOR_VIRTUAL_DISPLAYS), true)
     common_flags += -DFORCE_HWC_FOR_VIRTUAL_DISPLAYS
 endif
 
+ifeq ($(TARGET_USE_ION_COMPAT), true)
+    common_flags += -D_ION_HEAP_MASK_COMPATIBILITY_WA
+endif
+
 common_deps  :=
 kernel_includes :=
 

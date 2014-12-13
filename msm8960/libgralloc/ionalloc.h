@@ -36,6 +36,12 @@
 
 namespace gralloc {
 
+#ifdef _ION_HEAP_MASK_COMPATIBILITY_WA
+    #define ION_HEAP_MASK heap_mask
+#else
+    #define ION_HEAP_MASK heap_id_mask
+#endif
+
 class IonAlloc : public IMemAlloc  {
 
     public:
