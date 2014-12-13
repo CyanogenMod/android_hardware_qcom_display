@@ -32,7 +32,7 @@
 namespace sde {
 
 HWCDisplayExternal::HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL) {
+  : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL, true) {
 }
 
 int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
@@ -42,8 +42,6 @@ int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
   if (status) {
     return status;
   }
-
-  layer_stack_.retire_fence_fd = -1;
 
   status = PrepareLayerStack(content_list);
   if (status) {

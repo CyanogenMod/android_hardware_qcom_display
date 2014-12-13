@@ -217,7 +217,13 @@ struct LayerStack {
   uint32_t layer_count;   //!< Total number of layers.
   LayerStackFlags flags;  //!< Flags associated with this layer set.
 
-  LayerStack() : output_buffer(NULL), layers(NULL), layer_count(0) { }
+  explicit LayerStack(bool need_retire_fence) : layers(NULL), layer_count(0) {
+    if (need_retire_fence) {
+      retire_fence_fd = -1;
+    } else {
+      output_buffer = NULL;
+    }
+  }
 };
 
 }  // namespace sde

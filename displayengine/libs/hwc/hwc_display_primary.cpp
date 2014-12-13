@@ -32,7 +32,7 @@
 namespace sde {
 
 HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY) {
+  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true) {
 }
 
 int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
@@ -42,8 +42,6 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
   if (status) {
     return status;
   }
-
-  layer_stack_.retire_fence_fd = -1;
 
   status = PrepareLayerStack(content_list);
   if (status) {

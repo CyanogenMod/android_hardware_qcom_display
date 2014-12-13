@@ -69,7 +69,8 @@ class HWCDisplay : public DisplayEventHandler {
     LayerStackCache() : layer_count(0) { }
   };
 
-  HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id);
+  HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id,
+             bool need_retire_fence);
   virtual ~HWCDisplay() { }
 
   // DisplayEventHandler methods
@@ -88,14 +89,15 @@ class HWCDisplay : public DisplayEventHandler {
   inline void SetBlending(const int32_t &source, LayerBlending *target);
   inline int SetFormat(const int32_t &source, LayerBufferFormat *target);
 
-  LayerStackMemory layer_stack_memory_;
-  LayerStack layer_stack_;
-  LayerStackCache layer_stack_cache_;
   CoreInterface *core_intf_;
   hwc_procs_t const **hwc_procs_;
   DisplayType type_;
   int id_;
   DisplayInterface *display_intf_;
+  LayerStackMemory layer_stack_memory_;
+  LayerStack layer_stack_;
+  bool need_retire_fence_;
+  LayerStackCache layer_stack_cache_;
 };
 
 }  // namespace sde
