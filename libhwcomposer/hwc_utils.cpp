@@ -86,7 +86,7 @@ uint32_t stdRefreshRates[] = { 30, 24, 48, 60 };
 
 bool isValidResolution(hwc_context_t *ctx, uint32_t xres, uint32_t yres)
 {
-    return !((xres > qdutils::MDPVersion::getInstance().getMaxMixerWidth() &&
+    return !((xres > qdutils::MDPVersion::getInstance().getMaxPipeWidth() &&
                 !isDisplaySplit(ctx, HWC_DISPLAY_PRIMARY)) ||
             (xres < MIN_DISPLAY_XRES || yres < MIN_DISPLAY_YRES));
 }
@@ -2353,7 +2353,7 @@ int getLeftSplit(hwc_context_t *ctx, const int& dpy) {
 
 bool isDisplaySplit(hwc_context_t* ctx, int dpy) {
     qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
-    if(ctx->dpyAttr[dpy].xres > mdpHw.getMaxMixerWidth()) {
+    if(ctx->dpyAttr[dpy].xres > mdpHw.getMaxPipeWidth()) {
         return true;
     }
     //For testing we could split primary via device tree values
@@ -2520,7 +2520,7 @@ void BwcPM::setBwc(const hwc_context_t *ctx, const int& dpy,
         swap(src_w, src_h);
     }
     //src width > MAX mixer supported dim
-    if(src_w > (int) qdutils::MDPVersion::getInstance().getMaxMixerWidth()) {
+    if(src_w > (int) qdutils::MDPVersion::getInstance().getMaxPipeWidth()) {
         return;
     }
     //Decimation necessary, cannot use BWC. H/W requirement.

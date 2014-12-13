@@ -459,9 +459,9 @@ static inline bool isYuvBuffer(const private_handle_t* hnd) {
 
 // Returns true if the buffer is yuv and exceeds the mixer width
 static inline bool isYUVSplitNeeded(const private_handle_t* hnd) {
-    int maxMixerWidth = qdutils::MDPVersion::getInstance().getMaxMixerWidth();
+    int maxPipeWidth = qdutils::MDPVersion::getInstance().getMaxPipeWidth();
     return (hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO) &&
-            (hnd->width > maxMixerWidth));
+            (hnd->width > maxPipeWidth));
 }
 
 // Returns true if the buffer is secure

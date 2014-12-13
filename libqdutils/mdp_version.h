@@ -139,6 +139,7 @@ public:
     uint32_t getMinFpsSupported() { return mPanelInfo.mMinFps; }
     uint32_t getMaxFpsSupported() { return mPanelInfo.mMaxFps; }
     uint32_t getMaxMixerWidth() const { return mMaxMixerWidth; }
+    uint32_t getMaxPipeWidth() const { return mMaxPipeWidth; }
     bool hasMinCropWidthLimitation() const;
     bool isSrcSplit() const;
     bool isSrcSplitAlways() const;
@@ -179,6 +180,7 @@ private:
     bool mRGBHasNoScalar;
     bool mRotDownscale;
     uint32_t mMaxMixerWidth; //maximum x-res of a given mdss mixer.
+    uint32_t mMaxPipeWidth; //maximum x-res of the mdp pipe.
 };
 }; //namespace qdutils
 #endif //INCLUDE_LIBQCOMUTILS_MDPVER
