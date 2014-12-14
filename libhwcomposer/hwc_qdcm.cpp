@@ -66,10 +66,8 @@ static void qdcmSetActiveMode(hwc_context_t *ctx, const Parcel *in, Parcel *out)
 
     if (ctx->mQdcmInfo.mQdcmMode && in && out) {
 
-        struct PARAMS {
-            int dispid;
-            int mode_id;
-        } params = { in->readInt32(), in->readInt32()};
+        struct SET_MODE_PROP_IN params =
+                           { (disp_id_type)in->readInt32(), in->readInt32()};
 
         ret = ctx->mQdcmInfo.mQdcmMode->requestRoute((int)CMD_SET_ACTIVE_MODE,
                 (void *)&params, (void *)NULL);
@@ -84,10 +82,8 @@ static void qdcmSetDefaultMode(hwc_context_t *ctx, const Parcel *in, Parcel *out
 
     if (ctx->mQdcmInfo.mQdcmMode && in && out) {
 
-        struct PARAMS {
-            int dispid;
-            int mode_id;
-        } params = { in->readInt32(), in->readInt32()};
+        struct SET_MODE_PROP_IN params =
+                          { (disp_id_type)in->readInt32(), in->readInt32()};
 
         ret = ctx->mQdcmInfo.mQdcmMode->requestRoute((int)CMD_SET_DEFAULT_MODE,
                 (void *)&params, (void *)NULL);
@@ -103,9 +99,7 @@ static void qdcmGetDefaultMode(hwc_context_t *ctx,
 
     if (ctx->mQdcmInfo.mQdcmMode && in && out) {
 
-        struct PARAMS {
-            int dispid;
-        } params = { in->readInt32() };
+        int params = in->readInt32();
         int modeid = 0;
 
         ret = ctx->mQdcmInfo.mQdcmMode->requestRoute((int)CMD_GET_DEFAULT_MODE,
@@ -116,8 +110,8 @@ static void qdcmGetDefaultMode(hwc_context_t *ctx,
     }
 }
 
-static void qdcmGetColorBalanceRange(hwc_context_t *ctx,
-                                            const Parcel *in, Parcel *out)
+static void qdcmGetColorBalanceRange(hwc_context_t *ctx __unused,
+                const Parcel *in __unused, Parcel *out __unused)
 {
 }
 
@@ -128,9 +122,7 @@ static void qdcmGetColorBalance(hwc_context_t *ctx,
 
     if (ctx->mQdcmInfo.mQdcmMode && in && out) {
 
-        struct PARAMS {
-            int dispid;
-        } params = { in->readInt32() };
+        int params = in->readInt32();
         int warmness = 0;
 
         ret = ctx->mQdcmInfo.mQdcmMode->requestRoute((int)CMD_GET_CB,
@@ -148,13 +140,11 @@ static void qdcmSetColorBalance(hwc_context_t *ctx,
 
     if (ctx->mQdcmInfo.mQdcmMode && in && out) {
 
-        struct PARAMS {
-            int dispid;
-            int warmness;
-        } params = { in->readInt32(), in->readInt32() };
+        struct SET_CB_IN params =
+                           { (disp_id_type)in->readInt32(), in->readInt32() };
 
         ALOGD_IF(QDCM_DEBUG, "%s dispID = %d, warmness = %d\n",
-                __FUNCTION__, params.dispid, params.warmness);
+                __FUNCTION__, params.id, params.warmness);
 
         ret = ctx->mQdcmInfo.mQdcmMode->requestRoute((int)CMD_SET_CB,
                 (const void *)&params, NULL);
@@ -169,11 +159,12 @@ static void qdcmSaveModeV2(hwc_context_t *ctx, const Parcel *in, Parcel *out)
 
     if (ctx->mQdcmInfo.mQdcmMode && in && out) {
 
-        struct PARAMS {
-            int dispid;
-            const char *name;
-            int mode_id;
-        } params = { in->readInt32(), in->readCString(), in->readInt32() };
+        struct SAVE_DISPLAY_MODE_V2_IN params =
+                     { (disp_id_type)in->readInt32(),
+                                     in->readCString(),
+                           (uint32_t)in->readInt32(),
+                                     in->readInt32()
+                     };
         int value = 0;
 
         ret = ctx->mQdcmInfo.mQdcmMode->requestRoute((int)CMD_SAVE_MODE_V2,
@@ -190,13 +181,9 @@ static void qdcmSetPaConfig(hwc_context_t *ctx, const Parcel *in, Parcel *out)
 
     if (ctx->mQdcmInfo.mQdcmMode && in && out) {
 
-        struct PARAMS {
-            int id;
-            struct disp_pa_config pa;
-        } params;
-        int value = 0;
+        struct SET_PA_CONFIG_IN params;
 
-        params.id = in->readInt32();
+        params.id = (disp_id_type)in->readInt32();
         params.pa.ops = in->readInt32();
         params.pa.data.hue = in->readInt32();
         params.pa.data.saturation = in->readInt32();
@@ -217,9 +204,7 @@ static void qdcmGetPaConfig(hwc_context_t *ctx, const Parcel *in, Parcel *out)
 
     if (ctx->mQdcmInfo.mQdcmMode && in && out) {
 
-        struct PARAMS {
-            int dispid;
-        } params = { in->readInt32() };
+        int params = in->readInt32();
         struct disp_pa_config value;
 
         ret = ctx->mQdcmInfo.mQdcmMode->requestRoute((int)CMD_GET_PA_CONFIG,
@@ -242,10 +227,7 @@ static void qdcmGetPaRange(hwc_context_t *ctx, const Parcel *in, Parcel *out)
 
     if (ctx->mQdcmInfo.mQdcmMode && in && out) {
 
-        struct PARAMS {
-            int dispid;
-        } params = { in->readInt32() };
-
+        int params = in->readInt32();
         struct disp_pa_range value;
 
         ret = ctx->mQdcmInfo.mQdcmMode->requestRoute((int)CMD_GET_PA_RANGE,
