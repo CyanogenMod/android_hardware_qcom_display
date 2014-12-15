@@ -122,6 +122,10 @@ static void intersect(struct copybit_rect_t *out,
     out->b = min(lhs->b, rhs->b);
 }
 
+static bool validateCopybitRect(struct copybit_rect_t *rect) {
+    return ((rect->b > rect->t) && (rect->r > rect->l)) ;
+}
+
 /** convert COPYBIT_FORMAT to MDP format */
 static int get_format(int format) {
     switch (format) {
@@ -159,13 +163,16 @@ static void set_image(struct mdp_img *img, const struct copybit_image_t *rhs)
     img->memory_id  = hnd->fd;
 }
 /** setup rectangles */
-static void set_rects(struct copybit_context_t *dev,
+static bool set_rects(struct copybit_context_t *dev,
                       struct mdp_blit_req *e,
                       const struct copybit_rect_t *dst,
                       const struct copybit_rect_t *src,
                       const struct copybit_rect_t *scissor) {
     struct copybit_rect_t clip;
     intersect(&clip, scissor, dst);
+
+    if (!validateCopybitRect(&clip))
+       return false;
 
     e->dst_rect.x  = clip.l;
     e->dst_rect.y  = clip.t;
@@ -210,6 +217,7 @@ static void set_rects(struct copybit_context_t *dev,
             e->src_rect.x = (src->l + src->r) - (e->src_rect.x + e->src_rect.w);
         }
     }
+    return true;
 }
 
 /** setup mdp request */
@@ -515,7 +523,8 @@ static int stretch_copybit(
             set_infos(ctx, req, flags);
             set_image(&req->dst, dst);
             set_image(&req->src, src);
-            set_rects(ctx, req, dst_rect, src_rect, &clip);
+            if (set_rects(ctx, req, dst_rect, src_rect, &clip) == false)
+                continue;
 
             if (req->src_rect.w<=0 || req->src_rect.h<=0)
                 continue;
