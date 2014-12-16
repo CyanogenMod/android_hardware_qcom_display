@@ -131,6 +131,21 @@ unsigned int CopyBit::getRGBRenderingArea (const hwc_context_t *ctx,
     return renderArea;
 }
 
+bool CopyBit::isLayerChanging(hwc_display_contents_1_t *list, int k) {
+    if((mLayerCache.hnd[k] != list->hwLayers[k].handle) ||
+            (mLayerCache.displayFrame[k].left !=
+                         list->hwLayers[k].displayFrame.left) ||
+            (mLayerCache.displayFrame[k].top !=
+                         list->hwLayers[k].displayFrame.top) ||
+            (mLayerCache.displayFrame[k].right !=
+                         list->hwLayers[k].displayFrame.right) ||
+            (mLayerCache.displayFrame[k].bottom !=
+                         list->hwLayers[k].displayFrame.bottom)) {
+        return 1;
+    }
+    return 0;
+}
+
 int CopyBit::getLayersChanging(hwc_context_t *ctx,
                       hwc_display_contents_1_t *list,
                       int dpy){
@@ -146,7 +161,7 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
     int updatingLayerCount = 0;
     for (int k = ctx->listStats[dpy].numAppLayers-1; k >= 0 ; k--){
        //swap rect will kick in only for single updating layer
-       if(mLayerCache.hnd[k] != list->hwLayers[k].handle){
+       if(isLayerChanging(list, k)) {
            updatingLayerCount ++;
            if(updatingLayerCount == 1)
              changingLayerIndex = k;
@@ -1204,6 +1219,7 @@ void CopyBit::LayerCache::updateCounts(hwc_context_t *ctx,
    layerCount = ctx->listStats[dpy].numAppLayers;
    for (int i=0; i<ctx->listStats[dpy].numAppLayers; i++){
       hnd[i] = list->hwLayers[i].handle;
+      displayFrame[i] = list->hwLayers[i].displayFrame;
    }
 }
 
