@@ -59,34 +59,39 @@ QClient::~QClient()
 }
 
 static void securing(hwc_context_t *ctx, uint32_t startEnd) {
-    Locker::Autolock _sl(ctx->mDrawLock);
     //The only way to make this class in this process subscribe to media
     //player's death.
     IMediaDeathNotifier::getMediaPlayerService();
 
+    ctx->mDrawLock.lock();
     ctx->mSecuring = startEnd;
     //We're done securing
     if(startEnd == IQService::END)
         ctx->mSecureMode = true;
+    ctx->mDrawLock.unlock();
+
     if(ctx->proc)
         ctx->proc->invalidate(ctx->proc);
 }
 
 static void unsecuring(hwc_context_t *ctx, uint32_t startEnd) {
-    Locker::Autolock _sl(ctx->mDrawLock);
+    ctx->mDrawLock.lock();
     ctx->mSecuring = startEnd;
     //We're done unsecuring
     if(startEnd == IQService::END)
         ctx->mSecureMode = false;
+    ctx->mDrawLock.unlock();
+
     if(ctx->proc)
         ctx->proc->invalidate(ctx->proc);
 }
 
 void QClient::MPDeathNotifier::died() {
-    Locker::Autolock _sl(mHwcContext->mDrawLock);
+    mHwcContext->mDrawLock.lock();
     ALOGD_IF(QCLIENT_DEBUG, "Media Player died");
     mHwcContext->mSecuring = false;
     mHwcContext->mSecureMode = false;
+    mHwcContext->mDrawLock.unlock();
     if(mHwcContext->proc)
         mHwcContext->proc->invalidate(mHwcContext->proc);
 }
@@ -315,8 +320,8 @@ static status_t setPartialUpdatePref(hwc_context_t *ctx, uint32_t enable) {
 
 static void toggleScreenUpdate(hwc_context_t* ctx, uint32_t on) {
     ALOGD("%s: toggle update: %d", __FUNCTION__, on);
-    Locker::Autolock _sl(ctx->mDrawLock);
     if (on == 0) {
+        ctx->mDrawLock.lock();
         ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isPause = true;
         ctx->mOverlay->configBegin();
         ctx->mOverlay->configDone();
@@ -324,8 +329,11 @@ static void toggleScreenUpdate(hwc_context_t* ctx, uint32_t on) {
         if(!Overlay::displayCommit(ctx->dpyAttr[0].fd)) {
             ALOGE("%s: Display commit failed", __FUNCTION__);
         }
+        ctx->mDrawLock.unlock();
     } else {
+        ctx->mDrawLock.lock();
         ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isPause = false;
+        ctx->mDrawLock.unlock();
         ctx->proc->invalidate(ctx->proc);
     }
 }
