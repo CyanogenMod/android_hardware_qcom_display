@@ -96,7 +96,7 @@ struct DisplayAttributes {
     //It should be active also. (UNBLANKED)
     bool isActive;
     // In pause state, composition is bypassed
-    // used for WFD displays only
+    // used for WFD displays and in QDCM calibration mode
     bool isPause;
     // To trigger padding round to clean up mdp
     // pipes
