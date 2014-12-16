@@ -343,10 +343,18 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             dx = (float)dst_w/(float)src_w;
             dy = (float)dst_h/(float)src_h;
 
-            if (dx > MAX_SCALE_FACTOR || dx < MIN_SCALE_FACTOR)
+            float scale_factor_max = MAX_SCALE_FACTOR;
+            float scale_factor_min = MIN_SCALE_FACTOR;
+
+            if (isAlphaPresent(layer)) {
+               scale_factor_max = MAX_SCALE_FACTOR/4;
+               scale_factor_min = MIN_SCALE_FACTOR*4;
+            }
+
+            if (dx > scale_factor_max || dx < scale_factor_min)
                 return false;
 
-            if (dy > MAX_SCALE_FACTOR || dy < MIN_SCALE_FACTOR)
+            if (dy > scale_factor_max || dy < scale_factor_min)
                 return false;
         }
     }
