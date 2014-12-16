@@ -47,6 +47,9 @@ Overlay::Overlay() {
 
     initScalar();
     setDMAMultiplexingSupported();
+#ifdef USES_POST_PROCESSING
+    initPostProc();
+#endif
 }
 
 Overlay::~Overlay() {
@@ -54,6 +57,9 @@ Overlay::~Overlay() {
         mPipeBook[i].destroy();
     }
     destroyScalar();
+#ifdef USES_POST_PROCESSING
+    destroyPostProc();
+#endif
 }
 
 void Overlay::configBegin() {
@@ -526,6 +532,23 @@ void Overlay::destroyScalar() {
     }
 }
 
+void Overlay::initPostProc() {
+    sLibAblHandle = dlopen("libmm-abl.so", RTLD_NOW);
+    if (sLibAblHandle) {
+        *(void **)&sFnppParams = dlsym(sLibAblHandle,
+                                       "display_pp_compute_params");
+    } else {
+        ALOGE("%s: Not able to load libmm-abl.so", __FUNCTION__);
+    }
+}
+
+void Overlay::destroyPostProc() {
+    if (sLibAblHandle) {
+        dlclose(sLibAblHandle);
+        sLibAblHandle = NULL;
+    }
+}
+
 void Overlay::PipeBook::init() {
     mPipe = NULL;
     mDisplay = DPY_UNUSED;
@@ -557,5 +580,9 @@ utils::eMdpPipeType Overlay::PipeBook::pipeTypeLUT[utils::OV_MAX] =
     {utils::OV_MDP_PIPE_ANY};
 void *Overlay::sLibScaleHandle = NULL;
 int (*Overlay::sFnProgramScale)(struct mdp_overlay_list *) = NULL;
+/* Dynamically link ABL library */
+void *Overlay::sLibAblHandle = NULL;
+int (*Overlay::sFnppParams)(const struct compute_params *,
+                            struct mdp_overlay_pp_params *) = NULL;
 
 }; // namespace overlay

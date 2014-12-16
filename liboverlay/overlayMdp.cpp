@@ -21,6 +21,7 @@
 #include "overlayMdp.h"
 #include "mdp_version.h"
 #include <overlay.h>
+#include <dlfcn.h>
 
 #define HSIC_SETTINGS_DEBUG 0
 
@@ -263,7 +264,7 @@ bool MdpCtrl::setVisualParams(const MetaData_t& data) {
         }
 
         if (needUpdate) {
-            mParams.params.pa_params.hue = data.hsicData.hue;
+            mParams.params.pa_params.hue = (float)data.hsicData.hue;
             mParams.params.pa_params.sat = data.hsicData.saturation;
             mParams.params.pa_params.intensity = data.hsicData.intensity;
             mParams.params.pa_params.contrast = data.hsicData.contrast;
@@ -333,7 +334,15 @@ bool MdpCtrl::setVisualParams(const MetaData_t& data) {
     }
 
     if (needUpdate) {
-        display_pp_compute_params(&mParams, &mOVInfo.overlay_pp_cfg);
+        int (*sFnppParams)(const struct compute_params *,
+                           struct mdp_overlay_pp_params *) =
+                           Overlay::getFnPpParams();
+        if(sFnppParams) {
+           int ret = sFnppParams(&mParams, &mOVInfo.overlay_pp_cfg);
+           if (ret) {
+             ALOGE("%s: Unable to set PP params", __FUNCTION__);
+           }
+        }
     }
 #endif
     return true;
