@@ -41,13 +41,36 @@ using namespace qhwc;
 namespace qdutils {
 
 int CBUtils::getuiClearRegion(hwc_display_contents_1_t* list,
-          hwc_rect_t &clearWormholeRect, LayerProp *layerProp) {
+          hwc_rect_t &clearWormholeRect, LayerProp *layerProp, int dirtyIndex) {
 
     size_t last = list->numHwLayers - 1;
     hwc_rect_t fbFrame = list->hwLayers[last].displayFrame;
     Rect fbFrameRect(fbFrame.left,fbFrame.top,fbFrame.right,fbFrame.bottom);
     Region wormholeRegion(fbFrameRect);
 
+   if (dirtyIndex != -1) {
+#ifdef QCOM_BSP
+      /*
+       * 1. Map dirty rect of updating layer to its display frame.
+       * 2. Use this display frame as wormholeRegion instead of full Frame
+       * */
+      hwc_rect_t dirtyRect = list->hwLayers[dirtyIndex].dirtyRect;
+      hwc_rect_t displayFrame = list->hwLayers[dirtyIndex].displayFrame;
+      hwc_frect_t sCropF = list->hwLayers[dirtyIndex].sourceCropf;
+      hwc_rect_t srcRect = {int(ceilf(sCropF.left)), int(ceilf(sCropF.top)),
+                           int(ceilf(sCropF.right)), int(ceilf(sCropF.bottom))};
+
+      displayFrame.left += dirtyRect.left - srcRect.left;
+      displayFrame.top += dirtyRect.top - srcRect.top;
+      displayFrame.right -= srcRect.right - dirtyRect.right;
+      displayFrame.bottom -= srcRect.bottom - dirtyRect.bottom;
+
+      Rect tmpRect(displayFrame.left,displayFrame.top,displayFrame.right,
+            displayFrame.bottom);
+      Region tmpRegion(tmpRect);
+      wormholeRegion = wormholeRegion.intersect(tmpRegion);
+#endif
+   }
     if(cb_swap_rect::getInstance().checkSwapRectFeature_on() == true){
       wormholeRegion.set(0,0);
       for(size_t i = 0 ; i < last; i++) {
