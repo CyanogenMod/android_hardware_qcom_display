@@ -129,6 +129,7 @@ private:
     int mDirtyLayerIndex;
     LayerCache mLayerCache;
     FbCache mFbCache;
+    hwc_rect_t mDirtyRect;
     int getLayersChanging(hwc_context_t *ctx, hwc_display_contents_1_t *list,
                   int dpy);
     int checkDirtyRect(hwc_context_t *ctx, hwc_display_contents_1_t *list,

@@ -163,19 +163,20 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
        dirtyRect = list->hwLayers[changingLayerIndex].dirtyRect;
 #endif
 
-       for (int k = ctx->listStats[dpy].numAppLayers-1; k >= 0 ; k--){
-            //disable swap rect for overlapping visible layer(s)
-            hwc_rect_t displayFrame = list->hwLayers[k].displayFrame;
-            hwc_rect_t result = getIntersection(displayFrame,dirtyRect);
-            if((k != changingLayerIndex) && isValidRect(result)){
-              return -1;
+       for (int k = ctx->listStats[dpy].numAppLayers-1; k >= 0 ; k--) {
+           //disable swap rect in case of scaling and video .
+           private_handle_t *hnd =(private_handle_t *)list->hwLayers[k].handle;
+           if(needsScaling(&list->hwLayers[k])||( hnd && isYuvBuffer(hnd))) {
+               mFbCache.reset();
+               return -1;
            }
        }
-       mFbCache.insertAndUpdateFbCache(dirtyRect);
        if(mFbCache.getUnchangedFbDRCount(dirtyRect) <
-                                             NUM_RENDER_BUFFERS)
+                                             NUM_RENDER_BUFFERS) {
+               mFbCache.insertAndUpdateFbCache(dirtyRect);
               changingLayerIndex =  -1;
-    }else {
+       }
+    } else {
        mFbCache.reset();
        changingLayerIndex =  -1;
     }
@@ -189,23 +190,11 @@ int CopyBit::checkDirtyRect(hwc_context_t *ctx,
 
    //dirty rect will enable only if
    //1.Only single layer is updating.
-   //2.No overlapping
-   //3.No scaling
-   //4.No video layer
+   //2.No scaling
+   //3.No video layer
    if(mSwapRectEnable == false)
       return -1;
-   int changingLayerIndex =  getLayersChanging(ctx, list, dpy);
-   //swap rect will kick in only for single updating layer
-   if(changingLayerIndex == -1){
-      return -1;
-   }
-   if(!needsScaling(&list->hwLayers[changingLayerIndex])){
-     private_handle_t *hnd =
-         (private_handle_t *)list->hwLayers[changingLayerIndex].handle;
-      if( hnd && !isYuvBuffer(hnd))
-           return  changingLayerIndex;
-   }
-   return -1;
+   return getLayersChanging(ctx, list, dpy);
 }
 
 bool CopyBit::prepareOverlap(hwc_context_t *ctx,
@@ -472,6 +461,7 @@ bool CopyBit::drawUsingAppBufferComposition(hwc_context_t *ctx,
              list->hwLayers[abcRenderBufIdx].acquireFenceFd);
           }
           for(int i = abcRenderBufIdx + 1; i < layerCount; i++){
+             mDirtyLayerIndex = -1;
              int retVal = drawLayerUsingCopybit(ctx,
                &(list->hwLayers[i]),renderBuffer, 0);
              if(retVal < 0) {
@@ -533,7 +523,13 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     }
 
     mDirtyLayerIndex =  checkDirtyRect(ctx, list, dpy);
+    ALOGD_IF (DEBUG_COPYBIT, "%s:Dirty Layer Index: %d",
+                                       __FUNCTION__, mDirtyLayerIndex);
     hwc_rect_t clearRegion = {0,0,0,0};
+    mDirtyRect = list->hwLayers[last].displayFrame;
+    if (mDirtyLayerIndex != -1)
+        mDirtyRect = list->hwLayers[mDirtyLayerIndex].displayFrame;
+
     if (CBUtils::getuiClearRegion(list, clearRegion, layerProp,
                                                        mDirtyLayerIndex))
              clear(renderBuffer, clearRegion);
@@ -546,9 +542,6 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         if(ctx->copybitDrop[i]) {
             continue;
         }
-        //skip non updating layers
-        if((mDirtyLayerIndex != -1) && (mDirtyLayerIndex != i) )
-            continue;
         int ret = -1;
         if (list->hwLayers[i].acquireFenceFd != -1
                 && ctx->mMDP.version >= qdutils::MDP_V4_0) {
@@ -848,11 +841,18 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
 #ifdef QCOM_BSP
     //change src and dst with dirtyRect
     if(mDirtyLayerIndex != -1) {
-      srcRect.l = layer->dirtyRect.left;
-      srcRect.t = layer->dirtyRect.top;
-      srcRect.r = layer->dirtyRect.right;
-      srcRect.b = layer->dirtyRect.bottom;
-      dstRect = srcRect;
+      hwc_rect_t result = getIntersection(displayFrame, mDirtyRect);
+      if(!isValidRect(result))
+             return true;
+      dstRect.l = result.left;
+      dstRect.t = result.top;
+      dstRect.r = result.right;
+      dstRect.b = result.bottom;
+
+      srcRect.l += (result.left - displayFrame.left);
+      srcRect.t += (result.top - displayFrame.top);
+      srcRect.r -= (displayFrame.right - result.right);
+      srcRect.b -= (displayFrame.bottom - result.bottom);
     }
 #endif
     // Copybit dst
