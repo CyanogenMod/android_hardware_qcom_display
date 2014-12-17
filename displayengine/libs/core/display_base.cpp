@@ -117,9 +117,10 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
 
   if ((state_ == kStateOn)) {
     // Clean hw layers for reuse.
-    hw_layers_.info.Reset();
+    hw_layers_.info = HWLayersInfo();
     hw_layers_.info.stack = layer_stack;
 
+    comp_manager_->PrePrepare(display_comp_ctx_, &hw_layers_);
     while (true) {
       error = comp_manager_->Prepare(display_comp_ctx_, &hw_layers_);
       if (error != kErrorNone) {
@@ -129,11 +130,11 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
       error = hw_intf_->Validate(hw_device_, &hw_layers_);
       if (error == kErrorNone) {
         // Strategy is successful now, wait for Commit().
-        comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
         pending_commit_ = true;
         break;
       }
     }
+    comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
   }
 
   return error;

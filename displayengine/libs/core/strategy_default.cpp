@@ -31,17 +31,53 @@
 
 namespace sde {
 
-DisplayError StrategyDefault::GetNextStrategy(StrategyConstraints *constraints,
-                                              HWLayersInfo *hw_layers_info) {
-  if (hw_layers_info->flags) {
-    DLOGW("All strategies exhausted.");
-    return kErrorUndefined;
+StrategyDefault::StrategyDefault() : hw_layers_info_(NULL) {
+}
+
+DisplayError StrategyDefault::CreateStrategyInterface(uint16_t version,
+                                                      StrategyInterface **interface) {
+  StrategyDefault *strategy_default  = new StrategyDefault();
+
+  if (!strategy_default) {
+    return kErrorMemory;
   }
 
+  *interface = strategy_default;
+
+  return kErrorNone;
+}
+
+DisplayError StrategyDefault::DestroyStrategyInterface(StrategyInterface *interface) {
+  StrategyDefault *strategy_default = static_cast<StrategyDefault *>(interface);
+
+  if (!strategy_default) {
+    return kErrorParameters;
+  }
+
+  delete strategy_default;
+
+  return kErrorNone;
+}
+
+DisplayError StrategyDefault::Start(HWLayersInfo *hw_layers_info) {
+  if (!hw_layers_info) {
+    return kErrorParameters;
+  }
+
+  hw_layers_info_ = hw_layers_info;
+
+  return kErrorNone;
+}
+
+DisplayError StrategyDefault::Stop() {
+  return kErrorNone;
+}
+
+DisplayError StrategyDefault::GetNextStrategy(StrategyConstraints *constraints) {
   // Mark all layers for GPU composition. Find GPU target buffer and store its index for programming
   // the hardware.
-  LayerStack *layer_stack = hw_layers_info->stack;
-  uint32_t &hw_layer_count = hw_layers_info->count;
+  LayerStack *layer_stack = hw_layers_info_->stack;
+  uint32_t &hw_layer_count = hw_layers_info_->count;
 
   hw_layer_count = 0;
   for (uint32_t i = 0; i < layer_stack->layer_count; i++) {
@@ -49,7 +85,7 @@ DisplayError StrategyDefault::GetNextStrategy(StrategyConstraints *constraints,
     if (composition != kCompositionGPUTarget) {
       composition = kCompositionGPU;
     } else {
-      hw_layers_info->index[hw_layer_count++] = i;
+      hw_layers_info_->index[hw_layer_count++] = i;
     }
   }
 
@@ -57,8 +93,6 @@ DisplayError StrategyDefault::GetNextStrategy(StrategyConstraints *constraints,
   if (hw_layer_count != 1) {
     return kErrorParameters;
   }
-
-  hw_layers_info->flags = 1;
 
   return kErrorNone;
 }

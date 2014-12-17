@@ -28,7 +28,6 @@
 #include <core/display_interface.h>
 
 #include "hw_interface.h"
-#include "strategy_default.h"
 #include "res_manager.h"
 #include "dump_impl.h"
 
@@ -42,6 +41,7 @@ class CompManager : public DumpImpl {
   DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
                                Handle *res_mgr_hnd);
   DisplayError UnregisterDisplay(Handle res_mgr_hnd);
+  void PrePrepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
   void PostPrepare(Handle display_ctx, HWLayers *hw_layers);
   void PostCommit(Handle display_ctx, HWLayers *hw_layers);
@@ -54,15 +54,17 @@ class CompManager : public DumpImpl {
   void PrepareStrategyConstraints(Handle display_ctx, HWLayers *hw_layers);
 
   struct DisplayCompositionContext {
+    StrategyInterface *strategy_intf;
     StrategyConstraints constraints;
     Handle display_resource_ctx;
     DisplayType display_type;
+    bool strategy_selected;
   };
 
   Locker locker_;
   void *strategy_lib_;
-  StrategyInterface *strategy_intf_;
-  StrategyDefault strategy_default_;
+  CreateStrategyInterface create_strategy_intf_;
+  DestroyStrategyInterface destroy_strategy_intf_;
   ResManager res_mgr_;
   uint64_t registered_displays_;        // Stores the bit mask of registered displays
   uint64_t configured_displays_;        // Stores the bit mask of sucessfully configured displays

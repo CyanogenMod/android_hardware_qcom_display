@@ -27,13 +27,15 @@
 #include <utils/debug.h>
 
 #include "comp_manager.h"
+#include "strategy_default.h"
 
 #define __CLASS__ "CompManager"
 
 namespace sde {
 
-CompManager::CompManager() : strategy_lib_(NULL), strategy_intf_(NULL), registered_displays_(0),
-                             configured_displays_(0), safe_mode_(false) {
+CompManager::CompManager()
+  : strategy_lib_(NULL), create_strategy_intf_(NULL), destroy_strategy_intf_(NULL),
+    registered_displays_(0), configured_displays_(0), safe_mode_(false) {
 }
 
 DisplayError CompManager::Init(const HWResourceInfo &hw_res_info) {
@@ -49,43 +51,40 @@ DisplayError CompManager::Init(const HWResourceInfo &hw_res_info) {
   // Try to load strategy library & get handle to its interface.
   // Default to GPU only composition on failure.
   strategy_lib_ = ::dlopen(STRATEGY_LIBRARY_NAME, RTLD_NOW);
-  if (!strategy_lib_) {
-    DLOGW("Unable to load = %s", STRATEGY_LIBRARY_NAME);
-  } else {
-    CreateStrategyInterface create_strategy_intf = NULL;
-    void **sym = reinterpret_cast<void **>(&create_strategy_intf);
-    *sym = ::dlsym(strategy_lib_, CREATE_STRATEGY_INTERFACE_NAME);
-    if (!create_strategy_intf) {
-      DLOGW("Unable to find symbol for %s", CREATE_STRATEGY_INTERFACE_NAME);
-    } else if (create_strategy_intf(STRATEGY_VERSION_TAG, &strategy_intf_) != kErrorNone) {
-      DLOGW("Unable to create strategy interface");
-    }
-  }
+  if (strategy_lib_) {
+    void **create_sym = reinterpret_cast<void **>(&create_strategy_intf_);
+    void **destroy_sym = reinterpret_cast<void **>(&destroy_strategy_intf_);
 
-  if (!strategy_intf_) {
-    DLOGI("Using GPU only composition");
-    if (strategy_lib_) {
+    *create_sym = ::dlsym(strategy_lib_, CREATE_STRATEGY_INTERFACE_NAME);
+    *destroy_sym = ::dlsym(strategy_lib_, DESTROY_STRATEGY_INTERFACE_NAME);
+
+    if (!create_strategy_intf_) {
+      DLOGE("Unable to find symbol for %s", CREATE_STRATEGY_INTERFACE_NAME);
+      error = kErrorUndefined;
+    }
+
+    if (!destroy_strategy_intf_) {
+      DLOGE("Unable to find symbol for %s", DESTROY_STRATEGY_INTERFACE_NAME);
+      error = kErrorUndefined;
+    }
+
+    if (error != kErrorNone) {
       ::dlclose(strategy_lib_);
-      strategy_lib_ = NULL;
+      res_mgr_.Deinit();
     }
-    strategy_intf_ = &strategy_default_;
+  } else {
+    DLOGW("Unable to load = %s, using GPU only (default) composition", STRATEGY_LIBRARY_NAME);
+    create_strategy_intf_ = StrategyDefault::CreateStrategyInterface;
+    destroy_strategy_intf_ = StrategyDefault::DestroyStrategyInterface;
   }
 
-  return kErrorNone;
+  return error;
 }
 
 DisplayError CompManager::Deinit() {
   SCOPE_LOCK(locker_);
 
   if (strategy_lib_) {
-    DestroyStrategyInterface destroy_strategy_intf = NULL;
-    void **sym = reinterpret_cast<void **>(&destroy_strategy_intf);
-    *sym = ::dlsym(strategy_lib_, DESTROY_STRATEGY_INTERFACE_NAME);
-    if (!destroy_strategy_intf) {
-      DLOGW("Unable to find symbol for %s", DESTROY_STRATEGY_INTERFACE_NAME);
-    } else if (destroy_strategy_intf(strategy_intf_) != kErrorNone) {
-      DLOGW("Unable to destroy strategy interface");
-    }
     ::dlclose(strategy_lib_);
   }
 
@@ -105,11 +104,19 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
     return kErrorMemory;
   }
 
+  if (create_strategy_intf_(STRATEGY_VERSION_TAG, &display_comp_ctx->strategy_intf) != kErrorNone) {
+    DLOGW("Unable to create strategy interface");
+    delete display_comp_ctx;
+    return kErrorUndefined;
+  }
+
   error = res_mgr_.RegisterDisplay(type, attributes, &display_comp_ctx->display_resource_ctx);
   if (error != kErrorNone) {
+    destroy_strategy_intf_(display_comp_ctx->strategy_intf);
     delete display_comp_ctx;
     return error;
   }
+
   SET_BIT(registered_displays_, type);
   display_comp_ctx->display_type = type;
   *display_ctx = display_comp_ctx;
@@ -127,8 +134,11 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
                              reinterpret_cast<DisplayCompositionContext *>(comp_handle);
 
   res_mgr_.UnregisterDisplay(display_comp_ctx->display_resource_ctx);
+  destroy_strategy_intf_(display_comp_ctx->strategy_intf);
+
   CLEAR_BIT(registered_displays_, display_comp_ctx->display_type);
   CLEAR_BIT(configured_displays_, display_comp_ctx->display_type);
+
   delete display_comp_ctx;
 
   return kErrorNone;
@@ -147,10 +157,18 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
   }
   // If validation for the best available composition strategy with driver has failed, just
   // fallback to safe mode composition e.g. GPU or video only.
-  if (UNLIKELY(hw_layers->info.flags)) {
+  if (display_comp_ctx->strategy_selected) {
     constraints->safe_mode = true;
     return;
   }
+}
+
+void CompManager::PrePrepare(Handle display_ctx, HWLayers *hw_layers) {
+  SCOPE_LOCK(locker_);
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+  display_comp_ctx->strategy_intf->Start(&hw_layers->info);
+  display_comp_ctx->strategy_selected = false;
 }
 
 DisplayError CompManager::Prepare(Handle display_ctx, HWLayers *hw_layers) {
@@ -167,7 +185,7 @@ DisplayError CompManager::Prepare(Handle display_ctx, HWLayers *hw_layers) {
   // Select a composition strategy, and try to allocate resources for it.
   res_mgr_.Start(display_resource_ctx);
   while (true) {
-    error = strategy_intf_->GetNextStrategy(&display_comp_ctx->constraints, &hw_layers->info);
+    error = display_comp_ctx->strategy_intf->GetNextStrategy(&display_comp_ctx->constraints);
     if (UNLIKELY(error != kErrorNone)) {
       // Composition strategies exhausted. Resource Manager could not allocate resources even for
       // GPU composition. This will never happen.
@@ -184,6 +202,7 @@ DisplayError CompManager::Prepare(Handle display_ctx, HWLayers *hw_layers) {
       break;
     }
   }
+  display_comp_ctx->strategy_selected = true;
   res_mgr_.Stop(display_resource_ctx);
 
   return error;
@@ -191,6 +210,9 @@ DisplayError CompManager::Prepare(Handle display_ctx, HWLayers *hw_layers) {
 
 void CompManager::PostPrepare(Handle display_ctx, HWLayers *hw_layers) {
   SCOPE_LOCK(locker_);
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+  display_comp_ctx->strategy_intf->Stop();
 }
 
 void CompManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {

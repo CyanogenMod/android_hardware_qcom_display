@@ -70,8 +70,7 @@ class HWCDisplay : public DisplayEventHandler {
     LayerStackCache() : layer_count(0) { }
   };
 
-  HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id,
-             bool need_retire_fence);
+  HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id);
   virtual ~HWCDisplay() { }
 
   // DisplayEventHandler methods
@@ -97,7 +96,6 @@ class HWCDisplay : public DisplayEventHandler {
   DisplayInterface *display_intf_;
   LayerStackMemory layer_stack_memory_;
   LayerStack layer_stack_;
-  bool need_retire_fence_;
   LayerStackCache layer_stack_cache_;
 };
 

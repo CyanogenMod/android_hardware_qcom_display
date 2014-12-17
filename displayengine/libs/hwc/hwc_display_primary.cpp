@@ -32,7 +32,7 @@
 namespace sde {
 
 HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true) {
+  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY) {
 }
 
 int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {

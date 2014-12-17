@@ -95,10 +95,12 @@ struct LayerTransform {
 struct LayerFlags {
   uint64_t skip : 1;      //!< This flag shall be set by client to indicate that this layer will be
                           //!< handled by GPU. Display Device will not consider it for composition.
+
   uint64_t updating : 1;  //!< This flag shall be set by client to indicate that this is updating/
                           //!< non-updating. so strategy manager will mark them for SDE/GPU
                           //!< composition respectively when the layer stack qualifies for cache
                           //!< based composition.
+
   LayerFlags() : skip(0), updating(0) { }
 };
 
@@ -111,12 +113,15 @@ struct LayerStackFlags {
   uint64_t geometry_changed : 1;  //!< This flag shall be set by client to indicate that the layer
                                   //!< set passed to Prepare() has changed by more than just the
                                   //!< buffer handles and acquire fences.
+
   uint64_t skip_present : 1;      //!< This flag will be set to true, if the current layer stack
-                                  //!< contains skip layers
+                                  //!< contains skip layers.
+
   uint64_t video_present : 1;     //!< This flag will be set to true, if current layer stack
-                                  //!< contains video
+                                  //!< contains video.
+
   uint64_t secure_present : 1;    //!< This flag will be set to true, if the current layer stack
-                                  //!< contains secure layers
+                                  //!< contains secure layers.
 
   LayerStackFlags() : geometry_changed(0), skip_present(0), video_present(0), secure_present(0) { }
 };
@@ -200,30 +205,24 @@ struct Layer {
   @sa DisplayInterface::Commit
 */
 struct LayerStack {
-  union {
-    int retire_fence_fd;          //!< File descriptor referring to a sync fence object which will
-                                  //!< be signaled when this composited frame has been replaced on
-                                  //!< screen by a subsequent frame on a physical display. The fence
-                                  //!< object is created and returned during Commit(). Client shall
-                                  //!< Client shall close the returned file descriptor.
-                                  //!< NOTE: This field applies to a physical display only.
+  Layer *layers;                //!< Array of layers.
+  uint32_t layer_count;         //!< Total number of layers.
 
-    LayerBuffer *output_buffer;   //!< Pointer to the buffer where composed buffer would be rendered
-                                  //!< for virtual displays.
-                                  //!< NOTE: This field applies to a virtual display only.
-  };
+  int retire_fence_fd;          //!< File descriptor referring to a sync fence object which will
+                                //!< be signaled when this composited frame has been replaced on
+                                //!< screen by a subsequent frame on a physical display. The fence
+                                //!< object is created and returned during Commit(). Client shall
+                                //!< Client shall close the returned file descriptor.
+                                //!< NOTE: This field applies to a physical display only.
 
-  Layer *layers;          //!< Array of layers.
-  uint32_t layer_count;   //!< Total number of layers.
-  LayerStackFlags flags;  //!< Flags associated with this layer set.
+  LayerBuffer *output_buffer;   //!< Pointer to the buffer where composed buffer would be rendered
+                                //!< for virtual displays.
+                                //!< NOTE: This field applies to a virtual display only.
 
-  explicit LayerStack(bool need_retire_fence) : layers(NULL), layer_count(0) {
-    if (need_retire_fence) {
-      retire_fence_fd = -1;
-    } else {
-      output_buffer = NULL;
-    }
-  }
+
+  LayerStackFlags flags;        //!< Flags associated with this layer set.
+
+  LayerStack() : layers(NULL), layer_count(0), retire_fence_fd(-1), output_buffer(NULL) { }
 };
 
 }  // namespace sde
