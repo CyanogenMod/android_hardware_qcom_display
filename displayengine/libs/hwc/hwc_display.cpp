@@ -85,10 +85,32 @@ int HWCDisplay::EventControl(int event, int enable) {
   return 0;
 }
 
-int HWCDisplay::Blank(int blank) {
-  DLOGI("blank = %d, display = %d", blank, id_);
-  DisplayState state = blank ? kStateOff : kStateOn;
-  return SetState(state);
+int HWCDisplay::SetPowerMode(int mode) {
+  DLOGI("display = %d, mode = %d", id_, mode);
+  DisplayState state = kStateOff;
+
+  switch (mode) {
+  case HWC_POWER_MODE_OFF:
+    state = kStateOff;
+    break;
+  case HWC_POWER_MODE_NORMAL:
+    state = kStateOn;
+    break;
+  case HWC_POWER_MODE_DOZE:
+  case HWC_POWER_MODE_DOZE_SUSPEND:
+    state = kStateDoze;
+    break;
+  default:
+    return -EINVAL;
+  }
+
+  DisplayError error = display_intf_->SetDisplayState(state);
+  if (UNLIKELY(error != kErrorNone)) {
+    DLOGE("Set state failed. Error = %d", error);
+    return -EINVAL;
+  }
+
+  return 0;
 }
 
 int HWCDisplay::GetDisplayConfigs(uint32_t *configs, size_t *num_configs) {
@@ -104,7 +126,7 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
   DisplayError error = kErrorNone;
 
   DisplayConfigVariableInfo variable_config;
-  error = display_intf_->GetConfig(&variable_config, config);
+  error = display_intf_->GetConfig(config, &variable_config);
   if (UNLIKELY(error != kErrorNone)) {
     DLOGE("GetConfig variable info failed. Error = %d", error);
     return -EINVAL;
@@ -139,11 +161,26 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
   return 0;
 }
 
-int HWCDisplay::SetState(DisplayState state) {
-  DisplayError error = display_intf_->SetDisplayState(state);
-  if (UNLIKELY(error != kErrorNone)) {
-    DLOGE("Set state failed. Error = %d", error);
-    return -EINVAL;
+int HWCDisplay::GetActiveConfig() {
+  DisplayError error = kErrorNone;
+  uint32_t index = 0;
+
+  error = display_intf_->GetActiveConfig(&index);
+  if (error != kErrorNone) {
+    DLOGE("GetActiveConfig failed. Error = %d", error);
+    return -1;
+  }
+
+  return index;
+}
+
+int HWCDisplay::SetActiveConfig(int index) {
+  DisplayError error = kErrorNone;
+
+  error = display_intf_->SetActiveConfig(index);
+  if (error != kErrorNone) {
+    DLOGE("SetActiveConfig failed. Error = %d", error);
+    return -1;
   }
 
   return 0;

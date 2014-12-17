@@ -37,10 +37,11 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int Prepare(hwc_display_contents_1_t *content_list) = 0;
   virtual int Commit(hwc_display_contents_1_t *content_list) = 0;
   virtual int EventControl(int event, int enable);
-  virtual int Blank(int blank);
+  virtual int SetPowerMode(int mode);
   virtual int GetDisplayConfigs(uint32_t *configs, size_t *num_configs);
   virtual int GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values);
-  int SetState(DisplayState state);
+  virtual int GetActiveConfig();
+  virtual int SetActiveConfig(int index);
 
  protected:
   // Maximum number of layers supported by display engine.

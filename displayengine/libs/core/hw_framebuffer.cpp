@@ -86,8 +86,8 @@ HWFrameBuffer::HWFrameBuffer() : event_thread_name_("SDE_EventThread"), fake_vsy
     fopen_ = virtual_fopen;
     fclose_ = virtual_fclose;
     getline_ = virtual_getline;
-    read_ = ::virtual_read;
-    write_ = ::virtual_write;
+    read_ = virtual_read;
+    write_ = virtual_write;
   }
 #endif
   for (int i = 0; i < kDeviceMax; i++) {
@@ -283,7 +283,7 @@ DisplayError HWFrameBuffer::GetNumDisplayAttributes(Handle device, uint32_t *cou
 
 DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
                                                  HWDisplayAttributes *display_attributes,
-                                                 uint32_t mode) {
+                                                 uint32_t index) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
   int &device_fd = hw_context->device_fd;
   // Variable screen info
@@ -332,7 +332,7 @@ DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
       msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[0];
       for (int i = 0; i < HDMI_VFRMT_MAX; i++) {
         msm_hdmi_mode_timing_info *cur = &supported_video_modes_[i];
-        if (cur->video_format == hdmi_modes_[mode]) {
+        if (cur->video_format == hdmi_modes_[index]) {
           timing_mode = cur;
           break;
         }
@@ -358,7 +358,7 @@ DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
   return kErrorNone;
 }
 
-DisplayError HWFrameBuffer::SetDisplayAttributes(Handle device, uint32_t mode) {
+DisplayError HWFrameBuffer::SetDisplayAttributes(Handle device, uint32_t index) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
   DisplayError error = kErrorNone;
 
@@ -383,7 +383,7 @@ DisplayError HWFrameBuffer::SetDisplayAttributes(Handle device, uint32_t mode) {
       msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[0];
       for (int i = 0; i < HDMI_VFRMT_MAX; i++) {
         msm_hdmi_mode_timing_info *cur = &supported_video_modes_[i];
-        if (cur->video_format == hdmi_modes_[mode]) {
+        if (cur->video_format == hdmi_modes_[index]) {
           timing_mode = cur;
           break;
         }

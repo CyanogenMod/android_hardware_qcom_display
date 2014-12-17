@@ -35,27 +35,11 @@ HWCDisplayVirtual::HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const
   : HWCDisplay(core_intf, hwc_procs, kVirtual, HWC_DISPLAY_VIRTUAL, false) {
 }
 
-int HWCDisplayVirtual::Init() {
-  return 0;
-}
-
-int HWCDisplayVirtual::Deinit() {
-  return 0;
-}
-
 int HWCDisplayVirtual::Prepare(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
 int HWCDisplayVirtual::Commit(hwc_display_contents_1_t *content_list) {
-  return 0;
-}
-
-int HWCDisplayVirtual::PowerOn() {
-  return 0;
-}
-
-int HWCDisplayVirtual::PowerOff() {
   return 0;
 }
 

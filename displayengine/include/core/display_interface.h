@@ -235,12 +235,20 @@ class DisplayInterface {
 
   /*! @brief Method to get configuration for variable properties of the display device.
 
-    @param[in] mode index of the mode
+    @param[in] index index of the mode
     @param[out] variable_info \link DisplayConfigVariableInfo \endlink
 
     @return \link DisplayError \endlink
   */
-  virtual DisplayError GetConfig(DisplayConfigVariableInfo *variable_info, uint32_t mode) = 0;
+  virtual DisplayError GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info) = 0;
+
+  /*! @brief Method to get index of active configuration of the display device.
+
+    @param[out] index index of the mode corresponding to variable properties.
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError GetActiveConfig(uint32_t *index) = 0;
 
   /*! @brief Method to get VSync event state. Default event state is disabled.
 
@@ -260,13 +268,13 @@ class DisplayInterface {
   */
   virtual DisplayError SetDisplayState(DisplayState state) = 0;
 
-  /*! @brief Method to set configuration for variable properties of the display device.
+  /*! @brief Method to set active configuration for variable properties of the display device.
 
-    @param[in] mode index of the mode corresponding to variable properties.
+    @param[in] index index of the mode corresponding to variable properties.
 
     @return \link DisplayError \endlink
   */
-  virtual DisplayError SetConfig(uint32_t mode) = 0;
+  virtual DisplayError SetActiveConfig(uint32_t index) = 0;
 
   /*! @brief Method to set VSync event state. Default event state is disabled.
 

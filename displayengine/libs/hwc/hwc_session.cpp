@@ -60,18 +60,20 @@ HWCSession::HWCSession(const hw_module_t *module) : core_intf_(NULL), hwc_procs_
             display_primary_(NULL), display_external_(NULL), hotplug_thread_exit_(false),
             hotplug_thread_name_("HWC_HotPlugThread") {
   hwc_composer_device_1_t::common.tag = HARDWARE_DEVICE_TAG;
-  hwc_composer_device_1_t::common.version = HWC_DEVICE_API_VERSION_1_3;
+  hwc_composer_device_1_t::common.version = HWC_DEVICE_API_VERSION_1_4;
   hwc_composer_device_1_t::common.module = const_cast<hw_module_t*>(module);
   hwc_composer_device_1_t::common.close = Close;
   hwc_composer_device_1_t::prepare = Prepare;
   hwc_composer_device_1_t::set = Set;
   hwc_composer_device_1_t::eventControl = EventControl;
-  hwc_composer_device_1_t::blank = Blank;
+  hwc_composer_device_1_t::setPowerMode = SetPowerMode;
   hwc_composer_device_1_t::query = Query;
   hwc_composer_device_1_t::registerProcs = RegisterProcs;
   hwc_composer_device_1_t::dump = Dump;
   hwc_composer_device_1_t::getDisplayConfigs = GetDisplayConfigs;
   hwc_composer_device_1_t::getDisplayAttributes = GetDisplayAttributes;
+  hwc_composer_device_1_t::getActiveConfig = GetActiveConfig;
+  hwc_composer_device_1_t::setActiveConfig = SetActiveConfig;
 }
 
 int HWCSession::Init() {
@@ -110,7 +112,7 @@ int HWCSession::Init() {
     return status;
   }
 
-  status = display_primary_->PowerOn();
+  status = display_primary_->SetPowerMode(HWC_POWER_MODE_NORMAL);
   if (status) {
     display_primary_->Deinit();
     delete display_primary_;
@@ -130,7 +132,7 @@ int HWCSession::Init() {
 }
 
 int HWCSession::Deinit() {
-  display_primary_->PowerOff();
+  display_primary_->SetPowerMode(HWC_POWER_MODE_OFF);
   display_primary_->Deinit();
   delete display_primary_;
   hotplug_thread_exit_ = true;
@@ -275,7 +277,7 @@ int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event,
   return status;
 }
 
-int HWCSession::Blank(hwc_composer_device_1 *device, int disp, int blank) {
+int HWCSession::SetPowerMode(hwc_composer_device_1 *device, int disp, int mode) {
   SCOPE_LOCK(locker_);
 
   if (!device) {
@@ -287,11 +289,11 @@ int HWCSession::Blank(hwc_composer_device_1 *device, int disp, int blank) {
 
   switch (disp) {
   case HWC_DISPLAY_PRIMARY:
-    status = hwc_session->display_primary_->Blank(blank);
+    status = hwc_session->display_primary_->SetPowerMode(mode);
     break;
   case HWC_DISPLAY_EXTERNAL:
     if (hwc_session->display_external_) {
-      status = hwc_session->display_external_->Blank(blank);
+      status = hwc_session->display_external_->SetPowerMode(mode);
     }
     break;
   default:
@@ -369,6 +371,55 @@ int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, ui
   case HWC_DISPLAY_EXTERNAL:
     if (hwc_session->display_external_) {
       status = hwc_session->display_external_->GetDisplayAttributes(config, attributes, values);
+    }
+    break;
+  default:
+    status = -EINVAL;
+  }
+
+  return status;
+}
+
+int HWCSession::GetActiveConfig(hwc_composer_device_1 *device, int disp) {
+  if (!device) {
+    return -1;
+  }
+
+  HWCSession *hwc_session = static_cast<HWCSession *>(device);
+  int active_config = -1;
+
+  switch (disp) {
+  case HWC_DISPLAY_PRIMARY:
+    active_config = hwc_session->display_primary_->GetActiveConfig();
+    break;
+  case HWC_DISPLAY_EXTERNAL:
+    if (hwc_session->display_external_) {
+      active_config = hwc_session->display_external_->GetActiveConfig();
+    }
+    break;
+  default:
+    active_config = -1;
+  }
+
+  return active_config;
+}
+
+int HWCSession::SetActiveConfig(hwc_composer_device_1 *device, int disp, int index) {
+  if (!device) {
+    return -EINVAL;
+  }
+
+  HWCSession *hwc_session = static_cast<HWCSession *>(device);
+  int status = -EINVAL;
+
+  switch (disp) {
+  case HWC_DISPLAY_PRIMARY:
+    status = hwc_session->display_primary_->SetActiveConfig(index);
+    break;
+  case HWC_DISPLAY_EXTERNAL:
+    if (hwc_session->display_external_) {
+      // TODO(user): Uncomment it. HDMI does not support resolution change currently.
+      status = 0;  // hwc_session->display_external_->SetActiveConfig(index);
     }
     break;
   default:
@@ -505,7 +556,7 @@ int HWCSession::HotPlugHandler(bool connected) {
      DLOGE("HDMI not connected");
      return -1;
     }
-    display_external_->PowerOff();
+    display_external_->SetPowerMode(HWC_POWER_MODE_OFF);
     display_external_->Deinit();
     delete display_external_;
     display_external_ = NULL;

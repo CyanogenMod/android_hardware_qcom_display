@@ -64,14 +64,6 @@ int HWCDisplayExternal::Commit(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-int HWCDisplayExternal::PowerOn() {
-  return 0;
-}
-
-int HWCDisplayExternal::PowerOff() {
-  return 0;
-}
-
 int HWCDisplayExternal::GetDisplayConfigs(uint32_t *configs, size_t *num_configs) {
   uint32_t config_count = 0;
   if (*num_configs <= 0) {
