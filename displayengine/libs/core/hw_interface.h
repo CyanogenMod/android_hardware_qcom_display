@@ -92,6 +92,20 @@ struct HWResourceInfo {
       has_non_scalar_rgb(false), is_src_split(false), always_src_split(false) { }
 };
 
+struct HWRotateInfo {
+  uint32_t pipe_id;
+  LayerRect src_roi;
+  LayerRect dst_roi;
+  HWBlockType writeback_id;
+  float downscale_ratio_x;
+  float downscale_ratio_y;
+
+  HWRotateInfo() : pipe_id(0), writeback_id(kHWWriteback0), downscale_ratio_x(1.0f),
+      downscale_ratio_y(1.0f) { }
+
+  inline void Reset() { *this = HWRotateInfo(); }
+};
+
 struct HWPipeInfo {
   uint32_t pipe_id;
   LayerRect src_roi;
@@ -108,6 +122,8 @@ struct HWLayerConfig {
   bool is_right_pipe;  // indicate if right pipe is valid
   HWPipeInfo left_pipe;  // pipe for left side of the buffer
   HWPipeInfo right_pipe;  // pipe for right side of the buffer
+  HWRotateInfo left_rotate;  // rotation for left side of the buffer
+  HWRotateInfo right_rotate;  // rotation for right side of the buffer
 
   HWLayerConfig() : use_non_dma_pipe(false), is_right_pipe(false) { }
 };

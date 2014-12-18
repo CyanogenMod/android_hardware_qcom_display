@@ -32,16 +32,37 @@
 
 namespace sde {
 
+void ResManager::RotationConfig(const LayerTransform &transform, LayerRect *src_rect,
+                              HWRotateInfo *left_rotate, HWRotateInfo *right_rotate,
+                              uint32_t *rotate_count) {
+  float src_width = src_rect->right - src_rect->left;
+  float src_height = src_rect->bottom - src_rect->top;
+  LayerRect dst_rect;
+  // Rotate output is a temp buffer, always output to the top left corner for saving memory
+  dst_rect.top = 0.0f;
+  dst_rect.left = 0.0f;
+  // downscale when doing rotation
+  dst_rect.right = src_height / left_rotate->downscale_ratio_x;
+  dst_rect.bottom = src_width / left_rotate->downscale_ratio_y;
+
+  left_rotate->src_roi = *src_rect;
+  left_rotate->pipe_id = kPipeIdNeedsAssignment;
+  left_rotate->dst_roi = dst_rect;
+  // Always use one rotator for now
+  right_rotate->Reset();
+
+  *src_rect = dst_rect;
+  (*rotate_count)++;
+}
+
 DisplayError ResManager::SrcSplitConfig(DisplayResourceContext *display_resource_ctx,
-                                        const Layer &layer, const LayerRect &src_rect,
+                                        const LayerTransform &transform, const LayerRect &src_rect,
                                         const LayerRect &dst_rect, HWLayerConfig *layer_config) {
   HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
   HWPipeInfo *left_pipe = &layer_config->left_pipe;
   HWPipeInfo *right_pipe = &layer_config->right_pipe;
   layer_config->is_right_pipe = false;
 
-  LayerTransform transform = layer.transform;
-  transform.rotation = 0.0f;
   if ((src_rect.right - src_rect.left) >= kMaxSourcePipeWidth ||
       (dst_rect.right - dst_rect.left) >= kMaxInterfaceWidth || hw_res_info_.always_src_split) {
     SplitRect(transform.flip_horizontal, src_rect, dst_rect, &left_pipe->src_roi,
@@ -59,8 +80,8 @@ DisplayError ResManager::SrcSplitConfig(DisplayResourceContext *display_resource
 }
 
 DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_resource_ctx,
-                                            const Layer &layer, const LayerRect &src_rect,
-                                            const LayerRect &dst_rect,
+                                            const LayerTransform &transform,
+                                            const LayerRect &src_rect, const LayerRect &dst_rect,
                                             HWLayerConfig *layer_config) {
   HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
   // for display split case
@@ -75,8 +96,8 @@ DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_reso
   dst_left = dst_rect;
   crop_right = crop_left;
   dst_right = dst_left;
-  LayerTransform transform = layer.transform;
   CalculateCropRects(scissor, transform, &crop_left, &dst_left);
+
   scissor.left = FLOAT(display_attributes.split_left);
   scissor.top = 0.0f;
   scissor.right = FLOAT(display_attributes.x_pixels);
@@ -159,11 +180,32 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     if (ValidateScaling(layer, src_rect, dst_rect, &rot_scale_x, &rot_scale_y))
       return kErrorNotSupported;
 
+    HWRotateInfo *left_rotate, *right_rotate;
+    // config rotator first
+    left_rotate = &hw_layers->config[i].left_rotate;
+    right_rotate = &hw_layers->config[i].right_rotate;
+
+    LayerTransform transform = layer.transform;
+    if (IsRotationNeeded(transform.rotation) ||
+        UINT32(rot_scale_x) != 1 || UINT32(rot_scale_y) != 1) {
+      left_rotate->downscale_ratio_x = rot_scale_x;
+      right_rotate->downscale_ratio_x = rot_scale_x;
+      left_rotate->downscale_ratio_y = rot_scale_y;
+      right_rotate->downscale_ratio_y = rot_scale_y;
+
+      RotationConfig(layer.transform, &src_rect, left_rotate, right_rotate, rotate_count);
+      // rotator will take care of flipping, reset tranform
+      transform = LayerTransform();
+    } else {
+      left_rotate->Reset();
+      right_rotate->Reset();
+    }
+
     if (hw_res_info_.is_src_split) {
-      error = SrcSplitConfig(display_resource_ctx, layer, src_rect,
+      error = SrcSplitConfig(display_resource_ctx, transform, src_rect,
                              dst_rect, &hw_layers->config[i]);
     } else {
-      error = DisplaySplitConfig(display_resource_ctx, layer, src_rect,
+      error = DisplaySplitConfig(display_resource_ctx, transform, src_rect,
                                  dst_rect, &hw_layers->config[i]);
     }
 
@@ -190,7 +232,7 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
 DisplayError ResManager::ValidateScaling(const Layer &layer, const LayerRect &crop,
                                          const LayerRect &dst, float *rot_scale_x,
                                          float *rot_scale_y) {
-  bool rotated90 = (UINT32(layer.transform.rotation) == 90);
+  bool rotated90 = IsRotationNeeded(layer.transform.rotation);
   float crop_width = rotated90 ? crop.bottom - crop.top : crop.right - crop.left;
   float crop_height = rotated90 ? crop.right - crop.left : crop.bottom - crop.top;
   float dst_width = dst.right - dst.left;
@@ -212,11 +254,22 @@ DisplayError ResManager::ValidateScaling(const Layer &layer, const LayerRect &cr
 
   if ((UINT32(scale_x) > 1) || (UINT32(scale_y) > 1)) {
     const uint32_t max_scale_down = hw_res_info_.max_scale_down;
+    uint32_t max_downscale_with_rotator;
+
+    if (hw_res_info_.has_rotator_downscale)
+      max_downscale_with_rotator = max_scale_down * kMaxRotateDownScaleRatio;
+    else
+      max_downscale_with_rotator = max_scale_down;
+
     if (((!hw_res_info_.has_decimation) || (IsMacroTileFormat(layer.input_buffer))) &&
         (scale_x > max_scale_down || scale_y > max_scale_down)) {
       DLOGV_IF(kTagResources,
                "Scaling down is over the limit is_tile = %d, scale_x = %d, scale_y = %d",
                IsMacroTileFormat(layer.input_buffer), scale_x, scale_y);
+      return kErrorNotSupported;
+    } else if (scale_x > max_downscale_with_rotator || scale_y > max_downscale_with_rotator) {
+      DLOGV_IF(kTagResources, "Scaling down is over the limit scale_x = %d, scale_y = %d",
+               scale_x, scale_y);
       return kErrorNotSupported;
     }
   }
@@ -266,7 +319,7 @@ void ResManager::CalculateCut(const LayerTransform &transform, float *left_cut_r
     Swap(*top_cut_ratio, *bottom_cut_ratio);
   }
 
-  if (UINT32(transform.rotation) == 90) {
+  if (IsRotationNeeded(transform.rotation)) {
     // Anti clock swapping
     float tmp_cut_ratio = *left_cut_ratio;
     *left_cut_ratio = *top_cut_ratio;

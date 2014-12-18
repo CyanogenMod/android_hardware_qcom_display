@@ -146,12 +146,12 @@ class ResManager : public DumpImpl {
   DisplayError Config(DisplayResourceContext *display_resource_ctx, HWLayers *hw_layers,
                       uint32_t *rotate_count);
   DisplayError DisplaySplitConfig(DisplayResourceContext *display_resource_ctx,
-                                  const Layer &layer, const LayerRect &src_rect,
+                                  const LayerTransform &transform, const LayerRect &src_rect,
                                   const LayerRect &dst_rect, HWLayerConfig *layer_config);
   DisplayError ValidateScaling(const Layer &layer, const LayerRect &crop,
                                const LayerRect &dst, float *rot_scale_x, float *rot_scale_y);
   DisplayError SrcSplitConfig(DisplayResourceContext *display_resource_ctx,
-                              const Layer &layer, const LayerRect &src_rect,
+                              const LayerTransform &transform, const LayerRect &src_rect,
                               const LayerRect &dst_rect, HWLayerConfig *layer_config);
   void CalculateCut(const LayerTransform &transform, float *left_cut_ratio, float *top_cut_ratio,
                     float *right_cut_ratio, float *bottom_cut_ratio);
@@ -169,7 +169,18 @@ class ResManager : public DumpImpl {
                  LayerRect *dst_right);
   bool IsMacroTileFormat(const LayerBuffer *buffer) { return buffer->flags.macro_tile; }
   bool IsYuvFormat(LayerBufferFormat format) { return (format >= kFormatYCbCr420Planar); }
+  bool IsRotationNeeded(float rotation)
+         { return (UINT32(rotation) == 90 || UINT32(rotation) == 270); }
   void LogRectVerbose(const char *prefix, const LayerRect &roi);
+  DisplayError MarkDedicated(DisplayResourceContext *display_resource_ctx,
+                             struct HWRotator *rotator);
+  void ClearDedicated(HWBlockType hw_block_id);
+  void RotationConfig(const LayerTransform &transform, LayerRect *src_rect,
+                      HWRotateInfo *left_rotate, HWRotateInfo *right_rotate, uint32_t *rotate_cnt);
+  DisplayError AcquireRotator(DisplayResourceContext *display_resource_ctx,
+                              const uint32_t roate_cnt);
+  void AssignRotator(HWRotateInfo *rotate, uint32_t *rotate_cnt);
+  void ClearRotator(DisplayResourceContext *display_resource_ctx);
 
   template <class T>
   inline void Swap(T &a, T &b) {
@@ -191,6 +202,7 @@ class ResManager : public DumpImpl {
   float clk_claimed_;  // Clock claimed by other display
   float last_primary_bw_;
   uint32_t virtual_count_;
+  struct HWRotator rotators_[kMaxNumRotator];
 };
 
 }  // namespace sde
