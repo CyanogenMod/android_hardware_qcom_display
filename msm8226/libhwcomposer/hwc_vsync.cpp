@@ -63,7 +63,7 @@ static void handle_vsync_event(hwc_context_t* ctx, int dpy, char *data)
         timestamp = strtoull(data + strlen("VSYNC="), NULL, 0);
     }
     // send timestamp to SurfaceFlinger
-    ALOGD_IF (logvsync, "%s: timestamp %"PRIu64" sent to SF for dpy=%d",
+    ALOGD_IF (logvsync, "%s: timestamp %" PRIu64 " sent to SF for dpy=%d",
             __FUNCTION__, timestamp, dpy);
     ctx->proc->vsync(ctx->proc, dpy, timestamp);
 }
