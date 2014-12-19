@@ -565,6 +565,9 @@ struct hwc_context_t {
     // PTOR Info
     qhwc::PtorInfo mPtorInfo;
     uint32_t mIsPTOREnabled;
+
+   // Stores the hpd enabled status- avoids re-enabling HDP on suspend resume.
+    bool mHPDEnabled;
 };
 
 namespace qhwc {
