@@ -141,14 +141,6 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
             flags |= private_handle_t::PRIV_FLAGS_HW_TEXTURE;
         }
 
-        if (usage & GRALLOC_USAGE_HW_RENDER) {
-            flags |= private_handle_t::PRIV_FLAGS_HW_RENDER;
-        }
-
-        if (usage & GRALLOC_USAGE_HW_FB) {
-            flags |= private_handle_t::PRIV_FLAGS_HW_FB;
-        }
-
         if(usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY) {
             flags |= private_handle_t::PRIV_FLAGS_SECURE_DISPLAY;
         }
@@ -159,6 +151,17 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
 
         if(usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK)) {
             flags |= private_handle_t::PRIV_FLAGS_CPU_RENDERED;
+        }
+
+        if (usage & (GRALLOC_USAGE_HW_VIDEO_ENCODER |
+                GRALLOC_USAGE_HW_CAMERA_WRITE |
+                GRALLOC_USAGE_HW_RENDER |
+                GRALLOC_USAGE_HW_FB)) {
+            flags |= private_handle_t::PRIV_FLAGS_NON_CPU_WRITER;
+        }
+
+        if(false == data.uncached) {
+            flags |= private_handle_t::PRIV_FLAGS_CACHED;
         }
 
         flags |= data.allocType;
