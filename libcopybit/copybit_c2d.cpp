@@ -350,12 +350,7 @@ static size_t c2d_get_gpuaddr(copybit_context_t* ctx,
     if(!handle)
         return 0;
 
-    if (handle->flags & (private_handle_t::PRIV_FLAGS_USES_PMEM |
-                         private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP))
-        memtype = KGSL_USER_MEM_TYPE_PMEM;
-    else if (handle->flags & private_handle_t::PRIV_FLAGS_USES_ASHMEM)
-        memtype = KGSL_USER_MEM_TYPE_ASHMEM;
-    else if (handle->flags & private_handle_t::PRIV_FLAGS_USES_ION)
+    if (handle->flags & private_handle_t::PRIV_FLAGS_USES_ION)
         memtype = KGSL_USER_MEM_TYPE_ION;
     else {
         ALOGE("Invalid handle flags: 0x%x", handle->flags);
@@ -1005,7 +1000,7 @@ static int get_temp_buffer(const bufferInfo& info, alloc_data& data)
     data.size = get_size(info);
     data.align = getpagesize();
     data.uncached = true;
-    int allocFlags = GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP;
+    int allocFlags = 0;
 
     if (sAlloc == 0) {
         sAlloc = gralloc::IAllocController::getInstance();

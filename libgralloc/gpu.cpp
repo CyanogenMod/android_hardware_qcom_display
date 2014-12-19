@@ -65,13 +65,11 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
         data.align = getpagesize();
 
     /* force 1MB alignment selectively for secure buffers, MDP5 onwards */
-#ifdef MDSS_TARGET
     if ((usage & GRALLOC_USAGE_PROTECTED) &&
         (usage & GRALLOC_USAGE_PRIVATE_MM_HEAP)) {
         data.align = ALIGN((int) data.align, SZ_1M);
         size = ALIGN(size, data.align);
     }
-#endif
 
     data.size = size;
     data.pHandle = (uintptr_t) pHandle;
@@ -86,7 +84,7 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
         eData.size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
         eData.pHandle = data.pHandle;
         eData.align = getpagesize();
-        int eDataUsage = GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP;
+        int eDataUsage = 0;
         int eDataErr = mAllocCtrl->allocate(eData, eDataUsage);
         ALOGE_IF(eDataErr, "gralloc failed for eDataErr=%s",
                                           strerror(-eDataErr));
@@ -99,10 +97,6 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
         flags |= private_handle_t::PRIV_FLAGS_ITU_R_601;
         if (bufferType == BUFFER_TYPE_VIDEO) {
             if (usage & GRALLOC_USAGE_HW_CAMERA_WRITE) {
-#ifndef MDSS_TARGET
-                colorSpace = ITU_R_601_FR;
-                flags |= private_handle_t::PRIV_FLAGS_ITU_R_601_FR;
-#else
                 // Per the camera spec ITU 709 format should be set only for
                 // video encoding.
                 // It should be set to ITU 601 full range format for any other
@@ -117,7 +111,6 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
                         colorSpace = ITU_R_601_FR;
                     }
                 }
-#endif
             }
         }
 
@@ -207,10 +200,7 @@ int gpu_context_t::gralloc_alloc_framebuffer_locked(int usage,
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(common.module);
 
-    // we don't support framebuffer allocations with graphics heap flags
-    if (usage & GRALLOC_HEAP_MASK) {
-        return -EINVAL;
-    }
+    // This allocation will only happen when gralloc is in fb mode
 
     if (m->framebuffer == NULL) {
         ALOGE("%s: Invalid framebuffer", __FUNCTION__);

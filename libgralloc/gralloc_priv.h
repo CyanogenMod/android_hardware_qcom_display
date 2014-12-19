@@ -34,9 +34,11 @@
                                (~(PAGE_SIZE-1)) )
 
 /* Gralloc usage bits indicating the type of allocation that should be used */
-/* SYSTEM heap comes from kernel vmalloc, can never be uncached,
+/* SYSTEM heap comes from kernel vmalloc (ION_SYSTEM_HEAP_ID)
+ * is cached by default and
  * is not secured */
-#define GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP     GRALLOC_USAGE_PRIVATE_0
+
+/* GRALLOC_USAGE_PRIVATE_0 is unused */
 
 /* Non linear, Universal Bandwidth Compression */
 #define GRALLOC_USAGE_PRIVATE_ALLOC_UBWC      GRALLOC_USAGE_PRIVATE_1
@@ -83,14 +85,6 @@
 #define GRALLOC_MODULE_PERFORM_GET_YUV_PLANE_INFO 7
 #define GRALLOC_MODULE_PERFORM_GET_MAP_SECURE_BUFFER_INFO 8
 #define GRALLOC_MODULE_PERFORM_GET_UBWC_FLAG 9
-
-#define GRALLOC_HEAP_MASK   (GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP    |\
-                             GRALLOC_USAGE_PRIVATE_IOMMU_HEAP     |\
-                             GRALLOC_USAGE_PRIVATE_MM_HEAP        |\
-                             GRALLOC_USAGE_PRIVATE_ADSP_HEAP)
-
-#define INTERLACE_MASK 0x80
-/*****************************************************************************/
 
 /* OEM specific HAL formats */
 
@@ -165,8 +159,6 @@ enum {
     BUFFER_TYPE_VIDEO
 };
 
-/*****************************************************************************/
-
 #ifdef __cplusplus
 struct private_handle_t : public native_handle {
 #else
@@ -175,8 +167,6 @@ struct private_handle_t : public native_handle {
 #endif
         enum {
             PRIV_FLAGS_FRAMEBUFFER        = 0x00000001,
-            PRIV_FLAGS_USES_PMEM          = 0x00000002,
-            PRIV_FLAGS_USES_PMEM_ADSP     = 0x00000004,
             PRIV_FLAGS_USES_ION           = 0x00000008,
             PRIV_FLAGS_USES_ASHMEM        = 0x00000010,
             PRIV_FLAGS_NEEDS_FLUSH        = 0x00000020,
@@ -184,10 +174,6 @@ struct private_handle_t : public native_handle {
             PRIV_FLAGS_NONCONTIGUOUS_MEM  = 0x00000100,
             PRIV_FLAGS_CACHED             = 0x00000200,
             PRIV_FLAGS_SECURE_BUFFER      = 0x00000400,
-            // For explicit synchronization
-            PRIV_FLAGS_UNSYNCHRONIZED     = 0x00000800,
-            // Not mapped in userspace
-            PRIV_FLAGS_NOT_MAPPED         = 0x00001000,
             // Display on external only
             PRIV_FLAGS_EXTERNAL_ONLY      = 0x00002000,
             // Set by HWC for protected non secure buffers
@@ -250,10 +236,6 @@ struct private_handle_t : public native_handle {
         }
         ~private_handle_t() {
             magic = 0;
-        }
-
-        bool usesPhysicallyContiguousMemory() {
-            return (flags & PRIV_FLAGS_USES_PMEM) != 0;
         }
 
         static int validate(const native_handle* h) {

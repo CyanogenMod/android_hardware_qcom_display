@@ -27,7 +27,6 @@ endif
 
 ifeq ($(call is-board-platform-in-list, $(MSM_VIDC_TARGET_LIST)), true)
     common_flags += -DVENUS_COLOR_FORMAT
-    common_flags += -DMDSS_TARGET
 endif
 
 common_deps  :=
