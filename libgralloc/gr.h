@@ -71,10 +71,6 @@ int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage);
 void free_buffer(private_handle_t *hnd);
 int getYUVPlaneInfo(private_handle_t* pHnd, struct android_ycbcr* ycbcr);
 
-// Use uncached for all scenarios except when the CPU needs to read or write
-// often
-bool useUncached(const int& usage);
-
 /*****************************************************************************/
 
 class Locker {
