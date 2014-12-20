@@ -70,20 +70,17 @@ enum {
     GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY  =       0x00800000,
 };
 
-enum {
-    /* Gralloc perform enums
-    */
-    GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER = 1,
-    // This will be deprecated from latest graphics drivers. This is kept
-    // for those backward compatibility i.e., newer Display HAL + older graphics
-    // libraries
-    GRALLOC_MODULE_PERFORM_GET_STRIDE,
-    GRALLOC_MODULE_PERFORM_GET_CUSTOM_STRIDE_FROM_HANDLE,
-    GRALLOC_MODULE_PERFORM_GET_CUSTOM_STRIDE_AND_HEIGHT_FROM_HANDLE,
-    GRALLOC_MODULE_PERFORM_GET_ATTRIBUTES,
-    GRALLOC_MODULE_PERFORM_GET_COLOR_SPACE_FROM_HANDLE,
-    GRALLOC_MODULE_PERFORM_GET_YUV_PLANE_INFO,
-};
+/* define Gralloc perform */
+#define GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER 1
+// This will be used by the graphics drivers to know if certain features
+// are defined in this display HAL.
+// Ex: Newer GFX libraries + Older Display HAL
+#define GRALLOC_MODULE_PERFORM_GET_STRIDE 2
+#define GRALLOC_MODULE_PERFORM_GET_CUSTOM_STRIDE_FROM_HANDLE 3
+#define GRALLOC_MODULE_PERFORM_GET_CUSTOM_STRIDE_AND_HEIGHT_FROM_HANDLE 4
+#define GRALLOC_MODULE_PERFORM_GET_ATTRIBUTES 5
+#define GRALLOC_MODULE_PERFORM_GET_COLOR_SPACE_FROM_HANDLE 6
+#define GRALLOC_MODULE_PERFORM_GET_YUV_PLANE_INFO 7
 
 #define GRALLOC_HEAP_MASK   (GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP |\
                              GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP    |\
