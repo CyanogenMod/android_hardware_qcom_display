@@ -483,8 +483,8 @@ bool CopyBit::drawUsingAppBufferComposition(hwc_context_t *ctx,
           }
           // Get Release Fence FD of copybit for the App layer(s)
           copybit->flush_get_fence(copybit, copybitFd);
-          close(list->hwLayers[abcRenderBufIdx].acquireFenceFd);
-          list->hwLayers[abcRenderBufIdx].acquireFenceFd = -1;
+          close(list->hwLayers[last].acquireFenceFd);
+          list->hwLayers[last].acquireFenceFd = -1;
           return true;
        }
     }
