@@ -200,14 +200,26 @@ DisplayError DisplayBase::GetConfig(DisplayConfigFixedInfo *fixed_info) {
   return kErrorNone;
 }
 
-DisplayError DisplayBase::GetConfig(DisplayConfigVariableInfo *variable_info, uint32_t mode) {
+DisplayError DisplayBase::GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info) {
   SCOPE_LOCK(locker_);
 
-  if (!variable_info || mode >= num_modes_) {
+  if (!variable_info || index >= num_modes_) {
     return kErrorParameters;
   }
 
-  *variable_info = display_attributes_[mode];
+  *variable_info = display_attributes_[index];
+
+  return kErrorNone;
+}
+
+DisplayError DisplayBase::GetActiveConfig(uint32_t *index) {
+  SCOPE_LOCK(locker_);
+
+  if (!index) {
+    return kErrorParameters;
+  }
+
+  *index = active_mode_index_;
 
   return kErrorNone;
 }
@@ -265,14 +277,18 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
   return error;
 }
 
-DisplayError DisplayBase::SetConfig(uint32_t mode) {
+DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
   SCOPE_LOCK(locker_);
   DisplayError error = kErrorNone;
 
-  if (mode >= num_modes_) {
-     return kErrorParameters;
+  if (index >= num_modes_) {
+    return kErrorParameters;
   }
-  error = hw_intf_->SetDisplayAttributes(hw_device_, mode);
+
+  error = hw_intf_->SetDisplayAttributes(hw_device_, index);
+  if (error != kErrorNone) {
+    active_mode_index_ = index;
+  }
 
   return error;
 }

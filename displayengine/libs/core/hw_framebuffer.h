@@ -47,8 +47,8 @@ class HWFrameBuffer : public HWInterface {
   virtual DisplayError Close(Handle device);
   virtual DisplayError GetNumDisplayAttributes(Handle device, uint32_t *count);
   virtual DisplayError GetDisplayAttributes(Handle device, HWDisplayAttributes *display_attributes,
-                                            uint32_t mode);
-  virtual DisplayError SetDisplayAttributes(Handle device, uint32_t mode);
+                                            uint32_t index);
+  virtual DisplayError SetDisplayAttributes(Handle device, uint32_t index);
   virtual DisplayError PowerOn(Handle device);
   virtual DisplayError PowerOff(Handle device);
   virtual DisplayError Doze(Handle device);

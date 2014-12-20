@@ -64,13 +64,5 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-int HWCDisplayPrimary::PowerOn() {
-  return SetState(kStateOn);
-}
-
-int HWCDisplayPrimary::PowerOff() {
-  return SetState(kStateOff);
-}
-
 }  // namespace sde
 

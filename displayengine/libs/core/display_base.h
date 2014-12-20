@@ -46,10 +46,11 @@ class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
   virtual DisplayError GetDisplayState(DisplayState *state);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
   virtual DisplayError GetConfig(DisplayConfigFixedInfo *fixed_info);
-  virtual DisplayError GetConfig(DisplayConfigVariableInfo *variable_info, uint32_t mode);
+  virtual DisplayError GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info);
+  virtual DisplayError GetActiveConfig(uint32_t *index);
   virtual DisplayError GetVSyncState(bool *enabled);
   virtual DisplayError SetDisplayState(DisplayState state);
-  virtual DisplayError SetConfig(uint32_t mode);
+  virtual DisplayError SetActiveConfig(uint32_t index);
   virtual DisplayError SetVSyncState(bool enable);
 
   // Implement the HWEventHandlers

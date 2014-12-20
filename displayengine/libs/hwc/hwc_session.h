@@ -56,7 +56,7 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   static int Set(hwc_composer_device_1 *device, size_t num_displays,
                  hwc_display_contents_1_t **displays);
   static int EventControl(hwc_composer_device_1 *device, int disp, int event, int enable);
-  static int Blank(hwc_composer_device_1 *device, int disp, int blank);
+  static int SetPowerMode(hwc_composer_device_1 *device, int disp, int mode);
   static int Query(hwc_composer_device_1 *device, int param, int *value);
   static void RegisterProcs(hwc_composer_device_1 *device, hwc_procs_t const *procs);
   static void Dump(hwc_composer_device_1 *device, char *buffer, int length);
@@ -64,6 +64,8 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
                                size_t *numConfigs);
   static int GetDisplayAttributes(hwc_composer_device_1 *device, int disp, uint32_t config,
                                   const uint32_t *attributes, int32_t *values);
+  static int GetActiveConfig(hwc_composer_device_1 *device, int disp);
+  static int SetActiveConfig(hwc_composer_device_1 *device, int disp, int index);
 
   // Hotplug thread for HDMI connect/disconnect
   static void* HWCHotPlugThread(void *context);
