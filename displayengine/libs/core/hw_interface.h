@@ -92,8 +92,9 @@ struct HWPipeInfo {
   uint32_t pipe_id;
   LayerRect src_roi;
   LayerRect dst_roi;
+  uint8_t decimation;
 
-  HWPipeInfo() : pipe_id(0) { }
+  HWPipeInfo() : pipe_id(0), decimation(1) { }
 };
 
 struct HWLayerConfig {

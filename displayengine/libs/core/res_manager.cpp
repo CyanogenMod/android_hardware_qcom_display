@@ -231,6 +231,7 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     }
 
     src_pipes_[left_index].reserved = true;
+    SetDecimationFactor(pipe_info);
 
     pipe_info =  &hw_layers->config[i].right_pipe;
     if (pipe_info->pipe_id == 0) {
@@ -262,6 +263,12 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     src_pipes_[left_index].reserved = true;
     src_pipes_[left_index].at_right = false;
     hw_layers->config[i].left_pipe.pipe_id = src_pipes_[left_index].mdss_pipe_id;
+    SetDecimationFactor(pipe_info);
+  }
+
+  if (!CheckBandwidth(display_resource_ctx, hw_layers)) {
+    DLOGV_IF(kTagResources, "Bandwidth check failed!");
+    goto Acquire_failed;
   }
 
   return kErrorNone;
@@ -270,6 +277,216 @@ Acquire_failed:
   for (uint32_t i = 0; i < num_pipe_; i++)
     src_pipes_[i].reserved = false;
   return kErrorResources;
+}
+
+bool ResManager::CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *hw_layers) {
+  float max_pipe_bw = 1.8f;  // From MDP to hw_res_info_ (in GBps)
+  float max_sde_clk = 400.0f;  // From MDP to hw_res_info_ (in MHz)
+  float clk_fudge_factor = 1.0f;  // From MDP to hw_res_info_
+  const struct HWLayersInfo &layer_info = hw_layers->info;
+
+  float left_pipe_bw[layer_info.count];
+  float right_pipe_bw[layer_info.count];
+  float left_max_clk = 0;
+  float right_max_clk = 0;
+
+  for (uint32_t i = 0; i < layer_info.count; i++) {
+    Layer &layer = layer_info.stack->layers[layer_info.index[i]];
+    float bpp = GetBpp(layer.input_buffer->format);
+    uint32_t left_id = hw_layers->config[i].left_pipe.pipe_id;
+    uint32_t right_id = hw_layers->config[i].right_pipe.pipe_id;
+
+    left_pipe_bw[i] = left_id ? GetPipeBw(display_ctx, &hw_layers->config[i].left_pipe, bpp) : 0;
+    right_pipe_bw[i] = right_id ? GetPipeBw(display_ctx, &hw_layers->config[i].right_pipe, bpp) : 0;
+
+    if ((left_pipe_bw[i] > max_pipe_bw) || (right_pipe_bw[i] > max_pipe_bw)) {
+      DLOGV_IF(kTagResources, "Pipe bandwidth exceeds limit for layer index = %d", i);
+      return false;
+    }
+
+    float left_clk = left_id ? GetClockForPipe(display_ctx, &hw_layers->config[i].left_pipe) : 0;
+    float right_clk = right_id ? GetClockForPipe(display_ctx, &hw_layers->config[i].right_pipe) : 0;
+
+    left_max_clk = MAX(left_clk, left_max_clk);
+    right_max_clk = MAX(right_clk, right_max_clk);
+  }
+
+  float left_mixer_bw = GetOverlapBw(hw_layers, left_pipe_bw, true);
+  float right_mixer_bw = GetOverlapBw(hw_layers, right_pipe_bw, false);
+  float display_bw = left_mixer_bw + right_mixer_bw;
+
+  // Check system bandwidth (nth External + max(nth, n-1th) Primary)
+  if (display_ctx->hw_block_id == kHWPrimary) {
+    display_bw = MAX(display_bw, last_primary_bw_);
+    last_primary_bw_ = left_mixer_bw + right_mixer_bw;
+  }
+
+  // If system has Video mode panel, use max_bandwidth_low, else use max_bandwidth_high
+  if ((display_bw + bw_claimed_) > hw_res_info_.max_bandwidth_low) {
+    DLOGV_IF(kTagResources, "Overlap bandwidth exceeds limit!");
+    return false;
+  }
+
+  // Max clock requirement of display
+  float display_clk = MAX(left_max_clk, right_max_clk);
+
+  // Check max clock requirement of system
+  float system_clk = MAX(display_clk, clk_claimed_);
+
+  // Apply fudge factor to consider in-efficieny
+  if ((system_clk * clk_fudge_factor) > max_sde_clk) {
+    DLOGV_IF(kTagResources, "Clock requirement exceeds limit!");
+    return false;
+  }
+
+  // If Primary display, reset claimed bw & clk for next cycle
+  if (display_ctx->hw_block_id == kHWPrimary) {
+    bw_claimed_ = 0.0f;
+    clk_claimed_ = 0.0f;
+  } else {
+    bw_claimed_ = display_bw;
+    clk_claimed_ = display_clk;
+  }
+
+  return true;
+}
+
+float ResManager::GetPipeBw(DisplayResourceContext *display_ctx, HWPipeInfo *pipe, float bpp) {
+  HWDisplayAttributes &display_attributes = display_ctx->display_attributes;
+  float v_total = 2600.0f;  // From MDP to display_attributes (vBP + vFP + v_active)
+  float fps = 60.0f;  // display_attributes.fps;
+
+  float src_w = pipe->src_roi.right - pipe->src_roi.left;
+  float src_h = pipe->src_roi.bottom - pipe->src_roi.top;
+  float dst_h = pipe->dst_roi.bottom - pipe->dst_roi.top;
+
+  // Adjust src_h with pipe decimation
+  src_h /= FLOAT(pipe->decimation);
+
+  float bw = src_w * src_h * bpp * fps;
+
+  // Consider panel dimension
+  // (v_total / v_active) * (v_active / dst_h)
+  bw *= (v_total / dst_h);
+
+  // Bandwidth in GBps
+  return (bw / 1000000000.0f);
+}
+
+float ResManager::GetClockForPipe(DisplayResourceContext *display_ctx, HWPipeInfo *pipe) {
+  HWDisplayAttributes &display_attributes = display_ctx->display_attributes;
+  float v_total = 2600.0f;  // (vBP + vFP + v_active)
+  float fps = 60.0f;  // display_attributes.fps;
+
+  float src_h = pipe->src_roi.bottom - pipe->src_roi.top;
+  float dst_h = pipe->dst_roi.bottom - pipe->dst_roi.top;
+  float dst_w = pipe->dst_roi.right - pipe->dst_roi.left;
+
+  // Adjust src_h with pipe decimation
+  src_h /= FLOAT(pipe->decimation);
+
+  // SDE Clock requirement in MHz
+  float clk = (dst_w * v_total * fps) / 1000000.0f;
+
+  // Consider down-scaling
+  if (src_h > dst_h)
+    clk *= (src_h / dst_h);
+
+  return clk;
+}
+
+float ResManager::GetOverlapBw(HWLayers *hw_layers, float *pipe_bw, bool left_mixer) {
+  uint32_t count = hw_layers->info.count;
+  float overlap_bw[count][count];
+  float overall_max = 0;
+
+  memset(overlap_bw, 0, sizeof(overlap_bw));
+
+  // Algorithm:
+  // 1.Create an 'n' by 'n' sized 2D array, overlap_bw[n][n] (n = # of layers).
+  // 2.Get overlap_bw between two layers, i and j, and account for other overlaps (prev_max) if any.
+  //   This will fill the bottom-left half of the array including diagonal (0 <= i < n, 0 <= j <= i)
+  //                      {1. pipe_bw[i],                         where i == j
+  //   overlap_bw[i][j] = {2. 0,                                  where i != j && !Overlap(i, j)
+  //                      {3. pipe_bw[i] + pipe_bw[j] + prev_max, where i != j && Overlap(i, j)
+  //
+  //   Overlap(i, j) = !(bottom_i <= top_j || top_i >= bottom_j)
+  //   prev_max = max(prev_max, overlap_bw[j, k]), where 0 <= k < j and prev_max initially 0
+  //   prev_max = prev_max ? (prev_max - pipe_bw[j]) : 0; (to account for "double counting")
+  // 3.Get the max value in 2D array, overlap_bw[n][n], for the final overall_max bandwidth.
+  //   overall_max = max(overlap_bw[i, j]), where 0 <= i < n, 0 <= j <= i
+
+  for (uint32_t i = 0; i < count; i++) {
+    HWPipeInfo &pipe1 = left_mixer ? hw_layers->config[i].left_pipe :
+                        hw_layers->config[i].right_pipe;
+
+    // Non existing pipe never overlaps
+    if (pipe_bw[i] == 0)
+      continue;
+
+    float top1 = pipe1.dst_roi.top;
+    float bottom1 = pipe1.dst_roi.bottom;
+    float row_max = 0;
+
+    for (uint32_t j = 0; j <= i; j++) {
+      HWPipeInfo &pipe2 = left_mixer ? hw_layers->config[j].left_pipe :
+                          hw_layers->config[j].right_pipe;
+
+      if ((pipe_bw[j] == 0) || (i == j)) {
+        overlap_bw[i][j] = pipe_bw[j];
+        row_max = MAX(pipe_bw[j], row_max);
+        continue;
+      }
+
+      float top2 = pipe2.dst_roi.top;
+      float bottom2 = pipe2.dst_roi.bottom;
+
+      if ((bottom1 <= top2) || (top1 >= bottom2)) {
+        overlap_bw[i][j] = 0;
+        continue;
+      }
+
+      overlap_bw[i][j] = pipe_bw[i] + pipe_bw[j];
+
+      float prev_max = 0;
+      for (uint32_t k = 0; k < j; k++) {
+        if (overlap_bw[j][k])
+          prev_max = MAX(overlap_bw[j][k], prev_max);
+      }
+      overlap_bw[i][j] += (prev_max > 0) ? (prev_max - pipe_bw[j]) : 0;
+      row_max = MAX(overlap_bw[i][j], row_max);
+    }
+
+    overall_max = MAX(row_max, overall_max);
+  }
+
+  return overall_max;
+}
+
+float ResManager::GetBpp(LayerBufferFormat format) {
+  switch (format) {
+    case kFormatARGB8888:
+    case kFormatRGBA8888:
+    case kFormatBGRA8888:
+    case kFormatXRGB8888:
+    case kFormatRGBX8888:
+    case kFormatBGRX8888:
+      return 4.0f;
+    case kFormatRGB888:
+      return 3.0f;
+    case kFormatRGB565:
+    case kFormatYCbCr422Packed:
+      return 2.0f;
+    case kFormatYCbCr420Planar:
+    case kFormatYCrCb420Planar:
+    case kFormatYCbCr420SemiPlanar:
+    case kFormatYCrCb420SemiPlanar:
+    case kFormatYCbCr420SemiPlanarVenus:
+      return 1.5f;
+    default:
+      DLOGE("GetBpp: Invalid buffer format: %x", format);
+      return 0.0f;
+  }
 }
 
 void ResManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {

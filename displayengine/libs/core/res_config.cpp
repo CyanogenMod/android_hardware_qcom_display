@@ -230,5 +230,23 @@ void ResManager::IntegerizeRect(LayerRect *dst_rect, const LayerRect &src_rect) 
   dst_rect->bottom = floorf(src_rect.bottom);
 }
 
+void ResManager::SetDecimationFactor(HWPipeInfo *pipe) {
+  float max_down_scale = FLOAT(hw_res_info_.max_scale_down);
+  float src_h = pipe->src_roi.bottom - pipe->src_roi.top;
+  float dst_h = pipe->dst_roi.bottom - pipe->dst_roi.top;
+  float down_scale = src_h / dst_h;
+  pipe->decimation = 1;
+
+  if (!hw_res_info_.has_decimation || (down_scale <= max_down_scale))
+    return;
+
+  // Decimation is the remaining downscale factor after doing max SDE downscale.
+  // In SDE, decimation is supported in powers of 2.
+  // For ex: If a pipe needs downscale of 8 but max_down_scale is 4
+  // So decimation = powf(2.0, ceilf(log2f(8) - log2f(4))) = powf(2.0, 1.0) = 2
+  float decimation_factor = ceilf(log2f(down_scale) - log2f(max_down_scale));
+  pipe->decimation = UINT8(powf(2.0f, decimation_factor));
+}
+
 }  // namespace sde
 
