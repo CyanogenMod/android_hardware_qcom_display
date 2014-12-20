@@ -103,7 +103,7 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
   DisplayError error = kErrorNone;
 
   DisplayConfigVariableInfo variable_config;
-  error = display_intf_->GetConfig(&variable_config, 0);
+  error = display_intf_->GetConfig(&variable_config, config);
   if (UNLIKELY(error != kErrorNone)) {
     DLOGE("GetConfig variable info failed. Error = %d", error);
     return -EINVAL;
@@ -127,7 +127,7 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
       values[i] = INT32(variable_config.y_dpi * 1000.0f);
       break;
     case HWC_DISPLAY_SECURE:
-      values[i] = INT32(true); // For backward compatibility. All Physical displays are secure
+      values[i] = INT32(true);  // For backward compatibility. All Physical displays are secure
       break;
     default:
       DLOGW("Spurious attribute type = %d", attributes[i]);
@@ -165,6 +165,11 @@ DisplayError HWCDisplay::Refresh() {
 }
 
 int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
+  if (!content_list || !content_list->numHwLayers) {
+    DLOGW("Invalid content list");
+    return -EINVAL;
+  }
+
   size_t num_hw_layers = content_list->numHwLayers;
 
   // Allocate memory for a) total number of layers b) buffer handle for each layer c) number of
@@ -233,6 +238,11 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
 }
 
 int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
+  if (!content_list || !content_list->numHwLayers) {
+    DLOGW("Invalid content list");
+    return -EINVAL;
+  }
+
   size_t num_hw_layers = content_list->numHwLayers;
   if (num_hw_layers <= 1) {
     return 0;
@@ -317,6 +327,11 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 }
 
 int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
+  if (!content_list || !content_list->numHwLayers) {
+    DLOGW("Invalid content list");
+    return -EINVAL;
+  }
+
   size_t num_hw_layers = content_list->numHwLayers;
   if (num_hw_layers <= 1) {
     if (!num_hw_layers) {

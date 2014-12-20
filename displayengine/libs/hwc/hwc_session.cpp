@@ -25,6 +25,9 @@
 #include <core/dump_interface.h>
 #include <utils/constants.h>
 #include <utils/String16.h>
+#include <hardware_legacy/uevent.h>
+#include <sys/resource.h>
+#include <sys/prctl.h>
 #include <binder/Parcel.h>
 #include <QService.h>
 
@@ -53,7 +56,9 @@ namespace sde {
 
 Locker HWCSession::locker_;
 
-HWCSession::HWCSession(const hw_module_t *module) : core_intf_(NULL), hwc_procs_(NULL) {
+HWCSession::HWCSession(const hw_module_t *module) : core_intf_(NULL), hwc_procs_(NULL),
+            display_primary_(NULL), display_external_(NULL), hotplug_thread_exit_(false),
+            hotplug_thread_name_("HWC_HotPlugThread") {
   hwc_composer_device_1_t::common.tag = HARDWARE_DEVICE_TAG;
   hwc_composer_device_1_t::common.version = HWC_DEVICE_API_VERSION_1_3;
   hwc_composer_device_1_t::common.module = const_cast<hw_module_t*>(module);
@@ -86,31 +91,39 @@ int HWCSession::Init() {
   }
 
   DisplayError error = CoreInterface::CreateCore(this, HWCLogHandler::Get(), &core_intf_);
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     DLOGE("Display core initialization failed. Error = %d", error);
     return -EINVAL;
   }
 
   // Create and power on primary display
   display_primary_ = new HWCDisplayPrimary(core_intf_, &hwc_procs_);
-  if (UNLIKELY(!display_primary_)) {
+  if (!display_primary_) {
     CoreInterface::DestroyCore();
     return -ENOMEM;
   }
 
   status = display_primary_->Init();
-  if (UNLIKELY(status)) {
+  if (status) {
     CoreInterface::DestroyCore();
     delete display_primary_;
     return status;
   }
 
   status = display_primary_->PowerOn();
-  if (UNLIKELY(status)) {
-    CoreInterface::DestroyCore();
+  if (status) {
     display_primary_->Deinit();
     delete display_primary_;
+    CoreInterface::DestroyCore();
     return status;
+  }
+
+  if (pthread_create(&hotplug_thread_, NULL, &HWCHotPlugThread, this) < 0) {
+    DLOGE("Failed to start = %s, error = %s HDMI display Not supported", hotplug_thread_name_);
+    display_primary_->Deinit();
+    delete display_primary_;
+    CoreInterface::DestroyCore();
+    return -errno;
   }
 
   return 0;
@@ -120,6 +133,8 @@ int HWCSession::Deinit() {
   display_primary_->PowerOff();
   display_primary_->Deinit();
   delete display_primary_;
+  hotplug_thread_exit_ = true;
+  pthread_join(hotplug_thread_, NULL);
 
   DisplayError error = CoreInterface::DestroyCore();
   if (error != kErrorNone) {
@@ -130,19 +145,19 @@ int HWCSession::Deinit() {
 }
 
 int HWCSession::Open(const hw_module_t *module, const char *name, hw_device_t **device) {
-  if (UNLIKELY(!module || !name || !device)) {
+  if (!module || !name || !device) {
     DLOGE("Invalid parameters.");
     return -EINVAL;
   }
 
-  if (LIKELY(!strcmp(name, HWC_HARDWARE_COMPOSER))) {
+  if (!strcmp(name, HWC_HARDWARE_COMPOSER)) {
     HWCSession *hwc_session = new HWCSession(module);
-    if (UNLIKELY(!hwc_session)) {
+    if (!hwc_session) {
       return -ENOMEM;
     }
 
     int status = hwc_session->Init();
-    if (UNLIKELY(status != 0)) {
+    if (status != 0) {
       delete hwc_session;
       return status;
     }
@@ -155,7 +170,7 @@ int HWCSession::Open(const hw_module_t *module, const char *name, hw_device_t **
 }
 
 int HWCSession::Close(hw_device_t *device) {
-  if (UNLIKELY(!device)) {
+  if (!device) {
     return -EINVAL;
   }
 
@@ -172,74 +187,72 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
                         hwc_display_contents_1_t **displays) {
   SCOPE_LOCK(locker_);
 
-  if (UNLIKELY(!device || !displays)) {
+  if (!device || !displays) {
     return -EINVAL;
   }
 
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
-  int status = -EINVAL;
 
-  for (size_t i = 0; i < num_displays; i++) {
+  for (ssize_t i = (num_displays-1); i >= 0; i--) {
     hwc_display_contents_1_t *content_list = displays[i];
-    if (UNLIKELY(!content_list || !content_list->numHwLayers)) {
-      DLOGW("Invalid content list.");
-      return -EINVAL;
-    }
 
     switch (i) {
     case HWC_DISPLAY_PRIMARY:
-      status = hwc_session->display_primary_->Prepare(content_list);
+      hwc_session->display_primary_->Prepare(content_list);
+      break;
+    case HWC_DISPLAY_EXTERNAL:
+      if (hwc_session->display_external_) {
+        hwc_session->display_external_->Prepare(content_list);
+      }
+      break;
+    case HWC_DISPLAY_VIRTUAL:
       break;
     default:
-      status = -EINVAL;
-    }
-
-    if (UNLIKELY(!status)) {
       break;
     }
   }
 
-  return status;
+  // Return 0, else client will go into bad state
+  return 0;
 }
 
 int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
                     hwc_display_contents_1_t **displays) {
   SCOPE_LOCK(locker_);
 
-  if (UNLIKELY(!device || !displays)) {
+  if (!device || !displays) {
     return -EINVAL;
   }
 
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
-  int status = -EINVAL;
 
   for (size_t i = 0; i < num_displays; i++) {
     hwc_display_contents_1_t *content_list = displays[i];
-    if (UNLIKELY(!content_list || !content_list->numHwLayers)) {
-      DLOGW("Invalid content list.");
-      return -EINVAL;
-    }
 
     switch (i) {
     case HWC_DISPLAY_PRIMARY:
-      status = hwc_session->display_primary_->Commit(content_list);
+      hwc_session->display_primary_->Commit(content_list);
+      break;
+    case HWC_DISPLAY_EXTERNAL:
+      if (hwc_session->display_external_) {
+        hwc_session->display_external_->Commit(content_list);
+      }
+      break;
+    case HWC_DISPLAY_VIRTUAL:
       break;
     default:
-      status = -EINVAL;
-    }
-
-    if (UNLIKELY(!status)) {
       break;
     }
   }
 
-  return status;
+  // Return 0, else client will go into bad state
+  return 0;
 }
 
 int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event, int enable) {
   SCOPE_LOCK(locker_);
 
-  if (UNLIKELY(!device)) {
+  if (!device) {
     return -EINVAL;
   }
 
@@ -250,17 +263,22 @@ int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event,
   case HWC_DISPLAY_PRIMARY:
     status = hwc_session->display_primary_->EventControl(event, enable);
     break;
+  case HWC_DISPLAY_EXTERNAL:
+    if (hwc_session->display_external_) {
+      status = hwc_session->display_external_->EventControl(event, enable);
+    }
+    break;
   default:
     status = -EINVAL;
   }
 
-  return 0;
+  return status;
 }
 
 int HWCSession::Blank(hwc_composer_device_1 *device, int disp, int blank) {
   SCOPE_LOCK(locker_);
 
-  if (UNLIKELY(!device)) {
+  if (!device) {
     return -EINVAL;
   }
 
@@ -271,6 +289,11 @@ int HWCSession::Blank(hwc_composer_device_1 *device, int disp, int blank) {
   case HWC_DISPLAY_PRIMARY:
     status = hwc_session->display_primary_->Blank(blank);
     break;
+  case HWC_DISPLAY_EXTERNAL:
+    if (hwc_session->display_external_) {
+      status = hwc_session->display_external_->Blank(blank);
+    }
+    break;
   default:
     status = -EINVAL;
   }
@@ -279,7 +302,7 @@ int HWCSession::Blank(hwc_composer_device_1 *device, int disp, int blank) {
 }
 
 int HWCSession::Query(hwc_composer_device_1 *device, int param, int *value) {
-  if (UNLIKELY(!device || !value)) {
+  if (!device || !value) {
     return -EINVAL;
   }
 
@@ -287,7 +310,7 @@ int HWCSession::Query(hwc_composer_device_1 *device, int param, int *value) {
 }
 
 void HWCSession::RegisterProcs(hwc_composer_device_1 *device, hwc_procs_t const *procs) {
-  if (UNLIKELY(!device || !procs)) {
+  if (!device || !procs) {
     return;
   }
 
@@ -298,7 +321,7 @@ void HWCSession::RegisterProcs(hwc_composer_device_1 *device, hwc_procs_t const 
 void HWCSession::Dump(hwc_composer_device_1 *device, char *buffer, int length) {
   SCOPE_LOCK(locker_);
 
-  if (UNLIKELY(!device || !buffer || !length)) {
+  if (!device || !buffer || !length) {
     return;
   }
 
@@ -307,7 +330,7 @@ void HWCSession::Dump(hwc_composer_device_1 *device, char *buffer, int length) {
 
 int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint32_t *configs,
                                   size_t *num_configs) {
-  if (UNLIKELY(!device || !configs || !num_configs)) {
+  if (!device || !configs || !num_configs) {
     return -EINVAL;
   }
 
@@ -318,6 +341,11 @@ int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint3
   case HWC_DISPLAY_PRIMARY:
     status = hwc_session->display_primary_->GetDisplayConfigs(configs, num_configs);
     break;
+  case HWC_DISPLAY_EXTERNAL:
+    if (hwc_session->display_external_) {
+      status = hwc_session->display_external_->GetDisplayConfigs(configs, num_configs);
+    }
+    break;
   default:
     status = -EINVAL;
   }
@@ -327,7 +355,7 @@ int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint3
 
 int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, uint32_t config,
                                      const uint32_t *attributes, int32_t *values) {
-  if (UNLIKELY(!device || !attributes || !values)) {
+  if (!device || !attributes || !values) {
     return -EINVAL;
   }
 
@@ -337,6 +365,11 @@ int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, ui
   switch (disp) {
   case HWC_DISPLAY_PRIMARY:
     status = hwc_session->display_primary_->GetDisplayAttributes(config, attributes, values);
+    break;
+  case HWC_DISPLAY_EXTERNAL:
+    if (hwc_session->display_external_) {
+      status = hwc_session->display_external_->GetDisplayAttributes(config, attributes, values);
+    }
     break;
   default:
     status = -EINVAL;
@@ -389,6 +422,100 @@ void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {
   default:
     DLOGW("type = %d is not supported", type);
   }
+}
+void* HWCSession::HWCHotPlugThread(void *context) {
+  if (context) {
+    return reinterpret_cast<HWCSession *>(context)->HWCHotPlugThreadHandler();
+  }
+
+  return NULL;
+}
+
+void* HWCSession::HWCHotPlugThreadHandler() {
+  static char uevent_data[PAGE_SIZE];
+  int length = 0;
+  prctl(PR_SET_NAME, hotplug_thread_name_, 0, 0, 0);
+  setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY);
+  if (!uevent_init()) {
+    DLOGE("Failed to init uevent");
+    pthread_exit(0);
+    return NULL;
+  }
+
+  while (!hotplug_thread_exit_) {
+    // keep last 2 zeroes to ensure double 0 termination
+    length = uevent_next_event(uevent_data, INT32(sizeof(uevent_data)) - 2);
+
+    if (!strcasestr("change@/devices/virtual/switch/hdmi", uevent_data)) {
+      continue;
+    }
+    DLOGI("Uevent HDMI = %s", uevent_data);
+    int connected = GetHDMIConnectedState(uevent_data, length);
+    if (connected >= 0) {
+      DLOGI("HDMI = %s", connected ? "connected" : "disconnected");
+      if (HotPlugHandler(connected) == -1) {
+        DLOGE("Failed handling Hotplug = %s", connected ? "connected" : "disconnected");
+      }
+    }
+  }
+  pthread_exit(0);
+
+  return NULL;
+}
+
+int HWCSession::GetHDMIConnectedState(const char *uevent_data, int length) {
+  const char* iterator_str = uevent_data;
+  while (((iterator_str - uevent_data) <= length) && (*iterator_str)) {
+    char* pstr = strstr(iterator_str, "SWITCH_STATE=");
+    if (pstr != NULL) {
+      return (atoi(iterator_str + strlen("SWITCH_STATE=")));
+    }
+    iterator_str += strlen(iterator_str) + 1;
+  }
+  return -1;
+}
+
+
+int HWCSession::HotPlugHandler(bool connected) {
+  if (!hwc_procs_) {
+     DLOGW("Ignore hotplug - hwc_proc not registered");
+    return -1;
+  }
+
+  if (connected) {
+    SCOPE_LOCK(locker_);
+    if (display_external_) {
+     DLOGE("HDMI already connected");
+     return -1;
+    }
+    // Create hdmi display
+    display_external_ = new HWCDisplayExternal(core_intf_, &hwc_procs_);
+    if (!display_external_) {
+      return -1;
+    }
+    int status = display_external_->Init();
+    if (status) {
+      delete display_external_;
+      display_external_ = NULL;
+      return -1;
+    }
+  } else {
+    SCOPE_LOCK(locker_);
+    if (!display_external_) {
+     DLOGE("HDMI not connected");
+     return -1;
+    }
+    display_external_->PowerOff();
+    display_external_->Deinit();
+    delete display_external_;
+    display_external_ = NULL;
+  }
+
+  // notify client and trigger a screen refresh
+  hwc_procs_->hotplug(hwc_procs_, HWC_DISPLAY_EXTERNAL, connected);
+  hwc_procs_->invalidate(hwc_procs_);
+
+  return 0;
 }
 
 }  // namespace sde

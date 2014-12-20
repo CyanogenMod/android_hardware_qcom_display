@@ -36,5 +36,36 @@ DisplayHDMI::DisplayHDMI(DisplayEventHandler *event_handler, HWInterface *hw_int
   : DisplayBase(kHDMI, event_handler, kDeviceHDMI, hw_intf, comp_manager) {
 }
 
+int DisplayHDMI::GetBestConfig() {
+  uint32_t best_config_mode = 0;
+  HWDisplayAttributes *best = &display_attributes_[0];
+  if (num_modes_ == 1) {
+    return best_config_mode;
+  }
+
+  // From the available configs, select the best
+  // Ex: 1920x1080@60Hz is better than 1920x1080@30 and 1920x1080@30 is better than 1280x720@60
+  for (uint32_t index = 1; index < num_modes_; index++) {
+    HWDisplayAttributes *current = &display_attributes_[index];
+    // compare the two modes: in the order of Resolution followed by refreshrate
+    if (current->y_pixels > best->y_pixels) {
+      best_config_mode = index;
+    } else if (current->y_pixels == best->y_pixels) {
+      if (current->x_pixels > best->x_pixels) {
+        best_config_mode = index;
+      } else if (current->x_pixels == best->x_pixels) {
+        if (current->vsync_period_ns < best->vsync_period_ns) {
+          best_config_mode = index;
+        }
+      }
+    }
+    if (best_config_mode == index) {
+      best = &display_attributes_[index];
+    }
+  }
+
+  return best_config_mode;
+}
+
 }  // namespace sde
 

@@ -35,26 +35,18 @@ HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const
   : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY) {
 }
 
-int HWCDisplayPrimary::Init() {
-  return HWCDisplay::Init();
-}
-
-int HWCDisplayPrimary::Deinit() {
-  return HWCDisplay::Deinit();
-}
-
 int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
   int status = 0;
 
   status = AllocateLayerStack(content_list);
-  if (UNLIKELY(status)) {
+  if (status) {
     return status;
   }
 
   layer_stack_.retire_fence_fd = -1;
 
   status = PrepareLayerStack(content_list);
-  if (UNLIKELY(status)) {
+  if (status) {
     return status;
   }
 
@@ -65,7 +57,7 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
   int status = 0;
 
   status = HWCDisplay::CommitLayerStack(content_list);
-  if (UNLIKELY(status)) {
+  if (status) {
     return status;
   }
 

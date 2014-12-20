@@ -31,6 +31,7 @@
 #include <IQClient.h>
 
 #include "hwc_display_primary.h"
+#include "hwc_display_external.h"
 
 namespace sde {
 
@@ -64,6 +65,12 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   static int GetDisplayAttributes(hwc_composer_device_1 *device, int disp, uint32_t config,
                                   const uint32_t *attributes, int32_t *values);
 
+  // Hotplug thread for HDMI connect/disconnect
+  static void* HWCHotPlugThread(void *context);
+  void* HWCHotPlugThreadHandler();
+  int GetHDMIConnectedState(const char *uevent_data, int length);
+  int HotPlugHandler(bool connected);
+
   // CoreEventHandler methods
   virtual DisplayError Hotplug(const CoreEventHotplug &hotplug);
 
@@ -76,6 +83,10 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   CoreInterface *core_intf_;
   hwc_procs_t const *hwc_procs_;
   HWCDisplayPrimary *display_primary_;
+  HWCDisplayExternal *display_external_;
+  pthread_t hotplug_thread_;
+  bool hotplug_thread_exit_;
+  const char *hotplug_thread_name_;
 };
 
 }  // namespace sde

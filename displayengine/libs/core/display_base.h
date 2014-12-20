@@ -61,6 +61,8 @@ class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
   void AppendRect(char *buffer, uint32_t length, const char *rect_name, LayerRect *rect);
 
  protected:
+  virtual int GetBestConfig();
+
   Locker locker_;
   DisplayType display_type_;
   DisplayEventHandler *event_handler_;

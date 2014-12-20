@@ -35,26 +35,18 @@ HWCDisplayExternal::HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t con
   : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL) {
 }
 
-int HWCDisplayExternal::Init() {
-  return 0;
-}
-
-int HWCDisplayExternal::Deinit() {
-  return 0;
-}
-
 int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
   int status = 0;
 
   status = AllocateLayerStack(content_list);
-  if (UNLIKELY(status)) {
+  if (status) {
     return status;
   }
 
   layer_stack_.retire_fence_fd = -1;
 
   status = PrepareLayerStack(content_list);
-  if (UNLIKELY(status)) {
+  if (status) {
     return status;
   }
 
@@ -65,7 +57,7 @@ int HWCDisplayExternal::Commit(hwc_display_contents_1_t *content_list) {
   int status = 0;
 
   status = HWCDisplay::CommitLayerStack(content_list);
-  if (UNLIKELY(status)) {
+  if (status) {
     return status;
   }
 
@@ -79,6 +71,25 @@ int HWCDisplayExternal::PowerOn() {
 }
 
 int HWCDisplayExternal::PowerOff() {
+  return 0;
+}
+
+int HWCDisplayExternal::GetDisplayConfigs(uint32_t *configs, size_t *num_configs) {
+  uint32_t config_count = 0;
+  if (*num_configs <= 0) {
+    return -EINVAL;
+  }
+
+  display_intf_->GetNumVariableInfoConfigs(&config_count);
+  *num_configs = static_cast<size_t>(config_count);
+  if (*num_configs <= 0) {
+    return -EINVAL;
+  }
+
+  for (uint32_t i = 0; i < config_count; i++) {
+    configs[i] = i;
+  }
+
   return 0;
 }
 

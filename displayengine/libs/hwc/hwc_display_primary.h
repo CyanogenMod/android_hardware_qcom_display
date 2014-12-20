@@ -32,8 +32,6 @@ namespace sde {
 class HWCDisplayPrimary : public HWCDisplay {
  public:
   explicit HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
-  virtual int Init();
-  virtual int Deinit();
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
   virtual int PowerOn();
