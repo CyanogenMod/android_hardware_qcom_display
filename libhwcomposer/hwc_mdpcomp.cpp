@@ -216,17 +216,21 @@ void MDPComp::timeout_handler(void *udata) {
         ALOGE("%s: received empty data in timer callback", __FUNCTION__);
         return;
     }
-    Locker::Autolock _l(ctx->mDrawLock);
+
+    ctx->mDrawLock.lock();
     // Handle timeout event only if the previous composition is MDP or MIXED.
     if(!sHandleTimeout) {
         ALOGD_IF(isDebug(), "%s:Do not handle this timeout", __FUNCTION__);
+        ctx->mDrawLock.unlock();
         return;
     }
     if(!ctx->proc) {
         ALOGE("%s: HWC proc not registered", __FUNCTION__);
+        ctx->mDrawLock.unlock();
         return;
     }
     sIdleFallBack = true;
+    ctx->mDrawLock.unlock();
     /* Trigger SF to redraw the current frame */
     ctx->proc->invalidate(ctx->proc);
 }
