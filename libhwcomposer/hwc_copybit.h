@@ -27,7 +27,7 @@
 //twice
 #define MAX_SCALE_FACTOR 16
 #define MIN_SCALE_FACTOR 0.0625
-#define MAX_LAYERS_FOR_ABC 1
+#define MAX_LAYERS_FOR_ABC 2
 namespace qhwc {
 
 class CopyBit {
@@ -82,7 +82,7 @@ private:
     struct copybit_device_t *mEngine;
     bool drawUsingAppBufferComposition(hwc_context_t *ctx,
                                 hwc_display_contents_1_t *list,
-                                int dpy);
+                                int dpy, int *fd);
     // Helper functions for copybit composition
     int  drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                           private_handle_t *renderBuffer, int dpy, bool isFG);
