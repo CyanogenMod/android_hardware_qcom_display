@@ -216,7 +216,10 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
     //framebuffers
 
     if ( updatingLayerCount ==  1 ) {
-       hwc_rect_t dirtyRect =list->hwLayers[changingLayerIndex].dirtyRect;
+       hwc_rect_t dirtyRect = list->hwLayers[changingLayerIndex].displayFrame;
+#ifdef QCOM_BSP
+       dirtyRect = list->hwLayers[changingLayerIndex].dirtyRect;
+#endif
 
        for (int k = ctx->listStats[dpy].numAppLayers-1; k >= 0 ; k--){
             //disable swap rect for overlapping visible layer(s)
@@ -437,7 +440,11 @@ bool CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     mDirtyLayerIndex =  checkDirtyRect(ctx, list, dpy);
     if( mDirtyLayerIndex != -1){
           hwc_layer_1_t *layer = &list->hwLayers[mDirtyLayerIndex];
+#ifdef QCOM_BSP
           clear(renderBuffer,layer->dirtyRect);
+#else
+          clear(renderBuffer,layer->displayFrame);
+#endif
     } else {
           hwc_rect_t clearRegion = {0,0,0,0};
           if(CBUtils::getuiClearRegion(list, clearRegion, layerProp))
@@ -751,6 +758,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
     copybit_rect_t dstRect = {displayFrame.left, displayFrame.top,
                               displayFrame.right,
                               displayFrame.bottom};
+#ifdef QCOM_BSP
     //change src and dst with dirtyRect
     if(mDirtyLayerIndex != -1) {
       srcRect.l = layer->dirtyRect.left;
@@ -759,6 +767,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
       srcRect.b = layer->dirtyRect.bottom;
       dstRect = srcRect;
     }
+#endif
     // Copybit dst
     copybit_image_t dst;
     dst.w = ALIGN(fbHandle->width,32);
