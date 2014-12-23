@@ -26,6 +26,7 @@
 #include "hwc_ad.h"
 #include <overlayRotator.h>
 #include "hwc_copybit.h"
+#include "qd_utils.h"
 
 using namespace overlay;
 using namespace qdutils;
@@ -47,6 +48,7 @@ int MDPComp::sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
 bool MDPComp::sEnableYUVsplit = false;
 bool MDPComp::sSrcSplitEnabled = false;
 bool MDPComp::enablePartialUpdateForMDP3 = false;
+bool MDPComp::sIsPartialUpdateActive = true;
 MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
     if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
         sSrcSplitEnabled = true;
@@ -1259,7 +1261,7 @@ bool MDPComp::canPartialUpdate(hwc_context_t *ctx,
         hwc_display_contents_1_t* list){
     if(!qdutils::MDPVersion::getInstance().isPartialUpdateEnabled() ||
             isSkipPresent(ctx, mDpy) || (list->flags & HWC_GEOMETRY_CHANGED) ||
-            mDpy ) {
+            !sIsPartialUpdateActive || mDpy ) {
         return false;
     }
     if(ctx->listStats[mDpy].secureUI)
@@ -2715,5 +2717,27 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
     return 0;
 }
 
+int MDPComp::setPartialUpdatePref(hwc_context_t *ctx, bool enable) {
+    Locker::Autolock _l(ctx->mDrawLock);
+    const int fbNum = Overlay::getFbForDpy(Overlay::DPY_PRIMARY);
+    char path[MAX_SYSFS_FILE_PATH];
+    snprintf (path, sizeof(path), "sys/class/graphics/fb%d/dyn_pu", fbNum);
+    int fd = open(path, O_RDWR);
+    if(fd < 0) {
+        ALOGE("%s: Failed to open dyn_pu sysfs node", __FUNCTION__);
+        return -1;
+    }
+    char value[4];
+    snprintf(value, sizeof(value), "%d", (int)enable);
+    ssize_t ret = write(fd, value, strlen(value));
+    if(ret <= 0) {
+        ALOGE("%s: Failed to write to dyn_pu sysfs node", __FUNCTION__);
+        close(fd);
+        return -1;
+    }
+    close(fd);
+    sIsPartialUpdateActive = enable;
+    return 0;
+}
 }; //namespace
 

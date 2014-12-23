@@ -290,6 +290,13 @@ static void configureDynRefreshRate(hwc_context_t* ctx,
     }
 }
 
+static status_t setPartialUpdatePref(hwc_context_t *ctx, uint32_t enable) {
+    ALOGD("%s: enable: %d", __FUNCTION__, enable);
+    if(qhwc::MDPComp::setPartialUpdatePref(ctx, (bool)enable) < 0)
+        return NO_INIT;
+    return NO_ERROR;
+}
+
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t ret = NO_ERROR;
@@ -334,6 +341,9 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::SET_IDLE_TIMEOUT:
             setIdleTimeout(mHwcContext, inParcel);
+            break;
+        case IQService::SET_PARTIAL_UPDATE:
+            ret = setPartialUpdatePref(mHwcContext, inParcel->readInt32());
             break;
         case IQService::CONFIGURE_DYN_REFRESH_RATE:
             configureDynRefreshRate(mHwcContext, inParcel);

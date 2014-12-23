@@ -50,7 +50,7 @@ public:
         SET_HSIC_DATA,           // Set HSIC on dspp
         GET_DISPLAY_VISIBLE_REGION,  // Get the visibleRegion for dpy
         SET_SECONDARY_DISPLAY_STATUS,  // Sets secondary display status
-        UNUSED_SLOT,             // XXX: Unsed - New one can go here
+        SET_PARTIAL_UPDATE,      // Preference on partial update feature
         SET_VIEW_FRAME,          // Set view frame of display
         DYNAMIC_DEBUG,           // Enable more logging on the fly
         SET_IDLE_TIMEOUT,        // Set idle timeout for GPU fallback

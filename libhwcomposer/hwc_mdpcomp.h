@@ -57,6 +57,7 @@ public:
     static bool isIdleFallback() { return sIdleFallBack; }
     static void dynamicDebug(bool enable){ sDebugLogs = enable; }
     static void setIdleTimeout(const uint32_t& timeout);
+    static int setPartialUpdatePref(hwc_context_t *ctx, bool enable);
 
 protected:
     enum { MAX_SEC_LAYERS = 1 }; //TODO add property support
@@ -261,6 +262,7 @@ protected:
     static IdleInvalidator *sIdleInvalidator;
     struct FrameInfo mCurrentFrame;
     struct LayerCache mCachedFrame;
+    static bool sIsPartialUpdateActive;
     //Enable 4kx2k yuv layer split
     static bool sEnableYUVsplit;
     bool mModeOn; // if prepare happened
