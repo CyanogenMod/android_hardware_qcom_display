@@ -385,6 +385,7 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::SET_MAX_PIPES_PER_MIXER:
             setMaxPipesPerMixer(mHwcContext, inParcel);
+            break;
         case IQService::SET_PARTIAL_UPDATE:
             ret = setPartialUpdatePref(mHwcContext, inParcel->readInt32());
             break;
