@@ -87,6 +87,7 @@ namespace sdm {
 
   const int kThreadPriorityUrgent = -9;
   const int kMaxRotatePerLayer = 2;
+  const uint32_t kMaxBlitTargetLayers = 2;
 
   typedef void * Handle;
 

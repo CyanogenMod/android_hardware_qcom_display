@@ -84,7 +84,7 @@ void HWCDisplayPrimary::Destroy(HWCDisplay *hwc_display) {
 }
 
 HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY) {
+  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true) {
 }
 
 void HWCDisplayPrimary::ProcessBootAnimCompleted() {

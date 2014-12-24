@@ -128,16 +128,17 @@ DisplayError Strategy::GetNextStrategy(StrategyConstraints *constraints) {
     return kErrorUndefined;
   }
 
-  // Mark all layers for GPU composition. Find GPU target buffer and store its index for
+  // Mark all application layers for GPU composition. Find GPU target buffer and store its index for
   // programming the hardware.
   LayerStack *layer_stack = hw_layers_info_->stack;
   uint32_t &hw_layer_count = hw_layers_info_->count;
   hw_layer_count = 0;
+
   for (uint32_t i = 0; i < layer_stack->layer_count; i++) {
     LayerComposition &composition = layer_stack->layers[i].composition;
     if (composition == kCompositionGPUTarget) {
       hw_layers_info_->index[hw_layer_count++] = i;
-    } else {
+    } else if (composition != kCompositionBlitTarget) {
       composition = kCompositionGPU;
     }
   }
