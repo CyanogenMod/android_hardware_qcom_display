@@ -60,6 +60,7 @@ private:
     struct LayerCache {
       int layerCount;
       buffer_handle_t hnd[MAX_NUM_APP_LAYERS];
+      hwc_rect_t displayFrame[MAX_NUM_APP_LAYERS];
       /* c'tor */
       LayerCache();
       /* clear caching info*/
@@ -133,6 +134,7 @@ private:
                   int dpy);
     int checkDirtyRect(hwc_context_t *ctx, hwc_display_contents_1_t *list,
                   int dpy);
+    bool isLayerChanging(hwc_display_contents_1_t *list, int k);
 };
 
 }; //namespace qhwc
