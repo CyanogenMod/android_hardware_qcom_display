@@ -38,7 +38,7 @@ class CBUtils {
 public:
 static int getuiClearRegion(hwc_display_contents_1_t* list,
                               hwc_rect_t &clearWormholeRec,
-                                      LayerProp *layerProp);
+                              LayerProp *layerProp, int dirtyIndex = -1);
 };
 }//namespace qdutils
 #endif /* end of include guard: CB_UTIL_H*/
