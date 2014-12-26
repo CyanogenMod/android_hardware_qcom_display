@@ -65,8 +65,8 @@ namespace sde {
 Locker HWCSession::locker_;
 
 HWCSession::HWCSession(const hw_module_t *module) : core_intf_(NULL), hwc_procs_(NULL),
-            display_primary_(NULL), display_external_(NULL), hotplug_thread_exit_(false),
-            hotplug_thread_name_("HWC_HotPlugThread") {
+            display_primary_(NULL), display_external_(NULL), display_virtual_(NULL),
+            hotplug_thread_exit_(false), hotplug_thread_name_("HWC_HotPlugThread") {
   hwc_composer_device_1_t::common.tag = HARDWARE_DEVICE_TAG;
   hwc_composer_device_1_t::common.version = HWC_DEVICE_API_VERSION_1_4;
   hwc_composer_device_1_t::common.module = const_cast<hw_module_t*>(module);
@@ -231,6 +231,15 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
       }
       break;
     case HWC_DISPLAY_VIRTUAL:
+      if (hwc_session->ValidateContentList(content_list)) {
+        hwc_session->CreateVirtualDisplay(hwc_session, content_list);
+      } else {
+        hwc_session->DestroyVirtualDisplay(hwc_session);
+      }
+
+      if (hwc_session->display_virtual_) {
+        hwc_session->display_virtual_->Prepare(content_list);
+      }
       break;
     default:
       break;
@@ -266,6 +275,9 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
       }
       break;
     case HWC_DISPLAY_VIRTUAL:
+      if (hwc_session->display_virtual_) {
+        hwc_session->display_virtual_->Commit(content_list);
+      }
       break;
     default:
       break;
@@ -295,6 +307,8 @@ int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event,
       status = hwc_session->display_external_->EventControl(event, enable);
     }
     break;
+  case HWC_DISPLAY_VIRTUAL:
+    break;
   default:
     status = -EINVAL;
   }
@@ -319,6 +333,11 @@ int HWCSession::SetPowerMode(hwc_composer_device_1 *device, int disp, int mode) 
   case HWC_DISPLAY_EXTERNAL:
     if (hwc_session->display_external_) {
       status = hwc_session->display_external_->SetPowerMode(mode);
+    }
+    break;
+  case HWC_DISPLAY_VIRTUAL:
+    if (hwc_session->display_virtual_) {
+      status = hwc_session->display_virtual_->SetPowerMode(mode);
     }
     break;
   default:
@@ -373,6 +392,11 @@ int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint3
       status = hwc_session->display_external_->GetDisplayConfigs(configs, num_configs);
     }
     break;
+  case HWC_DISPLAY_VIRTUAL:
+    if (hwc_session->display_virtual_) {
+      status = hwc_session->display_virtual_->GetDisplayConfigs(configs, num_configs);
+    }
+    break;
   default:
     status = -EINVAL;
   }
@@ -398,6 +422,11 @@ int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, ui
       status = hwc_session->display_external_->GetDisplayAttributes(config, attributes, values);
     }
     break;
+  case HWC_DISPLAY_VIRTUAL:
+    if (hwc_session->display_virtual_) {
+      status = hwc_session->display_virtual_->GetDisplayAttributes(config, attributes, values);
+    }
+    break;
   default:
     status = -EINVAL;
   }
@@ -420,6 +449,11 @@ int HWCSession::GetActiveConfig(hwc_composer_device_1 *device, int disp) {
   case HWC_DISPLAY_EXTERNAL:
     if (hwc_session->display_external_) {
       active_config = hwc_session->display_external_->GetActiveConfig();
+    }
+    break;
+  case HWC_DISPLAY_VIRTUAL:
+    if (hwc_session->display_virtual_) {
+      active_config = hwc_session->display_virtual_->GetActiveConfig();
     }
     break;
   default:
@@ -447,8 +481,63 @@ int HWCSession::SetActiveConfig(hwc_composer_device_1 *device, int disp, int ind
       status = 0;  // hwc_session->display_external_->SetActiveConfig(index);
     }
     break;
+  case HWC_DISPLAY_VIRTUAL:
+    break;
   default:
     status = -EINVAL;
+  }
+
+  return status;
+}
+
+bool HWCSession::ValidateContentList(hwc_display_contents_1_t *content_list) {
+  return (content_list && content_list->numHwLayers > 0 && content_list->outbuf);
+}
+
+int HWCSession::CreateVirtualDisplay(HWCSession *hwc_session,
+                                     hwc_display_contents_1_t *content_list) {
+  int status = 0;
+
+  if (!hwc_session->display_virtual_) {
+    // Create virtual display device
+    hwc_session->display_virtual_ = new HWCDisplayVirtual(hwc_session->core_intf_,
+                                                          &hwc_session->hwc_procs_);
+    if (!hwc_session->display_virtual_) {
+      // This is not catastrophic. Leave a warning message for now.
+      DLOGW("Virtual Display creation failed");
+      return -ENOMEM;
+    }
+
+    status = hwc_session->display_virtual_->Init();
+    if (status) {
+      goto CleanupOnError;
+    }
+
+    status = hwc_session->display_virtual_->SetPowerMode(HWC_POWER_MODE_NORMAL);
+    if (status) {
+      goto CleanupOnError;
+    }
+  }
+
+  if (hwc_session->display_virtual_) {
+    status = hwc_session->display_virtual_->SetActiveConfig(content_list);
+  }
+
+  return status;
+
+CleanupOnError:
+  return hwc_session->DestroyVirtualDisplay(hwc_session);
+}
+
+int HWCSession::DestroyVirtualDisplay(HWCSession *hwc_session) {
+  int status = 0;
+
+  if (hwc_session->display_virtual_) {
+    status = hwc_session->display_virtual_->Deinit();
+    if (!status) {
+      delete hwc_session->display_virtual_;
+      hwc_session->display_virtual_ = NULL;
+    }
   }
 
   return status;
@@ -495,6 +584,7 @@ void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {
 
   case qService::IQService::DEBUG_MDPCOMP:
     HWCDebugHandler::DebugStrategy(enable);
+    HWCDebugHandler::DebugCompManager(enable);
     break;
 
   case qService::IQService::DEBUG_PIPE_LIFECYCLE:
@@ -568,7 +658,6 @@ int HWCSession::GetHDMIConnectedState(const char *uevent_data, int length) {
   }
   return -1;
 }
-
 
 int HWCSession::HotPlugHandler(bool connected) {
   if (!hwc_procs_) {

@@ -66,20 +66,23 @@ class HWFrameBuffer : public HWInterface {
  private:
   struct HWDisplay {
     mdp_layer_commit mdp_disp_commit;
-    mdp_input_layer mdp_disp_layers[kMaxSDELayers * 2];   // split panel (left + right)
+    mdp_input_layer mdp_in_layers[kMaxSDELayers * 2];   // split panel (left + right)
+    mdp_output_layer mdp_out_layer;
 
     HWDisplay() { Reset(); }
 
     void Reset() {
       memset(&mdp_disp_commit, 0, sizeof(mdp_disp_commit));
-      memset(&mdp_disp_layers, 0, sizeof(mdp_disp_layers));
+      memset(&mdp_in_layers, 0, sizeof(mdp_in_layers));
+      memset(&mdp_out_layer, 0, sizeof(mdp_out_layer));
 
       for (uint32_t i = 0; i < kMaxSDELayers * 2; i++) {
-        mdp_disp_layers[i].buffer.fence = -1;
+        mdp_in_layers[i].buffer.fence = -1;
       }
 
       mdp_disp_commit.version = MDP_COMMIT_VERSION_1_0;
-      mdp_disp_commit.commit_v1.input_layers = mdp_disp_layers;
+      mdp_disp_commit.commit_v1.input_layers = mdp_in_layers;
+      mdp_disp_commit.commit_v1.output_layer = &mdp_out_layer;
       mdp_disp_commit.commit_v1.release_fence = -1;
     }
   };
@@ -160,7 +163,8 @@ class HWFrameBuffer : public HWInterface {
   DisplayError RotatorCommit(HWContext *device_ctx, HWLayers *hw_layers);
 
   inline DisplayError SetFormat(const LayerBufferFormat &source, uint32_t *target);
-  inline DisplayError SetStride(LayerBufferFormat format,  uint32_t width, uint32_t *target);
+  inline DisplayError SetStride(HWDeviceType device_type, LayerBufferFormat format,
+                                uint32_t width, uint32_t *target);
   inline void SetBlending(const LayerBlending &source, mdss_mdp_blend_op *target);
   inline void SetRect(const LayerRect &source, mdp_rect *target);
   inline void SyncMerge(const int &fd1, const int &fd2, int *target);

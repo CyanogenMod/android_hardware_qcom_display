@@ -43,6 +43,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int GetActiveConfig();
   virtual int SetActiveConfig(int index);
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
+  virtual int SetActiveConfig(hwc_display_contents_1_t *content_list);
 
  protected:
   // Maximum number of layers supported by display engine.
@@ -88,7 +89,8 @@ class HWCDisplay : public DisplayEventHandler {
   inline void SetComposition(const int32_t &source, LayerComposition *target);
   inline void SetComposition(const int32_t &source, int32_t *target);
   inline void SetBlending(const int32_t &source, LayerBlending *target);
-  inline int SetFormat(const int32_t &source, const int flags, LayerBufferFormat *target);
+  int SetFormat(const int32_t &source, const int flags, LayerBufferFormat *target);
+  LayerBufferFormat GetSDEFormat(const int32_t &source, const int flags);
 
   CoreInterface *core_intf_;
   hwc_procs_t const **hwc_procs_;
@@ -99,6 +101,7 @@ class HWCDisplay : public DisplayEventHandler {
   LayerStack layer_stack_;
   LayerStackCache layer_stack_cache_;
   bool flush_;
+  LayerBuffer *output_buffer_;
 };
 
 }  // namespace sde

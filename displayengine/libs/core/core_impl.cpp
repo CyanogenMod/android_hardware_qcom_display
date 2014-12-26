@@ -85,7 +85,7 @@ DisplayError CoreImpl::Deinit() {
 }
 
 DisplayError CoreImpl::CreateDisplay(DisplayType type, DisplayEventHandler *event_handler,
-                                    DisplayInterface **intf) {
+                                     DisplayInterface **intf) {
   SCOPE_LOCK(locker_);
 
   if (UNLIKELY(!event_handler || !intf)) {

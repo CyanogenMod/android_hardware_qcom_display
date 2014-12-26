@@ -32,6 +32,7 @@
 
 #include "hwc_display_primary.h"
 #include "hwc_display_external.h"
+#include "hwc_display_virtual.h"
 
 namespace sde {
 
@@ -72,6 +73,9 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   void* HWCHotPlugThreadHandler();
   int GetHDMIConnectedState(const char *uevent_data, int length);
   int HotPlugHandler(bool connected);
+  bool ValidateContentList(hwc_display_contents_1_t *content_list);
+  int CreateVirtualDisplay(HWCSession *hwc_session, hwc_display_contents_1_t *content_list);
+  int DestroyVirtualDisplay(HWCSession *hwc_session);
 
   // CoreEventHandler methods
   virtual DisplayError Hotplug(const CoreEventHotplug &hotplug);
@@ -86,6 +90,7 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   hwc_procs_t const *hwc_procs_;
   HWCDisplayPrimary *display_primary_;
   HWCDisplayExternal *display_external_;
+  HWCDisplayVirtual *display_virtual_;
   pthread_t hotplug_thread_;
   bool hotplug_thread_exit_;
   const char *hotplug_thread_name_;

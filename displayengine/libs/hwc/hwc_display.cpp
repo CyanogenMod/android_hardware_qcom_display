@@ -42,13 +42,14 @@ namespace sde {
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
                        int id)
   : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL),
-    flush_(false) {
+    flush_(false), output_buffer_(NULL) {
 }
 
 int HWCDisplay::Init() {
   DisplayError error = core_intf_->CreateDisplay(type_, this, &display_intf_);
   if (UNLIKELY(error != kErrorNone)) {
-    DLOGE("Display create failed. Error = %d", error);
+    DLOGE("Display create failed. Error = %d display_type %d event_handler %p disp_intf %p",
+      error, type_, this, &display_intf_);
     return -EINVAL;
   }
 
@@ -181,6 +182,10 @@ int HWCDisplay::GetActiveConfig() {
   return index;
 }
 
+int HWCDisplay::SetActiveConfig(hwc_display_contents_1_t *content_list) {
+  return 0;
+}
+
 int HWCDisplay::SetActiveConfig(int index) {
   DisplayError error = kErrorNone;
 
@@ -303,7 +308,8 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     LayerBuffer *layer_buffer = layer.input_buffer;
 
     if (pvt_handle) {
-      if (SetFormat(pvt_handle->format, pvt_handle->flags, &layer_buffer->format)) {
+      layer_buffer->format = GetSDEFormat(pvt_handle->format, pvt_handle->flags);
+      if (layer_buffer->format == kFormatInvalid) {
         return -EINVAL;
       }
 
@@ -540,43 +546,45 @@ void HWCDisplay::SetBlending(const int32_t &source, LayerBlending *target) {
   }
 }
 
-int HWCDisplay::SetFormat(const int32_t &source, const int flags, LayerBufferFormat *target) {
-
-  if (flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED) {
-    switch (source) {
-      case HAL_PIXEL_FORMAT_RGBA_8888:          *target = kFormatRGBA8888Ubwc;            break;
-      case HAL_PIXEL_FORMAT_RGB_565:            *target = kFormatRGB565Ubwc;              break;
-      case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
-      case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
-      case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:    *target = kFormatYCbCr420SPVenusUbwc;     break;
-      default:
-        DLOGE("Unsupported format type for UBWC %d", source);
-        return -EINVAL;
-    }
-    return 0;
-  }
-
-  switch (source) {
-  case HAL_PIXEL_FORMAT_RGBA_8888:            *target = kFormatRGBA8888;                  break;
-  case HAL_PIXEL_FORMAT_BGRA_8888:            *target = kFormatBGRA8888;                  break;
-  case HAL_PIXEL_FORMAT_RGBX_8888:            *target = kFormatRGBX8888;                  break;
-  case HAL_PIXEL_FORMAT_BGRX_8888:            *target = kFormatBGRX8888;                  break;
-  case HAL_PIXEL_FORMAT_RGB_888:              *target = kFormatRGB888;                    break;
-  case HAL_PIXEL_FORMAT_RGB_565:              *target = kFormatRGB565;                    break;
-  case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:   *target = kFormatYCbCr420SemiPlanarVenus;   break;
-  case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:  *target = kFormatYCbCr420SPVenusUbwc;   break;
-  default:
-    DLOGW("Unsupported format type = %d", source);
-    return -EINVAL;
-  }
-
-  return 0;
-}
-
 void HWCDisplay::SetIdleTimeoutMs(uint32_t timeout_ms) {
   if (display_intf_) {
     display_intf_->SetIdleTimeoutMs(timeout_ms);
   }
+}
+
+LayerBufferFormat HWCDisplay::GetSDEFormat(const int32_t &source, const int flags) {
+  LayerBufferFormat format = kFormatInvalid;
+  if (flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED) {
+    switch (source) {
+    case HAL_PIXEL_FORMAT_RGBA_8888:          format = kFormatRGBA8888Ubwc;            break;
+    case HAL_PIXEL_FORMAT_RGB_565:            format = kFormatRGB565Ubwc;              break;
+    case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+    case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
+    case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:    format = kFormatYCbCr420SPVenusUbwc;     break;
+    default:
+      DLOGE("Unsupported format type for UBWC %d", source);
+      return kFormatInvalid;
+    }
+    return format;
+  }
+
+  switch (source) {
+  case HAL_PIXEL_FORMAT_RGBA_8888:                format = kFormatRGBA8888;                 break;
+  case HAL_PIXEL_FORMAT_BGRA_8888:                format = kFormatBGRA8888;                 break;
+  case HAL_PIXEL_FORMAT_RGBX_8888:                format = kFormatRGBX8888;                 break;
+  case HAL_PIXEL_FORMAT_BGRX_8888:                format = kFormatBGRX8888;                 break;
+  case HAL_PIXEL_FORMAT_RGB_888:                  format = kFormatRGB888;                   break;
+  case HAL_PIXEL_FORMAT_RGB_565:                  format = kFormatRGB565;                   break;
+  case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+  case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:       format = kFormatYCbCr420SemiPlanarVenus;  break;
+  case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:  format = kFormatYCbCr420SPVenusUbwc;      break;
+  case HAL_PIXEL_FORMAT_YCrCb_420_SP:             format = kFormatYCrCb420SemiPlanar;       break;
+  default:
+    DLOGW("Unsupported format type = %d", source);
+    return kFormatInvalid;
+  }
+
+  return format;
 }
 
 }  // namespace sde

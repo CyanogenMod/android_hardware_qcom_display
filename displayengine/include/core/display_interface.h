@@ -284,6 +284,14 @@ class DisplayInterface {
 
   /*! @brief Method to set active configuration for variable properties of the display device.
 
+    @param[in] variable_info \link DisplayConfigVariableInfo \endlink
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info) = 0;
+
+  /*! @brief Method to set active configuration for variable properties of the display device.
+
     @param[in] index index of the mode corresponding to variable properties.
 
     @return \link DisplayError \endlink

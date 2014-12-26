@@ -34,7 +34,6 @@ class DisplayHDMI : public DisplayBase {
   DisplayHDMI(DisplayEventHandler *event_handler, HWInterface *hw_intf, CompManager *comp_manager,
               OfflineCtrl *offline_ctrl);
   virtual int GetBestConfig();
-  virtual DisplayError SetDisplayState(DisplayState state);
 };
 
 }  // namespace sde

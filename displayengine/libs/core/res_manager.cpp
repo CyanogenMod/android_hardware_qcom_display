@@ -376,6 +376,11 @@ CleanupOnError:
 }
 
 bool ResManager::CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *hw_layers) {
+  // No need to check bandwidth for virtual displays
+  if (display_ctx->display_type == kVirtual) {
+    return true;
+  }
+
   float max_pipe_bw = FLOAT(hw_res_info_.max_pipe_bw) / 1000000;  // KBps to GBps
   float max_sde_clk = FLOAT(hw_res_info_.max_sde_clk) / 1000000;  // Hz to MHz
   const struct HWLayersInfo &layer_info = hw_layers->info;

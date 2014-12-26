@@ -56,6 +56,7 @@ class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
   virtual DisplayError GetActiveConfig(uint32_t *index);
   virtual DisplayError GetVSyncState(bool *enabled);
   virtual DisplayError SetDisplayState(DisplayState state);
+  virtual DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info);
   virtual DisplayError SetActiveConfig(uint32_t index);
   virtual DisplayError SetVSyncState(bool enable);
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
