@@ -45,7 +45,7 @@ enum mdp_rev {
     MDSS_MDP_HW_REV_103 = 0x10030000, //8084
     MDSS_MDP_HW_REV_104 = 0x10040000, //Next version
     MDSS_MDP_HW_REV_105 = 0x10050000, //Next version
-    MDSS_MDP_HW_REV_106 = 0x10060000, //8x16
+    MDSS_MDP_HW_REV_107 = 0x10070000, //Next version
     MDSS_MDP_HW_REV_200 = 0x20000000, //8092
     MDSS_MDP_HW_REV_206 = 0x20060000, //Future
 };
@@ -53,7 +53,6 @@ enum mdp_rev {
 enum mdp_rev {
     MDSS_MDP_HW_REV_104 = 0x10040000, //Next version
     MDSS_MDP_HW_REV_206 = 0x20060000, //Future
-    MDSS_MDP_HW_REV_107 = 0x10070000, //Next version
 };
 #endif
 
@@ -71,7 +70,6 @@ MDPVersion::MDPVersion()
     mLowBw = 0;
     mHighBw = 0;
     mSourceSplit = false;
-    mRGBHasNoScalar = false;
 
     updatePanelInfo();
 
@@ -266,10 +264,6 @@ bool MDPVersion::updateSysFsInfo() {
                                     strlen("src_split"))) {
                             mSourceSplit = true;
                         }
-                        else if(!strncmp(tokens[i], "non_scalar_rgb",
-                                    strlen("non_scalar_rgb"))) {
-                            mRGBHasNoScalar = true;
-                        }
                     }
                 }
             }
@@ -342,10 +336,6 @@ bool MDPVersion::isSrcSplit() const {
     return mSourceSplit;
 }
 
-bool MDPVersion::isRGBScalarSupported() const {
-    return (!mRGBHasNoScalar);
-}
-
 bool MDPVersion::is8x26() {
     return (mMdpRev >= MDSS_MDP_HW_REV_101 and
             mMdpRev < MDSS_MDP_HW_REV_102);
@@ -364,11 +354,6 @@ bool MDPVersion::is8084() {
 bool MDPVersion::is8092() {
     return (mMdpRev >= MDSS_MDP_HW_REV_200 and
             mMdpRev < MDSS_MDP_HW_REV_206);
-}
-
-bool MDPVersion::is8x16() {
-    return (mMdpRev >= MDSS_MDP_HW_REV_106 and
-            mMdpRev < MDSS_MDP_HW_REV_107);
 }
 
 }; //namespace qdutils
