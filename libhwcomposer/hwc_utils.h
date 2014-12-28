@@ -111,7 +111,6 @@ struct ListStats {
     //Video specific
     int yuvCount;
     int yuvIndices[MAX_NUM_APP_LAYERS];
-    int extOnlyLayerIndex;
     bool preMultipliedAlpha;
     int yuv4k2kIndices[MAX_NUM_APP_LAYERS];
     int yuv4k2kCount;
@@ -410,11 +409,6 @@ static inline bool isProtectedBuffer(const private_handle_t* hnd) {
 //Return true if buffer is marked locked
 static inline bool isBufferLocked(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_HWC_LOCK & hnd->flags));
-}
-
-//Return true if buffer is for external display only
-static inline bool isExtOnly(const private_handle_t* hnd) {
-    return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_EXTERNAL_ONLY));
 }
 
 //Return true if the buffer is intended for Secure Display
