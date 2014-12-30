@@ -294,9 +294,6 @@ int IonController::allocate(alloc_data& data, int usage)
     data.uncached = useUncached(usage);
     data.allocType = 0;
 
-    if(usage & GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP)
-        ionFlags |= ION_HEAP(ION_SF_HEAP_ID);
-
     if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP)
         ionFlags |= ION_HEAP(ION_SYSTEM_HEAP_ID);
 
