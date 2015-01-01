@@ -40,8 +40,9 @@ enum {
     /* SYSTEM heap comes from kernel vmalloc,
      * can never be uncached, is not secured*/
     GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP     =       GRALLOC_USAGE_PRIVATE_0,
-    /* SF heap is used for application buffers, is not secured */
-    GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP  =       GRALLOC_USAGE_PRIVATE_1,
+
+    /* GRALLOC_USAGE_PRIVATE_1 is unused */
+
     /* IOMMU heap comes from manually allocated pages,
      * can be cached/uncached, is not secured */
     GRALLOC_USAGE_PRIVATE_IOMMU_HEAP      =       GRALLOC_USAGE_PRIVATE_2,
@@ -82,8 +83,7 @@ enum {
 #define GRALLOC_MODULE_PERFORM_GET_COLOR_SPACE_FROM_HANDLE 6
 #define GRALLOC_MODULE_PERFORM_GET_YUV_PLANE_INFO 7
 
-#define GRALLOC_HEAP_MASK   (GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP |\
-                             GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP    |\
+#define GRALLOC_HEAP_MASK   (GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP    |\
                              GRALLOC_USAGE_PRIVATE_IOMMU_HEAP     |\
                              GRALLOC_USAGE_PRIVATE_MM_HEAP        |\
                              GRALLOC_USAGE_PRIVATE_ADSP_HEAP)
