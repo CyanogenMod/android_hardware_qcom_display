@@ -313,12 +313,14 @@ DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
 
       display_attributes->x_pixels = var_screeninfo.xres;
       display_attributes->y_pixels = var_screeninfo.yres;
+      display_attributes->v_total = var_screeninfo.yres + var_screeninfo.lower_margin +
+          var_screeninfo.upper_margin + var_screeninfo.vsync_len;
       display_attributes->x_dpi =
           (FLOAT(var_screeninfo.xres) * 25.4f) / FLOAT(var_screeninfo.width);
       display_attributes->y_dpi =
           (FLOAT(var_screeninfo.yres) * 25.4f) / FLOAT(var_screeninfo.height);
-      display_attributes->vsync_period_ns =
-          UINT32(1000000000L / FLOAT(meta_data.data.panel_frame_rate));
+      display_attributes->fps = FLOAT(meta_data.data.panel_frame_rate);
+      display_attributes->vsync_period_ns = UINT32(1000000000L / display_attributes->fps);
       display_attributes->is_device_split = (hw_resource_.split_info.left_split ||
           (var_screeninfo.xres > hw_resource_.max_mixer_width)) ? true : false;
       display_attributes->split_left = hw_resource_.split_info.left_split ?
@@ -339,10 +341,12 @@ DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
       }
       display_attributes->x_pixels = timing_mode->active_h;
       display_attributes->y_pixels = timing_mode->active_v;
+      display_attributes->v_total = timing_mode->active_v + timing_mode->front_porch_v +
+          timing_mode->back_porch_v + timing_mode->pulse_width_v;
       display_attributes->x_dpi = 0;
       display_attributes->y_dpi = 0;
-      display_attributes->vsync_period_ns =
-          UINT32(1000000000L / FLOAT(timing_mode->refresh_rate));
+      display_attributes->fps = FLOAT(timing_mode->refresh_rate);
+      display_attributes->vsync_period_ns = UINT32(1000000000L / display_attributes->fps);
       display_attributes->split_left = display_attributes->x_pixels;
       if (display_attributes->x_pixels > hw_resource_.max_mixer_width) {
         display_attributes->is_device_split = true;
@@ -830,6 +834,12 @@ DisplayError HWFrameBuffer::PopulateHWCapabilities() {
         hw_resource_.max_bandwidth_high = atol(tokens[1]);
       } else if (!strncmp(tokens[0], "max_mixer_width", strlen("max_mixer_width"))) {
         hw_resource_.max_mixer_width = atoi(tokens[1]);
+      } else if (!strncmp(tokens[0], "max_pipe_bw", strlen("max_pipe_bw"))) {
+        hw_resource_.max_pipe_bw = atoi(tokens[1]);
+      } else if (!strncmp(tokens[0], "max_mdp_clk", strlen("max_mdp_clk"))) {
+        hw_resource_.max_sde_clk = atoi(tokens[1]);
+      } else if (!strncmp(tokens[0], "clk_fudge_factor", strlen("clk_fudge_factor"))) {
+        hw_resource_.clk_fudge_factor = FLOAT(atoi(tokens[1])) / FLOAT(atoi(tokens[2]));
       } else if (!strncmp(tokens[0], "features", strlen("features"))) {
         for (uint32_t i = 0; i < token_count; i++) {
           if (!strncmp(tokens[i], "bwc", strlen("bwc"))) {
@@ -896,6 +906,8 @@ DisplayError HWFrameBuffer::PopulateHWCapabilities() {
   DLOGI("SourceSplit = %d, Always = %d", hw_resource_.is_src_split, hw_resource_.always_src_split);
   DLOGI("MaxLowBw = %"PRIu64", MaxHighBw = %"PRIu64"", hw_resource_.max_bandwidth_low,
         hw_resource_.max_bandwidth_high);
+  DLOGI("MaxPipeBw = %"PRIu64" KBps, MaxSDEClock = %"PRIu64" Hz, ClockFudgeFactor = %f",
+        hw_resource_.max_pipe_bw, hw_resource_.max_sde_clk, hw_resource_.clk_fudge_factor);
 
   return error;
 }

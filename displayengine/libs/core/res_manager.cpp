@@ -280,13 +280,12 @@ Acquire_failed:
 }
 
 bool ResManager::CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *hw_layers) {
-  float max_pipe_bw = 1.8f;  // From MDP to hw_res_info_ (in GBps)
-  float max_sde_clk = 400.0f;  // From MDP to hw_res_info_ (in MHz)
-  float clk_fudge_factor = 1.0f;  // From MDP to hw_res_info_
+  float max_pipe_bw = FLOAT(hw_res_info_.max_pipe_bw) / 1000000;  // KBps to GBps
+  float max_sde_clk = FLOAT(hw_res_info_.max_sde_clk) / 1000000;  // Hz to MHz
   const struct HWLayersInfo &layer_info = hw_layers->info;
 
-  float left_pipe_bw[layer_info.count];
-  float right_pipe_bw[layer_info.count];
+  float left_pipe_bw[kMaxSDELayers] = {0};
+  float right_pipe_bw[kMaxSDELayers] = {0};
   float left_max_clk = 0;
   float right_max_clk = 0;
 
@@ -322,7 +321,7 @@ bool ResManager::CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *h
   }
 
   // If system has Video mode panel, use max_bandwidth_low, else use max_bandwidth_high
-  if ((display_bw + bw_claimed_) > hw_res_info_.max_bandwidth_low) {
+  if ((display_bw + bw_claimed_) > (hw_res_info_.max_bandwidth_low / 1000000)) {
     DLOGV_IF(kTagResources, "Overlap bandwidth exceeds limit!");
     return false;
   }
@@ -334,7 +333,7 @@ bool ResManager::CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *h
   float system_clk = MAX(display_clk, clk_claimed_);
 
   // Apply fudge factor to consider in-efficieny
-  if ((system_clk * clk_fudge_factor) > max_sde_clk) {
+  if ((system_clk * hw_res_info_.clk_fudge_factor) > max_sde_clk) {
     DLOGV_IF(kTagResources, "Clock requirement exceeds limit!");
     return false;
   }
@@ -353,9 +352,6 @@ bool ResManager::CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *h
 
 float ResManager::GetPipeBw(DisplayResourceContext *display_ctx, HWPipeInfo *pipe, float bpp) {
   HWDisplayAttributes &display_attributes = display_ctx->display_attributes;
-  float v_total = 2600.0f;  // From MDP to display_attributes (vBP + vFP + v_active)
-  float fps = 60.0f;  // display_attributes.fps;
-
   float src_w = pipe->src_roi.right - pipe->src_roi.left;
   float src_h = pipe->src_roi.bottom - pipe->src_roi.top;
   float dst_h = pipe->dst_roi.bottom - pipe->dst_roi.top;
@@ -363,11 +359,11 @@ float ResManager::GetPipeBw(DisplayResourceContext *display_ctx, HWPipeInfo *pip
   // Adjust src_h with pipe decimation
   src_h /= FLOAT(pipe->decimation);
 
-  float bw = src_w * src_h * bpp * fps;
+  float bw = src_w * src_h * bpp * display_attributes.fps;
 
   // Consider panel dimension
   // (v_total / v_active) * (v_active / dst_h)
-  bw *= (v_total / dst_h);
+  bw *= FLOAT(display_attributes.v_total) / dst_h;
 
   // Bandwidth in GBps
   return (bw / 1000000000.0f);
@@ -375,8 +371,8 @@ float ResManager::GetPipeBw(DisplayResourceContext *display_ctx, HWPipeInfo *pip
 
 float ResManager::GetClockForPipe(DisplayResourceContext *display_ctx, HWPipeInfo *pipe) {
   HWDisplayAttributes &display_attributes = display_ctx->display_attributes;
-  float v_total = 2600.0f;  // (vBP + vFP + v_active)
-  float fps = 60.0f;  // display_attributes.fps;
+  float v_total = FLOAT(display_attributes.v_total);
+  float fps = display_attributes.fps;
 
   float src_h = pipe->src_roi.bottom - pipe->src_roi.top;
   float dst_h = pipe->dst_roi.bottom - pipe->dst_roi.top;
