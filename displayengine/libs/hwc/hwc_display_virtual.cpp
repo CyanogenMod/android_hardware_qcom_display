@@ -32,7 +32,7 @@
 namespace sde {
 
 HWCDisplayVirtual::HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCDisplay(core_intf, hwc_procs, kVirtual, HWC_DISPLAY_VIRTUAL, false) {
+  : HWCDisplay(core_intf, hwc_procs, kVirtual, HWC_DISPLAY_VIRTUAL) {
 }
 
 int HWCDisplayVirtual::Prepare(hwc_display_contents_1_t *content_list) {

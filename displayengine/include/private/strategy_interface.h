@@ -35,31 +35,31 @@ namespace sde {
 
 /*! @brief Strategy library name
 
-    @details This macro defines name for the composition strategy library. This macro shall be used
-    to load library using dlopen().
+  @details This macro defines name for the composition strategy library. This macro shall be used
+  to load library using dlopen().
 
-    @sa CreateStrategyInterface
-    @sa DestoryStrategyInterface
+  @sa CreateStrategyInterface
+  @sa DestoryStrategyInterface
 */
 #define STRATEGY_LIBRARY_NAME "libsdestrategy.so"
 
 /*! @brief Function name to create composer strategy interface
 
-    @details This macro defines function name for CreateStrategyInterface() which is implemented
-    in the composition strategy library. This macro shall be used to specify name of the function
-    in dlsym().
+  @details This macro defines function name for CreateStrategyInterface() which is implemented in
+  the composition strategy library. This macro shall be used to specify name of the function in
+  dlsym().
 
-    @sa CreateStrategyInterface
+  @sa CreateStrategyInterface
 */
 #define CREATE_STRATEGY_INTERFACE_NAME "CreateStrategyInterface"
 
 /*! @brief Function name to destroy composer strategy interface
 
-    @details This macro defines function name for DestroyStrategyInterface() which is implemented
-    in the composition strategy library. This macro shall be used to specify name of the function
-    in dlsym().
+  @details This macro defines function name for DestroyStrategyInterface() which is implemented in
+  the composition strategy library. This macro shall be used to specify name of the function in
+  dlsym().
 
-    @sa DestroyStrategyInterface
+  @sa DestroyStrategyInterface
 */
 #define DESTROY_STRATEGY_INTERFACE_NAME "DestroyStrategyInterface"
 
@@ -82,23 +82,23 @@ class StrategyInterface;
 
 /*! @brief Function to create composer strategy interface.
 
-    @details This function is used to create StrategyInterface object which resides in the composer
-    strategy library loaded at runtime.
+  @details This function is used to create StrategyInterface object which resides in the composer
+  strategy library loaded at runtime.
 
-    @param[out] version \link STRATEGY_VERSION_TAG \endlink
-    @param[out] interface \link StrategyInterface \endlink
+  @param[out] version \link STRATEGY_VERSION_TAG \endlink
+  @param[out] interface \link StrategyInterface \endlink
 
-    @return \link DisplayError \endlink
+  @return \link DisplayError \endlink
 */
 typedef DisplayError (*CreateStrategyInterface)(uint16_t version, StrategyInterface **interface);
 
 /*! @brief Function to destroy composer strategy interface.
 
-    @details This function is used to destroy StrategyInterface object.
+  @details This function is used to destroy StrategyInterface object.
 
-    @param[in] interface \link StrategyInterface \endlink
+  @param[in] interface \link StrategyInterface \endlink
 
-    @return \link DisplayError \endlink
+  @return \link DisplayError \endlink
 */
 typedef DisplayError (*DestroyStrategyInterface)(StrategyInterface *interface);
 
@@ -107,9 +107,9 @@ typedef DisplayError (*DestroyStrategyInterface)(StrategyInterface *interface);
 const int kMaxSDELayers = 16;
 
 /*! @brief This structure defines constraints and display properties that shall be considered for
-    deciding a composition strategy.
+  deciding a composition strategy.
 
-    @sa GetNextStrategy
+  @sa GetNextStrategy
 */
 struct StrategyConstraints {
   bool safe_mode;         //!< In this mode, strategy manager chooses the composition strategy
@@ -123,9 +123,9 @@ struct StrategyConstraints {
 };
 
 /*! @brief This structure encapsulates information about the input layer stack and the layers which
-    shall be programmed on hardware.
+  shall be programmed on hardware.
 
-    @sa GetNextStrategy
+  @sa Start
 */
 struct HWLayersInfo {
   LayerStack *stack;        //!< Input layer stack. Set by the caller.
@@ -136,34 +136,45 @@ struct HWLayersInfo {
 
   uint32_t count;           //!< Total number of layers which need to be set on hardware.
 
-  uint32_t flags;           //!< Strategy flags. Caller must reset it to 0 for a new layer stack.
-                            //!< A non-zero flag value indicates that a strategy has been selected
-                            //!< previously for the current layer stack. This flag must be
-                            //!< preserved between multiple GetNextStrategy() calls.
-
-  HWLayersInfo() {
-    Reset();
-  }
-
-  void Reset() {
-    stack = NULL;
-    count = 0;
-    flags = 0;
-  }
+  HWLayersInfo() : stack(NULL), count(0) { }
 };
+
+/*! @brief Strategy interface.
+
+  @details This class defines Strategy interface. It contains methods which client shall use to
+  determine which strategy to be used for layer composition. This interface is created during
+  display device creation and remains valid until destroyed.
+*/
 
 class StrategyInterface {
  public:
+  /*! @brief Method to indicate start of a new strategy selection iteration for a layer stack.
+
+    @details Client shall call this method at beginning of each draw cycle before iterating
+    through strategy selection. Strategy interface implementation uses this method to do
+    preprocessing for a given layer stack.
+
+    @param[in] layers_info \link HWLayersInfo \endlink
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError Start(HWLayersInfo *hw_layers_info) = 0;
+
+
   /*! @brief Method to get strategy for a layer stack. Caller can loop through this method to try
     get all applicable strategies.
 
     @param[in] constraints \link StrategyConstraints \endlink
-    @param[inout] layers_info \link HWLayersInfo \endlink
 
     @return \link DisplayError \endlink
   */
-  virtual DisplayError GetNextStrategy(StrategyConstraints *constraints,
-                                       HWLayersInfo *hw_layers_info) = 0;
+  virtual DisplayError GetNextStrategy(StrategyConstraints *constraints) = 0;
+
+  /*! @brief Method to indicate end of a strategy selection cycle.
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError Stop() = 0;
 
  protected:
   virtual ~StrategyInterface() { }

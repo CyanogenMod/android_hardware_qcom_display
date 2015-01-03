@@ -34,9 +34,8 @@
 namespace sde {
 
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
-                       int id, bool need_retire_fence)
-  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL),
-    layer_stack_(need_retire_fence), need_retire_fence_(need_retire_fence) {
+                       int id)
+  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL) {
 }
 
 int HWCDisplay::Init() {
@@ -242,7 +241,7 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   uint8_t *current_address = layer_stack_memory_.raw;
 
   // Layer array address
-  layer_stack_ = LayerStack(need_retire_fence_);
+  layer_stack_ = LayerStack();
   layer_stack_.layers = reinterpret_cast<Layer *>(current_address);
   layer_stack_.layer_count = static_cast<uint32_t>(num_hw_layers);
   current_address += num_hw_layers * sizeof(Layer);
