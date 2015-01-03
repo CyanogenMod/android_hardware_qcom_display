@@ -513,6 +513,15 @@ DisplayError HWFrameBuffer::Validate(Handle device, HWLayers *hw_layers) {
       if (error != kErrorNone) {
         return error;
       }
+
+      if (layer.transform.flip_vertical) {
+        mdp_layer.flags |= MDP_LAYER_FLIP_UD;
+      }
+
+      if (layer.transform.flip_horizontal) {
+        mdp_layer.flags |= MDP_LAYER_FLIP_LR;
+      }
+
       mdp_layer_count++;
     }
   }
