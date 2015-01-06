@@ -345,7 +345,7 @@ DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
           timing_mode->back_porch_v + timing_mode->pulse_width_v;
       display_attributes->x_dpi = 0;
       display_attributes->y_dpi = 0;
-      display_attributes->fps = FLOAT(timing_mode->refresh_rate);
+      display_attributes->fps = FLOAT(timing_mode->refresh_rate) / 1000.0f;
       display_attributes->vsync_period_ns = UINT32(1000000000L / display_attributes->fps);
       display_attributes->split_left = display_attributes->x_pixels;
       if (display_attributes->x_pixels > hw_resource_.max_mixer_width) {
