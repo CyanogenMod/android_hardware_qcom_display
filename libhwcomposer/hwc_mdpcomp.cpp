@@ -1091,6 +1091,11 @@ bool MDPComp::videoOnlyComp(hwc_context_t *ctx,
 
     if(!postHeuristicsHandling(ctx, list)) {
         ALOGD_IF(isDebug(), "post heuristic handling failed");
+        if(errno == ENOBUFS) {
+            ALOGD_IF(isDebug(), "SMP Allocation failed");
+            //On SMP allocation failure in video only comp add padding round
+            ctx->isPaddingRound = true;
+        }
         reset(ctx);
         return false;
     }
