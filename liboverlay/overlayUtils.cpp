@@ -280,10 +280,11 @@ void getDecimationFactor(const int& src_w, const int& src_h,
     if(src_w > (int) mdpHw.getMaxPipeWidth()) {
         //If the client sends us something > what a layer mixer supports
         //then it means it doesn't want to use split-pipe but wants us to
-        //decimate. A minimum decimation of 2 will ensure that the width is
+        //decimate. A minimum decimation of 1 will ensure that the width is
         //always within layer mixer limits.
-        if(horzDeci < 2)
-            horzDeci = 2;
+        const uint8_t minDeci = 1;
+        if(horzDeci < minDeci)
+            horzDeci = minDeci;
     }
 }
 
