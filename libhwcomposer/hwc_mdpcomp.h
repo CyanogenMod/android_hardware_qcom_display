@@ -247,6 +247,10 @@ protected:
             hwc_display_contents_1_t* list);
     /* checks for conditions to enable partial udpate */
     bool canPartialUpdate(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    // Checks if only videocontent is updating
+    bool onlyVideosUpdating(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    static bool loadPerfLib();
+    void setPerfHint(hwc_context_t *ctx, hwc_display_contents_1_t* list);
 
     int mDpy;
     static bool sEnabled;
@@ -269,6 +273,12 @@ protected:
     bool allocSplitVGPipesfor4k2k(hwc_context_t *ctx, int index);
     //Enable Partial Update for MDP3 targets
     static bool enablePartialUpdateForMDP3;
+    static void *sLibPerfHint;
+    static int sPerfLockHandle;
+    static int (*sPerfLockAcquire)(int, int, int*, int);
+    static int (*sPerfLockRelease)(int value);
+    static int sPerfHintWindow;
+
 };
 
 class MDPCompNonSplit : public MDPComp {
