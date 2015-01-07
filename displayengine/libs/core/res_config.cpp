@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -32,26 +32,30 @@
 
 namespace sde {
 
-void ResManager::RotationConfig(const LayerTransform &transform, LayerRect *src_rect,
-                              HWRotateInfo *left_rotate, HWRotateInfo *right_rotate,
-                              uint32_t *rotate_count) {
+void ResManager::RotationConfig(const LayerTransform &transform, const float &scale_x,
+                                const float &scale_y, LayerRect *src_rect,
+                                struct HWLayerConfig *layer_config, uint32_t *rotate_count) {
+  HWRotateInfo *rotate = &layer_config->rotates[0];
   float src_width = src_rect->right - src_rect->left;
   float src_height = src_rect->bottom - src_rect->top;
   LayerRect dst_rect;
   // Rotate output is a temp buffer, always output to the top left corner for saving memory
   dst_rect.top = 0.0f;
   dst_rect.left = 0.0f;
-  // downscale when doing rotation
-  dst_rect.right = src_height / left_rotate->downscale_ratio_x;
-  dst_rect.bottom = src_width / left_rotate->downscale_ratio_y;
 
-  left_rotate->src_roi = *src_rect;
-  left_rotate->pipe_id = kPipeIdNeedsAssignment;
-  left_rotate->dst_roi = dst_rect;
-  // Always use one rotator for now
-  right_rotate->Reset();
+  rotate->downscale_ratio_x = scale_x;
+  rotate->downscale_ratio_y = scale_y;
+
+  // downscale when doing rotation
+  dst_rect.right = src_height / rotate->downscale_ratio_x;
+  dst_rect.bottom = src_width / rotate->downscale_ratio_y;
+
+  rotate->src_roi = *src_rect;
+  rotate->pipe_id = kPipeIdNeedsAssignment;
+  rotate->dst_roi = dst_rect;
 
   *src_rect = dst_rect;
+  layer_config->num_rotate = 1;
   (*rotate_count)++;
 }
 
@@ -180,49 +184,44 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     if (ValidateScaling(layer, src_rect, dst_rect, &rot_scale_x, &rot_scale_y))
       return kErrorNotSupported;
 
-    HWRotateInfo *left_rotate, *right_rotate;
+    struct HWLayerConfig *layer_config = &hw_layers->config[i];
     // config rotator first
-    left_rotate = &hw_layers->config[i].left_rotate;
-    right_rotate = &hw_layers->config[i].right_rotate;
+    for (uint32_t j = 0; j < kMaxRotatePerLayer; j++) {
+      layer_config->rotates[j].Reset();
+    }
+    layer_config->num_rotate = 0;
 
     LayerTransform transform = layer.transform;
     if (IsRotationNeeded(transform.rotation) ||
         UINT32(rot_scale_x) != 1 || UINT32(rot_scale_y) != 1) {
-      left_rotate->downscale_ratio_x = rot_scale_x;
-      right_rotate->downscale_ratio_x = rot_scale_x;
-      left_rotate->downscale_ratio_y = rot_scale_y;
-      right_rotate->downscale_ratio_y = rot_scale_y;
-
-      RotationConfig(layer.transform, &src_rect, left_rotate, right_rotate, rotate_count);
+      RotationConfig(layer.transform, rot_scale_x, rot_scale_y, &src_rect, layer_config,
+                     rotate_count);
       // rotator will take care of flipping, reset tranform
       transform = LayerTransform();
-    } else {
-      left_rotate->Reset();
-      right_rotate->Reset();
     }
 
     if (hw_res_info_.is_src_split) {
       error = SrcSplitConfig(display_resource_ctx, transform, src_rect,
-                             dst_rect, &hw_layers->config[i]);
+                             dst_rect, layer_config);
     } else {
       error = DisplaySplitConfig(display_resource_ctx, transform, src_rect,
-                                 dst_rect, &hw_layers->config[i]);
+                                 dst_rect, layer_config);
     }
 
     if (error != kErrorNone)
       break;
 
     DLOGV_IF(kTagResources, "layer = %d, left pipe_id = %x",
-             i, hw_layers->config[i].left_pipe.pipe_id);
+             i, layer_config->left_pipe.pipe_id);
     LogRectVerbose("input layer src_rect", layer.src_rect);
     LogRectVerbose("input layer dst_rect", layer.dst_rect);
     LogRectVerbose("cropped src_rect", src_rect);
     LogRectVerbose("cropped dst_rect", dst_rect);
-    LogRectVerbose("left pipe src", hw_layers->config[i].left_pipe.src_roi);
-    LogRectVerbose("left pipe dst", hw_layers->config[i].left_pipe.dst_roi);
+    LogRectVerbose("left pipe src", layer_config->left_pipe.src_roi);
+    LogRectVerbose("left pipe dst", layer_config->left_pipe.dst_roi);
     if (hw_layers->config[i].right_pipe.pipe_id) {
-      LogRectVerbose("right pipe src", hw_layers->config[i].right_pipe.src_roi);
-      LogRectVerbose("right pipe dst", hw_layers->config[i].right_pipe.dst_roi);
+      LogRectVerbose("right pipe src", layer_config->right_pipe.src_roi);
+      LogRectVerbose("right pipe dst", layer_config->right_pipe.dst_roi);
     }
   }
 
@@ -473,7 +472,7 @@ void ResManager::SplitRect(bool flip_horizontal, const LayerRect &src_rect,
 }
 
 void ResManager::LogRectVerbose(const char *prefix, const LayerRect &roi) {
-  DLOGV_IF(kTagResources,"%s: left = %.0f, top = %.0f, right = %.0f, bottom = %.0f",
+  DLOGV_IF(kTagResources, "%s: left = %.0f, top = %.0f, right = %.0f, bottom = %.0f",
            prefix, roi.left, roi.top, roi.right, roi.bottom);
 }
 

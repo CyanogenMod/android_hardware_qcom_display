@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -107,7 +107,6 @@ class ResManager : public DumpImpl {
 
     inline void ResetState() { state = kPipeStateIdle; hw_block_id = kHWBlockMax;
         at_right = false; reserved_hw_block = kHWBlockMax; dedicated_hw_block = kHWBlockMax; }
-
   };
 
   struct DisplayResourceContext {
@@ -131,7 +130,12 @@ class ResManager : public DumpImpl {
     uint32_t pipe_index;
     HWBlockType writeback_id;
     uint32_t client_bit_mask;
-    HWRotator() : pipe_index(0), writeback_id(kHWBlockMax), client_bit_mask(0) { }
+    uint32_t request_bit_mask;
+    HWRotator() : pipe_index(0), writeback_id(kHWBlockMax), client_bit_mask(0),
+                     request_bit_mask(0) { }
+
+    inline void ClearState(HWBlockType block) { CLEAR_BIT(client_bit_mask, block);
+        CLEAR_BIT(request_bit_mask, block); }
   };
 
   static const int kPipeIdNeedsAssignment = -1;
@@ -172,11 +176,9 @@ class ResManager : public DumpImpl {
   bool IsRotationNeeded(float rotation)
          { return (UINT32(rotation) == 90 || UINT32(rotation) == 270); }
   void LogRectVerbose(const char *prefix, const LayerRect &roi);
-  DisplayError MarkDedicated(DisplayResourceContext *display_resource_ctx,
-                             struct HWRotator *rotator);
-  void ClearDedicated(HWBlockType hw_block_id);
-  void RotationConfig(const LayerTransform &transform, LayerRect *src_rect,
-                      HWRotateInfo *left_rotate, HWRotateInfo *right_rotate, uint32_t *rotate_cnt);
+  void RotationConfig(const LayerTransform &transform, const float &scale_x,
+                      const float &scale_y,LayerRect *src_rect,
+                      struct HWLayerConfig *layer_config, uint32_t *rotate_count);
   DisplayError AcquireRotator(DisplayResourceContext *display_resource_ctx,
                               const uint32_t roate_cnt);
   void AssignRotator(HWRotateInfo *rotate, uint32_t *rotate_cnt);
