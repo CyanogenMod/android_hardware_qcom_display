@@ -25,6 +25,7 @@
 #ifndef __DEBUG_H__
 #define __DEBUG_H__
 
+#include <stdint.h>
 #include <core/sde_types.h>
 
 #define DLOG(tag, method, format, ...) Debug::GetLogHandler()->method(tag, \
@@ -47,6 +48,7 @@ class Debug {
   static inline void SetLogHandler(LogHandler *log_handler) { debug_.log_handler_ = log_handler; }
   static inline LogHandler* GetLogHandler() { return debug_.log_handler_; }
   static inline bool IsVirtualDriver() { return debug_.virtual_driver_; }
+  static uint32_t GetSimulationFlag();
 
  private:
   Debug();

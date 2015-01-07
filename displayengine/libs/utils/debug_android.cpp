@@ -38,5 +38,14 @@ Debug::Debug() : log_handler_(&default_log_handler_), virtual_driver_(false) {
   }
 }
 
+uint32_t Debug::GetSimulationFlag() {
+  char property[PROPERTY_VALUE_MAX];
+  if (property_get("debug.hwc.simulate", property, NULL) > 0) {
+    return atoi(property);
+  }
+
+  return 0;
+}
+
 }  // namespace sde
 
