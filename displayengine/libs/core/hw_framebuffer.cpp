@@ -442,9 +442,28 @@ DisplayError HWFrameBuffer::PowerOn(Handle device) {
 DisplayError HWFrameBuffer::PowerOff(Handle device) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 
-  if (ioctl_(hw_context->device_fd, FBIOBLANK, FB_BLANK_POWERDOWN) == -1) {
-    IOCTL_LOGE(FB_BLANK_POWERDOWN, hw_context->type);
-    return kErrorHardware;
+  switch (hw_context->type) {
+  case kDevicePrimary:
+    if (ioctl_(hw_context->device_fd, FBIOBLANK, FB_BLANK_POWERDOWN) == -1) {
+      IOCTL_LOGE(FB_BLANK_POWERDOWN, hw_context->type);
+      return kErrorHardware;
+    }
+    break;
+  case kDeviceHDMI:
+    {
+      hw_context->ResetMDPCommit();
+      mdp_layer_commit_v1 &mdp_commit = hw_context->mdp_commit.commit_v1;
+      mdp_commit.input_layer_cnt = 0;
+      mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
+      if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
+        IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, hw_context->type);
+        return kErrorHardware;
+      }
+    }
+    break;
+  case kDeviceVirtual:
+  default:
+    break;
   }
 
   return kErrorNone;
