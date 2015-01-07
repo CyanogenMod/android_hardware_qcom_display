@@ -369,6 +369,8 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
     return -EINVAL;
   }
 
+  int status = 0;
+
   size_t num_hw_layers = content_list->numHwLayers;
   if (num_hw_layers <= 1) {
     if (!num_hw_layers) {
@@ -401,7 +403,7 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
   DisplayError error = display_intf_->Commit(&layer_stack_);
   if (UNLIKELY(error != kErrorNone)) {
     DLOGE("Commit failed. Error = %d", error);
-    return -EINVAL;
+    status = -EINVAL;
   }
 
   for (size_t i = 0; i < num_hw_layers; i++) {
@@ -409,7 +411,8 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
     Layer &layer = layer_stack_.layers[i];
     LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
 
-    if (layer.composition == kCompositionSDE || layer.composition == kCompositionGPUTarget) {
+    if ((status == 0) && (layer.composition == kCompositionSDE ||
+                         layer.composition == kCompositionGPUTarget)) {
       hwc_layer.releaseFenceFd = layer_buffer->release_fence_fd;
     }
 
@@ -418,7 +421,7 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
     }
   }
 
-  return 0;
+  return status;
 }
 
 bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
