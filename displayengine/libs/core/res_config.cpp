@@ -32,6 +32,32 @@
 
 namespace sde {
 
+DisplayError ResManager::SrcSplitConfig(DisplayResourceContext *display_resource_ctx,
+                                        const Layer &layer, const LayerRect &src_rect,
+                                        const LayerRect &dst_rect, HWLayerConfig *layer_config) {
+  HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
+  HWPipeInfo *left_pipe = &layer_config->left_pipe;
+  HWPipeInfo *right_pipe = &layer_config->right_pipe;
+  layer_config->is_right_pipe = false;
+
+  LayerTransform transform = layer.transform;
+  transform.rotation = 0.0f;
+  if ((src_rect.right - src_rect.left) >= kMaxSourcePipeWidth ||
+      (dst_rect.right - dst_rect.left) >= kMaxInterfaceWidth || hw_res_info_.always_src_split) {
+    SplitRect(transform.flip_horizontal, src_rect, dst_rect, &left_pipe->src_roi,
+              &left_pipe->dst_roi, &right_pipe->src_roi, &right_pipe->dst_roi);
+    left_pipe->pipe_id = kPipeIdNeedsAssignment;
+    right_pipe->pipe_id = kPipeIdNeedsAssignment;
+    layer_config->is_right_pipe = true;
+  } else {
+    left_pipe->src_roi = src_rect;
+    left_pipe->dst_roi = dst_rect;
+    left_pipe->pipe_id = kPipeIdNeedsAssignment;
+    right_pipe->Reset();
+  }
+  return kErrorNone;
+}
+
 DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_resource_ctx,
                                             const Layer &layer, const LayerRect &src_rect,
                                             const LayerRect &dst_rect,
@@ -133,8 +159,14 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     if (ValidateScaling(layer, src_rect, dst_rect, &rot_scale_x, &rot_scale_y))
       return kErrorNotSupported;
 
-    error = DisplaySplitConfig(display_resource_ctx, layer, src_rect,
-                               dst_rect, &hw_layers->config[i]);
+    if (hw_res_info_.is_src_split) {
+      error = SrcSplitConfig(display_resource_ctx, layer, src_rect,
+                             dst_rect, &hw_layers->config[i]);
+    } else {
+      error = DisplaySplitConfig(display_resource_ctx, layer, src_rect,
+                                 dst_rect, &hw_layers->config[i]);
+    }
+
     if (error != kErrorNone)
       break;
 

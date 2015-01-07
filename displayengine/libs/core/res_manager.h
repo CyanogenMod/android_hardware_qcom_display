@@ -150,6 +150,9 @@ class ResManager : public DumpImpl {
                                   const LayerRect &dst_rect, HWLayerConfig *layer_config);
   DisplayError ValidateScaling(const Layer &layer, const LayerRect &crop,
                                const LayerRect &dst, float *rot_scale_x, float *rot_scale_y);
+  DisplayError SrcSplitConfig(DisplayResourceContext *display_resource_ctx,
+                              const Layer &layer, const LayerRect &src_rect,
+                              const LayerRect &dst_rect, HWLayerConfig *layer_config);
   void CalculateCut(const LayerTransform &transform, float *left_cut_ratio, float *top_cut_ratio,
                     float *right_cut_ratio, float *bottom_cut_ratio);
   void CalculateCropRects(const LayerRect &scissor, const LayerTransform &transform,
