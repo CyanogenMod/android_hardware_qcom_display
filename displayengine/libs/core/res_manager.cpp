@@ -32,7 +32,7 @@
 namespace sde {
 
 ResManager::ResManager()
-  : num_pipe_(0), vig_pipes_(NULL), rgb_pipes_(NULL), dma_pipes_(NULL), frame_start_(false) {
+  : num_pipe_(0), vig_pipes_(NULL), rgb_pipes_(NULL), dma_pipes_(NULL), virtual_count_(0) {
 }
 
 DisplayError ResManager::Init(const HWResourceInfo &hw_res_info) {
@@ -42,7 +42,7 @@ DisplayError ResManager::Init(const HWResourceInfo &hw_res_info) {
 
   num_pipe_ = hw_res_info_.num_vig_pipe + hw_res_info_.num_rgb_pipe + hw_res_info_.num_dma_pipe;
 
-  if (UNLIKELY(num_pipe_ > kPipeIdMax)) {
+  if (num_pipe_ > kPipeIdMax) {
     DLOGE("Number of pipe is over the limit! %d", num_pipe_);
     return kErrorParameters;
   }
@@ -89,28 +89,27 @@ DisplayError ResManager::Deinit() {
 }
 
 DisplayError ResManager::RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
-                                        Handle *display_ctx) {
+                                         Handle *display_ctx) {
   DisplayError error = kErrorNone;
 
   HWBlockType hw_block_id = kHWBlockMax;
   switch (type) {
   case kPrimary:
-    if (UNLIKELY(!hw_block_ctx_[kHWPrimary].is_in_use)) {
+    if (!hw_block_ctx_[kHWPrimary].is_in_use) {
       hw_block_id = kHWPrimary;
     }
     break;
 
   case kHDMI:
-    if (UNLIKELY(!hw_block_ctx_[kHWHDMI].is_in_use)) {
+    if (!hw_block_ctx_[kHWHDMI].is_in_use) {
       hw_block_id = kHWHDMI;
     }
     break;
 
   case kVirtual:
-    // assume only WB2 can be used for vitrual display
-    if (UNLIKELY(!hw_block_ctx_[kHWWriteback2].is_in_use)) {
-      hw_block_id = kHWWriteback2;
-    }
+    // assume only WB2 can be used for virtual display
+    virtual_count_++;
+    hw_block_id = kHWWriteback2;
     break;
 
   default:
@@ -118,12 +117,12 @@ DisplayError ResManager::RegisterDisplay(DisplayType type, const HWDisplayAttrib
     return kErrorParameters;
   }
 
-  if (UNLIKELY(hw_block_id == kHWBlockMax)) {
+  if (hw_block_id == kHWBlockMax) {
     return kErrorResources;
   }
 
   DisplayResourceContext *display_resource_ctx = new DisplayResourceContext();
-  if (UNLIKELY(!display_resource_ctx)) {
+  if (!display_resource_ctx) {
     return kErrorMemory;
   }
 
@@ -132,10 +131,12 @@ DisplayError ResManager::RegisterDisplay(DisplayType type, const HWDisplayAttrib
   display_resource_ctx->display_attributes = attributes;
   display_resource_ctx->display_type = type;
   display_resource_ctx->hw_block_id = hw_block_id;
+  if (!display_resource_ctx->display_attributes.is_device_split)
+    display_resource_ctx->display_attributes.split_left =
+      display_resource_ctx->display_attributes.x_pixels;
 
   *display_ctx = display_resource_ctx;
-
-  return kErrorNone;
+  return error;
 }
 
 DisplayError ResManager::UnregisterDisplay(Handle display_ctx) {
@@ -143,12 +144,17 @@ DisplayError ResManager::UnregisterDisplay(Handle display_ctx) {
                           reinterpret_cast<DisplayResourceContext *>(display_ctx);
 
   Purge(display_ctx);
-  hw_block_ctx_[display_resource_ctx->hw_block_id].is_in_use = false;
+  if (display_resource_ctx->hw_block_id == kHWWriteback2) {
+    virtual_count_--;
+    if (!virtual_count_)
+      hw_block_ctx_[display_resource_ctx->hw_block_id].is_in_use = false;
+  } else {
+    hw_block_ctx_[display_resource_ctx->hw_block_id].is_in_use = false;
+  }
   delete display_resource_ctx;
 
   return kErrorNone;
 }
-
 
 DisplayError ResManager::Start(Handle display_ctx) {
   locker_.Lock();
@@ -156,12 +162,12 @@ DisplayError ResManager::Start(Handle display_ctx) {
   DisplayResourceContext *display_resource_ctx =
                           reinterpret_cast<DisplayResourceContext *>(display_ctx);
 
-  if (frame_start_) {
+  if (display_resource_ctx->frame_start) {
     return kErrorNone;  // keep context locked.
   }
 
   // First call in the cycle
-  frame_start_ = true;
+  display_resource_ctx->frame_start = true;
   display_resource_ctx->frame_count++;
 
   // Release the pipes not used in the previous cycle
@@ -172,6 +178,7 @@ DisplayError ResManager::Start(Handle display_ctx) {
       src_pipes_[i].state = kPipeStateIdle;
     }
   }
+
   return kErrorNone;
 }
 
@@ -191,22 +198,25 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
   DisplayError error = kErrorNone;
   const struct HWLayersInfo &layer_info = hw_layers->info;
 
-  if (UNLIKELY(layer_info.count > num_pipe_)) {
+  if (layer_info.count > num_pipe_) {
     return kErrorResources;
   }
 
-  error = Config(display_resource_ctx, hw_layers);
-  if (UNLIKELY(error != kErrorNone)) {
+  uint32_t rotate_count = 0;
+  error = Config(display_resource_ctx, hw_layers, &rotate_count);
+  if (error != kErrorNone) {
     return error;
   }
 
-  uint32_t left_index = 0;
+  uint32_t left_index = kPipeIdMax;
   bool need_scale = false;
   HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
+  HWBlockType rotator_block = kHWBlockMax;
 
   // Clear reserved marking
   for (uint32_t i = 0; i < num_pipe_; i++) {
-    src_pipes_[i].reserved = false;
+    if (src_pipes_[i].reserved_hw_block == hw_block_id)
+      src_pipes_[i].reserved_hw_block = kHWBlockMax;
   }
 
   for (uint32_t i = 0; i < layer_info.count; i++) {
@@ -220,26 +230,28 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
 
     HWPipeInfo *pipe_info = &hw_layers->config[i].left_pipe;
 
-    need_scale = IsScalingNeeded(pipe_info);
-
     // Should have a generic macro
-    bool is_yuv = (layer.input_buffer->format >= kFormatYCbCr420Planar);
+    bool is_yuv = IsYuvFormat(layer.input_buffer->format);
 
-    left_index = GetPipe(hw_block_id, is_yuv, need_scale, false, use_non_dma_pipe);
-    if (left_index >= num_pipe_) {
-      goto Acquire_failed;
+    // left pipe is needed
+    if (pipe_info->pipe_id) {
+      need_scale = IsScalingNeeded(pipe_info);
+      left_index = GetPipe(hw_block_id, is_yuv, need_scale, false, use_non_dma_pipe);
+      if (left_index >= num_pipe_) {
+        goto CleanupOnError;
+      }
+      src_pipes_[left_index].reserved_hw_block = hw_block_id;
     }
 
-    src_pipes_[left_index].reserved = true;
     SetDecimationFactor(pipe_info);
 
     pipe_info =  &hw_layers->config[i].right_pipe;
     if (pipe_info->pipe_id == 0) {
       // assign single pipe
-      hw_layers->config[i].left_pipe.pipe_id = src_pipes_[left_index].mdss_pipe_id;
-      src_pipes_[left_index].at_right = false;
-      hw_layers->config[i].is_right_pipe = false;
-      src_pipes_[left_index].at_right = false;
+      if (left_index < num_pipe_) {
+        hw_layers->config[i].left_pipe.pipe_id = src_pipes_[left_index].mdss_pipe_id;
+        src_pipes_[left_index].at_right = false;
+      }
       continue;
     }
 
@@ -248,7 +260,7 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     uint32_t right_index;
     right_index = GetPipe(hw_block_id, is_yuv, need_scale, true, use_non_dma_pipe);
     if (right_index >= num_pipe_) {
-      goto Acquire_failed;
+      goto CleanupOnError;
     }
 
     if (src_pipes_[right_index].priority < src_pipes_[left_index].priority) {
@@ -257,25 +269,31 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     }
 
     // assign dual pipes
-    hw_layers->config[i].right_pipe.pipe_id = src_pipes_[right_index].mdss_pipe_id;
-    src_pipes_[right_index].reserved = true;
+    pipe_info->pipe_id = src_pipes_[right_index].mdss_pipe_id;
+    src_pipes_[right_index].reserved_hw_block = hw_block_id;
     src_pipes_[right_index].at_right = true;
-    src_pipes_[left_index].reserved = true;
+    src_pipes_[left_index].reserved_hw_block = hw_block_id;
     src_pipes_[left_index].at_right = false;
     hw_layers->config[i].left_pipe.pipe_id = src_pipes_[left_index].mdss_pipe_id;
     SetDecimationFactor(pipe_info);
+
+    DLOGV_IF(kTagResources, "Pipe acquired, layer index = %d, left_pipe = %x, right_pipe = %x",
+            i, hw_layers->config[i].left_pipe.pipe_id,  pipe_info->pipe_id);
   }
 
   if (!CheckBandwidth(display_resource_ctx, hw_layers)) {
     DLOGV_IF(kTagResources, "Bandwidth check failed!");
-    goto Acquire_failed;
+    goto CleanupOnError;
   }
 
   return kErrorNone;
 
-Acquire_failed:
-  for (uint32_t i = 0; i < num_pipe_; i++)
-    src_pipes_[i].reserved = false;
+CleanupOnError:
+  DLOGV_IF(kTagResources, "Resource reserving failed! hw_block = %d", hw_block_id);
+  for (uint32_t i = 0; i < num_pipe_; i++) {
+    if (src_pipes_[i].reserved_hw_block == hw_block_id)
+      src_pipes_[i].reserved_hw_block = kHWBlockMax;
+  }
   return kErrorResources;
 }
 
@@ -486,6 +504,7 @@ float ResManager::GetBpp(LayerBufferFormat format) {
 }
 
 void ResManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
+  SCOPE_LOCK(locker_);
   DisplayResourceContext *display_resource_ctx =
                           reinterpret_cast<DisplayResourceContext *>(display_ctx);
   HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
@@ -494,23 +513,23 @@ void ResManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   DLOGV_IF(kTagResources, "Resource for hw_block = %d, frame_count = %d", hw_block_id, frame_count);
 
   for (uint32_t i = 0; i < num_pipe_; i++) {
-    if (src_pipes_[i].reserved) {
+    if (src_pipes_[i].reserved_hw_block == hw_block_id) {
       src_pipes_[i].hw_block_id = hw_block_id;
       src_pipes_[i].state = kPipeStateAcquired;
       src_pipes_[i].state_frame_count = frame_count;
       DLOGV_IF(kTagResources, "Pipe acquired index = %d, type = %d, pipe_id = %x", i,
-            src_pipes_[i].type, src_pipes_[i].mdss_pipe_id);
+               src_pipes_[i].type, src_pipes_[i].mdss_pipe_id);
     } else if ((src_pipes_[i].hw_block_id == hw_block_id) &&
                (src_pipes_[i].state == kPipeStateAcquired)) {
       src_pipes_[i].state = kPipeStateToRelease;
       src_pipes_[i].state_frame_count = frame_count;
       DLOGV_IF(kTagResources, "Pipe to release index = %d, type = %d, pipe_id = %x", i,
-            src_pipes_[i].type, src_pipes_[i].mdss_pipe_id);
+               src_pipes_[i].type, src_pipes_[i].mdss_pipe_id);
     }
   }
 
   // handoff pipes which are used by splash screen
-  if (UNLIKELY((frame_count == 1) && (hw_block_id == kHWPrimary))) {
+  if ((frame_count == 1) && (hw_block_id == kHWPrimary)) {
     for (uint32_t i = 0; i < num_pipe_; i++) {
       if ((src_pipes_[i].state == kPipeStateOwnedByKernel)) {
         src_pipes_[i].state = kPipeStateToRelease;
@@ -518,8 +537,7 @@ void ResManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
       }
     }
   }
-
-  frame_start_ = false;
+  display_resource_ctx->frame_start = false;
 }
 
 void ResManager::Purge(Handle display_ctx) {
@@ -531,10 +549,9 @@ void ResManager::Purge(Handle display_ctx) {
 
   for (uint32_t i = 0; i < num_pipe_; i++) {
     if (src_pipes_[i].hw_block_id == hw_block_id)
-      src_pipes_[i].state = kPipeStateIdle;
+      src_pipes_[i].ResetState();
   }
 }
-
 
 uint32_t ResManager::GetMdssPipeId(PipeType type, uint32_t index) {
   uint32_t mdss_id = kPipeIdMax;
@@ -572,34 +589,19 @@ uint32_t ResManager::GetMdssPipeId(PipeType type, uint32_t index) {
   return (1 << mdss_id);
 }
 
-uint32_t ResManager::NextPipe(PipeType type, HWBlockType hw_block_id, bool at_right) {
-  uint32_t num_pipe = 0;
+uint32_t ResManager::SearchPipe(HWBlockType hw_block_id, SourcePipe *src_pipes,
+                                uint32_t num_pipe, bool at_right) {
   uint32_t index = kPipeIdMax;
-  SourcePipe *src_pipe = NULL;
+  SourcePipe *src_pipe;
+  HWBlockType dedicated_block;
 
-  switch (type) {
-  case kPipeTypeVIG:
-    src_pipe = vig_pipes_;
-    num_pipe = hw_res_info_.num_vig_pipe;
-    break;
-  case kPipeTypeRGB:
-    src_pipe = rgb_pipes_;
-    num_pipe = hw_res_info_.num_rgb_pipe;
-    break;
-  case kPipeTypeDMA:
-  default:
-    src_pipe = dma_pipes_;
-    num_pipe = hw_res_info_.num_dma_pipe;
-    break;
-  }
-
-  // search the pipe being used
+  // search dedicated idle pipes
   for (uint32_t i = 0; i < num_pipe; i++) {
-    if (!src_pipe[i].reserved &&
-        (src_pipe[i].state == kPipeStateAcquired) &&
-        (src_pipe[i].hw_block_id == hw_block_id) &&
-        (src_pipe[i].at_right == at_right)) {
-      index = src_pipe[i].index;
+    src_pipe = &src_pipes[i];
+    if (src_pipe->reserved_hw_block == kHWBlockMax &&
+        src_pipe->state == kPipeStateIdle &&
+        src_pipe->dedicated_hw_block == hw_block_id) {
+      index = src_pipe->index;
       break;
     }
   }
@@ -609,17 +611,61 @@ uint32_t ResManager::NextPipe(PipeType type, HWBlockType hw_block_id, bool at_ri
     return index;
   }
 
+  // search the pipe being used
   for (uint32_t i = 0; i < num_pipe; i++) {
-    if (!src_pipe[i].reserved &&
-        ((src_pipe[i].state == kPipeStateIdle) ||
-         ((src_pipe[i].state == kPipeStateAcquired) &&
-         (src_pipe[i].hw_block_id == hw_block_id)))) {
-      index = src_pipe[i].index;
+    src_pipe = &src_pipes[i];
+    dedicated_block = src_pipe->dedicated_hw_block;
+    if (src_pipe->reserved_hw_block == kHWBlockMax &&
+        (src_pipe->state == kPipeStateAcquired) &&
+        (src_pipe->hw_block_id == hw_block_id) &&
+        (src_pipe->at_right == at_right) &&
+        (dedicated_block == hw_block_id || dedicated_block == kHWBlockMax)) {
+      index = src_pipe->index;
       break;
     }
   }
 
+  // found
+  if (index < num_pipe_) {
+    return index;
+  }
+
+  // search the pipes idle or being used but not at the same side
+  for (uint32_t i = 0; i < num_pipe; i++) {
+    src_pipe = &src_pipes[i];
+    dedicated_block = src_pipe->dedicated_hw_block;
+    if (src_pipe->reserved_hw_block == kHWBlockMax &&
+        ((src_pipe->state == kPipeStateIdle) ||
+         (src_pipe->state == kPipeStateAcquired && src_pipe->hw_block_id == hw_block_id)) &&
+         (dedicated_block == hw_block_id || dedicated_block == kHWBlockMax)) {
+      index = src_pipe->index;
+      break;
+    }
+  }
   return index;
+}
+
+uint32_t ResManager::NextPipe(PipeType type, HWBlockType hw_block_id, bool at_right) {
+  uint32_t num_pipe = 0;
+  SourcePipe *src_pipes = NULL;
+
+  switch (type) {
+  case kPipeTypeVIG:
+    src_pipes = vig_pipes_;
+    num_pipe = hw_res_info_.num_vig_pipe;
+    break;
+  case kPipeTypeRGB:
+    src_pipes = rgb_pipes_;
+    num_pipe = hw_res_info_.num_rgb_pipe;
+    break;
+  case kPipeTypeDMA:
+  default:
+    src_pipes = dma_pipes_;
+    num_pipe = hw_res_info_.num_dma_pipe;
+    break;
+  }
+
+  return SearchPipe(hw_block_id, src_pipes, num_pipe, at_right);
 }
 
 uint32_t ResManager::GetPipe(HWBlockType hw_block_id, bool is_yuv, bool need_scale, bool at_right,
@@ -634,7 +680,7 @@ uint32_t ResManager::GetPipe(HWBlockType hw_block_id, bool is_yuv, bool need_sca
       index = NextPipe(kPipeTypeDMA, hw_block_id, at_right);
     }
 
-    if ((index >= num_pipe_) && (!need_scale || hw_res_info_.has_non_scalar_rgb)) {
+    if ((index >= num_pipe_) && (!need_scale || !hw_res_info_.has_non_scalar_rgb)) {
       index = NextPipe(kPipeTypeRGB, hw_block_id, at_right);
     }
 
@@ -656,6 +702,14 @@ bool ResManager::IsScalingNeeded(const HWPipeInfo *pipe_info) {
 
 void ResManager::AppendDump(char *buffer, uint32_t length) {
   SCOPE_LOCK(locker_);
+  AppendString(buffer, length, "\nresource manager pipe state");
+  for (uint32_t i = 0; i < num_pipe_; i++) {
+    SourcePipe *src_pipe = &src_pipes_[i];
+    AppendString(buffer, length,
+                 "\nindex = %d, id = %x, reserved = %d, state = %d, at_right = %d, dedicated = %d",
+                 src_pipe->index, src_pipe->mdss_pipe_id, src_pipe->reserved_hw_block,
+                 src_pipe->state, src_pipe->at_right, src_pipe->dedicated_hw_block);
+  }
 }
 
 }  // namespace sde

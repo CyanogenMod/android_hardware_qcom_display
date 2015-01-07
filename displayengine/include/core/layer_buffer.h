@@ -108,11 +108,13 @@ struct LayerBufferPlane {
   @sa LayerBuffer
 */
 struct LayerBufferFlags {
-  uint64_t secure : 1;  //!< This flag shall be set by client to indicate that the buffer need
-                        //!< to be handled securely.
-  uint64_t video  : 1;  //!< This flag shall be set by client to indicate that the buffer is
-                        //!< video/ui buffer
-  LayerBufferFlags() : secure(0) { }
+  uint64_t secure : 1;      //!< This flag shall be set by client to indicate that the buffer need
+                            //!< to be handled securely.
+  uint64_t video  : 1;      //!< This flag shall be set by client to indicate that the buffer is
+                            //!< video/ui buffer
+  uint64_t macro_tile : 1;  //!< This flag shall be set by client to indicate that the buffer format
+                            //!< is macro tiled.
+  LayerBufferFlags() : secure(0), video(0), macro_tile(0) { }
 };
 
 /*! @brief This structure defines a layer buffer handle which contains raw buffer and its associated

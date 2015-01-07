@@ -32,115 +32,200 @@
 
 namespace sde {
 
-DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HWLayers *hw_layers) {
-  HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
+DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_resource_ctx,
+                                            const Layer &layer, const LayerRect &src_rect,
+                                            const LayerRect &dst_rect,
+                                            HWLayerConfig *layer_config) {
   HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
-  HWLayersInfo &layer_info = hw_layers->info;
+  // for display split case
+  HWPipeInfo *left_pipe = &layer_config->left_pipe;
+  HWPipeInfo *right_pipe = &layer_config->right_pipe;
+  LayerRect scissor, dst_left, crop_left, crop_right, dst_right;
+  layer_config->is_right_pipe = false;
+  scissor.right = FLOAT(display_attributes.split_left);
+  scissor.bottom = FLOAT(display_attributes.y_pixels);
 
-  for (uint32_t i = 0; i < layer_info.count; i++) {
-    Layer& layer = layer_info.stack->layers[layer_info.index[i]];
-    float w_scale, h_scale;
-    if (!IsValidDimension(layer, &w_scale, &h_scale)) {
-      DLOGV("Invalid dimension");
+  crop_left = src_rect;
+  dst_left = dst_rect;
+  crop_right = crop_left;
+  dst_right = dst_left;
+  LayerTransform transform = layer.transform;
+  CalculateCropRects(scissor, transform, &crop_left, &dst_left);
+  scissor.left = FLOAT(display_attributes.split_left);
+  scissor.top = 0.0f;
+  scissor.right = FLOAT(display_attributes.x_pixels);
+  scissor.bottom = FLOAT(display_attributes.y_pixels);
+  CalculateCropRects(scissor, transform, &crop_right, &dst_right);
+  if ((crop_left.right - crop_left.left) >= kMaxSourcePipeWidth) {
+    if (crop_right.right != crop_right.left)
       return kErrorNotSupported;
-    }
+    // 2 pipes both are on the left
+    SplitRect(transform.flip_horizontal, crop_left, dst_left, &left_pipe->src_roi,
+              &left_pipe->dst_roi, &right_pipe->src_roi, &right_pipe->dst_roi);
+    left_pipe->pipe_id = kPipeIdNeedsAssignment;
+    right_pipe->pipe_id = kPipeIdNeedsAssignment;
+    layer_config->is_right_pipe = true;
+  } else if ((crop_right.right - crop_right.left) >= kMaxSourcePipeWidth) {
+    if (crop_left.right != crop_left.left)
+      return kErrorNotSupported;
+    // 2 pipes both are on the right
+    SplitRect(transform.flip_horizontal, crop_right, dst_right, &left_pipe->src_roi,
+              &left_pipe->dst_roi, &right_pipe->src_roi, &right_pipe->dst_roi);
+    left_pipe->pipe_id = kPipeIdNeedsAssignment;
+    right_pipe->pipe_id = kPipeIdNeedsAssignment;
+    layer_config->is_right_pipe = true;
+  } else if (UINT32(dst_left.right) > UINT32(dst_left.left)) {
+    // assign left pipe
+    left_pipe->src_roi = crop_left;
+    left_pipe->dst_roi = dst_left;
+    left_pipe->pipe_id = kPipeIdNeedsAssignment;
+  } else {
+    // Set default value, left_pipe is not needed.
+    left_pipe->Reset();
+  }
 
-    LayerRect scissor;
-    scissor.right = FLOAT(display_attributes.split_left);
-    scissor.bottom = FLOAT(display_attributes.y_pixels);
-    LayerRect crop = layer.src_rect;
-    LayerRect dst = layer.dst_rect;
-    LayerRect cropRight = crop;
-    LayerRect dstRight = dst;
-    CalculateCropRects(&crop, &dst, scissor, layer.transform);
-    HWPipeInfo *pipe_info = &hw_layers->config[i].left_pipe;
-
-    pipe_info->src_roi = crop;
-    pipe_info->dst_roi = dst;
-
-    float crop_width = cropRight.right - cropRight.left;
-    pipe_info = &hw_layers->config[i].right_pipe;
-    if ((dstRight.right - dstRight.left) > kMaxInterfaceWidth ||
-         crop_width > kMaxInterfaceWidth ||
-        ((hw_block_id == kHWPrimary) &&
-         (crop_width > display_attributes.split_left))) {
-      scissor.left = FLOAT(display_attributes.split_left);
-      scissor.top = 0.0f;
-      scissor.right = FLOAT(display_attributes.x_pixels);
-      scissor.bottom = FLOAT(display_attributes.y_pixels);
-      CalculateCropRects(&cropRight, &dstRight, scissor, layer.transform);
-      pipe_info->src_roi = cropRight;
-      pipe_info->dst_roi = dstRight;
-      pipe_info->pipe_id = -1;
+  // assign right pipe if needed
+  if (UINT32(dst_right.right) > UINT32(dst_right.left)) {
+    if (left_pipe->pipe_id) {
+      right_pipe->src_roi = crop_right;
+      right_pipe->dst_roi = dst_right;
+      right_pipe->pipe_id = kPipeIdNeedsAssignment;
+      layer_config->is_right_pipe = true;
     } else {
-      // need not right pipe
-      pipe_info->pipe_id = 0;
+      // If left pipe is not used, use left pipe first.
+      left_pipe->src_roi = crop_right;
+      left_pipe->dst_roi = dst_right;
+      left_pipe->pipe_id = kPipeIdNeedsAssignment;
+      right_pipe->Reset();
     }
+  } else {
+    // need not right pipe
+    right_pipe->Reset();
   }
 
   return kErrorNone;
 }
 
-bool ResManager::IsValidDimension(const Layer& layer, float *width_scale, float *height_scale) {
-  if (IsNonIntegralSrcCrop(layer.src_rect)) {
-    return false;
-  }
+DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HWLayers *hw_layers,
+                                uint32_t *rotate_count) {
+  HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
+  HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
+  HWLayersInfo &layer_info = hw_layers->info;
+  DisplayError error = kErrorNone;
 
-  LayerRect crop;
-  LayerRect dst;
-  IntegerizeRect(&crop, layer.src_rect);
-  IntegerizeRect(&dst, layer.dst_rect);
+  for (uint32_t i = 0; i < layer_info.count; i++) {
+    Layer& layer = layer_info.stack->layers[layer_info.index[i]];
+    float rot_scale_x = 1.0f, rot_scale_y = 1.0f;
+    if (!IsValidDimension(layer.src_rect, layer.dst_rect)) {
+      DLOGE_IF(kTagResources, "Input is invalid");
+      LogRectVerbose("input layer src_rect", layer.src_rect);
+      LogRectVerbose("input layer dst_rect", layer.dst_rect);
+      return kErrorNotSupported;
+    }
 
-  bool rotated90 = (static_cast<int>(layer.transform.rotation) == 90);
-  float crop_w = rotated90 ? crop.bottom - crop.top : crop.right - crop.left;
-  float crop_h = rotated90 ? crop.right - crop.left : crop.bottom - crop.top;
-  float dst_w = dst.right - dst.left;
-  float dst_h = dst.bottom - dst.top;
+    LayerRect scissor, src_rect, dst_rect;
+    src_rect = layer.src_rect;
+    dst_rect = layer.dst_rect;
+    scissor.right = FLOAT(display_attributes.x_pixels);
+    scissor.bottom = FLOAT(display_attributes.y_pixels);
+    CalculateCropRects(scissor, layer.transform, &src_rect, &dst_rect);
 
-  if ((dst_w < 1) || (dst_h < 1)) {
-    return false;
-  }
+    if (ValidateScaling(layer, src_rect, dst_rect, &rot_scale_x, &rot_scale_y))
+      return kErrorNotSupported;
 
-  float w_scale = crop_w / dst_w;
-  float h_scale = crop_h / dst_h;
+    error = DisplaySplitConfig(display_resource_ctx, layer, src_rect,
+                               dst_rect, &hw_layers->config[i]);
+    if (error != kErrorNone)
+      break;
 
-  if ((crop_w < kMaxCropWidth) ||(crop_h < kMaxCropHeight)) {
-    return false;
-  }
-
-  if ((w_scale > 1.0f) || (h_scale > 1.0f)) {
-    const uint32_t max_scale_down = hw_res_info_.max_scale_down;
-
-    if (!hw_res_info_.has_decimation) {
-      if (crop_w > kMaxSourcePipeWidth || w_scale > max_scale_down || h_scale > max_scale_down) {
-        return false;
-      }
-    } else {
-      if (w_scale > max_scale_down || h_scale > max_scale_down) {
-        return false;
-      }
+    DLOGV_IF(kTagResources, "layer = %d, left pipe_id = %x",
+             i, hw_layers->config[i].left_pipe.pipe_id);
+    LogRectVerbose("input layer src_rect", layer.src_rect);
+    LogRectVerbose("input layer dst_rect", layer.dst_rect);
+    LogRectVerbose("cropped src_rect", src_rect);
+    LogRectVerbose("cropped dst_rect", dst_rect);
+    LogRectVerbose("left pipe src", hw_layers->config[i].left_pipe.src_roi);
+    LogRectVerbose("left pipe dst", hw_layers->config[i].left_pipe.dst_roi);
+    if (hw_layers->config[i].right_pipe.pipe_id) {
+      LogRectVerbose("right pipe src", hw_layers->config[i].right_pipe.src_roi);
+      LogRectVerbose("right pipe dst", hw_layers->config[i].right_pipe.dst_roi);
     }
   }
 
-  if (((w_scale < 1.0f) || (h_scale < 1.0f)) && (w_scale > 0.0f) && (h_scale > 0.0f)) {
-    const uint32_t max_scale_up = hw_res_info_.max_scale_up;
-    const float w_uscale = 1.0f / w_scale;
-    const float h_uscale = 1.0f / h_scale;
-
-    if (w_uscale > max_scale_up || h_uscale > max_scale_up) {
-      return false;
-    }
-  }
-
-  *width_scale = w_scale;
-  *height_scale = h_scale;
-
-  return true;
+  return error;
 }
 
-void ResManager::CalculateCut(float *left_cut_ratio,
-    float *top_cut_ratio, float *right_cut_ratio, float *bottom_cut_ratio,
-    const LayerTransform& transform) {
+DisplayError ResManager::ValidateScaling(const Layer &layer, const LayerRect &crop,
+                                         const LayerRect &dst, float *rot_scale_x,
+                                         float *rot_scale_y) {
+  bool rotated90 = (UINT32(layer.transform.rotation) == 90);
+  float crop_width = rotated90 ? crop.bottom - crop.top : crop.right - crop.left;
+  float crop_height = rotated90 ? crop.right - crop.left : crop.bottom - crop.top;
+  float dst_width = dst.right - dst.left;
+  float dst_height = dst.bottom - dst.top;
+
+  if ((dst_width < 1.0f) || (dst_height < 1.0f)) {
+    DLOGV_IF(kTagResources, "Destination region is too small w = %d, h = %d",
+    dst_width, dst_height);
+    return kErrorNotSupported;
+  }
+
+  if ((crop_width < 1.0f) || (crop_height < 1.0f)) {
+    DLOGV_IF(kTagResources, "source region is too small w = %d, h = %d", crop_width, crop_height);
+    return kErrorNotSupported;
+  }
+
+  float scale_x = crop_width / dst_width;
+  float scale_y = crop_height / dst_height;
+
+  if ((UINT32(scale_x) > 1) || (UINT32(scale_y) > 1)) {
+    const uint32_t max_scale_down = hw_res_info_.max_scale_down;
+    if (((!hw_res_info_.has_decimation) || (IsMacroTileFormat(layer.input_buffer))) &&
+        (scale_x > max_scale_down || scale_y > max_scale_down)) {
+      DLOGV_IF(kTagResources,
+               "Scaling down is over the limit is_tile = %d, scale_x = %d, scale_y = %d",
+               IsMacroTileFormat(layer.input_buffer), scale_x, scale_y);
+      return kErrorNotSupported;
+    }
+  }
+
+  const uint32_t max_scale_up = hw_res_info_.max_scale_up;
+  if (UINT32(scale_x) < 1 && scale_x > 0.0f) {
+    if ((1.0f / scale_x) > max_scale_up) {
+      DLOGV_IF(kTagResources, "Scaling up is over limit scale_x = %d", 1.0f / scale_x);
+      return kErrorNotSupported;
+    }
+  }
+
+  if (UINT32(scale_y) < 1 && scale_y > 0.0f) {
+    if ((1.0f / scale_y) > max_scale_up) {
+      DLOGV_IF(kTagResources, "Scaling up is over limit scale_y = %d", 1.0f / scale_y);
+      return kErrorNotSupported;
+    }
+  }
+
+  // Calculate rotator downscale ratio
+  float rot_scale = 1.0f;
+  while (scale_x > hw_res_info_.max_scale_down) {
+    scale_x /= 2;
+    rot_scale *= 2;
+  }
+  *rot_scale_x = rot_scale;
+
+  rot_scale = 1.0f;
+  while (scale_y > hw_res_info_.max_scale_down) {
+    scale_y /= 2;
+    rot_scale *= 2;
+  }
+  *rot_scale_y = rot_scale;
+  DLOGV_IF(kTagResources, "rotator scaling hor = %.0f, ver = %.0f", *rot_scale_x, *rot_scale_y);
+
+  return kErrorNone;
+}
+
+void ResManager::CalculateCut(const LayerTransform &transform, float *left_cut_ratio,
+                              float *top_cut_ratio, float *right_cut_ratio,
+                              float *bottom_cut_ratio) {
   if (transform.flip_horizontal) {
     Swap(*left_cut_ratio, *right_cut_ratio);
   }
@@ -159,75 +244,80 @@ void ResManager::CalculateCut(float *left_cut_ratio,
   }
 }
 
-void ResManager::CalculateCropRects(LayerRect *crop, LayerRect *dst,
-    const LayerRect& scissor, const LayerTransform& transform) {
-  float& crop_l = crop->left;
-  float& crop_t = crop->top;
-  float& crop_r = crop->right;
-  float& crop_b = crop->bottom;
-  float crop_w = crop->right - crop->left;
-  float crop_h = crop->bottom - crop->top;
+void ResManager::CalculateCropRects(const LayerRect &scissor, const LayerTransform &transform,
+                                    LayerRect *crop, LayerRect *dst) {
+  float &crop_left = crop->left;
+  float &crop_top = crop->top;
+  float &crop_right = crop->right;
+  float &crop_bottom = crop->bottom;
+  float crop_width = crop->right - crop->left;
+  float crop_height = crop->bottom - crop->top;
 
-  float& dst_l = dst->left;
-  float& dst_t = dst->top;
-  float& dst_r = dst->right;
-  float& dst_b = dst->bottom;
-  float dst_w = (dst->right > dst->left) ? dst->right - dst->left :
-    dst->left - dst->right;
-  float dst_h = (dst->bottom > dst->top) ? dst->bottom > dst->top :
-    dst->top > dst->bottom;
+  float &dst_left = dst->left;
+  float &dst_top = dst->top;
+  float &dst_right = dst->right;
+  float &dst_bottom = dst->bottom;
+  float dst_width = dst->right - dst->left;
+  float dst_height = dst->bottom - dst->top;
 
-  const float& sci_l = scissor.left;
-  const float& sci_t = scissor.top;
-  const float& sci_r = scissor.right;
-  const float& sci_b = scissor.bottom;
+  const float &sci_left = scissor.left;
+  const float &sci_top = scissor.top;
+  const float &sci_right = scissor.right;
+  const float &sci_bottom = scissor.bottom;
 
-  float left_cut_ratio = 0.0, right_cut_ratio = 0.0, top_cut_ratio = 0.0,
-    bottom_cut_ratio = 0.0;
+  float left_cut_ratio = 0.0, right_cut_ratio = 0.0, top_cut_ratio = 0.0, bottom_cut_ratio = 0.0;
+  bool need_cut = false;
 
-  if (dst_l < sci_l) {
-    left_cut_ratio = (sci_l - dst_l) / dst_w;
-    dst_l = sci_l;
+  if (dst_left < sci_left) {
+    left_cut_ratio = (sci_left - dst_left) / dst_width;
+    dst_left = sci_left;
+    need_cut = true;
   }
 
-  if (dst_r > sci_r) {
-    right_cut_ratio = (dst_r - sci_r) / dst_w;
-    dst_r = sci_r;
+  if (dst_right > sci_right) {
+    right_cut_ratio = (dst_right - sci_right) / dst_width;
+    dst_right = sci_right;
+    need_cut = true;
   }
 
-  if (dst_t < sci_t) {
-    top_cut_ratio = (sci_t - dst_t) / (dst_h);
-    dst_t = sci_t;
+  if (dst_top < sci_top) {
+    top_cut_ratio = (sci_top - dst_top) / (dst_height);
+    dst_top = sci_top;
+    need_cut = true;
   }
 
-  if (dst_b > sci_b) {
-    bottom_cut_ratio = (dst_b - sci_b) / (dst_h);
-    dst_b = sci_b;
+  if (dst_bottom > sci_bottom) {
+    bottom_cut_ratio = (dst_bottom - sci_bottom) / (dst_height);
+    dst_bottom = sci_bottom;
+    need_cut = true;
   }
 
-  CalculateCut(&left_cut_ratio, &top_cut_ratio, &right_cut_ratio, &bottom_cut_ratio, transform);
-  crop_l += crop_w * left_cut_ratio;
-  crop_t += crop_h * top_cut_ratio;
-  crop_r -= crop_w * right_cut_ratio;
-  crop_b -= crop_h * bottom_cut_ratio;
+  if (!need_cut)
+    return;
+
+  CalculateCut(transform, &left_cut_ratio, &top_cut_ratio, &right_cut_ratio, &bottom_cut_ratio);
+  crop_left += crop_width * left_cut_ratio;
+  crop_top += crop_height * top_cut_ratio;
+  crop_right -= crop_width * right_cut_ratio;
+  crop_bottom -= crop_height * bottom_cut_ratio;
 }
 
-bool ResManager::IsNonIntegralSrcCrop(const LayerRect& crop) {
-  if (crop.left - roundf(crop.left)     ||
-      crop.top - roundf(crop.top)       ||
-      crop.right - roundf(crop.right)   ||
-      crop.bottom - roundf(crop.bottom)) {
-    return true;
-  } else {
+bool ResManager::IsValidDimension(const LayerRect &src, const LayerRect &dst) {
+  // Make sure source in integral
+  if (src.left - roundf(src.left)     ||
+      src.top - roundf(src.top)       ||
+      src.right - roundf(src.right)   ||
+      src.bottom - roundf(src.bottom)) {
+    DLOGE_IF(kTagResources, "Input ROI is not integral");
     return false;
   }
-}
 
-void ResManager::IntegerizeRect(LayerRect *dst_rect, const LayerRect &src_rect) {
-  dst_rect->left = ceilf(src_rect.left);
-  dst_rect->top = ceilf(src_rect.top);
-  dst_rect->right = floorf(src_rect.right);
-  dst_rect->bottom = floorf(src_rect.bottom);
+  if (src.left > src.right || src.top > src.bottom || dst.left > dst.right ||
+      dst.top > dst.bottom) {
+    return false;
+  } else {
+    return true;
+  }
 }
 
 void ResManager::SetDecimationFactor(HWPipeInfo *pipe) {
@@ -248,5 +338,58 @@ void ResManager::SetDecimationFactor(HWPipeInfo *pipe) {
   pipe->decimation = UINT8(powf(2.0f, decimation_factor));
 }
 
-}  // namespace sde
+void ResManager::SplitRect(bool flip_horizontal, const LayerRect &src_rect,
+                           const LayerRect &dst_rect, LayerRect *src_left, LayerRect *dst_left,
+                           LayerRect *src_right, LayerRect *dst_right) {
+  // Split rectangle horizontally and evenly into two.
+  float src_width = src_rect.right - src_rect.left;
+  float dst_width = dst_rect.right - dst_rect.left;
+  if (flip_horizontal) {
+    src_left->top = src_rect.top;
+    src_left->left = src_rect.left;
+    src_left->right = src_rect.left + (src_width / 2);
+    src_left->bottom = src_rect.bottom;
 
+    dst_left->top = dst_rect.top;
+    dst_left->left = dst_rect.left + (dst_width / 2);
+    dst_left->right = dst_rect.right;
+    dst_left->bottom = dst_rect.bottom;
+
+    src_right->top = src_rect.top;
+    src_right->left = src_left->right;
+    src_right->right = src_rect.right;
+    src_right->bottom = src_rect.bottom;
+
+    dst_right->top = dst_rect.top;
+    dst_right->left = dst_rect.left;
+    dst_right->right = dst_left->left;
+    dst_right->bottom = dst_rect.bottom;
+  } else {
+    src_left->top = src_rect.top;
+    src_left->left = src_rect.left;
+    src_left->right = src_rect.left + (src_width / 2);
+    src_left->bottom = src_rect.bottom;
+
+    dst_left->top = dst_rect.top;
+    dst_left->left = dst_rect.left;
+    dst_left->right = dst_rect.left + (dst_width / 2);
+    dst_left->bottom = dst_rect.bottom;
+
+    src_right->top = src_rect.top;
+    src_right->left = src_left->right;
+    src_right->right = src_rect.right;
+    src_right->bottom = src_rect.bottom;
+
+    dst_right->top = dst_rect.top;
+    dst_right->left = dst_left->right;
+    dst_right->right = dst_rect.right;
+    dst_right->bottom = dst_rect.bottom;
+  }
+}
+
+void ResManager::LogRectVerbose(const char *prefix, const LayerRect &roi) {
+  DLOGV_IF(kTagResources,"%s: left = %.0f, top = %.0f, right = %.0f, bottom = %.0f",
+           prefix, roi.left, roi.top, roi.right, roi.bottom);
+}
+
+}  // namespace sde
