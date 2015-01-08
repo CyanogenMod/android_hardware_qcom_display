@@ -64,6 +64,7 @@ struct copybit_context_t {
     int     relFence;
     struct  mdp_buf_sync sync;
     struct  blitReq list;
+    uint8_t dynamic_fps;
 };
 
 /**
@@ -219,6 +220,7 @@ static void set_infos(struct copybit_context_t *dev,
                       struct mdp_blit_req *req, int flags)
 {
     req->alpha = dev->mAlpha;
+    req->fps = dev->dynamic_fps;
     req->transp_mask = MDP_TRANSP_NOP;
     req->flags = dev->mFlags | flags;
     // check if we are blitting to f/b
@@ -250,7 +252,7 @@ static int msm_copybit(struct copybit_context_t *dev, void const *list)
         for (unsigned int i=0 ; i<l->count ; i++) {
             ALOGE("%d: src={w=%d, h=%d, f=%d, rect={%d,%d,%d,%d}}\n"
                   "    dst={w=%d, h=%d, f=%d, rect={%d,%d,%d,%d}}\n"
-                  "    flags=%08x"
+                  "    flags=%08x, fps=%d"
                   ,
                   i,
                   l->req[i].src.width,
@@ -267,7 +269,8 @@ static int msm_copybit(struct copybit_context_t *dev, void const *list)
                   l->req[i].dst_rect.y,
                   l->req[i].dst_rect.w,
                   l->req[i].dst_rect.h,
-                  l->req[i].flags
+                  l->req[i].flags,
+                  l->req[i].fps
                  );
         }
 #endif
@@ -314,6 +317,9 @@ static int set_parameter_copybit(
                 if (value < 0)      value = MDP_ALPHA_NOP;
                 if (value >= 256)   value = 255;
                 ctx->mAlpha = (uint8_t)value;
+                break;
+            case COPYBIT_DYNAMIC_FPS:
+                ctx->dynamic_fps = (uint8_t)value;
                 break;
             case COPYBIT_DITHER:
                 if (value == COPYBIT_ENABLE) {
@@ -747,6 +753,9 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     ctx->device.flush_get_fence = flush_get_fence;
     ctx->device.clear = clear_copybit;
     ctx->mAlpha = MDP_ALPHA_NOP;
+    //dynamic_fps is zero means default
+    //panel refresh rate for driver.
+    ctx->dynamic_fps = 0;
     ctx->mFlags = 0;
     ctx->sync.flags = 0;
     ctx->relFence = -1;
