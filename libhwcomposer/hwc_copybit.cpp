@@ -802,7 +802,13 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
         ALOGE("%s: Framebuffer handle is NULL", __FUNCTION__);
         return -1;
     }
-
+    uint32_t dynamic_fps = 0;
+#ifdef DYNAMIC_FPS
+    MetaData_t *mdata = hnd ? (MetaData_t *)hnd->base_metadata : NULL;
+    if (mdata && (mdata->operation & UPDATE_REFRESH_RATE)) {
+       dynamic_fps  = roundOff(mdata->refreshrate);
+    }
+#endif
     // Set the copybit source:
     copybit_image_t src;
     src.w = getWidth(hnd);
@@ -1015,6 +1021,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                                               layerTransform);
     //TODO: once, we are able to read layer alpha, update this
     copybit->set_parameter(copybit, COPYBIT_PLANE_ALPHA, 255);
+    copybit->set_parameter(copybit, COPYBIT_DYNAMIC_FPS, dynamic_fps);
     copybit->set_parameter(copybit, COPYBIT_BLEND_MODE,
                                               layer->blending);
     copybit->set_parameter(copybit, COPYBIT_DITHER,

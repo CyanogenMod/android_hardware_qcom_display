@@ -76,6 +76,7 @@ enum {
     /* FB height */
     COPYBIT_FRAMEBUFFER_HEIGHT = 8,
     COPYBIT_FG_LAYER = 9,
+    COPYBIT_DYNAMIC_FPS = 10,
 };
 
 /* values for copybit_set_parameter(COPYBIT_TRANSFORM) */
