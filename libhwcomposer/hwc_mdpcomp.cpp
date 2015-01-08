@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
  *
@@ -1385,6 +1385,12 @@ bool MDPComp::mdpOnlyLayersComp(hwc_context_t *ctx,
            ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
            return false;
        }
+    }
+
+    /* Bail out if we dont have any secure RGB layers */
+    if (!ctx->listStats[mDpy].secureRGBCount) {
+        reset(ctx);
+        return false;
     }
 
     mCurrentFrame.reset(numAppLayers);
