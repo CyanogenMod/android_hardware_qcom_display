@@ -47,5 +47,14 @@ uint32_t Debug::GetSimulationFlag() {
   return 0;
 }
 
+uint32_t Debug::GetHDMIResolution() {
+  char property[PROPERTY_VALUE_MAX];
+  if (property_get("hw.hdmi.resolution", property, NULL) > 0) {
+    return atoi(property);
+  }
+
+  return 0;
+}
+
 }  // namespace sde
 

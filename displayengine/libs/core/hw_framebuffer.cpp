@@ -423,6 +423,33 @@ DisplayError HWFrameBuffer::SetDisplayAttributes(Handle device, uint32_t index) 
   return error;
 }
 
+DisplayError HWFrameBuffer::GetConfigIndex(Handle device, uint32_t mode, uint32_t *index) {
+  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+
+  switch (hw_context->type) {
+  case kDevicePrimary:
+  case kDeviceVirtual:
+    return kErrorNone;
+    break;
+  case kDeviceHDMI:
+    // Check if the mode is valid and return corresponding index
+    for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
+      if (hdmi_modes_[i] == mode) {
+        *index = i;
+        DLOGI("Index = %d for config = %d", *index, mode);
+        return kErrorNone;
+      }
+    }
+    break;
+  default:
+    return kErrorParameters;
+  }
+
+  DLOGE("Config = %d not supported", mode);
+  return kErrorNotSupported;
+}
+
+
 DisplayError HWFrameBuffer::PowerOn(Handle device) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 

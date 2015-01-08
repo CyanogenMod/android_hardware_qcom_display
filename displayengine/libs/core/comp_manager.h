@@ -58,7 +58,8 @@ class CompManager : public DumpImpl {
     StrategyConstraints constraints;
     Handle display_resource_ctx;
     DisplayType display_type;
-    bool strategy_selected;
+    uint32_t max_strategies;
+    uint32_t remaining_strategies;
   };
 
   Locker locker_;

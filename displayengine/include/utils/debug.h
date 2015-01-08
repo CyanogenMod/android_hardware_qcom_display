@@ -49,6 +49,7 @@ class Debug {
   static inline LogHandler* GetLogHandler() { return debug_.log_handler_; }
   static inline bool IsVirtualDriver() { return debug_.virtual_driver_; }
   static uint32_t GetSimulationFlag();
+  static uint32_t GetHDMIResolution();
 
  private:
   Debug();

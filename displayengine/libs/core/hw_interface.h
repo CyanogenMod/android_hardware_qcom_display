@@ -160,6 +160,7 @@ class HWInterface {
   virtual DisplayError GetDisplayAttributes(Handle device,
                             HWDisplayAttributes *display_attributes, uint32_t index) = 0;
   virtual DisplayError SetDisplayAttributes(Handle device, uint32_t index) = 0;
+  virtual DisplayError GetConfigIndex(Handle device, uint32_t mode, uint32_t *index) = 0;
   virtual DisplayError PowerOn(Handle device) = 0;
   virtual DisplayError PowerOff(Handle device) = 0;
   virtual DisplayError Doze(Handle device) = 0;

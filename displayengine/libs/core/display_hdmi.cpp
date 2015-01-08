@@ -64,6 +64,16 @@ int DisplayHDMI::GetBestConfig() {
     }
   }
 
+  // Used for changing HDMI Resolution - override the best with user set config
+  uint32_t user_config = Debug::GetHDMIResolution();
+  if (user_config) {
+    uint32_t config_index = -1;
+    // For the config, get the corresponding index
+    DisplayError error = hw_intf_->GetConfigIndex(hw_device_, user_config, &config_index);
+    if (error == kErrorNone)
+      return config_index;
+  }
+
   return best_config_mode;
 }
 

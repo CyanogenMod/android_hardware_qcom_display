@@ -150,7 +150,7 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
   }
 
   if (!pending_commit_) {
-    DLOGE("Commit: Corresponding Prepare() is not called.");
+    DLOGE("Commit: Corresponding Prepare() is not called for display = %d", display_type_);
     return kErrorUndefined;
   }
 
@@ -345,7 +345,7 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
                                 num_layers, num_hw_layers);
 
   for (uint32_t i = 0; i < num_hw_layers; i++) {
-    Layer &layer = hw_layers_.info.stack->layers[i];
+    Layer &layer = hw_layers_.info.stack->layers[hw_layers_.info.index[i]];
     LayerBuffer *input_buffer = layer.input_buffer;
     HWLayerConfig &layer_config = hw_layers_.config[i];
     HWPipeInfo &left_pipe = hw_layers_.config[i].left_pipe;
