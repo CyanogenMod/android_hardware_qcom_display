@@ -274,8 +274,6 @@ bool isGLESOnlyComp(hwc_context_t *ctx, const int& dpy);
 void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers);
 bool isAbcInUse(hwc_context_t *ctx);
 
-bool canUseMDPforVirtualDisplay(hwc_context_t* ctx,
-                                const hwc_display_contents_1_t *list);
 void dumpBuffer(private_handle_t *ohnd, char *bufferName);
 
 //Helper function to dump logs
