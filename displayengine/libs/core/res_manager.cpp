@@ -22,6 +22,7 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <math.h>
 #include <utils/constants.h>
 #include <utils/debug.h>
 
@@ -286,7 +287,10 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
       src_pipes_[left_index].reserved_hw_block = hw_block_id;
     }
 
-    SetDecimationFactor(pipe_info);
+    error = SetDecimationFactor(pipe_info);
+    if (error != kErrorNone) {
+      goto CleanupOnError;
+    }
 
     pipe_info =  &layer_config.right_pipe;
     if (pipe_info->pipe_id == 0) {
@@ -318,7 +322,10 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     src_pipes_[left_index].reserved_hw_block = hw_block_id;
     src_pipes_[left_index].at_right = false;
     layer_config.left_pipe.pipe_id = src_pipes_[left_index].mdss_pipe_id;
-    SetDecimationFactor(pipe_info);
+    error = SetDecimationFactor(pipe_info);
+    if (error != kErrorNone) {
+      goto CleanupOnError;
+    }
 
     DLOGV_IF(kTagResources, "Pipe acquired, layer index = %d, left_pipe = %x, right_pipe = %x",
             i, layer_config.left_pipe.pipe_id,  pipe_info->pipe_id);
@@ -418,7 +425,8 @@ float ResManager::GetPipeBw(DisplayResourceContext *display_ctx, HWPipeInfo *pip
   float dst_h = pipe->dst_roi.bottom - pipe->dst_roi.top;
 
   // Adjust src_h with pipe decimation
-  src_h /= FLOAT(pipe->decimation);
+  float decimation = powf(2.0f, pipe->vertical_decimation);
+  src_h /= decimation;
 
   float bw = src_w * src_h * bpp * display_attributes.fps;
 
@@ -440,7 +448,9 @@ float ResManager::GetClockForPipe(DisplayResourceContext *display_ctx, HWPipeInf
   float dst_w = pipe->dst_roi.right - pipe->dst_roi.left;
 
   // Adjust src_h with pipe decimation
-  src_h /= FLOAT(pipe->decimation);
+  float decimation = powf(2.0f, pipe->vertical_decimation);
+  src_h /= decimation;
+
 
   // SDE Clock requirement in MHz
   float clk = (dst_w * v_total * fps) / 1000000.0f;
