@@ -194,6 +194,13 @@ void VirtualDisplay::setAttributes() {
 
             setDownScaleMode(maxArea);
         }
+        //Initialize the display viewFrame info
+        mHwcContext->mViewFrame[HWC_DISPLAY_VIRTUAL].left = 0;
+        mHwcContext->mViewFrame[HWC_DISPLAY_VIRTUAL].top = 0;
+        mHwcContext->mViewFrame[HWC_DISPLAY_VIRTUAL].right =
+            (int)mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].xres;
+        mHwcContext->mViewFrame[HWC_DISPLAY_VIRTUAL].bottom =
+            (int)mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].yres;
         mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].vsync_period =
                 1000000000l /60;
         ALOGD_IF(DEBUG,"%s: Setting Virtual Attr: res(%d x %d)",__FUNCTION__,
