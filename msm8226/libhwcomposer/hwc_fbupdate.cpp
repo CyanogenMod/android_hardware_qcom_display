@@ -38,10 +38,9 @@ namespace qhwc {
 namespace ovutils = overlay::utils;
 
 IFBUpdate* IFBUpdate::getObject(hwc_context_t *ctx, const int& dpy) {
-    if(isDisplaySplit(ctx, dpy)) {
-        if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
-            return new FBSrcSplit(ctx, dpy);
-        }
+    if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
+        return new FBSrcSplit(ctx, dpy);
+    } else if(isDisplaySplit(ctx, dpy)) {
         return new FBUpdateSplit(ctx, dpy);
     }
     return new FBUpdateNonSplit(ctx, dpy);
