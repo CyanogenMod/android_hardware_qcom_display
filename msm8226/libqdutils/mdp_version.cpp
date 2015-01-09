@@ -137,7 +137,6 @@ void  MDPVersion::updatePanelInfo() {
     FILE *panelInfoNodeFP = NULL;
     const int MAX_FRAME_BUFFER_NAME_SIZE = 128;
     char fbType[MAX_FRAME_BUFFER_NAME_SIZE];
-    char panelInfo[MAX_FRAME_BUFFER_NAME_SIZE];
     const char *strCmdPanel = "mipi dsi cmd panel";
     const char *strVideoPanel = "mipi dsi video panel";
     const char *strLVDSPanel = "lvds panel";

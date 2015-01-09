@@ -481,10 +481,10 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
         width = float(rect.right - rect.left);
         height = float(rect.bottom - rect.top);
     }
-    xRatio = (float)(inPos.x/actualWidth);
-    yRatio = (float)(inPos.y/actualHeight);
-    wRatio = (float)(inPos.w/actualWidth);
-    hRatio = (float)(inPos.h/actualHeight);
+    xRatio = (float)((float)inPos.x/actualWidth);
+    yRatio = (float)((float)inPos.y/actualHeight);
+    wRatio = (float)((float)inPos.w/actualWidth);
+    hRatio = (float)((float)inPos.h/actualHeight);
 
     //Calculate the pos9ition...
     outPos.x = uint32_t((xRatio * width) + (float)xPos);
@@ -1370,10 +1370,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
 
     //Waits for acquire fences, returns a release fence
     if(LIKELY(!swapzero)) {
-        uint64_t start = systemTime();
         ret = ioctl(fbFd, MSMFB_BUFFER_SYNC, &data);
-        ALOGD_IF(HWC_UTILS_DEBUG, "%s: time taken for MSMFB_BUFFER_SYNC IOCTL = %d",
-                            __FUNCTION__, (size_t) ns2ms(systemTime() - start));
     }
 
     if(ret < 0) {
