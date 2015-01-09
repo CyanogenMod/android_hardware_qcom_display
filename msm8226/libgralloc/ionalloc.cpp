@@ -114,7 +114,7 @@ int IonAlloc::alloc_buffer(alloc_data& data)
     data.base = base;
     data.fd = fd_data.fd;
     ioctl(mIonFd, ION_IOC_FREE, &handle_data);
-    ALOGD_IF(DEBUG, "ion: Allocated buffer base:%p size:%u fd:%d",
+    ALOGD_IF(DEBUG, "ion: Allocated buffer base:%p size:%zu fd:%d",
           data.base, ionAllocData.len, data.fd);
     return 0;
 }
