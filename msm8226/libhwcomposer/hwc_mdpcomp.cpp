@@ -817,80 +817,117 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         ALOGD_IF(isDebug(), "%s: Frame not supported!", __FUNCTION__);
         return false;
     }
-
-    // Find overlap index
-    int overlapIdx = numAppLayers - 1;
-    uint32_t layerPixelCount, minPixelCount = 0;
-    for (int i = numAppLayers - 1; i >= 0; i--) {
+    // MDP comp checks
+    for(int i = 0; i < numAppLayers; i++) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
-        hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
-        layerPixelCount = (crop.right - crop.left) * (crop.bottom - crop.top);
-        if (!minPixelCount || (layerPixelCount < minPixelCount)) {
-            minPixelCount = layerPixelCount;
-            overlapIdx = i;
+        if(not isSupportedForMDPComp(ctx, layer)) {
+            ALOGD_IF(isDebug(), "%s: Unsupported layer in list",__FUNCTION__);
+            return false;
         }
     }
-
-    // No overlap
-    if (!overlapIdx)
-        return false;
 
     /* We cannot use this composition mode, if:
      1. A below layer needs scaling.
      2. Overlap is not peripheral to display.
      3. Overlap or a below layer has 90 degree transform.
-     4. Intersection of Overlap layer with a below layer is not valid.
-     5. Overlap area > (1/3 * FrameBuffer) area, based on Perf inputs.
+     4. Overlap area > (1/3 * FrameBuffer) area, based on Perf inputs.
      */
 
-    hwc_rect_t overlap = list->hwLayers[overlapIdx].displayFrame;
-    if (!isPeripheral(overlap, ctx->mViewFrame[mDpy]))
-        return false;
-
-    if ((3 * (overlap.right - overlap.left) * (overlap.bottom - overlap.top)) >
-        ((int)ctx->dpyAttr[mDpy].xres * (int)ctx->dpyAttr[mDpy].yres))
-        return false;
-
-    for (int i = overlapIdx; i >= 0; i--) {
+    int minLayerIndex[MAX_PTOR_LAYERS] = { -1, -1};
+    hwc_rect_t overlapRect[MAX_PTOR_LAYERS];
+    memset(overlapRect, 0, sizeof(overlapRect));
+    int layerPixelCount, minPixelCount = 0;
+    int numPTORLayersFound = 0;
+    for (int i = numAppLayers-1; (i >= 0 &&
+                                  numPTORLayersFound < MAX_PTOR_LAYERS); i--) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
+        hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
         hwc_rect_t dispFrame = layer->displayFrame;
-
-        if (has90Transform(layer))
-            return false;
-
-        if (i < overlapIdx) {
-            if (needsScaling(layer) ||
-                !isValidRect(getIntersection(dispFrame, overlap)))
-                return false;
+        layerPixelCount = (crop.right - crop.left) * (crop.bottom - crop.top);
+        // PTOR layer should be peripheral and cannot have transform
+        if (!isPeripheral(dispFrame, ctx->mViewFrame[mDpy]) ||
+                                has90Transform(layer)) {
+            continue;
+        }
+        if((3 * (layerPixelCount + minPixelCount)) >
+                ((int)ctx->dpyAttr[mDpy].xres * (int)ctx->dpyAttr[mDpy].yres)) {
+            // Overlap area > (1/3 * FrameBuffer) area, based on Perf inputs.
+            continue;
+        }
+        // Found the PTOR layer
+        bool found = true;
+        for (int j = i-1; j >= 0; j--) {
+            // Check if the layers below this layer qualifies for PTOR comp
+            hwc_layer_1_t* layer = &list->hwLayers[j];
+            hwc_rect_t disFrame = layer->displayFrame;
+            //layer below PTOR is intersecting and has 90 degree transform or
+            // needs scaling cannot be supported.
+            if ((isValidRect(getIntersection(dispFrame, disFrame)))
+                            && (has90Transform(layer) || needsScaling(layer))) {
+                found = false;
+                break;
+            }
+        }
+        // Store the minLayer Index
+        if(found) {
+            minLayerIndex[numPTORLayersFound] = i;
+            overlapRect[numPTORLayersFound] = list->hwLayers[i].displayFrame;
+            minPixelCount += layerPixelCount;
+            numPTORLayersFound++;
         }
     }
 
-    mOverlapIndex = overlapIdx;
-    if (!ctx->mCopyBit[mDpy]->prepareOverlap(ctx, list, overlapIdx)) {
-        ALOGD_IF(isDebug(), "%s: Overlap prepare failed!",__FUNCTION__);
-        mOverlapIndex = -1;
-        return false;
+    if(isValidRect(getIntersection(overlapRect[0], overlapRect[1]))) {
+        ALOGD_IF(isDebug(), "%s: Ignore Rect2 its intersects with Rect1",
+                 __FUNCTION__);
+        // reset second minLayerIndex[1];
+        minLayerIndex[1] = -1;
+        numPTORLayersFound--;
     }
 
-    hwc_rect_t sourceCrop[overlapIdx];
-    hwc_rect_t displayFrame[overlapIdx];
+    // No overlap layers
+    if (!numPTORLayersFound)
+        return false;
 
-    // Remove overlap from crop & displayFrame of below layers
-    for (int i = 0; i < overlapIdx; i++) {
+    ctx->mPtorInfo.count = numPTORLayersFound;
+    for(int i = 0; i < MAX_PTOR_LAYERS; i++) {
+        ctx->mPtorInfo.layerIndex[i] = minLayerIndex[i];
+    }
+
+    if (!ctx->mCopyBit[mDpy]->prepareOverlap(ctx, list)) {
+        // reset PTOR
+        ctx->mPtorInfo.count = 0;
+        return false;
+    }
+    // Store the displayFrame and the sourceCrops of the layers
+    hwc_rect_t displayFrame[numAppLayers];
+    hwc_rect_t sourceCrop[numAppLayers];
+    for(int i = 0; i < numAppLayers; i++) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
         displayFrame[i] = layer->displayFrame;
         sourceCrop[i] = integerizeSourceCrop(layer->sourceCropf);
+    }
 
-        // Update layer attributes
-        hwc_rect_t srcCrop = integerizeSourceCrop(layer->sourceCropf);
-        hwc_rect_t destRect = deductRect(layer->displayFrame, overlap);
-        qhwc::calculate_crop_rects(srcCrop, layer->displayFrame, destRect,
-                                   layer->transform);
-
-        layer->sourceCropf.left = (float)srcCrop.left;
-        layer->sourceCropf.top = (float)srcCrop.top;
-        layer->sourceCropf.right = (float)srcCrop.right;
-        layer->sourceCropf.bottom = (float)srcCrop.bottom;
+    for(int j = 0; j < numPTORLayersFound; j++) {
+        int index =  ctx->mPtorInfo.layerIndex[j];
+        // Remove overlap from crop & displayFrame of below layers
+        for (int i = 0; i < index && index !=-1; i++) {
+            hwc_layer_1_t* layer = &list->hwLayers[i];
+            if(!isValidRect(getIntersection(layer->displayFrame,
+                                            overlapRect[j])))  {
+                continue;
+            }
+            // Update layer attributes
+            hwc_rect_t srcCrop = integerizeSourceCrop(layer->sourceCropf);
+            hwc_rect_t destRect = deductRect(layer->displayFrame,
+                                             overlapRect[j]);
+            qhwc::calculate_crop_rects(srcCrop, layer->displayFrame, destRect,
+                                       layer->transform);
+            layer->sourceCropf.left = (float)srcCrop.left;
+            layer->sourceCropf.top = (float)srcCrop.top;
+            layer->sourceCropf.right = (float)srcCrop.right;
+            layer->sourceCropf.bottom = (float)srcCrop.bottom;
+        }
     }
 
     mCurrentFrame.mdpCount = numAppLayers;
@@ -903,7 +940,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
     bool result = postHeuristicsHandling(ctx, list);
 
     // Restore layer attributes
-    for (int i = 0; i < overlapIdx; i++) {
+    for(int i = 0; i < numAppLayers; i++) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
         layer->displayFrame = displayFrame[i];
         layer->sourceCropf.left = (float)sourceCrop[i].left;
@@ -913,12 +950,16 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
     }
 
     if (!result) {
-        mOverlapIndex = -1;
+        // reset PTOR
+        ctx->mPtorInfo.count = 0;
         reset(ctx);
+    } else {
+        ALOGD_IF(isDebug(), "%s: PTOR Indexes: %d and %d", __FUNCTION__,
+                 ctx->mPtorInfo.layerIndex[0],  ctx->mPtorInfo.layerIndex[1]);
     }
 
-    ALOGD_IF(isDebug(), "%s: Postheuristics %s!, Overlap index = %d",
-        __FUNCTION__, (result ? "successful" : "failed"), mOverlapIndex);
+    ALOGD_IF(isDebug(), "%s: Postheuristics %s!", __FUNCTION__,
+             (result ? "successful" : "failed"));
     return result;
 }
 
@@ -1586,7 +1627,9 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                     sSimulationFlags, sSimulationFlags);
         }
     }
-    mOverlapIndex = -1;
+    // reset PTOR
+    if(!mDpy)
+        memset(&(ctx->mPtorInfo), 0, sizeof(ctx->mPtorInfo));
 
     //Do not cache the information for next draw cycle.
     if(numLayers > MAX_NUM_APP_LAYERS or (!numLayers)) {
@@ -1685,11 +1728,10 @@ bool MDPComp::allocSplitVGPipesfor4k2k(hwc_context_t *ctx, int index) {
 
 int MDPComp::drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int fd = -1;
-    if (mOverlapIndex != -1) {
-        fd = ctx->mCopyBit[mDpy]->drawOverlap(ctx, list, mOverlapIndex);
+    if (ctx->mPtorInfo.isActive()) {
+        fd = ctx->mCopyBit[mDpy]->drawOverlap(ctx, list);
         if (fd < 0) {
             ALOGD_IF(isDebug(),"%s: failed", __FUNCTION__);
-            mOverlapIndex = -1;
         }
     }
     return fd;
@@ -1883,16 +1925,19 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                 continue;
             }
 
-            if (!mDpy && (i == mOverlapIndex)) {
+            int fd = hnd->fd;
+            uint32_t offset = (uint32_t)hnd->offset;
+            int index = ctx->mPtorInfo.getPTORArrayIndex(i);
+            if (!mDpy && (index != -1)) {
                 hnd = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
+                fd = hnd->fd;
+                // Use the offset of the RenderBuffer
+                offset = ctx->mPtorInfo.mRenderBuffOffset[index];
             }
 
             ALOGD_IF(isDebug(),"%s: MDP Comp: Drawing layer: %p hnd: %p \
                     using  pipe: %d", __FUNCTION__, layer,
                     hnd, dest );
-
-            int fd = hnd->fd;
-            uint32_t offset = (uint32_t)hnd->offset;
 
             Rotator *rot = mCurrentFrame.mdpToLayer[mdpIndex].rot;
             if(rot) {
@@ -2132,12 +2177,14 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ovutils::eDest indexL = pipe_info.lIndex;
             ovutils::eDest indexR = pipe_info.rIndex;
 
-            if (!mDpy && (i == mOverlapIndex)) {
-                hnd = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
-            }
-
             int fd = hnd->fd;
-            int offset = (uint32_t)hnd->offset;
+            uint32_t offset = (uint32_t)hnd->offset;
+            int index = ctx->mPtorInfo.getPTORArrayIndex(i);
+            if (!mDpy && (index != -1)) {
+                hnd = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
+                fd = hnd->fd;
+                offset = ctx->mPtorInfo.mRenderBuffOffset[index];
+            }
 
             if(ctx->mAD->draw(ctx, fd, offset)) {
                 fd = ctx->mAD->getDstFd();

@@ -295,6 +295,7 @@ void initContext(hwc_context_t *ctx)
     ctx->mGPUHintInfo.mCompositionState = COMPOSITION_STATE_MDP;
     ctx->mGPUHintInfo.mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
 #endif
+    memset(&(ctx->mPtorInfo), 0, sizeof(ctx->mPtorInfo));
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
 }
@@ -1361,7 +1362,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         }
     }
 
-    if ((fd >= 0) && !dpy && ctx->mMDPComp[dpy]->isPTORActive()) {
+    if ((fd >= 0) && !dpy && ctx->mPtorInfo.isActive()) {
         // Acquire c2d fence of Overlap render buffer
         acquireFd[count++] = fd;
     }
@@ -1428,7 +1429,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     }
 
     if (!dpy && ctx->mCopyBit[dpy]) {
-        if (ctx->mMDPComp[dpy]->isPTORActive())
+        if (ctx->mPtorInfo.isActive())
             ctx->mCopyBit[dpy]->setReleaseFdSync(releaseFd);
         else
             ctx->mCopyBit[dpy]->setReleaseFd(releaseFd);
