@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -42,16 +42,16 @@ class IonAlloc : public IMemAlloc  {
     virtual int alloc_buffer(alloc_data& data);
 
     virtual int free_buffer(void *base, size_t size,
-                            int offset, int fd);
+                            size_t offset, int fd);
 
     virtual int map_buffer(void **pBase, size_t size,
-                           int offset, int fd);
+                           size_t offset, int fd);
 
     virtual int unmap_buffer(void *base, size_t size,
-                             int offset);
+                             size_t offset);
 
     virtual int clean_buffer(void*base, size_t size,
-                             int offset, int fd, int op);
+                             size_t offset, int fd, int op);
 
     IonAlloc() { mIonFd = FD_INIT; }
 
