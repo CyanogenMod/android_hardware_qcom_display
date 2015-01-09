@@ -115,7 +115,7 @@ static void reset(hwc_context_t *ctx, int numDisplays,
         // cache we need to reset it.
         // We can probably rethink that later on
         if (LIKELY(list && list->numHwLayers > 0)) {
-            for(uint32_t j = 0; j < list->numHwLayers; j++) {
+            for(size_t j = 0; j < list->numHwLayers; j++) {
                 if(list->hwLayers[j].compositionType != HWC_FRAMEBUFFER_TARGET)
                     list->hwLayers[j].compositionType = HWC_FRAMEBUFFER;
             }
@@ -135,7 +135,7 @@ static void reset(hwc_context_t *ctx, int numDisplays,
                  */
                 ctx->isPaddingRound = true;
             }
-            ctx->mPrevHwLayerCount[i] = list->numHwLayers;
+            ctx->mPrevHwLayerCount[i] = (int)list->numHwLayers;
         } else {
             ctx->mPrevHwLayerCount[i] = 0;
         }
@@ -160,29 +160,31 @@ bool isEqual(float f1, float f2) {
 
 static void scaleDisplayFrame(hwc_context_t *ctx, int dpy,
                             hwc_display_contents_1_t *list) {
-    float origXres = ctx->dpyAttr[dpy].xres_orig;
-    float origYres = ctx->dpyAttr[dpy].yres_orig;
-    float fakeXres = ctx->dpyAttr[dpy].xres;
-    float fakeYres = ctx->dpyAttr[dpy].yres;
-    float xresRatio = origXres / fakeXres;
-    float yresRatio = origYres / fakeYres;
+    uint32_t origXres = ctx->dpyAttr[dpy].xres_orig;
+    uint32_t origYres = ctx->dpyAttr[dpy].yres_orig;
+    uint32_t fakeXres = ctx->dpyAttr[dpy].xres;
+    uint32_t fakeYres = ctx->dpyAttr[dpy].yres;
+    float xresRatio = (float)origXres / (float)fakeXres;
+    float yresRatio = (float)origYres / (float)fakeYres;
     for (size_t i = 0; i < list->numHwLayers; i++) {
         hwc_layer_1_t *layer = &list->hwLayers[i];
         hwc_rect_t& displayFrame = layer->displayFrame;
         hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
-        float layerWidth = displayFrame.right - displayFrame.left;
-        float layerHeight = displayFrame.bottom - displayFrame.top;
-        float sourceWidth = sourceCrop.right - sourceCrop.left;
-        float sourceHeight = sourceCrop.bottom - sourceCrop.top;
+        uint32_t layerWidth = displayFrame.right - displayFrame.left;
+        uint32_t layerHeight = displayFrame.bottom - displayFrame.top;
+        uint32_t sourceWidth = sourceCrop.right - sourceCrop.left;
+        uint32_t sourceHeight = sourceCrop.bottom - sourceCrop.top;
 
-        if (isEqual(layerWidth / sourceWidth, xresRatio) &&
-                isEqual(layerHeight / sourceHeight, yresRatio))
+        if (isEqual(((float)layerWidth / (float)sourceWidth), xresRatio) &&
+                isEqual(((float)layerHeight / (float)sourceHeight), yresRatio))
             break;
 
-        displayFrame.left = xresRatio * displayFrame.left;
-        displayFrame.top = yresRatio * displayFrame.top;
-        displayFrame.right = displayFrame.left + layerWidth * xresRatio;
-        displayFrame.bottom = displayFrame.top + layerHeight * yresRatio;
+        displayFrame.left = (int)(xresRatio * (float)displayFrame.left);
+        displayFrame.top = (int)(yresRatio * (float)displayFrame.top);
+        displayFrame.right = (int)((float)displayFrame.left +
+                                   (float)layerWidth * xresRatio);
+        displayFrame.bottom = (int)((float)displayFrame.top +
+                                    (float)layerHeight * yresRatio);
     }
 }
 
@@ -198,7 +200,7 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         if (ctx->dpyAttr[dpy].customFBSize)
             scaleDisplayFrame(ctx, dpy, list);
 
-        reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
+        reset_layer_prop(ctx, dpy, (int)list->numHwLayers - 1);
         setListStats(ctx, list, dpy);
 
         fbComp = (ctx->mMDPComp[dpy]->prepare(ctx, list) < 0);
@@ -226,7 +228,7 @@ static int hwc_prepare_external(hwc_composer_device_1 *dev,
     if (LIKELY(list && list->numHwLayers > 1) &&
             ctx->dpyAttr[dpy].isActive &&
             ctx->dpyAttr[dpy].connected) {
-        reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
+        reset_layer_prop(ctx, dpy, (int)list->numHwLayers - 1);
         if(!ctx->dpyAttr[dpy].isPause) {
             ctx->dpyAttr[dpy].isConfiguring = false;
             setListStats(ctx, list, dpy);
@@ -261,13 +263,13 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 
     //Will be unlocked at the end of set
     ctx->mDrawLock.lock();
-    reset(ctx, numDisplays, displays);
+    reset(ctx, (int)numDisplays, displays);
 
     ctx->mOverlay->configBegin();
     ctx->mRotMgr->configBegin();
     overlay::Writeback::configBegin();
 
-    for (int32_t i = (numDisplays-1); i >= 0; i--) {
+    for (int32_t i = ((int32_t)numDisplays-1); i >=0 ; i--) {
         hwc_display_contents_1_t *list = displays[i];
         int dpy = getDpyforExternalDisplay(ctx, i);
         switch(dpy) {
@@ -496,7 +498,7 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int ret = 0;
     const int dpy = HWC_DISPLAY_PRIMARY;
     if (LIKELY(list) && ctx->dpyAttr[dpy].isActive) {
-        uint32_t last = list->numHwLayers - 1;
+        size_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         int fd = -1; //FenceFD from the Copybit(valid in async mode)
         bool copybitDone = false;
@@ -552,7 +554,7 @@ static int hwc_set_external(hwc_context_t *ctx,
     if (LIKELY(list) && ctx->dpyAttr[dpy].isActive &&
         ctx->dpyAttr[dpy].connected &&
         !ctx->dpyAttr[dpy].isPause) {
-        uint32_t last = list->numHwLayers - 1;
+        size_t last = list->numHwLayers - 1;
         hwc_layer_1_t *fbLayer = &list->hwLayers[last];
         int fd = -1; //FenceFD from the Copybit(valid in async mode)
         bool copybitDone = false;
@@ -605,7 +607,7 @@ static int hwc_set(hwc_composer_device_1 *dev,
 {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    for (uint32_t i = 0; i < numDisplays; i++) {
+    for (int i = 0; i < (int)numDisplays; i++) {
         hwc_display_contents_1_t* list = displays[i];
         int dpy = getDpyforExternalDisplay(ctx, i);
         switch(dpy) {
@@ -685,7 +687,7 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         HWC_DISPLAY_NO_ATTRIBUTE,
     };
 
-    const int NUM_DISPLAY_ATTRIBUTES = (sizeof(DISPLAY_ATTRIBUTES) /
+    const size_t NUM_DISPLAY_ATTRIBUTES = (sizeof(DISPLAY_ATTRIBUTES) /
             sizeof(DISPLAY_ATTRIBUTES)[0]);
 
     for (size_t i = 0; i < NUM_DISPLAY_ATTRIBUTES - 1; i++) {

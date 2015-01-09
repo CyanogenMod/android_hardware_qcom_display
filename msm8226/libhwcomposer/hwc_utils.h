@@ -189,7 +189,7 @@ inline overlay::Rotator* LayerRotMap::getRot(uint32_t index) const {
 }
 
 inline hwc_rect_t integerizeSourceCrop(const hwc_frect_t& cropF) {
-    hwc_rect_t cropI = {0};
+    hwc_rect_t cropI = {0,0,0,0};
     cropI.left = int(ceilf(cropF.left));
     cropI.top = int(ceilf(cropF.top));
     cropI.right = int(floorf(cropF.right));
