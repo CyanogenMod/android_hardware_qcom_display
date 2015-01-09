@@ -208,8 +208,6 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
                 sourceCrop, mdpFlags, rotFlags);
         if(!ret) {
             ALOGE("%s: preRotate for external Failed!", __FUNCTION__);
-            ctx->mOverlay->clear(mDpy);
-            ctx->mLayerRotMap[mDpy]->clear();
             return false;
         }
         //For the mdp, since either we are pre-rotating or MDP does flips
@@ -224,7 +222,6 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
         if(configMdp(ctx->mOverlay, parg, orient, sourceCrop, displayFrame,
                     NULL, mDest) < 0) {
             ALOGE("%s: configMdp failed for dpy %d", __FUNCTION__, mDpy);
-            ctx->mLayerRotMap[mDpy]->clear();
             ret = false;
         }
     }
@@ -387,10 +384,6 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
                 ret = false;
             }
         }
-
-        if(ret == false) {
-            ctx->mLayerRotMap[mDpy]->clear();
-        }
     }
     return ret;
 }
@@ -425,7 +418,6 @@ FBSrcSplit::FBSrcSplit(hwc_context_t *ctx, const int& dpy):
 
 bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         hwc_rect_t fbUpdatingRect, int fbZorder) {
-    bool ret = false;
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     int extOnlyLayerIndex = ctx->listStats[mDpy].extOnlyLayerIndex;
     // ext only layer present..
@@ -502,7 +494,6 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         if(configMdp(ctx->mOverlay, parg, orient,
                     cropL, cropL, NULL /*metadata*/, destL) < 0) {
             ALOGE("%s: commit failed for left mixer config", __FUNCTION__);
-            ctx->mLayerRotMap[mDpy]->clear();
             return false;
         }
     }
@@ -512,7 +503,6 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         if(configMdp(ctx->mOverlay, parg, orient,
                     cropR, cropR, NULL /*metadata*/, destR) < 0) {
             ALOGE("%s: commit failed for right mixer config", __FUNCTION__);
-            ctx->mLayerRotMap[mDpy]->clear();
             return false;
         }
     }
