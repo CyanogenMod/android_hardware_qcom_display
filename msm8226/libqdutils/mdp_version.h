@@ -147,6 +147,7 @@ public:
     bool is8084();
     bool is8092();
     bool is8x16();
+    bool is8x39();
 
 private:
     bool updateSysFsInfo();
