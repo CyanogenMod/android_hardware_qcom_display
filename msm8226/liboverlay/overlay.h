@@ -53,6 +53,17 @@ public:
     enum { MIXER_LEFT, MIXER_RIGHT, MIXER_UNUSED };
     enum { MIXER_DEFAULT = MIXER_LEFT, MIXER_MAX = MIXER_UNUSED };
     enum { MAX_FB_DEVICES = DPY_MAX };
+    enum { FORMAT_YUV, FORMAT_RGB };
+
+    struct PipeSpecs {
+        PipeSpecs() : formatClass(FORMAT_RGB), needsScaling(false), fb(false),
+                dpy(DPY_PRIMARY), mixer(MIXER_DEFAULT) {}
+        int formatClass;
+        bool needsScaling;
+        bool fb;
+        int dpy;
+        int mixer;
+    };
 
     /* dtor close */
     ~Overlay();
@@ -69,14 +80,10 @@ public:
      */
     void configDone();
 
-    /* Returns an available pipe based on the type of pipe requested. When ANY
-     * is requested, the first available VG or RGB is returned. If no pipe is
-     * available for the display "dpy" then INV is returned. Note: If a pipe is
-     * assigned to a certain display, then it cannot be assigned to another
-     * display without being garbage-collected once. To add if a pipe is
-     * asisgned to a mixer within a display it cannot be reused for another
-     * mixer without being UNSET once*/
-    utils::eDest nextPipe(utils::eMdpPipeType, int dpy, int mixer);
+    /* Get a pipe that supported the specified format class (yuv, rgb) and has
+     * scaling capabilities.
+     */
+    utils::eDest getPipe(const PipeSpecs& pipeSpecs);
     /* Returns the eDest corresponding to an already allocated pipeid.
      * Useful for the reservation case, when libvpu reserves the pipe at its
      * end, and expect the overlay to allocate a given pipe for a layer.
@@ -147,6 +154,18 @@ private:
     void validate(int index);
     static void setDMAMultiplexingSupported();
     void dump() const;
+    /* Returns an available pipe based on the type of pipe requested. When ANY
+     * is requested, the first available VG or RGB is returned. If no pipe is
+     * available for the display "dpy" then INV is returned. Note: If a pipe is
+     * assigned to a certain display, then it cannot be assigned to another
+     * display without being garbage-collected once. To add if a pipe is
+     * asisgned to a mixer within a display it cannot be reused for another
+     * mixer without being UNSET once*/
+    utils::eDest nextPipe(utils::eMdpPipeType, int dpy, int mixer);
+    /* Helpers that enfore target specific policies while returning pipes */
+    utils::eDest getPipe_8x26(const PipeSpecs& pipeSpecs);
+    utils::eDest getPipe_8x16(const PipeSpecs& pipeSpecs);
+
     /* Returns the scalar object */
     static scale::Scale *getScalar();
     /* Creates a scalar object using libscale.so */
