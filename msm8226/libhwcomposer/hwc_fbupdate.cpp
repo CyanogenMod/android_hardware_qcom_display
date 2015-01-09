@@ -275,8 +275,8 @@ bool FBUpdateSplit::prepare(hwc_context_t *ctx, hwc_display_contents_1 *list,
                  __FUNCTION__);
         return false;
     }
-    ALOGD_IF(DEBUG_FBUPDATE, "%s, mModeOn = %d", __FUNCTION__, mModeOn);
     mModeOn = configure(ctx, list, fbUpdatingRect, fbZorder);
+    ALOGD_IF(DEBUG_FBUPDATE, "%s, mModeOn = %d", __FUNCTION__, mModeOn);
     return mModeOn;
 }
 
