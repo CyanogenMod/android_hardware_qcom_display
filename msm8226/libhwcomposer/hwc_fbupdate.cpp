@@ -47,7 +47,7 @@ IFBUpdate* IFBUpdate::getObject(hwc_context_t *ctx, const int& dpy) {
 }
 
 IFBUpdate::IFBUpdate(hwc_context_t *ctx, const int& dpy) : mDpy(dpy) {
-    size_t size = 0;
+    unsigned int size = 0;
     uint32_t xres = ctx->dpyAttr[mDpy].xres;
     uint32_t yres = ctx->dpyAttr[mDpy].yres;
     if (ctx->dpyAttr[dpy].customFBSize) {
