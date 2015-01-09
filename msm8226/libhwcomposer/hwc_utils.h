@@ -41,6 +41,8 @@
 #define MIN_DISPLAY_YRES 200
 #define HWC_WFDDISPSYNC_LOG 0
 #define STR(f) #f;
+// Max number of PTOR layers handled
+#define MAX_PTOR_LAYERS 2
 
 //Fwrd decls
 struct hwc_context_t;
@@ -129,6 +131,23 @@ struct ListStats {
     hwc_rect_t rRoi;  //right ROI. Unused in single DSI panels.
     //App Buffer Composition index
     int  renderBufIndexforABC;
+};
+
+//PTOR Comp info
+struct PtorInfo {
+    int count;
+    int layerIndex[MAX_PTOR_LAYERS];
+    int mRenderBuffOffset[MAX_PTOR_LAYERS];
+    hwc_rect_t displayFrame[MAX_PTOR_LAYERS];
+    bool isActive() { return (count>0); }
+    int getPTORArrayIndex(int index) {
+        int idx = -1;
+        for(int i = 0; i < count; i++) {
+            if(index == layerIndex[i])
+                idx = i;
+        }
+        return idx;
+    }
 };
 
 struct LayerProp {
@@ -574,6 +593,8 @@ struct hwc_context_t {
     struct gpu_hint_info mGPUHintInfo;
     //App Buffer Composition
     bool enableABC;
+    // PTOR Info
+    qhwc::PtorInfo mPtorInfo;
 };
 
 namespace qhwc {
