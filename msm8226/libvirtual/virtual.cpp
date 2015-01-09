@@ -47,7 +47,6 @@
 #include "virtual.h"
 #include "overlayUtils.h"
 #include "overlay.h"
-#include "mdp_version.h"
 #include "qd_utils.h"
 
 using namespace android;
@@ -184,7 +183,7 @@ void VirtualDisplay::setAttributes() {
 
         initResolution(extW, extH);
 
-        if(!qdutils::MDPVersion::getInstance().is8x26()
+        if(mHwcContext->mOverlay->isUIScalingOnExternalSupported()
                 && (mHwcContext->mMDPDownscaleEnabled || isDRC)) {
 
             // maxArea represents the maximum resolution between

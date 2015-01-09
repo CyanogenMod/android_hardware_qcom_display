@@ -34,7 +34,6 @@
 #include "external.h"
 #include "overlayUtils.h"
 #include "overlay.h"
-#include "mdp_version.h"
 #include "qd_utils.h"
 
 using namespace android;
@@ -586,7 +585,7 @@ void ExternalDisplay::setAttributes() {
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].xres = width;
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].yres = height;
         mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode = false;
-        if(!qdutils::MDPVersion::getInstance().is8x26()
+        if(mHwcContext->mOverlay->isUIScalingOnExternalSupported()
                 && mHwcContext->mMDPDownscaleEnabled) {
             int priW = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
             int priH = mHwcContext->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
