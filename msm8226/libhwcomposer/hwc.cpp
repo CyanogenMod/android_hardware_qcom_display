@@ -101,12 +101,102 @@ static void hwc_registerProcs(struct hwc_composer_device_1* dev,
     init_vsync_thread(ctx);
 }
 
-//Helper
+static void setPaddingRound(hwc_context_t *ctx, int numDisplays,
+                            hwc_display_contents_1_t** displays) {
+    ctx->isPaddingRound = false;
+    for(int i = 0; i < numDisplays; i++) {
+        hwc_display_contents_1_t *list = displays[i];
+        if (LIKELY(list && list->numHwLayers > 0)) {
+            if((ctx->mPrevHwLayerCount[i] == 1 or
+                ctx->mPrevHwLayerCount[i] == 0) and
+               (list->numHwLayers > 1)) {
+                /* If the previous cycle for dpy 'i' has 0 AppLayers and the
+                 * current cycle has atleast 1 AppLayer, padding round needs
+                 * to be invoked in current cycle on all the active displays
+                 * to free up the resources.
+                 */
+                ctx->isPaddingRound = true;
+            }
+            ctx->mPrevHwLayerCount[i] = (int)list->numHwLayers;
+        } else {
+            ctx->mPrevHwLayerCount[i] = 0;
+        }
+    }
+}
+
+/* Based on certain conditions, isPaddingRound will be set
+ * to make this function self-contained */
+static void setDMAState(hwc_context_t *ctx, int numDisplays,
+                        hwc_display_contents_1_t** displays) {
+
+    if(ctx->mRotMgr->getNumActiveSessions() == 0)
+        Overlay::setDMAMode(Overlay::DMA_LINE_MODE);
+
+    for(int i = 0; i < numDisplays; i++) {
+        hwc_display_contents_1_t *list = displays[i];
+        if (LIKELY(list && list->numHwLayers > 0)) {
+            for(size_t j = 0; j < list->numHwLayers; j++) {
+                if(list->hwLayers[j].compositionType != HWC_FRAMEBUFFER_TARGET)
+                {
+                    hwc_layer_1_t const* layer = &list->hwLayers[i];
+                    private_handle_t *hnd = (private_handle_t *)layer->handle;
+
+                    /* If a video layer requires rotation, set the DMA state
+                     * to BLOCK_MODE */
+
+                    if (UNLIKELY(isYuvBuffer(hnd)) && canUseRotator(ctx,i) &&
+                        (layer->transform & HWC_TRANSFORM_ROT_90)) {
+                        if(not qdutils::MDPVersion::getInstance().is8x26()) {
+                            if(ctx->mOverlay->isPipeTypeAttached(
+                                             overlay::utils::OV_MDP_PIPE_DMA))
+                                ctx->isPaddingRound = true;
+                        }
+                        Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
+                    }
+                }
+            }
+            if(i) {
+                /* Uncomment the below code for testing purpose.
+                   Assuming the orientation value is in terms of HAL_TRANSFORM,
+                   this needs mapping to HAL, if its in different convention */
+
+                /* char value[PROPERTY_VALUE_MAX];
+                   property_get("sys.ext_orientation", value, "0");
+                   ctx->mExtOrientation = atoi(value);*/
+
+                if(ctx->mExtOrientation || ctx->mBufferMirrorMode) {
+                    if(ctx->mOverlay->isPipeTypeAttached(
+                                         overlay::utils::OV_MDP_PIPE_DMA)) {
+                        ctx->isPaddingRound = true;
+                    }
+                    Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
+                }
+            }
+        }
+    }
+}
+
+static void setNumActiveDisplays(hwc_context_t *ctx, int numDisplays,
+                            hwc_display_contents_1_t** displays) {
+
+    ctx->numActiveDisplays = 0;
+    for(int i = 0; i < numDisplays; i++) {
+        hwc_display_contents_1_t *list = displays[i];
+        if (LIKELY(list && list->numHwLayers > 0)) {
+            /* For display devices like SSD and screenrecord, we cannot
+             * rely on isActive and connected attributes of dpyAttr to
+             * determine if the displaydevice is active. Hence in case if
+             * the layer-list is non-null and numHwLayers > 0, we assume
+             * the display device to be active.
+             */
+            ctx->numActiveDisplays += 1;
+        }
+    }
+}
+
 static void reset(hwc_context_t *ctx, int numDisplays,
                   hwc_display_contents_1_t** displays) {
 
-    ctx->numActiveDisplays = 0;
-    ctx->isPaddingRound = false;
 
     for(int i = 0; i < numDisplays; i++) {
         hwc_display_contents_1_t *list = displays[i];
@@ -120,24 +210,6 @@ static void reset(hwc_context_t *ctx, int numDisplays,
                     list->hwLayers[j].compositionType = HWC_FRAMEBUFFER;
             }
 
-            /* For display devices like SSD and screenrecord, we cannot
-             * rely on isActive and connected attributes of dpyAttr to
-             * determine if the displaydevice is active. Hence in case if
-             * the layer-list is non-null and numHwLayers > 0, we assume
-             * the display device to be active.
-             */
-            ctx->numActiveDisplays += 1;
-
-            if((ctx->mPrevHwLayerCount[i] == 1) and (list->numHwLayers > 1)) {
-                /* If the previous cycle for dpy 'i' has 0 AppLayers and the
-                 * current cycle has atleast 1 AppLayer, padding round needs
-                 * to be invoked on current cycle to free up the resources.
-                 */
-                ctx->isPaddingRound = true;
-            }
-            ctx->mPrevHwLayerCount[i] = (int)list->numHwLayers;
-        } else {
-            ctx->mPrevHwLayerCount[i] = 0;
         }
 
         if(ctx->mFBUpdate[i])
@@ -263,6 +335,9 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
 
     //Will be unlocked at the end of set
     ctx->mDrawLock.lock();
+    setPaddingRound(ctx,numDisplays,displays);
+    setDMAState(ctx,numDisplays,displays);
+    setNumActiveDisplays(ctx,numDisplays,displays);
     reset(ctx, (int)numDisplays, displays);
 
     ctx->mOverlay->configBegin();
@@ -630,8 +705,6 @@ static int hwc_set(hwc_composer_device_1 *dev,
     CALC_FPS();
     MDPComp::resetIdleFallBack();
     ctx->mVideoTransFlag = false;
-    if(ctx->mRotMgr->getNumActiveSessions() == 0)
-        Overlay::setDMAMode(Overlay::DMA_LINE_MODE);
     //Was locked at the beginning of prepare
     ctx->mDrawLock.unlock();
     return ret;
