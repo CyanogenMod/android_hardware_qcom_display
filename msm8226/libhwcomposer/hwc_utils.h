@@ -158,6 +158,7 @@ struct LayerProp {
 struct VsyncState {
     bool enable;
     bool fakevsync;
+    bool debug;
 };
 
 struct BwcPM {
