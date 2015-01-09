@@ -163,6 +163,8 @@ utils::eDest Overlay::getPipe(const PipeSpecs& pipeSpecs) {
         return getPipe_8x26(pipeSpecs);
     } else if(MDPVersion::getInstance().is8x16()) {
         return getPipe_8x16(pipeSpecs);
+    } else if(MDPVersion::getInstance().is8x39()) {
+        return getPipe_8x39(pipeSpecs);
     }
 
     eDest dest = OV_INVALID;
@@ -249,6 +251,12 @@ utils::eDest Overlay::getPipe_8x16(const PipeSpecs& pipeSpecs) {
         }
     }
     return dest;
+}
+
+utils::eDest Overlay::getPipe_8x39(const PipeSpecs& pipeSpecs) {
+    //8x16 & 8x36 has same number of pipes, pipe-types & scaling capabilities.
+    //Rely on 8x16 until we see a need to change.
+    return getPipe_8x16(pipeSpecs);
 }
 
 void Overlay::endAllSessions() {
