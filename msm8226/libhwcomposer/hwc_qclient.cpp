@@ -193,6 +193,26 @@ static void setWfdStatus(hwc_context_t *ctx, uint32_t wfdStatus) {
     }
 }
 
+
+static status_t setViewFrame(hwc_context_t* ctx, const Parcel* inParcel) {
+    int dpy = inParcel->readInt32();
+    if(dpy >= HWC_DISPLAY_PRIMARY && dpy <= HWC_DISPLAY_VIRTUAL) {
+        Locker::Autolock _sl(ctx->mDrawLock);
+        ctx->mViewFrame[dpy].left   = inParcel->readInt32();
+        ctx->mViewFrame[dpy].top    = inParcel->readInt32();
+        ctx->mViewFrame[dpy].right  = inParcel->readInt32();
+        ctx->mViewFrame[dpy].bottom = inParcel->readInt32();
+        ALOGD_IF(QCLIENT_DEBUG, "%s: mViewFrame[%d] = [%d %d %d %d]",
+            __FUNCTION__, dpy,
+            ctx->mViewFrame[dpy].left, ctx->mViewFrame[dpy].top,
+            ctx->mViewFrame[dpy].right, ctx->mViewFrame[dpy].bottom);
+        return NO_ERROR;
+    } else {
+        ALOGE("In %s: invalid dpy index %d", __FUNCTION__, dpy);
+        return BAD_VALUE;
+    }
+}
+
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t ret = NO_ERROR;
@@ -231,6 +251,9 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::SET_WFD_STATUS:
             setWfdStatus(mHwcContext,inParcel->readInt32());
+            break;
+        case IQService::SET_VIEW_FRAME:
+            setViewFrame(mHwcContext, inParcel);
             break;
         default:
             ret = NO_ERROR;
