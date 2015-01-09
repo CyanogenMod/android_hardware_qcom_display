@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -40,7 +40,7 @@ DisplayError ResManager::Init(const HWResourceInfo &hw_res_info) {
 
   DisplayError error = kErrorNone;
 
-  // TODO: Remove this. Disable src_split as kernel not supported yet
+  // TODO(user): Remove this. Disable src_split as kernel not supported yet
   hw_res_info_.is_src_split = false;
   num_pipe_ = hw_res_info_.num_vig_pipe + hw_res_info_.num_rgb_pipe + hw_res_info_.num_dma_pipe;
 
@@ -123,7 +123,7 @@ DisplayError ResManager::RegisterDisplay(DisplayType type, const HWDisplayAttrib
     break;
 
   case kVirtual:
-    // assume only WB2 can be used for virtual display
+    // TODO(user): read this block id from kernel
     virtual_count_++;
     hw_block_id = kHWWriteback2;
     break;
@@ -159,7 +159,6 @@ DisplayError ResManager::UnregisterDisplay(Handle display_ctx) {
   DisplayResourceContext *display_resource_ctx =
                           reinterpret_cast<DisplayResourceContext *>(display_ctx);
 
-  Purge(display_ctx);
   if (display_resource_ctx->hw_block_id == kHWWriteback2) {
     virtual_count_--;
     if (!virtual_count_)
@@ -167,8 +166,9 @@ DisplayError ResManager::UnregisterDisplay(Handle display_ctx) {
   } else {
     hw_block_ctx_[display_resource_ctx->hw_block_id].is_in_use = false;
   }
+
   if (!hw_block_ctx_[display_resource_ctx->hw_block_id].is_in_use)
-    ClearDedicated(display_resource_ctx->hw_block_id);
+    Purge(display_ctx);
 
   delete display_resource_ctx;
 
@@ -202,13 +202,13 @@ DisplayError ResManager::Start(Handle display_ctx) {
   for (uint32_t i = 0; i < hw_res_info_.num_rotator; i++) {
     uint32_t pipe_index;
     pipe_index = rotators_[i].pipe_index;
+    rotators_[i].ClearState(display_resource_ctx->hw_block_id);
     if (rotators_[i].client_bit_mask == 0 &&
         src_pipes_[pipe_index].state == kPipeStateToRelease &&
         src_pipes_[pipe_index].hw_block_id == rotators_[i].writeback_id) {
       src_pipes_[pipe_index].dedicated_hw_block = kHWBlockMax;
       src_pipes_[pipe_index].state = kPipeStateIdle;
     }
-    CLEAR_BIT(rotators_[i].client_bit_mask, display_resource_ctx->hw_block_id);
   }
 
   return kErrorNone;
@@ -259,17 +259,19 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
   rotate_count = 0;
   for (uint32_t i = 0; i < layer_info.count; i++) {
     Layer &layer = layer_info.stack->layers[layer_info.index[i]];
-    bool use_non_dma_pipe = hw_layers->config[i].use_non_dma_pipe;
+    struct HWLayerConfig &layer_config = hw_layers->config[i];
+    bool use_non_dma_pipe = layer_config.use_non_dma_pipe;
 
-    // Temp setting, this should be set by comp_manager
+    // TODO(user): set this from comp_manager
     if (hw_block_id == kHWPrimary) {
       use_non_dma_pipe = true;
     }
 
-    AssignRotator(&hw_layers->config[i].left_rotate, &rotate_count);
-    AssignRotator(&hw_layers->config[i].right_rotate, &rotate_count);
+    for (uint32_t j = 0; j < layer_config.num_rotate; j++) {
+      AssignRotator(&layer_config.rotates[j], &rotate_count);
+    }
 
-    HWPipeInfo *pipe_info = &hw_layers->config[i].left_pipe;
+    HWPipeInfo *pipe_info = &layer_config.left_pipe;
 
     // Should have a generic macro
     bool is_yuv = IsYuvFormat(layer.input_buffer->format);
@@ -286,11 +288,11 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
 
     SetDecimationFactor(pipe_info);
 
-    pipe_info =  &hw_layers->config[i].right_pipe;
+    pipe_info =  &layer_config.right_pipe;
     if (pipe_info->pipe_id == 0) {
       // assign single pipe
       if (left_index < num_pipe_) {
-        hw_layers->config[i].left_pipe.pipe_id = src_pipes_[left_index].mdss_pipe_id;
+        layer_config.left_pipe.pipe_id = src_pipes_[left_index].mdss_pipe_id;
         src_pipes_[left_index].at_right = false;
       }
       continue;
@@ -315,11 +317,11 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     src_pipes_[right_index].at_right = true;
     src_pipes_[left_index].reserved_hw_block = hw_block_id;
     src_pipes_[left_index].at_right = false;
-    hw_layers->config[i].left_pipe.pipe_id = src_pipes_[left_index].mdss_pipe_id;
+    layer_config.left_pipe.pipe_id = src_pipes_[left_index].mdss_pipe_id;
     SetDecimationFactor(pipe_info);
 
     DLOGV_IF(kTagResources, "Pipe acquired, layer index = %d, left_pipe = %x, right_pipe = %x",
-            i, hw_layers->config[i].left_pipe.pipe_id,  pipe_info->pipe_id);
+            i, layer_config.left_pipe.pipe_id,  pipe_info->pipe_id);
   }
 
   if (!CheckBandwidth(display_resource_ctx, hw_layers)) {
@@ -580,16 +582,20 @@ void ResManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   }
   // set rotator pipes
   for (uint32_t i = 0; i < hw_res_info_.num_rotator; i++) {
-    uint32_t pipe_index;
-    pipe_index = rotators_[i].pipe_index;
+    uint32_t pipe_index = rotators_[i].pipe_index;
+
     if (IS_BIT_SET(rotators_[i].client_bit_mask, hw_block_id)) {
       src_pipes_[pipe_index].hw_block_id = rotators_[i].writeback_id;
       src_pipes_[pipe_index].state = kPipeStateAcquired;
-    } else if (!rotators_[i].client_bit_mask) {
+    } else if (!rotators_[i].client_bit_mask &&
+               src_pipes_[pipe_index].hw_block_id == rotators_[i].writeback_id &&
+               src_pipes_[pipe_index].state == kPipeStateAcquired) {
+      src_pipes_[pipe_index].state = kPipeStateToRelease;
+      src_pipes_[pipe_index].state_frame_count = frame_count;
+    }
+    // If no request on the rotation, release the pipe.
+    if (!rotators_[i].request_bit_mask) {
       src_pipes_[pipe_index].dedicated_hw_block = kHWBlockMax;
-      if (src_pipes_[pipe_index].hw_block_id == rotators_[i].writeback_id &&
-          src_pipes_[pipe_index].state == kPipeStateAcquired)
-        src_pipes_[pipe_index].state = kPipeStateToRelease;
     }
   }
   display_resource_ctx->frame_start = false;
@@ -762,116 +768,9 @@ void ResManager::AppendDump(char *buffer, uint32_t length) {
   for (uint32_t i = 0; i < num_pipe_; i++) {
     SourcePipe *src_pipe = &src_pipes_[i];
     AppendString(buffer, length,
-                 "\nindex = %d, id = %x, reserved = %d, state = %d, at_right = %d, dedicated = %d",
+                 "\nindex = %d, id = %x, reserved = %d, state = %d, hw_block = %d, dedicated = %d",
                  src_pipe->index, src_pipe->mdss_pipe_id, src_pipe->reserved_hw_block,
-                 src_pipe->state, src_pipe->at_right, src_pipe->dedicated_hw_block);
-  }
-}
-
-// This is to reserve resources for the device or rotator
-DisplayError ResManager::MarkDedicated(DisplayResourceContext *display_resource_ctx,
-                                       struct HWRotator *rotator) {
-  uint32_t num_base_pipe = 0, base_pipe_index = 0, num_vig_pipe = 0, i, vig_pipe_index = 0;
-  bool force = false;
-  SourcePipe *src_pipe = NULL;
-  HWBlockType hw_block_id;
-  if (rotator == NULL) {
-    hw_block_id = display_resource_ctx->hw_block_id;
-    switch (display_resource_ctx->display_type) {
-    case kPrimary:
-      src_pipe= rgb_pipes_;
-      if (display_resource_ctx->display_attributes.is_device_split ||
-          hw_res_info_.is_src_split) {
-        num_base_pipe = 2;
-        num_vig_pipe = 2;
-      } else {
-        num_base_pipe = 1;
-        num_vig_pipe = 1;
-      }
-      src_pipe = rgb_pipes_;
-      force = true;
-      break;
-    // HDMI and Virtual are using the same strategy
-    case kHDMI:
-    case kVirtual:
-      if (display_resource_ctx && display_resource_ctx->display_attributes.is_device_split) {
-        num_base_pipe = 2;
-        num_vig_pipe = 2;
-      } else {
-        num_base_pipe = 1;
-        num_vig_pipe = 1;
-      }
-      break;
-    default:
-      DLOGE("Wrong device type %d", display_resource_ctx->display_type);
-      break;
-    }
-  } else {
-    hw_block_id = rotator->writeback_id;
-    num_base_pipe = 1;
-    base_pipe_index = rotator->pipe_index;
-    src_pipe = &src_pipes_[base_pipe_index];
-    force = true;
-  }
-
-  if (!num_base_pipe) {
-    DLOGE("Cannot reserve dedicated pipe %d", hw_block_id);
-    return kErrorResources;
-  }
-
-  // Only search the assigned pipe type
-  if (force) {
-    for (i = 0; i < num_base_pipe; i++) {
-      if (src_pipe->dedicated_hw_block != kHWBlockMax)
-        DLOGV_IF(kTagResources, "Overwrite dedicated block %d", src_pipe->dedicated_hw_block);
-      src_pipe->dedicated_hw_block = hw_block_id;
-      src_pipe++;
-    }
-    num_base_pipe = 0;
-  } else {
-    // search available pipes
-    src_pipe = rgb_pipes_;
-    uint32_t num_pipe = hw_res_info_.num_rgb_pipe + hw_res_info_.num_vig_pipe;
-    for (i = 0; i < num_pipe; i++) {
-      if (src_pipe->dedicated_hw_block == kHWBlockMax ||
-          src_pipe->dedicated_hw_block == hw_block_id) {
-        src_pipe->dedicated_hw_block = hw_block_id;
-        num_base_pipe--;
-        if (!num_base_pipe)
-          break;
-      }
-      src_pipe++;
-    }
-    if (num_base_pipe) {
-      for (i = 0; i < num_pipe; i++) {
-        if (src_pipe->dedicated_hw_block == hw_block_id)
-          src_pipe->dedicated_hw_block = kHWBlockMax;
-        src_pipe++;
-      }
-      DLOGE("Cannot reserve dedicated pipe %d", hw_block_id);
-      return kErrorResources;
-    }
-  }
-  // optional for vig pipes
-  src_pipe= vig_pipes_;
-  for (i = 0; i < num_vig_pipe; i++) {
-    if (src_pipe->dedicated_hw_block == kHWBlockMax ||
-        src_pipe->dedicated_hw_block == hw_block_id) {
-      src_pipe->dedicated_hw_block = hw_block_id;
-      num_vig_pipe--;
-      if (!num_vig_pipe)
-        break;
-    }
-    src_pipe++;
-  }
-  return kErrorNone;
-}
-
-void ResManager::ClearDedicated(HWBlockType hw_block_id) {
-  SourcePipe *src_pipe = src_pipes_;
-  for (uint32_t i = 0; i < num_pipe_; i++) {
-    if (src_pipe->dedicated_hw_block == hw_block_id)
-      src_pipe->dedicated_hw_block = kHWBlockMax;
+                 src_pipe->state, src_pipe->hw_block_id, src_pipe->dedicated_hw_block);
   }
 }
 
@@ -890,7 +789,16 @@ DisplayError ResManager::AcquireRotator(DisplayResourceContext *display_resource
 
   for (i = 0; i < num_rotator; i++) {
     uint32_t rotate_pipe_index = rotators_[i].pipe_index;
-    MarkDedicated(display_resource_ctx, &rotators_[i]);
+    SourcePipe *src_pipe = &src_pipes_[rotate_pipe_index];
+
+    if (src_pipe->dedicated_hw_block != kHWBlockMax)
+      DLOGV_IF(kTagResources, "Overwrite dedicated block %d", src_pipe->dedicated_hw_block);
+    src_pipe->dedicated_hw_block = rotators_[i].writeback_id;
+    SET_BIT(rotators_[i].request_bit_mask, display_resource_ctx->hw_block_id);
+  }
+
+  for (i = 0; i < num_rotator; i++) {
+    uint32_t rotate_pipe_index = rotators_[i].pipe_index;
     if (src_pipes_[rotate_pipe_index].reserved_hw_block != kHWBlockMax) {
       DLOGV_IF(kTagResources, "pipe %x is reserved by block:%d",
                src_pipes_[rotate_pipe_index].mdss_pipe_id,
@@ -929,11 +837,14 @@ void ResManager::ClearRotator(DisplayResourceContext *display_resource_ctx) {
   for (uint32_t i = 0; i < hw_res_info_.num_rotator; i++) {
     uint32_t pipe_index;
     pipe_index = rotators_[i].pipe_index;
-    CLEAR_BIT(rotators_[i].client_bit_mask, display_resource_ctx->hw_block_id);
-    if (rotators_[i].client_bit_mask == 0 &&
-        src_pipes_[pipe_index].dedicated_hw_block == rotators_[i].writeback_id) {
+    rotators_[i].ClearState(display_resource_ctx->hw_block_id);
+    if (rotators_[i].client_bit_mask)
+      continue;
+
+    if (src_pipes_[pipe_index].hw_block_id == rotators_[i].writeback_id) {
+      src_pipes_[pipe_index].ResetState();
+    } else if (src_pipes_[pipe_index].dedicated_hw_block == rotators_[i].writeback_id) {
       src_pipes_[pipe_index].dedicated_hw_block = kHWBlockMax;
-      src_pipes_[pipe_index].state = kPipeStateIdle;
     }
   }
 }

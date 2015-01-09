@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -122,10 +122,10 @@ struct HWLayerConfig {
   bool is_right_pipe;  // indicate if right pipe is valid
   HWPipeInfo left_pipe;  // pipe for left side of the buffer
   HWPipeInfo right_pipe;  // pipe for right side of the buffer
-  HWRotateInfo left_rotate;  // rotation for left side of the buffer
-  HWRotateInfo right_rotate;  // rotation for right side of the buffer
+  uint32_t num_rotate;  // number of rotate
+  HWRotateInfo rotates[kMaxRotatePerLayer];  // rotation for the buffer
 
-  HWLayerConfig() : use_non_dma_pipe(false), is_right_pipe(false) { }
+  HWLayerConfig() : use_non_dma_pipe(false), is_right_pipe(false), num_rotate(0) { }
 };
 
 struct HWLayers {
