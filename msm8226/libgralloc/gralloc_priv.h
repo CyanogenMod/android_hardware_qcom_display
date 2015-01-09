@@ -202,7 +202,9 @@ struct private_handle_t : public native_handle {
             PRIV_FLAGS_ITU_R_709          = 0x00800000,
             PRIV_FLAGS_SECURE_DISPLAY     = 0x01000000,
             // Buffer is rendered in Tile Format
-            PRIV_FLAGS_TILE_RENDERED      = 0x02000000
+            PRIV_FLAGS_TILE_RENDERED      = 0x02000000,
+            // Buffer rendered using CPU/SW renderer
+            PRIV_FLAGS_CPU_RENDERED       = 0x04000000
         };
 
         // file-descriptors
