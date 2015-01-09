@@ -160,9 +160,10 @@ bool MDPComp::init(hwc_context_t *ctx) {
         }
     }
 
-    if((property_get("debug.mdpcomp.4k2kSplit", property, "0") > 0) &&
-            (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
-             (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+    if(!qdutils::MDPVersion::getInstance().isSrcSplit() &&
+            property_get("persist.mdpcomp.4k2kSplit", property, "0") > 0 &&
+            (!strncmp(property, "1", PROPERTY_VALUE_MAX) ||
+            !strncasecmp(property,"true", PROPERTY_VALUE_MAX))) {
         sEnable4k2kYUVSplit = true;
     }
 
