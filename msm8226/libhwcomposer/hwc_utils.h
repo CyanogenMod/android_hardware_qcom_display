@@ -376,6 +376,9 @@ bool isDisplaySplit(hwc_context_t* ctx, int dpy);
 // due to idle fallback or MDP composition.
 void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list);
 
+// Returns true if rect1 is peripheral to rect2, false otherwise.
+bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
+
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
     return (UNLIKELY(l && (l->flags & HWC_SKIP_LAYER)));
