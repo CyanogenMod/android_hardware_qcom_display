@@ -262,6 +262,7 @@ int getExtOrientation(hwc_context_t* ctx);
 bool isValidRect(const hwc_rect_t& rect);
 hwc_rect_t deductRect(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 bool isSameRect(const hwc_rect& rect1, const hwc_rect& rect2);
+hwc_rect_t moveRect(const hwc_rect_t& rect, const int& x_off, const int& y_off);
 hwc_rect_t getIntersection(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 hwc_rect_t getUnion(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 void optimizeLayerRects(const hwc_display_contents_1_t *list);
