@@ -47,12 +47,10 @@ int MDPComp::sMaxPipesPerMixer = MAX_PIPES_PER_MIXER;
 bool MDPComp::sEnable4k2kYUVSplit = false;
 bool MDPComp::sSrcSplitEnabled = false;
 MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
-
-    if(isDisplaySplit(ctx, dpy)) {
-        if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
-            sSrcSplitEnabled = true;
-            return new MDPCompSrcSplit(dpy);
-        }
+    if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
+        sSrcSplitEnabled = true;
+        return new MDPCompSrcSplit(dpy);
+    } else if(isDisplaySplit(ctx, dpy)) {
         return new MDPCompSplit(dpy);
     }
     return new MDPCompNonSplit(dpy);
