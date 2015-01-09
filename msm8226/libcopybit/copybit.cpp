@@ -705,7 +705,7 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
 {
     int status = -EINVAL;
 
-    if (!strcmp(name, COPYBIT_HARDWARE_COPYBIT0)) {
+    if (strcmp(name, COPYBIT_HARDWARE_COPYBIT0)) {
         return COPYBIT_FAILURE;
     }
     copybit_context_t *ctx;
