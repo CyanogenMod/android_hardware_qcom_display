@@ -1137,6 +1137,8 @@ bool MDPComp::canPartialUpdate(hwc_context_t *ctx,
             mDpy ) {
         return false;
     }
+    if(ctx->listStats[mDpy].secureUI)
+        return false;
     return true;
 }
 
