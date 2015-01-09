@@ -1848,7 +1848,7 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
 //================MDPCompSrcSplit==============================================
 bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
-        MdpPipeInfoSplit& pipe_info, ePipeType /*type*/) {
+        MdpPipeInfoSplit& pipe_info, ePipeType type) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     hwc_rect_t dst = layer->displayFrame;
     hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
@@ -1858,13 +1858,9 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
     //If 2 pipes are staged on a single stage of a mixer, then the left pipe
     //should have a higher priority than the right one. Pipe priorities are
     //starting with VG0, VG1 ... , RGB0 ..., DMA1
-    //TODO Currently we acquire VG pipes for left side and RGB/DMA for right to
-    //make sure pipe priorities are satisfied. A better way is to have priority
-    //as part of overlay object and acquire any 2 pipes. Assign the higher
-    //priority one to left side and lower to right side.
 
     //1 pipe by default for a layer
-    pipe_info.lIndex = getMdpPipe(ctx, MDPCOMP_OV_VG, Overlay::MIXER_DEFAULT);
+    pipe_info.lIndex = getMdpPipe(ctx, type, Overlay::MIXER_DEFAULT);
     if(pipe_info.lIndex == ovutils::OV_INVALID) {
         if(isYuvBuffer(hnd)) {
             return false;
@@ -1879,35 +1875,28 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
     //If layer's crop width or dest width > 2048, use 2 pipes
     if((dst.right - dst.left) > qdutils::MAX_DISPLAY_DIM or
             (crop.right - crop.left) > qdutils::MAX_DISPLAY_DIM) {
-        ePipeType rightType = isYuvBuffer(hnd) ?
-                MDPCOMP_OV_VG : MDPCOMP_OV_ANY;
-        pipe_info.rIndex = getMdpPipe(ctx, rightType, Overlay::MIXER_DEFAULT);
+        pipe_info.rIndex = getMdpPipe(ctx, type, Overlay::MIXER_DEFAULT);
         if(pipe_info.rIndex == ovutils::OV_INVALID) {
-            return false;
+            if(isYuvBuffer(hnd)) {
+                return false;
+            }
+            pipe_info.rIndex = getMdpPipe(ctx, MDPCOMP_OV_ANY,
+                    Overlay::MIXER_DEFAULT);
+            if(pipe_info.rIndex == ovutils::OV_INVALID) {
+                return false;
+            }
+        }
+
+        // Return values
+        // 1  Left pipe is higher priority, do nothing.
+        // 0  Pipes of same priority.
+        //-1  Right pipe is of higher priority, needs swap.
+        if(ctx->mOverlay->comparePipePriority(pipe_info.lIndex,
+                pipe_info.rIndex) == -1) {
+            qhwc::swap(pipe_info.lIndex, pipe_info.rIndex);
         }
     }
 
-    return true;
-}
-
-bool MDPCompSrcSplit::allocLayerPipes(hwc_context_t *ctx,
-        hwc_display_contents_1_t* list) {
-    for(int index = 0 ; index < mCurrentFrame.layerCount; index++) {
-        if(mCurrentFrame.isFBComposed[index]) continue;
-        hwc_layer_1_t* layer = &list->hwLayers[index];
-        int mdpIndex = mCurrentFrame.layerToMDP[index];
-        PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
-        info.pipeInfo = new MdpPipeInfoSplit;
-        info.rot = NULL;
-        MdpPipeInfoSplit& pipe_info = *(MdpPipeInfoSplit*)info.pipeInfo;
-
-        ePipeType type = MDPCOMP_OV_ANY;
-        if(!acquireMDPPipes(ctx, layer, pipe_info, type)) {
-            ALOGD_IF(isDebug(), "%s: Unable to get pipe for type = %d",
-                    __FUNCTION__, (int) type);
-            return false;
-        }
-    }
     return true;
 }
 

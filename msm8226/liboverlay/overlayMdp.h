@@ -80,6 +80,8 @@ public:
     utils::Dim getDstRectDim() const;
     /* returns a copy to src rect dim */
     utils::Dim getSrcRectDim() const;
+    /* return pipe priority */
+    uint8_t getPriority() const;
     /* setVisualParam */
     bool setVisualParams(const MetaData_t& data);
 
@@ -302,6 +304,10 @@ inline void MdpCtrl::setRotationFlags() {
     const int u = getUserData();
     if (u & MDP_ROT_90)
         mOVInfo.flags |= MDP_SOURCE_ROTATED_90;
+}
+
+inline uint8_t MdpCtrl::getPriority() const {
+    return mOVInfo.priority;
 }
 
 ///////    MdpCtrl3D //////
