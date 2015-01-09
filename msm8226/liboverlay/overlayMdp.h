@@ -84,6 +84,8 @@ public:
     uint8_t getPriority() const;
     /* setVisualParam */
     bool setVisualParams(const MetaData_t& data);
+    /* sets pipe type RGB/DMA/VG */
+    void setPipeType(const utils::eMdpPipeType& pType);
 
     static bool validateAndSet(MdpCtrl* mdpCtrlArray[], const int& count,
             const int& fbFd);

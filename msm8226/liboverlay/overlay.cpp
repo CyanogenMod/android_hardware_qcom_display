@@ -346,25 +346,18 @@ void Overlay::setSource(const utils::PipeArgs args,
         utils::eDest dest) {
     validate((int)dest);
 
-    PipeArgs newArgs(args);
-    if(PipeBook::getPipeType(dest) == OV_MDP_PIPE_VG) {
-        setMdpFlags(newArgs.mdpFlags, OV_MDP_PIPE_SHARE);
-    } else {
-        clearMdpFlags(newArgs.mdpFlags, OV_MDP_PIPE_SHARE);
-    }
-
-    if(PipeBook::getPipeType(dest) == OV_MDP_PIPE_DMA) {
-        setMdpFlags(newArgs.mdpFlags, OV_MDP_PIPE_FORCE_DMA);
-    } else {
-        clearMdpFlags(newArgs.mdpFlags, OV_MDP_PIPE_FORCE_DMA);
-    }
-
-    mPipeBook[dest].mPipe->setSource(newArgs);
+    setPipeType(dest, PipeBook::getPipeType(dest));
+    mPipeBook[dest].mPipe->setSource(args);
 }
 
 void Overlay::setVisualParams(const MetaData_t& metadata, utils::eDest dest) {
     validate((int)dest);
     mPipeBook[dest].mPipe->setVisualParams(metadata);
+}
+
+void Overlay::setPipeType(utils::eDest pipeIndex,
+        const utils::eMdpPipeType pType) {
+    mPipeBook[pipeIndex].mPipe->setPipeType(pType);
 }
 
 Overlay* Overlay::getInstance() {
