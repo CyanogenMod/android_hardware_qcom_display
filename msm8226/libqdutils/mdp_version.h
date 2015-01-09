@@ -99,8 +99,11 @@ struct PanelInfo {
     int mWidthAlign;             // ROI width alignment restriction
     int mTopAlign;               // ROI top alignment restriction
     int mHeightAlign;            // ROI height alignment restriction
+    int mMinROIWidth;            // Min width needed for ROI
+    int mMinROIHeight;           // Min height needed for ROI
     PanelInfo() : mType(NO_PANEL), mPartialUpdateEnable(0),
-    mLeftAlign(0), mWidthAlign(0), mTopAlign(0), mHeightAlign(0){}
+    mLeftAlign(0), mWidthAlign(0), mTopAlign(0), mHeightAlign(0),
+    mMinROIWidth(0), mMinROIHeight(0){}
     friend class MDPVersion;
 };
 
@@ -130,6 +133,8 @@ public:
     int getWidthAlign() { return mPanelInfo.mWidthAlign; }
     int getTopAlign() { return mPanelInfo.mTopAlign; }
     int getHeightAlign() { return mPanelInfo.mHeightAlign; }
+    int getMinROIWidth() { return mPanelInfo.mMinROIWidth; }
+    int getMinROIHeight() { return mPanelInfo.mMinROIHeight; }
     unsigned long getLowBw() { return mLowBw; }
     unsigned long getHighBw() { return mHighBw; }
     bool isSrcSplit() const;
