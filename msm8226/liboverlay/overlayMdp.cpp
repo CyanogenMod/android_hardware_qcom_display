@@ -22,11 +22,6 @@
 #include "mdp_version.h"
 #include <overlay.h>
 
-#ifdef USES_QSEED_SCALAR
-#include <scale/scale.h>
-using namespace scale;
-#endif
-
 #define HSIC_SETTINGS_DEBUG 0
 
 using namespace qdutils;
@@ -371,12 +366,11 @@ bool MdpCtrl::validateAndSet(MdpCtrl* mdpCtrlArray[], const int& count,
     list.num_overlays = count;
     list.overlay_list = ovArray;
 
-#ifdef USES_QSEED_SCALAR
-    Scale *scalar = Overlay::getScalar();
-    if(scalar) {
-        scalar->applyScale(&list);
+   int (*fnProgramScale)(struct mdp_overlay_list *) =
+        Overlay::getFnProgramScale();
+    if(fnProgramScale) {
+        fnProgramScale(&list);
     }
-#endif
 
     if(!mdp_wrapper::validateAndSet(fbFd, list)) {
         /* No dump for failure due to insufficient resource */
