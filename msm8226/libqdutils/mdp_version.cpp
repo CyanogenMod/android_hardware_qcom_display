@@ -206,6 +206,10 @@ void  MDPVersion::updatePanelInfo() {
                     mPanelInfo.mMinROIHeight = atoi(tokens[1]);
                     ALOGI("Min ROI Height: %d", mPanelInfo.mMinROIHeight);
                 }
+                if(!strncmp(tokens[0], "roi_merge", strlen("roi_merge"))) {
+                    mPanelInfo.mNeedsROIMerge = atoi(tokens[1]);
+                    ALOGI("Needs ROI Merge: %d", mPanelInfo.mNeedsROIMerge);
+                }
             }
         }
         fclose(panelInfoNodeFP);
