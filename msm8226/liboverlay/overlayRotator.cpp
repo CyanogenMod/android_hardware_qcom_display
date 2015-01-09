@@ -146,7 +146,7 @@ Rotator* RotMgr::getNext() {
     //Return a rot object, creating one if necessary
     overlay::Rotator *rot = NULL;
     if(mUseCount >= MAX_ROT_SESS) {
-        ALOGE("%s, MAX rotator sessions reached", __func__);
+        ALOGW("%s, MAX rotator sessions reached, request rejected", __func__);
     } else {
         if(mRot[mUseCount] == NULL)
             mRot[mUseCount] = overlay::Rotator::getRotator();
