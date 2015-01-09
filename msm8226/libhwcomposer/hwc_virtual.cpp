@@ -234,6 +234,7 @@ void HWCVirtualVDS::pause(hwc_context_t* ctx, int dpy) {
             ALOGE("%s: display commit fail! for %d dpy",
                     __FUNCTION__, dpy);
         }
+        ctx->proc->invalidate(ctx->proc);
     }
     return;
 }
