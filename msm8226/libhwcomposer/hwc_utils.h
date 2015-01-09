@@ -127,6 +127,8 @@ struct ListStats {
     bool isSecurePresent;
     hwc_rect_t lRoi;  //left ROI
     hwc_rect_t rRoi;  //right ROI. Unused in single DSI panels.
+    //App Buffer Composition index
+    int  renderBufIndexforABC;
 };
 
 struct LayerProp {
@@ -251,6 +253,7 @@ int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable);
 int getBlending(int blending);
 bool isGLESOnlyComp(hwc_context_t *ctx, const int& dpy);
 void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers);
+bool isAbcInUse(hwc_context_t *ctx);
 
 bool canUseMDPforVirtualDisplay(hwc_context_t* ctx,
                                 const hwc_display_contents_1_t *list);
@@ -556,6 +559,8 @@ struct hwc_context_t {
     // persist.hwc.enable_vds
     bool mVDSEnabled;
     struct gpu_hint_info mGPUHintInfo;
+    //App Buffer Composition
+    bool enableABC;
 };
 
 namespace qhwc {
