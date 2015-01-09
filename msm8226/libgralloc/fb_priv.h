@@ -41,7 +41,7 @@ struct private_module_t {
     uint32_t fbFormat;
     uint32_t flags;
     uint32_t numBuffers;
-    size_t   bufferMask;
+    uint32_t bufferMask;
     pthread_mutex_t lock;
     private_handle_t *currentBuffer;
     struct fb_var_screeninfo info;

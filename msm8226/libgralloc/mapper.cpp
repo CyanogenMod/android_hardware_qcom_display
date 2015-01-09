@@ -62,7 +62,7 @@ static int gralloc_map(gralloc_module_t const* module,
     void *mappedAddress;
     if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) &&
         !(hnd->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER)) {
-        size_t size = hnd->size;
+        unsigned int size = hnd->size;
         IMemAlloc* memalloc = getAllocator(hnd->flags) ;
         int err = memalloc->map_buffer(&mappedAddress, size,
                                        hnd->offset, hnd->fd);
@@ -73,7 +73,7 @@ static int gralloc_map(gralloc_module_t const* module,
             return -errno;
         }
 
-        hnd->base = intptr_t(mappedAddress) + hnd->offset;
+        hnd->base = uint64_t(mappedAddress) + hnd->offset;
         mappedAddress = MAP_FAILED;
         size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
         err = memalloc->map_buffer(&mappedAddress, size,
@@ -84,7 +84,7 @@ static int gralloc_map(gralloc_module_t const* module,
             hnd->base_metadata = 0;
             return -errno;
         }
-        hnd->base_metadata = intptr_t(mappedAddress) + hnd->offset_metadata;
+        hnd->base_metadata = uint64_t(mappedAddress) + hnd->offset_metadata;
     }
     return 0;
 }
@@ -99,7 +99,7 @@ static int gralloc_unmap(gralloc_module_t const* module,
     if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
         int err = -EINVAL;
         void* base = (void*)hnd->base;
-        size_t size = hnd->size;
+        unsigned int size = hnd->size;
         IMemAlloc* memalloc = getAllocator(hnd->flags) ;
         if(memalloc != NULL) {
             err = memalloc->unmap_buffer(base, size, hnd->offset);
@@ -307,8 +307,8 @@ int gralloc_perform(struct gralloc_module_t const* module,
         case GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER:
             {
                 int fd = va_arg(args, int);
-                size_t size = va_arg(args, size_t);
-                size_t offset = va_arg(args, size_t);
+                unsigned int size = va_arg(args, unsigned int);
+                unsigned int offset = va_arg(args, unsigned int);
                 void* base = va_arg(args, void*);
                 int width = va_arg(args, int);
                 int height = va_arg(args, int);
@@ -316,13 +316,13 @@ int gralloc_perform(struct gralloc_module_t const* module,
 
                 native_handle_t** handle = va_arg(args, native_handle_t**);
                 private_handle_t* hnd = (private_handle_t*)native_handle_create(
-                    private_handle_t::sNumFds, private_handle_t::sNumInts);
+                    private_handle_t::sNumFds, private_handle_t::sNumInts());
                 hnd->magic = private_handle_t::sMagic;
                 hnd->fd = fd;
                 hnd->flags =  private_handle_t::PRIV_FLAGS_USES_ION;
                 hnd->size = size;
                 hnd->offset = offset;
-                hnd->base = intptr_t(base) + offset;
+                hnd->base = uint64_t(base) + offset;
                 hnd->gpuaddr = 0;
                 hnd->width = width;
                 hnd->height = height;

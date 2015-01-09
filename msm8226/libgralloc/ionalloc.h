@@ -41,17 +41,17 @@ class IonAlloc : public IMemAlloc  {
     public:
     virtual int alloc_buffer(alloc_data& data);
 
-    virtual int free_buffer(void *base, size_t size,
-                            size_t offset, int fd);
+    virtual int free_buffer(void *base, unsigned int size,
+                            unsigned int offset, int fd);
 
-    virtual int map_buffer(void **pBase, size_t size,
-                           size_t offset, int fd);
+    virtual int map_buffer(void **pBase, unsigned int size,
+                           unsigned int offset, int fd);
 
-    virtual int unmap_buffer(void *base, size_t size,
-                             size_t offset);
+    virtual int unmap_buffer(void *base, unsigned int size,
+                             unsigned int offset);
 
-    virtual int clean_buffer(void*base, size_t size,
-                             size_t offset, int fd, int op);
+    virtual int clean_buffer(void*base, unsigned int size,
+                             unsigned int offset, int fd, int op);
 
     IonAlloc() { mIonFd = FD_INIT; }
 
