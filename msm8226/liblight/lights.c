@@ -168,12 +168,18 @@ set_speaker_light_locked(struct light_device_t* dev,
     }
 
     if (blink) {
-        if (red)
-            write_int(RED_BLINK_FILE, blink);
-        if (green)
-            write_int(GREEN_BLINK_FILE, blink);
-        if (blue)
-            write_int(BLUE_BLINK_FILE, blink);
+        if (red) {
+            if (write_int(RED_BLINK_FILE, blink))
+                write_int(RED_LED_FILE, 0);
+	}
+        if (green) {
+            if (write_int(GREEN_BLINK_FILE, blink))
+                write_int(GREEN_LED_FILE, 0);
+	}
+        if (blue) {
+            if (write_int(BLUE_BLINK_FILE, blink))
+                write_int(BLUE_LED_FILE, 0);
+	}
     } else {
         write_int(RED_LED_FILE, red);
         write_int(GREEN_LED_FILE, green);
