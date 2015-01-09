@@ -146,6 +146,7 @@ public:
     bool is8x74v2();
     bool is8084();
     bool is8092();
+    bool is8994();
     bool is8x16();
     bool is8x39();
 
