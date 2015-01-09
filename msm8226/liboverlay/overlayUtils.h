@@ -120,39 +120,8 @@ private:
     const NoCopy& operator=(const NoCopy&);
 };
 
-
-/* 3D related utils, defines etc...
- * The compound format passed to the overlay is
- * ABCCC where A is the input 3D format
- * B is the output 3D format
- * CCC is the color format e.g YCbCr420SP YCrCb420SP etc */
-enum { SHIFT_OUT_3D = 12,
-    SHIFT_TOT_3D = 16 };
-enum { INPUT_3D_MASK = 0xFFFF0000,
-    OUTPUT_3D_MASK = 0x0000FFFF };
-enum { BARRIER_LAND = 1,
-    BARRIER_PORT = 2 };
-
-inline uint32_t format3D(uint32_t x) { return x & 0xFF000; }
-inline uint32_t format3DOutput(uint32_t x) {
-    return (x & 0xF000) >> SHIFT_OUT_3D; }
-inline uint32_t format3DInput(uint32_t x) { return x & 0xF0000; }
-
-bool isHDMIConnected ();
-bool is3DTV();
-bool isPanel3D();
-bool usePanel3D();
-bool send3DInfoPacket (uint32_t fmt);
-bool enableBarrier (uint32_t orientation);
-uint32_t getS3DFormat(uint32_t fmt);
 bool isMdssRotator();
 void normalizeCrop(uint32_t& xy, uint32_t& wh);
-
-template <int CHAN>
-bool getPositionS3D(const Whf& whf, Dim& out);
-
-template <int CHAN>
-bool getCropS3D(const Dim& in, Dim& out, uint32_t fmt);
 
 template <class Type>
 void swapWidthHeight(Type& width, Type& height);
@@ -446,39 +415,6 @@ inline int align(int value, int a) {
     return a ? ((value + (a-1)) & ~(a-1)) : value;
 }
 
-enum eRotOutFmt {
-    ROT_OUT_FMT_DEFAULT,
-    ROT_OUT_FMT_Y_CRCB_H2V2
-};
-
-template <int ROT_OUT_FMT> struct RotOutFmt;
-
-// FIXME, taken from gralloc_priv.h. Need to
-// put it back as soon as overlay takes place of the old one
-/* possible formats for 3D content*/
-enum {
-    HAL_NO_3D                         = 0x0000,
-    HAL_3D_IN_SIDE_BY_SIDE_L_R        = 0x10000,
-    HAL_3D_IN_TOP_BOTTOM              = 0x20000,
-    HAL_3D_IN_INTERLEAVE              = 0x40000,
-    HAL_3D_IN_SIDE_BY_SIDE_R_L        = 0x80000,
-    HAL_3D_OUT_SIDE_BY_SIDE           = 0x1000,
-    HAL_3D_OUT_TOP_BOTTOM             = 0x2000,
-    HAL_3D_OUT_INTERLEAVE             = 0x4000,
-    HAL_3D_OUT_MONOSCOPIC             = 0x8000
-};
-
-enum { HAL_3D_OUT_SBS_MASK =
-    HAL_3D_OUT_SIDE_BY_SIDE >> overlay::utils::SHIFT_OUT_3D,
-    HAL_3D_OUT_TOP_BOT_MASK =
-            HAL_3D_OUT_TOP_BOTTOM >> overlay::utils::SHIFT_OUT_3D,
-    HAL_3D_OUT_INTERL_MASK =
-            HAL_3D_OUT_INTERLEAVE >> overlay::utils::SHIFT_OUT_3D,
-    HAL_3D_OUT_MONOS_MASK =
-            HAL_3D_OUT_MONOSCOPIC >> overlay::utils::SHIFT_OUT_3D
-};
-
-
 inline bool isYuv(uint32_t format) {
     switch(format){
         case MDP_Y_CBCR_H2V1:
@@ -577,105 +513,6 @@ inline void Dim::dump() const {
     ALOGE("== Dump Dim x=%d y=%d w=%d h=%d start/end ==", x, y, w, h);
 }
 
-// FB0
-template <int CHAN>
-inline Dim getPositionS3DImpl(const Whf& whf)
-{
-    switch (whf.format & OUTPUT_3D_MASK)
-    {
-        case HAL_3D_OUT_SBS_MASK:
-            // x, y, w, h
-            return Dim(0, 0, whf.w/2, whf.h);
-        case HAL_3D_OUT_TOP_BOT_MASK:
-            return Dim(0, 0, whf.w, whf.h/2);
-        case HAL_3D_OUT_MONOS_MASK:
-            return Dim();
-        case HAL_3D_OUT_INTERL_MASK:
-            // FIXME error?
-            ALOGE("%s HAL_3D_OUT_INTERLEAVE_MASK", __FUNCTION__);
-            return Dim();
-        default:
-            ALOGE("%s Unsupported 3D output format %d", __FUNCTION__,
-                    whf.format);
-    }
-    return Dim();
-}
-
-template <>
-inline Dim getPositionS3DImpl<utils::OV_RIGHT_SPLIT>(const Whf& whf)
-{
-    switch (whf.format & OUTPUT_3D_MASK)
-    {
-        case HAL_3D_OUT_SBS_MASK:
-            return Dim(whf.w/2, 0, whf.w/2, whf.h);
-        case HAL_3D_OUT_TOP_BOT_MASK:
-            return Dim(0, whf.h/2, whf.w, whf.h/2);
-        case HAL_3D_OUT_MONOS_MASK:
-            return Dim(0, 0, whf.w, whf.h);
-        case HAL_3D_OUT_INTERL_MASK:
-            // FIXME error?
-            ALOGE("%s HAL_3D_OUT_INTERLEAVE_MASK", __FUNCTION__);
-            return Dim();
-        default:
-            ALOGE("%s Unsupported 3D output format %d", __FUNCTION__,
-                    whf.format);
-    }
-    return Dim();
-}
-
-template <int CHAN>
-inline bool getPositionS3D(const Whf& whf, Dim& out) {
-    out = getPositionS3DImpl<CHAN>(whf);
-    return (out != Dim());
-}
-
-template <int CHAN>
-inline Dim getCropS3DImpl(const Dim& in, uint32_t fmt) {
-    switch (fmt & INPUT_3D_MASK)
-    {
-        case HAL_3D_IN_SIDE_BY_SIDE_L_R:
-            return Dim(0, 0, in.w/2, in.h);
-        case HAL_3D_IN_SIDE_BY_SIDE_R_L:
-            return Dim(in.w/2, 0, in.w/2, in.h);
-        case HAL_3D_IN_TOP_BOTTOM:
-            return Dim(0, 0, in.w, in.h/2);
-        case HAL_3D_IN_INTERLEAVE:
-            ALOGE("%s HAL_3D_IN_INTERLEAVE", __FUNCTION__);
-            break;
-        default:
-            ALOGE("%s Unsupported 3D format %d", __FUNCTION__, fmt);
-            break;
-    }
-    return Dim();
-}
-
-template <>
-inline Dim getCropS3DImpl<utils::OV_RIGHT_SPLIT>(const Dim& in, uint32_t fmt) {
-    switch (fmt & INPUT_3D_MASK)
-    {
-        case HAL_3D_IN_SIDE_BY_SIDE_L_R:
-            return Dim(in.w/2, 0, in.w/2, in.h);
-        case HAL_3D_IN_SIDE_BY_SIDE_R_L:
-            return Dim(0, 0, in.w/2, in.h);
-        case HAL_3D_IN_TOP_BOTTOM:
-            return Dim(0, in.h/2, in.w, in.h/2);
-        case HAL_3D_IN_INTERLEAVE:
-            ALOGE("%s HAL_3D_IN_INTERLEAVE", __FUNCTION__);
-            break;
-        default:
-            ALOGE("%s Unsupported 3D format %d", __FUNCTION__, fmt);
-            break;
-    }
-    return Dim();
-}
-
-template <int CHAN>
-inline bool getCropS3D(const Dim& in, Dim& out, uint32_t fmt)
-{
-    out = getCropS3DImpl<CHAN>(in, fmt);
-    return (out != Dim());
-}
-
 template <class Type>
 void swapWidthHeight(Type& width, Type& height) {
     Type tmp = width;
@@ -728,12 +565,6 @@ public:
     static const char* const fbPath;
     // /dev/msm_rotator
     static const char* const rotPath;
-    // /sys/class/graphics/fb1/format_3d
-    static const char* const format3DFile;
-    // /sys/class/graphics/fb1/3d_present
-    static const char* const edid3dInfoFile;
-    // /sys/devices/platform/mipi_novatek.0/enable_3d_barrier
-    static const char* const barrierFile;
 };
 
 
