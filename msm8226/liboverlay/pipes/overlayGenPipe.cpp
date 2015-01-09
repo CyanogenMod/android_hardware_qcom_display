@@ -106,6 +106,10 @@ utils::Dim GenericPipe::getCrop() const
     return mCtrl->getCrop();
 }
 
+uint8_t GenericPipe::getPriority() const {
+    return mCtrl->getPriority();
+}
+
 void GenericPipe::dump() const
 {
     ALOGE("== Dump Generic pipe start ==");
