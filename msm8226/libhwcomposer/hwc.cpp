@@ -260,6 +260,48 @@ static void scaleDisplayFrame(hwc_context_t *ctx, int dpy,
     }
 }
 
+static bool optimizePrepare(hwc_context_t *ctx, int numDisplays,
+                            hwc_display_contents_1_t** displays) {
+
+    /* Do not re-program H/W, if frame geometry has not changed.
+     * But honor these exceptions:
+     * 1. Padding round
+     * 2. Idle fallback
+     * 3. Overlay is not configured
+     * 4. External/Virtual display is in Configure state
+     * 5. External/Virtual is Paused OR not connected/active
+     * 6. Non-Overlay device
+     */
+
+    if (ctx->isPaddingRound || MDPComp::isIdleFallback() ||
+        !ctx->mOverlay->isConfigured() || isSecondaryConfiguring(ctx) ||
+        ctx->mMDP.version < qdutils::MDP_V4_0) {
+        return false;
+    }
+
+    bool isOptimized = false;
+    for (uint32_t i = 0; i < numDisplays; i++) {
+        hwc_display_contents_1_t *list = displays[i];
+
+        if (list) {
+            if (list->flags & HWC_GEOMETRY_CHANGED) {
+                return false;
+            }
+            int dpy = getDpyforExternalDisplay(ctx, i);
+            if (dpy && (ctx->dpyAttr[dpy].isPause ||
+                !ctx->dpyAttr[dpy].connected ||
+                !ctx->dpyAttr[dpy].isActive)) {
+                return false;
+            }
+            // Set layer composition type as per last frame
+            ctx->mMDPComp[dpy]->setMDPCompLayerFlags(ctx, list);
+            isOptimized = true;
+        }
+    }
+
+    return isOptimized;
+}
+
 static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     ATRACE_CALL();
@@ -338,6 +380,12 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
     setPaddingRound(ctx,numDisplays,displays);
     setDMAState(ctx,numDisplays,displays);
     setNumActiveDisplays(ctx,numDisplays,displays);
+
+    if (optimizePrepare(ctx, numDisplays, displays)) {
+        // Do not re-program H/W, if it is not needed
+        return ret;
+    }
+
     reset(ctx, (int)numDisplays, displays);
 
     ctx->mOverlay->configBegin();
