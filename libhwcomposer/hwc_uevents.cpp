@@ -1,7 +1,7 @@
 
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-14, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-15, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -173,8 +173,11 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 ctx->proc->hotplug(ctx->proc, HWC_DISPLAY_EXTERNAL,
                                    EXTERNAL_OFFLINE);
                 ctx->mVirtualonExtActive = false;
-                ctx->mQService->onHdmiHotplug((int)ctx->dpyAttr[dpy].connected);
             }
+
+            if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay())
+                ctx->mQService->onHdmiHotplug((int)ctx->dpyAttr[dpy].connected);
+
             break;
         }
     case EXTERNAL_ONLINE:
@@ -287,7 +290,6 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                          "hotplug event", __FUNCTION__);
                 ctx->proc->hotplug(ctx->proc,HWC_DISPLAY_EXTERNAL,
                                    EXTERNAL_ONLINE);
-                ctx->mQService->onHdmiHotplug(ctx->dpyAttr[dpy].connected);
             } else {
                 /* We wont be getting unblank for VIRTUAL DISPLAY and its
                  * always guaranteed from WFD stack that CONNECT uevent for
