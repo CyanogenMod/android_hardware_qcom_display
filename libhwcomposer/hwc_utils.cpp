@@ -494,7 +494,7 @@ void setRefreshRate(hwc_context_t* ctx, int dpy, uint32_t refreshRate) {
     const int fbNum = Overlay::getFbForDpy(dpy);
     char sysfsPath[qdutils::MAX_SYSFS_FILE_PATH];
     snprintf (sysfsPath, sizeof(sysfsPath),
-            "/sys/class/graphics/fb%d/dynamic_fps", fbNum);
+            "/sys/devices/virtual/graphics/fb%d/dynamic_fps", fbNum);
 
     int fd = open(sysfsPath, O_WRONLY);
     if(fd >= 0) {
