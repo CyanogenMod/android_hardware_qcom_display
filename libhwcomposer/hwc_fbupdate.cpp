@@ -132,9 +132,10 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
     if (LIKELY(ctx->mOverlay)) {
         overlay::Overlay& ov = *(ctx->mOverlay);
 
+        int flags = mTileEnabled ?
+            private_handle_t::PRIV_FLAGS_TILE_RENDERED : 0;
         ovutils::Whf info(mAlignedFBWidth, mAlignedFBHeight,
-                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888,
-                    mTileEnabled));
+                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888, flags));
 
         Overlay::PipeSpecs pipeSpecs;
         pipeSpecs.formatClass = Overlay::FORMAT_RGB;
@@ -276,9 +277,10 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
     bool ret = false;
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     if (LIKELY(ctx->mOverlay)) {
+        int flags = mTileEnabled ?
+            private_handle_t::PRIV_FLAGS_TILE_RENDERED : 0;
         ovutils::Whf info(mAlignedFBWidth, mAlignedFBHeight,
-                          ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888,
-                                                mTileEnabled));
+                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888, flags));
 
         overlay::Overlay& ov = *(ctx->mOverlay);
         ovutils::eMdpFlags mdpFlags = ovutils::OV_MDP_BLEND_FG_PREMULT;
@@ -440,10 +442,10 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     hwc_layer_1_t *layer = &list->hwLayers[list->numHwLayers - 1];
     overlay::Overlay& ov = *(ctx->mOverlay);
 
+    int flags = mTileEnabled ? private_handle_t::PRIV_FLAGS_TILE_RENDERED : 0;
     ovutils::Whf info(mAlignedFBWidth,
             mAlignedFBHeight,
-            ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888,
-                mTileEnabled));
+            ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888, flags));
 
     ovutils::eMdpFlags mdpFlags = OV_MDP_BLEND_FG_PREMULT;
     ovutils::setMdpFlags(mdpFlags,

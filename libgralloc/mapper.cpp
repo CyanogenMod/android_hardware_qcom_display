@@ -353,7 +353,7 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 int *stride = va_arg(args, int *);
                 int alignedw = 0, alignedh = 0;
                 AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width,
-                        0, format, false, alignedw, alignedh);
+                        0, format, 0, alignedw, alignedh);
                 *stride = alignedw;
                 res = 0;
             } break;
@@ -404,8 +404,7 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 int *tileEnabled = va_arg(args,int *);
                 *tileEnabled = isMacroTileEnabled(format, usage);
                 AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width,
-                        height, format, *tileEnabled, *alignedWidth,
-                        *alignedHeight);
+                        height, format, usage, *alignedWidth, *alignedHeight);
                 res = 0;
             } break;
 

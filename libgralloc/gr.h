@@ -71,6 +71,9 @@ int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage);
 void free_buffer(private_handle_t *hnd);
 int getYUVPlaneInfo(private_handle_t* pHnd, struct android_ycbcr* ycbcr);
 
+// To query if UBWC is enabled, based on format and usage flags
+bool isUBwcEnabled(int format, int usage);
+
 /*****************************************************************************/
 
 class Locker {
@@ -106,12 +109,21 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
     ~AdrenoMemInfo();
 
     /*
+     * Function to compute aligned width and aligned height based on
+     * width, height, format and usage flags.
+     *
+     * @return aligned width, aligned height
+     */
+    void getAlignedWidthAndHeight(int width, int height, int format,
+                            int usage, int& aligned_w, int& aligned_h);
+
+    /*
      * Function to compute the adreno aligned width and aligned height
      * based on the width and format.
      *
      * @return aligned width, aligned height
      */
-    void getAlignedWidthAndHeight(int width, int height, int format,
+    void getGpuAlignedWidthHeight(int width, int height, int format,
                             int tileEnabled, int& alignedw, int &alignedh);
 
     /*
@@ -121,6 +133,13 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
      *          0 : not supported
      */
     int isMacroTilingSupportedByGPU();
+
+    /*
+     * Function to query whether GPU supports UBWC for given HAL format
+     * @return > 0 : supported
+     *           0 : not supported
+     */
+    int isUBWCSupportedByGPU(int format);
 
     private:
         // Pointer to the padding library.

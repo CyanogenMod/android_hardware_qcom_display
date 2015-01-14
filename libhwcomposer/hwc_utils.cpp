@@ -1793,7 +1793,7 @@ int configColorLayer(hwc_context_t *ctx, hwc_layer_1_t *layer,
     int dst_w = dst.right - dst.left;
     int dst_h = dst.bottom - dst.top;
     uint32_t color = layer->transform;
-    Whf whf(w, h, getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888), 0);
+    Whf whf(w, h, getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888));
 
     ovutils::setMdpFlags(mdpFlags, ovutils::OV_MDP_SOLID_FILL);
     if (layer->blending == HWC_BLENDING_PREMULT)
@@ -1860,7 +1860,7 @@ int getRotDownscale(hwc_context_t *ctx, const hwc_layer_1_t *layer) {
     bool isInterlaced = metadata && (metadata->operation & PP_PARAM_INTERLACED)
                 && metadata->interlaced;
     int transform = layer->transform;
-    uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
+    uint32_t format = ovutils::getMdpFormat(hnd->format, hnd->flags);
 
     if(isYuvBuffer(hnd)) {
         if(ctx->mMDP.version >= qdutils::MDP_V4_2 &&
@@ -1970,7 +1970,7 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     int transform = layer->transform;
     eTransform orient = static_cast<eTransform>(transform);
     int rotFlags = ovutils::ROT_FLAGS_NONE;
-    uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
+    uint32_t format = ovutils::getMdpFormat(hnd->format, hnd->flags);
     Whf whf(getWidth(hnd), getHeight(hnd), format, (uint32_t)hnd->size);
 
     // Handle R/B swap
@@ -2066,7 +2066,7 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     int transform = layer->transform;
     eTransform orient = static_cast<eTransform>(transform);
     int rotFlags = ROT_FLAGS_NONE;
-    uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
+    uint32_t format = ovutils::getMdpFormat(hnd->format, hnd->flags);
     Whf whf(getWidth(hnd), getHeight(hnd), format, (uint32_t)hnd->size);
 
     // Handle R/B swap

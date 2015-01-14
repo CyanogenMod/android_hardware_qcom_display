@@ -41,7 +41,8 @@ enum {
      * can never be uncached, is not secured*/
     GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP     =       GRALLOC_USAGE_PRIVATE_0,
 
-    /* GRALLOC_USAGE_PRIVATE_1 is unused */
+    /* Non linear, Universal Bandwidth Compression */
+    GRALLOC_USAGE_PRIVATE_ALLOC_UBWC      =       GRALLOC_USAGE_PRIVATE_1,
 
     /* IOMMU heap comes from manually allocated pages,
      * can be cached/uncached, is not secured */
@@ -118,6 +119,9 @@ enum {
 //v4l2_fourcc('Y', 'B', 'W', 'C'). 10 bit per component. This compressed
 //format reduces the memory access bandwidth
 #define HAL_PIXEL_FORMAT_YCbCr_422_I_10BIT_COMPRESSED  0x43574259
+
+// UBWC aligned Venus format
+#define HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC 0x7FA30C06
 
 //Khronos ASTC formats
 #define HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_4x4_KHR             0x93B0
@@ -206,7 +210,9 @@ struct private_handle_t : public native_handle {
             // Buffer is rendered in Tile Format
             PRIV_FLAGS_TILE_RENDERED      = 0x02000000,
             // Buffer rendered using CPU/SW renderer
-            PRIV_FLAGS_CPU_RENDERED       = 0x04000000
+            PRIV_FLAGS_CPU_RENDERED       = 0x04000000,
+            // Buffer is allocated with UBWC alignment
+            PRIV_FLAGS_UBWC_ALIGNED       = 0x08000000
         };
 
         // file-descriptors

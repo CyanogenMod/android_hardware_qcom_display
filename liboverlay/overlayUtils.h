@@ -368,7 +368,7 @@ struct ScreenInfo {
 };
 
 int getMdpFormat(int format);
-int getMdpFormat(int format, bool tileEnabled);
+int getMdpFormat(int format, int flags);
 int getHALFormat(int mdpFormat);
 void getDecimationFactor(const int& src_w, const int& src_h,
         const int& dst_w, const int& dst_h, uint8_t& horzDeci,
