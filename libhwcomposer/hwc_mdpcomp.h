@@ -160,9 +160,9 @@ protected:
     /* validates the ROI generated for fallback conditions */
     virtual bool validateAndApplyROI(hwc_context_t *ctx,
             hwc_display_contents_1_t* list) = 0;
-    /* Trims fbRect calculated against ROI generated */
-    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect) = 0;
-
+    /* Trims layer coordinates against ROI generated */
+    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& crop,
+            hwc_rect& dst) = 0;
     /* set/reset flags for MDPComp */
     void setMDPCompLayerFlags(hwc_context_t *ctx,
                               hwc_display_contents_1_t* list);
@@ -315,8 +315,9 @@ private:
     /* validates the ROI generated for fallback conditions */
     virtual bool validateAndApplyROI(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
-    /* Trims fbRect calculated against ROI generated */
-    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect);
+    /* Trims layer coordinates against ROI generated */
+    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& crop,
+            hwc_rect& dst);
 };
 
 class MDPCompSplit : public MDPComp {
@@ -342,6 +343,9 @@ protected:
     /* allocates pipes to selected candidates */
     virtual bool allocLayerPipes(hwc_context_t *ctx,
                                  hwc_display_contents_1_t* list);
+    /* Trims layer coordinates against ROI generated */
+    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& crop,
+            hwc_rect& dst);
 private:
     /* Increments mdpCount if 4k2k yuv layer split is enabled.
      * updates framebuffer z order if fb lies above source-split layer */
@@ -357,8 +361,6 @@ private:
     /* validates the ROI generated for fallback conditions */
     virtual bool validateAndApplyROI(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
-    /* Trims fbRect calculated against ROI generated */
-    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect);
 };
 
 class MDPCompSrcSplit : public MDPCompSplit {
@@ -371,6 +373,12 @@ private:
 
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
             PipeLayerPair& pipeLayerPair);
+    /* generates ROI based on the modified area of the frame */
+    virtual void generateROI(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+    /* validates the ROI generated for fallback conditions */
+    virtual bool validateAndApplyROI(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
 };
 
 }; //namespace

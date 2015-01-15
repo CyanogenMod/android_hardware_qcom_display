@@ -525,9 +525,11 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     return ret;
 }
 
-void MDPCompNonSplit::trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect) {
+void MDPCompNonSplit::trimAgainstROI(hwc_context_t *ctx, hwc_rect &crop,
+        hwc_rect &dst) {
     hwc_rect_t roi = ctx->listStats[mDpy].lRoi;
-    fbRect = getIntersection(fbRect, roi);
+    dst = getIntersection(dst, roi);
+    crop = dst;
 }
 
 /* 1) Identify layers that are not visible or lying outside the updating ROI and
@@ -622,14 +624,20 @@ void MDPCompNonSplit::generateROI(hwc_context_t *ctx,
             ctx->listStats[mDpy].lRoi.right, ctx->listStats[mDpy].lRoi.bottom);
 }
 
-void MDPCompSplit::trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect) {
-    hwc_rect l_roi = ctx->listStats[mDpy].lRoi;
-    hwc_rect r_roi = ctx->listStats[mDpy].rRoi;
-
-    hwc_rect_t l_fbRect = getIntersection(fbRect, l_roi);
-    hwc_rect_t r_fbRect = getIntersection(fbRect, r_roi);
-    fbRect = getUnion(l_fbRect, r_fbRect);
+void MDPCompSplit::trimAgainstROI(hwc_context_t *ctx, hwc_rect &crop,
+        hwc_rect &dst) {
+    hwc_rect roi = getUnion(ctx->listStats[mDpy].lRoi,
+            ctx->listStats[mDpy].rRoi);
+    hwc_rect tmpDst = getIntersection(dst, roi);
+    if(!isSameRect(dst, tmpDst)) {
+        crop.left = crop.left + (tmpDst.left - dst.left);
+        crop.top = crop.top + (tmpDst.top - dst.top);
+        crop.right = crop.left + (tmpDst.right - tmpDst.left);
+        crop.bottom = crop.top + (tmpDst.bottom - tmpDst.top);
+        dst = tmpDst;
+    }
 }
+
 /* 1) Identify layers that are not visible or lying outside BOTH the updating
  *    ROI's and drop them from composition. If a layer is spanning across both
  *    the halves of the screen but needed by only ROI, the non-contributing
@@ -1761,7 +1769,7 @@ hwc_rect_t MDPComp::getUpdatingFBRect(hwc_context_t *ctx,
             fbRect = getUnion(fbRect, dst);
         }
     }
-    trimAgainstROI(ctx, fbRect);
+    trimAgainstROI(ctx, fbRect, fbRect);
     return fbRect;
 }
 
@@ -2608,6 +2616,122 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 }
 
 //================MDPCompSrcSplit==============================================
+
+bool MDPCompSrcSplit::validateAndApplyROI(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+    hwc_rect_t visibleRect = ctx->listStats[mDpy].lRoi;
+
+    for(int i = numAppLayers - 1; i >= 0; i--) {
+        if(!isValidRect(visibleRect)) {
+            mCurrentFrame.drop[i] = true;
+            mCurrentFrame.dropCount++;
+            continue;
+        }
+
+        const hwc_layer_1_t* layer =  &list->hwLayers[i];
+        hwc_rect_t dstRect = layer->displayFrame;
+        hwc_rect_t res  = getIntersection(visibleRect, dstRect);
+
+        if(!isValidRect(res)) {
+            mCurrentFrame.drop[i] = true;
+            mCurrentFrame.dropCount++;
+        } else {
+            /* Reset frame ROI when any layer which needs scaling also needs ROI
+             * cropping */
+            if(!isSameRect(res, dstRect) && needsScaling (layer)) {
+                ALOGI("%s: Resetting ROI due to scaling", __FUNCTION__);
+                memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
+                mCurrentFrame.dropCount = 0;
+                return false;
+            }
+
+            /* deduct any opaque region from visibleRect */
+            if (layer->blending == HWC_BLENDING_NONE &&
+                    layer->planeAlpha == 0xFF)
+                visibleRect = deductRect(visibleRect, res);
+        }
+    }
+    return true;
+}
+
+/*
+ * HW Limitation: ping pong split can always split the ping pong output
+ * equally across two DSI's. So the ROI programmed should be of equal width
+ * for both the halves
+ */
+void MDPCompSrcSplit::generateROI(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+
+
+    if(!canPartialUpdate(ctx, list))
+        return;
+
+    struct hwc_rect roi = (struct hwc_rect){0, 0, 0, 0};
+    hwc_rect fullFrame = (struct hwc_rect) {0, 0,(int)ctx->dpyAttr[mDpy].xres,
+        (int)ctx->dpyAttr[mDpy].yres};
+
+    for(int index = 0; index < numAppLayers; index++ ) {
+        hwc_layer_1_t* layer = &list->hwLayers[index];
+
+        // If we have a RGB layer which needs rotation, no partial update
+        if(!isYuvBuffer((private_handle_t *)layer->handle) && layer->transform)
+            return;
+
+        if ((mCachedFrame.hnd[index] != layer->handle) ||
+                isYuvBuffer((private_handle_t *)layer->handle)) {
+            hwc_rect_t dst = layer->displayFrame;
+            hwc_rect_t updatingRect = dst;
+
+#ifdef QCOM_BSP
+            if(!needsScaling(layer) && !layer->transform)
+            {
+                hwc_rect_t src = integerizeSourceCrop(layer->sourceCropf);
+                int x_off = dst.left - src.left;
+                int y_off = dst.top - src.top;
+                updatingRect = moveRect(layer->dirtyRect, x_off, y_off);
+            }
+#endif
+
+            roi = getUnion(roi, updatingRect);
+        }
+    }
+
+    /* No layer is updating. Still SF wants a refresh.*/
+    if(!isValidRect(roi))
+        return;
+
+    roi = expandROIFromMidPoint(roi, fullFrame);
+
+    hwc_rect lFrame = fullFrame;
+    lFrame.right /= 2;
+    hwc_rect lRoi = getIntersection(roi, lFrame);
+
+    // Align ROI coordinates to panel restrictions
+    lRoi = getSanitizeROI(lRoi, lFrame);
+
+    hwc_rect rFrame = fullFrame;
+    rFrame.left = lFrame.right;
+    hwc_rect rRoi = getIntersection(roi, rFrame);
+
+    // Align ROI coordinates to panel restrictions
+    rRoi = getSanitizeROI(rRoi, rFrame);
+
+    roi = getUnion(lRoi, rRoi);
+
+    ctx->listStats[mDpy].lRoi = roi;
+    if(!validateAndApplyROI(ctx, list))
+        resetROI(ctx, mDpy);
+
+    ALOGD_IF(isDebug(),"%s: generated ROI: [%d, %d, %d, %d] [%d, %d, %d, %d]",
+            __FUNCTION__,
+            ctx->listStats[mDpy].lRoi.left, ctx->listStats[mDpy].lRoi.top,
+            ctx->listStats[mDpy].lRoi.right, ctx->listStats[mDpy].lRoi.bottom,
+            ctx->listStats[mDpy].rRoi.left, ctx->listStats[mDpy].rRoi.top,
+            ctx->listStats[mDpy].rRoi.right, ctx->listStats[mDpy].rRoi.bottom);
+}
+
 bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
         MdpPipeInfoSplit& pipe_info) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
@@ -2615,6 +2739,9 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
     hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
     pipe_info.lIndex = ovutils::OV_INVALID;
     pipe_info.rIndex = ovutils::OV_INVALID;
+
+    if(qdutils::MDPVersion::getInstance().isPartialUpdateEnabled() && !mDpy)
+        trimAgainstROI(ctx,crop, dst);
 
     //If 2 pipes are staged on a single stage of a mixer, then the left pipe
     //should have a higher priority than the right one. Pipe priorities are
@@ -2702,6 +2829,17 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     ALOGD_IF(isDebug(),"%s: configuring: layer: %p z_order: %d dest_pipeL: %d"
              "dest_pipeR: %d",__FUNCTION__, layer, z, lDest, rDest);
+
+    if(qdutils::MDPVersion::getInstance().isPartialUpdateEnabled() && !mDpy) {
+        /* MDP driver crops layer coordinates against ROI in Non-Split
+         * and Split MDP comp. But HWC needs to crop them for source split.
+         * Reason: 1) Source split is efficient only when the final effective
+         *            load is distributed evenly across mixers.
+         *         2) We have to know the effective width of the layer that
+         *            the ROI needs to find the no. of pipes the layer needs.
+         */
+        trimAgainstROI(ctx, crop, dst);
+    }
 
     // Handle R/B swap
     if (layer->flags & HWC_FORMAT_RB_SWAP) {
