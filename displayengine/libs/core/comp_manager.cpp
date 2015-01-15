@@ -104,7 +104,8 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
     return kErrorMemory;
   }
 
-  if (create_strategy_intf_(STRATEGY_VERSION_TAG, &display_comp_ctx->strategy_intf) != kErrorNone) {
+  if (create_strategy_intf_(STRATEGY_VERSION_TAG, type,
+                            &display_comp_ctx->strategy_intf) != kErrorNone) {
     DLOGW("Unable to create strategy interface");
     delete display_comp_ctx;
     return kErrorUndefined;
@@ -151,15 +152,14 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
 
   constraints->safe_mode = safe_mode_;
 
-  // TODO(user): Need to enable SDE Comp on HDMI
+  // Limit 2 layer SDE Comp on HDMI
   if (display_comp_ctx->display_type == kHDMI) {
-    constraints->max_layers = 1;
+    constraints->max_layers = 2;
   }
-  // If validation for the best available composition strategy with driver has failed, just
-  // fallback to safe mode composition e.g. GPU or video only.
-  if (display_comp_ctx->strategy_selected) {
+
+  // If a strategy fails after successfully allocating resources, then set safe mode
+  if (display_comp_ctx->remaining_strategies != display_comp_ctx->max_strategies) {
     constraints->safe_mode = true;
-    return;
   }
 }
 
@@ -167,8 +167,9 @@ void CompManager::PrePrepare(Handle display_ctx, HWLayers *hw_layers) {
   SCOPE_LOCK(locker_);
   DisplayCompositionContext *display_comp_ctx =
                              reinterpret_cast<DisplayCompositionContext *>(display_ctx);
-  display_comp_ctx->strategy_intf->Start(&hw_layers->info);
-  display_comp_ctx->strategy_selected = false;
+  display_comp_ctx->strategy_intf->Start(&hw_layers->info,
+                                         &display_comp_ctx->max_strategies);
+  display_comp_ctx->remaining_strategies = display_comp_ctx->max_strategies;
 }
 
 DisplayError CompManager::Prepare(Handle display_ctx, HWLayers *hw_layers) {
@@ -178,31 +179,34 @@ DisplayError CompManager::Prepare(Handle display_ctx, HWLayers *hw_layers) {
                              reinterpret_cast<DisplayCompositionContext *>(display_ctx);
   Handle &display_resource_ctx = display_comp_ctx->display_resource_ctx;
 
-  DisplayError error = kErrorNone;
+  DisplayError error = kErrorUndefined;
 
   PrepareStrategyConstraints(display_ctx, hw_layers);
 
   // Select a composition strategy, and try to allocate resources for it.
   res_mgr_.Start(display_resource_ctx);
-  while (true) {
+
+  bool exit = false;
+  uint32_t &count = display_comp_ctx->remaining_strategies;
+  for (; !exit && count > 0; count--) {
     error = display_comp_ctx->strategy_intf->GetNextStrategy(&display_comp_ctx->constraints);
-    if (UNLIKELY(error != kErrorNone)) {
+    if (error != kErrorNone) {
       // Composition strategies exhausted. Resource Manager could not allocate resources even for
       // GPU composition. This will never happen.
-      DLOGE("Unexpected failure. Composition strategies exhausted.");
-      break;
+      exit = true;
     }
 
-    error = res_mgr_.Acquire(display_resource_ctx, hw_layers);
-    if (error != kErrorNone) {
-      // Not enough resources, try next strategy.
-      continue;
-    } else {
-      // Successfully selected and configured a composition strategy.
-      break;
+    if (!exit) {
+      error = res_mgr_.Acquire(display_resource_ctx, hw_layers);
+      // Exit if successfully allocated resource, else try next strategy.
+      exit = (error == kErrorNone);
     }
   }
-  display_comp_ctx->strategy_selected = true;
+
+  if (error != kErrorNone) {
+    DLOGE("Composition strategies exhausted for display = %d", display_comp_ctx->display_type);
+  }
+
   res_mgr_.Stop(display_resource_ctx);
 
   return error;

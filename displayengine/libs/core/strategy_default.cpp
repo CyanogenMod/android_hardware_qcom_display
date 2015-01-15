@@ -34,7 +34,7 @@ namespace sde {
 StrategyDefault::StrategyDefault() : hw_layers_info_(NULL) {
 }
 
-DisplayError StrategyDefault::CreateStrategyInterface(uint16_t version,
+DisplayError StrategyDefault::CreateStrategyInterface(uint16_t version, DisplayType type,
                                                       StrategyInterface **interface) {
   StrategyDefault *strategy_default  = new StrategyDefault();
 
@@ -59,12 +59,13 @@ DisplayError StrategyDefault::DestroyStrategyInterface(StrategyInterface *interf
   return kErrorNone;
 }
 
-DisplayError StrategyDefault::Start(HWLayersInfo *hw_layers_info) {
+DisplayError StrategyDefault::Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempts) {
   if (!hw_layers_info) {
     return kErrorParameters;
   }
 
   hw_layers_info_ = hw_layers_info;
+  *max_attempts = 1;
 
   return kErrorNone;
 }

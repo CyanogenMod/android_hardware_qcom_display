@@ -25,6 +25,7 @@
 #ifndef __HW_FRAMEBUFFER_H__
 #define __HW_FRAMEBUFFER_H__
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <linux/msm_mdp_ext.h>
@@ -49,6 +50,7 @@ class HWFrameBuffer : public HWInterface {
   virtual DisplayError GetDisplayAttributes(Handle device, HWDisplayAttributes *display_attributes,
                                             uint32_t index);
   virtual DisplayError SetDisplayAttributes(Handle device, uint32_t index);
+  virtual DisplayError GetConfigIndex(Handle device, uint32_t mode, uint32_t *index);
   virtual DisplayError PowerOn(Handle device);
   virtual DisplayError PowerOff(Handle device);
   virtual DisplayError Doze(Handle device);

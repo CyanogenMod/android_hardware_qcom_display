@@ -34,10 +34,11 @@ class StrategyDefault : public StrategyInterface {
  public:
   StrategyDefault();
 
-  static DisplayError CreateStrategyInterface(uint16_t version, StrategyInterface **interface);
+  static DisplayError CreateStrategyInterface(uint16_t version, DisplayType type,
+                                              StrategyInterface **interface);
   static DisplayError DestroyStrategyInterface(StrategyInterface *interface);
 
-  virtual DisplayError Start(HWLayersInfo *hw_layers_info);
+  virtual DisplayError Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempts);
   virtual DisplayError GetNextStrategy(StrategyConstraints *constraints);
   virtual DisplayError Stop();
 

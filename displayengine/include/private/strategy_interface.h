@@ -30,6 +30,7 @@
 #define __STRATEGY_INTERFACE_H__
 
 #include <core/sde_types.h>
+#include <core/display_interface.h>
 
 namespace sde {
 
@@ -85,12 +86,14 @@ class StrategyInterface;
   @details This function is used to create StrategyInterface object which resides in the composer
   strategy library loaded at runtime.
 
-  @param[out] version \link STRATEGY_VERSION_TAG \endlink
+  @param[in] version \link STRATEGY_VERSION_TAG \endlink
+  @param[in] type \link DisplayType \endlink
   @param[out] interface \link StrategyInterface \endlink
 
   @return \link DisplayError \endlink
 */
-typedef DisplayError (*CreateStrategyInterface)(uint16_t version, StrategyInterface **interface);
+typedef DisplayError (*CreateStrategyInterface)(uint16_t version, DisplayType type,
+                      StrategyInterface **interface);
 
 /*! @brief Function to destroy composer strategy interface.
 
@@ -155,10 +158,11 @@ class StrategyInterface {
     preprocessing for a given layer stack.
 
     @param[in] layers_info \link HWLayersInfo \endlink
+    @param[out] max_attempts Maximum calls to \link GetNextStrategy \endlink
 
     @return \link DisplayError \endlink
   */
-  virtual DisplayError Start(HWLayersInfo *hw_layers_info) = 0;
+  virtual DisplayError Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempts) = 0;
 
 
   /*! @brief Method to get strategy for a layer stack. Caller can loop through this method to try
