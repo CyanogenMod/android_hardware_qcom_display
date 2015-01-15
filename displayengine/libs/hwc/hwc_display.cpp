@@ -35,7 +35,8 @@ namespace sde {
 
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
                        int id)
-  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL) {
+  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL),
+    flush_(false) {
 }
 
 int HWCDisplay::Init() {
@@ -282,6 +283,7 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
   size_t num_hw_layers = content_list->numHwLayers;
   if (num_hw_layers <= 1) {
+    flush_ = true;
     return 0;
   }
 
@@ -336,9 +338,14 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   layer_stack_.flags.geometry_changed = ((content_list->flags & HWC_GEOMETRY_CHANGED) > 0);
 
   DisplayError error = display_intf_->Prepare(&layer_stack_);
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     DLOGE("Prepare failed. Error = %d", error);
-    return -EINVAL;
+
+    // To prevent surfaceflinger infinite wait, flush the previous frame during Commit() so that
+    // previous buffer and fences are released, and override the error.
+    flush_ = true;
+
+    return 0;
   }
 
   bool needs_fb_refresh = NeedsFrameBufferRefresh(content_list);
@@ -372,38 +379,39 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
   int status = 0;
 
   size_t num_hw_layers = content_list->numHwLayers;
-  if (num_hw_layers <= 1) {
-    if (!num_hw_layers) {
-      return 0;
+
+  if (!flush_) {
+    for (size_t i = 0; i < num_hw_layers; i++) {
+      hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
+      const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
+      LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
+
+      if (pvt_handle) {
+        layer_buffer->planes[0].fd = pvt_handle->fd;
+        layer_buffer->planes[0].offset = pvt_handle->offset;
+        layer_buffer->planes[0].stride = pvt_handle->width;
+      }
+
+      layer_buffer->acquire_fence_fd = hwc_layer.acquireFenceFd;
     }
 
-    // TODO(user): handle if only 1 layer(fb target) is received.
-    int &acquireFenceFd = content_list->hwLayers[0].acquireFenceFd;
-    if (acquireFenceFd >= 0) {
-      close(acquireFenceFd);
-    }
+    DisplayError error = display_intf_->Commit(&layer_stack_);
+    if (error != kErrorNone) {
+      DLOGE("Commit failed. Error = %d", error);
 
-    return 0;
+      // To prevent surfaceflinger infinite wait, flush the previous frame during Commit() so that
+      // previous buffer and fences are released, and override the error.
+      flush_ = true;
+    }
   }
 
-  for (size_t i = 0; i < num_hw_layers; i++) {
-    hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-    const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
-    LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
-
-    if (pvt_handle) {
-      layer_buffer->planes[0].fd = pvt_handle->fd;
-      layer_buffer->planes[0].offset = pvt_handle->offset;
-      layer_buffer->planes[0].stride = pvt_handle->width;
+  if (flush_) {
+    DisplayError error = display_intf_->Flush();
+    if (error != kErrorNone) {
+      DLOGE("Flush failed. Error = %d", error);
     }
 
-    layer_buffer->acquire_fence_fd = hwc_layer.acquireFenceFd;
-  }
-
-  DisplayError error = display_intf_->Commit(&layer_stack_);
-  if (UNLIKELY(error != kErrorNone)) {
-    DLOGE("Commit failed. Error = %d", error);
-    status = -EINVAL;
+    flush_ = false;
   }
 
   for (size_t i = 0; i < num_hw_layers; i++) {

@@ -135,6 +135,8 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
       }
     }
     comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
+  } else {
+    return kErrorNotSupported;
   }
 
   return error;
@@ -149,23 +151,45 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
     return kErrorParameters;
   }
 
-  if (!pending_commit_) {
-    DLOGE("Commit: Corresponding Prepare() is not called for display = %d", display_type_);
-    return kErrorUndefined;
-  }
-
   if (state_ == kStateOn) {
+    if (!pending_commit_) {
+      DLOGE("Commit: Corresponding Prepare() is not called for display = %d", display_type_);
+      return kErrorUndefined;
+    }
     error = hw_intf_->Commit(hw_device_, &hw_layers_);
     if (error == kErrorNone) {
       comp_manager_->PostCommit(display_comp_ctx_, &hw_layers_);
     } else {
       DLOGE("Unexpected error. Commit failed on driver.");
     }
+  } else {
+    return kErrorNotSupported;
   }
 
   pending_commit_ = false;
 
   return kErrorNone;
+}
+
+DisplayError DisplayBase::Flush() {
+  SCOPE_LOCK(locker_);
+
+  DisplayError error = kErrorNone;
+
+  if (state_ != kStateOn) {
+    return kErrorNone;
+  }
+
+  hw_layers_.info.count = 0;
+  error = hw_intf_->Flush(hw_device_);
+  if (error == kErrorNone) {
+    comp_manager_->Purge(display_comp_ctx_);
+    pending_commit_ = false;
+  } else {
+    DLOGV("Failed to flush device.");
+  }
+
+  return error;
 }
 
 DisplayError DisplayBase::GetDisplayState(DisplayState *state) {

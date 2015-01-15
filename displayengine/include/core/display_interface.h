@@ -207,6 +207,19 @@ class DisplayInterface {
   */
   virtual DisplayError Commit(LayerStack *layer_stack) = 0;
 
+  /*! @brief Method to flush any pending buffers/fences submitted previously via Commit() call.
+
+    @details Client shall call this method to request the Display Engine to release all buffers and
+    respective fences currently in use. This operation may result in a blank display on the panel
+    until a new frame is submitted for composition.
+
+    @return \link DisplayError \endlink
+
+    @sa Prepare
+    @sa Commit
+  */
+  virtual DisplayError Flush() = 0;
+
   /*! @brief Method to get current state of the display device.
 
     @param[out] state \link DisplayState \endlink

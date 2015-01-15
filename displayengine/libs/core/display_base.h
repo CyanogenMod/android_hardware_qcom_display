@@ -43,6 +43,7 @@ class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
   virtual DisplayError Deinit();
   virtual DisplayError Prepare(LayerStack *layer_stack);
   virtual DisplayError Commit(LayerStack *layer_stack);
+  virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
   virtual DisplayError GetConfig(DisplayConfigFixedInfo *fixed_info);

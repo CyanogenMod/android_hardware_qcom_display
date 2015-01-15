@@ -97,6 +97,7 @@ class HWCDisplay : public DisplayEventHandler {
   LayerStackMemory layer_stack_memory_;
   LayerStack layer_stack_;
   LayerStackCache layer_stack_cache_;
+  bool flush_;
 };
 
 }  // namespace sde
