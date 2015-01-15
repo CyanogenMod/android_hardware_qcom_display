@@ -58,7 +58,7 @@ void ResManager::RotationConfig(const LayerTransform &transform, const float &sc
   dst_rect.right = floorf(dst_rect.right);
   dst_rect.bottom = floorf(dst_rect.bottom);
   rotate->src_roi = *src_rect;
-  rotate->pipe_id = kPipeIdNeedsAssignment;
+  rotate->valid = true;
   rotate->dst_roi = dst_rect;
 
   *src_rect = dst_rect;
@@ -72,21 +72,20 @@ DisplayError ResManager::SrcSplitConfig(DisplayResourceContext *display_resource
   HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
   HWPipeInfo *left_pipe = &layer_config->left_pipe;
   HWPipeInfo *right_pipe = &layer_config->right_pipe;
-  layer_config->is_right_pipe = false;
 
   if ((src_rect.right - src_rect.left) > kMaxSourcePipeWidth ||
       (dst_rect.right - dst_rect.left) > kMaxInterfaceWidth || hw_res_info_.always_src_split) {
     SplitRect(transform.flip_horizontal, src_rect, dst_rect, &left_pipe->src_roi,
               &left_pipe->dst_roi, &right_pipe->src_roi, &right_pipe->dst_roi);
-    left_pipe->pipe_id = kPipeIdNeedsAssignment;
-    right_pipe->pipe_id = kPipeIdNeedsAssignment;
-    layer_config->is_right_pipe = true;
+    left_pipe->valid = true;
+    right_pipe->valid = true;
   } else {
     left_pipe->src_roi = src_rect;
     left_pipe->dst_roi = dst_rect;
-    left_pipe->pipe_id = kPipeIdNeedsAssignment;
+    left_pipe->valid = true;
     right_pipe->Reset();
   }
+
   return kErrorNone;
 }
 
@@ -94,12 +93,13 @@ DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_reso
                                             const LayerTransform &transform,
                                             const LayerRect &src_rect, const LayerRect &dst_rect,
                                             HWLayerConfig *layer_config) {
+  LayerRect scissor_dst_left, scissor_dst_right;
   HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
+
   // for display split case
   HWPipeInfo *left_pipe = &layer_config->left_pipe;
   HWPipeInfo *right_pipe = &layer_config->right_pipe;
   LayerRect scissor, dst_left, crop_left, crop_right, dst_right;
-  layer_config->is_right_pipe = false;
   scissor.right = FLOAT(display_attributes.split_left);
   scissor.bottom = FLOAT(display_attributes.y_pixels);
 
@@ -123,9 +123,8 @@ DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_reso
     // 2 pipes both are on the left
     SplitRect(transform.flip_horizontal, crop_left, dst_left, &left_pipe->src_roi,
               &left_pipe->dst_roi, &right_pipe->src_roi, &right_pipe->dst_roi);
-    left_pipe->pipe_id = kPipeIdNeedsAssignment;
-    right_pipe->pipe_id = kPipeIdNeedsAssignment;
-    layer_config->is_right_pipe = true;
+    left_pipe->valid = true;
+    right_pipe->valid = true;
   } else if ((crop_right.right - crop_right.left) > kMaxSourcePipeWidth) {
     if (crop_left.right != crop_left.left) {
       DLOGV_IF(kTagResources, "Need more than 2 pipes: left width = %.0f, right width = %.0f",
@@ -135,14 +134,13 @@ DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_reso
     // 2 pipes both are on the right
     SplitRect(transform.flip_horizontal, crop_right, dst_right, &left_pipe->src_roi,
               &left_pipe->dst_roi, &right_pipe->src_roi, &right_pipe->dst_roi);
-    left_pipe->pipe_id = kPipeIdNeedsAssignment;
-    right_pipe->pipe_id = kPipeIdNeedsAssignment;
-    layer_config->is_right_pipe = true;
+    left_pipe->valid = true;
+    right_pipe->valid = true;
   } else if (UINT32(dst_left.right) > UINT32(dst_left.left)) {
     // assign left pipe
     left_pipe->src_roi = crop_left;
     left_pipe->dst_roi = dst_left;
-    left_pipe->pipe_id = kPipeIdNeedsAssignment;
+    left_pipe->valid = true;
   } else {
     // Set default value, left_pipe is not needed.
     left_pipe->Reset();
@@ -150,16 +148,15 @@ DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_reso
 
   // assign right pipe if needed
   if (UINT32(dst_right.right) > UINT32(dst_right.left)) {
-    if (left_pipe->pipe_id) {
+    if (left_pipe->valid) {
       right_pipe->src_roi = crop_right;
       right_pipe->dst_roi = dst_right;
-      right_pipe->pipe_id = kPipeIdNeedsAssignment;
-      layer_config->is_right_pipe = true;
+      right_pipe->valid = true;
     } else {
       // If left pipe is not used, use left pipe first.
       left_pipe->src_roi = crop_right;
       left_pipe->dst_roi = dst_right;
-      left_pipe->pipe_id = kPipeIdNeedsAssignment;
+      left_pipe->valid = true;
       right_pipe->Reset();
     }
   } else {
@@ -230,12 +227,12 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     //    rectangle of video layer to be even.
     // 2. Normalize source and destination rect of a layer to multiple of 1.
     uint32_t factor = (1 << layer.input_buffer->flags.video);
-    if (left_pipe.pipe_id == kPipeIdNeedsAssignment) {
+    if (left_pipe.valid) {
       NormalizeRect(factor, &left_pipe.src_roi);
       NormalizeRect(1, &left_pipe.dst_roi);
     }
 
-    if (right_pipe.pipe_id == kPipeIdNeedsAssignment) {
+    if (right_pipe.valid) {
       NormalizeRect(factor, &right_pipe.src_roi);
       NormalizeRect(1, &right_pipe.dst_roi);
     }
@@ -421,6 +418,7 @@ void ResManager::CalculateCropRects(const LayerRect &scissor, const LayerTransfo
     return;
 
   CalculateCut(transform, &left_cut_ratio, &top_cut_ratio, &right_cut_ratio, &bottom_cut_ratio);
+
   crop_left += crop_width * left_cut_ratio;
   crop_top += crop_height * top_cut_ratio;
   crop_right -= crop_width * right_cut_ratio;

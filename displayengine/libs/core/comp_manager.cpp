@@ -25,6 +25,7 @@
 #include <dlfcn.h>
 #include <utils/constants.h>
 #include <utils/debug.h>
+#include <core/buffer_allocator.h>
 
 #include "comp_manager.h"
 #include "strategy_default.h"
@@ -38,12 +39,13 @@ CompManager::CompManager()
     registered_displays_(0), configured_displays_(0), safe_mode_(false) {
 }
 
-DisplayError CompManager::Init(const HWResourceInfo &hw_res_info) {
+DisplayError CompManager::Init(const HWResourceInfo &hw_res_info, BufferAllocator *buffer_allocator,
+                               BufferSyncHandler *buffer_sync_handler) {
   SCOPE_LOCK(locker_);
 
   DisplayError error = kErrorNone;
 
-  error = res_mgr_.Init(hw_res_info);
+  error = res_mgr_.Init(hw_res_info, buffer_allocator, buffer_sync_handler);
   if (error != kErrorNone) {
     return error;
   }
@@ -108,6 +110,7 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
                             &display_comp_ctx->strategy_intf) != kErrorNone) {
     DLOGW("Unable to create strategy interface");
     delete display_comp_ctx;
+    display_comp_ctx = NULL;
     return kErrorUndefined;
   }
 
@@ -115,6 +118,7 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
   if (error != kErrorNone) {
     destroy_strategy_intf_(display_comp_ctx->strategy_intf);
     delete display_comp_ctx;
+    display_comp_ctx = NULL;
     return error;
   }
 
@@ -140,7 +144,10 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
   CLEAR_BIT(registered_displays_, display_comp_ctx->display_type);
   CLEAR_BIT(configured_displays_, display_comp_ctx->display_type);
 
-  delete display_comp_ctx;
+  if (display_comp_ctx) {
+    delete display_comp_ctx;
+    display_comp_ctx = NULL;
+  }
 
   return kErrorNone;
 }
@@ -223,16 +230,27 @@ DisplayError CompManager::Prepare(Handle display_ctx, HWLayers *hw_layers) {
   return error;
 }
 
-void CompManager::PostPrepare(Handle display_ctx, HWLayers *hw_layers) {
+DisplayError CompManager::PostPrepare(Handle display_ctx, HWLayers *hw_layers) {
   SCOPE_LOCK(locker_);
   DisplayCompositionContext *display_comp_ctx =
                              reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+  Handle &display_resource_ctx = display_comp_ctx->display_resource_ctx;
+
+  DisplayError error = kErrorNone;
+  error = res_mgr_.PostPrepare(display_resource_ctx, hw_layers);
+  if (error != kErrorNone) {
+    return error;
+  }
+
   display_comp_ctx->strategy_intf->Stop();
+
+  return kErrorNone;
 }
 
-void CompManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
+DisplayError CompManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   SCOPE_LOCK(locker_);
 
+  DisplayError error = kErrorNone;
   DisplayCompositionContext *display_comp_ctx =
                              reinterpret_cast<DisplayCompositionContext *>(display_ctx);
   SET_BIT(configured_displays_, display_comp_ctx->display_type);
@@ -240,9 +258,14 @@ void CompManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
       safe_mode_ = false;
   }
 
-  res_mgr_.PostCommit(display_comp_ctx->display_resource_ctx, hw_layers);
+  error = res_mgr_.PostCommit(display_comp_ctx->display_resource_ctx, hw_layers);
+  if (error != kErrorNone) {
+    return error;
+  }
 
   display_comp_ctx->idle_fallback = false;
+
+  return kErrorNone;
 }
 
 void CompManager::Purge(Handle display_ctx) {

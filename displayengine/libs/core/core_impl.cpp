@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -35,8 +35,10 @@
 
 namespace sde {
 
-CoreImpl::CoreImpl(CoreEventHandler *event_handler)
-  : event_handler_(event_handler), hw_intf_(NULL) {
+CoreImpl::CoreImpl(CoreEventHandler *event_handler, BufferAllocator *buffer_allocator,
+                   BufferSyncHandler *buffer_sync_handler)
+  : event_handler_(event_handler), buffer_allocator_(buffer_allocator),
+    buffer_sync_handler_(buffer_sync_handler), hw_intf_(NULL) {
 }
 
 DisplayError CoreImpl::Init() {
@@ -44,7 +46,7 @@ DisplayError CoreImpl::Init() {
 
   DisplayError error = kErrorNone;
 
-  error = HWInterface::Create(&hw_intf_);
+  error = HWInterface::Create(&hw_intf_, buffer_sync_handler_);
   if (UNLIKELY(error != kErrorNone)) {
     return error;
   }
@@ -56,7 +58,7 @@ DisplayError CoreImpl::Init() {
     return error;
   }
 
-  error = comp_mgr_.Init(hw_res_info);
+  error = comp_mgr_.Init(hw_res_info, buffer_allocator_, buffer_sync_handler_);
   if (UNLIKELY(error != kErrorNone)) {
     HWInterface::Destroy(hw_intf_);
     return error;
@@ -93,15 +95,15 @@ DisplayError CoreImpl::CreateDisplay(DisplayType type, DisplayEventHandler *even
   DisplayBase *display_base = NULL;
   switch (type) {
   case kPrimary:
-    display_base = new DisplayPrimary(event_handler, hw_intf_, &comp_mgr_);
+    display_base = new DisplayPrimary(event_handler, hw_intf_, &comp_mgr_, &offline_ctrl_);
     break;
 
   case kHDMI:
-    display_base = new DisplayHDMI(event_handler, hw_intf_, &comp_mgr_);
+    display_base = new DisplayHDMI(event_handler, hw_intf_, &comp_mgr_, &offline_ctrl_);
     break;
 
   case kVirtual:
-    display_base = new DisplayVirtual(event_handler, hw_intf_, &comp_mgr_);
+    display_base = new DisplayVirtual(event_handler, hw_intf_, &comp_mgr_, &offline_ctrl_);
     break;
 
   default:
@@ -116,6 +118,7 @@ DisplayError CoreImpl::CreateDisplay(DisplayType type, DisplayEventHandler *even
   DisplayError error = display_base->Init();
   if (UNLIKELY(error != kErrorNone)) {
     delete display_base;
+    display_base = NULL;
     return error;
   }
 
@@ -133,6 +136,7 @@ DisplayError CoreImpl::DestroyDisplay(DisplayInterface *intf) {
   DisplayBase *display_base = static_cast<DisplayBase *>(intf);
   display_base->Deinit();
   delete display_base;
+  display_base = NULL;
 
   return kErrorNone;
 }

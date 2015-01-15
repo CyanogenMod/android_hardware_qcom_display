@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -26,6 +26,7 @@
 #define __OFFLINE_CTRL_H__
 
 #include <utils/locker.h>
+#include <utils/debug.h>
 
 #include "hw_interface.h"
 
@@ -36,9 +37,23 @@ class OfflineCtrl {
   OfflineCtrl();
   DisplayError Init(HWInterface *hw_intf, HWResourceInfo hw_res_info);
   DisplayError Deinit();
+  DisplayError RegisterDisplay(DisplayType type, Handle *display_ctx);
+  void UnregisterDisplay(Handle display_ctx);
+  DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
+  DisplayError Commit(Handle display_ctx, HWLayers *hw_layers);
 
  private:
+  struct DisplayOfflineContext {
+    DisplayType display_type;
+    bool pending_rot_commit;
+
+    DisplayOfflineContext() : display_type(kPrimary), pending_rot_commit(false) { }
+  };
+
+  bool IsRotationRequired(HWLayers *hw_layers);
+
   HWInterface *hw_intf_;
+  Handle hw_rotator_device_;
 };
 
 }  // namespace sde

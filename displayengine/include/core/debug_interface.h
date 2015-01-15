@@ -44,6 +44,9 @@ enum DebugTag {
   kTagNone,             //!< Debug log is not tagged. This type of logs should always be printed.
   kTagResources,        //!< Debug log is tagged for resource management.
   kTagStrategy,         //!< Debug log is tagged for strategy decisions.
+  kTagDriverConfig,     //!< Debug log is tagged for driver config.
+  kTagBufferManager,    //!< Debug log is tagged for buffer manager state transitions.
+  kTagOfflineCtrl,      //!< Debug log is tagged for offline controller.
 };
 
 /*! @brief Display debug handler class.
@@ -104,7 +107,7 @@ class DebugHandler {
 /*! @brief Scope tracer template class.
 
   @details This class template implements the funtionality to capture the trace for function/
-  module. it starts the trace upon object creation and ends the trace upon object destruction.
+  module. It starts the trace upon object creation and ends the trace upon object destruction.
 */
 template <class T>
 class ScopeTracer {

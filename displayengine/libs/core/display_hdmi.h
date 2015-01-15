@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -31,7 +31,8 @@ namespace sde {
 
 class DisplayHDMI : public DisplayBase {
  public:
-  DisplayHDMI(DisplayEventHandler *event_handler, HWInterface *hw_intf, CompManager *comp_manager);
+  DisplayHDMI(DisplayEventHandler *event_handler, HWInterface *hw_intf, CompManager *comp_manager,
+              OfflineCtrl *offline_ctrl);
   virtual int GetBestConfig();
   virtual DisplayError SetDisplayState(DisplayState state);
 };

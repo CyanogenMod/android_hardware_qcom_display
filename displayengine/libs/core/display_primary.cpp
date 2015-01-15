@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -32,9 +32,8 @@
 namespace sde {
 
 DisplayPrimary::DisplayPrimary(DisplayEventHandler *event_handler, HWInterface *hw_intf,
-                               CompManager *comp_manager)
-  : DisplayBase(kPrimary, event_handler, kDevicePrimary, hw_intf, comp_manager) {
-}
+                               CompManager *comp_manager, OfflineCtrl *offline_ctrl)
+  : DisplayBase(kPrimary, event_handler, kDevicePrimary, hw_intf, comp_manager, offline_ctrl) { }
 
 }  // namespace sde
 

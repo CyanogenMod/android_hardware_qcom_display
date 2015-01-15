@@ -41,6 +41,9 @@
 
 #include "display_interface.h"
 #include "sde_types.h"
+#include "buffer_allocator.h"
+
+class BufferSyncHandler;
 
 /*! @brief Display engine interface version.
 
@@ -131,6 +134,8 @@ class CoreInterface {
 
     @param[in] event_handler \link CoreEventHandler \endlink
     @param[in] debug_handler \link DebugHandler \endlink
+    @param[in] buffer_allocator \link BufferAllocator \endlink
+    @param[in] buffer_sync_handler \link BufferSyncHandler \endlink
     @param[out] interface \link CoreInterface \endlink
     @param[in] version \link SDE_VERSION_TAG \endlink. Client must not override this argument.
 
@@ -139,7 +144,9 @@ class CoreInterface {
     @sa DestroyCore
   */
   static DisplayError CreateCore(CoreEventHandler *event_handler, DebugHandler *debug_handler,
-                                 CoreInterface **interface, uint32_t version = SDE_VERSION_TAG);
+                                 BufferAllocator *buffer_allocator,
+                                 BufferSyncHandler *buffer_sync_handler, CoreInterface **interface,
+                                 uint32_t version = SDE_VERSION_TAG);
 
   /*! @brief Method to release handle to display core interface.
 

@@ -26,17 +26,20 @@
 #include <utils/debug.h>
 
 #include "display_base.h"
+#include "offline_ctrl.h"
 
 #define __CLASS__ "DisplayBase"
 
 namespace sde {
 
+// TODO(user): Have a single structure handle carries all the interface pointers and variables.
 DisplayBase::DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
-             HWDeviceType hw_device_type, HWInterface *hw_intf, CompManager *comp_manager)
+                         HWDeviceType hw_device_type, HWInterface *hw_intf,
+                         CompManager *comp_manager, OfflineCtrl *offline_ctrl)
   : display_type_(display_type), event_handler_(event_handler), hw_device_type_(hw_device_type),
-    hw_intf_(hw_intf), comp_manager_(comp_manager), state_(kStateOff), hw_device_(0),
-    display_comp_ctx_(0), display_attributes_(NULL), num_modes_(0), active_mode_index_(0),
-    pending_commit_(false), vsync_enable_(false) {
+    hw_intf_(hw_intf), comp_manager_(comp_manager), offline_ctrl_(offline_ctrl), state_(kStateOff),
+    hw_device_(0), display_comp_ctx_(0), display_attributes_(NULL), num_modes_(0),
+    active_mode_index_(0), pending_commit_(false), vsync_enable_(false) {
 }
 
 DisplayError DisplayBase::Init() {
@@ -83,13 +86,21 @@ DisplayError DisplayBase::Init() {
     goto CleanupOnError;
   }
 
+  error = offline_ctrl_->RegisterDisplay(display_type_, &display_offline_ctx_);
+  if (UNLIKELY(error != kErrorNone)) {
+    goto CleanupOnError;
+  }
+
   return kErrorNone;
 
 CleanupOnError:
-  comp_manager_->UnregisterDisplay(display_comp_ctx_);
+  if (display_comp_ctx_) {
+    comp_manager_->UnregisterDisplay(display_comp_ctx_);
+  }
 
   if (display_attributes_) {
     delete[] display_attributes_;
+    display_attributes_ = NULL;
   }
 
   hw_intf_->Close(hw_device_);
@@ -100,8 +111,15 @@ CleanupOnError:
 DisplayError DisplayBase::Deinit() {
   SCOPE_LOCK(locker_);
 
+  offline_ctrl_->UnregisterDisplay(display_offline_ctx_);
+
   comp_manager_->UnregisterDisplay(display_comp_ctx_);
-  delete[] display_attributes_;
+
+  if (display_attributes_) {
+    delete[] display_attributes_;
+    display_attributes_ = NULL;
+  }
+
   hw_intf_->Close(hw_device_);
 
   return kErrorNone;
@@ -118,7 +136,7 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
 
   pending_commit_ = false;
 
-  if ((state_ == kStateOn)) {
+  if (state_ == kStateOn) {
     // Clean hw layers for reuse.
     hw_layers_.info = HWLayersInfo();
     hw_layers_.info.stack = layer_stack;
@@ -130,11 +148,17 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
         break;
       }
 
-      error = hw_intf_->Validate(hw_device_, &hw_layers_);
+      error = offline_ctrl_->Prepare(display_offline_ctx_, &hw_layers_);
       if (error == kErrorNone) {
-        // Strategy is successful now, wait for Commit().
-        pending_commit_ = true;
-        break;
+        error = hw_intf_->Validate(hw_device_, &hw_layers_);
+        if (error == kErrorNone) {
+          error = comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
+          if (error == kErrorNone) {
+            // Strategy is successful now, wait for Commit().
+            pending_commit_ = true;
+            break;
+          }
+        }
       }
     }
     comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
@@ -159,11 +183,18 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
       DLOGE("Commit: Corresponding Prepare() is not called for display = %d", display_type_);
       return kErrorUndefined;
     }
-    error = hw_intf_->Commit(hw_device_, &hw_layers_);
+
+    error = offline_ctrl_->Commit(display_offline_ctx_, &hw_layers_);
     if (error == kErrorNone) {
-      comp_manager_->PostCommit(display_comp_ctx_, &hw_layers_);
-    } else {
-      DLOGE("Unexpected error. Commit failed on driver.");
+      error = hw_intf_->Commit(hw_device_, &hw_layers_);
+      if (error == kErrorNone) {
+        error = comp_manager_->PostCommit(display_comp_ctx_, &hw_layers_);
+        if (error != kErrorNone) {
+          DLOGE("Composition manager PostCommit failed");
+        }
+      } else {
+        DLOGE("Unexpected error. Commit failed on driver.");
+      }
     }
   } else {
     return kErrorNotSupported;
@@ -388,6 +419,8 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     HWLayerConfig &layer_config = hw_layers_.config[i];
     HWPipeInfo &left_pipe = hw_layers_.config[i].left_pipe;
     HWPipeInfo &right_pipe = hw_layers_.config[i].right_pipe;
+    HWRotateInfo &left_rotate = hw_layers_.config[i].rotates[0];
+    HWRotateInfo &right_rotate = hw_layers_.config[i].rotates[1];
 
     AppendString(buffer, length, "\n\nsde idx: %u, actual idx: %u", i, hw_layers_.info.index[i]);
     AppendString(buffer, length, "\nw: %u, h: %u, fmt: %u",
@@ -395,13 +428,29 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     AppendRect(buffer, length, "\nsrc_rect:", &layer.src_rect);
     AppendRect(buffer, length, "\ndst_rect:", &layer.dst_rect);
 
-    AppendString(buffer, length, "\n\tleft split =>");
-    AppendString(buffer, length, "\n\t  pipe id: 0x%x", left_pipe.pipe_id);
-    AppendRect(buffer, length, "\n\t  src_roi:", &left_pipe.src_roi);
-    AppendRect(buffer, length, "\n\t  dst_roi:", &left_pipe.dst_roi);
+    if (left_rotate.valid) {
+      AppendString(buffer, length, "\n\tleft rotate =>");
+      AppendString(buffer, length, "\n\t  pipe id: 0x%x", left_rotate.pipe_id);
+      AppendRect(buffer, length, "\n\t  src_roi:", &left_rotate.src_roi);
+      AppendRect(buffer, length, "\n\t  dst_roi:", &left_rotate.dst_roi);
+    }
 
-    if (layer_config.is_right_pipe) {
-      AppendString(buffer, length, "\n\tright split =>");
+    if (right_rotate.valid) {
+      AppendString(buffer, length, "\n\tright rotate =>");
+      AppendString(buffer, length, "\n\t  pipe id: 0x%x", right_rotate.pipe_id);
+      AppendRect(buffer, length, "\n\t  src_roi:", &right_rotate.src_roi);
+      AppendRect(buffer, length, "\n\t  dst_roi:", &right_rotate.dst_roi);
+    }
+
+    if (left_pipe.valid) {
+      AppendString(buffer, length, "\n\tleft pipe =>");
+      AppendString(buffer, length, "\n\t  pipe id: 0x%x", left_pipe.pipe_id);
+      AppendRect(buffer, length, "\n\t  src_roi:", &left_pipe.src_roi);
+      AppendRect(buffer, length, "\n\t  dst_roi:", &left_pipe.dst_roi);
+    }
+
+    if (right_pipe.valid) {
+      AppendString(buffer, length, "\n\tright pipe =>");
       AppendString(buffer, length, "\n\t  pipe id: 0x%x", right_pipe.pipe_id);
       AppendRect(buffer, length, "\n\t  src_roi:", &right_pipe.src_roi);
       AppendRect(buffer, length, "\n\t  dst_roi:", &right_pipe.dst_roi);

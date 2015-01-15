@@ -73,6 +73,8 @@ public:
         DEBUG_VSYNC,
         DEBUG_VD,
         DEBUG_PIPE_LIFECYCLE,
+        DEBUG_DRIVER_CONFIG,
+        DEBUG_ROTATOR,
     };
 
     // Register a client that can be notified

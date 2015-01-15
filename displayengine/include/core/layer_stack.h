@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -32,6 +32,7 @@
 #define __LAYER_STACK_H__
 
 #include <stdint.h>
+#include <utils/constants.h>
 
 #include "layer_buffer.h"
 #include "sde_types.h"
@@ -137,6 +138,8 @@ struct LayerRect {
   float bottom;   //!< Bottom-most pixel coordinate.
 
   LayerRect() : left(0.0f), top(0.0f), right(0.0f), bottom(0.0f) { }
+
+  LayerRect(float l, float t, float r, float b) : left(l), top(t), right(r), bottom(b) { }
 };
 
 /*! @brief This structure defines an array of display layer rectangles.
@@ -194,8 +197,10 @@ struct Layer {
 
   LayerFlags flags;                 //!< Flags associated with this layer.
 
+  uint32_t frame_rate;              //!< Rate at which frames are being updated for this layer.
+
   Layer() : input_buffer(NULL), composition(kCompositionGPU), blending(kBlendingNone),
-            plane_alpha(0) { }
+            plane_alpha(0), frame_rate(0) { }
 };
 
 /*! @brief This structure defines a layer stack that contains layers which need to be composed and

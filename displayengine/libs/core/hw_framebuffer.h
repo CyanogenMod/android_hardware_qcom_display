@@ -30,7 +30,7 @@
 #include <stdlib.h>
 #include <linux/msm_mdp_ext.h>
 #include <video/msm_hdmi_modes.h>
-
+#include <linux/mdss_rotator.h>
 #include <poll.h>
 #include <pthread.h>
 
@@ -40,7 +40,7 @@ namespace sde {
 
 class HWFrameBuffer : public HWInterface {
  public:
-  HWFrameBuffer();
+  explicit HWFrameBuffer(BufferSyncHandler *buffer_sync_handler);
   DisplayError Init();
   DisplayError Deinit();
   virtual DisplayError GetHWCapabilities(HWResourceInfo *hw_res_info);
@@ -56,28 +56,61 @@ class HWFrameBuffer : public HWInterface {
   virtual DisplayError Doze(Handle device);
   virtual DisplayError SetVSyncState(Handle device, bool enable);
   virtual DisplayError Standby(Handle device);
+  virtual DisplayError OpenRotatorSession(Handle device, HWLayers *hw_layers);
+  virtual DisplayError CloseRotatorSession(Handle device, int32_t session_id);
   virtual DisplayError Validate(Handle device, HWLayers *hw_layers);
   virtual DisplayError Commit(Handle device, HWLayers *hw_layers);
   virtual DisplayError Flush(Handle device);
   virtual void SetIdleTimeoutMs(Handle device, uint32_t timeout_ms);
 
  private:
+  struct HWDisplay {
+    mdp_layer_commit mdp_disp_commit;
+    mdp_input_layer mdp_disp_layers[kMaxSDELayers * 2];   // split panel (left + right)
+
+    HWDisplay() { Reset(); }
+
+    void Reset() {
+      memset(&mdp_disp_commit, 0, sizeof(mdp_disp_commit));
+      memset(&mdp_disp_layers, 0, sizeof(mdp_disp_layers));
+
+      for (uint32_t i = 0; i < kMaxSDELayers * 2; i++) {
+        mdp_disp_layers[i].buffer.fence = -1;
+      }
+
+      mdp_disp_commit.version = MDP_COMMIT_VERSION_1_0;
+      mdp_disp_commit.commit_v1.input_layers = mdp_disp_layers;
+      mdp_disp_commit.commit_v1.release_fence = -1;
+    }
+  };
+
+  struct HWRotator {
+    struct mdp_rotation_request mdp_rot_req;
+    struct mdp_rotation_item mdp_rot_layers[kMaxSDELayers * 2];  // split panel (left + right)
+
+    HWRotator() { Reset(); }
+
+    void Reset() {
+      memset(&mdp_rot_req, 0, sizeof(mdp_rot_req));
+      memset(&mdp_rot_layers, 0, sizeof(mdp_rot_layers));
+
+      for (uint32_t i = 0; i < kMaxSDELayers * 2; i++) {
+        mdp_rot_layers[i].input.fence = -1;
+        mdp_rot_layers[i].output.fence = -1;
+      }
+
+      mdp_rot_req.version = MDP_ROTATION_REQUEST_VERSION_1_0;
+      mdp_rot_req.list = mdp_rot_layers;
+    }
+  };
+
   struct HWContext {
     HWDeviceType type;
     int device_fd;
-    mdp_layer_commit mdp_commit;
-    mdp_input_layer mdp_layers[kMaxSDELayers * 2];   // split panel (left + right) for worst case
+    HWRotator hw_rotator;
+    HWDisplay hw_display;
 
-    HWContext() : type(kDeviceMax), device_fd(-1) {
-      ResetMDPCommit();
-    }
-
-    void ResetMDPCommit() {
-      memset(&mdp_commit, 0, sizeof(mdp_commit));
-      memset(&mdp_layers, 0, sizeof(mdp_layers));
-      mdp_commit.version = MDP_COMMIT_VERSION_1_0;
-      mdp_commit.commit_v1.input_layers = mdp_layers;
-    }
+    HWContext() : type(kDeviceMax), device_fd(-1) { }
   };
 
   enum PanelType {
@@ -120,9 +153,19 @@ class HWFrameBuffer : public HWInterface {
   static const int kNumDisplayEvents = 3;
   static const int kHWMdssVersion5 = 500;  // MDSS_V5
 
+  DisplayError DisplayValidate(HWContext *device_ctx, HWLayers *hw_layers);
+  DisplayError DisplayCommit(HWContext *device_ctx, HWLayers *hw_layers);
+
+  DisplayError RotatorValidate(HWContext *device_ctx, HWLayers *hw_layers);
+  DisplayError RotatorCommit(HWContext *device_ctx, HWLayers *hw_layers);
+
   inline DisplayError SetFormat(const LayerBufferFormat &source, uint32_t *target);
+  inline DisplayError SetStride(LayerBufferFormat format,  uint32_t width, uint32_t *target);
   inline void SetBlending(const LayerBlending &source, mdss_mdp_blend_op *target);
   inline void SetRect(const LayerRect &source, mdp_rect *target);
+  inline void SyncMerge(const int &fd1, const int &fd2, int *target);
+
+  inline const char *GetDeviceString(HWDeviceType type);
 
   // Event Thread to receive vsync/blank events
   static void* DisplayEventThread(void *context);
@@ -172,6 +215,7 @@ class HWFrameBuffer : public HWInterface {
   uint32_t hdmi_modes_[256];
   // Holds the hdmi timing information. Ex: resolution, fps etc.,
   msm_hdmi_mode_timing_info *supported_video_modes_;
+  BufferSyncHandler *buffer_sync_handler_;
 };
 
 }  // namespace sde

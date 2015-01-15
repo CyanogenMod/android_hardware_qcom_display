@@ -23,6 +23,7 @@ LOCAL_SRC_FILES               := core_interface.cpp \
                                  offline_ctrl.cpp \
                                  hw_interface.cpp \
                                  hw_framebuffer.cpp \
-                                 dump_impl.cpp
+                                 dump_impl.cpp \
+                                 buffer_manager.cpp
 
 include $(BUILD_SHARED_LIBRARY)

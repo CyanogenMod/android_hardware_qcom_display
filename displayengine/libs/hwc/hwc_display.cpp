@@ -30,6 +30,7 @@
 #include <errno.h>
 #include <gralloc_priv.h>
 #include <utils/constants.h>
+#include <qdMetaData.h>
 
 #include "hwc_display.h"
 #include "hwc_debugger.h"
@@ -61,8 +62,9 @@ int HWCDisplay::Deinit() {
     return -EINVAL;
   }
 
-  if (LIKELY(layer_stack_memory_.raw)) {
+  if (layer_stack_memory_.raw) {
     delete[] layer_stack_memory_.raw;
+    layer_stack_memory_.raw = NULL;
   }
 
   return 0;
@@ -314,6 +316,13 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
         layer_stack_.flags.secure_present = true;
         layer_buffer->flags.secure = true;
+      }
+
+      // TODO(user) : Initialize it to display refresh rate
+      layer.frame_rate = 60;
+      MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
+      if (meta_data && meta_data->operation & UPDATE_REFRESH_RATE) {
+        layer.frame_rate = meta_data->refreshrate;
       }
     }
 
