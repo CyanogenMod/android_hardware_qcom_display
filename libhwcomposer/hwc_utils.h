@@ -267,6 +267,10 @@ void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers);
 
 bool canUseMDPforVirtualDisplay(hwc_context_t* ctx,
                                 const hwc_display_contents_1_t *list);
+void updateDisplayInfo(hwc_context_t* ctx, int dpy);
+void resetDisplayInfo(hwc_context_t* ctx, int dpy);
+void initCompositionResources(hwc_context_t* ctx, int dpy);
+void destroyCompositionResources(hwc_context_t* ctx, int dpy);
 
 //Helper function to dump logs
 void dumpsys_log(android::String8& buf, const char* fmt, ...);

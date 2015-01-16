@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -23,7 +23,6 @@
 
 #include <linux/fb.h>
 
-struct hwc_context_t;
 struct msm_hdmi_mode_timing_info;
 
 namespace qhwc {
@@ -36,52 +35,74 @@ enum external_scansupport_type {
     EXT_SCAN_BOTH_SUPPORTED     = 3
 };
 
+// Structure to store EDID related data
+struct EDIDData {
+    int mMode, mWidth, mHeight, mFps;
+    // Predetermined ordering for each mode
+    int mModeOrder;
+    EDIDData(int mode, int width, int height, int fps, int order)
+    : mMode(mode), mWidth(width), mHeight(height), mFps(fps), mModeOrder(order)
+    { }
+};
+
 class ExternalDisplay
 {
 public:
-    ExternalDisplay(hwc_context_t* ctx);
+    ExternalDisplay();
     ~ExternalDisplay();
     void setHPD(uint32_t startEnd);
     void setActionSafeDimension(int w, int h);
     bool isCEUnderscanSupported() { return mUnderscanSupported; }
     int configure();
-    void getAttributes(int& width, int& height);
+    void getAttributes(uint32_t& width, uint32_t& height);
     int teardown();
-    bool isConnected() {
-        return  mHwcContext->dpyAttr[HWC_DISPLAY_EXTERNAL].connected;
-    }
+    uint32_t getWidth() const { return mXres; };
+    uint32_t getHeight() const { return mYres; };
+    uint32_t getVsyncPeriod() const { return mVsyncPeriod; };
+    int getFd() const { return mFd; };
+    bool getMDPScalingMode() const { return mMDPScalingMode; }
+    void activateDisplay();
+    /* Returns true if HDMI is the PRIMARY display device*/
+    bool isHDMIPrimaryDisplay();
+    int getConnectedState();
+    /* when HDMI is an EXTERNAL display, PRIMARY display attributes are needed
+       for scaling mode */
+    void setPrimaryAttributes(uint32_t primaryWidth, uint32_t primaryHeight);
 
 private:
     int getModeCount() const;
-    void getEDIDModes(int *out) const;
-    void setEDIDMode(int resMode);
     void setSPDInfo(const char* node, const char* property);
     void readCEUnderscanInfo();
     bool readResolution();
-    int  parseResolution(char* edidStr, int* edidModes);
-    void setResolution(int ID);
+    int  parseResolution(char* edidMode);
     bool openFrameBuffer();
     bool closeFrameBuffer();
     bool writeHPDOption(int userOption) const;
-    bool isValidMode(int ID);
+    bool isValidMode(int mode);
     int  getModeOrder(int mode);
     int  getUserMode();
     int  getBestMode();
     bool isInterlacedMode(int mode);
     void resetInfo();
     void setAttributes();
-    void getAttrForMode(int& width, int& height, int& fps);
+    void getAttrForMode(uint32_t& width, uint32_t& height, uint32_t& fps);
+    int openDeviceNode(const char* node, int fileMode) const;
 
     int mFd;
     int mFbNum;
     int mCurrentMode;
     int mEDIDModes[64];
     int mModeCount;
-    bool mUnderscanSupported;
-    hwc_context_t *mHwcContext;
     fb_var_screeninfo mVInfo;
     // Holds all the HDMI modes and timing info supported by driver
     msm_hdmi_mode_timing_info* supported_video_mode_lut;
+    uint32_t mXres, mYres, mVsyncPeriod, mPrimaryWidth, mPrimaryHeight;
+    bool mMDPScalingMode;
+    bool mUnderscanSupported;
+    // Downscale feature switch, set via system property
+    // sys.hwc.mdp_downscale_enabled
+    bool mMDPDownscaleEnabled;
+    int mDisplayId;
 };
 
 }; //qhwc
