@@ -27,16 +27,17 @@
 #include <sys/prctl.h>
 #include <poll.h>
 #include "hwc_utils.h"
+#include "qd_utils.h"
 #include "string.h"
 #include "external.h"
 #include "overlay.h"
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+using namespace qdutils;
 namespace qhwc {
 
 #define HWC_VSYNC_THREAD_NAME "hwcVsyncThread"
-#define MAX_SYSFS_FILE_PATH             255
 #define PANEL_ON_STR "panel_power_on ="
 #define ARRAY_LENGTH(array) (sizeof((array))/sizeof((array)[0]))
 const int MAX_DATA = 64;
