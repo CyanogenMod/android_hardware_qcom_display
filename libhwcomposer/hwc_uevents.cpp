@@ -30,7 +30,7 @@
 #include "hwc_mdpcomp.h"
 #include "hwc_copybit.h"
 #include "comptype.h"
-#include "external.h"
+#include "hdmi.h"
 #include "virtual.h"
 #include "hwc_virtual.h"
 #include "mdp_version.h"
@@ -157,7 +157,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             ctx->mDrawLock.lock();
             destroyCompositionResources(ctx, dpy);
             if(dpy == HWC_DISPLAY_EXTERNAL) {
-                ctx->mExtDisplay->teardown();
+                ctx->mHDMIDisplay->teardown();
             } else {
                 ctx->mVirtualDisplay->teardown();
             }
@@ -240,8 +240,8 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                         }
                     }
                 }
-                ctx->mExtDisplay->configure();
-                ctx->mExtDisplay->activateDisplay();
+                ctx->mHDMIDisplay->configure();
+                ctx->mHDMIDisplay->activateDisplay();
                 ctx->mDrawLock.lock();
                 updateDisplayInfo(ctx, dpy);
                 ctx->mDrawLock.unlock();
