@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,6 +82,7 @@ enum {
 #define GRALLOC_MODULE_PERFORM_GET_ATTRIBUTES 5
 #define GRALLOC_MODULE_PERFORM_GET_COLOR_SPACE_FROM_HANDLE 6
 #define GRALLOC_MODULE_PERFORM_GET_YUV_PLANE_INFO 7
+#define GRALLOC_MODULE_PERFORM_GET_MAP_SECURE_BUFFER_INFO 8
 
 #define GRALLOC_HEAP_MASK   (GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP    |\
                              GRALLOC_USAGE_PRIVATE_IOMMU_HEAP     |\
