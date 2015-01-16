@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -297,6 +297,14 @@ class DisplayInterface {
     @return \link DisplayError \endlink
   */
   virtual DisplayError SetVSyncState(bool enable) = 0;
+
+  /*! @brief Method to set idle timeout value. Idle fallback is disabled with timeout value 0.
+
+    @param[in] timeout value in milliseconds.
+
+    @return \link void \endlink
+  */
+  virtual void SetIdleTimeoutMs(uint32_t timeout_ms) = 0;
 
  protected:
   virtual ~DisplayInterface() { }

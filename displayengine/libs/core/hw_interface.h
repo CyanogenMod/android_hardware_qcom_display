@@ -145,7 +145,8 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
 class HWEventHandler {
  public:
   virtual DisplayError VSync(int64_t timestamp) = 0;
-  virtual DisplayError Blank(bool blank)= 0;
+  virtual DisplayError Blank(bool blank) = 0;
+  virtual void IdleTimeout() = 0;
  protected:
   virtual ~HWEventHandler() {}
 };
@@ -170,6 +171,7 @@ class HWInterface {
   virtual DisplayError Validate(Handle device, HWLayers *hw_layers) = 0;
   virtual DisplayError Commit(Handle device, HWLayers *hw_layers) = 0;
   virtual DisplayError Flush(Handle device) = 0;
+  virtual void SetIdleTimeoutMs(Handle device, uint32_t timeout_ms) = 0;
 
  protected:
   virtual ~HWInterface() { }

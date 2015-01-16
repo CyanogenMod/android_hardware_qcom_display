@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -59,6 +59,7 @@ class HWFrameBuffer : public HWInterface {
   virtual DisplayError Validate(Handle device, HWLayers *hw_layers);
   virtual DisplayError Commit(Handle device, HWLayers *hw_layers);
   virtual DisplayError Flush(Handle device);
+  virtual void SetIdleTimeoutMs(Handle device, uint32_t timeout_ms);
 
  private:
   struct HWContext {
@@ -116,7 +117,7 @@ class HWFrameBuffer : public HWInterface {
 
   static const int kMaxStringLength = 1024;
   static const int kNumPhysicalDisplays = 2;
-  static const int kNumDisplayEvents = 2;
+  static const int kNumDisplayEvents = 3;
   static const int kHWMdssVersion5 = 500;  // MDSS_V5
 
   inline DisplayError SetFormat(const LayerBufferFormat &source, uint32_t *target);
@@ -129,6 +130,7 @@ class HWFrameBuffer : public HWInterface {
 
   void HandleVSync(int display_id, char *data);
   void HandleBlank(int display_id, char *data);
+  void HandleIdleTimeout(int display_id, char *data);
 
   // Populates HW FrameBuffer Node Index
   void PopulateFBNodeIndex();
@@ -149,12 +151,10 @@ class HWFrameBuffer : public HWInterface {
   int (*close_)(int);
   int (*poll_)(struct pollfd *, nfds_t, int);
   ssize_t (*pread_)(int, void *, size_t, off_t);
+  ssize_t (*pwrite_)(int, const void *, size_t, off_t);
   FILE* (*fopen_)( const char *fname, const char *mode);
   int (*fclose_)(FILE* fileptr);
   ssize_t (*getline_)(char **lineptr, size_t *linelen, FILE *stream);
-  ssize_t (*read_)(int fd, void *buf, size_t count);
-  ssize_t (*write_)(int fd, const void *buf, size_t count);
-
 
   // Store the Device EventHandlers - used for callback
   HWEventHandler *event_handler_[kNumPhysicalDisplays];

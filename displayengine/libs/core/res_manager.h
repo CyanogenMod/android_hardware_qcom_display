@@ -177,7 +177,7 @@ class ResManager : public DumpImpl {
          { return (UINT32(rotation) == 90 || UINT32(rotation) == 270); }
   void LogRectVerbose(const char *prefix, const LayerRect &roi);
   void RotationConfig(const LayerTransform &transform, const float &scale_x,
-                      const float &scale_y,LayerRect *src_rect,
+                      const float &scale_y, LayerRect *src_rect,
                       struct HWLayerConfig *layer_config, uint32_t *rotate_count);
   DisplayError AcquireRotator(DisplayResourceContext *display_resource_ctx,
                               const uint32_t roate_cnt);

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -444,6 +444,12 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     hwc_procs_->invalidate(hwc_procs_);
     break;
 
+  case qService::IQService::SET_IDLE_TIMEOUT:
+    if (display_primary_) {
+      uint32_t timeout = (uint32_t)input_parcel->readInt32();
+      display_primary_->SetIdleTimeoutMs(timeout);
+    }
+    break;
   default:
     DLOGW("QService command = %d is not supported", command);
     return -EINVAL;
