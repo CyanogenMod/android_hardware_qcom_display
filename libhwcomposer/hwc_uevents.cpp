@@ -40,13 +40,19 @@ namespace qhwc {
 #define HWC_UEVENT_THREAD_NAME "hwcUeventThread"
 
 /* Parse uevent data for devices which we are interested */
-static int getConnectedDisplay(const char* strUdata)
+static int getConnectedDisplay(hwc_context_t* ctx, const char* strUdata)
 {
-    if(strcasestr("change@/devices/virtual/switch/hdmi", strUdata))
-        return HWC_DISPLAY_EXTERNAL;
+    int ret = -1;
+    if(strcasestr("change@/devices/virtual/switch/hdmi", strUdata)) {
+        if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+            ret = HWC_DISPLAY_PRIMARY;
+        } else {
+            ret = HWC_DISPLAY_EXTERNAL;
+        }
+    }
     if(strcasestr("change@/devices/virtual/switch/wfd", strUdata))
-        return HWC_DISPLAY_VIRTUAL;
-    return -1;
+        ret = HWC_DISPLAY_VIRTUAL;
+    return ret;
 }
 
 static bool getPanelResetStatus(hwc_context_t* ctx, const char* strUdata, int len)
@@ -133,7 +139,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         return;
     }
 
-    int dpy = getConnectedDisplay(udata);
+    int dpy = getConnectedDisplay(ctx, udata);
     if(dpy < 0) {
         ALOGD_IF(UEVENT_DEBUG, "%s: Not disp Event ", __FUNCTION__);
         return;
@@ -155,13 +161,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             }
 
             ctx->mDrawLock.lock();
-            destroyCompositionResources(ctx, dpy);
-            if(dpy == HWC_DISPLAY_EXTERNAL) {
-                ctx->mHDMIDisplay->teardown();
-            } else {
-                ctx->mVirtualDisplay->teardown();
-            }
-            resetDisplayInfo(ctx, dpy);
+            handle_offline(ctx, dpy);
             ctx->mDrawLock.unlock();
 
             /* We need to send hotplug to SF only when we are disconnecting
@@ -184,19 +184,29 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                          "for display: %d", __FUNCTION__, dpy);
                 break;
             }
-            ctx->mDrawLock.lock();
-            //Force composition to give up resources like pipes and
-            //close fb. For example if assertive display is going on,
-            //fb2 could be open, thus connecting Layer Mixer#0 to
-            //WriteBack module. If HDMI attempts to open fb1, the driver
-            //will try to attach Layer Mixer#0 to HDMI INT, which will
-            //fail, since Layer Mixer#0 is still connected to WriteBack.
-            //This block will force composition to close fb2 in above
-            //example.
-            ctx->dpyAttr[dpy].isConfiguring = true;
-            ctx->mDrawLock.unlock();
 
-            ctx->proc->invalidate(ctx->proc);
+            if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+                ctx->mDrawLock.lock();
+                handle_online(ctx, dpy);
+                ctx->mDrawLock.unlock();
+
+                ctx->proc->invalidate(ctx->proc);
+                break;
+            } else {
+                ctx->mDrawLock.lock();
+                //Force composition to give up resources like pipes and
+                //close fb. For example if assertive display is going on,
+                //fb2 could be open, thus connecting Layer Mixer#0 to
+                //WriteBack module. If HDMI attempts to open fb1, the driver
+                //will try to attach Layer Mixer#0 to HDMI INT, which will
+                //fail, since Layer Mixer#0 is still connected to WriteBack.
+                //This block will force composition to close fb2 in above
+                //example.
+                ctx->dpyAttr[dpy].isConfiguring = true;
+                ctx->mDrawLock.unlock();
+
+                ctx->proc->invalidate(ctx->proc);
+            }
             //2 cycles for slower content
             usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
                    * 2 / 1000);

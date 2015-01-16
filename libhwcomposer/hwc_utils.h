@@ -271,6 +271,7 @@ void updateDisplayInfo(hwc_context_t* ctx, int dpy);
 void resetDisplayInfo(hwc_context_t* ctx, int dpy);
 void initCompositionResources(hwc_context_t* ctx, int dpy);
 void destroyCompositionResources(hwc_context_t* ctx, int dpy);
+void clearPipeResources(hwc_context_t* ctx, int dpy);
 
 //Helper function to dump logs
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
@@ -323,6 +324,10 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary);
 // Handles wfd Pause and resume events
 void handle_pause(hwc_context_t *ctx, int dpy);
 void handle_resume(hwc_context_t *ctx, int dpy);
+
+// Handle ONLINE/OFFLINE for HDMI display
+void handle_online(hwc_context_t* ctx, int dpy);
+void handle_offline(hwc_context_t* ctx, int dpy);
 
 //Close acquireFenceFds of all layers of incoming list
 void closeAcquireFds(hwc_display_contents_1_t* list);

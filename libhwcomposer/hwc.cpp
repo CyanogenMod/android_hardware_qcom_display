@@ -269,7 +269,23 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
     const int dpy = HWC_DISPLAY_PRIMARY;
     bool fbComp = false;
     if (LIKELY(list && list->numHwLayers > 1) &&
-            ctx->dpyAttr[dpy].isActive) {
+            (ctx->dpyAttr[dpy].isActive ||
+             ctx->mHDMIDisplay->isHDMIPrimaryDisplay())) {
+
+        // When HDMI is primary we should rely on the first valid
+        // draw call in order to activate the display
+        if (!ctx->dpyAttr[dpy].isActive) {
+            // If the cable is connected after HWC initialization and before
+            // the UEvent thread is initialized then we will miss the ONLINE
+            // event. We need to update the display appropriately when we get
+            // the first valid frame.
+            int cableConnected = ctx->mHDMIDisplay->getConnectedState();
+            if ((cableConnected == 1) && !ctx->dpyAttr[dpy].connected) {
+                qhwc::handle_online(ctx, dpy);
+            }
+            ctx->mHDMIDisplay->activateDisplay();
+            ctx->dpyAttr[dpy].isActive = true;
+        }
 
         if (ctx->dpyAttr[dpy].customFBSize)
             scaleDisplayFrame(ctx, dpy, list);
@@ -459,27 +475,41 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
 
     switch(dpy) {
     case HWC_DISPLAY_PRIMARY:
-        if(ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK, value) < 0 ) {
-            ALOGE("%s: ioctl FBIOBLANK failed for Primary with error %s"
-                    " value %d", __FUNCTION__, strerror(errno), value);
-            return -errno;
-        }
+        if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+            if (ctx->dpyAttr[dpy].connected) {
+                // When HDMI is connected as primary we clean up resources
+                // and call commit to generate a black frame on the interface.
+                // However, we do not call blank since we need the timing
+                // generator and HDMI core to remain turned on.
+                if((mode == HWC_POWER_MODE_OFF) &&
+                        (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd))) {
+                    ALOGE("%s: display commit fail for %d", __FUNCTION__, dpy);
+                    ret = -1;
+                }
+            }
+        } else {
+            if(ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK, value) < 0 ) {
+                ALOGE("%s: ioctl FBIOBLANK failed for Primary with error %s"
+                        " value %d", __FUNCTION__, strerror(errno), value);
+                return -errno;
+            }
 
-        if(mode == HWC_POWER_MODE_NORMAL) {
-            // Enable HPD here, as during bootup POWER_MODE_NORMAL is set
-            // when SF is completely initialized
-            ctx->mHDMIDisplay->setHPD(1);
-        }
+            if(mode == HWC_POWER_MODE_NORMAL) {
+                // Enable HPD here, as during bootup POWER_MODE_NORMAL is set
+                // when SF is completely initialized
+                ctx->mHDMIDisplay->setHPD(1);
+            }
 
-        ctx->dpyAttr[dpy].isActive = not(mode == HWC_POWER_MODE_OFF);
+            ctx->dpyAttr[dpy].isActive = not(mode == HWC_POWER_MODE_OFF);
 
-        if(ctx->mVirtualonExtActive) {
-            /* if mVirtualonExtActive is true, display hal will
-             * receive unblank calls for non-hybrid WFD solution
-             * since we piggyback on HDMI.
-             * TODO: Not needed once we have WFD client working on top
-             of Google API's */
-            break;
+            if(ctx->mVirtualonExtActive) {
+                /* if mVirtualonExtActive is true, display hal will
+                 * receive unblank calls for non-hybrid WFD solution
+                 * since we piggyback on HDMI.
+                 * TODO: Not needed once we have WFD client working on top
+                 of Google API's */
+                break;
+            }
         }
         //Deliberate fall through since there is no explicit power mode for
         //virtual displays.
