@@ -95,6 +95,8 @@ enum {
 
 /* OEM specific HAL formats */
 
+#define HAL_PIXEL_FORMAT_RGBA_5551               6
+#define HAL_PIXEL_FORMAT_RGBA_4444               7
 #define HAL_PIXEL_FORMAT_NV12_ENCODEABLE         0x102
 #define HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS      0x7FA30C04
 #define HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED      0x7FA30C03
