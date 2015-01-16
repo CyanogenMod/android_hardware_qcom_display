@@ -91,15 +91,16 @@ int HDMIDisplay::configure() {
     }
     readCEUnderscanInfo();
     readResolution();
-    // TODO: Move this to activate
     /* Used for changing the resolution
-     * getUserMode will get the preferred
-     * mode set thru adb shell */
-    mCurrentMode = getUserMode();
-    if (mCurrentMode == -1) {
+     * getUserConfig will get the preferred
+     * config index set thru adb shell */
+    mActiveConfig = getUserConfig();
+    if (mActiveConfig == -1) {
         //Get the best mode and set
-        mCurrentMode = getBestMode();
+        mActiveConfig = getBestConfig();
     }
+    // Set the mode corresponding to the active index
+    mCurrentMode = mEDIDModes[mActiveConfig];
     setAttributes();
     // set system property
     property_set("hw.hdmiON", "1");
@@ -110,6 +111,14 @@ int HDMIDisplay::configure() {
     if(property_get("sys.hwc.mdp_downscale_enabled", value, "false")
             && !strcmp(value, "true")) {
         mMDPDownscaleEnabled = true;
+    }
+
+    // XXX: A debug property can be used to enable resolution change for
+    // testing purposes: debug.hwc.enable_resolution_change
+    mEnableResolutionChange = false;
+    if(property_get("debug.hwc.enable_resolution_change", value, "false")
+            && !strcmp(value, "true")) {
+        mEnableResolutionChange = true;
     }
     return 0;
 }
@@ -415,8 +424,8 @@ int HDMIDisplay::getModeOrder(int mode)
     return -1;
 }
 
-/// Returns the user mode set(if any) using adb shell
-int HDMIDisplay::getUserMode() {
+/// Returns the index of the user mode set(if any) using adb shell
+int HDMIDisplay::getUserConfig() {
     /* Based on the property set the resolution */
     char property_value[PROPERTY_VALUE_MAX];
     property_get("hw.hdmi.resolution", property_value, "-1");
@@ -424,15 +433,16 @@ int HDMIDisplay::getUserMode() {
     // We dont support interlaced modes
     if(isValidMode(mode) && !isInterlacedMode(mode)) {
         ALOGD_IF(DEBUG, "%s: setting the HDMI mode = %d", __FUNCTION__, mode);
-        return mode;
+        return getModeIndex(mode);
     }
     return -1;
 }
 
-// Get the best mode for the current HD TV
-int HDMIDisplay::getBestMode() {
+// Get the index of the best mode for the current HD TV
+int HDMIDisplay::getBestConfig() {
     int bestOrder = 0;
     int bestMode = HDMI_VFRMT_640x480p60_4_3;
+    int bestModeIndex = -1;
     // for all the edid read, get the best mode
     for(int i = 0; i < mModeCount; i++) {
         int mode = mEDIDModes[i];
@@ -440,9 +450,19 @@ int HDMIDisplay::getBestMode() {
         if (order > bestOrder) {
             bestOrder = order;
             bestMode = mode;
+            bestModeIndex = i;
         }
     }
-    return bestMode;
+    // If we fail to read from EDID when HDMI is connected, then
+    // mModeCount will be 0 and bestModeIndex will be invalid.
+    // In this case, we populate the mEDIDModes structure with
+    // a default mode at index 0.
+    if (bestModeIndex == -1) {
+        bestModeIndex = 0;
+        mModeCount = 1;
+        mEDIDModes[bestModeIndex] = bestMode;
+    }
+    return bestModeIndex;
 }
 
 inline bool HDMIDisplay::isValidMode(int ID)
@@ -683,6 +703,81 @@ void HDMIDisplay::setPrimaryAttributes(uint32_t primaryWidth,
         uint32_t primaryHeight) {
     mPrimaryHeight = primaryHeight;
     mPrimaryWidth = primaryWidth;
+}
+
+int HDMIDisplay::setActiveConfig(int newConfig) {
+    if(newConfig < 0 || newConfig > mModeCount) {
+        ALOGE("%s Invalid configuration %d", __FUNCTION__, newConfig);
+        return -EINVAL;
+    }
+
+    // XXX: Currently, we only support a change in frame rate.
+    // We need to validate the new config before proceeding.
+    if (!isValidConfigChange(newConfig)) {
+        ALOGE("%s Invalid configuration %d", __FUNCTION__, newConfig);
+        return -EINVAL;
+    }
+
+    mCurrentMode =  mEDIDModes[newConfig];
+    mActiveConfig = newConfig;
+    activateDisplay();
+    ALOGD("%s config(%d) mode(%d)", __FUNCTION__, mActiveConfig, mCurrentMode);
+    return 0;
+}
+
+// returns false if the xres or yres of the new config do
+// not match the current config
+bool HDMIDisplay::isValidConfigChange(int newConfig) {
+    int newMode = mEDIDModes[newConfig];
+    uint32_t width = 0, height = 0, refresh = 0;
+    getAttrForConfig(newConfig, width, height, refresh);
+    return ((mXres == width) && (mYres == height)) || mEnableResolutionChange;
+}
+
+int HDMIDisplay::getModeIndex(int mode) {
+    int modeIndex = -1;
+    for(int i = 0; i < mModeCount; i++) {
+        if(mode == mEDIDModes[i]) {
+            modeIndex = i;
+            break;
+        }
+    }
+    return modeIndex;
+}
+
+int HDMIDisplay::getAttrForConfig(int config, uint32_t& xres,
+        uint32_t& yres, uint32_t& refresh) const {
+    if(config < 0 || config > mModeCount) {
+        ALOGE("%s Invalid configuration %d", __FUNCTION__, config);
+        return -EINVAL;
+    }
+    int mode = mEDIDModes[config];
+    uint32_t fps = 0;
+    // Retrieve the mode attributes from gEDIDData
+    for (int dataIndex = 0; dataIndex < gEDIDCount; dataIndex++) {
+        if (gEDIDData[dataIndex].mMode == mode) {
+            xres = gEDIDData[dataIndex].mWidth;
+            yres = gEDIDData[dataIndex].mHeight;
+            fps = gEDIDData[dataIndex].mFps;
+        }
+    }
+    refresh = (uint32_t) 1000000000l / fps;
+    ALOGD_IF(DEBUG, "%s xres(%d) yres(%d) fps(%d) refresh(%d)", __FUNCTION__,
+            xres, yres, fps, refresh);
+    return 0;
+}
+
+int HDMIDisplay::getDisplayConfigs(uint32_t* configs,
+        size_t* numConfigs) const {
+    if (*numConfigs <= 0) {
+        ALOGE("%s Invalid number of configs (%d)", __FUNCTION__, *numConfigs);
+        return -EINVAL;
+    }
+    *numConfigs = mModeCount;
+    for (int configIndex = 0; configIndex < mModeCount; configIndex++) {
+        configs[configIndex] = (uint32_t)configIndex;
+    }
+    return 0;
 }
 
 };

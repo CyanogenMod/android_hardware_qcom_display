@@ -68,6 +68,11 @@ public:
     /* when HDMI is an EXTERNAL display, PRIMARY display attributes are needed
        for scaling mode */
     void setPrimaryAttributes(uint32_t primaryWidth, uint32_t primaryHeight);
+    int getActiveConfig() const { return mActiveConfig; };
+    int setActiveConfig(int newConfig);
+    int getAttrForConfig(int config, uint32_t& xres,
+            uint32_t& yres, uint32_t& refresh) const;
+    int getDisplayConfigs(uint32_t* configs, size_t* numConfigs) const;
 
 private:
     int getModeCount() const;
@@ -80,17 +85,26 @@ private:
     bool writeHPDOption(int userOption) const;
     bool isValidMode(int mode);
     int  getModeOrder(int mode);
-    int  getUserMode();
-    int  getBestMode();
+    int  getUserConfig();
+    int  getBestConfig();
     bool isInterlacedMode(int mode);
     void resetInfo();
     void setAttributes();
     void getAttrForMode(uint32_t& width, uint32_t& height, uint32_t& fps);
     int openDeviceNode(const char* node, int fileMode) const;
+    int getModeIndex(int mode);
+    bool isValidConfigChange(int newConfig);
 
     int mFd;
     int mFbNum;
+    // mCurrentMode is the HDMI video format that corresponds to the mEDIDMode
+    // entry referenced by mActiveConfig
     int mCurrentMode;
+    // mActiveConfig is the index correponding to the currently active mode for
+    // the HDMI display. It basically indexes the mEDIDMode array
+    int mActiveConfig;
+    // mEDIDModes contains a list of HDMI video formats (modes) supported by the
+    // HDMI display
     int mEDIDModes[64];
     int mModeCount;
     fb_var_screeninfo mVInfo;
@@ -102,6 +116,7 @@ private:
     // Downscale feature switch, set via system property
     // sys.hwc.mdp_downscale_enabled
     bool mMDPDownscaleEnabled;
+    bool mEnableResolutionChange;
     int mDisplayId;
 };
 
