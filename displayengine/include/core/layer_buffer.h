@@ -87,6 +87,15 @@ enum LayerBufferFormat {
                                       //!< factor of 2
                                       //!<    u(0), y(0), v(0), y(1), u(2), y(2), v(2), y(3)
                                       //!<    u(n-1), y(n-1), v(n-1), y(n)
+
+  /* All UBWC aligned formats. Any new format will be added towards end of this group to maintain
+     backward compatibility.
+  */
+  kFormatRGBA8888Ubwc = 0x400,        //!< UBWC aligned RGBA8888 format
+
+  kFormatRGB565Ubwc,                  //!< UBWC aligned RGB565 format
+
+  kFormatYCbCr420SPVenusUbwc,         //!< UBWC aligned Venus NV12 format
 };
 
 /*! @brief This structure defines a color sample plane belonging to a buffer format. RGB buffer

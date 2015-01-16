@@ -87,7 +87,7 @@ class HWCDisplay : public DisplayEventHandler {
   inline void SetComposition(const int32_t &source, LayerComposition *target);
   inline void SetComposition(const int32_t &source, int32_t *target);
   inline void SetBlending(const int32_t &source, LayerBlending *target);
-  inline int SetFormat(const int32_t &source, LayerBufferFormat *target);
+  inline int SetFormat(const int32_t &source, const int flags, LayerBufferFormat *target);
 
   CoreInterface *core_intf_;
   hwc_procs_t const **hwc_procs_;
