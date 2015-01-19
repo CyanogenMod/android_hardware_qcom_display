@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution.
  *
@@ -937,16 +937,18 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
        int tmp_w =  src_crop_width;
        int tmp_h =  src_crop_height;
 
-       if (dsdx > copybitsMaxScale || dtdy > copybitsMaxScale ){
+       if (dsdx > copybitsMaxScale)
          tmp_w = (int)((float)src_crop_width*copybitsMaxScale);
+       if (dtdy > copybitsMaxScale)
          tmp_h = (int)((float)src_crop_height*copybitsMaxScale);
-       }else if (dsdx < 1/copybitsMinScale ||dtdy < 1/copybitsMinScale ){
-         // ceil the tmp_w and tmp_h value to maintain proper ratio
-         // b/w src and dst (should not cross the desired scale limit
-         // due to float -> int )
+       // ceil the tmp_w and tmp_h value to maintain proper ratio
+       // b/w src and dst (should not cross the desired scale limit
+       // due to float -> int )
+       if (dsdx < 1/copybitsMinScale)
          tmp_w = (int)ceil((float)src_crop_width/copybitsMinScale);
+       if (dtdy < 1/copybitsMinScale)
          tmp_h = (int)ceil((float)src_crop_height/copybitsMinScale);
-       }
+
        ALOGD("%s:%d::tmp_w = %d,tmp_h = %d",__FUNCTION__,__LINE__,tmp_w,tmp_h);
 
        int usage = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
