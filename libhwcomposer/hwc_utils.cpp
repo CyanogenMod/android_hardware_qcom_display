@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2014, The Linux Foundation All rights reserved.
+ * Copyright (C) 2012-2015, The Linux Foundation All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -2471,6 +2471,15 @@ void handle_pause(hwc_context_t* ctx, int dpy) {
 void handle_resume(hwc_context_t* ctx, int dpy) {
     if(ctx->dpyAttr[dpy].connected) {
         ctx->mDrawLock.lock();
+        // A dynamic resolution change (DRC) can be made for a WiFi
+        // display. In order to support the resolution change, we
+        // need to reconfigure the corresponding display attributes.
+        // Since DRC is only on WiFi display, we only need to call
+        // configure() on the VirtualDisplay device.
+        if(dpy == HWC_DISPLAY_VIRTUAL && ctx->mVirtualDisplay != NULL) {
+            ctx->mVirtualDisplay->configure();
+        }
+
         ctx->dpyAttr[dpy].isConfiguring = true;
         ctx->dpyAttr[dpy].isActive = true;
         ctx->mDrawLock.unlock();
