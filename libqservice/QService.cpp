@@ -50,8 +50,13 @@ QService::~QService()
 }
 
 void QService::connect(const sp<qClient::IQClient>& client) {
-    ALOGD_IF(QSERVICE_DEBUG,"client connected");
+    ALOGD_IF(QSERVICE_DEBUG,"HWC client connected");
     mClient = client;
+}
+
+void QService::connect(const sp<qClient::IQHDMIClient>& client) {
+    ALOGD_IF(QSERVICE_DEBUG,"HWC client connected");
+    mHDMIClient = client;
 }
 
 status_t QService::dispatch(uint32_t command, const Parcel* inParcel,
@@ -67,6 +72,25 @@ status_t QService::dispatch(uint32_t command, const Parcel* inParcel,
     }
     return err;
 }
+
+void QService::onHdmiHotplug(int connected) {
+    if(mHDMIClient.get()) {
+        ALOGD_IF(QSERVICE_DEBUG, "%s: HDMI hotplug", __FUNCTION__);
+        mHDMIClient->onHdmiHotplug(connected);
+    } else {
+        ALOGE("%s: Failed to get a valid HDMI client", __FUNCTION__);
+    }
+}
+
+void QService::onCECMessageReceived(char *msg, ssize_t len) {
+    if(mHDMIClient.get()) {
+        ALOGD_IF(QSERVICE_DEBUG, "%s: CEC message received", __FUNCTION__);
+        mHDMIClient->onCECMessageRecieved(msg, len);
+    } else {
+        ALOGE("%s: Failed to get a valid HDMI client", __FUNCTION__);
+    }
+}
+
 
 void QService::init()
 {

@@ -335,9 +335,16 @@ void initContext(hwc_context_t *ctx)
     //independent process as well.
     QService::init();
     sp<IQClient> client = new QClient(ctx);
-    interface_cast<IQService>(
+    sp<IQService> iqs = interface_cast<IQService>(
             defaultServiceManager()->getService(
-            String16("display.qservice")))->connect(client);
+            String16("display.qservice")));
+    if (iqs.get()) {
+      iqs->connect(client);
+      ctx->mQService = reinterpret_cast<QService* >(iqs.get());
+    } else {
+      ALOGE("%s: Failed to acquire service pointer", __FUNCTION__);
+      return;
+    }
 
     // Initialize device orientation to its default orientation
     ctx->deviceOrientation = 0;
@@ -425,7 +432,10 @@ void closeContext(hwc_context_t *ctx)
         ctx->mAD = NULL;
     }
 
-
+    if(ctx->mQService) {
+        delete ctx->mQService;
+        ctx->mQService = NULL;
+    }
 }
 
 

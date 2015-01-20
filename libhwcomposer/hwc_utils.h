@@ -33,6 +33,7 @@
 #include "qdMetaData.h"
 #include <overlayUtils.h>
 #include <EGL/egl.h>
+#include <QService.h>
 
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
@@ -603,6 +604,8 @@ struct hwc_context_t {
     bool mWindowboxFeature;
     float mMinToleranceLevel;
     float mMaxToleranceLevel;
+    // Display binder service
+    qService::QService* mQService;
 };
 
 namespace qhwc {
