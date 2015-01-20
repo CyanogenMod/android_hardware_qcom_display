@@ -54,6 +54,7 @@ struct cec_context_t {
     cec_callback_t callback;     // Struct storing callback object
     bool enabled;
     bool arc_enabled;
+    bool system_control;         // If true, HAL/driver handle CEC messages
     int fb_num;                  // Framebuffer node for HDMI
     char fb_sysfs_path[MAX_PATH_LENGTH];
     hdmi_port_info *port_info;   // HDMI port info

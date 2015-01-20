@@ -187,10 +187,17 @@ static int cec_get_physical_address(const struct hdmi_cec_device* dev,
         uint16_t* addr)
 {
     cec_context_t* ctx = (cec_context_t*)(dev);
-    //XXX: Not sure if this physical address is the same as the one in port info
-    *addr = ctx->port_info[0].physical_address;
+    char pa_path[MAX_PATH_LENGTH];
+    char pa_data[MAX_SYSFS_DATA];
+    snprintf (pa_path, sizeof(pa_path),"%s/pa",
+            ctx->fb_sysfs_path);
+    ssize_t err = read_node(pa_path, pa_data);
+    *addr = (uint16_t) atoi(pa_data);
     ALOGD_IF(DEBUG, "%s: Physical Address: 0x%x", __FUNCTION__, *addr);
-    return 0;
+    if (err < 0)
+        return err;
+    else
+        return 0;
 }
 
 static int cec_send_message(const struct hdmi_cec_device* dev,
@@ -266,6 +273,9 @@ static int cec_send_message(const struct hdmi_cec_device* dev,
 
 void cec_receive_message(cec_context_t *ctx, char *msg, ssize_t len)
 {
+    if(!ctx->system_control)
+        return;
+
     char dump[128];
     if(len > 0) {
         hex_to_string(msg, len, dump);
@@ -288,6 +298,9 @@ void cec_receive_message(cec_context_t *ctx, char *msg, ssize_t len)
 
 void cec_hdmi_hotplug(cec_context_t *ctx, int connected)
 {
+    //Ignore unplug events when system control is disabled
+    if(!ctx->system_control && connected == 0)
+        return;
     hdmi_event_t event;
     event.type = HDMI_EVENT_HOT_PLUG;
     event.dev = (hdmi_cec_device *) ctx;
@@ -332,16 +345,19 @@ static void cec_set_option(const struct hdmi_cec_device* dev, int flag,
         int value)
 {
     cec_context_t* ctx = (cec_context_t*)(dev);
-    ALOGD_IF(DEBUG, "%s: flag:%d value:%d", __FUNCTION__, flag, value);
     switch (flag) {
         case HDMI_OPTION_WAKEUP:
+            ALOGD_IF(DEBUG, "%s: Wakeup: value: %d", __FUNCTION__, value);
             //XXX
             break;
         case HDMI_OPTION_ENABLE_CEC:
+            ALOGD_IF(DEBUG, "%s: Enable CEC: value: %d", __FUNCTION__, value);
             cec_enable(ctx, value? 1 : 0);
             break;
         case HDMI_OPTION_SYSTEM_CEC_CONTROL:
-            //XXX
+            ALOGD_IF(DEBUG, "%s: system_control: value: %d",
+                    __FUNCTION__, value);
+            ctx->system_control = !!value;
             break;
     }
 }
@@ -368,7 +384,7 @@ static int cec_is_connected(const struct hdmi_cec_device* dev, int port_id)
 
     ALOGD_IF(DEBUG, "%s: HDMI at port %d is - %s", __FUNCTION__, port_id,
             connected ? "connected":"disconnected");
-    if (err)
+    if (err < 0)
         return (int) err;
     else
         return connected;
@@ -390,7 +406,9 @@ static int cec_device_close(struct hw_device_t *dev)
 static int cec_enable(cec_context_t *ctx, int enable)
 {
     ssize_t err;
-    err = write_int_to_node(ctx, "cec/enable", !!enable);
+    // Enable CEC and set the CEC wakeup bit
+    int value = enable ? 0x3 : 0x0;
+    err = write_int_to_node(ctx, "cec/enable", value);
     if(err < 0) {
         ALOGE("%s: Failed to toggle CEC: enable: %d",
                 __FUNCTION__, enable);
@@ -408,17 +426,15 @@ static void cec_init_context(cec_context_t *ctx)
     //Initialize ports - We support only one output port
     ctx->port_info = new hdmi_port_info[NUM_HDMI_PORTS];
     ctx->port_info[0].type = HDMI_OUTPUT;
-    //XXX: Updated l-dev has port_id field
     ctx->port_info[0].port_id = 1;
     ctx->port_info[0].cec_supported = 1;
     //XXX: Enable ARC if supported
     ctx->port_info[0].arc_supported = 0;
-    //XXX: Get physical address from driver
-    ctx->port_info[0].physical_address = 0x1000;
+    cec_get_physical_address((hdmi_cec_device *) ctx,
+            &ctx->port_info[0].physical_address );
 
     ctx->version = 0x4;
-    //XXX: Get vendor ID from driver - this is currently a placeholder value
-    ctx->vendor_id = 0x4571;
+    ctx->vendor_id = 0xA47733;
     cec_clear_logical_address((hdmi_cec_device_t*)ctx);
 
     //Set up listener for HDMI events
