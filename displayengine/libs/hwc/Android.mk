@@ -17,6 +17,6 @@ LOCAL_SRC_FILES               := hwc_session.cpp \
                                  hwc_display_primary.cpp \
                                  hwc_display_external.cpp \
                                  hwc_display_virtual.cpp \
-                                 hwc_logger.cpp
+                                 hwc_debugger.cpp
 
 include $(BUILD_SHARED_LIBRARY)
