@@ -179,7 +179,7 @@ static void cec_clear_logical_address(const struct hdmi_cec_device* dev)
     memset(ctx->logical_address, LOGICAL_ADDRESS_UNSET,
             sizeof(ctx->logical_address));
     //XXX: Find logical_addr that needs to be reset
-    write_int_to_node(ctx, "cec/logical_addr", -1);
+    write_int_to_node(ctx, "cec/logical_addr", 15);
     ALOGD_IF(DEBUG, "%s: Cleared logical addresses", __FUNCTION__);
 }
 
