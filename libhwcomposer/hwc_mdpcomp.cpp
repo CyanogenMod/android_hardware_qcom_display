@@ -2701,7 +2701,7 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
     int transform = layer->transform;
     eTransform orient = static_cast<eTransform>(transform);
     int rotFlags = ROT_FLAGS_NONE;
-    uint32_t format = ovutils::getMdpFormat(hnd->format, isTileRendered(hnd));
+    uint32_t format = ovutils::getMdpFormat(hnd->format, hnd->flags);
     Whf whf(getWidth(hnd), getHeight(hnd), format, hnd->size);
 
     ALOGD_IF(isDebug(),"%s: configuring: layer: %p z_order: %d dest_pipeL: %d"
