@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -28,7 +28,11 @@
 #include <stdint.h>
 #include <pthread.h>
 
-#define SCOPE_LOCK(locker) Locker::ScopeLock scopeLock(locker)
+#define SCOPE_LOCK(locker) Locker::ScopeLock lock(locker)
+#define SEQUENCE_ENTRY_SCOPE_LOCK(locker) Locker::SequenceEntryScopeLock lock(locker)
+#define SEQUENCE_EXIT_SCOPE_LOCK(locker) Locker::SequenceExitScopeLock lock(locker)
+#define SEQUENCE_WAIT_SCOPE_LOCK(locker) Locker::SequenceWaitScopeLock lock(locker)
+#define SEQUENCE_CANCEL_SCOPE_LOCK(locker) Locker::SequenceCancelScopeLock lock(locker)
 
 namespace sde {
 
@@ -48,7 +52,78 @@ class Locker {
     Locker &locker_;
   };
 
-  Locker() {
+  class SequenceEntryScopeLock {
+   public:
+    explicit SequenceEntryScopeLock(Locker& locker) : locker_(locker) {
+      locker_.Lock();
+      locker_.sequence_wait_ = 1;
+    }
+
+    ~SequenceEntryScopeLock() {
+      locker_.Unlock();
+    }
+
+   private:
+    Locker &locker_;
+  };
+
+  class SequenceExitScopeLock {
+   public:
+    explicit SequenceExitScopeLock(Locker& locker) : locker_(locker) {
+      locker_.Lock();
+      locker_.sequence_wait_ = 0;
+    }
+
+    ~SequenceExitScopeLock() {
+      locker_.Broadcast();
+      locker_.Unlock();
+    }
+
+   private:
+    Locker &locker_;
+  };
+
+  class SequenceWaitScopeLock {
+   public:
+    explicit SequenceWaitScopeLock(Locker& locker) : locker_(locker), error_(false) {
+      locker_.Lock();
+
+      if (locker_.sequence_wait_ == 1) {
+        locker_.Wait();
+        error_ = (locker_.sequence_wait_ == -1);
+      }
+    }
+
+    ~SequenceWaitScopeLock() {
+      locker_.Unlock();
+    }
+
+    bool IsError() {
+      return error_;
+    }
+
+   private:
+    Locker &locker_;
+    bool error_;
+  };
+
+  class SequenceCancelScopeLock {
+   public:
+    explicit SequenceCancelScopeLock(Locker& locker) : locker_(locker) {
+      locker_.Lock();
+      locker_.sequence_wait_ = -1;
+    }
+
+    ~SequenceCancelScopeLock() {
+      locker_.Broadcast();
+      locker_.Unlock();
+    }
+
+   private:
+    Locker &locker_;
+  };
+
+  Locker() : sequence_wait_(0) {
     pthread_mutex_init(&mutex_, 0);
     pthread_cond_init(&condition_, 0);
   }
@@ -63,7 +138,7 @@ class Locker {
   void Signal() { pthread_cond_signal(&condition_); }
   void Broadcast() { pthread_cond_broadcast(&condition_); }
   void Wait() { pthread_cond_wait(&condition_, &mutex_); }
-  int WaitFinite(long int ms) {
+  int WaitFinite(int ms) {
     struct timespec ts;
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -77,6 +152,11 @@ class Locker {
  private:
   pthread_mutex_t mutex_;
   pthread_cond_t condition_;
+  int sequence_wait_;   // This flag is set to 1 on sequence entry, 0 on exit, and -1 on cancel.
+                        // Some routines will wait for sequence of function calls to finish
+                        // so that capturing a transitionary snapshot of context is prevented.
+                        // If flag is set to -1, these routines will exit without doing any
+                        // further processing.
 };
 
 }  // namespace sde
