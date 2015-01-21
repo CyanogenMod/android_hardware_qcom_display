@@ -91,9 +91,9 @@ int HWCVirtualVDS::prepare(hwc_composer_device_1 *dev,
             ctx->dpyAttr[dpy].vsync_period
                               = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period;
             init(ctx);
-            // XXX: for architectures with limited resources we would normally
-            // allow one padding round to free up resources but this breaks
-            // certain use cases.
+            // Do one padding round for cases where primary has all pipes
+            // The virtual composition falls back to GPU in such cases.
+            ctx->isPaddingRound = true;
         }
         if(!ctx->dpyAttr[dpy].isPause) {
             ctx->dpyAttr[dpy].isConfiguring = false;
