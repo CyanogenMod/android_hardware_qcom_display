@@ -302,9 +302,11 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       layer_buffer->height = pvt_handle->height;
       if (pvt_handle->bufferType == BUFFER_TYPE_VIDEO) {
         layer_stack_.flags.video_present = true;
+        layer_buffer->flags.video = true;
       }
       if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
         layer_stack_.flags.secure_present = true;
+        layer_buffer->flags.secure = true;
       }
     }
 
@@ -347,6 +349,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     Layer &layer = layer_stack_.layers[i];
     LayerComposition composition = layer.composition;
+
+    if (composition == kCompositionSDE) {
+      hwc_layer.hints |= HWC_HINT_CLEAR_FB;
+    }
 
     // If current layer does not need frame buffer redraw, then mark it as HWC_OVERLAY
     if (!needs_fb_refresh && (composition != kCompositionGPUTarget)) {

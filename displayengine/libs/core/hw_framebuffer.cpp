@@ -666,10 +666,10 @@ void HWFrameBuffer::SetBlending(const LayerBlending &source, mdss_mdp_blend_op *
 }
 
 void HWFrameBuffer::SetRect(const LayerRect &source, mdp_rect *target) {
-  target->x = INT(ceilf(source.left));
-  target->y = INT(ceilf(source.top));
-  target->w = INT(floorf(source.right)) - target->x;
-  target->h = INT(floorf(source.bottom)) - target->y;
+  target->x = UINT32(source.left);
+  target->y = UINT32(source.top);
+  target->w = UINT32(source.right) - target->x;
+  target->h = UINT32(source.bottom) - target->y;
 }
 
 void* HWFrameBuffer::DisplayEventThread(void *context) {

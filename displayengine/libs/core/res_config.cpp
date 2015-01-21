@@ -185,6 +185,8 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
       return kErrorNotSupported;
 
     struct HWLayerConfig *layer_config = &hw_layers->config[i];
+    HWPipeInfo &left_pipe = layer_config->left_pipe;
+    HWPipeInfo &right_pipe = layer_config->right_pipe;
     // config rotator first
     for (uint32_t j = 0; j < kMaxRotatePerLayer; j++) {
       layer_config->rotates[j].Reset();
@@ -210,6 +212,20 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
 
     if (error != kErrorNone)
       break;
+
+    // 1. Normalize Video layer source rectangle to multiple of 2, as MDP hardware require source
+    //    rectangle of video layer to be even.
+    // 2. Normalize source and destination rect of a layer to multiple of 1.
+    uint32_t factor = (1 << layer.input_buffer->flags.video);
+    if (left_pipe.pipe_id == kPipeIdNeedsAssignment) {
+      NormalizeRect(factor, &left_pipe.src_roi);
+      NormalizeRect(1, &left_pipe.dst_roi);
+    }
+
+    if (right_pipe.pipe_id == kPipeIdNeedsAssignment) {
+      NormalizeRect(factor, &right_pipe.src_roi);
+      NormalizeRect(1, &right_pipe.dst_roi);
+    }
 
     DLOGV_IF(kTagResources, "layer = %d, left pipe_id = %x",
              i, layer_config->left_pipe.pipe_id);
@@ -245,6 +261,12 @@ DisplayError ResManager::ValidateScaling(const Layer &layer, const LayerRect &cr
 
   if ((crop_width < 1.0f) || (crop_height < 1.0f)) {
     DLOGV_IF(kTagResources, "source region is too small w = %d, h = %d", crop_width, crop_height);
+    return kErrorNotSupported;
+  }
+
+  if (((crop_width - dst_width) == 1) || ((crop_height - dst_height) == 1)) {
+    DLOGV_IF(kTagResources, "One pixel downscaling detected crop_w %d, dst_w %d, crop_h %d, " \
+             "dst_h %d", crop_width, dst_width, crop_height, dst_height);
     return kErrorNotSupported;
   }
 
@@ -474,6 +496,18 @@ void ResManager::SplitRect(bool flip_horizontal, const LayerRect &src_rect,
 void ResManager::LogRectVerbose(const char *prefix, const LayerRect &roi) {
   DLOGV_IF(kTagResources, "%s: left = %.0f, top = %.0f, right = %.0f, bottom = %.0f",
            prefix, roi.left, roi.top, roi.right, roi.bottom);
+}
+
+void ResManager::NormalizeRect(const uint32_t &factor, LayerRect *rect) {
+  uint32_t left = UINT32(ceilf(rect->left));
+  uint32_t top = UINT32(ceilf(rect->top));
+  uint32_t right = UINT32(floorf(rect->right));
+  uint32_t bottom = UINT32(floorf(rect->bottom));
+
+  rect->left = FLOAT(CeilToMultipleOf(left, factor));
+  rect->top = FLOAT(CeilToMultipleOf(top, factor));
+  rect->right = FLOAT(FloorToMultipleOf(right, factor));
+  rect->bottom = FLOAT(FloorToMultipleOf(bottom, factor));
 }
 
 }  // namespace sde

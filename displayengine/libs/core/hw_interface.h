@@ -93,7 +93,7 @@ struct HWResourceInfo {
 };
 
 struct HWRotateInfo {
-  uint32_t pipe_id;
+  int pipe_id;
   LayerRect src_roi;
   LayerRect dst_roi;
   HWBlockType writeback_id;
@@ -107,7 +107,7 @@ struct HWRotateInfo {
 };
 
 struct HWPipeInfo {
-  uint32_t pipe_id;
+  int pipe_id;
   LayerRect src_roi;
   LayerRect dst_roi;
   uint8_t decimation;

@@ -183,12 +183,24 @@ class ResManager : public DumpImpl {
                               const uint32_t roate_cnt);
   void AssignRotator(HWRotateInfo *rotate, uint32_t *rotate_cnt);
   void ClearRotator(DisplayResourceContext *display_resource_ctx);
+  void NormalizeRect(const uint32_t &factor, LayerRect *rect);
 
   template <class T>
   inline void Swap(T &a, T &b) {
     T c(a);
     a = b;
     b = c;
+  }
+
+  // factor value should be in powers of 2(eg: 1, 2, 4, 8)
+  template <class T1, class T2>
+  inline T1 FloorToMultipleOf(const T1 &value, const T2 &factor) {
+    return (T1)(value & (~(factor - 1)));
+  }
+
+  template <class T1, class T2>
+  inline T1 CeilToMultipleOf(const T1 &value, const T2 &factor) {
+    return (T1)((value + (factor - 1)) & (~(factor - 1)));
   }
 
   Locker locker_;
