@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -92,6 +92,9 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
             break;
         case MAP_SECURE_BUFFER:
             data->mapSecureBuffer = *((int32_t *)param);
+            break;
+        case S3D_FORMAT:
+            data->s3dFormat = *((uint32_t *)param);
             break;
         default:
             ALOGE("Unknown paramType %d", paramType);
