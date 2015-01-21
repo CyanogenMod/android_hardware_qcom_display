@@ -101,6 +101,7 @@ AdrenoMemInfo::AdrenoMemInfo()
     LINK_adreno_compute_padding = NULL;
     LINK_adreno_isMacroTilingSupportedByGpu = NULL;
     LINK_adreno_compute_compressedfmt_aligned_width_and_height = NULL;
+    LINK_adreno_isUBWCSupportedByGpu = NULL;
 
     libadreno_utils = ::dlopen("libadreno_utils.so", RTLD_NOW);
     if (libadreno_utils) {
@@ -113,6 +114,8 @@ AdrenoMemInfo::AdrenoMemInfo()
         *(void **)&LINK_adreno_compute_compressedfmt_aligned_width_and_height =
                 ::dlsym(libadreno_utils,
                         "compute_compressedfmt_aligned_width_and_height");
+        *(void **)&LINK_adreno_isUBWCSupportedByGpu =
+                ::dlsym(libadreno_utils, "isUBWCSupportedByGpu");
     }
 }
 
@@ -285,9 +288,33 @@ void AdrenoMemInfo::getGpuAlignedWidthHeight(int width, int height, int format,
 
 int AdrenoMemInfo::isUBWCSupportedByGPU(int format)
 {
-    // TODO: Convert HAL pixel format to corresponding Adreno format,
-    // then query GPU with Adreno format.
+    if (libadreno_utils) {
+        if (LINK_adreno_isUBWCSupportedByGpu) {
+            ADRENOPIXELFORMAT gpu_format = getGpuPixelFormat(format);
+            return LINK_adreno_isUBWCSupportedByGpu(gpu_format);
+        }
+    }
     return 0;
+}
+
+ADRENOPIXELFORMAT AdrenoMemInfo::getGpuPixelFormat(int hal_format)
+{
+    switch (hal_format) {
+        case HAL_PIXEL_FORMAT_RGBA_8888:
+            return ADRENO_PIXELFORMAT_R8G8B8A8;
+        case HAL_PIXEL_FORMAT_RGB_565:
+            return ADRENO_PIXELFORMAT_B5G6R5;
+        case HAL_PIXEL_FORMAT_sRGB_A_8888:
+            return ADRENO_PIXELFORMAT_R8G8B8A8_SRGB;
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
+            return ADRENO_PIXELFORMAT_NV12;
+        default:
+            ALOGE("%s: No map for format: 0x%x", __FUNCTION__, hal_format);
+            break;
+    }
+    return ADRENO_PIXELFORMAT_UNKNOWN;
 }
 
 //-------------- IAllocController-----------------------//

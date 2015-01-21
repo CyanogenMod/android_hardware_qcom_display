@@ -27,6 +27,7 @@
 
 #include <cutils/native_handle.h>
 #include <utils/Singleton.h>
+#include "adreno_utils.h"
 
 /*****************************************************************************/
 
@@ -141,6 +142,11 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
      */
     int isUBWCSupportedByGPU(int format);
 
+    /*
+     * Function to get the corresponding Adreno format for given HAL format
+     */
+    ADRENOPIXELFORMAT getGpuPixelFormat(int hal_format);
+
     private:
         // Pointer to the padding library.
         void *libadreno_utils;
@@ -172,5 +178,7 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
                                                 int *aligned_w,
                                                 int *aligned_h,
                                                 int *bpp);
+
+        int (*LINK_adreno_isUBWCSupportedByGpu) (ADRENOPIXELFORMAT format);
 };
 #endif /* GR_H_ */
