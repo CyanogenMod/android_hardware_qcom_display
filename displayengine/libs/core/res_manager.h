@@ -166,7 +166,7 @@ class ResManager : public DumpImpl {
   float GetPipeBw(DisplayResourceContext *display_ctx, HWPipeInfo *pipe, float bpp);
   float GetClockForPipe(DisplayResourceContext *display_ctx, HWPipeInfo *pipe);
   float GetOverlapBw(HWLayers *hw_layers, float *pipe_bw, bool left_mixer);
-  void SetDecimationFactor(HWPipeInfo *pipe);
+  DisplayError SetDecimationFactor(HWPipeInfo *pipe);
   float GetBpp(LayerBufferFormat format);
   void SplitRect(bool flip_horizontal, const LayerRect &src_rect, const LayerRect &dst_rect,
                  LayerRect *src_left, LayerRect *dst_left, LayerRect *src_right,

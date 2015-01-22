@@ -110,9 +110,10 @@ struct HWPipeInfo {
   int pipe_id;
   LayerRect src_roi;
   LayerRect dst_roi;
-  uint8_t decimation;
+  uint8_t horizontal_decimation;
+  uint8_t vertical_decimation;
 
-  HWPipeInfo() : pipe_id(0), decimation(1) { }
+  HWPipeInfo() : pipe_id(0), horizontal_decimation(0), vertical_decimation(0) { }
 
   inline void Reset() { *this = HWPipeInfo(); }
 };

@@ -545,7 +545,11 @@ DisplayError HWFrameBuffer::Validate(Handle device, HWLayers *hw_layers) {
       mdp_layer.alpha = layer.plane_alpha;
       mdp_layer.z_order = static_cast<uint16_t>(i);
       mdp_layer.transp_mask = 0xffffffff;
+      mdp_layer.horz_deci = pipe.horizontal_decimation;
+      mdp_layer.vert_deci = pipe.vertical_decimation;
+
       SetBlending(layer.blending, &mdp_layer.blend_op);
+
       SetRect(pipe.src_roi, &mdp_layer.src_rect);
       SetRect(pipe.dst_roi, &mdp_layer.dst_rect);
 

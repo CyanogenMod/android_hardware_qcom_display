@@ -426,22 +426,41 @@ bool ResManager::IsValidDimension(const LayerRect &src, const LayerRect &dst) {
   }
 }
 
-void ResManager::SetDecimationFactor(HWPipeInfo *pipe) {
+DisplayError ResManager::SetDecimationFactor(HWPipeInfo *pipe) {
   float max_down_scale = FLOAT(hw_res_info_.max_scale_down);
   float src_h = pipe->src_roi.bottom - pipe->src_roi.top;
   float dst_h = pipe->dst_roi.bottom - pipe->dst_roi.top;
-  float down_scale = src_h / dst_h;
-  pipe->decimation = 1;
+  float down_scale_h = src_h / dst_h;
 
-  if (!hw_res_info_.has_decimation || (down_scale <= max_down_scale))
-    return;
+  float src_w = pipe->src_roi.right - pipe->src_roi.left;
+  float dst_w = pipe->dst_roi.right - pipe->dst_roi.left;
+  float down_scale_w = src_w / dst_w;
+
+
+  pipe->horizontal_decimation = 0;
+  pipe->vertical_decimation = 0;
+
+  // TODO(user): Need to check for the maximum downscale limit for decimation and return error
+  if (!hw_res_info_.has_decimation && ((down_scale_w > max_down_scale) ||
+      (down_scale_h > max_down_scale))) {
+    DLOGV("Downscaling exceeds the maximum MDP downscale limit and decimation not enabled");
+    return kErrorNotSupported;
+  }
+
+  if ((down_scale_w <= max_down_scale) && (down_scale_h <= max_down_scale))
+    return kErrorNone;
 
   // Decimation is the remaining downscale factor after doing max SDE downscale.
   // In SDE, decimation is supported in powers of 2.
   // For ex: If a pipe needs downscale of 8 but max_down_scale is 4
   // So decimation = powf(2.0, ceilf(log2f(8) - log2f(4))) = powf(2.0, 1.0) = 2
-  float decimation_factor = ceilf(log2f(down_scale) - log2f(max_down_scale));
-  pipe->decimation = UINT8(powf(2.0f, decimation_factor));
+  pipe->horizontal_decimation = UINT8(ceilf(log2f(down_scale_w) - log2f(max_down_scale)));
+  pipe->vertical_decimation = UINT8(ceilf(log2f(down_scale_h) - log2f(max_down_scale)));
+
+  DLOGI_IF(kTagResources, "horizontal_decimation %d, vertical_decimation %d",
+           pipe->horizontal_decimation, pipe->vertical_decimation);
+
+  return kErrorNone;
 }
 
 void ResManager::SplitRect(bool flip_horizontal, const LayerRect &src_rect,
