@@ -45,6 +45,7 @@
 #include "qd_utils.h"
 #include <sys/sysinfo.h>
 #include <dlfcn.h>
+#include <video/msm_hdmi_modes.h>
 
 using namespace qClient;
 using namespace qService;
@@ -351,7 +352,13 @@ void initContext(hwc_context_t *ctx)
         ctx->dpyAttr[i].mActionSafePresent = false;
         ctx->dpyAttr[i].mAsWidthRatio = 0;
         ctx->dpyAttr[i].mAsHeightRatio = 0;
+        ctx->dpyAttr[i].s3dMode = HDMI_S3D_NONE;
+        ctx->dpyAttr[i].s3dModeForced = false;
     }
+
+    //Make sure that the 3D mode is unset at bootup
+    //This makes sure that the state is accurate on framework reboots
+    ctx->mHDMIDisplay->configure3D(HDMI_S3D_NONE);
 
     for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
         ctx->mPrevHwLayerCount[i] = 0;
@@ -1008,6 +1015,8 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].refreshRateRequest = ctx->dpyAttr[dpy].refreshRate;
     uint32_t refreshRate = 0;
     qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
+    int s3dFormat = HAL_NO_3D;
+    int s3dLayerCount = 0;
 
     ctx->listStats[dpy].mAIVVideoMode = false;
     resetROI(ctx, dpy);
@@ -1063,6 +1072,14 @@ void setListStats(hwc_context_t *ctx,
                 ctx->listStats[dpy].yuv4k2kIndices[yuv4k2kCount] = (int)i;
                 yuv4k2kCount++;
             }
+
+            // Gets set if one YUV layer is 3D
+            if (displaySupports3D(ctx,dpy)) {
+                s3dFormat = get3DFormat(hnd);
+                if(s3dFormat != HAL_NO_3D)
+                    s3dLayerCount++;
+            }
+
         }
         if(layer->blending == HWC_BLENDING_PREMULT)
             ctx->listStats[dpy].preMultipliedAlpha = true;
@@ -1089,6 +1106,17 @@ void setListStats(hwc_context_t *ctx,
         }
 #endif
     }
+
+    //Set the TV's 3D mode based on format if it was not forced
+    //Only one 3D YUV layer is supported on external
+    //If there is more than one 3D YUV layer, the switch to 3D cannot occur.
+    if( !ctx->dpyAttr[dpy].s3dModeForced && (s3dLayerCount <= 1)) {
+        //XXX: Rapidly going in and out of 3D mode in some cases such
+        // as rotation might cause flickers. The OEMs are recommended to disable
+        // rotation on HDMI globally or in the app that plays 3D video
+        setup3DMode(ctx, dpy, convertS3DFormatToMode(s3dFormat));
+    }
+
     if(ctx->listStats[dpy].yuvCount > 0) {
         if (property_get("hw.cabl.yuv", property, NULL) > 0) {
             if (atoi(property) != 1) {
@@ -2197,6 +2225,113 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
     return 0;
 }
 
+int configure3DVideo(hwc_context_t *ctx, hwc_layer_1_t *layer,
+        const int& dpy, eMdpFlags& mdpFlagsL, eZorder& z,
+        const eDest& lDest, const eDest& rDest,
+        Rotator **rot) {
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    if(!hnd) {
+        ALOGE("%s: layer handle is NULL", __FUNCTION__);
+        return -1;
+    }
+    //Both pipes are configured to the same mixer
+    eZorder lz = z;
+    eZorder rz = (eZorder)(z + 1);
+
+    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+
+    hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
+    hwc_rect_t dst = layer->displayFrame;
+    int transform = layer->transform;
+    eTransform orient = static_cast<eTransform>(transform);
+    int rotFlags = ROT_FLAGS_NONE;
+    uint32_t format = ovutils::getMdpFormat(hnd->format, hnd->flags);
+    Whf whf(getWidth(hnd), getHeight(hnd), format, (uint32_t)hnd->size);
+
+    int downscale = getRotDownscale(ctx, layer);
+    setMdpFlags(ctx, layer, mdpFlagsL, downscale, transform);
+
+    //XXX: Check if rotation is supported and valid for 3D
+    if((has90Transform(layer) or downscale) and isRotationDoable(ctx, hnd)) {
+        (*rot) = ctx->mRotMgr->getNext();
+        if((*rot) == NULL) return -1;
+        ctx->mLayerRotMap[dpy]->add(layer, *rot);
+        //Configure rotator for pre-rotation
+        if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
+            ALOGE("%s: configRotator failed!", __FUNCTION__);
+            return -1;
+        }
+        updateSource(orient, whf, crop, *rot);
+        rotFlags |= ROT_PREROTATED;
+    }
+
+    eMdpFlags mdpFlagsR = mdpFlagsL;
+
+    hwc_rect_t cropL = crop, dstL = dst;
+    hwc_rect_t cropR = crop, dstR = dst;
+    int hw_w = ctx->dpyAttr[dpy].xres;
+    int hw_h = ctx->dpyAttr[dpy].yres;
+
+    if(get3DFormat(hnd) == HAL_3D_SIDE_BY_SIDE_L_R ||
+            get3DFormat(hnd) == HAL_3D_SIDE_BY_SIDE_R_L) {
+        // Calculate Left rects
+        // XXX: This assumes crop.right/2 is the center point of the video
+        cropL.right = crop.right/2;
+        dstL.left = dst.left/2;
+        dstL.right = dst.right/2;
+
+        // Calculate Right rects
+        cropR.left = crop.right/2;
+        dstR.left = hw_w/2 + dst.left/2;
+        dstR.right = hw_w/2 + dst.right/2;
+    } else if(get3DFormat(hnd) == HAL_3D_TOP_BOTTOM) {
+        // Calculate Left rects
+        cropL.bottom = crop.bottom/2;
+        dstL.top = dst.top/2;
+        dstL.bottom = dst.bottom/2;
+
+        // Calculate Right rects
+        cropR.top = crop.bottom/2;
+        dstR.top = hw_h/2 + dst.top/2;
+        dstR.bottom = hw_h/2 + dst.bottom/2;
+    } else {
+        ALOGE("%s: Unsupported 3D mode ", __FUNCTION__);
+        return -1;
+    }
+
+    //For the mdp, since either we are pre-rotating or MDP does flips
+    orient = OVERLAY_TRANSFORM_0;
+    transform = 0;
+
+    //configure left pipe
+    if(lDest != OV_INVALID) {
+        PipeArgs pargL(mdpFlagsL, whf, lz,
+                       static_cast<eRotFlags>(rotFlags), layer->planeAlpha,
+                       (ovutils::eBlending) getBlending(layer->blending));
+
+        if(configMdp(ctx->mOverlay, pargL, orient,
+                cropL, dstL, metadata, lDest) < 0) {
+            ALOGE("%s: commit failed for left mixer config", __FUNCTION__);
+            return -1;
+        }
+    }
+
+    //configure right pipe
+    if(rDest != OV_INVALID) {
+        PipeArgs pargR(mdpFlagsR, whf, rz,
+                       static_cast<eRotFlags>(rotFlags),
+                       layer->planeAlpha,
+                       (ovutils::eBlending) getBlending(layer->blending));
+        if(configMdp(ctx->mOverlay, pargR, orient,
+                cropR, dstR, metadata, rDest) < 0) {
+            ALOGE("%s: commit failed for right mixer config", __FUNCTION__);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy, eMdpFlags& mdpFlagsL, eZorder& z,
         const eDest& lDest, const eDest& rDest,
@@ -2815,5 +2950,42 @@ void handle_offline(hwc_context_t* ctx, int dpy) {
     ctx->dpyAttr[dpy].connected = false;
     ctx->dpyAttr[dpy].isActive = false;
 }
+
+int convertS3DFormatToMode(int s3DFormat) {
+    int ret;
+    switch(s3DFormat) {
+    case HAL_3D_SIDE_BY_SIDE_L_R:
+    case HAL_3D_SIDE_BY_SIDE_R_L:
+        ret = HDMI_S3D_SIDE_BY_SIDE;
+        break;
+    case HAL_3D_TOP_BOTTOM:
+        ret = HDMI_S3D_TOP_AND_BOTTOM;
+        break;
+    default:
+        ret = HDMI_S3D_NONE;
+    }
+    return ret;
+}
+
+bool needs3DComposition(hwc_context_t* ctx, int dpy) {
+    return (displaySupports3D(ctx, dpy) && ctx->dpyAttr[dpy].connected &&
+            ctx->dpyAttr[dpy].s3dMode != HDMI_S3D_NONE);
+}
+
+void setup3DMode(hwc_context_t *ctx, int dpy, int s3dMode) {
+    if (ctx->dpyAttr[dpy].s3dMode != s3dMode) {
+        ALOGD("%s: setup 3D mode: %d", __FUNCTION__, s3dMode);
+        if(ctx->mHDMIDisplay->configure3D(s3dMode)) {
+            ctx->dpyAttr[dpy].s3dMode = s3dMode;
+        }
+    }
+}
+
+bool displaySupports3D(hwc_context_t* ctx, int dpy) {
+    return ((dpy == HWC_DISPLAY_EXTERNAL) ||
+            ((dpy == HWC_DISPLAY_PRIMARY) &&
+             ctx->mHDMIDisplay->isHDMIPrimaryDisplay()));
+}
+
 
 };//namespace qhwc

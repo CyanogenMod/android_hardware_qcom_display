@@ -117,6 +117,18 @@ struct DisplayAttributes {
     uint32_t xres_new;
     uint32_t yres_new;
 
+    // This is the 3D mode to which the TV is set
+    // The mode may be set via the appearance of a layer with 3D format
+    // or by forcing the mode via binder.
+    // If the mode is set via binder, the s3dModeForced flag is set, so that the
+    // mode is not changed back when the 3D video layer drops out.
+    // If the forced mode is different from the one in 3D video, the results
+    // are unpredictable. The assumption is made here that the caller forcing
+    // the mode via binder knows the right formats to use.
+    // The s3dModeForced flag is also used to force 2D if the s3dMode is
+    // HDMI_S3D_NONE
+    int s3dMode;
+    bool s3dModeForced;
 };
 
 struct ListStats {
@@ -411,6 +423,15 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
         const ovutils::eDest& lDest,
         const ovutils::eDest& rDest, overlay::Rotator **rot);
 
+//Check if the current round needs 3D composition
+bool needs3DComposition(hwc_context_t* ctx, int dpy);
+
+//Routine to configure 3D video
+int configure3DVideo(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
+        ovutils::eMdpFlags& mdpFlags, ovutils::eZorder& z,
+        const ovutils::eDest& lDest,
+        const ovutils::eDest& rDest, overlay::Rotator **rot);
+
 //Routine to split and configure high resolution YUV layer (> 2048 width)
 int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy,
@@ -443,6 +464,16 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 
 // Checks if boot animation has completed and applies default mode
 void processBootAnimCompleted(hwc_context_t *ctx);
+
+//The gralloc API and driver have different formats
+//The format needs to be converted before passing to libhdmi
+int convertS3DFormatToMode(int s3DFormat);
+
+//Configure resources for 3D mode
+void setup3DMode(hwc_context_t* ctx, int dpy, int s3dMode);
+
+//Checks if this display supports 3D
+bool displaySupports3D(hwc_context_t* ctx, int dpy);
 
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
@@ -487,6 +518,14 @@ static inline bool isTileRendered(const private_handle_t* hnd) {
 //Return true if the buffer is intended for Secure Display
 static inline bool isSecureDisplayBuffer(const private_handle_t* hnd) {
     return (hnd && (hnd->flags & private_handle_t::PRIV_FLAGS_SECURE_DISPLAY));
+}
+
+static inline uint32_t get3DFormat(const private_handle_t* hnd) {
+    MetaData_t *metadata = reinterpret_cast<MetaData_t*>(hnd->base_metadata);
+    if(isYuvBuffer(hnd) && metadata && metadata->operation & S3D_FORMAT) {
+        return metadata->s3dFormat;
+    }
+    return HAL_NO_3D;
 }
 
 static inline int getWidth(const private_handle_t* hnd) {
@@ -644,7 +683,7 @@ struct hwc_context_t {
     bool mBWCEnabled;
     // Provides a way for OEM's to disable setting dynfps via metadata.
     bool mUseMetaDataRefreshRate;
-   // Stores the hpd enabled status- avoids re-enabling HDP on suspend resume.
+    // Stores the hpd enabled status- avoids re-enabling HDP on suspend resume.
     bool mHPDEnabled;
     //Used to notify that boot has completed
     bool mBootAnimCompleted;

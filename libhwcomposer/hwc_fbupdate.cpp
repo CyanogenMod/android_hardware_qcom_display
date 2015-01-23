@@ -25,6 +25,7 @@
 #include <overlayRotator.h>
 #include "hwc_fbupdate.h"
 #include "mdp_version.h"
+#include <video/msm_hdmi_modes.h>
 
 using namespace qdutils;
 using namespace overlay;
@@ -499,10 +500,25 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     hwc_rect_t dstL = displayFrame;
     hwc_rect_t dstR = displayFrame;
 
+    if(ctx->dpyAttr[mDpy].s3dMode == HDMI_S3D_SIDE_BY_SIDE) {
+        dstL.left = displayFrame.left/2;
+        dstL.right = displayFrame.right/2;
+
+        dstR.left = mAlignedFBWidth/2 + displayFrame.left/2;
+        dstR.right = mAlignedFBWidth/2 + displayFrame.right/2;
+    } else if(ctx->dpyAttr[mDpy].s3dMode == HDMI_S3D_TOP_AND_BOTTOM) {
+        dstL.top = displayFrame.top/2;
+        dstL.bottom = displayFrame.bottom/2;
+
+        dstR.top = mAlignedFBHeight/2 + displayFrame.top/2;
+        dstR.bottom = mAlignedFBHeight/2 + displayFrame.bottom/2;
+    }
+
     //Request left pipe (or 1 by default)
     Overlay::PipeSpecs pipeSpecs;
     pipeSpecs.formatClass = Overlay::FORMAT_RGB;
-    pipeSpecs.needsScaling = qhwc::needsScaling(layer);
+    pipeSpecs.needsScaling = (qhwc::needsScaling(layer) ||
+            needs3DComposition(ctx,mDpy));
     pipeSpecs.dpy = mDpy;
     pipeSpecs.mixer = Overlay::MIXER_DEFAULT;
     pipeSpecs.fb = true;
@@ -519,6 +535,7 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         a) FB's width is > Mixer width or
         b) On primary, driver has indicated with caps to split always. This is
            based on an empirically derived value of panel height.
+        c) The composition is 3D
     */
 
     const bool primarySplitAlways = (mDpy == HWC_DISPLAY_PRIMARY) and
@@ -533,7 +550,8 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
 
     if((cropWidth > qdutils::MDPVersion::getInstance().getMaxPipeWidth()) or
             (primarySplitAlways and
-            (cropWidth > lSplit or layerClock > mixerClock))) {
+            (cropWidth > lSplit or layerClock > mixerClock)) or
+            needs3DComposition(ctx, mDpy)) {
         destR = ov.getPipe(pipeSpecs);
         if(destR == ovutils::OV_INVALID) {
             ALOGE("%s: No pipes available to configure fb for dpy %d's right"
@@ -546,10 +564,12 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
         }
 
         //Split crop equally when using 2 pipes
-        cropL.right = (sourceCrop.right + sourceCrop.left) / 2;
-        cropR.left = cropL.right;
-        dstL.right = (displayFrame.right + displayFrame.left) / 2;
-        dstR.left = dstL.right;
+        if(!needs3DComposition(ctx, mDpy)) {
+            cropL.right = (sourceCrop.right + sourceCrop.left) / 2;
+            cropR.left = cropL.right;
+            dstL.right = (displayFrame.right + displayFrame.left) / 2;
+            dstR.left = dstL.right;
+        }
     }
 
     mDestLeft = destL;
@@ -562,6 +582,12 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             return false;
         }
     }
+
+    // XXX: Figure out why we need this with source split
+    // Currently, the driver silently fails to configure the right pipe
+    // if we don't increment the zorder
+    if (needs3DComposition(ctx, mDpy))
+        parg.zorder = eZorder(parg.zorder + 1);
 
     //configure right pipe
     if(destR != OV_INVALID) {
