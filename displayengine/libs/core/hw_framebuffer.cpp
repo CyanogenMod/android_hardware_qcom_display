@@ -653,6 +653,9 @@ DisplayError HWFrameBuffer::SetFormat(const LayerBufferFormat &source, uint32_t 
   case kFormatYCrCb420SemiPlanar:       *target = MDP_Y_CRCB_H2V2;       break;
   case kFormatYCbCr422Packed:           *target = MDP_YCBYCR_H2V1;       break;
   case kFormatYCbCr420SemiPlanarVenus:  *target = MDP_Y_CBCR_H2V2_VENUS; break;
+  case kFormatRGBA8888Ubwc:             *target = MDP_RGBA_8888_UBWC;    break;
+  case kFormatRGB565Ubwc:               *target = MDP_RGB_565_UBWC;      break;
+  case kFormatYCbCr420SPVenusUbwc:      *target = MDP_Y_CBCR_H2V2_UBWC;  break;
   default:
     DLOGE("Unsupported format type %d", source);
     return kErrorParameters;
