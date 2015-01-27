@@ -764,12 +764,15 @@ static bool isUBwcSupported(int format)
 
 bool isUBwcEnabled(int format, int usage)
 {
-    if (isUBwcFormat(format) ||
-        ((usage & GRALLOC_USAGE_PRIVATE_ALLOC_UBWC) && isUBwcSupported(format)))
-    {
-        // Allow UBWC, only if GPU supports it and CPU usage flags are not set
-        if (AdrenoMemInfo::getInstance().isUBWCSupportedByGPU(format) &&
-            !(usage & (GRALLOC_USAGE_SW_READ_MASK |
+    // Allow UBWC, if client is using an explicitly defined UBWC pixel format.
+    if (isUBwcFormat(format))
+        return true;
+
+    // Allow UBWC, if client sets UBWC gralloc usage flag & GPU supports format.
+    if ((usage & GRALLOC_USAGE_PRIVATE_ALLOC_UBWC) && isUBwcSupported(format) &&
+        AdrenoMemInfo::getInstance().isUBWCSupportedByGPU(format)) {
+        // Allow UBWC, only if CPU usage flags are not set
+        if (!(usage & (GRALLOC_USAGE_SW_READ_MASK |
                       GRALLOC_USAGE_SW_WRITE_MASK))) {
             return true;
         }
