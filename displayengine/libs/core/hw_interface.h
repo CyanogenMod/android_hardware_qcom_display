@@ -169,6 +169,7 @@ class HWInterface {
   virtual DisplayError Standby(Handle device) = 0;
   virtual DisplayError Validate(Handle device, HWLayers *hw_layers) = 0;
   virtual DisplayError Commit(Handle device, HWLayers *hw_layers) = 0;
+  virtual DisplayError Flush(Handle device) = 0;
 
  protected:
   virtual ~HWInterface() { }

@@ -77,5 +77,29 @@ int DisplayHDMI::GetBestConfig() {
   return best_config_mode;
 }
 
+DisplayError DisplayHDMI::SetDisplayState(DisplayState state) {
+  DisplayError error = kErrorNone;
+
+  DLOGI("Set state = %d", state);
+
+  if (state == kStateOff) {
+    SCOPE_LOCK(locker_);
+    if (state == state_) {
+      DLOGI("Same state transition is requested.");
+      return kErrorNone;
+    }
+    error = hw_intf_->Flush(hw_device_);
+    if (error == kErrorNone) {
+      comp_manager_->Purge(display_comp_ctx_);
+      state_ = state;
+      hw_layers_.info.count = 0;
+    }
+  } else {
+    error = DisplayBase::SetDisplayState(state);
+  }
+
+  return error;
+}
+
 }  // namespace sde
 

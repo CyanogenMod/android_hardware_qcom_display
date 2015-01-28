@@ -58,6 +58,7 @@ class HWFrameBuffer : public HWInterface {
   virtual DisplayError Standby(Handle device);
   virtual DisplayError Validate(Handle device, HWLayers *hw_layers);
   virtual DisplayError Commit(Handle device, HWLayers *hw_layers);
+  virtual DisplayError Flush(Handle device);
 
  private:
   struct HWContext {
@@ -141,7 +142,6 @@ class HWFrameBuffer : public HWInterface {
   bool EnableHotPlugDetection(int enable);
   int GetHDMIModeCount();
   bool MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode, fb_var_screeninfo *info);
-  void ResetHDMIModes();
 
   // Pointers to system calls which are either mapped to actual system call or virtual driver.
   int (*ioctl_)(int, int, ...);
@@ -166,7 +166,7 @@ class HWFrameBuffer : public HWInterface {
   HWResourceInfo hw_resource_;
   int fb_node_index_[kDeviceMax];
   const char* fb_path_;
-  PanelInfo pri_panel_info_;
+  PanelInfo primary_panel_info_;
   bool hotplug_enabled_;
   uint32_t hdmi_mode_count_;
   uint32_t hdmi_modes_[256];

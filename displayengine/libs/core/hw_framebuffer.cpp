@@ -392,17 +392,19 @@ DisplayError HWFrameBuffer::SetDisplayAttributes(Handle device, uint32_t index) 
           break;
         }
       }
+
       if (MapHDMIDisplayTiming(timing_mode, &vscreeninfo) == false) {
         return kErrorParameters;
       }
+
       STRUCT_VAR(msmfb_metadata, metadata);
-      memset(&metadata, 0 , sizeof(metadata));
       metadata.op = metadata_op_vic;
       metadata.data.video_info_code = timing_mode->video_format;
       if (ioctl(hw_context->device_fd, MSMFB_METADATA_SET, &metadata) == -1) {
         IOCTL_LOGE(MSMFB_METADATA_SET, hw_context->type);
         return kErrorHardware;
       }
+
       DLOGI("SetInfo<Mode=%d %dx%d (%d,%d,%d),(%d,%d,%d) %dMHz>", vscreeninfo.reserved[3] & 0xFF00,
             vscreeninfo.xres, vscreeninfo.yres, vscreeninfo.right_margin, vscreeninfo.hsync_len,
             vscreeninfo.left_margin, vscreeninfo.lower_margin, vscreeninfo.vsync_len,
@@ -476,19 +478,6 @@ DisplayError HWFrameBuffer::PowerOff(Handle device) {
       return kErrorHardware;
     }
     break;
-  case kDeviceHDMI:
-    {
-      hw_context->ResetMDPCommit();
-      mdp_layer_commit_v1 &mdp_commit = hw_context->mdp_commit.commit_v1;
-      mdp_commit.input_layer_cnt = 0;
-      mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
-      if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
-        IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, hw_context->type);
-        return kErrorHardware;
-      }
-    }
-    break;
-  case kDeviceVirtual:
   default:
     break;
   }
@@ -638,6 +627,22 @@ DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
   return kErrorNone;
 }
 
+DisplayError HWFrameBuffer::Flush(Handle device) {
+  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+
+  hw_context->ResetMDPCommit();
+  mdp_layer_commit_v1 &mdp_commit = hw_context->mdp_commit.commit_v1;
+  mdp_commit.input_layer_cnt = 0;
+  mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
+
+  if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
+    IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, hw_context->type);
+    return kErrorHardware;
+  }
+
+  return kErrorNone;
+}
+
 DisplayError HWFrameBuffer::SetFormat(const LayerBufferFormat &source, uint32_t *target) {
   switch (source) {
   case kFormatARGB8888:                 *target = MDP_ARGB_8888;         break;
@@ -782,16 +787,16 @@ void HWFrameBuffer::PopulateFBNodeIndex() {
     // TODO(user): For now, assume primary to be cmd/video/lvds/edp mode panel only
     // Need more concrete info from driver
     if ((strncmp(line, "mipi dsi cmd panel", strlen("mipi dsi cmd panel")) == 0)) {
-      pri_panel_info_.type = kCommandModePanel;
+      primary_panel_info_.type = kCommandModePanel;
       fb_node_index_[kDevicePrimary] = i;
     } else if ((strncmp(line, "mipi dsi video panel", strlen("mipi dsi video panel")) == 0))  {
-      pri_panel_info_.type = kVideoModePanel;
+      primary_panel_info_.type = kVideoModePanel;
       fb_node_index_[kDevicePrimary] = i;
     } else if ((strncmp(line, "lvds panel", strlen("lvds panel")) == 0)) {
-      pri_panel_info_.type = kLVDSPanel;
+      primary_panel_info_.type = kLVDSPanel;
       fb_node_index_[kDevicePrimary] = i;
     } else if ((strncmp(line, "edp panel", strlen("edp panel")) == 0)) {
-      pri_panel_info_.type = kEDPPanel;
+      primary_panel_info_.type = kEDPPanel;
       fb_node_index_[kDevicePrimary] = i;
     } else if ((strncmp(line, "dtv panel", strlen("dtv panel")) == 0)) {
       fb_node_index_[kDeviceHDMI] = i;
@@ -823,27 +828,27 @@ void HWFrameBuffer::PopulatePanelInfo(int fb_index) {
     char *tokens[max_count] = { NULL };
     if (!ParseLine(line, tokens, max_count, &token_count)) {
       if (!strncmp(tokens[0], "pu_en", strlen("pu_en"))) {
-        pri_panel_info_.partial_update = atoi(tokens[1]);
+        primary_panel_info_.partial_update = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "xstart", strlen("xstart"))) {
-        pri_panel_info_.left_align = atoi(tokens[1]);
+        primary_panel_info_.left_align = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "walign", strlen("walign"))) {
-        pri_panel_info_.width_align = atoi(tokens[1]);
+        primary_panel_info_.width_align = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "ystart", strlen("ystart"))) {
-        pri_panel_info_.top_align = atoi(tokens[1]);
+        primary_panel_info_.top_align = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "halign", strlen("halign"))) {
-        pri_panel_info_.height_align = atoi(tokens[1]);
+        primary_panel_info_.height_align = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "min_w", strlen("min_w"))) {
-        pri_panel_info_.min_roi_width = atoi(tokens[1]);
+        primary_panel_info_.min_roi_width = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "min_h", strlen("min_h"))) {
-        pri_panel_info_.min_roi_height = atoi(tokens[1]);
+        primary_panel_info_.min_roi_height = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "roi_merge", strlen("roi_merge"))) {
-        pri_panel_info_.needs_roi_merge = atoi(tokens[1]);
+        primary_panel_info_.needs_roi_merge = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "dynamic_fps_en", strlen("dyn_fps_en"))) {
-        pri_panel_info_.dynamic_fps = atoi(tokens[1]);
+        primary_panel_info_.dynamic_fps = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "min_fps", strlen("min_fps"))) {
-        pri_panel_info_.min_fps = atoi(tokens[1]);
+        primary_panel_info_.min_fps = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "max_fps", strlen("max_fps"))) {
-        pri_panel_info_.max_fps= atoi(tokens[1]);
+        primary_panel_info_.max_fps= atoi(tokens[1]);
       }
     }
   }
@@ -1077,3 +1082,4 @@ bool HWFrameBuffer::MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
 }
 
 }  // namespace sde
+
