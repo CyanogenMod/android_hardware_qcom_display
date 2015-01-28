@@ -216,8 +216,13 @@ bool CopyBit::prepareOverlap(hwc_context_t *ctx,
         return false;
     }
 
-    if (mEngine == NULL || !(validateParams(ctx, list))) {
-        ALOGE("%s: Invalid Params", __FUNCTION__);
+    if (mEngine == NULL) {
+        ALOGW("%s: Copybit HAL not enabled", __FUNCTION__);
+        return false;
+    }
+
+    if (!(validateParams(ctx, list))) {
+        ALOGE("%s: validateParams() failed", __FUNCTION__);
         return false;
     }
     PtorInfo* ptorInfo = &(ctx->mPtorInfo);
