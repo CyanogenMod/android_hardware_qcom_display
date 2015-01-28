@@ -306,14 +306,20 @@ bool Overlay::needsPrioritySwap(utils::eDest pipe1Index,
         if(leftType == rightType) {
             //Safe. Onus on driver to assign correct pipes within same type
             return false;
-        } else if(leftType == OV_MDP_PIPE_DMA or rightType == OV_MDP_PIPE_VG) {
-            //If we are here, right is definitely a higher prio type.
+        } else {
             //This check takes advantage of having only 3 types and avoids 3
             //different failure combination checks.
-            return true;
-        } else {
-            //Types are correct priority-wise
-            return false;
+            // Swap IF:
+            // ----------------
+            // | Left | Right |
+            // ================
+            // | DMA  | ViG   |
+            // ----------------
+            // | DMA  | RGB   |
+            // ----------------
+            // | RGB  | ViG   |
+            // ----------------
+            return (leftType == OV_MDP_PIPE_DMA or rightType == OV_MDP_PIPE_VG);
         }
     } else if(pipe1Id < 0) {
         //LEFT needs new allocation.
@@ -321,8 +327,7 @@ bool Overlay::needsPrioritySwap(utils::eDest pipe1Index,
             // If RIGHT has highest priority(lowest id), swap it.
             return (pipe2Id == PipeBook::pipeMinID[leftType]);
         } else {
-            // Swap if needs lowest priority type pipe.
-            return (leftType == OV_MDP_PIPE_DMA);
+            return (leftType == OV_MDP_PIPE_DMA or rightType == OV_MDP_PIPE_VG);
         }
     } else { /* if (pipe2Id < 0) */
         // RIGHT needs new allocation.
@@ -330,8 +335,7 @@ bool Overlay::needsPrioritySwap(utils::eDest pipe1Index,
             // If LEFT has lowest priority(highest id), swap it.
             return (pipe1Id == PipeBook::pipeMaxID[leftType]);
         } else {
-            // Swap if needs highest  priority type pipe.
-            return (rightType == OV_MDP_PIPE_VG);
+            return (leftType == OV_MDP_PIPE_DMA or rightType == OV_MDP_PIPE_VG);
         }
     }
 }
