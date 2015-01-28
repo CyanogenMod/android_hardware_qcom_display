@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -22,6 +22,7 @@
 #define HWC_HDMI_DISPLAY_H
 
 #include <linux/fb.h>
+#include <video/msm_hdmi_modes.h>
 
 struct msm_hdmi_mode_timing_info;
 
@@ -33,16 +34,6 @@ enum hdmi_scansupport_type {
     HDMI_SCAN_ALWAYS_OVERSCANED  = 1,
     HDMI_SCAN_ALWAYS_UNDERSCANED = 2,
     HDMI_SCAN_BOTH_SUPPORTED     = 3
-};
-
-// Structure to store EDID related data
-struct EDIDData {
-    int mMode, mWidth, mHeight, mFps;
-    // Predetermined ordering for each mode
-    int mModeOrder;
-    EDIDData(int mode, int width, int height, int fps, int order)
-    : mMode(mode), mWidth(width), mHeight(height), mFps(fps), mModeOrder(order)
-    { }
 };
 
 class HDMIDisplay
@@ -71,7 +62,7 @@ public:
     int getActiveConfig() const { return mActiveConfig; };
     int setActiveConfig(int newConfig);
     int getAttrForConfig(int config, uint32_t& xres,
-            uint32_t& yres, uint32_t& refresh) const;
+            uint32_t& yres, uint32_t& refresh, uint32_t& fps) const;
     int getDisplayConfigs(uint32_t* configs, size_t* numConfigs) const;
 
 private:
@@ -90,10 +81,12 @@ private:
     bool isInterlacedMode(int mode);
     void resetInfo();
     void setAttributes();
-    void getAttrForMode(uint32_t& width, uint32_t& height, uint32_t& fps);
     int openDeviceNode(const char* node, int fileMode) const;
     int getModeIndex(int mode);
     bool isValidConfigChange(int newConfig);
+    void requestNewPage(int pageNumber);
+    void readConfigs();
+    bool readResFile(char* configBuffer);
 
     int mFd;
     int mFbNum;
@@ -105,11 +98,11 @@ private:
     int mActiveConfig;
     // mEDIDModes contains a list of HDMI video formats (modes) supported by the
     // HDMI display
-    int mEDIDModes[64];
+    int mEDIDModes[HDMI_VFRMT_MAX];
     int mModeCount;
     fb_var_screeninfo mVInfo;
     // Holds all the HDMI modes and timing info supported by driver
-    msm_hdmi_mode_timing_info* supported_video_mode_lut;
+    msm_hdmi_mode_timing_info *mDisplayConfigs;
     uint32_t mXres, mYres, mVsyncPeriod, mPrimaryWidth, mPrimaryHeight;
     bool mMDPScalingMode;
     bool mUnderscanSupported;
