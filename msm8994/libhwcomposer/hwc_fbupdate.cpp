@@ -541,7 +541,7 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
             return false;
         }
 
-        if(ctx->mOverlay->comparePipePriority(destL, destR) == -1) {
+        if(ctx->mOverlay->needsPrioritySwap(destL, destR)) {
             qhwc::swap(destL, destR);
         }
 

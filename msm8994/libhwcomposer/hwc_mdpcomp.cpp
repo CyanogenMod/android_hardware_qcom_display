@@ -2669,12 +2669,8 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
             return false;
         }
 
-        // Return values
-        // 1  Left pipe is higher priority, do nothing.
-        // 0  Pipes of same priority.
-        //-1  Right pipe is of higher priority, needs swap.
-        if(ctx->mOverlay->comparePipePriority(pipe_info.lIndex,
-                pipe_info.rIndex) == -1) {
+        if(ctx->mOverlay->needsPrioritySwap(pipe_info.lIndex,
+                    pipe_info.rIndex)) {
             qhwc::swap(pipe_info.lIndex, pipe_info.rIndex);
         }
     }
