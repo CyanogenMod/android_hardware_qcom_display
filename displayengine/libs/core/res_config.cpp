@@ -47,9 +47,16 @@ void ResManager::RotationConfig(const LayerTransform &transform, const float &sc
   rotate->downscale_ratio_y = scale_y;
 
   // downscale when doing rotation
-  dst_rect.right = src_height / rotate->downscale_ratio_x;
-  dst_rect.bottom = src_width / rotate->downscale_ratio_y;
+  if (IsRotationNeeded(transform.rotation)) {
+    dst_rect.right = src_height / rotate->downscale_ratio_x;
+    dst_rect.bottom = src_width / rotate->downscale_ratio_y;
+  } else {
+    dst_rect.right = src_width / rotate->downscale_ratio_x;
+    dst_rect.bottom = src_height / rotate->downscale_ratio_y;
+  }
 
+  dst_rect.right = floorf(dst_rect.right);
+  dst_rect.bottom = floorf(dst_rect.bottom);
   rotate->src_roi = *src_rect;
   rotate->pipe_id = kPipeIdNeedsAssignment;
   rotate->dst_roi = dst_rect;
@@ -67,8 +74,8 @@ DisplayError ResManager::SrcSplitConfig(DisplayResourceContext *display_resource
   HWPipeInfo *right_pipe = &layer_config->right_pipe;
   layer_config->is_right_pipe = false;
 
-  if ((src_rect.right - src_rect.left) >= kMaxSourcePipeWidth ||
-      (dst_rect.right - dst_rect.left) >= kMaxInterfaceWidth || hw_res_info_.always_src_split) {
+  if ((src_rect.right - src_rect.left) > kMaxSourcePipeWidth ||
+      (dst_rect.right - dst_rect.left) > kMaxInterfaceWidth || hw_res_info_.always_src_split) {
     SplitRect(transform.flip_horizontal, src_rect, dst_rect, &left_pipe->src_roi,
               &left_pipe->dst_roi, &right_pipe->src_roi, &right_pipe->dst_roi);
     left_pipe->pipe_id = kPipeIdNeedsAssignment;
@@ -107,18 +114,24 @@ DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_reso
   scissor.right = FLOAT(display_attributes.x_pixels);
   scissor.bottom = FLOAT(display_attributes.y_pixels);
   CalculateCropRects(scissor, transform, &crop_right, &dst_right);
-  if ((crop_left.right - crop_left.left) >= kMaxSourcePipeWidth) {
-    if (crop_right.right != crop_right.left)
+  if ((crop_left.right - crop_left.left) > kMaxSourcePipeWidth) {
+    if (crop_right.right != crop_right.left) {
+      DLOGV_IF(kTagResources, "Need more than 2 pipes: left width = %.0f, right width = %.0f",
+               crop_left.right - crop_left.left, crop_right.right - crop_right.left);
       return kErrorNotSupported;
+    }
     // 2 pipes both are on the left
     SplitRect(transform.flip_horizontal, crop_left, dst_left, &left_pipe->src_roi,
               &left_pipe->dst_roi, &right_pipe->src_roi, &right_pipe->dst_roi);
     left_pipe->pipe_id = kPipeIdNeedsAssignment;
     right_pipe->pipe_id = kPipeIdNeedsAssignment;
     layer_config->is_right_pipe = true;
-  } else if ((crop_right.right - crop_right.left) >= kMaxSourcePipeWidth) {
-    if (crop_left.right != crop_left.left)
+  } else if ((crop_right.right - crop_right.left) > kMaxSourcePipeWidth) {
+    if (crop_left.right != crop_left.left) {
+      DLOGV_IF(kTagResources, "Need more than 2 pipes: left width = %.0f, right width = %.0f",
+               crop_left.right - crop_left.left, crop_right.right - crop_right.left);
       return kErrorNotSupported;
+    }
     // 2 pipes both are on the right
     SplitRect(transform.flip_horizontal, crop_right, dst_right, &left_pipe->src_roi,
               &left_pipe->dst_roi, &right_pipe->src_roi, &right_pipe->dst_roi);
@@ -168,7 +181,7 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     Layer& layer = layer_info.stack->layers[layer_info.index[i]];
     float rot_scale_x = 1.0f, rot_scale_y = 1.0f;
     if (!IsValidDimension(layer.src_rect, layer.dst_rect)) {
-      DLOGE_IF(kTagResources, "Input is invalid");
+      DLOGV_IF(kTagResources, "Input is invalid");
       LogRectVerbose("input layer src_rect", layer.src_rect);
       LogRectVerbose("input layer dst_rect", layer.dst_rect);
       return kErrorNotSupported;
@@ -231,6 +244,12 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
              i, layer_config->left_pipe.pipe_id);
     LogRectVerbose("input layer src_rect", layer.src_rect);
     LogRectVerbose("input layer dst_rect", layer.dst_rect);
+    for (uint32_t k = 0; k < layer_config->num_rotate; k++) {
+      DLOGV_IF(kTagResources, "rotate num = %d, scale_x = %.2f, scale_y = %.2f",
+               k, rot_scale_x, rot_scale_y);
+      LogRectVerbose("rotate src", layer_config->rotates[k].src_roi);
+      LogRectVerbose("rotate dst", layer_config->rotates[k].dst_roi);
+    }
     LogRectVerbose("cropped src_rect", src_rect);
     LogRectVerbose("cropped dst_rect", dst_rect);
     LogRectVerbose("left pipe src", layer_config->left_pipe.src_roi);
@@ -414,7 +433,7 @@ bool ResManager::IsValidDimension(const LayerRect &src, const LayerRect &dst) {
       src.top - roundf(src.top)       ||
       src.right - roundf(src.right)   ||
       src.bottom - roundf(src.bottom)) {
-    DLOGE_IF(kTagResources, "Input ROI is not integral");
+    DLOGV_IF(kTagResources, "Input ROI is not integral");
     return false;
   }
 

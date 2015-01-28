@@ -775,12 +775,22 @@ bool ResManager::IsScalingNeeded(const HWPipeInfo *pipe_info) {
 void ResManager::AppendDump(char *buffer, uint32_t length) {
   SCOPE_LOCK(locker_);
   AppendString(buffer, length, "\nresource manager pipe state");
-  for (uint32_t i = 0; i < num_pipe_; i++) {
+  uint32_t i;
+  for (i = 0; i < num_pipe_; i++) {
     SourcePipe *src_pipe = &src_pipes_[i];
     AppendString(buffer, length,
                  "\nindex = %d, id = %x, reserved = %d, state = %d, hw_block = %d, dedicated = %d",
                  src_pipe->index, src_pipe->mdss_pipe_id, src_pipe->reserved_hw_block,
                  src_pipe->state, src_pipe->hw_block_id, src_pipe->dedicated_hw_block);
+  }
+
+  for (i = 0; i < hw_res_info_.num_rotator; i++) {
+    if (rotators_[i].client_bit_mask || rotators_[i].request_bit_mask) {
+      AppendString(buffer, length,
+                   "\nrotator = %d, pipe index = %x, client_bit_mask = %x, request_bit_mask = %x",
+                   i, rotators_[i].pipe_index, rotators_[i].client_bit_mask,
+                   rotators_[i].request_bit_mask);
+    }
   }
 }
 
