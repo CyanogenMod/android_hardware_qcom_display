@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2013-14, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2013-15, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -297,6 +297,23 @@ static status_t setPartialUpdatePref(hwc_context_t *ctx, uint32_t enable) {
     return NO_ERROR;
 }
 
+static void toggleScreenUpdate(hwc_context_t* ctx, uint32_t on) {
+    ALOGD("%s: toggle update: %d", __FUNCTION__, on);
+    Locker::Autolock _sl(ctx->mDrawLock);
+    if (on == 0) {
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isPause = true;
+        ctx->mOverlay->configBegin();
+        ctx->mOverlay->configDone();
+        ctx->mRotMgr->clear();
+        if(!Overlay::displayCommit(ctx->dpyAttr[0].fd)) {
+            ALOGE("%s: Display commit failed", __FUNCTION__);
+        }
+    } else {
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isPause = false;
+        ctx->proc->invalidate(ctx->proc);
+    }
+}
+
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t ret = NO_ERROR;
@@ -349,6 +366,9 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             configureDynRefreshRate(mHwcContext, inParcel);
         case IQService::QDCM_SVC_CMDS:
             qdcmCmdsHandler(mHwcContext, inParcel, outParcel);
+            break;
+        case IQService::TOGGLE_SCREEN_UPDATE:
+            toggleScreenUpdate(mHwcContext, inParcel->readInt32());
             break;
         default:
             ret = NO_ERROR;
