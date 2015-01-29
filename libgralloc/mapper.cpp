@@ -222,21 +222,37 @@ int gralloc_lock(gralloc_module_t const* module,
             pthread_mutex_unlock(lock);
         }
         *vaddr = (void*)hnd->base;
-        if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_ION) {
-            //Invalidate if reading in software. No need to do this for the
-            //metadata buffer as it is only read/written in software.
-            IMemAlloc* memalloc = getAllocator(hnd->flags) ;
-            err = memalloc->clean_buffer((void*)hnd->base,
-                                         hnd->size, hnd->offset, hnd->fd,
-                                         CACHE_INVALIDATE);
+        if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_ION and
+                    not useUncached(usage)) {
+            bool nonCPUWriters = usage & (
+                        GRALLOC_USAGE_HW_RENDER |
+                        GRALLOC_USAGE_HW_FB |
+                        GRALLOC_USAGE_HW_VIDEO_ENCODER |
+                        GRALLOC_USAGE_HW_CAMERA_WRITE);
+
+            //Invalidate if CPU reads in software and there are non-CPU
+            //writers. No need to do this for the metadata buffer as it is
+            //only read/written in software.
+            //Corner case: If we reach here with a READ_RARELY, then there must
+            //be a WRITE_OFTEN that caused caching to be used.
+            if ((usage & GRALLOC_USAGE_SW_READ_MASK) and nonCPUWriters) {
+                IMemAlloc* memalloc = getAllocator(hnd->flags) ;
+                err = memalloc->clean_buffer((void*)hnd->base,
+                        hnd->size, hnd->offset, hnd->fd,
+                        CACHE_INVALIDATE);
+            }
+            //Mark the buffer to be flushed after CPU write.
+            //Corner case: If we reach here with a WRITE_RARELY, then there
+            //must be a READ_OFTEN that caused caching to be used.
             if (usage & GRALLOC_USAGE_SW_WRITE_MASK) {
-                // Mark the buffer to be flushed after cpu read/write
                 hnd->flags |= private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
             }
         }
-    } else {
-        hnd->flags |= private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
     }
+
+    if(useUncached(usage))
+        hnd->flags |= private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
+
     return err;
 }
 
@@ -248,23 +264,16 @@ int gralloc_unlock(gralloc_module_t const* module,
     int err = 0;
     private_handle_t* hnd = (private_handle_t*)handle;
 
-    if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_ION) {
-        IMemAlloc* memalloc = getAllocator(hnd->flags);
-        if (hnd->flags & private_handle_t::PRIV_FLAGS_NEEDS_FLUSH) {
-            err = memalloc->clean_buffer((void*)hnd->base,
-                                         hnd->size, hnd->offset, hnd->fd,
-                                         CACHE_CLEAN_AND_INVALIDATE);
-            hnd->flags &= ~private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
-        } else if(hnd->flags & private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH) {
-            hnd->flags &= ~private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
-        } else {
-            //Probably a round about way to do this, but this avoids adding new
-            //flags
-            err = memalloc->clean_buffer((void*)hnd->base,
-                                         hnd->size, hnd->offset, hnd->fd,
-                                         CACHE_INVALIDATE);
-        }
+    IMemAlloc* memalloc = getAllocator(hnd->flags);
+    if (hnd->flags & private_handle_t::PRIV_FLAGS_NEEDS_FLUSH) {
+        err = memalloc->clean_buffer((void*)hnd->base,
+                hnd->size, hnd->offset, hnd->fd,
+                CACHE_CLEAN);
+        hnd->flags &= ~private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
     }
+
+    if(hnd->flags & private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH)
+            hnd->flags &= ~private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
 
     return err;
 }
