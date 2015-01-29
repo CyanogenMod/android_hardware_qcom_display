@@ -8,6 +8,6 @@ LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-par
                                  -Wconversion -Wall -Werror \
                                  -DLOG_TAG=\"SDE\"
 LOCAL_SHARED_LIBRARIES        := libcutils
-LOCAL_SRC_FILES               := debug_android.cpp
+LOCAL_SRC_FILES               := debug_android.cpp rect.cpp
 
 include $(BUILD_SHARED_LIBRARY)
