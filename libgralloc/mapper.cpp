@@ -223,35 +223,24 @@ int gralloc_lock(gralloc_module_t const* module,
         }
         *vaddr = (void*)hnd->base;
         if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_ION and
-                    not useUncached(usage)) {
-            bool nonCPUWriters = hnd->flags & (
-                        private_handle_t::PRIV_FLAGS_HW_RENDER |
-                        private_handle_t::PRIV_FLAGS_HW_FB |
-                        private_handle_t::PRIV_FLAGS_VIDEO_ENCODER |
-                        private_handle_t::PRIV_FLAGS_CAMERA_WRITE);
-
+                hnd->flags & private_handle_t::PRIV_FLAGS_CACHED) {
             //Invalidate if CPU reads in software and there are non-CPU
             //writers. No need to do this for the metadata buffer as it is
             //only read/written in software.
-            //Corner case: If we reach here with a READ_RARELY, then there must
-            //be a WRITE_OFTEN that caused caching to be used.
-            if ((usage & GRALLOC_USAGE_SW_READ_MASK) and nonCPUWriters) {
+            if ((usage & GRALLOC_USAGE_SW_READ_MASK) and
+                    (hnd->flags & private_handle_t::PRIV_FLAGS_NON_CPU_WRITER))
+            {
                 IMemAlloc* memalloc = getAllocator(hnd->flags) ;
                 err = memalloc->clean_buffer((void*)hnd->base,
                         hnd->size, hnd->offset, hnd->fd,
                         CACHE_INVALIDATE);
             }
             //Mark the buffer to be flushed after CPU write.
-            //Corner case: If we reach here with a WRITE_RARELY, then there
-            //must be a READ_OFTEN that caused caching to be used.
             if (usage & GRALLOC_USAGE_SW_WRITE_MASK) {
                 hnd->flags |= private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
             }
         }
     }
-
-    if(useUncached(usage))
-        hnd->flags |= private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
 
     return err;
 }
@@ -271,9 +260,6 @@ int gralloc_unlock(gralloc_module_t const* module,
                 CACHE_CLEAN);
         hnd->flags &= ~private_handle_t::PRIV_FLAGS_NEEDS_FLUSH;
     }
-
-    if(hnd->flags & private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH)
-            hnd->flags &= ~private_handle_t::PRIV_FLAGS_DO_NOT_FLUSH;
 
     return err;
 }
