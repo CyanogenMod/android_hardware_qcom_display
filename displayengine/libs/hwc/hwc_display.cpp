@@ -361,6 +361,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
     layer.flags.updating = (layer_stack_cache_.layer_cache[i].handle != hwc_layer.handle);
 
+    if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
+      layer_stack_.flags.animating = true;
+    }
+
     if (layer.flags.skip) {
       layer_stack_.flags.skip_present = true;
     }
@@ -462,17 +466,31 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
     Layer &layer = layer_stack_.layers[i];
     LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
 
-    if (!flush_ && (layer.composition == kCompositionSDE ||
-                         layer.composition == kCompositionGPUTarget)) {
-      hwc_layer.releaseFenceFd = layer_buffer->release_fence_fd;
+    if (!flush_) {
+      if (layer.composition != kCompositionGPU) {
+        hwc_layer.releaseFenceFd = layer_buffer->release_fence_fd;
+      }
+
+      // During animation on external/virtual display, Display Engine will use the cached
+      // framebuffer layer throughout animation and do not allow framework to do eglswapbuffer on
+      // framebuffer target. So graphics doesn't close the release fence fd of framebuffer target,
+      // Hence close the release fencefd of framebuffer target here.
+      if (layer.composition == kCompositionGPUTarget && layer_stack_cache_.animating) {
+        close(hwc_layer.releaseFenceFd);
+        hwc_layer.releaseFenceFd = -1;
+      }
     }
 
     if (hwc_layer.acquireFenceFd >= 0) {
       close(hwc_layer.acquireFenceFd);
+      hwc_layer.acquireFenceFd = -1;
     }
   }
 
+
   if (!flush_) {
+    layer_stack_cache_.animating = layer_stack_.flags.animating;
+
     content_list->retireFenceFd = layer_stack_.retire_fence_fd;
 
     if (dump_frame_count_) {
@@ -495,8 +513,8 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
   // 2. Any layer is added/removed/layer properties changes in the current layer stack.
   // 3. Any layer handle is changed and it is marked for GPU composition
   // 4. Any layer's current composition is different from previous composition.
-  if ((layer_stack_cache_.layer_count != layer_count) || layer_stack_.flags.skip_present ||
-       layer_stack_.flags.geometry_changed) {
+  if (((layer_stack_cache_.layer_count != layer_count) || layer_stack_.flags.skip_present ||
+      layer_stack_.flags.geometry_changed) && !layer_stack_cache_.animating) {
     return true;
   }
 
@@ -513,7 +531,8 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
       return true;
     }
 
-    if ((layer.composition == kCompositionGPU) && (layer_cache.handle != hwc_layer.handle)) {
+    if ((layer.composition == kCompositionGPU) && (layer_cache.handle != hwc_layer.handle) &&
+        !layer_stack_cache_.animating) {
       return true;
     }
   }
