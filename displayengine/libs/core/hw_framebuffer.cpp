@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -50,11 +50,10 @@ extern int virtual_open(const char *file_name, int access, ...);
 extern int virtual_close(int fd);
 extern int virtual_poll(struct pollfd *fds,  nfds_t num, int timeout);
 extern ssize_t virtual_pread(int fd, void *data, size_t count, off_t offset);
+extern ssize_t virtual_pwrite(int fd, const void *data, size_t count, off_t offset);
 extern FILE* virtual_fopen(const char *fname, const char *mode);
 extern int virtual_fclose(FILE* fileptr);
 extern ssize_t virtual_getline(char **lineptr, size_t *linelen, FILE *stream);
-extern ssize_t virtual_read(int fd, void *buf, size_t count);
-extern ssize_t virtual_write(int fd, const void *buf, size_t count);
 
 #endif
 
@@ -69,11 +68,10 @@ HWFrameBuffer::HWFrameBuffer() : event_thread_name_("SDE_EventThread"), fake_vsy
   close_ = ::close;
   poll_ = ::poll;
   pread_ = ::pread;
+  pwrite_ = ::pwrite;
   fopen_ = ::fopen;
   fclose_ = ::fclose;
   getline_ = ::getline;
-  read_ = ::read;
-  write_ = ::write;
 
 #ifdef DISPLAY_CORE_VIRTUAL_DRIVER
   // If debug property to use virtual driver is set, point to virtual driver interfaces.
@@ -83,11 +81,10 @@ HWFrameBuffer::HWFrameBuffer() : event_thread_name_("SDE_EventThread"), fake_vsy
     close_ = virtual_close;
     poll_ = virtual_poll;
     pread_ = virtual_pread;
+    pwrite_ = virtual_pwrite;
     fopen_ = virtual_fopen;
     fclose_ = virtual_fclose;
     getline_ = virtual_getline;
-    read_ = virtual_read;
-    write_ = virtual_write;
   }
 #endif
   for (int i = 0; i < kDeviceMax; i++) {
@@ -99,7 +96,7 @@ DisplayError HWFrameBuffer::Init() {
   DisplayError error = kErrorNone;
   char node_path[kMaxStringLength] = {0};
   char data[kMaxStringLength] = {0};
-  const char* event_name[kNumDisplayEvents] = {"vsync_event", "show_blank_event"};
+  const char* event_name[kNumDisplayEvents] = {"vsync_event", "show_blank_event", "idle_notify"};
 
   // Read the fb node index
   PopulateFBNodeIndex();
@@ -128,6 +125,11 @@ DisplayError HWFrameBuffer::Init() {
     for (int display = 0; display < kNumPhysicalDisplays; display++) {
       for (int event = 0; event < kNumDisplayEvents; event++) {
         pollfd &poll_fd = poll_fds_[display][event];
+
+        if ((primary_panel_info_.type == kCommandModePanel) && (display == kDevicePrimary) &&
+            (!strncmp(event_name[event], "idle_notify", strlen("idle_notify")))) {
+          continue;
+        }
 
         snprintf(node_path, sizeof(node_path), "%s%d/%s", fb_path_, fb_node_index_[display],
                  event_name[event]);
@@ -606,7 +608,6 @@ DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
     }
   }
 
-  mdp_commit.flags |= MDP_COMMIT_RETIRE_FENCE;
   mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
   if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
     IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, hw_context->type);
@@ -719,7 +720,8 @@ void* HWFrameBuffer::DisplayEventThreadHandler() {
 
   typedef void (HWFrameBuffer::*EventHandler)(int, char *);
   EventHandler event_handler[kNumDisplayEvents] = { &HWFrameBuffer::HandleVSync,
-                                                    &HWFrameBuffer::HandleBlank };
+                                                    &HWFrameBuffer::HandleBlank,
+                                                    &HWFrameBuffer::HandleIdleTimeout };
 
   while (!exit_threads_) {
     int error = poll_(poll_fds_[0], kNumPhysicalDisplays * kNumDisplayEvents, -1);
@@ -762,6 +764,10 @@ void HWFrameBuffer::HandleVSync(int display_id, char *data) {
 
 void HWFrameBuffer::HandleBlank(int display_id, char *data) {
   // TODO(user): Need to send blank Event
+}
+
+void HWFrameBuffer::HandleIdleTimeout(int display_id, char *data) {
+  event_handler_[display_id]->IdleTimeout();
 }
 
 void HWFrameBuffer::PopulateFBNodeIndex() {
@@ -1008,7 +1014,7 @@ bool HWFrameBuffer::EnableHotPlugDetection(int enable) {
     return kErrorHardware;
   }
   char value = enable ? '1' : '0';
-  ssize_t length = write_(hpdfd, &value, 1);
+  ssize_t length = pwrite_(hpdfd, &value, 1, 0);
   if (length <= 0) {
     DLOGE("Write failed 'hpd' = %d", enable);
     ret_value = false;
@@ -1029,7 +1035,7 @@ int HWFrameBuffer::GetHDMIModeCount() {
     return -1;
   }
 
-  length = read_(edid_file, edid_str, sizeof(edid_str)-1);
+  length = pread_(edid_file, edid_str, sizeof(edid_str)-1, 0);
   if (length <= 0) {
     DLOGE("%s: edid_modes file empty");
     edid_str[0] = '\0';
@@ -1079,6 +1085,47 @@ bool HWFrameBuffer::MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
   info->upper_margin = mode->back_porch_v;
 
   return true;
+}
+
+void HWFrameBuffer::SetIdleTimeoutMs(Handle device, uint32_t timeout_ms) {
+  char node_path[kMaxStringLength] = {0};
+  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+
+  DLOGI("idle timeout = %d ms", timeout_ms);
+
+  switch (hw_context->type) {
+  case kDevicePrimary:
+    {
+      // Idle fallback feature is supported only for video mode panel.
+      if (primary_panel_info_.type == kCommandModePanel) {
+        return;
+      }
+
+      snprintf(node_path, sizeof(node_path), "%s%d/idle_time", fb_path_,
+               fb_node_index_[hw_context->type]);
+
+      // Open a sysfs node to send the timeout value to driver.
+      int fd = open_(node_path, O_WRONLY);
+      if (fd < 0) {
+        DLOGE("Unable to open %s, node %s", node_path, strerror(errno));
+        return;
+      }
+
+      char timeout_string[64];
+      snprintf(timeout_string, sizeof(timeout_string), "%d", timeout_ms);
+
+      // Notify driver about the timeout value
+      ssize_t length = pwrite_(fd, timeout_string, strlen(timeout_string), 0);
+      if (length < -1) {
+        DLOGE("Unable to write into %s, node %s", node_path, strerror(errno));
+      }
+
+      close_(fd);
+    }
+    break;
+  default:
+    break;
+  }
 }
 
 }  // namespace sde

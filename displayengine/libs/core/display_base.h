@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -53,10 +53,12 @@ class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
   virtual DisplayError SetDisplayState(DisplayState state);
   virtual DisplayError SetActiveConfig(uint32_t index);
   virtual DisplayError SetVSyncState(bool enable);
+  virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
 
   // Implement the HWEventHandlers
   virtual DisplayError VSync(int64_t timestamp);
   virtual DisplayError Blank(bool blank);
+  virtual void IdleTimeout();
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);

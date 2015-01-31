@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -161,6 +161,10 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
   if (display_comp_ctx->remaining_strategies != display_comp_ctx->max_strategies) {
     constraints->safe_mode = true;
   }
+
+  if (display_comp_ctx->idle_fallback) {
+    constraints->safe_mode = true;
+  }
 }
 
 void CompManager::PrePrepare(Handle display_ctx, HWLayers *hw_layers) {
@@ -170,6 +174,13 @@ void CompManager::PrePrepare(Handle display_ctx, HWLayers *hw_layers) {
   display_comp_ctx->strategy_intf->Start(&hw_layers->info,
                                          &display_comp_ctx->max_strategies);
   display_comp_ctx->remaining_strategies = display_comp_ctx->max_strategies;
+
+  // Avoid idle fallback, if there is only one app layer.
+  // TODO(user): App layer count will change for hybrid composition
+  uint32_t app_layer_count = hw_layers->info.stack->layer_count - 1;
+  if (!display_comp_ctx->idle_fallback && app_layer_count > 1) {
+    display_comp_ctx->handle_idle_timeout = true;
+  }
 }
 
 DisplayError CompManager::Prepare(Handle display_ctx, HWLayers *hw_layers) {
@@ -230,6 +241,8 @@ void CompManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   }
 
   res_mgr_.PostCommit(display_comp_ctx->display_resource_ctx, hw_layers);
+
+  display_comp_ctx->idle_fallback = false;
 }
 
 void CompManager::Purge(Handle display_ctx) {
@@ -239,6 +252,32 @@ void CompManager::Purge(Handle display_ctx) {
                              reinterpret_cast<DisplayCompositionContext *>(display_ctx);
 
   res_mgr_.Purge(display_comp_ctx->display_resource_ctx);
+}
+
+bool CompManager::ProcessIdleTimeout(Handle display_ctx) {
+  SCOPE_LOCK(locker_);
+
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+
+  if (!display_comp_ctx) {
+    return false;
+  }
+
+  // 1. handle_idle_timeout flag is set to true on start of every draw call, if the current
+  //    composition is not due to idle fallback.
+  // 2. idle_fallback flag will be set only if handle_idle_timeout flag is true and there is no
+  //    update to the screen for specified amount of time.
+  // 3. handle_idle_timeout flag helps us handle the very first idle timeout event and
+  //    ignore the next idle timeout event on consecutive two idle timeout events.
+  if (display_comp_ctx->handle_idle_timeout) {
+    display_comp_ctx->idle_fallback = true;
+    display_comp_ctx->handle_idle_timeout = false;
+
+    return true;
+  }
+
+  return false;
 }
 
 void CompManager::AppendDump(char *buffer, uint32_t length) {

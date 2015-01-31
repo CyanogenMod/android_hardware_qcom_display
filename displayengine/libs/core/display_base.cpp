@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -48,6 +48,9 @@ DisplayError DisplayBase::Init() {
   if (error != kErrorNone) {
     return error;
   }
+
+  // Set the idle timeout value to driver through sysfs node
+  hw_intf_->SetIdleTimeoutMs(hw_device_, Debug::GetIdleTimeoutMs());
 
   error = hw_intf_->GetNumDisplayAttributes(hw_device_, &num_modes_);
   if (error != kErrorNone) {
@@ -331,6 +334,10 @@ DisplayError DisplayBase::SetVSyncState(bool enable) {
   return error;
 }
 
+void DisplayBase::SetIdleTimeoutMs(uint32_t timeout_ms) {
+  hw_intf_->SetIdleTimeoutMs(hw_device_, timeout_ms);
+}
+
 DisplayError DisplayBase::VSync(int64_t timestamp) {
   if (vsync_enable_) {
     DisplayEventVSync vsync;
@@ -343,6 +350,13 @@ DisplayError DisplayBase::VSync(int64_t timestamp) {
 
 DisplayError DisplayBase::Blank(bool blank) {
   return kErrorNone;
+}
+
+void DisplayBase::IdleTimeout() {
+  bool need_refresh = comp_manager_->ProcessIdleTimeout(display_comp_ctx_);
+  if (need_refresh) {
+    event_handler_->Refresh();
+  }
 }
 
 void DisplayBase::AppendDump(char *buffer, uint32_t length) {
