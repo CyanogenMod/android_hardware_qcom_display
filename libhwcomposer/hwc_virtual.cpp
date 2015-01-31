@@ -223,13 +223,15 @@ void HWCVirtualVDS::setMDPScalingMode(hwc_context_t* ctx,
         private_handle_t* ohnd, int dpy) {
     bool scalingMode = false;
     int fbWidth = ctx->dpyAttr[dpy].xres;
-    int fbHeight =  ctx->dpyAttr[dpy].yres;
-    if((getWidth(ohnd) != fbWidth) || (getHeight(ohnd) != fbHeight)) {
+    int fbHeight = ctx->dpyAttr[dpy].yres;
+    int alW = 0, alH = 0;
+    getBufferSizeAndDimensions(fbWidth, fbHeight, ohnd->format, alW, alH);
+    if((getWidth(ohnd) != alW) || (getHeight(ohnd) != alH)) {
         scalingMode = true;
     }
     ctx->dpyAttr[dpy].mMDPScalingMode = scalingMode;
 
     ALOGD_IF(HWCVIRTUAL_LOG, "%s fb(%dx%d) outputBuffer(%dx%d) scalingMode=%d",
-            __FUNCTION__, fbWidth, fbHeight,
+            __FUNCTION__, alW, alH,
             getWidth(ohnd), getHeight(ohnd), scalingMode);
 }
