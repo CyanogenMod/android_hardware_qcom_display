@@ -125,6 +125,16 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                         "event", __FUNCTION__);
                 ctx->proc->hotplug(ctx->proc, dpy, EXTERNAL_OFFLINE);
             }
+
+            //On 8994, 8992 due to hardware limitations, we disable bwc
+            //when HDMI intf is active
+            if((qdutils::MDPVersion::getInstance().is8994() or
+                qdutils::MDPVersion::getInstance().is8092()) and
+                    qdutils::MDPVersion::getInstance().supportsBWC()) {
+                Locker::Autolock _l(ctx->mDrawLock);
+                ctx->mBWCEnabled = true;
+            }
+
             break;
         }
     case EXTERNAL_ONLINE:
@@ -134,6 +144,15 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 ALOGE_IF(UEVENT_DEBUG,"%s: Ignoring EXTERNAL_ONLINE event"
                          "for display: %d", __FUNCTION__, dpy);
                 break;
+            }
+
+            //On 8994, 8992 due to hardware limitations, we disable bwc
+            //when HDMI intf is active
+            if((qdutils::MDPVersion::getInstance().is8994() or
+                qdutils::MDPVersion::getInstance().is8092()) and
+                    qdutils::MDPVersion::getInstance().supportsBWC()) {
+                Locker::Autolock _l(ctx->mDrawLock);
+                ctx->mBWCEnabled = false;
             }
 
             if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
