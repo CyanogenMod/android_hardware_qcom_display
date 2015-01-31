@@ -217,6 +217,9 @@ void MDPComp::reset(hwc_context_t *ctx) {
     mCurrentFrame.reset(numLayers);
     ctx->mOverlay->clear(mDpy);
     ctx->mLayerRotMap[mDpy]->clear();
+    resetROI(ctx, mDpy);
+    memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
+    mCurrentFrame.dropCount = 0;
 }
 
 void MDPComp::reset() {
@@ -593,7 +596,8 @@ void MDPCompNonSplit::generateROI(hwc_context_t *ctx,
             hwc_rect_t updatingRect = dst;
 
 #ifdef QCOM_BSP
-            if(!needsScaling(layer) && !layer->transform)
+            if(!needsScaling(layer) && !layer->transform &&
+                   (!isYuvBuffer((private_handle_t *)layer->handle)))
             {
                 hwc_rect_t src = integerizeSourceCrop(layer->sourceCropf);
                 int x_off = dst.left - src.left;
