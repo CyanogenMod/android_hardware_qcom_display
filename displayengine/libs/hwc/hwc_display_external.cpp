@@ -64,7 +64,10 @@ int HWCDisplayExternal::Commit(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
-  content_list->retireFenceFd = layer_stack_.retire_fence_fd;
+  status = HWCDisplay::PostCommitLayerStack(content_list);
+  if (status) {
+    return status;
+  }
 
   return 0;
 }

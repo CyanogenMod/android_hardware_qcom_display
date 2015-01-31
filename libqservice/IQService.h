@@ -59,6 +59,7 @@ public:
         CONFIGURE_DYN_REFRESH_RATE = 18,
         SET_PARTIAL_UPDATE = 19,   // Preference on partial update feature
         TOGGLE_SCREEN_UPDATE = 20, // Provides ability to disable screen updates
+        SET_FRAME_DUMP_CONFIG = 21,  // Provides ability to set the frame dump config
         COMMAND_LIST_END = 400,
     };
 
@@ -75,6 +76,12 @@ public:
         DEBUG_PIPE_LIFECYCLE,
         DEBUG_DRIVER_CONFIG,
         DEBUG_ROTATOR,
+    };
+
+    enum {
+        DUMP_PRIMARY_DISPLAY,
+        DUMP_HDMI_DISPLAY,
+        DUMP_VIRTUAL_DISPLAY,
     };
 
     // Register a client that can be notified

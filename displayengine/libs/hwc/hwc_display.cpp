@@ -31,6 +31,7 @@
 #include <gralloc_priv.h>
 #include <utils/constants.h>
 #include <qdMetaData.h>
+#include <sync/sync.h>
 
 #include "hwc_display.h"
 #include "hwc_debugger.h"
@@ -42,7 +43,8 @@ namespace sde {
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
                        int id)
   : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL),
-    flush_(false), output_buffer_(NULL) {
+    flush_(false), output_buffer_(NULL), dump_frame_count_(0), dump_frame_index_(0),
+    dump_input_layers_(false) {
 }
 
 int HWCDisplay::Init() {
@@ -196,6 +198,14 @@ int HWCDisplay::SetActiveConfig(int index) {
   }
 
   return 0;
+}
+
+void HWCDisplay::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type) {
+  dump_frame_count_ = count;
+  dump_frame_index_ = 0;
+  dump_input_layers_ = ((bit_mask_layer_type & (1 << INPUT_LAYER_DUMP)) != 0);
+
+  DLOGI("num_frame_dump %d, input_layer_dump_enable %d", dump_frame_count_, dump_input_layers_);
 }
 
 DisplayError HWCDisplay::VSync(const DisplayEventVSync &vsync) {
@@ -406,6 +416,8 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
 
   size_t num_hw_layers = content_list->numHwLayers;
 
+  DumpInputBuffers(content_list);
+
   if (!flush_) {
     for (size_t i = 0; i < num_hw_layers; i++) {
       hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
@@ -431,13 +443,18 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
     }
   }
 
+  return status;
+}
+
+int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
+  size_t num_hw_layers = content_list->numHwLayers;
+  int status = 0;
+
   if (flush_) {
     DisplayError error = display_intf_->Flush();
     if (error != kErrorNone) {
       DLOGE("Flush failed. Error = %d", error);
     }
-
-    flush_ = false;
   }
 
   for (size_t i = 0; i < num_hw_layers; i++) {
@@ -445,7 +462,7 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
     Layer &layer = layer_stack_.layers[i];
     LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
 
-    if ((status == 0) && (layer.composition == kCompositionSDE ||
+    if (!flush_ && (layer.composition == kCompositionSDE ||
                          layer.composition == kCompositionGPUTarget)) {
       hwc_layer.releaseFenceFd = layer_buffer->release_fence_fd;
     }
@@ -455,8 +472,20 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
     }
   }
 
+  if (!flush_) {
+    content_list->retireFenceFd = layer_stack_.retire_fence_fd;
+
+    if (dump_frame_count_) {
+      dump_frame_count_--;
+      dump_frame_index_++;
+    }
+  }
+
+  flush_ = false;
+
   return status;
 }
+
 
 bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
@@ -585,6 +614,120 @@ LayerBufferFormat HWCDisplay::GetSDEFormat(const int32_t &source, const int flag
   }
 
   return format;
+}
+
+void HWCDisplay::DumpInputBuffers(hwc_display_contents_1_t *content_list) {
+  size_t num_hw_layers = content_list->numHwLayers;
+  char dir_path[PATH_MAX];
+
+  if (!dump_frame_count_ || flush_ || !dump_input_layers_) {
+    return;
+  }
+
+  snprintf(dir_path, sizeof(dir_path), "/data/misc/display/frame_dump_%s", GetDisplayString());
+
+  if (mkdir(dir_path, 0777) != 0 && errno != EEXIST) {
+    DLOGW("Failed to create %s directory errno = %d, desc = %s", dir_path, errno, strerror(errno));
+    return;
+  }
+
+  // if directory exists already, need to explicitly change the permission.
+  if (errno == EEXIST && chmod(dir_path, 0777) != 0) {
+    DLOGW("Failed to change permissions on %s directory", dir_path);
+    return;
+  }
+
+  for (uint32_t i = 0; i < num_hw_layers; i++) {
+    hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
+    const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
+
+    if (hwc_layer.acquireFenceFd >= 0) {
+      int error = sync_wait(hwc_layer.acquireFenceFd, 1000);
+      if (error < 0) {
+        DLOGW("sync_wait error errno = %d, desc = %s", errno, strerror(errno));
+        return;
+      }
+    }
+
+    if (pvt_handle && pvt_handle->base) {
+      char dump_file_name[PATH_MAX];
+      size_t result = 0;
+
+      snprintf(dump_file_name, sizeof(dump_file_name), "%s/input_layer%d_%dx%d_%s_frame%d.raw",
+               dir_path, i, pvt_handle->width, pvt_handle->height,
+               GetHALPixelFormatString(pvt_handle->format), dump_frame_index_);
+
+      FILE* fp = fopen(dump_file_name, "w+");
+      if (fp) {
+        result = fwrite(reinterpret_cast<void *>(pvt_handle->base), pvt_handle->size, 1, fp);
+        fclose(fp);
+      }
+
+      DLOGI("Frame Dump %s: is %s", dump_file_name, result ? "Successful" : "Failed");
+    }
+  }
+}
+
+const char *HWCDisplay::GetHALPixelFormatString(int format) {
+  switch (format) {
+  case HAL_PIXEL_FORMAT_RGBA_8888:
+    return "RGBA_8888";
+  case HAL_PIXEL_FORMAT_RGBX_8888:
+    return "RGBX_8888";
+  case HAL_PIXEL_FORMAT_RGB_888:
+    return "RGB_888";
+  case HAL_PIXEL_FORMAT_RGB_565:
+    return "RGB_565";
+  case HAL_PIXEL_FORMAT_BGRA_8888:
+    return "BGRA_8888";
+  case HAL_PIXEL_FORMAT_RGBA_5551:
+    return "RGBA_5551";
+  case HAL_PIXEL_FORMAT_RGBA_4444:
+    return "RGBA_4444";
+  case HAL_PIXEL_FORMAT_YV12:
+    return "YV12";
+  case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+    return "YCbCr_422_SP_NV16";
+  case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+    return "YCrCb_420_SP_NV21";
+  case HAL_PIXEL_FORMAT_YCbCr_422_I:
+    return "YCbCr_422_I_YUY2";
+  case HAL_PIXEL_FORMAT_YCrCb_422_I:
+    return "YCrCb_422_I_YVYU";
+  case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+    return "NV12_ENCODEABLE";
+  case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
+    return "YCbCr_420_SP_TILED_TILE_4x2";
+  case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+    return "YCbCr_420_SP";
+  case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
+    return "YCrCb_420_SP_ADRENO";
+  case HAL_PIXEL_FORMAT_YCrCb_422_SP:
+    return "YCrCb_422_SP";
+  case HAL_PIXEL_FORMAT_R_8:
+    return "R_8";
+  case HAL_PIXEL_FORMAT_RG_88:
+    return "RG_88";
+  case HAL_PIXEL_FORMAT_INTERLACE:
+    return "INTERLACE";
+  case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+    return "YCbCr_420_SP_VENUS";
+  default:
+    return "Unknown pixel format";
+  }
+}
+
+const char *HWCDisplay::GetDisplayString() {
+  switch (type_) {
+  case kPrimary:
+    return "primary";
+  case kHDMI:
+    return "hdmi";
+  case kVirtual:
+    return "virtual";
+  default:
+    return "invalid";
+  }
 }
 
 }  // namespace sde

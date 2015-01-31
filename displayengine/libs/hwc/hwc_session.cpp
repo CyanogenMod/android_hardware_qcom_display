@@ -564,12 +564,41 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
       display_primary_->SetIdleTimeoutMs(timeout);
     }
     break;
+
+  case qService::IQService::SET_FRAME_DUMP_CONFIG:
+    SetFrameDumpConfig(input_parcel);
+    break;
+
   default:
     DLOGW("QService command = %d is not supported", command);
     return -EINVAL;
   }
 
   return 0;
+}
+
+void HWCSession::SetFrameDumpConfig(const android::Parcel *input_parcel) {
+  uint32_t frame_dump_count = UINT32(input_parcel->readInt32());
+  uint32_t bit_mask_display_type = UINT32(input_parcel->readInt32());
+  uint32_t bit_mask_layer_type = UINT32(input_parcel->readInt32());
+
+  if (bit_mask_display_type & (1 << qService::IQService::DUMP_PRIMARY_DISPLAY)) {
+    if (display_primary_) {
+      display_primary_->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
+    }
+  }
+
+  if (bit_mask_display_type & (1 << qService::IQService::DUMP_HDMI_DISPLAY)) {
+    if (display_external_) {
+      display_external_->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
+    }
+  }
+
+  if (bit_mask_display_type & (1 << qService::IQService::DUMP_VIRTUAL_DISPLAY)) {
+    if (display_virtual_) {
+      display_virtual_->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
+    }
+  }
 }
 
 void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {

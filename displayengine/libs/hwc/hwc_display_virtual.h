@@ -37,9 +37,13 @@ class HWCDisplayVirtual : public HWCDisplay {
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
   virtual int SetActiveConfig(hwc_display_contents_1_t *content_list);
+  virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
 
  private:
   int SetOutputBuffer(hwc_display_contents_1_t *content_list);
+  void DumpOutputBuffer(hwc_display_contents_1_t *content_list);
+
+  bool dump_output_layer_;
 };
 
 }  // namespace sde
