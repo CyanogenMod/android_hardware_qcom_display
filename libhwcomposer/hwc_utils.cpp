@@ -2352,10 +2352,9 @@ int getLeftSplit(hwc_context_t *ctx, const int& dpy) {
 
 bool isDisplaySplit(hwc_context_t* ctx, int dpy) {
     qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
-    if(ctx->dpyAttr[dpy].xres > mdpHw.getMaxPipeWidth()) {
+    if(ctx->dpyAttr[dpy].xres > mdpHw.getMaxMixerWidth()) {
         return true;
     }
-    //For testing we could split primary via device tree values
     if(dpy == HWC_DISPLAY_PRIMARY && mdpHw.getRightSplit()) {
         return true;
     }
