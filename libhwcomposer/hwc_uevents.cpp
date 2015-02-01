@@ -121,8 +121,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             /* We need to send hotplug to SF only when we are disconnecting
              * HDMI as an external display. */
             if(dpy == HWC_DISPLAY_EXTERNAL) {
-                ALOGE_IF(UEVENT_DEBUG,"%s:Sending EXTERNAL OFFLINE hotplug"
-                        "event", __FUNCTION__);
+                ALOGI("%s: Sending EXTERNAL OFFLINE event", __FUNCTION__);
                 ctx->proc->hotplug(ctx->proc, dpy, EXTERNAL_OFFLINE);
             }
 
@@ -212,14 +211,13 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             ctx->mDrawLock.unlock();
 
             /* External display is HDMI */
-            ALOGE_IF(UEVENT_DEBUG, "%s: Sending EXTERNAL ONLINE"
-                    "hotplug event", __FUNCTION__);
+            ALOGI("%s: Sending EXTERNAL ONLINE event", __FUNCTION__);
             ctx->proc->hotplug(ctx->proc, dpy, EXTERNAL_ONLINE);
             break;
         }
     default:
         {
-            ALOGE("%s: Invalid state to swtich:%d", __FUNCTION__, switch_state);
+            ALOGE("%s: Invalid state to switch:%d", __FUNCTION__, switch_state);
             break;
         }
     }

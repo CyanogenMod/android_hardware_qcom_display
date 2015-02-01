@@ -374,8 +374,21 @@ bool MdpCtrl::validateAndSet(MdpCtrl* mdpCtrlArray[], const int& count,
     if(errVal) {
         /* No dump for failure due to insufficient resource */
         if(errVal != E2BIG) {
-            mdp_wrapper::dump("Bad ov dump: ",
-                *list.overlay_list[list.processed_overlays]);
+            //ENODEV is returned when the driver cannot satisfy a pipe request.
+            //This could happen if previous round's UNSET hasn't been commited
+            //yet, either because of a missed vsync or because of difference in
+            //vsyncs of primary and external. This is expected during
+            //transition scenarios, but should be considered fatal if seen
+            //continuously.
+            if(errVal == ENODEV) {
+                ALOGW("%s: Pipe unavailable. Likely previous UNSET pending. "
+                    "Fatal if seen continuously.", __FUNCTION__);
+            } else {
+                ALOGE("%s failed, error %d: %s", __FUNCTION__, errVal,
+                        strerror(errVal));
+                mdp_wrapper::dump("Bad ov dump: ",
+                        *list.overlay_list[list.processed_overlays]);
+            }
         }
         return false;
     }

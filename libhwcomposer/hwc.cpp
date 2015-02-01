@@ -752,7 +752,7 @@ int hwc_getDisplayConfigs(struct hwc_composer_device_1* dev, int disp,
     bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
     // If hotpluggable or virtual displays are inactive return error
     if ((hotPluggable || isVirtualDisplay) && !ctx->dpyAttr[disp].connected) {
-        ALOGE("%s display (%d) is inactive", __FUNCTION__, disp);
+        ALOGW("%s display (%d) is not connected anymore", __FUNCTION__, disp);
         return -EINVAL;
     }
 
