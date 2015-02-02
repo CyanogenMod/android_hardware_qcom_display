@@ -64,16 +64,11 @@ void LogRect(DebugTag debug_tag, const char *prefix, const LayerRect &roi) {
            prefix, roi.left, roi.top, roi.right, roi.bottom);
 }
 
-void NormalizeRect(const uint32_t &factor, LayerRect *rect) {
-  uint32_t left = UINT32(ceilf(rect->left));
-  uint32_t top = UINT32(ceilf(rect->top));
-  uint32_t right = UINT32(floorf(rect->right));
-  uint32_t bottom = UINT32(floorf(rect->bottom));
-
-  rect->left = FLOAT(CeilToMultipleOf(left, factor));
-  rect->top = FLOAT(CeilToMultipleOf(top, factor));
-  rect->right = FLOAT(FloorToMultipleOf(right, factor));
-  rect->bottom = FLOAT(FloorToMultipleOf(bottom, factor));
+void NormalizeRect(const uint32_t &align_x, const uint32_t &align_y, LayerRect *rect) {
+  rect->left = ROUND_UP_ALIGN_UP(rect->left, align_x);
+  rect->right = ROUND_UP_ALIGN_DOWN(rect->right, align_x);
+  rect->top = ROUND_UP_ALIGN_UP(rect->top, align_y);
+  rect->bottom = ROUND_UP_ALIGN_DOWN(rect->bottom, align_y);
 }
 
 }  // namespace sde

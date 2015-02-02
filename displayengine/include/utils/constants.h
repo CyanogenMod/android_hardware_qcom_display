@@ -53,6 +53,9 @@
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
+#define ROUND_UP_ALIGN_DOWN(value, a) FLOAT(FloorToMultipleOf(UINT32(value + 0.5f), UINT32(a)))
+#define ROUND_UP_ALIGN_UP(value, a) FLOAT(CeilToMultipleOf(UINT32(value + 0.5f), UINT32(a)))
+
 template <class T>
 inline void Swap(T &a, T &b) {
   T c(a);

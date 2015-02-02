@@ -9,7 +9,7 @@ LOCAL_C_INCLUDES              := hardware/qcom/display/displayengine/include/ \
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
                                  -Wconversion -Wall -Werror \
                                  -DLOG_TAG=\"SDE\"
-LOCAL_SHARED_LIBRARIES        := libdl libsdeutils
+LOCAL_SHARED_LIBRARIES        := libdl libsdeutils libcutils
 LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_SRC_FILES               := core_interface.cpp \
                                  core_impl.cpp \

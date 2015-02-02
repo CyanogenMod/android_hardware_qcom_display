@@ -63,6 +63,8 @@ class Debug {
   static uint32_t GetSimulationFlag();
   static uint32_t GetHDMIResolution();
   static uint32_t GetIdleTimeoutMs();
+  static bool IsRotatorDownScaleDisabled();
+  static bool IsDecimationDisabled();
 
  private:
   Debug();
