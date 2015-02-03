@@ -30,6 +30,7 @@
 #include <utils/constants.h>
 #include <core/buffer_allocator.h>
 #include <core/buffer_sync_handler.h>
+#include <scalar.h>
 
 namespace sde {
 
@@ -128,6 +129,7 @@ struct HWPipeInfo {
   LayerRect dst_roi;
   uint8_t horizontal_decimation;
   uint8_t vertical_decimation;
+  scalar::Scale scale_data;
   bool valid;
 
   HWPipeInfo() : pipe_id(0), horizontal_decimation(0), vertical_decimation(0), valid(false) { }

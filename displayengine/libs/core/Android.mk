@@ -4,7 +4,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE                  := libsde
 LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := hardware/qcom/display/displayengine/include/ \
-                                 $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
+                                 $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include \
+                                 $(TARGET_OUT_HEADERS)/scalar/inc
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
                                  -Wconversion -Wall -Werror \
                                  -DLOG_TAG=\"SDE\"
