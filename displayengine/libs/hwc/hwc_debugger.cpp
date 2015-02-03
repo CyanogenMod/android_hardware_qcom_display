@@ -60,6 +60,30 @@ void HWCDebugHandler::DebugStrategy(bool enable) {
   }
 }
 
+void HWCDebugHandler::DebugDriverConfig(bool enable) {
+  if (enable) {
+    SET_BIT(debug_flags_, kTagDriverConfig);
+  } else {
+    CLEAR_BIT(debug_flags_, kTagDriverConfig);
+  }
+}
+
+void HWCDebugHandler::DebugBufferManager(bool enable) {
+  if (enable) {
+    SET_BIT(debug_flags_, kTagBufferManager);
+  } else {
+    CLEAR_BIT(debug_flags_, kTagBufferManager);
+  }
+}
+
+void HWCDebugHandler::DebugOfflineCtrl(bool enable) {
+  if (enable) {
+    SET_BIT(debug_flags_, kTagOfflineCtrl);
+  } else {
+    CLEAR_BIT(debug_flags_, kTagOfflineCtrl);
+  }
+}
+
 void HWCDebugHandler::Error(DebugTag /*tag*/, const char *format, ...) {
   va_list list;
   va_start(list, format);

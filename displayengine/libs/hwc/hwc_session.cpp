@@ -35,7 +35,10 @@
 #include <sys/prctl.h>
 #include <binder/Parcel.h>
 #include <QService.h>
+#include <core/buffer_allocator.h>
 
+#include "hwc_buffer_allocator.h"
+#include "hwc_buffer_sync_handler.h"
 #include "hwc_session.h"
 #include "hwc_debugger.h"
 
@@ -97,7 +100,20 @@ int HWCSession::Init() {
     return -EINVAL;
   }
 
-  DisplayError error = CoreInterface::CreateCore(this, HWCDebugHandler::Get(), &core_intf_);
+  buffer_allocator_ = new HWCBufferAllocator();
+  if (buffer_allocator_ == NULL) {
+    DLOGE("Display core initialization failed due to no memory");
+    return -ENOMEM;
+  }
+
+  buffer_sync_handler_ = new HWCBufferSyncHandler();
+  if (buffer_sync_handler_ == NULL) {
+    DLOGE("Display core initialization failed due to no memory");
+    return -ENOMEM;
+  }
+
+  DisplayError error = CoreInterface::CreateCore(this, HWCDebugHandler::Get(), buffer_allocator_,
+                                                 buffer_sync_handler_, &core_intf_);
   if (error != kErrorNone) {
     DLOGE("Display core initialization failed. Error = %d", error);
     return -EINVAL;
@@ -485,10 +501,22 @@ void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {
     HWCDebugHandler::DebugResources(enable);
     break;
 
+  case qService::IQService::DEBUG_DRIVER_CONFIG:
+    HWCDebugHandler::DebugDriverConfig(enable);
+    break;
+
+  case qService::IQService::DEBUG_ROTATOR:
+    HWCDebugHandler::DebugResources(enable);
+    HWCDebugHandler::DebugDriverConfig(enable);
+    HWCDebugHandler::DebugBufferManager(enable);
+    HWCDebugHandler::DebugOfflineCtrl(enable);
+    break;
+
   default:
     DLOGW("type = %d is not supported", type);
   }
 }
+
 void* HWCSession::HWCHotPlugThread(void *context) {
   if (context) {
     return reinterpret_cast<HWCSession *>(context)->HWCHotPlugThreadHandler();

@@ -96,6 +96,8 @@ enum LayerBufferFormat {
   kFormatRGB565Ubwc,                  //!< UBWC aligned RGB565 format
 
   kFormatYCbCr420SPVenusUbwc,         //!< UBWC aligned Venus NV12 format
+
+  kFormatInvalid = 0xFFFFFFFF,
 };
 
 /*! @brief This structure defines a color sample plane belonging to a buffer format. RGB buffer
@@ -123,6 +125,7 @@ struct LayerBufferFlags {
                             //!< video/ui buffer
   uint64_t macro_tile : 1;  //!< This flag shall be set by client to indicate that the buffer format
                             //!< is macro tiled.
+
   LayerBufferFlags() : secure(0), video(0), macro_tile(0) { }
 };
 

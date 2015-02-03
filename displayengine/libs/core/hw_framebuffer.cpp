@@ -44,9 +44,10 @@
 
 #include "hw_framebuffer.h"
 
+
 #define __CLASS__ "HWFrameBuffer"
 
-#define IOCTL_LOGE(ioctl, type) DLOGE("ioctl %s, display = %d errno = %d, desc = %s", #ioctl, \
+#define IOCTL_LOGE(ioctl, type) DLOGE("ioctl %s, device = %d errno = %d, desc = %s", #ioctl, \
                                       type, errno, strerror(errno))
 
 #ifdef DISPLAY_CORE_VIRTUAL_DRIVER
@@ -64,9 +65,10 @@ extern ssize_t virtual_getline(char **lineptr, size_t *linelen, FILE *stream);
 
 namespace sde {
 
-HWFrameBuffer::HWFrameBuffer() : event_thread_name_("SDE_EventThread"), fake_vsync_(false),
-                                 exit_threads_(false), fb_path_("/sys/devices/virtual/graphics/fb"),
-                                 hotplug_enabled_(false) {
+HWFrameBuffer::HWFrameBuffer(BufferSyncHandler *buffer_sync_handler)
+  : event_thread_name_("SDE_EventThread"), fake_vsync_(false), exit_threads_(false),
+    fb_path_("/sys/devices/virtual/graphics/fb"), hotplug_enabled_(false),
+    buffer_sync_handler_(buffer_sync_handler) {
   // Pointer to actual driver interfaces.
   ioctl_ = ::ioctl;
   open_ = ::open;
@@ -195,7 +197,7 @@ DisplayError HWFrameBuffer::Deinit() {
 
   for (int display = 0; display < kNumPhysicalDisplays; display++) {
     for (int event = 0; event < kNumDisplayEvents; event++) {
-      close(poll_fds_[display][event].fd);
+      close_(poll_fds_[display][event].fd);
     }
   }
   if (supported_video_modes_) {
@@ -230,16 +232,20 @@ DisplayError HWFrameBuffer::Open(HWDeviceType type, Handle *device, HWEventHandl
   case kDeviceVirtual:
     snprintf(device_name, sizeof(device_name), "%s%d", "/dev/graphics/fb", fb_node_index_[type]);
     break;
+  case kDeviceRotator:
+    snprintf(device_name, sizeof(device_name), "%s", "/dev/mdss_rotator");
+    break;
   default:
     break;
   }
 
   hw_context->device_fd = open_(device_name, O_RDWR);
   if (hw_context->device_fd < 0) {
-    DLOGE("open %s failed.", device_name);
-    error = kErrorResources;
+    DLOGE("open %s failed err = %d errstr = %s", device_name, errno,  strerror(errno));
     delete hw_context;
+    return kErrorResources;
   }
+
   hw_context->type = type;
 
   *device = hw_context;
@@ -301,7 +307,7 @@ DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
   switch (hw_context->type) {
   case kDevicePrimary:
     {
-      if (ioctl_(device_fd, FBIOGET_VSCREENINFO, &var_screeninfo) == -1) {
+      if (ioctl_(device_fd, FBIOGET_VSCREENINFO, &var_screeninfo) < 0) {
         IOCTL_LOGE(FBIOGET_VSCREENINFO, hw_context->type);
         return kErrorHardware;
       }
@@ -309,7 +315,7 @@ DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
       // Frame rate
       STRUCT_VAR(msmfb_metadata, meta_data);
       meta_data.op = metadata_op_frame_rate;
-      if (ioctl_(device_fd, MSMFB_METADATA_GET, &meta_data) == -1) {
+      if (ioctl_(device_fd, MSMFB_METADATA_GET, &meta_data) < 0) {
         IOCTL_LOGE(MSMFB_METADATA_GET, hw_context->type);
         return kErrorHardware;
       }
@@ -385,7 +391,7 @@ DisplayError HWFrameBuffer::SetDisplayAttributes(Handle device, uint32_t index) 
     {
       // Variable screen info
       STRUCT_VAR(fb_var_screeninfo, vscreeninfo);
-      if (ioctl_(hw_context->device_fd, FBIOGET_VSCREENINFO, &vscreeninfo) == -1) {
+      if (ioctl_(hw_context->device_fd, FBIOGET_VSCREENINFO, &vscreeninfo) < 0) {
         IOCTL_LOGE(FBIOGET_VSCREENINFO, hw_context->type);
         return kErrorHardware;
       }
@@ -411,7 +417,7 @@ DisplayError HWFrameBuffer::SetDisplayAttributes(Handle device, uint32_t index) 
       STRUCT_VAR(msmfb_metadata, metadata);
       metadata.op = metadata_op_vic;
       metadata.data.video_info_code = timing_mode->video_format;
-      if (ioctl(hw_context->device_fd, MSMFB_METADATA_SET, &metadata) == -1) {
+      if (ioctl(hw_context->device_fd, MSMFB_METADATA_SET, &metadata) < 0) {
         IOCTL_LOGE(MSMFB_METADATA_SET, hw_context->type);
         return kErrorHardware;
       }
@@ -422,7 +428,7 @@ DisplayError HWFrameBuffer::SetDisplayAttributes(Handle device, uint32_t index) 
             vscreeninfo.upper_margin, vscreeninfo.pixclock/1000000);
 
       vscreeninfo.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_ALL | FB_ACTIVATE_FORCE;
-      if (ioctl_(hw_context->device_fd, FBIOPUT_VSCREENINFO, &vscreeninfo) == -1) {
+      if (ioctl_(hw_context->device_fd, FBIOPUT_VSCREENINFO, &vscreeninfo) < 0) {
         IOCTL_LOGE(FBIOGET_VSCREENINFO, hw_context->type);
         return kErrorHardware;
       }
@@ -468,7 +474,7 @@ DisplayError HWFrameBuffer::PowerOn(Handle device) {
 
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 
-  if (ioctl_(hw_context->device_fd, FBIOBLANK, FB_BLANK_UNBLANK) == -1) {
+  if (ioctl_(hw_context->device_fd, FBIOBLANK, FB_BLANK_UNBLANK) < 0) {
     IOCTL_LOGE(FB_BLANK_UNBLANK, hw_context->type);
     return kErrorHardware;
   }
@@ -485,10 +491,11 @@ DisplayError HWFrameBuffer::PowerOff(Handle device) {
   DTRACE_SCOPED();
 
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+  HWDisplay *hw_display = &hw_context->hw_display;
 
   switch (hw_context->type) {
   case kDevicePrimary:
-    if (ioctl_(hw_context->device_fd, FBIOBLANK, FB_BLANK_POWERDOWN) == -1) {
+    if (ioctl_(hw_context->device_fd, FBIOBLANK, FB_BLANK_POWERDOWN) < 0) {
       IOCTL_LOGE(FB_BLANK_POWERDOWN, hw_context->type);
       return kErrorHardware;
     }
@@ -517,10 +524,69 @@ DisplayError HWFrameBuffer::SetVSyncState(Handle device, bool enable) {
 
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
   int vsync_on = enable ? 1 : 0;
-  if (ioctl_(hw_context->device_fd, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) == -1) {
+  if (ioctl_(hw_context->device_fd, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) < 0) {
     IOCTL_LOGE(MSMFB_OVERLAY_VSYNC_CTRL, hw_context->type);
     return kErrorHardware;
   }
+
+  return kErrorNone;
+}
+
+DisplayError HWFrameBuffer::OpenRotatorSession(Handle device, HWLayers *hw_layers) {
+  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+  HWRotator *hw_rotator = &hw_context->hw_rotator;
+
+  hw_rotator->Reset();
+
+  HWLayersInfo &hw_layer_info = hw_layers->info;
+
+  for (uint32_t i = 0; i < hw_layer_info.count; i++) {
+    Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
+    LayerBuffer *input_buffer = layer.input_buffer;
+    bool rot90 = (layer.transform.rotation == 90.0f);
+
+    for (uint32_t count = 0; count < 2; count++) {
+      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
+
+      if (rotate_info->valid) {
+        HWBufferInfo *rot_buf_info = &rotate_info->hw_buffer_info;
+
+        if (rot_buf_info->session_id < 0) {
+          STRUCT_VAR(mdp_rotation_config, mdp_rot_config);
+          mdp_rot_config.version = MDP_ROTATION_REQUEST_VERSION_1_0;
+          mdp_rot_config.input.width = input_buffer->width;
+          mdp_rot_config.input.height = input_buffer->height;
+          SetFormat(input_buffer->format, &mdp_rot_config.input.format);
+          mdp_rot_config.output.width = rot_buf_info->output_buffer.width;
+          mdp_rot_config.output.height = rot_buf_info->output_buffer.height;
+          SetFormat(rot_buf_info->output_buffer.format, &mdp_rot_config.output.format);
+          mdp_rot_config.frame_rate = layer.frame_rate;
+
+          if (ioctl_(hw_context->device_fd, MDSS_ROTATION_OPEN, &mdp_rot_config) < 0) {
+            IOCTL_LOGE(MDSS_ROTATION_OPEN, hw_context->type);
+            return kErrorHardware;
+          }
+
+          rot_buf_info->session_id = mdp_rot_config.session_id;
+
+          DLOGV_IF(kTagDriverConfig, "session_id %d", rot_buf_info->session_id);
+        }
+      }
+    }
+  }
+
+  return kErrorNone;
+}
+
+DisplayError HWFrameBuffer::CloseRotatorSession(Handle device, int32_t session_id) {
+  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+
+  if (ioctl_(hw_context->device_fd, MDSS_ROTATION_CLOSE, (uint32_t)session_id) < 0) {
+    IOCTL_LOGE(MDSS_ROTATION_CLOSE, hw_context->type);
+    return kErrorHardware;
+  }
+
+  DLOGV_IF(kTagDriverConfig, "session_id %d", session_id);
 
   return kErrorNone;
 }
@@ -529,63 +595,142 @@ DisplayError HWFrameBuffer::Validate(Handle device, HWLayers *hw_layers) {
   DTRACE_SCOPED();
 
   DisplayError error = kErrorNone;
-  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 
-  hw_context->ResetMDPCommit();
+  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+  switch (hw_context->type) {
+    case kDevicePrimary:
+    case kDeviceHDMI:
+    case kDeviceVirtual:
+      error = DisplayValidate(hw_context, hw_layers);
+      if (error != kErrorNone) {
+        return error;
+      }
+      break;
+    case kDeviceRotator:
+      error = RotatorValidate(hw_context, hw_layers);
+      if (error != kErrorNone) {
+        return error;
+      }
+      break;
+    default:
+      break;
+  }
+  return error;
+}
+
+DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
+  DisplayError error = kErrorNone;
+
+  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+  switch (hw_context->type) {
+    case kDevicePrimary:
+    case kDeviceHDMI:
+    case kDeviceVirtual:
+      error = DisplayCommit(hw_context, hw_layers);
+      if (error != kErrorNone) {
+        return error;
+      }
+      break;
+    case kDeviceRotator:
+      error = RotatorCommit(hw_context, hw_layers);
+      if (error != kErrorNone) {
+        return error;
+      }
+      break;
+    default:
+      break;
+  }
+  return error;
+}
+
+DisplayError HWFrameBuffer::DisplayValidate(HWContext *hw_context, HWLayers *hw_layers) {
+  DisplayError error = kErrorNone;
+  HWDisplay *hw_display = &hw_context->hw_display;
+
+  hw_display->Reset();
 
   HWLayersInfo &hw_layer_info = hw_layers->info;
   LayerStack *stack = hw_layer_info.stack;
 
-  mdp_layer_commit_v1 &mdp_commit = hw_context->mdp_commit.commit_v1;
-  mdp_input_layer *mdp_layers = hw_context->mdp_layers;
+  DLOGV_IF(kTagDriverConfig, "************************** %s Validate Input ***********************",
+           GetDeviceString(hw_context->type));
+  DLOGV_IF(kTagDriverConfig, "SDE layer count is %d", hw_layer_info.count);
+
+  mdp_layer_commit_v1 &mdp_commit = hw_display->mdp_disp_commit.commit_v1;
+  mdp_input_layer *mdp_layers = hw_display->mdp_disp_layers;
   uint32_t &mdp_layer_count = mdp_commit.input_layer_cnt;
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
     Layer &layer = stack->layers[layer_index];
     LayerBuffer *input_buffer = layer.input_buffer;
-    HWLayerConfig &config = hw_layers->config[i];
+    HWPipeInfo *left_pipe = &hw_layers->config[i].left_pipe;
+    HWPipeInfo *right_pipe = &hw_layers->config[i].right_pipe;
+    mdp_input_layer mdp_layer;
 
-    uint32_t split_count = hw_layers->config[i].is_right_pipe ? 2 : 1;
-    for (uint32_t j = 0; j < split_count; j++) {
-      HWPipeInfo &pipe = (j == 0) ? config.left_pipe : config.right_pipe;
-      mdp_input_layer &mdp_layer = mdp_layers[mdp_layer_count];
-      mdp_layer.alpha = layer.plane_alpha;
-      mdp_layer.z_order = static_cast<uint16_t>(i);
-      mdp_layer.transp_mask = 0xffffffff;
-      mdp_layer.horz_deci = pipe.horizontal_decimation;
-      mdp_layer.vert_deci = pipe.vertical_decimation;
+    for (uint32_t count = 0; count < 2; count++) {
+      HWPipeInfo *pipe_info = (count == 0) ? left_pipe : right_pipe;
+      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
 
-      SetBlending(layer.blending, &mdp_layer.blend_op);
-
-      SetRect(pipe.src_roi, &mdp_layer.src_rect);
-      SetRect(pipe.dst_roi, &mdp_layer.dst_rect);
-
-      mdp_layer.pipe_ndx = pipe.pipe_id;
-
-      mdp_layer_buffer &mdp_buffer_left = mdp_layer.buffer;
-      mdp_buffer_left.width = input_buffer->width;
-      mdp_buffer_left.height = input_buffer->height;
-
-      error = SetFormat(layer.input_buffer->format, &mdp_buffer_left.format);
-      if (error != kErrorNone) {
-        return error;
+      if (rotate_info->valid) {
+        input_buffer = &rotate_info->hw_buffer_info.output_buffer;
       }
 
-      if (layer.transform.flip_vertical) {
-        mdp_layer.flags |= MDP_LAYER_FLIP_UD;
-      }
+      if (pipe_info->valid) {
+        mdp_input_layer &mdp_layer = mdp_layers[mdp_layer_count];
+        mdp_layer_buffer &mdp_buffer = mdp_layer.buffer;
 
-      if (layer.transform.flip_horizontal) {
-        mdp_layer.flags |= MDP_LAYER_FLIP_LR;
-      }
+        mdp_buffer.width = input_buffer->width;
+        mdp_buffer.height = input_buffer->height;
 
-      mdp_layer_count++;
+        error = SetFormat(input_buffer->format, &mdp_buffer.format);
+        if (error != kErrorNone) {
+          return error;
+        }
+
+        mdp_layer.alpha = layer.plane_alpha;
+        mdp_layer.z_order = static_cast<uint16_t>(i);
+        mdp_layer.transp_mask = 0xffffffff;
+        SetBlending(layer.blending, &mdp_layer.blend_op);
+        mdp_layer.pipe_ndx = pipe_info->pipe_id;
+        mdp_layer.horz_deci = pipe_info->horizontal_decimation;
+        mdp_layer.vert_deci = pipe_info->vertical_decimation;
+
+        SetRect(pipe_info->src_roi, &mdp_layer.src_rect);
+        SetRect(pipe_info->dst_roi, &mdp_layer.dst_rect);
+
+        // Flips will be taken care by rotator, if layer requires 90 rotation. So Dont use MDP for
+        // flip operation, if layer transform is 90.
+        if (!layer.transform.rotation) {
+          if (layer.transform.flip_vertical) {
+            mdp_layer.flags |= MDP_LAYER_FLIP_UD;
+          }
+
+          if (layer.transform.flip_horizontal) {
+            mdp_layer.flags |= MDP_LAYER_FLIP_LR;
+          }
+        }
+
+        mdp_layer_count++;
+
+        DLOGV_IF(kTagDriverConfig, "******************* Layer[%d] %s pipe Input ******************",
+                 i, count ? "Right" : "Left");
+        DLOGV_IF(kTagDriverConfig, "in_w %d, in_h %d, in_f %d", mdp_buffer.width, mdp_buffer.height,
+                 mdp_buffer.format);
+        DLOGV_IF(kTagDriverConfig, "plane_alpha %d, zorder %d, blending %d, horz_deci %d, "
+                 "vert_deci %d", mdp_layer.alpha, mdp_layer.z_order, mdp_layer.blend_op,
+                 mdp_layer.horz_deci, mdp_layer.vert_deci);
+        DLOGV_IF(kTagDriverConfig, "src_rect [%d, %d, %d, %d]", mdp_layer.src_rect.x,
+                 mdp_layer.src_rect.y, mdp_layer.src_rect.w, mdp_layer.src_rect.h);
+        DLOGV_IF(kTagDriverConfig, "dst_rect [%d, %d, %d, %d]", mdp_layer.dst_rect.x,
+                 mdp_layer.dst_rect.y, mdp_layer.dst_rect.w, mdp_layer.dst_rect.h);
+        DLOGV_IF(kTagDriverConfig, "*************************************************************");
+      }
     }
   }
 
   mdp_commit.flags |= MDP_VALIDATE_LAYER;
-  if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
+  if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_display->mdp_disp_commit) < 0) {
     IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, hw_context->type);
     return kErrorHardware;
   }
@@ -593,42 +738,65 @@ DisplayError HWFrameBuffer::Validate(Handle device, HWLayers *hw_layers) {
   return kErrorNone;
 }
 
-DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
+DisplayError HWFrameBuffer::DisplayCommit(HWContext *hw_context, HWLayers *hw_layers) {
   DTRACE_SCOPED();
 
-  HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+  HWDisplay *hw_display = &hw_context->hw_display;
   HWLayersInfo &hw_layer_info = hw_layers->info;
   LayerStack *stack = hw_layer_info.stack;
 
-  mdp_layer_commit_v1 &mdp_commit = hw_context->mdp_commit.commit_v1;
-  mdp_input_layer *mdp_layers = hw_context->mdp_layers;
+  DLOGV_IF(kTagDriverConfig, "*************************** %s Commit Input ************************",
+           GetDeviceString(hw_context->type));
+  DLOGV_IF(kTagDriverConfig, "SDE layer count is %d", hw_layer_info.count);
+
+  mdp_layer_commit_v1 &mdp_commit = hw_display->mdp_disp_commit.commit_v1;
+  mdp_input_layer *mdp_layers = hw_display->mdp_disp_layers;
   uint32_t mdp_layer_index = 0;
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
     LayerBuffer *input_buffer = stack->layers[layer_index].input_buffer;
+    HWPipeInfo *left_pipe = &hw_layers->config[i].left_pipe;
+    HWPipeInfo *right_pipe = &hw_layers->config[i].right_pipe;
 
-    uint32_t split_count = hw_layers->config[i].is_right_pipe ? 2 : 1;
-    for (uint32_t j = 0; j < split_count; j++) {
-      mdp_layer_buffer &mdp_buffer = mdp_layers[mdp_layer_index].buffer;
+    for (uint32_t count = 0; count < 2; count++) {
+      HWPipeInfo *pipe_info = (count == 0) ? left_pipe : right_pipe;
+      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
 
-      if (input_buffer->planes[0].fd >= 0) {
-        mdp_buffer.plane_count = 1;
-        mdp_buffer.planes[0].fd = input_buffer->planes[0].fd;
-        mdp_buffer.planes[0].offset = input_buffer->planes[0].offset;
-        mdp_buffer.planes[0].stride = input_buffer->planes[0].stride;
-      } else {
-        DLOGW("Invalid buffer fd, setting plane count to 0");
-        mdp_buffer.plane_count = 0;
+      if (rotate_info->valid) {
+        input_buffer = &rotate_info->hw_buffer_info.output_buffer;
       }
 
-      mdp_buffer.fence = input_buffer->acquire_fence_fd;
-      mdp_layer_index++;
+      if (pipe_info->valid) {
+        mdp_layer_buffer &mdp_buffer = mdp_layers[mdp_layer_index].buffer;
+        mdp_input_layer &mdp_layer = mdp_layers[mdp_layer_index];
+        if (input_buffer->planes[0].fd >= 0) {
+          mdp_buffer.plane_count = 1;
+          mdp_buffer.planes[0].fd = input_buffer->planes[0].fd;
+          mdp_buffer.planes[0].offset = input_buffer->planes[0].offset;
+          mdp_buffer.planes[0].stride = input_buffer->planes[0].stride;
+        } else {
+          DLOGW("Invalid buffer fd, setting plane count to 0");
+          mdp_buffer.plane_count = 0;
+        }
+
+        mdp_buffer.fence = input_buffer->acquire_fence_fd;
+        mdp_layer_index++;
+
+        DLOGV_IF(kTagDriverConfig, "****************** Layer[%d] %s pipe Input *******************",
+                 i, count ? "Right" : "Left");
+        DLOGV_IF(kTagDriverConfig, "in_buf_fd %d, in_buf_offset %d, in_buf_stride %d, " \
+                 "in_plane_count %d, in_fence %d, layer count %d", mdp_buffer.planes[0].fd,
+                 mdp_buffer.planes[0].offset, mdp_buffer.planes[0].stride, mdp_buffer.plane_count,
+                 mdp_buffer.fence, mdp_commit.input_layer_cnt);
+        DLOGV_IF(kTagDriverConfig, "*************************************************************");
+      }
     }
   }
 
+  mdp_commit.release_fence = -1;
   mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
-  if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
+  if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_display->mdp_disp_commit) < 0) {
     IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, hw_context->type);
     return kErrorHardware;
   }
@@ -639,23 +807,202 @@ DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
     LayerBuffer *input_buffer = stack->layers[layer_index].input_buffer;
+    HWRotateInfo *left_rotate = &hw_layers->config[i].rotates[0];
+    HWRotateInfo *right_rotate = &hw_layers->config[i].rotates[1];
 
-    input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
+    if (!left_rotate->valid && !right_rotate->valid) {
+      input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
+      continue;
+    }
+
+    for (uint32_t count = 0; count < 2; count++) {
+      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
+      if (rotate_info->valid) {
+        input_buffer = &rotate_info->hw_buffer_info.output_buffer;
+        input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
+        close_(input_buffer->acquire_fence_fd);
+        input_buffer->acquire_fence_fd = -1;
+      }
+    }
   }
-  close(mdp_commit.release_fence);
+  close_(mdp_commit.release_fence);
+
+  return kErrorNone;
+}
+
+DisplayError HWFrameBuffer::RotatorValidate(HWContext *hw_context, HWLayers *hw_layers) {
+  HWRotator *hw_rotator = &hw_context->hw_rotator;
+  DLOGV_IF(kTagDriverConfig, "************************* %s Validate Input ************************",
+           GetDeviceString(hw_context->type));
+
+  hw_rotator->Reset();
+
+  mdp_rotation_request *mdp_rot_request = &hw_rotator->mdp_rot_req;
+  HWLayersInfo &hw_layer_info = hw_layers->info;
+
+  uint32_t &rot_count = mdp_rot_request->count;
+  for (uint32_t i = 0; i < hw_layer_info.count; i++) {
+    Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
+
+    for (uint32_t count = 0; count < 2; count++) {
+      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
+
+      if (rotate_info->valid) {
+        HWBufferInfo *rot_buf_info = &rotate_info->hw_buffer_info;
+        mdp_rotation_item *mdp_rot_item = &mdp_rot_request->list[rot_count];
+        bool rot90 = (layer.transform.rotation == 90.0f);
+
+        if (rot90) {
+          mdp_rot_item->flags |= MDP_ROTATION_90;
+        }
+
+        if (layer.transform.flip_horizontal) {
+          mdp_rot_item->flags |= MDP_ROTATION_FLIP_LR;
+        }
+
+        if (layer.transform.flip_vertical) {
+          mdp_rot_item->flags |= MDP_ROTATION_FLIP_UD;
+        }
+
+        SetRect(rotate_info->src_roi, &mdp_rot_item->src_rect);
+        SetRect(rotate_info->dst_roi, &mdp_rot_item->dst_rect);
+
+        // TODO(user): Need to assign the writeback id and pipe id  returned from resource manager.
+        mdp_rot_item->pipe_idx = 0;
+        mdp_rot_item->wb_idx = 0;
+
+        mdp_rot_item->input.width = layer.input_buffer->width;
+        mdp_rot_item->input.height = layer.input_buffer->height;
+        SetFormat(layer.input_buffer->format, &mdp_rot_item->input.format);
+
+        mdp_rot_item->output.width = rot_buf_info->output_buffer.width;
+        mdp_rot_item->output.height = rot_buf_info->output_buffer.height;
+        SetFormat(rot_buf_info->output_buffer.format, &mdp_rot_item->output.format);
+
+        rot_count++;
+
+        DLOGV_IF(kTagDriverConfig, "******************** Layer[%d] %s rotate ********************",
+                 i, count ? "Right" : "Left");
+        DLOGV_IF(kTagDriverConfig, "in_w %d, in_h %d, in_f %d,\t out_w %d, out_h %d, out_f %d",
+                 mdp_rot_item->input.width, mdp_rot_item->input.height, mdp_rot_item->input.format,
+                 mdp_rot_item->output.width, mdp_rot_item->output.height,
+                 mdp_rot_item->output.format);
+        DLOGV_IF(kTagDriverConfig, "pipe_id %d, wb_id %d, rot_flag %d", mdp_rot_item->pipe_idx,
+                 mdp_rot_item->wb_idx, mdp_rot_item->flags);
+        DLOGV_IF(kTagDriverConfig, "src_rect [%d, %d, %d, %d]", mdp_rot_item->src_rect.x,
+                 mdp_rot_item->src_rect.y, mdp_rot_item->src_rect.w, mdp_rot_item->src_rect.h);
+        DLOGV_IF(kTagDriverConfig, "dst_rect [%d, %d, %d, %d]", mdp_rot_item->dst_rect.x,
+                 mdp_rot_item->dst_rect.y, mdp_rot_item->dst_rect.w, mdp_rot_item->dst_rect.h);
+        DLOGV_IF(kTagDriverConfig, "*************************************************************");
+      }
+    }
+  }
+
+  mdp_rot_request->flags = MDSS_ROTATION_REQUEST_VALIDATE;
+  if (ioctl_(hw_context->device_fd, MDSS_ROTATION_REQUEST, mdp_rot_request) < 0) {
+    IOCTL_LOGE(MDSS_ROTATION_REQUEST, hw_context->type);
+    return kErrorHardware;
+  }
+
+  return kErrorNone;
+}
+
+DisplayError HWFrameBuffer::RotatorCommit(HWContext *hw_context, HWLayers *hw_layers) {
+  HWRotator *hw_rotator = &hw_context->hw_rotator;
+  mdp_rotation_request *mdp_rot_request = &hw_rotator->mdp_rot_req;
+  HWLayersInfo &hw_layer_info = hw_layers->info;
+  uint32_t rot_count = 0;
+
+  DLOGV_IF(kTagDriverConfig, "************************* %s Commit Input **************************",
+           GetDeviceString(hw_context->type));
+  DLOGV_IF(kTagDriverConfig, "Rotate layer count is %d", mdp_rot_request->count);
+
+  mdp_rot_request->list = hw_rotator->mdp_rot_layers;
+
+  for (uint32_t i = 0; i < hw_layer_info.count; i++) {
+    Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
+
+    for (uint32_t count = 0; count < 2; count++) {
+      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
+
+      if (rotate_info->valid) {
+        HWBufferInfo *rot_buf_info = &rotate_info->hw_buffer_info;
+        mdp_rotation_item *mdp_rot_item = &mdp_rot_request->list[rot_count];
+
+        mdp_rot_item->input.planes[0].fd = layer.input_buffer->planes[0].fd;
+        mdp_rot_item->input.planes[0].offset = layer.input_buffer->planes[0].offset;
+        SetStride(layer.input_buffer->format, layer.input_buffer->width,
+                  &mdp_rot_item->input.planes[0].stride);
+        mdp_rot_item->input.plane_count = 1;
+        mdp_rot_item->input.fence = layer.input_buffer->acquire_fence_fd;
+
+        mdp_rot_item->output.planes[0].fd = rot_buf_info->output_buffer.planes[0].fd;
+        mdp_rot_item->output.planes[0].offset = rot_buf_info->output_buffer.planes[0].offset;
+        SetStride(rot_buf_info->output_buffer.format, rot_buf_info->output_buffer.planes[0].stride,
+                  &mdp_rot_item->output.planes[0].stride);
+        mdp_rot_item->output.plane_count = 1;
+        mdp_rot_item->output.fence = -1;
+
+        rot_count++;
+
+        DLOGV_IF(kTagDriverConfig, "******************** Layer[%d] %s rotate ********************",
+                 i, count ? "Right" : "Left");
+        DLOGV_IF(kTagDriverConfig, "in_buf_fd %d, in_buf_offset %d, in_stride %d, " \
+                 "in_plane_count %d, in_fence %d", mdp_rot_item->input.planes[0].fd,
+                 mdp_rot_item->input.planes[0].offset, mdp_rot_item->input.planes[0].stride,
+                 mdp_rot_item->input.plane_count, mdp_rot_item->input.fence);
+        DLOGV_IF(kTagDriverConfig, "out_fd %d, out_offset %d, out_stride %d, out_plane_count %d, " \
+                 "out_fence %d", mdp_rot_item->output.planes[0].fd,
+                 mdp_rot_item->output.planes[0].offset, mdp_rot_item->output.planes[0].stride,
+                 mdp_rot_item->output.plane_count, mdp_rot_item->output.fence);
+        DLOGV_IF(kTagDriverConfig, "*************************************************************");
+      }
+    }
+  }
+
+  mdp_rot_request->flags &= ~MDSS_ROTATION_REQUEST_VALIDATE;
+  if (ioctl_(hw_context->device_fd, MDSS_ROTATION_REQUEST, mdp_rot_request) < 0) {
+    IOCTL_LOGE(MDSS_ROTATION_REQUEST, hw_context->type);
+    return kErrorHardware;
+  }
+
+  rot_count = 0;
+  for (uint32_t i = 0; i < hw_layer_info.count; i++) {
+    Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
+
+    layer.input_buffer->release_fence_fd = -1;
+
+    for (uint32_t count = 0; count < 2; count++) {
+      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
+
+      if (rotate_info->valid) {
+        HWBufferInfo *rot_buf_info = &rotate_info->hw_buffer_info;
+        mdp_rotation_item *mdp_rot_item = &mdp_rot_request->list[rot_count];
+
+        SyncMerge(layer.input_buffer->release_fence_fd, dup(mdp_rot_item->output.fence),
+                  &layer.input_buffer->release_fence_fd);
+
+        rot_buf_info->output_buffer.acquire_fence_fd = dup(mdp_rot_item->output.fence);
+
+        close_(mdp_rot_item->output.fence);
+        rot_count++;
+      }
+    }
+  }
 
   return kErrorNone;
 }
 
 DisplayError HWFrameBuffer::Flush(Handle device) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
+  HWDisplay *hw_display = &hw_context->hw_display;
 
-  hw_context->ResetMDPCommit();
-  mdp_layer_commit_v1 &mdp_commit = hw_context->mdp_commit.commit_v1;
+  hw_display->Reset();
+  mdp_layer_commit_v1 &mdp_commit = hw_display->mdp_disp_commit.commit_v1;
   mdp_commit.input_layer_cnt = 0;
   mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
 
-  if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_context->mdp_commit) == -1) {
+  if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_display->mdp_disp_commit) == -1) {
     IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, hw_context->type);
     return kErrorHardware;
   }
@@ -689,6 +1036,39 @@ DisplayError HWFrameBuffer::SetFormat(const LayerBufferFormat &source, uint32_t 
   return kErrorNone;
 }
 
+DisplayError HWFrameBuffer::SetStride(LayerBufferFormat format, uint32_t width, uint32_t *target) {
+  switch (format) {
+  case kFormatARGB8888:
+  case kFormatRGBA8888:
+  case kFormatBGRA8888:
+  case kFormatRGBX8888:
+  case kFormatBGRX8888:
+    *target = width * 4;
+    break;
+  case kFormatRGB888:
+    *target = width * 3;
+    break;
+  case kFormatRGB565:
+    *target = width * 3;
+    break;
+  case kFormatYCbCr420SemiPlanarVenus:
+  case kFormatYCbCr420Planar:
+  case kFormatYCrCb420Planar:
+  case kFormatYCbCr420SemiPlanar:
+  case kFormatYCrCb420SemiPlanar:
+    *target = width;
+    break;
+  case kFormatYCbCr422Packed:
+    *target = width * 2;
+    break;
+  default:
+    DLOGE("Unsupported format type %d", format);
+    return kErrorParameters;
+  }
+
+  return kErrorNone;
+}
+
 void HWFrameBuffer::SetBlending(const LayerBlending &source, mdss_mdp_blend_op *target) {
   switch (source) {
   case kBlendingPremultiplied:  *target = BLEND_OP_PREMULTIPLIED;   break;
@@ -702,6 +1082,31 @@ void HWFrameBuffer::SetRect(const LayerRect &source, mdp_rect *target) {
   target->y = UINT32(source.top);
   target->w = UINT32(source.right) - target->x;
   target->h = UINT32(source.bottom) - target->y;
+}
+
+void HWFrameBuffer::SyncMerge(const int &fd1, const int &fd2, int *target) {
+  if (fd1 >= 0 && fd2 >= 0) {
+    buffer_sync_handler_->SyncMerge(fd1, fd2, target);
+  } else if (fd1 >= 0) {
+    *target = fd1;
+  } else if (fd2 >= 0) {
+    *target = fd2;
+  }
+}
+
+const char *HWFrameBuffer::GetDeviceString(HWDeviceType type) {
+  switch (type) {
+  case kDevicePrimary:
+    return "Primary Display Device";
+  case kDeviceHDMI:
+    return "HDMI Display Device";
+  case kDeviceVirtual:
+    return "Virtual Display Device";
+  case kDeviceRotator:
+    return "Rotator Device";
+  default:
+    return "Invalid Device";
+  }
 }
 
 void* HWFrameBuffer::DisplayEventThread(void *context) {
@@ -737,7 +1142,7 @@ void* HWFrameBuffer::DisplayEventThreadHandler() {
     pthread_exit(0);
   }
 
-  typedef void (HWFrameBuffer::*EventHandler)(int, char *);
+  typedef void (HWFrameBuffer::*EventHandler)(int, char*);
   EventHandler event_handler[kNumDisplayEvents] = { &HWFrameBuffer::HandleVSync,
                                                     &HWFrameBuffer::HandleBlank,
                                                     &HWFrameBuffer::HandleIdleTimeout };

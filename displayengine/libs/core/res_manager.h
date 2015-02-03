@@ -30,13 +30,15 @@
 
 #include "hw_interface.h"
 #include "dump_impl.h"
+#include "buffer_manager.h"
 
 namespace sde {
 
 class ResManager : public DumpImpl {
  public:
   ResManager();
-  DisplayError Init(const HWResourceInfo &hw_res_info);
+  DisplayError Init(const HWResourceInfo &hw_res_info, BufferAllocator *buffer_allocator,
+                    BufferSyncHandler *buffer_sync_handler);
   DisplayError Deinit();
   DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
                                Handle *display_ctx);
@@ -44,7 +46,8 @@ class ResManager : public DumpImpl {
   DisplayError Start(Handle display_ctx);
   DisplayError Stop(Handle display_ctx);
   DisplayError Acquire(Handle display_ctx, HWLayers *hw_layers);
-  void PostCommit(Handle display_ctx, HWLayers *hw_layers);
+  DisplayError PostPrepare(Handle display_ctx, HWLayers *hw_layers);
+  DisplayError PostCommit(Handle display_ctx, HWLayers *hw_layers);
   void Purge(Handle display_ctx);
 
   // DumpImpl method
@@ -111,14 +114,23 @@ class ResManager : public DumpImpl {
 
   struct DisplayResourceContext {
     HWDisplayAttributes display_attributes;
+    BufferManager *buffer_manager;
     DisplayType display_type;
     HWBlockType hw_block_id;
     uint64_t frame_count;
     int32_t session_id;  // applicable for virtual display sessions only
     uint32_t rotate_count;
     bool frame_start;
+
     DisplayResourceContext() : hw_block_id(kHWBlockMax), frame_count(0), session_id(-1),
                     rotate_count(0), frame_start(false) { }
+
+    ~DisplayResourceContext() {
+      if (buffer_manager) {
+        delete buffer_manager;
+        buffer_manager = NULL;
+      }
+    }
   };
 
   struct HWBlockContext {
@@ -184,6 +196,9 @@ class ResManager : public DumpImpl {
   void AssignRotator(HWRotateInfo *rotate, uint32_t *rotate_cnt);
   void ClearRotator(DisplayResourceContext *display_resource_ctx);
   void NormalizeRect(const uint32_t &factor, LayerRect *rect);
+  DisplayError AllocRotatorBuffer(Handle display_ctx, HWLayers *hw_layers);
+  void SetRotatorOutputFormat(const LayerBufferFormat &input_format, bool bwc, bool rot90,
+                              LayerBufferFormat *output_format);
 
   template <class T>
   inline void Swap(T &a, T &b) {
@@ -217,6 +232,9 @@ class ResManager : public DumpImpl {
   float last_primary_bw_;
   uint32_t virtual_count_;
   struct HWRotator rotators_[kMaxNumRotator];
+  BufferAllocator *buffer_allocator_;
+  BufferSyncHandler *buffer_sync_handler_;  // Pointer to buffer sync handler that was defined by
+                                            // the display engine's client
 };
 
 }  // namespace sde

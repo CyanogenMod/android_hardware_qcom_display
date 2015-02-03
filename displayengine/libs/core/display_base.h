@@ -31,13 +31,18 @@
 
 #include "hw_interface.h"
 #include "comp_manager.h"
+#include "buffer_manager.h"
+
 
 namespace sde {
+
+class OfflineCtrl;
 
 class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
  public:
   DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
-              HWDeviceType hw_device_type, HWInterface *hw_intf, CompManager *comp_manager);
+              HWDeviceType hw_device_type, HWInterface *hw_intf, CompManager *comp_manager,
+              OfflineCtrl *offline_ctrl);
   virtual ~DisplayBase() { }
   virtual DisplayError Init();
   virtual DisplayError Deinit();
@@ -73,9 +78,11 @@ class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
   HWDeviceType hw_device_type_;
   HWInterface *hw_intf_;
   CompManager *comp_manager_;
+  OfflineCtrl *offline_ctrl_;
   DisplayState state_;
   Handle hw_device_;
   Handle display_comp_ctx_;
+  Handle display_offline_ctx_;
   HWDisplayAttributes *display_attributes_;
   uint32_t num_modes_;
   uint32_t active_mode_index_;

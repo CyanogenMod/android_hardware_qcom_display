@@ -28,6 +28,8 @@
 #include <core/display_interface.h>
 #include <private/strategy_interface.h>
 #include <utils/constants.h>
+#include <core/buffer_allocator.h>
+#include <core/buffer_sync_handler.h>
 
 namespace sde {
 
@@ -44,7 +46,8 @@ enum HWDeviceType {
   kDevicePrimary,
   kDeviceHDMI,
   kDeviceVirtual,
-  kDeviceMax
+  kDeviceRotator,
+  kDeviceMax,
 };
 
 struct HWResourceInfo {
@@ -90,48 +93,68 @@ struct HWResourceInfo {
       max_pipe_bw(0), max_sde_clk(0), clk_fudge_factor(1.0f), has_bwc(false),
       has_decimation(false), has_macrotile(false), has_rotator_downscale(false),
       has_non_scalar_rgb(false), is_src_split(false), always_src_split(false) { }
+
+  void Reset() { *this = HWResourceInfo(); }
+};
+
+struct HWBufferInfo : public BufferInfo {
+  LayerBuffer output_buffer;
+  int session_id;
+  uint32_t slot;
+
+  HWBufferInfo() : session_id(-1), slot(0) { }
 };
 
 struct HWRotateInfo {
-  int pipe_id;
+  uint32_t pipe_id;
   LayerRect src_roi;
   LayerRect dst_roi;
+  LayerBufferFormat dst_format;
   HWBlockType writeback_id;
   float downscale_ratio_x;
   float downscale_ratio_y;
+  HWBufferInfo hw_buffer_info;
+  bool valid;
 
-  HWRotateInfo() : pipe_id(0), writeback_id(kHWWriteback0), downscale_ratio_x(1.0f),
-      downscale_ratio_y(1.0f) { }
+  HWRotateInfo() : pipe_id(0), dst_format(kFormatInvalid), writeback_id(kHWWriteback0),
+                   downscale_ratio_x(1.0f), downscale_ratio_y(1.0f), valid(false) { }
 
-  inline void Reset() { *this = HWRotateInfo(); }
+  void Reset() { *this = HWRotateInfo(); }
 };
 
 struct HWPipeInfo {
-  int pipe_id;
+  uint32_t pipe_id;
   LayerRect src_roi;
   LayerRect dst_roi;
   uint8_t horizontal_decimation;
   uint8_t vertical_decimation;
+  bool valid;
 
-  HWPipeInfo() : pipe_id(0), horizontal_decimation(0), vertical_decimation(0) { }
+  HWPipeInfo() : pipe_id(0), horizontal_decimation(0), vertical_decimation(0), valid(false) { }
 
-  inline void Reset() { *this = HWPipeInfo(); }
+  void Reset() { *this = HWPipeInfo(); }
 };
 
 struct HWLayerConfig {
   bool use_non_dma_pipe;  // set by client
-  bool is_right_pipe;  // indicate if right pipe is valid
   HWPipeInfo left_pipe;  // pipe for left side of the buffer
   HWPipeInfo right_pipe;  // pipe for right side of the buffer
   uint32_t num_rotate;  // number of rotate
   HWRotateInfo rotates[kMaxRotatePerLayer];  // rotation for the buffer
 
-  HWLayerConfig() : use_non_dma_pipe(false), is_right_pipe(false), num_rotate(0) { }
+  HWLayerConfig() : use_non_dma_pipe(false), num_rotate(0) { }
+
+  void Reset() { *this = HWLayerConfig(); }
 };
 
 struct HWLayers {
   HWLayersInfo info;
   HWLayerConfig config[kMaxSDELayers];
+  int closed_session_ids[kMaxSDELayers * 2];  // split panel (left + right)
+
+  HWLayers() { memset(closed_session_ids, -1, sizeof(closed_session_ids)); }
+
+  void Reset() { *this = HWLayers(); }
 };
 
 struct HWDisplayAttributes : DisplayConfigVariableInfo {
@@ -139,6 +162,8 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
   uint32_t split_left;
 
   HWDisplayAttributes() : is_device_split(false), split_left(0) { }
+
+  void Reset() { *this = HWDisplayAttributes(); }
 };
 
 // HWEventHandler - Implemented in DisplayBase and HWInterface implementation
@@ -148,12 +173,12 @@ class HWEventHandler {
   virtual DisplayError Blank(bool blank) = 0;
   virtual void IdleTimeout() = 0;
  protected:
-  virtual ~HWEventHandler() {}
+  virtual ~HWEventHandler() { }
 };
 
 class HWInterface {
  public:
-  static DisplayError Create(HWInterface **intf);
+  static DisplayError Create(HWInterface **intf, BufferSyncHandler *buffer_sync_handler);
   static DisplayError Destroy(HWInterface *intf);
   virtual DisplayError GetHWCapabilities(HWResourceInfo *hw_res_info) = 0;
   virtual DisplayError Open(HWDeviceType type, Handle *device, HWEventHandler *eventhandler) = 0;
@@ -168,6 +193,8 @@ class HWInterface {
   virtual DisplayError Doze(Handle device) = 0;
   virtual DisplayError SetVSyncState(Handle device, bool enable) = 0;
   virtual DisplayError Standby(Handle device) = 0;
+  virtual DisplayError OpenRotatorSession(Handle device, HWLayers *hw_layers) = 0;
+  virtual DisplayError CloseRotatorSession(Handle device, int32_t session_id) = 0;
   virtual DisplayError Validate(Handle device, HWLayers *hw_layers) = 0;
   virtual DisplayError Commit(Handle device, HWLayers *hw_layers) = 0;
   virtual DisplayError Flush(Handle device) = 0;

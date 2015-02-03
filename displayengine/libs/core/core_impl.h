@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -42,7 +42,8 @@ class CoreImpl : public CoreInterface {
   // This class implements display core interface revision 1.0.
   static const uint16_t kRevision = SET_REVISION(1, 0);
 
-  explicit CoreImpl(CoreEventHandler *event_handler);
+  CoreImpl(CoreEventHandler *event_handler, BufferAllocator *buffer_allocator,
+           BufferSyncHandler *buffer_sync_handler);
   virtual ~CoreImpl() { }
 
   // This method returns the interface revision for the current display core object.
@@ -59,6 +60,8 @@ class CoreImpl : public CoreInterface {
  protected:
   Locker locker_;
   CoreEventHandler *event_handler_;
+  BufferAllocator *buffer_allocator_;
+  BufferSyncHandler *buffer_sync_handler_;
   HWInterface *hw_intf_;
   CompManager comp_mgr_;
   OfflineCtrl offline_ctrl_;

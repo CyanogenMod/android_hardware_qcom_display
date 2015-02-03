@@ -33,11 +33,22 @@
 namespace sde {
 
 ResManager::ResManager()
-  : num_pipe_(0), vig_pipes_(NULL), rgb_pipes_(NULL), dma_pipes_(NULL), virtual_count_(0) {
+  : num_pipe_(0), vig_pipes_(NULL), rgb_pipes_(NULL), dma_pipes_(NULL), virtual_count_(0),
+    buffer_allocator_(NULL), buffer_sync_handler_(NULL) {
 }
 
-DisplayError ResManager::Init(const HWResourceInfo &hw_res_info) {
+DisplayError ResManager::Init(const HWResourceInfo &hw_res_info, BufferAllocator *buffer_allocator,
+                              BufferSyncHandler *buffer_sync_handler) {
   hw_res_info_ = hw_res_info;
+
+  buffer_sync_handler_ = buffer_sync_handler;
+
+  if (!hw_res_info_.max_mixer_width)
+    hw_res_info_.max_mixer_width = kMaxSourcePipeWidth;
+
+  buffer_allocator_ = buffer_allocator;
+
+  buffer_sync_handler_ = buffer_sync_handler;
 
   DisplayError error = kErrorNone;
 
@@ -79,6 +90,9 @@ DisplayError ResManager::Init(const HWResourceInfo &hw_res_info) {
 
   DLOGI("hw_rev=%x, DMA=%d RGB=%d VIG=%d", hw_res_info_.hw_revision, hw_res_info_.num_dma_pipe,
     hw_res_info_.num_rgb_pipe, hw_res_info_.num_vig_pipe);
+
+  // TODO(user): Need to get it from HW capability
+  hw_res_info_.num_rotator = 2;
 
   if (hw_res_info_.num_rotator > kMaxNumRotator) {
     DLOGE("Number of rotator is over the limit! %d", hw_res_info_.num_rotator);
@@ -140,6 +154,13 @@ DisplayError ResManager::RegisterDisplay(DisplayType type, const HWDisplayAttrib
 
   DisplayResourceContext *display_resource_ctx = new DisplayResourceContext();
   if (!display_resource_ctx) {
+    return kErrorMemory;
+  }
+
+  display_resource_ctx->buffer_manager = new BufferManager(buffer_allocator_, buffer_sync_handler_);
+  if (display_resource_ctx->buffer_manager == NULL) {
+    delete display_resource_ctx;
+    display_resource_ctx = NULL;
     return kErrorMemory;
   }
 
@@ -254,8 +275,9 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
 
   // allocate rotator
   error = AcquireRotator(display_resource_ctx, rotate_count);
-  if (error != kErrorNone)
+  if (error != kErrorNone) {
     return error;
+  }
 
   rotate_count = 0;
   for (uint32_t i = 0; i < layer_info.count; i++) {
@@ -278,7 +300,7 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     bool is_yuv = IsYuvFormat(layer.input_buffer->format);
 
     // left pipe is needed
-    if (pipe_info->pipe_id) {
+    if (pipe_info->valid) {
       need_scale = IsScalingNeeded(pipe_info);
       left_index = GetPipe(hw_block_id, is_yuv, need_scale, false, use_non_dma_pipe);
       if (left_index >= num_pipe_) {
@@ -293,7 +315,7 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     }
 
     pipe_info =  &layer_config.right_pipe;
-    if (pipe_info->pipe_id == 0) {
+    if (!pipe_info->valid) {
       // assign single pipe
       if (left_index < num_pipe_) {
         layer_config.left_pipe.pipe_id = src_pipes_[left_index].mdss_pipe_id;
@@ -336,6 +358,12 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     goto CleanupOnError;
   }
 
+  error = AllocRotatorBuffer(display_ctx, hw_layers);
+  if (error != kErrorNone) {
+    DLOGV_IF(kTagResources, "Rotator buffer allocation failed");
+    goto CleanupOnError;
+  }
+
   return kErrorNone;
 
 CleanupOnError:
@@ -360,19 +388,19 @@ bool ResManager::CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *h
   for (uint32_t i = 0; i < layer_info.count; i++) {
     Layer &layer = layer_info.stack->layers[layer_info.index[i]];
     float bpp = GetBpp(layer.input_buffer->format);
-    uint32_t left_id = hw_layers->config[i].left_pipe.pipe_id;
-    uint32_t right_id = hw_layers->config[i].right_pipe.pipe_id;
+    HWPipeInfo *left_pipe = &hw_layers->config[i].left_pipe;
+    HWPipeInfo *right_pipe = &hw_layers->config[i].right_pipe;
 
-    left_pipe_bw[i] = left_id ? GetPipeBw(display_ctx, &hw_layers->config[i].left_pipe, bpp) : 0;
-    right_pipe_bw[i] = right_id ? GetPipeBw(display_ctx, &hw_layers->config[i].right_pipe, bpp) : 0;
+    left_pipe_bw[i] = left_pipe->valid ? GetPipeBw(display_ctx, left_pipe, bpp) : 0;
+    right_pipe_bw[i] = right_pipe->valid ? GetPipeBw(display_ctx, right_pipe, bpp) : 0;
 
     if ((left_pipe_bw[i] > max_pipe_bw) || (right_pipe_bw[i] > max_pipe_bw)) {
       DLOGV_IF(kTagResources, "Pipe bandwidth exceeds limit for layer index = %d", i);
       return false;
     }
 
-    float left_clk = left_id ? GetClockForPipe(display_ctx, &hw_layers->config[i].left_pipe) : 0;
-    float right_clk = right_id ? GetClockForPipe(display_ctx, &hw_layers->config[i].right_pipe) : 0;
+    float left_clk = left_pipe->valid ? GetClockForPipe(display_ctx, left_pipe) : 0;
+    float right_clk = right_pipe->valid ? GetClockForPipe(display_ctx, right_pipe) : 0;
 
     left_max_clk = MAX(left_clk, left_max_clk);
     right_max_clk = MAX(right_clk, right_max_clk);
@@ -556,12 +584,105 @@ float ResManager::GetBpp(LayerBufferFormat format) {
   }
 }
 
-void ResManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
+DisplayError ResManager::AllocRotatorBuffer(Handle display_ctx, HWLayers *hw_layers) {
+  DisplayResourceContext *display_resource_ctx =
+                          reinterpret_cast<DisplayResourceContext *>(display_ctx);
+  DisplayError error = kErrorNone;
+
+  BufferManager *buffer_manager = display_resource_ctx->buffer_manager;
+  HWLayersInfo &layer_info = hw_layers->info;
+
+  // TODO(user): Do session management during prepare and allocate buffer and associate that with
+  // the session during commit.
+  buffer_manager->Start();
+
+  for (uint32_t i = 0; i < layer_info.count; i++) {
+    Layer& layer = layer_info.stack->layers[layer_info.index[i]];
+    HWRotateInfo *rotate = &hw_layers->config[i].rotates[0];
+
+    if (rotate->valid) {
+      LayerBufferFormat rot_ouput_format;
+      SetRotatorOutputFormat(layer.input_buffer->format, false, true, &rot_ouput_format);
+
+      HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
+      hw_buffer_info->buffer_config.width = UINT32(rotate->dst_roi.right - rotate->dst_roi.left);
+      hw_buffer_info->buffer_config.height = UINT32(rotate->dst_roi.bottom - rotate->dst_roi.top);
+      hw_buffer_info->buffer_config.format = rot_ouput_format;
+      hw_buffer_info->buffer_config.buffer_count = 2;
+      hw_buffer_info->buffer_config.secure = layer.input_buffer->flags.secure;
+
+      error = buffer_manager->GetNextBuffer(hw_buffer_info);
+      if (error != kErrorNone) {
+        return error;
+      }
+    }
+
+    rotate = &hw_layers->config[i].rotates[1];
+    if (rotate->valid) {
+      LayerBufferFormat rot_ouput_format;
+      SetRotatorOutputFormat(layer.input_buffer->format, false, true, &rot_ouput_format);
+
+      HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
+      hw_buffer_info->buffer_config.width = UINT32(rotate->dst_roi.right - rotate->dst_roi.left);
+      hw_buffer_info->buffer_config.height = UINT32(rotate->dst_roi.bottom - rotate->dst_roi.top);
+      hw_buffer_info->buffer_config.format = rot_ouput_format;
+      hw_buffer_info->buffer_config.buffer_count = 2;
+      hw_buffer_info->buffer_config.secure = layer.input_buffer->flags.secure;
+
+      error = buffer_manager->GetNextBuffer(hw_buffer_info);
+      if (error != kErrorNone) {
+        return error;
+      }
+    }
+  }
+  buffer_manager->Stop(hw_layers->closed_session_ids);
+
+  return kErrorNone;
+}
+
+DisplayError ResManager::PostPrepare(Handle display_ctx, HWLayers *hw_layers) {
+  SCOPE_LOCK(locker_);
+  DisplayResourceContext *display_resource_ctx =
+                          reinterpret_cast<DisplayResourceContext *>(display_ctx);
+  DisplayError error = kErrorNone;
+
+  BufferManager *buffer_manager = display_resource_ctx->buffer_manager;
+  HWLayersInfo &layer_info = hw_layers->info;
+
+  for (uint32_t i = 0; i < layer_info.count; i++) {
+    Layer& layer = layer_info.stack->layers[layer_info.index[i]];
+    HWRotateInfo *rotate = &hw_layers->config[i].rotates[0];
+
+    if (rotate->valid) {
+      HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
+
+      error = buffer_manager->SetSessionId(hw_buffer_info->slot, hw_buffer_info->session_id);
+      if (error != kErrorNone) {
+        return error;
+      }
+    }
+
+    rotate = &hw_layers->config[i].rotates[1];
+    if (rotate->valid) {
+      HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
+
+      error = buffer_manager->SetSessionId(hw_buffer_info->slot, hw_buffer_info->session_id);
+      if (error != kErrorNone) {
+        return error;
+      }
+    }
+  }
+
+  return kErrorNone;
+}
+
+DisplayError ResManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   SCOPE_LOCK(locker_);
   DisplayResourceContext *display_resource_ctx =
                           reinterpret_cast<DisplayResourceContext *>(display_ctx);
   HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
   uint64_t frame_count = display_resource_ctx->frame_count;
+  DisplayError error = kErrorNone;
 
   DLOGV_IF(kTagResources, "Resource for hw_block = %d, frame_count = %d", hw_block_id, frame_count);
 
@@ -609,6 +730,37 @@ void ResManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
     }
   }
   display_resource_ctx->frame_start = false;
+
+  BufferManager *buffer_manager = display_resource_ctx->buffer_manager;
+  HWLayersInfo &layer_info = hw_layers->info;
+
+  for (uint32_t i = 0; i < layer_info.count; i++) {
+    Layer& layer = layer_info.stack->layers[layer_info.index[i]];
+    HWRotateInfo *rotate = &hw_layers->config[i].rotates[0];
+
+    if (rotate->valid) {
+      HWBufferInfo *rot_buf_info = &rotate->hw_buffer_info;
+
+      error = buffer_manager->SetReleaseFd(rot_buf_info->slot,
+                                                rot_buf_info->output_buffer.release_fence_fd);
+      if (error != kErrorNone) {
+        return error;
+      }
+    }
+
+    rotate = &hw_layers->config[i].rotates[1];
+    if (rotate->valid) {
+      HWBufferInfo *rot_buf_info = &rotate->hw_buffer_info;
+
+      error = buffer_manager->SetReleaseFd(rot_buf_info->slot,
+                                                rot_buf_info->output_buffer.release_fence_fd);
+      if (error != kErrorNone) {
+        return error;
+      }
+    }
+  }
+
+  return kErrorNone;
 }
 
 void ResManager::Purge(Handle display_ctx) {
@@ -798,8 +950,10 @@ DisplayError ResManager::AcquireRotator(DisplayResourceContext *display_resource
                                         const uint32_t rotate_count) {
   if (rotate_count == 0)
     return kErrorNone;
-  if (hw_res_info_.num_rotator == 0)
+  if (hw_res_info_.num_rotator == 0) {
+    DLOGV_IF(kTagResources, "Rotator hardware is not available");
     return kErrorResources;
+  }
 
   uint32_t i, j, pipe_index, num_rotator;
   if (rotate_count > hw_res_info_.num_rotator)
@@ -840,7 +994,7 @@ DisplayError ResManager::AcquireRotator(DisplayResourceContext *display_resource
 }
 
 void ResManager::AssignRotator(HWRotateInfo *rotate, uint32_t *rotate_count) {
-  if (!rotate->pipe_id)
+  if (!rotate->valid)
     return;
   // Interleave rotator assignment
   if ((*rotate_count & 0x1) && (hw_res_info_.num_rotator > 1)) {
@@ -868,6 +1022,44 @@ void ResManager::ClearRotator(DisplayResourceContext *display_resource_ctx) {
     }
   }
 }
+
+void ResManager::SetRotatorOutputFormat(const LayerBufferFormat &input_format, bool bwc, bool rot90,
+                                        LayerBufferFormat *output_format) {
+  switch (input_format) {
+  case kFormatRGB565:
+    if (rot90)
+      *output_format = kFormatRGB888;
+    else
+      *output_format = input_format;
+    break;
+  case kFormatRGBA8888:
+    if (bwc)
+      *output_format = kFormatBGRA8888;
+    else
+      *output_format = input_format;
+    break;
+  case kFormatYCbCr420SemiPlanarVenus:
+  case kFormatYCbCr420SemiPlanar:
+    if (rot90)
+      *output_format = kFormatYCrCb420SemiPlanar;
+    else
+      *output_format = input_format;
+    break;
+  case kFormatYCbCr420Planar:
+  case kFormatYCrCb420Planar:
+    *output_format = kFormatYCrCb420SemiPlanar;
+    break;
+  default:
+    *output_format = input_format;
+    break;
+  }
+
+  DLOGV_IF(kTagResources, "Input format %x, Output format = %x, rot90 %d", input_format,
+           *output_format, rot90);
+
+  return;
+}
+
 
 }  // namespace sde
 

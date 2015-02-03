@@ -25,6 +25,8 @@
 #ifndef __CONSTANTS_H__
 #define __CONSTANTS_H__
 
+#include <stdlib.h>
+
 #define LIKELY(exp) __builtin_expect((exp) != 0, true)
 #define UNLIKELY(exp) __builtin_expect((exp) != 0, false)
 
@@ -47,7 +49,9 @@
 #define SET_BIT(value, bit) (value |= (1 << (bit)))
 #define CLEAR_BIT(value, bit) (value &= (~(1 << (bit))))
 #define IS_BIT_SET(value, bit) (value & (1 << (bit)))
+
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 namespace sde {
 

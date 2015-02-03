@@ -36,15 +36,16 @@ namespace sde {
 class CompManager : public DumpImpl {
  public:
   CompManager();
-  DisplayError Init(const HWResourceInfo &hw_res_info_);
+  DisplayError Init(const HWResourceInfo &hw_res_info_, BufferAllocator *buffer_allocator,
+                    BufferSyncHandler *buffer_sync_handler_);
   DisplayError Deinit();
   DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
                                Handle *res_mgr_hnd);
   DisplayError UnregisterDisplay(Handle res_mgr_hnd);
   void PrePrepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
-  void PostPrepare(Handle display_ctx, HWLayers *hw_layers);
-  void PostCommit(Handle display_ctx, HWLayers *hw_layers);
+  DisplayError PostPrepare(Handle display_ctx, HWLayers *hw_layers);
+  DisplayError PostCommit(Handle display_ctx, HWLayers *hw_layers);
   void Purge(Handle display_ctx);
   bool ProcessIdleTimeout(Handle display_ctx);
 
