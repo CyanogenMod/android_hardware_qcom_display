@@ -56,6 +56,7 @@ class DisplayHDMI : public DisplayBase, DumpImpl {
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
   virtual DisplayError SetDisplayMode(uint32_t mode);
+  virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual void AppendDump(char *buffer, uint32_t length);
 
  private:

@@ -28,7 +28,6 @@
 */
 
 #include <utils/constants.h>
-#include <gralloc_priv.h>
 #include <sync/sync.h>
 
 #include "hwc_display_virtual.h"
@@ -71,6 +70,11 @@ int HWCDisplayVirtual::Deinit() {
 
 int HWCDisplayVirtual::Prepare(hwc_display_contents_1_t *content_list) {
   int status = 0;
+  if (display_paused_) {
+    MarkLayersForGPUBypass(content_list);
+    return status;
+  }
+
   status = AllocateLayerStack(content_list);
   if (status) {
     return status;
@@ -91,6 +95,22 @@ int HWCDisplayVirtual::Prepare(hwc_display_contents_1_t *content_list) {
 
 int HWCDisplayVirtual::Commit(hwc_display_contents_1_t *content_list) {
   int status = 0;
+  if (display_paused_) {
+    if (content_list->outbufAcquireFenceFd >= 0) {
+      // If we do not handle the frame set retireFenceFd to outbufAcquireFenceFd,
+      // which will make sure the framework waits on it and closes it.
+      content_list->retireFenceFd = dup(content_list->outbufAcquireFenceFd);
+      close(content_list->outbufAcquireFenceFd);
+      content_list->outbufAcquireFenceFd = -1;
+    }
+    CloseAcquireFences(content_list);
+
+    DisplayError error = display_intf_->Flush();
+    if (error != kErrorNone) {
+      DLOGE("Flush failed. Error = %d", error);
+    }
+    return status;
+  }
 
   status = HWCDisplay::CommitLayerStack(content_list);
   if (status) {
@@ -124,13 +144,15 @@ int HWCDisplayVirtual::SetActiveConfig(hwc_display_contents_1_t *content_list) {
       return -EINVAL;
     }
 
-    if ((output_handle->width != INT(output_buffer_->width)) ||
-        (output_handle->height != INT(output_buffer_->height)) ||
+    int active_width = GetWidth(output_handle);
+    int active_height = GetHeight(output_handle);
+
+    if ((active_width != INT(output_buffer_->width)) ||
+        (active_height!= INT(output_buffer_->height)) ||
         (format != output_buffer_->format)) {
       DisplayConfigVariableInfo variable_info;
-
-      variable_info.x_pixels = output_handle->width;
-      variable_info.y_pixels = output_handle->height;
+      variable_info.x_pixels = active_width;
+      variable_info.y_pixels = active_height;
       // TODO(user): Need to get the framerate of primary display and update it.
       variable_info.fps = 60;
 
@@ -164,8 +186,8 @@ int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
       return -EINVAL;
     }
 
-    output_buffer_->width = output_handle->width;
-    output_buffer_->height = output_handle->height;
+    output_buffer_->width = GetWidth(output_handle);
+    output_buffer_->height = GetHeight(output_handle);
     output_buffer_->flags.secure = 0;
     output_buffer_->flags.video = 0;
 
@@ -232,6 +254,24 @@ void HWCDisplayVirtual::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_lay
   dump_output_layer_ = ((bit_mask_layer_type & (1 << OUTPUT_LAYER_DUMP)) != 0);
 
   DLOGI("output_layer_dump_enable %d", dump_output_layer_);
+}
+
+int HWCDisplayVirtual::GetWidth(const private_handle_t* handle) {
+  MetaData_t *metadata = reinterpret_cast<MetaData_t *>(handle->base_metadata);
+  if (metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
+    return metadata->bufferDim.sliceWidth;
+  }
+
+  return handle->width;
+}
+
+int HWCDisplayVirtual::GetHeight(const private_handle_t* handle) {
+  MetaData_t *metadata = reinterpret_cast<MetaData_t *>(handle->base_metadata);
+  if (metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
+    return metadata->bufferDim.sliceHeight;
+  }
+
+  return handle->height;
 }
 
 }  // namespace sde

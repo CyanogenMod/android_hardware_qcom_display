@@ -28,14 +28,17 @@
 */
 
 #include <core/dump_interface.h>
+#include <core/buffer_allocator.h>
 #include <utils/constants.h>
 #include <utils/String16.h>
+#include <cutils/properties.h>
 #include <hardware_legacy/uevent.h>
 #include <sys/resource.h>
 #include <sys/prctl.h>
 #include <binder/Parcel.h>
 #include <QService.h>
-#include <core/buffer_allocator.h>
+#include <gr.h>
+#include <gralloc_priv.h>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
@@ -152,6 +155,8 @@ int HWCSession::Init() {
     CoreInterface::DestroyCore();
     return -errno;
   }
+
+  SetFrameBufferResolution(HWC_DISPLAY_PRIMARY, NULL);
 
   return 0;
 }
@@ -556,6 +561,7 @@ int HWCSession::CreateVirtualDisplay(hwc_display_contents_1_t *content_list) {
   }
 
   if (display_virtual_) {
+    SetFrameBufferResolution(HWC_DISPLAY_VIRTUAL, content_list);
     status = display_virtual_->SetActiveConfig(content_list);
   }
 
@@ -618,6 +624,9 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
   case qService::IQService::SET_DISPLAY_MODE:
     status = SetDisplayMode(input_parcel);
     break;
+  case qService::IQService::SET_SECONDARY_DISPLAY_STATUS:
+    status = SetSecondaryDisplayStatus(input_parcel);
+    break;
 
   default:
     DLOGW("QService command = %d is not supported", command);
@@ -625,6 +634,27 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
   }
 
   return status;
+}
+
+android::status_t HWCSession::SetSecondaryDisplayStatus(const android::Parcel *input_parcel) {
+  uint32_t display_id = UINT32(input_parcel->readInt32());
+  uint32_t display_status = UINT32(input_parcel->readInt32());
+  HWCDisplay *display = NULL;
+
+  DLOGI("Display %d Status %d", display_id, display_status);
+  switch (display_id) {
+  case HWC_DISPLAY_EXTERNAL:
+    display = display_external_;
+    break;
+  case HWC_DISPLAY_VIRTUAL:
+    display = display_virtual_;
+    break;
+  default:
+    DLOGW("Not supported for display %d", display_id);
+    return -EINVAL;
+  }
+
+  return display->SetDisplayStatus(display_status);
 }
 
 android::status_t HWCSession::SetDisplayMode(const android::Parcel *input_parcel) {
@@ -771,8 +801,9 @@ void* HWCSession::HWCUeventThreadHandler() {
         if (hwc_procs_) {
           reset_panel_ = true;
           hwc_procs_->invalidate(hwc_procs_);
-        } else
+        } else {
           DLOGW("Ignore resetpanel - hwc_proc not registered");
+        }
       }
     }
   }
@@ -800,19 +831,19 @@ void HWCSession::ResetPanel() {
   DLOGI("Powering off primary");
   status = display_primary_->SetPowerMode(HWC_POWER_MODE_OFF);
   if (status) {
-    DLOGE("power-off on primary failed with error = %d",status);
+    DLOGE("power-off on primary failed with error = %d", status);
   }
 
   DLOGI("Restoring power mode on primary");
   uint32_t mode = display_primary_->GetLastPowerMode();
   status = display_primary_->SetPowerMode(mode);
   if (status) {
-    DLOGE("Setting power mode = %d on primary failed with error = %d", mode,status);
+    DLOGE("Setting power mode = %d on primary failed with error = %d", mode, status);
   }
 
   status = display_primary_->EventControl(HWC_EVENT_VSYNC, 1);
   if (status) {
-    DLOGE("enabling vsync failed for primary with error = %d",status);
+    DLOGE("enabling vsync failed for primary with error = %d", status);
   }
 
   reset_panel_ = false;
@@ -849,6 +880,7 @@ int HWCSession::HotPlugHandler(bool connected) {
       display_external_ = NULL;
       return -1;
     }
+    SetFrameBufferResolution(HWC_DISPLAY_EXTERNAL, NULL);
   } else {
     SEQUENCE_WAIT_SCOPE_LOCK(locker_);
     if (!display_external_) {
@@ -866,6 +898,73 @@ int HWCSession::HotPlugHandler(bool connected) {
   hwc_procs_->invalidate(hwc_procs_);
 
   return 0;
+}
+
+void HWCSession::SetFrameBufferResolution(int disp, hwc_display_contents_1_t *content_list) {
+  char property[PROPERTY_VALUE_MAX];
+  uint32_t primary_width = 0;
+  uint32_t primary_height = 0;
+
+  switch (disp) {
+  case HWC_DISPLAY_PRIMARY:
+  {
+    display_primary_->GetPanelResolution(&primary_width, &primary_height);
+    if (property_get("debug.hwc.fbsize", property, NULL) > 0) {
+      char *yptr = strcasestr(property, "x");
+      primary_width = atoi(property);
+      primary_height = atoi(yptr + 1);
+    }
+    display_primary_->SetFrameBufferResolution(primary_width, primary_height);
+    break;
+  }
+
+  case HWC_DISPLAY_EXTERNAL:
+  {
+    uint32_t external_width = 0;
+    uint32_t external_height = 0;
+    display_external_->GetPanelResolution(&external_width, &external_height);
+
+    if (property_get("sys.hwc.mdp_downscale_enabled", property, "false") &&
+        !strcmp(property, "true")) {
+      display_primary_->GetFrameBufferResolution(&primary_width, &primary_height);
+      uint32_t primary_area = primary_width * primary_height;
+      uint32_t external_area = external_width * external_height;
+
+      if (primary_area > external_area) {
+        if (primary_height > primary_width) {
+          Swap(primary_height, primary_width);
+        }
+        AdjustSourceResolution(primary_width, primary_height,
+                               &external_width, &external_height);
+      }
+    }
+    display_external_->SetFrameBufferResolution(external_width, external_height);
+    break;
+  }
+
+  case HWC_DISPLAY_VIRTUAL:
+  {
+    if (ValidateContentList(content_list)) {
+      const private_handle_t *output_handle =
+              static_cast<const private_handle_t *>(content_list->outbuf);
+      int virtual_width = 0;
+      int virtual_height = 0;
+      getBufferSizeAndDimensions(output_handle->width, output_handle->height, output_handle->format,
+                                 virtual_width, virtual_height);
+      display_virtual_->SetFrameBufferResolution(virtual_width, virtual_height);
+    }
+    break;
+  }
+
+  default:
+    break;
+  }
+}
+
+void HWCSession::AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height,
+                                        uint32_t *src_width, uint32_t *src_height) {
+  *src_height = (dst_width * (*src_height)) / (*src_width);
+  *src_width = dst_width;
 }
 
 }  // namespace sde

@@ -152,6 +152,12 @@ DisplayError DisplayHDMI::SetDisplayMode(uint32_t mode) {
   return DisplayBase::SetDisplayMode(mode);
 }
 
+DisplayError DisplayHDMI::IsScalingValid(const LayerRect &crop, const LayerRect &dst,
+                                         bool rotate90) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::IsScalingValid(crop, dst, rotate90);
+}
+
 int DisplayHDMI::GetBestConfig() {
   uint32_t best_config_mode = 0;
   HWDisplayAttributes *best = &display_attributes_[0];

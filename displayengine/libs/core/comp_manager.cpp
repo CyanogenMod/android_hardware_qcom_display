@@ -351,5 +351,10 @@ void CompManager::AppendDump(char *buffer, uint32_t length) {
   SCOPE_LOCK(locker_);
 }
 
+DisplayError CompManager::ValidateScaling(const LayerRect &crop, const LayerRect &dst,
+                                          bool rotate90) {
+  return res_mgr_.ValidateScaling(crop, dst, rotate90);
+}
+
 }  // namespace sde
 
