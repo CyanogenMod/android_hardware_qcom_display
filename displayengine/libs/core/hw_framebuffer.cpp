@@ -1,25 +1,30 @@
 /*
 * Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
 *
-* Redistribution and use in source and binary forms, with or without modification, are permitted
-* provided that the following conditions are met:
-*    * Redistributions of source code must retain the above copyright notice, this list of
-*      conditions and the following disclaimer.
-*    * Redistributions in binary form must reproduce the above copyright notice, this list of
-*      conditions and the following disclaimer in the documentation and/or other materials provided
-*      with the distribution.
-*    * Neither the name of The Linux Foundation nor the names of its contributors may be used to
-*      endorse or promote products derived from this software without specific prior written
-*      permission.
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions are
+* met:
+*     * Redistributions of source code must retain the above copyright
+*       notice, this list of conditions and the following disclaimer.
+*     * Redistributions in binary form must reproduce the above
+*       copyright notice, this list of conditions and the following
+*       disclaimer in the documentation and/or other materials provided
+*       with the distribution.
+*     * Neither the name of The Linux Foundation nor the names of its
+*       contributors may be used to endorse or promote products derived
+*       from this software without specific prior written permission.
 *
-* THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-* NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
-* FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-* OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
-* STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-* OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+* THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+* WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
+* ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
+* BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+* CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+* SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+* BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+* WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+* OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+* IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #define __STDC_FORMAT_MACROS
@@ -286,6 +291,8 @@ DisplayError HWFrameBuffer::GetNumDisplayAttributes(Handle device, uint32_t *cou
 DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
                                                  HWDisplayAttributes *display_attributes,
                                                  uint32_t index) {
+  DTRACE_SCOPED();
+
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
   int &device_fd = hw_context->device_fd;
   // Variable screen info
@@ -365,6 +372,8 @@ DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
 }
 
 DisplayError HWFrameBuffer::SetDisplayAttributes(Handle device, uint32_t index) {
+  DTRACE_SCOPED();
+
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
   DisplayError error = kErrorNone;
 
@@ -455,6 +464,8 @@ DisplayError HWFrameBuffer::GetConfigIndex(Handle device, uint32_t mode, uint32_
 
 
 DisplayError HWFrameBuffer::PowerOn(Handle device) {
+  DTRACE_SCOPED();
+
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 
   if (ioctl_(hw_context->device_fd, FBIOBLANK, FB_BLANK_UNBLANK) == -1) {
@@ -471,6 +482,8 @@ DisplayError HWFrameBuffer::PowerOn(Handle device) {
 }
 
 DisplayError HWFrameBuffer::PowerOff(Handle device) {
+  DTRACE_SCOPED();
+
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 
   switch (hw_context->type) {
@@ -500,6 +513,8 @@ DisplayError HWFrameBuffer::Standby(Handle device) {
 }
 
 DisplayError HWFrameBuffer::SetVSyncState(Handle device, bool enable) {
+  DTRACE_SCOPED();
+
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
   int vsync_on = enable ? 1 : 0;
   if (ioctl_(hw_context->device_fd, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) == -1) {
@@ -511,6 +526,8 @@ DisplayError HWFrameBuffer::SetVSyncState(Handle device, bool enable) {
 }
 
 DisplayError HWFrameBuffer::Validate(Handle device, HWLayers *hw_layers) {
+  DTRACE_SCOPED();
+
   DisplayError error = kErrorNone;
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
 
@@ -577,6 +594,8 @@ DisplayError HWFrameBuffer::Validate(Handle device, HWLayers *hw_layers) {
 }
 
 DisplayError HWFrameBuffer::Commit(Handle device, HWLayers *hw_layers) {
+  DTRACE_SCOPED();
+
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
   HWLayersInfo &hw_layer_info = hw_layers->info;
   LayerStack *stack = hw_layer_info.stack;
