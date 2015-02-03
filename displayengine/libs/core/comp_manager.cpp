@@ -129,6 +129,10 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
   // resources for the added display is configured properly.
   safe_mode_ = true;
 
+  DLOGV_IF(kTagCompManager, "registered display bit mask 0x%x, configured display bit mask 0x%x, " \
+           "display type %d", registered_displays_, configured_displays_,
+           display_comp_ctx->display_type);
+
   return kErrorNone;
 }
 
@@ -143,6 +147,10 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
 
   CLEAR_BIT(registered_displays_, display_comp_ctx->display_type);
   CLEAR_BIT(configured_displays_, display_comp_ctx->display_type);
+
+  DLOGV_IF(kTagCompManager, "registered display bit mask 0x%x, configured display bit mask 0x%x, " \
+           "display type %d", registered_displays_, configured_displays_,
+           display_comp_ctx->display_type);
 
   if (display_comp_ctx) {
     delete display_comp_ctx;
@@ -264,6 +272,10 @@ DisplayError CompManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   }
 
   display_comp_ctx->idle_fallback = false;
+
+  DLOGV_IF(kTagCompManager, "registered display bit mask 0x%x, configured display bit mask 0x%x, " \
+           "display type %d", registered_displays_, configured_displays_,
+           display_comp_ctx->display_type);
 
   return kErrorNone;
 }

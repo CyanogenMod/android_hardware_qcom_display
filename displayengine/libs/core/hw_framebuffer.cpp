@@ -258,6 +258,7 @@ DisplayError HWFrameBuffer::Close(Handle device) {
 
   switch (hw_context->type) {
   case kDevicePrimary:
+  case kDeviceVirtual:
     break;
   case kDeviceHDMI:
     hdmi_mode_count_ = 0;
@@ -279,6 +280,7 @@ DisplayError HWFrameBuffer::GetNumDisplayAttributes(Handle device, uint32_t *cou
 
   switch (hw_context->type) {
   case kDevicePrimary:
+  case kDeviceVirtual:
     *count = 1;
     break;
   case kDeviceHDMI:
@@ -370,6 +372,9 @@ DisplayError HWFrameBuffer::GetDisplayAttributes(Handle device,
     }
     break;
 
+  case kDeviceVirtual:
+    break;
+
   default:
     return kErrorParameters;
   }
@@ -385,6 +390,7 @@ DisplayError HWFrameBuffer::SetDisplayAttributes(Handle device, uint32_t index) 
 
   switch (hw_context->type) {
   case kDevicePrimary:
+  case kDeviceVirtual:
     break;
 
   case kDeviceHDMI:
@@ -657,7 +663,8 @@ DisplayError HWFrameBuffer::DisplayValidate(HWContext *hw_context, HWLayers *hw_
   DLOGV_IF(kTagDriverConfig, "SDE layer count is %d", hw_layer_info.count);
 
   mdp_layer_commit_v1 &mdp_commit = hw_display->mdp_disp_commit.commit_v1;
-  mdp_input_layer *mdp_layers = hw_display->mdp_disp_layers;
+  mdp_input_layer *mdp_layers = hw_display->mdp_in_layers;
+  mdp_output_layer *mdp_out_layer = &hw_display->mdp_out_layer;
   uint32_t &mdp_layer_count = mdp_commit.input_layer_cnt;
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
@@ -729,6 +736,22 @@ DisplayError HWFrameBuffer::DisplayValidate(HWContext *hw_context, HWLayers *hw_
     }
   }
 
+  if (hw_context->type == kDeviceVirtual) {
+    LayerBuffer *output_buffer = hw_layers->info.stack->output_buffer;
+    // TODO(user): Need to assign the writeback id from the resource manager, since the support
+    // has not been added hard coding it to 2 for now.
+    mdp_out_layer->writeback_ndx = 2;
+    mdp_out_layer->buffer.width = output_buffer->width;
+    mdp_out_layer->buffer.height = output_buffer->height;
+    SetFormat(output_buffer->format, &mdp_out_layer->buffer.format);
+
+    DLOGI_IF(kTagDriverConfig, "******************* Output buffer Info **********************");
+    DLOGI_IF(kTagDriverConfig, "out_w %d, out_h %d, out_f %d, wb_id %d",
+             mdp_out_layer->buffer.width, mdp_out_layer->buffer.height,
+             mdp_out_layer->buffer.format, mdp_out_layer->writeback_ndx);
+    DLOGI_IF(kTagDriverConfig, "*************************************************************");
+  }
+
   mdp_commit.flags |= MDP_VALIDATE_LAYER;
   if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_display->mdp_disp_commit) < 0) {
     IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, hw_context->type);
@@ -750,7 +773,8 @@ DisplayError HWFrameBuffer::DisplayCommit(HWContext *hw_context, HWLayers *hw_la
   DLOGV_IF(kTagDriverConfig, "SDE layer count is %d", hw_layer_info.count);
 
   mdp_layer_commit_v1 &mdp_commit = hw_display->mdp_disp_commit.commit_v1;
-  mdp_input_layer *mdp_layers = hw_display->mdp_disp_layers;
+  mdp_input_layer *mdp_layers = hw_display->mdp_in_layers;
+  mdp_output_layer *mdp_out_layer = &hw_display->mdp_out_layer;
   uint32_t mdp_layer_index = 0;
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
@@ -774,7 +798,8 @@ DisplayError HWFrameBuffer::DisplayCommit(HWContext *hw_context, HWLayers *hw_la
           mdp_buffer.plane_count = 1;
           mdp_buffer.planes[0].fd = input_buffer->planes[0].fd;
           mdp_buffer.planes[0].offset = input_buffer->planes[0].offset;
-          mdp_buffer.planes[0].stride = input_buffer->planes[0].stride;
+          SetStride(hw_context->type, input_buffer->format, input_buffer->planes[0].stride,
+                    &mdp_buffer.planes[0].stride);
         } else {
           DLOGW("Invalid buffer fd, setting plane count to 0");
           mdp_buffer.plane_count = 0;
@@ -785,13 +810,38 @@ DisplayError HWFrameBuffer::DisplayCommit(HWContext *hw_context, HWLayers *hw_la
 
         DLOGV_IF(kTagDriverConfig, "****************** Layer[%d] %s pipe Input *******************",
                  i, count ? "Right" : "Left");
-        DLOGV_IF(kTagDriverConfig, "in_buf_fd %d, in_buf_offset %d, in_buf_stride %d, " \
+        DLOGI_IF(kTagDriverConfig, "in_w %d, in_h %d, in_f %d, horz_deci %d, vert_deci %d",
+                 mdp_buffer.width, mdp_buffer.height, mdp_buffer.format, mdp_layer.horz_deci,
+                 mdp_layer.vert_deci);
+        DLOGI_IF(kTagDriverConfig, "in_buf_fd %d, in_buf_offset %d, in_buf_stride %d, " \
                  "in_plane_count %d, in_fence %d, layer count %d", mdp_buffer.planes[0].fd,
                  mdp_buffer.planes[0].offset, mdp_buffer.planes[0].stride, mdp_buffer.plane_count,
                  mdp_buffer.fence, mdp_commit.input_layer_cnt);
         DLOGV_IF(kTagDriverConfig, "*************************************************************");
       }
     }
+  }
+  if (hw_context->type == kDeviceVirtual) {
+    LayerBuffer *output_buffer = hw_layers->info.stack->output_buffer;
+
+    if (output_buffer->planes[0].fd >= 0) {
+      mdp_out_layer->buffer.planes[0].fd = output_buffer->planes[0].fd;
+      mdp_out_layer->buffer.planes[0].offset = output_buffer->planes[0].offset;
+      SetStride(hw_context->type, output_buffer->format, output_buffer->planes[0].stride,
+                &mdp_out_layer->buffer.planes[0].stride);
+      mdp_out_layer->buffer.plane_count = 1;
+    } else {
+      DLOGW("Invalid output buffer fd, setting plane count to 0");
+      mdp_out_layer->buffer.plane_count = 0;
+    }
+
+    mdp_out_layer->buffer.fence = output_buffer->acquire_fence_fd;
+
+    DLOGI_IF(kTagDriverConfig, "******************* Output buffer Info **********************");
+    DLOGI_IF(kTagDriverConfig, "out_fd %d, out_offset %d, out_stride %d, acquire_fence %d",
+             mdp_out_layer->buffer.planes[0].fd, mdp_out_layer->buffer.planes[0].offset,
+             mdp_out_layer->buffer.planes[0].stride,  mdp_out_layer->buffer.fence);
+    DLOGI_IF(kTagDriverConfig, "*************************************************************");
   }
 
   mdp_commit.release_fence = -1;
@@ -801,9 +851,10 @@ DisplayError HWFrameBuffer::DisplayCommit(HWContext *hw_context, HWLayers *hw_la
     return kErrorHardware;
   }
 
+  stack->retire_fence_fd = mdp_commit.retire_fence;
+
   // MDP returns only one release fence for the entire layer stack. Duplicate this fence into all
   // layers being composed by MDP.
-  stack->retire_fence_fd = mdp_commit.retire_fence;
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
     LayerBuffer *input_buffer = stack->layers[layer_index].input_buffer;
@@ -825,6 +876,11 @@ DisplayError HWFrameBuffer::DisplayCommit(HWContext *hw_context, HWLayers *hw_la
       }
     }
   }
+  DLOGI_IF(kTagDriverConfig, "*************************** %s Commit Input ************************",
+           GetDeviceString(hw_context->type));
+  DLOGI_IF(kTagDriverConfig, "retire_fence_fd %d", stack->retire_fence_fd);
+  DLOGI_IF(kTagDriverConfig, "*************************************************************");
+
   close_(mdp_commit.release_fence);
 
   return kErrorNone;
@@ -931,14 +987,15 @@ DisplayError HWFrameBuffer::RotatorCommit(HWContext *hw_context, HWLayers *hw_la
 
         mdp_rot_item->input.planes[0].fd = layer.input_buffer->planes[0].fd;
         mdp_rot_item->input.planes[0].offset = layer.input_buffer->planes[0].offset;
-        SetStride(layer.input_buffer->format, layer.input_buffer->width,
+        SetStride(hw_context->type, layer.input_buffer->format, layer.input_buffer->width,
                   &mdp_rot_item->input.planes[0].stride);
         mdp_rot_item->input.plane_count = 1;
         mdp_rot_item->input.fence = layer.input_buffer->acquire_fence_fd;
 
         mdp_rot_item->output.planes[0].fd = rot_buf_info->output_buffer.planes[0].fd;
         mdp_rot_item->output.planes[0].offset = rot_buf_info->output_buffer.planes[0].offset;
-        SetStride(rot_buf_info->output_buffer.format, rot_buf_info->output_buffer.planes[0].stride,
+        SetStride(hw_context->type, rot_buf_info->output_buffer.format,
+                  rot_buf_info->output_buffer.planes[0].stride,
                   &mdp_rot_item->output.planes[0].stride);
         mdp_rot_item->output.plane_count = 1;
         mdp_rot_item->output.fence = -1;
@@ -1036,7 +1093,15 @@ DisplayError HWFrameBuffer::SetFormat(const LayerBufferFormat &source, uint32_t 
   return kErrorNone;
 }
 
-DisplayError HWFrameBuffer::SetStride(LayerBufferFormat format, uint32_t width, uint32_t *target) {
+DisplayError HWFrameBuffer::SetStride(HWDeviceType device_type, LayerBufferFormat format,
+                                      uint32_t width, uint32_t *target) {
+  // TODO(user): This SetStride function is an workaround to satisfy the driver expectation for
+  // rotator and virtual devices. Eventually this will be taken care in the driver.
+  if (device_type != kDeviceRotator && device_type != kDeviceVirtual) {
+    *target = width;
+    return kErrorNone;
+  }
+
   switch (format) {
   case kFormatARGB8888:
   case kFormatRGBA8888:

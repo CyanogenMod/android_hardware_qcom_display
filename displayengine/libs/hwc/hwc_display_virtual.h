@@ -32,8 +32,14 @@ namespace sde {
 class HWCDisplayVirtual : public HWCDisplay {
  public:
   explicit HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
+  virtual int Init();
+  virtual int Deinit();
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
+  virtual int SetActiveConfig(hwc_display_contents_1_t *content_list);
+
+ private:
+  int SetOutputBuffer(hwc_display_contents_1_t *content_list);
 };
 
 }  // namespace sde

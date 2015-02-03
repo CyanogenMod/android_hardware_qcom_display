@@ -307,9 +307,14 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 
   switch (state) {
   case kStateOff:
-    hw_layers_.info.count = 0;
-    comp_manager_->Purge(display_comp_ctx_);
-    error = hw_intf_->PowerOff(hw_device_);
+    // Invoke flush during suspend for HDMI and virtual displays. StateOff is handled
+    // separately for primary in DisplayPrimary::SetDisplayState() function.
+    error = hw_intf_->Flush(hw_device_);
+    if (error == kErrorNone) {
+      comp_manager_->Purge(display_comp_ctx_);
+      state_ = state;
+      hw_layers_.info.count = 0;
+    }
     break;
 
   case kStateOn:
@@ -336,6 +341,36 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
   return error;
 }
 
+DisplayError DisplayBase::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
+  SCOPE_LOCK(locker_);
+  DisplayError error = kErrorNone;
+
+  if (!variable_info) {
+    return kErrorParameters;
+  }
+
+  HWDisplayAttributes display_attributes = display_attributes_[active_mode_index_];
+
+  display_attributes.x_pixels = variable_info->x_pixels;
+  display_attributes.y_pixels = variable_info->y_pixels;
+  display_attributes.fps = variable_info->fps;
+
+  // if display is already connected, unregister display from composition manager and register
+  // the display with new configuration.
+  if (display_comp_ctx_) {
+    comp_manager_->UnregisterDisplay(display_comp_ctx_);
+  }
+
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes, &display_comp_ctx_);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  display_attributes_[active_mode_index_] = display_attributes;
+
+  return kErrorNone;
+}
+
 DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
   SCOPE_LOCK(locker_);
   DisplayError error = kErrorNone;
@@ -346,8 +381,17 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
 
   error = hw_intf_->SetDisplayAttributes(hw_device_, index);
   if (error != kErrorNone) {
-    active_mode_index_ = index;
+    return error;
   }
+
+  active_mode_index_ = index;
+
+  if (display_comp_ctx_) {
+    comp_manager_->UnregisterDisplay(display_comp_ctx_);
+  }
+
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_[index],
+                                         &display_comp_ctx_);
 
   return error;
 }

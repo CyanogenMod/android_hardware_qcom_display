@@ -44,6 +44,7 @@ enum DebugTag {
   kTagNone,             //!< Debug log is not tagged. This type of logs should always be printed.
   kTagResources,        //!< Debug log is tagged for resource management.
   kTagStrategy,         //!< Debug log is tagged for strategy decisions.
+  kTagCompManager,      //!< Debug log is tagged for composition manager.
   kTagDriverConfig,     //!< Debug log is tagged for driver config.
   kTagBufferManager,    //!< Debug log is tagged for buffer manager state transitions.
   kTagOfflineCtrl,      //!< Debug log is tagged for offline controller.

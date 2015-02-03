@@ -60,6 +60,14 @@ void HWCDebugHandler::DebugStrategy(bool enable) {
   }
 }
 
+void HWCDebugHandler::DebugCompManager(bool enable) {
+  if (enable) {
+    SET_BIT(debug_flags_, kTagCompManager);
+  } else {
+    CLEAR_BIT(debug_flags_, kTagCompManager);
+  }
+}
+
 void HWCDebugHandler::DebugDriverConfig(bool enable) {
   if (enable) {
     SET_BIT(debug_flags_, kTagDriverConfig);
