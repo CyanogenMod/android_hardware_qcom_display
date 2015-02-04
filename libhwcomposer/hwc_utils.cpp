@@ -2577,6 +2577,30 @@ void LayerRotMap::setReleaseFd(const int& fence) {
     }
 }
 
+hwc_rect expandROIFromMidPoint(hwc_rect roi, hwc_rect fullFrame) {
+    int lRoiWidth = 0, rRoiWidth = 0;
+    int half_frame_width = fullFrame.right/2;
+
+    hwc_rect lFrame = fullFrame;
+    hwc_rect rFrame = fullFrame;
+    lFrame.right = (lFrame.right - lFrame.left)/2;
+    rFrame.left = lFrame.right;
+
+    hwc_rect lRoi = getIntersection(roi, lFrame);
+    hwc_rect rRoi = getIntersection(roi, rFrame);
+
+    lRoiWidth = lRoi.right - lRoi.left;
+    rRoiWidth = rRoi.right - rRoi.left;
+
+    if(lRoiWidth && rRoiWidth) {
+        if(lRoiWidth < rRoiWidth)
+            roi.left = half_frame_width - rRoiWidth;
+        else
+            roi.right = half_frame_width + lRoiWidth;
+    }
+    return roi;
+}
+
 void resetROI(hwc_context_t *ctx, const int dpy) {
     const int fbXRes = (int)ctx->dpyAttr[dpy].xres;
     const int fbYRes = (int)ctx->dpyAttr[dpy].yres;
