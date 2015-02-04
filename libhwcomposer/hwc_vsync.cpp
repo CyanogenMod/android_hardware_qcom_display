@@ -157,7 +157,9 @@ static void *vsync_loop(void *param)
                 }
             }
 
-            pread(pfd[dpy][ev].fd, vdata , MAX_DATA, 0);
+            memset(&vdata, '\0', sizeof(vdata));
+            // Read once from the fds to clear the first notify
+            pread(pfd[dpy][ev].fd, vdata , MAX_DATA - 1, 0);
             if (pfd[dpy][ev].fd >= 0)
                 pfd[dpy][ev].events = POLLPRI | POLLERR;
         }
@@ -170,7 +172,10 @@ static void *vsync_loop(void *param)
                 for (int dpy = HWC_DISPLAY_PRIMARY; dpy < num_displays; dpy++) {
                     for(size_t ev = 0; ev < num_events; ev++) {
                         if (pfd[dpy][ev].revents & POLLPRI) {
-                            ssize_t len = pread(pfd[dpy][ev].fd, vdata, MAX_DATA, 0);
+                            // Clear vdata before writing into it
+                            memset(&vdata, '\0', sizeof(vdata));
+                            ssize_t len = pread(pfd[dpy][ev].fd, vdata,
+                                                MAX_DATA - 1, 0);
                             if (UNLIKELY(len < 0)) {
                                 // If the read was just interrupted - it is not
                                 // a fatal error. Just continue in this case
@@ -179,6 +184,7 @@ static void *vsync_loop(void *param)
                                         __FUNCTION__, ev, dpy, strerror(errno));
                                 continue;
                             }
+                            vdata[len] = '\0';
                             event_list[ev].callback(ctx, dpy, vdata);
                         }
                     }
