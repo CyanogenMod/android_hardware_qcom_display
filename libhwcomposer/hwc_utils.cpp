@@ -1425,7 +1425,7 @@ void setMdpFlags(hwc_layer_1_t *layer,
                 ovutils::OV_MDP_SMP_FORCE_ALLOC);
     }
 
-    if(isProtectedBuffer(hnd)) {
+    if(isSecureBuffer(hnd) || isProtectedBuffer(hnd)) {
         ovutils::setMdpFlags(mdpFlags,
                 ovutils::OV_MDP_SMP_FORCE_ALLOC);
     }
