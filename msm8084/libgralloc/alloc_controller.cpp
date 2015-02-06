@@ -596,7 +596,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         //Planar
         case HAL_PIXEL_FORMAT_YV12:
             ystride = hnd->width;
-            cstride = hnd->width/2;
+            cstride = ALIGN(hnd->width/2, 16);
             ycbcr->y  = (void*)hnd->base;
             ycbcr->cr = (void*)(hnd->base + ystride * hnd->height);
             ycbcr->cb = (void*)(hnd->base + ystride * hnd->height +
