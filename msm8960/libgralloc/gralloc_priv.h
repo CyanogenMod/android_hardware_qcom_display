@@ -92,6 +92,7 @@ enum {
 /*****************************************************************************/
 enum {
     /* OEM specific HAL formats */
+    HAL_PIXEL_FORMAT_NV12                   = 0x15, /*OMX_COLOR_FormatYUV420SemiPlanar*/
     HAL_PIXEL_FORMAT_NV12_ENCODEABLE        = 0x102,
     HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS     = 0x7FA30C04,
     HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED     = 0x7FA30C03,
