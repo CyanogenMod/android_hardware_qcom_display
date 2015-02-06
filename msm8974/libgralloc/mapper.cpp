@@ -251,10 +251,11 @@ int gralloc_lock_ycbcr(gralloc_module_t const* module,
 {
     private_handle_t* hnd = (private_handle_t*)handle;
     int err = gralloc_map_and_invalidate(module, handle, usage, l, t, w, h);
-    int ystride;
+    int ystride, cstride;
+
+    memset(ycbcr->reserved, 0, sizeof(ycbcr->reserved));
     if(!err) {
         //hnd->format holds our implementation defined format
-        //HAL_PIXEL_FORMAT_YCrCb_420_SP is the only one set right now.
         switch (hnd->format) {
             case HAL_PIXEL_FORMAT_YCrCb_420_SP:
                 ystride = ALIGN(hnd->width, 16);
@@ -264,7 +265,15 @@ int gralloc_lock_ycbcr(gralloc_module_t const* module,
                 ycbcr->ystride = ystride;
                 ycbcr->cstride = ystride;
                 ycbcr->chroma_step = 2;
-                memset(ycbcr->reserved, 0, sizeof(ycbcr->reserved));
+                break;
+            case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+                ystride = cstride = hnd->width;
+                ycbcr->y  = (void*)hnd->base;
+                ycbcr->cb = (void*)(hnd->base + ystride * hnd->height);
+                ycbcr->cr = (void*)(hnd->base + ystride * hnd->height + 1);
+                ycbcr->ystride = ystride;
+                ycbcr->cstride = cstride;
+                ycbcr->chroma_step = 2;
                 break;
             default:
                 ALOGD("%s: Invalid format passed: 0x%x", __FUNCTION__,
