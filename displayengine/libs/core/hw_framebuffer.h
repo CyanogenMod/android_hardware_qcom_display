@@ -86,6 +86,7 @@ class HWFrameBuffer : public HWInterface {
       mdp_disp_commit.commit_v1.input_layers = mdp_in_layers;
       mdp_disp_commit.commit_v1.output_layer = &mdp_out_layer;
       mdp_disp_commit.commit_v1.release_fence = -1;
+      mdp_disp_commit.commit_v1.retire_fence = -1;
     }
 
     mdp_scale_data* GetScaleRef(uint32_t index) { return &scale_data[index]; }

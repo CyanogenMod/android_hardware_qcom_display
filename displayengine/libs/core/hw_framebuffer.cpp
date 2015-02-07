@@ -1077,14 +1077,26 @@ DisplayError HWFrameBuffer::Flush(Handle device) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
   HWDisplay *hw_display = &hw_context->hw_display;
 
-  hw_display->Reset();
-  mdp_layer_commit_v1 &mdp_commit = hw_display->mdp_disp_commit.commit_v1;
-  mdp_commit.input_layer_cnt = 0;
-  mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
+  switch (hw_context->type) {
+  case kDevicePrimary:
+  case kDeviceHDMI:
+  case kDeviceVirtual:
+    {
+      hw_display->Reset();
+      mdp_layer_commit_v1 &mdp_commit = hw_display->mdp_disp_commit.commit_v1;
+      mdp_commit.input_layer_cnt = 0;
+      mdp_commit.output_layer = NULL;
 
-  if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_display->mdp_disp_commit) == -1) {
-    IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, hw_context->type);
-    return kErrorHardware;
+      mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
+      if (ioctl_(hw_context->device_fd, MSMFB_ATOMIC_COMMIT, &hw_display->mdp_disp_commit) < 0) {
+        IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, hw_context->type);
+        return kErrorHardware;
+      }
+    }
+    break;
+  default:
+    DLOGE("Flush is not supported for the device %s", GetDeviceString(hw_context->type));
+    return kErrorNotSupported;
   }
 
   return kErrorNone;
