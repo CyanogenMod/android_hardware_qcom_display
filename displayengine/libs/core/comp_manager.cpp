@@ -125,9 +125,11 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
   SET_BIT(registered_displays_, type);
   display_comp_ctx->display_type = type;
   *display_ctx = display_comp_ctx;
-  // New display device has been added, so move the composition mode to safe mode until unless
+  // New non-primary display device has been added, so move the composition mode to safe mode until
   // resources for the added display is configured properly.
-  safe_mode_ = true;
+  if (type != kPrimary) {
+    safe_mode_ = true;
+  }
 
   DLOGV_IF(kTagCompManager, "registered display bit mask 0x%x, configured display bit mask 0x%x, " \
            "display type %d", registered_displays_, configured_displays_,

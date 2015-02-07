@@ -172,6 +172,10 @@ DisplayError HWFrameBuffer::Init() {
     goto CleanupOnError;
   }
 
+  // Disable HPD at start if HDMI is external, it will be enabled later when the display powers on
+  // This helps for framework reboot or adb shell stop/start
+  EnableHotPlugDetection(0);
+
   return kErrorNone;
 
 CleanupOnError:
