@@ -210,7 +210,7 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
                         hwc_display_contents_1_t **displays) {
   DTRACE_SCOPED();
 
-  SCOPE_LOCK(locker_);
+  SEQUENCE_ENTRY_SCOPE_LOCK(locker_);
 
   if (!device || !displays) {
     return -EINVAL;
@@ -254,7 +254,7 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
                     hwc_display_contents_1_t **displays) {
   DTRACE_SCOPED();
 
-  SCOPE_LOCK(locker_);
+  SEQUENCE_EXIT_SCOPE_LOCK(locker_);
 
   if (!device || !displays) {
     return -EINVAL;
@@ -289,7 +289,7 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
 }
 
 int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event, int enable) {
-  SCOPE_LOCK(locker_);
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
 
   if (!device) {
     return -EINVAL;
@@ -317,7 +317,7 @@ int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event,
 }
 
 int HWCSession::SetPowerMode(hwc_composer_device_1 *device, int disp, int mode) {
-  SCOPE_LOCK(locker_);
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
 
   if (!device) {
     return -EINVAL;
@@ -348,6 +348,8 @@ int HWCSession::SetPowerMode(hwc_composer_device_1 *device, int disp, int mode) 
 }
 
 int HWCSession::Query(hwc_composer_device_1 *device, int param, int *value) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!device || !value) {
     return -EINVAL;
   }
@@ -365,7 +367,7 @@ void HWCSession::RegisterProcs(hwc_composer_device_1 *device, hwc_procs_t const 
 }
 
 void HWCSession::Dump(hwc_composer_device_1 *device, char *buffer, int length) {
-  SCOPE_LOCK(locker_);
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
 
   if (!device || !buffer || !length) {
     return;
@@ -376,6 +378,8 @@ void HWCSession::Dump(hwc_composer_device_1 *device, char *buffer, int length) {
 
 int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint32_t *configs,
                                   size_t *num_configs) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!device || !configs || !num_configs) {
     return -EINVAL;
   }
@@ -406,6 +410,8 @@ int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint3
 
 int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, uint32_t config,
                                      const uint32_t *attributes, int32_t *values) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!device || !attributes || !values) {
     return -EINVAL;
   }
@@ -435,6 +441,8 @@ int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, ui
 }
 
 int HWCSession::GetActiveConfig(hwc_composer_device_1 *device, int disp) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!device) {
     return -1;
   }
@@ -464,6 +472,8 @@ int HWCSession::GetActiveConfig(hwc_composer_device_1 *device, int disp) {
 }
 
 int HWCSession::SetActiveConfig(hwc_composer_device_1 *device, int disp, int index) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!device) {
     return -EINVAL;
   }
@@ -549,6 +559,8 @@ DisplayError HWCSession::Hotplug(const CoreEventHotplug &hotplug) {
 
 android::status_t HWCSession::notifyCallback(uint32_t command, const android::Parcel *input_parcel,
                                              android::Parcel */*output_parcel*/) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   switch (command) {
   case qService::IQService::DYNAMIC_DEBUG:
     DynamicDebug(input_parcel);
@@ -695,7 +707,7 @@ int HWCSession::HotPlugHandler(bool connected) {
   }
 
   if (connected) {
-    SCOPE_LOCK(locker_);
+    SEQUENCE_WAIT_SCOPE_LOCK(locker_);
     if (display_external_) {
      DLOGE("HDMI already connected");
      return -1;
@@ -712,7 +724,7 @@ int HWCSession::HotPlugHandler(bool connected) {
       return -1;
     }
   } else {
-    SCOPE_LOCK(locker_);
+    SEQUENCE_WAIT_SCOPE_LOCK(locker_);
     if (!display_external_) {
      DLOGE("HDMI not connected");
      return -1;
