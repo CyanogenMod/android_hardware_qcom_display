@@ -1455,10 +1455,6 @@ void getNonWormholeRegion(hwc_display_contents_1_t* list,
     nwr = getIntersection(nwr, fbDisplayFrame);
 }
 
-bool isExternalActive(hwc_context_t* ctx) {
-    return ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive;
-}
-
 void closeAcquireFds(hwc_display_contents_1_t* list) {
     if(LIKELY(list)) {
         for(uint32_t i = 0; i < list->numHwLayers; i++) {
