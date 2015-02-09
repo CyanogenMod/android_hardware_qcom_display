@@ -171,7 +171,7 @@ class ResManager : public DumpImpl {
                                   const LayerRect &dst_rect, HWLayerConfig *layer_config,
                                   uint32_t align_x);
   DisplayError ValidateScaling(const Layer &layer, const LayerRect &crop,
-                               const LayerRect &dst, float *rot_scale_x, float *rot_scale_y);
+                               const LayerRect &dst, float *rot_scale);
   DisplayError SrcSplitConfig(DisplayResourceContext *display_resource_ctx,
                               const LayerTransform &transform, const LayerRect &src_rect,
                               const LayerRect &dst_rect, HWLayerConfig *layer_config,
@@ -194,9 +194,9 @@ class ResManager : public DumpImpl {
   bool IsYuvFormat(LayerBufferFormat format) { return (format >= kFormatYCbCr420Planar); }
   bool IsRotationNeeded(float rotation)
          { return (UINT32(rotation) == 90 || UINT32(rotation) == 270); }
-  void RotationConfig(const LayerTransform &transform, const float &scale_x,
-                      const float &scale_y, LayerRect *src_rect,
-                      struct HWLayerConfig *layer_config, uint32_t *rotate_count);
+  void RotationConfig(const LayerTransform &transform, const float &downscale,
+                      LayerRect *src_rect, struct HWLayerConfig *layer_config,
+                      uint32_t *rotate_count);
   DisplayError AcquireRotator(DisplayResourceContext *display_resource_ctx,
                               const uint32_t roate_cnt);
   void AssignRotator(HWRotateInfo *rotate, uint32_t *rotate_cnt);

@@ -36,9 +36,9 @@ using scalar::LayerInfo;
 
 namespace sde {
 
-void ResManager::RotationConfig(const LayerTransform &transform, const float &scale_x,
-                                const float &scale_y, LayerRect *src_rect,
-                                struct HWLayerConfig *layer_config, uint32_t *rotate_count) {
+void ResManager::RotationConfig(const LayerTransform &transform, const float &downscale,
+                                LayerRect *src_rect, struct HWLayerConfig *layer_config,
+                                uint32_t *rotate_count) {
   HWRotateInfo *rotate = &layer_config->rotates[0];
   float src_width = src_rect->right - src_rect->left;
   float src_height = src_rect->bottom - src_rect->top;
@@ -47,32 +47,27 @@ void ResManager::RotationConfig(const LayerTransform &transform, const float &sc
   dst_rect.top = 0.0f;
   dst_rect.left = 0.0f;
 
-  rotate->downscale_ratio_x = scale_x;
-  rotate->downscale_ratio_y = scale_y;
+  rotate->downscale_ratio = downscale;
 
   // downscale when doing rotation
   if (IsRotationNeeded(transform.rotation)) {
-    if (rotate->downscale_ratio_x > 1.0f) {
-      src_height = ROUND_UP_ALIGN_DOWN(src_height, rotate->downscale_ratio_x);
+    if (downscale > 1.0f) {
+      src_height = ROUND_UP_ALIGN_DOWN(src_height, downscale);
       src_rect->bottom = src_rect->top + src_height;
-    }
-    if (rotate->downscale_ratio_y > 1.0f) {
-      src_width = ROUND_UP_ALIGN_DOWN(src_width, rotate->downscale_ratio_y);
+      src_width = ROUND_UP_ALIGN_DOWN(src_width, downscale);
       src_rect->right = src_rect->left + src_width;
     }
-    dst_rect.right = src_height / rotate->downscale_ratio_x;
-    dst_rect.bottom = src_width / rotate->downscale_ratio_y;
+    dst_rect.right = src_height / downscale;
+    dst_rect.bottom = src_width / downscale;
   } else {
-    if (rotate->downscale_ratio_x > 1.0f) {
-      src_width = ROUND_UP_ALIGN_DOWN(src_width, rotate->downscale_ratio_x);
+    if (downscale > 1.0f) {
+      src_width = ROUND_UP_ALIGN_DOWN(src_width, downscale);
       src_rect->right = src_rect->left + src_width;
-    }
-    if (rotate->downscale_ratio_y > 1.0f) {
-      src_height = ROUND_UP_ALIGN_DOWN(src_height, rotate->downscale_ratio_y);
+      src_height = ROUND_UP_ALIGN_DOWN(src_height, downscale);
       src_rect->bottom = src_rect->top + src_height;
     }
-    dst_rect.right = src_width / rotate->downscale_ratio_x;
-    dst_rect.bottom = src_height / rotate->downscale_ratio_y;
+    dst_rect.right = src_width / downscale;
+    dst_rect.bottom = src_height / downscale;
   }
 
   rotate->src_roi = *src_rect;
@@ -190,12 +185,6 @@ DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_reso
     right_pipe->Reset();
   }
 
-  // TODO(user) remove this when zorder is assigned properly, check num_blending_stages on pipes
-  if (!display_attributes.is_device_split && right_pipe->valid) {
-    DLOGV_IF(kTagResources, "Non display split, do not support 2 pipes for now");
-    return kErrorNotSupported;
-  }
-
   return kErrorNone;
 }
 
@@ -205,10 +194,11 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
   HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
   HWLayersInfo &layer_info = hw_layers->info;
   DisplayError error = kErrorNone;
+  uint32_t z_order = 0;
 
   for (uint32_t i = 0; i < layer_info.count; i++) {
     Layer& layer = layer_info.stack->layers[layer_info.index[i]];
-    float rot_scale_x = 1.0f, rot_scale_y = 1.0f;
+    float rot_scale = 1.0f;
     if (!IsValidDimension(layer.src_rect, layer.dst_rect)) {
       DLOGV_IF(kTagResources, "Input is invalid");
       LogRect(kTagResources, "input layer src_rect", layer.src_rect);
@@ -241,7 +231,7 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
       NormalizeRect(align_x, align_y, &src_rect);
     }
 
-    if (ValidateScaling(layer, src_rect, dst_rect, &rot_scale_x, &rot_scale_y)) {
+    if (ValidateScaling(layer, src_rect, dst_rect, &rot_scale)) {
       return kErrorNotSupported;
     }
 
@@ -252,10 +242,8 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     layer_config->num_rotate = 0;
 
     LayerTransform transform = layer.transform;
-    if (IsRotationNeeded(transform.rotation) ||
-        UINT32(rot_scale_x) != 1 || UINT32(rot_scale_y) != 1) {
-      RotationConfig(layer.transform, rot_scale_x, rot_scale_y, &src_rect, layer_config,
-                     rotate_count);
+    if (IsRotationNeeded(transform.rotation) || UINT32(rot_scale) != 1) {
+      RotationConfig(layer.transform, rot_scale, &src_rect, layer_config, rotate_count);
       // rotator will take care of flipping, reset tranform
       transform = LayerTransform();
     }
@@ -282,8 +270,7 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     LogRect(kTagResources, "input layer src_rect", layer.src_rect);
     LogRect(kTagResources, "input layer dst_rect", layer.dst_rect);
     for (uint32_t k = 0; k < layer_config->num_rotate; k++) {
-      DLOGV_IF(kTagResources, "rotate num = %d, scale_x = %.2f, scale_y = %.2f",
-               k, rot_scale_x, rot_scale_y);
+      DLOGV_IF(kTagResources, "rotate num = %d, scale_x = %.2f", k, rot_scale);
       LogRect(kTagResources, "rotate src", layer_config->rotates[k].src_roi);
       LogRect(kTagResources, "rotate dst", layer_config->rotates[k].dst_roi);
     }
@@ -296,15 +283,32 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
       LogRect(kTagResources, "right pipe src", layer_config->right_pipe.src_roi);
       LogRect(kTagResources, "right pipe dst", layer_config->right_pipe.dst_roi);
     }
+    // set z_order, left_pipe should always be valid
+    left_pipe.z_order = z_order;
+    if (layer_config->right_pipe.valid) {
+      // use different z_order if 2 pipes are on one mixer and without src split support
+      if (!hw_res_info_.is_src_split &&
+          ((left_pipe.dst_roi.right <= display_attributes.split_left &&
+            right_pipe.dst_roi.right <= display_attributes.split_left) ||
+           (left_pipe.dst_roi.left >= display_attributes.split_left &&
+            right_pipe.dst_roi.left >= display_attributes.split_left))) {
+        z_order++;
+      }
+      layer_config->right_pipe.z_order = z_order;
+    }
+    z_order++;
+    if (z_order >= hw_res_info_.num_blending_stages) {
+      DLOGV_IF(kTagResources, "z_order is over the limit: z_order = %d", z_order);
+      return kErrorResources;
+    }
   }
 
   return error;
 }
 
 DisplayError ResManager::ValidateScaling(const Layer &layer, const LayerRect &crop,
-                                         const LayerRect &dst, float *rot_scale_x,
-                                         float *rot_scale_y) {
-  bool rotated90 = IsRotationNeeded(layer.transform.rotation) && (rot_scale_x != NULL);
+                                         const LayerRect &dst, float *rot_scale) {
+  bool rotated90 = IsRotationNeeded(layer.transform.rotation) && (rot_scale != NULL);
   float crop_width = rotated90 ? crop.bottom - crop.top : crop.right - crop.left;
   float crop_height = rotated90 ? crop.right - crop.left : crop.bottom - crop.top;
   float dst_width = dst.right - dst.left;
@@ -330,31 +334,43 @@ DisplayError ResManager::ValidateScaling(const Layer &layer, const LayerRect &cr
 
   float scale_x = crop_width / dst_width;
   float scale_y = crop_height / dst_height;
-  bool use_rotator = false;
+  uint32_t rot_scale_local = 1;
 
   if ((UINT32(scale_x) > 1) || (UINT32(scale_y) > 1)) {
-    uint32_t max_scale_down = hw_res_info_.max_scale_down;
+    float max_scale_down = FLOAT(hw_res_info_.max_scale_down);
 
     if (hw_res_info_.has_rotator_downscale && !property_setting_.disable_rotator_downscaling &&
-        rot_scale_x) {
-      max_scale_down *= kMaxRotateDownScaleRatio;
-      use_rotator = true;
-    } else if (hw_res_info_.has_decimation && !property_setting_.disable_decimation &&
-               !IsMacroTileFormat(layer.input_buffer)) {
-      max_scale_down *= kMaxDecimationDownScaleRatio;
+        rot_scale && !IsMacroTileFormat(layer.input_buffer)) {
+      float scale_min = MIN(scale_x, scale_y);
+      float scale_max = MAX(scale_x, scale_y);
+      // use rotator to downscale when over the pipe scaling ability
+      if (UINT32(scale_min) >= 2 && scale_max > max_scale_down) {
+        // downscaling ratio needs be the same for both direction, use the smaller one.
+        rot_scale_local = 1 << UINT32(ceilf(log2f(scale_min / max_scale_down)));
+        if (rot_scale_local > kMaxRotateDownScaleRatio)
+          rot_scale_local = kMaxRotateDownScaleRatio;
+        scale_x /= FLOAT(rot_scale_local);
+        scale_y /= FLOAT(rot_scale_local);
+      }
+      *rot_scale = FLOAT(rot_scale_local);
     }
 
-    if (scale_x > FLOAT(max_scale_down) || scale_y > FLOAT(max_scale_down)) {
+    if (hw_res_info_.has_decimation && !property_setting_.disable_decimation &&
+               !IsMacroTileFormat(layer.input_buffer)) {
+      max_scale_down *= FLOAT(kMaxDecimationDownScaleRatio);
+    }
+
+    if (scale_x > max_scale_down || scale_y > max_scale_down) {
       DLOGV_IF(kTagResources,
                "Scaling down is over the limit: is_tile = %d, scale_x = %.0f, scale_y = %.0f, " \
-               "crop_w = %.0f, dst_w = %.0f, has_deci = %d, disable_deci = %d",
+               "crop_w = %.0f, dst_w = %.0f, has_deci = %d, disable_deci = %d, rot_scale = %d",
                IsMacroTileFormat(layer.input_buffer), scale_x, scale_y, crop_width, dst_width,
-               hw_res_info_.has_decimation, property_setting_.disable_decimation);
+               hw_res_info_.has_decimation, property_setting_.disable_decimation, rot_scale_local);
       return kErrorNotSupported;
     }
   }
 
-  const uint32_t max_scale_up = hw_res_info_.max_scale_up;
+  float max_scale_up = FLOAT(hw_res_info_.max_scale_up);
   if (UINT32(scale_x) < 1 && scale_x > 0.0f) {
     if ((1.0f / scale_x) > max_scale_up) {
       DLOGV_IF(kTagResources, "Scaling up is over limit scale_x = %f", 1.0f / scale_x);
@@ -369,24 +385,8 @@ DisplayError ResManager::ValidateScaling(const Layer &layer, const LayerRect &cr
     }
   }
 
-  if (rot_scale_x == NULL) {
-    return kErrorNone;
-  }
-
-  // Calculate rotator downscale ratio
-  if (scale_x > hw_res_info_.max_scale_down && use_rotator) {
-    *rot_scale_x = FLOAT(1 << UINT32(ceilf(log2f(scale_x / FLOAT(hw_res_info_.max_scale_down)))));
-  } else {
-    *rot_scale_x = 1.0f;
-  }
-
-  if (scale_y > hw_res_info_.max_scale_down && use_rotator) {
-    *rot_scale_y = FLOAT(1 << UINT32(ceilf(log2f(scale_y / FLOAT(hw_res_info_.max_scale_down)))));
-  } else {
-    *rot_scale_y = 1.0f;
-  }
-  DLOGV_IF(kTagResources, "scale_x = %.0f, scale_y = %.0f, rot_scale_x = %.0f, rot_scale_y = %.0f",
-           scale_x, scale_y, *rot_scale_x, *rot_scale_y);
+  DLOGV_IF(kTagResources, "scale_x = %.4f, scale_y = %.4f, rot_scale = %d",
+           scale_x, scale_y, rot_scale_local);
 
   return kErrorNone;
 }
@@ -735,13 +735,13 @@ DisplayError ResManager::AlignPipeConfig(const Layer &layer, const LayerTransfor
       right_pipe->dst_roi.left = left_pipe->dst_roi.right;
     }
   }
-  error = ValidateScaling(layer, left_pipe->src_roi, left_pipe->dst_roi, NULL, NULL);
+  error = ValidateScaling(layer, left_pipe->src_roi, left_pipe->dst_roi, NULL);
   if (error != kErrorNone) {
     goto PipeConfigExit;
   }
 
   if (right_pipe->valid) {
-    error = ValidateScaling(layer, right_pipe->src_roi, right_pipe->dst_roi, NULL, NULL);
+    error = ValidateScaling(layer, right_pipe->src_roi, right_pipe->dst_roi, NULL);
   }
 PipeConfigExit:
   if (error != kErrorNone) {

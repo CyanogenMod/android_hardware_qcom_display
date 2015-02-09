@@ -98,7 +98,14 @@ DisplayError ResManager::Init(const HWResourceInfo &hw_res_info, BufferAllocator
 
   if (hw_res_info_.num_rotator > kMaxNumRotator) {
     DLOGE("Number of rotator is over the limit! %d", hw_res_info_.num_rotator);
-    return kErrorParameters;
+    hw_res_info_.num_rotator = kMaxNumRotator;
+  }
+
+  if (hw_res_info_.max_scale_down < 1 || hw_res_info_.max_scale_up < 1) {
+    DLOGE("Max scaling setting is invalid! max_scale_down = %d, max_scale_up = %d",
+          hw_res_info_.max_scale_down, hw_res_info_.max_scale_up);
+    hw_res_info_.max_scale_down = 1;
+    hw_res_info_.max_scale_up = 1;
   }
 
   if (hw_res_info_.num_rotator > 0) {
@@ -274,6 +281,7 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
   DLOGV_IF(kTagResources, "==== Resource reserving start: hw_block = %d ====", hw_block_id);
 
   if (layer_info.count > num_pipe_ || layer_info.count >= hw_res_info_.num_blending_stages) {
+    DLOGV_IF(kTagResources, "layer count is over the limit: layer count = %d", layer_info.count);
     return kErrorResources;
   }
 

@@ -684,7 +684,7 @@ DisplayError HWFrameBuffer::DisplayValidate(HWContext *hw_context, HWLayers *hw_
         }
 
         mdp_layer.alpha = layer.plane_alpha;
-        mdp_layer.z_order = static_cast<uint16_t>(i);
+        mdp_layer.z_order = UINT16(pipe_info->z_order);
         mdp_layer.transp_mask = 0xffffffff;
         SetBlending(layer.blending, &mdp_layer.blend_op);
         mdp_layer.pipe_ndx = pipe_info->pipe_id;
