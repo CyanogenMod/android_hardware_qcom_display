@@ -84,6 +84,7 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   virtual android::status_t notifyCallback(uint32_t command, const android::Parcel *input_parcel,
                                            android::Parcel *output_parcel);
   void DynamicDebug(const android::Parcel *input_parcel);
+  void SetFrameDumpConfig(const android::Parcel *input_parcel);
 
   static Locker locker_;
   CoreInterface *core_intf_;

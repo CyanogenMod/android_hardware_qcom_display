@@ -44,6 +44,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int SetActiveConfig(int index);
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual int SetActiveConfig(hwc_display_contents_1_t *content_list);
+  virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
 
  protected:
   // Maximum number of layers supported by display engine.
@@ -82,6 +83,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
+  virtual int PostCommitLayerStack(hwc_display_contents_1_t *content_list);
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
   void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
   inline void SetRect(const hwc_rect_t &source, LayerRect *target);
@@ -91,6 +93,14 @@ class HWCDisplay : public DisplayEventHandler {
   inline void SetBlending(const int32_t &source, LayerBlending *target);
   int SetFormat(const int32_t &source, const int flags, LayerBufferFormat *target);
   LayerBufferFormat GetSDEFormat(const int32_t &source, const int flags);
+  void DumpInputBuffers(hwc_display_contents_1_t *content_list);
+  const char *GetHALPixelFormatString(int format);
+  const char *GetDisplayString();
+
+  enum {
+    INPUT_LAYER_DUMP,
+    OUTPUT_LAYER_DUMP,
+  };
 
   CoreInterface *core_intf_;
   hwc_procs_t const **hwc_procs_;
@@ -102,6 +112,9 @@ class HWCDisplay : public DisplayEventHandler {
   LayerStackCache layer_stack_cache_;
   bool flush_;
   LayerBuffer *output_buffer_;
+  uint32_t dump_frame_count_;
+  uint32_t dump_frame_index_;
+  bool dump_input_layers_;
 };
 
 }  // namespace sde
