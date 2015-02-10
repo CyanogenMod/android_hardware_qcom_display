@@ -31,11 +31,8 @@
 #include <mdp_version.h>
 #include <hardware/hwcomposer.h>
 
-// This header is for clients to use to set/get global display configuration
-// The functions in this header run in the client process and wherever necessary
-// do a binder call to HWC to get/set data.
+// This header is for clients to use to set/get global display configuration.
 // Only primary and external displays are supported here.
-// WiFi/virtual displays are not supported.
 
 namespace qdutils {
 
@@ -69,14 +66,20 @@ enum {
 
 // Display Attributes that are available to clients of this library
 // Not to be confused with a similar struct in hwc_utils (in the hwc namespace)
-struct DisplayAttributes_t {
+typedef struct DisplayAttributes {
     uint32_t vsync_period; //nanoseconds
     uint32_t xres;
     uint32_t yres;
     float xdpi;
     float ydpi;
     char panel_type;
-};
+    DisplayAttributes() : vsync_period(0), xres(0), yres(0), xdpi(0.0f),
+            ydpi(0.0f), panel_type(0) {}
+} DisplayAttributes_t;
+
+//=============================================================================
+// The functions below run in the client process and wherever necessary
+// do a binder call to HWC to get/set data.
 
 // Check if external display is connected. Useful to check before making
 // calls for external displays
@@ -104,4 +107,66 @@ int setSecondaryDisplayStatus(int dpy, uint32_t status);
 
 // Enable/Disable/Set refresh rate dynamically
 int configureDynRefreshRate(uint32_t op, uint32_t refreshRate);
+
+// Returns the number of configs supported for the display on success.
+// Returns -1 on error.
+// Only primary display supported for now, value of dpy ignored.
+int getConfigCount(int dpy);
+
+// Returns the index of config that is current set for the display on success.
+// Returns -1 on error.
+// Only primary display supported for now, value of dpy ignored.
+int getActiveConfig(int dpy);
+
+// Sets the config for the display on success and returns 0.
+// Returns -1 on error.
+// Only primary display supported for now, value of dpy ignored
+int setActiveConfig(int configIndex, int dpy);
+
+// Returns the attributes for the specified config for the display on success.
+// Returns xres and yres as 0 on error.
+// Only primary display supported for now, value of dpy ignored
+DisplayAttributes getDisplayAttributes(int configIndex, int dpy);
+
+//=============================================================================
+// The functions and methods below run in the context of HWC and
+// are called in response to binder calls from clients
+
+class Configs {
+public:
+    DisplayAttributes getAttributes(const uint32_t& index) const;
+    uint32_t getActiveConfig() const;
+    bool setActiveConfig(const uint32_t& index);
+    uint32_t getConfigCount() const;
+    static Configs *getInstance();
+private:
+    enum { CONFIGS_MAX = 32 };
+    Configs();
+    bool init();
+    bool getCurrentMode(DisplayAttributes& dpyAttr);
+    DisplayAttributes mConfigs[CONFIGS_MAX];
+    char *mModeStr[CONFIGS_MAX];
+    uint32_t mActiveConfig;
+    uint32_t mConfigsSupported;
+    static Configs *sConfigs;
+};
+
+inline DisplayAttributes Configs::getAttributes(const uint32_t& index) const {
+    if(index >= mConfigsSupported) {
+        ALOGE("%s() Invalid index %d, max %d", __FUNCTION__, index,
+                mConfigsSupported);
+        return DisplayAttributes(); //All 0s
+    }
+    return mConfigs[index];
+}
+
+// Retuns the current config index, -1 if called without a setActiveConfig
+inline uint32_t Configs::getActiveConfig() const {
+    return mActiveConfig;
+}
+
+inline uint32_t Configs::getConfigCount() const {
+    return mConfigsSupported;
+}
+
 }; //namespace
