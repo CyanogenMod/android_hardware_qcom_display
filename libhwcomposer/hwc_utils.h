@@ -280,7 +280,6 @@ bool isSecureModePolicy(int mdpVersion);
 bool isRotatorSupportedFormat(private_handle_t *hnd);
 //Returns true, if the layer is YUV or the layer has been rendered by CPU
 bool isRotationDoable(hwc_context_t *ctx, private_handle_t *hnd);
-bool isExternalActive(hwc_context_t* ctx);
 bool isAlphaScaled(hwc_layer_1_t const* layer);
 bool needsScaling(hwc_layer_1_t const* layer);
 bool isDownscaleRequired(hwc_layer_1_t const* layer);
