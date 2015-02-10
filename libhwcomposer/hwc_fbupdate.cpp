@@ -49,11 +49,9 @@ IFBUpdate::IFBUpdate(hwc_context_t *ctx, const int& dpy) : mDpy(dpy) {
     unsigned int size = 0;
     uint32_t xres = ctx->dpyAttr[mDpy].xres;
     uint32_t yres = ctx->dpyAttr[mDpy].yres;
-    if (ctx->dpyAttr[dpy].customFBSize) {
-        //GPU will render and compose at new resolution
-        //So need to have FB at new resolution
-        xres = ctx->dpyAttr[mDpy].xres_new;
-        yres = ctx->dpyAttr[mDpy].yres_new;
+    if (ctx->dpyAttr[dpy].fbScaling) {
+        xres = ctx->dpyAttr[mDpy].xresFB;
+        yres = ctx->dpyAttr[mDpy].yresFB;
     }
     getBufferAttributes((int)xres, (int)yres,
             HAL_PIXEL_FORMAT_RGBA_8888,
@@ -168,7 +166,7 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
 
         // No FB update optimization on (1) Custom FB resolution,
         // (2) External Mirror mode, (3) External orientation
-        if(!ctx->dpyAttr[mDpy].customFBSize && !ctx->mBufferMirrorMode
+        if(!ctx->dpyAttr[mDpy].fbScaling && !ctx->mBufferMirrorMode
            && !ctx->mExtOrientation) {
             sourceCrop = fbUpdatingRect;
             displayFrame = fbUpdatingRect;
@@ -191,7 +189,7 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
         } else if((mDpy && !extOrient
                   && !ctx->dpyAttr[mDpy].mMDPScalingMode)) {
             if(ctx->mOverlay->isUIScalingOnExternalSupported() &&
-                !ctx->dpyAttr[mDpy].customFBSize) {
+                !ctx->dpyAttr[mDpy].fbScaling) {
                 getNonWormholeRegion(list, sourceCrop);
                 displayFrame = sourceCrop;
             }
@@ -300,7 +298,7 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
 
         // No FB update optimization on (1) Custom FB resolution,
         // (2) External Mirror mode, (3) External orientation
-        if(!ctx->dpyAttr[mDpy].customFBSize && !ctx->mBufferMirrorMode
+        if(!ctx->dpyAttr[mDpy].fbScaling && !ctx->mBufferMirrorMode
            && !ctx->mExtOrientation) {
             sourceCrop = fbUpdatingRect;
             displayFrame = fbUpdatingRect;
@@ -319,7 +317,7 @@ bool FBUpdateSplit::configure(hwc_context_t *ctx,
         } else if((mDpy && !extOrient
                   && !ctx->dpyAttr[mDpy].mMDPScalingMode)) {
             if(!qdutils::MDPVersion::getInstance().is8x26() &&
-                !ctx->dpyAttr[mDpy].customFBSize) {
+                !ctx->dpyAttr[mDpy].fbScaling) {
                 getNonWormholeRegion(list, sourceCrop);
                 displayFrame = sourceCrop;
             }
@@ -466,7 +464,7 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
 
     // No FB update optimization on (1) Custom FB resolution,
     // (2) External Mirror mode, (3) External orientation
-    if(!ctx->dpyAttr[mDpy].customFBSize && !ctx->mBufferMirrorMode
+    if(!ctx->dpyAttr[mDpy].fbScaling && !ctx->mBufferMirrorMode
        && !ctx->mExtOrientation) {
         sourceCrop = fbUpdatingRect;
         displayFrame = fbUpdatingRect;
@@ -487,7 +485,7 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     } else if((mDpy && !extOrient
               && !ctx->dpyAttr[mDpy].mMDPScalingMode)) {
         if(!qdutils::MDPVersion::getInstance().is8x26() &&
-            !ctx->dpyAttr[mDpy].customFBSize) {
+            !ctx->dpyAttr[mDpy].fbScaling) {
             getNonWormholeRegion(list, sourceCrop);
             displayFrame = sourceCrop;
         }

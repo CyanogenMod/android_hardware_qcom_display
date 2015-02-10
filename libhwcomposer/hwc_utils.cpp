@@ -93,33 +93,38 @@ bool isValidResolution(hwc_context_t *ctx, uint32_t xres, uint32_t yres)
             (xres < MIN_DISPLAY_XRES || yres < MIN_DISPLAY_YRES));
 }
 
-void changeResolution(hwc_context_t *ctx, int xres_orig, int yres_orig,
-                      int width, int height) {
+static void handleFbScaling(hwc_context_t *ctx, int xresPanel, int yresPanel,
+        int width, int height) {
+    const int dpy = HWC_DISPLAY_PRIMARY;
     //Store original display resolution.
-    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres_new = xres_orig;
-    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres_new = yres_orig;
-    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].customFBSize = false;
+    ctx->dpyAttr[dpy].xresFB = xresPanel;
+    ctx->dpyAttr[dpy].yresFB = yresPanel;
+    ctx->dpyAttr[dpy].fbScaling = false;
     char property[PROPERTY_VALUE_MAX] = {'\0'};
     char *yptr = NULL;
     if (property_get("debug.hwc.fbsize", property, NULL) > 0) {
         yptr = strcasestr(property,"x");
         if(yptr) {
-            int xres_new = atoi(property);
-            int yres_new = atoi(yptr + 1);
-            if (isValidResolution(ctx,xres_new,yres_new) &&
-                xres_new != xres_orig && yres_new != yres_orig) {
-                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres_new = xres_new;
-                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres_new = yres_new;
-                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].customFBSize = true;
+            int xresFB = atoi(property);
+            int yresFB = atoi(yptr + 1);
+            if (isValidResolution(ctx, xresFB, yresFB) &&
+                xresFB != xresPanel && yresFB != yresPanel) {
+                ctx->dpyAttr[dpy].xresFB = xresFB;
+                ctx->dpyAttr[dpy].yresFB = yresFB;
+                ctx->dpyAttr[dpy].fbScaling = true;
 
-                //Caluculate DPI according to changed resolution.
-                float xdpi = ((float)xres_new * 25.4f) / (float)width;
-                float ydpi = ((float)yres_new * 25.4f) / (float)height;
-                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xdpi = xdpi;
-                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].ydpi = ydpi;
+                //Calculate DPI according to changed resolution.
+                float xdpi = ((float)xresFB * 25.4f) / (float)width;
+                float ydpi = ((float)yresFB * 25.4f) / (float)height;
+                ctx->dpyAttr[dpy].xdpi = xdpi;
+                ctx->dpyAttr[dpy].ydpi = ydpi;
             }
         }
     }
+    ctx->dpyAttr[dpy].fbWidthScaleRatio = (float) ctx->dpyAttr[dpy].xres /
+            (float) ctx->dpyAttr[dpy].xresFB;
+    ctx->dpyAttr[dpy].fbHeightScaleRatio = (float) ctx->dpyAttr[dpy].yres /
+            (float) ctx->dpyAttr[dpy].yresFB;
 }
 
 // Initialize hdmi display attributes based on
@@ -234,8 +239,7 @@ static int openFramebufferDevice(hwc_context_t *ctx)
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period =
             (uint32_t)(1000000000l / fps);
 
-    //To change resolution of primary display
-    changeResolution(ctx, info.xres, info.yres, info.width, info.height);
+    handleFbScaling(ctx, info.xres, info.yres, info.width, info.height);
 
     //Unblank primary on first boot
     if(ioctl(fb_fd, FBIOBLANK,FB_BLANK_UNBLANK) < 0) {
