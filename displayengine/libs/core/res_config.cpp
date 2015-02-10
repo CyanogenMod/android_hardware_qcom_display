@@ -25,6 +25,7 @@
 #include <math.h>
 #include <utils/constants.h>
 #include <utils/debug.h>
+#include <utils/rect.h>
 
 #include "res_manager.h"
 
@@ -179,8 +180,8 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     float rot_scale_x = 1.0f, rot_scale_y = 1.0f;
     if (!IsValidDimension(layer.src_rect, layer.dst_rect)) {
       DLOGV_IF(kTagResources, "Input is invalid");
-      LogRectVerbose("input layer src_rect", layer.src_rect);
-      LogRectVerbose("input layer dst_rect", layer.dst_rect);
+      LogRect(kTagResources, "input layer src_rect", layer.src_rect);
+      LogRect(kTagResources, "input layer dst_rect", layer.dst_rect);
       return kErrorNotSupported;
     }
 
@@ -239,21 +240,21 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
 
     DLOGV_IF(kTagResources, "layer = %d, left pipe_id = %x",
              i, layer_config->left_pipe.pipe_id);
-    LogRectVerbose("input layer src_rect", layer.src_rect);
-    LogRectVerbose("input layer dst_rect", layer.dst_rect);
+    LogRect(kTagResources, "input layer src_rect", layer.src_rect);
+    LogRect(kTagResources, "input layer dst_rect", layer.dst_rect);
     for (uint32_t k = 0; k < layer_config->num_rotate; k++) {
       DLOGV_IF(kTagResources, "rotate num = %d, scale_x = %.2f, scale_y = %.2f",
                k, rot_scale_x, rot_scale_y);
-      LogRectVerbose("rotate src", layer_config->rotates[k].src_roi);
-      LogRectVerbose("rotate dst", layer_config->rotates[k].dst_roi);
+      LogRect(kTagResources, "rotate src", layer_config->rotates[k].src_roi);
+      LogRect(kTagResources, "rotate dst", layer_config->rotates[k].dst_roi);
     }
-    LogRectVerbose("cropped src_rect", src_rect);
-    LogRectVerbose("cropped dst_rect", dst_rect);
-    LogRectVerbose("left pipe src", layer_config->left_pipe.src_roi);
-    LogRectVerbose("left pipe dst", layer_config->left_pipe.dst_roi);
+    LogRect(kTagResources, "cropped src_rect", src_rect);
+    LogRect(kTagResources, "cropped dst_rect", dst_rect);
+    LogRect(kTagResources, "left pipe src", layer_config->left_pipe.src_roi);
+    LogRect(kTagResources, "left pipe dst", layer_config->left_pipe.dst_roi);
     if (hw_layers->config[i].right_pipe.pipe_id) {
-      LogRectVerbose("right pipe src", layer_config->right_pipe.src_roi);
-      LogRectVerbose("right pipe dst", layer_config->right_pipe.dst_roi);
+      LogRect(kTagResources, "right pipe src", layer_config->right_pipe.src_roi);
+      LogRect(kTagResources, "right pipe dst", layer_config->right_pipe.dst_roi);
     }
   }
 
@@ -527,23 +528,6 @@ void ResManager::SplitRect(bool flip_horizontal, const LayerRect &src_rect,
     dst_right->right = dst_rect.right;
     dst_right->bottom = dst_rect.bottom;
   }
-}
-
-void ResManager::LogRectVerbose(const char *prefix, const LayerRect &roi) {
-  DLOGV_IF(kTagResources, "%s: left = %.0f, top = %.0f, right = %.0f, bottom = %.0f",
-           prefix, roi.left, roi.top, roi.right, roi.bottom);
-}
-
-void ResManager::NormalizeRect(const uint32_t &factor, LayerRect *rect) {
-  uint32_t left = UINT32(ceilf(rect->left));
-  uint32_t top = UINT32(ceilf(rect->top));
-  uint32_t right = UINT32(floorf(rect->right));
-  uint32_t bottom = UINT32(floorf(rect->bottom));
-
-  rect->left = FLOAT(CeilToMultipleOf(left, factor));
-  rect->top = FLOAT(CeilToMultipleOf(top, factor));
-  rect->right = FLOAT(FloorToMultipleOf(right, factor));
-  rect->bottom = FLOAT(FloorToMultipleOf(bottom, factor));
 }
 
 }  // namespace sde

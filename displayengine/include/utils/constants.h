@@ -53,6 +53,24 @@
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
+template <class T>
+inline void Swap(T &a, T &b) {
+  T c(a);
+  a = b;
+  b = c;
+}
+
+// factor value should be in powers of 2(eg: 1, 2, 4, 8)
+template <class T1, class T2>
+inline T1 FloorToMultipleOf(const T1 &value, const T2 &factor) {
+  return (T1)(value & (~(factor - 1)));
+}
+
+template <class T1, class T2>
+inline T1 CeilToMultipleOf(const T1 &value, const T2 &factor) {
+  return (T1)((value + (factor - 1)) & (~(factor - 1)));
+}
+
 namespace sde {
 
   const int kThreadPriorityUrgent = -9;

@@ -27,7 +27,11 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <math.h>
 #include <utils/rect.h>
+#include <utils/constants.h>
+
+#define __CLASS__ "RectUtils"
 
 namespace sde {
 
@@ -53,6 +57,23 @@ LayerRect GetIntersection(const LayerRect &rect1, const LayerRect &rect2) {
   }
 
   return res;
+}
+
+void LogRect(DebugTag debug_tag, const char *prefix, const LayerRect &roi) {
+  DLOGV_IF(debug_tag, "%s: left = %.0f, top = %.0f, right = %.0f, bottom = %.0f",
+           prefix, roi.left, roi.top, roi.right, roi.bottom);
+}
+
+void NormalizeRect(const uint32_t &factor, LayerRect *rect) {
+  uint32_t left = UINT32(ceilf(rect->left));
+  uint32_t top = UINT32(ceilf(rect->top));
+  uint32_t right = UINT32(floorf(rect->right));
+  uint32_t bottom = UINT32(floorf(rect->bottom));
+
+  rect->left = FLOAT(CeilToMultipleOf(left, factor));
+  rect->top = FLOAT(CeilToMultipleOf(top, factor));
+  rect->right = FLOAT(FloorToMultipleOf(right, factor));
+  rect->bottom = FLOAT(FloorToMultipleOf(bottom, factor));
 }
 
 }  // namespace sde

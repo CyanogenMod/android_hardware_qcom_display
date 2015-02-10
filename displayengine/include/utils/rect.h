@@ -33,11 +33,14 @@
 #include <stdint.h>
 #include <core/sde_types.h>
 #include <core/layer_stack.h>
+#include <utils/debug.h>
 
 namespace sde {
 
   bool IsValidRect(const LayerRect &rect);
   LayerRect GetIntersection(const LayerRect &rect1, const LayerRect &rect2);
+  void LogRect(DebugTag debug_tag, const char *prefix, const LayerRect &roi);
+  void NormalizeRect(const uint32_t &factor, LayerRect *rect);
 
 }  // namespace sde
 
