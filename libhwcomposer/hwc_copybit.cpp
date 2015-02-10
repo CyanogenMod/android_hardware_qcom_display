@@ -542,12 +542,23 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
                                        __FUNCTION__, mDirtyLayerIndex);
     hwc_rect_t clearRegion = {0,0,0,0};
     mDirtyRect = list->hwLayers[last].displayFrame;
-    if (mDirtyLayerIndex != -1)
-        mDirtyRect = list->hwLayers[mDirtyLayerIndex].displayFrame;
 
     if (CBUtils::getuiClearRegion(list, clearRegion, layerProp,
-                                                       mDirtyLayerIndex))
-             clear(renderBuffer, clearRegion);
+                                                       mDirtyLayerIndex)) {
+       int clear_w =  clearRegion.right -  clearRegion.left;
+       int clear_h =  clearRegion.bottom - clearRegion.top;
+       //mdp can't handle solid fill for one line
+       //making solid fill as full in this case
+       //disable swap rect if presents
+       if ((clear_w == 1) || (clear_h ==1)) {
+           clear(renderBuffer, mDirtyRect);
+           mDirtyLayerIndex = -1;
+       }else
+           clear(renderBuffer, clearRegion);
+    }
+    if (mDirtyLayerIndex != -1)
+           mDirtyRect = list->hwLayers[mDirtyLayerIndex].displayFrame;
+
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
     for (int i = 0; i <= (ctx->listStats[dpy].numAppLayers-1); i++) {
         if(!(layerProp[i].mFlags & HWC_COPYBIT)) {
