@@ -50,6 +50,8 @@ class OfflineCtrl {
     DisplayOfflineContext() : display_type(kPrimary), pending_rot_commit(false) { }
   };
 
+  DisplayError OpenRotatorSession(HWLayers *hw_layers);
+  DisplayError CloseRotatorSession(HWLayers *hw_layers);
   bool IsRotationRequired(HWLayers *hw_layers);
 
   HWInterface *hw_intf_;

@@ -542,48 +542,32 @@ DisplayError HWFrameBuffer::SetVSyncState(Handle device, bool enable) {
   return kErrorNone;
 }
 
-DisplayError HWFrameBuffer::OpenRotatorSession(Handle device, HWLayers *hw_layers) {
+DisplayError HWFrameBuffer::OpenRotatorSession(Handle device, HWRotateInfo *rotate_info) {
   HWContext *hw_context = reinterpret_cast<HWContext *>(device);
   HWRotator *hw_rotator = &hw_context->hw_rotator;
+  LayerBuffer *input_buffer = rotate_info->input_buffer;
+  HWBufferInfo *rot_buf_info = &rotate_info->hw_buffer_info;
 
   hw_rotator->Reset();
 
-  HWLayersInfo &hw_layer_info = hw_layers->info;
+  STRUCT_VAR(mdp_rotation_config, mdp_rot_config);
+  mdp_rot_config.version = MDP_ROTATION_REQUEST_VERSION_1_0;
+  mdp_rot_config.input.width = input_buffer->width;
+  mdp_rot_config.input.height = input_buffer->height;
+  SetFormat(input_buffer->format, &mdp_rot_config.input.format);
+  mdp_rot_config.output.width = rot_buf_info->output_buffer.width;
+  mdp_rot_config.output.height = rot_buf_info->output_buffer.height;
+  SetFormat(rot_buf_info->output_buffer.format, &mdp_rot_config.output.format);
+  mdp_rot_config.frame_rate = rotate_info->frame_rate;
 
-  for (uint32_t i = 0; i < hw_layer_info.count; i++) {
-    Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
-    LayerBuffer *input_buffer = layer.input_buffer;
-    bool rot90 = (layer.transform.rotation == 90.0f);
-
-    for (uint32_t count = 0; count < 2; count++) {
-      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
-
-      if (rotate_info->valid) {
-        HWBufferInfo *rot_buf_info = &rotate_info->hw_buffer_info;
-
-        if (rot_buf_info->session_id < 0) {
-          STRUCT_VAR(mdp_rotation_config, mdp_rot_config);
-          mdp_rot_config.version = MDP_ROTATION_REQUEST_VERSION_1_0;
-          mdp_rot_config.input.width = input_buffer->width;
-          mdp_rot_config.input.height = input_buffer->height;
-          SetFormat(input_buffer->format, &mdp_rot_config.input.format);
-          mdp_rot_config.output.width = rot_buf_info->output_buffer.width;
-          mdp_rot_config.output.height = rot_buf_info->output_buffer.height;
-          SetFormat(rot_buf_info->output_buffer.format, &mdp_rot_config.output.format);
-          mdp_rot_config.frame_rate = layer.frame_rate;
-
-          if (ioctl_(hw_context->device_fd, MDSS_ROTATION_OPEN, &mdp_rot_config) < 0) {
-            IOCTL_LOGE(MDSS_ROTATION_OPEN, hw_context->type);
-            return kErrorHardware;
-          }
-
-          rot_buf_info->session_id = mdp_rot_config.session_id;
-
-          DLOGV_IF(kTagDriverConfig, "session_id %d", rot_buf_info->session_id);
-        }
-      }
-    }
+  if (ioctl_(hw_context->device_fd, MDSS_ROTATION_OPEN, &mdp_rot_config) < 0) {
+    IOCTL_LOGE(MDSS_ROTATION_OPEN, hw_context->type);
+    return kErrorHardware;
   }
+
+  rot_buf_info->session_id = mdp_rot_config.session_id;
+
+  DLOGV_IF(kTagDriverConfig, "session_id %d", rot_buf_info->session_id);
 
   return kErrorNone;
 }
@@ -890,7 +874,7 @@ DisplayError HWFrameBuffer::DisplayCommit(HWContext *hw_context, HWLayers *hw_la
   return kErrorNone;
 }
 
-DisplayError HWFrameBuffer::RotatorValidate(HWContext *hw_context, HWLayers *hw_layers) {
+void HWFrameBuffer::SetRotatorCtrlParams(HWContext *hw_context, HWLayers *hw_layers) {
   HWRotator *hw_rotator = &hw_context->hw_rotator;
   DLOGV_IF(kTagDriverConfig, "************************* %s Validate Input ************************",
            GetDeviceString(hw_context->type));
@@ -957,17 +941,9 @@ DisplayError HWFrameBuffer::RotatorValidate(HWContext *hw_context, HWLayers *hw_
       }
     }
   }
-
-  mdp_rot_request->flags = MDSS_ROTATION_REQUEST_VALIDATE;
-  if (ioctl_(hw_context->device_fd, MDSS_ROTATION_REQUEST, mdp_rot_request) < 0) {
-    IOCTL_LOGE(MDSS_ROTATION_REQUEST, hw_context->type);
-    return kErrorHardware;
-  }
-
-  return kErrorNone;
 }
 
-DisplayError HWFrameBuffer::RotatorCommit(HWContext *hw_context, HWLayers *hw_layers) {
+void HWFrameBuffer::SetRotatorBufferParams(HWContext *hw_context, HWLayers *hw_layers) {
   HWRotator *hw_rotator = &hw_context->hw_rotator;
   mdp_rotation_request *mdp_rot_request = &hw_rotator->mdp_rot_req;
   HWLayersInfo &hw_layer_info = hw_layers->info;
@@ -1020,14 +996,36 @@ DisplayError HWFrameBuffer::RotatorCommit(HWContext *hw_context, HWLayers *hw_la
       }
     }
   }
+}
 
-  mdp_rot_request->flags &= ~MDSS_ROTATION_REQUEST_VALIDATE;
-  if (ioctl_(hw_context->device_fd, MDSS_ROTATION_REQUEST, mdp_rot_request) < 0) {
+DisplayError HWFrameBuffer::RotatorValidate(HWContext *hw_context, HWLayers *hw_layers) {
+  HWRotator *hw_rotator = &hw_context->hw_rotator;
+  SetRotatorCtrlParams(hw_context, hw_layers);
+
+  hw_rotator->mdp_rot_req.flags = MDSS_ROTATION_REQUEST_VALIDATE;
+  if (ioctl_(hw_context->device_fd, MDSS_ROTATION_REQUEST, &hw_rotator->mdp_rot_req) < 0) {
     IOCTL_LOGE(MDSS_ROTATION_REQUEST, hw_context->type);
     return kErrorHardware;
   }
 
-  rot_count = 0;
+  return kErrorNone;
+}
+
+DisplayError HWFrameBuffer::RotatorCommit(HWContext *hw_context, HWLayers *hw_layers) {
+  HWRotator *hw_rotator = &hw_context->hw_rotator;
+  HWLayersInfo &hw_layer_info = hw_layers->info;
+  uint32_t rot_count = 0;
+
+  SetRotatorCtrlParams(hw_context, hw_layers);
+
+  SetRotatorBufferParams(hw_context, hw_layers);
+
+  hw_rotator->mdp_rot_req.flags &= ~MDSS_ROTATION_REQUEST_VALIDATE;
+  if (ioctl_(hw_context->device_fd, MDSS_ROTATION_REQUEST, &hw_rotator->mdp_rot_req) < 0) {
+    IOCTL_LOGE(MDSS_ROTATION_REQUEST, hw_context->type);
+    return kErrorHardware;
+  }
+
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
 
@@ -1038,7 +1036,7 @@ DisplayError HWFrameBuffer::RotatorCommit(HWContext *hw_context, HWLayers *hw_la
 
       if (rotate_info->valid) {
         HWBufferInfo *rot_buf_info = &rotate_info->hw_buffer_info;
-        mdp_rotation_item *mdp_rot_item = &mdp_rot_request->list[rot_count];
+        mdp_rotation_item *mdp_rot_item = &hw_rotator->mdp_rot_req.list[rot_count];
 
         SyncMerge(layer.input_buffer->release_fence_fd, dup(mdp_rot_item->output.fence),
                   &layer.input_buffer->release_fence_fd);
