@@ -318,6 +318,20 @@ bool CompManager::ProcessIdleTimeout(Handle display_ctx) {
   return false;
 }
 
+DisplayError CompManager::SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages) {
+  SCOPE_LOCK(locker_);
+
+  DisplayError error = kErrorNone;
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+
+  if (display_comp_ctx) {
+    error = res_mgr_.SetMaxMixerStages(display_comp_ctx->display_resource_ctx, max_mixer_stages);
+  }
+
+  return error;
+}
+
 void CompManager::AppendDump(char *buffer, uint32_t length) {
   SCOPE_LOCK(locker_);
 }

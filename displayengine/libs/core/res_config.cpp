@@ -325,8 +325,9 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
       layer_config->right_pipe.z_order = z_order;
     }
     z_order++;
-    if (z_order >= hw_res_info_.num_blending_stages) {
-      DLOGV_IF(kTagResources, "z_order is over the limit: z_order = %d", z_order);
+    if (z_order > display_resource_ctx->max_mixer_stages) {
+      DLOGV_IF(kTagResources, "z_order is over the limit of max_mixer_stages = %d",
+               display_resource_ctx->max_mixer_stages);
       return kErrorResources;
     }
   }

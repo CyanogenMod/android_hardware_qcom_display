@@ -91,12 +91,6 @@ public:
         ENABLE_PARTIAL_UPDATE,
     };
 
-    enum {
-        DUMP_PRIMARY_DISPLAY,
-        DUMP_HDMI_DISPLAY,
-        DUMP_VIRTUAL_DISPLAY,
-    };
-
     // Register a HWC client that can be notified
     // This client is generic and is intended to get
     // dispatches of all events calling into QService

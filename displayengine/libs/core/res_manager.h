@@ -49,6 +49,7 @@ class ResManager : public DumpImpl {
   DisplayError PostPrepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError PostCommit(Handle display_ctx, HWLayers *hw_layers);
   void Purge(Handle display_ctx);
+  DisplayError SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);
@@ -122,9 +123,10 @@ class ResManager : public DumpImpl {
     int32_t session_id;  // applicable for virtual display sessions only
     uint32_t rotate_count;
     bool frame_start;
+    uint32_t max_mixer_stages;
 
     DisplayResourceContext() : hw_block_id(kHWBlockMax), frame_count(0), session_id(-1),
-                    rotate_count(0), frame_start(false) { }
+                    rotate_count(0), frame_start(false), max_mixer_stages(0) { }
 
     ~DisplayResourceContext() {
       if (buffer_manager) {

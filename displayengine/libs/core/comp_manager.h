@@ -48,6 +48,7 @@ class CompManager : public DumpImpl {
   DisplayError PostCommit(Handle display_ctx, HWLayers *hw_layers);
   void Purge(Handle display_ctx);
   bool ProcessIdleTimeout(Handle display_ctx);
+  DisplayError SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);

@@ -60,6 +60,7 @@ class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
   virtual DisplayError SetActiveConfig(uint32_t index);
   virtual DisplayError SetVSyncState(bool enable);
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
+  virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
 
   // Implement the HWEventHandlers
   virtual DisplayError VSync(int64_t timestamp);

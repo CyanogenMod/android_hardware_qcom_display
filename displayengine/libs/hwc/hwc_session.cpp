@@ -562,6 +562,8 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
                                              android::Parcel */*output_parcel*/) {
   SEQUENCE_WAIT_SCOPE_LOCK(locker_);
 
+  android::status_t status = 0;
+
   switch (command) {
   case qService::IQService::DYNAMIC_DEBUG:
     DynamicDebug(input_parcel);
@@ -573,7 +575,7 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
 
   case qService::IQService::SET_IDLE_TIMEOUT:
     if (display_primary_) {
-      uint32_t timeout = (uint32_t)input_parcel->readInt32();
+      uint32_t timeout = UINT32(input_parcel->readInt32());
       display_primary_->SetIdleTimeoutMs(timeout);
     }
     break;
@@ -582,9 +584,48 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     SetFrameDumpConfig(input_parcel);
     break;
 
+  case qService::IQService::SET_MAX_PIPES_PER_MIXER:
+    status = SetMaxMixerStages(input_parcel);
+    break;
+
   default:
     DLOGW("QService command = %d is not supported", command);
     return -EINVAL;
+  }
+
+  return status;
+}
+
+android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_parcel) {
+  DisplayError error = kErrorNone;
+  uint32_t bit_mask_display_type = UINT32(input_parcel->readInt32());
+  uint32_t max_mixer_stages = UINT32(input_parcel->readInt32());
+
+  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_PRIMARY)) {
+    if (display_primary_) {
+      error = display_primary_->SetMaxMixerStages(max_mixer_stages);
+      if (error != kErrorNone) {
+        return -EINVAL;
+      }
+    }
+  }
+
+  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_EXTERNAL)) {
+    if (display_external_) {
+      error = display_external_->SetMaxMixerStages(max_mixer_stages);
+      if (error != kErrorNone) {
+        return -EINVAL;
+      }
+    }
+  }
+
+  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_VIRTUAL)) {
+    if (display_virtual_) {
+      error = display_virtual_->SetMaxMixerStages(max_mixer_stages);
+      if (error != kErrorNone) {
+        return -EINVAL;
+      }
+    }
   }
 
   return 0;
@@ -595,19 +636,19 @@ void HWCSession::SetFrameDumpConfig(const android::Parcel *input_parcel) {
   uint32_t bit_mask_display_type = UINT32(input_parcel->readInt32());
   uint32_t bit_mask_layer_type = UINT32(input_parcel->readInt32());
 
-  if (bit_mask_display_type & (1 << qService::IQService::DUMP_PRIMARY_DISPLAY)) {
+  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_PRIMARY)) {
     if (display_primary_) {
       display_primary_->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
   }
 
-  if (bit_mask_display_type & (1 << qService::IQService::DUMP_HDMI_DISPLAY)) {
+  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_EXTERNAL)) {
     if (display_external_) {
       display_external_->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
   }
 
-  if (bit_mask_display_type & (1 << qService::IQService::DUMP_VIRTUAL_DISPLAY)) {
+  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_VIRTUAL)) {
     if (display_virtual_) {
       display_virtual_->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
