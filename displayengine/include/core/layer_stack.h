@@ -124,7 +124,11 @@ struct LayerStackFlags {
   uint64_t secure_present : 1;    //!< This flag will be set to true, if the current layer stack
                                   //!< contains secure layers.
 
-  LayerStackFlags() : geometry_changed(0), skip_present(0), video_present(0), secure_present(0) { }
+  uint64_t animating : 1;         //!< This flag shall be set by client to indicate that the current
+                                  //!< frame is animating.
+
+  LayerStackFlags()
+    : geometry_changed(0), skip_present(0), video_present(0), secure_present(0), animating(0) { }
 };
 
 /*! @brief This structure defines a rectanglular area inside a display layer.

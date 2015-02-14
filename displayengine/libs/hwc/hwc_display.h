@@ -69,8 +69,9 @@ class HWCDisplay : public DisplayEventHandler {
   struct LayerStackCache {
     LayerCache layer_cache[kMaxLayerCount];
     uint32_t layer_count;
+    bool animating;
 
-    LayerStackCache() : layer_count(0) { }
+    LayerStackCache() : layer_count(0), animating(false) { }
   };
 
   HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id);
