@@ -91,7 +91,6 @@ enum {
                              GRALLOC_USAGE_PRIVATE_ADSP_HEAP)
 
 #define INTERLACE_MASK 0x80
-#define S3D_FORMAT_MASK 0xFF000
 /*****************************************************************************/
 
 /* OEM specific HAL formats */
@@ -155,15 +154,11 @@ enum {
 
 /* possible formats for 3D content*/
 enum {
-    HAL_NO_3D                         = 0x0000,
-    HAL_3D_IN_SIDE_BY_SIDE_L_R        = 0x10000,
-    HAL_3D_IN_TOP_BOTTOM              = 0x20000,
-    HAL_3D_IN_INTERLEAVE              = 0x40000,
-    HAL_3D_IN_SIDE_BY_SIDE_R_L        = 0x80000,
-    HAL_3D_OUT_SIDE_BY_SIDE           = 0x1000,
-    HAL_3D_OUT_TOP_BOTTOM             = 0x2000,
-    HAL_3D_OUT_INTERLEAVE             = 0x4000,
-    HAL_3D_OUT_MONOSCOPIC             = 0x8000
+    HAL_NO_3D                      = 0x0,
+    HAL_3D_SIDE_BY_SIDE_L_R        = 0x1,
+    HAL_3D_SIDE_BY_SIDE_R_L        = 0x2,
+    HAL_3D_TOP_BOTTOM              = 0x4,
+    HAL_3D_IN_SIDE_BY_SIDE_L_R     = 0x10000, //unused legacy format
 };
 
 enum {
