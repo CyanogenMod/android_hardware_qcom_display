@@ -187,7 +187,6 @@ class ResManager : public DumpImpl {
   bool IsYuvFormat(LayerBufferFormat format) { return (format >= kFormatYCbCr420Planar); }
   bool IsRotationNeeded(float rotation)
          { return (UINT32(rotation) == 90 || UINT32(rotation) == 270); }
-  void LogRectVerbose(const char *prefix, const LayerRect &roi);
   void RotationConfig(const LayerTransform &transform, const float &scale_x,
                       const float &scale_y, LayerRect *src_rect,
                       struct HWLayerConfig *layer_config, uint32_t *rotate_count);
@@ -195,28 +194,9 @@ class ResManager : public DumpImpl {
                               const uint32_t roate_cnt);
   void AssignRotator(HWRotateInfo *rotate, uint32_t *rotate_cnt);
   void ClearRotator(DisplayResourceContext *display_resource_ctx);
-  void NormalizeRect(const uint32_t &factor, LayerRect *rect);
   DisplayError AllocRotatorBuffer(Handle display_ctx, HWLayers *hw_layers);
   void SetRotatorOutputFormat(const LayerBufferFormat &input_format, bool bwc, bool rot90,
                               LayerBufferFormat *output_format);
-
-  template <class T>
-  inline void Swap(T &a, T &b) {
-    T c(a);
-    a = b;
-    b = c;
-  }
-
-  // factor value should be in powers of 2(eg: 1, 2, 4, 8)
-  template <class T1, class T2>
-  inline T1 FloorToMultipleOf(const T1 &value, const T2 &factor) {
-    return (T1)(value & (~(factor - 1)));
-  }
-
-  template <class T1, class T2>
-  inline T1 CeilToMultipleOf(const T1 &value, const T2 &factor) {
-    return (T1)((value + (factor - 1)) & (~(factor - 1)));
-  }
 
   Locker locker_;
   HWResourceInfo hw_res_info_;
