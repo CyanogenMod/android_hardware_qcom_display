@@ -106,7 +106,7 @@ int AdrenoMemInfo::getStride(int width, int format)
 {
     int stride = ALIGN(width, 32);
     // Currently surface padding is only computed for RGB* surfaces.
-    if (format <= HAL_PIXEL_FORMAT_sRGB_X_8888) {
+    if (format <= HAL_PIXEL_FORMAT_BGRA_8888) {
         int bpp = 4;
         switch(format)
         {
@@ -264,8 +264,6 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_BGRA_8888:
-        case HAL_PIXEL_FORMAT_sRGB_A_8888:
-        case HAL_PIXEL_FORMAT_sRGB_X_8888:
             size = alignedw * alignedh * 4;
             break;
         case HAL_PIXEL_FORMAT_RGB_888:
