@@ -722,6 +722,14 @@ DisplayError HWFrameBuffer::DisplayValidate(HWContext *hw_context, HWLayers *hw_
           }
         }
 
+        if (pipe_info->scale_data.enable_pxl_ext) {
+          if ((mdp_layer.flags & MDP_LAYER_DEINTERLACE) && (layer.transform.rotation == 90.0f))
+            mdp_buffer.width = pipe_info->scale_data.src_width;
+          hw_display->SetScaleData(pipe_info->scale_data, mdp_layer_count);
+        }
+
+        // Send scale data to MDP driver
+        mdp_layer.scale = hw_display->GetScaleRef(mdp_layer_count);
         mdp_layer_count++;
 
         DLOGV_IF(kTagDriverConfig, "******************* Layer[%d] %s pipe Input ******************",
@@ -735,6 +743,19 @@ DisplayError HWFrameBuffer::DisplayValidate(HWContext *hw_context, HWLayers *hw_
                  mdp_layer.src_rect.y, mdp_layer.src_rect.w, mdp_layer.src_rect.h);
         DLOGV_IF(kTagDriverConfig, "dst_rect [%d, %d, %d, %d]", mdp_layer.dst_rect.x,
                  mdp_layer.dst_rect.y, mdp_layer.dst_rect.w, mdp_layer.dst_rect.h);
+        for (int j = 0; j < MAX_PLANES; j++) {
+          DLOGV_IF(kTagDriverConfig, "Scale Data[%d]: Phase=[%x %x %x %x] Pixel_Ext=[%d %d %d %d]",
+                 j, mdp_layer.scale->init_phase_x[j], mdp_layer.scale->phase_step_x[j],
+                 mdp_layer.scale->init_phase_y[j], mdp_layer.scale->phase_step_y[j],
+                 mdp_layer.scale->num_ext_pxls_left[j], mdp_layer.scale->num_ext_pxls_top[j],
+                 mdp_layer.scale->num_ext_pxls_right[j], mdp_layer.scale->num_ext_pxls_btm[j]);
+          DLOGV_IF(kTagDriverConfig, "Fetch=[%d %d %d %d]  Repeat=[%d %d %d %d]  roi_width = %d",
+                 mdp_layer.scale->left_ftch[j], mdp_layer.scale->top_ftch[j],
+                 mdp_layer.scale->right_ftch[j], mdp_layer.scale->btm_ftch[j],
+                 mdp_layer.scale->left_rpt[j], mdp_layer.scale->top_rpt[j],
+                 mdp_layer.scale->right_rpt[j], mdp_layer.scale->btm_rpt[j],
+                 mdp_layer.scale->roi_w[j]);
+        }
         DLOGV_IF(kTagDriverConfig, "*************************************************************");
       }
     }

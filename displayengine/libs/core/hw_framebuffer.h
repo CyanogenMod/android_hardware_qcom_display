@@ -67,6 +67,7 @@ class HWFrameBuffer : public HWInterface {
   struct HWDisplay {
     mdp_layer_commit mdp_disp_commit;
     mdp_input_layer mdp_in_layers[kMaxSDELayers * 2];   // split panel (left + right)
+    mdp_scale_data scale_data[kMaxSDELayers * 2];
     mdp_output_layer mdp_out_layer;
 
     HWDisplay() { Reset(); }
@@ -75,6 +76,7 @@ class HWFrameBuffer : public HWInterface {
       memset(&mdp_disp_commit, 0, sizeof(mdp_disp_commit));
       memset(&mdp_in_layers, 0, sizeof(mdp_in_layers));
       memset(&mdp_out_layer, 0, sizeof(mdp_out_layer));
+      memset(&scale_data, 0, sizeof(scale_data));
 
       for (uint32_t i = 0; i < kMaxSDELayers * 2; i++) {
         mdp_in_layers[i].buffer.fence = -1;
@@ -84,6 +86,37 @@ class HWFrameBuffer : public HWInterface {
       mdp_disp_commit.commit_v1.input_layers = mdp_in_layers;
       mdp_disp_commit.commit_v1.output_layer = &mdp_out_layer;
       mdp_disp_commit.commit_v1.release_fence = -1;
+    }
+
+    mdp_scale_data* GetScaleRef(uint32_t index) { return &scale_data[index]; }
+
+    void SetScaleData(scalar::Scale scale, uint32_t index) {
+      mdp_scale_data *mdp_scale = &scale_data[index];
+      mdp_scale->enable_pxl_ext = scale.enable_pxl_ext;
+
+      for (int i = 0; i < MAX_PLANES; i++) {
+        mdp_scale->init_phase_x[i] = scale.init_phase_x[i];
+        mdp_scale->phase_step_x[i] = scale.phase_step_x[i];
+        mdp_scale->init_phase_y[i] = scale.init_phase_y[i];
+        mdp_scale->phase_step_y[i] = scale.phase_step_y[i];
+
+        mdp_scale->num_ext_pxls_left[i] = scale.left.extension[i];
+        mdp_scale->num_ext_pxls_top[i] = scale.top.extension[i];
+        mdp_scale->num_ext_pxls_right[i] = scale.right.extension[i];
+        mdp_scale->num_ext_pxls_btm[i] = scale.bottom.extension[i];
+
+        mdp_scale->left_ftch[i] = scale.left.overfetch[i];
+        mdp_scale->top_ftch[i] = scale.top.overfetch[i];
+        mdp_scale->right_ftch[i] = scale.right.overfetch[i];
+        mdp_scale->btm_ftch[i] = scale.bottom.overfetch[i];
+
+        mdp_scale->left_rpt[i] = scale.left.repeat[i];
+        mdp_scale->top_rpt[i] = scale.top.repeat[i];
+        mdp_scale->right_rpt[i] = scale.right.repeat[i];
+        mdp_scale->btm_rpt[i] = scale.bottom.repeat[i];
+
+        mdp_scale->roi_w[i] = scale.roi_width[i];
+      }
     }
   };
 

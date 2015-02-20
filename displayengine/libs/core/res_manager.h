@@ -197,6 +197,7 @@ class ResManager : public DumpImpl {
   DisplayError AllocRotatorBuffer(Handle display_ctx, HWLayers *hw_layers);
   void SetRotatorOutputFormat(const LayerBufferFormat &input_format, bool bwc, bool rot90,
                               LayerBufferFormat *output_format);
+  bool ConfigureScaling(HWLayers *hw_layers);
 
   Locker locker_;
   HWResourceInfo hw_res_info_;
@@ -215,6 +216,8 @@ class ResManager : public DumpImpl {
   BufferAllocator *buffer_allocator_;
   BufferSyncHandler *buffer_sync_handler_;  // Pointer to buffer sync handler that was defined by
                                             // the display engine's client
+  static void* lib_scalar_handle_;  // Scalar library handle
+  static int (*ScalarConfigureScale)(struct scalar::LayerInfo* layer);
 };
 
 }  // namespace sde
