@@ -265,8 +265,25 @@ static void changeDefaultAppBufferCount() {
     }
 }
 
-void initContext(hwc_context_t *ctx)
+int initContext(hwc_context_t *ctx)
 {
+    int error = -1;
+    int compositionType = 0;
+
+    //Right now hwc starts the service but anybody could do it, or it could be
+    //independent process as well.
+    QService::init();
+    sp<IQClient> client = new QClient(ctx);
+    android::sp<qService::IQService> qservice_sp = interface_cast<IQService>(
+            defaultServiceManager()->getService(
+            String16("display.qservice")));
+    if (qservice_sp.get()) {
+      qservice_sp->connect(client);
+    } else {
+      ALOGE("%s: Failed to acquire service pointer", __FUNCTION__);
+      return error;
+    }
+
     overlay::Overlay::initOverlay();
     ctx->mHDMIDisplay = new HDMIDisplay();
     uint32_t priW = 0, priH = 0;
@@ -279,15 +296,24 @@ void initContext(hwc_context_t *ctx)
     if(ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
         int connected = ctx->mHDMIDisplay->getConnectedState();
         if(connected == 1) {
-            ctx->mHDMIDisplay->configure();
+            error = ctx->mHDMIDisplay->configure();
+            if (error < 0) {
+                goto OpenFBError;
+            }
             updateDisplayInfo(ctx, HWC_DISPLAY_PRIMARY);
             ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
         } else {
-            openFramebufferDevice(ctx);
+            error = openFramebufferDevice(ctx);
+            if(error < 0) {
+                goto OpenFBError;
+            }
             ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = false;
         }
     } else {
-        openFramebufferDevice(ctx);
+        error = openFramebufferDevice(ctx);
+        if(error < 0) {
+            goto OpenFBError;
+        }
         ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
         // Send the primary resolution to the hdmi display class
         // to be used for MDP scaling functionality
@@ -313,8 +339,8 @@ void initContext(hwc_context_t *ctx)
 
     // Check if the target supports copybit compostion (dyn/mdp) to
     // decide if we need to open the copybit module.
-    int compositionType =
-        qdutils::QCCompositionType::getInstance().getCompositionType();
+    compositionType =
+                qdutils::QCCompositionType::getInstance().getCompositionType();
 
     // Only MDP copybit is used
     if ((compositionType & (qdutils::COMPOSITION_TYPE_DYN |
@@ -365,20 +391,6 @@ void initContext(hwc_context_t *ctx)
     ctx->mExtOrientation = 0;
     ctx->numActiveDisplays = 1;
 
-    //Right now hwc starts the service but anybody could do it, or it could be
-    //independent process as well.
-    QService::init();
-    sp<IQClient> client = new QClient(ctx);
-    android::sp<qService::IQService> qservice_sp = interface_cast<IQService>(
-            defaultServiceManager()->getService(
-            String16("display.qservice")));
-    if (qservice_sp.get()) {
-      qservice_sp->connect(client);
-    } else {
-      ALOGE("%s: Failed to acquire service pointer", __FUNCTION__);
-      return ;
-    }
-
     // Initialize device orientation to its default orientation
     ctx->deviceOrientation = 0;
     ctx->mBufferMirrorMode = false;
@@ -420,6 +432,13 @@ void initContext(hwc_context_t *ctx)
     ctx->mHPDEnabled = false;
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
+
+    return 0;
+
+OpenFBError:
+    ALOGE("%s: Fatal Error: FB Open failed!!!", __FUNCTION__);
+    delete ctx->mHDMIDisplay;
+    return error;
 }
 
 void closeContext(hwc_context_t *ctx)
@@ -2787,7 +2806,11 @@ void handle_online(hwc_context_t* ctx, int dpy) {
     // TODO: If HDMI is connected after the display has booted up,
     // and the best configuration is different from the default
     // then we need to deal with this appropriately.
-    ctx->mHDMIDisplay->configure();
+    int error = ctx->mHDMIDisplay->configure();
+    if (error < 0) {
+        ALOGE("Error opening FrameBuffer");
+        return;
+    }
     updateDisplayInfo(ctx, dpy);
     initCompositionResources(ctx, dpy);
     ctx->dpyAttr[dpy].connected = true;

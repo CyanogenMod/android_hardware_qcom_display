@@ -199,7 +199,15 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                         "uevent thread", __FUNCTION__);
                 ctx->mWfdSyncLock.unlock();
             }
-            ctx->mHDMIDisplay->configure();
+            // If FB open fails ignore this hotplug event
+            int error = ctx->mHDMIDisplay->configure();
+            if (error < 0) {
+                ALOGE("%s: Open Framebuffer for dpy = %d", __FUNCTION__, dpy);
+                ctx->mDrawLock.lock();
+                ctx->dpyAttr[dpy].isConfiguring = false;
+                ctx->mDrawLock.unlock();
+                break;
+            }
             ctx->mHDMIDisplay->activateDisplay();
 
             ctx->mDrawLock.lock();

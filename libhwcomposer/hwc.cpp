@@ -962,7 +962,11 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
         memset(dev, 0, sizeof(*dev));
 
         //Initialize hwc context
-        initContext(dev);
+        status = initContext(dev);
+        if (status < 0) {
+            free(dev);
+            return status;
+        }
 
         //Setup HWC methods
         dev->device.common.tag          = HARDWARE_DEVICE_TAG;
