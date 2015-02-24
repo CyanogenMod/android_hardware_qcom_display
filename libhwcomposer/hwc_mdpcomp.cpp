@@ -3044,9 +3044,7 @@ void MDPComp::setPerfHint(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         int perfHint = 0x4501; // 45-display layer hint, 01-Enable
         sPerfLockHandle = sPerfLockAcquire(0 /*handle*/, 0/*duration*/,
                                     &perfHint, sizeof(perfHint)/sizeof(int));
-        if(sPerfLockHandle < 0) {
-            ALOGE("Perf Lock Acquire Failed");
-        } else {
+        if(sPerfLockHandle > 0) {
             perflockFlag = 1;
         }
     }
