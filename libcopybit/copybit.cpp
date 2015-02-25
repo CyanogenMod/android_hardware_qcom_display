@@ -512,7 +512,11 @@ static int stretch_copybit(
 
             // Set Color Space for MDP to configure CSC matrix
             req->color_space = ITU_R_601;
-            MetaData_t *metadata = (MetaData_t *)src_hnd->base_metadata;
+            MetaData_t *metadata = NULL;
+
+            if (src_hnd != NULL)
+                metadata = (MetaData_t *)src_hnd->base_metadata;
+
             if (metadata && (metadata->operation & UPDATE_COLOR_SPACE)) {
                 req->color_space = metadata->colorSpace;
             }
@@ -722,6 +726,11 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     }
     copybit_context_t *ctx;
     ctx = (copybit_context_t *)malloc(sizeof(copybit_context_t));
+
+    if (ctx == NULL ) {
+       return COPYBIT_FAILURE;
+    }
+
     memset(ctx, 0, sizeof(*ctx));
 
     ctx->device.common.tag = HARDWARE_DEVICE_TAG;
