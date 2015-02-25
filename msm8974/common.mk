@@ -20,7 +20,7 @@ ifeq ($(ARCH_ARM_HAVE_NEON),true)
     common_flags += -D__ARM_HAVE_NEON
 endif
 
-ifneq ($(filter msm8974 msm8x74 msm8610 apq8084,$(TARGET_BOARD_PLATFORM)),)
+ifneq ($(filter msm8974 msm8x74 msm8610 apq8084 msm8992 msm8994,$(TARGET_BOARD_PLATFORM)),)
     common_flags += -DVENUS_COLOR_FORMAT
     common_flags += -DMDSS_TARGET
 endif
