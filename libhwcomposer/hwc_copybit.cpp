@@ -340,6 +340,17 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
             dst_h = layer->displayFrame.bottom - layer->displayFrame.top;
             dst_w = layer->displayFrame.right - layer->displayFrame.left;
 
+            /*
+             * Fallback to GPU for video with odd dimensions or boundaries
+             * for MDP3 targets to avoid green line on video surface.
+             * */
+            private_handle_t *hnd = (private_handle_t *)layer->handle;
+            if((hnd && isYuvBuffer(hnd)) && (sourceCrop.left %2 || src_w %2 ||
+                 sourceCrop.top % 2 || src_h % 2 || dst_w % 2 || dst_h %2 ||
+                 layer->displayFrame.left %2 || layer->displayFrame.top %2)) {
+                return false;
+            }
+
             if(src_w <=0 || src_h<=0 ||dst_w<=0 || dst_h<=0 ) {
               ALOGE("%s: wrong params for display screen_w=%d \
                          src_crop_width=%d screen_h=%d src_crop_height=%d",
