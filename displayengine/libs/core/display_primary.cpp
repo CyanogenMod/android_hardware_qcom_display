@@ -26,14 +26,71 @@
 #include <utils/debug.h>
 
 #include "display_primary.h"
+#include "hw_primary_interface.h"
+#include "hw_info_interface.h"
 
 #define __CLASS__ "DisplayPrimary"
 
 namespace sde {
 
-DisplayPrimary::DisplayPrimary(DisplayEventHandler *event_handler, HWInterface *hw_intf,
-                               CompManager *comp_manager, OfflineCtrl *offline_ctrl)
-  : DisplayBase(kPrimary, event_handler, kDevicePrimary, hw_intf, comp_manager, offline_ctrl) { }
+DisplayPrimary::DisplayPrimary(DisplayEventHandler *event_handler, HWInfoInterface *hw_info_intf,
+                               BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
+                               OfflineCtrl *offline_ctrl)
+  : DisplayBase(kPrimary, event_handler, kDevicePrimary, buffer_sync_handler, comp_manager,
+    offline_ctrl), hw_info_intf_(hw_info_intf) {
+}
+
+DisplayError DisplayPrimary::Init() {
+  SCOPE_LOCK(locker_);
+
+  DisplayError error = HWPrimaryInterface::Create(&hw_primary_intf_, hw_info_intf_,
+                                                  DisplayBase::buffer_sync_handler_);
+  if (error != kErrorNone) {
+    return error;
+  }
+  DisplayBase::hw_intf_ = hw_primary_intf_;
+
+  error = DisplayBase::Init();
+  if (error != kErrorNone) {
+    HWPrimaryInterface::Destroy(hw_primary_intf_);
+  }
+
+  return error;
+}
+
+DisplayError DisplayPrimary::Deinit() {
+  SCOPE_LOCK(locker_);
+
+  DisplayError error = DisplayBase::Deinit();
+  if (error != kErrorNone) {
+    return error;
+  }
+  HWPrimaryInterface::Destroy(hw_primary_intf_);
+
+  return error;
+}
+
+DisplayError DisplayPrimary::SetVSyncState(bool enable) {
+  SCOPE_LOCK(locker_);
+  DisplayError error = kErrorNone;
+  if (vsync_enable_ != enable) {
+    error = hw_primary_intf_->SetVSyncState(enable);
+    if (error == kErrorNone) {
+      vsync_enable_ = enable;
+    }
+  }
+
+  return error;
+}
+
+void DisplayPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
+  // Idle fallback feature is supported only for video mode panel.
+  if (panel_info_.type == kCommandModePanel) {
+    return;
+  }
+
+  hw_primary_intf_->SetIdleTimeoutMs(timeout_ms);
+}
 
 }  // namespace sde
 

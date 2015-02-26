@@ -26,6 +26,9 @@
 #include <utils/debug.h>
 
 #include "offline_ctrl.h"
+#include "hw_rotator_interface.h"
+#include <core/buffer_sync_handler.h>
+#include "hw_interface.h"
 
 #define __CLASS__ "OfflineCtrl"
 
@@ -33,16 +36,25 @@ namespace sde {
 
 // TODO(user): Move this offline controller under composition manager like other modules
 // [resource manager]. Implement session management and buffer management in offline controller.
-OfflineCtrl::OfflineCtrl() : hw_intf_(NULL), hw_rotator_device_(NULL) {
+OfflineCtrl::OfflineCtrl() : hw_rotator_intf_(NULL), hw_rotator_present_(false) {
 }
 
-DisplayError OfflineCtrl::Init(HWInterface *hw_intf, HWResourceInfo hw_res_info) {
-  hw_intf_ = hw_intf;
+DisplayError OfflineCtrl::Init(BufferSyncHandler *buffer_sync_handler) {
   DisplayError error = kErrorNone;
 
-  error = hw_intf_->Open(kDeviceRotator, &hw_rotator_device_, NULL);
+  error = HWRotatorInterface::Create(&hw_rotator_intf_, buffer_sync_handler);
+  if (error != kErrorNone) {
+    if (hw_rotator_intf_) {
+      HWRotatorInterface::Destroy(hw_rotator_intf_);
+    }
+    return error;
+  }
+
+  error = hw_rotator_intf_->Open();
   if (error != kErrorNone) {
     DLOGW("Failed to open rotator device");
+  } else {
+    hw_rotator_present_ = true;
   }
 
   return kErrorNone;
@@ -51,11 +63,13 @@ DisplayError OfflineCtrl::Init(HWInterface *hw_intf, HWResourceInfo hw_res_info)
 DisplayError OfflineCtrl::Deinit() {
   DisplayError error = kErrorNone;
 
-  error = hw_intf_->Close(hw_rotator_device_);
+  error = hw_rotator_intf_->Close();
   if (error != kErrorNone) {
     DLOGW("Failed to close rotator device");
     return error;
   }
+  hw_rotator_present_ = false;
+  HWRotatorInterface::Destroy(hw_rotator_intf_);
 
   return kErrorNone;
 }
@@ -87,13 +101,13 @@ DisplayError OfflineCtrl::Prepare(Handle display_ctx, HWLayers *hw_layers) {
 
   disp_offline_ctx->pending_rot_commit = false;
 
-  if (!hw_rotator_device_ && IsRotationRequired(hw_layers)) {
+  if (!hw_rotator_present_ && IsRotationRequired(hw_layers)) {
     DLOGV_IF(kTagOfflineCtrl, "No Rotator device found");
     return kErrorHardware;
   }
 
   error = CloseRotatorSession(hw_layers);
-  if (LIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     DLOGE("Close rotator session failed for display %d", disp_offline_ctx->display_type);
     return error;
   }
@@ -101,13 +115,13 @@ DisplayError OfflineCtrl::Prepare(Handle display_ctx, HWLayers *hw_layers) {
 
   if (IsRotationRequired(hw_layers)) {
     error = OpenRotatorSession(hw_layers);
-    if (LIKELY(error != kErrorNone)) {
+    if (error != kErrorNone) {
       DLOGE("Open rotator session failed for display %d", disp_offline_ctx->display_type);
       return error;
     }
 
-    error = hw_intf_->Validate(hw_rotator_device_, hw_layers);
-    if (LIKELY(error != kErrorNone)) {
+    error = hw_rotator_intf_->Validate(hw_layers);
+    if (error != kErrorNone) {
       DLOGE("Rotator validation failed for display %d", disp_offline_ctx->display_type);
       return error;
     }
@@ -123,7 +137,7 @@ DisplayError OfflineCtrl::Commit(Handle display_ctx, HWLayers *hw_layers) {
   DisplayOfflineContext *disp_offline_ctx = reinterpret_cast<DisplayOfflineContext *>(display_ctx);
 
   if (disp_offline_ctx->pending_rot_commit) {
-    error = hw_intf_->Commit(hw_rotator_device_, hw_layers);
+    error = hw_rotator_intf_->Commit(hw_layers);
     if (error != kErrorNone) {
       DLOGE("Rotator commit failed for display %d", disp_offline_ctx->display_type);
       return error;
@@ -153,8 +167,8 @@ DisplayError OfflineCtrl::OpenRotatorSession(HWLayers *hw_layers) {
       rotate_info->input_buffer = layer.input_buffer;
       rotate_info->frame_rate = layer.frame_rate;
 
-      error = hw_intf_->OpenRotatorSession(hw_rotator_device_, rotate_info);
-      if (LIKELY(error != kErrorNone)) {
+      error = hw_rotator_intf_->OpenSession(rotate_info);
+      if (error != kErrorNone) {
         return error;
       }
     }
@@ -168,8 +182,8 @@ DisplayError OfflineCtrl::CloseRotatorSession(HWLayers *hw_layers) {
   uint32_t i = 0;
 
   while (hw_layers->closed_session_ids[i] >= 0) {
-    error = hw_intf_->CloseRotatorSession(hw_rotator_device_, hw_layers->closed_session_ids[i]);
-    if (LIKELY(error != kErrorNone)) {
+    error = hw_rotator_intf_->CloseSession(hw_layers->closed_session_ids[i]);
+    if (error != kErrorNone) {
       return error;
     }
     hw_layers->closed_session_ids[i++] = -1;

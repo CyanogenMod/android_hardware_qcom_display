@@ -26,14 +26,49 @@
 #include <utils/debug.h>
 
 #include "display_virtual.h"
+#include "hw_virtual_interface.h"
+#include "hw_info_interface.h"
 
 #define __CLASS__ "DisplayVirtual"
 
 namespace sde {
 
-DisplayVirtual::DisplayVirtual(DisplayEventHandler *event_handler, HWInterface *hw_intf,
-                               CompManager *comp_manager, OfflineCtrl *offline_ctrl)
-  : DisplayBase(kVirtual, event_handler, kDeviceVirtual, hw_intf, comp_manager, offline_ctrl) { }
+DisplayVirtual::DisplayVirtual(DisplayEventHandler *event_handler, HWInfoInterface *hw_info_intf,
+                               BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
+                               OfflineCtrl *offline_ctrl)
+  : DisplayBase(kVirtual, event_handler, kDeviceVirtual, buffer_sync_handler, comp_manager,
+                offline_ctrl), hw_info_intf_(hw_info_intf) {
+}
+
+DisplayError DisplayVirtual::Init() {
+  SCOPE_LOCK(locker_);
+
+  DisplayError error = HWVirtualInterface::Create(&hw_virtual_intf_, hw_info_intf_,
+                                                  DisplayBase::buffer_sync_handler_);
+  if (error != kErrorNone) {
+    return error;
+  }
+  DisplayBase::hw_intf_ = hw_virtual_intf_;
+
+  error = DisplayBase::Init();
+  if (error != kErrorNone) {
+    HWVirtualInterface::Destroy(hw_virtual_intf_);
+  }
+
+  return error;
+}
+
+DisplayError DisplayVirtual::Deinit() {
+  SCOPE_LOCK(locker_);
+
+  DisplayError error = DisplayBase::Deinit();
+  if (error != kErrorNone) {
+    return error;
+  }
+  HWVirtualInterface::Destroy(hw_virtual_intf_);
+
+  return error;
+}
 
 }  // namespace sde
 

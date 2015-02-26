@@ -12,6 +12,7 @@ ifeq ($(TARGET_USES_SCALAR), true)
   LOCAL_C_INCLUDES  += $(TARGET_OUT_HEADERS)/scalar/inc
   LOCAL_CFLAGS      += -DUSES_SCALAR
 endif
+LOCAL_HW_INTF_PATH := fb
 LOCAL_SHARED_LIBRARIES        := libdl libsdeutils libcutils
 LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_SRC_FILES               := core_interface.cpp \
@@ -25,10 +26,14 @@ LOCAL_SRC_FILES               := core_interface.cpp \
                                  res_manager.cpp \
                                  res_config.cpp \
                                  offline_ctrl.cpp \
-                                 hw_interface.cpp \
-                                 hw_framebuffer.cpp \
                                  dump_impl.cpp \
                                  buffer_manager.cpp \
-                                 scalar_helper.cpp
+                                 scalar_helper.cpp \
+                                 $(LOCAL_HW_INTF_PATH)/hw_info.cpp \
+                                 $(LOCAL_HW_INTF_PATH)/hw_device.cpp \
+                                 $(LOCAL_HW_INTF_PATH)/hw_primary.cpp \
+                                 $(LOCAL_HW_INTF_PATH)/hw_rotator.cpp \
+                                 $(LOCAL_HW_INTF_PATH)/hw_hdmi.cpp \
+                                 $(LOCAL_HW_INTF_PATH)/hw_virtual.cpp
 
 include $(BUILD_SHARED_LIBRARY)
