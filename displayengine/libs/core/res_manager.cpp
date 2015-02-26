@@ -626,15 +626,17 @@ DisplayError ResManager::AllocRotatorBuffer(Handle display_ctx, HWLayers *hw_lay
   for (uint32_t i = 0; i < layer_info.count; i++) {
     Layer& layer = layer_info.stack->layers[layer_info.index[i]];
     HWRotateInfo *rotate = &hw_layers->config[i].rotates[0];
+    bool rot90 = (layer.transform.rotation == 90.0f);
 
     if (rotate->valid) {
       LayerBufferFormat rot_ouput_format;
-      SetRotatorOutputFormat(layer.input_buffer->format, false, true, &rot_ouput_format);
+      SetRotatorOutputFormat(layer.input_buffer->format, false, rot90, &rot_ouput_format);
 
       HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
       hw_buffer_info->buffer_config.width = UINT32(rotate->dst_roi.right - rotate->dst_roi.left);
       hw_buffer_info->buffer_config.height = UINT32(rotate->dst_roi.bottom - rotate->dst_roi.top);
       hw_buffer_info->buffer_config.format = rot_ouput_format;
+      // Allocate two rotator output buffers by default for double buffering.
       hw_buffer_info->buffer_config.buffer_count = 2;
       hw_buffer_info->buffer_config.secure = layer.input_buffer->flags.secure;
 
@@ -647,12 +649,13 @@ DisplayError ResManager::AllocRotatorBuffer(Handle display_ctx, HWLayers *hw_lay
     rotate = &hw_layers->config[i].rotates[1];
     if (rotate->valid) {
       LayerBufferFormat rot_ouput_format;
-      SetRotatorOutputFormat(layer.input_buffer->format, false, true, &rot_ouput_format);
+      SetRotatorOutputFormat(layer.input_buffer->format, false, rot90, &rot_ouput_format);
 
       HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
       hw_buffer_info->buffer_config.width = UINT32(rotate->dst_roi.right - rotate->dst_roi.left);
       hw_buffer_info->buffer_config.height = UINT32(rotate->dst_roi.bottom - rotate->dst_roi.top);
       hw_buffer_info->buffer_config.format = rot_ouput_format;
+      // Allocate two rotator output buffers by default for double buffering.
       hw_buffer_info->buffer_config.buffer_count = 2;
       hw_buffer_info->buffer_config.secure = layer.input_buffer->flags.secure;
 

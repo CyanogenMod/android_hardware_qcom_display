@@ -107,6 +107,7 @@ struct HWBufferInfo : public BufferInfo {
 };
 
 struct HWRotateInfo {
+  LayerBuffer *input_buffer;
   uint32_t pipe_id;
   LayerRect src_roi;
   LayerRect dst_roi;
@@ -116,9 +117,11 @@ struct HWRotateInfo {
   float downscale_ratio_y;
   HWBufferInfo hw_buffer_info;
   bool valid;
+  uint32_t frame_rate;
 
-  HWRotateInfo() : pipe_id(0), dst_format(kFormatInvalid), writeback_id(kHWWriteback0),
-                   downscale_ratio_x(1.0f), downscale_ratio_y(1.0f), valid(false) { }
+  HWRotateInfo() : input_buffer(NULL), pipe_id(0), dst_format(kFormatInvalid),
+                   writeback_id(kHWWriteback0), downscale_ratio_x(1.0f), downscale_ratio_y(1.0f),
+                   valid(false), frame_rate(0) { }
 
   void Reset() { *this = HWRotateInfo(); }
 };
@@ -195,7 +198,7 @@ class HWInterface {
   virtual DisplayError Doze(Handle device) = 0;
   virtual DisplayError SetVSyncState(Handle device, bool enable) = 0;
   virtual DisplayError Standby(Handle device) = 0;
-  virtual DisplayError OpenRotatorSession(Handle device, HWLayers *hw_layers) = 0;
+  virtual DisplayError OpenRotatorSession(Handle device, HWRotateInfo *rotate_info) = 0;
   virtual DisplayError CloseRotatorSession(Handle device, int32_t session_id) = 0;
   virtual DisplayError Validate(Handle device, HWLayers *hw_layers) = 0;
   virtual DisplayError Commit(Handle device, HWLayers *hw_layers) = 0;

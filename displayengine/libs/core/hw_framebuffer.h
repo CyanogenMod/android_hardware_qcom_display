@@ -56,7 +56,7 @@ class HWFrameBuffer : public HWInterface {
   virtual DisplayError Doze(Handle device);
   virtual DisplayError SetVSyncState(Handle device, bool enable);
   virtual DisplayError Standby(Handle device);
-  virtual DisplayError OpenRotatorSession(Handle device, HWLayers *hw_layers);
+  virtual DisplayError OpenRotatorSession(Handle device, HWRotateInfo *rotate_info);
   virtual DisplayError CloseRotatorSession(Handle device, int32_t session_id);
   virtual DisplayError Validate(Handle device, HWLayers *hw_layers);
   virtual DisplayError Commit(Handle device, HWLayers *hw_layers);
@@ -191,6 +191,9 @@ class HWFrameBuffer : public HWInterface {
 
   DisplayError DisplayValidate(HWContext *device_ctx, HWLayers *hw_layers);
   DisplayError DisplayCommit(HWContext *device_ctx, HWLayers *hw_layers);
+
+  void SetRotatorCtrlParams(HWContext *device_ctx, HWLayers *hw_layers);
+  void SetRotatorBufferParams(HWContext *device_ctx, HWLayers *hw_layers);
 
   DisplayError RotatorValidate(HWContext *device_ctx, HWLayers *hw_layers);
   DisplayError RotatorCommit(HWContext *device_ctx, HWLayers *hw_layers);

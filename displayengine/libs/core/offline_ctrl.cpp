@@ -85,34 +85,30 @@ DisplayError OfflineCtrl::Prepare(Handle display_ctx, HWLayers *hw_layers) {
 
   DisplayOfflineContext *disp_offline_ctx = reinterpret_cast<DisplayOfflineContext *>(display_ctx);
 
+  disp_offline_ctx->pending_rot_commit = false;
+
   if (!hw_rotator_device_ && IsRotationRequired(hw_layers)) {
     DLOGV_IF(kTagOfflineCtrl, "No Rotator device found");
     return kErrorHardware;
   }
 
-  disp_offline_ctx->pending_rot_commit = false;
-
-  uint32_t i = 0;
-  while (hw_layers->closed_session_ids[i] >= 0) {
-    error = hw_intf_->CloseRotatorSession(hw_rotator_device_, hw_layers->closed_session_ids[i]);
-    if (LIKELY(error != kErrorNone)) {
-      DLOGE("Rotator close session failed");
-      return error;
-    }
-    hw_layers->closed_session_ids[i++] = -1;
+  error = CloseRotatorSession(hw_layers);
+  if (LIKELY(error != kErrorNone)) {
+    DLOGE("Close rotator session failed for display %d", disp_offline_ctx->display_type);
+    return error;
   }
 
 
   if (IsRotationRequired(hw_layers)) {
-    error = hw_intf_->OpenRotatorSession(hw_rotator_device_, hw_layers);
+    error = OpenRotatorSession(hw_layers);
     if (LIKELY(error != kErrorNone)) {
-      DLOGE("Rotator open session failed");
+      DLOGE("Open rotator session failed for display %d", disp_offline_ctx->display_type);
       return error;
     }
 
     error = hw_intf_->Validate(hw_rotator_device_, hw_layers);
     if (LIKELY(error != kErrorNone)) {
-      DLOGE("Rotator validation failed");
+      DLOGE("Rotator validation failed for display %d", disp_offline_ctx->display_type);
       return error;
     }
     disp_offline_ctx->pending_rot_commit = true;
@@ -129,10 +125,54 @@ DisplayError OfflineCtrl::Commit(Handle display_ctx, HWLayers *hw_layers) {
   if (disp_offline_ctx->pending_rot_commit) {
     error = hw_intf_->Commit(hw_rotator_device_, hw_layers);
     if (error != kErrorNone) {
-      DLOGE("Rotator commit failed");
+      DLOGE("Rotator commit failed for display %d", disp_offline_ctx->display_type);
       return error;
     }
     disp_offline_ctx->pending_rot_commit = false;
+  }
+
+  return kErrorNone;
+}
+
+DisplayError OfflineCtrl::OpenRotatorSession(HWLayers *hw_layers) {
+  HWLayersInfo &hw_layer_info = hw_layers->info;
+  DisplayError error = kErrorNone;
+
+  for (uint32_t i = 0; i < hw_layer_info.count; i++) {
+    Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
+    bool rot90 = (layer.transform.rotation == 90.0f);
+
+    for (uint32_t count = 0; count < 2; count++) {
+      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
+      HWBufferInfo *rot_buf_info = &rotate_info->hw_buffer_info;
+
+      if (!rotate_info->valid || rot_buf_info->session_id >= 0) {
+        continue;
+      }
+
+      rotate_info->input_buffer = layer.input_buffer;
+      rotate_info->frame_rate = layer.frame_rate;
+
+      error = hw_intf_->OpenRotatorSession(hw_rotator_device_, rotate_info);
+      if (LIKELY(error != kErrorNone)) {
+        return error;
+      }
+    }
+  }
+
+  return kErrorNone;
+}
+
+DisplayError OfflineCtrl::CloseRotatorSession(HWLayers *hw_layers) {
+  DisplayError error = kErrorNone;
+  uint32_t i = 0;
+
+  while (hw_layers->closed_session_ids[i] >= 0) {
+    error = hw_intf_->CloseRotatorSession(hw_rotator_device_, hw_layers->closed_session_ids[i]);
+    if (LIKELY(error != kErrorNone)) {
+      return error;
+    }
+    hw_layers->closed_session_ids[i++] = -1;
   }
 
   return kErrorNone;
