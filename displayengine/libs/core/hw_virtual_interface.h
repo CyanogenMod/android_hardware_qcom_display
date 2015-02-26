@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -22,55 +22,26 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __CORE_IMPL_H__
-#define __CORE_IMPL_H__
-
-#include <core/core_interface.h>
-#include <private/strategy_interface.h>
-#include <utils/locker.h>
+#ifndef __HW_VIRTUAL_INTERFACE_H__
+#define __HW_VIRTUAL_INTERFACE_H__
 
 #include "hw_interface.h"
-#include "comp_manager.h"
-#include "offline_ctrl.h"
-
-#define SET_REVISION(major, minor) ((major << 8) | minor)
 
 namespace sde {
 
 class HWInfoInterface;
 
-class CoreImpl : public CoreInterface {
+class HWVirtualInterface: virtual public HWInterface {
  public:
-  // This class implements display core interface revision 1.0.
-  static const uint16_t kRevision = SET_REVISION(1, 0);
-
-  CoreImpl(CoreEventHandler *event_handler, BufferAllocator *buffer_allocator,
-           BufferSyncHandler *buffer_sync_handler);
-  virtual ~CoreImpl() { }
-
-  // This method returns the interface revision for the current display core object.
-  // Future revisions will override this method and return the appropriate revision upon query.
-  virtual uint16_t GetRevision() { return kRevision; }
-  virtual DisplayError Init();
-  virtual DisplayError Deinit();
-
-  // Methods from core interface
-  virtual DisplayError CreateDisplay(DisplayType type, DisplayEventHandler *event_handler,
-                                     DisplayInterface **intf);
-  virtual DisplayError DestroyDisplay(DisplayInterface *intf);
+  static DisplayError Create(HWVirtualInterface **intf, HWInfoInterface *hw_info_intf,
+                             BufferSyncHandler *buffer_sync_handler);
+  static DisplayError Destroy(HWVirtualInterface *intf);
 
  protected:
-  Locker locker_;
-  CoreEventHandler *event_handler_;
-  BufferAllocator *buffer_allocator_;
-  BufferSyncHandler *buffer_sync_handler_;
-  HWResourceInfo *hw_resource_;
-  CompManager comp_mgr_;
-  OfflineCtrl offline_ctrl_;
-  HWInfoInterface *hw_info_intf_;
+  virtual ~HWVirtualInterface() { }
 };
 
 }  // namespace sde
 
-#endif  // __CORE_IMPL_H__
+#endif  // __HW_VIRTUAL_INTERFACE_H__
 

@@ -29,10 +29,20 @@
 
 namespace sde {
 
+class HWVirtualInterface;
+class HWInfoInterface;
+
 class DisplayVirtual : public DisplayBase {
  public:
-  DisplayVirtual(DisplayEventHandler *event_handler, HWInterface *hw_intf,
-                 CompManager *comp_manager, OfflineCtrl *offline_ctrl);
+  DisplayVirtual(DisplayEventHandler *event_handler, HWInfoInterface *hw_info_intf,
+                 BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
+                 OfflineCtrl *offline_ctrl);
+  virtual DisplayError Init();
+  virtual DisplayError Deinit();
+
+ private:
+  HWVirtualInterface *hw_virtual_intf_;
+  HWInfoInterface *hw_info_intf_;
 };
 
 }  // namespace sde

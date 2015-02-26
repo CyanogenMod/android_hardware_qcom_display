@@ -27,6 +27,7 @@
 
 #include <core/display_interface.h>
 #include <private/strategy_interface.h>
+#include <private/hw_info_types.h>
 #include <utils/constants.h>
 #include <core/buffer_allocator.h>
 #include <core/buffer_sync_handler.h>
@@ -40,61 +41,6 @@ enum HWBlockType {
   kHWWriteback1,
   kHWWriteback2,
   kHWBlockMax
-};
-
-enum HWDeviceType {
-  kDevicePrimary,
-  kDeviceHDMI,
-  kDeviceVirtual,
-  kDeviceRotator,
-  kDeviceMax,
-};
-
-struct HWResourceInfo {
-  uint32_t hw_version;
-  uint32_t hw_revision;
-  uint32_t num_dma_pipe;
-  uint32_t num_vig_pipe;
-  uint32_t num_rgb_pipe;
-  uint32_t num_cursor_pipe;
-  uint32_t num_blending_stages;
-  uint32_t num_rotator;
-  uint32_t num_control;
-  uint32_t num_mixer_to_disp;
-  uint32_t smp_total;
-  uint32_t smp_size;
-  uint32_t num_smp_per_pipe;
-  uint32_t max_scale_up;
-  uint32_t max_scale_down;
-  uint64_t max_bandwidth_low;
-  uint64_t max_bandwidth_high;
-  uint32_t max_mixer_width;
-  uint32_t max_pipe_bw;
-  uint32_t max_sde_clk;
-  float clk_fudge_factor;
-  struct SplitInfo {
-    uint32_t left_split;
-    uint32_t right_split;
-    SplitInfo() : left_split(0), right_split(0) { }
-  } split_info;
-  bool has_bwc;
-  bool has_decimation;
-  bool has_macrotile;
-  bool has_rotator_downscale;
-  bool has_non_scalar_rgb;
-  bool is_src_split;
-  bool always_src_split;
-
-  HWResourceInfo()
-    : hw_version(0), hw_revision(0), num_dma_pipe(0), num_vig_pipe(0), num_rgb_pipe(0),
-      num_cursor_pipe(0), num_blending_stages(0), num_rotator(0), num_control(0),
-      num_mixer_to_disp(0), smp_total(0), smp_size(0), num_smp_per_pipe(0), max_scale_up(1),
-      max_scale_down(1), max_bandwidth_low(0), max_bandwidth_high(0), max_mixer_width(2048),
-      max_pipe_bw(0), max_sde_clk(0), clk_fudge_factor(1.0f), has_bwc(false),
-      has_decimation(false), has_macrotile(false), has_rotator_downscale(false),
-      has_non_scalar_rgb(false), is_src_split(false), always_src_split(false) { }
-
-  void Reset() { *this = HWResourceInfo(); }
 };
 
 struct HWBufferInfo : public BufferInfo {
@@ -164,8 +110,9 @@ struct HWLayers {
 struct HWDisplayAttributes : DisplayConfigVariableInfo {
   bool is_device_split;
   uint32_t split_left;
+  bool always_src_split;
 
-  HWDisplayAttributes() : is_device_split(false), split_left(0) { }
+  HWDisplayAttributes() : is_device_split(false), split_left(0), always_src_split(false) { }
 
   void Reset() { *this = HWDisplayAttributes(); }
 };
@@ -182,27 +129,21 @@ class HWEventHandler {
 
 class HWInterface {
  public:
-  static DisplayError Create(HWInterface **intf, BufferSyncHandler *buffer_sync_handler);
-  static DisplayError Destroy(HWInterface *intf);
-  virtual DisplayError GetHWCapabilities(HWResourceInfo *hw_res_info) = 0;
-  virtual DisplayError Open(HWDeviceType type, Handle *device, HWEventHandler *eventhandler) = 0;
-  virtual DisplayError Close(Handle device) = 0;
-  virtual DisplayError GetNumDisplayAttributes(Handle device, uint32_t *count) = 0;
-  virtual DisplayError GetDisplayAttributes(Handle device,
-                            HWDisplayAttributes *display_attributes, uint32_t index) = 0;
-  virtual DisplayError SetDisplayAttributes(Handle device, uint32_t index) = 0;
-  virtual DisplayError GetConfigIndex(Handle device, uint32_t mode, uint32_t *index) = 0;
-  virtual DisplayError PowerOn(Handle device) = 0;
-  virtual DisplayError PowerOff(Handle device) = 0;
-  virtual DisplayError Doze(Handle device) = 0;
-  virtual DisplayError SetVSyncState(Handle device, bool enable) = 0;
-  virtual DisplayError Standby(Handle device) = 0;
-  virtual DisplayError OpenRotatorSession(Handle device, HWRotateInfo *rotate_info) = 0;
-  virtual DisplayError CloseRotatorSession(Handle device, int32_t session_id) = 0;
-  virtual DisplayError Validate(Handle device, HWLayers *hw_layers) = 0;
-  virtual DisplayError Commit(Handle device, HWLayers *hw_layers) = 0;
-  virtual DisplayError Flush(Handle device) = 0;
-  virtual void SetIdleTimeoutMs(Handle device, uint32_t timeout_ms) = 0;
+  virtual DisplayError Open(HWEventHandler *eventhandler) = 0;
+  virtual DisplayError Close() = 0;
+  virtual DisplayError GetNumDisplayAttributes(uint32_t *count) = 0;
+  virtual DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
+                                            uint32_t index) = 0;
+  virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info) = 0;
+  virtual DisplayError SetDisplayAttributes(uint32_t index) = 0;
+  virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index) = 0;
+  virtual DisplayError PowerOn() = 0;
+  virtual DisplayError PowerOff() = 0;
+  virtual DisplayError Doze() = 0;
+  virtual DisplayError Standby() = 0;
+  virtual DisplayError Validate(HWLayers *hw_layers) = 0;
+  virtual DisplayError Commit(HWLayers *hw_layers) = 0;
+  virtual DisplayError Flush() = 0;
 
  protected:
   virtual ~HWInterface() { }
