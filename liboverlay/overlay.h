@@ -178,6 +178,9 @@ private:
     utils::eDest getPipe_8x16(const PipeSpecs& pipeSpecs);
     utils::eDest getPipe_8x39(const PipeSpecs& pipeSpecs);
     utils::eDest getPipe_8994(const PipeSpecs& pipeSpecs);
+    utils::eDest getPipe_8992(const PipeSpecs& pipeSpecs);
+
+    void resetPipeBookFormat(const int &dpy);
 
     /* Returns the handle to libscale.so's programScale function */
     static int (*getFnProgramScale())(struct mdp_overlay_list *);
@@ -441,6 +444,14 @@ inline const char* Overlay::PipeBook::getDestStr(utils::eDest dest) {
         default: return "Invalid";
     }
     return "Invalid";
+}
+
+inline void Overlay::resetPipeBookFormat(const int &dpy) {
+    for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
+        if (mPipeBook[i].mDisplay == dpy) {
+            mPipeBook[i].mFormatType = FORMAT_NONE;
+        }
+    }
 }
 
 }; // overlay
