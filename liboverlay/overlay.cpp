@@ -194,10 +194,13 @@ bool Overlay::commit(utils::eDest dest) {
 bool Overlay::queueBuffer(int fd, uint32_t offset,
         utils::eDest dest) {
     bool ret = false;
-    validate((int)dest);
-    //Queue only if commit() has succeeded (and the bit set)
-    if(PipeBook::isUsed((int)dest)) {
-        ret = mPipeBook[dest].mPipe->queueBuffer(fd, offset);
+
+    if (mPipeBook[dest].valid()) {
+        validate((int)dest);
+        //Queue only if commit() has succeeded (and the bit set)
+        if(PipeBook::isUsed((int)dest)) {
+            ret = mPipeBook[dest].mPipe->queueBuffer(fd, offset);
+        }
     }
     return ret;
 }
