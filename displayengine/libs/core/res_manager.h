@@ -49,6 +49,7 @@ class ResManager : public DumpImpl {
   DisplayError PostCommit(Handle display_ctx, HWLayers *hw_layers);
   void Purge(Handle display_ctx);
   DisplayError SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages);
+  DisplayError ValidateScaling(const LayerRect &crop, const LayerRect &dst, bool rotate90);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);
@@ -164,8 +165,6 @@ class ResManager : public DumpImpl {
                                   const LayerTransform &transform, const LayerRect &src_rect,
                                   const LayerRect &dst_rect, HWLayerConfig *layer_config,
                                   uint32_t align_x);
-  DisplayError ValidateScaling(const Layer &layer, const LayerRect &crop,
-                               const LayerRect &dst, float *rot_scale);
   DisplayError SrcSplitConfig(DisplayResourceContext *display_resource_ctx,
                               const LayerTransform &transform, const LayerRect &src_rect,
                               const LayerRect &dst_rect, HWLayerConfig *layer_config,
@@ -174,7 +173,19 @@ class ResManager : public DumpImpl {
                     float *right_cut_ratio, float *bottom_cut_ratio);
   bool CalculateCropRects(const LayerRect &scissor, const LayerTransform &transform,
                           LayerRect *crop, LayerRect *dst);
-  bool IsValidDimension(const Layer &layer);
+  DisplayError ValidateLayerDimensions(const Layer &layer);
+  DisplayError ValidateDimensions(const LayerRect &crop, const LayerRect &dst, bool rotate90);
+  DisplayError ValidatePipeParams(HWPipeInfo *pipe_info);
+  DisplayError ValidateDownScaling(float scale_x, float scale_y);
+  DisplayError ValidateUpScaling(float scale_x, float scale_y);
+  DisplayError GetCropAndDestination(const LayerRect &crop, const LayerRect &dst,
+                                     bool rotate90, float *crop_width, float *crop_height,
+                                     float *dst_width, float *dst_height);
+  DisplayError GetRotatorScaleFactor(const LayerRect &crop, const LayerRect &dst,
+                                     bool rotate90, float *rotator_scale_factor);
+  float GetRotatorScaleFactor(float scale_x, float scale_y);
+  DisplayError GetScaleFactor(const LayerRect &crop, const LayerRect &dst, bool rotate90,
+                              float *scale_x, float *scale_y);
   bool CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *hw_layers);
   float GetPipeBw(DisplayResourceContext *display_ctx, HWPipeInfo *pipe, float bpp);
   float GetClockForPipe(DisplayResourceContext *display_ctx, HWPipeInfo *pipe);
@@ -200,7 +211,7 @@ class ResManager : public DumpImpl {
                                HWPipeInfo *left_pipe, HWPipeInfo *right_pipe,
                                uint32_t align_x, uint32_t align_y);
   void ResourceStateLog(void);
-  DisplayError CalculateDecimation(float downscale, uint8_t* decimation);
+  DisplayError CalculateDecimation(float downscale, uint8_t *decimation);
 
   Locker locker_;
   HWResourceInfo hw_res_info_;
