@@ -35,6 +35,8 @@
 #include <hwc_virtual.h>
 #include <overlay.h>
 #include <display_config.h>
+#include <hdmi.h>
+#include <video/msm_hdmi_modes.h>
 
 #define QCLIENT_DEBUG 0
 
@@ -338,6 +340,21 @@ static void toggleScreenUpdate(hwc_context_t* ctx, uint32_t on) {
     }
 }
 
+static void setS3DMode(hwc_context_t* ctx, int mode) {
+    if (ctx->mHDMIDisplay) {
+        if(ctx->mHDMIDisplay->isS3DModeSupported(mode)) {
+            ALOGD("%s: Force S3D mode to %d", __FUNCTION__, mode);
+            Locker::Autolock _sl(ctx->mDrawLock);
+            ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].s3dModeForced = true;
+            setup3DMode(ctx, HWC_DISPLAY_EXTERNAL, mode);
+        } else {
+            ALOGD("%s: mode %d is not supported", __FUNCTION__, mode);
+        }
+    } else {
+        ALOGE("%s: No HDMI Display detected", __FUNCTION__);
+    }
+}
+
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t ret = NO_ERROR;
@@ -397,6 +414,9 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::TOGGLE_SCREEN_UPDATE:
             toggleScreenUpdate(mHwcContext, inParcel->readInt32());
+            break;
+        case IQService::SET_S3D_MODE:
+            setS3DMode(mHwcContext, inParcel->readInt32());
             break;
         default:
             ret = NO_ERROR;

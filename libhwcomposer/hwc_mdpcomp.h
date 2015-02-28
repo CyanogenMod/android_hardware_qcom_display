@@ -270,7 +270,7 @@ protected:
     //Enable 4kx2k yuv layer split
     static bool sEnableYUVsplit;
     bool mModeOn; // if prepare happened
-    bool allocSplitVGPipesfor4k2k(hwc_context_t *ctx, int index);
+    bool allocSplitVGPipes(hwc_context_t *ctx, int index);
     //Enable Partial Update for MDP3 targets
     static bool enablePartialUpdateForMDP3;
     static void *sLibPerfHint;
