@@ -447,6 +447,17 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 }
             } break;
 
+        case GRALLOC_MODULE_PERFORM_GET_UBWC_FLAG:
+            {
+                private_handle_t* hnd =  va_arg(args, private_handle_t*);
+                int *flag = va_arg(args, int *);
+                if (private_handle_t::validate(hnd)) {
+                    return res;
+                }
+                *flag = hnd->flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED;
+                res = 0;
+            } break;
+
         default:
             break;
     }

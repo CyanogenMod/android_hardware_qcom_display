@@ -33,44 +33,42 @@
 #define ROUND_UP_PAGESIZE(x) ( (((unsigned long)(x)) + PAGE_SIZE-1)  & \
                                (~(PAGE_SIZE-1)) )
 
-enum {
-    /* gralloc usage bits indicating the type
-     * of allocation that should be used */
+/* Gralloc usage bits indicating the type of allocation that should be used */
+/* SYSTEM heap comes from kernel vmalloc, can never be uncached,
+ * is not secured */
+#define GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP     GRALLOC_USAGE_PRIVATE_0
 
-    /* SYSTEM heap comes from kernel vmalloc,
-     * can never be uncached, is not secured*/
-    GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP     =       GRALLOC_USAGE_PRIVATE_0,
+/* Non linear, Universal Bandwidth Compression */
+#define GRALLOC_USAGE_PRIVATE_ALLOC_UBWC      GRALLOC_USAGE_PRIVATE_1
 
-    /* Non linear, Universal Bandwidth Compression */
-    GRALLOC_USAGE_PRIVATE_ALLOC_UBWC      =       GRALLOC_USAGE_PRIVATE_1,
+/* IOMMU heap comes from manually allocated pages, can be cached/uncached,
+ * is not secured */
+#define GRALLOC_USAGE_PRIVATE_IOMMU_HEAP      GRALLOC_USAGE_PRIVATE_2
 
-    /* IOMMU heap comes from manually allocated pages,
-     * can be cached/uncached, is not secured */
-    GRALLOC_USAGE_PRIVATE_IOMMU_HEAP      =       GRALLOC_USAGE_PRIVATE_2,
-    /* MM heap is a carveout heap for video, can be secured*/
-    GRALLOC_USAGE_PRIVATE_MM_HEAP         =       GRALLOC_USAGE_PRIVATE_3,
-    /* ADSP heap is a carveout heap, is not secured*/
-    GRALLOC_USAGE_PRIVATE_ADSP_HEAP       =       0x01000000,
+/* MM heap is a carveout heap for video, can be secured */
+#define GRALLOC_USAGE_PRIVATE_MM_HEAP         GRALLOC_USAGE_PRIVATE_3
 
-    /* Set this for allocating uncached memory (using O_DSYNC)
-     * cannot be used with noncontiguous heaps */
-    GRALLOC_USAGE_PRIVATE_UNCACHED        =       0x02000000,
+/* ADSP heap is a carveout heap, is not secured */
+#define GRALLOC_USAGE_PRIVATE_ADSP_HEAP       0x01000000
 
-    /* Buffer content should be displayed on an primary display only */
-    GRALLOC_USAGE_PRIVATE_INTERNAL_ONLY   =       0x04000000,
+/* Set this for allocating uncached memory (using O_DSYNC),
+ * cannot be used with noncontiguous heaps */
+#define GRALLOC_USAGE_PRIVATE_UNCACHED        0x02000000
 
-    /* Buffer content should be displayed on an external display only */
-    GRALLOC_USAGE_PRIVATE_EXTERNAL_ONLY   =       0x08000000,
+/* Buffer content should be displayed on an primary display only */
+#define GRALLOC_USAGE_PRIVATE_INTERNAL_ONLY   0x04000000
 
-    /* This flag is set for WFD usecase */
-    GRALLOC_USAGE_PRIVATE_WFD             =       0x00200000,
+/* Buffer content should be displayed on an external display only */
+#define GRALLOC_USAGE_PRIVATE_EXTERNAL_ONLY   0x08000000
 
-    /* CAMERA heap is a carveout heap for camera, is not secured*/
-    GRALLOC_USAGE_PRIVATE_CAMERA_HEAP     =       0x00400000,
+/* This flag is set for WFD usecase */
+#define GRALLOC_USAGE_PRIVATE_WFD             0x00200000
 
-    /* This flag is used for SECURE display usecase */
-    GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY  =       0x00800000,
-};
+/* CAMERA heap is a carveout heap for camera, is not secured */
+#define GRALLOC_USAGE_PRIVATE_CAMERA_HEAP     0x00400000
+
+/* This flag is used for SECURE display usecase */
+#define GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY  0x00800000
 
 /* define Gralloc perform */
 #define GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER 1
@@ -84,6 +82,7 @@ enum {
 #define GRALLOC_MODULE_PERFORM_GET_COLOR_SPACE_FROM_HANDLE 6
 #define GRALLOC_MODULE_PERFORM_GET_YUV_PLANE_INFO 7
 #define GRALLOC_MODULE_PERFORM_GET_MAP_SECURE_BUFFER_INFO 8
+#define GRALLOC_MODULE_PERFORM_GET_UBWC_FLAG 9
 
 #define GRALLOC_HEAP_MASK   (GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP    |\
                              GRALLOC_USAGE_PRIVATE_IOMMU_HEAP     |\
