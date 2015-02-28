@@ -1,3 +1,4 @@
+# i can count to potato
 ifeq ($(call my-dir),$(call project-path-for,qcom-display))
 
 display-hals := libgralloc libgenlock libcopybit libvirtual
