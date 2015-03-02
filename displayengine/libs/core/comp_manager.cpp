@@ -144,6 +144,10 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
   DisplayCompositionContext *display_comp_ctx =
                              reinterpret_cast<DisplayCompositionContext *>(comp_handle);
 
+  if (!display_comp_ctx) {
+    return kErrorParameters;
+  }
+
   res_mgr_.UnregisterDisplay(display_comp_ctx->display_resource_ctx);
   destroy_strategy_intf_(display_comp_ctx->strategy_intf);
 
@@ -154,11 +158,8 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
            "display type %d", registered_displays_, configured_displays_,
            display_comp_ctx->display_type);
 
-  if (display_comp_ctx) {
-    delete display_comp_ctx;
-    display_comp_ctx = NULL;
-  }
-
+  delete display_comp_ctx;
+  display_comp_ctx = NULL;
   return kErrorNone;
 }
 
