@@ -329,15 +329,16 @@ int HWCSession::SetPowerMode(hwc_composer_device_1 *device, int disp, int mode) 
   switch (disp) {
   case HWC_DISPLAY_PRIMARY:
     status = hwc_session->display_primary_->SetPowerMode(mode);
+  // Set the power mode for virtual display while setting power mode for primary, as surfaceflinger
+  // does not invoke SetPowerMode() for virtual display.
+  case HWC_DISPLAY_VIRTUAL:
+    if (hwc_session->display_virtual_) {
+      status = hwc_session->display_virtual_->SetPowerMode(mode);
+    }
     break;
   case HWC_DISPLAY_EXTERNAL:
     if (hwc_session->display_external_) {
       status = hwc_session->display_external_->SetPowerMode(mode);
-    }
-    break;
-  case HWC_DISPLAY_VIRTUAL:
-    if (hwc_session->display_virtual_) {
-      status = hwc_session->display_virtual_->SetPowerMode(mode);
     }
     break;
   default:

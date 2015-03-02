@@ -33,7 +33,6 @@ class DisplayPrimary : public DisplayBase {
  public:
   DisplayPrimary(DisplayEventHandler *event_handler, HWInterface *hw_intf,
                  CompManager *comp_manager, OfflineCtrl *offline_ctrl);
-  virtual DisplayError SetDisplayState(DisplayState state);
 };
 
 }  // namespace sde

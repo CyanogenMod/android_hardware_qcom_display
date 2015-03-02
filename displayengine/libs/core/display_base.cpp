@@ -298,7 +298,7 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 
   DisplayError error = kErrorNone;
 
-  DLOGI("Set state = %d", state);
+  DLOGI("Set state = %d, display %d", state, display_type_);
 
   if (state == state_) {
     DLOGI("Same state transition is requested.");
@@ -307,13 +307,12 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 
   switch (state) {
   case kStateOff:
-    // Invoke flush during suspend for HDMI and virtual displays. StateOff is handled
-    // separately for primary in DisplayPrimary::SetDisplayState() function.
+    hw_layers_.info.count = 0;
     error = hw_intf_->Flush(hw_device_);
     if (error == kErrorNone) {
       comp_manager_->Purge(display_comp_ctx_);
-      state_ = state;
-      hw_layers_.info.count = 0;
+
+      error = hw_intf_->PowerOff(hw_device_);
     }
     break;
 
