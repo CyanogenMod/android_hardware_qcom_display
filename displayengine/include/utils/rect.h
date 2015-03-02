@@ -40,7 +40,7 @@ namespace sde {
   bool IsValidRect(const LayerRect &rect);
   LayerRect GetIntersection(const LayerRect &rect1, const LayerRect &rect2);
   void LogRect(DebugTag debug_tag, const char *prefix, const LayerRect &roi);
-  void NormalizeRect(const uint32_t &factor, LayerRect *rect);
+  void NormalizeRect(const uint32_t &align_x, const uint32_t &align_y, LayerRect *rect);
 
 }  // namespace sde
 

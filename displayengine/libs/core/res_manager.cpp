@@ -248,6 +248,9 @@ DisplayError ResManager::Start(Handle display_ctx) {
     }
   }
 
+  property_setting_.disable_rotator_downscaling = Debug::IsRotatorDownScaleDisabled();
+  property_setting_.disable_decimation = Debug::IsDecimationDisabled();
+
   return kErrorNone;
 }
 
@@ -266,20 +269,23 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
 
   DisplayError error = kErrorNone;
   const struct HWLayersInfo &layer_info = hw_layers->info;
+  HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
 
-  if (layer_info.count > num_pipe_) {
+  DLOGV_IF(kTagResources, "==== Resource reserving start: hw_block = %d ====", hw_block_id);
+
+  if (layer_info.count > num_pipe_ || layer_info.count >= hw_res_info_.num_blending_stages) {
     return kErrorResources;
   }
 
   uint32_t rotate_count = 0;
   error = Config(display_resource_ctx, hw_layers, &rotate_count);
   if (error != kErrorNone) {
+    DLOGV_IF(kTagResources, "Resource config failed");
     return error;
   }
 
   uint32_t left_index = kPipeIdMax;
   bool need_scale = false;
-  HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
   HWBlockType rotator_block = kHWBlockMax;
 
   // Clear reserved marking
@@ -319,6 +325,10 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
       need_scale = IsScalingNeeded(pipe_info);
       left_index = GetPipe(hw_block_id, is_yuv, need_scale, false, use_non_dma_pipe);
       if (left_index >= num_pipe_) {
+        DLOGV_IF(kTagResources, "Get left pipe failed: hw_block_id = %d, is_yuv = %d, " \
+                 "need_scale = %d, use_non_dma_pipe= %d",
+                 hw_block_id, is_yuv, need_scale, use_non_dma_pipe);
+        ResourceStateLog();
         goto CleanupOnError;
       }
       src_pipes_[left_index].reserved_hw_block = hw_block_id;
@@ -336,6 +346,8 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
         layer_config.left_pipe.pipe_id = src_pipes_[left_index].mdss_pipe_id;
         src_pipes_[left_index].at_right = false;
       }
+      DLOGV_IF(kTagResources, "1 pipe acquired, layer index = %d, left_pipe = %x",
+               i, layer_config.left_pipe.pipe_id);
       continue;
     }
 
@@ -344,6 +356,10 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     uint32_t right_index;
     right_index = GetPipe(hw_block_id, is_yuv, need_scale, true, use_non_dma_pipe);
     if (right_index >= num_pipe_) {
+      DLOGV_IF(kTagResources, "Get right pipe failed: hw_block_id = %d, is_yuv = %d, " \
+               "need_scale = %d, use_non_dma_pipe= %d",
+               hw_block_id, is_yuv, need_scale, use_non_dma_pipe);
+      ResourceStateLog();
       goto CleanupOnError;
     }
 
@@ -364,8 +380,8 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
       goto CleanupOnError;
     }
 
-    DLOGV_IF(kTagResources, "Pipe acquired, layer index = %d, left_pipe = %x, right_pipe = %x",
-            i, layer_config.left_pipe.pipe_id,  pipe_info->pipe_id);
+    DLOGV_IF(kTagResources, "2 pipes acquired, layer index = %d, left_pipe = %x, right_pipe = %x",
+             i, layer_config.left_pipe.pipe_id,  pipe_info->pipe_id);
   }
 
   error = AllocRotatorBuffer(display_ctx, hw_layers);
@@ -805,6 +821,7 @@ void ResManager::Purge(Handle display_ctx) {
       src_pipes_[i].ResetState();
   }
   ClearRotator(display_resource_ctx);
+  DLOGV_IF(kTagResources, "display id = %d", display_resource_ctx->hw_block_id);
 }
 
 uint32_t ResManager::GetMdssPipeId(PipeType type, uint32_t index) {
@@ -972,6 +989,27 @@ void ResManager::AppendDump(char *buffer, uint32_t length) {
                    "\nrotator = %d, pipe index = %x, client_bit_mask = %x, request_bit_mask = %x",
                    i, rotators_[i].pipe_index, rotators_[i].client_bit_mask,
                    rotators_[i].request_bit_mask);
+    }
+  }
+}
+
+void ResManager::ResourceStateLog() {
+  DLOGV_IF(kTagResources, "==== resource manager pipe state ====");
+  uint32_t i;
+  for (i = 0; i < num_pipe_; i++) {
+    SourcePipe *src_pipe = &src_pipes_[i];
+    DLOGV_IF(kTagResources,
+             "index = %d, id = %x, reserved = %d, state = %d, hw_block = %d, dedicated = %d",
+             src_pipe->index, src_pipe->mdss_pipe_id, src_pipe->reserved_hw_block,
+             src_pipe->state, src_pipe->hw_block_id, src_pipe->dedicated_hw_block);
+  }
+
+  for (i = 0; i < hw_res_info_.num_rotator; i++) {
+    if (rotators_[i].client_bit_mask || rotators_[i].request_bit_mask) {
+      DLOGV_IF(kTagResources,
+               "rotator = %d, pipe index = %x, client_bit_mask = %x, request_bit_mask = %x",
+               i, rotators_[i].pipe_index, rotators_[i].client_bit_mask,
+               rotators_[i].request_bit_mask);
     }
   }
 }

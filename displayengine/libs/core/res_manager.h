@@ -88,6 +88,7 @@ class ResManager : public DumpImpl {
     kMaxSourcePipeWidth = 2048,
     kMaxInterfaceWidth = 2048,
     kMaxRotateDownScaleRatio = 8,
+    kMaxDecimationDownScaleRatio = 8,
     kMaxNumRotator = 2,
   };
 
@@ -150,7 +151,11 @@ class ResManager : public DumpImpl {
         CLEAR_BIT(request_bit_mask, block); }
   };
 
-  static const int kPipeIdNeedsAssignment = -1;
+  struct PropertySetting {
+    bool disable_rotator_downscaling;
+    bool disable_decimation;
+    PropertySetting() : disable_rotator_downscaling(false), disable_decimation(false) { }
+  };
 
   uint32_t GetMdssPipeId(PipeType pipe_type, uint32_t index);
   uint32_t NextPipe(PipeType pipe_type, HWBlockType hw_block_id, bool at_right);
@@ -163,15 +168,17 @@ class ResManager : public DumpImpl {
                       uint32_t *rotate_count);
   DisplayError DisplaySplitConfig(DisplayResourceContext *display_resource_ctx,
                                   const LayerTransform &transform, const LayerRect &src_rect,
-                                  const LayerRect &dst_rect, HWLayerConfig *layer_config);
+                                  const LayerRect &dst_rect, HWLayerConfig *layer_config,
+                                  uint32_t align_x);
   DisplayError ValidateScaling(const Layer &layer, const LayerRect &crop,
                                const LayerRect &dst, float *rot_scale_x, float *rot_scale_y);
   DisplayError SrcSplitConfig(DisplayResourceContext *display_resource_ctx,
                               const LayerTransform &transform, const LayerRect &src_rect,
-                              const LayerRect &dst_rect, HWLayerConfig *layer_config);
+                              const LayerRect &dst_rect, HWLayerConfig *layer_config,
+                              uint32_t align_x);
   void CalculateCut(const LayerTransform &transform, float *left_cut_ratio, float *top_cut_ratio,
                     float *right_cut_ratio, float *bottom_cut_ratio);
-  void CalculateCropRects(const LayerRect &scissor, const LayerTransform &transform,
+  bool CalculateCropRects(const LayerRect &scissor, const LayerTransform &transform,
                           LayerRect *crop, LayerRect *dst);
   bool IsValidDimension(const LayerRect &src, const LayerRect &dst);
   bool CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *hw_layers);
@@ -182,7 +189,7 @@ class ResManager : public DumpImpl {
   float GetBpp(LayerBufferFormat format);
   void SplitRect(bool flip_horizontal, const LayerRect &src_rect, const LayerRect &dst_rect,
                  LayerRect *src_left, LayerRect *dst_left, LayerRect *src_right,
-                 LayerRect *dst_right);
+                 LayerRect *dst_right, uint32_t align_x);
   bool IsMacroTileFormat(const LayerBuffer *buffer) { return buffer->flags.macro_tile; }
   bool IsYuvFormat(LayerBufferFormat format) { return (format >= kFormatYCbCr420Planar); }
   bool IsRotationNeeded(float rotation)
@@ -198,6 +205,10 @@ class ResManager : public DumpImpl {
   void SetRotatorOutputFormat(const LayerBufferFormat &input_format, bool bwc, bool rot90,
                               LayerBufferFormat *output_format);
   bool ConfigureScaling(HWLayers *hw_layers);
+  DisplayError AlignPipeConfig(const Layer &layer, const LayerTransform &transform,
+                               HWPipeInfo *left_pipe, HWPipeInfo *right_pipe,
+                               uint32_t align_x, uint32_t align_y);
+  void ResourceStateLog(void);
 
   Locker locker_;
   HWResourceInfo hw_res_info_;
@@ -218,6 +229,7 @@ class ResManager : public DumpImpl {
                                             // the display engine's client
   static void* lib_scalar_handle_;  // Scalar library handle
   static int (*ScalarConfigureScale)(struct scalar::LayerInfo* layer);
+  PropertySetting property_setting_;
 };
 
 }  // namespace sde

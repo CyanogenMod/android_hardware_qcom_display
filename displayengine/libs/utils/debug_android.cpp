@@ -70,5 +70,23 @@ uint32_t Debug::GetIdleTimeoutMs() {
   return 0;
 }
 
+bool Debug::IsRotatorDownScaleDisabled() {
+  char property[PROPERTY_VALUE_MAX];
+  if (property_get("sde.disable_rotator_downscaling", property, NULL) > 0) {
+    return (atoi(property) ? 0 : false, true);
+  }
+
+  return false;
+}
+
+bool Debug::IsDecimationDisabled() {
+  char property[PROPERTY_VALUE_MAX];
+  if (property_get("sde.disable_decimation", property, NULL) > 0) {
+    return (atoi(property) ? 0 : false, true);
+  }
+
+  return false;
+}
+
 }  // namespace sde
 
