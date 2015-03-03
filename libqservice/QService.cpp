@@ -59,11 +59,15 @@ status_t QService::dispatch(uint32_t command, const Parcel* inParcel,
     status_t err = (status_t) FAILED_TRANSACTION;
     IPCThreadState* ipc = IPCThreadState::self();
     //Rewind parcel in case we're calling from the same process
-    if (ipc->getCallingPid() == getpid())
+    bool sameProcess = (ipc->getCallingPid() == getpid());
+    if(sameProcess)
         inParcel->setDataPosition(0);
     if (mClient.get()) {
         ALOGD_IF(QSERVICE_DEBUG, "Dispatching command: %d", command);
         err = mClient->notifyCallback(command, inParcel, outParcel);
+        //Rewind parcel in case we're calling from the same process
+        if (sameProcess)
+            outParcel->setDataPosition(0);
     }
     return err;
 }
