@@ -2773,7 +2773,13 @@ hwc_rect expandROIFromMidPoint(hwc_rect roi, hwc_rect fullFrame) {
 void resetROI(hwc_context_t *ctx, const int dpy) {
     const int fbXRes = (int)ctx->dpyAttr[dpy].xres;
     const int fbYRes = (int)ctx->dpyAttr[dpy].yres;
-    if(isDisplaySplit(ctx, dpy)) {
+
+    /* When source split is enabled, both the panels are calibrated
+     * in a single coordinate system. So only one ROI is generated
+     * for the whole panel extending equally from the midpoint and
+     * populated for the left side. */
+    if(!qdutils::MDPVersion::getInstance().isSrcSplit() &&
+            isDisplaySplit(ctx, dpy)) {
         const int lSplit = getLeftSplit(ctx, dpy);
         ctx->listStats[dpy].lRoi = (struct hwc_rect){0, 0, lSplit, fbYRes};
         ctx->listStats[dpy].rRoi = (struct hwc_rect){lSplit, 0, fbXRes, fbYRes};
