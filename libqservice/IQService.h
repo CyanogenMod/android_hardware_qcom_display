@@ -28,6 +28,7 @@
 #include <binder/IInterface.h>
 #include <binder/IBinder.h>
 #include <IQClient.h>
+#include <IQHDMIClient.h>
 
 
 namespace qService {
@@ -41,7 +42,7 @@ public:
         COMMAND_LIST_START = android::IBinder::FIRST_CALL_TRANSACTION,
         SECURING = 2,           // Hardware securing start/end notification
         UNSECURING = 3,         // Hardware unsecuring start/end notification
-        CONNECT = 4,            // Connect to qservice
+        CONNECT_HWC_CLIENT = 4, // Connect to qservice
         SCREEN_REFRESH = 5,     // Refresh screen through SF invalidate
         EXTERNAL_ORIENTATION = 6,// Set external orientation
         BUFFER_MIRRORMODE = 7,  // Buffer mirrormode
@@ -61,6 +62,7 @@ public:
         TOGGLE_SCREEN_UPDATE = 20, // Provides ability to disable screen updates
         SET_FRAME_DUMP_CONFIG = 21,  // Provides ability to set the frame dump config
         SET_S3D_MODE = 22, // Set the 3D mode as specified in msm_hdmi_modes.h
+        CONNECT_HDMI_CLIENT = 23,  // Connect HDMI CEC HAL Client
         COMMAND_LIST_END = 400,
     };
 
@@ -85,8 +87,13 @@ public:
         DUMP_VIRTUAL_DISPLAY,
     };
 
-    // Register a client that can be notified
+    // Register a HWC client that can be notified
+    // This client is generic and is intended to get
+    // dispatches of all events calling into QService
     virtual void connect(const android::sp<qClient::IQClient>& client) = 0;
+    // Register an HDMI client. This client gets notification of HDMI events
+    // such as plug/unplug and CEC messages
+    virtual void connect(const android::sp<qClient::IQHDMIClient>& client) = 0;
     // Generic function to dispatch binder commands
     // The type of command decides how the data is parceled
     virtual android::status_t dispatch(uint32_t command,

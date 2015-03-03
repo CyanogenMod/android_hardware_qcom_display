@@ -5,6 +5,7 @@ else
 endif
 
 display-hals := libgralloc libcopybit liblight libmemtrack libqservice libqdutils
+display-hals += hdmi_cec
 
 ifeq ($(TARGET_USES_SDE), true)
     sde-libs := displayengine/libs
