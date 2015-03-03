@@ -412,8 +412,9 @@ int HDMIDisplay::getBestConfig() {
     // for all the timing info read, get the best config
     for (int configIndex = 0; configIndex < mModeCount; configIndex++) {
         currentModeInfo = mDisplayConfigs[configIndex];
+        edidMode = mEDIDModes[configIndex];
 
-        if (!currentModeInfo.supported) {
+        if (!isValidMode(edidMode)) {
             ALOGD("%s EDID Mode %d is not supported", __FUNCTION__, edidMode);
             continue;
         }
