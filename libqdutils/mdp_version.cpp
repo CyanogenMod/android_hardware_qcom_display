@@ -501,6 +501,10 @@ bool MDPVersion::is8x39() {
             mMdpRev < MDSS_MDP_HW_REV_109);
 }
 
+bool MDPVersion::is8992() {
+    return ((mMdpRev >= MDSS_MDP_HW_REV_110 and
+            mMdpRev < MDSS_MDP_HW_REV_200));
+}
 
 }; //namespace qdutils
 
