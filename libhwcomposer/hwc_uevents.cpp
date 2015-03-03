@@ -128,7 +128,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             //On 8994, 8992 due to hardware limitations, we disable bwc
             //when HDMI intf is active
             if((qdutils::MDPVersion::getInstance().is8994() or
-                qdutils::MDPVersion::getInstance().is8092()) and
+                qdutils::MDPVersion::getInstance().is8992()) and
                     qdutils::MDPVersion::getInstance().supportsBWC()) {
                 Locker::Autolock _l(ctx->mDrawLock);
                 ctx->mBWCEnabled = true;
@@ -148,7 +148,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             //On 8994, 8992 due to hardware limitations, we disable bwc
             //when HDMI intf is active
             if((qdutils::MDPVersion::getInstance().is8994() or
-                qdutils::MDPVersion::getInstance().is8092()) and
+                qdutils::MDPVersion::getInstance().is8992()) and
                     qdutils::MDPVersion::getInstance().supportsBWC()) {
                 Locker::Autolock _l(ctx->mDrawLock);
                 ctx->mBWCEnabled = false;
