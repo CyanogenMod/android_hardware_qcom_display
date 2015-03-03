@@ -27,7 +27,7 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#define DEBUG 1
+#define DEBUG 0
 #define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 #include <cstdlib>
 #include <cutils/log.h>
@@ -65,6 +65,7 @@ enum {
 //Forward declarations
 static void cec_close_context(cec_context_t* ctx __unused);
 static int cec_enable(cec_context_t *ctx, int enable);
+static int cec_is_connected(const struct hdmi_cec_device* dev, int port_id);
 
 static ssize_t read_node(const char *path, char *data)
 {
@@ -171,7 +172,7 @@ static int cec_add_logical_address(const struct hdmi_cec_device* dev,
     //XXX: We can get multiple logical addresses here but we can only send one
     //to the driver. Store locally for now
     ssize_t err = write_int_to_node(ctx, "cec/logical_addr", addr);
-    ALOGD_IF(DEBUG, "%s: Allocated logical address: %d ", __FUNCTION__, addr);
+    ALOGI("%s: Allocated logical address: %d ", __FUNCTION__, addr);
     return (int) err;
 }
 
@@ -206,6 +207,9 @@ static int cec_send_message(const struct hdmi_cec_device* dev,
         const cec_message_t* msg)
 {
     ATRACE_CALL();
+    if(cec_is_connected(dev, 0) <= 0)
+        return HDMI_RESULT_FAIL;
+
     cec_context_t* ctx = (cec_context_t*)(dev);
     ALOGD_IF(DEBUG, "%s: initiator: %d destination: %d length: %u",
             __FUNCTION__, msg->initiator, msg->destination,
@@ -254,7 +258,7 @@ static int cec_send_message(const struct hdmi_cec_device* dev,
 
     if (err < 0) {
        if (err == -ENXIO) {
-           ALOGE("%s: No device exists with the destination address",
+           ALOGI("%s: No device exists with the destination address",
                    __FUNCTION__);
            return HDMI_RESULT_NACK;
        } else if (err == -EAGAIN) {
