@@ -94,7 +94,7 @@ int HWCSession::Init() {
                 android::defaultServiceManager()->getService(android::String16(qservice_name)));
 
   if (qservice.get()) {
-    qservice->connect(this);
+    qservice->connect(android::sp<qClient::IQClient>(this));
   } else {
     DLOGE("Failed to acquire %s", qservice_name);
     return -EINVAL;
