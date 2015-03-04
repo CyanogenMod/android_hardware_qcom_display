@@ -33,6 +33,7 @@
 #define INT(exp) static_cast<int>(exp)
 #define FLOAT(exp) static_cast<float>(exp)
 #define UINT8(exp) static_cast<uint8_t>(exp)
+#define UINT16(exp) static_cast<uint16_t>(exp)
 #define UINT32(exp) static_cast<uint32_t>(exp)
 #define INT32(exp) static_cast<int32_t>(exp)
 

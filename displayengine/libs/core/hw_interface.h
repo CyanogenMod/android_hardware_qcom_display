@@ -89,8 +89,8 @@ struct HWResourceInfo {
   HWResourceInfo()
     : hw_version(0), hw_revision(0), num_dma_pipe(0), num_vig_pipe(0), num_rgb_pipe(0),
       num_cursor_pipe(0), num_blending_stages(0), num_rotator(0), num_control(0),
-      num_mixer_to_disp(0), smp_total(0), smp_size(0), num_smp_per_pipe(0), max_scale_up(0),
-      max_scale_down(0), max_bandwidth_low(0), max_bandwidth_high(0), max_mixer_width(2048),
+      num_mixer_to_disp(0), smp_total(0), smp_size(0), num_smp_per_pipe(0), max_scale_up(1),
+      max_scale_down(1), max_bandwidth_low(0), max_bandwidth_high(0), max_mixer_width(2048),
       max_pipe_bw(0), max_sde_clk(0), clk_fudge_factor(1.0f), has_bwc(false),
       has_decimation(false), has_macrotile(false), has_rotator_downscale(false),
       has_non_scalar_rgb(false), is_src_split(false), always_src_split(false) { }
@@ -113,15 +113,14 @@ struct HWRotateInfo {
   LayerRect dst_roi;
   LayerBufferFormat dst_format;
   HWBlockType writeback_id;
-  float downscale_ratio_x;
-  float downscale_ratio_y;
+  float downscale_ratio;
   HWBufferInfo hw_buffer_info;
   bool valid;
   uint32_t frame_rate;
 
   HWRotateInfo() : input_buffer(NULL), pipe_id(0), dst_format(kFormatInvalid),
-                   writeback_id(kHWWriteback0), downscale_ratio_x(1.0f), downscale_ratio_y(1.0f),
-                   valid(false), frame_rate(0) { }
+                   writeback_id(kHWWriteback0), downscale_ratio(1.0f), valid(false),
+                   frame_rate(0) { }
 
   void Reset() { *this = HWRotateInfo(); }
 };
@@ -134,8 +133,10 @@ struct HWPipeInfo {
   uint8_t vertical_decimation;
   scalar::Scale scale_data;
   bool valid;
+  uint32_t z_order;
 
-  HWPipeInfo() : pipe_id(0), horizontal_decimation(0), vertical_decimation(0), valid(false) { }
+  HWPipeInfo() : pipe_id(0), horizontal_decimation(0), vertical_decimation(0), valid(false),
+                 z_order(0) { }
 
   void Reset() { *this = HWPipeInfo(); }
 };
