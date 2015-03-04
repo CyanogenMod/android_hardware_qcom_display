@@ -28,9 +28,9 @@
 #include <dlfcn.h>
 
 #include "res_manager.h"
+#include "scalar_helper.h"
 
 #define __CLASS__ "ResManager"
-#define SCALAR_LIBRARY_NAME "libscalar.so"
 
 namespace sde {
 
@@ -121,23 +121,16 @@ DisplayError ResManager::Init(const HWResourceInfo &hw_res_info, BufferAllocator
   rgb_pipes_[0].state = kPipeStateOwnedByKernel;
   rgb_pipes_[1].state = kPipeStateOwnedByKernel;
 
-  ScalarConfigureScale = NULL;
-  lib_scalar_handle_ = dlopen(SCALAR_LIBRARY_NAME, RTLD_NOW);
-  if (lib_scalar_handle_) {
-    void **scalar_func = reinterpret_cast<void **>(&ScalarConfigureScale);
-    *scalar_func = ::dlsym(lib_scalar_handle_, "configureScale");
-  } else {
-    DLOGW("Unable to load %s !", SCALAR_LIBRARY_NAME);
-  }
-
+#ifdef USES_SCALAR
+  ScalarHelper::GetInstance()->Init();
+#endif
   return kErrorNone;
 }
 
 DisplayError ResManager::Deinit() {
-  if (lib_scalar_handle_) {
-    dlclose(lib_scalar_handle_);
-    lib_scalar_handle_ = NULL;
-  }
+#ifdef USES_SCALAR
+  ScalarHelper::GetInstance()->Deinit();
+#endif
   return kErrorNone;
 }
 
@@ -398,12 +391,12 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     goto CleanupOnError;
   }
 
-  if (lib_scalar_handle_ && ScalarConfigureScale) {
-    if (!ConfigureScaling(hw_layers)) {
-      DLOGV_IF(kTagResources, "Scale data configuration has failed!");
-      goto CleanupOnError;
-    }
+#ifdef USES_SCALAR
+  if (!ScalarHelper::GetInstance()->ConfigureScale(hw_layers)) {
+    DLOGV_IF(kTagResources, "Scale data configuration has failed!");
+    goto CleanupOnError;
   }
+#endif
 
   if (!CheckBandwidth(display_resource_ctx, hw_layers)) {
     DLOGV_IF(kTagResources, "Bandwidth check failed!");
@@ -1135,9 +1128,6 @@ void ResManager::SetRotatorOutputFormat(const LayerBufferFormat &input_format, b
 
   return;
 }
-
-void* ResManager::lib_scalar_handle_ = NULL;
-int (*ResManager::ScalarConfigureScale)(struct scalar::LayerInfo* layer) = NULL;
 
 }  // namespace sde
 
