@@ -152,12 +152,9 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
       if (error == kErrorNone) {
         error = hw_intf_->Validate(hw_device_, &hw_layers_);
         if (error == kErrorNone) {
-          error = comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
-          if (error == kErrorNone) {
-            // Strategy is successful now, wait for Commit().
-            pending_commit_ = true;
-            break;
-          }
+          // Strategy is successful now, wait for Commit().
+          pending_commit_ = true;
+          break;
         }
       }
     }
