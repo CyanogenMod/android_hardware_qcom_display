@@ -1154,6 +1154,7 @@ DisplayError HWFrameBuffer::SetStride(HWDeviceType device_type, LayerBufferForma
     *target = width * 3;
     break;
   case kFormatYCbCr420SemiPlanarVenus:
+  case kFormatYCbCr420SPVenusUbwc:
   case kFormatYCbCr420Planar:
   case kFormatYCrCb420Planar:
   case kFormatYCbCr420SemiPlanar:
