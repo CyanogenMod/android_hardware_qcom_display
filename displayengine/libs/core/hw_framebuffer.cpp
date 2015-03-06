@@ -43,7 +43,7 @@
 #include <utils/debug.h>
 
 #include "hw_framebuffer.h"
-
+#include "scalar_helper.h"
 
 #define __CLASS__ "HWFrameBuffer"
 
@@ -706,14 +706,16 @@ DisplayError HWFrameBuffer::DisplayValidate(HWContext *hw_context, HWLayers *hw_
           }
         }
 
-        if (pipe_info->scale_data.enable_pxl_ext) {
+        mdp_scale_data* mdp_scale = hw_display->GetScaleDataRef(mdp_layer_count);
+#ifdef USES_SCALAR
+        // Set the configured scale data for MDP driver
+        ScalarHelper::GetInstance()->SetScaleData(i, !count, mdp_scale);
+        if (mdp_scale->enable_pxl_ext) {
           if ((mdp_layer.flags & MDP_LAYER_DEINTERLACE) && (layer.transform.rotation == 90.0f))
-            mdp_buffer.width = pipe_info->scale_data.src_width;
-          hw_display->SetScaleData(pipe_info->scale_data, mdp_layer_count);
+            ScalarHelper::GetInstance()->UpdateSrcWidth(i, !count, &mdp_buffer.width);
         }
-
-        // Send scale data to MDP driver
-        mdp_layer.scale = hw_display->GetScaleRef(mdp_layer_count);
+#endif
+        mdp_layer.scale = mdp_scale;
         mdp_layer_count++;
 
         DLOGV_IF(kTagDriverConfig, "******************* Layer[%d] %s pipe Input ******************",

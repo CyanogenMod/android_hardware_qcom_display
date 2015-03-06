@@ -204,7 +204,6 @@ class ResManager : public DumpImpl {
   DisplayError AllocRotatorBuffer(Handle display_ctx, HWLayers *hw_layers);
   void SetRotatorOutputFormat(const LayerBufferFormat &input_format, bool bwc, bool rot90,
                               LayerBufferFormat *output_format);
-  bool ConfigureScaling(HWLayers *hw_layers);
   DisplayError AlignPipeConfig(const Layer &layer, const LayerTransform &transform,
                                HWPipeInfo *left_pipe, HWPipeInfo *right_pipe,
                                uint32_t align_x, uint32_t align_y);
@@ -227,8 +226,6 @@ class ResManager : public DumpImpl {
   BufferAllocator *buffer_allocator_;
   BufferSyncHandler *buffer_sync_handler_;  // Pointer to buffer sync handler that was defined by
                                             // the display engine's client
-  static void* lib_scalar_handle_;  // Scalar library handle
-  static int (*ScalarConfigureScale)(struct scalar::LayerInfo* layer);
   PropertySetting property_setting_;
 };
 

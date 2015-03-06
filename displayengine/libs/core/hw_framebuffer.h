@@ -89,36 +89,7 @@ class HWFrameBuffer : public HWInterface {
       mdp_disp_commit.commit_v1.retire_fence = -1;
     }
 
-    mdp_scale_data* GetScaleRef(uint32_t index) { return &scale_data[index]; }
-
-    void SetScaleData(scalar::Scale scale, uint32_t index) {
-      mdp_scale_data *mdp_scale = &scale_data[index];
-      mdp_scale->enable_pxl_ext = scale.enable_pxl_ext;
-
-      for (int i = 0; i < MAX_PLANES; i++) {
-        mdp_scale->init_phase_x[i] = scale.init_phase_x[i];
-        mdp_scale->phase_step_x[i] = scale.phase_step_x[i];
-        mdp_scale->init_phase_y[i] = scale.init_phase_y[i];
-        mdp_scale->phase_step_y[i] = scale.phase_step_y[i];
-
-        mdp_scale->num_ext_pxls_left[i] = scale.left.extension[i];
-        mdp_scale->num_ext_pxls_top[i] = scale.top.extension[i];
-        mdp_scale->num_ext_pxls_right[i] = scale.right.extension[i];
-        mdp_scale->num_ext_pxls_btm[i] = scale.bottom.extension[i];
-
-        mdp_scale->left_ftch[i] = scale.left.overfetch[i];
-        mdp_scale->top_ftch[i] = scale.top.overfetch[i];
-        mdp_scale->right_ftch[i] = scale.right.overfetch[i];
-        mdp_scale->btm_ftch[i] = scale.bottom.overfetch[i];
-
-        mdp_scale->left_rpt[i] = scale.left.repeat[i];
-        mdp_scale->top_rpt[i] = scale.top.repeat[i];
-        mdp_scale->right_rpt[i] = scale.right.repeat[i];
-        mdp_scale->btm_rpt[i] = scale.bottom.repeat[i];
-
-        mdp_scale->roi_w[i] = scale.roi_width[i];
-      }
-    }
+    mdp_scale_data* GetScaleDataRef(uint32_t index) { return &scale_data[index]; }
   };
 
   struct HWRotator {
