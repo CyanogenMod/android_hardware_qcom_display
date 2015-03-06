@@ -92,9 +92,30 @@ DisplayError ResManager::SrcSplitConfig(DisplayResourceContext *display_resource
   HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
   HWPipeInfo *left_pipe = &layer_config->left_pipe;
   HWPipeInfo *right_pipe = &layer_config->right_pipe;
+  float src_width = src_rect.right - src_rect.left;
+  float dst_width = dst_rect.right - dst_rect.left;
+  float src_height = src_rect.bottom - src_rect.top;
+  float dst_height = dst_rect.bottom - dst_rect.top;
+  float left_mixer_width = FLOAT(display_attributes.split_left);
 
-  if ((src_rect.right - src_rect.left) > kMaxSourcePipeWidth ||
-      (dst_rect.right - dst_rect.left) > kMaxInterfaceWidth || hw_res_info_.always_src_split) {
+  uint8_t decimation = 0;
+  if (CalculateDecimation((src_height / dst_height), &decimation) != kErrorNone) {
+    return kErrorNotSupported;
+  }
+  // Adjust source height to consider decimation
+  src_height /= powf(2.0f, decimation);
+
+  // No need to include common factors in clock calculation of pipe & mixer
+  float pipe_clock = MAX(dst_width, (dst_width * src_height / dst_height));
+  float mixer_clock = left_mixer_width;
+
+  // Layer cannot qualify for SrcSplit if source or destination width exceeds max pipe width.
+  // For perf/power optimization, even if "always_src_split" is enabled, use 2 pipes only if:
+  // 1. Source width is greater than split_left (left_mixer_width)
+  // 2. Pipe clock exceeds the mixer clock
+  if ((src_width > kMaxSourcePipeWidth) || (dst_width > kMaxSourcePipeWidth) ||
+      (hw_res_info_.always_src_split && ((src_width > left_mixer_width) ||
+      (pipe_clock > mixer_clock)))) {
     SplitRect(transform.flip_horizontal, src_rect, dst_rect, &left_pipe->src_roi,
               &left_pipe->dst_roi, &right_pipe->src_roi, &right_pipe->dst_roi, align_x);
     left_pipe->valid = true;
@@ -503,7 +524,6 @@ bool ResManager::IsValidDimension(const LayerRect &src, const LayerRect &dst) {
 }
 
 DisplayError ResManager::SetDecimationFactor(HWPipeInfo *pipe) {
-  float max_down_scale = FLOAT(hw_res_info_.max_scale_down);
   float src_h = pipe->src_roi.bottom - pipe->src_roi.top;
   float dst_h = pipe->dst_roi.bottom - pipe->dst_roi.top;
   float down_scale_h = src_h / dst_h;
@@ -512,27 +532,16 @@ DisplayError ResManager::SetDecimationFactor(HWPipeInfo *pipe) {
   float dst_w = pipe->dst_roi.right - pipe->dst_roi.left;
   float down_scale_w = src_w / dst_w;
 
-
   pipe->horizontal_decimation = 0;
   pipe->vertical_decimation = 0;
 
-  // TODO(user): Need to check for the maximum downscale limit for decimation and return error
-  if (!hw_res_info_.has_decimation && ((down_scale_w > max_down_scale) ||
-      (down_scale_h > max_down_scale))) {
-    DLOGV("Downscaling exceeds the maximum MDP downscale limit and decimation not enabled");
+  if (CalculateDecimation(down_scale_w, &pipe->horizontal_decimation) != kErrorNone) {
     return kErrorNotSupported;
   }
 
-  if ((down_scale_w <= max_down_scale) && (down_scale_h <= max_down_scale)) {
-    return kErrorNone;
+  if (CalculateDecimation(down_scale_h, &pipe->vertical_decimation) != kErrorNone) {
+    return kErrorNotSupported;
   }
-
-  // Decimation is the remaining downscale factor after doing max SDE downscale.
-  // In SDE, decimation is supported in powers of 2.
-  // For ex: If a pipe needs downscale of 8 but max_down_scale is 4
-  // So decimation = powf(2.0, ceilf(log2f(8) - log2f(4))) = powf(2.0, 1.0) = 2
-  pipe->horizontal_decimation = UINT8(ceilf(log2f(down_scale_w) - log2f(max_down_scale)));
-  pipe->vertical_decimation = UINT8(ceilf(log2f(down_scale_h) - log2f(max_down_scale)));
 
   DLOGI_IF(kTagResources, "horizontal_decimation %d, vertical_decimation %d",
            pipe->horizontal_decimation, pipe->vertical_decimation);
@@ -636,6 +645,25 @@ PipeConfigExit:
     DLOGV_IF(kTagResources, "AlignPipeConfig failed");
   }
   return error;
+}
+
+DisplayError ResManager::CalculateDecimation(float downscale, uint8_t* decimation) {
+  float max_down_scale = FLOAT(hw_res_info_.max_scale_down);
+
+  if (downscale <= max_down_scale) {
+    *decimation = 0;
+    return kErrorNone;
+  } else if (!hw_res_info_.has_decimation) {
+    DLOGE("Downscaling exceeds the maximum MDP downscale limit but decimation not enabled");
+    return kErrorNotSupported;
+  }
+
+  // Decimation is the remaining downscale factor after doing max SDE downscale.
+  // In SDE, decimation is supported in powers of 2.
+  // For ex: If a pipe needs downscale of 8 but max_down_scale is 4
+  // So decimation = powf(2.0, ceilf(log2f(8 / 4))) = powf(2.0, 1.0) = 2
+  *decimation = UINT8(ceilf(log2f(downscale / max_down_scale)));
+  return kErrorNone;
 }
 
 }  // namespace sde

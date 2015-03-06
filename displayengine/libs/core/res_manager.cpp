@@ -54,8 +54,6 @@ DisplayError ResManager::Init(const HWResourceInfo &hw_res_info, BufferAllocator
 
   DisplayError error = kErrorNone;
 
-  // TODO(user): Remove this. Disable src_split as kernel not supported yet
-  hw_res_info_.is_src_split = false;
   num_pipe_ = hw_res_info_.num_vig_pipe + hw_res_info_.num_rgb_pipe + hw_res_info_.num_dma_pipe;
 
   if (num_pipe_ > kPipeIdMax) {
