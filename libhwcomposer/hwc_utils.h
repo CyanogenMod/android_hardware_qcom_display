@@ -90,6 +90,7 @@ struct DisplayAttributes {
     float xdpi;
     float ydpi;
     bool secure;
+    uint32_t fbformat;
     int fd;
     bool connected; //Applies only to pluggable disp.
     //Connected does not mean it ready to use.
@@ -300,6 +301,7 @@ bool needsScalingWithSplit(hwc_context_t* ctx, hwc_layer_1_t const* layer,
 void sanitizeSourceCrop(hwc_rect_t& cropL, hwc_rect_t& cropR,
                         private_handle_t *hnd);
 bool isAlphaPresent(hwc_layer_1_t const* layer);
+bool isAlphaPresentinFB(hwc_context_t* ctx, int dpy);
 int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable);
 int getBlending(int blending);
 bool isGLESOnlyComp(hwc_context_t *ctx, const int& dpy);

@@ -56,7 +56,7 @@ IFBUpdate::IFBUpdate(hwc_context_t *ctx, const int& dpy) : mDpy(dpy) {
         yres = ctx->dpyAttr[mDpy].yres_new;
     }
     getBufferAttributes((int)xres, (int)yres,
-            HAL_PIXEL_FORMAT_RGBA_8888,
+            ctx->dpyAttr[mDpy].fbformat,
             0,
             mAlignedFBWidth,
             mAlignedFBHeight,
@@ -136,7 +136,7 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
         int flags = mTileEnabled ?
             private_handle_t::PRIV_FLAGS_TILE_RENDERED : 0;
         ovutils::Whf info(mAlignedFBWidth, mAlignedFBHeight,
-                ovutils::getMdpFormat(HAL_PIXEL_FORMAT_RGBA_8888, flags));
+                ovutils::getMdpFormat(ctx->dpyAttr[mDpy].fbformat, flags));
 
         Overlay::PipeSpecs pipeSpecs;
         pipeSpecs.formatClass = Overlay::FORMAT_RGB;
