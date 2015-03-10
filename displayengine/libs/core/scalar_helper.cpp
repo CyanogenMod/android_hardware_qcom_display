@@ -126,7 +126,8 @@ bool ScalarHelper::ConfigureScale(HWLayers *hw_layers) {
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     Layer &layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
-    LayerBuffer *input_buffer = layer.input_buffer;
+    uint32_t width = layer.input_buffer->width;
+    LayerBufferFormat format = layer.input_buffer->format;
     HWPipeInfo* left_pipe = &hw_layers->config[i].left_pipe;
     HWPipeInfo* right_pipe = &hw_layers->config[i].right_pipe;
 
@@ -147,15 +148,17 @@ bool ScalarHelper::ConfigureScale(HWLayers *hw_layers) {
       HWRotateInfo* rotate_info = &hw_layers->config[i].rotates[count];
       scalar::PipeInfo* pipe = (count == 0) ? &layer_info.left_pipe : &layer_info.right_pipe;
 
-      if (rotate_info->valid)
-        input_buffer = &rotate_info->hw_buffer_info.output_buffer;
+      if (rotate_info->valid) {
+        width = rotate_info->hw_buffer_info.buffer_config.width;
+        format = rotate_info->hw_buffer_info.buffer_config.format;
+      }
 
       pipe->flags = flags;
       pipe->scale_data = GetScaleRef(i, !count);
-      pipe->scale_data->src_width = input_buffer->width;
+      pipe->scale_data->src_width = width;
       SetPipeInfo(hw_pipe, pipe);
     }
-    layer_info.src_format = GetScalarFormat(input_buffer->format);
+    layer_info.src_format = GetScalarFormat(format);
 
     DLOGV_IF(kTagScalar, "Scalar Input[%d] flags=%x format=%x", i, flags, layer_info.src_format);
     DLOGV_IF(kTagScalar, "Left: id=%d hD=%d vD=%d srcRect=[%d %d %d %d] dstRect=[%d %d %d %d]",

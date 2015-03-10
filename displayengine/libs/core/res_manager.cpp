@@ -385,12 +385,6 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
              i, layer_config.left_pipe.pipe_id,  pipe_info->pipe_id);
   }
 
-  error = AllocRotatorBuffer(display_ctx, hw_layers);
-  if (error != kErrorNone) {
-    DLOGV_IF(kTagResources, "Rotator buffer allocation failed");
-    goto CleanupOnError;
-  }
-
 #ifdef USES_SCALAR
   if (!ScalarHelper::GetInstance()->ConfigureScale(hw_layers)) {
     DLOGV_IF(kTagResources, "Scale data configuration has failed!");
@@ -400,6 +394,12 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
 
   if (!CheckBandwidth(display_resource_ctx, hw_layers)) {
     DLOGV_IF(kTagResources, "Bandwidth check failed!");
+    goto CleanupOnError;
+  }
+
+  error = AllocRotatorBuffer(display_ctx, hw_layers);
+  if (error != kErrorNone) {
+    DLOGV_IF(kTagResources, "Rotator buffer allocation failed");
     goto CleanupOnError;
   }
 
@@ -621,6 +621,7 @@ float ResManager::GetBpp(LayerBufferFormat format) {
     case kFormatYCbCr420SemiPlanar:
     case kFormatYCrCb420SemiPlanar:
     case kFormatYCbCr420SemiPlanarVenus:
+    case kFormatYCbCr420SPVenusUbwc:
       return 1.5f;
     default:
       DLOGE("GetBpp: Invalid buffer format: %x", format);
@@ -643,16 +644,9 @@ DisplayError ResManager::AllocRotatorBuffer(Handle display_ctx, HWLayers *hw_lay
   for (uint32_t i = 0; i < layer_info.count; i++) {
     Layer& layer = layer_info.stack->layers[layer_info.index[i]];
     HWRotateInfo *rotate = &hw_layers->config[i].rotates[0];
-    bool rot90 = (layer.transform.rotation == 90.0f);
 
     if (rotate->valid) {
-      LayerBufferFormat rot_ouput_format;
-      SetRotatorOutputFormat(layer.input_buffer->format, false, rot90, &rot_ouput_format);
-
       HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
-      hw_buffer_info->buffer_config.width = UINT32(rotate->dst_roi.right - rotate->dst_roi.left);
-      hw_buffer_info->buffer_config.height = UINT32(rotate->dst_roi.bottom - rotate->dst_roi.top);
-      hw_buffer_info->buffer_config.format = rot_ouput_format;
       // Allocate two rotator output buffers by default for double buffering.
       hw_buffer_info->buffer_config.buffer_count = 2;
       hw_buffer_info->buffer_config.secure = layer.input_buffer->flags.secure;
@@ -665,13 +659,7 @@ DisplayError ResManager::AllocRotatorBuffer(Handle display_ctx, HWLayers *hw_lay
 
     rotate = &hw_layers->config[i].rotates[1];
     if (rotate->valid) {
-      LayerBufferFormat rot_ouput_format;
-      SetRotatorOutputFormat(layer.input_buffer->format, false, rot90, &rot_ouput_format);
-
       HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
-      hw_buffer_info->buffer_config.width = UINT32(rotate->dst_roi.right - rotate->dst_roi.left);
-      hw_buffer_info->buffer_config.height = UINT32(rotate->dst_roi.bottom - rotate->dst_roi.top);
-      hw_buffer_info->buffer_config.format = rot_ouput_format;
       // Allocate two rotator output buffers by default for double buffering.
       hw_buffer_info->buffer_config.buffer_count = 2;
       hw_buffer_info->buffer_config.secure = layer.input_buffer->flags.secure;
@@ -1093,33 +1081,32 @@ void ResManager::ClearRotator(DisplayResourceContext *display_resource_ctx) {
 }
 
 void ResManager::SetRotatorOutputFormat(const LayerBufferFormat &input_format, bool bwc, bool rot90,
-                                        LayerBufferFormat *output_format) {
+                                        bool downscale, LayerBufferFormat *output_format) {
+  *output_format = input_format;
+
   switch (input_format) {
   case kFormatRGB565:
     if (rot90)
       *output_format = kFormatRGB888;
-    else
-      *output_format = input_format;
     break;
   case kFormatRGBA8888:
     if (bwc)
       *output_format = kFormatBGRA8888;
-    else
-      *output_format = input_format;
     break;
   case kFormatYCbCr420SemiPlanarVenus:
   case kFormatYCbCr420SemiPlanar:
     if (rot90)
       *output_format = kFormatYCrCb420SemiPlanar;
-    else
-      *output_format = input_format;
+    break;
+  case kFormatYCbCr420SPVenusUbwc:
+    if (downscale)
+      *output_format = kFormatYCrCb420SemiPlanar;
     break;
   case kFormatYCbCr420Planar:
   case kFormatYCrCb420Planar:
     *output_format = kFormatYCrCb420SemiPlanar;
     break;
   default:
-    *output_format = input_format;
     break;
   }
 
