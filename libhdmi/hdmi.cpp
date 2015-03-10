@@ -95,6 +95,7 @@ HDMIDisplay::HDMIDisplay():mFd(-1),
     mUnderscanSupported(false), mMDPDownscaleEnabled(false)
 {
     memset(&mVInfo, 0, sizeof(mVInfo));
+    mFbNum = qdutils::getHDMINode();
 
     mDisplayId = HWC_DISPLAY_EXTERNAL;
     // Update the display if HDMI is connected as primary
@@ -102,7 +103,6 @@ HDMIDisplay::HDMIDisplay():mFd(-1),
         mDisplayId = HWC_DISPLAY_PRIMARY;
     }
 
-    mFbNum = overlay::Overlay::getInstance()->getFbForDpy(mDisplayId);
     // Disable HPD at start if HDMI is external, it will be enabled later
     // when the display powers on
     // This helps for framework reboot or adb shell stop/start
@@ -685,8 +685,7 @@ int HDMIDisplay::openDeviceNode(const char* node, int fileMode) const {
 }
 
 bool HDMIDisplay::isHDMIPrimaryDisplay() {
-    int hdmiNode = qdutils::getHDMINode();
-    return (hdmiNode == HWC_DISPLAY_PRIMARY);
+    return (mFbNum == HWC_DISPLAY_PRIMARY);
 }
 
 int HDMIDisplay::getConnectedState() {
@@ -738,6 +737,124 @@ int HDMIDisplay::setActiveConfig(int newConfig) {
     activateDisplay();
     ALOGD("%s config(%d) mode(%d)", __FUNCTION__, mActiveConfig, mCurrentMode);
     return 0;
+}
+
+static const char* getS3DStringFromMode(int s3dMode) {
+    const char* ret ;
+    switch(s3dMode) {
+    case HDMI_S3D_NONE:
+        ret = "None";
+        break;
+    case HDMI_S3D_SIDE_BY_SIDE:
+        ret = "SSH";
+        break;
+    case HDMI_S3D_TOP_AND_BOTTOM:
+        ret = "TAB";
+        break;
+    //FP (FramePacked) mode is not supported in the HAL
+    default:
+        ALOGD("%s: Unsupported s3d mode: %d", __FUNCTION__, s3dMode);
+        ret = NULL;
+    }
+    return ret;
+}
+
+bool HDMIDisplay::isS3DModeSupported(int s3dMode) {
+    if(s3dMode == HDMI_S3D_NONE)
+        return true;
+
+    char s3dEdidStr[PAGE_SIZE] = {'\0'};
+
+    const char *s3dModeString = getS3DStringFromMode(s3dMode);
+
+    if(s3dModeString == NULL)
+        return false;
+
+    int s3dEdidNode = openDeviceNode("edid_3d_modes", O_RDONLY);
+    if(s3dEdidNode >= 0) {
+        ssize_t len = read(s3dEdidNode, s3dEdidStr, sizeof(s3dEdidStr)-1);
+        if (len > 0) {
+            ALOGI("%s: s3dEdidStr: %s mCurrentMode:%d", __FUNCTION__,
+                    s3dEdidStr, mCurrentMode);
+            //Three level inception!
+            //The string looks like 16=SSH,4=FP:TAB:SSH,5=FP:SSH,32=FP:TAB:SSH
+            char *saveptr_l1, *saveptr_l2, *saveptr_l3;
+            char *l1, *l2, *l3;
+            int mode = 0;
+            l1 = strtok_r(s3dEdidStr,",", &saveptr_l1);
+            while (l1 != NULL) {
+                l2 = strtok_r(l1, "=", &saveptr_l2);
+                if (l2 != NULL)
+                    mode = atoi(l2);
+                while (l2 != NULL) {
+                    if (mode != mCurrentMode) {
+                        break;
+                    }
+                    l3 = strtok_r(l2, ":", &saveptr_l3);
+                    while (l3 != NULL) {
+                        if (strncmp(l3, s3dModeString,
+                                    strlen(s3dModeString)) == 0) {
+                            close(s3dEdidNode);
+                            return true;
+                        }
+                        l3 = strtok_r(NULL, ":", &saveptr_l3);
+                    }
+                    l2 = strtok_r(NULL, "=", &saveptr_l2);
+                }
+                l1 = strtok_r(NULL, ",", &saveptr_l1);
+            }
+
+        }
+    } else {
+        ALOGI("%s: /sys/class/graphics/fb%d/edid_3d_modes could not be opened : %s",
+                __FUNCTION__, mFbNum, strerror(errno));
+    }
+    close(s3dEdidNode);
+    return false;
+}
+
+bool HDMIDisplay::writeS3DMode(int s3dMode) {
+  bool ret = true;
+    if(mFbNum != -1) {
+        int hdmiS3DModeFile = openDeviceNode("s3d_mode", O_RDWR);
+        if(hdmiS3DModeFile >=0 ) {
+            char curModeStr[PROPERTY_VALUE_MAX];
+            int currentS3DMode = -1;
+            size_t len = read(hdmiS3DModeFile, curModeStr, sizeof(curModeStr) - 1);
+            if(len > 0) {
+                currentS3DMode = atoi(curModeStr);
+            } else {
+                ret = false;
+                ALOGE("%s: Failed to read s3d_mode", __FUNCTION__);
+            }
+
+            if (currentS3DMode >=0 && currentS3DMode != s3dMode) {
+                ssize_t err = -1;
+                ALOGD_IF(DEBUG, "%s: mode = %d",
+                        __FUNCTION__, s3dMode);
+                char mode[PROPERTY_VALUE_MAX];
+                snprintf(mode,sizeof(mode),"%d",s3dMode);
+                err = write(hdmiS3DModeFile, mode, sizeof(mode));
+                if (err <= 0) {
+                    ALOGE("%s: file write failed 's3d_mode'", __FUNCTION__);
+                    ret = false;
+                }
+            }
+            close(hdmiS3DModeFile);
+        }
+    }
+    return ret;
+}
+
+bool HDMIDisplay::configure3D(int s3dMode) {
+    if(isS3DModeSupported(s3dMode)) {
+        if(!writeS3DMode(s3dMode))
+            return false;
+    } else {
+        ALOGE("%s: 3D mode: %d is not supported", __FUNCTION__, s3dMode);
+        return false;
+    }
+    return true;
 }
 
 // returns false if the xres or yres of the new config do
