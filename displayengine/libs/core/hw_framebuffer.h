@@ -169,7 +169,7 @@ class HWFrameBuffer : public HWInterface {
 
   DisplayError RotatorValidate(HWContext *device_ctx, HWLayers *hw_layers);
   DisplayError RotatorCommit(HWContext *device_ctx, HWLayers *hw_layers);
-
+  void DumpLayerCommit(mdp_layer_commit &layer_commit);
   inline DisplayError SetFormat(const LayerBufferFormat &source, uint32_t *target);
   inline DisplayError SetStride(HWDeviceType device_type, LayerBufferFormat format,
                                 uint32_t width, uint32_t *target);
