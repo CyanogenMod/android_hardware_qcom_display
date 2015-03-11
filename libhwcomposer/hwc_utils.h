@@ -279,7 +279,7 @@ inline bool isNonIntegralSourceCrop(const hwc_frect_t& cropF) {
 void dumpLayer(hwc_layer_1_t const* l);
 void setListStats(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         int dpy);
-void initContext(hwc_context_t *ctx);
+int initContext(hwc_context_t *ctx);
 void closeContext(hwc_context_t *ctx);
 //Crops source buffer against destination and FB boundaries
 void calculate_crop_rects(hwc_rect_t& crop, hwc_rect_t& dst,
