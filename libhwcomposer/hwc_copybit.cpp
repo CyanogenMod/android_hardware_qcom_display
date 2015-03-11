@@ -183,7 +183,8 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
        for (int k = ctx->listStats[dpy].numAppLayers-1; k >= 0 ; k--) {
            //disable swap rect in case of scaling and video .
            private_handle_t *hnd =(private_handle_t *)list->hwLayers[k].handle;
-           if(needsScaling(&list->hwLayers[k])||( hnd && isYuvBuffer(hnd))) {
+           if(needsScaling(&list->hwLayers[k])||( hnd && isYuvBuffer(hnd)) ||
+                   (list->hwLayers[k].transform & HAL_TRANSFORM_ROT_90)) {
                mFbCache.reset();
                return -1;
            }
