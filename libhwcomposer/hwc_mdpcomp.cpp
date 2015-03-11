@@ -3012,7 +3012,6 @@ int MDPComp::setPartialUpdatePref(hwc_context_t *ctx, bool enable) {
         return -1;
     }
     close(fd);
-    sIsPartialUpdateActive = enable;
     return 0;
 }
 
