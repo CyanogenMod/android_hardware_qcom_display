@@ -790,12 +790,12 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         case HWC_DISPLAY_WIDTH:
             values[i] = hotPluggable ? xres : ctx->dpyAttr[disp].xres;
             ALOGD("%s disp = %d, width = %d",__FUNCTION__, disp,
-                    ctx->dpyAttr[disp].xres);
+                   hotPluggable ? xres : ctx->dpyAttr[disp].xres);
             break;
         case HWC_DISPLAY_HEIGHT:
             values[i] = hotPluggable ? yres : ctx->dpyAttr[disp].yres;
             ALOGD("%s disp = %d, height = %d",__FUNCTION__, disp,
-                    ctx->dpyAttr[disp].yres);
+                   hotPluggable ? yres : ctx->dpyAttr[disp].yres);
             break;
         case HWC_DISPLAY_DPI_X:
             values[i] = (int32_t) (ctx->dpyAttr[disp].xdpi*1000.0);
