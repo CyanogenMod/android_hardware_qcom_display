@@ -142,7 +142,7 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
 {
 
     // Currently surface padding is only computed for RGB* surfaces.
-    if (format <= HAL_PIXEL_FORMAT_sRGB_X_8888) {
+    if (format <= HAL_PIXEL_FORMAT_BGRA_8888) {
         int tileEnabled = isMacroTileEnabled(format, usage);
         AdrenoMemInfo::getInstance().getGpuAlignedWidthHeight(width,
             height, format, tileEnabled, aligned_w, aligned_h);
@@ -160,7 +160,7 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
     {
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
-        case HAL_PIXEL_FORMAT_RAW_SENSOR:
+        case HAL_PIXEL_FORMAT_RAW16:
             aligned_w = ALIGN(width, 32);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
@@ -304,8 +304,6 @@ ADRENOPIXELFORMAT AdrenoMemInfo::getGpuPixelFormat(int hal_format)
             return ADRENO_PIXELFORMAT_R8G8B8A8;
         case HAL_PIXEL_FORMAT_RGB_565:
             return ADRENO_PIXELFORMAT_B5G6R5;
-        case HAL_PIXEL_FORMAT_sRGB_A_8888:
-            return ADRENO_PIXELFORMAT_R8G8B8A8_SRGB;
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
@@ -469,8 +467,6 @@ unsigned int getSize(int format, int width, int height, int usage,
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_BGRA_8888:
-        case HAL_PIXEL_FORMAT_sRGB_A_8888:
-        case HAL_PIXEL_FORMAT_sRGB_X_8888:
             size = alignedw * alignedh * 4;
             break;
         case HAL_PIXEL_FORMAT_RGB_888:
@@ -479,7 +475,7 @@ unsigned int getSize(int format, int width, int height, int usage,
         case HAL_PIXEL_FORMAT_RGB_565:
         case HAL_PIXEL_FORMAT_RGBA_5551:
         case HAL_PIXEL_FORMAT_RGBA_4444:
-        case HAL_PIXEL_FORMAT_RAW_SENSOR:
+        case HAL_PIXEL_FORMAT_RAW16:
             size = alignedw * alignedh * 2;
             break;
 
@@ -647,7 +643,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         case HAL_PIXEL_FORMAT_YCrCb_422_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
         case HAL_PIXEL_FORMAT_NV21_ZSL:
-        case HAL_PIXEL_FORMAT_RAW_SENSOR:
+        case HAL_PIXEL_FORMAT_RAW16:
             ystride = cstride = hnd->width;
             ycbcr->y  = (void*)hnd->base;
             ycbcr->cr = (void*)(hnd->base + ystride * hnd->height);
@@ -753,7 +749,6 @@ static bool isUBwcSupported(int format)
     {
         case HAL_PIXEL_FORMAT_RGB_565:
         case HAL_PIXEL_FORMAT_RGBA_8888:
-        case HAL_PIXEL_FORMAT_sRGB_A_8888:
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
             return true;
@@ -856,7 +851,6 @@ static unsigned int getUBwcSize(int width, int height, int format,
             size += getUBwcMetaBufferSize(width, height, 2);
             break;
         case HAL_PIXEL_FORMAT_RGBA_8888:
-        case HAL_PIXEL_FORMAT_sRGB_A_8888:
             size = alignedw * alignedh * 4;
             size += getUBwcMetaBufferSize(width, height, 4);
             break;
