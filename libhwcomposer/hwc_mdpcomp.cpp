@@ -217,9 +217,6 @@ void MDPComp::reset(hwc_context_t *ctx) {
     mCurrentFrame.reset(numLayers);
     ctx->mOverlay->clear(mDpy);
     ctx->mLayerRotMap[mDpy]->clear();
-    resetROI(ctx, mDpy);
-    memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
-    mCurrentFrame.dropCount = 0;
 }
 
 void MDPComp::reset() {

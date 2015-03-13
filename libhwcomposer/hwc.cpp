@@ -635,7 +635,11 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             }
         }
 
-        int lSplit = getLeftSplit(ctx, dpy);
+        /* When source split is enabled, right ROI will always be NULL since the
+         * ROI for the whole panel generated in a single coordinate system will
+         * be populuated in left ROI. So leave the right ROI untouched */
+        int lSplit = qdutils::MDPVersion::getInstance().isSrcSplit() ? 0
+                :getLeftSplit(ctx, dpy);
         qhwc::ovutils::Dim lRoi = qhwc::ovutils::Dim(
             ctx->listStats[dpy].lRoi.left,
             ctx->listStats[dpy].lRoi.top,
