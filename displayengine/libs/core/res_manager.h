@@ -208,6 +208,7 @@ class ResManager : public DumpImpl {
                                HWPipeInfo *left_pipe, HWPipeInfo *right_pipe,
                                uint32_t align_x, uint32_t align_y);
   void ResourceStateLog(void);
+  DisplayError CalculateDecimation(float downscale, uint8_t* decimation);
 
   Locker locker_;
   HWResourceInfo hw_res_info_;
