@@ -29,6 +29,7 @@
 
 #include <stdlib.h>
 #include <utils/debug.h>
+#include <utils/constants.h>
 #include <cutils/log.h>
 #include <cutils/properties.h>
 
@@ -67,7 +68,7 @@ uint32_t Debug::GetIdleTimeoutMs() {
     return atoi(property);
   }
 
-  return 0;
+  return IDLE_TIMEOUT_DEFAULT_MS;
 }
 
 bool Debug::IsRotatorDownScaleDisabled() {
