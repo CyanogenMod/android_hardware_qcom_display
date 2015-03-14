@@ -112,12 +112,6 @@ struct DisplayAttributes {
     int mAsWidthRatio;
     int mAsHeightRatio;
 
-    //If property fbsize set via adb shell debug.hwc.fbsize = XRESxYRES
-    //following fields are used.
-    bool customFBSize;
-    uint32_t xres_new;
-    uint32_t yres_new;
-
     // This is the 3D mode to which the TV is set
     // The mode may be set via the appearance of a layer with 3D format
     // or by forcing the mode via binder.
@@ -130,6 +124,18 @@ struct DisplayAttributes {
     // HDMI_S3D_NONE
     int s3dMode;
     bool s3dModeForced;
+    //If property fbsize set via adb shell debug.hwc.fbsize = XRESxYRES
+    //following fields are used.
+    //Also used when the actual panel's dimensions change and FB remains
+    //constant
+    bool fbScaling;
+    uint32_t xresFB; //FB's width, by default from VSCREEN overridden by prop
+    uint32_t yresFB; //FB's height, by default from VSCREEN overridden by prop
+    float fbWidthScaleRatio; // Panel Width / FB Width
+    float fbHeightScaleRatio; // Panel Height / FB Height
+    //If configuration changed dynamically without subsequent GEOMETRY changes
+    //we may still need to adjust destination params
+    bool configSwitched;
 };
 
 struct ListStats {

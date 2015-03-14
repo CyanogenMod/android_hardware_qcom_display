@@ -226,18 +226,11 @@ static void reset(hwc_context_t *ctx, int numDisplays,
 
 }
 
-static void scaleDisplayFrame(hwc_context_t *ctx, int dpy,
-                            hwc_display_contents_1_t *list) {
-    uint32_t origXres = ctx->dpyAttr[dpy].xres;
-    uint32_t origYres = ctx->dpyAttr[dpy].yres;
-    uint32_t newXres = ctx->dpyAttr[dpy].xres_new;
-    uint32_t newYres = ctx->dpyAttr[dpy].yres_new;
-    float xresRatio = (float)origXres / (float)newXres;
-    float yresRatio = (float)origYres / (float)newYres;
+static void scaleDisplayFrame(hwc_display_contents_1_t *list, float xresRatio,
+        float yresRatio) {
     for (size_t i = 0; i < list->numHwLayers; i++) {
         hwc_layer_1_t *layer = &list->hwLayers[i];
         hwc_rect_t& displayFrame = layer->displayFrame;
-        hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
         uint32_t layerWidth = displayFrame.right - displayFrame.left;
         uint32_t layerHeight = displayFrame.bottom - displayFrame.top;
         displayFrame.left = (int)(xresRatio * (float)displayFrame.left);
@@ -246,6 +239,35 @@ static void scaleDisplayFrame(hwc_context_t *ctx, int dpy,
                                    (float)layerWidth * xresRatio);
         displayFrame.bottom = (int)((float)displayFrame.top +
                                     (float)layerHeight * yresRatio);
+    }
+}
+
+static void handleFbScaling(hwc_context_t *ctx, int dpy,
+        hwc_display_contents_1_t *list) {
+    //We could switch to a config that does not lead to fb scaling, but
+    //we need to update older display frames and ratios.
+    if (ctx->dpyAttr[dpy].fbScaling or ctx->dpyAttr[dpy].configSwitched) {
+        uint32_t xresPanel = ctx->dpyAttr[dpy].xres;
+        uint32_t yresPanel = ctx->dpyAttr[dpy].yres;
+        uint32_t xresFB = ctx->dpyAttr[dpy].xresFB;
+        uint32_t yresFB = ctx->dpyAttr[dpy].yresFB;
+        float xresRatio = (float)xresPanel / (float)xresFB;
+        float yresRatio = (float)yresPanel / (float)yresFB;
+        if(list->flags & HWC_GEOMETRY_CHANGED) {
+            //In case of geometry changes f/w resets displays frames w.r.t to
+            //FB's dimensions. So any config switch is automatically absorbed.
+            scaleDisplayFrame(list, xresRatio, yresRatio);
+        } else if (ctx->dpyAttr[dpy].configSwitched) {
+            //If there is a primary panel resolution switch without a geometry
+            //change we need to scale-back the previous ratio used and then use
+            //the current ratio. i.e use current ratio / prev ratio
+            scaleDisplayFrame(list,
+                    xresRatio / ctx->dpyAttr[dpy].fbWidthScaleRatio,
+                    yresRatio / ctx->dpyAttr[dpy].fbHeightScaleRatio);
+        }
+        ctx->dpyAttr[dpy].configSwitched = false;
+        ctx->dpyAttr[dpy].fbWidthScaleRatio = xresRatio;
+        ctx->dpyAttr[dpy].fbHeightScaleRatio = yresRatio;
     }
 }
 
@@ -277,9 +299,7 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
             ctx->dpyAttr[dpy].isActive = true;
         }
 
-        if (ctx->dpyAttr[dpy].customFBSize &&
-                list->flags & HWC_GEOMETRY_CHANGED)
-            scaleDisplayFrame(ctx, dpy, list);
+        handleFbScaling(ctx, dpy, list);
 
         reset_layer_prop(ctx, dpy, (int)list->numHwLayers - 1);
         setListStats(ctx, list, dpy);
@@ -834,8 +854,8 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
                     hotPluggable ? refresh : ctx->dpyAttr[disp].vsync_period;
             break;
         case HWC_DISPLAY_WIDTH:
-            if (ctx->dpyAttr[disp].customFBSize)
-                values[i] = ctx->dpyAttr[disp].xres_new;
+            if (ctx->dpyAttr[disp].fbScaling)
+                values[i] = ctx->dpyAttr[disp].xresFB;
             else
                 values[i] = hotPluggable ? xres : ctx->dpyAttr[disp].xres;
 
@@ -843,8 +863,8 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
                     values[i]);
             break;
         case HWC_DISPLAY_HEIGHT:
-            if (ctx->dpyAttr[disp].customFBSize)
-                values[i] = ctx->dpyAttr[disp].yres_new;
+            if (ctx->dpyAttr[disp].fbScaling)
+                values[i] = ctx->dpyAttr[disp].yresFB;
             else
                 values[i] = hotPluggable ? yres : ctx->dpyAttr[disp].yres;
             ALOGD("%s disp = %d, height = %d",__FUNCTION__, disp,
@@ -879,6 +899,10 @@ void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
     dumpsys_log(aBuf, "  DynRefreshRate=%d\n",
                 ctx->dpyAttr[HWC_DISPLAY_PRIMARY].dynRefreshRate);
     for(int dpy = 0; dpy < HWC_NUM_DISPLAY_TYPES; dpy++) {
+        if(dpy == HWC_DISPLAY_PRIMARY)
+            dumpsys_log(aBuf, "Dpy %d: FB Scale Ratio w %.1f, h %.1f\n", dpy,
+                    ctx->dpyAttr[dpy].fbWidthScaleRatio,
+                    ctx->dpyAttr[dpy].fbHeightScaleRatio);
         if(ctx->mMDPComp[dpy])
             ctx->mMDPComp[dpy]->dump(aBuf, ctx);
     }
