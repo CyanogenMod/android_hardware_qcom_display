@@ -48,6 +48,7 @@ public:
     /* dumpsys */
     void dump(android::String8& buf);
     bool isGLESOnlyComp() { return (mCurrentFrame.mdpCount == 0); }
+    bool isMDPComp() { return mModeOn; }
     int drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     static MDPComp* getObject(hwc_context_t *ctx, const int& dpy);
     /* Handler to invoke frame redraw on Idle Timer expiry */
@@ -129,6 +130,8 @@ protected:
         void updateCounts(const FrameInfo&);
         bool isSameFrame(const FrameInfo& curFrame,
                          hwc_display_contents_1_t* list);
+        bool isSameFrame(hwc_context_t *ctx, int dpy,
+                                        hwc_display_contents_1_t* list);
     };
 
     /* allocates pipe from pipe book */
@@ -228,8 +231,6 @@ protected:
     static bool sEnablePartialFrameUpdate;
     static bool sDebugLogs;
     static bool sIdleFallBack;
-    /* Handles the timeout event from kernel, if the value is set to true  */
-    static bool sHandleTimeout;
     static int sMaxPipesPerMixer;
     static IdleInvalidator *idleInvalidator;
     struct FrameInfo mCurrentFrame;
@@ -239,6 +240,7 @@ protected:
     bool allocSplitVGPipesfor4k2k(hwc_context_t *ctx,
             hwc_display_contents_1_t* list, int index);
     bool mModeOn; // if prepare happened
+    bool mPrevModeOn; //if previous prepare happened
 };
 
 class MDPCompNonSplit : public MDPComp {
