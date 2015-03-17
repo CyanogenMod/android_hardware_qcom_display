@@ -723,6 +723,16 @@ static inline bool isSecondaryConnected(hwc_context_t* ctx) {
             ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected);
 }
 
+static inline bool isSecondaryAnimating(hwc_context_t* ctx) {
+    return (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected &&
+            (!ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isPause) &&
+            ctx->listStats[HWC_DISPLAY_EXTERNAL].isDisplayAnimating)
+            ||
+           (ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected &&
+            (!ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isPause) &&
+            ctx->listStats[HWC_DISPLAY_VIRTUAL].isDisplayAnimating);
+}
+
 /* Return Virtual Display connection status */
 static inline bool isVDConnected(hwc_context_t* ctx) {
     return ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected;
