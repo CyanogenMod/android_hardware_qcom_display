@@ -86,6 +86,12 @@ public:
     };
 
     enum {
+        PREF_PARTIAL_UPDATE,
+        PREF_POST_PROCESSING,
+        ENABLE_PARTIAL_UPDATE,
+    };
+
+    enum {
         DUMP_PRIMARY_DISPLAY,
         DUMP_HDMI_DISPLAY,
         DUMP_VIRTUAL_DISPLAY,

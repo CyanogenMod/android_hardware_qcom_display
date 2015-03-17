@@ -58,6 +58,8 @@ public:
     static void setMaxPipesPerMixer(const uint32_t value);
     static int setPartialUpdatePref(hwc_context_t *ctx, bool enable);
     static bool getPartialUpdatePref(hwc_context_t *ctx);
+    static void enablePartialUpdate(bool enable)
+                                          { sIsPartialUpdateActive = enable; };
     void setDynRefreshRate(hwc_context_t *ctx, hwc_display_contents_1_t* list);
 
 protected:
