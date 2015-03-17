@@ -45,9 +45,7 @@ namespace sde {
   implemented by the client. Buffer manager and HWFramebuffer in display engine will use these
   methods to wait for buffer sync fd to be signaled/merge two buffer sync fds into one.
 
-  @sa CompManager::Init
-  @sa ResManager::Init
-  @sa HWInterface::Create
+  @sa CoreInterface::CreateCore
 */
 class BufferSyncHandler {
  public:
@@ -58,8 +56,6 @@ class BufferSyncHandler {
     @param[in] fd
 
     @return \link DisplayError \endlink
-
-    @sa BufferManager::GetNextBuffer
   */
 
   virtual DisplayError SyncWait(int fd) = 0;
@@ -74,8 +70,6 @@ class BufferSyncHandler {
     @param[out] merged_fd
 
     @return \link DisplayError \endlink
-
-    @sa HWFrameBuffer::RotatorCommit
  */
 
   virtual DisplayError SyncMerge(int fd1, int fd2, int *merged_fd) = 0;

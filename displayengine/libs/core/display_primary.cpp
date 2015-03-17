@@ -35,9 +35,9 @@ namespace sde {
 
 DisplayPrimary::DisplayPrimary(DisplayEventHandler *event_handler, HWInfoInterface *hw_info_intf,
                                BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
-                               OfflineCtrl *offline_ctrl)
+                               RotatorCtrl *rotator_ctrl)
   : DisplayBase(kPrimary, event_handler, kDevicePrimary, buffer_sync_handler, comp_manager,
-    offline_ctrl), hw_info_intf_(hw_info_intf) {
+    rotator_ctrl), hw_info_intf_(hw_info_intf) {
 }
 
 DisplayError DisplayPrimary::Init() {

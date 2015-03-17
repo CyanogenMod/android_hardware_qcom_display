@@ -209,14 +209,15 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
     LayerBuffer *input_buffer = layer.input_buffer;
     HWPipeInfo *left_pipe = &hw_layers->config[i].left_pipe;
     HWPipeInfo *right_pipe = &hw_layers->config[i].right_pipe;
+    HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
     mdp_input_layer mdp_layer;
 
     for (uint32_t count = 0; count < 2; count++) {
       HWPipeInfo *pipe_info = (count == 0) ? left_pipe : right_pipe;
-      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
+      HWRotateInfo *hw_rotate_info = &hw_rotator_session->hw_rotate_info[count];
 
-      if (rotate_info->valid) {
-        input_buffer = &rotate_info->hw_buffer_info.output_buffer;
+      if (hw_rotate_info->valid) {
+        input_buffer = &hw_rotator_session->output_buffer;
       }
 
       if (pipe_info->valid) {
@@ -272,8 +273,9 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         DLOGV_IF(kTagDriverConfig, "in_w %d, in_h %d, in_f %d", mdp_buffer.width, mdp_buffer.height,
                  mdp_buffer.format);
         DLOGV_IF(kTagDriverConfig, "plane_alpha %d, zorder %d, blending %d, horz_deci %d, "
-                 "vert_deci %d", mdp_layer.alpha, mdp_layer.z_order, mdp_layer.blend_op,
-                 mdp_layer.horz_deci, mdp_layer.vert_deci);
+                 "vert_deci %d, pipe_id = 0x%x, mdp_flags 0x%x", mdp_layer.alpha, mdp_layer.z_order,
+                 mdp_layer.blend_op, mdp_layer.horz_deci, mdp_layer.vert_deci, mdp_layer.pipe_ndx,
+                 mdp_layer.flags);
         DLOGV_IF(kTagDriverConfig, "src_rect [%d, %d, %d, %d]", mdp_layer.src_rect.x,
                  mdp_layer.src_rect.y, mdp_layer.src_rect.w, mdp_layer.src_rect.h);
         DLOGV_IF(kTagDriverConfig, "dst_rect [%d, %d, %d, %d]", mdp_layer.dst_rect.x,
@@ -305,11 +307,11 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
     mdp_out_layer_.buffer.height = output_buffer->height;
     SetFormat(output_buffer->format, &mdp_out_layer_.buffer.format);
 
-    DLOGI_IF(kTagDriverConfig, "******************* Output buffer Info **********************");
+    DLOGI_IF(kTagDriverConfig, "********************* Output buffer Info ************************");
     DLOGI_IF(kTagDriverConfig, "out_w %d, out_h %d, out_f %d, wb_id %d",
              mdp_out_layer_.buffer.width, mdp_out_layer_.buffer.height,
              mdp_out_layer_.buffer.format, mdp_out_layer_.writeback_ndx);
-    DLOGI_IF(kTagDriverConfig, "*************************************************************");
+    DLOGI_IF(kTagDriverConfig, "*****************************************************************");
   }
 
   mdp_commit.flags |= MDP_VALIDATE_LAYER;
@@ -326,13 +328,13 @@ void HWDevice::DumpLayerCommit(mdp_layer_commit &layer_commit) {
   mdp_layer_commit_v1 &mdp_commit = layer_commit.commit_v1;
   mdp_input_layer *mdp_layers = mdp_commit.input_layers;
 
-  DLOGE("mdp_commt: flags = %x, release fence = %x", mdp_commit.flags, mdp_commit.release_fence);
+  DLOGE("mdp_commit: flags = %x, release fence = %x", mdp_commit.flags, mdp_commit.release_fence);
   DLOGE("left_roi: x = %d, y = %d, w = %d, h = %d", mdp_commit.left_roi.x, mdp_commit.left_roi.y,
          mdp_commit.left_roi.w, mdp_commit.left_roi.h);
   DLOGE("right_roi: x = %d, y = %d, w = %d, h = %d", mdp_commit.right_roi.x,
          mdp_commit.right_roi.y, mdp_commit.right_roi.w, mdp_commit.right_roi.h);
   for (uint32_t i = 0; i < mdp_commit.input_layer_cnt; i++) {
-    DLOGE("mdp_commt: layer_cnt = %d, pipe_ndx = %x, zorder = %d, flags = %x",
+    DLOGE("mdp_commit: layer_cnt = %d, pipe_ndx = %x, zorder = %d, flags = %x",
           i, mdp_layers[i].pipe_ndx, mdp_layers[i].z_order, mdp_layers[i].flags);
     mdp_rect &src_rect = mdp_layers[i].src_rect;
     DLOGE("src rect: x = %d, y = %d, w = %d, h = %d",
@@ -361,13 +363,14 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
     LayerBuffer *input_buffer = stack->layers[layer_index].input_buffer;
     HWPipeInfo *left_pipe = &hw_layers->config[i].left_pipe;
     HWPipeInfo *right_pipe = &hw_layers->config[i].right_pipe;
+    HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
 
     for (uint32_t count = 0; count < 2; count++) {
       HWPipeInfo *pipe_info = (count == 0) ? left_pipe : right_pipe;
-      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
+      HWRotateInfo *hw_rotate_info = &hw_rotator_session->hw_rotate_info[count];
 
-      if (rotate_info->valid) {
-        input_buffer = &rotate_info->hw_buffer_info.output_buffer;
+      if (hw_rotate_info->valid) {
+        input_buffer = &hw_rotator_session->output_buffer;
       }
 
       if (pipe_info->valid) {
@@ -416,11 +419,11 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
 
     mdp_out_layer_.buffer.fence = output_buffer->acquire_fence_fd;
 
-    DLOGI_IF(kTagDriverConfig, "******************* Output buffer Info **********************");
+    DLOGI_IF(kTagDriverConfig, "********************** Output buffer Info ***********************");
     DLOGI_IF(kTagDriverConfig, "out_fd %d, out_offset %d, out_stride %d, acquire_fence %d",
              mdp_out_layer_.buffer.planes[0].fd, mdp_out_layer_.buffer.planes[0].offset,
              mdp_out_layer_.buffer.planes[0].stride,  mdp_out_layer_.buffer.fence);
-    DLOGI_IF(kTagDriverConfig, "*************************************************************");
+    DLOGI_IF(kTagDriverConfig, "*****************************************************************");
   }
 
   mdp_commit.release_fence = -1;
@@ -442,8 +445,9 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
     LayerBuffer *input_buffer = stack->layers[layer_index].input_buffer;
-    HWRotateInfo *left_rotate = &hw_layers->config[i].rotates[0];
-    HWRotateInfo *right_rotate = &hw_layers->config[i].rotates[1];
+    HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
+    HWRotateInfo *left_rotate = &hw_rotator_session->hw_rotate_info[0];
+    HWRotateInfo *right_rotate = &hw_rotator_session->hw_rotate_info[1];
 
     if (!left_rotate->valid && !right_rotate->valid) {
       input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
@@ -451,9 +455,9 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
     }
 
     for (uint32_t count = 0; count < 2; count++) {
-      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
-      if (rotate_info->valid) {
-        input_buffer = &rotate_info->hw_buffer_info.output_buffer;
+      HWRotateInfo *hw_rotate_info = &hw_rotator_session->hw_rotate_info[count];
+      if (hw_rotate_info->valid) {
+        input_buffer = &hw_rotator_session->output_buffer;
         input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
         close_(input_buffer->acquire_fence_fd);
         input_buffer->acquire_fence_fd = -1;
@@ -463,7 +467,7 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
   DLOGI_IF(kTagDriverConfig, "*************************** %s Commit Input ************************",
            device_name_);
   DLOGI_IF(kTagDriverConfig, "retire_fence_fd %d", stack->retire_fence_fd);
-  DLOGI_IF(kTagDriverConfig, "*************************************************************");
+  DLOGI_IF(kTagDriverConfig, "*******************************************************************");
 
   close_(mdp_commit.release_fence);
 
@@ -527,7 +531,7 @@ DisplayError HWDevice::SetFormat(const LayerBufferFormat &source, uint32_t *targ
 
 DisplayError HWDevice::SetStride(HWDeviceType device_type, LayerBufferFormat format,
                                       uint32_t width, uint32_t *target) {
-  // TODO(user): This SetStride function is an workaround to satisfy the driver expectation for
+  // TODO(user): This SetStride function is a workaround to satisfy the driver expectation for
   // rotator and virtual devices. Eventually this will be taken care in the driver.
   if (device_type != kDeviceRotator && device_type != kDeviceVirtual) {
     *target = width;

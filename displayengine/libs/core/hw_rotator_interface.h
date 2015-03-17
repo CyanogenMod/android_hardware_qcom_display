@@ -30,15 +30,16 @@ namespace sde {
 class BufferSyncHandler;
 struct HWRotateInfo;
 struct HWLayers;
+struct HWRotatorSession;
 
 class HWRotatorInterface {
  public:
-  static DisplayError Create(HWRotatorInterface **intf, BufferSyncHandler *buffer_sync_handler);
+  static DisplayError Create(BufferSyncHandler *buffer_sync_handler, HWRotatorInterface **intf);
   static DisplayError Destroy(HWRotatorInterface *intf);
   virtual DisplayError Open() = 0;
   virtual DisplayError Close() = 0;
-  virtual DisplayError OpenSession(HWRotateInfo *rotate_info) = 0;
-  virtual DisplayError CloseSession(int32_t session_id) = 0;
+  virtual DisplayError OpenSession(HWRotatorSession *hw_rotator_session) = 0;
+  virtual DisplayError CloseSession(HWRotatorSession *hw_rotator_session) = 0;
   virtual DisplayError Validate(HWLayers *hw_layers) = 0;
   virtual DisplayError Commit(HWLayers *hw_layers) = 0;
 

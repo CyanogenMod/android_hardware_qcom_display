@@ -706,8 +706,7 @@ void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {
   case qService::IQService::DEBUG_ROTATOR:
     HWCDebugHandler::DebugResources(enable);
     HWCDebugHandler::DebugDriverConfig(enable);
-    HWCDebugHandler::DebugBufferManager(enable);
-    HWCDebugHandler::DebugOfflineCtrl(enable);
+    HWCDebugHandler::DebugRotator(enable);
     break;
 
   default:

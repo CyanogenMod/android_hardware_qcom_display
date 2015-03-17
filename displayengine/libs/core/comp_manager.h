@@ -36,8 +36,7 @@ namespace sde {
 class CompManager : public DumpImpl {
  public:
   CompManager();
-  DisplayError Init(const HWResourceInfo &hw_res_info_, BufferAllocator *buffer_allocator,
-                    BufferSyncHandler *buffer_sync_handler_);
+  DisplayError Init(const HWResourceInfo &hw_res_info_);
   DisplayError Deinit();
   DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
                                const HWPanelInfo &hw_panel_info, Handle *res_mgr_hnd);

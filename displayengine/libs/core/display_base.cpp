@@ -26,7 +26,7 @@
 #include <utils/debug.h>
 
 #include "display_base.h"
-#include "offline_ctrl.h"
+#include "rotator_ctrl.h"
 
 #define __CLASS__ "DisplayBase"
 
@@ -35,10 +35,10 @@ namespace sde {
 // TODO(user): Have a single structure handle carries all the interface pointers and variables.
 DisplayBase::DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
                          HWDeviceType hw_device_type, BufferSyncHandler *buffer_sync_handler,
-                         CompManager *comp_manager, OfflineCtrl *offline_ctrl)
+                         CompManager *comp_manager, RotatorCtrl *rotator_ctrl)
   : display_type_(display_type), event_handler_(event_handler), hw_device_type_(hw_device_type),
     buffer_sync_handler_(buffer_sync_handler), comp_manager_(comp_manager),
-    offline_ctrl_(offline_ctrl), state_(kStateOff), hw_device_(0), display_comp_ctx_(0),
+    rotator_ctrl_(rotator_ctrl), state_(kStateOff), hw_device_(0), display_comp_ctx_(0),
     display_attributes_(NULL), num_modes_(0), active_mode_index_(0), pending_commit_(false),
     vsync_enable_(false) {
 }
@@ -79,9 +79,11 @@ DisplayError DisplayBase::Init() {
     goto CleanupOnError;
   }
 
-  error = offline_ctrl_->RegisterDisplay(display_type_, &display_offline_ctx_);
-  if (error != kErrorNone) {
-    goto CleanupOnError;
+  if (rotator_ctrl_) {
+    error = rotator_ctrl_->RegisterDisplay(display_type_, &display_rotator_ctx_);
+    if (error != kErrorNone) {
+      goto CleanupOnError;
+    }
   }
 
   return kErrorNone;
@@ -102,7 +104,9 @@ CleanupOnError:
 }
 
 DisplayError DisplayBase::Deinit() {
-  offline_ctrl_->UnregisterDisplay(display_offline_ctx_);
+  if (rotator_ctrl_) {
+    rotator_ctrl_->UnregisterDisplay(display_rotator_ctx_);
+  }
 
   comp_manager_->UnregisterDisplay(display_comp_ctx_);
 
@@ -137,7 +141,13 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
         break;
       }
 
-      error = offline_ctrl_->Prepare(display_offline_ctx_, &hw_layers_);
+      if (IsRotationRequired(&hw_layers_)) {
+        if (!rotator_ctrl_) {
+          continue;
+        }
+        error = rotator_ctrl_->Prepare(display_rotator_ctx_, &hw_layers_);
+      }
+
       if (error == kErrorNone) {
         error = hw_intf_->Validate(&hw_layers_);
         if (error == kErrorNone) {
@@ -162,29 +172,40 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
     return kErrorParameters;
   }
 
-  if (state_ == kStateOn) {
-    if (!pending_commit_) {
-      DLOGE("Commit: Corresponding Prepare() is not called for display = %d", display_type_);
-      return kErrorUndefined;
-    }
-
-    error = offline_ctrl_->Commit(display_offline_ctx_, &hw_layers_);
-    if (error == kErrorNone) {
-      error = hw_intf_->Commit(&hw_layers_);
-      if (error == kErrorNone) {
-        error = comp_manager_->PostCommit(display_comp_ctx_, &hw_layers_);
-        if (error != kErrorNone) {
-          DLOGE("Composition manager PostCommit failed");
-        }
-      } else {
-        DLOGE("Unexpected error. Commit failed on driver.");
-      }
-    }
-  } else {
+  if (state_ != kStateOn) {
     return kErrorNotSupported;
   }
 
+  if (!pending_commit_) {
+    DLOGE("Commit: Corresponding Prepare() is not called for display = %d", display_type_);
+    return kErrorUndefined;
+  }
+
   pending_commit_ = false;
+
+  if (rotator_ctrl_ && IsRotationRequired(&hw_layers_)) {
+    error = rotator_ctrl_->Commit(display_rotator_ctx_, &hw_layers_);
+    if (error != kErrorNone) {
+      return error;
+    }
+  }
+
+  error = hw_intf_->Commit(&hw_layers_);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  if (rotator_ctrl_ && IsRotationRequired(&hw_layers_)) {
+    error = rotator_ctrl_->PostCommit(display_rotator_ctx_, &hw_layers_);
+    if (error != kErrorNone) {
+      return error;
+    }
+  }
+
+  error = comp_manager_->PostCommit(display_comp_ctx_, &hw_layers_);
+  if (error != kErrorNone) {
+    return error;
+  }
 
   return kErrorNone;
 }
@@ -402,10 +423,13 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     Layer &layer = hw_layers_.info.stack->layers[hw_layers_.info.index[i]];
     LayerBuffer *input_buffer = layer.input_buffer;
     HWLayerConfig &layer_config = hw_layers_.config[i];
+
     HWPipeInfo &left_pipe = hw_layers_.config[i].left_pipe;
     HWPipeInfo &right_pipe = hw_layers_.config[i].right_pipe;
-    HWRotateInfo &left_rotate = hw_layers_.config[i].rotates[0];
-    HWRotateInfo &right_rotate = hw_layers_.config[i].rotates[1];
+
+    HWRotatorSession &hw_rotator_session = layer_config.hw_rotator_session;
+    HWRotateInfo &left_rotate = hw_rotator_session.hw_rotate_info[0];
+    HWRotateInfo &right_rotate = hw_rotator_session.hw_rotate_info[1];
 
     DumpImpl::AppendString(buffer, length, "\n\nsde idx: %u, actual idx: %u", i,
                            hw_layers_.info.index[i]);
@@ -452,6 +476,21 @@ void DisplayBase::AppendRect(char *buffer, uint32_t length, const char *rect_nam
 
 int DisplayBase::GetBestConfig() {
   return (num_modes_ == 1) ? 0 : -1;
+}
+
+bool DisplayBase::IsRotationRequired(HWLayers *hw_layers) {
+  HWLayersInfo &layer_info = hw_layers->info;
+
+  for (uint32_t i = 0; i < layer_info.count; i++) {
+    Layer& layer = layer_info.stack->layers[layer_info.index[i]];
+    HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
+
+    if (hw_rotator_session->hw_block_count) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 }  // namespace sde

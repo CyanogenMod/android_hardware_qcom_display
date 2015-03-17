@@ -43,31 +43,63 @@ enum HWBlockType {
   kHWBlockMax
 };
 
-struct HWBufferInfo : public BufferInfo {
-  LayerBuffer output_buffer;
-  int session_id;
-  uint32_t slot;
+struct HWSessionConfig {
+  uint32_t src_width;
+  uint32_t src_height;
+  LayerBufferFormat src_format;
+  uint32_t dst_width;
+  uint32_t dst_height;
+  LayerBufferFormat dst_format;
+  uint32_t buffer_count;
+  bool secure;
+  bool cache;
+  uint32_t frame_rate;
 
-  HWBufferInfo() : session_id(-1), slot(0) { }
+  HWSessionConfig()
+    : src_width(0), src_height(0), src_format(kFormatInvalid), dst_width(0), dst_height(0),
+      dst_format(kFormatInvalid), buffer_count(0), secure(false), cache(false), frame_rate(0) { }
+
+  bool operator != (const HWSessionConfig &input_config) const {
+    if ((src_width != input_config.src_width) || (src_height != input_config.src_height) ||
+        (src_format != input_config.src_format) || (dst_width != input_config.dst_width) ||
+        (dst_height != input_config.dst_height) || (dst_format != input_config.dst_format) ||
+        (buffer_count != input_config.buffer_count) || (secure != input_config.secure) ||
+        (cache != input_config.cache) || (frame_rate != input_config.frame_rate)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  bool operator == (const HWSessionConfig &input_config) const {
+    return !(operator != (input_config));
+  }
 };
 
 struct HWRotateInfo {
-  LayerBuffer *input_buffer;
   uint32_t pipe_id;
   LayerRect src_roi;
   LayerRect dst_roi;
-  LayerBufferFormat dst_format;
   HWBlockType writeback_id;
-  float downscale_ratio;
-  HWBufferInfo hw_buffer_info;
   bool valid;
-  uint32_t frame_rate;
+  int rotate_id;
 
-  HWRotateInfo() : input_buffer(NULL), pipe_id(0), dst_format(kFormatInvalid),
-                   writeback_id(kHWWriteback0), downscale_ratio(1.0f), valid(false),
-                   frame_rate(0) { }
+  HWRotateInfo()
+    : pipe_id(0), writeback_id(kHWWriteback0), valid(false), rotate_id(-1) { }
 
   void Reset() { *this = HWRotateInfo(); }
+};
+
+struct HWRotatorSession {
+  HWRotateInfo hw_rotate_info[kMaxRotatePerLayer];
+  uint32_t hw_block_count;  // number of rotator hw blocks used by rotator session
+  float downscale_ratio;
+  LayerTransform transform;
+  HWSessionConfig hw_session_config;
+  LayerBuffer output_buffer;
+  int session_id;
+
+  HWRotatorSession() : hw_block_count(0), downscale_ratio(1.0f), session_id(-1) { }
 };
 
 struct HWPipeInfo {
@@ -79,8 +111,8 @@ struct HWPipeInfo {
   bool valid;
   uint32_t z_order;
 
-  HWPipeInfo() : pipe_id(0), horizontal_decimation(0), vertical_decimation(0), valid(false),
-                 z_order(0) { }
+  HWPipeInfo()
+    : pipe_id(0), horizontal_decimation(0), vertical_decimation(0), valid(false), z_order(0) { }
 
   void Reset() { *this = HWPipeInfo(); }
 };
@@ -89,10 +121,9 @@ struct HWLayerConfig {
   bool use_non_dma_pipe;  // set by client
   HWPipeInfo left_pipe;  // pipe for left side of output
   HWPipeInfo right_pipe;  // pipe for right side of output
-  uint32_t num_rotate;  // number of rotate
-  HWRotateInfo rotates[kMaxRotatePerLayer];  // rotation for the buffer
+  HWRotatorSession hw_rotator_session;
 
-  HWLayerConfig() : use_non_dma_pipe(false), num_rotate(0) { }
+  HWLayerConfig() : use_non_dma_pipe(false) { }
 
   void Reset() { *this = HWLayerConfig(); }
 };
@@ -100,11 +131,6 @@ struct HWLayerConfig {
 struct HWLayers {
   HWLayersInfo info;
   HWLayerConfig config[kMaxSDELayers];
-  int closed_session_ids[kMaxSDELayers * 2];  // split panel (left + right)
-
-  HWLayers() { memset(closed_session_ids, -1, sizeof(closed_session_ids)); }
-
-  void Reset() { *this = HWLayers(); }
 };
 
 struct HWDisplayAttributes : DisplayConfigVariableInfo {

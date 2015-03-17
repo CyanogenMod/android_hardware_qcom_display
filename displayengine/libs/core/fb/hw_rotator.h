@@ -44,15 +44,15 @@ class HWRotator : public HWDevice, public HWRotatorInterface {
   explicit HWRotator(BufferSyncHandler *buffer_sync_handler);
   virtual DisplayError Open();
   virtual DisplayError Close();
-  virtual DisplayError OpenSession(HWRotateInfo *hw_layers);
-  virtual DisplayError CloseSession(int32_t session_id);
+  virtual DisplayError OpenSession(HWRotatorSession *hw_session_info);
+  virtual DisplayError CloseSession(HWRotatorSession *hw_session_info);
   virtual DisplayError Validate(HWLayers *hw_layers);
   virtual DisplayError Commit(HWLayers *hw_layers);
 
  private:
-  void ResetRotatorParams();
-  void SetRotatorCtrlParams(HWLayers *hw_layers);
-  void SetRotatorBufferParams(HWLayers *hw_layers);
+  void ResetParams();
+  void SetCtrlParams(HWLayers *hw_layers);
+  void SetBufferParams(HWLayers *hw_layers);
 
   struct mdp_rotation_request mdp_rot_request_;
   struct mdp_rotation_item mdp_rot_layers_[kMaxSDELayers * 2];  // split panel (left + right)

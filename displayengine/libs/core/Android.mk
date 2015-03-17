@@ -25,9 +25,9 @@ LOCAL_SRC_FILES               := core_interface.cpp \
                                  strategy_default.cpp \
                                  res_manager.cpp \
                                  res_config.cpp \
-                                 offline_ctrl.cpp \
+                                 rotator_ctrl.cpp \
                                  dump_impl.cpp \
-                                 buffer_manager.cpp \
+                                 session_manager.cpp \
                                  scalar_helper.cpp \
                                  $(LOCAL_HW_INTF_PATH)/hw_info.cpp \
                                  $(LOCAL_HW_INTF_PATH)/hw_device.cpp \
