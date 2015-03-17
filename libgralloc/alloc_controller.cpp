@@ -628,6 +628,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
     int width = hnd->width;
     int height = hnd->height;
     unsigned int ystride, cstride;
+    unsigned int alignment = 4096;
 
     memset(ycbcr->reserved, 0, sizeof(ycbcr->reserved));
 
@@ -652,6 +653,34 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
             ycbcr->cr = (void*)(hnd->base + ystride * height + 1);
             ycbcr->ystride = ystride;
             ycbcr->cstride = cstride;
+            ycbcr->chroma_step = 2;
+        break;
+
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
+            // NV12_UBWC buffer has these 4 planes in the following sequence:
+            // Y_Meta_Plane, Y_Plane, UV_Meta_Plane, UV_Plane
+            unsigned int y_meta_stride, y_meta_height, y_meta_size;
+            unsigned int y_stride, y_height, y_size;
+            unsigned int c_meta_stride, c_meta_height, c_meta_size;
+
+            y_meta_stride = VENUS_Y_META_STRIDE(COLOR_FMT_NV12_UBWC, width);
+            y_meta_height = VENUS_Y_META_SCANLINES(COLOR_FMT_NV12_UBWC, height);
+            y_meta_size = ALIGN((y_meta_stride * y_meta_height), alignment);
+
+            y_stride = VENUS_Y_STRIDE(COLOR_FMT_NV12_UBWC, width);
+            y_height = VENUS_Y_SCANLINES(COLOR_FMT_NV12_UBWC, height);
+            y_size = ALIGN((y_stride * y_height), alignment);
+
+            c_meta_stride = VENUS_UV_META_STRIDE(COLOR_FMT_NV12_UBWC, width);
+            c_meta_height = VENUS_UV_META_SCANLINES(COLOR_FMT_NV12_UBWC, height);
+            c_meta_size = ALIGN((c_meta_stride * c_meta_height), alignment);
+
+            ycbcr->y  = (void*)(hnd->base + y_meta_size);
+            ycbcr->cb = (void*)(hnd->base + y_meta_size + y_size + c_meta_size);
+            ycbcr->cr = (void*)(hnd->base + y_meta_size + y_size +
+                                c_meta_size + 1);
+            ycbcr->ystride = y_stride;
+            ycbcr->cstride = VENUS_UV_STRIDE(COLOR_FMT_NV12_UBWC, width);
             ycbcr->chroma_step = 2;
         break;
 
