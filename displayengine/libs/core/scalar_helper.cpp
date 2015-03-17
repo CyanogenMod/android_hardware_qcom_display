@@ -22,8 +22,6 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifdef USES_SCALAR
-
 #include <dlfcn.h>
 #include <utils/debug.h>
 #include "scalar_helper.h"
@@ -32,40 +30,94 @@
 
 namespace sde {
 
-ScalarHelper* ScalarHelper::scalar_helper_ = NULL;
+#ifdef USES_SCALAR
+ScalarHelper::ScalarHelper()
+  : scalar_library_name_("libscalar.so"), configure_scale_api_("configureScale"),
+    lib_scalar_(NULL), configure_scale_(NULL) {
+}
 
-ScalarHelper* ScalarHelper::GetInstance() {
-  if (scalar_helper_ == NULL) {
-    scalar_helper_ = new ScalarHelper();
+DisplayError ScalarHelper::Init() {
+  lib_scalar_ = dlopen(scalar_library_name_, RTLD_NOW);
+  if (lib_scalar_) {
+    void **scalar_func = reinterpret_cast<void **>(&configure_scale_);
+    *scalar_func = ::dlsym(lib_scalar_, configure_scale_api_);
+    if (!configure_scale_) {
+      DLOGE("Unable to find symbol for %s API!", configure_scale_api_);
+      dlclose(lib_scalar_);
+      return kErrorUndefined;
+    }
+  } else {
+    DLOGW("Unable to load %s !", scalar_library_name_);
+    return kErrorNotSupported;
   }
-  return scalar_helper_;
+
+  return kErrorNone;
 }
 
-// Scalar helper functions
-static void SetPipeInfo(HWPipeInfo* hw_pipe, scalar::PipeInfo* pipe) {
-  pipe->id = hw_pipe->pipe_id;
-  pipe->horz_deci = hw_pipe->horizontal_decimation;
-  pipe->vert_deci = hw_pipe->vertical_decimation;
-
-  pipe->src_rect.x = UINT32(hw_pipe->src_roi.left);
-  pipe->src_rect.y = UINT32(hw_pipe->src_roi.top);
-  pipe->src_rect.w = UINT32(hw_pipe->src_roi.right) - pipe->src_rect.x;
-  pipe->src_rect.h = UINT32(hw_pipe->src_roi.bottom) - pipe->src_rect.y;
-
-  pipe->dst_rect.x = UINT32(hw_pipe->dst_roi.left);
-  pipe->dst_rect.y = UINT32(hw_pipe->dst_roi.top);
-  pipe->dst_rect.w = UINT32(hw_pipe->dst_roi.right) - pipe->dst_rect.x;
-  pipe->dst_rect.h = UINT32(hw_pipe->dst_roi.bottom) - pipe->dst_rect.y;
+void ScalarHelper::Deinit() {
+  if (lib_scalar_) {
+    dlclose(lib_scalar_);
+  }
 }
 
-static void UpdateSrcRoi(scalar::PipeInfo* pipe, HWPipeInfo* hw_pipe) {
-  hw_pipe->src_roi.left   = FLOAT(pipe->src_rect.x);
-  hw_pipe->src_roi.top    = FLOAT(pipe->src_rect.y);
-  hw_pipe->src_roi.right  = FLOAT(pipe->src_rect.x + pipe->src_rect.w);
-  hw_pipe->src_roi.bottom = FLOAT(pipe->src_rect.y + pipe->src_rect.h);
+// Helper functions
+void ScalarHelper::SetPipeInfo(const HWPipeInfo &hw_pipe, scalar::PipeInfo *pipe) {
+  pipe->id = hw_pipe.pipe_id;
+  pipe->horz_deci = hw_pipe.horizontal_decimation;
+  pipe->vert_deci = hw_pipe.vertical_decimation;
+
+  pipe->src_rect.x = UINT32(hw_pipe.src_roi.left);
+  pipe->src_rect.y = UINT32(hw_pipe.src_roi.top);
+  pipe->src_rect.w = UINT32(hw_pipe.src_roi.right) - pipe->src_rect.x;
+  pipe->src_rect.h = UINT32(hw_pipe.src_roi.bottom) - pipe->src_rect.y;
+
+  pipe->dst_rect.x = UINT32(hw_pipe.dst_roi.left);
+  pipe->dst_rect.y = UINT32(hw_pipe.dst_roi.top);
+  pipe->dst_rect.w = UINT32(hw_pipe.dst_roi.right) - pipe->dst_rect.x;
+  pipe->dst_rect.h = UINT32(hw_pipe.dst_roi.bottom) - pipe->dst_rect.y;
 }
 
-static uint32_t GetScalarFormat(LayerBufferFormat source) {
+void ScalarHelper::UpdateSrcRoi(const scalar::PipeInfo &pipe, HWPipeInfo *hw_pipe) {
+  hw_pipe->src_roi.left   = FLOAT(pipe.src_rect.x);
+  hw_pipe->src_roi.top    = FLOAT(pipe.src_rect.y);
+  hw_pipe->src_roi.right  = FLOAT(pipe.src_rect.x + pipe.src_rect.w);
+  hw_pipe->src_roi.bottom = FLOAT(pipe.src_rect.y + pipe.src_rect.h);
+}
+
+void ScalarHelper::SetScaleData(const scalar::PipeInfo &pipe, ScaleData *scale_data) {
+  scalar::Scale *scale = pipe.scale_data;
+  scale_data->src_width = pipe.src_width;
+  scale_data->src_height = pipe.src_height;
+  scale_data->enable_pixel_ext = scale->enable_pxl_ext;
+
+  for (int i = 0; i < 4; i++) {
+    HWPlane &plane = scale_data->plane[i];
+    plane.init_phase_x = scale->init_phase_x[i];
+    plane.phase_step_x = scale->phase_step_x[i];
+    plane.init_phase_y = scale->init_phase_y[i];
+    plane.phase_step_y = scale->phase_step_y[i];
+
+    plane.left.extension = scale->left.extension[i];
+    plane.left.overfetch = scale->left.overfetch[i];
+    plane.left.repeat = scale->left.repeat[i];
+
+    plane.top.extension = scale->top.extension[i];
+    plane.top.overfetch = scale->top.overfetch[i];
+    plane.top.repeat = scale->top.repeat[i];
+
+    plane.right.extension = scale->right.extension[i];
+    plane.right.overfetch = scale->right.overfetch[i];
+    plane.right.repeat = scale->right.repeat[i];
+
+    plane.bottom.extension = scale->bottom.extension[i];
+    plane.bottom.overfetch = scale->bottom.overfetch[i];
+    plane.bottom.repeat = scale->bottom.repeat[i];
+
+    plane.roi_width = scale->roi_width[i];
+  }
+}
+
+uint32_t ScalarHelper::GetScalarFormat(LayerBufferFormat source) {
   uint32_t format = scalar::UNKNOWN_FORMAT;
 
   switch (source) {
@@ -101,48 +153,26 @@ static uint32_t GetScalarFormat(LayerBufferFormat source) {
   return format;
 }
 
-void ScalarHelper::Init() {
-  lib_scalar_handle_   = NULL;
-  ScalarConfigureScale = NULL;
-
-  lib_scalar_handle_ = dlopen(SCALAR_LIBRARY_NAME, RTLD_NOW);
-  if (lib_scalar_handle_) {
-    void **scalar_func = reinterpret_cast<void **>(&ScalarConfigureScale);
-    *scalar_func = ::dlsym(lib_scalar_handle_, "configureScale");
-  } else {
-    DLOGW("Unable to load %s !", SCALAR_LIBRARY_NAME);
-  }
-}
-
-void ScalarHelper::Deinit() {
-  if (lib_scalar_handle_) {
-    dlclose(lib_scalar_handle_);
-    lib_scalar_handle_ = NULL;
-  }
-}
-
-bool ScalarHelper::ConfigureScale(HWLayers *hw_layers) {
-
-  if (!lib_scalar_handle_ || !ScalarConfigureScale) {
-    // No scalar library
-    return true;
-  }
-
-  // Reset scale data
-  memset(&scale_data_, 0, sizeof(scale_data_));
+DisplayError ScalarHelper::ConfigureScale(HWLayers *hw_layers) {
   HWLayersInfo &hw_layer_info = hw_layers->info;
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     Layer &layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
     uint32_t width = layer.input_buffer->width;
+    uint32_t height = layer.input_buffer->height;
     LayerBufferFormat format = layer.input_buffer->format;
-    HWPipeInfo* left_pipe = &hw_layers->config[i].left_pipe;
-    HWPipeInfo* right_pipe = &hw_layers->config[i].right_pipe;
+    HWPipeInfo &left_pipe = hw_layers->config[i].left_pipe;
+    HWPipeInfo &right_pipe = hw_layers->config[i].right_pipe;
     HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
+
+    // Reset scale data
+    memset(&left_pipe.scale_data, 0, sizeof(ScaleData));
+    memset(&right_pipe.scale_data, 0, sizeof(ScaleData));
 
     // Prepare data structure for lib scalar
     uint32_t flags = 0;
     struct scalar::LayerInfo layer_info;
+    struct scalar::Scale left_scale, right_scale;
 
     if (layer.transform.rotation == 90.0f) {
       // Flips will be taken care by rotator, if layer requires 90 rotation
@@ -153,18 +183,20 @@ bool ScalarHelper::ConfigureScale(HWLayers *hw_layers) {
     }
 
     for (uint32_t count = 0; count < 2; count++) {
-      HWPipeInfo* hw_pipe = (count == 0) ? left_pipe : right_pipe;
+      const HWPipeInfo &hw_pipe = (count == 0) ? left_pipe : right_pipe;
       HWRotateInfo* hw_rotate_info = &hw_rotator_session->hw_rotate_info[count];
       scalar::PipeInfo* pipe = (count == 0) ? &layer_info.left_pipe : &layer_info.right_pipe;
 
       if (hw_rotate_info->valid) {
         width = UINT32(hw_rotate_info->dst_roi.right - hw_rotate_info->dst_roi.left);
+        height = UINT32(hw_rotate_info->dst_roi.bottom - hw_rotate_info->dst_roi.top);
         format = hw_rotator_session->output_buffer.format;
       }
 
       pipe->flags = flags;
-      pipe->scale_data = GetScaleRef(i, !count);
-      pipe->scale_data->src_width = width;
+      pipe->scale_data = (count == 0) ? &left_scale : &right_scale;
+      pipe->src_width = width;
+      pipe->src_height = height;
       SetPipeInfo(hw_pipe, pipe);
     }
     layer_info.src_format = GetScalarFormat(format);
@@ -184,57 +216,52 @@ bool ScalarHelper::ConfigureScale(HWLayers *hw_layers) {
       layer_info.right_pipe.dst_rect.w, layer_info.right_pipe.dst_rect.h);
 
     // Configure scale data structure
-    if (ScalarConfigureScale(&layer_info) < 0) {
+    if (configure_scale_(&layer_info) < 0) {
       DLOGE("Scalar library failed to configure scale data!");
-      return false;
+      return kErrorParameters;
     }
 
-    // Update Src Roi in HWPipeInfo
-    if (layer_info.left_pipe.scale_data->enable_pxl_ext)
-      UpdateSrcRoi(&layer_info.left_pipe, left_pipe);
-    if (layer_info.right_pipe.scale_data->enable_pxl_ext)
-      UpdateSrcRoi(&layer_info.right_pipe, right_pipe);
+    // Set ScaleData and update SrcRoi in HWPipeInfo
+    if (left_scale.enable_pxl_ext) {
+      SetScaleData(layer_info.left_pipe, &left_pipe.scale_data);
+      UpdateSrcRoi(layer_info.left_pipe, &left_pipe);
+    }
+    if (right_scale.enable_pxl_ext) {
+      SetScaleData(layer_info.right_pipe, &right_pipe.scale_data);
+      UpdateSrcRoi(layer_info.right_pipe, &right_pipe);
+    }
   }
-  return true;
+
+  return kErrorNone;
 }
-
-void ScalarHelper::UpdateSrcWidth(uint32_t index, bool left, uint32_t* width) {
-  *width = GetScaleRef(index, left)->src_width;
-}
-
-void ScalarHelper::SetScaleData(uint32_t index, bool left, mdp_scale_data* mdp_scale) {
-
-  if (!lib_scalar_handle_ || !ScalarConfigureScale)
-    return;
-
-  scalar::Scale* scale = GetScaleRef(index, left);
-  mdp_scale->enable_pxl_ext = scale->enable_pxl_ext;
-
-  for (int i = 0; i < MAX_PLANES; i++) {
-    mdp_scale->init_phase_x[i] = scale->init_phase_x[i];
-    mdp_scale->phase_step_x[i] = scale->phase_step_x[i];
-    mdp_scale->init_phase_y[i] = scale->init_phase_y[i];
-    mdp_scale->phase_step_y[i] = scale->phase_step_y[i];
-
-    mdp_scale->num_ext_pxls_left[i] = scale->left.extension[i];
-    mdp_scale->num_ext_pxls_top[i] = scale->top.extension[i];
-    mdp_scale->num_ext_pxls_right[i] = scale->right.extension[i];
-    mdp_scale->num_ext_pxls_btm[i] = scale->bottom.extension[i];
-
-    mdp_scale->left_ftch[i] = scale->left.overfetch[i];
-    mdp_scale->top_ftch[i] = scale->top.overfetch[i];
-    mdp_scale->right_ftch[i] = scale->right.overfetch[i];
-    mdp_scale->btm_ftch[i] = scale->bottom.overfetch[i];
-
-    mdp_scale->left_rpt[i] = scale->left.repeat[i];
-    mdp_scale->top_rpt[i] = scale->top.repeat[i];
-    mdp_scale->right_rpt[i] = scale->right.repeat[i];
-    mdp_scale->btm_rpt[i] = scale->bottom.repeat[i];
-
-    mdp_scale->roi_w[i] = scale->roi_width[i];
-  }
-}
-
-} // namespace sde
-
 #endif
+
+DisplayError Scalar::CreateScalar(Scalar **scalar) {
+  Scalar *scalar_obj = NULL;
+
+#ifdef USES_SCALAR
+  scalar_obj = new ScalarHelper();
+  if (scalar_obj) {
+    if (scalar_obj->Init() == kErrorNone) {
+      goto OnSuccess;
+    } else {
+      delete scalar_obj;
+    }
+  }
+#endif
+
+  scalar_obj = new Scalar();
+  if (!scalar_obj) {
+    return kErrorMemory;
+  }
+
+OnSuccess:
+  *scalar = scalar_obj;
+  return kErrorNone;
+}
+
+void Scalar::Destroy(Scalar *scalar) {
+  scalar->Deinit();
+}
+
+}  // namespace sde

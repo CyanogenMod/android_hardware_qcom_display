@@ -40,7 +40,6 @@
 #include <utils/debug.h>
 
 #include "hw_device.h"
-#include "scalar_helper.h"
 
 #define __CLASS__ "HWDevice"
 
@@ -249,17 +248,15 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         SetRect(pipe_info->dst_roi, &mdp_layer.dst_rect);
         SetMDPFlags(layer, is_rotator_used, &mdp_layer.flags);
 
-        mdp_scale_data* mdp_scale = GetScaleDataRef(mdp_layer_count);
-#ifdef USES_SCALAR
-        // Set the configured scale data for MDP driver
-        ScalarHelper::GetInstance()->SetScaleData(i, !count, mdp_scale);
-        if (mdp_scale->enable_pxl_ext) {
-          if ((mdp_layer.flags & MDP_LAYER_DEINTERLACE) && (layer.transform.rotation == 90.0f))
-            ScalarHelper::GetInstance()->UpdateSrcWidth(i, !count, &mdp_buffer.width);
+        if (pipe_info->scale_data.enable_pixel_ext) {
+          if ((mdp_layer.flags & MDP_LAYER_DEINTERLACE) && (layer.transform.rotation == 90.0f)) {
+            mdp_buffer.width = pipe_info->scale_data.src_width;
+          }
+          SetHWScaleData(pipe_info->scale_data, mdp_layer_count);
         }
-#endif
-        mdp_layer.scale = mdp_scale;
 
+        // Send scale data to MDP driver
+        mdp_layer.scale = GetScaleDataRef(mdp_layer_count);
         mdp_layer_count++;
 
         DLOGV_IF(kTagDriverConfig, "******************* Layer[%d] %s pipe Input ******************",
@@ -274,7 +271,7 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
                  mdp_layer.src_rect.y, mdp_layer.src_rect.w, mdp_layer.src_rect.h);
         DLOGV_IF(kTagDriverConfig, "dst_rect [%d, %d, %d, %d]", mdp_layer.dst_rect.x,
                  mdp_layer.dst_rect.y, mdp_layer.dst_rect.w, mdp_layer.dst_rect.h);
-        for (int j = 0; j < MAX_PLANES; j++) {
+        for (int j = 0; j < 4; j++) {
           DLOGV_IF(kTagDriverConfig, "Scale Data[%d]: Phase=[%x %x %x %x] Pixel_Ext=[%d %d %d %d]",
                  j, mdp_layer.scale->init_phase_x[j], mdp_layer.scale->phase_step_x[j],
                  mdp_layer.scale->init_phase_y[j], mdp_layer.scale->phase_step_y[j],
@@ -905,6 +902,37 @@ void HWDevice::ResetDisplayParams() {
   mdp_disp_commit_.commit_v1.output_layer = &mdp_out_layer_;
   mdp_disp_commit_.commit_v1.release_fence = -1;
   mdp_disp_commit_.commit_v1.retire_fence = -1;
+}
+
+void HWDevice::SetHWScaleData(const ScaleData &scale, uint32_t index) {
+  mdp_scale_data *mdp_scale = GetScaleDataRef(index);
+  mdp_scale->enable_pxl_ext = scale.enable_pixel_ext;
+
+  for (int i = 0; i < 4; i++) {
+    const HWPlane &plane = scale.plane[i];
+    mdp_scale->init_phase_x[i] = plane.init_phase_x;
+    mdp_scale->phase_step_x[i] = plane.phase_step_x;
+    mdp_scale->init_phase_y[i] = plane.init_phase_y;
+    mdp_scale->phase_step_y[i] = plane.phase_step_y;
+
+    mdp_scale->num_ext_pxls_left[i] = plane.left.extension;
+    mdp_scale->left_ftch[i] = plane.left.overfetch;
+    mdp_scale->left_rpt[i] = plane.left.repeat;
+
+    mdp_scale->num_ext_pxls_top[i] = plane.top.extension;
+    mdp_scale->top_ftch[i] = plane.top.overfetch;
+    mdp_scale->top_rpt[i] = plane.top.repeat;
+
+    mdp_scale->num_ext_pxls_right[i] = plane.right.extension;
+    mdp_scale->right_ftch[i] = plane.right.overfetch;
+    mdp_scale->right_rpt[i] = plane.right.repeat;
+
+    mdp_scale->num_ext_pxls_btm[i] = plane.bottom.extension;
+    mdp_scale->btm_ftch[i] = plane.bottom.overfetch;
+    mdp_scale->btm_rpt[i] = plane.bottom.repeat;
+
+    mdp_scale->roi_w[i] = plane.roi_width;
+  }
 }
 
 }  // namespace sde
