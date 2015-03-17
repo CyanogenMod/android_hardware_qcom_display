@@ -525,6 +525,14 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. video transition padding round",
                 __FUNCTION__);
         ret = false;
+    } else if((qdutils::MDPVersion::getInstance().is8x26() ||
+               qdutils::MDPVersion::getInstance().is8x16() ||
+               qdutils::MDPVersion::getInstance().is8x39()) &&
+              !mDpy && isSecondaryAnimating(ctx) &&
+              isYuvPresent(ctx,HWC_DISPLAY_VIRTUAL)) {
+        ALOGD_IF(isDebug(),"%s: Display animation in progress",
+                 __FUNCTION__);
+        ret = false;
     } else if(qdutils::MDPVersion::getInstance().getTotalPipes() < 8) {
        /* TODO: freeing up all the resources only for the targets having total
                 number of pipes < 8. Need to analyze number of VIG pipes used
@@ -815,6 +823,14 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
                   !ctx->listStats[mDpy].secureRGBCount &&
                   (ctx->listStats[mDpy].numAppLayers > 1)) {
         ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
+        return false;
+    }
+
+    if(!mDpy && isSecondaryAnimating(ctx) &&
+       (isYuvPresent(ctx,HWC_DISPLAY_EXTERNAL) ||
+       isYuvPresent(ctx,HWC_DISPLAY_VIRTUAL)) ) {
+        ALOGD_IF(isDebug(),"%s: Display animation in progress",
+                 __FUNCTION__);
         return false;
     }
 
