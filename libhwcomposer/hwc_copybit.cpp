@@ -189,9 +189,10 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
                return -1;
            }
        }
-       if(mFbCache.getUnchangedFbDRCount(dirtyRect) <
+       hwc_rect_t displayRect = list->hwLayers[changingLayerIndex].displayFrame;
+       if(mFbCache.getUnchangedFbDRCount(dirtyRect, displayRect) <
                                              NUM_RENDER_BUFFERS) {
-               mFbCache.insertAndUpdateFbCache(dirtyRect);
+              mFbCache.insertAndUpdateFbCache(dirtyRect, displayRect);
               changingLayerIndex =  -1;
        }
     } else {
@@ -1260,19 +1261,24 @@ CopyBit::FbCache::FbCache() {
 }
 void CopyBit::FbCache::reset() {
      memset(&FbdirtyRect, 0, sizeof(FbdirtyRect));
+     memset(&FbdisplayRect, 0, sizeof(FbdisplayRect));
      FbIndex =0;
 }
 
-void CopyBit::FbCache::insertAndUpdateFbCache(hwc_rect_t dirtyRect) {
+void CopyBit::FbCache::insertAndUpdateFbCache(hwc_rect_t dirtyRect,
+                                             hwc_rect_t displayRect) {
    FbIndex =  FbIndex % NUM_RENDER_BUFFERS;
    FbdirtyRect[FbIndex] = dirtyRect;
+   FbdisplayRect[FbIndex] = displayRect;
    FbIndex++;
 }
 
-int CopyBit::FbCache::getUnchangedFbDRCount(hwc_rect_t dirtyRect){
+int CopyBit::FbCache::getUnchangedFbDRCount(hwc_rect_t dirtyRect,
+                                          hwc_rect_t displayRect){
     int sameDirtyCount = 0;
     for (int i = 0 ; i < NUM_RENDER_BUFFERS ; i++ ){
-      if( FbdirtyRect[i] == dirtyRect)
+      if( FbdirtyRect[i] == dirtyRect &&
+          FbdisplayRect[i] == displayRect)
            sameDirtyCount++;
    }
    return sameDirtyCount;
