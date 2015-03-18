@@ -266,7 +266,7 @@ static void changeDefaultAppBufferCount() {
     }
     if ((ramSize && ramSize < MAX_RAM_SIZE) &&
          (sInfo.xres &&  sInfo.xres <= qHD_WIDTH )) {
-                  property_set(PROP_DEFAULT_APPBUFFER, "2");
+                  property_set(PROP_DEFAULT_APPBUFFER, "3");
     }
 }
 
