@@ -35,6 +35,8 @@ class StrategyDefault : public StrategyInterface {
   StrategyDefault();
 
   static DisplayError CreateStrategyInterface(uint16_t version, DisplayType type,
+                                              const HWResourceInfo *hw_resource_info,
+                                              const HWPanelInfo *hw_panel_info,
                                               StrategyInterface **interface);
   static DisplayError DestroyStrategyInterface(StrategyInterface *interface);
 

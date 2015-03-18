@@ -35,15 +35,33 @@
 
 namespace sde {
 
-bool IsValidRect(const LayerRect &rect) {
+bool IsValid(const LayerRect &rect) {
   return ((rect.bottom > rect.top) && (rect.right > rect.left));
 }
 
+bool IsCongruent(const LayerRect &rect1, const LayerRect &rect2) {
+  return ((rect1.left == rect2.left) &&
+          (rect1.top == rect2.top) &&
+          (rect1.right == rect2.right) &&
+          (rect1.bottom == rect2.bottom));
+}
 
-LayerRect GetIntersection(const LayerRect &rect1, const LayerRect &rect2) {
+void Log(DebugTag debug_tag, const char *prefix, const LayerRect &roi) {
+  DLOGV_IF(debug_tag, "%s: left = %.0f, top = %.0f, right = %.0f, bottom = %.0f",
+           prefix, roi.left, roi.top, roi.right, roi.bottom);
+}
+
+void Normalize(const uint32_t &align_x, const uint32_t &align_y, LayerRect *rect) {
+    rect->left = ROUND_UP_ALIGN_UP(rect->left, align_x);
+    rect->right = ROUND_UP_ALIGN_DOWN(rect->right, align_x);
+    rect->top = ROUND_UP_ALIGN_UP(rect->top, align_y);
+    rect->bottom = ROUND_UP_ALIGN_DOWN(rect->bottom, align_y);
+}
+
+LayerRect Intersection(const LayerRect &rect1, const LayerRect &rect2) {
   LayerRect res;
 
-  if (!IsValidRect(rect1) || !IsValidRect(rect2)) {
+  if (!IsValid(rect1) || !IsValid(rect2)) {
     return LayerRect();
   }
 
@@ -52,23 +70,72 @@ LayerRect GetIntersection(const LayerRect &rect1, const LayerRect &rect2) {
   res.right = MIN(rect1.right, rect2.right);
   res.bottom = MIN(rect1.bottom, rect2.bottom);
 
-  if (!IsValidRect(res)) {
+  if (!IsValid(res)) {
     return LayerRect();
   }
 
   return res;
 }
 
-void LogRect(DebugTag debug_tag, const char *prefix, const LayerRect &roi) {
-  DLOGV_IF(debug_tag, "%s: left = %.0f, top = %.0f, right = %.0f, bottom = %.0f",
-           prefix, roi.left, roi.top, roi.right, roi.bottom);
+LayerRect Reposition(const LayerRect &rect, const int &x_offset, const int &y_offset) {
+  LayerRect res;
+
+  if (!IsValid(rect)) {
+    return LayerRect();
+  }
+
+  res.left = rect.left + FLOAT(x_offset);
+  res.top = rect.top + FLOAT(y_offset);
+  res.right = rect.right + FLOAT(x_offset);
+  res.bottom = rect.bottom + FLOAT(y_offset);
+
+  return res;
 }
 
-void NormalizeRect(const uint32_t &align_x, const uint32_t &align_y, LayerRect *rect) {
-  rect->left = ROUND_UP_ALIGN_UP(rect->left, align_x);
-  rect->right = ROUND_UP_ALIGN_DOWN(rect->right, align_x);
-  rect->top = ROUND_UP_ALIGN_UP(rect->top, align_y);
-  rect->bottom = ROUND_UP_ALIGN_DOWN(rect->bottom, align_y);
+// Not a geometrical rect deduction. Deducts rect2 from rect1 only if it results a single rect
+LayerRect Subtract(const LayerRect &rect1, const LayerRect &rect2) {
+  LayerRect res;
+
+  res = rect1;
+
+  if ((rect1.left == rect2.left) && (rect1.right == rect2.right)) {
+    if ((rect1.top == rect2.top) && (rect2.bottom <= rect1.bottom)) {
+      res.top = rect2.bottom;
+    } else if ((rect1.bottom == rect2.bottom) && (rect2.top >= rect1.top)) {
+      res.bottom = rect2.top;
+    }
+  } else if ((rect1.top == rect2.top) && (rect1.bottom == rect2.bottom)) {
+    if ((rect1.left == rect2.left) && (rect2.right <= rect1.right)) {
+      res.left = rect2.right;
+    } else if ((rect1.right == rect2.right) && (rect2.left >= rect1.left)) {
+      res.right = rect2.left;
+    }
+  }
+
+  return res;
+}
+
+LayerRect Union(const LayerRect &rect1, const LayerRect &rect2) {
+  LayerRect res;
+
+  if (!IsValid(rect1) && !IsValid(rect2)) {
+    return LayerRect();
+  }
+
+  if(!IsValid(rect1)){
+    return rect2;
+  }
+
+  if(!IsValid(rect2)){
+    return rect1;
+  }
+
+  res.left = MIN(rect1.left, rect2.left);
+  res.top = MIN(rect1.top, rect2.top);
+  res.right = MAX(rect1.right, rect2.right);
+  res.bottom = MAX(rect1.bottom, rect2.bottom);
+
+  return res;
 }
 
 }  // namespace sde

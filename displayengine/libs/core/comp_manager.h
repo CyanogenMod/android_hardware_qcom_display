@@ -40,7 +40,7 @@ class CompManager : public DumpImpl {
                     BufferSyncHandler *buffer_sync_handler_);
   DisplayError Deinit();
   DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
-                               Handle *res_mgr_hnd);
+                               const HWPanelInfo &hw_panel_info, Handle *res_mgr_hnd);
   DisplayError UnregisterDisplay(Handle res_mgr_hnd);
   void PrePrepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
@@ -81,6 +81,7 @@ class CompManager : public DumpImpl {
   bool safe_mode_;                      // Flag to notify all displays to be in resource crunch
                                         // mode, where strategy manager chooses the best strategy
                                         // that uses optimal number of pipes for each display
+  HWResourceInfo hw_res_info_;
 };
 
 }  // namespace sde

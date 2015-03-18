@@ -74,7 +74,7 @@ DisplayError DisplayBase::Init() {
   }
 
   error = comp_manager_->RegisterDisplay(display_type_, display_attributes_[active_mode_index_],
-                                        &display_comp_ctx_);
+                                         hw_panel_info_, &display_comp_ctx_);
   if (error != kErrorNone) {
     goto CleanupOnError;
   }
@@ -327,7 +327,8 @@ DisplayError DisplayBase::SetActiveConfig(DisplayConfigVariableInfo *variable_in
     comp_manager_->UnregisterDisplay(display_comp_ctx_);
   }
 
-  error = comp_manager_->RegisterDisplay(display_type_, display_attributes, &display_comp_ctx_);
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes, hw_panel_info_,
+                                         &display_comp_ctx_);
   if (error != kErrorNone) {
     return error;
   }
@@ -355,7 +356,7 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
     comp_manager_->UnregisterDisplay(display_comp_ctx_);
   }
 
-  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_[index],
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_[index], hw_panel_info_,
                                          &display_comp_ctx_);
 
   return error;

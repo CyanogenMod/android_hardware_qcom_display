@@ -89,5 +89,15 @@ bool Debug::IsDecimationDisabled() {
   return false;
 }
 
+// This property serves to disable/enable partial update
+bool Debug::IsPartialUpdate() {
+  char property[PROPERTY_VALUE_MAX];
+  if (property_get("sde.hwc.partial_update", property, NULL) > 0) {
+    return (atoi(property) ? 1 : true, false);
+  }
+
+  return false;
+}
+
 }  // namespace sde
 

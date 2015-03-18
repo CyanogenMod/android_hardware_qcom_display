@@ -37,11 +37,14 @@
 
 namespace sde {
 
-  bool IsValidRect(const LayerRect &rect);
-  LayerRect GetIntersection(const LayerRect &rect1, const LayerRect &rect2);
-  void LogRect(DebugTag debug_tag, const char *prefix, const LayerRect &roi);
-  void NormalizeRect(const uint32_t &align_x, const uint32_t &align_y, LayerRect *rect);
-
+  bool IsValid(const LayerRect &rect);
+  bool IsCongruent(const LayerRect &rect1, const LayerRect &rect2);
+  void Log(DebugTag debug_tag, const char *prefix, const LayerRect &roi);
+  void Normalize(const uint32_t &align_x, const uint32_t &align_y, LayerRect *rect);
+  LayerRect Union(const LayerRect &rect1, const LayerRect &rect2);
+  LayerRect Intersection(const LayerRect &rect1, const LayerRect &rect2);
+  LayerRect Subtract(const LayerRect &rect1, const LayerRect &rect2);
+  LayerRect Reposition(const LayerRect &rect1, const int &x_offset, const int &y_offset);
 }  // namespace sde
 
 #endif  // __RECT_H__

@@ -31,6 +31,7 @@
 
 #include <core/sde_types.h>
 #include <core/display_interface.h>
+#include "hw_info_types.h"
 
 namespace sde {
 
@@ -88,11 +89,14 @@ class StrategyInterface;
 
   @param[in] version \link STRATEGY_VERSION_TAG \endlink
   @param[in] type \link DisplayType \endlink
+  @param[in] hw_resource_info \link HWResourceInfo \endlink
+  @param[in] hw_panel_info \link HWPanelInfo \endlink
   @param[out] interface \link StrategyInterface \endlink
 
   @return \link DisplayError \endlink
 */
 typedef DisplayError (*CreateStrategyInterface)(uint16_t version, DisplayType type,
+                      const HWResourceInfo *hw_resource_info, const HWPanelInfo *hw_panel_info,
                       StrategyInterface **interface);
 
 /*! @brief Function to destroy composer strategy interface.
@@ -138,6 +142,13 @@ struct HWLayersInfo {
                             //!< programmed on hardware.
 
   uint32_t count;           //!< Total number of layers which need to be set on hardware.
+
+  LayerRect left_partial_update;
+                            //!< Left ROI.
+
+  LayerRect right_partial_update;
+                            //!< Right ROI.
+
 
   HWLayersInfo() : stack(NULL), count(0) { }
 };
