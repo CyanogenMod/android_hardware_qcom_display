@@ -560,46 +560,33 @@ void ResManager::SplitRect(bool flip_horizontal, const LayerRect &src_rect,
   dst_width = ROUND_UP_ALIGN_DOWN(dst_width * src_width / src_width_ori, 1);
 
   if (flip_horizontal) {
-    src_left->top = src_rect.top;
-    src_left->left = src_rect.left;
-    src_left->right = src_rect.left + src_width;
-    src_left->bottom = src_rect.bottom;
+    src_left->left = src_rect.right - src_width;
+    src_left->right = src_rect.right;
 
-    dst_left->top = dst_rect.top;
-    dst_left->left = dst_rect.left + dst_width;
-    dst_left->right = dst_rect.right;
-    dst_left->bottom = dst_rect.bottom;
-
-    src_right->top = src_rect.top;
-    src_right->left = src_left->right;
-    src_right->right = src_rect.right;
-    src_right->bottom = src_rect.bottom;
-
-    dst_right->top = dst_rect.top;
-    dst_right->left = dst_rect.left;
-    dst_right->right = dst_left->left;
-    dst_right->bottom = dst_rect.bottom;
+    src_right->left = src_rect.left;
+    src_right->right = src_left->left;
   } else {
-    src_left->top = src_rect.top;
     src_left->left = src_rect.left;
     src_left->right = src_rect.left + src_width;
-    src_left->bottom = src_rect.bottom;
 
-    dst_left->top = dst_rect.top;
-    dst_left->left = dst_rect.left;
-    dst_left->right = dst_rect.left + dst_width;
-    dst_left->bottom = dst_rect.bottom;
-
-    src_right->top = src_rect.top;
     src_right->left = src_left->right;
     src_right->right = src_rect.right;
-    src_right->bottom = src_rect.bottom;
-
-    dst_right->top = dst_rect.top;
-    dst_right->left = dst_left->right;
-    dst_right->right = dst_rect.right;
-    dst_right->bottom = dst_rect.bottom;
   }
+
+  src_left->top = src_rect.top;
+  src_left->bottom = src_rect.bottom;
+  dst_left->top = dst_rect.top;
+  dst_left->bottom = dst_rect.bottom;
+
+  src_right->top = src_rect.top;
+  src_right->bottom = src_rect.bottom;
+  dst_right->top = dst_rect.top;
+  dst_right->bottom = dst_rect.bottom;
+
+  dst_left->left = dst_rect.left;
+  dst_left->right = dst_rect.left + dst_width;
+  dst_right->left = dst_left->right;
+  dst_right->right = dst_rect.right;
 }
 
 DisplayError ResManager::AlignPipeConfig(const Layer &layer, const LayerTransform &transform,
@@ -625,12 +612,12 @@ DisplayError ResManager::AlignPipeConfig(const Layer &layer, const LayerTransfor
 
   if (right_pipe->valid) {
     // Make sure the  left and right ROI are conjunct
-    right_pipe->src_roi.left = left_pipe->src_roi.right;
     if (transform.flip_horizontal) {
-      right_pipe->dst_roi.right = left_pipe->dst_roi.left;
+      left_pipe->src_roi.left = right_pipe->src_roi.right;
     } else {
-      right_pipe->dst_roi.left = left_pipe->dst_roi.right;
+      right_pipe->src_roi.left = left_pipe->src_roi.right;
     }
+    right_pipe->dst_roi.left = left_pipe->dst_roi.right;
   }
   error = ValidateScaling(layer, left_pipe->src_roi, left_pipe->dst_roi, NULL);
   if (error != kErrorNone) {
