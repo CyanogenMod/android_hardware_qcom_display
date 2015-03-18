@@ -1025,6 +1025,14 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
     }
     // Copybit region
     hwc_region_t region = layer->visibleRegionScreen;
+    //Do not use visible regions in case of scaling
+    if (region.numRects > 1) {
+        if (needsScaling(layer)) {
+            region.numRects = 1;
+            region.rects = &layer->displayFrame;
+        }
+    }
+
     region_iterator copybitRegion(region);
 
     copybit->set_parameter(copybit, COPYBIT_FRAMEBUFFER_WIDTH,
