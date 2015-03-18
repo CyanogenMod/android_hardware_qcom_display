@@ -152,11 +152,11 @@ public:
     bool is8x16();
     bool is8x39();
     bool is8992();
+    bool updateSplitInfo();
 
 private:
     bool updateSysFsInfo();
     void updatePanelInfo();
-    bool updateSplitInfo();
     int tokenizeParams(char *inputParams, const char *delim,
                         char* tokenStr[], int *idx);
     int mFd;
