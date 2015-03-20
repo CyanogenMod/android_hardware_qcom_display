@@ -121,7 +121,7 @@ inline bool OvMem::open(uint32_t numbufs,
         uint32_t bufSz, bool isSecure)
 {
     alloc_data data;
-    int allocFlags = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+    int allocFlags = 0;
     int err = 0;
     OVASSERT(numbufs && bufSz, "numbufs=%d bufSz=%d", numbufs, bufSz);
     mBufSz = bufSz;

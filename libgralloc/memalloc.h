@@ -49,6 +49,7 @@ struct alloc_data {
     uintptr_t      pHandle;
     bool           uncached;
     unsigned int   flags;
+    unsigned int   heapId;
     int            allocType;
 };
 

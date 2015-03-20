@@ -58,27 +58,6 @@ static void getUBwcWidthAndHeight(int, int, int, int&, int&);
 static unsigned int getUBwcSize(int, int, int, const int, const int);
 
 //Common functions
-static bool canFallback(int usage, bool triedSystem)
-{
-    // Fallback to system heap when alloc fails unless
-    // 1. Composition type is MDP
-    // 2. Alloc from system heap was already tried
-    // 3. The heap type is requsted explicitly
-    // 4. The heap type is protected
-    // 5. The buffer is meant for external display only
-
-    if(QCCompositionType::getInstance().getCompositionType() &
-       COMPOSITION_TYPE_MDP)
-        return false;
-    if(triedSystem)
-        return false;
-    if(usage & (GRALLOC_HEAP_MASK | GRALLOC_USAGE_PROTECTED))
-        return false;
-    if(usage & (GRALLOC_HEAP_MASK | GRALLOC_USAGE_PRIVATE_EXTERNAL_ONLY))
-        return false;
-    //Return true by default
-    return true;
-}
 
 /* The default policy is to return cached buffers unless the client explicity
  * sets the PRIVATE_UNCACHED flag or indicates that the buffer will be rarely
@@ -344,20 +323,15 @@ void IonController::allocateIonMem()
 int IonController::allocate(alloc_data& data, int usage)
 {
     int ionFlags = 0;
+    int ionHeapId = 0;
     int ret;
 
     data.uncached = useUncached(usage);
     data.allocType = 0;
 
-    if(usage & GRALLOC_USAGE_PRIVATE_SYSTEM_HEAP)
-        ionFlags |= ION_HEAP(ION_SYSTEM_HEAP_ID);
-
-    if(usage & GRALLOC_USAGE_PRIVATE_IOMMU_HEAP)
-        ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
-
     if(usage & GRALLOC_USAGE_PROTECTED) {
         if (usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
-            ionFlags |= ION_HEAP(ION_CP_MM_HEAP_ID);
+            ionHeapId |= ION_HEAP(ION_CP_MM_HEAP_ID);
             ionFlags |= ION_SECURE;
 #ifdef ION_FLAG_ALLOW_NON_CONTIG
             if (!(usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY)) {
@@ -366,8 +340,8 @@ int IonController::allocate(alloc_data& data, int usage)
 #endif
         } else {
             // for targets/OEMs which do not need HW level protection
-            // do not set ion secure flag & MM heap. Fallback to IOMMU heap.
-            ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
+            // do not set ion secure flag & MM heap. Fallback to system heap.
+            ionHeapId |= ION_HEAP(ION_SYSTEM_HEAP_ID);
             data.allocType |= private_handle_t::PRIV_FLAGS_PROTECTED_BUFFER;
         }
     } else if(usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
@@ -375,40 +349,33 @@ int IonController::allocate(alloc_data& data, int usage)
         //If it is used for non secure cases, fallback to IOMMU heap
         ALOGW("GRALLOC_USAGE_PRIVATE_MM_HEAP \
                                 cannot be used as an insecure heap!\
-                                trying to use IOMMU instead !!");
-        ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
+                                trying to use system heap instead !!");
+        ionHeapId |= ION_HEAP(ION_SYSTEM_HEAP_ID);
     }
 
     if(usage & GRALLOC_USAGE_PRIVATE_CAMERA_HEAP)
-        ionFlags |= ION_HEAP(ION_CAMERA_HEAP_ID);
+        ionHeapId |= ION_HEAP(ION_CAMERA_HEAP_ID);
 
     if(usage & GRALLOC_USAGE_PRIVATE_ADSP_HEAP)
-        ionFlags |= ION_HEAP(ION_ADSP_HEAP_ID);
+        ionHeapId |= ION_HEAP(ION_ADSP_HEAP_ID);
 
     if(ionFlags & ION_SECURE)
          data.allocType |= private_handle_t::PRIV_FLAGS_SECURE_BUFFER;
 
-    // if no flags are set, default to
-    // SF + IOMMU heaps, so that bypass can work
-    // we can fall back to system heap if
-    // we run out.
-    if(!ionFlags)
-        ionFlags = ION_HEAP(ION_SF_HEAP_ID) | ION_HEAP(ION_IOMMU_HEAP_ID);
+    // if no ion heap flags are set, default to system heap
+    if(!ionHeapId)
+        ionHeapId = ION_HEAP(ION_SYSTEM_HEAP_ID);
 
+    //At this point we should have the right heap set, there is no fallback
     data.flags = ionFlags;
+    data.heapId = ionHeapId;
     ret = mIonAlloc->alloc_buffer(data);
-
-    // Fallback
-    if(ret < 0 && canFallback(usage,
-                              (ionFlags & ION_SYSTEM_HEAP_ID)))
-    {
-        ALOGW("Falling back to system heap");
-        data.flags = ION_HEAP(ION_SYSTEM_HEAP_ID);
-        ret = mIonAlloc->alloc_buffer(data);
-    }
 
     if(ret >= 0 ) {
         data.allocType |= private_handle_t::PRIV_FLAGS_USES_ION;
+    } else {
+        ALOGE("%s: Failed to allocate buffer - heap: 0x%x flags: 0x%x",
+                __FUNCTION__, ionHeapId, ionFlags);
     }
 
     return ret;

@@ -204,10 +204,7 @@ int terminateBuffer(gralloc_module_t const* module,
 
     if (hnd->base != 0) {
         // this buffer was mapped, unmap it now
-        if (hnd->flags & (private_handle_t::PRIV_FLAGS_USES_PMEM |
-                          private_handle_t::PRIV_FLAGS_USES_PMEM_ADSP |
-                          private_handle_t::PRIV_FLAGS_USES_ASHMEM |
-                          private_handle_t::PRIV_FLAGS_USES_ION)) {
+        if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_ION) {
                 gralloc_unmap(module, hnd);
         } else {
             ALOGE("terminateBuffer: unmapping a non pmem/ashmem buffer flags = 0x%x",
