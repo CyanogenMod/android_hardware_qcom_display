@@ -72,11 +72,14 @@ private:
     /* framebuffer cache*/
     struct FbCache {
       hwc_rect_t  FbdirtyRect[NUM_RENDER_BUFFERS];
+      hwc_rect_t  FbdisplayRect[NUM_RENDER_BUFFERS];
       int FbIndex;
       FbCache();
       void reset();
-      void insertAndUpdateFbCache(hwc_rect_t dirtyRect);
-      int getUnchangedFbDRCount(hwc_rect_t dirtyRect);
+      void insertAndUpdateFbCache(hwc_rect_t dirtyRect,
+                               hwc_rect_t displayRect);
+      int getUnchangedFbDRCount(hwc_rect_t dirtyRect,
+                             hwc_rect_t displayRect);
     };
 
     // holds the copybit device
