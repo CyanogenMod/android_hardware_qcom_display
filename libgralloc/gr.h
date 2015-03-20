@@ -57,6 +57,7 @@ int decideBufferHandlingMechanism(int format, const char *compositionUsed,
 // It is the responsibility of the caller to free the buffer
 int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage);
 void free_buffer(private_handle_t *hnd);
+int getYUVPlaneInfo(private_handle_t* pHnd, struct android_ycbcr* ycbcr);
 
 /*****************************************************************************/
 
