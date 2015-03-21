@@ -369,11 +369,11 @@ static void cec_set_option(const struct hdmi_cec_device* dev, int flag,
 }
 
 static void cec_set_audio_return_channel(const struct hdmi_cec_device* dev,
-        int flag)
+        int port, int flag)
 {
     cec_context_t* ctx = (cec_context_t*)(dev);
     ctx->arc_enabled = flag ? true : false;
-    ALOGD_IF(DEBUG, "%s: ARC flag: %d", __FUNCTION__, flag);
+    ALOGD_IF(DEBUG, "%s: ARC flag: %d port: %d", __FUNCTION__, flag, port);
 }
 
 static int cec_is_connected(const struct hdmi_cec_device* dev, int port_id)
