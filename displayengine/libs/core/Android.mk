@@ -9,7 +9,9 @@ LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-par
                                  -Wconversion -Wall -Werror \
                                  -DLOG_TAG=\"SDE\"
 LOCAL_SHARED_LIBRARIES        := libdl libsdeutils
+ifeq ($(TARGET_COMPILE_WITH_MSM_KERNEL),true)
 LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
+endif
 LOCAL_SRC_FILES               := core_interface.cpp \
                                  core_impl.cpp \
                                  display_base.cpp \
