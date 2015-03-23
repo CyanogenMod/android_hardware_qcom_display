@@ -1123,8 +1123,8 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
 
 bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
 {
-    if(!sEnableMixedMode) {
-        //Mixed mode is disabled. No need to even try caching.
+    if(!sEnableMixedMode || !isAlphaPresentinFB(ctx, mDpy)) {
+        //Mixed mode is disabled/can't be used. No need to even try caching.
         return false;
     }
 

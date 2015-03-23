@@ -90,6 +90,7 @@ int HWCVirtualVDS::prepare(hwc_composer_device_1 *dev,
             // it up to the consumer to decide how fast to consume frames.
             ctx->dpyAttr[dpy].vsync_period
                               = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period;
+            ctx->dpyAttr[dpy].fbformat = HAL_PIXEL_FORMAT_RGBA_8888;
             init(ctx);
             // Do one padding round for cases where primary has all pipes
             // The virtual composition falls back to GPU in such cases.

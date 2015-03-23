@@ -86,6 +86,32 @@ namespace qhwc {
 // Std refresh rates for digital videos- 24p, 30p, 48p and 60p
 uint32_t stdRefreshRates[] = { 30, 24, 48, 60 };
 
+static uint32_t getFBformat(fb_var_screeninfo vinfo) {
+    uint32_t fbformat = HAL_PIXEL_FORMAT_RGBA_8888;
+
+#ifdef GET_FRAMEBUFFER_FORMAT_FROM_HWC
+    // Here, we are adding the formats that are supported by both GPU and MDP.
+    // The formats that fall in this category are RGBA_8888, RGB_565, RGB_888
+    switch(vinfo.bits_per_pixel) {
+        case 16:
+            fbformat = HAL_PIXEL_FORMAT_RGB_565;
+            break;
+        case 24:
+            if ((vinfo.transp.offset == 0) && (vinfo.transp.length == 0))
+                fbformat = HAL_PIXEL_FORMAT_RGB_888;
+            break;
+        case 32:
+            if ((vinfo.red.offset == 0) && (vinfo.green.offset == 8) &&
+                    (vinfo.blue.offset == 16) && (vinfo.transp.offset == 24))
+                fbformat = HAL_PIXEL_FORMAT_RGBA_8888;
+            break;
+        default:
+            fbformat = HAL_PIXEL_FORMAT_RGBA_8888;
+    }
+#endif
+    return fbformat;
+}
+
 bool isValidResolution(hwc_context_t *ctx, uint32_t xres, uint32_t yres)
 {
     return !((xres > qdutils::MDPVersion::getInstance().getMaxPipeWidth() &&
@@ -130,6 +156,14 @@ static void handleFbScaling(hwc_context_t *ctx, int xresPanel, int yresPanel,
 // Initialize hdmi display attributes based on
 // hdmi display class state
 void updateDisplayInfo(hwc_context_t* ctx, int dpy) {
+    struct fb_var_screeninfo info;
+
+    if (ioctl(ctx->mHDMIDisplay->getFd(), FBIOGET_VSCREENINFO, &info) == -1) {
+        ALOGE("%s:Error in ioctl FBIOGET_VSCREENINFO: %s",
+                __FUNCTION__, strerror(errno));
+    }
+
+    ctx->dpyAttr[dpy].fbformat = getFBformat(info);
     ctx->dpyAttr[dpy].fd = ctx->mHDMIDisplay->getFd();
     ctx->dpyAttr[dpy].xres = ctx->mHDMIDisplay->getWidth();
     ctx->dpyAttr[dpy].yres = ctx->mHDMIDisplay->getHeight();
@@ -238,6 +272,7 @@ static int openFramebufferDevice(hwc_context_t *ctx)
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].secure = true;
     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period =
             (uint32_t)(1000000000l / fps);
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fbformat = getFBformat(info);
 
     handleFbScaling(ctx, info.xres, info.yres, info.width, info.height);
 
@@ -988,6 +1023,16 @@ bool isAlphaPresent(hwc_layer_1_t const* layer) {
             return true;
         default : return false;
         }
+    }
+    return false;
+}
+
+bool isAlphaPresentinFB(hwc_context_t *ctx, int dpy) {
+    switch(ctx->dpyAttr[dpy].fbformat) {
+        case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_BGRA_8888:
+            return true;
+        default : return false;
     }
     return false;
 }
