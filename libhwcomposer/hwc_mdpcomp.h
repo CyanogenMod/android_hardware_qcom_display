@@ -45,6 +45,7 @@ public:
     /* dumpsys */
     void dump(android::String8& buf, hwc_context_t *ctx);
     bool isGLESOnlyComp() { return (mCurrentFrame.mdpCount == 0); }
+    bool isMDPComp() { return mModeOn; }
     int drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     static MDPComp* getObject(hwc_context_t *ctx, const int& dpy);
     /* Handler to invoke frame redraw on Idle Timer expiry */
@@ -141,6 +142,8 @@ protected:
         void updateCounts(const FrameInfo&);
         bool isSameFrame(const FrameInfo& curFrame,
                          hwc_display_contents_1_t* list);
+        bool isSameFrame(hwc_context_t *ctx, int dpy,
+                                        hwc_display_contents_1_t* list);
     };
 
     /* allocates pipe from pipe book */
@@ -260,8 +263,6 @@ protected:
     static int sSimulationFlags;
     static bool sDebugLogs;
     static bool sIdleFallBack;
-    /* Handles the timeout event from kernel, if the value is set to true */
-    static bool sHandleTimeout;
     static int sMaxPipesPerMixer;
     static bool sSrcSplitEnabled;
     static IdleInvalidator *sIdleInvalidator;
@@ -273,6 +274,7 @@ protected:
     static bool sEnableYUVsplit;
     bool mModeOn; // if prepare happened
     bool allocSplitVGPipes(hwc_context_t *ctx, int index);
+    bool mPrevModeOn; //if previous prepare happened
     //Enable Partial Update for MDP3 targets
     static bool enablePartialUpdateForMDP3;
     static void *sLibPerfHint;
