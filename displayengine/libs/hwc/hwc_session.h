@@ -68,11 +68,12 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   static int GetActiveConfig(hwc_composer_device_1 *device, int disp);
   static int SetActiveConfig(hwc_composer_device_1 *device, int disp, int index);
 
-  // Hotplug thread for HDMI connect/disconnect
-  static void* HWCHotPlugThread(void *context);
-  void* HWCHotPlugThreadHandler();
-  int GetHDMIConnectedState(const char *uevent_data, int length);
+  // Uevent thread
+  static void* HWCUeventThread(void *context);
+  void* HWCUeventThreadHandler();
+  int GetEventValue(const char *uevent_data, int length, const char *event_info);
   int HotPlugHandler(bool connected);
+  void ResetPanel();
   bool ValidateContentList(hwc_display_contents_1_t *content_list);
   int CreateVirtualDisplay(HWCSession *hwc_session, hwc_display_contents_1_t *content_list);
   int DestroyVirtualDisplay(HWCSession *hwc_session);
@@ -93,9 +94,10 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   HWCDisplayPrimary *display_primary_;
   HWCDisplayExternal *display_external_;
   HWCDisplayVirtual *display_virtual_;
-  pthread_t hotplug_thread_;
-  bool hotplug_thread_exit_;
-  const char *hotplug_thread_name_;
+  pthread_t uevent_thread_;
+  bool uevent_thread_exit_;
+  static bool reset_panel_;
+  const char *uevent_thread_name_;
   HWCBufferAllocator *buffer_allocator_;
   HWCBufferSyncHandler *buffer_sync_handler_;
 };

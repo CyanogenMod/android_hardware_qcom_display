@@ -44,6 +44,9 @@
 
 #define __CLASS__ "HWCSession"
 
+#define HWC_UEVENT_SWITCH_HDMI "change@/devices/virtual/switch/hdmi"
+#define HWC_UEVENT_GRAPHICS_FB0 "change@/devices/virtual/graphics/fb0"
+
 static sde::HWCSession::HWCModuleMethods g_hwc_module_methods;
 
 hwc_module_t HAL_MODULE_INFO_SYM = {
@@ -63,10 +66,11 @@ hwc_module_t HAL_MODULE_INFO_SYM = {
 namespace sde {
 
 Locker HWCSession::locker_;
+bool HWCSession::reset_panel_ = false;
 
 HWCSession::HWCSession(const hw_module_t *module) : core_intf_(NULL), hwc_procs_(NULL),
             display_primary_(NULL), display_external_(NULL), display_virtual_(NULL),
-            hotplug_thread_exit_(false), hotplug_thread_name_("HWC_HotPlugThread") {
+            uevent_thread_exit_(false), uevent_thread_name_("HWC_UeventThread") {
   hwc_composer_device_1_t::common.tag = HARDWARE_DEVICE_TAG;
   hwc_composer_device_1_t::common.version = HWC_DEVICE_API_VERSION_1_4;
   hwc_composer_device_1_t::common.module = const_cast<hw_module_t*>(module);
@@ -141,8 +145,8 @@ int HWCSession::Init() {
     return status;
   }
 
-  if (pthread_create(&hotplug_thread_, NULL, &HWCHotPlugThread, this) < 0) {
-    DLOGE("Failed to start = %s, error = %s HDMI display Not supported", hotplug_thread_name_);
+  if (pthread_create(&uevent_thread_, NULL, &HWCUeventThread, this) < 0) {
+    DLOGE("Failed to start = %s, error = %s", uevent_thread_name_);
     display_primary_->Deinit();
     delete display_primary_;
     CoreInterface::DestroyCore();
@@ -156,8 +160,8 @@ int HWCSession::Deinit() {
   display_primary_->SetPowerMode(HWC_POWER_MODE_OFF);
   display_primary_->Deinit();
   delete display_primary_;
-  hotplug_thread_exit_ = true;
-  pthread_join(hotplug_thread_, NULL);
+  uevent_thread_exit_ = true;
+  pthread_join(uevent_thread_, NULL);
 
   DisplayError error = CoreInterface::DestroyCore();
   if (error != kErrorNone) {
@@ -217,6 +221,11 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
   }
 
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
+
+  if (reset_panel_) {
+    DLOGW("panel is in bad state, resetting the panel");
+    hwc_session->ResetPanel();
+  }
 
   for (ssize_t i = (num_displays-1); i >= 0; i--) {
     hwc_display_contents_1_t *content_list = displays[i];
@@ -690,18 +699,18 @@ void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {
   }
 }
 
-void* HWCSession::HWCHotPlugThread(void *context) {
+void* HWCSession::HWCUeventThread(void *context) {
   if (context) {
-    return reinterpret_cast<HWCSession *>(context)->HWCHotPlugThreadHandler();
+    return reinterpret_cast<HWCSession *>(context)->HWCUeventThreadHandler();
   }
 
   return NULL;
 }
 
-void* HWCSession::HWCHotPlugThreadHandler() {
+void* HWCSession::HWCUeventThreadHandler() {
   static char uevent_data[PAGE_SIZE];
   int length = 0;
-  prctl(PR_SET_NAME, hotplug_thread_name_, 0, 0, 0);
+  prctl(PR_SET_NAME, uevent_thread_name_, 0, 0, 0);
   setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY);
   if (!uevent_init()) {
     DLOGE("Failed to init uevent");
@@ -709,19 +718,28 @@ void* HWCSession::HWCHotPlugThreadHandler() {
     return NULL;
   }
 
-  while (!hotplug_thread_exit_) {
+  while (!uevent_thread_exit_) {
     // keep last 2 zeroes to ensure double 0 termination
     length = uevent_next_event(uevent_data, INT32(sizeof(uevent_data)) - 2);
 
-    if (!strcasestr("change@/devices/virtual/switch/hdmi", uevent_data)) {
-      continue;
-    }
-    DLOGI("Uevent HDMI = %s", uevent_data);
-    int connected = GetHDMIConnectedState(uevent_data, length);
-    if (connected >= 0) {
-      DLOGI("HDMI = %s", connected ? "connected" : "disconnected");
-      if (HotPlugHandler(connected) == -1) {
-        DLOGE("Failed handling Hotplug = %s", connected ? "connected" : "disconnected");
+    if (strcasestr(HWC_UEVENT_SWITCH_HDMI, uevent_data)) {
+      DLOGI("Uevent HDMI = %s", uevent_data);
+      int connected = GetEventValue(uevent_data, length, "SWITCH_STATE=");
+      if (connected >= 0) {
+        DLOGI("HDMI = %s", connected ? "connected" : "disconnected");
+        if (HotPlugHandler(connected) == -1) {
+          DLOGE("Failed handling Hotplug = %s", connected ? "connected" : "disconnected");
+        }
+      }
+    } else if (strcasestr(HWC_UEVENT_GRAPHICS_FB0, uevent_data)) {
+      DLOGI("Uevent FB0 = %s", uevent_data);
+      int panel_reset = GetEventValue(uevent_data, length, "PANEL_ALIVE=");
+      if (panel_reset == 0) {
+        if (hwc_procs_) {
+          reset_panel_ = true;
+          hwc_procs_->invalidate(hwc_procs_);
+        } else
+          DLOGW("Ignore resetpanel - hwc_proc not registered");
       }
     }
   }
@@ -730,16 +748,41 @@ void* HWCSession::HWCHotPlugThreadHandler() {
   return NULL;
 }
 
-int HWCSession::GetHDMIConnectedState(const char *uevent_data, int length) {
-  const char* iterator_str = uevent_data;
+int HWCSession::GetEventValue(const char *uevent_data, int length, const char *event_info) {
+  const char *iterator_str = uevent_data;
   while (((iterator_str - uevent_data) <= length) && (*iterator_str)) {
-    char* pstr = strstr(iterator_str, "SWITCH_STATE=");
+    char *pstr = strstr(iterator_str, event_info);
     if (pstr != NULL) {
-      return (atoi(iterator_str + strlen("SWITCH_STATE=")));
+      return (atoi(iterator_str + strlen(event_info)));
     }
     iterator_str += strlen(iterator_str) + 1;
   }
+
   return -1;
+}
+
+void HWCSession::ResetPanel() {
+  int status = -EINVAL;
+
+  DLOGI("Powering off primary");
+  status = display_primary_->SetPowerMode(HWC_POWER_MODE_OFF);
+  if (status) {
+    DLOGE("power-off on primary failed with error = %d",status);
+  }
+
+  DLOGI("Restoring power mode on primary");
+  uint32_t mode = display_primary_->GetLastPowerMode();
+  status = display_primary_->SetPowerMode(mode);
+  if (status) {
+    DLOGE("Setting power mode = %d on primary failed with error = %d", mode,status);
+  }
+
+  status = display_primary_->EventControl(HWC_EVENT_VSYNC, 1);
+  if (status) {
+    DLOGE("enabling vsync failed for primary with error = %d",status);
+  }
+
+  reset_panel_ = false;
 }
 
 int HWCSession::HotPlugHandler(bool connected) {
