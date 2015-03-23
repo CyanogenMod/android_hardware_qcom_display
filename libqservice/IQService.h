@@ -63,6 +63,7 @@ public:
         SET_FRAME_DUMP_CONFIG = 21,  // Provides ability to set the frame dump config
         SET_S3D_MODE = 22, // Set the 3D mode as specified in msm_hdmi_modes.h
         CONNECT_HDMI_CLIENT = 23,  // Connect HDMI CEC HAL Client
+        QDCM_SVC_CMDS = 24,        // request QDCM services.
         SET_ACTIVE_CONFIG = 25, //Set a specified display config
         GET_ACTIVE_CONFIG = 26, //Get the current config index
         GET_CONFIG_COUNT = 27, //Get the number of supported display configs
