@@ -1,4 +1,4 @@
-ifeq ($(call is-board-platform-in-list, thulium),true)
+ifeq ($(call is-board-platform-in-list, msm8996),true)
     TARGET_USES_SDE = true
 else
     TARGET_USES_SDE = false
