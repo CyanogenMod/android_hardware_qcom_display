@@ -314,6 +314,14 @@ class DisplayInterface {
   */
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms) = 0;
 
+  /*! @brief Method to set maximum number of mixer stages for each display.
+
+    @param[in] max_mixer_stages maximum number of mixer stages.
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages) = 0;
+
  protected:
   virtual ~DisplayInterface() { }
 };

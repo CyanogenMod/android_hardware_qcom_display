@@ -186,6 +186,8 @@ DisplayError ResManager::RegisterDisplay(DisplayType type, const HWDisplayAttrib
     display_resource_ctx->display_attributes.split_left =
       display_resource_ctx->display_attributes.x_pixels;
 
+  display_resource_ctx->max_mixer_stages = hw_res_info_.num_blending_stages;
+
   *display_ctx = display_resource_ctx;
   return error;
 }
@@ -271,8 +273,15 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
 
   DLOGV_IF(kTagResources, "==== Resource reserving start: hw_block = %d ====", hw_block_id);
 
-  if (layer_info.count > num_pipe_ || layer_info.count >= hw_res_info_.num_blending_stages) {
-    DLOGV_IF(kTagResources, "layer count is over the limit: layer count = %d", layer_info.count);
+  if (layer_info.count > num_pipe_) {
+    DLOGV_IF(kTagResources, "layer count exceeds pipe limit of %d, layer count %d", num_pipe_,
+             layer_info.count);
+    return kErrorResources;
+  }
+
+  if (layer_info.count > display_resource_ctx->max_mixer_stages) {
+    DLOGV_IF(kTagResources, "layer count exceeds max mixer stage limit of %d, layer count %d",
+             display_resource_ctx->max_mixer_stages, layer_info.count);
     return kErrorResources;
   }
 
@@ -809,6 +818,26 @@ void ResManager::Purge(Handle display_ctx) {
   }
   ClearRotator(display_resource_ctx);
   DLOGV_IF(kTagResources, "display id = %d", display_resource_ctx->hw_block_id);
+}
+
+DisplayError ResManager::SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages) {
+  SCOPE_LOCK(locker_);
+
+  if (max_mixer_stages < 1 || max_mixer_stages > hw_res_info_.num_blending_stages) {
+    DLOGE("Max mixer stages = %d and that should be in between 1 to %d", max_mixer_stages,
+          hw_res_info_.num_blending_stages);
+
+    return kErrorParameters;
+  }
+
+  DisplayResourceContext *display_resource_ctx =
+                          reinterpret_cast<DisplayResourceContext *>(display_ctx);
+
+  if (display_resource_ctx) {
+    display_resource_ctx->max_mixer_stages = max_mixer_stages;
+  }
+
+  return kErrorNone;
 }
 
 uint32_t ResManager::GetMdssPipeId(PipeType type, uint32_t index) {

@@ -85,6 +85,7 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
                                            android::Parcel *output_parcel);
   void DynamicDebug(const android::Parcel *input_parcel);
   void SetFrameDumpConfig(const android::Parcel *input_parcel);
+  android::status_t SetMaxMixerStages(const android::Parcel *input_parcel);
 
   static Locker locker_;
   CoreInterface *core_intf_;

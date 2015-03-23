@@ -409,6 +409,18 @@ void DisplayBase::SetIdleTimeoutMs(uint32_t timeout_ms) {
   hw_intf_->SetIdleTimeoutMs(hw_device_, timeout_ms);
 }
 
+DisplayError DisplayBase::SetMaxMixerStages(uint32_t max_mixer_stages) {
+  SCOPE_LOCK(locker_);
+
+  DisplayError error = kErrorNone;
+
+  if (comp_manager_) {
+    error = comp_manager_->SetMaxMixerStages(display_comp_ctx_, max_mixer_stages);
+  }
+
+  return error;
+}
+
 DisplayError DisplayBase::VSync(int64_t timestamp) {
   if (vsync_enable_) {
     DisplayEventVSync vsync;
