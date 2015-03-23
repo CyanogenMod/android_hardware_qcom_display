@@ -141,8 +141,8 @@ struct HWPipeInfo {
 
 struct HWLayerConfig {
   bool use_non_dma_pipe;  // set by client
-  HWPipeInfo left_pipe;  // pipe for left side of the buffer
-  HWPipeInfo right_pipe;  // pipe for right side of the buffer
+  HWPipeInfo left_pipe;  // pipe for left side of output
+  HWPipeInfo right_pipe;  // pipe for right side of output
   uint32_t num_rotate;  // number of rotate
   HWRotateInfo rotates[kMaxRotatePerLayer];  // rotation for the buffer
 
