@@ -128,6 +128,8 @@ int getMdpFormat(int format) {
             //NV12 encodeable format maps to the venus format on
             //B-Family targets
             return MDP_Y_CBCR_H2V2_VENUS;
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS:
+            return MDP_Y_CRCB_H2V2_VENUS;
         default:
             //Unsupported by MDP
             //---gralloc_priv.h-----
@@ -227,6 +229,8 @@ int getHALFormat(int mdpFormat) {
             return HAL_PIXEL_FORMAT_YCrCb_444_SP;
         case MDP_Y_CBCR_H2V2_VENUS:
             return HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS;
+        case MDP_Y_CRCB_H2V2_VENUS:
+            return HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS;
         default:
             ALOGE("%s: Unsupported MDP format = 0x%x", __func__, mdpFormat);
             return -1;

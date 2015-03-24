@@ -420,6 +420,7 @@ inline bool isYuv(uint32_t format) {
         case MDP_Y_CR_CB_H2V2:
         case MDP_Y_CR_CB_GH2V2:
         case MDP_Y_CBCR_H2V2_VENUS:
+        case MDP_Y_CRCB_H2V2_VENUS:
         case MDP_YCBYCR_H2V1:
         case MDP_YCRYCB_H2V1:
             return true;
@@ -478,6 +479,7 @@ inline const char* getFormatString(int format){
     formats[MDP_BGR_565] = STR(MDP_BGR_565);
     formats[MDP_BGR_888] = STR(MDP_BGR_888);
     formats[MDP_Y_CBCR_H2V2_VENUS] = STR(MDP_Y_CBCR_H2V2_VENUS);
+    formats[MDP_Y_CRCB_H2V2_VENUS] = STR(MDP_Y_CRCB_H2V2_VENUS);
     formats[MDP_BGRX_8888] = STR(MDP_BGRX_8888);
     formats[MDP_RGBA_8888_TILE] = STR(MDP_RGBA_8888_TILE);
     formats[MDP_ARGB_8888_TILE] = STR(MDP_ARGB_8888_TILE);
