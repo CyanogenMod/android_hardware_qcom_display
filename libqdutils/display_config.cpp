@@ -262,6 +262,24 @@ DisplayAttributes getDisplayAttributes(int configIndex, int /*dpy*/) {
     return dpyattr;
 }
 
+int setPanelMode(int mode) {
+    status_t err = (status_t) FAILED_TRANSACTION;
+    sp<IQService> binder = getBinder();
+    if(binder != NULL) {
+        Parcel inParcel, outParcel;
+        inParcel.writeInt32(mode);
+        err = binder->dispatch(IQService::SET_DISPLAY_MODE,
+                               &inParcel, &outParcel);
+        if(!err) {
+            ALOGI("%s() Successfully set the display mode to %d", __FUNCTION__,
+                  mode);
+        } else {
+            ALOGE("%s() failed with err %d", __FUNCTION__, err);
+        }
+    }
+    return err;
+}
+
 //=============================================================================
 // The functions/methods below run in the context of HWC and
 // are called in response to binder calls from clients

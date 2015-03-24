@@ -371,6 +371,10 @@ DisplayError DisplayBase::SetMaxMixerStages(uint32_t max_mixer_stages) {
   return error;
 }
 
+DisplayError DisplayBase::SetDisplayMode(uint32_t mode) {
+  return kErrorNotSupported;
+}
+
 void DisplayBase::AppendDump(char *buffer, uint32_t length) {
   DumpImpl::AppendString(buffer, length, "\n-----------------------");
   DumpImpl::AppendString(buffer, length, "\ndevice type: %u", display_type_);

@@ -588,12 +588,28 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     status = SetMaxMixerStages(input_parcel);
     break;
 
+  case qService::IQService::SET_DISPLAY_MODE:
+    status = SetDisplayMode(input_parcel);
+    break;
+
   default:
     DLOGW("QService command = %d is not supported", command);
     return -EINVAL;
   }
 
   return status;
+}
+
+android::status_t HWCSession::SetDisplayMode(const android::Parcel *input_parcel) {
+  DisplayError error = kErrorNone;
+  uint32_t mode = UINT32(input_parcel->readInt32());
+
+  error = display_primary_->SetDisplayMode(mode);
+  if (error != kErrorNone) {
+    return -EINVAL;
+  }
+
+  return 0;
 }
 
 android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_parcel) {

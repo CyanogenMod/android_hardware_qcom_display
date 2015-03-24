@@ -147,6 +147,11 @@ DisplayError DisplayVirtual::SetMaxMixerStages(uint32_t max_mixer_stages) {
   return DisplayBase::SetMaxMixerStages(max_mixer_stages);
 }
 
+DisplayError DisplayVirtual::SetDisplayMode(uint32_t mode) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetDisplayMode(mode);
+}
+
 void DisplayVirtual::AppendDump(char *buffer, uint32_t length) {
   SCOPE_LOCK(locker_);
   DisplayBase::AppendDump(buffer, length);

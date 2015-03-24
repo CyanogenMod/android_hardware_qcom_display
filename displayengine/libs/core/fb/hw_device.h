@@ -84,7 +84,8 @@ class HWDevice {
   // Populates HWPanelInfo based on node index
   void PopulateHWPanelInfo();
   void GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info);
-  HWPanelType GetHWPanelType(int device_node);
+  HWDisplayPort GetHWDisplayPort(int device_node);
+  HWDisplayMode GetHWDisplayMode(int device_node);
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
   int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
   mdp_scale_data* GetScaleDataRef(uint32_t index) { return &scale_data_[index]; }
@@ -106,7 +107,7 @@ class HWDevice {
   // Store the Device EventHandler - used for callback
   HWEventHandler *event_handler_;
   HWResourceInfo hw_resource_;
-  HWPanelInfo panel_info_;
+  HWPanelInfo hw_panel_info_;
   HWInfoInterface *hw_info_intf_;
   int fb_node_index_;
   const char *fb_path_;
@@ -119,6 +120,7 @@ class HWDevice {
   mdp_scale_data scale_data_[kMaxSDELayers * 2];
   mdp_output_layer mdp_out_layer_;
   const char *device_name_;
+  bool synchronous_commit_;
 };
 
 }  // namespace sde

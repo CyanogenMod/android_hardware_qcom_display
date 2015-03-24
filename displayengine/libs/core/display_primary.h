@@ -54,6 +54,7 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
   virtual DisplayError SetVSyncState(bool enable);
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
+  virtual DisplayError SetDisplayMode(uint32_t mode);
   virtual void AppendDump(char *buffer, uint32_t length);
 
   // Implement the HWEventHandlers

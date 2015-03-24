@@ -52,8 +52,15 @@ class HWPrimary : public HWDevice, public HWPrimaryInterface {
   virtual DisplayError Flush();
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetVSyncState(bool enable);
+  virtual DisplayError SetDisplayMode(const HWDisplayMode hw_display_mode);
 
  private:
+  // Panel modes for the MSMFB_LPM_ENABLE ioctl
+  enum {
+    kModeLPMVideo,
+    kModeLPMCommand,
+  };
+
   // Event Thread to receive vsync/blank events
   static void* DisplayEventThread(void *context);
   void* DisplayEventThreadHandler();

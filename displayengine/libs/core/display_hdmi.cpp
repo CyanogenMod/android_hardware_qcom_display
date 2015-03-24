@@ -147,6 +147,11 @@ DisplayError DisplayHDMI::SetMaxMixerStages(uint32_t max_mixer_stages) {
   return DisplayBase::SetMaxMixerStages(max_mixer_stages);
 }
 
+DisplayError DisplayHDMI::SetDisplayMode(uint32_t mode) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetDisplayMode(mode);
+}
+
 int DisplayHDMI::GetBestConfig() {
   uint32_t best_config_mode = 0;
   HWDisplayAttributes *best = &display_attributes_[0];
