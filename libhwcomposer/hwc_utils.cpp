@@ -2700,32 +2700,31 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
 
 void processBootAnimCompleted(hwc_context_t *ctx) {
     char value[PROPERTY_VALUE_MAX];
-    int boot_finished = 0, ret = -1;
+    int ret = -1;
     int (*applyMode)(int) = NULL;
     void *modeHandle = NULL;
 
-    // Reading property set on boot finish in SF
-    property_get("service.bootanim.exit", value, "0");
-    boot_finished = atoi(value);
-    if (!boot_finished)
-        return;
+    // Applying default mode after bootanimation is finished
+    property_get("init.svc.bootanim", value, "running");
 
-    modeHandle = dlopen("libmm-qdcm.so", RTLD_NOW);
-    if (modeHandle) {
-        *(void **)&applyMode = dlsym(modeHandle, "applyDefaults");
-        if (applyMode) {
-            ret = applyMode(HWC_DISPLAY_PRIMARY);
-            if (ret)
-                ALOGD("%s: Not able to apply default mode", __FUNCTION__);
+    if (!strncmp(value,"stopped",strlen("stopped"))) {
+        modeHandle = dlopen("libmm-qdcm.so", RTLD_NOW);
+        if (modeHandle) {
+            *(void **)&applyMode = dlsym(modeHandle, "applyDefaults");
+            if (applyMode) {
+                ret = applyMode(HWC_DISPLAY_PRIMARY);
+                if (ret)
+                    ALOGD("%s: Not able to apply default mode", __FUNCTION__);
+            } else {
+                ALOGE("%s: No symbol applyDefaults found", __FUNCTION__);
+            }
+            dlclose(modeHandle);
         } else {
-            ALOGE("%s: No symbol applyDefaults found", __FUNCTION__);
+            ALOGE("%s: Not able to load libmm-qdcm.so", __FUNCTION__);
         }
-        dlclose(modeHandle);
-    } else {
-        ALOGE("%s: Not able to load libmm-qdcm.so", __FUNCTION__);
-    }
 
-    ctx->mBootAnimCompleted = true;
+        ctx->mBootAnimCompleted = true;
+    }
 }
 
 void BwcPM::setBwc(const hwc_context_t *ctx, const int& dpy,
