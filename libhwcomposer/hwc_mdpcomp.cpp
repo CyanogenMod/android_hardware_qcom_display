@@ -434,6 +434,13 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     if(mdpHw.hasMinCropWidthLimitation() and (crop_w < 5 or crop_h < 5))
         return false;
 
+    /* crop_w and crop_h should be even for yuv layer, so fallback to GPU for
+     * those cases
+     */
+    if(isYuvBuffer(hnd) && (crop_w < 2 || crop_h < 2)) {
+        return false;
+    }
+
     if((w_scale > 1.0f) || (h_scale > 1.0f)) {
         const uint32_t maxMDPDownscale = mdpHw.getMaxMDPDownscale();
         const float w_dscale = w_scale;
