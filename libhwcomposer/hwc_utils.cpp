@@ -2490,19 +2490,18 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
 
 void processBootAnimCompleted(hwc_context_t *ctx) {
     char value[PROPERTY_VALUE_MAX];
-    int boot_finished = 0, ret = -1;
+    int ret = -1;
 
-    // Reading property set on boot finish in SF
-    property_get("service.bootanim.exit", value, "0");
-    boot_finished = atoi(value);
-    if (!boot_finished)
-        return;
+    // Applying default mode after bootanimation is finished
+    property_get("init.svc.bootanim", value, "running");
 
-    ctx->mBootAnimCompleted = true;
+    if (!strncmp(value,"stopped",strlen("stopped"))) {
+        ctx->mBootAnimCompleted = true;
 
-    //one-shot action check if bootanimation completed then apply
-    //default display mode.
-    qdcmApplyDefaultAfterBootAnimationDone(ctx);
+        //one-shot action check if bootanimation completed then apply
+        //default display mode.
+        qdcmApplyDefaultAfterBootAnimationDone(ctx);
+    }
 }
 
 void BwcPM::setBwc(const hwc_rect_t& crop, const hwc_rect_t& dst,
