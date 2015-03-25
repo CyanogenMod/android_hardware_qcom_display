@@ -325,8 +325,7 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
 
     HWPipeInfo *pipe_info = &layer_config.left_pipe;
 
-    // Should have a generic macro
-    bool is_yuv = IsYuvFormat(layer.input_buffer->format);
+    bool is_yuv = !IS_RGB_FORMAT(layer.input_buffer->format);
 
     // left pipe is needed
     if (pipe_info->valid) {

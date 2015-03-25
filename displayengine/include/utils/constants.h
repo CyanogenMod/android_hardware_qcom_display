@@ -59,6 +59,8 @@
 
 #define IDLE_TIMEOUT_DEFAULT_MS 70
 
+#define IS_RGB_FORMAT(format) (((format) < kFormatYCbCr420Planar) ? true: false)
+
 template <class T>
 inline void Swap(T &a, T &b) {
   T c(a);

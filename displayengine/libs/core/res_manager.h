@@ -193,7 +193,6 @@ class ResManager : public DumpImpl {
                  LayerRect *src_left, LayerRect *dst_left, LayerRect *src_right,
                  LayerRect *dst_right, uint32_t align_x);
   bool IsMacroTileFormat(const LayerBuffer *buffer) { return buffer->flags.macro_tile; }
-  bool IsYuvFormat(LayerBufferFormat format) { return (format >= kFormatYCbCr420Planar); }
   bool IsRotationNeeded(float rotation)
          { return (UINT32(rotation) == 90 || UINT32(rotation) == 270); }
   void RotationConfig(LayerBufferFormat format, const LayerTransform &transform,
