@@ -175,12 +175,15 @@ bool MdpCtrl::set() {
                 mOVInfo.src_rect.w = utils::aligndown(mOVInfo.src_rect.w, 4);
         }
     } else {
+        // On 8974 and 8x26, there is a limitation of 1-pixel down-scaling
         if (mdpVersion >= MDSS_V5) {
-            // Check for 1-pixel down-scaling
-            if (mOVInfo.src_rect.w - mOVInfo.dst_rect.w == 1)
-                mOVInfo.src_rect.w -= 1;
-            if (mOVInfo.src_rect.h - mOVInfo.dst_rect.h == 1)
-                mOVInfo.src_rect.h -= 1;
+            if(qdutils::MDPVersion::getInstance().is8x74v2() ||
+                    qdutils::MDPVersion::getInstance().is8x26()) {
+                if (mOVInfo.src_rect.w - mOVInfo.dst_rect.w == 1)
+                    mOVInfo.src_rect.w -= 1;
+                if (mOVInfo.src_rect.h - mOVInfo.dst_rect.h == 1)
+                    mOVInfo.src_rect.h -= 1;
+            }
         }
     }
 
