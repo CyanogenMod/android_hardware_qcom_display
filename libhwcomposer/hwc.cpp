@@ -222,6 +222,7 @@ static void reset(hwc_context_t *ctx, int numDisplays,
             ctx->mLayerRotMap[i]->reset();
     }
 
+    memset(&(ctx->mPtorInfo), 0, sizeof(ctx->mPtorInfo));
     ctx->mAD->reset();
 
 }
