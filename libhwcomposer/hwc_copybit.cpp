@@ -448,6 +448,7 @@ bool CopyBit::drawUsingAppBufferComposition(hwc_context_t *ctx,
     if(hnd && fbhnd && (hnd->size == fbhnd->size) &&
     (hnd->width == fbhnd->width) && (hnd->height == fbhnd->height)){
        if(tmpLayer->transform  ||
+        (list->flags & HWC_GEOMETRY_CHANGED) ||
        (!(hnd->format == HAL_PIXEL_FORMAT_RGBA_8888 ||
        hnd->format == HAL_PIXEL_FORMAT_RGBX_8888))  ||
                    (needsScaling(tmpLayer) == true)) {
