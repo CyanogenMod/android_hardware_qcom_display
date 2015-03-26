@@ -2004,9 +2004,6 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             }
         }
     }
-    // reset PTOR
-    if(!mDpy)
-        memset(&(ctx->mPtorInfo), 0, sizeof(ctx->mPtorInfo));
 
     //reset old data
     mCurrentFrame.reset(numLayers);
