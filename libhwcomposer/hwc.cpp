@@ -29,6 +29,7 @@
 #include <overlay.h>
 #include <overlayRotator.h>
 #include <overlayWriteback.h>
+#include <overlayCursor.h>
 #include <mdp_version.h>
 #include "hwc_utils.h"
 #include "hwc_fbupdate.h"
@@ -443,6 +444,30 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
     return ret;
 }
 
+static int hwc_setCursorPositionAsync(struct hwc_composer_device_1* dev,
+        int dpy, int x, int y) {
+    int ret = -1;
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+    switch(dpy) {
+        case HWC_DISPLAY_PRIMARY:
+        {
+            ATRACE_CALL();
+            HWCursor* hwCursor = HWCursor::getInstance();
+            ctx->mDrawLock.lock();
+            if (hwCursor->isCursorSet() &&
+                  hwCursor->setPositionAsync(ctx->dpyAttr[dpy].fd, x, y)) {
+                ret = 0;
+            }
+            ctx->mDrawLock.unlock();
+            break;
+        }
+        default:
+            ret = 0;
+            break;
+    }
+    return ret;
+}
+
 static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
         int mode)
 {
@@ -462,6 +487,7 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
             ctx->mOverlay->configBegin();
             ctx->mOverlay->configDone();
             ctx->mRotMgr->clear();
+            HWCursor::getInstance()->free(ctx->dpyAttr[dpy].fd);
             // If VDS is connected, do not clear WB object as it
             // will end up detaching IOMMU. This is required
             // to send black frame to WFD sink on power suspend.
@@ -922,17 +948,20 @@ void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
         if(ctx->mMDPComp[dpy])
             ctx->mMDPComp[dpy]->dump(aBuf, ctx);
     }
-    char ovDump[2048] = {'\0'};
-    ctx->mOverlay->getDump(ovDump, 2048);
+    char ovDump[3072] = {'\0'};
+    ctx->mOverlay->getDump(ovDump, 3072);
     dumpsys_log(aBuf, ovDump);
     ovDump[0] = '\0';
     ctx->mRotMgr->getDump(ovDump, 1024);
     dumpsys_log(aBuf, ovDump);
     ovDump[0] = '\0';
-    if(Writeback::getDump(ovDump, 1024)) {
+    if(Writeback::getDump(ovDump, 512)) {
         dumpsys_log(aBuf, ovDump);
         ovDump[0] = '\0';
     }
+    HWCursor::getInstance()->getDump(ovDump, 512);
+    dumpsys_log(aBuf, ovDump);
+    ovDump[0] = '\0';
     dumpsys_log(aBuf, "Copybit::isAbcInUse=%d\n\n",isAbcInUse(ctx) ? 1 : 0);
     strlcpy(buff, aBuf.string(), buff_len);
 }
@@ -1029,6 +1058,7 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
         dev->device.getDisplayAttributes = hwc_getDisplayAttributes;
         dev->device.getActiveConfig     = hwc_getActiveConfig;
         dev->device.setActiveConfig     = hwc_setActiveConfig;
+        dev->device.setCursorPositionAsync = hwc_setCursorPositionAsync;
         *device = &dev->device.common;
         status = 0;
     }
