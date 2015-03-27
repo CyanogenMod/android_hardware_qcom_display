@@ -30,6 +30,7 @@
 #include <overlay.h>
 #include <overlayRotator.h>
 #include <overlayWriteback.h>
+#include <overlayCursor.h>
 #include "hwc_utils.h"
 #include "hwc_mdpcomp.h"
 #include "hwc_fbupdate.h"
@@ -1036,6 +1037,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].renderBufIndexforABC = -1;
     ctx->listStats[dpy].secureRGBCount = 0;
     ctx->listStats[dpy].refreshRateRequest = ctx->dpyAttr[dpy].refreshRate;
+    ctx->listStats[dpy].cursorLayerPresent = false;
     uint32_t refreshRate = 0;
     qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
     int s3dFormat = HAL_NO_3D;
@@ -1066,6 +1068,12 @@ void setListStats(hwc_context_t *ctx,
         // continue if number of app layers exceeds MAX_NUM_APP_LAYERS
         if(ctx->listStats[dpy].numAppLayers > MAX_NUM_APP_LAYERS)
             continue;
+
+        // Valid cursor must be the top most layer
+        if((int)i == (ctx->listStats[dpy].numAppLayers - 1) &&
+                     isCursorLayer(&list->hwLayers[i])) {
+            ctx->listStats[dpy].cursorLayerPresent = true;
+        }
 
         //reset yuv indices
         ctx->listStats[dpy].yuvIndices[i] = -1;
@@ -1891,6 +1899,46 @@ void updateSource(eTransform& orient, Whf& whf,
     crop.top = transformedCrop.y;
     crop.right = transformedCrop.x + transformedCrop.w;
     crop.bottom = transformedCrop.y + transformedCrop.h;
+}
+
+bool configHwCursor(const int fd, int dpy, hwc_layer_1_t* layer) {
+    if(dpy > HWC_DISPLAY_PRIMARY) {
+        // HWCursor not supported on secondary displays
+        return false;
+    }
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    hwc_rect dst = layer->displayFrame;
+    hwc_rect src = integerizeSourceCrop(layer->sourceCropf);
+    int srcW = src.right - src.left;
+    int srcH = src.bottom - src.top;
+    int dstW = dst.right - dst.left;
+    int dstH = dst.bottom - dst.top;
+
+    Whf whf(getWidth(hnd), getHeight(hnd), hnd->format);
+    Dim crop(src.left, src.top, srcW, srcH);
+    Dim dest(dst.left, dst.top, dstW, dstH);
+
+    ovutils::PipeArgs pargs(ovutils::OV_MDP_FLAGS_NONE,
+                            whf,
+                            Z_SYSTEM_ALLOC,
+                            ovutils::ROT_FLAGS_NONE,
+                            layer->planeAlpha,
+                            (ovutils::eBlending)
+                            getBlending(layer->blending));
+
+    ALOGD_IF(HWC_UTILS_DEBUG, "%s: CursorInfo: w = %d h = %d "
+        "crop [%d, %d, %d, %d] dst [%d, %d, %d, %d]", __FUNCTION__,
+        getWidth(hnd), getHeight(hnd), src.left, src.top, srcW, srcH,
+        dst.left, dst.top, dstW, dstH);
+
+    return HWCursor::getInstance()->config(fd, (void*)hnd->base, pargs,
+                crop, dest);
+}
+
+void freeHwCursor(const int fd, int dpy) {
+    if (dpy == HWC_DISPLAY_PRIMARY) {
+        HWCursor::getInstance()->free(fd);
+    }
 }
 
 int getRotDownscale(hwc_context_t *ctx, const hwc_layer_1_t *layer) {

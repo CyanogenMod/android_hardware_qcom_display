@@ -18,7 +18,6 @@
 
 #include <math.h>
 #include "hwc_mdpcomp.h"
-#include <sys/ioctl.h>
 #include <dlfcn.h>
 #include "hdmi.h"
 #include "qdMetaData.h"
@@ -26,6 +25,7 @@
 #include "hwc_fbupdate.h"
 #include "hwc_ad.h"
 #include <overlayRotator.h>
+#include <overlayCursor.h>
 #include "hwc_copybit.h"
 #include "qd_utils.h"
 
@@ -79,8 +79,8 @@ void MDPComp::dump(android::String8& buf, hwc_context_t *ctx)
                 (mDpy == 0) ? "\"PRIMARY\"" :
                 (mDpy == 1) ? "\"EXTERNAL\"" : "\"VIRTUAL\"");
     dumpsys_log(buf,"CURR_FRAME: layerCount:%2d mdpCount:%2d "
-                "fbCount:%2d \n", mCurrentFrame.layerCount,
-                mCurrentFrame.mdpCount, mCurrentFrame.fbCount);
+                "fbCount:%2d  dropCount:%2d\n", mCurrentFrame.layerCount,
+                mCurrentFrame.mdpCount, mCurrentFrame.fbCount, mCurrentFrame.dropCount);
     dumpsys_log(buf,"needsFBRedraw:%3s  pipesUsed:%2d  MaxPipesPerMixer: %d \n",
                 (mCurrentFrame.needsRedraw? "YES" : "NO"),
                 mCurrentFrame.mdpCount, sMaxPipesPerMixer);
@@ -108,7 +108,8 @@ void MDPComp::dump(android::String8& buf, hwc_context_t *ctx)
                     (mCurrentFrame.isFBComposed[index] ? "YES" : "NO"),
                      mCurrentFrame.layerToMDP[index],
                     (mCurrentFrame.isFBComposed[index] ?
-                    (mCurrentFrame.drop[index] ? "DROP" :
+                    (mCurrentFrame.drop[index] ?
+                    ((mCurrentFrame.hwCursorIndex == index) ? "CURSOR": "DROP"):
                     (mCurrentFrame.needsRedraw ? "GLES" : "CACHE")) : "MDP"),
                     (mCurrentFrame.isFBComposed[index] ? mCurrentFrame.fbZ :
     mCurrentFrame.mdpToLayer[mCurrentFrame.layerToMDP[index]].pipeInfo->zOrder));
@@ -303,7 +304,11 @@ void MDPComp::setMDPCompLayerFlags(hwc_context_t *ctx,
             /* Drop the layer when its already present in FB OR when it lies
              * outside frame's ROI */
             if(!mCurrentFrame.needsRedraw || mCurrentFrame.drop[index]) {
-                layer->compositionType = HWC_OVERLAY;
+                if(index == mCurrentFrame.hwCursorIndex) {
+                    layer->compositionType = HWC_CURSOR_OVERLAY;
+                } else {
+                    layer->compositionType = HWC_OVERLAY;
+                }
             }
         }
     }
@@ -944,6 +949,9 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
     hwc_display_contents_1_t* list) {
 
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+    // PTOR does not qualify when there are layers dropped, but if
+    // dropped layer is only a cursor, PTOR could qualify
+    const int numNonCursorLayers = numAppLayers - mCurrentFrame.dropCount;
     const int stagesForMDP = min(sMaxPipesPerMixer,
             ctx->mOverlay->availablePipes(mDpy, Overlay::MIXER_DEFAULT));
 
@@ -953,10 +961,11 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         return false;
     }
 
-    // Frame level checks
+    // Frame level checks - consider PTOR in case of dropCount only if the cursor
+    // layer is dropped, otherwise bail out of PTOR
     if ((numAppLayers > stagesForMDP) || isSkipPresent(ctx, mDpy) ||
-        isYuvPresent(ctx, mDpy) || mCurrentFrame.dropCount ||
-        isSecurePresent(ctx, mDpy)) {
+        isYuvPresent(ctx, mDpy) || isSecurePresent(ctx, mDpy) ||
+        (mCurrentFrame.dropCount - (int)isCursorPresent(ctx, mDpy))) {
         ALOGD_IF(isDebug(), "%s: Frame not supported!", __FUNCTION__);
         return false;
     }
@@ -981,7 +990,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
     memset(overlapRect, 0, sizeof(overlapRect));
     int layerPixelCount, minPixelCount = 0;
     int numPTORLayersFound = 0;
-    for (int i = numAppLayers-1; (i >= 0 &&
+    for (int i = numNonCursorLayers - 1; (i >= 0 &&
                                   numPTORLayersFound < MAX_PTOR_LAYERS); i--) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
         hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
@@ -1026,9 +1035,9 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         return false;
 
     // Store the displayFrame and the sourceCrops of the layers
-    hwc_rect_t displayFrame[numAppLayers];
-    hwc_rect_t sourceCrop[numAppLayers];
-    for(int i = 0; i < numAppLayers; i++) {
+    hwc_rect_t displayFrame[numNonCursorLayers];
+    hwc_rect_t sourceCrop[numNonCursorLayers];
+    for(int i = 0; i < numNonCursorLayers; i++) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
         displayFrame[i] = layer->displayFrame;
         sourceCrop[i] = integerizeSourceCrop(layer->sourceCropf);
@@ -1117,11 +1126,11 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         }
     }
 
-    mCurrentFrame.mdpCount = numAppLayers;
+    mCurrentFrame.mdpCount = numNonCursorLayers;
     mCurrentFrame.fbCount = 0;
     mCurrentFrame.fbZ = -1;
 
-    for (int j = 0; j < numAppLayers; j++) {
+    for (int j = 0; j < numNonCursorLayers; j++) {
         if(isValidRect(list->hwLayers[j].displayFrame)) {
             mCurrentFrame.isFBComposed[j] = false;
         } else {
@@ -1133,7 +1142,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
     bool result = postHeuristicsHandling(ctx, list);
 
     // Restore layer attributes
-    for(int i = 0; i < numAppLayers; i++) {
+    for(int i = 0; i < numNonCursorLayers; i++) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
         layer->displayFrame = displayFrame[i];
         layer->sourceCropf.left = (float)sourceCrop[i].left;
@@ -1340,7 +1349,9 @@ bool MDPComp::canPartialUpdate(hwc_context_t *ctx,
         hwc_display_contents_1_t* list){
     if(!qdutils::MDPVersion::getInstance().isPartialUpdateEnabled() ||
             isSkipPresent(ctx, mDpy) || (list->flags & HWC_GEOMETRY_CHANGED) ||
-            !sIsPartialUpdateActive || mDpy ) {
+            isCursorPresent(ctx, mDpy) || !sIsPartialUpdateActive || mDpy) {
+            // On Async position update, the ROI becomes invalid, hence disable PU
+            // when cursor is present
         return false;
     }
     if(ctx->listStats[mDpy].secureUI)
@@ -1908,7 +1919,20 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
 bool MDPComp::resourceCheck(hwc_context_t* ctx,
         hwc_display_contents_1_t* list) {
     const bool fbUsed = mCurrentFrame.fbCount;
-    if(mCurrentFrame.mdpCount > sMaxPipesPerMixer - fbUsed) {
+    int cursorInUse = 0;
+    if(mDpy == HWC_DISPLAY_PRIMARY) {
+      // check if cursor is in use for primary
+      cursorInUse = HWCursor::getInstance()->isCursorSet();
+    }
+    int maxStages =  qdutils::MDPVersion::getInstance().getBlendStages();
+    // HW Cursor needs one blending stage, account for that in the check below
+    // On high end targets(8994) has 8 blending stages, HAL is configured to use < 8.
+    // Make use of the remaining stages for HW Cursor so that the composition
+    // strategy would not fail due to this limitation.
+    if (maxStages > sMaxPipesPerMixer) {
+        cursorInUse = 0;
+    }
+    if(mCurrentFrame.mdpCount > (sMaxPipesPerMixer - fbUsed - cursorInUse)) {
         ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
         return false;
     }
@@ -1983,6 +2007,52 @@ bool MDPComp::hwLimitationsCheck(hwc_context_t* ctx,
     return true;
 }
 
+static bool validForCursor(hwc_context_t* ctx, int dpy, hwc_layer_1_t* layer) {
+    private_handle_t *hnd = (private_handle_t *)layer->handle;
+    hwc_rect dst = layer->displayFrame;
+    hwc_rect src = integerizeSourceCrop(layer->sourceCropf);
+    int srcW = src.right - src.left;
+    int srcH = src.bottom - src.top;
+    int dstW = dst.right - dst.left;
+    int dstH = dst.bottom - dst.top;
+    qdutils::MDPVersion &mdpVersion = qdutils::MDPVersion::getInstance();
+    uint32_t maxCursorSize = mdpVersion.getMaxCursorSize();
+    uint32_t numHwCursors = mdpVersion.getCursorPipes();
+    bool primarySplit = isDisplaySplit(ctx, HWC_DISPLAY_PRIMARY);
+    uint32_t cursorPipesNeeded = 1; // One cursor pipe needed(default)
+    bool ret = false;
+
+    if(dpy > HWC_DISPLAY_PRIMARY) {
+        // Cursor not supported on secondary displays, as it involves scaling
+        // in most of the cases
+        return false;
+    } else if (isSkipLayer(layer)) {
+        return false;
+    // Checks for HW limitation
+    } else if (numHwCursors == 0 || maxCursorSize <= 0) {
+        return false;
+    } else if (needsScaling(layer)) {
+        return false;
+    } else if (layer->transform != 0) {
+        return false;
+    } else if (hnd->format != HAL_PIXEL_FORMAT_RGBA_8888) {
+        return false;
+    } else if (srcW > (int)maxCursorSize || srcH > (int)maxCursorSize) {
+        return false;
+    }
+
+    if (isDisplaySplit(ctx, dpy) && !mdpVersion.isSrcSplit()) {
+        // In case of split display with no srcSplit, the driver allocates two
+        // pipes to support async position update across mixers, hence
+        // need to account for that here.
+        cursorPipesNeeded = 2;
+    }
+    if (cursorPipesNeeded <= numHwCursors) {
+        ret = true;
+    }
+    return ret;
+}
+
 // Checks only if videos or single layer(RGB) is updating
 // which is used for setting dynamic fps or perf hint for single
 // layer video playback
@@ -2027,9 +2097,10 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     int ret = 0;
     char property[PROPERTY_VALUE_MAX];
 
-    if(!ctx || !list) {
-        ALOGE("%s: Invalid context or list",__FUNCTION__);
+    if(!list) {
+        ALOGE("%s: Invalid list", __FUNCTION__);
         mCachedFrame.reset();
+        freeHwCursor(ctx->dpyAttr[mDpy].fd, mDpy);
         return -1;
     }
 
@@ -2050,6 +2121,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     mCurrentFrame.reset(numLayers);
     memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
     mCurrentFrame.dropCount = 0;
+    mCurrentFrame.hwCursorIndex = -1;
 
     //Do not cache the information for next draw cycle.
     if(numLayers > MAX_NUM_APP_LAYERS or (!numLayers)) {
@@ -2059,6 +2131,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 #ifdef DYNAMIC_FPS
         setDynRefreshRate(ctx, list);
 #endif
+        freeHwCursor(ctx->dpyAttr[mDpy].fd, mDpy);
         return -1;
     }
 
@@ -2075,6 +2148,7 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 #ifdef DYNAMIC_FPS
         setDynRefreshRate(ctx, list);
 #endif
+        freeHwCursor(ctx->dpyAttr[mDpy].fd, mDpy);
         ret = -1;
         return ret;
     } else {
@@ -2104,6 +2178,23 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             dropNonAIVLayers(ctx, list);
         }
 
+        // Configure the cursor if present
+        int topIndex = ctx->listStats[mDpy].numAppLayers - 1;
+        if(ctx->listStats[mDpy].cursorLayerPresent &&
+                validForCursor(ctx, mDpy, &(list->hwLayers[topIndex]))) {
+            if(configHwCursor(ctx->dpyAttr[mDpy].fd, mDpy,
+                                      &(list->hwLayers[topIndex]))) {
+                // As cursor is configured, mark that layer as dropped, so that
+                // it wont be considered for composition by other strategies.
+                mCurrentFrame.hwCursorIndex = topIndex;
+                mCurrentFrame.drop[topIndex] = true;
+                mCurrentFrame.dropCount++;
+            }
+        } else {
+            // Release the hw cursor
+            freeHwCursor(ctx->dpyAttr[mDpy].fd, mDpy);
+        }
+
         // if tryFullFrame fails, try to push all video and secure RGB layers
         // to MDP for composition.
         mModeOn = tryFullFrame(ctx, list) || tryMDPOnlyLayers(ctx, list) ||
@@ -2115,6 +2206,12 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             reset(ctx);
             memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
             mCurrentFrame.dropCount = 0;
+            // Check if cursor is in use for primary and mark accordingly
+            if(!mDpy && HWCursor::getInstance()->isCursorSet()) {
+                int topIndex = ctx->listStats[mDpy].numAppLayers - 1;
+                hwc_layer_1_t *layer = &(list->hwLayers[topIndex]);
+                layer->compositionType = HWC_CURSOR_OVERLAY;
+            }
             ret = -1;
             ALOGE_IF(sSimulationFlags && (mDpy == HWC_DISPLAY_PRIMARY),
                     "MDP Composition Strategies Failed");
@@ -2129,6 +2226,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         }
         ALOGD_IF( isDebug(),"%s: MDP Comp not possible for this frame",
                 __FUNCTION__);
+        // Release the hw cursor
+        freeHwCursor(ctx->dpyAttr[mDpy].fd, mDpy);
         ret = -1;
     }
 
