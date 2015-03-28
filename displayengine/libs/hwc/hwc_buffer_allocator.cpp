@@ -157,9 +157,12 @@ int HWCBufferAllocator::SetHALFormat(LayerBufferFormat format, int *target) {
   case kFormatYCrCb420Planar:           *target = HAL_PIXEL_FORMAT_YV12;                  break;
   case kFormatYCrCb420SemiPlanar:       *target = HAL_PIXEL_FORMAT_YCrCb_420_SP;          break;
   case kFormatYCbCr420SemiPlanar:       *target = HAL_PIXEL_FORMAT_YCbCr_420_SP;          break;
-  case kFormatYCbCr422Packed:           *target = HAL_PIXEL_FORMAT_YCbCr_422_I;           break;
+  case kFormatYCbCr422H2V1Packed:       *target = HAL_PIXEL_FORMAT_YCbCr_422_I;           break;
+  case kFormatYCbCr422H2V1SemiPlanar:   *target = HAL_PIXEL_FORMAT_YCbCr_422_SP;          break;
   case kFormatYCbCr420SemiPlanarVenus:  *target = HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS;    break;
   case kFormatYCbCr420SPVenusUbwc:    *target = HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC; break;
+  case kFormatRGBA5551:                 *target = HAL_PIXEL_FORMAT_RGBA_5551;             break;
+  case kFormatRGBA4444:                 *target = HAL_PIXEL_FORMAT_RGBA_4444;             break;
 
   default:
     DLOGE("Unsupported format = 0x%x", format);
