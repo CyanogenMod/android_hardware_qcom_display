@@ -33,13 +33,13 @@
 
 namespace sde {
 
-void ResManager::RotationConfig(LayerBufferFormat format, const LayerTransform &transform,
-                                const float &downscale, LayerRect *src_rect,
+void ResManager::RotationConfig(const Layer &layer, const float &downscale, LayerRect *src_rect,
                                 struct HWLayerConfig *layer_config, uint32_t *rotate_count) {
   HWRotateInfo *rotate = &layer_config->rotates[0];
   float src_width = src_rect->right - src_rect->left;
   float src_height = src_rect->bottom - src_rect->top;
-  bool rot90 = IsRotationNeeded(transform.rotation);
+  bool rot90 = IsRotationNeeded(layer.transform.rotation);
+  bool is_opaque = (layer.blending == kBlendingOpaque);
   LayerRect dst_rect;
   // Rotate output is a temp buffer, always output to the top left corner for saving memory
   dst_rect.top = 0.0f;
@@ -73,10 +73,11 @@ void ResManager::RotationConfig(LayerBufferFormat format, const LayerTransform &
   rotate->dst_roi = dst_rect;
 
   // Set WHF for Rotator output
-  LayerBufferFormat ouput_format;
-  SetRotatorOutputFormat(format, false /* bwc */, rot90, downscale, &ouput_format);
+  LayerBufferFormat output_format;
+  SetRotatorOutputFormat(layer.input_buffer->format, is_opaque, rot90, (downscale > 1.0f),
+                         &output_format);
   HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
-  hw_buffer_info->buffer_config.format = ouput_format;
+  hw_buffer_info->buffer_config.format = output_format;
   hw_buffer_info->buffer_config.width = UINT32(rotate->dst_roi.right);
   hw_buffer_info->buffer_config.height = UINT32(rotate->dst_roi.bottom);
 
@@ -270,8 +271,7 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
 
     LayerTransform transform = layer.transform;
     if (IsRotationNeeded(transform.rotation) || UINT32(rot_scale) != 1) {
-      RotationConfig(layer.input_buffer->format, layer.transform, rot_scale, &src_rect,
-                     layer_config, rotate_count);
+      RotationConfig(layer, rot_scale, &src_rect, layer_config, rotate_count);
       // rotator will take care of flipping, reset tranform
       transform = LayerTransform();
     }

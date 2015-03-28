@@ -590,7 +590,7 @@ void HWCDisplay::SetBlending(const int32_t &source, LayerBlending *target) {
   switch (source) {
   case HWC_BLENDING_PREMULT:    *target = kBlendingPremultiplied;   break;
   case HWC_BLENDING_COVERAGE:   *target = kBlendingCoverage;        break;
-  default:                      *target = kBlendingNone;            break;
+  default:                      *target = kBlendingOpaque;          break;
   }
 }
 

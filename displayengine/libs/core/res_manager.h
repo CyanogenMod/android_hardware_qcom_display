@@ -197,16 +197,16 @@ class ResManager : public DumpImpl {
   bool IsYuvFormat(LayerBufferFormat format) { return (format >= kFormatYCbCr420Planar); }
   bool IsRotationNeeded(float rotation)
          { return (UINT32(rotation) == 90 || UINT32(rotation) == 270); }
-  void RotationConfig(LayerBufferFormat format, const LayerTransform &transform,
-                      const float &downscale, LayerRect *src_rect,
-                      struct HWLayerConfig *layer_config, uint32_t *rotate_count);
+  void RotationConfig(const Layer &layer, const float &downscale, LayerRect *src_rect,
+                      HWLayerConfig *layer_config, uint32_t *rotate_count);
   DisplayError AcquireRotator(DisplayResourceContext *display_resource_ctx,
                               const uint32_t roate_cnt);
   void AssignRotator(HWRotateInfo *rotate, uint32_t *rotate_cnt);
   void ClearRotator(DisplayResourceContext *display_resource_ctx);
   DisplayError AllocRotatorBuffer(Handle display_ctx, HWLayers *hw_layers);
-  void SetRotatorOutputFormat(const LayerBufferFormat &input_format, bool bwc, bool rot90,
-                              bool downscale, LayerBufferFormat *output_format);
+  void SetRotatorOutputFormat(const LayerBufferFormat &input_format, const bool &is_opaque,
+                              const bool &rot90, const bool &downscale,
+                              LayerBufferFormat *output_format);
   DisplayError AlignPipeConfig(const Layer &layer, const LayerTransform &transform,
                                HWPipeInfo *left_pipe, HWPipeInfo *right_pipe,
                                uint32_t align_x, uint32_t align_y);
