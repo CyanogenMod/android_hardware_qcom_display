@@ -49,7 +49,10 @@ enum LayerBufferFormat {
   kFormatXRGB8888,      //!< 8-bits Padding, Red, Green, Blue interleaved in XRGB order. No Alpha.
   kFormatRGBX8888,      //!< 8-bits Red, Green, Blue, Padding interleaved in RGBX order. No Alpha.
   kFormatBGRX8888,      //!< 8-bits Blue, Green, Red, Padding interleaved in BGRX order. No Alpha.
+  kFormatRGBA5551,      //!< 5-bits Red, Green, Blue, and 1 bit Alpha interleaved in RGBA order.
+  kFormatRGBA4444,      //!< 4-bits Red, Green, Blue, Alpha interleaved in RGBA order.
   kFormatRGB888,        //!< 8-bits Red, Green, Blue interleaved in RGB order. No Alpha.
+  kFormatBGR888,        //!< 8-bits Blue, Green, Red interleaved in BGR order. No Alpha.
   kFormatRGB565,        //!< 5-bit Red, 6-bit Green, 5-bit Blue interleaved in RGB order. No Alpha.
 
   /* All YUV-Planar formats, Any new format will be added towards end of this group to maintain
@@ -80,13 +83,29 @@ enum LayerBufferFormat {
                                       //!< 2x2 subsampled interleaved UV-plane:
                                       //!<    u(0), v(0), u(2), v(2) ... u(n-1), v(n-1)
 
+  kFormatYCbCr422H1V2SemiPlanar,      //!< Y-plane: y(0), y(1), y(2) ... y(n)
+                                      //!< vertically subsampled interleaved UV-plane:
+                                      //!<    u(0), v(1), u(2), v(3) ... u(n-1), v(n)
+
+  kFormatYCrCb422H1V2SemiPlanar,      //!< Y-plane: y(0), y(1), y(2) ... y(n)
+                                      //!< vertically subsampled interleaved VU-plane:
+                                      //!<    v(0), u(1), v(2), u(3) ... v(n-1), u(n)
+
+  kFormatYCbCr422H2V1SemiPlanar,      //!< Y-plane: y(0), y(1), y(2) ... y(n)
+                                      //!< horizontally subsampled interleaved UV-plane:
+                                      //!<    u(0), v(1), u(2), v(3) ... u(n-1), v(n)
+
+  kFormatYCrCb422H2V1SemiPlanar,      //!< Y-plane: y(0), y(1), y(2) ... y(n)
+                                      //!< horizontally subsampled interleaved VU-plane:
+                                      //!<    v(0), u(1), v(2), u(3) ... v(n-1), u(n)
+
   /* All YUV-Packed formats, Any new format will be added towards end of this group to maintain
      backward compatibility.
   */
-  kFormatYCbCr422Packed = 0x300,      //!< Y-plane interleaved with horizontally subsampled U/V by
+  kFormatYCbCr422H2V1Packed = 0x300,  //!< Y-plane interleaved with horizontally subsampled U/V by
                                       //!< factor of 2
-                                      //!<    u(0), y(0), v(0), y(1), u(2), y(2), v(2), y(3)
-                                      //!<    u(n-1), y(n-1), v(n-1), y(n)
+                                      //!<    y(0), u(0), y(1), v(0), y(2), u(2), y(3), v(2)
+                                      //!<    y(n-1), u(n-1), y(n), v(n-1)
 
   /* All UBWC aligned formats. Any new format will be added towards end of this group to maintain
      backward compatibility.

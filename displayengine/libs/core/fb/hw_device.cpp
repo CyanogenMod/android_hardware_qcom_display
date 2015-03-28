@@ -488,13 +488,20 @@ DisplayError HWDevice::SetFormat(const LayerBufferFormat &source, uint32_t *targ
   case kFormatBGRA8888:                 *target = MDP_BGRA_8888;         break;
   case kFormatRGBX8888:                 *target = MDP_RGBX_8888;         break;
   case kFormatBGRX8888:                 *target = MDP_BGRX_8888;         break;
+  case kFormatRGBA5551:                 *target = MDP_RGBA_5551;         break;
+  case kFormatRGBA4444:                 *target = MDP_RGBA_4444;         break;
   case kFormatRGB888:                   *target = MDP_RGB_888;           break;
+  case kFormatBGR888:                   *target = MDP_BGR_888;           break;
   case kFormatRGB565:                   *target = MDP_RGB_565;           break;
   case kFormatYCbCr420Planar:           *target = MDP_Y_CB_CR_H2V2;      break;
   case kFormatYCrCb420Planar:           *target = MDP_Y_CR_CB_H2V2;      break;
   case kFormatYCbCr420SemiPlanar:       *target = MDP_Y_CBCR_H2V2;       break;
   case kFormatYCrCb420SemiPlanar:       *target = MDP_Y_CRCB_H2V2;       break;
-  case kFormatYCbCr422Packed:           *target = MDP_YCBYCR_H2V1;       break;
+  case kFormatYCbCr422H1V2SemiPlanar:   *target = MDP_Y_CBCR_H1V2;       break;
+  case kFormatYCrCb422H1V2SemiPlanar:   *target = MDP_Y_CRCB_H1V2;       break;
+  case kFormatYCbCr422H2V1SemiPlanar:   *target = MDP_Y_CBCR_H2V1;       break;
+  case kFormatYCrCb422H2V1SemiPlanar:   *target = MDP_Y_CRCB_H2V1;       break;
+  case kFormatYCbCr422H2V1Packed:       *target = MDP_YCBYCR_H2V1;       break;
   case kFormatYCbCr420SemiPlanarVenus:  *target = MDP_Y_CBCR_H2V2_VENUS; break;
   case kFormatRGBA8888Ubwc:             *target = MDP_RGBA_8888_UBWC;    break;
   case kFormatRGB565Ubwc:               *target = MDP_RGB_565_UBWC;      break;
@@ -525,6 +532,7 @@ DisplayError HWDevice::SetStride(HWDeviceType device_type, LayerBufferFormat for
     *target = width * 4;
     break;
   case kFormatRGB888:
+  case kFormatBGR888:
     *target = width * 3;
     break;
   case kFormatRGB565:
@@ -538,7 +546,13 @@ DisplayError HWDevice::SetStride(HWDeviceType device_type, LayerBufferFormat for
   case kFormatYCrCb420SemiPlanar:
     *target = width;
     break;
-  case kFormatYCbCr422Packed:
+  case kFormatYCbCr422H2V1Packed:
+  case kFormatYCrCb422H2V1SemiPlanar:
+  case kFormatYCrCb422H1V2SemiPlanar:
+  case kFormatYCbCr422H2V1SemiPlanar:
+  case kFormatYCbCr422H1V2SemiPlanar:
+  case kFormatRGBA5551:
+  case kFormatRGBA4444:
     *target = width * 2;
     break;
   default:

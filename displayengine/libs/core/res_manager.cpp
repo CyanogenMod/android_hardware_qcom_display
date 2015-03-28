@@ -619,9 +619,16 @@ float ResManager::GetBpp(LayerBufferFormat format) {
     case kFormatBGRX8888:
       return 4.0f;
     case kFormatRGB888:
+    case kFormatBGR888:
       return 3.0f;
     case kFormatRGB565:
-    case kFormatYCbCr422Packed:
+    case kFormatRGBA5551:
+    case kFormatRGBA4444:
+    case kFormatYCbCr422H2V1Packed:
+    case kFormatYCrCb422H2V1SemiPlanar:
+    case kFormatYCrCb422H1V2SemiPlanar:
+    case kFormatYCbCr422H2V1SemiPlanar:
+    case kFormatYCbCr422H1V2SemiPlanar:
       return 2.0f;
     case kFormatYCbCr420Planar:
     case kFormatYCrCb420Planar:
