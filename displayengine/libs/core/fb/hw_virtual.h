@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -22,55 +22,37 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __CORE_IMPL_H__
-#define __CORE_IMPL_H__
+#ifndef __HW_VIRTUAL_H__
+#define __HW_VIRTUAL_H__
 
-#include <core/core_interface.h>
-#include <private/strategy_interface.h>
-#include <utils/locker.h>
-
-#include "hw_interface.h"
-#include "comp_manager.h"
-#include "offline_ctrl.h"
-
-#define SET_REVISION(major, minor) ((major << 8) | minor)
+#include "hw_device.h"
+#include "hw_virtual_interface.h"
 
 namespace sde {
 
-class HWInfoInterface;
-
-class CoreImpl : public CoreInterface {
+class HWVirtual : public HWDevice, public HWVirtualInterface {
  public:
-  // This class implements display core interface revision 1.0.
-  static const uint16_t kRevision = SET_REVISION(1, 0);
-
-  CoreImpl(CoreEventHandler *event_handler, BufferAllocator *buffer_allocator,
-           BufferSyncHandler *buffer_sync_handler);
-  virtual ~CoreImpl() { }
-
-  // This method returns the interface revision for the current display core object.
-  // Future revisions will override this method and return the appropriate revision upon query.
-  virtual uint16_t GetRevision() { return kRevision; }
+  HWVirtual(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
   virtual DisplayError Init();
   virtual DisplayError Deinit();
-
-  // Methods from core interface
-  virtual DisplayError CreateDisplay(DisplayType type, DisplayEventHandler *event_handler,
-                                     DisplayInterface **intf);
-  virtual DisplayError DestroyDisplay(DisplayInterface *intf);
-
- protected:
-  Locker locker_;
-  CoreEventHandler *event_handler_;
-  BufferAllocator *buffer_allocator_;
-  BufferSyncHandler *buffer_sync_handler_;
-  HWResourceInfo *hw_resource_;
-  CompManager comp_mgr_;
-  OfflineCtrl offline_ctrl_;
-  HWInfoInterface *hw_info_intf_;
+  virtual DisplayError Open(HWEventHandler *eventhandler);
+  virtual DisplayError Close();
+  virtual DisplayError GetNumDisplayAttributes(uint32_t *count);
+  virtual DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
+                                            uint32_t index);
+  virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info);
+  virtual DisplayError SetDisplayAttributes(uint32_t index);
+  virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
+  virtual DisplayError PowerOn();
+  virtual DisplayError PowerOff();
+  virtual DisplayError Doze();
+  virtual DisplayError Standby();
+  virtual DisplayError Validate(HWLayers *hw_layers);
+  virtual DisplayError Commit(HWLayers *hw_layers);
+  virtual DisplayError Flush();
 };
 
 }  // namespace sde
 
-#endif  // __CORE_IMPL_H__
+#endif  // __HW_VIRTUAL_H__
 

@@ -26,6 +26,7 @@
 #define __RES_MANAGER_H__
 
 #include <core/display_interface.h>
+#include <private/hw_info_types.h>
 #include <utils/locker.h>
 
 #include "hw_interface.h"

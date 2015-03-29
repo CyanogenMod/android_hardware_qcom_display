@@ -41,8 +41,8 @@ class OfflineCtrl;
 class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
  public:
   DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
-              HWDeviceType hw_device_type, HWInterface *hw_intf, CompManager *comp_manager,
-              OfflineCtrl *offline_ctrl);
+              HWDeviceType hw_device_type, BufferSyncHandler *buffer_sync_handler,
+              CompManager *comp_manager, OfflineCtrl *offline_ctrl);
   virtual ~DisplayBase() { }
   virtual DisplayError Init();
   virtual DisplayError Deinit();
@@ -79,6 +79,8 @@ class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
   DisplayEventHandler *event_handler_;
   HWDeviceType hw_device_type_;
   HWInterface *hw_intf_;
+  HWPanelInfo panel_info_;
+  BufferSyncHandler *buffer_sync_handler_;
   CompManager *comp_manager_;
   OfflineCtrl *offline_ctrl_;
   DisplayState state_;

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -22,55 +22,31 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __CORE_IMPL_H__
-#define __CORE_IMPL_H__
-
-#include <core/core_interface.h>
-#include <private/strategy_interface.h>
-#include <utils/locker.h>
-
-#include "hw_interface.h"
-#include "comp_manager.h"
-#include "offline_ctrl.h"
-
-#define SET_REVISION(major, minor) ((major << 8) | minor)
+#ifndef __HW_ROTATOR_INTERFACE_H__
+#define __HW_ROTATOR_INTERFACE_H__
 
 namespace sde {
 
-class HWInfoInterface;
+class BufferSyncHandler;
+struct HWRotateInfo;
+struct HWLayers;
 
-class CoreImpl : public CoreInterface {
+class HWRotatorInterface {
  public:
-  // This class implements display core interface revision 1.0.
-  static const uint16_t kRevision = SET_REVISION(1, 0);
-
-  CoreImpl(CoreEventHandler *event_handler, BufferAllocator *buffer_allocator,
-           BufferSyncHandler *buffer_sync_handler);
-  virtual ~CoreImpl() { }
-
-  // This method returns the interface revision for the current display core object.
-  // Future revisions will override this method and return the appropriate revision upon query.
-  virtual uint16_t GetRevision() { return kRevision; }
-  virtual DisplayError Init();
-  virtual DisplayError Deinit();
-
-  // Methods from core interface
-  virtual DisplayError CreateDisplay(DisplayType type, DisplayEventHandler *event_handler,
-                                     DisplayInterface **intf);
-  virtual DisplayError DestroyDisplay(DisplayInterface *intf);
+  static DisplayError Create(HWRotatorInterface **intf, BufferSyncHandler *buffer_sync_handler);
+  static DisplayError Destroy(HWRotatorInterface *intf);
+  virtual DisplayError Open() = 0;
+  virtual DisplayError Close() = 0;
+  virtual DisplayError OpenSession(HWRotateInfo *rotate_info) = 0;
+  virtual DisplayError CloseSession(int32_t session_id) = 0;
+  virtual DisplayError Validate(HWLayers *hw_layers) = 0;
+  virtual DisplayError Commit(HWLayers *hw_layers) = 0;
 
  protected:
-  Locker locker_;
-  CoreEventHandler *event_handler_;
-  BufferAllocator *buffer_allocator_;
-  BufferSyncHandler *buffer_sync_handler_;
-  HWResourceInfo *hw_resource_;
-  CompManager comp_mgr_;
-  OfflineCtrl offline_ctrl_;
-  HWInfoInterface *hw_info_intf_;
+  virtual ~HWRotatorInterface() { }
 };
 
 }  // namespace sde
 
-#endif  // __CORE_IMPL_H__
+#endif  // __HW_ROTATOR_INTERFACE_H__
 

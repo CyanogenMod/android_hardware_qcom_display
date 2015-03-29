@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -22,31 +22,54 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __DISPLAY_HDMI_H__
-#define __DISPLAY_HDMI_H__
+#ifndef __HW_PRIMARY_H__
+#define __HW_PRIMARY_H__
 
-#include "display_base.h"
+#include "hw_device.h"
+#include "hw_primary_interface.h"
 
 namespace sde {
 
-class HWHDMIInterface;
-class HWInfoInterface;
-
-class DisplayHDMI : public DisplayBase {
+class HWPrimary : public HWDevice, public HWPrimaryInterface {
  public:
-  DisplayHDMI(DisplayEventHandler *event_handler, HWInfoInterface *hw_info_intf,
-              BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
-              OfflineCtrl *offline_ctrl);
+  HWPrimary(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
   virtual DisplayError Init();
   virtual DisplayError Deinit();
-  virtual int GetBestConfig();
+  virtual DisplayError Open(HWEventHandler *eventhandler);
+  virtual DisplayError Close();
+  virtual DisplayError GetNumDisplayAttributes(uint32_t *count);
+  virtual DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
+                                            uint32_t index);
+  virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info);
+  virtual DisplayError SetDisplayAttributes(uint32_t index);
+  virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
+  virtual DisplayError PowerOn();
+  virtual DisplayError PowerOff();
+  virtual DisplayError Doze();
+  virtual DisplayError Standby();
+  virtual DisplayError Validate(HWLayers *hw_layers);
+  virtual DisplayError Commit(HWLayers *hw_layers);
+  virtual DisplayError Flush();
+  virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
+  virtual DisplayError SetVSyncState(bool enable);
 
  private:
-  HWHDMIInterface *hw_hdmi_intf_;
-  HWInfoInterface *hw_info_intf_;
+  // Event Thread to receive vsync/blank events
+  static void* DisplayEventThread(void *context);
+  void* DisplayEventThreadHandler();
+
+  void HandleVSync(char *data);
+  void HandleBlank(char *data);
+  void HandleIdleTimeout(char *data);
+
+  pollfd poll_fds_[kNumDisplayEvents];
+  pthread_t event_thread_;
+  const char *event_thread_name_;
+  bool fake_vsync_;
+  bool exit_threads_;
 };
 
 }  // namespace sde
 
-#endif  // __DISPLAY_HDMI_H__
+#endif  // __HW_PRIMARY_H__
 

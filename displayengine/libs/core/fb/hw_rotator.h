@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -22,46 +22,43 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __OFFLINE_CTRL_H__
-#define __OFFLINE_CTRL_H__
+#ifndef __HW_ROTATOR_H__
+#define __HW_ROTATOR_H__
 
-#include <utils/locker.h>
-#include <utils/debug.h>
-#include <core/display_interface.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <linux/msm_mdp_ext.h>
+#include <video/msm_hdmi_modes.h>
+#include <linux/mdss_rotator.h>
+#include <poll.h>
+#include <pthread.h>
+
+#include "hw_device.h"
+#include "hw_rotator_interface.h"
 
 namespace sde {
 
-class HWRotatorInterface;
-class BufferSyncHandler;
-struct HWLayers;
-
-class OfflineCtrl {
+class HWRotator : public HWDevice, public HWRotatorInterface {
  public:
-  OfflineCtrl();
-  DisplayError Init(BufferSyncHandler *buffer_sync_handler);
-  DisplayError Deinit();
-  DisplayError RegisterDisplay(DisplayType type, Handle *display_ctx);
-  void UnregisterDisplay(Handle display_ctx);
-  DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
-  DisplayError Commit(Handle display_ctx, HWLayers *hw_layers);
+  explicit HWRotator(BufferSyncHandler *buffer_sync_handler);
+  virtual DisplayError Open();
+  virtual DisplayError Close();
+  virtual DisplayError OpenSession(HWRotateInfo *hw_layers);
+  virtual DisplayError CloseSession(int32_t session_id);
+  virtual DisplayError Validate(HWLayers *hw_layers);
+  virtual DisplayError Commit(HWLayers *hw_layers);
 
  private:
-  struct DisplayOfflineContext {
-    DisplayType display_type;
-    bool pending_rot_commit;
+  void ResetRotatorParams();
+  void SetRotatorCtrlParams(HWLayers *hw_layers);
+  void SetRotatorBufferParams(HWLayers *hw_layers);
 
-    DisplayOfflineContext() : display_type(kPrimary), pending_rot_commit(false) { }
-  };
-
-  DisplayError OpenRotatorSession(HWLayers *hw_layers);
-  DisplayError CloseRotatorSession(HWLayers *hw_layers);
-  bool IsRotationRequired(HWLayers *hw_layers);
-
-  HWRotatorInterface *hw_rotator_intf_;
-  bool hw_rotator_present_;
+  struct mdp_rotation_request mdp_rot_request_;
+  struct mdp_rotation_item mdp_rot_layers_[kMaxSDELayers * 2];  // split panel (left + right)
 };
 
 }  // namespace sde
 
-#endif  // __OFFLINE_CTRL_H__
+#endif  // __HW_ROTATOR_H__
 

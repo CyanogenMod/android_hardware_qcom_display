@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -22,46 +22,33 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __OFFLINE_CTRL_H__
-#define __OFFLINE_CTRL_H__
+#ifndef __HW_INFO_H__
+#define __HW_INFO_H__
 
-#include <utils/locker.h>
-#include <utils/debug.h>
-#include <core/display_interface.h>
+#include <inttypes.h>
+#include <core/sde_types.h>
+#include <private/hw_info_types.h>
+#include "hw_info_interface.h"
 
 namespace sde {
 
-class HWRotatorInterface;
-class BufferSyncHandler;
-struct HWLayers;
-
-class OfflineCtrl {
+class HWInfo: public HWInfoInterface {
  public:
-  OfflineCtrl();
-  DisplayError Init(BufferSyncHandler *buffer_sync_handler);
-  DisplayError Deinit();
-  DisplayError RegisterDisplay(DisplayType type, Handle *display_ctx);
-  void UnregisterDisplay(Handle display_ctx);
-  DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
-  DisplayError Commit(Handle display_ctx, HWLayers *hw_layers);
+  virtual DisplayError GetHWResourceInfo(HWResourceInfo *hw_resource);
 
  private:
-  struct DisplayOfflineContext {
-    DisplayType display_type;
-    bool pending_rot_commit;
+  // TODO(user): Read Mdss version from the driver
+  static const int kHWMdssVersion5 = 500;  // MDSS_V5
+  static const int kMaxStringLength = 1024;
+  // MDP Capabilities are replicated across all frame buffer devices.
+  // However, we rely on reading the capabalities from fbO since this
+  // is guaranteed to be available.
+  static const int kHWCapabilitiesNode = 0;
 
-    DisplayOfflineContext() : display_type(kPrimary), pending_rot_commit(false) { }
-  };
-
-  DisplayError OpenRotatorSession(HWLayers *hw_layers);
-  DisplayError CloseRotatorSession(HWLayers *hw_layers);
-  bool IsRotationRequired(HWLayers *hw_layers);
-
-  HWRotatorInterface *hw_rotator_intf_;
-  bool hw_rotator_present_;
+  static int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
 };
 
 }  // namespace sde
 
-#endif  // __OFFLINE_CTRL_H__
+#endif  // __HW_INFO_H__
 

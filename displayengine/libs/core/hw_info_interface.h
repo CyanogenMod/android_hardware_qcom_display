@@ -22,55 +22,25 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __CORE_IMPL_H__
-#define __CORE_IMPL_H__
+#ifndef __HW_INFO_INTERFACE_H__
+#define __HW_INFO_INTERFACE_H__
 
-#include <core/core_interface.h>
-#include <private/strategy_interface.h>
-#include <utils/locker.h>
-
-#include "hw_interface.h"
-#include "comp_manager.h"
-#include "offline_ctrl.h"
-
-#define SET_REVISION(major, minor) ((major << 8) | minor)
+#include <inttypes.h>
+#include <private/hw_info_types.h>
 
 namespace sde {
 
-class HWInfoInterface;
-
-class CoreImpl : public CoreInterface {
+class HWInfoInterface {
  public:
-  // This class implements display core interface revision 1.0.
-  static const uint16_t kRevision = SET_REVISION(1, 0);
-
-  CoreImpl(CoreEventHandler *event_handler, BufferAllocator *buffer_allocator,
-           BufferSyncHandler *buffer_sync_handler);
-  virtual ~CoreImpl() { }
-
-  // This method returns the interface revision for the current display core object.
-  // Future revisions will override this method and return the appropriate revision upon query.
-  virtual uint16_t GetRevision() { return kRevision; }
-  virtual DisplayError Init();
-  virtual DisplayError Deinit();
-
-  // Methods from core interface
-  virtual DisplayError CreateDisplay(DisplayType type, DisplayEventHandler *event_handler,
-                                     DisplayInterface **intf);
-  virtual DisplayError DestroyDisplay(DisplayInterface *intf);
+  static DisplayError Create(HWInfoInterface **intf);
+  static DisplayError Destroy(HWInfoInterface *intf);
+  virtual DisplayError GetHWResourceInfo(HWResourceInfo *hw_resource) = 0;
 
  protected:
-  Locker locker_;
-  CoreEventHandler *event_handler_;
-  BufferAllocator *buffer_allocator_;
-  BufferSyncHandler *buffer_sync_handler_;
-  HWResourceInfo *hw_resource_;
-  CompManager comp_mgr_;
-  OfflineCtrl offline_ctrl_;
-  HWInfoInterface *hw_info_intf_;
+  virtual ~HWInfoInterface() { }
 };
 
 }  // namespace sde
 
-#endif  // __CORE_IMPL_H__
+#endif  // __HW_INFO_INTERFACE_H__
 
