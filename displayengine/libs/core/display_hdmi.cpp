@@ -26,14 +26,49 @@
 #include <utils/debug.h>
 
 #include "display_hdmi.h"
+#include "hw_hdmi_interface.h"
+#include "hw_info_interface.h"
 
 #define __CLASS__ "DisplayHDMI"
 
 namespace sde {
 
-DisplayHDMI::DisplayHDMI(DisplayEventHandler *event_handler, HWInterface *hw_intf,
-                         CompManager *comp_manager, OfflineCtrl *offline_ctrl)
-  : DisplayBase(kHDMI, event_handler, kDeviceHDMI, hw_intf, comp_manager, offline_ctrl) { }
+DisplayHDMI::DisplayHDMI(DisplayEventHandler *event_handler, HWInfoInterface *hw_info_intf,
+                         BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
+                         OfflineCtrl *offline_ctrl)
+  : DisplayBase(kHDMI, event_handler, kDeviceHDMI, buffer_sync_handler, comp_manager,
+                offline_ctrl), hw_info_intf_(hw_info_intf) {
+}
+
+DisplayError DisplayHDMI::Init() {
+  SCOPE_LOCK(locker_);
+
+  DisplayError error = HWHDMIInterface::Create(&hw_hdmi_intf_, hw_info_intf_,
+                                               DisplayBase::buffer_sync_handler_);
+  if (error != kErrorNone) {
+    return error;
+  }
+  DisplayBase::hw_intf_ = hw_hdmi_intf_;
+
+  error = DisplayBase::Init();
+  if (error != kErrorNone) {
+    HWHDMIInterface::Destroy(hw_hdmi_intf_);
+  }
+
+  return error;
+}
+
+DisplayError DisplayHDMI::Deinit() {
+  SCOPE_LOCK(locker_);
+
+  DisplayError error = DisplayBase::Deinit();
+  if (error != kErrorNone) {
+    return error;
+  }
+  HWHDMIInterface::Destroy(hw_hdmi_intf_);
+
+  return error;
+}
 
 int DisplayHDMI::GetBestConfig() {
   uint32_t best_config_mode = 0;
@@ -68,7 +103,7 @@ int DisplayHDMI::GetBestConfig() {
   if (user_config) {
     uint32_t config_index = -1;
     // For the config, get the corresponding index
-    DisplayError error = hw_intf_->GetConfigIndex(hw_device_, user_config, &config_index);
+    DisplayError error = hw_intf_->GetConfigIndex(user_config, &config_index);
     if (error == kErrorNone)
       return config_index;
   }

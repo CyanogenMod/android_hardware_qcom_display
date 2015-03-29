@@ -34,28 +34,30 @@ namespace sde {
 
 // TODO(user): Have a single structure handle carries all the interface pointers and variables.
 DisplayBase::DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
-                         HWDeviceType hw_device_type, HWInterface *hw_intf,
+                         HWDeviceType hw_device_type, BufferSyncHandler *buffer_sync_handler,
                          CompManager *comp_manager, OfflineCtrl *offline_ctrl)
   : display_type_(display_type), event_handler_(event_handler), hw_device_type_(hw_device_type),
-    hw_intf_(hw_intf), comp_manager_(comp_manager), offline_ctrl_(offline_ctrl), state_(kStateOff),
-    hw_device_(0), display_comp_ctx_(0), display_attributes_(NULL), num_modes_(0),
-    active_mode_index_(0), pending_commit_(false), vsync_enable_(false) {
+    buffer_sync_handler_(buffer_sync_handler), comp_manager_(comp_manager),
+    offline_ctrl_(offline_ctrl), state_(kStateOff), hw_device_(0), display_comp_ctx_(0),
+    display_attributes_(NULL), num_modes_(0), active_mode_index_(0), pending_commit_(false),
+    vsync_enable_(false) {
 }
 
 DisplayError DisplayBase::Init() {
-  SCOPE_LOCK(locker_);
-
   DisplayError error = kErrorNone;
 
-  error = hw_intf_->Open(hw_device_type_, &hw_device_, this);
+  error = hw_intf_->Open(this);
   if (error != kErrorNone) {
     return error;
   }
 
-  // Set the idle timeout value to driver through sysfs node
-  hw_intf_->SetIdleTimeoutMs(hw_device_, Debug::GetIdleTimeoutMs());
+  panel_info_ = HWPanelInfo();
+  hw_intf_->GetHWPanelInfo(&panel_info_);
 
-  error = hw_intf_->GetNumDisplayAttributes(hw_device_, &num_modes_);
+  // Set the idle timeout value to driver through sysfs node
+  SetIdleTimeoutMs(Debug::GetIdleTimeoutMs());
+
+  error = hw_intf_->GetNumDisplayAttributes(&num_modes_);
   if (error != kErrorNone) {
     goto CleanupOnError;
   }
@@ -67,7 +69,7 @@ DisplayError DisplayBase::Init() {
   }
 
   for (uint32_t i = 0; i < num_modes_; i++) {
-    error = hw_intf_->GetDisplayAttributes(hw_device_, &display_attributes_[i], i);
+    error = hw_intf_->GetDisplayAttributes(&display_attributes_[i], i);
     if (error != kErrorNone) {
       goto CleanupOnError;
     }
@@ -75,7 +77,7 @@ DisplayError DisplayBase::Init() {
 
   active_mode_index_ = GetBestConfig();
 
-  error = hw_intf_->SetDisplayAttributes(hw_device_, active_mode_index_);
+  error = hw_intf_->SetDisplayAttributes(active_mode_index_);
   if (error != kErrorNone) {
     goto CleanupOnError;
   }
@@ -103,14 +105,12 @@ CleanupOnError:
     display_attributes_ = NULL;
   }
 
-  hw_intf_->Close(hw_device_);
+  hw_intf_->Close();
 
   return error;
 }
 
 DisplayError DisplayBase::Deinit() {
-  SCOPE_LOCK(locker_);
-
   offline_ctrl_->UnregisterDisplay(display_offline_ctx_);
 
   comp_manager_->UnregisterDisplay(display_comp_ctx_);
@@ -120,7 +120,7 @@ DisplayError DisplayBase::Deinit() {
     display_attributes_ = NULL;
   }
 
-  hw_intf_->Close(hw_device_);
+  hw_intf_->Close();
 
   return kErrorNone;
 }
@@ -150,7 +150,7 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
 
       error = offline_ctrl_->Prepare(display_offline_ctx_, &hw_layers_);
       if (error == kErrorNone) {
-        error = hw_intf_->Validate(hw_device_, &hw_layers_);
+        error = hw_intf_->Validate(&hw_layers_);
         if (error == kErrorNone) {
           // Strategy is successful now, wait for Commit().
           pending_commit_ = true;
@@ -183,7 +183,7 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
 
     error = offline_ctrl_->Commit(display_offline_ctx_, &hw_layers_);
     if (error == kErrorNone) {
-      error = hw_intf_->Commit(hw_device_, &hw_layers_);
+      error = hw_intf_->Commit(&hw_layers_);
       if (error == kErrorNone) {
         error = comp_manager_->PostCommit(display_comp_ctx_, &hw_layers_);
         if (error != kErrorNone) {
@@ -212,7 +212,7 @@ DisplayError DisplayBase::Flush() {
   }
 
   hw_layers_.info.count = 0;
-  error = hw_intf_->Flush(hw_device_);
+  error = hw_intf_->Flush();
   if (error == kErrorNone) {
     comp_manager_->Purge(display_comp_ctx_);
     pending_commit_ = false;
@@ -305,24 +305,24 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
   switch (state) {
   case kStateOff:
     hw_layers_.info.count = 0;
-    error = hw_intf_->Flush(hw_device_);
+    error = hw_intf_->Flush();
     if (error == kErrorNone) {
       comp_manager_->Purge(display_comp_ctx_);
 
-      error = hw_intf_->PowerOff(hw_device_);
+      error = hw_intf_->PowerOff();
     }
     break;
 
   case kStateOn:
-    error = hw_intf_->PowerOn(hw_device_);
+    error = hw_intf_->PowerOn();
     break;
 
   case kStateDoze:
-    error = hw_intf_->Doze(hw_device_);
+    error = hw_intf_->Doze();
     break;
 
   case kStateStandby:
-    error = hw_intf_->Standby(hw_device_);
+    error = hw_intf_->Standby();
     break;
 
   default:
@@ -375,7 +375,7 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
     return kErrorParameters;
   }
 
-  error = hw_intf_->SetDisplayAttributes(hw_device_, index);
+  error = hw_intf_->SetDisplayAttributes(index);
   if (error != kErrorNone) {
     return error;
   }
@@ -393,21 +393,10 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
 }
 
 DisplayError DisplayBase::SetVSyncState(bool enable) {
-  SCOPE_LOCK(locker_);
-  DisplayError error = kErrorNone;
-  if (vsync_enable_ != enable) {
-    error = hw_intf_->SetVSyncState(hw_device_, enable);
-    if (error == kErrorNone) {
-      vsync_enable_ = enable;
-    }
-  }
-
-  return error;
+  return kErrorNotSupported;
 }
 
-void DisplayBase::SetIdleTimeoutMs(uint32_t timeout_ms) {
-  hw_intf_->SetIdleTimeoutMs(hw_device_, timeout_ms);
-}
+void DisplayBase::SetIdleTimeoutMs(uint32_t timeout_ms) { }
 
 DisplayError DisplayBase::SetMaxMixerStages(uint32_t max_mixer_stages) {
   SCOPE_LOCK(locker_);

@@ -30,6 +30,7 @@
 #include "display_primary.h"
 #include "display_hdmi.h"
 #include "display_virtual.h"
+#include "hw_info_interface.h"
 
 #define __CLASS__ "CoreImpl"
 
@@ -38,40 +39,50 @@ namespace sde {
 CoreImpl::CoreImpl(CoreEventHandler *event_handler, BufferAllocator *buffer_allocator,
                    BufferSyncHandler *buffer_sync_handler)
   : event_handler_(event_handler), buffer_allocator_(buffer_allocator),
-    buffer_sync_handler_(buffer_sync_handler), hw_intf_(NULL) {
+    buffer_sync_handler_(buffer_sync_handler), hw_resource_(NULL) {
 }
 
 DisplayError CoreImpl::Init() {
   SCOPE_LOCK(locker_);
-
   DisplayError error = kErrorNone;
 
-  error = HWInterface::Create(&hw_intf_, buffer_sync_handler_);
-  if (UNLIKELY(error != kErrorNone)) {
+  error = HWInfoInterface::Create(&hw_info_intf_);
+  if (error != kErrorNone) {
     return error;
   }
 
-  HWResourceInfo hw_res_info;
-  error = hw_intf_->GetHWCapabilities(&hw_res_info);
-  if (UNLIKELY(error != kErrorNone)) {
-    HWInterface::Destroy(hw_intf_);
-    return error;
+  hw_resource_ = new HWResourceInfo();
+  if (!hw_resource_) {
+    error = kErrorMemory;
+    goto CleanUpOnError;
   }
 
-  error = comp_mgr_.Init(hw_res_info, buffer_allocator_, buffer_sync_handler_);
-  if (UNLIKELY(error != kErrorNone)) {
-    HWInterface::Destroy(hw_intf_);
-    return error;
+  error = hw_info_intf_->GetHWResourceInfo(hw_resource_);
+  if (error != kErrorNone) {
+    goto CleanUpOnError;
   }
 
-  error = offline_ctrl_.Init(hw_intf_, hw_res_info);
-  if (UNLIKELY(error != kErrorNone)) {
+  error = comp_mgr_.Init(*hw_resource_, buffer_allocator_, buffer_sync_handler_);
+  if (error != kErrorNone) {
     comp_mgr_.Deinit();
-    HWInterface::Destroy(hw_intf_);
-    return error;
+    goto CleanUpOnError;
   }
 
+  error = offline_ctrl_.Init(buffer_sync_handler_);
+  if (error != kErrorNone) {
+    goto CleanUpOnError;
+  }
   return kErrorNone;
+
+CleanUpOnError:
+  if (hw_resource_) {
+    delete hw_resource_;
+    hw_resource_ = NULL;
+  }
+
+  HWInfoInterface::Destroy(hw_info_intf_);
+
+  return error;
 }
 
 DisplayError CoreImpl::Deinit() {
@@ -79,7 +90,7 @@ DisplayError CoreImpl::Deinit() {
 
   offline_ctrl_.Deinit();
   comp_mgr_.Deinit();
-  HWInterface::Destroy(hw_intf_);
+  HWInfoInterface::Destroy(hw_info_intf_);
 
   return kErrorNone;
 }
@@ -88,24 +99,25 @@ DisplayError CoreImpl::CreateDisplay(DisplayType type, DisplayEventHandler *even
                                      DisplayInterface **intf) {
   SCOPE_LOCK(locker_);
 
-  if (UNLIKELY(!event_handler || !intf)) {
+  if (!event_handler || !intf) {
     return kErrorParameters;
   }
 
   DisplayBase *display_base = NULL;
+
   switch (type) {
   case kPrimary:
-    display_base = new DisplayPrimary(event_handler, hw_intf_, &comp_mgr_, &offline_ctrl_);
+    display_base = new DisplayPrimary(event_handler, hw_info_intf_, buffer_sync_handler_,
+                                      &comp_mgr_, &offline_ctrl_);
     break;
-
   case kHDMI:
-    display_base = new DisplayHDMI(event_handler, hw_intf_, &comp_mgr_, &offline_ctrl_);
+    display_base = new DisplayHDMI(event_handler, hw_info_intf_, buffer_sync_handler_,
+                                   &comp_mgr_, &offline_ctrl_);
     break;
-
   case kVirtual:
-    display_base = new DisplayVirtual(event_handler, hw_intf_, &comp_mgr_, &offline_ctrl_);
+    display_base = new DisplayVirtual(event_handler, hw_info_intf_, buffer_sync_handler_,
+                                      &comp_mgr_, &offline_ctrl_);
     break;
-
   default:
     DLOGE("Spurious display type %d", type);
     return kErrorParameters;
@@ -116,7 +128,8 @@ DisplayError CoreImpl::CreateDisplay(DisplayType type, DisplayEventHandler *even
   }
 
   DisplayError error = display_base->Init();
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
+    display_base->Deinit();
     delete display_base;
     display_base = NULL;
     return error;
@@ -129,7 +142,7 @@ DisplayError CoreImpl::CreateDisplay(DisplayType type, DisplayEventHandler *even
 DisplayError CoreImpl::DestroyDisplay(DisplayInterface *intf) {
   SCOPE_LOCK(locker_);
 
-  if (UNLIKELY(!intf)) {
+  if (!intf) {
     return kErrorParameters;
   }
 

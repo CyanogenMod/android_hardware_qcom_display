@@ -114,8 +114,8 @@ DisplayError ResManager::SrcSplitConfig(DisplayResourceContext *display_resource
   // 1. Source width is greater than split_left (left_mixer_width)
   // 2. Pipe clock exceeds the mixer clock
   if ((src_width > kMaxSourcePipeWidth) || (dst_width > kMaxSourcePipeWidth) ||
-      (hw_res_info_.always_src_split && ((src_width > left_mixer_width) ||
-      (pipe_clock > mixer_clock)))) {
+      (display_resource_ctx->display_attributes.always_src_split &&
+      ((src_width > left_mixer_width) || (pipe_clock > mixer_clock)))) {
     SplitRect(transform.flip_horizontal, src_rect, dst_rect, &left_pipe->src_roi,
               &left_pipe->dst_roi, &right_pipe->src_roi, &right_pipe->dst_roi, align_x);
     left_pipe->valid = true;
@@ -635,7 +635,7 @@ PipeConfigExit:
   return error;
 }
 
-DisplayError ResManager::CalculateDecimation(float downscale, uint8_t* decimation) {
+DisplayError ResManager::CalculateDecimation(float downscale, uint8_t *decimation) {
   float max_down_scale = FLOAT(hw_res_info_.max_scale_down);
 
   if (downscale <= max_down_scale) {
