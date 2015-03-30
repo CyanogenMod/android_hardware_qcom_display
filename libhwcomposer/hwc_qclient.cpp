@@ -38,6 +38,8 @@
 #include <hwc_qdcm.h>
 
 #define QCLIENT_DEBUG 0
+#define FILE_MAX_MDSSBW_FLAG \
+    "/sys/devices/virtual/graphics/fb0/mdp/bw_mode_bitmap"
 
 using namespace android;
 using namespace qService;
@@ -50,7 +52,8 @@ namespace qClient {
 
 // ----------------------------------------------------------------------------
 QClient::QClient(hwc_context_t *ctx) : mHwcContext(ctx),
-        mMPDeathNotifier(new MPDeathNotifier(ctx))
+        mMPDeathNotifier(new MPDeathNotifier(ctx)),
+        mCamDeathNotifier(new CamDeathNotifier())
 {
     ALOGD_IF(QCLIENT_DEBUG, "QClient Constructor invoked");
 }
@@ -336,6 +339,85 @@ static void toggleScreenUpdate(hwc_context_t* ctx, uint32_t on) {
     }
 }
 
+
+/*  register/unregister camera service */
+static bool  setCameraDeathNotifier(
+        android::sp<QClient::CamDeathNotifier> camDeathNotifier, bool on) {
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<IBinder> binder = sm->getService(String16("media.camera"));
+    if (binder == 0) {
+        ALOGW("%s: CameraService not published or dead...", __FUNCTION__);
+        return false;
+    }
+    if(on) {
+        binder->linkToDeath(camDeathNotifier);
+    } else {
+        binder->unlinkToDeath(camDeathNotifier);
+    }
+    return true;
+}
+
+static bool updateDisplayBWCapForCam(bool on) {
+    char sysfsPath[255];
+    char bw[64];
+    int bw_flag = 0; // to reset to default.
+
+    memset(sysfsPath, 0, sizeof(sysfsPath));
+    snprintf(sysfsPath , sizeof(sysfsPath), FILE_MAX_MDSSBW_FLAG);
+    int sysfsFd = open(sysfsPath, O_RDWR);
+    if(sysfsFd < 0 ) {
+        ALOGE("%s: Status: %d Error in opening %s: %s",
+                __FUNCTION__, on, sysfsPath, strerror(errno));
+        return false;
+    }
+
+    if(on) {
+        bw_flag = MDSS_MAX_BW_LIMIT_CAMERA;
+    }
+    snprintf(bw, sizeof(bw), "%d", bw_flag);
+    ssize_t bytes = pwrite(sysfsFd, bw, strlen(bw), 0);
+    if(bytes < 0) {
+        ALOGE ("%s: Unable to write into %s node %s",
+                __FUNCTION__, sysfsPath, strerror(errno));
+        close(sysfsFd);
+        return false;
+    }
+    close(sysfsFd);
+    return true;
+}
+
+static void setCameraStatus(hwc_context_t* ctx,
+        android::sp<QClient::CamDeathNotifier> camDeathNotifier, uint32_t on) {
+
+    //Currently we need this only for 8939 target.
+    if(!MDPVersion::getInstance().is8x39()) {
+        ALOGI("%s  Not 8939?? return", __FUNCTION__);
+        return;
+    }
+
+    if(!setCameraDeathNotifier(camDeathNotifier, on)) {
+        ALOGE("%s  failed in updateCameraStatus", __FUNCTION__);
+        return;
+    }
+
+    if(!updateDisplayBWCapForCam(on)) {
+        ALOGE("%s  failed in updateDisplayBWCap", __FUNCTION__);
+        return;
+    }
+
+    // Trigger a screen update so that our BW setting will reflect
+    // atleast by next vsync.
+    screenRefresh(ctx);
+}
+
+void QClient::CamDeathNotifier::binderDied(const wp<IBinder>& who) {
+    //If Cameraservice abruptly gone, reset mdss bw caps
+    //This new cap will be applicable from next frame onwards
+    if(!updateDisplayBWCapForCam(false)) {
+        ALOGE("%s  failed in updateDisplayBWCap", __FUNCTION__);
+    }
+}
+
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t ret = NO_ERROR;
@@ -391,6 +473,10 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::TOGGLE_SCREEN_UPDATE:
             toggleScreenUpdate(mHwcContext, inParcel->readInt32());
+            break;
+        case IQService::SET_CAMERA_STATUS:
+            setCameraStatus(mHwcContext,
+                    mCamDeathNotifier, inParcel->readInt32());
             break;
         default:
             ret = NO_ERROR;
