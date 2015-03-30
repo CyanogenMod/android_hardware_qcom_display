@@ -58,6 +58,7 @@ public:
         CONFIGURE_DYN_REFRESH_RATE,
         QDCM_SVC_CMDS,           // request QDCM services.
         TOGGLE_SCREEN_UPDATE,    // Provides ability to disable screen updates
+        SET_CAMERA_STATUS, // To notify display when camera is on and off
         COMMAND_LIST_END = 400,
     };
 
