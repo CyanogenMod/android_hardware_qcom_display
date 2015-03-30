@@ -188,6 +188,7 @@ void  MDPVersion::updatePanelInfo() {
             }
         }
         fclose(panelInfoNodeFP);
+        free(readLine);
     } else {
         ALOGE("Failed to open msm_fb_panel_info node");
     }
