@@ -51,6 +51,8 @@ bool MDPComp::enablePartialUpdateForMDP3 = false;
 bool MDPComp::sIsPartialUpdateActive = true;
 float MDPComp::sDownscaleThreshold = 1.0;
 
+enum AllocOrder { FORMAT_YUV, FORMAT_RGB, FORMAT_MAX };
+
 MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
     if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
         sSrcSplitEnabled = true;
@@ -2215,39 +2217,48 @@ int MDPCompNonSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
 bool MDPCompNonSplit::allocLayerPipes(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-    for(int index = 0; index < mCurrentFrame.layerCount; index++) {
+    for(uint32_t formatType = FORMAT_YUV; formatType < FORMAT_MAX;
+            formatType++) {
+        for(int index = 0; index < mCurrentFrame.layerCount; index++) {
+            if(mCurrentFrame.isFBComposed[index]) continue;
 
-        if(mCurrentFrame.isFBComposed[index]) continue;
-
-        hwc_layer_1_t* layer = &list->hwLayers[index];
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        if(isYUVSplitNeeded(hnd) && sEnableYUVsplit){
-            if(allocSplitVGPipesfor4k2k(ctx, index)){
+            hwc_layer_1_t* layer = &list->hwLayers[index];
+            private_handle_t *hnd = (private_handle_t *)layer->handle;
+            if(formatType == FORMAT_YUV && !isYuvBuffer(hnd))
                 continue;
+            if(formatType == FORMAT_RGB && isYuvBuffer(hnd))
+                continue;
+
+            if(isYUVSplitNeeded(hnd) && sEnableYUVsplit){
+                if(allocSplitVGPipesfor4k2k(ctx, index)){
+                    continue;
+                }
             }
-        }
 
-        int mdpIndex = mCurrentFrame.layerToMDP[index];
-        PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
-        info.pipeInfo = new MdpPipeInfoNonSplit;
-        info.rot = NULL;
-        MdpPipeInfoNonSplit& pipe_info = *(MdpPipeInfoNonSplit*)info.pipeInfo;
+            int mdpIndex = mCurrentFrame.layerToMDP[index];
+            PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
+            info.pipeInfo = new MdpPipeInfoNonSplit;
+            info.rot = NULL;
+            MdpPipeInfoNonSplit& pipe_info =
+                    *(MdpPipeInfoNonSplit*)info.pipeInfo;
 
-        Overlay::PipeSpecs pipeSpecs;
-        pipeSpecs.formatClass = isYuvBuffer(hnd) ?
-                Overlay::FORMAT_YUV : Overlay::FORMAT_RGB;
-        pipeSpecs.needsScaling = qhwc::needsScaling(layer) or
-                (qdutils::MDPVersion::getInstance().is8x26() and
-                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres > 1024);
-        pipeSpecs.dpy = mDpy;
-        pipeSpecs.fb = false;
-        pipeSpecs.numActiveDisplays = ctx->numActiveDisplays;
+            Overlay::PipeSpecs pipeSpecs;
+            pipeSpecs.formatClass = isYuvBuffer(hnd) ?
+                    Overlay::FORMAT_YUV : Overlay::FORMAT_RGB;
+            pipeSpecs.needsScaling = qhwc::needsScaling(layer) or
+                    (qdutils::MDPVersion::getInstance().is8x26() and
+                     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres > 1024);
+            pipeSpecs.dpy = mDpy;
+            pipeSpecs.fb = false;
+            pipeSpecs.numActiveDisplays = ctx->numActiveDisplays;
 
-        pipe_info.index = ctx->mOverlay->getPipe(pipeSpecs);
+            pipe_info.index = ctx->mOverlay->getPipe(pipeSpecs);
 
-        if(pipe_info.index == ovutils::OV_INVALID) {
-            ALOGD_IF(isDebug(), "%s: Unable to get pipe", __FUNCTION__);
-            return false;
+            if(pipe_info.index == ovutils::OV_INVALID) {
+                ALOGD_IF(isDebug(), "%s: Unable to get pipe for layer %d of "\
+                        "format type %d", __FUNCTION__, index, formatType);
+                return false;
+            }
         }
     }
     return true;
@@ -2453,31 +2464,39 @@ bool MDPCompSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
 
 bool MDPCompSplit::allocLayerPipes(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-    for(int index = 0 ; index < mCurrentFrame.layerCount; index++) {
+    for(uint32_t formatType = FORMAT_YUV; formatType < FORMAT_MAX;
+            formatType++) {
+        for(int index = 0 ; index < mCurrentFrame.layerCount; index++) {
+            if(mCurrentFrame.isFBComposed[index]) continue;
 
-        if(mCurrentFrame.isFBComposed[index]) continue;
+            hwc_layer_1_t* layer = &list->hwLayers[index];
+            private_handle_t *hnd = (private_handle_t *)layer->handle;
+            if(formatType == FORMAT_YUV && !isYuvBuffer(hnd))
+                continue;
+            if(formatType == FORMAT_RGB && isYuvBuffer(hnd))
+                continue;
 
-        hwc_layer_1_t* layer = &list->hwLayers[index];
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        hwc_rect_t dst = layer->displayFrame;
-        const int lSplit = getLeftSplit(ctx, mDpy);
-        if(isYUVSplitNeeded(hnd) && sEnableYUVsplit){
-            if((dst.left > lSplit)||(dst.right < lSplit)){
-                if(allocSplitVGPipesfor4k2k(ctx, index)){
-                    continue;
+            hwc_rect_t dst = layer->displayFrame;
+            const int lSplit = getLeftSplit(ctx, mDpy);
+            if(isYUVSplitNeeded(hnd) && sEnableYUVsplit){
+                if((dst.left > lSplit)||(dst.right < lSplit)){
+                    if(allocSplitVGPipesfor4k2k(ctx, index)){
+                        continue;
+                    }
                 }
             }
-        }
-        int mdpIndex = mCurrentFrame.layerToMDP[index];
-        PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
-        info.pipeInfo = new MdpPipeInfoSplit;
-        info.rot = NULL;
-        MdpPipeInfoSplit& pipe_info = *(MdpPipeInfoSplit*)info.pipeInfo;
 
-        if(!acquireMDPPipes(ctx, layer, pipe_info)) {
-            ALOGD_IF(isDebug(), "%s: Unable to get pipe for type",
-                    __FUNCTION__);
-            return false;
+            int mdpIndex = mCurrentFrame.layerToMDP[index];
+            PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
+            info.pipeInfo = new MdpPipeInfoSplit;
+            info.rot = NULL;
+            MdpPipeInfoSplit& pipe_info = *(MdpPipeInfoSplit*)info.pipeInfo;
+
+            if(!acquireMDPPipes(ctx, layer, pipe_info)) {
+                ALOGD_IF(isDebug(), "%s: Unable to get pipe for layer %d of "\
+                        "format type %d", __FUNCTION__, index, formatType);
+                return false;
+            }
         }
     }
     return true;
