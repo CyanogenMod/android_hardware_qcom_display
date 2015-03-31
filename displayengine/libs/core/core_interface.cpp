@@ -64,16 +64,16 @@ DisplayError CoreInterface::CreateCore(CoreEventHandler *event_handler, DebugHan
 
   // Check compatibility of client and core.
   uint32_t lib_version = SDE_VERSION_TAG;
-  if (UNLIKELY(GET_REVISION(client_version) > GET_REVISION(lib_version))) {
+  if (GET_REVISION(client_version) > GET_REVISION(lib_version)) {
     return kErrorVersion;
-  } else if (UNLIKELY(GET_DATA_ALIGNMENT(client_version) != GET_DATA_ALIGNMENT(lib_version))) {
+  } else if (GET_DATA_ALIGNMENT(client_version) != GET_DATA_ALIGNMENT(lib_version)) {
     return kErrorDataAlignment;
-  } else if (UNLIKELY(GET_INSTRUCTION_SET(client_version) != GET_INSTRUCTION_SET(lib_version))) {
+  } else if (GET_INSTRUCTION_SET(client_version) != GET_INSTRUCTION_SET(lib_version)) {
     return kErrorInstructionSet;
   }
 
   CoreImpl *&core_impl = g_core.core_impl;
-  if (UNLIKELY(core_impl)) {
+  if (core_impl) {
     return kErrorUndefined;
   }
 
@@ -86,12 +86,12 @@ DisplayError CoreInterface::CreateCore(CoreEventHandler *event_handler, DebugHan
     return kErrorNotSupported;
   }
 
-  if (UNLIKELY(!core_impl)) {
+  if (!core_impl) {
     return kErrorMemory;
   }
 
   DisplayError error = core_impl->Init();
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     delete core_impl;
     core_impl = NULL;
     return error;
@@ -109,7 +109,7 @@ DisplayError CoreInterface::DestroyCore() {
   DLOGI("Close handle");
 
   CoreImpl *&core_impl = g_core.core_impl;
-  if (UNLIKELY(!core_impl)) {
+  if (!core_impl) {
     return kErrorUndefined;
   }
 

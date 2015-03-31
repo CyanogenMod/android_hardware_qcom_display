@@ -49,7 +49,7 @@ HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, 
 
 int HWCDisplay::Init() {
   DisplayError error = core_intf_->CreateDisplay(type_, this, &display_intf_);
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     DLOGE("Display create failed. Error = %d display_type %d event_handler %p disp_intf %p",
       error, type_, this, &display_intf_);
     return -EINVAL;
@@ -60,7 +60,7 @@ int HWCDisplay::Init() {
 
 int HWCDisplay::Deinit() {
   DisplayError error = core_intf_->DestroyDisplay(display_intf_);
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     DLOGE("Display destroy failed. Error = %d", error);
     return -EINVAL;
   }
@@ -87,7 +87,7 @@ int HWCDisplay::EventControl(int event, int enable) {
     DLOGW("Unsupported event = %d", event);
   }
 
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     DLOGE("Failed. event = %d, enable = %d, error = %d", event, enable, error);
     return -EINVAL;
   }
@@ -115,7 +115,7 @@ int HWCDisplay::SetPowerMode(int mode) {
   }
 
   DisplayError error = display_intf_->SetDisplayState(state);
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     DLOGE("Set state failed. Error = %d", error);
     return -EINVAL;
   }
@@ -137,7 +137,7 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
 
   DisplayConfigVariableInfo variable_config;
   error = display_intf_->GetConfig(config, &variable_config);
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     DLOGE("GetConfig variable info failed. Error = %d", error);
     return -EINVAL;
   }
@@ -243,8 +243,8 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
 
   // Layer array may be large enough to hold current number of layers.
   // If not, re-allocate it now.
-  if (UNLIKELY(layer_stack_memory_.size < required_size)) {
-    if (LIKELY(layer_stack_memory_.raw)) {
+  if (layer_stack_memory_.size < required_size) {
+    if (layer_stack_memory_.raw) {
       delete[] layer_stack_memory_.raw;
       layer_stack_memory_.size = 0;
     }
@@ -253,7 +253,7 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
     required_size = ROUND_UP(required_size, layer_stack_memory_.kSizeSteps);
 
     layer_stack_memory_.raw = new uint8_t[required_size];
-    if (UNLIKELY(!layer_stack_memory_.raw)) {
+    if (!layer_stack_memory_.raw) {
       return -ENOMEM;
     }
 

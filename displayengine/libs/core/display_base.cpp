@@ -45,17 +45,8 @@ DisplayBase::DisplayBase(DisplayType display_type, DisplayEventHandler *event_ha
 
 DisplayError DisplayBase::Init() {
   DisplayError error = kErrorNone;
-
-  error = hw_intf_->Open(this);
-  if (error != kErrorNone) {
-    return error;
-  }
-
-  panel_info_ = HWPanelInfo();
-  hw_intf_->GetHWPanelInfo(&panel_info_);
-
-  // Set the idle timeout value to driver through sysfs node
-  SetIdleTimeoutMs(Debug::GetIdleTimeoutMs());
+  hw_panel_info_ = HWPanelInfo();
+  hw_intf_->GetHWPanelInfo(&hw_panel_info_);
 
   error = hw_intf_->GetNumDisplayAttributes(&num_modes_);
   if (error != kErrorNone) {
@@ -89,7 +80,7 @@ DisplayError DisplayBase::Init() {
   }
 
   error = offline_ctrl_->RegisterDisplay(display_type_, &display_offline_ctx_);
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     goto CleanupOnError;
   }
 
@@ -126,8 +117,6 @@ DisplayError DisplayBase::Deinit() {
 }
 
 DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
-  SCOPE_LOCK(locker_);
-
   DisplayError error = kErrorNone;
 
   if (!layer_stack) {
@@ -167,8 +156,6 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
 }
 
 DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
-  SCOPE_LOCK(locker_);
-
   DisplayError error = kErrorNone;
 
   if (!layer_stack) {
@@ -203,8 +190,6 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
 }
 
 DisplayError DisplayBase::Flush() {
-  SCOPE_LOCK(locker_);
-
   DisplayError error = kErrorNone;
 
   if (state_ != kStateOn) {
@@ -224,8 +209,6 @@ DisplayError DisplayBase::Flush() {
 }
 
 DisplayError DisplayBase::GetDisplayState(DisplayState *state) {
-  SCOPE_LOCK(locker_);
-
   if (!state) {
     return kErrorParameters;
   }
@@ -235,8 +218,6 @@ DisplayError DisplayBase::GetDisplayState(DisplayState *state) {
 }
 
 DisplayError DisplayBase::GetNumVariableInfoConfigs(uint32_t *count) {
-  SCOPE_LOCK(locker_);
-
   if (!count) {
     return kErrorParameters;
   }
@@ -247,8 +228,6 @@ DisplayError DisplayBase::GetNumVariableInfoConfigs(uint32_t *count) {
 }
 
 DisplayError DisplayBase::GetConfig(DisplayConfigFixedInfo *fixed_info) {
-  SCOPE_LOCK(locker_);
-
   if (!fixed_info) {
     return kErrorParameters;
   }
@@ -257,8 +236,6 @@ DisplayError DisplayBase::GetConfig(DisplayConfigFixedInfo *fixed_info) {
 }
 
 DisplayError DisplayBase::GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info) {
-  SCOPE_LOCK(locker_);
-
   if (!variable_info || index >= num_modes_) {
     return kErrorParameters;
   }
@@ -269,8 +246,6 @@ DisplayError DisplayBase::GetConfig(uint32_t index, DisplayConfigVariableInfo *v
 }
 
 DisplayError DisplayBase::GetActiveConfig(uint32_t *index) {
-  SCOPE_LOCK(locker_);
-
   if (!index) {
     return kErrorParameters;
   }
@@ -281,8 +256,6 @@ DisplayError DisplayBase::GetActiveConfig(uint32_t *index) {
 }
 
 DisplayError DisplayBase::GetVSyncState(bool *enabled) {
-  SCOPE_LOCK(locker_);
-
   if (!enabled) {
     return kErrorParameters;
   }
@@ -291,8 +264,6 @@ DisplayError DisplayBase::GetVSyncState(bool *enabled) {
 }
 
 DisplayError DisplayBase::SetDisplayState(DisplayState state) {
-  SCOPE_LOCK(locker_);
-
   DisplayError error = kErrorNone;
 
   DLOGI("Set state = %d, display %d", state, display_type_);
@@ -338,7 +309,6 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 }
 
 DisplayError DisplayBase::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
-  SCOPE_LOCK(locker_);
   DisplayError error = kErrorNone;
 
   if (!variable_info) {
@@ -368,7 +338,6 @@ DisplayError DisplayBase::SetActiveConfig(DisplayConfigVariableInfo *variable_in
 }
 
 DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
-  SCOPE_LOCK(locker_);
   DisplayError error = kErrorNone;
 
   if (index >= num_modes_) {
@@ -392,15 +361,7 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
   return error;
 }
 
-DisplayError DisplayBase::SetVSyncState(bool enable) {
-  return kErrorNotSupported;
-}
-
-void DisplayBase::SetIdleTimeoutMs(uint32_t timeout_ms) { }
-
 DisplayError DisplayBase::SetMaxMixerStages(uint32_t max_mixer_stages) {
-  SCOPE_LOCK(locker_);
-
   DisplayError error = kErrorNone;
 
   if (comp_manager_) {
@@ -410,39 +371,17 @@ DisplayError DisplayBase::SetMaxMixerStages(uint32_t max_mixer_stages) {
   return error;
 }
 
-DisplayError DisplayBase::VSync(int64_t timestamp) {
-  if (vsync_enable_) {
-    DisplayEventVSync vsync;
-    vsync.timestamp = timestamp;
-    event_handler_->VSync(vsync);
-  }
-
-  return kErrorNone;
-}
-
-DisplayError DisplayBase::Blank(bool blank) {
-  return kErrorNone;
-}
-
-void DisplayBase::IdleTimeout() {
-  bool need_refresh = comp_manager_->ProcessIdleTimeout(display_comp_ctx_);
-  if (need_refresh) {
-    event_handler_->Refresh();
-  }
-}
-
 void DisplayBase::AppendDump(char *buffer, uint32_t length) {
-  SCOPE_LOCK(locker_);
-
-  AppendString(buffer, length, "\n-----------------------");
-  AppendString(buffer, length, "\ndevice type: %u", display_type_);
-  AppendString(buffer, length, "\nstate: %u, vsync on: %u", state_, INT(vsync_enable_));
-  AppendString(buffer, length, "\nnum configs: %u, active config index: %u",
-                                num_modes_, active_mode_index_);
+  DumpImpl::AppendString(buffer, length, "\n-----------------------");
+  DumpImpl::AppendString(buffer, length, "\ndevice type: %u", display_type_);
+  DumpImpl::AppendString(buffer, length, "\nstate: %u, vsync on: %u", state_, INT(vsync_enable_));
+  DumpImpl::AppendString(buffer, length, "\nnum configs: %u, active config index: %u",
+                         num_modes_, active_mode_index_);
 
   DisplayConfigVariableInfo &info = display_attributes_[active_mode_index_];
-  AppendString(buffer, length, "\nres:%ux%u, dpi:%.2fx%.2f, fps:%.2f, vsync period: %u",
-      info.x_pixels, info.y_pixels, info.x_dpi, info.y_dpi, info.fps, info.vsync_period_ns);
+  DumpImpl::AppendString(buffer, length, "\nres:%ux%u, dpi:%.2fx%.2f, fps:%.2f, vsync period: %u",
+                         info.x_pixels, info.y_pixels, info.x_dpi, info.y_dpi, info.fps,
+                         info.vsync_period_ns);
 
   uint32_t num_layers = 0;
   uint32_t num_hw_layers = 0;
@@ -451,8 +390,8 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     num_hw_layers = hw_layers_.info.count;
   }
 
-  AppendString(buffer, length, "\n\nnum actual layers: %u, num sde layers: %u",
-                                num_layers, num_hw_layers);
+  DumpImpl::AppendString(buffer, length, "\n\nnum actual layers: %u, num sde layers: %u",
+                         num_layers, num_hw_layers);
 
   for (uint32_t i = 0; i < num_hw_layers; i++) {
     Layer &layer = hw_layers_.info.stack->layers[hw_layers_.info.index[i]];
@@ -463,36 +402,37 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     HWRotateInfo &left_rotate = hw_layers_.config[i].rotates[0];
     HWRotateInfo &right_rotate = hw_layers_.config[i].rotates[1];
 
-    AppendString(buffer, length, "\n\nsde idx: %u, actual idx: %u", i, hw_layers_.info.index[i]);
-    AppendString(buffer, length, "\nw: %u, h: %u, fmt: %u",
-                                  input_buffer->width, input_buffer->height, input_buffer->format);
+    DumpImpl::AppendString(buffer, length, "\n\nsde idx: %u, actual idx: %u", i,
+                           hw_layers_.info.index[i]);
+    DumpImpl::AppendString(buffer, length, "\nw: %u, h: %u, fmt: %u",
+                           input_buffer->width, input_buffer->height, input_buffer->format);
     AppendRect(buffer, length, "\nsrc_rect:", &layer.src_rect);
     AppendRect(buffer, length, "\ndst_rect:", &layer.dst_rect);
 
     if (left_rotate.valid) {
-      AppendString(buffer, length, "\n\tleft rotate =>");
-      AppendString(buffer, length, "\n\t  pipe id: 0x%x", left_rotate.pipe_id);
+      DumpImpl::AppendString(buffer, length, "\n\tleft rotate =>");
+      DumpImpl::AppendString(buffer, length, "\n\t  pipe id: 0x%x", left_rotate.pipe_id);
       AppendRect(buffer, length, "\n\t  src_roi:", &left_rotate.src_roi);
       AppendRect(buffer, length, "\n\t  dst_roi:", &left_rotate.dst_roi);
     }
 
     if (right_rotate.valid) {
-      AppendString(buffer, length, "\n\tright rotate =>");
-      AppendString(buffer, length, "\n\t  pipe id: 0x%x", right_rotate.pipe_id);
+      DumpImpl::AppendString(buffer, length, "\n\tright rotate =>");
+      DumpImpl::AppendString(buffer, length, "\n\t  pipe id: 0x%x", right_rotate.pipe_id);
       AppendRect(buffer, length, "\n\t  src_roi:", &right_rotate.src_roi);
       AppendRect(buffer, length, "\n\t  dst_roi:", &right_rotate.dst_roi);
     }
 
     if (left_pipe.valid) {
-      AppendString(buffer, length, "\n\tleft pipe =>");
-      AppendString(buffer, length, "\n\t  pipe id: 0x%x", left_pipe.pipe_id);
+      DumpImpl::AppendString(buffer, length, "\n\tleft pipe =>");
+      DumpImpl::AppendString(buffer, length, "\n\t  pipe id: 0x%x", left_pipe.pipe_id);
       AppendRect(buffer, length, "\n\t  src_roi:", &left_pipe.src_roi);
       AppendRect(buffer, length, "\n\t  dst_roi:", &left_pipe.dst_roi);
     }
 
     if (right_pipe.valid) {
-      AppendString(buffer, length, "\n\tright pipe =>");
-      AppendString(buffer, length, "\n\t  pipe id: 0x%x", right_pipe.pipe_id);
+      DumpImpl::AppendString(buffer, length, "\n\tright pipe =>");
+      DumpImpl::AppendString(buffer, length, "\n\t  pipe id: 0x%x", right_pipe.pipe_id);
       AppendRect(buffer, length, "\n\t  src_roi:", &right_pipe.src_roi);
       AppendRect(buffer, length, "\n\t  dst_roi:", &right_pipe.dst_roi);
     }
@@ -501,8 +441,8 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
 
 void DisplayBase::AppendRect(char *buffer, uint32_t length, const char *rect_name,
                              LayerRect *rect) {
-  AppendString(buffer, length, "%s %.1f, %.1f, %.1f, %.1f",
-                                rect_name, rect->left, rect->top, rect->right, rect->bottom);
+  DumpImpl::AppendString(buffer, length, "%s %.1f, %.1f, %.1f, %.1f",
+                         rect_name, rect->left, rect->top, rect->right, rect->bottom);
 }
 
 int DisplayBase::GetBestConfig() {

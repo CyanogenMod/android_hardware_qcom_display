@@ -32,15 +32,32 @@ namespace sde {
 class HWVirtualInterface;
 class HWInfoInterface;
 
-class DisplayVirtual : public DisplayBase {
+class DisplayVirtual : public DisplayBase, DumpImpl {
  public:
   DisplayVirtual(DisplayEventHandler *event_handler, HWInfoInterface *hw_info_intf,
                  BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
                  OfflineCtrl *offline_ctrl);
   virtual DisplayError Init();
   virtual DisplayError Deinit();
+  virtual DisplayError Prepare(LayerStack *layer_stack);
+  virtual DisplayError Commit(LayerStack *layer_stack);
+  virtual DisplayError Flush();
+  virtual DisplayError GetDisplayState(DisplayState *state);
+  virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
+  virtual DisplayError GetConfig(DisplayConfigFixedInfo *fixed_info);
+  virtual DisplayError GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info);
+  virtual DisplayError GetActiveConfig(uint32_t *index);
+  virtual DisplayError GetVSyncState(bool *enabled);
+  virtual DisplayError SetDisplayState(DisplayState state);
+  virtual DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info);
+  virtual DisplayError SetActiveConfig(uint32_t index);
+  virtual DisplayError SetVSyncState(bool enable);
+  virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
+  virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
+  virtual void AppendDump(char *buffer, uint32_t length);
 
  private:
+  Locker locker_;
   HWVirtualInterface *hw_virtual_intf_;
   HWInfoInterface *hw_info_intf_;
 };

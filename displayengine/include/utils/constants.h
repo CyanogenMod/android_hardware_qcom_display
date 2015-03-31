@@ -27,9 +27,6 @@
 
 #include <stdlib.h>
 
-#define LIKELY(exp) __builtin_expect((exp) != 0, true)
-#define UNLIKELY(exp) __builtin_expect((exp) != 0, false)
-
 #define INT(exp) static_cast<int>(exp)
 #define FLOAT(exp) static_cast<float>(exp)
 #define UINT8(exp) static_cast<uint8_t>(exp)

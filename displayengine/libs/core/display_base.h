@@ -38,7 +38,7 @@ namespace sde {
 
 class OfflineCtrl;
 
-class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
+class DisplayBase : public DisplayInterface {
  public:
   DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
               HWDeviceType hw_device_type, BufferSyncHandler *buffer_sync_handler,
@@ -58,28 +58,20 @@ class DisplayBase : public DisplayInterface, HWEventHandler, DumpImpl {
   virtual DisplayError SetDisplayState(DisplayState state);
   virtual DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info);
   virtual DisplayError SetActiveConfig(uint32_t index);
-  virtual DisplayError SetVSyncState(bool enable);
-  virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
 
-  // Implement the HWEventHandlers
-  virtual DisplayError VSync(int64_t timestamp);
-  virtual DisplayError Blank(bool blank);
-  virtual void IdleTimeout();
-
+ protected:
   // DumpImpl method
-  virtual void AppendDump(char *buffer, uint32_t length);
+  void AppendDump(char *buffer, uint32_t length);
   void AppendRect(char *buffer, uint32_t length, const char *rect_name, LayerRect *rect);
 
- protected:
   virtual int GetBestConfig();
 
-  Locker locker_;
   DisplayType display_type_;
   DisplayEventHandler *event_handler_;
   HWDeviceType hw_device_type_;
   HWInterface *hw_intf_;
-  HWPanelInfo panel_info_;
+  HWPanelInfo hw_panel_info_;
   BufferSyncHandler *buffer_sync_handler_;
   CompManager *comp_manager_;
   OfflineCtrl *offline_ctrl_;

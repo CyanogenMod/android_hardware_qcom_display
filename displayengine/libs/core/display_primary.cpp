@@ -50,9 +50,19 @@ DisplayError DisplayPrimary::Init() {
   }
   DisplayBase::hw_intf_ = hw_primary_intf_;
 
+  error = hw_primary_intf_->Open(this);
+  if (error != kErrorNone) {
+    return error;
+  }
+
   error = DisplayBase::Init();
   if (error != kErrorNone) {
     HWPrimaryInterface::Destroy(hw_primary_intf_);
+  }
+
+  // Idle fallback feature is supported only for video mode panel.
+  if (hw_panel_info_.type == kVideoModePanel) {
+    hw_primary_intf_->SetIdleTimeoutMs(Debug::GetIdleTimeoutMs());
   }
 
   return error;
@@ -70,6 +80,66 @@ DisplayError DisplayPrimary::Deinit() {
   return error;
 }
 
+DisplayError DisplayPrimary::Prepare(LayerStack *layer_stack) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::Prepare(layer_stack);
+}
+
+DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::Commit(layer_stack);
+}
+
+DisplayError DisplayPrimary::Flush() {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::Flush();
+}
+
+DisplayError DisplayPrimary::GetDisplayState(DisplayState *state) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetDisplayState(state);
+}
+
+DisplayError DisplayPrimary::GetNumVariableInfoConfigs(uint32_t *count) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetNumVariableInfoConfigs(count);
+}
+
+DisplayError DisplayPrimary::GetConfig(DisplayConfigFixedInfo *fixed_info) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetConfig(fixed_info);
+}
+
+DisplayError DisplayPrimary::GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetConfig(index, variable_info);
+}
+
+DisplayError DisplayPrimary::GetActiveConfig(uint32_t *index) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetActiveConfig(index);
+}
+
+DisplayError DisplayPrimary::GetVSyncState(bool *enabled) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetVSyncState(enabled);
+}
+
+DisplayError DisplayPrimary::SetDisplayState(DisplayState state) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetDisplayState(state);
+}
+
+DisplayError DisplayPrimary::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetActiveConfig(variable_info);
+}
+
+DisplayError DisplayPrimary::SetActiveConfig(uint32_t index) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetActiveConfig(index);
+}
+
 DisplayError DisplayPrimary::SetVSyncState(bool enable) {
   SCOPE_LOCK(locker_);
   DisplayError error = kErrorNone;
@@ -84,12 +154,45 @@ DisplayError DisplayPrimary::SetVSyncState(bool enable) {
 }
 
 void DisplayPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
+  SCOPE_LOCK(locker_);
   // Idle fallback feature is supported only for video mode panel.
-  if (panel_info_.type == kCommandModePanel) {
-    return;
+  if (hw_panel_info_.type == kVideoModePanel) {
+    hw_primary_intf_->SetIdleTimeoutMs(timeout_ms);
+  }
+}
+
+DisplayError DisplayPrimary::SetMaxMixerStages(uint32_t max_mixer_stages) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetMaxMixerStages(max_mixer_stages);
+}
+
+void DisplayPrimary::AppendDump(char *buffer, uint32_t length) {
+  SCOPE_LOCK(locker_);
+  DisplayBase::AppendDump(buffer, length);
+}
+
+DisplayError DisplayPrimary::VSync(int64_t timestamp) {
+  SCOPE_LOCK(locker_);
+  if (vsync_enable_) {
+    DisplayEventVSync vsync;
+    vsync.timestamp = timestamp;
+    event_handler_->VSync(vsync);
   }
 
-  hw_primary_intf_->SetIdleTimeoutMs(timeout_ms);
+  return kErrorNone;
+}
+
+DisplayError DisplayPrimary::Blank(bool blank) {
+  SCOPE_LOCK(locker_);
+  return kErrorNone;
+}
+
+void DisplayPrimary::IdleTimeout() {
+  SCOPE_LOCK(locker_);
+  bool need_refresh = comp_manager_->ProcessIdleTimeout(display_comp_ctx_);
+  if (need_refresh) {
+    event_handler_->Refresh();
+  }
 }
 
 }  // namespace sde
