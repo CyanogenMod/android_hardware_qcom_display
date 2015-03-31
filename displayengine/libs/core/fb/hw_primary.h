@@ -68,6 +68,7 @@ class HWPrimary : public HWDevice, public HWPrimaryInterface {
   void HandleVSync(char *data);
   void HandleBlank(char *data);
   void HandleIdleTimeout(char *data);
+  void HandleThermal(char *data);
 
   pollfd poll_fds_[kNumDisplayEvents];
   pthread_t event_thread_;

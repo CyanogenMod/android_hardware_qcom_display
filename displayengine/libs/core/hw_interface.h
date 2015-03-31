@@ -123,6 +123,7 @@ class HWEventHandler {
   virtual DisplayError VSync(int64_t timestamp) = 0;
   virtual DisplayError Blank(bool blank) = 0;
   virtual void IdleTimeout() = 0;
+  virtual void ThermalEvent(int64_t thermal_level) = 0;
  protected:
   virtual ~HWEventHandler() { }
 };

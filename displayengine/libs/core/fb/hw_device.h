@@ -69,7 +69,7 @@ class HWDevice {
 
   static const int kMaxStringLength = 1024;
   static const int kNumPhysicalDisplays = 2;
-  static const int kNumDisplayEvents = 3;
+  static const int kNumDisplayEvents = 4;
 
   void DumpLayerCommit(mdp_layer_commit &layer_commit);
   DisplayError SetFormat(const LayerBufferFormat &source, uint32_t *target);

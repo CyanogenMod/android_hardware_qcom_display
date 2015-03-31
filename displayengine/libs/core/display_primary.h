@@ -61,6 +61,7 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
   virtual DisplayError VSync(int64_t timestamp);
   virtual DisplayError Blank(bool blank);
   virtual void IdleTimeout();
+  virtual void ThermalEvent(int64_t thermal_level);
 
  private:
   Locker locker_;
