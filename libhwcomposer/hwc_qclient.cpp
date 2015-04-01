@@ -37,6 +37,7 @@
 #include <display_config.h>
 #include <hdmi.h>
 #include <video/msm_hdmi_modes.h>
+#include <hwc_qdcm.h>
 
 #define QCLIENT_DEBUG 0
 
@@ -45,6 +46,7 @@ using namespace qService;
 using namespace qhwc;
 using namespace overlay;
 using namespace qdutils;
+using namespace qQdcm;
 
 namespace qClient {
 
@@ -554,6 +556,8 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         case IQService::GET_DISPLAY_ATTRIBUTES_FOR_CONFIG:
             ret = getDisplayAttributesForConfig(mHwcContext, inParcel,
                     outParcel);
+        case IQService::QDCM_SVC_CMDS:
+            qdcmCmdsHandler(mHwcContext, inParcel, outParcel);
             break;
         default:
             ret = NO_ERROR;

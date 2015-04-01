@@ -39,9 +39,11 @@
 #include "hwc_ad.h"
 #include "profiler.h"
 #include "hwc_virtual.h"
+#include "hwc_qdcm.h"
 
 using namespace qhwc;
 using namespace overlay;
+using namespace qQdcm;
 
 #define VSYNC_DEBUG 0
 #define POWER_MODE_DEBUG 1
@@ -278,6 +280,7 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     const int dpy = HWC_DISPLAY_PRIMARY;
     bool fbComp = false;
+
     if (!ctx->mBootAnimCompleted)
         processBootAnimCompleted(ctx);
     if (LIKELY(list && list->numHwLayers > 1) && ctx->dpyAttr[dpy].connected &&
