@@ -222,6 +222,8 @@ DisplayError HWHDMI::GetDisplayAttributes(HWDisplayAttributes *display_attribute
   display_attributes->y_pixels = timing_mode->active_v;
   display_attributes->v_total = timing_mode->active_v + timing_mode->front_porch_v +
       timing_mode->back_porch_v + timing_mode->pulse_width_v;
+  display_attributes->h_total = timing_mode->active_h + timing_mode->front_porch_h +
+      timing_mode->back_porch_h + timing_mode->pulse_width_h;
   display_attributes->x_dpi = 0;
   display_attributes->y_dpi = 0;
   display_attributes->fps = FLOAT(timing_mode->refresh_rate) / 1000.0f;
