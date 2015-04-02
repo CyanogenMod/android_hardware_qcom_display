@@ -827,6 +827,12 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         return false;
     }
 
+    uint32_t totalDirtyArea = 0;
+    bool computeDirtyArea = not (list->flags & HWC_GEOMETRY_CHANGED) and
+            not isYuvPresent(ctx, mDpy) and
+            not qdutils::MDPVersion::getInstance().isPartialUpdateEnabled() and
+            numAppLayers > 1;
+
     for(int i = 0; i < numAppLayers; ++i) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
@@ -845,6 +851,33 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         if( mdpHw.is8x26() && (ctx->dpyAttr[mDpy].xres > 1024) &&
                 (transform & HWC_TRANSFORM_FLIP_H) && (!isYuvBuffer(hnd)))
             return false;
+
+#ifdef QCOM_BSP
+        if(computeDirtyArea and mCachedFrame.hnd[i] != hnd) {
+            if(needsScaling(layer)) {
+                totalDirtyArea = 0;
+                computeDirtyArea = false;
+            } else {
+                hwc_rect_t dirtyRect = layer->dirtyRect;
+                ALOGD_IF(isDebug(),
+                        "Updating layer: %d Dirty rect: %d, %d, %d, %d",
+                        i, dirtyRect.left, dirtyRect.top, dirtyRect.right,
+                        dirtyRect.bottom);
+                totalDirtyArea += (dirtyRect.right - dirtyRect.left)
+                        * (dirtyRect.bottom - dirtyRect.top);
+            }
+        }
+#endif
+    }
+
+    if(totalDirtyArea) {
+        const uint32_t fbArea = ctx->dpyAttr[mDpy].xres *
+                ctx->dpyAttr[mDpy].yres;
+        if(totalDirtyArea < (fbArea / 20)) {
+            ALOGD_IF(isDebug(), "%s: Small update, bailing out. Dirty area %u",
+                    __FUNCTION__, totalDirtyArea);
+            return false;
+        }
     }
 
     if(ctx->mAD->isDoable()) {
