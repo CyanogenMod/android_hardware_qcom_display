@@ -427,6 +427,13 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. video transition padding round",
                 __FUNCTION__);
         ret = false;
+    } else if(qdutils::MDPVersion::getInstance().is8x26() &&
+              !mDpy && isSecondaryAnimating(ctx) &&
+              (isYuvPresent(ctx,HWC_DISPLAY_EXTERNAL) ||
+               isYuvPresent(ctx,HWC_DISPLAY_VIRTUAL))) {
+        ALOGD_IF(isDebug(),"%s: Display animation in progress",
+                 __FUNCTION__);
+        ret = false;
     } else if(isSecondaryConfiguring(ctx)) {
         ALOGD_IF( isDebug(),"%s: External Display connection is pending",
                   __FUNCTION__);
@@ -568,6 +575,14 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         ALOGD_IF(isDebug(),"%s: SKIP present: %d",
                 __FUNCTION__,
                 isSkipPresent(ctx, mDpy));
+        return false;
+    }
+
+    if(!mDpy && isSecondaryAnimating(ctx) &&
+       (isYuvPresent(ctx,HWC_DISPLAY_EXTERNAL) ||
+       isYuvPresent(ctx,HWC_DISPLAY_VIRTUAL)) ) {
+        ALOGD_IF(isDebug(),"%s: Display animation in progress",
+                 __FUNCTION__);
         return false;
     }
 
