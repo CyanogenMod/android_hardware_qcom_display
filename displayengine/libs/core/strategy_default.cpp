@@ -31,14 +31,17 @@
 
 namespace sde {
 
-StrategyDefault::StrategyDefault() : hw_layers_info_(NULL) {
+StrategyDefault::StrategyDefault(DisplayType type, const HWResourceInfo &hw_resource_info,
+                                 const HWPanelInfo &hw_panel_info) : type_(type),
+                                 hw_resource_info_(hw_resource_info),
+                                 hw_panel_info_(hw_panel_info), hw_layers_info_(NULL) {
 }
 
 DisplayError StrategyDefault::CreateStrategyInterface(uint16_t version, DisplayType type,
-                                                      const HWResourceInfo *hw_resource_info,
-                                                      const HWPanelInfo *hw_panel_info,
+                                                      const HWResourceInfo &hw_resource_info,
+                                                      const HWPanelInfo &hw_panel_info,
                                                       StrategyInterface **interface) {
-  StrategyDefault *strategy_default  = new StrategyDefault();
+  StrategyDefault *strategy_default  = new StrategyDefault(type, hw_resource_info, hw_panel_info);
 
   if (!strategy_default) {
     return kErrorMemory;
@@ -61,6 +64,18 @@ DisplayError StrategyDefault::DestroyStrategyInterface(StrategyInterface *interf
   return kErrorNone;
 }
 
+bool StrategyDefault::IsDisplaySplit(uint32_t fb_x_res) {
+  if (fb_x_res > hw_resource_info_.max_mixer_width) {
+    return true;
+  }
+
+  if ((type_ == kPrimary) && hw_panel_info_.split_info.right_split) {
+    return true;
+  }
+
+  return false;
+}
+
 DisplayError StrategyDefault::Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempts) {
   if (!hw_layers_info) {
     return kErrorParameters;
@@ -68,6 +83,29 @@ DisplayError StrategyDefault::Start(HWLayersInfo *hw_layers_info, uint32_t *max_
 
   hw_layers_info_ = hw_layers_info;
   *max_attempts = 1;
+
+  const LayerStack *layer_stack = hw_layers_info_->stack;
+  for (uint32_t i = 0; i < layer_stack->layer_count; i++) {
+    LayerComposition &composition = layer_stack->layers[i].composition;
+    if (composition == kCompositionGPUTarget) {
+      fb_layer_index_ = i;
+      break;
+    }
+  }
+
+  const LayerRect &src_rect = hw_layers_info_->stack->layers[fb_layer_index_].src_rect;
+  // TODO(user): read panels x_pixels and y_pixels instead of fb_x_res and fb_y_res
+  const float fb_x_res = src_rect.right - src_rect.left;
+  const float fb_y_res = src_rect.bottom - src_rect.top;
+
+  if (IsDisplaySplit(INT(fb_x_res))) {
+    float left_split = FLOAT(hw_panel_info_.split_info.left_split);
+    hw_layers_info->left_partial_update = (LayerRect) {0.0, 0.0, left_split, fb_y_res};
+    hw_layers_info->right_partial_update = (LayerRect) {left_split, 0.0, fb_x_res, fb_y_res};
+  } else {
+    hw_layers_info->left_partial_update = (LayerRect) {0.0, 0.0, fb_x_res, fb_y_res};
+    hw_layers_info->right_partial_update = (LayerRect) {0.0, 0.0, 0.0, 0.0};
+  }
 
   return kErrorNone;
 }

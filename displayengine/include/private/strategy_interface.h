@@ -96,7 +96,7 @@ class StrategyInterface;
   @return \link DisplayError \endlink
 */
 typedef DisplayError (*CreateStrategyInterface)(uint16_t version, DisplayType type,
-                      const HWResourceInfo *hw_resource_info, const HWPanelInfo *hw_panel_info,
+                      const HWResourceInfo &hw_resource_info, const HWPanelInfo &hw_panel_info,
                       StrategyInterface **interface);
 
 /*! @brief Function to destroy composer strategy interface.

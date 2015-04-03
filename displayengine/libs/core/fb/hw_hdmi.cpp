@@ -326,6 +326,7 @@ DisplayError HWHDMI::Standby() {
 }
 
 DisplayError HWHDMI::Validate(HWLayers *hw_layers) {
+  HWDevice::ResetDisplayParams();
   return HWDevice::Validate(hw_layers);
 }
 

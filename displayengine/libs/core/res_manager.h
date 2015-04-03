@@ -164,9 +164,12 @@ class ResManager : public DumpImpl {
   DisplayError Config(DisplayResourceContext *display_resource_ctx, HWLayers *hw_layers,
                       uint32_t *rotate_count);
   DisplayError DisplaySplitConfig(DisplayResourceContext *display_resource_ctx,
-                                  const LayerTransform &transform, const LayerRect &src_rect,
-                                  const LayerRect &dst_rect, HWLayerConfig *layer_config,
+                                  const LayerTransform &transform,
+                                  const LayerRect &src_rect, const LayerRect &dst_rect,
+                                  const HWLayers &hw_layers, HWLayerConfig *layer_config,
                                   uint32_t align_x);
+  DisplayError ValidateScaling(const Layer &layer, const LayerRect &crop,
+                               const LayerRect &dst, float *rot_scale);
   DisplayError SrcSplitConfig(DisplayResourceContext *display_resource_ctx,
                               const LayerTransform &transform, const LayerRect &src_rect,
                               const LayerRect &dst_rect, HWLayerConfig *layer_config,
@@ -210,8 +213,8 @@ class ResManager : public DumpImpl {
                               const bool &rot90, const bool &downscale,
                               LayerBufferFormat *output_format);
   DisplayError AlignPipeConfig(const Layer &layer, const LayerTransform &transform,
-                               HWPipeInfo *left_pipe, HWPipeInfo *right_pipe,
-                               uint32_t align_x, uint32_t align_y);
+                               const HWLayers &hw_layers, HWPipeInfo *left_pipe,
+                               HWPipeInfo *right_pipe, uint32_t align_x, uint32_t align_y);
   void ResourceStateLog(void);
   DisplayError CalculateDecimation(float downscale, uint8_t *decimation);
 

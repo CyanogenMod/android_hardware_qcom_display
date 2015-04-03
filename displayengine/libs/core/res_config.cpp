@@ -142,31 +142,39 @@ DisplayError ResManager::SrcSplitConfig(DisplayResourceContext *display_resource
 DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_resource_ctx,
                                             const LayerTransform &transform,
                                             const LayerRect &src_rect, const LayerRect &dst_rect,
-                                            HWLayerConfig *layer_config, uint32_t align_x) {
+                                            const HWLayers &hw_layers, HWLayerConfig *layer_config,
+                                            uint32_t align_x) {
   LayerRect scissor_dst_left, scissor_dst_right;
   HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
 
   // for display split case
   HWPipeInfo *left_pipe = &layer_config->left_pipe;
   HWPipeInfo *right_pipe = &layer_config->right_pipe;
-  LayerRect scissor, dst_left, crop_left, crop_right, dst_right;
-  scissor.right = FLOAT(display_attributes.split_left);
-  scissor.bottom = FLOAT(display_attributes.y_pixels);
+  LayerRect scissor_left, scissor_right, dst_left, crop_left, crop_right, dst_right;
+
+  scissor_left.right = FLOAT(display_attributes.split_left);
+  scissor_left.bottom = FLOAT(display_attributes.y_pixels);
+
+  scissor_right.left = FLOAT(display_attributes.split_left);
+  scissor_right.top = 0.0f;
+  scissor_right.right = FLOAT(display_attributes.x_pixels);
+  scissor_right.bottom = FLOAT(display_attributes.y_pixels);
+
+  if (IsValid(hw_layers.info.left_partial_update) ||
+      IsValid(hw_layers.info.right_partial_update)) {
+    scissor_left = hw_layers.info.left_partial_update;
+    scissor_right = hw_layers.info.right_partial_update;
+  }
 
   crop_left = src_rect;
   dst_left = dst_rect;
   crop_right = crop_left;
   dst_right = dst_left;
-  bool crop_left_valid = CalculateCropRects(scissor, transform, &crop_left, &dst_left);
-
-  scissor.left = FLOAT(display_attributes.split_left);
-  scissor.top = 0.0f;
-  scissor.right = FLOAT(display_attributes.x_pixels);
-  scissor.bottom = FLOAT(display_attributes.y_pixels);
+  bool crop_left_valid = CalculateCropRects(scissor_left, transform, &crop_left, &dst_left);
   bool crop_right_valid = false;
 
-  if (IsValid(scissor)) {
-    crop_right_valid = CalculateCropRects(scissor, transform, &crop_right, &dst_right);
+  if (IsValid(scissor_right)) {
+    crop_right_valid = CalculateCropRects(scissor_right, transform, &crop_right, &dst_right);
   }
 
   if (crop_left_valid && (crop_left.right - crop_left.left) > hw_res_info_.max_pipe_width) {
@@ -248,6 +256,10 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     scissor.right = FLOAT(display_attributes.x_pixels);
     scissor.bottom = FLOAT(display_attributes.y_pixels);
 
+    if (IsValid(hw_layers->info.left_partial_update)) {
+      scissor = hw_layers->info.left_partial_update;
+    }
+
     struct HWLayerConfig *layer_config = &hw_layers->config[i];
     HWPipeInfo &left_pipe = layer_config->left_pipe;
     HWPipeInfo &right_pipe = layer_config->right_pipe;
@@ -295,19 +307,21 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
       transform = LayerTransform();
     }
 
+    // TODO(user): need to revisit this logic
     if (hw_res_info_.is_src_split) {
-      error = SrcSplitConfig(display_resource_ctx, transform, src_rect,
-                             dst_rect, layer_config, align_x);
+      error = SrcSplitConfig(display_resource_ctx, transform, src_rect, dst_rect, layer_config,
+                             align_x);
     } else {
-      error = DisplaySplitConfig(display_resource_ctx, transform, src_rect,
-                                 dst_rect, layer_config, align_x);
+      error = DisplaySplitConfig(display_resource_ctx, transform, src_rect, dst_rect, *hw_layers,
+                                 layer_config, align_x);
     }
 
     if (error != kErrorNone) {
       break;
     }
 
-    error = AlignPipeConfig(layer, transform, &left_pipe, &right_pipe, align_x, align_y);
+    error = AlignPipeConfig(layer, transform, *hw_layers, &left_pipe, &right_pipe, align_x,
+                            align_y);
     if (error != kErrorNone) {
       break;
     }
@@ -742,8 +756,9 @@ void ResManager::SplitRect(bool flip_horizontal, const LayerRect &src_rect,
 }
 
 DisplayError ResManager::AlignPipeConfig(const Layer &layer, const LayerTransform &transform,
-                                         HWPipeInfo *left_pipe, HWPipeInfo *right_pipe,
-                                         uint32_t align_x, uint32_t align_y) {
+                                         const HWLayers &hw_layers, HWPipeInfo *left_pipe,
+                                         HWPipeInfo *right_pipe, uint32_t align_x,
+                                         uint32_t align_y) {
   DisplayError error = kErrorNone;
   if (!left_pipe->valid) {
     DLOGE_IF(kTagResources, "left_pipe should not be invalid");
@@ -753,7 +768,6 @@ DisplayError ResManager::AlignPipeConfig(const Layer &layer, const LayerTransfor
   //    rectangle of video layer to be even.
   // 2. Normalize source and destination rect of a layer to multiple of 1.
   // TODO(user) Check buffer format and check if rotate is involved.
-
   Normalize(align_x, align_y, &left_pipe->src_roi);
   Normalize(1, 1, &left_pipe->dst_roi);
 
@@ -762,8 +776,10 @@ DisplayError ResManager::AlignPipeConfig(const Layer &layer, const LayerTransfor
     Normalize(1, 1, &right_pipe->dst_roi);
   }
 
-  if (right_pipe->valid) {
-    // Make sure the  left and right ROI are conjunct
+  // Make sure the  left and right ROI are conjunct, then make pipes ROI conjunct.
+  if (right_pipe->valid &&
+      (!IsValid(hw_layers.info.right_partial_update) ||
+      (hw_layers.info.left_partial_update.right == hw_layers.info.right_partial_update.left))) {
     if (transform.flip_horizontal) {
       left_pipe->src_roi.left = right_pipe->src_roi.right;
     } else {

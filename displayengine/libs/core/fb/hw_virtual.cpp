@@ -119,6 +119,7 @@ DisplayError HWVirtual::Standby() {
 }
 
 DisplayError HWVirtual::Validate(HWLayers *hw_layers) {
+  HWDevice::ResetDisplayParams();
   return HWDevice::Validate(hw_layers);
 }
 

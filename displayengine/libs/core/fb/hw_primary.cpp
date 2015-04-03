@@ -299,6 +299,27 @@ DisplayError HWPrimary::Standby() {
 }
 
 DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
+  HWDevice::ResetDisplayParams();
+
+  mdp_layer_commit_v1 &mdp_commit = mdp_disp_commit_.commit_v1;
+
+  LayerRect left_roi = hw_layers->info.left_partial_update;
+  LayerRect right_roi = hw_layers->info.right_partial_update;
+  mdp_commit.left_roi.x = INT(left_roi.left);
+  mdp_commit.left_roi.y = INT(left_roi.top);
+  mdp_commit.left_roi.w = INT(left_roi.right - left_roi.left);
+  mdp_commit.left_roi.h = INT(left_roi.bottom - left_roi.top);
+
+  // SDE treats ROI as one full coordinate system.
+  // In case source split is disabled, However, Driver assumes Mixer to operate in
+  // different co-ordinate system.
+  if (!hw_resource_.is_src_split) {
+    mdp_commit.right_roi.x = INT(right_roi.left) - hw_panel_info_.split_info.left_split;
+    mdp_commit.right_roi.y = INT(right_roi.top);
+    mdp_commit.right_roi.w = INT(right_roi.right - right_roi.left);
+    mdp_commit.right_roi.h = INT(right_roi.bottom - right_roi.top);
+  }
+
   return HWDevice::Validate(hw_layers);
 }
 
@@ -402,7 +423,7 @@ void HWPrimary::HandleThermal(char *data) {
     thermal_level = strtoull(data + strlen("thermal_level="), NULL, 0);
   }
 
-  DLOGI("Received thermal notification with thermal level = %d",thermal_level);
+  DLOGI("Received thermal notification with thermal level = %d", thermal_level);
 
   event_handler_->ThermalEvent(thermal_level);
 }
