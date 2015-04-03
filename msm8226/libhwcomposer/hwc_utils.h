@@ -108,6 +108,10 @@ struct DisplayAttributes {
     bool customFBSize;
     uint32_t xres_new;
     uint32_t yres_new;
+    //This is the last value that was attempted to be set on the driver
+    //It is only used to restore the last active power mode
+    //in case of an ESD event.
+    int lastPowerMode;
 
 };
 
