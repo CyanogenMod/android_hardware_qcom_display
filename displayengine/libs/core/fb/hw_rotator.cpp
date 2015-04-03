@@ -173,17 +173,7 @@ void HWRotator::SetCtrlParams(HWLayers *hw_layers) {
       if (hw_rotate_info->valid) {
         mdp_rotation_item *mdp_rot_item = &mdp_rot_request_.list[rot_count];
 
-        if (rot90) {
-          mdp_rot_item->flags |= MDP_ROTATION_90;
-        }
-
-        if (layer.transform.flip_horizontal) {
-          mdp_rot_item->flags |= MDP_ROTATION_FLIP_LR;
-        }
-
-        if (layer.transform.flip_vertical) {
-          mdp_rot_item->flags |= MDP_ROTATION_FLIP_UD;
-        }
+        SetMDPFlags(layer, &mdp_rot_item->flags);
 
         SetRect(hw_rotate_info->src_roi, &mdp_rot_item->src_rect);
         SetRect(hw_rotate_info->dst_roi, &mdp_rot_item->dst_rect);
@@ -271,6 +261,27 @@ void HWRotator::SetBufferParams(HWLayers *hw_layers) {
         DLOGV_IF(kTagDriverConfig, "*************************************************************");
       }
     }
+  }
+}
+
+ void HWRotator::SetMDPFlags(const Layer &layer, uint32_t *mdp_flags) {
+  LayerTransform transform = layer.transform;
+  bool rot90 = (transform.rotation == 90.0f);
+
+  if (rot90) {
+    *mdp_flags |= MDP_ROTATION_90;
+  }
+
+  if (transform.flip_horizontal) {
+    *mdp_flags |= MDP_ROTATION_FLIP_LR;
+  }
+
+  if (transform.flip_vertical) {
+    *mdp_flags |= MDP_ROTATION_FLIP_UD;
+  }
+
+  if (layer.input_buffer->flags.secure) {
+    *mdp_flags |= MDP_ROTATION_SECURE;
   }
 }
 

@@ -53,6 +53,7 @@ class HWRotator : public HWDevice, public HWRotatorInterface {
   void ResetParams();
   void SetCtrlParams(HWLayers *hw_layers);
   void SetBufferParams(HWLayers *hw_layers);
+  void SetMDPFlags(const Layer &layer, uint32_t *rot_flags);
 
   struct mdp_rotation_request mdp_rot_request_;
   struct mdp_rotation_item mdp_rot_layers_[kMaxSDELayers * 2];  // split panel (left + right)

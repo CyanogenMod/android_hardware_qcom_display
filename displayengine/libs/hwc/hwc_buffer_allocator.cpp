@@ -85,7 +85,7 @@ DisplayError HWCBufferAllocator::AllocateBuffer(BufferInfo *buffer_info) {
   uint32_t buffer_size = getBufferSizeAndDimensions(width, height, format, alloc_flags,
                                                     aligned_width, aligned_height);
 
-  buffer_size = ROUND_UP((buffer_size * buffer_config.buffer_count), data.align);
+  buffer_size = ROUND_UP(buffer_size, data.align) * buffer_config.buffer_count;
 
   data.base = 0;
   data.fd = -1;
@@ -116,8 +116,9 @@ DisplayError HWCBufferAllocator::FreeBuffer(BufferInfo *buffer_info) {
 
   AllocatedBufferInfo *alloc_buffer_info = &buffer_info->alloc_buffer_info;
   MetaBufferInfo *meta_buffer_info = static_cast<MetaBufferInfo *> (buffer_info->private_data);
-  if ((alloc_buffer_info->fd < 0) || (meta_buffer_info->base_addr == NULL)) {
-    return kErrorNone;
+  if (alloc_buffer_info->fd < 0) {
+    DLOGE("Invalid parameters: fd %d", alloc_buffer_info->fd);
+    return kErrorParameters;
   }
 
   gralloc::IMemAlloc *memalloc = alloc_controller_->getAllocator(meta_buffer_info->alloc_type);

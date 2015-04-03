@@ -235,7 +235,7 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
   for (uint32_t i = 0; i < layer_info.count; i++) {
     Layer& layer = layer_info.stack->layers[layer_info.index[i]];
     float rot_scale = 1.0f;
-    if (!IsValidDimension(layer.src_rect, layer.dst_rect)) {
+    if (!IsValidDimension(layer)) {
       DLOGV_IF(kTagResources, "Input is invalid");
       Log(kTagResources, "input layer src_rect", layer.src_rect);
       Log(kTagResources, "input layer dst_rect", layer.dst_rect);
@@ -514,22 +514,25 @@ bool ResManager::CalculateCropRects(const LayerRect &scissor, const LayerTransfo
     return false;
 }
 
-bool ResManager::IsValidDimension(const LayerRect &src, const LayerRect &dst) {
-  // Make sure source in integral
-  if (src.left - roundf(src.left)     ||
-      src.top - roundf(src.top)       ||
-      src.right - roundf(src.right)   ||
-      src.bottom - roundf(src.bottom)) {
+bool ResManager::IsValidDimension(const Layer &layer) {
+  const LayerRect &src = layer.src_rect;
+  const LayerRect &dst = layer.dst_rect;
+  LayerBuffer *input_buffer = layer.input_buffer;
+
+  if (!IsValid(src) || !IsValid(dst)) {
+    Log(kTagResources, "input layer src_rect", src);
+    Log(kTagResources, "input layer dst_rect", dst);
+    return false;
+  }
+
+  // Make sure source in integral only if it is a non secure layer.
+  if (!input_buffer->flags.secure && (src.left - roundf(src.left) || src.top - roundf(src.top) ||
+      src.right - roundf(src.right) || src.bottom - roundf(src.bottom))) {
     DLOGV_IF(kTagResources, "Input ROI is not integral");
     return false;
   }
 
-  if (src.left > src.right || src.top > src.bottom || dst.left > dst.right ||
-      dst.top > dst.bottom) {
-    return false;
-  } else {
-    return true;
-  }
+  return true;
 }
 
 DisplayError ResManager::SetDecimationFactor(HWPipeInfo *pipe) {
