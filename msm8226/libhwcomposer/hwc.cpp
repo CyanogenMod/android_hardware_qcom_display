@@ -328,13 +328,14 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
 
+    //Will be unlocked at the end of set
+    ctx->mDrawLock.lock();
+
     if (ctx->mPanelResetStatus) {
         ALOGW("%s: panel is in bad state. reset the panel", __FUNCTION__);
         reset_panel(dev);
     }
 
-    //Will be unlocked at the end of set
-    ctx->mDrawLock.lock();
     setPaddingRound(ctx, (int)numDisplays, displays);
     setDMAState(ctx, (int)numDisplays, displays);
     setNumActiveDisplays(ctx, (int)numDisplays, displays);
@@ -436,6 +437,7 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
             break;
     }
 
+    ctx->dpyAttr[dpy].lastPowerMode = value;
     switch(dpy) {
     case HWC_DISPLAY_PRIMARY:
         if(ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK, value) < 0 ) {
@@ -495,17 +497,21 @@ static void reset_panel(struct hwc_composer_device_1* dev)
         return;
     }
 
-    ALOGD("%s: setting power mode off", __FUNCTION__);
-    ret = hwc_setPowerMode(dev, HWC_DISPLAY_PRIMARY, HWC_POWER_MODE_OFF);
+    ALOGD("%s: Blanking display", __FUNCTION__);
+    ret = ioctl(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd, FBIOBLANK,
+            FB_BLANK_POWERDOWN);
     if (ret < 0) {
         ALOGE("%s: FBIOBLANK failed to BLANK:  %s", __FUNCTION__,
                 strerror(errno));
     }
 
-    ALOGD("%s: setting power mode normal and enabling vsync", __FUNCTION__);
-    ret = hwc_setPowerMode(dev, HWC_DISPLAY_PRIMARY, HWC_POWER_MODE_NORMAL);
+    ALOGD("%s: setting power mode to previous active mode and enabling vsync",
+            __FUNCTION__);
+    ret = ioctl(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd, FBIOBLANK,
+            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].lastPowerMode);
     if (ret < 0) {
-        ALOGE("%s: FBIOBLANK failed to UNBLANK : %s", __FUNCTION__,
+        ALOGE("%s: FBIOBLANK failed to restore mode %d : %s", __FUNCTION__,
+                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].lastPowerMode,
                 strerror(errno));
     }
     hwc_vsync_control(ctx, HWC_DISPLAY_PRIMARY, 1);
