@@ -198,6 +198,12 @@ static void setNumActiveDisplays(hwc_context_t *ctx, int numDisplays,
     }
 }
 
+static bool isHotPluggable(hwc_context_t *ctx, int dpy) {
+    return ((dpy == HWC_DISPLAY_EXTERNAL) ||
+            ((dpy == HWC_DISPLAY_PRIMARY) &&
+             ctx->mHDMIDisplay->isHDMIPrimaryDisplay()));
+}
+
 static void reset(hwc_context_t *ctx, int numDisplays,
                   hwc_display_contents_1_t** displays) {
 
@@ -698,43 +704,56 @@ static int hwc_set(hwc_composer_device_1 *dev,
 
 int hwc_getDisplayConfigs(struct hwc_composer_device_1* dev, int disp,
         uint32_t* configs, size_t* numConfigs) {
-    int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-    disp = getDpyforExternalDisplay(ctx, disp);
 
-    //Currently we allow only 1 config, reported as config id # 0
-    //This config is passed in to getDisplayAttributes. Ignored for now.
+    disp = getDpyforExternalDisplay(ctx, disp);
+    Locker::Autolock _l(ctx->mDrawLock);
+    bool hotPluggable = isHotPluggable(ctx, disp);
+    bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
+    // If hotpluggable or virtual displays are inactive return error
+    if ((hotPluggable || isVirtualDisplay) && !ctx->dpyAttr[disp].connected) {
+        ALOGE("%s display (%d) is inactive", __FUNCTION__, disp);
+        return -EINVAL;
+    }
+
+    if (*numConfigs <= 0) {
+        ALOGE("%s Invalid number of configs (%d)", __FUNCTION__, *numConfigs);
+        return -EINVAL;
+    }
+
     switch(disp) {
         case HWC_DISPLAY_PRIMARY:
-            if(*numConfigs > 0) {
+            if (hotPluggable) {
+                ctx->mHDMIDisplay->getDisplayConfigs(configs, numConfigs);
+            } else {
                 configs[0] = 0;
                 *numConfigs = 1;
             }
-            ret = 0; //NO_ERROR
             break;
         case HWC_DISPLAY_EXTERNAL:
+                ctx->mHDMIDisplay->getDisplayConfigs(configs, numConfigs);
+            break;
         case HWC_DISPLAY_VIRTUAL:
-            ret = -1; //Not connected
-            if(ctx->dpyAttr[disp].connected) {
-                ret = 0; //NO_ERROR
-                if(*numConfigs > 0) {
-                    configs[0] = 0;
-                    *numConfigs = 1;
-                }
-            }
+            configs[0] = 0;
+            *numConfigs = 1;
             break;
     }
-    return ret;
+    return 0;
 }
 
 int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         uint32_t config, const uint32_t* attributes, int32_t* values) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+
     disp = getDpyforExternalDisplay(ctx, disp);
-    //If hotpluggable displays(i.e, HDMI, WFD) are inactive return error
-    if( (disp != HWC_DISPLAY_PRIMARY) && !ctx->dpyAttr[disp].connected) {
-        return -1;
+    Locker::Autolock _l(ctx->mDrawLock);
+    bool hotPluggable = isHotPluggable(ctx, disp);
+    bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
+    // If hotpluggable or virtual displays are inactive return error
+    if ((hotPluggable || isVirtualDisplay) && !ctx->dpyAttr[disp].connected) {
+        ALOGE("%s display (%d) is inactive", __FUNCTION__, disp);
+        return -EINVAL;
     }
 
     //From HWComposer
@@ -751,18 +770,29 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
     const int NUM_DISPLAY_ATTRIBUTES = (sizeof(DISPLAY_ATTRIBUTES) /
             sizeof(DISPLAY_ATTRIBUTES)[0]);
 
+    uint32_t xres = 0, yres = 0, refresh = 0;
+    int ret = 0;
+    if (hotPluggable) {
+        ret = ctx->mHDMIDisplay->getAttrForConfig(config, xres, yres, refresh);
+        if(ret < 0) {
+            ALOGE("%s Error getting attributes for config %d", config);
+            return ret;
+        }
+    }
+
     for (size_t i = 0; i < NUM_DISPLAY_ATTRIBUTES - 1; i++) {
         switch (attributes[i]) {
         case HWC_DISPLAY_VSYNC_PERIOD:
-            values[i] = ctx->dpyAttr[disp].vsync_period;
+            values[i] =
+                    hotPluggable ? refresh : ctx->dpyAttr[disp].vsync_period;
             break;
         case HWC_DISPLAY_WIDTH:
-            values[i] = ctx->dpyAttr[disp].xres;
+            values[i] = hotPluggable ? xres : ctx->dpyAttr[disp].xres;
             ALOGD("%s disp = %d, width = %d",__FUNCTION__, disp,
                     ctx->dpyAttr[disp].xres);
             break;
         case HWC_DISPLAY_HEIGHT:
-            values[i] = ctx->dpyAttr[disp].yres;
+            values[i] = hotPluggable ? yres : ctx->dpyAttr[disp].yres;
             ALOGD("%s disp = %d, height = %d",__FUNCTION__, disp,
                     ctx->dpyAttr[disp].yres);
             break;
@@ -810,15 +840,54 @@ void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
     strlcpy(buff, aBuf.string(), buff_len);
 }
 
-int hwc_getActiveConfig(struct hwc_composer_device_1* /*dev*/, int /*disp*/) {
-    //Supports only the default config (0th index) for now
-    return 0;
+int hwc_getActiveConfig(struct hwc_composer_device_1* dev, int disp)
+{
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    Locker::Autolock _l(ctx->mDrawLock);
+    bool hotPluggable = isHotPluggable(ctx, disp);
+    bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
+    // If hotpluggable or virtual displays are inactive return error
+    if ((hotPluggable || isVirtualDisplay) && !ctx->dpyAttr[disp].connected) {
+        ALOGE("%s display (%d) is inactive", __FUNCTION__, disp);
+        return -EINVAL;
+    }
+
+    // For use cases when primary panel is the default interface we only have
+    // the default config (0th index)
+    if (!hotPluggable) {
+        return 0;
+    }
+
+    return ctx->mHDMIDisplay->getActiveConfig();
 }
 
-int hwc_setActiveConfig(struct hwc_composer_device_1* /*dev*/, int /*disp*/,
-        int index) {
-    //Supports only the default config (0th index) for now
-    return (index == 0) ? index : -EINVAL;
+int hwc_setActiveConfig(struct hwc_composer_device_1* dev, int disp, int index)
+{
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+    int status;
+
+    Locker::Autolock _l(ctx->mDrawLock);
+    bool hotPluggable = isHotPluggable(ctx, disp);
+    bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
+
+    // If hotpluggable or virtual displays are inactive return error
+    if ((hotPluggable || isVirtualDisplay) && !ctx->dpyAttr[disp].connected) {
+        ALOGE("%s display (%d) is inactive", __FUNCTION__, disp);
+        return -EINVAL;
+    }
+
+    // For use cases when primary panel is the default interface we only have
+    // the default config (0th index)
+    if (!hotPluggable) {
+        // Primary and virtual supports only the default config (0th index)
+        return (index == 0) ? index : -EINVAL;
+    }
+
+    status = ctx->mHDMIDisplay->setActiveConfig(index);
+    if(status == 0)
+        ctx->proc->invalidate(ctx->proc);
+    return status;
 }
 
 static int hwc_device_close(struct hw_device_t *dev)
