@@ -742,8 +742,13 @@ int HDMIDisplay::getAttrForConfig(int config, uint32_t& xres,
     // Retrieve the mode attributes from gEDIDData
     for (int dataIndex = 0; dataIndex < gEDIDCount; dataIndex++) {
         if (gEDIDData[dataIndex].mMode == mode) {
-            xres = gEDIDData[dataIndex].mWidth;
-            yres = gEDIDData[dataIndex].mHeight;
+            if(mMDPScalingMode && (config == mActiveConfig)) {
+                xres = mXres;
+                yres = mYres;
+            } else {
+                xres = gEDIDData[dataIndex].mWidth;
+                yres = gEDIDData[dataIndex].mHeight;
+            }
             fps = gEDIDData[dataIndex].mFps;
         }
     }
