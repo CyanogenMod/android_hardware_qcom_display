@@ -33,6 +33,15 @@
 
 namespace sde {
 
+static void GetAlignFactor(const LayerBufferFormat &format, uint32_t *align_x, uint32_t *align_y) {
+  *align_x = 1;
+  *align_y = 1;
+  if (!IS_RGB_FORMAT(format)) {
+    *align_x = 2;
+    *align_y = 2;
+  }
+}
+
 void ResManager::RotationConfig(LayerBufferFormat format, const LayerTransform &transform,
                                 const float &downscale, LayerRect *src_rect,
                                 struct HWLayerConfig *layer_config, uint32_t *rotate_count) {
@@ -46,22 +55,24 @@ void ResManager::RotationConfig(LayerBufferFormat format, const LayerTransform &
   dst_rect.left = 0.0f;
 
   rotate->downscale_ratio = downscale;
+  uint32_t align_x, align_y;
+  GetAlignFactor(format, &align_x, &align_y);
 
   // downscale when doing rotation
   if (rot90) {
     if (downscale > 1.0f) {
-      src_height = ROUND_UP_ALIGN_DOWN(src_height, downscale);
+      src_height = ROUND_UP_ALIGN_DOWN(src_height, downscale * FLOAT(align_x));
       src_rect->bottom = src_rect->top + src_height;
-      src_width = ROUND_UP_ALIGN_DOWN(src_width, downscale);
+      src_width = ROUND_UP_ALIGN_DOWN(src_width, downscale * FLOAT(align_y));
       src_rect->right = src_rect->left + src_width;
     }
     dst_rect.right = src_height / downscale;
     dst_rect.bottom = src_width / downscale;
   } else {
     if (downscale > 1.0f) {
-      src_width = ROUND_UP_ALIGN_DOWN(src_width, downscale);
+      src_width = ROUND_UP_ALIGN_DOWN(src_width, downscale * FLOAT(align_x));
       src_rect->right = src_rect->left + src_width;
-      src_height = ROUND_UP_ALIGN_DOWN(src_height, downscale);
+      src_height = ROUND_UP_ALIGN_DOWN(src_height, downscale * FLOAT(align_y));
       src_rect->bottom = src_rect->top + src_height;
     }
     dst_rect.right = src_width / downscale;
@@ -250,11 +261,9 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
       continue;
     }
 
-    uint32_t align_x = 1, align_y = 1;
-    if (IsYuvFormat(layer.input_buffer->format)) {
-      // TODO(user) Select x and y alignment according to the format
-      align_x = 2;
-      align_y = 2;
+    uint32_t align_x, align_y;
+    GetAlignFactor(layer.input_buffer->format, &align_x, &align_y);
+    if (align_x > 1 || align_y > 1) {
       NormalizeRect(align_x, align_y, &src_rect);
     }
 
