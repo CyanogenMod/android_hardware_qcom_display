@@ -46,6 +46,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int SetActiveConfig(hwc_display_contents_1_t *content_list);
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
+  virtual uint32_t GetLastPowerMode();
 
  protected:
   // Maximum number of layers supported by display engine.
@@ -117,6 +118,7 @@ class HWCDisplay : public DisplayEventHandler {
   uint32_t dump_frame_count_;
   uint32_t dump_frame_index_;
   bool dump_input_layers_;
+  uint32_t last_power_mode_;
 };
 
 }  // namespace sde

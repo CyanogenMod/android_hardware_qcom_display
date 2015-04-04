@@ -105,10 +105,12 @@ int HWCDisplay::SetPowerMode(int mode) {
     break;
   case HWC_POWER_MODE_NORMAL:
     state = kStateOn;
+    last_power_mode_ = HWC_POWER_MODE_NORMAL;
     break;
   case HWC_POWER_MODE_DOZE:
   case HWC_POWER_MODE_DOZE_SUSPEND:
     state = kStateDoze;
+    last_power_mode_ = HWC_POWER_MODE_DOZE;
     break;
   default:
     return -EINVAL;
@@ -206,6 +208,10 @@ void HWCDisplay::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type
   dump_input_layers_ = ((bit_mask_layer_type & (1 << INPUT_LAYER_DUMP)) != 0);
 
   DLOGI("num_frame_dump %d, input_layer_dump_enable %d", dump_frame_count_, dump_input_layers_);
+}
+
+uint32_t HWCDisplay::GetLastPowerMode() {
+  return last_power_mode_;
 }
 
 DisplayError HWCDisplay::VSync(const DisplayEventVSync &vsync) {
