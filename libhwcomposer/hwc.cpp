@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -242,8 +242,8 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
     ATRACE_CALL();
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     const int dpy = HWC_DISPLAY_PRIMARY;
-    if (LIKELY(list && list->numHwLayers > 1) &&
-            ctx->dpyAttr[dpy].isActive) {
+    if (LIKELY(list && list->numHwLayers > 1) && ctx->dpyAttr[dpy].connected &&
+            ctx->dpyAttr[dpy].isActive ) {
         reset_layer_prop(ctx, dpy, list->numHwLayers - 1);
         setListStats(ctx, list, dpy);
 #ifdef VPU_TARGET
@@ -775,7 +775,8 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
     if (hotPluggable) {
         ret = ctx->mHDMIDisplay->getAttrForConfig(config, xres, yres, refresh);
         if(ret < 0) {
-            ALOGE("%s Error getting attributes for config %d", config);
+            ALOGE("%s Error getting attributes for config %d",
+                    __FUNCTION__, config);
             return ret;
         }
     }

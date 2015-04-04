@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -99,11 +99,6 @@ int HDMIDisplay::configure() {
         //Get the best mode and set
         mActiveConfig = getBestConfig();
     }
-    // Set the mode corresponding to the active index
-    mCurrentMode = mEDIDModes[mActiveConfig];
-    setAttributes();
-    // set system property
-    property_set("hw.hdmiON", "1");
 
     // Read the system property to determine if downscale feature is enabled.
     char value[PROPERTY_VALUE_MAX];
@@ -112,6 +107,12 @@ int HDMIDisplay::configure() {
             && !strcmp(value, "true")) {
         mMDPDownscaleEnabled = true;
     }
+
+    // Set the mode corresponding to the active index
+    mCurrentMode = mEDIDModes[mActiveConfig];
+    setAttributes();
+    // set system property
+    property_set("hw.hdmiON", "1");
 
     // XXX: A debug property can be used to enable resolution change for
     // testing purposes: debug.hwc.enable_resolution_change
@@ -138,7 +139,7 @@ int HDMIDisplay::teardown() {
 
 HDMIDisplay::HDMIDisplay():mFd(-1),
     mCurrentMode(-1), mModeCount(0), mPrimaryWidth(0), mPrimaryHeight(0),
-    mUnderscanSupported(false)
+    mUnderscanSupported(false), mMDPDownscaleEnabled(false)
 {
     memset(&mVInfo, 0, sizeof(mVInfo));
 
@@ -149,10 +150,12 @@ HDMIDisplay::HDMIDisplay():mFd(-1),
     }
 
     mFbNum = overlay::Overlay::getInstance()->getFbForDpy(mDisplayId);
-    // disable HPD at start, it will be enabled later
+    // Disable HPD at start if HDMI is external, it will be enabled later
     // when the display powers on
     // This helps for framework reboot or adb shell stop/start
-    writeHPDOption(0);
+    if (mDisplayId) {
+        writeHPDOption(0);
+    }
 
     // for HDMI - retreive all the modes supported by the driver
     if(mFbNum != -1) {
