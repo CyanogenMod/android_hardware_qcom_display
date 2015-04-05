@@ -48,7 +48,12 @@ DisplayError DisplayVirtual::Init() {
   if (error != kErrorNone) {
     return error;
   }
+
   DisplayBase::hw_intf_ = hw_virtual_intf_;
+  error = hw_virtual_intf_->Open(NULL);
+  if (error != kErrorNone) {
+    return error;
+  }
 
   error = DisplayBase::Init();
   if (error != kErrorNone) {
@@ -68,6 +73,83 @@ DisplayError DisplayVirtual::Deinit() {
   HWVirtualInterface::Destroy(hw_virtual_intf_);
 
   return error;
+}
+
+DisplayError DisplayVirtual::Prepare(LayerStack *layer_stack) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::Prepare(layer_stack);
+}
+
+DisplayError DisplayVirtual::Commit(LayerStack *layer_stack) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::Commit(layer_stack);
+}
+
+DisplayError DisplayVirtual::Flush() {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::Flush();
+}
+
+DisplayError DisplayVirtual::GetDisplayState(DisplayState *state) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetDisplayState(state);
+}
+
+DisplayError DisplayVirtual::GetNumVariableInfoConfigs(uint32_t *count) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetNumVariableInfoConfigs(count);
+}
+
+DisplayError DisplayVirtual::GetConfig(DisplayConfigFixedInfo *fixed_info) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetConfig(fixed_info);
+}
+
+DisplayError DisplayVirtual::GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetConfig(index, variable_info);
+}
+
+DisplayError DisplayVirtual::GetActiveConfig(uint32_t *index) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetActiveConfig(index);
+}
+
+DisplayError DisplayVirtual::GetVSyncState(bool *enabled) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetVSyncState(enabled);
+}
+
+DisplayError DisplayVirtual::SetDisplayState(DisplayState state) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetDisplayState(state);
+}
+
+DisplayError DisplayVirtual::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetActiveConfig(variable_info);
+}
+
+DisplayError DisplayVirtual::SetActiveConfig(uint32_t index) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetActiveConfig(index);
+}
+
+DisplayError DisplayVirtual::SetVSyncState(bool enable) {
+  SCOPE_LOCK(locker_);
+  return kErrorNotSupported;
+}
+
+void DisplayVirtual::SetIdleTimeoutMs(uint32_t timeout_ms) { }
+
+DisplayError DisplayVirtual::SetMaxMixerStages(uint32_t max_mixer_stages) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetMaxMixerStages(max_mixer_stages);
+}
+
+void DisplayVirtual::AppendDump(char *buffer, uint32_t length) {
+  SCOPE_LOCK(locker_);
+  DisplayBase::AppendDump(buffer, length);
 }
 
 }  // namespace sde

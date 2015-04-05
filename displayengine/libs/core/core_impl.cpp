@@ -123,7 +123,7 @@ DisplayError CoreImpl::CreateDisplay(DisplayType type, DisplayEventHandler *even
     return kErrorParameters;
   }
 
-  if (UNLIKELY(!display_base)) {
+  if (!display_base) {
     return kErrorMemory;
   }
 

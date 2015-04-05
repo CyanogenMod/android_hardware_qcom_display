@@ -41,7 +41,7 @@ DisplayError HWVirtualInterface::Create(HWVirtualInterface **intf, HWInfoInterfa
 
   hw_virtual = new HWVirtual(buffer_sync_handler, hw_info_intf);
   error = hw_virtual->Init();
-  if (UNLIKELY(error != kErrorNone)) {
+  if (error != kErrorNone) {
     delete hw_virtual;
   } else {
     *intf = hw_virtual;
