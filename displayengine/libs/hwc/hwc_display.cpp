@@ -634,6 +634,8 @@ LayerBufferFormat HWCDisplay::GetSDEFormat(const int32_t &source, const int flag
 
   switch (source) {
   case HAL_PIXEL_FORMAT_RGBA_8888:                format = kFormatRGBA8888;                 break;
+  case HAL_PIXEL_FORMAT_RGBA_5551:                format = kFormatRGBA5551;                 break;
+  case HAL_PIXEL_FORMAT_RGBA_4444:                format = kFormatRGBA4444;                 break;
   case HAL_PIXEL_FORMAT_BGRA_8888:                format = kFormatBGRA8888;                 break;
   case HAL_PIXEL_FORMAT_RGBX_8888:                format = kFormatRGBX8888;                 break;
   case HAL_PIXEL_FORMAT_BGRX_8888:                format = kFormatBGRX8888;                 break;
@@ -643,6 +645,8 @@ LayerBufferFormat HWCDisplay::GetSDEFormat(const int32_t &source, const int flag
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:       format = kFormatYCbCr420SemiPlanarVenus;  break;
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:  format = kFormatYCbCr420SPVenusUbwc;      break;
   case HAL_PIXEL_FORMAT_YCrCb_420_SP:             format = kFormatYCrCb420SemiPlanar;       break;
+  case HAL_PIXEL_FORMAT_YCbCr_422_SP:             format = kFormatYCbCr422H2V1SemiPlanar;   break;
+  case HAL_PIXEL_FORMAT_YCbCr_422_I:              format = kFormatYCbCr422H2V1Packed;       break;
   default:
     DLOGW("Unsupported format type = %d", source);
     return kFormatInvalid;
