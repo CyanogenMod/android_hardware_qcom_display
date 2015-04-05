@@ -37,6 +37,7 @@ class HWPrimaryInterface: virtual public HWInterface {
   static DisplayError Destroy(HWPrimaryInterface *intf);
   virtual DisplayError SetVSyncState(bool enable) = 0;
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms) = 0;
+  virtual DisplayError SetDisplayMode(const HWDisplayMode hw_display_mode) = 0;
 
  protected:
   virtual ~HWPrimaryInterface() { }

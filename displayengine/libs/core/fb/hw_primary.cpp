@@ -91,7 +91,7 @@ DisplayError HWPrimary::Init() {
     for (int event = 0; event < kNumDisplayEvents; event++) {
       pollfd &poll_fd = poll_fds_[event];
 
-      if ((panel_info_.type == kCommandModePanel) &&
+      if ((hw_panel_info_.mode == kModeCommand) &&
           (!strncmp(event_name[event], "idle_notify", strlen("idle_notify")))) {
         continue;
       }
@@ -196,11 +196,11 @@ DisplayError HWPrimary::GetDisplayAttributes(HWDisplayAttributes *display_attrib
       (FLOAT(var_screeninfo.yres) * 25.4f) / FLOAT(var_screeninfo.height);
   display_attributes->fps = FLOAT(meta_data.data.panel_frame_rate);
   display_attributes->vsync_period_ns = UINT32(1000000000L / display_attributes->fps);
-  display_attributes->is_device_split = (panel_info_.split_info.left_split ||
+  display_attributes->is_device_split = (hw_panel_info_.split_info.left_split ||
       (var_screeninfo.xres > hw_resource_.max_mixer_width)) ? true : false;
-  display_attributes->split_left = panel_info_.split_info.left_split ?
-      panel_info_.split_info.left_split : display_attributes->x_pixels / 2;
-  display_attributes->always_src_split = panel_info_.split_info.always_src_split;
+  display_attributes->split_left = hw_panel_info_.split_info.left_split ?
+      hw_panel_info_.split_info.left_split : display_attributes->x_pixels / 2;
+  display_attributes->always_src_split = hw_panel_info_.split_info.always_src_split;
 
   return kErrorNone;
 }
@@ -364,6 +364,34 @@ DisplayError HWPrimary::SetVSyncState(bool enable) {
     IOCTL_LOGE(MSMFB_OVERLAY_VSYNC_CTRL, device_type_);
     return kErrorHardware;
   }
+
+  return kErrorNone;
+}
+
+DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
+  DisplayError error = kErrorNone;
+  uint32_t mode = -1;
+
+  switch (hw_display_mode) {
+  case kModeVideo:
+    mode = kModeLPMVideo;
+    break;
+  case kModeCommand:
+    mode = kModeLPMCommand;
+    break;
+  default:
+    DLOGW("Failed to translate SDE display mode %d to a MSMFB_LPM_ENABLE mode",
+          hw_display_mode);
+    return kErrorParameters;
+  }
+
+  if (ioctl_(device_fd_, MSMFB_LPM_ENABLE, &mode) < 0) {
+    IOCTL_LOGE(MSMFB_LPM_ENABLE, device_type_);
+    return kErrorHardware;
+  }
+
+  DLOGI("Triggering display mode change to %d on next commit.", hw_display_mode);
+  synchronous_commit_ = true;
 
   return kErrorNone;
 }

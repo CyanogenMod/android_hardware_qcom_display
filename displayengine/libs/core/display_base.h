@@ -59,6 +59,7 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info);
   virtual DisplayError SetActiveConfig(uint32_t index);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
+  virtual DisplayError SetDisplayMode(uint32_t mode);
 
  protected:
   // DumpImpl method

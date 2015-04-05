@@ -61,7 +61,7 @@ namespace sde {
 
 HWDevice::HWDevice(BufferSyncHandler *buffer_sync_handler)
   : fb_node_index_(-1), fb_path_("/sys/devices/virtual/graphics/fb"), hotplug_enabled_(false),
-    buffer_sync_handler_(buffer_sync_handler) {
+    buffer_sync_handler_(buffer_sync_handler), synchronous_commit_(false) {
   // Pointer to actual driver interfaces.
   ioctl_ = ::ioctl;
   open_ = ::open;
@@ -146,7 +146,7 @@ DisplayError HWDevice::GetDisplayAttributes(HWDisplayAttributes *display_attribu
 }
 
 DisplayError HWDevice::GetHWPanelInfo(HWPanelInfo *panel_info) {
-  *panel_info = panel_info_;
+  *panel_info = hw_panel_info_;
   return kErrorNone;
 }
 
@@ -425,9 +425,13 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
 
   mdp_commit.release_fence = -1;
   mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
+  if (synchronous_commit_) {
+    mdp_commit.flags |= MDP_COMMIT_WAIT_FOR_FINISH;
+  }
   if (ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
     IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, device_type_);
     DumpLayerCommit(mdp_disp_commit_);
+    synchronous_commit_ = false;
     return kErrorHardware;
   }
 
@@ -462,6 +466,13 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
   DLOGI_IF(kTagDriverConfig, "*************************************************************");
 
   close_(mdp_commit.release_fence);
+
+  if (synchronous_commit_) {
+    // A synchronous commit can be requested when changing the display mode so we need to update
+    // panel info.
+    PopulateHWPanelInfo();
+    synchronous_commit_ = false;
+  }
 
   return kErrorNone;
 }
@@ -600,12 +611,12 @@ int HWDevice::GetFBNodeIndex(HWDeviceType device_type) {
       }
       break;
     case kDeviceHDMI:
-      if (panel_info->type == kDTvPanel) {
+      if (panel_info->port == kPortDTv) {
         fb_node_index = i;
       }
       break;
     case kDeviceVirtual:
-      if (panel_info->type == kWriteBackPanel) {
+      if (panel_info->port == kPortWriteBack) {
         fb_node_index = i;
       }
       break;
@@ -617,21 +628,23 @@ int HWDevice::GetFBNodeIndex(HWDeviceType device_type) {
 }
 
 void HWDevice::PopulateHWPanelInfo() {
-  panel_info_ = HWPanelInfo();
-  GetHWPanelInfoByNode(fb_node_index_, &panel_info_);
-  DLOGI("Device type = %d, Panel Type = %d, Device Node = %d, Is Primary = %d",
-        device_type_, panel_info_.type, fb_node_index_, panel_info_.is_primary_panel);
+  hw_panel_info_ = HWPanelInfo();
+  GetHWPanelInfoByNode(fb_node_index_, &hw_panel_info_);
+  DLOGI("Device type = %d, Display Port = %d, Display Mode = %d, Device Node = %d, Is Primary = %d",
+        device_type_, hw_panel_info_.port, hw_panel_info_.mode, fb_node_index_,
+        hw_panel_info_.is_primary_panel);
   DLOGI("Partial Update = %d, Dynamic FPS = %d",
-        panel_info_.partial_update, panel_info_.dynamic_fps);
+        hw_panel_info_.partial_update, hw_panel_info_.dynamic_fps);
   DLOGI("Align: left = %d, width = %d, top = %d, height = %d",
-        panel_info_.left_align, panel_info_.width_align,
-        panel_info_.top_align, panel_info_.height_align);
+        hw_panel_info_.left_align, hw_panel_info_.width_align,
+        hw_panel_info_.top_align, hw_panel_info_.height_align);
   DLOGI("ROI: min_width = %d, min_height = %d, need_merge = %d",
-        panel_info_.min_roi_width, panel_info_.min_roi_height, panel_info_.needs_roi_merge);
-  DLOGI("FPS: min = %d, max =%d", panel_info_.min_fps, panel_info_.max_fps);
-  DLOGI("Left Split = %d, Right Split = %d", panel_info_.split_info.left_split,
-        panel_info_.split_info.right_split);
-  DLOGI("Source Split Always = %d", panel_info_.split_info.always_src_split);
+        hw_panel_info_.min_roi_width, hw_panel_info_.min_roi_height,
+        hw_panel_info_.needs_roi_merge);
+  DLOGI("FPS: min = %d, max =%d", hw_panel_info_.min_fps, hw_panel_info_.max_fps);
+  DLOGI("Left Split = %d, Right Split = %d", hw_panel_info_.split_info.left_split,
+        hw_panel_info_.split_info.right_split);
+  DLOGI("Source Split Always = %d", hw_panel_info_.split_info.always_src_split);
 }
 
 void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
@@ -650,7 +663,7 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
 
   size_t len = kMaxStringLength;
   ssize_t read;
-  char *line = stringbuffer;
+  char *line = NULL;
   while ((read = getline(&line, &len, fileptr)) != -1) {
     uint32_t token_count = 0;
     const uint32_t max_count = 10;
@@ -684,45 +697,80 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
     }
   }
   fclose(fileptr);
-  panel_info->type = GetHWPanelType(device_node);
+  free(line);
+  panel_info->port = GetHWDisplayPort(device_node);
+  panel_info->mode = GetHWDisplayMode(device_node);
   GetSplitInfo(device_node, panel_info);
 }
 
-HWPanelType HWDevice::GetHWPanelType(int device_node) {
+HWDisplayPort HWDevice::GetHWDisplayPort(int device_node) {
   char stringbuffer[kMaxStringLength];
   DisplayError error = kErrorNone;
-  char *line = stringbuffer;
+  char *line = NULL;
   size_t len = kMaxStringLength;
   ssize_t read;
-  HWPanelType panel_type = kNoPanel;
+  HWDisplayPort port = kPortDefault;
 
   snprintf(stringbuffer, sizeof(stringbuffer), "%s%d/msm_fb_type", fb_path_, device_node);
   FILE *fileptr = fopen(stringbuffer, "r");
   if (!fileptr) {
     DLOGW("File not found %s", stringbuffer);
-    return panel_type;
+    return port;
   }
   read = getline(&line, &len, fileptr);
   if (read == -1) {
     fclose(fileptr);
-    return panel_type;
+    return port;
   }
   if ((strncmp(line, "mipi dsi cmd panel", strlen("mipi dsi cmd panel")) == 0)) {
-    panel_type = kCommandModePanel;
+    port = kPortDSI;
   } else if ((strncmp(line, "mipi dsi video panel", strlen("mipi dsi video panel")) == 0)) {
-    panel_type = kVideoModePanel;
+    port = kPortDSI;
   } else if ((strncmp(line, "lvds panel", strlen("lvds panel")) == 0)) {
-    panel_type = kLVDSPanel;
+    port = kPortLVDS;
   } else if ((strncmp(line, "edp panel", strlen("edp panel")) == 0)) {
-    panel_type = kEDPPanel;
+    port = kPortEDP;
   } else if ((strncmp(line, "dtv panel", strlen("dtv panel")) == 0)) {
-    panel_type = kDTvPanel;
+    port = kPortDTv;
   } else if ((strncmp(line, "writeback panel", strlen("writeback panel")) == 0)) {
-    panel_type = kWriteBackPanel;
+    port = kPortWriteBack;
+  } else {
+    port = kPortDefault;
   }
   fclose(fileptr);
+  free(line);
+  return port;
+}
 
-  return panel_type;
+HWDisplayMode HWDevice::GetHWDisplayMode(int device_node) {
+  char stringbuffer[kMaxStringLength];
+  DisplayError error = kErrorNone;
+  char *line = NULL;
+  size_t len = kMaxStringLength;
+  ssize_t read;
+  HWDisplayMode mode = kModeDefault;
+
+  snprintf(stringbuffer, sizeof(stringbuffer), "%s%d/msm_fb_type", fb_path_, device_node);
+  FILE *fileptr = fopen(stringbuffer, "r");
+  if (!fileptr) {
+    DLOGW("File not found %s", stringbuffer);
+    return mode;
+  }
+  read = getline(&line, &len, fileptr);
+  if (read == -1) {
+    fclose(fileptr);
+    return mode;
+  }
+  if ((strncmp(line, "mipi dsi cmd panel", strlen("mipi dsi cmd panel")) == 0)) {
+    mode = kModeCommand;
+  } else if ((strncmp(line, "mipi dsi video panel", strlen("mipi dsi video panel")) == 0)) {
+    mode = kModeVideo;
+  } else {
+    mode = kModeDefault;
+  }
+  fclose(fileptr);
+  free(line);
+  return mode;
 }
 
 void HWDevice::GetSplitInfo(int device_node, HWPanelInfo *panel_info) {
@@ -730,7 +778,7 @@ void HWDevice::GetSplitInfo(int device_node, HWPanelInfo *panel_info) {
   FILE *fileptr = NULL;
   size_t len = kMaxStringLength;
   ssize_t read;
-  char *line = stringbuffer;
+  char *line = NULL;
   uint32_t token_count = 0;
   const uint32_t max_count = 10;
   char *tokens[max_count] = { NULL };
@@ -769,6 +817,7 @@ void HWDevice::GetSplitInfo(int device_node, HWPanelInfo *panel_info) {
     }
   }
   fclose(fileptr);
+  free(line);
 }
 
 int HWDevice::ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count) {

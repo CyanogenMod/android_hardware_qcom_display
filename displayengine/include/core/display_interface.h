@@ -322,6 +322,14 @@ class DisplayInterface {
   */
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages) = 0;
 
+  /*! @brief Method to set the mode of the primary display.
+
+    @param[in] mode the new display mode.
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError SetDisplayMode(uint32_t mode) = 0;
+
  protected:
   virtual ~DisplayInterface() { }
 };

@@ -64,6 +64,12 @@ enum {
     SET_BINDER_DYN_REFRESH_RATE,
 };
 
+enum {
+    DEFAULT_MODE = 0,
+    VIDEO_MODE,
+    COMMAND_MODE,
+};
+
 // Display Attributes that are available to clients of this library
 // Not to be confused with a similar struct in hwc_utils (in the hwc namespace)
 typedef struct DisplayAttributes {
@@ -127,6 +133,9 @@ int setActiveConfig(int configIndex, int dpy);
 // Returns xres and yres as 0 on error.
 // Only primary display supported for now, value of dpy ignored
 DisplayAttributes getDisplayAttributes(int configIndex, int dpy);
+
+// Set the primary display mode to command or video mode
+int setDisplayMode(int mode);
 
 //=============================================================================
 // The functions and methods below run in the context of HWC and

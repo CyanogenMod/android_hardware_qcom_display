@@ -72,5 +72,15 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
+DisplayError HWCDisplayPrimary::SetDisplayMode(uint32_t mode) {
+  DisplayError error = kErrorNone;
+
+  if (display_intf_) {
+    error = display_intf_->SetDisplayMode(mode);
+  }
+
+  return error;
+}
+
 }  // namespace sde
 

@@ -61,7 +61,7 @@ DisplayError DisplayPrimary::Init() {
   }
 
   // Idle fallback feature is supported only for video mode panel.
-  if (hw_panel_info_.type == kVideoModePanel) {
+  if (hw_panel_info_.mode == kModeVideo) {
     hw_primary_intf_->SetIdleTimeoutMs(Debug::GetIdleTimeoutMs());
   }
 
@@ -87,7 +87,17 @@ DisplayError DisplayPrimary::Prepare(LayerStack *layer_stack) {
 
 DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
   SCOPE_LOCK(locker_);
-  return DisplayBase::Commit(layer_stack);
+  DisplayError error = kErrorNone;
+
+  error = DisplayBase::Commit(layer_stack);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  hw_primary_intf_->GetHWPanelInfo(&hw_panel_info_);
+  // TODO(user): Update panel info in composition manager and resource manager
+
+  return error;
 }
 
 DisplayError DisplayPrimary::Flush() {
@@ -156,7 +166,7 @@ DisplayError DisplayPrimary::SetVSyncState(bool enable) {
 void DisplayPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
   SCOPE_LOCK(locker_);
   // Idle fallback feature is supported only for video mode panel.
-  if (hw_panel_info_.type == kVideoModePanel) {
+  if (hw_panel_info_.mode == kModeCommand) {
     hw_primary_intf_->SetIdleTimeoutMs(timeout_ms);
   }
 }
@@ -164,6 +174,44 @@ void DisplayPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
 DisplayError DisplayPrimary::SetMaxMixerStages(uint32_t max_mixer_stages) {
   SCOPE_LOCK(locker_);
   return DisplayBase::SetMaxMixerStages(max_mixer_stages);
+}
+
+DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
+  SCOPE_LOCK(locker_);
+  DisplayError error = kErrorNone;
+  HWDisplayMode hw_display_mode = kModeDefault;
+
+  if (state_ != kStateOn) {
+    DLOGW("Invalid display state (%d). Panel must be on.", state_);
+    return kErrorNotSupported;
+  }
+
+  switch(mode) {
+  case kModeVideo:
+    hw_display_mode = kModeVideo;
+    break;
+  case kModeCommand:
+    hw_display_mode = kModeCommand;
+    break;
+  default:
+    DLOGW("Invalid panel mode parameters. Requested (%d)", mode);
+    return kErrorParameters;
+  }
+
+  if (hw_display_mode == hw_panel_info_.mode) {
+    DLOGW("Same display mode requested. Current (%d) Requested (%d)", hw_panel_info_.mode,
+          hw_display_mode);
+    return kErrorNone;
+  }
+
+  error = hw_primary_intf_->SetDisplayMode(hw_display_mode);
+  if (error != kErrorNone) {
+    DLOGW("Retaining current display mode. Current (%d), Requested (%d)", hw_panel_info_.mode,
+          hw_display_mode);
+    return error;
+  }
+
+  return error;
 }
 
 void DisplayPrimary::AppendDump(char *buffer, uint32_t length) {

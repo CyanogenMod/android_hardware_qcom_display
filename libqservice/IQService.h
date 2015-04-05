@@ -68,6 +68,7 @@ public:
         GET_ACTIVE_CONFIG = 26, //Get the current config index
         GET_CONFIG_COUNT = 27, //Get the number of supported display configs
         GET_DISPLAY_ATTRIBUTES_FOR_CONFIG = 28, //Get attr for specified config
+        SET_DISPLAY_MODE = 29, // Set display mode to command or video mode
         COMMAND_LIST_END = 400,
     };
 
