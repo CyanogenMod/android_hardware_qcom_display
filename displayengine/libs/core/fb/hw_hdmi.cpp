@@ -314,6 +314,10 @@ DisplayError HWHDMI::Doze() {
   return HWDevice::Doze();
 }
 
+DisplayError HWHDMI::DozeSuspend() {
+  return HWDevice::DozeSuspend();
+}
+
 DisplayError HWHDMI::Standby() {
   return HWDevice::Standby();
 }

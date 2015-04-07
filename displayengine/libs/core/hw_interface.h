@@ -141,6 +141,7 @@ class HWInterface {
   virtual DisplayError PowerOn() = 0;
   virtual DisplayError PowerOff() = 0;
   virtual DisplayError Doze() = 0;
+  virtual DisplayError DozeSuspend() = 0;
   virtual DisplayError Standby() = 0;
   virtual DisplayError Validate(HWLayers *hw_layers) = 0;
   virtual DisplayError Commit(HWLayers *hw_layers) = 0;

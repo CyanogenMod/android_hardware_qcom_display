@@ -292,6 +292,10 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
     error = hw_intf_->Doze();
     break;
 
+  case kStateDozeSuspend:
+    error = hw_intf_->DozeSuspend();
+    break;
+
   case kStateStandby:
     error = hw_intf_->Standby();
     break;

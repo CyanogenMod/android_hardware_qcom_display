@@ -46,6 +46,7 @@ class HWVirtual : public HWDevice, public HWVirtualInterface {
   virtual DisplayError PowerOn();
   virtual DisplayError PowerOff();
   virtual DisplayError Doze();
+  virtual DisplayError DozeSuspend();
   virtual DisplayError Standby();
   virtual DisplayError Validate(HWLayers *hw_layers);
   virtual DisplayError Commit(HWLayers *hw_layers);

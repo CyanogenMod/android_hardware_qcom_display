@@ -183,6 +183,10 @@ DisplayError HWDevice::Doze() {
   return kErrorNone;
 }
 
+DisplayError HWDevice::DozeSuspend() {
+  return kErrorNone;
+}
+
 DisplayError HWDevice::Standby() {
   return kErrorNone;
 }

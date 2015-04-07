@@ -108,9 +108,12 @@ int HWCDisplay::SetPowerMode(int mode) {
     last_power_mode_ = HWC_POWER_MODE_NORMAL;
     break;
   case HWC_POWER_MODE_DOZE:
-  case HWC_POWER_MODE_DOZE_SUSPEND:
     state = kStateDoze;
     last_power_mode_ = HWC_POWER_MODE_DOZE;
+    break;
+  case HWC_POWER_MODE_DOZE_SUSPEND:
+    state = kStateDozeSuspend;
+    last_power_mode_ = HWC_POWER_MODE_DOZE_SUSPEND;
     break;
   default:
     return -EINVAL;

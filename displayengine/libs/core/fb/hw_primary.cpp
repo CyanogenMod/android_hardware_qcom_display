@@ -225,11 +225,26 @@ DisplayError HWPrimary::PowerOff() {
     IOCTL_LOGE(FB_BLANK_POWERDOWN, device_type_);
     return kErrorHardware;
   }
+
   return kErrorNone;
 }
 
 DisplayError HWPrimary::Doze() {
-  return HWDevice::Doze();
+  if (ioctl_(device_fd_, FBIOBLANK, FB_BLANK_NORMAL) < 0) {
+    IOCTL_LOGE(FB_BLANK_NORMAL, device_type_);
+    return kErrorHardware;
+  }
+
+  return kErrorNone;
+}
+
+DisplayError HWPrimary::DozeSuspend() {
+  if (ioctl_(device_fd_, FBIOBLANK, FB_BLANK_VSYNC_SUSPEND) < 0) {
+    IOCTL_LOGE(FB_BLANK_VSYNC_SUSPEND, device_type_);
+    return kErrorHardware;
+  }
+
+  return kErrorNone;
 }
 
 DisplayError HWPrimary::Standby() {
