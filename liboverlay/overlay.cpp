@@ -32,6 +32,7 @@
 #include "pipes/overlayGenPipe.h"
 #include "mdp_version.h"
 #include "qdMetaData.h"
+#include "qd_utils.h"
 
 #ifdef USES_QSEED_SCALAR
 #include <scale/scale.h>
@@ -42,7 +43,7 @@ using namespace scale;
 
 namespace overlay {
 using namespace utils;
-
+using namespace qdutils;
 
 Overlay::Overlay() {
     int numPipes = qdutils::MDPVersion::getInstance().getTotalPipes();
@@ -321,7 +322,6 @@ int Overlay::initOverlay() {
     }
 
     FILE *displayDeviceFP = NULL;
-    const int MAX_FRAME_BUFFER_NAME_SIZE = 128;
     char fbType[MAX_FRAME_BUFFER_NAME_SIZE];
     char msmFbTypePath[MAX_FRAME_BUFFER_NAME_SIZE];
     const char *strDtvPanel = "dtv panel";

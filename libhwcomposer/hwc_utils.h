@@ -56,7 +56,7 @@ class RotMgr;
 namespace qhwc {
 //fwrd decl
 class QueuedBufferStore;
-class ExternalDisplay;
+class HDMIDisplay;
 class VirtualDisplay;
 class IFBUpdate;
 class IVideoOverlay;
@@ -261,6 +261,10 @@ bool isGLESOnlyComp(hwc_context_t *ctx, const int& dpy);
 void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers);
 void dumpBuffer(private_handle_t *ohnd, char *bufferName);
 bool isAbcInUse(hwc_context_t *ctx);
+void updateDisplayInfo(hwc_context_t* ctx, int dpy);
+void resetDisplayInfo(hwc_context_t* ctx, int dpy);
+void initCompositionResources(hwc_context_t* ctx, int dpy);
+void destroyCompositionResources(hwc_context_t* ctx, int dpy);
 
 //Helper function to dump logs
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
@@ -500,8 +504,9 @@ struct hwc_context_t {
 
     //Primary and external FB updater
     qhwc::IFBUpdate *mFBUpdate[HWC_NUM_DISPLAY_TYPES];
-    // External display related information
-    qhwc::ExternalDisplay *mExtDisplay;
+    // HDMI display related object. Used to configure/teardown
+    // HDMI when it is connected as primary or external.
+    qhwc::HDMIDisplay *mHDMIDisplay;
     qhwc::VirtualDisplay *mVirtualDisplay;
     qhwc::MDPInfo mMDP;
     qhwc::VsyncState vstate;
@@ -587,7 +592,17 @@ inline bool isSecurePresent(hwc_context_t *ctx, int dpy) {
 
 static inline bool isSecondaryConnected(hwc_context_t* ctx) {
     return (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected ||
-    ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected);
+            ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected);
+}
+
+static inline bool isSecondaryAnimating(hwc_context_t* ctx) {
+    return (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected &&
+            (!ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isPause) &&
+            ctx->listStats[HWC_DISPLAY_EXTERNAL].isDisplayAnimating)
+            ||
+           (ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected &&
+            (!ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isPause) &&
+            ctx->listStats[HWC_DISPLAY_VIRTUAL].isDisplayAnimating);
 }
 
 static inline bool isSecondaryConfiguring(hwc_context_t* ctx) {
