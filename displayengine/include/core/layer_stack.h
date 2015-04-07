@@ -44,8 +44,6 @@ namespace sde {
   @sa Layer
 */
 enum LayerBlending {
-  kBlendingNone,            //!< Blend operation is not specified.
-
   kBlendingOpaque,          //!< Pixel color is expressed using straight alpha in color tuples. It
                             //!< is constant blend operation. The layer would appear opaque if plane
                             //!< alpha is 0xFF.
@@ -203,7 +201,7 @@ struct Layer {
 
   uint32_t frame_rate;              //!< Rate at which frames are being updated for this layer.
 
-  Layer() : input_buffer(NULL), composition(kCompositionGPU), blending(kBlendingNone),
+  Layer() : input_buffer(NULL), composition(kCompositionGPU), blending(kBlendingOpaque),
             plane_alpha(0), frame_rate(0) { }
 };
 

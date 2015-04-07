@@ -69,6 +69,7 @@ struct HWResourceInfo {
   uint32_t max_sde_clk;
   float clk_fudge_factor;
   bool has_bwc;
+  bool has_ubwc;
   bool has_decimation;
   bool has_macrotile;
   bool has_rotator_downscale;
@@ -80,7 +81,7 @@ struct HWResourceInfo {
       num_cursor_pipe(0), num_blending_stages(0), num_rotator(0), num_control(0),
       num_mixer_to_disp(0), smp_total(0), smp_size(0), num_smp_per_pipe(0), max_scale_up(1),
       max_scale_down(1), max_bandwidth_low(0), max_bandwidth_high(0), max_mixer_width(2048),
-      max_pipe_bw(0), max_sde_clk(0), clk_fudge_factor(1.0f), has_bwc(false),
+      max_pipe_bw(0), max_sde_clk(0), clk_fudge_factor(1.0f), has_bwc(false), has_ubwc(false),
       has_decimation(false), has_macrotile(false), has_rotator_downscale(false),
       has_non_scalar_rgb(false), is_src_split(false) { }
 

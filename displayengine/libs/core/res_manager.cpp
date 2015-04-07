@@ -1113,38 +1113,76 @@ void ResManager::ClearRotator(DisplayResourceContext *display_resource_ctx) {
   }
 }
 
-void ResManager::SetRotatorOutputFormat(const LayerBufferFormat &input_format, bool bwc, bool rot90,
-                                        bool downscale, LayerBufferFormat *output_format) {
+void ResManager::SetRotatorOutputFormat(const LayerBufferFormat &input_format,
+                                        const bool &is_opaque, const bool &rot90,
+                                        const bool &downscale, LayerBufferFormat *output_format) {
+  // Initialize the output format with input format by default.
   *output_format = input_format;
 
-  switch (input_format) {
-  case kFormatRGB565:
-    if (rot90)
-      *output_format = kFormatRGB888;
-    break;
+  switch(input_format) {
+  case kFormatARGB8888:
   case kFormatRGBA8888:
-    if (bwc)
-      *output_format = kFormatBGRA8888;
+    if (is_opaque) {
+      *output_format = kFormatRGB888;
+    }
     break;
-  case kFormatYCbCr420SemiPlanarVenus:
+  case kFormatBGRA8888:
+    if (is_opaque) {
+      *output_format = kFormatBGR888;
+    }
+    break;
+  case kFormatBGRX8888:
+    *output_format = kFormatBGR888;
+    break;
+  case kFormatXRGB8888:
+  case kFormatRGBX8888:
+    *output_format = kFormatRGB888;
+    break;
   case kFormatYCbCr420SemiPlanar:
-    if (rot90)
-      *output_format = kFormatYCrCb420SemiPlanar;
-    break;
-  case kFormatYCbCr420SPVenusUbwc:
-    if (downscale)
-      *output_format = kFormatYCrCb420SemiPlanar;
-    break;
-  case kFormatYCbCr420Planar:
-  case kFormatYCrCb420Planar:
-    *output_format = kFormatYCrCb420SemiPlanar;
+  case kFormatYCbCr420SemiPlanarVenus:
+    *output_format = kFormatYCbCr420SemiPlanar;
     break;
   default:
+    *output_format = input_format;
     break;
   }
 
-  DLOGV_IF(kTagResources, "Input format %x, Output format = %x, rot90 %d", input_format,
-           *output_format, rot90);
+  // TODO(user): UBWC RGB formats will be handled separately
+  if (downscale) {
+    switch (input_format) {
+    case kFormatYCbCr420SPVenusUbwc:
+      *output_format = kFormatYCbCr420SemiPlanar;
+      break;
+    default:
+      break;
+    }
+  } else {
+    if (hw_res_info_.has_ubwc) {
+      switch (input_format) {
+      case kFormatYCbCr420SemiPlanar:
+      case kFormatYCbCr420SemiPlanarVenus:
+        *output_format = kFormatYCbCr420SPVenusUbwc;
+        break;
+      default:
+        break;
+      }
+    }
+  }
+
+  if (rot90) {
+    if (input_format == kFormatYCbCr422H2V1SemiPlanar) {
+      *output_format = kFormatYCbCr422H1V2SemiPlanar;
+    } else if (input_format == kFormatYCbCr422H1V2SemiPlanar) {
+      *output_format = kFormatYCbCr422H2V1SemiPlanar;
+    } else if (input_format == kFormatYCrCb422H2V1SemiPlanar) {
+      *output_format = kFormatYCrCb422H1V2SemiPlanar;
+    } else if (input_format == kFormatYCrCb422H1V2SemiPlanar) {
+      *output_format = kFormatYCrCb422H2V1SemiPlanar;
+    }
+  }
+
+  DLOGV_IF(kTagResources, "Input format %x, Output format = %x, rot90 %d ubwc %d downscale %d",
+           input_format, *output_format, rot90, hw_res_info_.has_ubwc, downscale);
 
   return;
 }
