@@ -274,6 +274,8 @@ protected:
     bool mPrevModeOn; //if previous prepare happened
     //Enable Partial Update for MDP3 targets
     static bool enablePartialUpdateForMDP3;
+    static float sDownscaleThreshold;
+
 };
 
 class MDPCompNonSplit : public MDPComp {
