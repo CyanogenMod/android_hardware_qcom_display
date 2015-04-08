@@ -309,6 +309,7 @@ bool isRotationDoable(hwc_context_t *ctx, private_handle_t *hnd);
 bool isAlphaScaled(hwc_layer_1_t const* layer);
 bool needsScaling(hwc_layer_1_t const* layer);
 bool isDownscaleRequired(hwc_layer_1_t const* layer);
+bool isDownscaleWithinThreshold(hwc_layer_1_t const* layer, float threshold);
 bool needsScalingWithSplit(hwc_context_t* ctx, hwc_layer_1_t const* layer,
                            const int& dpy);
 void sanitizeSourceCrop(hwc_rect_t& cropL, hwc_rect_t& cropR,

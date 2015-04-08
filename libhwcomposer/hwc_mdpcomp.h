@@ -283,6 +283,7 @@ protected:
     static int (*sPerfLockAcquire)(int, int, int*, int);
     static int (*sPerfLockRelease)(int value);
     static int sPerfHintWindow;
+    static float sDownscaleThreshold;
 
 };
 

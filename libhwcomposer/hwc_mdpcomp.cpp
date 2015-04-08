@@ -55,6 +55,7 @@ int MDPComp::sPerfLockHandle = 0;
 int (*MDPComp::sPerfLockAcquire)(int, int, int*, int) = NULL;
 int (*MDPComp::sPerfLockRelease)(int value) = NULL;
 int MDPComp::sPerfHintWindow = -1;
+float MDPComp::sDownscaleThreshold = 1.0;
 
 enum AllocOrder { FORMAT_YUV, FORMAT_RGB, FORMAT_MAX };
 
@@ -209,6 +210,10 @@ bool MDPComp::init(hwc_context_t *ctx) {
             sPerfHintWindow = val;
             ALOGI("PerfHintWindow = %d", sPerfHintWindow);
         }
+    }
+
+    if(property_get("persist.hwc.downscale_threshold", property, "1.0") > 0) {
+        sDownscaleThreshold = (float)atof(property);
     }
 
     return true;
@@ -429,6 +434,24 @@ bool MDPComp::isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer) {
         //More conditions here, sRGB+Blend etc
         return false;
     }
+
+    //In targets with fewer pipes, frequent composition switch between MDP/GPU
+    //can happen for a layer due to lack of pipes. When this switch happens
+    //continuously for RGB downscaled layer with downscale greater than
+    //threshold, it appears as flicker as output
+    //of MDP and GPU are different as they use different filters for downscale.
+    //To avoid this flicker, punt RGB downscaled layer with downscale greater
+    //than threshold value to GPU always.
+    if((sDownscaleThreshold > 1.0)) {
+        if(((not isYuvBuffer(hnd))
+                and (not isDownscaleWithinThreshold(layer,
+                        sDownscaleThreshold)))) {
+            ALOGD_IF(isDebug(), "%s: required downscale is greater than \
+                    threshold %f", __FUNCTION__, sDownscaleThreshold);
+            return false;
+        }
+    }
+
     return true;
 }
 
