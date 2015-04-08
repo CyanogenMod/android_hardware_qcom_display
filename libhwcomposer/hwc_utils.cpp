@@ -403,7 +403,37 @@ void closeContext(hwc_context_t *ctx)
 #endif
 }
 
-//Helper to roundoff the refreshrates
+uint32_t getRefreshRate(hwc_context_t* ctx, uint32_t requestedRefreshRate) {
+
+    qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
+    int dpy = HWC_DISPLAY_PRIMARY;
+    uint32_t defaultRefreshRate = ctx->dpyAttr[dpy].refreshRate;
+    uint32_t rate = defaultRefreshRate;
+
+    if(!requestedRefreshRate)
+        return defaultRefreshRate;
+
+    uint32_t maxNumIterations =
+            (uint32_t)ceil(
+                    (float)mdpHw.getMaxFpsSupported()/
+                    (float)requestedRefreshRate);
+
+    for(uint32_t i = 1; i <= maxNumIterations; i++) {
+        rate = roundOff(i * requestedRefreshRate);
+        if(rate < mdpHw.getMinFpsSupported()) {
+            continue;
+        } else if((rate >= mdpHw.getMinFpsSupported() &&
+                   rate <= mdpHw.getMaxFpsSupported())) {
+            break;
+        } else {
+            rate = defaultRefreshRate;
+            break;
+        }
+    }
+    return rate;
+}
+
+//Helper to roundoff the refreshrates to the std refresh-rates
 uint32_t roundOff(uint32_t refreshRate) {
     int count =  (int) (sizeof(stdRefreshRates)/sizeof(stdRefreshRates[0]));
     uint32_t rate = refreshRate;
@@ -970,21 +1000,18 @@ void setListStats(hwc_context_t *ctx,
 
 #ifdef DYNAMIC_FPS
         if (!dpy && mdpHw.isDynFpsSupported() && ctx->mUseMetaDataRefreshRate){
-            //dyn fps: get refreshrate from metadata
-            //Support multiple refresh rates if they are same
-            //else set to  default
+            /* Dyn fps: get refreshrate from metadata */
             MetaData_t *mdata = hnd ? (MetaData_t *)hnd->base_metadata : NULL;
             if (mdata && (mdata->operation & UPDATE_REFRESH_RATE)) {
                 // Valid refreshRate in metadata and within the range
-                uint32_t rate = roundOff(mdata->refreshrate);
-                if((rate >= mdpHw.getMinFpsSupported() &&
-                                rate <= mdpHw.getMaxFpsSupported())) {
-                    if (!refreshRate) {
-                        refreshRate = rate;
-                    } else if(refreshRate != rate) {
-                        // multiple refreshrate requests, set to default
-                        refreshRate = ctx->dpyAttr[dpy].refreshRate;
-                    }
+                uint32_t rate = getRefreshRate(ctx, mdata->refreshrate);
+                if (!refreshRate) {
+                    refreshRate = rate;
+                } else if(refreshRate != rate) {
+                    /* Support multiple refresh rates if they are same
+                     * else set to default.
+                     */
+                    refreshRate = ctx->dpyAttr[dpy].refreshRate;
                 }
             }
         }

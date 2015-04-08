@@ -303,6 +303,8 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& dst);
 void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
                                 hwc_rect_t& inRect, hwc_rect_t& outRect);
 
+uint32_t getRefreshRate(hwc_context_t* ctx, uint32_t requestedRefreshRate);
+
 uint32_t roundOff(uint32_t refreshRate);
 
 void setRefreshRate(hwc_context_t *ctx, int dpy, uint32_t refreshRate);
