@@ -166,7 +166,7 @@ DisplayError DisplayPrimary::SetVSyncState(bool enable) {
 void DisplayPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
   SCOPE_LOCK(locker_);
   // Idle fallback feature is supported only for video mode panel.
-  if (hw_panel_info_.mode == kModeCommand) {
+  if (hw_panel_info_.mode == kModeVideo) {
     hw_primary_intf_->SetIdleTimeoutMs(timeout_ms);
   }
 }

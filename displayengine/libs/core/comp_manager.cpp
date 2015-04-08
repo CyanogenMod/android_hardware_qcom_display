@@ -170,8 +170,8 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
 
   constraints->safe_mode = safe_mode_;
 
-  // Limit 2 layer SDE Comp on HDMI
-  if (display_comp_ctx->display_type == kHDMI) {
+  // Limit 2 layer SDE Comp on HDMI/Virtual
+  if (display_comp_ctx->display_type != kPrimary) {
     constraints->max_layers = 2;
   }
 
