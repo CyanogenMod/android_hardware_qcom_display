@@ -938,6 +938,26 @@ bool isDownscaleRequired(hwc_layer_1_t const* layer) {
 
     return false;
 }
+
+bool isDownscaleWithinThreshold(hwc_layer_1_t const* layer, float threshold) {
+    hwc_rect_t displayFrame  = layer->displayFrame;
+    hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
+    int dst_w, dst_h, src_w, src_h;
+    dst_w = displayFrame.right - displayFrame.left;
+    dst_h = displayFrame.bottom - displayFrame.top;
+    src_w = sourceCrop.right - sourceCrop.left;
+    src_h = sourceCrop.bottom - sourceCrop.top;
+    if(dst_w && dst_h) {
+        float w_scale = ((float)src_w / (float)dst_w);
+        float h_scale = ((float)src_h / (float)dst_h);
+
+        if((w_scale > threshold) or (h_scale > threshold))
+            return false;
+    }
+
+    return true;
+}
+
 bool needsScaling(hwc_layer_1_t const* layer) {
     int dst_w, dst_h, src_w, src_h;
     hwc_rect_t displayFrame  = layer->displayFrame;

@@ -49,6 +49,8 @@ bool MDPComp::sEnableYUVsplit = false;
 bool MDPComp::sSrcSplitEnabled = false;
 bool MDPComp::enablePartialUpdateForMDP3 = false;
 bool MDPComp::sIsPartialUpdateActive = true;
+float MDPComp::sDownscaleThreshold = 1.0;
+
 MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
     if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
         sSrcSplitEnabled = true;
@@ -184,6 +186,10 @@ bool MDPComp::init(hwc_context_t *ctx) {
     int retPartialUpdatePref = getPartialUpdatePref(ctx);
     if(retPartialUpdatePref >= 0)
        sIsPartialUpdateActive = (retPartialUpdatePref != 0);
+
+    if(property_get("persist.hwc.downscale_threshold", property, "1.0") > 0) {
+        sDownscaleThreshold = (float)atof(property);
+    }
 
     return true;
 }
@@ -397,6 +403,24 @@ bool MDPComp::isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer) {
         //More conditions here, sRGB+Blend etc
         return false;
     }
+
+    //In targets with fewer pipes, frequent composition switch between MDP/GPU
+    //can happen for a layer due to lack of pipes. When this switch happens
+    //continuously for RGB downscaled layer with downscale greater than
+    //threshold, it appears as flicker as output
+    //of MDP and GPU are different as they use different filters for downscale.
+    //To avoid this flicker, punt RGB downscaled layer with downscale greater
+    //than threshold value to GPU always.
+    if((sDownscaleThreshold > 1.0)) {
+        if(((not isYuvBuffer(hnd))
+                and (not isDownscaleWithinThreshold(layer,
+                        sDownscaleThreshold)))) {
+            ALOGD_IF(isDebug(), "%s: required downscale is greater than \
+                    threshold %f", __FUNCTION__, sDownscaleThreshold);
+            return false;
+        }
+    }
+
     return true;
 }
 
