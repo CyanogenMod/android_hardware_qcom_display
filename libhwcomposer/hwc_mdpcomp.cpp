@@ -834,6 +834,15 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         }
     }
 
+    if(!mDpy && isSecondaryConnected(ctx) &&
+           (qdutils::MDPVersion::getInstance().is8x16() ||
+            qdutils::MDPVersion::getInstance().is8x26() ||
+            qdutils::MDPVersion::getInstance().is8x39()) &&
+           isYuvPresent(ctx, HWC_DISPLAY_VIRTUAL)) {
+        ALOGD_IF(isDebug(), "%s: YUV layer present on secondary", __FUNCTION__);
+        return false;
+    }
+
     mCurrentFrame.fbCount = 0;
     memcpy(&mCurrentFrame.isFBComposed, &mCurrentFrame.drop,
            sizeof(mCurrentFrame.isFBComposed));
@@ -886,6 +895,15 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
             ALOGD_IF(isDebug(), "%s: Unsupported layer in list",__FUNCTION__);
             return false;
         }
+    }
+
+    if(!mDpy && isSecondaryConnected(ctx) &&
+           (qdutils::MDPVersion::getInstance().is8x16() ||
+            qdutils::MDPVersion::getInstance().is8x26() ||
+            qdutils::MDPVersion::getInstance().is8x39()) &&
+           isYuvPresent(ctx, HWC_DISPLAY_VIRTUAL)) {
+        ALOGD_IF(isDebug(), "%s: YUV layer present on secondary", __FUNCTION__);
+        return false;
     }
 
     /* We cannot use this composition mode, if:
