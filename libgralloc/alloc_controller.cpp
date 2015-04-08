@@ -908,3 +908,38 @@ static unsigned int getUBwcSize(int width, int height, int format,
     }
     return size;
 }
+
+int getRgbDataAddress(private_handle_t* hnd, void* rgb_data)
+{
+    int err = 0;
+
+    // This api is for RGB* formats
+    if (hnd->format > HAL_PIXEL_FORMAT_sRGB_X_8888) {
+        return -EINVAL;
+    }
+
+    // linear buffer
+    if (!(hnd->flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED)) {
+        rgb_data = (void*)hnd->base;
+        return err;
+    }
+
+    unsigned int meta_size = 0;
+    switch (hnd->format) {
+        case HAL_PIXEL_FORMAT_RGB_565:
+            meta_size = getUBwcMetaBufferSize(hnd->width, hnd->height, 2);
+            break;
+        case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+        case HAL_PIXEL_FORMAT_sRGB_A_8888:
+            meta_size = getUBwcMetaBufferSize(hnd->width, hnd->height, 4);
+            break;
+        default:
+            ALOGE("%s:Unsupported RGB format: 0x%x", __FUNCTION__, hnd->format);
+            err = -EINVAL;
+            break;
+    }
+
+    rgb_data = (void*)(hnd->base + meta_size);
+    return err;
+}
