@@ -174,20 +174,11 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
     //dirty rect for same layer at least equal of number of
     //framebuffers
 
-    if ( updatingLayerCount <=  1 ) {
-        hwc_rect_t dirtyRect;
-        if (updatingLayerCount == 0) {
-            dirtyRect.left = INVALID_DIMENSION;
-            dirtyRect.top = INVALID_DIMENSION;
-            dirtyRect.right = INVALID_DIMENSION;
-            dirtyRect.bottom = INVALID_DIMENSION;
-            changingLayerIndex = NO_UPDATING_LAYER;
-        } else {
-            dirtyRect = list->hwLayers[changingLayerIndex].displayFrame;
+    if ( updatingLayerCount ==  1 ) {
+       hwc_rect_t dirtyRect = list->hwLayers[changingLayerIndex].displayFrame;
 #ifdef QCOM_BSP
-            dirtyRect = list->hwLayers[changingLayerIndex].dirtyRect;
+       dirtyRect = list->hwLayers[changingLayerIndex].dirtyRect;
 #endif
-        }
 
        for (int k = ctx->listStats[dpy].numAppLayers-1; k >= 0 ; k--) {
            //disable swap rect in case of scaling and video .
@@ -557,12 +548,6 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     mDirtyLayerIndex =  checkDirtyRect(ctx, list, dpy);
     ALOGD_IF (DEBUG_COPYBIT, "%s:Dirty Layer Index: %d",
                                        __FUNCTION__, mDirtyLayerIndex);
-    // repetitive frame will have mDirtyLayerIndex as NO_UPDATING_LAYER
-    if (mDirtyLayerIndex == NO_UPDATING_LAYER) {
-        ALOGD_IF (DEBUG_COPYBIT, "%s: No Updating Layers", __FUNCTION__);
-        return true;
-    }
-
     hwc_rect_t clearRegion = {0,0,0,0};
     mDirtyRect = list->hwLayers[last].displayFrame;
 
