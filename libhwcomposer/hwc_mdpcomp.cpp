@@ -301,7 +301,8 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     }
 
     //XXX: Investigate doing this with pixel phase on MDSS
-    if(!isSecureBuffer(hnd) && isNonIntegralSourceCrop(layer->sourceCropf))
+    if(!isSecureBuffer(hnd) && !isProtectedBuffer(hnd) &&
+            isNonIntegralSourceCrop(layer->sourceCropf))
         return false;
 
     int hw_w = ctx->dpyAttr[mDpy].xres;
