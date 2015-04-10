@@ -133,7 +133,7 @@ DisplayError ResManager::Deinit() {
 }
 
 DisplayError ResManager::RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
-                                         Handle *display_ctx) {
+                                         const HWPanelInfo &hw_panel_info, Handle *display_ctx) {
   DisplayError error = kErrorNone;
 
   HWBlockType hw_block_id = kHWBlockMax;
@@ -170,6 +170,7 @@ DisplayError ResManager::RegisterDisplay(DisplayType type, const HWDisplayAttrib
     return kErrorMemory;
   }
 
+  display_resource_ctx->hw_panel_info_ = hw_panel_info;
   display_resource_ctx->buffer_manager = new BufferManager(buffer_allocator_, buffer_sync_handler_);
   if (display_resource_ctx->buffer_manager == NULL) {
     delete display_resource_ctx;
@@ -1119,7 +1120,7 @@ void ResManager::SetRotatorOutputFormat(const LayerBufferFormat &input_format,
   // Initialize the output format with input format by default.
   *output_format = input_format;
 
-  switch(input_format) {
+  switch (input_format) {
   case kFormatARGB8888:
   case kFormatRGBA8888:
     if (is_opaque) {
@@ -1181,8 +1182,9 @@ void ResManager::SetRotatorOutputFormat(const LayerBufferFormat &input_format,
     }
   }
 
-  DLOGV_IF(kTagResources, "Input format %x, Output format = %x, rot90 %d ubwc %d downscale %d",
-           input_format, *output_format, rot90, hw_res_info_.has_ubwc, downscale);
+  DLOGV_IF(kTagResources, "Input format = %x, Output format = %x, rot90 = %d, ubwc = %d,"
+           "downscale = %d", input_format, *output_format, rot90, hw_res_info_.has_ubwc,
+           downscale);
 
   return;
 }

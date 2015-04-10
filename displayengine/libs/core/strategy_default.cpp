@@ -35,6 +35,8 @@ StrategyDefault::StrategyDefault() : hw_layers_info_(NULL) {
 }
 
 DisplayError StrategyDefault::CreateStrategyInterface(uint16_t version, DisplayType type,
+                                                      const HWResourceInfo *hw_resource_info,
+                                                      const HWPanelInfo *hw_panel_info,
                                                       StrategyInterface **interface) {
   StrategyDefault *strategy_default  = new StrategyDefault();
 

@@ -80,6 +80,8 @@ DisplayError CompManager::Init(const HWResourceInfo &hw_res_info, BufferAllocato
     destroy_strategy_intf_ = StrategyDefault::DestroyStrategyInterface;
   }
 
+  hw_res_info_ = hw_res_info;
+
   return error;
 }
 
@@ -96,7 +98,7 @@ DisplayError CompManager::Deinit() {
 }
 
 DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
-                                          Handle *display_ctx) {
+                                          const HWPanelInfo &hw_panel_info, Handle *display_ctx) {
   SCOPE_LOCK(locker_);
 
   DisplayError error = kErrorNone;
@@ -106,7 +108,7 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
     return kErrorMemory;
   }
 
-  if (create_strategy_intf_(STRATEGY_VERSION_TAG, type,
+  if (create_strategy_intf_(STRATEGY_VERSION_TAG, type, &hw_res_info_, &hw_panel_info,
                             &display_comp_ctx->strategy_intf) != kErrorNone) {
     DLOGW("Unable to create strategy interface");
     delete display_comp_ctx;
@@ -114,7 +116,8 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
     return kErrorUndefined;
   }
 
-  error = res_mgr_.RegisterDisplay(type, attributes, &display_comp_ctx->display_resource_ctx);
+  error = res_mgr_.RegisterDisplay(type, attributes, hw_panel_info,
+                                   &display_comp_ctx->display_resource_ctx);
   if (error != kErrorNone) {
     destroy_strategy_intf_(display_comp_ctx->strategy_intf);
     delete display_comp_ctx;

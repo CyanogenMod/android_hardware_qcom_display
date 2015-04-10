@@ -168,7 +168,7 @@ DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_reso
   scissor.bottom = FLOAT(display_attributes.y_pixels);
   bool crop_right_valid = false;
 
-  if (IsValidRect(scissor)) {
+  if (IsValid(scissor)) {
     crop_right_valid = CalculateCropRects(scissor, transform, &crop_right, &dst_right);
   }
 
@@ -240,8 +240,8 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     float rot_scale = 1.0f;
     if (!IsValidDimension(layer.src_rect, layer.dst_rect)) {
       DLOGV_IF(kTagResources, "Input is invalid");
-      LogRect(kTagResources, "input layer src_rect", layer.src_rect);
-      LogRect(kTagResources, "input layer dst_rect", layer.dst_rect);
+      Log(kTagResources, "input layer src_rect", layer.src_rect);
+      Log(kTagResources, "input layer dst_rect", layer.dst_rect);
       return kErrorNotSupported;
     }
 
@@ -265,7 +265,7 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     uint32_t align_x, align_y;
     GetAlignFactor(layer.input_buffer->format, &align_x, &align_y);
     if (align_x > 1 || align_y > 1) {
-      NormalizeRect(align_x, align_y, &src_rect);
+      Normalize(align_x, align_y, &src_rect);
     }
 
     if (ValidateScaling(layer, src_rect, dst_rect, &rot_scale)) {
@@ -304,21 +304,21 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
 
     DLOGV_IF(kTagResources, "==== layer = %d, left pipe valid = %d ====",
              i, layer_config->left_pipe.valid);
-    LogRect(kTagResources, "input layer src_rect", layer.src_rect);
-    LogRect(kTagResources, "input layer dst_rect", layer.dst_rect);
+    Log(kTagResources, "input layer src_rect", layer.src_rect);
+    Log(kTagResources, "input layer dst_rect", layer.dst_rect);
     for (uint32_t k = 0; k < layer_config->num_rotate; k++) {
       DLOGV_IF(kTagResources, "rotate num = %d, scale_x = %.2f", k, rot_scale);
-      LogRect(kTagResources, "rotate src", layer_config->rotates[k].src_roi);
-      LogRect(kTagResources, "rotate dst", layer_config->rotates[k].dst_roi);
+      Log(kTagResources, "rotate src", layer_config->rotates[k].src_roi);
+      Log(kTagResources, "rotate dst", layer_config->rotates[k].dst_roi);
     }
 
-    LogRect(kTagResources, "cropped src_rect", src_rect);
-    LogRect(kTagResources, "cropped dst_rect", dst_rect);
-    LogRect(kTagResources, "left pipe src", layer_config->left_pipe.src_roi);
-    LogRect(kTagResources, "left pipe dst", layer_config->left_pipe.dst_roi);
+    Log(kTagResources, "cropped src_rect", src_rect);
+    Log(kTagResources, "cropped dst_rect", dst_rect);
+    Log(kTagResources, "left pipe src", layer_config->left_pipe.src_roi);
+    Log(kTagResources, "left pipe dst", layer_config->left_pipe.dst_roi);
     if (hw_layers->config[i].right_pipe.valid) {
-      LogRect(kTagResources, "right pipe src", layer_config->right_pipe.src_roi);
-      LogRect(kTagResources, "right pipe dst", layer_config->right_pipe.dst_roi);
+      Log(kTagResources, "right pipe src", layer_config->right_pipe.src_roi);
+      Log(kTagResources, "right pipe dst", layer_config->right_pipe.dst_roi);
     }
     // set z_order, left_pipe should always be valid
     left_pipe.z_order = z_order;
@@ -507,9 +507,9 @@ bool ResManager::CalculateCropRects(const LayerRect &scissor, const LayerTransfo
   crop_top += crop_height * top_cut_ratio;
   crop_right -= crop_width * right_cut_ratio;
   crop_bottom -= crop_height * bottom_cut_ratio;
-  NormalizeRect(1, 1, crop);
-  NormalizeRect(1, 1, dst);
-  if (IsValidRect(*crop) && IsValidRect(*dst))
+  Normalize(1, 1, crop);
+  Normalize(1, 1, dst);
+  if (IsValid(*crop) && IsValid(*dst))
     return true;
   else
     return false;
@@ -612,12 +612,12 @@ DisplayError ResManager::AlignPipeConfig(const Layer &layer, const LayerTransfor
   // 2. Normalize source and destination rect of a layer to multiple of 1.
   // TODO(user) Check buffer format and check if rotate is involved.
 
-  NormalizeRect(align_x, align_y, &left_pipe->src_roi);
-  NormalizeRect(1, 1, &left_pipe->dst_roi);
+  Normalize(align_x, align_y, &left_pipe->src_roi);
+  Normalize(1, 1, &left_pipe->dst_roi);
 
   if (right_pipe->valid) {
-    NormalizeRect(align_x, align_y, &right_pipe->src_roi);
-    NormalizeRect(1, 1, &right_pipe->dst_roi);
+    Normalize(align_x, align_y, &right_pipe->src_roi);
+    Normalize(1, 1, &right_pipe->dst_roi);
   }
 
   if (right_pipe->valid) {
