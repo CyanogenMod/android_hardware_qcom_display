@@ -183,7 +183,7 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
     constraints->safe_mode = true;
   }
 
-  if (display_comp_ctx->idle_fallback) {
+  if (display_comp_ctx->idle_fallback || display_comp_ctx->fallback_) {
     constraints->safe_mode = true;
   }
 }
@@ -319,6 +319,19 @@ bool CompManager::ProcessIdleTimeout(Handle display_ctx) {
   }
 
   return false;
+}
+
+void CompManager::ProcessThermalEvent(Handle display_ctx, int64_t thermal_level) {
+  SCOPE_LOCK(locker_);
+
+  DisplayCompositionContext *display_comp_ctx =
+          reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+
+  if (thermal_level >= kMaxThermalLevel) {
+    display_comp_ctx->fallback_ = true;
+  } else {
+    display_comp_ctx->fallback_ = false;
+  }
 }
 
 DisplayError CompManager::SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages) {

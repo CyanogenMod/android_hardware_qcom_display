@@ -48,12 +48,15 @@ class CompManager : public DumpImpl {
   DisplayError PostCommit(Handle display_ctx, HWLayers *hw_layers);
   void Purge(Handle display_ctx);
   bool ProcessIdleTimeout(Handle display_ctx);
+  void ProcessThermalEvent(Handle display_ctx, int64_t thermal_level);
   DisplayError SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);
 
  private:
+  static const int kMaxThermalLevel = 3;
+
   void PrepareStrategyConstraints(Handle display_ctx, HWLayers *hw_layers);
 
   struct DisplayCompositionContext {
@@ -65,10 +68,12 @@ class CompManager : public DumpImpl {
     uint32_t remaining_strategies;
     bool idle_fallback;
     bool handle_idle_timeout;
+    bool fallback_;
 
     DisplayCompositionContext()
       : display_resource_ctx(NULL), display_type(kPrimary), max_strategies(0),
-        remaining_strategies(0), idle_fallback(false), handle_idle_timeout(true) { }
+        remaining_strategies(0), idle_fallback(false), handle_idle_timeout(true),
+        fallback_(false) { }
   };
 
   Locker locker_;

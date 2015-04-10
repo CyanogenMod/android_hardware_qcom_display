@@ -243,5 +243,10 @@ void DisplayPrimary::IdleTimeout() {
   }
 }
 
+void DisplayPrimary::ThermalEvent(int64_t thermal_level) {
+  SCOPE_LOCK(locker_);
+  comp_manager_->ProcessThermalEvent(display_comp_ctx_, thermal_level);
+}
+
 }  // namespace sde
 
