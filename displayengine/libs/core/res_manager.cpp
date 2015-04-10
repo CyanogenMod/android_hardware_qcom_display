@@ -1138,12 +1138,12 @@ void ResManager::SetRotatorOutputFormat(const LayerBufferFormat &input_format,
   case kFormatRGBX8888:
     *output_format = kFormatRGB888;
     break;
+  case kFormatYCrCb420SemiPlanar:
   case kFormatYCbCr420SemiPlanar:
   case kFormatYCbCr420SemiPlanarVenus:
     *output_format = kFormatYCbCr420SemiPlanar;
     break;
   default:
-    *output_format = input_format;
     break;
   }
 
@@ -1159,6 +1159,7 @@ void ResManager::SetRotatorOutputFormat(const LayerBufferFormat &input_format,
   } else {
     if (hw_res_info_.has_ubwc) {
       switch (input_format) {
+      case kFormatYCrCb420SemiPlanar:
       case kFormatYCbCr420SemiPlanar:
       case kFormatYCbCr420SemiPlanarVenus:
         *output_format = kFormatYCbCr420SPVenusUbwc;
