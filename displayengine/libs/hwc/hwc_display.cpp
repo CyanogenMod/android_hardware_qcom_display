@@ -27,6 +27,7 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <math.h>
 #include <errno.h>
 #include <gralloc_priv.h>
 #include <utils/constants.h>
@@ -571,10 +572,10 @@ void HWCDisplay::SetRect(const hwc_rect_t &source, LayerRect *target) {
 }
 
 void HWCDisplay::SetRect(const hwc_frect_t &source, LayerRect *target) {
-  target->left = source.left;
-  target->top = source.top;
-  target->right = source.right;
-  target->bottom = source.bottom;
+  target->left = floorf(source.left);
+  target->top = floorf(source.top);
+  target->right = ceilf(source.right);
+  target->bottom = ceilf(source.bottom);
 }
 
 void HWCDisplay::SetComposition(const int32_t &source, LayerComposition *target) {
