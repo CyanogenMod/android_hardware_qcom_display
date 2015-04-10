@@ -122,6 +122,8 @@ DisplayError ResManager::Init(const HWResourceInfo &hw_res_info, BufferAllocator
 #ifdef USES_SCALAR
   ScalarHelper::GetInstance()->Init();
 #endif
+
+  max_system_bw_ = FLOAT(hw_res_info_.max_bandwidth_high);
   return kErrorNone;
 }
 
@@ -446,7 +448,9 @@ bool ResManager::CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *h
     right_pipe_bw[i] = right_pipe->valid ? GetPipeBw(display_ctx, right_pipe, bpp) : 0;
 
     if ((left_pipe_bw[i] > max_pipe_bw) || (right_pipe_bw[i] > max_pipe_bw)) {
-      DLOGV_IF(kTagResources, "Pipe bandwidth exceeds limit for layer index = %d", i);
+      DLOGV_IF(kTagResources, "Pipe bandwidth exceeds limit for layer index=%d !" \
+               " left_pipe_bw=%f, right_pipe_bw=%f, max_pipe_bw=%f",
+               i, left_pipe_bw[i], right_pipe_bw[i], max_pipe_bw);
       return false;
     }
 
@@ -467,9 +471,14 @@ bool ResManager::CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *h
     last_primary_bw_ = left_mixer_bw + right_mixer_bw;
   }
 
-  // If system has Video mode panel, use max_bandwidth_low, else use max_bandwidth_high
-  if ((display_bw + bw_claimed_) > (hw_res_info_.max_bandwidth_low / 1000000)) {
-    DLOGV_IF(kTagResources, "Overlap bandwidth exceeds limit!");
+  // If system has Video mode panel, then bw limit is max_bandwidth_low
+  if (display_ctx->hw_panel_info_.mode == kModeVideo) {
+    max_system_bw_ = FLOAT(hw_res_info_.max_bandwidth_low);
+  }
+
+  if ((display_bw + bw_claimed_) > (max_system_bw_ / 1000000)) {
+    DLOGV_IF(kTagResources, "Overlap bandwidth: %f exceeds system limit: %f (GBps)!",
+             (display_bw + bw_claimed_), (max_system_bw_ / 1000000));
     return false;
   }
 
@@ -481,7 +490,8 @@ bool ResManager::CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *h
 
   // Apply fudge factor to consider in-efficieny
   if ((system_clk * hw_res_info_.clk_fudge_factor) > max_sde_clk) {
-    DLOGV_IF(kTagResources, "Clock requirement exceeds limit!");
+    DLOGV_IF(kTagResources, "Clock requirement: %f exceeds system limit: %f (MHz)!",
+             (system_clk * hw_res_info_.clk_fudge_factor), max_sde_clk);
     return false;
   }
 
@@ -512,6 +522,15 @@ float ResManager::GetPipeBw(DisplayResourceContext *display_ctx, HWPipeInfo *pip
   // Consider panel dimension
   // (v_total / v_active) * (v_active / dst_h)
   bw *= FLOAT(display_attributes.v_total) / dst_h;
+
+  // Bandwidth is the rate at which data needs to be fetched from source to MDP (bytes/time).
+  // On Video mode panel, there is no transfer of data from MDP to panel in horizontal blanking
+  // time (hBP + hFP + hPW). So MDP gets this extra time to fetch data from source. But on the
+  // Command mode panel, data gets transferred from MDP to panel during blanking time as well,
+  // which means MDP needs to fetch the data faster. So pipe bandwidth needs to be adjusted.
+  if (display_ctx->hw_panel_info_.mode == kModeCommand) {
+    bw *= FLOAT(display_attributes.h_total) / FLOAT(display_attributes.x_pixels);
+  }
 
   // Bandwidth in GBps
   return (bw / 1000000000.0f);

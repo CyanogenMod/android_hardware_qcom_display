@@ -225,6 +225,7 @@ class ResManager : public DumpImpl {
   float bw_claimed_;  // Bandwidth claimed by other display
   float clk_claimed_;  // Clock claimed by other display
   float last_primary_bw_;
+  float max_system_bw_;
   uint32_t virtual_count_;
   struct HWRotator rotators_[kMaxNumRotator];
   BufferAllocator *buffer_allocator_;
