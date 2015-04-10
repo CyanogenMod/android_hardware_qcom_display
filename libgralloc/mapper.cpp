@@ -328,18 +328,20 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 native_handle_t** handle = va_arg(args, native_handle_t**);
                 private_handle_t* hnd = (private_handle_t*)native_handle_create(
                     private_handle_t::sNumFds, private_handle_t::sNumInts());
-                hnd->magic = private_handle_t::sMagic;
-                hnd->fd = fd;
-                hnd->flags =  private_handle_t::PRIV_FLAGS_USES_ION;
-                hnd->size = size;
-                hnd->offset = offset;
-                hnd->base = uint64_t(base) + offset;
-                hnd->gpuaddr = 0;
-                hnd->width = width;
-                hnd->height = height;
-                hnd->format = format;
-                *handle = (native_handle_t *)hnd;
-                res = 0;
+                if (hnd) {
+                  hnd->magic = private_handle_t::sMagic;
+                  hnd->fd = fd;
+                  hnd->flags =  private_handle_t::PRIV_FLAGS_USES_ION;
+                  hnd->size = size;
+                  hnd->offset = offset;
+                  hnd->base = uint64_t(base) + offset;
+                  hnd->gpuaddr = 0;
+                  hnd->width = width;
+                  hnd->height = height;
+                  hnd->format = format;
+                  *handle = (native_handle_t *)hnd;
+                  res = 0;
+                }
                 break;
 
             }
