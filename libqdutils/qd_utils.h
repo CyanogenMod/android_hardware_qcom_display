@@ -53,7 +53,7 @@ enum qd_utils {
     SUPPORTED_DOWNSCALE_AREA = (1920*1080)
 };
 
-int getHDMINode(void);
+int getPluggableNode(void);
 int getEdidRawData(char *buffer);
 
 void getAspectRatioPosition(int destWidth, int destHeight, int srcWidth,

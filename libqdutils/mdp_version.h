@@ -95,10 +95,11 @@ struct PanelInfo {
     bool mDynFpsSupported;       // Panel Supports dyn fps
     uint32_t mMinFps;            // Min fps supported by panel
     uint32_t mMaxFps;            // Max fps supported by panel
+    uint32_t mPluggable;         // Pluggable interface
     PanelInfo() : mType(NO_PANEL), mPartialUpdateEnable(0),
     mLeftAlign(0), mWidthAlign(0), mTopAlign(0), mHeightAlign(0),
     mMinROIWidth(0), mMinROIHeight(0), mNeedsROIMerge(false),
-    mDynFpsSupported(0), mMinFps(0), mMaxFps(0) {}
+    mDynFpsSupported(0), mMinFps(0), mMaxFps(0), mPluggable(0) { }
     friend class MDPVersion;
 };
 
@@ -133,6 +134,7 @@ public:
     int getMinROIWidth() { return mPanelInfo.mMinROIWidth; }
     int getMinROIHeight() { return mPanelInfo.mMinROIHeight; }
     bool needsROIMerge() { return mPanelInfo.mNeedsROIMerge; }
+    bool isPluggable() { return (mPanelInfo.mPluggable == 1); }
     unsigned long getLowBw() { return mLowBw; }
     unsigned long getHighBw() { return mHighBw; }
     bool isRotDownscaleEnabled() { return mRotDownscale; }

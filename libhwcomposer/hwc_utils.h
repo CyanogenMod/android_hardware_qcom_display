@@ -141,6 +141,8 @@ struct DisplayAttributes {
     //If configuration changed dynamically without subsequent GEOMETRY changes
     //we may still need to adjust destination params
     bool configSwitched;
+    //Denotes whether the display is pluggable
+    bool isPluggable;
 };
 
 struct ListStats {
@@ -788,6 +790,10 @@ static inline bool isVDConnected(hwc_context_t* ctx) {
 inline uint32_t getLayerClock(const uint32_t& dstW, const uint32_t& dstH,
         const uint32_t& srcH) {
     return max(dstW, (srcH * dstW) / dstH);
+}
+
+inline bool isPrimaryPluggable(hwc_context_t* ctx) {
+    return ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isPluggable;
 }
 
 };

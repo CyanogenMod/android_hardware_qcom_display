@@ -258,6 +258,10 @@ void  MDPVersion::updatePanelInfo() {
                     mPanelInfo.mMaxFps = atoi(tokens[1]);
                     ALOGI("Max Panel fps: %d", mPanelInfo.mMaxFps);
                 }
+                if(!strncmp(tokens[0], "is_pluggable", strlen("is_pluggable"))) {
+                    mPanelInfo.mPluggable = atoi(tokens[1]);
+                    ALOGI("Pluggable: %d", mPanelInfo.mPluggable);
+                }
             }
         }
         if((property_get("persist.hwc.pubypass", property, 0) > 0) &&
