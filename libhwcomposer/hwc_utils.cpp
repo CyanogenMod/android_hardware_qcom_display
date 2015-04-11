@@ -1594,34 +1594,9 @@ void closeAcquireFds(hwc_display_contents_1_t* list) {
     }
 }
 
-int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
-        int fd) {
+void hwc_sync_rotator(hwc_context_t *ctx, hwc_display_contents_1_t* list,
+        int dpy) {
     ATRACE_CALL();
-    int ret = 0;
-    int acquireFd[MAX_NUM_APP_LAYERS];
-    int count = 0;
-    int releaseFd = -1;
-    int retireFd = -1;
-    int fbFd = -1;
-    bool swapzero = false;
-
-    struct mdp_buf_sync data;
-    memset(&data, 0, sizeof(data));
-    data.acq_fen_fd = acquireFd;
-    data.rel_fen_fd = &releaseFd;
-    data.retire_fen_fd = &retireFd;
-    data.flags = MDP_BUF_SYNC_FLAG_RETIRE_FENCE;
-
-    char property[PROPERTY_VALUE_MAX];
-    if(property_get("debug.egl.swapinterval", property, "1") > 0) {
-        if(atoi(property) == 0)
-            swapzero = true;
-    }
-
-    bool isExtAnimating = false;
-    if(dpy)
-       isExtAnimating = ctx->listStats[dpy].isDisplayAnimating;
-
     //Send acquireFenceFds to rotator
     for(uint32_t i = 0; i < ctx->mLayerRotMap[dpy]->getCount(); i++) {
         int rotFd = ctx->mRotMgr->getRotDevFd();
@@ -1641,7 +1616,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
             rotData.acq_fen_fd_cnt = 1; //1 ioctl call per rot session
         }
         int ret = 0;
-        if(LIKELY(!swapzero) and (not ctx->mLayerRotMap[dpy]->isRotCached(i)))
+        if(not ctx->mLayerRotMap[dpy]->isRotCached(i))
             ret = ioctl(rotFd, MSMFB_BUFFER_SYNC, &rotData);
 
         if(ret < 0) {
@@ -1659,58 +1634,61 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
                     rotReleaseFd;
         }
     }
+}
+
+int hwc_sync_mdss(hwc_context_t *ctx, hwc_display_contents_1_t *list, int dpy,
+        bool isExtAnimating, int fd) {
+    ATRACE_CALL();
+    int ret = 0;
+    int acquireFd[MAX_NUM_APP_LAYERS];
+    int count = 0;
+    int releaseFd = -1;
+    int retireFd = -1;
+    int fbFd = ctx->dpyAttr[dpy].fd;
+
+    struct mdp_buf_sync data;
+    memset(&data, 0, sizeof(data));
+    data.acq_fen_fd = acquireFd;
+    data.rel_fen_fd = &releaseFd;
+    data.retire_fen_fd = &retireFd;
+    data.flags = MDP_BUF_SYNC_FLAG_RETIRE_FENCE;
 
     //Accumulate acquireFenceFds for MDP Overlays
     if(list->outbufAcquireFenceFd >= 0) {
         //Writeback output buffer
-        if(LIKELY(!swapzero) )
-            acquireFd[count++] = list->outbufAcquireFenceFd;
+        acquireFd[count++] = list->outbufAcquireFenceFd;
     }
 
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(((isAbcInUse(ctx)== true ) ||
           (list->hwLayers[i].compositionType == HWC_OVERLAY)) &&
                         list->hwLayers[i].acquireFenceFd >= 0) {
-            if(LIKELY(!swapzero) ) {
-                // if ABC is enabled for more than one layer.
-                // renderBufIndexforABC will work as FB.Hence
-                // set the acquireFD from fd - which is coming from copybit
-                if(fd >= 0 && (isAbcInUse(ctx) == true)) {
-                    if(ctx->listStats[dpy].renderBufIndexforABC ==(int32_t)i)
-                        acquireFd[count++] = fd;
-                    else
-                        continue;
-                } else
-                    acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
-            }
+            // if ABC is enabled for more than one layer.
+            // renderBufIndexforABC will work as FB.Hence
+            // set the acquireFD from fd - which is coming from copybit
+            if(fd >= 0 && (isAbcInUse(ctx) == true)) {
+                if(ctx->listStats[dpy].renderBufIndexforABC ==(int32_t)i)
+                    acquireFd[count++] = fd;
+                else
+                    continue;
+            } else
+                acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
         }
         if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
-            if(LIKELY(!swapzero) ) {
-                if(fd >= 0) {
-                    //set the acquireFD from fd - which is coming from c2d
-                    acquireFd[count++] = fd;
-                    // Buffer sync IOCTL should be async when using c2d fence is
-                    // used
-                    data.flags &= ~MDP_BUF_SYNC_FLAG_WAIT;
-                } else if(list->hwLayers[i].acquireFenceFd >= 0)
-                    acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
-            }
+            if(fd >= 0) {
+                //set the acquireFD from fd - which is coming from c2d
+                acquireFd[count++] = fd;
+                // Buffer sync IOCTL should be async when using c2d fence
+                data.flags &= ~MDP_BUF_SYNC_FLAG_WAIT;
+            } else if(list->hwLayers[i].acquireFenceFd >= 0)
+                acquireFd[count++] = list->hwLayers[i].acquireFenceFd;
         }
-    }
-
-    if ((fd >= 0) && !dpy && ctx->mPtorInfo.isActive()) {
-        // Acquire c2d fence of Overlap render buffer
-        if(LIKELY(!swapzero) )
-            acquireFd[count++] = fd;
     }
 
     data.acq_fen_fd_cnt = count;
-    fbFd = ctx->dpyAttr[dpy].fd;
 
     //Waits for acquire fences, returns a release fence
-    if(LIKELY(!swapzero)) {
-        ret = ioctl(fbFd, MSMFB_BUFFER_SYNC, &data);
-    }
+    ret = ioctl(fbFd, MSMFB_BUFFER_SYNC, &data);
 
     if(ret < 0) {
         ALOGE("%s: ioctl MSMFB_BUFFER_SYNC failed, err=%s",
@@ -1731,9 +1709,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
 #endif
            list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             //Populate releaseFenceFds.
-            if(UNLIKELY(swapzero)) {
-                list->hwLayers[i].releaseFenceFd = -1;
-            } else if(isExtAnimating) {
+            if(isExtAnimating) {
                 // Release all the app layer fds immediately,
                 // if animation is in progress.
                 list->hwLayers[i].releaseFenceFd = -1;
@@ -1760,16 +1736,11 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         }
     }
 
-    if(fd >= 0) {
-        close(fd);
-        fd = -1;
-    }
-
     if (ctx->mCopyBit[dpy]) {
-        if (!dpy && ctx->mPtorInfo.isActive())
-            ctx->mCopyBit[dpy]->setReleaseFdSync(releaseFd);
-        else
+        if((!dpy && ctx->mPtorInfo.isActive()) or
+           ctx->mMDP.version < qdutils::MDP_V4_0) {
             ctx->mCopyBit[dpy]->setReleaseFd(releaseFd);
+        }
     }
 
     //Signals when MDP finishes reading rotator buffers.
@@ -1777,11 +1748,59 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     close(releaseFd);
     releaseFd = -1;
 
-    if(UNLIKELY(swapzero)) {
-        list->retireFenceFd = -1;
-    } else {
-        list->retireFenceFd = retireFd;
+    list->retireFenceFd = retireFd;
+
+    return ret;
+}
+
+void hwc_sync_sz(hwc_context_t* ctx, hwc_display_contents_1_t* list, int dpy) {
+    ATRACE_CALL();
+    for(uint32_t i = 0; i < list->numHwLayers; i++) {
+        list->hwLayers[i].releaseFenceFd = -1;
     }
+
+    if (ctx->mCopyBit[dpy]) {
+        if((!dpy && ctx->mPtorInfo.isActive()) or
+           ctx->mMDP.version < qdutils::MDP_V4_0) {
+            ctx->mCopyBit[dpy]->setReleaseFd(-1);
+        }
+    }
+
+    ctx->mLayerRotMap[dpy]->setReleaseFd(-1);
+
+    list->retireFenceFd = -1;
+}
+
+int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
+        int fd) {
+    ATRACE_CALL();
+    int ret = 0;
+
+    bool isExtAnimating = false;
+    if(dpy)
+        isExtAnimating = ctx->listStats[dpy].isDisplayAnimating;
+
+    bool swapzero = false;
+    char property[PROPERTY_VALUE_MAX];
+    if(property_get("debug.egl.swapinterval", property, "1") > 0) {
+        if(atoi(property) == 0)
+            swapzero = true;
+    }
+
+    if(swapzero) {
+        hwc_sync_sz(ctx, list, dpy);
+    } else {
+        hwc_sync_rotator(ctx, list, dpy);
+        ret = hwc_sync_mdss(ctx, list, dpy,
+                            isExtAnimating, fd);
+    }
+
+    if(fd >= 0) {
+        close(fd);
+        fd = -1;
+    }
+
+
     return ret;
 }
 
