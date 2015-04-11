@@ -142,8 +142,8 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
             flags |= private_handle_t::PRIV_FLAGS_TILE_RENDERED;
         }
 
-        if (AdrenoMemInfo::getInstance().isUBWCSupportedByGPU(format) &&
-            isUBwcEnabled(format, usage)) {
+        if (isUBwcEnabled(format, usage) &&
+            AdrenoMemInfo::getInstance().isUBWCSupportedByGPU(format)) {
             flags |= private_handle_t::PRIV_FLAGS_UBWC_ALIGNED;
         }
 
