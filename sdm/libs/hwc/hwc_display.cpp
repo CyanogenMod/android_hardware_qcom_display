@@ -30,6 +30,7 @@
 #include <math.h>
 #include <errno.h>
 #include <gralloc_priv.h>
+#include <gr.h>
 #include <utils/constants.h>
 #include <qdMetaData.h>
 #include <sync/sync.h>
@@ -330,6 +331,87 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
+int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint32_t fps) {
+  const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer->handle);
+
+  LayerBuffer *layer_buffer = layer->input_buffer;
+
+  if (pvt_handle) {
+    layer_buffer->format = GetSDMFormat(pvt_handle->format, pvt_handle->flags);
+    if (layer_buffer->format == kFormatInvalid) {
+      return -EINVAL;
+    }
+
+    layer_buffer->width = pvt_handle->width;
+    layer_buffer->height = pvt_handle->height;
+    if (pvt_handle->bufferType == BUFFER_TYPE_VIDEO) {
+      layer_stack_.flags.video_present = true;
+      layer_buffer->flags.video = true;
+    }
+    if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
+      layer_stack_.flags.secure_present = true;
+      layer_buffer->flags.secure = true;
+    }
+
+    layer->frame_rate = fps;
+    MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
+    if (meta_data && meta_data->operation & UPDATE_REFRESH_RATE) {
+      layer->frame_rate = RoundToStandardFPS(meta_data->refreshrate);
+    }
+
+    if (meta_data && meta_data->operation == PP_PARAM_INTERLACED && meta_data->interlaced) {
+      layer_buffer->flags.interlace = true;
+    }
+
+    if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_DISPLAY) {
+      layer_buffer->flags.secure_display = true;
+    }
+  } else {
+    // for FBT layer
+    if (hwc_layer->compositionType == HWC_FRAMEBUFFER_TARGET) {
+      uint32_t x_pixels;
+      uint32_t y_pixels;
+      int aligned_width;
+      int aligned_height;
+      int usage = GRALLOC_USAGE_HW_FB;
+      int format = HAL_PIXEL_FORMAT_RGBA_8888;
+      int ubwc_enabled = 0;
+      HWCDebugHandler::Get()->GetProperty("debug.gralloc.enable_fb_ubwc", &ubwc_enabled);
+      if (ubwc_enabled == 1) {
+        usage |= GRALLOC_USAGE_PRIVATE_ALLOC_UBWC;
+      }
+
+      GetFrameBufferResolution(&x_pixels, &y_pixels);
+
+      AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(INT(x_pixels), INT(y_pixels), format,
+                                                            usage, aligned_width, aligned_height);
+      layer_buffer->width = aligned_width;
+      layer_buffer->height = aligned_height;
+      layer->frame_rate = fps;
+    }
+  }
+
+  return 0;
+}
+
+void HWCDisplay::CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
+  const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer->handle);
+  LayerBuffer *layer_buffer = layer->input_buffer;
+
+  if (pvt_handle) {
+    layer_buffer->planes[0].fd = pvt_handle->fd;
+    layer_buffer->planes[0].offset = pvt_handle->offset;
+    layer_buffer->planes[0].stride = pvt_handle->width;
+  }
+
+  // if swapinterval property is set to 0 then close and reset the acquireFd
+  if (swap_interval_zero_ && hwc_layer->acquireFenceFd >= 0) {
+    close(hwc_layer->acquireFenceFd);
+    hwc_layer->acquireFenceFd = -1;
+  }
+  layer_buffer->acquire_fence_fd = hwc_layer->acquireFenceFd;
+}
+
 int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   if (!content_list || !content_list->numHwLayers) {
     DLOGW("Invalid content list");
@@ -345,6 +427,7 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   DisplayConfigVariableInfo active_config;
   uint32_t active_config_index = 0;
   display_intf_->GetActiveConfig(&active_config_index);
+  int ret;
 
   display_intf_->GetConfig(active_config_index, &active_config);
 
@@ -356,36 +439,11 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     Layer &layer = layer_stack_.layers[i];
     LayerBuffer *layer_buffer = layer.input_buffer;
 
-    if (pvt_handle) {
-      layer_buffer->format = GetSDMFormat(pvt_handle->format, pvt_handle->flags);
-      if (layer_buffer->format == kFormatInvalid) {
-        return -EINVAL;
-      }
+    ret = PrepareLayerParams(&content_list->hwLayers[i], &layer_stack_.layers[i],
+                             active_config.fps);
 
-      layer_buffer->width = pvt_handle->width;
-      layer_buffer->height = pvt_handle->height;
-      if (pvt_handle->bufferType == BUFFER_TYPE_VIDEO) {
-        layer_stack_.flags.video_present = true;
-        layer_buffer->flags.video = true;
-      }
-      if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
-        layer_stack_.flags.secure_present = true;
-        layer_buffer->flags.secure = true;
-      }
-
-      layer.frame_rate = UINT32(active_config.fps);
-      MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
-      if (meta_data && meta_data->operation & UPDATE_REFRESH_RATE) {
-        layer.frame_rate = RoundToStandardFPS(meta_data->refreshrate);
-      }
-
-      if (meta_data && meta_data->operation == PP_PARAM_INTERLACED && meta_data->interlaced) {
-        layer_buffer->flags.interlace = true;
-      }
-
-      if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_DISPLAY) {
-        layer_buffer->flags.secure_display = true;
-      }
+    if (ret != kErrorNone) {
+      return ret;
     }
 
     hwc_rect_t scaled_display_frame = hwc_layer.displayFrame;
@@ -395,7 +453,7 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     SetRect(scaled_display_frame, &layer.dst_rect);
     SetRect(hwc_layer.sourceCropf, &layer.src_rect);
     for (size_t j = 0; j < hwc_layer.visibleRegionScreen.numRects; j++) {
-        SetRect(hwc_layer.visibleRegionScreen.rects[j], &layer.visible_regions.rect[j]);
+      SetRect(hwc_layer.visibleRegionScreen.rects[j], &layer.visible_regions.rect[j]);
     }
     SetRect(hwc_layer.dirtyRect, &layer.dirty_regions.rect[0]);
     SetComposition(hwc_layer.compositionType, &layer.composition);
@@ -484,22 +542,7 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
 
   if (!flush_) {
     for (size_t i = 0; i < num_hw_layers; i++) {
-      hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-      const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
-      LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
-
-      if (pvt_handle) {
-        layer_buffer->planes[0].fd = pvt_handle->fd;
-        layer_buffer->planes[0].offset = pvt_handle->offset;
-        layer_buffer->planes[0].stride = pvt_handle->width;
-      }
-
-      // if swapinterval property is set to 0 then close and reset the acquireFd
-      if (swap_interval_zero_ && hwc_layer.acquireFenceFd >= 0) {
-        close(hwc_layer.acquireFenceFd);
-        hwc_layer.acquireFenceFd = -1;
-      }
-      layer_buffer->acquire_fence_fd = hwc_layer.acquireFenceFd;
+      CommitLayerParams(&content_list->hwLayers[i], &layer_stack_.layers[i]);
     }
 
     DisplayError error = display_intf_->Commit(&layer_stack_);
