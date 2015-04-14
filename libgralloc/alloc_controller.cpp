@@ -49,6 +49,17 @@
 
 #define ASTC_BLOCK_SIZE 16
 
+#ifdef ION_FLAG_CP_PIXEL
+#define CP_HEAP_ID ION_SECURE_HEAP_ID
+#else
+#define ION_FLAG_CP_PIXEL 0
+#define CP_HEAP_ID ION_CP_MM_HEAP_ID
+#endif
+
+#ifndef ION_FLAG_ALLOW_NON_CONTIG
+#define ION_FLAG_ALLOW_NON_CONTIG 0
+#endif
+
 using namespace gralloc;
 using namespace qdutils;
 
@@ -334,13 +345,22 @@ int IonController::allocate(alloc_data& data, int usage)
 
     if(usage & GRALLOC_USAGE_PROTECTED) {
         if (usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
-            ionHeapId |= ION_HEAP(ION_CP_MM_HEAP_ID);
+            ionHeapId = ION_HEAP(CP_HEAP_ID);
             ionFlags |= ION_SECURE;
-#ifdef ION_FLAG_ALLOW_NON_CONTIG
+            if (usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY) {
+                /*
+                 * There is currently no flag in ION for Secure Display
+                 * VM. Please add it here once available.
+                 *
+                   ionFlags |= <Ion flag for Secure Display>;
+                */
+            } else {
+                ionFlags |= ION_FLAG_CP_PIXEL;
+            }
+
             if (!(usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY)) {
                 ionFlags |= ION_FLAG_ALLOW_NON_CONTIG;
             }
-#endif
         } else {
             // for targets/OEMs which do not need HW level protection
             // do not set ion secure flag & MM heap. Fallback to system heap.

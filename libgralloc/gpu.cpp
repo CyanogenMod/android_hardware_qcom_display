@@ -26,10 +26,19 @@
 #include "memalloc.h"
 #include "alloc_controller.h"
 #include <qdMetaData.h>
+#include <linux/msm_ion.h>
 
 using namespace gralloc;
 
+#define SZ_2M 0x200000
 #define SZ_1M 0x100000
+#define SZ_4K 0x1000
+
+#ifdef ION_FLAG_CP_PIXEL
+#define SECURE_ALIGN SZ_4K
+#else
+#define SECURE_ALIGN SZ_1M
+#endif
 
 gpu_context_t::gpu_context_t(const private_module_t* module,
                              IAllocController* alloc_ctrl ) :
@@ -64,10 +73,14 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
     else
         data.align = getpagesize();
 
-    /* force 1MB alignment selectively for secure buffers, MDP5 onwards */
     if ((usage & GRALLOC_USAGE_PROTECTED) &&
         (usage & GRALLOC_USAGE_PRIVATE_MM_HEAP)) {
-        data.align = ALIGN((int) data.align, SZ_1M);
+            if (usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY) {
+                /* The alignment here reflects qsee mmu V7L/V8L requirement */
+                data.align = SZ_2M;
+            } else {
+                data.align = SECURE_ALIGN;
+            }
         size = ALIGN(size, data.align);
     }
 
