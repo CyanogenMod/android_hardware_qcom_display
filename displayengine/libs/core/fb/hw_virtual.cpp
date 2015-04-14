@@ -110,6 +110,10 @@ DisplayError HWVirtual::Doze() {
   return HWDevice::Doze();
 }
 
+DisplayError HWVirtual::DozeSuspend() {
+  return HWDevice::DozeSuspend();
+}
+
 DisplayError HWVirtual::Standby() {
   return HWDevice::Standby();
 }

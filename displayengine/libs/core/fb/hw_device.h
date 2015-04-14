@@ -57,6 +57,7 @@ class HWDevice {
   DisplayError PowerOn();
   DisplayError PowerOff();
   DisplayError Doze();
+  DisplayError DozeSuspend();
   DisplayError Standby();
   DisplayError Validate(HWLayers *hw_layers);
   DisplayError Commit(HWLayers *hw_layers);

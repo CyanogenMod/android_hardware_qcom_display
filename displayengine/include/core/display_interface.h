@@ -63,8 +63,11 @@ enum DisplayState {
 
   kStateOn,         //!< Display is ON. Contents are rendered in this state.
 
-  kStateDoze,       //!< Display is ON but not updating contents. Client shall not push any contents
-                    //!< in this state.
+  kStateDoze,       //!< Display is ON and it is configured in a low power state.
+
+  kStateDozeSuspend,
+                    //!< Display is ON in a low power state and continue showing its current
+                    //!< contents indefinitely until the mode changes.
 
   kStateStandby,    //!< Display is OFF. Client will continue to receive VSync events in this state
                     //!< if VSync is enabled. Contents are not rendered in this state.
