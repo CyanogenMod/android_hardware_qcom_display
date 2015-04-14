@@ -177,10 +177,11 @@ bool MDPComp::init(hwc_context_t *ctx) {
 
     bool defaultPTOR = false;
     //Enable PTOR when "persist.hwc.ptor.enable" is not defined for
-    //8x16 and 8x39 targets by default
+    //Bear family targets by default
     if((property_get("persist.hwc.ptor.enable", property, NULL) <= 0) &&
             (qdutils::MDPVersion::getInstance().is8x16() ||
-                qdutils::MDPVersion::getInstance().is8x39())) {
+             qdutils::MDPVersion::getInstance().is8x39() ||
+             qdutils::MDPVersion::getInstance().is8x52())) {
         defaultPTOR = true;
     }
 
@@ -532,7 +533,8 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ret = false;
     } else if((qdutils::MDPVersion::getInstance().is8x26() ||
                qdutils::MDPVersion::getInstance().is8x16() ||
-               qdutils::MDPVersion::getInstance().is8x39()) &&
+               qdutils::MDPVersion::getInstance().is8x39() ||
+               qdutils::MDPVersion::getInstance().is8x52()) &&
             ctx->mVideoTransFlag &&
             isSecondaryConnected(ctx)) {
         //1 Padding round to shift pipes across mixers
@@ -541,7 +543,8 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         ret = false;
     } else if((qdutils::MDPVersion::getInstance().is8x26() ||
                qdutils::MDPVersion::getInstance().is8x16() ||
-               qdutils::MDPVersion::getInstance().is8x39()) &&
+               qdutils::MDPVersion::getInstance().is8x39() ||
+               qdutils::MDPVersion::getInstance().is8x52()) &&
               !mDpy && isSecondaryAnimating(ctx) &&
               isYuvPresent(ctx,HWC_DISPLAY_VIRTUAL)) {
         ALOGD_IF(isDebug(),"%s: Display animation in progress",

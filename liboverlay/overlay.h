@@ -177,6 +177,7 @@ private:
     utils::eDest getPipe_8x26(const PipeSpecs& pipeSpecs);
     utils::eDest getPipe_8x16(const PipeSpecs& pipeSpecs);
     utils::eDest getPipe_8x39(const PipeSpecs& pipeSpecs);
+    utils::eDest getPipe_8x52(const PipeSpecs& pipeSpecs);
     utils::eDest getPipe_8994(const PipeSpecs& pipeSpecs);
     utils::eDest getPipe_8992(const PipeSpecs& pipeSpecs);
 
@@ -344,7 +345,8 @@ inline bool Overlay::isDMAMultiplexingSupported() {
 inline bool Overlay::isUIScalingOnExternalSupported() {
     if(qdutils::MDPVersion::getInstance().is8x26() or
        qdutils::MDPVersion::getInstance().is8x16() or
-       qdutils::MDPVersion::getInstance().is8x39()) {
+       qdutils::MDPVersion::getInstance().is8x39() or
+       qdutils::MDPVersion::getInstance().is8x52()) {
         return false;
     }
     return true;
