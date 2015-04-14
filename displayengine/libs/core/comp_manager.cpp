@@ -165,6 +165,16 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
   return kErrorNone;
 }
 
+void CompManager::ReconfigureDisplay(Handle comp_handle, const HWDisplayAttributes &attributes,
+                                     const HWPanelInfo &hw_panel_info) {
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(comp_handle);
+
+  res_mgr_.ReconfigureDisplay(display_comp_ctx->display_resource_ctx, attributes, hw_panel_info);
+
+  // TODO(user): Need to reconfigure strategy with updated panel info
+}
+
 void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_layers) {
   DisplayCompositionContext *display_comp_ctx =
                              reinterpret_cast<DisplayCompositionContext *>(comp_handle);

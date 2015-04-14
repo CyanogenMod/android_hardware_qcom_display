@@ -113,6 +113,15 @@ struct HWSplitInfo {
   bool always_src_split;
 
   HWSplitInfo() : left_split(0), right_split(0), always_src_split(false) { }
+
+  bool operator !=(const HWSplitInfo &split_info) {
+    return ((left_split != split_info.left_split) || (right_split != split_info.right_split) ||
+            (always_src_split != split_info.always_src_split));
+  }
+
+  bool operator ==(const HWSplitInfo &split_info) {
+    return !(operator !=(split_info));
+  }
 };
 
 /*! @brief This structure describes properties of a display panel. */
@@ -136,6 +145,23 @@ struct HWPanelInfo {
   HWPanelInfo() : port(kPortDefault), mode(kModeDefault), partial_update(false), left_align(false),
     width_align(false), top_align(false), height_align(false), min_roi_width(0), min_roi_height(0),
     needs_roi_merge(false), dynamic_fps(false), min_fps(0), max_fps(0) { }
+
+  bool operator !=(const HWPanelInfo &panel_info) {
+    return ((port != panel_info.port) || (mode != panel_info.mode) ||
+            (partial_update != panel_info.partial_update) ||
+            (left_align != panel_info.left_align) || (width_align != panel_info.width_align) ||
+            (top_align != panel_info.top_align) || (height_align != panel_info.height_align) ||
+            (min_roi_width != panel_info.min_roi_width) ||
+            (min_roi_height != panel_info.min_roi_height) ||
+            (needs_roi_merge != panel_info.needs_roi_merge) ||
+            (dynamic_fps != panel_info.dynamic_fps) || (min_fps != panel_info.min_fps) ||
+            (max_fps != panel_info.max_fps) || (is_primary_panel != panel_info.is_primary_panel) ||
+            (split_info != panel_info.split_info));
+  }
+
+  bool operator ==(const HWPanelInfo &panel_info) {
+    return !(operator !=(panel_info));
+  }
 };
 
 }  // namespace sde

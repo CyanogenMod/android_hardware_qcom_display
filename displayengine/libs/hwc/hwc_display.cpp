@@ -47,7 +47,7 @@ HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, 
   : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL),
     flush_(false), output_buffer_(NULL), dump_frame_count_(0), dump_frame_index_(0),
     dump_input_layers_(false), swap_interval_zero_(false), framebuffer_config_(NULL),
-    display_paused_(false) {
+    display_paused_(false), use_metadata_refresh_rate_(false),metadata_refresh_rate_(0) {
 }
 
 int HWCDisplay::Init() {
@@ -342,6 +342,12 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     return 0;
   }
 
+  DisplayConfigVariableInfo active_config;
+  uint32_t active_config_index = 0;
+  display_intf_->GetActiveConfig(&active_config_index);
+
+  display_intf_->GetConfig(active_config_index, &active_config);
+
   // Configure each layer
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
@@ -367,11 +373,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
         layer_buffer->flags.secure = true;
       }
 
-      // TODO(user) : Initialize it to display refresh rate
-      layer.frame_rate = 60;
+      layer.frame_rate = UINT32(active_config.fps);
       MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
       if (meta_data && meta_data->operation & UPDATE_REFRESH_RATE) {
-        layer.frame_rate = meta_data->refreshrate;
+        layer.frame_rate = RoundToStandardFPS(meta_data->refreshrate);
       }
 
       if (meta_data && meta_data->operation == PP_PARAM_INTERLACED && meta_data->interlaced) {
@@ -430,6 +435,8 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
   bool needs_fb_refresh = NeedsFrameBufferRefresh(content_list);
 
+  metadata_refresh_rate_ = 0;
+
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     Layer &layer = layer_stack_.layers[i];
@@ -437,6 +444,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
     if (composition == kCompositionSDE) {
       hwc_layer.hints |= HWC_HINT_CLEAR_FB;
+
+      if (use_metadata_refresh_rate_ && layer.frame_rate > metadata_refresh_rate_) {
+        metadata_refresh_rate_ = layer.frame_rate;
+      }
     }
 
     // If current layer does not need frame buffer redraw, then mark it as HWC_OVERLAY
@@ -972,6 +983,21 @@ void HWCDisplay::CloseAcquireFences(hwc_display_contents_1_t *content_list) {
       content_list->hwLayers[i].acquireFenceFd = -1;
     }
   }
+}
+
+uint32_t HWCDisplay::RoundToStandardFPS(uint32_t fps) {
+  static const uint32_t standard_fps[4] = {30, 24, 48, 60};
+
+  int count = INT(sizeof(standard_fps) / sizeof(standard_fps[0]));
+  for (int i = 0; i < count; i++) {
+    if (abs(standard_fps[i] - fps) < 2) {
+      // Most likely used for video, the fps can fluctuate
+      // Ex: b/w 29 and 30 for 30 fps clip
+      return standard_fps[i];
+    }
+  }
+
+  return fps;
 }
 
 }  // namespace sde

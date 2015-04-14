@@ -88,14 +88,25 @@ DisplayError DisplayPrimary::Prepare(LayerStack *layer_stack) {
 DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
   SCOPE_LOCK(locker_);
   DisplayError error = kErrorNone;
+  HWPanelInfo panel_info;
+  HWDisplayAttributes display_attributes;
 
   error = DisplayBase::Commit(layer_stack);
   if (error != kErrorNone) {
     return error;
   }
 
-  hw_primary_intf_->GetHWPanelInfo(&hw_panel_info_);
-  // TODO(user): Update panel info in composition manager and resource manager
+  hw_primary_intf_->GetHWPanelInfo(&panel_info);
+
+  hw_primary_intf_->GetDisplayAttributes(&display_attributes, active_mode_index_);
+
+  if (panel_info != hw_panel_info_ ||
+      display_attributes != display_attributes_[active_mode_index_]) {
+    comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, panel_info);
+
+    hw_panel_info_ = panel_info;
+    display_attributes_[active_mode_index_] = display_attributes;
+  }
 
   return error;
 }
@@ -142,7 +153,7 @@ DisplayError DisplayPrimary::SetDisplayState(DisplayState state) {
 
 DisplayError DisplayPrimary::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
   SCOPE_LOCK(locker_);
-  return DisplayBase::SetActiveConfig(variable_info);
+  return kErrorNotSupported;
 }
 
 DisplayError DisplayPrimary::SetActiveConfig(uint32_t index) {
@@ -218,6 +229,25 @@ DisplayError DisplayPrimary::IsScalingValid(const LayerRect &crop, const LayerRe
                                             bool rotate90) {
   SCOPE_LOCK(locker_);
   return DisplayBase::IsScalingValid(crop, dst, rotate90);
+}
+
+DisplayError DisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
+  SCOPE_LOCK(locker_);
+
+  DisplayError error = kErrorNone;
+
+  if (!hw_panel_info_.dynamic_fps) {
+    DLOGW("Dynamic fps feature is not supported");
+    return kErrorNotSupported;
+  }
+
+  if (refresh_rate > hw_panel_info_.max_fps) {
+    refresh_rate = hw_panel_info_.max_fps;
+  } else if (refresh_rate < hw_panel_info_.min_fps) {
+    refresh_rate = hw_panel_info_.min_fps;
+  }
+
+  return hw_primary_intf_->SetRefreshRate(refresh_rate);
 }
 
 void DisplayPrimary::AppendDump(char *buffer, uint32_t length) {

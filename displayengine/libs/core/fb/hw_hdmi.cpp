@@ -227,7 +227,7 @@ DisplayError HWHDMI::GetDisplayAttributes(HWDisplayAttributes *display_attribute
   display_attributes->h_total = timing_mode->active_h + h_blanking;
   display_attributes->x_dpi = 0;
   display_attributes->y_dpi = 0;
-  display_attributes->fps = FLOAT(timing_mode->refresh_rate) / 1000.0f;
+  display_attributes->fps = timing_mode->refresh_rate / 1000;
   display_attributes->vsync_period_ns = UINT32(1000000000L / display_attributes->fps);
   display_attributes->split_left = display_attributes->x_pixels;
   if (display_attributes->x_pixels > hw_resource_.max_mixer_width) {

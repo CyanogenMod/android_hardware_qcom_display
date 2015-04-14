@@ -55,7 +55,6 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError GetActiveConfig(uint32_t *index);
   virtual DisplayError GetVSyncState(bool *enabled);
   virtual DisplayError SetDisplayState(DisplayState state);
-  virtual DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info);
   virtual DisplayError SetActiveConfig(uint32_t index);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
   virtual DisplayError SetDisplayMode(uint32_t mode);

@@ -264,7 +264,7 @@ void HWRotator::SetBufferParams(HWLayers *hw_layers) {
   }
 }
 
- void HWRotator::SetMDPFlags(const Layer &layer, uint32_t *mdp_flags) {
+void HWRotator::SetMDPFlags(const Layer &layer, uint32_t *mdp_flags) {
   LayerTransform transform = layer.transform;
   bool rot90 = (transform.rotation == 90.0f);
 

@@ -39,6 +39,8 @@
 #include <QService.h>
 #include <gr.h>
 #include <gralloc_priv.h>
+#include <core/buffer_allocator.h>
+#include <display_config.h>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
@@ -628,6 +630,10 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     status = SetSecondaryDisplayStatus(input_parcel);
     break;
 
+  case qService::IQService::CONFIGURE_DYN_REFRESH_RATE:
+    status = ConfigureRefreshRate(input_parcel);
+    break;
+
   default:
     DLOGW("QService command = %d is not supported", command);
     return -EINVAL;
@@ -655,6 +661,34 @@ android::status_t HWCSession::SetSecondaryDisplayStatus(const android::Parcel *i
   }
 
   return display->SetDisplayStatus(display_status);
+}
+
+android::status_t HWCSession::ConfigureRefreshRate(const android::Parcel *input_parcel) {
+  uint32_t operation = UINT32(input_parcel->readInt32());
+
+  switch (operation) {
+  case qdutils::DISABLE_METADATA_DYN_REFRESH_RATE:
+    display_primary_->SetMetaDataRefreshRateFlag(false);
+    break;
+
+  case qdutils::ENABLE_METADATA_DYN_REFRESH_RATE:
+    display_primary_->SetMetaDataRefreshRateFlag(true);
+    break;
+
+  case qdutils::SET_BINDER_DYN_REFRESH_RATE:
+  {
+    uint32_t refresh_rate = UINT32(input_parcel->readInt32());
+
+    display_primary_->SetRefreshRate(refresh_rate);
+    break;
+  }
+
+  default:
+    DLOGW("Invalid operation %d", operation);
+    return -EINVAL;
+  }
+
+  return 0;
 }
 
 android::status_t HWCSession::SetDisplayMode(const android::Parcel *input_parcel) {

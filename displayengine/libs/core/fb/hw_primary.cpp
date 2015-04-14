@@ -65,7 +65,7 @@ DisplayError HWPrimaryInterface::Destroy(HWPrimaryInterface *intf) {
 
 HWPrimary::HWPrimary(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf)
   : HWDevice(buffer_sync_handler), event_thread_name_("SDE_EventThread"), fake_vsync_(false),
-    exit_threads_(false) {
+    exit_threads_(false), config_changed_(true) {
   HWDevice::device_type_ = kDevicePrimary;
   HWDevice::device_name_ = "Primary Display Device";
   HWDevice::hw_info_intf_ = hw_info_intf;
@@ -163,6 +163,21 @@ DisplayError HWPrimary::GetNumDisplayAttributes(uint32_t *count) {
 
 DisplayError HWPrimary::GetDisplayAttributes(HWDisplayAttributes *display_attributes,
                                              uint32_t index) {
+  if (!display_attributes) {
+    return kErrorParameters;
+  }
+
+  if (config_changed_) {
+    PopulateDisplayAttributes();
+    config_changed_ = false;
+  }
+
+  *display_attributes = display_attributes_;
+
+  return kErrorNone;
+}
+
+DisplayError HWPrimary::PopulateDisplayAttributes() {
   DTRACE_SCOPED();
 
   // Variable screen info
@@ -187,31 +202,61 @@ DisplayError HWPrimary::GetDisplayAttributes(HWDisplayAttributes *display_attrib
     var_screeninfo.height = INT(((FLOAT(var_screeninfo.yres) * 25.4f)/160.0f) + 0.5f);
   }
 
-  display_attributes->x_pixels = var_screeninfo.xres;
-  display_attributes->y_pixels = var_screeninfo.yres;
-  display_attributes->v_total = var_screeninfo.yres + var_screeninfo.lower_margin +
+  display_attributes_.x_pixels = var_screeninfo.xres;
+  display_attributes_.y_pixels = var_screeninfo.yres;
+  display_attributes_.v_total = var_screeninfo.yres + var_screeninfo.lower_margin +
       var_screeninfo.upper_margin + var_screeninfo.vsync_len;
   uint32_t h_blanking = var_screeninfo.right_margin + var_screeninfo.left_margin +
       var_screeninfo.hsync_len;
-  display_attributes->h_total = var_screeninfo.xres + h_blanking;
-  display_attributes->x_dpi =
+  display_attributes_.h_total = var_screeninfo.xres + var_screeninfo.right_margin +
+      var_screeninfo.left_margin + var_screeninfo.hsync_len;
+  display_attributes_.x_dpi =
       (FLOAT(var_screeninfo.xres) * 25.4f) / FLOAT(var_screeninfo.width);
-  display_attributes->y_dpi =
+  display_attributes_.y_dpi =
       (FLOAT(var_screeninfo.yres) * 25.4f) / FLOAT(var_screeninfo.height);
-  display_attributes->fps = FLOAT(meta_data.data.panel_frame_rate);
-  display_attributes->vsync_period_ns = UINT32(1000000000L / display_attributes->fps);
-  display_attributes->is_device_split = (hw_panel_info_.split_info.left_split ||
+  display_attributes_.fps = meta_data.data.panel_frame_rate;
+  display_attributes_.vsync_period_ns = UINT32(1000000000L / display_attributes_.fps);
+  display_attributes_.is_device_split = (hw_panel_info_.split_info.left_split ||
       (var_screeninfo.xres > hw_resource_.max_mixer_width)) ? true : false;
-  display_attributes->split_left = hw_panel_info_.split_info.left_split ?
-      hw_panel_info_.split_info.left_split : display_attributes->x_pixels / 2;
-  display_attributes->always_src_split = hw_panel_info_.split_info.always_src_split;
-  display_attributes->h_total += display_attributes->is_device_split ? h_blanking : 0;
+  display_attributes_.split_left = hw_panel_info_.split_info.left_split ?
+      hw_panel_info_.split_info.left_split : display_attributes_.x_pixels / 2;
+  display_attributes_.always_src_split = hw_panel_info_.split_info.always_src_split;
+  display_attributes_.h_total += display_attributes_.is_device_split ? h_blanking : 0;
 
   return kErrorNone;
 }
 
 DisplayError HWPrimary::SetDisplayAttributes(uint32_t index) {
   return HWDevice::SetDisplayAttributes(index);
+}
+
+DisplayError HWPrimary::SetRefreshRate(uint32_t refresh_rate) {
+  char node_path[kMaxStringLength] = {0};
+
+  DLOGI("Setting refresh rate to = %d fps", refresh_rate);
+
+  snprintf(node_path, sizeof(node_path), "%s%d/dynamic_fps", fb_path_, fb_node_index_);
+
+  int fd = open_(node_path, O_WRONLY);
+  if (fd < 0) {
+    DLOGE("Failed to open %s with error %s", node_path, strerror(errno));
+    return kErrorFileDescriptor;
+  }
+
+  char refresh_rate_string[kMaxStringLength];
+  snprintf(refresh_rate_string, sizeof(refresh_rate_string), "%d", refresh_rate);
+  ssize_t len = pwrite_(fd, refresh_rate_string, strlen(refresh_rate_string), 0);
+  if (len < 0) {
+    DLOGE("Failed to write %d with error %s", refresh_rate, strerror(errno));
+    close_(fd);
+    return kErrorUndefined;
+  }
+  close_(fd);
+
+  config_changed_ = true;
+  synchronous_commit_ = true;
+
+  return kErrorNone;
 }
 
 DisplayError HWPrimary::GetConfigIndex(uint32_t mode, uint32_t *index) {
