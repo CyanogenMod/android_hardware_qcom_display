@@ -57,7 +57,7 @@ class HWCBufferAllocator : public BufferAllocator {
     void *base_addr;             //!< Specifies the base address of the allocated output buffer.
   };
 
-  int SetHALFormat(LayerBufferFormat format, int *target);
+  int SetBufferInfo(LayerBufferFormat format, int *target, int *flags);
 
   gralloc::IAllocController *alloc_controller_;
 };
