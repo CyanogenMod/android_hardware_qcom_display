@@ -31,6 +31,7 @@
 #include "display_hdmi.h"
 #include "display_virtual.h"
 #include "hw_info_interface.h"
+#include "rotator_ctrl.h"
 
 #define __CLASS__ "CoreImpl"
 
@@ -39,7 +40,7 @@ namespace sde {
 CoreImpl::CoreImpl(CoreEventHandler *event_handler, BufferAllocator *buffer_allocator,
                    BufferSyncHandler *buffer_sync_handler)
   : event_handler_(event_handler), buffer_allocator_(buffer_allocator),
-    buffer_sync_handler_(buffer_sync_handler), hw_resource_(NULL) {
+    buffer_sync_handler_(buffer_sync_handler), hw_resource_(NULL), rotator_ctrl_(NULL) {
 }
 
 DisplayError CoreImpl::Init() {
@@ -62,16 +63,24 @@ DisplayError CoreImpl::Init() {
     goto CleanUpOnError;
   }
 
-  error = comp_mgr_.Init(*hw_resource_, buffer_allocator_, buffer_sync_handler_);
+  error = comp_mgr_.Init(*hw_resource_);
   if (error != kErrorNone) {
-    comp_mgr_.Deinit();
     goto CleanUpOnError;
   }
 
-  error = offline_ctrl_.Init(buffer_sync_handler_);
-  if (error != kErrorNone) {
+  rotator_ctrl_ = new RotatorCtrl();
+  if (!rotator_ctrl_) {
+    comp_mgr_.Deinit();
+    error = kErrorMemory;
     goto CleanUpOnError;
   }
+
+  error = rotator_ctrl_->Init(buffer_allocator_, buffer_sync_handler_);
+  if (error != kErrorNone) {
+    delete rotator_ctrl_;
+    rotator_ctrl_ = NULL;
+  }
+
   return kErrorNone;
 
 CleanUpOnError:
@@ -88,7 +97,7 @@ CleanUpOnError:
 DisplayError CoreImpl::Deinit() {
   SCOPE_LOCK(locker_);
 
-  offline_ctrl_.Deinit();
+  rotator_ctrl_->Deinit();
   comp_mgr_.Deinit();
   HWInfoInterface::Destroy(hw_info_intf_);
 
@@ -108,15 +117,15 @@ DisplayError CoreImpl::CreateDisplay(DisplayType type, DisplayEventHandler *even
   switch (type) {
   case kPrimary:
     display_base = new DisplayPrimary(event_handler, hw_info_intf_, buffer_sync_handler_,
-                                      &comp_mgr_, &offline_ctrl_);
+                                      &comp_mgr_, rotator_ctrl_);
     break;
   case kHDMI:
     display_base = new DisplayHDMI(event_handler, hw_info_intf_, buffer_sync_handler_,
-                                   &comp_mgr_, &offline_ctrl_);
+                                   &comp_mgr_, rotator_ctrl_);
     break;
   case kVirtual:
     display_base = new DisplayVirtual(event_handler, hw_info_intf_, buffer_sync_handler_,
-                                      &comp_mgr_, &offline_ctrl_);
+                                      &comp_mgr_, rotator_ctrl_);
     break;
   default:
     DLOGE("Spurious display type %d", type);

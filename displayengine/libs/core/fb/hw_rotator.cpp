@@ -36,8 +36,8 @@
 
 namespace sde {
 
-DisplayError HWRotatorInterface::Create(HWRotatorInterface **intf,
-                                        BufferSyncHandler *buffer_sync_handler) {
+DisplayError HWRotatorInterface::Create(BufferSyncHandler *buffer_sync_handler,
+                                        HWRotatorInterface **intf) {
   DisplayError error = kErrorNone;
   HWRotator *hw_rotator = NULL;
 
@@ -85,64 +85,93 @@ DisplayError HWRotator::Close() {
   return kErrorNone;
 }
 
-DisplayError HWRotator::OpenSession(HWRotateInfo *rotate_info) {
-  LayerBuffer *input_buffer = rotate_info->input_buffer;
-  HWBufferInfo *rot_buf_info = &rotate_info->hw_buffer_info;
+DisplayError HWRotator::OpenSession(HWRotatorSession *hw_rotator_session) {
+  uint32_t frame_rate = hw_rotator_session->hw_session_config.frame_rate;
+  LayerBufferFormat src_format = hw_rotator_session->hw_session_config.src_format;
+  LayerBufferFormat dst_format = hw_rotator_session->hw_session_config.dst_format;
+  bool rot90 = (hw_rotator_session->transform.rotation == 90.0f);
 
-  ResetRotatorParams();
+  for (uint32_t i = 0; i < hw_rotator_session->hw_block_count; i++) {
+    HWRotateInfo *hw_rotate_info = &hw_rotator_session->hw_rotate_info[i];
 
-  STRUCT_VAR(mdp_rotation_config, mdp_rot_config);
-  mdp_rot_config.version = MDP_ROTATION_REQUEST_VERSION_1_0;
-  mdp_rot_config.input.width = input_buffer->width;
-  mdp_rot_config.input.height = input_buffer->height;
-  HWDevice::SetFormat(input_buffer->format, &mdp_rot_config.input.format);
-  mdp_rot_config.output.width = rot_buf_info->output_buffer.width;
-  mdp_rot_config.output.height = rot_buf_info->output_buffer.height;
-  HWDevice::SetFormat(rot_buf_info->output_buffer.format, &mdp_rot_config.output.format);
-  mdp_rot_config.frame_rate = rotate_info->frame_rate;
+    if (!hw_rotate_info->valid) {
+      continue;
+    }
 
-  if (ioctl_(HWDevice::device_fd_, MDSS_ROTATION_OPEN, &mdp_rot_config) < 0) {
-    IOCTL_LOGE(MDSS_ROTATION_OPEN, HWDevice::device_type_);
-    return kErrorHardware;
+    uint32_t src_width = UINT32(hw_rotate_info->src_roi.right - hw_rotate_info->src_roi.left);
+    uint32_t src_height =
+        UINT32(hw_rotate_info->src_roi.bottom - hw_rotate_info->src_roi.top);
+
+    uint32_t dst_width = UINT32(hw_rotate_info->dst_roi.right - hw_rotate_info->dst_roi.left);
+    uint32_t dst_height =
+        UINT32(hw_rotate_info->dst_roi.bottom - hw_rotate_info->dst_roi.top);
+
+    STRUCT_VAR(mdp_rotation_config, mdp_rot_config);
+
+    mdp_rot_config.version = MDP_ROTATION_REQUEST_VERSION_1_0;
+    mdp_rot_config.input.width = src_width;
+    mdp_rot_config.input.height = src_height;
+    SetFormat(src_format, &mdp_rot_config.input.format);
+    mdp_rot_config.output.width = dst_width;
+    mdp_rot_config.output.height = dst_height;
+    SetFormat(dst_format, &mdp_rot_config.output.format);
+    mdp_rot_config.frame_rate = frame_rate;
+
+    if (rot90) {
+      mdp_rot_config.flags |= MDP_ROTATION_90;
+    }
+
+    if (ioctl_(device_fd_, MDSS_ROTATION_OPEN, &mdp_rot_config) < 0) {
+      IOCTL_LOGE(MDSS_ROTATION_OPEN, device_type_);
+      return kErrorHardware;
+    }
+
+    hw_rotate_info->rotate_id = mdp_rot_config.session_id;
+
+    DLOGV_IF(kTagDriverConfig, "session_id %d", hw_rotate_info->rotate_id);
   }
-
-  rot_buf_info->session_id = mdp_rot_config.session_id;
-
-  DLOGV_IF(kTagDriverConfig, "session_id %d", rot_buf_info->session_id);
 
   return kErrorNone;
 }
 
-DisplayError HWRotator::CloseSession(int32_t session_id) {
-  if (ioctl_(HWDevice::device_fd_, MDSS_ROTATION_CLOSE, (uint32_t)session_id) < 0) {
-    IOCTL_LOGE(MDSS_ROTATION_CLOSE, HWDevice::device_type_);
-    return kErrorHardware;
-  }
+DisplayError HWRotator::CloseSession(HWRotatorSession *hw_rotator_session) {
+  for (uint32_t i = 0; i < hw_rotator_session->hw_block_count; i++) {
+    HWRotateInfo *hw_rotate_info = &hw_rotator_session->hw_rotate_info[i];
 
-  DLOGV_IF(kTagDriverConfig, "session_id %d", session_id);
+    if (!hw_rotate_info->valid) {
+      continue;
+    }
+
+    if (ioctl_(device_fd_, MDSS_ROTATION_CLOSE, UINT32(hw_rotate_info->rotate_id)) < 0) {
+      IOCTL_LOGE(MDSS_ROTATION_CLOSE, device_type_);
+      return kErrorHardware;
+    }
+
+    DLOGV_IF(kTagDriverConfig, "session_id %d", hw_rotate_info->rotate_id);
+  }
 
   return kErrorNone;
 }
 
-void HWRotator::SetRotatorCtrlParams(HWLayers *hw_layers) {
+void HWRotator::SetCtrlParams(HWLayers *hw_layers) {
   DLOGV_IF(kTagDriverConfig, "************************* %s Validate Input ************************",
            HWDevice::device_name_);
 
-  ResetRotatorParams();
+  ResetParams();
 
   HWLayersInfo &hw_layer_info = hw_layers->info;
 
   uint32_t &rot_count = mdp_rot_request_.count;
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
+    HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
+    bool rot90 = (layer.transform.rotation == 90.0f);
 
-    for (uint32_t count = 0; count < 2; count++) {
-      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
+    for (uint32_t count = 0; count < hw_rotator_session->hw_block_count; count++) {
+      HWRotateInfo *hw_rotate_info = &hw_rotator_session->hw_rotate_info[count];
 
-      if (rotate_info->valid) {
-        HWBufferInfo *rot_buf_info = &rotate_info->hw_buffer_info;
+      if (hw_rotate_info->valid) {
         mdp_rotation_item *mdp_rot_item = &mdp_rot_request_.list[rot_count];
-        bool rot90 = (layer.transform.rotation == 90.0f);
 
         if (rot90) {
           mdp_rot_item->flags |= MDP_ROTATION_90;
@@ -156,8 +185,8 @@ void HWRotator::SetRotatorCtrlParams(HWLayers *hw_layers) {
           mdp_rot_item->flags |= MDP_ROTATION_FLIP_UD;
         }
 
-        HWDevice::SetRect(rotate_info->src_roi, &mdp_rot_item->src_rect);
-        HWDevice::SetRect(rotate_info->dst_roi, &mdp_rot_item->dst_rect);
+        SetRect(hw_rotate_info->src_roi, &mdp_rot_item->src_rect);
+        SetRect(hw_rotate_info->dst_roi, &mdp_rot_item->dst_rect);
 
         // TODO(user): Need to assign the writeback id and pipe id  returned from resource manager.
         mdp_rot_item->pipe_idx = 0;
@@ -165,11 +194,13 @@ void HWRotator::SetRotatorCtrlParams(HWLayers *hw_layers) {
 
         mdp_rot_item->input.width = layer.input_buffer->width;
         mdp_rot_item->input.height = layer.input_buffer->height;
-        HWDevice::SetFormat(layer.input_buffer->format, &mdp_rot_item->input.format);
+        SetFormat(layer.input_buffer->format, &mdp_rot_item->input.format);
 
-        mdp_rot_item->output.width = rot_buf_info->output_buffer.width;
-        mdp_rot_item->output.height = rot_buf_info->output_buffer.height;
-        HWDevice::SetFormat(rot_buf_info->output_buffer.format, &mdp_rot_item->output.format);
+        mdp_rot_item->output.width = hw_rotator_session->output_buffer.width;
+        mdp_rot_item->output.height = hw_rotator_session->output_buffer.height;
+        SetFormat(hw_rotator_session->output_buffer.format, &mdp_rot_item->output.format);
+
+        mdp_rot_item->session_id = hw_rotate_info->rotate_id;
 
         rot_count++;
 
@@ -179,8 +210,9 @@ void HWRotator::SetRotatorCtrlParams(HWLayers *hw_layers) {
                  mdp_rot_item->input.width, mdp_rot_item->input.height, mdp_rot_item->input.format,
                  mdp_rot_item->output.width, mdp_rot_item->output.height,
                  mdp_rot_item->output.format);
-        DLOGV_IF(kTagDriverConfig, "pipe_id %d, wb_id %d, rot_flag %d", mdp_rot_item->pipe_idx,
-                 mdp_rot_item->wb_idx, mdp_rot_item->flags);
+        DLOGV_IF(kTagDriverConfig, "pipe_id 0x%x, wb_id %d, rot_flag 0x%x, session_id %d",
+                 mdp_rot_item->pipe_idx, mdp_rot_item->wb_idx, mdp_rot_item->flags,
+                 mdp_rot_item->session_id);
         DLOGV_IF(kTagDriverConfig, "src_rect [%d, %d, %d, %d]", mdp_rot_item->src_rect.x,
                  mdp_rot_item->src_rect.y, mdp_rot_item->src_rect.w, mdp_rot_item->src_rect.h);
         DLOGV_IF(kTagDriverConfig, "dst_rect [%d, %d, %d, %d]", mdp_rot_item->dst_rect.x,
@@ -191,7 +223,7 @@ void HWRotator::SetRotatorCtrlParams(HWLayers *hw_layers) {
   }
 }
 
-void HWRotator::SetRotatorBufferParams(HWLayers *hw_layers) {
+void HWRotator::SetBufferParams(HWLayers *hw_layers) {
   HWLayersInfo &hw_layer_info = hw_layers->info;
   uint32_t rot_count = 0;
 
@@ -201,26 +233,26 @@ void HWRotator::SetRotatorBufferParams(HWLayers *hw_layers) {
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
+    HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
 
-    for (uint32_t count = 0; count < 2; count++) {
-      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
+    for (uint32_t count = 0; count < hw_rotator_session->hw_block_count; count++) {
+      HWRotateInfo *hw_rotate_info = &hw_rotator_session->hw_rotate_info[count];
 
-      if (rotate_info->valid) {
-        HWBufferInfo *rot_buf_info = &rotate_info->hw_buffer_info;
+      if (hw_rotate_info->valid) {
         mdp_rotation_item *mdp_rot_item = &mdp_rot_request_.list[rot_count];
 
         mdp_rot_item->input.planes[0].fd = layer.input_buffer->planes[0].fd;
         mdp_rot_item->input.planes[0].offset = layer.input_buffer->planes[0].offset;
-        HWDevice::SetStride(HWDevice::device_type_, layer.input_buffer->format,
-                            layer.input_buffer->width, &mdp_rot_item->input.planes[0].stride);
+        SetStride(device_type_, layer.input_buffer->format, layer.input_buffer->width,
+                  &mdp_rot_item->input.planes[0].stride);
         mdp_rot_item->input.plane_count = 1;
         mdp_rot_item->input.fence = layer.input_buffer->acquire_fence_fd;
 
-        mdp_rot_item->output.planes[0].fd = rot_buf_info->output_buffer.planes[0].fd;
-        mdp_rot_item->output.planes[0].offset = rot_buf_info->output_buffer.planes[0].offset;
-        HWDevice::SetStride(HWDevice::device_type_, rot_buf_info->output_buffer.format,
-                            rot_buf_info->output_buffer.planes[0].stride,
-                            &mdp_rot_item->output.planes[0].stride);
+        mdp_rot_item->output.planes[0].fd = hw_rotator_session->output_buffer.planes[0].fd;
+        mdp_rot_item->output.planes[0].offset = hw_rotator_session->output_buffer.planes[0].offset;
+        SetStride(device_type_, hw_rotator_session->output_buffer.format,
+                  hw_rotator_session->output_buffer.planes[0].stride,
+                  &mdp_rot_item->output.planes[0].stride);
         mdp_rot_item->output.plane_count = 1;
         mdp_rot_item->output.fence = -1;
 
@@ -243,7 +275,7 @@ void HWRotator::SetRotatorBufferParams(HWLayers *hw_layers) {
 }
 
 DisplayError HWRotator::Validate(HWLayers *hw_layers) {
-  SetRotatorCtrlParams(hw_layers);
+  SetCtrlParams(hw_layers);
 
   mdp_rot_request_.flags = MDSS_ROTATION_REQUEST_VALIDATE;
   if (ioctl_(HWDevice::device_fd_, MDSS_ROTATION_REQUEST, &mdp_rot_request_) < 0) {
@@ -258,9 +290,9 @@ DisplayError HWRotator::Commit(HWLayers *hw_layers) {
   HWLayersInfo &hw_layer_info = hw_layers->info;
   uint32_t rot_count = 0;
 
-  SetRotatorCtrlParams(hw_layers);
+  SetCtrlParams(hw_layers);
 
-  SetRotatorBufferParams(hw_layers);
+  SetBufferParams(hw_layers);
 
   mdp_rot_request_.flags &= ~MDSS_ROTATION_REQUEST_VALIDATE;
   if (ioctl_(HWDevice::device_fd_, MDSS_ROTATION_REQUEST, &mdp_rot_request_) < 0) {
@@ -270,20 +302,20 @@ DisplayError HWRotator::Commit(HWLayers *hw_layers) {
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
+    HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
 
     layer.input_buffer->release_fence_fd = -1;
 
-    for (uint32_t count = 0; count < 2; count++) {
-      HWRotateInfo *rotate_info = &hw_layers->config[i].rotates[count];
+    for (uint32_t count = 0; count < hw_rotator_session->hw_block_count; count++) {
+      HWRotateInfo *hw_rotate_info = &hw_rotator_session->hw_rotate_info[count];
 
-      if (rotate_info->valid) {
-        HWBufferInfo *rot_buf_info = &rotate_info->hw_buffer_info;
+      if (hw_rotate_info->valid) {
         mdp_rotation_item *mdp_rot_item = &mdp_rot_request_.list[rot_count];
 
         HWDevice::SyncMerge(layer.input_buffer->release_fence_fd, dup(mdp_rot_item->output.fence),
                             &layer.input_buffer->release_fence_fd);
 
-        rot_buf_info->output_buffer.acquire_fence_fd = dup(mdp_rot_item->output.fence);
+        hw_rotator_session->output_buffer.acquire_fence_fd = dup(mdp_rot_item->output.fence);
 
         close_(mdp_rot_item->output.fence);
         rot_count++;
@@ -294,7 +326,7 @@ DisplayError HWRotator::Commit(HWLayers *hw_layers) {
   return kErrorNone;
 }
 
-void HWRotator::ResetRotatorParams() {
+void HWRotator::ResetParams() {
   memset(&mdp_rot_request_, 0, sizeof(mdp_rot_request_));
   memset(&mdp_rot_layers_, 0, sizeof(mdp_rot_layers_));
 

@@ -137,6 +137,7 @@ bool ScalarHelper::ConfigureScale(HWLayers *hw_layers) {
     LayerBufferFormat format = layer.input_buffer->format;
     HWPipeInfo* left_pipe = &hw_layers->config[i].left_pipe;
     HWPipeInfo* right_pipe = &hw_layers->config[i].right_pipe;
+    HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
 
     // Prepare data structure for lib scalar
     uint32_t flags = 0;
@@ -152,12 +153,12 @@ bool ScalarHelper::ConfigureScale(HWLayers *hw_layers) {
 
     for (uint32_t count = 0; count < 2; count++) {
       HWPipeInfo* hw_pipe = (count == 0) ? left_pipe : right_pipe;
-      HWRotateInfo* rotate_info = &hw_layers->config[i].rotates[count];
+      HWRotateInfo* hw_rotate_info = &hw_rotator_session->hw_rotate_info[count];
       scalar::PipeInfo* pipe = (count == 0) ? &layer_info.left_pipe : &layer_info.right_pipe;
 
-      if (rotate_info->valid) {
-        width = rotate_info->hw_buffer_info.buffer_config.width;
-        format = rotate_info->hw_buffer_info.buffer_config.format;
+      if (hw_rotate_info->valid) {
+        width = UINT32(hw_rotate_info->dst_roi.right - hw_rotate_info->dst_roi.left);
+        format = hw_rotator_session->output_buffer.format;
       }
 
       pipe->flags = flags;

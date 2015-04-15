@@ -90,8 +90,7 @@ struct BufferInfo {
   implemented by the client. Buffer manager in display engine will use these methods to
   allocate/deallocate buffers for display engine.
 
-  @sa CompManager::Init
-  @sa ResManager::Init
+  @sa CoreInterface::CreateCore
 */
 class BufferAllocator {
  public:
@@ -102,8 +101,6 @@ class BufferAllocator {
     @param[in] buffer_info \link BufferInfo \endlink
 
     @return \link DisplayError \endlink
-
-    @sa BufferManager
   */
   virtual DisplayError AllocateBuffer(BufferInfo *buffer_info) = 0;
 
@@ -115,8 +112,6 @@ class BufferAllocator {
     @param[in] buffer_info \link BufferInfo \endlink
 
     @return \link DisplayError \endlink
-
-    @sa BufferManager
   */
   virtual DisplayError FreeBuffer(BufferInfo *buffer_info) = 0;
 

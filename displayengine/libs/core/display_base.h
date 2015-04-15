@@ -31,18 +31,17 @@
 
 #include "hw_interface.h"
 #include "comp_manager.h"
-#include "buffer_manager.h"
 
 
 namespace sde {
 
-class OfflineCtrl;
+class RotatorCtrl;
 
 class DisplayBase : public DisplayInterface {
  public:
   DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
               HWDeviceType hw_device_type, BufferSyncHandler *buffer_sync_handler,
-              CompManager *comp_manager, OfflineCtrl *offline_ctrl);
+              CompManager *comp_manager, RotatorCtrl *rotator_ctrl);
   virtual ~DisplayBase() { }
   virtual DisplayError Init();
   virtual DisplayError Deinit();
@@ -61,6 +60,9 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
   virtual DisplayError SetDisplayMode(uint32_t mode);
 
+ private:
+  bool IsRotationRequired(HWLayers *hw_layers);
+
  protected:
   // DumpImpl method
   void AppendDump(char *buffer, uint32_t length);
@@ -75,11 +77,11 @@ class DisplayBase : public DisplayInterface {
   HWPanelInfo hw_panel_info_;
   BufferSyncHandler *buffer_sync_handler_;
   CompManager *comp_manager_;
-  OfflineCtrl *offline_ctrl_;
+  RotatorCtrl *rotator_ctrl_;
   DisplayState state_;
   Handle hw_device_;
   Handle display_comp_ctx_;
-  Handle display_offline_ctx_;
+  Handle display_rotator_ctx_;
   HWDisplayAttributes *display_attributes_;
   uint32_t num_modes_;
   uint32_t active_mode_index_;

@@ -27,8 +27,8 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __BUFFER_MANAGER_H__
-#define __BUFFER_MANAGER_H__
+#ifndef __SESSION_MANAGER_H__
+#define __SESSION_MANAGER_H__
 
 #include <utils/locker.h>
 #include <core/buffer_allocator.h>
@@ -36,47 +36,52 @@
 
 namespace sde {
 
-class BufferManager {
+class HWRotatorInterface;
+
+class SessionManager {
  public:
-  BufferManager(BufferAllocator *buffer_allocator, BufferSyncHandler *buffer_sync_handler);
+  SessionManager(HWRotatorInterface *hw_intf, BufferAllocator *buffer_allocator,
+                 BufferSyncHandler *buffer_sync_handler);
 
   void Start();
-  DisplayError GetNextBuffer(HWBufferInfo *hw_buffer_info);
-  DisplayError Stop(int *session_ids);
-  DisplayError SetReleaseFd(uint32_t slot, int fd);
-  DisplayError SetSessionId(uint32_t slot, int session_id);
+  DisplayError Stop();
+  DisplayError OpenSession(HWRotatorSession *hw_rotator_session);
+  DisplayError GetNextBuffer(HWRotatorSession *hw_rotator_session);
+  DisplayError SetReleaseFd(HWRotatorSession *hw_rotator_session);
 
  private:
-  static const uint32_t kMaxBufferSlotCount = 32;
+  // TODO(user): Read from hw capability instead of hardcoding
+  static const int kMaxSessionCount = 32;
 
-  enum kBufferSlotState {
-    kBufferSlotFree     = 0,
-    kBufferSlotReady    = 1,
-    kBufferSlotAcquired = 2,
+  enum SessionState {
+    kSessionReleased = 0,
+    kSessionReady    = 1,
+    kSessionAcquired = 2,
   };
 
-  struct BufferSlot {
-    HWBufferInfo hw_buffer_info;
-    kBufferSlotState state;
+  struct Session {
+    HWRotatorSession hw_rotator_session;
+    BufferInfo buffer_info;
+    SessionState state;
     int *release_fd;
     uint32_t *offset;
     uint32_t curr_index;
 
-    BufferSlot() : state(kBufferSlotFree), release_fd(NULL), offset(NULL), curr_index(0) { }
-    DisplayError Init();
-    DisplayError Deinit();
+    Session() : state(kSessionReleased), release_fd(NULL), offset(NULL), curr_index(0) { }
   };
 
-  DisplayError FreeBufferSlot(uint32_t index);
+  DisplayError AcquireSession(HWRotatorSession *hw_rotator_session, Session *session);
+  DisplayError ReleaseSession(Session *session);
 
-  BufferSlot buffer_slot_[kMaxBufferSlotCount];
+  Session session_list_[kMaxSessionCount];
+  HWRotatorInterface *hw_rotator_intf_;
   BufferAllocator *buffer_allocator_;
   BufferSyncHandler *buffer_sync_handler_;
-  uint32_t num_used_slot_;
+  uint32_t active_session_count_;           // number of sessions in ready/acquired state.
 };
 
 }  // namespace sde
 
-#endif  // __BUFFER_MANAGER_H__
+#endif  // __SESSION_MANAGER_H__
 
 

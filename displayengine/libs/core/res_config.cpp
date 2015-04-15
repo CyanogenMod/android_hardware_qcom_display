@@ -44,7 +44,8 @@ static void GetAlignFactor(const LayerBufferFormat &format, uint32_t *align_x, u
 
 void ResManager::RotationConfig(const Layer &layer, const float &downscale, LayerRect *src_rect,
                                 struct HWLayerConfig *layer_config, uint32_t *rotate_count) {
-  HWRotateInfo *rotate = &layer_config->rotates[0];
+  HWRotatorSession *hw_rotator_session = &layer_config->hw_rotator_session;
+  HWRotateInfo *hw_rotate_info = &hw_rotator_session->hw_rotate_info[0];
   float src_width = src_rect->right - src_rect->left;
   float src_height = src_rect->bottom - src_rect->top;
   bool rot90 = IsRotationNeeded(layer.transform.rotation);
@@ -54,7 +55,7 @@ void ResManager::RotationConfig(const Layer &layer, const float &downscale, Laye
   dst_rect.top = 0.0f;
   dst_rect.left = 0.0f;
 
-  rotate->downscale_ratio = downscale;
+  hw_rotator_session->downscale_ratio = downscale;
   uint32_t align_x, align_y;
   GetAlignFactor(layer.input_buffer->format, &align_x, &align_y);
 
@@ -79,21 +80,17 @@ void ResManager::RotationConfig(const Layer &layer, const float &downscale, Laye
     dst_rect.bottom = src_height / downscale;
   }
 
-  rotate->src_roi = *src_rect;
-  rotate->valid = true;
-  rotate->dst_roi = dst_rect;
+  hw_rotate_info->src_roi = *src_rect;
+  hw_rotate_info->valid = true;
+  hw_rotate_info->dst_roi = dst_rect;
 
-  // Set WHF for Rotator output
-  LayerBufferFormat output_format;
+  LayerBufferFormat *output_format = &hw_rotator_session->output_buffer.format;
   SetRotatorOutputFormat(layer.input_buffer->format, is_opaque, rot90, (downscale > 1.0f),
-                         &output_format);
-  HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
-  hw_buffer_info->buffer_config.format = output_format;
-  hw_buffer_info->buffer_config.width = UINT32(rotate->dst_roi.right);
-  hw_buffer_info->buffer_config.height = UINT32(rotate->dst_roi.bottom);
+                         output_format);
 
   *src_rect = dst_rect;
-  layer_config->num_rotate = 1;
+  hw_rotator_session->hw_block_count = 1;
+  hw_rotator_session->transform = layer.transform;
   (*rotate_count)++;
 }
 
@@ -254,6 +251,9 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
     struct HWLayerConfig *layer_config = &hw_layers->config[i];
     HWPipeInfo &left_pipe = layer_config->left_pipe;
     HWPipeInfo &right_pipe = layer_config->right_pipe;
+    HWRotatorSession *hw_rotator_session = &layer_config->hw_rotator_session;
+    LayerTransform transform = layer.transform;
+    bool rot90 = IsRotationNeeded(transform.rotation);
 
     if (!CalculateCropRects(scissor, layer.transform, &src_rect, &dst_rect)) {
       layer_config->Reset();
@@ -274,12 +274,11 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
 
     // config rotator first
     for (uint32_t j = 0; j < kMaxRotatePerLayer; j++) {
-      layer_config->rotates[j].Reset();
+      hw_rotator_session->hw_rotate_info[j].Reset();
     }
-    layer_config->num_rotate = 0;
+    hw_rotator_session->hw_block_count = 0;
 
-    LayerTransform transform = layer.transform;
-    if (IsRotationNeeded(transform.rotation) || UINT32(rot_scale) != 1) {
+    if (rot90 || UINT32(rot_scale) != 1) {
       RotationConfig(layer, rot_scale, &src_rect, layer_config, rotate_count);
       // rotator will take care of flipping, reset tranform
       transform = LayerTransform();
@@ -306,10 +305,10 @@ DisplayError ResManager::Config(DisplayResourceContext *display_resource_ctx, HW
              i, layer_config->left_pipe.valid);
     Log(kTagResources, "input layer src_rect", layer.src_rect);
     Log(kTagResources, "input layer dst_rect", layer.dst_rect);
-    for (uint32_t k = 0; k < layer_config->num_rotate; k++) {
+    for (uint32_t k = 0; k < hw_rotator_session->hw_block_count; k++) {
       DLOGV_IF(kTagResources, "rotate num = %d, scale_x = %.2f", k, rot_scale);
-      Log(kTagResources, "rotate src", layer_config->rotates[k].src_roi);
-      Log(kTagResources, "rotate dst", layer_config->rotates[k].dst_roi);
+      Log(kTagResources, "rotate src", hw_rotator_session->hw_rotate_info[k].src_roi);
+      Log(kTagResources, "rotate dst", hw_rotator_session->hw_rotate_info[k].dst_roi);
     }
 
     Log(kTagResources, "cropped src_rect", src_rect);

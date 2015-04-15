@@ -22,8 +22,8 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __OFFLINE_CTRL_H__
-#define __OFFLINE_CTRL_H__
+#ifndef __ROTATOR_CTRL_H__
+#define __ROTATOR_CTRL_H__
 
 #include <utils/locker.h>
 #include <utils/debug.h>
@@ -32,36 +32,43 @@
 namespace sde {
 
 class HWRotatorInterface;
+class BufferAllocator;
 class BufferSyncHandler;
 struct HWLayers;
+class SessionManager;
 
-class OfflineCtrl {
+class RotatorCtrl {
  public:
-  OfflineCtrl();
-  DisplayError Init(BufferSyncHandler *buffer_sync_handler);
+  RotatorCtrl();
+  DisplayError Init(BufferAllocator *buffer_allocator, BufferSyncHandler *buffer_sync_handler);
   DisplayError Deinit();
   DisplayError RegisterDisplay(DisplayType type, Handle *display_ctx);
   void UnregisterDisplay(Handle display_ctx);
   DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError Commit(Handle display_ctx, HWLayers *hw_layers);
+  DisplayError PostCommit(Handle display_ctx, HWLayers *hw_layers);
 
  private:
-  struct DisplayOfflineContext {
-    DisplayType display_type;
-    bool pending_rot_commit;
-
-    DisplayOfflineContext() : display_type(kPrimary), pending_rot_commit(false) { }
+  enum {
+    kSingleBuffering = 1,
+    kDoubleBuffering = 2,
+    kTripleBuffering = 3,
   };
 
-  DisplayError OpenRotatorSession(HWLayers *hw_layers);
-  DisplayError CloseRotatorSession(HWLayers *hw_layers);
-  bool IsRotationRequired(HWLayers *hw_layers);
+  struct DisplaRotatorContext {
+    DisplayType display_type;
+
+    DisplaRotatorContext() : display_type(kPrimary) { }
+  };
+
+  DisplayError PrepareSessions(HWLayers *hw_layers);
+  DisplayError GetOutputBuffers(HWLayers *hw_layers);
 
   HWRotatorInterface *hw_rotator_intf_;
-  bool hw_rotator_present_;
+  SessionManager *session_manager_;
 };
 
 }  // namespace sde
 
-#endif  // __OFFLINE_CTRL_H__
+#endif  // __ROTATOR_CTRL_H__
 

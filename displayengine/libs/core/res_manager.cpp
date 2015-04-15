@@ -39,18 +39,11 @@ ResManager::ResManager()
     buffer_allocator_(NULL), buffer_sync_handler_(NULL) {
 }
 
-DisplayError ResManager::Init(const HWResourceInfo &hw_res_info, BufferAllocator *buffer_allocator,
-                              BufferSyncHandler *buffer_sync_handler) {
+DisplayError ResManager::Init(const HWResourceInfo &hw_res_info) {
   hw_res_info_ = hw_res_info;
-
-  buffer_sync_handler_ = buffer_sync_handler;
 
   if (!hw_res_info_.max_mixer_width)
     hw_res_info_.max_mixer_width = kMaxSourcePipeWidth;
-
-  buffer_allocator_ = buffer_allocator;
-
-  buffer_sync_handler_ = buffer_sync_handler;
 
   DisplayError error = kErrorNone;
 
@@ -173,13 +166,6 @@ DisplayError ResManager::RegisterDisplay(DisplayType type, const HWDisplayAttrib
   }
 
   display_resource_ctx->hw_panel_info_ = hw_panel_info;
-  display_resource_ctx->buffer_manager = new BufferManager(buffer_allocator_, buffer_sync_handler_);
-  if (display_resource_ctx->buffer_manager == NULL) {
-    delete display_resource_ctx;
-    display_resource_ctx = NULL;
-    return kErrorMemory;
-  }
-
   hw_block_ctx_[hw_block_id].is_in_use = true;
 
   display_resource_ctx->display_attributes = attributes;
@@ -315,6 +301,7 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
   for (uint32_t i = 0; i < layer_info.count; i++) {
     Layer &layer = layer_info.stack->layers[layer_info.index[i]];
     struct HWLayerConfig &layer_config = hw_layers->config[i];
+    HWRotatorSession &hw_rotator_session = layer_config.hw_rotator_session;
     bool use_non_dma_pipe = layer_config.use_non_dma_pipe;
 
     // TODO(user): set this from comp_manager
@@ -322,8 +309,8 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
       use_non_dma_pipe = true;
     }
 
-    for (uint32_t j = 0; j < layer_config.num_rotate; j++) {
-      AssignRotator(&layer_config.rotates[j], &rotate_count);
+    for (uint32_t j = 0; j < hw_rotator_session.hw_block_count; j++) {
+      AssignRotator(&hw_rotator_session.hw_rotate_info[j], &rotate_count);
     }
 
     HWPipeInfo *pipe_info = &layer_config.left_pipe;
@@ -403,12 +390,6 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
 
   if (!CheckBandwidth(display_resource_ctx, hw_layers)) {
     DLOGV_IF(kTagResources, "Bandwidth check failed!");
-    goto CleanupOnError;
-  }
-
-  error = AllocRotatorBuffer(display_ctx, hw_layers);
-  if (error != kErrorNone) {
-    DLOGV_IF(kTagResources, "Rotator buffer allocation failed");
     goto CleanupOnError;
   }
 
@@ -662,84 +643,8 @@ float ResManager::GetBpp(LayerBufferFormat format) {
   }
 }
 
-DisplayError ResManager::AllocRotatorBuffer(Handle display_ctx, HWLayers *hw_layers) {
-  DisplayResourceContext *display_resource_ctx =
-                          reinterpret_cast<DisplayResourceContext *>(display_ctx);
-  DisplayError error = kErrorNone;
-
-  BufferManager *buffer_manager = display_resource_ctx->buffer_manager;
-  HWLayersInfo &layer_info = hw_layers->info;
-
-  // TODO(user): Do session management during prepare and allocate buffer and associate that with
-  // the session during commit.
-  buffer_manager->Start();
-
-  for (uint32_t i = 0; i < layer_info.count; i++) {
-    Layer& layer = layer_info.stack->layers[layer_info.index[i]];
-    HWRotateInfo *rotate = &hw_layers->config[i].rotates[0];
-
-    if (rotate->valid) {
-      HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
-      // Allocate two rotator output buffers by default for double buffering.
-      hw_buffer_info->buffer_config.buffer_count = 2;
-      hw_buffer_info->buffer_config.secure = layer.input_buffer->flags.secure;
-
-      error = buffer_manager->GetNextBuffer(hw_buffer_info);
-      if (error != kErrorNone) {
-        return error;
-      }
-    }
-
-    rotate = &hw_layers->config[i].rotates[1];
-    if (rotate->valid) {
-      HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
-      // Allocate two rotator output buffers by default for double buffering.
-      hw_buffer_info->buffer_config.buffer_count = 2;
-      hw_buffer_info->buffer_config.secure = layer.input_buffer->flags.secure;
-
-      error = buffer_manager->GetNextBuffer(hw_buffer_info);
-      if (error != kErrorNone) {
-        return error;
-      }
-    }
-  }
-  buffer_manager->Stop(hw_layers->closed_session_ids);
-
-  return kErrorNone;
-}
-
 DisplayError ResManager::PostPrepare(Handle display_ctx, HWLayers *hw_layers) {
   SCOPE_LOCK(locker_);
-  DisplayResourceContext *display_resource_ctx =
-                          reinterpret_cast<DisplayResourceContext *>(display_ctx);
-  DisplayError error = kErrorNone;
-
-  BufferManager *buffer_manager = display_resource_ctx->buffer_manager;
-  HWLayersInfo &layer_info = hw_layers->info;
-
-  for (uint32_t i = 0; i < layer_info.count; i++) {
-    Layer& layer = layer_info.stack->layers[layer_info.index[i]];
-    HWRotateInfo *rotate = &hw_layers->config[i].rotates[0];
-
-    if (rotate->valid) {
-      HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
-
-      error = buffer_manager->SetSessionId(hw_buffer_info->slot, hw_buffer_info->session_id);
-      if (error != kErrorNone) {
-        return error;
-      }
-    }
-
-    rotate = &hw_layers->config[i].rotates[1];
-    if (rotate->valid) {
-      HWBufferInfo *hw_buffer_info = &rotate->hw_buffer_info;
-
-      error = buffer_manager->SetSessionId(hw_buffer_info->slot, hw_buffer_info->session_id);
-      if (error != kErrorNone) {
-        return error;
-      }
-    }
-  }
 
   return kErrorNone;
 }
@@ -798,35 +703,6 @@ DisplayError ResManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
     }
   }
   display_resource_ctx->frame_start = false;
-
-  BufferManager *buffer_manager = display_resource_ctx->buffer_manager;
-  HWLayersInfo &layer_info = hw_layers->info;
-
-  for (uint32_t i = 0; i < layer_info.count; i++) {
-    Layer& layer = layer_info.stack->layers[layer_info.index[i]];
-    HWRotateInfo *rotate = &hw_layers->config[i].rotates[0];
-
-    if (rotate->valid) {
-      HWBufferInfo *rot_buf_info = &rotate->hw_buffer_info;
-
-      error = buffer_manager->SetReleaseFd(rot_buf_info->slot,
-                                                rot_buf_info->output_buffer.release_fence_fd);
-      if (error != kErrorNone) {
-        return error;
-      }
-    }
-
-    rotate = &hw_layers->config[i].rotates[1];
-    if (rotate->valid) {
-      HWBufferInfo *rot_buf_info = &rotate->hw_buffer_info;
-
-      error = buffer_manager->SetReleaseFd(rot_buf_info->slot,
-                                                rot_buf_info->output_buffer.release_fence_fd);
-      if (error != kErrorNone) {
-        return error;
-      }
-    }
-  }
 
   return kErrorNone;
 }

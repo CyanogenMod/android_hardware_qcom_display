@@ -36,7 +36,7 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
  public:
   DisplayPrimary(DisplayEventHandler *event_handler, HWInfoInterface *hw_info_intf,
                  BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
-                 OfflineCtrl *offline_ctrl);
+                 RotatorCtrl *rotator_ctrl);
   virtual DisplayError Init();
   virtual DisplayError Deinit();
   virtual DisplayError Prepare(LayerStack *layer_stack);

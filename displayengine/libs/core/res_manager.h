@@ -31,15 +31,13 @@
 
 #include "hw_interface.h"
 #include "dump_impl.h"
-#include "buffer_manager.h"
 
 namespace sde {
 
 class ResManager : public DumpImpl {
  public:
   ResManager();
-  DisplayError Init(const HWResourceInfo &hw_res_info, BufferAllocator *buffer_allocator,
-                    BufferSyncHandler *buffer_sync_handler);
+  DisplayError Init(const HWResourceInfo &hw_res_info);
   DisplayError Deinit();
   DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
                                const HWPanelInfo &hw_panel_info, Handle *display_ctx);
@@ -117,7 +115,6 @@ class ResManager : public DumpImpl {
 
   struct DisplayResourceContext {
     HWDisplayAttributes display_attributes;
-    BufferManager *buffer_manager;
     DisplayType display_type;
     HWBlockType hw_block_id;
     HWPanelInfo hw_panel_info_;
@@ -129,13 +126,6 @@ class ResManager : public DumpImpl {
 
     DisplayResourceContext() : hw_block_id(kHWBlockMax), frame_count(0), session_id(-1),
                     rotate_count(0), frame_start(false), max_mixer_stages(0) { }
-
-    ~DisplayResourceContext() {
-      if (buffer_manager) {
-        delete buffer_manager;
-        buffer_manager = NULL;
-      }
-    }
   };
 
   struct HWBlockContext {
@@ -203,7 +193,6 @@ class ResManager : public DumpImpl {
                               const uint32_t roate_cnt);
   void AssignRotator(HWRotateInfo *rotate, uint32_t *rotate_cnt);
   void ClearRotator(DisplayResourceContext *display_resource_ctx);
-  DisplayError AllocRotatorBuffer(Handle display_ctx, HWLayers *hw_layers);
   void SetRotatorOutputFormat(const LayerBufferFormat &input_format, const bool &is_opaque,
                               const bool &rot90, const bool &downscale,
                               LayerBufferFormat *output_format);

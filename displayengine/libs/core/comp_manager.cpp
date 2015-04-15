@@ -39,13 +39,12 @@ CompManager::CompManager()
     registered_displays_(0), configured_displays_(0), safe_mode_(false) {
 }
 
-DisplayError CompManager::Init(const HWResourceInfo &hw_res_info, BufferAllocator *buffer_allocator,
-                               BufferSyncHandler *buffer_sync_handler) {
+DisplayError CompManager::Init(const HWResourceInfo &hw_res_info) {
   SCOPE_LOCK(locker_);
 
   DisplayError error = kErrorNone;
 
-  error = res_mgr_.Init(hw_res_info, buffer_allocator, buffer_sync_handler);
+  error = res_mgr_.Init(hw_res_info);
   if (error != kErrorNone) {
     return error;
   }

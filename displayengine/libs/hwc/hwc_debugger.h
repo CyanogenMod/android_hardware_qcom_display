@@ -59,8 +59,7 @@ class HWCDebugHandler : public DebugHandler {
   static void DebugStrategy(bool enable);
   static void DebugCompManager(bool enable);
   static void DebugDriverConfig(bool enable);
-  static void DebugBufferManager(bool enable);
-  static void DebugOfflineCtrl(bool enable);
+  static void DebugRotator(bool enable);
 
   virtual void Error(DebugTag tag, const char *format, ...);
   virtual void Warning(DebugTag tag, const char *format, ...);

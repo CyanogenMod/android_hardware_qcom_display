@@ -31,13 +31,13 @@
 
 #include "hw_interface.h"
 #include "comp_manager.h"
-#include "offline_ctrl.h"
 
 #define SET_REVISION(major, minor) ((major << 8) | minor)
 
 namespace sde {
 
 class HWInfoInterface;
+class RotatorCtrl;
 
 class CoreImpl : public CoreInterface {
  public:
@@ -66,7 +66,7 @@ class CoreImpl : public CoreInterface {
   BufferSyncHandler *buffer_sync_handler_;
   HWResourceInfo *hw_resource_;
   CompManager comp_mgr_;
-  OfflineCtrl offline_ctrl_;
+  RotatorCtrl *rotator_ctrl_;
   HWInfoInterface *hw_info_intf_;
 };
 

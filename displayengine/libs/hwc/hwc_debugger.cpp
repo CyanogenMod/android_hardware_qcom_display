@@ -76,19 +76,11 @@ void HWCDebugHandler::DebugDriverConfig(bool enable) {
   }
 }
 
-void HWCDebugHandler::DebugBufferManager(bool enable) {
+void HWCDebugHandler::DebugRotator(bool enable) {
   if (enable) {
-    SET_BIT(debug_flags_, kTagBufferManager);
+    SET_BIT(debug_flags_, kTagRotator);
   } else {
-    CLEAR_BIT(debug_flags_, kTagBufferManager);
-  }
-}
-
-void HWCDebugHandler::DebugOfflineCtrl(bool enable) {
-  if (enable) {
-    SET_BIT(debug_flags_, kTagOfflineCtrl);
-  } else {
-    CLEAR_BIT(debug_flags_, kTagOfflineCtrl);
+    CLEAR_BIT(debug_flags_, kTagRotator);
   }
 }
 

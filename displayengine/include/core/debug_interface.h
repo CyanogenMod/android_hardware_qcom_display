@@ -46,8 +46,7 @@ enum DebugTag {
   kTagStrategy,         //!< Debug log is tagged for strategy decisions.
   kTagCompManager,      //!< Debug log is tagged for composition manager.
   kTagDriverConfig,     //!< Debug log is tagged for driver config.
-  kTagBufferManager,    //!< Debug log is tagged for buffer manager state transitions.
-  kTagOfflineCtrl,      //!< Debug log is tagged for offline controller.
+  kTagRotator,          //!< Debug log is tagged for rotator.
   kTagScalar,           //!< Debug log is tagged for Scalar Helper.
 };
 
