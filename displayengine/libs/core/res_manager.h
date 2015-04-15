@@ -85,7 +85,6 @@ class ResManager : public DumpImpl {
 
   // todo: retrieve all these from kernel
   enum {
-    kMaxSourcePipeWidth = 2048,
     kMaxInterfaceWidth = 2048,
     kMaxRotateDownScaleRatio = 8,
     kMaxDecimationDownScaleRatio = 8,

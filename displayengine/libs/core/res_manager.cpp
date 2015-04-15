@@ -40,20 +40,18 @@ ResManager::ResManager()
 }
 
 DisplayError ResManager::Init(const HWResourceInfo &hw_res_info) {
-  hw_res_info_ = hw_res_info;
-
-  if (!hw_res_info_.max_mixer_width)
-    hw_res_info_.max_mixer_width = kMaxSourcePipeWidth;
-
   DisplayError error = kErrorNone;
+  uint32_t num_pipe = 0;
 
-  num_pipe_ = hw_res_info_.num_vig_pipe + hw_res_info_.num_rgb_pipe + hw_res_info_.num_dma_pipe;
+  num_pipe = hw_res_info.num_vig_pipe + hw_res_info.num_rgb_pipe + hw_res_info.num_dma_pipe;
 
-  if (num_pipe_ > kPipeIdMax) {
-    DLOGE("Number of pipe is over the limit! %d", num_pipe_);
+  if (num_pipe > kPipeIdMax) {
+    DLOGE("Number of pipe is over the limit! %d", num_pipe);
     return kErrorParameters;
   }
 
+  num_pipe_ = num_pipe;
+  hw_res_info_ = hw_res_info;
   // Init pipe info
   vig_pipes_ = &src_pipes_[0];
   rgb_pipes_ = &src_pipes_[hw_res_info_.num_vig_pipe];
