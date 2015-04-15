@@ -43,11 +43,11 @@ class SessionManager {
   SessionManager(HWRotatorInterface *hw_intf, BufferAllocator *buffer_allocator,
                  BufferSyncHandler *buffer_sync_handler);
 
-  void Start();
-  DisplayError Stop();
-  DisplayError OpenSession(HWRotatorSession *hw_rotator_session);
-  DisplayError GetNextBuffer(HWRotatorSession *hw_rotator_session);
-  DisplayError SetReleaseFd(HWRotatorSession *hw_rotator_session);
+  void Start(const int &client_id);
+  DisplayError Stop(const int &client_id);
+  DisplayError OpenSession(const int &client_id, HWRotatorSession *hw_rotator_session);
+  DisplayError GetNextBuffer(const int &client_id, HWRotatorSession *hw_rotator_session);
+  DisplayError SetReleaseFd(const int &client_id, HWRotatorSession *hw_rotator_session);
 
  private:
   // TODO(user): Read from hw capability instead of hardcoding
@@ -66,13 +66,16 @@ class SessionManager {
     int *release_fd;
     uint32_t *offset;
     uint32_t curr_index;
+    int client_id;
 
-    Session() : state(kSessionReleased), release_fd(NULL), offset(NULL), curr_index(0) { }
+    Session() : state(kSessionReleased), release_fd(NULL), offset(NULL), curr_index(0),
+                client_id(-1) { }
   };
 
   DisplayError AcquireSession(HWRotatorSession *hw_rotator_session, Session *session);
   DisplayError ReleaseSession(Session *session);
 
+  Locker locker_;
   Session session_list_[kMaxSessionCount];
   HWRotatorInterface *hw_rotator_intf_;
   BufferAllocator *buffer_allocator_;

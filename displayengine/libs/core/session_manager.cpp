@@ -59,23 +59,28 @@ SessionManager::SessionManager(HWRotatorInterface *hw_rotator_intf,
     buffer_sync_handler_(buffer_sync_handler), active_session_count_(0) {
 }
 
-void SessionManager::Start() {
+void SessionManager::Start(const int &client_id) {
+  SCOPE_LOCK(locker_);
+
   uint32_t session_count = 0;
-  uint32_t ready_session_count = 0;
+  uint32_t acquired_session_count = 0;
 
   // Change the state of acquired session to kSessionReady
-  while ((ready_session_count < active_session_count_) && (session_count < kMaxSessionCount)) {
-    if (session_list_[session_count].state == kSessionReleased) {
-      session_count++;
-      continue;
+  while ((acquired_session_count < active_session_count_) && (session_count < kMaxSessionCount)) {
+    if (session_list_[session_count].state == kSessionAcquired) {
+      if (session_list_[session_count].client_id == client_id) {
+        session_list_[session_count].state = kSessionReady;
+      }
+      acquired_session_count++;
     }
-
-    session_list_[session_count++].state = kSessionReady;
-    ready_session_count++;
+    session_count++;
   }
 }
 
-DisplayError SessionManager::OpenSession(HWRotatorSession *hw_rotator_session) {
+DisplayError SessionManager::OpenSession(const int &client_id,
+                                         HWRotatorSession *hw_rotator_session) {
+  SCOPE_LOCK(locker_);
+
   DisplayError error = kErrorNone;
 
   const HWSessionConfig &input_config = hw_rotator_session->hw_session_config;
@@ -90,12 +95,12 @@ DisplayError SessionManager::OpenSession(HWRotatorSession *hw_rotator_session) {
 
   uint32_t free_session = active_session_count_;
   uint32_t acquired_session = kMaxSessionCount;
-  uint32_t ready_session_count = 0;
+  uint32_t active_session_count = 0;
 
   // First look for a session in ready state, if no session found in ready state matching
   // with current input session config, assign a session in released state.
   for (uint32_t session_count = 0; session_count < kMaxSessionCount &&
-       ready_session_count < active_session_count_; session_count++) {
+       active_session_count < active_session_count_; session_count++) {
     HWSessionConfig &hw_session_config =
            session_list_[session_count].hw_rotator_session.hw_session_config;
 
@@ -104,17 +109,15 @@ DisplayError SessionManager::OpenSession(HWRotatorSession *hw_rotator_session) {
       continue;
     }
 
-    if (session_list_[session_count].state != kSessionReady) {
-      continue;
+    if (session_list_[session_count].state == kSessionReady) {
+      if (session_list_[session_count].client_id == client_id &&
+          input_config == hw_session_config) {
+        session_list_[session_count].state = kSessionAcquired;
+        acquired_session = session_count;
+        break;
+      }
     }
-
-    if (input_config == hw_session_config) {
-      session_list_[session_count].state = kSessionAcquired;
-      acquired_session = session_count;
-      break;
-    }
-
-    ready_session_count++;
+    active_session_count++;
   }
 
   // If the input config does not match with existing config, then add new session and change the
@@ -131,31 +134,31 @@ DisplayError SessionManager::OpenSession(HWRotatorSession *hw_rotator_session) {
 
     acquired_session = free_session;
     hw_rotator_session->session_id = acquired_session;
+    session_list_[acquired_session].client_id = client_id;
     active_session_count_++;
 
     DLOGV_IF(kTagRotator, "Acquire new session Output: width = %d, height = %d, format = %d, " \
-             "session_id %d", hw_rotator_session->output_buffer.width,
+             "session_id %d, client_id %d", hw_rotator_session->output_buffer.width,
              hw_rotator_session->output_buffer.height, hw_rotator_session->output_buffer.format,
-             hw_rotator_session->session_id);
+             hw_rotator_session->session_id, client_id);
 
     return kErrorNone;
   }
 
-  hw_rotator_session->output_buffer.width = input_config.dst_width;
-  hw_rotator_session->output_buffer.height = input_config.dst_height;
-  hw_rotator_session->output_buffer.format = input_config.dst_format;
-  hw_rotator_session->output_buffer.flags.secure = input_config.secure;
-  hw_rotator_session->session_id = acquired_session;
+  *hw_rotator_session = session_list_[acquired_session].hw_rotator_session;
 
   DLOGV_IF(kTagRotator, "Acquire existing session Output: width = %d, height = %d, format = %d, " \
-           "session_id %d", hw_rotator_session->output_buffer.width,
+           "session_id %d, client_id %d", hw_rotator_session->output_buffer.width,
            hw_rotator_session->output_buffer.height, hw_rotator_session->output_buffer.format,
-           hw_rotator_session->session_id);
+           hw_rotator_session->session_id, client_id);
 
   return kErrorNone;
 }
 
-DisplayError SessionManager::GetNextBuffer(HWRotatorSession *hw_rotator_session) {
+DisplayError SessionManager::GetNextBuffer(const int &client_id,
+                                           HWRotatorSession *hw_rotator_session) {
+  SCOPE_LOCK(locker_);
+
   DisplayError error = kErrorNone;
 
   int session_id = hw_rotator_session->session_id;
@@ -166,7 +169,7 @@ DisplayError SessionManager::GetNextBuffer(HWRotatorSession *hw_rotator_session)
   Session *session = &session_list_[session_id];
   if (session->state != kSessionAcquired) {
     DLOGE("Invalid session state %d", session->state);
-    kErrorParameters;
+    return kErrorParameters;
   }
 
   uint32_t curr_index = session->curr_index;
@@ -195,33 +198,38 @@ DisplayError SessionManager::GetNextBuffer(HWRotatorSession *hw_rotator_session)
   hw_rotator_session->output_buffer.planes[0].fd = buffer_info->alloc_buffer_info.fd;
   hw_rotator_session->output_buffer.planes[0].offset = session->offset[curr_index];
 
+  session->hw_rotator_session = *hw_rotator_session;
+
   DLOGI_IF(kTagRotator, "Output: width = %d, height = %d, format = %d, stride %d, " \
-           "curr_index = %d, offset %d, fd %d, session_id %d,",
+           "curr_index = %d, offset %d, fd %d, session_id %d, client_id %d",
            hw_rotator_session->output_buffer.width, hw_rotator_session->output_buffer.height,
            hw_rotator_session->output_buffer.format,
            hw_rotator_session->output_buffer.planes[0].stride, curr_index,
            hw_rotator_session->output_buffer.planes[0].offset,
-           hw_rotator_session->output_buffer.planes[0].fd, hw_rotator_session->session_id);
+           hw_rotator_session->output_buffer.planes[0].fd, session_id, client_id);
 
   return kErrorNone;
 }
 
-DisplayError SessionManager::Stop() {
+DisplayError SessionManager::Stop(const int &client_id) {
+  SCOPE_LOCK(locker_);
+
   DisplayError error = kErrorNone;
   uint32_t session_id = 0;
 
   // Release all the sessions which were not acquired in the current cycle and deallocate the
   // buffers associated with it.
   while ((active_session_count_ > 0) && (session_id < kMaxSessionCount)) {
-    if (session_list_[session_id].state == kSessionReady) {
+    if (session_list_[session_id].state == kSessionReady &&
+        session_list_[session_id].client_id == client_id) {
       error = ReleaseSession(&session_list_[session_id]);
       if (error != kErrorNone) {
         return error;
       }
       active_session_count_--;
 
-      DLOGI_IF(kTagRotator, "session_id = %d, active_session_count = %d", session_id,
-               active_session_count_);
+      DLOGI_IF(kTagRotator, "session_id = %d, active_session_count = %d, client_id %d", session_id,
+               active_session_count_, client_id);
     }
     session_id++;
   }
@@ -229,7 +237,10 @@ DisplayError SessionManager::Stop() {
   return kErrorNone;
 }
 
-DisplayError SessionManager::SetReleaseFd(HWRotatorSession *hw_rotator_session) {
+DisplayError SessionManager::SetReleaseFd(const int &client_id,
+                                          HWRotatorSession *hw_rotator_session) {
+  SCOPE_LOCK(locker_);
+
   int session_id = hw_rotator_session->session_id;
   if (session_id > kMaxSessionCount) {
     return kErrorParameters;
@@ -238,7 +249,7 @@ DisplayError SessionManager::SetReleaseFd(HWRotatorSession *hw_rotator_session) 
   Session *session = &session_list_[session_id];
   if (session->state != kSessionAcquired) {
     DLOGE("Invalid session state %d", session->state);
-    kErrorParameters;
+    return kErrorParameters;
   }
 
   uint32_t &curr_index = session->curr_index;
@@ -251,8 +262,8 @@ DisplayError SessionManager::SetReleaseFd(HWRotatorSession *hw_rotator_session) 
 
   curr_index = (curr_index + 1) % buffer_count;
 
-  DLOGI_IF(kTagRotator, "session_id %d, curr_index = %d, release fd %d", session_id,
-           curr_index, hw_rotator_session->output_buffer.release_fence_fd);
+  DLOGI_IF(kTagRotator, "session_id %d, curr_index = %d, release fd %d, client_id %d", session_id,
+           curr_index, hw_rotator_session->output_buffer.release_fence_fd, client_id);
 
   return kErrorNone;
 }
@@ -333,7 +344,9 @@ DisplayError SessionManager::ReleaseSession(Session *session) {
       session->release_fd[idx] = -1;
     }
   }
+
   session->state = kSessionReleased;
+  session->client_id == -1;
 
   if (session->offset) {
     delete[] session->offset;

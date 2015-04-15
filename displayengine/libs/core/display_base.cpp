@@ -146,6 +146,11 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
           continue;
         }
         error = rotator_ctrl_->Prepare(display_rotator_ctx_, &hw_layers_);
+      } else {
+        // Release all the previous rotator sessions.
+        if (rotator_ctrl_) {
+          error = rotator_ctrl_->Purge(display_rotator_ctx_, &hw_layers_);
+        }
       }
 
       if (error == kErrorNone) {
