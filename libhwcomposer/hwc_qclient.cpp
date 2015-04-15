@@ -295,11 +295,25 @@ static void configureDynRefreshRate(hwc_context_t* ctx,
     }
 }
 
-static status_t setPartialUpdatePref(hwc_context_t *ctx, uint32_t enable) {
-    ALOGD("%s: enable: %d", __FUNCTION__, enable);
-    if(qhwc::MDPComp::setPartialUpdatePref(ctx, (bool)enable) < 0)
-        return NO_INIT;
-    return NO_ERROR;
+static status_t setPartialUpdateState(hwc_context_t *ctx, uint32_t state) {
+    ALOGD("%s: state: %d", __FUNCTION__, state);
+    switch(state) {
+        case IQService::PREF_PARTIAL_UPDATE:
+            if(qhwc::MDPComp::setPartialUpdatePref(ctx, true) < 0)
+                return NO_INIT;
+            return NO_ERROR;
+        case IQService::PREF_POST_PROCESSING:
+            if(qhwc::MDPComp::setPartialUpdatePref(ctx, false) < 0)
+                return NO_INIT;
+            qhwc::MDPComp::enablePartialUpdate(false);
+            return NO_ERROR;
+        case IQService::ENABLE_PARTIAL_UPDATE:
+            qhwc::MDPComp::enablePartialUpdate(true);
+            return NO_ERROR;
+        default:
+            ALOGE("%s: Invalid state", __FUNCTION__);
+            return NO_ERROR;
+    };
 }
 
 static void toggleScreenUpdate(hwc_context_t* ctx, uint32_t on) {
@@ -368,7 +382,7 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             setIdleTimeout(mHwcContext, inParcel);
             break;
         case IQService::SET_PARTIAL_UPDATE:
-            ret = setPartialUpdatePref(mHwcContext, inParcel->readInt32());
+            ret = setPartialUpdateState(mHwcContext, inParcel->readInt32());
             break;
         case IQService::CONFIGURE_DYN_REFRESH_RATE:
             configureDynRefreshRate(mHwcContext, inParcel);

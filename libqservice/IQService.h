@@ -74,6 +74,12 @@ public:
         DEBUG_PIPE_LIFECYCLE,
     };
 
+    enum {
+        PREF_PARTIAL_UPDATE,
+        PREF_POST_PROCESSING,
+        ENABLE_PARTIAL_UPDATE,
+    };
+
     // Register a client that can be notified
     virtual void connect(const android::sp<qClient::IQClient>& client) = 0;
     // Generic function to dispatch binder commands

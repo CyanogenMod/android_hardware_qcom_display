@@ -60,6 +60,9 @@ public:
     static int setPartialUpdatePref(hwc_context_t *ctx, bool enable);
     void setDynRefreshRate(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     static int getPartialUpdatePref(hwc_context_t *ctx);
+    static void enablePartialUpdate(bool enable)
+                                          { sIsPartialUpdateActive = enable; };
+
 protected:
     enum { MAX_SEC_LAYERS = 1 }; //TODO add property support
 
