@@ -28,10 +28,9 @@
  */
 
 #include "qd_utils.h"
-
-
-#define MAX_FRAME_BUFFER_NAME_SIZE      (80)
 #define QD_UTILS_DEBUG 0
+
+namespace qdutils {
 
 int getHDMINode(void)
 {
@@ -121,3 +120,4 @@ void getAspectRatioPosition(int destWidth, int destHeight, int srcWidth,
     rect.bottom = srcHeight + rect.top;
 }
 
+}; //namespace qdutils

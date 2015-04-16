@@ -32,6 +32,7 @@
 #include "pipes/overlayGenPipe.h"
 #include "mdp_version.h"
 #include "qdMetaData.h"
+#include "qd_utils.h"
 
 #define PIPE_DEBUG 0
 
@@ -441,7 +442,6 @@ int Overlay::initOverlay() {
     }
 
     FILE *displayDeviceFP = NULL;
-    const int MAX_FRAME_BUFFER_NAME_SIZE = 128;
     char fbType[MAX_FRAME_BUFFER_NAME_SIZE];
     char msmFbTypePath[MAX_FRAME_BUFFER_NAME_SIZE];
     const char *strDtvPanel = "dtv panel";

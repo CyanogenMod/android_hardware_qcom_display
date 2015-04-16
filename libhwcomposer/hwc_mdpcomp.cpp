@@ -19,7 +19,7 @@
 #include <math.h>
 #include "hwc_mdpcomp.h"
 #include <sys/ioctl.h>
-#include "external.h"
+#include "hdmi.h"
 #include "virtual.h"
 #include "qdMetaData.h"
 #include "mdp_version.h"
@@ -323,7 +323,7 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
             // Color layer
             return true;
         }
-        ALOGE("%s: layer handle is NULL", __FUNCTION__);
+        ALOGD_IF(isDebug(), "%s: layer handle is NULL", __FUNCTION__);
         return false;
     }
 
@@ -428,7 +428,15 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
                      __FUNCTION__,mDpy);
             ret = false;
         }
+    } else if (ctx->isDMAStateChanging) {
+        // Bail out if a padding round has been invoked in order to switch DMA
+        // state to block mode. We need this to cater for the case when a layer
+        // requires rotation in the current frame.
+        ALOGD_IF(isDebug(), "%s: padding round invoked to switch DMA state",
+                __FUNCTION__);
+        return false;
     }
+
     return ret;
 }
 
@@ -471,7 +479,8 @@ bool MDPCompNonSplit::validateAndApplyROI(hwc_context_t *ctx,
             }
 
             /* deduct any opaque region from visibleRect */
-            if (layer->blending == HWC_BLENDING_NONE)
+            if (layer->blending == HWC_BLENDING_NONE &&
+                    layer->planeAlpha == 0xFF)
                 visibleRect = deductRect(visibleRect, res);
         }
     }
@@ -672,7 +681,15 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     int priDispW = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
 
-    // No Idle fall back, if secure display or secure RGB layers are present
+    // Fall back to video only composition, if AIV video mode is enabled
+    if(ctx->listStats[mDpy].mAIVVideoMode) {
+        ALOGD_IF(isDebug(), "%s: AIV Video Mode enabled dpy %d",
+            __FUNCTION__, mDpy);
+        return false;
+    }
+
+    // No Idle fall back, if secure display or secure RGB layers are present or
+    // if there's only a single layer being composed
     if(sIdleFallBack && (!ctx->listStats[mDpy].secureUI &&
                     !ctx->listStats[mDpy].secureRGBCount)) {
         ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
@@ -1038,6 +1055,13 @@ bool MDPComp::videoOnlyComp(hwc_context_t *ctx,
 /* if tryFullFrame fails, try to push all video and secure RGB layers to MDP */
 bool MDPComp::tryMDPOnlyLayers(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
+    // Fall back to video only composition, if AIV video mode is enabled
+    if(ctx->listStats[mDpy].mAIVVideoMode) {
+        ALOGD_IF(isDebug(), "%s: AIV Video Mode enabled dpy %d",
+            __FUNCTION__, mDpy);
+        return false;
+    }
+
     const bool secureOnly = true;
     return mdpOnlyLayersComp(ctx, list, not secureOnly) or
             mdpOnlyLayersComp(ctx, list, secureOnly);
@@ -1335,12 +1359,34 @@ void MDPComp::updateLayerCache(hwc_context_t* ctx,
             mCurrentFrame.dropCount);
 }
 
+// drop other non-AIV layers from external display list.
+void MDPComp::dropNonAIVLayers(hwc_context_t* ctx,
+                              hwc_display_contents_1_t* list) {
+    for (size_t i = 0; i < (size_t)ctx->listStats[mDpy].numAppLayers; i++) {
+        hwc_layer_1_t * layer = &list->hwLayers[i];
+         if(!(isAIVVideoLayer(layer) || isAIVCCLayer(layer))) {
+            mCurrentFrame.dropCount++;
+            mCurrentFrame.drop[i] = true;
+        }
+    }
+    mCurrentFrame.fbCount -= mCurrentFrame.dropCount;
+    mCurrentFrame.mdpCount = mCurrentFrame.layerCount -
+            mCurrentFrame.fbCount - mCurrentFrame.dropCount;
+    ALOGD_IF(isDebug(),"%s: fb count: %d mdp count %d drop count %d",
+        __FUNCTION__, mCurrentFrame.fbCount, mCurrentFrame.mdpCount,
+        mCurrentFrame.dropCount);
+}
+
 void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
         bool secureOnly) {
     int nYuvCount = ctx->listStats[mDpy].yuvCount;
     for(int index = 0;index < nYuvCount; index++){
         int nYuvIndex = ctx->listStats[mDpy].yuvIndices[index];
         hwc_layer_1_t* layer = &list->hwLayers[nYuvIndex];
+
+        if(mCurrentFrame.drop[nYuvIndex]) {
+            continue;
+        }
 
         if(!isYUVDoable(ctx, layer)) {
             if(!mCurrentFrame.isFBComposed[nYuvIndex]) {
@@ -1600,11 +1646,16 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     //Hard conditions, if not met, cannot do MDP comp
     if(isFrameDoable(ctx)) {
         generateROI(ctx, list);
+        // if AIV Video mode is enabled, drop all non AIV layers from the
+        // external display list.
+        if(ctx->listStats[mDpy].mAIVVideoMode) {
+            dropNonAIVLayers(ctx, list);
+        }
 
         // if tryFullFrame fails, try to push all video and secure RGB layers
         // to MDP for composition.
-        if(tryFullFrame(ctx, list) || tryMDPOnlyLayers(ctx, list) 
-            || tryVideoOnly(ctx, list)) {
+        if(tryFullFrame(ctx, list) || tryMDPOnlyLayers(ctx, list) ||
+             tryVideoOnly(ctx, list)) {
             setMDPCompLayerFlags(ctx, list);
         } else {
             resetROI(ctx, mDpy);
@@ -2256,6 +2307,10 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRA_8888);
         else if (hnd->format == HAL_PIXEL_FORMAT_RGBX_8888)
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
+    }
+    // update source crop and destination position of AIV video layer.
+    if(ctx->listStats[mDpy].mAIVVideoMode && isYuvBuffer(hnd)) {
+        updateCoordinates(ctx, crop, dst, mDpy);
     }
     /* Calculate the external display position based on MDP downscale,
        ActionSafe, and extorientation features. */

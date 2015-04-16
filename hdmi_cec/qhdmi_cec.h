@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2013 The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -26,42 +26,49 @@
 * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#ifndef QHDMI_CEC_H
+#define QHDMI_CEC_H
 
+#include <hardware/hdmi_cec.h>
+#include <utils/RefBase.h>
 
-#ifndef HWC_VIRTUAL_DISPLAY_H
-#define HWC_VIRTUAL_DISPLAY_H
-
-#include <linux/fb.h>
-
-struct hwc_context_t;
-
-namespace qhwc {
-
-class VirtualDisplay
-{
-public:
-    VirtualDisplay(hwc_context_t* ctx);
-    ~VirtualDisplay();
-    int  configure();
-    void getAttributes(uint32_t& width, uint32_t& height);
-    int  teardown();
-    bool isConnected() {
-        return  mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].connected;
-    }
-private:
-    bool openFrameBuffer();
-    bool closeFrameBuffer();
-    bool isSinkSecure();
-    void setAttributes();
-    void initResolution(uint32_t &extW, uint32_t &extH);
-    void setToPrimary(uint32_t maxArea, uint32_t priW, uint32_t priH,
-                      uint32_t &extW, uint32_t &extH);
-    void setDownScaleMode(uint32_t maxArea);
-
-    int mFd;
-    hwc_context_t *mHwcContext;
-    fb_var_screeninfo mVInfo;
+namespace qClient {
+    class QHDMIClient;
 };
-}; //qhwc
-// ---------------------------------------------------------------------------
-#endif //HWC_VIRTUAL_DISPLAY_H
+
+namespace qhdmicec {
+
+#define SYSFS_BASE  "/sys/class/graphics/fb"
+#define MAX_PATH_LENGTH  128
+
+struct cec_callback_t {
+    // Function in HDMI service to call back on CEC messages
+    event_callback_t callback_func;
+    // This stores the object to pass back to the framework
+    void* callback_arg;
+
+};
+
+struct cec_context_t {
+    hdmi_cec_device_t device;    // Device for HW module
+    cec_callback_t callback;     // Struct storing callback object
+    bool enabled;
+    bool arc_enabled;
+    bool system_control;         // If true, HAL/driver handle CEC messages
+    int fb_num;                  // Framebuffer node for HDMI
+    char fb_sysfs_path[MAX_PATH_LENGTH];
+    hdmi_port_info *port_info;   // HDMI port info
+
+    // Logical address is stored in an array, the index of the array is the
+    // logical address and the value in the index shows whether it is set or not
+    int logical_address[CEC_ADDR_BROADCAST];
+    int version;
+    uint32_t vendor_id;
+    android::sp<qClient::QHDMIClient> disp_client;
+};
+
+void cec_receive_message(cec_context_t *ctx, char *msg, ssize_t len);
+void cec_hdmi_hotplug(cec_context_t *ctx, int connected);
+
+}; //namespace
+#endif /* end of include guard: QHDMI_CEC_H */

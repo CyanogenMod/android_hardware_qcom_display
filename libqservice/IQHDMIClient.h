@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2013 The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -27,41 +27,31 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#ifndef HDMI_EVENTS_LISTENER_H_
+#define HDMI_EVENTS_LISTENER_H_
 
-#ifndef HWC_VIRTUAL_DISPLAY_H
-#define HWC_VIRTUAL_DISPLAY_H
+#include <utils/RefBase.h>
+#include <binder/IInterface.h>
 
-#include <linux/fb.h>
+namespace qClient {
 
-struct hwc_context_t;
-
-namespace qhwc {
-
-class VirtualDisplay
+class IQHDMIClient : public android::IInterface
 {
 public:
-    VirtualDisplay(hwc_context_t* ctx);
-    ~VirtualDisplay();
-    int  configure();
-    void getAttributes(uint32_t& width, uint32_t& height);
-    int  teardown();
-    bool isConnected() {
-        return  mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].connected;
-    }
-private:
-    bool openFrameBuffer();
-    bool closeFrameBuffer();
-    bool isSinkSecure();
-    void setAttributes();
-    void initResolution(uint32_t &extW, uint32_t &extH);
-    void setToPrimary(uint32_t maxArea, uint32_t priW, uint32_t priH,
-                      uint32_t &extW, uint32_t &extH);
-    void setDownScaleMode(uint32_t maxArea);
-
-    int mFd;
-    hwc_context_t *mHwcContext;
-    fb_var_screeninfo mVInfo;
+    DECLARE_META_INTERFACE(QHDMIClient);
+    virtual void onHdmiHotplug(int connected) = 0;
+    virtual void onCECMessageRecieved(char *msg, ssize_t len) = 0;
 };
-}; //qhwc
-// ---------------------------------------------------------------------------
-#endif //HWC_VIRTUAL_DISPLAY_H
+
+class BnQHDMIClient : public android::BnInterface<IQHDMIClient>
+{
+public:
+    virtual android::status_t onTransact( uint32_t code,
+            const android::Parcel& data,
+            android::Parcel* reply, uint32_t flags = 0);
+};
+
+}; //namespace qhdmi
+
+#endif // HDMI_EVENTS_LISTENER_H_
+

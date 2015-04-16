@@ -50,9 +50,7 @@ HWCVirtualBase* HWCVirtualBase::getObject(bool isVDSEnabled) {
 
 void HWCVirtualVDS::init(hwc_context_t *ctx) {
     const int dpy = HWC_DISPLAY_VIRTUAL;
-    ctx->mFBUpdate[dpy] =
-            IFBUpdate::getObject(ctx, dpy);
-    ctx->mMDPComp[dpy] =  MDPComp::getObject(ctx, dpy);
+    initCompositionResources(ctx, dpy);
 
     if(ctx->mFBUpdate[dpy])
         ctx->mFBUpdate[dpy]->reset();
@@ -69,19 +67,9 @@ void HWCVirtualVDS::destroy(hwc_context_t *ctx, size_t /*numDisplays*/,
         ctx->dpyAttr[dpy].connected = false;
         ctx->dpyAttr[dpy].isPause = false;
 
-        if(ctx->mFBUpdate[dpy]) {
-            delete ctx->mFBUpdate[dpy];
-            ctx->mFBUpdate[dpy] = NULL;
-        }
-        if(ctx->mMDPComp[dpy]) {
-            delete ctx->mMDPComp[dpy];
-            ctx->mMDPComp[dpy] = NULL;
-        }
-        // We reset the WB session to non-secure when the virtual display
-        // has been disconnected.
-        if(!Writeback::getInstance()->setSecure(false)) {
-            ALOGE("Failure while attempting to reset WB session.");
-        }
+        destroyCompositionResources(ctx, dpy);
+
+        // signal synclock to indicate successful wfd teardown
         ctx->mWfdSyncLock.lock();
         ctx->mWfdSyncLock.signal();
         ctx->mWfdSyncLock.unlock();
@@ -165,13 +153,12 @@ int HWCVirtualVDS::set(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
             Writeback::getInstance()->setOutputFormat(
                                     utils::getMdpFormat(format));
 
-            // Configure WB as secure if the output buffer handle is secure.
-            if(isSecureBuffer(ohnd)){
-                if(! Writeback::getInstance()->setSecure(true))
-                {
-                    ALOGE("Failed to set WB as secure for virtual display");
-                    return false;
-                }
+            // Configure WB secure mode based on output buffer handle
+            if(! Writeback::getInstance()->setSecure(isSecureBuffer(ohnd)))
+            {
+                ALOGE("Failed to set WB secure mode: %d for virtual display",
+                    isSecureBuffer(ohnd));
+                return false;
             }
 
             int fd = -1; //FenceFD from the Copybit

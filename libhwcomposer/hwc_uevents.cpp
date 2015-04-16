@@ -1,7 +1,7 @@
 
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-14, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-15, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -30,7 +30,7 @@
 #include "hwc_mdpcomp.h"
 #include "hwc_copybit.h"
 #include "comptype.h"
-#include "external.h"
+#include "hdmi.h"
 #include "virtual.h"
 #include "hwc_virtual.h"
 #include "mdp_version.h"
@@ -39,32 +39,20 @@ namespace qhwc {
 #define HWC_UEVENT_SWITCH_STR  "change@/devices/virtual/switch/"
 #define HWC_UEVENT_THREAD_NAME "hwcUeventThread"
 
-static void setup(hwc_context_t* ctx, int dpy)
-{
-    ctx->mFBUpdate[dpy] = IFBUpdate::getObject(ctx, dpy);
-    ctx->mMDPComp[dpy] =  MDPComp::getObject(ctx, dpy);
-}
-
-static void clear(hwc_context_t* ctx, int dpy)
-{
-    if(ctx->mFBUpdate[dpy]) {
-        delete ctx->mFBUpdate[dpy];
-        ctx->mFBUpdate[dpy] = NULL;
-    }
-    if(ctx->mMDPComp[dpy]) {
-        delete ctx->mMDPComp[dpy];
-        ctx->mMDPComp[dpy] = NULL;
-    }
-}
-
 /* Parse uevent data for devices which we are interested */
-static int getConnectedDisplay(const char* strUdata)
+static int getConnectedDisplay(hwc_context_t* ctx, const char* strUdata)
 {
-    if(strcasestr("change@/devices/virtual/switch/hdmi", strUdata))
-        return HWC_DISPLAY_EXTERNAL;
+    int ret = -1;
+    if(strcasestr("change@/devices/virtual/switch/hdmi", strUdata)) {
+        if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+            ret = HWC_DISPLAY_PRIMARY;
+        } else {
+            ret = HWC_DISPLAY_EXTERNAL;
+        }
+    }
     if(strcasestr("change@/devices/virtual/switch/wfd", strUdata))
-        return HWC_DISPLAY_VIRTUAL;
-    return -1;
+        ret = HWC_DISPLAY_VIRTUAL;
+    return ret;
 }
 
 static bool getPanelResetStatus(hwc_context_t* ctx, const char* strUdata, int len)
@@ -105,7 +93,7 @@ static void teardownWfd(hwc_context_t* ctx) {
             "active");
     {
         Locker::Autolock _l(ctx->mDrawLock);
-        clear(ctx, HWC_DISPLAY_VIRTUAL);
+        destroyCompositionResources(ctx, HWC_DISPLAY_VIRTUAL);
         ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected = false;
         ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = false;
     }
@@ -151,7 +139,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
         return;
     }
 
-    int dpy = getConnectedDisplay(udata);
+    int dpy = getConnectedDisplay(ctx, udata);
     if(dpy < 0) {
         ALOGD_IF(UEVENT_DEBUG, "%s: Not disp Event ", __FUNCTION__);
         return;
@@ -173,15 +161,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             }
 
             ctx->mDrawLock.lock();
-            clear(ctx, dpy);
-            ctx->dpyAttr[dpy].connected = false;
-            ctx->dpyAttr[dpy].isActive = false;
-
-            if(dpy == HWC_DISPLAY_EXTERNAL) {
-                ctx->mExtDisplay->teardown();
-            } else {
-                ctx->mVirtualDisplay->teardown();
-            }
+            handle_offline(ctx, dpy);
             ctx->mDrawLock.unlock();
 
             /* We need to send hotplug to SF only when we are disconnecting
@@ -194,6 +174,10 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                                    EXTERNAL_OFFLINE);
                 ctx->mVirtualonExtActive = false;
             }
+
+            if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay())
+                ctx->mQService->onHdmiHotplug((int)ctx->dpyAttr[dpy].connected);
+
             break;
         }
     case EXTERNAL_ONLINE:
@@ -204,43 +188,77 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                          "for display: %d", __FUNCTION__, dpy);
                 break;
             }
-            ctx->mDrawLock.lock();
-            //Force composition to give up resources like pipes and
-            //close fb. For example if assertive display is going on,
-            //fb2 could be open, thus connecting Layer Mixer#0 to
-            //WriteBack module. If HDMI attempts to open fb1, the driver
-            //will try to attach Layer Mixer#0 to HDMI INT, which will
-            //fail, since Layer Mixer#0 is still connected to WriteBack.
-            //This block will force composition to close fb2 in above
-            //example.
-            ctx->dpyAttr[dpy].isConfiguring = true;
-            ctx->mDrawLock.unlock();
 
-            ctx->proc->invalidate(ctx->proc);
+            if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+                ctx->mDrawLock.lock();
+                handle_online(ctx, dpy);
+                ctx->mDrawLock.unlock();
+                ctx->mQService->onHdmiHotplug(ctx->dpyAttr[dpy].connected);
+                ctx->proc->invalidate(ctx->proc);
+                break;
+            } else {
+                ctx->mDrawLock.lock();
+                //Force composition to give up resources like pipes and
+                //close fb. For example if assertive display is going on,
+                //fb2 could be open, thus connecting Layer Mixer#0 to
+                //WriteBack module. If HDMI attempts to open fb1, the driver
+                //will try to attach Layer Mixer#0 to HDMI INT, which will
+                //fail, since Layer Mixer#0 is still connected to WriteBack.
+                //This block will force composition to close fb2 in above
+                //example.
+                ctx->dpyAttr[dpy].isConfiguring = true;
+                ctx->mDrawLock.unlock();
+
+                ctx->proc->invalidate(ctx->proc);
+            }
             //2 cycles for slower content
             usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
                    * 2 / 1000);
 
             if(dpy == HWC_DISPLAY_EXTERNAL) {
-                if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected) {
-                    // Triple Display is supported on 8084 target
-                    // WFD can be initiated by Wfd-client or Settings app
-                    // 1. wfd-client use hdmi hotplug mechanism.
-                    //    If wfd is connected via wfd-client and if HDMI is
-                    //    connected, we have to teardown wfd session.
-                    //    (as SF support only one active External display
-                    //     at a given time).
-                    //    (ToDo: Once wfd-client migrates using virtual display
-                    //     apis, second condition is redundant).
-                    // 2. Settings app use virtual display mechanism.
-                    //    In this approach, there is no limitation of supporting
-                    //    triple display.
-                    if(!(qdutils::MDPVersion::getInstance().is8084() &&
-                                !ctx->mVirtualonExtActive)) {
-                        teardownWfd(ctx);
+                if(isVDConnected(ctx)) {
+                    // Do not initiate WFD teardown if WFD architecture is based
+                    // on VDS mechanism.
+                    // WFD Stack listens to HDMI intent and initiates virtual
+                    // display teardown.
+                    // ToDo: Currently non-WFD Virtual display clients do not
+                    // involve HWC. If there is a change, we need to come up
+                    // with mechanism of how to address non-WFD Virtual display
+                    // clients + HDMI
+                    if(isVDSEnabled(ctx)) {
+                        ctx->mWfdSyncLock.lock();
+                        ALOGD_IF(HWC_WFDDISPSYNC_LOG,
+                                "%s: Waiting for wfd-teardown to be signalled",
+                                __FUNCTION__);
+                        ctx->mWfdSyncLock.wait();
+                        ALOGD_IF(HWC_WFDDISPSYNC_LOG,
+                                "%s: Teardown signalled. Completed waiting in"
+                                "uevent thread", __FUNCTION__);
+                        ctx->mWfdSyncLock.unlock();
+                    } else {
+                        // Triple Display is supported on 8084 target
+                        // WFD can be initiated by Wfd-client or Settings app
+                        // 1. wfd-client use hdmi hotplug mechanism.
+                        //    If wfd is connected via wfd-client and if HDMI is
+                        //    connected, we have to teardown wfd session.
+                        //    (as SF support only one active External display
+                        //     at a given time).
+                        //    (ToDo: Once wfd-client migrates using virtual
+                        //     display apis, second condition is redundant).
+                        // 2. Settings app use virtual display mechanism.
+                        //    In this approach, there is no limitation of
+                        //    supporting triple display.
+                        if(!(qdutils::MDPVersion::getInstance().is8084() &&
+                                    !ctx->mVirtualonExtActive)) {
+                            teardownWfd(ctx);
+                        }
                     }
                 }
-                ctx->mExtDisplay->configure();
+                ctx->mHDMIDisplay->configure();
+                ctx->mHDMIDisplay->activateDisplay();
+                ctx->mDrawLock.lock();
+                updateDisplayInfo(ctx, dpy);
+                ctx->mDrawLock.unlock();
             } else {
                 {
                     Locker::Autolock _l(ctx->mDrawLock);
@@ -259,7 +277,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
             }
 
             ctx->mDrawLock.lock();
-            setup(ctx, dpy);
+            initCompositionResources(ctx, dpy);
             ctx->dpyAttr[dpy].isPause = false;
             ctx->dpyAttr[dpy].connected = true;
             ctx->dpyAttr[dpy].isConfiguring = true;

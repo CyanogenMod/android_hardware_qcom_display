@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -34,7 +34,7 @@
 #include "hwc_fbupdate.h"
 #include "hwc_mdpcomp.h"
 #include "hwc_dump_layers.h"
-#include "external.h"
+#include "hdmi.h"
 #include "hwc_copybit.h"
 #include "hwc_ad.h"
 #include "profiler.h"
@@ -44,7 +44,7 @@ using namespace qhwc;
 using namespace overlay;
 
 #define VSYNC_DEBUG 0
-#define BLANK_DEBUG 1
+#define POWER_MODE_DEBUG 1
 
 static int hwc_device_open(const struct hw_module_t* module,
                            const char* name,
@@ -124,11 +124,12 @@ static void setPaddingRound(hwc_context_t *ctx, int numDisplays,
     }
 }
 
-/* Based on certain conditions, isPaddingRound will be set
+/* Based on certain conditions, isDMAStateChanging will be set
  * to make this function self-contained */
 static void setDMAState(hwc_context_t *ctx, int numDisplays,
                         hwc_display_contents_1_t** displays) {
 
+    ctx->isDMAStateChanging = false;
     if(ctx->mRotMgr->getNumActiveSessions() == 0)
         Overlay::setDMAMode(Overlay::DMA_LINE_MODE);
 
@@ -151,7 +152,7 @@ static void setDMAState(hwc_context_t *ctx, int numDisplays,
                         if(not qdutils::MDPVersion::getInstance().is8x26()) {
                             if(ctx->mOverlay->isPipeTypeAttached(
                                              overlay::utils::OV_MDP_PIPE_DMA))
-                                ctx->isPaddingRound = true;
+                                ctx->isDMAStateChanging = true;
                         }
                         Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
                     }
@@ -169,7 +170,7 @@ static void setDMAState(hwc_context_t *ctx, int numDisplays,
                 if(ctx->mExtOrientation || ctx->mBufferMirrorMode) {
                     if(ctx->mOverlay->isPipeTypeAttached(
                                          overlay::utils::OV_MDP_PIPE_DMA)) {
-                        ctx->isPaddingRound = true;
+                        ctx->isDMAStateChanging = true;
                     }
                     Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
                 }
@@ -194,6 +195,12 @@ static void setNumActiveDisplays(hwc_context_t *ctx, int numDisplays,
             ctx->numActiveDisplays += 1;
         }
     }
+}
+
+static bool isHotPluggable(hwc_context_t *ctx, int dpy) {
+    return ((dpy == HWC_DISPLAY_EXTERNAL) ||
+            ((dpy == HWC_DISPLAY_PRIMARY) &&
+             ctx->mHDMIDisplay->isHDMIPrimaryDisplay()));
 }
 
 static void reset(hwc_context_t *ctx, int numDisplays,
@@ -225,9 +232,6 @@ static void reset(hwc_context_t *ctx, int numDisplays,
     }
 
     ctx->mAD->reset();
-    MDPComp::reset();
-    if(ctx->mHWCVirtual)
-        ctx->mHWCVirtual->destroy(ctx, numDisplays, displays);
 }
 
 bool isEqual(float f1, float f2) {
@@ -270,8 +274,24 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     const int dpy = HWC_DISPLAY_PRIMARY;
     bool fbComp = false;
-    if (LIKELY(list && list->numHwLayers > 1) &&
-            ctx->dpyAttr[dpy].isActive) {
+    if (LIKELY(list && list->numHwLayers > 1) && ctx->dpyAttr[dpy].connected &&
+            (ctx->dpyAttr[dpy].isActive ||
+             ctx->mHDMIDisplay->isHDMIPrimaryDisplay())) {
+
+        // When HDMI is primary we should rely on the first valid
+        // draw call in order to activate the display
+        if (!ctx->dpyAttr[dpy].isActive) {
+            // If the cable is connected after HWC initialization and before
+            // the UEvent thread is initialized then we will miss the ONLINE
+            // event. We need to update the display appropriately when we get
+            // the first valid frame.
+            int cableConnected = ctx->mHDMIDisplay->getConnectedState();
+            if ((cableConnected == 1) && !ctx->dpyAttr[dpy].connected) {
+                qhwc::handle_online(ctx, dpy);
+            }
+            ctx->mHDMIDisplay->activateDisplay();
+            ctx->dpyAttr[dpy].isActive = true;
+        }
 
         if (ctx->dpyAttr[dpy].customFBSize)
             scaleDisplayFrame(ctx, dpy, list);
@@ -344,10 +364,6 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
         reset_panel(dev);
     }
 
-    if(ctx->alwaysOn) {
-        return 0;
-    }
-
     //Will be unlocked at the end of set
     ctx->mDrawLock.lock();
     setPaddingRound(ctx,numDisplays,displays);
@@ -382,6 +398,11 @@ static int hwc_prepare(hwc_composer_device_1 *dev, size_t numDisplays,
     ctx->mOverlay->configDone();
     ctx->mRotMgr->configDone();
     overlay::Writeback::configDone();
+    // If VD list is deleted, mdp overlay pipe objects and writeback object
+    // are deleted as part of configDone functions.
+    // Proceed with HWCVirtualVDS object deletion.
+    if(ctx->mHWCVirtual)
+        ctx->mHWCVirtual->destroy(ctx, numDisplays, displays);
 
     return ret;
 }
@@ -417,100 +438,87 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
     return ret;
 }
 
-static bool getAlwaysOn() {
-    int ret = 0;
-    char alwaysOnPath[256];
-    snprintf (alwaysOnPath, sizeof(alwaysOnPath),
-            "/sys/class/graphics/fb%d/always_on", HWC_DISPLAY_PRIMARY);
-    int fd = open(alwaysOnPath, O_RDONLY);
-    if(fd >= 0) {
-        char opStr[4];
-        int bytesRead = read(fd, opStr, sizeof(opStr) - 1);
-        if(bytesRead > 0) {
-            opStr[bytesRead] = '\0';
-            ret = atoi(opStr);
-        } else if(bytesRead == 0) {
-            ALOGI("%s: No contents found in always_on node",
-                    __func__);
-        } else {
-            ALOGE("%s: Read from always_on node failed with error %s", __func__,
-                    strerror(errno));
-        }
-        close(fd);
-    } else {
-        ALOGI("%s: /sys/class/graphics/fb%d/always_on could not be opened : %s",
-                __func__, HWC_DISPLAY_PRIMARY, strerror(errno));
-    }
-    return (!!ret);
-}
-
-static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
+static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
+        int mode)
 {
     ATRACE_CALL();
     hwc_context_t* ctx = (hwc_context_t*)(dev);
-
-    Locker::Autolock _l(ctx->mDrawLock);
     int ret = 0, value = 0;
 
-    bool suspend = false;
-    ctx->alwaysOn = false;
-
+    Locker::Autolock _l(ctx->mDrawLock);
     /* In case of non-hybrid WFD session, we are fooling SF by
      * piggybacking on HDMI display ID for virtual.
      * TODO: Not needed once we have WFD client working on top
      * of Google API's.
      */
     dpy = getDpyforExternalDisplay(ctx,dpy);
+    ALOGD_IF(POWER_MODE_DEBUG, "%s: Setting mode %d on display: %d",
+            __FUNCTION__, mode, dpy);
 
-    ALOGD_IF(BLANK_DEBUG, "%s: %s display: %d", __FUNCTION__,
-          blank==1 ? "Blanking":"Unblanking", dpy);
-    if(blank) {
-        if(dpy == HWC_DISPLAY_PRIMARY)
-            suspend = getAlwaysOn();
-
-        if(not suspend) {
-        // free up all the overlay pipes in use
-        // when we get a blank for either display
-        // makes sure that all pipes are freed
-        ctx->mOverlay->configBegin();
-        ctx->mOverlay->configDone();
-        ctx->mRotMgr->clear();
-        // If VDS is connected, do not clear WB object as it
-        // will end up detaching IOMMU. This is required
-        // to send black frame to WFD sink on power suspend.
-        // Note: With this change, we keep the WriteBack object
-        // alive on power suspend for AD use case.
-        } else {
-            ctx->alwaysOn = true;
-        }
+    switch(mode) {
+        case HWC_POWER_MODE_OFF:
+            // free up all the overlay pipes in use
+            // when we get a blank for either display
+            // makes sure that all pipes are freed
+            ctx->mOverlay->configBegin();
+            ctx->mOverlay->configDone();
+            ctx->mRotMgr->clear();
+            // If VDS is connected, do not clear WB object as it
+            // will end up detaching IOMMU. This is required
+            // to send black frame to WFD sink on power suspend.
+            // Note: With this change, we keep the WriteBack object
+            // alive on power suspend for AD use case.
+            value = FB_BLANK_POWERDOWN;
+            break;
+        case HWC_POWER_MODE_DOZE:
+        case HWC_POWER_MODE_DOZE_SUSPEND:
+            value = FB_BLANK_VSYNC_SUSPEND;
+            break;
+        case HWC_POWER_MODE_NORMAL:
+            value = FB_BLANK_UNBLANK;
+            break;
     }
+
     switch(dpy) {
     case HWC_DISPLAY_PRIMARY:
-        value = blank ? FB_BLANK_POWERDOWN : FB_BLANK_UNBLANK;
-        if(suspend)
-            value = FB_BLANK_VSYNC_SUSPEND;
-        if(ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK, value) < 0 ) {
-            ALOGE("%s: Failed to handle blank event(%d) for Primary!!",
-                  __FUNCTION__, blank );
-            return -1;
-        }
+        if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+            if (ctx->dpyAttr[dpy].connected) {
+                // When HDMI is connected as primary we clean up resources
+                // and call commit to generate a black frame on the interface.
+                // However, we do not call blank since we need the timing
+                // generator and HDMI core to remain turned on.
+                if((mode == HWC_POWER_MODE_OFF) &&
+                        (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd))) {
+                    ALOGE("%s: display commit fail for %d", __FUNCTION__, dpy);
+                    ret = -1;
+                }
+            }
+        } else {
+            if(ioctl(ctx->dpyAttr[dpy].fd, FBIOBLANK, value) < 0 ) {
+                ALOGE("%s: ioctl FBIOBLANK failed for Primary with error %s"
+                        " value %d", __FUNCTION__, strerror(errno), value);
+                return -errno;
+            }
 
-        if(!blank) {
-            // Enable HPD here, as during bootup unblank is called
-            // when SF is completely initialized
-            ctx->mExtDisplay->setHPD(1);
-        }
+            if(mode == HWC_POWER_MODE_NORMAL) {
+                // Enable HPD here, as during bootup POWER_MODE_NORMAL is set
+                // when SF is completely initialized
+                ctx->mHDMIDisplay->setHPD(1);
+            }
 
-        ctx->dpyAttr[dpy].isActive = !blank;
+            ctx->dpyAttr[dpy].isActive = not(mode == HWC_POWER_MODE_OFF);
 
-        if(ctx->mVirtualonExtActive) {
-            /* if mVirtualonExtActive is true, display hal will
-             * receive unblank calls for non-hybrid WFD solution
-             * since we piggyback on HDMI.
-             * TODO: Not needed once we have WFD client working on top
-             of Google API's */
-            break;
+            if(ctx->mVirtualonExtActive) {
+                /* if mVirtualonExtActive is true, display hal will
+                 * receive unblank calls for non-hybrid WFD solution
+                 * since we piggyback on HDMI.
+                 * TODO: Not needed once we have WFD client working on top
+                 of Google API's */
+                break;
+            }
         }
+        //Deliberate fall through since there is no explicit power mode for
+        //virtual displays.
     case HWC_DISPLAY_VIRTUAL:
         /* There are two ways to reach this block of code.
 
@@ -531,31 +539,32 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
          */
 
         if(ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected) {
-            if(blank and (!ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isPause)) {
-                int dpy = HWC_DISPLAY_VIRTUAL;
+            const int dpy = HWC_DISPLAY_VIRTUAL;
+            if(mode == HWC_POWER_MODE_OFF and
+                    (not ctx->dpyAttr[dpy].isPause)) {
                 if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
-                    ALOGE("%s: display commit fail for virtual!", __FUNCTION__);
+                    ALOGE("%s: displayCommit failed for virtual", __FUNCTION__);
                     ret = -1;
                 }
             }
-            ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].isActive = !blank;
+            ctx->dpyAttr[dpy].isActive = not(mode == HWC_POWER_MODE_OFF);
         }
         break;
     case HWC_DISPLAY_EXTERNAL:
-        if(blank) {
+        if(mode == HWC_POWER_MODE_OFF) {
             if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
-                ALOGE("%s: display commit fail for external!", __FUNCTION__);
+                ALOGE("%s: displayCommit failed for external", __FUNCTION__);
                 ret = -1;
             }
         }
-        ctx->dpyAttr[dpy].isActive = !blank;
+        ctx->dpyAttr[dpy].isActive = not(mode == HWC_POWER_MODE_OFF);
         break;
     default:
         return -EINVAL;
     }
 
-    ALOGD_IF(BLANK_DEBUG, "%s: Done %s display: %d", __FUNCTION__,
-          blank ? "blanking":"unblanking", dpy);
+    ALOGD_IF(POWER_MODE_DEBUG, "%s: Done setting mode %d on display %d",
+            __FUNCTION__, mode, dpy);
     return ret;
 }
 
@@ -570,18 +579,18 @@ static void reset_panel(struct hwc_composer_device_1* dev)
         return;
     }
 
-    ALOGD("%s: calling BLANK DISPLAY", __FUNCTION__);
-    ret = hwc_blank(dev, HWC_DISPLAY_PRIMARY, 1);
+    ALOGD("%s: setting power mode off", __FUNCTION__);
+    ret = hwc_setPowerMode(dev, HWC_DISPLAY_PRIMARY, HWC_POWER_MODE_OFF);
     if (ret < 0) {
         ALOGE("%s: FBIOBLANK failed to BLANK:  %s", __FUNCTION__,
-                                                            strerror(errno));
+                strerror(errno));
     }
 
-    ALOGD("%s: calling UNBLANK DISPLAY and enabling vsync", __FUNCTION__);
-    ret = hwc_blank(dev, HWC_DISPLAY_PRIMARY, 0);
+    ALOGD("%s: setting power mode normal and enabling vsync", __FUNCTION__);
+    ret = hwc_setPowerMode(dev, HWC_DISPLAY_PRIMARY, HWC_POWER_MODE_NORMAL);
     if (ret < 0) {
         ALOGE("%s: FBIOBLANK failed to UNBLANK : %s", __FUNCTION__,
-                                                            strerror(errno));
+                strerror(errno));
     }
     hwc_vsync_control(ctx, HWC_DISPLAY_PRIMARY, 1);
 
@@ -779,42 +788,56 @@ static int hwc_set(hwc_composer_device_1 *dev,
 
 int hwc_getDisplayConfigs(struct hwc_composer_device_1* dev, int disp,
         uint32_t* configs, size_t* numConfigs) {
-    int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+
     disp = getDpyforExternalDisplay(ctx, disp);
-    //in 1.1 there is no way to choose a config, report as config id # 0
-    //This config is passed to getDisplayAttributes. Ignore for now.
+    Locker::Autolock _l(ctx->mDrawLock);
+    bool hotPluggable = isHotPluggable(ctx, disp);
+    bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
+    // If hotpluggable or virtual displays are inactive return error
+    if ((hotPluggable || isVirtualDisplay) && !ctx->dpyAttr[disp].connected) {
+        ALOGE("%s display (%d) is inactive", __FUNCTION__, disp);
+        return -EINVAL;
+    }
+
+    if (*numConfigs <= 0) {
+        ALOGE("%s Invalid number of configs (%d)", __FUNCTION__, *numConfigs);
+        return -EINVAL;
+    }
+
     switch(disp) {
         case HWC_DISPLAY_PRIMARY:
-            if(*numConfigs > 0) {
+            if (hotPluggable) {
+                ctx->mHDMIDisplay->getDisplayConfigs(configs, numConfigs);
+            } else {
                 configs[0] = 0;
                 *numConfigs = 1;
             }
-            ret = 0; //NO_ERROR
             break;
         case HWC_DISPLAY_EXTERNAL:
+                ctx->mHDMIDisplay->getDisplayConfigs(configs, numConfigs);
+            break;
         case HWC_DISPLAY_VIRTUAL:
-            ret = -1; //Not connected
-            if(ctx->dpyAttr[disp].connected) {
-                ret = 0; //NO_ERROR
-                if(*numConfigs > 0) {
-                    configs[0] = 0;
-                    *numConfigs = 1;
-                }
-            }
+            configs[0] = 0;
+            *numConfigs = 1;
             break;
     }
-    return ret;
+    return 0;
 }
 
 int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
-        uint32_t /*config*/, const uint32_t* attributes, int32_t* values) {
+        uint32_t config, const uint32_t* attributes, int32_t* values) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+
     disp = getDpyforExternalDisplay(ctx, disp);
-    //If hotpluggable displays(i.e, HDMI, WFD) are inactive return error
-    if( (disp != HWC_DISPLAY_PRIMARY) && !ctx->dpyAttr[disp].connected) {
-        return -1;
+    Locker::Autolock _l(ctx->mDrawLock);
+    bool hotPluggable = isHotPluggable(ctx, disp);
+    bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
+    // If hotpluggable or virtual displays are inactive return error
+    if ((hotPluggable || isVirtualDisplay) && !ctx->dpyAttr[disp].connected) {
+        ALOGE("%s display (%d) is inactive", __FUNCTION__, disp);
+        return -EINVAL;
     }
 
     //From HWComposer
@@ -831,18 +854,30 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
     const size_t NUM_DISPLAY_ATTRIBUTES = (sizeof(DISPLAY_ATTRIBUTES) /
             sizeof(DISPLAY_ATTRIBUTES)[0]);
 
+    uint32_t xres = 0, yres = 0, refresh = 0;
+    int ret = 0;
+    if (hotPluggable) {
+        ret = ctx->mHDMIDisplay->getAttrForConfig(config, xres, yres, refresh);
+        if(ret < 0) {
+            ALOGE("%s Error getting attributes for config %d",
+                    __FUNCTION__, config);
+            return ret;
+        }
+    }
+
     for (size_t i = 0; i < NUM_DISPLAY_ATTRIBUTES - 1; i++) {
         switch (attributes[i]) {
         case HWC_DISPLAY_VSYNC_PERIOD:
-            values[i] = ctx->dpyAttr[disp].vsync_period;
+            values[i] =
+                    hotPluggable ? refresh : ctx->dpyAttr[disp].vsync_period;
             break;
         case HWC_DISPLAY_WIDTH:
-            values[i] = ctx->dpyAttr[disp].xres;
+            values[i] = hotPluggable ? xres : ctx->dpyAttr[disp].xres;
             ALOGD("%s disp = %d, width = %d",__FUNCTION__, disp,
                     ctx->dpyAttr[disp].xres);
             break;
         case HWC_DISPLAY_HEIGHT:
-            values[i] = ctx->dpyAttr[disp].yres;
+            values[i] = hotPluggable ? yres : ctx->dpyAttr[disp].yres;
             ALOGD("%s disp = %d, height = %d",__FUNCTION__, disp,
                     ctx->dpyAttr[disp].yres);
             break;
@@ -890,6 +925,51 @@ void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
     strlcpy(buff, aBuf.string(), buff_len);
 }
 
+int hwc_getActiveConfig(struct hwc_composer_device_1* dev, int disp)
+{
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    Locker::Autolock _l(ctx->mDrawLock);
+    bool hotPluggable = isHotPluggable(ctx, disp);
+    bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
+    // If hotpluggable or virtual displays are inactive return error
+    if ((hotPluggable || isVirtualDisplay) && !ctx->dpyAttr[disp].connected) {
+        ALOGE("%s display (%d) is inactive", __FUNCTION__, disp);
+        return -EINVAL;
+    }
+
+    // For use cases when primary panel is the default interface we only have
+    // the default config (0th index)
+    if (!hotPluggable) {
+        return 0;
+    }
+
+    return ctx->mHDMIDisplay->getActiveConfig();
+}
+
+int hwc_setActiveConfig(struct hwc_composer_device_1* dev, int disp, int index)
+{
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    Locker::Autolock _l(ctx->mDrawLock);
+    bool hotPluggable = isHotPluggable(ctx, disp);
+    bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
+    // If hotpluggable or virtual displays are inactive return error
+    if ((hotPluggable || isVirtualDisplay) && !ctx->dpyAttr[disp].connected) {
+        ALOGE("%s display (%d) is inactive", __FUNCTION__, disp);
+        return -EINVAL;
+    }
+
+    // For use cases when primary panel is the default interface we only have
+    // the default config (0th index)
+    if (!hotPluggable) {
+        // Primary and virtual supports only the default config (0th index)
+        return (index == 0) ? index : -EINVAL;
+    }
+
+    return ctx->mHDMIDisplay->setActiveConfig(index);
+}
+
 static int hwc_device_close(struct hw_device_t *dev)
 {
     if(!dev) {
@@ -919,18 +999,20 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
 
         //Setup HWC methods
         dev->device.common.tag          = HARDWARE_DEVICE_TAG;
-        dev->device.common.version      = HWC_DEVICE_API_VERSION_1_3;
+        dev->device.common.version      = HWC_DEVICE_API_VERSION_1_4;
         dev->device.common.module       = const_cast<hw_module_t*>(module);
         dev->device.common.close        = hwc_device_close;
         dev->device.prepare             = hwc_prepare;
         dev->device.set                 = hwc_set;
         dev->device.eventControl        = hwc_eventControl;
-        dev->device.blank               = hwc_blank;
+        dev->device.setPowerMode        = hwc_setPowerMode;
         dev->device.query               = hwc_query;
         dev->device.registerProcs       = hwc_registerProcs;
         dev->device.dump                = hwc_dump;
         dev->device.getDisplayConfigs   = hwc_getDisplayConfigs;
         dev->device.getDisplayAttributes = hwc_getDisplayAttributes;
+        dev->device.getActiveConfig     = hwc_getActiveConfig;
+        dev->device.setActiveConfig     = hwc_setActiveConfig;
         *device = &dev->device.common;
         status = 0;
     }

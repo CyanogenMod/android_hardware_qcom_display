@@ -33,6 +33,7 @@
 #include "qdMetaData.h"
 #include <overlayUtils.h>
 #include <EGL/egl.h>
+#include <QService.h>
 
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
@@ -58,7 +59,7 @@ class RotMgr;
 namespace qhwc {
 //fwrd decl
 class QueuedBufferStore;
-class ExternalDisplay;
+class HDMIDisplay;
 class VirtualDisplay;
 class IFBUpdate;
 class IVideoOverlay;
@@ -133,6 +134,8 @@ struct ListStats {
     // Secure RGB specific
     int secureRGBCount;
     int secureRGBIndices[MAX_NUM_APP_LAYERS];
+    // Flag related to windowboxing feature
+    bool mAIVVideoMode;
 };
 
 struct LayerProp {
@@ -155,6 +158,12 @@ struct BwcPM {
 enum {
     HWC_MDPCOMP = 0x00000001,
     HWC_COPYBIT = 0x00000002,
+};
+
+// AIV specific flags
+enum {
+    HWC_AIV_VIDEO = 0x80000000,
+    HWC_AIV_CC    = 0x40000000,
 };
 
 // HAL specific features
@@ -259,6 +268,11 @@ void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers);
 
 bool canUseMDPforVirtualDisplay(hwc_context_t* ctx,
                                 const hwc_display_contents_1_t *list);
+void updateDisplayInfo(hwc_context_t* ctx, int dpy);
+void resetDisplayInfo(hwc_context_t* ctx, int dpy);
+void initCompositionResources(hwc_context_t* ctx, int dpy);
+void destroyCompositionResources(hwc_context_t* ctx, int dpy);
+void clearPipeResources(hwc_context_t* ctx, int dpy);
 
 //Helper function to dump logs
 void dumpsys_log(android::String8& buf, const char* fmt, ...);
@@ -312,6 +326,10 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary);
 void handle_pause(hwc_context_t *ctx, int dpy);
 void handle_resume(hwc_context_t *ctx, int dpy);
 
+// Handle ONLINE/OFFLINE for HDMI display
+void handle_online(hwc_context_t* ctx, int dpy);
+void handle_offline(hwc_context_t* ctx, int dpy);
+
 //Close acquireFenceFds of all layers of incoming list
 void closeAcquireFds(hwc_display_contents_1_t* list);
 
@@ -339,6 +357,12 @@ int configColorLayer(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
 
 void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
         hwc_rect_t& crop);
+
+bool isZoomModeEnabled(hwc_rect_t crop);
+void updateCropAIVVideoMode(hwc_context_t *ctx, hwc_rect_t& crop, int dpy);
+void updateDestAIVVideoMode(hwc_context_t *ctx, hwc_rect_t& dst, int dpy);
+void updateCoordinates(hwc_context_t *ctx, hwc_rect_t& crop,
+                           hwc_rect_t& dst, int dpy);
 
 //Routine to configure low resolution panels (<= 2048 width)
 int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
@@ -380,6 +404,14 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list);
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
     return (UNLIKELY(l && (l->flags & HWC_SKIP_LAYER)));
+}
+
+static inline bool isAIVVideoLayer(const hwc_layer_1_t* l) {
+    return (UNLIKELY(l && (l->flags & HWC_AIV_VIDEO)));
+}
+
+static inline bool isAIVCCLayer(const hwc_layer_1_t* l) {
+    return (UNLIKELY(l && (l->flags & HWC_AIV_CC)));
 }
 
 // Returns true if the buffer is yuv
@@ -510,8 +542,9 @@ struct hwc_context_t {
 
     //Primary and external FB updater
     qhwc::IFBUpdate *mFBUpdate[HWC_NUM_DISPLAY_TYPES];
-    // External display related information
-    qhwc::ExternalDisplay *mExtDisplay;
+    // HDMI display related object. Used to configure/teardown
+    // HDMI when it is connected as primary or external.
+    qhwc::HDMIDisplay *mHDMIDisplay;
     qhwc::VirtualDisplay *mVirtualDisplay;
     qhwc::MDPInfo mMDP;
     qhwc::VsyncState vstate;
@@ -541,6 +574,8 @@ struct hwc_context_t {
     mutable Locker mDrawLock;
     //Drawing round when we use GPU
     bool isPaddingRound;
+    // Used to mark composition cycle when DMA state change is required
+    bool isDMAStateChanging;
     // External Orientation
     int mExtOrientation;
     //Flags the transition of a video session
@@ -564,9 +599,13 @@ struct hwc_context_t {
     // persist.hwc.enable_vds
     bool mVDSEnabled;
     struct gpu_hint_info mGPUHintInfo;
-    // When this mode is set, no draw cycles are permitted to go through but at
-    // the same time, overlay objects should not be GCed either
-    bool alwaysOn;
+    // Flags related to windowboxing feature
+    bool mAIVVideoMode[HWC_NUM_DISPLAY_TYPES];
+    bool mWindowboxFeature;
+    float mMinToleranceLevel;
+    float mMaxToleranceLevel;
+    // Display binder service
+    qService::QService* mQService;
 };
 
 namespace qhwc {
@@ -595,6 +634,16 @@ static inline bool isSecondaryConfiguring(hwc_context_t* ctx) {
 static inline bool isSecondaryConnected(hwc_context_t* ctx) {
     return (ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].connected ||
             ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected);
+}
+
+/* Return true if HWC supports VirtualDisplaySurface mechanism */
+static inline bool isVDSEnabled(hwc_context_t* ctx) {
+    return ctx->mVDSEnabled;
+}
+
+/* Return Virtual Display connection status */
+static inline bool isVDConnected(hwc_context_t* ctx) {
+    return ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].connected;
 }
 
 };

@@ -216,6 +216,9 @@ protected:
     bool intersectingUpdatingLayers(const hwc_display_contents_1_t* list,
             int fromIndex, int toIndex, int targetLayerIndex);
 
+    /* drop other non-AIV layers from external display list.*/
+    void dropNonAIVLayers(hwc_context_t* ctx, hwc_display_contents_1_t* list);
+
         /* updates cache map with YUV info */
     void updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
             bool secureOnly);

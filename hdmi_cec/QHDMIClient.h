@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2013 The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -27,41 +27,31 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include "IQHDMIClient.h"
+#include "qhdmi_cec.h"
+#include <IQService.h>
 
-#ifndef HWC_VIRTUAL_DISPLAY_H
-#define HWC_VIRTUAL_DISPLAY_H
+namespace qClient {
 
-#include <linux/fb.h>
-
-struct hwc_context_t;
-
-namespace qhwc {
-
-class VirtualDisplay
+class QHDMIClient: public android::IBinder::DeathRecipient,
+    public BnQHDMIClient
 {
 public:
-    VirtualDisplay(hwc_context_t* ctx);
-    ~VirtualDisplay();
-    int  configure();
-    void getAttributes(uint32_t& width, uint32_t& height);
-    int  teardown();
-    bool isConnected() {
-        return  mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].connected;
-    }
-private:
-    bool openFrameBuffer();
-    bool closeFrameBuffer();
-    bool isSinkSecure();
-    void setAttributes();
-    void initResolution(uint32_t &extW, uint32_t &extH);
-    void setToPrimary(uint32_t maxArea, uint32_t priW, uint32_t priH,
-                      uint32_t &extW, uint32_t &extH);
-    void setDownScaleMode(uint32_t maxArea);
+    QHDMIClient() {}
 
-    int mFd;
-    hwc_context_t *mHwcContext;
-    fb_var_screeninfo mVInfo;
+    virtual void binderDied(const android::wp<android::IBinder>& who);
+
+    virtual void onHdmiHotplug(int connected);
+
+    virtual void onCECMessageRecieved(char *msg, ssize_t len);
+
+    void setCECContext(qhdmicec::cec_context_t* ctx) { mCtx = ctx; }
+
+    void registerClient(android::sp<QHDMIClient>& client);
+
+private:
+    qhdmicec::cec_context_t* mCtx;
+    android::sp<qService::IQService> mQService;
+
 };
-}; //qhwc
-// ---------------------------------------------------------------------------
-#endif //HWC_VIRTUAL_DISPLAY_H
+};

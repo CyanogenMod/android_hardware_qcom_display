@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2014, The Linux Foundation All rights reserved.
+ * Copyright (C) 2012-2015, The Linux Foundation All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -37,7 +37,7 @@
 #include "mdp_version.h"
 #include "hwc_copybit.h"
 #include "hwc_dump_layers.h"
-#include "external.h"
+#include "hdmi.h"
 #include "virtual.h"
 #include "hwc_qclient.h"
 #include "QService.h"
@@ -101,6 +101,53 @@ void changeResolution(hwc_context_t *ctx, int xres_orig, int yres_orig) {
             ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres = yres;
             ctx->dpyAttr[HWC_DISPLAY_PRIMARY].customFBSize = true;
         }
+    }
+}
+
+// Initialize hdmi display attributes based on
+// hdmi display class state
+void updateDisplayInfo(hwc_context_t* ctx, int dpy) {
+    ctx->dpyAttr[dpy].fd = ctx->mHDMIDisplay->getFd();
+    ctx->dpyAttr[dpy].xres = ctx->mHDMIDisplay->getWidth();
+    ctx->dpyAttr[dpy].yres = ctx->mHDMIDisplay->getHeight();
+    ctx->dpyAttr[dpy].mDownScaleMode = ctx->mHDMIDisplay->getMDPScalingMode();
+    ctx->dpyAttr[dpy].vsync_period = ctx->mHDMIDisplay->getVsyncPeriod();
+    ctx->mViewFrame[dpy].left = 0;
+    ctx->mViewFrame[dpy].top = 0;
+    ctx->mViewFrame[dpy].right = ctx->dpyAttr[dpy].xres;
+    ctx->mViewFrame[dpy].bottom = ctx->dpyAttr[dpy].yres;
+    //FIXME: for now assume HDMI as secure
+    //Will need to read the HDCP status from the driver
+    //and update this accordingly
+    if (dpy == HWC_DISPLAY_EXTERNAL) {
+        ctx->dpyAttr[dpy].secure = true;
+    }
+}
+
+// Reset hdmi display attributes and list stats structures
+void resetDisplayInfo(hwc_context_t* ctx, int dpy) {
+    memset(&(ctx->dpyAttr[dpy]), 0, sizeof(ctx->dpyAttr[dpy]));
+    memset(&(ctx->listStats[dpy]), 0, sizeof(ctx->listStats[dpy]));
+    // We reset the fd to -1 here but External display class is responsible
+    // for it when the display is disconnected. This is handled as part of
+    // EXTERNAL_OFFLINE event.
+    ctx->dpyAttr[dpy].fd = -1;
+}
+
+// Initialize composition resources
+void initCompositionResources(hwc_context_t* ctx, int dpy) {
+    ctx->mFBUpdate[dpy] = IFBUpdate::getObject(ctx, dpy);
+    ctx->mMDPComp[dpy] = MDPComp::getObject(ctx, dpy);
+}
+
+void destroyCompositionResources(hwc_context_t* ctx, int dpy) {
+    if(ctx->mFBUpdate[dpy]) {
+        delete ctx->mFBUpdate[dpy];
+        ctx->mFBUpdate[dpy] = NULL;
+    }
+    if(ctx->mMDPComp[dpy]) {
+        delete ctx->mMDPComp[dpy];
+        ctx->mMDPComp[dpy] = NULL;
     }
 }
 
@@ -184,20 +231,44 @@ static int openFramebufferDevice(hwc_context_t *ctx)
 
 void initContext(hwc_context_t *ctx)
 {
-    openFramebufferDevice(ctx);
+    overlay::Overlay::initOverlay();
+    ctx->mHDMIDisplay = new HDMIDisplay();
+    uint32_t priW = 0, priH = 0;
+    // 1. HDMI as Primary
+    //    -If HDMI cable is connected, read display configs from edid data
+    //    -If HDMI cable is not connected then use default data in vscreeninfo
+    // 2. HDMI as External
+    //    -Initialize HDMI class for use with external display
+    //    -Use vscreeninfo to populate display configs
+    if(ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+        int connected = ctx->mHDMIDisplay->getConnectedState();
+        if(connected == 1) {
+            ctx->mHDMIDisplay->configure();
+            updateDisplayInfo(ctx, HWC_DISPLAY_PRIMARY);
+            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
+        } else {
+            openFramebufferDevice(ctx);
+            ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = false;
+        }
+    } else {
+        openFramebufferDevice(ctx);
+        ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
+        // Send the primary resolution to the hdmi display class
+        // to be used for MDP scaling functionality
+        priW = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres;
+        priH = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].yres;
+        ctx->mHDMIDisplay->setPrimaryAttributes(priW, priH);
+    }
+
     char value[PROPERTY_VALUE_MAX];
     ctx->mMDP.version = qdutils::MDPVersion::getInstance().getMDPVersion();
     ctx->mMDP.hasOverlay = qdutils::MDPVersion::getInstance().hasOverlay();
     ctx->mMDP.panel = qdutils::MDPVersion::getInstance().getPanelType();
-    overlay::Overlay::initOverlay();
     ctx->mOverlay = overlay::Overlay::getInstance();
     ctx->mRotMgr = RotMgr::getInstance();
 
-    //Is created and destroyed only once for primary
-    //For external it could get created and destroyed multiple times depending
-    //on what external we connect to.
-    ctx->mFBUpdate[HWC_DISPLAY_PRIMARY] =
-        IFBUpdate::getObject(ctx, HWC_DISPLAY_PRIMARY);
+    // Initialize composition objects for the primary display
+    initCompositionResources(ctx, HWC_DISPLAY_PRIMARY);
 
     // Check if the target supports copybit compostion (dyn/mdp) to
     // decide if we need to open the copybit module.
@@ -213,7 +284,6 @@ void initContext(hwc_context_t *ctx)
                                                          HWC_DISPLAY_PRIMARY);
     }
 
-    ctx->mExtDisplay = new ExternalDisplay(ctx);
     ctx->mVirtualDisplay = new VirtualDisplay(ctx);
     ctx->mVirtualonExtActive = false;
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].isActive = false;
@@ -224,9 +294,6 @@ void initContext(hwc_context_t *ctx)
     ctx->dpyAttr[HWC_DISPLAY_EXTERNAL].mDownScaleMode = false;
     ctx->dpyAttr[HWC_DISPLAY_VIRTUAL].mDownScaleMode = false;
 
-    ctx->mMDPComp[HWC_DISPLAY_PRIMARY] =
-         MDPComp::getObject(ctx, HWC_DISPLAY_PRIMARY);
-    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].connected = true;
     //Initialize the primary display viewFrame info
     ctx->mViewFrame[HWC_DISPLAY_PRIMARY].left = 0;
     ctx->mViewFrame[HWC_DISPLAY_PRIMARY].top = 0;
@@ -268,9 +335,16 @@ void initContext(hwc_context_t *ctx)
     //independent process as well.
     QService::init();
     sp<IQClient> client = new QClient(ctx);
-    interface_cast<IQService>(
+    sp<IQService> iqs = interface_cast<IQService>(
             defaultServiceManager()->getService(
-            String16("display.qservice")))->connect(client);
+            String16("display.qservice")));
+    if (iqs.get()) {
+      iqs->connect(client);
+      ctx->mQService = reinterpret_cast<QService* >(iqs.get());
+    } else {
+      ALOGE("%s: Failed to acquire service pointer", __FUNCTION__);
+      return;
+    }
 
     // Initialize device orientation to its default orientation
     ctx->deviceOrientation = 0;
@@ -283,6 +357,10 @@ void initContext(hwc_context_t *ctx)
         ctx->mMDPDownscaleEnabled = true;
     }
 
+    property_get("sys.hwc.windowbox_aspect_ratio_tolerance", value, "0");
+    ctx->mMinToleranceLevel = 1.0f - (((float)(atoi(value))) / 100);
+    ctx->mMaxToleranceLevel = 1.0f + (((float)(atoi(value))) / 100);
+
     // Initialize gpu perfomance hint related parameters
     property_get("sys.hwc.gpu_perf_mode", value, "0");
 #ifdef QCOM_BSP
@@ -293,7 +371,13 @@ void initContext(hwc_context_t *ctx)
     ctx->mGPUHintInfo.mPrevCompositionGLES = false;
     ctx->mGPUHintInfo.mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
 #endif
-    ctx->alwaysOn = false;
+    // Read the system property to determine if windowboxing feature is enabled.
+    ctx->mWindowboxFeature = false;
+    if(property_get("sys.hwc.windowbox_feature", value, "false")
+            && !strcmp(value, "true")) {
+        ctx->mWindowboxFeature = true;
+    }
+
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
 }
@@ -322,20 +406,14 @@ void closeContext(hwc_context_t *ctx)
         ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd = -1;
     }
 
-    if(ctx->mExtDisplay) {
-        delete ctx->mExtDisplay;
-        ctx->mExtDisplay = NULL;
+    if(ctx->mHDMIDisplay) {
+        delete ctx->mHDMIDisplay;
+        ctx->mHDMIDisplay = NULL;
     }
 
     for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
-        if(ctx->mFBUpdate[i]) {
-            delete ctx->mFBUpdate[i];
-            ctx->mFBUpdate[i] = NULL;
-        }
-        if(ctx->mMDPComp[i]) {
-            delete ctx->mMDPComp[i];
-            ctx->mMDPComp[i] = NULL;
-        }
+        destroyCompositionResources(ctx, i);
+
         if(ctx->mHwcDebug[i]) {
             delete ctx->mHwcDebug[i];
             ctx->mHwcDebug[i] = NULL;
@@ -354,7 +432,10 @@ void closeContext(hwc_context_t *ctx)
         ctx->mAD = NULL;
     }
 
-
+    if(ctx->mQService) {
+        delete ctx->mQService;
+        ctx->mQService = NULL;
+    }
 }
 
 
@@ -391,12 +472,12 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& rect) {
     float xRatio = 1.0;
     float yRatio = 1.0;
 
-    int fbWidth = ctx->dpyAttr[dpy].xres;
-    int fbHeight = ctx->dpyAttr[dpy].yres;
+    uint32_t fbWidth = ctx->dpyAttr[dpy].xres;
+    uint32_t fbHeight = ctx->dpyAttr[dpy].yres;
     if(ctx->dpyAttr[dpy].mDownScaleMode) {
-        // if downscale Mode is enabled for external, need to query
+        // if MDP scaling mode is enabled for external, need to query
         // the actual width and height, as that is the physical w & h
-         ctx->mExtDisplay->getAttributes(fbWidth, fbHeight);
+         ctx->mHDMIDisplay->getAttributes(fbWidth, fbHeight);
     }
 
 
@@ -473,8 +554,8 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
     if(extOrientation & HAL_TRANSFORM_ROT_90) {
         // Swap width/height for input position
         swapWidthHeight(actualWidth, actualHeight);
-        getAspectRatioPosition((int)fbWidth, (int)fbHeight, (int)actualWidth,
-                               (int)actualHeight, rect);
+        qdutils::getAspectRatioPosition((int)fbWidth, (int)fbHeight,
+                                (int)actualWidth, (int)actualHeight, rect);
         xPos = rect.left;
         yPos = rect.top;
         width = float(rect.right - rect.left);
@@ -505,7 +586,7 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
         xRatio = (float)(outPos.x - xPos)/width;
         // GetaspectRatio -- tricky to get the correct aspect ratio
         // But we need to do this.
-        getAspectRatioPosition((int)width, (int)height,
+        qdutils::getAspectRatioPosition((int)width, (int)height,
                                (int)width,(int)height, r);
         xPos = r.left;
         yPos = r.top;
@@ -526,9 +607,9 @@ void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
                  outPos.w, outPos.h);
     }
     if(ctx->dpyAttr[dpy].mDownScaleMode) {
-        int extW, extH;
+        uint32_t extW = 0, extH = 0;
         if(dpy == HWC_DISPLAY_EXTERNAL)
-            ctx->mExtDisplay->getAttributes(extW, extH);
+            ctx->mHDMIDisplay->getAttributes(extW, extH);
         else
             ctx->mVirtualDisplay->getAttributes(extW, extH);
         fbWidth  = (float)ctx->dpyAttr[dpy].xres;
@@ -588,7 +669,7 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
                 if(!isPrimaryPortrait(ctx)) {
                     swap(srcWidth, srcHeight);
                 }                    // Get Aspect Ratio for external
-                getAspectRatioPosition(dstWidth, dstHeight, srcWidth,
+                qdutils::getAspectRatioPosition(dstWidth, dstHeight, srcWidth,
                                     srcHeight, displayFrame);
                 // Crop - this is needed, because for sidesync, the dest fb will
                 // be in portrait orientation, so update the crop to not show the
@@ -602,14 +683,14 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
                 }
             }
             if(ctx->dpyAttr[dpy].mDownScaleMode) {
-                int extW, extH;
-                // if downscale is enabled, map the co-ordinates to new
+                uint32_t extW = 0, extH = 0;
+                // if MDP scaling mode is enabled, map the co-ordinates to new
                 // domain(downscaled)
                 float fbWidth  = (float)ctx->dpyAttr[dpy].xres;
                 float fbHeight = (float)ctx->dpyAttr[dpy].yres;
                 // query MDP configured attributes
                 if(dpy == HWC_DISPLAY_EXTERNAL)
-                    ctx->mExtDisplay->getAttributes(extW, extH);
+                    ctx->mHDMIDisplay->getAttributes(extW, extH);
                 else
                     ctx->mVirtualDisplay->getAttributes(extW, extH);
                 //Calculate the ratio...
@@ -829,6 +910,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->dpyAttr[dpy].mActionSafePresent = isActionSafePresent(ctx, dpy);
     ctx->listStats[dpy].secureRGBCount = 0;
 
+    ctx->listStats[dpy].mAIVVideoMode = false;
     resetROI(ctx, dpy);
 
     trimList(ctx, list, dpy);
@@ -838,6 +920,11 @@ void setListStats(hwc_context_t *ctx,
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
 #ifdef QCOM_BSP
+        // Window boxing feature is applicable obly for external display, So
+        // enable mAIVVideoMode only for external display
+        if(ctx->mWindowboxFeature && dpy && isAIVVideoLayer(layer)) {
+            ctx->listStats[dpy].mAIVVideoMode = true;
+        }
         if (layer->flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
             ctx->listStats[dpy].isDisplayAnimating = true;
         }
@@ -999,7 +1086,7 @@ bool isActionSafePresent(hwc_context_t *ctx, int dpy) {
     // Disable Actionsafe for non HDMI displays.
     if(!(dpy == HWC_DISPLAY_EXTERNAL) ||
         qdutils::MDPVersion::getInstance().is8x74v2() ||
-        ctx->mExtDisplay->isCEUnderscanSupported()) {
+        ctx->mHDMIDisplay->isCEUnderscanSupported()) {
         return false;
     }
 
@@ -1184,7 +1271,8 @@ void optimizeLayerRects(const hwc_display_contents_1_t *list) {
         //see if there is no blending required.
         //If it is opaque see if we can substract this region from below
         //layers.
-        if(list->hwLayers[i].blending == HWC_BLENDING_NONE) {
+        if(list->hwLayers[i].blending == HWC_BLENDING_NONE &&
+                list->hwLayers[i].planeAlpha == 0xFF) {
             int j= i-1;
             hwc_rect_t& topframe =
                 (hwc_rect_t&)list->hwLayers[i].displayFrame;
@@ -1602,6 +1690,71 @@ void updateSource(eTransform& orient, Whf& whf,
     }
 }
 
+bool isZoomModeEnabled(hwc_rect_t crop) {
+    // This does not work for zooming in top left corner of the image
+    return(crop.top > 0 || crop.left > 0);
+}
+
+void updateCropAIVVideoMode(hwc_context_t *ctx, hwc_rect_t& crop, int dpy) {
+    ALOGD_IF(HWC_UTILS_DEBUG, "dpy %d Source crop [%d %d %d %d]", dpy,
+             crop.left, crop.top, crop.right, crop.bottom);
+    if(isZoomModeEnabled(crop)) {
+        Dim srcCrop(crop.left, crop.top,
+                crop.right - crop.left,
+                crop.bottom - crop.top);
+        int extW = ctx->dpyAttr[dpy].xres;
+        int extH = ctx->dpyAttr[dpy].yres;
+        //Crop the original video in order to fit external display aspect ratio
+        if(srcCrop.w * extH < extW * srcCrop.h) {
+            int offset = (srcCrop.h - ((srcCrop.w * extH) / extW)) / 2;
+            crop.top += offset;
+            crop.bottom -= offset;
+        } else {
+            int offset = (srcCrop.w - ((extW * srcCrop.h) / extH)) / 2;
+            crop.left += offset;
+            crop.right -= offset;
+        }
+        ALOGD_IF(HWC_UTILS_DEBUG, "External Resolution [%d %d] dpy %d Modified"
+                 " source crop [%d %d %d %d]", extW, extH, dpy,
+                 crop.left, crop.top, crop.right, crop.bottom);
+    }
+}
+
+void updateDestAIVVideoMode(hwc_context_t *ctx, hwc_rect_t crop,
+                           hwc_rect_t& dst, int dpy) {
+    ALOGD_IF(HWC_UTILS_DEBUG, "dpy %d Destination position [%d %d %d %d]", dpy,
+             dst.left, dst.top, dst.right, dst.bottom);
+    Dim srcCrop(crop.left, crop.top,
+            crop.right - crop.left,
+            crop.bottom - crop.top);
+    int extW = ctx->dpyAttr[dpy].xres;
+    int extH = ctx->dpyAttr[dpy].yres;
+    // Set the destination coordinates of external display to full screen,
+    // when zoom in mode is enabled or the ratio between video aspect ratio
+    // and external display aspect ratio is below the tolerance level
+    float bufferAspectRatio = ((float)srcCrop.w / (float)srcCrop.h);
+    float extDisplayAspectRatio = ((float)extW / (float)extH);
+    float toleranceLevel = bufferAspectRatio / extDisplayAspectRatio;
+    if(((toleranceLevel >= ctx->mMinToleranceLevel) &&
+        (toleranceLevel <= ctx->mMaxToleranceLevel)) ||
+        (isZoomModeEnabled(crop))) {
+        dst.left = 0;
+        dst.top = 0;
+        dst.right = extW;
+        dst.bottom = extH;
+    }
+    ALOGD_IF(HWC_UTILS_DEBUG, "External Resolution [%d %d] dpy %d Modified"
+             " Destination position [%d %d %d %d] Source crop [%d %d %d %d]",
+             extW, extH, dpy, dst.left, dst.top, dst.right, dst.bottom,
+             crop.left, crop.top, crop.right, crop.bottom);
+}
+
+void updateCoordinates(hwc_context_t *ctx, hwc_rect_t& crop,
+                           hwc_rect_t& dst, int dpy) {
+    updateCropAIVVideoMode(ctx, crop, dpy);
+    updateDestAIVVideoMode(ctx, crop, dst, dpy);
+}
+
 int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         const int& dpy, eMdpFlags& mdpFlags, eZorder& z,
         eIsFg& isFg, const eDest& dest, Rotator **rot) {
@@ -1635,7 +1788,10 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         else if (hnd->format == HAL_PIXEL_FORMAT_RGBX_8888)
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
     }
-
+    // update source crop and destination position of AIV video layer.
+    if(ctx->listStats[dpy].mAIVVideoMode && isYuvBuffer(hnd)) {
+        updateCoordinates(ctx, crop, dst, dpy);
+    }
     calcExtDisplayPosition(ctx, hnd, dpy, crop, dst, transform, orient);
 
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
@@ -1742,6 +1898,11 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRA_8888);
         else if (hnd->format == HAL_PIXEL_FORMAT_RGBX_8888)
             whf.format = getMdpFormat(HAL_PIXEL_FORMAT_BGRX_8888);
+    }
+
+    // update source crop and destination position of AIV video layer.
+    if(ctx->listStats[dpy].mAIVVideoMode && isYuvBuffer(hnd)) {
+        updateCoordinates(ctx, crop, dst, dpy);
     }
 
     /* Calculate the external display position based on MDP downscale,
@@ -1885,6 +2046,11 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     Whf whf(getWidth(hnd), getHeight(hnd),
             getMdpFormat(hnd->format), (uint32_t)hnd->size);
+
+    // update source crop and destination position of AIV video layer.
+    if(ctx->listStats[dpy].mAIVVideoMode && isYuvBuffer(hnd)) {
+        updateCoordinates(ctx, crop, dst, dpy);
+    }
 
     /* Calculate the external display position based on MDP downscale,
        ActionSafe, and extorientation features. */
@@ -2305,6 +2471,15 @@ void handle_pause(hwc_context_t* ctx, int dpy) {
 void handle_resume(hwc_context_t* ctx, int dpy) {
     if(ctx->dpyAttr[dpy].connected) {
         ctx->mDrawLock.lock();
+        // A dynamic resolution change (DRC) can be made for a WiFi
+        // display. In order to support the resolution change, we
+        // need to reconfigure the corresponding display attributes.
+        // Since DRC is only on WiFi display, we only need to call
+        // configure() on the VirtualDisplay device.
+        if(dpy == HWC_DISPLAY_VIRTUAL && ctx->mVirtualDisplay != NULL) {
+            ctx->mVirtualDisplay->configure();
+        }
+
         ctx->dpyAttr[dpy].isConfiguring = true;
         ctx->dpyAttr[dpy].isActive = true;
         ctx->mDrawLock.unlock();
@@ -2320,6 +2495,61 @@ void handle_resume(hwc_context_t* ctx, int dpy) {
         ctx->proc->invalidate(ctx->proc);
     }
     return;
+}
+
+void clearPipeResources(hwc_context_t* ctx, int dpy) {
+    if(ctx->mOverlay) {
+        ctx->mOverlay->configBegin();
+        ctx->mOverlay->configDone();
+    }
+    if(ctx->mRotMgr) {
+        ctx->mRotMgr->clear();
+    }
+    // Call a display commit to ensure that pipes and associated
+    // fd's are cleaned up.
+    if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+        ALOGE("%s: display commit failed for  %d", __FUNCTION__, dpy);
+    }
+}
+
+// Handles online events when HDMI is the primary display. In particular,
+// online events for hdmi connected before AND after boot up and HWC init.
+void handle_online(hwc_context_t* ctx, int dpy) {
+    // Close the current fd if it was opened earlier on when HWC
+    // was initialized.
+    if (ctx->dpyAttr[dpy].fd >= 0) {
+        close(ctx->dpyAttr[dpy].fd);
+        ctx->dpyAttr[dpy].fd = -1;
+    }
+    // TODO: If HDMI is connected after the display has booted up,
+    // and the best configuration is different from the default
+    // then we need to deal with this appropriately.
+    ctx->mHDMIDisplay->configure();
+    updateDisplayInfo(ctx, dpy);
+    initCompositionResources(ctx, dpy);
+    ctx->dpyAttr[dpy].connected = true;
+}
+
+// Handles offline events for HDMI. This can be used for offline events
+// initiated by the HDMI driver and the CEC framework.
+void handle_offline(hwc_context_t* ctx, int dpy) {
+    destroyCompositionResources(ctx, dpy);
+    // Clear all pipe resources and call a display commit to ensure
+    // that all the fd's are closed. This will ensure that the HDMI
+    // core turns off and that we receive an event the next time the
+    // cable is connected.
+    if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+        clearPipeResources(ctx, dpy);
+    }
+    if(dpy == HWC_DISPLAY_EXTERNAL ||
+            ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+        ctx->mHDMIDisplay->teardown();
+    } else {
+        ctx->mVirtualDisplay->teardown();
+    }
+    resetDisplayInfo(ctx, dpy);
+    ctx->dpyAttr[dpy].connected = false;
+    ctx->dpyAttr[dpy].isActive = false;
 }
 
 };//namespace qhwc

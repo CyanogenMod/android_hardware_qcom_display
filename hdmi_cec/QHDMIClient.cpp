@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2013 The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -27,41 +27,40 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#define DEBUG 0
+#include <QServiceUtils.h>
+#include "QHDMIClient.h"
 
-#ifndef HWC_VIRTUAL_DISPLAY_H
-#define HWC_VIRTUAL_DISPLAY_H
+using namespace android;
+using namespace qhdmicec;
+using namespace qService;
 
-#include <linux/fb.h>
+namespace qClient {
 
-struct hwc_context_t;
-
-namespace qhwc {
-
-class VirtualDisplay
+void QHDMIClient::binderDied(const wp<IBinder>& who __unused)
 {
-public:
-    VirtualDisplay(hwc_context_t* ctx);
-    ~VirtualDisplay();
-    int  configure();
-    void getAttributes(uint32_t& width, uint32_t& height);
-    int  teardown();
-    bool isConnected() {
-        return  mHwcContext->dpyAttr[HWC_DISPLAY_VIRTUAL].connected;
-    }
-private:
-    bool openFrameBuffer();
-    bool closeFrameBuffer();
-    bool isSinkSecure();
-    void setAttributes();
-    void initResolution(uint32_t &extW, uint32_t &extH);
-    void setToPrimary(uint32_t maxArea, uint32_t priW, uint32_t priH,
-                      uint32_t &extW, uint32_t &extH);
-    void setDownScaleMode(uint32_t maxArea);
+    ALOGW("%s: Display QService died", __FUNCTION__);
+}
 
-    int mFd;
-    hwc_context_t *mHwcContext;
-    fb_var_screeninfo mVInfo;
+void QHDMIClient::onHdmiHotplug(int connected)
+{
+    ALOGD("%s: HDMI connected event connected: %d", __FUNCTION__, connected);
+    cec_hdmi_hotplug(mCtx, connected);
+}
+
+void QHDMIClient::onCECMessageRecieved(char *msg, ssize_t len)
+{
+    ALOGD_IF(DEBUG, "%s: CEC message received len: %zd", __FUNCTION__, len);
+    cec_receive_message(mCtx, msg, len);
+}
+
+void QHDMIClient::registerClient(sp<QHDMIClient>& client)
+{
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<IBinder> binder = sm->getService(String16("display.qservice"));
+    binder->linkToDeath(client);
+    mQService = interface_cast<IQService>(binder);
+    mQService->connect(interface_cast<IQHDMIClient>(client));
+}
+
 };
-}; //qhwc
-// ---------------------------------------------------------------------------
-#endif //HWC_VIRTUAL_DISPLAY_H

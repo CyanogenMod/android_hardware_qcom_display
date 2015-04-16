@@ -27,16 +27,17 @@
 #include <sys/prctl.h>
 #include <poll.h>
 #include "hwc_utils.h"
+#include "hdmi.h"
+#include "qd_utils.h"
 #include "string.h"
-#include "external.h"
 #include "overlay.h"
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+using namespace qdutils;
 namespace qhwc {
 
 #define HWC_VSYNC_THREAD_NAME "hwcVsyncThread"
-#define MAX_SYSFS_FILE_PATH             255
 #define PANEL_ON_STR "panel_power_on ="
 #define ARRAY_LENGTH(array) (sizeof((array))/sizeof((array)[0]))
 const int MAX_DATA = 64;
@@ -55,7 +56,8 @@ int hwc_vsync_control(hwc_context_t* ctx, int dpy, int enable)
     return ret;
 }
 
-static void handle_vsync_event(hwc_context_t* ctx, int dpy, char *data)
+static void handle_vsync_event(hwc_context_t* ctx, int dpy, char *data,
+        ssize_t len __unused)
 {
     // extract timestamp
     uint64_t timestamp = 0;
@@ -68,23 +70,35 @@ static void handle_vsync_event(hwc_context_t* ctx, int dpy, char *data)
     ctx->proc->vsync(ctx->proc, dpy, timestamp);
 }
 
-static void handle_blank_event(hwc_context_t* ctx, int dpy, char *data)
+static void handle_blank_event(hwc_context_t* ctx, int dpy, char *data,
+        ssize_t len __unused)
 {
     if (!strncmp(data, PANEL_ON_STR, strlen(PANEL_ON_STR))) {
         uint32_t poweron = strtoul(data + strlen(PANEL_ON_STR), NULL, 0);
         ALOGI("%s: dpy:%d panel power state: %d", __FUNCTION__, dpy, poweron);
-        ctx->dpyAttr[dpy].isActive = poweron ? true: false;
+        if (!ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+            ctx->dpyAttr[dpy].isActive = poweron ? true: false;
+        }
     }
+}
+
+static void handle_cec_event(hwc_context_t* ctx, int dpy, char *data,
+        ssize_t len)
+{
+    ALOGD_IF(logvsync, "%s: Got CEC event from driver dpy:%d",
+            __FUNCTION__, dpy);
+    ctx->mQService->onCECMessageReceived(data, len);
 }
 
 struct event {
     const char* name;
-    void (*callback)(hwc_context_t* ctx, int dpy, char *data);
+    void (*callback)(hwc_context_t* ctx, int dpy, char *data, ssize_t len);
 };
 
 struct event event_list[] =  {
     { "vsync_event", handle_vsync_event },
     { "show_blank_event", handle_blank_event },
+    { "cec/rd_msg", handle_cec_event },
 };
 
 #define num_events ARRAY_LENGTH(event_list)
@@ -165,7 +179,7 @@ static void *vsync_loop(void *param)
                                         __FUNCTION__, ev, dpy, strerror(errno));
                                 continue;
                             }
-                            event_list[ev].callback(ctx, dpy, vdata);
+                            event_list[ev].callback(ctx, dpy, vdata, len);
                         }
                     }
                 }
