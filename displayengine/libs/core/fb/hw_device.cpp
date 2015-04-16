@@ -314,9 +314,9 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
   return kErrorNone;
 }
 
-void HWDevice::DumpLayerCommit(mdp_layer_commit &layer_commit) {
-  mdp_layer_commit_v1 &mdp_commit = layer_commit.commit_v1;
-  mdp_input_layer *mdp_layers = mdp_commit.input_layers;
+void HWDevice::DumpLayerCommit(const mdp_layer_commit &layer_commit) {
+  const mdp_layer_commit_v1 &mdp_commit = layer_commit.commit_v1;
+  const mdp_input_layer *mdp_layers = mdp_commit.input_layers;
 
   DLOGE("mdp_commit: flags = %x, release fence = %x", mdp_commit.flags, mdp_commit.release_fence);
   DLOGE("left_roi: x = %d, y = %d, w = %d, h = %d", mdp_commit.left_roi.x, mdp_commit.left_roi.y,
@@ -326,10 +326,10 @@ void HWDevice::DumpLayerCommit(mdp_layer_commit &layer_commit) {
   for (uint32_t i = 0; i < mdp_commit.input_layer_cnt; i++) {
     DLOGE("mdp_commit: layer_cnt = %d, pipe_ndx = %x, zorder = %d, flags = %x",
           i, mdp_layers[i].pipe_ndx, mdp_layers[i].z_order, mdp_layers[i].flags);
-    mdp_rect &src_rect = mdp_layers[i].src_rect;
+    const mdp_rect &src_rect = mdp_layers[i].src_rect;
     DLOGE("src rect: x = %d, y = %d, w = %d, h = %d",
           src_rect.x, src_rect.y, src_rect.w, src_rect.h);
-    mdp_rect &dst_rect = mdp_layers[i].dst_rect;
+    const mdp_rect &dst_rect = mdp_layers[i].dst_rect;
     DLOGE("dst rect: x = %d, y = %d, w = %d, h = %d",
           dst_rect.x, dst_rect.y, dst_rect.w, dst_rect.h);
   }

@@ -186,7 +186,7 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
     return kErrorNotSupported;
   }
 
-  switch(mode) {
+  switch (mode) {
   case kModeVideo:
     hw_display_mode = kModeVideo;
     break;

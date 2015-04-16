@@ -44,7 +44,7 @@ DisplayError DumpInterface::GetDump(char *buffer, uint32_t length) {
   for (uint32_t i = 0; i < DumpImpl::dump_count_; i++) {
     DumpImpl::dump_list_[i]->AppendDump(buffer, length);
   }
-  DumpImpl::AppendString(buffer, length, "\n-------------------------------------------\n");
+  DumpImpl::AppendString(buffer, length, "\n\n");
 
   return kErrorNone;
 }

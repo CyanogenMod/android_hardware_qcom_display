@@ -60,15 +60,14 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
   virtual DisplayError SetDisplayMode(uint32_t mode);
 
- private:
-  bool IsRotationRequired(HWLayers *hw_layers);
-
  protected:
   // DumpImpl method
   void AppendDump(char *buffer, uint32_t length);
-  void AppendRect(char *buffer, uint32_t length, const char *rect_name, LayerRect *rect);
 
   virtual int GetBestConfig();
+  bool IsRotationRequired(HWLayers *hw_layers);
+  const char * GetName(const LayerComposition &composition);
+  const char * GetName(const LayerBufferFormat &format);
 
   DisplayType display_type_;
   DisplayEventHandler *event_handler_;

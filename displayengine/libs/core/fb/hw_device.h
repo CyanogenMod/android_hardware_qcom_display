@@ -71,7 +71,7 @@ class HWDevice {
   static const int kNumPhysicalDisplays = 2;
   static const int kNumDisplayEvents = 3;
 
-  void DumpLayerCommit(mdp_layer_commit &layer_commit);
+  void DumpLayerCommit(const mdp_layer_commit &layer_commit);
   DisplayError SetFormat(const LayerBufferFormat &source, uint32_t *target);
   DisplayError SetStride(HWDeviceType device_type, LayerBufferFormat format,
                          uint32_t width, uint32_t *target);

@@ -92,15 +92,22 @@ struct LayerTransform {
   @sa LayerBuffer
 */
 struct LayerFlags {
-  uint64_t skip : 1;      //!< This flag shall be set by client to indicate that this layer will be
-                          //!< handled by GPU. Display Device will not consider it for composition.
+  union {
+    struct {
+      uint32_t skip : 1;      //!< This flag shall be set by client to indicate that this layer
+                              //!< will be handled by GPU. Display Device will not consider it
+                              //!< for composition.
 
-  uint64_t updating : 1;  //!< This flag shall be set by client to indicate that this is updating/
-                          //!< non-updating. so strategy manager will mark them for SDE/GPU
-                          //!< composition respectively when the layer stack qualifies for cache
-                          //!< based composition.
+      uint32_t updating : 1;  //!< This flag shall be set by client to indicate that this is
+                              //!< updating non-updating. so strategy manager will mark them for
+                              //!< SDE/GPU composition respectively when the layer stack qualifies
+                              //!< for cache based composition.
+    };
 
-  LayerFlags() : skip(0), updating(0) { }
+    uint32_t flags;   //!< For initialization purpose only. Client shall not refer it directly.
+  };
+
+  LayerFlags() : flags(0) { }
 };
 
 /*! @brief This structure defines flags associated with a layer stack. The 1-bit flag can be set to
@@ -109,24 +116,29 @@ struct LayerFlags {
   @sa LayerBuffer
 */
 struct LayerStackFlags {
-  uint64_t geometry_changed : 1;  //!< This flag shall be set by client to indicate that the layer
-                                  //!< set passed to Prepare() has changed by more than just the
-                                  //!< buffer handles and acquire fences.
+  union {
+    struct {
+      uint32_t geometry_changed : 1;  //!< This flag shall be set by client to indicate that the
+                                      //!< layer set passed to Prepare() has changed by more than
+                                      //!< just the buffer handles and acquire fences.
 
-  uint64_t skip_present : 1;      //!< This flag will be set to true, if the current layer stack
-                                  //!< contains skip layers.
+      uint32_t skip_present : 1;      //!< This flag will be set to true, if the current layer
+                                      //!< stack contains skip layers.
 
-  uint64_t video_present : 1;     //!< This flag will be set to true, if current layer stack
-                                  //!< contains video.
+      uint32_t video_present : 1;     //!< This flag will be set to true, if current layer stack
+                                      //!< contains video.
 
-  uint64_t secure_present : 1;    //!< This flag will be set to true, if the current layer stack
-                                  //!< contains secure layers.
+      uint32_t secure_present : 1;    //!< This flag will be set to true, if the current layer
+                                      //!< stack contains secure layers.
 
-  uint64_t animating : 1;         //!< This flag shall be set by client to indicate that the current
-                                  //!< frame is animating.
+      uint32_t animating : 1;         //!< This flag shall be set by client to indicate that the
+                                      //!<  current frame is animating.
+      };
 
-  LayerStackFlags()
-    : geometry_changed(0), skip_present(0), video_present(0), secure_present(0), animating(0) { }
+      uint32_t flags;   //!< For initialization purpose only. Client shall not refer it directly.
+  };
+
+  LayerStackFlags() : flags(0) { }
 };
 
 /*! @brief This structure defines a rectanglular area inside a display layer.
