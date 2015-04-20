@@ -144,8 +144,14 @@ struct LayerBufferFlags {
                             //!< video/ui buffer
   uint64_t macro_tile : 1;  //!< This flag shall be set by client to indicate that the buffer format
                             //!< is macro tiled.
+  uint64_t interlace : 1;   //!< This flag shall be set by the client to indicate that the buffer
+                            //!< has interlaced content.
+  uint64_t secure_display : 1;
+                            //!< This flag shall be set by the client to indicate that the secure
+                            //!< display session is in progress. Secure display session cannot
+                            //!< coexist with non-secure session.
 
-  LayerBufferFlags() : secure(0), video(0), macro_tile(0) { }
+  LayerBufferFlags() : secure(0), video(0), macro_tile(0), interlace(0), secure_display(0) { }
 };
 
 /*! @brief This structure defines a layer buffer handle which contains raw buffer and its associated

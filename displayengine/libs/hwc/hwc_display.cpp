@@ -350,6 +350,14 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       if (meta_data && meta_data->operation & UPDATE_REFRESH_RATE) {
         layer.frame_rate = meta_data->refreshrate;
       }
+
+      if (meta_data && meta_data->operation == PP_PARAM_INTERLACED && meta_data->interlaced) {
+        layer_buffer->flags.interlace = true;
+      }
+
+      if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_DISPLAY) {
+        layer_buffer->flags.secure_display = true;
+      }
     }
 
     SetRect(hwc_layer.displayFrame, &layer.dst_rect);

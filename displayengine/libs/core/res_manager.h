@@ -174,7 +174,7 @@ class ResManager : public DumpImpl {
                     float *right_cut_ratio, float *bottom_cut_ratio);
   bool CalculateCropRects(const LayerRect &scissor, const LayerTransform &transform,
                           LayerRect *crop, LayerRect *dst);
-  bool IsValidDimension(const LayerRect &src, const LayerRect &dst);
+  bool IsValidDimension(const Layer &layer);
   bool CheckBandwidth(DisplayResourceContext *display_ctx, HWLayers *hw_layers);
   float GetPipeBw(DisplayResourceContext *display_ctx, HWPipeInfo *pipe, float bpp);
   float GetClockForPipe(DisplayResourceContext *display_ctx, HWPipeInfo *pipe);
