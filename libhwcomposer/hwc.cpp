@@ -284,8 +284,9 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
 
     if (!ctx->mBootAnimCompleted)
         processBootAnimCompleted(ctx);
-    if (LIKELY(list && list->numHwLayers > 1) && ctx->dpyAttr[dpy].connected &&
-            (ctx->dpyAttr[dpy].isActive ||
+    if (LIKELY(list && (list->numHwLayers > 1 ||
+                    ctx->mMDP.version < qdutils::MDP_V4_0)) &&
+        ctx->dpyAttr[dpy].connected && (ctx->dpyAttr[dpy].isActive ||
              ctx->mHDMIDisplay->isHDMIPrimaryDisplay())
             && !ctx->dpyAttr[dpy].isPause) {
 
