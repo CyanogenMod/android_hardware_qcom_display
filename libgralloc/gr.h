@@ -148,6 +148,8 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
     ADRENOPIXELFORMAT getGpuPixelFormat(int hal_format);
 
     private:
+        // Overriding flag to disable UBWC alloc for graphics stack
+        int  gfx_ubwc_disable;
         // Pointer to the padding library.
         void *libadreno_utils;
 
