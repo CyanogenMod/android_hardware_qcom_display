@@ -513,6 +513,7 @@ DisplayError HWDevice::SetFormat(const LayerBufferFormat &source, uint32_t *targ
   case kFormatYCbCr422H2V1Packed:       *target = MDP_YCBYCR_H2V1;       break;
   case kFormatYCbCr420SemiPlanarVenus:  *target = MDP_Y_CBCR_H2V2_VENUS; break;
   case kFormatRGBA8888Ubwc:             *target = MDP_RGBA_8888_UBWC;    break;
+  case kFormatRGBX8888Ubwc:             *target = MDP_RGBX_8888_UBWC;    break;
   case kFormatRGB565Ubwc:               *target = MDP_RGB_565_UBWC;      break;
   case kFormatYCbCr420SPVenusUbwc:      *target = MDP_Y_CBCR_H2V2_UBWC;  break;
   default:
@@ -538,6 +539,8 @@ DisplayError HWDevice::SetStride(HWDeviceType device_type, LayerBufferFormat for
   case kFormatBGRA8888:
   case kFormatRGBX8888:
   case kFormatBGRX8888:
+  case kFormatRGBA8888Ubwc:
+  case kFormatRGBX8888Ubwc:
     *target = width * 4;
     break;
   case kFormatRGB888:
@@ -545,7 +548,8 @@ DisplayError HWDevice::SetStride(HWDeviceType device_type, LayerBufferFormat for
     *target = width * 3;
     break;
   case kFormatRGB565:
-    *target = width * 3;
+  case kFormatRGB565Ubwc:
+    *target = width * 2;
     break;
   case kFormatYCbCr420SemiPlanarVenus:
   case kFormatYCbCr420SPVenusUbwc:

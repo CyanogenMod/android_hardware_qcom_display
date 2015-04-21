@@ -296,6 +296,8 @@ ADRENOPIXELFORMAT AdrenoMemInfo::getGpuPixelFormat(int hal_format)
     switch (hal_format) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
             return ADRENO_PIXELFORMAT_R8G8B8A8;
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+            return ADRENO_PIXELFORMAT_R8G8B8X8;
         case HAL_PIXEL_FORMAT_RGB_565:
             return ADRENO_PIXELFORMAT_B5G6R5;
         case HAL_PIXEL_FORMAT_sRGB_A_8888:
@@ -787,6 +789,7 @@ static bool isUBwcSupported(int format)
     {
         case HAL_PIXEL_FORMAT_RGB_565:
         case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_sRGB_A_8888:
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
@@ -893,6 +896,7 @@ static unsigned int getUBwcSize(int width, int height, int format,
             size += getUBwcMetaBufferSize(width, height, 2);
             break;
         case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_sRGB_A_8888:
             size = alignedw * alignedh * 4;
             size += getUBwcMetaBufferSize(width, height, 4);

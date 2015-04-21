@@ -54,6 +54,9 @@ enum LayerBufferFormat {
   kFormatRGB888,        //!< 8-bits Red, Green, Blue interleaved in RGB order. No Alpha.
   kFormatBGR888,        //!< 8-bits Blue, Green, Red interleaved in BGR order. No Alpha.
   kFormatRGB565,        //!< 5-bit Red, 6-bit Green, 5-bit Blue interleaved in RGB order. No Alpha.
+  kFormatRGBA8888Ubwc,  //!< UBWC aligned RGBA8888 format
+  kFormatRGBX8888Ubwc,  //!< UBWC aligned RGBX8888 format
+  kFormatRGB565Ubwc,    //!< UBWC aligned RGB565 format
 
   /* All YUV-Planar formats, Any new format will be added towards end of this group to maintain
      backward compatibility.
@@ -99,6 +102,8 @@ enum LayerBufferFormat {
                                       //!< horizontally subsampled interleaved VU-plane:
                                       //!<    v(0), u(1), v(2), u(3) ... v(n-1), u(n)
 
+  kFormatYCbCr420SPVenusUbwc,         //!< UBWC aligned YCbCr420SemiPlanarVenus format
+
   /* All YUV-Packed formats, Any new format will be added towards end of this group to maintain
      backward compatibility.
   */
@@ -106,15 +111,6 @@ enum LayerBufferFormat {
                                       //!< factor of 2
                                       //!<    y(0), u(0), y(1), v(0), y(2), u(2), y(3), v(2)
                                       //!<    y(n-1), u(n-1), y(n), v(n-1)
-
-  /* All UBWC aligned formats. Any new format will be added towards end of this group to maintain
-     backward compatibility.
-  */
-  kFormatRGBA8888Ubwc = 0x400,        //!< UBWC aligned RGBA8888 format
-
-  kFormatRGB565Ubwc,                  //!< UBWC aligned RGB565 format
-
-  kFormatYCbCr420SPVenusUbwc,         //!< UBWC aligned Venus NV12 format
 
   kFormatInvalid = 0xFFFFFFFF,
 };

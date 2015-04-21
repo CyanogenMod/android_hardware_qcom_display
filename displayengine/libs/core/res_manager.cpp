@@ -1043,9 +1043,17 @@ void ResManager::SetRotatorOutputFormat(const LayerBufferFormat &input_format,
     break;
   }
 
-  // TODO(user): UBWC RGB formats will be handled separately
   if (downscale) {
     switch (input_format) {
+    case kFormatRGBA8888Ubwc:
+      *output_format = is_opaque ? kFormatRGB888 : kFormatRGBA8888;
+      break;
+    case kFormatRGBX8888Ubwc:
+      *output_format = kFormatRGB888;
+      break;
+    case kFormatRGB565Ubwc:
+      *output_format = kFormatRGB565;
+      break;
     case kFormatYCbCr420SPVenusUbwc:
       *output_format = kFormatYCbCr420SemiPlanar;
       break;
@@ -1055,6 +1063,15 @@ void ResManager::SetRotatorOutputFormat(const LayerBufferFormat &input_format,
   } else {
     if (hw_res_info_.has_ubwc) {
       switch (input_format) {
+      case kFormatRGBA8888:
+        *output_format = kFormatRGBA8888Ubwc;
+        break;
+      case kFormatRGBX8888:
+        *output_format = kFormatRGBX8888Ubwc;
+        break;
+      case kFormatRGB565:
+        *output_format = kFormatRGB565Ubwc;
+        break;
       case kFormatYCrCb420SemiPlanar:
       case kFormatYCbCr420SemiPlanar:
       case kFormatYCbCr420SemiPlanarVenus:

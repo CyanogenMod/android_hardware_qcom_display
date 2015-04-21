@@ -633,6 +633,7 @@ LayerBufferFormat HWCDisplay::GetSDEFormat(const int32_t &source, const int flag
   if (flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED) {
     switch (source) {
     case HAL_PIXEL_FORMAT_RGBA_8888:          format = kFormatRGBA8888Ubwc;            break;
+    case HAL_PIXEL_FORMAT_RGBX_8888:          format = kFormatRGBX8888Ubwc;            break;
     case HAL_PIXEL_FORMAT_RGB_565:            format = kFormatRGB565Ubwc;              break;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
@@ -763,6 +764,8 @@ const char *HWCDisplay::GetHALPixelFormatString(int format) {
     return "INTERLACE";
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
     return "YCbCr_420_SP_VENUS";
+  case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
+    return "YCbCr_420_SP_VENUS_UBWC";
   default:
     return "Unknown pixel format";
   }

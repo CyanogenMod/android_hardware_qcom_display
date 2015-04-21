@@ -91,6 +91,7 @@ static uint32_t GetScalarFormat(LayerBufferFormat source) {
   case kFormatYCbCr422H2V1Packed:       format = scalar::YCBYCR_H2V1;       break;
   case kFormatYCbCr420SemiPlanarVenus:  format = scalar::Y_CBCR_H2V2_VENUS; break;
   case kFormatRGBA8888Ubwc:             format = scalar::RGBA_8888_UBWC;    break;
+  case kFormatRGBX8888Ubwc:             format = scalar::RGBX_8888_UBWC;    break;
   case kFormatRGB565Ubwc:               format = scalar::RGB_565_UBWC;      break;
   case kFormatYCbCr420SPVenusUbwc:      format = scalar::Y_CBCR_H2V2_UBWC;  break;
   default:
