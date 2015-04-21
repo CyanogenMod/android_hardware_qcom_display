@@ -174,11 +174,20 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
     //dirty rect for same layer at least equal of number of
     //framebuffers
 
-    if ( updatingLayerCount ==  1 ) {
-       hwc_rect_t dirtyRect = list->hwLayers[changingLayerIndex].displayFrame;
+    if ( updatingLayerCount <=  1 ) {
+        hwc_rect_t dirtyRect;
+        if (updatingLayerCount == 0) {
+            dirtyRect.left = INVALID_DIMENSION;
+            dirtyRect.top = INVALID_DIMENSION;
+            dirtyRect.right = INVALID_DIMENSION;
+            dirtyRect.bottom = INVALID_DIMENSION;
+            changingLayerIndex = NO_UPDATING_LAYER;
+        } else {
+            dirtyRect = list->hwLayers[changingLayerIndex].displayFrame;
 #ifdef QCOM_BSP
-       dirtyRect = list->hwLayers[changingLayerIndex].dirtyRect;
+            dirtyRect = list->hwLayers[changingLayerIndex].dirtyRect;
 #endif
+        }
 
        for (int k = ctx->listStats[dpy].numAppLayers-1; k >= 0 ; k--) {
            //disable swap rect in case of scaling and video .
@@ -553,11 +562,13 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     mDirtyLayerIndex =  checkDirtyRect(ctx, list, dpy);
     ALOGD_IF (DEBUG_COPYBIT, "%s:Dirty Layer Index: %d",
                                        __FUNCTION__, mDirtyLayerIndex);
+
     hwc_rect_t clearRegion = {0,0,0,0};
     mDirtyRect = list->hwLayers[last].displayFrame;
 
-    if (CBUtils::getuiClearRegion(list, clearRegion, layerProp,
-                                                       mDirtyLayerIndex)) {
+    if (mDirtyLayerIndex != NO_UPDATING_LAYER &&
+            CBUtils::getuiClearRegion(list, clearRegion, layerProp,
+                                                    mDirtyLayerIndex)) {
        int clear_w =  clearRegion.right -  clearRegion.left;
        int clear_h =  clearRegion.bottom - clearRegion.top;
        //mdp can't handle solid fill for one line
@@ -569,8 +580,13 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
        }else
            clear(renderBuffer, clearRegion);
     }
-    if (mDirtyLayerIndex != -1)
-           mDirtyRect = list->hwLayers[mDirtyLayerIndex].displayFrame;
+    if (mDirtyLayerIndex != -1) {
+        if (mDirtyLayerIndex == NO_UPDATING_LAYER) {
+            mDirtyRect = clearRegion;
+        } else {
+            mDirtyRect = list->hwLayers[mDirtyLayerIndex].displayFrame;
+        }
+    }
 
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
     for (int i = 0; i <= (ctx->listStats[dpy].numAppLayers-1); i++) {
