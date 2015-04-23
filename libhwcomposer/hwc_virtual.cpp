@@ -79,6 +79,7 @@ void HWCVirtualVDS::destroy(hwc_context_t *ctx, size_t numDisplays,
         displays[dpy] == NULL)) {
         ctx->dpyAttr[dpy].connected = false;
         ctx->dpyAttr[dpy].isPause = false;
+        ctx->dpyAttr[dpy].isActive = false;
 
         destroyCompositionResources(ctx, dpy);
 
@@ -113,6 +114,7 @@ int HWCVirtualVDS::prepare(hwc_composer_device_1 *dev,
         if(ctx->dpyAttr[dpy].connected == false) {
             ctx->dpyAttr[dpy].connected = true;
             ctx->dpyAttr[dpy].isPause = false;
+            ctx->dpyAttr[dpy].isActive = true;
             // We set the vsync period to the primary refresh rate, leaving
             // it up to the consumer to decide how fast to consume frames.
             ctx->dpyAttr[dpy].vsync_period
