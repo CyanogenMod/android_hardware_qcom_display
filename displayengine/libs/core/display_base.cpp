@@ -41,7 +41,7 @@ DisplayBase::DisplayBase(DisplayType display_type, DisplayEventHandler *event_ha
     buffer_sync_handler_(buffer_sync_handler), comp_manager_(comp_manager),
     rotator_ctrl_(rotator_ctrl), state_(kStateOff), hw_device_(0), display_comp_ctx_(0),
     display_attributes_(NULL), num_modes_(0), active_mode_index_(0), pending_commit_(false),
-    vsync_enable_(false) {
+    vsync_enable_(false), underscan_supported_(false) {
 }
 
 DisplayError DisplayBase::Init() {
@@ -288,6 +288,10 @@ DisplayError DisplayBase::GetVSyncState(bool *enabled) {
   }
 
   return kErrorNone;
+}
+
+bool DisplayBase::IsUnderscanSupported() {
+  return underscan_supported_;
 }
 
 DisplayError DisplayBase::SetDisplayState(DisplayState state) {

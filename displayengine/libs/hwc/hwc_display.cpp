@@ -390,6 +390,7 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
     hwc_rect_t scaled_display_frame = hwc_layer.displayFrame;
     ScaleDisplayFrame(&scaled_display_frame);
+    ApplyScanAdjustment(&scaled_display_frame);
 
     SetRect(scaled_display_frame, &layer.dst_rect);
     SetRect(hwc_layer.sourceCropf, &layer.src_rect);
@@ -998,6 +999,9 @@ uint32_t HWCDisplay::RoundToStandardFPS(uint32_t fps) {
   }
 
   return fps;
+}
+
+void HWCDisplay::ApplyScanAdjustment(hwc_rect_t *display_frame) {
 }
 
 }  // namespace sde

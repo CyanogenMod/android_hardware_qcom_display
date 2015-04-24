@@ -29,7 +29,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <linux/msm_mdp_ext.h>
-#include <video/msm_hdmi_modes.h>
 #include <linux/mdss_rotator.h>
 #include <poll.h>
 #include <pthread.h>

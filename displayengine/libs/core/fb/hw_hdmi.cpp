@@ -105,7 +105,7 @@ DisplayError HWHDMIInterface::Destroy(HWHDMIInterface *intf) {
 }
 
 HWHDMI::HWHDMI(BufferSyncHandler *buffer_sync_handler,  HWInfoInterface *hw_info_intf)
-  : HWDevice(buffer_sync_handler) {
+  : HWDevice(buffer_sync_handler), hw_scan_info_() {
   HWDevice::device_type_ = kDeviceHDMI;
   HWDevice::device_name_ = "HDMI Display Device";
   HWDevice::hw_info_intf_ = hw_info_intf;
@@ -129,6 +129,7 @@ DisplayError HWHDMI::Init() {
   MSM_HDMI_MODES_INIT_TIMINGS(supported_video_modes_);
   MSM_HDMI_MODES_SET_SUPP_TIMINGS(supported_video_modes_, MSM_HDMI_MODES_ALL);
 
+  ReadScanInfo();
   return kErrorNone;
 
 CleanupOnError:
@@ -338,6 +339,81 @@ DisplayError HWHDMI::Flush() {
 
 DisplayError HWHDMI::GetHWPanelInfo(HWPanelInfo *panel_info) {
   return HWDevice::GetHWPanelInfo(panel_info);
+}
+
+DisplayError HWHDMI::GetHWScanInfo(HWScanInfo *scan_info) {
+  if (!scan_info) {
+    return kErrorParameters;
+  }
+  *scan_info = hw_scan_info_;
+  return kErrorNone;
+}
+
+DisplayError HWHDMI::GetVideoFormat(uint32_t config_index, uint32_t *video_format) {
+  *video_format = hdmi_modes_[config_index];
+
+  return kErrorNone;
+}
+
+DisplayError HWHDMI::GetMaxCEAFormat(uint32_t *max_cea_format) {
+  *max_cea_format = HDMI_VFRMT_END;
+
+  return kErrorNone;
+}
+
+HWScanSupport HWHDMI::MapHWScanSupport(uint32_t value) {
+  switch (value) {
+  // TODO(user): Read the scan type from driver defined values instead of hardcoding
+  case 0:
+    return kScanNotSupported;
+  case 1:
+    return kScanAlwaysOverscanned;
+  case 2:
+    return kScanAlwaysUnderscanned;
+  case 3:
+    return kScanBoth;
+  default:
+    return kScanNotSupported;
+    break;
+  }
+}
+
+void HWHDMI::ReadScanInfo() {
+  int scan_info_file = -1;
+  ssize_t len = -1;
+  char data[PAGE_SIZE] = {'\0'};
+
+  snprintf(data, sizeof(data), "%s%d/scan_info", fb_path_, fb_node_index_);
+  scan_info_file = open_(data, O_RDONLY);
+  if (scan_info_file < 0) {
+    DLOGW("File '%s' not found.", data);
+    return;
+  }
+
+  memset(&data[0], 0, sizeof(data));
+  len = read(scan_info_file, data, sizeof(data) - 1);
+  if (len <= 0) {
+    close_(scan_info_file);
+    DLOGW("File %s%d/scan_info is empty.", fb_path_, fb_node_index_);
+    return;
+  }
+  data[len] = '\0';
+  close_(scan_info_file);
+
+  const uint32_t scan_info_max_count = 3;
+  uint32_t scan_info_count = 0;
+  char *tokens[scan_info_max_count] = { NULL };
+  ParseLine(data, tokens, scan_info_max_count, &scan_info_count);
+  if (scan_info_count != scan_info_max_count) {
+    DLOGW("Failed to parse scan info string %s", data);
+    return;
+  }
+
+  hw_scan_info_.pt_scan_support = MapHWScanSupport(atoi(tokens[0]));
+  hw_scan_info_.it_scan_support = MapHWScanSupport(atoi(tokens[1]));
+  hw_scan_info_.cea_scan_support = MapHWScanSupport(atoi(tokens[2]));
+  DLOGI("PT %d IT %d CEA %d", hw_scan_info_.pt_scan_support, hw_scan_info_.it_scan_support,
+        hw_scan_info_.cea_scan_support);
 }
 
 }  // namespace sde

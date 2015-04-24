@@ -349,6 +349,12 @@ class DisplayInterface {
   */
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate) = 0;
 
+  /*! @brief Method to query whether scanning is support for the HDMI display.
+
+    @return \link DisplayError \endlink
+  */
+  virtual bool IsUnderscanSupported() = 0;
+
  protected:
   virtual ~DisplayInterface() { }
 };

@@ -25,6 +25,7 @@
 #ifndef __HW_HDMI_H__
 #define __HW_HDMI_H__
 
+#include <video/msm_hdmi_modes.h>
 #include "hw_device.h"
 #include "hw_hdmi_interface.h"
 
@@ -41,6 +42,9 @@ class HWHDMI : public HWDevice, public HWHDMIInterface {
   virtual DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
                                             uint32_t index);
   virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info);
+  virtual DisplayError GetHWScanInfo(HWScanInfo *scan_info);
+  virtual DisplayError GetVideoFormat(uint32_t config_index, uint32_t *video_format);
+  virtual DisplayError GetMaxCEAFormat(uint32_t *max_cea_format);
   virtual DisplayError SetDisplayAttributes(uint32_t index);
   virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
   virtual DisplayError PowerOn();
@@ -54,11 +58,14 @@ class HWHDMI : public HWDevice, public HWHDMIInterface {
 
  private:
   int GetHDMIModeCount();
+  void ReadScanInfo();
+  HWScanSupport MapHWScanSupport(uint32_t value);
 
   uint32_t hdmi_mode_count_;
   uint32_t hdmi_modes_[256];
   // Holds the hdmi timing information. Ex: resolution, fps etc.,
   msm_hdmi_mode_timing_info *supported_video_modes_;
+  HWScanInfo hw_scan_info_;
 };
 
 }  // namespace sde

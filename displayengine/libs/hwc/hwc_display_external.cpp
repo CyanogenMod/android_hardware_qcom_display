@@ -27,6 +27,7 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <cutils/properties.h>
 #include <utils/constants.h>
 
 #include "hwc_display_external.h"
@@ -38,6 +39,17 @@ namespace sde {
 
 HWCDisplayExternal::HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
   : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL) {
+}
+
+int HWCDisplayExternal::Init() {
+  int status = 0;
+
+  status = HWCDisplay::Init();
+  if (status != 0) {
+    return status;
+  }
+
+  return status;
 }
 
 int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
@@ -89,6 +101,40 @@ int HWCDisplayExternal::GetDisplayConfigs(uint32_t *configs, size_t *num_configs
   }
 
   return 0;
+}
+
+void HWCDisplayExternal::ApplyScanAdjustment(hwc_rect_t *display_frame) {
+  if (display_intf_->IsUnderscanSupported()) {
+    return;
+  }
+
+  // Read user defined width and height ratio
+  char property[PROPERTY_VALUE_MAX];
+  property_get("persist.sys.actionsafe.width", property, "0");
+  float width_ratio = FLOAT(atoi(property)) / 100.0f;
+  property_get("persist.sys.actionsafe.height", property, "0");
+  float height_ratio = FLOAT(atoi(property)) / 100.0f;
+
+  if (width_ratio == 0.0f ||  height_ratio == 0.0f) {
+    return;
+  }
+
+  uint32_t panel_width = 0;
+  uint32_t panel_height = 0;
+  GetPanelResolution(&panel_width, &panel_height);
+
+  if (panel_width == 0 || panel_height == 0) {
+    DLOGV("Invalid panel dimensions (%d, %d)", panel_width, panel_height);
+    return;
+  }
+
+  int x_offset = INT((FLOAT(panel_width) * width_ratio) / 2.0f);
+  int y_offset = INT((FLOAT(panel_height) * height_ratio) / 2.0f);
+
+  display_frame->left = display_frame->left + x_offset;
+  display_frame->top = display_frame->top + y_offset;
+  display_frame->right = display_frame->right - x_offset;
+  display_frame->bottom = display_frame->bottom - y_offset;
 }
 
 }  // namespace sde

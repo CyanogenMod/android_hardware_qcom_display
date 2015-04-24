@@ -58,6 +58,7 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
   virtual DisplayError SetDisplayMode(uint32_t mode);
   virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
+  virtual bool IsUnderscanSupported();
   virtual void AppendDump(char *buffer, uint32_t length);
 
   // Implement the HWEventHandlers

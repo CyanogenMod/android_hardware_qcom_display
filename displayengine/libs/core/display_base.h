@@ -59,6 +59,7 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
   virtual DisplayError SetDisplayMode(uint32_t mode);
   virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
+  virtual bool IsUnderscanSupported();
 
  protected:
   // DumpImpl method
@@ -87,6 +88,7 @@ class DisplayBase : public DisplayInterface {
   HWLayers hw_layers_;
   bool pending_commit_;
   bool vsync_enable_;
+  bool underscan_supported_;
 };
 
 }  // namespace sde
