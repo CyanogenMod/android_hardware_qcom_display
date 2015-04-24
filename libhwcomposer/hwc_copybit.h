@@ -28,6 +28,8 @@
 #define MAX_SCALE_FACTOR 16
 #define MIN_SCALE_FACTOR 0.0625
 #define MAX_LAYERS_FOR_ABC 2
+#define INVALID_DIMENSION -1
+#define NO_UPDATING_LAYER -2
 namespace qhwc {
 
 class CopyBit {
