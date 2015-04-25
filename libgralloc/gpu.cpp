@@ -308,6 +308,25 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
             grallocFormat = HAL_PIXEL_FORMAT_RGBA_8888;
     }
 
+    bool useFbMem = false;
+    char property[PROPERTY_VALUE_MAX];
+    char isUBWC[PROPERTY_VALUE_MAX];
+    if (usage & GRALLOC_USAGE_HW_FB) {
+        if ((property_get("debug.gralloc.map_fb_memory", property, NULL) > 0) &&
+            (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+            (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+            useFbMem = true;
+        } else {
+            if (property_get("debug.gralloc.enable_fb_ubwc", isUBWC, NULL) > 0){
+                if ((!strncmp(isUBWC, "1", PROPERTY_VALUE_MAX)) ||
+                    (!strncasecmp(isUBWC, "true", PROPERTY_VALUE_MAX))) {
+                    // Allocate UBWC aligned framebuffer
+                    usage |= GRALLOC_USAGE_PRIVATE_ALLOC_UBWC;
+                }
+            }
+        }
+    }
+
     getGrallocInformationFromFormat(grallocFormat, &bufferType);
     size = getBufferSizeAndDimensions(w, h, grallocFormat, usage, alignedw,
                    alignedh);
@@ -315,15 +334,6 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
     if ((unsigned int)size <= 0)
         return -EINVAL;
     size = (bufferSize >= size)? bufferSize : size;
-
-    bool useFbMem = false;
-    char property[PROPERTY_VALUE_MAX];
-    if((usage & GRALLOC_USAGE_HW_FB) &&
-       (property_get("debug.gralloc.map_fb_memory", property, NULL) > 0) &&
-       (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
-        (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
-        useFbMem = true;
-    }
 
     int err = 0;
     if(useFbMem) {
