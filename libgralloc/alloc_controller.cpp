@@ -108,6 +108,16 @@ AdrenoMemInfo::AdrenoMemInfo()
         *(void **)&LINK_adreno_isUBWCSupportedByGpu =
                 ::dlsym(libadreno_utils, "isUBWCSupportedByGpu");
     }
+
+    // Check if the overriding property debug.gralloc.gfx_ubwc_disable
+    // that disables UBWC allocations for the graphics stack is set
+    gfx_ubwc_disable = 0;
+    char property[PROPERTY_VALUE_MAX];
+    property_get("debug.gralloc.gfx_ubwc_disable", property, "0");
+    if(!(strncmp(property, "1", PROPERTY_VALUE_MAX)) ||
+       !(strncmp(property, "true", PROPERTY_VALUE_MAX))) {
+        gfx_ubwc_disable = 1;
+    }
 }
 
 AdrenoMemInfo::~AdrenoMemInfo()
@@ -282,7 +292,7 @@ void AdrenoMemInfo::getGpuAlignedWidthHeight(int width, int height, int format,
 
 int AdrenoMemInfo::isUBWCSupportedByGPU(int format)
 {
-    if (libadreno_utils) {
+    if (!gfx_ubwc_disable && libadreno_utils) {
         if (LINK_adreno_isUBWCSupportedByGpu) {
             ADRENOPIXELFORMAT gpu_format = getGpuPixelFormat(format);
             return LINK_adreno_isUBWCSupportedByGpu(gpu_format);
