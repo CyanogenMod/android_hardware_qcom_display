@@ -84,7 +84,7 @@ DisplayError RotatorCtrl::Deinit() {
 }
 
 DisplayError RotatorCtrl::RegisterDisplay(DisplayType type, Handle *display_ctx) {
-  DisplaRotatorContext *disp_rotator_ctx = new DisplaRotatorContext();
+  DisplayRotatorContext *disp_rotator_ctx = new DisplayRotatorContext();
   if (disp_rotator_ctx == NULL) {
     return kErrorMemory;
   }
@@ -96,7 +96,7 @@ DisplayError RotatorCtrl::RegisterDisplay(DisplayType type, Handle *display_ctx)
 }
 
 void RotatorCtrl::UnregisterDisplay(Handle display_ctx) {
-  DisplaRotatorContext *disp_rotator_ctx = reinterpret_cast<DisplaRotatorContext *>(display_ctx);
+  DisplayRotatorContext *disp_rotator_ctx = reinterpret_cast<DisplayRotatorContext *>(display_ctx);
 
   delete disp_rotator_ctx;
   disp_rotator_ctx = NULL;
@@ -106,9 +106,9 @@ void RotatorCtrl::UnregisterDisplay(Handle display_ctx) {
 DisplayError RotatorCtrl::Prepare(Handle display_ctx, HWLayers *hw_layers) {
   DisplayError error = kErrorNone;
 
-  DisplaRotatorContext *disp_rotator_ctx = reinterpret_cast<DisplaRotatorContext *>(display_ctx);
+  DisplayRotatorContext *disp_rotator_ctx = reinterpret_cast<DisplayRotatorContext *>(display_ctx);
 
-  error = PrepareSessions(hw_layers);
+  error = PrepareSessions(disp_rotator_ctx, hw_layers);
   if (error != kErrorNone) {
     DLOGE("Prepare rotator session failed for display %d", disp_rotator_ctx->display_type);
     return error;
@@ -126,9 +126,9 @@ DisplayError RotatorCtrl::Prepare(Handle display_ctx, HWLayers *hw_layers) {
 DisplayError RotatorCtrl::Commit(Handle display_ctx, HWLayers *hw_layers) {
   DisplayError error = kErrorNone;
 
-  DisplaRotatorContext *disp_rotator_ctx = reinterpret_cast<DisplaRotatorContext *>(display_ctx);
+  DisplayRotatorContext *disp_rotator_ctx = reinterpret_cast<DisplayRotatorContext *>(display_ctx);
 
-  error = GetOutputBuffers(hw_layers);
+  error = GetOutputBuffers(disp_rotator_ctx, hw_layers);
   if (error != kErrorNone) {
     return error;
   }
@@ -145,7 +145,8 @@ DisplayError RotatorCtrl::Commit(Handle display_ctx, HWLayers *hw_layers) {
 DisplayError RotatorCtrl::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   HWLayersInfo &hw_layer_info = hw_layers->info;
   DisplayError error = kErrorNone;
-  DisplaRotatorContext *disp_rotator_ctx = reinterpret_cast<DisplaRotatorContext *>(display_ctx);
+  DisplayRotatorContext *disp_rotator_ctx = reinterpret_cast<DisplayRotatorContext *>(display_ctx);
+  int client_id = INT(disp_rotator_ctx->display_type);
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
@@ -155,7 +156,7 @@ DisplayError RotatorCtrl::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
       continue;
     }
 
-    error = session_manager_->SetReleaseFd(hw_rotator_session);
+    error = session_manager_->SetReleaseFd(client_id, hw_rotator_session);
     if (error != kErrorNone) {
       DLOGE("Rotator Post commit failed for display %d", disp_rotator_ctx->display_type);
       return error;
@@ -165,11 +166,22 @@ DisplayError RotatorCtrl::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   return kErrorNone;
 }
 
-DisplayError RotatorCtrl::PrepareSessions(HWLayers *hw_layers) {
+DisplayError RotatorCtrl::Purge(Handle display_ctx, HWLayers *hw_layers) {
+  DisplayRotatorContext *disp_rotator_ctx = reinterpret_cast<DisplayRotatorContext *>(display_ctx);
+  int client_id = INT(disp_rotator_ctx->display_type);
+
+  session_manager_->Start(client_id);
+
+  return session_manager_->Stop(client_id);
+}
+
+DisplayError RotatorCtrl::PrepareSessions(DisplayRotatorContext *disp_rotator_ctx,
+                                          HWLayers *hw_layers) {
   HWLayersInfo &hw_layer_info = hw_layers->info;
   DisplayError error = kErrorNone;
+  int client_id = INT(disp_rotator_ctx->display_type);
 
-  session_manager_->Start();
+  session_manager_->Start(client_id);
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
@@ -197,20 +209,25 @@ DisplayError RotatorCtrl::PrepareSessions(HWLayers *hw_layers) {
     hw_session_config.secure = layer.input_buffer->flags.secure;
     hw_session_config.frame_rate = layer.frame_rate;
 
-    error = session_manager_->OpenSession(hw_rotator_session);
+    error = session_manager_->OpenSession(client_id, hw_rotator_session);
     if (error != kErrorNone) {
       return error;
     }
   }
 
-  session_manager_->Stop();
+  error = session_manager_->Stop(client_id);
+  if (error != kErrorNone) {
+    return error;
+  }
 
   return kErrorNone;
 }
 
-DisplayError RotatorCtrl::GetOutputBuffers(HWLayers *hw_layers) {
+DisplayError RotatorCtrl::GetOutputBuffers(DisplayRotatorContext *disp_rotator_ctx,
+                                           HWLayers *hw_layers) {
   HWLayersInfo &hw_layer_info = hw_layers->info;
   DisplayError error = kErrorNone;
+  int client_id = INT(disp_rotator_ctx->display_type);
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     Layer& layer = hw_layer_info.stack->layers[hw_layer_info.index[i]];
@@ -220,7 +237,7 @@ DisplayError RotatorCtrl::GetOutputBuffers(HWLayers *hw_layers) {
       continue;
     }
 
-    error = session_manager_->GetNextBuffer(hw_rotator_session);
+    error = session_manager_->GetNextBuffer(client_id, hw_rotator_session);
     if (error != kErrorNone) {
       return error;
     }

@@ -47,6 +47,7 @@ class RotatorCtrl {
   DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError Commit(Handle display_ctx, HWLayers *hw_layers);
   DisplayError PostCommit(Handle display_ctx, HWLayers *hw_layers);
+  DisplayError Purge(Handle display_ctx, HWLayers *hw_layers);
 
  private:
   enum {
@@ -55,14 +56,14 @@ class RotatorCtrl {
     kTripleBuffering = 3,
   };
 
-  struct DisplaRotatorContext {
+  struct DisplayRotatorContext {
     DisplayType display_type;
 
-    DisplaRotatorContext() : display_type(kPrimary) { }
+    DisplayRotatorContext() : display_type(kPrimary) { }
   };
 
-  DisplayError PrepareSessions(HWLayers *hw_layers);
-  DisplayError GetOutputBuffers(HWLayers *hw_layers);
+  DisplayError PrepareSessions(DisplayRotatorContext *disp_rotator_ctx, HWLayers *hw_layers);
+  DisplayError GetOutputBuffers(DisplayRotatorContext *disp_rotator_ctx, HWLayers *hw_layers);
 
   HWRotatorInterface *hw_rotator_intf_;
   SessionManager *session_manager_;
