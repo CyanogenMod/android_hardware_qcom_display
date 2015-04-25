@@ -47,7 +47,8 @@ HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, 
   : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL),
     flush_(false), dump_frame_count_(0), dump_frame_index_(0),
     dump_input_layers_(false), swap_interval_zero_(false), framebuffer_config_(NULL),
-    display_paused_(false), use_metadata_refresh_rate_(false), metadata_refresh_rate_(0) {
+    display_paused_(false), use_metadata_refresh_rate_(false), metadata_refresh_rate_(0),
+    boot_animation_completed_(false) {
 }
 
 int HWCDisplay::Init() {
@@ -1075,6 +1076,18 @@ DisplayError HWCDisplay::SetMetaData(const MetaData_t &meta_data, Layer *layer) 
   }
 
   return kErrorNone;
+}
+
+int HWCDisplay::ColorSVCRequestRoute(PPDisplayAPIPayload &in_payload,
+                               PPDisplayAPIPayload *out_payload, PPPendingParams *pending_action) {
+  int ret = 0;
+
+  if (display_intf_)
+    ret = display_intf_->ColorSVCRequestRoute(in_payload, out_payload, pending_action);
+  else
+    ret = -EINVAL;
+
+  return ret;
 }
 
 }  // namespace sdm

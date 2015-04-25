@@ -18,7 +18,9 @@ ifeq ($(call is-board-platform-in-list, $(MASTER_SIDE_CP_TARGET_LIST)), true)
 endif
 
 LOCAL_SHARED_LIBRARIES        := libsdmcore libqservice libbinder libhardware libhardware_legacy \
-                                 libutils libcutils libsync libmemalloc libqdutils
+                                 libutils libcutils libsync libmemalloc libqdutils libdl \
+                                 libpowermanager
+
 LOCAL_SRC_FILES               := hwc_session.cpp \
                                  hwc_display.cpp \
                                  hwc_display_primary.cpp \
@@ -26,6 +28,7 @@ LOCAL_SRC_FILES               := hwc_session.cpp \
                                  hwc_display_virtual.cpp \
                                  hwc_debugger.cpp \
                                  hwc_buffer_allocator.cpp \
-                                 hwc_buffer_sync_handler.cpp
+                                 hwc_buffer_sync_handler.cpp \
+                                 hwc_color_manager.cpp
 
 include $(BUILD_SHARED_LIBRARY)

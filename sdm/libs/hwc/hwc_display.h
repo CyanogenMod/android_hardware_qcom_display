@@ -28,6 +28,7 @@
 #include <hardware/hwcomposer.h>
 #include <core/core_interface.h>
 #include <qdMetaData.h>
+#include <private/color_params.h>
 
 namespace sdm {
 
@@ -53,6 +54,9 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int SetDisplayStatus(uint32_t display_status);
   virtual int Perform(uint32_t operation, ...);
   virtual ~HWCDisplay() { }
+
+  int ColorSVCRequestRoute(PPDisplayAPIPayload &in_payload, PPDisplayAPIPayload *out_payload,
+                           PPPendingParams *pending_action);
 
  protected:
   enum DisplayStatus {
@@ -140,6 +144,7 @@ class HWCDisplay : public DisplayEventHandler {
   bool display_paused_;
   bool use_metadata_refresh_rate_;
   uint32_t metadata_refresh_rate_;
+  bool boot_animation_completed_;
 
  private:
   bool IsFrameBufferScaled();

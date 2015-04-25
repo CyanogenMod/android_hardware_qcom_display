@@ -29,6 +29,7 @@
 
 #include <core/dump_interface.h>
 #include <core/buffer_allocator.h>
+#include <private/color_params.h>
 #include <utils/constants.h>
 #include <utils/String16.h>
 #include <cutils/properties.h>
@@ -137,6 +138,12 @@ int HWCSession::Init() {
     return status;
   }
 
+  // Create HWC ColorManager to host Android/HWC specific behavior.
+  color_mgr_ = HWCColorManager::CreateColorManager();
+  if (!color_mgr_) {
+    DLOGW("Failed to load HWCColorManager.");
+  }
+
   if (pthread_create(&uevent_thread_, NULL, &HWCUeventThread, this) < 0) {
     DLOGE("Failed to start = %s, error = %s", uevent_thread_name_);
     HWCDisplayPrimary::Destroy(hwc_display_[HWC_DISPLAY_PRIMARY]);
@@ -151,6 +158,9 @@ int HWCSession::Init() {
 int HWCSession::Deinit() {
   HWCDisplayPrimary::Destroy(hwc_display_[HWC_DISPLAY_PRIMARY]);
   hwc_display_[HWC_DISPLAY_PRIMARY] = 0;
+  if (color_mgr_) {
+    color_mgr_->DestroyColorManager();
+  }
   uevent_thread_exit_ = true;
   pthread_join(uevent_thread_, NULL);
 
@@ -431,7 +441,7 @@ int HWCSession::HandleVirtualDisplayLifeCycle(hwc_display_contents_1_t *content_
 }
 
 android::status_t HWCSession::notifyCallback(uint32_t command, const android::Parcel *input_parcel,
-                                             android::Parcel */*output_parcel*/) {
+                                             android::Parcel *output_parcel) {
   SEQUENCE_WAIT_SCOPE_LOCK(locker_);
 
   android::status_t status = 0;
@@ -472,6 +482,10 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     break;
 
   case qService::IQService::SET_VIEW_FRAME:
+    break;
+
+  case qService::IQService::QDCM_SVC_CMDS:
+    status = QdcmCMDHandler(*input_parcel, output_parcel);
     break;
 
   default:
@@ -615,6 +629,60 @@ void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {
   default:
     DLOGW("type = %d is not supported", type);
   }
+}
+
+android::status_t HWCSession::QdcmCMDHandler(const android::Parcel &in, android::Parcel *out) {
+  int ret = 0;
+  uint32_t display_id(0);
+  PPPendingParams pending_action;
+  PPDisplayAPIPayload resp_payload, req_payload;
+
+  // Read display_id, payload_size and payload from in_parcel.
+  ret = HWCColorManager::CreatePayloadFromParcel(in, &display_id, &req_payload);
+  if (!ret) {
+    if (HWC_DISPLAY_PRIMARY == display_id && hwc_display_[HWC_DISPLAY_PRIMARY])
+      ret = hwc_display_[HWC_DISPLAY_PRIMARY]->ColorSVCRequestRoute(req_payload,
+                                                                  &resp_payload, &pending_action);
+
+    if (HWC_DISPLAY_EXTERNAL == display_id && hwc_display_[HWC_DISPLAY_EXTERNAL])
+      ret = hwc_display_[HWC_DISPLAY_EXTERNAL]->ColorSVCRequestRoute(req_payload, &resp_payload,
+                                                                  &pending_action);
+  }
+
+  if (ret) {
+    out->writeInt32(ret);  // first field in out parcel indicates return code.
+    req_payload.DestroyPayload();
+    resp_payload.DestroyPayload();
+    return ret;
+  }
+
+  switch (pending_action.action) {
+    case kInvalidating:
+      hwc_procs_->invalidate(hwc_procs_);
+      break;
+    case kEnterQDCMMode:
+      ret = color_mgr_->EnableQDCMMode(true);
+      break;
+    case kExitQDCMMode:
+      ret = color_mgr_->EnableQDCMMode(false);
+      break;
+    case kApplySolidFill:
+    case kDisableSolidFill:
+      break;
+    case kNoAction:
+      break;
+    default:
+      DLOGW("Invalid pending action = %d!", pending_action.action);
+      break;
+  }
+
+  // for display API getter case, marshall returned params into out_parcel.
+  out->writeInt32(ret);
+  HWCColorManager::MarshallStructIntoParcel(resp_payload, *out);
+  req_payload.DestroyPayload();
+  resp_payload.DestroyPayload();
+
+  return (ret? -EINVAL : 0);
 }
 
 void* HWCSession::HWCUeventThread(void *context) {
