@@ -123,6 +123,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->max_bandwidth_high = atol(tokens[1]);
       } else if (!strncmp(tokens[0], "max_mixer_width", strlen("max_mixer_width"))) {
         hw_resource->max_mixer_width = atoi(tokens[1]);
+      } else if (!strncmp(tokens[0], "max_pipe_width", strlen("max_pipe_width"))) {
+        hw_resource->max_pipe_width = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "max_pipe_bw", strlen("max_pipe_bw"))) {
         hw_resource->max_pipe_bw = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "max_mdp_clk", strlen("max_mdp_clk"))) {

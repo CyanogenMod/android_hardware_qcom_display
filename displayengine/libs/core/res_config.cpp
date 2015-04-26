@@ -122,7 +122,7 @@ DisplayError ResManager::SrcSplitConfig(DisplayResourceContext *display_resource
   // For perf/power optimization, even if "always_src_split" is enabled, use 2 pipes only if:
   // 1. Source width is greater than split_left (left_mixer_width)
   // 2. Pipe clock exceeds the mixer clock
-  if ((src_width > kMaxSourcePipeWidth) || (dst_width > kMaxSourcePipeWidth) ||
+  if ((src_width > hw_res_info_.max_pipe_width) || (dst_width > hw_res_info_.max_pipe_width) ||
       (display_resource_ctx->display_attributes.always_src_split &&
       ((src_width > left_mixer_width) || (pipe_clock > mixer_clock)))) {
     SplitRect(transform.flip_horizontal, src_rect, dst_rect, &left_pipe->src_roi,
@@ -169,7 +169,7 @@ DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_reso
     crop_right_valid = CalculateCropRects(scissor, transform, &crop_right, &dst_right);
   }
 
-  if (crop_left_valid && (crop_left.right - crop_left.left) > kMaxSourcePipeWidth) {
+  if (crop_left_valid && (crop_left.right - crop_left.left) > hw_res_info_.max_pipe_width) {
     if (crop_right_valid) {
       DLOGV_IF(kTagResources, "Need more than 2 pipes: left width = %.0f, right width = %.0f",
                crop_left.right - crop_left.left, crop_right.right - crop_right.left);
@@ -181,7 +181,8 @@ DisplayError ResManager::DisplaySplitConfig(DisplayResourceContext *display_reso
     left_pipe->valid = true;
     right_pipe->valid = true;
     crop_right_valid = true;
-  } else if (crop_right_valid && (crop_right.right - crop_right.left) > kMaxSourcePipeWidth) {
+  } else if (crop_right_valid &&
+             (crop_right.right - crop_right.left) > hw_res_info_.max_pipe_width) {
     if (crop_left_valid) {
       DLOGV_IF(kTagResources, "Need more than 2 pipes: left width = %.0f, right width = %.0f",
                crop_left.right - crop_left.left, crop_right.right - crop_right.left);
