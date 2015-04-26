@@ -250,15 +250,16 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     const int dpy = HWC_DISPLAY_PRIMARY;
     bool fbComp = false;
-
+    static int compStart = false;
     if (!ctx->mBootAnimCompleted)
         processBootAnimCompleted(ctx);
 
     if (LIKELY(list && (list->numHwLayers > 1 ||
-                    ctx->mMDP.version < qdutils::MDP_V4_0)) &&
+                    (ctx->mMDP.version < qdutils::MDP_V4_0 && compStart))) &&
             (ctx->dpyAttr[dpy].isActive ||
              ctx->mHDMIDisplay->isHDMIPrimaryDisplay())
             && !ctx->dpyAttr[dpy].isPause) {
+        compStart = true;
 
         // When HDMI is primary we should rely on the first valid
         // draw call in order to activate the display
