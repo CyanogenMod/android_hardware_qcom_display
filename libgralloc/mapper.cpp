@@ -457,6 +457,15 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 res = 0;
             } break;
 
+        case GRALLOC_MODULE_PERFORM_GET_RGB_DATA_ADDRESS:
+            {
+                private_handle_t* hnd = va_arg(args, private_handle_t*);
+                void* rgb_data = va_arg(args, void*);
+                if (!private_handle_t::validate(hnd)) {
+                    res = getRgbDataAddress(hnd, rgb_data);
+                }
+            } break;
+
         default:
             break;
     }
