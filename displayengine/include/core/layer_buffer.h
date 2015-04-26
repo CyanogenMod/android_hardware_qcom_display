@@ -134,20 +134,30 @@ struct LayerBufferPlane {
   @sa LayerBuffer
 */
 struct LayerBufferFlags {
-  uint64_t secure : 1;      //!< This flag shall be set by client to indicate that the buffer need
-                            //!< to be handled securely.
-  uint64_t video  : 1;      //!< This flag shall be set by client to indicate that the buffer is
-                            //!< video/ui buffer
-  uint64_t macro_tile : 1;  //!< This flag shall be set by client to indicate that the buffer format
-                            //!< is macro tiled.
-  uint64_t interlace : 1;   //!< This flag shall be set by the client to indicate that the buffer
-                            //!< has interlaced content.
-  uint64_t secure_display : 1;
-                            //!< This flag shall be set by the client to indicate that the secure
-                            //!< display session is in progress. Secure display session cannot
-                            //!< coexist with non-secure session.
+  union {
+    struct {
+      uint32_t secure : 1;          //!< This flag shall be set by client to indicate that the
+                                    //!< buffer need to be handled securely.
 
-  LayerBufferFlags() : secure(0), video(0), macro_tile(0), interlace(0), secure_display(0) { }
+      uint32_t video  : 1;          //!< This flag shall be set by client to indicate that the
+                                    //!< buffer is video/ui buffer.
+
+      uint32_t macro_tile : 1;      //!< This flag shall be set by client to indicate that the
+                                    //!< buffer format is macro tiled.
+
+      uint32_t interlace : 1;       //!< This flag shall be set by the client to indicate that
+                                    //!< the buffer has interlaced content.
+
+      uint32_t secure_display : 1;
+                                    //!< This flag shall be set by the client to indicate that the
+                                    //!< secure display session is in progress. Secure display
+                                    //!< session can not coexist with non-secure session.
+      };
+
+      uint32_t flags;   //!< For initialization purpose only. Client shall not refer it directly.
+  };
+
+  LayerBufferFlags() : flags(0) { }
 };
 
 /*! @brief This structure defines a layer buffer handle which contains raw buffer and its associated

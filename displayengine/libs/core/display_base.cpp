@@ -22,6 +22,7 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <stdio.h>
 #include <utils/constants.h>
 #include <utils/debug.h>
 
@@ -414,9 +415,11 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
                          num_modes_, active_mode_index_);
 
   DisplayConfigVariableInfo &info = display_attributes_[active_mode_index_];
-  DumpImpl::AppendString(buffer, length, "\nres:%ux%u, dpi:%.2fx%.2f, fps:%.2f, vsync period: %u",
-                         info.x_pixels, info.y_pixels, info.x_dpi, info.y_dpi, info.fps,
-                         info.vsync_period_ns);
+  DumpImpl::AppendString(buffer, length, "\nres:%u x %u, dpi:%.2f x %.2f, fps:%.2f,"
+                         "vsync period: %u", info.x_pixels, info.y_pixels, info.x_dpi,
+                         info.y_dpi, info.fps, info.vsync_period_ns);
+
+  DumpImpl::AppendString(buffer, length, "\n");
 
   uint32_t num_layers = 0;
   uint32_t num_hw_layers = 0;
@@ -425,62 +428,99 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     num_hw_layers = hw_layers_.info.count;
   }
 
-  DumpImpl::AppendString(buffer, length, "\n\nnum actual layers: %u, num sde layers: %u",
-                         num_layers, num_hw_layers);
+  if (num_hw_layers == 0) {
+    DumpImpl::AppendString(buffer, length, "\nNo hardware layers programmed");
+    return;
+  }
+
+  HWLayersInfo &layer_info = hw_layers_.info;
+  LayerRect &l_roi = layer_info.left_partial_update;
+  LayerRect &r_roi = layer_info.right_partial_update;
+  DumpImpl::AppendString(buffer, length, "\nROI(L T R B) : LEFT(%d %d %d %d), RIGHT(%d %d %d %d)",
+                         INT(l_roi.left), INT(l_roi.top), INT(l_roi.right), INT(l_roi.bottom),
+                         INT(r_roi.left), INT(r_roi.top), INT(r_roi.right), INT(r_roi.bottom));
+
+  const char *header  = "\n| Idx |  Comp Type  |  Split | WB |  Pipe |    W x H    |       Format       |  Src Rect (L T R B) |  Dst Rect (L T R B) |  Z |    Flags   | Deci(HxV) |";  //NOLINT
+  const char *newline = "\n|-----|-------------|--------|----|-------|-------------|--------------------|---------------------|---------------------|----|------------|-----------|";  //NOLINT
+  const char *format  = "\n| %3s | %11s "     "| %6s " "| %2s | 0x%03x | %4d x %4d | %18s "            "| %4d %4d %4d %4d "  "| %4d %4d %4d %4d "  "| %2s | %10s "   "| %9s |";  //NOLINT
+
+  DumpImpl::AppendString(buffer, length, "\n");
+  DumpImpl::AppendString(buffer, length, newline);
+  DumpImpl::AppendString(buffer, length, header);
+  DumpImpl::AppendString(buffer, length, newline);
 
   for (uint32_t i = 0; i < num_hw_layers; i++) {
-    Layer &layer = hw_layers_.info.stack->layers[hw_layers_.info.index[i]];
+    uint32_t layer_index = hw_layers_.info.index[i];
+    Layer &layer = hw_layers_.info.stack->layers[layer_index];
     LayerBuffer *input_buffer = layer.input_buffer;
     HWLayerConfig &layer_config = hw_layers_.config[i];
-
-    HWPipeInfo &left_pipe = hw_layers_.config[i].left_pipe;
-    HWPipeInfo &right_pipe = hw_layers_.config[i].right_pipe;
-
     HWRotatorSession &hw_rotator_session = layer_config.hw_rotator_session;
-    HWRotateInfo &left_rotate = hw_rotator_session.hw_rotate_info[0];
-    HWRotateInfo &right_rotate = hw_rotator_session.hw_rotate_info[1];
 
-    DumpImpl::AppendString(buffer, length, "\n\nsde idx: %u, actual idx: %u", i,
-                           hw_layers_.info.index[i]);
-    DumpImpl::AppendString(buffer, length, "\nw: %u, h: %u, fmt: %u",
-                           input_buffer->width, input_buffer->height, input_buffer->format);
-    AppendRect(buffer, length, "\nsrc_rect:", &layer.src_rect);
-    AppendRect(buffer, length, "\ndst_rect:", &layer.dst_rect);
+    char idx[8] = { 0 };
+    const char *comp_type = GetName(layer.composition);
+    const char *buffer_format = GetName(input_buffer->format);
+    const char *rotate_split[2] = { "Rot-L", "Rot-R" };
+    const char *comp_split[2] = { "Comp-L", "Comp-R" };
 
-    if (left_rotate.valid) {
-      DumpImpl::AppendString(buffer, length, "\n\tleft rotate =>");
-      DumpImpl::AppendString(buffer, length, "\n\t  pipe id: 0x%x", left_rotate.pipe_id);
-      AppendRect(buffer, length, "\n\t  src_roi:", &left_rotate.src_roi);
-      AppendRect(buffer, length, "\n\t  dst_roi:", &left_rotate.dst_roi);
+    snprintf(idx, sizeof(idx), "%d", layer_index);
+
+    for (uint32_t count = 0; count < hw_rotator_session.hw_block_count; count++) {
+      char writeback_id[8];
+      HWRotateInfo &rotate = hw_rotator_session.hw_rotate_info[count];
+      LayerRect &src_roi = rotate.src_roi;
+      LayerRect &dst_roi = rotate.dst_roi;
+
+      snprintf(writeback_id, sizeof(writeback_id), "%d", rotate.writeback_id);
+
+      DumpImpl::AppendString(buffer, length, format, idx, comp_type, rotate_split[count],
+                             writeback_id, rotate.pipe_id, input_buffer->width,
+                             input_buffer->height, buffer_format, INT(src_roi.left),
+                             INT(src_roi.top), INT(src_roi.right), INT(src_roi.bottom),
+                             INT(dst_roi.left), INT(dst_roi.top), INT(dst_roi.right),
+                             INT(dst_roi.bottom), "-", "-    ", "-    ");
+
+      // print the below only once per layer block, fill with spaces for rest.
+      idx[0] = 0;
+      comp_type = "";
     }
 
-    if (right_rotate.valid) {
-      DumpImpl::AppendString(buffer, length, "\n\tright rotate =>");
-      DumpImpl::AppendString(buffer, length, "\n\t  pipe id: 0x%x", right_rotate.pipe_id);
-      AppendRect(buffer, length, "\n\t  src_roi:", &right_rotate.src_roi);
-      AppendRect(buffer, length, "\n\t  dst_roi:", &right_rotate.dst_roi);
+    if (hw_rotator_session.hw_block_count > 0) {
+      input_buffer = &hw_rotator_session.output_buffer;
+      buffer_format = GetName(input_buffer->format);
     }
 
-    if (left_pipe.valid) {
-      DumpImpl::AppendString(buffer, length, "\n\tleft pipe =>");
-      DumpImpl::AppendString(buffer, length, "\n\t  pipe id: 0x%x", left_pipe.pipe_id);
-      AppendRect(buffer, length, "\n\t  src_roi:", &left_pipe.src_roi);
-      AppendRect(buffer, length, "\n\t  dst_roi:", &left_pipe.dst_roi);
+    for (uint32_t count = 0; count < 2; count++) {
+      char decimation[16];
+      char flags[16];
+      char z_order[8];
+      HWPipeInfo &pipe = (count == 0) ? layer_config.left_pipe : layer_config.right_pipe;
+
+      if (!pipe.valid) {
+        continue;
+      }
+
+      LayerRect &src_roi = pipe.src_roi;
+      LayerRect &dst_roi = pipe.dst_roi;
+
+      snprintf(z_order, sizeof(z_order), "%d", pipe.z_order);
+      snprintf(flags, sizeof(flags), "0x%08x", layer.flags.flags);
+      snprintf(decimation, sizeof(decimation), "%3d x %3d", pipe.horizontal_decimation,
+               pipe.vertical_decimation);
+
+      DumpImpl::AppendString(buffer, length, format, idx, comp_type, comp_split[count],
+                             "-", pipe.pipe_id, input_buffer->width, input_buffer->height,
+                             buffer_format, INT(src_roi.left), INT(src_roi.top),
+                             INT(src_roi.right), INT(src_roi.bottom), INT(dst_roi.left),
+                             INT(dst_roi.top), INT(dst_roi.right), INT(dst_roi.bottom),
+                             z_order, flags, decimation);
+
+      // print the below only once per layer block, fill with spaces for rest.
+      idx[0] = 0;
+      comp_type = "";
     }
 
-    if (right_pipe.valid) {
-      DumpImpl::AppendString(buffer, length, "\n\tright pipe =>");
-      DumpImpl::AppendString(buffer, length, "\n\t  pipe id: 0x%x", right_pipe.pipe_id);
-      AppendRect(buffer, length, "\n\t  src_roi:", &right_pipe.src_roi);
-      AppendRect(buffer, length, "\n\t  dst_roi:", &right_pipe.dst_roi);
-    }
+    DumpImpl::AppendString(buffer, length, newline);
   }
-}
-
-void DisplayBase::AppendRect(char *buffer, uint32_t length, const char *rect_name,
-                             LayerRect *rect) {
-  DumpImpl::AppendString(buffer, length, "%s %.1f, %.1f, %.1f, %.1f",
-                         rect_name, rect->left, rect->top, rect->right, rect->bottom);
 }
 
 int DisplayBase::GetBestConfig() {
@@ -502,5 +542,44 @@ bool DisplayBase::IsRotationRequired(HWLayers *hw_layers) {
   return false;
 }
 
-}  // namespace sde
+const char * DisplayBase::GetName(const LayerComposition &composition) {
+  switch (composition) {
+  case kCompositionGPU:         return "GPU";
+  case kCompositionSDE:         return "SDE";
+  case kCompositionGPUTarget:   return "GPU_TARGET";
+  default:                      return "UNKNOWN";
+  }
+}
 
+const char * DisplayBase::GetName(const LayerBufferFormat &format) {
+  switch (format) {
+  case kFormatARGB8888:                 return "ARGB_8888";
+  case kFormatRGBA8888:                 return "RGBA_8888";
+  case kFormatBGRA8888:                 return "BGRA_8888";
+  case kFormatXRGB8888:                 return "XRGB_8888";
+  case kFormatRGBX8888:                 return "RGBX_8888";
+  case kFormatBGRX8888:                 return "BGRX_8888";
+  case kFormatRGBA5551:                 return "RGBA_5551";
+  case kFormatRGBA4444:                 return "RGBA_4444";
+  case kFormatRGB888:                   return "RGB_888";
+  case kFormatBGR888:                   return "BGR_888";
+  case kFormatRGB565:                   return "RGB_565";
+  case kFormatRGBA8888Ubwc:             return "RGBA_8888_UBWC";
+  case kFormatRGBX8888Ubwc:             return "RGBX_8888_UBWC";
+  case kFormatRGB565Ubwc:               return "RGB_565_UBWC";
+  case kFormatYCbCr420Planar:           return "Y_CB_CR_420";
+  case kFormatYCrCb420Planar:           return "Y_CR_CB_420";
+  case kFormatYCbCr420SemiPlanar:       return "Y_CBCR_420";
+  case kFormatYCrCb420SemiPlanar:       return "Y_CRCB_420";
+  case kFormatYCbCr420SemiPlanarVenus:  return "Y_CBCR_420_VENUS";
+  case kFormatYCbCr422H1V2SemiPlanar:   return "Y_CBCR_422_H1V2";
+  case kFormatYCrCb422H1V2SemiPlanar:   return "Y_CRCB_422_H1V2";
+  case kFormatYCbCr422H2V1SemiPlanar:   return "Y_CBCR_422_H2V1";
+  case kFormatYCrCb422H2V1SemiPlanar:   return "Y_CRCB_422_H2V2";
+  case kFormatYCbCr420SPVenusUbwc:      return "Y_CBCR_420_VENUS_UBWC";
+  case kFormatYCbCr422H2V1Packed:       return "YCBYCR_422_H2V1";
+  default:                              return "UNKNOWN";
+  }
+}
+
+}  // namespace sde

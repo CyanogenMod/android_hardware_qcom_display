@@ -26,6 +26,7 @@
 #define __DISPLAY_HDMI_H__
 
 #include "display_base.h"
+#include "dump_impl.h"
 
 namespace sde {
 
