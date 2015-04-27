@@ -33,6 +33,7 @@
 #include <utils/constants.h>
 #include <qdMetaData.h>
 #include <sync/sync.h>
+#include <cutils/properties.h>
 
 #include "hwc_display.h"
 #include "hwc_debugger.h"
@@ -45,7 +46,7 @@ HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, 
                        int id)
   : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL),
     flush_(false), output_buffer_(NULL), dump_frame_count_(0), dump_frame_index_(0),
-    dump_input_layers_(false) {
+    dump_input_layers_(false), swap_interval_zero_(false) {
 }
 
 int HWCDisplay::Init() {
@@ -54,6 +55,13 @@ int HWCDisplay::Init() {
     DLOGE("Display create failed. Error = %d display_type %d event_handler %p disp_intf %p",
       error, type_, this, &display_intf_);
     return -EINVAL;
+  }
+
+  char property[PROPERTY_VALUE_MAX];
+  if (property_get("debug.egl.swapinterval", property, "1") > 0) {
+    if (atoi(property) == 0) {
+      swap_interval_zero_ = true;
+    }
   }
 
   return 0;
@@ -452,6 +460,11 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
         layer_buffer->planes[0].stride = pvt_handle->width;
       }
 
+      // if swapinterval property is set to 0 then close and reset the acquireFd
+      if (swap_interval_zero_ && hwc_layer.acquireFenceFd >= 0) {
+        close(hwc_layer.acquireFenceFd);
+        hwc_layer.acquireFenceFd = -1;
+      }
       layer_buffer->acquire_fence_fd = hwc_layer.acquireFenceFd;
     }
 
@@ -485,6 +498,14 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
     LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
 
     if (!flush_) {
+      // if swapinterval property is set to 0 then do not update f/w release fences with driver
+      // values
+      if (swap_interval_zero_) {
+        hwc_layer.releaseFenceFd = -1;
+        close(layer_buffer->release_fence_fd);
+        layer_buffer->release_fence_fd = -1;
+      }
+
       if (layer.composition != kCompositionGPU) {
         hwc_layer.releaseFenceFd = layer_buffer->release_fence_fd;
       }
@@ -509,6 +530,11 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
   if (!flush_) {
     layer_stack_cache_.animating = layer_stack_.flags.animating;
 
+    // if swapinterval property is set to 0 then close and reset the list retire fence
+    if (swap_interval_zero_) {
+      close(layer_stack_.retire_fence_fd);
+      layer_stack_.retire_fence_fd = -1;
+    }
     content_list->retireFenceFd = layer_stack_.retire_fence_fd;
 
     if (dump_frame_count_) {
