@@ -191,8 +191,9 @@ DisplayError HWPrimary::GetDisplayAttributes(HWDisplayAttributes *display_attrib
   display_attributes->y_pixels = var_screeninfo.yres;
   display_attributes->v_total = var_screeninfo.yres + var_screeninfo.lower_margin +
       var_screeninfo.upper_margin + var_screeninfo.vsync_len;
-  display_attributes->h_total = var_screeninfo.xres + var_screeninfo.right_margin +
-      var_screeninfo.left_margin + var_screeninfo.hsync_len;
+  uint32_t h_blanking = var_screeninfo.right_margin + var_screeninfo.left_margin +
+      var_screeninfo.hsync_len;
+  display_attributes->h_total = var_screeninfo.xres + h_blanking;
   display_attributes->x_dpi =
       (FLOAT(var_screeninfo.xres) * 25.4f) / FLOAT(var_screeninfo.width);
   display_attributes->y_dpi =
@@ -204,6 +205,7 @@ DisplayError HWPrimary::GetDisplayAttributes(HWDisplayAttributes *display_attrib
   display_attributes->split_left = hw_panel_info_.split_info.left_split ?
       hw_panel_info_.split_info.left_split : display_attributes->x_pixels / 2;
   display_attributes->always_src_split = hw_panel_info_.split_info.always_src_split;
+  display_attributes->h_total += display_attributes->is_device_split ? h_blanking : 0;
 
   return kErrorNone;
 }

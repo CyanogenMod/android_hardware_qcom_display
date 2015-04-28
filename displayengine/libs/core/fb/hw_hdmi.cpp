@@ -222,8 +222,9 @@ DisplayError HWHDMI::GetDisplayAttributes(HWDisplayAttributes *display_attribute
   display_attributes->y_pixels = timing_mode->active_v;
   display_attributes->v_total = timing_mode->active_v + timing_mode->front_porch_v +
       timing_mode->back_porch_v + timing_mode->pulse_width_v;
-  display_attributes->h_total = timing_mode->active_h + timing_mode->front_porch_h +
-      timing_mode->back_porch_h + timing_mode->pulse_width_h;
+  uint32_t h_blanking = timing_mode->front_porch_h + timing_mode->back_porch_h +
+      timing_mode->pulse_width_h;
+  display_attributes->h_total = timing_mode->active_h + h_blanking;
   display_attributes->x_dpi = 0;
   display_attributes->y_dpi = 0;
   display_attributes->fps = FLOAT(timing_mode->refresh_rate) / 1000.0f;
@@ -232,6 +233,7 @@ DisplayError HWHDMI::GetDisplayAttributes(HWDisplayAttributes *display_attribute
   if (display_attributes->x_pixels > hw_resource_.max_mixer_width) {
     display_attributes->is_device_split = true;
     display_attributes->split_left = display_attributes->x_pixels / 2;
+    display_attributes->h_total += h_blanking;
   }
   return kErrorNone;
 }
