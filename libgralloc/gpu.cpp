@@ -34,7 +34,7 @@ using namespace gralloc;
 #define SZ_1M 0x100000
 #define SZ_4K 0x1000
 
-#ifdef ION_FLAG_CP_PIXEL
+#ifdef MASTER_SIDE_CP
 #define SECURE_ALIGN SZ_4K
 #else
 #define SECURE_ALIGN SZ_1M

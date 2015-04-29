@@ -49,15 +49,26 @@
 
 #define ASTC_BLOCK_SIZE 16
 
-#ifdef ION_FLAG_CP_PIXEL
-#define CP_HEAP_ID ION_SECURE_HEAP_ID
-#else
+#ifndef ION_FLAG_CP_PIXEL
 #define ION_FLAG_CP_PIXEL 0
-#define CP_HEAP_ID ION_CP_MM_HEAP_ID
 #endif
 
 #ifndef ION_FLAG_ALLOW_NON_CONTIG
 #define ION_FLAG_ALLOW_NON_CONTIG 0
+#endif
+
+#ifdef MASTER_SIDE_CP
+#define CP_HEAP_ID ION_SECURE_HEAP_ID
+/* Please Add the new SD ION Heap here */
+#define SD_HEAP_ID 0
+#define ION_CP_FLAGS (ION_SECURE | ION_FLAG_CP_PIXEL)
+/* Please Add the new SD ION Flag here */
+#define ION_SD_FLAGS ION_SECURE
+#else // SLAVE_SIDE_CP
+#define CP_HEAP_ID ION_CP_MM_HEAP_ID
+#define SD_HEAP_ID CP_HEAP_ID
+#define ION_CP_FLAGS (ION_SECURE | ION_FLAG_ALLOW_NON_CONTIG)
+#define ION_SD_FLAGS ION_SECURE
 #endif
 
 using namespace gralloc;
@@ -357,21 +368,16 @@ int IonController::allocate(alloc_data& data, int usage)
 
     if(usage & GRALLOC_USAGE_PROTECTED) {
         if (usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
-            ionHeapId = ION_HEAP(CP_HEAP_ID);
-            ionFlags |= ION_SECURE;
             if (usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY) {
+                ionHeapId = ION_HEAP(SD_HEAP_ID);
                 /*
                  * There is currently no flag in ION for Secure Display
-                 * VM. Please add it here once available.
-                 *
-                   ionFlags |= <Ion flag for Secure Display>;
+                 * VM. Please add it to the define once available.
                 */
+                ionFlags |= ION_SD_FLAGS;
             } else {
-                ionFlags |= ION_FLAG_CP_PIXEL;
-            }
-
-            if (!(usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY)) {
-                ionFlags |= ION_FLAG_ALLOW_NON_CONTIG;
+                ionHeapId = ION_HEAP(CP_HEAP_ID);
+                ionFlags |= ION_CP_FLAGS;
             }
         } else {
             // for targets/OEMs which do not need HW level protection
