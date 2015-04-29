@@ -265,6 +265,16 @@ void setDisplayTiming(struct fb_var_screeninfo &info,
     info.lower_margin = mode->front_porch_v;
     info.vsync_len = mode->pulse_width_v;
     info.upper_margin = mode->back_porch_v;
+    // Set the sync polarity based on the current mode
+    if (!mode->active_low_h)
+        info.sync |= FB_SYNC_HOR_HIGH_ACT;
+    else
+        info.sync &= ~FB_SYNC_HOR_HIGH_ACT;
+
+    if (!mode->active_low_v)
+        info.sync |= FB_SYNC_VERT_HIGH_ACT;
+    else
+        info.sync &= ~FB_SYNC_VERT_HIGH_ACT;
 }
 
 int HDMIDisplay::parseResolution(char* edidStr)
