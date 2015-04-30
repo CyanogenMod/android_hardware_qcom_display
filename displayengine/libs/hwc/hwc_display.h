@@ -119,6 +119,7 @@ class HWCDisplay : public DisplayEventHandler {
   uint32_t dump_frame_index_;
   bool dump_input_layers_;
   uint32_t last_power_mode_;
+  bool swap_interval_zero_;
 };
 
 }  // namespace sde
