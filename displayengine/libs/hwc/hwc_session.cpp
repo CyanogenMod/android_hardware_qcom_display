@@ -240,10 +240,13 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
       }
       break;
     case HWC_DISPLAY_VIRTUAL:
+      if (hwc_session->display_external_) {
+        break;
+      }
       if (hwc_session->ValidateContentList(content_list)) {
-        hwc_session->CreateVirtualDisplay(hwc_session, content_list);
+        hwc_session->CreateVirtualDisplay(content_list);
       } else {
-        hwc_session->DestroyVirtualDisplay(hwc_session);
+        hwc_session->DestroyVirtualDisplay();
       }
 
       if (hwc_session->display_virtual_) {
@@ -284,6 +287,21 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
       }
       break;
     case HWC_DISPLAY_VIRTUAL:
+      if (hwc_session->display_external_) {
+        if (content_list) {
+          for (size_t i = 0; i < content_list->numHwLayers; i++) {
+            if (content_list->hwLayers[i].acquireFenceFd >= 0) {
+              close(content_list->hwLayers[i].acquireFenceFd);
+              content_list->hwLayers[i].acquireFenceFd = -1;
+            }
+          }
+          if (content_list->outbufAcquireFenceFd >= 0) {
+            close(content_list->outbufAcquireFenceFd);
+            content_list->outbufAcquireFenceFd = -1;
+          }
+          content_list->retireFenceFd = -1;
+        }
+      }
       if (hwc_session->display_virtual_) {
         hwc_session->display_virtual_->Commit(content_list);
       }
@@ -514,49 +532,49 @@ bool HWCSession::ValidateContentList(hwc_display_contents_1_t *content_list) {
   return (content_list && content_list->numHwLayers > 0 && content_list->outbuf);
 }
 
-int HWCSession::CreateVirtualDisplay(HWCSession *hwc_session,
-                                     hwc_display_contents_1_t *content_list) {
+int HWCSession::CreateVirtualDisplay(hwc_display_contents_1_t *content_list) {
   int status = 0;
 
-  if (!hwc_session->display_virtual_) {
+  if (!display_virtual_) {
     // Create virtual display device
-    hwc_session->display_virtual_ = new HWCDisplayVirtual(hwc_session->core_intf_,
-                                                          &hwc_session->hwc_procs_);
-    if (!hwc_session->display_virtual_) {
+    display_virtual_ = new HWCDisplayVirtual(core_intf_, &hwc_procs_);
+    if (!display_virtual_) {
       // This is not catastrophic. Leave a warning message for now.
       DLOGW("Virtual Display creation failed");
       return -ENOMEM;
     }
 
-    status = hwc_session->display_virtual_->Init();
+    status = display_virtual_->Init();
     if (status) {
       goto CleanupOnError;
     }
 
-    status = hwc_session->display_virtual_->SetPowerMode(HWC_POWER_MODE_NORMAL);
+    status = display_virtual_->SetPowerMode(HWC_POWER_MODE_NORMAL);
     if (status) {
       goto CleanupOnError;
     }
   }
 
-  if (hwc_session->display_virtual_) {
-    status = hwc_session->display_virtual_->SetActiveConfig(content_list);
+  if (display_virtual_) {
+    status = display_virtual_->SetActiveConfig(content_list);
   }
 
   return status;
 
 CleanupOnError:
-  return hwc_session->DestroyVirtualDisplay(hwc_session);
+  return DestroyVirtualDisplay();
 }
 
-int HWCSession::DestroyVirtualDisplay(HWCSession *hwc_session) {
+int HWCSession::DestroyVirtualDisplay() {
   int status = 0;
 
-  if (hwc_session->display_virtual_) {
-    status = hwc_session->display_virtual_->Deinit();
+  if (display_virtual_) {
+    status = display_virtual_->Deinit();
     if (!status) {
-      delete hwc_session->display_virtual_;
-      hwc_session->display_virtual_ = NULL;
+      delete display_virtual_;
+      display_virtual_ = NULL;
+      // Signal the HotPlug thread to continue with the external display connection
+      locker_.Signal();
     }
   }
 
@@ -808,6 +826,14 @@ int HWCSession::HotPlugHandler(bool connected) {
 
   if (connected) {
     SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+    if (display_virtual_) {
+      // Wait for the virtual display to tear down
+      int status = locker_.WaitFinite(kExternalConnectionTimeoutMs);
+      if (status != 0) {
+        DLOGE("Timed out while waiting for virtual display to tear down.");
+        return -1;
+      }
+    }
     if (display_external_) {
      DLOGE("HDMI already connected");
      return -1;
