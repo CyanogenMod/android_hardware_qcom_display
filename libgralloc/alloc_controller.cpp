@@ -898,7 +898,7 @@ static unsigned int getUBwcMetaBufferSize(int width, int height, int bpp)
     meta_width = ALIGN(((width + block_width - 1) / block_width), 64);
 
     // Align meta buffer size to 4K
-    size = ((meta_width * meta_height), 4096);
+    size = ALIGN((meta_width * meta_height), 4096);
     return size;
 }
 
@@ -929,7 +929,7 @@ static unsigned int getUBwcSize(int width, int height, int format,
     return size;
 }
 
-int getRgbDataAddress(private_handle_t* hnd, void* rgb_data)
+int getRgbDataAddress(private_handle_t* hnd, void** rgb_data)
 {
     int err = 0;
 
@@ -940,7 +940,7 @@ int getRgbDataAddress(private_handle_t* hnd, void* rgb_data)
 
     // linear buffer
     if (!(hnd->flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED)) {
-        rgb_data = (void*)hnd->base;
+        *rgb_data = (void*)hnd->base;
         return err;
     }
 
@@ -960,6 +960,6 @@ int getRgbDataAddress(private_handle_t* hnd, void* rgb_data)
             break;
     }
 
-    rgb_data = (void*)(hnd->base + meta_size);
+    *rgb_data = (void*)(hnd->base + meta_size);
     return err;
 }
