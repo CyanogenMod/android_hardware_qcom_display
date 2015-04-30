@@ -28,7 +28,6 @@
 #include <dlfcn.h>
 
 #include "res_manager.h"
-#include "scalar_helper.h"
 
 #define __CLASS__ "ResManager"
 
@@ -36,7 +35,7 @@ namespace sde {
 
 ResManager::ResManager()
   : num_pipe_(0), vig_pipes_(NULL), rgb_pipes_(NULL), dma_pipes_(NULL), virtual_count_(0),
-    buffer_allocator_(NULL), buffer_sync_handler_(NULL) {
+    buffer_allocator_(NULL), buffer_sync_handler_(NULL), scalar_(NULL) {
 }
 
 DisplayError ResManager::Init(const HWResourceInfo &hw_res_info) {
@@ -110,18 +109,17 @@ DisplayError ResManager::Init(const HWResourceInfo &hw_res_info) {
   rgb_pipes_[0].state = kPipeStateOwnedByKernel;
   rgb_pipes_[1].state = kPipeStateOwnedByKernel;
 
-#ifdef USES_SCALAR
-  ScalarHelper::GetInstance()->Init();
-#endif
+  error = Scalar::CreateScalar(&scalar_);
+  if (error != kErrorNone) {
+    DLOGE("Failed to create Scalar object!");
+  }
 
   max_system_bw_ = FLOAT(hw_res_info_.max_bandwidth_high);
-  return kErrorNone;
+  return error;
 }
 
 DisplayError ResManager::Deinit() {
-#ifdef USES_SCALAR
-  ScalarHelper::GetInstance()->Deinit();
-#endif
+  Scalar::Destroy(scalar_);
   return kErrorNone;
 }
 
@@ -379,12 +377,10 @@ DisplayError ResManager::Acquire(Handle display_ctx, HWLayers *hw_layers) {
              i, layer_config.left_pipe.pipe_id,  pipe_info->pipe_id);
   }
 
-#ifdef USES_SCALAR
-  if (!ScalarHelper::GetInstance()->ConfigureScale(hw_layers)) {
+  if (scalar_->ConfigureScale(hw_layers) != kErrorNone) {
     DLOGV_IF(kTagResources, "Scale data configuration has failed!");
     goto CleanupOnError;
   }
-#endif
 
   if (!CheckBandwidth(display_resource_ctx, hw_layers)) {
     DLOGV_IF(kTagResources, "Bandwidth check failed!");

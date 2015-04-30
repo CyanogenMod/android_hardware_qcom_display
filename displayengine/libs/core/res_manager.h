@@ -31,6 +31,7 @@
 
 #include "hw_interface.h"
 #include "dump_impl.h"
+#include "scalar_helper.h"
 
 namespace sde {
 
@@ -231,6 +232,7 @@ class ResManager : public DumpImpl {
   BufferSyncHandler *buffer_sync_handler_;  // Pointer to buffer sync handler that was defined by
                                             // the display engine's client
   PropertySetting property_setting_;
+  Scalar *scalar_;
 };
 
 }  // namespace sde

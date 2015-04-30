@@ -91,6 +91,7 @@ class HWDevice {
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
   int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
   mdp_scale_data* GetScaleDataRef(uint32_t index) { return &scale_data_[index]; }
+  void SetHWScaleData(const ScaleData &scale, uint32_t index);
   void ResetDisplayParams();
 
   bool EnableHotPlugDetection(int enable);

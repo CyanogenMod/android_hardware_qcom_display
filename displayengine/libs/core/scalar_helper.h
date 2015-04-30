@@ -25,43 +25,47 @@
 #ifndef __SCALAR_HELPER_H__
 #define __SCALAR_HELPER_H__
 
-#ifdef USES_SCALAR
-
-#include <sys/types.h>
-#include <linux/msm_mdp_ext.h>
 #include <hw_interface.h>
+#ifdef USES_SCALAR
 #include <scalar.h>
-
-#define SCALAR_LIBRARY_NAME "libscalar.so"
+#endif
 
 namespace sde {
 
-class ScalarHelper {
-
+class Scalar {
  public:
-  void Init();
-  void Deinit();
-  bool ConfigureScale(HWLayers *hw_layers);
-  void UpdateSrcWidth(uint32_t index, bool left, uint32_t* src_width);
-  void SetScaleData(uint32_t index, bool left, mdp_scale_data* mdp_scale);
-  static ScalarHelper* GetInstance();
+  static DisplayError CreateScalar(Scalar **scalar);
+  static void Destroy(Scalar *scalar);
+  virtual ~Scalar() { }
+  virtual DisplayError ConfigureScale(HWLayers *hw_layers) { return kErrorNone; }
+
+ protected:
+  virtual DisplayError Init() { return kErrorNone; }
+  virtual void Deinit() { }
+};
+
+#ifdef USES_SCALAR
+class ScalarHelper : public Scalar {
+ public:
+  ScalarHelper();
+  virtual DisplayError ConfigureScale(HWLayers *hw_layers);
+
+ protected:
+  virtual DisplayError Init();
+  virtual void Deinit();
 
  private:
-  explicit ScalarHelper() { }
-  struct ScaleData {
-    scalar::Scale left_scale;
-    scalar::Scale right_scale;
-  };
-  struct ScaleData scale_data_[kMaxSDELayers];
-  void* lib_scalar_handle_;
-  int (*ScalarConfigureScale)(struct scalar::LayerInfo* layer);
-  scalar::Scale* GetScaleRef(uint32_t index, bool left) {
-    return (left ? &scale_data_[index].left_scale : &scale_data_[index].right_scale);
-  }
-  static ScalarHelper* scalar_helper_;  // Singleton Instance
+  const char *scalar_library_name_;
+  const char *configure_scale_api_;
+  void* lib_scalar_;
+  int (*configure_scale_)(scalar::LayerInfo *layer);
+  void SetPipeInfo(const HWPipeInfo &hw_pipe, scalar::PipeInfo *pipe);
+  void UpdateSrcRoi(const scalar::PipeInfo &pipe, HWPipeInfo *hw_pipe);
+  void SetScaleData(const scalar::PipeInfo &pipe, ScaleData *scale_data);
+  uint32_t GetScalarFormat(LayerBufferFormat source);
 };
+#endif
 
 }  // namespace sde
 
-#endif
 #endif  // __SCALAR_HELPER_H__

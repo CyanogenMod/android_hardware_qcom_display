@@ -102,12 +102,45 @@ struct HWRotatorSession {
   HWRotatorSession() : hw_block_count(0), downscale_ratio(1.0f), session_id(-1) { }
 };
 
+struct HWPixelExtension {
+  // Number of pixels extension in left, right, top and bottom directions for all color components.
+  // This pixel value for each color component should be sum of fetch and repeat pixels.
+  int extension;
+
+  // Number of pixels need to be overfetched in left, right, top and bottom directions from source
+  // image for scaling.
+  int overfetch;
+
+  // Number of pixels need to be repeated in left, right, top and bottom directions for scaling.
+  int repeat;
+};
+
+struct HWPlane {
+  int init_phase_x;
+  int phase_step_x;
+  int init_phase_y;
+  int phase_step_y;
+  HWPixelExtension left;
+  HWPixelExtension top;
+  HWPixelExtension right;
+  HWPixelExtension bottom;
+  uint32_t roi_width;
+};
+
+struct ScaleData {
+  uint8_t enable_pixel_ext;
+  uint32_t src_width;
+  uint32_t src_height;
+  HWPlane plane[4];
+};
+
 struct HWPipeInfo {
   uint32_t pipe_id;
   LayerRect src_roi;
   LayerRect dst_roi;
   uint8_t horizontal_decimation;
   uint8_t vertical_decimation;
+  ScaleData scale_data;
   bool valid;
   uint32_t z_order;
 
