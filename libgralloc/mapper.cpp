@@ -386,7 +386,8 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 int *alignedWidth = va_arg(args, int *);
                 int *alignedHeight = va_arg(args, int *);
                 int *tileEnabled = va_arg(args,int *);
-                *tileEnabled = isMacroTileEnabled(format, usage);
+                *tileEnabled = isUBwcEnabled(format, usage) ||
+                               isMacroTileEnabled(format, usage);
                 AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width,
                         height, format, usage, *alignedWidth, *alignedHeight);
                 res = 0;
