@@ -232,6 +232,7 @@ static void reset(hwc_context_t *ctx, int numDisplays,
     }
 
     ctx->mAD->reset();
+    MDPComp::reset();
 }
 
 bool isEqual(float f1, float f2) {
