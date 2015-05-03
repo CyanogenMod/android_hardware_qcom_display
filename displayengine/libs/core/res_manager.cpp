@@ -504,7 +504,15 @@ float ResManager::GetPipeBw(DisplayResourceContext *display_ctx, HWPipeInfo *pip
   // Command mode panel, data gets transferred from MDP to panel during blanking time as well,
   // which means MDP needs to fetch the data faster. So pipe bandwidth needs to be adjusted.
   if (display_ctx->hw_panel_info_.mode == kModeCommand) {
-    bw *= FLOAT(display_attributes.h_total) / FLOAT(display_attributes.x_pixels);
+    uint32_t h_total = display_attributes.h_total;
+    uint32_t h_active = display_attributes.x_pixels;
+    // On split-panel device, h_active is left split
+    if (display_attributes.is_device_split) {
+      uint32_t h_blanking = (h_total - h_active) / 2;
+      h_active = display_attributes.split_left;
+      h_total = h_active + h_blanking;
+    }
+    bw *= FLOAT(h_total) / FLOAT(h_active);
   }
 
   // Bandwidth in GBps
