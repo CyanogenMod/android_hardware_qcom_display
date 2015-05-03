@@ -162,7 +162,16 @@ set_speaker_light_locked(struct light_device_t* dev,
     blue = colorRGB & 0xFF;
 
     if (onMS > 0 && offMS > 0) {
-        blink = 1;
+        /*
+         * if ON time == OFF time
+         *   use blink mode 2
+         * else
+         *   use blink mode 1
+         */
+        if (onMS == offMS)
+            blink = 2;
+        else
+            blink = 1;
     } else {
         blink = 0;
     }
