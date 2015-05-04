@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,6 +31,12 @@
 #define _QDMETADATA_H
 
 #define MAX_IGC_LUT_ENTRIES 256
+
+typedef enum {
+    ITU_R_601,
+    ITU_R_601_FR,
+    ITU_R_709,
+} ColorSpace_t;
 
 struct HSICData_t {
     int32_t hue;
@@ -67,6 +73,7 @@ struct MetaData_t {
     IGCData_t igcData;
     Sharp2Data_t Sharp2Data;
     int64_t timestamp;
+    ColorSpace_t colorSpace;
 };
 
 typedef enum {
@@ -78,6 +85,7 @@ typedef enum {
     PP_PARAM_SHARP2     = 0x0020,
     PP_PARAM_TIMESTAMP  = 0x0040,
     UPDATE_BUFFER_GEOMETRY = 0x0080,
+    UPDATE_COLOR_SPACE = 0x0100,
 } DispParamType;
 
 int setMetaData(private_handle_t *handle, DispParamType paramType, void *param);

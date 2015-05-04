@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -80,6 +80,9 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
             break;
         case UPDATE_BUFFER_GEOMETRY:
             memcpy((void *)&data->bufferDim, param, sizeof(BufferDim_t));
+            break;
+        case UPDATE_COLOR_SPACE:
+            data->colorSpace = *((ColorSpace_t *)param);
             break;
         default:
             ALOGE("Unknown paramType %d", paramType);
