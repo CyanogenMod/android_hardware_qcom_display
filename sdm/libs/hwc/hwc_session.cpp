@@ -138,7 +138,6 @@ int HWCSession::Init() {
     return status;
   }
 
-  // Create HWC ColorManager to host Android/HWC specific behavior.
   color_mgr_ = HWCColorManager::CreateColorManager();
   if (!color_mgr_) {
     DLOGW("Failed to load HWCColorManager.");

@@ -46,7 +46,6 @@ namespace sdm {
 // This macro defines variable name of display color APIs function tables
 // This macro shall be used to specify name of the variable in dlsym().
 #define DISPLAY_API_FUNC_TABLES "display_color_apis_ftables"
-
 #define QDCM_DIAG_CLIENT_LIBRARY_NAME "libsdm-diag.so"
 #define INIT_QDCM_DIAG_CLIENT_NAME "QDCMDiagInit"
 #define DEINIT_QDCM_DIAG_CLIENT_NAME "QDCMDiagDeInit"
@@ -130,4 +129,5 @@ class HWCColorManager {
 };
 
 }  // namespace sdm
+
 #endif  // __HWC_COLOR_MANAGER_H__

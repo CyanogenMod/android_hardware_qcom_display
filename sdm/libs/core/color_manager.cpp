@@ -99,14 +99,15 @@ ColorManagerProxy *ColorManagerProxy::CreateColorManagerProxy(DisplayType type,
     } else {
       hw_attr.Set(hw_res_info_, panel_info, attribute, versions);
       DLOGW("PAV2 version is versions = %d, version = %d ",
-            hw_attr.version.version[kDSPPFeaturePaV2], versions.version[kDSPPFeaturePaV2]);
+            hw_attr.version.version[kGlobalColorFeaturePaV2],
+            versions.version[kGlobalColorFeaturePaV2]);
     }
 
     // 2. instantiate concrete ColorInterface from libsdm-color.so, pass all hardware info in.
     error = create_intf_(COLOR_VERSION_TAG, color_manager_proxy->device_type_, hw_attr,
                          &color_manager_proxy->color_intf_);
     if (error != kErrorNone) {
-      DLOGW("Failed to instantiate concrete ColorInterface from %s", COLORMGR_LIBRARY_NAME);
+      DLOGW("Unable to instantiate concrete ColorInterface from %s", COLORMGR_LIBRARY_NAME);
       delete color_manager_proxy;
       color_manager_proxy = NULL;
     }

@@ -52,13 +52,13 @@ enum PendingAction {
 // ENUM to identify different Postprocessing feature block to program.
 // Note: For each new entry added here, also need update hw_interface::GetPPFeaturesVersion<>
 // AND HWPrimary::SetPPFeatures<>.
-enum PPFeatureID {
-  kDSPPFeaturePcc,
-  kDSPPFeatureIgc,
-  kDSPPFeaturePgc,
-  kDSPPFeaturePaV2,
-  kDSPPFeatureDither,
-  kDSPPFeatureGamut,
+enum PPGlobalColorFeatureID {
+  kGlobalColorFeaturePcc,
+  kGlobalColorFeatureIgc,
+  kGlobalColorFeaturePgc,
+  kGlobalColorFeaturePaV2,
+  kGlobalColorFeatureDither,
+  kGlobalColorFeatureGamut,
   kMaxNumPPFeatures,
 };
 

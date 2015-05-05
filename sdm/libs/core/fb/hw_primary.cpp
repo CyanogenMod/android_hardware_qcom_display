@@ -37,6 +37,7 @@
 #include <sys/resource.h>
 #include <utils/debug.h>
 #include "hw_primary.h"
+#include "hw_color_manager.h"
 
 #define __CLASS__ "HWPrimary"
 
@@ -498,11 +499,56 @@ DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
 }
 
 DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
-  return kErrorNotSupported;
+  STRUCT_VAR(mdp_pp_feature_version, version);
+
+  // map from core domain to mdp FB driver domain.
+  uint32_t feature_id_mapping[kMaxNumPPFeatures] = { PCC, IGC, GC, PA, DITHER, GAMUT };
+
+  for (int i(0); i < kMaxNumPPFeatures; i++) {
+    version.pp_feature = feature_id_mapping[i];
+
+    if (ioctl_(device_fd_,  MSMFB_MDP_PP_GET_FEATURE_VERSION, &version) < 0) {
+      IOCTL_LOGE(MSMFB_MDP_PP_GET_FEATURE_VERSION, device_type_);
+      return kErrorHardware;
+    }
+    vers->version[i] = version.version_info;
+  }
+
+  return kErrorNone;
 }
 
+// It was entered with PPFeaturesConfig::locker_ being hold.
 DisplayError HWPrimary::SetPPFeatures(PPFeaturesConfig &feature_list) {
-  return kErrorNotSupported;
+  STRUCT_VAR(msmfb_mdp_pp, kernel_params);
+  int ret = 0;
+  PPFeatureInfo *feature = NULL;
+
+  while (true) {
+    ret = feature_list.RetrieveNextFeature(&feature);
+    if (ret)
+        break;
+
+    if (feature) {
+      DLOGV("feature_id = %d", feature->feature_id_);
+
+      if ((feature->feature_id_ < kMaxNumPPFeatures)) {
+
+        HWColorManager::SetFeature[feature->feature_id_](*feature, &kernel_params);
+        if (ioctl_(device_fd_, MSMFB_MDP_PP, &kernel_params) < 0) {
+          IOCTL_LOGE(MSMFB_MDP_PP, device_type_);
+
+          feature_list.Reset();
+          return kErrorHardware;
+        }
+      }
+    }
+  } // while(true)
+
+   // Once all features were consumed, then destroy all feature instance from feature_list,
+   // Then mark it as non-dirty of PPFeaturesConfig cache.
+  feature_list.Reset();
+
+  return kErrorNone;
 }
 
 }  // namespace sdm
