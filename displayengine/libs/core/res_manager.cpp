@@ -619,6 +619,8 @@ float ResManager::GetBpp(LayerBufferFormat format) {
     case kFormatXRGB8888:
     case kFormatRGBX8888:
     case kFormatBGRX8888:
+    case kFormatRGBA8888Ubwc:
+    case kFormatRGBX8888Ubwc:
       return 4.0f;
     case kFormatRGB888:
     case kFormatBGR888:
@@ -626,6 +628,7 @@ float ResManager::GetBpp(LayerBufferFormat format) {
     case kFormatRGB565:
     case kFormatRGBA5551:
     case kFormatRGBA4444:
+    case kFormatRGB565Ubwc:
     case kFormatYCbCr422H2V1Packed:
     case kFormatYCrCb422H2V1SemiPlanar:
     case kFormatYCrCb422H1V2SemiPlanar:
