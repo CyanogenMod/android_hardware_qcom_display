@@ -194,6 +194,10 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
             aligned_w = VENUS_Y_STRIDE(COLOR_FMT_NV12, width);
             aligned_h = VENUS_Y_SCANLINES(COLOR_FMT_NV12, height);
             break;
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS:
+            aligned_w = VENUS_Y_STRIDE(COLOR_FMT_NV21, width);
+            aligned_h = VENUS_Y_SCANLINES(COLOR_FMT_NV21, height);
+            break;
         case HAL_PIXEL_FORMAT_BLOB:
             break;
         case HAL_PIXEL_FORMAT_NV21_ZSL:
@@ -535,6 +539,9 @@ unsigned int getSize(int format, int width, int height, int usage,
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
             size = VENUS_BUFFER_SIZE(COLOR_FMT_NV12, width, height);
             break;
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS:
+            size = VENUS_BUFFER_SIZE(COLOR_FMT_NV21, width, height);
+            break;
         case HAL_PIXEL_FORMAT_BLOB:
             if(height != 1) {
                 ALOGE("%s: Buffers with format HAL_PIXEL_FORMAT_BLOB \
@@ -698,6 +705,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_422_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS:
         case HAL_PIXEL_FORMAT_NV21_ZSL:
         case HAL_PIXEL_FORMAT_RAW_SENSOR:
         case HAL_PIXEL_FORMAT_RAW10:
