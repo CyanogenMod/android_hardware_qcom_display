@@ -27,8 +27,8 @@ ifeq ($(ARCH_ARM_HAVE_NEON),true)
     common_flags += -D__ARM_HAVE_NEON
 endif
 
-ifeq ($(call is-board-platform-in-list, msm8974 msm8226 msm8610 msm8084 \
-        mpq8092 msm_bronze msm8916), true)
+ifneq ($(filter msm8974 msm8226 msm8610 msm8084 msm8916, \
+       $(TARGET_BOARD_PLATFORM)),)
     common_flags += -DVENUS_COLOR_FORMAT
     common_flags += -DMDSS_TARGET
 endif
