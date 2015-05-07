@@ -50,8 +50,6 @@ class HWCBufferAllocator : public BufferAllocator {
   DisplayError FreeBuffer(BufferInfo *buffer_info);
 
  private:
-  static const size_t kSecureBufferAlignment = 0x00100000;
-
   struct MetaBufferInfo {
     int alloc_type;              //!< Specifies allocation type set by the buffer allocator.
     void *base_addr;             //!< Specifies the base address of the allocated output buffer.

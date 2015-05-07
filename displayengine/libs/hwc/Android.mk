@@ -11,6 +11,12 @@ LOCAL_C_INCLUDES              := hardware/qcom/display/displayengine/include/ \
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
                                  -Wconversion -Wall -Werror \
                                  -DLOG_TAG=\"SDE\"
+
+# TODO: Move this to the common makefile
+ifeq ($(call is-board-platform-in-list, $(MASTER_SIDE_CP_TARGET_LIST)), true)
+    LOCAL_CFLAGS += -DMASTER_SIDE_CP
+endif
+
 LOCAL_SHARED_LIBRARIES        := libsde libqservice libbinder libhardware libhardware_legacy \
                                  libutils libcutils libsync libmemalloc libqdutils
 LOCAL_SRC_FILES               := hwc_session.cpp \
