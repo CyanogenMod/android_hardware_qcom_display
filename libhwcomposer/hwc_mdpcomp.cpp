@@ -539,6 +539,10 @@ bool MDPComp::canDoPartialUpdate(hwc_context_t *ctx,
        isDisplaySplit(ctx, mDpy)) {
         return false;
     }
+
+    if(ctx->listStats[mDpy].secureUI)
+        return false;
+
     return true;
 }
 
