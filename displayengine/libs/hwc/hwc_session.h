@@ -49,6 +49,8 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   int Deinit();
 
  private:
+  static const int kExternalConnectionTimeoutMs = 500;
+
   // hwc methods
   static int Open(const hw_module_t *module, const char* name, hw_device_t **device);
   static int Close(hw_device_t *device);
@@ -75,8 +77,8 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   int HotPlugHandler(bool connected);
   void ResetPanel();
   bool ValidateContentList(hwc_display_contents_1_t *content_list);
-  int CreateVirtualDisplay(HWCSession *hwc_session, hwc_display_contents_1_t *content_list);
-  int DestroyVirtualDisplay(HWCSession *hwc_session);
+  int CreateVirtualDisplay(hwc_display_contents_1_t *content_list);
+  int DestroyVirtualDisplay();
 
   // CoreEventHandler methods
   virtual DisplayError Hotplug(const CoreEventHotplug &hotplug);
