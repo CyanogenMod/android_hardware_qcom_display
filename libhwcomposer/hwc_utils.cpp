@@ -703,9 +703,8 @@ void setListStats(hwc_context_t *ctx,
         }
     }
 
-    if (ctx->listStats[dpy].yuvCount != 1) {
-        ctx->mPrevWHF[dpy].w = 0;
-        ctx->mPrevWHF[dpy].h = 0;
+    if (ctx->listStats[dpy].yuvCount == 0 ) {
+        memset(ctx->mPrevWHF[dpy], 0, MAX_MDP_YUV_COUNT * sizeof(Whf));
     }
 
     setYUVProp(ctx->listStats[dpy].yuvCount);
@@ -1348,18 +1347,25 @@ inline void updateSource(eTransform& orient, Whf& whf,
 }
 
 bool needToForceRotator(hwc_context_t *ctx, const int& dpy,
-         uint32_t w, uint32_t h, int transform) {
-    int nYuvCount = ctx->listStats[dpy].yuvCount;
+         uint32_t w, uint32_t h, int transform, const eDest& dest) {
     bool forceRot = false;
-    //Force rotator for resolution change only if 1 yuv layer on primary
-    if(nYuvCount == 1 && (!((transform & HWC_TRANSFORM_FLIP_H) ||
-            (transform & HWC_TRANSFORM_FLIP_V)))) {
-        uint32_t& prevWidth = ctx->mPrevWHF[dpy].w;
-        uint32_t& prevHeight = ctx->mPrevWHF[dpy].h;
+    //This Function gets called for YUV layers only
+    //Force rotator for resolution change for upto 2 YUV layers
+    ALOGD_IF(HWC_UTILS_DEBUG,
+            "%s: pipe = %d transform = %d Curr W X H =%d X %d",
+            __FUNCTION__, dest, transform, w, h);
+
+    if(!((transform & HWC_TRANSFORM_FLIP_H) ||
+            (transform & HWC_TRANSFORM_FLIP_V))) {
+        uint32_t& prevWidth = ctx->mPrevWHF[dpy][dest%MAX_MDP_YUV_COUNT].w;
+        uint32_t& prevHeight = ctx->mPrevWHF[dpy][dest%MAX_MDP_YUV_COUNT].h;
         if((prevWidth != w) || (prevHeight != h)) {
             uint32_t prevBufArea = prevWidth * prevHeight;
             if(prevBufArea) {
                 forceRot = true;
+                ALOGD_IF(HWC_UTILS_DEBUG,
+                   "%s: Forcing Rotator for prev W X H = %d X %d cur W X H = %d X %d",
+                   __FUNCTION__, prevWidth, prevHeight, w, h);
             }
             prevWidth = w;
             prevHeight = h;
@@ -1392,6 +1398,7 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
     calcExtDisplayPosition(ctx, hnd, dpy, crop, dst, transform, orient);
 
     bool forceRot = false;
+
     if(isYuvBuffer(hnd) && ctx->mMDP.version >= qdutils::MDP_V4_2 &&
        ctx->mMDP.version < qdutils::MDSS_V5) {
         downscale =  getDownscaleFactor(
@@ -1404,7 +1411,8 @@ int configureLowRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
         }
 
         forceRot = needToForceRotator(ctx, dpy, (uint32_t)getWidth(hnd),
-                (uint32_t)getHeight(hnd), transform);
+                (uint32_t)getHeight(hnd), transform, dest);
+
     }
 
     setMdpFlags(layer, mdpFlags, downscale, transform);
@@ -1467,9 +1475,10 @@ int configureHighRes(hwc_context_t *ctx, hwc_layer_1_t *layer,
             getMdpFormat(hnd->format), hnd->size);
 
     bool forceRot = false;
+
     if(isYuvBuffer(hnd)) {
         forceRot = needToForceRotator(ctx, dpy, (uint32_t)getWidth(hnd),
-                (uint32_t)getHeight(hnd), transform);
+                     (uint32_t)getHeight(hnd), transform, lDest);
     }
 
     setMdpFlags(layer, mdpFlagsL, 0, transform);
