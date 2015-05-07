@@ -567,19 +567,11 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     mDirtyRect = list->hwLayers[last].displayFrame;
 
     if (mDirtyLayerIndex != NO_UPDATING_LAYER &&
-            CBUtils::getuiClearRegion(list, clearRegion, layerProp,
-                                                    mDirtyLayerIndex)) {
-       int clear_w =  clearRegion.right -  clearRegion.left;
-       int clear_h =  clearRegion.bottom - clearRegion.top;
-       //mdp can't handle solid fill for one line
-       //making solid fill as full in this case
-       //disable swap rect if presents
-       if ((clear_w == 1) || (clear_h ==1)) {
-           clear(renderBuffer, mDirtyRect);
-           mDirtyLayerIndex = -1;
-       }else
-           clear(renderBuffer, clearRegion);
+           not CBUtils::uiClearRegion(list, ctx->mMDP.version, layerProp,
+                                   mDirtyLayerIndex, mEngine, renderBuffer)){
+        mDirtyLayerIndex = -1;
     }
+
     if (mDirtyLayerIndex != -1) {
         if (mDirtyLayerIndex == NO_UPDATING_LAYER) {
             mDirtyRect = clearRegion;
@@ -648,10 +640,9 @@ int CopyBit::drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
     }
 
     //Clear the transparent or left out region on the render buffer
-    hwc_rect_t clearRegion = {0,0,0,0};
     LayerProp *layerProp = ctx->layerProp[0];
-    if(CBUtils::getuiClearRegion(list, clearRegion, layerProp))
-        clear(renderBuffer, clearRegion);
+    CBUtils::uiClearRegion(list, ctx->mMDP.version, layerProp, -1,
+                                                    mEngine, renderBuffer);
 
     int copybitLayerCount = 0;
     for(int j = 0; j < ptorInfo->count; j++) {
