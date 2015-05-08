@@ -31,7 +31,6 @@
 namespace sdm {
 
 class HWPrimaryInterface;
-class HWInfoInterface;
 
 class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
  public:
@@ -70,7 +69,6 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
  private:
   Locker locker_;
   HWPrimaryInterface *hw_primary_intf_;
-  HWInfoInterface *hw_info_intf_;
 };
 
 }  // namespace sdm

@@ -37,12 +37,14 @@
 namespace sdm {
 
 class RotatorCtrl;
+class HWInfoInterface;
 
 class DisplayBase : public DisplayInterface {
  public:
   DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
               HWDeviceType hw_device_type, BufferSyncHandler *buffer_sync_handler,
-              CompManager *comp_manager, RotatorInterface *rotator_intf);
+              CompManager *comp_manager, RotatorInterface *rotator_intf,
+              HWInfoInterface *hw_info_intf);
   virtual ~DisplayBase() { }
   virtual DisplayError Init();
   virtual DisplayError Deinit();
@@ -90,6 +92,8 @@ class DisplayBase : public DisplayInterface {
   bool pending_commit_;
   bool vsync_enable_;
   bool underscan_supported_;
+  uint32_t max_mixer_stages_;
+  HWInfoInterface *hw_info_intf_;
 };
 
 }  // namespace sdm

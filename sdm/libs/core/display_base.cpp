@@ -27,6 +27,7 @@
 #include <utils/debug.h>
 
 #include "display_base.h"
+#include "hw_info_interface.h"
 
 #define __CLASS__ "DisplayBase"
 
@@ -35,12 +36,14 @@ namespace sdm {
 // TODO(user): Have a single structure handle carries all the interface pointers and variables.
 DisplayBase::DisplayBase(DisplayType display_type, DisplayEventHandler *event_handler,
                          HWDeviceType hw_device_type, BufferSyncHandler *buffer_sync_handler,
-                         CompManager *comp_manager, RotatorInterface *rotator_intf)
+                         CompManager *comp_manager, RotatorInterface *rotator_intf,
+                         HWInfoInterface *hw_info_intf)
   : display_type_(display_type), event_handler_(event_handler), hw_device_type_(hw_device_type),
     buffer_sync_handler_(buffer_sync_handler), comp_manager_(comp_manager),
     rotator_intf_(rotator_intf), state_(kStateOff), hw_device_(0), display_comp_ctx_(0),
     display_attributes_(NULL), num_modes_(0), active_mode_index_(0), pending_commit_(false),
-    vsync_enable_(false), underscan_supported_(false) {
+    vsync_enable_(false), underscan_supported_(false), max_mixer_stages_(0),
+    hw_info_intf_(hw_info_intf) {
 }
 
 DisplayError DisplayBase::Init() {
@@ -84,6 +87,17 @@ DisplayError DisplayBase::Init() {
     if (error != kErrorNone) {
       goto CleanupOnError;
     }
+  }
+
+  if (hw_info_intf_) {
+    HWResourceInfo hw_resource_info = HWResourceInfo();
+    hw_info_intf_->GetHWResourceInfo(&hw_resource_info);
+    int max_mixer_stages = hw_resource_info.num_blending_stages;
+    int property_value = Debug::GetMaxPipesPerMixer();
+    if (property_value >= 0) {
+      max_mixer_stages = MIN(UINT32(property_value), hw_resource_info.num_blending_stages);
+    }
+    DisplayBase::SetMaxMixerStages(max_mixer_stages);
   }
 
   return kErrorNone;
@@ -372,6 +386,10 @@ DisplayError DisplayBase::SetMaxMixerStages(uint32_t max_mixer_stages) {
 
   if (comp_manager_) {
     error = comp_manager_->SetMaxMixerStages(display_comp_ctx_, max_mixer_stages);
+
+    if (error == kErrorNone) {
+      max_mixer_stages_ = max_mixer_stages;
+    }
   }
 
   return error;
@@ -389,7 +407,8 @@ DisplayError DisplayBase::IsScalingValid(const LayerRect &crop, const LayerRect 
 void DisplayBase::AppendDump(char *buffer, uint32_t length) {
   DumpImpl::AppendString(buffer, length, "\n-----------------------");
   DumpImpl::AppendString(buffer, length, "\ndevice type: %u", display_type_);
-  DumpImpl::AppendString(buffer, length, "\nstate: %u, vsync on: %u", state_, INT(vsync_enable_));
+  DumpImpl::AppendString(buffer, length, "\nstate: %u, vsync on: %u, max. mixer stages: %u",
+                         state_, INT(vsync_enable_), max_mixer_stages_);
   DumpImpl::AppendString(buffer, length, "\nnum configs: %u, active config index: %u",
                          num_modes_, active_mode_index_);
 
