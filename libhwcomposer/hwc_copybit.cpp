@@ -82,6 +82,29 @@ bool CopyBit::canUseCopybitForYUV(hwc_context_t *ctx) {
     return true;
 }
 
+bool CopyBit::isSmartBlitPossible(const hwc_display_contents_1_t *list){
+    if(list->numHwLayers > 2) {
+        hwc_rect_t displayFrame0 = {0, 0, 0, 0};
+        hwc_rect_t displayFrame1 = {0, 0, 0, 0};
+        for (unsigned int i=0; i<list->numHwLayers -1; i++) {
+            hwc_rect_t displayFrame = getIntersection(mDirtyRect,
+                                                list->hwLayers[i].displayFrame);
+            if (isValidRect(displayFrame) && !isValidRect(displayFrame0)) {
+                displayFrame0 = displayFrame;
+            } else if(isValidRect(displayFrame)) {
+                displayFrame1 = displayFrame;
+                break;
+            }
+        }
+        if((displayFrame0 == displayFrame1) &&
+            not (list->flags & (MDP_ROT_90 | MDP_FLIP_UD | MDP_FLIP_LR))) {
+            ALOGD_IF (DEBUG_COPYBIT, "%s:Smart Bilt Possible",__FUNCTION__);
+            return true;
+        }
+    }
+    return false;
+}
+
 bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx,
                                         hwc_display_contents_1_t *list,
                                         int dpy) {
@@ -99,7 +122,11 @@ bool CopyBit::canUseCopybitForRGB(hwc_context_t *ctx,
         unsigned int renderArea = getRGBRenderingArea(ctx, list);
             ALOGD_IF (DEBUG_COPYBIT, "%s:renderArea %u, fbArea %u",
                                   __FUNCTION__, renderArea, fbArea);
-        if (renderArea < (mDynThreshold * fbArea)) {
+        double dynThreshold = mDynThreshold;
+        if(not isSmartBlitPossible(list))
+            dynThreshold -= 1;
+
+        if (renderArea < (dynThreshold * fbArea)) {
             return true;
         }
     } else if ((compositionType & qdutils::COMPOSITION_TYPE_MDP)) {
@@ -319,6 +346,20 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     if (ctx->listStats[dpy].numAppLayers > MAX_NUM_APP_LAYERS) {
         // Reached max layers supported by HWC.
         return false;
+    }
+
+    mDirtyLayerIndex =  checkDirtyRect(ctx, list, dpy);
+    ALOGD_IF (DEBUG_COPYBIT, "%s:Dirty Layer Index: %d",
+                                       __FUNCTION__, mDirtyLayerIndex);
+    hwc_rect_t clearRegion = {0,0,0,0};
+    int last = (uint32_t)list->numHwLayers - 1;
+    mDirtyRect = list->hwLayers[last].displayFrame;
+    if (mDirtyLayerIndex != -1) {
+        if (mDirtyLayerIndex == NO_UPDATING_LAYER) {
+            mDirtyRect = clearRegion;
+        } else {
+            mDirtyRect = list->hwLayers[mDirtyLayerIndex].displayFrame;
+        }
     }
 
     bool useCopybitForYUV = canUseCopybitForYUV(ctx);
@@ -554,25 +595,10 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         }
     }
 
-    mDirtyLayerIndex =  checkDirtyRect(ctx, list, dpy);
-    ALOGD_IF (DEBUG_COPYBIT, "%s:Dirty Layer Index: %d",
-                                       __FUNCTION__, mDirtyLayerIndex);
-
-    hwc_rect_t clearRegion = {0,0,0,0};
-    mDirtyRect = list->hwLayers[last].displayFrame;
-
     if (mDirtyLayerIndex != NO_UPDATING_LAYER &&
            not CBUtils::uiClearRegion(list, ctx->mMDP.version, layerProp,
                                    mDirtyLayerIndex, mEngine, renderBuffer)){
         mDirtyLayerIndex = -1;
-    }
-
-    if (mDirtyLayerIndex != -1) {
-        if (mDirtyLayerIndex == NO_UPDATING_LAYER) {
-            mDirtyRect = clearRegion;
-        } else {
-            mDirtyRect = list->hwLayers[mDirtyLayerIndex].displayFrame;
-        }
     }
 
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
@@ -1133,9 +1159,10 @@ void CopyBit::getLayerResolution(const hwc_layer_1_t* layer,
                                  unsigned int& width, unsigned int& height)
 {
     hwc_rect_t displayFrame  = layer->displayFrame;
+    hwc_rect_t result = getIntersection(mDirtyRect, displayFrame);
 
-    width = displayFrame.right - displayFrame.left;
-    height = displayFrame.bottom - displayFrame.top;
+    width = result.right - result.left;
+    height = result.bottom - result.top;
 }
 
 bool CopyBit::validateParams(hwc_context_t *ctx,
