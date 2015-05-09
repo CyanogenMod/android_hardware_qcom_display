@@ -1,15 +1,15 @@
 ifeq ($(call is-board-platform-in-list, msm8996),true)
-    TARGET_USES_SDE = true
+    TARGET_USES_SDM = true
 else
-    TARGET_USES_SDE = false
+    TARGET_USES_SDM = false
 endif
 
 display-hals := libgralloc libcopybit liblight libmemtrack libqservice libqdutils
 display-hals += hdmi_cec
 
-ifeq ($(TARGET_USES_SDE), true)
-    sde-libs := displayengine/libs
-    display-hals += $(sde-libs)/utils $(sde-libs)/core $(sde-libs)/hwc
+ifeq ($(TARGET_USES_SDM), true)
+    sdm-libs := sdm/libs
+    display-hals += $(sdm-libs)/utils $(sdm-libs)/core $(sdm-libs)/hwc
 else
     display-hals += libgenlock libhwcomposer liboverlay libhdmi
 endif
