@@ -25,6 +25,8 @@
 #ifndef __HWC_DISPLAY_VIRTUAL_H__
 #define __HWC_DISPLAY_VIRTUAL_H__
 
+#include <qdMetaData.h>
+#include <gralloc_priv.h>
 #include "hwc_display.h"
 
 namespace sde {
@@ -42,6 +44,8 @@ class HWCDisplayVirtual : public HWCDisplay {
  private:
   int SetOutputBuffer(hwc_display_contents_1_t *content_list);
   void DumpOutputBuffer(hwc_display_contents_1_t *content_list);
+  int GetWidth(const private_handle_t* handle);
+  int GetHeight(const private_handle_t* handle);
 
   bool dump_output_layer_;
 };

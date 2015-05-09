@@ -90,6 +90,10 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   void SetFrameDumpConfig(const android::Parcel *input_parcel);
   android::status_t SetMaxMixerStages(const android::Parcel *input_parcel);
   android::status_t SetDisplayMode(const android::Parcel *input_parcel);
+  android::status_t SetSecondaryDisplayStatus(const android::Parcel *input_parcel);
+  void SetFrameBufferResolution(int disp, hwc_display_contents_1_t *content_list);
+  void AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height,
+                              uint32_t *src_width, uint32_t *src_height);
 
   static Locker locker_;
   CoreInterface *core_intf_;

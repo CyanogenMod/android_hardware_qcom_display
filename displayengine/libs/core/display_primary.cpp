@@ -214,6 +214,12 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
   return error;
 }
 
+DisplayError DisplayPrimary::IsScalingValid(const LayerRect &crop, const LayerRect &dst,
+                                            bool rotate90) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::IsScalingValid(crop, dst, rotate90);
+}
+
 void DisplayPrimary::AppendDump(char *buffer, uint32_t length) {
   SCOPE_LOCK(locker_);
   DisplayBase::AppendDump(buffer, length);

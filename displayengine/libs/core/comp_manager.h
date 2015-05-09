@@ -49,6 +49,7 @@ class CompManager : public DumpImpl {
   bool ProcessIdleTimeout(Handle display_ctx);
   void ProcessThermalEvent(Handle display_ctx, int64_t thermal_level);
   DisplayError SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages);
+  DisplayError ValidateScaling(const LayerRect &crop, const LayerRect &dst, bool rotate90);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);

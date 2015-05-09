@@ -46,7 +46,8 @@ HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, 
                        int id)
   : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL),
     flush_(false), output_buffer_(NULL), dump_frame_count_(0), dump_frame_index_(0),
-    dump_input_layers_(false), swap_interval_zero_(false) {
+    dump_input_layers_(false), swap_interval_zero_(false), framebuffer_config_(NULL),
+    display_paused_(false) {
 }
 
 int HWCDisplay::Init() {
@@ -64,6 +65,13 @@ int HWCDisplay::Init() {
     }
   }
 
+  framebuffer_config_ = new DisplayConfigVariableInfo();
+  if (!framebuffer_config_) {
+    DLOGV("Failed to allocate memory for custom framebuffer config.");
+    core_intf_->DestroyDisplay(display_intf_);
+    return -EINVAL;
+  }
+
   return 0;
 }
 
@@ -78,6 +86,8 @@ int HWCDisplay::Deinit() {
     delete[] layer_stack_memory_.raw;
     layer_stack_memory_.raw = NULL;
   }
+
+  delete framebuffer_config_;
 
   return 0;
 }
@@ -150,10 +160,15 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
   DisplayError error = kErrorNone;
 
   DisplayConfigVariableInfo variable_config;
-  error = display_intf_->GetConfig(config, &variable_config);
-  if (error != kErrorNone) {
-    DLOGE("GetConfig variable info failed. Error = %d", error);
-    return -EINVAL;
+  uint32_t active_config = UINT32(GetActiveConfig());
+  if (IsFrameBufferScaled() && config == active_config) {
+    variable_config = *framebuffer_config_;
+  } else {
+    error = display_intf_->GetConfig(config, &variable_config);
+    if (error != kErrorNone) {
+      DLOGE("GetConfig variable info failed. Error = %d", error);
+      return -EINVAL;
+    }
   }
 
   for (int i = 0; attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
@@ -368,7 +383,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       }
     }
 
-    SetRect(hwc_layer.displayFrame, &layer.dst_rect);
+    hwc_rect_t scaled_display_frame = hwc_layer.displayFrame;
+    ScaleDisplayFrame(&scaled_display_frame);
+
+    SetRect(scaled_display_frame, &layer.dst_rect);
     SetRect(hwc_layer.sourceCropf, &layer.src_rect);
     for (size_t j = 0; j < hwc_layer.visibleRegionScreen.numRects; j++) {
         SetRect(hwc_layer.visibleRegionScreen.rects[j], &layer.visible_regions.rect[j]);
@@ -807,6 +825,152 @@ const char *HWCDisplay::GetDisplayString() {
     return "virtual";
   default:
     return "invalid";
+  }
+}
+
+int HWCDisplay::SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels) {
+  if (x_pixels <= 0 || y_pixels <= 0) {
+    DLOGV("Unsupported config: x_pixels=%d, y_pixels=%d", x_pixels, y_pixels);
+    return -EINVAL;
+  }
+
+  if (framebuffer_config_->x_pixels == x_pixels && framebuffer_config_->y_pixels == y_pixels) {
+    return 0;
+  }
+
+  DisplayConfigVariableInfo active_config;
+  int active_config_index = GetActiveConfig();
+  DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
+  if (error != kErrorNone) {
+    DLOGV("GetConfig variable info failed. Error = %d", error);
+    return -EINVAL;
+  }
+
+  if (active_config.x_pixels <= 0 || active_config.y_pixels <= 0) {
+    DLOGV("Invalid panel resolution (%dx%d)", active_config.x_pixels, active_config.y_pixels);
+    return -EINVAL;
+  }
+
+  // Create rects to represent the new source and destination crops
+  LayerRect crop = LayerRect(0, 0, FLOAT(x_pixels), FLOAT(y_pixels));
+  LayerRect dst = LayerRect(0, 0, FLOAT(active_config.x_pixels), FLOAT(active_config.y_pixels));
+  // Set rotate90 to false since this is taken care of during regular composition.
+  bool rotate90 = false;
+  error = display_intf_->IsScalingValid(crop, dst, rotate90);
+  if (error != kErrorNone) {
+    DLOGV("Unsupported resolution: (%dx%d)", x_pixels, y_pixels);
+    return -EINVAL;
+  }
+
+  uint32_t panel_width =
+          UINT32((FLOAT(active_config.x_pixels) * 25.4f) / FLOAT(active_config.x_dpi));
+  uint32_t panel_height =
+          UINT32((FLOAT(active_config.y_pixels) * 25.4f) / FLOAT(active_config.y_dpi));
+  framebuffer_config_->x_pixels = x_pixels;
+  framebuffer_config_->y_pixels = y_pixels;
+  framebuffer_config_->vsync_period_ns = active_config.vsync_period_ns;
+  framebuffer_config_->x_dpi =
+          (FLOAT(framebuffer_config_->x_pixels) * 25.4f) / FLOAT(panel_width);
+  framebuffer_config_->y_dpi =
+          (FLOAT(framebuffer_config_->y_pixels) * 25.4f) / FLOAT(panel_height);
+
+  DLOGI("New framebuffer resolution (%dx%d)", framebuffer_config_->x_pixels,
+        framebuffer_config_->y_pixels);
+
+  return 0;
+}
+
+void HWCDisplay::GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
+  *x_pixels = framebuffer_config_->x_pixels;
+  *y_pixels = framebuffer_config_->y_pixels;
+}
+
+void HWCDisplay::ScaleDisplayFrame(hwc_rect_t *display_frame) {
+  if (!IsFrameBufferScaled()) {
+    return;
+  }
+
+  int active_config_index = GetActiveConfig();
+  DisplayConfigVariableInfo active_config;
+  DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
+  if (error != kErrorNone) {
+    DLOGE("GetConfig variable info failed. Error = %d", error);
+    return;
+  }
+
+  float custom_x_pixels = FLOAT(framebuffer_config_->x_pixels);
+  float custom_y_pixels = FLOAT(framebuffer_config_->y_pixels);
+  float active_x_pixels = FLOAT(active_config.x_pixels);
+  float active_y_pixels = FLOAT(active_config.y_pixels);
+  float x_pixels_ratio = active_x_pixels / custom_x_pixels;
+  float y_pixels_ratio = active_y_pixels / custom_y_pixels;
+  float layer_width = FLOAT(display_frame->right - display_frame->left);
+  float layer_height = FLOAT(display_frame->bottom - display_frame->top);
+
+  display_frame->left = INT(x_pixels_ratio * FLOAT(display_frame->left));
+  display_frame->top = INT(y_pixels_ratio * FLOAT(display_frame->top));
+  display_frame->right = INT(FLOAT(display_frame->left) + layer_width * x_pixels_ratio);
+  display_frame->bottom = INT(FLOAT(display_frame->top) + layer_height * y_pixels_ratio);
+}
+
+bool HWCDisplay::IsFrameBufferScaled() {
+  if (framebuffer_config_->x_pixels == 0 || framebuffer_config_->y_pixels == 0) {
+    return false;
+  }
+  uint32_t panel_x_pixels = 0;
+  uint32_t panel_y_pixels = 0;
+  GetPanelResolution(&panel_x_pixels, &panel_y_pixels);
+  return (framebuffer_config_->x_pixels != panel_x_pixels) ||
+          (framebuffer_config_->y_pixels != panel_y_pixels);
+}
+
+void HWCDisplay::GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
+  DisplayConfigVariableInfo active_config;
+  int active_config_index = GetActiveConfig();
+  DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
+  if (error != kErrorNone) {
+    DLOGE("GetConfig variable info failed. Error = %d", error);
+    return;
+  }
+  *x_pixels = active_config.x_pixels;
+  *y_pixels = active_config.y_pixels;
+}
+
+int HWCDisplay::SetDisplayStatus(uint32_t display_status) {
+  int status = 0;
+
+  switch (display_status) {
+  case kDisplayStatusResume:
+    display_paused_ = false;
+  case kDisplayStatusOnline:
+    status = SetPowerMode(HWC_POWER_MODE_NORMAL);
+    break;
+  case kDisplayStatusPause:
+    display_paused_ = true;
+  case kDisplayStatusOffline:
+    status = SetPowerMode(HWC_POWER_MODE_OFF);
+    break;
+  default:
+    DLOGW("Invalid display status %d", display_status);
+    return -EINVAL;
+  }
+
+  return status;
+}
+
+void HWCDisplay::MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list) {
+  for (size_t i = 0 ; i < (content_list->numHwLayers - 1); i++) {
+    hwc_layer_1_t *layer = &content_list->hwLayers[i];
+    layer->compositionType = HWC_OVERLAY;
+  }
+}
+
+void HWCDisplay::CloseAcquireFences(hwc_display_contents_1_t *content_list) {
+  for (size_t i = 0; i < content_list->numHwLayers; i++) {
+    if (content_list->hwLayers[i].acquireFenceFd >= 0) {
+      close(content_list->hwLayers[i].acquireFenceFd);
+      content_list->hwLayers[i].acquireFenceFd = -1;
+    }
   }
 }
 
