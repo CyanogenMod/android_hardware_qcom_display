@@ -41,6 +41,8 @@ class CompManager : public DumpImpl {
   DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
                                const HWPanelInfo &hw_panel_info, Handle *res_mgr_hnd);
   DisplayError UnregisterDisplay(Handle res_mgr_hnd);
+  void ReconfigureDisplay(Handle display_ctx, const HWDisplayAttributes &attributes,
+                          const HWPanelInfo &hw_panel_info);
   void PrePrepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError PostPrepare(Handle display_ctx, HWLayers *hw_layers);

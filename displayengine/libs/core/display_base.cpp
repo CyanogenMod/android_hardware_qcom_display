@@ -339,36 +339,6 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
   return error;
 }
 
-DisplayError DisplayBase::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
-  DisplayError error = kErrorNone;
-
-  if (!variable_info) {
-    return kErrorParameters;
-  }
-
-  HWDisplayAttributes display_attributes = display_attributes_[active_mode_index_];
-
-  display_attributes.x_pixels = variable_info->x_pixels;
-  display_attributes.y_pixels = variable_info->y_pixels;
-  display_attributes.fps = variable_info->fps;
-
-  // if display is already connected, unregister display from composition manager and register
-  // the display with new configuration.
-  if (display_comp_ctx_) {
-    comp_manager_->UnregisterDisplay(display_comp_ctx_);
-  }
-
-  error = comp_manager_->RegisterDisplay(display_type_, display_attributes, hw_panel_info_,
-                                         &display_comp_ctx_);
-  if (error != kErrorNone) {
-    return error;
-  }
-
-  display_attributes_[active_mode_index_] = display_attributes;
-
-  return kErrorNone;
-}
-
 DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
   DisplayError error = kErrorNone;
 

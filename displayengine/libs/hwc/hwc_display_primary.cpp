@@ -53,6 +53,10 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
+  if (use_metadata_refresh_rate_) {
+    SetRefreshRate(metadata_refresh_rate_);
+  }
+
   return 0;
 }
 
@@ -80,6 +84,30 @@ DisplayError HWCDisplayPrimary::SetDisplayMode(uint32_t mode) {
   }
 
   return error;
+}
+
+int HWCDisplayPrimary::SetActiveConfig(uint32_t index) {
+  DisplayError error = kErrorNone;
+
+  if (display_intf_) {
+    error = display_intf_->SetActiveConfig(index);
+  }
+
+  return error;
+}
+
+int HWCDisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
+  DisplayError error = kErrorNone;
+
+  if (display_intf_) {
+    error = display_intf_->SetRefreshRate(refresh_rate);
+  }
+
+  return error;
+}
+
+void HWCDisplayPrimary::SetMetaDataRefreshRateFlag(bool enable) {
+  use_metadata_refresh_rate_ = enable;
 }
 
 }  // namespace sde

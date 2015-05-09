@@ -174,6 +174,19 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
   HWDisplayAttributes() : is_device_split(false), split_left(0), always_src_split(false) { }
 
   void Reset() { *this = HWDisplayAttributes(); }
+
+  bool operator !=(const HWDisplayAttributes &attributes) {
+    return ((is_device_split != attributes.is_device_split) ||
+            (split_left != attributes.split_left) ||
+            (always_src_split != attributes.always_src_split) ||
+            (x_pixels != attributes.x_pixels) || (y_pixels != attributes.y_pixels) ||
+            (x_dpi != attributes.x_dpi) || (y_dpi != attributes.y_dpi) || (fps != attributes.fps) ||
+            (vsync_period_ns != attributes.vsync_period_ns) || (v_total != attributes.v_total));
+  }
+
+  bool operator ==(const HWDisplayAttributes &attributes) {
+    return !(operator !=(attributes));
+  }
 };
 
 // HWEventHandler - Implemented in DisplayBase and HWInterface implementation

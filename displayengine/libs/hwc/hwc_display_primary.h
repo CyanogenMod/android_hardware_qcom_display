@@ -35,6 +35,9 @@ class HWCDisplayPrimary : public HWCDisplay {
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
   virtual DisplayError SetDisplayMode(uint32_t mode);
+  virtual int SetActiveConfig(uint32_t index);
+  virtual int SetRefreshRate(uint32_t refresh_rate);
+  virtual void SetMetaDataRefreshRateFlag(bool enable);
 };
 
 }  // namespace sde

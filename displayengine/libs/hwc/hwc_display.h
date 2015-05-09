@@ -42,8 +42,8 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values);
   virtual int GetActiveConfig();
   virtual int SetActiveConfig(int index);
-  virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual int SetActiveConfig(hwc_display_contents_1_t *content_list);
+  virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
   virtual uint32_t GetLastPowerMode();
@@ -114,6 +114,7 @@ class HWCDisplay : public DisplayEventHandler {
   bool IsFrameBufferScaled();
   void MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list);
   void CloseAcquireFences(hwc_display_contents_1_t *content_list);
+  uint32_t RoundToStandardFPS(uint32_t fps);
 
   enum {
     INPUT_LAYER_DUMP,
@@ -137,6 +138,8 @@ class HWCDisplay : public DisplayEventHandler {
   bool swap_interval_zero_;
   DisplayConfigVariableInfo *framebuffer_config_;
   bool display_paused_;
+  bool use_metadata_refresh_rate_;
+  uint32_t metadata_refresh_rate_;
 };
 
 }  // namespace sde

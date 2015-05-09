@@ -54,6 +54,7 @@ class HWPrimary : public HWDevice, public HWPrimaryInterface {
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetVSyncState(bool enable);
   virtual DisplayError SetDisplayMode(const HWDisplayMode hw_display_mode);
+  virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
 
  private:
   // Panel modes for the MSMFB_LPM_ENABLE ioctl
@@ -70,12 +71,15 @@ class HWPrimary : public HWDevice, public HWPrimaryInterface {
   void HandleBlank(char *data);
   void HandleIdleTimeout(char *data);
   void HandleThermal(char *data);
+  DisplayError PopulateDisplayAttributes();
 
   pollfd poll_fds_[kNumDisplayEvents];
   pthread_t event_thread_;
   const char *event_thread_name_;
   bool fake_vsync_;
   bool exit_threads_;
+  HWDisplayAttributes display_attributes_;
+  bool config_changed_;
 };
 
 }  // namespace sde

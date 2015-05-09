@@ -127,7 +127,7 @@ DisplayError DisplayHDMI::SetDisplayState(DisplayState state) {
 
 DisplayError DisplayHDMI::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
   SCOPE_LOCK(locker_);
-  return DisplayBase::SetActiveConfig(variable_info);
+  return kErrorNotSupported;
 }
 
 DisplayError DisplayHDMI::SetActiveConfig(uint32_t index) {
@@ -156,6 +156,11 @@ DisplayError DisplayHDMI::IsScalingValid(const LayerRect &crop, const LayerRect 
                                          bool rotate90) {
   SCOPE_LOCK(locker_);
   return DisplayBase::IsScalingValid(crop, dst, rotate90);
+}
+
+DisplayError DisplayHDMI::SetRefreshRate(uint32_t refresh_rate) {
+  SCOPE_LOCK(locker_);
+  return kErrorNotSupported;
 }
 
 int DisplayHDMI::GetBestConfig() {

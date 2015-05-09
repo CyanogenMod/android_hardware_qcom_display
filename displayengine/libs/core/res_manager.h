@@ -43,6 +43,8 @@ class ResManager : public DumpImpl {
   DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
                                const HWPanelInfo &hw_panel_info, Handle *display_ctx);
   DisplayError UnregisterDisplay(Handle display_ctx);
+  void ReconfigureDisplay(Handle display_ctx, const HWDisplayAttributes &attributes,
+                          const HWPanelInfo &hw_panel_info);
   DisplayError Start(Handle display_ctx);
   DisplayError Stop(Handle display_ctx);
   DisplayError Acquire(Handle display_ctx, HWLayers *hw_layers);

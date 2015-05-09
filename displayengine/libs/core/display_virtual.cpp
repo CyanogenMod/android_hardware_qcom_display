@@ -127,7 +127,33 @@ DisplayError DisplayVirtual::SetDisplayState(DisplayState state) {
 
 DisplayError DisplayVirtual::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
   SCOPE_LOCK(locker_);
-  return DisplayBase::SetActiveConfig(variable_info);
+  DisplayError error = kErrorNone;
+
+  if (!variable_info) {
+    return kErrorParameters;
+  }
+
+  HWDisplayAttributes display_attributes = display_attributes_[active_mode_index_];
+
+  display_attributes.x_pixels = variable_info->x_pixels;
+  display_attributes.y_pixels = variable_info->y_pixels;
+  display_attributes.fps = variable_info->fps;
+
+  // if display is already connected, unregister display from composition manager and register
+  // the display with new configuration.
+  if (display_comp_ctx_) {
+    comp_manager_->UnregisterDisplay(display_comp_ctx_);
+  }
+
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes, hw_panel_info_,
+                                         &display_comp_ctx_);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  display_attributes_[active_mode_index_] = display_attributes;
+
+  return error;
 }
 
 DisplayError DisplayVirtual::SetActiveConfig(uint32_t index) {
@@ -156,6 +182,11 @@ DisplayError DisplayVirtual::IsScalingValid(const LayerRect &crop, const LayerRe
                                             bool rotate90) {
   SCOPE_LOCK(locker_);
   return DisplayBase::IsScalingValid(crop, dst, rotate90);
+}
+
+DisplayError DisplayVirtual::SetRefreshRate(uint32_t refresh_rate) {
+  SCOPE_LOCK(locker_);
+  return kErrorNotSupported;
 }
 
 void DisplayVirtual::AppendDump(char *buffer, uint32_t length) {

@@ -94,6 +94,7 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   void SetFrameBufferResolution(int disp, hwc_display_contents_1_t *content_list);
   void AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height,
                               uint32_t *src_width, uint32_t *src_height);
+  android::status_t ConfigureRefreshRate(const android::Parcel *input_parcel);
 
   static Locker locker_;
   CoreInterface *core_intf_;
