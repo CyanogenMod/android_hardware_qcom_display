@@ -31,14 +31,15 @@
 
 #include <ui/Region.h>
 #include "hwc_utils.h"
+#include "copybit.h"
 
 using namespace qhwc;
 namespace qdutils {
 class CBUtils {
 public:
-static int getuiClearRegion(hwc_display_contents_1_t* list,
-                              hwc_rect_t &clearWormholeRec,
-                              LayerProp *layerProp, int dirtyIndex = -1);
+    static int uiClearRegion(hwc_display_contents_1_t* list,
+            int version, LayerProp *layerProp, int dirtyIndex,
+            copybit_device_t *copybit, private_handle_t *renderBuffer);
 };
 }//namespace qdutils
 #endif /* end of include guard: CB_UTIL_H*/

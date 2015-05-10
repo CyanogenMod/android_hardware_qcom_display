@@ -36,12 +36,28 @@ void getUnion(hwc_rect_t& rect1,hwc_rect_t& rect2, hwc_rect_t& irect) {
     irect.bottom = max(rect1.bottom, rect2.bottom);
 }
 
+int clear (copybit_device_t *copybit, private_handle_t* hnd, hwc_rect_t& rect)
+{
+    int ret = 0;
+    copybit_rect_t clear_rect = {rect.left, rect.top,rect.right,rect.bottom};
+
+    copybit_image_t buf;
+    buf.w = ALIGN(getWidth(hnd),32);
+    buf.h = getHeight(hnd);
+    buf.format = hnd->format;
+    buf.base = (void *)hnd->base;
+    buf.handle = (native_handle_t *)hnd;
+
+    ret = copybit->clear(copybit, &buf, &clear_rect);
+    return ret;
+}
 using namespace android;
 using namespace qhwc;
 namespace qdutils {
 
-int CBUtils::getuiClearRegion(hwc_display_contents_1_t* list,
-          hwc_rect_t &clearWormholeRect, LayerProp *layerProp, int dirtyIndex) {
+int CBUtils::uiClearRegion(hwc_display_contents_1_t* list,
+        int version, LayerProp *layerProp,  int dirtyIndex,
+            copybit_device_t *copybit, private_handle_t *renderBuffer) {
 
     size_t last = list->numHwLayers - 1;
     hwc_rect_t fbFrame = list->hwLayers[last].displayFrame;
@@ -108,14 +124,22 @@ int CBUtils::getuiClearRegion(hwc_display_contents_1_t* list,
    while (it != end) {
        const Rect& r = *it++;
        hwc_rect_t tmpWormRect = {r.left,r.top,r.right,r.bottom};
-       int dst_w =  clearWormholeRect.right -  clearWormholeRect.left;
-       int dst_h =  clearWormholeRect.bottom -  clearWormholeRect.top;
-
-       if (!(dst_w || dst_h))
-             clearWormholeRect = tmpWormRect;
-       else
-             getUnion(clearWormholeRect, tmpWormRect, clearWormholeRect);
-
+       if (version == qdutils::MDP_V3_0_4 ||
+               version == qdutils::MDP_V3_0_5) {
+           int clear_w =  tmpWormRect.right - tmpWormRect.left;
+           int clear_h =  tmpWormRect.bottom - tmpWormRect.top;
+           //mdp can't handle solid fill for one line
+           //making solid fill as full in this case
+           //disable swap rect if presents
+           if ((clear_w == 1) || (clear_h ==1)) {
+               clear(copybit, renderBuffer, fbFrame);
+               return 0;
+           } else {
+               clear(copybit, renderBuffer, tmpWormRect);
+           }
+       } else {
+           clear(copybit, renderBuffer, tmpWormRect);
+       }
    }
    return 1;
 }
