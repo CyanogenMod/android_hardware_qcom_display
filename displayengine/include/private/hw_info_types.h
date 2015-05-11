@@ -106,6 +106,24 @@ enum HWDisplayPort {
   kPortEDP,
 };
 
+/*! @brief This enumeration holds the all possible scan types. */
+enum HWScanSupport {
+  kScanNotSupported,
+  kScanAlwaysOverscanned,
+  kScanAlwaysUnderscanned,
+  kScanBoth,
+};
+
+/*! @brief This structure holds the scan support for different timing modes. */
+struct HWScanInfo {
+  HWScanSupport pt_scan_support;  //!< Scan support for preferred timing
+  HWScanSupport it_scan_support;  //!< Scan support for digital monitor or industry timings
+  HWScanSupport cea_scan_support; //!< Scan support for CEA resolution timings
+
+  HWScanInfo() : pt_scan_support(kScanNotSupported), it_scan_support(kScanNotSupported),
+                 cea_scan_support(kScanNotSupported) { }
+};
+
 /*! @brief This structure describes the split configuration of a display panel. */
 struct HWSplitInfo {
   uint32_t left_split;

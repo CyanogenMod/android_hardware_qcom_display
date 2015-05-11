@@ -120,6 +120,11 @@ DisplayError DisplayVirtual::GetVSyncState(bool *enabled) {
   return DisplayBase::GetVSyncState(enabled);
 }
 
+bool DisplayVirtual::IsUnderscanSupported() {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::IsUnderscanSupported();
+}
+
 DisplayError DisplayVirtual::SetDisplayState(DisplayState state) {
   SCOPE_LOCK(locker_);
   return DisplayBase::SetDisplayState(state);

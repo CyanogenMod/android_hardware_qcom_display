@@ -58,14 +58,17 @@ class DisplayHDMI : public DisplayBase, DumpImpl {
   virtual DisplayError SetDisplayMode(uint32_t mode);
   virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
+  virtual bool IsUnderscanSupported();
   virtual void AppendDump(char *buffer, uint32_t length);
 
  private:
   virtual int GetBestConfig();
+  virtual void GetScanSupport();
 
   Locker locker_;
   HWHDMIInterface *hw_hdmi_intf_;
   HWInfoInterface *hw_info_intf_;
+  HWScanSupport scan_support_;
 };
 
 }  // namespace sde

@@ -60,6 +60,9 @@ DisplayError DisplayHDMI::Init() {
     HWHDMIInterface::Destroy(hw_hdmi_intf_);
   }
 
+  GetScanSupport();
+  underscan_supported_ = (scan_support_ == kScanAlwaysUnderscanned) || (scan_support_ == kScanBoth);
+
   return error;
 }
 
@@ -163,6 +166,11 @@ DisplayError DisplayHDMI::SetRefreshRate(uint32_t refresh_rate) {
   return kErrorNotSupported;
 }
 
+bool DisplayHDMI::IsUnderscanSupported() {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::IsUnderscanSupported();
+}
+
 int DisplayHDMI::GetBestConfig() {
   uint32_t best_config_mode = 0;
   HWDisplayAttributes *best = &display_attributes_[0];
@@ -202,6 +210,36 @@ int DisplayHDMI::GetBestConfig() {
   }
 
   return best_config_mode;
+}
+
+void DisplayHDMI::GetScanSupport() {
+  DisplayError error = kErrorNone;
+  uint32_t video_format = -1;
+  uint32_t max_cea_format = -1;
+  HWScanInfo scan_info = HWScanInfo();
+  hw_hdmi_intf_->GetHWScanInfo(&scan_info);
+
+  error = hw_hdmi_intf_->GetVideoFormat(active_mode_index_, &video_format);
+  if (error != kErrorNone) {
+    return;
+  }
+
+  error = hw_hdmi_intf_->GetMaxCEAFormat(&max_cea_format);
+  if (error != kErrorNone) {
+    return;
+  }
+
+  // The scan support for a given HDMI TV must be read from scan info corresponding to
+  // Preferred Timing if the preferred timing of the display is currently active, and if it is
+  // valid. In all other cases, we must read the scan support from CEA scan info if
+  // the resolution is a CEA resolution, or from IT scan info for all other resolutions.
+  if (active_mode_index_ == 0 && scan_info.pt_scan_support != kScanNotSupported) {
+    scan_support_ = scan_info.pt_scan_support;
+  } else if (video_format < max_cea_format) {
+    scan_support_ = scan_info.cea_scan_support;
+  } else {
+    scan_support_ = scan_info.it_scan_support;
+  }
 }
 
 void DisplayHDMI::AppendDump(char *buffer, uint32_t length) {

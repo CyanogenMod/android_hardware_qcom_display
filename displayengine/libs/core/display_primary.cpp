@@ -146,6 +146,11 @@ DisplayError DisplayPrimary::GetVSyncState(bool *enabled) {
   return DisplayBase::GetVSyncState(enabled);
 }
 
+bool DisplayPrimary::IsUnderscanSupported() {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::IsUnderscanSupported();
+}
+
 DisplayError DisplayPrimary::SetDisplayState(DisplayState state) {
   SCOPE_LOCK(locker_);
   return DisplayBase::SetDisplayState(state);
