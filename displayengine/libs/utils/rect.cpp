@@ -122,11 +122,11 @@ LayerRect Union(const LayerRect &rect1, const LayerRect &rect2) {
     return LayerRect();
   }
 
-  if(!IsValid(rect1)){
+  if (!IsValid(rect1)) {
     return rect2;
   }
 
-  if(!IsValid(rect2)){
+  if (!IsValid(rect2)) {
     return rect1;
   }
 

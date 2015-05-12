@@ -194,7 +194,6 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
   DTRACE_SCOPED();
 
   DisplayError error = kErrorNone;
-  ResetDisplayParams();
 
   HWLayersInfo &hw_layer_info = hw_layers->info;
   LayerStack *stack = hw_layer_info.stack;
@@ -205,6 +204,12 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
 
   mdp_layer_commit_v1 &mdp_commit = mdp_disp_commit_.commit_v1;
   uint32_t &mdp_layer_count = mdp_commit.input_layer_cnt;
+
+  DLOGI("left_roi: x = %d, y = %d, w = %d, h = %d", mdp_commit.left_roi.x, mdp_commit.left_roi.y,
+                                                    mdp_commit.left_roi.w, mdp_commit.left_roi.h);
+  DLOGI("right_roi: x = %d, y = %d, w = %d, h = %d", mdp_commit.right_roi.x,
+                                                     mdp_commit.right_roi.y, mdp_commit.right_roi.w,
+                                                     mdp_commit.right_roi.h);
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];

@@ -32,11 +32,11 @@ namespace sde {
 
 class StrategyDefault : public StrategyInterface {
  public:
-  StrategyDefault();
-
+  StrategyDefault(DisplayType type, const HWResourceInfo &hw_resource_info,
+                  const HWPanelInfo &hw_panel_info);
   static DisplayError CreateStrategyInterface(uint16_t version, DisplayType type,
-                                              const HWResourceInfo *hw_resource_info,
-                                              const HWPanelInfo *hw_panel_info,
+                                              const HWResourceInfo &hw_resource_info,
+                                              const HWPanelInfo &hw_panel_info,
                                               StrategyInterface **interface);
   static DisplayError DestroyStrategyInterface(StrategyInterface *interface);
 
@@ -45,7 +45,12 @@ class StrategyDefault : public StrategyInterface {
   virtual DisplayError Stop();
 
  private:
+  bool IsDisplaySplit(uint32_t fb_x_res);
+  DisplayType type_;
+  HWResourceInfo hw_resource_info_;
+  HWPanelInfo hw_panel_info_;
   HWLayersInfo *hw_layers_info_;
+  int fb_layer_index_;
 };
 
 }  // namespace sde

@@ -107,7 +107,7 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
     return kErrorMemory;
   }
 
-  if (create_strategy_intf_(STRATEGY_VERSION_TAG, type, &hw_res_info_, &hw_panel_info,
+  if (create_strategy_intf_(STRATEGY_VERSION_TAG, type, hw_res_info_, hw_panel_info,
                             &display_comp_ctx->strategy_intf) != kErrorNone) {
     DLOGW("Unable to create strategy interface");
     delete display_comp_ctx;

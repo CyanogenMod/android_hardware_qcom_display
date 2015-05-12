@@ -65,7 +65,7 @@ class Debug {
   static uint32_t GetIdleTimeoutMs();
   static bool IsRotatorDownScaleDisabled();
   static bool IsDecimationDisabled();
-  static bool IsPartialUpdate();
+  static bool IsPartialUpdateEnabled();
 
  private:
   Debug();
