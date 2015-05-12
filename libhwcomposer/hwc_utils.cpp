@@ -967,6 +967,9 @@ bool isDownscaleRequired(hwc_layer_1_t const* layer) {
     src_w = sourceCrop.right - sourceCrop.left;
     src_h = sourceCrop.bottom - sourceCrop.top;
 
+    if(layer->transform & HWC_TRANSFORM_ROT_90)
+        swap(src_w, src_h);
+
     if(((src_w > dst_w) || (src_h > dst_h)))
         return true;
 
@@ -982,6 +985,10 @@ bool isDownscaleWithinThreshold(hwc_layer_1_t const* layer, float threshold) {
     dst_h = displayFrame.bottom - displayFrame.top;
     src_w = sourceCrop.right - sourceCrop.left;
     src_h = sourceCrop.bottom - sourceCrop.top;
+
+    if(layer->transform & HWC_TRANSFORM_ROT_90)
+        swap(src_w, src_h);
+
     if(dst_w && dst_h) {
         float w_scale = ((float)src_w / (float)dst_w);
         float h_scale = ((float)src_h / (float)dst_h);
