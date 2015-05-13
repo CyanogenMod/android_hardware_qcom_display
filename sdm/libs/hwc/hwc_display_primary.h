@@ -30,14 +30,22 @@
 namespace sdm {
 
 class HWCDisplayPrimary : public HWCDisplay {
- public:
+public:
+  enum {
+    SET_METADATA_DYN_REFRESH_RATE,
+    SET_BINDER_DYN_REFRESH_RATE,
+    SET_DISPLAY_MODE,
+  };
+
   explicit HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
-  virtual DisplayError SetDisplayMode(uint32_t mode);
   virtual int SetActiveConfig(uint32_t index);
   virtual int SetRefreshRate(uint32_t refresh_rate);
-  virtual void SetMetaDataRefreshRateFlag(bool enable);
+  virtual int Perform(uint32_t operation, ...);
+private:
+  void SetMetaDataRefreshRateFlag(bool enable);
+  virtual DisplayError SetDisplayMode(uint32_t mode);
 };
 
 }  // namespace sdm

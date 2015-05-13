@@ -45,7 +45,7 @@ namespace sdm {
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
                        int id)
   : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL),
-    flush_(false), output_buffer_(NULL), dump_frame_count_(0), dump_frame_index_(0),
+    flush_(false), dump_frame_count_(0), dump_frame_index_(0),
     dump_input_layers_(false), swap_interval_zero_(false), framebuffer_config_(NULL),
     display_paused_(false), use_metadata_refresh_rate_(false), metadata_refresh_rate_(0) {
 }
@@ -211,10 +211,6 @@ int HWCDisplay::GetActiveConfig() {
   }
 
   return index;
-}
-
-int HWCDisplay::SetActiveConfig(hwc_display_contents_1_t *content_list) {
-  return 0;
 }
 
 int HWCDisplay::SetActiveConfig(int index) {

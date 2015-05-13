@@ -42,7 +42,6 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values);
   virtual int GetActiveConfig();
   virtual int SetActiveConfig(int index);
-  virtual int SetActiveConfig(hwc_display_contents_1_t *content_list);
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
@@ -51,6 +50,8 @@ class HWCDisplay : public DisplayEventHandler {
   virtual void GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels);
   virtual void GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels);
   virtual int SetDisplayStatus(uint32_t display_status);
+  virtual int Perform(uint32_t operation, ...);
+  virtual ~HWCDisplay() { }
 
  protected:
   enum DisplayStatus {
@@ -88,7 +89,6 @@ class HWCDisplay : public DisplayEventHandler {
   };
 
   HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id);
-  virtual ~HWCDisplay() { }
 
   // DisplayEventHandler methods
   virtual DisplayError VSync(const DisplayEventVSync &vsync);
@@ -131,7 +131,6 @@ class HWCDisplay : public DisplayEventHandler {
   LayerStack layer_stack_;
   LayerStackCache layer_stack_cache_;
   bool flush_;
-  LayerBuffer *output_buffer_;
   uint32_t dump_frame_count_;
   uint32_t dump_frame_index_;
   bool dump_input_layers_;
@@ -142,6 +141,10 @@ class HWCDisplay : public DisplayEventHandler {
   bool use_metadata_refresh_rate_;
   uint32_t metadata_refresh_rate_;
 };
+
+inline int HWCDisplay::Perform(uint32_t operation, ...) {
+  return 0;
+}
 
 }  // namespace sdm
 

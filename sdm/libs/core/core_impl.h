@@ -44,8 +44,7 @@ class CoreImpl : public CoreInterface {
   // This class implements display core interface revision 1.0.
   static const uint16_t kRevision = SET_REVISION(1, 0);
 
-  CoreImpl(CoreEventHandler *event_handler, BufferAllocator *buffer_allocator,
-           BufferSyncHandler *buffer_sync_handler);
+  CoreImpl(BufferAllocator *buffer_allocator, BufferSyncHandler *buffer_sync_handler);
   virtual ~CoreImpl() { }
 
   // This method returns the interface revision for the current display core object.
@@ -61,7 +60,6 @@ class CoreImpl : public CoreInterface {
 
  protected:
   Locker locker_;
-  CoreEventHandler *event_handler_;
   BufferAllocator *buffer_allocator_;
   BufferSyncHandler *buffer_sync_handler_;
   HWResourceInfo *hw_resource_;

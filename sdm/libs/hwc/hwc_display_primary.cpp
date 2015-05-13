@@ -28,6 +28,7 @@
 */
 
 #include <utils/constants.h>
+#include <stdarg.h>
 
 #include "hwc_display_primary.h"
 #include "hwc_debugger.h"
@@ -76,16 +77,6 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-DisplayError HWCDisplayPrimary::SetDisplayMode(uint32_t mode) {
-  DisplayError error = kErrorNone;
-
-  if (display_intf_) {
-    error = display_intf_->SetDisplayMode(mode);
-  }
-
-  return error;
-}
-
 int HWCDisplayPrimary::SetActiveConfig(uint32_t index) {
   DisplayError error = kErrorNone;
 
@@ -101,6 +92,39 @@ int HWCDisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
 
   if (display_intf_) {
     error = display_intf_->SetRefreshRate(refresh_rate);
+  }
+
+  return error;
+}
+
+int HWCDisplayPrimary::Perform(uint32_t operation, ...) {
+  va_list args;
+  va_start(args, operation);
+  int val = va_arg(args, uint32_t);
+  va_end(args);
+  switch (operation) {
+    case SET_METADATA_DYN_REFRESH_RATE:
+      SetMetaDataRefreshRateFlag(val);
+      break;
+    case SET_BINDER_DYN_REFRESH_RATE:
+      SetRefreshRate(val);
+      break;
+    case SET_DISPLAY_MODE:
+      SetDisplayMode(val);
+      break;
+    default:
+      DLOGW("Invalid operation %d", operation);
+      return -EINVAL;
+  }
+
+  return 0;
+}
+
+DisplayError HWCDisplayPrimary::SetDisplayMode(uint32_t mode) {
+  DisplayError error = kErrorNone;
+
+  if (display_intf_) {
+    error = display_intf_->SetDisplayMode(mode);
   }
 
   return error;

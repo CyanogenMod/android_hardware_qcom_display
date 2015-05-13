@@ -76,43 +76,6 @@ namespace sdm {
 */
 class DebugHandler;
 
-
-/*! @brief Event data associated with hotplug event.
-
-  @sa CoreEventHandler::Hotplug
-*/
-struct CoreEventHotplug {
-  bool connected;   //!< True when device is connected.
-
-  CoreEventHotplug() : connected(false) { }
-};
-
-/*! @brief Display core event handler implemented by the client.
-
-  @details This class declares prototype for display core event handler methods which must be
-  implemented by the client. Display core will use these methods to notify events to the client.
-  Client must post heavy-weight event handling to a separate thread and unblock display core thread
-  instantly.
-
-  @sa CoreInterface::CreateCore
-*/
-class CoreEventHandler {
- public:
-  /*! @brief Event handler for Hotplug event.
-
-    @details Event generated when a display device is connected or disconnected. Applicable to
-    detachable displays only.
-
-    @param[in] \link CoreEventHotplug \endlink
-
-    @return \link DisplayError \endlink
-  */
-  virtual DisplayError Hotplug(const CoreEventHotplug &hotplug) = 0;
-
- protected:
-  virtual ~CoreEventHandler() { }
-};
-
 /*! @brief Display core interface.
 
   @details This class defines display core interfaces. It contains methods which client shall use
@@ -131,7 +94,6 @@ class CoreInterface {
     object of display core is created and handle to this object is returned via output parameter.
     This interface shall be called only once.
 
-    @param[in] event_handler \link CoreEventHandler \endlink
     @param[in] debug_handler \link DebugHandler \endlink
     @param[in] buffer_allocator \link BufferAllocator \endlink
     @param[in] buffer_sync_handler \link BufferSyncHandler \endlink
@@ -142,8 +104,7 @@ class CoreInterface {
 
     @sa DestroyCore
   */
-  static DisplayError CreateCore(CoreEventHandler *event_handler, DebugHandler *debug_handler,
-                                 BufferAllocator *buffer_allocator,
+  static DisplayError CreateCore(DebugHandler *debug_handler, BufferAllocator *buffer_allocator,
                                  BufferSyncHandler *buffer_sync_handler, CoreInterface **interface,
                                  uint32_t version = SDM_VERSION_TAG);
 
