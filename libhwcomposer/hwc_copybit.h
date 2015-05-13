@@ -141,6 +141,7 @@ private:
                   int dpy);
     bool isLayerChanging(hwc_context_t *ctx,
                             hwc_display_contents_1_t *list, int k);
+    bool isSmartBlitPossible(const hwc_display_contents_1_t *list);
 };
 
 }; //namespace qhwc
