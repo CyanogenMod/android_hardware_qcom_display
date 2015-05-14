@@ -261,7 +261,6 @@ void DisplayPrimary::AppendDump(char *buffer, uint32_t length) {
 }
 
 DisplayError DisplayPrimary::VSync(int64_t timestamp) {
-  SCOPE_LOCK(locker_);
   if (vsync_enable_) {
     DisplayEventVSync vsync;
     vsync.timestamp = timestamp;
