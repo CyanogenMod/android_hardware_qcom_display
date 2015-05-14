@@ -175,16 +175,19 @@ bool CopyBit::isLayerChanging(hwc_context_t *ctx,
     return 0;
 }
 
-int CopyBit::getLayersChanging(hwc_context_t *ctx,
-                      hwc_display_contents_1_t *list,
-                      int dpy){
-
-   int changingLayerIndex = -1;
-   if(mLayerCache.layerCount != ctx->listStats[dpy].numAppLayers) {
+bool CopyBit::prepareSwapRect(hwc_context_t *ctx,
+                           hwc_display_contents_1_t *list,
+                           int dpy) {
+   bool canUseSwapRect = 0;
+   hwc_rect_t dirtyRect = {0, 0, 0, 0};
+   hwc_rect_t displayRect = {0, 0, 0, 0};
+   if((mLayerCache.layerCount != ctx->listStats[dpy].numAppLayers) ||
+                                                        not mSwapRectEnable) {
         mLayerCache.reset();
         mFbCache.reset();
         mLayerCache.updateCounts(ctx,list,dpy);
-        return -1;
+        mDirtyRect = displayRect;
+        return 0;
     }
 
     int updatingLayerCount = 0;
@@ -192,8 +195,10 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
        //swap rect will kick in only for single updating layer
        if(isLayerChanging(ctx, list, k)) {
            updatingLayerCount ++;
-           if(updatingLayerCount == 1)
-             changingLayerIndex = k;
+           hwc_layer_1_t layer = list->hwLayers[k];
+           canUseSwapRect = 1;
+           dirtyRect = getUnion(dirtyRect, layer.dirtyRect);
+           displayRect = getUnion(displayRect, layer.displayFrame);
        }
     }
     //since we are using more than one framebuffers,we have to
@@ -201,19 +206,13 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
     //dirty rect for same layer at least equal of number of
     //framebuffers
 
-    if ( updatingLayerCount <=  1 ) {
-        hwc_rect_t dirtyRect;
+      if (canUseSwapRect || updatingLayerCount == 0) {
         if (updatingLayerCount == 0) {
             dirtyRect.left = INVALID_DIMENSION;
             dirtyRect.top = INVALID_DIMENSION;
             dirtyRect.right = INVALID_DIMENSION;
             dirtyRect.bottom = INVALID_DIMENSION;
-            changingLayerIndex = NO_UPDATING_LAYER;
-        } else {
-            dirtyRect = list->hwLayers[changingLayerIndex].displayFrame;
-#ifdef QCOM_BSP
-            dirtyRect = list->hwLayers[changingLayerIndex].dirtyRect;
-#endif
+            canUseSwapRect = 1;
         }
 
        for (int k = ctx->listStats[dpy].numAppLayers-1; k >= 0 ; k--) {
@@ -222,34 +221,36 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
            if(needsScaling(&list->hwLayers[k])||( hnd && isYuvBuffer(hnd)) ||
                    (list->hwLayers[k].transform & HAL_TRANSFORM_ROT_90)) {
                mFbCache.reset();
-               return -1;
+               displayRect.bottom = 0;
+               displayRect.top = 0;
+               displayRect.right = 0;
+               displayRect.bottom = 0;
+               mDirtyRect = displayRect;
+               return 0;
            }
        }
-       hwc_rect_t displayRect = list->hwLayers[changingLayerIndex].displayFrame;
+
        if(mFbCache.getUnchangedFbDRCount(dirtyRect, displayRect) <
                                              NUM_RENDER_BUFFERS) {
               mFbCache.insertAndUpdateFbCache(dirtyRect, displayRect);
-              changingLayerIndex =  -1;
+              canUseSwapRect =  0;
+              displayRect.bottom = 0;
+              displayRect.top = 0;
+              displayRect.right = 0;
+              displayRect.bottom = 0;
        }
     } else {
        mFbCache.reset();
-       changingLayerIndex =  -1;
+       canUseSwapRect =  0;
+       displayRect.bottom = 0;
+       displayRect.top = 0;
+       displayRect.right = 0;
+       displayRect.bottom = 0;
+
     }
+    mDirtyRect = displayRect;
     mLayerCache.updateCounts(ctx,list,dpy);
-    return changingLayerIndex;
-}
-
-int CopyBit::checkDirtyRect(hwc_context_t *ctx,
-                           hwc_display_contents_1_t *list,
-                           int dpy) {
-
-   //dirty rect will enable only if
-   //1.Only single layer is updating.
-   //2.No scaling
-   //3.No video layer
-   if(mSwapRectEnable == false)
-      return -1;
-   return getLayersChanging(ctx, list, dpy);
+    return canUseSwapRect;
 }
 
 bool CopyBit::prepareOverlap(hwc_context_t *ctx,
@@ -353,19 +354,12 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         return false;
     }
 
-    mDirtyLayerIndex =  checkDirtyRect(ctx, list, dpy);
-    ALOGD_IF (DEBUG_COPYBIT, "%s:Dirty Layer Index: %d",
-                                       __FUNCTION__, mDirtyLayerIndex);
-    hwc_rect_t clearRegion = {0,0,0,0};
     int last = (uint32_t)list->numHwLayers - 1;
     mDirtyRect = list->hwLayers[last].displayFrame;
-    if (mDirtyLayerIndex != -1) {
-        if (mDirtyLayerIndex == NO_UPDATING_LAYER) {
-            mDirtyRect = clearRegion;
-        } else {
-            mDirtyRect = list->hwLayers[mDirtyLayerIndex].displayFrame;
-        }
-    }
+    mSwapRect =  prepareSwapRect(ctx, list, dpy);
+    ALOGD_IF (DEBUG_COPYBIT, "%s: mSwapRect: %d mDirtyRect: [%d, %d, %d, %d]",
+                           __FUNCTION__, mSwapRect, mDirtyRect.left,
+                           mDirtyRect.top, mDirtyRect.right, mDirtyRect.bottom);
 
     bool useCopybitForYUV = canUseCopybitForYUV(ctx);
     bool useCopybitForRGB = canUseCopybitForRGB(ctx, list, dpy);
@@ -539,7 +533,7 @@ bool CopyBit::drawUsingAppBufferComposition(hwc_context_t *ctx,
              list->hwLayers[abcRenderBufIdx].acquireFenceFd);
           }
           for(int i = abcRenderBufIdx + 1; i < layerCount; i++){
-             mDirtyLayerIndex = -1;
+             mSwapRect = 0;
              int retVal = drawLayerUsingCopybit(ctx,
                &(list->hwLayers[i]),renderBuffer, 0);
              if(retVal < 0) {
@@ -600,10 +594,9 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         }
     }
 
-    if (mDirtyLayerIndex != NO_UPDATING_LAYER &&
-           not CBUtils::uiClearRegion(list, ctx->mMDP.version, layerProp,
-                                   mDirtyLayerIndex, mEngine, renderBuffer)){
-        mDirtyLayerIndex = -1;
+    if (not CBUtils::uiClearRegion(list, ctx->mMDP.version, layerProp,
+                                   mDirtyRect, mEngine, renderBuffer)){
+        mSwapRect = 0;
     }
 
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
@@ -667,7 +660,8 @@ int CopyBit::drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
 
     //Clear the transparent or left out region on the render buffer
     LayerProp *layerProp = ctx->layerProp[0];
-    CBUtils::uiClearRegion(list, ctx->mMDP.version, layerProp, -1,
+    hwc_rect_t clearRegion = {0, 0, 0, 0};
+    CBUtils::uiClearRegion(list, ctx->mMDP.version, layerProp, clearRegion,
                                                     mEngine, renderBuffer);
 
     int copybitLayerCount = 0;
@@ -918,7 +912,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                               displayFrame.bottom};
 #ifdef QCOM_BSP
     //change src and dst with dirtyRect
-    if(mDirtyLayerIndex != -1) {
+    if(mSwapRect) {
       hwc_rect_t result = getIntersection(displayFrame, mDirtyRect);
       if(!isValidRect(result))
              return true;
@@ -1256,7 +1250,7 @@ CopyBit::CopyBit(hwc_context_t *ctx, const int& dpy) :  mEngine(0),
 
     property_get("debug.sf.swaprect", value, "0");
     mSwapRectEnable = atoi(value) ? true:false ;
-    mDirtyLayerIndex = -1;
+    mSwapRect = 0;
     if (hw_get_module(COPYBIT_HARDWARE_MODULE_ID, &module) == 0) {
         if(copybit_open(module, &mEngine) < 0) {
             ALOGE("FATAL ERROR: copybit open failed.");

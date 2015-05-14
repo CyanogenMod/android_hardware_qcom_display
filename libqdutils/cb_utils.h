@@ -38,7 +38,7 @@ namespace qdutils {
 class CBUtils {
 public:
     static int uiClearRegion(hwc_display_contents_1_t* list,
-            int version, LayerProp *layerProp, int dirtyIndex,
+            int version, LayerProp *layerProp, hwc_rect_t dirtyIndex,
             copybit_device_t *copybit, private_handle_t *renderBuffer);
 };
 }//namespace qdutils
