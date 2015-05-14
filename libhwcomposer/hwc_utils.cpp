@@ -119,7 +119,8 @@ void updateDisplayInfo(hwc_context_t* ctx, int dpy) {
     //FIXME: for now assume HDMI as secure
     //Will need to read the HDCP status from the driver
     //and update this accordingly
-    if (dpy == HWC_DISPLAY_EXTERNAL) {
+    if (dpy == HWC_DISPLAY_EXTERNAL ||
+            ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
         ctx->dpyAttr[dpy].secure = true;
     }
 }
