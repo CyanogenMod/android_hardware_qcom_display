@@ -64,7 +64,7 @@ static void handle_vsync_event(hwc_context_t* ctx, int dpy, char *data)
         timestamp = strtoull(data + strlen("VSYNC="), NULL, 0);
     }
     // send timestamp to SurfaceFlinger
-    ALOGD_IF (ctx->vstate.debug, "%s: timestamp %"PRIu64" sent to SF for dpy=%d",
+    ALOGD_IF (ctx->vstate.debug, "%s: timestamp %" PRIu64 " sent to SF for dpy=%d",
             __FUNCTION__, timestamp, dpy);
     ctx->proc->vsync(ctx->proc, dpy, timestamp);
 }
@@ -89,7 +89,7 @@ static void handle_thermal_event(hwc_context_t* ctx, int dpy, char *data)
     }
 
     if (thermalLevel >= MAX_THERMAL_LEVEL) {
-        ALOGD("%s: dpy:%d thermal_level=%"PRIu64"",__FUNCTION__,dpy,thermalLevel);
+        ALOGD("%s: dpy:%d thermal_level=%" PRIu64 "",__FUNCTION__,dpy,thermalLevel);
         ctx->mThermalBurstMode = true;
     } else
         ctx->mThermalBurstMode = false;

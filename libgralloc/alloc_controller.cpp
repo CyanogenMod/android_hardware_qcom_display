@@ -137,7 +137,7 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
     aligned_w = width;
     aligned_h = height;
     // Currently surface padding is only computed for RGB* surfaces.
-    if (format <= HAL_PIXEL_FORMAT_sRGB_X_8888) {
+    if (format <= HAL_PIXEL_FORMAT_BGRA_8888) {
         aligned_w = ALIGN(width, 32);
         aligned_h = ALIGN(height, 32);
         // Don't add any additional padding if debug.gralloc.map_fb_memory
@@ -188,7 +188,6 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
         {
             case HAL_PIXEL_FORMAT_YCrCb_420_SP:
             case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
-            case HAL_PIXEL_FORMAT_RAW_SENSOR:
                 aligned_w = ALIGN(width, 32);
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
@@ -407,15 +406,13 @@ unsigned int getSize(int format, int width, int height, const int alignedw,
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_BGRA_8888:
-        case HAL_PIXEL_FORMAT_sRGB_A_8888:
-        case HAL_PIXEL_FORMAT_sRGB_X_8888:
             size = alignedw * alignedh * 4;
             break;
         case HAL_PIXEL_FORMAT_RGB_888:
             size = alignedw * alignedh * 3;
             break;
         case HAL_PIXEL_FORMAT_RGB_565:
-        case HAL_PIXEL_FORMAT_RAW_SENSOR:
+        case HAL_PIXEL_FORMAT_RAW16:
             size = alignedw * alignedh * 2;
             break;
 
@@ -584,7 +581,6 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         case HAL_PIXEL_FORMAT_YCrCb_422_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
         case HAL_PIXEL_FORMAT_NV21_ZSL:
-        case HAL_PIXEL_FORMAT_RAW_SENSOR:
             ystride = cstride = hnd->width;
             ycbcr->y  = (void*)hnd->base;
             ycbcr->cr = (void*)(hnd->base + ystride * hnd->height);
