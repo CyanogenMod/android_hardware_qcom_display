@@ -52,13 +52,13 @@ enum mdp_version {
     MDP_V4_4    = 440,
     MDSS_V5     = 500,
 };
-
+/*
 enum mdp_rev {
     MDSS_MDP_HW_REV_100 = 0x10000000,
     MDSS_MDP_HW_REV_101 = 0x10010000, //8x26
     MDSS_MDP_HW_REV_102 = 0x10020000,
 };
-
+*/
 enum {
     MAX_DISPLAY_DIM = 2048,
 };
