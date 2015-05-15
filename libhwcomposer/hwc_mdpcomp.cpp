@@ -79,8 +79,9 @@ void MDPComp::dump(android::String8& buf, hwc_context_t *ctx)
                 (mDpy == 0) ? "\"PRIMARY\"" :
                 (mDpy == 1) ? "\"EXTERNAL\"" : "\"VIRTUAL\"");
     dumpsys_log(buf,"CURR_FRAME: layerCount:%2d mdpCount:%2d "
-                "fbCount:%2d  dropCount:%2d\n", mCurrentFrame.layerCount,
-                mCurrentFrame.mdpCount, mCurrentFrame.fbCount, mCurrentFrame.dropCount);
+                "fbCount:%2d \n", mCurrentFrame.layerCount,
+                mCurrentFrame.mdpCount, (mCurrentFrame.fbCount -
+                (mCurrentFrame.hwCursorIndex != -1)));
     dumpsys_log(buf,"needsFBRedraw:%3s  pipesUsed:%2d  MaxPipesPerMixer: %d \n",
                 (mCurrentFrame.needsRedraw? "YES" : "NO"),
                 mCurrentFrame.mdpCount, sMaxPipesPerMixer);
@@ -105,12 +106,13 @@ void MDPComp::dump(android::String8& buf, hwc_context_t *ctx)
     for(int index = 0; index < mCurrentFrame.layerCount; index++ )
         dumpsys_log(buf," %7d | %7s | %8d | %9s | %2d \n",
                     index,
-                    (mCurrentFrame.isFBComposed[index] ? "YES" : "NO"),
+                    ((mCurrentFrame.hwCursorIndex == index) ? "NO" :
+                    ((mCurrentFrame.isFBComposed[index] ? "YES" : "NO"))),
                      mCurrentFrame.layerToMDP[index],
-                    (mCurrentFrame.isFBComposed[index] ?
-                    (mCurrentFrame.drop[index] ?
-                    ((mCurrentFrame.hwCursorIndex == index) ? "CURSOR": "DROP"):
-                    (mCurrentFrame.needsRedraw ? "GLES" : "CACHE")) : "MDP"),
+                    (mCurrentFrame.hwCursorIndex == index) ? "CURSOR" :
+                    ((mCurrentFrame.isFBComposed[index] ?
+                    (mCurrentFrame.drop[index] ? "DROP" :
+                    (mCurrentFrame.needsRedraw ? "GLES" : "CACHE")) : "MDP")),
                     (mCurrentFrame.isFBComposed[index] ? mCurrentFrame.fbZ :
     mCurrentFrame.mdpToLayer[mCurrentFrame.layerToMDP[index]].pipeInfo->zOrder));
     dumpsys_log(buf,"\n");
