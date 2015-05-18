@@ -87,6 +87,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   android::status_t SetMaxMixerStages(const android::Parcel *input_parcel);
   android::status_t SetDisplayMode(const android::Parcel *input_parcel);
   android::status_t SetSecondaryDisplayStatus(const android::Parcel *input_parcel);
+  android::status_t ControlBackLight(const android::Parcel *input_parcel);
   android::status_t ConfigureRefreshRate(const android::Parcel *input_parcel);
   android::status_t QdcmCMDHandler(const android::Parcel &in, android::Parcel *out);
 
@@ -100,8 +101,8 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   const char *uevent_thread_name_;
   HWCBufferAllocator *buffer_allocator_;
   HWCBufferSyncHandler *buffer_sync_handler_;
-
   HWCColorManager *color_mgr_;
+  char brightness_[64];
 };
 
 }  // namespace sdm
