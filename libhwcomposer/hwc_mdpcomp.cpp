@@ -40,7 +40,6 @@ namespace qhwc {
 
 IdleInvalidator *MDPComp::sIdleInvalidator = NULL;
 bool MDPComp::sIdleFallBack = false;
-bool MDPComp::sHandleTimeout = false;
 bool MDPComp::sDebugLogs = false;
 bool MDPComp::sEnabled = false;
 bool MDPComp::sEnableMixedMode = true;
@@ -56,6 +55,8 @@ int MDPComp::sPerfLockHandle = 0;
 int (*MDPComp::sPerfLockAcquire)(int, int, int*, int) = NULL;
 int (*MDPComp::sPerfLockRelease)(int value) = NULL;
 int MDPComp::sPerfHintWindow = -1;
+
+enum AllocOrder { FORMAT_YUV, FORMAT_RGB, FORMAT_MAX };
 
 MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
     if(qdutils::MDPVersion::getInstance().isSrcSplit()) {
@@ -220,12 +221,13 @@ void MDPComp::reset(hwc_context_t *ctx) {
 }
 
 void MDPComp::reset() {
-    sHandleTimeout = false;
+    mPrevModeOn = mModeOn;
     mModeOn = false;
 }
 
 void MDPComp::timeout_handler(void *udata) {
     struct hwc_context_t* ctx = (struct hwc_context_t*)(udata);
+    bool handleTimeout = false;
 
     if(!ctx) {
         ALOGE("%s: received empty data in timer callback", __FUNCTION__);
@@ -233,8 +235,16 @@ void MDPComp::timeout_handler(void *udata) {
     }
 
     ctx->mDrawLock.lock();
-    // Handle timeout event only if the previous composition is MDP or MIXED.
-    if(!sHandleTimeout) {
+
+    /* Handle timeout event only if the previous composition
+       on any display is MDP or MIXED*/
+    for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+        if(ctx->mMDPComp[i])
+            handleTimeout =
+                    ctx->mMDPComp[i]->isMDPComp() || handleTimeout;
+    }
+
+    if(!handleTimeout) {
         ALOGD_IF(isDebug(), "%s:Do not handle this timeout", __FUNCTION__);
         ctx->mDrawLock.unlock();
         return;
@@ -387,6 +397,25 @@ bool MDPComp::LayerCache::isSameFrame(const FrameInfo& curFrame,
     return true;
 }
 
+bool MDPComp::LayerCache::isSameFrame(hwc_context_t *ctx, int dpy,
+                                      hwc_display_contents_1_t* list) {
+
+    if(layerCount != ctx->listStats[dpy].numAppLayers)
+        return false;
+
+    if((list->flags & HWC_GEOMETRY_CHANGED) ||
+       isSkipPresent(ctx, dpy)) {
+        return false;
+    }
+
+    for(int i = 0; i < layerCount; i++) {
+        if(hnd[i] != list->hwLayers[i].handle)
+            return false;
+    }
+
+    return true;
+}
+
 bool MDPComp::isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     if((has90Transform(layer) and (not isRotationDoable(ctx, hnd))) ||
@@ -496,14 +525,18 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     if(!isEnabled()) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. not enabled.", __FUNCTION__);
         ret = false;
-    } else if((qdutils::MDPVersion::getInstance().is8x26() ||
-               qdutils::MDPVersion::getInstance().is8x16() ||
-               qdutils::MDPVersion::getInstance().is8x39()) &&
-            ctx->mVideoTransFlag &&
-            isSecondaryConnected(ctx)) {
+    } else if(ctx->mVideoTransFlag && isSecondaryConnected(ctx)) {
         //1 Padding round to shift pipes across mixers
         ALOGD_IF(isDebug(),"%s: MDP Comp. video transition padding round",
                 __FUNCTION__);
+        ret = false;
+    } else if((qdutils::MDPVersion::getInstance().is8x26() ||
+               qdutils::MDPVersion::getInstance().is8x16() ||
+               qdutils::MDPVersion::getInstance().is8x39()) &&
+              !mDpy && isSecondaryAnimating(ctx) &&
+              isYuvPresent(ctx,HWC_DISPLAY_VIRTUAL)) {
+        ALOGD_IF(isDebug(),"%s: Display animation in progress",
+                 __FUNCTION__);
         ret = false;
     } else if(qdutils::MDPVersion::getInstance().getTotalPipes() < 8) {
        /* TODO: freeing up all the resources only for the targets having total
@@ -795,6 +828,14 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
                   !ctx->listStats[mDpy].secureRGBCount &&
                   (ctx->listStats[mDpy].numAppLayers > 1)) {
         ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
+        return false;
+    }
+
+    if(!mDpy && isSecondaryAnimating(ctx) &&
+       (isYuvPresent(ctx,HWC_DISPLAY_EXTERNAL) ||
+       isYuvPresent(ctx,HWC_DISPLAY_VIRTUAL)) ) {
+        ALOGD_IF(isDebug(),"%s: Display animation in progress",
+                 __FUNCTION__);
         return false;
     }
 
@@ -2040,6 +2081,20 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         ctx->mAnimationState[mDpy] = ANIMATION_STOPPED;
     }
 
+    if(!mDpy and !isSecondaryConnected(ctx) and !mPrevModeOn and
+       mCachedFrame.isSameFrame(ctx,mDpy,list)) {
+
+        ALOGD_IF(isDebug(),"%s: Avoid new composition",__FUNCTION__);
+        mCurrentFrame.needsRedraw = false;
+        setMDPCompLayerFlags(ctx, list);
+        mCachedFrame.updateCounts(mCurrentFrame);
+#ifdef DYNAMIC_FPS
+        setDynRefreshRate(ctx, list);
+#endif
+        return -1;
+
+    }
+
     //Hard conditions, if not met, cannot do MDP comp
     if(isFrameDoable(ctx)) {
         generateROI(ctx, list);
@@ -2191,39 +2246,48 @@ int MDPCompNonSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
 bool MDPCompNonSplit::allocLayerPipes(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-    for(int index = 0; index < mCurrentFrame.layerCount; index++) {
+    for(uint32_t formatType = FORMAT_YUV; formatType < FORMAT_MAX;
+            formatType++) {
+        for(int index = 0; index < mCurrentFrame.layerCount; index++) {
+            if(mCurrentFrame.isFBComposed[index]) continue;
 
-        if(mCurrentFrame.isFBComposed[index]) continue;
-
-        hwc_layer_1_t* layer = &list->hwLayers[index];
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        if(isYUVSplitNeeded(hnd) && sEnableYUVsplit){
-            if(allocSplitVGPipes(ctx, index)){
+            hwc_layer_1_t* layer = &list->hwLayers[index];
+            private_handle_t *hnd = (private_handle_t *)layer->handle;
+            if(formatType == FORMAT_YUV && !isYuvBuffer(hnd))
                 continue;
+            if(formatType == FORMAT_RGB && isYuvBuffer(hnd))
+                continue;
+
+            if(isYUVSplitNeeded(hnd) && sEnableYUVsplit){
+                if(allocSplitVGPipes(ctx, index)){
+                    continue;
+                }
             }
-        }
 
-        int mdpIndex = mCurrentFrame.layerToMDP[index];
-        PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
-        info.pipeInfo = new MdpPipeInfoNonSplit;
-        info.rot = NULL;
-        MdpPipeInfoNonSplit& pipe_info = *(MdpPipeInfoNonSplit*)info.pipeInfo;
+            int mdpIndex = mCurrentFrame.layerToMDP[index];
+            PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
+            info.pipeInfo = new MdpPipeInfoNonSplit;
+            info.rot = NULL;
+            MdpPipeInfoNonSplit& pipe_info =
+                    *(MdpPipeInfoNonSplit*)info.pipeInfo;
 
-        Overlay::PipeSpecs pipeSpecs;
-        pipeSpecs.formatClass = isYuvBuffer(hnd) ?
-                Overlay::FORMAT_YUV : Overlay::FORMAT_RGB;
-        pipeSpecs.needsScaling = qhwc::needsScaling(layer) or
-                (qdutils::MDPVersion::getInstance().is8x26() and
-                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres > 1024);
-        pipeSpecs.dpy = mDpy;
-        pipeSpecs.fb = false;
-        pipeSpecs.numActiveDisplays = ctx->numActiveDisplays;
+            Overlay::PipeSpecs pipeSpecs;
+            pipeSpecs.formatClass = isYuvBuffer(hnd) ?
+                    Overlay::FORMAT_YUV : Overlay::FORMAT_RGB;
+            pipeSpecs.needsScaling = qhwc::needsScaling(layer) or
+                    (qdutils::MDPVersion::getInstance().is8x26() and
+                     ctx->dpyAttr[HWC_DISPLAY_PRIMARY].xres > 1024);
+            pipeSpecs.dpy = mDpy;
+            pipeSpecs.fb = false;
+            pipeSpecs.numActiveDisplays = ctx->numActiveDisplays;
 
-        pipe_info.index = ctx->mOverlay->getPipe(pipeSpecs);
+            pipe_info.index = ctx->mOverlay->getPipe(pipeSpecs);
 
-        if(pipe_info.index == ovutils::OV_INVALID) {
-            ALOGD_IF(isDebug(), "%s: Unable to get pipe", __FUNCTION__);
-            return false;
+            if(pipe_info.index == ovutils::OV_INVALID) {
+                ALOGD_IF(isDebug(), "%s: Unable to get pipe for layer %d of "\
+                        "format type %d", __FUNCTION__, index, formatType);
+                return false;
+            }
         }
     }
     return true;
@@ -2247,11 +2311,6 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if(!isEnabled() or !mModeOn) {
         ALOGD_IF(isDebug(),"%s: MDP Comp not enabled/configured", __FUNCTION__);
         return true;
-    }
-
-    // Set the Handle timeout to true for MDP or MIXED composition.
-    if(sIdleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount) {
-        sHandleTimeout = true;
     }
 
     overlay::Overlay& ov = *ctx->mOverlay;
@@ -2430,36 +2489,43 @@ bool MDPCompSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
 
 bool MDPCompSplit::allocLayerPipes(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-    for(int index = 0 ; index < mCurrentFrame.layerCount; index++) {
+    for(uint32_t formatType = FORMAT_YUV; formatType < FORMAT_MAX;
+            formatType++) {
+        for(int index = 0 ; index < mCurrentFrame.layerCount; index++) {
+            if(mCurrentFrame.isFBComposed[index]) continue;
 
-        if(mCurrentFrame.isFBComposed[index]) continue;
-
-        hwc_layer_1_t* layer = &list->hwLayers[index];
-        private_handle_t *hnd = (private_handle_t *)layer->handle;
-        hwc_rect_t dst = layer->displayFrame;
-        const int lSplit = getLeftSplit(ctx, mDpy);
-        if(isYUVSplitNeeded(hnd) && sEnableYUVsplit){
-            if((dst.left > lSplit)||(dst.right < lSplit)){
-                if(allocSplitVGPipes(ctx, index)){
-                    continue;
-                }
-            }
-        }
-        //XXX: Check for forced 2D composition
-        if(needs3DComposition(ctx, mDpy) && get3DFormat(hnd) != HAL_NO_3D)
-            if(allocSplitVGPipes(ctx,index))
+            hwc_layer_1_t* layer = &list->hwLayers[index];
+            private_handle_t *hnd = (private_handle_t *)layer->handle;
+            if(formatType == FORMAT_YUV && !isYuvBuffer(hnd))
+                continue;
+            if(formatType == FORMAT_RGB && isYuvBuffer(hnd))
                 continue;
 
-        int mdpIndex = mCurrentFrame.layerToMDP[index];
-        PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
-        info.pipeInfo = new MdpPipeInfoSplit;
-        info.rot = NULL;
-        MdpPipeInfoSplit& pipe_info = *(MdpPipeInfoSplit*)info.pipeInfo;
+            hwc_rect_t dst = layer->displayFrame;
+            const int lSplit = getLeftSplit(ctx, mDpy);
+            if(isYUVSplitNeeded(hnd) && sEnableYUVsplit){
+                if((dst.left > lSplit)||(dst.right < lSplit)){
+                    if(allocSplitVGPipes(ctx, index)){
+                        continue;
+                    }
+                }
+            }
+            //XXX: Check for forced 2D composition
+            if(needs3DComposition(ctx, mDpy) && get3DFormat(hnd) != HAL_NO_3D)
+                if(allocSplitVGPipes(ctx,index))
+                    continue;
 
-        if(!acquireMDPPipes(ctx, layer, pipe_info)) {
-            ALOGD_IF(isDebug(), "%s: Unable to get pipe for type",
-                    __FUNCTION__);
-            return false;
+            int mdpIndex = mCurrentFrame.layerToMDP[index];
+            PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
+            info.pipeInfo = new MdpPipeInfoSplit;
+            info.rot = NULL;
+            MdpPipeInfoSplit& pipe_info = *(MdpPipeInfoSplit*)info.pipeInfo;
+
+            if(!acquireMDPPipes(ctx, layer, pipe_info)) {
+                ALOGD_IF(isDebug(), "%s: Unable to get pipe for layer %d of "\
+                        "format type %d", __FUNCTION__, index, formatType);
+                return false;
+            }
         }
     }
     return true;
@@ -2509,13 +2575,6 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if(!isEnabled() or !mModeOn) {
         ALOGD_IF(isDebug(),"%s: MDP Comp not enabled/configured", __FUNCTION__);
         return true;
-    }
-
-    // Set the Handle timeout to true for MDP or MIXED composition.
-    if(sIdleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount &&
-            !(needs3DComposition(ctx, HWC_DISPLAY_PRIMARY) ||
-                needs3DComposition(ctx, HWC_DISPLAY_EXTERNAL))) {
-        sHandleTimeout = true;
     }
 
     overlay::Overlay& ov = *ctx->mOverlay;

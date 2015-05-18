@@ -396,7 +396,7 @@ bool MdpCtrl::validateAndSet(MdpCtrl* mdpCtrlArray[], const int& count,
     int errVal = mdp_wrapper::validateAndSet(fbFd, list);
     if(errVal) {
         /* No dump for failure due to insufficient resource */
-        if(errVal != E2BIG) {
+        if(errVal != E2BIG && errVal != EBADSLT) {
             //ENODEV is returned when the driver cannot satisfy a pipe request.
             //This could happen if previous round's UNSET hasn't been commited
             //yet, either because of a missed vsync or because of difference in
