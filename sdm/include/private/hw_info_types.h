@@ -221,10 +221,11 @@ struct HWRotatorSession {
   int session_id;
   float input_compression;
   float output_compression;
+  bool is_buffer_cached;
 
   HWRotatorSession()
     : hw_block_count(0), downscale_ratio(1.0f), session_id(-1), input_compression(1.0f),
-      output_compression(1.0f) { }
+      output_compression(1.0f), is_buffer_cached(false) { }
 };
 
 struct HWPixelExtension {
