@@ -115,35 +115,34 @@ DisplayError HWCBufferAllocator::FreeBuffer(BufferInfo *buffer_info) {
   int ret = 0;
 
   AllocatedBufferInfo *alloc_buffer_info = &buffer_info->alloc_buffer_info;
-  MetaBufferInfo *meta_buffer_info = static_cast<MetaBufferInfo *> (buffer_info->private_data);
-  if (alloc_buffer_info->fd < 0) {
-    DLOGE("Invalid parameters: fd %d", alloc_buffer_info->fd);
-    return kErrorParameters;
+
+  // Deallocate the buffer, only if the buffer fd is valid.
+  if (alloc_buffer_info->fd > 0) {
+    MetaBufferInfo *meta_buffer_info = static_cast<MetaBufferInfo *> (buffer_info->private_data);
+    gralloc::IMemAlloc *memalloc = alloc_controller_->getAllocator(meta_buffer_info->alloc_type);
+    if (memalloc == NULL) {
+      DLOGE("Memalloc handle is NULL, alloc type %d", meta_buffer_info->alloc_type);
+      return kErrorResources;
+    }
+
+    ret = memalloc->free_buffer(meta_buffer_info->base_addr, alloc_buffer_info->size, 0,
+                                alloc_buffer_info->fd);
+    if (ret != 0) {
+      DLOGE("Error freeing buffer base_addr %p size %d fd %d", meta_buffer_info->base_addr,
+            alloc_buffer_info->size, alloc_buffer_info->fd);
+      return kErrorMemory;
+    }
+
+    alloc_buffer_info->fd = -1;
+    alloc_buffer_info->stride = 0;
+    alloc_buffer_info->size = 0;
+
+    meta_buffer_info->base_addr = NULL;
+    meta_buffer_info->alloc_type = 0;
+
+    delete meta_buffer_info;
+    meta_buffer_info = NULL;
   }
-
-  gralloc::IMemAlloc *memalloc = alloc_controller_->getAllocator(meta_buffer_info->alloc_type);
-  if (memalloc == NULL) {
-    DLOGE("Memalloc handle is NULL, alloc type %d", meta_buffer_info->alloc_type);
-    return kErrorResources;
-  }
-
-  ret = memalloc->free_buffer(meta_buffer_info->base_addr, alloc_buffer_info->size, 0,
-                              alloc_buffer_info->fd);
-  if (ret != 0) {
-    DLOGE("Error freeing buffer base_addr %p size %d fd %d", meta_buffer_info->base_addr,
-          alloc_buffer_info->size, alloc_buffer_info->fd);
-    return kErrorMemory;
-  }
-
-  alloc_buffer_info->fd = -1;
-  alloc_buffer_info->stride = 0;
-  alloc_buffer_info->size = 0;
-
-  meta_buffer_info->base_addr = NULL;
-  meta_buffer_info->alloc_type = 0;
-
-  delete meta_buffer_info;
-  meta_buffer_info = NULL;
 
   return kErrorNone;
 }
