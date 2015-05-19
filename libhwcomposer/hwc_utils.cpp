@@ -854,7 +854,8 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
                                ovutils::eTransform& orient) {
     // Swap width and height when there is a 90deg transform
     int extOrient = getExtOrientation(ctx);
-    if(dpy && ctx->mOverlay->isUIScalingOnExternalSupported()) {
+    if ((dpy || ctx->mHDMIDisplay->isHDMIPrimaryDisplay())
+            && ctx->mOverlay->isUIScalingOnExternalSupported()) {
         if(!isYuvBuffer(hnd)) {
             if(extOrient & HWC_TRANSFORM_ROT_90) {
                 int dstWidth = ctx->dpyAttr[dpy].xres;
@@ -1377,8 +1378,9 @@ bool isActionSafePresent(hwc_context_t *ctx, int dpy) {
     // Disable Action safe for 8974 due to HW limitation for downscaling
     // layers with overlapped region
     // Disable Actionsafe for non HDMI displays.
-    if(!(dpy == HWC_DISPLAY_EXTERNAL) ||
-        qdutils::MDPVersion::getInstance().is8x74v2() ||
+    if (!(dpy == HWC_DISPLAY_EXTERNAL ||
+                ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) ||
+            qdutils::MDPVersion::getInstance().is8x74v2() ||
         ctx->mHDMIDisplay->isCEUnderscanSupported()) {
         return false;
     }
