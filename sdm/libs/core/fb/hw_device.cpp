@@ -442,23 +442,14 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
     uint32_t layer_index = hw_layer_info.index[i];
     LayerBuffer *input_buffer = stack->layers[layer_index].input_buffer;
     HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
-    HWRotateInfo *left_rotate = &hw_rotator_session->hw_rotate_info[0];
-    HWRotateInfo *right_rotate = &hw_rotator_session->hw_rotate_info[1];
 
-    if (!left_rotate->valid && !right_rotate->valid) {
-      input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
-      continue;
+    if (hw_rotator_session->hw_block_count) {
+      input_buffer = &hw_rotator_session->output_buffer;
+      close_(input_buffer->acquire_fence_fd);
+      input_buffer->acquire_fence_fd = -1;
     }
 
-    for (uint32_t count = 0; count < 2; count++) {
-      HWRotateInfo *hw_rotate_info = &hw_rotator_session->hw_rotate_info[count];
-      if (hw_rotate_info->valid) {
-        input_buffer = &hw_rotator_session->output_buffer;
-        input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
-        close_(input_buffer->acquire_fence_fd);
-        input_buffer->acquire_fence_fd = -1;
-      }
-    }
+    input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
   }
   DLOGI_IF(kTagDriverConfig, "*************************** %s Commit Input ************************",
            device_name_);
