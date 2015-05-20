@@ -34,7 +34,7 @@ namespace sdm {
 Strategy::Strategy(ExtensionInterface *extension_intf, DisplayType type,
                    const HWResourceInfo &hw_resource_info, const HWPanelInfo &hw_panel_info)
   : extension_intf_(extension_intf), strategy_intf_(NULL), partial_update_intf_(NULL),
-    display_type_(type),hw_resource_info_(hw_resource_info), hw_panel_info_(hw_panel_info),
+    display_type_(type), hw_resource_info_(hw_resource_info), hw_panel_info_(hw_panel_info),
     hw_layers_info_(NULL), fb_layer_index_(0), extn_start_success_(false), tried_default_(false) {
 }
 
