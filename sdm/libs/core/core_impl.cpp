@@ -90,7 +90,7 @@ DisplayError CoreImpl::Init() {
     goto CleanupOnError;
   }
 
-  error = comp_mgr_.Init(*hw_resource_, extension_intf_);
+  error = comp_mgr_.Init(*hw_resource_, extension_intf_, buffer_sync_handler_);
   if (error != kErrorNone) {
     goto CleanupOnError;
   }

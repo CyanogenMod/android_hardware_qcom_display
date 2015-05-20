@@ -419,6 +419,11 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
 
     input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
   }
+
+  if (hw_layer_info.need_sync_handle) {
+    hw_layer_info.sync_handle = dup(mdp_commit.release_fence);
+  }
+
   DLOGI_IF(kTagDriverConfig, "*************************** %s Commit Input ************************",
            device_name_);
   DLOGI_IF(kTagDriverConfig, "retire_fence_fd %d", stack->retire_fence_fd);

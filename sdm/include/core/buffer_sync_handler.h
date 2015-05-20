@@ -76,6 +76,27 @@ class BufferSyncHandler {
 
   virtual DisplayError SyncMerge(int fd1, int fd2, int *merged_fd) = 0;
 
+  /*! @brief Method to close sync fd
+
+    @details This method closes a sync fd.
+
+    @param[in] fd
+
+    @return \link None \endlink
+ */
+
+  virtual void SyncClose(int fd) = 0;
+
+  /*! @brief Method to detect if sync fd is signaled
+
+    @details This method detects if sync fd is signaled
+
+    @param[in] fd
+
+    @return \link Tue if fd has been signaled \endlink
+ */
+  virtual bool IsSyncSignaled(int fd) = 0;
+
  protected:
   virtual ~BufferSyncHandler() { }
 };

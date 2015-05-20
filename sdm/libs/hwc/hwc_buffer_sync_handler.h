@@ -44,6 +44,8 @@ class HWCBufferSyncHandler : public BufferSyncHandler {
 
   virtual DisplayError SyncWait(int fd);
   virtual DisplayError SyncMerge(int fd1, int fd2, int *merged_fd);
+  virtual void SyncClose(int fd);
+  virtual bool IsSyncSignaled(int fd);
 };
 
 }  // namespace sdm
