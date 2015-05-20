@@ -30,16 +30,6 @@
 
 using namespace gralloc;
 
-#define SZ_2M 0x200000
-#define SZ_1M 0x100000
-#define SZ_4K 0x1000
-
-#ifdef MASTER_SIDE_CP
-#define SECURE_ALIGN SZ_4K
-#else
-#define SECURE_ALIGN SZ_1M
-#endif
-
 gpu_context_t::gpu_context_t(const private_module_t* module,
                              IAllocController* alloc_ctrl ) :
     mAllocCtrl(alloc_ctrl)

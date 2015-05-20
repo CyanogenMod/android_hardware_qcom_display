@@ -66,7 +66,7 @@ DisplayError HWCBufferAllocator::AllocateBuffer(BufferInfo *buffer_info) {
   if (buffer_config.secure) {
     alloc_flags = GRALLOC_USAGE_PRIVATE_MM_HEAP;
     alloc_flags |= GRALLOC_USAGE_PROTECTED;
-    data.align = kSecureBufferAlignment;
+    data.align = SECURE_ALIGN;
   } else {
     data.align = getpagesize();
   }

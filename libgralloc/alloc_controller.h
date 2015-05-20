@@ -29,6 +29,17 @@
 #ifndef GRALLOC_ALLOCCONTROLLER_H
 #define GRALLOC_ALLOCCONTROLLER_H
 
+#define SZ_2M 0x200000
+#define SZ_1M 0x100000
+#define SZ_4K 0x1000
+
+/* TODO: Move this to the common makefile */
+#ifdef MASTER_SIDE_CP
+#define SECURE_ALIGN SZ_4K
+#else
+#define SECURE_ALIGN SZ_1M
+#endif
+
 namespace gralloc {
 
 struct alloc_data;
