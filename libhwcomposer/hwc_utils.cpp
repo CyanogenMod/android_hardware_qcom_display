@@ -1494,6 +1494,10 @@ int configRotator(Rotator *rot, Whf& whf,
         hwc_rect_t& crop, const eMdpFlags& mdpFlags,
         const eTransform& orient, const int& downscale) {
 
+    //Check if input switched from secure->non-secure OR non-secure->secure
+    //Need to fail rotator setup as rotator buffer needs reallocation.
+    if(!rot->isRotBufReusable(mdpFlags)) return -1;
+
     // Fix alignments for TILED format
     if(whf.format == MDP_Y_CRCB_H2V2_TILE ||
                             whf.format == MDP_Y_CBCR_H2V2_TILE) {
