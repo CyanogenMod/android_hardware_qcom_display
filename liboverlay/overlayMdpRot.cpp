@@ -130,6 +130,10 @@ void MdpRot::setFrameRate(uint32_t /*frame_rate*/) {
     // NO-OP for non-mdss rotator
 }
 
+bool MdpRot::isRotBufReusable(const utils::eMdpFlags& flags) {
+    return true;
+}
+
 void MdpRot::setFlags(const utils::eMdpFlags& flags) {
     mRotImgInfo.secure = 0;
     if(flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)
