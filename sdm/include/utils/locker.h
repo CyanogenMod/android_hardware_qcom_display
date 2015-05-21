@@ -27,6 +27,7 @@
 
 #include <stdint.h>
 #include <pthread.h>
+#include <sys/time.h>
 
 #define SCOPE_LOCK(locker) Locker::ScopeLock lock(locker)
 #define SEQUENCE_ENTRY_SCOPE_LOCK(locker) Locker::SequenceEntryScopeLock lock(locker)

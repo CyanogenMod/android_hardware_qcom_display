@@ -27,6 +27,8 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <unistd.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <ctype.h>
 #include <utils/debug.h>
@@ -382,7 +384,7 @@ HWScanSupport HWHDMI::MapHWScanSupport(uint32_t value) {
 void HWHDMI::ReadScanInfo() {
   int scan_info_file = -1;
   ssize_t len = -1;
-  char data[PAGE_SIZE] = {'\0'};
+  char data[4096] = {'\0'};
 
   snprintf(data, sizeof(data), "%s%d/scan_info", fb_path_, fb_node_index_);
   scan_info_file = open_(data, O_RDONLY);

@@ -25,7 +25,6 @@
 #ifndef __HW_INFO_H__
 #define __HW_INFO_H__
 
-#include <inttypes.h>
 #include <core/sdm_types.h>
 #include <private/hw_info_types.h>
 #include "hw_info_interface.h"

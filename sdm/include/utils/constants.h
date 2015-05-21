@@ -26,6 +26,11 @@
 #define __CONSTANTS_H__
 
 #include <stdlib.h>
+#include <inttypes.h>
+
+#ifndef PRIu64
+#define PRIu64 "llu"
+#endif
 
 #define INT(exp) static_cast<int>(exp)
 #define FLOAT(exp) static_cast<float>(exp)

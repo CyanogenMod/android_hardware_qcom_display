@@ -30,73 +30,54 @@
 #include <stdlib.h>
 #include <utils/debug.h>
 #include <utils/constants.h>
-#include <cutils/log.h>
-#include <cutils/properties.h>
 
 namespace sdm {
 
 Debug Debug::debug_;
 
-Debug::Debug() : debug_handler_(&default_debug_handler_), virtual_driver_(false) {
-  char property[PROPERTY_VALUE_MAX];
-  if (property_get("displaycore.virtualdriver", property, NULL) > 0) {
-    virtual_driver_ = (atoi(property) == 1);
-  }
+Debug::Debug() : debug_handler_(&default_debug_handler_) {
 }
 
 uint32_t Debug::GetSimulationFlag() {
-  char property[PROPERTY_VALUE_MAX];
-  if (property_get("debug.hwc.simulate", property, NULL) > 0) {
-    return atoi(property);
-  }
+  int value = 0;
+  debug_.debug_handler_->GetProperty("debug.hwc.simulate", &value);
 
-  return 0;
+  return value;
 }
 
 uint32_t Debug::GetHDMIResolution() {
-  char property[PROPERTY_VALUE_MAX];
-  if (property_get("hw.hdmi.resolution", property, NULL) > 0) {
-    return atoi(property);
-  }
+  int value = 0;
+  debug_.debug_handler_->GetProperty("hw.hdmi.resolution", &value);
 
-  return 0;
+  return value;
 }
 
 uint32_t Debug::GetIdleTimeoutMs() {
-  char property[PROPERTY_VALUE_MAX];
-  if (property_get("debug.mdpcomp.idletime", property, NULL) > 0) {
-    return atoi(property);
-  }
+  int value = IDLE_TIMEOUT_DEFAULT_MS;
+  debug_.debug_handler_->GetProperty("debug.mdpcomp.idletime", &value);
 
-  return IDLE_TIMEOUT_DEFAULT_MS;
+  return value;
 }
 
 bool Debug::IsRotatorDownScaleDisabled() {
-  char property[PROPERTY_VALUE_MAX];
-  if (property_get("sdm.disable_rotator_downscaling", property, NULL) > 0) {
-    return (atoi(property) ? 0 : false, true);
-  }
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.disable_rotator_downscaling", &value);
 
-  return false;
+  return (value == 1);
 }
 
 bool Debug::IsDecimationDisabled() {
-  char property[PROPERTY_VALUE_MAX];
-  if (property_get("sdm.disable_decimation", property, NULL) > 0) {
-    return (atoi(property) ? 0 : false, true);
-  }
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.disable_decimation", &value);
 
-  return false;
+  return (value == 1);
 }
 
-// This property serves to disable/enable partial update
 bool Debug::IsPartialUpdateEnabled() {
-  char property[PROPERTY_VALUE_MAX];
-  if (property_get("sdm.hwc.partial_update", property, NULL) > 0) {
-    return (atoi(property) ? 1 : true, false);
-  }
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.hwc.partial_update", &value);
 
-  return false;
+  return (value == 1);
 }
 
 }  // namespace sdm
