@@ -30,6 +30,7 @@
 #include <utils/constants.h>
 #include <sync/sync.h>
 #include <stdarg.h>
+#include <gr.h>
 
 #include "hwc_display_virtual.h"
 #include "hwc_debugger.h"
@@ -38,7 +39,7 @@
 
 namespace sdm {
 
-static int GetWidthFromMetaData(const private_handle_t* handle) {
+static int GetWidthFromMetaData(const private_handle_t *handle) {
   MetaData_t *metadata = reinterpret_cast<MetaData_t *>(handle->base_metadata);
   if (metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
     return metadata->bufferDim.sliceWidth;
@@ -47,13 +48,53 @@ static int GetWidthFromMetaData(const private_handle_t* handle) {
   return handle->width;
 }
 
-static int GetHeightFromMetaData(const private_handle_t* handle) {
+static int GetHeightFromMetaData(const private_handle_t *handle) {
   MetaData_t *metadata = reinterpret_cast<MetaData_t *>(handle->base_metadata);
   if (metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
     return metadata->bufferDim.sliceHeight;
   }
 
   return handle->height;
+}
+
+int HWCDisplayVirtual::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                              hwc_display_contents_1_t *content_list,
+                              HWCDisplay **hwc_display) {
+  int status = 0;
+  HWCDisplay *hwc_display_virtual = new HWCDisplayVirtual(core_intf, hwc_procs);
+
+  status = hwc_display_virtual->Init();
+  if (status) {
+    delete hwc_display_virtual;
+    return status;
+  }
+
+  status = hwc_display_virtual->SetPowerMode(HWC_POWER_MODE_NORMAL);
+  if (status) {
+    Destroy(hwc_display_virtual);
+    return status;
+  }
+
+  const private_handle_t *output_handle =
+    static_cast<const private_handle_t *>(content_list->outbuf);
+  int virtual_width = 0;
+  int virtual_height = 0;
+  getBufferSizeAndDimensions(output_handle->width, output_handle->height, output_handle->format,
+                             virtual_width, virtual_height);
+  status = hwc_display_virtual->SetFrameBufferResolution(virtual_width, virtual_height);
+  if (status) {
+    Destroy(hwc_display_virtual);
+    return status;
+  }
+
+  *hwc_display = hwc_display_virtual;
+
+  return status;
+}
+
+void HWCDisplayVirtual::Destroy(HWCDisplay *hwc_display) {
+  hwc_display->Deinit();
+  delete hwc_display;
 }
 
 HWCDisplayVirtual::HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
@@ -89,6 +130,12 @@ int HWCDisplayVirtual::Deinit() {
 
 int HWCDisplayVirtual::Prepare(hwc_display_contents_1_t *content_list) {
   int status = 0;
+
+  status = SetOutputSliceFromMetadata(content_list);
+  if (status) {
+    return status;
+  }
+
   if (display_paused_) {
     MarkLayersForGPUBypass(content_list);
     return status;
@@ -151,15 +198,7 @@ int HWCDisplayVirtual::Commit(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-int HWCDisplayVirtual::Perform(uint32_t operation, ...) {
-  if(operation != SET_OUTPUT_SLICE_FROM_METADATA) {
-    return -EINVAL;
-  }
-
-  va_list args;
-  va_start(args, operation);
-  hwc_display_contents_1_t *content_list = va_arg(args, hwc_display_contents_1_t *);
-  va_end(args);
+int HWCDisplayVirtual::SetOutputSliceFromMetadata(hwc_display_contents_1_t *content_list) {
   const private_handle_t *output_handle =
         static_cast<const private_handle_t *>(content_list->outbuf);
   DisplayError error = kErrorNone;
