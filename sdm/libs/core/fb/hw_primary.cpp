@@ -207,12 +207,12 @@ DisplayError HWPrimary::PopulateDisplayAttributes() {
 
   display_attributes_.x_pixels = var_screeninfo.xres;
   display_attributes_.y_pixels = var_screeninfo.yres;
-  display_attributes_.v_total = var_screeninfo.yres + var_screeninfo.lower_margin +
-      var_screeninfo.upper_margin + var_screeninfo.vsync_len;
+  display_attributes_.v_front_porch = var_screeninfo.lower_margin;
+  display_attributes_.v_back_porch = var_screeninfo.upper_margin;
+  display_attributes_.v_pulse_width = var_screeninfo.vsync_len;
   uint32_t h_blanking = var_screeninfo.right_margin + var_screeninfo.left_margin +
       var_screeninfo.hsync_len;
-  display_attributes_.h_total = var_screeninfo.xres + var_screeninfo.right_margin +
-      var_screeninfo.left_margin + var_screeninfo.hsync_len;
+  display_attributes_.h_total = var_screeninfo.xres + h_blanking;
   display_attributes_.x_dpi =
       (FLOAT(var_screeninfo.xres) * 25.4f) / FLOAT(var_screeninfo.width);
   display_attributes_.y_dpi =

@@ -88,6 +88,11 @@ struct HWResourceInfo {
   uint32_t max_pipe_bw;
   uint32_t max_sde_clk;
   float clk_fudge_factor;
+  uint32_t macrotile_nv12_factor;
+  uint32_t macrotile_factor;
+  uint32_t linear_factor;
+  uint32_t scale_factor;
+  uint32_t extra_fudge_factor;
   bool has_bwc;
   bool has_ubwc;
   bool has_decimation;
@@ -101,9 +106,11 @@ struct HWResourceInfo {
       num_cursor_pipe(0), num_blending_stages(0), num_rotator(0), num_control(0),
       num_mixer_to_disp(0), smp_total(0), smp_size(0), num_smp_per_pipe(0), max_scale_up(1),
       max_scale_down(1), max_bandwidth_low(0), max_bandwidth_high(0), max_mixer_width(2048),
-      max_pipe_width(2048), max_pipe_bw(0), max_sde_clk(0), clk_fudge_factor(1.0f), has_bwc(false),
-      has_ubwc(false), has_decimation(false), has_macrotile(false), has_rotator_downscale(false),
-      has_non_scalar_rgb(false), is_src_split(false) { }
+      max_pipe_width(2048), max_pipe_bw(0), max_sde_clk(0), clk_fudge_factor(1.0f),
+      macrotile_nv12_factor(0), macrotile_factor(0), linear_factor(0), scale_factor(0),
+      extra_fudge_factor(0), has_bwc(false), has_ubwc(false), has_decimation(false),
+      has_macrotile(false), has_rotator_downscale(false), has_non_scalar_rgb(false),
+      is_src_split(false) { }
 
   void Reset() { *this = HWResourceInfo(); }
 };
@@ -316,8 +323,13 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
   bool is_device_split;
   uint32_t split_left;
   bool always_src_split;
+  uint32_t v_front_porch;  //!< Vertical front porch of panel
+  uint32_t v_back_porch;   //!< Vertical back porch of panel
+  uint32_t v_pulse_width;  //!< Vertical pulse width of panel
+  uint32_t h_total;        //!< Total width of panel (hActive + hFP + hBP + hPulseWidth)
 
-  HWDisplayAttributes() : is_device_split(false), split_left(0), always_src_split(false) { }
+  HWDisplayAttributes() : is_device_split(false), split_left(0), always_src_split(false),
+                          v_front_porch(0), v_back_porch(0), v_pulse_width(0), h_total(0) { }
 
   void Reset() { *this = HWDisplayAttributes(); }
 
@@ -327,7 +339,10 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
             (always_src_split != attributes.always_src_split) ||
             (x_pixels != attributes.x_pixels) || (y_pixels != attributes.y_pixels) ||
             (x_dpi != attributes.x_dpi) || (y_dpi != attributes.y_dpi) || (fps != attributes.fps) ||
-            (vsync_period_ns != attributes.vsync_period_ns) || (v_total != attributes.v_total));
+            (vsync_period_ns != attributes.vsync_period_ns) ||
+            (v_front_porch != attributes.v_front_porch) ||
+            (v_back_porch != attributes.v_back_porch) ||
+            (v_pulse_width != attributes.v_pulse_width));
   }
 
   bool operator ==(const HWDisplayAttributes &attributes) {

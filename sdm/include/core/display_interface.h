@@ -97,11 +97,9 @@ struct DisplayConfigVariableInfo {
   float y_dpi;                //!< Dots per inch in Y-direction.
   uint32_t fps;               //!< Frame rate per second.
   uint32_t vsync_period_ns;   //!< VSync period in nanoseconds.
-  uint32_t v_total;           //!< Total height of panel (vActive + vFP + vBP + vPulseWidth).
-  uint32_t h_total;           //!< Total width of panel (hActive + hFP + hBP + hPulseWidth).
 
   DisplayConfigVariableInfo() : x_pixels(0), y_pixels(0), x_dpi(0.0f), y_dpi(0.0f),
-                                fps(0), vsync_period_ns(0), v_total(0), h_total(0) { }
+                                fps(0), vsync_period_ns(0) { }
 };
 
 /*! @brief Event data associated with VSync event.

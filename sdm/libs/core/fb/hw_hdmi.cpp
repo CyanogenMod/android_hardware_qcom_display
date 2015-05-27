@@ -223,8 +223,9 @@ DisplayError HWHDMI::GetDisplayAttributes(HWDisplayAttributes *display_attribute
   }
   display_attributes->x_pixels = timing_mode->active_h;
   display_attributes->y_pixels = timing_mode->active_v;
-  display_attributes->v_total = timing_mode->active_v + timing_mode->front_porch_v +
-      timing_mode->back_porch_v + timing_mode->pulse_width_v;
+  display_attributes->v_front_porch = timing_mode->front_porch_v;
+  display_attributes->v_back_porch = timing_mode->back_porch_v;
+  display_attributes->v_pulse_width = timing_mode->pulse_width_v;
   uint32_t h_blanking = timing_mode->front_porch_h + timing_mode->back_porch_h +
       timing_mode->pulse_width_h;
   display_attributes->h_total = timing_mode->active_h + h_blanking;
