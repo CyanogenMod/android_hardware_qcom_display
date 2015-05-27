@@ -65,7 +65,7 @@ DisplayError CoreImpl::Init() {
     }
 
     error = create_extension_intf_(EXTENSION_VERSION_TAG, &extension_intf_);
-    if(error != kErrorNone) {
+    if (error != kErrorNone) {
       DLOGE("Unable to create interface");
       ::dlclose(extension_lib_);
       return error;

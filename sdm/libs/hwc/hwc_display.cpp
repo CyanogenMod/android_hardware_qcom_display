@@ -409,7 +409,11 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
     layer.plane_alpha = hwc_layer.planeAlpha;
     layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
-    layer.flags.updating = (layer_stack_cache_.layer_cache[i].handle != hwc_layer.handle);
+    if (num_hw_layers <= kMaxLayerCount) {
+      layer.flags.updating = (layer_stack_cache_.layer_cache[i].handle != hwc_layer.handle);
+    } else {
+      layer.flags.updating = true;
+    }
 
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
       layer_stack_.flags.animating = true;
@@ -616,6 +620,10 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
 
 void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
+
+  if (layer_count > kMaxLayerCount) {
+    return;
+  }
 
   for (uint32_t i = 0; i < layer_count; i++) {
     Layer &layer = layer_stack_.layers[i];
