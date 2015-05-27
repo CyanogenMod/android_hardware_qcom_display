@@ -445,8 +445,6 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
 
     if (hw_rotator_session->hw_block_count) {
       input_buffer = &hw_rotator_session->output_buffer;
-      close_(input_buffer->acquire_fence_fd);
-      input_buffer->acquire_fence_fd = -1;
     }
 
     input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
