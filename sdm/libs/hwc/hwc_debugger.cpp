@@ -28,6 +28,7 @@
 */
 
 #include <utils/constants.h>
+#include <cutils/properties.h>
 
 #include "hwc_debugger.h"
 
@@ -121,6 +122,17 @@ void HWCDebugHandler::BeginTrace(const char *class_name, const char *function_na
 
 void HWCDebugHandler::EndTrace() {
   atrace_end(ATRACE_TAG);
+}
+
+DisplayError HWCDebugHandler::GetProperty(const char *property_name, int *value) {
+  char property[PROPERTY_VALUE_MAX];
+
+  if (property_get(property_name, property, NULL) > 0) {
+    *value = atoi(property);
+    return kErrorNone;
+  }
+
+  return kErrorNotSupported;
 }
 
 }  // namespace sdm

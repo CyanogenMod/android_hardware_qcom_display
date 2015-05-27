@@ -27,11 +27,14 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <unistd.h>
+#include <string.h>
+#include <pthread.h>
+#include <fcntl.h>
 #include <sys/prctl.h>
 #include <sys/ioctl.h>
-#include <pthread.h>
+#include <sys/time.h>
 #include <sys/resource.h>
-#include <fcntl.h>
 #include <utils/debug.h>
 #include "hw_primary.h"
 

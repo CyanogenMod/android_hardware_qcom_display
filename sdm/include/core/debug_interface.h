@@ -38,7 +38,7 @@ namespace sdm {
 /*! @brief This enum represents different modules/logical unit tags that a log message may
   be associated with. Client may use this to filter messages for dynamic logging.
 
-  @sa DisplayLogHandler
+  @sa DebugHandler
 */
 enum DebugTag {
   kTagNone,             //!< Debug log is not tagged. This type of logs should always be printed.
@@ -100,6 +100,15 @@ class DebugHandler {
   /*! @brief Method to end trace for a module/logical unit.
   */
   virtual void EndTrace() = 0;
+
+  /*! @brief Method to get property value corresponding to give string.
+
+    @param[in] property_name name of the property
+    @param[out] value value corresponding to the property name
+
+    @return \link DisplayError \endlink
+`  */
+  virtual DisplayError GetProperty(const char *property_name, int *value) = 0;
 
  protected:
   virtual ~DebugHandler() { }

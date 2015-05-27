@@ -42,8 +42,7 @@
 #include "display_interface.h"
 #include "sdm_types.h"
 #include "buffer_allocator.h"
-
-class BufferSyncHandler;
+#include "buffer_sync_handler.h"
 
 /*! @brief Display manager interface version.
 

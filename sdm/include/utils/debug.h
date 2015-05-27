@@ -59,7 +59,6 @@ class Debug {
     debug_.debug_handler_ = debug_handler;
   }
   static inline DebugHandler* Get() { return debug_.debug_handler_; }
-  static inline bool IsVirtualDriver() { return debug_.virtual_driver_; }
   static uint32_t GetSimulationFlag();
   static uint32_t GetHDMIResolution();
   static uint32_t GetIdleTimeoutMs();
@@ -81,11 +80,13 @@ class Debug {
     virtual void BeginTrace(const char */*class_name*/, const char */*function_name*/,
                             const char */*custom_string*/) { }
     virtual void EndTrace() { }
+    virtual DisplayError GetProperty(const char *property_name, int *value) {
+      return kErrorNotSupported;
+    }
   };
 
   DefaultDebugHandler default_debug_handler_;
   DebugHandler *debug_handler_;
-  bool virtual_driver_;
   static Debug debug_;
 };
 

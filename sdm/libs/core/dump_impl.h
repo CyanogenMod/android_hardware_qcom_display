@@ -49,7 +49,7 @@ class DumpImpl {
   static DumpImpl *dump_list_[kMaxDumpObjects];
   static uint32_t dump_count_;
 
-  friend DumpInterface;
+  friend class DumpInterface;
 };
 
 }  // namespace sdm
