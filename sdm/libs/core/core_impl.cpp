@@ -99,8 +99,7 @@ DisplayError CoreImpl::Init() {
     error = extension_intf_->CreateRotator(buffer_allocator_, buffer_sync_handler_,
                                            &rotator_intf_);
     if (error != kErrorNone) {
-      comp_mgr_.Deinit();
-      goto CleanupOnError;
+      DLOGW("rotation is not supported");
     }
   }
 
