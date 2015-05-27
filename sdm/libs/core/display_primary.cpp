@@ -65,6 +65,14 @@ DisplayError DisplayPrimary::Init() {
     hw_primary_intf_->SetIdleTimeoutMs(Debug::GetIdleTimeoutMs());
   }
 
+  if (hw_panel_info_.mode == kModeCommand && Debug::IsVideoModeEnabled()) {
+    error = hw_primary_intf_->SetDisplayMode(kModeVideo);
+    if (error != kErrorNone) {
+      DLOGW("Retaining current display mode. Current = %d, Requested = %d", hw_panel_info_.mode,
+            kModeVideo);
+    }
+  }
+
   return error;
 }
 
@@ -198,7 +206,7 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
   HWDisplayMode hw_display_mode = kModeDefault;
 
   if (state_ != kStateOn) {
-    DLOGW("Invalid display state (%d). Panel must be on.", state_);
+    DLOGW("Invalid display state = %d. Panel must be on.", state_);
     return kErrorNotSupported;
   }
 
@@ -210,19 +218,19 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
     hw_display_mode = kModeCommand;
     break;
   default:
-    DLOGW("Invalid panel mode parameters. Requested (%d)", mode);
+    DLOGW("Invalid panel mode parameters. Requested = %d", mode);
     return kErrorParameters;
   }
 
   if (hw_display_mode == hw_panel_info_.mode) {
-    DLOGW("Same display mode requested. Current (%d) Requested (%d)", hw_panel_info_.mode,
+    DLOGW("Same display mode requested. Current = %d, Requested = %d", hw_panel_info_.mode,
           hw_display_mode);
     return kErrorNone;
   }
 
   error = hw_primary_intf_->SetDisplayMode(hw_display_mode);
   if (error != kErrorNone) {
-    DLOGW("Retaining current display mode. Current (%d), Requested (%d)", hw_panel_info_.mode,
+    DLOGW("Retaining current display mode. Current = %d, Requested = %d", hw_panel_info_.mode,
           hw_display_mode);
     return error;
   }

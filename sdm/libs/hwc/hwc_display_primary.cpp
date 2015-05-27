@@ -59,10 +59,12 @@ int HWCDisplayPrimary::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_
   }
 
   hwc_display_primary->GetPanelResolution(&primary_width, &primary_height);
-  if (property_get("debug.hwc.fbsize", property, NULL) > 0) {
-    char *yptr = strcasestr(property, "x");
-    primary_width = atoi(property);
-    primary_height = atoi(yptr + 1);
+  int width = 0, height = 0;
+  HWCDebugHandler::Get()->GetProperty("sdm.fb_size_width", &width);
+  HWCDebugHandler::Get()->GetProperty("sdm.fb_size_height", &height);
+  if (width > 0 && height > 0) {
+    primary_width = width;
+    primary_height = height;
   }
 
   status = hwc_display_primary->SetFrameBufferResolution(primary_width, primary_height);

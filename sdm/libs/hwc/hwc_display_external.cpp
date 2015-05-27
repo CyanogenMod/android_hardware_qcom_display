@@ -59,8 +59,9 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
 
   hwc_display_external->GetPanelResolution(&external_width, &external_height);
 
-  if (property_get("sys.hwc.mdp_downscale_enabled", property, "false") &&
-      !strcmp(property, "true")) {
+  int downscale_enabled = 0;
+  HWCDebugHandler::Get()->GetProperty("sdm.debug.sde_downscale_enabled", &downscale_enabled);
+  if (downscale_enabled == 1) {
     uint32_t primary_area = primary_width * primary_height;
     uint32_t external_area = external_width * external_height;
 
@@ -150,11 +151,11 @@ void HWCDisplayExternal::ApplyScanAdjustment(hwc_rect_t *display_frame) {
   }
 
   // Read user defined width and height ratio
-  char property[PROPERTY_VALUE_MAX];
-  property_get("persist.sys.actionsafe.width", property, "0");
-  float width_ratio = FLOAT(atoi(property)) / 100.0f;
-  property_get("persist.sys.actionsafe.height", property, "0");
-  float height_ratio = FLOAT(atoi(property)) / 100.0f;
+  int width = 0, height = 0;
+  HWCDebugHandler::Get()->GetProperty("sdm.external_action_safe_width", &width);
+  float width_ratio = FLOAT(width) / 100.0f;
+  HWCDebugHandler::Get()->GetProperty("sdm.external_action_safe_height", &height);
+  float height_ratio = FLOAT(height) / 100.0f;
 
   if (width_ratio == 0.0f ||  height_ratio == 0.0f) {
     return;
