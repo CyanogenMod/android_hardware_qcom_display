@@ -1085,8 +1085,7 @@ bool MDPComp::loadBasedComp(hwc_context_t *ctx,
 
 bool MDPComp::isLoadBasedCompDoable(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
-    if(mDpy or isSecurePresent(ctx, mDpy) or
-            isYuvPresent(ctx, mDpy)) {
+    if(mDpy or isSecurePresent(ctx, mDpy)) {
         return false;
     }
     return true;
