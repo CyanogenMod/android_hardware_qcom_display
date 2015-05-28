@@ -37,7 +37,7 @@ DisplayVirtual::DisplayVirtual(DisplayEventHandler *event_handler, HWInfoInterfa
                                BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
                                RotatorInterface *rotator_intf)
   : DisplayBase(kVirtual, event_handler, kDeviceVirtual, buffer_sync_handler, comp_manager,
-                rotator_intf), hw_info_intf_(hw_info_intf) {
+                rotator_intf, hw_info_intf) {
 }
 
 DisplayError DisplayVirtual::Init() {

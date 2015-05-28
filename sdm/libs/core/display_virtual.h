@@ -31,7 +31,6 @@
 namespace sdm {
 
 class HWVirtualInterface;
-class HWInfoInterface;
 
 class DisplayVirtual : public DisplayBase, DumpImpl {
  public:
@@ -64,7 +63,6 @@ class DisplayVirtual : public DisplayBase, DumpImpl {
  private:
   Locker locker_;
   HWVirtualInterface *hw_virtual_intf_;
-  HWInfoInterface *hw_info_intf_;
 };
 
 }  // namespace sdm

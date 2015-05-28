@@ -31,7 +31,6 @@
 namespace sdm {
 
 class HWHDMIInterface;
-class HWInfoInterface;
 
 class DisplayHDMI : public DisplayBase, DumpImpl {
  public:
@@ -67,7 +66,6 @@ class DisplayHDMI : public DisplayBase, DumpImpl {
 
   Locker locker_;
   HWHDMIInterface *hw_hdmi_intf_;
-  HWInfoInterface *hw_info_intf_;
   HWScanSupport scan_support_;
 };
 

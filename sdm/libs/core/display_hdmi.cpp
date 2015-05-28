@@ -37,7 +37,7 @@ DisplayHDMI::DisplayHDMI(DisplayEventHandler *event_handler, HWInfoInterface *hw
                          BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
                          RotatorInterface *rotator_intf)
   : DisplayBase(kHDMI, event_handler, kDeviceHDMI, buffer_sync_handler, comp_manager,
-                rotator_intf), hw_info_intf_(hw_info_intf) {
+                rotator_intf, hw_info_intf) {
 }
 
 DisplayError DisplayHDMI::Init() {

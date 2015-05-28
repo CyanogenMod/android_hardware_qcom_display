@@ -80,5 +80,12 @@ bool Debug::IsPartialUpdateEnabled() {
   return (value == 1);
 }
 
+int Debug::GetMaxPipesPerMixer() {
+  int value = -1;
+  debug_.debug_handler_->GetProperty("persist.hwc.mdpcomp.maxpermixer", &value);
+
+  return value;
+}
+
 }  // namespace sdm
 

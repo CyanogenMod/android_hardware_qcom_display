@@ -65,6 +65,7 @@ class Debug {
   static bool IsRotatorDownScaleDisabled();
   static bool IsDecimationDisabled();
   static bool IsPartialUpdateEnabled();
+  static int GetMaxPipesPerMixer();
 
  private:
   Debug();
