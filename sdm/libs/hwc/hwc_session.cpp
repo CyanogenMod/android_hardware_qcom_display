@@ -633,6 +633,9 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     status = ConfigureRefreshRate(input_parcel);
     break;
 
+  case qService::IQService::SET_VIEW_FRAME:
+    break;
+
   default:
     DLOGW("QService command = %d is not supported", command);
     return -EINVAL;
