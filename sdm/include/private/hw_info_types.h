@@ -198,15 +198,15 @@ struct HWSessionConfig {
 };
 
 struct HWRotateInfo {
-  uint32_t pipe_id;
+  int pipe_id;
+  int writeback_id;
   LayerRect src_roi;
   LayerRect dst_roi;
-  HWBlockType writeback_id;
   bool valid;
   int rotate_id;
 
   HWRotateInfo()
-    : pipe_id(0), writeback_id(kHWWriteback0), valid(false), rotate_id(-1) { }
+    : pipe_id(-1), writeback_id(-1), valid(false), rotate_id(-1) { }
 
   void Reset() { *this = HWRotateInfo(); }
 };
