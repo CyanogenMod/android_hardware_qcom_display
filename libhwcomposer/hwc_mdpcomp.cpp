@@ -1966,7 +1966,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                 __FUNCTION__);
         mCachedFrame.reset();
 #ifdef DYNAMIC_FPS
-        setDynRefreshRate(ctx, list);
+        // Reset refresh rate
+        setRefreshRate(ctx, mDpy, ctx->dpyAttr[mDpy].refreshRate);
 #endif
         return -1;
     }
@@ -1982,7 +1983,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         setMDPCompLayerFlags(ctx, list);
         mCachedFrame.updateCounts(mCurrentFrame);
 #ifdef DYNAMIC_FPS
-        setDynRefreshRate(ctx, list);
+        // Reset refresh rate
+        setRefreshRate(ctx, mDpy, ctx->dpyAttr[mDpy].refreshRate);
 #endif
         ret = -1;
         return ret;
