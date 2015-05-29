@@ -2865,22 +2865,13 @@ void MDPCompSrcSplit::generateROI(hwc_context_t *ctx,
         if(!isYuvBuffer((private_handle_t *)layer->handle) && layer->transform)
             return;
 
-        if ((mCachedFrame.hnd[index] != layer->handle) ||
+        if (layerUpdating(layer) ||
                 isYuvBuffer((private_handle_t *)layer->handle)) {
-            hwc_rect_t dst = layer->displayFrame;
-            hwc_rect_t updatingRect = dst;
-
-#ifdef QCOM_BSP
-            if(!needsScaling(layer) && !layer->transform)
-            {
-                hwc_rect_t src = integerizeSourceCrop(layer->sourceCropf);
-                int x_off = dst.left - src.left;
-                int y_off = dst.top - src.top;
-                updatingRect = moveRect(layer->dirtyRect, x_off, y_off);
+            hwc_rect_t dirtyRect = (struct hwc_rect){0, 0, 0, 0};
+            if (!needsScaling(layer) && !layer->transform) {
+                dirtyRect = calculateDirtyRect(layer, fullFrame);
             }
-#endif
-
-            roi = getUnion(roi, updatingRect);
+            roi = getUnion(roi, dirtyRect);
         }
     }
 
