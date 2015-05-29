@@ -335,6 +335,7 @@ void optimizeLayerRects(const hwc_display_contents_1_t *list);
 bool areLayersIntersecting(const hwc_layer_1_t* layer1,
         const hwc_layer_1_t* layer2);
 bool operator ==(const hwc_rect_t& lhs, const hwc_rect_t& rhs);
+bool layerUpdating(const hwc_layer_1_t* layer);
 
 // returns true if Action safe dimensions are set and target supports Actionsafe
 bool isActionSafePresent(hwc_context_t *ctx, int dpy);
