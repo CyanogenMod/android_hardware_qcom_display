@@ -113,5 +113,12 @@ bool Debug::IsRotatorUbwcDisabled() {
   return (value == 1);
 }
 
+bool Debug::IsRotatorSplitDisabled() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.debug.disable_rotator_split", &value);
+
+  return (value == 1);
+}
+
 }  // namespace sdm
 

@@ -138,5 +138,43 @@ LayerRect Union(const LayerRect &rect1, const LayerRect &rect2) {
   return res;
 }
 
+void SplitLeftRight(const LayerRect &in_rect, uint32_t split_count, uint32_t align_x,
+                   LayerRect *out_rects) {
+  LayerRect rect_temp = in_rect;
+
+  uint32_t split_width = UINT32(rect_temp.right - rect_temp.left) / split_count;
+
+  for (uint32_t count = 0; count < split_count; count++) {
+    float aligned_right = rect_temp.left + FLOAT(CeilToMultipleOf(split_width, align_x));
+    out_rects[count].left = rect_temp.left;
+    out_rects[count].right = MIN(rect_temp.right, aligned_right);
+    out_rects[count].top = rect_temp.top;
+    out_rects[count].bottom = rect_temp.bottom;
+
+    rect_temp.left = out_rects[count].right;
+
+    Log(kTagRotator, "SplitLeftRight", out_rects[count]);
+  }
+}
+
+void SplitTopBottom(const LayerRect &in_rect, uint32_t split_count, uint32_t align_y,
+                     LayerRect *out_rects) {
+  LayerRect rect_temp = in_rect;
+
+  uint32_t split_height = UINT32(rect_temp.bottom - rect_temp.top) / split_count;
+
+  for (uint32_t count = 0; count < split_count; count++) {
+    float aligned_bottom = rect_temp.top + FLOAT(CeilToMultipleOf(split_height, align_y));
+    out_rects[count].top = rect_temp.top;
+    out_rects[count].bottom = MIN(rect_temp.bottom, aligned_bottom);
+    out_rects[count].left = rect_temp.left;
+    out_rects[count].right = rect_temp.right;
+
+    rect_temp.top = out_rects[count].bottom;
+
+    Log(kTagRotator, "SplitTopBottom", out_rects[count]);
+  }
+}
+
 }  // namespace sdm
 
