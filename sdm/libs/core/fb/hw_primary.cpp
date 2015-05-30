@@ -497,5 +497,13 @@ DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
   return kErrorNone;
 }
 
+DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWPrimary::SetPPFeatures(PPFeaturesConfig &feature_list) {
+  return kErrorNotSupported;
+}
+
 }  // namespace sdm
 

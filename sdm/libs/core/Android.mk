@@ -21,6 +21,7 @@ LOCAL_SRC_FILES               := core_interface.cpp \
                                  strategy.cpp \
                                  resource_default.cpp \
                                  dump_impl.cpp \
+                                 color_manager.cpp \
                                  $(LOCAL_HW_INTF_PATH)/hw_info.cpp \
                                  $(LOCAL_HW_INTF_PATH)/hw_device.cpp \
                                  $(LOCAL_HW_INTF_PATH)/hw_primary.cpp \

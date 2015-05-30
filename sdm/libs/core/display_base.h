@@ -28,11 +28,12 @@
 #include <core/display_interface.h>
 #include <private/strategy_interface.h>
 #include <private/rotator_interface.h>
+#include <private/color_interface.h>
 #include <utils/locker.h>
 
 #include "hw_interface.h"
 #include "comp_manager.h"
-
+#include "color_manager.h"
 
 namespace sdm {
 
@@ -63,6 +64,10 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError SetDisplayMode(uint32_t mode);
   virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual bool IsUnderscanSupported();
+  virtual DisplayError ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
+                                            PPDisplayAPIPayload *out_payload,
+                                            PPPendingParams *pending_action);
+  virtual DisplayError ApplyDefaultDisplayMode(void);
 
  protected:
   // DumpImpl method
@@ -70,8 +75,8 @@ class DisplayBase : public DisplayInterface {
 
   virtual int GetBestConfig();
   bool IsRotationRequired(HWLayers *hw_layers);
-  const char * GetName(const LayerComposition &composition);
-  const char * GetName(const LayerBufferFormat &format);
+  const char *GetName(const LayerComposition &composition);
+  const char *GetName(const LayerBufferFormat &format);
 
   DisplayType display_type_;
   DisplayEventHandler *event_handler_;
@@ -94,9 +99,9 @@ class DisplayBase : public DisplayInterface {
   bool underscan_supported_;
   uint32_t max_mixer_stages_;
   HWInfoInterface *hw_info_intf_;
+  ColorManagerProxy *color_mgr_;  // each display object owns its ColorManagerProxy
 };
 
 }  // namespace sdm
 
 #endif  // __DISPLAY_BASE_H__
-

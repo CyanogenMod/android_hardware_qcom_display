@@ -28,6 +28,7 @@
 #include <core/display_interface.h>
 #include <private/strategy_interface.h>
 #include <private/hw_info_types.h>
+#include <private/color_interface.h>
 #include <utils/constants.h>
 #include <core/buffer_allocator.h>
 #include <core/buffer_sync_handler.h>
@@ -79,6 +80,8 @@ class HWInterface {
   virtual DisplayError Validate(HWLayers *hw_layers) = 0;
   virtual DisplayError Commit(HWLayers *hw_layers) = 0;
   virtual DisplayError Flush() = 0;
+  virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers) = 0;
+  virtual DisplayError SetPPFeatures(PPFeaturesConfig &feature_list) = 0;
 
  protected:
   virtual ~HWInterface() { }

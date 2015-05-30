@@ -43,7 +43,7 @@ DisplayBase::DisplayBase(DisplayType display_type, DisplayEventHandler *event_ha
     rotator_intf_(rotator_intf), state_(kStateOff), hw_device_(0), display_comp_ctx_(0),
     display_attributes_(NULL), num_modes_(0), active_mode_index_(0), pending_commit_(false),
     vsync_enable_(false), underscan_supported_(false), max_mixer_stages_(0),
-    hw_info_intf_(hw_info_intf) {
+    hw_info_intf_(hw_info_intf), color_mgr_(NULL) {
 }
 
 DisplayError DisplayBase::Init() {
@@ -100,6 +100,12 @@ DisplayError DisplayBase::Init() {
     DisplayBase::SetMaxMixerStages(max_mixer_stages);
   }
 
+  color_mgr_ = ColorManagerProxy::CreateColorManagerProxy(display_type_, hw_intf_,
+                               display_attributes_[active_mode_index_], hw_panel_info_);
+  if (!color_mgr_) {
+    DLOGW("Unable to create ColorManagerProxy for display = %d", display_type_);
+  }
+
   return kErrorNone;
 
 CleanupOnError:
@@ -120,6 +126,11 @@ CleanupOnError:
 DisplayError DisplayBase::Deinit() {
   if (rotator_intf_) {
     rotator_intf_->UnregisterDisplay(display_rotator_ctx_);
+  }
+
+  if (color_mgr_) {
+    delete color_mgr_;
+    color_mgr_ = NULL;
   }
 
   comp_manager_->UnregisterDisplay(display_comp_ctx_);
@@ -208,6 +219,14 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
     if (error != kErrorNone) {
       return error;
     }
+  }
+
+   // check if feature list cache is dirty and pending.
+   // If dirty, need program to hardware blocks.
+  if (color_mgr_)
+    error = color_mgr_->Commit();
+  if (error != kErrorNone) { // won't affect this execution path.
+    DLOGW("ColorManager::Commit(...) isn't working");
   }
 
   error = hw_intf_->Commit(&hw_layers_);
@@ -578,6 +597,22 @@ const char * DisplayBase::GetName(const LayerBufferFormat &format) {
   case kFormatYCbCr422H2V1Packed:       return "YCBYCR_422_H2V1";
   default:                              return "UNKNOWN";
   }
+}
+
+DisplayError DisplayBase::ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
+                                               PPDisplayAPIPayload *out_payload,
+                                               PPPendingParams *pending_action) {
+  if (color_mgr_)
+    return color_mgr_->ColorSVCRequestRoute(in_payload, out_payload, pending_action);
+  else
+    return kErrorParameters;
+}
+
+DisplayError DisplayBase::ApplyDefaultDisplayMode() {
+  if (color_mgr_)
+    return color_mgr_->ApplyDefaultDisplayMode();
+  else
+    return kErrorParameters;
 }
 
 }  // namespace sdm
