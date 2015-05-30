@@ -29,6 +29,7 @@
 
 #include <utils/constants.h>
 #include <sync/sync.h>
+#include <stdarg.h>
 
 #include "hwc_display_virtual.h"
 #include "hwc_debugger.h"
@@ -37,9 +38,27 @@
 
 namespace sdm {
 
+static int GetWidthFromMetaData(const private_handle_t* handle) {
+  MetaData_t *metadata = reinterpret_cast<MetaData_t *>(handle->base_metadata);
+  if (metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
+    return metadata->bufferDim.sliceWidth;
+  }
+
+  return handle->width;
+}
+
+static int GetHeightFromMetaData(const private_handle_t* handle) {
+  MetaData_t *metadata = reinterpret_cast<MetaData_t *>(handle->base_metadata);
+  if (metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
+    return metadata->bufferDim.sliceHeight;
+  }
+
+  return handle->height;
+}
+
 HWCDisplayVirtual::HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
   : HWCDisplay(core_intf, hwc_procs, kVirtual, HWC_DISPLAY_VIRTUAL),
-    dump_output_layer_(false) {
+    dump_output_layer_(false), output_buffer_(NULL) {
 }
 
 int HWCDisplayVirtual::Init() {
@@ -132,7 +151,15 @@ int HWCDisplayVirtual::Commit(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-int HWCDisplayVirtual::SetActiveConfig(hwc_display_contents_1_t *content_list) {
+int HWCDisplayVirtual::Perform(uint32_t operation, ...) {
+  if(operation != SET_OUTPUT_SLICE_FROM_METADATA) {
+    return -EINVAL;
+  }
+
+  va_list args;
+  va_start(args, operation);
+  hwc_display_contents_1_t *content_list = va_arg(args, hwc_display_contents_1_t *);
+  va_end(args);
   const private_handle_t *output_handle =
         static_cast<const private_handle_t *>(content_list->outbuf);
   DisplayError error = kErrorNone;
@@ -144,8 +171,8 @@ int HWCDisplayVirtual::SetActiveConfig(hwc_display_contents_1_t *content_list) {
       return -EINVAL;
     }
 
-    int active_width = GetWidth(output_handle);
-    int active_height = GetHeight(output_handle);
+    int active_width = GetWidthFromMetaData(output_handle);
+    int active_height = GetHeightFromMetaData(output_handle);
 
     if ((active_width != INT(output_buffer_->width)) ||
         (active_height!= INT(output_buffer_->height)) ||
@@ -186,8 +213,8 @@ int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
       return -EINVAL;
     }
 
-    output_buffer_->width = GetWidth(output_handle);
-    output_buffer_->height = GetHeight(output_handle);
+    output_buffer_->width = GetWidthFromMetaData(output_handle);
+    output_buffer_->height = GetHeightFromMetaData(output_handle);
     output_buffer_->flags.secure = 0;
     output_buffer_->flags.video = 0;
 
@@ -254,24 +281,6 @@ void HWCDisplayVirtual::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_lay
   dump_output_layer_ = ((bit_mask_layer_type & (1 << OUTPUT_LAYER_DUMP)) != 0);
 
   DLOGI("output_layer_dump_enable %d", dump_output_layer_);
-}
-
-int HWCDisplayVirtual::GetWidth(const private_handle_t* handle) {
-  MetaData_t *metadata = reinterpret_cast<MetaData_t *>(handle->base_metadata);
-  if (metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
-    return metadata->bufferDim.sliceWidth;
-  }
-
-  return handle->width;
-}
-
-int HWCDisplayVirtual::GetHeight(const private_handle_t* handle) {
-  MetaData_t *metadata = reinterpret_cast<MetaData_t *>(handle->base_metadata);
-  if (metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
-    return metadata->bufferDim.sliceHeight;
-  }
-
-  return handle->height;
 }
 
 }  // namespace sdm

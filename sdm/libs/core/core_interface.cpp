@@ -52,13 +52,13 @@ struct CoreSingleton {
 } g_core;
 
 // TODO(user): Have a single structure handle carries all the interface pointers.
-DisplayError CoreInterface::CreateCore(CoreEventHandler *event_handler, DebugHandler *debug_handler,
+DisplayError CoreInterface::CreateCore(DebugHandler *debug_handler,
                                        BufferAllocator *buffer_allocator,
                                        BufferSyncHandler *buffer_sync_handler,
                                        CoreInterface **interface, uint32_t client_version) {
   SCOPE_LOCK(g_core.locker);
 
-  if (!event_handler || !debug_handler || !buffer_allocator || !buffer_sync_handler || !interface) {
+  if (!debug_handler || !buffer_allocator || !buffer_sync_handler || !interface) {
     return kErrorParameters;
   }
 
@@ -81,7 +81,7 @@ DisplayError CoreInterface::CreateCore(CoreEventHandler *event_handler, DebugHan
 
   // Create appropriate CoreImpl object based on client version.
   if (GET_REVISION(client_version) == CoreImpl::kRevision) {
-    core_impl = new CoreImpl(event_handler, buffer_allocator, buffer_sync_handler);
+    core_impl = new CoreImpl(buffer_allocator, buffer_sync_handler);
   } else {
     return kErrorNotSupported;
   }

@@ -36,7 +36,7 @@
 
 namespace sdm {
 
-class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::BnQClient {
+class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
  public:
   struct HWCModuleMethods : public hw_module_methods_t {
     HWCModuleMethods() {
@@ -76,12 +76,8 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   int GetEventValue(const char *uevent_data, int length, const char *event_info);
   int HotPlugHandler(bool connected);
   void ResetPanel();
-  bool ValidateContentList(hwc_display_contents_1_t *content_list);
   int CreateVirtualDisplay(hwc_display_contents_1_t *content_list);
   int DestroyVirtualDisplay();
-
-  // CoreEventHandler methods
-  virtual DisplayError Hotplug(const CoreEventHotplug &hotplug);
 
   // QClient methods
   virtual android::status_t notifyCallback(uint32_t command, const android::Parcel *input_parcel,
@@ -99,9 +95,7 @@ class HWCSession : hwc_composer_device_1_t, CoreEventHandler, public qClient::Bn
   static Locker locker_;
   CoreInterface *core_intf_;
   hwc_procs_t const *hwc_procs_;
-  HWCDisplayPrimary *display_primary_;
-  HWCDisplayExternal *display_external_;
-  HWCDisplayVirtual *display_virtual_;
+  HWCDisplay *hwc_display_[HWC_NUM_DISPLAY_TYPES];
   pthread_t uevent_thread_;
   bool uevent_thread_exit_;
   static bool reset_panel_;
