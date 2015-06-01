@@ -714,7 +714,7 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
       } else if (!strncmp(tokens[0], "min_fps", strlen("min_fps"))) {
         panel_info->min_fps = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "max_fps", strlen("max_fps"))) {
-        panel_info->max_fps= atoi(tokens[1]);
+        panel_info->max_fps = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "primary_panel", strlen("primary_panel"))) {
         panel_info->is_primary_panel = atoi(tokens[1]);
       }
