@@ -132,6 +132,16 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->max_sde_clk = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "clk_fudge_factor", strlen("clk_fudge_factor"))) {
         hw_resource->clk_fudge_factor = FLOAT(atoi(tokens[1])) / FLOAT(atoi(tokens[2]));
+      } else if (!strncmp(tokens[0], "fmt_mt_nv12_factor", strlen("fmt_mt_nv12_factor"))) {
+        hw_resource->macrotile_nv12_factor = atoi(tokens[1]);
+      } else if (!strncmp(tokens[0], "fmt_mt_factor", strlen("fmt_mt_factor"))) {
+        hw_resource->macrotile_factor = atoi(tokens[1]);
+      } else if (!strncmp(tokens[0], "fmt_linear_factor", strlen("fmt_linear_factor"))) {
+        hw_resource->linear_factor = atoi(tokens[1]);
+      } else if (!strncmp(tokens[0], "scale_factor", strlen("scale_factor"))) {
+        hw_resource->scale_factor = atoi(tokens[1]);
+      } else if (!strncmp(tokens[0], "xtra_ff_factor", strlen("xtra_ff_factor"))) {
+        hw_resource->extra_fudge_factor = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "features", strlen("features"))) {
         for (uint32_t i = 0; i < token_count; i++) {
           if (!strncmp(tokens[i], "bwc", strlen("bwc"))) {
@@ -166,6 +176,9 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->max_bandwidth_high);
   DLOGI("MaxPipeBw = %"PRIu64" KBps, MaxSDEClock = %"PRIu64" Hz, ClockFudgeFactor = %f",
         hw_resource->max_pipe_bw, hw_resource->max_sde_clk, hw_resource->clk_fudge_factor);
+  DLOGI("Prefill factors: Tiled_NV12 = %d, Tiled = %d, Linear = %d, Scale = %d, Fudge_factor = %d",
+        hw_resource->macrotile_nv12_factor, hw_resource->macrotile_factor,
+        hw_resource->linear_factor, hw_resource->scale_factor, hw_resource->extra_fudge_factor);
 
   return kErrorNone;
 }
