@@ -537,12 +537,12 @@ static inline bool isYUVSplitNeeded(const private_handle_t* hnd) {
             (hnd->width > maxPipeWidth));
 }
 
-// Returns true if the buffer is secure
+// Returns true if the buffer is secure(using secure heap)
 static inline bool isSecureBuffer(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_SECURE_BUFFER & hnd->flags));
 }
 
-// Returns true if the buffer is protected
+// Returns true if the buffer is protected(L3 using IOMMU heap)
 static inline bool isProtectedBuffer(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_PROTECTED_BUFFER & hnd->flags));
 }

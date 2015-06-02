@@ -470,8 +470,10 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     }
 
     //XXX: Investigate doing this with pixel phase on MDSS
-    if(!isSecureBuffer(hnd) && isNonIntegralSourceCrop(layer->sourceCropf))
+    if((!isSecureBuffer(hnd) || !isProtectedBuffer(hnd)) &&
+            isNonIntegralSourceCrop(layer->sourceCropf)) {
         return false;
+    }
 
     hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
     hwc_rect_t dst = layer->displayFrame;
@@ -1833,7 +1835,8 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
         } else {
             if(frame.isFBComposed[nYuvIndex]) {
                 private_handle_t *hnd = (private_handle_t *)layer->handle;
-                if(!secureOnly || isSecureBuffer(hnd)) {
+                if(!secureOnly || isSecureBuffer(hnd) ||
+                        isProtectedBuffer(hnd)) {
                     frame.isFBComposed[nYuvIndex] = false;
                     frame.fbCount--;
                 }
