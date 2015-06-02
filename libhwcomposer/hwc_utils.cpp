@@ -1079,7 +1079,8 @@ void setListStats(hwc_context_t *ctx,
         ctx->listStats[dpy].yuvIndices[i] = -1;
         ctx->listStats[dpy].yuv4k2kIndices[i] = -1;
 
-        if (isSecureBuffer(hnd)) {
+        if (isSecureBuffer(hnd) || isProtectedBuffer(hnd)) {
+            // Protected Buffer must be treated as Secure Layer
             ctx->listStats[dpy].isSecurePresent = true;
             if(not isYuvBuffer(hnd)) {
                 // cache secureRGB layer parameters like we cache for YUV layers
