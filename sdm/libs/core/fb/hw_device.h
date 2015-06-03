@@ -92,6 +92,7 @@ class HWDevice {
   mdp_scale_data* GetScaleDataRef(uint32_t index) { return &scale_data_[index]; }
   void SetHWScaleData(const ScaleData &scale, uint32_t index);
   void ResetDisplayParams();
+  void SetColorSpace(LayerColorSpace source, mdp_color_space *color_space);
 
   bool EnableHotPlugDetection(int enable);
 

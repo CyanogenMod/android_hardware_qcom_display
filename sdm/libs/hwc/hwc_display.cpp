@@ -32,7 +32,6 @@
 #include <gralloc_priv.h>
 #include <gr.h>
 #include <utils/constants.h>
-#include <qdMetaData.h>
 #include <sync/sync.h>
 #include <cutils/properties.h>
 
@@ -350,13 +349,9 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint3
     }
 
     layer->frame_rate = fps;
-    MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
-    if (meta_data && meta_data->operation & UPDATE_REFRESH_RATE) {
-      layer->frame_rate = RoundToStandardFPS(meta_data->refreshrate);
-    }
-
-    if (meta_data && meta_data->operation == PP_PARAM_INTERLACED && meta_data->interlaced) {
-      layer_buffer->flags.interlace = true;
+    const MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
+    if (meta_data && (SetMetaData(*meta_data, layer) != kErrorNone)) {
+      return -EINVAL;
     }
 
     if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_DISPLAY) {
@@ -1049,6 +1044,37 @@ uint32_t HWCDisplay::RoundToStandardFPS(uint32_t fps) {
 }
 
 void HWCDisplay::ApplyScanAdjustment(hwc_rect_t *display_frame) {
+}
+
+DisplayError HWCDisplay::SetColorSpace(const ColorSpace_t source, LayerColorSpace *target) {
+  switch (source) {
+  case ITU_R_601:      *target = kLimitedRange601;   break;
+  case ITU_R_601_FR:   *target = kFullRange601;      break;
+  case ITU_R_709:      *target = kLimitedRange709;   break;
+  default:
+    DLOGE("Unsupported Color Space: %d", source);
+    return kErrorNotSupported;
+  }
+
+  return kErrorNone;
+}
+
+DisplayError HWCDisplay::SetMetaData(const MetaData_t &meta_data, Layer *layer) {
+  if (meta_data.operation & UPDATE_REFRESH_RATE) {
+    layer->frame_rate = RoundToStandardFPS(meta_data.refreshrate);
+  }
+
+  if ((meta_data.operation & PP_PARAM_INTERLACED) && meta_data.interlaced) {
+    layer->input_buffer->flags.interlace = true;
+  }
+
+  if (meta_data.operation & UPDATE_COLOR_SPACE) {
+    if (SetColorSpace(meta_data.colorSpace, &layer->color_space) != kErrorNone) {
+      return kErrorNotSupported;
+    }
+  }
+
+  return kErrorNone;
 }
 
 }  // namespace sdm
