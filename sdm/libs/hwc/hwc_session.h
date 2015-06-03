@@ -76,8 +76,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   int GetEventValue(const char *uevent_data, int length, const char *event_info);
   int HotPlugHandler(bool connected);
   void ResetPanel();
-  int CreateVirtualDisplay(hwc_display_contents_1_t *content_list);
-  int DestroyVirtualDisplay();
+  int HandleVirtualDisplayLifeCycle(hwc_display_contents_1_t *content_list);
 
   // QClient methods
   virtual android::status_t notifyCallback(uint32_t command, const android::Parcel *input_parcel,
@@ -87,9 +86,6 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   android::status_t SetMaxMixerStages(const android::Parcel *input_parcel);
   android::status_t SetDisplayMode(const android::Parcel *input_parcel);
   android::status_t SetSecondaryDisplayStatus(const android::Parcel *input_parcel);
-  void SetFrameBufferResolution(int disp, hwc_display_contents_1_t *content_list);
-  void AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height,
-                              uint32_t *src_width, uint32_t *src_height);
   android::status_t ConfigureRefreshRate(const android::Parcel *input_parcel);
 
   static Locker locker_;

@@ -37,19 +37,60 @@
 
 namespace sdm {
 
-HWCDisplayExternal::HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL) {
+static void AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height, uint32_t *src_width,
+                                   uint32_t *src_height) {
+  *src_height = (dst_width * (*src_height)) / (*src_width);
+  *src_width = dst_width;
 }
 
-int HWCDisplayExternal::Init() {
-  int status = 0;
+int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                               uint32_t primary_width, uint32_t primary_height,
+                               HWCDisplay **hwc_display) {
+  uint32_t external_width = 0;
+  uint32_t external_height = 0;
+  char property[PROPERTY_VALUE_MAX];
 
-  status = HWCDisplay::Init();
-  if (status != 0) {
+  HWCDisplay *hwc_display_external = new HWCDisplayExternal(core_intf, hwc_procs);
+  int status = hwc_display_external->Init();
+  if (status) {
+    delete hwc_display_external;
     return status;
   }
 
+  hwc_display_external->GetPanelResolution(&external_width, &external_height);
+
+  if (property_get("sys.hwc.mdp_downscale_enabled", property, "false") &&
+      !strcmp(property, "true")) {
+    uint32_t primary_area = primary_width * primary_height;
+    uint32_t external_area = external_width * external_height;
+
+    if (primary_area > external_area) {
+      if (primary_height > primary_width) {
+        Swap(primary_height, primary_width);
+      }
+      AdjustSourceResolution(primary_width, primary_height,
+                             &external_width, &external_height);
+    }
+  }
+
+  status = hwc_display_external->SetFrameBufferResolution(external_width, external_height);
+  if (status) {
+    Destroy(hwc_display_external);
+    return status;
+  }
+
+  *hwc_display = hwc_display_external;
+
   return status;
+}
+
+void HWCDisplayExternal::Destroy(HWCDisplay *hwc_display) {
+  hwc_display->Deinit();
+  delete hwc_display;
+}
+
+HWCDisplayExternal::HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
+  : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL) {
 }
 
 int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {

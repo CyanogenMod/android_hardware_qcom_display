@@ -27,6 +27,7 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <cutils/properties.h>
 #include <utils/constants.h>
 #include <stdarg.h>
 
@@ -36,6 +37,49 @@
 #define __CLASS__ "HWCDisplayPrimary"
 
 namespace sdm {
+
+int HWCDisplayPrimary::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                              HWCDisplay **hwc_display) {
+  int status = 0;
+  uint32_t primary_width = 0;
+  uint32_t primary_height = 0;
+  char property[PROPERTY_VALUE_MAX];
+
+  HWCDisplay *hwc_display_primary = new HWCDisplayPrimary(core_intf, hwc_procs);
+  status = hwc_display_primary->Init();
+  if (status) {
+    delete hwc_display_primary;
+    return status;
+  }
+
+  status = hwc_display_primary->SetPowerMode(HWC_POWER_MODE_NORMAL);
+  if (status) {
+    Destroy(hwc_display_primary);
+    return status;
+  }
+
+  hwc_display_primary->GetPanelResolution(&primary_width, &primary_height);
+  if (property_get("debug.hwc.fbsize", property, NULL) > 0) {
+    char *yptr = strcasestr(property, "x");
+    primary_width = atoi(property);
+    primary_height = atoi(yptr + 1);
+  }
+
+  status = hwc_display_primary->SetFrameBufferResolution(primary_width, primary_height);
+  if (status) {
+    Destroy(hwc_display_primary);
+    return status;
+  }
+
+  *hwc_display = hwc_display_primary;
+
+  return status;
+}
+
+void HWCDisplayPrimary::Destroy(HWCDisplay *hwc_display) {
+  hwc_display->Deinit();
+  delete hwc_display;
+}
 
 HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
   : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY) {

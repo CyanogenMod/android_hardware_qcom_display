@@ -31,13 +31,16 @@ namespace sdm {
 
 class HWCDisplayExternal : public HWCDisplay {
  public:
-  explicit HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
-  virtual int Init();
+  static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, uint32_t primary_width,
+                    uint32_t primary_height, HWCDisplay **hwc_display);
+  static void Destroy(HWCDisplay *hwc_display);
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
   virtual int GetDisplayConfigs(uint32_t *configs, size_t *num_configs);
+
  private:
-  virtual void ApplyScanAdjustment(hwc_rect_t *display_frame);
+  HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
+  void ApplyScanAdjustment(hwc_rect_t *display_frame);
 };
 
 }  // namespace sdm

@@ -33,29 +33,27 @@ namespace sdm {
 
 class HWCDisplayVirtual : public HWCDisplay {
  public:
-  enum {
-    SET_OUTPUT_SLICE_FROM_METADATA,
-  };
-
-  explicit HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
+  static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                    hwc_display_contents_1_t *content_list, HWCDisplay **hwc_display);
+  static void Destroy(HWCDisplay *hwc_display);
+  static bool IsValidContentList(hwc_display_contents_1_t *content_list);
   virtual int Init();
   virtual int Deinit();
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
-  virtual int Perform(uint32_t operation, ...);
-
-  static bool ValidateContentList(hwc_display_contents_1_t *content_list);
 
  private:
+  HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
   int SetOutputBuffer(hwc_display_contents_1_t *content_list);
   void DumpOutputBuffer(hwc_display_contents_1_t *content_list);
+  int SetOutputSliceFromMetadata(hwc_display_contents_1_t *content_list);
 
   bool dump_output_layer_;
   LayerBuffer *output_buffer_;
 };
 
-inline bool HWCDisplayVirtual::ValidateContentList(hwc_display_contents_1_t *content_list) {
+inline bool HWCDisplayVirtual::IsValidContentList(hwc_display_contents_1_t *content_list) {
   return (content_list && content_list->numHwLayers > 0 && content_list->outbuf);
 }
 
