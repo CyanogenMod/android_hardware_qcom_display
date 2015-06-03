@@ -555,6 +555,13 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     if(!isEnabled()) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. not enabled.", __FUNCTION__);
         ret = false;
+    } else if (ctx->isDMAStateChanging) {
+        // Bail out if a padding round has been invoked in order to switch DMA
+        // state to block mode. We need this to cater for the case when a layer
+        // requires rotation in the current frame.
+        ALOGD_IF(isDebug(), "%s: padding round invoked to switch DMA state",
+                __FUNCTION__);
+        ret = false;
     } else if(ctx->mVideoTransFlag && isSecondaryConnected(ctx)) {
         //1 Padding round to shift pipes across mixers
         ALOGD_IF(isDebug(),"%s: MDP Comp. video transition padding round",
@@ -584,13 +591,6 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
                      __FUNCTION__,mDpy);
             ret = false;
         }
-    } else if (ctx->isDMAStateChanging) {
-        // Bail out if a padding round has been invoked in order to switch DMA
-        // state to block mode. We need this to cater for the case when a layer
-        // requires rotation in the current frame.
-        ALOGD_IF(isDebug(), "%s: padding round invoked to switch DMA state",
-                __FUNCTION__);
-        return false;
     }
 
     return ret;
