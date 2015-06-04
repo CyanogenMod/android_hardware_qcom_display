@@ -117,6 +117,7 @@ protected:
 
         bool needsRedraw;
         int fbZ;
+        int hwCursorIndex;
 
         /* c'tor */
         FrameInfo();
