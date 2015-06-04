@@ -3103,8 +3103,14 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
             BwcPM::setBwc(ctx, mDpy, hnd, crop, dst, transform, downscale,
                     mdpFlags);
         }
+        uint32_t frame_rate = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].refreshRate;
+        if(!mDpy && !isSecondaryConnected(ctx)) {
+            if(metadata && (metadata->operation & UPDATE_REFRESH_RATE))
+                frame_rate = metadata->refreshrate;
+        }
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale) < 0) {
+        if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale,
+                    frame_rate) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
         }

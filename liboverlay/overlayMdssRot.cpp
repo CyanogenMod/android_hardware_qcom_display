@@ -129,6 +129,10 @@ void MdssRot::setDownscale(int downscale) {
     mDownscale = downscale;
 }
 
+void MdssRot::setFrameRate(uint32_t frame_rate) {
+    mRotInfo.frame_rate = frame_rate;
+}
+
 void MdssRot::setFlags(const utils::eMdpFlags& flags) {
     mRotInfo.flags = flags;
 }
