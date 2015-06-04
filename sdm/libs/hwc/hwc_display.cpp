@@ -58,9 +58,9 @@ int HWCDisplay::Init() {
     return -EINVAL;
   }
 
-  char property[PROPERTY_VALUE_MAX];
-  if (property_get("debug.egl.swapinterval", property, "1") > 0) {
-    if (atoi(property) == 0) {
+  int property_swap_interval = 1;
+  if (HWCDebugHandler::Get()->GetProperty("debug.egl.swapinterval", &property_swap_interval)) {
+    if (property_swap_interval == 0) {
       swap_interval_zero_ = true;
     }
   }

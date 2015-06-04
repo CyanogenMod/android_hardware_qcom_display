@@ -93,7 +93,7 @@ DisplayError DisplayBase::Init() {
     HWResourceInfo hw_resource_info = HWResourceInfo();
     hw_info_intf_->GetHWResourceInfo(&hw_resource_info);
     int max_mixer_stages = hw_resource_info.num_blending_stages;
-    int property_value = Debug::GetMaxPipesPerMixer();
+    int property_value = Debug::GetMaxPipesPerMixer(display_type_);
     if (property_value >= 0) {
       max_mixer_stages = MIN(UINT32(property_value), hw_resource_info.num_blending_stages);
     }

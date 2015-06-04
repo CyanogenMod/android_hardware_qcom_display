@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <core/sdm_types.h>
 #include <core/debug_interface.h>
+#include <core/display_interface.h>
 
 #define DLOG(tag, method, format, ...) Debug::Get()->method(tag, __CLASS__ "::%s: " format, \
                                                             __FUNCTION__, ##__VA_ARGS__)
@@ -65,7 +66,8 @@ class Debug {
   static bool IsRotatorDownScaleDisabled();
   static bool IsDecimationDisabled();
   static bool IsPartialUpdateEnabled();
-  static int GetMaxPipesPerMixer();
+  static int GetMaxPipesPerMixer(DisplayType display_type);
+  static bool IsVideoModeEnabled();
 
  private:
   Debug();

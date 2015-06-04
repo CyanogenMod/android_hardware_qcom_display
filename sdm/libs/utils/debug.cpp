@@ -40,7 +40,7 @@ Debug::Debug() : debug_handler_(&default_debug_handler_) {
 
 uint32_t Debug::GetSimulationFlag() {
   int value = 0;
-  debug_.debug_handler_->GetProperty("debug.hwc.simulate", &value);
+  debug_.debug_handler_->GetProperty("sdm.composition_simulation", &value);
 
   return value;
 }
@@ -54,14 +54,14 @@ uint32_t Debug::GetHDMIResolution() {
 
 uint32_t Debug::GetIdleTimeoutMs() {
   int value = IDLE_TIMEOUT_DEFAULT_MS;
-  debug_.debug_handler_->GetProperty("debug.mdpcomp.idletime", &value);
+  debug_.debug_handler_->GetProperty("sdm.idle_time", &value);
 
   return value;
 }
 
 bool Debug::IsRotatorDownScaleDisabled() {
   int value = 0;
-  debug_.debug_handler_->GetProperty("sdm.disable_rotator_downscaling", &value);
+  debug_.debug_handler_->GetProperty("sdm.debug.rotator_downscale", &value);
 
   return (value == 1);
 }
@@ -75,16 +75,35 @@ bool Debug::IsDecimationDisabled() {
 
 bool Debug::IsPartialUpdateEnabled() {
   int value = 0;
-  debug_.debug_handler_->GetProperty("sdm.hwc.partial_update", &value);
+  debug_.debug_handler_->GetProperty("sdm.partial_update", &value);
 
   return (value == 1);
 }
 
-int Debug::GetMaxPipesPerMixer() {
+int Debug::GetMaxPipesPerMixer(DisplayType display_type) {
   int value = -1;
-  debug_.debug_handler_->GetProperty("persist.hwc.mdpcomp.maxpermixer", &value);
+  switch (display_type) {
+  case kPrimary:
+    debug_.debug_handler_->GetProperty("sdm.primary.mixer_stages", &value);
+    break;
+  case kHDMI:
+    debug_.debug_handler_->GetProperty("sdm.external.mixer_stages", &value);
+    break;
+  case kVirtual:
+    debug_.debug_handler_->GetProperty("sdm.virtual.mixer_stages", &value);
+    break;
+  default:
+    break;
+  }
 
   return value;
+}
+
+bool Debug::IsVideoModeEnabled() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.video_mode_panel", &value);
+
+  return (value == 1);
 }
 
 }  // namespace sdm
