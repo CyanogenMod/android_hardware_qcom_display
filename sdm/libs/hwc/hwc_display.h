@@ -98,7 +98,6 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PostCommitLayerStack(hwc_display_contents_1_t *content_list);
-  bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
   void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
   inline void SetRect(const hwc_rect_t &source, LayerRect *target);
   inline void SetRect(const hwc_frect_t &source, LayerRect *target);
@@ -107,11 +106,9 @@ class HWCDisplay : public DisplayEventHandler {
   inline void SetBlending(const int32_t &source, LayerBlending *target);
   int SetFormat(const int32_t &source, const int flags, LayerBufferFormat *target);
   LayerBufferFormat GetSDMFormat(const int32_t &source, const int flags);
-  void DumpInputBuffers(hwc_display_contents_1_t *content_list);
   const char *GetHALPixelFormatString(int format);
   const char *GetDisplayString();
   void ScaleDisplayFrame(hwc_rect_t *display_frame);
-  bool IsFrameBufferScaled();
   void MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list);
   void CloseAcquireFences(hwc_display_contents_1_t *content_list);
   uint32_t RoundToStandardFPS(uint32_t fps);
@@ -140,6 +137,13 @@ class HWCDisplay : public DisplayEventHandler {
   bool display_paused_;
   bool use_metadata_refresh_rate_;
   uint32_t metadata_refresh_rate_;
+
+ private:
+  bool IsFrameBufferScaled();
+  void DumpInputBuffers(hwc_display_contents_1_t *content_list);
+  bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
+  int PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint32_t fps);
+  void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
 };
 
 inline int HWCDisplay::Perform(uint32_t operation, ...) {
