@@ -103,7 +103,6 @@ HWCDisplayVirtual::HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const
 }
 
 int HWCDisplayVirtual::Init() {
-  int status = 0;
 
   output_buffer_ = new LayerBuffer();
   if (!output_buffer_) {

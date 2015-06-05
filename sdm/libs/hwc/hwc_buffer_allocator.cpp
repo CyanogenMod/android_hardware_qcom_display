@@ -56,7 +56,7 @@ DisplayError HWCBufferAllocator::AllocateBuffer(BufferInfo *buffer_info) {
     return kErrorMemory;
   }
 
-  int alloc_flags = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+  int alloc_flags = INT(GRALLOC_USAGE_PRIVATE_IOMMU_HEAP);
   int error = 0;
 
   int width = INT(buffer_config.width);
@@ -64,8 +64,8 @@ DisplayError HWCBufferAllocator::AllocateBuffer(BufferInfo *buffer_info) {
   int format;
 
   if (buffer_config.secure) {
-    alloc_flags = GRALLOC_USAGE_PRIVATE_MM_HEAP;
-    alloc_flags |= GRALLOC_USAGE_PROTECTED;
+    alloc_flags = INT(GRALLOC_USAGE_PRIVATE_MM_HEAP);
+    alloc_flags |= INT(GRALLOC_USAGE_PROTECTED);
     data.align = SECURE_ALIGN;
   } else {
     data.align = getpagesize();

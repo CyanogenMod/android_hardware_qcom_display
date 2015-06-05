@@ -43,7 +43,6 @@ int HWCDisplayPrimary::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_
   int status = 0;
   uint32_t primary_width = 0;
   uint32_t primary_height = 0;
-  char property[PROPERTY_VALUE_MAX];
 
   HWCDisplay *hwc_display_primary = new HWCDisplayPrimary(core_intf, hwc_procs);
   status = hwc_display_primary->Init();
@@ -140,7 +139,7 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-int HWCDisplayPrimary::SetActiveConfig(uint32_t index) {
+int HWCDisplayPrimary::SetActiveConfig(int index) {
   DisplayError error = kErrorNone;
 
   if (display_intf_) {

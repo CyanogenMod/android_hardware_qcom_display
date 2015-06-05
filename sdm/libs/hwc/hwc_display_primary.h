@@ -42,7 +42,7 @@ class HWCDisplayPrimary : public HWCDisplay {
   static void Destroy(HWCDisplay *hwc_display);
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
-  virtual int SetActiveConfig(uint32_t index);
+  virtual int SetActiveConfig(int index);
   virtual int SetRefreshRate(uint32_t refresh_rate);
   virtual int Perform(uint32_t operation, ...);
 

@@ -39,24 +39,6 @@
 
 namespace sdm {
 
-static int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count) {
-  char *tmp_token = NULL;
-  char *temp_ptr;
-  uint32_t index = 0;
-  const char *delim = ", =\n";
-  if (!input) {
-    return -1;
-  }
-  tmp_token = strtok_r(input, delim, &temp_ptr);
-  while (tmp_token && index < max_token) {
-    tokens[index++] = tmp_token;
-    tmp_token = strtok_r(NULL, delim, &temp_ptr);
-  }
-  *count = index;
-
-  return 0;
-}
-
 static bool MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
                                  fb_var_screeninfo *info) {
   if (!mode || !info) {
@@ -244,8 +226,6 @@ DisplayError HWHDMI::GetDisplayAttributes(HWDisplayAttributes *display_attribute
 
 DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
   DTRACE_SCOPED();
-
-  DisplayError error = kErrorNone;
 
   // Variable screen info
   STRUCT_VAR(fb_var_screeninfo, vscreeninfo);

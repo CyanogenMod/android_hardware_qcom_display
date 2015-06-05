@@ -475,10 +475,8 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   // Configure each layer
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-    const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
 
     Layer &layer = layer_stack_.layers[i];
-    LayerBuffer *layer_buffer = layer.input_buffer;
 
     ret = PrepareLayerParams(&content_list->hwLayers[i], &layer_stack_.layers[i],
                              active_config.fps);
@@ -1114,7 +1112,7 @@ uint32_t HWCDisplay::RoundToStandardFPS(uint32_t fps) {
 
   int count = INT(sizeof(standard_fps) / sizeof(standard_fps[0]));
   for (int i = 0; i < count; i++) {
-    if (abs(standard_fps[i] - fps) < 2) {
+    if ((standard_fps[i] - fps) < 2) {
       // Most likely used for video, the fps can fluctuate
       // Ex: b/w 29 and 30 for 30 fps clip
       return standard_fps[i];

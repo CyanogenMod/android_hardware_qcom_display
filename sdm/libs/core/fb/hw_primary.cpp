@@ -471,7 +471,6 @@ DisplayError HWPrimary::SetVSyncState(bool enable) {
 }
 
 DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
-  DisplayError error = kErrorNone;
   uint32_t mode = -1;
 
   switch (hw_display_mode) {

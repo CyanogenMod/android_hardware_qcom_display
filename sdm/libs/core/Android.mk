@@ -6,8 +6,9 @@ LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := hardware/qcom/display/sdm/include/ \
                                  $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
-                                 -Wconversion -Wall -Werror \
+                                 -Wall -Werror -std=c++11 -fcolor-diagnostics\
                                  -DLOG_TAG=\"SDM\"
+LOCAL_CLANG                   := true
 LOCAL_HW_INTF_PATH            := fb
 LOCAL_SHARED_LIBRARIES        := libdl libsdmutils
 LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr

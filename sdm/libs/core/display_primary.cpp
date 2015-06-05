@@ -247,8 +247,6 @@ DisplayError DisplayPrimary::IsScalingValid(const LayerRect &crop, const LayerRe
 DisplayError DisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
   SCOPE_LOCK(locker_);
 
-  DisplayError error = kErrorNone;
-
   if (!hw_panel_info_.dynamic_fps) {
     DLOGW("Dynamic fps feature is not supported");
     return kErrorNotSupported;

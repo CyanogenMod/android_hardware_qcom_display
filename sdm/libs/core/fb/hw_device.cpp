@@ -215,7 +215,6 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
     HWPipeInfo *right_pipe = &hw_layers->config[i].right_pipe;
     HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
     bool is_rotator_used = (hw_rotator_session->hw_block_count != 0);
-    mdp_input_layer mdp_layer;
 
     for (uint32_t count = 0; count < 2; count++) {
       HWPipeInfo *pipe_info = (count == 0) ? left_pipe : right_pipe;
@@ -728,7 +727,6 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
 
 HWDisplayPort HWDevice::GetHWDisplayPort(int device_node) {
   char stringbuffer[kMaxStringLength];
-  DisplayError error = kErrorNone;
   char *line = NULL;
   size_t len = kMaxStringLength;
   ssize_t read;
@@ -767,7 +765,6 @@ HWDisplayPort HWDevice::GetHWDisplayPort(int device_node) {
 
 HWDisplayMode HWDevice::GetHWDisplayMode(int device_node) {
   char stringbuffer[kMaxStringLength];
-  DisplayError error = kErrorNone;
   char *line = NULL;
   size_t len = kMaxStringLength;
   ssize_t read;
