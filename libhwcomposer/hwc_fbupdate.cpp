@@ -101,7 +101,8 @@ bool FBUpdateNonSplit::preRotateExtDisplay(hwc_context_t *ctx,
         // viewFrame with sourceCrop to avoid those black bars
         sourceCrop = getIntersection(sourceCrop, ctx->mViewFrame[mDpy]);
         //Configure rotator for pre-rotation
-        if(configRotator(mRot, info, sourceCrop, mdpFlags, orient, 0) < 0) {
+        if(configRotator(mRot, info, sourceCrop, mdpFlags, orient, 0,
+                    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].refreshRate) < 0) {
             ALOGE("%s: configRotator Failed!", __FUNCTION__);
             mRot = NULL;
             return false;

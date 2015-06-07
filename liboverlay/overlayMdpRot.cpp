@@ -126,6 +126,10 @@ void MdpRot::setCrop(const utils::Dim& /*crop*/) {
     // NO-OP for non-mdss rotator due to possible h/w limitations
 }
 
+void MdpRot::setFrameRate(uint32_t /*frame_rate*/) {
+    // NO-OP for non-mdss rotator
+}
+
 void MdpRot::setFlags(const utils::eMdpFlags& flags) {
     mRotImgInfo.secure = 0;
     if(flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)

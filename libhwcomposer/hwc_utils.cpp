@@ -1924,7 +1924,8 @@ void setMdpFlags(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
 int configRotator(Rotator *rot, Whf& whf,
         hwc_rect_t& crop, const eMdpFlags& mdpFlags,
-        const eTransform& orient, const int& downscale) {
+        const eTransform& orient, const int& downscale,
+        const uint32_t& frame_rate) {
 
     // Fix alignments for TILED format
     if(whf.format == MDP_Y_CRCB_H2V2_TILE ||
@@ -1941,6 +1942,7 @@ int configRotator(Rotator *rot, Whf& whf,
         rot->setCrop(rotCrop);
     }
 
+    rot->setFrameRate(frame_rate);
     rot->setFlags(mdpFlags);
     rot->setTransform(orient);
     rot->setDownscale(downscale);
@@ -2228,8 +2230,14 @@ int configureNonSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
         BwcPM::setBwc(ctx, dpy, hnd, crop, dst, transform, downscale,
                 mdpFlags);
+        uint32_t frame_rate = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].refreshRate;
+        if(!dpy && !isSecondaryConnected(ctx)) {
+            if(metadata && (metadata->operation & UPDATE_REFRESH_RATE))
+                frame_rate = metadata->refreshrate;
+        }
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale) < 0) {
+        if(configRotator(*rot, whf, crop, mdpFlags, orient, downscale,
+                    frame_rate) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
         }
@@ -2337,8 +2345,14 @@ int configureSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
+        uint32_t frame_rate = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].refreshRate;
+        if(!dpy && !isSecondaryConnected(ctx)) {
+            if(metadata && (metadata->operation & UPDATE_REFRESH_RATE))
+                frame_rate = metadata->refreshrate;
+        }
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
+        if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale,
+                    frame_rate) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
         }
@@ -2461,8 +2475,14 @@ int configure3DVideo(hwc_context_t *ctx, hwc_layer_1_t *layer,
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
+        uint32_t frame_rate = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].refreshRate;
+        if(!dpy && !isSecondaryConnected(ctx)) {
+            if(metadata && (metadata->operation & UPDATE_REFRESH_RATE))
+                frame_rate = metadata->refreshrate;
+        }
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
+        if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale,
+                    frame_rate) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
         }
@@ -2579,8 +2599,14 @@ int configureSourceSplit(hwc_context_t *ctx, hwc_layer_1_t *layer,
         (*rot) = ctx->mRotMgr->getNext();
         if((*rot) == NULL) return -1;
         ctx->mLayerRotMap[dpy]->add(layer, *rot);
+        uint32_t frame_rate = ctx->dpyAttr[HWC_DISPLAY_PRIMARY].refreshRate;
+        if(!dpy && !isSecondaryConnected(ctx)) {
+            if(metadata && (metadata->operation & UPDATE_REFRESH_RATE))
+                frame_rate = metadata->refreshrate;
+        }
         //Configure rotator for pre-rotation
-        if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale) < 0) {
+        if(configRotator(*rot, whf, crop, mdpFlagsL, orient, downscale,
+                    frame_rate) < 0) {
             ALOGE("%s: configRotator failed!", __FUNCTION__);
             return -1;
         }
