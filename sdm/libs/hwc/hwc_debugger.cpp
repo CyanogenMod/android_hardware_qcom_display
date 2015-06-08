@@ -85,6 +85,14 @@ void HWCDebugHandler::DebugRotator(bool enable) {
   }
 }
 
+void HWCDebugHandler::DebugQdcm(bool enable) {
+  if (enable) {
+    SET_BIT(debug_flags_, kTagQDCM);
+  } else {
+    CLEAR_BIT(debug_flags_, kTagQDCM);
+  }
+}
+
 void HWCDebugHandler::Error(DebugTag /*tag*/, const char *format, ...) {
   va_list list;
   va_start(list, format);

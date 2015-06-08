@@ -86,6 +86,7 @@ public:
         DEBUG_PIPE_LIFECYCLE,
         DEBUG_DRIVER_CONFIG,
         DEBUG_ROTATOR,
+        DEBUG_QDCM,
     };
 
     enum {

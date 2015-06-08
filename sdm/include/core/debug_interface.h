@@ -48,6 +48,7 @@ enum DebugTag {
   kTagDriverConfig,     //!< Debug log is tagged for driver config.
   kTagRotator,          //!< Debug log is tagged for rotator.
   kTagScalar,           //!< Debug log is tagged for Scalar Helper.
+  kTagQDCM,             //!< Debug log is tagged for display QDCM color managing.
 };
 
 /*! @brief Display debug handler class.
