@@ -74,6 +74,12 @@ enum LayerComposition {
                           //!< Only one layer shall be marked as target buffer by the caller.
 };
 
+enum LayerColorSpace {
+  kLimitedRange601,       //!< 601 limited range color space
+  kFullRange601,          //!< 601 full range color space
+  kLimitedRange709,       //!< 709 limited range color space
+};
+
 /*! @brief This structure defines rotation and flip values for a display layer.
 
   @sa Layer
@@ -213,8 +219,10 @@ struct Layer {
 
   uint32_t frame_rate;              //!< Rate at which frames are being updated for this layer.
 
+  LayerColorSpace color_space;      //!< Color Space of the layer
+
   Layer() : input_buffer(NULL), composition(kCompositionGPU), blending(kBlendingOpaque),
-            plane_alpha(0), frame_rate(0) { }
+            plane_alpha(0), frame_rate(0), color_space(kLimitedRange601) { }
 };
 
 /*! @brief This structure defines a layer stack that contains layers which need to be composed and

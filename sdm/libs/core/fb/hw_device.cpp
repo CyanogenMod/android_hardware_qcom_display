@@ -250,6 +250,7 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         SetRect(pipe_info->src_roi, &mdp_layer.src_rect);
         SetRect(pipe_info->dst_roi, &mdp_layer.dst_rect);
         SetMDPFlags(layer, is_rotator_used, &mdp_layer.flags);
+        SetColorSpace(layer.color_space, &mdp_layer.color_space);
 
         if (pipe_info->scale_data.enable_pixel_ext) {
           if ((mdp_layer.flags & MDP_LAYER_DEINTERLACE) && (layer.transform.rotation == 90.0f)) {
@@ -926,6 +927,14 @@ void HWDevice::SetHWScaleData(const ScaleData &scale, uint32_t index) {
     mdp_scale->btm_rpt[i] = plane.bottom.repeat;
 
     mdp_scale->roi_w[i] = plane.roi_width;
+  }
+}
+
+void HWDevice::SetColorSpace(LayerColorSpace source, mdp_color_space *color_space) {
+  switch (source) {
+  case kLimitedRange601:    *color_space = MDP_CSC_ITU_R_601;      break;
+  case kFullRange601:       *color_space = MDP_CSC_ITU_R_601_FR;   break;
+  case kLimitedRange709:    *color_space = MDP_CSC_ITU_R_709;      break;
   }
 }
 
