@@ -186,6 +186,10 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
           pending_commit_ = true;
           break;
         }
+        if (error == kErrorShutDown) {
+          comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
+          return error;
+        }
       }
     }
     comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);

@@ -49,7 +49,8 @@ HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, 
     display_intf_(NULL), flush_(false), dump_frame_count_(0), dump_frame_index_(0),
     dump_input_layers_(false), swap_interval_zero_(false), framebuffer_config_(NULL),
     display_paused_(false), use_metadata_refresh_rate_(false), metadata_refresh_rate_(0),
-    boot_animation_completed_(false), use_blit_comp_(false), blit_engine_(NULL) {
+    boot_animation_completed_(false), shutdown_pending_(false),  use_blit_comp_(false),
+    blit_engine_(NULL) {
 }
 
 int HWCDisplay::Init() {
@@ -116,6 +117,10 @@ int HWCDisplay::Deinit() {
 int HWCDisplay::EventControl(int event, int enable) {
   DisplayError error = kErrorNone;
 
+  if (shutdown_pending_) {
+    return 0;
+  }
+
   switch (event) {
   case HWC_EVENT_VSYNC:
     error = display_intf_->SetVSyncState(enable);
@@ -128,6 +133,10 @@ int HWCDisplay::EventControl(int event, int enable) {
   }
 
   if (error != kErrorNone) {
+    if (error == kErrorShutDown) {
+      shutdown_pending_ = true;
+      return 0;
+    }
     DLOGE("Failed. event = %d, enable = %d, error = %d", event, enable, error);
     return -EINVAL;
   }
@@ -138,6 +147,10 @@ int HWCDisplay::EventControl(int event, int enable) {
 int HWCDisplay::SetPowerMode(int mode) {
   DLOGI("display = %d, mode = %d", id_, mode);
   DisplayState state = kStateOff;
+
+  if (shutdown_pending_) {
+    return 0;
+  }
 
   switch (mode) {
   case HWC_POWER_MODE_OFF:
@@ -161,6 +174,10 @@ int HWCDisplay::SetPowerMode(int mode) {
 
   DisplayError error = display_intf_->SetDisplayState(state);
   if (error != kErrorNone) {
+    if (error == kErrorShutDown) {
+      shutdown_pending_ = true;
+      return 0;
+    }
     DLOGE("Set state failed. Error = %d", error);
     return -EINVAL;
   }
@@ -237,8 +254,16 @@ int HWCDisplay::GetActiveConfig() {
 int HWCDisplay::SetActiveConfig(int index) {
   DisplayError error = kErrorNone;
 
+  if (shutdown_pending_) {
+    return 0;
+  }
+
   error = display_intf_->SetActiveConfig(index);
   if (error != kErrorNone) {
+    if (error == kErrorShutDown) {
+      shutdown_pending_ = true;
+      return 0;
+    }
     DLOGE("SetActiveConfig failed. Error = %d", error);
     return -1;
   }
@@ -453,6 +478,10 @@ void HWCDisplay::CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
 }
 
 int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
+  if (shutdown_pending_) {
+    return 0;
+  }
+
   if (!content_list || !content_list->numHwLayers) {
     DLOGW("Invalid content list");
     return -EINVAL;
@@ -538,6 +567,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
   DisplayError error = display_intf_->Prepare(&layer_stack_);
   if (error != kErrorNone) {
+    if (error == kErrorShutDown) {
+      shutdown_pending_ = true;
+      return 0;
+    }
     DLOGE("Prepare failed. Error = %d", error);
 
     // To prevent surfaceflinger infinite wait, flush the previous frame during Commit() so that
@@ -586,6 +619,10 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
     return -EINVAL;
   }
 
+  if (shutdown_pending_) {
+    return 0;
+  }
+
   int status = 0;
 
   size_t num_hw_layers = content_list->numHwLayers;
@@ -613,6 +650,10 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
       status = 0;
     }
     if (error != kErrorNone) {
+      if (error == kErrorShutDown) {
+        shutdown_pending_ = true;
+        return status;
+      }
       DLOGE("Commit failed. Error = %d", error);
       // To prevent surfaceflinger infinite wait, flush the previous frame during Commit() so that
       // previous buffer and fences are released, and override the error.

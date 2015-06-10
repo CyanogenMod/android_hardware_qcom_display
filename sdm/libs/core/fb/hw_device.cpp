@@ -129,6 +129,10 @@ DisplayError HWDevice::PowerOn() {
   DTRACE_SCOPED();
 
   if (Sys::ioctl_(device_fd_, FBIOBLANK, FB_BLANK_UNBLANK) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
     IOCTL_LOGE(FB_BLANK_UNBLANK, device_type_);
     return kErrorHardware;
   }
@@ -282,6 +286,10 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
 
   mdp_commit.flags |= MDP_VALIDATE_LAYER;
   if (Sys::ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
     IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, device_type_);
     DumpLayerCommit(mdp_disp_commit_);
     return kErrorHardware;
@@ -398,6 +406,10 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
     mdp_commit.flags |= MDP_COMMIT_WAIT_FOR_FINISH;
   }
   if (Sys::ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
     IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, device_type_);
     DumpLayerCommit(mdp_disp_commit_);
     synchronous_commit_ = false;
@@ -449,6 +461,10 @@ DisplayError HWDevice::Flush() {
 
   mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
   if (Sys::ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
     IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, device_type_);
     DumpLayerCommit(mdp_disp_commit_);
     return kErrorHardware;

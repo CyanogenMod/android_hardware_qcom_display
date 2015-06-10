@@ -149,6 +149,7 @@ class HWCDisplay : public DisplayEventHandler {
   bool use_metadata_refresh_rate_;
   uint32_t metadata_refresh_rate_;
   bool boot_animation_completed_;
+  bool shutdown_pending_;
 
  private:
   bool IsFrameBufferScaled();
