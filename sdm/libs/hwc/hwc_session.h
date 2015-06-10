@@ -70,6 +70,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
                                   const uint32_t *attributes, int32_t *values);
   static int GetActiveConfig(hwc_composer_device_1 *device, int disp);
   static int SetActiveConfig(hwc_composer_device_1 *device, int disp, int index);
+  static int SetCursorPositionAsync(hwc_composer_device_1 *device, int disp, int x, int y);
 
   // Uevent thread
   static void* HWCUeventThread(void *context);

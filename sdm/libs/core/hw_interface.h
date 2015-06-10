@@ -82,6 +82,7 @@ class HWInterface {
   virtual DisplayError Flush() = 0;
   virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers) = 0;
   virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list) = 0;
+  virtual DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y) = 0;
 
  protected:
   virtual ~HWInterface() { }

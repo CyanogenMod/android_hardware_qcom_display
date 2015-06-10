@@ -171,6 +171,7 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
   StrategyConstraints *constraints = &display_comp_ctx->constraints;
 
   constraints->safe_mode = safe_mode_;
+  constraints->use_cursor = false;
 
   // Limit 2 layer SDE Comp on HDMI/Virtual
   if (display_comp_ctx->display_type != kPrimary) {
@@ -184,6 +185,10 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
 
   if (display_comp_ctx->idle_fallback || display_comp_ctx->fallback_) {
     constraints->safe_mode = true;
+  }
+
+  if (SupportLayerAsCursor(comp_handle, hw_layers)) {
+    constraints->use_cursor = true;
   }
 }
 
@@ -373,6 +378,46 @@ void CompManager::AppendDump(char *buffer, uint32_t length) {
 DisplayError CompManager::ValidateScaling(const LayerRect &crop, const LayerRect &dst,
                                           bool rotate90) {
   return resource_intf_->ValidateScaling(crop, dst, rotate90);
+}
+
+DisplayError CompManager::ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers,
+                                                 int x, int y) {
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+  Handle &display_resource_ctx = display_comp_ctx->display_resource_ctx;
+
+  return resource_intf_->ValidateCursorPosition(display_resource_ctx, hw_layers, x, y);
+}
+
+bool CompManager::SupportLayerAsCursor(Handle comp_handle, HWLayers *hw_layers) {
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(comp_handle);
+  Handle &display_resource_ctx = display_comp_ctx->display_resource_ctx;
+  LayerStack *layer_stack = hw_layers->info.stack;
+  bool supported = false;
+  int32_t gpu_index = -1;
+
+  if (!layer_stack->flags.cursor_present) {
+    return supported;
+  }
+
+  for (int32_t i = layer_stack->layer_count; i >= 0; i--) {
+    Layer &layer = layer_stack->layers[i];
+    if (layer.composition == kCompositionGPUTarget) {
+      gpu_index = i;
+      break;
+    }
+  }
+  if (gpu_index <= 0) {
+    return supported;
+  }
+  Layer &cursor_layer = layer_stack->layers[gpu_index - 1];
+  if (resource_intf_->ValidateCursorConfig(display_resource_ctx, cursor_layer, true) ==
+                                           kErrorNone) {
+    supported = true;
+  }
+
+  return supported;
 }
 
 }  // namespace sdm

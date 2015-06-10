@@ -93,6 +93,7 @@ HWCSession::HWCSession(const hw_module_t *module) : core_intf_(NULL), hwc_procs_
   hwc_composer_device_1_t::getDisplayAttributes = GetDisplayAttributes;
   hwc_composer_device_1_t::getActiveConfig = GetActiveConfig;
   hwc_composer_device_1_t::setActiveConfig = SetActiveConfig;
+  hwc_composer_device_1_t::setCursorPositionAsync = SetCursorPositionAsync;
 }
 
 int HWCSession::Init() {
@@ -444,6 +445,24 @@ int HWCSession::SetActiveConfig(hwc_composer_device_1 *device, int disp, int ind
 
   if (hwc_session->hwc_display_[disp]) {
     status = hwc_session->hwc_display_[disp]->SetActiveConfig(index);
+  }
+
+  return status;
+}
+
+int HWCSession::SetCursorPositionAsync(hwc_composer_device_1 *device, int disp, int x, int y) {
+  DTRACE_SCOPED();
+
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
+  if (!device || (disp < HWC_DISPLAY_PRIMARY) || (disp > HWC_DISPLAY_VIRTUAL)) {
+    return -EINVAL;
+  }
+
+  int status = -EINVAL;
+  HWCSession *hwc_session = static_cast<HWCSession *>(device);
+  if (hwc_session->hwc_display_[disp]) {
+    status = hwc_session->hwc_display_[disp]->SetCursorPosition(x, y);
   }
 
   return status;

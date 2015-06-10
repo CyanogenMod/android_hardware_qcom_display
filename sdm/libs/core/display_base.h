@@ -69,6 +69,7 @@ class DisplayBase : public DisplayInterface {
                                             PPDisplayAPIPayload *out_payload,
                                             PPPendingParams *pending_action);
   virtual DisplayError ApplyDefaultDisplayMode(void);
+  virtual DisplayError SetCursorPosition(int x, int y);
 
  protected:
   // DumpImpl method

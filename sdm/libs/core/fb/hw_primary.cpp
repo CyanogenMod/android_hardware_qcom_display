@@ -584,5 +584,9 @@ DisplayError HWPrimary::SetPPFeatures(PPFeaturesConfig *feature_list) {
   return kErrorNone;
 }
 
+DisplayError HWPrimary::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
+  return HWDevice::SetCursorPosition(hw_layers, x, y);
+}
+
 }  // namespace sdm
 

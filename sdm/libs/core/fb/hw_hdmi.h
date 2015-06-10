@@ -57,6 +57,7 @@ class HWHDMI : public HWDevice, public HWHDMIInterface {
   virtual DisplayError Flush();
   virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers);
   virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list);
+  virtual DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y);
 
  private:
   DisplayError ReadEDIDInfo();
