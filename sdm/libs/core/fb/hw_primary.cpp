@@ -531,7 +531,7 @@ DisplayError HWPrimary::SetPPFeatures(PPFeaturesConfig &feature_list) {
         break;
 
     if (feature) {
-      DLOGV("feature_id = %d", feature->feature_id_);
+      DLOGV_IF(kTagDriverConfig, "feature_id = %d", feature->feature_id_);
 
       if ((feature->feature_id_ < kMaxNumPPFeatures)) {
 

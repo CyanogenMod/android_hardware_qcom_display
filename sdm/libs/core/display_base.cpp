@@ -275,7 +275,7 @@ DisplayError DisplayBase::Flush() {
     comp_manager_->Purge(display_comp_ctx_);
     pending_commit_ = false;
   } else {
-    DLOGV("Failed to flush device.");
+    DLOGW("Unable to flush display = %d", display_type_);
   }
 
   return error;

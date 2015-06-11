@@ -600,33 +600,34 @@ void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {
   int type = input_parcel->readInt32();
   bool enable = (input_parcel->readInt32() > 0);
   DLOGI("type = %d enable = %d", type, enable);
+  int verbose_level = input_parcel->readInt32();
 
   switch (type) {
   case qService::IQService::DEBUG_ALL:
-    HWCDebugHandler::DebugAll(enable);
+    HWCDebugHandler::DebugAll(enable, verbose_level);
     break;
 
   case qService::IQService::DEBUG_MDPCOMP:
-    HWCDebugHandler::DebugStrategy(enable);
-    HWCDebugHandler::DebugCompManager(enable);
+    HWCDebugHandler::DebugStrategy(enable, verbose_level);
+    HWCDebugHandler::DebugCompManager(enable, verbose_level);
     break;
 
   case qService::IQService::DEBUG_PIPE_LIFECYCLE:
-    HWCDebugHandler::DebugResources(enable);
+    HWCDebugHandler::DebugResources(enable, verbose_level);
     break;
 
   case qService::IQService::DEBUG_DRIVER_CONFIG:
-    HWCDebugHandler::DebugDriverConfig(enable);
+    HWCDebugHandler::DebugDriverConfig(enable, verbose_level);
     break;
 
   case qService::IQService::DEBUG_ROTATOR:
-    HWCDebugHandler::DebugResources(enable);
-    HWCDebugHandler::DebugDriverConfig(enable);
-    HWCDebugHandler::DebugRotator(enable);
+    HWCDebugHandler::DebugResources(enable, verbose_level);
+    HWCDebugHandler::DebugDriverConfig(enable, verbose_level);
+    HWCDebugHandler::DebugRotator(enable, verbose_level);
     break;
 
   case qService::IQService::DEBUG_QDCM:
-    HWCDebugHandler::DebugQdcm(enable);
+    HWCDebugHandler::DebugQdcm(enable, verbose_level);
     break;
 
   default:
