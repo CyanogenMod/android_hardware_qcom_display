@@ -2758,6 +2758,10 @@ void BwcPM::setBwc(const hwc_context_t *ctx, const int& dpy,
     if(src_w > (int) qdutils::MDPVersion::getInstance().getMaxPipeWidth()) {
         return;
     }
+    //H/w requirement for BWC only. Pipe can still support 4096
+    if(src_h > 4092) {
+        return;
+    }
     //Decimation necessary, cannot use BWC. H/W requirement.
     if(qdutils::MDPVersion::getInstance().supportsDecimation()) {
         uint8_t horzDeci = 0;
