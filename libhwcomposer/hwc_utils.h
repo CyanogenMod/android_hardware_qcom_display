@@ -75,6 +75,8 @@ struct MDPInfo {
 };
 
 struct DisplayAttributes {
+    uint32_t refreshRate;
+    uint32_t dynRefreshRate;
     uint32_t vsync_period; //nanos
     uint32_t xres;
     uint32_t yres;
@@ -124,6 +126,8 @@ struct ListStats {
     hwc_rect_t rRoi;  //right ROI. Unused in single DSI panels.
     //App Buffer Composition index
     int  renderBufIndexforABC;
+    //dyn refresh rate-Client requested refreshrate
+    uint32_t refreshRateRequest;
 };
 
 //PTOR Comp info
@@ -289,6 +293,10 @@ void getActionSafePosition(hwc_context_t *ctx, int dpy, hwc_rect_t& dst);
 
 void getAspectRatioPosition(hwc_context_t* ctx, int dpy, int extOrientation,
                                 hwc_rect_t& inRect, hwc_rect_t& outRect);
+
+uint32_t roundOff(uint32_t refreshRate);
+
+void setRefreshRate(hwc_context_t *ctx, int dpy, uint32_t refreshRate);
 
 bool isPrimaryPortrait(hwc_context_t *ctx);
 
@@ -565,6 +573,9 @@ struct hwc_context_t {
     // PTOR Info
     qhwc::PtorInfo mPtorInfo;
     uint32_t mIsPTOREnabled;
+
+    // Provides a way for OEM's to disable setting dynfps via metadata.
+    bool mUseMetaDataRefreshRate;
 
    // Stores the hpd enabled status- avoids re-enabling HDP on suspend resume.
     bool mHPDEnabled;

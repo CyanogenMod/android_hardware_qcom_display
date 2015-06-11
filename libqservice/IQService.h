@@ -55,6 +55,8 @@ public:
         VPU_COMMAND_LIST_START = 100, //Reserved block for VPU commands
         VPU_COMMAND_LIST_END   = 200,
         SET_VIEW_FRAME,          // Set view frame of display
+        /* Enable/Disable/Set refresh rate dynamically */
+        CONFIGURE_DYN_REFRESH_RATE,
         COMMAND_LIST_END = 400,
     };
 

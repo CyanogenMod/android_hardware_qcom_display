@@ -87,6 +87,7 @@ struct MetaData_t {
     int64_t timestamp;
     int32_t vfmDataBitMap;
     VfmData_t vfmData[MAX_VFM_DATA_COUNT];
+    uint32_t refreshrate;
 };
 
 typedef enum {
@@ -99,6 +100,7 @@ typedef enum {
     PP_PARAM_TIMESTAMP  = 0x0040,
     UPDATE_BUFFER_GEOMETRY = 0x0080,
     PP_PARAM_VFM_DATA   = 0x0100,
+    UPDATE_REFRESH_RATE = 0x0200,
 } DispParamType;
 
 int setMetaData(private_handle_t *handle, DispParamType paramType, void *param);

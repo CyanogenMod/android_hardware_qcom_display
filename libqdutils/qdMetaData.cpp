@@ -82,6 +82,9 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
         case UPDATE_BUFFER_GEOMETRY:
             memcpy((void *)&data->bufferDim, param, sizeof(BufferDim_t));
             break;
+        case UPDATE_REFRESH_RATE:
+            data->refreshrate = *((uint32_t *)param);
+            break;
         case PP_PARAM_VFM_DATA:
         {
             int32_t     indx = 0;
