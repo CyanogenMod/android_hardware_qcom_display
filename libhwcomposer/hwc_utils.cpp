@@ -1794,8 +1794,7 @@ int hwc_sync_mdss(hwc_context_t *ctx, hwc_display_contents_1_t *list, int dpy,
     }
 
     if (ctx->mCopyBit[dpy]) {
-        if((!dpy && ctx->mPtorInfo.isActive()) or
-           ctx->mMDP.version < qdutils::MDP_V4_0) {
+        if((!dpy && ctx->mPtorInfo.isActive())) {
             ctx->mCopyBit[dpy]->setReleaseFd(releaseFd);
         }
     }
