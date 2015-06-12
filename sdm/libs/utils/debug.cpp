@@ -106,5 +106,12 @@ bool Debug::IsVideoModeEnabled() {
   return (value == 1);
 }
 
+bool Debug::IsRotatorUbwcDisabled() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.debug.rotator_disable_ubwc", &value);
+
+  return (value == 1);
+}
+
 }  // namespace sdm
 

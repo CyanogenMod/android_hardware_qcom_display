@@ -68,6 +68,7 @@ class Debug {
   static bool IsPartialUpdateEnabled();
   static int GetMaxPipesPerMixer(DisplayType display_type);
   static bool IsVideoModeEnabled();
+  static bool IsRotatorUbwcDisabled();
 
  private:
   Debug();

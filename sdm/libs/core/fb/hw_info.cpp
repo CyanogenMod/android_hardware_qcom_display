@@ -147,6 +147,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         for (uint32_t i = 0; i < token_count; i++) {
           if (!strncmp(tokens[i], "bwc", strlen("bwc"))) {
             hw_resource->has_bwc = true;
+          } else if (!strncmp(tokens[i], "ubwc", strlen("ubwc"))) {
+            hw_resource->has_ubwc = true;
           } else if (!strncmp(tokens[i], "decimation", strlen("decimation"))) {
             hw_resource->has_decimation = true;
           } else if (!strncmp(tokens[i], "tile_format", strlen("tile_format"))) {
@@ -170,9 +172,9 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->num_vig_pipe, hw_resource->num_dma_pipe, hw_resource->num_cursor_pipe);
   DLOGI("Upscale Ratio = %d, Downscale Ratio = %d, Blending Stages = %d", hw_resource->max_scale_up,
         hw_resource->max_scale_down, hw_resource->num_blending_stages);
-  DLOGI("BWC = %d, Decimation = %d, Tile Format = %d, Rotator Downscale = %d", hw_resource->has_bwc,
-        hw_resource->has_decimation, hw_resource->has_macrotile,
-        hw_resource->has_rotator_downscale);
+  DLOGI("BWC = %d, UBWC = %d, Decimation = %d, Tile Format = %d, Rotator Downscale = %d",
+        hw_resource->has_bwc, hw_resource->has_ubwc, hw_resource->has_decimation,
+        hw_resource->has_macrotile, hw_resource->has_rotator_downscale);
   DLOGI("SourceSplit = %d", hw_resource->is_src_split);
   DLOGI("MaxLowBw = %" PRIu64 " , MaxHighBw = % " PRIu64 "", hw_resource->max_bandwidth_low,
         hw_resource->max_bandwidth_high);
