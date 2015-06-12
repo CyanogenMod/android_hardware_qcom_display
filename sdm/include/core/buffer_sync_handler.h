@@ -37,6 +37,8 @@
 #ifndef __BUFFER_SYNC_HANDLER_H__
 #define __BUFFER_SYNC_HANDLER_H__
 
+#include "sdm_types.h"
+
 namespace sdm {
 
 /*! @brief Buffer sync handler implemented by the client
