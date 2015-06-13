@@ -25,6 +25,8 @@
 #ifndef __HW_PRIMARY_H__
 #define __HW_PRIMARY_H__
 
+#include <sys/poll.h>
+
 #include "hw_device.h"
 #include "hw_primary_interface.h"
 

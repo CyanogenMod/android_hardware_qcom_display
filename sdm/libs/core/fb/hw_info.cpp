@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <utils/constants.h>
 #include <utils/debug.h>
+#include <utils/sys.h>
 
 #define __CLASS__ "HWInfo"
 
@@ -88,7 +89,7 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
   char *tokens[max_count] = { NULL };
   snprintf(stringbuffer , sizeof(stringbuffer), "%s%d/mdp/caps",
            kHWCapabilitiesPath, kHWCapabilitiesNode);
-  fileptr = fopen(stringbuffer, "rb");
+  fileptr = Sys::fopen_(stringbuffer, "r");
 
   if (!fileptr) {
     DLOGE("File '%s' not found", stringbuffer);
@@ -99,7 +100,7 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
   ssize_t read;
   char *line = stringbuffer;
   hw_resource->hw_version = kHWMdssVersion5;
-  while ((read = getline(&line, &len, fileptr)) != -1) {
+  while ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
     // parse the line and update information accordingly
     if (!ParseLine(line, tokens, max_count, &token_count)) {
       if (!strncmp(tokens[0], "hw_rev", strlen("hw_rev"))) {
@@ -161,7 +162,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
       }
     }
   }
-  fclose(fileptr);
+
+  Sys::fclose_(fileptr);
 
   DLOGI("SDE Version = %d, SDE Revision = %x, RGB = %d, VIG = %d, DMA = %d, Cursor = %d",
         hw_resource->hw_version, hw_resource->hw_revision, hw_resource->num_rgb_pipe,

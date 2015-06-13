@@ -27,6 +27,7 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <pthread.h>
@@ -36,6 +37,8 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <utils/debug.h>
+#include <utils/sys.h>
+
 #include "hw_primary.h"
 #include "hw_color_manager.h"
 
@@ -104,7 +107,7 @@ DisplayError HWPrimary::Init() {
       snprintf(node_path, sizeof(node_path), "%s%d/%s", fb_path_, fb_node_index_,
                event_name[event]);
 
-      poll_fd.fd = open_(node_path, O_RDONLY);
+      poll_fd.fd = Sys::open_(node_path, O_RDONLY);
       if (poll_fd.fd < 0) {
         DLOGE("open failed for event=%d, error=%s", event, strerror(errno));
         error = kErrorHardware;
@@ -112,7 +115,7 @@ DisplayError HWPrimary::Init() {
       }
 
       // Read once on all fds to clear data on all fds.
-      pread_(poll_fd.fd, data , kMaxStringLength, 0);
+      Sys::pread_(poll_fd.fd, data , kMaxStringLength, 0);
       poll_fd.events = POLLPRI | POLLERR;
     }
   }
@@ -135,7 +138,7 @@ CleanupOnError:
   for (int event = 0; event < kNumDisplayEvents; event++) {
     int &fd = poll_fds_[event].fd;
     if (fd >= 0) {
-      close_(fd);
+      Sys::close_(fd);
     }
   }
 
@@ -147,7 +150,7 @@ DisplayError HWPrimary::Deinit() {
   pthread_join(event_thread_, NULL);
 
   for (int event = 0; event < kNumDisplayEvents; event++) {
-    close_(poll_fds_[event].fd);
+    Sys::close_(poll_fds_[event].fd);
   }
 
   return kErrorNone;
@@ -187,7 +190,7 @@ DisplayError HWPrimary::PopulateDisplayAttributes() {
   // Variable screen info
   STRUCT_VAR(fb_var_screeninfo, var_screeninfo);
 
-  if (ioctl_(device_fd_, FBIOGET_VSCREENINFO, &var_screeninfo) < 0) {
+  if (Sys::ioctl_(device_fd_, FBIOGET_VSCREENINFO, &var_screeninfo) < 0) {
     IOCTL_LOGE(FBIOGET_VSCREENINFO, device_type_);
     return kErrorHardware;
   }
@@ -195,7 +198,7 @@ DisplayError HWPrimary::PopulateDisplayAttributes() {
   // Frame rate
   STRUCT_VAR(msmfb_metadata, meta_data);
   meta_data.op = metadata_op_frame_rate;
-  if (ioctl_(device_fd_, MSMFB_METADATA_GET, &meta_data) < 0) {
+  if (Sys::ioctl_(device_fd_, MSMFB_METADATA_GET, &meta_data) < 0) {
     IOCTL_LOGE(MSMFB_METADATA_GET, device_type_);
     return kErrorHardware;
   }
@@ -241,7 +244,7 @@ DisplayError HWPrimary::SetRefreshRate(uint32_t refresh_rate) {
 
   snprintf(node_path, sizeof(node_path), "%s%d/dynamic_fps", fb_path_, fb_node_index_);
 
-  int fd = open_(node_path, O_WRONLY);
+  int fd = Sys::open_(node_path, O_WRONLY);
   if (fd < 0) {
     DLOGE("Failed to open %s with error %s", node_path, strerror(errno));
     return kErrorFileDescriptor;
@@ -249,13 +252,13 @@ DisplayError HWPrimary::SetRefreshRate(uint32_t refresh_rate) {
 
   char refresh_rate_string[kMaxStringLength];
   snprintf(refresh_rate_string, sizeof(refresh_rate_string), "%d", refresh_rate);
-  ssize_t len = pwrite_(fd, refresh_rate_string, strlen(refresh_rate_string), 0);
+  ssize_t len = Sys::pwrite_(fd, refresh_rate_string, strlen(refresh_rate_string), 0);
   if (len < 0) {
     DLOGE("Failed to write %d with error %s", refresh_rate, strerror(errno));
-    close_(fd);
+    Sys::close_(fd);
     return kErrorUndefined;
   }
-  close_(fd);
+  Sys::close_(fd);
 
   config_changed_ = true;
   synchronous_commit_ = true;
@@ -272,7 +275,7 @@ DisplayError HWPrimary::PowerOn() {
 }
 
 DisplayError HWPrimary::PowerOff() {
-  if (ioctl_(device_fd_, FBIOBLANK, FB_BLANK_POWERDOWN) < 0) {
+  if (Sys::ioctl_(device_fd_, FBIOBLANK, FB_BLANK_POWERDOWN) < 0) {
     IOCTL_LOGE(FB_BLANK_POWERDOWN, device_type_);
     return kErrorHardware;
   }
@@ -281,7 +284,7 @@ DisplayError HWPrimary::PowerOff() {
 }
 
 DisplayError HWPrimary::Doze() {
-  if (ioctl_(device_fd_, FBIOBLANK, FB_BLANK_NORMAL) < 0) {
+  if (Sys::ioctl_(device_fd_, FBIOBLANK, FB_BLANK_NORMAL) < 0) {
     IOCTL_LOGE(FB_BLANK_NORMAL, device_type_);
     return kErrorHardware;
   }
@@ -290,7 +293,7 @@ DisplayError HWPrimary::Doze() {
 }
 
 DisplayError HWPrimary::DozeSuspend() {
-  if (ioctl_(device_fd_, FBIOBLANK, FB_BLANK_VSYNC_SUSPEND) < 0) {
+  if (Sys::ioctl_(device_fd_, FBIOBLANK, FB_BLANK_VSYNC_SUSPEND) < 0) {
     IOCTL_LOGE(FB_BLANK_VSYNC_SUSPEND, device_type_);
     return kErrorHardware;
   }
@@ -379,7 +382,7 @@ void* HWPrimary::DisplayEventThreadHandler() {
                                                     &HWPrimary::HandleThermal };
 
   while (!exit_threads_) {
-    int error = poll_(poll_fds_, kNumDisplayEvents, -1);
+    int error = Sys::poll_(poll_fds_, kNumDisplayEvents, -1);
     if (error < 0) {
       DLOGW("poll failed. error = %s", strerror(errno));
       continue;
@@ -388,7 +391,7 @@ void* HWPrimary::DisplayEventThreadHandler() {
       pollfd &poll_fd = poll_fds_[event];
 
       if (poll_fd.revents & POLLPRI) {
-        ssize_t length = pread_(poll_fd.fd, data, kMaxStringLength, 0);
+        ssize_t length = Sys::pread_(poll_fd.fd, data, kMaxStringLength, 0);
         if (length < 0) {
           // If the read was interrupted - it is not a fatal error, just continue.
           DLOGW("pread failed. event = %d, error = %s", event, strerror(errno));
@@ -440,7 +443,7 @@ void HWPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
   snprintf(node_path, sizeof(node_path), "%s%d/idle_time", fb_path_, fb_node_index_);
 
   // Open a sysfs node to send the timeout value to driver.
-  int fd = open_(node_path, O_WRONLY);
+  int fd = Sys::open_(node_path, O_WRONLY);
   if (fd < 0) {
     DLOGE("Unable to open %s, node %s", node_path, strerror(errno));
     return;
@@ -450,19 +453,19 @@ void HWPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
   snprintf(timeout_string, sizeof(timeout_string), "%d", timeout_ms);
 
   // Notify driver about the timeout value
-  ssize_t length = pwrite_(fd, timeout_string, strlen(timeout_string), 0);
+  ssize_t length = Sys::pwrite_(fd, timeout_string, strlen(timeout_string), 0);
   if (length < -1) {
     DLOGE("Unable to write into %s, node %s", node_path, strerror(errno));
   }
 
-  close_(fd);
+  Sys::close_(fd);
 }
 
 DisplayError HWPrimary::SetVSyncState(bool enable) {
   DTRACE_SCOPED();
 
   int vsync_on = enable ? 1 : 0;
-  if (ioctl_(device_fd_, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) < 0) {
+  if (Sys::ioctl_(device_fd_, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) < 0) {
     IOCTL_LOGE(MSMFB_OVERLAY_VSYNC_CTRL, device_type_);
     return kErrorHardware;
   }
@@ -486,7 +489,7 @@ DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
     return kErrorParameters;
   }
 
-  if (ioctl_(device_fd_, MSMFB_LPM_ENABLE, &mode) < 0) {
+  if (Sys::ioctl_(device_fd_, MSMFB_LPM_ENABLE, &mode) < 0) {
     IOCTL_LOGE(MSMFB_LPM_ENABLE, device_type_);
     return kErrorHardware;
   }
@@ -506,7 +509,7 @@ DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
   for (int i(0); i < kMaxNumPPFeatures; i++) {
     version.pp_feature = feature_id_mapping[i];
 
-    if (ioctl_(device_fd_,  MSMFB_MDP_PP_GET_FEATURE_VERSION, &version) < 0) {
+    if (Sys::ioctl_(device_fd_,  MSMFB_MDP_PP_GET_FEATURE_VERSION, &version) < 0) {
       IOCTL_LOGE(MSMFB_MDP_PP_GET_FEATURE_VERSION, device_type_);
       return kErrorHardware;
     }
@@ -533,7 +536,7 @@ DisplayError HWPrimary::SetPPFeatures(PPFeaturesConfig &feature_list) {
       if ((feature->feature_id_ < kMaxNumPPFeatures)) {
 
         HWColorManager::SetFeature[feature->feature_id_](*feature, &kernel_params);
-        if (ioctl_(device_fd_, MSMFB_MDP_PP, &kernel_params) < 0) {
+        if (Sys::ioctl_(device_fd_, MSMFB_MDP_PP, &kernel_params) < 0) {
           IOCTL_LOGE(MSMFB_MDP_PP, device_type_);
 
           feature_list.Reset();

@@ -27,12 +27,15 @@
 * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <ctype.h>
-#include <utils/debug.h>
 #include <fcntl.h>
+#include <utils/debug.h>
+#include <utils/sys.h>
+
 #include "hw_hdmi.h"
 
 #define __CLASS__ "HWHDMI"
@@ -155,13 +158,13 @@ int HWHDMI::GetHDMIModeCount() {
   char edid_str[256] = {'\0'};
   char edid_path[kMaxStringLength] = {'\0'};
   snprintf(edid_path, sizeof(edid_path), "%s%d/edid_modes", fb_path_, fb_node_index_);
-  int edid_file = open_(edid_path, O_RDONLY);
+  int edid_file = Sys::open_(edid_path, O_RDONLY);
   if (edid_file < 0) {
     DLOGE("EDID file open failed.");
     return -1;
   }
 
-  length = pread_(edid_file, edid_str, sizeof(edid_str)-1, 0);
+  length = Sys::pread_(edid_file, edid_str, sizeof(edid_str)-1, 0);
   if (length <= 0) {
     DLOGE("%s: edid_modes file empty");
     edid_str[0] = '\0';
@@ -172,7 +175,7 @@ int HWHDMI::GetHDMIModeCount() {
     }
     edid_str[length] = '\0';
   }
-  close_(edid_file);
+  Sys::close_(edid_file);
 
   if (length > 0) {
     // Get EDID modes from the EDID string
@@ -229,7 +232,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
 
   // Variable screen info
   STRUCT_VAR(fb_var_screeninfo, vscreeninfo);
-  if (ioctl_(device_fd_, FBIOGET_VSCREENINFO, &vscreeninfo) < 0) {
+  if (Sys::ioctl_(device_fd_, FBIOGET_VSCREENINFO, &vscreeninfo) < 0) {
     IOCTL_LOGE(FBIOGET_VSCREENINFO, device_type_);
     return kErrorHardware;
   }
@@ -266,7 +269,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
         vscreeninfo.upper_margin, vscreeninfo.pixclock/1000000);
 
   vscreeninfo.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_ALL | FB_ACTIVATE_FORCE;
-  if (ioctl_(device_fd_, FBIOPUT_VSCREENINFO, &vscreeninfo) < 0) {
+  if (Sys::ioctl_(device_fd_, FBIOPUT_VSCREENINFO, &vscreeninfo) < 0) {
     IOCTL_LOGE(FBIOGET_VSCREENINFO, device_type_);
     return kErrorHardware;
   }
@@ -368,7 +371,7 @@ void HWHDMI::ReadScanInfo() {
   char data[4096] = {'\0'};
 
   snprintf(data, sizeof(data), "%s%d/scan_info", fb_path_, fb_node_index_);
-  scan_info_file = open_(data, O_RDONLY);
+  scan_info_file = Sys::open_(data, O_RDONLY);
   if (scan_info_file < 0) {
     DLOGW("File '%s' not found.", data);
     return;
@@ -377,12 +380,12 @@ void HWHDMI::ReadScanInfo() {
   memset(&data[0], 0, sizeof(data));
   len = read(scan_info_file, data, sizeof(data) - 1);
   if (len <= 0) {
-    close_(scan_info_file);
+    Sys::close_(scan_info_file);
     DLOGW("File %s%d/scan_info is empty.", fb_path_, fb_node_index_);
     return;
   }
   data[len] = '\0';
-  close_(scan_info_file);
+  Sys::close_(scan_info_file);
 
   const uint32_t scan_info_max_count = 3;
   uint32_t scan_info_count = 0;

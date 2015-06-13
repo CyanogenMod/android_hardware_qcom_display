@@ -186,9 +186,7 @@ DisplayError CoreImpl::CreateDisplay(DisplayType type, DisplayEventHandler *even
 
   DisplayError error = display_base->Init();
   if (error != kErrorNone) {
-    display_base->Deinit();
     delete display_base;
-    display_base = NULL;
     return error;
   }
 
@@ -206,7 +204,6 @@ DisplayError CoreImpl::DestroyDisplay(DisplayInterface *intf) {
   DisplayBase *display_base = static_cast<DisplayBase *>(intf);
   display_base->Deinit();
   delete display_base;
-  display_base = NULL;
 
   return kErrorNone;
 }
