@@ -503,8 +503,7 @@ DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
 DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
   STRUCT_VAR(mdp_pp_feature_version, version);
 
-  // map from core domain to mdp FB driver domain.
-  uint32_t feature_id_mapping[kMaxNumPPFeatures] = { PCC, IGC, GC, PA, DITHER, GAMUT };
+  uint32_t feature_id_mapping[kMaxNumPPFeatures] = { PCC, IGC, GC, GC, PA, DITHER, GAMUT };
 
   for (int i(0); i < kMaxNumPPFeatures; i++) {
     version.pp_feature = feature_id_mapping[i];

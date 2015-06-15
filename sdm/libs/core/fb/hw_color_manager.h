@@ -42,6 +42,7 @@ class HWColorManager {
   static DisplayError SetPCC(const PPFeatureInfo &feature, msmfb_mdp_pp *kernel_params);
   static DisplayError SetIGC(const PPFeatureInfo &feature, msmfb_mdp_pp *kernel_params);
   static DisplayError SetPGC(const PPFeatureInfo &feature, msmfb_mdp_pp *kernel_params);
+  static DisplayError SetMixerGC(const PPFeatureInfo &feature, msmfb_mdp_pp *kernel_params);
   static DisplayError SetPAV2(const PPFeatureInfo &feature, msmfb_mdp_pp *kernel_params);
   static DisplayError SetDither(const PPFeatureInfo &feature, msmfb_mdp_pp *kernel_params);
   static DisplayError SetGamut(const PPFeatureInfo &feature, msmfb_mdp_pp *kernel_params);
