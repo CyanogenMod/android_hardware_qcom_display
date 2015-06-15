@@ -624,7 +624,7 @@ void HWDevice::SyncMerge(const int &fd1, const int &fd2, int *target) {
 
 int HWDevice::GetFBNodeIndex(HWDeviceType device_type) {
   int fb_node_index = -1;
-  for (int i = 0; i < kDeviceMax; i++) {
+  for (int i = 0; i <= kDeviceVirtual; i++) {
     HWPanelInfo *panel_info = new HWPanelInfo();
     GetHWPanelInfoByNode(i, panel_info);
     switch (device_type) {
