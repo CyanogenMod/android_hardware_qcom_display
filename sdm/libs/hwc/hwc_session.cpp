@@ -700,6 +700,7 @@ void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {
 
 android::status_t HWCSession::QdcmCMDHandler(const android::Parcel &in, android::Parcel *out) {
   int ret = 0;
+  int *brightness_value = NULL;
   uint32_t display_id(0);
   PPPendingParams pending_action;
   PPDisplayAPIPayload resp_payload, req_payload;
@@ -735,6 +736,17 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel &in, android:
       break;
     case kApplySolidFill:
     case kDisableSolidFill:
+      break;
+    case kSetPanelBrightness:
+      brightness_value = reinterpret_cast<int*>(pending_action.params);
+      pending_action.params = NULL;
+      if (brightness_value == NULL) {
+        DLOGE("Brightness is null");
+        return -EINVAL;
+      }
+      if (HWC_DISPLAY_PRIMARY == display_id)
+        ret = hwc_display_[HWC_DISPLAY_PRIMARY]->SetPanelBrightness(*brightness_value);
+      delete brightness_value;
       break;
     case kNoAction:
       break;

@@ -500,6 +500,35 @@ DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
   return kErrorNone;
 }
 
+DisplayError HWPrimary::SetPanelBrightness(int level) {
+  char buffer[MAX_SYSFS_COMMAND_LENGTH];
+  int32_t bytes, bl_fd = -1;
+  ssize_t ret;
+
+  memset(buffer, 0, MAX_SYSFS_COMMAND_LENGTH);
+
+  DLOGV_IF(kTagDriverConfig, "Set brightness level to %d", level);
+  bl_fd = Sys::open_("/sys/class/leds/lcd-backlight/brightness", O_RDWR);
+  if (bl_fd < 0) {
+    DLOGI("SetPanelBrightness: open failed out :( %d", level);
+    return kErrorParameters;
+  }
+  bytes = snprintf(buffer, MAX_SYSFS_COMMAND_LENGTH, "%d\n", level);
+  if (bytes < 0) {
+    DLOGE("SetPanelBrightness: snprintf failed out :( %d", level);
+    Sys::close_(bl_fd);
+    return kErrorParameters;
+  }
+  ret = Sys::pwrite_(bl_fd, buffer, bytes, 0);
+  if (ret <= 0) {
+    DLOGE("SetPanelBrightness: write failed out :( %d", level);
+    Sys::close_(bl_fd);
+    return kErrorParameters;
+  }
+  Sys::close_(bl_fd);
+  return kErrorNone;
+}
+
 DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
   STRUCT_VAR(mdp_pp_feature_version, version);
 

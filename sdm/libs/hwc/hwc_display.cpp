@@ -1216,6 +1216,16 @@ DisplayError HWCDisplay::SetMetaData(const MetaData_t &meta_data, Layer *layer) 
   return kErrorNone;
 }
 
+int HWCDisplay::SetPanelBrightness(int level) {
+  int ret = 0;
+  if (display_intf_)
+    ret = display_intf_->SetPanelBrightness(level);
+  else
+    ret = -EINVAL;
+
+  return ret;
+}
+
 int HWCDisplay::ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
                                      PPDisplayAPIPayload *out_payload,
                                      PPPendingParams *pending_action) {

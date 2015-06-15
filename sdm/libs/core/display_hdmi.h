@@ -58,6 +58,7 @@ class DisplayHDMI : public DisplayBase, DumpImpl {
   virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
   virtual bool IsUnderscanSupported();
+  virtual DisplayError SetPanelBrightness(int level);
   virtual void AppendDump(char *buffer, uint32_t length);
 
  private:
