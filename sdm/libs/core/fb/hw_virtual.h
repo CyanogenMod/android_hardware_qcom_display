@@ -51,6 +51,8 @@ class HWVirtual : public HWDevice, public HWVirtualInterface {
   virtual DisplayError Validate(HWLayers *hw_layers);
   virtual DisplayError Commit(HWLayers *hw_layers);
   virtual DisplayError Flush();
+  virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers);
+  virtual DisplayError SetPPFeatures(PPFeaturesConfig &feature_list);
 };
 
 }  // namespace sdm

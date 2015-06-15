@@ -33,6 +33,7 @@
 #include "hwc_display_primary.h"
 #include "hwc_display_external.h"
 #include "hwc_display_virtual.h"
+#include "hwc_color_manager.h"
 
 namespace sdm {
 
@@ -87,6 +88,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   android::status_t SetDisplayMode(const android::Parcel *input_parcel);
   android::status_t SetSecondaryDisplayStatus(const android::Parcel *input_parcel);
   android::status_t ConfigureRefreshRate(const android::Parcel *input_parcel);
+  android::status_t QdcmCMDHandler(const android::Parcel &in, android::Parcel *out);
 
   static Locker locker_;
   CoreInterface *core_intf_;
@@ -98,6 +100,8 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   const char *uevent_thread_name_;
   HWCBufferAllocator *buffer_allocator_;
   HWCBufferSyncHandler *buffer_sync_handler_;
+
+  HWCColorManager *color_mgr_;
 };
 
 }  // namespace sdm

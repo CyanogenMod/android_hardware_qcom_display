@@ -53,6 +53,8 @@
 #define CLEAR_BIT(value, bit) (value &= (~(1 << (bit))))
 #define IS_BIT_SET(value, bit) (value & (1 << (bit)))
 
+#define BITMAP(bit) (1 << (bit))
+
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 

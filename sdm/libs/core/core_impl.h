@@ -27,6 +27,7 @@
 
 #include <core/core_interface.h>
 #include <private/extension_interface.h>
+#include <private/color_interface.h>
 #include <utils/locker.h>
 
 #include "hw_interface.h"

@@ -420,5 +420,13 @@ void HWHDMI::ReadScanInfo() {
         hw_scan_info_.cea_scan_support);
 }
 
+DisplayError HWHDMI::GetPPFeaturesVersion(PPFeatureVersion *vers) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWHDMI::SetPPFeatures(PPFeaturesConfig &feature_list) {
+  return kErrorNotSupported;
+}
+
 }  // namespace sdm
 

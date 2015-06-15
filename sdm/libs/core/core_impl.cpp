@@ -32,6 +32,7 @@
 #include "display_hdmi.h"
 #include "display_virtual.h"
 #include "hw_info_interface.h"
+#include "color_manager.h"
 
 #define __CLASS__ "CoreImpl"
 
@@ -102,6 +103,12 @@ DisplayError CoreImpl::Init() {
     }
   }
 
+  error = ColorManagerProxy::Init(*hw_resource_);
+  // if failed, doesn't affect display core functionalities.
+  if (error != kErrorNone) {
+    DLOGW("Unable creating color manager and continue without it.");
+  }
+
   return kErrorNone;
 
 CleanupOnError:
@@ -127,6 +134,8 @@ DisplayError CoreImpl::Deinit() {
   if (extension_intf_) {
     extension_intf_->DestroyRotator(rotator_intf_);
   }
+
+  ColorManagerProxy::Deinit();
 
   comp_mgr_.Deinit();
   HWInfoInterface::Destroy(hw_info_intf_);

@@ -30,7 +30,7 @@
 #include <cutils/properties.h>
 #include <utils/constants.h>
 #include <stdarg.h>
-
+#include <cutils/properties.h>
 #include "hwc_display_primary.h"
 #include "hwc_debugger.h"
 
@@ -87,8 +87,25 @@ HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const
   : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY) {
 }
 
+void HWCDisplayPrimary::ProcessBootAnimCompleted() {
+  char value[PROPERTY_VALUE_MAX];
+
+  // Applying default mode after bootanimation is finished
+  property_get("init.svc.bootanim", value, "running");
+  if (!strncmp(value,"stopped",strlen("stopped"))) {
+    boot_animation_completed_ = true;
+
+    // one-shot action check if bootanimation completed then apply default display mode.
+    if (display_intf_)
+      display_intf_->ApplyDefaultDisplayMode();
+  }
+}
+
 int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
   int status = 0;
+
+  if (!boot_animation_completed_)
+    ProcessBootAnimCompleted();
 
   status = AllocateLayerStack(content_list);
   if (status) {

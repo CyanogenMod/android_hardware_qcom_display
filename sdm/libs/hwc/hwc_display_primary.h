@@ -50,6 +50,7 @@ class HWCDisplayPrimary : public HWCDisplay {
   HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
   void SetMetaDataRefreshRateFlag(bool enable);
   virtual DisplayError SetDisplayMode(uint32_t mode);
+  void ProcessBootAnimCompleted();
 };
 
 }  // namespace sdm

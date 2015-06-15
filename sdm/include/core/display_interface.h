@@ -154,6 +154,9 @@ class DisplayEventHandler {
   virtual ~DisplayEventHandler() { }
 };
 
+struct PPDisplayAPIPayload;
+struct PPPendingParams;
+
 /*! @brief Display device interface.
 
   @details This class defines display device interface. It contains methods which client shall use
@@ -352,6 +355,24 @@ class DisplayInterface {
     @return \link DisplayError \endlink
   */
   virtual bool IsUnderscanSupported() = 0;
+
+  /*! @brief Method to route display API requests to color service.
+
+    @param[in] in_payload \link PPDisplayAPIPayload \endlink
+    @param[out] out_payload \link PPDisplayPayload \endlink
+    @param[out] pending_action \link PPPendingParams \endlink
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
+                                            PPDisplayAPIPayload *out_payload,
+                                            PPPendingParams *pending_action) = 0;
+
+  /*! @brief Method to request applying default display mode.
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError ApplyDefaultDisplayMode() = 0;
 
  protected:
   virtual ~DisplayInterface() { }
