@@ -43,6 +43,25 @@
 
 namespace sdm {
 
+void HWCDisplay::AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height,
+                                        uint32_t *src_width, uint32_t *src_height) {
+  *src_height = (dst_width * (*src_height)) / (*src_width);
+  *src_width = dst_width;
+}
+
+void HWCDisplay::GetDownscaleResolution(uint32_t primary_width, uint32_t primary_height,
+                                        uint32_t *non_primary_width, uint32_t *non_primary_height) {
+  uint32_t primary_area = primary_width * primary_height;
+  uint32_t non_primary_area = (*non_primary_width) * (*non_primary_height);
+
+  if (primary_area > non_primary_area) {
+    if (primary_height > primary_width) {
+      Swap(primary_height, primary_width);
+    }
+    AdjustSourceResolution(primary_width, primary_height, non_primary_width, non_primary_height);
+  }
+}
+
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
                        int id, bool needs_blit)
   : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit),

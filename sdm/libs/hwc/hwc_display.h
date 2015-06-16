@@ -124,6 +124,11 @@ class HWCDisplay : public DisplayEventHandler {
   DisplayError SetColorSpace(const ColorSpace_t source, LayerColorSpace *target);
   DisplayError SetMetaData(const MetaData_t &meta_data, Layer *layer);
 
+  static void AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height, uint32_t *src_width,
+                                     uint32_t *src_height);
+  static void GetDownscaleResolution(uint32_t primary_width, uint32_t primary_height,
+                                     uint32_t *virtual_width, uint32_t *virtual_height);
+
   enum {
     INPUT_LAYER_DUMP,
     OUTPUT_LAYER_DUMP,

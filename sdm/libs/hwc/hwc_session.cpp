@@ -423,9 +423,12 @@ int HWCSession::HandleVirtualDisplayLifeCycle(hwc_display_contents_1_t *content_
 
   if (HWCDisplayVirtual::IsValidContentList(content_list)) {
     if (!hwc_display_[HWC_DISPLAY_VIRTUAL]) {
+      uint32_t primary_width = 0;
+      uint32_t primary_height = 0;
+      hwc_display_[HWC_DISPLAY_PRIMARY]->GetFrameBufferResolution(&primary_width, &primary_height);
       // Create virtual display device
-      status = HWCDisplayVirtual::Create(core_intf_, &hwc_procs_, content_list,
-                                         &hwc_display_[HWC_DISPLAY_VIRTUAL]);
+      status = HWCDisplayVirtual::Create(core_intf_, &hwc_procs_, primary_width, primary_height,
+                                         content_list, &hwc_display_[HWC_DISPLAY_VIRTUAL]);
     }
   } else {
     if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
