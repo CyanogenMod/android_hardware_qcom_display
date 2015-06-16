@@ -419,7 +419,7 @@ uint32_t getRefreshRate(hwc_context_t* ctx, uint32_t requestedRefreshRate) {
                     (float)requestedRefreshRate);
 
     for(uint32_t i = 1; i <= maxNumIterations; i++) {
-        rate = roundOff(i * requestedRefreshRate);
+        rate = i * roundOff(requestedRefreshRate);
         if(rate < mdpHw.getMinFpsSupported()) {
             continue;
         } else if((rate >= mdpHw.getMinFpsSupported() &&
