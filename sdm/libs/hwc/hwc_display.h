@@ -123,6 +123,10 @@ class HWCDisplay : public DisplayEventHandler {
   virtual void ApplyScanAdjustment(hwc_rect_t *display_frame);
   DisplayError SetColorSpace(const ColorSpace_t source, LayerColorSpace *target);
   DisplayError SetMetaData(const MetaData_t &meta_data, Layer *layer);
+  bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
+  bool IsFullFrameGPUComposed();
+  bool IsFullFrameSDEComposed();
+  bool IsFullFrameCached(hwc_display_contents_1_t *content_list);
 
   enum {
     INPUT_LAYER_DUMP,
@@ -150,15 +154,15 @@ class HWCDisplay : public DisplayEventHandler {
   uint32_t metadata_refresh_rate_;
   bool boot_animation_completed_;
   bool shutdown_pending_;
+  bool handle_refresh_;
+  bool use_blit_comp_;
 
  private:
   bool IsFrameBufferScaled();
   void DumpInputBuffers(hwc_display_contents_1_t *content_list);
-  bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
   int PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint32_t fps);
   void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
   void ResetLayerCacheStack();
-  bool use_blit_comp_;
   BlitEngine *blit_engine_;
 };
 
