@@ -360,6 +360,10 @@ int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint3
     return -EINVAL;
   }
 
+  if (disp < HWC_DISPLAY_PRIMARY || disp >  HWC_NUM_PHYSICAL_DISPLAY_TYPES) {
+    return -EINVAL;
+  }
+
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
   int status = -EINVAL;
   if (hwc_session->hwc_display_[disp]) {
@@ -377,6 +381,10 @@ int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, ui
     return -EINVAL;
   }
 
+  if (disp < HWC_DISPLAY_PRIMARY || disp >  HWC_NUM_PHYSICAL_DISPLAY_TYPES) {
+    return -EINVAL;
+  }
+
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
   int status = -EINVAL;
   if (hwc_session->hwc_display_[disp]) {
@@ -390,7 +398,11 @@ int HWCSession::GetActiveConfig(hwc_composer_device_1 *device, int disp) {
   SEQUENCE_WAIT_SCOPE_LOCK(locker_);
 
   if (!device) {
-    return -1;
+    return -EINVAL;
+  }
+
+  if (disp < HWC_DISPLAY_PRIMARY || disp >  HWC_NUM_PHYSICAL_DISPLAY_TYPES) {
+    return -EINVAL;
   }
 
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
@@ -409,8 +421,13 @@ int HWCSession::SetActiveConfig(hwc_composer_device_1 *device, int disp, int ind
     return -EINVAL;
   }
 
+  if (disp < HWC_DISPLAY_PRIMARY || disp >  HWC_NUM_PHYSICAL_DISPLAY_TYPES) {
+    return -EINVAL;
+  }
+
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
   int status = -EINVAL;
+
   if (hwc_session->hwc_display_[disp]) {
     status = hwc_session->hwc_display_[disp]->SetActiveConfig(index);
   }
