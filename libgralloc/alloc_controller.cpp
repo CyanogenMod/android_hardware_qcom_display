@@ -35,9 +35,11 @@
 #include "memalloc.h"
 #include "ionalloc.h"
 #include "gr.h"
-#include "comptype.h"
-#include "mdp_version.h"
+#include "qd_utils.h"
 #include <qdMetaData.h>
+#include <utils/Singleton.h>
+#include <utils/Mutex.h>
+
 
 #ifdef VENUS_COLOR_FORMAT
 #include <media/msm_media_info.h>
@@ -73,6 +75,7 @@
 
 using namespace gralloc;
 using namespace qdutils;
+using namespace android;
 
 ANDROID_SINGLETON_STATIC_INSTANCE(AdrenoMemInfo);
 
@@ -445,10 +448,13 @@ IMemAlloc* IonController::getAllocator(int flags)
 bool isMacroTileEnabled(int format, int usage)
 {
     bool tileEnabled = false;
+    int isMacroTileSupportedByMDP = 0;
+
+    qdutils::querySDEInfo(HAS_MACRO_TILE, &isMacroTileSupportedByMDP);
 
     // Check whether GPU & MDSS supports MacroTiling feature
     if(AdrenoMemInfo::getInstance().isMacroTilingSupportedByGPU() &&
-            qdutils::MDPVersion::getInstance().supportsMacroTile())
+       isMacroTileSupportedByMDP)
     {
         // check the format
         switch(format)
