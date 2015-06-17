@@ -91,6 +91,7 @@ MDPVersion::MDPVersion()
     mRGBPipes = 0;
     mVGPipes = 0;
     mDMAPipes = 0;
+    mCursorPipes = 0;
     mFeatures = 0;
     mMDPUpscale = 1;
     mMDPDownscale = 1;
@@ -110,6 +111,7 @@ MDPVersion::MDPVersion()
     // Default width of MDSS SSPP. For layer resolutions beyond this, we drive
     // using two SSPP's.
     mMaxPipeWidth = 2048;
+    mMaxCursorSize = 0;
 
     updatePanelInfo();
 
@@ -309,6 +311,10 @@ bool MDPVersion::updateSysFsInfo() {
                 else if(!strncmp(tokens[0], "dma_pipes", strlen("dma_pipes"))) {
                     mDMAPipes = (uint8_t)atoi(tokens[1]);
                 }
+                else if(!strncmp(tokens[0], "cursor_pipes",
+                                strlen("cursor_pipes"))) {
+                    mCursorPipes = (uint8_t)atoi(tokens[1]);
+                }
                 else if(!strncmp(tokens[0], "blending_stages",
                                 strlen("blending_stages"))) {
                     mBlendStages = (uint8_t)atoi(tokens[1]);
@@ -354,6 +360,9 @@ bool MDPVersion::updateSysFsInfo() {
                             mRotDownscale = true;
                         }
                     }
+                } else if(!strncmp(tokens[0], "max_cursor_size",
+                        strlen("max_cursor_size"))) {
+                        mMaxCursorSize = atoi(tokens[1]);
                 }
             }
         }
@@ -389,8 +398,8 @@ bool MDPVersion::updateSysFsInfo() {
     }
 
     ALOGD_IF(DEBUG, "%s: mMDPVersion: %d mMdpRev: %x mRGBPipes:%d,"
-                    "mVGPipes:%d", __FUNCTION__, mMDPVersion, mMdpRev,
-                    mRGBPipes, mVGPipes);
+                    "mVGPipes:%d  mCursorPipes:%d", __FUNCTION__, mMDPVersion,
+                    mMdpRev, mRGBPipes, mVGPipes, mCursorPipes);
     ALOGD_IF(DEBUG, "%s:mDMAPipes:%d \t mMDPDownscale:%d, mFeatures:%d",
                      __FUNCTION__,  mDMAPipes, mMDPDownscale, mFeatures);
     ALOGD_IF(DEBUG, "%s:mLowBw: %lu mHighBw: %lu", __FUNCTION__,  mLowBw,
