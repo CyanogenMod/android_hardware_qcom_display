@@ -744,8 +744,8 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
   // 2. Any layer is added/removed/layer properties changes in the current layer stack.
   // 3. Any layer handle is changed and it is marked for GPU composition
   // 4. Any layer's current composition is different from previous composition.
-  if (((layer_stack_cache_.layer_count != layer_count) || layer_stack_.flags.skip_present ||
-      layer_stack_.flags.geometry_changed) && !layer_stack_cache_.animating) {
+  if ((layer_stack_cache_.layer_count != layer_count) || layer_stack_.flags.skip_present ||
+      layer_stack_.flags.geometry_changed || layer_stack_.flags.animating) {
     return true;
   }
 
@@ -762,8 +762,7 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
       return true;
     }
 
-    if ((layer.composition == kCompositionGPU) && (layer_cache.handle != hwc_layer.handle) &&
-        !layer_stack_cache_.animating) {
+    if ((layer.composition == kCompositionGPU) && (layer_cache.handle != hwc_layer.handle)) {
       return true;
     }
   }
@@ -775,6 +774,7 @@ void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
   if (layer_count > kMaxLayerCount) {
+    ResetLayerCacheStack();
     return;
   }
 
@@ -1207,6 +1207,17 @@ int HWCDisplay::ColorSVCRequestRoute(PPDisplayAPIPayload &in_payload,
     ret = -EINVAL;
 
   return ret;
+}
+
+void HWCDisplay::ResetLayerCacheStack() {
+  uint32_t layer_count = layer_stack_cache_.layer_count;
+  for (uint32_t i = 0; i < layer_count; i++) {
+    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
+    layer_cache.handle = NULL;
+    layer_cache.composition = kCompositionGPU;
+  }
+  layer_stack_cache_.animating = false;
+  layer_stack_cache_.layer_count = 0;
 }
 
 }  // namespace sdm

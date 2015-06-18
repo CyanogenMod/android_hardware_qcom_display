@@ -157,6 +157,7 @@ class HWCDisplay : public DisplayEventHandler {
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
   int PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint32_t fps);
   void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
+  void ResetLayerCacheStack();
   bool use_blit_comp_;
   BlitEngine *blit_engine_;
 };
