@@ -7,7 +7,9 @@ LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := hardware/qcom/display/sdm/include/ \
                                  hardware/qcom/display/libgralloc/ \
                                  hardware/qcom/display/libqservice/ \
-                                 hardware/qcom/display/libqdutils/
+                                 hardware/qcom/display/libqdutils/ \
+                                 hardware/qcom/display/libcopybit/
+
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
                                  -Wconversion -Wall -Werror \
                                  -DLOG_TAG=\"SDM\"
@@ -19,7 +21,7 @@ endif
 
 LOCAL_SHARED_LIBRARIES        := libsdmcore libqservice libbinder libhardware libhardware_legacy \
                                  libutils libcutils libsync libmemalloc libqdutils libdl \
-                                 libpowermanager
+                                 libpowermanager libsdmutils
 
 LOCAL_SRC_FILES               := hwc_session.cpp \
                                  hwc_display.cpp \
@@ -29,6 +31,7 @@ LOCAL_SRC_FILES               := hwc_session.cpp \
                                  hwc_debugger.cpp \
                                  hwc_buffer_allocator.cpp \
                                  hwc_buffer_sync_handler.cpp \
-                                 hwc_color_manager.cpp
+                                 hwc_color_manager.cpp \
+                                 blit_engine_c2d.cpp
 
 include $(BUILD_SHARED_LIBRARY)

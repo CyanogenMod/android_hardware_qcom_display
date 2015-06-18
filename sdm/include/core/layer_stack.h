@@ -62,16 +62,32 @@ enum LayerBlending {
   @sa Layer
 */
 enum LayerComposition {
-  kCompositionGPU,        //!< This layer will be drawn into the target buffer by GPU. Display
-                          //!< device will mark the layer for SDE composition if it can handle it
-                          //!< or it will mark the layer for GPU composition.
+  kCompositionGPU,          //!< This layer will be drawn onto the target buffer by GPU. Display
+                            //!< device will mark the layer for GPU composition if it can not handle
+                            //!< it completely.
 
-  kCompositionSDE,        //!< This layer will be handled by SDE. It must not be composed by GPU.
+  kCompositionSDE,          //!< This layer will be handled by SDE. It must not be composed by GPU.
 
-  kCompositionGPUTarget,  //!< This layer will hold result of composition for layers marked for GPU
-                          //!< composition. If display device sets all other layers for SDE
-                          //!< composition then this layer would be ignored during Commit().
-                          //!< Only one layer shall be marked as target buffer by the caller.
+  kCompositionHybrid,       //!< This layer will be drawn by a blit engine and SDE together. Display
+                            //!< device will split the layer, update the blit rectangle that
+                            //!< need to be composed by a blit engine and update original source
+                            //!< rectangle that will be composed by SDE.
+
+  kCompositionBlit,         //!< This layer will be composed using Blit Engine
+
+  kCompositionGPUTarget,    //!< This layer will hold result of composition for layers marked for
+                            //!< GPU composition.
+                            //!< If display device does not set any layer for SDE composition then
+                            //!< this would be ignored during Commit().
+                            //!< Only one layer shall be marked as target buffer by the caller.
+                            //!< GPU target layer shall be after application layers in layer stack.
+
+  kCompositionBlitTarget,   //!< This layer will hold result of composition for blit rectangles
+                            //!< from the layers marked for hybrid composition. Nth blit rectangle
+                            //!< in a layer shall be composed onto Nth blit target.
+                            //!< If display device does not set any layer for hybrid composition
+                            //!< then this would be ignored during Commit().
+                            //!< Blit target layers shall be after GPU target layer in layer stack.
 };
 
 enum LayerColorSpace {
@@ -138,10 +154,15 @@ struct LayerStackFlags {
                                       //!< stack contains secure layers.
 
       uint32_t animating : 1;         //!< This flag shall be set by client to indicate that the
-                                      //!<  current frame is animating.
-      };
+                                      //!<  current frame is animating.i
 
-      uint32_t flags;   //!< For initialization purpose only. Client shall not refer it directly.
+      uint64_t attributes_changed : 1;
+                                      //!< This flag shall be set by client to indicate that the
+                                      //!< current frame has some properties changed and
+                                      //!< needs re-config.
+    };
+
+    uint32_t flags;   //!< For initialization purpose only. Client shall not refer it directly.
   };
 
   LayerStackFlags() : flags(0) { }
@@ -201,6 +222,11 @@ struct Layer {
 
   LayerRectArray dirty_regions;     //!< Rectangular areas in the current frames that have changed
                                     //!< in comparison to previous frame.
+
+  LayerRectArray blit_regions;      //!< Rectangular areas of this layer which need to composed
+                                    //!< to blit target. Display device will update blit rectangles
+                                    //!< if a layer composition is set as hybrid. Nth blit rectangle
+                                    //!< shall be composed onto Nth blit target.
 
   LayerBlending blending;           //!< Blending operation which need to be applied on the layer
                                     //!< buffer during composition.

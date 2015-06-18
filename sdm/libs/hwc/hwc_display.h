@@ -32,6 +32,8 @@
 
 namespace sdm {
 
+class BlitEngine;
+
 class HWCDisplay : public DisplayEventHandler {
  public:
   virtual int Init();
@@ -93,7 +95,8 @@ class HWCDisplay : public DisplayEventHandler {
     LayerStackCache() : layer_count(0), animating(false) { }
   };
 
-  HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id);
+  HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id,
+             bool needs_blit);
 
   // DisplayEventHandler methods
   virtual DisplayError VSync(const DisplayEventVSync &vsync);
@@ -130,6 +133,7 @@ class HWCDisplay : public DisplayEventHandler {
   hwc_procs_t const **hwc_procs_;
   DisplayType type_;
   int id_;
+  bool needs_blit_;
   DisplayInterface *display_intf_;
   LayerStackMemory layer_stack_memory_;
   LayerStack layer_stack_;
@@ -152,6 +156,8 @@ class HWCDisplay : public DisplayEventHandler {
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
   int PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint32_t fps);
   void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
+  bool use_blit_comp_;
+  BlitEngine *blit_engine_;
 };
 
 inline int HWCDisplay::Perform(uint32_t operation, ...) {

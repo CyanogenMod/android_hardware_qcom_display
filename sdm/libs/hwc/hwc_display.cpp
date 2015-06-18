@@ -37,18 +37,19 @@
 
 #include "hwc_display.h"
 #include "hwc_debugger.h"
+#include "blit_engine_c2d.h"
 
 #define __CLASS__ "HWCDisplay"
 
 namespace sdm {
 
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
-                       int id)
-  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), display_intf_(NULL),
-    flush_(false), dump_frame_count_(0), dump_frame_index_(0),
+                       int id, bool needs_blit)
+  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit),
+    display_intf_(NULL), flush_(false), dump_frame_count_(0), dump_frame_index_(0),
     dump_input_layers_(false), swap_interval_zero_(false), framebuffer_config_(NULL),
     display_paused_(false), use_metadata_refresh_rate_(false), metadata_refresh_rate_(0),
-    boot_animation_completed_(false) {
+    boot_animation_completed_(false), use_blit_comp_(false), blit_engine_(NULL) {
 }
 
 int HWCDisplay::Init() {
@@ -73,6 +74,19 @@ int HWCDisplay::Init() {
     return -EINVAL;
   }
 
+  if (needs_blit_) {
+    blit_engine_ = new BlitEngineC2d();
+    if (!blit_engine_) {
+      DLOGI("Create Blit Engine C2D failed");
+    } else {
+      if (blit_engine_->Init() < 0) {
+        DLOGI("Blit Engine Init failed, Blit Composition will not be used!!");
+        delete blit_engine_;
+        blit_engine_= NULL;
+      }
+    }
+  }
+
   return 0;
 }
 
@@ -89,6 +103,12 @@ int HWCDisplay::Deinit() {
   }
 
   delete framebuffer_config_;
+
+  if (blit_engine_) {
+    blit_engine_->DeInit();
+    delete blit_engine_;
+    blit_engine_= NULL;
+  }
 
   return 0;
 }
@@ -231,6 +251,10 @@ void HWCDisplay::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type
   dump_frame_index_ = 0;
   dump_input_layers_ = ((bit_mask_layer_type & (1 << INPUT_LAYER_DUMP)) != 0);
 
+  if (blit_engine_) {
+    blit_engine_->SetFrameDumpConfig(count);
+  }
+
   DLOGI("num_frame_dump %d, input_layer_dump_enable %d", dump_frame_count_, dump_input_layers_);
 }
 
@@ -261,13 +285,25 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   }
 
   size_t num_hw_layers = content_list->numHwLayers;
+  uint32_t blit_target_count = 0;
+
+  if (needs_blit_ && blit_engine_) {
+    blit_target_count = kMaxBlitTargetLayers;
+  }
 
   // Allocate memory for a) total number of layers b) buffer handle for each layer c) number of
   // visible rectangles in each layer d) dirty rectangle for each layer
-  size_t required_size = num_hw_layers * (sizeof(Layer) + sizeof(LayerBuffer));
-  for (size_t i = 0; i < num_hw_layers; i++) {
-    // visible rectangles + 1 dirty rectangle
-    size_t num_rects = content_list->hwLayers[i].visibleRegionScreen.numRects + 1;
+  size_t required_size = (num_hw_layers + blit_target_count) *
+                         (sizeof(Layer) + sizeof(LayerBuffer));
+
+  for (size_t i = 0; i < num_hw_layers + blit_target_count; i++) {
+    uint32_t num_visible_rects = 1;
+    if (i < num_hw_layers) {
+      num_visible_rects = INT32(content_list->hwLayers[i].visibleRegionScreen.numRects);
+    }
+
+    // visible rectangles + 1 dirty rectangle + blit rectangle
+    size_t num_rects = num_visible_rects + 1 + blit_target_count;
     required_size += num_rects * sizeof(LayerRect);
   }
 
@@ -281,7 +317,6 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
 
     // Allocate in multiple of kSizeSteps.
     required_size = ROUND_UP(required_size, layer_stack_memory_.kSizeSteps);
-
     layer_stack_memory_.raw = new uint8_t[required_size];
     if (!layer_stack_memory_.raw) {
       return -ENOMEM;
@@ -296,11 +331,16 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   // Layer array address
   layer_stack_ = LayerStack();
   layer_stack_.layers = reinterpret_cast<Layer *>(current_address);
-  layer_stack_.layer_count = static_cast<uint32_t>(num_hw_layers);
-  current_address += num_hw_layers * sizeof(Layer);
+  layer_stack_.layer_count = INT32(num_hw_layers + blit_target_count);
+  current_address += (num_hw_layers + blit_target_count) * sizeof(Layer);
 
-  for (size_t i = 0; i < num_hw_layers; i++) {
-    hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
+  for (size_t i = 0; i < num_hw_layers + blit_target_count; i++) {
+    uint32_t num_visible_rects = 1;
+    if (i < num_hw_layers) {
+      num_visible_rects =
+        static_cast<uint32_t>(content_list->hwLayers[i].visibleRegionScreen.numRects);
+    }
+
     Layer &layer = layer_stack_.layers[i];
     layer = Layer();
 
@@ -311,17 +351,25 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
 
     // Visible rectangle address
     layer.visible_regions.rect = reinterpret_cast<LayerRect *>(current_address);
-    layer.visible_regions.count = static_cast<uint32_t>(hwc_layer.visibleRegionScreen.numRects);
+    layer.visible_regions.count = num_visible_rects;
     for (size_t i = 0; i < layer.visible_regions.count; i++) {
-      *layer.visible_regions.rect = LayerRect();
+      layer.visible_regions.rect[i] = LayerRect();
     }
-    current_address += hwc_layer.visibleRegionScreen.numRects * sizeof(LayerRect);
+    current_address += num_visible_rects * sizeof(LayerRect);
 
     // Dirty rectangle address
     layer.dirty_regions.rect = reinterpret_cast<LayerRect *>(current_address);
     layer.dirty_regions.count = 1;
     *layer.dirty_regions.rect = LayerRect();
     current_address += sizeof(LayerRect);
+
+    // Blit rectangle address
+    layer.blit_regions.rect = reinterpret_cast<LayerRect *>(current_address);
+    layer.blit_regions.count = blit_target_count;
+    for (size_t i = 0; i < layer.blit_regions.count; i++) {
+      layer.blit_regions.rect[i] = LayerRect();
+    }
+    current_address += layer.blit_regions.count * sizeof(LayerRect);
   }
 
   return 0;
@@ -422,6 +470,7 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   int ret;
 
   display_intf_->GetConfig(active_config_index, &active_config);
+  use_blit_comp_ = false;
 
   // Configure each layer
   for (size_t i = 0; i < num_hw_layers; i++) {
@@ -474,6 +523,18 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     }
   }
 
+  // Prepare the Blit Target
+  if (blit_engine_) {
+    int ret = blit_engine_->Prepare(&layer_stack_);
+    if (ret) {
+      // Blit engine cannot handle this layer stack, hence set the layer stack
+      // count to num_hw_layers
+      layer_stack_.layer_count -= kMaxBlitTargetLayers;
+    } else {
+      use_blit_comp_ = true;
+    }
+  }
+
   // Configure layer stack
   layer_stack_.flags.geometry_changed = ((content_list->flags & HWC_GEOMETRY_CHANGED) > 0);
 
@@ -497,7 +558,8 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     Layer &layer = layer_stack_.layers[i];
     LayerComposition composition = layer.composition;
 
-    if (composition == kCompositionSDE) {
+    if ((composition == kCompositionSDE) || (composition == kCompositionHybrid) ||
+        (composition == kCompositionBlit)) {
       hwc_layer.hints |= HWC_HINT_CLEAR_FB;
 
       if (use_metadata_refresh_rate_ && layer.frame_rate > metadata_refresh_rate_) {
@@ -537,10 +599,23 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
       CommitLayerParams(&content_list->hwLayers[i], &layer_stack_.layers[i]);
     }
 
-    DisplayError error = display_intf_->Commit(&layer_stack_);
+    if (use_blit_comp_) {
+      status = blit_engine_->PreCommit(content_list, &layer_stack_);
+      if (status == 0) {
+        status = blit_engine_->Commit(content_list, &layer_stack_);
+        if (status != 0) {
+          DLOGE("Blit Comp Failed!");
+        }
+      }
+    }
+
+    DisplayError error = kErrorUndefined;
+    if (status == 0) {
+      error = display_intf_->Commit(&layer_stack_);
+      status = 0;
+    }
     if (error != kErrorNone) {
       DLOGE("Commit failed. Error = %d", error);
-
       // To prevent surfaceflinger infinite wait, flush the previous frame during Commit() so that
       // previous buffer and fences are released, and override the error.
       flush_ = true;
@@ -559,6 +634,11 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
     if (error != kErrorNone) {
       DLOGE("Flush failed. Error = %d", error);
     }
+  }
+
+  // Set the release fence fd to the blit engine
+  if (use_blit_comp_ && blit_engine_->BlitActive()) {
+    blit_engine_->PostCommit(&layer_stack_);
   }
 
   for (size_t i = 0; i < num_hw_layers; i++) {
@@ -594,7 +674,6 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
       hwc_layer.acquireFenceFd = -1;
     }
   }
-
 
   if (!flush_) {
     layer_stack_cache_.animating = layer_stack_.flags.animating;
@@ -663,7 +742,8 @@ void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
   for (uint32_t i = 0; i < layer_count; i++) {
     Layer &layer = layer_stack_.layers[i];
 
-    if (layer.composition == kCompositionGPUTarget) {
+    if (layer.composition == kCompositionGPUTarget ||
+        layer.composition == kCompositionBlitTarget) {
       continue;
     }
 
@@ -691,15 +771,15 @@ void HWCDisplay::SetRect(const hwc_frect_t &source, LayerRect *target) {
 void HWCDisplay::SetComposition(const int32_t &source, LayerComposition *target) {
   switch (source) {
   case HWC_FRAMEBUFFER_TARGET:  *target = kCompositionGPUTarget;  break;
-  default:                      *target = kCompositionSDE;        break;
+  default:                      *target = kCompositionGPU;        break;
   }
 }
 
 void HWCDisplay::SetComposition(const int32_t &source, int32_t *target) {
   switch (source) {
   case kCompositionGPUTarget:   *target = HWC_FRAMEBUFFER_TARGET; break;
-  case kCompositionSDE:         *target = HWC_OVERLAY;            break;
-  default:                      *target = HWC_FRAMEBUFFER;        break;
+  case kCompositionGPU:         *target = HWC_FRAMEBUFFER;        break;
+  default:                      *target = HWC_OVERLAY;            break;
   }
 }
 

@@ -214,6 +214,19 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
 
   pending_commit_ = false;
 
+  // Layer stack attributes has changed, need to Reconfigure, currently in use for Hybrid Comp
+  if (layer_stack->flags.attributes_changed) {
+    error = comp_manager_->ReConfigure(display_comp_ctx_, &hw_layers_);
+    if (error != kErrorNone) {
+      return error;
+    }
+
+    error = hw_intf_->Validate(&hw_layers_);
+    if (error != kErrorNone) {
+        return error;
+    }
+  }
+
   if (rotator_intf_ && IsRotationRequired(&hw_layers_)) {
     error = rotator_intf_->Commit(display_rotator_ctx_, &hw_layers_);
     if (error != kErrorNone) {
@@ -563,7 +576,10 @@ const char * DisplayBase::GetName(const LayerComposition &composition) {
   switch (composition) {
   case kCompositionGPU:         return "GPU";
   case kCompositionSDE:         return "SDE";
+  case kCompositionHybrid:      return "HYBRID";
+  case kCompositionBlit:        return "BLIT";
   case kCompositionGPUTarget:   return "GPU_TARGET";
+  case kCompositionBlitTarget:  return "BLIT_TARGET";
   default:                      return "UNKNOWN";
   }
 }
