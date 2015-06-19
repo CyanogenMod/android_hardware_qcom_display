@@ -59,19 +59,19 @@ DisplayError CoreImpl::Init() {
     *destroy_sym = ::dlsym(extension_lib_, DESTROY_EXTENSION_INTERFACE_NAME);
 
     if (!create_extension_intf_ || !destroy_extension_intf_) {
-      DLOGE("Unable to load symbols");
+      DLOGE("Unable to load symbols, error = %s", ::dlerror());
       ::dlclose(extension_lib_);
       return kErrorUndefined;
     }
 
     error = create_extension_intf_(EXTENSION_VERSION_TAG, &extension_intf_);
     if (error != kErrorNone) {
-      DLOGE("Unable to create interface");
+      DLOGE("Unable to create interface, error = %s", ::dlerror());
       ::dlclose(extension_lib_);
       return error;
     }
   } else {
-    DLOGW("Unable to load = %s", EXTENSION_LIBRARY_NAME);
+    DLOGW("Unable to load = %s, error = %s", EXTENSION_LIBRARY_NAME, ::dlerror());
   }
 
   error = HWInfoInterface::Create(&hw_info_intf_);
@@ -90,7 +90,7 @@ DisplayError CoreImpl::Init() {
     goto CleanupOnError;
   }
 
-  error = comp_mgr_.Init(*hw_resource_, extension_intf_);
+  error = comp_mgr_.Init(*hw_resource_, extension_intf_, buffer_sync_handler_);
   if (error != kErrorNone) {
     goto CleanupOnError;
   }
@@ -186,9 +186,7 @@ DisplayError CoreImpl::CreateDisplay(DisplayType type, DisplayEventHandler *even
 
   DisplayError error = display_base->Init();
   if (error != kErrorNone) {
-    display_base->Deinit();
     delete display_base;
-    display_base = NULL;
     return error;
   }
 
@@ -206,7 +204,6 @@ DisplayError CoreImpl::DestroyDisplay(DisplayInterface *intf) {
   DisplayBase *display_base = static_cast<DisplayBase *>(intf);
   display_base->Deinit();
   delete display_base;
-  display_base = NULL;
 
   return kErrorNone;
 }

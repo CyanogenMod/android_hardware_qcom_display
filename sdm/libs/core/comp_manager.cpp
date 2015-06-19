@@ -39,13 +39,14 @@ CompManager::CompManager()
 }
 
 DisplayError CompManager::Init(const HWResourceInfo &hw_res_info,
-                               ExtensionInterface *extension_intf) {
+                               ExtensionInterface *extension_intf,
+                               BufferSyncHandler *buffer_sync_handler) {
   SCOPE_LOCK(locker_);
 
   DisplayError error = kErrorNone;
 
   if (extension_intf) {
-    error = extension_intf->CreateResourceExtn(hw_res_info, &resource_intf_);
+    error = extension_intf->CreateResourceExtn(hw_res_info, &resource_intf_, buffer_sync_handler);
   } else {
     resource_intf_ = &resource_default_;
     error = resource_default_.Init(hw_res_info);

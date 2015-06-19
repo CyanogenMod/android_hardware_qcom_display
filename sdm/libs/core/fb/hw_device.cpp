@@ -28,6 +28,8 @@
 */
 
 #define __STDC_FORMAT_MACROS
+
+#include <stdio.h>
 #include <ctype.h>
 #include <math.h>
 #include <fcntl.h>
@@ -40,6 +42,7 @@
 #include <linux/fb.h>
 #include <utils/constants.h>
 #include <utils/debug.h>
+#include <utils/sys.h>
 
 #include "hw_device.h"
 
@@ -50,39 +53,6 @@ namespace sdm {
 HWDevice::HWDevice(BufferSyncHandler *buffer_sync_handler)
   : fb_node_index_(-1), fb_path_("/sys/devices/virtual/graphics/fb"), hotplug_enabled_(false),
     buffer_sync_handler_(buffer_sync_handler), synchronous_commit_(false) {
-#ifndef SDM_VIRTUAL_DRIVER
-  // Pointer to actual driver interfaces.
-  ioctl_ = ::ioctl;
-  open_ = ::open;
-  close_ = ::close;
-  poll_ = ::poll;
-  pread_ = ::pread;
-  pwrite_ = ::pwrite;
-  fopen_ = ::fopen;
-  fclose_ = ::fclose;
-  getline_ = ::getline;
-#else
-  // Point to virtual driver interfaces.
-  extern int virtual_ioctl(int fd, int cmd, ...);
-  extern int virtual_open(const char *file_name, int access, ...);
-  extern int virtual_close(int fd);
-  extern int virtual_poll(struct pollfd *fds,  nfds_t num, int timeout);
-  extern ssize_t virtual_pread(int fd, void *data, size_t count, off_t offset);
-  extern ssize_t virtual_pwrite(int fd, const void *data, size_t count, off_t offset);
-  extern FILE* virtual_fopen(const char *fname, const char *mode);
-  extern int virtual_fclose(FILE* fileptr);
-  extern ssize_t virtual_getline(char **lineptr, size_t *linelen, FILE *stream);
-
-  ioctl_ = virtual_ioctl;
-  open_ = virtual_open;
-  close_ = virtual_close;
-  poll_ = virtual_poll;
-  pread_ = virtual_pread;
-  pwrite_ = virtual_pwrite;
-  fopen_ = virtual_fopen;
-  fclose_ = virtual_fclose;
-  getline_ = virtual_getline;
-#endif
 }
 
 DisplayError HWDevice::Init() {
@@ -114,7 +84,7 @@ DisplayError HWDevice::Open(HWEventHandler *eventhandler) {
   event_handler_ = eventhandler;
   snprintf(device_name, sizeof(device_name), "%s%d", "/dev/graphics/fb", fb_node_index_);
 
-  device_fd_ = open_(device_name, O_RDWR);
+  device_fd_ = Sys::open_(device_name, O_RDWR);
   if (device_fd_ < 0) {
     DLOGE("open %s failed err = %d errstr = %s", device_name, errno,  strerror(errno));
     return kErrorResources;
@@ -125,7 +95,7 @@ DisplayError HWDevice::Open(HWEventHandler *eventhandler) {
 
 DisplayError HWDevice::Close() {
   if (device_fd_ > 0) {
-    close_(device_fd_);
+    Sys::close_(device_fd_);
   }
 
   return kErrorNone;
@@ -158,7 +128,11 @@ DisplayError HWDevice::GetConfigIndex(uint32_t mode, uint32_t *index) {
 DisplayError HWDevice::PowerOn() {
   DTRACE_SCOPED();
 
-  if (ioctl_(device_fd_, FBIOBLANK, FB_BLANK_UNBLANK) < 0) {
+  if (Sys::ioctl_(device_fd_, FBIOBLANK, FB_BLANK_UNBLANK) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
     IOCTL_LOGE(FB_BLANK_UNBLANK, device_type_);
     return kErrorHardware;
   }
@@ -215,7 +189,6 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
     HWPipeInfo *right_pipe = &hw_layers->config[i].right_pipe;
     HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
     bool is_rotator_used = (hw_rotator_session->hw_block_count != 0);
-    mdp_input_layer mdp_layer;
 
     for (uint32_t count = 0; count < 2; count++) {
       HWPipeInfo *pipe_info = (count == 0) ? left_pipe : right_pipe;
@@ -312,7 +285,11 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
   }
 
   mdp_commit.flags |= MDP_VALIDATE_LAYER;
-  if (ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
+  if (Sys::ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
     IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, device_type_);
     DumpLayerCommit(mdp_disp_commit_);
     return kErrorHardware;
@@ -428,7 +405,11 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
   if (synchronous_commit_) {
     mdp_commit.flags |= MDP_COMMIT_WAIT_FOR_FINISH;
   }
-  if (ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
+  if (Sys::ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
     IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, device_type_);
     DumpLayerCommit(mdp_disp_commit_);
     synchronous_commit_ = false;
@@ -450,12 +431,17 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
 
     input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
   }
+
+  if (hw_layer_info.need_sync_handle) {
+    hw_layer_info.sync_handle = dup(mdp_commit.release_fence);
+  }
+
   DLOGI_IF(kTagDriverConfig, "*************************** %s Commit Input ************************",
            device_name_);
   DLOGI_IF(kTagDriverConfig, "retire_fence_fd %d", stack->retire_fence_fd);
   DLOGI_IF(kTagDriverConfig, "*******************************************************************");
 
-  close_(mdp_commit.release_fence);
+  Sys::close_(mdp_commit.release_fence);
 
   if (synchronous_commit_) {
     // A synchronous commit can be requested when changing the display mode so we need to update
@@ -474,7 +460,11 @@ DisplayError HWDevice::Flush() {
   mdp_commit.output_layer = NULL;
 
   mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
-  if (ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
+  if (Sys::ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
     IOCTL_LOGE(MSMFB_ATOMIC_COMMIT, device_type_);
     DumpLayerCommit(mdp_disp_commit_);
     return kErrorHardware;
@@ -678,16 +668,17 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
   char stringbuffer[kMaxStringLength];
   FILE *fileptr = NULL;
   snprintf(stringbuffer, sizeof(stringbuffer), "%s%d/msm_fb_panel_info", fb_path_, device_node);
-  fileptr = fopen(stringbuffer, "r");
+  fileptr = Sys::fopen_(stringbuffer, "r");
   if (!fileptr) {
     DLOGW("Failed to open msm_fb_panel_info node device node %d", device_node);
     return;
   }
 
+  char *line = stringbuffer;
   size_t len = kMaxStringLength;
   ssize_t read;
-  char *line = NULL;
-  while ((read = getline(&line, &len, fileptr)) != -1) {
+
+  while ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
     uint32_t token_count = 0;
     const uint32_t max_count = 10;
     char *tokens[max_count] = { NULL };
@@ -719,8 +710,7 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
       }
     }
   }
-  fclose(fileptr);
-  free(line);
+  Sys::fclose_(fileptr);
   panel_info->port = GetHWDisplayPort(device_node);
   panel_info->mode = GetHWDisplayMode(device_node);
   GetSplitInfo(device_node, panel_info);
@@ -728,21 +718,22 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
 
 HWDisplayPort HWDevice::GetHWDisplayPort(int device_node) {
   char stringbuffer[kMaxStringLength];
-  DisplayError error = kErrorNone;
-  char *line = NULL;
-  size_t len = kMaxStringLength;
-  ssize_t read;
   HWDisplayPort port = kPortDefault;
 
   snprintf(stringbuffer, sizeof(stringbuffer), "%s%d/msm_fb_type", fb_path_, device_node);
-  FILE *fileptr = fopen(stringbuffer, "r");
+  FILE *fileptr = Sys::fopen_(stringbuffer, "r");
   if (!fileptr) {
     DLOGW("File not found %s", stringbuffer);
     return port;
   }
-  read = getline(&line, &len, fileptr);
+
+  char *line = stringbuffer;
+  size_t len = kMaxStringLength;
+  ssize_t read;
+
+  read = Sys::getline_(&line, &len, fileptr);
   if (read == -1) {
-    fclose(fileptr);
+    Sys::fclose_(fileptr);
     return port;
   }
   if ((strncmp(line, "mipi dsi cmd panel", strlen("mipi dsi cmd panel")) == 0)) {
@@ -760,28 +751,28 @@ HWDisplayPort HWDevice::GetHWDisplayPort(int device_node) {
   } else {
     port = kPortDefault;
   }
-  fclose(fileptr);
-  free(line);
+  Sys::fclose_(fileptr);
   return port;
 }
 
 HWDisplayMode HWDevice::GetHWDisplayMode(int device_node) {
   char stringbuffer[kMaxStringLength];
-  DisplayError error = kErrorNone;
-  char *line = NULL;
-  size_t len = kMaxStringLength;
-  ssize_t read;
   HWDisplayMode mode = kModeDefault;
 
   snprintf(stringbuffer, sizeof(stringbuffer), "%s%d/msm_fb_type", fb_path_, device_node);
-  FILE *fileptr = fopen(stringbuffer, "r");
+  FILE *fileptr = Sys::fopen_(stringbuffer, "r");
   if (!fileptr) {
     DLOGW("File not found %s", stringbuffer);
     return mode;
   }
-  read = getline(&line, &len, fileptr);
+
+  char *line = stringbuffer;
+  size_t len = kMaxStringLength;
+  ssize_t read;
+
+  read = Sys::getline_(&line, &len, fileptr);
   if (read == -1) {
-    fclose(fileptr);
+    Sys::fclose_(fileptr);
     return mode;
   }
   if ((strncmp(line, "mipi dsi cmd panel", strlen("mipi dsi cmd panel")) == 0)) {
@@ -791,56 +782,58 @@ HWDisplayMode HWDevice::GetHWDisplayMode(int device_node) {
   } else {
     mode = kModeDefault;
   }
-  fclose(fileptr);
-  free(line);
+  Sys::fclose_(fileptr);
+
   return mode;
 }
 
 void HWDevice::GetSplitInfo(int device_node, HWPanelInfo *panel_info) {
   char stringbuffer[kMaxStringLength];
   FILE *fileptr = NULL;
-  size_t len = kMaxStringLength;
-  ssize_t read;
-  char *line = NULL;
   uint32_t token_count = 0;
   const uint32_t max_count = 10;
   char *tokens[max_count] = { NULL };
 
   // Split info - for MDSS Version 5 - No need to check version here
   snprintf(stringbuffer , sizeof(stringbuffer), "%s%d/msm_fb_split", fb_path_, device_node);
-  fileptr = fopen(stringbuffer, "r");
+  fileptr = Sys::fopen_(stringbuffer, "r");
   if (!fileptr) {
     DLOGW("File not found %s", stringbuffer);
     return;
   }
 
+  char *line = stringbuffer;
+  size_t len = kMaxStringLength;
+  ssize_t read;
+
   // Format "left right" space as delimiter
-  read = getline(&line, &len, fileptr);
+  read = Sys::getline_(&line, &len, fileptr);
   if (read != -1) {
     if (!ParseLine(line, tokens, max_count, &token_count)) {
       panel_info->split_info.left_split = atoi(tokens[0]);
       panel_info->split_info.right_split = atoi(tokens[1]);
     }
   }
-  fclose(fileptr);
+
+  Sys::fclose_(fileptr);
 
   // SourceSplit enabled - Get More information
   snprintf(stringbuffer , sizeof(stringbuffer), "%s%d/msm_fb_src_split_info", fb_path_,
            device_node);
-  fileptr = fopen(stringbuffer, "r");
+  fileptr = Sys::fopen_(stringbuffer, "r");
   if (!fileptr) {
     DLOGW("File not found %s", stringbuffer);
     return;
   }
 
-  read = getline(&line, &len, fileptr);
+  read = Sys::getline_(&line, &len, fileptr);
   if (read != -1) {
     if (!strncmp(line, "src_split_always", strlen("src_split_always"))) {
       panel_info->split_info.always_src_split = true;
     }
   }
-  fclose(fileptr);
-  free(line);
+
+  Sys::fclose_(fileptr);
 }
 
 int HWDevice::ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count) {
@@ -866,18 +859,18 @@ bool HWDevice::EnableHotPlugDetection(int enable) {
   char hpdpath[kMaxStringLength];
   int hdmi_node_index = GetFBNodeIndex(kDeviceHDMI);
   snprintf(hpdpath , sizeof(hpdpath), "%s%d/hpd", fb_path_, hdmi_node_index);
-  int hpdfd = open_(hpdpath, O_RDWR, 0);
+  int hpdfd = Sys::open_(hpdpath, O_RDWR, 0);
   if (hpdfd < 0) {
     DLOGE("Open failed = %s", hpdpath);
     return kErrorHardware;
   }
   char value = enable ? '1' : '0';
-  ssize_t length = pwrite_(hpdfd, &value, 1, 0);
+  ssize_t length = Sys::pwrite_(hpdfd, &value, 1, 0);
   if (length <= 0) {
     DLOGE("Write failed 'hpd' = %d", enable);
     ret_value = false;
   }
-  close_(hpdfd);
+  Sys::close_(hpdfd);
 
   return ret_value;
 }

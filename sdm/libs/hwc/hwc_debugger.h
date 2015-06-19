@@ -42,6 +42,7 @@
 #define DLOGE(format, ...) DLOG(ALOGE, format, ##__VA_ARGS__)
 #define DLOGW(format, ...) DLOG(ALOGW, format, ##__VA_ARGS__)
 #define DLOGI(format, ...) DLOG(ALOGI, format, ##__VA_ARGS__)
+#define DLOGD(format, ...) DLOG(ALOGI, format, ##__VA_ARGS__)
 #define DLOGV(format, ...) DLOG(ALOGV, format, ##__VA_ARGS__)
 
 #define DTRACE_BEGIN(custom_string) HWCDebugHandler::Get()->BeginTrace(__CLASS__, __FUNCTION__, \
@@ -54,17 +55,19 @@ namespace sdm {
 class HWCDebugHandler : public DebugHandler {
  public:
   static inline DebugHandler* Get() { return &debug_handler_; }
-  static void DebugAll(bool enable);
-  static void DebugResources(bool enable);
-  static void DebugStrategy(bool enable);
-  static void DebugCompManager(bool enable);
-  static void DebugDriverConfig(bool enable);
-  static void DebugRotator(bool enable);
-  static void DebugQdcm(bool enable);
+
+  static void DebugAll(bool enable, int verbose_level);
+  static void DebugResources(bool enable, int verbose_level);
+  static void DebugStrategy(bool enable, int verbose_level);
+  static void DebugCompManager(bool enable, int verbose_level);
+  static void DebugDriverConfig(bool enable, int verbose_level);
+  static void DebugRotator(bool enable, int verbose_level);
+  static void DebugQdcm(bool enable, int verbose_level);
 
   virtual void Error(DebugTag tag, const char *format, ...);
   virtual void Warning(DebugTag tag, const char *format, ...);
   virtual void Info(DebugTag tag, const char *format, ...);
+  virtual void Debug(DebugTag tag, const char *format, ...);
   virtual void Verbose(DebugTag tag, const char *format, ...);
   virtual void BeginTrace(const char *class_name, const char *function_name,
                           const char *custom_string);
@@ -74,6 +77,7 @@ class HWCDebugHandler : public DebugHandler {
  private:
   static HWCDebugHandler debug_handler_;
   static uint32_t debug_flags_;
+  static uint32_t verbose_level_;
 };
 
 }  // namespace sdm

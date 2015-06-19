@@ -82,6 +82,13 @@ class DebugHandler {
   */
   virtual void Info(DebugTag tag, const char *format, ...) = 0;
 
+  /*! @brief Method to handle debug messages.
+
+    @param[in] tag \link DebugTag \endlink
+    @param[in] format \link message format with variable argument list \endlink
+  */
+  virtual void Debug(DebugTag tag, const char *format, ...) = 0;
+
   /*! @brief Method to handle verbose messages.
 
     @param[in] tag \link DebugTag \endlink

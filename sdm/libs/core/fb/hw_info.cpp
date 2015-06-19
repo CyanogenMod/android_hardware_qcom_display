@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <utils/constants.h>
 #include <utils/debug.h>
+#include <utils/sys.h>
 
 #define __CLASS__ "HWInfo"
 
@@ -88,7 +89,7 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
   char *tokens[max_count] = { NULL };
   snprintf(stringbuffer , sizeof(stringbuffer), "%s%d/mdp/caps",
            kHWCapabilitiesPath, kHWCapabilitiesNode);
-  fileptr = fopen(stringbuffer, "rb");
+  fileptr = Sys::fopen_(stringbuffer, "r");
 
   if (!fileptr) {
     DLOGE("File '%s' not found", stringbuffer);
@@ -99,11 +100,11 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
   ssize_t read;
   char *line = stringbuffer;
   hw_resource->hw_version = kHWMdssVersion5;
-  while ((read = getline(&line, &len, fileptr)) != -1) {
+  while ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
     // parse the line and update information accordingly
     if (!ParseLine(line, tokens, max_count, &token_count)) {
       if (!strncmp(tokens[0], "hw_rev", strlen("hw_rev"))) {
-        hw_resource->hw_revision = atoi(tokens[1]);  // HW Rev, v1/v2
+        hw_resource->hw_revision = UINT32(atoi(tokens[1]));  // HW Rev, v1/v2
       } else if (!strncmp(tokens[0], "rgb_pipes", strlen("rgb_pipes"))) {
         hw_resource->num_rgb_pipe = UINT8(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "vig_pipes", strlen("vig_pipes"))) {
@@ -115,37 +116,39 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
       } else if (!strncmp(tokens[0], "blending_stages", strlen("blending_stages"))) {
         hw_resource->num_blending_stages = UINT8(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_downscale_ratio", strlen("max_downscale_ratio"))) {
-        hw_resource->max_scale_down = atoi(tokens[1]);
+        hw_resource->max_scale_down = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_upscale_ratio", strlen("max_upscale_ratio"))) {
-        hw_resource->max_scale_up = atoi(tokens[1]);
+        hw_resource->max_scale_up = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_bandwidth_low", strlen("max_bandwidth_low"))) {
-        hw_resource->max_bandwidth_low = atol(tokens[1]);
+        hw_resource->max_bandwidth_low = UINT64(atol(tokens[1]));
       } else if (!strncmp(tokens[0], "max_bandwidth_high", strlen("max_bandwidth_high"))) {
-        hw_resource->max_bandwidth_high = atol(tokens[1]);
+        hw_resource->max_bandwidth_high = UINT64(atol(tokens[1]));
       } else if (!strncmp(tokens[0], "max_mixer_width", strlen("max_mixer_width"))) {
-        hw_resource->max_mixer_width = atoi(tokens[1]);
+        hw_resource->max_mixer_width = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_pipe_width", strlen("max_pipe_width"))) {
-        hw_resource->max_pipe_width = atoi(tokens[1]);
+        hw_resource->max_pipe_width = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_pipe_bw", strlen("max_pipe_bw"))) {
-        hw_resource->max_pipe_bw = atoi(tokens[1]);
+        hw_resource->max_pipe_bw = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_mdp_clk", strlen("max_mdp_clk"))) {
-        hw_resource->max_sde_clk = atoi(tokens[1]);
+        hw_resource->max_sde_clk = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "clk_fudge_factor", strlen("clk_fudge_factor"))) {
         hw_resource->clk_fudge_factor = FLOAT(atoi(tokens[1])) / FLOAT(atoi(tokens[2]));
       } else if (!strncmp(tokens[0], "fmt_mt_nv12_factor", strlen("fmt_mt_nv12_factor"))) {
-        hw_resource->macrotile_nv12_factor = atoi(tokens[1]);
+        hw_resource->macrotile_nv12_factor = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "fmt_mt_factor", strlen("fmt_mt_factor"))) {
-        hw_resource->macrotile_factor = atoi(tokens[1]);
+        hw_resource->macrotile_factor = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "fmt_linear_factor", strlen("fmt_linear_factor"))) {
-        hw_resource->linear_factor = atoi(tokens[1]);
+        hw_resource->linear_factor = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "scale_factor", strlen("scale_factor"))) {
-        hw_resource->scale_factor = atoi(tokens[1]);
+        hw_resource->scale_factor = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "xtra_ff_factor", strlen("xtra_ff_factor"))) {
-        hw_resource->extra_fudge_factor = atoi(tokens[1]);
+        hw_resource->extra_fudge_factor = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "features", strlen("features"))) {
         for (uint32_t i = 0; i < token_count; i++) {
           if (!strncmp(tokens[i], "bwc", strlen("bwc"))) {
             hw_resource->has_bwc = true;
+          } else if (!strncmp(tokens[i], "ubwc", strlen("ubwc"))) {
+            hw_resource->has_ubwc = true;
           } else if (!strncmp(tokens[i], "decimation", strlen("decimation"))) {
             hw_resource->has_decimation = true;
           } else if (!strncmp(tokens[i], "tile_format", strlen("tile_format"))) {
@@ -161,20 +164,21 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
       }
     }
   }
-  fclose(fileptr);
+
+  Sys::fclose_(fileptr);
 
   DLOGI("SDE Version = %d, SDE Revision = %x, RGB = %d, VIG = %d, DMA = %d, Cursor = %d",
         hw_resource->hw_version, hw_resource->hw_revision, hw_resource->num_rgb_pipe,
         hw_resource->num_vig_pipe, hw_resource->num_dma_pipe, hw_resource->num_cursor_pipe);
   DLOGI("Upscale Ratio = %d, Downscale Ratio = %d, Blending Stages = %d", hw_resource->max_scale_up,
         hw_resource->max_scale_down, hw_resource->num_blending_stages);
-  DLOGI("BWC = %d, Decimation = %d, Tile Format = %d, Rotator Downscale = %d", hw_resource->has_bwc,
-        hw_resource->has_decimation, hw_resource->has_macrotile,
-        hw_resource->has_rotator_downscale);
+  DLOGI("BWC = %d, UBWC = %d, Decimation = %d, Tile Format = %d, Rotator Downscale = %d",
+        hw_resource->has_bwc, hw_resource->has_ubwc, hw_resource->has_decimation,
+        hw_resource->has_macrotile, hw_resource->has_rotator_downscale);
   DLOGI("SourceSplit = %d", hw_resource->is_src_split);
-  DLOGI("MaxLowBw = %"PRIu64", MaxHighBw = %"PRIu64"", hw_resource->max_bandwidth_low,
+  DLOGI("MaxLowBw = %" PRIu64 " , MaxHighBw = % " PRIu64 "", hw_resource->max_bandwidth_low,
         hw_resource->max_bandwidth_high);
-  DLOGI("MaxPipeBw = %"PRIu64" KBps, MaxSDEClock = %"PRIu64" Hz, ClockFudgeFactor = %f",
+  DLOGI("MaxPipeBw = %" PRIu64 " KBps, MaxSDEClock = % " PRIu64 " Hz, ClockFudgeFactor = %f",
         hw_resource->max_pipe_bw, hw_resource->max_sde_clk, hw_resource->clk_fudge_factor);
   DLOGI("Prefill factors: Tiled_NV12 = %d, Tiled = %d, Linear = %d, Scale = %d, Fudge_factor = %d",
         hw_resource->macrotile_nv12_factor, hw_resource->macrotile_factor,

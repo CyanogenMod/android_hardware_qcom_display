@@ -38,21 +38,21 @@ Debug Debug::debug_;
 Debug::Debug() : debug_handler_(&default_debug_handler_) {
 }
 
-uint32_t Debug::GetSimulationFlag() {
+int Debug::GetSimulationFlag() {
   int value = 0;
   debug_.debug_handler_->GetProperty("sdm.composition_simulation", &value);
 
   return value;
 }
 
-uint32_t Debug::GetHDMIResolution() {
+int Debug::GetHDMIResolution() {
   int value = 0;
   debug_.debug_handler_->GetProperty("hw.hdmi.resolution", &value);
 
   return value;
 }
 
-uint32_t Debug::GetIdleTimeoutMs() {
+int Debug::GetIdleTimeoutMs() {
   int value = IDLE_TIMEOUT_DEFAULT_MS;
   debug_.debug_handler_->GetProperty("sdm.idle_time", &value);
 
@@ -102,6 +102,13 @@ int Debug::GetMaxPipesPerMixer(DisplayType display_type) {
 bool Debug::IsVideoModeEnabled() {
   int value = 0;
   debug_.debug_handler_->GetProperty("sdm.video_mode_panel", &value);
+
+  return (value == 1);
+}
+
+bool Debug::IsRotatorUbwcDisabled() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.debug.rotator_disable_ubwc", &value);
 
   return (value == 1);
 }

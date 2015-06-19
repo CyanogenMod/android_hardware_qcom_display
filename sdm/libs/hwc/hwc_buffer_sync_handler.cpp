@@ -67,5 +67,17 @@ DisplayError HWCBufferSyncHandler::SyncMerge(int fd1, int fd2, int *merged_fd) {
   return error;
 }
 
+void HWCBufferSyncHandler::SyncClose(int fd) {
+  close(fd);
+}
+
+bool HWCBufferSyncHandler::IsSyncSignaled(int fd) {
+  if (sync_wait(fd, 0) < 0) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
 }  // namespace sdm
 

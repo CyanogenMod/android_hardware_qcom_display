@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -22,38 +22,39 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __HWC_DISPLAY_PRIMARY_H__
-#define __HWC_DISPLAY_PRIMARY_H__
+#ifndef __SYS_H__
+#define __SYS_H__
 
-#include "hwc_display.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <poll.h>
 
 namespace sdm {
 
-class HWCDisplayPrimary : public HWCDisplay {
+class Sys {
  public:
-  enum {
-    SET_METADATA_DYN_REFRESH_RATE,
-    SET_BINDER_DYN_REFRESH_RATE,
-    SET_DISPLAY_MODE,
-  };
+  // Pointers to system calls which are either mapped to actual system call or virtual driver.
+  typedef int (*ioctl)(int, int, ...);
+  typedef int (*open)(const char *, int, ...);
+  typedef int (*close)(int);
+  typedef int (*poll)(struct pollfd *, nfds_t, int);
+  typedef ssize_t (*pread)(int, void *, size_t, off_t);
+  typedef ssize_t (*pwrite)(int, const void *, size_t, off_t);
+  typedef FILE* (*fopen)( const char *fname, const char *mode);
+  typedef int (*fclose)(FILE* fileptr);
+  typedef ssize_t (*getline)(char **lineptr, size_t *linelen, FILE *stream);
 
-  static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
-                    HWCDisplay **hwc_display);
-  static void Destroy(HWCDisplay *hwc_display);
-  virtual int Prepare(hwc_display_contents_1_t *content_list);
-  virtual int Commit(hwc_display_contents_1_t *content_list);
-  virtual int SetActiveConfig(int index);
-  virtual int SetRefreshRate(uint32_t refresh_rate);
-  virtual int Perform(uint32_t operation, ...);
-
- private:
-  HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
-  void SetMetaDataRefreshRateFlag(bool enable);
-  virtual DisplayError SetDisplayMode(uint32_t mode);
-  void ProcessBootAnimCompleted();
+  static ioctl ioctl_;
+  static open open_;
+  static close close_;
+  static poll poll_;
+  static pread pread_;
+  static pwrite pwrite_;
+  static fopen fopen_;
+  static fclose fclose_;
+  static getline getline_;
 };
 
 }  // namespace sdm
 
-#endif  // __HWC_DISPLAY_PRIMARY_H__
-
+#endif  // __SYS_H__

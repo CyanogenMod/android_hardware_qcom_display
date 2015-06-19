@@ -36,7 +36,7 @@
 #ifndef __BUFFER_ALLOCATOR_H__
 #define __BUFFER_ALLOCATOR_H__
 
-#include <core/layer_buffer.h>
+#include "layer_buffer.h"
 
 namespace sdm {
 /*! @brief Input configuration set by the client for buffer allocation.

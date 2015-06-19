@@ -186,6 +186,10 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
           pending_commit_ = true;
           break;
         }
+        if (error == kErrorShutDown) {
+          comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
+          return error;
+        }
       }
     }
     comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
@@ -275,7 +279,7 @@ DisplayError DisplayBase::Flush() {
     comp_manager_->Purge(display_comp_ctx_);
     pending_commit_ = false;
   } else {
-    DLOGV("Failed to flush device.");
+    DLOGW("Unable to flush display = %d", display_type_);
   }
 
   return error;
@@ -561,7 +565,6 @@ bool DisplayBase::IsRotationRequired(HWLayers *hw_layers) {
   HWLayersInfo &layer_info = hw_layers->info;
 
   for (uint32_t i = 0; i < layer_info.count; i++) {
-    Layer& layer = layer_info.stack->layers[layer_info.index[i]];
     HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
 
     if (hw_rotator_session->hw_block_count) {

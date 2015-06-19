@@ -295,7 +295,6 @@ DisplayError ResourceDefault::PostCommit(Handle display_ctx, HWLayers *hw_layers
                           reinterpret_cast<DisplayResourceContext *>(display_ctx);
   HWBlockType hw_block_id = display_resource_ctx->hw_block_id;
   uint64_t frame_count = display_resource_ctx->frame_count;
-  DisplayError error = kErrorNone;
 
   DLOGV_IF(kTagResources, "Resource for hw_block = %d, frame_count = %d", hw_block_id, frame_count);
 
@@ -457,8 +456,6 @@ DisplayError ResourceDefault::SrcSplitConfig(DisplayResourceContext *display_res
   HWPipeInfo *right_pipe = &layer_config->right_pipe;
   float src_width = src_rect.right - src_rect.left;
   float dst_width = dst_rect.right - dst_rect.left;
-  float src_height = src_rect.bottom - src_rect.top;
-  float dst_height = dst_rect.bottom - dst_rect.top;
   float left_mixer_width = FLOAT(display_attributes.split_left);
 
   // Layer cannot qualify for SrcSplit if source or destination width exceeds max pipe width.
@@ -533,11 +530,8 @@ DisplayError ResourceDefault::DisplaySplitConfig(DisplayResourceContext *display
 
 DisplayError ResourceDefault::Config(DisplayResourceContext *display_resource_ctx,
                                 HWLayers *hw_layers) {
-  HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
   HWLayersInfo &layer_info = hw_layers->info;
   DisplayError error = kErrorNone;
-  uint32_t z_order = 0;
-
   Layer& layer = layer_info.stack->layers[layer_info.index[0]];
 
   error = ValidateLayerDimensions(layer);

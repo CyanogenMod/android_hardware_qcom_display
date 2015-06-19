@@ -48,7 +48,6 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
                                HWCDisplay **hwc_display) {
   uint32_t external_width = 0;
   uint32_t external_height = 0;
-  char property[PROPERTY_VALUE_MAX];
 
   HWCDisplay *hwc_display_external = new HWCDisplayExternal(core_intf, hwc_procs);
   int status = hwc_display_external->Init();

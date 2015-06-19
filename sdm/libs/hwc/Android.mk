@@ -11,8 +11,9 @@ LOCAL_C_INCLUDES              := hardware/qcom/display/sdm/include/ \
                                  hardware/qcom/display/libcopybit/
 
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
-                                 -Wconversion -Wall -Werror \
+                                 -Wall -Werror -std=c++11 -fcolor-diagnostics\
                                  -DLOG_TAG=\"SDM\"
+LOCAL_CLANG                   := true
 
 # TODO: Move this to the common makefile
 ifeq ($(call is-board-platform-in-list, $(MASTER_SIDE_CP_TARGET_LIST)), true)

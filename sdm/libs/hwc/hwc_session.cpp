@@ -57,16 +57,16 @@
 static sdm::HWCSession::HWCModuleMethods g_hwc_module_methods;
 
 hwc_module_t HAL_MODULE_INFO_SYM = {
-  common: {
-    tag: HARDWARE_MODULE_TAG,
-    version_major: 2,
-    version_minor: 0,
-    id: HWC_HARDWARE_MODULE_ID,
-    name: "QTI Hardware Composer Module",
-    author: "CodeAurora Forum",
-    methods: &g_hwc_module_methods,
-    dso: 0,
-    reserved: {0},
+  .common = {
+    .tag = HARDWARE_MODULE_TAG,
+    .version_major = 2,
+    .version_minor = 0,
+    .id = HWC_HARDWARE_MODULE_ID,
+    .name = "QTI Hardware Composer Module",
+    .author = "CodeAurora Forum",
+    .methods = &g_hwc_module_methods,
+    .dso = 0,
+    .reserved = {0},
   }
 };
 
@@ -144,7 +144,7 @@ int HWCSession::Init() {
   }
 
   if (pthread_create(&uevent_thread_, NULL, &HWCUeventThread, this) < 0) {
-    DLOGE("Failed to start = %s, error = %s", uevent_thread_name_);
+    DLOGE("Failed to start = %s, error = %s", uevent_thread_name_, strerror(errno));
     HWCDisplayPrimary::Destroy(hwc_display_[HWC_DISPLAY_PRIMARY]);
     hwc_display_[HWC_DISPLAY_PRIMARY] = 0;
     CoreInterface::DestroyCore();
@@ -227,7 +227,7 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
     hwc_session->ResetPanel();
   }
 
-  for (ssize_t dpy = (num_displays - 1); dpy >= 0; dpy--) {
+  for (ssize_t dpy = static_cast<ssize_t>(num_displays - 1); dpy >= 0; dpy--) {
     hwc_display_contents_1_t *content_list = displays[dpy];
     if (dpy == HWC_DISPLAY_VIRTUAL) {
       if (hwc_session->hwc_display_[HWC_DISPLAY_EXTERNAL]) {
@@ -600,33 +600,34 @@ void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {
   int type = input_parcel->readInt32();
   bool enable = (input_parcel->readInt32() > 0);
   DLOGI("type = %d enable = %d", type, enable);
+  int verbose_level = input_parcel->readInt32();
 
   switch (type) {
   case qService::IQService::DEBUG_ALL:
-    HWCDebugHandler::DebugAll(enable);
+    HWCDebugHandler::DebugAll(enable, verbose_level);
     break;
 
   case qService::IQService::DEBUG_MDPCOMP:
-    HWCDebugHandler::DebugStrategy(enable);
-    HWCDebugHandler::DebugCompManager(enable);
+    HWCDebugHandler::DebugStrategy(enable, verbose_level);
+    HWCDebugHandler::DebugCompManager(enable, verbose_level);
     break;
 
   case qService::IQService::DEBUG_PIPE_LIFECYCLE:
-    HWCDebugHandler::DebugResources(enable);
+    HWCDebugHandler::DebugResources(enable, verbose_level);
     break;
 
   case qService::IQService::DEBUG_DRIVER_CONFIG:
-    HWCDebugHandler::DebugDriverConfig(enable);
+    HWCDebugHandler::DebugDriverConfig(enable, verbose_level);
     break;
 
   case qService::IQService::DEBUG_ROTATOR:
-    HWCDebugHandler::DebugResources(enable);
-    HWCDebugHandler::DebugDriverConfig(enable);
-    HWCDebugHandler::DebugRotator(enable);
+    HWCDebugHandler::DebugResources(enable, verbose_level);
+    HWCDebugHandler::DebugDriverConfig(enable, verbose_level);
+    HWCDebugHandler::DebugRotator(enable, verbose_level);
     break;
 
   case qService::IQService::DEBUG_QDCM:
-    HWCDebugHandler::DebugQdcm(enable);
+    HWCDebugHandler::DebugQdcm(enable, verbose_level);
     break;
 
   default:

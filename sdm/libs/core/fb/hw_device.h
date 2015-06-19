@@ -26,11 +26,8 @@
 #define __HW_DEVICE_H__
 
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <linux/msm_mdp_ext.h>
 #include <linux/mdss_rotator.h>
-#include <poll.h>
 #include <pthread.h>
 
 #include "hw_interface.h"
@@ -95,17 +92,6 @@ class HWDevice {
   void SetColorSpace(LayerColorSpace source, mdp_color_space *color_space);
 
   bool EnableHotPlugDetection(int enable);
-
-  // Pointers to system calls which are either mapped to actual system call or virtual driver.
-  int (*ioctl_)(int, int, ...);
-  int (*open_)(const char *, int, ...);
-  int (*close_)(int);
-  int (*poll_)(struct pollfd *, nfds_t, int);
-  ssize_t (*pread_)(int, void *, size_t, off_t);
-  ssize_t (*pwrite_)(int, const void *, size_t, off_t);
-  FILE* (*fopen_)( const char *fname, const char *mode);
-  int (*fclose_)(FILE* fileptr);
-  ssize_t (*getline_)(char **lineptr, size_t *linelen, FILE *stream);
 
   // Store the Device EventHandler - used for callback
   HWEventHandler *event_handler_;
