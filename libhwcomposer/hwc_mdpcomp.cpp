@@ -183,7 +183,8 @@ bool MDPComp::init(hwc_context_t *ctx) {
     if((property_get("persist.hwc.ptor.enable", property, NULL) <= 0) &&
             (qdutils::MDPVersion::getInstance().is8x16() ||
              qdutils::MDPVersion::getInstance().is8x39() ||
-             qdutils::MDPVersion::getInstance().is8x52())) {
+             qdutils::MDPVersion::getInstance().is8x52() ||
+             qdutils::MDPVersion::getInstance().is8976())) {
         defaultPTOR = true;
     }
 
