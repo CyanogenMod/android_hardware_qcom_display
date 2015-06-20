@@ -250,7 +250,7 @@ int gralloc_lock_ycbcr(gralloc_module_t const* module,
 {
     private_handle_t* hnd = (private_handle_t*)handle;
     int err = gralloc_map_and_invalidate(module, handle, usage, l, t, w, h);
-    int ystride;
+    int ystride, cstride;
     if(!err) {
         //hnd->format holds our implementation defined format
         //HAL_PIXEL_FORMAT_YCrCb_420_SP is the only one set right now.
@@ -274,6 +274,19 @@ int gralloc_lock_ycbcr(gralloc_module_t const* module,
                 ycbcr->ystride = ystride;
                 ycbcr->cstride = ystride;
                 ycbcr->chroma_step = 2;
+                memset(ycbcr->reserved, 0, sizeof(ycbcr->reserved));
+                break;
+            // YCrCb_420_P
+            case HAL_PIXEL_FORMAT_YV12:
+                ystride = ALIGN(hnd->width, 16);
+                cstride = ALIGN(ystride / 2, 16);
+                ycbcr->y  = (void*)hnd->base;
+                ycbcr->cr = (void*)(hnd->base + ystride * hnd->height);
+                ycbcr->cb = (void*)(hnd->base + ystride * hnd->height
+                                              + cstride * hnd->height / 2);
+                ycbcr->ystride = ystride;
+                ycbcr->cstride = cstride;
+                ycbcr->chroma_step = 1;
                 memset(ycbcr->reserved, 0, sizeof(ycbcr->reserved));
                 break;
             default:
