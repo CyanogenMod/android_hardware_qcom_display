@@ -455,10 +455,8 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
 
   DumpImpl::AppendString(buffer, length, "\n");
 
-  uint32_t num_layers = 0;
   uint32_t num_hw_layers = 0;
   if (hw_layers_.info.stack) {
-    num_layers = hw_layers_.info.stack->layer_count;
     num_hw_layers = hw_layers_.info.count;
   }
 
