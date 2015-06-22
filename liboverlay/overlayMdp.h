@@ -1,6 +1,6 @@
 /*
 * Copyright (C) 2008 The Android Open Source Project
-* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+* Copyright (c) 2010-2015, The Linux Foundation. All rights reserved.
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -23,9 +23,6 @@
 #include "overlayUtils.h"
 #include "mdpWrapper.h"
 #include "qdMetaData.h"
-#ifdef USES_POST_PROCESSING
-#include "lib-postproc.h"
-#endif
 
 namespace overlay{
 
@@ -122,11 +119,6 @@ private:
     /* FD for the mdp fbnum */
     OvFD          mFd;
     int mDpy;
-
-#ifdef USES_POST_PROCESSING
-    /* PP Compute Params */
-    struct compute_params mParams;
-#endif
 };
 
 /* MDP data */
