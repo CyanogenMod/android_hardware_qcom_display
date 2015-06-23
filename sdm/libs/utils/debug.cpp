@@ -73,13 +73,6 @@ bool Debug::IsDecimationDisabled() {
   return (value == 1);
 }
 
-bool Debug::IsPartialUpdateEnabled() {
-  int value = 0;
-  debug_.debug_handler_->GetProperty("sdm.partial_update", &value);
-
-  return (value == 1);
-}
-
 int Debug::GetMaxPipesPerMixer(DisplayType display_type) {
   int value = -1;
   switch (display_type) {

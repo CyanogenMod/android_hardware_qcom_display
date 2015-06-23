@@ -525,6 +525,10 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     status = QdcmCMDHandler(*input_parcel, output_parcel);
     break;
 
+  case qService::IQService::CONTROL_PARTIAL_UPDATE:
+    status = ControlPartialUpdate(input_parcel, output_parcel);
+    break;
+
   default:
     DLOGW("QService command = %d is not supported", command);
     return -EINVAL;
@@ -570,6 +574,55 @@ android::status_t HWCSession::ControlBackLight(const android::Parcel *input_parc
   close(fd);
 
   return display->SetDisplayStatus(display_status);
+}
+
+android::status_t HWCSession::ControlPartialUpdate(const android::Parcel *input_parcel,
+                                                   android::Parcel *out) {
+  DisplayError error = kErrorNone;
+  int ret = 0;
+  uint32_t disp_id = UINT32(input_parcel->readInt32());
+  uint32_t enable = UINT32(input_parcel->readInt32());
+
+  if (disp_id != HWC_DISPLAY_PRIMARY) {
+    DLOGW("CONTROL_PARTIAL_UPDATE is not applicable for display = %d", disp_id);
+    ret = -EINVAL;
+    out->writeInt32(ret);
+    return ret;
+  }
+
+  if (!hwc_display_[HWC_DISPLAY_PRIMARY]) {
+    DLOGE("primary display object is not instantiated");
+    ret = -EINVAL;
+    out->writeInt32(ret);
+    return ret;
+  }
+
+  uint32_t pending = 0;
+  error = hwc_display_[HWC_DISPLAY_PRIMARY]->ControlPartialUpdate(enable, &pending);
+
+  if (error == kErrorNone) {
+    if (!pending) {
+      out->writeInt32(ret);
+      return ret;
+    }
+  } else if (error == kErrorNotSupported) {
+    out->writeInt32(ret);
+    return ret;
+  } else {
+    ret = -EINVAL;
+    out->writeInt32(ret);
+    return ret;
+  }
+
+  hwc_procs_->invalidate(hwc_procs_);
+
+  // Wait until partial update control is complete
+  ret = locker_.WaitFinite(kPartialUpdateControlTimeoutMs);
+  locker_.Unlock();
+
+  out->writeInt32(ret);
+
+  return ret;
 }
 
 android::status_t HWCSession::SetSecondaryDisplayStatus(const android::Parcel *input_parcel) {

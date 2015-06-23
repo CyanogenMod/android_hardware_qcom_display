@@ -61,6 +61,7 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError SetDisplayState(DisplayState state);
   virtual DisplayError SetActiveConfig(uint32_t index);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
   virtual DisplayError SetDisplayMode(uint32_t mode);
   virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual bool IsUnderscanSupported();
@@ -101,6 +102,7 @@ class DisplayBase : public DisplayInterface {
   uint32_t max_mixer_stages_;
   HWInfoInterface *hw_info_intf_;
   ColorManagerProxy *color_mgr_;  // each display object owns its ColorManagerProxy
+  bool partial_update_control_;
 };
 
 }  // namespace sdm

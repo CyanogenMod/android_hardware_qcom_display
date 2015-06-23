@@ -286,7 +286,26 @@ int setPanelMode(int mode) {
 // Screen refresh for native daemons linking dynamically to libqdutils
 // ----------------------------------------------------------------------------
 extern "C" int refreshScreen() {
-  int ret = 0;
-  ret = screenRefresh();
-  return ret;
+    int ret = 0;
+    ret = screenRefresh();
+    return ret;
 }
+
+extern "C" int controlPartialUpdate(int dpy, int mode) {
+    status_t err = (status_t) FAILED_TRANSACTION;
+    sp<IQService> binder = getBinder();
+    if(binder != NULL) {
+        Parcel inParcel, outParcel;
+        inParcel.writeInt32(dpy);
+        inParcel.writeInt32(mode);
+        err = binder->dispatch(IQService::CONTROL_PARTIAL_UPDATE, &inParcel, &outParcel);
+        if(err != 0) {
+            ALOGE("%s() failed with err %d", __FUNCTION__, err);
+        } else {
+            return outParcel.readInt32();
+        }
+    }
+
+    return err;
+}
+

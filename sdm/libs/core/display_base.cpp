@@ -43,7 +43,7 @@ DisplayBase::DisplayBase(DisplayType display_type, DisplayEventHandler *event_ha
     rotator_intf_(rotator_intf), state_(kStateOff), hw_device_(0), display_comp_ctx_(0),
     display_attributes_(NULL), num_modes_(0), active_mode_index_(0), pending_commit_(false),
     vsync_enable_(false), underscan_supported_(false), max_mixer_stages_(0),
-    hw_info_intf_(hw_info_intf), color_mgr_(NULL) {
+    hw_info_intf_(hw_info_intf), color_mgr_(NULL), partial_update_control_(true) {
 }
 
 DisplayError DisplayBase::Init() {
@@ -420,15 +420,42 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
 DisplayError DisplayBase::SetMaxMixerStages(uint32_t max_mixer_stages) {
   DisplayError error = kErrorNone;
 
-  if (comp_manager_) {
-    error = comp_manager_->SetMaxMixerStages(display_comp_ctx_, max_mixer_stages);
+  error = comp_manager_->SetMaxMixerStages(display_comp_ctx_, max_mixer_stages);
 
-    if (error == kErrorNone) {
-      max_mixer_stages_ = max_mixer_stages;
-    }
+  if (error == kErrorNone) {
+    max_mixer_stages_ = max_mixer_stages;
   }
 
   return error;
+}
+
+DisplayError DisplayBase::ControlPartialUpdate(bool enable, uint32_t *pending) {
+  if (!pending) {
+    return kErrorParameters;
+  }
+
+  if (!hw_panel_info_.partial_update) {
+    // Nothing to be done.
+    DLOGI("partial update is not applicable for display=%d", display_type_);
+    return kErrorNotSupported;
+  }
+
+  *pending = false;
+  if (enable == partial_update_control_) {
+    DLOGI("Same state transition is requested.");
+    return kErrorNone;
+  }
+
+  partial_update_control_ = enable;
+  comp_manager_->ControlPartialUpdate(display_comp_ctx_, enable);
+
+  if (!enable) {
+    // If the request is to turn off feature, new draw call is required to have
+    // the new setting into effect.
+    *pending = true;
+  }
+
+  return kErrorNone;
 }
 
 DisplayError DisplayBase::SetDisplayMode(uint32_t mode) {

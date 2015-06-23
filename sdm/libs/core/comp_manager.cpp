@@ -191,7 +191,8 @@ void CompManager::PrePrepare(Handle display_ctx, HWLayers *hw_layers) {
   SCOPE_LOCK(locker_);
   DisplayCompositionContext *display_comp_ctx =
                              reinterpret_cast<DisplayCompositionContext *>(display_ctx);
-  display_comp_ctx->strategy->Start(&hw_layers->info, &display_comp_ctx->max_strategies);
+  display_comp_ctx->strategy->Start(&hw_layers->info, &display_comp_ctx->max_strategies,
+                                    display_comp_ctx->partial_update_enable);
   display_comp_ctx->remaining_strategies = display_comp_ctx->max_strategies;
 
   // Avoid idle fallback, if there is only one app layer.
@@ -364,6 +365,14 @@ DisplayError CompManager::SetMaxMixerStages(Handle display_ctx, uint32_t max_mix
   }
 
   return error;
+}
+
+void CompManager::ControlPartialUpdate(Handle display_ctx, bool enable) {
+  SCOPE_LOCK(locker_);
+
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+  display_comp_ctx->partial_update_enable = enable;
 }
 
 void CompManager::AppendDump(char *buffer, uint32_t length) {

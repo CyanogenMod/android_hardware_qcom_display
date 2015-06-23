@@ -36,6 +36,7 @@ namespace sdm {
 class PartialUpdateInterface {
  public:
   virtual DisplayError GenerateROI(HWLayersInfo *hw_layers_info) = 0;
+  virtual void ControlPartialUpdate(bool enable) = 0;
 
  protected:
   virtual ~PartialUpdateInterface() { }

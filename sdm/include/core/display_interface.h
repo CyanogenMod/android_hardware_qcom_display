@@ -327,6 +327,15 @@ class DisplayInterface {
   */
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages) = 0;
 
+  /*! @brief Method to control partial update feature for each display.
+
+    @param[in] enable partial update feature control flag
+    @param[out] pending whether the operation is completed or pending for completion
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending) = 0;
+
   /*! @brief Method to set the mode of the primary display.
 
     @param[in] mode the new display mode.

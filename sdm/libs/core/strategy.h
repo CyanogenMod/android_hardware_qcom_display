@@ -38,7 +38,8 @@ class Strategy {
   DisplayError Init();
   DisplayError Deinit();
 
-  DisplayError Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempts);
+  DisplayError Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempts,
+                     bool partial_update_enable);
   DisplayError GetNextStrategy(StrategyConstraints *constraints);
   DisplayError Stop();
 
