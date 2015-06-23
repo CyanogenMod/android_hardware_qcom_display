@@ -197,7 +197,9 @@ bool CopyBit::prepareSwapRect(hwc_context_t *ctx,
            updatingLayerCount ++;
            hwc_layer_1_t layer = list->hwLayers[k];
            canUseSwapRect = 1;
+#ifdef QCOM_BSP
            dirtyRect = getUnion(dirtyRect, layer.dirtyRect);
+#endif
            displayRect = getUnion(displayRect, layer.displayFrame);
        }
     }
