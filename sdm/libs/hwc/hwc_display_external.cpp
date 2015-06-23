@@ -37,12 +37,6 @@
 
 namespace sdm {
 
-static void AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height, uint32_t *src_width,
-                                   uint32_t *src_height) {
-  *src_height = (dst_width * (*src_height)) / (*src_width);
-  *src_width = dst_width;
-}
-
 int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
                                uint32_t primary_width, uint32_t primary_height,
                                HWCDisplay **hwc_display) {
@@ -59,18 +53,9 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
   hwc_display_external->GetPanelResolution(&external_width, &external_height);
 
   int downscale_enabled = 0;
-  HWCDebugHandler::Get()->GetProperty("sdm.debug.sde_downscale_enabled", &downscale_enabled);
-  if (downscale_enabled == 1) {
-    uint32_t primary_area = primary_width * primary_height;
-    uint32_t external_area = external_width * external_height;
-
-    if (primary_area > external_area) {
-      if (primary_height > primary_width) {
-        Swap(primary_height, primary_width);
-      }
-      AdjustSourceResolution(primary_width, primary_height,
-                             &external_width, &external_height);
-    }
+  HWCDebugHandler::Get()->GetProperty("sdm.debug.sde_downscale_external", &downscale_enabled);
+  if (downscale_enabled) {
+    GetDownscaleResolution(primary_width, primary_height, &external_width, &external_width);
   }
 
   status = hwc_display_external->SetFrameBufferResolution(external_width, external_height);

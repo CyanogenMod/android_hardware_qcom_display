@@ -34,6 +34,7 @@ namespace sdm {
 class HWCDisplayVirtual : public HWCDisplay {
  public:
   static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                    uint32_t primary_width, uint32_t primary_height,
                     hwc_display_contents_1_t *content_list, HWCDisplay **hwc_display);
   static void Destroy(HWCDisplay *hwc_display);
   static bool IsValidContentList(hwc_display_contents_1_t *content_list);
@@ -43,11 +44,12 @@ class HWCDisplayVirtual : public HWCDisplay {
   virtual int Commit(hwc_display_contents_1_t *content_list);
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
 
+  int SetOutputSliceFromMetadata(hwc_display_contents_1_t *content_list);
+
  private:
   HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
   int SetOutputBuffer(hwc_display_contents_1_t *content_list);
   void DumpOutputBuffer(hwc_display_contents_1_t *content_list);
-  int SetOutputSliceFromMetadata(hwc_display_contents_1_t *content_list);
 
   bool dump_output_layer_;
   LayerBuffer *output_buffer_;

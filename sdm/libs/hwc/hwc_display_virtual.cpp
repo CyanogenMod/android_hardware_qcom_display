@@ -58,10 +58,12 @@ static int GetHeightFromMetaData(const private_handle_t *handle) {
 }
 
 int HWCDisplayVirtual::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                              uint32_t primary_width, uint32_t primary_height,
                               hwc_display_contents_1_t *content_list,
                               HWCDisplay **hwc_display) {
   int status = 0;
-  HWCDisplay *hwc_display_virtual = new HWCDisplayVirtual(core_intf, hwc_procs);
+  HWCDisplayVirtual *hwc_display_virtual = new HWCDisplayVirtual(core_intf, hwc_procs);
+  uint32_t virtual_width = 0, virtual_height = 0;
 
   status = hwc_display_virtual->Init();
   if (status) {
@@ -75,19 +77,26 @@ int HWCDisplayVirtual::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_
     return status;
   }
 
-  const private_handle_t *output_handle =
-    static_cast<const private_handle_t *>(content_list->outbuf);
-  int virtual_width = 0;
-  int virtual_height = 0;
-  getBufferSizeAndDimensions(output_handle->width, output_handle->height, output_handle->format,
-                             virtual_width, virtual_height);
+  status = hwc_display_virtual->SetOutputSliceFromMetadata(content_list);
+  if (status) {
+    return status;
+  }
+
+  hwc_display_virtual->GetPanelResolution(&virtual_width, &virtual_height);
+
+  int downscale_enabled = 0;
+  HWCDebugHandler::Get()->GetProperty("sdm.debug.sde_downscale_virtual", &downscale_enabled);
+  if (downscale_enabled) {
+    GetDownscaleResolution(primary_width, primary_height, &virtual_width, &virtual_height);
+  }
+
   status = hwc_display_virtual->SetFrameBufferResolution(virtual_width, virtual_height);
   if (status) {
     Destroy(hwc_display_virtual);
     return status;
   }
 
-  *hwc_display = hwc_display_virtual;
+  *hwc_display = static_cast<HWCDisplay *>(hwc_display_virtual);
 
   return status;
 }
