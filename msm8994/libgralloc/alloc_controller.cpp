@@ -160,6 +160,9 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
     {
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
+        case HAL_PIXEL_FORMAT_RAW10:
+            aligned_w = ALIGN(width * 10 /8, 16);
+            break;
         case HAL_PIXEL_FORMAT_RAW16:
             aligned_w = ALIGN(width, 32);
             break;
@@ -475,10 +478,12 @@ unsigned int getSize(int format, int width, int height, int usage,
         case HAL_PIXEL_FORMAT_RGB_565:
         case HAL_PIXEL_FORMAT_RGBA_5551:
         case HAL_PIXEL_FORMAT_RGBA_4444:
+        case HAL_PIXEL_FORMAT_RAW10:
+            size = ALIGN(alignedw * alignedh, 4096);
+            break;
         case HAL_PIXEL_FORMAT_RAW16:
             size = alignedw * alignedh * 2;
             break;
-
             // adreno formats
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:  // NV21
             size  = ALIGN(alignedw*alignedh, 4096);
@@ -643,6 +648,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         case HAL_PIXEL_FORMAT_YCrCb_422_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
         case HAL_PIXEL_FORMAT_NV21_ZSL:
+        case HAL_PIXEL_FORMAT_RAW10:
         case HAL_PIXEL_FORMAT_RAW16:
             ystride = cstride = hnd->width;
             ycbcr->y  = (void*)hnd->base;
