@@ -30,7 +30,6 @@
 #include <cutils/properties.h>
 #include <utils/constants.h>
 #include <stdarg.h>
-#include <cutils/properties.h>
 #include "hwc_display_primary.h"
 #include "hwc_debugger.h"
 
@@ -91,7 +90,7 @@ void HWCDisplayPrimary::ProcessBootAnimCompleted() {
 
   // Applying default mode after bootanimation is finished
   property_get("init.svc.bootanim", value, "running");
-  if (!strncmp(value,"stopped",strlen("stopped"))) {
+  if (!strncmp(value, "stopped", strlen("stopped"))) {
     boot_animation_completed_ = true;
 
     // one-shot action check if bootanimation completed then apply default display mode.

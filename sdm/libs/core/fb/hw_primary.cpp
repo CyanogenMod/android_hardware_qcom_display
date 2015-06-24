@@ -519,13 +519,13 @@ DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
 }
 
 // It was entered with PPFeaturesConfig::locker_ being hold.
-DisplayError HWPrimary::SetPPFeatures(PPFeaturesConfig &feature_list) {
+DisplayError HWPrimary::SetPPFeatures(PPFeaturesConfig *feature_list) {
   STRUCT_VAR(msmfb_mdp_pp, kernel_params);
   int ret = 0;
   PPFeatureInfo *feature = NULL;
 
   while (true) {
-    ret = feature_list.RetrieveNextFeature(&feature);
+    ret = feature_list->RetrieveNextFeature(&feature);
     if (ret)
         break;
 
@@ -533,21 +533,20 @@ DisplayError HWPrimary::SetPPFeatures(PPFeaturesConfig &feature_list) {
       DLOGV_IF(kTagDriverConfig, "feature_id = %d", feature->feature_id_);
 
       if ((feature->feature_id_ < kMaxNumPPFeatures)) {
-
         HWColorManager::SetFeature[feature->feature_id_](*feature, &kernel_params);
         if (Sys::ioctl_(device_fd_, MSMFB_MDP_PP, &kernel_params) < 0) {
           IOCTL_LOGE(MSMFB_MDP_PP, device_type_);
 
-          feature_list.Reset();
+          feature_list->Reset();
           return kErrorHardware;
         }
       }
     }
-  } // while(true)
+  }  // while(true)
 
-   // Once all features were consumed, then destroy all feature instance from feature_list,
-   // Then mark it as non-dirty of PPFeaturesConfig cache.
-  feature_list.Reset();
+  // Once all features were consumed, then destroy all feature instance from feature_list,
+  // Then mark it as non-dirty of PPFeaturesConfig cache.
+  feature_list->Reset();
 
   return kErrorNone;
 }

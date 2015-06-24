@@ -71,10 +71,10 @@ int HWCColorManager::CreatePayloadFromParcel(const android::Parcel &in, uint32_t
 }
 
 void HWCColorManager::MarshallStructIntoParcel(const PPDisplayAPIPayload &data,
-                                               android::Parcel &out_parcel) {
-  out_parcel.writeInt32(data.size);
+                                               android::Parcel *out_parcel) {
+  out_parcel->writeInt32(data.size);
   if (data.payload)
-    out_parcel.write(data.payload, data.size);
+    out_parcel->write(data.payload, data.size);
 }
 
 HWCColorManager *HWCColorManager::CreateColorManager() {
