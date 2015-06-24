@@ -28,7 +28,6 @@
  */
 #include <gralloc_priv.h>
 #include <qdMetaData.h>
-#include <mdp_version.h>
 #include <hardware/hwcomposer.h>
 
 // This header is for clients to use to set/get global display configuration.
