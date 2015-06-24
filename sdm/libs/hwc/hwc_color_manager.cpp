@@ -30,8 +30,12 @@
 #include <dlfcn.h>
 #include <powermanager/IPowerManager.h>
 #include <cutils/sockets.h>
+#include <cutils/native_handle.h>
 #include <utils/String16.h>
 #include <binder/Parcel.h>
+#include <gralloc_priv.h>
+#include <hardware/hwcomposer.h>
+#include <hardware/hwcomposer_defs.h>
 #include <QService.h>
 
 #include <core/dump_interface.h>
@@ -46,6 +50,12 @@
 #define __CLASS__ "HWCColorManager"
 
 namespace sdm {
+
+uint32_t HWCColorManager::Get8BitsARGBColorValue(const PPColorFillParams &params) {
+  uint32_t argb_color = ((params.color.r << 16) & 0xff0000) | ((params.color.g) & 0xff)
+                        | ((params.color.b << 8) & 0xff00);
+  return argb_color;
+}
 
 int HWCColorManager::CreatePayloadFromParcel(const android::Parcel &in, uint32_t *disp_id,
                                              PPDisplayAPIPayload *sink) {
@@ -87,14 +97,14 @@ HWCColorManager *HWCColorManager::CreateColorManager() {
     if (color_lib) {
       color_mgr->color_apis_ = ::dlsym(color_lib, DISPLAY_API_FUNC_TABLES);
       if (!color_mgr->color_apis_) {
-        DLOGW("Fail to retrieve = %s from %s", DISPLAY_API_FUNC_TABLES,
+        DLOGE("Fail to retrieve = %s from %s", DISPLAY_API_FUNC_TABLES,
               DISPLAY_API_INTERFACE_LIBRARY_NAME);
         ::dlclose(color_lib);
         delete color_mgr;
         return NULL;
       }
     } else {
-      DLOGW("Fail to load = %s", DISPLAY_API_INTERFACE_LIBRARY_NAME);
+      DLOGW("Unable to load = %s", DISPLAY_API_INTERFACE_LIBRARY_NAME);
       delete color_mgr;
       return NULL;
     }
@@ -110,7 +120,7 @@ HWCColorManager *HWCColorManager::CreateColorManager() {
           ::dlsym(diag_lib, DEINIT_QDCM_DIAG_CLIENT_NAME);
 
       if (!color_mgr->qdcm_diag_init_ || !color_mgr->qdcm_diag_deinit_) {
-        DLOGW("Fail to retrieve = %s from %s", INIT_QDCM_DIAG_CLIENT_NAME,
+        DLOGE("Fail to retrieve = %s from %s", INIT_QDCM_DIAG_CLIENT_NAME,
               QDCM_DIAG_CLIENT_LIBRARY_NAME);
         ::dlclose(diag_lib);
       } else {
@@ -120,11 +130,11 @@ HWCColorManager *HWCColorManager::CreateColorManager() {
               QDCM_DIAG_CLIENT_LIBRARY_NAME);
       }
     } else {
-      DLOGW("Fail to load = %s", QDCM_DIAG_CLIENT_LIBRARY_NAME);
+      DLOGW("Unable to load = %s", QDCM_DIAG_CLIENT_LIBRARY_NAME);
       // only QDCM Diag client failed to be loaded and system still should function.
     }
   } else {
-    DLOGW("Unable to create HWCColorManager");
+    DLOGE("Unable to create HWCColorManager");
     return NULL;
   }
 
@@ -143,28 +153,180 @@ void HWCColorManager::DestroyColorManager() {
   delete this;
 }
 
-int HWCColorManager::EnableQDCMMode(bool enable) {
+int HWCColorManager::EnableQDCMMode(bool enable, HWCDisplay *hwc_display) {
   int ret = 0;
 
   if (enable) {  // entering QDCM mode, disable all active features and acquire Android wakelock
     qdcm_mode_mgr_ = HWCQDCMModeManager::CreateQDCMModeMgr();
     if (!qdcm_mode_mgr_) {
-      DLOGW("failing to create QDCM operating mode manager.");
+      DLOGE("failing to create QDCM operating mode manager.");
       ret = -EFAULT;
     } else {
-      ret = qdcm_mode_mgr_->EnableQDCMMode(enable);
+      ret = qdcm_mode_mgr_->EnableQDCMMode(enable, hwc_display);
     }
   } else {  // exiting QDCM mode, reverse the effect of entering.
     if (!qdcm_mode_mgr_) {
-      DLOGW("failing to disable QDCM operating mode manager.");
+      DLOGE("failing to disable QDCM operating mode manager.");
       ret = -EFAULT;
     } else {  // once exiting from QDCM operating mode, destroy QDCMModeMgr and release the
               // resources
-      ret = qdcm_mode_mgr_->EnableQDCMMode(enable);
+      ret = qdcm_mode_mgr_->EnableQDCMMode(enable, hwc_display);
       delete qdcm_mode_mgr_;
       qdcm_mode_mgr_ = NULL;
     }
   }
+
+  return ret;
+}
+
+bool HWCColorManager::SolidFillLayersPrepare(hwc_display_contents_1_t **displays,
+                                             HWCDisplay *hwc_display) {
+  SCOPE_LOCK(locker_);
+
+  // Query HWCColorManager if QDCM tool requesting SOLID_FILL mode.
+  uint32_t solid_fill_color = Get8BitsARGBColorValue(solid_fill_params_);
+  hwc_display_contents_1_t *layer_list = displays[HWC_DISPLAY_PRIMARY];
+
+  if (solid_fill_enable_ && solid_fill_layers_ && layer_list) {
+    // 1. shallow copy HWC_FRAMEBUFFER_TARGET layer info solid fill layer list.
+    solid_fill_layers_->hwLayers[1] = layer_list->hwLayers[layer_list->numHwLayers - 1];
+
+    // 2. continue the prepare<> on solid_fill_layers.
+    hwc_display->Perform(HWCDisplayPrimary::SET_QDCM_SOLID_FILL_INFO, solid_fill_color);
+    hwc_display->Prepare(solid_fill_layers_);  // RECT info included.
+
+    // 3. Set HWC_OVERLAY to all SF layers before returning to framework.
+    for (size_t i = 0; i < (layer_list->numHwLayers - 1); i++) {
+      hwc_layer_1_t *layer = &layer_list->hwLayers[i];
+      layer->compositionType = HWC_OVERLAY;
+    }
+
+    return true;
+  } else if (!solid_fill_enable_) {
+    hwc_display->Perform(HWCDisplayPrimary::UNSET_QDCM_SOLID_FILL_INFO, 0);
+  }
+
+  return false;
+}
+
+bool HWCColorManager::SolidFillLayersSet(hwc_display_contents_1_t **displays,
+                                         HWCDisplay *hwc_display) {
+  // Query HWCColorManager if QDCM tool requesting SOLID_FILL mode.
+  SCOPE_LOCK(locker_);
+  hwc_display_contents_1_t *layer_list = displays[HWC_DISPLAY_PRIMARY];
+  if (solid_fill_enable_ && solid_fill_layers_ && layer_list) {
+    hwc_display->Commit(solid_fill_layers_);
+
+    // release SF layers corresponding Fences manually before returning to Framework.
+    for (size_t i = 0; i < (layer_list->numHwLayers - 1); i++) {
+      if (layer_list->hwLayers[i].acquireFenceFd >= 0) {
+        close(layer_list->hwLayers[i].acquireFenceFd);
+        layer_list->hwLayers[i].acquireFenceFd = -1;
+      }
+      layer_list->retireFenceFd = -1;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
+int HWCColorManager::CreateSolidFillLayers(HWCDisplay *hwc_display) {
+  int ret = 0;
+
+  if (!solid_fill_layers_) {
+    uint32_t size = sizeof(hwc_display_contents_1) + kNumSolidFillLayers * sizeof(hwc_layer_1_t);
+    uint32_t primary_width = 0;
+    uint32_t primary_height = 0;
+
+    hwc_display->GetPanelResolution(&primary_width, &primary_height);
+    uint8_t *buf = new uint8_t[size]();
+    // handle for solid fill layer with fd = -1.
+    private_handle_t *handle =
+        new private_handle_t(-1, 0, private_handle_t::PRIV_FLAGS_FRAMEBUFFER, BUFFER_TYPE_UI,
+                            HAL_PIXEL_FORMAT_RGBA_8888, primary_width, primary_height);
+
+    if (!buf || !handle) {
+      DLOGE("Failed to allocate memory.");
+      if (buf)
+        delete[] buf;
+      if (handle)
+        delete handle;
+
+      return -ENOMEM;
+    }
+
+    solid_fill_layers_ = reinterpret_cast<hwc_display_contents_1 *>(buf);
+    hwc_layer_1_t &layer = solid_fill_layers_->hwLayers[0];
+    layer.handle = handle;
+  }
+
+  solid_fill_layers_->flags = HWC_GEOMETRY_CHANGED;
+  solid_fill_layers_->numHwLayers = kNumSolidFillLayers;
+  solid_fill_layers_->retireFenceFd = -1;
+  solid_fill_layers_->outbuf = NULL;
+  solid_fill_layers_->outbufAcquireFenceFd = -1;
+
+  hwc_layer_1_t &layer = solid_fill_layers_->hwLayers[0];
+  hwc_rect_t solid_fill_rect = {
+      INT(solid_fill_params_.rect.x), INT(solid_fill_params_.rect.y),
+      INT(solid_fill_params_.rect.x + solid_fill_params_.rect.width),
+      INT(solid_fill_params_.rect.y + solid_fill_params_.rect.height),
+  };
+
+  layer.compositionType = HWC_FRAMEBUFFER;
+  layer.blending = HWC_BLENDING_PREMULT;
+  layer.sourceCropf.left = solid_fill_params_.rect.x;
+  layer.sourceCropf.top = solid_fill_params_.rect.y;
+  layer.sourceCropf.right = solid_fill_params_.rect.x + solid_fill_params_.rect.width;
+  layer.sourceCropf.bottom = solid_fill_params_.rect.y + solid_fill_params_.rect.height;
+  layer.acquireFenceFd = -1;
+  layer.releaseFenceFd = -1;
+  layer.flags = 0;
+  layer.transform = 0;
+  layer.hints = 0;
+  layer.planeAlpha = 0xff;
+  layer.displayFrame = solid_fill_rect;
+  layer.visibleRegionScreen.numRects = 1;
+  layer.visibleRegionScreen.rects = &layer.displayFrame;
+
+  return ret;
+}
+
+void HWCColorManager::DestroySolidFillLayers() {
+  if (solid_fill_layers_) {
+    hwc_layer_1_t &layer = solid_fill_layers_->hwLayers[0];
+    uint8_t *buf = reinterpret_cast<uint8_t *>(solid_fill_layers_);
+    private_handle_t const *hnd = reinterpret_cast<private_handle_t const *>(layer.handle);
+
+    if (hnd)
+        delete hnd;
+
+    if (buf)
+        delete[] buf;
+
+    solid_fill_layers_ = NULL;
+  }
+}
+
+int HWCColorManager::SetSolidFill(const void *params, bool enable, HWCDisplay *hwc_display) {
+  SCOPE_LOCK(locker_);
+  int ret = 0;
+
+  if (params) {
+    solid_fill_params_ = *reinterpret_cast<const PPColorFillParams *>(params);
+  } else {
+    solid_fill_params_ = PPColorFillParams();
+  }
+
+  if (enable) {
+    // will create solid fill layers for rendering if not present.
+    ret = CreateSolidFillLayers(hwc_display);
+  } else {
+    DestroySolidFillLayers();
+  }
+  solid_fill_enable_ = enable;
 
   return ret;
 }
@@ -192,6 +354,9 @@ HWCQDCMModeManager *HWCQDCMModeManager::CreateQDCMModeMgr() {
       // it should not be disastrous and we still can grab wakelock in QDCM mode.
       DLOGW("Unable to connect to dpps socket!");
     }
+
+    // retrieve system GPU idle timeout value for later to recover.
+    mode_mgr->entry_timeout_ = HWCDebugHandler::GetIdleTimeoutMs();
 
     // acquire the binder handle to Android system PowerManager for later use.
     android::sp<android::IBinder> binder =
@@ -280,12 +445,18 @@ int HWCQDCMModeManager::EnableActiveFeatures(bool enable,
   return ret;
 }
 
-int HWCQDCMModeManager::EnableQDCMMode(bool enable) {
+int HWCQDCMModeManager::EnableQDCMMode(bool enable, HWCDisplay *hwc_display) {
   int ret = 0;
 
   ret = EnableActiveFeatures((enable ? false : true), kActiveFeatureCMD[kCABLFeature],
                              &cabl_was_running_);
   ret = AcquireAndroidWakeLock(enable);
+
+  // if enter QDCM mode, disable GPU fallback idle timeout.
+  if (hwc_display) {
+    uint32_t timeout = enable ? 0 : entry_timeout_;
+    hwc_display->SetIdleTimeoutMs(timeout);
+  }
 
   return ret;
 }

@@ -155,6 +155,13 @@ void HWCDebugHandler::EndTrace() {
   atrace_end(ATRACE_TAG);
 }
 
+int  HWCDebugHandler::GetIdleTimeoutMs() {
+  int value = IDLE_TIMEOUT_DEFAULT_MS;
+  debug_handler_.GetProperty("sdm.idle_time", &value);
+
+  return value;
+}
+
 DisplayError HWCDebugHandler::GetProperty(const char *property_name, int *value) {
   char property[PROPERTY_VALUE_MAX];
 

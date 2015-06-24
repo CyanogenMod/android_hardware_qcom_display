@@ -227,6 +227,13 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
     hwc_session->ResetPanel();
   }
 
+  HWCDisplay *&primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
+  if (primary_display) {
+    int ret = hwc_session->color_mgr_->SolidFillLayersPrepare(displays, primary_display);
+    if (ret)
+      return 0;
+  }
+
   for (ssize_t dpy = static_cast<ssize_t>(num_displays - 1); dpy >= 0; dpy--) {
     hwc_display_contents_1_t *content_list = displays[dpy];
     if (dpy == HWC_DISPLAY_VIRTUAL) {
@@ -256,6 +263,13 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
   }
 
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
+
+  HWCDisplay *&primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
+  if (primary_display) {
+    int ret = hwc_session->color_mgr_->SolidFillLayersSet(displays, primary_display);
+    if (ret)
+      return 0;
+  }
 
   for (size_t dpy = 0; dpy < num_displays; dpy++) {
     hwc_display_contents_1_t *content_list = displays[dpy];
@@ -729,13 +743,20 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel &in, android:
       hwc_procs_->invalidate(hwc_procs_);
       break;
     case kEnterQDCMMode:
-      ret = color_mgr_->EnableQDCMMode(true);
+      ret = color_mgr_->EnableQDCMMode(true, hwc_display_[HWC_DISPLAY_PRIMARY]);
       break;
     case kExitQDCMMode:
-      ret = color_mgr_->EnableQDCMMode(false);
+      ret = color_mgr_->EnableQDCMMode(false, hwc_display_[HWC_DISPLAY_PRIMARY]);
       break;
     case kApplySolidFill:
+      ret = color_mgr_->SetSolidFill(pending_action.params,
+                                        true, hwc_display_[HWC_DISPLAY_PRIMARY]);
+      hwc_procs_->invalidate(hwc_procs_);
+      break;
     case kDisableSolidFill:
+      ret = color_mgr_->SetSolidFill(pending_action.params,
+                                        false, hwc_display_[HWC_DISPLAY_PRIMARY]);
+      hwc_procs_->invalidate(hwc_procs_);
       break;
     case kSetPanelBrightness:
       brightness_value = reinterpret_cast<int*>(pending_action.params);
