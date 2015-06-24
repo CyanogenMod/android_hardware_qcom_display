@@ -59,9 +59,14 @@ class HWHDMI : public HWDevice, public HWHDMIInterface {
   virtual DisplayError SetPPFeatures(PPFeaturesConfig &feature_list);
 
  private:
-  int GetHDMIModeCount();
+  DisplayError ReadEDIDInfo();
   void ReadScanInfo();
   HWScanSupport MapHWScanSupport(uint32_t value);
+  int OpenResolutionFile(int file_mode);
+  void RequestNewPage(uint32_t page_number);
+  DisplayError ReadTimingInfo();
+  bool ReadResolutionFile(char *config_buffer);
+  bool IsResolutionFilePresent();
 
   uint32_t hdmi_mode_count_;
   uint32_t hdmi_modes_[256];

@@ -33,6 +33,7 @@
 #include <sys/ioctl.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <linux/videodev2.h>
 #include <utils/debug.h>
 #include <utils/sys.h>
 
@@ -64,6 +65,11 @@ static bool MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
   info->lower_margin = mode->front_porch_v;
   info->vsync_len = mode->pulse_width_v;
   info->upper_margin = mode->back_porch_v;
+
+  // If the mode supports YUV420 set grayscale to the FOURCC value for YUV420.
+  if (IS_BIT_SET(mode->pixel_formats, 1)) {
+    info->grayscale = V4L2_PIX_FMT_NV12;
+  }
 
   return true;
 }
@@ -103,26 +109,34 @@ DisplayError HWHDMI::Init() {
 
   error = HWDevice::Init();
   if (error != kErrorNone) {
-    goto CleanupOnError;
+    return error;
+  }
+
+  error = ReadEDIDInfo();
+  if (error != kErrorNone) {
+    Deinit();
+    return error;
+  }
+
+  if (!IsResolutionFilePresent()) {
+    Deinit();
+    return kErrorHardware;
   }
 
   // Mode look-up table for HDMI
-  supported_video_modes_ = new msm_hdmi_mode_timing_info[HDMI_VFRMT_MAX];
+  supported_video_modes_ = new msm_hdmi_mode_timing_info[hdmi_mode_count_];
   if (!supported_video_modes_) {
-    error = kErrorMemory;
-    goto CleanupOnError;
+    Deinit();
+    return kErrorMemory;
   }
-  // Populate the mode table for supported modes
-  MSM_HDMI_MODES_INIT_TIMINGS(supported_video_modes_);
-  MSM_HDMI_MODES_SET_SUPP_TIMINGS(supported_video_modes_, MSM_HDMI_MODES_ALL);
+
+  error = ReadTimingInfo();
+  if (error != kErrorNone) {
+    Deinit();
+    return error;
+  }
 
   ReadScanInfo();
-  return kErrorNone;
-
-CleanupOnError:
-  if (supported_video_modes_) {
-    delete supported_video_modes_;
-  }
 
   return error;
 }
@@ -145,7 +159,7 @@ DisplayError HWHDMI::Close() {
 }
 
 DisplayError HWHDMI::GetNumDisplayAttributes(uint32_t *count) {
-  *count = GetHDMIModeCount();
+  *count = hdmi_mode_count_;
   if (*count <= 0) {
     return kErrorHardware;
   }
@@ -153,29 +167,29 @@ DisplayError HWHDMI::GetNumDisplayAttributes(uint32_t *count) {
   return kErrorNone;
 }
 
-int HWHDMI::GetHDMIModeCount() {
+DisplayError HWHDMI::ReadEDIDInfo() {
   ssize_t length = -1;
-  char edid_str[256] = {'\0'};
+  char edid_str[PAGE_SIZE] = {'\0'};
   char edid_path[kMaxStringLength] = {'\0'};
   snprintf(edid_path, sizeof(edid_path), "%s%d/edid_modes", fb_path_, fb_node_index_);
   int edid_file = Sys::open_(edid_path, O_RDONLY);
   if (edid_file < 0) {
     DLOGE("EDID file open failed.");
-    return -1;
+    return kErrorHardware;
   }
 
   length = Sys::pread_(edid_file, edid_str, sizeof(edid_str)-1, 0);
   if (length <= 0) {
     DLOGE("%s: edid_modes file empty");
-    edid_str[0] = '\0';
-  } else {
-    DLOGI("EDID mode string: %s", edid_str);
-    while (length > 1 && isspace(edid_str[length-1])) {
-      --length;
-    }
-    edid_str[length] = '\0';
+    return kErrorHardware;
   }
   Sys::close_(edid_file);
+
+  DLOGI("EDID mode string: %s", edid_str);
+  while (length > 1 && isspace(edid_str[length-1])) {
+    --length;
+  }
+  edid_str[length] = '\0';
 
   if (length > 0) {
     // Get EDID modes from the EDID string
@@ -187,19 +201,24 @@ int HWHDMI::GetHDMIModeCount() {
       hdmi_modes_[i] = atoi(tokens[i]);
     }
   }
-  return (hdmi_mode_count_ > 0) ? hdmi_mode_count_ : 0;
+
+  return kErrorNone;
 }
 
 DisplayError HWHDMI::GetDisplayAttributes(HWDisplayAttributes *display_attributes,
                                                      uint32_t index) {
   DTRACE_SCOPED();
 
+  if (index > hdmi_mode_count_) {
+    return kErrorNotSupported;
+  }
+
   // Variable screen info
   STRUCT_VAR(fb_var_screeninfo, var_screeninfo);
 
   // Get the resolution info from the look up table
   msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[0];
-  for (int i = 0; i < HDMI_VFRMT_MAX; i++) {
+  for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
     msm_hdmi_mode_timing_info *cur = &supported_video_modes_[i];
     if (cur->video_format == hdmi_modes_[index]) {
       timing_mode = cur;
@@ -224,11 +243,16 @@ DisplayError HWHDMI::GetDisplayAttributes(HWDisplayAttributes *display_attribute
     display_attributes->split_left = display_attributes->x_pixels / 2;
     display_attributes->h_total += h_blanking;
   }
+
   return kErrorNone;
 }
 
 DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
   DTRACE_SCOPED();
+
+  if (index > hdmi_mode_count_) {
+    return kErrorNotSupported;
+  }
 
   // Variable screen info
   STRUCT_VAR(fb_var_screeninfo, vscreeninfo);
@@ -243,7 +267,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
         vscreeninfo.upper_margin, vscreeninfo.pixclock/1000000);
 
   msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[0];
-  for (int i = 0; i < HDMI_VFRMT_MAX; i++) {
+  for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
     msm_hdmi_mode_timing_info *cur = &supported_video_modes_[i];
     if (cur->video_format == hdmi_modes_[index]) {
       timing_mode = cur;
@@ -270,7 +294,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
 
   vscreeninfo.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_ALL | FB_ACTIVATE_FORCE;
   if (Sys::ioctl_(device_fd_, FBIOPUT_VSCREENINFO, &vscreeninfo) < 0) {
-    IOCTL_LOGE(FBIOGET_VSCREENINFO, device_type_);
+    IOCTL_LOGE(FBIOPUT_VSCREENINFO, device_type_);
     return kErrorHardware;
   }
 
@@ -337,6 +361,10 @@ DisplayError HWHDMI::GetHWScanInfo(HWScanInfo *scan_info) {
 }
 
 DisplayError HWHDMI::GetVideoFormat(uint32_t config_index, uint32_t *video_format) {
+  if (config_index > hdmi_mode_count_) {
+    return kErrorNotSupported;
+  }
+
   *video_format = hdmi_modes_[config_index];
 
   return kErrorNone;
@@ -409,6 +437,115 @@ DisplayError HWHDMI::GetPPFeaturesVersion(PPFeatureVersion *vers) {
 
 DisplayError HWHDMI::SetPPFeatures(PPFeaturesConfig &feature_list) {
   return kErrorNotSupported;
+}
+
+int HWHDMI::OpenResolutionFile(int file_mode) {
+  char file_path[PATH_MAX];
+  memset(file_path, 0, sizeof(file_path));
+  snprintf(file_path , sizeof(file_path), "%s%d/res_info", fb_path_, fb_node_index_);
+
+  int fd = Sys::open_(file_path, file_mode);
+
+  if (fd < 0) {
+    DLOGE("file '%s' not found : ret = %d err str: %s", file_path, fd, strerror(errno));
+  }
+
+  return fd;
+}
+
+// Method to request HDMI driver to write a new page of timing info into res_info node
+void HWHDMI::RequestNewPage(uint32_t page_number) {
+  char page_string[PAGE_SIZE];
+  int fd = OpenResolutionFile(O_WRONLY);
+  if (fd < 0) {
+    return;
+  }
+
+  snprintf(page_string, sizeof(page_string), "%d", page_number);
+
+  DLOGI_IF(kTagDriverConfig, "page=%s", page_string);
+
+  ssize_t err = Sys::pwrite_(fd, page_string, sizeof(page_string), 0);
+  if (err <= 0) {
+    DLOGE("Write to res_info failed (%s)", strerror(errno));
+  }
+  close(fd);
+}
+
+// Reads the contents of res_info node into a buffer if the file is not empty
+bool HWHDMI::ReadResolutionFile(char *config_buffer) {
+  bool is_file_read = false;
+  size_t bytes_read = 0;
+  int fd = OpenResolutionFile(O_RDONLY);
+  if (fd < 0) {
+    return false;
+  }
+
+  if ((bytes_read = Sys::pread_(fd, config_buffer, PAGE_SIZE, 0)) != 0) {
+    is_file_read = true;
+  }
+  close(fd);
+
+  DLOGI_IF(kTagDriverConfig, "bytes_read=%d is_file_read=%d", bytes_read, is_file_read);
+
+  return is_file_read;
+}
+
+// Populates the internal timing info structure with the timing info obtained
+// from the HDMI driver
+DisplayError HWHDMI::ReadTimingInfo() {
+  uint32_t config_index = 0;
+  uint32_t page_number = MSM_HDMI_INIT_RES_PAGE;
+  uint32_t size = sizeof(msm_hdmi_mode_timing_info);
+
+  while (true) {
+    char config_buffer[PAGE_SIZE] = {0};
+    msm_hdmi_mode_timing_info *info = reinterpret_cast<msm_hdmi_mode_timing_info *>(config_buffer);
+
+    if (!ReadResolutionFile(config_buffer)) {
+      break;
+    }
+
+    while (info->video_format && size < PAGE_SIZE && config_index < hdmi_mode_count_) {
+      supported_video_modes_[config_index] = *info;
+      size += sizeof(msm_hdmi_mode_timing_info);
+
+      DLOGI_IF(kTagDriverConfig, "Config=%d Mode %d: (%dx%d) @ %d, pixel formats %d",
+               config_index,
+               supported_video_modes_[config_index].video_format,
+               supported_video_modes_[config_index].active_h,
+               supported_video_modes_[config_index].active_v,
+               supported_video_modes_[config_index].refresh_rate,
+               supported_video_modes_[config_index].pixel_formats);
+
+      info++;
+      config_index++;
+    }
+
+    size = sizeof(msm_hdmi_mode_timing_info);
+    // Request HDMI driver to populate res_info with more
+    // timing information
+    page_number++;
+    RequestNewPage(page_number);
+  }
+
+  if (page_number == MSM_HDMI_INIT_RES_PAGE || config_index == 0) {
+    DLOGE("No timing information found.");
+    return kErrorHardware;
+  }
+
+  return kErrorNone;
+}
+
+bool HWHDMI::IsResolutionFilePresent() {
+  bool is_file_present = false;
+  int fd = OpenResolutionFile(O_RDONLY);
+  if (fd >= 0) {
+    is_file_present = true;
+    Sys::close_(fd);
+  }
+
+  return is_file_present;
 }
 
 }  // namespace sdm
