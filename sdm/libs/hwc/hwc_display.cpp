@@ -68,8 +68,8 @@ HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, 
     display_intf_(NULL), flush_(false), dump_frame_count_(0), dump_frame_index_(0),
     dump_input_layers_(false), swap_interval_zero_(false), framebuffer_config_(NULL),
     display_paused_(false), use_metadata_refresh_rate_(false), metadata_refresh_rate_(0),
-    boot_animation_completed_(false), shutdown_pending_(false),  use_blit_comp_(false),
-    blit_engine_(NULL) {
+    boot_animation_completed_(false), shutdown_pending_(false), handle_refresh_(false),
+    use_blit_comp_(false), blit_engine_(NULL) {
 }
 
 int HWCDisplay::Init() {
@@ -315,7 +315,7 @@ DisplayError HWCDisplay::VSync(const DisplayEventVSync &vsync) {
 }
 
 DisplayError HWCDisplay::Refresh() {
-  if (*hwc_procs_) {
+  if (*hwc_procs_ && handle_refresh_) {
     (*hwc_procs_)->invalidate(*hwc_procs_);
   }
 
@@ -763,8 +763,8 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
   // 2. Any layer is added/removed/layer properties changes in the current layer stack.
   // 3. Any layer handle is changed and it is marked for GPU composition
   // 4. Any layer's current composition is different from previous composition.
-  if (((layer_stack_cache_.layer_count != layer_count) || layer_stack_.flags.skip_present ||
-      layer_stack_.flags.geometry_changed) && !layer_stack_cache_.animating) {
+  if ((layer_stack_cache_.layer_count != layer_count) || layer_stack_.flags.skip_present ||
+      layer_stack_.flags.geometry_changed || layer_stack_.flags.animating) {
     return true;
   }
 
@@ -781,8 +781,7 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
       return true;
     }
 
-    if ((layer.composition == kCompositionGPU) && (layer_cache.handle != hwc_layer.handle) &&
-        !layer_stack_cache_.animating) {
+    if ((layer.composition == kCompositionGPU) && (layer_cache.handle != hwc_layer.handle)) {
       return true;
     }
   }
@@ -794,6 +793,7 @@ void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
   if (layer_count > kMaxLayerCount) {
+    ResetLayerCacheStack();
     return;
   }
 
@@ -1226,6 +1226,52 @@ int HWCDisplay::ColorSVCRequestRoute(PPDisplayAPIPayload &in_payload,
     ret = -EINVAL;
 
   return ret;
+}
+
+void HWCDisplay::ResetLayerCacheStack() {
+  uint32_t layer_count = layer_stack_cache_.layer_count;
+  for (uint32_t i = 0; i < layer_count; i++) {
+    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
+    layer_cache.handle = NULL;
+    layer_cache.composition = kCompositionGPU;
+  }
+  layer_stack_cache_.animating = false;
+  layer_stack_cache_.layer_count = 0;
+}
+
+bool HWCDisplay::IsFullFrameGPUComposed() {
+  uint32_t layer_count = layer_stack_.layer_count;
+  for (size_t i = 0; i < layer_count; i++) {
+    LayerComposition composition = layer_stack_.layers[i].composition;
+    if (composition == kCompositionGPUTarget || composition == kCompositionBlitTarget) {
+      continue;
+    }
+    if (composition != kCompositionGPU) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool HWCDisplay::IsFullFrameSDEComposed() {
+  uint32_t layer_count = layer_stack_.layer_count;
+  for (size_t i = 0; i < layer_count; i++) {
+    LayerComposition composition = layer_stack_.layers[i].composition;
+    if (composition == kCompositionGPUTarget || composition == kCompositionBlitTarget) {
+      continue;
+    }
+    if (composition != kCompositionSDE && composition != kCompositionBlit &&
+        composition != kCompositionHybrid) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool HWCDisplay::IsFullFrameCached(hwc_display_contents_1_t *content_list) {
+  return IsFullFrameSDEComposed() && !NeedsFrameBufferRefresh(content_list);
 }
 
 }  // namespace sdm
