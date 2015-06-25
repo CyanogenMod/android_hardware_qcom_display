@@ -214,16 +214,32 @@ void MDPComp::timeout_handler(void *udata) {
 
     ctx->mDrawLock.lock();
 
-    if(!sHandleTimeout) {
-        ALOGD_IF(isDebug(), "%s:Do not handle this timeout", __FUNCTION__);
-        ctx->mDrawLock.unlock();
-        return;
-    }
     if(!ctx->proc) {
         ALOGE("%s: HWC proc not registered", __FUNCTION__);
         ctx->mDrawLock.unlock();
         return;
     }
+
+    if(!sHandleTimeout) {
+        ALOGD_IF(isDebug(), "%s:Do not handle this timeout", __FUNCTION__);
+        if(qdutils::MDPVersion::getInstance().isDynFpsSupported() &&
+           ctx->mUseMetaDataRefreshRate) {
+            MDPVersion& mdpHw = MDPVersion::getInstance();
+            /* Even in cases, where we wouldnot like to trigger new frame update
+               (for ex: if previous frame happens to be single pipe mdpcomp, etc),
+               refresh-rate should be set to the minfps supported by panel as
+               part of idle-fallback */
+            uint32_t refreshRate = mdpHw.getMinFpsSupported();
+            setRefreshRate(ctx, HWC_DISPLAY_PRIMARY, refreshRate);
+            if(!Overlay::displayCommit(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd)) {
+                ALOGE("%s: displayCommit failed for primary during dynfps",
+                      __FUNCTION__);
+            }
+        }
+        ctx->mDrawLock.unlock();
+        return;
+    }
+
     sIdleFallBack = true;
     ctx->mDrawLock.unlock();
     /* Trigger SF to redraw the current frame */
