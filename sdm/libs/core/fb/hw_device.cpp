@@ -613,31 +613,30 @@ void HWDevice::SyncMerge(const int &fd1, const int &fd2, int *target) {
 }
 
 int HWDevice::GetFBNodeIndex(HWDeviceType device_type) {
-  int fb_node_index = -1;
   for (int i = 0; i <= kDeviceVirtual; i++) {
     HWPanelInfo *panel_info = new HWPanelInfo();
     GetHWPanelInfoByNode(i, panel_info);
     switch (device_type) {
     case kDevicePrimary:
       if (panel_info->is_primary_panel) {
-        fb_node_index = i;
+        return i;
       }
       break;
     case kDeviceHDMI:
       if (panel_info->port == kPortDTv) {
-        fb_node_index = i;
+        return i;
       }
       break;
     case kDeviceVirtual:
       if (panel_info->port == kPortWriteBack) {
-        fb_node_index = i;
+        return i;
       }
       break;
     default:
       break;
     }
   }
-  return fb_node_index;
+  return -1;
 }
 
 void HWDevice::PopulateHWPanelInfo() {
@@ -858,18 +857,24 @@ bool HWDevice::EnableHotPlugDetection(int enable) {
   bool ret_value = true;
   char hpdpath[kMaxStringLength];
   int hdmi_node_index = GetFBNodeIndex(kDeviceHDMI);
+  if (hdmi_node_index < 0) {
+    return false;
+  }
+
   snprintf(hpdpath , sizeof(hpdpath), "%s%d/hpd", fb_path_, hdmi_node_index);
   int hpdfd = Sys::open_(hpdpath, O_RDWR, 0);
   if (hpdfd < 0) {
-    DLOGE("Open failed = %s", hpdpath);
-    return kErrorHardware;
+    DLOGW("Open failed = %s", hpdpath);
+    return false;
   }
+
   char value = enable ? '1' : '0';
   ssize_t length = Sys::pwrite_(hpdfd, &value, 1, 0);
   if (length <= 0) {
     DLOGE("Write failed 'hpd' = %d", enable);
     ret_value = false;
   }
+
   Sys::close_(hpdfd);
 
   return ret_value;
