@@ -91,7 +91,7 @@ void HWCDisplayExternal::Destroy(HWCDisplay *hwc_display) {
 }
 
 HWCDisplayExternal::HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL) {
+  : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL, false) {
 }
 
 int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {

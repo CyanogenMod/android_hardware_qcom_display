@@ -258,6 +258,29 @@ DisplayError CompManager::PostPrepare(Handle display_ctx, HWLayers *hw_layers) {
   return kErrorNone;
 }
 
+DisplayError CompManager::ReConfigure(Handle display_ctx, HWLayers *hw_layers) {
+  SCOPE_LOCK(locker_);
+
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+  Handle &display_resource_ctx = display_comp_ctx->display_resource_ctx;
+
+  DisplayError error = kErrorUndefined;
+  resource_intf_->Start(display_resource_ctx);
+  error = resource_intf_->Acquire(display_resource_ctx, hw_layers);
+
+  if (error != kErrorNone) {
+    DLOGE("Reconfigure failed for display = %d", display_comp_ctx->display_type);
+  }
+
+  resource_intf_->Stop(display_resource_ctx);
+  if (error != kErrorNone) {
+      error = resource_intf_->PostPrepare(display_resource_ctx, hw_layers);
+  }
+
+  return error;
+}
+
 DisplayError CompManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   SCOPE_LOCK(locker_);
 

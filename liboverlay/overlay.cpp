@@ -151,6 +151,8 @@ utils::eDest Overlay::getPipe(const PipeSpecs& pipeSpecs) {
         return getPipe_8x39(pipeSpecs);
     } else if(MDPVersion::getInstance().is8x52()) {
         return getPipe_8x52(pipeSpecs);
+    } else if(MDPVersion::getInstance().is8976()) {
+        return getPipe_8976(pipeSpecs);
     } else if(MDPVersion::getInstance().is8994()) {
         return getPipe_8994(pipeSpecs);
     }
@@ -250,6 +252,12 @@ utils::eDest Overlay::getPipe_8x39(const PipeSpecs& pipeSpecs) {
 utils::eDest Overlay::getPipe_8x52(const PipeSpecs& pipeSpecs) {
     //8x16 & 8x52 has same number of pipes, pipe-types & scaling capabilities.
     //Rely on 8x16 until we see a need to change.
+    return getPipe_8x16(pipeSpecs);
+}
+
+utils::eDest Overlay::getPipe_8976(const PipeSpecs& pipeSpecs) {
+    /* TODO: Have a separate func to make use of one extra VG pipe available
+       in 8976 in comparision to 8x16 */
     return getPipe_8x16(pipeSpecs);
 }
 
