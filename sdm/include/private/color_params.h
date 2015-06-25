@@ -56,6 +56,7 @@ enum PPGlobalColorFeatureID {
   kGlobalColorFeaturePcc,
   kGlobalColorFeatureIgc,
   kGlobalColorFeaturePgc,
+  kMixerColorFeatureGc,
   kGlobalColorFeaturePaV2,
   kGlobalColorFeatureDither,
   kGlobalColorFeatureGamut,

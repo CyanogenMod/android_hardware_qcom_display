@@ -48,6 +48,7 @@ DisplayError (*HWColorManager::SetFeature[])(const PPFeatureInfo &, msmfb_mdp_pp
         [kGlobalColorFeaturePcc] = &HWColorManager::SetPCC,
         [kGlobalColorFeatureIgc] = &HWColorManager::SetIGC,
         [kGlobalColorFeaturePgc] = &HWColorManager::SetPGC,
+        [kMixerColorFeatureGc] = &HWColorManager::SetMixerGC,
         [kGlobalColorFeaturePaV2] = &HWColorManager::SetPAV2,
         [kGlobalColorFeatureDither] = &HWColorManager::SetDither,
         [kGlobalColorFeatureGamut] = &HWColorManager::SetGamut,
@@ -93,6 +94,19 @@ DisplayError HWColorManager::SetPGC(const PPFeatureInfo &feature, msmfb_mdp_pp *
   kernel_params->data.lut_cfg_data.data.pgc_lut_data.flags = feature.enable_flags_;
   kernel_params->data.lut_cfg_data.data.pgc_lut_data.cfg_payload = feature.GetConfigData();
 
+  return ret;
+}
+
+DisplayError HWColorManager::SetMixerGC(const PPFeatureInfo &feature, msmfb_mdp_pp *kernel_params) {
+  DisplayError ret = kErrorNone;
+
+  kernel_params->op = mdp_op_lut_cfg;
+  kernel_params->data.lut_cfg_data.lut_type = mdp_lut_pgc;
+  kernel_params->data.lut_cfg_data.data.pgc_lut_data.version = feature.feature_version_;
+  kernel_params->data.lut_cfg_data.data.pgc_lut_data.block =
+      (MDP_LOGICAL_BLOCK_DISP_0 + feature.disp_id_) | MDSS_PP_LM_CFG;
+  kernel_params->data.lut_cfg_data.data.pgc_lut_data.flags = feature.enable_flags_;
+  kernel_params->data.lut_cfg_data.data.pgc_lut_data.cfg_payload = feature.GetConfigData();
   return ret;
 }
 
