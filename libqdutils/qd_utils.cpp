@@ -28,9 +28,74 @@
  */
 
 #include "qd_utils.h"
-#define QD_UTILS_DEBUG 0
 
 namespace qdutils {
+
+int parseLine(char *input, char *tokens[], const uint32_t maxToken, uint32_t *count) {
+    char *tmpToken = NULL;
+    char *tmpPtr;
+    uint32_t index = 0;
+    const char *delim = ", =\n";
+    if (!input) {
+      return -1;
+    }
+    tmpToken = strtok_r(input, delim, &tmpPtr);
+    while (tmpToken && index < maxToken) {
+      tokens[index++] = tmpToken;
+      tmpToken = strtok_r(NULL, delim, &tmpPtr);
+    }
+    *count = index;
+
+    return 0;
+}
+
+int querySDEInfo(HWQueryType type, int *value) {
+    FILE *fileptr = NULL;
+    const char *featureName;
+    char stringBuffer[MAX_STRING_LENGTH];
+    uint32_t tokenCount = 0;
+    const uint32_t maxCount = 10;
+    char *tokens[maxCount] = { NULL };
+
+    switch(type) {
+    case HAS_MACRO_TILE:
+        featureName = "tile_format";
+        break;
+
+    default:
+        ALOGE("Invalid query type %d", type);
+        return -EINVAL;
+    }
+
+    fileptr = fopen("/sys/devices/virtual/graphics/fb0/mdp/caps", "rb");
+    if (!fileptr) {
+        ALOGE("File '%s' not found", stringBuffer);
+        return -EINVAL;
+    }
+
+    size_t len = MAX_STRING_LENGTH;
+    ssize_t read;
+    char *line = stringBuffer;
+    while ((read = getline(&line, &len, fileptr)) != -1) {
+        // parse the line and update information accordingly
+        if (parseLine(line, tokens, maxCount, &tokenCount)) {
+            continue;
+        }
+
+        if (strncmp(tokens[0], "features", strlen("features"))) {
+            continue;
+        }
+
+        for (uint32_t i = 0; i < tokenCount; i++) {
+            if (!strncmp(tokens[i], featureName, strlen(featureName))) {
+              *value = 1;
+            }
+        }
+    }
+    fclose(fileptr);
+
+    return 0;
+}
 
 int getHDMINode(void)
 {
@@ -80,7 +145,7 @@ int getEdidRawData(char *buffer)
     snprintf(msmFbTypePath, sizeof(msmFbTypePath),
                  "/sys/class/graphics/fb%d/edid_raw_data", node_id);
 
-   edidFile = open(msmFbTypePath, O_RDONLY, 0);
+    edidFile = open(msmFbTypePath, O_RDONLY, 0);
 
     if (edidFile < 0) {
         ALOGE("%s no edid raw data found", __func__);
@@ -90,34 +155,6 @@ int getEdidRawData(char *buffer)
     size = (int)read(edidFile, (char*)buffer, EDID_RAW_DATA_SIZE);
     close(edidFile);
     return size;
-}
-
-/* Calculates the aspect ratio for based on src & dest */
-void getAspectRatioPosition(int destWidth, int destHeight, int srcWidth,
-                                int srcHeight, hwc_rect_t& rect) {
-   int x =0, y =0;
-
-   if (srcWidth * destHeight > destWidth * srcHeight) {
-        srcHeight = destWidth * srcHeight / srcWidth;
-        srcWidth = destWidth;
-    } else if (srcWidth * destHeight < destWidth * srcHeight) {
-        srcWidth = destHeight * srcWidth / srcHeight;
-        srcHeight = destHeight;
-    } else {
-        srcWidth = destWidth;
-        srcHeight = destHeight;
-    }
-    if (srcWidth > destWidth) srcWidth = destWidth;
-    if (srcHeight > destHeight) srcHeight = destHeight;
-    x = (destWidth - srcWidth) / 2;
-    y = (destHeight - srcHeight) / 2;
-    ALOGD_IF(QD_UTILS_DEBUG, "%s: AS Position: x = %d, y = %d w = %d h = %d",
-             __FUNCTION__, x, y, srcWidth , srcHeight);
-    // Convert it back to hwc_rect_t
-    rect.left = x;
-    rect.top = y;
-    rect.right = srcWidth + rect.left;
-    rect.bottom = srcHeight + rect.top;
 }
 
 }; //namespace qdutils

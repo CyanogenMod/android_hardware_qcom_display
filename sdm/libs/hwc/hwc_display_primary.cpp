@@ -116,6 +116,16 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
+  handle_refresh_ = true;
+  int app_layer_count = layer_stack_.layer_count - 1;
+  if (needs_blit_ && use_blit_comp_) {
+    app_layer_count -= kMaxBlitTargetLayers;
+  }
+
+  if (app_layer_count <= 1 || IsFullFrameGPUComposed() || IsFullFrameCached(content_list)) {
+    handle_refresh_ = false;
+  }
+
   if (use_metadata_refresh_rate_) {
     SetRefreshRate(metadata_refresh_rate_);
   }

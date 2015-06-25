@@ -45,18 +45,22 @@
 #include <hardware/hwcomposer.h>
 
 namespace qdutils {
-#define EDID_RAW_DATA_SIZE              640
 
-enum qd_utils {
-    MAX_FRAME_BUFFER_NAME_SIZE = 128,
-    MAX_SYSFS_FILE_PATH = 255,
-    SUPPORTED_DOWNSCALE_AREA = (1920*1080)
+enum HWQueryType {
+    HAS_MACRO_TILE = 0,
 };
 
-int getHDMINode(void);
-int getEdidRawData(char *buffer);
+enum {
+    EDID_RAW_DATA_SIZE = 640,
+    MAX_FRAME_BUFFER_NAME_SIZE = 128,
+    MAX_SYSFS_FILE_PATH = 255,
+    MAX_STRING_LENGTH = 1024,
+};
 
-void getAspectRatioPosition(int destWidth, int destHeight, int srcWidth,
-                                int srcHeight, hwc_rect_t& rect);
+int parseLine(char *input, char *tokens[], const uint32_t maxToken, uint32_t *count);
+int querySDEInfo(HWQueryType type, int *value);
+int getEdidRawData(char *buffer);
+int getHDMINode(void);
+
 }; //namespace qdutils
 #endif

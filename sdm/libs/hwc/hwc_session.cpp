@@ -360,6 +360,10 @@ int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint3
     return -EINVAL;
   }
 
+  if (disp < HWC_DISPLAY_PRIMARY || disp >  HWC_NUM_PHYSICAL_DISPLAY_TYPES) {
+    return -EINVAL;
+  }
+
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
   int status = -EINVAL;
   if (hwc_session->hwc_display_[disp]) {
@@ -377,6 +381,10 @@ int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, ui
     return -EINVAL;
   }
 
+  if (disp < HWC_DISPLAY_PRIMARY || disp >  HWC_NUM_PHYSICAL_DISPLAY_TYPES) {
+    return -EINVAL;
+  }
+
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
   int status = -EINVAL;
   if (hwc_session->hwc_display_[disp]) {
@@ -390,7 +398,11 @@ int HWCSession::GetActiveConfig(hwc_composer_device_1 *device, int disp) {
   SEQUENCE_WAIT_SCOPE_LOCK(locker_);
 
   if (!device) {
-    return -1;
+    return -EINVAL;
+  }
+
+  if (disp < HWC_DISPLAY_PRIMARY || disp >  HWC_NUM_PHYSICAL_DISPLAY_TYPES) {
+    return -EINVAL;
   }
 
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
@@ -409,8 +421,13 @@ int HWCSession::SetActiveConfig(hwc_composer_device_1 *device, int disp, int ind
     return -EINVAL;
   }
 
+  if (disp < HWC_DISPLAY_PRIMARY || disp >  HWC_NUM_PHYSICAL_DISPLAY_TYPES) {
+    return -EINVAL;
+  }
+
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
   int status = -EINVAL;
+
   if (hwc_session->hwc_display_[disp]) {
     status = hwc_session->hwc_display_[disp]->SetActiveConfig(index);
   }
@@ -423,9 +440,12 @@ int HWCSession::HandleVirtualDisplayLifeCycle(hwc_display_contents_1_t *content_
 
   if (HWCDisplayVirtual::IsValidContentList(content_list)) {
     if (!hwc_display_[HWC_DISPLAY_VIRTUAL]) {
+      uint32_t primary_width = 0;
+      uint32_t primary_height = 0;
+      hwc_display_[HWC_DISPLAY_PRIMARY]->GetFrameBufferResolution(&primary_width, &primary_height);
       // Create virtual display device
-      status = HWCDisplayVirtual::Create(core_intf_, &hwc_procs_, content_list,
-                                         &hwc_display_[HWC_DISPLAY_VIRTUAL]);
+      status = HWCDisplayVirtual::Create(core_intf_, &hwc_procs_, primary_width, primary_height,
+                                         content_list, &hwc_display_[HWC_DISPLAY_VIRTUAL]);
     }
   } else {
     if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
