@@ -503,6 +503,10 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
   case qService::IQService::SET_VIEW_FRAME:
     break;
 
+  case qService::IQService::CONTROL_BACKLIGHT:
+    status = ControlBackLight(input_parcel);
+    break;
+
   case qService::IQService::QDCM_SVC_CMDS:
     status = QdcmCMDHandler(*input_parcel, output_parcel);
     break;
@@ -513,6 +517,45 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
   }
 
   return status;
+}
+
+android::status_t HWCSession::ControlBackLight(const android::Parcel *input_parcel) {
+  uint32_t display_status = UINT32(input_parcel->readInt32());
+  HWCDisplay *display = hwc_display_[HWC_DISPLAY_PRIMARY];
+
+  DLOGI("Primary Display display_status = %d", display_status);
+
+  int fd = open("/sys/class/leds/lcd-backlight/brightness", O_RDWR);
+  const char *bl_brightness = "0";
+
+  if (fd < 0) {
+    DLOGE("unable to open brightness node err = %d errstr = %s", errno, strerror(errno));
+    return -1;
+  }
+
+  if (display_status == 0) {
+    // Read backlight and store it internally. Set backlight to 0 on primary.
+    if (read(fd, brightness_, sizeof(brightness_)) > 0) {
+      DLOGI("backlight brightness is %s", brightness_);
+      ssize_t ret = write(fd, bl_brightness, sizeof(bl_brightness));
+      if (ret < 0) {
+        DLOGE("Failed to write backlight node err = %d errstr = %s", errno, strerror(errno));
+        close(fd);
+        return -1;
+      }
+    }
+  } else {
+    // Restore backlight to original value.
+    ssize_t ret = write(fd, brightness_, sizeof(brightness_));
+    if (ret < 0) {
+      DLOGE("Failed to write backlight node err = %d errstr = %s", errno, strerror(errno));
+      close(fd);
+      return -1;
+    }
+  }
+  close(fd);
+
+  return display->SetDisplayStatus(display_status);
 }
 
 android::status_t HWCSession::SetSecondaryDisplayStatus(const android::Parcel *input_parcel) {

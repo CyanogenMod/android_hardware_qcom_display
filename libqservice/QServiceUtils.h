@@ -74,8 +74,9 @@ inline android::status_t screenRefresh() {
     return sendSingleParam(qService::IQService::SCREEN_REFRESH, 1);
 }
 
+// TODO(user): Need to rename this wrapper name
 inline android::status_t toggleScreenUpdate(uint32_t on) {
-    return sendSingleParam(qService::IQService::TOGGLE_SCREEN_UPDATE, on);
+    return sendSingleParam(qService::IQService::CONTROL_BACKLIGHT, on);
 }
 
 inline android::status_t setPartialUpdate(uint32_t enable) {

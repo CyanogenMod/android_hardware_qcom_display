@@ -59,7 +59,7 @@ public:
         /* Enable/Disable/Set refresh rate dynamically */
         CONFIGURE_DYN_REFRESH_RATE = 18,
         SET_PARTIAL_UPDATE = 19,   // Preference on partial update feature
-        TOGGLE_SCREEN_UPDATE = 20, // Provides ability to disable screen updates
+        CONTROL_BACKLIGHT = 20, // Provides ability to control backlight
         SET_FRAME_DUMP_CONFIG = 21,  // Provides ability to set the frame dump config
         SET_S3D_MODE = 22, // Set the 3D mode as specified in msm_hdmi_modes.h
         CONNECT_HDMI_CLIENT = 23,  // Connect HDMI CEC HAL Client
