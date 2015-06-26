@@ -48,7 +48,7 @@ public:
         ALOGD_IF(QSERVICE_DEBUG, "%s: connect HWC client", __FUNCTION__);
         Parcel data, reply;
         data.writeInterfaceToken(IQService::getInterfaceDescriptor());
-        data.writeStrongBinder(client->asBinder());
+        data.writeStrongBinder(IInterface::asBinder(client));
         remote()->transact(CONNECT_HWC_CLIENT, data, &reply);
     }
 
@@ -56,7 +56,8 @@ public:
         ALOGD_IF(QSERVICE_DEBUG, "%s: connect HDMI client", __FUNCTION__);
         Parcel data, reply;
         data.writeInterfaceToken(IQService::getInterfaceDescriptor());
-        data.writeStrongBinder(client->asBinder());
+        data.writeInterfaceToken(IQService::getInterfaceDescriptor());
+        data.writeStrongBinder(IInterface::asBinder(client));
         remote()->transact(CONNECT_HDMI_CLIENT, data, &reply);
     }
 

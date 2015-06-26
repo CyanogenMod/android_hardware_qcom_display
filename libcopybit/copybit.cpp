@@ -125,8 +125,6 @@ static void intersect(struct copybit_rect_t *out,
 static int get_format(int format) {
     switch (format) {
         case HAL_PIXEL_FORMAT_RGB_565:       return MDP_RGB_565;
-        case HAL_PIXEL_FORMAT_RGBA_5551:     return MDP_RGBA_5551;
-        case HAL_PIXEL_FORMAT_RGBA_4444:     return MDP_RGBA_4444;
         case HAL_PIXEL_FORMAT_RGBX_8888:     return MDP_RGBX_8888;
         case HAL_PIXEL_FORMAT_BGRX_8888:     return MDP_BGRX_8888;
         case HAL_PIXEL_FORMAT_RGB_888:       return MDP_RGB_888;
@@ -441,8 +439,6 @@ static int stretch_copybit(
                 // we don't support plane alpha with RGBA formats
                 case HAL_PIXEL_FORMAT_RGBA_8888:
                 case HAL_PIXEL_FORMAT_BGRA_8888:
-                case HAL_PIXEL_FORMAT_RGBA_5551:
-                case HAL_PIXEL_FORMAT_RGBA_4444:
                     ALOGE ("%s : Unsupported Pixel format %d", __FUNCTION__,
                            src->format);
                     return -EINVAL;

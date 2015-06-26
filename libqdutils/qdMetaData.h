@@ -36,6 +36,16 @@ extern "C" {
 
 #define MAX_IGC_LUT_ENTRIES 256
 
+/* This macro finds the index corresponding to a type */
+/* This is equivalent to indx = LOG_2(type) */
+inline int32_t getVfmDataIdx(int32_t type){
+    int32_t indx = 0, x = type;
+    while( x >> 1) {
+        x = (x >> 1);
+        indx++;
+    }
+    return indx;
+}
 enum ColorSpace_t{
     ITU_R_601,
     ITU_R_601_FR,
@@ -77,6 +87,7 @@ struct MetaData_t {
     struct IGCData_t igcData;
     struct Sharp2Data_t Sharp2Data;
     int64_t timestamp;
+    uint32_t refreshrate;
     enum ColorSpace_t colorSpace;
      /* Gralloc sets PRIV_SECURE_BUFFER flag to inform that the buffers are from
       * ION_SECURE. which should not be mapped. However, for GPU post proc

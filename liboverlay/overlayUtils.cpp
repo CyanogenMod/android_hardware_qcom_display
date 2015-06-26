@@ -99,10 +99,6 @@ int getMdpFormat(int format) {
             return MDP_RGB_888;
         case HAL_PIXEL_FORMAT_RGB_565:
             return MDP_RGB_565;
-        case HAL_PIXEL_FORMAT_RGBA_5551:
-            return MDP_RGBA_5551;
-        case HAL_PIXEL_FORMAT_RGBA_4444:
-            return MDP_RGBA_4444;
         case HAL_PIXEL_FORMAT_BGRA_8888:
             return MDP_BGRA_8888;
         case HAL_PIXEL_FORMAT_BGRX_8888:
@@ -187,10 +183,6 @@ int getHALFormat(int mdpFormat) {
             return HAL_PIXEL_FORMAT_RGB_888;
         case MDP_RGB_565:
             return HAL_PIXEL_FORMAT_RGB_565;
-        case MDP_RGBA_5551:
-            return HAL_PIXEL_FORMAT_RGBA_5551;
-        case MDP_RGBA_4444:
-            return HAL_PIXEL_FORMAT_RGBA_4444;
         case MDP_BGRA_8888:
             return HAL_PIXEL_FORMAT_BGRA_8888;
         case MDP_Y_CR_CB_GH2V2:
