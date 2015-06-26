@@ -54,6 +54,7 @@ using namespace overlay;
 using namespace overlay::utils;
 namespace ovutils = overlay::utils;
 
+#ifdef QCOM_BSP
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -72,6 +73,7 @@ EGLAPI EGLBoolean eglGpuPerfHintQCOM(EGLDisplay dpy, EGLContext ctx,
 
 #ifdef __cplusplus
 }
+#endif
 #endif
 
 namespace qhwc {
@@ -313,13 +315,14 @@ void initContext(hwc_context_t *ctx)
 
     // Initialize gpu perfomance hint related parameters
     property_get("sys.hwc.gpu_perf_mode", value, "0");
+#ifdef QCOM_BSP
     ctx->mGPUHintInfo.mGpuPerfModeEnable = atoi(value)? true : false;
 
     ctx->mGPUHintInfo.mEGLDisplay = NULL;
     ctx->mGPUHintInfo.mEGLContext = NULL;
     ctx->mGPUHintInfo.mPrevCompositionGLES = false;
     ctx->mGPUHintInfo.mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
-
+#endif
     ctx->mUseMetaDataRefreshRate = true;
     if(property_get("persist.metadata_dynfps.disable", value, "false")
             && !strcmp(value, "true")) {
@@ -1462,7 +1465,9 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
 
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(list->hwLayers[i].compositionType == HWC_OVERLAY ||
+#ifdef QCOM_BSP
            list->hwLayers[i].compositionType == HWC_BLIT ||
+#endif
            list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             //Populate releaseFenceFds.
             if(UNLIKELY(swapzero)) {
@@ -2163,6 +2168,8 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
     struct gpu_hint_info *gpuHint = &ctx->mGPUHintInfo;
     if(!gpuHint->mGpuPerfModeEnable)
         return;
+
+#ifdef QCOM_BSP
     /* Set the GPU hint flag to high for MIXED/GPU composition only for
        first frame after MDP -> GPU/MIXED mode transition. Set the GPU
        hint to default if the previous composition is GPU or current GPU
@@ -2218,6 +2225,7 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
         }
         gpuHint->mPrevCompositionGLES = false;
     }
+#endif
 }
 
 bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
