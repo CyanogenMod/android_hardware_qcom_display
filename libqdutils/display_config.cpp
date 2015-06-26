@@ -280,4 +280,13 @@ int setPanelMode(int mode) {
     return err;
 }
 
+// ----------------------------------------------------------------------------
+// Screen refresh for native daemons linking dynamically to libqdutils
+// ----------------------------------------------------------------------------
+extern "C" int refreshScreen() {
+  int ret = 0;
+  ret = screenRefresh();
+  return ret;
+}
+
 }// namespace
