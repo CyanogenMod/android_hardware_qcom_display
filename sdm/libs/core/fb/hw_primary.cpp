@@ -175,7 +175,11 @@ DisplayError HWPrimary::GetDisplayAttributes(HWDisplayAttributes *display_attrib
   }
 
   if (config_changed_) {
-    PopulateDisplayAttributes();
+    DisplayError error = PopulateDisplayAttributes();
+    if (error != kErrorNone) {
+      return error;
+    }
+
     config_changed_ = false;
   }
 
