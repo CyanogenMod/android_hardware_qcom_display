@@ -81,7 +81,7 @@ class HWInterface {
   virtual DisplayError Commit(HWLayers *hw_layers) = 0;
   virtual DisplayError Flush() = 0;
   virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers) = 0;
-  virtual DisplayError SetPPFeatures(PPFeaturesConfig &feature_list) = 0;
+  virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list) = 0;
 
  protected:
   virtual ~HWInterface() { }

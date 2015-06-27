@@ -71,14 +71,15 @@ void ColorManagerProxy::Deinit() {
     ::dlclose(color_lib_);
 }
 
-ColorManagerProxy::ColorManagerProxy(DisplayType type, HWInterface *intf, HWDisplayAttributes &attr,
-                                     HWPanelInfo &info)
+ColorManagerProxy::ColorManagerProxy(DisplayType type, HWInterface *intf,
+                                     const HWDisplayAttributes &attr,
+                                     const HWPanelInfo &info)
     : device_type_(type), pp_hw_attributes_(), hw_intf_(intf), color_intf_(NULL), pp_features_() {}
 
 ColorManagerProxy *ColorManagerProxy::CreateColorManagerProxy(DisplayType type,
                                                               HWInterface *hw_intf,
-                                                              HWDisplayAttributes &attribute,
-                                                              HWPanelInfo &panel_info) {
+                                                              const HWDisplayAttributes &attribute,
+                                                              const HWPanelInfo &panel_info) {
   DisplayError error = kErrorNone;
   PPFeatureVersion versions;
 
@@ -149,7 +150,7 @@ DisplayError ColorManagerProxy::Commit() {
 
   DisplayError ret = kErrorNone;
   if (pp_features_.IsDirty()) {
-    ret = hw_intf_->SetPPFeatures(pp_features_);
+    ret = hw_intf_->SetPPFeatures(&pp_features_);
   }
 
   return ret;

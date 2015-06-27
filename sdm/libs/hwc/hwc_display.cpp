@@ -1216,8 +1216,9 @@ DisplayError HWCDisplay::SetMetaData(const MetaData_t &meta_data, Layer *layer) 
   return kErrorNone;
 }
 
-int HWCDisplay::ColorSVCRequestRoute(PPDisplayAPIPayload &in_payload,
-                               PPDisplayAPIPayload *out_payload, PPPendingParams *pending_action) {
+int HWCDisplay::ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
+                                     PPDisplayAPIPayload *out_payload,
+                                     PPPendingParams *pending_action) {
   int ret = 0;
 
   if (display_intf_)

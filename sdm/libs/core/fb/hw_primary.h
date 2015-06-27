@@ -58,7 +58,7 @@ class HWPrimary : public HWDevice, public HWPrimaryInterface {
   virtual DisplayError SetDisplayMode(const HWDisplayMode hw_display_mode);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
   virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers);
-  virtual DisplayError SetPPFeatures(PPFeaturesConfig &feature_list);
+  virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list);
 
  private:
   // Panel modes for the MSMFB_LPM_ENABLE ioctl

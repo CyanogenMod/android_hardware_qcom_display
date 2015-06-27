@@ -56,7 +56,7 @@ class HWHDMI : public HWDevice, public HWHDMIInterface {
   virtual DisplayError Commit(HWLayers *hw_layers);
   virtual DisplayError Flush();
   virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers);
-  virtual DisplayError SetPPFeatures(PPFeaturesConfig &feature_list);
+  virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list);
 
  private:
   int GetHDMIModeCount();

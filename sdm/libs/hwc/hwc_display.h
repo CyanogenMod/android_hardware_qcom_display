@@ -57,7 +57,8 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int Perform(uint32_t operation, ...);
   virtual ~HWCDisplay() { }
 
-  int ColorSVCRequestRoute(PPDisplayAPIPayload &in_payload, PPDisplayAPIPayload *out_payload,
+  int ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
+                           PPDisplayAPIPayload *out_payload,
                            PPPendingParams *pending_action);
 
  protected:

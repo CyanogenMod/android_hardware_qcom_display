@@ -407,7 +407,7 @@ DisplayError HWHDMI::GetPPFeaturesVersion(PPFeatureVersion *vers) {
   return kErrorNotSupported;
 }
 
-DisplayError HWHDMI::SetPPFeatures(PPFeaturesConfig &feature_list) {
+DisplayError HWHDMI::SetPPFeatures(PPFeaturesConfig *feature_list) {
   return kErrorNotSupported;
 }
 

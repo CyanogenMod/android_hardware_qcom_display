@@ -745,7 +745,7 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel &in, android:
 
   // for display API getter case, marshall returned params into out_parcel.
   out->writeInt32(ret);
-  HWCColorManager::MarshallStructIntoParcel(resp_payload, *out);
+  HWCColorManager::MarshallStructIntoParcel(resp_payload, out);
   req_payload.DestroyPayload();
   resp_payload.DestroyPayload();
 

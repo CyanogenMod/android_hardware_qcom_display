@@ -139,7 +139,7 @@ DisplayError HWVirtual::GetPPFeaturesVersion(PPFeatureVersion *vers) {
   return kErrorNotSupported;
 }
 
-DisplayError HWVirtual::SetPPFeatures(PPFeaturesConfig &feature_list) {
+DisplayError HWVirtual::SetPPFeatures(PPFeaturesConfig *feature_list) {
   return kErrorNotSupported;
 }
 

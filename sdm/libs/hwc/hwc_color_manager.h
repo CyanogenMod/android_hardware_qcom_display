@@ -110,7 +110,7 @@ class HWCColorManager {
   static int CreatePayloadFromParcel(const android::Parcel &in, uint32_t *disp_id,
                                      PPDisplayAPIPayload *sink);
   static void MarshallStructIntoParcel(const PPDisplayAPIPayload &data,
-                                       android::Parcel &out_parcel);
+                                       android::Parcel *out_parcel);
 
   ~HWCColorManager();
   void DestroyColorManager();
