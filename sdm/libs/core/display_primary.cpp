@@ -58,6 +58,7 @@ DisplayError DisplayPrimary::Init() {
   error = DisplayBase::Init();
   if (error != kErrorNone) {
     HWPrimaryInterface::Destroy(hw_primary_intf_);
+    return error;
   }
 
   // Idle fallback feature is supported only for video mode panel.
