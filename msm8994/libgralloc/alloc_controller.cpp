@@ -160,11 +160,13 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
     {
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
-        case HAL_PIXEL_FORMAT_RAW16:
             aligned_w = ALIGN(width, 32);
             break;
+        case HAL_PIXEL_FORMAT_RAW16:
+            aligned_w = ALIGN(width, 16);
+            break;
         case HAL_PIXEL_FORMAT_RAW10:
-            aligned_w = ALIGN(width * 10 /8, 16);
+            aligned_w = ALIGN(width * 10 /8, 8);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
             aligned_w = ALIGN(width, 128);
