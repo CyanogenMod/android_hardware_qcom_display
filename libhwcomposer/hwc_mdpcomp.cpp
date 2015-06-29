@@ -1845,6 +1845,7 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
        possible number of YUV layers to MDP, instead of falling back to GPU
        completely.*/
     nYuvCount = (nYuvCount > nVGpipes) ? nVGpipes : nYuvCount;
+    if(nYuvCount > MAX_NUM_APP_LAYERS) return;
 
     for(int index = 0;index < nYuvCount; index++){
         int nYuvIndex = ctx->listStats[mDpy].yuvIndices[index];
