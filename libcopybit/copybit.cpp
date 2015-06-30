@@ -532,6 +532,10 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
     int status = -EINVAL;
     copybit_context_t *ctx;
     ctx = (copybit_context_t *)malloc(sizeof(copybit_context_t));
+    if (ctx == NULL) {
+        ALOGE("%s Error: malloc failure!", __FUNCTION__);
+        return status;
+    }
     memset(ctx, 0, sizeof(*ctx));
 
     ctx->device.common.tag = HARDWARE_DEVICE_TAG;

@@ -341,7 +341,7 @@ void getDump(char *buf, size_t len, const char *prefix,
             "%s id=%d z=%d fg=%d alpha=%d mask=%d flags=0x%x\n",
             prefix, ov.id, ov.z_order, ov.is_fg, ov.alpha,
             ov.transp_mask, ov.flags);
-    strncat(buf, str, strlen(str));
+    strlcat(buf, str, len);
     getDump(buf, len, "\tsrc(msmfb_img)", ov.src);
     getDump(buf, len, "\tsrc_rect(mdp_rect)", ov.src_rect);
     getDump(buf, len, "\tdst_rect(mdp_rect)", ov.dst_rect);
@@ -354,7 +354,7 @@ void getDump(char *buf, size_t len, const char *prefix,
             "%s w=%d h=%d format=%d %s\n",
             prefix, ov.width, ov.height, ov.format,
             overlay::utils::getFormatString(ov.format));
-    strncat(buf, str_src, strlen(str_src));
+    strlcat(buf, str_src, len);
 }
 
 void getDump(char *buf, size_t len, const char *prefix,
@@ -363,7 +363,7 @@ void getDump(char *buf, size_t len, const char *prefix,
     snprintf(str_rect, 256,
             "%s x=%d y=%d w=%d h=%d\n",
             prefix, ov.x, ov.y, ov.w, ov.h);
-    strncat(buf, str_rect, strlen(str_rect));
+    strlcat(buf, str_rect, len);
 }
 
 void getDump(char *buf, size_t len, const char *prefix,
@@ -372,7 +372,7 @@ void getDump(char *buf, size_t len, const char *prefix,
     snprintf(str, 256,
             "%s id=%d\n",
             prefix, ov.id);
-    strncat(buf, str, strlen(str));
+    strlcat(buf, str, len);
     getDump(buf, len, "\tdata(msmfb_data)", ov.data);
 }
 
@@ -383,7 +383,7 @@ void getDump(char *buf, size_t len, const char *prefix,
             "%s offset=%d memid=%d id=%d flags=0x%x priv=%d\n",
             prefix, ov.offset, ov.memory_id, ov.id, ov.flags,
             ov.priv);
-    strncat(buf, str_data, strlen(str_data));
+    strlcat(buf, str_data, len);
 }
 
 void getDump(char *buf, size_t len, const char *prefix,
@@ -392,7 +392,7 @@ void getDump(char *buf, size_t len, const char *prefix,
     snprintf(str, 256, "%s sessid=%u rot=%d, enable=%d downscale=%d\n",
             prefix, rot.session_id, rot.rotations, rot.enable,
             rot.downscale_ratio);
-    strncat(buf, str, strlen(str));
+    strlcat(buf, str, len);
     getDump(buf, len, "\tsrc", rot.src);
     getDump(buf, len, "\tdst", rot.dst);
     getDump(buf, len, "\tsrc_rect", rot.src_rect);
@@ -404,7 +404,7 @@ void getDump(char *buf, size_t len, const char *prefix,
     snprintf(str, 256,
             "%s sessid=%u verkey=%d\n",
             prefix, rot.session_id, rot.version_key);
-    strncat(buf, str, strlen(str));
+    strlcat(buf, str, len);
     getDump(buf, len, "\tsrc", rot.src);
     getDump(buf, len, "\tdst", rot.dst);
     getDump(buf, len, "\tsrc_chroma", rot.src_chroma);

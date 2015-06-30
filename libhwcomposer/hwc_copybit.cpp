@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2013, 2015, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution.
  *
@@ -448,7 +448,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
             copybit_rect_t tmp_rect;
             tmp_dst.w = tmp_w;
             tmp_dst.h = tmp_h;
-            tmp_dst.format = tmpHnd->format;
+            tmp_dst.format = fbHandle->format;
             tmp_dst.handle = tmpHnd;
             tmp_dst.horiz_padding = src.horiz_padding;
             tmp_dst.vert_padding = src.vert_padding;
