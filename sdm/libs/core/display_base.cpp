@@ -440,6 +440,10 @@ DisplayError DisplayBase::IsScalingValid(const LayerRect &crop, const LayerRect 
   return comp_manager_->ValidateScaling(crop, dst, rotate90);
 }
 
+DisplayError DisplayBase::SetPanelBrightness(int level) {
+  return kErrorNotSupported;
+}
+
 void DisplayBase::AppendDump(char *buffer, uint32_t length) {
   DumpImpl::AppendString(buffer, length, "\n-----------------------");
   DumpImpl::AppendString(buffer, length, "\ndevice type: %u", display_type_);

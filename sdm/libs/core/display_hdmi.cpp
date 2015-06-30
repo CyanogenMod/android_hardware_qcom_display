@@ -171,6 +171,11 @@ bool DisplayHDMI::IsUnderscanSupported() {
   return DisplayBase::IsUnderscanSupported();
 }
 
+DisplayError DisplayHDMI::SetPanelBrightness(int level) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetPanelBrightness(level);
+}
+
 int DisplayHDMI::GetBestConfig() {
   uint32_t best_config_mode = 0;
   HWDisplayAttributes *best = &display_attributes_[0];

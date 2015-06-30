@@ -39,6 +39,7 @@ class HWPrimaryInterface: virtual public HWInterface {
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms) = 0;
   virtual DisplayError SetDisplayMode(const HWDisplayMode hw_display_mode) = 0;
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate) = 0;
+  virtual DisplayError SetPanelBrightness(int level) = 0;
 
  protected:
   virtual ~HWPrimaryInterface() { }

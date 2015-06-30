@@ -46,6 +46,7 @@ enum PendingAction {
   kDisableSolidFill = BITMAP(2),
   kEnterQDCMMode = BITMAP(3),
   kExitQDCMMode = BITMAP(4),
+  kSetPanelBrightness = BITMAP(5),
   kNoAction = BITMAP(31),
 };
 

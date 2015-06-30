@@ -31,6 +31,7 @@
 #include "hw_primary_interface.h"
 
 namespace sdm {
+#define MAX_SYSFS_COMMAND_LENGTH 12
 
 class HWPrimary : public HWDevice, public HWPrimaryInterface {
  public:
@@ -57,6 +58,7 @@ class HWPrimary : public HWDevice, public HWPrimaryInterface {
   virtual DisplayError SetVSyncState(bool enable);
   virtual DisplayError SetDisplayMode(const HWDisplayMode hw_display_mode);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
+  virtual DisplayError SetPanelBrightness(int level);
   virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers);
   virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list);
 
