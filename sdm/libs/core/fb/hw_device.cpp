@@ -301,21 +301,22 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
 void HWDevice::DumpLayerCommit(const mdp_layer_commit &layer_commit) {
   const mdp_layer_commit_v1 &mdp_commit = layer_commit.commit_v1;
   const mdp_input_layer *mdp_layers = mdp_commit.input_layers;
+  const mdp_rect &l_roi = mdp_commit.left_roi;
+  const mdp_rect &r_roi = mdp_commit.right_roi;
 
-  DLOGE("mdp_commit: flags = %x, release fence = %x", mdp_commit.flags, mdp_commit.release_fence);
-  DLOGE("left_roi: x = %d, y = %d, w = %d, h = %d", mdp_commit.left_roi.x, mdp_commit.left_roi.y,
-         mdp_commit.left_roi.w, mdp_commit.left_roi.h);
-  DLOGE("right_roi: x = %d, y = %d, w = %d, h = %d", mdp_commit.right_roi.x,
-         mdp_commit.right_roi.y, mdp_commit.right_roi.w, mdp_commit.right_roi.h);
+  DLOGI("mdp_commit: flags = %x, release fence = %x", mdp_commit.flags, mdp_commit.release_fence);
+  DLOGI("left_roi: x = %d, y = %d, w = %d, h = %d", l_roi.x, l_roi.y, l_roi.w, l_roi.h);
+  DLOGI("right_roi: x = %d, y = %d, w = %d, h = %d", r_roi.x, r_roi.y, r_roi.w, r_roi.h);
   for (uint32_t i = 0; i < mdp_commit.input_layer_cnt; i++) {
-    DLOGE("mdp_commit: layer_cnt = %d, pipe_ndx = %x, zorder = %d, flags = %x",
-          i, mdp_layers[i].pipe_ndx, mdp_layers[i].z_order, mdp_layers[i].flags);
-    const mdp_rect &src_rect = mdp_layers[i].src_rect;
-    DLOGE("src rect: x = %d, y = %d, w = %d, h = %d",
-          src_rect.x, src_rect.y, src_rect.w, src_rect.h);
-    const mdp_rect &dst_rect = mdp_layers[i].dst_rect;
-    DLOGE("dst rect: x = %d, y = %d, w = %d, h = %d",
-          dst_rect.x, dst_rect.y, dst_rect.w, dst_rect.h);
+    const mdp_input_layer &layer = mdp_layers[i];
+    const mdp_rect &src_rect = layer.src_rect;
+    const mdp_rect &dst_rect = layer.dst_rect;
+    DLOGI("layer = %d, pipe_ndx = %x, z = %d, flags = %x",
+      i, layer.pipe_ndx, layer.z_order, layer.flags);
+    DLOGI("src_rect: x = %d, y = %d, w = %d, h = %d",
+      src_rect.x, src_rect.y, src_rect.w, src_rect.h);
+    DLOGI("dst_rect: x = %d, y = %d, w = %d, h = %d",
+      dst_rect.x, dst_rect.y, dst_rect.w, dst_rect.h);
   }
 }
 
