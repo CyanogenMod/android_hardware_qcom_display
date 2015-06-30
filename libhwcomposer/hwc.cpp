@@ -849,6 +849,10 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
     if (!strcmp(name, HWC_HARDWARE_COMPOSER)) {
         struct hwc_context_t *dev;
         dev = (hwc_context_t*)malloc(sizeof(*dev));
+        if (dev == NULL) {
+            ALOGE("%s: malloc failure!", __FUNCTION__);
+            return status;
+        }
         memset(dev, 0, sizeof(*dev));
 
         //Initialize hwc context

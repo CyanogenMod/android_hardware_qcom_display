@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013, 2015, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -309,20 +309,23 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 int memoryFlags __attribute__((__unused__)) = va_arg(args, int);
                 private_handle_t* hnd = (private_handle_t*)native_handle_create(
                     private_handle_t::sNumFds, private_handle_t::sNumInts);
-                hnd->magic = private_handle_t::sMagic;
-                hnd->fd = fd;
-                hnd->flags =  private_handle_t::PRIV_FLAGS_USES_ION;
-                hnd->size = size;
-                hnd->offset = offset;
-                hnd->base = intptr_t(base) + offset;
-                hnd->gpuaddr = 0;
-                hnd->width = width;
-                hnd->height = height;
-                hnd->format = format;
-                *handle = (native_handle_t *)hnd;
-                res = 0;
+                if (hnd) {
+                    hnd->magic = private_handle_t::sMagic;
+                    hnd->fd = fd;
+                    hnd->flags =  private_handle_t::PRIV_FLAGS_USES_ION;
+                    hnd->size = size;
+                    hnd->offset = offset;
+                    hnd->base = intptr_t(base) + offset;
+                    hnd->gpuaddr = 0;
+                    hnd->width = width;
+                    hnd->height = height;
+                    hnd->format = format;
+                    *handle = (native_handle_t *)hnd;
+                    res = 0;
+                } else {
+                    ALOGE("%s: native_handle_create failed", __FUNCTION__);
+                }
                 break;
-
             }
         case GRALLOC_MODULE_PERFORM_GET_STRIDE:
             {
