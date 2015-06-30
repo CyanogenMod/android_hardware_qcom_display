@@ -79,6 +79,12 @@ protected:
         MDPCOMP_AVOID_MDP_ONLY_LAYERS = 0x010,
     };
 
+    //FB Z-Order
+    enum {
+        DEFAULT_FB_ZORDER = -2,
+        BASE_PIPE_ZORDER,
+    };
+
     /* mdp pipe data */
     struct MdpPipeInfo {
         int zOrder;
@@ -247,6 +253,8 @@ protected:
             hwc_display_contents_1_t* list);
     void reset(hwc_context_t *ctx);
     bool isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer);
+    int isBottomLayerFullScreen(hwc_context_t *ctx,
+            hwc_display_contents_1_t *list);
     bool resourceCheck(hwc_context_t* ctx, hwc_display_contents_1_t* list);
     hwc_rect_t getUpdatingFBRect(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);

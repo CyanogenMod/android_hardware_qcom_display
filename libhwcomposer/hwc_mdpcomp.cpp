@@ -348,7 +348,7 @@ void MDPComp::FrameInfo::reset(const int& numLayers) {
     fbCount = numLayers;
     mdpCount = 0;
     needsRedraw = true;
-    fbZ = -1;
+    fbZ = DEFAULT_FB_ZORDER;
 }
 
 void MDPComp::FrameInfo::map() {
@@ -1201,7 +1201,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
 
     mCurrentFrame.mdpCount = numNonCursorLayers;
     mCurrentFrame.fbCount = 0;
-    mCurrentFrame.fbZ = -1;
+    mCurrentFrame.fbZ = DEFAULT_FB_ZORDER;
 
     for (int j = 0; j < numNonCursorLayers; j++) {
         if(isValidRect(list->hwLayers[j].displayFrame)) {
@@ -1331,7 +1331,8 @@ bool MDPComp::loadBasedComp(hwc_context_t *ctx,
 
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     const int numNonDroppedLayers = numAppLayers - mCurrentFrame.dropCount;
-    const int stagesForMDP = min(sMaxPipesPerMixer,
+    const int basePipe = isBottomLayerFullScreen(ctx, list);
+    const int stagesForMDP = min((sMaxPipesPerMixer + basePipe),
             ctx->mOverlay->availablePipes(mDpy, Overlay::MIXER_DEFAULT));
 
     int mdpBatchSize = stagesForMDP - 1; //1 stage for FB
@@ -1386,7 +1387,7 @@ bool MDPComp::loadBasedComp(hwc_context_t *ctx,
             --mdpBatchLeft;
         }
 
-        mCurrentFrame.fbZ = mdpBatchSize;
+        mCurrentFrame.fbZ = mdpBatchSize - basePipe;
         mCurrentFrame.fbCount = fbBatchSize;
         mCurrentFrame.mdpCount = mdpBatchSize;
 
@@ -1752,7 +1753,7 @@ bool  MDPComp::markLayersForCaching(hwc_context_t* ctx,
     int maxBatchStart = -1;
     int maxBatchEnd = -1;
     int maxBatchCount = 0;
-    int fbZ = -1;
+    int fbZ = DEFAULT_FB_ZORDER;
 
     /* Nothing is cached. No batching needed */
     if(mCurrentFrame.fbCount == 0) {
@@ -1764,7 +1765,8 @@ bool  MDPComp::markLayersForCaching(hwc_context_t* ctx,
         return false;
     }
 
-    fbZ = getBatch(list, maxBatchStart, maxBatchEnd, maxBatchCount);
+    fbZ = getBatch(list, maxBatchStart, maxBatchEnd, maxBatchCount) -
+        isBottomLayerFullScreen(ctx, list);
 
     /* reset rest of the layers lying inside ROI for MDP comp */
     for(int i = 0; i < mCurrentFrame.layerCount; i++) {
@@ -1934,7 +1936,7 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
     }
 
     //Configure framebuffer first if applicable
-    if(mCurrentFrame.fbZ >= 0) {
+    if(mCurrentFrame.fbZ >= BASE_PIPE_ZORDER) {
         hwc_rect_t fbRect = getUpdatingFBRect(ctx, list);
         if(!ctx->mFBUpdate[mDpy]->prepare(ctx, list, fbRect, mCurrentFrame.fbZ))
         {
@@ -1951,8 +1953,15 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
         return false;
     }
 
-    for (int index = 0, mdpNextZOrder = 0; index < mCurrentFrame.layerCount;
-            index++) {
+    int mdpNextZOrder = 0;
+    hwc_rect_t fbRect = {0, 0, (int)ctx->dpyAttr[mDpy].xres,
+        (int)ctx->dpyAttr[mDpy].yres};
+    if(isBottomLayerFullScreen(ctx, list) && (not mCurrentFrame.isFBComposed[0]
+                or (mCurrentFrame.fbZ == BASE_PIPE_ZORDER &&
+                    isSameRect(fbRect, getUpdatingFBRect(ctx, list)))))
+        mdpNextZOrder = BASE_PIPE_ZORDER;
+
+    for (int index = 0; index < mCurrentFrame.layerCount; index++) {
         if(!mCurrentFrame.isFBComposed[index]) {
             int mdpIndex = mCurrentFrame.layerToMDP[index];
             hwc_layer_1_t* layer = &list->hwLayers[index];
@@ -2015,7 +2024,9 @@ bool MDPComp::resourceCheck(hwc_context_t* ctx,
     if (maxStages > sMaxPipesPerMixer) {
         cursorInUse = 0;
     }
-    if(mCurrentFrame.mdpCount > (sMaxPipesPerMixer - fbUsed - cursorInUse)) {
+    const int basePipe = isBottomLayerFullScreen(ctx, list);
+    if(mCurrentFrame.mdpCount >
+            (sMaxPipesPerMixer - fbUsed - cursorInUse + basePipe)) {
         ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
         return false;
     }
@@ -2174,6 +2185,24 @@ void MDPComp::setDynRefreshRate(hwc_context_t *ctx, hwc_display_contents_1_t* li
         }
         setRefreshRate(ctx, mDpy, refreshRate);
     }
+}
+
+/*
+ * For the use-cases where bottom most layer in the layer list
+ * is full screen, it can be used as base layer in the first stage
+ * instead of borderfill to optimize MDP staging.
+ * */
+int MDPComp::isBottomLayerFullScreen(hwc_context_t *ctx,
+        hwc_display_contents_1_t *list) {
+    hwc_layer_1_t* layer = &list->hwLayers[0];
+    hwc_rect_t rect = {0, 0, (int)ctx->dpyAttr[mDpy].xres,
+        (int)ctx->dpyAttr[mDpy].yres};
+    if((ctx->listStats[mDpy].numAppLayers > 1) &&
+            isSupportedForMDPComp(ctx, layer) &&
+            isSameRect(rect, layer->displayFrame)) {
+        return 1;
+    }
+    return 0;
 }
 
 int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
