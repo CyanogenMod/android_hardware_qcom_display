@@ -1079,7 +1079,8 @@ void setListStats(hwc_context_t *ctx,
         ctx->listStats[dpy].yuvIndices[i] = -1;
         ctx->listStats[dpy].yuv4k2kIndices[i] = -1;
 
-        if (isSecureBuffer(hnd)) {
+        if (isSecureBuffer(hnd) || isProtectedBuffer(hnd)) {
+            // Protected Buffer must be treated as Secure Layer
             ctx->listStats[dpy].isSecurePresent = true;
             if(not isYuvBuffer(hnd)) {
                 // cache secureRGB layer parameters like we cache for YUV layers
@@ -2755,6 +2756,10 @@ void BwcPM::setBwc(const hwc_context_t *ctx, const int& dpy,
     }
     //src width > MAX mixer supported dim
     if(src_w > (int) qdutils::MDPVersion::getInstance().getMaxPipeWidth()) {
+        return;
+    }
+    //H/w requirement for BWC only. Pipe can still support 4096
+    if(src_h > 4092) {
         return;
     }
     //Decimation necessary, cannot use BWC. H/W requirement.
