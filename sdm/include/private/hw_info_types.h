@@ -151,7 +151,7 @@ struct HWPanelInfo {
 
   HWPanelInfo() : port(kPortDefault), mode(kModeDefault), partial_update(false), left_align(false),
     width_align(false), top_align(false), height_align(false), min_roi_width(0), min_roi_height(0),
-    needs_roi_merge(false), dynamic_fps(false), min_fps(0), max_fps(0) { }
+    needs_roi_merge(false), dynamic_fps(false), min_fps(0), max_fps(0), is_primary_panel(false) { }
 
   bool operator !=(const HWPanelInfo &panel_info) {
     return ((port != panel_info.port) || (mode != panel_info.mode) ||

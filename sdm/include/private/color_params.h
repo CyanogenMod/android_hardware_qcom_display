@@ -56,6 +56,7 @@ enum PPGlobalColorFeatureID {
   kGlobalColorFeaturePcc,
   kGlobalColorFeatureIgc,
   kGlobalColorFeaturePgc,
+  kMixerColorFeatureGc,
   kGlobalColorFeaturePaV2,
   kGlobalColorFeatureDither,
   kGlobalColorFeatureGamut,
@@ -83,7 +84,7 @@ struct PPFeatureVersion {
 };
 
 struct PPHWAttributes : HWResourceInfo, HWPanelInfo, DisplayConfigVariableInfo {
-  const char *panel_name;  // TODO:  Add into HWPanelInfo to retrieve panel_name from HW.
+  const char *panel_name;  // TODO(user):  Add into HWPanelInfo to retrieve panel_name from HW.
   PPFeatureVersion version;
 
   PPHWAttributes() : panel_name("generic_panel"), version() {}
@@ -364,9 +365,9 @@ class PPFeaturesConfig {
   // ColorManager installs one TFeatureInfo<T> to take the output configs computed
   // from ColorManager, containing all physical features to be programmed and also compute
   // metadata/populate into T.
-  inline DisplayError AddFeature(uint32_t feature_id, PPFeatureInfo &feature) {
+  inline DisplayError AddFeature(uint32_t feature_id, PPFeatureInfo *feature) {
     if (feature_id < kMaxNumPPFeatures)
-      feature_[feature_id] = &feature;
+      feature_[feature_id] = feature;
 
     return kErrorNone;
   }

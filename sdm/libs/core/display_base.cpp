@@ -238,11 +238,11 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
     }
   }
 
-   // check if feature list cache is dirty and pending.
-   // If dirty, need program to hardware blocks.
+  // check if feature list cache is dirty and pending.
+  // If dirty, need program to hardware blocks.
   if (color_mgr_)
     error = color_mgr_->Commit();
-  if (error != kErrorNone) { // won't affect this execution path.
+  if (error != kErrorNone) {  // won't affect this execution path.
     DLOGW("ColorManager::Commit(...) isn't working");
   }
 
@@ -455,10 +455,8 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
 
   DumpImpl::AppendString(buffer, length, "\n");
 
-  uint32_t num_layers = 0;
   uint32_t num_hw_layers = 0;
   if (hw_layers_.info.stack) {
-    num_layers = hw_layers_.info.stack->layer_count;
     num_hw_layers = hw_layers_.info.count;
   }
 

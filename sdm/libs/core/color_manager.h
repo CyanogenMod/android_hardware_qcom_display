@@ -55,8 +55,8 @@ class ColorManagerProxy {
    * 4. Need get panel name for hw_panel_info_.
    */
   static ColorManagerProxy *CreateColorManagerProxy(DisplayType type, HWInterface *hw_intf,
-                                                    HWDisplayAttributes &attribute,
-                                                    HWPanelInfo &panel_info);
+                                                    const HWDisplayAttributes &attribute,
+                                                    const HWPanelInfo &panel_info);
 
   /* need reverse the effect of CreateColorManagerProxy. */
   ~ColorManagerProxy();
@@ -69,8 +69,8 @@ class ColorManagerProxy {
 
  protected:
   ColorManagerProxy() {}
-  ColorManagerProxy(DisplayType type, HWInterface *intf, HWDisplayAttributes &attr,
-                    HWPanelInfo &info);
+  ColorManagerProxy(DisplayType type, HWInterface *intf, const HWDisplayAttributes &attr,
+                    const HWPanelInfo &info);
 
  private:
   static void *color_lib_;
