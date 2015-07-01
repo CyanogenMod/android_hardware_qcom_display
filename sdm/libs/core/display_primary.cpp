@@ -287,10 +287,8 @@ DisplayError DisplayPrimary::Blank(bool blank) {
 }
 
 void DisplayPrimary::IdleTimeout() {
-  SCOPE_LOCK(locker_);
-  bool need_refresh = comp_manager_->ProcessIdleTimeout(display_comp_ctx_);
-  if (need_refresh) {
-    event_handler_->Refresh();
+  if (event_handler_->Refresh() == kErrorNone) {
+    comp_manager_->ProcessIdleTimeout(display_comp_ctx_);
   }
 }
 

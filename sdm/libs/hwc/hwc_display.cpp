@@ -317,9 +317,10 @@ DisplayError HWCDisplay::VSync(const DisplayEventVSync &vsync) {
 DisplayError HWCDisplay::Refresh() {
   if (*hwc_procs_ && handle_refresh_) {
     (*hwc_procs_)->invalidate(*hwc_procs_);
+    return kErrorNone;
   }
 
-  return kErrorNone;
+  return kErrorNotSupported;
 }
 
 int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
