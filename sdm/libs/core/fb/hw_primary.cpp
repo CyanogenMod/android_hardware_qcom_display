@@ -38,6 +38,9 @@
 #include <sys/resource.h>
 #include <utils/debug.h>
 #include <utils/sys.h>
+#include <core/display_interface.h>
+
+#include <string>
 
 #include "hw_primary.h"
 #include "hw_color_manager.h"
@@ -45,6 +48,8 @@
 #define __CLASS__ "HWPrimary"
 
 namespace sdm {
+
+using std::string;
 
 DisplayError HWPrimary::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
                                BufferSyncHandler *buffer_sync_handler,
@@ -130,6 +135,7 @@ DisplayError HWPrimary::Init(HWEventHandler *eventhandler) {
   // Disable HPD at start if HDMI is external, it will be enabled later when the display powers on
   // This helps for framework reboot or adb shell stop/start
   EnableHotPlugDetection(0);
+  InitializeConfigs();
 
   return kErrorNone;
 
@@ -145,6 +151,73 @@ CleanupOnError:
   return error;
 }
 
+void HWPrimary::InitializeConfigs() {
+  size_t curr_x_pixels = 0;
+  size_t curr_y_pixels = 0;
+  string mode_path = string(fb_path_) + string("0/mode");
+  string modes_path = string(fb_path_) + string("0/modes");
+  size_t len = kPageSize;
+  char *buffer = static_cast<char *>(calloc(len, sizeof(char)));
+
+  if (buffer == NULL) {
+    DLOGW("Failed to allocate memory");
+    return;
+  }
+
+  FILE *fd = Sys::fopen_(mode_path.c_str(), "r");
+  if (fd) {
+    if (Sys::getline_(&buffer, &len, fd) > 0) {
+      // String is of form "U:1600x2560p-0". Documentation/fb/modedb.txt in
+      // kernel has more info on the format.
+      size_t xpos = string(buffer).find(':');
+      size_t ypos = string(buffer).find('x');
+
+      if (xpos == string::npos || ypos == string::npos) {
+        DLOGI("Resolution switch not supported");
+        free(buffer);
+        Sys::fclose_(fd);
+        return;
+      }
+
+      curr_x_pixels = atoi(buffer + xpos + 1);
+      curr_y_pixels = atoi(buffer + ypos + 1);
+      DLOGI("Current Config: %u x %u", curr_x_pixels, curr_y_pixels);
+    }
+
+    Sys::fclose_(fd);
+  }
+
+  fd = Sys::fopen_(modes_path.c_str(), "r");
+  if (fd) {
+    while (Sys::getline_(&buffer, &len, fd) > 0) {
+      DisplayConfigVariableInfo config;
+      size_t xpos = string(buffer).find(':');
+      size_t ypos = string(buffer).find('x');
+
+      if (xpos == string::npos || ypos == string::npos) {
+        continue;
+      }
+
+      config.x_pixels = atoi(buffer + xpos + 1);
+      config.y_pixels = atoi(buffer + ypos + 1);
+      DLOGI("Found mode %d x %d", config.x_pixels, config.y_pixels);
+      display_configs_.push_back(config);
+      display_config_strings_.push_back(string(buffer));
+
+      if (curr_x_pixels == config.x_pixels && curr_y_pixels == config.y_pixels) {
+        active_config_index_ = display_configs_.size() - 1;
+        DLOGI("Active config index %u", active_config_index_);
+      }
+    }
+
+    Sys::fclose_(fd);
+  } else {
+    DLOGI("Unable to process modes");
+  }
+
+  free(buffer);
+}
+
 DisplayError HWPrimary::Deinit() {
   exit_threads_ = true;
   pthread_join(event_thread_, NULL);
@@ -157,12 +230,22 @@ DisplayError HWPrimary::Deinit() {
 }
 
 DisplayError HWPrimary::GetNumDisplayAttributes(uint32_t *count) {
-  return HWDevice::GetNumDisplayAttributes(count);
+  *count = isResolutionSwitchEnabled() ? display_configs_.size() : 1;
+  return kErrorNone;
 }
 
-DisplayError HWPrimary::GetDisplayAttributes(HWDisplayAttributes *display_attributes,
-                                             uint32_t index) {
+DisplayError HWPrimary::GetActiveConfig(uint32_t *active_config_index) {
+  *active_config_index = active_config_index_;
+  return kErrorNone;
+}
+
+DisplayError HWPrimary::GetDisplayAttributes(uint32_t index,
+                                             HWDisplayAttributes *display_attributes) {
   if (!display_attributes) {
+    return kErrorParameters;
+  }
+
+  if (isResolutionSwitchEnabled() && index >= display_configs_.size()) {
     return kErrorParameters;
   }
 
@@ -171,11 +254,16 @@ DisplayError HWPrimary::GetDisplayAttributes(HWDisplayAttributes *display_attrib
     if (error != kErrorNone) {
       return error;
     }
-
     config_changed_ = false;
   }
 
   *display_attributes = display_attributes_;
+  if (isResolutionSwitchEnabled()) {
+    // Overwrite only the parent portion of object
+    display_attributes->x_pixels = display_configs_.at(index).x_pixels;
+    display_attributes->y_pixels = display_configs_.at(index).y_pixels;
+    display_attributes->fps = display_configs_.at(index).fps;
+  }
 
   return kErrorNone;
 }
@@ -230,7 +318,38 @@ DisplayError HWPrimary::PopulateDisplayAttributes() {
 }
 
 DisplayError HWPrimary::SetDisplayAttributes(uint32_t index) {
-  return HWDevice::SetDisplayAttributes(index);
+  DisplayError ret = kErrorNone;
+
+  if (!isResolutionSwitchEnabled()) {
+    return kErrorNotSupported;
+  }
+
+  if (index >= display_configs_.size()) {
+    return kErrorParameters;
+  }
+
+  string mode_path = string(fb_path_) + string("0/mode");
+  int fd = Sys::open_(mode_path.c_str(), O_WRONLY);
+
+  if (fd < 0) {
+    DLOGE("Opening mode failed");
+    return kErrorNotSupported;
+  }
+
+  ssize_t written = Sys::pwrite_(fd, display_config_strings_.at(index).c_str(),
+                                 display_config_strings_.at(index).length(), 0);
+  if (written > 0) {
+    DLOGI("Successfully set config %u", index);
+    PopulateDisplayAttributes();
+    active_config_index_ = index;
+  } else {
+    DLOGE("Writing config index %u failed with error: %s", index, strerror(errno));
+    ret = kErrorParameters;
+  }
+
+  Sys::close_(fd);
+
+  return ret;
 }
 
 DisplayError HWPrimary::SetRefreshRate(uint32_t refresh_rate) {

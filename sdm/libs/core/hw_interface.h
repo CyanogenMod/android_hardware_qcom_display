@@ -62,9 +62,10 @@ class HWEventHandler {
 
 class HWInterface {
  public:
+  virtual DisplayError GetActiveConfig(uint32_t *active_config) = 0;
   virtual DisplayError GetNumDisplayAttributes(uint32_t *count) = 0;
-  virtual DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
-                                            uint32_t index) = 0;
+  virtual DisplayError GetDisplayAttributes(uint32_t index,
+                                            HWDisplayAttributes *display_attributes) = 0;
   virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info) = 0;
   virtual DisplayError SetDisplayAttributes(uint32_t index) = 0;
   virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index) = 0;

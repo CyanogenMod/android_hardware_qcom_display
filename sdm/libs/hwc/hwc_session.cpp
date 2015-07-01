@@ -586,6 +586,22 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     status = ControlPartialUpdate(input_parcel, output_parcel);
     break;
 
+  case qService::IQService::SET_ACTIVE_CONFIG:
+    status = HandleSetActiveDisplayConfig(input_parcel, output_parcel);
+    break;
+
+  case qService::IQService::GET_ACTIVE_CONFIG:
+    status = HandleGetActiveDisplayConfig(input_parcel, output_parcel);
+    break;
+
+  case qService::IQService::GET_CONFIG_COUNT:
+    status = HandleGetDisplayConfigCount(input_parcel, output_parcel);
+    break;
+
+  case qService::IQService::GET_DISPLAY_ATTRIBUTES_FOR_CONFIG:
+    status = HandleGetDisplayAttributesForConfig(input_parcel, output_parcel);
+    break;
+
   default:
     DLOGW("QService command = %d is not supported", command);
     return -EINVAL;
@@ -680,6 +696,93 @@ android::status_t HWCSession::ControlPartialUpdate(const android::Parcel *input_
   out->writeInt32(ret);
 
   return ret;
+}
+
+android::status_t HWCSession::HandleSetActiveDisplayConfig(const android::Parcel *input_parcel,
+                                                     android::Parcel *output_parcel) {
+  int config = input_parcel->readInt32();
+  int dpy = input_parcel->readInt32();
+  int error = android::BAD_VALUE;
+
+  if (dpy > HWC_DISPLAY_VIRTUAL) {
+    return android::BAD_VALUE;
+  }
+
+  if (hwc_display_[dpy]) {
+    error = hwc_display_[dpy]->SetActiveDisplayConfig(config);
+    if (error == 0) {
+      hwc_procs_->invalidate(hwc_procs_);
+    }
+  }
+
+  return error;
+}
+
+android::status_t HWCSession::HandleGetActiveDisplayConfig(const android::Parcel *input_parcel,
+                                                           android::Parcel *output_parcel) {
+  int dpy = input_parcel->readInt32();
+  int error = android::BAD_VALUE;
+
+  if (dpy > HWC_DISPLAY_VIRTUAL) {
+    return android::BAD_VALUE;
+  }
+
+  if (hwc_display_[dpy]) {
+    uint32_t config = 0;
+    error = hwc_display_[dpy]->GetActiveDisplayConfig(&config);
+    if (error == 0) {
+      output_parcel->writeInt32(config);
+    }
+  }
+
+  return error;
+}
+
+android::status_t HWCSession::HandleGetDisplayConfigCount(const android::Parcel *input_parcel,
+                                                          android::Parcel *output_parcel) {
+  int dpy = input_parcel->readInt32();
+  int error = android::BAD_VALUE;
+
+  if (dpy > HWC_DISPLAY_VIRTUAL) {
+    return android::BAD_VALUE;
+  }
+
+  uint32_t count = 0;
+  if (hwc_display_[dpy]) {
+    error = hwc_display_[dpy]->GetDisplayConfigCount(&count);
+    if (error == 0) {
+      output_parcel->writeInt32(count);
+    }
+  }
+
+  return error;
+}
+
+android::status_t HWCSession::HandleGetDisplayAttributesForConfig(const android::Parcel
+                                                                  *input_parcel,
+                                                                  android::Parcel *output_parcel) {
+  int config = input_parcel->readInt32();
+  int dpy = input_parcel->readInt32();
+  int error = android::BAD_VALUE;
+  DisplayConfigVariableInfo attributes;
+
+  if (dpy > HWC_DISPLAY_VIRTUAL) {
+    return android::BAD_VALUE;
+  }
+
+  if (hwc_display_[dpy]) {
+    error = hwc_display_[dpy]->GetDisplayAttributesForConfig(config, &attributes);
+    if (error == 0) {
+      output_parcel->writeInt32(attributes.vsync_period_ns);
+      output_parcel->writeInt32(attributes.x_pixels);
+      output_parcel->writeInt32(attributes.y_pixels);
+      output_parcel->writeFloat(attributes.x_dpi);
+      output_parcel->writeFloat(attributes.y_dpi);
+      output_parcel->writeInt32(0);  // Panel type, unsupported.
+    }
+  }
+
+  return error;
 }
 
 android::status_t HWCSession::SetSecondaryDisplayStatus(const android::Parcel *input_parcel) {

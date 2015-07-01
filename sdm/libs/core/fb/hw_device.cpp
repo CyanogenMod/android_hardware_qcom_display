@@ -94,13 +94,18 @@ DisplayError HWDevice::Deinit() {
   return kErrorNone;
 }
 
+DisplayError HWDevice::GetActiveConfig(uint32_t *active_config) {
+  *active_config = 0;
+  return kErrorNone;
+}
+
 DisplayError HWDevice::GetNumDisplayAttributes(uint32_t *count) {
   *count = 1;
   return kErrorNone;
 }
 
-DisplayError HWDevice::GetDisplayAttributes(HWDisplayAttributes *display_attributes,
-                                                 uint32_t index) {
+DisplayError HWDevice::GetDisplayAttributes(uint32_t index,
+                                            HWDisplayAttributes *display_attributes) {
   return kErrorNone;
 }
 
@@ -116,7 +121,6 @@ DisplayError HWDevice::SetDisplayAttributes(uint32_t index) {
 DisplayError HWDevice::GetConfigIndex(uint32_t mode, uint32_t *index) {
   return kErrorNone;
 }
-
 
 DisplayError HWDevice::PowerOn() {
   DTRACE_SCOPED();
