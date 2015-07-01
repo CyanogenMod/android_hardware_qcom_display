@@ -28,6 +28,12 @@
 #include "sync/sync.h"
 
 using namespace qdutils;
+#ifdef NO_IOMMU
+#define HEAP_ID GRALLOC_USAGE_PRIVATE_UI_CONTIG_HEAP
+#else
+#define HEAP_ID GRALLOC_USAGE_PRIVATE_IOMMU_HEAP
+#endif
+
 namespace qhwc {
 
 struct range {
@@ -442,7 +448,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
        }
        ALOGE("%s:%d::tmp_w = %d,tmp_h = %d",__FUNCTION__,__LINE__,tmp_w,tmp_h);
 
-       int usage = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP;
+       int usage = HEAP_ID;
 
        if (0 == alloc_buffer(&tmpHnd, tmp_w, tmp_h, fbHandle->format, usage)){
             copybit_image_t tmp_dst;
@@ -539,8 +545,7 @@ int CopyBit::allocRenderBuffers(int w, int h, int f)
     for (int i = 0; i < NUM_RENDER_BUFFERS; i++) {
         if (mRenderBuffer[i] == NULL) {
             ret = alloc_buffer(&mRenderBuffer[i],
-                               w, h, f,
-                               GRALLOC_USAGE_PRIVATE_IOMMU_HEAP);
+                               w, h, f, HEAP_ID);
         }
         if(ret < 0) {
             freeRenderBuffers();
