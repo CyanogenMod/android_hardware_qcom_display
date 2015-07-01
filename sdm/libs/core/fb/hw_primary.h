@@ -26,11 +26,14 @@
 #define __HW_PRIMARY_H__
 
 #include <sys/poll.h>
+#include <vector>
+#include <string>
 
 #include "hw_device.h"
 
 namespace sdm {
 #define MAX_SYSFS_COMMAND_LENGTH 12
+struct DisplayConfigVariableInfo;
 
 class HWPrimary : public HWDevice {
  public:
@@ -43,8 +46,9 @@ class HWPrimary : public HWDevice {
   virtual DisplayError Init(HWEventHandler *eventhandler);
   virtual DisplayError Deinit();
   virtual DisplayError GetNumDisplayAttributes(uint32_t *count);
-  virtual DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
-                                            uint32_t index);
+  virtual DisplayError GetActiveConfig(uint32_t *active_config);
+  virtual DisplayError GetDisplayAttributes(uint32_t index,
+                                            HWDisplayAttributes *display_attributes);
   virtual DisplayError SetDisplayAttributes(uint32_t index);
   virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
   virtual DisplayError PowerOff();
@@ -75,6 +79,8 @@ class HWPrimary : public HWDevice {
   void HandleIdleTimeout(char *data);
   void HandleThermal(char *data);
   DisplayError PopulateDisplayAttributes();
+  void InitializeConfigs();
+  bool isResolutionSwitchEnabled() { return !display_configs_.empty(); }
 
   pollfd poll_fds_[kNumDisplayEvents];
   pthread_t event_thread_;
@@ -83,6 +89,9 @@ class HWPrimary : public HWDevice {
   bool exit_threads_ = false;
   HWDisplayAttributes display_attributes_;
   bool config_changed_ = true;
+  std::vector<DisplayConfigVariableInfo> display_configs_;
+  std::vector<std::string> display_config_strings_;
+  uint32_t active_config_index_ = 0;
 };
 
 }  // namespace sdm

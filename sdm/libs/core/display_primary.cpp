@@ -92,6 +92,7 @@ DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
   HWPanelInfo panel_info;
   HWDisplayAttributes display_attributes;
+  uint32_t active_index = 0;
 
   error = DisplayBase::Commit(layer_stack);
   if (error != kErrorNone) {
@@ -99,15 +100,12 @@ DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
   }
 
   hw_intf_->GetHWPanelInfo(&panel_info);
+  hw_intf_->GetActiveConfig(&active_index);
+  hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
 
-  hw_intf_->GetDisplayAttributes(&display_attributes, active_mode_index_);
-
-  if (panel_info != hw_panel_info_ ||
-      display_attributes != display_attributes_[active_mode_index_]) {
+  if (panel_info != hw_panel_info_) {
     comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, panel_info);
-
     hw_panel_info_ = panel_info;
-    display_attributes_[active_mode_index_] = display_attributes;
   }
 
   return error;
@@ -126,11 +124,6 @@ DisplayError DisplayPrimary::GetDisplayState(DisplayState *state) {
 DisplayError DisplayPrimary::GetNumVariableInfoConfigs(uint32_t *count) {
   SCOPE_LOCK(locker_);
   return DisplayBase::GetNumVariableInfoConfigs(count);
-}
-
-DisplayError DisplayPrimary::GetConfig(DisplayConfigFixedInfo *fixed_info) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetConfig(fixed_info);
 }
 
 DisplayError DisplayPrimary::GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info) {
