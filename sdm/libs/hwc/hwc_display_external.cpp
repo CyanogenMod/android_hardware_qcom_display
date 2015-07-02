@@ -55,7 +55,7 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
   int downscale_enabled = 0;
   HWCDebugHandler::Get()->GetProperty("sdm.debug.sde_downscale_external", &downscale_enabled);
   if (downscale_enabled) {
-    GetDownscaleResolution(primary_width, primary_height, &external_width, &external_width);
+    GetDownscaleResolution(primary_width, primary_height, &external_width, &external_height);
   }
 
   status = hwc_display_external->SetFrameBufferResolution(external_width, external_height);
@@ -115,25 +115,6 @@ int HWCDisplayExternal::Commit(hwc_display_contents_1_t *content_list) {
   status = HWCDisplay::PostCommitLayerStack(content_list);
   if (status) {
     return status;
-  }
-
-  return 0;
-}
-
-int HWCDisplayExternal::GetDisplayConfigs(uint32_t *configs, size_t *num_configs) {
-  uint32_t config_count = 0;
-  if (*num_configs <= 0) {
-    return -EINVAL;
-  }
-
-  display_intf_->GetNumVariableInfoConfigs(&config_count);
-  *num_configs = static_cast<size_t>(config_count);
-  if (*num_configs <= 0) {
-    return -EINVAL;
-  }
-
-  for (uint32_t i = 0; i < config_count; i++) {
-    configs[i] = i;
   }
 
   return 0;

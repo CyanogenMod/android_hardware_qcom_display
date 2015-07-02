@@ -215,19 +215,7 @@ int HWCDisplay::GetDisplayConfigs(uint32_t *configs, size_t *num_configs) {
 }
 
 int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values) {
-  DisplayError error = kErrorNone;
-
-  DisplayConfigVariableInfo variable_config;
-  uint32_t active_config = UINT32(GetActiveConfig());
-  if (IsFrameBufferScaled() && config == active_config) {
-    variable_config = *framebuffer_config_;
-  } else {
-    error = display_intf_->GetConfig(config, &variable_config);
-    if (error != kErrorNone) {
-      DLOGE("GetConfig variable info failed. Error = %d", error);
-      return -EINVAL;
-    }
-  }
+  DisplayConfigVariableInfo variable_config = *framebuffer_config_;
 
   for (int i = 0; attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
     switch (attributes[i]) {
@@ -259,36 +247,11 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
 }
 
 int HWCDisplay::GetActiveConfig() {
-  DisplayError error = kErrorNone;
-  uint32_t index = 0;
-
-  error = display_intf_->GetActiveConfig(&index);
-  if (error != kErrorNone) {
-    DLOGE("GetActiveConfig failed. Error = %d", error);
-    return -1;
-  }
-
-  return index;
+  return 0;
 }
 
 int HWCDisplay::SetActiveConfig(int index) {
-  DisplayError error = kErrorNone;
-
-  if (shutdown_pending_) {
-    return 0;
-  }
-
-  error = display_intf_->SetActiveConfig(index);
-  if (error != kErrorNone) {
-    if (error == kErrorShutDown) {
-      shutdown_pending_ = true;
-      return 0;
-    }
-    DLOGE("SetActiveConfig failed. Error = %d", error);
-    return -1;
-  }
-
-  return 0;
+  return -1;
 }
 
 void HWCDisplay::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type) {
@@ -1068,7 +1031,8 @@ int HWCDisplay::SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels) {
   }
 
   DisplayConfigVariableInfo active_config;
-  int active_config_index = GetActiveConfig();
+  uint32_t active_config_index = 0;
+  display_intf_->GetActiveConfig(&active_config_index);
   DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
   if (error != kErrorNone) {
     DLOGV("GetConfig variable info failed. Error = %d", error);
@@ -1091,17 +1055,11 @@ int HWCDisplay::SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels) {
     return -EINVAL;
   }
 
-  uint32_t panel_width =
-          UINT32((FLOAT(active_config.x_pixels) * 25.4f) / FLOAT(active_config.x_dpi));
-  uint32_t panel_height =
-          UINT32((FLOAT(active_config.y_pixels) * 25.4f) / FLOAT(active_config.y_dpi));
   framebuffer_config_->x_pixels = x_pixels;
   framebuffer_config_->y_pixels = y_pixels;
   framebuffer_config_->vsync_period_ns = active_config.vsync_period_ns;
-  framebuffer_config_->x_dpi =
-          (FLOAT(framebuffer_config_->x_pixels) * 25.4f) / FLOAT(panel_width);
-  framebuffer_config_->y_dpi =
-          (FLOAT(framebuffer_config_->y_pixels) * 25.4f) / FLOAT(panel_height);
+  framebuffer_config_->x_dpi = active_config.x_dpi;
+  framebuffer_config_->y_dpi = active_config.y_dpi;
 
   DLOGI("New framebuffer resolution (%dx%d)", framebuffer_config_->x_pixels,
         framebuffer_config_->y_pixels);
@@ -1119,7 +1077,8 @@ void HWCDisplay::ScaleDisplayFrame(hwc_rect_t *display_frame) {
     return;
   }
 
-  int active_config_index = GetActiveConfig();
+  uint32_t active_config_index = 0;
+  display_intf_->GetActiveConfig(&active_config_index);
   DisplayConfigVariableInfo active_config;
   DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
   if (error != kErrorNone) {
@@ -1155,7 +1114,8 @@ bool HWCDisplay::IsFrameBufferScaled() {
 
 void HWCDisplay::GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
   DisplayConfigVariableInfo active_config;
-  int active_config_index = GetActiveConfig();
+  uint32_t active_config_index = 0;
+  display_intf_->GetActiveConfig(&active_config_index);
   DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
   if (error != kErrorNone) {
     DLOGE("GetConfig variable info failed. Error = %d", error);

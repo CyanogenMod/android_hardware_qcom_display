@@ -160,16 +160,6 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-int HWCDisplayPrimary::SetActiveConfig(int index) {
-  DisplayError error = kErrorNone;
-
-  if (display_intf_) {
-    error = display_intf_->SetActiveConfig(index);
-  }
-
-  return error;
-}
-
 int HWCDisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
   DisplayError error = kErrorNone;
 
