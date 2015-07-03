@@ -45,6 +45,7 @@
 #include <utils/sys.h>
 
 #include "hw_device.h"
+#include "hw_info_interface.h"
 
 #define __CLASS__ "HWDevice"
 
@@ -55,8 +56,11 @@ HWDevice::HWDevice(BufferSyncHandler *buffer_sync_handler)
     buffer_sync_handler_(buffer_sync_handler), synchronous_commit_(false) {
 }
 
-DisplayError HWDevice::Init() {
+DisplayError HWDevice::Init(HWEventHandler *eventhandler) {
   DisplayError error = kErrorNone;
+  char device_name[64] = {0};
+
+  event_handler_ = eventhandler;
 
   // Read the fb node index
   fb_node_index_ = GetFBNodeIndex(device_type_);
@@ -71,19 +75,7 @@ DisplayError HWDevice::Init() {
   hw_resource_ = HWResourceInfo();
   hw_info_intf_->GetHWResourceInfo(&hw_resource_);
 
-  return error;
-}
-
-DisplayError HWDevice::Open(HWEventHandler *eventhandler) {
-  DisplayError error = kErrorNone;
-
-  char device_name[64] = {0};
-
-  // Store EventHandlers for two Physical displays, i.e., Primary and HDMI
-  // TODO(user): Need to revisit for HDMI as Primary usecase
-  event_handler_ = eventhandler;
   snprintf(device_name, sizeof(device_name), "%s%d", "/dev/graphics/fb", fb_node_index_);
-
   device_fd_ = Sys::open_(device_name, O_RDWR);
   if (device_fd_ < 0) {
     DLOGE("open %s failed err = %d errstr = %s", device_name, errno,  strerror(errno));
@@ -93,9 +85,10 @@ DisplayError HWDevice::Open(HWEventHandler *eventhandler) {
   return error;
 }
 
-DisplayError HWDevice::Close() {
-  if (device_fd_ > 0) {
+DisplayError HWDevice::Deinit() {
+  if (device_fd_ >= 0) {
     Sys::close_(device_fd_);
+    device_fd_ = -1;
   }
 
   return kErrorNone;
@@ -979,6 +972,49 @@ DisplayError HWDevice::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
   }
 
   return kErrorNone;
+}
+
+DisplayError HWDevice::GetPPFeaturesVersion(PPFeatureVersion *vers) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::SetPPFeatures(PPFeaturesConfig *feature_list) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::SetVSyncState(bool enable) {
+  return kErrorNotSupported;
+}
+
+void HWDevice::SetIdleTimeoutMs(uint32_t timeout_ms) {
+}
+
+DisplayError HWDevice::SetDisplayMode(const HWDisplayMode hw_display_mode) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::SetRefreshRate(uint32_t refresh_rate) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::SetPanelBrightness(int level) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::GetHWScanInfo(HWScanInfo *scan_info) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::GetVideoFormat(uint32_t config_index, uint32_t *video_format) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::GetMaxCEAFormat(uint32_t *max_cea_format) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::OnMinHdcpEncryptionLevelChange() {
+  return kErrorNotSupported;
 }
 
 }  // namespace sdm

@@ -28,32 +28,29 @@
 #include <sys/poll.h>
 
 #include "hw_device.h"
-#include "hw_primary_interface.h"
 
 namespace sdm {
 #define MAX_SYSFS_COMMAND_LENGTH 12
 
-class HWPrimary : public HWDevice, public HWPrimaryInterface {
+class HWPrimary : public HWDevice {
  public:
+  static DisplayError Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
+                             BufferSyncHandler *buffer_sync_handler, HWEventHandler *eventhandler);
+  static DisplayError Destroy(HWInterface *intf);
+
+ protected:
   HWPrimary(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
-  virtual DisplayError Init();
+  virtual DisplayError Init(HWEventHandler *eventhandler);
   virtual DisplayError Deinit();
-  virtual DisplayError Open(HWEventHandler *eventhandler);
-  virtual DisplayError Close();
   virtual DisplayError GetNumDisplayAttributes(uint32_t *count);
   virtual DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
                                             uint32_t index);
-  virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info);
   virtual DisplayError SetDisplayAttributes(uint32_t index);
   virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
-  virtual DisplayError PowerOn();
   virtual DisplayError PowerOff();
   virtual DisplayError Doze();
   virtual DisplayError DozeSuspend();
-  virtual DisplayError Standby();
   virtual DisplayError Validate(HWLayers *hw_layers);
-  virtual DisplayError Commit(HWLayers *hw_layers);
-  virtual DisplayError Flush();
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetVSyncState(bool enable);
   virtual DisplayError SetDisplayMode(const HWDisplayMode hw_display_mode);
@@ -61,7 +58,6 @@ class HWPrimary : public HWDevice, public HWPrimaryInterface {
   virtual DisplayError SetPanelBrightness(int level);
   virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers);
   virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list);
-  virtual DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y);
 
  private:
   // Panel modes for the MSMFB_LPM_ENABLE ioctl

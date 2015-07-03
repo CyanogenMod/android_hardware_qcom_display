@@ -34,13 +34,13 @@
 
 namespace sdm {
 
-DisplayError HWVirtualInterface::Create(HWVirtualInterface **intf, HWInfoInterface *hw_info_intf,
-                                        BufferSyncHandler *buffer_sync_handler) {
+DisplayError HWVirtual::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
+                               BufferSyncHandler *buffer_sync_handler) {
   DisplayError error = kErrorNone;
   HWVirtual *hw_virtual = NULL;
 
   hw_virtual = new HWVirtual(buffer_sync_handler, hw_info_intf);
-  error = hw_virtual->Init();
+  error = hw_virtual->Init(NULL);
   if (error != kErrorNone) {
     delete hw_virtual;
   } else {
@@ -50,7 +50,7 @@ DisplayError HWVirtualInterface::Create(HWVirtualInterface **intf, HWInfoInterfa
   return error;
 }
 
-DisplayError HWVirtualInterface::Destroy(HWVirtualInterface *intf) {
+DisplayError HWVirtual::Destroy(HWInterface *intf) {
   HWVirtual *hw_virtual = static_cast<HWVirtual *>(intf);
   hw_virtual->Deinit();
   delete hw_virtual;
@@ -65,86 +65,13 @@ HWVirtual::HWVirtual(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw
   HWDevice::hw_info_intf_ = hw_info_intf;
 }
 
-DisplayError HWVirtual::Init() {
-  return HWDevice::Init();
-}
-
-DisplayError HWVirtual::Deinit() {
-  return kErrorNone;
-}
-
-DisplayError HWVirtual::Open(HWEventHandler *eventhandler) {
-  return HWDevice::Open(eventhandler);
-}
-
-DisplayError HWVirtual::Close() {
-  return HWDevice::Close();
-}
-
-DisplayError HWVirtual::GetNumDisplayAttributes(uint32_t *count) {
-  return HWDevice::GetNumDisplayAttributes(count);
-}
-
-DisplayError HWVirtual::GetDisplayAttributes(HWDisplayAttributes *display_attributes,
-                                             uint32_t index) {
-  return HWDevice::GetDisplayAttributes(display_attributes, index);
-}
-
-DisplayError HWVirtual::SetDisplayAttributes(uint32_t index) {
-  return HWDevice::SetDisplayAttributes(index);
-}
-
-DisplayError HWVirtual::GetConfigIndex(uint32_t mode, uint32_t *index) {
-  return HWDevice::GetConfigIndex(mode, index);
-}
-
-DisplayError HWVirtual::PowerOn() {
-  return HWDevice::PowerOn();
-}
-
-DisplayError HWVirtual::PowerOff() {
-  return HWDevice::PowerOff();
-}
-
-DisplayError HWVirtual::Doze() {
-  return HWDevice::Doze();
-}
-
-DisplayError HWVirtual::DozeSuspend() {
-  return HWDevice::DozeSuspend();
-}
-
-DisplayError HWVirtual::Standby() {
-  return HWDevice::Standby();
+DisplayError HWVirtual::Init(HWEventHandler *eventhandler) {
+  return HWDevice::Init(eventhandler);
 }
 
 DisplayError HWVirtual::Validate(HWLayers *hw_layers) {
   HWDevice::ResetDisplayParams();
   return HWDevice::Validate(hw_layers);
-}
-
-DisplayError HWVirtual::Commit(HWLayers *hw_layers) {
-  return HWDevice::Commit(hw_layers);
-}
-
-DisplayError HWVirtual::Flush() {
-  return HWDevice::Flush();
-}
-
-DisplayError HWVirtual::GetHWPanelInfo(HWPanelInfo *panel_info) {
-  return HWDevice::GetHWPanelInfo(panel_info);
-}
-
-DisplayError HWVirtual::GetPPFeaturesVersion(PPFeatureVersion *vers) {
-  return kErrorNotSupported;
-}
-
-DisplayError HWVirtual::SetPPFeatures(PPFeaturesConfig *feature_list) {
-  return kErrorNotSupported;
-}
-
-DisplayError HWVirtual::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
-  return HWDevice::SetCursorPosition(hw_layers, x, y);
 }
 
 }  // namespace sdm

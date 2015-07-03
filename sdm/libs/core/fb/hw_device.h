@@ -31,34 +31,49 @@
 #include <pthread.h>
 
 #include "hw_interface.h"
-#include "hw_info_interface.h"
 
 #define IOCTL_LOGE(ioctl, type) DLOGE("ioctl %s, device = %d errno = %d, desc = %s", #ioctl, \
                                       type, errno, strerror(errno))
 
 namespace sdm {
+class HWInfoInterface;
 
-class HWDevice {
+class HWDevice : public HWInterface {
  protected:
   explicit HWDevice(BufferSyncHandler *buffer_sync_handler);
-  DisplayError Init();
-  DisplayError Open(HWEventHandler *eventhandler);
-  DisplayError Close();
-  DisplayError GetNumDisplayAttributes(uint32_t *count);
-  DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
-                                    uint32_t index);
-  DisplayError GetHWPanelInfo(HWPanelInfo *panel_info);
-  DisplayError SetDisplayAttributes(uint32_t index);
-  DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
-  DisplayError PowerOn();
-  DisplayError PowerOff();
-  DisplayError Doze();
-  DisplayError DozeSuspend();
-  DisplayError Standby();
-  DisplayError Validate(HWLayers *hw_layers);
-  DisplayError Commit(HWLayers *hw_layers);
-  DisplayError Flush();
-  DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y);
+  virtual ~HWDevice() {}
+
+  // From HWInterface
+  virtual DisplayError GetNumDisplayAttributes(uint32_t *count);
+  virtual DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
+                                            uint32_t index);
+  virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info);
+  virtual DisplayError SetDisplayAttributes(uint32_t index);
+  virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
+  virtual DisplayError PowerOn();
+  virtual DisplayError PowerOff();
+  virtual DisplayError Doze();
+  virtual DisplayError DozeSuspend();
+  virtual DisplayError Standby();
+  virtual DisplayError Validate(HWLayers *hw_layers);
+  virtual DisplayError Commit(HWLayers *hw_layers);
+  virtual DisplayError Flush();
+  virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers);
+  virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list);
+  virtual DisplayError SetVSyncState(bool enable);
+  virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
+  virtual DisplayError SetDisplayMode(const HWDisplayMode hw_display_mode);
+  virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
+  virtual DisplayError SetPanelBrightness(int level);
+  virtual DisplayError GetHWScanInfo(HWScanInfo *scan_info);
+  virtual DisplayError GetVideoFormat(uint32_t config_index, uint32_t *video_format);
+  virtual DisplayError GetMaxCEAFormat(uint32_t *max_cea_format);
+  virtual DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y);
+  virtual DisplayError OnMinHdcpEncryptionLevelChange();
+
+  // For HWDevice derivatives
+  virtual DisplayError Init(HWEventHandler *eventhandler);
+  virtual DisplayError Deinit();
 
   enum {
     kHWEventVSync,
