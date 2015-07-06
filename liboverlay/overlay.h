@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+* Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -33,9 +33,6 @@
 #include "overlayUtils.h"
 #include "mdp_version.h"
 #include "utils/threads.h"
-#ifdef USES_POST_PROCESSING
-#include "lib-postproc.h"
-#endif
 
 struct MetaData_t;
 
