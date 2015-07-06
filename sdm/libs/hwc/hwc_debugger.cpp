@@ -173,5 +173,13 @@ DisplayError HWCDebugHandler::GetProperty(const char *property_name, int *value)
   return kErrorNotSupported;
 }
 
+DisplayError HWCDebugHandler::GetProperty(const char *property_name, char *value) {
+  if (property_get(property_name, value, NULL) > 0) {
+    return kErrorNone;
+  }
+
+  return kErrorNotSupported;
+}
+
 }  // namespace sdm
 
