@@ -120,5 +120,12 @@ bool Debug::IsRotatorSplitDisabled() {
   return (value == 1);
 }
 
+bool Debug::IsScalarDisabled() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.debug.disable_scalar", &value);
+
+  return (value == 1);
+}
+
 }  // namespace sdm
 
