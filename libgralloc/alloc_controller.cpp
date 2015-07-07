@@ -655,21 +655,27 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
     int err = 0;
     int width = hnd->width;
     int height = hnd->height;
+    int format = hnd->format;
     unsigned int ystride, cstride;
     unsigned int alignment = 4096;
 
     memset(ycbcr->reserved, 0, sizeof(ycbcr->reserved));
+    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+
+    // Check if UBWC buffer has been rendered in linear format.
+    if (metadata && (metadata->operation & LINEAR_FORMAT)) {
+        format = metadata->linearFormat;
+    }
 
     // Check metadata if the geometry has been updated.
-    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
     if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
         AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(metadata->bufferDim.sliceWidth,
-                   metadata->bufferDim.sliceHeight, hnd->format, 0, width, height);
+                   metadata->bufferDim.sliceHeight, format, 0, width, height);
     }
 
     // Get the chroma offsets from the handle width/height. We take advantage
     // of the fact the width _is_ the stride
-    switch (hnd->format) {
+    switch (format) {
         //Semiplanar
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
@@ -745,8 +751,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         case HAL_PIXEL_FORMAT_YCrCb_422_I:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
         default:
-        ALOGD("%s: Invalid format passed: 0x%x", __FUNCTION__,
-                hnd->format);
+        ALOGD("%s: Invalid format passed: 0x%x", __FUNCTION__, format);
         err = -EINVAL;
     }
     return err;
