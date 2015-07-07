@@ -35,6 +35,8 @@ class HWCDisplayPrimary : public HWCDisplay {
     SET_METADATA_DYN_REFRESH_RATE,
     SET_BINDER_DYN_REFRESH_RATE,
     SET_DISPLAY_MODE,
+    SET_QDCM_SOLID_FILL_INFO,
+    UNSET_QDCM_SOLID_FILL_INFO,
   };
 
   static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
@@ -51,6 +53,7 @@ class HWCDisplayPrimary : public HWCDisplay {
   void SetMetaDataRefreshRateFlag(bool enable);
   virtual DisplayError SetDisplayMode(uint32_t mode);
   void ProcessBootAnimCompleted();
+  void SetQDCMSolidFillInfo(bool enable, uint32_t color);
 };
 
 }  // namespace sdm

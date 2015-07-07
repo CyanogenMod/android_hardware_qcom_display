@@ -451,6 +451,12 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint3
     if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_DISPLAY) {
       layer_buffer->flags.secure_display = true;
     }
+
+    // check if this is special solid_fill layer without input_buffer.
+    if (solid_fill_enable_ && pvt_handle->fd == -1) {
+      layer->flags.solid_fill = true;
+      layer->solid_fill_color = solid_fill_color_;
+    }
   } else {
     // for FBT layer
     if (hwc_layer->compositionType == HWC_FRAMEBUFFER_TARGET) {

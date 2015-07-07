@@ -207,11 +207,14 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         mdp_buffer.comp_ratio.denom = 1000;
         mdp_buffer.comp_ratio.numer = UINT32(hw_layers->config[i].compression * 1000);
 
-        error = SetFormat(input_buffer->format, &mdp_buffer.format);
-        if (error != kErrorNone) {
-          return error;
+        if (layer.flags.solid_fill) {
+          mdp_buffer.format = MDP_ARGB_8888;
+        } else {
+          error = SetFormat(input_buffer->format, &mdp_buffer.format);
+          if (error != kErrorNone) {
+            return error;
+          }
         }
-
         mdp_layer.alpha = layer.plane_alpha;
         mdp_layer.z_order = UINT16(pipe_info->z_order);
         mdp_layer.transp_mask = 0xffffffff;
@@ -224,6 +227,7 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         SetRect(pipe_info->dst_roi, &mdp_layer.dst_rect);
         SetMDPFlags(layer, is_rotator_used, &mdp_layer.flags);
         SetColorSpace(layer.color_space, &mdp_layer.color_space);
+        mdp_layer.bg_color = layer.solid_fill_color;
 
         if (pipe_info->scale_data.enable_pixel_ext) {
           if ((mdp_layer.flags & MDP_LAYER_DEINTERLACE) && (layer.transform.rotation == 90.0f)) {
@@ -600,6 +604,10 @@ void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
 
   if (input_buffer->flags.secure_display) {
     *mdp_flags |= MDP_SECURE_DISPLAY_OVERLAY_SESSION;
+  }
+
+  if (layer.flags.solid_fill) {
+    *mdp_flags |= MDP_LAYER_SOLID_FILL;
   }
 }
 

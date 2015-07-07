@@ -124,6 +124,11 @@ struct LayerFlags {
                               //!< updating non-updating. so strategy manager will mark them for
                               //!< SDE/GPU composition respectively when the layer stack qualifies
                               //!< for cache based composition.
+
+      uint32_t solid_fill : 1;
+                              //!< This flag shall be set by client to indicate that this layer
+                              //!< is for solid fill without input buffer. Display Device will
+                              //!< use SDE HW feature to achieve it.
     };
 
     uint32_t flags;   //!< For initialization purpose only. Client shall not refer it directly.
@@ -247,8 +252,11 @@ struct Layer {
 
   LayerColorSpace color_space;      //!< Color Space of the layer
 
+  uint32_t solid_fill_color;        //!< Solid color used to fill the layer when no content is
+                                    //!< associated with the layer.
+
   Layer() : input_buffer(NULL), composition(kCompositionGPU), blending(kBlendingOpaque),
-            plane_alpha(0), frame_rate(0), color_space(kLimitedRange601) { }
+            plane_alpha(0), frame_rate(0), color_space(kLimitedRange601), solid_fill_color(0) { }
 };
 
 /*! @brief This structure defines a layer stack that contains layers which need to be composed and

@@ -70,6 +70,27 @@ struct PPPendingParams {
   PPPendingParams() : action(kNoAction), params(NULL) {}
 };
 
+struct PPColorInfo {
+  uint32_t r_bitdepth;
+  uint32_t r;
+  uint32_t g_bitdepth;
+  uint32_t g;
+  uint32_t b_bitdepth;
+  uint32_t b;
+};
+
+struct PPColorFillParams {
+  uint32_t flags;
+  struct {
+    uint32_t width;
+    uint32_t height;
+    int32_t x;
+    int32_t y;
+  } rect;
+
+  PPColorInfo color;
+};
+
 struct PPFeatureVersion {
   // SDE ASIC versioning its PP block at each specific feature level.
   static const uint32_t kSDEIgcV17 = 1;
