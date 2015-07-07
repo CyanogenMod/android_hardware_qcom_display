@@ -169,7 +169,7 @@ DisplayError HWHDMI::GetNumDisplayAttributes(uint32_t *count) {
 
 DisplayError HWHDMI::ReadEDIDInfo() {
   ssize_t length = -1;
-  char edid_str[PAGE_SIZE] = {'\0'};
+  char edid_str[kPageSize] = {'\0'};
   char edid_path[kMaxStringLength] = {'\0'};
   snprintf(edid_path, sizeof(edid_path), "%s%d/edid_modes", fb_path_, fb_node_index_);
   int edid_file = Sys::open_(edid_path, O_RDONLY);
@@ -440,7 +440,7 @@ DisplayError HWHDMI::SetPPFeatures(PPFeaturesConfig &feature_list) {
 }
 
 int HWHDMI::OpenResolutionFile(int file_mode) {
-  char file_path[PATH_MAX];
+  char file_path[kMaxStringLength];
   memset(file_path, 0, sizeof(file_path));
   snprintf(file_path , sizeof(file_path), "%s%d/res_info", fb_path_, fb_node_index_);
 
@@ -455,7 +455,7 @@ int HWHDMI::OpenResolutionFile(int file_mode) {
 
 // Method to request HDMI driver to write a new page of timing info into res_info node
 void HWHDMI::RequestNewPage(uint32_t page_number) {
-  char page_string[PAGE_SIZE];
+  char page_string[kPageSize];
   int fd = OpenResolutionFile(O_WRONLY);
   if (fd < 0) {
     return;
@@ -481,7 +481,7 @@ bool HWHDMI::ReadResolutionFile(char *config_buffer) {
     return false;
   }
 
-  if ((bytes_read = Sys::pread_(fd, config_buffer, PAGE_SIZE, 0)) != 0) {
+  if ((bytes_read = Sys::pread_(fd, config_buffer, kPageSize, 0)) != 0) {
     is_file_read = true;
   }
   close(fd);
@@ -499,14 +499,14 @@ DisplayError HWHDMI::ReadTimingInfo() {
   uint32_t size = sizeof(msm_hdmi_mode_timing_info);
 
   while (true) {
-    char config_buffer[PAGE_SIZE] = {0};
+    char config_buffer[kPageSize] = {0};
     msm_hdmi_mode_timing_info *info = reinterpret_cast<msm_hdmi_mode_timing_info *>(config_buffer);
 
     if (!ReadResolutionFile(config_buffer)) {
       break;
     }
 
-    while (info->video_format && size < PAGE_SIZE && config_index < hdmi_mode_count_) {
+    while (info->video_format && size < kPageSize && config_index < hdmi_mode_count_) {
       supported_video_modes_[config_index] = *info;
       size += sizeof(msm_hdmi_mode_timing_info);
 
