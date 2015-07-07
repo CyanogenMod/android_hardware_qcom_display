@@ -112,7 +112,6 @@ HWCDisplayVirtual::HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const
 }
 
 int HWCDisplayVirtual::Init() {
-
   output_buffer_ = new LayerBuffer();
   if (!output_buffer_) {
     return -ENOMEM;

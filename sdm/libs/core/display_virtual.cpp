@@ -194,6 +194,11 @@ DisplayError DisplayVirtual::SetRefreshRate(uint32_t refresh_rate) {
   return kErrorNotSupported;
 }
 
+DisplayError DisplayVirtual::SetPanelBrightness(int level) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetPanelBrightness(level);
+}
+
 void DisplayVirtual::AppendDump(char *buffer, uint32_t length) {
   SCOPE_LOCK(locker_);
   DisplayBase::AppendDump(buffer, length);

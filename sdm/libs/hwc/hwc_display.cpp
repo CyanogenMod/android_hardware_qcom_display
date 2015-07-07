@@ -102,7 +102,7 @@ int HWCDisplay::Init() {
       if (blit_engine_->Init() < 0) {
         DLOGI("Blit Engine Init failed, Blit Composition will not be used!!");
         delete blit_engine_;
-        blit_engine_= NULL;
+        blit_engine_ = NULL;
       }
     }
   }
@@ -127,7 +127,7 @@ int HWCDisplay::Deinit() {
   if (blit_engine_) {
     blit_engine_->DeInit();
     delete blit_engine_;
-    blit_engine_= NULL;
+    blit_engine_ = NULL;
   }
 
   return 0;
@@ -1214,6 +1214,16 @@ DisplayError HWCDisplay::SetMetaData(const MetaData_t &meta_data, Layer *layer) 
   }
 
   return kErrorNone;
+}
+
+int HWCDisplay::SetPanelBrightness(int level) {
+  int ret = 0;
+  if (display_intf_)
+    ret = display_intf_->SetPanelBrightness(level);
+  else
+    ret = -EINVAL;
+
+  return ret;
 }
 
 int HWCDisplay::ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,

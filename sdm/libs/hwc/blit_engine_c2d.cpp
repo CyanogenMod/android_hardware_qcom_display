@@ -263,7 +263,7 @@ int BlitEngineC2d::Prepare(LayerStack *layer_stack) {
   }
 
   blit_target_start_index_ = ++i;
-  num_blit_target_= layer_stack->layer_count - blit_target_start_index_;
+  num_blit_target_ = layer_stack->layer_count - blit_target_start_index_;
 
   LayerBuffer *layer_buffer = layer_stack->layers[gpu_target_index].input_buffer;
   int fbwidth = INT(layer_buffer->width);

@@ -356,6 +356,14 @@ class DisplayInterface {
   */
   virtual bool IsUnderscanSupported() = 0;
 
+  /*! @brief Method to set brightness of the primary display.
+
+    @param[in] level the new backlight level.
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError SetPanelBrightness(int level) = 0;
+
   /*! @brief Method to route display API requests to color service.
 
     @param[in] in_payload \link PPDisplayAPIPayload \endlink

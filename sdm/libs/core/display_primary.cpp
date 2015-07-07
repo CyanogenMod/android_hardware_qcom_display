@@ -238,6 +238,10 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
 
   return error;
 }
+DisplayError DisplayPrimary::SetPanelBrightness(int level) {
+  SCOPE_LOCK(locker_);
+  return hw_primary_intf_->SetPanelBrightness(level);
+}
 
 DisplayError DisplayPrimary::IsScalingValid(const LayerRect &crop, const LayerRect &dst,
                                             bool rotate90) {

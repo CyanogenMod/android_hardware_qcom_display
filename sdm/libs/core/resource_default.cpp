@@ -88,8 +88,11 @@ DisplayError ResourceDefault::Init(const HWResourceInfo &hw_res_info) {
     hw_res_info_.max_scale_up = 1;
   }
 
+  // TODO(user): clean it up, query from driver for initial pipe status.
+#ifndef SDM_VIRTUAL_DRIVER
   rgb_pipes_[0].owner = kPipeOwnerKernelMode;
   rgb_pipes_[1].owner = kPipeOwnerKernelMode;
+#endif
 
   return error;
 }
