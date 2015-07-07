@@ -604,7 +604,7 @@ void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
   }
 
   if (input_buffer->flags.secure_display) {
-    *mdp_flags |= MDP_SECURE_DISPLAY_OVERLAY_SESSION;
+    *mdp_flags |= MDP_LAYER_SECURE_DISPLAY_SESSION;
   }
 
   if (layer.flags.solid_fill) {

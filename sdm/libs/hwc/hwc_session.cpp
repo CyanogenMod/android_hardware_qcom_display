@@ -76,7 +76,8 @@ Locker HWCSession::locker_;
 bool HWCSession::reset_panel_ = false;
 
 HWCSession::HWCSession(const hw_module_t *module) : core_intf_(NULL), hwc_procs_(NULL),
-            uevent_thread_exit_(false), uevent_thread_name_("HWC_UeventThread") {
+            uevent_thread_exit_(false), uevent_thread_name_("HWC_UeventThread"),
+            secure_display_active_(false) {
   memset(&hwc_display_, 0, sizeof(hwc_display_));
   hwc_composer_device_1_t::common.tag = HARDWARE_DEVICE_TAG;
   hwc_composer_device_1_t::common.version = HWC_DEVICE_API_VERSION_1_4;
@@ -227,6 +228,8 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
     DLOGW("panel is in bad state, resetting the panel");
     hwc_session->ResetPanel();
   }
+
+  hwc_session->HandleSecureDisplaySession(displays);
 
   HWCDisplay *&primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
   if (primary_display) {
@@ -479,6 +482,9 @@ int HWCSession::HandleVirtualDisplayLifeCycle(hwc_display_contents_1_t *content_
       // Create virtual display device
       status = HWCDisplayVirtual::Create(core_intf_, &hwc_procs_, primary_width, primary_height,
                                          content_list, &hwc_display_[HWC_DISPLAY_VIRTUAL]);
+      if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
+        hwc_display_[HWC_DISPLAY_VIRTUAL]->SetSecureDisplay(secure_display_active_);
+      }
     }
   } else {
     if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
@@ -996,6 +1002,9 @@ int HWCSession::HotPlugHandler(bool connected) {
     if (status) {
       return status;
     }
+    if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
+      hwc_display_[HWC_DISPLAY_EXTERNAL]->SetSecureDisplay(secure_display_active_);
+    }
   } else {
     SEQUENCE_WAIT_SCOPE_LOCK(locker_);
     if (!hwc_display_[HWC_DISPLAY_EXTERNAL]) {
@@ -1011,6 +1020,35 @@ int HWCSession::HotPlugHandler(bool connected) {
   hwc_procs_->invalidate(hwc_procs_);
 
   return 0;
+}
+
+void HWCSession::HandleSecureDisplaySession(hwc_display_contents_1_t **displays) {
+  secure_display_active_ = false;
+  if (!*displays) {
+    DLOGW("Invalid display contents");
+    return;
+  }
+
+  hwc_display_contents_1_t *content_list = displays[HWC_DISPLAY_PRIMARY];
+  if (!content_list) {
+    DLOGW("Invalid primary content list");
+    return;
+  }
+  size_t num_hw_layers = content_list->numHwLayers;
+
+  for (size_t i = 0; i < num_hw_layers - 1; i++) {
+    hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
+    const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
+    if (pvt_handle && pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_DISPLAY) {
+      secure_display_active_ = true;
+    }
+  }
+
+  for (ssize_t dpy = static_cast<ssize_t>(HWC_NUM_DISPLAY_TYPES - 1); dpy >= 0; dpy--) {
+    if (hwc_display_[dpy]) {
+      hwc_display_[dpy]->SetSecureDisplay(secure_display_active_);
+    }
+  }
 }
 
 }  // namespace sdm
