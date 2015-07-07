@@ -8,7 +8,8 @@ LOCAL_C_INCLUDES              := hardware/qcom/display/sdm/include/ \
                                  hardware/qcom/display/libgralloc/ \
                                  hardware/qcom/display/libqservice/ \
                                  hardware/qcom/display/libqdutils/ \
-                                 hardware/qcom/display/libcopybit/
+                                 hardware/qcom/display/libcopybit/ \
+                                 external/libcxx/include/
 
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
                                  -Wall -Werror -std=c++11 -fcolor-diagnostics\
@@ -22,7 +23,7 @@ endif
 
 LOCAL_SHARED_LIBRARIES        := libsdmcore libqservice libbinder libhardware libhardware_legacy \
                                  libutils libcutils libsync libmemalloc libqdutils libdl \
-                                 libpowermanager libsdmutils
+                                 libpowermanager libsdmutils libc++
 
 LOCAL_SRC_FILES               := hwc_session.cpp \
                                  hwc_display.cpp \
