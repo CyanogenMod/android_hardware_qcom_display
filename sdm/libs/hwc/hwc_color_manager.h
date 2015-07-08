@@ -31,11 +31,11 @@
 #define __HWC_COLOR_MANAGER_H__
 
 #include <stdlib.h>
-#include <core/sdm_types.h>
-#include <utils/locker.h>
 #include <binder/Parcel.h>
 #include <powermanager/IPowerManager.h>
 #include <binder/BinderService.h>
+#include <core/sdm_types.h>
+#include <utils/locker.h>
 
 namespace sdm {
 
@@ -83,11 +83,11 @@ class HWCQDCMModeManager {
  public:
   static HWCQDCMModeManager *CreateQDCMModeMgr();
   ~HWCQDCMModeManager();
-  int EnableQDCMMode(bool enable);
+  int EnableQDCMMode(bool enable, HWCDisplay *hwc_display);
 
  protected:
-  HWCQDCMModeManager()
-      : cabl_was_running_(false), socket_fd_(-1), wakelock_token_(NULL), power_mgr_(NULL) {}
+  HWCQDCMModeManager() : cabl_was_running_(false), socket_fd_(-1), wakelock_token_(NULL),
+        power_mgr_(NULL), entry_timeout_(0) {}
   bool SendSocketCmd();
   int AcquireAndroidWakeLock(bool enable);
   int EnableActiveFeatures(bool enable);
@@ -98,6 +98,7 @@ class HWCQDCMModeManager {
   int socket_fd_;
   android::sp<android::IBinder> wakelock_token_;
   android::sp<android::IPowerManager> power_mgr_;
+  uint32_t entry_timeout_;
   static const char *const kSocketName;
   static const char *const kTagName;
   static const char *const kPackageName;
@@ -106,6 +107,7 @@ class HWCQDCMModeManager {
 // Class to encapsulte all HWC/OS specific behaviours for ColorManager.
 class HWCColorManager {
  public:
+  static const int kNumSolidFillLayers = 2;
   static HWCColorManager *CreateColorManager();
   static int CreatePayloadFromParcel(const android::Parcel &in, uint32_t *disp_id,
                                      PPDisplayAPIPayload *sink);
@@ -114,11 +116,17 @@ class HWCColorManager {
 
   ~HWCColorManager();
   void DestroyColorManager();
-  int EnableQDCMMode(bool enable);
+  int EnableQDCMMode(bool enable, HWCDisplay *hwc_display);
+  int SetSolidFill(const void *params, bool enable, HWCDisplay *hwc_display);
+  bool SolidFillLayersPrepare(hwc_display_contents_1_t **displays, HWCDisplay *hwc_display);
+  bool SolidFillLayersSet(hwc_display_contents_1_t **displays, HWCDisplay *hwc_display);
 
  protected:
-  HWCColorManager()
-      : color_apis_lib_(NULL), diag_client_lib_(NULL), color_apis_(NULL), qdcm_mode_mgr_(NULL) {}
+  HWCColorManager() : color_apis_lib_(NULL), diag_client_lib_(NULL), color_apis_(NULL),
+        qdcm_mode_mgr_(NULL), solid_fill_enable_(false), solid_fill_layers_(NULL) {}
+  int CreateSolidFillLayers(HWCDisplay *hwc_display);
+  void DestroySolidFillLayers();
+  static uint32_t Get8BitsARGBColorValue(const PPColorFillParams &params);
 
  private:
   void *color_apis_lib_, *diag_client_lib_;
@@ -126,6 +134,11 @@ class HWCColorManager {
   QDCMDiagInit qdcm_diag_init_;
   QDCMDiagDeInit qdcm_diag_deinit_;
   HWCQDCMModeManager *qdcm_mode_mgr_;
+
+  bool solid_fill_enable_;
+  PPColorFillParams solid_fill_params_;
+  hwc_display_contents_1_t *solid_fill_layers_;
+  Locker locker_;
 };
 
 }  // namespace sdm

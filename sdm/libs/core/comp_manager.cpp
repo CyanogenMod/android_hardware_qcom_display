@@ -316,14 +316,14 @@ void CompManager::Purge(Handle display_ctx) {
   resource_intf_->Purge(display_comp_ctx->display_resource_ctx);
 }
 
-bool CompManager::ProcessIdleTimeout(Handle display_ctx) {
+void CompManager::ProcessIdleTimeout(Handle display_ctx) {
   SCOPE_LOCK(locker_);
 
   DisplayCompositionContext *display_comp_ctx =
                              reinterpret_cast<DisplayCompositionContext *>(display_ctx);
 
   if (!display_comp_ctx) {
-    return false;
+    return;
   }
 
   // 1. handle_idle_timeout flag is set to true on start of every draw call, if the current
@@ -335,11 +335,7 @@ bool CompManager::ProcessIdleTimeout(Handle display_ctx) {
   if (display_comp_ctx->handle_idle_timeout) {
     display_comp_ctx->idle_fallback = true;
     display_comp_ctx->handle_idle_timeout = false;
-
-    return true;
   }
-
-  return false;
 }
 
 void CompManager::ProcessThermalEvent(Handle display_ctx, int64_t thermal_level) {

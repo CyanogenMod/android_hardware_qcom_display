@@ -440,6 +440,10 @@ int gralloc_perform(struct gralloc_module_t const* module,
                     return res;
                 }
                 *flag = hnd->flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED;
+                MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+                if (metadata && (metadata->operation & LINEAR_FORMAT)) {
+                    *flag = 0;
+                }
                 res = 0;
             } break;
 

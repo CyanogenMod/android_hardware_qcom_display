@@ -317,9 +317,10 @@ DisplayError HWCDisplay::VSync(const DisplayEventVSync &vsync) {
 DisplayError HWCDisplay::Refresh() {
   if (*hwc_procs_ && handle_refresh_) {
     (*hwc_procs_)->invalidate(*hwc_procs_);
+    return kErrorNone;
   }
 
-  return kErrorNone;
+  return kErrorNotSupported;
 }
 
 int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
@@ -425,7 +426,14 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint3
   LayerBuffer *layer_buffer = layer->input_buffer;
 
   if (pvt_handle) {
+    layer->frame_rate = fps;
     layer_buffer->format = GetSDMFormat(pvt_handle->format, pvt_handle->flags);
+
+    const MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
+    if (meta_data && (SetMetaData(*meta_data, layer) != kErrorNone)) {
+      return -EINVAL;
+    }
+
     if (layer_buffer->format == kFormatInvalid) {
       return -EINVAL;
     }
@@ -440,15 +448,14 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint3
       layer_stack_.flags.secure_present = true;
       layer_buffer->flags.secure = true;
     }
-
-    layer->frame_rate = fps;
-    const MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
-    if (meta_data && (SetMetaData(*meta_data, layer) != kErrorNone)) {
-      return -EINVAL;
-    }
-
     if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_DISPLAY) {
       layer_buffer->flags.secure_display = true;
+    }
+
+    // check if this is special solid_fill layer without input_buffer.
+    if (solid_fill_enable_ && pvt_handle->fd == -1) {
+      layer->flags.solid_fill = true;
+      layer->solid_fill_color = solid_fill_color_;
     }
   } else {
     // for FBT layer
@@ -1205,6 +1212,10 @@ DisplayError HWCDisplay::SetMetaData(const MetaData_t &meta_data, Layer *layer) 
 
   if ((meta_data.operation & PP_PARAM_INTERLACED) && meta_data.interlaced) {
     layer->input_buffer->flags.interlace = true;
+  }
+
+  if (meta_data.operation & LINEAR_FORMAT) {
+    layer->input_buffer->format = GetSDMFormat(meta_data.linearFormat, 0);
   }
 
   if (meta_data.operation & UPDATE_COLOR_SPACE) {

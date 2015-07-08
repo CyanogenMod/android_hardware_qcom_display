@@ -164,6 +164,9 @@ class HWCDisplay : public DisplayEventHandler {
   bool handle_refresh_;
   bool use_blit_comp_;
 
+  bool solid_fill_enable_;
+  uint32_t solid_fill_color_;
+
  private:
   bool IsFrameBufferScaled();
   void DumpInputBuffers(hwc_display_contents_1_t *content_list);

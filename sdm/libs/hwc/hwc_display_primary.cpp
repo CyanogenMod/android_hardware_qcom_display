@@ -183,6 +183,12 @@ int HWCDisplayPrimary::Perform(uint32_t operation, ...) {
     case SET_DISPLAY_MODE:
       SetDisplayMode(val);
       break;
+    case SET_QDCM_SOLID_FILL_INFO:
+      SetQDCMSolidFillInfo(true, val);
+      break;
+    case UNSET_QDCM_SOLID_FILL_INFO:
+      SetQDCMSolidFillInfo(false, val);
+      break;
     default:
       DLOGW("Invalid operation %d", operation);
       return -EINVAL;
@@ -203,6 +209,11 @@ DisplayError HWCDisplayPrimary::SetDisplayMode(uint32_t mode) {
 
 void HWCDisplayPrimary::SetMetaDataRefreshRateFlag(bool enable) {
   use_metadata_refresh_rate_ = enable;
+}
+
+void HWCDisplayPrimary::SetQDCMSolidFillInfo(bool enable, uint32_t color) {
+  solid_fill_enable_ = enable;
+  solid_fill_color_  = color;
 }
 
 }  // namespace sdm
