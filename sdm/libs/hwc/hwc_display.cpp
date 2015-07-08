@@ -69,7 +69,7 @@ HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, 
     dump_input_layers_(false), swap_interval_zero_(false), framebuffer_config_(NULL),
     display_paused_(false), use_metadata_refresh_rate_(false), metadata_refresh_rate_(0),
     boot_animation_completed_(false), shutdown_pending_(false), handle_refresh_(false),
-    use_blit_comp_(false), blit_engine_(NULL) {
+    use_blit_comp_(false), solid_fill_enable_(false), blit_engine_(NULL) {
 }
 
 int HWCDisplay::Init() {
