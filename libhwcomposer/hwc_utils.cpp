@@ -3022,18 +3022,34 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
 
    /* Align to minimum width recommended by the panel */
    if((t_roi.right - t_roi.left) < MIN_WIDTH) {
-       if((t_roi.left + MIN_WIDTH) > boundary.right)
-           t_roi.left = t_roi.right - MIN_WIDTH;
-       else
+       t_roi.left = t_roi.left - MIN_WIDTH / 2 +
+           (t_roi.right - t_roi.left) / 2;
+       t_roi.right = t_roi.right + MIN_WIDTH / 2 -
+           (t_roi.right - t_roi.left) / 2;
+
+       if(t_roi.left < boundary.left) {
+           t_roi.left = boundary.left;
            t_roi.right = t_roi.left + MIN_WIDTH;
+       } else if(t_roi.right > boundary.right) {
+           t_roi.right = boundary.right;
+           t_roi.left = t_roi.right - MIN_WIDTH;
+       }
    }
 
   /* Align to minimum height recommended by the panel */
    if((t_roi.bottom - t_roi.top) < MIN_HEIGHT) {
-       if((t_roi.top + MIN_HEIGHT) > boundary.bottom)
-           t_roi.top = t_roi.bottom - MIN_HEIGHT;
-       else
+       t_roi.top = t_roi.top - MIN_HEIGHT / 2 +
+           (t_roi.bottom - t_roi.top) / 2;
+       t_roi.bottom = t_roi.bottom + MIN_HEIGHT / 2 -
+           (t_roi.bottom - t_roi.top) / 2;
+
+       if(t_roi.top < boundary.top) {
+           t_roi.top = boundary.top;
            t_roi.bottom = t_roi.top + MIN_HEIGHT;
+       } else if(t_roi.bottom > boundary.bottom) {
+           t_roi.bottom = boundary.bottom;
+           t_roi.top = t_roi.bottom - MIN_HEIGHT;
+       }
    }
 
    /* Align left and width to meet panel restrictions */
