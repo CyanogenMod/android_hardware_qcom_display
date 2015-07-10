@@ -2669,7 +2669,6 @@ void MDPCompSrcSplit::generateROI(hwc_context_t *ctx,
         hwc_display_contents_1_t* list) {
     int numAppLayers = ctx->listStats[mDpy].numAppLayers;
 
-
     if(!canPartialUpdate(ctx, list))
         return;
 
@@ -2698,25 +2697,32 @@ void MDPCompSrcSplit::generateROI(hwc_context_t *ctx,
     if(!isValidRect(roi))
         return;
 
-    roi = expandROIFromMidPoint(roi, fullFrame);
+    if (isDisplaySplit(ctx, mDpy)) {
+        hwc_rect lFrame = fullFrame;
+        roi = expandROIFromMidPoint(roi, fullFrame);
 
-    hwc_rect lFrame = fullFrame;
-    lFrame.right /= 2;
-    hwc_rect lRoi = getIntersection(roi, lFrame);
+        lFrame.right = fullFrame.right / 2;
+        hwc_rect lRoi = getIntersection(roi, lFrame);
+        // Align ROI coordinates to panel restrictions
+        lRoi = getSanitizeROI(lRoi, lFrame);
 
-    // Align ROI coordinates to panel restrictions
-    lRoi = getSanitizeROI(lRoi, lFrame);
+        hwc_rect rFrame = fullFrame;
+        rFrame.left = fullFrame.right/2;
+        hwc_rect rRoi = getIntersection(roi, rFrame);
+        // Align ROI coordinates to panel restrictions
+        rRoi = getSanitizeROI(rRoi, rFrame);
 
-    hwc_rect rFrame = fullFrame;
-    rFrame.left = lFrame.right;
-    hwc_rect rRoi = getIntersection(roi, rFrame);
+        roi = getUnion(lRoi, rRoi);
 
-    // Align ROI coordinates to panel restrictions
-    rRoi = getSanitizeROI(rRoi, rFrame);
+        ctx->listStats[mDpy].lRoi = roi;
+    } else {
+      hwc_rect lRoi = getIntersection(roi, fullFrame);
+      // Align ROI coordinates to panel restrictions
+      lRoi = getSanitizeROI(lRoi, fullFrame);
 
-    roi = getUnion(lRoi, rRoi);
+      ctx->listStats[mDpy].lRoi = lRoi;
+    }
 
-    ctx->listStats[mDpy].lRoi = roi;
     if(!validateAndApplyROI(ctx, list))
         resetROI(ctx, mDpy);
 
