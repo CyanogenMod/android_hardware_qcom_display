@@ -66,6 +66,7 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual bool IsUnderscanSupported();
   virtual DisplayError SetPanelBrightness(int level);
+  virtual DisplayError OnMinHdcpEncryptionLevelChange();
   virtual DisplayError ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
                                             PPDisplayAPIPayload *out_payload,
                                             PPPendingParams *pending_action);

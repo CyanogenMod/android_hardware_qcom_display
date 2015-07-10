@@ -70,6 +70,7 @@ public:
         GET_DISPLAY_ATTRIBUTES_FOR_CONFIG = 28, //Get attr for specified config
         SET_DISPLAY_MODE = 29, // Set display mode to command or video mode
         SET_CAMERA_STATUS = 30, // To notify display when camera is on and off
+        MIN_HDCP_ENCRYPTION_LEVEL_CHANGED = 31,
         COMMAND_LIST_END = 400,
     };
 

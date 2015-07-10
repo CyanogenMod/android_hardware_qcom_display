@@ -91,8 +91,11 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   android::status_t SetSecondaryDisplayStatus(const android::Parcel *input_parcel);
   android::status_t ControlBackLight(const android::Parcel *input_parcel);
   android::status_t ConfigureRefreshRate(const android::Parcel *input_parcel);
-  android::status_t QdcmCMDHandler(const android::Parcel &in, android::Parcel *out);
+  android::status_t QdcmCMDHandler(const android::Parcel *input_parcel,
+                                   android::Parcel *output_parcel);
   android::status_t ControlPartialUpdate(const android::Parcel *input_parcel, android::Parcel *out);
+  android::status_t OnMinHdcpEncryptionLevelChange(const android::Parcel *input_parcel,
+                                   android::Parcel *output_parcel);
 
   static Locker locker_;
   CoreInterface *core_intf_;

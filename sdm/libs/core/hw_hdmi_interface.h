@@ -39,6 +39,7 @@ class HWHDMIInterface: virtual public HWInterface {
   virtual DisplayError GetHWScanInfo(HWScanInfo *scan_info) = 0;
   virtual DisplayError GetVideoFormat(uint32_t config_index, uint32_t *video_format) = 0;
   virtual DisplayError GetMaxCEAFormat(uint32_t *max_cea_format) = 0;
+  virtual DisplayError OnMinHdcpEncryptionLevelChange() = 0;
 
  protected:
   virtual ~HWHDMIInterface() { }

@@ -373,6 +373,12 @@ class DisplayInterface {
   */
   virtual DisplayError SetPanelBrightness(int level) = 0;
 
+  /*! @brief Method to notify display about change in min HDCP encryption level.
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError OnMinHdcpEncryptionLevelChange() = 0;
+
   /*! @brief Method to route display API requests to color service.
 
     @param[in] in_payload \link PPDisplayAPIPayload \endlink
