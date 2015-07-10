@@ -554,7 +554,8 @@ DisplayError ResourceDefault::Config(DisplayResourceContext *display_resource_ct
     return error;
   }
 
-  error = ValidateScaling(src_rect, dst_rect, false);
+  bool ubwc_tiled = IsUBWCFormat(layer.input_buffer->format);
+  error = ValidateScaling(src_rect, dst_rect, false, ubwc_tiled);
   if (error != kErrorNone) {
     return error;
   }
@@ -702,7 +703,7 @@ DisplayError ResourceDefault::ValidateDimensions(const LayerRect &crop, const La
   return kErrorNone;
 }
 
-DisplayError ResourceDefault::ValidatePipeParams(HWPipeInfo *pipe_info) {
+DisplayError ResourceDefault::ValidatePipeParams(HWPipeInfo *pipe_info, bool ubwc_tiled) {
   DisplayError error = kErrorNone;
 
   const LayerRect &src_rect = pipe_info->src_roi;
@@ -713,7 +714,7 @@ DisplayError ResourceDefault::ValidatePipeParams(HWPipeInfo *pipe_info) {
     return error;
   }
 
-  error = ValidateScaling(src_rect, dst_rect, false);
+  error = ValidateScaling(src_rect, dst_rect, false, ubwc_tiled);
   if (error != kErrorNone) {
     return error;
   }
@@ -722,7 +723,7 @@ DisplayError ResourceDefault::ValidatePipeParams(HWPipeInfo *pipe_info) {
 }
 
 DisplayError ResourceDefault::ValidateScaling(const LayerRect &crop, const LayerRect &dst,
-                                         bool rotate90) {
+                                         bool rotate90, bool ubwc_tiled) {
   DisplayError error = kErrorNone;
 
   float scale_x = 1.0f;
@@ -733,7 +734,7 @@ DisplayError ResourceDefault::ValidateScaling(const LayerRect &crop, const Layer
     return error;
   }
 
-  error = ValidateDownScaling(scale_x, scale_y);
+  error = ValidateDownScaling(scale_x, scale_y, ubwc_tiled);
   if (error != kErrorNone) {
     return error;
   }
@@ -746,11 +747,12 @@ DisplayError ResourceDefault::ValidateScaling(const LayerRect &crop, const Layer
   return kErrorNone;
 }
 
-DisplayError ResourceDefault::ValidateDownScaling(float scale_x, float scale_y) {
+DisplayError ResourceDefault::ValidateDownScaling(float scale_x, float scale_y, bool ubwc_tiled) {
   if ((UINT32(scale_x) > 1) || (UINT32(scale_y) > 1)) {
     float max_scale_down = FLOAT(hw_res_info_.max_scale_down);
 
-    if (hw_res_info_.has_decimation) {
+    // MDP H/W cannot apply decimation on UBWC tiled framebuffer
+    if (!ubwc_tiled && hw_res_info_.has_decimation) {
       max_scale_down *= FLOAT(kMaxDecimationDownScaleRatio);
     }
 
@@ -867,7 +869,8 @@ DisplayError ResourceDefault::AlignPipeConfig(const Layer &layer, HWPipeInfo *le
     return kErrorNotSupported;
   }
 
-  error = ValidatePipeParams(left_pipe);
+  bool ubwc_tiled = IsUBWCFormat(layer.input_buffer->format);
+  error = ValidatePipeParams(left_pipe, ubwc_tiled);
   if (error != kErrorNone) {
     goto PipeConfigExit;
   }
@@ -876,7 +879,7 @@ DisplayError ResourceDefault::AlignPipeConfig(const Layer &layer, HWPipeInfo *le
     // Make sure the  left and right ROI are conjunct
     right_pipe->src_roi.left = left_pipe->src_roi.right;
     right_pipe->dst_roi.left = left_pipe->dst_roi.right;
-    error = ValidatePipeParams(right_pipe);
+    error = ValidatePipeParams(right_pipe, ubwc_tiled);
   }
 
 PipeConfigExit:
@@ -913,6 +916,19 @@ DisplayError ResourceDefault::ValidateCursorConfig(Handle display_ctx, const Lay
 DisplayError ResourceDefault::ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers,
                                                      int x, int y) {
   return kErrorNotSupported;
+}
+
+bool ResourceDefault::IsUBWCFormat(LayerBufferFormat format) {
+  switch (format) {
+  case kFormatRGBA8888Ubwc:
+  case kFormatRGBX8888Ubwc:
+  case kFormatRGB565Ubwc:
+  case kFormatYCbCr420SPVenusUbwc:
+    return true;
+  default:
+    break;
+  }
+  return false;
 }
 
 }  // namespace sdm

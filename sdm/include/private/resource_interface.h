@@ -45,7 +45,7 @@ class ResourceInterface {
   virtual void Purge(Handle display_ctx) = 0;
   virtual DisplayError SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages) = 0;
   virtual DisplayError ValidateScaling(const LayerRect &crop, const LayerRect &dst,
-                                       bool rotate90) = 0;
+                                       bool rotate90, bool ubwc_tiled) = 0;
   virtual DisplayError ValidateCursorConfig(Handle display_ctx, const Layer &layer,
                                             bool is_top) = 0;
   virtual DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers,
