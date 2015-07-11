@@ -25,6 +25,7 @@
 #ifndef __HWC_DISPLAY_PRIMARY_H__
 #define __HWC_DISPLAY_PRIMARY_H__
 
+#include "cpuhint.h"
 #include "hwc_display.h"
 
 namespace sdm {
@@ -42,6 +43,7 @@ class HWCDisplayPrimary : public HWCDisplay {
   static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
                     HWCDisplay **hwc_display);
   static void Destroy(HWCDisplay *hwc_display);
+  virtual int Init();
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
   virtual int SetActiveConfig(int index);
@@ -54,6 +56,9 @@ class HWCDisplayPrimary : public HWCDisplay {
   virtual DisplayError SetDisplayMode(uint32_t mode);
   void ProcessBootAnimCompleted();
   void SetQDCMSolidFillInfo(bool enable, uint32_t color);
+  void ToggleCPUHint(int app_layer_count);
+
+  CPUHint *cpu_hint_;
 };
 
 }  // namespace sdm

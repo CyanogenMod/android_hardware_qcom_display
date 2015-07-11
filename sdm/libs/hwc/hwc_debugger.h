@@ -74,6 +74,7 @@ class HWCDebugHandler : public DebugHandler {
                           const char *custom_string);
   virtual void EndTrace();
   virtual DisplayError GetProperty(const char *property_name, int *value);
+  virtual DisplayError GetProperty(const char *property_name, char *value);
 
  private:
   static HWCDebugHandler debug_handler_;
