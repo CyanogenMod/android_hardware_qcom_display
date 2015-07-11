@@ -65,7 +65,6 @@ class Debug {
   static int GetIdleTimeoutMs();
   static bool IsRotatorDownScaleDisabled();
   static bool IsDecimationDisabled();
-  static bool IsPartialUpdateEnabled();
   static int GetMaxPipesPerMixer(DisplayType display_type);
   static bool IsVideoModeEnabled();
   static bool IsRotatorUbwcDisabled();

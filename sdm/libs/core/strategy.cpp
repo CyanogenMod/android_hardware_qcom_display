@@ -70,7 +70,8 @@ DisplayError Strategy::Deinit() {
   return kErrorNone;
 }
 
-DisplayError Strategy::Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempts) {
+DisplayError Strategy::Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempts,
+                             bool partial_update_enable) {
   DisplayError error = kErrorNone;
 
   hw_layers_info_ = hw_layers_info;
@@ -90,6 +91,9 @@ DisplayError Strategy::Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempt
     return kErrorUndefined;
   }
 
+  if (partial_update_intf_) {
+    partial_update_intf_->ControlPartialUpdate(partial_update_enable);
+  }
   GenerateROI();
 
   if (strategy_intf_) {
