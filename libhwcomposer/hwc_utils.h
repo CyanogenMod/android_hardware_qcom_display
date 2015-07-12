@@ -163,6 +163,8 @@ struct ListStats {
     uint32_t refreshRateRequest;
     // Flag related to windowboxing feature
     bool mAIVVideoMode;
+    // curser layer info
+    bool cursorLayerPresent;
 };
 
 //PTOR Comp info
@@ -411,6 +413,9 @@ int configColorLayer(hwc_context_t *ctx, hwc_layer_1_t *layer, const int& dpy,
 void updateSource(ovutils::eTransform& orient, ovutils::Whf& whf,
         hwc_rect_t& crop, overlay::Rotator *rot);
 
+bool configHwCursor(const int fd, int dpy, hwc_layer_1_t* layer);
+void freeHwCursor(const int fd, int dpy);
+
 bool isZoomModeEnabled(hwc_rect_t crop);
 void updateCropAIVVideoMode(hwc_context_t *ctx, hwc_rect_t& crop, int dpy);
 void updateDestAIVVideoMode(hwc_context_t *ctx, hwc_rect_t& dst, int dpy);
@@ -494,6 +499,11 @@ static inline bool isAIVCCLayer(const hwc_layer_1_t* l) {
     return (UNLIKELY(l && (l->flags & HWC_AIV_CC)));
 }
 
+static inline bool isCursorLayer(const hwc_layer_1_t* l) {
+    return (UNLIKELY(l && (l->flags & HWC_IS_CURSOR_LAYER)));
+}
+
+
 // Returns true if the buffer is yuv
 static inline bool isYuvBuffer(const private_handle_t* hnd) {
     return (hnd && (hnd->bufferType == BUFFER_TYPE_VIDEO));
@@ -506,12 +516,12 @@ static inline bool isYUVSplitNeeded(const private_handle_t* hnd) {
             (hnd->width > maxPipeWidth));
 }
 
-// Returns true if the buffer is secure
+// Returns true if the buffer is secure(using secure heap)
 static inline bool isSecureBuffer(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_SECURE_BUFFER & hnd->flags));
 }
 
-// Returns true if the buffer is protected
+// Returns true if the buffer is protected(L3 using IOMMU heap)
 static inline bool isProtectedBuffer(const private_handle_t* hnd) {
     return (hnd && (private_handle_t::PRIV_FLAGS_PROTECTED_BUFFER & hnd->flags));
 }
@@ -711,6 +721,10 @@ static inline bool has90Transform(hwc_layer_1_t const* layer) {
 
 inline bool isSecurePresent(hwc_context_t *ctx, int dpy) {
     return ctx->listStats[dpy].isSecurePresent;
+}
+
+static inline bool isCursorPresent (hwc_context_t *ctx, int dpy) {
+    return  ctx->listStats[dpy].cursorLayerPresent;
 }
 
 static inline bool isSecondaryConfiguring(hwc_context_t* ctx) {

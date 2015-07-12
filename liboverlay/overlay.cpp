@@ -151,8 +151,6 @@ utils::eDest Overlay::getPipe(const PipeSpecs& pipeSpecs) {
         return getPipe_8x39(pipeSpecs);
     } else if(MDPVersion::getInstance().is8994()) {
         return getPipe_8994(pipeSpecs);
-    } else if(MDPVersion::getInstance().is8992()) {
-        return getPipe_8992(pipeSpecs);
     }
 
     eDest dest = OV_INVALID;
@@ -253,13 +251,6 @@ utils::eDest Overlay::getPipe_8994(const PipeSpecs& pipeSpecs) {
     //supported since we at least need 1 round in between where the DMA is
     //unused
     eDest dest = OV_INVALID;
-
-    // Reset format type to FORMAT_NONE to select the pipe irrespective of the
-    // format specifed by the client. This is required for the device where
-    // SMP starvation is unlikely, we need not keep track of formats
-    // programmed in the pipes to avoid potential pipe crunching.
-    resetPipeBookFormat(pipeSpecs.dpy);
-
     if(pipeSpecs.formatClass == FORMAT_YUV) {
         return nextPipe(OV_MDP_PIPE_VG, pipeSpecs);
     } else {
@@ -271,12 +262,7 @@ utils::eDest Overlay::getPipe_8994(const PipeSpecs& pipeSpecs) {
             dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs);
         }
     }
-
     return dest;
-}
-
-utils::eDest Overlay::getPipe_8992(const PipeSpecs& pipeSpecs) {
-    return getPipe_8994(pipeSpecs);
 }
 
 void Overlay::endAllSessions() {
