@@ -58,6 +58,7 @@ class HWDevice {
   DisplayError Validate(HWLayers *hw_layers);
   DisplayError Commit(HWLayers *hw_layers);
   DisplayError Flush();
+  DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y);
 
   enum {
     kHWEventVSync,
@@ -74,7 +75,8 @@ class HWDevice {
                          uint32_t width, uint32_t *target);
   void SetBlending(const LayerBlending &source, mdss_mdp_blend_op *target);
   void SetRect(const LayerRect &source, mdp_rect *target);
-  void SetMDPFlags(const Layer &layer, const bool &is_rotator_used, uint32_t *mdp_flags);
+  void SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
+                   bool is_cursor_pipe_used, uint32_t *mdp_flags);
   void SyncMerge(const int &fd1, const int &fd2, int *target);
 
   // Retrieves HW FrameBuffer Node Index

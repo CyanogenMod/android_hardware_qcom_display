@@ -60,6 +60,7 @@ class DisplayHDMI : public DisplayBase, DumpImpl {
   virtual bool IsUnderscanSupported();
   virtual DisplayError SetPanelBrightness(int level);
   virtual void AppendDump(char *buffer, uint32_t length);
+  virtual DisplayError SetCursorPosition(int x, int y);
 
  private:
   virtual int GetBestConfig();

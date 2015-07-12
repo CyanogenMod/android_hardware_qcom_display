@@ -42,7 +42,8 @@ DisplayError Strategy::Init() {
   DisplayError error = kErrorNone;
 
   if (extension_intf_) {
-    error = extension_intf_->CreateStrategyExtn(display_type_, &strategy_intf_);
+    error = extension_intf_->CreateStrategyExtn(display_type_, hw_panel_info_.mode,
+                                                &strategy_intf_);
     if (error != kErrorNone) {
       DLOGE("Failed to create strategy");
       return error;

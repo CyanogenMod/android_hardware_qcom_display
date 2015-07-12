@@ -46,6 +46,10 @@ class ResourceInterface {
   virtual DisplayError SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages) = 0;
   virtual DisplayError ValidateScaling(const LayerRect &crop, const LayerRect &dst,
                                        bool rotate90) = 0;
+  virtual DisplayError ValidateCursorConfig(Handle display_ctx, const Layer &layer,
+                                            bool is_top) = 0;
+  virtual DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers,
+                                              int x, int y) = 0;
 
  protected:
   virtual ~ResourceInterface() { }

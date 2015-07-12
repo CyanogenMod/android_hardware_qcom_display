@@ -68,6 +68,9 @@ enum LayerComposition {
 
   kCompositionSDE,          //!< This layer will be handled by SDE. It must not be composed by GPU.
 
+  kCompositionHWCursor,     //!< This layer will be handled by SDE using HWCursor. It must not be
+                            //!< composed by GPU
+
   kCompositionHybrid,       //!< This layer will be drawn by a blit engine and SDE together. Display
                             //!< device will split the layer, update the blit rectangle that
                             //!< need to be composed by a blit engine and update original source
@@ -129,6 +132,10 @@ struct LayerFlags {
                               //!< This flag shall be set by client to indicate that this layer
                               //!< is for solid fill without input buffer. Display Device will
                               //!< use SDE HW feature to achieve it.
+
+      uint32_t cursor : 1;    //!< This flag shall be set by client to indicate that this layer
+                              //!< is a cursor
+                              //!< Display Device may handle this layer using HWCursor
     };
 
     uint32_t flags;   //!< For initialization purpose only. Client shall not refer it directly.
@@ -161,10 +168,13 @@ struct LayerStackFlags {
       uint32_t animating : 1;         //!< This flag shall be set by client to indicate that the
                                       //!<  current frame is animating.i
 
-      uint64_t attributes_changed : 1;
+      uint32_t attributes_changed : 1;
                                       //!< This flag shall be set by client to indicate that the
                                       //!< current frame has some properties changed and
                                       //!< needs re-config.
+
+      uint32_t cursor_present : 1;    //!< This flag will be set to true if the current layer
+                                      //!< stack contains cursor layer.
     };
 
     uint32_t flags;   //!< For initialization purpose only. Client shall not refer it directly.

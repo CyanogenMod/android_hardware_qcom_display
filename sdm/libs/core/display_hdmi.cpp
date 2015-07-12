@@ -252,5 +252,10 @@ void DisplayHDMI::AppendDump(char *buffer, uint32_t length) {
   DisplayBase::AppendDump(buffer, length);
 }
 
+DisplayError DisplayHDMI::SetCursorPosition(int x, int y) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetCursorPosition(x, y);
+}
+
 }  // namespace sdm
 

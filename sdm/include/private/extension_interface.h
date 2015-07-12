@@ -57,7 +57,8 @@ class ExtensionInterface {
                                            PartialUpdateInterface **interface) = 0;
   virtual DisplayError DestroyPartialUpdate(PartialUpdateInterface *interface) = 0;
 
-  virtual DisplayError CreateStrategyExtn(DisplayType type, StrategyInterface **interface) = 0;
+  virtual DisplayError CreateStrategyExtn(DisplayType type, HWDisplayMode mode,
+                                          StrategyInterface **interface) = 0;
   virtual DisplayError DestroyStrategyExtn(StrategyInterface *interface) = 0;
 
   virtual DisplayError CreateResourceExtn(const HWResourceInfo &hw_resource_info,

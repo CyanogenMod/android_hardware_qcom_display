@@ -127,6 +127,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->max_mixer_width = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_pipe_width", strlen("max_pipe_width"))) {
         hw_resource->max_pipe_width = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "max_cursor_size", strlen("max_cursor_size"))) {
+        hw_resource->max_cursor_size = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_pipe_bw", strlen("max_pipe_bw"))) {
         hw_resource->max_pipe_bw = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_mdp_clk", strlen("max_mdp_clk"))) {

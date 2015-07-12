@@ -608,6 +608,7 @@ const char * DisplayBase::GetName(const LayerComposition &composition) {
   switch (composition) {
   case kCompositionGPU:         return "GPU";
   case kCompositionSDE:         return "SDE";
+  case kCompositionHWCursor:    return "CURSOR";
   case kCompositionHybrid:      return "HYBRID";
   case kCompositionBlit:        return "BLIT";
   case kCompositionGPUTarget:   return "GPU_TARGET";
@@ -661,6 +662,19 @@ DisplayError DisplayBase::ApplyDefaultDisplayMode() {
     return color_mgr_->ApplyDefaultDisplayMode();
   else
     return kErrorParameters;
+}
+
+DisplayError DisplayBase::SetCursorPosition(int x, int y) {
+  if (state_ != kStateOn) {
+    return kErrorNotSupported;
+  }
+
+  DisplayError error = comp_manager_->ValidateCursorPosition(display_comp_ctx_, &hw_layers_, x, y);
+  if (error == kErrorNone) {
+    return hw_intf_->SetCursorPosition(&hw_layers_, x, y);
+  }
+
+  return kErrorNone;
 }
 
 }  // namespace sdm

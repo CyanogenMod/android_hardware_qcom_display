@@ -561,10 +561,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
     layer.plane_alpha = hwc_layer.planeAlpha;
     layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
+    layer.flags.cursor = ((hwc_layer.flags & HWC_IS_CURSOR_LAYER) > 0);
+    layer.flags.updating = true;
     if (num_hw_layers <= kMaxLayerCount) {
       layer.flags.updating = (layer_stack_cache_.layer_cache[i].handle != hwc_layer.handle);
-    } else {
-      layer.flags.updating = true;
     }
 
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
@@ -573,6 +573,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
     if (layer.flags.skip) {
       layer_stack_.flags.skip_present = true;
+    }
+
+    if (layer.flags.cursor) {
+      layer_stack_.flags.cursor_present = true;
     }
   }
 
@@ -625,17 +629,16 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     }
 
     // If current layer does not need frame buffer redraw, then mark it as HWC_OVERLAY
-    if (!needs_fb_refresh && (composition != kCompositionGPUTarget)) {
+    if (!needs_fb_refresh && (composition != kCompositionGPUTarget &&
+                              composition != kCompositionHWCursor)) {
       composition = kCompositionSDE;
     }
-
     SetComposition(composition, &hwc_layer.compositionType);
   }
 
   // Cache the current layer stack information like layer_count, composition type and layer handle
   // for the future.
   CacheLayerStackInfo(content_list);
-
   return 0;
 }
 
@@ -844,6 +847,7 @@ void HWCDisplay::SetComposition(const int32_t &source, int32_t *target) {
   switch (source) {
   case kCompositionGPUTarget:   *target = HWC_FRAMEBUFFER_TARGET; break;
   case kCompositionGPU:         *target = HWC_FRAMEBUFFER;        break;
+  case kCompositionHWCursor:    *target = HWC_CURSOR_OVERLAY;     break;
   default:                      *target = HWC_OVERLAY;            break;
   }
 }
@@ -1168,6 +1172,27 @@ int HWCDisplay::SetDisplayStatus(uint32_t display_status) {
   return status;
 }
 
+int HWCDisplay::SetCursorPosition(int x, int y) {
+  DisplayError error = kErrorNone;
+
+  if (shutdown_pending_) {
+    return 0;
+  }
+
+  error = display_intf_->SetCursorPosition(x, y);
+  if (error != kErrorNone) {
+    if (error == kErrorShutDown) {
+      shutdown_pending_ = true;
+      return 0;
+    }
+    DLOGE("Failed for x = %d y = %d, Error = %d", x, y, error);
+    return -1;
+  }
+
+  return 0;
+}
+
+
 void HWCDisplay::MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list) {
   for (size_t i = 0 ; i < (content_list->numHwLayers - 1); i++) {
     hwc_layer_1_t *layer = &content_list->hwLayers[i];
@@ -1294,7 +1319,7 @@ bool HWCDisplay::IsFullFrameSDEComposed() {
       continue;
     }
     if (composition != kCompositionSDE && composition != kCompositionBlit &&
-        composition != kCompositionHybrid) {
+        composition != kCompositionHybrid && composition != kCompositionHWCursor) {
       return false;
     }
   }

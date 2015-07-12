@@ -61,6 +61,7 @@ class HWPrimary : public HWDevice, public HWPrimaryInterface {
   virtual DisplayError SetPanelBrightness(int level);
   virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers);
   virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list);
+  virtual DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y);
 
  private:
   // Panel modes for the MSMFB_LPM_ENABLE ioctl

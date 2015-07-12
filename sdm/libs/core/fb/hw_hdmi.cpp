@@ -548,5 +548,9 @@ bool HWHDMI::IsResolutionFilePresent() {
   return is_file_present;
 }
 
+DisplayError HWHDMI::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
+  return HWDevice::SetCursorPosition(hw_layers, x, y);
+}
+
 }  // namespace sdm
 

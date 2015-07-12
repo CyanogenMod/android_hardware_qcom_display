@@ -58,6 +58,8 @@ class CompManager : public DumpImpl {
   DisplayError SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages);
   void ControlPartialUpdate(Handle display_ctx, bool enable);
   DisplayError ValidateScaling(const LayerRect &crop, const LayerRect &dst, bool rotate90);
+  DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers, int x, int y);
+  bool SupportLayerAsCursor(Handle display_ctx, HWLayers *hw_layers);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);

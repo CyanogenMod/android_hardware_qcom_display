@@ -281,6 +281,11 @@ DisplayError DisplayPrimary::VSync(int64_t timestamp) {
   return kErrorNone;
 }
 
+DisplayError DisplayPrimary::SetCursorPosition(int x, int y) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetCursorPosition(x, y);
+}
+
 DisplayError DisplayPrimary::Blank(bool blank) {
   SCOPE_LOCK(locker_);
   return kErrorNone;

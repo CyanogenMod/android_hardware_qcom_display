@@ -391,6 +391,15 @@ class DisplayInterface {
   */
   virtual DisplayError ApplyDefaultDisplayMode() = 0;
 
+  /*! @brief Method to set the position of the hw cursor.
+
+    @param[in] x \link x position \endlink
+    @param[in] y \link y position \endlink
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError SetCursorPosition(int x, int y) = 0;
+
  protected:
   virtual ~DisplayInterface() { }
 };

@@ -204,5 +204,10 @@ void DisplayVirtual::AppendDump(char *buffer, uint32_t length) {
   DisplayBase::AppendDump(buffer, length);
 }
 
+DisplayError DisplayVirtual::SetCursorPosition(int x, int y) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetCursorPosition(x, y);
+}
+
 }  // namespace sdm
 

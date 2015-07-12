@@ -85,6 +85,7 @@ struct HWResourceInfo {
   uint64_t max_bandwidth_high;
   uint32_t max_mixer_width;
   uint32_t max_pipe_width;
+  uint32_t max_cursor_size;
   uint32_t max_pipe_bw;
   uint32_t max_sde_clk;
   float clk_fudge_factor;
@@ -106,11 +107,11 @@ struct HWResourceInfo {
       num_cursor_pipe(0), num_blending_stages(0), num_rotator(0), num_control(0),
       num_mixer_to_disp(0), smp_total(0), smp_size(0), num_smp_per_pipe(0), max_scale_up(1),
       max_scale_down(1), max_bandwidth_low(0), max_bandwidth_high(0), max_mixer_width(2048),
-      max_pipe_width(2048), max_pipe_bw(0), max_sde_clk(0), clk_fudge_factor(1.0f),
-      macrotile_nv12_factor(0), macrotile_factor(0), linear_factor(0), scale_factor(0),
-      extra_fudge_factor(0), has_bwc(false), has_ubwc(false), has_decimation(false),
-      has_macrotile(false), has_rotator_downscale(false), has_non_scalar_rgb(false),
-      is_src_split(false) { }
+      max_pipe_width(2048),  max_cursor_size(0), max_pipe_bw(0), max_sde_clk(0),
+      clk_fudge_factor(1.0f), macrotile_nv12_factor(0), macrotile_factor(0), linear_factor(0),
+      scale_factor(0), extra_fudge_factor(0), has_bwc(false), has_ubwc(false),
+      has_decimation(false), has_macrotile(false), has_rotator_downscale(false),
+      has_non_scalar_rgb(false), is_src_split(false) { }
 
   void Reset() { *this = HWResourceInfo(); }
 };
@@ -311,6 +312,7 @@ struct HWLayersInfo {
 
   LayerRect right_partial_update;
                             // Right ROI.
+  bool use_hw_cursor;       // Indicates that HWCursor pipe needs to be used for cursor layer
 
 
   HWLayersInfo() : stack(NULL), count(0), need_sync_handle(false), sync_handle(-1) { }
