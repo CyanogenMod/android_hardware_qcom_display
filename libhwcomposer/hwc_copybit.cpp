@@ -567,6 +567,7 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     }
 
     if(drawUsingAppBufferComposition(ctx, list, dpy, fd)) {
+       mFbCache.reset();
        return true;
     }
     //render buffer

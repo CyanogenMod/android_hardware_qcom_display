@@ -40,6 +40,7 @@ namespace qhwc {
 
 IdleInvalidator *MDPComp::sIdleInvalidator = NULL;
 bool MDPComp::sIdleFallBack = false;
+bool MDPComp::sHandleTimeout = false;
 bool MDPComp::sDebugLogs = false;
 bool MDPComp::sEnabled = false;
 bool MDPComp::sEnableMixedMode = true;
@@ -230,13 +231,13 @@ void MDPComp::reset(hwc_context_t *ctx) {
 }
 
 void MDPComp::reset() {
+    sHandleTimeout = false;
     mPrevModeOn = mModeOn;
     mModeOn = false;
 }
 
 void MDPComp::timeout_handler(void *udata) {
     struct hwc_context_t* ctx = (struct hwc_context_t*)(udata);
-    bool handleTimeout = false;
 
     if(!ctx) {
         ALOGE("%s: received empty data in timer callback", __FUNCTION__);
@@ -245,24 +246,32 @@ void MDPComp::timeout_handler(void *udata) {
 
     ctx->mDrawLock.lock();
 
-    /* Handle timeout event only if the previous composition
-       on any display is MDP or MIXED*/
-    for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
-        if(ctx->mMDPComp[i])
-            handleTimeout =
-                    ctx->mMDPComp[i]->isMDPComp() || handleTimeout;
-    }
-
-    if(!handleTimeout) {
-        ALOGD_IF(isDebug(), "%s:Do not handle this timeout", __FUNCTION__);
-        ctx->mDrawLock.unlock();
-        return;
-    }
     if(!ctx->proc) {
         ALOGE("%s: HWC proc not registered", __FUNCTION__);
         ctx->mDrawLock.unlock();
         return;
     }
+
+    if(!sHandleTimeout) {
+        ALOGD_IF(isDebug(), "%s:Do not handle this timeout", __FUNCTION__);
+        if(qdutils::MDPVersion::getInstance().isDynFpsSupported() &&
+           ctx->mUseMetaDataRefreshRate) {
+            MDPVersion& mdpHw = MDPVersion::getInstance();
+            /* Even in cases, where we wouldnot like to trigger new frame update
+               (for ex: if previous frame happens to be single pipe mdpcomp, etc),
+               refresh-rate should be set to the minfps supported by panel as
+               part of idle-fallback */
+            uint32_t refreshRate = mdpHw.getMinFpsSupported();
+            setRefreshRate(ctx, HWC_DISPLAY_PRIMARY, refreshRate);
+            if(!Overlay::displayCommit(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd)) {
+                ALOGE("%s: displayCommit failed for primary during dynfps",
+                      __FUNCTION__);
+            }
+        }
+        ctx->mDrawLock.unlock();
+        return;
+    }
+
     sIdleFallBack = true;
     ctx->mDrawLock.unlock();
     /* Trigger SF to redraw the current frame */
@@ -355,7 +364,7 @@ void MDPComp::FrameInfo::reset(const int& numLayers) {
     fbCount = numLayers;
     mdpCount = 0;
     needsRedraw = true;
-    fbZ = -1;
+    fbZ = DEFAULT_FB_ZORDER;
 }
 
 void MDPComp::FrameInfo::map() {
@@ -1208,7 +1217,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
 
     mCurrentFrame.mdpCount = numNonCursorLayers;
     mCurrentFrame.fbCount = 0;
-    mCurrentFrame.fbZ = -1;
+    mCurrentFrame.fbZ = DEFAULT_FB_ZORDER;
 
     for (int j = 0; j < numNonCursorLayers; j++) {
         if(isValidRect(list->hwLayers[j].displayFrame)) {
@@ -1338,7 +1347,8 @@ bool MDPComp::loadBasedComp(hwc_context_t *ctx,
 
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
     const int numNonDroppedLayers = numAppLayers - mCurrentFrame.dropCount;
-    const int stagesForMDP = min(sMaxPipesPerMixer,
+    const int basePipe = isBottomLayerFullScreen(ctx, list);
+    const int stagesForMDP = min((sMaxPipesPerMixer + basePipe),
             ctx->mOverlay->availablePipes(mDpy, Overlay::MIXER_DEFAULT));
 
     int mdpBatchSize = stagesForMDP - 1; //1 stage for FB
@@ -1393,7 +1403,7 @@ bool MDPComp::loadBasedComp(hwc_context_t *ctx,
             --mdpBatchLeft;
         }
 
-        mCurrentFrame.fbZ = mdpBatchSize;
+        mCurrentFrame.fbZ = mdpBatchSize - basePipe;
         mCurrentFrame.fbCount = fbBatchSize;
         mCurrentFrame.mdpCount = mdpBatchSize;
 
@@ -1759,7 +1769,7 @@ bool  MDPComp::markLayersForCaching(hwc_context_t* ctx,
     int maxBatchStart = -1;
     int maxBatchEnd = -1;
     int maxBatchCount = 0;
-    int fbZ = -1;
+    int fbZ = DEFAULT_FB_ZORDER;
 
     /* Nothing is cached. No batching needed */
     if(mCurrentFrame.fbCount == 0) {
@@ -1771,7 +1781,8 @@ bool  MDPComp::markLayersForCaching(hwc_context_t* ctx,
         return false;
     }
 
-    fbZ = getBatch(list, maxBatchStart, maxBatchEnd, maxBatchCount);
+    fbZ = getBatch(list, maxBatchStart, maxBatchEnd, maxBatchCount) -
+        isBottomLayerFullScreen(ctx, list);
 
     /* reset rest of the layers lying inside ROI for MDP comp */
     for(int i = 0; i < mCurrentFrame.layerCount; i++) {
@@ -1852,6 +1863,7 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
        possible number of YUV layers to MDP, instead of falling back to GPU
        completely.*/
     nYuvCount = (nYuvCount > nVGpipes) ? nVGpipes : nYuvCount;
+    if(nYuvCount > MAX_NUM_APP_LAYERS) return;
 
     for(int index = 0;index < nYuvCount; index++){
         int nYuvIndex = ctx->listStats[mDpy].yuvIndices[index];
@@ -1940,7 +1952,7 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
     }
 
     //Configure framebuffer first if applicable
-    if(mCurrentFrame.fbZ >= 0) {
+    if(mCurrentFrame.fbZ >= BASE_PIPE_ZORDER) {
         hwc_rect_t fbRect = getUpdatingFBRect(ctx, list);
         if(!ctx->mFBUpdate[mDpy]->prepare(ctx, list, fbRect, mCurrentFrame.fbZ))
         {
@@ -1957,8 +1969,15 @@ bool MDPComp::postHeuristicsHandling(hwc_context_t *ctx,
         return false;
     }
 
-    for (int index = 0, mdpNextZOrder = 0; index < mCurrentFrame.layerCount;
-            index++) {
+    int mdpNextZOrder = 0;
+    hwc_rect_t fbRect = {0, 0, (int)ctx->dpyAttr[mDpy].xres,
+        (int)ctx->dpyAttr[mDpy].yres};
+    if(isBottomLayerFullScreen(ctx, list) && (not mCurrentFrame.isFBComposed[0]
+                or (mCurrentFrame.fbZ == BASE_PIPE_ZORDER &&
+                    isSameRect(fbRect, getUpdatingFBRect(ctx, list)))))
+        mdpNextZOrder = BASE_PIPE_ZORDER;
+
+    for (int index = 0; index < mCurrentFrame.layerCount; index++) {
         if(!mCurrentFrame.isFBComposed[index]) {
             int mdpIndex = mCurrentFrame.layerToMDP[index];
             hwc_layer_1_t* layer = &list->hwLayers[index];
@@ -2021,7 +2040,9 @@ bool MDPComp::resourceCheck(hwc_context_t* ctx,
     if (maxStages > sMaxPipesPerMixer) {
         cursorInUse = 0;
     }
-    if(mCurrentFrame.mdpCount > (sMaxPipesPerMixer - fbUsed - cursorInUse)) {
+    const int basePipe = isBottomLayerFullScreen(ctx, list);
+    if(mCurrentFrame.mdpCount >
+            (sMaxPipesPerMixer - fbUsed - cursorInUse + basePipe)) {
         ALOGD_IF(isDebug(), "%s: Exceeds MAX_PIPES_PER_MIXER",__FUNCTION__);
         return false;
     }
@@ -2180,6 +2201,24 @@ void MDPComp::setDynRefreshRate(hwc_context_t *ctx, hwc_display_contents_1_t* li
         }
         setRefreshRate(ctx, mDpy, refreshRate);
     }
+}
+
+/*
+ * For the use-cases where bottom most layer in the layer list
+ * is full screen, it can be used as base layer in the first stage
+ * instead of borderfill to optimize MDP staging.
+ * */
+int MDPComp::isBottomLayerFullScreen(hwc_context_t *ctx,
+        hwc_display_contents_1_t *list) {
+    hwc_layer_1_t* layer = &list->hwLayers[0];
+    hwc_rect_t rect = {0, 0, (int)ctx->dpyAttr[mDpy].xres,
+        (int)ctx->dpyAttr[mDpy].yres};
+    if((ctx->listStats[mDpy].numAppLayers > 1) &&
+            isSupportedForMDPComp(ctx, layer) &&
+            isSameRect(rect, layer->displayFrame)) {
+        return 1;
+    }
+    return 0;
 }
 
 int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
@@ -2503,6 +2542,12 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         return true;
     }
 
+    if(sIdleInvalidator && !sIdleFallBack &&
+       /* Neednot set for single pipe mdp composition cases */
+       !(mCurrentFrame.mdpCount == 1 and mCurrentFrame.fbCount == 0) ) {
+        sHandleTimeout = true;
+    }
+
     overlay::Overlay& ov = *ctx->mOverlay;
     LayerProp *layerProp = ctx->layerProp[mDpy];
 
@@ -2765,6 +2810,14 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if(!isEnabled() or !mModeOn) {
         ALOGD_IF(isDebug(),"%s: MDP Comp not enabled/configured", __FUNCTION__);
         return true;
+    }
+
+    if(sIdleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount &&
+       !(needs3DComposition(ctx, HWC_DISPLAY_PRIMARY) ||
+         needs3DComposition(ctx, HWC_DISPLAY_EXTERNAL)) &&
+       /* Neednot set for single pipe mdp composition cases */
+       !(mCurrentFrame.mdpCount == 1 and mCurrentFrame.fbCount == 0) ) {
+        sHandleTimeout = true;
     }
 
     overlay::Overlay& ov = *ctx->mOverlay;

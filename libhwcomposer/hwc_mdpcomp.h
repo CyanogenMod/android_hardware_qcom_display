@@ -45,7 +45,6 @@ public:
     /* dumpsys */
     void dump(android::String8& buf, hwc_context_t *ctx);
     bool isGLESOnlyComp() { return (mCurrentFrame.mdpCount == 0); }
-    bool isMDPComp() { return mModeOn; }
     int drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     static MDPComp* getObject(hwc_context_t *ctx, const int& dpy);
     /* Handler to invoke frame redraw on Idle Timer expiry */
@@ -78,6 +77,12 @@ protected:
         MDPCOMP_AVOID_LOAD_MDP = 0x004,
         MDPCOMP_AVOID_VIDEO_ONLY = 0x008,
         MDPCOMP_AVOID_MDP_ONLY_LAYERS = 0x010,
+    };
+
+    //FB Z-Order
+    enum {
+        DEFAULT_FB_ZORDER = -2,
+        BASE_PIPE_ZORDER,
     };
 
     /* mdp pipe data */
@@ -248,6 +253,8 @@ protected:
             hwc_display_contents_1_t* list);
     void reset(hwc_context_t *ctx);
     bool isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer);
+    int isBottomLayerFullScreen(hwc_context_t *ctx,
+            hwc_display_contents_1_t *list);
     bool resourceCheck(hwc_context_t* ctx, hwc_display_contents_1_t* list);
     hwc_rect_t getUpdatingFBRect(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
@@ -264,6 +271,8 @@ protected:
     static int sSimulationFlags;
     static bool sDebugLogs;
     static bool sIdleFallBack;
+    /* Handles the timeout event from kernel, if the value is set to true */
+    static bool sHandleTimeout;
     static int sMaxPipesPerMixer;
     static bool sSrcSplitEnabled;
     static IdleInvalidator *sIdleInvalidator;
