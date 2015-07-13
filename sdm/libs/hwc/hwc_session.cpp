@@ -541,7 +541,11 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     break;
 
   case qService::IQService::QDCM_SVC_CMDS:
-    status = QdcmCMDHandler(*input_parcel, output_parcel);
+    status = QdcmCMDHandler(input_parcel, output_parcel);
+    break;
+
+  case qService::IQService::MIN_HDCP_ENCRYPTION_LEVEL_CHANGED:
+    status = OnMinHdcpEncryptionLevelChange(input_parcel, output_parcel);
     break;
 
   case qService::IQService::CONTROL_PARTIAL_UPDATE:
@@ -784,7 +788,8 @@ void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {
   }
 }
 
-android::status_t HWCSession::QdcmCMDHandler(const android::Parcel &in, android::Parcel *out) {
+android::status_t HWCSession::QdcmCMDHandler(const android::Parcel *input_parcel,
+                                             android::Parcel *output_parcel) {
   int ret = 0;
   int32_t *brightness_value = NULL;
   uint32_t display_id(0);
@@ -792,7 +797,7 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel &in, android:
   PPDisplayAPIPayload resp_payload, req_payload;
 
   // Read display_id, payload_size and payload from in_parcel.
-  ret = HWCColorManager::CreatePayloadFromParcel(in, &display_id, &req_payload);
+  ret = HWCColorManager::CreatePayloadFromParcel(*input_parcel, &display_id, &req_payload);
   if (!ret) {
     if (HWC_DISPLAY_PRIMARY == display_id && hwc_display_[HWC_DISPLAY_PRIMARY])
       ret = hwc_display_[HWC_DISPLAY_PRIMARY]->ColorSVCRequestRoute(req_payload,
@@ -804,7 +809,7 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel &in, android:
   }
 
   if (ret) {
-    out->writeInt32(ret);  // first field in out parcel indicates return code.
+    output_parcel->writeInt32(ret);  // first field in out parcel indicates return code.
     req_payload.DestroyPayload();
     resp_payload.DestroyPayload();
     return ret;
@@ -847,12 +852,31 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel &in, android:
   }
 
   // for display API getter case, marshall returned params into out_parcel.
-  out->writeInt32(ret);
-  HWCColorManager::MarshallStructIntoParcel(resp_payload, out);
+  output_parcel->writeInt32(ret);
+  HWCColorManager::MarshallStructIntoParcel(resp_payload, output_parcel);
   req_payload.DestroyPayload();
   resp_payload.DestroyPayload();
 
   return (ret? -EINVAL : 0);
+}
+
+android::status_t HWCSession::OnMinHdcpEncryptionLevelChange(const android::Parcel *input_parcel,
+                                                             android::Parcel *output_parcel) {
+  int ret = -EINVAL;
+  uint32_t display_id = UINT32(input_parcel->readInt32());
+
+  DLOGI("Display %d", display_id);
+  if (display_id != HWC_DISPLAY_EXTERNAL) {
+    DLOGW("Not supported for display %d", display_id);
+  } else if (!hwc_display_[display_id]) {
+    DLOGE("Display %d is not connected", display_id);
+  } else {
+    ret = hwc_display_[display_id]->OnMinHdcpEncryptionLevelChange();
+  }
+
+  output_parcel->writeInt32(ret);
+
+  return ret;
 }
 
 void* HWCSession::HWCUeventThread(void *context) {

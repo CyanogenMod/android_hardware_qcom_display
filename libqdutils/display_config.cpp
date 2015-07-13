@@ -280,6 +280,26 @@ int setPanelMode(int mode) {
     return err;
 }
 
+int minHdcpEncryptionLevelChanged(int dpy) {
+    status_t err = (status_t) FAILED_TRANSACTION;
+    sp<IQService> binder = getBinder();
+    Parcel inParcel, outParcel;
+    inParcel.writeInt32(dpy);
+
+    if(binder != NULL) {
+        err = binder->dispatch(IQService::MIN_HDCP_ENCRYPTION_LEVEL_CHANGED,
+                &inParcel, &outParcel);
+    }
+
+    if(err) {
+        ALOGE("%s: Failed for dpy %d err=%d", __FUNCTION__, dpy, err);
+    } else {
+        err = outParcel.readInt32();
+    }
+
+    return err;
+}
+
 }// namespace
 
 // ----------------------------------------------------------------------------

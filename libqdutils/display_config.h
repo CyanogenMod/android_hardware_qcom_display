@@ -136,6 +136,11 @@ DisplayAttributes getDisplayAttributes(int configIndex, int dpy);
 // Set the primary display mode to command or video mode
 int setDisplayMode(int mode);
 
+// Notify change in minimum encryption level for HDCP
+// Return -1 on error.
+// Only HDMI display is supported as dpy for now
+int minHdcpEncryptionLevelChanged(int dpy);
+
 //=============================================================================
 // The functions and methods below run in the context of HWC and
 // are called in response to binder calls from clients

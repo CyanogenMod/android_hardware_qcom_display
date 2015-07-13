@@ -1192,6 +1192,15 @@ int HWCDisplay::SetCursorPosition(int x, int y) {
   return 0;
 }
 
+int HWCDisplay::OnMinHdcpEncryptionLevelChange() {
+  DisplayError error = display_intf_->OnMinHdcpEncryptionLevelChange();
+  if (error != kErrorNone) {
+    DLOGE("Failed. Error = %d", error);
+    return -1;
+  }
+
+  return 0;
+}
 
 void HWCDisplay::MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list) {
   for (size_t i = 0 ; i < (content_list->numHwLayers - 1); i++) {
