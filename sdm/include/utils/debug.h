@@ -70,6 +70,7 @@ class Debug {
   static bool IsRotatorUbwcDisabled();
   static bool IsRotatorSplitDisabled();
   static bool IsScalarDisabled();
+  static bool IsUbwcTiledFrameBuffer();
 
  private:
   Debug();

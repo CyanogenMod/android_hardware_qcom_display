@@ -51,7 +51,7 @@ class ResourceDefault : public ResourceInterface {
   virtual void Purge(Handle display_ctx);
   virtual DisplayError SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages);
   virtual DisplayError ValidateScaling(const LayerRect &crop, const LayerRect &dst,
-                                       bool rotate90);
+                                       bool rotate90, bool ubwc_tiled);
   DisplayError ValidateCursorConfig(Handle display_ctx, const Layer& layer, bool is_top);
   DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers, int x, int y);
 
@@ -130,8 +130,8 @@ class ResourceDefault : public ResourceInterface {
   bool CalculateCropRects(const LayerRect &scissor, LayerRect *crop, LayerRect *dst);
   DisplayError ValidateLayerDimensions(const Layer &layer);
   DisplayError ValidateDimensions(const LayerRect &crop, const LayerRect &dst);
-  DisplayError ValidatePipeParams(HWPipeInfo *pipe_info);
-  DisplayError ValidateDownScaling(float scale_x, float scale_y);
+  DisplayError ValidatePipeParams(HWPipeInfo *pipe_info, bool ubwc_tiled);
+  DisplayError ValidateDownScaling(float scale_x, float scale_y, bool ubwc_tiled);
   DisplayError ValidateUpScaling(float scale_x, float scale_y);
   DisplayError GetScaleFactor(const LayerRect &crop, const LayerRect &dst, float *scale_x,
                              float *scale_y);
@@ -141,6 +141,7 @@ class ResourceDefault : public ResourceInterface {
   DisplayError AlignPipeConfig(const Layer &layer, HWPipeInfo *left_pipe, HWPipeInfo *right_pipe);
   void ResourceStateLog(void);
   DisplayError CalculateDecimation(float downscale, uint8_t *decimation);
+  bool IsUBWCFormat(LayerBufferFormat format);
 
   Locker locker_;
   HWResourceInfo hw_res_info_;
