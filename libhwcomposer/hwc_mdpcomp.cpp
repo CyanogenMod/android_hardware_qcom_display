@@ -892,7 +892,6 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
     uint32_t totalDirtyArea = 0;
     bool computeDirtyArea = not (list->flags & HWC_GEOMETRY_CHANGED) and
             not isYuvPresent(ctx, mDpy) and
-            not qdutils::MDPVersion::getInstance().isPartialUpdateEnabled() and
             numAppLayers > 1;
 
     for(int i = 0; i < numAppLayers; ++i) {
