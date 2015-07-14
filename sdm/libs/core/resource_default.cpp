@@ -905,5 +905,14 @@ DisplayError ResourceDefault::CalculateDecimation(float downscale, uint8_t *deci
   return kErrorNone;
 }
 
-}  // namespace sdm
+DisplayError ResourceDefault::ValidateCursorConfig(Handle display_ctx, const Layer& layer,
+                                                   bool is_top) {
+  return kErrorNotSupported;
+}
 
+DisplayError ResourceDefault::ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers,
+                                                     int x, int y) {
+  return kErrorNotSupported;
+}
+
+}  // namespace sdm

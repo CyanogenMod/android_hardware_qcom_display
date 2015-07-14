@@ -176,6 +176,11 @@ DisplayError DisplayHDMI::SetPanelBrightness(int level) {
   return DisplayBase::SetPanelBrightness(level);
 }
 
+DisplayError DisplayHDMI::OnMinHdcpEncryptionLevelChange() {
+  SCOPE_LOCK(locker_);
+  return hw_hdmi_intf_->OnMinHdcpEncryptionLevelChange();
+}
+
 int DisplayHDMI::GetBestConfig() {
   uint32_t best_config_mode = 0;
   HWDisplayAttributes *best = &display_attributes_[0];
@@ -250,6 +255,11 @@ void DisplayHDMI::GetScanSupport() {
 void DisplayHDMI::AppendDump(char *buffer, uint32_t length) {
   SCOPE_LOCK(locker_);
   DisplayBase::AppendDump(buffer, length);
+}
+
+DisplayError DisplayHDMI::SetCursorPosition(int x, int y) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::SetCursorPosition(x, y);
 }
 
 }  // namespace sdm

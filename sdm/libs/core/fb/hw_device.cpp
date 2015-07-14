@@ -189,6 +189,7 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
     HWPipeInfo *right_pipe = &hw_layers->config[i].right_pipe;
     HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
     bool is_rotator_used = (hw_rotator_session->hw_block_count != 0);
+    bool is_cursor_pipe_used = (hw_layer_info.use_hw_cursor & layer.flags.cursor);
 
     for (uint32_t count = 0; count < 2; count++) {
       HWPipeInfo *pipe_info = (count == 0) ? left_pipe : right_pipe;
@@ -225,7 +226,7 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
 
         SetRect(pipe_info->src_roi, &mdp_layer.src_rect);
         SetRect(pipe_info->dst_roi, &mdp_layer.dst_rect);
-        SetMDPFlags(layer, is_rotator_used, &mdp_layer.flags);
+        SetMDPFlags(layer, is_rotator_used, is_cursor_pipe_used, &mdp_layer.flags);
         SetColorSpace(layer.color_space, &mdp_layer.color_space);
         mdp_layer.bg_color = layer.solid_fill_color;
 
@@ -579,7 +580,7 @@ void HWDevice::SetRect(const LayerRect &source, mdp_rect *target) {
 }
 
 void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
-                           uint32_t *mdp_flags) {
+                           bool is_cursor_pipe_used, uint32_t *mdp_flags) {
   LayerBuffer *input_buffer = layer.input_buffer;
 
   // Flips will be taken care by rotator, if layer uses rotator for downscale/rotation. So ignore
@@ -608,6 +609,10 @@ void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
 
   if (layer.flags.solid_fill) {
     *mdp_flags |= MDP_LAYER_SOLID_FILL;
+  }
+
+  if (layer.flags.cursor && is_cursor_pipe_used) {
+    *mdp_flags |= MDP_LAYER_ASYNC;
   }
 }
 
@@ -943,6 +948,37 @@ void HWDevice::SetColorSpace(LayerColorSpace source, mdp_color_space *color_spac
   case kFullRange601:       *color_space = MDP_CSC_ITU_R_601_FR;   break;
   case kLimitedRange709:    *color_space = MDP_CSC_ITU_R_709;      break;
   }
+}
+
+DisplayError HWDevice::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
+  DTRACE_SCOPED();
+
+  HWLayersInfo &hw_layer_info = hw_layers->info;
+  uint32_t count = hw_layer_info.count;
+  uint32_t cursor_index = count - 1;
+  HWPipeInfo *left_pipe = &hw_layers->config[cursor_index].left_pipe;
+
+  STRUCT_VAR(mdp_async_layer, async_layer);
+  async_layer.flags = MDP_LAYER_ASYNC;
+  async_layer.pipe_ndx = left_pipe->pipe_id;
+  async_layer.src.x = left_pipe->src_roi.left;
+  async_layer.src.y = left_pipe->src_roi.top;
+  async_layer.dst.x = x;
+  async_layer.dst.y = y;
+
+  STRUCT_VAR(mdp_position_update, pos_update);
+  pos_update.input_layer_cnt = 1;
+  pos_update.input_layers = &async_layer;
+  if (Sys::ioctl_(device_fd_, MSMFB_ASYNC_POSITION_UPDATE, &pos_update) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
+    IOCTL_LOGE(MSMFB_ASYNC_POSITION_UPDATE, device_type_);
+    return kErrorHardware;
+  }
+
+  return kErrorNone;
 }
 
 }  // namespace sdm

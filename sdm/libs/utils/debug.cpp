@@ -73,13 +73,6 @@ bool Debug::IsDecimationDisabled() {
   return (value == 1);
 }
 
-bool Debug::IsPartialUpdateEnabled() {
-  int value = 0;
-  debug_.debug_handler_->GetProperty("sdm.partial_update", &value);
-
-  return (value == 1);
-}
-
 int Debug::GetMaxPipesPerMixer(DisplayType display_type) {
   int value = -1;
   switch (display_type) {
@@ -116,6 +109,13 @@ bool Debug::IsRotatorUbwcDisabled() {
 bool Debug::IsRotatorSplitDisabled() {
   int value = 0;
   debug_.debug_handler_->GetProperty("sdm.debug.disable_rotator_split", &value);
+
+  return (value == 1);
+}
+
+bool Debug::IsScalarDisabled() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.debug.disable_scalar", &value);
 
   return (value == 1);
 }

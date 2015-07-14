@@ -327,6 +327,15 @@ class DisplayInterface {
   */
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages) = 0;
 
+  /*! @brief Method to control partial update feature for each display.
+
+    @param[in] enable partial update feature control flag
+    @param[out] pending whether the operation is completed or pending for completion
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending) = 0;
+
   /*! @brief Method to set the mode of the primary display.
 
     @param[in] mode the new display mode.
@@ -364,6 +373,12 @@ class DisplayInterface {
   */
   virtual DisplayError SetPanelBrightness(int level) = 0;
 
+  /*! @brief Method to notify display about change in min HDCP encryption level.
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError OnMinHdcpEncryptionLevelChange() = 0;
+
   /*! @brief Method to route display API requests to color service.
 
     @param[in] in_payload \link PPDisplayAPIPayload \endlink
@@ -381,6 +396,15 @@ class DisplayInterface {
     @return \link DisplayError \endlink
   */
   virtual DisplayError ApplyDefaultDisplayMode() = 0;
+
+  /*! @brief Method to set the position of the hw cursor.
+
+    @param[in] x \link x position \endlink
+    @param[in] y \link y position \endlink
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError SetCursorPosition(int x, int y) = 0;
 
  protected:
   virtual ~DisplayInterface() { }

@@ -169,7 +169,7 @@ DisplayError HWHDMI::GetNumDisplayAttributes(uint32_t *count) {
 
 DisplayError HWHDMI::ReadEDIDInfo() {
   ssize_t length = -1;
-  char edid_str[PAGE_SIZE] = {'\0'};
+  char edid_str[kPageSize] = {'\0'};
   char edid_path[kMaxStringLength] = {'\0'};
   snprintf(edid_path, sizeof(edid_path), "%s%d/edid_modes", fb_path_, fb_node_index_);
   int edid_file = Sys::open_(edid_path, O_RDONLY);
@@ -376,6 +376,33 @@ DisplayError HWHDMI::GetMaxCEAFormat(uint32_t *max_cea_format) {
   return kErrorNone;
 }
 
+DisplayError HWHDMI::OnMinHdcpEncryptionLevelChange() {
+  DisplayError error = kErrorNone;
+  int fd = -1;
+  char data[kMaxStringLength] = {'\0'};
+
+  snprintf(data, sizeof(data), "%s%d/hdcp2p2/min_level_change", fb_path_, fb_node_index_);
+
+  fd = Sys::open_(data, O_WRONLY);
+  if (fd < 0) {
+    DLOGW("File '%s' could not be opened.", data);
+    return kErrorHardware;
+  }
+
+  // write any value (1 here) on this fd to trigger level change.
+  snprintf(data, sizeof(data), "%d", 1);
+
+  ssize_t err = Sys::pwrite_(fd, data, strlen(data), 0);
+  if (err <= 0) {
+    DLOGE("Write failed, Error = %s", strerror(errno));
+    error = kErrorHardware;
+  }
+
+  Sys::close_(fd);
+
+  return error;
+}
+
 HWScanSupport HWHDMI::MapHWScanSupport(uint32_t value) {
   switch (value) {
   // TODO(user): Read the scan type from driver defined values instead of hardcoding
@@ -396,7 +423,7 @@ HWScanSupport HWHDMI::MapHWScanSupport(uint32_t value) {
 void HWHDMI::ReadScanInfo() {
   int scan_info_file = -1;
   ssize_t len = -1;
-  char data[4096] = {'\0'};
+  char data[kPageSize] = {'\0'};
 
   snprintf(data, sizeof(data), "%s%d/scan_info", fb_path_, fb_node_index_);
   scan_info_file = Sys::open_(data, O_RDONLY);
@@ -406,7 +433,7 @@ void HWHDMI::ReadScanInfo() {
   }
 
   memset(&data[0], 0, sizeof(data));
-  len = read(scan_info_file, data, sizeof(data) - 1);
+  len = Sys::pread_(scan_info_file, data, sizeof(data) - 1, 0);
   if (len <= 0) {
     Sys::close_(scan_info_file);
     DLOGW("File %s%d/scan_info is empty.", fb_path_, fb_node_index_);
@@ -440,7 +467,7 @@ DisplayError HWHDMI::SetPPFeatures(PPFeaturesConfig *feature_list) {
 }
 
 int HWHDMI::OpenResolutionFile(int file_mode) {
-  char file_path[PATH_MAX];
+  char file_path[kMaxStringLength];
   memset(file_path, 0, sizeof(file_path));
   snprintf(file_path , sizeof(file_path), "%s%d/res_info", fb_path_, fb_node_index_);
 
@@ -455,7 +482,7 @@ int HWHDMI::OpenResolutionFile(int file_mode) {
 
 // Method to request HDMI driver to write a new page of timing info into res_info node
 void HWHDMI::RequestNewPage(uint32_t page_number) {
-  char page_string[PAGE_SIZE];
+  char page_string[kPageSize];
   int fd = OpenResolutionFile(O_WRONLY);
   if (fd < 0) {
     return;
@@ -469,7 +496,8 @@ void HWHDMI::RequestNewPage(uint32_t page_number) {
   if (err <= 0) {
     DLOGE("Write to res_info failed (%s)", strerror(errno));
   }
-  close(fd);
+
+  Sys::close_(fd);
 }
 
 // Reads the contents of res_info node into a buffer if the file is not empty
@@ -481,10 +509,11 @@ bool HWHDMI::ReadResolutionFile(char *config_buffer) {
     return false;
   }
 
-  if ((bytes_read = Sys::pread_(fd, config_buffer, PAGE_SIZE, 0)) != 0) {
+  if ((bytes_read = Sys::pread_(fd, config_buffer, kPageSize, 0)) != 0) {
     is_file_read = true;
   }
-  close(fd);
+
+  Sys::close_(fd);
 
   DLOGI_IF(kTagDriverConfig, "bytes_read=%d is_file_read=%d", bytes_read, is_file_read);
 
@@ -499,14 +528,14 @@ DisplayError HWHDMI::ReadTimingInfo() {
   uint32_t size = sizeof(msm_hdmi_mode_timing_info);
 
   while (true) {
-    char config_buffer[PAGE_SIZE] = {0};
+    char config_buffer[kPageSize] = {0};
     msm_hdmi_mode_timing_info *info = reinterpret_cast<msm_hdmi_mode_timing_info *>(config_buffer);
 
     if (!ReadResolutionFile(config_buffer)) {
       break;
     }
 
-    while (info->video_format && size < PAGE_SIZE && config_index < hdmi_mode_count_) {
+    while (info->video_format && size < kPageSize && config_index < hdmi_mode_count_) {
       supported_video_modes_[config_index] = *info;
       size += sizeof(msm_hdmi_mode_timing_info);
 
@@ -546,6 +575,10 @@ bool HWHDMI::IsResolutionFilePresent() {
   }
 
   return is_file_present;
+}
+
+DisplayError HWHDMI::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
+  return HWDevice::SetCursorPosition(hw_layers, x, y);
 }
 
 }  // namespace sdm

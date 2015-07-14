@@ -58,7 +58,7 @@ public:
         TOGGLE_BWC = 17,           // Toggle BWC On/Off on targets that support
         /* Enable/Disable/Set refresh rate dynamically */
         CONFIGURE_DYN_REFRESH_RATE = 18,
-        SET_PARTIAL_UPDATE = 19,   // Preference on partial update feature
+        CONTROL_PARTIAL_UPDATE = 19,   // Provides ability to enable/disable partial update
         CONTROL_BACKLIGHT = 20, // Provides ability to control backlight
         SET_FRAME_DUMP_CONFIG = 21,  // Provides ability to set the frame dump config
         SET_S3D_MODE = 22, // Set the 3D mode as specified in msm_hdmi_modes.h
@@ -70,6 +70,7 @@ public:
         GET_DISPLAY_ATTRIBUTES_FOR_CONFIG = 28, //Get attr for specified config
         SET_DISPLAY_MODE = 29, // Set display mode to command or video mode
         SET_CAMERA_STATUS = 30, // To notify display when camera is on and off
+        MIN_HDCP_ENCRYPTION_LEVEL_CHANGED = 31,
         COMMAND_LIST_END = 400,
     };
 

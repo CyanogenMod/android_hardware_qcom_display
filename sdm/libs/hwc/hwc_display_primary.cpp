@@ -82,7 +82,17 @@ void HWCDisplayPrimary::Destroy(HWCDisplay *hwc_display) {
 }
 
 HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true) {
+  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true), cpu_hint_(NULL) {
+}
+
+int HWCDisplayPrimary::Init() {
+  cpu_hint_ = new CPUHint();
+  if (cpu_hint_->Init(static_cast<HWCDebugHandler*>(HWCDebugHandler::Get())) != kErrorNone) {
+    delete cpu_hint_;
+    cpu_hint_ = NULL;
+  }
+
+  return HWCDisplay::Init();
 }
 
 void HWCDisplayPrimary::ProcessBootAnimCompleted() {
@@ -128,6 +138,8 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
   if (use_metadata_refresh_rate_) {
     SetRefreshRate(metadata_refresh_rate_);
   }
+
+  ToggleCPUHint(app_layer_count);
 
   return 0;
 }
@@ -214,6 +226,27 @@ void HWCDisplayPrimary::SetMetaDataRefreshRateFlag(bool enable) {
 void HWCDisplayPrimary::SetQDCMSolidFillInfo(bool enable, uint32_t color) {
   solid_fill_enable_ = enable;
   solid_fill_color_  = color;
+}
+
+void HWCDisplayPrimary::ToggleCPUHint(int app_layer_count) {
+  int updating_count = 0;
+
+  if (!cpu_hint_) {
+    return;
+  }
+
+  for (int i = 0; i < app_layer_count; i++) {
+    Layer &layer = layer_stack_.layers[i];
+    if (layer.flags.updating) {
+      updating_count++;
+    }
+  }
+
+  if (updating_count == 1) {
+    cpu_hint_->Set();
+  } else {
+    cpu_hint_->Reset();
+  }
 }
 
 }  // namespace sdm

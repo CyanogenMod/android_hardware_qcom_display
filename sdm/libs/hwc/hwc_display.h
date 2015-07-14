@@ -49,12 +49,15 @@ class HWCDisplay : public DisplayEventHandler {
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
   virtual uint32_t GetLastPowerMode();
   virtual int SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels);
   virtual void GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels);
   virtual void GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels);
   virtual int SetDisplayStatus(uint32_t display_status);
+  virtual int OnMinHdcpEncryptionLevelChange();
   virtual int Perform(uint32_t operation, ...);
+  virtual int SetCursorPosition(int x, int y);
   virtual ~HWCDisplay() { }
 
   int SetPanelBrightness(int level);

@@ -56,7 +56,10 @@ class CompManager : public DumpImpl {
   void ProcessIdleTimeout(Handle display_ctx);
   void ProcessThermalEvent(Handle display_ctx, int64_t thermal_level);
   DisplayError SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages);
+  void ControlPartialUpdate(Handle display_ctx, bool enable);
   DisplayError ValidateScaling(const LayerRect &crop, const LayerRect &dst, bool rotate90);
+  DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers, int x, int y);
+  bool SupportLayerAsCursor(Handle display_ctx, HWLayers *hw_layers);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);
@@ -76,11 +79,12 @@ class CompManager : public DumpImpl {
     bool idle_fallback;
     bool handle_idle_timeout;
     bool fallback_;
+    uint32_t partial_update_enable;
 
     DisplayCompositionContext()
       : display_resource_ctx(NULL), display_type(kPrimary), max_strategies(0),
         remaining_strategies(0), idle_fallback(false), handle_idle_timeout(true),
-        fallback_(false) { }
+        fallback_(false), partial_update_enable(true) { }
   };
 
   Locker locker_;
