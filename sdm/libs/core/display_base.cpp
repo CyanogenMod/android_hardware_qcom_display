@@ -147,6 +147,8 @@ DisplayError DisplayBase::Deinit() {
 
 DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
+  bool disable_partial_update = false;
+  uint32_t pending;
 
   if (!layer_stack) {
     return kErrorParameters;
@@ -155,6 +157,13 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   pending_commit_ = false;
 
   if (state_ == kStateOn) {
+    if (color_mgr_) {
+      disable_partial_update = color_mgr_->NeedsPartialUpdateDisable();
+      if (disable_partial_update) {
+        ControlPartialUpdate(false, &pending);
+      }
+    }
+
     // Clean hw layers for reuse.
     hw_layers_.info = HWLayersInfo();
     hw_layers_.info.stack = layer_stack;
@@ -193,6 +202,9 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
       }
     }
     comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
+    if (disable_partial_update) {
+      ControlPartialUpdate(true, &pending);
+    }
   } else {
     return kErrorNotSupported;
   }

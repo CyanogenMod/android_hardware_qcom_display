@@ -144,6 +144,13 @@ DisplayError ColorManagerProxy::ApplyDefaultDisplayMode(void) {
   return ret;
 }
 
+bool ColorManagerProxy::NeedsPartialUpdateDisable() {
+  Locker &locker(pp_features_.GetLocker());
+  SCOPE_LOCK(locker);
+
+  return pp_features_.IsDirty();
+}
+
 DisplayError ColorManagerProxy::Commit() {
   Locker &locker(pp_features_.GetLocker());
   SCOPE_LOCK(locker);
