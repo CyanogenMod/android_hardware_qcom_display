@@ -97,8 +97,9 @@ class HWCDisplay : public DisplayEventHandler {
     LayerCache layer_cache[kMaxLayerCount];
     uint32_t layer_count;
     bool animating;
+    bool in_use;
 
-    LayerStackCache() : layer_count(0), animating(false) { }
+    LayerStackCache() : layer_count(0), animating(false), in_use(false) { }
   };
 
   HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id,
@@ -130,9 +131,6 @@ class HWCDisplay : public DisplayEventHandler {
   DisplayError SetColorSpace(const ColorSpace_t source, LayerColorSpace *target);
   DisplayError SetMetaData(const MetaData_t &meta_data, Layer *layer);
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
-  bool IsFullFrameGPUComposed();
-  bool IsFullFrameSDEComposed();
-  bool IsFullFrameCached(hwc_display_contents_1_t *content_list);
 
   static void AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height, uint32_t *src_width,
                                      uint32_t *src_height);

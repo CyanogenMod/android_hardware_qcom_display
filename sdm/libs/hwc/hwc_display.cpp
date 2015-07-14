@@ -68,7 +68,7 @@ HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, 
     display_intf_(NULL), flush_(false), dump_frame_count_(0), dump_frame_index_(0),
     dump_input_layers_(false), swap_interval_zero_(false), framebuffer_config_(NULL),
     display_paused_(false), use_metadata_refresh_rate_(false), metadata_refresh_rate_(0),
-    boot_animation_completed_(false), shutdown_pending_(false), handle_refresh_(false),
+    boot_animation_completed_(false), shutdown_pending_(false), handle_refresh_(true),
     use_blit_comp_(false), secure_display_active_(false), skip_prepare_(false),
     solid_fill_enable_(false), blit_engine_(NULL) {
 }
@@ -308,20 +308,31 @@ uint32_t HWCDisplay::GetLastPowerMode() {
 }
 
 DisplayError HWCDisplay::VSync(const DisplayEventVSync &vsync) {
-  if (*hwc_procs_) {
-    (*hwc_procs_)->vsync(*hwc_procs_, id_, vsync.timestamp);
+  const hwc_procs_t *hwc_procs = *hwc_procs_;
+
+  if (!hwc_procs) {
+    return kErrorParameters;
   }
+
+  hwc_procs->vsync(hwc_procs, id_, vsync.timestamp);
 
   return kErrorNone;
 }
 
 DisplayError HWCDisplay::Refresh() {
-  if (*hwc_procs_ && handle_refresh_) {
-    (*hwc_procs_)->invalidate(*hwc_procs_);
-    return kErrorNone;
+  const hwc_procs_t *hwc_procs = *hwc_procs_;
+
+  if (!hwc_procs) {
+    return kErrorParameters;
   }
 
-  return kErrorNotSupported;
+  if (!handle_refresh_) {
+    return kErrorNotSupported;
+  }
+
+  hwc_procs->invalidate(hwc_procs);
+
+  return kErrorNone;
 }
 
 int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
@@ -624,9 +635,14 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     flush_ = true;
   }
 
-  bool needs_fb_refresh = NeedsFrameBufferRefresh(content_list);
-
   metadata_refresh_rate_ = 0;
+
+  // If current draw cycle has different set of layers updating in comparison to previous cycle,
+  // cache content using GPU again.
+  // If set of updating layers remains same, use cached buffer and replace layers marked for GPU
+  // composition with SDE so that SurfaceFlinger does not compose them. Set cache inuse here.
+  bool needs_fb_refresh = NeedsFrameBufferRefresh(content_list);
+  layer_stack_cache_.in_use = false;
 
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
@@ -642,17 +658,15 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       }
     }
 
-    // If current layer does not need frame buffer redraw, then mark it as HWC_OVERLAY
-    if (!needs_fb_refresh && (composition != kCompositionGPUTarget &&
-                              composition != kCompositionHWCursor)) {
+    if (!needs_fb_refresh && composition == kCompositionGPU) {
       composition = kCompositionSDE;
+      layer_stack_cache_.in_use = true;
     }
     SetComposition(composition, &hwc_layer.compositionType);
   }
 
-  // Cache the current layer stack information like layer_count, composition type and layer handle
-  // for the future.
   CacheLayerStackInfo(content_list);
+
   return 0;
 }
 
@@ -1316,43 +1330,9 @@ void HWCDisplay::ResetLayerCacheStack() {
     layer_cache.handle = NULL;
     layer_cache.composition = kCompositionGPU;
   }
-  layer_stack_cache_.animating = false;
   layer_stack_cache_.layer_count = 0;
-}
-
-bool HWCDisplay::IsFullFrameGPUComposed() {
-  uint32_t layer_count = layer_stack_.layer_count;
-  for (size_t i = 0; i < layer_count; i++) {
-    LayerComposition composition = layer_stack_.layers[i].composition;
-    if (composition == kCompositionGPUTarget || composition == kCompositionBlitTarget) {
-      continue;
-    }
-    if (composition != kCompositionGPU) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool HWCDisplay::IsFullFrameSDEComposed() {
-  uint32_t layer_count = layer_stack_.layer_count;
-  for (size_t i = 0; i < layer_count; i++) {
-    LayerComposition composition = layer_stack_.layers[i].composition;
-    if (composition == kCompositionGPUTarget || composition == kCompositionBlitTarget) {
-      continue;
-    }
-    if (composition != kCompositionSDE && composition != kCompositionBlit &&
-        composition != kCompositionHybrid && composition != kCompositionHWCursor) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool HWCDisplay::IsFullFrameCached(hwc_display_contents_1_t *content_list) {
-  return IsFullFrameSDEComposed() && !NeedsFrameBufferRefresh(content_list);
+  layer_stack_cache_.animating = false;
+  layer_stack_cache_.in_use = false;
 }
 
 void HWCDisplay::SetSecureDisplay(bool secure_display_active) {
