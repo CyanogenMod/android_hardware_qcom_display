@@ -69,6 +69,8 @@ enum LayerBufferFormat {
                                   //!< 2x2 subsampled V-plane: v(0), v(2) ... v(n-1)
                                   //!< 2x2 subsampled U-plane: u(0), u(2) ... u(n-1)
 
+  kFormatYCrCb420PlanarStride16,  //!< kFormatYCrCb420Planar with stride aligned to 16 bytes
+
   /* All YUV-Semiplanar formats, Any new format will be added towards end of this group to
      maintain backward compatibility.
   */
