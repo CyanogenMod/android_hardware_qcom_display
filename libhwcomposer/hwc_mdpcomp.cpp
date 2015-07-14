@@ -225,15 +225,19 @@ void MDPComp::timeout_handler(void *udata) {
         if(qdutils::MDPVersion::getInstance().isDynFpsSupported() &&
            ctx->mUseMetaDataRefreshRate) {
             MDPVersion& mdpHw = MDPVersion::getInstance();
+            int dpy = HWC_DISPLAY_PRIMARY;
             /* Even in cases, where we wouldnot like to trigger new frame update
                (for ex: if previous frame happens to be single pipe mdpcomp, etc),
                refresh-rate should be set to the minfps supported by panel as
                part of idle-fallback */
             uint32_t refreshRate = mdpHw.getMinFpsSupported();
-            setRefreshRate(ctx, HWC_DISPLAY_PRIMARY, refreshRate);
-            if(!Overlay::displayCommit(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].fd)) {
-                ALOGE("%s: displayCommit failed for primary during dynfps",
-                      __FUNCTION__);
+            if((refreshRate != ctx->dpyAttr[dpy].dynRefreshRate) &&
+               ctx->dpyAttr[dpy].isActive) {
+                setRefreshRate(ctx, dpy, refreshRate);
+                if(!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+                    ALOGE("%s: displayCommit failed for %d when setting dynfps",
+                          __FUNCTION__, dpy);
+                }
             }
         }
         ctx->mDrawLock.unlock();
