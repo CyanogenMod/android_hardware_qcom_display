@@ -71,6 +71,8 @@ class DisplayBase : public DisplayInterface {
                                             PPPendingParams *pending_action);
   virtual DisplayError ApplyDefaultDisplayMode(void);
   virtual DisplayError SetCursorPosition(int x, int y);
+  virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
+
 
  protected:
   // DumpImpl method

@@ -113,6 +113,9 @@ int HWCDisplay::Init() {
     }
   }
 
+  display_intf_->GetRefreshRateRange(&min_refresh_rate_, &max_refresh_rate_);
+  current_refresh_rate_ = max_refresh_rate_;
+
   return 0;
 }
 
@@ -287,19 +290,7 @@ DisplayError HWCDisplay::VSync(const DisplayEventVSync &vsync) {
 }
 
 DisplayError HWCDisplay::Refresh() {
-  const hwc_procs_t *hwc_procs = *hwc_procs_;
-
-  if (!hwc_procs) {
-    return kErrorParameters;
-  }
-
-  if (!handle_refresh_) {
-    return kErrorNotSupported;
-  }
-
-  hwc_procs->invalidate(hwc_procs);
-
-  return kErrorNone;
+  return kErrorNotSupported;
 }
 
 int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
@@ -392,13 +383,12 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
-int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint32_t fps) {
+int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
   const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer->handle);
 
   LayerBuffer *layer_buffer = layer->input_buffer;
 
   if (pvt_handle) {
-    layer->frame_rate = fps;
     layer_buffer->format = GetSDMFormat(pvt_handle->format, pvt_handle->flags);
 
     const MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
@@ -458,7 +448,6 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint3
       layer_buffer->width = aligned_width;
       layer_buffer->height = aligned_height;
       layer_buffer->format = GetSDMFormat(format, flags);
-      layer->frame_rate = fps;
     }
   }
 
@@ -499,13 +488,8 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     return 0;
   }
 
-  DisplayConfigVariableInfo active_config;
-  uint32_t active_config_index = 0;
-  display_intf_->GetActiveConfig(&active_config_index);
-  int ret;
-
-  display_intf_->GetConfig(active_config_index, &active_config);
   use_blit_comp_ = false;
+  metadata_refresh_rate_ = 0;
 
   // Configure each layer
   for (size_t i = 0; i < num_hw_layers; i++) {
@@ -513,8 +497,7 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
     Layer &layer = layer_stack_.layers[i];
 
-    ret = PrepareLayerParams(&content_list->hwLayers[i], &layer_stack_.layers[i],
-                             active_config.fps);
+    int ret = PrepareLayerParams(&content_list->hwLayers[i], &layer_stack_.layers[i]);
 
     if (ret != kErrorNone) {
       return ret;
@@ -590,6 +573,12 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     if (layer.flags.cursor) {
       layer_stack_.flags.cursor_present = true;
     }
+
+    if (layer.frame_rate > metadata_refresh_rate_) {
+      metadata_refresh_rate_ = SanitizeRefreshRate(layer.frame_rate);
+    } else {
+      layer.frame_rate = current_refresh_rate_;
+    }
   }
 
   // Prepare the Blit Target
@@ -630,8 +619,6 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     flush_ = true;
   }
 
-  metadata_refresh_rate_ = 0;
-
   // If current draw cycle has different set of layers updating in comparison to previous cycle,
   // cache content using GPU again.
   // If set of updating layers remains same, use cached buffer and replace layers marked for GPU
@@ -647,10 +634,6 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     if ((composition == kCompositionSDE) || (composition == kCompositionHybrid) ||
         (composition == kCompositionBlit)) {
       hwc_layer.hints |= HWC_HINT_CLEAR_FB;
-
-      if (use_metadata_refresh_rate_ && layer.frame_rate > metadata_refresh_rate_) {
-        metadata_refresh_rate_ = layer.frame_rate;
-      }
     }
 
     if (!needs_fb_refresh && composition == kCompositionGPU) {
@@ -1355,5 +1338,33 @@ int HWCDisplay::GetDisplayAttributesForConfig(int config, DisplayConfigVariableI
   return display_intf_->GetConfig(config, attributes) == kErrorNone ? 0 : -1;
 }
 
-}  // namespace sdm
+bool HWCDisplay::SingleLayerUpdating(uint32_t app_layer_count) {
+  uint32_t updating_count = 0;
 
+  for (uint i = 0; i < app_layer_count; i++) {
+    Layer &layer = layer_stack_.layers[i];
+    if (layer.flags.updating) {
+      updating_count++;
+    }
+  }
+
+  return (updating_count == 1);
+}
+
+uint32_t HWCDisplay::SanitizeRefreshRate(uint32_t req_refresh_rate) {
+  uint32_t refresh_rate = req_refresh_rate;
+
+  if (refresh_rate < min_refresh_rate_) {
+    // Pick the next multiple of request which is within the range
+    refresh_rate = (((min_refresh_rate_ / refresh_rate) +
+                     ((min_refresh_rate_ % refresh_rate) ? 1 : 0)) * refresh_rate);
+  }
+
+  if (refresh_rate > max_refresh_rate_) {
+    refresh_rate = max_refresh_rate_;
+  }
+
+  return refresh_rate;
+}
+
+}  // namespace sdm

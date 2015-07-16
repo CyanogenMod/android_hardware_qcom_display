@@ -249,21 +249,50 @@ DisplayError DisplayPrimary::IsScalingValid(const LayerRect &crop, const LayerRe
   return DisplayBase::IsScalingValid(crop, dst, rotate90);
 }
 
+DisplayError DisplayPrimary::GetRefreshRateRange(uint32_t *min_refresh_rate,
+                                                 uint32_t *max_refresh_rate) {
+  SCOPE_LOCK(locker_);
+  DisplayError error = kErrorNone;
+
+  if (hw_panel_info_.min_fps && hw_panel_info_.max_fps) {
+    *min_refresh_rate = hw_panel_info_.min_fps;
+    *max_refresh_rate = hw_panel_info_.max_fps;
+  } else {
+    error = DisplayBase::GetRefreshRateRange(min_refresh_rate, max_refresh_rate);
+  }
+
+  return error;
+}
+
 DisplayError DisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
   SCOPE_LOCK(locker_);
 
-  if (!hw_panel_info_.dynamic_fps) {
-    DLOGW("Dynamic fps feature is not supported");
+  if (!hw_panel_info_.dynamic_fps || refresh_rate < hw_panel_info_.min_fps ||
+       refresh_rate > hw_panel_info_.max_fps) {
+    DLOGW("Invalid Request");
     return kErrorNotSupported;
   }
 
-  if (refresh_rate > hw_panel_info_.max_fps) {
-    refresh_rate = hw_panel_info_.max_fps;
-  } else if (refresh_rate < hw_panel_info_.min_fps) {
-    refresh_rate = hw_panel_info_.min_fps;
+  DisplayError error = hw_intf_->SetRefreshRate(refresh_rate);
+  if (error != kErrorNone) {
+    return error;
   }
 
-  return hw_intf_->SetRefreshRate(refresh_rate);
+  HWDisplayAttributes display_attributes;
+  uint32_t active_index = 0;
+  error = hw_intf_->GetActiveConfig(&active_index);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  error = hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, hw_panel_info_);
+
+  return kErrorNone;
 }
 
 void DisplayPrimary::AppendDump(char *buffer, uint32_t length) {

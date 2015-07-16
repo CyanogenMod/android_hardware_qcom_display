@@ -89,7 +89,6 @@ class HWPrimary : public HWDevice {
   bool fake_vsync_ = false;
   bool exit_threads_ = false;
   HWDisplayAttributes display_attributes_;
-  bool config_changed_ = true;
   std::vector<DisplayConfigVariableInfo> display_configs_;
   std::vector<std::string> display_config_strings_;
   uint32_t active_config_index_ = 0;

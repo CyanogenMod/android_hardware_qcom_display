@@ -86,6 +86,13 @@ int HWCDisplayPrimary::Init() {
     cpu_hint_ = NULL;
   }
 
+  use_metadata_refresh_rate_ = true;
+  int disable_metadata_dynfps = 0;
+  HWCDebugHandler::Get()->GetProperty("persist.metadata_dynfps.disable", &disable_metadata_dynfps);
+  if (disable_metadata_dynfps) {
+    use_metadata_refresh_rate_ = false;
+  }
+
   return HWCDisplay::Init();
 }
 
@@ -141,12 +148,6 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
     }
   }
 
-  if (use_metadata_refresh_rate_) {
-    SetRefreshRate(metadata_refresh_rate_);
-  }
-
-  ToggleCPUHint(app_layer_count);
-
   return 0;
 }
 
@@ -163,6 +164,11 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
+  bool one_updating_layer = SingleLayerUpdating(content_list->numHwLayers - 1);
+
+  SetMetadataRefreshRate(one_updating_layer);
+  ToggleCPUHint(one_updating_layer);
+
   return 0;
 }
 
@@ -173,7 +179,7 @@ int HWCDisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
     error = display_intf_->SetRefreshRate(refresh_rate);
   }
 
-  return error;
+  return (error ? -1 : 0);
 }
 
 int HWCDisplayPrimary::Perform(uint32_t operation, ...) {
@@ -186,7 +192,7 @@ int HWCDisplayPrimary::Perform(uint32_t operation, ...) {
       SetMetaDataRefreshRateFlag(val);
       break;
     case SET_BINDER_DYN_REFRESH_RATE:
-      SetRefreshRate(val);
+      ForceRefreshRate(val);
       break;
     case SET_DISPLAY_MODE:
       SetDisplayMode(val);
@@ -216,6 +222,12 @@ DisplayError HWCDisplayPrimary::SetDisplayMode(uint32_t mode) {
 }
 
 void HWCDisplayPrimary::SetMetaDataRefreshRateFlag(bool enable) {
+  int disable_metadata_dynfps = 0;
+
+  HWCDebugHandler::Get()->GetProperty("persist.metadata_dynfps.disable", &disable_metadata_dynfps);
+  if (disable_metadata_dynfps) {
+    return;
+  }
   use_metadata_refresh_rate_ = enable;
 }
 
@@ -224,21 +236,12 @@ void HWCDisplayPrimary::SetQDCMSolidFillInfo(bool enable, uint32_t color) {
   solid_fill_color_  = color;
 }
 
-void HWCDisplayPrimary::ToggleCPUHint(int app_layer_count) {
-  int updating_count = 0;
-
+void HWCDisplayPrimary::ToggleCPUHint(bool set) {
   if (!cpu_hint_) {
     return;
   }
 
-  for (int i = 0; i < app_layer_count; i++) {
-    Layer &layer = layer_stack_.layers[i];
-    if (layer.flags.updating) {
-      updating_count++;
-    }
-  }
-
-  if (updating_count == 1) {
+  if (set) {
     cpu_hint_->Set();
   } else {
     cpu_hint_->Reset();
@@ -254,6 +257,80 @@ void HWCDisplayPrimary::SetSecureDisplay(bool secure_display_active) {
     skip_prepare_ = true;
   }
   return;
+}
+
+void HWCDisplayPrimary::SetMetadataRefreshRate(bool one_updating_layer) {
+  // return if force_refresh_rate_ is set or metadata_refresh_rate is not enabled
+  if (force_refresh_rate_) {
+    return;
+  }
+
+  uint32_t refresh_rate = max_refresh_rate_;
+  if (use_metadata_refresh_rate_ && one_updating_layer && metadata_refresh_rate_) {
+    refresh_rate = metadata_refresh_rate_;
+  }
+
+  int status = SetRefreshRate(refresh_rate);
+  if (status == 0) {
+    // Set current refresh rate to metadata refresh rate
+    current_refresh_rate_ = refresh_rate;
+  } else {
+    // Failed - Restore to max refresh rate
+    current_refresh_rate_ = max_refresh_rate_;
+  }
+}
+
+void HWCDisplayPrimary::ForceRefreshRate(uint32_t refresh_rate) {
+  if (refresh_rate && (refresh_rate < min_refresh_rate_ || refresh_rate > max_refresh_rate_)) {
+    // Cannot honor force refresh rate, as its beyond the range
+    return;
+  }
+
+  uint32_t rate = refresh_rate;
+  force_refresh_rate_ = refresh_rate;
+  if (refresh_rate == 0) {
+    // refresh rate request of 0 means the client is resetting the forced request rate
+    rate = max_refresh_rate_;
+  }
+
+  int status = SetRefreshRate(rate);
+  if (status) {
+    // failed Reset force_refresh_rate to 0, and restore max refresh rate
+    force_refresh_rate_ = 0;
+    rate = max_refresh_rate_;
+    DLOGE("Setting Refresh Rate = %d Failed", refresh_rate);
+  }
+  current_refresh_rate_ = rate;
+
+  return;
+}
+
+DisplayError HWCDisplayPrimary::Refresh() {
+  const hwc_procs_t *hwc_procs = *hwc_procs_;
+  DisplayError error = kErrorNone;
+
+  if (!hwc_procs) {
+    return kErrorParameters;
+  }
+
+  if (!handle_refresh_) {
+    error = kErrorNotSupported;
+  }
+
+  if (error == kErrorNone) {
+    hwc_procs->invalidate(hwc_procs);
+  }
+
+  uint32_t refresh_rate = force_refresh_rate_ ? force_refresh_rate_ : min_refresh_rate_;
+
+  int status = SetRefreshRate(refresh_rate);
+  if (status) {
+    DLOGE("Setting Refresh Rate = %d Failed", refresh_rate);
+  } else {
+    current_refresh_rate_ = refresh_rate;
+  }
+
+  return error;
 }
 
 }  // namespace sdm

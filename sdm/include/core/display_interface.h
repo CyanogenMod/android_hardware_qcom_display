@@ -344,6 +344,15 @@ class DisplayInterface {
   virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst,
                                       bool rotate90) = 0;
 
+  /*! @brief Method to get the min and max refresh rate of a display.
+
+    @param[out] min and max refresh rate.
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate,
+                                           uint32_t *max_refresh_rate) = 0;
+
   /*! @brief Method to set the refresh rate of a display.
 
     @param[in] new refresh rate of the display.
