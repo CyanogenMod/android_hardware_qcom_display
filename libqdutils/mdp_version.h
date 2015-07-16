@@ -101,9 +101,13 @@ struct PanelInfo {
     int mHeightAlign;            // ROI height alignment restriction
     int mMinROIWidth;            // Min width needed for ROI
     int mMinROIHeight;           // Min height needed for ROI
+    bool mDynFpsSupported;       // Panel Supports dyn fps
+    uint32_t mMinFps;            // Min fps supported by panel
+    uint32_t mMaxFps;            // Max fps supported by panel
     PanelInfo() : mType(NO_PANEL), mPartialUpdateEnable(0),
     mLeftAlign(0), mWidthAlign(0), mTopAlign(0), mHeightAlign(0),
-    mMinROIWidth(0), mMinROIHeight(0){}
+    mMinROIWidth(0), mMinROIHeight(0),mDynFpsSupported(0), mMinFps(0),
+    mMaxFps(0){}
     friend class MDPVersion;
 };
 
@@ -136,6 +140,9 @@ public:
     int getMinROIHeight() { return mPanelInfo.mMinROIHeight; }
     unsigned long getLowBw() { return mLowBw; }
     unsigned long getHighBw() { return mHighBw; }
+    bool isDynFpsSupported() { return mPanelInfo.mDynFpsSupported; }
+    uint32_t getMinFpsSupported() { return mPanelInfo.mMinFps; }
+    uint32_t getMaxFpsSupported() { return mPanelInfo.mMaxFps; }
     bool is8x26();
     bool is8x74v2();
     bool is8084();

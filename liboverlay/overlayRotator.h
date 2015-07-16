@@ -70,6 +70,7 @@ public:
     virtual ~Rotator();
     virtual void setSource(const utils::Whf& wfh) = 0;
     virtual void setCrop(const utils::Dim& crop) = 0;
+    virtual bool isRotBufReusable(const utils::eMdpFlags& flags) = 0;
     virtual void setFlags(const utils::eMdpFlags& flags) = 0;
     virtual void setTransform(const utils::eTransform& rot) = 0;
     virtual bool commit() = 0;
@@ -110,6 +111,7 @@ public:
     virtual ~MdpRot();
     virtual void setSource(const utils::Whf& wfh);
     virtual void setCrop(const utils::Dim& crop);
+    virtual bool isRotBufReusable(const utils::eMdpFlags& flags);
     virtual void setFlags(const utils::eMdpFlags& flags);
     virtual void setTransform(const utils::eTransform& rot);
     virtual bool commit();
@@ -169,6 +171,7 @@ public:
     virtual ~MdssRot();
     virtual void setSource(const utils::Whf& wfh);
     virtual void setCrop(const utils::Dim& crop);
+    virtual bool isRotBufReusable(const utils::eMdpFlags& flags);
     virtual void setFlags(const utils::eMdpFlags& flags);
     virtual void setTransform(const utils::eTransform& rot);
     virtual bool commit();

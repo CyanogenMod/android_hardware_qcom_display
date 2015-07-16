@@ -235,42 +235,38 @@ int HWCVirtualVDS::set(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
 
 void HWCVirtualVDS::pause(hwc_context_t* ctx, int dpy) {
     {
-        Locker::Autolock _l(ctx->mDrawLock);
+        ctx->mDrawLock.lock();
         ctx->dpyAttr[dpy].isActive = true;
         ctx->dpyAttr[dpy].isPause = true;
         ctx->proc->invalidate(ctx->proc);
+        ctx->mDrawLock.wait();
     }
-    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-            * 2 / 1000);
     // At this point all the pipes used by External have been
     // marked as UNSET.
-    {
-        Locker::Autolock _l(ctx->mDrawLock);
-        // Perform commit to unstage the pipes.
-        if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
-            ALOGE("%s: display commit fail! for %d dpy",
-                    __FUNCTION__, dpy);
-        }
-        ctx->proc->invalidate(ctx->proc);
+    // Perform commit to unstage the pipes.
+    ALOGD_IF(HWCVIRTUAL_LOG, "%s: VDS calling commit",
+             __FUNCTION__);
+    if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+        ALOGE("%s: display commit fail! for %d dpy",
+                __FUNCTION__, dpy);
     }
+    ctx->mDrawLock.unlock();
+    ctx->proc->invalidate(ctx->proc);
     return;
 }
 
 void HWCVirtualVDS::resume(hwc_context_t* ctx, int dpy) {
     {
-        Locker::Autolock _l(ctx->mDrawLock);
+        ctx->mDrawLock.lock();
         ctx->dpyAttr[dpy].isConfiguring = true;
         ctx->dpyAttr[dpy].isActive = true;
         ctx->proc->invalidate(ctx->proc);
+        ctx->mDrawLock.wait();
     }
-    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-            * 2 / 1000);
     //At this point external has all the pipes it would need.
-    {
-        Locker::Autolock _l(ctx->mDrawLock);
-        ctx->dpyAttr[dpy].isPause = false;
-        ctx->proc->invalidate(ctx->proc);
-    }
+    ctx->dpyAttr[dpy].isPause = false;
+    ctx->mDrawLock.unlock();
+    ctx->proc->invalidate(ctx->proc);
     return;
 }
 
@@ -369,23 +365,22 @@ int HWCVirtualV4L2::set(hwc_context_t *ctx, hwc_display_contents_1_t *list) {
 
 void HWCVirtualV4L2::pause(hwc_context_t* ctx, int dpy) {
     {
-        Locker::Autolock _l(ctx->mDrawLock);
+        ctx->mDrawLock.lock();
         ctx->dpyAttr[dpy].isActive = true;
         ctx->dpyAttr[dpy].isPause = true;
         ctx->proc->invalidate(ctx->proc);
+        ctx->mDrawLock.wait();
     }
-    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-            * 2 / 1000);
     // At this point all the pipes used by External have been
     // marked as UNSET.
-    {
-        Locker::Autolock _l(ctx->mDrawLock);
-        // Perform commit to unstage the pipes.
-        if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
-            ALOGE("%s: display commit fail! for %d dpy",
-                    __FUNCTION__, dpy);
-        }
+    // Perform commit to unstage the pipes.
+    ALOGD_IF(HWCVIRTUAL_LOG, "%s: V4L2 calling commit",
+             __FUNCTION__);
+    if (!Overlay::displayCommit(ctx->dpyAttr[dpy].fd)) {
+        ALOGE("%s: display commit fail! for %d dpy",
+                __FUNCTION__, dpy);
     }
+    ctx->mDrawLock.unlock();
     return;
 }
 
@@ -394,8 +389,7 @@ void HWCVirtualV4L2::resume(hwc_context_t* ctx, int dpy){
     //Since external didnt have any pipes, force primary to give up
     //its pipes; we don't allow inter-mixer pipe transfers.
     {
-        Locker::Autolock _l(ctx->mDrawLock);
-
+        ctx->mDrawLock.lock();
         // A dynamic resolution change (DRC) can be made for a WiFi
         // display. In order to support the resolution change, we
         // need to reconfigure the corresponding display attributes.
@@ -408,14 +402,13 @@ void HWCVirtualV4L2::resume(hwc_context_t* ctx, int dpy){
         ctx->dpyAttr[dpy].isConfiguring = true;
         ctx->dpyAttr[dpy].isActive = true;
         ctx->proc->invalidate(ctx->proc);
+        ctx->mDrawLock.wait();
     }
-    usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-            * 2 / 1000);
     //At this point external has all the pipes it would need.
     {
-        Locker::Autolock _l(ctx->mDrawLock);
         ctx->dpyAttr[dpy].isPause = false;
         ctx->proc->invalidate(ctx->proc);
+        ctx->mDrawLock.unlock();
     }
     return;
 }

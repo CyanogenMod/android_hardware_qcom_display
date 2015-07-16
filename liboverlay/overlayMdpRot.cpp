@@ -117,6 +117,10 @@ void MdpRot::setCrop(const utils::Dim& crop) {
     // NO-OP for non-mdss rotator due to possible h/w limitations
 }
 
+bool MdpRot::isRotBufReusable(const utils::eMdpFlags& flags) {
+    return true;
+}
+
 void MdpRot::setFlags(const utils::eMdpFlags& flags) {
     mRotImgInfo.secure = 0;
     if(flags & utils::OV_MDP_SECURE_OVERLAY_SESSION)

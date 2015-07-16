@@ -86,6 +86,19 @@ bool MdssRot::init() {
     return true;
 }
 
+bool MdssRot::isRotBufReusable(const utils::eMdpFlags& flags) {
+    if((mRotInfo.flags != 0) &&
+      (((mRotInfo.flags & ovutils::OV_MDP_SECURE_OVERLAY_SESSION) &&
+         !(flags & ovutils::OV_MDP_SECURE_OVERLAY_SESSION)) ||
+      (!(mRotInfo.flags & ovutils::OV_MDP_SECURE_OVERLAY_SESSION) &&
+         (flags & ovutils::OV_MDP_SECURE_OVERLAY_SESSION)))) {
+          ALOGE("%s: Rotator buffer usage flag is changed, failing",
+                     __FUNCTION__);
+          return false;
+    }
+    return true;
+}
+
 void MdssRot::setSource(const overlay::utils::Whf& awhf) {
     utils::Whf whf(awhf);
 

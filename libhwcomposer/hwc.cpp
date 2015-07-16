@@ -687,6 +687,7 @@ static int hwc_set(hwc_composer_device_1 *dev,
     CALC_FPS();
     MDPComp::resetIdleFallBack();
     ctx->mVideoTransFlag = false;
+    ctx->mDrawLock.signal();
     //Was locked at the beginning of prepare
     ctx->mDrawLock.unlock();
     return ret;
@@ -813,6 +814,8 @@ void hwc_dump(struct hwc_composer_device_1* dev, char *buff, int buff_len)
     dumpsys_log(aBuf, "Qualcomm HWC state:\n");
     dumpsys_log(aBuf, "  MDPVersion=%d\n", ctx->mMDP.version);
     dumpsys_log(aBuf, "  DisplayPanel=%c\n", ctx->mMDP.panel);
+    dumpsys_log(aBuf, "  DynRefreshRate=%d\n",
+                ctx->dpyAttr[HWC_DISPLAY_PRIMARY].dynRefreshRate);
     for(int dpy = 0; dpy < HWC_NUM_DISPLAY_TYPES; dpy++) {
         if(ctx->mMDPComp[dpy])
             ctx->mMDPComp[dpy]->dump(aBuf);
