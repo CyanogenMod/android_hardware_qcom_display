@@ -444,9 +444,14 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint3
       layer_stack_.flags.video_present = true;
       layer_buffer->flags.video = true;
     }
+    // TZ Protected Buffer - L1
     if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
       layer_stack_.flags.secure_present = true;
       layer_buffer->flags.secure = true;
+    }
+    // Gralloc Usage Protected Buffer - L3 - which needs to be treated as Secure & avoid fallback
+    if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_PROTECTED_BUFFER) {
+      layer_stack_.flags.secure_present = true;
     }
     if (pvt_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_DISPLAY) {
       layer_buffer->flags.secure_display = true;

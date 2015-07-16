@@ -65,6 +65,7 @@ class ColorManagerProxy {
                                     PPDisplayAPIPayload *out_payload,
                                     PPPendingParams *pending_action);
   DisplayError ApplyDefaultDisplayMode();
+  bool NeedsPartialUpdateDisable();
   DisplayError Commit();
 
  protected:

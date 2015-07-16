@@ -120,5 +120,18 @@ bool Debug::IsScalarDisabled() {
   return (value == 1);
 }
 
+bool Debug::IsUbwcTiledFrameBuffer() {
+  int ubwc_disabled = 0;
+  int ubwc_framebuffer = 0;
+
+  debug_.debug_handler_->GetProperty("debug.gralloc.gfx_ubwc_disable", &ubwc_disabled);
+
+  if (!ubwc_disabled) {
+    debug_.debug_handler_->GetProperty("debug.gralloc.enable_fb_ubwc", &ubwc_framebuffer);
+  }
+
+  return (ubwc_framebuffer == 1);
+}
+
 }  // namespace sdm
 
