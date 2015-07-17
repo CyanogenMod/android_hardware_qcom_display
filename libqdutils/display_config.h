@@ -26,6 +26,10 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#ifndef _DISPLAY_CONFIG_H
+#define _DISPLAY_CONFIG_H
+
 #include <gralloc_priv.h>
 #include <qdMetaData.h>
 #include <hardware/hwcomposer.h>
@@ -141,45 +145,6 @@ int setDisplayMode(int mode);
 // Only HDMI display is supported as dpy for now
 int minHdcpEncryptionLevelChanged(int dpy);
 
-//=============================================================================
-// The functions and methods below run in the context of HWC and
-// are called in response to binder calls from clients
-
-class Configs {
-public:
-    DisplayAttributes getAttributes(const uint32_t& index) const;
-    uint32_t getActiveConfig() const;
-    bool setActiveConfig(const uint32_t& index);
-    uint32_t getConfigCount() const;
-    static Configs *getInstance();
-private:
-    enum { CONFIGS_MAX = 32 };
-    Configs();
-    bool init();
-    bool getCurrentMode(DisplayAttributes& dpyAttr);
-    DisplayAttributes mConfigs[CONFIGS_MAX];
-    char *mModeStr[CONFIGS_MAX];
-    uint32_t mActiveConfig;
-    uint32_t mConfigsSupported;
-    static Configs *sConfigs;
-};
-
-inline DisplayAttributes Configs::getAttributes(const uint32_t& index) const {
-    if(index >= mConfigsSupported) {
-        ALOGE("%s() Invalid index %d, max %d", __FUNCTION__, index,
-                mConfigsSupported);
-        return DisplayAttributes(); //All 0s
-    }
-    return mConfigs[index];
-}
-
-// Retuns the current config index, -1 if called without a setActiveConfig
-inline uint32_t Configs::getActiveConfig() const {
-    return mActiveConfig;
-}
-
-inline uint32_t Configs::getConfigCount() const {
-    return mConfigsSupported;
-}
-
 }; //namespace
+
+#endif
