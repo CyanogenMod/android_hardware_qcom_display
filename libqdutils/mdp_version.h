@@ -116,6 +116,7 @@ public:
     uint8_t getRGBPipes() { return mRGBPipes; }
     uint8_t getVGPipes() { return mVGPipes; }
     uint8_t getDMAPipes() { return mDMAPipes; }
+    uint8_t getCursorPipes() { return mCursorPipes; }
     uint8_t getBlendStages() { return mBlendStages; }
     bool supportsDecimation();
     uint32_t getMaxMDPDownscale();
@@ -140,6 +141,7 @@ public:
     uint32_t getMaxFpsSupported() { return mPanelInfo.mMaxFps; }
     uint32_t getMaxMixerWidth() const { return mMaxMixerWidth; }
     uint32_t getMaxPipeWidth() const { return mMaxPipeWidth; }
+    uint32_t getMaxCursorSize() const { return mMaxCursorSize; }
     bool hasMinCropWidthLimitation() const;
     bool isSrcSplit() const;
     bool isSrcSplitAlways() const;
@@ -166,6 +168,7 @@ private:
     uint8_t mRGBPipes;
     uint8_t mVGPipes;
     uint8_t mDMAPipes;
+    uint8_t mCursorPipes;
     uint8_t mBlendStages;
     uint32_t mFeatures;
     uint32_t mMDPDownscale;
@@ -182,6 +185,7 @@ private:
     bool mRotDownscale;
     uint32_t mMaxMixerWidth; //maximum x-res of a given mdss mixer.
     uint32_t mMaxPipeWidth; //maximum x-res of the mdp pipe.
+    uint32_t mMaxCursorSize; //maximum size supported by hw cursor
 };
 }; //namespace qdutils
 #endif //INCLUDE_LIBQCOMUTILS_MDPVER
