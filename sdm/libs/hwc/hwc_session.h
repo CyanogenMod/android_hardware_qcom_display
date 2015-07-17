@@ -80,6 +80,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   int HotPlugHandler(bool connected);
   void ResetPanel();
   int HandleVirtualDisplayLifeCycle(hwc_display_contents_1_t *content_list);
+  void HandleSecureDisplaySession(hwc_display_contents_1_t **displays);
 
   // QClient methods
   virtual android::status_t notifyCallback(uint32_t command, const android::Parcel *input_parcel,
@@ -109,6 +110,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   HWCBufferSyncHandler *buffer_sync_handler_;
   HWCColorManager *color_mgr_;
   char brightness_[64];
+  bool secure_display_active_;
 };
 
 }  // namespace sdm

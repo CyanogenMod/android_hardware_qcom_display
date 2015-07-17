@@ -59,6 +59,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int Perform(uint32_t operation, ...);
   virtual int SetCursorPosition(int x, int y);
   virtual ~HWCDisplay() { }
+  virtual void SetSecureDisplay(bool secure_display_active);
 
   int SetPanelBrightness(int level);
   int ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
@@ -166,6 +167,8 @@ class HWCDisplay : public DisplayEventHandler {
   bool shutdown_pending_;
   bool handle_refresh_;
   bool use_blit_comp_;
+  bool secure_display_active_;
+  bool skip_prepare_;
 
   bool solid_fill_enable_;
   uint32_t solid_fill_color_;

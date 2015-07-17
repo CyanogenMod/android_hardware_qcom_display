@@ -485,6 +485,7 @@ DisplayError HWDevice::SetFormat(const LayerBufferFormat &source, uint32_t *targ
   case kFormatRGB565:                   *target = MDP_RGB_565;           break;
   case kFormatYCbCr420Planar:           *target = MDP_Y_CB_CR_H2V2;      break;
   case kFormatYCrCb420Planar:           *target = MDP_Y_CR_CB_H2V2;      break;
+  case kFormatYCrCb420PlanarStride16:   *target = MDP_Y_CR_CB_GH2V2;     break;
   case kFormatYCbCr420SemiPlanar:       *target = MDP_Y_CBCR_H2V2;       break;
   case kFormatYCrCb420SemiPlanar:       *target = MDP_Y_CRCB_H2V2;       break;
   case kFormatYCbCr422H1V2SemiPlanar:   *target = MDP_Y_CBCR_H1V2;       break;
@@ -536,6 +537,7 @@ DisplayError HWDevice::SetStride(HWDeviceType device_type, LayerBufferFormat for
   case kFormatYCbCr420SPVenusUbwc:
   case kFormatYCbCr420Planar:
   case kFormatYCrCb420Planar:
+  case kFormatYCrCb420PlanarStride16:
   case kFormatYCbCr420SemiPlanar:
   case kFormatYCrCb420SemiPlanar:
     *target = width;
@@ -597,7 +599,7 @@ void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
   }
 
   if (input_buffer->flags.secure_display) {
-    *mdp_flags |= MDP_SECURE_DISPLAY_OVERLAY_SESSION;
+    *mdp_flags |= MDP_LAYER_SECURE_DISPLAY_SESSION;
   }
 
   if (layer.flags.solid_fill) {

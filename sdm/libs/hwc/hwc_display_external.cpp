@@ -81,6 +81,11 @@ HWCDisplayExternal::HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t con
 int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
   int status = 0;
 
+  if (secure_display_active_) {
+    MarkLayersForGPUBypass(content_list);
+    return status;
+  }
+
   status = AllocateLayerStack(content_list);
   if (status) {
     return status;
@@ -96,6 +101,11 @@ int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
 
 int HWCDisplayExternal::Commit(hwc_display_contents_1_t *content_list) {
   int status = 0;
+
+  if (secure_display_active_) {
+    CloseAcquireFences(content_list);
+    return status;
+  }
 
   status = HWCDisplay::CommitLayerStack(content_list);
   if (status) {
@@ -161,6 +171,20 @@ void HWCDisplayExternal::ApplyScanAdjustment(hwc_rect_t *display_frame) {
   display_frame->top = display_frame->top + y_offset;
   display_frame->right = display_frame->right - x_offset;
   display_frame->bottom = display_frame->bottom - y_offset;
+}
+
+void HWCDisplayExternal::SetSecureDisplay(bool secure_display_active) {
+  if (secure_display_active_ != secure_display_active) {
+    secure_display_active_ = secure_display_active;
+
+    if (secure_display_active_) {
+      DisplayError error = display_intf_->Flush();
+      if (error != kErrorNone) {
+        DLOGE("Flush failed. Error = %d", error);
+      }
+    }
+  }
+  return;
 }
 
 }  // namespace sdm
