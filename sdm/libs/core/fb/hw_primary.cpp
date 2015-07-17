@@ -46,13 +46,14 @@
 
 namespace sdm {
 
-DisplayError HWPrimaryInterface::Create(HWPrimaryInterface **intf, HWInfoInterface *hw_info_intf,
-                                        BufferSyncHandler *buffer_sync_handler) {
+DisplayError HWPrimary::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
+                               BufferSyncHandler *buffer_sync_handler,
+                               HWEventHandler *eventhandler) {
   DisplayError error = kErrorNone;
   HWPrimary *hw_primary = NULL;
 
   hw_primary = new HWPrimary(buffer_sync_handler, hw_info_intf);
-  error = hw_primary->Init();
+  error = hw_primary->Init(eventhandler);
   if (error != kErrorNone) {
     delete hw_primary;
   } else {
@@ -62,7 +63,7 @@ DisplayError HWPrimaryInterface::Create(HWPrimaryInterface **intf, HWInfoInterfa
   return error;
 }
 
-DisplayError HWPrimaryInterface::Destroy(HWPrimaryInterface *intf) {
+DisplayError HWPrimary::Destroy(HWInterface *intf) {
   HWPrimary *hw_primary = static_cast<HWPrimary *>(intf);
   hw_primary->Deinit();
   delete hw_primary;
@@ -78,14 +79,14 @@ HWPrimary::HWPrimary(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw
   HWDevice::hw_info_intf_ = hw_info_intf;
 }
 
-DisplayError HWPrimary::Init() {
+DisplayError HWPrimary::Init(HWEventHandler *eventhandler) {
   DisplayError error = kErrorNone;
   char node_path[kMaxStringLength] = {0};
   char data[kMaxStringLength] = {0};
   const char* event_name[kNumDisplayEvents] = {"vsync_event", "show_blank_event", "idle_notify",
                                               "msm_fb_thermal_level"};
 
-  error = HWDevice::Init();
+  error = HWDevice::Init(eventhandler);
   if (error != kErrorNone) {
     goto CleanupOnError;
   }
@@ -153,15 +154,7 @@ DisplayError HWPrimary::Deinit() {
     Sys::close_(poll_fds_[event].fd);
   }
 
-  return kErrorNone;
-}
-
-DisplayError HWPrimary::Open(HWEventHandler *eventhandler) {
-  return HWDevice::Open(eventhandler);
-}
-
-DisplayError HWPrimary::Close() {
-  return HWDevice::Close();
+  return HWDevice::Deinit();
 }
 
 DisplayError HWPrimary::GetNumDisplayAttributes(uint32_t *count) {
@@ -274,10 +267,6 @@ DisplayError HWPrimary::GetConfigIndex(uint32_t mode, uint32_t *index) {
   return HWDevice::GetConfigIndex(mode, index);
 }
 
-DisplayError HWPrimary::PowerOn() {
-  return HWDevice::PowerOn();
-}
-
 DisplayError HWPrimary::PowerOff() {
   if (Sys::ioctl_(device_fd_, FBIOBLANK, FB_BLANK_POWERDOWN) < 0) {
     IOCTL_LOGE(FB_BLANK_POWERDOWN, device_type_);
@@ -305,10 +294,6 @@ DisplayError HWPrimary::DozeSuspend() {
   return kErrorNone;
 }
 
-DisplayError HWPrimary::Standby() {
-  return HWDevice::Standby();
-}
-
 DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
   HWDevice::ResetDisplayParams();
 
@@ -332,18 +317,6 @@ DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
   }
 
   return HWDevice::Validate(hw_layers);
-}
-
-DisplayError HWPrimary::Commit(HWLayers *hw_layers) {
-  return HWDevice::Commit(hw_layers);
-}
-
-DisplayError HWPrimary::Flush() {
-  return HWDevice::Flush();
-}
-
-DisplayError HWPrimary::GetHWPanelInfo(HWPanelInfo *panel_info) {
-  return HWDevice::GetHWPanelInfo(panel_info);
 }
 
 void* HWPrimary::DisplayEventThread(void *context) {
@@ -582,10 +555,6 @@ DisplayError HWPrimary::SetPPFeatures(PPFeaturesConfig *feature_list) {
   feature_list->Reset();
 
   return kErrorNone;
-}
-
-DisplayError HWPrimary::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
-  return HWDevice::SetCursorPosition(hw_layers, x, y);
 }
 
 }  // namespace sdm

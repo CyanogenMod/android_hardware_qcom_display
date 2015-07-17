@@ -26,8 +26,9 @@
 #include <utils/debug.h>
 
 #include "display_primary.h"
-#include "hw_primary_interface.h"
+#include "hw_interface.h"
 #include "hw_info_interface.h"
+#include "fb/hw_primary.h"
 
 #define __CLASS__ "DisplayPrimary"
 
@@ -43,31 +44,26 @@ DisplayPrimary::DisplayPrimary(DisplayEventHandler *event_handler, HWInfoInterfa
 DisplayError DisplayPrimary::Init() {
   SCOPE_LOCK(locker_);
 
-  DisplayError error = HWPrimaryInterface::Create(&hw_primary_intf_, hw_info_intf_,
-                                                  DisplayBase::buffer_sync_handler_);
-  if (error != kErrorNone) {
-    return error;
-  }
-  DisplayBase::hw_intf_ = hw_primary_intf_;
+  DisplayError error = HWPrimary::Create(&hw_intf_, hw_info_intf_,
+                                         DisplayBase::buffer_sync_handler_, this);
 
-  error = hw_primary_intf_->Open(this);
   if (error != kErrorNone) {
     return error;
   }
 
   error = DisplayBase::Init();
   if (error != kErrorNone) {
-    HWPrimaryInterface::Destroy(hw_primary_intf_);
+    HWPrimary::Destroy(hw_intf_);
     return error;
   }
 
   // Idle fallback feature is supported only for video mode panel.
   if (hw_panel_info_.mode == kModeVideo) {
-    hw_primary_intf_->SetIdleTimeoutMs(Debug::GetIdleTimeoutMs());
+    hw_intf_->SetIdleTimeoutMs(Debug::GetIdleTimeoutMs());
   }
 
   if (hw_panel_info_.mode == kModeCommand && Debug::IsVideoModeEnabled()) {
-    error = hw_primary_intf_->SetDisplayMode(kModeVideo);
+    error = hw_intf_->SetDisplayMode(kModeVideo);
     if (error != kErrorNone) {
       DLOGW("Retaining current display mode. Current = %d, Requested = %d", hw_panel_info_.mode,
             kModeVideo);
@@ -81,10 +77,7 @@ DisplayError DisplayPrimary::Deinit() {
   SCOPE_LOCK(locker_);
 
   DisplayError error = DisplayBase::Deinit();
-  if (error != kErrorNone) {
-    return error;
-  }
-  HWPrimaryInterface::Destroy(hw_primary_intf_);
+  HWPrimary::Destroy(hw_intf_);
 
   return error;
 }
@@ -105,9 +98,9 @@ DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
     return error;
   }
 
-  hw_primary_intf_->GetHWPanelInfo(&panel_info);
+  hw_intf_->GetHWPanelInfo(&panel_info);
 
-  hw_primary_intf_->GetDisplayAttributes(&display_attributes, active_mode_index_);
+  hw_intf_->GetDisplayAttributes(&display_attributes, active_mode_index_);
 
   if (panel_info != hw_panel_info_ ||
       display_attributes != display_attributes_[active_mode_index_]) {
@@ -179,7 +172,7 @@ DisplayError DisplayPrimary::SetVSyncState(bool enable) {
   SCOPE_LOCK(locker_);
   DisplayError error = kErrorNone;
   if (vsync_enable_ != enable) {
-    error = hw_primary_intf_->SetVSyncState(enable);
+    error = hw_intf_->SetVSyncState(enable);
     if (error == kErrorNone) {
       vsync_enable_ = enable;
     }
@@ -192,7 +185,7 @@ void DisplayPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
   SCOPE_LOCK(locker_);
   // Idle fallback feature is supported only for video mode panel.
   if (hw_panel_info_.mode == kModeVideo) {
-    hw_primary_intf_->SetIdleTimeoutMs(timeout_ms);
+    hw_intf_->SetIdleTimeoutMs(timeout_ms);
   }
 }
 
@@ -229,7 +222,7 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
     return kErrorNone;
   }
 
-  error = hw_primary_intf_->SetDisplayMode(hw_display_mode);
+  error = hw_intf_->SetDisplayMode(hw_display_mode);
   if (error != kErrorNone) {
     DLOGW("Retaining current display mode. Current = %d, Requested = %d", hw_panel_info_.mode,
           hw_display_mode);
@@ -240,7 +233,7 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
 }
 DisplayError DisplayPrimary::SetPanelBrightness(int level) {
   SCOPE_LOCK(locker_);
-  return hw_primary_intf_->SetPanelBrightness(level);
+  return hw_intf_->SetPanelBrightness(level);
 }
 
 DisplayError DisplayPrimary::IsScalingValid(const LayerRect &crop, const LayerRect &dst,
@@ -263,7 +256,7 @@ DisplayError DisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
     refresh_rate = hw_panel_info_.min_fps;
   }
 
-  return hw_primary_intf_->SetRefreshRate(refresh_rate);
+  return hw_intf_->SetRefreshRate(refresh_rate);
 }
 
 void DisplayPrimary::AppendDump(char *buffer, uint32_t length) {

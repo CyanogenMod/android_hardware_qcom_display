@@ -118,8 +118,6 @@ CleanupOnError:
     display_attributes_ = NULL;
   }
 
-  hw_intf_->Close();
-
   return error;
 }
 
@@ -139,8 +137,6 @@ DisplayError DisplayBase::Deinit() {
     delete[] display_attributes_;
     display_attributes_ = NULL;
   }
-
-  hw_intf_->Close();
 
   return kErrorNone;
 }

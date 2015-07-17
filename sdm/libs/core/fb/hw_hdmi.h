@@ -27,38 +27,29 @@
 
 #include <video/msm_hdmi_modes.h>
 #include "hw_device.h"
-#include "hw_hdmi_interface.h"
 
 namespace sdm {
 
-class HWHDMI : public HWDevice, public HWHDMIInterface {
+class HWHDMI : public HWDevice {
  public:
+  static DisplayError Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
+                             BufferSyncHandler *buffer_sync_handler);
+  static DisplayError Destroy(HWInterface *intf);
+
+ protected:
   HWHDMI(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
-  virtual DisplayError Init();
+  virtual DisplayError Init(HWEventHandler *eventhandler);
   virtual DisplayError Deinit();
-  virtual DisplayError Open(HWEventHandler *eventhandler);
-  virtual DisplayError Close();
   virtual DisplayError GetNumDisplayAttributes(uint32_t *count);
   virtual DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
                                             uint32_t index);
-  virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info);
   virtual DisplayError GetHWScanInfo(HWScanInfo *scan_info);
   virtual DisplayError GetVideoFormat(uint32_t config_index, uint32_t *video_format);
   virtual DisplayError GetMaxCEAFormat(uint32_t *max_cea_format);
   virtual DisplayError OnMinHdcpEncryptionLevelChange();
   virtual DisplayError SetDisplayAttributes(uint32_t index);
   virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
-  virtual DisplayError PowerOn();
-  virtual DisplayError PowerOff();
-  virtual DisplayError Doze();
-  virtual DisplayError DozeSuspend();
-  virtual DisplayError Standby();
   virtual DisplayError Validate(HWLayers *hw_layers);
-  virtual DisplayError Commit(HWLayers *hw_layers);
-  virtual DisplayError Flush();
-  virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers);
-  virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list);
-  virtual DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y);
 
  private:
   DisplayError ReadEDIDInfo();

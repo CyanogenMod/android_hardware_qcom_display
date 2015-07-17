@@ -64,7 +64,6 @@ class DisplayVirtual : public DisplayBase, DumpImpl {
 
  private:
   Locker locker_;
-  HWVirtualInterface *hw_virtual_intf_;
 };
 
 }  // namespace sdm
