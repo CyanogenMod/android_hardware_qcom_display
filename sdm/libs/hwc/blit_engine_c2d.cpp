@@ -247,7 +247,6 @@ int BlitEngineC2d::Prepare(LayerStack *layer_stack) {
     Layer &layer = layer_stack->layers[i];
     if (IsUBWCFormat(layer.input_buffer->format)) {
       // UBWC is not currently supported
-      DLOGW("UBWC format found, cant support BLIT");
       return -1;
     }
     if (layer.composition == kCompositionGPUTarget) {
