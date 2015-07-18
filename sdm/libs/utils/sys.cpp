@@ -30,6 +30,7 @@
 #include <utils/sys.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #define __CLASS__ "Sys"
 
