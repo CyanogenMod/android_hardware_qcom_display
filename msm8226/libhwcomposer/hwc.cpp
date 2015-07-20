@@ -410,7 +410,7 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
     int ret = 0, value = 0;
 
     Locker::Autolock _l(ctx->mDrawLock);
-    ALOGD_IF(POWER_MODE_DEBUG, "%s: Setting mode %d on display: %d",
+    ALOGV_IF(POWER_MODE_DEBUG, "%s: Setting mode %d on display: %d",
             __FUNCTION__, mode, dpy);
 
     switch(mode) {
@@ -481,7 +481,7 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
         return -EINVAL;
     }
 
-    ALOGD_IF(POWER_MODE_DEBUG, "%s: Done setting mode %d on display %d",
+    ALOGV_IF(POWER_MODE_DEBUG, "%s: Done setting mode %d on display %d",
             __FUNCTION__, mode, dpy);
     return ret;
 }
