@@ -56,7 +56,7 @@ using namespace qhwc;
 namespace qdutils {
 
 int CBUtils::uiClearRegion(hwc_display_contents_1_t* list,
-        int version, LayerProp *layerProp,  int dirtyIndex,
+        int version, LayerProp *layerProp,  hwc_rect_t dirtyRect,
             copybit_device_t *copybit, private_handle_t *renderBuffer) {
 
     size_t last = list->numHwLayers - 1;
@@ -64,25 +64,11 @@ int CBUtils::uiClearRegion(hwc_display_contents_1_t* list,
     Rect fbFrameRect(fbFrame.left,fbFrame.top,fbFrame.right,fbFrame.bottom);
     Region wormholeRegion(fbFrameRect);
 
-   if (dirtyIndex != -1) {
+   if ((dirtyRect.right - dirtyRect.left > 0) &&
+                               (dirtyRect.bottom - dirtyRect.top > 0)) {
 #ifdef QCOM_BSP
-      /*
-       * 1. Map dirty rect of updating layer to its display frame.
-       * 2. Use this display frame as wormholeRegion instead of full Frame
-       * */
-      hwc_rect_t dirtyRect = list->hwLayers[dirtyIndex].dirtyRect;
-      hwc_rect_t displayFrame = list->hwLayers[dirtyIndex].displayFrame;
-      hwc_frect_t sCropF = list->hwLayers[dirtyIndex].sourceCropf;
-      hwc_rect_t srcRect = {int(ceilf(sCropF.left)), int(ceilf(sCropF.top)),
-                           int(ceilf(sCropF.right)), int(ceilf(sCropF.bottom))};
-
-      displayFrame.left += dirtyRect.left - srcRect.left;
-      displayFrame.top += dirtyRect.top - srcRect.top;
-      displayFrame.right -= srcRect.right - dirtyRect.right;
-      displayFrame.bottom -= srcRect.bottom - dirtyRect.bottom;
-
-      Rect tmpRect(displayFrame.left,displayFrame.top,displayFrame.right,
-            displayFrame.bottom);
+      Rect tmpRect(dirtyRect.left,dirtyRect.top,dirtyRect.right,
+            dirtyRect.bottom);
       Region tmpRegion(tmpRect);
       wormholeRegion = wormholeRegion.intersect(tmpRegion);
 #endif
@@ -116,7 +102,7 @@ int CBUtils::uiClearRegion(hwc_display_contents_1_t* list,
      }
    }
    if(wormholeRegion.isEmpty()){
-        return 0;
+        return 1;
    }
    //TO DO :- 1. remove union and call clear for each rect.
    Region::const_iterator it = wormholeRegion.begin();
