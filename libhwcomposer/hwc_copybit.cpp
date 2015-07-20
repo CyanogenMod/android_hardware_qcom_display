@@ -87,7 +87,9 @@ bool CopyBit::isSmartBlitPossible(const hwc_display_contents_1_t *list){
         hwc_rect_t displayFrame0 = {0, 0, 0, 0};
         hwc_rect_t displayFrame1 = {0, 0, 0, 0};
         for (unsigned int i=0; i<list->numHwLayers -1; i++) {
-            hwc_rect_t displayFrame = getIntersection(mDirtyRect,
+            hwc_rect_t displayFrame = list->hwLayers[i].displayFrame;
+            if (mSwapRect)
+               displayFrame = getIntersection(mDirtyRect,
                                                 list->hwLayers[i].displayFrame);
             if (isValidRect(displayFrame) && !isValidRect(displayFrame0)) {
                 displayFrame0 = displayFrame;
@@ -1165,8 +1167,9 @@ int CopyBit::fillColorUsingCopybit(hwc_layer_1_t *layer,
 void CopyBit::getLayerResolution(const hwc_layer_1_t* layer,
                                  unsigned int& width, unsigned int& height)
 {
-    hwc_rect_t displayFrame  = layer->displayFrame;
-    hwc_rect_t result = getIntersection(mDirtyRect, displayFrame);
+    hwc_rect_t result  = layer->displayFrame;
+    if (mSwapRect)
+       result = getIntersection(mDirtyRect, result);
 
     width = result.right - result.left;
     height = result.bottom - result.top;
