@@ -343,12 +343,22 @@ int HWCSession::SetPowerMode(hwc_composer_device_1 *device, int disp, int mode) 
 
 int HWCSession::Query(hwc_composer_device_1 *device, int param, int *value) {
   SEQUENCE_WAIT_SCOPE_LOCK(locker_);
-
   if (!device || !value) {
     return -EINVAL;
   }
 
-  return -EINVAL;
+  int status = 0;
+
+  switch (param) {
+  case HWC_BACKGROUND_LAYER_SUPPORTED:
+    value[0] = 1;
+    break;
+
+  default:
+    status = -EINVAL;
+  }
+
+  return status;
 }
 
 void HWCSession::RegisterProcs(hwc_composer_device_1 *device, hwc_procs_t const *procs) {

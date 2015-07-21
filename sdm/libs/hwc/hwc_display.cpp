@@ -531,20 +531,47 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     }
     SetRect(hwc_layer.dirtyRect, &layer.dirty_regions.rect[0]);
     SetComposition(hwc_layer.compositionType, &layer.composition);
-    SetBlending(hwc_layer.blending, &layer.blending);
+
+    // For dim layers, SurfaceFlinger
+    //    - converts planeAlpha to per pixel alpha,
+    //    - sets RGB color to 000,
+    //    - sets planeAlpha to 0xff,
+    //    - blending to Premultiplied.
+    // This can be achieved at hardware by
+    //    - solid fill ARGB to 0xff000000,
+    //    - incoming planeAlpha,
+    //    - blending to Coverage.
+    if (hwc_layer.flags & kDimLayer) {
+      layer.input_buffer->format = kFormatARGB8888;
+      layer.flags.solid_fill = true;
+      layer.solid_fill_color = 0xff000000;
+      SetBlending(HWC_BLENDING_COVERAGE, &layer.blending);
+    } else {
+      SetBlending(hwc_layer.blending, &layer.blending);
+    }
+
+    // TODO(user): Remove below block.
+    // For solid fill, only dest rect need to be specified.
+    if (layer.flags.solid_fill) {
+      LayerBuffer *input_buffer = layer.input_buffer;
+      input_buffer->width = layer.dst_rect.right - layer.dst_rect.left;
+      input_buffer->height = layer.dst_rect.bottom - layer.dst_rect.top;
+      layer.src_rect = layer.dst_rect;
+      layer.dirty_regions.rect[0] = layer.src_rect;
+    }
 
     LayerTransform &layer_transform = layer.transform;
     uint32_t &hwc_transform = hwc_layer.transform;
+    layer.plane_alpha = hwc_layer.planeAlpha;
     layer_transform.flip_horizontal = ((hwc_transform & HWC_TRANSFORM_FLIP_H) > 0);
     layer_transform.flip_vertical = ((hwc_transform & HWC_TRANSFORM_FLIP_V) > 0);
     layer_transform.rotation = ((hwc_transform & HWC_TRANSFORM_ROT_90) ? 90.0f : 0.0f);
-
-    layer.plane_alpha = hwc_layer.planeAlpha;
     layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
     layer.flags.cursor = ((hwc_layer.flags & HWC_IS_CURSOR_LAYER) > 0);
     layer.flags.updating = true;
     if (num_hw_layers <= kMaxLayerCount) {
-      layer.flags.updating = (layer_stack_cache_.layer_cache[i].handle != hwc_layer.handle);
+      LayerCache layer_cache = layer_stack_cache_.layer_cache[i];
+      layer.flags.updating = IsLayerUpdating(hwc_layer, layer_cache);
     }
 
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
@@ -782,12 +809,17 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
       return true;
     }
 
-    if ((layer.composition == kCompositionGPU) && (layer_cache.handle != hwc_layer.handle)) {
+    if ((layer.composition == kCompositionGPU) && IsLayerUpdating(hwc_layer, layer_cache)) {
       return true;
     }
   }
 
   return false;
+}
+
+bool HWCDisplay::IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache) {
+  return ((layer_cache.handle != hwc_layer.handle) ||
+          (layer_cache.plane_alpha != hwc_layer.planeAlpha));
 }
 
 void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
@@ -800,14 +832,15 @@ void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
 
   for (uint32_t i = 0; i < layer_count; i++) {
     Layer &layer = layer_stack_.layers[i];
-
     if (layer.composition == kCompositionGPUTarget ||
         layer.composition == kCompositionBlitTarget) {
       continue;
     }
 
-    layer_stack_cache_.layer_cache[i].handle = content_list->hwLayers[i].handle;
-    layer_stack_cache_.layer_cache[i].composition = layer.composition;
+    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
+    layer_cache.handle = content_list->hwLayers[i].handle;
+    layer_cache.plane_alpha = content_list->hwLayers[i].planeAlpha;
+    layer_cache.composition = layer.composition;
   }
 
   layer_stack_cache_.layer_count = layer_count;
@@ -1286,9 +1319,7 @@ int HWCDisplay::ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
 void HWCDisplay::ResetLayerCacheStack() {
   uint32_t layer_count = layer_stack_cache_.layer_count;
   for (uint32_t i = 0; i < layer_count; i++) {
-    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
-    layer_cache.handle = NULL;
-    layer_cache.composition = kCompositionGPU;
+    layer_stack_cache_.layer_cache[i] = LayerCache();
   }
   layer_stack_cache_.layer_count = 0;
   layer_stack_cache_.animating = false;
