@@ -356,7 +356,6 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
           SetStride(device_type_, input_buffer->format, input_buffer->planes[0].stride,
                     &mdp_buffer.planes[0].stride);
         } else {
-          DLOGW("Invalid buffer fd, setting plane count to 0");
           mdp_buffer.plane_count = 0;
         }
 
@@ -376,6 +375,7 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
       }
     }
   }
+
   if (device_type_ == kDeviceVirtual) {
     LayerBuffer *output_buffer = hw_layers->info.stack->output_buffer;
 
@@ -386,8 +386,8 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
                 &mdp_out_layer_.buffer.planes[0].stride);
       mdp_out_layer_.buffer.plane_count = 1;
     } else {
-      DLOGW("Invalid output buffer fd, setting plane count to 0");
-      mdp_out_layer_.buffer.plane_count = 0;
+      DLOGE("Invalid output buffer fd");
+      return kErrorParameters;
     }
 
     mdp_out_layer_.buffer.fence = output_buffer->acquire_fence_fd;
