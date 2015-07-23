@@ -26,8 +26,9 @@
 #include <utils/debug.h>
 
 #include "display_hdmi.h"
-#include "hw_hdmi_interface.h"
+#include "hw_interface.h"
 #include "hw_info_interface.h"
+#include "fb/hw_hdmi.h"
 
 #define __CLASS__ "DisplayHDMI"
 
@@ -43,21 +44,15 @@ DisplayHDMI::DisplayHDMI(DisplayEventHandler *event_handler, HWInfoInterface *hw
 DisplayError DisplayHDMI::Init() {
   SCOPE_LOCK(locker_);
 
-  DisplayError error = HWHDMIInterface::Create(&hw_hdmi_intf_, hw_info_intf_,
-                                               DisplayBase::buffer_sync_handler_);
-  if (error != kErrorNone) {
-    return error;
-  }
-
-  DisplayBase::hw_intf_ = hw_hdmi_intf_;
-  error = hw_hdmi_intf_->Open(NULL);
+  DisplayError error = HWHDMI::Create(&hw_intf_, hw_info_intf_,
+                                      DisplayBase::buffer_sync_handler_);
   if (error != kErrorNone) {
     return error;
   }
 
   error = DisplayBase::Init();
   if (error != kErrorNone) {
-    HWHDMIInterface::Destroy(hw_hdmi_intf_);
+    HWHDMI::Destroy(hw_intf_);
   }
 
   GetScanSupport();
@@ -70,10 +65,7 @@ DisplayError DisplayHDMI::Deinit() {
   SCOPE_LOCK(locker_);
 
   DisplayError error = DisplayBase::Deinit();
-  if (error != kErrorNone) {
-    return error;
-  }
-  HWHDMIInterface::Destroy(hw_hdmi_intf_);
+  HWHDMI::Destroy(hw_intf_);
 
   return error;
 }
@@ -178,7 +170,7 @@ DisplayError DisplayHDMI::SetPanelBrightness(int level) {
 
 DisplayError DisplayHDMI::OnMinHdcpEncryptionLevelChange() {
   SCOPE_LOCK(locker_);
-  return hw_hdmi_intf_->OnMinHdcpEncryptionLevelChange();
+  return hw_intf_->OnMinHdcpEncryptionLevelChange();
 }
 
 int DisplayHDMI::GetBestConfig() {
@@ -227,14 +219,14 @@ void DisplayHDMI::GetScanSupport() {
   uint32_t video_format = -1;
   uint32_t max_cea_format = -1;
   HWScanInfo scan_info = HWScanInfo();
-  hw_hdmi_intf_->GetHWScanInfo(&scan_info);
+  hw_intf_->GetHWScanInfo(&scan_info);
 
-  error = hw_hdmi_intf_->GetVideoFormat(active_mode_index_, &video_format);
+  error = hw_intf_->GetVideoFormat(active_mode_index_, &video_format);
   if (error != kErrorNone) {
     return;
   }
 
-  error = hw_hdmi_intf_->GetMaxCEAFormat(&max_cea_format);
+  error = hw_intf_->GetMaxCEAFormat(&max_cea_format);
   if (error != kErrorNone) {
     return;
   }

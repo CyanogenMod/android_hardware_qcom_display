@@ -249,5 +249,16 @@ void HWCDisplayPrimary::ToggleCPUHint(int app_layer_count) {
   }
 }
 
+void HWCDisplayPrimary::SetSecureDisplay(bool secure_display_active) {
+  if (secure_display_active_ != secure_display_active) {
+    // Skip Prepare and call Flush for null commit
+    DLOGI("SecureDisplay state changed from %d to %d Needs Flush!!", secure_display_active_,
+           secure_display_active);
+    secure_display_active_ = secure_display_active;
+    skip_prepare_ = true;
+  }
+  return;
+}
+
 }  // namespace sdm
 

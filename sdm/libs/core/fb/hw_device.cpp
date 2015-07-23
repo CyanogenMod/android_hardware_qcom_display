@@ -45,6 +45,7 @@
 #include <utils/sys.h>
 
 #include "hw_device.h"
+#include "hw_info_interface.h"
 
 #define __CLASS__ "HWDevice"
 
@@ -55,8 +56,11 @@ HWDevice::HWDevice(BufferSyncHandler *buffer_sync_handler)
     buffer_sync_handler_(buffer_sync_handler), synchronous_commit_(false) {
 }
 
-DisplayError HWDevice::Init() {
+DisplayError HWDevice::Init(HWEventHandler *eventhandler) {
   DisplayError error = kErrorNone;
+  char device_name[64] = {0};
+
+  event_handler_ = eventhandler;
 
   // Read the fb node index
   fb_node_index_ = GetFBNodeIndex(device_type_);
@@ -71,19 +75,7 @@ DisplayError HWDevice::Init() {
   hw_resource_ = HWResourceInfo();
   hw_info_intf_->GetHWResourceInfo(&hw_resource_);
 
-  return error;
-}
-
-DisplayError HWDevice::Open(HWEventHandler *eventhandler) {
-  DisplayError error = kErrorNone;
-
-  char device_name[64] = {0};
-
-  // Store EventHandlers for two Physical displays, i.e., Primary and HDMI
-  // TODO(user): Need to revisit for HDMI as Primary usecase
-  event_handler_ = eventhandler;
   snprintf(device_name, sizeof(device_name), "%s%d", "/dev/graphics/fb", fb_node_index_);
-
   device_fd_ = Sys::open_(device_name, O_RDWR);
   if (device_fd_ < 0) {
     DLOGE("open %s failed err = %d errstr = %s", device_name, errno,  strerror(errno));
@@ -93,9 +85,10 @@ DisplayError HWDevice::Open(HWEventHandler *eventhandler) {
   return error;
 }
 
-DisplayError HWDevice::Close() {
-  if (device_fd_ > 0) {
+DisplayError HWDevice::Deinit() {
+  if (device_fd_ >= 0) {
     Sys::close_(device_fd_);
+    device_fd_ = -1;
   }
 
   return kErrorNone;
@@ -492,6 +485,7 @@ DisplayError HWDevice::SetFormat(const LayerBufferFormat &source, uint32_t *targ
   case kFormatRGB565:                   *target = MDP_RGB_565;           break;
   case kFormatYCbCr420Planar:           *target = MDP_Y_CB_CR_H2V2;      break;
   case kFormatYCrCb420Planar:           *target = MDP_Y_CR_CB_H2V2;      break;
+  case kFormatYCrCb420PlanarStride16:   *target = MDP_Y_CR_CB_GH2V2;     break;
   case kFormatYCbCr420SemiPlanar:       *target = MDP_Y_CBCR_H2V2;       break;
   case kFormatYCrCb420SemiPlanar:       *target = MDP_Y_CRCB_H2V2;       break;
   case kFormatYCbCr422H1V2SemiPlanar:   *target = MDP_Y_CBCR_H1V2;       break;
@@ -543,6 +537,7 @@ DisplayError HWDevice::SetStride(HWDeviceType device_type, LayerBufferFormat for
   case kFormatYCbCr420SPVenusUbwc:
   case kFormatYCbCr420Planar:
   case kFormatYCrCb420Planar:
+  case kFormatYCrCb420PlanarStride16:
   case kFormatYCbCr420SemiPlanar:
   case kFormatYCrCb420SemiPlanar:
     *target = width;
@@ -604,7 +599,7 @@ void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
   }
 
   if (input_buffer->flags.secure_display) {
-    *mdp_flags |= MDP_SECURE_DISPLAY_OVERLAY_SESSION;
+    *mdp_flags |= MDP_LAYER_SECURE_DISPLAY_SESSION;
   }
 
   if (layer.flags.solid_fill) {
@@ -979,6 +974,49 @@ DisplayError HWDevice::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
   }
 
   return kErrorNone;
+}
+
+DisplayError HWDevice::GetPPFeaturesVersion(PPFeatureVersion *vers) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::SetPPFeatures(PPFeaturesConfig *feature_list) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::SetVSyncState(bool enable) {
+  return kErrorNotSupported;
+}
+
+void HWDevice::SetIdleTimeoutMs(uint32_t timeout_ms) {
+}
+
+DisplayError HWDevice::SetDisplayMode(const HWDisplayMode hw_display_mode) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::SetRefreshRate(uint32_t refresh_rate) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::SetPanelBrightness(int level) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::GetHWScanInfo(HWScanInfo *scan_info) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::GetVideoFormat(uint32_t config_index, uint32_t *video_format) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::GetMaxCEAFormat(uint32_t *max_cea_format) {
+  return kErrorNotSupported;
+}
+
+DisplayError HWDevice::OnMinHdcpEncryptionLevelChange() {
+  return kErrorNotSupported;
 }
 
 }  // namespace sdm

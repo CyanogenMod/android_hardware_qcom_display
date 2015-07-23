@@ -74,13 +74,13 @@ static bool MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
   return true;
 }
 
-DisplayError HWHDMIInterface::Create(HWHDMIInterface **intf, HWInfoInterface *hw_info_intf,
-                                     BufferSyncHandler *buffer_sync_handler) {
+DisplayError HWHDMI::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
+                            BufferSyncHandler *buffer_sync_handler) {
   DisplayError error = kErrorNone;
   HWHDMI *hw_fb_hdmi = NULL;
 
   hw_fb_hdmi = new HWHDMI(buffer_sync_handler, hw_info_intf);
-  error = hw_fb_hdmi->Init();
+  error = hw_fb_hdmi->Init(NULL);
   if (error != kErrorNone) {
     delete hw_fb_hdmi;
   } else {
@@ -89,7 +89,7 @@ DisplayError HWHDMIInterface::Create(HWHDMIInterface **intf, HWInfoInterface *hw
   return error;
 }
 
-DisplayError HWHDMIInterface::Destroy(HWHDMIInterface *intf) {
+DisplayError HWHDMI::Destroy(HWInterface *intf) {
   HWHDMI *hw_fb_hdmi = static_cast<HWHDMI *>(intf);
   hw_fb_hdmi->Deinit();
   delete hw_fb_hdmi;
@@ -104,10 +104,10 @@ HWHDMI::HWHDMI(BufferSyncHandler *buffer_sync_handler,  HWInfoInterface *hw_info
   HWDevice::hw_info_intf_ = hw_info_intf;
 }
 
-DisplayError HWHDMI::Init() {
+DisplayError HWHDMI::Init(HWEventHandler *eventhandler) {
   DisplayError error = kErrorNone;
 
-  error = HWDevice::Init();
+  error = HWDevice::Init(eventhandler);
   if (error != kErrorNone) {
     return error;
   }
@@ -147,15 +147,7 @@ DisplayError HWHDMI::Deinit() {
     delete supported_video_modes_;
   }
 
-  return kErrorNone;
-}
-
-DisplayError HWHDMI::Open(HWEventHandler *eventhandler) {
-  return HWDevice::Open(eventhandler);
-}
-
-DisplayError HWHDMI::Close() {
-  return HWDevice::Close();
+  return HWDevice::Deinit();
 }
 
 DisplayError HWHDMI::GetNumDisplayAttributes(uint32_t *count) {
@@ -315,41 +307,9 @@ DisplayError HWHDMI::GetConfigIndex(uint32_t mode, uint32_t *index) {
   return kErrorNotSupported;
 }
 
-DisplayError HWHDMI::PowerOn() {
-  return HWDevice::PowerOn();
-}
-
-DisplayError HWHDMI::PowerOff() {
-  return HWDevice::PowerOff();
-}
-
-DisplayError HWHDMI::Doze() {
-  return HWDevice::Doze();
-}
-
-DisplayError HWHDMI::DozeSuspend() {
-  return HWDevice::DozeSuspend();
-}
-
-DisplayError HWHDMI::Standby() {
-  return HWDevice::Standby();
-}
-
 DisplayError HWHDMI::Validate(HWLayers *hw_layers) {
   HWDevice::ResetDisplayParams();
   return HWDevice::Validate(hw_layers);
-}
-
-DisplayError HWHDMI::Commit(HWLayers *hw_layers) {
-  return HWDevice::Commit(hw_layers);
-}
-
-DisplayError HWHDMI::Flush() {
-  return HWDevice::Flush();
-}
-
-DisplayError HWHDMI::GetHWPanelInfo(HWPanelInfo *panel_info) {
-  return HWDevice::GetHWPanelInfo(panel_info);
 }
 
 DisplayError HWHDMI::GetHWScanInfo(HWScanInfo *scan_info) {
@@ -456,14 +416,6 @@ void HWHDMI::ReadScanInfo() {
   hw_scan_info_.cea_scan_support = MapHWScanSupport(atoi(tokens[2]));
   DLOGI("PT %d IT %d CEA %d", hw_scan_info_.pt_scan_support, hw_scan_info_.it_scan_support,
         hw_scan_info_.cea_scan_support);
-}
-
-DisplayError HWHDMI::GetPPFeaturesVersion(PPFeatureVersion *vers) {
-  return kErrorNotSupported;
-}
-
-DisplayError HWHDMI::SetPPFeatures(PPFeaturesConfig *feature_list) {
-  return kErrorNotSupported;
 }
 
 int HWHDMI::OpenResolutionFile(int file_mode) {
@@ -575,10 +527,6 @@ bool HWHDMI::IsResolutionFilePresent() {
   }
 
   return is_file_present;
-}
-
-DisplayError HWHDMI::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
-  return HWDevice::SetCursorPosition(hw_layers, x, y);
 }
 
 }  // namespace sdm

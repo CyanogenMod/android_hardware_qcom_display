@@ -69,7 +69,8 @@ HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, 
     dump_input_layers_(false), swap_interval_zero_(false), framebuffer_config_(NULL),
     display_paused_(false), use_metadata_refresh_rate_(false), metadata_refresh_rate_(0),
     boot_animation_completed_(false), shutdown_pending_(false), handle_refresh_(false),
-    use_blit_comp_(false), solid_fill_enable_(false), blit_engine_(NULL) {
+    use_blit_comp_(false), secure_display_active_(false), skip_prepare_(false),
+    solid_fill_enable_(false), blit_engine_(NULL) {
 }
 
 int HWCDisplay::Init() {
@@ -600,19 +601,27 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   // Configure layer stack
   layer_stack_.flags.geometry_changed = ((content_list->flags & HWC_GEOMETRY_CHANGED) > 0);
 
-  DisplayError error = display_intf_->Prepare(&layer_stack_);
-  if (error != kErrorNone) {
-    if (error == kErrorShutDown) {
-      shutdown_pending_ = true;
+  if (!skip_prepare_) {
+    DisplayError error = display_intf_->Prepare(&layer_stack_);
+    if (error != kErrorNone) {
+      if (error == kErrorShutDown) {
+        shutdown_pending_ = true;
+        return 0;
+      }
+      DLOGE("Prepare failed. Error = %d", error);
+      // To prevent surfaceflinger infinite wait, flush the previous frame during Commit() so that
+      // previous buffer and fences are released, and override the error.
+      flush_ = true;
+
       return 0;
     }
-    DLOGE("Prepare failed. Error = %d", error);
-
-    // To prevent surfaceflinger infinite wait, flush the previous frame during Commit() so that
-    // previous buffer and fences are released, and override the error.
+  } else {
+    // Skip is not set
+    MarkLayersForGPUBypass(content_list);
+    skip_prepare_ = false;
+    DLOGI("SecureDisplay %s, Skip Prepare/Commit and Flush", secure_display_active_ ? "Starting" :
+          "Stopping");
     flush_ = true;
-
-    return 0;
   }
 
   bool needs_fb_refresh = NeedsFrameBufferRefresh(content_list);
@@ -920,6 +929,7 @@ LayerBufferFormat HWCDisplay::GetSDMFormat(const int32_t &source, const int flag
   case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:       format = kFormatYCbCr420SemiPlanarVenus;  break;
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:  format = kFormatYCbCr420SPVenusUbwc;      break;
+  case HAL_PIXEL_FORMAT_YV12:                     format = kFormatYCrCb420PlanarStride16;   break;
   case HAL_PIXEL_FORMAT_YCrCb_420_SP:             format = kFormatYCrCb420SemiPlanar;       break;
   case HAL_PIXEL_FORMAT_YCbCr_422_SP:             format = kFormatYCbCr422H2V1SemiPlanar;   break;
   case HAL_PIXEL_FORMAT_YCbCr_422_I:              format = kFormatYCbCr422H2V1Packed;       break;
@@ -1343,6 +1353,11 @@ bool HWCDisplay::IsFullFrameSDEComposed() {
 
 bool HWCDisplay::IsFullFrameCached(hwc_display_contents_1_t *content_list) {
   return IsFullFrameSDEComposed() && !NeedsFrameBufferRefresh(content_list);
+}
+
+void HWCDisplay::SetSecureDisplay(bool secure_display_active) {
+  secure_display_active_ = secure_display_active;
+  return;
 }
 
 }  // namespace sdm

@@ -37,6 +37,7 @@ class HWCDisplayExternal : public HWCDisplay {
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
   virtual int GetDisplayConfigs(uint32_t *configs, size_t *num_configs);
+  virtual void SetSecureDisplay(bool secure_display_active);
 
  private:
   HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);

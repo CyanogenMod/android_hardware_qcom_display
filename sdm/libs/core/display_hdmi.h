@@ -68,7 +68,6 @@ class DisplayHDMI : public DisplayBase, DumpImpl {
   virtual void GetScanSupport();
 
   Locker locker_;
-  HWHDMIInterface *hw_hdmi_intf_;
   HWScanSupport scan_support_;
 };
 

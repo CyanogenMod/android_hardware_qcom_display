@@ -70,7 +70,6 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
 
  private:
   Locker locker_;
-  HWPrimaryInterface *hw_primary_intf_;
 };
 
 }  // namespace sdm

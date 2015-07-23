@@ -26,11 +26,9 @@
 #define __HW_INTERFACE_H__
 
 #include <core/display_interface.h>
-#include <private/strategy_interface.h>
 #include <private/hw_info_types.h>
 #include <private/color_interface.h>
 #include <utils/constants.h>
-#include <core/buffer_allocator.h>
 #include <core/buffer_sync_handler.h>
 
 namespace sdm {
@@ -64,8 +62,6 @@ class HWEventHandler {
 
 class HWInterface {
  public:
-  virtual DisplayError Open(HWEventHandler *eventhandler) = 0;
-  virtual DisplayError Close() = 0;
   virtual DisplayError GetNumDisplayAttributes(uint32_t *count) = 0;
   virtual DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
                                             uint32_t index) = 0;
@@ -82,7 +78,16 @@ class HWInterface {
   virtual DisplayError Flush() = 0;
   virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers) = 0;
   virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list) = 0;
+  virtual DisplayError SetVSyncState(bool enable) = 0;
+  virtual void SetIdleTimeoutMs(uint32_t timeout_ms) = 0;
+  virtual DisplayError SetDisplayMode(const HWDisplayMode hw_display_mode) = 0;
+  virtual DisplayError SetRefreshRate(uint32_t refresh_rate) = 0;
+  virtual DisplayError SetPanelBrightness(int level) = 0;
+  virtual DisplayError GetHWScanInfo(HWScanInfo *scan_info) = 0;
+  virtual DisplayError GetVideoFormat(uint32_t config_index, uint32_t *video_format) = 0;
+  virtual DisplayError GetMaxCEAFormat(uint32_t *max_cea_format) = 0;
   virtual DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y) = 0;
+  virtual DisplayError OnMinHdcpEncryptionLevelChange() = 0;
 
  protected:
   virtual ~HWInterface() { }

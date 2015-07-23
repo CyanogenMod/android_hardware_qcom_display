@@ -26,8 +26,9 @@
 #include <utils/debug.h>
 
 #include "display_virtual.h"
-#include "hw_virtual_interface.h"
+#include "hw_interface.h"
 #include "hw_info_interface.h"
+#include "fb/hw_virtual.h"
 
 #define __CLASS__ "DisplayVirtual"
 
@@ -43,21 +44,15 @@ DisplayVirtual::DisplayVirtual(DisplayEventHandler *event_handler, HWInfoInterfa
 DisplayError DisplayVirtual::Init() {
   SCOPE_LOCK(locker_);
 
-  DisplayError error = HWVirtualInterface::Create(&hw_virtual_intf_, hw_info_intf_,
-                                                  DisplayBase::buffer_sync_handler_);
-  if (error != kErrorNone) {
-    return error;
-  }
-
-  DisplayBase::hw_intf_ = hw_virtual_intf_;
-  error = hw_virtual_intf_->Open(NULL);
+  DisplayError error = HWVirtual::Create(&hw_intf_, hw_info_intf_,
+                                         DisplayBase::buffer_sync_handler_);
   if (error != kErrorNone) {
     return error;
   }
 
   error = DisplayBase::Init();
   if (error != kErrorNone) {
-    HWVirtualInterface::Destroy(hw_virtual_intf_);
+    HWVirtual::Destroy(hw_intf_);
   }
 
   return error;
@@ -67,10 +62,7 @@ DisplayError DisplayVirtual::Deinit() {
   SCOPE_LOCK(locker_);
 
   DisplayError error = DisplayBase::Deinit();
-  if (error != kErrorNone) {
-    return error;
-  }
-  HWVirtualInterface::Destroy(hw_virtual_intf_);
+  HWVirtual::Destroy(hw_intf_);
 
   return error;
 }
