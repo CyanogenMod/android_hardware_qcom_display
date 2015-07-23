@@ -58,8 +58,9 @@ bool HWCursor::config(const int fd, void* base, PipeArgs& pargs,
 
     cursorImage.dx = dest.x;
     cursorImage.dy = dest.y;
-    cursorImage.width = pargs.whf.w;
-    cursorImage.height = pargs.whf.h;
+    // Pack width/height with src crop width/height and hnd width/height
+    cursorImage.width = (crop.w << 16) | pargs.whf.w;
+    cursorImage.height = (crop.h << 16) | pargs.whf.h;
     cursorImage.fg_color = pargs.planeAlpha; // Hint for PMA
     cursorImage.bg_color = 0xffffff00;  // RGBA
     cursorImage.depth = 32;
