@@ -47,9 +47,9 @@ namespace sdm {
   LayerRect Subtract(const LayerRect &rect1, const LayerRect &rect2);
   LayerRect Reposition(const LayerRect &rect1, const int &x_offset, const int &y_offset);
   void SplitLeftRight(const LayerRect &in_rect, uint32_t split_count, uint32_t align_x,
-                     LayerRect *out_rects);
+                      bool flip_horizontal, LayerRect *out_rects);
   void SplitTopBottom(const LayerRect &in_rect, uint32_t split_count, uint32_t align_y,
-                       LayerRect *out_rects);
+                      bool flip_horizontal, LayerRect *out_rects);
 }  // namespace sdm
 
 #endif  // __RECT_H__
