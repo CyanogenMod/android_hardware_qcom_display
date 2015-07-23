@@ -2044,6 +2044,11 @@ static bool validForCursor(hwc_context_t* ctx, int dpy, hwc_layer_1_t* layer) {
         return false;
     } else if (srcW > (int)maxCursorSize || srcH > (int)maxCursorSize) {
         return false;
+    } else if ((getWidth(hnd) > 0xFFFF) || (getHeight(hnd) > 0xFFFF)) {
+        // using fb_image's width/heigh field to pack crop and width, hence
+        // rejecting if width/height > 0xFFFF.
+        // Crop is already taken care by the cursor_size
+        return false;
     }
 
     if (isDisplaySplit(ctx, dpy) && !mdpVersion.isSrcSplit()) {
