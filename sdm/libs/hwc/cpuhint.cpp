@@ -37,10 +37,6 @@
 
 namespace sdm {
 
-CPUHint::CPUHint() : enabled_(false), pre_enable_window_(0), frame_countdown_(0), lock_handle_(0),
-  lock_acquired_(false), lib_handle_(NULL), fn_lock_acquire_(NULL), fn_lock_release_(NULL) {
-}
-
 CPUHint::~CPUHint() {
   if (lib_handle_) {
     dlclose(lib_handle_);

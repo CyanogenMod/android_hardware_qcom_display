@@ -138,10 +138,9 @@ struct LayerFlags {
                               //!< Display Device may handle this layer using HWCursor
     };
 
-    uint32_t flags;   //!< For initialization purpose only. Client shall not refer it directly.
+    uint32_t flags = 0;       //!< For initialization purpose only.
+                              //!< Client shall not refer it directly.
   };
-
-  LayerFlags() : flags(0) { }
 };
 
 /*! @brief This structure defines flags associated with a layer stack. The 1-bit flag can be set to
@@ -177,10 +176,9 @@ struct LayerStackFlags {
                                       //!< stack contains cursor layer.
     };
 
-    uint32_t flags;   //!< For initialization purpose only. Client shall not refer it directly.
+    uint32_t flags = 0;               //!< For initialization purpose only.
+                                      //!< Client shall not refer it directly.
   };
-
-  LayerStackFlags() : flags(0) { }
 };
 
 /*! @brief This structure defines a rectanglular area inside a display layer.
@@ -188,13 +186,12 @@ struct LayerStackFlags {
   @sa LayerRectArray
 */
 struct LayerRect {
-  float left;     //!< Left-most pixel coordinate.
-  float top;      //!< Top-most pixel coordinate.
-  float right;    //!< Right-most pixel coordinate.
-  float bottom;   //!< Bottom-most pixel coordinate.
+  float left   = 0.0f;   //!< Left-most pixel coordinate.
+  float top    = 0.0f;   //!< Top-most pixel coordinate.
+  float right  = 0.0f;   //!< Right-most pixel coordinate.
+  float bottom = 0.0f;   //!< Bottom-most pixel coordinate.
 
-  LayerRect() : left(0.0f), top(0.0f), right(0.0f), bottom(0.0f) { }
-
+  LayerRect() = default;
   LayerRect(float l, float t, float r, float b) : left(l), top(t), right(r), bottom(b) { }
 };
 
@@ -203,10 +200,8 @@ struct LayerRect {
   @sa LayerRect
 */
 struct LayerRectArray {
-  LayerRect *rect;  //!< Pointer to first element of array.
-  uint32_t count;   //!< Number of elements in the array.
-
-  LayerRectArray() : rect(NULL), count(0) { }
+  LayerRect *rect = NULL;  //!< Pointer to first element of array.
+  uint32_t count = 0;      //!< Number of elements in the array.
 };
 
 /*! @brief This structure defines display layer object which contains layer properties and a drawing
@@ -215,58 +210,65 @@ struct LayerRectArray {
   @sa LayerArray
 */
 struct Layer {
-  LayerBuffer *input_buffer;        //!< Pointer to the buffer to be composed. If this remains
-                                    //!< unchanged between two consecutive Prepare() calls and
-                                    //!< geometry_changed flag is not set for the second call, then
-                                    //!< the display device will assume that buffer content has not
-                                    //!< changed.
+  LayerBuffer *input_buffer = NULL;                //!< Pointer to the buffer to be composed.
+                                                   //!< If this remains unchanged between two
+                                                   //!< consecutive Prepare() calls and
+                                                   //!< geometry_changed flag is not set for the
+                                                   //!< second call, then the display device will
+                                                   //!< assume that buffer content has not
+                                                   //!< changed.
 
-  LayerComposition composition;     //!< Composition type which can be set by either the client or
-                                    //!< the display device. This value should be preserved between
-                                    //!< Prepare() and Commit() calls.
+  LayerComposition composition = kCompositionGPU;  //!< Composition type which can be set by either
+                                                   //!< the client or the display device. This value
+                                                   //!< should be preserved between Prepare() and
+                                                   //!< Commit() calls.
 
-  LayerRect src_rect;               //!< Rectangular area of the layer buffer to consider for
-                                    //!< composition.
+  LayerRect src_rect;                              //!< Rectangular area of the layer buffer to
+                                                   //!< consider for composition.
 
-  LayerRect dst_rect;               //!< The target position where the frame will be displayed.
-                                    //!< Cropping rectangle is scaled to fit into this rectangle.
-                                    //!< The origin is top-left corner of the screen.
+  LayerRect dst_rect;                              //!< The target position where the frame will be
+                                                   //!< displayed. Cropping rectangle is scaled to
+                                                   //!< fit into this rectangle. The origin is the
+                                                   //!< top-left corner of the screen.
 
-  LayerRectArray visible_regions;   //!< Visible rectangular areas in screen space. The visible
-                                    //!< region includes areas overlapped by a translucent layer.
+  LayerRectArray visible_regions;                  //!< Visible rectangular areas in screen space.
+                                                   //!< The visible region includes areas overlapped
+                                                   //!< by a translucent layer.
 
-  LayerRectArray dirty_regions;     //!< Rectangular areas in the current frames that have changed
-                                    //!< in comparison to previous frame.
+  LayerRectArray dirty_regions;                    //!< Rectangular areas in the current frames
+                                                   //!< that have changed in comparison to
+                                                   //!< previous frame.
 
-  LayerRectArray blit_regions;      //!< Rectangular areas of this layer which need to composed
-                                    //!< to blit target. Display device will update blit rectangles
-                                    //!< if a layer composition is set as hybrid. Nth blit rectangle
-                                    //!< shall be composed onto Nth blit target.
+  LayerRectArray blit_regions;                     //!< Rectangular areas of this layer which need
+                                                   //!< to be composed to blit target. Display
+                                                   //!< device will update blit rectangles if a
+                                                   //!< layer composition is set as hybrid. Nth blit
+                                                   //!< rectangle shall be composed onto Nth blit
+                                                   //!< target.
 
-  LayerBlending blending;           //!< Blending operation which need to be applied on the layer
-                                    //!< buffer during composition.
+  LayerBlending blending = kBlendingOpaque;        //!< Blending operation which need to be applied
+                                                   //!< on the layer buffer during composition.
 
-  LayerTransform transform;         //!< Rotation/Flip operations which need to be applied to the
-                                    //!< layer buffer during composition.
+  LayerTransform transform;                        //!< Rotation/Flip operations which need to be
+                                                   //!< applied to the layer buffer during
+                                                   //!< composition.
 
-  uint8_t plane_alpha;              //!< Alpha value applied to the whole layer. Value of each pixel
-                                    //!< computed as:
-                                    //!<    if(kBlendingPremultiplied) {
-                                    //!<      pixel.RGB = pixel.RGB * planeAlpha / 255
-                                    //!<    }
-                                    //!<    pixel.a = pixel.a * planeAlpha
+  uint8_t plane_alpha = 0;                         //!< Alpha value applied to the whole layer.
+                                                   //!< Value of each pixel is computed as:
+                                                   //!<    if(kBlendingPremultiplied) {
+                                                   //!<      pixel.RGB = pixel.RGB * planeAlpha/255
+                                                   //!<    }
+                                                   //!<    pixel.a = pixel.a * planeAlpha
 
-  LayerFlags flags;                 //!< Flags associated with this layer.
+  LayerFlags flags;                                //!< Flags associated with this layer.
 
-  uint32_t frame_rate;              //!< Rate at which frames are being updated for this layer.
+  uint32_t frame_rate = 0;                         //!< Rate at which frames are being updated for
+                                                   //!< this layer.
 
-  LayerColorSpace color_space;      //!< Color Space of the layer
+  LayerColorSpace color_space = kLimitedRange601;  //!< Color Space of the layer
 
-  uint32_t solid_fill_color;        //!< Solid color used to fill the layer when no content is
-                                    //!< associated with the layer.
-
-  Layer() : input_buffer(NULL), composition(kCompositionGPU), blending(kBlendingOpaque),
-            plane_alpha(0), frame_rate(0), color_space(kLimitedRange601), solid_fill_color(0) { }
+  uint32_t solid_fill_color = 0;                   //!< Solid color used to fill the layer when
+                                                   //!< no content is associated with the layer.
 };
 
 /*! @brief This structure defines a layer stack that contains layers which need to be composed and
@@ -276,24 +278,22 @@ struct Layer {
   @sa DisplayInterface::Commit
 */
 struct LayerStack {
-  Layer *layers;                //!< Array of layers.
-  uint32_t layer_count;         //!< Total number of layers.
+  Layer *layers = NULL;                //!< Array of layers.
+  uint32_t layer_count = 0;            //!< Total number of layers.
 
-  int retire_fence_fd;          //!< File descriptor referring to a sync fence object which will
-                                //!< be signaled when this composited frame has been replaced on
-                                //!< screen by a subsequent frame on a physical display. The fence
-                                //!< object is created and returned during Commit(). Client shall
-                                //!< Client shall close the returned file descriptor.
-                                //!< NOTE: This field applies to a physical display only.
+  int retire_fence_fd = -1;            //!< File descriptor referring to a sync fence object which
+                                       //!< will be signaled when this composited frame has been
+                                       //!< replaced on screen by a subsequent frame on a physical
+                                       //!< display. The fence object is created and returned during
+                                       //!< Commit(). Client shall close the returned file
+                                       //!< descriptor.
+                                       //!< NOTE: This field applies to a physical display only.
 
-  LayerBuffer *output_buffer;   //!< Pointer to the buffer where composed buffer would be rendered
-                                //!< for virtual displays.
-                                //!< NOTE: This field applies to a virtual display only.
+  LayerBuffer *output_buffer = NULL;   //!< Pointer to the buffer where composed buffer would be
+                                       //!< rendered for virtual displays.
+                                       //!< NOTE: This field applies to a virtual display only.
 
-
-  LayerStackFlags flags;        //!< Flags associated with this layer set.
-
-  LayerStack() : layers(NULL), layer_count(0), retire_fence_fd(-1), output_buffer(NULL) { }
+  LayerStackFlags flags;               //!< Flags associated with this layer set.
 };
 
 }  // namespace sdm

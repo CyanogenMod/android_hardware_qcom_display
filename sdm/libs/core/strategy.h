@@ -47,15 +47,15 @@ class Strategy {
   void GenerateROI();
 
   ExtensionInterface *extension_intf_;
-  StrategyInterface *strategy_intf_;
-  PartialUpdateInterface *partial_update_intf_;
+  StrategyInterface *strategy_intf_ = NULL;
+  PartialUpdateInterface *partial_update_intf_ = NULL;
   DisplayType display_type_;
   HWResourceInfo hw_resource_info_;
   HWPanelInfo hw_panel_info_;
-  HWLayersInfo *hw_layers_info_;
-  uint32_t fb_layer_index_;
-  bool extn_start_success_;
-  bool tried_default_;
+  HWLayersInfo *hw_layers_info_ = NULL;
+  uint32_t fb_layer_index_ = 0;
+  bool extn_start_success_ = false;
+  bool tried_default_ = false;
 };
 
 }  // namespace sdm

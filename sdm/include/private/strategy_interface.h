@@ -32,17 +32,15 @@
 namespace sdm {
 
 struct StrategyConstraints {
-  bool safe_mode;         //!< In this mode, strategy manager chooses the composition strategy
-                          //!< that requires minimum number of pipe for the current frame. i.e.,
-                          //!< video only composition, secure only composition or GPU composition
+  bool safe_mode = false;   //!< In this mode, strategy manager chooses the composition strategy
+                            //!< that requires minimum number of pipe for the current frame. i.e.,
+                            //!< video only composition, secure only composition or GPU composition
 
-  bool use_cursor;        //!<  If this is set, strategy manager will configure cursor layer in the
-                          //!<  layer stack as hw cursor else it will be treated as a normal layer
+  bool use_cursor = false;  //!< If this is set, strategy manager will configure cursor layer in the
+                            //!< layer stack as hw cursor else it will be treated as a normal layer
 
-  uint32_t max_layers;    //!< Maximum number of layers that shall be programmed on hardware for the
-                          //!< given layer stack.
-
-  StrategyConstraints() : safe_mode(false), use_cursor(false), max_layers(kMaxSDELayers) { }
+  uint32_t max_layers = kMaxSDELayers;  //!< Maximum number of layers that shall be programmed
+                                        //!< on hardware for the given layer stack.
 };
 
 class StrategyInterface {

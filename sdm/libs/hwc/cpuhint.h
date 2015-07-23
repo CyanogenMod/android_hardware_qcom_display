@@ -38,7 +38,6 @@ class HWCDebugHandler;
 
 class CPUHint {
  public:
-  CPUHint();
   ~CPUHint();
   DisplayError Init(HWCDebugHandler *debug_handler);
   void Set();
@@ -46,15 +45,15 @@ class CPUHint {
 
  private:
   enum { HINT =  0x4701 /* 47-display layer hint, 01-Enable */ };
-  bool enabled_;
+  bool enabled_ = false;
   // frames to wait before setting this hint
-  int pre_enable_window_;
-  int frame_countdown_;
-  int lock_handle_;
-  bool lock_acquired_;
-  void *lib_handle_;
-  int (*fn_lock_acquire_)(int handle, int duration, int *hints, int num_args);
-  int (*fn_lock_release_)(int value);
+  int pre_enable_window_ = 0;
+  int frame_countdown_ = 0;
+  int lock_handle_ = 0;
+  bool lock_acquired_ = false;
+  void *lib_handle_ = NULL;
+  int (*fn_lock_acquire_)(int handle, int duration, int *hints, int num_args) = NULL;
+  int (*fn_lock_release_)(int value) = NULL;
 };
 
 }  // namespace sdm

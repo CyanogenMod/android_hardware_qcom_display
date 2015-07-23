@@ -33,11 +33,6 @@
 
 namespace sdm {
 
-CompManager::CompManager()
-  : resource_intf_(NULL), registered_displays_(0), configured_displays_(0), safe_mode_(false),
-    extension_intf_(NULL) {
-}
-
 DisplayError CompManager::Init(const HWResourceInfo &hw_res_info,
                                ExtensionInterface *extension_intf,
                                BufferSyncHandler *buffer_sync_handler) {

@@ -65,27 +65,26 @@ enum PPGlobalColorFeatureID {
 };
 
 struct PPPendingParams {
-  PendingAction action;
-  void *params;
-  PPPendingParams() : action(kNoAction), params(NULL) {}
+  PendingAction action = kNoAction;
+  void *params = NULL;
 };
 
 struct PPColorInfo {
-  uint32_t r_bitdepth;
-  uint32_t r;
-  uint32_t g_bitdepth;
-  uint32_t g;
-  uint32_t b_bitdepth;
-  uint32_t b;
+  uint32_t r_bitdepth = 0;
+  uint32_t r = 0;
+  uint32_t g_bitdepth = 0;
+  uint32_t g = 0;
+  uint32_t b_bitdepth = 0;
+  uint32_t b = 0;
 };
 
 struct PPColorFillParams {
-  uint32_t flags;
+  uint32_t flags = 0;
   struct {
-    uint32_t width;
-    uint32_t height;
-    int32_t x;
-    int32_t y;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    int32_t x = 0;
+    int32_t y = 0;
   } rect;
 
   PPColorInfo color;
@@ -106,10 +105,10 @@ struct PPFeatureVersion {
 };
 
 struct PPHWAttributes : HWResourceInfo, HWPanelInfo, DisplayConfigVariableInfo {
-  const char *panel_name;  // TODO(user):  Add into HWPanelInfo to retrieve panel_name from HW.
+  const char *panel_name = "generic_panel";  // TODO(user):  Add into HWPanelInfo
+                                             // to retrieve panel_name from HW.
   PPFeatureVersion version;
 
-  PPHWAttributes() : panel_name("generic_panel"), version() {}
   inline void Set(const HWResourceInfo &hw_res, const HWPanelInfo &panel_info,
                   const DisplayConfigVariableInfo &attr, const PPFeatureVersion &feature_ver) {
     HWResourceInfo &res = *this;
@@ -123,13 +122,13 @@ struct PPHWAttributes : HWResourceInfo, HWPanelInfo, DisplayConfigVariableInfo {
 };
 
 struct PPDisplayAPIPayload {
-  bool own_payload;  // to indicate if *payload is owned by this or just a reference.
-  uint32_t size;
-  uint8_t *payload;
+  bool own_payload = false;  // to indicate if *payload is owned by this or just a reference.
+  uint32_t size = 0;
+  uint8_t *payload = NULL;
 
-  PPDisplayAPIPayload() : own_payload(false), size(0), payload(NULL) {}
+  PPDisplayAPIPayload() = default;
   PPDisplayAPIPayload(uint32_t size, uint8_t *param)
-      : own_payload(false), size(size), payload(param) {}
+      : size(size), payload(param) {}
 
   template <typename T>
   DisplayError CreatePayload(T *&output) {
@@ -175,78 +174,71 @@ struct SDEGamutCfg {
 };
 
 struct SDEPccCoeff {
-  uint32_t c;
-  uint32_t r;
-  uint32_t g;
-  uint32_t b;
-  uint32_t rg;
-  uint32_t gb;
-  uint32_t rb;
-  uint32_t rgb;
-
-  SDEPccCoeff() : c(0), r(0), g(0), b(0), rg(0), gb(0), rb(0), rgb(0) {}
+  uint32_t c = 0;
+  uint32_t r = 0;
+  uint32_t g = 0;
+  uint32_t b = 0;
+  uint32_t rg = 0;
+  uint32_t gb = 0;
+  uint32_t rb = 0;
+  uint32_t rgb = 0;
 };
 
 struct SDEPccCfg {
   SDEPccCoeff red;
   SDEPccCoeff green;
   SDEPccCoeff blue;
-  SDEPccCfg() : red(), green(), blue() {}
 
   static SDEPccCfg *Init(uint32_t arg __attribute__((__unused__)));
   SDEPccCfg *GetConfig() { return this; }
 };
 
 struct SDEPaMemColorData {
-  uint32_t adjust_p0;
-  uint32_t adjust_p1;
-  uint32_t adjust_p2;
-  uint32_t blend_gain;
-  uint8_t sat_hold;
-  uint8_t val_hold;
-  uint32_t hue_region;
-  uint32_t sat_region;
-  uint32_t val_region;
+  uint32_t adjust_p0 = 0;
+  uint32_t adjust_p1 = 0;
+  uint32_t adjust_p2 = 0;
+  uint32_t blend_gain = 0;
+  uint8_t sat_hold = 0;
+  uint8_t val_hold = 0;
+  uint32_t hue_region = 0;
+  uint32_t sat_region = 0;
+  uint32_t val_region = 0;
 };
 
 struct SDEPaData {
   static const int kSixZoneLUTSize = 384;
-  uint32_t mode;
-  uint32_t hue_adj;
-  uint32_t sat_adj;
-  uint32_t val_adj;
+  uint32_t mode = 0;
+  uint32_t hue_adj = 0;
+  uint32_t sat_adj = 0;
+  uint32_t val_adj = 0;
   uint32_t cont_adj;
   SDEPaMemColorData skin;
   SDEPaMemColorData sky;
   SDEPaMemColorData foliage;
-  uint32_t six_zone_thresh;
-  uint32_t six_zone_adj_p0;
-  uint32_t six_zone_adj_p1;
-  uint8_t six_zone_sat_hold;
-  uint8_t six_zone_val_hold;
-  uint32_t six_zone_len;
-  uint32_t *six_zone_curve_p0;
-  uint32_t *six_zone_curve_p1;
+  uint32_t six_zone_thresh = 0;
+  uint32_t six_zone_adj_p0 = 0;
+  uint32_t six_zone_adj_p1 = 0;
+  uint8_t six_zone_sat_hold = 0;
+  uint8_t six_zone_val_hold = 0;
+  uint32_t six_zone_len = 0;
+  uint32_t *six_zone_curve_p0 = NULL;
+  uint32_t *six_zone_curve_p1 = NULL;
 };
 
 struct SDEIgcLUTData {
   static const int kMaxIgcLUTEntries = 256;
-  uint32_t table_fmt;
-  uint32_t len;
-  uint32_t *c0_c1_data;
-  uint32_t *c2_data;
-
-  SDEIgcLUTData() : table_fmt(0), len(0), c0_c1_data(NULL), c2_data(NULL) {}
+  uint32_t table_fmt = 0;
+  uint32_t len = 0;
+  uint32_t *c0_c1_data = NULL;
+  uint32_t *c2_data = NULL;
 };
 
 struct SDEPgcLUTData {
   static const int kPgcLUTEntries = 1024;
-  uint32_t len;
-  uint32_t *c0_data;
-  uint32_t *c1_data;
-  uint32_t *c2_data;
-
-  SDEPgcLUTData() : len(0), c0_data(NULL), c1_data(NULL), c2_data(NULL) {}
+  uint32_t len = 0;
+  uint32_t *c0_data = NULL;
+  uint32_t *c1_data = NULL;
+  uint32_t *c2_data = NULL;
 };
 
 // Wrapper on HW block config data structure to encapsulate the details of allocating
@@ -272,8 +264,8 @@ class SDEGamutCfgWrapper : private SDEGamutCfg {
   inline SDEGamutCfg *GetConfig(void) { return this; }
 
  private:
-  SDEGamutCfgWrapper() : buffer_(NULL) {}
-  uint32_t *buffer_;
+  SDEGamutCfgWrapper() {}
+  uint32_t *buffer_ = NULL;
 };
 
 class SDEPaCfgWrapper : private SDEPaData {
@@ -286,8 +278,8 @@ class SDEPaCfgWrapper : private SDEPaData {
   inline SDEPaData *GetConfig(void) { return this; }
 
  private:
-  SDEPaCfgWrapper() : buffer_(NULL) {}
-  uint32_t *buffer_;
+  SDEPaCfgWrapper() {}
+  uint32_t *buffer_ = NULL;
 };
 
 class SDEIgcLUTWrapper : private SDEIgcLUTData {
@@ -300,8 +292,8 @@ class SDEIgcLUTWrapper : private SDEIgcLUTData {
   inline SDEIgcLUTData *GetConfig(void) { return this; }
 
  private:
-  SDEIgcLUTWrapper() : buffer_(NULL) {}
-  uint32_t *buffer_;
+  SDEIgcLUTWrapper() {}
+  uint32_t *buffer_ = NULL;
 };
 
 class SDEPgcLUTWrapper : private SDEPgcLUTData {
@@ -314,24 +306,21 @@ class SDEPgcLUTWrapper : private SDEPgcLUTData {
   inline SDEPgcLUTData *GetConfig(void) { return this; }
 
  private:
-  SDEPgcLUTWrapper() : buffer_(NULL) {}
-  uint32_t *buffer_;
+  SDEPgcLUTWrapper() {}
+  uint32_t *buffer_ = NULL;
 };
 
 // Base Postprocessing features information.
 class PPFeatureInfo {
  public:
-  uint32_t enable_flags_;  // bitmap to indicate subset of parameters enabling or not.
-  uint32_t feature_version_;
-  uint32_t feature_id_;
-  uint32_t disp_id_;
-  uint32_t pipe_id_;
+  uint32_t enable_flags_ = 0;  // bitmap to indicate subset of parameters enabling or not.
+  uint32_t feature_version_ = 0;
+  uint32_t feature_id_ = 0;
+  uint32_t disp_id_ = 0;
+  uint32_t pipe_id_ = 0;
 
   virtual ~PPFeatureInfo() {}
   virtual void *GetConfigData(void) const = 0;
-
-  PPFeatureInfo()
-      : enable_flags_(0), feature_version_(0), feature_id_(0), disp_id_(0), pipe_id_(0) {}
 };
 
 // Individual Postprocessing feature representing physical attributes and information
@@ -367,10 +356,10 @@ class TPPFeatureInfo : public PPFeatureInfo {
   }
 
  protected:
-  TPPFeatureInfo() : params_(NULL) {}
+  TPPFeatureInfo() = default;
 
  private:
-  T *params_;
+  T *params_ = NULL;
 };
 
 // This singleton class serves as data exchanging central between data producer
@@ -381,7 +370,7 @@ class TPPFeatureInfo : public PPFeatureInfo {
 // All API exposed are not threadsafe, it's caller's responsiblity to acquire the locker.
 class PPFeaturesConfig {
  public:
-  PPFeaturesConfig() : dirty_(0), next_idx_(0) { memset(feature_, 0, sizeof(feature_)); }
+  PPFeaturesConfig() { memset(feature_, 0, sizeof(feature_)); }
   ~PPFeaturesConfig() { Reset(); }
 
   // ColorManager installs one TFeatureInfo<T> to take the output configs computed
@@ -433,10 +422,10 @@ class PPFeaturesConfig {
   inline void MarkAsDirty() { dirty_ = true; }
 
  private:
-  bool dirty_;
+  bool dirty_ = 0;
   Locker locker_;
   PPFeatureInfo *feature_[kMaxNumPPFeatures];  // reference to TFeatureInfo<T>.
-  uint32_t next_idx_;
+  uint32_t next_idx_ = 0;
 };
 
 }  // namespace sdm

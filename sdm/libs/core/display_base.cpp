@@ -40,10 +40,7 @@ DisplayBase::DisplayBase(DisplayType display_type, DisplayEventHandler *event_ha
                          HWInfoInterface *hw_info_intf)
   : display_type_(display_type), event_handler_(event_handler), hw_device_type_(hw_device_type),
     buffer_sync_handler_(buffer_sync_handler), comp_manager_(comp_manager),
-    rotator_intf_(rotator_intf), state_(kStateOff), hw_device_(0), display_comp_ctx_(0),
-    display_attributes_(NULL), num_modes_(0), active_mode_index_(0), pending_commit_(false),
-    vsync_enable_(false), underscan_supported_(false), max_mixer_stages_(0),
-    hw_info_intf_(hw_info_intf), color_mgr_(NULL), partial_update_control_(true) {
+    rotator_intf_(rotator_intf), hw_info_intf_(hw_info_intf) {
 }
 
 DisplayError DisplayBase::Init() {
