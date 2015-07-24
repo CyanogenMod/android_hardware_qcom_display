@@ -152,6 +152,7 @@ HDMIDisplay::HDMIDisplay():mFd(-1),
     mUnderscanSupported(false), mMDPDownscaleEnabled(false)
 {
     memset(&mVInfo, 0, sizeof(mVInfo));
+    mFbNum = qdutils::getHDMINode();
 
     mDisplayId = HWC_DISPLAY_EXTERNAL;
     // Update the display if HDMI is connected as primary
@@ -159,7 +160,6 @@ HDMIDisplay::HDMIDisplay():mFd(-1),
         mDisplayId = HWC_DISPLAY_PRIMARY;
     }
 
-    mFbNum = overlay::Overlay::getInstance()->getFbForDpy(mDisplayId);
     // Disable HPD at start if HDMI is external, it will be enabled later
     // when the display powers on
     // This helps for framework reboot or adb shell stop/start
@@ -684,8 +684,7 @@ int HDMIDisplay::openDeviceNode(const char* node, int fileMode) const {
 }
 
 bool HDMIDisplay::isHDMIPrimaryDisplay() {
-    int hdmiNode = qdutils::getHDMINode();
-    return (hdmiNode == HWC_DISPLAY_PRIMARY);
+    return (mFbNum == HWC_DISPLAY_PRIMARY);
 }
 
 int HDMIDisplay::getConnectedState() {
