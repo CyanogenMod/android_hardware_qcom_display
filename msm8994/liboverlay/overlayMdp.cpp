@@ -353,8 +353,31 @@ bool MdpCtrl::validateAndSet(MdpCtrl* mdpCtrlArray[], const int& count,
     mdp_overlay* ovArray[count];
     memset(&ovArray, 0, sizeof(ovArray));
 
+    uint8_t max_horz_deci = 0, max_vert_deci = 0;
+
+    // Decimation factor for the left and right pipe differs, when there is a
+    // one pixel difference in the dst width of right pipe and the left pipe.
+    // libscalar returns a failure as it expects decimation on both the pipe
+    // to be same. So compare the decimation factor on both the pipes and assign
+    // the maximum of it.
     for(int i = 0; i < count; i++) {
-        ovArray[i] = &mdpCtrlArray[i]->mOVInfo;
+        mdp_overlay *ov_current = &mdpCtrlArray[i]->mOVInfo;
+        for(int j = i + 1; j < count; j++) {
+            mdp_overlay *ov_next = &mdpCtrlArray[j]->mOVInfo;
+            if(ov_current->z_order == ov_next->z_order) {
+                max_horz_deci = utils::max(ov_current->horz_deci,
+                                           ov_next->horz_deci);
+                max_vert_deci = utils::max(ov_current->vert_deci,
+                                           ov_next->vert_deci);
+
+                ov_current->horz_deci = max_horz_deci;
+                ov_next->horz_deci = max_horz_deci;
+                ov_current->vert_deci = max_vert_deci;
+                ov_next->vert_deci = max_vert_deci;
+                break;
+            }
+        }
+        ovArray[i] = ov_current;
     }
 
     struct mdp_overlay_list list;
