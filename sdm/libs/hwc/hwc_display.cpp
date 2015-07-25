@@ -556,7 +556,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       LayerBuffer *input_buffer = layer.input_buffer;
       input_buffer->width = layer.dst_rect.right - layer.dst_rect.left;
       input_buffer->height = layer.dst_rect.bottom - layer.dst_rect.top;
-      layer.src_rect = layer.dst_rect;
+      layer.src_rect.left = 0;
+      layer.src_rect.top = 0;
+      layer.src_rect.right = input_buffer->width;
+      layer.src_rect.bottom = input_buffer->height;
       layer.dirty_regions.rect[0] = layer.src_rect;
     }
 
