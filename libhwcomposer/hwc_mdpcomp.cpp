@@ -1541,7 +1541,7 @@ bool MDPComp::mdpOnlyLayersComp(hwc_context_t *ctx,
         /* Bail out if we are processing only secured video/ui layers
          * and we dont have any */
         if(secureOnly) {
-            ALOGD_IF(isDebug(), "%s: No secure video/ui layers");
+            ALOGD_IF(isDebug(), "%s: No secure video/ui layers",__FUNCTION__);
             return false;
         }
         /* No Idle fall back for secure video/ui layers and if there is only
