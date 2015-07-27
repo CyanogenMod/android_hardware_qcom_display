@@ -95,7 +95,7 @@ HDMIDisplay::HDMIDisplay():mFd(-1),
     mUnderscanSupported(false), mMDPDownscaleEnabled(false)
 {
     memset(&mVInfo, 0, sizeof(mVInfo));
-    mFbNum = qdutils::getHDMINode();
+    mFbNum = qdutils::getPluggableNode();
 
     mDisplayId = HWC_DISPLAY_EXTERNAL;
     // Update the display if HDMI is connected as primary
@@ -690,7 +690,6 @@ bool HDMIDisplay::isHDMIPrimaryDisplay() {
 
 int HDMIDisplay::getConnectedState() {
     int ret = -1;
-    int mFbNum = qdutils::getHDMINode();
     int connectedNode = openDeviceNode("connected", O_RDONLY);
     if(connectedNode >= 0) {
         char opStr[4];

@@ -29,40 +29,68 @@
 
 #include "qd_utils.h"
 #define QD_UTILS_DEBUG 0
+#define TOKEN_PARAMS_DELIM  "="
 
 namespace qdutils {
 
-int getHDMINode(void)
-{
-    FILE *displayDeviceFP = NULL;
-    char fbType[MAX_FRAME_BUFFER_NAME_SIZE];
-    char msmFbTypePath[MAX_FRAME_BUFFER_NAME_SIZE];
-    int j = 0;
+static int tokenizeParams(char *inputParams, const char *delim,
+        char* tokenStr[], int *idx) {
+    char *tmp_token = NULL;
+    char *temp_ptr;
+    int index = 0;
+    if (!inputParams) {
+        return -1;
+    }
+    tmp_token = strtok_r(inputParams, delim, &temp_ptr);
+    while (tmp_token != NULL) {
+        tokenStr[index++] = tmp_token;
+        tmp_token = strtok_r(NULL, " ", &temp_ptr);
+    }
+    *idx = index;
+    return 0;
+}
 
-    for(j = 0; j < HWC_NUM_DISPLAY_TYPES; j++) {
+int getPluggableNode() {
+    FILE *panelInfoNodeFP = NULL;
+    int pluggableNode = -1;
+    char msmFbTypePath[MAX_FRAME_BUFFER_NAME_SIZE];
+
+    for(int j = 0; j < HWC_NUM_DISPLAY_TYPES; j++) {
         snprintf (msmFbTypePath, sizeof(msmFbTypePath),
-                  "/sys/class/graphics/fb%d/msm_fb_type", j);
-        displayDeviceFP = fopen(msmFbTypePath, "r");
-        if(displayDeviceFP) {
-            fread(fbType, sizeof(char), MAX_FRAME_BUFFER_NAME_SIZE,
-                    displayDeviceFP);
-            if(strncmp(fbType, "dtv panel", strlen("dtv panel")) == 0) {
-                ALOGD("%s: HDMI is at fb%d", __func__, j);
-                fclose(displayDeviceFP);
-                break;
+                "/sys/class/graphics/fb%d/msm_fb_panel_info", j);
+        panelInfoNodeFP = fopen(msmFbTypePath, "r");
+        if(panelInfoNodeFP){
+            size_t len = PAGE_SIZE;
+            ssize_t read;
+            char *readLine = (char *) malloc (len);
+            char property[PROPERTY_VALUE_MAX];
+            while((read = getline((char **)&readLine, &len,
+                            panelInfoNodeFP)) != -1) {
+                int token_ct = 0;
+                char *tokens[10];
+                memset(tokens, 0, sizeof(tokens));
+
+                if(!tokenizeParams(readLine, TOKEN_PARAMS_DELIM, tokens,
+                            &token_ct)) {
+                    if(!strncmp(tokens[0], "is_pluggable",
+                                strlen("is_pluggable"))) {
+                        if (atoi(tokens[1]) == 1) {
+                            pluggableNode = j;
+                            break;
+                        }
+                    }
+                }
             }
-            fclose(displayDeviceFP);
-        } else {
-            ALOGE("%s: Failed to open fb node %d", __func__, j);
+            fclose(panelInfoNodeFP);
+            free(readLine);
         }
     }
 
-    if (j < HWC_NUM_DISPLAY_TYPES)
-        return j;
-    else
-        ALOGE("%s: Failed to find HDMI node", __func__);
+    if (pluggableNode == -1) {
+        ALOGE("%s: Failed to find HDMI node.", __FUNCTION__);
+    }
 
-    return -1;
+    return pluggableNode;
 }
 
 int getEdidRawData(char *buffer)
@@ -70,7 +98,7 @@ int getEdidRawData(char *buffer)
     int size;
     int edidFile;
     char msmFbTypePath[MAX_FRAME_BUFFER_NAME_SIZE];
-    int node_id = getHDMINode();
+    int node_id = getPluggableNode();
 
     if (node_id < 0) {
         ALOGE("%s no HDMI node found", __func__);

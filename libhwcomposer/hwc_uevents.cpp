@@ -44,7 +44,7 @@ static int getConnectedDisplay(hwc_context_t* ctx, const char* strUdata)
     int ret = -1;
     // Switch node for HDMI as PRIMARY/EXTERNAL
     if(strcasestr("change@/devices/virtual/switch/hdmi", strUdata)) {
-        if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+        if (isPrimaryPluggable(ctx)) {
             ret = HWC_DISPLAY_PRIMARY;
         } else {
             ret = HWC_DISPLAY_EXTERNAL;
@@ -157,7 +157,7 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 ctx->mBWCEnabled = false;
             }
 
-            if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+            if (isPrimaryPluggable(ctx)) {
                 ctx->mDrawLock.lock();
                 handle_online(ctx, dpy);
                 ctx->mDrawLock.unlock();

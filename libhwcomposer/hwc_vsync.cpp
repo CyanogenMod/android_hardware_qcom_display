@@ -77,7 +77,7 @@ static void handle_blank_event(hwc_context_t* ctx, int dpy, char *data,
     if (!strncmp(data, PANEL_ON_STR, strlen(PANEL_ON_STR))) {
         unsigned long int poweron = strtoul(data + strlen(PANEL_ON_STR), NULL, 0);
         ALOGI("%s: dpy:%d panel power state: %ld", __FUNCTION__, dpy, poweron);
-        if (!ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+        if (!isPrimaryPluggable(ctx)) {
             ctx->dpyAttr[dpy].isActive = poweron ? true: false;
         }
     }

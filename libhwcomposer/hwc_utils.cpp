@@ -329,6 +329,8 @@ int initContext(hwc_context_t *ctx)
     }
 
     overlay::Overlay::initOverlay();
+    ctx->dpyAttr[HWC_DISPLAY_PRIMARY].isPluggable =
+            qdutils::MDPVersion::getInstance().isPluggable();
     ctx->mHDMIDisplay = new HDMIDisplay();
     uint32_t priW = 0, priH = 0;
     // 1. HDMI as Primary
@@ -337,9 +339,9 @@ int initContext(hwc_context_t *ctx)
     // 2. HDMI as External
     //    -Initialize HDMI class for use with external display
     //    -Use vscreeninfo to populate display configs
-    if(ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+    if(isPrimaryPluggable(ctx)) {
         int connected = ctx->mHDMIDisplay->getConnectedState();
-        if(connected == 1) {
+        if (connected == 1) {
             error = ctx->mHDMIDisplay->configure();
             if (error < 0) {
                 goto OpenFBError;
@@ -854,7 +856,7 @@ void calcExtDisplayPosition(hwc_context_t *ctx,
                                ovutils::eTransform& orient) {
     // Swap width and height when there is a 90deg transform
     int extOrient = getExtOrientation(ctx);
-    if ((dpy || ctx->mHDMIDisplay->isHDMIPrimaryDisplay())
+    if ((dpy || isPrimaryPluggable(ctx))
             && ctx->mOverlay->isUIScalingOnExternalSupported()) {
         if(!isYuvBuffer(hnd)) {
             if(extOrient & HWC_TRANSFORM_ROT_90) {
@@ -1379,8 +1381,7 @@ bool isActionSafePresent(hwc_context_t *ctx, int dpy) {
     // Disable Action safe for 8974 due to HW limitation for downscaling
     // layers with overlapped region
     // Disable Actionsafe for non HDMI displays.
-    if (!(dpy == HWC_DISPLAY_EXTERNAL ||
-                ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) ||
+    if (!(dpy == HWC_DISPLAY_EXTERNAL || isPrimaryPluggable(ctx)) ||
             qdutils::MDPVersion::getInstance().is8x74v2() ||
         ctx->mHDMIDisplay->isCEUnderscanSupported()) {
         return false;
@@ -3022,18 +3023,34 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
 
    /* Align to minimum width recommended by the panel */
    if((t_roi.right - t_roi.left) < MIN_WIDTH) {
-       if((t_roi.left + MIN_WIDTH) > boundary.right)
-           t_roi.left = t_roi.right - MIN_WIDTH;
-       else
+       t_roi.left = t_roi.left - MIN_WIDTH / 2 +
+           (t_roi.right - t_roi.left) / 2;
+       t_roi.right = t_roi.right + MIN_WIDTH / 2 -
+           (t_roi.right - t_roi.left) / 2;
+
+       if(t_roi.left < boundary.left) {
+           t_roi.left = boundary.left;
            t_roi.right = t_roi.left + MIN_WIDTH;
+       } else if(t_roi.right > boundary.right) {
+           t_roi.right = boundary.right;
+           t_roi.left = t_roi.right - MIN_WIDTH;
+       }
    }
 
   /* Align to minimum height recommended by the panel */
    if((t_roi.bottom - t_roi.top) < MIN_HEIGHT) {
-       if((t_roi.top + MIN_HEIGHT) > boundary.bottom)
-           t_roi.top = t_roi.bottom - MIN_HEIGHT;
-       else
+       t_roi.top = t_roi.top - MIN_HEIGHT / 2 +
+           (t_roi.bottom - t_roi.top) / 2;
+       t_roi.bottom = t_roi.bottom + MIN_HEIGHT / 2 -
+           (t_roi.bottom - t_roi.top) / 2;
+
+       if(t_roi.top < boundary.top) {
+           t_roi.top = boundary.top;
            t_roi.bottom = t_roi.top + MIN_HEIGHT;
+       } else if(t_roi.bottom > boundary.bottom) {
+           t_roi.bottom = boundary.bottom;
+           t_roi.top = t_roi.bottom - MIN_HEIGHT;
+       }
    }
 
    /* Align left and width to meet panel restrictions */
@@ -3167,7 +3184,7 @@ void handle_offline(hwc_context_t* ctx, int dpy) {
     // that all the fd's are closed. This will ensure that the HDMI
     // core turns off and that we receive an event the next time the
     // cable is connected.
-    if (ctx->mHDMIDisplay->isHDMIPrimaryDisplay()) {
+    if (isPrimaryPluggable(ctx)) {
         clearPipeResources(ctx, dpy);
     }
     ctx->mHDMIDisplay->teardown();
@@ -3209,7 +3226,7 @@ void setup3DMode(hwc_context_t *ctx, int dpy, int s3dMode) {
 bool displaySupports3D(hwc_context_t* ctx, int dpy) {
     return ((dpy == HWC_DISPLAY_EXTERNAL) ||
             ((dpy == HWC_DISPLAY_PRIMARY) &&
-             ctx->mHDMIDisplay->isHDMIPrimaryDisplay()));
+             isPrimaryPluggable(ctx)));
 }
 
 
