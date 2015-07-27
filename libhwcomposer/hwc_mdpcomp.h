@@ -119,7 +119,6 @@ protected:
     /* cached data */
     struct LayerCache {
         int layerCount;
-        buffer_handle_t hnd[MAX_NUM_APP_LAYERS];
         bool isFBComposed[MAX_NUM_APP_LAYERS];
         bool drop[MAX_NUM_APP_LAYERS];
 
@@ -127,7 +126,6 @@ protected:
         LayerCache();
         /* clear caching info*/
         void reset();
-        void cacheAll(hwc_display_contents_1_t* list);
         void updateCounts(const FrameInfo&);
         bool isSameFrame(const FrameInfo& curFrame,
                          hwc_display_contents_1_t* list);
@@ -150,6 +148,9 @@ protected:
     /* configures 4kx2k yuv layer*/
     virtual int configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
             PipeLayerPair& PipeLayerPair) = 0;
+    /* Calculates the dirtyRegion for the given layer */
+    hwc_rect_t calculateDirtyRect(const hwc_layer_1_t* layer,
+            hwc_rect_t& scissor);
     /* set/reset flags for MDPComp */
     void setMDPCompLayerFlags(hwc_context_t *ctx,
                               hwc_display_contents_1_t* list);

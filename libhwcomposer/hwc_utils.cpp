@@ -1166,6 +1166,12 @@ bool isValidRect(const hwc_rect& rect)
    return ((rect.bottom > rect.top) && (rect.right > rect.left)) ;
 }
 
+bool layerUpdating(const hwc_layer_1_t* layer) {
+     hwc_region_t surfDamage = layer->surfaceDamage;
+     return ((surfDamage.numRects == 0) ||
+              isValidRect(layer->surfaceDamage.rects[0]));
+}
+
 hwc_rect_t moveRect(const hwc_rect_t& rect, const int& x_off, const int& y_off)
 {
     hwc_rect_t res;
