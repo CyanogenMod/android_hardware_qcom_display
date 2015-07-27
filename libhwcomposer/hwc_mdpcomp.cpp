@@ -318,17 +318,9 @@ MDPComp::LayerCache::LayerCache() {
 }
 
 void MDPComp::LayerCache::reset() {
-    memset(&hnd, 0, sizeof(hnd));
     memset(&isFBComposed, true, sizeof(isFBComposed));
     memset(&drop, false, sizeof(drop));
     layerCount = 0;
-}
-
-void MDPComp::LayerCache::cacheAll(hwc_display_contents_1_t* list) {
-    const int numAppLayers = (int)list->numHwLayers - 1;
-    for(int i = 0; i < numAppLayers; i++) {
-        hnd[i] = list->hwLayers[i].handle;
-    }
 }
 
 void MDPComp::LayerCache::updateCounts(const FrameInfo& curFrame) {
@@ -346,8 +338,8 @@ bool MDPComp::LayerCache::isSameFrame(const FrameInfo& curFrame,
                 (curFrame.drop[i] != drop[i])) {
             return false;
         }
-        if(curFrame.isFBComposed[i] &&
-           (hnd[i] != list->hwLayers[i].handle)){
+        hwc_layer_1_t const* layer = &list->hwLayers[i];
+        if(curFrame.isFBComposed[i] && layerUpdating(layer)) {
             return false;
         }
     }
@@ -497,6 +489,32 @@ void MDPCompNonSplit::trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect) {
     fbRect = getIntersection(fbRect, roi);
 }
 
+hwc_rect_t MDPComp::calculateDirtyRect(const hwc_layer_1_t* layer,
+                                       hwc_rect_t& scissor) {
+    hwc_region_t surfDamage = layer->surfaceDamage;
+    hwc_rect_t src = integerizeSourceCrop(layer->sourceCropf);
+    hwc_rect_t dst = layer->displayFrame;
+    int x_off = dst.left - src.left;
+    int y_off = dst.top - src.top;
+    hwc_rect dirtyRect = (hwc_rect){0, 0, 0, 0};
+    hwc_rect_t updatingRect = dst;
+
+    if (surfDamage.numRects == 0) {
+      // full layer updating, dirty rect is full frame
+        dirtyRect = getIntersection(layer->displayFrame, scissor);
+    } else {
+        for(uint32_t i = 0; i < surfDamage.numRects; i++) {
+            updatingRect = moveRect(surfDamage.rects[i], x_off, y_off);
+            hwc_rect_t intersect = getIntersection(updatingRect, scissor);
+            if(isValidRect(intersect)) {
+               dirtyRect = getUnion(intersect, dirtyRect);
+            }
+        }
+     }
+     return dirtyRect;
+}
+
+
 /* 1) Identify layers that are not visible or lying outside the updating ROI and
  *    drop them from composition.
  * 2) If we have a scaling layer which needs cropping against generated
@@ -554,23 +572,16 @@ void MDPCompNonSplit::generateROI(hwc_context_t *ctx,
 
     for(int index = 0; index < numAppLayers; index++ ) {
         hwc_layer_1_t* layer = &list->hwLayers[index];
-        if ((mCachedFrame.hnd[index] != layer->handle) ||
+        if (layerUpdating(layer) ||
                 isYuvBuffer((private_handle_t *)layer->handle)) {
-            hwc_rect_t dst = layer->displayFrame;
-            hwc_rect_t updatingRect = dst;
-
-#ifdef QCOM_BSP
+            hwc_rect_t dirtyRect = (struct hwc_rect){0, 0, 0, 0};;
             if(!needsScaling(layer) && !layer->transform &&
                    (!isYuvBuffer((private_handle_t *)layer->handle)))
             {
-                hwc_rect_t src = integerizeSourceCrop(layer->sourceCropf);
-                int x_off = dst.left - src.left;
-                int y_off = dst.top - src.top;
-                updatingRect = moveRect(layer->dirtyRect, x_off, y_off);
+                dirtyRect = calculateDirtyRect(layer, fullFrame);
             }
-#endif
 
-            roi = getUnion(roi, updatingRect);
+            roi = getUnion(roi, dirtyRect);
         }
     }
 
@@ -671,28 +682,19 @@ void MDPCompSplit::generateROI(hwc_context_t *ctx,
     for(int index = 0; index < numAppLayers; index++ ) {
         hwc_layer_1_t* layer = &list->hwLayers[index];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-        if ((mCachedFrame.hnd[index] != layer->handle) ||
-                isYuvBuffer(hnd)) {
-            hwc_rect_t dst = layer->displayFrame;
-            hwc_rect_t updatingRect = dst;
-
-#ifdef QCOM_BSP
+        if (layerUpdating(layer) || isYuvBuffer(hnd)) {
+            hwc_rect_t l_dirtyRect = (struct hwc_rect){0, 0, 0, 0};
+            hwc_rect_t r_dirtyRect = (struct hwc_rect){0, 0, 0, 0};
             if(!needsScaling(layer) && !layer->transform)
             {
-                hwc_rect_t src = integerizeSourceCrop(layer->sourceCropf);
-                int x_off = dst.left - src.left;
-                int y_off = dst.top - src.top;
-                updatingRect = moveRect(layer->dirtyRect, x_off, y_off);
+                l_dirtyRect = calculateDirtyRect(layer, l_frame);
+                r_dirtyRect = calculateDirtyRect(layer, r_frame);
             }
-#endif
+            if(isValidRect(l_dirtyRect))
+                l_roi = getUnion(l_roi, l_dirtyRect);
 
-            hwc_rect_t l_dst  = getIntersection(l_frame, updatingRect);
-            if(isValidRect(l_dst))
-                l_roi = getUnion(l_roi, l_dst);
-
-            hwc_rect_t r_dst  = getIntersection(r_frame, updatingRect);
-            if(isValidRect(r_dst))
-                r_roi = getUnion(r_roi, r_dst);
+            if(isValidRect(r_dirtyRect))
+                r_roi = getUnion(r_roi, r_dirtyRect);
         }
     }
 
@@ -1646,7 +1648,8 @@ void MDPComp::updateLayerCache(hwc_context_t* ctx,
     int fbCount = 0;
 
     for(int i = 0; i < numAppLayers; i++) {
-        if (mCachedFrame.hnd[i] == list->hwLayers[i].handle) {
+        hwc_layer_1_t * layer = &list->hwLayers[i];
+        if (!layerUpdating(layer)) {
             if(!frame.drop[i])
                 fbCount++;
             frame.isFBComposed[i] = true;
@@ -2039,7 +2042,6 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     setDynRefreshRate(ctx, list);
 #endif
 
-    mCachedFrame.cacheAll(list);
     mCachedFrame.updateCounts(mCurrentFrame);
     return ret;
 }
