@@ -182,7 +182,7 @@ bool CopyBit::prepareSwapRect(hwc_context_t *ctx,
    hwc_rect_t dirtyRect = {0, 0, 0, 0};
    hwc_rect_t displayRect = {0, 0, 0, 0};
    if((mLayerCache.layerCount != ctx->listStats[dpy].numAppLayers) ||
-                                                        not mSwapRectEnable) {
+         list->flags & HWC_GEOMETRY_CHANGED || not mSwapRectEnable) {
         mLayerCache.reset();
         mFbCache.reset();
         mLayerCache.updateCounts(ctx,list,dpy);
@@ -197,7 +197,9 @@ bool CopyBit::prepareSwapRect(hwc_context_t *ctx,
            updatingLayerCount ++;
            hwc_layer_1_t layer = list->hwLayers[k];
            canUseSwapRect = 1;
+#ifdef QCOM_BSP
            dirtyRect = getUnion(dirtyRect, layer.dirtyRect);
+#endif
            displayRect = getUnion(displayRect, layer.displayFrame);
        }
     }
@@ -560,6 +562,7 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     }
 
     if(drawUsingAppBufferComposition(ctx, list, dpy, fd)) {
+       mFbCache.reset();
        return true;
     }
     //render buffer
@@ -589,9 +592,14 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         }
     }
 
-    if (not CBUtils::uiClearRegion(list, ctx->mMDP.version, layerProp,
-                                   mDirtyRect, mEngine, renderBuffer)){
-        mSwapRect = 0;
+    //if swap rect on and not getting valid dirtyRect
+    //means calling only commit without any draw. Hence avoid
+    //clear call as well.
+    if (not mSwapRect || isValidRect(mDirtyRect)) {
+       if (not CBUtils::uiClearRegion(list, ctx->mMDP.version, layerProp,
+                                      mDirtyRect, mEngine, renderBuffer)){
+           mSwapRect = 0;
+       }
     }
 
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
