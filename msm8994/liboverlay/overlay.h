@@ -123,11 +123,10 @@ public:
      */
     bool isPipeTypeAttached(utils::eMdpPipeType type);
     /* Compare pipe priorities and return
-     * 1 if 1st pipe has a higher priority
-     * 0 if both have the same priority
-     *-1 if 2nd pipe has a higher priority
+     * true - A swap is needed to fix the priority.
+     * false - Good, priority wise.
      */
-    int comparePipePriority(utils::eDest pipe1Index, utils::eDest pipe2Index);
+    bool needsPrioritySwap(utils::eDest pipe1Index, utils::eDest pipe2Index);
     /* Returns pipe dump. Expects a NULL terminated buffer of big enough size
      * to populate.
      */
@@ -229,6 +228,9 @@ private:
 
         static int NUM_PIPES;
         static utils::eMdpPipeType pipeTypeLUT[utils::OV_MAX];
+        static int pipeMinID[utils::OV_MDP_PIPE_ANY];
+        static int pipeMaxID[utils::OV_MDP_PIPE_ANY];
+
         /* Session for reserved pipes */
         enum Session {
             NONE,
