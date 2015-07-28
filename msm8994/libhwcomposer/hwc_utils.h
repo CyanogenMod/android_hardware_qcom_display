@@ -352,6 +352,9 @@ const char* getExternalDisplayState(uint32_t external_state);
 // Resets display ROI to full panel resoluion
 void resetROI(hwc_context_t *ctx, const int dpy);
 
+// Modifies ROI even from middle of the screen
+hwc_rect expandROIFromMidPoint(hwc_rect roi, hwc_rect fullFrame);
+
 // Aligns updating ROI to panel restrictions
 hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary);
 
