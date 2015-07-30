@@ -231,11 +231,13 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
 
   hwc_session->HandleSecureDisplaySession(displays);
 
-  HWCDisplay *&primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
-  if (primary_display) {
-    int ret = hwc_session->color_mgr_->SolidFillLayersPrepare(displays, primary_display);
-    if (ret)
-      return 0;
+  if (hwc_session->color_mgr_) {
+    HWCDisplay *primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
+    if (primary_display) {
+      int ret = hwc_session->color_mgr_->SolidFillLayersPrepare(displays, primary_display);
+      if (ret)
+        return 0;
+    }
   }
 
   for (ssize_t dpy = static_cast<ssize_t>(num_displays - 1); dpy >= 0; dpy--) {
@@ -268,11 +270,13 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
 
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
 
-  HWCDisplay *&primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
-  if (primary_display) {
-    int ret = hwc_session->color_mgr_->SolidFillLayersSet(displays, primary_display);
-    if (ret)
-      return 0;
+  if (hwc_session->color_mgr_) {
+    HWCDisplay *primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
+    if (primary_display) {
+      int ret = hwc_session->color_mgr_->SolidFillLayersSet(displays, primary_display);
+      if (ret)
+        return 0;
+    }
   }
 
   for (size_t dpy = 0; dpy < num_displays; dpy++) {
@@ -812,6 +816,10 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel *input_parcel
   PPPendingParams pending_action;
   PPDisplayAPIPayload resp_payload, req_payload;
 
+  if (!color_mgr_) {
+    return -1;
+  }
+
   // Read display_id, payload_size and payload from in_parcel.
   ret = HWCColorManager::CreatePayloadFromParcel(*input_parcel, &display_id, &req_payload);
   if (!ret) {
@@ -843,12 +851,12 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel *input_parcel
       break;
     case kApplySolidFill:
       ret = color_mgr_->SetSolidFill(pending_action.params,
-                                        true, hwc_display_[HWC_DISPLAY_PRIMARY]);
+                                     true, hwc_display_[HWC_DISPLAY_PRIMARY]);
       hwc_procs_->invalidate(hwc_procs_);
       break;
     case kDisableSolidFill:
       ret = color_mgr_->SetSolidFill(pending_action.params,
-                                        false, hwc_display_[HWC_DISPLAY_PRIMARY]);
+                                     false, hwc_display_[HWC_DISPLAY_PRIMARY]);
       hwc_procs_->invalidate(hwc_procs_);
       break;
     case kSetPanelBrightness:

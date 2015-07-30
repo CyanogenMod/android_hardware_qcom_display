@@ -69,13 +69,12 @@ class HWCQDCMModeManager {
   };
 
   struct ActiveFeatureCMD {
-    const char *cmd_on;
-    const char *cmd_off;
-    const char *cmd_query_status;
-    const char *running;
+    const char *cmd_on = NULL;
+    const char *cmd_off = NULL;
+    const char *cmd_query_status = NULL;
+    const char *running = NULL;
     ActiveFeatureCMD(const char *arg1, const char *arg2, const char *arg3, const char *arg4)
         : cmd_on(arg1), cmd_off(arg2), cmd_query_status(arg3), running(arg4) {}
-    ActiveFeatureCMD() : cmd_on(NULL), cmd_off(NULL), cmd_query_status(NULL), running(NULL) {}
   };
 
   static const ActiveFeatureCMD kActiveFeatureCMD[kMaxNumActiveFeature];
@@ -86,19 +85,17 @@ class HWCQDCMModeManager {
   int EnableQDCMMode(bool enable, HWCDisplay *hwc_display);
 
  protected:
-  HWCQDCMModeManager() : cabl_was_running_(false), socket_fd_(-1), wakelock_token_(NULL),
-        power_mgr_(NULL), entry_timeout_(0) {}
   bool SendSocketCmd();
   int AcquireAndroidWakeLock(bool enable);
   int EnableActiveFeatures(bool enable);
   int EnableActiveFeatures(bool enable, const ActiveFeatureCMD &cmds, bool *was_running);
 
  private:
-  bool cabl_was_running_;
-  int socket_fd_;
-  android::sp<android::IBinder> wakelock_token_;
-  android::sp<android::IPowerManager> power_mgr_;
-  uint32_t entry_timeout_;
+  bool cabl_was_running_ = false;
+  int socket_fd_ = -1;
+  android::sp<android::IBinder> wakelock_token_ = NULL;
+  android::sp<android::IPowerManager> power_mgr_ = NULL;
+  uint32_t entry_timeout_ = 0;
   static const char *const kSocketName;
   static const char *const kTagName;
   static const char *const kPackageName;
@@ -122,22 +119,21 @@ class HWCColorManager {
   bool SolidFillLayersSet(hwc_display_contents_1_t **displays, HWCDisplay *hwc_display);
 
  protected:
-  HWCColorManager() : color_apis_lib_(NULL), diag_client_lib_(NULL), color_apis_(NULL),
-        qdcm_mode_mgr_(NULL), solid_fill_enable_(false), solid_fill_layers_(NULL) {}
   int CreateSolidFillLayers(HWCDisplay *hwc_display);
   void DestroySolidFillLayers();
   static uint32_t Get8BitsARGBColorValue(const PPColorFillParams &params);
 
  private:
-  void *color_apis_lib_, *diag_client_lib_;
-  void *color_apis_;
-  QDCMDiagInit qdcm_diag_init_;
-  QDCMDiagDeInit qdcm_diag_deinit_;
-  HWCQDCMModeManager *qdcm_mode_mgr_;
+  void *color_apis_lib_ = NULL;
+  void *diag_client_lib_ = NULL;
+  void *color_apis_ = NULL;
+  QDCMDiagInit qdcm_diag_init_ = NULL;
+  QDCMDiagDeInit qdcm_diag_deinit_ = NULL;
+  HWCQDCMModeManager *qdcm_mode_mgr_ = NULL;
 
-  bool solid_fill_enable_;
+  bool solid_fill_enable_ = false;
   PPColorFillParams solid_fill_params_;
-  hwc_display_contents_1_t *solid_fill_layers_;
+  hwc_display_contents_1_t *solid_fill_layers_ = NULL;
   Locker locker_;
 };
 
