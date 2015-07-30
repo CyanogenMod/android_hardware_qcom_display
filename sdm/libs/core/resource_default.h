@@ -35,7 +35,6 @@ namespace sdm {
 
 class ResourceDefault : public ResourceInterface {
  public:
-  ResourceDefault();
   DisplayError Init(const HWResourceInfo &hw_resource_info);
   DisplayError Deinit();
   virtual DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
@@ -147,10 +146,10 @@ class ResourceDefault : public ResourceInterface {
   HWResourceInfo hw_res_info_;
   HWBlockContext hw_block_ctx_[kHWBlockMax];
   SourcePipe src_pipes_[kPipeIdMax];
-  uint32_t num_pipe_;
-  SourcePipe *vig_pipes_;
-  SourcePipe *rgb_pipes_;
-  SourcePipe *dma_pipes_;
+  uint32_t num_pipe_ = 0;
+  SourcePipe *vig_pipes_ = NULL;
+  SourcePipe *rgb_pipes_ = NULL;
+  SourcePipe *dma_pipes_ = NULL;
 };
 
 }  // namespace sdm

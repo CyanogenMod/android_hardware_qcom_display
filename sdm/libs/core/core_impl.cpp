@@ -40,9 +40,7 @@ namespace sdm {
 
 CoreImpl::CoreImpl(BufferAllocator *buffer_allocator,
                    BufferSyncHandler *buffer_sync_handler)
-  : buffer_allocator_(buffer_allocator), buffer_sync_handler_(buffer_sync_handler),
-    hw_resource_(NULL), hw_info_intf_(NULL), rotator_intf_(NULL), extension_lib_(NULL),
-    extension_intf_(NULL), create_extension_intf_(NULL), destroy_extension_intf_(NULL) {
+  : buffer_allocator_(buffer_allocator), buffer_sync_handler_(buffer_sync_handler) {
 }
 
 DisplayError CoreImpl::Init() {

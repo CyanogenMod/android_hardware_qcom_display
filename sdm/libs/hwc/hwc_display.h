@@ -152,28 +152,28 @@ class HWCDisplay : public DisplayEventHandler {
   DisplayType type_;
   int id_;
   bool needs_blit_;
-  DisplayInterface *display_intf_;
+  DisplayInterface *display_intf_ = NULL;
   LayerStackMemory layer_stack_memory_;
   LayerStack layer_stack_;
   LayerStackCache layer_stack_cache_;
-  bool flush_;
-  uint32_t dump_frame_count_;
-  uint32_t dump_frame_index_;
-  bool dump_input_layers_;
+  bool flush_ = false;
+  uint32_t dump_frame_count_ = 0;
+  uint32_t dump_frame_index_ = 0;
+  bool dump_input_layers_ = false;
   uint32_t last_power_mode_;
-  bool swap_interval_zero_;
-  DisplayConfigVariableInfo *framebuffer_config_;
-  bool display_paused_;
-  bool use_metadata_refresh_rate_;
-  uint32_t metadata_refresh_rate_;
-  bool boot_animation_completed_;
-  bool shutdown_pending_;
-  bool handle_refresh_;
-  bool use_blit_comp_;
-  bool secure_display_active_;
-  bool skip_prepare_;
+  bool swap_interval_zero_ = false;
+  DisplayConfigVariableInfo *framebuffer_config_ = NULL;
+  bool display_paused_ = false;
+  bool use_metadata_refresh_rate_ = false;
+  uint32_t metadata_refresh_rate_ = 0;
+  bool boot_animation_completed_ = false;
+  bool shutdown_pending_ = false;
+  bool handle_refresh_ = true;
+  bool use_blit_comp_ = false;
+  bool secure_display_active_ = false;
+  bool skip_prepare_ = false;
 
-  bool solid_fill_enable_;
+  bool solid_fill_enable_ = false;
   uint32_t solid_fill_color_;
 
  private:
@@ -182,7 +182,7 @@ class HWCDisplay : public DisplayEventHandler {
   int PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint32_t fps);
   void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
   void ResetLayerCacheStack();
-  BlitEngine *blit_engine_;
+  BlitEngine *blit_engine_ = NULL;
 };
 
 inline int HWCDisplay::Perform(uint32_t operation, ...) {

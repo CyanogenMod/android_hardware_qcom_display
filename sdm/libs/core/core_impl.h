@@ -44,7 +44,6 @@ class CoreImpl : public CoreInterface {
  public:
   // This class implements display core interface revision 1.0.
   static const uint16_t kRevision = SET_REVISION(1, 0);
-
   CoreImpl(BufferAllocator *buffer_allocator, BufferSyncHandler *buffer_sync_handler);
   virtual ~CoreImpl() { }
 
@@ -63,14 +62,14 @@ class CoreImpl : public CoreInterface {
   Locker locker_;
   BufferAllocator *buffer_allocator_;
   BufferSyncHandler *buffer_sync_handler_;
-  HWResourceInfo *hw_resource_;
+  HWResourceInfo *hw_resource_ = NULL;
   CompManager comp_mgr_;
-  HWInfoInterface *hw_info_intf_;
-  RotatorInterface *rotator_intf_;
-  void *extension_lib_;
-  ExtensionInterface *extension_intf_;
-  CreateExtensionInterface create_extension_intf_;
-  DestroyExtensionInterface destroy_extension_intf_;
+  HWInfoInterface *hw_info_intf_ = NULL;
+  RotatorInterface *rotator_intf_ = NULL;
+  void *extension_lib_ = NULL;
+  ExtensionInterface *extension_intf_ = NULL;
+  CreateExtensionInterface create_extension_intf_ = NULL;
+  DestroyExtensionInterface destroy_extension_intf_ = NULL;
 };
 
 }  // namespace sdm

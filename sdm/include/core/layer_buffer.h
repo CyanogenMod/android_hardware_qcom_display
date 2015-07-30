@@ -123,11 +123,9 @@ enum LayerBufferFormat {
   @sa LayerBuffer
 */
 struct LayerBufferPlane {
-  int fd;           //!< File descriptor referring to the buffer associated with this plane.
-  uint32_t offset;  //!< Offset of the plane in bytes from beginning of the buffer.
-  uint32_t stride;  //!< Stride in bytes i.e. length of a scanline including padding.
-
-  LayerBufferPlane() : fd(-1), offset(0), stride(0) { }
+  int fd = -1;           //!< File descriptor referring to the buffer associated with this plane.
+  uint32_t offset = 0;   //!< Offset of the plane in bytes from beginning of the buffer.
+  uint32_t stride = 0;   //!< Stride in bytes i.e. length of a scanline including padding.
 };
 
 /*! @brief This structure defines flags associated with a layer buffer. The 1-bit flag can be set
@@ -156,10 +154,9 @@ struct LayerBufferFlags {
                                     //!< session can not coexist with non-secure session.
       };
 
-      uint32_t flags;   //!< For initialization purpose only. Client shall not refer it directly.
+      uint32_t flags = 0;           //!< For initialization purpose only.
+                                    //!< Client shall not refer to it directly.
   };
-
-  LayerBufferFlags() : flags(0) { }
 };
 
 /*! @brief This structure defines a layer buffer handle which contains raw buffer and its associated
@@ -169,15 +166,15 @@ struct LayerBufferFlags {
   @sa LayerStack
 */
 struct LayerBuffer {
-  uint32_t width;               //!< Actual width of the Layer that this buffer is for.
-  uint32_t height;              //!< Actual height of the Layer that this buffer is for.
-  LayerBufferFormat format;     //!< Format of the buffer content.
+  uint32_t width = 0;           //!< Actual width of the Layer that this buffer is for.
+  uint32_t height = 0;          //!< Actual height of the Layer that this buffer is for.
+  LayerBufferFormat format = kFormatRGBA8888;     //!< Format of the buffer content.
   LayerBufferPlane planes[4];   //!< Array of planes that this buffer contains. RGB buffer formats
                                 //!< have 1 plane whereas YUV buffer formats may have upto 4 planes.
                                 //!< Total number of planes for the buffer will be interpreted based
                                 //!< on the buffer format specified.
 
-  int acquire_fence_fd;         //!< File descriptor referring to a sync fence object which will be
+  int acquire_fence_fd = -1;    //!< File descriptor referring to a sync fence object which will be
                                 //!< signaled when buffer can be read/write by display manager.
                                 //!< This fence object is set by the client during Commit(). For
                                 //!< input buffers client shall signal this fence when buffer
@@ -188,7 +185,7 @@ struct LayerBuffer {
                                 //!< This field is used only during Commit() and shall be set to -1
                                 //!< by the client when buffer is already available for read/write.
 
-  int release_fence_fd;         //!< File descriptor referring to a sync fence object which will be
+  int release_fence_fd = -1;    //!< File descriptor referring to a sync fence object which will be
                                 //!< signaled when buffer has been read/written by display manager.
                                 //!< This fence object is set by display manager during Commit().
                                 //!< For input buffers display manager will signal this fence when
@@ -200,9 +197,6 @@ struct LayerBuffer {
                                 //!< read/write.
 
   LayerBufferFlags flags;       //!< Flags associated with this buffer.
-
-  LayerBuffer() : width(0), height(0), format(kFormatRGBA8888), acquire_fence_fd(-1),
-                  release_fence_fd(-1) { }
 };
 
 }  // namespace sdm

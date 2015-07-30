@@ -83,28 +83,28 @@ class DisplayBase : public DisplayInterface {
   const char *GetName(const LayerBufferFormat &format);
 
   DisplayType display_type_;
-  DisplayEventHandler *event_handler_;
+  DisplayEventHandler *event_handler_ = NULL;
   HWDeviceType hw_device_type_;
-  HWInterface *hw_intf_;
+  HWInterface *hw_intf_ = NULL;
   HWPanelInfo hw_panel_info_;
-  BufferSyncHandler *buffer_sync_handler_;
-  CompManager *comp_manager_;
-  RotatorInterface *rotator_intf_;
-  DisplayState state_;
-  Handle hw_device_;
-  Handle display_comp_ctx_;
-  Handle display_rotator_ctx_;
-  HWDisplayAttributes *display_attributes_;
-  uint32_t num_modes_;
-  uint32_t active_mode_index_;
+  BufferSyncHandler *buffer_sync_handler_ = NULL;
+  CompManager *comp_manager_ = NULL;
+  RotatorInterface *rotator_intf_ = NULL;
+  DisplayState state_ = kStateOff;
+  Handle hw_device_ = 0;
+  Handle display_comp_ctx_ = 0;
+  Handle display_rotator_ctx_ = 0;
+  HWDisplayAttributes *display_attributes_ = NULL;
+  uint32_t num_modes_ = 0;
+  uint32_t active_mode_index_ = 0;
   HWLayers hw_layers_;
-  bool pending_commit_;
-  bool vsync_enable_;
-  bool underscan_supported_;
-  uint32_t max_mixer_stages_;
-  HWInfoInterface *hw_info_intf_;
-  ColorManagerProxy *color_mgr_;  // each display object owns its ColorManagerProxy
-  bool partial_update_control_;
+  bool pending_commit_ = false;
+  bool vsync_enable_ = false;
+  bool underscan_supported_ = false;
+  uint32_t max_mixer_stages_ = 0;
+  HWInfoInterface *hw_info_intf_ = NULL;
+  ColorManagerProxy *color_mgr_ = NULL;  // each display object owns its ColorManagerProxy
+  bool partial_update_control_ = true;
 };
 
 }  // namespace sdm
