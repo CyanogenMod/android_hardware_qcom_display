@@ -74,6 +74,9 @@ class HWCDisplay : public DisplayEventHandler {
     kDisplayStatusResume,
   };
 
+  // Dim layer flag set by SurfaceFlinger service.
+  static const uint32_t kDimLayer = 0x8000;
+
   // Maximum number of layers supported by display manager.
   static const uint32_t kMaxLayerCount = 32;
 
@@ -88,17 +91,19 @@ class HWCDisplay : public DisplayEventHandler {
 
   struct LayerCache {
     buffer_handle_t handle;
+    uint8_t plane_alpha;
     LayerComposition composition;
 
-    LayerCache() : handle(NULL), composition(kCompositionGPU) { }
+    LayerCache() : handle(NULL), plane_alpha(0xff), composition(kCompositionGPU) { }
   };
 
   struct LayerStackCache {
     LayerCache layer_cache[kMaxLayerCount];
     uint32_t layer_count;
     bool animating;
+    bool in_use;
 
-    LayerStackCache() : layer_count(0), animating(false) { }
+    LayerStackCache() : layer_count(0), animating(false), in_use(false) { }
   };
 
   HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id,
@@ -112,7 +117,6 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PostCommitLayerStack(hwc_display_contents_1_t *content_list);
-  void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
   inline void SetRect(const hwc_rect_t &source, LayerRect *target);
   inline void SetRect(const hwc_frect_t &source, LayerRect *target);
   inline void SetComposition(const int32_t &source, LayerComposition *target);
@@ -130,9 +134,8 @@ class HWCDisplay : public DisplayEventHandler {
   DisplayError SetColorSpace(const ColorSpace_t source, LayerColorSpace *target);
   DisplayError SetMetaData(const MetaData_t &meta_data, Layer *layer);
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
-  bool IsFullFrameGPUComposed();
-  bool IsFullFrameSDEComposed();
-  bool IsFullFrameCached(hwc_display_contents_1_t *content_list);
+  void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
+  bool IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache);
 
   static void AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height, uint32_t *src_width,
                                      uint32_t *src_height);

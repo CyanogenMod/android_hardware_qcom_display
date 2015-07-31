@@ -515,9 +515,9 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
                          INT(l_roi.left), INT(l_roi.top), INT(l_roi.right), INT(l_roi.bottom),
                          INT(r_roi.left), INT(r_roi.top), INT(r_roi.right), INT(r_roi.bottom));
 
-  const char *header  = "\n| Idx |  Comp Type  |  Split | WB |  Pipe |    W x H    |       Format       |  Src Rect (L T R B) |  Dst Rect (L T R B) |  Z |    Flags   | Deci(HxV) |";  //NOLINT
-  const char *newline = "\n|-----|-------------|--------|----|-------|-------------|--------------------|---------------------|---------------------|----|------------|-----------|";  //NOLINT
-  const char *format  = "\n| %3s | %11s "     "| %6s " "| %2s | 0x%03x | %4d x %4d | %18s "            "| %4d %4d %4d %4d "  "| %4d %4d %4d %4d "  "| %2s | %10s "   "| %9s |";  //NOLINT
+  const char *header  = "\n| Idx |  Comp Type  |  Split | WB |  Pipe |    W x H    |          Format          |  Src Rect (L T R B) |  Dst Rect (L T R B) |  Z |    Flags   | Deci(HxV) |";  //NOLINT
+  const char *newline = "\n|-----|-------------|--------|----|-------|-------------|--------------------------|---------------------|---------------------|----|------------|-----------|";  //NOLINT
+  const char *format  = "\n| %3s | %11s "     "| %6s " "| %2s | 0x%03x | %4d x %4d | %24s "                  "| %4d %4d %4d %4d "  "| %4d %4d %4d %4d "  "| %2s | %10s "   "| %9s |";  //NOLINT
 
   DumpImpl::AppendString(buffer, length, "\n");
   DumpImpl::AppendString(buffer, length, newline);

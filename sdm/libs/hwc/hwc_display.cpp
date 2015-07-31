@@ -68,7 +68,7 @@ HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, 
     display_intf_(NULL), flush_(false), dump_frame_count_(0), dump_frame_index_(0),
     dump_input_layers_(false), swap_interval_zero_(false), framebuffer_config_(NULL),
     display_paused_(false), use_metadata_refresh_rate_(false), metadata_refresh_rate_(0),
-    boot_animation_completed_(false), shutdown_pending_(false), handle_refresh_(false),
+    boot_animation_completed_(false), shutdown_pending_(false), handle_refresh_(true),
     use_blit_comp_(false), secure_display_active_(false), skip_prepare_(false),
     solid_fill_enable_(false), blit_engine_(NULL) {
 }
@@ -215,19 +215,7 @@ int HWCDisplay::GetDisplayConfigs(uint32_t *configs, size_t *num_configs) {
 }
 
 int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values) {
-  DisplayError error = kErrorNone;
-
-  DisplayConfigVariableInfo variable_config;
-  uint32_t active_config = UINT32(GetActiveConfig());
-  if (IsFrameBufferScaled() && config == active_config) {
-    variable_config = *framebuffer_config_;
-  } else {
-    error = display_intf_->GetConfig(config, &variable_config);
-    if (error != kErrorNone) {
-      DLOGE("GetConfig variable info failed. Error = %d", error);
-      return -EINVAL;
-    }
-  }
+  DisplayConfigVariableInfo variable_config = *framebuffer_config_;
 
   for (int i = 0; attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
     switch (attributes[i]) {
@@ -259,36 +247,11 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
 }
 
 int HWCDisplay::GetActiveConfig() {
-  DisplayError error = kErrorNone;
-  uint32_t index = 0;
-
-  error = display_intf_->GetActiveConfig(&index);
-  if (error != kErrorNone) {
-    DLOGE("GetActiveConfig failed. Error = %d", error);
-    return -1;
-  }
-
-  return index;
+  return 0;
 }
 
 int HWCDisplay::SetActiveConfig(int index) {
-  DisplayError error = kErrorNone;
-
-  if (shutdown_pending_) {
-    return 0;
-  }
-
-  error = display_intf_->SetActiveConfig(index);
-  if (error != kErrorNone) {
-    if (error == kErrorShutDown) {
-      shutdown_pending_ = true;
-      return 0;
-    }
-    DLOGE("SetActiveConfig failed. Error = %d", error);
-    return -1;
-  }
-
-  return 0;
+  return -1;
 }
 
 void HWCDisplay::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type) {
@@ -308,20 +271,31 @@ uint32_t HWCDisplay::GetLastPowerMode() {
 }
 
 DisplayError HWCDisplay::VSync(const DisplayEventVSync &vsync) {
-  if (*hwc_procs_) {
-    (*hwc_procs_)->vsync(*hwc_procs_, id_, vsync.timestamp);
+  const hwc_procs_t *hwc_procs = *hwc_procs_;
+
+  if (!hwc_procs) {
+    return kErrorParameters;
   }
+
+  hwc_procs->vsync(hwc_procs, id_, vsync.timestamp);
 
   return kErrorNone;
 }
 
 DisplayError HWCDisplay::Refresh() {
-  if (*hwc_procs_ && handle_refresh_) {
-    (*hwc_procs_)->invalidate(*hwc_procs_);
-    return kErrorNone;
+  const hwc_procs_t *hwc_procs = *hwc_procs_;
+
+  if (!hwc_procs) {
+    return kErrorParameters;
   }
 
-  return kErrorNotSupported;
+  if (!handle_refresh_) {
+    return kErrorNotSupported;
+  }
+
+  hwc_procs->invalidate(hwc_procs);
+
+  return kErrorNone;
 }
 
 int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
@@ -557,20 +531,50 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     }
     SetRect(hwc_layer.dirtyRect, &layer.dirty_regions.rect[0]);
     SetComposition(hwc_layer.compositionType, &layer.composition);
-    SetBlending(hwc_layer.blending, &layer.blending);
+
+    // For dim layers, SurfaceFlinger
+    //    - converts planeAlpha to per pixel alpha,
+    //    - sets RGB color to 000,
+    //    - sets planeAlpha to 0xff,
+    //    - blending to Premultiplied.
+    // This can be achieved at hardware by
+    //    - solid fill ARGB to 0xff000000,
+    //    - incoming planeAlpha,
+    //    - blending to Coverage.
+    if (hwc_layer.flags & kDimLayer) {
+      layer.input_buffer->format = kFormatARGB8888;
+      layer.flags.solid_fill = true;
+      layer.solid_fill_color = 0xff000000;
+      SetBlending(HWC_BLENDING_COVERAGE, &layer.blending);
+    } else {
+      SetBlending(hwc_layer.blending, &layer.blending);
+    }
+
+    // TODO(user): Remove below block.
+    // For solid fill, only dest rect need to be specified.
+    if (layer.flags.solid_fill) {
+      LayerBuffer *input_buffer = layer.input_buffer;
+      input_buffer->width = layer.dst_rect.right - layer.dst_rect.left;
+      input_buffer->height = layer.dst_rect.bottom - layer.dst_rect.top;
+      layer.src_rect.left = 0;
+      layer.src_rect.top = 0;
+      layer.src_rect.right = input_buffer->width;
+      layer.src_rect.bottom = input_buffer->height;
+      layer.dirty_regions.rect[0] = layer.src_rect;
+    }
 
     LayerTransform &layer_transform = layer.transform;
     uint32_t &hwc_transform = hwc_layer.transform;
+    layer.plane_alpha = hwc_layer.planeAlpha;
     layer_transform.flip_horizontal = ((hwc_transform & HWC_TRANSFORM_FLIP_H) > 0);
     layer_transform.flip_vertical = ((hwc_transform & HWC_TRANSFORM_FLIP_V) > 0);
     layer_transform.rotation = ((hwc_transform & HWC_TRANSFORM_ROT_90) ? 90.0f : 0.0f);
-
-    layer.plane_alpha = hwc_layer.planeAlpha;
     layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
     layer.flags.cursor = ((hwc_layer.flags & HWC_IS_CURSOR_LAYER) > 0);
     layer.flags.updating = true;
     if (num_hw_layers <= kMaxLayerCount) {
-      layer.flags.updating = (layer_stack_cache_.layer_cache[i].handle != hwc_layer.handle);
+      LayerCache layer_cache = layer_stack_cache_.layer_cache[i];
+      layer.flags.updating = IsLayerUpdating(hwc_layer, layer_cache);
     }
 
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
@@ -624,9 +628,14 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     flush_ = true;
   }
 
-  bool needs_fb_refresh = NeedsFrameBufferRefresh(content_list);
-
   metadata_refresh_rate_ = 0;
+
+  // If current draw cycle has different set of layers updating in comparison to previous cycle,
+  // cache content using GPU again.
+  // If set of updating layers remains same, use cached buffer and replace layers marked for GPU
+  // composition with SDE so that SurfaceFlinger does not compose them. Set cache inuse here.
+  bool needs_fb_refresh = NeedsFrameBufferRefresh(content_list);
+  layer_stack_cache_.in_use = false;
 
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
@@ -642,17 +651,15 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       }
     }
 
-    // If current layer does not need frame buffer redraw, then mark it as HWC_OVERLAY
-    if (!needs_fb_refresh && (composition != kCompositionGPUTarget &&
-                              composition != kCompositionHWCursor)) {
+    if (!needs_fb_refresh && composition == kCompositionGPU) {
       composition = kCompositionSDE;
+      layer_stack_cache_.in_use = true;
     }
     SetComposition(composition, &hwc_layer.compositionType);
   }
 
-  // Cache the current layer stack information like layer_count, composition type and layer handle
-  // for the future.
   CacheLayerStackInfo(content_list);
+
   return 0;
 }
 
@@ -805,12 +812,17 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
       return true;
     }
 
-    if ((layer.composition == kCompositionGPU) && (layer_cache.handle != hwc_layer.handle)) {
+    if ((layer.composition == kCompositionGPU) && IsLayerUpdating(hwc_layer, layer_cache)) {
       return true;
     }
   }
 
   return false;
+}
+
+bool HWCDisplay::IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache) {
+  return ((layer_cache.handle != hwc_layer.handle) ||
+          (layer_cache.plane_alpha != hwc_layer.planeAlpha));
 }
 
 void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
@@ -823,14 +835,15 @@ void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
 
   for (uint32_t i = 0; i < layer_count; i++) {
     Layer &layer = layer_stack_.layers[i];
-
     if (layer.composition == kCompositionGPUTarget ||
         layer.composition == kCompositionBlitTarget) {
       continue;
     }
 
-    layer_stack_cache_.layer_cache[i].handle = content_list->hwLayers[i].handle;
-    layer_stack_cache_.layer_cache[i].composition = layer.composition;
+    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
+    layer_cache.handle = content_list->hwLayers[i].handle;
+    layer_cache.plane_alpha = content_list->hwLayers[i].planeAlpha;
+    layer_cache.composition = layer.composition;
   }
 
   layer_stack_cache_.layer_count = layer_count;
@@ -1068,7 +1081,8 @@ int HWCDisplay::SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels) {
   }
 
   DisplayConfigVariableInfo active_config;
-  int active_config_index = GetActiveConfig();
+  uint32_t active_config_index = 0;
+  display_intf_->GetActiveConfig(&active_config_index);
   DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
   if (error != kErrorNone) {
     DLOGV("GetConfig variable info failed. Error = %d", error);
@@ -1091,17 +1105,11 @@ int HWCDisplay::SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels) {
     return -EINVAL;
   }
 
-  uint32_t panel_width =
-          UINT32((FLOAT(active_config.x_pixels) * 25.4f) / FLOAT(active_config.x_dpi));
-  uint32_t panel_height =
-          UINT32((FLOAT(active_config.y_pixels) * 25.4f) / FLOAT(active_config.y_dpi));
   framebuffer_config_->x_pixels = x_pixels;
   framebuffer_config_->y_pixels = y_pixels;
   framebuffer_config_->vsync_period_ns = active_config.vsync_period_ns;
-  framebuffer_config_->x_dpi =
-          (FLOAT(framebuffer_config_->x_pixels) * 25.4f) / FLOAT(panel_width);
-  framebuffer_config_->y_dpi =
-          (FLOAT(framebuffer_config_->y_pixels) * 25.4f) / FLOAT(panel_height);
+  framebuffer_config_->x_dpi = active_config.x_dpi;
+  framebuffer_config_->y_dpi = active_config.y_dpi;
 
   DLOGI("New framebuffer resolution (%dx%d)", framebuffer_config_->x_pixels,
         framebuffer_config_->y_pixels);
@@ -1119,7 +1127,8 @@ void HWCDisplay::ScaleDisplayFrame(hwc_rect_t *display_frame) {
     return;
   }
 
-  int active_config_index = GetActiveConfig();
+  uint32_t active_config_index = 0;
+  display_intf_->GetActiveConfig(&active_config_index);
   DisplayConfigVariableInfo active_config;
   DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
   if (error != kErrorNone) {
@@ -1155,7 +1164,8 @@ bool HWCDisplay::IsFrameBufferScaled() {
 
 void HWCDisplay::GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
   DisplayConfigVariableInfo active_config;
-  int active_config_index = GetActiveConfig();
+  uint32_t active_config_index = 0;
+  display_intf_->GetActiveConfig(&active_config_index);
   DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
   if (error != kErrorNone) {
     DLOGE("GetConfig variable info failed. Error = %d", error);
@@ -1312,47 +1322,11 @@ int HWCDisplay::ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
 void HWCDisplay::ResetLayerCacheStack() {
   uint32_t layer_count = layer_stack_cache_.layer_count;
   for (uint32_t i = 0; i < layer_count; i++) {
-    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
-    layer_cache.handle = NULL;
-    layer_cache.composition = kCompositionGPU;
+    layer_stack_cache_.layer_cache[i] = LayerCache();
   }
-  layer_stack_cache_.animating = false;
   layer_stack_cache_.layer_count = 0;
-}
-
-bool HWCDisplay::IsFullFrameGPUComposed() {
-  uint32_t layer_count = layer_stack_.layer_count;
-  for (size_t i = 0; i < layer_count; i++) {
-    LayerComposition composition = layer_stack_.layers[i].composition;
-    if (composition == kCompositionGPUTarget || composition == kCompositionBlitTarget) {
-      continue;
-    }
-    if (composition != kCompositionGPU) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool HWCDisplay::IsFullFrameSDEComposed() {
-  uint32_t layer_count = layer_stack_.layer_count;
-  for (size_t i = 0; i < layer_count; i++) {
-    LayerComposition composition = layer_stack_.layers[i].composition;
-    if (composition == kCompositionGPUTarget || composition == kCompositionBlitTarget) {
-      continue;
-    }
-    if (composition != kCompositionSDE && composition != kCompositionBlit &&
-        composition != kCompositionHybrid && composition != kCompositionHWCursor) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool HWCDisplay::IsFullFrameCached(hwc_display_contents_1_t *content_list) {
-  return IsFullFrameSDEComposed() && !NeedsFrameBufferRefresh(content_list);
+  layer_stack_cache_.animating = false;
+  layer_stack_cache_.in_use = false;
 }
 
 void HWCDisplay::SetSecureDisplay(bool secure_display_active) {

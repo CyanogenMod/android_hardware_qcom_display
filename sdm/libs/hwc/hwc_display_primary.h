@@ -46,7 +46,6 @@ class HWCDisplayPrimary : public HWCDisplay {
   virtual int Init();
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
-  virtual int SetActiveConfig(int index);
   virtual int SetRefreshRate(uint32_t refresh_rate);
   virtual int Perform(uint32_t operation, ...);
   virtual void SetSecureDisplay(bool secure_display_active);

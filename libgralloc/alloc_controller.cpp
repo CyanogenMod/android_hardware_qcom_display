@@ -61,11 +61,9 @@
 
 #ifdef MASTER_SIDE_CP
 #define CP_HEAP_ID ION_SECURE_HEAP_ID
-/* Please Add the new SD ION Heap here */
-#define SD_HEAP_ID 0
+#define SD_HEAP_ID ION_SECURE_DISPLAY_HEAP_ID
 #define ION_CP_FLAGS (ION_SECURE | ION_FLAG_CP_PIXEL)
-/* Please Add the new SD ION Flag here */
-#define ION_SD_FLAGS ION_SECURE
+#define ION_SD_FLAGS (ION_SECURE | ION_FLAG_CP_SEC_DISPLAY)
 #else // SLAVE_SIDE_CP
 #define CP_HEAP_ID ION_CP_MM_HEAP_ID
 #define SD_HEAP_ID CP_HEAP_ID

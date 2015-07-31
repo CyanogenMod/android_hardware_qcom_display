@@ -125,14 +125,26 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
-  handle_refresh_ = true;
-  int app_layer_count = layer_stack_.layer_count - 1;
-  if (needs_blit_ && use_blit_comp_) {
-    app_layer_count -= kMaxBlitTargetLayers;
-  }
+  // Drop invalidate trigger to SurfaceFlinger
+  // if all layers in previous draw cycle were composed using GPU
+  // OR
+  // if all layers were composed using GPU sometime in past and the cached content
+  // is being used currently.
+  handle_refresh_ = false;
+  int app_layer_count = content_list->numHwLayers - 1;
+  if (app_layer_count > 1) {
+    int fb_layer_count = 0;
+    for (int i = 0; i < app_layer_count; i++) {
+      if (content_list->hwLayers[i].compositionType == HWC_FRAMEBUFFER) {
+        fb_layer_count++;
+      }
+    }
 
-  if (app_layer_count <= 1 || IsFullFrameGPUComposed() || IsFullFrameCached(content_list)) {
-    handle_refresh_ = false;
+    if ((fb_layer_count == 0) && !layer_stack_cache_.in_use) {
+      handle_refresh_ = true;
+    } else if (fb_layer_count > 0 && fb_layer_count < app_layer_count) {
+      handle_refresh_ = true;
+    }
   }
 
   if (use_metadata_refresh_rate_) {
@@ -158,16 +170,6 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
   }
 
   return 0;
-}
-
-int HWCDisplayPrimary::SetActiveConfig(int index) {
-  DisplayError error = kErrorNone;
-
-  if (display_intf_) {
-    error = display_intf_->SetActiveConfig(index);
-  }
-
-  return error;
 }
 
 int HWCDisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
