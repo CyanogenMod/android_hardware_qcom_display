@@ -37,6 +37,9 @@
 #include "mdpWrapper.h"
 #include "mdp_version.h"
 #include <hardware/hwcomposer_defs.h>
+#ifdef QTI_BSP
+#include <exhwcomposer_defs.h>
+#endif
 
 // just a helper static thingy
 namespace {

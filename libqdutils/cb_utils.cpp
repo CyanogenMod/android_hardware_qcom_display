@@ -66,7 +66,7 @@ int CBUtils::uiClearRegion(hwc_display_contents_1_t* list,
 
    if ((dirtyRect.right - dirtyRect.left > 0) &&
                                (dirtyRect.bottom - dirtyRect.top > 0)) {
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
       Rect tmpRect(dirtyRect.left,dirtyRect.top,dirtyRect.right,
             dirtyRect.bottom);
       Region tmpRegion(tmpRect);

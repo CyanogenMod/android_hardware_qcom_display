@@ -181,6 +181,8 @@ bool CopyBit::prepareSwapRect(hwc_context_t *ctx,
    bool canUseSwapRect = 0;
    hwc_rect_t dirtyRect = {0, 0, 0, 0};
    hwc_rect_t displayRect = {0, 0, 0, 0};
+   hwc_rect fullFrame = (struct hwc_rect) {0, 0,(int)ctx->dpyAttr[dpy].xres,
+                                                (int)ctx->dpyAttr[dpy].yres};
    if((mLayerCache.layerCount != ctx->listStats[dpy].numAppLayers) ||
          list->flags & HWC_GEOMETRY_CHANGED || not mSwapRectEnable) {
         mLayerCache.reset();
@@ -197,8 +199,8 @@ bool CopyBit::prepareSwapRect(hwc_context_t *ctx,
            updatingLayerCount ++;
            hwc_layer_1_t layer = list->hwLayers[k];
            canUseSwapRect = 1;
-#ifdef QCOM_BSP
-           dirtyRect = getUnion(dirtyRect, layer.dirtyRect);
+#ifdef QTI_BSP
+           dirtyRect = getUnion(dirtyRect, calculateDirtyRect(&layer,fullFrame));
 #endif
            displayRect = getUnion(displayRect, layer.displayFrame);
        }
@@ -445,7 +447,7 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         // Mark all layers to be drawn by copybit
         for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
             layerProp[i].mFlags |= HWC_COPYBIT;
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
             if (ctx->mMDP.version == qdutils::MDP_V3_0_4 ||
                ctx->mMDP.version == qdutils::MDP_V3_0_5)
                 list->hwLayers[i].compositionType = HWC_BLIT;
@@ -918,7 +920,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
     copybit_rect_t dstRect = {displayFrame.left, displayFrame.top,
                               displayFrame.right,
                               displayFrame.bottom};
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
     //change src and dst with dirtyRect
     if(mSwapRect) {
       hwc_rect_t result = getIntersection(displayFrame, mDirtyRect);
