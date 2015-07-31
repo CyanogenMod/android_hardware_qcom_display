@@ -15,6 +15,9 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL liboverlay \
 
 ifeq ($(TARGET_USES_QCOM_BSP),true)
 LOCAL_SHARED_LIBRARIES += libskia
+ifeq ($(GET_DISPLAY_SECURE_STATUS_FROM_HWC),true)
+    LOCAL_CFLAGS += -DGET_DISPLAY_SECURE_STATUS_FROM_HWC
+endif
 endif #TARGET_USES_QCOM_BSP
 
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhwcomposer\"

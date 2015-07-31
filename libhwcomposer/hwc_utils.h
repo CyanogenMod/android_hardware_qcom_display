@@ -45,6 +45,10 @@
 #define HWC_WFDDISPSYNC_LOG 0
 #define STR(f) #f;
 
+#ifdef QTI_BSP
+#include <exhwcomposer_defs.h>
+#endif
+
 //Fwrd decls
 struct hwc_context_t;
 
@@ -288,6 +292,10 @@ void optimizeLayerRects(const hwc_display_contents_1_t *list);
 bool areLayersIntersecting(const hwc_layer_1_t* layer1,
         const hwc_layer_1_t* layer2);
 bool layerUpdating(const hwc_layer_1_t* layer);
+/* Calculates the dirtyRegion for the given layer */
+hwc_rect_t calculateDirtyRect(const hwc_layer_1_t* layer,
+                                       hwc_rect_t& scissor);
+
 
 // returns true if Action safe dimensions are set and target supports Actionsafe
 bool isActionSafePresent(hwc_context_t *ctx, int dpy);
@@ -401,6 +409,8 @@ bool isDisplaySplit(hwc_context_t* ctx, int dpy);
 // Set the GPU hint to default if the current composition type is GPU
 // due to idle fallback or MDP composition.
 void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list);
+
+bool loadEglLib(hwc_context_t* ctx);
 
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
@@ -599,9 +609,15 @@ struct hwc_context_t {
     // This can be set via system property
     // persist.hwc.enable_vds
     bool mVDSEnabled;
-    struct gpu_hint_info mGPUHintInfo;
     // Flags related to windowboxing feature
     bool mAIVVideoMode[HWC_NUM_DISPLAY_TYPES];
+#ifdef QTI_BSP
+    void *mEglLib;
+    EGLBoolean (*mpfn_eglGpuPerfHintQCOM)(EGLDisplay, EGLContext, EGLint *);
+    EGLDisplay (*mpfn_eglGetCurrentDisplay)();
+    EGLContext (*mpfn_eglGetCurrentContext)();
+    struct gpu_hint_info mGPUHintInfo;
+#endif
     bool mWindowboxFeature;
     float mMinToleranceLevel;
     float mMaxToleranceLevel;
