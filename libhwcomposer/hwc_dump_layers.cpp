@@ -36,10 +36,11 @@
 #include <cutils/log.h>
 #include <sys/stat.h>
 #include <comptype.h>
-#ifdef QCOM_BSP
-// Ignore Wconversion errors for external headers
+#ifdef QTI_BSP
+// Ignore W(float)conversion errors for external headers
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wfloat-conversion"
 #include <SkBitmap.h>
 #include <SkImageEncoder.h>
 #pragma GCC diagnostic pop
@@ -314,7 +315,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
     }
 
     getHalPixelFormatStr(hnd->format, pixFormatStr);
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
     if (needDumpPng && hnd->base) {
         bool bResult = false;
         char dumpFilename[PATH_MAX];
@@ -342,7 +343,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         }
         if (kUnknown_SkColorType != tempSkBmpColor) {
             tempSkBmp->setInfo(SkImageInfo::Make(getWidth(hnd), getHeight(hnd),
-                    tempSkBmpColor, kIgnore_SkAlphaType), 0);
+                    tempSkBmpColor, kUnknown_SkAlphaType), 0);
             tempSkBmp->setPixels((void*)hnd->base);
             bResult = SkImageEncoder::EncodeFile(dumpFilename,
                                     *tempSkBmp, SkImageEncoder::kPNG_Type, 100);

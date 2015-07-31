@@ -160,9 +160,6 @@ protected:
     /* generates ROI based on the modified area of the frame */
     virtual void generateROI(hwc_context_t *ctx,
             hwc_display_contents_1_t* list) = 0;
-    /* Calculates the dirtyRegion for the given layer */
-    hwc_rect_t calculateDirtyRect(const hwc_layer_1_t* layer,
-            hwc_rect_t& scissor);
     /* validates the ROI generated for fallback conditions */
     virtual bool validateAndApplyROI(hwc_context_t *ctx,
             hwc_display_contents_1_t* list) = 0;
