@@ -40,7 +40,7 @@ class RotatorInterface {
   virtual DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers) = 0;
   virtual DisplayError Commit(Handle display_ctx, HWLayers *hw_layers) = 0;
   virtual DisplayError PostCommit(Handle display_ctx, HWLayers *hw_layers) = 0;
-  virtual DisplayError Purge(Handle display_ctx, HWLayers *hw_layers) = 0;
+  virtual DisplayError Purge(Handle display_ctx) = 0;
 
  protected:
   virtual ~RotatorInterface() { }

@@ -177,7 +177,7 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
       } else {
         // Release all the previous rotator sessions.
         if (rotator_intf_) {
-          error = rotator_intf_->Purge(display_rotator_ctx_, &hw_layers_);
+          error = rotator_intf_->Purge(display_rotator_ctx_);
         }
       }
 
@@ -281,7 +281,17 @@ DisplayError DisplayBase::Flush() {
   hw_layers_.info.count = 0;
   error = hw_intf_->Flush();
   if (error == kErrorNone) {
+    // Release all the rotator sessions.
+    if (rotator_intf_) {
+      error = rotator_intf_->Purge(display_rotator_ctx_);
+      if (error != kErrorNone) {
+        DLOGE("Rotator purge failed for display %d", display_type_);
+        return error;
+      }
+    }
+
     comp_manager_->Purge(display_comp_ctx_);
+
     pending_commit_ = false;
   } else {
     DLOGW("Unable to flush display = %d", display_type_);
@@ -364,6 +374,15 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
     hw_layers_.info.count = 0;
     error = hw_intf_->Flush();
     if (error == kErrorNone) {
+      // Release all the rotator sessions.
+      if (rotator_intf_) {
+        error = rotator_intf_->Purge(display_rotator_ctx_);
+        if (error != kErrorNone) {
+          DLOGE("Rotator purge failed for display %d", display_type_);
+          return error;
+        }
+      }
+
       comp_manager_->Purge(display_comp_ctx_);
 
       error = hw_intf_->PowerOff();
