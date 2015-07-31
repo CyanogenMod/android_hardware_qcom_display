@@ -548,6 +548,11 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       SetBlending(HWC_BLENDING_COVERAGE, &layer.blending);
     } else {
       SetBlending(hwc_layer.blending, &layer.blending);
+      LayerTransform &layer_transform = layer.transform;
+      uint32_t &hwc_transform = hwc_layer.transform;
+      layer_transform.flip_horizontal = ((hwc_transform & HWC_TRANSFORM_FLIP_H) > 0);
+      layer_transform.flip_vertical = ((hwc_transform & HWC_TRANSFORM_FLIP_V) > 0);
+      layer_transform.rotation = ((hwc_transform & HWC_TRANSFORM_ROT_90) ? 90.0f : 0.0f);
     }
 
     // TODO(user): Remove below block.
@@ -563,12 +568,7 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       layer.dirty_regions.rect[0] = layer.src_rect;
     }
 
-    LayerTransform &layer_transform = layer.transform;
-    uint32_t &hwc_transform = hwc_layer.transform;
     layer.plane_alpha = hwc_layer.planeAlpha;
-    layer_transform.flip_horizontal = ((hwc_transform & HWC_TRANSFORM_FLIP_H) > 0);
-    layer_transform.flip_vertical = ((hwc_transform & HWC_TRANSFORM_FLIP_V) > 0);
-    layer_transform.rotation = ((hwc_transform & HWC_TRANSFORM_ROT_90) ? 90.0f : 0.0f);
     layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
     layer.flags.cursor = ((hwc_layer.flags & HWC_IS_CURSOR_LAYER) > 0);
     layer.flags.updating = true;
