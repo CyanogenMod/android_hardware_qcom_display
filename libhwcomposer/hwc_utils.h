@@ -42,6 +42,10 @@
 // Max number of PTOR layers handled
 #define MAX_PTOR_LAYERS 2
 
+#ifdef QTI_BSP
+#include <exhwcomposer_defs.h>
+#endif
+
 //Fwrd decls
 struct hwc_context_t;
 
@@ -285,6 +289,10 @@ bool areLayersIntersecting(const hwc_layer_1_t* layer1,
         const hwc_layer_1_t* layer2);
 bool operator ==(const hwc_rect_t& lhs, const hwc_rect_t& rhs);
 bool layerUpdating(const hwc_layer_1_t* layer);
+/* Calculates the dirtyRegion for the given layer */
+hwc_rect_t calculateDirtyRect(const hwc_layer_1_t* layer,
+                                       hwc_rect_t& scissor);
+
 
 // returns true if Action safe dimensions are set and target supports Actionsafe
 bool isActionSafePresent(hwc_context_t *ctx, int dpy);
@@ -389,6 +397,8 @@ bool isDisplaySplit(hwc_context_t* ctx, int dpy);
 // Set the GPU hint to default if the current composition type is GPU
 // due to idle fallback or MDP composition.
 void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list);
+
+bool loadEglLib(hwc_context_t* ctx);
 
 // Returns true if rect1 is peripheral to rect2, false otherwise.
 bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
@@ -570,7 +580,13 @@ struct hwc_context_t {
     // This can be set via system property
     // persist.hwc.enable_vds
     bool mVDSEnabled;
+#ifdef QTI_BSP
+    void *mEglLib;
+    EGLBoolean (*mpfn_eglGpuPerfHintQCOM)(EGLDisplay, EGLContext, EGLint *);
+    EGLDisplay (*mpfn_eglGetCurrentDisplay)();
+    EGLContext (*mpfn_eglGetCurrentContext)();
     struct gpu_hint_info mGPUHintInfo;
+#endif
     // PTOR Info
     qhwc::PtorInfo mPtorInfo;
     uint32_t mIsPTOREnabled;

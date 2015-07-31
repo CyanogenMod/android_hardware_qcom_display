@@ -467,31 +467,6 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     return ret;
 }
 
-hwc_rect_t MDPComp::calculateDirtyRect(const hwc_layer_1_t* layer,
-                                       hwc_rect_t& scissor) {
-    hwc_region_t surfDamage = layer->surfaceDamage;
-    hwc_rect_t src = integerizeSourceCrop(layer->sourceCropf);
-    hwc_rect_t dst = layer->displayFrame;
-    int x_off = dst.left - src.left;
-    int y_off = dst.top - src.top;
-    hwc_rect dirtyRect = (hwc_rect){0, 0, 0, 0};
-    hwc_rect_t updatingRect = dst;
-
-    if (surfDamage.numRects == 0) {
-      // full layer updating, dirty rect is full frame
-        dirtyRect = getIntersection(layer->displayFrame, scissor);
-    } else {
-        for(uint32_t i = 0; i < surfDamage.numRects; i++) {
-            updatingRect = moveRect(surfDamage.rects[i], x_off, y_off);
-            hwc_rect_t intersect = getIntersection(updatingRect, scissor);
-            if(isValidRect(intersect)) {
-               dirtyRect = getUnion(intersect, dirtyRect);
-            }
-        }
-     }
-     return dirtyRect;
-}
-
 /*
  * 1) Identify layers that are not visible in the updating ROI and drop them
  * from composition.

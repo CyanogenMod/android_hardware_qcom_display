@@ -194,6 +194,8 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
                       int dpy){
 
    int changingLayerIndex = -1;
+   hwc_rect fullFrame = (struct hwc_rect) {0, 0,(int)ctx->dpyAttr[dpy].xres,
+                        (int)ctx->dpyAttr[dpy].yres};
    if(mLayerCache.layerCount != ctx->listStats[dpy].numAppLayers) {
         mLayerCache.reset();
         mFbCache.reset();
@@ -216,9 +218,11 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
     //framebuffers
 
     if ( updatingLayerCount ==  1 ) {
-       hwc_rect_t dirtyRect = list->hwLayers[changingLayerIndex].displayFrame;
-#ifdef QCOM_BSP
-       dirtyRect = list->hwLayers[changingLayerIndex].dirtyRect;
+       hwc_layer_1_t layer = list->hwLayers[changingLayerIndex];
+       hwc_rect_t dirtyRect = layer.displayFrame;
+#ifdef QTI_BSP
+       dirtyRect = calculateDirtyRect(&layer, fullFrame);
+       mDirtyRect = dirtyRect;
 #endif
 
        for (int k = ctx->listStats[dpy].numAppLayers-1; k >= 0 ; k--){
@@ -369,7 +373,7 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         // Mark all layers to be drawn by copybit
         for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
             layerProp[i].mFlags |= HWC_COPYBIT;
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
             if (ctx->mMDP.version == qdutils::MDP_V3_0_4)
                 list->hwLayers[i].compositionType = HWC_BLIT;
             else
@@ -519,10 +523,10 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     mDirtyLayerIndex =  checkDirtyRect(ctx, list, dpy);
     hwc_rect_t clearRegion = {0,0,0,0};
     if (CBUtils::getuiClearRegion(list, clearRegion, layerProp)){
-        if (mDirtyLayerIndex != -1){
+        if ((mDirtyLayerIndex != -1) && isValidRect(mDirtyRect)){
             hwc_layer_1_t *layer = &list->hwLayers[mDirtyLayerIndex];
-#ifdef QCOM_BSP
-             hwc_rect_t result = getIntersection(layer->dirtyRect,clearRegion);
+#ifdef QTI_BSP
+             hwc_rect_t result = getIntersection(mDirtyRect,clearRegion);
              if(isValidRect(result))
                clear(renderBuffer,result);
 #else
@@ -839,13 +843,13 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
     copybit_rect_t dstRect = {displayFrame.left, displayFrame.top,
                               displayFrame.right,
                               displayFrame.bottom};
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
     //change src and dst with dirtyRect
-    if(mDirtyLayerIndex != -1) {
-      srcRect.l = layer->dirtyRect.left;
-      srcRect.t = layer->dirtyRect.top;
-      srcRect.r = layer->dirtyRect.right;
-      srcRect.b = layer->dirtyRect.bottom;
+    if((mDirtyLayerIndex != -1) && isValidRect(mDirtyRect)) {
+      srcRect.l = mDirtyRect.left;
+      srcRect.t = mDirtyRect.top;
+      srcRect.r = mDirtyRect.right;
+      srcRect.b = mDirtyRect.bottom;
       dstRect = srcRect;
     }
 #endif

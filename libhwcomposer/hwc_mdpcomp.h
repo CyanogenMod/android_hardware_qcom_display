@@ -148,9 +148,6 @@ protected:
     /* configures 4kx2k yuv layer*/
     virtual int configure4k2kYuv(hwc_context_t *ctx, hwc_layer_1_t *layer,
             PipeLayerPair& PipeLayerPair) = 0;
-    /* Calculates the dirtyRegion for the given layer */
-    hwc_rect_t calculateDirtyRect(const hwc_layer_1_t* layer,
-            hwc_rect_t& scissor);
     /* set/reset flags for MDPComp */
     void setMDPCompLayerFlags(hwc_context_t *ctx,
                               hwc_display_contents_1_t* list);
