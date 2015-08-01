@@ -45,15 +45,13 @@ namespace sdm {
 */
 
 struct BufferConfig {
-  uint32_t width;            //!< Specifies buffer width for buffer allocation.
-  uint32_t height;           //!< Specifies buffer height for buffer allocation.
-  LayerBufferFormat format;  //!< Specifies buffer format for buffer allocation.
-  uint32_t buffer_count;     //!< Specifies number of buffers to be allocated.
-  bool secure;               //!< Specifies buffer to be allocated from secure region.
-  bool cache;                //!< Specifies whether the buffer needs to be cache.
-
-  BufferConfig() : width(0), height(0), format(kFormatInvalid), buffer_count(0), secure(false),
-                  cache(false) { }
+  uint32_t width = 0;                         //!< Specifies buffer width for buffer allocation.
+  uint32_t height = 0;                        //!< Specifies buffer height for buffer allocation.
+  LayerBufferFormat format = kFormatInvalid;  //!< Specifies buffer format for buffer allocation.
+  uint32_t buffer_count = 0;                  //!< Specifies number of buffers to be allocated.
+  bool secure = false;                        //!< Specifies buffer to be allocated from
+                                              //!< secure region.
+  bool cache = false;                         //!< Specifies whether the buffer needs to be cache.
 };
 
 /*! @brief Holds the information about the allocated buffer.
@@ -62,11 +60,9 @@ struct BufferConfig {
   @sa BufferAllocator::FreeBuffer
 */
 struct AllocatedBufferInfo {
-  int fd;                    //!< Specifies the fd of the allocated buffer.
-  uint32_t stride;           //!< Specifies aligned buffer width of the allocated buffer.
-  uint32_t size;             //!< Specifies the size of the allocated buffer.
-
-  AllocatedBufferInfo() : fd(-1), stride(0), size(0) { }
+  int fd = -1;                   //!< Specifies the fd of the allocated buffer.
+  uint32_t stride = 0;           //!< Specifies aligned buffer width of the allocated buffer.
+  uint32_t size = 0;             //!< Specifies the size of the allocated buffer.
 };
 
 /*! @brief Holds the information about the input/output configuration of an output buffer.
@@ -78,9 +74,7 @@ struct BufferInfo {
   BufferConfig buffer_config;             //!< Specifies configuration of a buffer to be allocated.
   AllocatedBufferInfo alloc_buffer_info;  //!< Specifies buffer information of allocated buffer.
 
-  void *private_data;                      //!< Pointer to private data.
-
-  BufferInfo() : private_data(NULL) { }
+  void *private_data = NULL;              //!< Pointer to private data.
 };
 
 /*! @brief Buffer allocator implemented by the client

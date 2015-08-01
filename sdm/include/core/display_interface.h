@@ -79,10 +79,8 @@ enum DisplayState {
   @sa DisplayInterface::SetConfig
 */
 struct DisplayConfigFixedInfo {
-  bool underscan;   //!< If display support CE underscan.
-  bool secure;      //!< If this display is capable of handling secure content.
-
-  DisplayConfigFixedInfo() : underscan(false), secure(false) { }
+  bool underscan = false;   //!< If display support CE underscan.
+  bool secure = false;      //!< If this display is capable of handling secure content.
 };
 
 /*! @brief This structure defines configuration for variable properties of a display device.
@@ -91,15 +89,12 @@ struct DisplayConfigFixedInfo {
   @sa DisplayInterface::SetConfig
 */
 struct DisplayConfigVariableInfo {
-  uint32_t x_pixels;          //!< Total number of pixels in X-direction on the display panel.
-  uint32_t y_pixels;          //!< Total number of pixels in Y-direction on the display panel.
-  float x_dpi;                //!< Dots per inch in X-direction.
-  float y_dpi;                //!< Dots per inch in Y-direction.
-  uint32_t fps;               //!< Frame rate per second.
-  uint32_t vsync_period_ns;   //!< VSync period in nanoseconds.
-
-  DisplayConfigVariableInfo() : x_pixels(0), y_pixels(0), x_dpi(0.0f), y_dpi(0.0f),
-                                fps(0), vsync_period_ns(0) { }
+  uint32_t x_pixels = 0;          //!< Total number of pixels in X-direction on the display panel.
+  uint32_t y_pixels = 0;          //!< Total number of pixels in Y-direction on the display panel.
+  float x_dpi = 0.0f;             //!< Dots per inch in X-direction.
+  float y_dpi = 0.0f;             //!< Dots per inch in Y-direction.
+  uint32_t fps = 0;               //!< Frame rate per second.
+  uint32_t vsync_period_ns = 0;   //!< VSync period in nanoseconds.
 };
 
 /*! @brief Event data associated with VSync event.
@@ -107,9 +102,7 @@ struct DisplayConfigVariableInfo {
   @sa DisplayEventHandler::VSync
 */
 struct DisplayEventVSync {
-  int64_t timestamp;    //!< System monotonic clock timestamp in nanoseconds.
-
-  DisplayEventVSync() : timestamp(0) { }
+  int64_t timestamp = 0;    //!< System monotonic clock timestamp in nanoseconds.
 };
 
 /*! @brief Display device event handler implemented by the client.

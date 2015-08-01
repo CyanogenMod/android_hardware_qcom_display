@@ -64,13 +64,7 @@ void HWCDisplay::GetDownscaleResolution(uint32_t primary_width, uint32_t primary
 
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
                        int id, bool needs_blit)
-  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit),
-    display_intf_(NULL), flush_(false), dump_frame_count_(0), dump_frame_index_(0),
-    dump_input_layers_(false), swap_interval_zero_(false), framebuffer_config_(NULL),
-    display_paused_(false), use_metadata_refresh_rate_(false), metadata_refresh_rate_(0),
-    boot_animation_completed_(false), shutdown_pending_(false), handle_refresh_(true),
-    use_blit_comp_(false), secure_display_active_(false), skip_prepare_(false),
-    solid_fill_enable_(false), blit_engine_(NULL) {
+  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit) {
 }
 
 int HWCDisplay::Init() {

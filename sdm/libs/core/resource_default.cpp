@@ -34,10 +34,6 @@
 
 namespace sdm {
 
-ResourceDefault::ResourceDefault()
-  : num_pipe_(0), vig_pipes_(NULL), rgb_pipes_(NULL), dma_pipes_(NULL) {
-}
-
 DisplayError ResourceDefault::Init(const HWResourceInfo &hw_res_info) {
   DisplayError error = kErrorNone;
   uint32_t num_pipe = 0;

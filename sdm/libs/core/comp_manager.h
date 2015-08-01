@@ -38,7 +38,6 @@ namespace sdm {
 
 class CompManager : public DumpImpl {
  public:
-  CompManager();
   DisplayError Init(const HWResourceInfo &hw_res_info_, ExtensionInterface *extension_intf,
                   BufferSyncHandler *buffer_sync_handler);
   DisplayError Deinit();
@@ -88,15 +87,15 @@ class CompManager : public DumpImpl {
   };
 
   Locker locker_;
-  ResourceInterface *resource_intf_;
+  ResourceInterface *resource_intf_ = NULL;
   ResourceDefault resource_default_;
-  uint64_t registered_displays_;        // Stores the bit mask of registered displays
-  uint64_t configured_displays_;        // Stores the bit mask of sucessfully configured displays
-  bool safe_mode_;                      // Flag to notify all displays to be in resource crunch
+  uint64_t registered_displays_ = 0;    // Stores the bit mask of registered displays
+  uint64_t configured_displays_ = 0;    // Stores the bit mask of sucessfully configured displays
+  bool safe_mode_ = false;              // Flag to notify all displays to be in resource crunch
                                         // mode, where strategy manager chooses the best strategy
                                         // that uses optimal number of pipes for each display
   HWResourceInfo hw_res_info_;
-  ExtensionInterface *extension_intf_;
+  ExtensionInterface *extension_intf_ = NULL;
 };
 
 }  // namespace sdm
