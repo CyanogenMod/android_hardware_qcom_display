@@ -3023,9 +3023,22 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
    const int WIDTH_ALIGN = qdutils::MDPVersion::getInstance().getWidthAlign();
    const int TOP_ALIGN = qdutils::MDPVersion::getInstance().getTopAlign();
    const int HEIGHT_ALIGN = qdutils::MDPVersion::getInstance().getHeightAlign();
-   const int MIN_WIDTH = qdutils::MDPVersion::getInstance().getMinROIWidth();
+   int MIN_WIDTH = qdutils::MDPVersion::getInstance().getMinROIWidth();
    const int MIN_HEIGHT = qdutils::MDPVersion::getInstance().getMinROIHeight();
 
+
+   if(qdutils::MDPVersion::getInstance().is8976() &&
+            qdutils::MDPVersion::getInstance().isPingPongSplit() &&
+           (t_roi.left < (boundary.right - boundary.left) / 2) &&
+           (t_roi.right > (boundary.right - boundary.left) / 2)) {
+       MIN_WIDTH *= 2;
+       if(((boundary.right - boundary.left) / 2 - t_roi.left) >
+               (t_roi.right - (boundary.right - boundary.left) / 2)) {
+           t_roi.right = (boundary.right - boundary.left) - t_roi.left;
+       } else {
+           t_roi.left = (boundary.right - boundary.left) - t_roi.right;
+       }
+   }
    /* Align to minimum width recommended by the panel */
    if((t_roi.right - t_roi.left) < MIN_WIDTH) {
        t_roi.left = t_roi.left - MIN_WIDTH / 2 +

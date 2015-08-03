@@ -457,7 +457,6 @@ int Overlay::initOverlay() {
     FILE *displayDeviceFP = NULL;
     char fbType[MAX_FRAME_BUFFER_NAME_SIZE];
     char msmFbTypePath[MAX_FRAME_BUFFER_NAME_SIZE];
-    const char *strDtvPanel = "dtv panel";
     const char *strWbPanel = "writeback panel";
 
     for(int num = 1; num < MAX_FB_DEVICES; num++) {
@@ -469,15 +468,17 @@ int Overlay::initOverlay() {
             fread(fbType, sizeof(char), MAX_FRAME_BUFFER_NAME_SIZE,
                     displayDeviceFP);
 
-            if(strncmp(fbType, strDtvPanel, strlen(strDtvPanel)) == 0) {
-                sDpyFbMap[DPY_EXTERNAL] = num;
-            } else if(strncmp(fbType, strWbPanel, strlen(strWbPanel)) == 0) {
+            if(strncmp(fbType, strWbPanel, strlen(strWbPanel)) == 0) {
                 sDpyFbMap[DPY_WRITEBACK] = num;
             }
 
             fclose(displayDeviceFP);
         }
     }
+
+    int fbNum = qdutils::getPluggableNode();
+    if(fbNum != -1)
+        sDpyFbMap[DPY_EXTERNAL] = fbNum;
 
     return 0;
 }
