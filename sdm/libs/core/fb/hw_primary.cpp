@@ -72,8 +72,7 @@ DisplayError HWPrimary::Destroy(HWInterface *intf) {
 }
 
 HWPrimary::HWPrimary(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf)
-  : HWDevice(buffer_sync_handler), event_thread_name_("SDM_EventThread"), fake_vsync_(false),
-    exit_threads_(false), config_changed_(true) {
+  : HWDevice(buffer_sync_handler) {
   HWDevice::device_type_ = kDevicePrimary;
   HWDevice::device_name_ = "Primary Display Device";
   HWDevice::hw_info_intf_ = hw_info_intf;
@@ -81,10 +80,10 @@ HWPrimary::HWPrimary(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw
 
 DisplayError HWPrimary::Init(HWEventHandler *eventhandler) {
   DisplayError error = kErrorNone;
-  char node_path[kMaxStringLength] = {0};
-  char data[kMaxStringLength] = {0};
-  const char* event_name[kNumDisplayEvents] = {"vsync_event", "show_blank_event", "idle_notify",
-                                              "msm_fb_thermal_level"};
+  char node_path[kMaxStringLength] = { 0 };
+  char data[kMaxStringLength] = { 0 };
+  const char *event_name[kNumDisplayEvents] = {"vsync_event", "show_blank_event", "idle_notify",
+                                               "msm_fb_thermal_level"};
 
   error = HWDevice::Init(eventhandler);
   if (error != kErrorNone) {
@@ -360,22 +359,18 @@ void* HWPrimary::DisplayEventThreadHandler() {
 
   while (!exit_threads_) {
     int error = Sys::poll_(poll_fds_, kNumDisplayEvents, -1);
-    if (error < 0) {
+    if (error <= 0) {
       DLOGW("poll failed. error = %s", strerror(errno));
       continue;
     }
+
     for (int event = 0; event < kNumDisplayEvents; event++) {
       pollfd &poll_fd = poll_fds_[event];
 
       if (poll_fd.revents & POLLPRI) {
-        ssize_t length = Sys::pread_(poll_fd.fd, data, kMaxStringLength, 0);
-        if (length < 0) {
-          // If the read was interrupted - it is not a fatal error, just continue.
-          DLOGW("pread failed. event = %d, error = %s", event, strerror(errno));
-          continue;
+        if (Sys::pread_(poll_fd.fd, data, kMaxStringLength, 0) > 0) {
+          (this->*event_handler[event])(data);
         }
-
-        (this->*event_handler[event])(data);
       }
     }
   }
