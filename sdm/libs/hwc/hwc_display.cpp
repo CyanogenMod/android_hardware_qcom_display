@@ -76,10 +76,9 @@ int HWCDisplay::Init() {
   }
 
   int property_swap_interval = 1;
-  if (HWCDebugHandler::Get()->GetProperty("debug.egl.swapinterval", &property_swap_interval)) {
-    if (property_swap_interval == 0) {
-      swap_interval_zero_ = true;
-    }
+  HWCDebugHandler::Get()->GetProperty("debug.egl.swapinterval", &property_swap_interval);
+  if (property_swap_interval == 0) {
+    swap_interval_zero_ = true;
   }
 
   framebuffer_config_ = new DisplayConfigVariableInfo();
