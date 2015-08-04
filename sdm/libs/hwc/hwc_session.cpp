@@ -75,10 +75,21 @@ namespace sdm {
 Locker HWCSession::locker_;
 bool HWCSession::reset_panel_ = false;
 
-HWCSession::HWCSession(const hw_module_t *module) : core_intf_(NULL), hwc_procs_(NULL),
-            uevent_thread_exit_(false), uevent_thread_name_("HWC_UeventThread"),
-            secure_display_active_(false) {
-  memset(&hwc_display_, 0, sizeof(hwc_display_));
+static void Invalidate(const struct hwc_procs *procs) {
+}
+
+static void VSync(const struct hwc_procs* procs, int disp, int64_t timestamp) {
+}
+
+static void Hotplug(const struct hwc_procs* procs, int disp, int connected) {
+}
+
+HWCSession::HWCSession(const hw_module_t *module) {
+  // By default, drop any events. Calls will be routed to SurfaceFlinger after registerProcs.
+  hwc_procs_default_.invalidate = Invalidate;
+  hwc_procs_default_.vsync = VSync;
+  hwc_procs_default_.hotplug = Hotplug;
+
   hwc_composer_device_1_t::common.tag = HARDWARE_DEVICE_TAG;
   hwc_composer_device_1_t::common.version = HWC_DEVICE_API_VERSION_1_4;
   hwc_composer_device_1_t::common.module = const_cast<hw_module_t*>(module);
@@ -231,11 +242,13 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
 
   hwc_session->HandleSecureDisplaySession(displays);
 
-  HWCDisplay *&primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
-  if (primary_display) {
-    int ret = hwc_session->color_mgr_->SolidFillLayersPrepare(displays, primary_display);
-    if (ret)
-      return 0;
+  if (hwc_session->color_mgr_) {
+    HWCDisplay *primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
+    if (primary_display) {
+      int ret = hwc_session->color_mgr_->SolidFillLayersPrepare(displays, primary_display);
+      if (ret)
+        return 0;
+    }
   }
 
   for (ssize_t dpy = static_cast<ssize_t>(num_displays - 1); dpy >= 0; dpy--) {
@@ -268,11 +281,13 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
 
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
 
-  HWCDisplay *&primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
-  if (primary_display) {
-    int ret = hwc_session->color_mgr_->SolidFillLayersSet(displays, primary_display);
-    if (ret)
-      return 0;
+  if (hwc_session->color_mgr_) {
+    HWCDisplay *primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
+    if (primary_display) {
+      int ret = hwc_session->color_mgr_->SolidFillLayersSet(displays, primary_display);
+      if (ret)
+        return 0;
+    }
   }
 
   for (size_t dpy = 0; dpy < num_displays; dpy++) {
@@ -343,6 +358,7 @@ int HWCSession::SetPowerMode(hwc_composer_device_1 *device, int disp, int mode) 
 
 int HWCSession::Query(hwc_composer_device_1 *device, int param, int *value) {
   SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!device || !value) {
     return -EINVAL;
   }
@@ -362,6 +378,8 @@ int HWCSession::Query(hwc_composer_device_1 *device, int param, int *value) {
 }
 
 void HWCSession::RegisterProcs(hwc_composer_device_1 *device, hwc_procs_t const *procs) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!device || !procs) {
     return;
   }
@@ -812,6 +830,10 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel *input_parcel
   PPPendingParams pending_action;
   PPDisplayAPIPayload resp_payload, req_payload;
 
+  if (!color_mgr_) {
+    return -1;
+  }
+
   // Read display_id, payload_size and payload from in_parcel.
   ret = HWCColorManager::CreatePayloadFromParcel(*input_parcel, &display_id, &req_payload);
   if (!ret) {
@@ -843,12 +865,12 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel *input_parcel
       break;
     case kApplySolidFill:
       ret = color_mgr_->SetSolidFill(pending_action.params,
-                                        true, hwc_display_[HWC_DISPLAY_PRIMARY]);
+                                     true, hwc_display_[HWC_DISPLAY_PRIMARY]);
       hwc_procs_->invalidate(hwc_procs_);
       break;
     case kDisableSolidFill:
       ret = color_mgr_->SetSolidFill(pending_action.params,
-                                        false, hwc_display_[HWC_DISPLAY_PRIMARY]);
+                                     false, hwc_display_[HWC_DISPLAY_PRIMARY]);
       hwc_procs_->invalidate(hwc_procs_);
       break;
     case kSetPanelBrightness:

@@ -99,18 +99,19 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
                                    android::Parcel *output_parcel);
 
   static Locker locker_;
-  CoreInterface *core_intf_;
-  hwc_procs_t const *hwc_procs_;
-  HWCDisplay *hwc_display_[HWC_NUM_DISPLAY_TYPES];
+  CoreInterface *core_intf_ = NULL;
+  hwc_procs_t hwc_procs_default_;
+  hwc_procs_t const *hwc_procs_ = &hwc_procs_default_;
+  HWCDisplay *hwc_display_[HWC_NUM_DISPLAY_TYPES] = { NULL };
   pthread_t uevent_thread_;
-  bool uevent_thread_exit_;
+  bool uevent_thread_exit_ = false;
+  const char *uevent_thread_name_ = "HWC_UeventThread";
+  HWCBufferAllocator *buffer_allocator_ = NULL;
+  HWCBufferSyncHandler *buffer_sync_handler_ = NULL;
+  HWCColorManager *color_mgr_ = NULL;
+  char brightness_[64] = { 0 };
   static bool reset_panel_;
-  const char *uevent_thread_name_;
-  HWCBufferAllocator *buffer_allocator_;
-  HWCBufferSyncHandler *buffer_sync_handler_;
-  HWCColorManager *color_mgr_;
-  char brightness_[64];
-  bool secure_display_active_;
+  bool secure_display_active_ = false;
 };
 
 }  // namespace sdm
