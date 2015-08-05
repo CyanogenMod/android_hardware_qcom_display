@@ -441,9 +441,11 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint3
       int usage = GRALLOC_USAGE_HW_FB;
       int format = HAL_PIXEL_FORMAT_RGBA_8888;
       int ubwc_enabled = 0;
+      int flags = 0;
       HWCDebugHandler::Get()->GetProperty("debug.gralloc.enable_fb_ubwc", &ubwc_enabled);
       if (ubwc_enabled == 1) {
         usage |= GRALLOC_USAGE_PRIVATE_ALLOC_UBWC;
+        flags |= private_handle_t::PRIV_FLAGS_UBWC_ALIGNED;
       }
 
       GetFrameBufferResolution(&x_pixels, &y_pixels);
@@ -452,6 +454,7 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint3
                                                             usage, aligned_width, aligned_height);
       layer_buffer->width = aligned_width;
       layer_buffer->height = aligned_height;
+      layer_buffer->format = GetSDMFormat(format, flags);
       layer->frame_rate = fps;
     }
   }
