@@ -223,7 +223,10 @@ DisplayError HWPrimary::Deinit() {
   pthread_join(event_thread_, NULL);
 
   for (int event = 0; event < kNumDisplayEvents; event++) {
-    Sys::close_(poll_fds_[event].fd);
+    int &fd = poll_fds_[event].fd;
+    if (fd >= 0) {
+      Sys::close_(fd);
+    }
   }
 
   return HWDevice::Deinit();
