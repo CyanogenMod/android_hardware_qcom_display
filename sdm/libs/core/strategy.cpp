@@ -165,10 +165,10 @@ void Strategy::GenerateROI() {
   }
 
   LayerStack *layer_stack = hw_layers_info_->stack;
-  LayerRect &src_rect = layer_stack->layers[fb_layer_index_].src_rect;
-  // TODO(user): read panels x_pixels and y_pixels instead of fb_x_res and fb_y_res
-  float fb_x_res = src_rect.right - src_rect.left;
-  float fb_y_res = src_rect.bottom - src_rect.top;
+  LayerRect &dst_rect = layer_stack->layers[fb_layer_index_].dst_rect;
+  // The destination co-ordinates of the FB layer map to the panel and may be different than source
+  float fb_x_res = dst_rect.right - dst_rect.left;
+  float fb_y_res = dst_rect.bottom - dst_rect.top;
 
   if (!hw_resource_info_.is_src_split &&
      ((fb_x_res > hw_resource_info_.max_mixer_width) ||

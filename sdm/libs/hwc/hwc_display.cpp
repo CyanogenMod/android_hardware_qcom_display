@@ -76,10 +76,9 @@ int HWCDisplay::Init() {
   }
 
   int property_swap_interval = 1;
-  if (HWCDebugHandler::Get()->GetProperty("debug.egl.swapinterval", &property_swap_interval)) {
-    if (property_swap_interval == 0) {
-      swap_interval_zero_ = true;
-    }
+  HWCDebugHandler::Get()->GetProperty("debug.egl.swapinterval", &property_swap_interval);
+  if (property_swap_interval == 0) {
+    swap_interval_zero_ = true;
   }
 
   framebuffer_config_ = new DisplayConfigVariableInfo();
@@ -138,9 +137,6 @@ int HWCDisplay::EventControl(int event, int enable) {
   switch (event) {
   case HWC_EVENT_VSYNC:
     error = display_intf_->SetVSyncState(enable);
-    break;
-  case HWC_EVENT_ORIENTATION:
-    // TODO(user): Need to handle this case
     break;
   default:
     DLOGW("Unsupported event = %d", event);
@@ -228,9 +224,11 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
     case HWC_DISPLAY_DPI_Y:
       values[i] = INT32(variable_config.y_dpi * 1000.0f);
       break;
+#ifdef QCOM_BSP
     case HWC_DISPLAY_SECURE:
       values[i] = INT32(true);  // For backward compatibility. All Physical displays are secure
       break;
+#endif
     default:
       DLOGW("Spurious attribute type = %d", attributes[i]);
       return -EINVAL;
@@ -523,7 +521,7 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     for (size_t j = 0; j < hwc_layer.visibleRegionScreen.numRects; j++) {
       SetRect(hwc_layer.visibleRegionScreen.rects[j], &layer.visible_regions.rect[j]);
     }
-    SetRect(hwc_layer.dirtyRect, &layer.dirty_regions.rect[0]);
+    SetRect(hwc_layer.sourceCropf, &layer.dirty_regions.rect[0]);
     SetComposition(hwc_layer.compositionType, &layer.composition);
 
     // For dim layers, SurfaceFlinger
@@ -570,11 +568,11 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       LayerCache layer_cache = layer_stack_cache_.layer_cache[i];
       layer.flags.updating = IsLayerUpdating(hwc_layer, layer_cache);
     }
-
+#ifdef QCOM_BSP
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
       layer_stack_.flags.animating = true;
     }
-
+#endif
     if (layer.flags.skip) {
       layer_stack_.flags.skip_present = true;
     }

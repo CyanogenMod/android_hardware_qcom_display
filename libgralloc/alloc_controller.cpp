@@ -153,11 +153,10 @@ int AdrenoMemInfo::isMacroTilingSupportedByGPU()
 void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
                             int usage, int& aligned_w, int& aligned_h)
 {
-
     bool ubwc_enabled = isUBwcEnabled(format, usage);
 
     // Currently surface padding is only computed for RGB* surfaces.
-    if (format <= HAL_PIXEL_FORMAT_sRGB_X_8888) {
+    if (format <= HAL_PIXEL_FORMAT_BGRA_8888) {
         int tileEnabled = ubwc_enabled || isMacroTileEnabled(format, usage);
         AdrenoMemInfo::getInstance().getGpuAlignedWidthHeight(width,
             height, format, tileEnabled, aligned_w, aligned_h);
@@ -177,7 +176,7 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
             aligned_w = ALIGN(width, 32);
             break;
-        case HAL_PIXEL_FORMAT_RAW_SENSOR:
+        case HAL_PIXEL_FORMAT_RAW16:
             aligned_w = ALIGN(width, 16);
             break;
         case HAL_PIXEL_FORMAT_RAW10:
@@ -330,8 +329,6 @@ ADRENOPIXELFORMAT AdrenoMemInfo::getGpuPixelFormat(int hal_format)
             return ADRENO_PIXELFORMAT_R8G8B8X8;
         case HAL_PIXEL_FORMAT_RGB_565:
             return ADRENO_PIXELFORMAT_B5G6R5;
-        case HAL_PIXEL_FORMAT_sRGB_A_8888:
-            return ADRENO_PIXELFORMAT_R8G8B8A8_SRGB;
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
             return ADRENO_PIXELFORMAT_NV12;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
@@ -491,8 +488,6 @@ unsigned int getSize(int format, int width, int height, int usage,
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_BGRA_8888:
-        case HAL_PIXEL_FORMAT_sRGB_A_8888:
-        case HAL_PIXEL_FORMAT_sRGB_X_8888:
             size = alignedw * alignedh * 4;
             break;
         case HAL_PIXEL_FORMAT_RGB_888:
@@ -501,7 +496,7 @@ unsigned int getSize(int format, int width, int height, int usage,
         case HAL_PIXEL_FORMAT_RGB_565:
         case HAL_PIXEL_FORMAT_RGBA_5551:
         case HAL_PIXEL_FORMAT_RGBA_4444:
-        case HAL_PIXEL_FORMAT_RAW_SENSOR:
+        case HAL_PIXEL_FORMAT_RAW16:
             size = alignedw * alignedh * 2;
             break;
         case HAL_PIXEL_FORMAT_RAW10:
@@ -721,7 +716,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS:
         case HAL_PIXEL_FORMAT_NV21_ZSL:
-        case HAL_PIXEL_FORMAT_RAW_SENSOR:
+        case HAL_PIXEL_FORMAT_RAW16:
         case HAL_PIXEL_FORMAT_RAW10:
             ystride = cstride = width;
             ycbcr->y  = (void*)hnd->base;
@@ -827,7 +822,6 @@ static bool isUBwcSupported(int format)
         case HAL_PIXEL_FORMAT_RGB_565:
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
-        case HAL_PIXEL_FORMAT_sRGB_A_8888:
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
             return true;
@@ -934,7 +928,6 @@ static unsigned int getUBwcSize(int width, int height, int format,
             break;
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
-        case HAL_PIXEL_FORMAT_sRGB_A_8888:
             size = alignedw * alignedh * 4;
             size += getUBwcMetaBufferSize(width, height, 4);
             break;
@@ -955,7 +948,7 @@ int getRgbDataAddress(private_handle_t* hnd, void** rgb_data)
     int err = 0;
 
     // This api is for RGB* formats
-    if (hnd->format > HAL_PIXEL_FORMAT_sRGB_X_8888) {
+    if (hnd->format > HAL_PIXEL_FORMAT_BGRA_8888) {
         return -EINVAL;
     }
 
@@ -972,7 +965,6 @@ int getRgbDataAddress(private_handle_t* hnd, void** rgb_data)
             break;
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
-        case HAL_PIXEL_FORMAT_sRGB_A_8888:
             meta_size = getUBwcMetaBufferSize(hnd->width, hnd->height, 4);
             break;
         default:
