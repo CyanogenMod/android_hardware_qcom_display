@@ -162,7 +162,8 @@ bool MDPComp::init(hwc_context_t *ctx) {
         sMaxSecLayers = min(sMaxSecLayers, sMaxPipesPerMixer);
     }
 
-    if(ctx->mMDP.panel != MIPI_CMD_PANEL) {
+    if(ctx->mMDP.panel != MIPI_CMD_PANEL &&
+            (ctx->mMDP.version >= qdutils::MDP_V4_0)) {
         sIdleInvalidator = IdleInvalidator::getInstance();
         if(sIdleInvalidator->init(timeout_handler, ctx) < 0) {
             delete sIdleInvalidator;
