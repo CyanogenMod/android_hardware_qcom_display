@@ -39,24 +39,6 @@
 
 namespace sdm {
 
-static int GetWidthFromMetaData(const private_handle_t *handle) {
-  MetaData_t *metadata = reinterpret_cast<MetaData_t *>(handle->base_metadata);
-  if (metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
-    return metadata->bufferDim.sliceWidth;
-  }
-
-  return handle->width;
-}
-
-static int GetHeightFromMetaData(const private_handle_t *handle) {
-  MetaData_t *metadata = reinterpret_cast<MetaData_t *>(handle->base_metadata);
-  if (metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
-    return metadata->bufferDim.sliceHeight;
-  }
-
-  return handle->height;
-}
-
 int HWCDisplayVirtual::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
                               uint32_t primary_width, uint32_t primary_height,
                               hwc_display_contents_1_t *content_list,
@@ -217,8 +199,11 @@ int HWCDisplayVirtual::SetOutputSliceFromMetadata(hwc_display_contents_1_t *cont
       return -EINVAL;
     }
 
-    int active_width = GetWidthFromMetaData(output_handle);
-    int active_height = GetHeightFromMetaData(output_handle);
+    int active_width;
+    int active_height;
+
+    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(output_handle, active_width,
+                                                          active_height);
 
     if ((active_width != INT(output_buffer_->width)) ||
         (active_height!= INT(output_buffer_->height)) ||
@@ -259,8 +244,12 @@ int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
       return -EINVAL;
     }
 
-    output_buffer_->width = GetWidthFromMetaData(output_handle);
-    output_buffer_->height = GetHeightFromMetaData(output_handle);
+    int output_buffer_width, output_buffer_height;
+    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(output_handle, output_buffer_width,
+                                                          output_buffer_height);
+
+    output_buffer_->width = output_buffer_width;
+    output_buffer_->height = output_buffer_height;
     output_buffer_->flags.secure = 0;
     output_buffer_->flags.video = 0;
 

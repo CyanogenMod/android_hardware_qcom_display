@@ -120,6 +120,14 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
                             int usage, int& aligned_w, int& aligned_h);
 
     /*
+     * Function to compute aligned width and aligned height based on
+     * private handle
+     *
+     * @return aligned width, aligned height
+     */
+    void getAlignedWidthAndHeight(const private_handle_t *hnd, int& aligned_w, int& aligned_h);
+
+    /*
      * Function to compute the adreno aligned width and aligned height
      * based on the width and format.
      *
