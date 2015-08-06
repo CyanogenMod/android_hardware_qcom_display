@@ -51,6 +51,7 @@ bool MDPComp::sSrcSplitEnabled = false;
 int MDPComp::sMaxSecLayers = 1;
 bool MDPComp::enablePartialUpdateForMDP3 = false;
 bool MDPComp::sIsPartialUpdateActive = true;
+bool MDPComp::sIsSingleFullScreenUpdate = false;
 void *MDPComp::sLibPerfHint = NULL;
 int MDPComp::sPerfLockHandle = 0;
 int (*MDPComp::sPerfLockAcquire)(int, int, int*, int) = NULL;
@@ -1304,6 +1305,11 @@ bool MDPComp::canPartialUpdate(hwc_context_t *ctx,
     }
     if(ctx->listStats[mDpy].secureUI)
         return false;
+    if (sIsSingleFullScreenUpdate) {
+        // make sure one full screen update
+        sIsSingleFullScreenUpdate = false;
+        return false;
+    }
     return true;
 }
 
