@@ -91,7 +91,7 @@ HWCSession::HWCSession(const hw_module_t *module) {
   hwc_procs_default_.hotplug = Hotplug;
 
   hwc_composer_device_1_t::common.tag = HARDWARE_DEVICE_TAG;
-  hwc_composer_device_1_t::common.version = HWC_DEVICE_API_VERSION_1_4;
+  hwc_composer_device_1_t::common.version = HWC_DEVICE_API_VERSION_1_5;
   hwc_composer_device_1_t::common.module = const_cast<hw_module_t*>(module);
   hwc_composer_device_1_t::common.close = Close;
   hwc_composer_device_1_t::prepare = Prepare;
