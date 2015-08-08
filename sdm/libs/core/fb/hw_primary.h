@@ -78,11 +78,11 @@ class HWPrimary : public HWDevice {
 
   pollfd poll_fds_[kNumDisplayEvents];
   pthread_t event_thread_;
-  const char *event_thread_name_;
-  bool fake_vsync_;
-  bool exit_threads_;
+  const char *event_thread_name_ = "SDM_EventThread";
+  bool fake_vsync_ = false;
+  bool exit_threads_ = false;
   HWDisplayAttributes display_attributes_;
-  bool config_changed_;
+  bool config_changed_ = true;
 };
 
 }  // namespace sdm
