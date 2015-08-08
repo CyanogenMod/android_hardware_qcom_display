@@ -101,6 +101,7 @@ struct HWResourceInfo {
   bool has_rotator_downscale = false;
   bool has_non_scalar_rgb = false;
   bool is_src_split = false;
+  bool perf_calc = false;
 
   void Reset() { *this = HWResourceInfo(); }
 };
@@ -264,7 +265,9 @@ struct HWLayersInfo {
 struct HWLayers {
   HWLayersInfo info;
   HWLayerConfig config[kMaxSDELayers];
-  float output_compression;
+  float output_compression = 1.0f;
+  uint32_t bandwidth = 0;
+  uint32_t clock = 0;
 };
 
 struct HWDisplayAttributes : DisplayConfigVariableInfo {
