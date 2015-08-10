@@ -40,6 +40,7 @@
 // Ignore Wconversion errors for external headers
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wfloat-conversion"
 #include <SkBitmap.h>
 #include <SkImageEncoder.h>
 #pragma GCC diagnostic pop
