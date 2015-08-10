@@ -54,7 +54,6 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
-  virtual DisplayError GetConfig(DisplayConfigFixedInfo *fixed_info);
   virtual DisplayError GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info);
   virtual DisplayError GetActiveConfig(uint32_t *index);
   virtual DisplayError GetVSyncState(bool *enabled);
@@ -77,7 +76,6 @@ class DisplayBase : public DisplayInterface {
   // DumpImpl method
   void AppendDump(char *buffer, uint32_t length);
 
-  virtual int GetBestConfig();
   bool IsRotationRequired(HWLayers *hw_layers);
   const char *GetName(const LayerComposition &composition);
   const char *GetName(const LayerBufferFormat &format);
@@ -94,9 +92,6 @@ class DisplayBase : public DisplayInterface {
   Handle hw_device_ = 0;
   Handle display_comp_ctx_ = 0;
   Handle display_rotator_ctx_ = 0;
-  HWDisplayAttributes *display_attributes_ = NULL;
-  uint32_t num_modes_ = 0;
-  uint32_t active_mode_index_ = 0;
   HWLayers hw_layers_;
   bool pending_commit_ = false;
   bool vsync_enable_ = false;
@@ -105,6 +100,12 @@ class DisplayBase : public DisplayInterface {
   HWInfoInterface *hw_info_intf_ = NULL;
   ColorManagerProxy *color_mgr_ = NULL;  // each display object owns its ColorManagerProxy
   bool partial_update_control_ = true;
+
+ private:
+  // Unused
+  virtual DisplayError GetConfig(DisplayConfigFixedInfo *variable_info) {
+    return kErrorNone;
+  }
 };
 
 }  // namespace sdm

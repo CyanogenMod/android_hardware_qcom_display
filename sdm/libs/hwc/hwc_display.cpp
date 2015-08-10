@@ -1329,5 +1329,21 @@ void HWCDisplay::SetSecureDisplay(bool secure_display_active) {
   return;
 }
 
+int HWCDisplay::SetActiveDisplayConfig(int config) {
+  return display_intf_->SetActiveConfig(config) == kErrorNone ? 0 : -1;
+}
+
+int HWCDisplay::GetActiveDisplayConfig(uint32_t *config) {
+  return display_intf_->GetActiveConfig(config) == kErrorNone ? 0 : -1;
+}
+
+int HWCDisplay::GetDisplayConfigCount(uint32_t *count) {
+  return display_intf_->GetNumVariableInfoConfigs(count) == kErrorNone ? 0 : -1;
+}
+
+int HWCDisplay::GetDisplayAttributesForConfig(int config, DisplayConfigVariableInfo *attributes) {
+  return display_intf_->GetConfig(config, attributes) == kErrorNone ? 0 : -1;
+}
+
 }  // namespace sdm
 

@@ -50,6 +50,8 @@ DisplayError DisplayVirtual::Init() {
     return error;
   }
 
+  hw_intf_->GetDisplayAttributes(0 /* active_index */, &display_attributes_);
+
   error = DisplayBase::Init();
   if (error != kErrorNone) {
     HWVirtual::Destroy(hw_intf_);
@@ -89,22 +91,20 @@ DisplayError DisplayVirtual::GetDisplayState(DisplayState *state) {
 
 DisplayError DisplayVirtual::GetNumVariableInfoConfigs(uint32_t *count) {
   SCOPE_LOCK(locker_);
-  return DisplayBase::GetNumVariableInfoConfigs(count);
-}
-
-DisplayError DisplayVirtual::GetConfig(DisplayConfigFixedInfo *fixed_info) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetConfig(fixed_info);
+  *count = 1;
+  return kErrorNone;
 }
 
 DisplayError DisplayVirtual::GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info) {
   SCOPE_LOCK(locker_);
-  return DisplayBase::GetConfig(index, variable_info);
+  *variable_info = display_attributes_;
+  return kErrorNone;
 }
 
 DisplayError DisplayVirtual::GetActiveConfig(uint32_t *index) {
   SCOPE_LOCK(locker_);
-  return DisplayBase::GetActiveConfig(index);
+  *index = 0;
+  return kErrorNone;
 }
 
 DisplayError DisplayVirtual::GetVSyncState(bool *enabled) {
@@ -130,11 +130,9 @@ DisplayError DisplayVirtual::SetActiveConfig(DisplayConfigVariableInfo *variable
     return kErrorParameters;
   }
 
-  HWDisplayAttributes display_attributes = display_attributes_[active_mode_index_];
-
-  display_attributes.x_pixels = variable_info->x_pixels;
-  display_attributes.y_pixels = variable_info->y_pixels;
-  display_attributes.fps = variable_info->fps;
+  display_attributes_.x_pixels = variable_info->x_pixels;
+  display_attributes_.y_pixels = variable_info->y_pixels;
+  display_attributes_.fps = variable_info->fps;
 
   // if display is already connected, unregister display from composition manager and register
   // the display with new configuration.
@@ -142,20 +140,18 @@ DisplayError DisplayVirtual::SetActiveConfig(DisplayConfigVariableInfo *variable
     comp_manager_->UnregisterDisplay(display_comp_ctx_);
   }
 
-  error = comp_manager_->RegisterDisplay(display_type_, display_attributes, hw_panel_info_,
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_, hw_panel_info_,
                                          &display_comp_ctx_);
   if (error != kErrorNone) {
     return error;
   }
-
-  display_attributes_[active_mode_index_] = display_attributes;
 
   return error;
 }
 
 DisplayError DisplayVirtual::SetActiveConfig(uint32_t index) {
   SCOPE_LOCK(locker_);
-  return DisplayBase::SetActiveConfig(index);
+  return kErrorNotSupported;
 }
 
 DisplayError DisplayVirtual::SetVSyncState(bool enable) {

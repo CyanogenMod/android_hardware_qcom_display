@@ -44,9 +44,10 @@ class HWDevice : public HWInterface {
   virtual ~HWDevice() {}
 
   // From HWInterface
+  virtual DisplayError GetActiveConfig(uint32_t *active_config);
   virtual DisplayError GetNumDisplayAttributes(uint32_t *count);
-  virtual DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
-                                            uint32_t index);
+  virtual DisplayError GetDisplayAttributes(uint32_t index,
+                                            HWDisplayAttributes *display_attributes);
   virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info);
   virtual DisplayError SetDisplayAttributes(uint32_t index);
   virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
