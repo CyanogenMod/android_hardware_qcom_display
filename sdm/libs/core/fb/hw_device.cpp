@@ -228,6 +228,7 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
             mdp_buffer.width = pipe_info->scale_data.src_width;
           }
           SetHWScaleData(pipe_info->scale_data, mdp_layer_count);
+          mdp_layer.flags |= MDP_LAYER_ENABLE_PIXEL_EXT;
         }
 
         // Send scale data to MDP driver
