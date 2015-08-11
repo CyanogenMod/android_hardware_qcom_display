@@ -41,6 +41,8 @@ class HWCDisplayExternal : public HWCDisplay {
  private:
   HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
   void ApplyScanAdjustment(hwc_rect_t *display_frame);
+  static void GetDownscaleResolution(uint32_t primary_width, uint32_t primary_height,
+                                     uint32_t *virtual_width, uint32_t *virtual_height);
 };
 
 }  // namespace sdm

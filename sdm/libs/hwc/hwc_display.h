@@ -148,9 +148,6 @@ class HWCDisplay : public DisplayEventHandler {
   bool SingleLayerUpdating(uint32_t app_layer_count);
   uint32_t SanitizeRefreshRate(uint32_t req_refresh_rate);
 
-  static void GetDownscaleResolution(uint32_t primary_width, uint32_t primary_height,
-                                     uint32_t *virtual_width, uint32_t *virtual_height);
-
   enum {
     INPUT_LAYER_DUMP,
     OUTPUT_LAYER_DUMP,
