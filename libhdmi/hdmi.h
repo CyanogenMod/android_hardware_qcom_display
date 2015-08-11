@@ -47,8 +47,8 @@ public:
     int configure();
     void getAttributes(uint32_t& width, uint32_t& height);
     int teardown();
-    uint32_t getWidth() const { return mXres; };
-    uint32_t getHeight() const { return mYres; };
+    uint32_t getFBWidth() const { return mXres; };
+    uint32_t getFBHeight() const { return mYres; };
     uint32_t getVsyncPeriod() const { return mVsyncPeriod; };
     int getFd() const { return mFd; };
     bool getMDPScalingMode() const { return mMDPScalingMode; }

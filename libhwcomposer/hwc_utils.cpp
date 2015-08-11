@@ -132,8 +132,8 @@ static void handleFbScaling(hwc_context_t *ctx, int xresPanel, int yresPanel,
 // hdmi display class state
 void updateDisplayInfo(hwc_context_t* ctx, int dpy) {
     ctx->dpyAttr[dpy].fd = ctx->mHDMIDisplay->getFd();
-    ctx->dpyAttr[dpy].xres = ctx->mHDMIDisplay->getWidth();
-    ctx->dpyAttr[dpy].yres = ctx->mHDMIDisplay->getHeight();
+    ctx->dpyAttr[dpy].xres = ctx->mHDMIDisplay->getFBWidth();
+    ctx->dpyAttr[dpy].yres = ctx->mHDMIDisplay->getFBHeight();
     ctx->dpyAttr[dpy].mMDPScalingMode = ctx->mHDMIDisplay->getMDPScalingMode();
     ctx->dpyAttr[dpy].vsync_period = ctx->mHDMIDisplay->getVsyncPeriod();
     //FIXME: for now assume HDMI as secure
