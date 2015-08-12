@@ -80,7 +80,8 @@ class HWPrimary : public HWDevice {
   void HandleThermal(char *data);
   DisplayError PopulateDisplayAttributes();
   void InitializeConfigs();
-  bool isResolutionSwitchEnabled() { return !display_configs_.empty(); }
+  bool IsResolutionSwitchEnabled() { return !display_configs_.empty(); }
+  bool GetCurrentModeFromSysfs(size_t *curr_x_pixels, size_t *curr_y_pixels);
 
   pollfd poll_fds_[kNumDisplayEvents];
   pthread_t event_thread_;
