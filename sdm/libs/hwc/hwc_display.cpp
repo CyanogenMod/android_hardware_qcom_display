@@ -784,13 +784,16 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
 bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
+  if (layer_stack_cache_.animating) {
+      return false;
+  }
+
   // Frame buffer needs to be refreshed for the following reasons:
   // 1. Any layer is marked skip in the current layer stack.
   // 2. Any layer is added/removed/layer properties changes in the current layer stack.
   // 3. Any layer handle is changed and it is marked for GPU composition
   // 4. Any layer's current composition is different from previous composition.
-  if ((layer_stack_cache_.layer_count != layer_count) || layer_stack_.flags.skip_present ||
-      layer_stack_.flags.geometry_changed || layer_stack_.flags.animating) {
+  if (layer_stack_.flags.skip_present || layer_stack_.flags.geometry_changed) {
     return true;
   }
 
