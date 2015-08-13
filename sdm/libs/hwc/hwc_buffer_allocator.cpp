@@ -78,6 +78,7 @@ DisplayError HWCBufferAllocator::AllocateBuffer(BufferInfo *buffer_info) {
 
   error = SetBufferInfo(buffer_config.format, &format, &alloc_flags);
   if (error != 0) {
+    delete meta_buffer_info;
     return kErrorParameters;
   }
 
@@ -96,6 +97,7 @@ DisplayError HWCBufferAllocator::AllocateBuffer(BufferInfo *buffer_info) {
   error = alloc_controller_->allocate(data, alloc_flags);
   if (error != 0) {
     DLOGE("Error allocating memory size %d uncached %d", data.size, data.uncached);
+    delete meta_buffer_info;
     return kErrorMemory;
   }
 

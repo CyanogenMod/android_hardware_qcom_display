@@ -628,7 +628,7 @@ android::status_t HWCSession::ControlBackLight(const android::Parcel *input_parc
     // Read backlight and store it internally. Set backlight to 0 on primary.
     if (read(fd, brightness_, sizeof(brightness_)) > 0) {
       DLOGI("backlight brightness is %s", brightness_);
-      ssize_t ret = write(fd, bl_brightness, sizeof(bl_brightness));
+      ssize_t ret = write(fd, bl_brightness, strlen(bl_brightness));
       if (ret < 0) {
         DLOGE("Failed to write backlight node err = %d errstr = %s", errno, strerror(errno));
         close(fd);
