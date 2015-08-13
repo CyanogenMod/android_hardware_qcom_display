@@ -836,12 +836,18 @@ bool isUBwcEnabled(int format, int usage)
     if (isUBwcFormat(format))
         return true;
 
-    // Allow UBWC, if client sets UBWC gralloc usage flag & GPU supports format.
-    if ((usage & GRALLOC_USAGE_PRIVATE_ALLOC_UBWC) && isUBwcSupported(format) &&
-        AdrenoMemInfo::getInstance().isUBWCSupportedByGPU(format)) {
+    // Allow UBWC, if an OpenGL client sets UBWC usage flag and GPU plus MDP
+    // support the format. OR if a non-OpenGL client like Rotator, sets UBWC
+    // usage flag and MDP supports the format.
+    if ((usage & GRALLOC_USAGE_PRIVATE_ALLOC_UBWC) && isUBwcSupported(format)) {
+        bool enable = true;
+        // Query GPU for UBWC only if buffer is intended to be used by GPU.
+        if (usage & (GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_RENDER)) {
+            enable = AdrenoMemInfo::getInstance().isUBWCSupportedByGPU(format);
+        }
         // Allow UBWC, only if CPU usage flags are not set
-        if (!(usage & (GRALLOC_USAGE_SW_READ_MASK |
-                      GRALLOC_USAGE_SW_WRITE_MASK))) {
+        if (enable && !(usage & (GRALLOC_USAGE_SW_READ_MASK |
+            GRALLOC_USAGE_SW_WRITE_MASK))) {
             return true;
         }
     }
