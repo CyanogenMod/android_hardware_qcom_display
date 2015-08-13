@@ -1685,7 +1685,7 @@ int MDPComp::getBatch(hwc_display_contents_1_t* list,
         int& maxBatchStart, int& maxBatchEnd,
         int& maxBatchCount) {
     int i = 0;
-    int fbZOrder =-1;
+    int fbZOrder = DEFAULT_FB_ZORDER;
     int droppedLayerCt = 0;
     while (i < mCurrentFrame.layerCount) {
         int batchCount = 0;
@@ -2216,7 +2216,7 @@ int MDPComp::isBottomLayerFullScreen(hwc_context_t *ctx,
     hwc_layer_1_t* layer = &list->hwLayers[0];
     hwc_rect_t rect = {0, 0, (int)ctx->dpyAttr[mDpy].xres,
         (int)ctx->dpyAttr[mDpy].yres};
-    if((ctx->listStats[mDpy].numAppLayers > 1) &&
+    if(not mDpy && (ctx->listStats[mDpy].numAppLayers > 1) &&
             isSupportedForMDPComp(ctx, layer) &&
             isSameRect(rect, layer->displayFrame)) {
         return 1;
