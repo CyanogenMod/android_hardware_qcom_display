@@ -43,8 +43,20 @@
 
 namespace sdm {
 
-void HWCDisplay::AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height,
-                                        uint32_t *src_width, uint32_t *src_height) {
+static void AssignLayerRegionsAddress(LayerRectArray *region, uint32_t rect_count,
+                                      uint8_t **base_address) {
+  if (rect_count) {
+    region->rect = reinterpret_cast<LayerRect *>(*base_address);
+    region->count = rect_count;
+    for (size_t i = 0; i < rect_count; i++) {
+      region->rect[i] = LayerRect();
+    }
+    *base_address += rect_count * sizeof(LayerRect);
+  }
+}
+
+static void AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height, uint32_t *src_width,
+                                   uint32_t *src_height) {
   *src_height = (dst_width * (*src_height)) / (*src_width);
   *src_width = dst_width;
 }
@@ -303,19 +315,27 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
     blit_target_count = kMaxBlitTargetLayers;
   }
 
-  // Allocate memory for a) total number of layers b) buffer handle for each layer c) number of
-  // visible rectangles in each layer d) dirty rectangle for each layer
+  // Allocate memory for
+  //  a) total number of layers
+  //  b) buffer handle for each layer
+  //  c) number of visible rectangles in each layer
+  //  d) number of dirty rectangles in each layer
+  //  e) number of blit rectangles in each layer
   size_t required_size = (num_hw_layers + blit_target_count) *
                          (sizeof(Layer) + sizeof(LayerBuffer));
 
   for (size_t i = 0; i < num_hw_layers + blit_target_count; i++) {
-    uint32_t num_visible_rects = 1;
+    uint32_t num_visible_rects = 0;
+    uint32_t num_dirty_rects = 0;
+
+    hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     if (i < num_hw_layers) {
-      num_visible_rects = INT32(content_list->hwLayers[i].visibleRegionScreen.numRects);
+      num_visible_rects = INT32(hwc_layer.visibleRegionScreen.numRects);
+      num_dirty_rects = INT32(hwc_layer.surfaceDamage.numRects);
     }
 
-    // visible rectangles + 1 dirty rectangle + blit rectangle
-    size_t num_rects = num_visible_rects + 1 + blit_target_count;
+    // visible rectangles + dirty rectangles + blit rectangle
+    size_t num_rects = num_visible_rects + num_dirty_rects + blit_target_count;
     required_size += num_rects * sizeof(LayerRect);
   }
 
@@ -347,10 +367,12 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   current_address += (num_hw_layers + blit_target_count) * sizeof(Layer);
 
   for (size_t i = 0; i < num_hw_layers + blit_target_count; i++) {
-    uint32_t num_visible_rects = 1;
+    uint32_t num_visible_rects = 0;
+    uint32_t num_dirty_rects = 0;
+
     if (i < num_hw_layers) {
-      num_visible_rects =
-        static_cast<uint32_t>(content_list->hwLayers[i].visibleRegionScreen.numRects);
+      num_visible_rects = UINT32(content_list->hwLayers[i].visibleRegionScreen.numRects);
+      num_dirty_rects = UINT32(content_list->hwLayers[i].surfaceDamage.numRects);
     }
 
     Layer &layer = layer_stack_.layers[i];
@@ -361,27 +383,10 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
     *layer.input_buffer = LayerBuffer();
     current_address += sizeof(LayerBuffer);
 
-    // Visible rectangle address
-    layer.visible_regions.rect = reinterpret_cast<LayerRect *>(current_address);
-    layer.visible_regions.count = num_visible_rects;
-    for (size_t i = 0; i < layer.visible_regions.count; i++) {
-      layer.visible_regions.rect[i] = LayerRect();
-    }
-    current_address += num_visible_rects * sizeof(LayerRect);
-
-    // Dirty rectangle address
-    layer.dirty_regions.rect = reinterpret_cast<LayerRect *>(current_address);
-    layer.dirty_regions.count = 1;
-    *layer.dirty_regions.rect = LayerRect();
-    current_address += sizeof(LayerRect);
-
-    // Blit rectangle address
-    layer.blit_regions.rect = reinterpret_cast<LayerRect *>(current_address);
-    layer.blit_regions.count = blit_target_count;
-    for (size_t i = 0; i < layer.blit_regions.count; i++) {
-      layer.blit_regions.rect[i] = LayerRect();
-    }
-    current_address += layer.blit_regions.count * sizeof(LayerRect);
+    // Visible/Dirty/Blit rectangle address
+    AssignLayerRegionsAddress(&layer.visible_regions, num_visible_rects, &current_address);
+    AssignLayerRegionsAddress(&layer.dirty_regions, num_dirty_rects, &current_address);
+    AssignLayerRegionsAddress(&layer.blit_regions, blit_target_count, &current_address);
   }
 
   return 0;
@@ -524,7 +529,9 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     for (size_t j = 0; j < hwc_layer.visibleRegionScreen.numRects; j++) {
       SetRect(hwc_layer.visibleRegionScreen.rects[j], &layer.visible_regions.rect[j]);
     }
-    SetRect(hwc_layer.sourceCropf, &layer.dirty_regions.rect[0]);
+    for (size_t j = 0; j < hwc_layer.surfaceDamage.numRects; j++) {
+      SetRect(hwc_layer.surfaceDamage.rects[j], &layer.dirty_regions.rect[j]);
+    }
     SetComposition(hwc_layer.compositionType, &layer.composition);
 
     // For dim layers, SurfaceFlinger
@@ -560,7 +567,7 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       layer.src_rect.top = 0;
       layer.src_rect.right = input_buffer->width;
       layer.src_rect.bottom = input_buffer->height;
-      layer.dirty_regions.rect[0] = layer.src_rect;
+      layer.dirty_regions.count = 0;
     }
 
     layer.plane_alpha = hwc_layer.planeAlpha;
