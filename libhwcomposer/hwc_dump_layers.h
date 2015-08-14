@@ -47,10 +47,6 @@ private:
   int mDumpCntrRaw;
   char mDumpPropStrRaw[PROPERTY_VALUE_MAX];
   char mDumpDirRaw[PATH_MAX];
-  int mDumpCntLimPng;
-  int mDumpCntrPng;
-  char mDumpPropStrPng[PROPERTY_VALUE_MAX];
-  char mDumpDirPng[PATH_MAX];
   uint32_t mDpy;
   char mDisplayName[PROPERTY_VALUE_MAX];
   char mDumpPropKeyDisplayType[PROPERTY_KEY_MAX];
