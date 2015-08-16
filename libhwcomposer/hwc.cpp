@@ -254,7 +254,8 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
     if (!ctx->mBootAnimCompleted)
         processBootAnimCompleted(ctx);
 
-    if (LIKELY(list && list->numHwLayers > 1) &&
+    if (LIKELY(list && (list->numHwLayers > 1 ||
+                    ctx->mMDP.version < qdutils::MDP_V4_0)) &&
             (ctx->dpyAttr[dpy].isActive ||
              ctx->mHDMIDisplay->isHDMIPrimaryDisplay())
             && !ctx->dpyAttr[dpy].isPause) {
@@ -787,6 +788,9 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         HWC_DISPLAY_DPI_X,
         HWC_DISPLAY_DPI_Y,
         HWC_DISPLAY_SECURE,
+#ifdef GET_FRAMEBUFFER_FORMAT_FROM_HWC
+        HWC_DISPLAY_FBFORMAT,
+#endif
         HWC_DISPLAY_NO_ATTRIBUTE,
     };
 
@@ -824,6 +828,11 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         case HWC_DISPLAY_SECURE:
             values[i] = (int32_t) (ctx->dpyAttr[disp].secure);
             break;
+#ifdef GET_FRAMEBUFFER_FORMAT_FROM_HWC
+        case HWC_DISPLAY_FBFORMAT:
+            values[i] = ctx->dpyAttr[disp].fbformat;
+            break;
+#endif
         default:
             ALOGE("Unknown display attribute %d",
                     attributes[i]);

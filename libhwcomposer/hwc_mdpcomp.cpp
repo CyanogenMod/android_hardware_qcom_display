@@ -39,7 +39,6 @@ namespace qhwc {
 
 IdleInvalidator *MDPComp::sIdleInvalidator = NULL;
 bool MDPComp::sIdleFallBack = false;
-bool MDPComp::sHandleTimeout = false;
 bool MDPComp::sDebugLogs = false;
 bool MDPComp::sEnabled = false;
 bool MDPComp::sEnableMixedMode = true;
@@ -197,12 +196,13 @@ void MDPComp::reset(hwc_context_t *ctx) {
 }
 
 void MDPComp::reset() {
-    sHandleTimeout = false;
+    mPrevModeOn = mModeOn;
     mModeOn = false;
 }
 
 void MDPComp::timeout_handler(void *udata) {
     struct hwc_context_t* ctx = (struct hwc_context_t*)(udata);
+    bool handleTimeout = false;
 
     if(!ctx) {
         ALOGE("%s: received empty data in timer callback", __FUNCTION__);
@@ -210,8 +210,16 @@ void MDPComp::timeout_handler(void *udata) {
     }
 
     ctx->mDrawLock.lock();
-    // Handle timeout event only if the previous composition is MDP or MIXED.
-    if(!sHandleTimeout) {
+
+    /* Handle timeout event only if the previous composition
+       on any display is MDP or MIXED*/
+    for(int i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+        if(ctx->mMDPComp[i])
+            handleTimeout =
+                    ctx->mMDPComp[i]->isMDPComp() || handleTimeout;
+    }
+
+    if(!handleTimeout) {
         ALOGD_IF(isDebug(), "%s:Do not handle this timeout", __FUNCTION__);
         ctx->mDrawLock.unlock();
         return;
@@ -354,6 +362,25 @@ bool MDPComp::LayerCache::isSameFrame(const FrameInfo& curFrame,
     return true;
 }
 
+bool MDPComp::LayerCache::isSameFrame(hwc_context_t *ctx, int dpy,
+                                      hwc_display_contents_1_t* list) {
+
+    if(layerCount != ctx->listStats[dpy].numAppLayers)
+        return false;
+
+    if((list->flags & HWC_GEOMETRY_CHANGED) ||
+       isSkipPresent(ctx, dpy)) {
+        return false;
+    }
+
+    for(int i = 0; i < layerCount; i++) {
+        if(hnd[i] != list->hwLayers[i].handle)
+            return false;
+    }
+
+    return true;
+}
+
 bool MDPComp::isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
     if((has90Transform(layer) and (not isRotationDoable(ctx, hnd))) ||
@@ -464,6 +491,14 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         //1 Padding round to shift pipes across mixers
         ALOGD_IF(isDebug(),"%s: MDP Comp. video transition padding round",
                 __FUNCTION__);
+        ret = false;
+    } else if((qdutils::MDPVersion::getInstance().is8x26() ||
+               qdutils::MDPVersion::getInstance().is8x16() ||
+               qdutils::MDPVersion::getInstance().is8x39()) &&
+              !mDpy && isSecondaryAnimating(ctx) &&
+              isYuvPresent(ctx,HWC_DISPLAY_VIRTUAL)) {
+        ALOGD_IF(isDebug(),"%s: Display animation in progress",
+                 __FUNCTION__);
         ret = false;
     } else if(qdutils::MDPVersion::getInstance().getTotalPipes() < 8) {
        /* TODO: freeing up all the resources only for the targets having total
@@ -743,6 +778,14 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         return false;
     }
 
+    if(!mDpy && isSecondaryAnimating(ctx) &&
+       (isYuvPresent(ctx,HWC_DISPLAY_EXTERNAL) ||
+       isYuvPresent(ctx,HWC_DISPLAY_VIRTUAL)) ) {
+        ALOGD_IF(isDebug(),"%s: Display animation in progress",
+                 __FUNCTION__);
+        return false;
+    }
+
     // if secondary is configuring or Padding round, fall back to video only
     // composition and release all assigned non VIG pipes from primary.
     if(isSecondaryConfiguring(ctx)) {
@@ -834,6 +877,15 @@ bool MDPComp::fullMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         }
     }
 
+    if(!mDpy && isSecondaryConnected(ctx) &&
+           (qdutils::MDPVersion::getInstance().is8x16() ||
+            qdutils::MDPVersion::getInstance().is8x26() ||
+            qdutils::MDPVersion::getInstance().is8x39()) &&
+           isYuvPresent(ctx, HWC_DISPLAY_VIRTUAL)) {
+        ALOGD_IF(isDebug(), "%s: YUV layer present on secondary", __FUNCTION__);
+        return false;
+    }
+
     mCurrentFrame.fbCount = 0;
     memcpy(&mCurrentFrame.isFBComposed, &mCurrentFrame.drop,
            sizeof(mCurrentFrame.isFBComposed));
@@ -886,6 +938,15 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
             ALOGD_IF(isDebug(), "%s: Unsupported layer in list",__FUNCTION__);
             return false;
         }
+    }
+
+    if(!mDpy && isSecondaryConnected(ctx) &&
+           (qdutils::MDPVersion::getInstance().is8x16() ||
+            qdutils::MDPVersion::getInstance().is8x26() ||
+            qdutils::MDPVersion::getInstance().is8x39()) &&
+           isYuvPresent(ctx, HWC_DISPLAY_VIRTUAL)) {
+        ALOGD_IF(isDebug(), "%s: YUV layer present on secondary", __FUNCTION__);
+        return false;
     }
 
     /* We cannot use this composition mode, if:
@@ -1090,8 +1151,8 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
 
 bool MDPComp::partialMDPComp(hwc_context_t *ctx, hwc_display_contents_1_t* list)
 {
-    if(!sEnableMixedMode) {
-        //Mixed mode is disabled. No need to even try caching.
+    if(!sEnableMixedMode || !isAlphaPresentinFB(ctx, mDpy)) {
+        //Mixed mode is disabled/can't be used. No need to even try caching.
         return false;
     }
 
@@ -1932,7 +1993,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                 __FUNCTION__);
         mCachedFrame.reset();
 #ifdef DYNAMIC_FPS
-        setDynRefreshRate(ctx, list);
+        // Reset refresh rate
+        setRefreshRate(ctx, mDpy, ctx->dpyAttr[mDpy].refreshRate);
 #endif
         return -1;
     }
@@ -1948,12 +2010,27 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         setMDPCompLayerFlags(ctx, list);
         mCachedFrame.updateCounts(mCurrentFrame);
 #ifdef DYNAMIC_FPS
-        setDynRefreshRate(ctx, list);
+        // Reset refresh rate
+        setRefreshRate(ctx, mDpy, ctx->dpyAttr[mDpy].refreshRate);
 #endif
         ret = -1;
         return ret;
     } else {
         ctx->mAnimationState[mDpy] = ANIMATION_STOPPED;
+    }
+
+    if(!mDpy and !isSecondaryConnected(ctx) and !mPrevModeOn and
+       mCachedFrame.isSameFrame(ctx,mDpy,list)) {
+
+        ALOGD_IF(isDebug(),"%s: Avoid new composition",__FUNCTION__);
+        mCurrentFrame.needsRedraw = false;
+        setMDPCompLayerFlags(ctx, list);
+        mCachedFrame.updateCounts(mCurrentFrame);
+#ifdef DYNAMIC_FPS
+        setDynRefreshRate(ctx, list);
+#endif
+        return -1;
+
     }
 
     //Hard conditions, if not met, cannot do MDP comp
@@ -2162,11 +2239,6 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if(!isEnabled() or !mModeOn) {
         ALOGD_IF(isDebug(),"%s: MDP Comp not enabled/configured", __FUNCTION__);
         return true;
-    }
-
-    // Set the Handle timeout to true for MDP or MIXED composition.
-    if(sIdleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount) {
-        sHandleTimeout = true;
     }
 
     overlay::Overlay& ov = *ctx->mOverlay;
@@ -2417,11 +2489,6 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     if(!isEnabled() or !mModeOn) {
         ALOGD_IF(isDebug(),"%s: MDP Comp not enabled/configured", __FUNCTION__);
         return true;
-    }
-
-    // Set the Handle timeout to true for MDP or MIXED composition.
-    if(sIdleInvalidator && !sIdleFallBack && mCurrentFrame.mdpCount) {
-        sHandleTimeout = true;
     }
 
     overlay::Overlay& ov = *ctx->mOverlay;
@@ -2778,7 +2845,6 @@ int MDPComp::setPartialUpdatePref(hwc_context_t *ctx, bool enable) {
         return -1;
     }
     close(fd);
-    sIsPartialUpdateActive = enable;
     return 0;
 }
 }; //namespace

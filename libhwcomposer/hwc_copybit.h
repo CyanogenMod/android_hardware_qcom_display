@@ -28,6 +28,8 @@
 #define MAX_SCALE_FACTOR 16
 #define MIN_SCALE_FACTOR 0.0625
 #define MAX_LAYERS_FOR_ABC 2
+#define INVALID_DIMENSION -1
+#define NO_UPDATING_LAYER -2
 namespace qhwc {
 
 class CopyBit {
@@ -72,11 +74,14 @@ private:
     /* framebuffer cache*/
     struct FbCache {
       hwc_rect_t  FbdirtyRect[NUM_RENDER_BUFFERS];
+      hwc_rect_t  FbdisplayRect[NUM_RENDER_BUFFERS];
       int FbIndex;
       FbCache();
       void reset();
-      void insertAndUpdateFbCache(hwc_rect_t dirtyRect);
-      int getUnchangedFbDRCount(hwc_rect_t dirtyRect);
+      void insertAndUpdateFbCache(hwc_rect_t dirtyRect,
+                               hwc_rect_t displayRect);
+      int getUnchangedFbDRCount(hwc_rect_t dirtyRect,
+                             hwc_rect_t displayRect);
     };
 
     // holds the copybit device
