@@ -445,7 +445,9 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
   DLOGI_IF(kTagDriverConfig, "retire_fence_fd %d", stack->retire_fence_fd);
   DLOGI_IF(kTagDriverConfig, "*******************************************************************");
 
-  Sys::close_(mdp_commit.release_fence);
+  if (mdp_commit.release_fence >= 0) {
+    Sys::close_(mdp_commit.release_fence);
+  }
 
   if (synchronous_commit_) {
     // A synchronous commit can be requested when changing the display mode so we need to update
