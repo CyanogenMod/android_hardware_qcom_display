@@ -86,20 +86,46 @@ bool CopyBit::isSmartBlitPossible(const hwc_display_contents_1_t *list){
     if(list->numHwLayers > 2) {
         hwc_rect_t displayFrame0 = {0, 0, 0, 0};
         hwc_rect_t displayFrame1 = {0, 0, 0, 0};
+        int layer0_transform     = 0;
+        int layer1_transform     = 0;
+        int isYuvLayer0          = 0;
+        int isYuvLayer1          = 0;
         for (unsigned int i=0; i<list->numHwLayers -1; i++) {
-            hwc_rect_t displayFrame = getIntersection(mDirtyRect,
+            hwc_rect_t displayFrame = list->hwLayers[i].displayFrame;
+            if (mSwapRect)
+               displayFrame = getIntersection(mDirtyRect,
                                                 list->hwLayers[i].displayFrame);
             if (isValidRect(displayFrame) && !isValidRect(displayFrame0)) {
                 displayFrame0 = displayFrame;
+                private_handle_t *hnd =(private_handle_t *)list->hwLayers[i].handle;
+                isYuvLayer0 = isYuvBuffer(hnd);
+                layer0_transform = list->hwLayers[i].transform;
             } else if(isValidRect(displayFrame)) {
                 displayFrame1 = displayFrame;
+                layer1_transform = list->hwLayers[i].transform;
+                private_handle_t *hnd =(private_handle_t *)list->hwLayers[i].handle;
+                isYuvLayer1 = isYuvBuffer(hnd);
                 break;
             }
         }
-        if((displayFrame0 == displayFrame1) &&
-            not (list->flags & (MDP_ROT_90 | MDP_FLIP_UD | MDP_FLIP_LR))) {
-            ALOGD_IF (DEBUG_COPYBIT, "%s:Smart Bilt Possible",__FUNCTION__);
-            return true;
+        /*
+         *  smart blit enable only if
+         *  1. Both layers should have same ROI.
+         *  2. Both layers can't be video layer.
+         *  3. Should not be any rotation for base RGB layer.
+         *  4. In case of base layer as video, next above RGB layer
+         *     should not contains any rotation.
+         */
+        if((displayFrame0 == displayFrame1) && not (isYuvLayer1 && isYuvLayer0)) {
+            if (isYuvLayer0) {
+                if (not layer1_transform) {
+                    ALOGD_IF(DEBUG_COPYBIT,"%s:Smart Bilt Possible",__FUNCTION__);
+                    return true;
+                }
+            } else if (not layer0_transform) {
+                    ALOGD_IF(DEBUG_COPYBIT,"%s:Smart Bilt Possible",__FUNCTION__);
+                    return true;
+            }
         }
     }
     return false;
@@ -182,7 +208,7 @@ bool CopyBit::prepareSwapRect(hwc_context_t *ctx,
    hwc_rect_t dirtyRect = {0, 0, 0, 0};
    hwc_rect_t displayRect = {0, 0, 0, 0};
    if((mLayerCache.layerCount != ctx->listStats[dpy].numAppLayers) ||
-                                                        not mSwapRectEnable) {
+         list->flags & HWC_GEOMETRY_CHANGED || not mSwapRectEnable) {
         mLayerCache.reset();
         mFbCache.reset();
         mLayerCache.updateCounts(ctx,list,dpy);
@@ -593,9 +619,14 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         }
     }
 
-    if (not CBUtils::uiClearRegion(list, ctx->mMDP.version, layerProp,
-                                   mDirtyRect, mEngine, renderBuffer)){
-        mSwapRect = 0;
+    //if swap rect on and not getting valid dirtyRect
+    //means calling only commit without any draw. Hence avoid
+    //clear call as well.
+    if (not mSwapRect || isValidRect(mDirtyRect)) {
+       if (not CBUtils::uiClearRegion(list, ctx->mMDP.version, layerProp,
+                                      mDirtyRect, mEngine, renderBuffer)){
+           mSwapRect = 0;
+       }
     }
 
     // numAppLayers-1, as we iterate from 0th layer index with HWC_COPYBIT flag
@@ -1156,8 +1187,9 @@ int CopyBit::fillColorUsingCopybit(hwc_layer_1_t *layer,
 void CopyBit::getLayerResolution(const hwc_layer_1_t* layer,
                                  unsigned int& width, unsigned int& height)
 {
-    hwc_rect_t displayFrame  = layer->displayFrame;
-    hwc_rect_t result = getIntersection(mDirtyRect, displayFrame);
+    hwc_rect_t result  = layer->displayFrame;
+    if (mSwapRect)
+       result = getIntersection(mDirtyRect, result);
 
     width = result.right - result.left;
     height = result.bottom - result.top;

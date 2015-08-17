@@ -137,7 +137,8 @@ bool MDPComp::init(hwc_context_t *ctx) {
             sMaxPipesPerMixer = min(val, MAX_PIPES_PER_MIXER);
     }
 
-    if(ctx->mMDP.panel != MIPI_CMD_PANEL) {
+    if(ctx->mMDP.panel != MIPI_CMD_PANEL &&
+            (ctx->mMDP.version >= qdutils::MDP_V4_0)) {
         sIdleInvalidator = IdleInvalidator::getInstance();
         if(sIdleInvalidator->init(timeout_handler, ctx) < 0) {
             delete sIdleInvalidator;
@@ -1969,7 +1970,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                 __FUNCTION__);
         mCachedFrame.reset();
 #ifdef DYNAMIC_FPS
-        setDynRefreshRate(ctx, list);
+        // Reset refresh rate
+        setRefreshRate(ctx, mDpy, ctx->dpyAttr[mDpy].refreshRate);
 #endif
         return -1;
     }
@@ -1985,7 +1987,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         setMDPCompLayerFlags(ctx, list);
         mCachedFrame.updateCounts(mCurrentFrame);
 #ifdef DYNAMIC_FPS
-        setDynRefreshRate(ctx, list);
+        // Reset refresh rate
+        setRefreshRate(ctx, mDpy, ctx->dpyAttr[mDpy].refreshRate);
 #endif
         ret = -1;
         return ret;
