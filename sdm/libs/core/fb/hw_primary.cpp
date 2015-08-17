@@ -38,6 +38,9 @@
 #include <sys/resource.h>
 #include <utils/debug.h>
 #include <utils/sys.h>
+#include <core/display_interface.h>
+
+#include <string>
 
 #include "hw_primary.h"
 #include "hw_color_manager.h"
@@ -45,6 +48,8 @@
 #define __CLASS__ "HWPrimary"
 
 namespace sdm {
+
+using std::string;
 
 DisplayError HWPrimary::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
                                BufferSyncHandler *buffer_sync_handler,
@@ -72,8 +77,7 @@ DisplayError HWPrimary::Destroy(HWInterface *intf) {
 }
 
 HWPrimary::HWPrimary(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf)
-  : HWDevice(buffer_sync_handler), event_thread_name_("SDM_EventThread"), fake_vsync_(false),
-    exit_threads_(false), config_changed_(true) {
+  : HWDevice(buffer_sync_handler) {
   HWDevice::device_type_ = kDevicePrimary;
   HWDevice::device_name_ = "Primary Display Device";
   HWDevice::hw_info_intf_ = hw_info_intf;
@@ -81,10 +85,10 @@ HWPrimary::HWPrimary(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw
 
 DisplayError HWPrimary::Init(HWEventHandler *eventhandler) {
   DisplayError error = kErrorNone;
-  char node_path[kMaxStringLength] = {0};
-  char data[kMaxStringLength] = {0};
-  const char* event_name[kNumDisplayEvents] = {"vsync_event", "show_blank_event", "idle_notify",
-                                              "msm_fb_thermal_level"};
+  char node_path[kMaxStringLength] = { 0 };
+  char data[kMaxStringLength] = { 0 };
+  const char *event_name[kNumDisplayEvents] = {"vsync_event", "show_blank_event", "idle_notify",
+                                               "msm_fb_thermal_level"};
 
   error = HWDevice::Init(eventhandler);
   if (error != kErrorNone) {
@@ -131,6 +135,7 @@ DisplayError HWPrimary::Init(HWEventHandler *eventhandler) {
   // Disable HPD at start if HDMI is external, it will be enabled later when the display powers on
   // This helps for framework reboot or adb shell stop/start
   EnableHotPlugDetection(0);
+  InitializeConfigs();
 
   return kErrorNone;
 
@@ -146,6 +151,92 @@ CleanupOnError:
   return error;
 }
 
+bool HWPrimary::GetCurrentModeFromSysfs(size_t *curr_x_pixels, size_t *curr_y_pixels) {
+  bool ret = false;
+  size_t len = kPageSize;
+  string mode_path = string(fb_path_) + string("0/mode");
+
+  FILE *fd = Sys::fopen_(mode_path.c_str(), "r");
+  if (fd) {
+    char *buffer = static_cast<char *>(calloc(len, sizeof(char)));
+
+    if (buffer == NULL) {
+      DLOGW("Failed to allocate memory");
+      Sys::fclose_(fd);
+      return false;
+    }
+
+    if (Sys::getline_(&buffer, &len, fd) > 0) {
+      // String is of form "U:1600x2560p-0". Documentation/fb/modedb.txt in
+      // kernel has more info on the format.
+      size_t xpos = string(buffer).find(':');
+      size_t ypos = string(buffer).find('x');
+
+      if (xpos == string::npos || ypos == string::npos) {
+        DLOGI("Resolution switch not supported");
+      } else {
+        *curr_x_pixels = atoi(buffer + xpos + 1);
+        *curr_y_pixels = atoi(buffer + ypos + 1);
+        DLOGI("Current Config: %u x %u", *curr_x_pixels, *curr_y_pixels);
+        ret = true;
+      }
+    }
+
+    free(buffer);
+    Sys::fclose_(fd);
+  }
+
+  return ret;
+}
+
+void HWPrimary::InitializeConfigs() {
+  size_t curr_x_pixels = 0;
+  size_t curr_y_pixels = 0;
+  size_t len = kPageSize;
+  string modes_path = string(fb_path_) + string("0/modes");
+
+  if (!GetCurrentModeFromSysfs(&curr_x_pixels, &curr_y_pixels)) {
+    return;
+  }
+
+  FILE *fd = Sys::fopen_(modes_path.c_str(), "r");
+  if (fd) {
+    char *buffer = static_cast<char *>(calloc(len, sizeof(char)));
+
+    if (buffer == NULL) {
+      DLOGW("Failed to allocate memory");
+      Sys::fclose_(fd);
+      return;
+    }
+
+    while (Sys::getline_(&buffer, &len, fd) > 0) {
+      DisplayConfigVariableInfo config;
+      size_t xpos = string(buffer).find(':');
+      size_t ypos = string(buffer).find('x');
+
+      if (xpos == string::npos || ypos == string::npos) {
+        continue;
+      }
+
+      config.x_pixels = atoi(buffer + xpos + 1);
+      config.y_pixels = atoi(buffer + ypos + 1);
+      DLOGI("Found mode %d x %d", config.x_pixels, config.y_pixels);
+      display_configs_.push_back(config);
+      display_config_strings_.push_back(string(buffer));
+
+      if (curr_x_pixels == config.x_pixels && curr_y_pixels == config.y_pixels) {
+        active_config_index_ = display_configs_.size() - 1;
+        DLOGI("Active config index %u", active_config_index_);
+      }
+    }
+
+    free(buffer);
+    Sys::fclose_(fd);
+  } else {
+    DLOGI("Unable to process modes");
+  }
+}
+
 DisplayError HWPrimary::Deinit() {
   exit_threads_ = true;
   pthread_join(event_thread_, NULL);
@@ -158,12 +249,22 @@ DisplayError HWPrimary::Deinit() {
 }
 
 DisplayError HWPrimary::GetNumDisplayAttributes(uint32_t *count) {
-  return HWDevice::GetNumDisplayAttributes(count);
+  *count = IsResolutionSwitchEnabled() ? display_configs_.size() : 1;
+  return kErrorNone;
 }
 
-DisplayError HWPrimary::GetDisplayAttributes(HWDisplayAttributes *display_attributes,
-                                             uint32_t index) {
+DisplayError HWPrimary::GetActiveConfig(uint32_t *active_config_index) {
+  *active_config_index = active_config_index_;
+  return kErrorNone;
+}
+
+DisplayError HWPrimary::GetDisplayAttributes(uint32_t index,
+                                             HWDisplayAttributes *display_attributes) {
   if (!display_attributes) {
+    return kErrorParameters;
+  }
+
+  if (IsResolutionSwitchEnabled() && index >= display_configs_.size()) {
     return kErrorParameters;
   }
 
@@ -172,11 +273,15 @@ DisplayError HWPrimary::GetDisplayAttributes(HWDisplayAttributes *display_attrib
     if (error != kErrorNone) {
       return error;
     }
-
     config_changed_ = false;
   }
 
   *display_attributes = display_attributes_;
+  if (IsResolutionSwitchEnabled()) {
+    // Overwrite only the parent portion of object
+    display_attributes->x_pixels = display_configs_.at(index).x_pixels;
+    display_attributes->y_pixels = display_configs_.at(index).y_pixels;
+  }
 
   return kErrorNone;
 }
@@ -231,7 +336,38 @@ DisplayError HWPrimary::PopulateDisplayAttributes() {
 }
 
 DisplayError HWPrimary::SetDisplayAttributes(uint32_t index) {
-  return HWDevice::SetDisplayAttributes(index);
+  DisplayError ret = kErrorNone;
+
+  if (!IsResolutionSwitchEnabled()) {
+    return kErrorNotSupported;
+  }
+
+  if (index >= display_configs_.size()) {
+    return kErrorParameters;
+  }
+
+  string mode_path = string(fb_path_) + string("0/mode");
+  int fd = Sys::open_(mode_path.c_str(), O_WRONLY);
+
+  if (fd < 0) {
+    DLOGE("Opening mode failed");
+    return kErrorNotSupported;
+  }
+
+  ssize_t written = Sys::pwrite_(fd, display_config_strings_.at(index).c_str(),
+                                 display_config_strings_.at(index).length(), 0);
+  if (written > 0) {
+    DLOGI("Successfully set config %u", index);
+    PopulateDisplayAttributes();
+    active_config_index_ = index;
+  } else {
+    DLOGE("Writing config index %u failed with error: %s", index, strerror(errno));
+    ret = kErrorParameters;
+  }
+
+  Sys::close_(fd);
+
+  return ret;
 }
 
 DisplayError HWPrimary::SetRefreshRate(uint32_t refresh_rate) {
@@ -360,22 +496,18 @@ void* HWPrimary::DisplayEventThreadHandler() {
 
   while (!exit_threads_) {
     int error = Sys::poll_(poll_fds_, kNumDisplayEvents, -1);
-    if (error < 0) {
+    if (error <= 0) {
       DLOGW("poll failed. error = %s", strerror(errno));
       continue;
     }
+
     for (int event = 0; event < kNumDisplayEvents; event++) {
       pollfd &poll_fd = poll_fds_[event];
 
       if (poll_fd.revents & POLLPRI) {
-        ssize_t length = Sys::pread_(poll_fd.fd, data, kMaxStringLength, 0);
-        if (length < 0) {
-          // If the read was interrupted - it is not a fatal error, just continue.
-          DLOGW("pread failed. event = %d, error = %s", event, strerror(errno));
-          continue;
+        if (Sys::pread_(poll_fd.fd, data, kMaxStringLength, 0) > 0) {
+          (this->*event_handler[event])(data);
         }
-
-        (this->*event_handler[event])(data);
       }
     }
   }

@@ -65,6 +65,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   static int Query(hwc_composer_device_1 *device, int param, int *value);
   static void RegisterProcs(hwc_composer_device_1 *device, hwc_procs_t const *procs);
   static void Dump(hwc_composer_device_1 *device, char *buffer, int length);
+  // These config functions always return FB params, the actual display params may differ.
   static int GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint32_t *configs,
                                size_t *numConfigs);
   static int GetDisplayAttributes(hwc_composer_device_1 *device, int disp, uint32_t config,
@@ -97,6 +98,15 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   android::status_t ControlPartialUpdate(const android::Parcel *input_parcel, android::Parcel *out);
   android::status_t OnMinHdcpEncryptionLevelChange(const android::Parcel *input_parcel,
                                    android::Parcel *output_parcel);
+  // These functions return the actual display config info as opposed to FB
+  android::status_t HandleSetActiveDisplayConfig(const android::Parcel *input_parcel,
+                                                 android::Parcel *output_parcel);
+  android::status_t HandleGetActiveDisplayConfig(const android::Parcel *input_parcel,
+                                                 android::Parcel *output_parcel);
+  android::status_t HandleGetDisplayConfigCount(const android::Parcel *input_parcel,
+                                                android::Parcel *output_parcel);
+  android::status_t HandleGetDisplayAttributesForConfig(const android::Parcel *input_parcel,
+                                                        android::Parcel *output_parcel);
 
   static Locker locker_;
   CoreInterface *core_intf_ = NULL;

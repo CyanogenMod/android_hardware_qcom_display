@@ -42,10 +42,13 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int Commit(hwc_display_contents_1_t *content_list) = 0;
   virtual int EventControl(int event, int enable);
   virtual int SetPowerMode(int mode);
+
+  // Framebuffer configurations
   virtual int GetDisplayConfigs(uint32_t *configs, size_t *num_configs);
   virtual int GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values);
   virtual int GetActiveConfig();
   virtual int SetActiveConfig(int index);
+
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
@@ -60,6 +63,12 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int SetCursorPosition(int x, int y);
   virtual ~HWCDisplay() { }
   virtual void SetSecureDisplay(bool secure_display_active);
+
+  // Display Configurations
+  virtual int SetActiveDisplayConfig(int config);
+  virtual int GetActiveDisplayConfig(uint32_t *config);
+  virtual int GetDisplayConfigCount(uint32_t *count);
+  virtual int GetDisplayAttributesForConfig(int config, DisplayConfigVariableInfo *attributes);
 
   int SetPanelBrightness(int level);
   int ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,

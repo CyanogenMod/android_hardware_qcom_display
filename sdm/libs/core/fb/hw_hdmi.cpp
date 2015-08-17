@@ -98,7 +98,7 @@ DisplayError HWHDMI::Destroy(HWInterface *intf) {
 }
 
 HWHDMI::HWHDMI(BufferSyncHandler *buffer_sync_handler,  HWInfoInterface *hw_info_intf)
-  : HWDevice(buffer_sync_handler), hw_scan_info_() {
+  : HWDevice(buffer_sync_handler), hw_scan_info_(), active_config_index_(0) {
   HWDevice::device_type_ = kDeviceHDMI;
   HWDevice::device_name_ = "HDMI Display Device";
   HWDevice::hw_info_intf_ = hw_info_intf;
@@ -159,6 +159,11 @@ DisplayError HWHDMI::GetNumDisplayAttributes(uint32_t *count) {
   return kErrorNone;
 }
 
+DisplayError HWHDMI::GetActiveConfig(uint32_t *active_config_index) {
+  *active_config_index = active_config_index_;
+  return kErrorNone;
+}
+
 DisplayError HWHDMI::ReadEDIDInfo() {
   ssize_t length = -1;
   char edid_str[kPageSize] = {'\0'};
@@ -197,8 +202,8 @@ DisplayError HWHDMI::ReadEDIDInfo() {
   return kErrorNone;
 }
 
-DisplayError HWHDMI::GetDisplayAttributes(HWDisplayAttributes *display_attributes,
-                                                     uint32_t index) {
+DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
+                                          HWDisplayAttributes *display_attributes) {
   DTRACE_SCOPED();
 
   if (index > hdmi_mode_count_) {
@@ -289,6 +294,8 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
     IOCTL_LOGE(FBIOPUT_VSCREENINFO, device_type_);
     return kErrorHardware;
   }
+
+  active_config_index_ = index;
 
   return kErrorNone;
 }

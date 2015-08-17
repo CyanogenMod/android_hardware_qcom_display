@@ -138,6 +138,16 @@ LayerRect Union(const LayerRect &rect1, const LayerRect &rect2) {
   return res;
 }
 
+LayerRect Union(const LayerRectArray &rects) {
+  LayerRect res;
+
+  for (uint32_t i = 0; i < rects.count; i++) {
+    res = Union(rects.rect[i], res);
+  }
+
+  return res;
+}
+
 void SplitLeftRight(const LayerRect &in_rect, uint32_t split_count, uint32_t align_x,
                    LayerRect *out_rects) {
   LayerRect rect_temp = in_rect;

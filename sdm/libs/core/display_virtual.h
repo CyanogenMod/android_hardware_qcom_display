@@ -25,6 +25,7 @@
 #ifndef __DISPLAY_VIRTUAL_H__
 #define __DISPLAY_VIRTUAL_H__
 
+#include <private/hw_info_types.h>
 #include "display_base.h"
 #include "dump_impl.h"
 
@@ -44,7 +45,6 @@ class DisplayVirtual : public DisplayBase, DumpImpl {
   virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
-  virtual DisplayError GetConfig(DisplayConfigFixedInfo *fixed_info);
   virtual DisplayError GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info);
   virtual DisplayError GetActiveConfig(uint32_t *index);
   virtual DisplayError GetVSyncState(bool *enabled);
@@ -64,6 +64,7 @@ class DisplayVirtual : public DisplayBase, DumpImpl {
 
  private:
   Locker locker_;
+  HWDisplayAttributes display_attributes_;
 };
 
 }  // namespace sdm

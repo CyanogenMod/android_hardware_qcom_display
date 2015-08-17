@@ -48,32 +48,12 @@ DisplayError DisplayBase::Init() {
   hw_panel_info_ = HWPanelInfo();
   hw_intf_->GetHWPanelInfo(&hw_panel_info_);
 
-  error = hw_intf_->GetNumDisplayAttributes(&num_modes_);
-  if (error != kErrorNone) {
-    goto CleanupOnError;
-  }
+  HWDisplayAttributes display_attrib;
+  uint32_t active_index = 0;
+  hw_intf_->GetActiveConfig(&active_index);
+  hw_intf_->GetDisplayAttributes(active_index, &display_attrib);
 
-  display_attributes_ = new HWDisplayAttributes[num_modes_];
-  if (!display_attributes_) {
-    error = kErrorMemory;
-    goto CleanupOnError;
-  }
-
-  for (uint32_t i = 0; i < num_modes_; i++) {
-    error = hw_intf_->GetDisplayAttributes(&display_attributes_[i], i);
-    if (error != kErrorNone) {
-      goto CleanupOnError;
-    }
-  }
-
-  active_mode_index_ = GetBestConfig();
-
-  error = hw_intf_->SetDisplayAttributes(active_mode_index_);
-  if (error != kErrorNone) {
-    goto CleanupOnError;
-  }
-
-  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_[active_mode_index_],
+  error = comp_manager_->RegisterDisplay(display_type_, display_attrib,
                                          hw_panel_info_, &display_comp_ctx_);
   if (error != kErrorNone) {
     goto CleanupOnError;
@@ -98,7 +78,7 @@ DisplayError DisplayBase::Init() {
   }
 
   color_mgr_ = ColorManagerProxy::CreateColorManagerProxy(display_type_, hw_intf_,
-                               display_attributes_[active_mode_index_], hw_panel_info_);
+                               display_attrib, hw_panel_info_);
   if (!color_mgr_) {
     DLOGW("Unable to create ColorManagerProxy for display = %d", display_type_);
   }
@@ -108,11 +88,6 @@ DisplayError DisplayBase::Init() {
 CleanupOnError:
   if (display_comp_ctx_) {
     comp_manager_->UnregisterDisplay(display_comp_ctx_);
-  }
-
-  if (display_attributes_) {
-    delete[] display_attributes_;
-    display_attributes_ = NULL;
   }
 
   return error;
@@ -129,11 +104,6 @@ DisplayError DisplayBase::Deinit() {
   }
 
   comp_manager_->UnregisterDisplay(display_comp_ctx_);
-
-  if (display_attributes_) {
-    delete[] display_attributes_;
-    display_attributes_ = NULL;
-  }
 
   return kErrorNone;
 }
@@ -177,7 +147,7 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
       } else {
         // Release all the previous rotator sessions.
         if (rotator_intf_) {
-          error = rotator_intf_->Purge(display_rotator_ctx_, &hw_layers_);
+          error = rotator_intf_->Purge(display_rotator_ctx_);
         }
       }
 
@@ -281,7 +251,17 @@ DisplayError DisplayBase::Flush() {
   hw_layers_.info.count = 0;
   error = hw_intf_->Flush();
   if (error == kErrorNone) {
+    // Release all the rotator sessions.
+    if (rotator_intf_) {
+      error = rotator_intf_->Purge(display_rotator_ctx_);
+      if (error != kErrorNone) {
+        DLOGE("Rotator purge failed for display %d", display_type_);
+        return error;
+      }
+    }
+
     comp_manager_->Purge(display_comp_ctx_);
+
     pending_commit_ = false;
   } else {
     DLOGW("Unable to flush display = %d", display_type_);
@@ -300,41 +280,21 @@ DisplayError DisplayBase::GetDisplayState(DisplayState *state) {
 }
 
 DisplayError DisplayBase::GetNumVariableInfoConfigs(uint32_t *count) {
-  if (!count) {
-    return kErrorParameters;
-  }
-
-  *count = num_modes_;
-
-  return kErrorNone;
-}
-
-DisplayError DisplayBase::GetConfig(DisplayConfigFixedInfo *fixed_info) {
-  if (!fixed_info) {
-    return kErrorParameters;
-  }
-
-  return kErrorNone;
+  return hw_intf_->GetNumDisplayAttributes(count);
 }
 
 DisplayError DisplayBase::GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info) {
-  if (!variable_info || index >= num_modes_) {
-    return kErrorParameters;
+  HWDisplayAttributes attrib;
+  if (hw_intf_->GetDisplayAttributes(index, &attrib) == kErrorNone) {
+    *variable_info = attrib;
+    return kErrorNone;
   }
 
-  *variable_info = display_attributes_[index];
-
-  return kErrorNone;
+  return kErrorNotSupported;
 }
 
 DisplayError DisplayBase::GetActiveConfig(uint32_t *index) {
-  if (!index) {
-    return kErrorParameters;
-  }
-
-  *index = active_mode_index_;
-
-  return kErrorNone;
+  return hw_intf_->GetActiveConfig(index);
 }
 
 DisplayError DisplayBase::GetVSyncState(bool *enabled) {
@@ -364,6 +324,15 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
     hw_layers_.info.count = 0;
     error = hw_intf_->Flush();
     if (error == kErrorNone) {
+      // Release all the rotator sessions.
+      if (rotator_intf_) {
+        error = rotator_intf_->Purge(display_rotator_ctx_);
+        if (error != kErrorNone) {
+          DLOGE("Rotator purge failed for display %d", display_type_);
+          return error;
+        }
+      }
+
       comp_manager_->Purge(display_comp_ctx_);
 
       error = hw_intf_->PowerOff();
@@ -400,9 +369,12 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 
 DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
   DisplayError error = kErrorNone;
+  uint32_t active_index = 0;
 
-  if (index >= num_modes_) {
-    return kErrorParameters;
+  hw_intf_->GetActiveConfig(&active_index);
+
+  if (active_index == index) {
+    return kErrorNone;
   }
 
   error = hw_intf_->SetDisplayAttributes(index);
@@ -410,13 +382,17 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
     return error;
   }
 
-  active_mode_index_ = index;
+  HWDisplayAttributes attrib;
+  error = hw_intf_->GetDisplayAttributes(index, &attrib);
+  if (error != kErrorNone) {
+    return error;
+  }
 
   if (display_comp_ctx_) {
     comp_manager_->UnregisterDisplay(display_comp_ctx_);
   }
 
-  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_[index], hw_panel_info_,
+  error = comp_manager_->RegisterDisplay(display_type_, attrib, hw_panel_info_,
                                          &display_comp_ctx_);
 
   return error;
@@ -481,14 +457,21 @@ DisplayError DisplayBase::OnMinHdcpEncryptionLevelChange() {
 }
 
 void DisplayBase::AppendDump(char *buffer, uint32_t length) {
+  HWDisplayAttributes attrib;
+  uint32_t active_index = 0;
+  uint32_t num_modes = 0;
+  hw_intf_->GetNumDisplayAttributes(&num_modes);
+  hw_intf_->GetActiveConfig(&active_index);
+  hw_intf_->GetDisplayAttributes(active_index, &attrib);
+
   DumpImpl::AppendString(buffer, length, "\n-----------------------");
   DumpImpl::AppendString(buffer, length, "\ndevice type: %u", display_type_);
   DumpImpl::AppendString(buffer, length, "\nstate: %u, vsync on: %u, max. mixer stages: %u",
                          state_, INT(vsync_enable_), max_mixer_stages_);
   DumpImpl::AppendString(buffer, length, "\nnum configs: %u, active config index: %u",
-                         num_modes_, active_mode_index_);
+                         num_modes, active_index);
 
-  DisplayConfigVariableInfo &info = display_attributes_[active_mode_index_];
+  DisplayConfigVariableInfo &info = attrib;
   DumpImpl::AppendString(buffer, length, "\nres:%u x %u, dpi:%.2f x %.2f, fps:%.2f,"
                          "vsync period: %u", info.x_pixels, info.y_pixels, info.x_dpi,
                          info.y_dpi, info.fps, info.vsync_period_ns);
@@ -593,10 +576,6 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
 
     DumpImpl::AppendString(buffer, length, newline);
   }
-}
-
-int DisplayBase::GetBestConfig() {
-  return (num_modes_ == 1) ? 0 : -1;
 }
 
 bool DisplayBase::IsRotationRequired(HWLayers *hw_layers) {

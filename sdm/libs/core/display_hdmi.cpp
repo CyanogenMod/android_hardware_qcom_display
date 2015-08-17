@@ -50,6 +50,13 @@ DisplayError DisplayHDMI::Init() {
     return error;
   }
 
+  uint32_t active_mode_index = GetBestConfig();
+
+  error = hw_intf_->SetDisplayAttributes(active_mode_index);
+  if (error != kErrorNone) {
+    HWHDMI::Destroy(hw_intf_);
+  }
+
   error = DisplayBase::Init();
   if (error != kErrorNone) {
     HWHDMI::Destroy(hw_intf_);
@@ -93,11 +100,6 @@ DisplayError DisplayHDMI::GetDisplayState(DisplayState *state) {
 DisplayError DisplayHDMI::GetNumVariableInfoConfigs(uint32_t *count) {
   SCOPE_LOCK(locker_);
   return DisplayBase::GetNumVariableInfoConfigs(count);
-}
-
-DisplayError DisplayHDMI::GetConfig(DisplayConfigFixedInfo *fixed_info) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetConfig(fixed_info);
 }
 
 DisplayError DisplayHDMI::GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info) {
@@ -174,30 +176,36 @@ DisplayError DisplayHDMI::OnMinHdcpEncryptionLevelChange() {
 }
 
 int DisplayHDMI::GetBestConfig() {
-  uint32_t best_config_mode = 0;
-  HWDisplayAttributes *best = &display_attributes_[0];
-  if (num_modes_ == 1) {
-    return best_config_mode;
+  uint32_t best_index = 0;
+  uint32_t num_modes = 0;
+  HWDisplayAttributes best_attrib;
+
+  hw_intf_->GetNumDisplayAttributes(&num_modes);
+  if (num_modes == 1) {
+    return best_index;
   }
+
+  hw_intf_->GetDisplayAttributes(0, &best_attrib);
 
   // From the available configs, select the best
   // Ex: 1920x1080@60Hz is better than 1920x1080@30 and 1920x1080@30 is better than 1280x720@60
-  for (uint32_t index = 1; index < num_modes_; index++) {
-    HWDisplayAttributes *current = &display_attributes_[index];
+  for (uint32_t index = 1; index < num_modes; index++) {
+    HWDisplayAttributes current_attrib;
+    hw_intf_->GetDisplayAttributes(index, &current_attrib);
     // compare the two modes: in the order of Resolution followed by refreshrate
-    if (current->y_pixels > best->y_pixels) {
-      best_config_mode = index;
-    } else if (current->y_pixels == best->y_pixels) {
-      if (current->x_pixels > best->x_pixels) {
-        best_config_mode = index;
-      } else if (current->x_pixels == best->x_pixels) {
-        if (current->vsync_period_ns < best->vsync_period_ns) {
-          best_config_mode = index;
+    if (current_attrib.y_pixels > best_attrib.y_pixels) {
+      best_index = index;
+    } else if (current_attrib.y_pixels == best_attrib.y_pixels) {
+      if (current_attrib.x_pixels > best_attrib.x_pixels) {
+        best_index = index;
+      } else if (current_attrib.x_pixels == best_attrib.x_pixels) {
+        if (current_attrib.vsync_period_ns < best_attrib.vsync_period_ns) {
+          best_index = index;
         }
       }
     }
-    if (best_config_mode == index) {
-      best = &display_attributes_[index];
+    if (best_index == index) {
+      best_attrib = current_attrib;
     }
   }
 
@@ -211,7 +219,7 @@ int DisplayHDMI::GetBestConfig() {
       return config_index;
   }
 
-  return best_config_mode;
+  return best_index;
 }
 
 void DisplayHDMI::GetScanSupport() {
@@ -221,7 +229,10 @@ void DisplayHDMI::GetScanSupport() {
   HWScanInfo scan_info = HWScanInfo();
   hw_intf_->GetHWScanInfo(&scan_info);
 
-  error = hw_intf_->GetVideoFormat(active_mode_index_, &video_format);
+  uint32_t active_mode_index = 0;
+  hw_intf_->GetActiveConfig(&active_mode_index);
+
+  error = hw_intf_->GetVideoFormat(active_mode_index, &video_format);
   if (error != kErrorNone) {
     return;
   }
@@ -235,7 +246,7 @@ void DisplayHDMI::GetScanSupport() {
   // Preferred Timing if the preferred timing of the display is currently active, and if it is
   // valid. In all other cases, we must read the scan support from CEA scan info if
   // the resolution is a CEA resolution, or from IT scan info for all other resolutions.
-  if (active_mode_index_ == 0 && scan_info.pt_scan_support != kScanNotSupported) {
+  if (active_mode_index == 0 && scan_info.pt_scan_support != kScanNotSupported) {
     scan_support_ = scan_info.pt_scan_support;
   } else if (video_format < max_cea_format) {
     scan_support_ = scan_info.cea_scan_support;

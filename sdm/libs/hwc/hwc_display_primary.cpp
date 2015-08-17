@@ -50,12 +50,6 @@ int HWCDisplayPrimary::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_
     return status;
   }
 
-  status = hwc_display_primary->SetPowerMode(HWC_POWER_MODE_NORMAL);
-  if (status) {
-    Destroy(hwc_display_primary);
-    return status;
-  }
-
   hwc_display_primary->GetPanelResolution(&primary_width, &primary_height);
   int width = 0, height = 0;
   HWCDebugHandler::Get()->GetProperty("sdm.fb_size_width", &width);

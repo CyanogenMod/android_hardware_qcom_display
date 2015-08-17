@@ -41,8 +41,10 @@ class HWHDMI : public HWDevice {
   virtual DisplayError Init(HWEventHandler *eventhandler);
   virtual DisplayError Deinit();
   virtual DisplayError GetNumDisplayAttributes(uint32_t *count);
-  virtual DisplayError GetDisplayAttributes(HWDisplayAttributes *display_attributes,
-                                            uint32_t index);
+  // Requirement to call this only after the first config has been explicitly set by client
+  virtual DisplayError GetActiveConfig(uint32_t *active_config);
+  virtual DisplayError GetDisplayAttributes(uint32_t index,
+                                            HWDisplayAttributes *display_attributes);
   virtual DisplayError GetHWScanInfo(HWScanInfo *scan_info);
   virtual DisplayError GetVideoFormat(uint32_t config_index, uint32_t *video_format);
   virtual DisplayError GetMaxCEAFormat(uint32_t *max_cea_format);
@@ -66,6 +68,7 @@ class HWHDMI : public HWDevice {
   // Holds the hdmi timing information. Ex: resolution, fps etc.,
   msm_hdmi_mode_timing_info *supported_video_modes_;
   HWScanInfo hw_scan_info_;
+  uint32_t active_config_index_;
 };
 
 }  // namespace sdm
