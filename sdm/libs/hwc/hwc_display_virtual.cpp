@@ -79,6 +79,7 @@ int HWCDisplayVirtual::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_
 
   status = hwc_display_virtual->SetOutputSliceFromMetadata(content_list);
   if (status) {
+    Destroy(hwc_display_virtual);
     return status;
   }
 
