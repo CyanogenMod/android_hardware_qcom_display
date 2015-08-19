@@ -149,15 +149,39 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
   return kErrorNone;
 }
 
-void CompManager::ReconfigureDisplay(Handle comp_handle, const HWDisplayAttributes &attributes,
-                                     const HWPanelInfo &hw_panel_info) {
+DisplayError CompManager::ReconfigureDisplay(Handle comp_handle,
+                                             const HWDisplayAttributes &attributes,
+                                             const HWPanelInfo &hw_panel_info) {
   DisplayCompositionContext *display_comp_ctx =
                              reinterpret_cast<DisplayCompositionContext *>(comp_handle);
 
   resource_intf_->ReconfigureDisplay(display_comp_ctx->display_resource_ctx, attributes,
                                      hw_panel_info);
 
-  // TODO(user): Need to reconfigure strategy with updated panel info
+  DisplayError error = kErrorNone;
+  if (display_comp_ctx->strategy) {
+    display_comp_ctx->strategy->Deinit();
+    delete display_comp_ctx->strategy;
+    display_comp_ctx->strategy = NULL;
+  }
+
+  Strategy *&new_strategy = display_comp_ctx->strategy;
+  display_comp_ctx->strategy = new Strategy(extension_intf_, display_comp_ctx->display_type,
+                                            hw_res_info_, hw_panel_info);
+  if (!display_comp_ctx->strategy) {
+    DLOGE("Unable to create strategy.");
+    return kErrorMemory;
+  }
+
+  error = new_strategy->Init();
+  if (error != kErrorNone) {
+    DLOGE("Unable to initialize strategy.");
+    delete display_comp_ctx->strategy;
+    display_comp_ctx->strategy = NULL;
+    return error;
+  }
+
+  return error;
 }
 
 void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_layers) {

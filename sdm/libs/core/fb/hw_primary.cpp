@@ -104,11 +104,6 @@ DisplayError HWPrimary::Init(HWEventHandler *eventhandler) {
     for (int event = 0; event < kNumDisplayEvents; event++) {
       pollfd &poll_fd = poll_fds_[event];
 
-      if ((hw_panel_info_.mode == kModeCommand) &&
-          (!strncmp(event_name[event], "idle_notify", strlen("idle_notify")))) {
-        continue;
-      }
-
       snprintf(node_path, sizeof(node_path), "%s%d/%s", fb_path_, fb_node_index_,
                event_name[event]);
 

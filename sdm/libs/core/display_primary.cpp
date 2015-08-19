@@ -104,7 +104,7 @@ DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
   hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
 
   if (panel_info != hw_panel_info_) {
-    comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, panel_info);
+    error = comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, panel_info);
     hw_panel_info_ = panel_info;
   }
 
@@ -222,8 +222,22 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
     return error;
   }
 
+  // Disable PU if the previous PU state is on when switching to video mode, and re-enable PU when
+  // switching back to command mode.
+  bool toggle_partial_update = !(hw_display_mode == kModeVideo);
+  if (partial_update_control_) {
+    comp_manager_->ControlPartialUpdate(display_comp_ctx_, toggle_partial_update);
+  }
+
+  if (hw_display_mode == kModeVideo) {
+    hw_intf_->SetIdleTimeoutMs(Debug::GetIdleTimeoutMs());
+  } else if (hw_display_mode == kModeCommand) {
+    hw_intf_->SetIdleTimeoutMs(0);
+  }
+
   return error;
 }
+
 DisplayError DisplayPrimary::SetPanelBrightness(int level) {
   SCOPE_LOCK(locker_);
   return hw_intf_->SetPanelBrightness(level);
