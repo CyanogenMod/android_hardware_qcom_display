@@ -234,6 +234,7 @@ void HWPrimary::InitializeConfigs() {
 
 DisplayError HWPrimary::Deinit() {
   exit_threads_ = true;
+  Sys::pthread_cancel_(event_thread_);
   pthread_join(event_thread_, NULL);
 
   for (int event = 0; event < kNumDisplayEvents; event++) {
@@ -561,7 +562,7 @@ void HWPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
 
   // Notify driver about the timeout value
   ssize_t length = Sys::pwrite_(fd, timeout_string, strlen(timeout_string), 0);
-  if (length < -1) {
+  if (length <= 0) {
     DLOGE("Unable to write into %s, node %s", node_path, strerror(errno));
   }
 

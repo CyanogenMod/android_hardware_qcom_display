@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <poll.h>
+#include <pthread.h>
 
 namespace sdm {
 
@@ -43,6 +44,7 @@ class Sys {
   typedef FILE* (*fopen)( const char *fname, const char *mode);
   typedef int (*fclose)(FILE* fileptr);
   typedef ssize_t (*getline)(char **lineptr, size_t *linelen, FILE *stream);
+  typedef int (*pthread_cancel)(pthread_t thread);
 
   static ioctl ioctl_;
   static open open_;
@@ -53,6 +55,7 @@ class Sys {
   static fopen fopen_;
   static fclose fclose_;
   static getline getline_;
+  static pthread_cancel pthread_cancel_;
 };
 
 }  // namespace sdm

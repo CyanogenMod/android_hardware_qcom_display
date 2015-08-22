@@ -38,6 +38,10 @@ namespace sdm {
 
 #ifndef SDM_VIRTUAL_DRIVER
 
+int PthreadCancel(pthread_t /* thread */) {
+  return 0;
+}
+
 // Pointer to actual driver interfaces.
 Sys::ioctl Sys::ioctl_ = ::ioctl;
 Sys::open Sys::open_ = ::open;
@@ -48,6 +52,7 @@ Sys::pwrite Sys::pwrite_ = ::pwrite;
 Sys::fopen Sys::fopen_ = ::fopen;
 Sys::fclose Sys::fclose_ = ::fclose;
 Sys::getline Sys::getline_ = ::getline;
+Sys::pthread_cancel Sys::pthread_cancel_ = PthreadCancel;
 
 #else
 
@@ -71,6 +76,7 @@ Sys::pwrite Sys::pwrite_ = virtual_pwrite;
 Sys::fopen Sys::fopen_ = virtual_fopen;
 Sys::fclose Sys::fclose_ = virtual_fclose;
 Sys::getline Sys::getline_ = virtual_getline;
+Sys::pthread_cancel Sys::pthread_cancel_ = ::pthread_cancel;
 
 #endif  // SDM_VIRTUAL_DRIVER
 

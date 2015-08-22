@@ -302,6 +302,8 @@ DisplayError DisplayBase::GetVSyncState(bool *enabled) {
     return kErrorParameters;
   }
 
+  *enabled = vsync_enable_;
+
   return kErrorNone;
 }
 
