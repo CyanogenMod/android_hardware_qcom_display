@@ -35,6 +35,7 @@
 #include <hwc_virtual.h>
 #include <overlay.h>
 #include <display_config.h>
+#include <dlfcn.h>
 
 #define QCLIENT_DEBUG 0
 
@@ -338,6 +339,28 @@ static void toggleScreenUpdate(hwc_context_t* ctx, uint32_t on) {
     }
 }
 
+static void applyModeById(hwc_context_t* ctx, int32_t modeId) {
+    int (*applyMode)(int, int) = NULL;
+    void *modeHandle = NULL;
+
+    modeHandle = dlopen("libmm-qdcm.so", RTLD_NOW);
+    if (modeHandle) {
+        *(void **)&applyMode = dlsym(modeHandle, "applyModeById");
+        if (applyMode) {
+            int err = applyMode(modeId, HWC_DISPLAY_PRIMARY);
+            if (err)
+                ALOGD("%s: Not able to apply mode: %d", __FUNCTION__, modeId);
+            else
+                ctx->proc->invalidate(ctx->proc);
+        } else {
+            ALOGE("%s: No symbol applyModeById found", __FUNCTION__);
+        }
+        dlclose(modeHandle);
+    } else {
+        ALOGE("%s: Not able to load libmm-qdcm.so", __FUNCTION__);
+    }
+}
+
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
         Parcel* outParcel) {
     status_t ret = NO_ERROR;
@@ -397,6 +420,9 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             break;
         case IQService::TOGGLE_SCREEN_UPDATE:
             toggleScreenUpdate(mHwcContext, inParcel->readInt32());
+            break;
+        case IQService::APPLY_MODE_BY_ID:
+            applyModeById(mHwcContext, inParcel->readInt32());
             break;
         default:
             ret = NO_ERROR;

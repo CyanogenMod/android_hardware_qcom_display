@@ -59,6 +59,7 @@ public:
         CONFIGURE_DYN_REFRESH_RATE = 18,
         SET_PARTIAL_UPDATE = 19,   // Preference on partial update feature
         TOGGLE_SCREEN_UPDATE = 20, // Provides ability to disable screen updates
+        APPLY_MODE_BY_ID = 40, //Apply display mode by ID
         COMMAND_LIST_END = 400,
     };
 
