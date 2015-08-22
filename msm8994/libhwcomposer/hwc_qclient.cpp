@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2013-14, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2013-15, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -373,6 +373,7 @@ status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
             unsecuring(mHwcContext, inParcel->readInt32());
             break;
         case IQService::SCREEN_REFRESH:
+            qhwc::MDPComp::setSingleFullScreenUpdate();
             return screenRefresh(mHwcContext);
             break;
         case IQService::EXTERNAL_ORIENTATION:
