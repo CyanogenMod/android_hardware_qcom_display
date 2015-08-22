@@ -493,6 +493,17 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
     hwc_rect_t dst = layer->displayFrame;
     bool rotated90 = (bool)(layer->transform & HAL_TRANSFORM_ROT_90);
+
+    /* For YUV formats, Normalize source crop for MDP before computing scaling
+     * required as we would normalize source crop for overlay pipe.
+     * Else we could end up calling set IOCTL with scaling requirement
+     * marginally >upscale limit or <downscale limit tus failing at IOCTL.
+     */
+    if(isYuvBuffer(hnd)) {
+        normalizeCrop((uint32_t&)crop.left, (uint32_t&)crop.right);
+        normalizeCrop((uint32_t&)crop.top, (uint32_t&)crop.bottom);
+    }
+
     int crop_w = rotated90 ? crop.bottom - crop.top : crop.right - crop.left;
     int crop_h = rotated90 ? crop.right - crop.left : crop.bottom - crop.top;
     int dst_w = dst.right - dst.left;
