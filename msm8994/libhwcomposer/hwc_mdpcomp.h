@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -59,6 +59,7 @@ public:
     static int setPartialUpdatePref(hwc_context_t *ctx, bool enable);
     static bool getPartialUpdatePref(hwc_context_t *ctx);
     void setDynRefreshRate(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    static void setSingleFullScreenUpdate() { sIsSingleFullScreenUpdate = true; }
 
 protected:
     enum ePipeType {
@@ -264,6 +265,7 @@ protected:
     static int sMaxPipesPerMixer;
     static bool sSrcSplitEnabled;
     static IdleInvalidator *sIdleInvalidator;
+    static bool sIsSingleFullScreenUpdate;
     static int sMaxSecLayers;
     static bool sIsPartialUpdateActive;
     struct FrameInfo mCurrentFrame;
