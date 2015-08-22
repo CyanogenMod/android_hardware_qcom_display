@@ -44,6 +44,7 @@
 #include "hwc_virtual.h"
 #include "qd_utils.h"
 #include <sys/sysinfo.h>
+#include <dlfcn.h>
 
 using namespace qClient;
 using namespace qService;
@@ -388,6 +389,9 @@ void initContext(hwc_context_t *ctx)
     ctx->enableABC = false;
     property_get("debug.sf.hwc.canUseABC", value, "0");
     ctx->enableABC  = atoi(value) ? true : false;
+
+    // Initializing boot anim completed check to false
+    ctx->mBootAnimCompleted = false;
 
     // Initialize gpu perfomance hint related parameters
     property_get("sys.hwc.gpu_perf_mode", value, "0");
@@ -2496,6 +2500,36 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
     if (rect1.bottom == rect2.bottom)
         eqBounds++;
     return (eqBounds == 3);
+}
+
+void processBootAnimCompleted(hwc_context_t *ctx) {
+    char value[PROPERTY_VALUE_MAX];
+    int boot_finished = 0, ret = -1;
+    int (*applyMode)(int) = NULL;
+    void *modeHandle = NULL;
+
+    // Reading property set on boot finish in SF
+    property_get("service.bootanim.exit", value, "0");
+    boot_finished = atoi(value);
+    if (!boot_finished)
+        return;
+
+    modeHandle = dlopen("libmm-qdcm.so", RTLD_NOW);
+    if (modeHandle) {
+        *(void **)&applyMode = dlsym(modeHandle, "applyDefaults");
+        if (applyMode) {
+            ret = applyMode(HWC_DISPLAY_PRIMARY);
+            if (ret)
+                ALOGD("%s: Not able to apply default mode", __FUNCTION__);
+        } else {
+            ALOGE("%s: No symbol applyDefaults found", __FUNCTION__);
+        }
+        dlclose(modeHandle);
+    } else {
+        ALOGE("%s: Not able to load libmm-qdcm.so", __FUNCTION__);
+    }
+
+    ctx->mBootAnimCompleted = true;
 }
 
 void BwcPM::setBwc(const hwc_context_t *ctx, const int& dpy,
