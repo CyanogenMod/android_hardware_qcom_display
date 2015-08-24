@@ -408,6 +408,14 @@ class DisplayInterface {
   */
   virtual DisplayError SetCursorPosition(int x, int y) = 0;
 
+  /*! @brief Method to get the brightness level of the display
+
+    @param[out] level brightness level
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError GetPanelBrightness(int *level) = 0;
+
  protected:
   virtual ~DisplayInterface() { }
 };

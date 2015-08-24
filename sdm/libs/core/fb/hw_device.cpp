@@ -1025,5 +1025,9 @@ DisplayError HWDevice::OnMinHdcpEncryptionLevelChange() {
   return kErrorNotSupported;
 }
 
+DisplayError HWDevice::GetPanelBrightness(int *level) {
+  return kErrorNotSupported;
+}
+
 }  // namespace sdm
 

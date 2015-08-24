@@ -1275,6 +1275,15 @@ int HWCDisplay::SetPanelBrightness(int level) {
   return ret;
 }
 
+int HWCDisplay::GetPanelBrightness(int *level) {
+  return display_intf_->GetPanelBrightness(level);
+}
+
+int HWCDisplay::ToggleScreenUpdates(bool enable) {
+  display_paused_ = enable ? false : true;
+  return 0;
+}
+
 int HWCDisplay::ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
                                      PPDisplayAPIPayload *out_payload,
                                      PPPendingParams *pending_action) {

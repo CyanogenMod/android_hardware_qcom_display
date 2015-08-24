@@ -62,6 +62,7 @@ class HWPrimary : public HWDevice {
   virtual DisplayError SetPanelBrightness(int level);
   virtual DisplayError GetPPFeaturesVersion(PPFeatureVersion *vers);
   virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list);
+  virtual DisplayError GetPanelBrightness(int *level);
 
  private:
   // Panel modes for the MSMFB_LPM_ENABLE ioctl
@@ -92,6 +93,7 @@ class HWPrimary : public HWDevice {
   std::vector<DisplayConfigVariableInfo> display_configs_;
   std::vector<std::string> display_config_strings_;
   uint32_t active_config_index_ = 0;
+  const char *kBrightnessNode = "/sys/class/leds/lcd-backlight/brightness";
 };
 
 }  // namespace sdm

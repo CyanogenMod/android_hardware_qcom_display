@@ -300,6 +300,41 @@ int minHdcpEncryptionLevelChanged(int dpy) {
     return err;
 }
 
+int setPanelBrightness(int level) {
+    status_t err = (status_t) FAILED_TRANSACTION;
+    sp<IQService> binder = getBinder();
+    Parcel inParcel, outParcel;
+
+    if(binder != NULL) {
+        inParcel.writeInt32(level);
+        status_t err = binder->dispatch(IQService::SET_PANEL_BRIGHTNESS,
+                &inParcel, &outParcel);
+        if(err) {
+            ALOGE("%s() failed with err %d", __FUNCTION__, err);
+        }
+    }
+    return err;
+}
+
+int getPanelBrightness() {
+    int panel_brightness = -1;
+    sp<IQService> binder = getBinder();
+    Parcel inParcel, outParcel;
+
+    if(binder != NULL) {
+        status_t err = binder->dispatch(IQService::GET_PANEL_BRIGHTNESS,
+                &inParcel, &outParcel);
+        if(!err) {
+            panel_brightness = outParcel.readInt32();
+            ALOGI("%s() Current panel brightness value %d", __FUNCTION__,
+                    panel_brightness);
+        } else {
+            ALOGE("%s() failed with err %d", __FUNCTION__, err);
+        }
+    }
+    return panel_brightness;
+}
+
 }// namespace
 
 // ----------------------------------------------------------------------------

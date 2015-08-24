@@ -91,13 +91,18 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   android::status_t SetMaxMixerStages(const android::Parcel *input_parcel);
   android::status_t SetDisplayMode(const android::Parcel *input_parcel);
   android::status_t SetSecondaryDisplayStatus(const android::Parcel *input_parcel);
-  android::status_t ControlBackLight(const android::Parcel *input_parcel);
+  android::status_t ToggleScreenUpdates(const android::Parcel *input_parcel,
+                                        android::Parcel *output_parcel);
   android::status_t ConfigureRefreshRate(const android::Parcel *input_parcel);
   android::status_t QdcmCMDHandler(const android::Parcel *input_parcel,
                                    android::Parcel *output_parcel);
   android::status_t ControlPartialUpdate(const android::Parcel *input_parcel, android::Parcel *out);
   android::status_t OnMinHdcpEncryptionLevelChange(const android::Parcel *input_parcel,
-                                   android::Parcel *output_parcel);
+                                                   android::Parcel *output_parcel);
+  android::status_t SetPanelBrightness(const android::Parcel *input_parcel,
+                                       android::Parcel *output_parcel);
+  android::status_t GetPanelBrightness(const android::Parcel *input_parcel,
+                                       android::Parcel *output_parcel);
   // These functions return the actual display config info as opposed to FB
   android::status_t HandleSetActiveDisplayConfig(const android::Parcel *input_parcel,
                                                  android::Parcel *output_parcel);
@@ -119,7 +124,6 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   HWCBufferAllocator *buffer_allocator_ = NULL;
   HWCBufferSyncHandler *buffer_sync_handler_ = NULL;
   HWCColorManager *color_mgr_ = NULL;
-  char brightness_[64] = { 0 };
   static bool reset_panel_;
   bool secure_display_active_ = false;
 };

@@ -72,7 +72,7 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError ApplyDefaultDisplayMode(void);
   virtual DisplayError SetCursorPosition(int x, int y);
   virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
-
+  virtual DisplayError GetPanelBrightness(int *level);
 
  protected:
   // DumpImpl method

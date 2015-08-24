@@ -71,6 +71,7 @@ class HWDevice : public HWInterface {
   virtual DisplayError GetMaxCEAFormat(uint32_t *max_cea_format);
   virtual DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y);
   virtual DisplayError OnMinHdcpEncryptionLevelChange();
+  virtual DisplayError GetPanelBrightness(int *level);
 
   // For HWDevice derivatives
   virtual DisplayError Init(HWEventHandler *eventhandler);

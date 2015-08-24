@@ -89,6 +89,7 @@ class HWInterface {
   virtual DisplayError GetMaxCEAFormat(uint32_t *max_cea_format) = 0;
   virtual DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y) = 0;
   virtual DisplayError OnMinHdcpEncryptionLevelChange() = 0;
+  virtual DisplayError GetPanelBrightness(int *level) = 0;
 
  protected:
   virtual ~HWInterface() { }
