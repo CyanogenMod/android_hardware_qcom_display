@@ -270,7 +270,6 @@ struct HWLayersInfo {
 
   uint32_t count = 0;              // Total number of layers which need to be set on hardware.
 
-  bool need_sync_handle = false;
   int sync_handle = -1;
 
   LayerRect left_partial_update;   // Left ROI.
