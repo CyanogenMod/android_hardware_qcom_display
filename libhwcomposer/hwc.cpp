@@ -866,11 +866,16 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
     int ret = 0;
     if (hotPluggable) {
         ret = ctx->mHDMIDisplay->getAttrForConfig(config, xres,
-                yres, refresh, fps);
+                    yres, refresh, fps);
         if(ret < 0) {
             ALOGE("%s Error getting attributes for config %d",
                     __FUNCTION__, config);
             return ret;
+        }
+        if((uint32_t)ctx->mHDMIDisplay->getActiveConfig() == config &&
+                ctx->mHDMIDisplay->getMDPScalingMode()) {
+            xres = ctx->mHDMIDisplay->getFBWidth();
+            yres = ctx->mHDMIDisplay->getFBHeight();
         }
     }
 
