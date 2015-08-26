@@ -881,11 +881,15 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
         return false;
     }
 
-    /* No Idle fall back if secure display or secure RGB layers are present
-     * or if there is only a single layer being composed */
+    /* No Idle fallback if secure display (or)
+     * if secure RGB layers are present (or)
+     * if there is only a single layer being composed (or)
+     * if there is yuv-layer present
+     */
     if(sIdleFallBack && !ctx->listStats[mDpy].secureUI &&
                   !ctx->listStats[mDpy].secureRGBCount &&
-                  (ctx->listStats[mDpy].numAppLayers > 1)) {
+                  (ctx->listStats[mDpy].numAppLayers > 1) &&
+                  (ctx->listStats[mDpy].yuvCount == 0)) {
         ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
         return false;
     }
@@ -1484,12 +1488,6 @@ bool MDPComp::videoOnlyComp(hwc_context_t *ctx,
            ALOGD_IF(isDebug(),"%s: No Secure Video Layers", __FUNCTION__);
            return false;
        }
-       /* No Idle fall back for secure video layers and if there is only
-        * single layer being composed. */
-       if(sIdleFallBack && (ctx->listStats[mDpy].numAppLayers > 1)) {
-           ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
-           return false;
-        }
     }
 
     mCurrentFrame.reset(numAppLayers);
@@ -1560,8 +1558,9 @@ bool MDPComp::mdpOnlyLayersComp(hwc_context_t *ctx,
             return false;
         }
         /* No Idle fall back for secure video/ui layers and if there is only
-         * single layer being composed. */
-        if(sIdleFallBack && (ctx->listStats[mDpy].numAppLayers > 1)) {
+         * single layer being composed or if a yuv layer is present. */
+        if(sIdleFallBack && (ctx->listStats[mDpy].numAppLayers > 1) &&
+                            (ctx->listStats[mDpy].yuvCount == 0)) {
            ALOGD_IF(isDebug(), "%s: Idle fallback dpy %d",__FUNCTION__, mDpy);
            return false;
        }
@@ -2559,7 +2558,8 @@ bool MDPCompNonSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
     if(sIdleInvalidator && !sIdleFallBack &&
        /* Neednot set for single pipe mdp composition cases */
-       !(mCurrentFrame.mdpCount == 1 and mCurrentFrame.fbCount == 0) ) {
+       !(mCurrentFrame.mdpCount == 1 and mCurrentFrame.fbCount == 0) &&
+       !(ctx->listStats[mDpy].yuvCount == 0)) {
         sHandleTimeout = true;
     }
 
@@ -2831,7 +2831,8 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
        !(needs3DComposition(ctx, HWC_DISPLAY_PRIMARY) ||
          needs3DComposition(ctx, HWC_DISPLAY_EXTERNAL)) &&
        /* Neednot set for single pipe mdp composition cases */
-       !(mCurrentFrame.mdpCount == 1 and mCurrentFrame.fbCount == 0) ) {
+       !(mCurrentFrame.mdpCount == 1 and mCurrentFrame.fbCount == 0) &&
+       !(ctx->listStats[mDpy].yuvCount == 0) ) {
         sHandleTimeout = true;
     }
 
