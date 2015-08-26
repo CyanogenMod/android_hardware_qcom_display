@@ -283,6 +283,10 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
         else if(usage & GRALLOC_USAGE_HW_COMPOSER)
             //XXX: If we still haven't set a format, default to RGBA8888
             grallocFormat = HAL_PIXEL_FORMAT_RGBA_8888;
+        //If no other usage flags are detected, default the
+        //flexible YUV format to NV21.
+        else if(format == HAL_PIXEL_FORMAT_YCbCr_420_888)
+            grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP;
     }
 
     getGrallocInformationFromFormat(grallocFormat, &bufferType);
