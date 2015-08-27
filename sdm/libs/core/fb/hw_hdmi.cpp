@@ -279,7 +279,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
   STRUCT_VAR(msmfb_metadata, metadata);
   metadata.op = metadata_op_vic;
   metadata.data.video_info_code = timing_mode->video_format;
-  if (ioctl(device_fd_, MSMFB_METADATA_SET, &metadata) < 0) {
+  if (Sys::ioctl_(device_fd_, MSMFB_METADATA_SET, &metadata) < 0) {
     IOCTL_LOGE(MSMFB_METADATA_SET, device_type_);
     return kErrorHardware;
   }
@@ -461,22 +461,16 @@ void HWHDMI::RequestNewPage(uint32_t page_number) {
 
 // Reads the contents of res_info node into a buffer if the file is not empty
 bool HWHDMI::ReadResolutionFile(char *config_buffer) {
-  bool is_file_read = false;
-  size_t bytes_read = 0;
+  ssize_t bytes_read = 0;
   int fd = OpenResolutionFile(O_RDONLY);
-  if (fd < 0) {
-    return false;
+  if (fd >= 0) {
+    bytes_read = Sys::pread_(fd, config_buffer, kPageSize, 0);
+    Sys::close_(fd);
   }
 
-  if ((bytes_read = Sys::pread_(fd, config_buffer, kPageSize, 0)) != 0) {
-    is_file_read = true;
-  }
+  DLOGI_IF(kTagDriverConfig, "bytes_read = %d", bytes_read);
 
-  Sys::close_(fd);
-
-  DLOGI_IF(kTagDriverConfig, "bytes_read=%d is_file_read=%d", bytes_read, is_file_read);
-
-  return is_file_read;
+  return (bytes_read > 0);
 }
 
 // Populates the internal timing info structure with the timing info obtained
