@@ -44,8 +44,8 @@ class CompManager : public DumpImpl {
   DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
                                const HWPanelInfo &hw_panel_info, Handle *res_mgr_hnd);
   DisplayError UnregisterDisplay(Handle res_mgr_hnd);
-  void ReconfigureDisplay(Handle display_ctx, const HWDisplayAttributes &attributes,
-                          const HWPanelInfo &hw_panel_info);
+  DisplayError ReconfigureDisplay(Handle display_ctx, const HWDisplayAttributes &attributes,
+                                  const HWPanelInfo &hw_panel_info);
   void PrePrepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError PostPrepare(Handle display_ctx, HWLayers *hw_layers);
@@ -89,8 +89,8 @@ class CompManager : public DumpImpl {
   Locker locker_;
   ResourceInterface *resource_intf_ = NULL;
   ResourceDefault resource_default_;
-  uint64_t registered_displays_ = 0;    // Stores the bit mask of registered displays
-  uint64_t configured_displays_ = 0;    // Stores the bit mask of sucessfully configured displays
+  uint32_t registered_displays_ = 0;    // Stores the bit mask of registered displays
+  uint32_t configured_displays_ = 0;    // Stores the bit mask of sucessfully configured displays
   bool safe_mode_ = false;              // Flag to notify all displays to be in resource crunch
                                         // mode, where strategy manager chooses the best strategy
                                         // that uses optimal number of pipes for each display

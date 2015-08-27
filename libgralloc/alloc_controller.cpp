@@ -149,6 +149,26 @@ int AdrenoMemInfo::isMacroTilingSupportedByGPU()
     return 0;
 }
 
+void AdrenoMemInfo::getAlignedWidthAndHeight(const private_handle_t *hnd, int& aligned_w,
+                          int& aligned_h) {
+    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+    if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
+        int w = metadata->bufferDim.sliceWidth;
+        int h = metadata->bufferDim.sliceHeight;
+        int f = hnd->format;
+        int usage = 0;
+
+        if (hnd->flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED) {
+            usage = GRALLOC_USAGE_PRIVATE_ALLOC_UBWC;
+        }
+
+        getAlignedWidthAndHeight(w, h, f, usage, aligned_w, aligned_h);
+    } else {
+        aligned_w = hnd->width;
+        aligned_h = hnd->height;
+    }
+
+}
 
 void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
                             int usage, int& aligned_w, int& aligned_h)
@@ -158,8 +178,7 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
     // Currently surface padding is only computed for RGB* surfaces.
     if (format <= HAL_PIXEL_FORMAT_BGRA_8888) {
         int tileEnabled = ubwc_enabled || isMacroTileEnabled(format, usage);
-        AdrenoMemInfo::getInstance().getGpuAlignedWidthHeight(width,
-            height, format, tileEnabled, aligned_w, aligned_h);
+        getGpuAlignedWidthHeight(width, height, format, tileEnabled, aligned_w, aligned_h);
         return;
     }
 
@@ -649,6 +668,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
     int width = hnd->width;
     int height = hnd->height;
     int format = hnd->format;
+
     unsigned int ystride, cstride;
     unsigned int alignment = 4096;
 
@@ -662,8 +682,14 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
 
     // Check metadata if the geometry has been updated.
     if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
+        int usage = 0;
+
+        if (hnd->flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED) {
+            usage = GRALLOC_USAGE_PRIVATE_ALLOC_UBWC;
+        }
+
         AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(metadata->bufferDim.sliceWidth,
-                   metadata->bufferDim.sliceHeight, format, 0, width, height);
+                   metadata->bufferDim.sliceHeight, format, usage, width, height);
     }
 
     // Get the chroma offsets from the handle width/height. We take advantage
@@ -836,12 +862,18 @@ bool isUBwcEnabled(int format, int usage)
     if (isUBwcFormat(format))
         return true;
 
-    // Allow UBWC, if client sets UBWC gralloc usage flag & GPU supports format.
-    if ((usage & GRALLOC_USAGE_PRIVATE_ALLOC_UBWC) && isUBwcSupported(format) &&
-        AdrenoMemInfo::getInstance().isUBWCSupportedByGPU(format)) {
+    // Allow UBWC, if an OpenGL client sets UBWC usage flag and GPU plus MDP
+    // support the format. OR if a non-OpenGL client like Rotator, sets UBWC
+    // usage flag and MDP supports the format.
+    if ((usage & GRALLOC_USAGE_PRIVATE_ALLOC_UBWC) && isUBwcSupported(format)) {
+        bool enable = true;
+        // Query GPU for UBWC only if buffer is intended to be used by GPU.
+        if (usage & (GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_RENDER)) {
+            enable = AdrenoMemInfo::getInstance().isUBWCSupportedByGPU(format);
+        }
         // Allow UBWC, only if CPU usage flags are not set
-        if (!(usage & (GRALLOC_USAGE_SW_READ_MASK |
-                      GRALLOC_USAGE_SW_WRITE_MASK))) {
+        if (enable && !(usage & (GRALLOC_USAGE_SW_READ_MASK |
+            GRALLOC_USAGE_SW_WRITE_MASK))) {
             return true;
         }
     }

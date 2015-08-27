@@ -36,6 +36,7 @@ class BlitEngine;
 
 class HWCDisplay : public DisplayEventHandler {
  public:
+  virtual ~HWCDisplay() { }
   virtual int Init();
   virtual int Deinit();
   virtual int Prepare(hwc_display_contents_1_t *content_list) = 0;
@@ -61,7 +62,6 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int OnMinHdcpEncryptionLevelChange();
   virtual int Perform(uint32_t operation, ...);
   virtual int SetCursorPosition(int x, int y);
-  virtual ~HWCDisplay() { }
   virtual void SetSecureDisplay(bool secure_display_active);
 
   // Display Configurations
@@ -145,9 +145,6 @@ class HWCDisplay : public DisplayEventHandler {
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
   void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
   bool IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache);
-
-  static void AdjustSourceResolution(uint32_t dst_width, uint32_t dst_height, uint32_t *src_width,
-                                     uint32_t *src_height);
   static void GetDownscaleResolution(uint32_t primary_width, uint32_t primary_height,
                                      uint32_t *virtual_width, uint32_t *virtual_height);
 

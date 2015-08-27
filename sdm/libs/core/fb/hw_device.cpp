@@ -232,6 +232,7 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
             mdp_buffer.width = pipe_info->scale_data.src_width;
           }
           SetHWScaleData(pipe_info->scale_data, mdp_layer_count);
+          mdp_layer.flags |= MDP_LAYER_ENABLE_PIXEL_EXT;
         }
 
         // Send scale data to MDP driver
@@ -435,16 +436,16 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
     input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
   }
 
-  if (hw_layer_info.need_sync_handle) {
-    hw_layer_info.sync_handle = dup(mdp_commit.release_fence);
-  }
+  hw_layer_info.sync_handle = dup(mdp_commit.release_fence);
 
   DLOGI_IF(kTagDriverConfig, "*************************** %s Commit Input ************************",
            device_name_);
   DLOGI_IF(kTagDriverConfig, "retire_fence_fd %d", stack->retire_fence_fd);
   DLOGI_IF(kTagDriverConfig, "*******************************************************************");
 
-  Sys::close_(mdp_commit.release_fence);
+  if (mdp_commit.release_fence >= 0) {
+    Sys::close_(mdp_commit.release_fence);
+  }
 
   if (synchronous_commit_) {
     // A synchronous commit can be requested when changing the display mode so we need to update

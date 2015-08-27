@@ -104,11 +104,6 @@ DisplayError HWPrimary::Init(HWEventHandler *eventhandler) {
     for (int event = 0; event < kNumDisplayEvents; event++) {
       pollfd &poll_fd = poll_fds_[event];
 
-      if ((hw_panel_info_.mode == kModeCommand) &&
-          (!strncmp(event_name[event], "idle_notify", strlen("idle_notify")))) {
-        continue;
-      }
-
       snprintf(node_path, sizeof(node_path), "%s%d/%s", fb_path_, fb_node_index_,
                event_name[event]);
 
@@ -239,10 +234,14 @@ void HWPrimary::InitializeConfigs() {
 
 DisplayError HWPrimary::Deinit() {
   exit_threads_ = true;
+  Sys::pthread_cancel_(event_thread_);
   pthread_join(event_thread_, NULL);
 
   for (int event = 0; event < kNumDisplayEvents; event++) {
-    Sys::close_(poll_fds_[event].fd);
+    int &fd = poll_fds_[event].fd;
+    if (fd >= 0) {
+      Sys::close_(fd);
+    }
   }
 
   return HWDevice::Deinit();
@@ -563,7 +562,7 @@ void HWPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
 
   // Notify driver about the timeout value
   ssize_t length = Sys::pwrite_(fd, timeout_string, strlen(timeout_string), 0);
-  if (length < -1) {
+  if (length <= 0) {
     DLOGE("Unable to write into %s, node %s", node_path, strerror(errno));
   }
 

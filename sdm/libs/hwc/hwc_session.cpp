@@ -91,7 +91,7 @@ HWCSession::HWCSession(const hw_module_t *module) {
   hwc_procs_default_.hotplug = Hotplug;
 
   hwc_composer_device_1_t::common.tag = HARDWARE_DEVICE_TAG;
-  hwc_composer_device_1_t::common.version = HWC_DEVICE_API_VERSION_1_4;
+  hwc_composer_device_1_t::common.version = HWC_DEVICE_API_VERSION_1_5;
   hwc_composer_device_1_t::common.module = const_cast<hw_module_t*>(module);
   hwc_composer_device_1_t::common.close = Close;
   hwc_composer_device_1_t::prepare = Prepare;
@@ -628,7 +628,7 @@ android::status_t HWCSession::ControlBackLight(const android::Parcel *input_parc
     // Read backlight and store it internally. Set backlight to 0 on primary.
     if (read(fd, brightness_, sizeof(brightness_)) > 0) {
       DLOGI("backlight brightness is %s", brightness_);
-      ssize_t ret = write(fd, bl_brightness, sizeof(bl_brightness));
+      ssize_t ret = write(fd, bl_brightness, strlen(bl_brightness));
       if (ret < 0) {
         DLOGE("Failed to write backlight node err = %d errstr = %s", errno, strerror(errno));
         close(fd);

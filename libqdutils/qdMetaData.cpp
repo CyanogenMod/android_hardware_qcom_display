@@ -61,7 +61,7 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
     data->operation |= paramType;
     switch (paramType) {
         case PP_PARAM_HSIC:
-            memcpy((void *)&data->hsicData, param, sizeof(HSICData_t));
+            data->hsicData = *((HSICData_t *)param);
             break;
         case PP_PARAM_SHARPNESS:
             data->sharpness = *((int32_t *)param);
@@ -76,13 +76,13 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
             memcpy((void *)&data->igcData, param, sizeof(IGCData_t));
             break;
         case PP_PARAM_SHARP2:
-            memcpy((void *)&data->Sharp2Data, param, sizeof(Sharp2Data_t));
+            data->Sharp2Data = *((Sharp2Data_t *)param);
             break;
         case PP_PARAM_TIMESTAMP:
             data->timestamp = *((int64_t *)param);
             break;
         case UPDATE_BUFFER_GEOMETRY:
-            memcpy((void *)&data->bufferDim, param, sizeof(BufferDim_t));
+            data->bufferDim = *((BufferDim_t *)param);
             break;
         case UPDATE_REFRESH_RATE:
             data->refreshrate = *((uint32_t *)param);

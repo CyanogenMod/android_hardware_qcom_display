@@ -149,13 +149,14 @@ LayerRect Union(const LayerRectArray &rects) {
 }
 
 void SplitLeftRight(const LayerRect &in_rect, uint32_t split_count, uint32_t align_x,
-                   LayerRect *out_rects) {
+                    bool flip_horizontal, LayerRect *out_rects) {
   LayerRect rect_temp = in_rect;
 
   uint32_t split_width = UINT32(rect_temp.right - rect_temp.left) / split_count;
+  float aligned_width = FLOAT(CeilToMultipleOf(split_width, align_x));
 
   for (uint32_t count = 0; count < split_count; count++) {
-    float aligned_right = rect_temp.left + FLOAT(CeilToMultipleOf(split_width, align_x));
+    float aligned_right = rect_temp.left + aligned_width;
     out_rects[count].left = rect_temp.left;
     out_rects[count].right = MIN(rect_temp.right, aligned_right);
     out_rects[count].top = rect_temp.top;
@@ -165,16 +166,27 @@ void SplitLeftRight(const LayerRect &in_rect, uint32_t split_count, uint32_t ali
 
     Log(kTagRotator, "SplitLeftRight", out_rects[count]);
   }
+
+  // If we have a horizontal flip, then we should be splitting the source from right to left
+  // to ensure that the right split will have an aligned width that matches the alignment on the
+  // destination.
+  if (flip_horizontal && split_count > 1) {
+    out_rects[0].right = out_rects[0].left + (out_rects[1].right - out_rects[1].left);
+    out_rects[1].left = out_rects[0].right;
+    Log(kTagRotator, "Adjusted Left", out_rects[0]);
+    Log(kTagRotator, "Adjusted Right", out_rects[1]);
+  }
 }
 
 void SplitTopBottom(const LayerRect &in_rect, uint32_t split_count, uint32_t align_y,
-                     LayerRect *out_rects) {
+                    bool flip_horizontal, LayerRect *out_rects) {
   LayerRect rect_temp = in_rect;
 
   uint32_t split_height = UINT32(rect_temp.bottom - rect_temp.top) / split_count;
+  float aligned_height = FLOAT(CeilToMultipleOf(split_height, align_y));
 
   for (uint32_t count = 0; count < split_count; count++) {
-    float aligned_bottom = rect_temp.top + FLOAT(CeilToMultipleOf(split_height, align_y));
+    float aligned_bottom = rect_temp.top + aligned_height;
     out_rects[count].top = rect_temp.top;
     out_rects[count].bottom = MIN(rect_temp.bottom, aligned_bottom);
     out_rects[count].left = rect_temp.left;
@@ -183,6 +195,16 @@ void SplitTopBottom(const LayerRect &in_rect, uint32_t split_count, uint32_t ali
     rect_temp.top = out_rects[count].bottom;
 
     Log(kTagRotator, "SplitTopBottom", out_rects[count]);
+  }
+
+  // If we have a horizontal flip, then we should be splitting the destination from bottom to top
+  // to ensure that the bottom split's y-offset is aligned correctly after we swap the destinations
+  // while accounting for the flip.
+  if (flip_horizontal && split_count > 1) {
+    out_rects[0].bottom = out_rects[0].top + (out_rects[1].bottom - out_rects[1].top);
+    out_rects[1].top = out_rects[0].bottom;
+    Log(kTagRotator, "Adjusted Top", out_rects[0]);
+    Log(kTagRotator, "Adjusted Bottom", out_rects[1]);
   }
 }
 
