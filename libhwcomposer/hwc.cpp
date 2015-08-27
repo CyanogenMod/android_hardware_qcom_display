@@ -868,7 +868,7 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         HWC_DISPLAY_HEIGHT,
         HWC_DISPLAY_DPI_X,
         HWC_DISPLAY_DPI_Y,
-#ifdef QTI_BSP
+#ifdef GET_DISPLAY_SECURE_STATUS_FROM_HWC
         HWC_DISPLAY_SECURE,
 #endif
 #ifdef GET_FRAMEBUFFER_FORMAT_FROM_HWC
@@ -921,7 +921,7 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         case HWC_DISPLAY_DPI_Y:
             values[i] = (int32_t) (ctx->dpyAttr[disp].ydpi*1000.0);
             break;
-#ifdef QTI_BSP
+#ifdef GET_DISPLAY_SECURE_STATUS_FROM_HWC
         case HWC_DISPLAY_SECURE:
             values[i] = (int32_t) (ctx->dpyAttr[disp].secure);
             break;
