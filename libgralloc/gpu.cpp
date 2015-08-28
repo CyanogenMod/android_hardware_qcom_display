@@ -193,11 +193,8 @@ void gpu_context_t::getGrallocInformationFromFormat(int inputFormat,
 {
     *bufferType = BUFFER_TYPE_VIDEO;
 
-    if (inputFormat <= HAL_PIXEL_FORMAT_BGRA_8888) {
+    if (isUncompressedRgbFormat(inputFormat) == TRUE) {
         // RGB formats
-        *bufferType = BUFFER_TYPE_UI;
-    } else if ((inputFormat == HAL_PIXEL_FORMAT_R_8) ||
-               (inputFormat == HAL_PIXEL_FORMAT_RG_88)) {
         *bufferType = BUFFER_TYPE_UI;
     }
 }
