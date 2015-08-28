@@ -120,5 +120,6 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
                                                 int *aligned_w,
                                                 int *aligned_h);
 
+        unsigned int (*LINK_adreno_get_gpu_pixel_alignment) ();
 };
 #endif /* GR_H_ */
