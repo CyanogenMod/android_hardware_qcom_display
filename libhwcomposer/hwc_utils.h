@@ -34,8 +34,10 @@
 #include "mdp_version.h"
 #include <overlayUtils.h>
 #include <overlayRotator.h>
-#include <EGL/egl.h>
 
+#ifdef QTI_BSP
+#include <exhwcomposer_defs.h>
+#endif
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
@@ -465,12 +467,6 @@ bool isDisplaySplit(hwc_context_t* ctx, int dpy);
 
 int getRotDownscale(hwc_context_t *ctx, const hwc_layer_1_t *layer);
 
-// Set the GPU hint flag to high for MIXED/GPU composition only for
-// first frame after MDP to GPU/MIXED mode transition.
-// Set the GPU hint to default if the current composition type is GPU
-// due to idle fallback or MDP composition.
-void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list);
-
 // Returns true if rect1 is peripheral to rect2, false otherwise.
 bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 
@@ -605,20 +601,6 @@ enum eCompositionState {
     COMPOSITION_STATE_IDLE_FALLBACK,  // Set if it is idlefallback
 };
 
-// Structure holds the information about the GPU hint.
-struct gpu_hint_info {
-    // system level flag to enable gpu_perf_mode
-    bool mGpuPerfModeEnable;
-    // Stores the current GPU performance mode DEFAULT/HIGH
-    bool mCurrGPUPerfMode;
-    // Stores the compositon state GPU, MDP or IDLE_FALLBACK
-    bool mCompositionState;
-    // Stores the EGLContext of current process
-    EGLContext mEGLContext;
-    // Stores the EGLDisplay of current process
-    EGLDisplay mEGLDisplay;
-};
-
 // -----------------------------------------------------------------------------
 // HWC context
 // This structure contains overall state
@@ -682,7 +664,6 @@ struct hwc_context_t {
     bool mPanelResetStatus;
     // number of active Displays
     int numActiveDisplays;
-    struct gpu_hint_info mGPUHintInfo;
     //App Buffer Composition
     bool enableABC;
     // PTOR Info
