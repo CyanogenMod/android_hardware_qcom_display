@@ -48,6 +48,7 @@
 #define STR(f) #f;
 // Max number of PTOR layers handled
 #define MAX_PTOR_LAYERS 2
+#define MAX_NUM_COLOR_MODES 32
 
 //Fwrd decls
 struct hwc_context_t;
@@ -227,6 +228,36 @@ private:
     hwc_layer_1_t* mLayer[overlay::RotMgr::MAX_ROT_SESS];
     overlay::Rotator* mRot[overlay::RotMgr::MAX_ROT_SESS];
     uint32_t mCount;
+};
+
+//ColorModes for primary displays
+class ColorMode {
+public:
+    void init();
+    void destroy();
+    int32_t getNumModes() { return mNumModes; }
+    const int32_t* getModeList() { return mModeList; }
+    int32_t getModeForIndex(int32_t index);
+    int32_t getIndexForMode(int32_t mode);
+    int applyDefaultMode();
+    int applyModeByID(int modeID);
+    int applyModeByIndex(int index);
+    int setDefaultMode(int modeID);
+    int getActiveModeIndex() { return mCurModeIndex; }
+private:
+    int32_t (*fnGetNumModes)(int /*dispID*/);
+    int32_t (*fnGetModeList)(int32_t* /*mModeList*/, int32_t* /*current default*/,
+            int32_t /*dispID*/);
+    int (*fnApplyDefaultMode)(int /*dispID*/);
+    int (*fnApplyModeById)(int /*modeID*/, int /*dispID*/);
+    int (*fnSetDefaultMode)(int /*modeID*/, int /*dispID*/);
+
+    void*     mModeHandle = NULL;
+    int32_t   mModeList[MAX_NUM_COLOR_MODES];
+    int32_t   mNumModes = 0;
+    int32_t   mCurModeIndex = 0;
+    int32_t   mCurMode = 0;
+
 };
 
 inline uint32_t LayerRotMap::getCount() const {
@@ -650,6 +681,8 @@ struct hwc_context_t {
     bool mHPDEnabled;
     //Used to notify that boot has completed
     bool mBootAnimCompleted;
+    //Manages color modes
+    qhwc::ColorMode *mColorMode;
 };
 
 namespace qhwc {
