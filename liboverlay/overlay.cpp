@@ -109,7 +109,8 @@ eDest Overlay::nextPipe(eMdpPipeType type, const PipeSpecs& pipeSpecs) {
              mPipeBook[i].mDisplay == dpy) &&
             (mPipeBook[i].mMixer == MIXER_UNUSED || //Free or same mixer
              mPipeBook[i].mMixer == mixer) &&
-            (mPipeBook[i].mFormatType == FORMAT_NONE || //Free or same format
+            (qdutils::MDPVersion::getInstance().is8976() ||
+             mPipeBook[i].mFormatType == FORMAT_NONE || //Free or same format
              mPipeBook[i].mFormatType == formatType) &&
             PipeBook::isNotAllocated(i) && //Free pipe
             ( (sDMAMultiplexingSupported && dpy) ||

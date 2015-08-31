@@ -162,7 +162,8 @@ bool MDPComp::init(hwc_context_t *ctx) {
         sMaxSecLayers = min(sMaxSecLayers, sMaxPipesPerMixer);
     }
 
-    if(ctx->mMDP.panel != MIPI_CMD_PANEL) {
+    if(ctx->mMDP.panel != MIPI_CMD_PANEL &&
+            (ctx->mMDP.version >= qdutils::MDP_V4_0)) {
         sIdleInvalidator = IdleInvalidator::getInstance();
         if(sIdleInvalidator->init(timeout_handler, ctx) < 0) {
             delete sIdleInvalidator;
@@ -485,6 +486,17 @@ bool MDPComp::isValidDimension(hwc_context_t *ctx, hwc_layer_1_t *layer) {
     hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
     hwc_rect_t dst = layer->displayFrame;
     bool rotated90 = (bool)(layer->transform & HAL_TRANSFORM_ROT_90);
+
+    /* For YUV formats, Normalize source crop for MDP before computing scaling
+     * required as we would normalize source crop for overlay pipe.
+     * Else we could end up calling set IOCTL with scaling requirement
+     * marginally >upscale limit or <downscale limit tus failing at IOCTL.
+     */
+    if(isYuvBuffer(hnd)) {
+        normalizeCrop((uint32_t&)crop.left, (uint32_t&)crop.right);
+        normalizeCrop((uint32_t&)crop.top, (uint32_t&)crop.bottom);
+    }
+
     int crop_w = rotated90 ? crop.bottom - crop.top : crop.right - crop.left;
     int crop_h = rotated90 ? crop.right - crop.left : crop.bottom - crop.top;
     int dst_w = dst.right - dst.left;
@@ -1664,7 +1676,7 @@ int MDPComp::getBatch(hwc_display_contents_1_t* list,
         int& maxBatchStart, int& maxBatchEnd,
         int& maxBatchCount) {
     int i = 0;
-    int fbZOrder =-1;
+    int fbZOrder = DEFAULT_FB_ZORDER;
     int droppedLayerCt = 0;
     while (i < mCurrentFrame.layerCount) {
         int batchCount = 0;
@@ -2196,7 +2208,7 @@ int MDPComp::isBottomLayerFullScreen(hwc_context_t *ctx,
     hwc_layer_1_t* layer = &list->hwLayers[0];
     hwc_rect_t rect = {0, 0, (int)ctx->dpyAttr[mDpy].xres,
         (int)ctx->dpyAttr[mDpy].yres};
-    if((ctx->listStats[mDpy].numAppLayers > 1) &&
+    if(not mDpy && (ctx->listStats[mDpy].numAppLayers > 1) &&
             isSupportedForMDPComp(ctx, layer) &&
             isSameRect(rect, layer->displayFrame)) {
         return 1;

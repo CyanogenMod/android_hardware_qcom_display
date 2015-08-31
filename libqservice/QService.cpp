@@ -82,7 +82,7 @@ void QService::onHdmiHotplug(int connected) {
         ALOGD_IF(QSERVICE_DEBUG, "%s: HDMI hotplug", __FUNCTION__);
         mHDMIClient->onHdmiHotplug(connected);
     } else {
-        ALOGE("%s: Failed to get a valid HDMI client", __FUNCTION__);
+        ALOGW("%s: Failed to get a valid HDMI client", __FUNCTION__);
     }
 }
 
