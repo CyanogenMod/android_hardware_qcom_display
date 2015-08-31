@@ -144,7 +144,7 @@ class HWCDisplay : public DisplayEventHandler {
   uint32_t RoundToStandardFPS(uint32_t fps);
   virtual void ApplyScanAdjustment(hwc_rect_t *display_frame);
   DisplayError SetColorSpace(const ColorSpace_t source, LayerColorSpace *target);
-  DisplayError SetMetaData(const MetaData_t &meta_data, Layer *layer);
+  DisplayError SetMetaData(const private_handle_t *pvt_handle, Layer *layer);
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
   void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
   bool IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache);

@@ -381,9 +381,10 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
 
   if (pvt_handle) {
     layer_buffer->format = GetSDMFormat(pvt_handle->format, pvt_handle->flags);
+    layer_buffer->width = pvt_handle->width;
+    layer_buffer->height = pvt_handle->height;
 
-    const MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
-    if (meta_data && (SetMetaData(*meta_data, layer) != kErrorNone)) {
+    if (SetMetaData(pvt_handle, layer) != kErrorNone) {
       return -EINVAL;
     }
 
@@ -391,8 +392,6 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
       return -EINVAL;
     }
 
-    layer_buffer->width = pvt_handle->width;
-    layer_buffer->height = pvt_handle->height;
     if (pvt_handle->bufferType == BUFFER_TYPE_VIDEO) {
       layer_stack_.flags.video_present = true;
       layer_buffer->flags.video = true;
@@ -1260,23 +1259,38 @@ DisplayError HWCDisplay::SetColorSpace(const ColorSpace_t source, LayerColorSpac
   return kErrorNone;
 }
 
-DisplayError HWCDisplay::SetMetaData(const MetaData_t &meta_data, Layer *layer) {
-  if (meta_data.operation & UPDATE_REFRESH_RATE) {
-    layer->frame_rate = RoundToStandardFPS(meta_data.refreshrate);
+DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *layer) {
+  const MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
+  LayerBuffer *layer_buffer = layer->input_buffer;
+
+  if (!meta_data) {
+    return kErrorNone;
   }
 
-  if ((meta_data.operation & PP_PARAM_INTERLACED) && meta_data.interlaced) {
-    layer->input_buffer->flags.interlace = true;
-  }
-
-  if (meta_data.operation & LINEAR_FORMAT) {
-    layer->input_buffer->format = GetSDMFormat(meta_data.linearFormat, 0);
-  }
-
-  if (meta_data.operation & UPDATE_COLOR_SPACE) {
-    if (SetColorSpace(meta_data.colorSpace, &layer->color_space) != kErrorNone) {
+  if (meta_data->operation & UPDATE_COLOR_SPACE) {
+    if (SetColorSpace(meta_data->colorSpace, &layer->color_space) != kErrorNone) {
       return kErrorNotSupported;
     }
+  }
+
+  if (meta_data->operation & UPDATE_REFRESH_RATE) {
+    layer->frame_rate = RoundToStandardFPS(meta_data->refreshrate);
+  }
+
+  if ((meta_data->operation & PP_PARAM_INTERLACED) && meta_data->interlaced) {
+    layer_buffer->flags.interlace = true;
+  }
+
+  if (meta_data->operation & LINEAR_FORMAT) {
+    layer_buffer->format = GetSDMFormat(meta_data->linearFormat, 0);
+  }
+
+  if (meta_data->operation & UPDATE_BUFFER_GEOMETRY) {
+    int actual_width = pvt_handle->width;
+    int actual_height = pvt_handle->height;
+    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(pvt_handle, actual_width, actual_height);
+    layer_buffer->width = actual_width;
+    layer_buffer->height = actual_height;
   }
 
   return kErrorNone;
