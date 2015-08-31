@@ -340,25 +340,11 @@ static void toggleScreenUpdate(hwc_context_t* ctx, uint32_t on) {
 }
 
 static void applyModeById(hwc_context_t* ctx, int32_t modeId) {
-    int (*applyMode)(int, int) = NULL;
-    void *modeHandle = NULL;
-
-    modeHandle = dlopen("libmm-qdcm.so", RTLD_NOW);
-    if (modeHandle) {
-        *(void **)&applyMode = dlsym(modeHandle, "applyModeById");
-        if (applyMode) {
-            int err = applyMode(modeId, HWC_DISPLAY_PRIMARY);
-            if (err)
-                ALOGD("%s: Not able to apply mode: %d", __FUNCTION__, modeId);
-            else
-                ctx->proc->invalidate(ctx->proc);
-        } else {
-            ALOGE("%s: No symbol applyModeById found", __FUNCTION__);
-        }
-        dlclose(modeHandle);
-    } else {
-        ALOGE("%s: Not able to load libmm-qdcm.so", __FUNCTION__);
-    }
+    int err = ctx->mColorMode->applyModeByID(modeId);
+    if (err)
+        ALOGD("%s: Not able to apply mode: %d", __FUNCTION__, modeId);
+    else
+        ctx->proc->invalidate(ctx->proc);
 }
 
 status_t QClient::notifyCallback(uint32_t command, const Parcel* inParcel,
