@@ -2681,31 +2681,27 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
 
    /* Align to minimum width recommended by the panel */
    if((t_roi.right - t_roi.left) < MIN_WIDTH) {
-       const int corWidth = MIN_WIDTH - (t_roi.right - t_roi.left);
-       t_roi.left = t_roi.left - (corWidth >> 1);
-       t_roi.right = t_roi.right + (corWidth >> 1) + (corWidth & 1);
-
-       if(t_roi.left < boundary.left) {
-           t_roi.left = boundary.left;
-           t_roi.right = t_roi.left + MIN_WIDTH;
-       } else if(t_roi.right > boundary.right) {
-           t_roi.right = boundary.right;
-           t_roi.left = t_roi.right - MIN_WIDTH;
+       if(MIN_WIDTH == boundary.right - boundary.left) {
+           t_roi.left = 0;
+           t_roi.right = MIN_WIDTH;
+       } else {
+           if((t_roi.left + MIN_WIDTH) > boundary.right)
+               t_roi.left = t_roi.right - MIN_WIDTH;
+           else
+               t_roi.right = t_roi.left + MIN_WIDTH;
        }
    }
 
   /* Align to minimum height recommended by the panel */
    if((t_roi.bottom - t_roi.top) < MIN_HEIGHT) {
-       const int corHeight = MIN_HEIGHT - (t_roi.bottom - t_roi.top);
-       t_roi.top = t_roi.top - (corHeight >> 1);
-       t_roi.bottom = t_roi.bottom + (corHeight >> 1) + (corHeight & 1);
-
-       if(t_roi.top < boundary.top) {
-           t_roi.top = boundary.top;
-           t_roi.bottom = t_roi.top + MIN_HEIGHT;
-       } else if(t_roi.bottom > boundary.bottom) {
-           t_roi.bottom = boundary.bottom;
-           t_roi.top = t_roi.bottom - MIN_HEIGHT;
+       if(MIN_HEIGHT == boundary.bottom - boundary.top) {
+           t_roi.top = 0;
+           t_roi.bottom = MIN_HEIGHT;
+       } else {
+           if((t_roi.top + MIN_HEIGHT) > boundary.bottom)
+               t_roi.top = t_roi.bottom - MIN_HEIGHT;
+           else
+               t_roi.bottom = t_roi.top + MIN_HEIGHT;
        }
    }
 
@@ -2715,28 +2711,17 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
 
    if(WIDTH_ALIGN) {
        int width = t_roi.right - t_roi.left;
-       int corWidth = WIDTH_ALIGN - width % WIDTH_ALIGN;
-       t_roi.left = t_roi.left - (corWidth >> 1);
-       t_roi.right = t_roi.right + (corWidth >> 1) + (corWidth & 1);
+       width = WIDTH_ALIGN * ((width + (WIDTH_ALIGN - 1)) / WIDTH_ALIGN);
+       t_roi.right = t_roi.left + width;
 
-       if(LEFT_ALIGN) {
-           int errLeft = t_roi.left % LEFT_ALIGN;
-           t_roi.left = t_roi.left - errLeft;
-           t_roi.right = t_roi.right + LEFT_ALIGN - errLeft;
-       }
        if(t_roi.right > boundary.right) {
            t_roi.right = boundary.right;
            t_roi.left = t_roi.right - width;
 
            if(LEFT_ALIGN)
                t_roi.left = t_roi.left - (t_roi.left % LEFT_ALIGN);
-
-       } else if(t_roi.left < boundary.left) {
-           t_roi.left = boundary.left;
-           t_roi.right = t_roi.left + width;
        }
    }
-
 
    /* Align top and height to meet panel restrictions */
    if(TOP_ALIGN)
@@ -2744,28 +2729,17 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
 
    if(HEIGHT_ALIGN) {
        int height = t_roi.bottom - t_roi.top;
-       int corHeight = HEIGHT_ALIGN - height % HEIGHT_ALIGN;
-       t_roi.top = t_roi.top - (corHeight >> 1);
-       t_roi.bottom = t_roi.bottom + (corHeight >> 1) + (corHeight & 1);
+       height = HEIGHT_ALIGN *  ((height + (HEIGHT_ALIGN - 1)) / HEIGHT_ALIGN);
+       t_roi.bottom = t_roi.top  + height;
 
-       if(TOP_ALIGN) {
-           int errTop = t_roi.top % TOP_ALIGN;
-           t_roi.top = t_roi.top - errTop;
-           t_roi.bottom = t_roi.bottom + TOP_ALIGN - errTop;
-       }
        if(t_roi.bottom > boundary.bottom) {
            t_roi.bottom = boundary.bottom;
            t_roi.top = t_roi.bottom - height;
 
            if(TOP_ALIGN)
                t_roi.top = t_roi.top - (t_roi.top % TOP_ALIGN);
-
-       } else if(t_roi.top < boundary.top) {
-           t_roi.top = boundary.top;
-           t_roi.bottom = t_roi.top + height;
        }
    }
-
 
    return t_roi;
 }
