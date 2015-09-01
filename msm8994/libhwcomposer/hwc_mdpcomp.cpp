@@ -2015,8 +2015,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
     //Do not cache the information for next draw cycle.
     if(numLayers > MAX_NUM_APP_LAYERS or (!numLayers)) {
-        ALOGI("%s: Unsupported layer count for mdp composition",
-                __FUNCTION__);
+        ALOGI_IF(numLayers, "%s: Unsupported layer count for mdp composition: %d",
+                __FUNCTION__, numLayers);
         mCachedFrame.reset();
 #ifdef DYNAMIC_FPS
         // Reset refresh rate
