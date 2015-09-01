@@ -228,9 +228,6 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         mdp_layer.bg_color = layer.solid_fill_color;
 
         if (pipe_info->scale_data.enable_pixel_ext) {
-          if ((mdp_layer.flags & MDP_LAYER_DEINTERLACE) && (layer.transform.rotation == 90.0f)) {
-            mdp_buffer.width = pipe_info->scale_data.src_width;
-          }
           SetHWScaleData(pipe_info->scale_data, mdp_layer_count);
           mdp_layer.flags |= MDP_LAYER_ENABLE_PIXEL_EXT;
         }
@@ -593,10 +590,6 @@ void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
     if (layer.transform.flip_horizontal) {
       *mdp_flags |= MDP_LAYER_FLIP_LR;
     }
-  }
-
-  if (input_buffer->flags.interlace) {
-    *mdp_flags |= MDP_LAYER_DEINTERLACE;
   }
 
   if (input_buffer->flags.secure) {
