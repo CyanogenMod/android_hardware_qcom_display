@@ -320,7 +320,6 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
             if(ctx->mCopyBit[dpy])
                 ctx->mCopyBit[dpy]->prepare(ctx, list, dpy);
         }
-        setGPUHint(ctx, list);
     }
     return 0;
 }
@@ -429,7 +428,7 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
             ALOGD_IF (VSYNC_DEBUG, "VSYNC state changed to %s",
                       (enable)?"ENABLED":"DISABLED");
             break;
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
         case  HWC_EVENT_ORIENTATION:
             if(dpy == HWC_DISPLAY_PRIMARY) {
                 Locker::Autolock _l(ctx->mDrawLock);
@@ -855,7 +854,7 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         HWC_DISPLAY_HEIGHT,
         HWC_DISPLAY_DPI_X,
         HWC_DISPLAY_DPI_Y,
-#ifdef QCOM_BSP
+#ifdef GET_DISPLAY_SECURE_STATUS
         HWC_DISPLAY_SECURE,
 #endif
         HWC_DISPLAY_NO_ATTRIBUTE,
@@ -910,7 +909,7 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         case HWC_DISPLAY_DPI_Y:
             values[i] = (int32_t) (ctx->dpyAttr[disp].ydpi*1000.0);
             break;
-#ifdef QCOM_BSP
+#ifdef GET_DISPLAY_SECURE_STATUS
         case HWC_DISPLAY_SECURE:
             values[i] = (int32_t) (ctx->dpyAttr[disp].secure);
             break;

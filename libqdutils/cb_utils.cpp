@@ -49,16 +49,15 @@ int CBUtils::getuiClearRegion(hwc_display_contents_1_t* list,
     Region wormholeRegion(fbFrameRect);
 
    if (dirtyIndex != -1) {
-#ifdef QCOM_BSP
       /*
        * 1. Map dirty rect of updating layer to its display frame.
        * 2. Use this display frame as wormholeRegion instead of full Frame
        * */
-      hwc_rect_t dirtyRect = list->hwLayers[dirtyIndex].dirtyRect;
       hwc_rect_t displayFrame = list->hwLayers[dirtyIndex].displayFrame;
       hwc_frect_t sCropF = list->hwLayers[dirtyIndex].sourceCropf;
       hwc_rect_t srcRect = {int(ceilf(sCropF.left)), int(ceilf(sCropF.top)),
                            int(ceilf(sCropF.right)), int(ceilf(sCropF.bottom))};
+      hwc_rect_t dirtyRect = srcRect;
 
       displayFrame.left += dirtyRect.left - srcRect.left;
       displayFrame.top += dirtyRect.top - srcRect.top;
@@ -69,7 +68,6 @@ int CBUtils::getuiClearRegion(hwc_display_contents_1_t* list,
             displayFrame.bottom);
       Region tmpRegion(tmpRect);
       wormholeRegion = wormholeRegion.intersect(tmpRegion);
-#endif
    }
     if(cb_swap_rect::getInstance().checkSwapRectFeature_on() == true){
       wormholeRegion.set(0,0);

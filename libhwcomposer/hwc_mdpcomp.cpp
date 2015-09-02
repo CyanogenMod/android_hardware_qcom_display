@@ -660,7 +660,8 @@ void MDPCompNonSplit::generateROI(hwc_context_t *ctx,
         hwc_layer_1_t* layer = &list->hwLayers[index];
         if (layerUpdating(layer) ||
                 isYuvBuffer((private_handle_t *)layer->handle)) {
-            hwc_rect_t dirtyRect = (struct hwc_rect){0, 0, 0, 0};;
+            hwc_rect_t dirtyRect = getIntersection(layer->displayFrame,
+                                                    fullFrame);
             if(!needsScaling(layer) && !layer->transform) {
                 dirtyRect = calculateDirtyRect(layer, fullFrame);
             }
@@ -774,8 +775,10 @@ void MDPCompSplit::generateROI(hwc_context_t *ctx,
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
         if (layerUpdating(layer) || isYuvBuffer(hnd)) {
-            hwc_rect_t l_dirtyRect = (struct hwc_rect){0, 0, 0, 0};
-            hwc_rect_t r_dirtyRect = (struct hwc_rect){0, 0, 0, 0};
+            hwc_rect_t l_dirtyRect = getIntersection(layer->displayFrame,
+                                        l_frame);
+            hwc_rect_t r_dirtyRect = getIntersection(layer->displayFrame,
+                                        r_frame);
 
             if(!needsScaling(layer) && !layer->transform) {
                 l_dirtyRect = calculateDirtyRect(layer, l_frame);
@@ -2048,6 +2051,11 @@ static bool validForCursor(hwc_context_t* ctx, int dpy, hwc_layer_1_t* layer) {
         return false;
     } else if (srcW > (int)maxCursorSize || srcH > (int)maxCursorSize) {
         return false;
+    } else if ((getWidth(hnd) > 0xFFFF) || (getHeight(hnd) > 0xFFFF)) {
+        // using fb_image's width/heigh field to pack crop and width, hence
+        // rejecting if width/height > 0xFFFF.
+        // Crop is already taken care by the cursor_size
+        return false;
     }
 
     if (isDisplaySplit(ctx, dpy) && !mdpVersion.isSrcSplit()) {
@@ -2869,7 +2877,8 @@ void MDPCompSrcSplit::generateROI(hwc_context_t *ctx,
 
         if (layerUpdating(layer) ||
                 isYuvBuffer((private_handle_t *)layer->handle)) {
-            hwc_rect_t dirtyRect = (struct hwc_rect){0, 0, 0, 0};
+            hwc_rect_t dirtyRect = getIntersection(layer->displayFrame,
+                                                    fullFrame);
             if (!needsScaling(layer) && !layer->transform) {
                 dirtyRect = calculateDirtyRect(layer, fullFrame);
             }

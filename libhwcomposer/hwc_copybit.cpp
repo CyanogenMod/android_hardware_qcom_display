@@ -174,9 +174,7 @@ int CopyBit::getLayersChanging(hwc_context_t *ctx,
 
     if ( updatingLayerCount ==  1 ) {
        hwc_rect_t dirtyRect = list->hwLayers[changingLayerIndex].displayFrame;
-#ifdef QCOM_BSP
-       dirtyRect = list->hwLayers[changingLayerIndex].dirtyRect;
-#endif
+       dirtyRect = list->hwLayers[changingLayerIndex].displayFrame;
 
        for (int k = ctx->listStats[dpy].numAppLayers-1; k >= 0 ; k--) {
            //disable swap rect in case of scaling and video .
@@ -387,7 +385,7 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         // Mark all layers to be drawn by copybit
         for (int i = ctx->listStats[dpy].numAppLayers-1; i >= 0 ; i--) {
             layerProp[i].mFlags |= HWC_COPYBIT;
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
             if (ctx->mMDP.version == qdutils::MDP_V3_0_4 ||
                ctx->mMDP.version == qdutils::MDP_V3_0_5)
                 list->hwLayers[i].compositionType = HWC_BLIT;
@@ -853,7 +851,7 @@ int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
     copybit_rect_t dstRect = {displayFrame.left, displayFrame.top,
                               displayFrame.right,
                               displayFrame.bottom};
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
     //change src and dst with dirtyRect
     if(mDirtyLayerIndex != -1) {
       hwc_rect_t result = getIntersection(displayFrame, mDirtyRect);

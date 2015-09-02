@@ -58,8 +58,9 @@ bool HWCursor::config(const int fd, void* base, PipeArgs& pargs,
 
     cursorImage.dx = dest.x;
     cursorImage.dy = dest.y;
-    cursorImage.width = pargs.whf.w;
-    cursorImage.height = pargs.whf.h;
+    // Pack width/height with src crop width/height and hnd width/height
+    cursorImage.width = (crop.w << 16) | pargs.whf.w;
+    cursorImage.height = (crop.h << 16) | pargs.whf.h;
     cursorImage.fg_color = pargs.planeAlpha; // Hint for PMA
     cursorImage.bg_color = 0xffffff00;  // RGBA
     cursorImage.depth = 32;
@@ -134,11 +135,13 @@ void HWCursor::getDump(char* buf, size_t len) {
           snprintf(cursordump, sizeof(cursordump),
               "HWCursor on Primary: src w=%d h=%d\n"
               "\tsrc_rect x=%d y=%d w=%d h=%d\n"
-              "\tdst_rect x=%d y=%d w=%d h=%d\n\n", cursor->image.width,
-              cursor->image.height, cursor->hot.x, cursor->hot.y,
-              cursor->image.width, cursor->image.height,
-              cursor->image.dx, cursor->image.dy, cursor->image.width,
-              cursor->image.height);
+              "\tdst_rect x=%d y=%d w=%d h=%d\n\n",
+              (cursor->image.width & 0x00FF), (cursor->image.height & 0x00FF),
+              cursor->hot.x, cursor->hot.y,
+              ((cursor->image.width >> 16) & 0x00FF),
+              ((cursor->image.height >> 16) & 0xFF), cursor->image.dx,
+              cursor->image.dy, ((cursor->image.width >> 16) & 0x00FF),
+              ((cursor->image.height >> 16) &0xFF));
           strlcat(buf, cursordump, len);
       }
 
