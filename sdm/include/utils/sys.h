@@ -45,6 +45,7 @@ class Sys {
   typedef int (*fclose)(FILE* fileptr);
   typedef ssize_t (*getline)(char **lineptr, size_t *linelen, FILE *stream);
   typedef int (*pthread_cancel)(pthread_t thread);
+  typedef int (*dup)(int fd);
 
   static ioctl ioctl_;
   static open open_;
@@ -56,6 +57,7 @@ class Sys {
   static fclose fclose_;
   static getline getline_;
   static pthread_cancel pthread_cancel_;
+  static dup dup_;
 };
 
 }  // namespace sdm

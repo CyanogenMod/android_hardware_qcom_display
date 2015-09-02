@@ -53,6 +53,7 @@ Sys::fopen Sys::fopen_ = ::fopen;
 Sys::fclose Sys::fclose_ = ::fclose;
 Sys::getline Sys::getline_ = ::getline;
 Sys::pthread_cancel Sys::pthread_cancel_ = PthreadCancel;
+Sys::dup Sys::dup_ = ::dup;
 
 #else
 
@@ -66,6 +67,7 @@ extern ssize_t virtual_pwrite(int fd, const void *data, size_t count, off_t offs
 extern FILE* virtual_fopen(const char *fname, const char *mode);
 extern int virtual_fclose(FILE* fileptr);
 extern ssize_t virtual_getline(char **lineptr, size_t *linelen, FILE *stream);
+extern int virtual_dup(int fd);
 
 Sys::ioctl Sys::ioctl_ = virtual_ioctl;
 Sys::open Sys::open_ = virtual_open;
@@ -77,6 +79,7 @@ Sys::fopen Sys::fopen_ = virtual_fopen;
 Sys::fclose Sys::fclose_ = virtual_fclose;
 Sys::getline Sys::getline_ = virtual_getline;
 Sys::pthread_cancel Sys::pthread_cancel_ = ::pthread_cancel;
+Sys::dup Sys::dup_ = virtual_dup;
 
 #endif  // SDM_VIRTUAL_DRIVER
 

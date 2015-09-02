@@ -433,10 +433,10 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
       input_buffer = &hw_rotator_session->output_buffer;
     }
 
-    input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
+    input_buffer->release_fence_fd = Sys::dup_(mdp_commit.release_fence);
   }
 
-  hw_layer_info.sync_handle = dup(mdp_commit.release_fence);
+  hw_layer_info.sync_handle = Sys::dup_(mdp_commit.release_fence);
 
   DLOGI_IF(kTagDriverConfig, "*************************** %s Commit Input ************************",
            device_name_);
