@@ -611,7 +611,8 @@ void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
     *mdp_flags |= MDP_LAYER_SOLID_FILL;
   }
 
-  if (layer.flags.cursor && is_cursor_pipe_used) {
+  if (hw_panel_info_.mode == kModeVideo && layer.flags.cursor && is_cursor_pipe_used) {
+    // Only video mode panels support ASYNC layer updates
     *mdp_flags |= MDP_LAYER_ASYNC;
   }
 }

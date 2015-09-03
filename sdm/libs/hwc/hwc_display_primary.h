@@ -49,6 +49,7 @@ class HWCDisplayPrimary : public HWCDisplay {
   virtual int SetRefreshRate(uint32_t refresh_rate);
   virtual int Perform(uint32_t operation, ...);
   virtual void SetSecureDisplay(bool secure_display_active);
+  virtual DisplayError Refresh();
 
  private:
   HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
@@ -56,7 +57,9 @@ class HWCDisplayPrimary : public HWCDisplay {
   virtual DisplayError SetDisplayMode(uint32_t mode);
   void ProcessBootAnimCompleted();
   void SetQDCMSolidFillInfo(bool enable, uint32_t color);
-  void ToggleCPUHint(int app_layer_count);
+  void ToggleCPUHint(bool set);
+  void SetMetadataRefreshRate(bool one_updating_layer);
+  void ForceRefreshRate(uint32_t refresh_rate);
 
   CPUHint *cpu_hint_;
 };

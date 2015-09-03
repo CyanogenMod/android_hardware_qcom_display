@@ -95,6 +95,11 @@ DisplayError HWPrimary::Init(HWEventHandler *eventhandler) {
     goto CleanupOnError;
   }
 
+  error = PopulateDisplayAttributes();
+  if (error != kErrorNone) {
+    goto CleanupOnError;
+  }
+
   // Open nodes for polling
   for (int event = 0; event < kNumDisplayEvents; event++) {
     poll_fds_[event].fd = -1;
@@ -267,14 +272,6 @@ DisplayError HWPrimary::GetDisplayAttributes(uint32_t index,
     return kErrorParameters;
   }
 
-  if (config_changed_) {
-    DisplayError error = PopulateDisplayAttributes();
-    if (error != kErrorNone) {
-      return error;
-    }
-    config_changed_ = false;
-  }
-
   *display_attributes = display_attributes_;
   if (IsResolutionSwitchEnabled()) {
     // Overwrite only the parent portion of object
@@ -372,7 +369,9 @@ DisplayError HWPrimary::SetDisplayAttributes(uint32_t index) {
 DisplayError HWPrimary::SetRefreshRate(uint32_t refresh_rate) {
   char node_path[kMaxStringLength] = {0};
 
-  DLOGI("Setting refresh rate to = %d fps", refresh_rate);
+  if (refresh_rate == display_attributes_.fps) {
+    return kErrorNone;
+  }
 
   snprintf(node_path, sizeof(node_path), "%s%d/dynamic_fps", fb_path_, fb_node_index_);
 
@@ -392,8 +391,10 @@ DisplayError HWPrimary::SetRefreshRate(uint32_t refresh_rate) {
   }
   Sys::close_(fd);
 
-  config_changed_ = true;
-  synchronous_commit_ = true;
+  DisplayError error = PopulateDisplayAttributes();
+  if (error != kErrorNone) {
+    return error;
+  }
 
   return kErrorNone;
 }

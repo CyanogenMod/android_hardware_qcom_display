@@ -59,6 +59,7 @@ int HWCDisplayVirtual::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_
     return status;
   }
 
+  // TODO(user): Need to update resolution(and not aligned resolution) on writeback.
   status = hwc_display_virtual->SetOutputSliceFromMetadata(content_list);
   if (status) {
     Destroy(hwc_display_virtual);
@@ -67,13 +68,17 @@ int HWCDisplayVirtual::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_
 
   hwc_display_virtual->GetPanelResolution(&virtual_width, &virtual_height);
 
-  int downscale_enabled = 0;
-  HWCDebugHandler::Get()->GetProperty("sdm.debug.sde_downscale_virtual", &downscale_enabled);
-  if (downscale_enabled) {
-    GetDownscaleResolution(primary_width, primary_height, &virtual_width, &virtual_height);
+  if (content_list->numHwLayers < 1) {
+    Destroy(hwc_display_virtual);
+    return -1;
   }
 
-  status = hwc_display_virtual->SetFrameBufferResolution(virtual_width, virtual_height);
+  hwc_layer_1_t &fb_layer = content_list->hwLayers[content_list->numHwLayers-1];
+  int fb_width = fb_layer.displayFrame.right - fb_layer.displayFrame.left;
+  int fb_height = fb_layer.displayFrame.bottom - fb_layer.displayFrame.top;
+
+  status = hwc_display_virtual->SetFrameBufferResolution(fb_width, fb_height);
+
   if (status) {
     Destroy(hwc_display_virtual);
     return status;

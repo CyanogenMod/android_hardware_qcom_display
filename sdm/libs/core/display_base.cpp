@@ -474,7 +474,7 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
                          num_modes, active_index);
 
   DisplayConfigVariableInfo &info = attrib;
-  DumpImpl::AppendString(buffer, length, "\nres:%u x %u, dpi:%.2f x %.2f, fps:%.2f,"
+  DumpImpl::AppendString(buffer, length, "\nres:%u x %u, dpi:%.2f x %.2f, fps:%u,"
                          "vsync period: %u", info.x_pixels, info.y_pixels, info.x_dpi,
                          info.y_dpi, info.fps, info.vsync_period_ns);
 
@@ -666,6 +666,24 @@ DisplayError DisplayBase::SetCursorPosition(int x, int y) {
   }
 
   return kErrorNone;
+}
+
+DisplayError DisplayBase::GetRefreshRateRange(uint32_t *min_refresh_rate,
+                                              uint32_t *max_refresh_rate) {
+  // The min and max refresh rates will be same when the HWPanelInfo does not contain valid rates.
+  // Usually for secondary displays, command mode panels
+  HWDisplayAttributes display_attributes;
+  uint32_t active_index = 0;
+  hw_intf_->GetActiveConfig(&active_index);
+  DisplayError error = hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
+  if (error) {
+    return error;
+  }
+
+  *min_refresh_rate = display_attributes.fps;
+  *max_refresh_rate = display_attributes.fps;
+
+  return error;
 }
 
 }  // namespace sdm

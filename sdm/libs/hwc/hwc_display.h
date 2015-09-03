@@ -145,8 +145,8 @@ class HWCDisplay : public DisplayEventHandler {
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
   void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
   bool IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache);
-  static void GetDownscaleResolution(uint32_t primary_width, uint32_t primary_height,
-                                     uint32_t *virtual_width, uint32_t *virtual_height);
+  bool SingleLayerUpdating(uint32_t app_layer_count);
+  uint32_t SanitizeRefreshRate(uint32_t req_refresh_rate);
 
   enum {
     INPUT_LAYER_DUMP,
@@ -170,8 +170,12 @@ class HWCDisplay : public DisplayEventHandler {
   bool swap_interval_zero_ = false;
   DisplayConfigVariableInfo *framebuffer_config_ = NULL;
   bool display_paused_ = false;
+  uint32_t min_refresh_rate_ = 0;
+  uint32_t max_refresh_rate_ = 0;
+  uint32_t current_refresh_rate_ = 0;
   bool use_metadata_refresh_rate_ = false;
   uint32_t metadata_refresh_rate_ = 0;
+  uint32_t force_refresh_rate_ = 0;
   bool boot_animation_completed_ = false;
   bool shutdown_pending_ = false;
   bool handle_refresh_ = true;
@@ -180,12 +184,12 @@ class HWCDisplay : public DisplayEventHandler {
   bool skip_prepare_ = false;
 
   bool solid_fill_enable_ = false;
-  uint32_t solid_fill_color_;
+  uint32_t solid_fill_color_ = 0;;
 
  private:
   bool IsFrameBufferScaled();
   void DumpInputBuffers(hwc_display_contents_1_t *content_list);
-  int PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer, uint32_t fps);
+  int PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
   void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
   void ResetLayerCacheStack();
   BlitEngine *blit_engine_ = NULL;

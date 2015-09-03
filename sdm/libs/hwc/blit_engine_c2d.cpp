@@ -285,6 +285,7 @@ int BlitEngineC2d::Prepare(LayerStack *layer_stack) {
     layer.plane_alpha = 0xFF;
     layer.blending = kBlendingOpaque;
     layer.composition = kCompositionBlitTarget;
+    layer.frame_rate = layer_stack->layers[gpu_target_index].frame_rate;
   }
 
   return 0;

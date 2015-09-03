@@ -155,6 +155,12 @@ DisplayError DisplayHDMI::IsScalingValid(const LayerRect &crop, const LayerRect 
   return DisplayBase::IsScalingValid(crop, dst, rotate90);
 }
 
+DisplayError DisplayHDMI::GetRefreshRateRange(uint32_t *min_refresh_rate,
+                                              uint32_t *max_refresh_rate) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetRefreshRateRange(min_refresh_rate, max_refresh_rate);
+}
+
 DisplayError DisplayHDMI::SetRefreshRate(uint32_t refresh_rate) {
   SCOPE_LOCK(locker_);
   return kErrorNotSupported;

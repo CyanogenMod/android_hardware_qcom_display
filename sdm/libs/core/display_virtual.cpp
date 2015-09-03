@@ -177,6 +177,12 @@ DisplayError DisplayVirtual::IsScalingValid(const LayerRect &crop, const LayerRe
   return DisplayBase::IsScalingValid(crop, dst, rotate90);
 }
 
+DisplayError DisplayVirtual::GetRefreshRateRange(uint32_t *min_refresh_rate,
+                                                 uint32_t *max_refresh_rate) {
+  SCOPE_LOCK(locker_);
+  return DisplayBase::GetRefreshRateRange(min_refresh_rate, max_refresh_rate);
+}
+
 DisplayError DisplayVirtual::SetRefreshRate(uint32_t refresh_rate) {
   SCOPE_LOCK(locker_);
   return kErrorNotSupported;
