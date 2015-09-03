@@ -170,13 +170,38 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(const private_handle_t *hnd, int& a
 
 }
 
+bool isUncompressedRgbFormat(int format)
+{
+    bool is_rgb_format = false;
+
+    switch (format)
+    {
+        case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+        case HAL_PIXEL_FORMAT_RGB_888:
+        case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_BGRA_8888:
+        case HAL_PIXEL_FORMAT_RGBA_5551:
+        case HAL_PIXEL_FORMAT_RGBA_4444:
+        case HAL_PIXEL_FORMAT_R_8:
+        case HAL_PIXEL_FORMAT_RG_88:
+        case HAL_PIXEL_FORMAT_BGRX_8888:    // Intentional fallthrough
+            is_rgb_format = true;
+            break;
+        default:
+            break;
+    }
+
+    return is_rgb_format;
+}
+
 void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
                             int usage, int& aligned_w, int& aligned_h)
 {
     bool ubwc_enabled = isUBwcEnabled(format, usage);
 
     // Currently surface padding is only computed for RGB* surfaces.
-    if (format <= HAL_PIXEL_FORMAT_BGRA_8888) {
+    if (isUncompressedRgbFormat(format) == true) {
         int tileEnabled = ubwc_enabled || isMacroTileEnabled(format, usage);
         getGpuAlignedWidthHeight(width, height, format, tileEnabled, aligned_w, aligned_h);
         return;
