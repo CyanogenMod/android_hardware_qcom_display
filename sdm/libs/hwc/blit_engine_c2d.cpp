@@ -523,7 +523,7 @@ bool BlitEngineC2d::IsUBWCFormat(LayerBufferFormat format) {
   switch (format) {
   case kFormatRGBA8888Ubwc:
   case kFormatRGBX8888Ubwc:
-  case kFormatRGB565Ubwc:
+  case kFormatBGR565Ubwc:
   case kFormatYCbCr420SPVenusUbwc:
     return true;
   default:

@@ -54,9 +54,10 @@ enum LayerBufferFormat {
   kFormatRGB888,        //!< 8-bits Red, Green, Blue interleaved in RGB order. No Alpha.
   kFormatBGR888,        //!< 8-bits Blue, Green, Red interleaved in BGR order. No Alpha.
   kFormatRGB565,        //!< 5-bit Red, 6-bit Green, 5-bit Blue interleaved in RGB order. No Alpha.
+  kFormatBGR565,        //!< 5-bit Blue, 6-bit Green, 5-bit Red interleaved in BGR order. No Alpha.
   kFormatRGBA8888Ubwc,  //!< UBWC aligned RGBA8888 format
   kFormatRGBX8888Ubwc,  //!< UBWC aligned RGBX8888 format
-  kFormatRGB565Ubwc,    //!< UBWC aligned RGB565 format
+  kFormatBGR565Ubwc,    //!< UBWC aligned BGR565 format
 
   /* All YUV-Planar formats, Any new format will be added towards end of this group to maintain
      backward compatibility.
