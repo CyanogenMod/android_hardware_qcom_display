@@ -86,7 +86,7 @@ class HWCDisplay : public DisplayEventHandler {
   };
 
   // Dim layer flag set by SurfaceFlinger service.
-  static const uint32_t kDimLayer = 0x8000;
+  static const uint32_t kDimLayer = 0x80000000;
 
   // Maximum number of layers supported by display manager.
   static const uint32_t kMaxLayerCount = 32;
