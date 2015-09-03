@@ -155,6 +155,7 @@ int HWCBufferAllocator::SetBufferInfo(LayerBufferFormat format, int *target, int
   case kFormatRGBX8888:                 *target = HAL_PIXEL_FORMAT_RGBX_8888;             break;
   case kFormatRGB888:                   *target = HAL_PIXEL_FORMAT_RGB_888;               break;
   case kFormatRGB565:                   *target = HAL_PIXEL_FORMAT_RGB_565;               break;
+  case kFormatBGR565:                   *target = HAL_PIXEL_FORMAT_BGR_565;               break;
   case kFormatBGRA8888:                 *target = HAL_PIXEL_FORMAT_BGRA_8888;             break;
   case kFormatYCrCb420PlanarStride16:   *target = HAL_PIXEL_FORMAT_YV12;                  break;
   case kFormatYCrCb420SemiPlanar:       *target = HAL_PIXEL_FORMAT_YCrCb_420_SP;          break;
@@ -173,8 +174,8 @@ int HWCBufferAllocator::SetBufferInfo(LayerBufferFormat format, int *target, int
     *target = HAL_PIXEL_FORMAT_RGBX_8888;
     *flags |= GRALLOC_USAGE_PRIVATE_ALLOC_UBWC;
     break;
-  case kFormatRGB565Ubwc:
-    *target = HAL_PIXEL_FORMAT_RGB_565;
+  case kFormatBGR565Ubwc:
+    *target = HAL_PIXEL_FORMAT_BGR_565;
     *flags |= GRALLOC_USAGE_PRIVATE_ALLOC_UBWC;
     break;
   default:

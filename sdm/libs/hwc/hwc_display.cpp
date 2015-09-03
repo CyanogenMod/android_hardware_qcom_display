@@ -900,7 +900,7 @@ LayerBufferFormat HWCDisplay::GetSDMFormat(const int32_t &source, const int flag
     switch (source) {
     case HAL_PIXEL_FORMAT_RGBA_8888:          format = kFormatRGBA8888Ubwc;            break;
     case HAL_PIXEL_FORMAT_RGBX_8888:          format = kFormatRGBX8888Ubwc;            break;
-    case HAL_PIXEL_FORMAT_RGB_565:            format = kFormatRGB565Ubwc;              break;
+    case HAL_PIXEL_FORMAT_BGR_565:            format = kFormatBGR565Ubwc;              break;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
     case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:    format = kFormatYCbCr420SPVenusUbwc;     break;
@@ -920,6 +920,7 @@ LayerBufferFormat HWCDisplay::GetSDMFormat(const int32_t &source, const int flag
   case HAL_PIXEL_FORMAT_BGRX_8888:                format = kFormatBGRX8888;                 break;
   case HAL_PIXEL_FORMAT_RGB_888:                  format = kFormatRGB888;                   break;
   case HAL_PIXEL_FORMAT_RGB_565:                  format = kFormatRGB565;                   break;
+  case HAL_PIXEL_FORMAT_BGR_565:                  format = kFormatBGR565;                   break;
   case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:       format = kFormatYCbCr420SemiPlanarVenus;  break;
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:  format = kFormatYCbCr420SPVenusUbwc;      break;
@@ -997,6 +998,8 @@ const char *HWCDisplay::GetHALPixelFormatString(int format) {
     return "RGB_888";
   case HAL_PIXEL_FORMAT_RGB_565:
     return "RGB_565";
+  case HAL_PIXEL_FORMAT_BGR_565:
+    return "BGR_565";
   case HAL_PIXEL_FORMAT_BGRA_8888:
     return "BGRA_8888";
   case HAL_PIXEL_FORMAT_RGBA_5551:
