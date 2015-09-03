@@ -671,7 +671,6 @@ void HWDevice::PopulateHWPanelInfo() {
   DLOGI("FPS: min = %d, max =%d", hw_panel_info_.min_fps, hw_panel_info_.max_fps);
   DLOGI("Left Split = %d, Right Split = %d", hw_panel_info_.split_info.left_split,
         hw_panel_info_.split_info.right_split);
-  DLOGI("Source Split Always = %d", hw_panel_info_.split_info.always_src_split);
 }
 
 void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
@@ -822,28 +821,10 @@ void HWDevice::GetSplitInfo(int device_node, HWPanelInfo *panel_info) {
 
   // Format "left right" space as delimiter
   read = Sys::getline_(&line, &len, fileptr);
-  if (read != -1) {
+  if (read > 0) {
     if (!ParseLine(line, tokens, max_count, &token_count)) {
       panel_info->split_info.left_split = atoi(tokens[0]);
       panel_info->split_info.right_split = atoi(tokens[1]);
-    }
-  }
-
-  Sys::fclose_(fileptr);
-
-  // SourceSplit enabled - Get More information
-  snprintf(stringbuffer , sizeof(stringbuffer), "%s%d/msm_fb_src_split_info", fb_path_,
-           device_node);
-  fileptr = Sys::fopen_(stringbuffer, "r");
-  if (!fileptr) {
-    DLOGW("File not found %s", stringbuffer);
-    return;
-  }
-
-  read = Sys::getline_(&line, &len, fileptr);
-  if (read != -1) {
-    if (!strncmp(line, "src_split_always", strlen("src_split_always"))) {
-      panel_info->split_info.always_src_split = true;
     }
   }
 

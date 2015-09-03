@@ -450,18 +450,13 @@ void ResourceDefault::ResourceStateLog() {
 DisplayError ResourceDefault::SrcSplitConfig(DisplayResourceContext *display_resource_ctx,
                                         const LayerRect &src_rect, const LayerRect &dst_rect,
                                         HWLayerConfig *layer_config) {
-  HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
   HWPipeInfo *left_pipe = &layer_config->left_pipe;
   HWPipeInfo *right_pipe = &layer_config->right_pipe;
   float src_width = src_rect.right - src_rect.left;
   float dst_width = dst_rect.right - dst_rect.left;
-  float left_mixer_width = FLOAT(display_attributes.split_left);
 
   // Layer cannot qualify for SrcSplit if source or destination width exceeds max pipe width.
-  // For perf/power optimization, even if "always_src_split" is enabled, use 2 pipes only if:
-  // Source width is greater than split_left (left_mixer_width)
-  if ((src_width > hw_res_info_.max_pipe_width) || (dst_width > hw_res_info_.max_pipe_width) ||
-      (display_resource_ctx->display_attributes.always_src_split && src_width > left_mixer_width)) {
+  if ((src_width > hw_res_info_.max_pipe_width) || (dst_width > hw_res_info_.max_pipe_width)) {
     SplitRect(src_rect, dst_rect, &left_pipe->src_roi, &left_pipe->dst_roi, &right_pipe->src_roi,
               &right_pipe->dst_roi);
     left_pipe->valid = true;
