@@ -569,6 +569,10 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
         // requires rotation in the current frame.
         ALOGD_IF(isDebug(), "%s: padding round invoked to switch DMA state",
                 __FUNCTION__);
+
+        if(isSecurePresent(ctx, mDpy))
+            ctx->triggerRefresh = true;
+
         return false;
     }
 
@@ -2168,7 +2172,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     }
 
     if(!mDpy and !isSecondaryConnected(ctx) and !mPrevModeOn and
-       mCachedFrame.isSameFrame(ctx,mDpy,list)) {
+            !isSecurePresent(ctx, mDpy) and
+            mCachedFrame.isSameFrame(ctx,mDpy,list)) {
 
         ALOGD_IF(isDebug(),"%s: Avoid new composition",__FUNCTION__);
         mCurrentFrame.needsRedraw = false;

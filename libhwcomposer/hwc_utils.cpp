@@ -442,6 +442,7 @@ int initContext(hwc_context_t *ctx)
 
     memset(&(ctx->mPtorInfo), 0, sizeof(ctx->mPtorInfo));
     ctx->mHPDEnabled = false;
+    ctx->triggerRefresh = false;
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
 

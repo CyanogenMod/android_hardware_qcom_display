@@ -793,6 +793,14 @@ static int hwc_set(hwc_composer_device_1 *dev,
     ctx->mVideoTransFlag = false;
     //Was locked at the beginning of prepare
     ctx->mDrawLock.unlock();
+
+    if(ctx->triggerRefresh) {
+        ctx->triggerRefresh = false;
+        if(ctx->proc) {
+            ctx->proc->invalidate(ctx->proc);
+        }
+    }
+
     return ret;
 }
 
