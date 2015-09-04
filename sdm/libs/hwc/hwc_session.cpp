@@ -41,6 +41,7 @@
 #include <gr.h>
 #include <gralloc_priv.h>
 #include <display_config.h>
+#include <utils/debug.h>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
@@ -608,6 +609,10 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
 
   case qService::IQService::SET_PANEL_BRIGHTNESS:
     status = SetPanelBrightness(input_parcel, output_parcel);
+    break;
+
+  case qService::IQService::GET_DISPLAY_VISIBLE_REGION:
+    status = GetVisibleDisplayRect(input_parcel, output_parcel);
     break;
 
   default:
@@ -1202,6 +1207,32 @@ void HWCSession::HandleSecureDisplaySession(hwc_display_contents_1_t **displays)
       hwc_display_[dpy]->SetSecureDisplay(secure_display_active_);
     }
   }
+}
+
+android::status_t HWCSession::GetVisibleDisplayRect(const android::Parcel *input_parcel,
+                                                    android::Parcel *output_parcel) {
+  int dpy = input_parcel->readInt32();
+
+  if (dpy < HWC_DISPLAY_PRIMARY || dpy > HWC_DISPLAY_VIRTUAL) {
+    return android::BAD_VALUE;;
+  }
+
+  if (!hwc_display_[dpy]) {
+    return android::NO_INIT;
+  }
+
+  hwc_rect_t visible_rect = {0, 0, 0, 0};
+  int error = hwc_display_[dpy]->GetVisibleDisplayRect(&visible_rect);
+  if (error < 0) {
+    return error;
+  }
+
+  output_parcel->writeInt32(visible_rect.left);
+  output_parcel->writeInt32(visible_rect.top);
+  output_parcel->writeInt32(visible_rect.right);
+  output_parcel->writeInt32(visible_rect.bottom);
+
+  return android::NO_ERROR;
 }
 
 }  // namespace sdm

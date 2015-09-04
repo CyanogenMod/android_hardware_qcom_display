@@ -29,6 +29,7 @@
 
 #include <cutils/properties.h>
 #include <dlfcn.h>
+#include <utils/debug.h>
 
 #include "cpuhint.h"
 #include "hwc_debugger.h"

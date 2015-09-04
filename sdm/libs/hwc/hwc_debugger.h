@@ -37,19 +37,6 @@
 #include <cutils/log.h>
 #include <utils/Trace.h>
 
-#define DLOG(Macro, format, ...) Macro(__CLASS__ "::%s: " format, __FUNCTION__, ##__VA_ARGS__)
-
-#define DLOGE(format, ...) DLOG(ALOGE, format, ##__VA_ARGS__)
-#define DLOGW(format, ...) DLOG(ALOGW, format, ##__VA_ARGS__)
-#define DLOGI(format, ...) DLOG(ALOGI, format, ##__VA_ARGS__)
-#define DLOGD(format, ...) DLOG(ALOGI, format, ##__VA_ARGS__)
-#define DLOGV(format, ...) DLOG(ALOGV, format, ##__VA_ARGS__)
-
-#define DTRACE_BEGIN(custom_string) HWCDebugHandler::Get()->BeginTrace(__CLASS__, __FUNCTION__, \
-                                                                       custom_string)
-#define DTRACE_END() HWCDebugHandler::Get()->EndTrace()
-#define DTRACE_SCOPED() ScopeTracer<HWCDebugHandler> scope_tracer(__CLASS__, __FUNCTION__)
-
 namespace sdm {
 
 class HWCDebugHandler : public DebugHandler {

@@ -29,6 +29,7 @@
 
 #include <cutils/properties.h>
 #include <utils/constants.h>
+#include <utils/debug.h>
 
 #include "hwc_display_external.h"
 #include "hwc_debugger.h"
