@@ -3081,14 +3081,14 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
        }
        if(t_roi.right > boundary.right) {
            t_roi.right = boundary.right;
-           t_roi.left = t_roi.right - (width + corWidth);
+           t_roi.left = t_roi.right - width;
 
            if(LEFT_ALIGN)
                t_roi.left = t_roi.left - (t_roi.left % LEFT_ALIGN);
 
        } else if(t_roi.left < boundary.left) {
            t_roi.left = boundary.left;
-           t_roi.right = t_roi.left + (width + corWidth);
+           t_roi.right = t_roi.left + width;
        }
    }
 
@@ -3110,14 +3110,14 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
        }
        if(t_roi.bottom > boundary.bottom) {
            t_roi.bottom = boundary.bottom;
-           t_roi.top = t_roi.bottom - (height + corHeight);
+           t_roi.top = t_roi.bottom - height;
 
            if(TOP_ALIGN)
                t_roi.top = t_roi.top - (t_roi.top % TOP_ALIGN);
 
        } else if(t_roi.top < boundary.top) {
            t_roi.top = boundary.top;
-           t_roi.bottom = t_roi.top + (height + corHeight);
+           t_roi.bottom = t_roi.top + height;
        }
    }
 
