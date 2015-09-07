@@ -2200,8 +2200,9 @@ void MDPComp::setDynRefreshRate(hwc_context_t *ctx, hwc_display_contents_1_t* li
 /*
  * For the use-cases where bottom most layer in the layer list
  * is full screen, it can be used as base layer in the first stage
+ * provided it is opaque and blending is not needed,
  * instead of borderfill to optimize MDP staging.
- * */
+ */
 int MDPComp::isBottomLayerFullScreen(hwc_context_t *ctx,
         hwc_display_contents_1_t *list) {
     hwc_layer_1_t* layer = &list->hwLayers[0];
@@ -2209,7 +2210,9 @@ int MDPComp::isBottomLayerFullScreen(hwc_context_t *ctx,
         (int)ctx->dpyAttr[mDpy].yres};
     if(not mDpy && (ctx->listStats[mDpy].numAppLayers > 1) &&
             isSupportedForMDPComp(ctx, layer) &&
-            isSameRect(rect, layer->displayFrame)) {
+            isSameRect(rect, layer->displayFrame) &&
+            (layer->planeAlpha == 0xFF) &&
+            (layer->blending == HWC_BLENDING_NONE)) {
         return 1;
     }
     return 0;
