@@ -892,7 +892,7 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         }
     }
 
-    for (size_t i = 0; i < NUM_DISPLAY_ATTRIBUTES - 1; i++) {
+    for (size_t i = 0; attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
         switch (attributes[i]) {
         case HWC_DISPLAY_VSYNC_PERIOD:
             values[i] =
