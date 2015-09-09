@@ -391,7 +391,7 @@ void initContext(hwc_context_t *ctx)
     ctx->enableABC  = atoi(value) ? true : false;
 
     // Initializing boot anim completed check to false
-    ctx->mBootAnimCompleted = false;
+    ctx->mDefaultModeApplied = false;
 
     // Initialize gpu perfomance hint related parameters
     property_get("sys.hwc.gpu_perf_mode", value, "0");
@@ -2508,9 +2508,14 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
     return (eqBounds == 3);
 }
 
-void processBootAnimCompleted(hwc_context_t *ctx) {
+void applyDefaultMode(hwc_context_t *ctx) {
     char value[PROPERTY_VALUE_MAX];
-    int boot_finished = 0, ret = -1;
+    int boot_finished = 0;
+    static int ret = ctx->mColorMode->applyDefaultMode();
+    if(!ret) {
+        ctx->mDefaultModeApplied = true;
+        return;
+    }
 
     // Reading property set on boot finish in SF
     property_get("service.bootanim.exit", value, "0");
@@ -2521,7 +2526,7 @@ void processBootAnimCompleted(hwc_context_t *ctx) {
     ret = ctx->mColorMode->applyDefaultMode();
     if (ret)
         ALOGD("%s: Not able to apply default mode", __FUNCTION__);
-    ctx->mBootAnimCompleted = true;
+    ctx->mDefaultModeApplied = true;
 }
 
 void BwcPM::setBwc(const hwc_context_t *ctx, const int& dpy,

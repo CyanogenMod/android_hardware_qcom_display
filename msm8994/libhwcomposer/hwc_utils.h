@@ -474,8 +474,8 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list);
 // Returns true if rect1 is peripheral to rect2, false otherwise.
 bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 
-// Checks if boot animation has completed and applies default mode
-void processBootAnimCompleted(hwc_context_t *ctx);
+// Applies default mode at boot
+void applyDefaultMode(hwc_context_t *ctx);
 
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
@@ -679,8 +679,8 @@ struct hwc_context_t {
     bool mUseMetaDataRefreshRate;
    // Stores the hpd enabled status- avoids re-enabling HDP on suspend resume.
     bool mHPDEnabled;
-    //Used to notify that boot has completed
-    bool mBootAnimCompleted;
+    //Used to notify that default mode has been applied
+    bool mDefaultModeApplied;
     //Manages color modes
     qhwc::ColorMode *mColorMode;
 };
