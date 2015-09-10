@@ -474,10 +474,6 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   }
 
   size_t num_hw_layers = content_list->numHwLayers;
-  if (num_hw_layers <= 1) {
-    flush_ = true;
-    return 0;
-  }
 
   use_blit_comp_ = false;
   metadata_refresh_rate_ = 0;
