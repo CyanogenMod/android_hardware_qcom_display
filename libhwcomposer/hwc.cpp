@@ -198,6 +198,18 @@ static void setNumActiveDisplays(hwc_context_t *ctx, int numDisplays,
     }
 }
 
+static bool validDisplay(int disp) {
+    switch(disp) {
+        case HWC_DISPLAY_PRIMARY:
+        case HWC_DISPLAY_EXTERNAL:
+        case HWC_DISPLAY_VIRTUAL:
+            return true;
+            break;
+        default:
+            return false;
+    }
+}
+
 static bool isHotPluggable(hwc_context_t *ctx, int dpy) {
     return ((dpy == HWC_DISPLAY_EXTERNAL) ||
             ((dpy == HWC_DISPLAY_PRIMARY) &&
@@ -347,6 +359,10 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
     ATRACE_CALL();
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+    if(!validDisplay(dpy)) {
+        return -EINVAL;
+    }
+
     switch(event) {
         case HWC_EVENT_VSYNC:
             if (ctx->vstate.enable == enable)
@@ -380,6 +396,10 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
     int ret = 0, value = 0;
 
     Locker::Autolock _l(ctx->mDrawLock);
+    if(!validDisplay(dpy)) {
+        return -EINVAL;
+    }
+
     /* In case of non-hybrid WFD session, we are fooling SF by
      * piggybacking on HDMI display ID for virtual.
      * TODO: Not needed once we have WFD client working on top
@@ -623,7 +643,6 @@ static int hwc_set_external(hwc_context_t *ctx,
 
     const int dpy = HWC_DISPLAY_EXTERNAL;
 
-
     if (LIKELY(list) && ctx->dpyAttr[dpy].isActive &&
         ctx->dpyAttr[dpy].connected &&
         !ctx->dpyAttr[dpy].isPause) {
@@ -707,8 +726,12 @@ int hwc_getDisplayConfigs(struct hwc_composer_device_1* dev, int disp,
         uint32_t* configs, size_t* numConfigs) {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
 
-    disp = getDpyforExternalDisplay(ctx, disp);
     Locker::Autolock _l(ctx->mDrawLock);
+    if(!validDisplay(disp)) {
+        return -EINVAL;
+    }
+
+    disp = getDpyforExternalDisplay(ctx, disp);
     bool hotPluggable = isHotPluggable(ctx, disp);
     bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
     // If hotpluggable or virtual displays are inactive return error
@@ -747,8 +770,13 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
 
-    disp = getDpyforExternalDisplay(ctx, disp);
     Locker::Autolock _l(ctx->mDrawLock);
+    if(!validDisplay(disp)) {
+        return -EINVAL;
+    }
+
+    disp = getDpyforExternalDisplay(ctx, disp);
+
     bool hotPluggable = isHotPluggable(ctx, disp);
     bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
     // If hotpluggable or virtual displays are inactive return error
@@ -853,6 +881,10 @@ int hwc_getActiveConfig(struct hwc_composer_device_1* dev, int disp)
     hwc_context_t* ctx = (hwc_context_t*)(dev);
 
     Locker::Autolock _l(ctx->mDrawLock);
+    if(!validDisplay(disp)) {
+        return -EINVAL;
+    }
+
     bool hotPluggable = isHotPluggable(ctx, disp);
     bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
     // If hotpluggable or virtual displays are inactive return error
@@ -876,6 +908,10 @@ int hwc_setActiveConfig(struct hwc_composer_device_1* dev, int disp, int index)
     int status;
 
     Locker::Autolock _l(ctx->mDrawLock);
+    if(!validDisplay(disp)) {
+        return -EINVAL;
+    }
+
     bool hotPluggable = isHotPluggable(ctx, disp);
     bool isVirtualDisplay = (disp == HWC_DISPLAY_VIRTUAL);
 
