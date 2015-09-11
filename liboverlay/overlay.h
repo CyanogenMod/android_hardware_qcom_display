@@ -48,7 +48,7 @@ public:
     //Abstract Display types. Each backed by a LayerMixer,
     //represented by a fb node.
     //High res panels can be backed by 2 layer mixers and a single fb node.
-    enum { DPY_PRIMARY, DPY_EXTERNAL, DPY_WRITEBACK, DPY_UNUSED };
+    enum { DPY_PRIMARY, DPY_EXTERNAL, DPY_TERTIARY, DPY_WRITEBACK, DPY_UNUSED };
     enum { DPY_MAX = DPY_UNUSED };
     enum { MIXER_LEFT, MIXER_RIGHT, MIXER_UNUSED };
     enum { MIXER_DEFAULT = MIXER_LEFT, MIXER_MAX = MIXER_UNUSED };
