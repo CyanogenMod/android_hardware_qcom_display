@@ -200,7 +200,12 @@ int HWCDisplayVirtual::SetOutputSliceFromMetadata(hwc_display_contents_1_t *cont
   int status = 0;
 
   if (output_handle) {
-    LayerBufferFormat format = GetSDMFormat(output_handle->format, output_handle->flags);
+    int output_handle_format = output_handle->format;
+    if (output_handle_format == HAL_PIXEL_FORMAT_RGBA_8888) {
+      output_handle_format = HAL_PIXEL_FORMAT_RGBX_8888;
+    }
+
+    LayerBufferFormat format = GetSDMFormat(output_handle_format, output_handle->flags);
     if (format == kFormatInvalid) {
       return -EINVAL;
     }
@@ -245,7 +250,14 @@ int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
   output_buffer_->acquire_fence_fd = content_list->outbufAcquireFenceFd;
 
   if (output_handle) {
-    output_buffer_->format = GetSDMFormat(output_handle->format, output_handle->flags);
+    int output_handle_format = output_handle->format;
+
+    if (output_handle_format == HAL_PIXEL_FORMAT_RGBA_8888) {
+      output_handle_format = HAL_PIXEL_FORMAT_RGBX_8888;
+    }
+
+    output_buffer_->format = GetSDMFormat(output_handle_format, output_handle->flags);
+
     if (output_buffer_->format == kFormatInvalid) {
       return -EINVAL;
     }
