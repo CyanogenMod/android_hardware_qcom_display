@@ -273,6 +273,9 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
     mdp_out_layer_.writeback_ndx = 2;
     mdp_out_layer_.buffer.width = output_buffer->width;
     mdp_out_layer_.buffer.height = output_buffer->height;
+    if (output_buffer->flags.secure) {
+      mdp_out_layer_.flags |= MDP_LAYER_SECURE_SESSION;
+    }
     mdp_out_layer_.buffer.comp_ratio.denom = 1000;
     mdp_out_layer_.buffer.comp_ratio.numer = UINT32(hw_layers->output_compression * 1000);
     SetFormat(output_buffer->format, &mdp_out_layer_.buffer.format);

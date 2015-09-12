@@ -271,6 +271,11 @@ int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
     output_buffer_->flags.secure = 0;
     output_buffer_->flags.video = 0;
 
+    // TZ Protected Buffer - L1
+    if (output_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
+      output_buffer_->flags.secure = 1;
+    }
+
     // ToDo: Need to extend for non-RGB formats
     output_buffer_->planes[0].fd = output_handle->fd;
     output_buffer_->planes[0].offset = output_handle->offset;
