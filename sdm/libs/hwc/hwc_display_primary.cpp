@@ -126,6 +126,12 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
+  size_t num_hw_layers = content_list->numHwLayers;
+  if (num_hw_layers <= 1) {
+    flush_ = true;
+    return 0;
+  }
+
   status = PrepareLayerStack(content_list);
   if (status) {
     return status;
