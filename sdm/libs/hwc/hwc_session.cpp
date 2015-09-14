@@ -559,8 +559,9 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
   case qService::IQService::SET_DISPLAY_MODE:
     status = SetDisplayMode(input_parcel);
     break;
+
   case qService::IQService::SET_SECONDARY_DISPLAY_STATUS:
-    status = SetSecondaryDisplayStatus(input_parcel);
+    status = SetSecondaryDisplayStatus(input_parcel, output_parcel);
     break;
 
   case qService::IQService::CONFIGURE_DYN_REFRESH_RATE:
@@ -803,17 +804,28 @@ android::status_t HWCSession::HandleGetDisplayAttributesForConfig(const android:
   return error;
 }
 
-android::status_t HWCSession::SetSecondaryDisplayStatus(const android::Parcel *input_parcel) {
+android::status_t HWCSession::SetSecondaryDisplayStatus(const android::Parcel *input_parcel,
+                                                        android::Parcel *output_parcel) {
+  int ret = -EINVAL;
+
   uint32_t display_id = UINT32(input_parcel->readInt32());
   uint32_t display_status = UINT32(input_parcel->readInt32());
 
-  DLOGI("Display %d Status %d", display_id, display_status);
-  if (display_id < HWC_DISPLAY_EXTERNAL || display_id > HWC_DISPLAY_VIRTUAL) {
-    DLOGW("Not supported for display %d", display_id);
-    return -EINVAL;
+  DLOGI("Display = %d, Status = %d", display_id, display_status);
+
+  if (display_id >= HWC_NUM_DISPLAY_TYPES) {
+    DLOGE("Invalid display_id");
+  } else if (display_id == HWC_DISPLAY_PRIMARY) {
+    DLOGE("Not supported for this display");
+  } else if (!hwc_display_[display_id]) {
+    DLOGW("Display is not connected");
+  } else {
+    ret = hwc_display_[display_id]->SetDisplayStatus(display_status);
   }
 
-  return hwc_display_[display_id]->SetDisplayStatus(display_status);
+  output_parcel->writeInt32(ret);
+
+  return ret;
 }
 
 android::status_t HWCSession::ConfigureRefreshRate(const android::Parcel *input_parcel) {
@@ -1025,10 +1037,13 @@ android::status_t HWCSession::OnMinHdcpEncryptionLevelChange(const android::Parc
   uint32_t display_id = UINT32(input_parcel->readInt32());
 
   DLOGI("Display %d", display_id);
-  if (display_id != HWC_DISPLAY_EXTERNAL) {
-    DLOGW("Not supported for display %d", display_id);
+
+  if (display_id >= HWC_NUM_DISPLAY_TYPES) {
+    DLOGE("Invalid display_id");
+  } else if (display_id != HWC_DISPLAY_EXTERNAL) {
+    DLOGE("Not supported for display");
   } else if (!hwc_display_[display_id]) {
-    DLOGE("Display %d is not connected", display_id);
+    DLOGW("Display is not connected");
   } else {
     ret = hwc_display_[display_id]->OnMinHdcpEncryptionLevelChange();
   }

@@ -90,7 +90,8 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   void SetFrameDumpConfig(const android::Parcel *input_parcel);
   android::status_t SetMaxMixerStages(const android::Parcel *input_parcel);
   android::status_t SetDisplayMode(const android::Parcel *input_parcel);
-  android::status_t SetSecondaryDisplayStatus(const android::Parcel *input_parcel);
+  android::status_t SetSecondaryDisplayStatus(const android::Parcel *input_parcel,
+                                              android::Parcel *output_parcel);
   android::status_t ToggleScreenUpdates(const android::Parcel *input_parcel,
                                         android::Parcel *output_parcel);
   android::status_t ConfigureRefreshRate(const android::Parcel *input_parcel);
