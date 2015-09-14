@@ -62,21 +62,12 @@ inline android::status_t sendSingleParam(uint32_t command, uint32_t value) {
 // ----------------------------------------------------------------------------
 // Convenience wrappers that clients can call
 // ----------------------------------------------------------------------------
-inline android::status_t securing(uint32_t startEnd) {
-    return sendSingleParam(qService::IQService::SECURING, startEnd);
-}
-
-inline android::status_t unsecuring(uint32_t startEnd) {
-    return sendSingleParam(qService::IQService::UNSECURING, startEnd);
-}
-
 inline android::status_t screenRefresh() {
     return sendSingleParam(qService::IQService::SCREEN_REFRESH, 1);
 }
 
-// TODO(user): Need to rename this wrapper name
 inline android::status_t toggleScreenUpdate(uint32_t on) {
-    return sendSingleParam(qService::IQService::CONTROL_BACKLIGHT, on);
+    return sendSingleParam(qService::IQService::TOGGLE_SCREEN_UPDATES, on);
 }
 
 inline android::status_t setExtOrientation(uint32_t orientation) {

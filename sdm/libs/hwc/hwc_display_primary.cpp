@@ -116,6 +116,11 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
   if (!boot_animation_completed_)
     ProcessBootAnimCompleted();
 
+  if (display_paused_) {
+    MarkLayersForGPUBypass(content_list);
+    return status;
+  }
+
   status = AllocateLayerStack(content_list);
   if (status) {
     return status;
@@ -153,6 +158,22 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
 
 int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
   int status = 0;
+  if (display_paused_) {
+    if (content_list->outbufAcquireFenceFd >= 0) {
+      // If we do not handle the frame set retireFenceFd to outbufAcquireFenceFd,
+      // which will make sure the framework waits on it and closes it.
+      content_list->retireFenceFd = dup(content_list->outbufAcquireFenceFd);
+      close(content_list->outbufAcquireFenceFd);
+      content_list->outbufAcquireFenceFd = -1;
+    }
+    CloseAcquireFences(content_list);
+
+    DisplayError error = display_intf_->Flush();
+    if (error != kErrorNone) {
+      DLOGE("Flush failed. Error = %d", error);
+    }
+    return status;
+  }
 
   status = HWCDisplay::CommitLayerStack(content_list);
   if (status) {

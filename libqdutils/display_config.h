@@ -145,6 +145,12 @@ int setDisplayMode(int mode);
 // Only HDMI display is supported as dpy for now
 int minHdcpEncryptionLevelChanged(int dpy);
 
+// Sets the panel brightness of the primary display
+int setPanelBrightness(int level);
+
+// Retrieves the current panel brightness value
+int getPanelBrightness();
+
 }; //namespace
 
 #endif

@@ -40,8 +40,8 @@ public:
     DECLARE_META_INTERFACE(QService);
     enum {
         COMMAND_LIST_START = android::IBinder::FIRST_CALL_TRANSACTION,
-        SECURING = 2,           // Hardware securing start/end notification
-        UNSECURING = 3,         // Hardware unsecuring start/end notification
+        GET_PANEL_BRIGHTNESS = 2, // Provides ability to set the panel brightness
+        SET_PANEL_BRIGHTNESS = 3, // Provides ability to get the panel brightness
         CONNECT_HWC_CLIENT = 4, // Connect to qservice
         SCREEN_REFRESH = 5,     // Refresh screen through SF invalidate
         EXTERNAL_ORIENTATION = 6,// Set external orientation
@@ -59,7 +59,7 @@ public:
         /* Enable/Disable/Set refresh rate dynamically */
         CONFIGURE_DYN_REFRESH_RATE = 18,
         CONTROL_PARTIAL_UPDATE = 19,   // Provides ability to enable/disable partial update
-        CONTROL_BACKLIGHT = 20, // Provides ability to control backlight
+        TOGGLE_SCREEN_UPDATES = 20, // Provides ability to set the panel brightness
         SET_FRAME_DUMP_CONFIG = 21,  // Provides ability to set the frame dump config
         SET_S3D_MODE = 22, // Set the 3D mode as specified in msm_hdmi_modes.h
         CONNECT_HDMI_CLIENT = 23,  // Connect HDMI CEC HAL Client

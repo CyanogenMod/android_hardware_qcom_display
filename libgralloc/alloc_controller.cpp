@@ -105,6 +105,7 @@ AdrenoMemInfo::AdrenoMemInfo()
     LINK_adreno_isMacroTilingSupportedByGpu = NULL;
     LINK_adreno_compute_compressedfmt_aligned_width_and_height = NULL;
     LINK_adreno_isUBWCSupportedByGpu = NULL;
+    LINK_adreno_get_gpu_pixel_alignment = NULL;
 
     libadreno_utils = ::dlopen("libadreno_utils.so", RTLD_NOW);
     if (libadreno_utils) {
@@ -119,6 +120,8 @@ AdrenoMemInfo::AdrenoMemInfo()
                         "compute_compressedfmt_aligned_width_and_height");
         *(void **)&LINK_adreno_isUBWCSupportedByGpu =
                 ::dlsym(libadreno_utils, "isUBWCSupportedByGpu");
+        *(void **)&LINK_adreno_get_gpu_pixel_alignment =
+                ::dlsym(libadreno_utils, "get_gpu_pixel_alignment");
     }
 
     // Check if the overriding property debug.gralloc.gfx_ubwc_disable
@@ -170,13 +173,38 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(const private_handle_t *hnd, int& a
 
 }
 
+bool isUncompressedRgbFormat(int format)
+{
+    bool is_rgb_format = false;
+
+    switch (format)
+    {
+        case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+        case HAL_PIXEL_FORMAT_RGB_888:
+        case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_BGRA_8888:
+        case HAL_PIXEL_FORMAT_RGBA_5551:
+        case HAL_PIXEL_FORMAT_RGBA_4444:
+        case HAL_PIXEL_FORMAT_R_8:
+        case HAL_PIXEL_FORMAT_RG_88:
+        case HAL_PIXEL_FORMAT_BGRX_8888:    // Intentional fallthrough
+            is_rgb_format = true;
+            break;
+        default:
+            break;
+    }
+
+    return is_rgb_format;
+}
+
 void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
                             int usage, int& aligned_w, int& aligned_h)
 {
     bool ubwc_enabled = isUBwcEnabled(format, usage);
 
     // Currently surface padding is only computed for RGB* surfaces.
-    if (format <= HAL_PIXEL_FORMAT_BGRA_8888) {
+    if (isUncompressedRgbFormat(format) == true) {
         int tileEnabled = ubwc_enabled || isMacroTileEnabled(format, usage);
         getGpuAlignedWidthHeight(width, height, format, tileEnabled, aligned_w, aligned_h);
         return;
@@ -189,11 +217,18 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
 
     aligned_w = width;
     aligned_h = height;
+    int alignment = 32;
     switch (format)
     {
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+            if (LINK_adreno_get_gpu_pixel_alignment) {
+              alignment = LINK_adreno_get_gpu_pixel_alignment();
+            }
+            aligned_w = ALIGN(width, alignment);
+            break;
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
-            aligned_w = ALIGN(width, 32);
+            aligned_w = ALIGN(width, alignment);
             break;
         case HAL_PIXEL_FORMAT_RAW16:
             aligned_w = ALIGN(width, 16);
@@ -204,7 +239,6 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
             aligned_w = ALIGN(width, 128);
             break;
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
         case HAL_PIXEL_FORMAT_YV12:
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
         case HAL_PIXEL_FORMAT_YCrCb_422_SP:

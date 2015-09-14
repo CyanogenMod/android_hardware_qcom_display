@@ -331,5 +331,10 @@ void DisplayPrimary::ThermalEvent(int64_t thermal_level) {
   comp_manager_->ProcessThermalEvent(display_comp_ctx_, thermal_level);
 }
 
+DisplayError DisplayPrimary::GetPanelBrightness(int *level) {
+  SCOPE_LOCK(locker_);
+  return hw_intf_->GetPanelBrightness(level);
+}
+
 }  // namespace sdm
 

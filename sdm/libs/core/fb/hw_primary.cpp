@@ -610,31 +610,56 @@ DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
 }
 
 DisplayError HWPrimary::SetPanelBrightness(int level) {
-  char buffer[MAX_SYSFS_COMMAND_LENGTH];
-  int32_t bytes, bl_fd = -1;
-  ssize_t ret;
-
-  memset(buffer, 0, MAX_SYSFS_COMMAND_LENGTH);
+  char buffer[MAX_SYSFS_COMMAND_LENGTH] = {0};
 
   DLOGV_IF(kTagDriverConfig, "Set brightness level to %d", level);
-  bl_fd = Sys::open_("/sys/class/leds/lcd-backlight/brightness", O_RDWR);
-  if (bl_fd < 0) {
-    DLOGI("SetPanelBrightness: open failed out :( %d", level);
-    return kErrorParameters;
+  int fd = Sys::open_(kBrightnessNode, O_RDWR);
+  if (fd < 0) {
+    DLOGV_IF(kTagDriverConfig, "Failed to open node = %s, error = %s ", kBrightnessNode,
+             strerror(errno));
+    return kErrorFileDescriptor;
   }
-  bytes = snprintf(buffer, MAX_SYSFS_COMMAND_LENGTH, "%d\n", level);
+
+  int32_t bytes = snprintf(buffer, MAX_SYSFS_COMMAND_LENGTH, "%d\n", level);
   if (bytes < 0) {
-    DLOGE("SetPanelBrightness: snprintf failed out :( %d", level);
-    Sys::close_(bl_fd);
-    return kErrorParameters;
+    DLOGV_IF(kTagDriverConfig, "Failed to copy new brightness level = %d", level);
+    Sys::close_(fd);
+    return kErrorUndefined;
   }
-  ret = Sys::pwrite_(bl_fd, buffer, bytes, 0);
+
+  ssize_t ret = Sys::pwrite_(fd, buffer, bytes, 0);
   if (ret <= 0) {
-    DLOGE("SetPanelBrightness: write failed out :( %d", level);
-    Sys::close_(bl_fd);
+    DLOGV_IF(kTagDriverConfig, "Failed to write to node = %s, error = %s ", kBrightnessNode,
+             strerror(errno));
+    Sys::close_(fd);
+    return kErrorUndefined;
+  }
+  Sys::close_(fd);
+
+  return kErrorNone;
+}
+
+DisplayError HWPrimary::GetPanelBrightness(int *level) {
+  char brightness[kMaxStringLength] = {0};
+
+  if (!level) {
+    DLOGV_IF(kTagDriverConfig, "Invalid input, null pointer.");
     return kErrorParameters;
   }
-  Sys::close_(bl_fd);
+
+  int fd = Sys::open_(kBrightnessNode, O_RDWR);
+  if (fd < 0) {
+    DLOGV_IF(kTagDriverConfig, "Failed to open brightness node = %s, error = %s", kBrightnessNode,
+             strerror(errno));
+    return kErrorFileDescriptor;
+  }
+
+  if (Sys::pread_(fd, brightness, sizeof(brightness), 0) > 0) {
+    *level = atoi(brightness);
+    DLOGV_IF(kTagDriverConfig, "Brightness level = %d", *level);
+  }
+  Sys::close_(fd);
+
   return kErrorNone;
 }
 

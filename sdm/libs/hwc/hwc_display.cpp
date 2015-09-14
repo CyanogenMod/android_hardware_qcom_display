@@ -55,6 +55,16 @@ static void AssignLayerRegionsAddress(LayerRectArray *region, uint32_t rect_coun
   }
 }
 
+static void ApplyDeInterlaceAdjustment(Layer *layer) {
+  // De-interlacing adjustment
+  if (layer->input_buffer->flags.interlace) {
+    float height = (layer->src_rect.bottom - layer->src_rect.top) / 2.0f;
+    layer->src_rect.bottom = layer->src_rect.top + floorf(height);
+    layer->input_buffer->height /= 2;
+    layer->input_buffer->width *= 2;
+  }
+}
+
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
                        int id, bool needs_blit)
   : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit) {
@@ -490,6 +500,8 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
     SetRect(scaled_display_frame, &layer.dst_rect);
     SetRect(hwc_layer.sourceCropf, &layer.src_rect);
+    ApplyDeInterlaceAdjustment(&layer);
+
     for (size_t j = 0; j < hwc_layer.visibleRegionScreen.numRects; j++) {
       SetRect(hwc_layer.visibleRegionScreen.rects[j], &layer.visible_regions.rect[j]);
     }
@@ -1273,6 +1285,15 @@ int HWCDisplay::SetPanelBrightness(int level) {
     ret = -EINVAL;
 
   return ret;
+}
+
+int HWCDisplay::GetPanelBrightness(int *level) {
+  return display_intf_->GetPanelBrightness(level);
+}
+
+int HWCDisplay::ToggleScreenUpdates(bool enable) {
+  display_paused_ = enable ? false : true;
+  return 0;
 }
 
 int HWCDisplay::ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,

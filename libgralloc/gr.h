@@ -76,6 +76,9 @@ int getRgbDataAddress(private_handle_t* pHnd, void** rgb_data);
 // To query if UBWC is enabled, based on format and usage flags
 bool isUBwcEnabled(int format, int usage);
 
+// Function to check if the format is an uncompressed RGB format
+bool isUncompressedRgbFormat(int format);
+
 /*****************************************************************************/
 
 class Locker {
@@ -191,5 +194,7 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
                                                 int *bpp);
 
         int (*LINK_adreno_isUBWCSupportedByGpu) (ADRENOPIXELFORMAT format);
+
+        unsigned int (*LINK_adreno_get_gpu_pixel_alignment) ();
 };
 #endif /* GR_H_ */

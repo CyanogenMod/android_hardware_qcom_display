@@ -686,4 +686,8 @@ DisplayError DisplayBase::GetRefreshRateRange(uint32_t *min_refresh_rate,
   return error;
 }
 
+DisplayError DisplayBase::GetPanelBrightness(int *level) {
+  return kErrorNotSupported;
+}
+
 }  // namespace sdm

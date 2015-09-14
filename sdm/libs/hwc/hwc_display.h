@@ -71,6 +71,8 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int GetDisplayAttributesForConfig(int config, DisplayConfigVariableInfo *attributes);
 
   int SetPanelBrightness(int level);
+  int GetPanelBrightness(int *level);
+  int ToggleScreenUpdates(bool enable);
   int ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
                            PPDisplayAPIPayload *out_payload,
                            PPPendingParams *pending_action);
@@ -84,7 +86,7 @@ class HWCDisplay : public DisplayEventHandler {
   };
 
   // Dim layer flag set by SurfaceFlinger service.
-  static const uint32_t kDimLayer = 0x8000;
+  static const uint32_t kDimLayer = 0x80000000;
 
   // Maximum number of layers supported by display manager.
   static const uint32_t kMaxLayerCount = 32;

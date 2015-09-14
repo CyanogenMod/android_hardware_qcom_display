@@ -570,8 +570,8 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
   case qService::IQService::SET_VIEW_FRAME:
     break;
 
-  case qService::IQService::CONTROL_BACKLIGHT:
-    status = ControlBackLight(input_parcel);
+  case qService::IQService::TOGGLE_SCREEN_UPDATES:
+    status = ToggleScreenUpdates(input_parcel, output_parcel);
     break;
 
   case qService::IQService::QDCM_SVC_CMDS:
@@ -602,6 +602,14 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     status = HandleGetDisplayAttributesForConfig(input_parcel, output_parcel);
     break;
 
+  case qService::IQService::GET_PANEL_BRIGHTNESS:
+    status = GetPanelBrightness(input_parcel, output_parcel);
+    break;
+
+  case qService::IQService::SET_PANEL_BRIGHTNESS:
+    status = SetPanelBrightness(input_parcel, output_parcel);
+    break;
+
   default:
     DLOGW("QService command = %d is not supported", command);
     return -EINVAL;
@@ -610,43 +618,53 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
   return status;
 }
 
-android::status_t HWCSession::ControlBackLight(const android::Parcel *input_parcel) {
-  uint32_t display_status = UINT32(input_parcel->readInt32());
-  HWCDisplay *display = hwc_display_[HWC_DISPLAY_PRIMARY];
+android::status_t HWCSession::ToggleScreenUpdates(const android::Parcel *input_parcel,
+                                                  android::Parcel *output_parcel) {
+  int input = input_parcel->readInt32();
+  int error = android::BAD_VALUE;
 
-  DLOGI("Primary Display display_status = %d", display_status);
-
-  int fd = open("/sys/class/leds/lcd-backlight/brightness", O_RDWR);
-  const char *bl_brightness = "0";
-
-  if (fd < 0) {
-    DLOGE("unable to open brightness node err = %d errstr = %s", errno, strerror(errno));
-    return -1;
-  }
-
-  if (display_status == 0) {
-    // Read backlight and store it internally. Set backlight to 0 on primary.
-    if (read(fd, brightness_, sizeof(brightness_)) > 0) {
-      DLOGI("backlight brightness is %s", brightness_);
-      ssize_t ret = write(fd, bl_brightness, strlen(bl_brightness));
-      if (ret < 0) {
-        DLOGE("Failed to write backlight node err = %d errstr = %s", errno, strerror(errno));
-        close(fd);
-        return -1;
-      }
-    }
-  } else {
-    // Restore backlight to original value.
-    ssize_t ret = write(fd, brightness_, sizeof(brightness_));
-    if (ret < 0) {
-      DLOGE("Failed to write backlight node err = %d errstr = %s", errno, strerror(errno));
-      close(fd);
-      return -1;
+  if (hwc_display_[HWC_DISPLAY_PRIMARY] && (input <= 1) && (input >= 0)) {
+    error = hwc_display_[HWC_DISPLAY_PRIMARY]->ToggleScreenUpdates(input == 1);
+    if (error != 0) {
+      DLOGE("Failed to toggle screen updates = %d. Error = %d", input, error);
     }
   }
-  close(fd);
+  output_parcel->writeInt32(error);
 
-  return display->SetDisplayStatus(display_status);
+  return error;
+}
+
+android::status_t HWCSession::SetPanelBrightness(const android::Parcel *input_parcel,
+                                                 android::Parcel *output_parcel) {
+  int level = input_parcel->readInt32();
+  int error = android::BAD_VALUE;
+
+  if (hwc_display_[HWC_DISPLAY_PRIMARY]) {
+    error = hwc_display_[HWC_DISPLAY_PRIMARY]->SetPanelBrightness(level);
+    if (error != 0) {
+      DLOGE("Failed to set the panel brightness = %d. Error = %d", level, error);
+    }
+  }
+  output_parcel->writeInt32(error);
+
+  return error;
+}
+
+android::status_t HWCSession::GetPanelBrightness(const android::Parcel *input_parcel,
+                                                 android::Parcel *output_parcel) {
+  int error = android::BAD_VALUE;
+  int ret = error;
+
+  if (hwc_display_[HWC_DISPLAY_PRIMARY]) {
+    error = hwc_display_[HWC_DISPLAY_PRIMARY]->GetPanelBrightness(&ret);
+    if (error != 0) {
+      ret = error;
+      DLOGE("Failed to get the panel brightness. Error = %d", error);
+    }
+  }
+  output_parcel->writeInt32(ret);
+
+  return error;
 }
 
 android::status_t HWCSession::ControlPartialUpdate(const android::Parcel *input_parcel,
