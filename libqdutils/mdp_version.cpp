@@ -248,6 +248,12 @@ void  MDPVersion::updatePanelInfo() {
                     mPanelInfo.mMaxFps = atoi(tokens[1]);
                     ALOGI("Max Panel fps: %d", mPanelInfo.mMaxFps);
                 }
+                if(!strncmp(tokens[0], "idle_fps", strlen("idle_fps"))) {
+                    mPanelInfo.mIdleFps = atoi(tokens[1]);
+                    if (mPanelInfo.mIdleFps > 0) {
+                        ALOGI("Panel idle fps: %d", mPanelInfo.mMaxFps);
+                    }
+                }
             }
         }
         if((property_get("persist.hwc.pubypass", property, 0) > 0) &&
