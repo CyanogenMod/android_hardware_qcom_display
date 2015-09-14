@@ -95,10 +95,11 @@ struct PanelInfo {
     bool mDynFpsSupported;       // Panel Supports dyn fps
     uint32_t mMinFps;            // Min fps supported by panel
     uint32_t mMaxFps;            // Max fps supported by panel
+    uint32_t mIdleFps;           // FPS to use while panel is idle
     PanelInfo() : mType(NO_PANEL), mPartialUpdateEnable(0),
     mLeftAlign(0), mWidthAlign(0), mTopAlign(0), mHeightAlign(0),
     mMinROIWidth(0), mMinROIHeight(0), mNeedsROIMerge(false),
-    mDynFpsSupported(0), mMinFps(0), mMaxFps(0) {}
+    mDynFpsSupported(0), mMinFps(0), mMaxFps(0), mIdleFps(0) {}
     friend class MDPVersion;
 };
 
@@ -137,6 +138,7 @@ public:
     bool isDynFpsSupported() { return mPanelInfo.mDynFpsSupported; }
     uint32_t getMinFpsSupported() { return mPanelInfo.mMinFps; }
     uint32_t getMaxFpsSupported() { return mPanelInfo.mMaxFps; }
+    uint32_t getMinIdleFpsSupported() { return mPanelInfo.mIdleFps; }
     uint32_t getMaxMixerWidth() const { return mMaxMixerWidth; }
     bool hasMinCropWidthLimitation() const;
     bool isSrcSplit() const;
