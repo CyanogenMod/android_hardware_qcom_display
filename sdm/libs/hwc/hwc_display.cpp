@@ -47,12 +47,12 @@ static void AssignLayerRegionsAddress(LayerRectArray *region, uint32_t rect_coun
                                       uint8_t **base_address) {
   if (rect_count) {
     region->rect = reinterpret_cast<LayerRect *>(*base_address);
-    region->count = rect_count;
-    for (size_t i = 0; i < rect_count; i++) {
+    for (uint32_t i = 0; i < rect_count; i++) {
       region->rect[i] = LayerRect();
     }
     *base_address += rect_count * sizeof(LayerRect);
   }
+  region->count = rect_count;
 }
 
 static void ApplyDeInterlaceAdjustment(Layer *layer) {
@@ -498,10 +498,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     SetRect(hwc_layer.sourceCropf, &layer.src_rect);
     ApplyDeInterlaceAdjustment(&layer);
 
-    for (size_t j = 0; j < hwc_layer.visibleRegionScreen.numRects; j++) {
+    for (uint32_t j = 0; j < layer.visible_regions.count; j++) {
       SetRect(hwc_layer.visibleRegionScreen.rects[j], &layer.visible_regions.rect[j]);
     }
-    for (size_t j = 0; j < hwc_layer.surfaceDamage.numRects; j++) {
+    for (uint32_t j = 0; j < layer.dirty_regions.count; j++) {
       SetRect(hwc_layer.surfaceDamage.rects[j], &layer.dirty_regions.rect[j]);
     }
     SetComposition(hwc_layer.compositionType, &layer.composition);

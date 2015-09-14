@@ -290,6 +290,7 @@ int HWCColorManager::CreateSolidFillLayers(HWCDisplay *hwc_display) {
   layer.displayFrame = solid_fill_rect;
   layer.visibleRegionScreen.numRects = 1;
   layer.visibleRegionScreen.rects = &layer.displayFrame;
+  layer.surfaceDamage.numRects = 0;
 
   return ret;
 }
