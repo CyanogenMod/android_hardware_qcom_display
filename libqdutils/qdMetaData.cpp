@@ -86,6 +86,7 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
             break;
         case UPDATE_REFRESH_RATE:
             data->refreshrate = *((uint32_t *)param);
+            ALOGD("UPDATE_REFRESH_RATE: %d", data->refreshrate);
             break;
         case UPDATE_COLOR_SPACE:
             data->colorSpace = *((ColorSpace_t *)param);
