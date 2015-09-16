@@ -44,7 +44,7 @@ class CPUHint {
   void Reset();
 
  private:
-  enum { HINT =  0x4701 /* 47-display layer hint, 01-Enable */ };
+  enum { HINT =  0x4501 /* 45-display layer hint, 01-Enable */ };
   bool enabled_ = false;
   // frames to wait before setting this hint
   int pre_enable_window_ = 0;
