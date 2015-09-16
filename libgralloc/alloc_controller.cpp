@@ -183,6 +183,7 @@ bool isUncompressedRgbFormat(int format)
         case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_RGB_888:
         case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_BGR_565:
         case HAL_PIXEL_FORMAT_BGRA_8888:
         case HAL_PIXEL_FORMAT_RGBA_5551:
         case HAL_PIXEL_FORMAT_RGBA_4444:
@@ -330,6 +331,7 @@ void AdrenoMemInfo::getGpuAlignedWidthHeight(int width, int height, int format,
             bpp = 3;
             break;
         case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_BGR_565:
         case HAL_PIXEL_FORMAT_RGBA_5551:
         case HAL_PIXEL_FORMAT_RGBA_4444:
             bpp = 2;
@@ -382,6 +384,8 @@ ADRENOPIXELFORMAT AdrenoMemInfo::getGpuPixelFormat(int hal_format)
             return ADRENO_PIXELFORMAT_R8G8B8X8;
         case HAL_PIXEL_FORMAT_RGB_565:
             return ADRENO_PIXELFORMAT_B5G6R5;
+        case HAL_PIXEL_FORMAT_BGR_565:
+            return ADRENO_PIXELFORMAT_R5G6B5;
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
             return ADRENO_PIXELFORMAT_NV12;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
@@ -511,6 +515,7 @@ bool isMacroTileEnabled(int format, int usage)
             case  HAL_PIXEL_FORMAT_RGBX_8888:
             case  HAL_PIXEL_FORMAT_BGRA_8888:
             case  HAL_PIXEL_FORMAT_RGB_565:
+            case  HAL_PIXEL_FORMAT_BGR_565:
                 {
                     tileEnabled = true;
                     // check the usage flags
@@ -547,6 +552,7 @@ unsigned int getSize(int format, int width, int height, int usage,
             size = alignedw * alignedh * 3;
             break;
         case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_BGR_565:
         case HAL_PIXEL_FORMAT_RGBA_5551:
         case HAL_PIXEL_FORMAT_RGBA_4444:
         case HAL_PIXEL_FORMAT_RAW16:
@@ -879,7 +885,7 @@ static bool isUBwcSupported(int format)
     // Existing HAL formats with UBWC support
     switch(format)
     {
-        case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_BGR_565:
         case HAL_PIXEL_FORMAT_RGBA_8888:
         case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
@@ -988,7 +994,7 @@ static unsigned int getUBwcSize(int width, int height, int format,
 
     unsigned int size = 0;
     switch (format) {
-        case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_BGR_565:
             size = alignedw * alignedh * 2;
             size += getUBwcMetaBufferSize(width, height, 2);
             break;
@@ -1014,7 +1020,7 @@ int getRgbDataAddress(private_handle_t* hnd, void** rgb_data)
     int err = 0;
 
     // This api is for RGB* formats
-    if (hnd->format > HAL_PIXEL_FORMAT_BGRA_8888) {
+    if (!isUncompressedRgbFormat(hnd->format)) {
         return -EINVAL;
     }
 
@@ -1026,7 +1032,7 @@ int getRgbDataAddress(private_handle_t* hnd, void** rgb_data)
 
     unsigned int meta_size = 0;
     switch (hnd->format) {
-        case HAL_PIXEL_FORMAT_RGB_565:
+        case HAL_PIXEL_FORMAT_BGR_565:
             meta_size = getUBwcMetaBufferSize(hnd->width, hnd->height, 2);
             break;
         case HAL_PIXEL_FORMAT_RGBA_8888:

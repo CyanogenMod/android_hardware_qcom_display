@@ -485,6 +485,7 @@ DisplayError HWDevice::SetFormat(const LayerBufferFormat &source, uint32_t *targ
   case kFormatRGB888:                   *target = MDP_RGB_888;           break;
   case kFormatBGR888:                   *target = MDP_BGR_888;           break;
   case kFormatRGB565:                   *target = MDP_RGB_565;           break;
+  case kFormatBGR565:                   *target = MDP_BGR_565;           break;
   case kFormatYCbCr420Planar:           *target = MDP_Y_CB_CR_H2V2;      break;
   case kFormatYCrCb420Planar:           *target = MDP_Y_CR_CB_H2V2;      break;
   case kFormatYCrCb420PlanarStride16:   *target = MDP_Y_CR_CB_GH2V2;     break;
@@ -498,7 +499,7 @@ DisplayError HWDevice::SetFormat(const LayerBufferFormat &source, uint32_t *targ
   case kFormatYCbCr420SemiPlanarVenus:  *target = MDP_Y_CBCR_H2V2_VENUS; break;
   case kFormatRGBA8888Ubwc:             *target = MDP_RGBA_8888_UBWC;    break;
   case kFormatRGBX8888Ubwc:             *target = MDP_RGBX_8888_UBWC;    break;
-  case kFormatRGB565Ubwc:               *target = MDP_RGB_565_UBWC;      break;
+  case kFormatBGR565Ubwc:               *target = MDP_RGB_565_UBWC;      break;
   case kFormatYCbCr420SPVenusUbwc:      *target = MDP_Y_CBCR_H2V2_UBWC;  break;
   default:
     DLOGE("Unsupported format type %d", source);
@@ -532,7 +533,8 @@ DisplayError HWDevice::SetStride(HWDeviceType device_type, LayerBufferFormat for
     *target = width * 3;
     break;
   case kFormatRGB565:
-  case kFormatRGB565Ubwc:
+  case kFormatBGR565:
+  case kFormatBGR565Ubwc:
     *target = width * 2;
     break;
   case kFormatYCbCr420SemiPlanarVenus:
