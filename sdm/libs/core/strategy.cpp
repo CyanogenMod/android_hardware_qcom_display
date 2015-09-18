@@ -50,9 +50,6 @@ DisplayError Strategy::Init() {
 
     error = extension_intf_->CreatePartialUpdate(display_type_, hw_resource_info_,
                                                  hw_panel_info_, &partial_update_intf_);
-    if (error != kErrorNone) {
-      DLOGW("Partial Update creation failed, Continue without partial update.");
-    }
   }
 
   return kErrorNone;
