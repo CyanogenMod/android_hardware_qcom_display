@@ -60,8 +60,6 @@ static void ApplyDeInterlaceAdjustment(Layer *layer) {
   if (layer->input_buffer->flags.interlace) {
     float height = (layer->src_rect.bottom - layer->src_rect.top) / 2.0f;
     layer->src_rect.bottom = layer->src_rect.top + floorf(height);
-    layer->input_buffer->height /= 2;
-    layer->input_buffer->width *= 2;
   }
 }
 
