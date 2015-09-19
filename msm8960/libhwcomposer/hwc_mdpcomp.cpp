@@ -1037,7 +1037,8 @@ bool MDPCompHighRes::allocLayerPipes(hwc_context_t *ctx,
         if(isYuvBuffer(hnd))
             continue;
 
-        PipeLayerPair& info = mCurrentFrame.mdpToLayer[index];
+        int mdpIndex = mCurrentFrame.layerToMDP[index];
+        PipeLayerPair& info = mCurrentFrame.mdpToLayer[mdpIndex];
         info.pipeInfo = new MdpPipeInfoHighRes;
         info.rot = NULL;
         MdpPipeInfoHighRes& pipe_info = *(MdpPipeInfoHighRes*)info.pipeInfo;
