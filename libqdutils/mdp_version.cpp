@@ -251,7 +251,7 @@ void  MDPVersion::updatePanelInfo() {
                 if(!strncmp(tokens[0], "idle_fps", strlen("idle_fps"))) {
                     mPanelInfo.mIdleFps = atoi(tokens[1]);
                     if (mPanelInfo.mIdleFps > 0) {
-                        ALOGI("Panel idle fps: %d", mPanelInfo.mMaxFps);
+                        ALOGI("Panel idle fps: %d", mPanelInfo.mIdleFps);
                     }
                 }
             }
