@@ -201,6 +201,9 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
             aligned_w = ALIGN(width, 32);
             break;
+        case HAL_PIXEL_FORMAT_RAW16:
+            aligned_w = ALIGN(width, 16);
+            break;
         case HAL_PIXEL_FORMAT_RAW10:
             aligned_w = ALIGN(width * 10 /8, 16);
             break;
@@ -729,6 +732,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS:
         case HAL_PIXEL_FORMAT_NV21_ZSL:
+        case HAL_PIXEL_FORMAT_RAW16:
         case HAL_PIXEL_FORMAT_RAW10:
             ystride = cstride = width;
             ycbcr->y  = (void*)hnd->base;
@@ -940,6 +944,7 @@ static unsigned int getUBwcSize(int width, int height, int format,
             size += getUBwcMetaBufferSize(width, height, 2);
             break;
         case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_RGBX_8888:
             size = alignedw * alignedh * 4;
             size += getUBwcMetaBufferSize(width, height, 4);
             break;
@@ -959,6 +964,10 @@ int getRgbDataAddress(private_handle_t* hnd, void** rgb_data)
 {
     int err = 0;
 
+    // This api is for RGB* formats
+    if (hnd->format > HAL_PIXEL_FORMAT_BGRA_8888) {
+        return -EINVAL;
+    }
     // linear buffer
     if (!(hnd->flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED)) {
         *rgb_data = (void*)hnd->base;
