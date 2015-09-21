@@ -108,11 +108,9 @@ struct HWResourceInfo {
 struct HWSplitInfo {
   uint32_t left_split = 0;
   uint32_t right_split = 0;
-  bool always_src_split = false;
 
   bool operator !=(const HWSplitInfo &split_info) {
-    return ((left_split != split_info.left_split) || (right_split != split_info.right_split) ||
-            (always_src_split != split_info.always_src_split));
+    return ((left_split != split_info.left_split) || (right_split != split_info.right_split));
   }
 
   bool operator ==(const HWSplitInfo &split_info) {
@@ -287,7 +285,6 @@ struct HWLayers {
 struct HWDisplayAttributes : DisplayConfigVariableInfo {
   bool is_device_split = false;
   uint32_t split_left = 0;
-  bool always_src_split = false;
   uint32_t v_front_porch = 0;  //!< Vertical front porch of panel
   uint32_t v_back_porch = 0;   //!< Vertical back porch of panel
   uint32_t v_pulse_width = 0;  //!< Vertical pulse width of panel
@@ -298,7 +295,6 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
   bool operator !=(const HWDisplayAttributes &attributes) {
     return ((is_device_split != attributes.is_device_split) ||
             (split_left != attributes.split_left) ||
-            (always_src_split != attributes.always_src_split) ||
             (x_pixels != attributes.x_pixels) || (y_pixels != attributes.y_pixels) ||
             (x_dpi != attributes.x_dpi) || (y_dpi != attributes.y_dpi) || (fps != attributes.fps) ||
             (vsync_period_ns != attributes.vsync_period_ns) ||

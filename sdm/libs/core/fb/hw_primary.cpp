@@ -325,7 +325,6 @@ DisplayError HWPrimary::PopulateDisplayAttributes() {
       (var_screeninfo.xres > hw_resource_.max_mixer_width)) ? true : false;
   display_attributes_.split_left = hw_panel_info_.split_info.left_split ?
       hw_panel_info_.split_info.left_split : display_attributes_.x_pixels / 2;
-  display_attributes_.always_src_split = hw_panel_info_.split_info.always_src_split;
   display_attributes_.h_total += display_attributes_.is_device_split ? h_blanking : 0;
 
   return kErrorNone;
