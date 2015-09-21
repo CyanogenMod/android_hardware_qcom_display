@@ -139,7 +139,8 @@ bool FBUpdateNonSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *lis
 
         Overlay::PipeSpecs pipeSpecs;
         pipeSpecs.formatClass = Overlay::FORMAT_RGB;
-        pipeSpecs.needsScaling = qhwc::needsScaling(layer);
+        pipeSpecs.needsScaling = qhwc::needsScaling(layer) ||
+                isActionSafePresent(ctx, mDpy);
         pipeSpecs.dpy = mDpy;
         pipeSpecs.mixer = Overlay::MIXER_DEFAULT;
         pipeSpecs.fb = true;
