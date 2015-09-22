@@ -162,6 +162,10 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
             flags |= private_handle_t::PRIV_FLAGS_NON_CPU_WRITER;
         }
 
+        if(usage & GRALLOC_USAGE_HW_COMPOSER) {
+            flags |= private_handle_t::PRIV_FLAGS_DISP_CONSUMER;
+        }
+
         if(false == data.uncached) {
             flags |= private_handle_t::PRIV_FLAGS_CACHED;
         }
