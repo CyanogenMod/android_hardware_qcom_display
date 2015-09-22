@@ -17,6 +17,9 @@ LOCAL_PATH := $(call my-dir)
 include $(LOCAL_PATH)/../common.mk
 include $(CLEAR_VARS)
 
+# b/24171136 many files not compiling with clang/llvm yet
+LOCAL_CLANG := false
+
 LOCAL_MODULE                  := gralloc.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_RELATIVE_PATH    := hw
 LOCAL_MODULE_TAGS             := optional
@@ -33,6 +36,9 @@ include $(BUILD_SHARED_LIBRARY)
 
 # MemAlloc Library
 include $(CLEAR_VARS)
+
+# b/24171136 many files not compiling with clang/llvm yet
+LOCAL_CLANG := false
 
 LOCAL_MODULE                  := libmemalloc
 LOCAL_MODULE_TAGS             := optional
