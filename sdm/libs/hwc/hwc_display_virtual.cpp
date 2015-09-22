@@ -87,7 +87,7 @@ int HWCDisplayVirtual::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_
 
   *hwc_display = static_cast<HWCDisplay *>(hwc_display_virtual);
 
-  return status;
+  return 0;
 }
 
 void HWCDisplayVirtual::Destroy(HWCDisplay *hwc_display) {
