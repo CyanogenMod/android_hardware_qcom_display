@@ -32,6 +32,7 @@
 #include <gr.h>
 #include <alloc_controller.h>
 #include <utils/constants.h>
+#include <utils/debug.h>
 #include <core/buffer_allocator.h>
 
 #include "hwc_debugger.h"

@@ -47,6 +47,7 @@
 #define DLOGE(format, ...) DLOGE_IF(kTagNone, format, ##__VA_ARGS__)
 #define DLOGW(format, ...) DLOGW_IF(kTagNone, format, ##__VA_ARGS__)
 #define DLOGI(format, ...) DLOGI_IF(kTagNone, format, ##__VA_ARGS__)
+#define DLOGV(format, ...) DLOGV_IF(kTagNone, format, ##__VA_ARGS__)
 
 #define DTRACE_BEGIN(custom_string) Debug::Get()->BeginTrace(__CLASS__, __FUNCTION__, custom_string)
 #define DTRACE_END() Debug::Get()->EndTrace()

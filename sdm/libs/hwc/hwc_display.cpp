@@ -32,6 +32,8 @@
 #include <gralloc_priv.h>
 #include <gr.h>
 #include <utils/constants.h>
+#include <utils/rect.h>
+#include <utils/debug.h>
 #include <sync/sync.h>
 #include <cutils/properties.h>
 
@@ -477,6 +479,7 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
   use_blit_comp_ = false;
   metadata_refresh_rate_ = 0;
+  display_rect_ = LayerRect();
 
   // Configure each layer
   for (size_t i = 0; i < num_hw_layers; i++) {
@@ -505,6 +508,11 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       SetRect(hwc_layer.surfaceDamage.rects[j], &layer.dirty_regions.rect[j]);
     }
     SetComposition(hwc_layer.compositionType, &layer.composition);
+
+    if (hwc_layer.compositionType != HWC_FRAMEBUFFER_TARGET) {
+      display_rect_ = Union(display_rect_, layer.dst_rect);
+    }
+
 
     // For dim layers, SurfaceFlinger
     //    - converts planeAlpha to per pixel alpha,
@@ -1306,6 +1314,21 @@ int HWCDisplay::ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
     ret = -EINVAL;
 
   return ret;
+}
+
+int HWCDisplay::GetVisibleDisplayRect(hwc_rect_t* visible_rect) {
+  if (!IsValid(display_rect_)) {
+    return -EINVAL;
+  }
+
+  visible_rect->left = INT(display_rect_.left);
+  visible_rect->top = INT(display_rect_.top);
+  visible_rect->right = INT(display_rect_.right);
+  visible_rect->bottom = INT(display_rect_.bottom);
+  DLOGI("Dpy = %d Visible Display Rect(%d %d %d %d)", visible_rect->left, visible_rect->top,
+        visible_rect->right, visible_rect->bottom);
+
+  return 0;
 }
 
 void HWCDisplay::ResetLayerCacheStack() {

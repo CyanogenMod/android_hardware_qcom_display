@@ -113,6 +113,8 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
                                                 android::Parcel *output_parcel);
   android::status_t HandleGetDisplayAttributesForConfig(const android::Parcel *input_parcel,
                                                         android::Parcel *output_parcel);
+  android::status_t GetVisibleDisplayRect(const android::Parcel *input_parcel,
+                                          android::Parcel *output_parcel);
 
   static Locker locker_;
   CoreInterface *core_intf_ = NULL;

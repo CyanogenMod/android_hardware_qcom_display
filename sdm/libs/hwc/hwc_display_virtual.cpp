@@ -28,6 +28,7 @@
 */
 
 #include <utils/constants.h>
+#include <utils/debug.h>
 #include <sync/sync.h>
 #include <stdarg.h>
 #include <gr.h>

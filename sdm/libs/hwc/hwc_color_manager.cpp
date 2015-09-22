@@ -40,6 +40,7 @@
 
 #include <core/dump_interface.h>
 #include <utils/constants.h>
+#include <utils/debug.h>
 #include <core/buffer_allocator.h>
 #include <private/color_params.h>
 #include "hwc_buffer_allocator.h"

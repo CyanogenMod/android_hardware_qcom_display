@@ -76,6 +76,7 @@ class HWCDisplay : public DisplayEventHandler {
   int ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
                            PPDisplayAPIPayload *out_payload,
                            PPPendingParams *pending_action);
+  int GetVisibleDisplayRect(hwc_rect_t* rect);
 
  protected:
   enum DisplayStatus {
@@ -186,7 +187,8 @@ class HWCDisplay : public DisplayEventHandler {
   bool skip_prepare_ = false;
 
   bool solid_fill_enable_ = false;
-  uint32_t solid_fill_color_ = 0;;
+  uint32_t solid_fill_color_ = 0;
+  LayerRect display_rect_;
 
  private:
   bool IsFrameBufferScaled();
