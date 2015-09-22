@@ -382,6 +382,7 @@ DisplayError HWPrimary::SetRefreshRate(uint32_t refresh_rate) {
 
   char refresh_rate_string[kMaxStringLength];
   snprintf(refresh_rate_string, sizeof(refresh_rate_string), "%d", refresh_rate);
+  DLOGI_IF(kTagDriverConfig, "Setting refresh rate = %d", refresh_rate);
   ssize_t len = Sys::pwrite_(fd, refresh_rate_string, strlen(refresh_rate_string), 0);
   if (len < 0) {
     DLOGE("Failed to write %d with error %s", refresh_rate, strerror(errno));

@@ -278,10 +278,13 @@ DisplayError DisplayPrimary::GetRefreshRateRange(uint32_t *min_refresh_rate,
 DisplayError DisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
   SCOPE_LOCK(locker_);
 
-  if (!hw_panel_info_.dynamic_fps || refresh_rate < hw_panel_info_.min_fps ||
-       refresh_rate > hw_panel_info_.max_fps) {
-    DLOGW("Invalid Request");
+  if (state_ != kStateOn || !hw_panel_info_.dynamic_fps) {
     return kErrorNotSupported;
+  }
+
+  if (refresh_rate < hw_panel_info_.min_fps || refresh_rate > hw_panel_info_.max_fps) {
+    DLOGE("Invalid Fps = %d request", refresh_rate);
+    return kErrorParameters;
   }
 
   DisplayError error = hw_intf_->SetRefreshRate(refresh_rate);

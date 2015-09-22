@@ -203,11 +203,13 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
 int HWCDisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
   DisplayError error = kErrorNone;
 
-  if (display_intf_) {
-    error = display_intf_->SetRefreshRate(refresh_rate);
+  error = display_intf_->SetRefreshRate(refresh_rate);
+  if (error == kErrorNone) {
+    current_refresh_rate_ = refresh_rate;
+    return 0;
   }
 
-  return (error ? -1 : 0);
+  return -1;
 }
 
 int HWCDisplayPrimary::Perform(uint32_t operation, ...) {
@@ -298,14 +300,7 @@ void HWCDisplayPrimary::SetMetadataRefreshRate(bool one_updating_layer) {
     refresh_rate = metadata_refresh_rate_;
   }
 
-  int status = SetRefreshRate(refresh_rate);
-  if (status == 0) {
-    // Set current refresh rate to metadata refresh rate
-    current_refresh_rate_ = refresh_rate;
-  } else {
-    // Failed - Restore to max refresh rate
-    current_refresh_rate_ = max_refresh_rate_;
-  }
+  SetRefreshRate(refresh_rate);
 }
 
 void HWCDisplayPrimary::ForceRefreshRate(uint32_t refresh_rate) {
@@ -325,10 +320,8 @@ void HWCDisplayPrimary::ForceRefreshRate(uint32_t refresh_rate) {
   if (status) {
     // failed Reset force_refresh_rate to 0, and restore max refresh rate
     force_refresh_rate_ = 0;
-    rate = max_refresh_rate_;
     DLOGE("Setting Refresh Rate = %d Failed", refresh_rate);
   }
-  current_refresh_rate_ = rate;
 
   return;
 }
@@ -351,12 +344,7 @@ DisplayError HWCDisplayPrimary::Refresh() {
 
   uint32_t refresh_rate = force_refresh_rate_ ? force_refresh_rate_ : min_refresh_rate_;
 
-  int status = SetRefreshRate(refresh_rate);
-  if (status) {
-    DLOGE("Setting Refresh Rate = %d Failed", refresh_rate);
-  } else {
-    current_refresh_rate_ = refresh_rate;
-  }
+  SetRefreshRate(refresh_rate);
 
   return error;
 }
