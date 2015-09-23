@@ -200,7 +200,12 @@ int HWCDisplayVirtual::SetOutputSliceFromMetadata(hwc_display_contents_1_t *cont
   int status = 0;
 
   if (output_handle) {
-    LayerBufferFormat format = GetSDMFormat(output_handle->format, output_handle->flags);
+    int output_handle_format = output_handle->format;
+    if (output_handle_format == HAL_PIXEL_FORMAT_RGBA_8888) {
+      output_handle_format = HAL_PIXEL_FORMAT_RGBX_8888;
+    }
+
+    LayerBufferFormat format = GetSDMFormat(output_handle_format, output_handle->flags);
     if (format == kFormatInvalid) {
       return -EINVAL;
     }
@@ -245,7 +250,14 @@ int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
   output_buffer_->acquire_fence_fd = content_list->outbufAcquireFenceFd;
 
   if (output_handle) {
-    output_buffer_->format = GetSDMFormat(output_handle->format, output_handle->flags);
+    int output_handle_format = output_handle->format;
+
+    if (output_handle_format == HAL_PIXEL_FORMAT_RGBA_8888) {
+      output_handle_format = HAL_PIXEL_FORMAT_RGBX_8888;
+    }
+
+    output_buffer_->format = GetSDMFormat(output_handle_format, output_handle->flags);
+
     if (output_buffer_->format == kFormatInvalid) {
       return -EINVAL;
     }
@@ -258,6 +270,11 @@ int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
     output_buffer_->height = output_buffer_height;
     output_buffer_->flags.secure = 0;
     output_buffer_->flags.video = 0;
+
+    // TZ Protected Buffer - L1
+    if (output_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
+      output_buffer_->flags.secure = 1;
+    }
 
     // ToDo: Need to extend for non-RGB formats
     output_buffer_->planes[0].fd = output_handle->fd;

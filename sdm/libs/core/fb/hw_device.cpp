@@ -273,6 +273,9 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
     mdp_out_layer_.writeback_ndx = 2;
     mdp_out_layer_.buffer.width = output_buffer->width;
     mdp_out_layer_.buffer.height = output_buffer->height;
+    if (output_buffer->flags.secure) {
+      mdp_out_layer_.flags |= MDP_LAYER_SECURE_SESSION;
+    }
     mdp_out_layer_.buffer.comp_ratio.denom = 1000;
     mdp_out_layer_.buffer.comp_ratio.numer = UINT32(hw_layers->output_compression * 1000);
     SetFormat(output_buffer->format, &mdp_out_layer_.buffer.format);
@@ -430,10 +433,10 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
       input_buffer = &hw_rotator_session->output_buffer;
     }
 
-    input_buffer->release_fence_fd = dup(mdp_commit.release_fence);
+    input_buffer->release_fence_fd = Sys::dup_(mdp_commit.release_fence);
   }
 
-  hw_layer_info.sync_handle = dup(mdp_commit.release_fence);
+  hw_layer_info.sync_handle = Sys::dup_(mdp_commit.release_fence);
 
   DLOGI_IF(kTagDriverConfig, "*************************** %s Commit Input ************************",
            device_name_);
