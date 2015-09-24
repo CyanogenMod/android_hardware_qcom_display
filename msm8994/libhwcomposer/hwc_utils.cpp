@@ -2857,6 +2857,7 @@ void ColorMode::init() {
         *(void **)& fnGetNumModes = dlsym(mModeHandle, "getNumDisplayModes");
         *(void **)& fnGetModeList = dlsym(mModeHandle, "getDisplayModeIdList");
         *(void **)& fnSetDefaultMode = dlsym(mModeHandle, "setDefaultMode");
+        *(void **)& fnDeleteInstance = dlsym(mModeHandle, "deleteInstance");
     } else {
         ALOGW("Unable to load libmm-qdcm");
     }
@@ -2910,7 +2911,6 @@ int ColorMode::applyModeByIndex(int index) {
     ret = applyModeByID(mode);
     if(!ret) {
         mCurModeIndex = index;
-        setDefaultMode(mode);
     }
     return ret;
 }
@@ -2943,6 +2943,9 @@ int ColorMode::getIndexForMode(int mode) {
 
 void ColorMode::destroy() {
     if(mModeHandle) {
+        if (fnDeleteInstance) {
+            fnDeleteInstance();
+        }
         dlclose(mModeHandle);
         mModeHandle = NULL;
     }
