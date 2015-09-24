@@ -75,6 +75,9 @@ int getYUVPlaneInfo(private_handle_t* pHnd, struct android_ycbcr* ycbcr);
 // To query if UBWC is enabled, based on format and usage flags
 bool isUBwcEnabled(int format, int usage);
 
+// Function to check if the format is an uncompressed RGB format
+bool isUncompressedRgbFormat(int format);
+
 /*****************************************************************************/
 
 class Locker {
