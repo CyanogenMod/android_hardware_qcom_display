@@ -595,6 +595,10 @@ void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
     if (layer.transform.flip_horizontal) {
       *mdp_flags |= MDP_LAYER_FLIP_LR;
     }
+
+    if (input_buffer->flags.interlace) {
+      *mdp_flags |= MDP_LAYER_DEINTERLACE;
+    }
   }
 
   if (input_buffer->flags.secure) {
