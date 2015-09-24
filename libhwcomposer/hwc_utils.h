@@ -685,6 +685,7 @@ struct hwc_context_t {
     bool mHPDEnabled;
     //Used to notify that boot has completed
     bool mBootAnimCompleted;
+    bool triggerRefresh;
 };
 
 namespace qhwc {
