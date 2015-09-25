@@ -186,5 +186,7 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
                                                 int *bpp);
 
         int (*LINK_adreno_isUBWCSupportedByGpu) (ADRENOPIXELFORMAT format);
+
+        unsigned int (*LINK_adreno_get_gpu_pixel_alignment) ();
 };
 #endif /* GR_H_ */

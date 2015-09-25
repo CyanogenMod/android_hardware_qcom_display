@@ -194,7 +194,9 @@ struct private_handle_t : public native_handle {
             // Buffer rendered using CPU/SW renderer
             PRIV_FLAGS_CPU_RENDERED       = 0x04000000,
             // Buffer is allocated with UBWC alignment
-            PRIV_FLAGS_UBWC_ALIGNED       = 0x08000000
+            PRIV_FLAGS_UBWC_ALIGNED       = 0x08000000,
+            // Buffer allocated will be consumed by SF/HWC
+            PRIV_FLAGS_DISP_CONSUMER      = 0x10000000
         };
 
         // file-descriptors
