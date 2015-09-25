@@ -214,16 +214,26 @@ utils::eDest Overlay::getPipe_8x26(const PipeSpecs& pipeSpecs) {
     } else { //FB layer
         //For 8x26 Secondary we use DMA always for FB for inline rotation
         if(pipeSpecs.dpy == DPY_PRIMARY) {
-            dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
-            if(dest == OV_INVALID) {
-                dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
-            }
+	    /* For wearable targets, secondary display is not applicable
+               Try for DMA pipe for FB first, if FB does not have scaling*/
+		if (not pipeSpecs.needsScaling) {
+			dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
+		} else {
+			dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
+			if (dest == OV_INVALID) {
+				// FB needs scaling, and RGB pipe is not available - try VG
+				dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
+			}
+		}
         }
         if(dest == OV_INVALID and (not pipeSpecs.needsScaling) and
           (not (pipeSpecs.numActiveDisplays > 1 &&
                 pipeSpecs.dpy == DPY_PRIMARY))) {
             dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
         }
+    }
+    if (dest == OV_INVALID) {
+		ALOGE("%s - not able to allocate FB pipe", __func__);
     }
     return dest;
 }
