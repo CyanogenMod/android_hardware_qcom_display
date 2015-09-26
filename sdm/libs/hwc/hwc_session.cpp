@@ -74,6 +74,7 @@ hwc_module_t HAL_MODULE_INFO_SYM = {
 namespace sdm {
 
 Locker HWCSession::locker_;
+Locker HWCSession::concurrency_locker_;
 bool HWCSession::reset_panel_ = false;
 
 static void Invalidate(const struct hwc_procs *procs) {
@@ -293,22 +294,31 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
 
   for (size_t dpy = 0; dpy < num_displays; dpy++) {
     hwc_display_contents_1_t *content_list = displays[dpy];
-    if (dpy == HWC_DISPLAY_VIRTUAL) {
-      if (hwc_session->hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-        if (content_list) {
-          for (size_t i = 0; i < content_list->numHwLayers; i++) {
-            if (content_list->hwLayers[i].acquireFenceFd >= 0) {
-              close(content_list->hwLayers[i].acquireFenceFd);
-              content_list->hwLayers[i].acquireFenceFd = -1;
-            }
-          }
-          if (content_list->outbufAcquireFenceFd >= 0) {
-            close(content_list->outbufAcquireFenceFd);
-            content_list->outbufAcquireFenceFd = -1;
-          }
-          content_list->retireFenceFd = -1;
+
+    // Drop virtual display composition if virtual display object could not be created
+    // due to HDMI concurrency.
+    if (dpy == HWC_DISPLAY_VIRTUAL && !hwc_session->hwc_display_[HWC_DISPLAY_VIRTUAL]) {
+      if (!content_list) {
+        continue;
+      }
+
+      for (size_t i = 0; i < content_list->numHwLayers; i++) {
+        int &acquireFenceFd = content_list->hwLayers[i].acquireFenceFd;
+        if (acquireFenceFd >= 0) {
+          close(acquireFenceFd);
+          acquireFenceFd = -1;
         }
       }
+
+      int &outbufAcquireFenceFd = content_list->outbufAcquireFenceFd;
+      if (outbufAcquireFenceFd >= 0) {
+        close(outbufAcquireFenceFd);
+        outbufAcquireFenceFd = -1;
+      }
+
+      content_list->retireFenceFd = -1;
+
+      continue;
     }
 
     if (hwc_session->hwc_display_[dpy]) {
@@ -500,31 +510,35 @@ int HWCSession::SetCursorPositionAsync(hwc_composer_device_1 *device, int disp, 
   return status;
 }
 
-int HWCSession::HandleVirtualDisplayLifeCycle(hwc_display_contents_1_t *content_list) {
-  int status = 0;
+void HWCSession::HandleVirtualDisplayLifeCycle(hwc_display_contents_1_t *content_list) {
+  // Virtual display & HDMI concurrency is not supported.
+  // Acquire concurrency mutex before creating / destroying virtual display.
+  // Signal concurrency condition on virtual display destroy so that HDMI hotplug could
+  // proceed with connection.
+  SCOPE_LOCK(concurrency_locker_);
 
   if (HWCDisplayVirtual::IsValidContentList(content_list)) {
     if (!hwc_display_[HWC_DISPLAY_VIRTUAL]) {
+      DLOGI("Create Virtual Display");
       uint32_t primary_width = 0;
       uint32_t primary_height = 0;
       hwc_display_[HWC_DISPLAY_PRIMARY]->GetFrameBufferResolution(&primary_width, &primary_height);
-      // Create virtual display device
-      status = HWCDisplayVirtual::Create(core_intf_, &hwc_procs_, primary_width, primary_height,
-                                         content_list, &hwc_display_[HWC_DISPLAY_VIRTUAL]);
-      if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
+
+      int status = HWCDisplayVirtual::Create(core_intf_, &hwc_procs_, primary_width,
+                                             primary_height, content_list,
+                                             &hwc_display_[HWC_DISPLAY_VIRTUAL]);
+      if (!status) {
         hwc_display_[HWC_DISPLAY_VIRTUAL]->SetSecureDisplay(secure_display_active_);
       }
     }
   } else {
     if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
+      DLOGI("Destroy Virtual Display");
       HWCDisplayVirtual::Destroy(hwc_display_[HWC_DISPLAY_VIRTUAL]);
-      hwc_display_[HWC_DISPLAY_VIRTUAL] = 0;
-      // Signal the HotPlug thread to continue with the external display connection
-      locker_.Signal();
+      hwc_display_[HWC_DISPLAY_VIRTUAL] = NULL;
+      concurrency_locker_.Signal();
     }
   }
-
-  return status;
 }
 
 android::status_t HWCSession::notifyCallback(uint32_t command, const android::Parcel *input_parcel,
@@ -711,11 +725,11 @@ android::status_t HWCSession::ControlPartialUpdate(const android::Parcel *input_
     return ret;
   }
 
+  // Todo(user): Unlock it before sending events to client. It may cause deadlocks in future.
   hwc_procs_->invalidate(hwc_procs_);
 
   // Wait until partial update control is complete
   ret = locker_.WaitFinite(kPartialUpdateControlTimeoutMs);
-  locker_.Unlock();
 
   out->writeInt32(ret);
 
@@ -1146,46 +1160,66 @@ void HWCSession::ResetPanel() {
 }
 
 int HWCSession::HotPlugHandler(bool connected) {
-  if (!hwc_procs_) {
-     DLOGW("Ignore hotplug - hwc_proc not registered");
-    return -1;
-  }
+  // To prevent sending events to client while a lock is held, acquire scope locks only within
+  // below scope so that those get automatically unlocked after the scope ends.
+  {
+    // Virtual display & HDMI concurrency is not supported. Acquire concurrency lock
+    // and wait for virtual display to tear down if connected.
+    SCOPE_LOCK(concurrency_locker_);
 
-  if (connected) {
-    SEQUENCE_WAIT_SCOPE_LOCK(locker_);
-    if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
-      // Wait for the virtual display to tear down
-      int status = locker_.WaitFinite(kExternalConnectionTimeoutMs);
-      if (status != 0) {
-        DLOGE("Timed out while waiting for virtual display to tear down.");
+    if (connected) {
+      // Acquire global lock and check if virtual display is connected.
+      // Release global lock before waiting for virtual display to disconnect and signal.
+      bool virtual_display_connected = false;
+      {
+        SCOPE_LOCK(locker_);
+        if (!hwc_display_[HWC_DISPLAY_PRIMARY]) {
+          DLOGE("Primay display is not connected");
+          return -1;
+        }
+
+        if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
+          DLOGE("HDMI is already connected");
+          return -1;
+        }
+
+        virtual_display_connected = (hwc_display_[HWC_DISPLAY_VIRTUAL] != NULL);
+        DLOGI("Virtual display connection status = %d", virtual_display_connected);
+      }
+
+      if (virtual_display_connected) {
+        DLOGI("Wait for virtual display to disconnect.");
+        concurrency_locker_.Wait();
+        DLOGI("virtual display is disconnected now.");
+      }
+
+      // Acquire global sequence lock now.
+      SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
+      uint32_t primary_width = 0;
+      uint32_t primary_height = 0;
+      hwc_display_[HWC_DISPLAY_PRIMARY]->GetFrameBufferResolution(&primary_width, &primary_height);
+
+      // Create hdmi display
+      int status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, primary_width,
+                                              primary_height, &hwc_display_[HWC_DISPLAY_EXTERNAL]);
+      if (status) {
+        return status;
+      }
+
+      hwc_display_[HWC_DISPLAY_EXTERNAL]->SetSecureDisplay(secure_display_active_);
+    } else {
+      // Acquire concurrency lock as well as global sequence lock.
+      SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
+      if (!hwc_display_[HWC_DISPLAY_EXTERNAL]) {
+        DLOGE("HDMI not connected");
         return -1;
       }
-    }
-    if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-     DLOGE("HDMI already connected");
-     return -1;
-    }
 
-    uint32_t primary_width = 0;
-    uint32_t primary_height = 0;
-    hwc_display_[HWC_DISPLAY_PRIMARY]->GetFrameBufferResolution(&primary_width, &primary_height);
-    // Create hdmi display
-    int status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, primary_width,
-                                            primary_height, &hwc_display_[HWC_DISPLAY_EXTERNAL]);
-    if (status) {
-      return status;
+      HWCDisplayExternal::Destroy(hwc_display_[HWC_DISPLAY_EXTERNAL]);
+      hwc_display_[HWC_DISPLAY_EXTERNAL] = NULL;
     }
-    if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-      hwc_display_[HWC_DISPLAY_EXTERNAL]->SetSecureDisplay(secure_display_active_);
-    }
-  } else {
-    SEQUENCE_WAIT_SCOPE_LOCK(locker_);
-    if (!hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-     DLOGE("HDMI not connected");
-     return -1;
-    }
-    HWCDisplayExternal::Destroy(hwc_display_[HWC_DISPLAY_EXTERNAL]);
-    hwc_display_[HWC_DISPLAY_EXTERNAL] = 0;
   }
 
   // notify client and trigger a screen refresh
