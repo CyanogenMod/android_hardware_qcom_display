@@ -42,6 +42,39 @@ CreateColorInterface ColorManagerProxy::create_intf_ = NULL;
 DestroyColorInterface ColorManagerProxy::destroy_intf_ = NULL;
 HWResourceInfo ColorManagerProxy::hw_res_info_;
 
+// Below two functions are part of concrete implementation for SDM core private
+// color_params.h
+void PPFeaturesConfig::Reset() {
+  for (int i = 0; i < kMaxNumPPFeatures; i++) {
+    if (feature_[i]) {
+      delete feature_[i];
+      feature_[i] = NULL;
+    }
+  }
+  dirty_ = false;
+  next_idx_ = 0;
+}
+
+DisplayError PPFeaturesConfig::RetrieveNextFeature(PPFeatureInfo **feature) {
+  DisplayError ret = kErrorNone;
+  int i(0);
+
+  for (i = next_idx_; i < kMaxNumPPFeatures; i++) {
+    if (feature_[i]) {
+      *feature = feature_[i];
+      next_idx_ = i + 1;
+      break;
+    }
+  }
+
+  if (i == kMaxNumPPFeatures) {
+    ret = kErrorParameters;
+    next_idx_ = 0;
+  }
+
+  return ret;
+}
+
 DisplayError ColorManagerProxy::Init(const HWResourceInfo &hw_res_info) {
   DisplayError error = kErrorNone;
 

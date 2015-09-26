@@ -142,9 +142,16 @@ HWCColorManager *HWCColorManager::CreateColorManager() {
   return color_mgr;
 }
 
-HWCColorManager::~HWCColorManager() {}
+HWCColorManager::~HWCColorManager() {
+}
 
 void HWCColorManager::DestroyColorManager() {
+  if (qdcm_mode_mgr_) {
+    delete qdcm_mode_mgr_;
+  }
+  if (qdcm_diag_deinit_) {
+    qdcm_diag_deinit_();
+  }
   if (diag_client_lib_) {
     ::dlclose(diag_client_lib_);
   }
@@ -157,24 +164,16 @@ void HWCColorManager::DestroyColorManager() {
 int HWCColorManager::EnableQDCMMode(bool enable, HWCDisplay *hwc_display) {
   int ret = 0;
 
-  if (enable) {  // entering QDCM mode, disable all active features and acquire Android wakelock
+  if (!qdcm_mode_mgr_) {
     qdcm_mode_mgr_ = HWCQDCMModeManager::CreateQDCMModeMgr();
     if (!qdcm_mode_mgr_) {
-      DLOGE("failing to create QDCM operating mode manager.");
+      DLOGE("Unable to create QDCM operating mode manager.");
       ret = -EFAULT;
-    } else {
-      ret = qdcm_mode_mgr_->EnableQDCMMode(enable, hwc_display);
     }
-  } else {  // exiting QDCM mode, reverse the effect of entering.
-    if (!qdcm_mode_mgr_) {
-      DLOGE("failing to disable QDCM operating mode manager.");
-      ret = -EFAULT;
-    } else {  // once exiting from QDCM operating mode, destroy QDCMModeMgr and release the
-              // resources
-      ret = qdcm_mode_mgr_->EnableQDCMMode(enable, hwc_display);
-      delete qdcm_mode_mgr_;
-      qdcm_mode_mgr_ = NULL;
-    }
+  }
+
+  if (qdcm_mode_mgr_) {
+    ret = qdcm_mode_mgr_->EnableQDCMMode(enable, hwc_display);
   }
 
   return ret;
@@ -407,6 +406,7 @@ int HWCQDCMModeManager::EnableActiveFeatures(bool enable,
                                              const HWCQDCMModeManager::ActiveFeatureCMD &cmds,
                                              bool *was_running) {
   int ret = 0;
+  ssize_t size = 0;
   char response[kSocketCMDMaxLength] = {
       0,
   };
@@ -418,25 +418,31 @@ int HWCQDCMModeManager::EnableActiveFeatures(bool enable,
 
   if (!enable) {  // if client requesting to disable it.
     // query CABL status, if off, no action. keep the status.
-    if (::write(socket_fd_, cmds.cmd_query_status, strlen(cmds.cmd_query_status)) < 0) {
+    size = ::write(socket_fd_, cmds.cmd_query_status, strlen(cmds.cmd_query_status));
+    if (size < 0) {
       DLOGW("Unable to send data over socket %s", ::strerror(errno));
       ret = -EFAULT;
-    } else if (::read(socket_fd_, response, kSocketCMDMaxLength) < 0) {
-      DLOGW("Unable to read data over socket %s", ::strerror(errno));
-      ret = -EFAULT;
-    } else if (!strncmp(response, cmds.running, strlen(cmds.running))) {
-      *was_running = true;
+    } else {
+      size = ::read(socket_fd_, response, kSocketCMDMaxLength);
+      if (size < 0) {
+        DLOGW("Unable to read data over socket %s", ::strerror(errno));
+        ret = -EFAULT;
+      } else if (!strncmp(response, cmds.running, strlen(cmds.running))) {
+        *was_running = true;
+      }
     }
 
     if (*was_running) {  // if was running, it's requested to disable it.
-      if (::write(socket_fd_, cmds.cmd_off, strlen(cmds.cmd_off)) < 0) {
+      size = ::write(socket_fd_, cmds.cmd_off, strlen(cmds.cmd_off));
+      if (size < 0) {
         DLOGW("Unable to send data over socket %s", ::strerror(errno));
         ret = -EFAULT;
       }
     }
   } else {  // if was running, need enable it back.
     if (*was_running) {
-      if (::write(socket_fd_, cmds.cmd_on, strlen(cmds.cmd_on)) < 0) {
+      size = ::write(socket_fd_, cmds.cmd_on, strlen(cmds.cmd_on));
+      if (size < 0) {
         DLOGW("Unable to send data over socket %s", ::strerror(errno));
         ret = -EFAULT;
       }
