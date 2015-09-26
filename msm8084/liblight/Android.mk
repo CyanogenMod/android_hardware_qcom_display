@@ -17,7 +17,15 @@ LOCAL_PATH:= $(call my-dir)
 # hw/<COPYPIX_HARDWARE_MODULE_ID>.<ro.board.platform>.so
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES := lights.c
+include $(CLEAR_VARS)
+
+ifdef $(TARGET_USES_CUSTOM_LIBLIGHT)
+ifdef $(CUSTOM_LIBLIGHT_PATH)
+LOCAL_SRC_FILES := $(CUSTOM_LIBLIGHT_PATH)/lights.c
+endif
+else
+LOCAL_SOURCE_FILES := lights.c
+endif
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_SHARED_LIBRARIES := liblog
 LOCAL_CFLAGS := $(common_flags) -DLOG_TAG=\"qdlights\"
