@@ -42,6 +42,11 @@ enum ColorSpace_t{
     ITU_R_709,
 };
 
+enum IGC_t {
+    IGC_NotSpecified,
+    IGC_sRGB,
+};
+
 struct HSICData_t {
     int32_t hue;
     float   saturation;
@@ -79,6 +84,7 @@ struct MetaData_t {
     int64_t timestamp;
     uint32_t refreshrate;
     enum ColorSpace_t colorSpace;
+    enum IGC_t igc;
      /* Gralloc sets PRIV_SECURE_BUFFER flag to inform that the buffers are from
       * ION_SECURE. which should not be mapped. However, for GPU post proc
       * feature, GFX needs to map this buffer, in the client context and in SF
@@ -107,6 +113,7 @@ enum DispParamType {
     MAP_SECURE_BUFFER = 0x400,
     S3D_FORMAT = 0x800,
     LINEAR_FORMAT = 0x1000,
+    SET_IGC = 0x2000,
 };
 
 struct private_handle_t;

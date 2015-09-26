@@ -892,7 +892,7 @@ DisplayError HWCDisplay::SetMaxMixerStages(uint32_t max_mixer_stages) {
   return error;
 }
 
-DisplayError HWCDisplay:: ControlPartialUpdate(bool enable, uint32_t *pending) {
+DisplayError HWCDisplay::ControlPartialUpdate(bool enable, uint32_t *pending) {
   DisplayError error = kErrorNone;
 
   if (display_intf_) {
@@ -1253,13 +1253,25 @@ uint32_t HWCDisplay::RoundToStandardFPS(uint32_t fps) {
 void HWCDisplay::ApplyScanAdjustment(hwc_rect_t *display_frame) {
 }
 
-DisplayError HWCDisplay::SetColorSpace(const ColorSpace_t source, LayerColorSpace *target) {
+DisplayError HWCDisplay::SetCSC(ColorSpace_t source, LayerCSC *target) {
   switch (source) {
-  case ITU_R_601:      *target = kLimitedRange601;   break;
-  case ITU_R_601_FR:   *target = kFullRange601;      break;
-  case ITU_R_709:      *target = kLimitedRange709;   break;
+  case ITU_R_601:       *target = kCSCLimitedRange601;   break;
+  case ITU_R_601_FR:    *target = kCSCFullRange601;      break;
+  case ITU_R_709:       *target = kCSCLimitedRange709;   break;
   default:
-    DLOGE("Unsupported Color Space: %d", source);
+    DLOGE("Unsupported CSC: %d", source);
+    return kErrorNotSupported;
+  }
+
+  return kErrorNone;
+}
+
+DisplayError HWCDisplay::SetIGC(IGC_t source, LayerIGC *target) {
+  switch (source) {
+  case IGC_NotSpecified:    *target = kIGCNotSpecified; break;
+  case IGC_sRGB:            *target = kIGCsRGB;   break;
+  default:
+    DLOGE("Unsupported IGC: %d", source);
     return kErrorNotSupported;
   }
 
@@ -1275,7 +1287,13 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
   }
 
   if (meta_data->operation & UPDATE_COLOR_SPACE) {
-    if (SetColorSpace(meta_data->colorSpace, &layer->color_space) != kErrorNone) {
+    if (SetCSC(meta_data->colorSpace, &layer->csc) != kErrorNone) {
+      return kErrorNotSupported;
+    }
+  }
+
+  if (meta_data->operation & SET_IGC) {
+    if (SetIGC(meta_data->igc, &layer->igc) != kErrorNone) {
       return kErrorNotSupported;
     }
   }

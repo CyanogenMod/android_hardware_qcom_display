@@ -228,14 +228,14 @@ struct HWPipeInfo {
   uint8_t horizontal_decimation = 0;
   uint8_t vertical_decimation = 0;
   ScaleData scale_data;
-  bool valid = false;
   uint32_t z_order = 0;
+  bool set_igc = false;
+  bool valid = false;
 
   void Reset() { *this = HWPipeInfo(); }
 };
 
 struct HWLayerConfig {
-  bool use_non_dma_pipe = false;  // set by client
   HWPipeInfo left_pipe;           // pipe for left side of output
   HWPipeInfo right_pipe;          // pipe for right side of output
   HWRotatorSession hw_rotator_session;

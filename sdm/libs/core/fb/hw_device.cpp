@@ -224,7 +224,10 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         SetRect(pipe_info->src_roi, &mdp_layer.src_rect);
         SetRect(pipe_info->dst_roi, &mdp_layer.dst_rect);
         SetMDPFlags(layer, is_rotator_used, is_cursor_pipe_used, &mdp_layer.flags);
-        SetColorSpace(layer.color_space, &mdp_layer.color_space);
+        SetCSC(layer.csc, &mdp_layer.color_space);
+        if (pipe_info->set_igc) {
+          SetIGC(layer, mdp_layer_count);
+        }
         mdp_layer.bg_color = layer.solid_fill_color;
 
         if (pipe_info->scale_data.enable_pixel_ext) {
@@ -874,6 +877,8 @@ void HWDevice::ResetDisplayParams() {
   memset(&mdp_in_layers_, 0, sizeof(mdp_in_layers_));
   memset(&mdp_out_layer_, 0, sizeof(mdp_out_layer_));
   memset(&scale_data_, 0, sizeof(scale_data_));
+  memset(&pp_params_, 0, sizeof(pp_params_));
+  memset(&igc_lut_data_, 0, sizeof(igc_lut_data_));
 
   for (uint32_t i = 0; i < kMaxSDELayers * 2; i++) {
     mdp_in_layers_[i].buffer.fence = -1;
@@ -917,12 +922,36 @@ void HWDevice::SetHWScaleData(const ScaleData &scale, uint32_t index) {
   }
 }
 
-void HWDevice::SetColorSpace(LayerColorSpace source, mdp_color_space *color_space) {
+void HWDevice::SetCSC(LayerCSC source, mdp_color_space *color_space) {
   switch (source) {
-  case kLimitedRange601:    *color_space = MDP_CSC_ITU_R_601;      break;
-  case kFullRange601:       *color_space = MDP_CSC_ITU_R_601_FR;   break;
-  case kLimitedRange709:    *color_space = MDP_CSC_ITU_R_709;      break;
+  case kCSCLimitedRange601:    *color_space = MDP_CSC_ITU_R_601;      break;
+  case kCSCFullRange601:       *color_space = MDP_CSC_ITU_R_601_FR;   break;
+  case kCSCLimitedRange709:    *color_space = MDP_CSC_ITU_R_709;      break;
   }
+}
+
+void HWDevice::SetIGC(const Layer &layer, uint32_t index) {
+  mdp_input_layer &mdp_layer = mdp_in_layers_[index];
+  mdp_overlay_pp_params &pp_params = pp_params_[index];
+  mdp_igc_lut_data_v1_7 &igc_lut_data = igc_lut_data_[index];
+
+  switch (layer.igc) {
+  case kIGCsRGB:
+    igc_lut_data.table_fmt = mdp_igc_srgb;
+    pp_params.igc_cfg.ops = MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;
+    break;
+
+  default:
+    pp_params.igc_cfg.ops = MDP_PP_OPS_DISABLE;
+    break;
+  }
+
+  pp_params.config_ops = MDP_OVERLAY_PP_IGC_CFG;
+  pp_params.igc_cfg.version = mdp_igc_v1_7;
+  pp_params.igc_cfg.cfg_payload = &igc_lut_data;
+
+  mdp_layer.pp_info = &pp_params;
+  mdp_layer.flags |= MDP_LAYER_PP;
 }
 
 DisplayError HWDevice::SetCursorPosition(HWLayers *hw_layers, int x, int y) {

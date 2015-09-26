@@ -108,7 +108,8 @@ class HWDevice : public HWInterface {
   mdp_scale_data* GetScaleDataRef(uint32_t index) { return &scale_data_[index]; }
   void SetHWScaleData(const ScaleData &scale, uint32_t index);
   void ResetDisplayParams();
-  void SetColorSpace(LayerColorSpace source, mdp_color_space *color_space);
+  void SetCSC(LayerCSC source, mdp_color_space *color_space);
+  void SetIGC(const Layer &layer, uint32_t index);
 
   bool EnableHotPlugDetection(int enable);
   ssize_t SysFsWrite(char* file_node, char* value, ssize_t length);
@@ -127,6 +128,8 @@ class HWDevice : public HWInterface {
   mdp_layer_commit mdp_disp_commit_;
   mdp_input_layer mdp_in_layers_[kMaxSDELayers * 2];   // split panel (left + right)
   mdp_scale_data scale_data_[kMaxSDELayers * 2];
+  mdp_overlay_pp_params pp_params_[kMaxSDELayers * 2];
+  mdp_igc_lut_data_v1_7 igc_lut_data_[kMaxSDELayers * 2];
   mdp_output_layer mdp_out_layer_;
   const char *device_name_;
   bool synchronous_commit_;

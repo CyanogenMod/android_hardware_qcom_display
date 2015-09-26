@@ -99,6 +99,9 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
         case LINEAR_FORMAT:
             data->linearFormat = *((uint32_t *)param);
             break;
+        case SET_IGC:
+            data->igc = *((IGC_t *)param);
+            break;
         default:
             ALOGE("Unknown paramType %d", paramType);
             break;
