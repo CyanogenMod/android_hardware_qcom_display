@@ -81,14 +81,13 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
     DLOGE("HWResourceInfo pointer in invalid.");
     return kErrorParameters;
   }
-  const char *kHWCapabilitiesPath = "/sys/devices/virtual/graphics/fb";
+  const char *fb_path = "/sys/devices/virtual/graphics/fb";
   FILE *fileptr = NULL;
   char stringbuffer[kMaxStringLength];
   uint32_t token_count = 0;
   const uint32_t max_count = 10;
   char *tokens[max_count] = { NULL };
-  snprintf(stringbuffer , sizeof(stringbuffer), "%s%d/mdp/caps",
-           kHWCapabilitiesPath, kHWCapabilitiesNode);
+  snprintf(stringbuffer , sizeof(stringbuffer), "%s%d/mdp/caps", fb_path, kHWCapabilitiesNode);
   fileptr = Sys::fopen_(stringbuffer, "r");
 
   if (!fileptr) {
@@ -159,8 +158,6 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
             hw_resource->is_src_split = true;
           } else if (!strncmp(tokens[i], "non_scalar_rgb", strlen("non_scalar_rgb"))) {
             hw_resource->has_non_scalar_rgb = true;
-          } else if (!strncmp(tokens[i], "rotator_downscale", strlen("rotator_downscale"))) {
-            hw_resource->has_rotator_downscale = true;
           }
         }
       }
@@ -174,9 +171,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->num_vig_pipe, hw_resource->num_dma_pipe, hw_resource->num_cursor_pipe);
   DLOGI("Upscale Ratio = %d, Downscale Ratio = %d, Blending Stages = %d", hw_resource->max_scale_up,
         hw_resource->max_scale_down, hw_resource->num_blending_stages);
-  DLOGI("BWC = %d, UBWC = %d, Decimation = %d, Tile Format = %d, Rotator Downscale = %d",
-        hw_resource->has_bwc, hw_resource->has_ubwc, hw_resource->has_decimation,
-        hw_resource->has_macrotile, hw_resource->has_rotator_downscale);
+  DLOGI("BWC = %d, UBWC = %d, Decimation = %d, Tile Format = %d", hw_resource->has_bwc,
+        hw_resource->has_ubwc, hw_resource->has_decimation, hw_resource->has_macrotile);
   DLOGI("SourceSplit = %d", hw_resource->is_src_split);
   DLOGI("MaxLowBw = %" PRIu64 " , MaxHighBw = % " PRIu64 "", hw_resource->max_bandwidth_low,
         hw_resource->max_bandwidth_high);
@@ -185,6 +181,30 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
   DLOGI("Prefill factors: Tiled_NV12 = %d, Tiled = %d, Linear = %d, Scale = %d, Fudge_factor = %d",
         hw_resource->macrotile_nv12_factor, hw_resource->macrotile_factor,
         hw_resource->linear_factor, hw_resource->scale_factor, hw_resource->extra_fudge_factor);
+
+  const char *rotator_caps_path = "/sys/devices/virtual/rotator/mdss_rotator/caps";
+  snprintf(stringbuffer , sizeof(stringbuffer), "%s", rotator_caps_path);
+  fileptr = Sys::fopen_(stringbuffer, "r");
+
+  if (!fileptr) {
+    DLOGW("File '%s' not found", stringbuffer);
+    return kErrorNone;
+  }
+
+  while ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
+    if (!ParseLine(line, tokens, max_count, &token_count)) {
+      if (!strncmp(tokens[0], "wb_count", strlen("wb_count"))) {
+        hw_resource->num_rotator = UINT8(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "downscale", strlen("downscale"))) {
+        hw_resource->has_rotator_downscale = UINT8(atoi(tokens[1]));
+      }
+    }
+  }
+
+  Sys::fclose_(fileptr);
+
+  DLOGI("ROTATOR = %d, Rotator Downscale = %d", hw_resource->num_rotator,
+        hw_resource->has_rotator_downscale);
 
   return kErrorNone;
 }
