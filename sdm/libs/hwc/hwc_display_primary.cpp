@@ -133,31 +133,28 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
     return 0;
   }
 
-  status = PrepareLayerStack(content_list);
+  status = PrePrepareLayerStack(content_list);
   if (status) {
     return status;
   }
 
-  // Drop invalidate trigger to SurfaceFlinger
-  // if all layers in previous draw cycle were composed using GPU
-  // OR
-  // if all layers were composed using GPU sometime in past and the cached content
-  // is being used currently.
-  handle_refresh_ = false;
-  int app_layer_count = content_list->numHwLayers - 1;
-  if (app_layer_count > 1) {
-    int fb_layer_count = 0;
-    for (int i = 0; i < app_layer_count; i++) {
-      if (content_list->hwLayers[i].compositionType == HWC_FRAMEBUFFER) {
-        fb_layer_count++;
-      }
-    }
+  bool one_updating_layer = SingleLayerUpdating(content_list->numHwLayers - 1);
+  ToggleCPUHint(one_updating_layer);
 
-    if ((fb_layer_count == 0) && !layer_stack_cache_.in_use) {
-      handle_refresh_ = true;
-    } else if (fb_layer_count > 0 && fb_layer_count < app_layer_count) {
-      handle_refresh_ = true;
-    }
+  uint32_t refresh_rate = GetOptimalRefreshRate(one_updating_layer);
+  DisplayError error = display_intf_->SetRefreshRate(refresh_rate);
+  if (error == kErrorNone) {
+    // On success, set current refresh rate to new refresh rate
+    current_refresh_rate_ = refresh_rate;
+  }
+
+  if (handle_idle_timeout_) {
+    handle_idle_timeout_ = false;
+  }
+
+  status = PrepareLayerStack(content_list);
+  if (status) {
+    return status;
   }
 
   return 0;
@@ -192,24 +189,7 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
-  bool one_updating_layer = SingleLayerUpdating(content_list->numHwLayers - 1);
-
-  SetMetadataRefreshRate(one_updating_layer);
-  ToggleCPUHint(one_updating_layer);
-
   return 0;
-}
-
-int HWCDisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
-  DisplayError error = kErrorNone;
-
-  error = display_intf_->SetRefreshRate(refresh_rate);
-  if (error == kErrorNone) {
-    current_refresh_rate_ = refresh_rate;
-    return 0;
-  }
-
-  return -1;
 }
 
 int HWCDisplayPrimary::Perform(uint32_t operation, ...) {
@@ -289,41 +269,31 @@ void HWCDisplayPrimary::SetSecureDisplay(bool secure_display_active) {
   return;
 }
 
-void HWCDisplayPrimary::SetMetadataRefreshRate(bool one_updating_layer) {
-  // return if force_refresh_rate_ is set or metadata_refresh_rate is not enabled
-  if (force_refresh_rate_) {
-    return;
-  }
-
-  uint32_t refresh_rate = max_refresh_rate_;
-  if (use_metadata_refresh_rate_ && one_updating_layer && metadata_refresh_rate_) {
-    refresh_rate = metadata_refresh_rate_;
-  }
-
-  SetRefreshRate(refresh_rate);
-}
-
 void HWCDisplayPrimary::ForceRefreshRate(uint32_t refresh_rate) {
-  if (refresh_rate && (refresh_rate < min_refresh_rate_ || refresh_rate > max_refresh_rate_)) {
-    // Cannot honor force refresh rate, as its beyond the range
+  if ((refresh_rate && (refresh_rate < min_refresh_rate_ || refresh_rate > max_refresh_rate_)) ||
+       force_refresh_rate_ == refresh_rate) {
+    // Cannot honor force refresh rate, as its beyond the range or new request is same
     return;
   }
 
-  uint32_t rate = refresh_rate;
+  const hwc_procs_t *hwc_procs = *hwc_procs_;
   force_refresh_rate_ = refresh_rate;
-  if (refresh_rate == 0) {
-    // refresh rate request of 0 means the client is resetting the forced request rate
-    rate = max_refresh_rate_;
-  }
 
-  int status = SetRefreshRate(rate);
-  if (status) {
-    // failed Reset force_refresh_rate to 0, and restore max refresh rate
-    force_refresh_rate_ = 0;
-    DLOGE("Setting Refresh Rate = %d Failed", refresh_rate);
-  }
+  hwc_procs->invalidate(hwc_procs);
 
   return;
+}
+
+uint32_t HWCDisplayPrimary::GetOptimalRefreshRate(bool one_updating_layer) {
+  if (force_refresh_rate_) {
+    return force_refresh_rate_;
+  } else if (handle_idle_timeout_) {
+    return min_refresh_rate_;
+  } else if (use_metadata_refresh_rate_ && one_updating_layer && metadata_refresh_rate_) {
+    return metadata_refresh_rate_;
+  }
+
+  return max_refresh_rate_;
 }
 
 DisplayError HWCDisplayPrimary::Refresh() {
@@ -334,19 +304,14 @@ DisplayError HWCDisplayPrimary::Refresh() {
     return kErrorParameters;
   }
 
-  if (!handle_refresh_) {
-    error = kErrorNotSupported;
-  }
-
-  if (error == kErrorNone) {
-    hwc_procs->invalidate(hwc_procs);
-  }
-
-  uint32_t refresh_rate = force_refresh_rate_ ? force_refresh_rate_ : min_refresh_rate_;
-
-  SetRefreshRate(refresh_rate);
+  hwc_procs->invalidate(hwc_procs);
+  handle_idle_timeout_ = true;
 
   return error;
+}
+
+void HWCDisplayPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
+  display_intf_->SetIdleTimeoutMs(timeout_ms);
 }
 
 }  // namespace sdm

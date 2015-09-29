@@ -57,10 +57,7 @@ DisplayError DisplayPrimary::Init() {
     return error;
   }
 
-  // Idle fallback feature is supported only for video mode panel.
-  if (hw_panel_info_.mode == kModeVideo) {
-    hw_intf_->SetIdleTimeoutMs(Debug::GetIdleTimeoutMs());
-  }
+  idle_timeout_ms_ = Debug::GetIdleTimeoutMs();
 
   if (hw_panel_info_.mode == kModeCommand && Debug::IsVideoModeEnabled()) {
     error = hw_intf_->SetDisplayMode(kModeVideo);
@@ -94,6 +91,8 @@ DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
   HWDisplayAttributes display_attributes;
   uint32_t active_index = 0;
 
+  bool set_idle_timeout = comp_manager_->CanSetIdleTimeout(display_comp_ctx_);
+
   error = DisplayBase::Commit(layer_stack);
   if (error != kErrorNone) {
     return error;
@@ -106,6 +105,10 @@ DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
   if (panel_info != hw_panel_info_) {
     error = comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, panel_info);
     hw_panel_info_ = panel_info;
+  }
+
+  if (set_idle_timeout && hw_panel_info_.mode != kModeCommand) {
+    hw_intf_->SetIdleTimeoutMs(idle_timeout_ms_);
   }
 
   return error;
@@ -187,10 +190,12 @@ DisplayError DisplayPrimary::SetVSyncState(bool enable) {
 
 void DisplayPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
   SCOPE_LOCK(locker_);
+
   // Idle fallback feature is supported only for video mode panel.
   if (hw_panel_info_.mode == kModeVideo) {
     hw_intf_->SetIdleTimeoutMs(timeout_ms);
   }
+  idle_timeout_ms_ = timeout_ms;
 }
 
 DisplayError DisplayPrimary::SetMaxMixerStages(uint32_t max_mixer_stages) {
@@ -241,7 +246,7 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
   }
 
   if (hw_display_mode == kModeVideo) {
-    hw_intf_->SetIdleTimeoutMs(Debug::GetIdleTimeoutMs());
+    hw_intf_->SetIdleTimeoutMs(idle_timeout_ms_);
   } else if (hw_display_mode == kModeCommand) {
     hw_intf_->SetIdleTimeoutMs(0);
   }
@@ -335,9 +340,9 @@ DisplayError DisplayPrimary::Blank(bool blank) {
 }
 
 void DisplayPrimary::IdleTimeout() {
-  if (event_handler_->Refresh() == kErrorNone) {
-    comp_manager_->ProcessIdleTimeout(display_comp_ctx_);
-  }
+  event_handler_->Refresh();
+  comp_manager_->ProcessIdleTimeout(display_comp_ctx_);
+  hw_intf_->SetIdleTimeoutMs(0);
 }
 
 void DisplayPrimary::ThermalEvent(int64_t thermal_level) {

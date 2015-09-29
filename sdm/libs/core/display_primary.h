@@ -71,6 +71,7 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
 
  private:
   Locker locker_;
+  uint32_t idle_timeout_ms_ = 0;
 };
 
 }  // namespace sdm

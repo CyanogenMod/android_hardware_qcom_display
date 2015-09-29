@@ -46,10 +46,10 @@ class HWCDisplayPrimary : public HWCDisplay {
   virtual int Init();
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
-  virtual int SetRefreshRate(uint32_t refresh_rate);
   virtual int Perform(uint32_t operation, ...);
   virtual void SetSecureDisplay(bool secure_display_active);
   virtual DisplayError Refresh();
+  virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
 
  private:
   HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
@@ -58,10 +58,11 @@ class HWCDisplayPrimary : public HWCDisplay {
   void ProcessBootAnimCompleted();
   void SetQDCMSolidFillInfo(bool enable, uint32_t color);
   void ToggleCPUHint(bool set);
-  void SetMetadataRefreshRate(bool one_updating_layer);
   void ForceRefreshRate(uint32_t refresh_rate);
+  uint32_t GetOptimalRefreshRate(bool one_updating_layer);
 
   CPUHint *cpu_hint_;
+  bool handle_idle_timeout_ = false;
 };
 
 }  // namespace sdm

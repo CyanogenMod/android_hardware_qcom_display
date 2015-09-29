@@ -98,6 +98,11 @@ int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
     return 0;
   }
 
+  status = PrePrepareLayerStack(content_list);
+  if (status) {
+    return status;
+  }
+
   status = PrepareLayerStack(content_list);
   if (status) {
     return status;

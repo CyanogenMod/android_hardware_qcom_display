@@ -547,7 +547,7 @@ void HWPrimary::HandleThermal(char *data) {
 void HWPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
   char node_path[kMaxStringLength] = {0};
 
-  DLOGI("Setting idle timeout to = %d ms", timeout_ms);
+  DLOGI_IF(kTagDriverConfig, "Setting idle timeout to = %d ms", timeout_ms);
 
   snprintf(node_path, sizeof(node_path), "%s%d/idle_time", fb_path_, fb_node_index_);
 
