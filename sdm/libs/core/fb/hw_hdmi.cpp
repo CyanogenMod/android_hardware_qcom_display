@@ -483,6 +483,7 @@ DisplayError HWHDMI::ReadTimingInfo() {
   while (true) {
     char config_buffer[kPageSize] = {0};
     msm_hdmi_mode_timing_info *info = reinterpret_cast<msm_hdmi_mode_timing_info *>(config_buffer);
+    RequestNewPage(page_number);
 
     if (!ReadResolutionFile(config_buffer)) {
       break;
@@ -508,7 +509,6 @@ DisplayError HWHDMI::ReadTimingInfo() {
     // Request HDMI driver to populate res_info with more
     // timing information
     page_number++;
-    RequestNewPage(page_number);
   }
 
   if (page_number == MSM_HDMI_INIT_RES_PAGE || config_index == 0) {

@@ -29,6 +29,7 @@
 
 #include <cutils/properties.h>
 #include <utils/constants.h>
+#include <utils/debug.h>
 
 #include "hwc_display_external.h"
 #include "hwc_debugger.h"
@@ -53,7 +54,7 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
   hwc_display_external->GetPanelResolution(&external_width, &external_height);
 
   int downscale_enabled = 0;
-  HWCDebugHandler::Get()->GetProperty("sdm.debug.sde_downscale_external", &downscale_enabled);
+  HWCDebugHandler::Get()->GetProperty("sdm.debug.downscale_external", &downscale_enabled);
   if (downscale_enabled) {
     GetDownscaleResolution(primary_width, primary_height, &external_width, &external_height);
   }

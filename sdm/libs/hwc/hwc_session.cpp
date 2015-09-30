@@ -41,6 +41,7 @@
 #include <gr.h>
 #include <gralloc_priv.h>
 #include <display_config.h>
+#include <utils/debug.h>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
@@ -559,8 +560,9 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
   case qService::IQService::SET_DISPLAY_MODE:
     status = SetDisplayMode(input_parcel);
     break;
+
   case qService::IQService::SET_SECONDARY_DISPLAY_STATUS:
-    status = SetSecondaryDisplayStatus(input_parcel);
+    status = SetSecondaryDisplayStatus(input_parcel, output_parcel);
     break;
 
   case qService::IQService::CONFIGURE_DYN_REFRESH_RATE:
@@ -608,6 +610,10 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
 
   case qService::IQService::SET_PANEL_BRIGHTNESS:
     status = SetPanelBrightness(input_parcel, output_parcel);
+    break;
+
+  case qService::IQService::GET_DISPLAY_VISIBLE_REGION:
+    status = GetVisibleDisplayRect(input_parcel, output_parcel);
     break;
 
   default:
@@ -803,17 +809,28 @@ android::status_t HWCSession::HandleGetDisplayAttributesForConfig(const android:
   return error;
 }
 
-android::status_t HWCSession::SetSecondaryDisplayStatus(const android::Parcel *input_parcel) {
+android::status_t HWCSession::SetSecondaryDisplayStatus(const android::Parcel *input_parcel,
+                                                        android::Parcel *output_parcel) {
+  int ret = -EINVAL;
+
   uint32_t display_id = UINT32(input_parcel->readInt32());
   uint32_t display_status = UINT32(input_parcel->readInt32());
 
-  DLOGI("Display %d Status %d", display_id, display_status);
-  if (display_id < HWC_DISPLAY_EXTERNAL || display_id > HWC_DISPLAY_VIRTUAL) {
-    DLOGW("Not supported for display %d", display_id);
-    return -EINVAL;
+  DLOGI("Display = %d, Status = %d", display_id, display_status);
+
+  if (display_id >= HWC_NUM_DISPLAY_TYPES) {
+    DLOGE("Invalid display_id");
+  } else if (display_id == HWC_DISPLAY_PRIMARY) {
+    DLOGE("Not supported for this display");
+  } else if (!hwc_display_[display_id]) {
+    DLOGW("Display is not connected");
+  } else {
+    ret = hwc_display_[display_id]->SetDisplayStatus(display_status);
   }
 
-  return hwc_display_[display_id]->SetDisplayStatus(display_status);
+  output_parcel->writeInt32(ret);
+
+  return ret;
 }
 
 android::status_t HWCSession::ConfigureRefreshRate(const android::Parcel *input_parcel) {
@@ -1025,10 +1042,13 @@ android::status_t HWCSession::OnMinHdcpEncryptionLevelChange(const android::Parc
   uint32_t display_id = UINT32(input_parcel->readInt32());
 
   DLOGI("Display %d", display_id);
-  if (display_id != HWC_DISPLAY_EXTERNAL) {
-    DLOGW("Not supported for display %d", display_id);
+
+  if (display_id >= HWC_NUM_DISPLAY_TYPES) {
+    DLOGE("Invalid display_id");
+  } else if (display_id != HWC_DISPLAY_EXTERNAL) {
+    DLOGE("Not supported for display");
   } else if (!hwc_display_[display_id]) {
-    DLOGE("Display %d is not connected", display_id);
+    DLOGW("Display is not connected");
   } else {
     ret = hwc_display_[display_id]->OnMinHdcpEncryptionLevelChange();
   }
@@ -1202,6 +1222,32 @@ void HWCSession::HandleSecureDisplaySession(hwc_display_contents_1_t **displays)
       hwc_display_[dpy]->SetSecureDisplay(secure_display_active_);
     }
   }
+}
+
+android::status_t HWCSession::GetVisibleDisplayRect(const android::Parcel *input_parcel,
+                                                    android::Parcel *output_parcel) {
+  int dpy = input_parcel->readInt32();
+
+  if (dpy < HWC_DISPLAY_PRIMARY || dpy > HWC_DISPLAY_VIRTUAL) {
+    return android::BAD_VALUE;;
+  }
+
+  if (!hwc_display_[dpy]) {
+    return android::NO_INIT;
+  }
+
+  hwc_rect_t visible_rect = {0, 0, 0, 0};
+  int error = hwc_display_[dpy]->GetVisibleDisplayRect(&visible_rect);
+  if (error < 0) {
+    return error;
+  }
+
+  output_parcel->writeInt32(visible_rect.left);
+  output_parcel->writeInt32(visible_rect.top);
+  output_parcel->writeInt32(visible_rect.right);
+  output_parcel->writeInt32(visible_rect.bottom);
+
+  return android::NO_ERROR;
 }
 
 }  // namespace sdm
