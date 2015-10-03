@@ -50,7 +50,7 @@ class ResourceDefault : public ResourceInterface {
   virtual void Purge(Handle display_ctx);
   virtual DisplayError SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages);
   virtual DisplayError ValidateScaling(const LayerRect &crop, const LayerRect &dst,
-                                       bool rotate90, bool ubwc_tiled);
+                                       bool rotate90, bool ubwc_tiled, bool use_rotator_downscale);
   DisplayError ValidateCursorConfig(Handle display_ctx, const Layer& layer, bool is_top);
   DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers, int x, int y);
 
@@ -84,7 +84,7 @@ class ResourceDefault : public ResourceInterface {
 
   // todo: retrieve all these from kernel
   enum {
-    kMaxDecimationDownScaleRatio = 8,
+    kMaxDecimationDownScaleRatio = 16,
   };
 
   struct SourcePipe {
