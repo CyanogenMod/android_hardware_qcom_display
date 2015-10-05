@@ -387,36 +387,10 @@ class PPFeaturesConfig {
 
   // Once all features are consumed, destroy/release all TFeatureInfo<T> on the list,
   // then clear dirty_ flag and return the lock to the TFeatureInfo<T> producer.
-  inline void Reset() {
-    for (int i = 0; i < kMaxNumPPFeatures; i++) {
-      if (feature_[i]) {
-        delete feature_[i];
-        feature_[i] = NULL;
-      }
-    }
-    dirty_ = false;
-    next_idx_ = 0;
-  }
+  void Reset();
 
   // Consumer to call this to retrieve all the TFeatureInfo<T> on the list to be programmed.
-  inline DisplayError RetrieveNextFeature(PPFeatureInfo **feature) {
-    DisplayError ret = kErrorNone;
-    int i(0);
-
-    for (i = next_idx_; i < kMaxNumPPFeatures; i++) {
-      if (feature_[i]) {
-        *feature = feature_[i];
-        next_idx_ = i + 1;
-        break;
-      }
-    }
-    if (i == kMaxNumPPFeatures) {
-      ret = kErrorParameters;
-      next_idx_ = 0;
-    }
-
-    return ret;
-  }
+  DisplayError RetrieveNextFeature(PPFeatureInfo **feature);
 
   inline bool IsDirty() { return dirty_; }
   inline void MarkAsDirty() { dirty_ = true; }

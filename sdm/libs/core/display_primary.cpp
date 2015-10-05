@@ -148,7 +148,18 @@ bool DisplayPrimary::IsUnderscanSupported() {
 
 DisplayError DisplayPrimary::SetDisplayState(DisplayState state) {
   SCOPE_LOCK(locker_);
-  return DisplayBase::SetDisplayState(state);
+  DisplayError error = kErrorNone;
+  error = DisplayBase::SetDisplayState(state);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  // Set vsync enable state to false, as driver disables vsync during display power off.
+  if (state == kStateOff) {
+    vsync_enable_ = false;
+  }
+
+  return kErrorNone;
 }
 
 DisplayError DisplayPrimary::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {

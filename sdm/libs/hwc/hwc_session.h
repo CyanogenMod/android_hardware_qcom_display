@@ -80,7 +80,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   int GetEventValue(const char *uevent_data, int length, const char *event_info);
   int HotPlugHandler(bool connected);
   void ResetPanel();
-  int HandleVirtualDisplayLifeCycle(hwc_display_contents_1_t *content_list);
+  void HandleVirtualDisplayLifeCycle(hwc_display_contents_1_t *content_list);
   void HandleSecureDisplaySession(hwc_display_contents_1_t **displays);
 
   // QClient methods
@@ -117,6 +117,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
                                           android::Parcel *output_parcel);
 
   static Locker locker_;
+  static Locker concurrency_locker_;
   CoreInterface *core_intf_ = NULL;
   hwc_procs_t hwc_procs_default_;
   hwc_procs_t const *hwc_procs_ = &hwc_procs_default_;

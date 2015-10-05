@@ -164,22 +164,6 @@ struct HWSessionConfig {
   bool secure = false;
   bool cache = false;
   uint32_t frame_rate = 0;
-
-  bool operator != (const HWSessionConfig &input_config) const {
-    if ((src_width != input_config.src_width) || (src_height != input_config.src_height) ||
-        (src_format != input_config.src_format) || (dst_width != input_config.dst_width) ||
-        (dst_height != input_config.dst_height) || (dst_format != input_config.dst_format) ||
-        (buffer_count != input_config.buffer_count) || (secure != input_config.secure) ||
-        (cache != input_config.cache) || (frame_rate != input_config.frame_rate)) {
-      return true;
-    }
-
-    return false;
-  }
-
-  bool operator == (const HWSessionConfig &input_config) const {
-    return !(operator != (input_config));
-  }
 };
 
 struct HWRotateInfo {
