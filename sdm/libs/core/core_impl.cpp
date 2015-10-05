@@ -206,5 +206,11 @@ DisplayError CoreImpl::DestroyDisplay(DisplayInterface *intf) {
   return kErrorNone;
 }
 
+DisplayError CoreImpl::SetMaxBandwidthMode(HWBwModes mode) {
+  SCOPE_LOCK(locker_);
+
+  return comp_mgr_.SetMaxBandwidthMode(mode);
+}
+
 }  // namespace sdm
 

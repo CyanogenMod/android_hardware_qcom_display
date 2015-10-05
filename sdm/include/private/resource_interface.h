@@ -51,6 +51,7 @@ class ResourceInterface {
                                             bool is_top) = 0;
   virtual DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers,
                                               int x, int y) = 0;
+  virtual DisplayError SetMaxBandwidthMode(HWBwModes mode) = 0;
 
  protected:
   virtual ~ResourceInterface() { }

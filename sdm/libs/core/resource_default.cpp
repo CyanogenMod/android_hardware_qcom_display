@@ -917,6 +917,10 @@ DisplayError ResourceDefault::ValidateCursorPosition(Handle display_ctx, HWLayer
   return kErrorNotSupported;
 }
 
+DisplayError ResourceDefault::SetMaxBandwidthMode(HWBwModes mode) {
+  return kErrorNotSupported;
+}
+
 bool ResourceDefault::IsUBWCFormat(LayerBufferFormat format) {
   switch (format) {
   case kFormatRGBA8888Ubwc:

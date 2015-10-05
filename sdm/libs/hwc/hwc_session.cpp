@@ -42,6 +42,7 @@
 #include <gralloc_priv.h>
 #include <display_config.h>
 #include <utils/debug.h>
+#include <sync/sync.h>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
@@ -74,7 +75,6 @@ hwc_module_t HAL_MODULE_INFO_SYM = {
 namespace sdm {
 
 Locker HWCSession::locker_;
-bool HWCSession::reset_panel_ = false;
 
 static void Invalidate(const struct hwc_procs *procs) {
 }
@@ -246,9 +246,13 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
 
     hwc_procs = hwc_session->hwc_procs_;
 
-    if (reset_panel_) {
+    if (hwc_session->reset_panel_) {
       DLOGW("panel is in bad state, resetting the panel");
       hwc_session->ResetPanel();
+    }
+
+    if (hwc_session->need_invalidate_) {
+      hwc_procs->invalidate(hwc_procs);
     }
 
     hwc_session->HandleSecureDisplaySession(displays);
@@ -359,6 +363,15 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
     if (hwc_session->hwc_display_[dpy]) {
       hwc_session->hwc_display_[dpy]->Commit(content_list);
     }
+  }
+
+  if (hwc_session->new_bw_mode_) {
+    hwc_display_contents_1_t *content_list = displays[HWC_DISPLAY_PRIMARY];
+    hwc_session->new_bw_mode_ = false;
+    if (hwc_session->bw_mode_release_fd_ >= 0) {
+      close(hwc_session->bw_mode_release_fd_);
+    }
+    hwc_session->bw_mode_release_fd_ = dup(content_list->retireFenceFd);
   }
 
   // Return 0, else client will go into bad state
@@ -678,6 +691,14 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     status = GetVisibleDisplayRect(input_parcel, output_parcel);
     break;
 
+  case qService::IQService::SET_CAMERA_STATUS:
+    status = SetDynamicBWForCamera(input_parcel, output_parcel);
+    break;
+
+  case qService::IQService::GET_BW_TRANSACTION_STATUS:
+    status = GetBWTransactionStatus(input_parcel, output_parcel);
+    break;
+
   default:
     DLOGW("QService command = %d is not supported", command);
     return -EINVAL;
@@ -954,6 +975,41 @@ android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_par
         return -EINVAL;
       }
     }
+  }
+
+  return 0;
+}
+
+android::status_t HWCSession::SetDynamicBWForCamera(const android::Parcel *input_parcel,
+                                                    android::Parcel *output_parcel) {
+  DisplayError error = kErrorNone;
+  uint32_t camera_status = UINT32(input_parcel->readInt32());
+  HWBwModes mode = camera_status > 0 ? kBwCamera : kBwDefault;
+
+  // trigger invalidate to apply new bw caps.
+  hwc_procs_->invalidate(hwc_procs_);
+
+    error = core_intf_->SetMaxBandwidthMode(mode);
+  if (error != kErrorNone) {
+      return -EINVAL;
+  }
+
+  new_bw_mode_ = true;
+  need_invalidate_ = true;
+
+  return 0;
+}
+
+android::status_t HWCSession::GetBWTransactionStatus(const android::Parcel *input_parcel,
+                                                     android::Parcel *output_parcel)  {
+  bool state = true;
+
+  if (hwc_display_[HWC_DISPLAY_PRIMARY]) {
+    if (sync_wait(bw_mode_release_fd_, 0) < 0) {
+      DLOGI("bw_transaction_release_fd is not yet signalled: err= %s", strerror(errno));
+      state = false;
+    }
+    output_parcel->writeInt32(state);
   }
 
   return 0;

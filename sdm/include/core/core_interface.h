@@ -76,6 +76,18 @@ namespace sdm {
 */
 class DebugHandler;
 
+/*! @brief This enum represents max bandwidth limit mode.
+
+  @sa DisplayInterface::SetMaxBandwidthMode
+*/
+enum HWBwModes {
+  kBwDefault,      //!< Default state. No change in device bandwidth limit.
+  kBwCamera,       //!< Camera is on. Bandwidth limit should be reduced accordingly.
+  kBwVFlip,        //!< VFlip is required. Reduce bandwidth limit accordingly.
+  kBwHFlip,        //!< HFlip is required.  Reduce bandwidth limit accordingly.
+  kBwModeMax,      //!< Limiter for maximum available bandwidth modes.
+};
+
 /*! @brief Display core interface.
 
   @details This class defines display core interfaces. It contains methods which client shall use
@@ -150,6 +162,16 @@ class CoreInterface {
     @sa CreateDisplay
   */
   virtual DisplayError DestroyDisplay(DisplayInterface *interface) = 0;
+
+  /*! @brief Method to update the bandwidth limit as per given mode.
+
+    @param[in] mode indicate the mode or use case
+
+    @return \link DisplayError \endlink
+
+   */
+    virtual DisplayError SetMaxBandwidthMode(HWBwModes mode) = 0;
+
 
  protected:
   virtual ~CoreInterface() { }
