@@ -118,6 +118,15 @@ class DebugHandler {
   */
   virtual DisplayError GetProperty(const char *property_name, int *value) = 0;
 
+  /*! @brief Method to get property value corresponding to give string.
+
+   @param[in] property_name name of the property
+   @param[out] string value corresponding to the property name
+
+   @return \link DisplayError \endlink
+  */
+  virtual DisplayError GetProperty(const char *property_name, char *value) = 0;
+
  protected:
   virtual ~DebugHandler() { }
 };

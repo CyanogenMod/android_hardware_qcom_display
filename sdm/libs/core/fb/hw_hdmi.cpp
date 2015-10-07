@@ -107,6 +107,9 @@ HWHDMI::HWHDMI(BufferSyncHandler *buffer_sync_handler,  HWInfoInterface *hw_info
 DisplayError HWHDMI::Init(HWEventHandler *eventhandler) {
   DisplayError error = kErrorNone;
 
+  SetSourceProductInformation("vendor_name", "ro.product.manufacturer");
+  SetSourceProductInformation("product_description", "ro.product.name");
+
   error = HWDevice::Init(eventhandler);
   if (error != kErrorNone) {
     return error;
@@ -528,6 +531,27 @@ bool HWHDMI::IsResolutionFilePresent() {
   }
 
   return is_file_present;
+}
+
+void HWHDMI::SetSourceProductInformation(const char *node, const char *name) {
+  char property_value[kMaxStringLength];
+  char sys_fs_path[kMaxStringLength];
+  int hdmi_node_index = GetFBNodeIndex(kDeviceHDMI);
+  if (hdmi_node_index < 0) {
+    return;
+  }
+
+  ssize_t length = 0;
+  bool prop_read_success = Debug::GetProperty(name, property_value);
+  if (!prop_read_success) {
+    return;
+  }
+
+  snprintf(sys_fs_path , sizeof(sys_fs_path), "%s%d/%s", fb_path_, hdmi_node_index, node);
+  length = HWDevice::SysFsWrite(sys_fs_path, property_value, strlen(property_value));
+  if (length <= 0) {
+    DLOGW("Failed to write %s = %s", node, property_value);
+  }
 }
 
 }  // namespace sdm

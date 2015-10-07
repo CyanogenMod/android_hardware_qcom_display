@@ -111,6 +111,7 @@ class HWDevice : public HWInterface {
   void SetColorSpace(LayerColorSpace source, mdp_color_space *color_space);
 
   bool EnableHotPlugDetection(int enable);
+  ssize_t SysFsWrite(char* file_node, char* value, ssize_t length);
 
   // Store the Device EventHandler - used for callback
   HWEventHandler *event_handler_;

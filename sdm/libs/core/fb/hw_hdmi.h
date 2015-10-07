@@ -62,6 +62,7 @@ class HWHDMI : public HWDevice {
   DisplayError ReadTimingInfo();
   bool ReadResolutionFile(char *config_buffer);
   bool IsResolutionFilePresent();
+  void SetSourceProductInformation(const char *node, const char *name);
 
   uint32_t hdmi_mode_count_;
   uint32_t hdmi_modes_[256];

@@ -72,6 +72,7 @@ class Debug {
   static bool IsRotatorSplitDisabled();
   static bool IsScalarDisabled();
   static bool IsUbwcTiledFrameBuffer();
+  static bool GetProperty(const char *property_name, char *value);
 
  private:
   Debug();
@@ -89,6 +90,9 @@ class Debug {
                             const char */*custom_string*/) { }
     virtual void EndTrace() { }
     virtual DisplayError GetProperty(const char */*property_name*/, int */*value*/) {
+      return kErrorNotSupported;
+    }
+    virtual DisplayError GetProperty(const char */*property_name*/, char */*value*/) {
       return kErrorNotSupported;
     }
   };

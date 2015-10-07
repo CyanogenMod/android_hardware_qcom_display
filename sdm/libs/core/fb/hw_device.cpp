@@ -852,7 +852,6 @@ int HWDevice::ParseLine(char *input, char *tokens[], const uint32_t max_token, u
 }
 
 bool HWDevice::EnableHotPlugDetection(int enable) {
-  bool ret_value = true;
   char hpdpath[kMaxStringLength];
   int hdmi_node_index = GetFBNodeIndex(kDeviceHDMI);
   if (hdmi_node_index < 0) {
@@ -860,22 +859,14 @@ bool HWDevice::EnableHotPlugDetection(int enable) {
   }
 
   snprintf(hpdpath , sizeof(hpdpath), "%s%d/hpd", fb_path_, hdmi_node_index);
-  int hpdfd = Sys::open_(hpdpath, O_RDWR, 0);
-  if (hpdfd < 0) {
-    DLOGW("Open failed = %s", hpdpath);
+
+  char value = enable ? '1' : '0';
+  ssize_t length = SysFsWrite(hpdpath, &value, sizeof(value));
+  if (length <= 0) {
     return false;
   }
 
-  char value = enable ? '1' : '0';
-  ssize_t length = Sys::pwrite_(hpdfd, &value, 1, 0);
-  if (length <= 0) {
-    DLOGE("Write failed 'hpd' = %d", enable);
-    ret_value = false;
-  }
-
-  Sys::close_(hpdfd);
-
-  return ret_value;
+  return true;
 }
 
 void HWDevice::ResetDisplayParams() {
@@ -1010,6 +1001,21 @@ DisplayError HWDevice::OnMinHdcpEncryptionLevelChange() {
 
 DisplayError HWDevice::GetPanelBrightness(int *level) {
   return kErrorNotSupported;
+}
+
+ssize_t HWDevice::SysFsWrite(char* file_node, char* value, ssize_t length) {
+  int fd = Sys::open_(file_node, O_RDWR, 0);
+  if (fd < 0) {
+    DLOGW("Open failed = %s", file_node);
+    return -1;
+  }
+  ssize_t len = Sys::pwrite_(fd, value, length, 0);
+  if (length <= 0) {
+    DLOGE("Write failed for path %s with value %s", file_node, value);
+  }
+  Sys::close_(fd);
+
+  return len;
 }
 
 }  // namespace sdm
