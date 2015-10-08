@@ -1757,6 +1757,16 @@ void hwc_sync_rotator(hwc_context_t *ctx, hwc_display_contents_1_t* list,
     }
 }
 
+bool isLayerMarkedForHWRotator(hwc_context_t *ctx,
+        hwc_layer_1_t* layer, int dpy) {
+    for(uint32_t i = 0; i < ctx->mLayerRotMap[dpy]->getCount(); i++) {
+        hwc_layer_1_t* rotLayer = ctx->mLayerRotMap[dpy]->getLayer(i);
+        if(layer->handle == rotLayer->handle)
+            return true;
+    }
+    return false;
+}
+
 int hwc_sync_mdss(hwc_context_t *ctx, hwc_display_contents_1_t *list, int dpy,
         bool isExtAnimating, int fd) {
     ATRACE_CALL();
@@ -1834,7 +1844,8 @@ int hwc_sync_mdss(hwc_context_t *ctx, hwc_display_contents_1_t *list, int dpy,
                 // Release all the app layer fds immediately,
                 // if animation is in progress.
                 list->hwLayers[i].releaseFenceFd = -1;
-            } else if(list->hwLayers[i].releaseFenceFd < 0 ) {
+            } else if(list->hwLayers[i].releaseFenceFd < 0 &&
+                    !isLayerMarkedForHWRotator(ctx, &list->hwLayers[i], dpy)) {
 #ifdef QTI_BSP
                 //If rotator has not already populated this field
                 // & if it's a not VPU layer
