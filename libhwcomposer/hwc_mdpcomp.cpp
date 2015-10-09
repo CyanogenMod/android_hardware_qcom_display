@@ -264,6 +264,7 @@ void MDPComp::timeout_handler(void *udata) {
                refresh-rate should be set to the minfps supported by panel as
                part of idle-fallback */
             uint32_t refreshRate = mdpHw.getMinFpsSupported();
+            readRefreshRate(ctx, dpy);
             if((refreshRate != ctx->dpyAttr[dpy].dynRefreshRate) &&
                ctx->dpyAttr[dpy].isActive) {
                 setRefreshRate(ctx, dpy, refreshRate);
