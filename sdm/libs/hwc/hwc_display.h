@@ -126,6 +126,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual DisplayError Refresh();
 
   virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
+  virtual int PrePrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PostCommitLayerStack(hwc_display_contents_1_t *content_list);
@@ -181,7 +182,6 @@ class HWCDisplay : public DisplayEventHandler {
   uint32_t force_refresh_rate_ = 0;
   bool boot_animation_completed_ = false;
   bool shutdown_pending_ = false;
-  bool handle_refresh_ = true;
   bool use_blit_comp_ = false;
   bool secure_display_active_ = false;
   bool skip_prepare_ = false;

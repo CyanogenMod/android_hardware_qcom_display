@@ -463,7 +463,7 @@ void HWCDisplay::CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
   layer_buffer->acquire_fence_fd = hwc_layer->acquireFenceFd;
 }
 
-int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
+int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
   if (shutdown_pending_) {
     return 0;
   }
@@ -590,6 +590,15 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
   // Configure layer stack
   layer_stack_.flags.geometry_changed = ((content_list->flags & HWC_GEOMETRY_CHANGED) > 0);
+
+  return 0;
+}
+
+int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
+  if (shutdown_pending_) {
+    return 0;
+  }
+  size_t num_hw_layers = content_list->numHwLayers;
 
   if (!skip_prepare_) {
     DisplayError error = display_intf_->Prepare(&layer_stack_);
@@ -871,9 +880,7 @@ void HWCDisplay::SetBlending(const int32_t &source, LayerBlending *target) {
 }
 
 void HWCDisplay::SetIdleTimeoutMs(uint32_t timeout_ms) {
-  if (display_intf_) {
-    display_intf_->SetIdleTimeoutMs(timeout_ms);
-  }
+  return;
 }
 
 DisplayError HWCDisplay::SetMaxMixerStages(uint32_t max_mixer_stages) {

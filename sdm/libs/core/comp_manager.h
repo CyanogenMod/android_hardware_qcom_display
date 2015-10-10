@@ -59,6 +59,7 @@ class CompManager : public DumpImpl {
   DisplayError ValidateScaling(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers, int x, int y);
   bool SupportLayerAsCursor(Handle display_ctx, HWLayers *hw_layers);
+  bool CanSetIdleTimeout(Handle display_ctx);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);
@@ -69,21 +70,15 @@ class CompManager : public DumpImpl {
   void PrepareStrategyConstraints(Handle display_ctx, HWLayers *hw_layers);
 
   struct DisplayCompositionContext {
-    Strategy *strategy;
+    Strategy *strategy = NULL;
     StrategyConstraints constraints;
-    Handle display_resource_ctx;
-    DisplayType display_type;
-    uint32_t max_strategies;
-    uint32_t remaining_strategies;
-    bool idle_fallback;
-    bool handle_idle_timeout;
-    bool fallback_;
-    uint32_t partial_update_enable;
-
-    DisplayCompositionContext()
-      : display_resource_ctx(NULL), display_type(kPrimary), max_strategies(0),
-        remaining_strategies(0), idle_fallback(false), handle_idle_timeout(true),
-        fallback_(false), partial_update_enable(true) { }
+    Handle display_resource_ctx = NULL;
+    DisplayType display_type = kPrimary;
+    uint32_t max_strategies = 0;
+    uint32_t remaining_strategies = 0;
+    bool idle_fallback = false;
+    bool fallback_ = false;
+    uint32_t partial_update_enable = true;
   };
 
   Locker locker_;
