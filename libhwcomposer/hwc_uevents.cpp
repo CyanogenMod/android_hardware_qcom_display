@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2010 The Android Open Source Project
  * Copyright (C) 2012-14, The Linux Foundation. All rights reserved.
@@ -237,7 +238,7 @@ static void *uevent_loop(void *param)
     hwc_context_t * ctx = reinterpret_cast<hwc_context_t *>(param);
     char thread_name[64] = HWC_UEVENT_THREAD_NAME;
     prctl(PR_SET_NAME, (unsigned long) &thread_name, 0, 0, 0);
-    androidSetThreadPriority(0, HAL_PRIORITY_URGENT_DISPLAY);
+    setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY);
     if(!uevent_init()) {
         ALOGE("%s: failed to init uevent ",__FUNCTION__);
         return NULL;
