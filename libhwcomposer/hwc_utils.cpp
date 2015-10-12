@@ -25,6 +25,7 @@
 #include <binder/IServiceManager.h>
 #include <EGL/egl.h>
 #include <cutils/properties.h>
+#include <dlfcn.h>
 #include <utils/Trace.h>
 #include <gralloc_priv.h>
 #include <overlay.h>
@@ -54,12 +55,8 @@ using namespace overlay;
 using namespace overlay::utils;
 namespace ovutils = overlay::utils;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifdef QTI_BSP
 
-EGLAPI EGLBoolean eglGpuPerfHintQCOM(EGLDisplay dpy, EGLContext ctx,
-                                           EGLint *attrib_list);
 #define EGL_GPU_HINT_1        0x32D0
 #define EGL_GPU_HINT_2        0x32D1
 
@@ -70,8 +67,6 @@ EGLAPI EGLBoolean eglGpuPerfHintQCOM(EGLDisplay dpy, EGLContext ctx,
 #define EGL_GPU_LEVEL_4       0x4
 #define EGL_GPU_LEVEL_5       0x5
 
-#ifdef __cplusplus
-}
 #endif
 
 namespace qhwc {
@@ -312,14 +307,23 @@ void initContext(hwc_context_t *ctx)
     ctx->enableABC  = atoi(value) ? true : false;
 
     // Initialize gpu perfomance hint related parameters
-    property_get("sys.hwc.gpu_perf_mode", value, "0");
-    ctx->mGPUHintInfo.mGpuPerfModeEnable = atoi(value)? true : false;
-
+#ifdef QTI_BSP
+    ctx->mEglLib = NULL;
+    ctx->mpfn_eglGpuPerfHintQCOM = NULL;
+    ctx->mpfn_eglGetCurrentDisplay = NULL;
+    ctx->mpfn_eglGetCurrentContext = NULL;
+    ctx->mGPUHintInfo.mGpuPerfModeEnable = false;
     ctx->mGPUHintInfo.mEGLDisplay = NULL;
     ctx->mGPUHintInfo.mEGLContext = NULL;
     ctx->mGPUHintInfo.mPrevCompositionGLES = false;
     ctx->mGPUHintInfo.mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
-
+    if(property_get("sys.hwc.gpu_perf_mode", value, "0") > 0) {
+        int val = atoi(value);
+        if(val > 0 && loadEglLib(ctx)) {
+            ctx->mGPUHintInfo.mGpuPerfModeEnable = true;
+        }
+    }
+#endif
     ctx->mUseMetaDataRefreshRate = true;
     if(property_get("persist.metadata_dynfps.disable", value, "false")
             && !strcmp(value, "true")) {
@@ -388,7 +392,15 @@ void closeContext(hwc_context_t *ctx)
         ctx->mAD = NULL;
     }
 
-
+#ifdef QTI_BSP
+    ctx->mpfn_eglGpuPerfHintQCOM = NULL;
+    ctx->mpfn_eglGetCurrentDisplay = NULL;
+    ctx->mpfn_eglGetCurrentContext = NULL;
+    if(ctx->mEglLib) {
+        dlclose(ctx->mEglLib);
+        ctx->mEglLib = NULL;
+    }
+#endif
 }
 
 //Helper to roundoff the refreshrates
@@ -918,7 +930,7 @@ void setListStats(hwc_context_t *ctx,
         hwc_layer_1_t const* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
         if (layer->flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
             ctx->listStats[dpy].isDisplayAnimating = true;
         }
@@ -1163,6 +1175,37 @@ bool isValidRect(const hwc_rect& rect)
    return ((rect.bottom > rect.top) && (rect.right > rect.left)) ;
 }
 
+bool layerUpdating(const hwc_layer_1_t* layer) {
+     hwc_region_t surfDamage = layer->surfaceDamage;
+     return ((surfDamage.numRects == 0) ||
+              isValidRect(layer->surfaceDamage.rects[0]));
+}
+
+hwc_rect_t calculateDirtyRect(const hwc_layer_1_t* layer,
+                                       hwc_rect_t& scissor) {
+    hwc_region_t surfDamage = layer->surfaceDamage;
+    hwc_rect_t src = integerizeSourceCrop(layer->sourceCropf);
+    hwc_rect_t dst = layer->displayFrame;
+    int x_off = dst.left - src.left;
+    int y_off = dst.top - src.top;
+    hwc_rect dirtyRect = (hwc_rect){0, 0, 0, 0};
+    hwc_rect_t updatingRect = dst;
+
+    if (surfDamage.numRects == 0) {
+      // full layer updating, dirty rect is full frame
+        dirtyRect = getIntersection(layer->displayFrame, scissor);
+    } else {
+        for(uint32_t i = 0; i < surfDamage.numRects; i++) {
+            updatingRect = moveRect(surfDamage.rects[i], x_off, y_off);
+            hwc_rect_t intersect = getIntersection(updatingRect, scissor);
+            if(isValidRect(intersect)) {
+               dirtyRect = getUnion(intersect, dirtyRect);
+            }
+        }
+     }
+     return dirtyRect;
+}
+
 hwc_rect_t moveRect(const hwc_rect_t& rect, const int& x_off, const int& y_off)
 {
     hwc_rect_t res;
@@ -1282,11 +1325,6 @@ void optimizeLayerRects(hwc_context_t *ctx,
                      layer->sourceCropf.top = (float)bottomCrop.top;
                      layer->sourceCropf.right = (float)bottomCrop.right;
                      layer->sourceCropf.bottom = (float)bottomCrop.bottom;
-#ifdef QCOM_BSP
-                     //Update layer dirtyRect
-                     layer->dirtyRect = getIntersection(bottomCrop,
-                                            layer->dirtyRect);
-#endif
                   }
                }
                j--;
@@ -1462,7 +1500,9 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
 
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(list->hwLayers[i].compositionType == HWC_OVERLAY ||
+#ifdef QTI_BSP
            list->hwLayers[i].compositionType == HWC_BLIT ||
+#endif
            list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             //Populate releaseFenceFds.
             if(UNLIKELY(swapzero)) {
@@ -1471,8 +1511,8 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
                 // Release all the app layer fds immediately,
                 // if animation is in progress.
                 list->hwLayers[i].releaseFenceFd = -1;
-            } else if(list->hwLayers[i].releaseFenceFd < 0) {
-#ifdef QCOM_BSP
+            } else if(list->hwLayers[i].releaseFenceFd < 0 ) {
+#ifdef QTI_BSP
                 //If rotator has not already populated this field
                 // & if it's a not VPU layer
 
@@ -2149,20 +2189,22 @@ bool isGLESComp(hwc_context_t *ctx,
 }
 
 void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
+#ifdef QTI_BSP
     struct gpu_hint_info *gpuHint = &ctx->mGPUHintInfo;
     if(!gpuHint->mGpuPerfModeEnable)
         return;
+
     /* Set the GPU hint flag to high for MIXED/GPU composition only for
        first frame after MDP -> GPU/MIXED mode transition. Set the GPU
        hint to default if the previous composition is GPU or current GPU
        composition is due to idle fallback */
     if(!gpuHint->mEGLDisplay || !gpuHint->mEGLContext) {
-        gpuHint->mEGLDisplay = eglGetCurrentDisplay();
+        gpuHint->mEGLDisplay = (*(ctx->mpfn_eglGetCurrentDisplay))();
         if(!gpuHint->mEGLDisplay) {
             ALOGW("%s Warning: EGL current display is NULL", __FUNCTION__);
             return;
         }
-        gpuHint->mEGLContext = eglGetCurrentContext();
+        gpuHint->mEGLContext = (*(ctx->mpfn_eglGetCurrentContext))();
         if(!gpuHint->mEGLContext) {
             ALOGW("%s Warning: EGL current context is NULL", __FUNCTION__);
             return;
@@ -2174,8 +2216,8 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
                                   EGL_GPU_LEVEL_3,
                                   EGL_NONE };
             if((gpuHint->mCurrGPUPerfMode != EGL_GPU_LEVEL_3) &&
-                !eglGpuPerfHintQCOM(gpuHint->mEGLDisplay,
-                                    gpuHint->mEGLContext, attr_list)) {
+                !((*(ctx->mpfn_eglGpuPerfHintQCOM))(gpuHint->mEGLDisplay,
+                                    gpuHint->mEGLContext, attr_list))) {
                 ALOGW("eglGpuPerfHintQCOM failed for Built in display");
             } else {
                 gpuHint->mCurrGPUPerfMode = EGL_GPU_LEVEL_3;
@@ -2186,8 +2228,8 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
                                   EGL_GPU_LEVEL_0,
                                   EGL_NONE };
             if((gpuHint->mCurrGPUPerfMode != EGL_GPU_LEVEL_0) &&
-                !eglGpuPerfHintQCOM(gpuHint->mEGLDisplay,
-                                    gpuHint->mEGLContext, attr_list)) {
+                !((*(ctx->mpfn_eglGpuPerfHintQCOM))(gpuHint->mEGLDisplay,
+                                    gpuHint->mEGLContext, attr_list))) {
                 ALOGW("eglGpuPerfHintQCOM failed for Built in display");
             } else {
                 gpuHint->mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
@@ -2199,14 +2241,15 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
                               EGL_GPU_LEVEL_0,
                               EGL_NONE };
         if((gpuHint->mCurrGPUPerfMode != EGL_GPU_LEVEL_0) &&
-                !eglGpuPerfHintQCOM(gpuHint->mEGLDisplay,
-                                    gpuHint->mEGLContext, attr_list)) {
+                !((*(ctx->mpfn_eglGpuPerfHintQCOM))(gpuHint->mEGLDisplay,
+                                    gpuHint->mEGLContext, attr_list))) {
             ALOGW("eglGpuPerfHintQCOM failed for Built in display");
         } else {
             gpuHint->mCurrGPUPerfMode = EGL_GPU_LEVEL_0;
         }
         gpuHint->mPrevCompositionGLES = false;
     }
+#endif
 }
 
 bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
@@ -2357,6 +2400,34 @@ hwc_rect_t sanitizeROI(struct hwc_rect roi, hwc_rect boundary)
    }
 
    return t_roi;
+}
+
+bool loadEglLib(hwc_context_t* ctx) {
+    bool success = false;
+#ifdef QTI_BSP
+    const char* error;
+    dlerror();
+
+    ctx->mEglLib = dlopen("libEGL_adreno.so", RTLD_NOW);
+    if(ctx->mEglLib) {
+        *(void **)&(ctx->mpfn_eglGpuPerfHintQCOM) = dlsym(ctx->mEglLib, "eglGpuPerfHintQCOM");
+        *(void **)&(ctx->mpfn_eglGetCurrentDisplay) = dlsym(ctx->mEglLib,"eglGetCurrentDisplay");
+        *(void **)&(ctx->mpfn_eglGetCurrentContext) = dlsym(ctx->mEglLib,"eglGetCurrentContext");
+        if (!ctx->mpfn_eglGpuPerfHintQCOM ||
+            !ctx->mpfn_eglGetCurrentDisplay ||
+            !ctx->mpfn_eglGetCurrentContext) {
+            ALOGE("Failed to load symbols from libEGL");
+            dlclose(ctx->mEglLib);
+            ctx->mEglLib = NULL;
+            return false;
+        }
+        success = true;
+        ALOGI("Successfully Loaded GPUPerfHint APIs");
+    } else {
+        ALOGE("Couldn't load libEGL: %s", dlerror());
+    }
+#endif
+    return success;
 }
 
 };//namespace qhwc

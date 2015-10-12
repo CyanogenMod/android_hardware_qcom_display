@@ -17,6 +17,9 @@ LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhwcomposer\"
 ifeq ($(VSYNC_EVENT_PHASE_OFFSET_NS),)
     LOCAL_CFLAGS += -DDYNAMIC_FPS
 endif
+ifeq ($(GET_DISPLAY_SECURE_STATUS_FROM_HWC),true)
+    LOCAL_CFLAGS += -DGET_DISPLAY_SECURE_STATUS_FROM_HWC
+endif
 
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := hwc.cpp          \

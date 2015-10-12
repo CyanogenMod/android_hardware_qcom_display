@@ -119,7 +119,6 @@ protected:
     /* cached data */
     struct LayerCache {
         int layerCount;
-        buffer_handle_t hnd[MAX_NUM_APP_LAYERS];
         bool isFBComposed[MAX_NUM_APP_LAYERS];
         bool drop[MAX_NUM_APP_LAYERS];
 
@@ -127,7 +126,6 @@ protected:
         LayerCache();
         /* clear caching info*/
         void reset();
-        void cacheAll(hwc_display_contents_1_t* list);
         void updateCounts(const FrameInfo&);
         bool isSameFrame(const FrameInfo& curFrame,
                          hwc_display_contents_1_t* list);

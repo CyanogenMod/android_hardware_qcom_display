@@ -130,6 +130,7 @@ private:
     int mAlignedFBWidth;
     int mAlignedFBHeight;
     int mDirtyLayerIndex;
+    hwc_rect_t mDirtyRect;
     LayerCache mLayerCache;
     FbCache mFbCache;
     int getLayersChanging(hwc_context_t *ctx, hwc_display_contents_1_t *list,
