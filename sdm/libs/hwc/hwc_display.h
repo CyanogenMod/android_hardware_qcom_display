@@ -59,7 +59,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual void GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels);
   virtual void GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels);
   virtual int SetDisplayStatus(uint32_t display_status);
-  virtual int OnMinHdcpEncryptionLevelChange();
+  virtual int OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
   virtual int Perform(uint32_t operation, ...);
   virtual int SetCursorPosition(int x, int y);
   virtual void SetSecureDisplay(bool secure_display_active);

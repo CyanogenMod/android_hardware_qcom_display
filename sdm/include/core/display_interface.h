@@ -377,9 +377,11 @@ class DisplayInterface {
 
   /*! @brief Method to notify display about change in min HDCP encryption level.
 
+    @param[in] min_enc_level minimum encryption level value.
+
     @return \link DisplayError \endlink
   */
-  virtual DisplayError OnMinHdcpEncryptionLevelChange() = 0;
+  virtual DisplayError OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) = 0;
 
   /*! @brief Method to route display API requests to color service.
 

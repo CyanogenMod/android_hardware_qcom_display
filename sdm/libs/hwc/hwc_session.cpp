@@ -1058,6 +1058,7 @@ android::status_t HWCSession::OnMinHdcpEncryptionLevelChange(const android::Parc
                                                              android::Parcel *output_parcel) {
   int ret = -EINVAL;
   uint32_t display_id = UINT32(input_parcel->readInt32());
+  uint32_t min_enc_level = UINT32(input_parcel->readInt32());
 
   DLOGI("Display %d", display_id);
 
@@ -1068,7 +1069,7 @@ android::status_t HWCSession::OnMinHdcpEncryptionLevelChange(const android::Parc
   } else if (!hwc_display_[display_id]) {
     DLOGW("Display is not connected");
   } else {
-    ret = hwc_display_[display_id]->OnMinHdcpEncryptionLevelChange();
+    ret = hwc_display_[display_id]->OnMinHdcpEncryptionLevelChange(min_enc_level);
   }
 
   output_parcel->writeInt32(ret);

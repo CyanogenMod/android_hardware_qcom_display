@@ -320,11 +320,12 @@ int getPanelBrightness() {
 // ----------------------------------------------------------------------------
 // Functions for linking dynamically to libqdutils
 // ----------------------------------------------------------------------------
-extern "C" int minHdcpEncryptionLevelChanged(int dpy) {
+extern "C" int minHdcpEncryptionLevelChanged(int dpy, int min_enc_level) {
     status_t err = (status_t) FAILED_TRANSACTION;
     sp<IQService> binder = getBinder();
     Parcel inParcel, outParcel;
     inParcel.writeInt32(dpy);
+    inParcel.writeInt32(min_enc_level);
 
     if(binder != NULL) {
         err = binder->dispatch(IQService::MIN_HDCP_ENCRYPTION_LEVEL_CHANGED,

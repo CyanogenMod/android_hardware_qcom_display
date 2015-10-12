@@ -346,7 +346,7 @@ DisplayError HWHDMI::GetMaxCEAFormat(uint32_t *max_cea_format) {
   return kErrorNone;
 }
 
-DisplayError HWHDMI::OnMinHdcpEncryptionLevelChange() {
+DisplayError HWHDMI::OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) {
   DisplayError error = kErrorNone;
   int fd = -1;
   char data[kMaxStringLength] = {'\0'};
@@ -359,8 +359,7 @@ DisplayError HWHDMI::OnMinHdcpEncryptionLevelChange() {
     return kErrorHardware;
   }
 
-  // write any value (1 here) on this fd to trigger level change.
-  snprintf(data, sizeof(data), "%d", 1);
+  snprintf(data, sizeof(data), "%d", min_enc_level);
 
   ssize_t err = Sys::pwrite_(fd, data, strlen(data), 0);
   if (err <= 0) {

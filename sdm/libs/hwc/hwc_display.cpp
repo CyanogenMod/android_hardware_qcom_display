@@ -1209,8 +1209,8 @@ int HWCDisplay::SetCursorPosition(int x, int y) {
   return 0;
 }
 
-int HWCDisplay::OnMinHdcpEncryptionLevelChange() {
-  DisplayError error = display_intf_->OnMinHdcpEncryptionLevelChange();
+int HWCDisplay::OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) {
+  DisplayError error = display_intf_->OnMinHdcpEncryptionLevelChange(min_enc_level);
   if (error != kErrorNone) {
     DLOGE("Failed. Error = %d", error);
     return -1;
