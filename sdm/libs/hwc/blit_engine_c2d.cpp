@@ -128,7 +128,8 @@ void BlitEngineC2d::DeInit() {
   }
 }
 
-int BlitEngineC2d::AllocateBlitTargetBuffers(uint32_t width, uint32_t height, uint32_t format) {
+int BlitEngineC2d::AllocateBlitTargetBuffers(uint32_t width, uint32_t height, uint32_t format,
+                                             uint32_t usage) {
   int status = 0;
   if (width <= 0 || height <= 0) {
     return false;
@@ -144,8 +145,7 @@ int BlitEngineC2d::AllocateBlitTargetBuffers(uint32_t width, uint32_t height, ui
 
   for (uint32_t i = 0; i < kNumBlitTargetBuffers; i++) {
     if (blit_target_buffer_[i] == NULL) {
-      status = alloc_buffer(&blit_target_buffer_[i], width, height, format,
-                         GRALLOC_USAGE_PRIVATE_IOMMU_HEAP);
+      status = alloc_buffer(&blit_target_buffer_[i], width, height, format, usage);
     }
     if (status < 0) {
       DLOGE("Allocation of Blit target Buffer failed");
@@ -182,6 +182,11 @@ int BlitEngineC2d::ClearTargetBuffer(private_handle_t* hnd, const LayerRect& rec
   buffer.format = hnd->format;
   buffer.base = reinterpret_cast<void *>(hnd->base);
   buffer.handle = reinterpret_cast<native_handle_t *>(hnd);
+  int dst_format_mode = COPYBIT_LINEAR;
+  if (hnd->flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED) {
+    dst_format_mode = COPYBIT_UBWC_COMPRESSED;
+  }
+  blit_engine_c2d_->set_parameter(blit_engine_c2d_, COPYBIT_DST_FORMAT_MODE, dst_format_mode);
 
   status = blit_engine_c2d_->clear(blit_engine_c2d_, &buffer, &clear_rect);
   return status;
@@ -299,6 +304,7 @@ int BlitEngineC2d::PreCommit(hwc_display_contents_1_t *content_list, LayerStack 
   uint32_t processed_blit = 0;
   LayerRect dst_rects[kMaxBlitTargetLayers];
   bool blit_needed = false;
+  uint32_t usage = 0;
 
   for (uint32_t i = num_app_layers-1; (i > 0) && (processed_blit < num_blit_target_); i--) {
     Layer &layer = layer_stack->layers[i];
@@ -312,9 +318,13 @@ int BlitEngineC2d::PreCommit(hwc_display_contents_1_t *content_list, LayerStack 
     LayerRect &blit_src_rect = blit_layer.src_rect;
     int width = INT(layer.dst_rect.right - layer.dst_rect.left);
     int height = INT(layer.dst_rect.bottom - layer.dst_rect.top);
+    usage = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP | GRALLOC_USAGE_HW_TEXTURE;
+    if (blit_engine_c2d_->get(blit_engine_c2d_, COPYBIT_UBWC_SUPPORT) > 0) {
+      usage |= GRALLOC_USAGE_PRIVATE_ALLOC_UBWC;
+    }
     // TODO(user): FrameBuffer is assumed to be RGBA
     AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width, height,
-                                 INT(HAL_PIXEL_FORMAT_RGBA_8888), 0, width, height);
+                                 INT(HAL_PIXEL_FORMAT_RGBA_8888), usage, width, height);
 
     target_width = MAX(target_width, width);
     target_height += height;
@@ -331,7 +341,7 @@ int BlitEngineC2d::PreCommit(hwc_display_contents_1_t *content_list, LayerStack 
 
   // Allocate a single buffer of RGBA8888 format
   if (blit_needed && (AllocateBlitTargetBuffers(target_width, target_height,
-                                                HAL_PIXEL_FORMAT_RGBA_8888) < 0)) {
+                                                HAL_PIXEL_FORMAT_RGBA_8888, usage) < 0)) {
       status = -1;
       return status;
   }
@@ -344,6 +354,9 @@ int BlitEngineC2d::PreCommit(hwc_display_contents_1_t *content_list, LayerStack 
       if (layer.input_buffer) {
         layer.input_buffer->width = target_width;
         layer.input_buffer->height = target_height;
+        if (target_buffer->flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED) {
+          layer.input_buffer->format = kFormatRGBA8888Ubwc;
+        }
         layer.input_buffer->planes[0].fd = target_buffer->fd;
         layer.input_buffer->planes[0].offset = 0;
         layer.input_buffer->planes[0].stride = target_buffer->width;
@@ -508,6 +521,13 @@ int BlitEngineC2d::DrawRectUsingCopybit(hwc_layer_1_t *hwc_layer, Layer *layer,
   blit_engine_c2d_->set_parameter(blit_engine_c2d_, COPYBIT_BLEND_MODE, hwc_layer->blending);
   blit_engine_c2d_->set_parameter(blit_engine_c2d_, COPYBIT_DITHER,
     (dst.format == HAL_PIXEL_FORMAT_RGB_565) ? COPYBIT_ENABLE : COPYBIT_DISABLE);
+
+  int src_format_mode = COPYBIT_LINEAR;
+  if (hnd->flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED) {
+    src_format_mode = COPYBIT_UBWC_COMPRESSED;
+  }
+  blit_engine_c2d_->set_parameter(blit_engine_c2d_, COPYBIT_SRC_FORMAT_MODE, src_format_mode);
+
   blit_engine_c2d_->set_sync(blit_engine_c2d_, acquireFd);
   int err = blit_engine_c2d_->stretch(blit_engine_c2d_, &dst, &src, &dst_rect, &src_rect,
                                       &copybitRegion);

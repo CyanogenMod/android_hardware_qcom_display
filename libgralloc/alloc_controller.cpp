@@ -844,6 +844,10 @@ int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage)
         return -ENOMEM;
     }
 
+    if(isUBwcEnabled(format, usage)) {
+      data.allocType |= private_handle_t::PRIV_FLAGS_UBWC_ALIGNED;
+    }
+
     private_handle_t* hnd = new private_handle_t(data.fd, data.size,
                                                  data.allocType, 0, format,
                                                  alignedw, alignedh);
