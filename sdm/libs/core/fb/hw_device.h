@@ -72,6 +72,7 @@ class HWDevice : public HWInterface {
   virtual DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y);
   virtual DisplayError OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
   virtual DisplayError GetPanelBrightness(int *level);
+  virtual DisplayError SetAutoRefresh(bool enable) { return kErrorNone; }
 
   // For HWDevice derivatives
   virtual DisplayError Init(HWEventHandler *eventhandler);
@@ -115,7 +116,7 @@ class HWDevice : public HWInterface {
   void SetIGC(const Layer &layer, uint32_t index);
 
   bool EnableHotPlugDetection(int enable);
-  ssize_t SysFsWrite(char* file_node, char* value, ssize_t length);
+  ssize_t SysFsWrite(const char* file_node, const char* value, ssize_t length);
 
   // Store the Device EventHandler - used for callback
   HWEventHandler *event_handler_;

@@ -1086,7 +1086,7 @@ DisplayError HWDevice::GetPanelBrightness(int *level) {
   return kErrorNotSupported;
 }
 
-ssize_t HWDevice::SysFsWrite(char* file_node, char* value, ssize_t length) {
+ssize_t HWDevice::SysFsWrite(const char* file_node, const char* value, ssize_t length) {
   int fd = Sys::open_(file_node, O_RDWR, 0);
   if (fd < 0) {
     DLOGW("Open failed = %s", file_node);

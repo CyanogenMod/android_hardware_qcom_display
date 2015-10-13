@@ -91,6 +91,11 @@ DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
   HWDisplayAttributes display_attributes;
   uint32_t active_index = 0;
 
+  // Enabling auto refresh is async and needs to happen before commit ioctl
+  if (hw_panel_info_.mode == kModeCommand) {
+    hw_intf_->SetAutoRefresh(layer_stack->flags.single_buffered_layer_present);
+  }
+
   bool set_idle_timeout = comp_manager_->CanSetIdleTimeout(display_comp_ctx_);
 
   error = DisplayBase::Commit(layer_stack);
@@ -107,8 +112,12 @@ DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
     hw_panel_info_ = panel_info;
   }
 
-  if (set_idle_timeout && hw_panel_info_.mode != kModeCommand) {
-    hw_intf_->SetIdleTimeoutMs(idle_timeout_ms_);
+  if (hw_panel_info_.mode == kModeVideo) {
+    if (set_idle_timeout && !layer_stack->flags.single_buffered_layer_present) {
+      hw_intf_->SetIdleTimeoutMs(idle_timeout_ms_);
+    } else {
+      hw_intf_->SetIdleTimeoutMs(0);
+    }
   }
 
   return error;
@@ -342,7 +351,6 @@ DisplayError DisplayPrimary::Blank(bool blank) {
 void DisplayPrimary::IdleTimeout() {
   event_handler_->Refresh();
   comp_manager_->ProcessIdleTimeout(display_comp_ctx_);
-  hw_intf_->SetIdleTimeoutMs(0);
 }
 
 void DisplayPrimary::ThermalEvent(int64_t thermal_level) {

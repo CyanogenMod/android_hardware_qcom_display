@@ -133,7 +133,7 @@ class HWCDisplay : public DisplayEventHandler {
   inline void SetRect(const hwc_rect_t &source, LayerRect *target);
   inline void SetRect(const hwc_frect_t &source, LayerRect *target);
   inline void SetComposition(const int32_t &source, LayerComposition *target);
-  inline void SetComposition(const int32_t &source, int32_t *target);
+  inline void SetComposition(const LayerComposition &source, int32_t *target);
   inline void SetBlending(const int32_t &source, LayerBlending *target);
   int SetFormat(const int32_t &source, const int flags, LayerBufferFormat *target);
   LayerBufferFormat GetSDMFormat(const int32_t &source, const int flags);

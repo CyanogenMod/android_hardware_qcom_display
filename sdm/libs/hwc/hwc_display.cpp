@@ -557,6 +557,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
     layer.flags.cursor = ((hwc_layer.flags & HWC_IS_CURSOR_LAYER) > 0);
     layer.flags.updating = true;
+
     if (num_hw_layers <= kMaxLayerCount) {
       LayerCache layer_cache = layer_stack_cache_.layer_cache[i];
       layer.flags.updating = IsLayerUpdating(hwc_layer, layer_cache);
@@ -734,15 +735,13 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
     LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
 
     if (!flush_) {
-      // if swapinterval property is set to 0 then do not update f/w release fences with driver
-      // values
-      if (swap_interval_zero_) {
+      // If swapinterval property is set to 0 or for single buffer layers, do not update f/w
+      // release fences and discard fences from driver
+      if (swap_interval_zero_ || layer.flags.single_buffer) {
         hwc_layer.releaseFenceFd = -1;
         close(layer_buffer->release_fence_fd);
         layer_buffer->release_fence_fd = -1;
-      }
-
-      if (layer.composition != kCompositionGPU) {
+      } else if (layer.composition != kCompositionGPU) {
         hwc_layer.releaseFenceFd = layer_buffer->release_fence_fd;
       }
 
@@ -822,7 +821,14 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
 }
 
 bool HWCDisplay::IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache) {
-  return ((layer_cache.handle != hwc_layer.handle) ||
+  const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
+  const MetaData_t *meta_data = pvt_handle ?
+    reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata) : NULL;
+
+  // If a layer is in single buffer mode, it should be considered as updating always
+  return ((meta_data && (meta_data->operation & SET_SINGLE_BUFFER_MODE) &&
+            meta_data->isSingleBufferMode) ||
+          (layer_cache.handle != hwc_layer.handle) ||
           (layer_cache.plane_alpha != hwc_layer.planeAlpha));
 }
 
@@ -871,7 +877,7 @@ void HWCDisplay::SetComposition(const int32_t &source, LayerComposition *target)
   }
 }
 
-void HWCDisplay::SetComposition(const int32_t &source, int32_t *target) {
+void HWCDisplay::SetComposition(const LayerComposition &source, int32_t *target) {
   switch (source) {
   case kCompositionGPUTarget:   *target = HWC_FRAMEBUFFER_TARGET; break;
   case kCompositionGPU:         *target = HWC_FRAMEBUFFER;        break;
@@ -1327,6 +1333,11 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
     AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(pvt_handle, actual_width, actual_height);
     layer_buffer->width = actual_width;
     layer_buffer->height = actual_height;
+  }
+
+  if (meta_data->operation & SET_SINGLE_BUFFER_MODE) {
+    layer->flags.single_buffer = meta_data->isSingleBufferMode;
+    layer_stack_.flags.single_buffered_layer_present = meta_data->isSingleBufferMode;
   }
 
   return kErrorNone;

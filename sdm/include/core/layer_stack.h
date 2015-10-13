@@ -149,6 +149,9 @@ struct LayerFlags {
       uint32_t cursor : 1;    //!< This flag shall be set by client to indicate that this layer
                               //!< is a cursor
                               //!< Display Device may handle this layer using HWCursor
+
+      uint32_t single_buffer : 1;  //!< This flag shall be set by client to indicate that the layer
+                                   //!< uses only a single buffer that will not be swapped out
     };
 
     uint32_t flags = 0;       //!< For initialization purpose only.
@@ -187,6 +190,8 @@ struct LayerStackFlags {
 
       uint32_t cursor_present : 1;    //!< This flag will be set to true if the current layer
                                       //!< stack contains cursor layer.
+
+      uint32_t single_buffered_layer_present : 1;    //!< Set if stack has single buffered layer
     };
 
     uint32_t flags = 0;               //!< For initialization purpose only.

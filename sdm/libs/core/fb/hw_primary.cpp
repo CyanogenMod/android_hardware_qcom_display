@@ -663,6 +663,18 @@ DisplayError HWPrimary::GetPanelBrightness(int *level) {
   return kErrorNone;
 }
 
+DisplayError HWPrimary::SetAutoRefresh(bool enable) {
+  const int kWriteLength = 2;
+  char buffer[kWriteLength] = {'\0'};
+  ssize_t bytes = snprintf(buffer, kWriteLength, "%d", enable);
+
+  if (HWDevice::SysFsWrite(kAutoRefreshNode, buffer, bytes) <= 0) {  // Returns bytes written
+    return kErrorUndefined;
+  }
+
+  return kErrorNone;
+}
+
 DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
   STRUCT_VAR(mdp_pp_feature_version, version);
 
