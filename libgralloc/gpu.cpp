@@ -315,6 +315,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
             (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
             useFbMem = true;
         } else {
+            usage &= ~GRALLOC_USAGE_PRIVATE_ALLOC_UBWC;
             if (property_get("debug.gralloc.enable_fb_ubwc", isUBWC, NULL) > 0){
                 if ((!strncmp(isUBWC, "1", PROPERTY_VALUE_MAX)) ||
                     (!strncasecmp(isUBWC, "true", PROPERTY_VALUE_MAX))) {

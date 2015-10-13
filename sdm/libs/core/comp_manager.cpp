@@ -202,7 +202,11 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
     constraints->safe_mode = true;
   }
 
-  if (display_comp_ctx->idle_fallback || display_comp_ctx->fallback_) {
+  // Avoid idle fallback, if there is only one app layer.
+  // TODO(user): App layer count will change for hybrid composition
+  uint32_t app_layer_count = hw_layers->info.stack->layer_count - 1;
+  if ((app_layer_count > 1 && display_comp_ctx->idle_fallback) || display_comp_ctx->fallback_) {
+    // Handle the idle timeout by falling back
     constraints->safe_mode = true;
   }
 
@@ -218,13 +222,6 @@ void CompManager::PrePrepare(Handle display_ctx, HWLayers *hw_layers) {
   display_comp_ctx->strategy->Start(&hw_layers->info, &display_comp_ctx->max_strategies,
                                     display_comp_ctx->partial_update_enable);
   display_comp_ctx->remaining_strategies = display_comp_ctx->max_strategies;
-
-  // Avoid idle fallback, if there is only one app layer.
-  // TODO(user): App layer count will change for hybrid composition
-  uint32_t app_layer_count = hw_layers->info.stack->layer_count - 1;
-  if (!display_comp_ctx->idle_fallback && app_layer_count > 1) {
-    display_comp_ctx->handle_idle_timeout = true;
-  }
 }
 
 DisplayError CompManager::Prepare(Handle display_ctx, HWLayers *hw_layers) {
@@ -351,16 +348,7 @@ void CompManager::ProcessIdleTimeout(Handle display_ctx) {
     return;
   }
 
-  // 1. handle_idle_timeout flag is set to true on start of every draw call, if the current
-  //    composition is not due to idle fallback.
-  // 2. idle_fallback flag will be set only if handle_idle_timeout flag is true and there is no
-  //    update to the screen for specified amount of time.
-  // 3. handle_idle_timeout flag helps us handle the very first idle timeout event and
-  //    ignore the next idle timeout event on consecutive two idle timeout events.
-  if (display_comp_ctx->handle_idle_timeout) {
-    display_comp_ctx->idle_fallback = true;
-    display_comp_ctx->handle_idle_timeout = false;
-  }
+  display_comp_ctx->idle_fallback = true;
 }
 
 void CompManager::ProcessThermalEvent(Handle display_ctx, int64_t thermal_level) {
@@ -446,6 +434,21 @@ bool CompManager::SupportLayerAsCursor(Handle comp_handle, HWLayers *hw_layers) 
   }
 
   return supported;
+}
+
+bool CompManager::CanSetIdleTimeout(Handle display_ctx) {
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+
+  if (!display_comp_ctx) {
+    return false;
+  }
+
+  if (!display_comp_ctx->idle_fallback) {
+    return true;
+  }
+
+  return false;
 }
 
 }  // namespace sdm

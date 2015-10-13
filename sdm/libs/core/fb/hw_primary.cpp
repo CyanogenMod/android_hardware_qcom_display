@@ -382,6 +382,7 @@ DisplayError HWPrimary::SetRefreshRate(uint32_t refresh_rate) {
 
   char refresh_rate_string[kMaxStringLength];
   snprintf(refresh_rate_string, sizeof(refresh_rate_string), "%d", refresh_rate);
+  DLOGI_IF(kTagDriverConfig, "Setting refresh rate = %d", refresh_rate);
   ssize_t len = Sys::pwrite_(fd, refresh_rate_string, strlen(refresh_rate_string), 0);
   if (len < 0) {
     DLOGE("Failed to write %d with error %s", refresh_rate, strerror(errno));
@@ -546,7 +547,7 @@ void HWPrimary::HandleThermal(char *data) {
 void HWPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
   char node_path[kMaxStringLength] = {0};
 
-  DLOGI("Setting idle timeout to = %d ms", timeout_ms);
+  DLOGI_IF(kTagDriverConfig, "Setting idle timeout to = %d ms", timeout_ms);
 
   snprintf(node_path, sizeof(node_path), "%s%d/idle_time", fb_path_, fb_node_index_);
 
