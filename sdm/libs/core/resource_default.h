@@ -127,7 +127,7 @@ class ResourceDefault : public ResourceInterface {
                              const LayerRect &src_rect, const LayerRect &dst_rect,
                              HWLayerConfig *layer_config);
   bool CalculateCropRects(const LayerRect &scissor, LayerRect *crop, LayerRect *dst);
-  DisplayError ValidateLayerDimensions(const Layer &layer);
+  DisplayError ValidateLayerParams(const Layer &layer);
   DisplayError ValidateDimensions(const LayerRect &crop, const LayerRect &dst);
   DisplayError ValidatePipeParams(HWPipeInfo *pipe_info, bool ubwc_tiled);
   DisplayError ValidateDownScaling(float scale_x, float scale_y, bool ubwc_tiled);

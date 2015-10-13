@@ -388,10 +388,6 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
       return -EINVAL;
     }
 
-    if (layer_buffer->format == kFormatInvalid) {
-      return -EINVAL;
-    }
-
     if (pvt_handle->bufferType == BUFFER_TYPE_VIDEO) {
       layer_stack_.flags.video_present = true;
       layer_buffer->flags.video = true;

@@ -528,7 +528,7 @@ DisplayError ResourceDefault::Config(DisplayResourceContext *display_resource_ct
   DisplayError error = kErrorNone;
   Layer& layer = layer_info.stack->layers[layer_info.index[0]];
 
-  error = ValidateLayerDimensions(layer);
+  error = ValidateLayerParams(layer);
   if (error != kErrorNone) {
     return error;
   }
@@ -649,10 +649,15 @@ bool ResourceDefault::CalculateCropRects(const LayerRect &scissor, LayerRect *cr
     return false;
 }
 
-DisplayError ResourceDefault::ValidateLayerDimensions(const Layer &layer) {
+DisplayError ResourceDefault::ValidateLayerParams(const Layer &layer) {
   const LayerRect &src = layer.src_rect;
   const LayerRect &dst = layer.dst_rect;
   LayerBuffer *input_buffer = layer.input_buffer;
+
+  if (input_buffer->format == kFormatInvalid) {
+    DLOGV_IF(kTagResources, "Invalid input buffer format %d", input_buffer->format);
+    return kErrorNotSupported;
+  }
 
   if (!IsValid(src) || !IsValid(dst)) {
     Log(kTagResources, "input layer src_rect", src);
