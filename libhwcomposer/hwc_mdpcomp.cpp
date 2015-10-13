@@ -861,13 +861,13 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
                 (transform & HWC_TRANSFORM_FLIP_H) && (!isYuvBuffer(hnd)))
             return false;
 
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
         if(computeDirtyArea and mCachedFrame.hnd[i] != hnd) {
             if(needsScaling(layer)) {
                 totalDirtyArea = 0;
                 computeDirtyArea = false;
             } else {
-                hwc_rect_t dirtyRect = layer->dirtyRect;
+                hwc_rect_t dirtyRect = calculateDirtyRect(&layer,fullFrame);
                 ALOGD_IF(isDebug(),
                         "Updating layer: %d Dirty rect: %d, %d, %d, %d",
                         i, dirtyRect.left, dirtyRect.top, dirtyRect.right,
