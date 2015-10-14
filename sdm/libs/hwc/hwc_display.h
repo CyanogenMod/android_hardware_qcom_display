@@ -167,6 +167,7 @@ class HWCDisplay : public DisplayEventHandler {
   LayerStackMemory layer_stack_memory_;
   LayerStack layer_stack_;
   LayerStackCache layer_stack_cache_;
+  bool flush_on_error_ = false;
   bool flush_ = false;
   uint32_t dump_frame_count_ = 0;
   uint32_t dump_frame_index_ = 0;

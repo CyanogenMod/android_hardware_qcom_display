@@ -687,7 +687,11 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
       error = display_intf_->Commit(&layer_stack_);
       status = 0;
     }
-    if (error != kErrorNone) {
+
+    if (error == kErrorNone) {
+      // Do no call flush on errors, if a successful buffer is never submitted.
+      flush_on_error_ = true;
+    } else {
       if (error == kErrorShutDown) {
         shutdown_pending_ = true;
         return status;
@@ -706,7 +710,7 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
   size_t num_hw_layers = content_list->numHwLayers;
   int status = 0;
 
-  if (flush_) {
+  if (flush_ && flush_on_error_) {
     DisplayError error = display_intf_->Flush();
     if (error != kErrorNone) {
       DLOGE("Flush failed. Error = %d", error);
