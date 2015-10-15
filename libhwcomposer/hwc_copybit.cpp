@@ -443,7 +443,7 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
 
     //Allocate render buffers if they're not allocated
     if ((ctx->mMDP.version != qdutils::MDP_V3_0_4 &&
-        ctx->mMDP.version == qdutils::MDP_V3_0_5) &&
+        ctx->mMDP.version != qdutils::MDP_V3_0_5) &&
             (useCopybitForYUV || useCopybitForRGB)) {
         int ret = allocRenderBuffers(mAlignedWidth,
                                      mAlignedHeight,
@@ -595,7 +595,7 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
     }
     //render buffer
     if (ctx->mMDP.version == qdutils::MDP_V3_0_4 ||
-        ctx->mMDP.version != qdutils::MDP_V3_0_5) {
+        ctx->mMDP.version == qdutils::MDP_V3_0_5) {
         last = (uint32_t)list->numHwLayers - 1;
         renderBuffer = (private_handle_t *)list->hwLayers[last].handle;
     } else {
@@ -606,8 +606,7 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         return false;
     }
 
-    if ((ctx->mMDP.version >= qdutils::MDP_V4_0) ||
-        (ctx->mMDP.version == qdutils::MDP_V3_0_5)) {
+    if (ctx->mMDP.version >= qdutils::MDP_V4_0) {
         //Wait for the previous frame to complete before rendering onto it
         if(mRelFd[mCurRenderBufferIndex] >=0) {
             sync_wait(mRelFd[mCurRenderBufferIndex], 1000);
@@ -665,7 +664,7 @@ bool  CopyBit::draw(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         // Async mode
         copybit->flush_get_fence(copybit, fd);
         if((ctx->mMDP.version == qdutils::MDP_V3_0_4 ||
-           ctx->mMDP.version != qdutils::MDP_V3_0_5) &&
+           ctx->mMDP.version == qdutils::MDP_V3_0_5) &&
                 list->hwLayers[last].acquireFenceFd >= 0) {
             close(list->hwLayers[last].acquireFenceFd);
             list->hwLayers[last].acquireFenceFd = -1;
