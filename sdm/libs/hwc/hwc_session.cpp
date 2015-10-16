@@ -187,6 +187,8 @@ int HWCSession::Deinit() {
 }
 
 int HWCSession::Open(const hw_module_t *module, const char *name, hw_device_t **device) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!module || !name || !device) {
     DLOGE("Invalid parameters.");
     return -EINVAL;
@@ -212,6 +214,8 @@ int HWCSession::Open(const hw_module_t *module, const char *name, hw_device_t **
 }
 
 int HWCSession::Close(hw_device_t *device) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!device) {
     return -EINVAL;
   }
