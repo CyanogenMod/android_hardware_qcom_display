@@ -13,6 +13,9 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL liboverlay \
                                  libdl libmemalloc libqservice libsync \
                                  libbinder libmedia libvirtual libskia
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhwcomposer\"
+ifeq ($(GET_DISPLAY_SECURE_STATUS_FROM_HWC),true)
+    LOCAL_CFLAGS += -DGET_DISPLAY_SECURE_STATUS_FROM_HWC
+endif
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := hwc.cpp          \
                                  hwc_utils.cpp    \
