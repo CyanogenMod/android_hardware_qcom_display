@@ -36,8 +36,10 @@
 #include <cutils/log.h>
 #include <sys/stat.h>
 #include <comptype.h>
+#ifdef QCOM_BSP
 #include <SkBitmap.h>
 #include <SkImageEncoder.h>
+#endif
 
 namespace qhwc {
 
@@ -302,12 +304,12 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
     }
 
     getHalPixelFormatStr(hnd->format, pixFormatStr);
-
+#ifdef QCOM_BSP
     if (needDumpPng && hnd->base) {
         bool bResult = false;
         char dumpFilename[PATH_MAX];
         SkBitmap *tempSkBmp = new SkBitmap();
-        SkBitmap::Config tempSkBmpConfig = SkBitmap::kNo_Config;
+        SkColorType tempSkBmpColor = kUnknown_SkColorType;
         sprintf(dumpFilename, "%s/sfdump%03d.layer%d.%s.png", mDumpDirPng,
             mDumpCntrPng, layerIndex, mDisplayName);
 
@@ -315,18 +317,19 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
             case HAL_PIXEL_FORMAT_RGBA_8888:
             case HAL_PIXEL_FORMAT_RGBX_8888:
             case HAL_PIXEL_FORMAT_BGRA_8888:
-                tempSkBmpConfig = SkBitmap::kARGB_8888_Config;
+                tempSkBmpColor = kRGBA_8888_SkColorType;
                 break;
             case HAL_PIXEL_FORMAT_RGB_565:
-                tempSkBmpConfig = SkBitmap::kRGB_565_Config;
+                tempSkBmpColor = kRGB_565_SkColorType;
                 break;
             case HAL_PIXEL_FORMAT_RGB_888:
             default:
-                tempSkBmpConfig = SkBitmap::kNo_Config;
+                tempSkBmpColor = kUnknown_SkColorType;
                 break;
         }
-        if (SkBitmap::kNo_Config != tempSkBmpConfig) {
-            tempSkBmp->setConfig(tempSkBmpConfig, hnd->width, hnd->height);
+        if (kUnknown_SkColorType != tempSkBmpColor) {
+                tempSkBmp->setInfo(SkImageInfo::Make(getWidth(hnd), getHeight(hnd),
+                        tempSkBmpColor, kUnknown_SkAlphaType), 0);
             tempSkBmp->setPixels((void*)hnd->base);
             bResult = SkImageEncoder::EncodeFile(dumpFilename,
                                     *tempSkBmp, SkImageEncoder::kPNG_Type, 100);
@@ -340,7 +343,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         }
         delete tempSkBmp; // Calls SkBitmap::freePixels() internally.
     }
-
+#endif
     if (needDumpRaw && hnd->base) {
         char dumpFilename[PATH_MAX];
         bool bResult = false;
