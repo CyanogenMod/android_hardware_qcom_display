@@ -480,6 +480,15 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 }
             } break;
 
+        case GRALLOC_MODULE_PERFORM_SET_SINGLE_BUFFER_MODE:
+            {
+                private_handle_t* hnd =  va_arg(args, private_handle_t*);
+                bool *enable = va_arg(args, bool*);
+                if (private_handle_t::validate(hnd)) {
+                    return res;
+                }
+                setMetaData(hnd, SET_SINGLE_BUFFER_MODE, enable);
+            } break;
         default:
             break;
     }

@@ -97,6 +97,9 @@ struct MetaData_t {
     uint32_t s3dFormat;
     /* VENUS output buffer is linear for UBWC Interlaced video */
     uint32_t linearFormat;
+    /* Set by graphics to indicate that this buffer will be written to but not
+     * swapped out */
+    bool isSingleBufferMode;
 };
 
 enum DispParamType {
@@ -114,6 +117,7 @@ enum DispParamType {
     S3D_FORMAT = 0x800,
     LINEAR_FORMAT = 0x1000,
     SET_IGC = 0x2000,
+    SET_SINGLE_BUFFER_MODE = 0x4000,
 };
 
 struct private_handle_t;
