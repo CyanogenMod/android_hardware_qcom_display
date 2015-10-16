@@ -78,7 +78,7 @@ protected:
     struct FrameInfo {
         /* maps layer list to mdp list */
         int layerCount;
-        int layerToMDP[MAX_NUM_LAYERS];
+        int layerToMDP[MAX_NUM_APP_LAYERS];
 
         /* maps mdp list to layer list */
         int mdpCount;
@@ -86,7 +86,7 @@ protected:
 
         /* layer composing on FB? */
         int fbCount;
-        bool isFBComposed[MAX_NUM_LAYERS];
+        bool isFBComposed[MAX_NUM_APP_LAYERS];
 
         bool needsRedraw;
         int fbZ;
@@ -104,7 +104,7 @@ protected:
         int mdpCount;
         int cacheCount;
         int fbZ;
-        buffer_handle_t hnd[MAX_NUM_LAYERS];
+        buffer_handle_t hnd[MAX_NUM_APP_LAYERS];
 
         /* c'tor */
         LayerCache();
