@@ -430,12 +430,16 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].planeAlpha = false;
     ctx->listStats[dpy].yuvCount = 0;
 
-    for (size_t i = 0; i < list->numHwLayers; i++) {
+    //reset yuv indices
+    memset(ctx->listStats[dpy].yuvIndices, -1, MAX_NUM_APP_LAYERS);
+
+    for (size_t i = 0; i < (list->numHwLayers - 1); i++) {
         hwc_layer_1_t const* layer = &list->hwLayers[i];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
 
-        //reset stored yuv index
-        ctx->listStats[dpy].yuvIndices[i] = -1;
+        // continue if i reaches MAX_NUM_APP_LAYERS
+        if(i >= MAX_NUM_APP_LAYERS)
+            continue;
 
         if(list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             continue;
@@ -646,8 +650,7 @@ void closeAcquireFds(hwc_display_contents_1_t* list) {
 int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
         int fd) {
     int ret = 0;
-
-    int acquireFd[MAX_NUM_LAYERS];
+    int acquireFd[MAX_NUM_APP_LAYERS];
     int count = 0;
     int releaseFd = -1;
     int retireFd = -1;
