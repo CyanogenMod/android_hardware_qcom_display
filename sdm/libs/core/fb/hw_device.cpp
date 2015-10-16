@@ -995,7 +995,7 @@ DisplayError HWDevice::GetMaxCEAFormat(uint32_t *max_cea_format) {
   return kErrorNotSupported;
 }
 
-DisplayError HWDevice::OnMinHdcpEncryptionLevelChange() {
+DisplayError HWDevice::OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) {
   return kErrorNotSupported;
 }
 

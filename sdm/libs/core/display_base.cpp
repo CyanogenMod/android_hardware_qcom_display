@@ -454,7 +454,7 @@ DisplayError DisplayBase::SetPanelBrightness(int level) {
   return kErrorNotSupported;
 }
 
-DisplayError DisplayBase::OnMinHdcpEncryptionLevelChange() {
+DisplayError DisplayBase::OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) {
   return kErrorNotSupported;
 }
 
