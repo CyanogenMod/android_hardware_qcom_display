@@ -159,6 +159,11 @@ bool CopyBit::prepare(hwc_context_t *ctx, hwc_display_contents_1_t *list,
         return false;
     }
 
+    if (ctx->listStats[dpy].numAppLayers > MAX_NUM_APP_LAYERS) {
+        // Reached max layers supported by HWC.
+        return false;
+    }
+
     bool useCopybitForYUV = canUseCopybitForYUV(ctx);
     bool useCopybitForRGB = canUseCopybitForRGB(ctx, list, dpy);
     LayerProp *layerProp = ctx->layerProp[dpy];

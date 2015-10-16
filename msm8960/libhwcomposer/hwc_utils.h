@@ -35,7 +35,7 @@
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
-#define MAX_NUM_LAYERS 32 //includes fb layer
+#define MAX_NUM_APP_LAYERS 32
 #define MAX_DISPLAY_DIM 2048
 
 // For support of virtual displays
@@ -91,7 +91,7 @@ struct ListStats {
     int fbLayerIndex; //Always last for now. = numAppLayers
     //Video specific
     int yuvCount;
-    int yuvIndices[MAX_NUM_LAYERS];
+    int yuvIndices[MAX_NUM_APP_LAYERS];
     bool needsAlphaScale;
     bool preMultipliedAlpha;
     bool planeAlpha;

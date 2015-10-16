@@ -343,6 +343,7 @@ ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type) {
 
 bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     bool ret = true;
+    const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
 
     if(!isEnabled()) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. not enabled.", __FUNCTION__);
@@ -354,6 +355,9 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     } else if(ctx->mVideoTransFlag) {
         ALOGD_IF(isDebug(), "%s: MDP Comp. video transition padding round",
                 __FUNCTION__);
+    } else if(numAppLayers > MAX_NUM_APP_LAYERS) {
+        ALOGD_IF(isDebug(), "%s: Number of App layers exceeded the limit ",
+                 __FUNCTION__);
         ret = false;
     }
     return ret;
