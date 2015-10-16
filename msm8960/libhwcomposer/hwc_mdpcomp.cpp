@@ -344,9 +344,8 @@ ovutils::eDest MDPComp::getMdpPipe(hwc_context_t *ctx, ePipeType type) {
 }
 
 bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
-    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
-    bool ret = true;
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+    bool ret = true;
 
     if(!isEnabled()) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. not enabled.", __FUNCTION__);
