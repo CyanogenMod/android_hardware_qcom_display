@@ -217,13 +217,27 @@ bool HWCColorManager::SolidFillLayersSet(hwc_display_contents_1_t **displays,
   if (solid_fill_enable_ && solid_fill_layers_ && layer_list) {
     hwc_display->Commit(solid_fill_layers_);
 
-    // release SF layers corresponding Fences manually before returning to Framework.
+    // SurfaceFlinger layer stack is dropped in solid fill case and replaced with local layer stack
+    // Close acquire fence fds associated with SF layer stack
+    // Close release/retire fence fds returned along with local layer stack
     for (size_t i = 0; i < (layer_list->numHwLayers - 1); i++) {
-      if (layer_list->hwLayers[i].acquireFenceFd >= 0) {
-        close(layer_list->hwLayers[i].acquireFenceFd);
-        layer_list->hwLayers[i].acquireFenceFd = -1;
+      int &fence_fd = layer_list->hwLayers[i].acquireFenceFd;
+      if (fence_fd >= 0) {
+        close(fence_fd);
+        fence_fd = -1;
       }
-      layer_list->retireFenceFd = -1;
+    }
+
+    for (size_t i = 0; i < (solid_fill_layers_->numHwLayers - 1); i++) {
+      int &fence_fd = solid_fill_layers_->hwLayers[i].releaseFenceFd;
+      if (fence_fd >= 0) {
+        close(fence_fd);
+        fence_fd = -1;
+      }
+    }
+    if (solid_fill_layers_->retireFenceFd >= 0) {
+      close(solid_fill_layers_->retireFenceFd);
+      solid_fill_layers_->retireFenceFd = -1;
     }
 
     return true;
