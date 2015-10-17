@@ -370,6 +370,8 @@ uint32_t roundOff(uint32_t refreshRate);
 
 void setRefreshRate(hwc_context_t *ctx, int dpy, uint32_t refreshRate);
 
+void readRefreshRate(hwc_context_t* ctx, int dpy);
+
 bool isPrimaryPortrait(hwc_context_t *ctx);
 
 bool isOrientationPortrait(hwc_context_t *ctx);

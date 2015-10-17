@@ -640,6 +640,33 @@ void setRefreshRate(hwc_context_t* ctx, int dpy, uint32_t refreshRate) {
     }
 }
 
+//Helper func to read the dyn fps
+void readRefreshRate(hwc_context_t* ctx, int dpy) {
+    if(!ctx)
+        return;
+    const int fbNum = Overlay::getFbForDpy(dpy);
+    ssize_t len = -1;
+    char sysfsPath[qdutils::MAX_SYSFS_FILE_PATH];
+    snprintf (sysfsPath, sizeof(sysfsPath),
+            "/sys/devices/virtual/graphics/fb%d/dynamic_fps", fbNum);
+
+    int fd = open(sysfsPath, O_RDONLY);
+    if(fd >= 0) {
+        char str[64];
+        len = read(fd, str, sizeof(str)-1);
+        if (len <= 0) {
+            ALOGE("%s: dynamic fps node empty", __FUNCTION__);
+            close(fd);
+            return;
+        }
+        str[len] = '\0'; /* null terminate the string */
+        ctx->dpyAttr[dpy].dynRefreshRate = atoi(str);
+        ALOGD_IF(HWC_UTILS_DEBUG, "%s: Dynamic fps read as %d",
+                 __FUNCTION__, ctx->dpyAttr[dpy].dynRefreshRate);
+        close(fd);
+    }
+}
+
 void dumpsys_log(android::String8& buf, const char* fmt, ...)
 {
     va_list varargs;
