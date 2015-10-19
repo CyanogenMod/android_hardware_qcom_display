@@ -147,7 +147,7 @@ DisplayError HWHDMI::Init(HWEventHandler *eventhandler) {
 DisplayError HWHDMI::Deinit() {
   hdmi_mode_count_ = 0;
   if (supported_video_modes_) {
-    delete supported_video_modes_;
+    delete[] supported_video_modes_;
   }
 
   return HWDevice::Deinit();
