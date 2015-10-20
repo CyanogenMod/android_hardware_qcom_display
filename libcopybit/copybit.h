@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <sys/cdefs.h>
 #include <sys/types.h>
+#include <gralloc_priv.h>
 
 __BEGIN_DECLS
 
