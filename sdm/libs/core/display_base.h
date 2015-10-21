@@ -81,6 +81,7 @@ class DisplayBase : public DisplayInterface {
   bool IsRotationRequired(HWLayers *hw_layers);
   const char *GetName(const LayerComposition &composition);
   const char *GetName(const LayerBufferFormat &format);
+  DisplayError ValidateGPUTarget(LayerStack *layer_stack);
 
   DisplayType display_type_;
   DisplayEventHandler *event_handler_ = NULL;

@@ -109,6 +109,56 @@ DisplayError DisplayBase::Deinit() {
   return kErrorNone;
 }
 
+DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
+  uint32_t i = 0;
+  Layer *layers = layer_stack->layers;
+
+  // TODO(user): Remove this check once we have query display attributes on virtual display
+  if (display_type_ == kVirtual) {
+    return kErrorNone;
+  }
+
+  while (i < layer_stack->layer_count && (layers[i].composition != kCompositionGPUTarget)) {
+    i++;
+  }
+
+  if (i >= layer_stack->layer_count) {
+    DLOGE("Either layer count is zero or GPU target layer is not present");
+    return kErrorParameters;
+  }
+
+  uint32_t gpu_target_index = i;
+
+  // Check GPU target layer
+  Layer &gpu_target_layer = layer_stack->layers[gpu_target_index];
+
+  if (!IsValid(gpu_target_layer.src_rect)) {
+    DLOGE("Invalid src rect for GPU target layer");
+    return kErrorParameters;
+  }
+
+  if (!IsValid(gpu_target_layer.dst_rect)) {
+    DLOGE("Invalid dst rect for GPU target layer");
+    return kErrorParameters;
+  }
+
+  uint32_t gpu_target_layer_dst_xpixels = gpu_target_layer.dst_rect.right;
+  uint32_t gpu_target_layer_dst_ypixels = gpu_target_layer.dst_rect.bottom;
+
+  HWDisplayAttributes display_attrib;
+  uint32_t active_index = 0;
+  hw_intf_->GetActiveConfig(&active_index);
+  hw_intf_->GetDisplayAttributes(active_index, &display_attrib);
+
+  if (gpu_target_layer_dst_xpixels > display_attrib.x_pixels ||
+    gpu_target_layer_dst_ypixels > display_attrib.y_pixels) {
+    DLOGE("GPU target layer dst rect is not with in limits");
+    return kErrorParameters;
+  }
+
+  return kErrorNone;
+}
+
 DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
   bool disable_partial_update = false;
@@ -119,6 +169,11 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   }
 
   pending_commit_ = false;
+
+  error = ValidateGPUTarget(layer_stack);
+  if (error != kErrorNone) {
+    return error;
+  }
 
   if (state_ == kStateOn) {
     if (color_mgr_) {
