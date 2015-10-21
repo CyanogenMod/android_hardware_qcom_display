@@ -134,6 +134,7 @@ struct HWPanelInfo {
   uint32_t max_fps = 0;               // Max fps supported by panel
   bool is_primary_panel = false;      // Panel is primary display
   HWSplitInfo split_info;             // Panel split configuration
+  char panel_name[256] = {0};         // Panel name
 
   bool operator !=(const HWPanelInfo &panel_info) {
     return ((port != panel_info.port) || (mode != panel_info.mode) ||

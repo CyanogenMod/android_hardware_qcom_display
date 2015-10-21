@@ -101,10 +101,13 @@ class HWDevice : public HWInterface {
   // Populates HWPanelInfo based on node index
   void PopulateHWPanelInfo();
   void GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info);
+  void GetHWPanelNameByNode(int device_node, HWPanelInfo *panel_info);
   HWDisplayPort GetHWDisplayPort(int device_node);
   HWDisplayMode GetHWDisplayMode(int device_node);
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
   int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
+  int ParseLine(char *input, const char *delim, char *tokens[],
+                const uint32_t max_token, uint32_t *count);
   mdp_scale_data* GetScaleDataRef(uint32_t index) { return &scale_data_[index]; }
   void SetHWScaleData(const ScaleData &scale, uint32_t index);
   void ResetDisplayParams();

@@ -679,6 +679,40 @@ void HWDevice::PopulateHWPanelInfo() {
         hw_panel_info_.split_info.right_split);
 }
 
+void HWDevice::GetHWPanelNameByNode(int device_node, HWPanelInfo *panel_info) {
+  if (!panel_info) {
+    DLOGE("PanelInfo pointer in invalid.");
+    return;
+  }
+  char *string_buffer = new char[kMaxStringLength]();
+  if (!string_buffer) {
+    DLOGE("Failed to allocated string_buffer memory");
+    return;
+  }
+  snprintf(string_buffer, kMaxStringLength, "%s%d/msm_fb_panel_info", fb_path_, device_node);
+  FILE *fileptr = Sys::fopen_(string_buffer, "r");
+  if (!fileptr) {
+    DLOGW("Failed to open msm_fb_panel_info node device node %d", device_node);
+  } else {
+    char *line = string_buffer;
+    size_t len = kMaxStringLength;
+
+    while ((Sys::getline_(&line, &len, fileptr)) != -1) {
+      uint32_t token_count = 0;
+      const uint32_t max_count = 10;
+      char *tokens[max_count] = { NULL };
+      if (!ParseLine(line, "=\n", tokens, max_count, &token_count)) {
+        if (!strncmp(tokens[0], "panel_name", strlen("panel_name"))) {
+          snprintf(panel_info->panel_name, sizeof(panel_info->panel_name), "%s", tokens[1]);
+          break;
+        }
+      }
+    }
+    Sys::fclose_(fileptr);
+  }
+  delete[] string_buffer;
+}
+
 void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
   if (!panel_info) {
     DLOGE("PanelInfo pointer in invalid.");
@@ -733,6 +767,7 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
   panel_info->port = GetHWDisplayPort(device_node);
   panel_info->mode = GetHWDisplayMode(device_node);
   GetSplitInfo(device_node, panel_info);
+  GetHWPanelNameByNode(device_node, panel_info);
 }
 
 HWDisplayPort HWDevice::GetHWDisplayPort(int device_node) {
@@ -842,6 +877,24 @@ int HWDevice::ParseLine(char *input, char *tokens[], const uint32_t max_token, u
   char *temp_ptr;
   uint32_t index = 0;
   const char *delim = ", =\n";
+  if (!input) {
+    return -1;
+  }
+  tmp_token = strtok_r(input, delim, &temp_ptr);
+  while (tmp_token && index < max_token) {
+    tokens[index++] = tmp_token;
+    tmp_token = strtok_r(NULL, delim, &temp_ptr);
+  }
+  *count = index;
+
+  return 0;
+}
+
+int HWDevice::ParseLine(char *input, const char *delim, char *tokens[],
+                        const uint32_t max_token, uint32_t *count) {
+  char *tmp_token = NULL;
+  char *temp_ptr;
+  uint32_t index = 0;
   if (!input) {
     return -1;
   }

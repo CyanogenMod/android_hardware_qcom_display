@@ -30,6 +30,7 @@
 #ifndef __COLOR_PARAMS_H__
 #define __COLOR_PARAMS_H__
 
+#include <stdio.h>
 #include <string.h>
 #include <utils/locker.h>
 #include <utils/constants.h>
@@ -105,20 +106,11 @@ struct PPFeatureVersion {
 };
 
 struct PPHWAttributes : HWResourceInfo, HWPanelInfo, DisplayConfigVariableInfo {
-  const char *panel_name = "generic_panel";  // TODO(user):  Add into HWPanelInfo
-                                             // to retrieve panel_name from HW.
+  char panel_name[256] = "generic_panel";
   PPFeatureVersion version;
 
-  inline void Set(const HWResourceInfo &hw_res, const HWPanelInfo &panel_info,
-                  const DisplayConfigVariableInfo &attr, const PPFeatureVersion &feature_ver) {
-    HWResourceInfo &res = *this;
-    res = hw_res;
-    HWPanelInfo &panel = *this;
-    panel = panel_info;
-    DisplayConfigVariableInfo &attributes = *this;
-    attributes = attr;
-    version = feature_ver;
-  }
+  void Set(const HWResourceInfo &hw_res, const HWPanelInfo &panel_info,
+           const DisplayConfigVariableInfo &attr, const PPFeatureVersion &feature_ver);
 };
 
 struct PPDisplayAPIPayload {
