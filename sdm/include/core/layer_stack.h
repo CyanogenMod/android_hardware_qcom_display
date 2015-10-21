@@ -44,13 +44,13 @@ namespace sdm {
   @sa Layer
 */
 enum LayerBlending {
-  kBlendingOpaque,          //!< Pixel color is expressed using straight alpha in color tuples. It
-                            //!< is constant blend operation. The layer would appear opaque if plane
-                            //!< alpha is 0xFF.
-
   kBlendingPremultiplied,   //!< Pixel color is expressed using premultiplied alpha in RGBA tuples.
                             //!< If plane alpha is less than 0xFF, apply modulation as well.
                             //!<   pixel.rgb = src.rgb + dest.rgb x (1 - src.a)
+
+  kBlendingOpaque,          //!< Pixel color is expressed using straight alpha in color tuples. It
+                            //!< is constant blend operation. The layer would appear opaque if plane
+                            //!< alpha is 0xFF.
 
   kBlendingCoverage,        //!< Pixel color is expressed using straight alpha in color tuples. If
                             //!< plane alpha is less than 0xff, apply modulation as well.
@@ -259,8 +259,9 @@ struct Layer {
                                                    //!< rectangle shall be composed onto Nth blit
                                                    //!< target.
 
-  LayerBlending blending = kBlendingOpaque;        //!< Blending operation which need to be applied
-                                                   //!< on the layer buffer during composition.
+  LayerBlending blending = kBlendingPremultiplied;  //!< Blending operation which need to be
+                                                    //!< applied on the layer buffer during
+                                                    //!< composition.
 
   LayerTransform transform;                        //!< Rotation/Flip operations which need to be
                                                    //!< applied to the layer buffer during
