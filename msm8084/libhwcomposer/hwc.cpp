@@ -196,6 +196,18 @@ static void setNumActiveDisplays(hwc_context_t *ctx, int numDisplays,
     }
 }
 
+static bool validDisplay(int disp) {
+    switch(disp) {
+        case HWC_DISPLAY_PRIMARY:
+        case HWC_DISPLAY_EXTERNAL:
+        case HWC_DISPLAY_VIRTUAL:
+            return true;
+            break;
+        default:
+            return false;
+    }
+}
+
 static void reset(hwc_context_t *ctx, int numDisplays,
                   hwc_display_contents_1_t** displays) {
 
@@ -387,6 +399,10 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
     ATRACE_CALL();
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    if (!validDisplay(dpy)) {
+        return -EINVAL;
+    }
     switch(event) {
         case HWC_EVENT_VSYNC:
             if (ctx->vstate.enable == enable)
@@ -418,6 +434,10 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
     ATRACE_CALL();
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     int ret = 0, value = 0;
+
+    if (!validDisplay(dpy)) {
+        return -EINVAL;
+    }
 
     Locker::Autolock _l(ctx->mDrawLock);
     ALOGD_IF(POWER_MODE_DEBUG, "%s: Setting mode %d on display: %d",
@@ -734,6 +754,10 @@ int hwc_getDisplayConfigs(struct hwc_composer_device_1* dev, int disp,
         uint32_t* configs, size_t* numConfigs) {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    if (!validDisplay(disp)) {
+        return -EINVAL;
+    }
     disp = getDpyforExternalDisplay(ctx, disp);
     //Currently we allow only 1 config, reported as config id # 0
     //This config is passed in to getDisplayAttributes. Ignored for now.
@@ -764,6 +788,10 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         uint32_t /*config*/, const uint32_t* attributes, int32_t* values) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    if (!validDisplay(disp)) {
+        return -EINVAL;
+    }
     disp = getDpyforExternalDisplay(ctx, disp);
     //If hotpluggable displays(i.e, HDMI, WFD) are inactive return error
     if( (disp != HWC_DISPLAY_PRIMARY) && !ctx->dpyAttr[disp].connected) {
