@@ -86,6 +86,18 @@ static void hwc_registerProcs(struct hwc_composer_device_1* dev,
     init_vsync_thread(ctx);
 }
 
+static bool validDisplay(int disp) {
+    switch(disp) {
+        case HWC_DISPLAY_PRIMARY:
+        case HWC_DISPLAY_EXTERNAL:
+        case HWC_DISPLAY_VIRTUAL:
+            return true;
+            break;
+        default:
+            return false;
+    }
+}
+
 //Helper
 static void reset(hwc_context_t *ctx, int numDisplays,
                   hwc_display_contents_1_t** displays) {
@@ -293,6 +305,10 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev, int dpy,
     ATRACE_CALL();
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    if (!validDisplay(dpy)) {
+        return -EINVAL;
+    }
     switch(event) {
         case HWC_EVENT_VSYNC:
             if(!ctx->dpyAttr[dpy].isActive) {
@@ -319,6 +335,10 @@ static int hwc_blank(struct hwc_composer_device_1* dev, int dpy, int blank)
 {
     ATRACE_CALL();
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    if (!validDisplay(dpy)) {
+        return -EINVAL;
+    }
 
     Locker::Autolock _l(ctx->mDrawLock);
     int ret = 0;
@@ -586,6 +606,11 @@ int hwc_getDisplayConfigs(struct hwc_composer_device_1* dev, int disp,
         uint32_t* configs, size_t* numConfigs) {
     int ret = 0;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    if (!validDisplay(disp)) {
+        return -EINVAL;
+    }
+
     //in 1.1 there is no way to choose a config, report as config id # 0
     //This config is passed to getDisplayAttributes. Ignore for now.
     switch(disp) {
@@ -614,6 +639,11 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         uint32_t config, const uint32_t* attributes, int32_t* values) {
 
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    if (!validDisplay(disp)) {
+        return -EINVAL;
+    }
+
     //If hotpluggable displays are inactive return error
     if(disp == HWC_DISPLAY_EXTERNAL && !ctx->dpyAttr[disp].connected) {
         return -1;
