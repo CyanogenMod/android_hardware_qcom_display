@@ -92,6 +92,7 @@ class DisplayBase : public DisplayInterface {
   CompManager *comp_manager_ = NULL;
   RotatorInterface *rotator_intf_ = NULL;
   DisplayState state_ = kStateOff;
+  bool active_ = false;
   Handle hw_device_ = 0;
   Handle display_comp_ctx_ = 0;
   Handle display_rotator_ctx_ = 0;
