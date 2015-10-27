@@ -60,26 +60,8 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
     MetaData_t *data = reinterpret_cast <MetaData_t *>(base);
     data->operation |= paramType;
     switch (paramType) {
-        case PP_PARAM_HSIC:
-            data->hsicData = *((HSICData_t *)param);
-            break;
-        case PP_PARAM_SHARPNESS:
-            data->sharpness = *((int32_t *)param);
-            break;
-        case PP_PARAM_VID_INTFC:
-            data->video_interface = *((int32_t *)param);
-            break;
         case PP_PARAM_INTERLACED:
             data->interlaced = *((int32_t *)param);
-            break;
-        case PP_PARAM_IGC:
-            memcpy((void *)&data->igcData, param, sizeof(IGCData_t));
-            break;
-        case PP_PARAM_SHARP2:
-            data->Sharp2Data = *((Sharp2Data_t *)param);
-            break;
-        case PP_PARAM_TIMESTAMP:
-            data->timestamp = *((int64_t *)param);
             break;
         case UPDATE_BUFFER_GEOMETRY:
             data->bufferDim = *((BufferDim_t *)param);
