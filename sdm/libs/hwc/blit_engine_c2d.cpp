@@ -306,6 +306,10 @@ int BlitEngineC2d::PreCommit(hwc_display_contents_1_t *content_list, LayerStack 
   bool blit_needed = false;
   uint32_t usage = 0;
 
+  if (!num_app_layers) {
+    return -1;
+  }
+
   for (uint32_t i = num_app_layers-1; (i > 0) && (processed_blit < num_blit_target_); i--) {
     Layer &layer = layer_stack->layers[i];
     if (layer.composition != kCompositionBlit) {
@@ -374,6 +378,10 @@ int BlitEngineC2d::Commit(hwc_display_contents_1_t *content_list, LayerStack *la
   uint32_t num_app_layers = (uint32_t) content_list->numHwLayers-1;
   private_handle_t *target_buffer = blit_target_buffer_[current_blit_target_index_];
   blit_active_ = false;
+
+  if (!num_app_layers) {
+    return -1;
+  }
 
   // if not Blit Targets return
   for (uint32_t i = 0; i < num_app_layers; i++) {
