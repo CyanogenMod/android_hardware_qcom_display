@@ -45,6 +45,8 @@
 #define VENUS_BUFFER_SIZE(args...) 0
 #endif
 
+#define EXTRADATA_SIZE 8 * 1024
+
 #ifndef ION_ADSP_HEAP_ID
 #define ION_ADSP_HEAP_ID ION_CAMERA_HEAP_ID
 #endif
@@ -330,6 +332,7 @@ size_t getBufferSizeAndDimensions(int width, int height, int format,
             alignedw = ALIGN(alignedw, 128);
             size  = ALIGN( alignedw * alignedh, 8192);
             size += ALIGN( alignedw * ALIGN(height/2, 32), 8192);
+            size += EXTRADATA_SIZE;
             break;
         case HAL_PIXEL_FORMAT_NV12:
             alignedw = ALIGN(width, 16);
