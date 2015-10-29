@@ -59,4 +59,8 @@ else
 LOCAL_SRC_FILES += hwc_qdcm_legacy.cpp
 endif
 
+ifeq ($(TARGET_SUPPORTS_ANDROID_WEAR), true)
+    LOCAL_CFLAGS += -DSUPPORT_BLIT_TO_FB
+endif
+
 include $(BUILD_SHARED_LIBRARY)
