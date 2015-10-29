@@ -623,16 +623,6 @@ void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
   }
 }
 
-void HWDevice::SyncMerge(const int &fd1, const int &fd2, int *target) {
-  if (fd1 >= 0 && fd2 >= 0) {
-    buffer_sync_handler_->SyncMerge(fd1, fd2, target);
-  } else if (fd1 >= 0) {
-    *target = fd1;
-  } else if (fd2 >= 0) {
-    *target = fd2;
-  }
-}
-
 int HWDevice::GetFBNodeIndex(HWDeviceType device_type) {
   for (int i = 0; i <= kDeviceVirtual; i++) {
     HWPanelInfo *panel_info = new HWPanelInfo();

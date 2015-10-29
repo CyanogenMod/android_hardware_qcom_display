@@ -54,6 +54,7 @@ class BufferSyncHandler {
   /*! @brief Method to wait for ouput buffer to be released.
 
     @details This method waits for fd to be signaled by the producer/consumer.
+    It is responsibility of the caller to close file descriptor.
 
     @param[in] fd
 
@@ -65,7 +66,8 @@ class BufferSyncHandler {
   /*! @brief Method to merge two sync fds into one sync fd
 
     @details This method merges two buffer sync fds into one sync fd, if a producer/consumer
-    requires to wait for more than one sync fds.
+    requires to wait for more than one sync fds. It is responsibility of the caller to close file
+    descriptor.
 
     @param[in] fd1
     @param[in] fd2
@@ -76,20 +78,10 @@ class BufferSyncHandler {
 
   virtual DisplayError SyncMerge(int fd1, int fd2, int *merged_fd) = 0;
 
-  /*! @brief Method to close sync fd
-
-    @details This method closes a sync fd.
-
-    @param[in] fd
-
-    @return \link None \endlink
- */
-
-  virtual void SyncClose(int fd) = 0;
-
   /*! @brief Method to detect if sync fd is signaled
 
-    @details This method detects if sync fd is signaled
+    @details This method detects if sync fd is signaled. It is responsibility of the caller to
+    close file descriptor.
 
     @param[in] fd
 

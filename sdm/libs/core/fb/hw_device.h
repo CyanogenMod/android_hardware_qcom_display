@@ -95,8 +95,6 @@ class HWDevice : public HWInterface {
   void SetRect(const LayerRect &source, mdp_rect *target);
   void SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
                    bool is_cursor_pipe_used, uint32_t *mdp_flags);
-  void SyncMerge(const int &fd1, const int &fd2, int *target);
-
   // Retrieves HW FrameBuffer Node Index
   int GetFBNodeIndex(HWDeviceType device_type);
   // Populates HWPanelInfo based on node index
