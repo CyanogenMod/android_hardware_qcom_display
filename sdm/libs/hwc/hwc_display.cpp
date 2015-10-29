@@ -61,6 +61,7 @@ static void ApplyDeInterlaceAdjustment(Layer *layer) {
   // De-interlacing adjustment
   if (layer->input_buffer->flags.interlace) {
     float height = (layer->src_rect.bottom - layer->src_rect.top) / 2.0f;
+    layer->src_rect.top = ROUND_UP_ALIGN_DOWN(layer->src_rect.top / 2.0f, 2);
     layer->src_rect.bottom = layer->src_rect.top + floorf(height);
   }
 }
