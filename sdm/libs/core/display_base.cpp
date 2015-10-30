@@ -175,57 +175,58 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
     return error;
   }
 
-  if (state_ == kStateOn) {
-    if (color_mgr_) {
-      disable_partial_update = color_mgr_->NeedsPartialUpdateDisable();
-      if (disable_partial_update) {
-        ControlPartialUpdate(false, &pending);
+  if (!active_) {
+    return kErrorPermission;
+  }
+
+  if (color_mgr_) {
+    disable_partial_update = color_mgr_->NeedsPartialUpdateDisable();
+    if (disable_partial_update) {
+      ControlPartialUpdate(false, &pending);
+    }
+  }
+
+  // Clean hw layers for reuse.
+  hw_layers_.info = HWLayersInfo();
+  hw_layers_.info.stack = layer_stack;
+  hw_layers_.output_compression = 1.0f;
+
+  comp_manager_->PrePrepare(display_comp_ctx_, &hw_layers_);
+  while (true) {
+    error = comp_manager_->Prepare(display_comp_ctx_, &hw_layers_);
+    if (error != kErrorNone) {
+      break;
+    }
+
+    if (IsRotationRequired(&hw_layers_)) {
+      if (!rotator_intf_) {
+        continue;
+      }
+      error = rotator_intf_->Prepare(display_rotator_ctx_, &hw_layers_);
+    } else {
+      // Release all the previous rotator sessions.
+      if (rotator_intf_) {
+        error = rotator_intf_->Purge(display_rotator_ctx_);
       }
     }
 
-    // Clean hw layers for reuse.
-    hw_layers_.info = HWLayersInfo();
-    hw_layers_.info.stack = layer_stack;
-    hw_layers_.output_compression = 1.0f;
-
-    comp_manager_->PrePrepare(display_comp_ctx_, &hw_layers_);
-    while (true) {
-      error = comp_manager_->Prepare(display_comp_ctx_, &hw_layers_);
-      if (error != kErrorNone) {
+    if (error == kErrorNone) {
+      error = hw_intf_->Validate(&hw_layers_);
+      if (error == kErrorNone) {
+        // Strategy is successful now, wait for Commit().
+        pending_commit_ = true;
         break;
       }
-
-      if (IsRotationRequired(&hw_layers_)) {
-        if (!rotator_intf_) {
-          continue;
-        }
-        error = rotator_intf_->Prepare(display_rotator_ctx_, &hw_layers_);
-      } else {
-        // Release all the previous rotator sessions.
-        if (rotator_intf_) {
-          error = rotator_intf_->Purge(display_rotator_ctx_);
-        }
-      }
-
-      if (error == kErrorNone) {
-        error = hw_intf_->Validate(&hw_layers_);
-        if (error == kErrorNone) {
-          // Strategy is successful now, wait for Commit().
-          pending_commit_ = true;
-          break;
-        }
-        if (error == kErrorShutDown) {
-          comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
-          return error;
-        }
+      if (error == kErrorShutDown) {
+        comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
+        return error;
       }
     }
-    comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
-    if (disable_partial_update) {
-      ControlPartialUpdate(true, &pending);
-    }
-  } else {
-    return kErrorNotSupported;
+  }
+
+  comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
+  if (disable_partial_update) {
+    ControlPartialUpdate(true, &pending);
   }
 
   return error;
@@ -238,8 +239,8 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
     return kErrorParameters;
   }
 
-  if (state_ != kStateOn) {
-    return kErrorNotSupported;
+  if (!active_) {
+    return kErrorPermission;
   }
 
   if (!pending_commit_) {
@@ -300,8 +301,8 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
 DisplayError DisplayBase::Flush() {
   DisplayError error = kErrorNone;
 
-  if (state_ != kStateOn) {
-    return kErrorNone;
+  if (!active_) {
+    return kErrorPermission;
   }
 
   hw_layers_.info.count = 0;
@@ -369,6 +370,7 @@ bool DisplayBase::IsUnderscanSupported() {
 
 DisplayError DisplayBase::SetDisplayState(DisplayState state) {
   DisplayError error = kErrorNone;
+  bool active = false;
 
   DLOGI("Set state = %d, display %d", state, display_type_);
 
@@ -399,10 +401,12 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 
   case kStateOn:
     error = hw_intf_->PowerOn();
+    active = true;
     break;
 
   case kStateDoze:
     error = hw_intf_->Doze();
+    active = true;
     break;
 
   case kStateDozeSuspend:
@@ -419,6 +423,7 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
   }
 
   if (error == kErrorNone) {
+    active_ = active;
     state_ = state;
   }
 

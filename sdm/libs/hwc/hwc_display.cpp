@@ -163,6 +163,7 @@ int HWCDisplay::EventControl(int event, int enable) {
 int HWCDisplay::SetPowerMode(int mode) {
   DLOGI("display = %d, mode = %d", id_, mode);
   DisplayState state = kStateOff;
+  bool flush_on_error = flush_on_error_;
 
   if (shutdown_pending_) {
     return 0;
@@ -170,26 +171,35 @@ int HWCDisplay::SetPowerMode(int mode) {
 
   switch (mode) {
   case HWC_POWER_MODE_OFF:
+    // During power off, all of the buffers are released.
+    // Do not flush until a buffer is successfully submitted again.
+    flush_on_error = false;
     state = kStateOff;
     break;
+
   case HWC_POWER_MODE_NORMAL:
     state = kStateOn;
     last_power_mode_ = HWC_POWER_MODE_NORMAL;
     break;
+
   case HWC_POWER_MODE_DOZE:
     state = kStateDoze;
     last_power_mode_ = HWC_POWER_MODE_DOZE;
     break;
+
   case HWC_POWER_MODE_DOZE_SUSPEND:
     state = kStateDozeSuspend;
     last_power_mode_ = HWC_POWER_MODE_DOZE_SUSPEND;
     break;
+
   default:
     return -EINVAL;
   }
 
   DisplayError error = display_intf_->SetDisplayState(state);
-  if (error != kErrorNone) {
+  if (error == kErrorNone) {
+    flush_on_error_ = flush_on_error;
+  } else {
     if (error == kErrorShutDown) {
       shutdown_pending_ = true;
       return 0;
@@ -593,6 +603,7 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   if (shutdown_pending_) {
     return 0;
   }
+
   size_t num_hw_layers = content_list->numHwLayers;
 
   if (!skip_prepare_) {
@@ -600,12 +611,12 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     if (error != kErrorNone) {
       if (error == kErrorShutDown) {
         shutdown_pending_ = true;
-        return 0;
+      } else if (error != kErrorPermission) {
+        DLOGE("Prepare failed. Error = %d", error);
+        // To prevent surfaceflinger infinite wait, flush the previous frame during Commit()
+        // so that previous buffer and fences are released, and override the error.
+        flush_ = true;
       }
-      DLOGE("Prepare failed. Error = %d", error);
-      // To prevent surfaceflinger infinite wait, flush the previous frame during Commit() so that
-      // previous buffer and fences are released, and override the error.
-      flush_ = true;
 
       return 0;
     }
@@ -685,17 +696,18 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
     }
 
     if (error == kErrorNone) {
-      // Do no call flush on errors, if a successful buffer is never submitted.
+      // A commit is successfully submitted, start flushing on failure now onwards.
       flush_on_error_ = true;
     } else {
       if (error == kErrorShutDown) {
         shutdown_pending_ = true;
         return status;
+      } else if (error != kErrorPermission) {
+        DLOGE("Commit failed. Error = %d", error);
+        // To prevent surfaceflinger infinite wait, flush the previous frame during Commit()
+        // so that previous buffer and fences are released, and override the error.
+        flush_ = true;
       }
-      DLOGE("Commit failed. Error = %d", error);
-      // To prevent surfaceflinger infinite wait, flush the previous frame during Commit() so that
-      // previous buffer and fences are released, and override the error.
-      flush_ = true;
     }
   }
 
@@ -706,11 +718,9 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
   size_t num_hw_layers = content_list->numHwLayers;
   int status = 0;
 
+  // Do no call flush on errors, if a successful buffer is never submitted.
   if (flush_ && flush_on_error_) {
-    DisplayError error = display_intf_->Flush();
-    if (error != kErrorNone) {
-      DLOGE("Flush failed. Error = %d", error);
-    }
+    display_intf_->Flush();
   }
 
   // Set the release fence fd to the blit engine

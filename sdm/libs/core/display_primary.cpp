@@ -208,7 +208,7 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
   DisplayError error = kErrorNone;
   HWDisplayMode hw_display_mode = kModeDefault;
 
-  if (state_ != kStateOn) {
+  if (!active_) {
     DLOGW("Invalid display state = %d. Panel must be on.", state_);
     return kErrorNotSupported;
   }
@@ -283,7 +283,7 @@ DisplayError DisplayPrimary::GetRefreshRateRange(uint32_t *min_refresh_rate,
 DisplayError DisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
   SCOPE_LOCK(locker_);
 
-  if (state_ != kStateOn || !hw_panel_info_.dynamic_fps) {
+  if (!active_ || !hw_panel_info_.dynamic_fps) {
     return kErrorNotSupported;
   }
 

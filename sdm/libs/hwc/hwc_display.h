@@ -187,7 +187,6 @@ class HWCDisplay : public DisplayEventHandler {
   bool use_blit_comp_ = false;
   bool secure_display_active_ = false;
   bool skip_prepare_ = false;
-
   bool solid_fill_enable_ = false;
   uint32_t solid_fill_color_ = 0;
   LayerRect display_rect_;
