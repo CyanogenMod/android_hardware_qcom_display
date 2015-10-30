@@ -642,7 +642,7 @@ void setRefreshRate(hwc_context_t* ctx, int dpy, uint32_t refreshRate) {
 
 //Helper func to read the dyn fps
 void readRefreshRate(hwc_context_t* ctx, int dpy) {
-    if(!ctx)
+    if(!ctx || !ctx->dpyAttr[dpy].isActive)
         return;
     const int fbNum = Overlay::getFbForDpy(dpy);
     ssize_t len = -1;
