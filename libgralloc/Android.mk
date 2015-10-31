@@ -21,13 +21,13 @@ LOCAL_MODULE                  := gralloc.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_PATH             := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
-LOCAL_SHARED_LIBRARIES        := $(common_libs) libmemalloc
+LOCAL_SHARED_LIBRARIES        := $(common_libs) libmemalloc libqdMetaData
 LOCAL_SHARED_LIBRARIES        += libqdutils libGLESv1_CM
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps) $(kernel_deps)
 LOCAL_SRC_FILES               := gpu.cpp gralloc.cpp framebuffer.cpp mapper.cpp
 LOCAL_COPY_HEADERS_TO         := $(common_header_export_path)
-LOCAL_COPY_HEADERS            := gralloc_priv.h
+LOCAL_COPY_HEADERS            := gralloc_priv.h gr.h
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -41,5 +41,6 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libqdutils libdl
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdmemalloc\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps) $(kernel_deps)
 LOCAL_SRC_FILES               := ionalloc.cpp alloc_controller.cpp
+LOCAL_COPY_HEADERS            := alloc_controller.h memalloc.h
 
 include $(BUILD_SHARED_LIBRARY)
