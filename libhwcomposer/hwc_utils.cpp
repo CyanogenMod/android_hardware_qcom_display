@@ -438,7 +438,7 @@ uint32_t roundOff(uint32_t refreshRate) {
     int count =  (int) (sizeof(stdRefreshRates)/sizeof(stdRefreshRates[0]));
     uint32_t rate = refreshRate;
     for(int i=0; i< count; i++) {
-        if(abs(stdRefreshRates[i] - refreshRate) < 2) {
+        if((stdRefreshRates[i] - refreshRate) < 2) {
             // Most likely used for video, the fps can fluctuate
             // Ex: b/w 29 and 30 for 30 fps clip
             rate = stdRefreshRates[i];
@@ -1318,8 +1318,8 @@ hwc_rect_t deductRect(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
    return res;
 }
 
-void optimizeLayerRects(hwc_context_t *ctx,
-                        const hwc_display_contents_1_t *list, const int& dpy) {
+void optimizeLayerRects(hwc_context_t * /*ctx*/,
+                        const hwc_display_contents_1_t *list, const int& /*dpy*/) {
     int i=list->numHwLayers-2;
     hwc_rect_t irect;
     while(i > 0) {
@@ -2242,8 +2242,7 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
             EGLint attr_list[] = {EGL_GPU_HINT_1,
                                   EGL_GPU_LEVEL_3,
                                   EGL_NONE };
-            if((gpuHint->mCurrGPUPerfMode != EGL_GPU_LEVEL_3) &&
-                !((*(ctx->mpfn_eglGpuPerfHintQCOM))(gpuHint->mEGLDisplay,
+            if (!((*(ctx->mpfn_eglGpuPerfHintQCOM))(gpuHint->mEGLDisplay,
                                     gpuHint->mEGLContext, attr_list))) {
                 ALOGW("eglGpuPerfHintQCOM failed for Built in display");
             } else {
@@ -2302,7 +2301,7 @@ void reset_layer_prop(hwc_context_t* ctx, int dpy, int numAppLayers) {
     ctx->layerProp[dpy] = new LayerProp[numAppLayers];
 }
 
-void BwcPM::setBwc(hwc_context_t *ctx, const hwc_rect_t& crop,
+void BwcPM::setBwc(hwc_context_t * /*ctx*/, const hwc_rect_t& crop,
             const hwc_rect_t& dst, const int& transform,
             ovutils::eMdpFlags& mdpFlags) {
     //Target doesnt support Bwc

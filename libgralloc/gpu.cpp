@@ -184,7 +184,7 @@ void gpu_context_t::getGrallocInformationFromFormat(int inputFormat,
     }
 }
 
-int gpu_context_t::gralloc_alloc_framebuffer_locked(size_t size, int usage,
+int gpu_context_t::gralloc_alloc_framebuffer_locked(size_t /*size*/, int usage,
                                                     buffer_handle_t* pHandle)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(common.module);

@@ -96,13 +96,17 @@ static android::status_t screenRefresh(hwc_context_t *ctx) {
     return result;
 }
 
-static android::status_t vpuCommand(hwc_context_t *ctx,
+static android::status_t vpuCommand(hwc_context_t * /*ctx*/,
         uint32_t command,
         const Parcel* inParcel,
         Parcel* outParcel) {
     status_t result = NO_INIT;
 #ifdef VPU_TARGET
     result = ctx->mVPUClient->processCommand(command, inParcel, outParcel);
+#else
+    (void)command;
+    (void)inParcel;
+    (void)outParcel;
 #endif
     return result;
 }
@@ -128,7 +132,7 @@ static void getDisplayAttributes(hwc_context_t* ctx, const Parcel* inParcel,
     //XXX: Need to check what to return for HDMI
     outParcel->writeInt32(ctx->mMDP.panel);
 }
-static void setHSIC(hwc_context_t* ctx, const Parcel* inParcel) {
+static void setHSIC(hwc_context_t* /*ctx*/, const Parcel* inParcel) {
     int dpy = inParcel->readInt32();
     HSICData_t hsic_data;
     hsic_data.hue = inParcel->readInt32();

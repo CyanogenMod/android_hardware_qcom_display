@@ -55,7 +55,7 @@ static IMemAlloc* getAllocator(int flags)
     return memalloc;
 }
 
-static int gralloc_map(gralloc_module_t const* module,
+static int gralloc_map(gralloc_module_t const* /*module*/,
                        buffer_handle_t handle)
 {
     private_handle_t* hnd = (private_handle_t*)handle;
@@ -89,7 +89,7 @@ static int gralloc_map(gralloc_module_t const* module,
     return 0;
 }
 
-static int gralloc_unmap(gralloc_module_t const* module,
+static int gralloc_unmap(gralloc_module_t const* /*module*/,
                          buffer_handle_t handle)
 {
     private_handle_t* hnd = (private_handle_t*)handle;
@@ -261,7 +261,7 @@ int gralloc_lock_ycbcr(gralloc_module_t const* module,
     return err;
 }
 
-int gralloc_unlock(gralloc_module_t const* module,
+int gralloc_unlock(gralloc_module_t const* /*module*/,
                    buffer_handle_t handle)
 {
     if (private_handle_t::validate(handle) < 0)
@@ -282,7 +282,7 @@ int gralloc_unlock(gralloc_module_t const* module,
 
 /*****************************************************************************/
 
-int gralloc_perform(struct gralloc_module_t const* module,
+int gralloc_perform(struct gralloc_module_t const* /*module*/,
                     int operation, ... )
 {
     int res = -EINVAL;
