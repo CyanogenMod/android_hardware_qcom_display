@@ -764,7 +764,7 @@ int CopyBit::drawRectUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
 
 
 int  CopyBit::drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
-                          private_handle_t *renderBuffer, int dpy, bool isFG)
+                          private_handle_t *renderBuffer, int /*dpy*/, bool isFG)
 {
     hwc_context_t* ctx = (hwc_context_t*)(dev);
     int err = 0, acquireFd;

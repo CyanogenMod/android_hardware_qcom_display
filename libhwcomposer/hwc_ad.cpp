@@ -256,12 +256,12 @@ bool AssertiveDisplay::draw(hwc_context_t *ctx, int fd, uint32_t offset) {
     return true;
 }
 
-int AssertiveDisplay::getDstFd(hwc_context_t *ctx) const {
+int AssertiveDisplay::getDstFd(hwc_context_t * /*ctx*/) const {
     overlay::Writeback *wb = overlay::Writeback::getInstance();
     return wb->getDstFd();
 }
 
-uint32_t AssertiveDisplay::getDstOffset(hwc_context_t *ctx) const {
+uint32_t AssertiveDisplay::getDstOffset(hwc_context_t * /*ctx*/) const {
     overlay::Writeback *wb = overlay::Writeback::getInstance();
     return wb->getOffset();
 }
