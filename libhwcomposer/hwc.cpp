@@ -848,9 +848,6 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
             values[i] = ctx->dpyAttr[disp].fbformat;
             break;
 #endif
-        case HWC_DISPLAY_SECURE:
-            values[i] = (int32_t) (ctx->dpyAttr[disp].secure);
-            break;
         default:
             ALOGE("Unknown display attribute %d",
                     attributes[i]);
