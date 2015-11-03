@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -193,7 +193,7 @@ void HDMIDisplay::readCEUnderscanInfo()
         return;
     } else {
         len = read(hdmiScanInfoFile, scanInfo, sizeof(scanInfo)-1);
-        ALOGD("%s: Scan Info string: %s length = %zu",
+        ALOGD("%s: Scan Info string: %s length = %zd",
                  __FUNCTION__, scanInfo, len);
         if (len <= 0) {
             close(hdmiScanInfoFile);
@@ -317,7 +317,7 @@ bool HDMIDisplay::readResolution()
         return false;
     } else {
         len = read(hdmiEDIDFile, edidStr, sizeof(edidStr)-1);
-        ALOGD_IF(DEBUG, "%s: EDID string: %s length = %zu",
+        ALOGD_IF(DEBUG, "%s: EDID string: %s length = %zd",
                  __FUNCTION__, edidStr, len);
         if (len <= 0) {
             ALOGE("%s: edid_modes file empty", __FUNCTION__);
@@ -562,7 +562,7 @@ bool HDMIDisplay::readResFile(char * configBuffer) {
         fileRead = true;
     }
     close(fd);
-    ALOGD_IF(DEBUG, "%s: bytesRead=%d fileRead=%d",
+    ALOGD_IF(DEBUG, "%s: bytesRead=%zu fileRead=%d",
             __FUNCTION__, bytesRead, fileRead);
     return fileRead;
 }
@@ -946,7 +946,6 @@ bool HDMIDisplay::configure3D(int s3dMode) {
 // returns false if the xres or yres of the new config do
 // not match the current config
 bool HDMIDisplay::isValidConfigChange(int newConfig) {
-    int newMode = mEDIDModes[newConfig];
     uint32_t width = 0, height = 0, refresh = 0, fps = 0;
     getAttrForConfig(newConfig, width, height, refresh, fps);
     return ((mXres == width) && (mYres == height)) || mEnableResolutionChange;
@@ -983,7 +982,7 @@ int HDMIDisplay::getAttrForConfig(int config, uint32_t& xres,
 int HDMIDisplay::getDisplayConfigs(uint32_t* configs,
         size_t* numConfigs) const {
     if (*numConfigs <= 0) {
-        ALOGE("%s Invalid number of configs (%d)", __FUNCTION__, *numConfigs);
+        ALOGE("%s Invalid number of configs (%zu)", __FUNCTION__, *numConfigs);
         return -EINVAL;
     }
     *numConfigs = mModeCount;

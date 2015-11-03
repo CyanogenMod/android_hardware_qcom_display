@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2016, The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
  *
@@ -1095,7 +1095,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         return false;
     }
     private_handle_t *renderBuf = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
-    Whf layerWhf[numPTORLayersFound]; // To store w,h,f of PTOR layers
+    Whf layerWhf[MAX_PTOR_LAYERS]; // To store w,h,f of PTOR layers
 
     // Store the blending mode, planeAlpha, and transform of PTOR layers
     int32_t blending[numPTORLayersFound];
@@ -1251,8 +1251,6 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
         reset(ctx);
         return false;
     }
-
-    int mdpCount = mCurrentFrame.mdpCount;
 
     if(sEnableYUVsplit){
         adjustForSourceSplit(ctx, list);
@@ -1472,7 +1470,7 @@ bool MDPComp::mdpOnlyLayersComp(hwc_context_t *ctx,
         /* Bail out if we are processing only secured video/ui layers
          * and we dont have any */
         if(secureOnly) {
-            ALOGD_IF(isDebug(), "%s: No secure video/ui layers");
+            ALOGD_IF(isDebug(), "%s: No secure video/ui layers",__FUNCTION__);
             return false;
         }
         /* No Idle fall back for secure video/ui layers and if there is only
@@ -2032,16 +2030,12 @@ bool MDPComp::hwLimitationsCheck(hwc_context_t* ctx,
 
 static bool validForCursor(hwc_context_t* ctx, int dpy, hwc_layer_1_t* layer) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
-    hwc_rect dst = layer->displayFrame;
     hwc_rect src = integerizeSourceCrop(layer->sourceCropf);
     int srcW = src.right - src.left;
     int srcH = src.bottom - src.top;
-    int dstW = dst.right - dst.left;
-    int dstH = dst.bottom - dst.top;
     qdutils::MDPVersion &mdpVersion = qdutils::MDPVersion::getInstance();
     uint32_t maxCursorSize = mdpVersion.getMaxCursorSize();
     uint32_t numHwCursors = mdpVersion.getCursorPipes();
-    bool primarySplit = isDisplaySplit(ctx, HWC_DISPLAY_PRIMARY);
     uint32_t cursorPipesNeeded = 1; // One cursor pipe needed(default)
     bool ret = false;
 
