@@ -43,14 +43,6 @@
 #include <profiler.h>
 
 #define EVEN_OUT(x) if (x & 0x0001) {x--;}
-/** min of int a, b */
-static inline int min(int a, int b) {
-    return (a<b) ? a : b;
-}
-/** max of int a, b */
-static inline int max(int a, int b) {
-    return (a>b) ? a : b;
-}
 
 enum {
     PAGE_FLIP = 0x00000001,
