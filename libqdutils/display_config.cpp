@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
+* Copyright (c) 2013-2014,2016 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -399,9 +399,7 @@ bool Configs::setActiveConfig(const uint32_t& index) {
         return false;
     }
 
-    bool ret = true;
     int fd = -1;
-    size_t len = PAGE_SIZE;
     char sysfsPath[MAX_SYSFS_FILE_PATH];
     memset(sysfsPath, '\0', sizeof(sysfsPath));
     snprintf(sysfsPath , sizeof(sysfsPath),

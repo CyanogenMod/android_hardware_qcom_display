@@ -93,7 +93,6 @@ bool HWCursor::setPositionAsync(const int fd, int x, int y) {
 
 bool HWCursor::free(const int fd) {
     fb_cursor *cursor = &mfbCursor;
-    fb_image cursorImage;
     bool ret = true;
 
     if(!cursor->enable) {
@@ -116,7 +115,7 @@ bool HWCursor::setCursor(const int fd) {
     fb_cursor *cursor = &mfbCursor;
 
     if(fd <= 0) {
-        ALOGE("%s: Invalid fd", fd);
+        ALOGE("%s: Invalid fd %d",__FUNCTION__, fd);
         return false;
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2016, The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
  *
@@ -854,7 +854,8 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
                                 hwc_display_contents_1_t* list){
 
     const int numAppLayers = ctx->listStats[mDpy].numAppLayers;
-    hwc_rect fullFrame = (struct hwc_rect) {0, 0,(int)ctx->dpyAttr[mDpy].xres,
+    hwc_rect fullFrame;
+    fullFrame = (struct hwc_rect) {0, 0,(int)ctx->dpyAttr[mDpy].xres,
                                                 (int)ctx->dpyAttr[mDpy].yres};
 
     // Fall back to video only composition, if AIV video mode is enabled
@@ -909,7 +910,8 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
     }
 
     uint32_t totalDirtyArea = 0;
-    bool computeDirtyArea = not (list->flags & HWC_GEOMETRY_CHANGED) and
+    bool computeDirtyArea = false;
+    computeDirtyArea = not (list->flags & HWC_GEOMETRY_CHANGED) and
             not isYuvPresent(ctx, mDpy) and
             numAppLayers > 1;
 
@@ -1164,7 +1166,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         return false;
     }
     private_handle_t *renderBuf = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
-    Whf layerWhf[numPTORLayersFound]; // To store w,h,f of PTOR layers
+    Whf layerWhf[MAX_PTOR_LAYERS]; // To store w,h,f of PTOR layers
 
     // Store the blending mode, planeAlpha, and transform of PTOR layers
     int32_t blending[numPTORLayersFound];
@@ -1320,8 +1322,6 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
         reset(ctx);
         return false;
     }
-
-    int mdpCount = mCurrentFrame.mdpCount;
 
     if(sEnableYUVsplit){
         adjustForSourceSplit(ctx, list);
@@ -2118,16 +2118,12 @@ bool MDPComp::hwLimitationsCheck(hwc_context_t* ctx,
 
 static bool validForCursor(hwc_context_t* ctx, int dpy, hwc_layer_1_t* layer) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
-    hwc_rect dst = layer->displayFrame;
     hwc_rect src = integerizeSourceCrop(layer->sourceCropf);
     int srcW = src.right - src.left;
     int srcH = src.bottom - src.top;
-    int dstW = dst.right - dst.left;
-    int dstH = dst.bottom - dst.top;
     qdutils::MDPVersion &mdpVersion = qdutils::MDPVersion::getInstance();
     uint32_t maxCursorSize = mdpVersion.getMaxCursorSize();
     uint32_t numHwCursors = mdpVersion.getCursorPipes();
-    bool primarySplit = isDisplaySplit(ctx, HWC_DISPLAY_PRIMARY);
     uint32_t cursorPipesNeeded = 1; // One cursor pipe needed(default)
     bool ret = false;
 

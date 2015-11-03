@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2014, The Linux Foundation All rights reserved.
+ * Copyright (C) 2012-2014,2016, The Linux Foundation All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -81,7 +81,7 @@ namespace qhwc {
 // Std refresh rates for digital videos- 24p, 30p, 48p and 60p
 uint32_t stdRefreshRates[] = { 30, 24, 48, 60 };
 
-static uint32_t getFBformat(fb_var_screeninfo vinfo) {
+static uint32_t getFBformat(fb_var_screeninfo /*vinfo*/) {
     uint32_t fbformat = HAL_PIXEL_FORMAT_RGBA_8888;
 
 #ifdef GET_FRAMEBUFFER_FORMAT_FROM_HWC
@@ -1019,7 +1019,6 @@ bool isDownscaleWithinThreshold(hwc_layer_1_t const* layer, float threshold) {
     hwc_rect_t displayFrame  = layer->displayFrame;
     hwc_rect_t sourceCrop = integerizeSourceCrop(layer->sourceCropf);
     int dst_w, dst_h, src_w, src_h;
-    float downscale = 1.0;
     dst_w = displayFrame.right - displayFrame.left;
     dst_h = displayFrame.bottom - displayFrame.top;
     src_w = sourceCrop.right - sourceCrop.left;
@@ -1403,8 +1402,7 @@ bool isRotationDoable(hwc_context_t *ctx, private_handle_t *hnd) {
     // Rotate layers, if it is not secure display buffer and not
     // for the MDP versions below MDP5
     if((!isSecureDisplayBuffer(hnd) && isRotatorSupportedFormat(hnd) &&
-        !ctx->mMDP.version < qdutils::MDSS_V5)
-                   || isYuvBuffer(hnd)) {
+        !(ctx->mMDP.version < qdutils::MDSS_V5))|| isYuvBuffer(hnd)) {
         return true;
     }
     return false;
@@ -1715,7 +1713,7 @@ void closeAcquireFds(hwc_display_contents_1_t* list) {
     }
 }
 
-void hwc_sync_rotator(hwc_context_t *ctx, hwc_display_contents_1_t* list,
+void hwc_sync_rotator(hwc_context_t *ctx, hwc_display_contents_1_t* /* list */,
         int dpy) {
     ATRACE_CALL();
     //Send acquireFenceFds to rotator
@@ -3380,7 +3378,6 @@ bool displaySupports3D(hwc_context_t* ctx, int dpy) {
 bool loadEglLib(hwc_context_t* ctx) {
     bool success = false;
 #ifdef QTI_BSP
-    const char* error;
     dlerror();
 
     ctx->mEglLib = dlopen("libEGL_adreno.so", RTLD_NOW);
