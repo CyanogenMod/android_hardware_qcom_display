@@ -842,23 +842,7 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         return -1;
     }
 
-    //From HWComposer
-    static const uint32_t DISPLAY_ATTRIBUTES[] = {
-        HWC_DISPLAY_VSYNC_PERIOD,
-        HWC_DISPLAY_WIDTH,
-        HWC_DISPLAY_HEIGHT,
-        HWC_DISPLAY_DPI_X,
-        HWC_DISPLAY_DPI_Y,
-#ifdef GET_FRAMEBUFFER_FORMAT_FROM_HWC
-        HWC_DISPLAY_FBFORMAT,
-#endif
-        HWC_DISPLAY_NO_ATTRIBUTE,
-    };
-
-    const size_t NUM_DISPLAY_ATTRIBUTES = (sizeof(DISPLAY_ATTRIBUTES) /
-            sizeof(DISPLAY_ATTRIBUTES)[0]);
-
-    for (size_t i = 0; i < NUM_DISPLAY_ATTRIBUTES - 1; i++) {
+    for (size_t i = 0; attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
         switch (attributes[i]) {
         case HWC_DISPLAY_VSYNC_PERIOD:
             values[i] = ctx->dpyAttr[disp].vsync_period;
