@@ -353,6 +353,7 @@ DisplayError HWPrimary::SetDisplayAttributes(uint32_t index) {
                                  display_config_strings_.at(index).length(), 0);
   if (written > 0) {
     DLOGI("Successfully set config %u", index);
+    PopulateHWPanelInfo();
     PopulateDisplayAttributes();
     active_config_index_ = index;
   } else {
