@@ -170,6 +170,7 @@ protected:
     bool programYUV(hwc_context_t *ctx, hwc_display_contents_1_t* list);
     void reset(const int& numAppLayers, hwc_display_contents_1_t* list);
     bool isSupportedForMDPComp(hwc_context_t *ctx, hwc_layer_1_t* layer);
+    int checkOpaqueSurface(hwc_context_t *ctx, hwc_display_contents_1_t* list);
 
     int mDpy;
     const int mMaxPipesPerLayer;
