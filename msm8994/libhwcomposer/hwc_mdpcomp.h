@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -59,6 +59,7 @@ public:
     static int setPartialUpdatePref(hwc_context_t *ctx, bool enable);
     static bool getPartialUpdatePref(hwc_context_t *ctx);
     void setDynRefreshRate(hwc_context_t *ctx, hwc_display_contents_1_t* list);
+    static void setSingleFullScreenUpdate() { sIsSingleFullScreenUpdate = true; }
 
 protected:
     enum ePipeType {
@@ -127,7 +128,6 @@ protected:
     /* cached data */
     struct LayerCache {
         int layerCount;
-        buffer_handle_t hnd[MAX_NUM_APP_LAYERS];
         bool isFBComposed[MAX_NUM_APP_LAYERS];
         bool drop[MAX_NUM_APP_LAYERS];
 
@@ -135,7 +135,6 @@ protected:
         LayerCache();
         /* clear caching info*/
         void reset();
-        void cacheAll(hwc_display_contents_1_t* list);
         void updateCounts(const FrameInfo&);
         bool isSameFrame(const FrameInfo& curFrame,
                          hwc_display_contents_1_t* list);
@@ -157,12 +156,15 @@ protected:
     /* generates ROI based on the modified area of the frame */
     virtual void generateROI(hwc_context_t *ctx,
             hwc_display_contents_1_t* list) = 0;
+    /* Calculates the dirtyRegion for the given layer */
+    hwc_rect_t calculateDirtyRect(const hwc_layer_1_t* layer,
+                                hwc_rect_t& scissor);
     /* validates the ROI generated for fallback conditions */
     virtual bool validateAndApplyROI(hwc_context_t *ctx,
             hwc_display_contents_1_t* list) = 0;
-    /* Trims fbRect calculated against ROI generated */
-    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect) = 0;
-
+    /* Trims layer coordinates against ROI generated */
+    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& crop,
+            hwc_rect& dst) = 0;
     /* set/reset flags for MDPComp */
     void setMDPCompLayerFlags(hwc_context_t *ctx,
                               hwc_display_contents_1_t* list);
@@ -263,6 +265,7 @@ protected:
     static int sMaxPipesPerMixer;
     static bool sSrcSplitEnabled;
     static IdleInvalidator *sIdleInvalidator;
+    static bool sIsSingleFullScreenUpdate;
     static int sMaxSecLayers;
     static bool sIsPartialUpdateActive;
     struct FrameInfo mCurrentFrame;
@@ -315,8 +318,9 @@ private:
     /* validates the ROI generated for fallback conditions */
     virtual bool validateAndApplyROI(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
-    /* Trims fbRect calculated against ROI generated */
-    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect);
+    /* Trims layer coordinates against ROI generated */
+    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& crop,
+            hwc_rect& dst);
 };
 
 class MDPCompSplit : public MDPComp {
@@ -342,6 +346,9 @@ protected:
     /* allocates pipes to selected candidates */
     virtual bool allocLayerPipes(hwc_context_t *ctx,
                                  hwc_display_contents_1_t* list);
+    /* Trims layer coordinates against ROI generated */
+    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& crop,
+            hwc_rect& dst);
 private:
     /* Increments mdpCount if 4k2k yuv layer split is enabled.
      * updates framebuffer z order if fb lies above source-split layer */
@@ -357,8 +364,6 @@ private:
     /* validates the ROI generated for fallback conditions */
     virtual bool validateAndApplyROI(hwc_context_t *ctx,
             hwc_display_contents_1_t* list);
-    /* Trims fbRect calculated against ROI generated */
-    virtual void trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect);
 };
 
 class MDPCompSrcSplit : public MDPCompSplit {
@@ -371,6 +376,12 @@ private:
 
     virtual int configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
             PipeLayerPair& pipeLayerPair);
+    /* generates ROI based on the modified area of the frame */
+    virtual void generateROI(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
+    /* validates the ROI generated for fallback conditions */
+    virtual bool validateAndApplyROI(hwc_context_t *ctx,
+            hwc_display_contents_1_t* list);
 };
 
 }; //namespace

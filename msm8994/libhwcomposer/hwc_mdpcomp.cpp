@@ -51,6 +51,7 @@ bool MDPComp::sSrcSplitEnabled = false;
 int MDPComp::sMaxSecLayers = 1;
 bool MDPComp::enablePartialUpdateForMDP3 = false;
 bool MDPComp::sIsPartialUpdateActive = true;
+bool MDPComp::sIsSingleFullScreenUpdate = false;
 void *MDPComp::sLibPerfHint = NULL;
 int MDPComp::sPerfLockHandle = 0;
 int (*MDPComp::sPerfLockAcquire)(int, int, int*, int) = NULL;
@@ -351,17 +352,9 @@ MDPComp::LayerCache::LayerCache() {
 }
 
 void MDPComp::LayerCache::reset() {
-    memset(&hnd, 0, sizeof(hnd));
     memset(&isFBComposed, true, sizeof(isFBComposed));
     memset(&drop, false, sizeof(drop));
     layerCount = 0;
-}
-
-void MDPComp::LayerCache::cacheAll(hwc_display_contents_1_t* list) {
-    const int numAppLayers = (int)list->numHwLayers - 1;
-    for(int i = 0; i < numAppLayers; i++) {
-        hnd[i] = list->hwLayers[i].handle;
-    }
 }
 
 void MDPComp::LayerCache::updateCounts(const FrameInfo& curFrame) {
@@ -379,8 +372,8 @@ bool MDPComp::LayerCache::isSameFrame(const FrameInfo& curFrame,
                 (curFrame.drop[i] != drop[i])) {
             return false;
         }
-        if(curFrame.isFBComposed[i] &&
-           (hnd[i] != list->hwLayers[i].handle)){
+        hwc_layer_1_t const* layer = &list->hwLayers[i];
+        if(curFrame.isFBComposed[i] && layerUpdating(layer)){
             return false;
         }
     }
@@ -525,9 +518,37 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     return ret;
 }
 
-void MDPCompNonSplit::trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect) {
+hwc_rect_t MDPComp::calculateDirtyRect(const hwc_layer_1_t* layer,
+                    hwc_rect_t& scissor) {
+  hwc_region_t surfDamage = layer->surfaceDamage;
+  hwc_rect_t src = integerizeSourceCrop(layer->sourceCropf);
+  hwc_rect_t dst = layer->displayFrame;
+  int x_off = dst.left - src.left;
+  int y_off = dst.top - src.top;
+  hwc_rect dirtyRect = (hwc_rect){0, 0, 0, 0};
+  hwc_rect_t updatingRect = dst;
+
+  if (surfDamage.numRects == 0) {
+      // full layer updating, dirty rect is full frame
+      dirtyRect = getIntersection(layer->displayFrame, scissor);
+  } else {
+      for(uint32_t i = 0; i < surfDamage.numRects; i++) {
+          updatingRect = moveRect(surfDamage.rects[i], x_off, y_off);
+          hwc_rect_t intersect = getIntersection(updatingRect, scissor);
+          if(isValidRect(intersect)) {
+              dirtyRect = getUnion(intersect, dirtyRect);
+          }
+      }
+  }
+
+  return dirtyRect;
+}
+
+void MDPCompNonSplit::trimAgainstROI(hwc_context_t *ctx, hwc_rect &crop,
+        hwc_rect &dst) {
     hwc_rect_t roi = ctx->listStats[mDpy].lRoi;
-    fbRect = getIntersection(fbRect, roi);
+    dst = getIntersection(dst, roi);
+    crop = dst;
 }
 
 /* 1) Identify layers that are not visible or lying outside the updating ROI and
@@ -587,22 +608,15 @@ void MDPCompNonSplit::generateROI(hwc_context_t *ctx,
 
     for(int index = 0; index < numAppLayers; index++ ) {
         hwc_layer_1_t* layer = &list->hwLayers[index];
-        if ((mCachedFrame.hnd[index] != layer->handle) ||
+        if (layerUpdating(layer) ||
                 isYuvBuffer((private_handle_t *)layer->handle)) {
-            hwc_rect_t dst = layer->displayFrame;
-            hwc_rect_t updatingRect = dst;
-
-#ifdef QCOM_BSP
-            if(!needsScaling(layer) && !layer->transform)
-            {
-                hwc_rect_t src = integerizeSourceCrop(layer->sourceCropf);
-                int x_off = dst.left - src.left;
-                int y_off = dst.top - src.top;
-                updatingRect = moveRect(layer->dirtyRect, x_off, y_off);
+            hwc_rect_t dirtyRect = getIntersection(layer->displayFrame,
+                                                    fullFrame);
+            if(!needsScaling(layer) && !layer->transform) {
+                dirtyRect = calculateDirtyRect(layer, fullFrame);
             }
-#endif
 
-            roi = getUnion(roi, updatingRect);
+            roi = getUnion(roi, dirtyRect);
         }
     }
 
@@ -622,14 +636,20 @@ void MDPCompNonSplit::generateROI(hwc_context_t *ctx,
             ctx->listStats[mDpy].lRoi.right, ctx->listStats[mDpy].lRoi.bottom);
 }
 
-void MDPCompSplit::trimAgainstROI(hwc_context_t *ctx, hwc_rect_t& fbRect) {
-    hwc_rect l_roi = ctx->listStats[mDpy].lRoi;
-    hwc_rect r_roi = ctx->listStats[mDpy].rRoi;
-
-    hwc_rect_t l_fbRect = getIntersection(fbRect, l_roi);
-    hwc_rect_t r_fbRect = getIntersection(fbRect, r_roi);
-    fbRect = getUnion(l_fbRect, r_fbRect);
+void MDPCompSplit::trimAgainstROI(hwc_context_t *ctx, hwc_rect &crop,
+        hwc_rect &dst) {
+    hwc_rect roi = getUnion(ctx->listStats[mDpy].lRoi,
+            ctx->listStats[mDpy].rRoi);
+    hwc_rect tmpDst = getIntersection(dst, roi);
+    if(!isSameRect(dst, tmpDst)) {
+        crop.left = crop.left + (tmpDst.left - dst.left);
+        crop.top = crop.top + (tmpDst.top - dst.top);
+        crop.right = crop.left + (tmpDst.right - tmpDst.left);
+        crop.bottom = crop.top + (tmpDst.bottom - tmpDst.top);
+        dst = tmpDst;
+    }
 }
+
 /* 1) Identify layers that are not visible or lying outside BOTH the updating
  *    ROI's and drop them from composition. If a layer is spanning across both
  *    the halves of the screen but needed by only ROI, the non-contributing
@@ -703,28 +723,23 @@ void MDPCompSplit::generateROI(hwc_context_t *ctx,
     for(int index = 0; index < numAppLayers; index++ ) {
         hwc_layer_1_t* layer = &list->hwLayers[index];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
-        if ((mCachedFrame.hnd[index] != layer->handle) ||
-                isYuvBuffer(hnd)) {
-            hwc_rect_t dst = layer->displayFrame;
-            hwc_rect_t updatingRect = dst;
 
-#ifdef QCOM_BSP
-            if(!needsScaling(layer) && !layer->transform)
-            {
-                hwc_rect_t src = integerizeSourceCrop(layer->sourceCropf);
-                int x_off = dst.left - src.left;
-                int y_off = dst.top - src.top;
-                updatingRect = moveRect(layer->dirtyRect, x_off, y_off);
+        if (layerUpdating(layer) || isYuvBuffer(hnd)) {
+            hwc_rect_t l_dirtyRect = getIntersection(layer->displayFrame,
+                                        l_frame);
+            hwc_rect_t r_dirtyRect = getIntersection(layer->displayFrame,
+                                        r_frame);
+
+            if(!needsScaling(layer) && !layer->transform) {
+                l_dirtyRect = calculateDirtyRect(layer, l_frame);
+                r_dirtyRect = calculateDirtyRect(layer, r_frame);
             }
-#endif
+            if(isValidRect(l_dirtyRect))
+                l_roi = getUnion(l_roi, l_dirtyRect);
 
-            hwc_rect_t l_dst  = getIntersection(l_frame, updatingRect);
-            if(isValidRect(l_dst))
-                l_roi = getUnion(l_roi, l_dst);
+            if(isValidRect(r_dirtyRect))
+                r_roi = getUnion(r_roi, r_dirtyRect);
 
-            hwc_rect_t r_dst  = getIntersection(r_frame, updatingRect);
-            if(isValidRect(r_dst))
-                r_roi = getUnion(r_roi, r_dst);
         }
     }
 
@@ -1290,6 +1305,11 @@ bool MDPComp::canPartialUpdate(hwc_context_t *ctx,
     }
     if(ctx->listStats[mDpy].secureUI)
         return false;
+    if (sIsSingleFullScreenUpdate) {
+        // make sure one full screen update
+        sIsSingleFullScreenUpdate = false;
+        return false;
+    }
     return true;
 }
 
@@ -1657,7 +1677,8 @@ void MDPComp::updateLayerCache(hwc_context_t* ctx,
     int fbCount = 0;
 
     for(int i = 0; i < numAppLayers; i++) {
-        if (mCachedFrame.hnd[i] == list->hwLayers[i].handle) {
+        hwc_layer_1_t * layer = &list->hwLayers[i];
+        if (!layerUpdating(layer)) {
             if(!frame.drop[i])
                 fbCount++;
             frame.isFBComposed[i] = true;
@@ -1761,7 +1782,7 @@ hwc_rect_t MDPComp::getUpdatingFBRect(hwc_context_t *ctx,
             fbRect = getUnion(fbRect, dst);
         }
     }
-    trimAgainstROI(ctx, fbRect);
+    trimAgainstROI(ctx, fbRect, fbRect);
     return fbRect;
 }
 
@@ -1994,11 +2015,12 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 
     //Do not cache the information for next draw cycle.
     if(numLayers > MAX_NUM_APP_LAYERS or (!numLayers)) {
-        ALOGI("%s: Unsupported layer count for mdp composition",
-                __FUNCTION__);
+        ALOGI_IF(numLayers, "%s: Unsupported layer count for mdp composition: %d",
+                __FUNCTION__, numLayers);
         mCachedFrame.reset();
 #ifdef DYNAMIC_FPS
-        setDynRefreshRate(ctx, list);
+        // Reset refresh rate
+        setRefreshRate(ctx, mDpy, ctx->dpyAttr[mDpy].refreshRate);
 #endif
         return -1;
     }
@@ -2014,7 +2036,8 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         setMDPCompLayerFlags(ctx, list);
         mCachedFrame.updateCounts(mCurrentFrame);
 #ifdef DYNAMIC_FPS
-        setDynRefreshRate(ctx, list);
+        // Reset refresh rate
+        setRefreshRate(ctx, mDpy, ctx->dpyAttr[mDpy].refreshRate);
 #endif
         ret = -1;
         return ret;
@@ -2072,7 +2095,6 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 #endif
     setPerfHint(ctx, list);
 
-    mCachedFrame.cacheAll(list);
     mCachedFrame.updateCounts(mCurrentFrame);
     return ret;
 }
@@ -2608,6 +2630,120 @@ bool MDPCompSplit::draw(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
 }
 
 //================MDPCompSrcSplit==============================================
+
+bool MDPCompSrcSplit::validateAndApplyROI(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+    hwc_rect_t visibleRect = ctx->listStats[mDpy].lRoi;
+
+    for(int i = numAppLayers - 1; i >= 0; i--) {
+        if(!isValidRect(visibleRect)) {
+            mCurrentFrame.drop[i] = true;
+            mCurrentFrame.dropCount++;
+            continue;
+        }
+
+        const hwc_layer_1_t* layer =  &list->hwLayers[i];
+        hwc_rect_t dstRect = layer->displayFrame;
+        hwc_rect_t res  = getIntersection(visibleRect, dstRect);
+
+        if(!isValidRect(res)) {
+            mCurrentFrame.drop[i] = true;
+            mCurrentFrame.dropCount++;
+        } else {
+            /* Reset frame ROI when any layer which needs scaling also needs ROI
+             * cropping */
+            if(!isSameRect(res, dstRect) && needsScaling (layer)) {
+                ALOGI("%s: Resetting ROI due to scaling", __FUNCTION__);
+                memset(&mCurrentFrame.drop, 0, sizeof(mCurrentFrame.drop));
+                mCurrentFrame.dropCount = 0;
+                return false;
+            }
+
+            /* deduct any opaque region from visibleRect */
+            if (layer->blending == HWC_BLENDING_NONE &&
+                    layer->planeAlpha == 0xFF)
+                visibleRect = deductRect(visibleRect, res);
+        }
+    }
+    return true;
+}
+
+/*
+ * HW Limitation: ping pong split can always split the ping pong output
+ * equally across two DSI's. So the ROI programmed should be of equal width
+ * for both the halves
+ */
+void MDPCompSrcSplit::generateROI(hwc_context_t *ctx,
+        hwc_display_contents_1_t* list) {
+    int numAppLayers = ctx->listStats[mDpy].numAppLayers;
+
+    if(!canPartialUpdate(ctx, list))
+        return;
+
+    struct hwc_rect roi = (struct hwc_rect){0, 0, 0, 0};
+    hwc_rect fullFrame = (struct hwc_rect) {0, 0,(int)ctx->dpyAttr[mDpy].xres,
+        (int)ctx->dpyAttr[mDpy].yres};
+
+    for(int index = 0; index < numAppLayers; index++ ) {
+        hwc_layer_1_t* layer = &list->hwLayers[index];
+
+        // If we have a RGB layer which needs rotation, no partial update
+        if(!isYuvBuffer((private_handle_t *)layer->handle) && layer->transform)
+            return;
+
+        if (layerUpdating(layer) ||
+                isYuvBuffer((private_handle_t *)layer->handle)) {
+            hwc_rect_t dirtyRect = getIntersection(layer->displayFrame,
+                                                    fullFrame);
+            if (!needsScaling(layer) && !layer->transform) {
+                dirtyRect = calculateDirtyRect(layer, fullFrame);
+            }
+            roi = getUnion(roi, dirtyRect);
+        }
+    }
+
+    /* No layer is updating. Still SF wants a refresh.*/
+    if(!isValidRect(roi))
+        return;
+
+    if (isDisplaySplit(ctx, mDpy)) {
+        hwc_rect lFrame = fullFrame;
+        roi = expandROIFromMidPoint(roi, fullFrame);
+
+        lFrame.right = fullFrame.right / 2;
+        hwc_rect lRoi = getIntersection(roi, lFrame);
+        // Align ROI coordinates to panel restrictions
+        lRoi = getSanitizeROI(lRoi, lFrame);
+
+        hwc_rect rFrame = fullFrame;
+        rFrame.left = fullFrame.right/2;
+        hwc_rect rRoi = getIntersection(roi, rFrame);
+        // Align ROI coordinates to panel restrictions
+        rRoi = getSanitizeROI(rRoi, rFrame);
+
+        roi = getUnion(lRoi, rRoi);
+
+        ctx->listStats[mDpy].lRoi = roi;
+    } else {
+      hwc_rect lRoi = getIntersection(roi, fullFrame);
+      // Align ROI coordinates to panel restrictions
+      lRoi = getSanitizeROI(lRoi, fullFrame);
+
+      ctx->listStats[mDpy].lRoi = lRoi;
+    }
+
+    if(!validateAndApplyROI(ctx, list))
+        resetROI(ctx, mDpy);
+
+    ALOGD_IF(isDebug(),"%s: generated ROI: [%d, %d, %d, %d] [%d, %d, %d, %d]",
+            __FUNCTION__,
+            ctx->listStats[mDpy].lRoi.left, ctx->listStats[mDpy].lRoi.top,
+            ctx->listStats[mDpy].lRoi.right, ctx->listStats[mDpy].lRoi.bottom,
+            ctx->listStats[mDpy].rRoi.left, ctx->listStats[mDpy].rRoi.top,
+            ctx->listStats[mDpy].rRoi.right, ctx->listStats[mDpy].rRoi.bottom);
+}
+
 bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
         MdpPipeInfoSplit& pipe_info) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
@@ -2615,6 +2751,9 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
     hwc_rect_t crop = integerizeSourceCrop(layer->sourceCropf);
     pipe_info.lIndex = ovutils::OV_INVALID;
     pipe_info.rIndex = ovutils::OV_INVALID;
+
+    if(qdutils::MDPVersion::getInstance().isPartialUpdateEnabled() && !mDpy)
+        trimAgainstROI(ctx,crop, dst);
 
     //If 2 pipes are staged on a single stage of a mixer, then the left pipe
     //should have a higher priority than the right one. Pipe priorities are
@@ -2647,19 +2786,21 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
     const uint32_t lSplit = getLeftSplit(ctx, mDpy);
     const uint32_t dstWidth = dst.right - dst.left;
     const uint32_t dstHeight = dst.bottom - dst.top;
-    const uint32_t cropWidth = has90Transform(layer) ? crop.bottom - crop.top :
+    uint32_t cropWidth = has90Transform(layer) ? crop.bottom - crop.top :
             crop.right - crop.left;
-    const uint32_t cropHeight = has90Transform(layer) ? crop.right - crop.left :
+    uint32_t cropHeight = has90Transform(layer) ? crop.right - crop.left :
             crop.bottom - crop.top;
     //Approximation to actual clock, ignoring the common factors in pipe and
     //mixer cases like line_time
     const uint32_t layerClock = getLayerClock(dstWidth, dstHeight, cropHeight);
     const uint32_t mixerClock = lSplit;
 
-    //TODO Even if a 4k video is going to be rot-downscaled to dimensions under
-    //pipe line length, we are still using 2 pipes. This is fine just because
-    //this is source split where destination doesn't matter. Evaluate later to
-    //see if going through all the calcs to save a pipe is worth it
+    const uint32_t downscale = getRotDownscale(ctx, layer);
+    if(downscale) {
+        cropWidth /= downscale;
+        cropHeight /= downscale;
+    }
+
     if(dstWidth > mdpHw.getMaxPipeWidth() or
             cropWidth > mdpHw.getMaxPipeWidth() or
             (primarySplitAlways and
@@ -2669,12 +2810,8 @@ bool MDPCompSrcSplit::acquireMDPPipes(hwc_context_t *ctx, hwc_layer_1_t* layer,
             return false;
         }
 
-        // Return values
-        // 1  Left pipe is higher priority, do nothing.
-        // 0  Pipes of same priority.
-        //-1  Right pipe is of higher priority, needs swap.
-        if(ctx->mOverlay->comparePipePriority(pipe_info.lIndex,
-                pipe_info.rIndex) == -1) {
+        if(ctx->mOverlay->needsPrioritySwap(pipe_info.lIndex,
+                    pipe_info.rIndex)) {
             qhwc::swap(pipe_info.lIndex, pipe_info.rIndex);
         }
     }
@@ -2706,6 +2843,17 @@ int MDPCompSrcSplit::configure(hwc_context_t *ctx, hwc_layer_1_t *layer,
 
     ALOGD_IF(isDebug(),"%s: configuring: layer: %p z_order: %d dest_pipeL: %d"
              "dest_pipeR: %d",__FUNCTION__, layer, z, lDest, rDest);
+
+    if(qdutils::MDPVersion::getInstance().isPartialUpdateEnabled() && !mDpy) {
+        /* MDP driver crops layer coordinates against ROI in Non-Split
+         * and Split MDP comp. But HWC needs to crop them for source split.
+         * Reason: 1) Source split is efficient only when the final effective
+         *            load is distributed evenly across mixers.
+         *         2) We have to know the effective width of the layer that
+         *            the ROI needs to find the no. of pipes the layer needs.
+         */
+        trimAgainstROI(ctx, crop, dst);
+    }
 
     // Handle R/B swap
     if (layer->flags & HWC_FORMAT_RB_SWAP) {
@@ -2910,9 +3058,7 @@ void MDPComp::setPerfHint(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         int perfHint = 0x4501; // 45-display layer hint, 01-Enable
         sPerfLockHandle = sPerfLockAcquire(0 /*handle*/, 0/*duration*/,
                                     &perfHint, sizeof(perfHint)/sizeof(int));
-        if(sPerfLockHandle < 0) {
-            ALOGE("Perf Lock Acquire Failed");
-        } else {
+        if(sPerfLockHandle > 0) {
             perflockFlag = 1;
         }
     }

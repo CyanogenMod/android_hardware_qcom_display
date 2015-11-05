@@ -44,6 +44,7 @@
 #include "hwc_virtual.h"
 #include "qd_utils.h"
 #include <sys/sysinfo.h>
+#include <dlfcn.h>
 
 using namespace qClient;
 using namespace qService;
@@ -389,6 +390,9 @@ void initContext(hwc_context_t *ctx)
     property_get("debug.sf.hwc.canUseABC", value, "0");
     ctx->enableABC  = atoi(value) ? true : false;
 
+    // Initializing boot anim completed check to false
+    ctx->mDefaultModeApplied = false;
+
     // Initialize gpu perfomance hint related parameters
     property_get("sys.hwc.gpu_perf_mode", value, "0");
 #ifdef QCOM_BSP
@@ -414,6 +418,8 @@ void initContext(hwc_context_t *ctx)
 
     memset(&(ctx->mPtorInfo), 0, sizeof(ctx->mPtorInfo));
     ctx->mHPDEnabled = false;
+    ctx->mColorMode = new ColorMode();
+    ctx->mColorMode->init();
     ALOGI("Initializing Qualcomm Hardware Composer");
     ALOGI("MDP version: %d", ctx->mMDP.version);
 }
@@ -468,7 +474,11 @@ void closeContext(hwc_context_t *ctx)
         ctx->mAD = NULL;
     }
 
-
+    if(ctx->mColorMode) {
+        ctx->mColorMode->destroy();
+        delete ctx->mColorMode;
+        ctx->mColorMode = NULL;
+    }
 }
 
 //Helper to roundoff the refreshrates
@@ -1309,6 +1319,12 @@ bool operator ==(const hwc_rect_t& lhs, const hwc_rect_t& rhs) {
        lhs.right == rhs.right &&  lhs.bottom == rhs.bottom )
           return true ;
     return false;
+}
+
+bool layerUpdating(const hwc_layer_1_t* layer) {
+    hwc_region_t surfDamage = layer->surfaceDamage;
+    return ((surfDamage.numRects == 0) ||
+            isValidRect(layer->surfaceDamage.rects[0]));
 }
 
 hwc_rect_t moveRect(const hwc_rect_t& rect, const int& x_off, const int& y_off)
@@ -2492,6 +2508,27 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
     return (eqBounds == 3);
 }
 
+void applyDefaultMode(hwc_context_t *ctx) {
+    char value[PROPERTY_VALUE_MAX];
+    int boot_finished = 0;
+    static int ret = ctx->mColorMode->applyDefaultMode();
+    if(!ret) {
+        ctx->mDefaultModeApplied = true;
+        return;
+    }
+
+    // Reading property set on boot finish in SF
+    property_get("service.bootanim.exit", value, "0");
+    boot_finished = atoi(value);
+    if (!boot_finished)
+        return;
+
+    ret = ctx->mColorMode->applyDefaultMode();
+    if (ret)
+        ALOGD("%s: Not able to apply default mode", __FUNCTION__);
+    ctx->mDefaultModeApplied = true;
+}
+
 void BwcPM::setBwc(const hwc_context_t *ctx, const int& dpy,
         const private_handle_t *hnd,
         const hwc_rect_t& crop, const hwc_rect_t& dst,
@@ -2520,6 +2557,10 @@ void BwcPM::setBwc(const hwc_context_t *ctx, const int& dpy,
     }
     //src width > MAX mixer supported dim
     if(src_w > (int) qdutils::MDPVersion::getInstance().getMaxPipeWidth()) {
+        return;
+    }
+    //H/w requirement for BWC only. Pipe can still support 4096
+    if(src_h > 4092) {
         return;
     }
     //Decimation necessary, cannot use BWC. H/W requirement.
@@ -2578,10 +2619,40 @@ void LayerRotMap::setReleaseFd(const int& fence) {
     }
 }
 
+hwc_rect expandROIFromMidPoint(hwc_rect roi, hwc_rect fullFrame) {
+    int lRoiWidth = 0, rRoiWidth = 0;
+    int half_frame_width = fullFrame.right/2;
+
+    hwc_rect lFrame = fullFrame;
+    hwc_rect rFrame = fullFrame;
+    lFrame.right = (lFrame.right - lFrame.left)/2;
+    rFrame.left = lFrame.right;
+
+    hwc_rect lRoi = getIntersection(roi, lFrame);
+    hwc_rect rRoi = getIntersection(roi, rFrame);
+
+    lRoiWidth = lRoi.right - lRoi.left;
+    rRoiWidth = rRoi.right - rRoi.left;
+
+    if(lRoiWidth && rRoiWidth) {
+        if(lRoiWidth < rRoiWidth)
+            roi.left = half_frame_width - rRoiWidth;
+        else
+            roi.right = half_frame_width + lRoiWidth;
+    }
+    return roi;
+}
+
 void resetROI(hwc_context_t *ctx, const int dpy) {
     const int fbXRes = (int)ctx->dpyAttr[dpy].xres;
     const int fbYRes = (int)ctx->dpyAttr[dpy].yres;
-    if(isDisplaySplit(ctx, dpy)) {
+
+    /* When source split is enabled, both the panels are calibrated
+     * in a single coordinate system. So only one ROI is generated
+     * for the whole panel extending equally from the midpoint and
+     * populated for the left side. */
+    if(!qdutils::MDPVersion::getInstance().isSrcSplit() &&
+            isDisplaySplit(ctx, dpy)) {
         const int lSplit = getLeftSplit(ctx, dpy);
         ctx->listStats[dpy].lRoi = (struct hwc_rect){0, 0, lSplit, fbYRes};
         ctx->listStats[dpy].rRoi = (struct hwc_rect){lSplit, 0, fbXRes, fbYRes};
@@ -2607,18 +2678,28 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
 
    /* Align to minimum width recommended by the panel */
    if((t_roi.right - t_roi.left) < MIN_WIDTH) {
-       if((t_roi.left + MIN_WIDTH) > boundary.right)
-           t_roi.left = t_roi.right - MIN_WIDTH;
-       else
-           t_roi.right = t_roi.left + MIN_WIDTH;
+       if(MIN_WIDTH == boundary.right - boundary.left) {
+           t_roi.left = 0;
+           t_roi.right = MIN_WIDTH;
+       } else {
+           if((t_roi.left + MIN_WIDTH) > boundary.right)
+               t_roi.left = t_roi.right - MIN_WIDTH;
+           else
+               t_roi.right = t_roi.left + MIN_WIDTH;
+       }
    }
 
   /* Align to minimum height recommended by the panel */
    if((t_roi.bottom - t_roi.top) < MIN_HEIGHT) {
-       if((t_roi.top + MIN_HEIGHT) > boundary.bottom)
-           t_roi.top = t_roi.bottom - MIN_HEIGHT;
-       else
-           t_roi.bottom = t_roi.top + MIN_HEIGHT;
+       if(MIN_HEIGHT == boundary.bottom - boundary.top) {
+           t_roi.top = 0;
+           t_roi.bottom = MIN_HEIGHT;
+       } else {
+           if((t_roi.top + MIN_HEIGHT) > boundary.bottom)
+               t_roi.top = t_roi.bottom - MIN_HEIGHT;
+           else
+               t_roi.bottom = t_roi.top + MIN_HEIGHT;
+       }
    }
 
    /* Align left and width to meet panel restrictions */
@@ -2639,7 +2720,6 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
        }
    }
 
-
    /* Align top and height to meet panel restrictions */
    if(TOP_ALIGN)
        t_roi.top = t_roi.top - (t_roi.top % TOP_ALIGN);
@@ -2657,7 +2737,6 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
                t_roi.top = t_roi.top - (t_roi.top % TOP_ALIGN);
        }
    }
-
 
    return t_roi;
 }
@@ -2766,6 +2845,106 @@ void handle_offline(hwc_context_t* ctx, int dpy) {
     if(qdutils::MDPVersion::getInstance().is8994() and
             qdutils::MDPVersion::getInstance().supportsBWC()) {
         ctx->mBWCEnabled = true;
+    }
+}
+
+void ColorMode::init() {
+    //Map symbols from libmm-qdcm and get list of modes
+    mModeHandle = dlopen("libmm-qdcm.so", RTLD_NOW);
+    if (mModeHandle) {
+        *(void **)& fnApplyDefaultMode = dlsym(mModeHandle, "applyDefaults");
+        *(void **)& fnApplyModeById = dlsym(mModeHandle, "applyModeById");
+        *(void **)& fnGetNumModes = dlsym(mModeHandle, "getNumDisplayModes");
+        *(void **)& fnGetModeList = dlsym(mModeHandle, "getDisplayModeIdList");
+        *(void **)& fnSetDefaultMode = dlsym(mModeHandle, "setDefaultMode");
+    } else {
+        ALOGW("Unable to load libmm-qdcm");
+    }
+
+    if(fnGetNumModes) {
+        mNumModes = fnGetNumModes(HWC_DISPLAY_PRIMARY);
+        if(mNumModes > MAX_NUM_COLOR_MODES) {
+            ALOGE("Number of modes is above the limit: %d", mNumModes);
+            mNumModes = 0;
+            return;
+        }
+        if(fnGetModeList) {
+            fnGetModeList(mModeList, &mCurMode, HWC_DISPLAY_PRIMARY);
+            mCurModeIndex = getIndexForMode(mCurMode);
+            ALOGI("ColorMode: current mode: %d current mode index: %d number of modes: %d",
+                    mCurMode, mCurModeIndex, mNumModes);
+        }
+    }
+}
+
+//Legacy API
+int ColorMode::applyDefaultMode() {
+    if(fnApplyDefaultMode) {
+        return fnApplyDefaultMode(HWC_DISPLAY_PRIMARY);
+    } else {
+        return -EINVAL;
+    }
+}
+
+int ColorMode::applyModeByID(int modeID) {
+    if(fnApplyModeById) {
+        int ret = fnApplyModeById(modeID, HWC_DISPLAY_PRIMARY);
+        if (!ret)
+            ret = setDefaultMode(modeID);
+        return ret;
+    } else {
+        return -EINVAL;
+    }
+}
+
+//This API is called from setActiveConfig
+//The value here must be set as default
+int ColorMode::applyModeByIndex(int index) {
+    int ret = 0;
+    int mode  = getModeForIndex(index);
+    if(mode < 0) {
+        ALOGE("Invalid mode for index: %d", index);
+        return -EINVAL;
+    }
+    ALOGD("%s: Applying mode index: %d modeID: %d", __FUNCTION__, index, mode);
+    ret = applyModeByID(mode);
+    if(!ret) {
+        mCurModeIndex = index;
+        setDefaultMode(mode);
+    }
+    return ret;
+}
+
+int ColorMode::setDefaultMode(int modeID) {
+    if(fnSetDefaultMode) {
+        ALOGD("Setting default color mode to %d", modeID);
+        return fnSetDefaultMode(modeID, HWC_DISPLAY_PRIMARY);
+    } else {
+        return -EINVAL;
+    }
+}
+
+int ColorMode::getModeForIndex(int index) {
+    if(index < mNumModes) {
+        return mModeList[index];
+    } else {
+        return -EINVAL;
+    }
+}
+
+int ColorMode::getIndexForMode(int mode) {
+    if(mModeList) {
+        for(int32_t i = 0; i < mNumModes; i++)
+            if(mModeList[i] == mode)
+                return i;
+    }
+    return -EINVAL;
+}
+
+void ColorMode::destroy() {
+    if(mModeHandle) {
+        dlclose(mModeHandle);
+        mModeHandle = NULL;
     }
 }
 

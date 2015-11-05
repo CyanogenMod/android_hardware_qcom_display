@@ -282,38 +282,62 @@ bool Overlay::isPipeTypeAttached(eMdpPipeType type) {
     return false;
 }
 
-int Overlay::comparePipePriority(utils::eDest pipe1Index,
+bool Overlay::needsPrioritySwap(utils::eDest pipe1Index,
         utils::eDest pipe2Index) {
     validate((int)pipe1Index);
     validate((int)pipe2Index);
+
     uint8_t pipe1Prio = mPipeBook[(int)pipe1Index].mPipe->getPriority();
     uint8_t pipe2Prio = mPipeBook[(int)pipe2Index].mPipe->getPriority();
-    if(pipe1Prio > pipe2Prio)
-        return -1;
-    else if(pipe1Prio < pipe2Prio)
-        return 1;
-    else {
+
+    int pipe1Id = mPipeBook[(int)pipe1Index].mPipe->getPipeId();
+    int pipe2Id = mPipeBook[(int)pipe2Index].mPipe->getPipeId();
+
+    utils::eMdpPipeType leftType = PipeBook::getPipeType(pipe1Index);
+    utils::eMdpPipeType rightType = PipeBook::getPipeType(pipe2Index);
+
+    if(pipe1Id >=0 && pipe2Id >=0) {
+        // LEFT priority should be higher then RIGHT
+        return (pipe1Prio > pipe2Prio);
+    } else if(pipe1Id < 0 && pipe2Id < 0) {
         // If we are here, Source Split is enabled and both pipes are
         // new requests. In this case left type should be of higher prio
         // than right type
-        utils::eMdpPipeType leftType = PipeBook::getPipeType(pipe1Index);
-        utils::eMdpPipeType rightType = PipeBook::getPipeType(pipe2Index);
-
         if(leftType == rightType) {
             //Safe. Onus on driver to assign correct pipes within same type
-            return 1;
-        } else if(leftType == OV_MDP_PIPE_DMA or rightType == OV_MDP_PIPE_VG) {
-            //If we are here, right is definitely a higher prio type.
+            return false;
+        } else {
             //This check takes advantage of having only 3 types and avoids 3
             //different failure combination checks.
-            return -1;
+            // Swap IF:
+            // ----------------
+            // | Left | Right |
+            // ================
+            // | DMA  | ViG   |
+            // ----------------
+            // | DMA  | RGB   |
+            // ----------------
+            // | RGB  | ViG   |
+            // ----------------
+            return (leftType == OV_MDP_PIPE_DMA or rightType == OV_MDP_PIPE_VG);
+        }
+    } else if(pipe1Id < 0) {
+        //LEFT needs new allocation.
+        if(leftType == rightType) {
+            // If RIGHT has highest priority(lowest id), swap it.
+            return (pipe2Id == PipeBook::pipeMinID[leftType]);
         } else {
-            //Types are correct priority-wise
-            return 1;
+            return (leftType == OV_MDP_PIPE_DMA or rightType == OV_MDP_PIPE_VG);
+        }
+    } else { /* if (pipe2Id < 0) */
+        // RIGHT needs new allocation.
+        if(leftType == rightType) {
+            // If LEFT has lowest priority(highest id), swap it.
+            return (pipe1Id == PipeBook::pipeMaxID[leftType]);
+        } else {
+            return (leftType == OV_MDP_PIPE_DMA or rightType == OV_MDP_PIPE_VG);
         }
     }
-
-    return 0;
 }
 
 bool Overlay::commit(utils::eDest dest) {
@@ -412,6 +436,13 @@ int Overlay::initOverlay() {
             index++;
         }
     }
+
+    PipeBook::pipeMinID[OV_MDP_PIPE_RGB] = 8;
+    PipeBook::pipeMaxID[OV_MDP_PIPE_RGB] = (numPipesXType[OV_MDP_PIPE_RGB] == 3)? 32 : 512;
+    PipeBook::pipeMinID[OV_MDP_PIPE_VG] = 1;
+    PipeBook::pipeMaxID[OV_MDP_PIPE_VG] = (numPipesXType[OV_MDP_PIPE_VG] == 3)? 4 : 256;
+    PipeBook::pipeMinID[OV_MDP_PIPE_DMA] = 64;
+    PipeBook::pipeMaxID[OV_MDP_PIPE_DMA] = 128;
 
     FILE *displayDeviceFP = NULL;
     char fbType[MAX_FRAME_BUFFER_NAME_SIZE];
@@ -578,6 +609,8 @@ int Overlay::PipeBook::sLastUsageBitmap = 0;
 int Overlay::PipeBook::sAllocatedBitmap = 0;
 utils::eMdpPipeType Overlay::PipeBook::pipeTypeLUT[utils::OV_MAX] =
     {utils::OV_MDP_PIPE_ANY};
+int Overlay::PipeBook::pipeMinID[utils::OV_MDP_PIPE_ANY] = {0};
+int Overlay::PipeBook::pipeMaxID[utils::OV_MDP_PIPE_ANY] = {0};
 void *Overlay::sLibScaleHandle = NULL;
 int (*Overlay::sFnProgramScale)(struct mdp_overlay_list *) = NULL;
 /* Dynamically link ABL library */

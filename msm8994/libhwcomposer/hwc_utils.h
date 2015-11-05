@@ -48,6 +48,7 @@
 #define STR(f) #f;
 // Max number of PTOR layers handled
 #define MAX_PTOR_LAYERS 2
+#define MAX_NUM_COLOR_MODES 32
 
 //Fwrd decls
 struct hwc_context_t;
@@ -229,6 +230,36 @@ private:
     uint32_t mCount;
 };
 
+//ColorModes for primary displays
+class ColorMode {
+public:
+    void init();
+    void destroy();
+    int32_t getNumModes() { return mNumModes; }
+    const int32_t* getModeList() { return mModeList; }
+    int32_t getModeForIndex(int32_t index);
+    int32_t getIndexForMode(int32_t mode);
+    int applyDefaultMode();
+    int applyModeByID(int modeID);
+    int applyModeByIndex(int index);
+    int setDefaultMode(int modeID);
+    int getActiveModeIndex() { return mCurModeIndex; }
+private:
+    int32_t (*fnGetNumModes)(int /*dispID*/);
+    int32_t (*fnGetModeList)(int32_t* /*mModeList*/, int32_t* /*current default*/,
+            int32_t /*dispID*/);
+    int (*fnApplyDefaultMode)(int /*dispID*/);
+    int (*fnApplyModeById)(int /*modeID*/, int /*dispID*/);
+    int (*fnSetDefaultMode)(int /*modeID*/, int /*dispID*/);
+
+    void*     mModeHandle = NULL;
+    int32_t   mModeList[MAX_NUM_COLOR_MODES];
+    int32_t   mNumModes = 0;
+    int32_t   mCurModeIndex = 0;
+    int32_t   mCurMode = 0;
+
+};
+
 inline uint32_t LayerRotMap::getCount() const {
     return mCount;
 }
@@ -316,6 +347,7 @@ void optimizeLayerRects(const hwc_display_contents_1_t *list);
 bool areLayersIntersecting(const hwc_layer_1_t* layer1,
         const hwc_layer_1_t* layer2);
 bool operator ==(const hwc_rect_t& lhs, const hwc_rect_t& rhs);
+bool layerUpdating(const hwc_layer_1_t* layer);
 
 // returns true if Action safe dimensions are set and target supports Actionsafe
 bool isActionSafePresent(hwc_context_t *ctx, int dpy);
@@ -351,6 +383,9 @@ const char* getExternalDisplayState(uint32_t external_state);
 
 // Resets display ROI to full panel resoluion
 void resetROI(hwc_context_t *ctx, const int dpy);
+
+// Modifies ROI even from middle of the screen
+hwc_rect expandROIFromMidPoint(hwc_rect roi, hwc_rect fullFrame);
 
 // Aligns updating ROI to panel restrictions
 hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary);
@@ -438,6 +473,9 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list);
 
 // Returns true if rect1 is peripheral to rect2, false otherwise.
 bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
+
+// Applies default mode at boot
+void applyDefaultMode(hwc_context_t *ctx);
 
 // Inline utility functions
 static inline bool isSkipLayer(const hwc_layer_1_t* l) {
@@ -641,6 +679,10 @@ struct hwc_context_t {
     bool mUseMetaDataRefreshRate;
    // Stores the hpd enabled status- avoids re-enabling HDP on suspend resume.
     bool mHPDEnabled;
+    //Used to notify that default mode has been applied
+    bool mDefaultModeApplied;
+    //Manages color modes
+    qhwc::ColorMode *mColorMode;
 };
 
 namespace qhwc {
