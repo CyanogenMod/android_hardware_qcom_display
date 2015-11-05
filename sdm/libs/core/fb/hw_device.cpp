@@ -224,7 +224,10 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         SetRect(pipe_info->src_roi, &mdp_layer.src_rect);
         SetRect(pipe_info->dst_roi, &mdp_layer.dst_rect);
         SetMDPFlags(layer, is_rotator_used, is_cursor_pipe_used, &mdp_layer.flags);
-        SetColorSpace(layer.color_space, &mdp_layer.color_space);
+        SetCSC(layer.csc, &mdp_layer.color_space);
+        if (pipe_info->set_igc) {
+          SetIGC(layer, mdp_layer_count);
+        }
         mdp_layer.bg_color = layer.solid_fill_color;
 
         if (pipe_info->scale_data.enable_pixel_ext) {
@@ -268,9 +271,10 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
 
   if (device_type_ == kDeviceVirtual) {
     LayerBuffer *output_buffer = hw_layers->info.stack->output_buffer;
-    // TODO(user): Need to assign the writeback id from the resource manager, since the support
-    // has not been added hard coding it to 2 for now.
-    mdp_out_layer_.writeback_ndx = 2;
+    // Fill WB index for virtual based on number of rotator WB blocks present in the HW.
+    // Eg: If 2 WB rotator blocks available, the WB index for virtual will be 2, as the
+    // indexing of WB blocks start from 0.
+    mdp_out_layer_.writeback_ndx = hw_resource_.num_rotator;
     mdp_out_layer_.buffer.width = output_buffer->width;
     mdp_out_layer_.buffer.height = output_buffer->height;
     if (output_buffer->flags.secure) {
@@ -852,7 +856,6 @@ int HWDevice::ParseLine(char *input, char *tokens[], const uint32_t max_token, u
 }
 
 bool HWDevice::EnableHotPlugDetection(int enable) {
-  bool ret_value = true;
   char hpdpath[kMaxStringLength];
   int hdmi_node_index = GetFBNodeIndex(kDeviceHDMI);
   if (hdmi_node_index < 0) {
@@ -860,22 +863,14 @@ bool HWDevice::EnableHotPlugDetection(int enable) {
   }
 
   snprintf(hpdpath , sizeof(hpdpath), "%s%d/hpd", fb_path_, hdmi_node_index);
-  int hpdfd = Sys::open_(hpdpath, O_RDWR, 0);
-  if (hpdfd < 0) {
-    DLOGW("Open failed = %s", hpdpath);
+
+  char value = enable ? '1' : '0';
+  ssize_t length = SysFsWrite(hpdpath, &value, sizeof(value));
+  if (length <= 0) {
     return false;
   }
 
-  char value = enable ? '1' : '0';
-  ssize_t length = Sys::pwrite_(hpdfd, &value, 1, 0);
-  if (length <= 0) {
-    DLOGE("Write failed 'hpd' = %d", enable);
-    ret_value = false;
-  }
-
-  Sys::close_(hpdfd);
-
-  return ret_value;
+  return true;
 }
 
 void HWDevice::ResetDisplayParams() {
@@ -883,6 +878,8 @@ void HWDevice::ResetDisplayParams() {
   memset(&mdp_in_layers_, 0, sizeof(mdp_in_layers_));
   memset(&mdp_out_layer_, 0, sizeof(mdp_out_layer_));
   memset(&scale_data_, 0, sizeof(scale_data_));
+  memset(&pp_params_, 0, sizeof(pp_params_));
+  memset(&igc_lut_data_, 0, sizeof(igc_lut_data_));
 
   for (uint32_t i = 0; i < kMaxSDELayers * 2; i++) {
     mdp_in_layers_[i].buffer.fence = -1;
@@ -926,12 +923,36 @@ void HWDevice::SetHWScaleData(const ScaleData &scale, uint32_t index) {
   }
 }
 
-void HWDevice::SetColorSpace(LayerColorSpace source, mdp_color_space *color_space) {
+void HWDevice::SetCSC(LayerCSC source, mdp_color_space *color_space) {
   switch (source) {
-  case kLimitedRange601:    *color_space = MDP_CSC_ITU_R_601;      break;
-  case kFullRange601:       *color_space = MDP_CSC_ITU_R_601_FR;   break;
-  case kLimitedRange709:    *color_space = MDP_CSC_ITU_R_709;      break;
+  case kCSCLimitedRange601:    *color_space = MDP_CSC_ITU_R_601;      break;
+  case kCSCFullRange601:       *color_space = MDP_CSC_ITU_R_601_FR;   break;
+  case kCSCLimitedRange709:    *color_space = MDP_CSC_ITU_R_709;      break;
   }
+}
+
+void HWDevice::SetIGC(const Layer &layer, uint32_t index) {
+  mdp_input_layer &mdp_layer = mdp_in_layers_[index];
+  mdp_overlay_pp_params &pp_params = pp_params_[index];
+  mdp_igc_lut_data_v1_7 &igc_lut_data = igc_lut_data_[index];
+
+  switch (layer.igc) {
+  case kIGCsRGB:
+    igc_lut_data.table_fmt = mdp_igc_srgb;
+    pp_params.igc_cfg.ops = MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;
+    break;
+
+  default:
+    pp_params.igc_cfg.ops = MDP_PP_OPS_DISABLE;
+    break;
+  }
+
+  pp_params.config_ops = MDP_OVERLAY_PP_IGC_CFG;
+  pp_params.igc_cfg.version = mdp_igc_v1_7;
+  pp_params.igc_cfg.cfg_payload = &igc_lut_data;
+
+  mdp_layer.pp_info = &pp_params;
+  mdp_layer.flags |= MDP_LAYER_PP;
 }
 
 DisplayError HWDevice::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
@@ -1004,12 +1025,27 @@ DisplayError HWDevice::GetMaxCEAFormat(uint32_t *max_cea_format) {
   return kErrorNotSupported;
 }
 
-DisplayError HWDevice::OnMinHdcpEncryptionLevelChange() {
+DisplayError HWDevice::OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) {
   return kErrorNotSupported;
 }
 
 DisplayError HWDevice::GetPanelBrightness(int *level) {
   return kErrorNotSupported;
+}
+
+ssize_t HWDevice::SysFsWrite(char* file_node, char* value, ssize_t length) {
+  int fd = Sys::open_(file_node, O_RDWR, 0);
+  if (fd < 0) {
+    DLOGW("Open failed = %s", file_node);
+    return -1;
+  }
+  ssize_t len = Sys::pwrite_(fd, value, length, 0);
+  if (length <= 0) {
+    DLOGE("Write failed for path %s with value %s", file_node, value);
+  }
+  Sys::close_(fd);
+
+  return len;
 }
 
 }  // namespace sdm

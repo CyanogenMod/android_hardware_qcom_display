@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <utils/constants.h>
 #include <utils/debug.h>
+#include <utils/rect.h>
 
 #include "display_base.h"
 #include "hw_info_interface.h"
@@ -454,7 +455,7 @@ DisplayError DisplayBase::SetPanelBrightness(int level) {
   return kErrorNotSupported;
 }
 
-DisplayError DisplayBase::OnMinHdcpEncryptionLevelChange() {
+DisplayError DisplayBase::OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) {
   return kErrorNotSupported;
 }
 
@@ -493,9 +494,13 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
   HWLayersInfo &layer_info = hw_layers_.info;
   LayerRect &l_roi = layer_info.left_partial_update;
   LayerRect &r_roi = layer_info.right_partial_update;
-  DumpImpl::AppendString(buffer, length, "\nROI(L T R B) : LEFT(%d %d %d %d), RIGHT(%d %d %d %d)",
-                         INT(l_roi.left), INT(l_roi.top), INT(l_roi.right), INT(l_roi.bottom),
-                         INT(r_roi.left), INT(r_roi.top), INT(r_roi.right), INT(r_roi.bottom));
+  DumpImpl::AppendString(buffer, length, "\nROI(L T R B) : LEFT(%d %d %d %d)", INT(l_roi.left),
+                         INT(l_roi.top), INT(l_roi.right), INT(l_roi.bottom));
+
+  if (IsValid(r_roi)) {
+    DumpImpl::AppendString(buffer, length, ", RIGHT(%d %d %d %d)", INT(r_roi.left),
+                           INT(r_roi.top), INT(r_roi.right), INT(r_roi.bottom));
+  }
 
   const char *header  = "\n| Idx |  Comp Type  |  Split | WB |  Pipe |    W x H    |          Format          |  Src Rect (L T R B) |  Dst Rect (L T R B) |  Z |    Flags   | Deci(HxV) |";  //NOLINT
   const char *newline = "\n|-----|-------------|--------|----|-------|-------------|--------------------------|---------------------|---------------------|----|------------|-----------|";  //NOLINT
@@ -516,8 +521,8 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     char idx[8] = { 0 };
     const char *comp_type = GetName(layer.composition);
     const char *buffer_format = GetName(input_buffer->format);
-    const char *rotate_split[2] = { "Rot-L", "Rot-R" };
-    const char *comp_split[2] = { "Comp-L", "Comp-R" };
+    const char *rotate_split[2] = { "Rot-1", "Rot-2" };
+    const char *comp_split[2] = { "Comp-1", "Comp-2" };
 
     snprintf(idx, sizeof(idx), "%d", layer_index);
 

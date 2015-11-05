@@ -381,18 +381,13 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
 
   if (pvt_handle) {
     layer_buffer->format = GetSDMFormat(pvt_handle->format, pvt_handle->flags);
-
-    const MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
-    if (meta_data && (SetMetaData(*meta_data, layer) != kErrorNone)) {
-      return -EINVAL;
-    }
-
-    if (layer_buffer->format == kFormatInvalid) {
-      return -EINVAL;
-    }
-
     layer_buffer->width = pvt_handle->width;
     layer_buffer->height = pvt_handle->height;
+
+    if (SetMetaData(pvt_handle, layer) != kErrorNone) {
+      return -EINVAL;
+    }
+
     if (pvt_handle->bufferType == BUFFER_TYPE_VIDEO) {
       layer_stack_.flags.video_present = true;
       layer_buffer->flags.video = true;
@@ -688,7 +683,11 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
       error = display_intf_->Commit(&layer_stack_);
       status = 0;
     }
-    if (error != kErrorNone) {
+
+    if (error == kErrorNone) {
+      // Do no call flush on errors, if a successful buffer is never submitted.
+      flush_on_error_ = true;
+    } else {
       if (error == kErrorShutDown) {
         shutdown_pending_ = true;
         return status;
@@ -707,7 +706,7 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
   size_t num_hw_layers = content_list->numHwLayers;
   int status = 0;
 
-  if (flush_) {
+  if (flush_ && flush_on_error_) {
     DisplayError error = display_intf_->Flush();
     if (error != kErrorNone) {
       DLOGE("Flush failed. Error = %d", error);
@@ -893,7 +892,7 @@ DisplayError HWCDisplay::SetMaxMixerStages(uint32_t max_mixer_stages) {
   return error;
 }
 
-DisplayError HWCDisplay:: ControlPartialUpdate(bool enable, uint32_t *pending) {
+DisplayError HWCDisplay::ControlPartialUpdate(bool enable, uint32_t *pending) {
   DisplayError error = kErrorNone;
 
   if (display_intf_) {
@@ -935,6 +934,7 @@ LayerBufferFormat HWCDisplay::GetSDMFormat(const int32_t &source, const int flag
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:  format = kFormatYCbCr420SPVenusUbwc;      break;
   case HAL_PIXEL_FORMAT_YV12:                     format = kFormatYCrCb420PlanarStride16;   break;
   case HAL_PIXEL_FORMAT_YCrCb_420_SP:             format = kFormatYCrCb420SemiPlanar;       break;
+  case HAL_PIXEL_FORMAT_YCbCr_420_SP:             format = kFormatYCbCr420SemiPlanar;       break;
   case HAL_PIXEL_FORMAT_YCbCr_422_SP:             format = kFormatYCbCr422H2V1SemiPlanar;   break;
   case HAL_PIXEL_FORMAT_YCbCr_422_I:              format = kFormatYCbCr422H2V1Packed;       break;
   default:
@@ -1210,8 +1210,8 @@ int HWCDisplay::SetCursorPosition(int x, int y) {
   return 0;
 }
 
-int HWCDisplay::OnMinHdcpEncryptionLevelChange() {
-  DisplayError error = display_intf_->OnMinHdcpEncryptionLevelChange();
+int HWCDisplay::OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) {
+  DisplayError error = display_intf_->OnMinHdcpEncryptionLevelChange(min_enc_level);
   if (error != kErrorNone) {
     DLOGE("Failed. Error = %d", error);
     return -1;
@@ -1254,36 +1254,69 @@ uint32_t HWCDisplay::RoundToStandardFPS(uint32_t fps) {
 void HWCDisplay::ApplyScanAdjustment(hwc_rect_t *display_frame) {
 }
 
-DisplayError HWCDisplay::SetColorSpace(const ColorSpace_t source, LayerColorSpace *target) {
+DisplayError HWCDisplay::SetCSC(ColorSpace_t source, LayerCSC *target) {
   switch (source) {
-  case ITU_R_601:      *target = kLimitedRange601;   break;
-  case ITU_R_601_FR:   *target = kFullRange601;      break;
-  case ITU_R_709:      *target = kLimitedRange709;   break;
+  case ITU_R_601:       *target = kCSCLimitedRange601;   break;
+  case ITU_R_601_FR:    *target = kCSCFullRange601;      break;
+  case ITU_R_709:       *target = kCSCLimitedRange709;   break;
   default:
-    DLOGE("Unsupported Color Space: %d", source);
+    DLOGE("Unsupported CSC: %d", source);
     return kErrorNotSupported;
   }
 
   return kErrorNone;
 }
 
-DisplayError HWCDisplay::SetMetaData(const MetaData_t &meta_data, Layer *layer) {
-  if (meta_data.operation & UPDATE_REFRESH_RATE) {
-    layer->frame_rate = RoundToStandardFPS(meta_data.refreshrate);
+DisplayError HWCDisplay::SetIGC(IGC_t source, LayerIGC *target) {
+  switch (source) {
+  case IGC_NotSpecified:    *target = kIGCNotSpecified; break;
+  case IGC_sRGB:            *target = kIGCsRGB;   break;
+  default:
+    DLOGE("Unsupported IGC: %d", source);
+    return kErrorNotSupported;
   }
 
-  if ((meta_data.operation & PP_PARAM_INTERLACED) && meta_data.interlaced) {
-    layer->input_buffer->flags.interlace = true;
+  return kErrorNone;
+}
+
+DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *layer) {
+  const MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
+  LayerBuffer *layer_buffer = layer->input_buffer;
+
+  if (!meta_data) {
+    return kErrorNone;
   }
 
-  if (meta_data.operation & LINEAR_FORMAT) {
-    layer->input_buffer->format = GetSDMFormat(meta_data.linearFormat, 0);
-  }
-
-  if (meta_data.operation & UPDATE_COLOR_SPACE) {
-    if (SetColorSpace(meta_data.colorSpace, &layer->color_space) != kErrorNone) {
+  if (meta_data->operation & UPDATE_COLOR_SPACE) {
+    if (SetCSC(meta_data->colorSpace, &layer->csc) != kErrorNone) {
       return kErrorNotSupported;
     }
+  }
+
+  if (meta_data->operation & SET_IGC) {
+    if (SetIGC(meta_data->igc, &layer->igc) != kErrorNone) {
+      return kErrorNotSupported;
+    }
+  }
+
+  if (meta_data->operation & UPDATE_REFRESH_RATE) {
+    layer->frame_rate = RoundToStandardFPS(meta_data->refreshrate);
+  }
+
+  if ((meta_data->operation & PP_PARAM_INTERLACED) && meta_data->interlaced) {
+    layer_buffer->flags.interlace = true;
+  }
+
+  if (meta_data->operation & LINEAR_FORMAT) {
+    layer_buffer->format = GetSDMFormat(meta_data->linearFormat, 0);
+  }
+
+  if (meta_data->operation & UPDATE_BUFFER_GEOMETRY) {
+    int actual_width = pvt_handle->width;
+    int actual_height = pvt_handle->height;
+    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(pvt_handle, actual_width, actual_height);
+    layer_buffer->width = actual_width;
+    layer_buffer->height = actual_height;
   }
 
   return kErrorNone;

@@ -44,13 +44,13 @@ namespace sdm {
   @sa Layer
 */
 enum LayerBlending {
-  kBlendingOpaque,          //!< Pixel color is expressed using straight alpha in color tuples. It
-                            //!< is constant blend operation. The layer would appear opaque if plane
-                            //!< alpha is 0xFF.
-
   kBlendingPremultiplied,   //!< Pixel color is expressed using premultiplied alpha in RGBA tuples.
                             //!< If plane alpha is less than 0xFF, apply modulation as well.
                             //!<   pixel.rgb = src.rgb + dest.rgb x (1 - src.a)
+
+  kBlendingOpaque,          //!< Pixel color is expressed using straight alpha in color tuples. It
+                            //!< is constant blend operation. The layer would appear opaque if plane
+                            //!< alpha is 0xFF.
 
   kBlendingCoverage,        //!< Pixel color is expressed using straight alpha in color tuples. If
                             //!< plane alpha is less than 0xff, apply modulation as well.
@@ -93,10 +93,23 @@ enum LayerComposition {
                             //!< Blit target layers shall be after GPU target layer in layer stack.
 };
 
-enum LayerColorSpace {
-  kLimitedRange601,       //!< 601 limited range color space
-  kFullRange601,          //!< 601 full range color space
-  kLimitedRange709,       //!< 709 limited range color space
+/*! @brief This enum represents display layer color space conversion (CSC) matrix types.
+
+  @sa Layer
+*/
+enum LayerCSC {
+  kCSCLimitedRange601,    //!< 601 limited range color space.
+  kCSCFullRange601,       //!< 601 full range color space.
+  kCSCLimitedRange709,    //!< 709 limited range color space.
+};
+
+/*! @brief This enum represents display layer inverse gamma correction (IGC) types.
+
+  @sa Layer
+*/
+enum LayerIGC {
+  kIGCNotSpecified,       //!< IGC is not specified.
+  kIGCsRGB,               //!< sRGB IGC type.
 };
 
 /*! @brief This structure defines rotation and flip values for a display layer.
@@ -246,8 +259,9 @@ struct Layer {
                                                    //!< rectangle shall be composed onto Nth blit
                                                    //!< target.
 
-  LayerBlending blending = kBlendingOpaque;        //!< Blending operation which need to be applied
-                                                   //!< on the layer buffer during composition.
+  LayerBlending blending = kBlendingPremultiplied;  //!< Blending operation which need to be
+                                                    //!< applied on the layer buffer during
+                                                    //!< composition.
 
   LayerTransform transform;                        //!< Rotation/Flip operations which need to be
                                                    //!< applied to the layer buffer during
@@ -260,15 +274,17 @@ struct Layer {
                                                    //!<    }
                                                    //!<    pixel.a = pixel.a * planeAlpha
 
-  LayerFlags flags;                                //!< Flags associated with this layer.
-
   uint32_t frame_rate = 0;                         //!< Rate at which frames are being updated for
                                                    //!< this layer.
 
-  LayerColorSpace color_space = kLimitedRange601;  //!< Color Space of the layer
+  LayerCSC csc = kCSCLimitedRange601;              //!< Color Space of the layer.
+
+  LayerIGC igc = kIGCNotSpecified;                 //!< IGC that will be applied on this layer.
 
   uint32_t solid_fill_color = 0;                   //!< Solid color used to fill the layer when
                                                    //!< no content is associated with the layer.
+
+  LayerFlags flags;                                //!< Flags associated with this layer.
 };
 
 /*! @brief This structure defines a layer stack that contains layers which need to be composed and
