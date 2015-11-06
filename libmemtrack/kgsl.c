@@ -45,14 +45,12 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
                              size_t *num_records)
 {
     size_t allocated_records = min(*num_records, ARRAY_SIZE(record_templates));
-    int i;
     FILE *fp;
     char line[1024];
     char tmp[128];
     bool is_surfaceflinger = false;
     size_t accounted_size = 0;
     size_t unaccounted_size = 0;
-    unsigned long smaps_addr = 0;
 
     *num_records = ARRAY_SIZE(record_templates);
 

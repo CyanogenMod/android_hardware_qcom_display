@@ -118,7 +118,7 @@ static int gralloc_unmap(gralloc_module_t const* module,
     if(hnd->base) {
         err = memalloc->unmap_buffer((void*)hnd->base, hnd->size, hnd->offset);
         if (err) {
-            ALOGE("Could not unmap memory at address %p, %s", hnd->base,
+            ALOGE("Could not unmap memory at address %p, %s", (void*) hnd->base,
                     strerror(errno));
             return -errno;
         }
@@ -131,7 +131,7 @@ static int gralloc_unmap(gralloc_module_t const* module,
                 size, hnd->offset_metadata);
         if (err) {
             ALOGE("Could not unmap memory at address %p, %s",
-                    hnd->base_metadata, strerror(errno));
+                    (void*) hnd->base_metadata, strerror(errno));
             return -errno;
         }
         hnd->base_metadata = 0;
