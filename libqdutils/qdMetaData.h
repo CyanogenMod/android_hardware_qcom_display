@@ -78,7 +78,7 @@ struct MetaData_t {
     uint32_t linearFormat;
     /* Set by graphics to indicate that this buffer will be written to but not
      * swapped out */
-    bool isSingleBufferMode;
+    uint32_t isSingleBufferMode;
 };
 
 enum DispParamType {

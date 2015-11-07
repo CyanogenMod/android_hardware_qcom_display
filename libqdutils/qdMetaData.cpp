@@ -85,7 +85,7 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
             data->igc = *((IGC_t *)param);
             break;
         case SET_SINGLE_BUFFER_MODE:
-            data->isSingleBufferMode = *((bool *)param);
+            data->isSingleBufferMode = *((uint32_t *)param);
             break;
         default:
             ALOGE("Unknown paramType %d", paramType);
