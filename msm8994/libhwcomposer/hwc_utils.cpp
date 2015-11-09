@@ -2857,6 +2857,7 @@ void ColorMode::init() {
         *(void **)& fnApplyDefaultMode = dlsym(mModeHandle, "applyDefaults");
         *(void **)& fnApplyModeById = dlsym(mModeHandle, "applyModeById");
         *(void **)& fnGetNumModes = dlsym(mModeHandle, "getNumDisplayModes");
+        *(void **)& fnGetCurrentMode = dlsym(mModeHandle, "getCurrentMode");
         *(void **)& fnGetModeList = dlsym(mModeHandle, "getDisplayModeIdList");
         *(void **)& fnSetDefaultMode = dlsym(mModeHandle, "setDefaultMode");
         *(void **)& fnDeleteInstance = dlsym(mModeHandle, "deleteInstance");
@@ -2882,8 +2883,13 @@ void ColorMode::init() {
 
 //Legacy API
 int ColorMode::applyDefaultMode() {
+    int ret = 0;
     if(fnApplyDefaultMode) {
-        return fnApplyDefaultMode(HWC_DISPLAY_PRIMARY);
+        ret = fnApplyDefaultMode(HWC_DISPLAY_PRIMARY);
+        if(!ret) {
+            mCurModeIndex = getIndexForMode(fnGetCurrentMode(HWC_DISPLAY_PRIMARY));
+        }
+        return ret;
     } else {
         return -EINVAL;
     }

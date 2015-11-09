@@ -934,7 +934,7 @@ int hwc_getActiveConfig(struct hwc_composer_device_1* dev, int disp)
 
     // For use cases when primary panel is the default interface we only have
     // the default config (0th index)
-    if (!hotPluggable && HWC_DISPLAY_PRIMARY) {
+    if (!hotPluggable && disp == HWC_DISPLAY_PRIMARY) {
         return ctx->mColorMode->getActiveModeIndex();
     } else if (isVirtualDisplay) {
         return 0;
