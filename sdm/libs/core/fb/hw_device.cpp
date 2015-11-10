@@ -625,21 +625,21 @@ void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
 
 int HWDevice::GetFBNodeIndex(HWDeviceType device_type) {
   for (int i = 0; i <= kDeviceVirtual; i++) {
-    HWPanelInfo *panel_info = new HWPanelInfo();
-    GetHWPanelInfoByNode(i, panel_info);
+    HWPanelInfo panel_info;
+    GetHWPanelInfoByNode(i, &panel_info);
     switch (device_type) {
     case kDevicePrimary:
-      if (panel_info->is_primary_panel) {
+      if (panel_info.is_primary_panel) {
         return i;
       }
       break;
     case kDeviceHDMI:
-      if (panel_info->port == kPortDTv) {
+      if (panel_info.port == kPortDTv) {
         return i;
       }
       break;
     case kDeviceVirtual:
-      if (panel_info->port == kPortWriteBack) {
+      if (panel_info.port == kPortWriteBack) {
         return i;
       }
       break;
