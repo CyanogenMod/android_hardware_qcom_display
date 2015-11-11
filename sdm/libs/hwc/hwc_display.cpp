@@ -1338,7 +1338,9 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
 
   if (meta_data->operation & SET_SINGLE_BUFFER_MODE) {
     layer->flags.single_buffer = meta_data->isSingleBufferMode;
-    layer_stack_.flags.single_buffered_layer_present = meta_data->isSingleBufferMode;
+    // Graphics can set this operation on all types of layers including FB and set the actual value
+    // to 0. To protect against SET operations of 0 value, we need to do a logical OR.
+    layer_stack_.flags.single_buffered_layer_present |= meta_data->isSingleBufferMode;
   }
 
   return kErrorNone;
