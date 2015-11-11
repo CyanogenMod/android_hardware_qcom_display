@@ -232,7 +232,7 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
                         hwc_display_contents_1_t **displays) {
   DTRACE_SCOPED();
 
-  if (!device || !displays) {
+  if (!device || !displays || num_displays > HWC_NUM_DISPLAY_TYPES) {
     return -EINVAL;
   }
 
@@ -312,7 +312,7 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
 
   SEQUENCE_EXIT_SCOPE_LOCK(locker_);
 
-  if (!device || !displays) {
+  if (!device || !displays || num_displays > HWC_NUM_DISPLAY_TYPES) {
     return -EINVAL;
   }
 
