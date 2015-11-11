@@ -158,6 +158,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
             hw_resource->is_src_split = true;
           } else if (!strncmp(tokens[i], "non_scalar_rgb", strlen("non_scalar_rgb"))) {
             hw_resource->has_non_scalar_rgb = true;
+          } else if (!strncmp(tokens[i], "perf_calc", strlen("perf_calc"))) {
+            hw_resource->perf_calc = true;
           }
         }
       }
