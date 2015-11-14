@@ -101,8 +101,7 @@ class HWDevice : public HWInterface {
   void PopulateHWPanelInfo();
   void GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info);
   void GetHWPanelNameByNode(int device_node, HWPanelInfo *panel_info);
-  HWDisplayPort GetHWDisplayPort(int device_node);
-  HWDisplayMode GetHWDisplayMode(int device_node);
+  void GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode);
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
   int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
   int ParseLine(char *input, const char *delim, char *tokens[],
