@@ -274,7 +274,7 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
     // Fill WB index for virtual based on number of rotator WB blocks present in the HW.
     // Eg: If 2 WB rotator blocks available, the WB index for virtual will be 2, as the
     // indexing of WB blocks start from 0.
-    mdp_out_layer_.writeback_ndx = hw_resource_.num_rotator;
+    mdp_out_layer_.writeback_ndx = hw_resource_.hw_rot_info.num_rotator;
     mdp_out_layer_.buffer.width = output_buffer->width;
     mdp_out_layer_.buffer.height = output_buffer->height;
     if (output_buffer->flags.secure) {

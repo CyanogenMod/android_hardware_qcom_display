@@ -30,6 +30,7 @@
 #include <core/core_interface.h>
 #include <vector>
 #include <map>
+#include <string>
 
 namespace sdm {
 const int kMaxSDELayers = 16;   // Maximum number of layers that can be handled by hardware in a
@@ -100,6 +101,16 @@ struct HWPipeCaps {
   uint32_t max_rects = 1;
 };
 
+struct HWRotatorInfo {
+  enum { ROT_TYPE_MDSS, ROT_TYPE_V4L2 };
+  uint32_t type = ROT_TYPE_MDSS;
+  uint32_t num_rotator = 0;
+  bool has_downscale = false;
+  std::string device_path = "";
+
+  void Reset() { *this = HWRotatorInfo(); }
+};
+
 struct HWResourceInfo {
   uint32_t hw_version = 0;
   uint32_t hw_revision = 0;
@@ -108,7 +119,6 @@ struct HWResourceInfo {
   uint32_t num_rgb_pipe = 0;
   uint32_t num_cursor_pipe = 0;
   uint32_t num_blending_stages = 0;
-  uint32_t num_rotator = 0;
   uint32_t num_control = 0;
   uint32_t num_mixer_to_disp = 0;
   uint32_t smp_total = 0;
@@ -133,7 +143,6 @@ struct HWResourceInfo {
   bool has_ubwc = false;
   bool has_decimation = false;
   bool has_macrotile = false;
-  bool has_rotator_downscale = false;
   bool has_non_scalar_rgb = false;
   bool is_src_split = false;
   bool perf_calc = false;
@@ -142,6 +151,7 @@ struct HWResourceInfo {
   HWDynBwLimitInfo dyn_bw_info;
   std::vector<HWPipeCaps> hw_pipes;
   FormatsMap supported_formats_map;
+  HWRotatorInfo hw_rot_info;
 
   void Reset() { *this = HWResourceInfo(); }
 };
@@ -213,17 +223,30 @@ struct HWSessionConfig {
   LayerRect dst_rect;
   uint32_t buffer_count = 0;
   bool secure = false;
-  bool cache = false;
   uint32_t frame_rate = 0;
+  LayerTransform transform;
+
+  bool operator==(const HWSessionConfig& config) const {
+    return (src_rect == config.src_rect &&
+            dst_rect == config.dst_rect &&
+            buffer_count == config.buffer_count &&
+            secure == config.secure &&
+            frame_rate == config.frame_rate &&
+            transform == config.transform);
+  }
+
+  bool operator!=(const HWSessionConfig& config) const {
+    return !operator==(config);
+  }
 };
 
 struct HWRotateInfo {
-  int pipe_id = -1;
-  int writeback_id = -1;
-  LayerRect src_roi;
-  LayerRect dst_roi;
+  int pipe_id = -1;  // Not actual pipe id, but the relative DMA id
+  int writeback_id = -1;  // Writeback block id, but this is the same as DMA id
+  LayerRect src_roi;  // Source crop of each split
+  LayerRect dst_roi;  // Destination crop of each split
   bool valid = false;
-  int rotate_id = -1;
+  int rotate_id = -1;  // Actual rotator session id with driver
 
   void Reset() { *this = HWRotateInfo(); }
 };
@@ -231,12 +254,10 @@ struct HWRotateInfo {
 struct HWRotatorSession {
   HWRotateInfo hw_rotate_info[kMaxRotatePerLayer];
   uint32_t hw_block_count = 0;  // number of rotator hw blocks used by rotator session
-  float downscale_ratio = 1.0f;
-  LayerTransform transform;
+  int session_id = -1;  // A handle with Session Manager
   HWSessionConfig hw_session_config;
-  LayerBuffer output_buffer;
-  LayerBuffer input_buffer;
-  int session_id = -1;
+  LayerBuffer input_buffer;  // Input to rotator
+  LayerBuffer output_buffer;  // Output of rotator, crop width and stride are same
   float input_compression = 1.0f;
   float output_compression = 1.0f;
   bool is_buffer_cached = false;

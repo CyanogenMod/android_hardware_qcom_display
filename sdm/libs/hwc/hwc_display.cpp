@@ -469,6 +469,7 @@ void HWCDisplay::CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
     layer_buffer->planes[0].fd = pvt_handle->fd;
     layer_buffer->planes[0].offset = pvt_handle->offset;
     layer_buffer->planes[0].stride = UINT32(pvt_handle->width);
+    layer_buffer->size = pvt_handle->size;
   }
 
   // if swapinterval property is set to 0 then close and reset the acquireFd

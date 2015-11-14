@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014, 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -185,6 +185,7 @@ struct LayerBufferFlags {
 struct LayerBuffer {
   uint32_t width = 0;           //!< Actual width of the Layer that this buffer is for.
   uint32_t height = 0;          //!< Actual height of the Layer that this buffer is for.
+  uint32_t size = 0;            //!< Size of a single buffer (even if multiple clubbed together)
   LayerBufferFormat format = kFormatRGBA8888;     //!< Format of the buffer content.
   LayerBufferPlane planes[4];   //!< Array of planes that this buffer contains. RGB buffer formats
                                 //!< have 1 plane whereas YUV buffer formats may have upto 4 planes.

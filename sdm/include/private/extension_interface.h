@@ -66,7 +66,8 @@ class ExtensionInterface {
                                           BufferSyncHandler *buffer_sync_handler) = 0;
   virtual DisplayError DestroyResourceExtn(ResourceInterface *interface) = 0;
 
-  virtual DisplayError CreateRotator(BufferAllocator *buffer_allocator,
+  virtual DisplayError CreateRotator(const HWRotatorInfo &hw_rot_info,
+                                     BufferAllocator *buffer_allocator,
                                      BufferSyncHandler *buffer_sync_handler,
                                      RotatorInterface **intf) = 0;
   virtual DisplayError DestroyRotator(RotatorInterface *intf) = 0;

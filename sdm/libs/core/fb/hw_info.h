@@ -37,6 +37,10 @@ class HWInfo: public HWInfoInterface {
   virtual DisplayError GetHWResourceInfo(HWResourceInfo *hw_resource);
 
  private:
+  virtual DisplayError GetHWRotatorInfo(HWResourceInfo *hw_resource);
+  virtual DisplayError GetMDSSRotatorInfo(HWResourceInfo *hw_resource);
+  virtual DisplayError GetV4L2RotatorInfo(HWResourceInfo *hw_resource);
+
   // TODO(user): Read Mdss version from the driver
   static const int kHWMdssVersion5 = 500;  // MDSS_V5
   static const int kMaxStringLength = 1024;
@@ -45,6 +49,7 @@ class HWInfo: public HWInfoInterface {
   // is guaranteed to be available.
   static const int kHWCapabilitiesNode = 0;
   static const uint8_t kDefaultFormatSupport[kHWSubBlockMax][BITS_TO_BYTES(MDP_IMGTYPE_LIMIT)];
+  static constexpr const char *kRotatorCapsPath = "/sys/devices/virtual/rotator/mdss_rotator/caps";
 
   static int ParseString(char *input, char *tokens[], const uint32_t max_token, const char *delim,
                          uint32_t *count);

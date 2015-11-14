@@ -31,16 +31,25 @@
 #include <utils/constants.h>
 #include <utils/debug.h>
 #include <utils/sys.h>
-#include <vector>
-#include <utility>
+
+#include <algorithm>
+#include <iostream>
+#include <fstream>
 #include <map>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "hw_info.h"
 
 #define __CLASS__ "HWInfo"
 
 using std::vector;
 using std::map;
+using std::string;
+using std::ifstream;
+using std::to_string;
 
 namespace sdm {
 
@@ -314,31 +323,7 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->macrotile_nv12_factor, hw_resource->macrotile_factor,
         hw_resource->linear_factor, hw_resource->scale_factor, hw_resource->extra_fudge_factor);
 
-  const char *rotator_caps_path = "/sys/devices/virtual/rotator/mdss_rotator/caps";
-  snprintf(stringbuffer , kMaxStringLength, "%s", rotator_caps_path);
-  fileptr = Sys::fopen_(stringbuffer, "r");
-
-  if (!fileptr) {
-    DLOGW("File '%s' not found", stringbuffer);
-    free(stringbuffer);
-    return kErrorNone;
-  }
-
-  while ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
-    if (!ParseString(line, tokens, max_count, ":, =\n", &token_count)) {
-      if (!strncmp(tokens[0], "wb_count", strlen("wb_count"))) {
-        hw_resource->num_rotator = UINT8(atoi(tokens[1]));
-      } else if (!strncmp(tokens[0], "downscale", strlen("downscale"))) {
-        hw_resource->has_rotator_downscale = UINT8(atoi(tokens[1]));
-      }
-    }
-  }
-
-  free(stringbuffer);
-  Sys::fclose_(fileptr);
-
-  DLOGI("ROTATOR = %d, Rotator Downscale = %d", hw_resource->num_rotator,
-        hw_resource->has_rotator_downscale);
+  GetHWRotatorInfo(hw_resource);
 
   if (hw_resource->has_dyn_bw_support) {
     DisplayError ret = GetDynamicBWLimits(hw_resource);
@@ -354,6 +339,82 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
             hw_resource->dyn_bw_info.pipe_bw_limit[index]);
     }
   }
+
+  return kErrorNone;
+}
+
+DisplayError HWInfo::GetHWRotatorInfo(HWResourceInfo *hw_resource) {
+  if (GetMDSSRotatorInfo(hw_resource) != kErrorNone)
+    return GetV4L2RotatorInfo(hw_resource);
+
+  return kErrorNone;
+}
+
+DisplayError HWInfo::GetMDSSRotatorInfo(HWResourceInfo *hw_resource) {
+  FILE *fileptr = NULL;
+  char *stringbuffer = reinterpret_cast<char *>(malloc(sizeof(char) * kMaxStringLength));
+  uint32_t token_count = 0;
+  const uint32_t max_count = 10;
+  char *tokens[max_count] = { NULL };
+  size_t len = kMaxStringLength;
+  ssize_t read = 0;
+
+  snprintf(stringbuffer, sizeof(char) * kMaxStringLength, "%s", kRotatorCapsPath);
+  fileptr = Sys::fopen_(stringbuffer, "r");
+
+  if (!fileptr) {
+    DLOGW("File '%s' not found", stringbuffer);
+    free(stringbuffer);
+    return kErrorNotSupported;
+  }
+
+  hw_resource->hw_rot_info.type = HWRotatorInfo::ROT_TYPE_MDSS;
+  while ((read = Sys::getline_(&stringbuffer, &len, fileptr)) != -1) {
+    if (!ParseString(stringbuffer, tokens, max_count, ":, =\n", &token_count)) {
+      if (!strncmp(tokens[0], "wb_count", strlen("wb_count"))) {
+        hw_resource->hw_rot_info.num_rotator = UINT8(atoi(tokens[1]));
+        hw_resource->hw_rot_info.device_path = "/dev/mdss_rotator";
+      } else if (!strncmp(tokens[0], "downscale", strlen("downscale"))) {
+        hw_resource->hw_rot_info.has_downscale = UINT8(atoi(tokens[1]));
+      }
+    }
+  }
+
+  Sys::fclose_(fileptr);
+  free(stringbuffer);
+
+  DLOGI("MDSS Rotator: Count = %d, Downscale = %d", hw_resource->hw_rot_info.num_rotator,
+        hw_resource->hw_rot_info.has_downscale);
+
+  return kErrorNone;
+}
+
+DisplayError HWInfo::GetV4L2RotatorInfo(HWResourceInfo *hw_resource) {
+  const uint32_t kMaxV4L2Nodes = 64;
+  size_t len = kMaxStringLength;
+  char *line = reinterpret_cast<char *>(malloc(sizeof(char) * len));
+  bool found = false;
+
+  for (uint32_t i = 0; (i < kMaxV4L2Nodes) && (false == found); i++) {
+    string path = "/sys/class/video4linux/video" + to_string(i) + "/name";
+    FILE *fileptr = Sys::fopen_(path.c_str(), "r");
+    if (fileptr) {
+      if ((Sys::getline_(&line, &len, fileptr) != -1) &&
+          (!strncmp(line, "sde_rotator", strlen("sde_rotator")))) {
+         hw_resource->hw_rot_info.device_path = string("/dev/video" + to_string(i));
+         hw_resource->hw_rot_info.num_rotator++;
+         hw_resource->hw_rot_info.type = HWRotatorInfo::ROT_TYPE_V4L2;
+         hw_resource->hw_rot_info.has_downscale = true;
+         // We support only 1 rotator
+         found = true;
+      }
+      Sys::fclose_(fileptr);
+    }
+  }
+
+  free(line);
+  DLOGI("V4L2 Rotator: Count = %d, Downscale = %d", hw_resource->hw_rot_info.num_rotator,
+        hw_resource->hw_rot_info.has_downscale);
 
   return kErrorNone;
 }
