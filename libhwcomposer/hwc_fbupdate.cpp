@@ -547,6 +547,7 @@ bool FBSrcSplit::configure(hwc_context_t *ctx, hwc_display_contents_1 *list,
     const uint32_t mixerClock = lSplit;
 
     if((cropWidth > qdutils::MDPVersion::getInstance().getMaxPipeWidth()) or
+            (dstWidth > qdutils::MDPVersion::getInstance().getMaxPipeWidth()) or
             (primarySplitAlways and
             (cropWidth > lSplit or layerClock > mixerClock)) or
             needs3DComposition(ctx, mDpy)) {
