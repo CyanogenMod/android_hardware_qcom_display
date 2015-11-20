@@ -143,6 +143,7 @@ struct HWPanelInfo {
   uint32_t min_fps = 0;               // Min fps supported by panel
   uint32_t max_fps = 0;               // Max fps supported by panel
   bool is_primary_panel = false;      // Panel is primary display
+  bool is_pluggable = false;          // Panel is pluggable
   HWSplitInfo split_info;             // Panel split configuration
   char panel_name[256] = {0};         // Panel name
 
