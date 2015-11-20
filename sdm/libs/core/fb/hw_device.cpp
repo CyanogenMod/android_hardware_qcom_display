@@ -617,39 +617,29 @@ void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
     *mdp_flags |= MDP_LAYER_SOLID_FILL;
   }
 
-  if (hw_panel_info_.mode == kModeVideo && layer.flags.cursor && is_cursor_pipe_used) {
-    // Only video mode panels support ASYNC layer updates
+  if (hw_panel_info_.mode != kModeCommand && layer.flags.cursor && is_cursor_pipe_used) {
+    // command mode panels does not support async position update
     *mdp_flags |= MDP_LAYER_ASYNC;
-  }
-}
-
-void HWDevice::SyncMerge(const int &fd1, const int &fd2, int *target) {
-  if (fd1 >= 0 && fd2 >= 0) {
-    buffer_sync_handler_->SyncMerge(fd1, fd2, target);
-  } else if (fd1 >= 0) {
-    *target = fd1;
-  } else if (fd2 >= 0) {
-    *target = fd2;
   }
 }
 
 int HWDevice::GetFBNodeIndex(HWDeviceType device_type) {
   for (int i = 0; i <= kDeviceVirtual; i++) {
-    HWPanelInfo *panel_info = new HWPanelInfo();
-    GetHWPanelInfoByNode(i, panel_info);
+    HWPanelInfo panel_info;
+    GetHWPanelInfoByNode(i, &panel_info);
     switch (device_type) {
     case kDevicePrimary:
-      if (panel_info->is_primary_panel) {
+      if (panel_info.is_primary_panel) {
         return i;
       }
       break;
     case kDeviceHDMI:
-      if (panel_info->port == kPortDTv) {
+      if (panel_info.port == kPortDTv) {
         return i;
       }
       break;
     case kDeviceVirtual:
-      if (panel_info->port == kPortWriteBack) {
+      if (panel_info.port == kPortWriteBack) {
         return i;
       }
       break;
@@ -677,6 +667,39 @@ void HWDevice::PopulateHWPanelInfo() {
   DLOGI("FPS: min = %d, max =%d", hw_panel_info_.min_fps, hw_panel_info_.max_fps);
   DLOGI("Left Split = %d, Right Split = %d", hw_panel_info_.split_info.left_split,
         hw_panel_info_.split_info.right_split);
+}
+
+void HWDevice::GetHWPanelNameByNode(int device_node, HWPanelInfo *panel_info) {
+  if (!panel_info) {
+    DLOGE("PanelInfo pointer in invalid.");
+    return;
+  }
+  char *string_buffer = reinterpret_cast<char*>(malloc(sizeof(char) * kMaxStringLength));
+  if (!string_buffer) {
+    DLOGE("Failed to allocated string_buffer memory");
+    return;
+  }
+  snprintf(string_buffer, kMaxStringLength, "%s%d/msm_fb_panel_info", fb_path_, device_node);
+  FILE *fileptr = Sys::fopen_(string_buffer, "r");
+  if (!fileptr) {
+    DLOGW("Failed to open msm_fb_panel_info node device node %d", device_node);
+  } else {
+    size_t len = kMaxStringLength;
+
+    while ((Sys::getline_(&string_buffer, &len, fileptr)) != -1) {
+      uint32_t token_count = 0;
+      const uint32_t max_count = 10;
+      char *tokens[max_count] = { NULL };
+      if (!ParseLine(string_buffer, "=\n", tokens, max_count, &token_count)) {
+        if (!strncmp(tokens[0], "panel_name", strlen("panel_name"))) {
+          snprintf(panel_info->panel_name, sizeof(panel_info->panel_name), "%s", tokens[1]);
+          break;
+        }
+      }
+    }
+    Sys::fclose_(fileptr);
+  }
+  free(string_buffer);
 }
 
 void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
@@ -730,80 +753,58 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
     }
   }
   Sys::fclose_(fileptr);
-  panel_info->port = GetHWDisplayPort(device_node);
-  panel_info->mode = GetHWDisplayMode(device_node);
+  GetHWDisplayPortAndMode(device_node, &panel_info->port, &panel_info->mode);
   GetSplitInfo(device_node, panel_info);
+  GetHWPanelNameByNode(device_node, panel_info);
 }
 
-HWDisplayPort HWDevice::GetHWDisplayPort(int device_node) {
-  char stringbuffer[kMaxStringLength];
-  HWDisplayPort port = kPortDefault;
+void HWDevice::GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode) {
+  *port = kPortDefault;
+  *mode = kModeDefault;
+  char *stringbuffer = reinterpret_cast<char*>(malloc(sizeof(char) * kMaxStringLength));
+  if (!stringbuffer) {
+    DLOGE("Failed to allocated string_buffer memory");
+    return;
+  }
 
-  snprintf(stringbuffer, sizeof(stringbuffer), "%s%d/msm_fb_type", fb_path_, device_node);
+  snprintf(stringbuffer, kMaxStringLength, "%s%d/msm_fb_type", fb_path_, device_node);
   FILE *fileptr = Sys::fopen_(stringbuffer, "r");
   if (!fileptr) {
     DLOGW("File not found %s", stringbuffer);
-    return port;
+    free(stringbuffer);
+    return;
   }
 
-  char *line = stringbuffer;
   size_t len = kMaxStringLength;
-  ssize_t read;
-
-  read = Sys::getline_(&line, &len, fileptr);
+  ssize_t read = Sys::getline_(&stringbuffer, &len, fileptr);
   if (read == -1) {
     Sys::fclose_(fileptr);
-    return port;
+    free(stringbuffer);
+    return;
   }
-  if ((strncmp(line, "mipi dsi cmd panel", strlen("mipi dsi cmd panel")) == 0)) {
-    port = kPortDSI;
-  } else if ((strncmp(line, "mipi dsi video panel", strlen("mipi dsi video panel")) == 0)) {
-    port = kPortDSI;
-  } else if ((strncmp(line, "lvds panel", strlen("lvds panel")) == 0)) {
-    port = kPortLVDS;
-  } else if ((strncmp(line, "edp panel", strlen("edp panel")) == 0)) {
-    port = kPortEDP;
-  } else if ((strncmp(line, "dtv panel", strlen("dtv panel")) == 0)) {
-    port = kPortDTv;
-  } else if ((strncmp(line, "writeback panel", strlen("writeback panel")) == 0)) {
-    port = kPortWriteBack;
-  } else {
-    port = kPortDefault;
-  }
-  Sys::fclose_(fileptr);
-  return port;
-}
-
-HWDisplayMode HWDevice::GetHWDisplayMode(int device_node) {
-  char stringbuffer[kMaxStringLength];
-  HWDisplayMode mode = kModeDefault;
-
-  snprintf(stringbuffer, sizeof(stringbuffer), "%s%d/msm_fb_type", fb_path_, device_node);
-  FILE *fileptr = Sys::fopen_(stringbuffer, "r");
-  if (!fileptr) {
-    DLOGW("File not found %s", stringbuffer);
-    return mode;
-  }
-
-  char *line = stringbuffer;
-  size_t len = kMaxStringLength;
-  ssize_t read;
-
-  read = Sys::getline_(&line, &len, fileptr);
-  if (read == -1) {
-    Sys::fclose_(fileptr);
-    return mode;
-  }
-  if ((strncmp(line, "mipi dsi cmd panel", strlen("mipi dsi cmd panel")) == 0)) {
-    mode = kModeCommand;
-  } else if ((strncmp(line, "mipi dsi video panel", strlen("mipi dsi video panel")) == 0)) {
-    mode = kModeVideo;
-  } else {
-    mode = kModeDefault;
+  if ((strncmp(stringbuffer, "mipi dsi cmd panel", strlen("mipi dsi cmd panel")) == 0)) {
+    *port = kPortDSI;
+    *mode = kModeCommand;
+  } else if ((strncmp(stringbuffer, "mipi dsi video panel", strlen("mipi dsi video panel")) == 0)) {
+    *port = kPortDSI;
+    *mode = kModeVideo;
+  } else if ((strncmp(stringbuffer, "lvds panel", strlen("lvds panel")) == 0)) {
+    *port = kPortLVDS;
+    *mode = kModeVideo;
+  } else if ((strncmp(stringbuffer, "edp panel", strlen("edp panel")) == 0)) {
+    *port = kPortEDP;
+    *mode = kModeVideo;
+  } else if ((strncmp(stringbuffer, "dtv panel", strlen("dtv panel")) == 0)) {
+    *port = kPortDTv;
+    *mode = kModeVideo;
+  } else if ((strncmp(stringbuffer, "writeback panel", strlen("writeback panel")) == 0)) {
+    *port = kPortWriteBack;
+    *mode = kModeCommand;
   }
   Sys::fclose_(fileptr);
+  free(stringbuffer);
 
-  return mode;
+  return;
 }
 
 void HWDevice::GetSplitInfo(int device_node, HWPanelInfo *panel_info) {
@@ -842,6 +843,24 @@ int HWDevice::ParseLine(char *input, char *tokens[], const uint32_t max_token, u
   char *temp_ptr;
   uint32_t index = 0;
   const char *delim = ", =\n";
+  if (!input) {
+    return -1;
+  }
+  tmp_token = strtok_r(input, delim, &temp_ptr);
+  while (tmp_token && index < max_token) {
+    tokens[index++] = tmp_token;
+    tmp_token = strtok_r(NULL, delim, &temp_ptr);
+  }
+  *count = index;
+
+  return 0;
+}
+
+int HWDevice::ParseLine(char *input, const char *delim, char *tokens[],
+                        const uint32_t max_token, uint32_t *count) {
+  char *tmp_token = NULL;
+  char *temp_ptr;
+  uint32_t index = 0;
   if (!input) {
     return -1;
   }
@@ -1033,7 +1052,7 @@ DisplayError HWDevice::GetPanelBrightness(int *level) {
   return kErrorNotSupported;
 }
 
-ssize_t HWDevice::SysFsWrite(char* file_node, char* value, ssize_t length) {
+ssize_t HWDevice::SysFsWrite(const char* file_node, const char* value, ssize_t length) {
   int fd = Sys::open_(file_node, O_RDWR, 0);
   if (fd < 0) {
     DLOGW("Open failed = %s", file_node);

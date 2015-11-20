@@ -50,6 +50,7 @@ enum DisplayType {
   kHDMI,            //!< HDMI physical display which is generally detachable.
   kVirtual,         //!< Contents would be rendered into the output buffer provided by the client
                     //!< e.g. wireless display.
+  kDisplayMax,
 };
 
 /*! @brief This enum represents states of a display device.

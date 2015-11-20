@@ -90,6 +90,7 @@ class HWInterface {
   virtual DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y) = 0;
   virtual DisplayError OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) = 0;
   virtual DisplayError GetPanelBrightness(int *level) = 0;
+  virtual DisplayError SetAutoRefresh(bool enable) = 0;
 
  protected:
   virtual ~HWInterface() { }

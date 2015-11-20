@@ -118,7 +118,7 @@ static int gralloc_unmap(gralloc_module_t const* module,
     if(hnd->base) {
         err = memalloc->unmap_buffer((void*)hnd->base, hnd->size, hnd->offset);
         if (err) {
-            ALOGE("Could not unmap memory at address %p, %s", hnd->base,
+            ALOGE("Could not unmap memory at address %p, %s", (void*) hnd->base,
                     strerror(errno));
             return -errno;
         }
@@ -131,7 +131,7 @@ static int gralloc_unmap(gralloc_module_t const* module,
                 size, hnd->offset_metadata);
         if (err) {
             ALOGE("Could not unmap memory at address %p, %s",
-                    hnd->base_metadata, strerror(errno));
+                    (void*) hnd->base_metadata, strerror(errno));
             return -errno;
         }
         hnd->base_metadata = 0;
@@ -480,6 +480,15 @@ int gralloc_perform(struct gralloc_module_t const* module,
                 }
             } break;
 
+        case GRALLOC_MODULE_PERFORM_SET_SINGLE_BUFFER_MODE:
+            {
+                private_handle_t* hnd =  va_arg(args, private_handle_t*);
+                uint32_t *enable = va_arg(args, uint32_t*);
+                if (private_handle_t::validate(hnd)) {
+                    return res;
+                }
+                setMetaData(hnd, SET_SINGLE_BUFFER_MODE, enable);
+            } break;
         default:
             break;
     }

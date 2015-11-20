@@ -225,9 +225,23 @@ int HWCDisplayVirtual::SetOutputSliceFromMetadata(hwc_display_contents_1_t *cont
     if ((active_width != INT(output_buffer_->width)) ||
         (active_height!= INT(output_buffer_->height)) ||
         (format != output_buffer_->format)) {
+      // Populate virtual display attributes based on displayFrame of FBT.
+      // For DRC, use width and height populated in metadata (unaligned values)
+      // for setting attributes of virtual display. This is needed because if
+      // we use aligned width and height, scaling will be required for FBT layer.
       DisplayConfigVariableInfo variable_info;
-      variable_info.x_pixels = active_width;
-      variable_info.y_pixels = active_height;
+      hwc_layer_1_t &fbt_layer = content_list->hwLayers[content_list->numHwLayers-1];
+      hwc_rect_t &frame = fbt_layer.displayFrame;
+      int fbt_width = frame.right - frame.left;
+      int fbt_height = frame.bottom - frame.top;
+      const MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(output_handle->base_metadata);
+      if (meta_data && meta_data->operation & UPDATE_BUFFER_GEOMETRY) {
+        variable_info.x_pixels = meta_data->bufferDim.sliceWidth;
+        variable_info.y_pixels = meta_data->bufferDim.sliceHeight;
+      } else {
+        variable_info.x_pixels = fbt_width;
+        variable_info.y_pixels = fbt_height;
+      }
       // TODO(user): Need to get the framerate of primary display and update it.
       variable_info.fps = 60;
 

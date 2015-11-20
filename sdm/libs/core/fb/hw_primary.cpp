@@ -353,6 +353,7 @@ DisplayError HWPrimary::SetDisplayAttributes(uint32_t index) {
                                  display_config_strings_.at(index).length(), 0);
   if (written > 0) {
     DLOGI("Successfully set config %u", index);
+    PopulateHWPanelInfo();
     PopulateDisplayAttributes();
     active_config_index_ = index;
   } else {
@@ -659,6 +660,18 @@ DisplayError HWPrimary::GetPanelBrightness(int *level) {
     DLOGV_IF(kTagDriverConfig, "Brightness level = %d", *level);
   }
   Sys::close_(fd);
+
+  return kErrorNone;
+}
+
+DisplayError HWPrimary::SetAutoRefresh(bool enable) {
+  const int kWriteLength = 2;
+  char buffer[kWriteLength] = {'\0'};
+  ssize_t bytes = snprintf(buffer, kWriteLength, "%d", enable);
+
+  if (HWDevice::SysFsWrite(kAutoRefreshNode, buffer, bytes) <= 0) {  // Returns bytes written
+    return kErrorUndefined;
+  }
 
   return kErrorNone;
 }

@@ -97,7 +97,7 @@ class BlitEngineC2d : public BlitEngine {
     mutable Range r;
   };
 
-  int AllocateBlitTargetBuffers(uint32_t width, uint32_t height, uint32_t format);
+  int AllocateBlitTargetBuffers(uint32_t width, uint32_t height, uint32_t format, uint32_t usage);
   void FreeBlitTargetBuffers();
   int ClearTargetBuffer(private_handle_t* hnd, const LayerRect& rect);
   int DrawRectUsingCopybit(hwc_layer_1_t *hwc_layer, Layer *layer, LayerRect blit_rect,

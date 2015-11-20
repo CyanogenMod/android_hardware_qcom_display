@@ -196,4 +196,26 @@ DisplayError ColorManagerProxy::Commit() {
   return ret;
 }
 
+void PPHWAttributes::Set(const HWResourceInfo &hw_res,
+                         const HWPanelInfo &panel_info,
+                         const DisplayConfigVariableInfo &attr,
+                         const PPFeatureVersion &feature_ver) {
+  HWResourceInfo &res = *this;
+  res = hw_res;
+  HWPanelInfo &panel = *this;
+  panel = panel_info;
+  DisplayConfigVariableInfo &attributes = *this;
+  attributes = attr;
+  version = feature_ver;
+
+  if (strlen(panel_info.panel_name)) {
+    snprintf(&panel_name[0], sizeof(panel_name), "%s", &panel_info.panel_name[0]);
+    char *tmp = panel_name;
+    while ((tmp = strstr(tmp, " ")) != NULL)
+      *tmp = '_';
+    if ((tmp = strstr(panel_name, "\n")) != NULL)
+      *tmp = '\0';
+  }
+}
+
 }  // namespace sdm

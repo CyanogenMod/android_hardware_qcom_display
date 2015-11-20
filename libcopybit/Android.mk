@@ -26,8 +26,9 @@ LOCAL_MODULE_RELATIVE_PATH    := hw
 LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libdl libmemalloc
-LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdcopybit\"
+LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdcopybit\" -Wno-sign-conversion
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
+LOCAL_CLANG                   := true
 
 ifeq ($(TARGET_USES_C2D_COMPOSITION),true)
     LOCAL_CFLAGS += -DCOPYBIT_Z180=1 -DC2D_SUPPORT_DISPLAY=1

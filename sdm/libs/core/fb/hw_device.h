@@ -72,6 +72,7 @@ class HWDevice : public HWInterface {
   virtual DisplayError SetCursorPosition(HWLayers *hw_layers, int x, int y);
   virtual DisplayError OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
   virtual DisplayError GetPanelBrightness(int *level);
+  virtual DisplayError SetAutoRefresh(bool enable) { return kErrorNone; }
 
   // For HWDevice derivatives
   virtual DisplayError Init(HWEventHandler *eventhandler);
@@ -94,17 +95,17 @@ class HWDevice : public HWInterface {
   void SetRect(const LayerRect &source, mdp_rect *target);
   void SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
                    bool is_cursor_pipe_used, uint32_t *mdp_flags);
-  void SyncMerge(const int &fd1, const int &fd2, int *target);
-
   // Retrieves HW FrameBuffer Node Index
   int GetFBNodeIndex(HWDeviceType device_type);
   // Populates HWPanelInfo based on node index
   void PopulateHWPanelInfo();
   void GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info);
-  HWDisplayPort GetHWDisplayPort(int device_node);
-  HWDisplayMode GetHWDisplayMode(int device_node);
+  void GetHWPanelNameByNode(int device_node, HWPanelInfo *panel_info);
+  void GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode);
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
   int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
+  int ParseLine(char *input, const char *delim, char *tokens[],
+                const uint32_t max_token, uint32_t *count);
   mdp_scale_data* GetScaleDataRef(uint32_t index) { return &scale_data_[index]; }
   void SetHWScaleData(const ScaleData &scale, uint32_t index);
   void ResetDisplayParams();
@@ -112,7 +113,7 @@ class HWDevice : public HWInterface {
   void SetIGC(const Layer &layer, uint32_t index);
 
   bool EnableHotPlugDetection(int enable);
-  ssize_t SysFsWrite(char* file_node, char* value, ssize_t length);
+  ssize_t SysFsWrite(const char* file_node, const char* value, ssize_t length);
 
   // Store the Device EventHandler - used for callback
   HWEventHandler *event_handler_;

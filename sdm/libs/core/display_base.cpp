@@ -109,6 +109,56 @@ DisplayError DisplayBase::Deinit() {
   return kErrorNone;
 }
 
+DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
+  uint32_t i = 0;
+  Layer *layers = layer_stack->layers;
+
+  // TODO(user): Remove this check once we have query display attributes on virtual display
+  if (display_type_ == kVirtual) {
+    return kErrorNone;
+  }
+
+  while (i < layer_stack->layer_count && (layers[i].composition != kCompositionGPUTarget)) {
+    i++;
+  }
+
+  if (i >= layer_stack->layer_count) {
+    DLOGE("Either layer count is zero or GPU target layer is not present");
+    return kErrorParameters;
+  }
+
+  uint32_t gpu_target_index = i;
+
+  // Check GPU target layer
+  Layer &gpu_target_layer = layer_stack->layers[gpu_target_index];
+
+  if (!IsValid(gpu_target_layer.src_rect)) {
+    DLOGE("Invalid src rect for GPU target layer");
+    return kErrorParameters;
+  }
+
+  if (!IsValid(gpu_target_layer.dst_rect)) {
+    DLOGE("Invalid dst rect for GPU target layer");
+    return kErrorParameters;
+  }
+
+  uint32_t gpu_target_layer_dst_xpixels = gpu_target_layer.dst_rect.right;
+  uint32_t gpu_target_layer_dst_ypixels = gpu_target_layer.dst_rect.bottom;
+
+  HWDisplayAttributes display_attrib;
+  uint32_t active_index = 0;
+  hw_intf_->GetActiveConfig(&active_index);
+  hw_intf_->GetDisplayAttributes(active_index, &display_attrib);
+
+  if (gpu_target_layer_dst_xpixels > display_attrib.x_pixels ||
+    gpu_target_layer_dst_ypixels > display_attrib.y_pixels) {
+    DLOGE("GPU target layer dst rect is not with in limits");
+    return kErrorParameters;
+  }
+
+  return kErrorNone;
+}
+
 DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
   bool disable_partial_update = false;
@@ -120,57 +170,63 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
 
   pending_commit_ = false;
 
-  if (state_ == kStateOn) {
-    if (color_mgr_) {
-      disable_partial_update = color_mgr_->NeedsPartialUpdateDisable();
-      if (disable_partial_update) {
-        ControlPartialUpdate(false, &pending);
+  error = ValidateGPUTarget(layer_stack);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  if (!active_) {
+    return kErrorPermission;
+  }
+
+  if (color_mgr_) {
+    disable_partial_update = color_mgr_->NeedsPartialUpdateDisable();
+    if (disable_partial_update) {
+      ControlPartialUpdate(false, &pending);
+    }
+  }
+
+  // Clean hw layers for reuse.
+  hw_layers_.info = HWLayersInfo();
+  hw_layers_.info.stack = layer_stack;
+  hw_layers_.output_compression = 1.0f;
+
+  comp_manager_->PrePrepare(display_comp_ctx_, &hw_layers_);
+  while (true) {
+    error = comp_manager_->Prepare(display_comp_ctx_, &hw_layers_);
+    if (error != kErrorNone) {
+      break;
+    }
+
+    if (IsRotationRequired(&hw_layers_)) {
+      if (!rotator_intf_) {
+        continue;
+      }
+      error = rotator_intf_->Prepare(display_rotator_ctx_, &hw_layers_);
+    } else {
+      // Release all the previous rotator sessions.
+      if (rotator_intf_) {
+        error = rotator_intf_->Purge(display_rotator_ctx_);
       }
     }
 
-    // Clean hw layers for reuse.
-    hw_layers_.info = HWLayersInfo();
-    hw_layers_.info.stack = layer_stack;
-    hw_layers_.output_compression = 1.0f;
-
-    comp_manager_->PrePrepare(display_comp_ctx_, &hw_layers_);
-    while (true) {
-      error = comp_manager_->Prepare(display_comp_ctx_, &hw_layers_);
-      if (error != kErrorNone) {
+    if (error == kErrorNone) {
+      error = hw_intf_->Validate(&hw_layers_);
+      if (error == kErrorNone) {
+        // Strategy is successful now, wait for Commit().
+        pending_commit_ = true;
         break;
       }
-
-      if (IsRotationRequired(&hw_layers_)) {
-        if (!rotator_intf_) {
-          continue;
-        }
-        error = rotator_intf_->Prepare(display_rotator_ctx_, &hw_layers_);
-      } else {
-        // Release all the previous rotator sessions.
-        if (rotator_intf_) {
-          error = rotator_intf_->Purge(display_rotator_ctx_);
-        }
-      }
-
-      if (error == kErrorNone) {
-        error = hw_intf_->Validate(&hw_layers_);
-        if (error == kErrorNone) {
-          // Strategy is successful now, wait for Commit().
-          pending_commit_ = true;
-          break;
-        }
-        if (error == kErrorShutDown) {
-          comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
-          return error;
-        }
+      if (error == kErrorShutDown) {
+        comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
+        return error;
       }
     }
-    comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
-    if (disable_partial_update) {
-      ControlPartialUpdate(true, &pending);
-    }
-  } else {
-    return kErrorNotSupported;
+  }
+
+  comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
+  if (disable_partial_update) {
+    ControlPartialUpdate(true, &pending);
   }
 
   return error;
@@ -183,8 +239,8 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
     return kErrorParameters;
   }
 
-  if (state_ != kStateOn) {
-    return kErrorNotSupported;
+  if (!active_) {
+    return kErrorPermission;
   }
 
   if (!pending_commit_) {
@@ -245,8 +301,8 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
 DisplayError DisplayBase::Flush() {
   DisplayError error = kErrorNone;
 
-  if (state_ != kStateOn) {
-    return kErrorNone;
+  if (!active_) {
+    return kErrorPermission;
   }
 
   hw_layers_.info.count = 0;
@@ -314,6 +370,7 @@ bool DisplayBase::IsUnderscanSupported() {
 
 DisplayError DisplayBase::SetDisplayState(DisplayState state) {
   DisplayError error = kErrorNone;
+  bool active = false;
 
   DLOGI("Set state = %d, display %d", state, display_type_);
 
@@ -344,10 +401,12 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 
   case kStateOn:
     error = hw_intf_->PowerOn();
+    active = true;
     break;
 
   case kStateDoze:
     error = hw_intf_->Doze();
+    active = true;
     break;
 
   case kStateDozeSuspend:
@@ -364,6 +423,7 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
   }
 
   if (error == kErrorNone) {
+    active_ = active;
     state_ = state;
   }
 

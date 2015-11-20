@@ -66,6 +66,7 @@ static bool MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
   info->vsync_len = mode->pulse_width_v;
   info->upper_margin = mode->back_porch_v;
 
+  info->grayscale = V4L2_PIX_FMT_RGB24;
   // If the mode supports YUV420 set grayscale to the FOURCC value for YUV420.
   if (IS_BIT_SET(mode->pixel_formats, 1)) {
     info->grayscale = V4L2_PIX_FMT_NV12;
