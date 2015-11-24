@@ -53,6 +53,7 @@ class ResourceDefault : public ResourceInterface {
                                        bool rotate90, bool ubwc_tiled, bool use_rotator_downscale);
   DisplayError ValidateCursorConfig(Handle display_ctx, const Layer& layer, bool is_top);
   DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers, int x, int y);
+  DisplayError SetMaxBandwidthMode(HWBwModes mode);
 
  private:
   enum PipeId {
