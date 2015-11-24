@@ -150,6 +150,42 @@ DisplayError HWCBufferAllocator::FreeBuffer(BufferInfo *buffer_info) {
   return kErrorNone;
 }
 
+uint32_t HWCBufferAllocator::GetBufferSize(BufferInfo *buffer_info) {
+  uint32_t align = getpagesize();
+
+  const BufferConfig &buffer_config = buffer_info->buffer_config;
+
+  int alloc_flags = INT(GRALLOC_USAGE_PRIVATE_IOMMU_HEAP);
+
+  int width = INT(buffer_config.width);
+  int height = INT(buffer_config.height);
+  int format;
+
+  if (buffer_config.secure) {
+    alloc_flags = INT(GRALLOC_USAGE_PRIVATE_MM_HEAP);
+    alloc_flags |= INT(GRALLOC_USAGE_PROTECTED);
+    align = SECURE_ALIGN;
+  }
+
+  if (buffer_config.cache == false) {
+    // Allocate uncached buffers
+    alloc_flags |= GRALLOC_USAGE_PRIVATE_UNCACHED;
+  }
+
+  if (SetBufferInfo(buffer_config.format, &format, &alloc_flags) < 0) {
+    return 0;
+  }
+
+  int aligned_width = 0;
+  int aligned_height = 0;
+  uint32_t buffer_size = getBufferSizeAndDimensions(width, height, format, alloc_flags,
+                                                    aligned_width, aligned_height);
+
+  buffer_size = ROUND_UP(buffer_size, align) * buffer_config.buffer_count;
+
+  return buffer_size;
+}
+
 int HWCBufferAllocator::SetBufferInfo(LayerBufferFormat format, int *target, int *flags) {
   switch (format) {
   case kFormatRGBA8888:                 *target = HAL_PIXEL_FORMAT_RGBA_8888;             break;

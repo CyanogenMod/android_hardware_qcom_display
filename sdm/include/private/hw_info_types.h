@@ -165,12 +165,8 @@ struct HWPanelInfo {
 };
 
 struct HWSessionConfig {
-  uint32_t src_width = 0;
-  uint32_t src_height = 0;
-  LayerBufferFormat src_format = kFormatInvalid;
-  uint32_t dst_width = 0;
-  uint32_t dst_height = 0;
-  LayerBufferFormat dst_format = kFormatInvalid;
+  LayerRect src_rect;
+  LayerRect dst_rect;
   uint32_t buffer_count = 0;
   bool secure = false;
   bool cache = false;
@@ -195,6 +191,7 @@ struct HWRotatorSession {
   LayerTransform transform;
   HWSessionConfig hw_session_config;
   LayerBuffer output_buffer;
+  LayerBuffer input_buffer;
   int session_id = -1;
   float input_compression = 1.0f;
   float output_compression = 1.0f;
