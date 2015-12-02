@@ -71,6 +71,7 @@ public:
         SET_DISPLAY_MODE = 29, // Set display mode to command or video mode
         SET_CAMERA_STATUS = 30, // To notify display when camera is on and off
         MIN_HDCP_ENCRYPTION_LEVEL_CHANGED = 31,
+        GET_BW_TRANSACTION_STATUS = 32, //Client can query BW transaction status.
         COMMAND_LIST_END = 400,
     };
 

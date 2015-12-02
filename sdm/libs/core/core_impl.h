@@ -57,6 +57,7 @@ class CoreImpl : public CoreInterface {
   virtual DisplayError CreateDisplay(DisplayType type, DisplayEventHandler *event_handler,
                                      DisplayInterface **intf);
   virtual DisplayError DestroyDisplay(DisplayInterface *intf);
+  virtual DisplayError SetMaxBandwidthMode(HWBwModes mode);
 
  protected:
   Locker locker_;

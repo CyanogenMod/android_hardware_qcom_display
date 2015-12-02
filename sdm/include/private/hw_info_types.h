@@ -27,6 +27,7 @@
 
 #include <stdint.h>
 #include <core/display_interface.h>
+#include <core/core_interface.h>
 
 namespace sdm {
 
@@ -63,6 +64,12 @@ enum HWDisplayPort {
   kPortWriteBack,
   kPortLVDS,
   kPortEDP,
+};
+
+struct HWDynBwLimitInfo {
+  uint32_t cur_mode = kBwDefault;
+  uint32_t total_bw_limit[kBwModeMax] = { 0 };
+  uint32_t pipe_bw_limit[kBwModeMax] = { 0 };
 };
 
 struct HWResourceInfo {
@@ -102,6 +109,8 @@ struct HWResourceInfo {
   bool has_non_scalar_rgb = false;
   bool is_src_split = false;
   bool perf_calc = false;
+  bool has_dyn_bw_support = false;
+  HWDynBwLimitInfo dyn_bw_info;
 
   void Reset() { *this = HWResourceInfo(); }
 };

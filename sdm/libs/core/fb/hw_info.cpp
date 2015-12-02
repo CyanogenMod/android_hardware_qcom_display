@@ -76,6 +76,61 @@ DisplayError HWInfoInterface::Destroy(HWInfoInterface *intf) {
   return kErrorNone;
 }
 
+DisplayError HWInfo::GetDynamicBWLimits(HWResourceInfo *hw_resource) {
+  const char *bw_info_node = "/sys/devices/virtual/graphics/fb0/mdp/bw_mode_bitmap";
+  FILE *fileptr = NULL;
+  uint32_t token_count = 0;
+  const uint32_t max_count = kBwModeMax;
+  char *tokens[max_count] = { NULL };
+  fileptr = Sys::fopen_(bw_info_node, "r");
+
+  if (!fileptr) {
+    DLOGE("File '%s' not found", bw_info_node);
+    return kErrorHardware;
+  }
+
+  HWDynBwLimitInfo* bw_info = &hw_resource->dyn_bw_info;
+  for (int index = 0; index < kBwModeMax; index++) {
+    bw_info->total_bw_limit[index] = hw_resource->max_bandwidth_low;
+    bw_info->pipe_bw_limit[index] = hw_resource->max_pipe_bw;
+  }
+
+  char *stringbuffer = reinterpret_cast<char *>(malloc(kMaxStringLength));
+  if (stringbuffer == NULL) {
+    DLOGE("Failed to allocate stringbuffer");
+    return kErrorMemory;
+  }
+
+  size_t len = kMaxStringLength;
+  ssize_t read;
+  char *line = stringbuffer;
+  while ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
+    if (!ParseLine(line, tokens, max_count, &token_count)) {
+      if (!strncmp(tokens[0], "default_pipe", strlen("default_pipe"))) {
+        bw_info->pipe_bw_limit[kBwDefault] = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "camera_pipe", strlen("camera_pipe"))) {
+        bw_info->pipe_bw_limit[kBwCamera] = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "vflip_pipe", strlen("vflip_pipe"))) {
+        bw_info->pipe_bw_limit[kBwVFlip] = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "hflip_pipe", strlen("hflip_pipe"))) {
+        bw_info->pipe_bw_limit[kBwHFlip] = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "default", strlen("default"))) {
+        bw_info->total_bw_limit[kBwDefault] = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "camera", strlen("camera"))) {
+        bw_info->total_bw_limit[kBwCamera] = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "vflip", strlen("vflip"))) {
+        bw_info->total_bw_limit[kBwVFlip] = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "hflip", strlen("hflip"))) {
+        bw_info->total_bw_limit[kBwHFlip] = UINT32(atoi(tokens[1]));
+      }
+    }
+  }
+  free(stringbuffer);
+  Sys::fclose_(fileptr);
+
+  return kErrorNone;
+}
+
 DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
   if (!hw_resource) {
     DLOGE("HWResourceInfo pointer in invalid.");
@@ -83,15 +138,22 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
   }
   const char *fb_path = "/sys/devices/virtual/graphics/fb";
   FILE *fileptr = NULL;
-  char stringbuffer[kMaxStringLength];
   uint32_t token_count = 0;
   const uint32_t max_count = 10;
   char *tokens[max_count] = { NULL };
-  snprintf(stringbuffer , sizeof(stringbuffer), "%s%d/mdp/caps", fb_path, kHWCapabilitiesNode);
+  char *stringbuffer = reinterpret_cast<char *>(malloc(kMaxStringLength));
+
+  if (stringbuffer == NULL) {
+    DLOGE("Failed to allocate stringbuffer");
+    return kErrorMemory;
+  }
+
+  snprintf(stringbuffer , kMaxStringLength, "%s%d/mdp/caps", fb_path, kHWCapabilitiesNode);
   fileptr = Sys::fopen_(stringbuffer, "r");
 
   if (!fileptr) {
     DLOGE("File '%s' not found", stringbuffer);
+    free(stringbuffer);
     return kErrorHardware;
   }
 
@@ -160,6 +222,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
             hw_resource->has_non_scalar_rgb = true;
           } else if (!strncmp(tokens[i], "perf_calc", strlen("perf_calc"))) {
             hw_resource->perf_calc = true;
+          } else if (!strncmp(tokens[i], "dynamic_bw_limit", strlen("dynamic_bw_limit"))) {
+            hw_resource->has_dyn_bw_support = true;
           }
         }
       }
@@ -185,11 +249,12 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->linear_factor, hw_resource->scale_factor, hw_resource->extra_fudge_factor);
 
   const char *rotator_caps_path = "/sys/devices/virtual/rotator/mdss_rotator/caps";
-  snprintf(stringbuffer , sizeof(stringbuffer), "%s", rotator_caps_path);
+  snprintf(stringbuffer , kMaxStringLength, "%s", rotator_caps_path);
   fileptr = Sys::fopen_(stringbuffer, "r");
 
   if (!fileptr) {
     DLOGW("File '%s' not found", stringbuffer);
+    free(stringbuffer);
     return kErrorNone;
   }
 
@@ -203,10 +268,26 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
     }
   }
 
+  free(stringbuffer);
   Sys::fclose_(fileptr);
 
   DLOGI("ROTATOR = %d, Rotator Downscale = %d", hw_resource->num_rotator,
         hw_resource->has_rotator_downscale);
+
+  if (hw_resource->has_dyn_bw_support) {
+    DisplayError ret = GetDynamicBWLimits(hw_resource);
+    if (ret != kErrorNone) {
+      DLOGE("Failed to read dynamic band width info");
+      return ret;
+    }
+
+    DLOGI("Has Support for multiple bw limits shown below");
+    for (int index = 0; index < kBwModeMax; index++) {
+      DLOGI("Mode-index=%d  total_bw_limit=%d and pipe_bw_limit=%d",
+            index, hw_resource->dyn_bw_info.total_bw_limit[index],
+            hw_resource->dyn_bw_info.pipe_bw_limit[index]);
+    }
+  }
 
   return kErrorNone;
 }

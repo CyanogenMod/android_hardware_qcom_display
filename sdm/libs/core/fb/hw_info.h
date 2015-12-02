@@ -45,6 +45,7 @@ class HWInfo: public HWInfoInterface {
   static const int kHWCapabilitiesNode = 0;
 
   static int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
+  DisplayError GetDynamicBWLimits(HWResourceInfo *hw_resource);
 };
 
 }  // namespace sdm
