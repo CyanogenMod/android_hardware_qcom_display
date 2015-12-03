@@ -109,7 +109,6 @@ int HWCDisplayExternal::Commit(hwc_display_contents_1_t *content_list) {
   int status = 0;
 
   if (secure_display_active_) {
-    CloseAcquireFences(content_list);
     return status;
   }
 

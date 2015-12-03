@@ -337,25 +337,10 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
     // Drop virtual display composition if virtual display object could not be created
     // due to HDMI concurrency.
     if (dpy == HWC_DISPLAY_VIRTUAL && !hwc_session->hwc_display_[HWC_DISPLAY_VIRTUAL]) {
-      if (!content_list) {
-        continue;
+      CloseAcquireFds(content_list);
+      if (content_list) {
+        content_list->retireFenceFd = -1;
       }
-
-      for (size_t i = 0; i < content_list->numHwLayers; i++) {
-        int &acquireFenceFd = content_list->hwLayers[i].acquireFenceFd;
-        if (acquireFenceFd >= 0) {
-          close(acquireFenceFd);
-          acquireFenceFd = -1;
-        }
-      }
-
-      int &outbufAcquireFenceFd = content_list->outbufAcquireFenceFd;
-      if (outbufAcquireFenceFd >= 0) {
-        close(outbufAcquireFenceFd);
-        outbufAcquireFenceFd = -1;
-      }
-
-      content_list->retireFenceFd = -1;
 
       continue;
     }
@@ -363,6 +348,7 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
     if (hwc_session->hwc_display_[dpy]) {
       hwc_session->hwc_display_[dpy]->Commit(content_list);
     }
+    CloseAcquireFds(content_list);
   }
 
   if (hwc_session->new_bw_mode_) {
@@ -376,6 +362,24 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
 
   // Return 0, else client will go into bad state
   return 0;
+}
+
+void HWCSession::CloseAcquireFds(hwc_display_contents_1_t *content_list) {
+  if (content_list) {
+    for (size_t i = 0; i < content_list->numHwLayers; i++) {
+      int &acquireFenceFd = content_list->hwLayers[i].acquireFenceFd;
+      if (acquireFenceFd >= 0) {
+        close(acquireFenceFd);
+        acquireFenceFd = -1;
+      }
+    }
+
+    int &outbufAcquireFenceFd = content_list->outbufAcquireFenceFd;
+    if (outbufAcquireFenceFd >= 0) {
+      close(outbufAcquireFenceFd);
+      outbufAcquireFenceFd = -1;
+    }
+  }
 }
 
 int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event, int enable) {
