@@ -26,6 +26,9 @@
 #define __HW_HDMI_H__
 
 #include <video/msm_hdmi_modes.h>
+#include <map>
+#include <vector>
+
 #include "hw_device.h"
 
 namespace sdm {
@@ -52,6 +55,7 @@ class HWHDMI : public HWDevice {
   virtual DisplayError SetDisplayAttributes(uint32_t index);
   virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
   virtual DisplayError Validate(HWLayers *hw_layers);
+  virtual DisplayError SetS3DMode(HWS3DMode s3d_mode);
 
  private:
   DisplayError ReadEDIDInfo();
@@ -63,6 +67,9 @@ class HWHDMI : public HWDevice {
   bool ReadResolutionFile(char *config_buffer);
   bool IsResolutionFilePresent();
   void SetSourceProductInformation(const char *node, const char *name);
+  DisplayError GetDisplayS3DSupport(uint32_t num_modes,
+                                    HWDisplayAttributes *attrib);
+  bool IsSupportedS3DMode(HWS3DMode s3d_mode);
 
   uint32_t hdmi_mode_count_;
   uint32_t hdmi_modes_[256];
@@ -70,6 +77,9 @@ class HWHDMI : public HWDevice {
   msm_hdmi_mode_timing_info *supported_video_modes_;
   HWScanInfo hw_scan_info_;
   uint32_t active_config_index_;
+  std::map<HWS3DMode, msm_hdmi_s3d_mode> s3d_mode_sdm_to_mdp_;
+  std::vector<HWS3DMode> supported_s3d_modes_;
+  int active_mdp_s3d_mode_ = HDMI_S3D_NONE;
 };
 
 }  // namespace sdm

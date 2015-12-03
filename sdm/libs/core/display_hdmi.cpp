@@ -24,6 +24,8 @@
 
 #include <utils/constants.h>
 #include <utils/debug.h>
+#include <map>
+#include <utility>
 
 #include "display_hdmi.h"
 #include "hw_interface.h"
@@ -50,7 +52,14 @@ DisplayError DisplayHDMI::Init() {
     return error;
   }
 
-  uint32_t active_mode_index = GetBestConfig();
+  uint32_t active_mode_index;
+  char value[64] = "0";
+  Debug::GetProperty("sdm.hdmi.s3d_enable", value);
+  if (atoi(value) != 0) {
+    active_mode_index = GetBestConfig(kS3DModeLR);
+  } else {
+    active_mode_index = GetBestConfig(kS3DModeNone);
+  }
 
   error = hw_intf_->SetDisplayAttributes(active_mode_index);
   if (error != kErrorNone) {
@@ -65,6 +74,16 @@ DisplayError DisplayHDMI::Init() {
   GetScanSupport();
   underscan_supported_ = (scan_support_ == kScanAlwaysUnderscanned) || (scan_support_ == kScanBoth);
 
+  s3d_format_to_mode_.insert(std::pair<LayerBufferS3DFormat, HWS3DMode>
+                            (kS3dFormatNone, kS3DModeNone));
+  s3d_format_to_mode_.insert(std::pair<LayerBufferS3DFormat, HWS3DMode>
+                            (kS3dFormatLeftRight, kS3DModeLR));
+  s3d_format_to_mode_.insert(std::pair<LayerBufferS3DFormat, HWS3DMode>
+                            (kS3dFormatRightLeft, kS3DModeRL));
+  s3d_format_to_mode_.insert(std::pair<LayerBufferS3DFormat, HWS3DMode>
+                            (kS3dFormatTopBottom, kS3DModeTB));
+  s3d_format_to_mode_.insert(std::pair<LayerBufferS3DFormat, HWS3DMode>
+                            (kS3dFormatFramePacking, kS3DModeFP));
   return error;
 }
 
@@ -79,6 +98,9 @@ DisplayError DisplayHDMI::Deinit() {
 
 DisplayError DisplayHDMI::Prepare(LayerStack *layer_stack) {
   SCOPE_LOCK(locker_);
+
+  SetS3DMode(layer_stack);
+
   return DisplayBase::Prepare(layer_stack);
 }
 
@@ -181,39 +203,50 @@ DisplayError DisplayHDMI::OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level)
   return hw_intf_->OnMinHdcpEncryptionLevelChange(min_enc_level);
 }
 
-int DisplayHDMI::GetBestConfig() {
-  uint32_t best_index = 0;
+int DisplayHDMI::GetBestConfig(HWS3DMode s3d_mode) {
+  uint32_t best_index = 0, index;
   uint32_t num_modes = 0;
   HWDisplayAttributes best_attrib;
 
   hw_intf_->GetNumDisplayAttributes(&num_modes);
-  if (num_modes == 1) {
-    return best_index;
+
+  // Get display attribute for each mode
+  HWDisplayAttributes *attrib = new HWDisplayAttributes[num_modes];
+  for (index = 0; index < num_modes; index++) {
+    hw_intf_->GetDisplayAttributes(index, &attrib[index]);
   }
 
-  hw_intf_->GetDisplayAttributes(0, &best_attrib);
+  // Select best config for s3d_mode. If s3d is not enabled, s3d_mode is kS3DModeNone
+  for (index = 0; index < num_modes; index ++) {
+    if (IS_BIT_SET(attrib[index].s3d_config, s3d_mode)) {
+      break;
+    }
+  }
+  if (index < num_modes) {
+    best_index = index;
+    for (size_t index = best_index + 1; index < num_modes; index ++) {
+      if (!IS_BIT_SET(attrib[index].s3d_config, s3d_mode))
+        continue;
 
-  // From the available configs, select the best
-  // Ex: 1920x1080@60Hz is better than 1920x1080@30 and 1920x1080@30 is better than 1280x720@60
-  for (uint32_t index = 1; index < num_modes; index++) {
-    HWDisplayAttributes current_attrib;
-    hw_intf_->GetDisplayAttributes(index, &current_attrib);
-    // compare the two modes: in the order of Resolution followed by refreshrate
-    if (current_attrib.y_pixels > best_attrib.y_pixels) {
-      best_index = index;
-    } else if (current_attrib.y_pixels == best_attrib.y_pixels) {
-      if (current_attrib.x_pixels > best_attrib.x_pixels) {
-        best_index = index;
-      } else if (current_attrib.x_pixels == best_attrib.x_pixels) {
-        if (current_attrib.vsync_period_ns < best_attrib.vsync_period_ns) {
+      // From the available configs, select the best
+      // Ex: 1920x1080@60Hz is better than 1920x1080@30 and 1920x1080@30 is better than 1280x720@60
+      if (attrib[index].y_pixels > attrib[best_index].y_pixels) {
           best_index = index;
+      } else if (attrib[index].y_pixels == attrib[best_index].y_pixels) {
+        if (attrib[index].x_pixels > attrib[best_index].x_pixels) {
+          best_index = index;
+        } else if (attrib[index].x_pixels == attrib[best_index].x_pixels) {
+          if (attrib[index].vsync_period_ns < attrib[best_index].vsync_period_ns) {
+            best_index = index;
+          }
         }
       }
     }
-    if (best_index == index) {
-      best_attrib = current_attrib;
-    }
+  } else {
+    DLOGW("%s, could not support S3D mode from EDID info. S3D mode is %d",
+          __FUNCTION__, s3d_mode);
   }
+  delete attrib;
 
   // Used for changing HDMI Resolution - override the best with user set config
   uint32_t user_config = Debug::GetHDMIResolution();
@@ -269,6 +302,56 @@ void DisplayHDMI::AppendDump(char *buffer, uint32_t length) {
 DisplayError DisplayHDMI::SetCursorPosition(int x, int y) {
   SCOPE_LOCK(locker_);
   return DisplayBase::SetCursorPosition(x, y);
+}
+
+void DisplayHDMI::SetS3DMode(LayerStack *layer_stack) {
+  uint32_t s3d_layer_count = 0;
+  HWS3DMode s3d_mode = kS3DModeNone;
+  HWPanelInfo panel_info;
+  HWDisplayAttributes display_attributes;
+  uint32_t active_index = 0;
+  uint32_t layer_count = layer_stack->layer_count;
+
+  // S3D mode is supported for the following scenarios:
+  // 1. Layer stack containing only one s3d layer which is not skip
+  // 2. Layer stack containing only one secure layer along with one s3d layer
+  for (uint32_t i = 0; i < layer_count; i++) {
+    Layer &layer = layer_stack->layers[i];
+    LayerBuffer *layer_buffer = layer.input_buffer;
+
+    if (layer_buffer->s3d_format != kS3dFormatNone) {
+      s3d_layer_count++;
+      if (s3d_layer_count > 1 || layer.flags.skip) {
+        s3d_mode = kS3DModeNone;
+        break;
+      }
+
+      std::map<LayerBufferS3DFormat, HWS3DMode>::iterator it =
+                s3d_format_to_mode_.find(layer_buffer->s3d_format);
+      if (it != s3d_format_to_mode_.end()) {
+        s3d_mode = it->second;
+      }
+    } else if (layer_buffer->flags.secure && layer_count > 2) {
+        s3d_mode = kS3DModeNone;
+        break;
+    }
+  }
+
+  if (hw_intf_->SetS3DMode(s3d_mode) != kErrorNone) {
+    hw_intf_->SetS3DMode(kS3DModeNone);
+    layer_stack->flags.s3d_mode_present = false;
+  } else if (s3d_mode != kS3DModeNone) {
+    layer_stack->flags.s3d_mode_present = true;
+  }
+
+  hw_intf_->GetHWPanelInfo(&panel_info);
+  hw_intf_->GetActiveConfig(&active_index);
+  hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
+
+  if (panel_info != hw_panel_info_) {
+    comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, panel_info);
+    hw_panel_info_ = panel_info;
+  }
 }
 
 }  // namespace sdm

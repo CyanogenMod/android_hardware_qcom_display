@@ -128,6 +128,15 @@ struct HWSplitInfo {
   }
 };
 
+enum HWS3DMode {
+  kS3DModeNone,
+  kS3DModeLR,
+  kS3DModeRL,
+  kS3DModeTB,
+  kS3DModeFP,
+  kS3DModeMax,
+};
+
 struct HWPanelInfo {
   HWDisplayPort port = kPortDefault;  // Display port
   HWDisplayMode mode = kModeDefault;  // Display mode
@@ -146,6 +155,7 @@ struct HWPanelInfo {
   bool is_pluggable = false;          // Panel is pluggable
   HWSplitInfo split_info;             // Panel split configuration
   char panel_name[256] = {0};         // Panel name
+  HWS3DMode s3d_mode = kS3DModeNone;  // Panel's current s3d mode.
 
   bool operator !=(const HWPanelInfo &panel_info) {
     return ((port != panel_info.port) || (mode != panel_info.mode) ||
@@ -157,7 +167,8 @@ struct HWPanelInfo {
             (needs_roi_merge != panel_info.needs_roi_merge) ||
             (dynamic_fps != panel_info.dynamic_fps) || (min_fps != panel_info.min_fps) ||
             (max_fps != panel_info.max_fps) || (is_primary_panel != panel_info.is_primary_panel) ||
-            (split_info != panel_info.split_info));
+            (split_info != panel_info.split_info) ||
+            (s3d_mode != panel_info.s3d_mode));
   }
 
   bool operator ==(const HWPanelInfo &panel_info) {
@@ -258,6 +269,8 @@ struct HWLayersInfo {
 
   uint32_t index[kMaxSDELayers];   // Indexes of the layers from the layer stack which need to be
                                    // programmed on hardware.
+  LayerRect updated_src_rect[kMaxSDELayers];  // Updated layer src rects in s3d mode
+  LayerRect updated_dst_rect[kMaxSDELayers];  // Updated layer dst rects in s3d mode
 
   uint32_t count = 0;              // Total number of layers which need to be set on hardware.
 
@@ -284,6 +297,7 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
   uint32_t v_back_porch = 0;   //!< Vertical back porch of panel
   uint32_t v_pulse_width = 0;  //!< Vertical pulse width of panel
   uint32_t h_total = 0;        //!< Total width of panel (hActive + hFP + hBP + hPulseWidth)
+  uint32_t s3d_config = 0;     //!< Stores the bit mask of S3D modes
 
   void Reset() { *this = HWDisplayAttributes(); }
 

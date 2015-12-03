@@ -73,6 +73,7 @@ class HWDevice : public HWInterface {
   virtual DisplayError OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
   virtual DisplayError GetPanelBrightness(int *level);
   virtual DisplayError SetAutoRefresh(bool enable) { return kErrorNone; }
+  virtual DisplayError SetS3DMode(HWS3DMode s3d_mode);
 
   // For HWDevice derivatives
   virtual DisplayError Init(HWEventHandler *eventhandler);
