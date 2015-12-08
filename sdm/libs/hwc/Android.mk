@@ -21,6 +21,13 @@ ifeq ($(call is-board-platform-in-list, $(MASTER_SIDE_CP_TARGET_LIST)), true)
     LOCAL_CFLAGS += -DMASTER_SIDE_CP
 endif
 
+
+ifeq ($(TARGET_USES_QCOM_BSP),true)
+# Enable QCOM Display features
+LOCAL_CFLAGS += -DQTI_BSP
+LOCAL_C_INCLUDES += vendor/qcom/opensource/display-frameworks/include
+endif
+
 LOCAL_SHARED_LIBRARIES        := libsdmcore libqservice libbinder libhardware libhardware_legacy \
                                  libutils libcutils libsync libmemalloc libqdutils libdl \
                                  libpowermanager libsdmutils libc++
