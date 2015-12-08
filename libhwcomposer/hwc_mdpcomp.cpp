@@ -55,7 +55,8 @@ MDPComp* MDPComp::getObject(hwc_context_t *ctx, const int& dpy) {
     return new MDPCompNonSplit(dpy);
 }
 
-MDPComp::MDPComp(int dpy):mDpy(dpy){};
+MDPComp::MDPComp(int dpy) : mDpy(dpy), mModeOn(false), mPrevModeOn(false) {
+};
 
 void MDPComp::dump(android::String8& buf)
 {

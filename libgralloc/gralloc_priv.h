@@ -144,6 +144,7 @@ struct private_handle_t : public native_handle {
             PRIV_FLAGS_USES_ION           = 0x00000008,
             PRIV_FLAGS_USES_ASHMEM        = 0x00000010,
             PRIV_FLAGS_NEEDS_FLUSH        = 0x00000020,
+            PRIV_FLAGS_INTERNAL_ONLY      = 0x00000040,
             PRIV_FLAGS_NON_CPU_WRITER     = 0x00000080,
             PRIV_FLAGS_NONCONTIGUOUS_MEM  = 0x00000100,
             PRIV_FLAGS_CACHED             = 0x00000200,
