@@ -294,8 +294,10 @@ static int hwc_prepare_primary(hwc_composer_device_1 *dev,
     const int dpy = HWC_DISPLAY_PRIMARY;
     bool fbComp = false;
     static int compStart = false;
+
     if (!ctx->mBootAnimCompleted)
-        processBootAnimCompleted(ctx);
+        processBootAnimCompleted(ctx,list);
+
     if (LIKELY(list && (list->numHwLayers > 1 ||
                     (ctx->mMDP.version < qdutils::MDP_V4_0 && compStart))) &&
         ctx->dpyAttr[dpy].connected && (ctx->dpyAttr[dpy].isActive ||

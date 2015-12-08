@@ -511,7 +511,7 @@ bool loadEglLib(hwc_context_t* ctx);
 bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2);
 
 // Checks if boot animation has completed and applies default mode
-void processBootAnimCompleted(hwc_context_t *ctx);
+ void processBootAnimCompleted(hwc_context_t *ctx, hwc_display_contents_1_t *list);
 
 //The gralloc API and driver have different formats
 //The format needs to be converted before passing to libhdmi

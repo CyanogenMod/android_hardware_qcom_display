@@ -2931,18 +2931,18 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
     return (eqBounds == 3);
 }
 
-void processBootAnimCompleted(hwc_context_t *ctx) {
-    char value[PROPERTY_VALUE_MAX];
-    int ret = -1;
+void processBootAnimCompleted(hwc_context_t *ctx,
+                              hwc_display_contents_1_t *list) {
 
-    // Applying default mode after bootanimation is finished
-    property_get("init.svc.bootanim", value, "running");
+    const uint32_t numBootUpLayers = 2;
+    /* All other checks namely "init.svc.bootanim" or
+     * HWC_GEOMETRY_CHANGED fail in correctly identifying the
+     * exact bootup transition to homescreen
+     */
 
-    if (!strncmp(value,"stopped",strlen("stopped"))) {
+    if(list->numHwLayers > numBootUpLayers) {
+        // Applying default mode after bootanimation is finished
         ctx->mBootAnimCompleted = true;
-
-        //one-shot action check if bootanimation completed then apply
-        //default display mode.
         qdcmApplyDefaultAfterBootAnimationDone(ctx);
     }
 }
