@@ -1247,15 +1247,6 @@ void HWCDisplay::MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list) 
   }
 }
 
-void HWCDisplay::CloseAcquireFences(hwc_display_contents_1_t *content_list) {
-  for (size_t i = 0; i < content_list->numHwLayers; i++) {
-    if (content_list->hwLayers[i].acquireFenceFd >= 0) {
-      close(content_list->hwLayers[i].acquireFenceFd);
-      content_list->hwLayers[i].acquireFenceFd = -1;
-    }
-  }
-}
-
 uint32_t HWCDisplay::RoundToStandardFPS(uint32_t fps) {
   static const uint32_t standard_fps[4] = {30, 24, 48, 60};
 
