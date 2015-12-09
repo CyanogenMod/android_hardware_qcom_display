@@ -43,6 +43,7 @@
 #include <display_config.h>
 #include <utils/debug.h>
 #include <sync/sync.h>
+#include <profiler.h>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
@@ -359,6 +360,10 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
     }
     hwc_session->bw_mode_release_fd_ = dup(content_list->retireFenceFd);
   }
+
+  // This is only indicative of how many times SurfaceFlinger posts
+  // frames to the display.
+  CALC_FPS();
 
   // Return 0, else client will go into bad state
   return 0;
