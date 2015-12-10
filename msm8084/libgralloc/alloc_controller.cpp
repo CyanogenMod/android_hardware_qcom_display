@@ -208,6 +208,7 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
                 aligned_h = VENUS_Y_SCANLINES(COLOR_FMT_NV12, height);
                 break;
             case HAL_PIXEL_FORMAT_BLOB:
+            case HAL_PIXEL_FORMAT_RAW_OPAQUE:
                 break;
             case HAL_PIXEL_FORMAT_NV21_ZSL:
                 aligned_w = ALIGN(width, 64);
@@ -455,8 +456,9 @@ size_t getSize(int format, int width, int height, const int alignedw,
             size = VENUS_BUFFER_SIZE(COLOR_FMT_NV12, width, height);
             break;
         case HAL_PIXEL_FORMAT_BLOB:
+        case HAL_PIXEL_FORMAT_RAW_OPAQUE:
             if(height != 1) {
-                ALOGE("%s: Buffers with format HAL_PIXEL_FORMAT_BLOB \
+                ALOGE("%s: Buffers with RAW_OPAQUE/BLOB formats \
                       must have height==1 ", __FUNCTION__);
                 return 0;
             }
@@ -496,7 +498,7 @@ size_t getSize(int format, int width, int height, const int alignedw,
             size = alignedw * alignedh * ASTC_BLOCK_SIZE;
             break;
         default:
-            ALOGE("unrecognized pixel format: 0x%x", format);
+            ALOGE("%s: unrecognized pixel format: 0x%x", __FUNCTION__, format);
             return 0;
     }
     return size;
