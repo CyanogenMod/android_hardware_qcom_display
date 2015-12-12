@@ -43,6 +43,10 @@
 
 #define __CLASS__ "HWCDisplay"
 
+#ifdef QCOM_BSP
+#include <exhwcomposer_defs.h>
+#endif
+
 namespace sdm {
 
 static void AssignLayerRegionsAddress(LayerRectArray *region, uint32_t rect_count,
