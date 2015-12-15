@@ -789,8 +789,15 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
 bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
+  // Handle ongoing animation and end here, start is handled below
   if (layer_stack_cache_.animating) {
-      return false;
+      if (!layer_stack_.flags.animating) {
+        // Animation is ending.
+        return true;
+      } else {
+        // Animation is going on.
+        return false;
+      }
   }
 
   // Frame buffer needs to be refreshed for the following reasons:
@@ -838,7 +845,7 @@ bool HWCDisplay::IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCach
 void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
-  if (layer_count > kMaxLayerCount) {
+  if (layer_count > kMaxLayerCount || layer_stack_.flags.animating) {
     ResetLayerCacheStack();
     return;
   }
