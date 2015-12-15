@@ -203,6 +203,7 @@ class MDPCapabilityInfo : public android::Singleton <MDPCapabilityInfo>
 {
     int isMacroTileSupported = 0;
     int isUBwcSupported = 0;
+    int isWBUBWCSupported = 0;
 
     public:
         MDPCapabilityInfo();
@@ -220,6 +221,13 @@ class MDPCapabilityInfo : public android::Singleton <MDPCapabilityInfo>
         *          0 : not supported
         */
         int isUBwcSupportedByMDP() { return isUBwcSupported; }
+        /*
+        * Function to return whether MDP WB block outputs UBWC format
+        *
+        * @return  1 : supported
+        *          0 : not supported
+        */
+        int isWBUBWCSupportedByMDP() { return isWBUBWCSupported; }
 };
 
 #endif /* GR_H_ */
