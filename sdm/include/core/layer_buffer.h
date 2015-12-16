@@ -107,6 +107,10 @@ enum LayerBufferFormat {
 
   kFormatYCbCr420SPVenusUbwc,         //!< UBWC aligned YCbCr420SemiPlanarVenus format
 
+  kFormatYCrCb420SemiPlanarVenus,     //!< Y-plane: y(0), y(1), y(2) ... y(n)
+                                      //!< 2x2 subsampled interleaved UV-plane:
+                                      //!<    v(0), u(0), v(2), u(2) ... v(n-1), u(n-1)
+
   /* All YUV-Packed formats, Any new format will be added towards end of this group to maintain
      backward compatibility.
   */

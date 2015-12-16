@@ -950,6 +950,7 @@ LayerBufferFormat HWCDisplay::GetSDMFormat(const int32_t &source, const int flag
   case HAL_PIXEL_FORMAT_BGR_565:                  format = kFormatBGR565;                   break;
   case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:       format = kFormatYCbCr420SemiPlanarVenus;  break;
+  case HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS:       format = kFormatYCrCb420SemiPlanarVenus;  break;
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:  format = kFormatYCbCr420SPVenusUbwc;      break;
   case HAL_PIXEL_FORMAT_YV12:                     format = kFormatYCrCb420PlanarStride16;   break;
   case HAL_PIXEL_FORMAT_YCrCb_420_SP:             format = kFormatYCrCb420SemiPlanar;       break;
@@ -1062,6 +1063,8 @@ const char *HWCDisplay::GetHALPixelFormatString(int format) {
     return "INTERLACE";
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
     return "YCbCr_420_SP_VENUS";
+  case HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS:
+    return "YCrCb_420_SP_VENUS";
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
     return "YCbCr_420_SP_VENUS_UBWC";
   default:
