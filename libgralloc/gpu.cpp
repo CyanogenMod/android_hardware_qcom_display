@@ -302,7 +302,7 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
            if (format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
                grallocFormat = HAL_PIXEL_FORMAT_NV21_ZSL; //NV21
            } else {
-               grallocFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS; //NV12 preview
+               grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV12 preview
            }
         } else if(usage & GRALLOC_USAGE_HW_COMPOSER)
             //XXX: If we still haven't set a format, default to RGBA8888
