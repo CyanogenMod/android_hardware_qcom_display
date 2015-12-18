@@ -143,6 +143,7 @@ struct HWPanelInfo {
   uint32_t min_fps = 0;               // Min fps supported by panel
   uint32_t max_fps = 0;               // Max fps supported by panel
   bool is_primary_panel = false;      // Panel is primary display
+  bool is_pluggable = false;          // Panel is pluggable
   HWSplitInfo split_info;             // Panel split configuration
   char panel_name[256] = {0};         // Panel name
 
@@ -165,12 +166,8 @@ struct HWPanelInfo {
 };
 
 struct HWSessionConfig {
-  uint32_t src_width = 0;
-  uint32_t src_height = 0;
-  LayerBufferFormat src_format = kFormatInvalid;
-  uint32_t dst_width = 0;
-  uint32_t dst_height = 0;
-  LayerBufferFormat dst_format = kFormatInvalid;
+  LayerRect src_rect;
+  LayerRect dst_rect;
   uint32_t buffer_count = 0;
   bool secure = false;
   bool cache = false;
@@ -195,6 +192,7 @@ struct HWRotatorSession {
   LayerTransform transform;
   HWSessionConfig hw_session_config;
   LayerBuffer output_buffer;
+  LayerBuffer input_buffer;
   int session_id = -1;
   float input_compression = 1.0f;
   float output_compression = 1.0f;

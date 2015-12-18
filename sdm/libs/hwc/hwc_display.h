@@ -141,7 +141,6 @@ class HWCDisplay : public DisplayEventHandler {
   const char *GetDisplayString();
   void ScaleDisplayFrame(hwc_rect_t *display_frame);
   void MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list);
-  void CloseAcquireFences(hwc_display_contents_1_t *content_list);
   uint32_t RoundToStandardFPS(uint32_t fps);
   virtual void ApplyScanAdjustment(hwc_rect_t *display_frame);
   DisplayError SetCSC(ColorSpace_t source, LayerCSC *target);

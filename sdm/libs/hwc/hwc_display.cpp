@@ -41,6 +41,10 @@
 #include "hwc_debugger.h"
 #include "blit_engine_c2d.h"
 
+#ifdef QTI_BSP
+#include <exhwcomposer_defs.h>
+#endif
+
 #define __CLASS__ "HWCDisplay"
 
 namespace sdm {
@@ -241,11 +245,6 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
     case HWC_DISPLAY_DPI_Y:
       values[i] = INT32(variable_config.y_dpi * 1000.0f);
       break;
-#ifdef QCOM_BSP
-    case HWC_DISPLAY_SECURE:
-      values[i] = INT32(true);  // For backward compatibility. All Physical displays are secure
-      break;
-#endif
     default:
       DLOGW("Spurious attribute type = %d", attributes[i]);
       return -EINVAL;
@@ -566,7 +565,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
       LayerCache layer_cache = layer_stack_cache_.layer_cache[i];
       layer.flags.updating = IsLayerUpdating(hwc_layer, layer_cache);
     }
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
       layer_stack_.flags.animating = true;
     }
@@ -1244,15 +1243,6 @@ void HWCDisplay::MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list) 
   for (size_t i = 0 ; i < (content_list->numHwLayers - 1); i++) {
     hwc_layer_1_t *layer = &content_list->hwLayers[i];
     layer->compositionType = HWC_OVERLAY;
-  }
-}
-
-void HWCDisplay::CloseAcquireFences(hwc_display_contents_1_t *content_list) {
-  for (size_t i = 0; i < content_list->numHwLayers; i++) {
-    if (content_list->hwLayers[i].acquireFenceFd >= 0) {
-      close(content_list->hwLayers[i].acquireFenceFd);
-      content_list->hwLayers[i].acquireFenceFd = -1;
-    }
   }
 }
 

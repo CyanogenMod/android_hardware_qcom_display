@@ -163,15 +163,6 @@ int HWCDisplayVirtual::Prepare(hwc_display_contents_1_t *content_list) {
 int HWCDisplayVirtual::Commit(hwc_display_contents_1_t *content_list) {
   int status = 0;
   if (display_paused_) {
-    if (content_list->outbufAcquireFenceFd >= 0) {
-      // If we do not handle the frame set retireFenceFd to outbufAcquireFenceFd,
-      // which will make sure the framework waits on it and closes it.
-      content_list->retireFenceFd = dup(content_list->outbufAcquireFenceFd);
-      close(content_list->outbufAcquireFenceFd);
-      content_list->outbufAcquireFenceFd = -1;
-    }
-    CloseAcquireFences(content_list);
-
     DisplayError error = display_intf_->Flush();
     if (error != kErrorNone) {
       DLOGE("Flush failed. Error = %d", error);
@@ -189,11 +180,6 @@ int HWCDisplayVirtual::Commit(hwc_display_contents_1_t *content_list) {
   status = HWCDisplay::PostCommitLayerStack(content_list);
   if (status) {
     return status;
-  }
-
-  if (content_list->outbufAcquireFenceFd >= 0) {
-    close(content_list->outbufAcquireFenceFd);
-    content_list->outbufAcquireFenceFd = -1;
   }
 
   return 0;

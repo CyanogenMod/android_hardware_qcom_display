@@ -164,7 +164,6 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
       close(content_list->outbufAcquireFenceFd);
       content_list->outbufAcquireFenceFd = -1;
     }
-    CloseAcquireFences(content_list);
 
     DisplayError error = display_intf_->Flush();
     if (error != kErrorNone) {

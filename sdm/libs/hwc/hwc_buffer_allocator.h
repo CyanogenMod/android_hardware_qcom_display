@@ -48,6 +48,7 @@ class HWCBufferAllocator : public BufferAllocator {
 
   DisplayError AllocateBuffer(BufferInfo *buffer_info);
   DisplayError FreeBuffer(BufferInfo *buffer_info);
+  uint32_t GetBufferSize(BufferInfo *buffer_info);
 
  private:
   struct MetaBufferInfo {

@@ -634,7 +634,7 @@ int HWDevice::GetFBNodeIndex(HWDeviceType device_type) {
       }
       break;
     case kDeviceHDMI:
-      if (panel_info.port == kPortDTv) {
+      if (panel_info.is_pluggable == true) {
         return i;
       }
       break;
@@ -749,6 +749,8 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
         panel_info->max_fps = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "primary_panel", strlen("primary_panel"))) {
         panel_info->is_primary_panel = atoi(tokens[1]);
+      } else if (!strncmp(tokens[0], "is_pluggable", strlen("is_pluggable"))) {
+        panel_info->is_pluggable = atoi(tokens[1]);
       }
     }
   }
