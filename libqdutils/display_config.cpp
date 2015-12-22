@@ -444,8 +444,8 @@ extern "C" int refreshScreen() {
 // ----------------------------------------------------------------------------
 // Native daemons needs to send enable partial update ack for PU to enable
 // ----------------------------------------------------------------------------
-extern "C" int setPartialUpdateState() {
+extern "C" int setPartialUpdateState(int status) {
     int ret = 0;
-    ret = setPartialUpdate(IQService::ENABLE_PARTIAL_UPDATE);
+    ret = setPartialUpdate(status);
     return ret;
 }

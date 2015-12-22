@@ -56,9 +56,9 @@ public:
     static void dynamicDebug(bool enable){ sDebugLogs = enable; }
     static void setIdleTimeout(const uint32_t& timeout);
     static void setMaxPipesPerMixer(const uint32_t value);
-    static int setPartialUpdatePref(hwc_context_t *ctx, bool enable);
+    static int setPartialUpdatePref(hwc_context_t *ctx, int enable);
     static bool getPartialUpdatePref(hwc_context_t *ctx);
-    static void enablePartialUpdate(bool enable)
+    static void enablePartialUpdate(int enable)
                                           { sIsPartialUpdateActive = enable; };
     void setDynRefreshRate(hwc_context_t *ctx, hwc_display_contents_1_t* list);
 
@@ -275,7 +275,7 @@ protected:
     static bool sSrcSplitEnabled;
     static IdleInvalidator *sIdleInvalidator;
     static int sMaxSecLayers;
-    static bool sIsPartialUpdateActive;
+    static int sIsPartialUpdateActive;
     struct FrameInfo mCurrentFrame;
     struct LayerCache mCachedFrame;
     //Enable 4kx2k yuv layer split
