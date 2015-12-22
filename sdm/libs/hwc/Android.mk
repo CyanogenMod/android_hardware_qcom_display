@@ -9,7 +9,6 @@ LOCAL_C_INCLUDES              := $(call project-path-for,qcom-display)/sdm/inclu
                                  $(call project-path-for,qcom-display)/libqservice/ \
                                  $(call project-path-for,qcom-display)/libqdutils/ \
                                  $(call project-path-for,qcom-display)/libcopybit/ \
-                                 vendor/qcom/opensource/display-frameworks/include \
                                  external/libcxx/include/
 
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
