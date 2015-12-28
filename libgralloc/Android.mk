@@ -29,8 +29,8 @@ LOCAL_SRC_FILES               := gpu.cpp gralloc.cpp framebuffer.cpp mapper.cpp
 LOCAL_COPY_HEADERS_TO         := $(common_header_export_path)
 LOCAL_COPY_HEADERS            := gralloc_priv.h gr.h
 
-ifeq ($(BOARD_VENDOR_QCOM_CAMERA_PREVIEW_USES_NV21_FORMAT),true)
-    LOCAL_CFLAGS += -DCAMERA_PREVIEW_USES_NV21_FORMAT
+ifeq ($(BOARD_VENDOR_QCOM_CAMERA_USES_NV21_FORMAT),true)
+    LOCAL_CFLAGS += -DCAMERA_USES_NV21_FORMAT
 endif
 
 include $(BUILD_SHARED_LIBRARY)
