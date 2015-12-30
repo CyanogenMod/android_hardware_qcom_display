@@ -303,12 +303,24 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
   }
 
   if (hotplug_connect) {
+    // notify client
     hwc_procs->hotplug(hwc_procs, HWC_DISPLAY_EXTERNAL, true);
-    hwc_procs->invalidate(hwc_procs);
   }
-
   // Return 0, else client will go into bad state
   return 0;
+}
+
+int HWCSession::GetVsyncPeriod(int disp) {
+  SEQUENCE_ENTRY_SCOPE_LOCK(locker_);
+  // default value
+  int32_t vsync_period = 1000000000l / 60;
+  const uint32_t attribute = HWC_DISPLAY_VSYNC_PERIOD;
+
+  if (hwc_display_[disp]) {
+    hwc_display_[disp]->GetDisplayAttributes(0, &attribute, &vsync_period);
+  }
+
+  return vsync_period;
 }
 
 int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
@@ -1317,13 +1329,17 @@ int HWCSession::HotPlugHandler(bool connected) {
       external_pending_connect_ = false;
     }
   }
-
-  // notify client and trigger a screen refresh
+  if (connected && notify_hotplug) {
+    // trigger screen refresh to ensure sufficient resources are available to process new
+    // new display connection.
+    hwc_procs_->invalidate(hwc_procs_);
+    int32_t vsync_period = GetVsyncPeriod(HWC_DISPLAY_PRIMARY);
+    usleep(vsync_period * 2 / 1000);
+  }
+  // notify client
   if (notify_hotplug) {
     hwc_procs_->hotplug(hwc_procs_, HWC_DISPLAY_EXTERNAL, connected);
   }
-
-  hwc_procs_->invalidate(hwc_procs_);
 
   return 0;
 }
