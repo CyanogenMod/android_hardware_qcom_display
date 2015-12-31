@@ -112,9 +112,10 @@ class BlitEngineC2d : public BlitEngine {
   int release_fence_fd_[kNumBlitTargetBuffers];
   uint32_t num_blit_target_;
   int blit_target_start_index_;
-  bool blit_active_;
-  uint32_t dump_frame_count_;
-  uint32_t dump_frame_index_;
+  bool blit_active_ = false;
+  uint32_t dump_frame_count_ = 0;
+  uint32_t dump_frame_index_ = 0;
+  int blit_supported_ = 0;
 };
 
 }  // namespace sdm

@@ -789,8 +789,15 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
 bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
+  // Handle ongoing animation and end here, start is handled below
   if (layer_stack_cache_.animating) {
-      return false;
+      if (!layer_stack_.flags.animating) {
+        // Animation is ending.
+        return true;
+      } else {
+        // Animation is going on.
+        return false;
+      }
   }
 
   // Frame buffer needs to be refreshed for the following reasons:
@@ -838,7 +845,7 @@ bool HWCDisplay::IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCach
 void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
-  if (layer_count > kMaxLayerCount) {
+  if (layer_count > kMaxLayerCount || layer_stack_.flags.animating) {
     ResetLayerCacheStack();
     return;
   }
@@ -1192,6 +1199,7 @@ void HWCDisplay::GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
 
 int HWCDisplay::SetDisplayStatus(uint32_t display_status) {
   int status = 0;
+  const hwc_procs_t *hwc_procs = *hwc_procs_;
 
   switch (display_status) {
   case kDisplayStatusResume:
@@ -1207,6 +1215,11 @@ int HWCDisplay::SetDisplayStatus(uint32_t display_status) {
   default:
     DLOGW("Invalid display status %d", display_status);
     return -EINVAL;
+  }
+
+  if (display_status == kDisplayStatusResume ||
+      display_status == kDisplayStatusPause) {
+    hwc_procs->invalidate(hwc_procs);
   }
 
   return status;
@@ -1357,7 +1370,9 @@ int HWCDisplay::GetPanelBrightness(int *level) {
 }
 
 int HWCDisplay::ToggleScreenUpdates(bool enable) {
+  const hwc_procs_t *hwc_procs = *hwc_procs_;
   display_paused_ = enable ? false : true;
+  hwc_procs->invalidate(hwc_procs);
   return 0;
 }
 
