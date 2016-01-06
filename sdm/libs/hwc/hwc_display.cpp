@@ -65,6 +65,7 @@ static void ApplyDeInterlaceAdjustment(Layer *layer) {
   // De-interlacing adjustment
   if (layer->input_buffer->flags.interlace) {
     float height = (layer->src_rect.bottom - layer->src_rect.top) / 2.0f;
+    layer->src_rect.top = ROUND_UP_ALIGN_DOWN(layer->src_rect.top / 2.0f, 2);
     layer->src_rect.bottom = layer->src_rect.top + floorf(height);
   }
 }
@@ -167,6 +168,7 @@ int HWCDisplay::EventControl(int event, int enable) {
 int HWCDisplay::SetPowerMode(int mode) {
   DLOGI("display = %d, mode = %d", id_, mode);
   DisplayState state = kStateOff;
+  bool flush_on_error = flush_on_error_;
 
   if (shutdown_pending_) {
     return 0;
@@ -174,26 +176,35 @@ int HWCDisplay::SetPowerMode(int mode) {
 
   switch (mode) {
   case HWC_POWER_MODE_OFF:
+    // During power off, all of the buffers are released.
+    // Do not flush until a buffer is successfully submitted again.
+    flush_on_error = false;
     state = kStateOff;
     break;
+
   case HWC_POWER_MODE_NORMAL:
     state = kStateOn;
     last_power_mode_ = HWC_POWER_MODE_NORMAL;
     break;
+
   case HWC_POWER_MODE_DOZE:
     state = kStateDoze;
     last_power_mode_ = HWC_POWER_MODE_DOZE;
     break;
+
   case HWC_POWER_MODE_DOZE_SUSPEND:
     state = kStateDozeSuspend;
     last_power_mode_ = HWC_POWER_MODE_DOZE_SUSPEND;
     break;
+
   default:
     return -EINVAL;
   }
 
   DisplayError error = display_intf_->SetDisplayState(state);
-  if (error != kErrorNone) {
+  if (error == kErrorNone) {
+    flush_on_error_ = flush_on_error;
+  } else {
     if (error == kErrorShutDown) {
       shutdown_pending_ = true;
       return 0;
@@ -385,18 +396,13 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
 
   if (pvt_handle) {
     layer_buffer->format = GetSDMFormat(pvt_handle->format, pvt_handle->flags);
-
-    const MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
-    if (meta_data && (SetMetaData(*meta_data, layer) != kErrorNone)) {
-      return -EINVAL;
-    }
-
-    if (layer_buffer->format == kFormatInvalid) {
-      return -EINVAL;
-    }
-
     layer_buffer->width = pvt_handle->width;
     layer_buffer->height = pvt_handle->height;
+
+    if (SetMetaData(pvt_handle, layer) != kErrorNone) {
+      return -EINVAL;
+    }
+
     if (pvt_handle->bufferType == BUFFER_TYPE_VIDEO) {
       layer_stack_.flags.video_present = true;
       layer_buffer->flags.video = true;
@@ -495,6 +501,12 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
       return ret;
     }
 
+    layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
+    layer.flags.solid_fill = (hwc_layer.flags & kDimLayer) || solid_fill_enable_;
+    if (layer.flags.skip || layer.flags.solid_fill) {
+      layer.dirty_regions.count = 0;
+    }
+
     hwc_rect_t scaled_display_frame = hwc_layer.displayFrame;
     ScaleDisplayFrame(&scaled_display_frame);
     ApplyScanAdjustment(&scaled_display_frame);
@@ -527,7 +539,6 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     //    - blending to Coverage.
     if (hwc_layer.flags & kDimLayer) {
       layer.input_buffer->format = kFormatARGB8888;
-      layer.flags.solid_fill = true;
       layer.solid_fill_color = 0xff000000;
       SetBlending(HWC_BLENDING_COVERAGE, &layer.blending);
     } else {
@@ -549,13 +560,12 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
       layer.src_rect.top = 0;
       layer.src_rect.right = input_buffer->width;
       layer.src_rect.bottom = input_buffer->height;
-      layer.dirty_regions.count = 0;
     }
 
     layer.plane_alpha = hwc_layer.planeAlpha;
-    layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
     layer.flags.cursor = ((hwc_layer.flags & HWC_IS_CURSOR_LAYER) > 0);
     layer.flags.updating = true;
+
     if (num_hw_layers <= kMaxLayerCount) {
       LayerCache layer_cache = layer_stack_cache_.layer_cache[i];
       layer.flags.updating = IsLayerUpdating(hwc_layer, layer_cache);
@@ -602,6 +612,7 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   if (shutdown_pending_) {
     return 0;
   }
+
   size_t num_hw_layers = content_list->numHwLayers;
 
   if (!skip_prepare_) {
@@ -609,12 +620,12 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     if (error != kErrorNone) {
       if (error == kErrorShutDown) {
         shutdown_pending_ = true;
-        return 0;
+      } else if (error != kErrorPermission) {
+        DLOGE("Prepare failed. Error = %d", error);
+        // To prevent surfaceflinger infinite wait, flush the previous frame during Commit()
+        // so that previous buffer and fences are released, and override the error.
+        flush_ = true;
       }
-      DLOGE("Prepare failed. Error = %d", error);
-      // To prevent surfaceflinger infinite wait, flush the previous frame during Commit() so that
-      // previous buffer and fences are released, and override the error.
-      flush_ = true;
 
       return 0;
     }
@@ -692,15 +703,20 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
       error = display_intf_->Commit(&layer_stack_);
       status = 0;
     }
-    if (error != kErrorNone) {
+
+    if (error == kErrorNone) {
+      // A commit is successfully submitted, start flushing on failure now onwards.
+      flush_on_error_ = true;
+    } else {
       if (error == kErrorShutDown) {
         shutdown_pending_ = true;
         return status;
+      } else if (error != kErrorPermission) {
+        DLOGE("Commit failed. Error = %d", error);
+        // To prevent surfaceflinger infinite wait, flush the previous frame during Commit()
+        // so that previous buffer and fences are released, and override the error.
+        flush_ = true;
       }
-      DLOGE("Commit failed. Error = %d", error);
-      // To prevent surfaceflinger infinite wait, flush the previous frame during Commit() so that
-      // previous buffer and fences are released, and override the error.
-      flush_ = true;
     }
   }
 
@@ -711,11 +727,9 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
   size_t num_hw_layers = content_list->numHwLayers;
   int status = 0;
 
-  if (flush_) {
-    DisplayError error = display_intf_->Flush();
-    if (error != kErrorNone) {
-      DLOGE("Flush failed. Error = %d", error);
-    }
+  // Do no call flush on errors, if a successful buffer is never submitted.
+  if (flush_ && flush_on_error_) {
+    display_intf_->Flush();
   }
 
   // Set the release fence fd to the blit engine
@@ -729,15 +743,13 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
     LayerBuffer *layer_buffer = layer_stack_.layers[i].input_buffer;
 
     if (!flush_) {
-      // if swapinterval property is set to 0 then do not update f/w release fences with driver
-      // values
-      if (swap_interval_zero_) {
+      // If swapinterval property is set to 0 or for single buffer layers, do not update f/w
+      // release fences and discard fences from driver
+      if (swap_interval_zero_ || layer.flags.single_buffer) {
         hwc_layer.releaseFenceFd = -1;
         close(layer_buffer->release_fence_fd);
         layer_buffer->release_fence_fd = -1;
-      }
-
-      if (layer.composition != kCompositionGPU) {
+      } else if (layer.composition != kCompositionGPU) {
         hwc_layer.releaseFenceFd = layer_buffer->release_fence_fd;
       }
 
@@ -817,7 +829,14 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
 }
 
 bool HWCDisplay::IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache) {
-  return ((layer_cache.handle != hwc_layer.handle) ||
+  const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
+  const MetaData_t *meta_data = pvt_handle ?
+    reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata) : NULL;
+
+  // If a layer is in single buffer mode, it should be considered as updating always
+  return ((meta_data && (meta_data->operation & SET_SINGLE_BUFFER_MODE) &&
+            meta_data->isSingleBufferMode) ||
+          (layer_cache.handle != hwc_layer.handle) ||
           (layer_cache.plane_alpha != hwc_layer.planeAlpha));
 }
 
@@ -866,7 +885,7 @@ void HWCDisplay::SetComposition(const int32_t &source, LayerComposition *target)
   }
 }
 
-void HWCDisplay::SetComposition(const int32_t &source, int32_t *target) {
+void HWCDisplay::SetComposition(const LayerComposition &source, int32_t *target) {
   switch (source) {
   case kCompositionGPUTarget:   *target = HWC_FRAMEBUFFER_TARGET; break;
   case kCompositionGPU:         *target = HWC_FRAMEBUFFER;        break;
@@ -897,7 +916,7 @@ DisplayError HWCDisplay::SetMaxMixerStages(uint32_t max_mixer_stages) {
   return error;
 }
 
-DisplayError HWCDisplay:: ControlPartialUpdate(bool enable, uint32_t *pending) {
+DisplayError HWCDisplay::ControlPartialUpdate(bool enable, uint32_t *pending) {
   DisplayError error = kErrorNone;
 
   if (display_intf_) {
@@ -939,6 +958,7 @@ LayerBufferFormat HWCDisplay::GetSDMFormat(const int32_t &source, const int flag
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:  format = kFormatYCbCr420SPVenusUbwc;      break;
   case HAL_PIXEL_FORMAT_YV12:                     format = kFormatYCrCb420PlanarStride16;   break;
   case HAL_PIXEL_FORMAT_YCrCb_420_SP:             format = kFormatYCrCb420SemiPlanar;       break;
+  case HAL_PIXEL_FORMAT_YCbCr_420_SP:             format = kFormatYCbCr420SemiPlanar;       break;
   case HAL_PIXEL_FORMAT_YCbCr_422_SP:             format = kFormatYCbCr422H2V1SemiPlanar;   break;
   case HAL_PIXEL_FORMAT_YCbCr_422_I:              format = kFormatYCbCr422H2V1Packed;       break;
   default:
@@ -1214,8 +1234,8 @@ int HWCDisplay::SetCursorPosition(int x, int y) {
   return 0;
 }
 
-int HWCDisplay::OnMinHdcpEncryptionLevelChange() {
-  DisplayError error = display_intf_->OnMinHdcpEncryptionLevelChange();
+int HWCDisplay::OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) {
+  DisplayError error = display_intf_->OnMinHdcpEncryptionLevelChange(min_enc_level);
   if (error != kErrorNone) {
     DLOGE("Failed. Error = %d", error);
     return -1;
@@ -1258,36 +1278,76 @@ uint32_t HWCDisplay::RoundToStandardFPS(uint32_t fps) {
 void HWCDisplay::ApplyScanAdjustment(hwc_rect_t *display_frame) {
 }
 
-DisplayError HWCDisplay::SetColorSpace(const ColorSpace_t source, LayerColorSpace *target) {
+DisplayError HWCDisplay::SetCSC(ColorSpace_t source, LayerCSC *target) {
   switch (source) {
-  case ITU_R_601:      *target = kLimitedRange601;   break;
-  case ITU_R_601_FR:   *target = kFullRange601;      break;
-  case ITU_R_709:      *target = kLimitedRange709;   break;
+  case ITU_R_601:       *target = kCSCLimitedRange601;   break;
+  case ITU_R_601_FR:    *target = kCSCFullRange601;      break;
+  case ITU_R_709:       *target = kCSCLimitedRange709;   break;
   default:
-    DLOGE("Unsupported Color Space: %d", source);
+    DLOGE("Unsupported CSC: %d", source);
     return kErrorNotSupported;
   }
 
   return kErrorNone;
 }
 
-DisplayError HWCDisplay::SetMetaData(const MetaData_t &meta_data, Layer *layer) {
-  if (meta_data.operation & UPDATE_REFRESH_RATE) {
-    layer->frame_rate = RoundToStandardFPS(meta_data.refreshrate);
+DisplayError HWCDisplay::SetIGC(IGC_t source, LayerIGC *target) {
+  switch (source) {
+  case IGC_NotSpecified:    *target = kIGCNotSpecified; break;
+  case IGC_sRGB:            *target = kIGCsRGB;   break;
+  default:
+    DLOGE("Unsupported IGC: %d", source);
+    return kErrorNotSupported;
   }
 
-  if ((meta_data.operation & PP_PARAM_INTERLACED) && meta_data.interlaced) {
-    layer->input_buffer->flags.interlace = true;
+  return kErrorNone;
+}
+
+DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *layer) {
+  const MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata);
+  LayerBuffer *layer_buffer = layer->input_buffer;
+
+  if (!meta_data) {
+    return kErrorNone;
   }
 
-  if (meta_data.operation & LINEAR_FORMAT) {
-    layer->input_buffer->format = GetSDMFormat(meta_data.linearFormat, 0);
-  }
-
-  if (meta_data.operation & UPDATE_COLOR_SPACE) {
-    if (SetColorSpace(meta_data.colorSpace, &layer->color_space) != kErrorNone) {
+  if (meta_data->operation & UPDATE_COLOR_SPACE) {
+    if (SetCSC(meta_data->colorSpace, &layer->csc) != kErrorNone) {
       return kErrorNotSupported;
     }
+  }
+
+  if (meta_data->operation & SET_IGC) {
+    if (SetIGC(meta_data->igc, &layer->igc) != kErrorNone) {
+      return kErrorNotSupported;
+    }
+  }
+
+  if (meta_data->operation & UPDATE_REFRESH_RATE) {
+    layer->frame_rate = RoundToStandardFPS(meta_data->refreshrate);
+  }
+
+  if ((meta_data->operation & PP_PARAM_INTERLACED) && meta_data->interlaced) {
+    layer_buffer->flags.interlace = true;
+  }
+
+  if (meta_data->operation & LINEAR_FORMAT) {
+    layer_buffer->format = GetSDMFormat(meta_data->linearFormat, 0);
+  }
+
+  if (meta_data->operation & UPDATE_BUFFER_GEOMETRY) {
+    int actual_width = pvt_handle->width;
+    int actual_height = pvt_handle->height;
+    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(pvt_handle, actual_width, actual_height);
+    layer_buffer->width = actual_width;
+    layer_buffer->height = actual_height;
+  }
+
+  if (meta_data->operation & SET_SINGLE_BUFFER_MODE) {
+    layer->flags.single_buffer = meta_data->isSingleBufferMode;
+    // Graphics can set this operation on all types of layers including FB and set the actual value
+    // to 0. To protect against SET operations of 0 value, we need to do a logical OR.
+    layer_stack_.flags.single_buffered_layer_present |= meta_data->isSingleBufferMode;
   }
 
   return kErrorNone;

@@ -80,7 +80,8 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   int GetEventValue(const char *uevent_data, int length, const char *event_info);
   int HotPlugHandler(bool connected);
   void ResetPanel();
-  void HandleVirtualDisplayLifeCycle(hwc_display_contents_1_t *content_list);
+  int ConnectDisplay(int disp, hwc_display_contents_1_t *content_list);
+  int DisconnectDisplay(int disp);
   void HandleSecureDisplaySession(hwc_display_contents_1_t **displays);
 
   // QClient methods
@@ -116,8 +117,11 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   android::status_t GetVisibleDisplayRect(const android::Parcel *input_parcel,
                                           android::Parcel *output_parcel);
 
+  android::status_t SetDynamicBWForCamera(const android::Parcel *input_parcel,
+                                          android::Parcel *output_parcel);
+  android::status_t GetBWTransactionStatus(const android::Parcel *input_parcel,
+                                          android::Parcel *output_parcel);
   static Locker locker_;
-  static Locker concurrency_locker_;
   CoreInterface *core_intf_ = NULL;
   hwc_procs_t hwc_procs_default_;
   hwc_procs_t const *hwc_procs_ = &hwc_procs_default_;
@@ -128,8 +132,12 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   HWCBufferAllocator *buffer_allocator_ = NULL;
   HWCBufferSyncHandler *buffer_sync_handler_ = NULL;
   HWCColorManager *color_mgr_ = NULL;
-  static bool reset_panel_;
+  bool reset_panel_ = false;
   bool secure_display_active_ = false;
+  bool external_pending_connect_ = false;
+  bool new_bw_mode_ = false;
+  bool need_invalidate_ = false;
+  int bw_mode_release_fd_ = -1;
 };
 
 }  // namespace sdm

@@ -95,29 +95,9 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
         if (usage & GRALLOC_USAGE_PRIVATE_EXTERNAL_ONLY) {
             flags |= private_handle_t::PRIV_FLAGS_EXTERNAL_ONLY;
         }
+
         if (usage & GRALLOC_USAGE_PRIVATE_INTERNAL_ONLY) {
             flags |= private_handle_t::PRIV_FLAGS_INTERNAL_ONLY;
-        }
-
-        ColorSpace_t colorSpace = ITU_R_601;
-        flags |= private_handle_t::PRIV_FLAGS_ITU_R_601;
-        if (bufferType == BUFFER_TYPE_VIDEO) {
-            if (usage & GRALLOC_USAGE_HW_CAMERA_WRITE) {
-                // Per the camera spec ITU 709 format should be set only for
-                // video encoding.
-                // It should be set to ITU 601 full range format for any other
-                // camera buffer
-                //
-                if (usage & GRALLOC_USAGE_HW_CAMERA_MASK) {
-                    if (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) {
-                        flags |= private_handle_t::PRIV_FLAGS_ITU_R_709;
-                        colorSpace = ITU_R_709;
-                    } else {
-                        flags |= private_handle_t::PRIV_FLAGS_ITU_R_601_FR;
-                        colorSpace = ITU_R_601_FR;
-                    }
-                }
-            }
         }
 
         if (usage & GRALLOC_USAGE_HW_VIDEO_ENCODER ) {
@@ -163,6 +143,10 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
             flags |= private_handle_t::PRIV_FLAGS_NON_CPU_WRITER;
         }
 
+        if(usage & GRALLOC_USAGE_HW_COMPOSER) {
+            flags |= private_handle_t::PRIV_FLAGS_DISP_CONSUMER;
+        }
+
         if(false == data.uncached) {
             flags |= private_handle_t::PRIV_FLAGS_CACHED;
         }
@@ -176,6 +160,7 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
         hnd->offset = data.offset;
         hnd->base = (uint64_t)(data.base) + data.offset;
         hnd->gpuaddr = 0;
+        ColorSpace_t colorSpace = ITU_R_601;
         setMetaData(hnd, UPDATE_COLOR_SPACE, (void*) &colorSpace);
 
         *pHandle = hnd;

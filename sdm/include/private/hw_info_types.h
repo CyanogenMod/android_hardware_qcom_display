@@ -27,6 +27,7 @@
 
 #include <stdint.h>
 #include <core/display_interface.h>
+#include <core/core_interface.h>
 
 namespace sdm {
 
@@ -65,6 +66,12 @@ enum HWDisplayPort {
   kPortEDP,
 };
 
+struct HWDynBwLimitInfo {
+  uint32_t cur_mode = kBwDefault;
+  uint32_t total_bw_limit[kBwModeMax] = { 0 };
+  uint32_t pipe_bw_limit[kBwModeMax] = { 0 };
+};
+
 struct HWResourceInfo {
   uint32_t hw_version = 0;
   uint32_t hw_revision = 0;
@@ -101,6 +108,9 @@ struct HWResourceInfo {
   bool has_rotator_downscale = false;
   bool has_non_scalar_rgb = false;
   bool is_src_split = false;
+  bool perf_calc = false;
+  bool has_dyn_bw_support = false;
+  HWDynBwLimitInfo dyn_bw_info;
 
   void Reset() { *this = HWResourceInfo(); }
 };
@@ -134,6 +144,7 @@ struct HWPanelInfo {
   uint32_t max_fps = 0;               // Max fps supported by panel
   bool is_primary_panel = false;      // Panel is primary display
   HWSplitInfo split_info;             // Panel split configuration
+  char panel_name[256] = {0};         // Panel name
 
   bool operator !=(const HWPanelInfo &panel_info) {
     return ((port != panel_info.port) || (mode != panel_info.mode) ||
@@ -228,14 +239,14 @@ struct HWPipeInfo {
   uint8_t horizontal_decimation = 0;
   uint8_t vertical_decimation = 0;
   ScaleData scale_data;
-  bool valid = false;
   uint32_t z_order = 0;
+  bool set_igc = false;
+  bool valid = false;
 
   void Reset() { *this = HWPipeInfo(); }
 };
 
 struct HWLayerConfig {
-  bool use_non_dma_pipe = false;  // set by client
   HWPipeInfo left_pipe;           // pipe for left side of output
   HWPipeInfo right_pipe;          // pipe for right side of output
   HWRotatorSession hw_rotator_session;
@@ -263,7 +274,9 @@ struct HWLayersInfo {
 struct HWLayers {
   HWLayersInfo info;
   HWLayerConfig config[kMaxSDELayers];
-  float output_compression;
+  float output_compression = 1.0f;
+  uint32_t bandwidth = 0;
+  uint32_t clock = 0;
 };
 
 struct HWDisplayAttributes : DisplayConfigVariableInfo {

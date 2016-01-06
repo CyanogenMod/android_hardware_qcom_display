@@ -42,7 +42,6 @@ namespace sdm {
   void Log(DebugTag debug_tag, const char *prefix, const LayerRect &roi);
   void Normalize(const uint32_t &align_x, const uint32_t &align_y, LayerRect *rect);
   LayerRect Union(const LayerRect &rect1, const LayerRect &rect2);
-  LayerRect Union(const LayerRectArray &rects);
   LayerRect Intersection(const LayerRect &rect1, const LayerRect &rect2);
   LayerRect Subtract(const LayerRect &rect1, const LayerRect &rect2);
   LayerRect Reposition(const LayerRect &rect1, const int &x_offset, const int &y_offset);

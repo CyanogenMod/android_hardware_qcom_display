@@ -86,6 +86,9 @@
 #define GRALLOC_MODULE_PERFORM_GET_MAP_SECURE_BUFFER_INFO 8
 #define GRALLOC_MODULE_PERFORM_GET_UBWC_FLAG 9
 #define GRALLOC_MODULE_PERFORM_GET_RGB_DATA_ADDRESS 10
+#define GRALLOC_MODULE_PERFORM_GET_IGC 11
+#define GRALLOC_MODULE_PERFORM_SET_IGC 12
+#define GRALLOC_MODULE_PERFORM_SET_SINGLE_BUFFER_MODE 13
 
 /* OEM specific HAL formats */
 
@@ -148,6 +151,10 @@
 #define HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR   0x93DC
 #define HAL_PIXEL_FORMAT_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR   0x93DD
 
+/* possible values for inverse gamma correction */
+#define HAL_IGC_NOT_SPECIFIED     0
+#define HAL_IGC_s_RGB             1
+
 /* possible formats for 3D content*/
 enum {
     HAL_NO_3D                      = 0x0,
@@ -187,16 +194,18 @@ struct private_handle_t : public native_handle {
             PRIV_FLAGS_CAMERA_READ        = 0x00040000,
             PRIV_FLAGS_HW_COMPOSER        = 0x00080000,
             PRIV_FLAGS_HW_TEXTURE         = 0x00100000,
-            PRIV_FLAGS_ITU_R_601          = 0x00200000,
-            PRIV_FLAGS_ITU_R_601_FR       = 0x00400000,
-            PRIV_FLAGS_ITU_R_709          = 0x00800000,
+            PRIV_FLAGS_ITU_R_601          = 0x00200000, //Unused from display
+            PRIV_FLAGS_ITU_R_601_FR       = 0x00400000, //Unused from display
+            PRIV_FLAGS_ITU_R_709          = 0x00800000, //Unused from display
             PRIV_FLAGS_SECURE_DISPLAY     = 0x01000000,
             // Buffer is rendered in Tile Format
             PRIV_FLAGS_TILE_RENDERED      = 0x02000000,
             // Buffer rendered using CPU/SW renderer
             PRIV_FLAGS_CPU_RENDERED       = 0x04000000,
             // Buffer is allocated with UBWC alignment
-            PRIV_FLAGS_UBWC_ALIGNED       = 0x08000000
+            PRIV_FLAGS_UBWC_ALIGNED       = 0x08000000,
+            // Buffer allocated will be consumed by SF/HWC
+            PRIV_FLAGS_DISP_CONSUMER      = 0x10000000
         };
 
         // file-descriptors

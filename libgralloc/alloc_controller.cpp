@@ -646,7 +646,7 @@ unsigned int getSize(int format, int width, int height, int usage,
             size = alignedw * alignedh * ASTC_BLOCK_SIZE;
             break;
         default:
-            ALOGE("Unrecognized pixel format: 0x%x", __FUNCTION__, format);
+            ALOGE("%s: Unrecognized pixel format: 0x%x", __FUNCTION__, format);
             return 0;
     }
     return size;
@@ -842,6 +842,10 @@ int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage)
     if (0 != err) {
         ALOGE("%s: allocate failed", __FUNCTION__);
         return -ENOMEM;
+    }
+
+    if(isUBwcEnabled(format, usage)) {
+      data.allocType |= private_handle_t::PRIV_FLAGS_UBWC_ALIGNED;
     }
 
     private_handle_t* hnd = new private_handle_t(data.fd, data.size,

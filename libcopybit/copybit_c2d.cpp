@@ -124,7 +124,8 @@ enum eConversionType {
 enum eC2DFlags {
     FLAGS_PREMULTIPLIED_ALPHA  = 1<<0,
     FLAGS_YUV_DESTINATION      = 1<<1,
-    FLAGS_TEMP_SRC_DST         = 1<<2
+    FLAGS_TEMP_SRC_DST         = 1<<2,
+    FLAGS_UBWC_FORMAT_MODE     = 1<<3
 };
 
 static gralloc::IAllocController* sAlloc = 0;
@@ -159,6 +160,8 @@ struct copybit_context_t {
     void* time_stamp;
     bool dst_surface_mapped; // Set when dst surface is mapped to GPU addr
     void* dst_surface_base; // Stores the dst surface addr
+    bool is_src_ubwc_format;
+    bool is_dst_ubwc_format;
 
     // used for signaling the wait thread
     bool wait_timestamp;
@@ -191,22 +194,22 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
                         struct hw_device_t** device);
 
 static struct hw_module_methods_t copybit_module_methods = {
-open:  open_copybit
+    .open = open_copybit,
 };
 
 /*
  * The COPYBIT Module
  */
 struct copybit_module_t HAL_MODULE_INFO_SYM = {
-common: {
-tag: HARDWARE_MODULE_TAG,
-     version_major: 1,
-     version_minor: 0,
-     id: COPYBIT_HARDWARE_MODULE_ID,
-     name: "QCT COPYBIT C2D 2.0 Module",
-     author: "Qualcomm",
-     methods: &copybit_module_methods
-        }
+    .common = {
+        .tag =  HARDWARE_MODULE_TAG,
+        .version_major = 1,
+        .version_minor = 0,
+        .id = COPYBIT_HARDWARE_MODULE_ID,
+        .name = "QCT COPYBIT C2D 2.0 Module",
+        .author = "Qualcomm",
+        .methods =  &copybit_module_methods
+    }
 };
 
 
@@ -543,6 +546,10 @@ static int set_image(copybit_context_t* ctx, uint32 surfaceId,
 
         surfaceDef.format = c2d_format |
             ((flags & FLAGS_PREMULTIPLIED_ALPHA) ? C2D_FORMAT_PREMULTIPLIED : 0);
+
+        surfaceDef.format = surfaceDef.format |
+            ((flags & FLAGS_UBWC_FORMAT_MODE) ? C2D_FORMAT_UBWC_COMPRESSED : 0);
+
         surfaceDef.width = rhs->w;
         surfaceDef.height = rhs->h;
         int aligned_width = ALIGN((int)surfaceDef.width,32);
@@ -699,6 +706,8 @@ static int clear_copybit(struct copybit_device_t *dev,
     int flags = FLAGS_PREMULTIPLIED_ALPHA;
     int mapped_dst_idx = -1;
     struct copybit_context_t* ctx = (struct copybit_context_t*)dev;
+    if (ctx->is_dst_ubwc_format)
+        flags |= FLAGS_UBWC_FORMAT_MODE;
     C2D_RECT c2drect = {rect->l, rect->t, rect->r - rect->l, rect->b - rect->t};
     pthread_mutex_lock(&ctx->wait_cleanup_lock);
     if(!ctx->dst_surface_mapped) {
@@ -864,6 +873,12 @@ static int set_parameter_copybit(
         case COPYBIT_BLIT_TO_FRAMEBUFFER:
             // Do nothing
             break;
+        case COPYBIT_SRC_FORMAT_MODE:
+            ctx->is_src_ubwc_format = (value == COPYBIT_UBWC_COMPRESSED);
+            break;
+        case COPYBIT_DST_FORMAT_MODE:
+            ctx->is_dst_ubwc_format = (value == COPYBIT_UBWC_COMPRESSED);
+            break;
         default:
             ALOGE("%s: default case param=0x%x", __FUNCTION__, name);
             status = -EINVAL;
@@ -897,32 +912,17 @@ static int get(struct copybit_device_t *dev, int name)
         case COPYBIT_ROTATION_STEP_DEG:
             value = 1;
             break;
+        case COPYBIT_UBWC_SUPPORT:
+            value = 0;
+            if (ctx->c2d_driver_info.capabilities_mask & C2D_DRIVER_SUPPORTS_UBWC_COMPRESSED_OP) {
+                value = 1;
+            }
+            break;
         default:
             ALOGE("%s: default case param=0x%x", __FUNCTION__, name);
             value = -EINVAL;
     }
     return value;
-}
-
-static int is_alpha(int cformat)
-{
-    int alpha = 0;
-    switch (cformat & 0xFF) {
-        case C2D_COLOR_FORMAT_8888_ARGB:
-        case C2D_COLOR_FORMAT_8888_RGBA:
-        case C2D_COLOR_FORMAT_5551_RGBA:
-        case C2D_COLOR_FORMAT_4444_ARGB:
-            alpha = 1;
-            break;
-        default:
-            alpha = 0;
-            break;
-    }
-
-    if(alpha && (cformat&C2D_FORMAT_DISABLE_ALPHA))
-        alpha = 0;
-
-    return alpha;
 }
 
 /* Function to check if we need a temporary buffer for the blit.
@@ -1123,6 +1123,9 @@ static int stretch_copybit_internal(
     }
 
     int dst_surface_type;
+    if (ctx->is_dst_ubwc_format)
+        flags |= FLAGS_UBWC_FORMAT_MODE;
+
     if (is_supported_rgb_format(dst->format) == COPYBIT_SUCCESS) {
         dst_surface_type = RGB_SURFACE;
         flags |= FLAGS_PREMULTIPLIED_ALPHA;
@@ -1305,6 +1308,7 @@ static int stretch_copybit_internal(
 
     flags |= (ctx->is_premultiplied_alpha) ? FLAGS_PREMULTIPLIED_ALPHA : 0;
     flags |= (ctx->dst_surface_type != RGB_SURFACE) ? FLAGS_YUV_DESTINATION : 0;
+    flags |= (ctx->is_src_ubwc_format) ? FLAGS_UBWC_FORMAT_MODE : 0;
     status = set_image(ctx, src_surface.surface_id, &src_image,
                        (eC2DFlags)flags, mapped_src_idx);
     if(status) {

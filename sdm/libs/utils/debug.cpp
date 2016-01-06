@@ -133,5 +133,13 @@ bool Debug::IsUbwcTiledFrameBuffer() {
   return (ubwc_framebuffer == 1);
 }
 
+bool Debug::GetProperty(const char* property_name, char* value) {
+  if (debug_.debug_handler_->GetProperty(property_name, value) != kErrorNone) {
+    return false;
+  }
+
+  return true;
+}
+
 }  // namespace sdm
 

@@ -528,7 +528,7 @@ DisplayError ResourceDefault::Config(DisplayResourceContext *display_resource_ct
   DisplayError error = kErrorNone;
   Layer& layer = layer_info.stack->layers[layer_info.index[0]];
 
-  error = ValidateLayerDimensions(layer);
+  error = ValidateLayerParams(layer);
   if (error != kErrorNone) {
     return error;
   }
@@ -546,7 +546,8 @@ DisplayError ResourceDefault::Config(DisplayResourceContext *display_resource_ct
   }
 
   bool ubwc_tiled = IsUBWCFormat(layer.input_buffer->format);
-  error = ValidateScaling(src_rect, dst_rect, false, ubwc_tiled);
+  error = ValidateScaling(src_rect, dst_rect, false /*rotated90 */, ubwc_tiled,
+                          false /* use_rotator_downscale */);
   if (error != kErrorNone) {
     return error;
   }
@@ -648,10 +649,15 @@ bool ResourceDefault::CalculateCropRects(const LayerRect &scissor, LayerRect *cr
     return false;
 }
 
-DisplayError ResourceDefault::ValidateLayerDimensions(const Layer &layer) {
+DisplayError ResourceDefault::ValidateLayerParams(const Layer &layer) {
   const LayerRect &src = layer.src_rect;
   const LayerRect &dst = layer.dst_rect;
   LayerBuffer *input_buffer = layer.input_buffer;
+
+  if (input_buffer->format == kFormatInvalid) {
+    DLOGV_IF(kTagResources, "Invalid input buffer format %d", input_buffer->format);
+    return kErrorNotSupported;
+  }
 
   if (!IsValid(src) || !IsValid(dst)) {
     Log(kTagResources, "input layer src_rect", src);
@@ -705,7 +711,8 @@ DisplayError ResourceDefault::ValidatePipeParams(HWPipeInfo *pipe_info, bool ubw
     return error;
   }
 
-  error = ValidateScaling(src_rect, dst_rect, false, ubwc_tiled);
+  error = ValidateScaling(src_rect, dst_rect, false /* rotated90 */, ubwc_tiled,
+                          false /* use_rotator_downscale */);
   if (error != kErrorNone) {
     return error;
   }
@@ -714,7 +721,8 @@ DisplayError ResourceDefault::ValidatePipeParams(HWPipeInfo *pipe_info, bool ubw
 }
 
 DisplayError ResourceDefault::ValidateScaling(const LayerRect &crop, const LayerRect &dst,
-                                         bool rotate90, bool ubwc_tiled) {
+                                              bool rotate90, bool ubwc_tiled,
+                                              bool use_rotator_downscale) {
   DisplayError error = kErrorNone;
 
   float scale_x = 1.0f;
@@ -906,6 +914,10 @@ DisplayError ResourceDefault::ValidateCursorConfig(Handle display_ctx, const Lay
 
 DisplayError ResourceDefault::ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers,
                                                      int x, int y) {
+  return kErrorNotSupported;
+}
+
+DisplayError ResourceDefault::SetMaxBandwidthMode(HWBwModes mode) {
   return kErrorNotSupported;
 }
 

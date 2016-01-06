@@ -72,6 +72,7 @@ typedef enum {
     C2D_FORMAT_MACROTILED        = (1 << 16), /* tiled in macro level */
     C2D_FORMAT_TILED_4x4         = (1 << 17), /* 4x4 tiled format */
     C2D_FORMAT_SWAP_RB           = (1 << 18), /* Swap R & B color components */
+    C2D_FORMAT_UBWC_COMPRESSED   = (1 << 23), /* UBWC compressed format */
 } C2D_FORMAT_MODE;
 
 /* Definitions of supported RGB formats, used in C2D_RGB_SURFACE_DEF.
@@ -408,7 +409,8 @@ typedef enum {
     C2D_DRIVER_SUPPORTS_TARGET_RECT_OP            = (1 << 15),
     C2D_DRIVER_SUPPORTS_ROTATE_OP                 = (1 << 16), /* all rotations */
     C2D_DRIVER_SUPPORTS_FLUSH_WITH_FENCE_FD_OP    = (1 << 17), /* all rotations */
-    C2D_DRIVER_SUPPORTS_ALL_CAPABILITIES_OP       = ((0xFFFFFFFF) >> (31 - 17)) /* mask for all capabilities supported */
+    C2D_DRIVER_SUPPORTS_UBWC_COMPRESSED_OP        = (1 << 18), /* UBWC Compression */
+    C2D_DRIVER_SUPPORTS_ALL_CAPABILITIES_OP       = ((0xFFFFFFFF) >> (31 - 18)) /* mask for all capabilities supported */
 } C2D_DRIVER_CAPABILITIES;
 
 /* 2D driver workaround bits used by the 2D applications */

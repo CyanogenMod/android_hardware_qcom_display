@@ -176,9 +176,9 @@ DisplayError DisplayHDMI::SetPanelBrightness(int level) {
   return DisplayBase::SetPanelBrightness(level);
 }
 
-DisplayError DisplayHDMI::OnMinHdcpEncryptionLevelChange() {
+DisplayError DisplayHDMI::OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) {
   SCOPE_LOCK(locker_);
-  return hw_intf_->OnMinHdcpEncryptionLevelChange();
+  return hw_intf_->OnMinHdcpEncryptionLevelChange(min_enc_level);
 }
 
 int DisplayHDMI::GetBestConfig() {

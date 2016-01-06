@@ -393,7 +393,8 @@ void CompManager::AppendDump(char *buffer, uint32_t length) {
 
 DisplayError CompManager::ValidateScaling(const LayerRect &crop, const LayerRect &dst,
                                           bool rotate90) {
-  return resource_intf_->ValidateScaling(crop, dst, rotate90, Debug::IsUbwcTiledFrameBuffer());
+  return resource_intf_->ValidateScaling(crop, dst, rotate90, Debug::IsUbwcTiledFrameBuffer(),
+                                         true /* use_rotator_downscale */);
 }
 
 DisplayError CompManager::ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers,
@@ -434,6 +435,14 @@ bool CompManager::SupportLayerAsCursor(Handle comp_handle, HWLayers *hw_layers) 
   }
 
   return supported;
+}
+
+DisplayError CompManager::SetMaxBandwidthMode(HWBwModes mode) {
+  if ((hw_res_info_.has_dyn_bw_support == false) || (mode >= kBwModeMax)) {
+    return kErrorNotSupported;
+  }
+
+  return resource_intf_->SetMaxBandwidthMode(mode);
 }
 
 bool CompManager::CanSetIdleTimeout(Handle display_ctx) {

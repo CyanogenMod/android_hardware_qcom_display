@@ -60,6 +60,7 @@ class CompManager : public DumpImpl {
   DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers, int x, int y);
   bool SupportLayerAsCursor(Handle display_ctx, HWLayers *hw_layers);
   bool CanSetIdleTimeout(Handle display_ctx);
+  DisplayError SetMaxBandwidthMode(HWBwModes mode);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);

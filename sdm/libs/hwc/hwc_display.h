@@ -59,7 +59,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual void GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels);
   virtual void GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels);
   virtual int SetDisplayStatus(uint32_t display_status);
-  virtual int OnMinHdcpEncryptionLevelChange();
+  virtual int OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
   virtual int Perform(uint32_t operation, ...);
   virtual int SetCursorPosition(int x, int y);
   virtual void SetSecureDisplay(bool secure_display_active);
@@ -133,7 +133,7 @@ class HWCDisplay : public DisplayEventHandler {
   inline void SetRect(const hwc_rect_t &source, LayerRect *target);
   inline void SetRect(const hwc_frect_t &source, LayerRect *target);
   inline void SetComposition(const int32_t &source, LayerComposition *target);
-  inline void SetComposition(const int32_t &source, int32_t *target);
+  inline void SetComposition(const LayerComposition &source, int32_t *target);
   inline void SetBlending(const int32_t &source, LayerBlending *target);
   int SetFormat(const int32_t &source, const int flags, LayerBufferFormat *target);
   LayerBufferFormat GetSDMFormat(const int32_t &source, const int flags);
@@ -144,8 +144,9 @@ class HWCDisplay : public DisplayEventHandler {
   void CloseAcquireFences(hwc_display_contents_1_t *content_list);
   uint32_t RoundToStandardFPS(uint32_t fps);
   virtual void ApplyScanAdjustment(hwc_rect_t *display_frame);
-  DisplayError SetColorSpace(const ColorSpace_t source, LayerColorSpace *target);
-  DisplayError SetMetaData(const MetaData_t &meta_data, Layer *layer);
+  DisplayError SetCSC(ColorSpace_t source, LayerCSC *target);
+  DisplayError SetIGC(IGC_t source, LayerIGC *target);
+  DisplayError SetMetaData(const private_handle_t *pvt_handle, Layer *layer);
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
   void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
   bool IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache);
@@ -166,6 +167,7 @@ class HWCDisplay : public DisplayEventHandler {
   LayerStackMemory layer_stack_memory_;
   LayerStack layer_stack_;
   LayerStackCache layer_stack_cache_;
+  bool flush_on_error_ = false;
   bool flush_ = false;
   uint32_t dump_frame_count_ = 0;
   uint32_t dump_frame_index_ = 0;
@@ -185,7 +187,6 @@ class HWCDisplay : public DisplayEventHandler {
   bool use_blit_comp_ = false;
   bool secure_display_active_ = false;
   bool skip_prepare_ = false;
-
   bool solid_fill_enable_ = false;
   uint32_t solid_fill_color_ = 0;
   LayerRect display_rect_;

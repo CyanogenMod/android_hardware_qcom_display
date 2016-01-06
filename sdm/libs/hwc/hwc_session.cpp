@@ -42,6 +42,7 @@
 #include <gralloc_priv.h>
 #include <display_config.h>
 #include <utils/debug.h>
+#include <sync/sync.h>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
@@ -74,8 +75,6 @@ hwc_module_t HAL_MODULE_INFO_SYM = {
 namespace sdm {
 
 Locker HWCSession::locker_;
-Locker HWCSession::concurrency_locker_;
-bool HWCSession::reset_panel_ = false;
 
 static void Invalidate(const struct hwc_procs *procs) {
 }
@@ -187,6 +186,8 @@ int HWCSession::Deinit() {
 }
 
 int HWCSession::Open(const hw_module_t *module, const char *name, hw_device_t **device) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!module || !name || !device) {
     DLOGE("Invalid parameters.");
     return -EINVAL;
@@ -212,6 +213,8 @@ int HWCSession::Open(const hw_module_t *module, const char *name, hw_device_t **
 }
 
 int HWCSession::Close(hw_device_t *device) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!device) {
     return -EINVAL;
   }
@@ -229,42 +232,78 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
                         hwc_display_contents_1_t **displays) {
   DTRACE_SCOPED();
 
-  SEQUENCE_ENTRY_SCOPE_LOCK(locker_);
-
-  if (!device || !displays) {
+  if (!device || !displays || num_displays > HWC_NUM_DISPLAY_TYPES) {
     return -EINVAL;
   }
 
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
+  hwc_procs_t const *hwc_procs = NULL;
+  bool hotplug_connect = false;
 
-  if (reset_panel_) {
-    DLOGW("panel is in bad state, resetting the panel");
-    hwc_session->ResetPanel();
-  }
+  // Hold mutex only in this scope.
+  {
+    SEQUENCE_ENTRY_SCOPE_LOCK(locker_);
 
-  hwc_session->HandleSecureDisplaySession(displays);
+    hwc_procs = hwc_session->hwc_procs_;
 
-  if (hwc_session->color_mgr_) {
-    HWCDisplay *primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
-    if (primary_display) {
-      int ret = hwc_session->color_mgr_->SolidFillLayersPrepare(displays, primary_display);
-      if (ret)
-        return 0;
+    if (hwc_session->reset_panel_) {
+      DLOGW("panel is in bad state, resetting the panel");
+      hwc_session->ResetPanel();
     }
-  }
 
-  for (ssize_t dpy = static_cast<ssize_t>(num_displays - 1); dpy >= 0; dpy--) {
-    hwc_display_contents_1_t *content_list = displays[dpy];
-    if (dpy == HWC_DISPLAY_VIRTUAL) {
-      if (hwc_session->hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-        continue;
+    if (hwc_session->need_invalidate_) {
+      hwc_procs->invalidate(hwc_procs);
+    }
+
+    hwc_session->HandleSecureDisplaySession(displays);
+
+    if (hwc_session->color_mgr_) {
+      HWCDisplay *primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
+      if (primary_display) {
+        int ret = hwc_session->color_mgr_->SolidFillLayersPrepare(displays, primary_display);
+        if (ret)
+          return 0;
       }
-      hwc_session->HandleVirtualDisplayLifeCycle(content_list);
     }
 
-    if (hwc_session->hwc_display_[dpy]) {
-      hwc_session->hwc_display_[dpy]->Prepare(content_list);
+    for (ssize_t dpy = static_cast<ssize_t>(num_displays - 1); dpy >= 0; dpy--) {
+      hwc_display_contents_1_t *content_list = displays[dpy];
+      // If external display is connected, ignore virtual display content list.
+      // If virtual display content list is valid, connect virtual display if not connected.
+      // If virtual display content list is invalid, disconnect virtual display if connected.
+      // If external display connection is pending, connect external display when virtual
+      // display is destroyed.
+      if (dpy == HWC_DISPLAY_VIRTUAL) {
+        if (hwc_session->hwc_display_[HWC_DISPLAY_EXTERNAL]) {
+          continue;
+        }
+
+        bool valid_content = HWCDisplayVirtual::IsValidContentList(content_list);
+        bool connected = (hwc_session->hwc_display_[HWC_DISPLAY_VIRTUAL] != NULL);
+
+        if (valid_content && !connected) {
+          hwc_session->ConnectDisplay(HWC_DISPLAY_VIRTUAL, content_list);
+        } else if (!valid_content && connected) {
+          hwc_session->DisconnectDisplay(HWC_DISPLAY_VIRTUAL);
+
+          if (hwc_session->external_pending_connect_) {
+            DLOGI("Process pending external display connection");
+            hwc_session->ConnectDisplay(HWC_DISPLAY_EXTERNAL, NULL);
+            hwc_session->external_pending_connect_ = false;
+            hotplug_connect = true;
+          }
+        }
+      }
+
+      if (hwc_session->hwc_display_[dpy]) {
+        hwc_session->hwc_display_[dpy]->Prepare(content_list);
+      }
     }
+  }
+
+  if (hotplug_connect) {
+    hwc_procs->hotplug(hwc_procs, HWC_DISPLAY_EXTERNAL, true);
+    hwc_procs->invalidate(hwc_procs);
   }
 
   // Return 0, else client will go into bad state
@@ -277,7 +316,7 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
 
   SEQUENCE_EXIT_SCOPE_LOCK(locker_);
 
-  if (!device || !displays) {
+  if (!device || !displays || num_displays > HWC_NUM_DISPLAY_TYPES) {
     return -EINVAL;
   }
 
@@ -326,6 +365,15 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
     }
   }
 
+  if (hwc_session->new_bw_mode_) {
+    hwc_display_contents_1_t *content_list = displays[HWC_DISPLAY_PRIMARY];
+    hwc_session->new_bw_mode_ = false;
+    if (hwc_session->bw_mode_release_fd_ >= 0) {
+      close(hwc_session->bw_mode_release_fd_);
+    }
+    hwc_session->bw_mode_release_fd_ = dup(content_list->retireFenceFd);
+  }
+
   // Return 0, else client will go into bad state
   return 0;
 }
@@ -368,7 +416,7 @@ int HWCSession::SetPowerMode(hwc_composer_device_1 *device, int disp, int mode) 
 }
 
 int HWCSession::Query(hwc_composer_device_1 *device, int param, int *value) {
-  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+  SCOPE_LOCK(locker_);
 
   if (!device || !value) {
     return -EINVAL;
@@ -389,7 +437,7 @@ int HWCSession::Query(hwc_composer_device_1 *device, int param, int *value) {
 }
 
 void HWCSession::RegisterProcs(hwc_composer_device_1 *device, hwc_procs_t const *procs) {
-  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+  SCOPE_LOCK(locker_);
 
   if (!device || !procs) {
     return;
@@ -411,7 +459,7 @@ void HWCSession::Dump(hwc_composer_device_1 *device, char *buffer, int length) {
 
 int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint32_t *configs,
                                   size_t *num_configs) {
-  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+  SCOPE_LOCK(locker_);
 
   if (!device || !configs || !num_configs) {
     return -EINVAL;
@@ -432,7 +480,7 @@ int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint3
 
 int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, uint32_t config,
                                      const uint32_t *attributes, int32_t *values) {
-  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+  SCOPE_LOCK(locker_);
 
   if (!device || !attributes || !values) {
     return -EINVAL;
@@ -452,7 +500,7 @@ int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, ui
 }
 
 int HWCSession::GetActiveConfig(hwc_composer_device_1 *device, int disp) {
-  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+  SCOPE_LOCK(locker_);
 
   if (!device) {
     return -EINVAL;
@@ -495,7 +543,7 @@ int HWCSession::SetActiveConfig(hwc_composer_device_1 *device, int disp, int ind
 int HWCSession::SetCursorPositionAsync(hwc_composer_device_1 *device, int disp, int x, int y) {
   DTRACE_SCOPED();
 
-  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+  SCOPE_LOCK(locker_);
 
   if (!device || (disp < HWC_DISPLAY_PRIMARY) || (disp > HWC_DISPLAY_VIRTUAL)) {
     return -EINVAL;
@@ -510,35 +558,48 @@ int HWCSession::SetCursorPositionAsync(hwc_composer_device_1 *device, int disp, 
   return status;
 }
 
-void HWCSession::HandleVirtualDisplayLifeCycle(hwc_display_contents_1_t *content_list) {
-  // Virtual display & HDMI concurrency is not supported.
-  // Acquire concurrency mutex before creating / destroying virtual display.
-  // Signal concurrency condition on virtual display destroy so that HDMI hotplug could
-  // proceed with connection.
-  SCOPE_LOCK(concurrency_locker_);
+int HWCSession::ConnectDisplay(int disp, hwc_display_contents_1_t *content_list) {
+  DLOGI("Display = %d", disp);
 
-  if (HWCDisplayVirtual::IsValidContentList(content_list)) {
-    if (!hwc_display_[HWC_DISPLAY_VIRTUAL]) {
-      DLOGI("Create Virtual Display");
-      uint32_t primary_width = 0;
-      uint32_t primary_height = 0;
-      hwc_display_[HWC_DISPLAY_PRIMARY]->GetFrameBufferResolution(&primary_width, &primary_height);
+  int status = 0;
+  uint32_t primary_width = 0;
+  uint32_t primary_height = 0;
 
-      int status = HWCDisplayVirtual::Create(core_intf_, &hwc_procs_, primary_width,
-                                             primary_height, content_list,
-                                             &hwc_display_[HWC_DISPLAY_VIRTUAL]);
-      if (!status) {
-        hwc_display_[HWC_DISPLAY_VIRTUAL]->SetSecureDisplay(secure_display_active_);
-      }
-    }
+  hwc_display_[HWC_DISPLAY_PRIMARY]->GetFrameBufferResolution(&primary_width, &primary_height);
+
+  if (disp == HWC_DISPLAY_EXTERNAL) {
+    status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, primary_width, primary_height,
+                                        &hwc_display_[disp]);
+  } else if (disp == HWC_DISPLAY_VIRTUAL) {
+    status = HWCDisplayVirtual::Create(core_intf_, &hwc_procs_, primary_width, primary_height,
+                                       content_list, &hwc_display_[disp]);
   } else {
-    if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
-      DLOGI("Destroy Virtual Display");
-      HWCDisplayVirtual::Destroy(hwc_display_[HWC_DISPLAY_VIRTUAL]);
-      hwc_display_[HWC_DISPLAY_VIRTUAL] = NULL;
-      concurrency_locker_.Signal();
-    }
+    DLOGE("Invalid display type");
+    return -1;
   }
+
+  if (!status) {
+    hwc_display_[disp]->SetSecureDisplay(secure_display_active_);
+  }
+
+  return status;
+}
+
+int HWCSession::DisconnectDisplay(int disp) {
+  DLOGI("Display = %d", disp);
+
+  if (disp == HWC_DISPLAY_EXTERNAL) {
+    HWCDisplayExternal::Destroy(hwc_display_[disp]);
+  } else if (disp == HWC_DISPLAY_VIRTUAL) {
+    HWCDisplayVirtual::Destroy(hwc_display_[disp]);
+  } else {
+    DLOGE("Invalid display type");
+    return -1;
+  }
+
+  hwc_display_[disp] = NULL;
+
+  return 0;
 }
 
 android::status_t HWCSession::notifyCallback(uint32_t command, const android::Parcel *input_parcel,
@@ -628,6 +689,14 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
 
   case qService::IQService::GET_DISPLAY_VISIBLE_REGION:
     status = GetVisibleDisplayRect(input_parcel, output_parcel);
+    break;
+
+  case qService::IQService::SET_CAMERA_STATUS:
+    status = SetDynamicBWForCamera(input_parcel, output_parcel);
+    break;
+
+  case qService::IQService::GET_BW_TRANSACTION_STATUS:
+    status = GetBWTransactionStatus(input_parcel, output_parcel);
     break;
 
   default:
@@ -911,6 +980,41 @@ android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_par
   return 0;
 }
 
+android::status_t HWCSession::SetDynamicBWForCamera(const android::Parcel *input_parcel,
+                                                    android::Parcel *output_parcel) {
+  DisplayError error = kErrorNone;
+  uint32_t camera_status = UINT32(input_parcel->readInt32());
+  HWBwModes mode = camera_status > 0 ? kBwCamera : kBwDefault;
+
+  // trigger invalidate to apply new bw caps.
+  hwc_procs_->invalidate(hwc_procs_);
+
+    error = core_intf_->SetMaxBandwidthMode(mode);
+  if (error != kErrorNone) {
+      return -EINVAL;
+  }
+
+  new_bw_mode_ = true;
+  need_invalidate_ = true;
+
+  return 0;
+}
+
+android::status_t HWCSession::GetBWTransactionStatus(const android::Parcel *input_parcel,
+                                                     android::Parcel *output_parcel)  {
+  bool state = true;
+
+  if (hwc_display_[HWC_DISPLAY_PRIMARY]) {
+    if (sync_wait(bw_mode_release_fd_, 0) < 0) {
+      DLOGI("bw_transaction_release_fd is not yet signalled: err= %s", strerror(errno));
+      state = false;
+    }
+    output_parcel->writeInt32(state);
+  }
+
+  return 0;
+}
+
 void HWCSession::SetFrameDumpConfig(const android::Parcel *input_parcel) {
   uint32_t frame_dump_count = UINT32(input_parcel->readInt32());
   uint32_t bit_mask_display_type = UINT32(input_parcel->readInt32());
@@ -1054,6 +1158,7 @@ android::status_t HWCSession::OnMinHdcpEncryptionLevelChange(const android::Parc
                                                              android::Parcel *output_parcel) {
   int ret = -EINVAL;
   uint32_t display_id = UINT32(input_parcel->readInt32());
+  uint32_t min_enc_level = UINT32(input_parcel->readInt32());
 
   DLOGI("Display %d", display_id);
 
@@ -1064,7 +1169,7 @@ android::status_t HWCSession::OnMinHdcpEncryptionLevelChange(const android::Parc
   } else if (!hwc_display_[display_id]) {
     DLOGW("Display is not connected");
   } else {
-    ret = hwc_display_[display_id]->OnMinHdcpEncryptionLevelChange();
+    ret = hwc_display_[display_id]->OnMinHdcpEncryptionLevelChange(min_enc_level);
   }
 
   output_parcel->writeInt32(ret);
@@ -1160,70 +1265,55 @@ void HWCSession::ResetPanel() {
 }
 
 int HWCSession::HotPlugHandler(bool connected) {
+  int status = 0;
+  bool notify_hotplug = false;
+
   // To prevent sending events to client while a lock is held, acquire scope locks only within
   // below scope so that those get automatically unlocked after the scope ends.
   {
-    // Virtual display & HDMI concurrency is not supported. Acquire concurrency lock
-    // and wait for virtual display to tear down if connected.
-    SCOPE_LOCK(concurrency_locker_);
+    SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
+    if (!hwc_display_[HWC_DISPLAY_PRIMARY]) {
+      DLOGE("Primay display is not connected.");
+      return -1;
+    }
 
     if (connected) {
-      // Acquire global lock and check if virtual display is connected.
-      // Release global lock before waiting for virtual display to disconnect and signal.
-      bool virtual_display_connected = false;
-      {
-        SCOPE_LOCK(locker_);
-        if (!hwc_display_[HWC_DISPLAY_PRIMARY]) {
-          DLOGE("Primay display is not connected");
-          return -1;
-        }
-
-        if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-          DLOGE("HDMI is already connected");
-          return -1;
-        }
-
-        virtual_display_connected = (hwc_display_[HWC_DISPLAY_VIRTUAL] != NULL);
-        DLOGI("Virtual display connection status = %d", virtual_display_connected);
-      }
-
-      if (virtual_display_connected) {
-        DLOGI("Wait for virtual display to disconnect.");
-        concurrency_locker_.Wait();
-        DLOGI("virtual display is disconnected now.");
-      }
-
-      // Acquire global sequence lock now.
-      SEQUENCE_WAIT_SCOPE_LOCK(locker_);
-
-      uint32_t primary_width = 0;
-      uint32_t primary_height = 0;
-      hwc_display_[HWC_DISPLAY_PRIMARY]->GetFrameBufferResolution(&primary_width, &primary_height);
-
-      // Create hdmi display
-      int status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, primary_width,
-                                              primary_height, &hwc_display_[HWC_DISPLAY_EXTERNAL]);
-      if (status) {
-        return status;
-      }
-
-      hwc_display_[HWC_DISPLAY_EXTERNAL]->SetSecureDisplay(secure_display_active_);
-    } else {
-      // Acquire concurrency lock as well as global sequence lock.
-      SEQUENCE_WAIT_SCOPE_LOCK(locker_);
-
-      if (!hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-        DLOGE("HDMI not connected");
+      if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
+        DLOGE("HDMI is already connected");
         return -1;
       }
 
-      HWCDisplayExternal::Destroy(hwc_display_[HWC_DISPLAY_EXTERNAL]);
-      hwc_display_[HWC_DISPLAY_EXTERNAL] = NULL;
+      // Connect external display if virtual display is not connected.
+      // Else, defer external display connection and process it when virtual display
+      // tears down; Do not notify SurfaceFlinger since connection is deferred now.
+      if (!hwc_display_[HWC_DISPLAY_VIRTUAL]) {
+        status = ConnectDisplay(HWC_DISPLAY_EXTERNAL, NULL);
+        if (status) {
+          return status;
+        }
+        notify_hotplug = true;
+      } else {
+        DLOGI("Virtual display is connected, pending connection");
+        external_pending_connect_ = true;
+      }
+    } else {
+      // Do not return error if external display is not in connected status.
+      // Due to virtual display concurrency, external display connection might be still pending
+      // but hdmi got disconnected before pending connection could be processed.
+      if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
+        status = DisconnectDisplay(HWC_DISPLAY_EXTERNAL);
+        notify_hotplug = true;
+      }
+      external_pending_connect_ = false;
     }
   }
 
   // notify client and trigger a screen refresh
-  hwc_procs_->hotplug(hwc_procs_, HWC_DISPLAY_EXTERNAL, connected);
+  if (notify_hotplug) {
+    hwc_procs_->hotplug(hwc_procs_, HWC_DISPLAY_EXTERNAL, connected);
+  }
+
   hwc_procs_->invalidate(hwc_procs_);
 
   return 0;

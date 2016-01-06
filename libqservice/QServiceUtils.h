@@ -83,4 +83,20 @@ inline android::status_t setCameraLaunchStatus(uint32_t on) {
     return sendSingleParam(qService::IQService::SET_CAMERA_STATUS, on);
 }
 
+inline bool displayBWTransactionPending() {
+    android::status_t err = (android::status_t) android::FAILED_TRANSACTION;
+    bool ret = false;
+    android::sp<qService::IQService> binder = getBinder();
+    android::Parcel inParcel, outParcel;
+    if(binder != NULL) {
+        err = binder->dispatch(qService::IQService::GET_BW_TRANSACTION_STATUS,
+                &inParcel , &outParcel);
+        if(err != android::NO_ERROR){
+          ALOGE("GET_BW_TRANSACTION_STATUS binder call failed err=%d", err);
+          return ret;
+        }
+    }
+    ret = outParcel.readInt32();
+    return ret;
+}
 #endif /* end of include guard: QSERVICEUTILS_H */

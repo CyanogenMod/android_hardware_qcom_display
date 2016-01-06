@@ -47,10 +47,10 @@ namespace qdutils {
 
 // Use this enum to specify the dpy parameters where needed
 enum {
-    DISPLAY_PRIMARY = 0,
-    DISPLAY_EXTERNAL,
-    DISPLAY_TERTIARY,
-    DISPLAY_VIRTUAL,
+    DISPLAY_PRIMARY = HWC_DISPLAY_PRIMARY,
+    DISPLAY_EXTERNAL = HWC_DISPLAY_EXTERNAL,
+    DISPLAY_TERTIARY = HWC_DISPLAY_TERTIARY,
+    DISPLAY_VIRTUAL = HWC_DISPLAY_VIRTUAL,
 };
 
 // External Display states - used in setSecondaryDisplayStatus()
@@ -140,11 +140,6 @@ DisplayAttributes getDisplayAttributes(int configIndex, int dpy);
 
 // Set the primary display mode to command or video mode
 int setDisplayMode(int mode);
-
-// Notify change in minimum encryption level for HDCP
-// Return -1 on error.
-// Only HDMI display is supported as dpy for now
-int minHdcpEncryptionLevelChanged(int dpy);
 
 // Sets the panel brightness of the primary display
 int setPanelBrightness(int level);

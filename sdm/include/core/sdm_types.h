@@ -41,6 +41,7 @@ enum DisplayError {
   kErrorNone,             //!< Call executed successfully.
   kErrorUndefined,        //!< An unspecified error has occured.
   kErrorNotSupported,     //!< Requested operation is not supported.
+  kErrorPermission,       //!< Operation is not permitted in current state.
   kErrorVersion,          //!< Client is using advanced version of interfaces and calling into an
                           //!< older version of display library.
   kErrorDataAlignment,    //!< Client data structures are not aligned on naturual boundaries.

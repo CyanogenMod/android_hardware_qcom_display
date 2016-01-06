@@ -59,7 +59,7 @@ class DisplayHDMI : public DisplayBase, DumpImpl {
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
   virtual bool IsUnderscanSupported();
   virtual DisplayError SetPanelBrightness(int level);
-  virtual DisplayError OnMinHdcpEncryptionLevelChange();
+  virtual DisplayError OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
   virtual void AppendDump(char *buffer, uint32_t length);
   virtual DisplayError SetCursorPosition(int x, int y);
 

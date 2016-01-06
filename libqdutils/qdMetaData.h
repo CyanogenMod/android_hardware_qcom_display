@@ -34,12 +34,15 @@
 extern "C" {
 #endif
 
-#define MAX_IGC_LUT_ENTRIES 256
-
 enum ColorSpace_t{
     ITU_R_601,
     ITU_R_601_FR,
     ITU_R_709,
+};
+
+enum IGC_t {
+    IGC_NotSpecified,
+    IGC_sRGB,
 };
 
 struct HSICData_t {
@@ -47,19 +50,6 @@ struct HSICData_t {
     float   saturation;
     int32_t intensity;
     float   contrast;
-};
-
-struct Sharp2Data_t {
-    int32_t strength;
-    uint32_t edge_thr;
-    uint32_t smooth_thr;
-    uint32_t noise_thr;
-};
-
-struct IGCData_t{
-    uint16_t c0[MAX_IGC_LUT_ENTRIES];
-    uint16_t c1[MAX_IGC_LUT_ENTRIES];
-    uint16_t c2[MAX_IGC_LUT_ENTRIES];
 };
 
 struct BufferDim_t {
@@ -71,14 +61,9 @@ struct MetaData_t {
     int32_t operation;
     int32_t interlaced;
     struct BufferDim_t bufferDim;
-    struct HSICData_t hsicData;
-    int32_t sharpness;
-    int32_t video_interface;
-    struct IGCData_t igcData;
-    struct Sharp2Data_t Sharp2Data;
-    int64_t timestamp;
     uint32_t refreshrate;
     enum ColorSpace_t colorSpace;
+    enum IGC_t igc;
      /* Gralloc sets PRIV_SECURE_BUFFER flag to inform that the buffers are from
       * ION_SECURE. which should not be mapped. However, for GPU post proc
       * feature, GFX needs to map this buffer, in the client context and in SF
@@ -91,22 +76,27 @@ struct MetaData_t {
     uint32_t s3dFormat;
     /* VENUS output buffer is linear for UBWC Interlaced video */
     uint32_t linearFormat;
+    /* Set by graphics to indicate that this buffer will be written to but not
+     * swapped out */
+    uint32_t isSingleBufferMode;
 };
 
 enum DispParamType {
-    PP_PARAM_HSIC       = 0x0001,
-    PP_PARAM_SHARPNESS  = 0x0002,
+    UNUSED0             = 0x0001,
+    UNUSED1             = 0x0002,
     PP_PARAM_INTERLACED = 0x0004,
-    PP_PARAM_VID_INTFC  = 0x0008,
-    PP_PARAM_IGC        = 0x0010,
-    PP_PARAM_SHARP2     = 0x0020,
-    PP_PARAM_TIMESTAMP  = 0x0040,
+    UNUSED2             = 0x0008,
+    UNUSED3             = 0x0010,
+    UNUSED4             = 0x0020,
+    UNUSED5             = 0x0040,
     UPDATE_BUFFER_GEOMETRY = 0x0080,
     UPDATE_REFRESH_RATE = 0x0100,
     UPDATE_COLOR_SPACE = 0x0200,
     MAP_SECURE_BUFFER = 0x400,
     S3D_FORMAT = 0x800,
     LINEAR_FORMAT = 0x1000,
+    SET_IGC = 0x2000,
+    SET_SINGLE_BUFFER_MODE = 0x4000,
 };
 
 struct private_handle_t;

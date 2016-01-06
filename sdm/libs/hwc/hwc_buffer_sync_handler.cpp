@@ -45,10 +45,8 @@ DisplayError HWCBufferSyncHandler::SyncWait(int fd) {
     error = sync_wait(fd, 1000);
     if (error < 0) {
       DLOGE("sync_wait error errno = %d, desc = %s", errno,  strerror(errno));
-      close(fd);
       return kErrorTimeOut;
     }
-    close(fd);
   }
 
   return kErrorNone;
@@ -57,19 +55,28 @@ DisplayError HWCBufferSyncHandler::SyncWait(int fd) {
 DisplayError HWCBufferSyncHandler::SyncMerge(int fd1, int fd2, int *merged_fd) {
   DisplayError error = kErrorNone;
 
-  *merged_fd = sync_merge("SyncMerge", fd1, fd2);
+  // Merge the two fences.  In the case where one of the fences is not a
+  // valid fence (e.g. NO_FENCE) merge the one valid fence with itself so
+  // that a new fence with the given name is created.
+  // TODO(user): "SyncMerge"string should be replaced with user-defined string to represent
+  // why it is merged.
+  if (fd1 >= 0 && fd2 >= 0) {
+    *merged_fd = sync_merge("SyncMerge", fd1, fd2);
+  } else if (fd1 >= 0) {
+    *merged_fd = sync_merge("SyncMerge", fd1, fd1);
+  } else if (fd2 >= 0) {
+    *merged_fd = sync_merge("SyncMerge", fd2, fd2);
+  } else {
+    DLOGE("Invalid arguments passed");
+    return kErrorParameters;
+  }
+
   if (*merged_fd == -1) {
-    DLOGE(" Sync merge error! fd1 %d fd2 %d", fd1, fd2);
+    DLOGE("Sync merge error! fd1 %d fd2 %d", fd1, fd2);
     error = kErrorFileDescriptor;
   }
-  close(fd1);
-  close(fd2);
 
   return error;
-}
-
-void HWCBufferSyncHandler::SyncClose(int fd) {
-  close(fd);
 }
 
 bool HWCBufferSyncHandler::IsSyncSignaled(int fd) {

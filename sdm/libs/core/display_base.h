@@ -65,7 +65,7 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual bool IsUnderscanSupported();
   virtual DisplayError SetPanelBrightness(int level);
-  virtual DisplayError OnMinHdcpEncryptionLevelChange();
+  virtual DisplayError OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
   virtual DisplayError ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
                                             PPDisplayAPIPayload *out_payload,
                                             PPPendingParams *pending_action);
@@ -81,6 +81,7 @@ class DisplayBase : public DisplayInterface {
   bool IsRotationRequired(HWLayers *hw_layers);
   const char *GetName(const LayerComposition &composition);
   const char *GetName(const LayerBufferFormat &format);
+  DisplayError ValidateGPUTarget(LayerStack *layer_stack);
 
   DisplayType display_type_;
   DisplayEventHandler *event_handler_ = NULL;
@@ -91,6 +92,7 @@ class DisplayBase : public DisplayInterface {
   CompManager *comp_manager_ = NULL;
   RotatorInterface *rotator_intf_ = NULL;
   DisplayState state_ = kStateOff;
+  bool active_ = false;
   Handle hw_device_ = 0;
   Handle display_comp_ctx_ = 0;
   Handle display_rotator_ctx_ = 0;
