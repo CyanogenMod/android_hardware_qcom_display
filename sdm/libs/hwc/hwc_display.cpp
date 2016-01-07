@@ -609,6 +609,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   }
 
   size_t num_hw_layers = content_list->numHwLayers;
+  if (num_hw_layers <= 1) {
+    flush_ = true;
+    return 0;
+  }
 
   if (!skip_prepare_) {
     DisplayError error = display_intf_->Prepare(&layer_stack_);
