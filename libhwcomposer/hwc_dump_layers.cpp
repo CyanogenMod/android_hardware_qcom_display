@@ -142,7 +142,7 @@ bool HwcDebug::needToDumpLayers()
     if ((property_get("debug.sf.dump", dumpPropStr, NULL) > 0) &&
             (strncmp(dumpPropStr, mDumpPropStrRaw, PROPERTY_VALUE_MAX - 1))) {
         // Strings exist & not equal implies it has changed, so trigger a dump
-        strncpy(mDumpPropStrRaw, dumpPropStr, PROPERTY_VALUE_MAX - 1);
+        strlcpy(mDumpPropStrRaw, dumpPropStr, PROPERTY_VALUE_MAX - 1);
         mDumpCntLimRaw = atoi(dumpPropStr);
         if (mDumpCntLimRaw > MAX_ALLOWED_FRAMEDUMPS) {
             ALOGW("Warning: Using debug.sf.dump %d (= max)",
