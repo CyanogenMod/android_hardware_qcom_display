@@ -113,6 +113,7 @@ void HWCDisplayPrimary::ProcessBootAnimCompleted() {
 
 int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
   int status = 0;
+  DisplayError error = kErrorNone;
 
   if (!boot_animation_completed_)
     ProcessBootAnimCompleted();
@@ -136,7 +137,10 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
   ToggleCPUHint(one_updating_layer);
 
   uint32_t refresh_rate = GetOptimalRefreshRate(one_updating_layer);
-  DisplayError error = display_intf_->SetRefreshRate(refresh_rate);
+  if (current_refresh_rate_ != refresh_rate) {
+    error = display_intf_->SetRefreshRate(refresh_rate);
+  }
+
   if (error == kErrorNone) {
     // On success, set current refresh rate to new refresh rate
     current_refresh_rate_ = refresh_rate;
