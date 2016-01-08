@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2014, 2016, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are
  * retained for attribution purposes only.
@@ -88,7 +88,7 @@ EDIDData gEDIDData [] = {
     EDIDData(HDMI_VFRMT_3840x2160p24_16_9, 3840, 2160, 24, 32),
     EDIDData(HDMI_VFRMT_3840x2160p25_16_9, 3840, 2160, 25, 33),
     EDIDData(HDMI_VFRMT_3840x2160p30_16_9, 3840, 2160, 30, 34),
-    EDIDData(HDMI_VFRMT_4096x2160p24_16_9, 4096, 2160, 24, 35),
+    EDIDData(HDMI_EVFRMT_4096x2160p24_16_9, 4096, 2160, 24, 35),
 };
 
 // Number of modes in gEDIDData
