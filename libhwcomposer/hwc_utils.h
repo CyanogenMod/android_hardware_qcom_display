@@ -26,6 +26,7 @@
 
 #include <fcntl.h>
 #include <math.h>
+#include <hardware/display_defs.h>
 #include <hardware/hwcomposer.h>
 #include <gr.h>
 #include <gralloc_priv.h>
