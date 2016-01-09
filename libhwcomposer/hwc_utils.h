@@ -36,10 +36,6 @@
 #include <overlayUtils.h>
 #include <overlayRotator.h>
 
-#ifdef QTI_BSP
-#include <exhwcomposer_defs.h>
-#endif
-
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
 #define UNLIKELY( exp )     (__builtin_expect( (exp) != 0, false ))
