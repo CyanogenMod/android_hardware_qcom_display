@@ -92,6 +92,7 @@ public:
     enum {
         PREF_POST_PROCESSING,
         PREF_PARTIAL_UPDATE,
+        PREF_QDCM_UPDATE,
         ENABLE_PARTIAL_UPDATE,
     };
 

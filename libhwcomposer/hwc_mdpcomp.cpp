@@ -50,7 +50,7 @@ bool MDPComp::sEnableYUVsplit = false;
 bool MDPComp::sSrcSplitEnabled = false;
 int MDPComp::sMaxSecLayers = 1;
 bool MDPComp::enablePartialUpdateForMDP3 = false;
-bool MDPComp::sIsPartialUpdateActive = true;
+int MDPComp::sIsPartialUpdateActive = PU_STATE;
 void *MDPComp::sLibPerfHint = NULL;
 int MDPComp::sPerfLockHandle = 0;
 int (*MDPComp::sPerfLockAcquire)(int, int, int*, int) = NULL;
@@ -1441,7 +1441,8 @@ bool MDPComp::canPartialUpdate(hwc_context_t *ctx,
         hwc_display_contents_1_t* list){
     if(!qdutils::MDPVersion::getInstance().isPartialUpdateEnabled() ||
             isSkipPresent(ctx, mDpy) || (list->flags & HWC_GEOMETRY_CHANGED) ||
-            isCursorPresent(ctx, mDpy) || !sIsPartialUpdateActive || mDpy) {
+            isCursorPresent(ctx, mDpy) || (sIsPartialUpdateActive != PU_STATE) ||
+            mDpy) {
             // On Async position update, the ROI becomes invalid, hence disable PU
             // when cursor is present
         return false;
@@ -3310,7 +3311,7 @@ bool MDPComp::getPartialUpdatePref(hwc_context_t *ctx) {
     return atoi(value);
 }
 
-int MDPComp::setPartialUpdatePref(hwc_context_t *ctx, bool enable) {
+int MDPComp::setPartialUpdatePref(hwc_context_t *ctx, int enable) {
     Locker::Autolock _l(ctx->mDrawLock);
     const int fbNum = Overlay::getFbForDpy(Overlay::DPY_PRIMARY);
     char path[MAX_SYSFS_FILE_PATH];
@@ -3321,7 +3322,7 @@ int MDPComp::setPartialUpdatePref(hwc_context_t *ctx, bool enable) {
         return -1;
     }
     char value[4];
-    snprintf(value, sizeof(value), "%d", (int)enable);
+    snprintf(value, sizeof(value), "%d", enable);
     ssize_t ret = write(fd, value, strlen(value));
     if(ret <= 0) {
         ALOGE("%s: Failed to write to sysfd nodes: %s", __FUNCTION__, path);

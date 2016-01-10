@@ -317,16 +317,21 @@ static status_t setPartialUpdateState(hwc_context_t *ctx, uint32_t state) {
     ALOGD("%s: state: %d", __FUNCTION__, state);
     switch(state) {
         case IQService::PREF_PARTIAL_UPDATE:
-            if(qhwc::MDPComp::setPartialUpdatePref(ctx, true) < 0)
+            if(qhwc::MDPComp::setPartialUpdatePref(ctx, PU_STATE) < 0)
                 return NO_INIT;
             return NO_ERROR;
         case IQService::PREF_POST_PROCESSING:
-            if(qhwc::MDPComp::setPartialUpdatePref(ctx, false) < 0)
+            if(qhwc::MDPComp::setPartialUpdatePref(ctx, PP_STATE) < 0)
                 return NO_INIT;
-            qhwc::MDPComp::enablePartialUpdate(false);
+            qhwc::MDPComp::enablePartialUpdate(PP_STATE);
+            return NO_ERROR;
+        case IQService::PREF_QDCM_UPDATE:
+            if(qhwc::MDPComp::setPartialUpdatePref(ctx, QDCM_STATE) < 0)
+                return NO_INIT;
+            qhwc::MDPComp::enablePartialUpdate(QDCM_STATE);
             return NO_ERROR;
         case IQService::ENABLE_PARTIAL_UPDATE:
-            qhwc::MDPComp::enablePartialUpdate(true);
+            qhwc::MDPComp::enablePartialUpdate(PU_STATE);
             return NO_ERROR;
         default:
             ALOGE("%s: Invalid state", __FUNCTION__);

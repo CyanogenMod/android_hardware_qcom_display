@@ -238,6 +238,13 @@ enum {
     EXTERNAL_MAXSTATES
 };
 
+/* Post-processing specific states */
+enum {
+    PP_STATE,
+    PU_STATE,
+    QDCM_STATE,
+};
+
 class LayerRotMap {
 public:
     LayerRotMap() { reset(); }
