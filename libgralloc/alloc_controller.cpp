@@ -114,8 +114,10 @@ AdrenoMemInfo::AdrenoMemInfo()
         *(void **)&LINK_adreno_compute_compressedfmt_aligned_width_and_height =
                 ::dlsym(libadreno_utils,
                         "compute_compressedfmt_aligned_width_and_height");
+#ifndef DISABLE_GET_PIXEL_ALIGNMENT
         *(void **)&LINK_adreno_get_gpu_pixel_alignment =
                 ::dlsym(libadreno_utils, "get_gpu_pixel_alignment");
+#endif
     }
 }
 

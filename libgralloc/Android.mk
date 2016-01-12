@@ -43,4 +43,8 @@ LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps) $(kernel_deps)
 LOCAL_SRC_FILES               := ionalloc.cpp alloc_controller.cpp
 LOCAL_COPY_HEADERS            := alloc_controller.h memalloc.h
 
+ifeq ($(TARGET_USE_COMPAT_GRALLOC_ALIGN),true)
+LOCAL_CFLAGS += -DDISABLE_GET_PIXEL_ALIGNMENT
+endif
+
 include $(BUILD_SHARED_LIBRARY)
