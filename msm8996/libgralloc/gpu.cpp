@@ -163,6 +163,12 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
         ColorSpace_t colorSpace = ITU_R_601;
         setMetaData(hnd, UPDATE_COLOR_SPACE, (void*) &colorSpace);
 
+        // Ensure that secure buffers are mapped for protected content.
+        if (data.allocType & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
+            int32_t param = 1;
+            setMetaData(hnd, MAP_SECURE_BUFFER, (void*) &param);
+        }
+
         *pHandle = hnd;
     }
 
