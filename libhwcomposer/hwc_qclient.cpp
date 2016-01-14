@@ -493,8 +493,8 @@ static status_t getDisplayAttributesForConfig(hwc_context_t* ctx,
 static bool  setCameraDeathNotifier(
         android::sp<QClient::CamDeathNotifier> camDeathNotifier, bool on) {
     sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> binder = sm->getService(String16("media.camera"));
-    if (binder == 0) {
+    sp<IBinder> binder = sm->checkService(String16("media.camera"));
+    if (binder == NULL) {
         ALOGW("%s: CameraService not published or dead...", __FUNCTION__);
         return false;
     }
