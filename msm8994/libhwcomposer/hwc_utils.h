@@ -684,6 +684,8 @@ struct hwc_context_t {
     bool mDefaultModeApplied;
     //Manages color modes
     qhwc::ColorMode *mColorMode;
+    // Indicates whether cool color temperature is enabled.
+    bool mCoolColorTemperatureEnabled;
 };
 
 namespace qhwc {

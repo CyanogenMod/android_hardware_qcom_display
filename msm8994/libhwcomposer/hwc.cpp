@@ -249,6 +249,34 @@ static void scaleDisplayFrame(hwc_context_t *ctx, int dpy,
     }
 }
 
+static void hwc_configure_color_temp(hwc_composer_device_1* dev) {
+    hwc_context_t* ctx = (hwc_context_t*)(dev);
+    char value[PROPERTY_VALUE_MAX];
+    bool cool;
+
+    property_get("persist.sys.debug.color_temp", value, "x");
+    cool = (value[0] == '1');
+
+    if ((value[0] == '0' || value[0] == '1') &&
+        cool != ctx->mCoolColorTemperatureEnabled) {
+        ctx->mCoolColorTemperatureEnabled = cool;
+
+        ALOGI("Color temperature change. Cool = %d", cool ? 1 : 0);
+
+        int fd = open("/sys/class/graphics/fb0/color_temp", O_WRONLY);
+        if (fd >= 0) {
+            if (cool)
+                write(fd, "1", 2);
+            else
+                write(fd, "0", 2);
+            close(fd);
+        } else {
+            ALOGE("Failed to open color_temp file with result=%d", fd);
+        }
+    }
+}
+
+
 static int hwc_prepare_primary(hwc_composer_device_1 *dev,
         hwc_display_contents_1_t *list) {
     ATRACE_CALL();
@@ -514,6 +542,9 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
     default:
         return -EINVAL;
     }
+
+    // Configure the color temperature
+    hwc_configure_color_temp(dev);
 
     ALOGD_IF(POWER_MODE_DEBUG, "%s: Done setting mode %d on display %d",
             __FUNCTION__, mode, dpy);
