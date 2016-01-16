@@ -41,7 +41,7 @@ int HWInfo::ParseLine(char *input, char *tokens[], const uint32_t max_token, uin
   char *tmp_token = NULL;
   char *temp_ptr;
   uint32_t index = 0;
-  const char *delim = ", =\n";
+  const char *delim = ":, =\n";
   if (!input) {
     return -1;
   }
@@ -166,14 +166,6 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
     if (!ParseLine(line, tokens, max_count, &token_count)) {
       if (!strncmp(tokens[0], "hw_rev", strlen("hw_rev"))) {
         hw_resource->hw_revision = UINT32(atoi(tokens[1]));  // HW Rev, v1/v2
-      } else if (!strncmp(tokens[0], "rgb_pipes", strlen("rgb_pipes"))) {
-        hw_resource->num_rgb_pipe = UINT8(atoi(tokens[1]));
-      } else if (!strncmp(tokens[0], "vig_pipes", strlen("vig_pipes"))) {
-        hw_resource->num_vig_pipe = UINT8(atoi(tokens[1]));
-      } else if (!strncmp(tokens[0], "dma_pipes", strlen("dma_pipes"))) {
-        hw_resource->num_dma_pipe = UINT8(atoi(tokens[1]));
-      } else if (!strncmp(tokens[0], "cursor_pipes", strlen("cursor_pipes"))) {
-        hw_resource->num_cursor_pipe = UINT8(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "blending_stages", strlen("blending_stages"))) {
         hw_resource->num_blending_stages = UINT8(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_downscale_ratio", strlen("max_downscale_ratio"))) {
@@ -224,6 +216,34 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
             hw_resource->perf_calc = true;
           } else if (!strncmp(tokens[i], "dynamic_bw_limit", strlen("dynamic_bw_limit"))) {
             hw_resource->has_dyn_bw_support = true;
+          }
+        }
+      } else if (!strncmp(tokens[0], "pipe_count", strlen("pipe_count"))) {
+        uint32_t pipe_count = UINT8(atoi(tokens[1]));
+        for (uint32_t i = 0; i < pipe_count; i++) {
+          read = Sys::getline_(&line, &len, fileptr);
+          if (!ParseLine(line, tokens, max_count, &token_count)) {
+            HWPipeCaps pipe_caps;
+            for (uint32_t j = 0; j < token_count; j += 2) {
+              if (!strncmp(tokens[j], "pipe_type", strlen("pipe_type"))) {
+                if (!strncmp(tokens[j+1], "vig", strlen("vig"))) {
+                  pipe_caps.type = kPipeTypeVIG;
+                  hw_resource->num_vig_pipe++;
+                } else if (!strncmp(tokens[j+1], "rgb", strlen("rgb"))) {
+                  pipe_caps.type = kPipeTypeRGB;
+                  hw_resource->num_rgb_pipe++;
+                } else if (!strncmp(tokens[j+1], "dma", strlen("dma"))) {
+                  pipe_caps.type = kPipeTypeDMA;
+                  hw_resource->num_dma_pipe++;
+                } else if (!strncmp(tokens[j+1], "cursor", strlen("cursor"))) {
+                  pipe_caps.type = kPipeTypeCursor;
+                  hw_resource->num_cursor_pipe++;
+                }
+              } else if (!strncmp(tokens[j], "pipe_ndx", strlen("pipe_ndx"))) {
+                pipe_caps.id = UINT32(atoi(tokens[j+1]));
+              }
+            }
+            hw_resource->hw_pipes.push_back(pipe_caps);
           }
         }
       }
