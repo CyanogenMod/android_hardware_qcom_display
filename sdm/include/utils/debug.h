@@ -64,6 +64,7 @@ class Debug {
   static int GetSimulationFlag();
   static int GetHDMIResolution();
   static int GetIdleTimeoutMs();
+  static int GetBootAnimLayerCount();
   static bool IsRotatorDownScaleDisabled();
   static bool IsDecimationDisabled();
   static int GetMaxPipesPerMixer(DisplayType display_type);

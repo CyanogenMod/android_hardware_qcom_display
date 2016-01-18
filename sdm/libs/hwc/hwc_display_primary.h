@@ -55,7 +55,7 @@ class HWCDisplayPrimary : public HWCDisplay {
   HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
   void SetMetaDataRefreshRateFlag(bool enable);
   virtual DisplayError SetDisplayMode(uint32_t mode);
-  void ProcessBootAnimCompleted();
+  void ProcessBootAnimCompleted(hwc_display_contents_1_t *content_list);
   void SetQDCMSolidFillInfo(bool enable, uint32_t color);
   void ToggleCPUHint(bool set);
   void ForceRefreshRate(uint32_t refresh_rate);
