@@ -332,10 +332,14 @@ int HDMIDisplay::parseResolution(char* edidStr)
     // Parse this string to get mode(int)
     start = (char*) edidStr;
     end = &delim;
+    int edid_data;
     while(*end == delim) {
-        mEDIDModes[count] = (int) strtol(start, &end, 10);
+        edid_data = (int) strtol(start, &end, 10);
+        if(!isInterlacedMode(edid_data)) {
+            mEDIDModes[count] = edid_data;
+            count++;
+        }
         start = end+1;
-        count++;
     }
     ALOGD_IF(DEBUG, "In %s: count = %d", __FUNCTION__, count);
     for (int i = 0; i < count; i++)
