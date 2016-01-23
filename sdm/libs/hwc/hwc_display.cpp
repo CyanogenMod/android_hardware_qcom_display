@@ -36,13 +36,15 @@
 #include <utils/debug.h>
 #include <sync/sync.h>
 #include <cutils/properties.h>
+#include <map>
+#include <utility>
 
 #include "hwc_display.h"
 #include "hwc_debugger.h"
 #include "blit_engine_c2d.h"
 
 #ifdef QTI_BSP
-#include <exhwcomposer_defs.h>
+#include <hardware/display_defs.h>
 #endif
 
 #define __CLASS__ "HWCDisplay"
@@ -111,6 +113,14 @@ int HWCDisplay::Init() {
 
   display_intf_->GetRefreshRateRange(&min_refresh_rate_, &max_refresh_rate_);
   current_refresh_rate_ = max_refresh_rate_;
+
+  s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_NO_3D, kS3dFormatNone));
+  s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_3D_SIDE_BY_SIDE_L_R,
+                                kS3dFormatLeftRight));
+  s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_3D_SIDE_BY_SIDE_R_L,
+                                kS3dFormatRightLeft));
+  s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_3D_TOP_BOTTOM,
+                                kS3dFormatTopBottom));
 
   return 0;
 }
@@ -818,6 +828,11 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
     Layer &layer = layer_stack_.layers[i];
     LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
 
+    // need FB refresh for s3d case
+    if (layer.input_buffer->s3d_format != kS3dFormatNone) {
+        return true;
+    }
+
     if (layer.composition == kCompositionGPUTarget) {
       continue;
     }
@@ -1354,6 +1369,16 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
     // Graphics can set this operation on all types of layers including FB and set the actual value
     // to 0. To protect against SET operations of 0 value, we need to do a logical OR.
     layer_stack_.flags.single_buffered_layer_present |= meta_data->isSingleBufferMode;
+  }
+
+  if (meta_data->operation & S3D_FORMAT) {
+    std::map<int, LayerBufferS3DFormat>::iterator it =
+                      s3d_format_hwc_to_sdm_.find(meta_data->s3dFormat);
+    if (it != s3d_format_hwc_to_sdm_.end()) {
+      layer->input_buffer->s3d_format = it->second;
+    } else {
+      DLOGW("Invalid S3D format %d", meta_data->s3dFormat);
+    }
   }
 
   return kErrorNone;

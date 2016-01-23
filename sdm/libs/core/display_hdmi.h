@@ -25,6 +25,8 @@
 #ifndef __DISPLAY_HDMI_H__
 #define __DISPLAY_HDMI_H__
 
+#include <map>
+
 #include "display_base.h"
 #include "dump_impl.h"
 
@@ -64,11 +66,13 @@ class DisplayHDMI : public DisplayBase, DumpImpl {
   virtual DisplayError SetCursorPosition(int x, int y);
 
  private:
-  virtual int GetBestConfig();
+  virtual int GetBestConfig(HWS3DMode s3d_mode);
   virtual void GetScanSupport();
+  virtual void SetS3DMode(LayerStack *layer_stack);
 
   Locker locker_;
   HWScanSupport scan_support_;
+  std::map<LayerBufferS3DFormat, HWS3DMode> s3d_format_to_mode_;
 };
 
 }  // namespace sdm
