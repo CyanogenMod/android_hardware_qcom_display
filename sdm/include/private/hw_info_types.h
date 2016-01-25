@@ -156,6 +156,7 @@ struct HWPanelInfo {
   HWSplitInfo split_info;             // Panel split configuration
   char panel_name[256] = {0};         // Panel name
   HWS3DMode s3d_mode = kS3DModeNone;  // Panel's current s3d mode.
+  int panel_max_brightness = 0;       // Max panel brightness
 
   bool operator !=(const HWPanelInfo &panel_info) {
     return ((port != panel_info.port) || (mode != panel_info.mode) ||

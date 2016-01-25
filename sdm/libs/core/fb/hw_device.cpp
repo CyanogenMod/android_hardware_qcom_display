@@ -770,6 +770,7 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
   GetHWDisplayPortAndMode(device_node, &panel_info->port, &panel_info->mode);
   GetSplitInfo(device_node, panel_info);
   GetHWPanelNameByNode(device_node, panel_info);
+  GetHWPanelMaxBrightnessFromNode(panel_info);
 }
 
 void HWDevice::GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode) {
@@ -850,6 +851,30 @@ void HWDevice::GetSplitInfo(int device_node, HWPanelInfo *panel_info) {
   }
 
   Sys::fclose_(fileptr);
+}
+
+void HWDevice::GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info) {
+  char brightness[kMaxStringLength] = { 0 };
+  char kMaxBrightnessNode[64] = { 0 };
+
+  snprintf(kMaxBrightnessNode, sizeof(kMaxBrightnessNode), "%s",
+           "/sys/class/leds/lcd-backlight/max_brightness");
+
+  panel_info->panel_max_brightness = 0;
+  int fd = Sys::open_(kMaxBrightnessNode, O_RDONLY);
+  if (fd < 0) {
+    DLOGW("Failed to open max brightness node = %s, error = %s", kMaxBrightnessNode,
+          strerror(errno));
+    return;
+  }
+
+  if (Sys::pread_(fd, brightness, sizeof(brightness), 0) > 0) {
+    panel_info->panel_max_brightness = atoi(brightness);
+    DLOGW("Max brightness level = %d", panel_info->panel_max_brightness);
+  } else {
+    DLOGW("Failed to read max brightness level. error = %s", strerror(errno));
+  }
+  Sys::close_(fd);
 }
 
 int HWDevice::ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count) {
