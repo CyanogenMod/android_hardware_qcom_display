@@ -689,6 +689,7 @@ DisplayError HWHDMI::SetS3DMode(HWS3DMode s3d_mode) {
   }
 
   active_mdp_s3d_mode_ = s3d_mdp_mode;
+  hw_panel_info_.s3d_mode = s3d_mode;
   Sys::close_(s3d_mode_node);
 
   DLOGI_IF(kTagDriverConfig, "s3d mode %d", hw_panel_info_.s3d_mode);

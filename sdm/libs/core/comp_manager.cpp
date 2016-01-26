@@ -140,6 +140,10 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
   CLEAR_BIT(registered_displays_, display_comp_ctx->display_type);
   CLEAR_BIT(configured_displays_, display_comp_ctx->display_type);
 
+  if (display_comp_ctx->display_type == kHDMI) {
+    max_layers_ = kMaxSDELayers;
+  }
+
   DLOGV_IF(kTagCompManager, "registered display bit mask 0x%x, configured display bit mask 0x%x, " \
            "display type %d", registered_displays_, configured_displays_,
            display_comp_ctx->display_type);
@@ -181,6 +185,16 @@ DisplayError CompManager::ReconfigureDisplay(Handle comp_handle,
     return error;
   }
 
+  // For HDMI S3D mode, set max_layers_ to 0 so that primary display would fall back
+  // to GPU composition to release pipes for HDMI.
+  if (display_comp_ctx->display_type == kHDMI) {
+    if (hw_panel_info.s3d_mode != kS3DModeNone) {
+      max_layers_ = 0;
+    } else {
+      max_layers_ = kMaxSDELayers;
+    }
+  }
+
   return error;
 }
 
@@ -191,6 +205,7 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
 
   constraints->safe_mode = safe_mode_;
   constraints->use_cursor = false;
+  constraints->max_layers = max_layers_;
 
   // Limit 2 layer SDE Comp on HDMI/Virtual
   if (display_comp_ctx->display_type != kPrimary) {
