@@ -180,7 +180,10 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
         setMetaData(hnd, UPDATE_COLOR_SPACE, (void*) &colorSpace);
 
         // Ensure that secure buffers are mapped for protected content.
-        if (data.allocType & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
+        if ((usage & GRALLOC_USAGE_PROTECTED) &&
+            (usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) &&
+            (usage & GRALLOC_USAGE_PRIVATE_UNCACHED) &&
+            (data.allocType & private_handle_t::PRIV_FLAGS_SECURE_BUFFER)) {
             int32_t param = 1;
             setMetaData(hnd, MAP_SECURE_BUFFER, (void*) &param);
         }
