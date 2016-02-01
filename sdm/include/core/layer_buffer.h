@@ -217,6 +217,8 @@ struct LayerBuffer {
 
   LayerBufferS3DFormat s3d_format = kS3dFormatNone;
                                 //!< Represents the format of the buffer content in 3D.
+  uint64_t buffer_id __attribute__((aligned(8))) = 0;
+                                //!< Specifies the buffer id.
 };
 
 }  // namespace sdm
