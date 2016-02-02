@@ -593,6 +593,8 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     } else {
       layer.frame_rate = current_refresh_rate_;
     }
+
+    layer.input_buffer->buffer_id = reinterpret_cast<uint64_t>(hwc_layer.handle);
   }
 
   // Prepare the Blit Target
