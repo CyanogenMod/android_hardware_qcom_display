@@ -33,6 +33,9 @@
 #include <overlayUtils.h>
 #include <EGL/egl.h>
 
+#ifdef QTI_BSP
+#include <hardware/display_defs.h>
+#endif
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
