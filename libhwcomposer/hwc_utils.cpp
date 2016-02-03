@@ -2939,11 +2939,30 @@ void processBootAnimCompleted(hwc_context_t *ctx,
      * HWC_GEOMETRY_CHANGED fail in correctly identifying the
      * exact bootup transition to homescreen
      */
+    char cryptoState[PROPERTY_VALUE_MAX];
+    char voldDecryptState[PROPERTY_VALUE_MAX];
+    bool isEncrypted = false;
+    bool main_class_services_started = false;
+    if(property_get("ro.crypto.state", cryptoState, "unencrypted")) {
+        ALOGD_IF(HWC_UTILS_DEBUG, "%s: cryptostate= %s", \
+              __FUNCTION__, cryptoState);
+        if(!strcmp(cryptoState, "encrypted")) {
+            isEncrypted = true;
+            if(property_get("vold.decrypt", voldDecryptState, "") &&
+                  !strcmp(voldDecryptState, "trigger_restart_framework"))
+                main_class_services_started = true;
 
-    if(list->numHwLayers > numBootUpLayers) {
-        // Applying default mode after bootanimation is finished
+            ALOGD_IF(HWC_UTILS_DEBUG, "%s: vold= %s", __FUNCTION__, \
+                  voldDecryptState);
+        }
+    }
+    if((!isEncrypted ||(isEncrypted && main_class_services_started)) &&
+        (list->numHwLayers > numBootUpLayers)) {
+        // Applying default mode after bootanimation is finished And
+        // If Data is Encrypted, it is ready for access.
         ctx->mBootAnimCompleted = true;
         qdcmApplyDefaultAfterBootAnimationDone(ctx);
+        ALOGD_IF(HWC_UTILS_DEBUG, "%s: SettingDefaultMode ", __FUNCTION__);
     }
 }
 
