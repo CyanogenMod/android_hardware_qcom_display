@@ -246,7 +246,7 @@ int DisplayHDMI::GetBestConfig(HWS3DMode s3d_mode) {
     DLOGW("%s, could not support S3D mode from EDID info. S3D mode is %d",
           __FUNCTION__, s3d_mode);
   }
-  delete attrib;
+  delete[] attrib;
 
   // Used for changing HDMI Resolution - override the best with user set config
   uint32_t user_config = Debug::GetHDMIResolution();
