@@ -43,6 +43,8 @@
 #include <utils/constants.h>
 #include <utils/debug.h>
 #include <utils/sys.h>
+#include <vector>
+#include <algorithm>
 
 #include "hw_device.h"
 #include "hw_info_interface.h"
@@ -428,6 +430,10 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
 
   // MDP returns only one release fence for the entire layer stack. Duplicate this fence into all
   // layers being composed by MDP.
+
+  std::vector<uint32_t> fence_dup_flag;
+  fence_dup_flag.clear();
+
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
     LayerBuffer *input_buffer = stack->layers[layer_index].input_buffer;
@@ -437,8 +443,14 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
       input_buffer = &hw_rotator_session->output_buffer;
     }
 
-    input_buffer->release_fence_fd = Sys::dup_(mdp_commit.release_fence);
+    // Make sure the release fence is duplicated only once for each buffer.
+    if (std::find(fence_dup_flag.begin(), fence_dup_flag.end(), layer_index) ==
+        fence_dup_flag.end()) {
+      input_buffer->release_fence_fd = Sys::dup_(mdp_commit.release_fence);
+      fence_dup_flag.push_back(layer_index);
+    }
   }
+  fence_dup_flag.clear();
 
   hw_layer_info.sync_handle = Sys::dup_(mdp_commit.release_fence);
 
@@ -634,7 +646,7 @@ int HWDevice::GetFBNodeIndex(HWDeviceType device_type) {
       }
       break;
     case kDeviceHDMI:
-      if (panel_info.port == kPortDTv) {
+      if (panel_info.is_pluggable == true) {
         return i;
       }
       break;
@@ -749,6 +761,8 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
         panel_info->max_fps = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "primary_panel", strlen("primary_panel"))) {
         panel_info->is_primary_panel = atoi(tokens[1]);
+      } else if (!strncmp(tokens[0], "is_pluggable", strlen("is_pluggable"))) {
+        panel_info->is_pluggable = atoi(tokens[1]);
       }
     }
   }
@@ -1065,6 +1079,10 @@ ssize_t HWDevice::SysFsWrite(const char* file_node, const char* value, ssize_t l
   Sys::close_(fd);
 
   return len;
+}
+
+DisplayError HWDevice::SetS3DMode(HWS3DMode s3d_mode) {
+  return kErrorNotSupported;
 }
 
 }  // namespace sdm

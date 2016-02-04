@@ -36,10 +36,16 @@
 #include <utils/debug.h>
 #include <sync/sync.h>
 #include <cutils/properties.h>
+#include <map>
+#include <utility>
 
 #include "hwc_display.h"
 #include "hwc_debugger.h"
 #include "blit_engine_c2d.h"
+
+#ifdef QTI_BSP
+#include <hardware/display_defs.h>
+#endif
 
 #define __CLASS__ "HWCDisplay"
 
@@ -107,6 +113,14 @@ int HWCDisplay::Init() {
 
   display_intf_->GetRefreshRateRange(&min_refresh_rate_, &max_refresh_rate_);
   current_refresh_rate_ = max_refresh_rate_;
+
+  s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_NO_3D, kS3dFormatNone));
+  s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_3D_SIDE_BY_SIDE_L_R,
+                                kS3dFormatLeftRight));
+  s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_3D_SIDE_BY_SIDE_R_L,
+                                kS3dFormatRightLeft));
+  s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_3D_TOP_BOTTOM,
+                                kS3dFormatTopBottom));
 
   return 0;
 }
@@ -241,11 +255,6 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
     case HWC_DISPLAY_DPI_Y:
       values[i] = INT32(variable_config.y_dpi * 1000.0f);
       break;
-#ifdef QCOM_BSP
-    case HWC_DISPLAY_SECURE:
-      values[i] = INT32(true);  // For backward compatibility. All Physical displays are secure
-      break;
-#endif
     default:
       DLOGW("Spurious attribute type = %d", attributes[i]);
       return -EINVAL;
@@ -497,6 +506,12 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
       return ret;
     }
 
+    layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
+    layer.flags.solid_fill = (hwc_layer.flags & kDimLayer) || solid_fill_enable_;
+    if (layer.flags.skip || layer.flags.solid_fill) {
+      layer.dirty_regions.count = 0;
+    }
+
     hwc_rect_t scaled_display_frame = hwc_layer.displayFrame;
     ScaleDisplayFrame(&scaled_display_frame);
     ApplyScanAdjustment(&scaled_display_frame);
@@ -529,7 +544,6 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     //    - blending to Coverage.
     if (hwc_layer.flags & kDimLayer) {
       layer.input_buffer->format = kFormatARGB8888;
-      layer.flags.solid_fill = true;
       layer.solid_fill_color = 0xff000000;
       SetBlending(HWC_BLENDING_COVERAGE, &layer.blending);
     } else {
@@ -551,11 +565,9 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
       layer.src_rect.top = 0;
       layer.src_rect.right = input_buffer->width;
       layer.src_rect.bottom = input_buffer->height;
-      layer.dirty_regions.count = 0;
     }
 
     layer.plane_alpha = hwc_layer.planeAlpha;
-    layer.flags.skip = ((hwc_layer.flags & HWC_SKIP_LAYER) > 0);
     layer.flags.cursor = ((hwc_layer.flags & HWC_IS_CURSOR_LAYER) > 0);
     layer.flags.updating = true;
 
@@ -563,7 +575,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
       LayerCache layer_cache = layer_stack_cache_.layer_cache[i];
       layer.flags.updating = IsLayerUpdating(hwc_layer, layer_cache);
     }
-#ifdef QCOM_BSP
+#ifdef QTI_BSP
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
       layer_stack_.flags.animating = true;
     }
@@ -607,6 +619,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   }
 
   size_t num_hw_layers = content_list->numHwLayers;
+  if (num_hw_layers <= 1) {
+    flush_ = true;
+    return 0;
+  }
 
   if (!skip_prepare_) {
     DisplayError error = display_intf_->Prepare(&layer_stack_);
@@ -787,8 +803,15 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
 bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
+  // Handle ongoing animation and end here, start is handled below
   if (layer_stack_cache_.animating) {
-      return false;
+      if (!layer_stack_.flags.animating) {
+        // Animation is ending.
+        return true;
+      } else {
+        // Animation is going on.
+        return false;
+      }
   }
 
   // Frame buffer needs to be refreshed for the following reasons:
@@ -804,6 +827,11 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     Layer &layer = layer_stack_.layers[i];
     LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
+
+    // need FB refresh for s3d case
+    if (layer.input_buffer->s3d_format != kS3dFormatNone) {
+        return true;
+    }
 
     if (layer.composition == kCompositionGPUTarget) {
       continue;
@@ -836,7 +864,7 @@ bool HWCDisplay::IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCach
 void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
-  if (layer_count > kMaxLayerCount) {
+  if (layer_count > kMaxLayerCount || layer_stack_.flags.animating) {
     ResetLayerCacheStack();
     return;
   }
@@ -948,6 +976,7 @@ LayerBufferFormat HWCDisplay::GetSDMFormat(const int32_t &source, const int flag
   case HAL_PIXEL_FORMAT_BGR_565:                  format = kFormatBGR565;                   break;
   case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:       format = kFormatYCbCr420SemiPlanarVenus;  break;
+  case HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS:       format = kFormatYCrCb420SemiPlanarVenus;  break;
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:  format = kFormatYCbCr420SPVenusUbwc;      break;
   case HAL_PIXEL_FORMAT_YV12:                     format = kFormatYCrCb420PlanarStride16;   break;
   case HAL_PIXEL_FORMAT_YCrCb_420_SP:             format = kFormatYCrCb420SemiPlanar;       break;
@@ -1060,6 +1089,8 @@ const char *HWCDisplay::GetHALPixelFormatString(int format) {
     return "INTERLACE";
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
     return "YCbCr_420_SP_VENUS";
+  case HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS:
+    return "YCrCb_420_SP_VENUS";
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
     return "YCbCr_420_SP_VENUS_UBWC";
   default:
@@ -1187,6 +1218,7 @@ void HWCDisplay::GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
 
 int HWCDisplay::SetDisplayStatus(uint32_t display_status) {
   int status = 0;
+  const hwc_procs_t *hwc_procs = *hwc_procs_;
 
   switch (display_status) {
   case kDisplayStatusResume:
@@ -1202,6 +1234,11 @@ int HWCDisplay::SetDisplayStatus(uint32_t display_status) {
   default:
     DLOGW("Invalid display status %d", display_status);
     return -EINVAL;
+  }
+
+  if (display_status == kDisplayStatusResume ||
+      display_status == kDisplayStatusPause) {
+    hwc_procs->invalidate(hwc_procs);
   }
 
   return status;
@@ -1241,15 +1278,6 @@ void HWCDisplay::MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list) 
   for (size_t i = 0 ; i < (content_list->numHwLayers - 1); i++) {
     hwc_layer_1_t *layer = &content_list->hwLayers[i];
     layer->compositionType = HWC_OVERLAY;
-  }
-}
-
-void HWCDisplay::CloseAcquireFences(hwc_display_contents_1_t *content_list) {
-  for (size_t i = 0; i < content_list->numHwLayers; i++) {
-    if (content_list->hwLayers[i].acquireFenceFd >= 0) {
-      close(content_list->hwLayers[i].acquireFenceFd);
-      content_list->hwLayers[i].acquireFenceFd = -1;
-    }
   }
 }
 
@@ -1343,6 +1371,16 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
     layer_stack_.flags.single_buffered_layer_present |= meta_data->isSingleBufferMode;
   }
 
+  if (meta_data->operation & S3D_FORMAT) {
+    std::map<int, LayerBufferS3DFormat>::iterator it =
+                      s3d_format_hwc_to_sdm_.find(meta_data->s3dFormat);
+    if (it != s3d_format_hwc_to_sdm_.end()) {
+      layer->input_buffer->s3d_format = it->second;
+    } else {
+      DLOGW("Invalid S3D format %d", meta_data->s3dFormat);
+    }
+  }
+
   return kErrorNone;
 }
 
@@ -1361,7 +1399,9 @@ int HWCDisplay::GetPanelBrightness(int *level) {
 }
 
 int HWCDisplay::ToggleScreenUpdates(bool enable) {
+  const hwc_procs_t *hwc_procs = *hwc_procs_;
   display_paused_ = enable ? false : true;
+  hwc_procs->invalidate(hwc_procs);
   return 0;
 }
 

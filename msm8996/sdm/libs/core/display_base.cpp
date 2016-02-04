@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -187,7 +187,7 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   }
 
   // Clean hw layers for reuse.
-  hw_layers_.info = HWLayersInfo();
+  hw_layers_ = HWLayers();
   hw_layers_.info.stack = layer_stack;
   hw_layers_.output_compression = 1.0f;
 
@@ -562,9 +562,9 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
                            INT(r_roi.top), INT(r_roi.right), INT(r_roi.bottom));
   }
 
-  const char *header  = "\n| Idx |  Comp Type  |  Split | WB |  Pipe |    W x H    |          Format          |  Src Rect (L T R B) |  Dst Rect (L T R B) |  Z |    Flags   | Deci(HxV) |";  //NOLINT
-  const char *newline = "\n|-----|-------------|--------|----|-------|-------------|--------------------------|---------------------|---------------------|----|------------|-----------|";  //NOLINT
-  const char *format  = "\n| %3s | %11s "     "| %6s " "| %2s | 0x%03x | %4d x %4d | %24s "                  "| %4d %4d %4d %4d "  "| %4d %4d %4d %4d "  "| %2s | %10s "   "| %9s |";  //NOLINT
+  const char *header  = "\n| Idx |  Comp Type  |  Split | WB |  Pipe |    W x H    |          Format          |  Src Rect (L T R B) |  Dst Rect (L T R B) |  Z |    Flags   | Deci(HxV) | CS |";  //NOLINT
+  const char *newline = "\n|-----|-------------|--------|----|-------|-------------|--------------------------|---------------------|---------------------|----|------------|-----------|----|";  //NOLINT
+  const char *format  = "\n| %3s | %11s "     "| %6s " "| %2s | 0x%03x | %4d x %4d | %24s "                  "| %4d %4d %4d %4d "  "| %4d %4d %4d %4d "  "| %2s | %10s "   "| %9s | %2s |";  //NOLINT
 
   DumpImpl::AppendString(buffer, length, "\n");
   DumpImpl::AppendString(buffer, length, newline);
@@ -587,7 +587,7 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     snprintf(idx, sizeof(idx), "%d", layer_index);
 
     for (uint32_t count = 0; count < hw_rotator_session.hw_block_count; count++) {
-      char writeback_id[8];
+      char writeback_id[8] = { 0 };
       HWRotateInfo &rotate = hw_rotator_session.hw_rotate_info[count];
       LayerRect &src_roi = rotate.src_roi;
       LayerRect &dst_roi = rotate.dst_roi;
@@ -599,7 +599,7 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
                              input_buffer->height, buffer_format, INT(src_roi.left),
                              INT(src_roi.top), INT(src_roi.right), INT(src_roi.bottom),
                              INT(dst_roi.left), INT(dst_roi.top), INT(dst_roi.right),
-                             INT(dst_roi.bottom), "-", "-    ", "-    ");
+                             INT(dst_roi.bottom), "-", "-    ", "-    ", "-");
 
       // print the below only once per layer block, fill with spaces for rest.
       idx[0] = 0;
@@ -612,9 +612,11 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     }
 
     for (uint32_t count = 0; count < 2; count++) {
-      char decimation[16];
-      char flags[16];
-      char z_order[8];
+      char decimation[16] = { 0 };
+      char flags[16] = { 0 };
+      char z_order[8] = { 0 };
+      char csc[8] = { 0 };
+
       HWPipeInfo &pipe = (count == 0) ? layer_config.left_pipe : layer_config.right_pipe;
 
       if (!pipe.valid) {
@@ -628,13 +630,14 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
       snprintf(flags, sizeof(flags), "0x%08x", layer.flags.flags);
       snprintf(decimation, sizeof(decimation), "%3d x %3d", pipe.horizontal_decimation,
                pipe.vertical_decimation);
+      snprintf(csc, sizeof(csc), "%d", layer.csc);
 
       DumpImpl::AppendString(buffer, length, format, idx, comp_type, comp_split[count],
                              "-", pipe.pipe_id, input_buffer->width, input_buffer->height,
                              buffer_format, INT(src_roi.left), INT(src_roi.top),
                              INT(src_roi.right), INT(src_roi.bottom), INT(dst_roi.left),
                              INT(dst_roi.top), INT(dst_roi.right), INT(dst_roi.bottom),
-                             z_order, flags, decimation);
+                             z_order, flags, decimation, csc);
 
       // print the below only once per layer block, fill with spaces for rest.
       idx[0] = 0;
@@ -695,6 +698,7 @@ const char * DisplayBase::GetName(const LayerBufferFormat &format) {
   case kFormatYCbCr420SemiPlanar:       return "Y_CBCR_420";
   case kFormatYCrCb420SemiPlanar:       return "Y_CRCB_420";
   case kFormatYCbCr420SemiPlanarVenus:  return "Y_CBCR_420_VENUS";
+  case kFormatYCrCb420SemiPlanarVenus:  return "Y_CRCB_420_VENUS";
   case kFormatYCbCr422H1V2SemiPlanar:   return "Y_CBCR_422_H1V2";
   case kFormatYCrCb422H1V2SemiPlanar:   return "Y_CRCB_422_H1V2";
   case kFormatYCbCr422H2V1SemiPlanar:   return "Y_CBCR_422_H2V1";

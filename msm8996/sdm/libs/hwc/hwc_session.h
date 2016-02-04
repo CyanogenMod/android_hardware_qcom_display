@@ -73,6 +73,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   static int GetActiveConfig(hwc_composer_device_1 *device, int disp);
   static int SetActiveConfig(hwc_composer_device_1 *device, int disp, int index);
   static int SetCursorPositionAsync(hwc_composer_device_1 *device, int disp, int x, int y);
+  static void CloseAcquireFds(hwc_display_contents_1_t *content_list);
 
   // Uevent thread
   static void* HWCUeventThread(void *context);
@@ -83,6 +84,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   int ConnectDisplay(int disp, hwc_display_contents_1_t *content_list);
   int DisconnectDisplay(int disp);
   void HandleSecureDisplaySession(hwc_display_contents_1_t **displays);
+  int GetVsyncPeriod(int disp);
 
   // QClient methods
   virtual android::status_t notifyCallback(uint32_t command, const android::Parcel *input_parcel,

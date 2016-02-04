@@ -8,7 +8,7 @@ LOCAL_C_INCLUDES              := $(common_includes)
 
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
                                  -Wall -Werror -std=c++11 -fcolor-diagnostics\
-                                 -DLOG_TAG=\"SDM\" $(common_flags)
+                                 -DLOG_TAG=\"SDM\" $(common_flags) -DDEBUG_CALC_FPS
 LOCAL_CLANG                   := true
 
 # TODO: Move this to the common makefile

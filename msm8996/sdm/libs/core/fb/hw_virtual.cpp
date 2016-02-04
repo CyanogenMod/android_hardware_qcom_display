@@ -74,9 +74,5 @@ DisplayError HWVirtual::Validate(HWLayers *hw_layers) {
   return HWDevice::Validate(hw_layers);
 }
 
-DisplayError HWVirtual::Flush() {
-  return kErrorNone;
-}
-
 }  // namespace sdm
 
