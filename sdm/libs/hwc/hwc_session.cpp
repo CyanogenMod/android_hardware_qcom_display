@@ -1111,6 +1111,9 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel *input_parcel
     return -1;
   }
 
+  pending_action.action = kNoAction;
+  pending_action.params = NULL;
+
   // Read display_id, payload_size and payload from in_parcel.
   ret = HWCColorManager::CreatePayloadFromParcel(*input_parcel, &display_id, &req_payload);
   if (!ret) {
