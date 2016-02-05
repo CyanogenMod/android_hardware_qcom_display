@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -572,8 +572,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     layer.flags.updating = true;
 
     if (num_hw_layers <= kMaxLayerCount) {
-      LayerCache layer_cache = layer_stack_cache_.layer_cache[i];
-      layer.flags.updating = IsLayerUpdating(hwc_layer, layer_cache);
+      layer.flags.updating = IsLayerUpdating(content_list, i);
     }
 #ifdef QTI_BSP
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
@@ -826,7 +825,6 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
   }
 
   for (uint32_t i = 0; i < layer_count; i++) {
-    hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     Layer &layer = layer_stack_.layers[i];
     LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
 
@@ -843,7 +841,7 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
       return true;
     }
 
-    if ((layer.composition == kCompositionGPU) && IsLayerUpdating(hwc_layer, layer_cache)) {
+    if ((layer.composition == kCompositionGPU) && IsLayerUpdating(content_list, i)) {
       return true;
     }
   }
@@ -851,16 +849,24 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
   return false;
 }
 
-bool HWCDisplay::IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache) {
+bool HWCDisplay::IsLayerUpdating(hwc_display_contents_1_t *content_list, int layer_index) {
+  hwc_layer_1_t &hwc_layer = content_list->hwLayers[layer_index];
+  LayerCache &layer_cache = layer_stack_cache_.layer_cache[layer_index];
+
   const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
   const MetaData_t *meta_data = pvt_handle ?
     reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata) : NULL;
 
-  // If a layer is in single buffer mode, it should be considered as updating always
+  // Layer should be considered updating if
+  //   a) layer is in single buffer mode, or
+  //   b) layer handle has changed, or
+  //   c) layer plane alpha has changed, or
+  //   d) layer stack geometry has changed
   return ((meta_data && (meta_data->operation & SET_SINGLE_BUFFER_MODE) &&
-            meta_data->isSingleBufferMode) ||
+              meta_data->isSingleBufferMode) ||
           (layer_cache.handle != hwc_layer.handle) ||
-          (layer_cache.plane_alpha != hwc_layer.planeAlpha));
+          (layer_cache.plane_alpha != hwc_layer.planeAlpha) ||
+          (content_list->flags & HWC_GEOMETRY_CHANGED));
 }
 
 void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
