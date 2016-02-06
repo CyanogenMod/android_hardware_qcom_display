@@ -118,6 +118,7 @@ class ResourceDefault : public ResourceInterface {
   DisplayError AlignPipeConfig(const Layer &layer, HWPipeInfo *left_pipe, HWPipeInfo *right_pipe);
   void ResourceStateLog(void);
   DisplayError CalculateDecimation(float downscale, uint8_t *decimation);
+  DisplayError GetScaleLutConfig(HWScaleLutInfo *lut_info);
 
   Locker locker_;
   HWResourceInfo hw_res_info_;

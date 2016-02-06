@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -52,6 +52,7 @@ class ResourceInterface {
   virtual DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers,
                                               int x, int y) = 0;
   virtual DisplayError SetMaxBandwidthMode(HWBwModes mode) = 0;
+  virtual DisplayError GetScaleLutConfig(HWScaleLutInfo *lut_info) = 0;
 
  protected:
   virtual ~ResourceInterface() { }

@@ -35,6 +35,9 @@
 namespace sdm {
 const int kMaxSDELayers = 16;   // Maximum number of layers that can be handled by hardware in a
                                 // given layer stack.
+#define MAX_PLANES 4
+
+#define MAX_DETAIL_ENHANCE_CURVE 3
 
 enum HWDeviceType {
   kDevicePrimary,
@@ -84,7 +87,29 @@ enum HWSubBlockType {
   kHWRotatorInput,
   kHWRotatorOutput,
   kHWWBIntfOutput,
+  kHWDestinationScalar,
   kHWSubBlockMax,
+};
+
+// y/RGB & UV Scaling Filters
+enum HWScalingFilter {
+  kScalingFilterEdgeDirected,
+  kScalingFilterCircular,
+  kScalingFilterSeparable,
+  kScalingFilterBilinear,
+  kScalingFilterMax,
+};
+
+enum HWAlphaInterpolation {
+  kInterpolationPixelRepeat,
+  kInterpolationBilinear,
+  kInterpolationMax,
+};
+
+enum HWBlendingFilter {
+  kBlendFilterCircular,
+  kBlendFilterSeparable,
+  kBlendFilterMax,
 };
 
 typedef std::map<HWSubBlockType, std::vector<LayerBufferFormat>> FormatsMap;
@@ -148,6 +173,7 @@ struct HWResourceInfo {
   bool perf_calc = false;
   bool has_dyn_bw_support = false;
   bool separate_rotator = false;
+  bool has_qseed3 = false;
   HWDynBwLimitInfo dyn_bw_info;
   std::vector<HWPipeCaps> hw_pipes;
   FormatsMap supported_formats_map;
@@ -263,44 +289,101 @@ struct HWRotatorSession {
   bool is_buffer_cached = false;
 };
 
+struct HWScaleLutInfo {
+  uint32_t dir_lut_size = 0;
+  uint32_t cir_lut_size = 0;
+  uint32_t sep_lut_size = 0;
+  uint64_t dir_lut = 0;
+  uint64_t cir_lut = 0;
+  uint64_t sep_lut = 0;
+};
+
+struct HWDetailEnhanceData {
+  uint32_t enable = 0;
+  int16_t sharpen_level1 = 0;
+  int16_t sharpen_level2 = 0;
+  uint16_t clip = 0;
+  uint16_t limit = 0;
+  uint16_t thr_quiet = 0;
+  uint16_t thr_dieout = 0;
+  uint16_t thr_low = 0;
+  uint16_t thr_high = 0;
+  uint16_t prec_shift = 0;
+  int16_t adjust_a[MAX_DETAIL_ENHANCE_CURVE] = {0};
+  int16_t adjust_b[MAX_DETAIL_ENHANCE_CURVE] = {0};
+  int16_t adjust_c[MAX_DETAIL_ENHANCE_CURVE] = {0};
+};
+
 struct HWPixelExtension {
-  int extension;  // Number of pixels extension in left, right, top and bottom directions for all
-                  // color components. This pixel value for each color component should be sum of
-                  // fetch and repeat pixels.
+  int32_t extension = 0;  // Number of pixels extension in left, right, top and bottom directions
+                          // for all color components. This pixel value for each color component
+                          // should be sum of fetch and repeat pixels.
 
-  int overfetch;  // Number of pixels need to be overfetched in left, right, top and bottom
-                  // directions from source image for scaling.
+  int32_t overfetch = 0;  // Number of pixels need to be overfetched in left, right, top and bottom
+                          // directions from source image for scaling.
 
-  int repeat;     // Number of pixels need to be repeated in left, right, top and bottom directions
-                  // for scaling.
+  int32_t repeat = 0;     // Number of pixels need to be repeated in left, right, top and bottom
+                          // directions for scaling.
 };
 
 struct HWPlane {
-  int init_phase_x = 0;
-  int phase_step_x = 0;
-  int init_phase_y = 0;
-  int phase_step_y = 0;
+  int32_t init_phase_x = 0;
+  int32_t phase_step_x = 0;
+  int32_t init_phase_y = 0;
+  int32_t phase_step_y = 0;
   HWPixelExtension left;
   HWPixelExtension top;
   HWPixelExtension right;
   HWPixelExtension bottom;
   uint32_t roi_width = 0;
-};
-
-struct ScaleData {
-  uint8_t enable_pixel_ext;
+  int32_t preload_x = 0;
+  int32_t preload_y = 0;
   uint32_t src_width = 0;
   uint32_t src_height = 0;
-  HWPlane plane[4];
+};
+
+struct HWScaleData {
+  struct enable {
+    uint8_t scale = 0;
+    uint8_t direction_detection = 0;
+    uint8_t detail_enhance = 0;
+  } enable;
+  uint32_t dst_width = 0;
+  uint32_t dst_height = 0;
+  HWPlane plane[MAX_PLANES];
+  // scale_v2_data fields
+  HWScalingFilter y_rgb_filter_cfg = kScalingFilterEdgeDirected;
+  HWScalingFilter uv_filter_cfg = kScalingFilterEdgeDirected;
+  HWAlphaInterpolation alpha_filter_cfg = kInterpolationPixelRepeat;
+  HWBlendingFilter blend_cfg = kBlendFilterCircular;
+
+  struct lut_flags {
+    uint8_t lut_swap = 0;
+    uint8_t lut_dir_wr = 0;
+    uint8_t lut_y_cir_wr = 0;
+    uint8_t lut_uv_cir_wr = 0;
+    uint8_t lut_y_sep_wr = 0;
+    uint8_t lut_uv_sep_wr = 0;
+  } lut_flag;
+
+  uint32_t dir_lut_idx = 0;
+  /* for Y(RGB) and UV planes*/
+  uint32_t y_rgb_cir_lut_idx = 0;
+  uint32_t uv_cir_lut_idx = 0;
+  uint32_t y_rgb_sep_lut_idx = 0;
+  uint32_t uv_sep_lut_idx = 0;
+
+  HWDetailEnhanceData detail_enhance;
 };
 
 struct HWPipeInfo {
   uint32_t pipe_id = 0;
+  HWSubBlockType sub_block_type = kHWSubBlockMax;
   LayerRect src_roi;
   LayerRect dst_roi;
   uint8_t horizontal_decimation = 0;
   uint8_t vertical_decimation = 0;
-  ScaleData scale_data;
+  HWScaleData scale_data;
   uint32_t z_order = 0;
   bool set_igc = false;
   bool valid = false;
