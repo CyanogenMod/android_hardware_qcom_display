@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -66,7 +66,7 @@ class DisplayHDMI : public DisplayBase, DumpImpl {
   virtual DisplayError SetCursorPosition(int x, int y);
 
  private:
-  virtual int GetBestConfig(HWS3DMode s3d_mode);
+  virtual uint32_t GetBestConfig(HWS3DMode s3d_mode);
   virtual void GetScanSupport();
   virtual void SetS3DMode(LayerStack *layer_stack);
 

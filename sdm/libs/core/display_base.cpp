@@ -70,7 +70,7 @@ DisplayError DisplayBase::Init() {
   if (hw_info_intf_) {
     HWResourceInfo hw_resource_info = HWResourceInfo();
     hw_info_intf_->GetHWResourceInfo(&hw_resource_info);
-    int max_mixer_stages = hw_resource_info.num_blending_stages;
+    auto max_mixer_stages = hw_resource_info.num_blending_stages;
     int property_value = Debug::GetMaxPipesPerMixer(display_type_);
     if (property_value >= 0) {
       max_mixer_stages = MIN(UINT32(property_value), hw_resource_info.num_blending_stages);
@@ -142,8 +142,8 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
     return kErrorParameters;
   }
 
-  uint32_t gpu_target_layer_dst_xpixels = gpu_target_layer.dst_rect.right;
-  uint32_t gpu_target_layer_dst_ypixels = gpu_target_layer.dst_rect.bottom;
+  auto gpu_target_layer_dst_xpixels = gpu_target_layer.dst_rect.right;
+  auto gpu_target_layer_dst_ypixels = gpu_target_layer.dst_rect.bottom;
 
   HWDisplayAttributes display_attrib;
   uint32_t active_index = 0;

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -78,7 +78,7 @@ int HWCDisplayVirtual::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_
   int fb_width = fb_layer.displayFrame.right - fb_layer.displayFrame.left;
   int fb_height = fb_layer.displayFrame.bottom - fb_layer.displayFrame.top;
 
-  status = hwc_display_virtual->SetFrameBufferResolution(fb_width, fb_height);
+  status = hwc_display_virtual->SetFrameBufferResolution(UINT32(fb_width), UINT32(fb_height));
 
   if (status) {
     Destroy(hwc_display_virtual);
@@ -222,11 +222,11 @@ int HWCDisplayVirtual::SetOutputSliceFromMetadata(hwc_display_contents_1_t *cont
       int fbt_height = frame.bottom - frame.top;
       const MetaData_t *meta_data = reinterpret_cast<MetaData_t *>(output_handle->base_metadata);
       if (meta_data && meta_data->operation & UPDATE_BUFFER_GEOMETRY) {
-        variable_info.x_pixels = meta_data->bufferDim.sliceWidth;
-        variable_info.y_pixels = meta_data->bufferDim.sliceHeight;
+        variable_info.x_pixels = UINT32(meta_data->bufferDim.sliceWidth);
+        variable_info.y_pixels = UINT32(meta_data->bufferDim.sliceHeight);
       } else {
-        variable_info.x_pixels = fbt_width;
-        variable_info.y_pixels = fbt_height;
+        variable_info.x_pixels = UINT32(fbt_width);
+        variable_info.y_pixels = UINT32(fbt_height);
       }
       // TODO(user): Need to get the framerate of primary display and update it.
       variable_info.fps = 60;
@@ -272,8 +272,8 @@ int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
     AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(output_handle, output_buffer_width,
                                                           output_buffer_height);
 
-    output_buffer_->width = output_buffer_width;
-    output_buffer_->height = output_buffer_height;
+    output_buffer_->width = UINT32(output_buffer_width);
+    output_buffer_->height = UINT32(output_buffer_height);
     output_buffer_->flags.secure = 0;
     output_buffer_->flags.video = 0;
 
@@ -285,7 +285,7 @@ int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
     // ToDo: Need to extend for non-RGB formats
     output_buffer_->planes[0].fd = output_handle->fd;
     output_buffer_->planes[0].offset = output_handle->offset;
-    output_buffer_->planes[0].stride = output_handle->width;
+    output_buffer_->planes[0].stride = UINT32(output_handle->width);
   }
 
   layer_stack_.output_buffer = output_buffer_;

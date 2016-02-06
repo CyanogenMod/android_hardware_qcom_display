@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -56,8 +56,8 @@ int HWCDisplayPrimary::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_
   HWCDebugHandler::Get()->GetProperty("sdm.fb_size_width", &width);
   HWCDebugHandler::Get()->GetProperty("sdm.fb_size_height", &height);
   if (width > 0 && height > 0) {
-    primary_width = width;
-    primary_height = height;
+    primary_width = UINT32(width);
+    primary_height = UINT32(height);
   }
 
   status = hwc_display_primary->SetFrameBufferResolution(primary_width, primary_height);
@@ -136,7 +136,7 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
-  bool one_updating_layer = SingleLayerUpdating(content_list->numHwLayers - 1);
+  bool one_updating_layer = SingleLayerUpdating(UINT32(content_list->numHwLayers - 1));
   ToggleCPUHint(one_updating_layer);
 
   uint32_t refresh_rate = GetOptimalRefreshRate(one_updating_layer);
@@ -200,23 +200,23 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
 int HWCDisplayPrimary::Perform(uint32_t operation, ...) {
   va_list args;
   va_start(args, operation);
-  int val = va_arg(args, uint32_t);
+  int val = va_arg(args, int32_t);
   va_end(args);
   switch (operation) {
     case SET_METADATA_DYN_REFRESH_RATE:
       SetMetaDataRefreshRateFlag(val);
       break;
     case SET_BINDER_DYN_REFRESH_RATE:
-      ForceRefreshRate(val);
+      ForceRefreshRate(UINT32(val));
       break;
     case SET_DISPLAY_MODE:
-      SetDisplayMode(val);
+      SetDisplayMode(UINT32(val));
       break;
     case SET_QDCM_SOLID_FILL_INFO:
-      SetQDCMSolidFillInfo(true, val);
+      SetQDCMSolidFillInfo(true, UINT32(val));
       break;
     case UNSET_QDCM_SOLID_FILL_INFO:
-      SetQDCMSolidFillInfo(false, val);
+      SetQDCMSolidFillInfo(false, UINT32(val));
       break;
     default:
       DLOGW("Invalid operation %d", operation);

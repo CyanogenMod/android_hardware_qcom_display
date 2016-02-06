@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -203,7 +203,7 @@ DisplayError DisplayHDMI::OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level)
   return hw_intf_->OnMinHdcpEncryptionLevelChange(min_enc_level);
 }
 
-int DisplayHDMI::GetBestConfig(HWS3DMode s3d_mode) {
+uint32_t DisplayHDMI::GetBestConfig(HWS3DMode s3d_mode) {
   uint32_t best_index = 0, index;
   uint32_t num_modes = 0;
   HWDisplayAttributes best_attrib;
@@ -223,7 +223,7 @@ int DisplayHDMI::GetBestConfig(HWS3DMode s3d_mode) {
     }
   }
   if (index < num_modes) {
-    best_index = index;
+    best_index = UINT32(index);
     for (size_t index = best_index + 1; index < num_modes; index ++) {
       if (!IS_BIT_SET(attrib[index].s3d_config, s3d_mode))
         continue;
@@ -231,13 +231,13 @@ int DisplayHDMI::GetBestConfig(HWS3DMode s3d_mode) {
       // From the available configs, select the best
       // Ex: 1920x1080@60Hz is better than 1920x1080@30 and 1920x1080@30 is better than 1280x720@60
       if (attrib[index].y_pixels > attrib[best_index].y_pixels) {
-          best_index = index;
+        best_index = UINT32(index);
       } else if (attrib[index].y_pixels == attrib[best_index].y_pixels) {
         if (attrib[index].x_pixels > attrib[best_index].x_pixels) {
-          best_index = index;
+          best_index = UINT32(index);
         } else if (attrib[index].x_pixels == attrib[best_index].x_pixels) {
           if (attrib[index].vsync_period_ns < attrib[best_index].vsync_period_ns) {
-            best_index = index;
+            best_index = UINT32(index);
           }
         }
       }
@@ -249,9 +249,9 @@ int DisplayHDMI::GetBestConfig(HWS3DMode s3d_mode) {
   delete[] attrib;
 
   // Used for changing HDMI Resolution - override the best with user set config
-  uint32_t user_config = Debug::GetHDMIResolution();
+  uint32_t user_config = UINT32(Debug::GetHDMIResolution());
   if (user_config) {
-    uint32_t config_index = -1;
+    uint32_t config_index = 0;
     // For the config, get the corresponding index
     DisplayError error = hw_intf_->GetConfigIndex(user_config, &config_index);
     if (error == kErrorNone)
@@ -263,8 +263,8 @@ int DisplayHDMI::GetBestConfig(HWS3DMode s3d_mode) {
 
 void DisplayHDMI::GetScanSupport() {
   DisplayError error = kErrorNone;
-  uint32_t video_format = -1;
-  uint32_t max_cea_format = -1;
+  uint32_t video_format = 0;
+  uint32_t max_cea_format = 0;
   HWScanInfo scan_info = HWScanInfo();
   hw_intf_->GetHWScanInfo(&scan_info);
 

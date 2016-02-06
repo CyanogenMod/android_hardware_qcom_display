@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -175,8 +175,8 @@ bool HWPrimary::GetCurrentModeFromSysfs(size_t *curr_x_pixels, size_t *curr_y_pi
       if (xpos == string::npos || ypos == string::npos) {
         DLOGI("Resolution switch not supported");
       } else {
-        *curr_x_pixels = atoi(buffer + xpos + 1);
-        *curr_y_pixels = atoi(buffer + ypos + 1);
+        *curr_x_pixels = static_cast<size_t>(atoi(buffer + xpos + 1));
+        *curr_y_pixels = static_cast<size_t>(atoi(buffer + ypos + 1));
         DLOGI("Current Config: %u x %u", *curr_x_pixels, *curr_y_pixels);
         ret = true;
       }
@@ -218,14 +218,14 @@ void HWPrimary::InitializeConfigs() {
         continue;
       }
 
-      config.x_pixels = atoi(buffer + xpos + 1);
-      config.y_pixels = atoi(buffer + ypos + 1);
+      config.x_pixels = UINT32(atoi(buffer + xpos + 1));
+      config.y_pixels = UINT32(atoi(buffer + ypos + 1));
       DLOGI("Found mode %d x %d", config.x_pixels, config.y_pixels);
       display_configs_.push_back(config);
       display_config_strings_.push_back(string(buffer));
 
       if (curr_x_pixels == config.x_pixels && curr_y_pixels == config.y_pixels) {
-        active_config_index_ = display_configs_.size() - 1;
+        active_config_index_ = UINT32(display_configs_.size() - 1);
         DLOGI("Active config index %u", active_config_index_);
       }
     }
@@ -253,7 +253,7 @@ DisplayError HWPrimary::Deinit() {
 }
 
 DisplayError HWPrimary::GetNumDisplayAttributes(uint32_t *count) {
-  *count = IsResolutionSwitchEnabled() ? display_configs_.size() : 1;
+  *count = IsResolutionSwitchEnabled() ? UINT32(display_configs_.size()) : 1;
   return kErrorNone;
 }
 
@@ -303,8 +303,8 @@ DisplayError HWPrimary::PopulateDisplayAttributes() {
 
   // If driver doesn't return width/height information, default to 160 dpi
   if (INT(var_screeninfo.width) <= 0 || INT(var_screeninfo.height) <= 0) {
-    var_screeninfo.width  = INT(((FLOAT(var_screeninfo.xres) * 25.4f)/160.0f) + 0.5f);
-    var_screeninfo.height = INT(((FLOAT(var_screeninfo.yres) * 25.4f)/160.0f) + 0.5f);
+    var_screeninfo.width  = UINT32(((FLOAT(var_screeninfo.xres) * 25.4f)/160.0f) + 0.5f);
+    var_screeninfo.height = UINT32(((FLOAT(var_screeninfo.yres) * 25.4f)/160.0f) + 0.5f);
   }
 
   display_attributes_.x_pixels = var_screeninfo.xres;
@@ -438,19 +438,19 @@ DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
 
   LayerRect left_roi = hw_layers->info.left_partial_update;
   LayerRect right_roi = hw_layers->info.right_partial_update;
-  mdp_commit.left_roi.x = INT(left_roi.left);
-  mdp_commit.left_roi.y = INT(left_roi.top);
-  mdp_commit.left_roi.w = INT(left_roi.right - left_roi.left);
-  mdp_commit.left_roi.h = INT(left_roi.bottom - left_roi.top);
+  mdp_commit.left_roi.x = UINT32(left_roi.left);
+  mdp_commit.left_roi.y = UINT32(left_roi.top);
+  mdp_commit.left_roi.w = UINT32(left_roi.right - left_roi.left);
+  mdp_commit.left_roi.h = UINT32(left_roi.bottom - left_roi.top);
 
   // SDM treats ROI as one full coordinate system.
   // In case source split is disabled, However, Driver assumes Mixer to operate in
   // different co-ordinate system.
   if (!hw_resource_.is_src_split) {
-    mdp_commit.right_roi.x = INT(right_roi.left) - hw_panel_info_.split_info.left_split;
-    mdp_commit.right_roi.y = INT(right_roi.top);
-    mdp_commit.right_roi.w = INT(right_roi.right - right_roi.left);
-    mdp_commit.right_roi.h = INT(right_roi.bottom - right_roi.top);
+    mdp_commit.right_roi.x = UINT32(right_roi.left) - hw_panel_info_.split_info.left_split;
+    mdp_commit.right_roi.y = UINT32(right_roi.top);
+    mdp_commit.right_roi.w = UINT32(right_roi.right - right_roi.left);
+    mdp_commit.right_roi.h = UINT32(right_roi.bottom - right_roi.top);
   }
 
   return HWDevice::Validate(hw_layers);
@@ -480,7 +480,7 @@ void* HWPrimary::DisplayEventThreadHandler() {
       usleep(16666);
       STRUCT_VAR(timeval, time_now);
       gettimeofday(&time_now, NULL);
-      uint64_t ts = uint64_t(time_now.tv_sec)*1000000000LL +uint64_t(time_now.tv_usec)*1000LL;
+      int64_t ts = int64_t(time_now.tv_sec)*1000000000LL +int64_t(time_now.tv_usec)*1000LL;
 
       // Send Vsync event for primary display(0)
       event_handler_->VSync(ts);
@@ -521,7 +521,7 @@ void* HWPrimary::DisplayEventThreadHandler() {
 void HWPrimary::HandleVSync(char *data) {
   int64_t timestamp = 0;
   if (!strncmp(data, "VSYNC=", strlen("VSYNC="))) {
-    timestamp = strtoull(data + strlen("VSYNC="), NULL, 0);
+    timestamp = strtoll(data + strlen("VSYNC="), NULL, 0);
   }
   event_handler_->VSync(timestamp);
 }
@@ -537,7 +537,7 @@ void HWPrimary::HandleIdleTimeout(char *data) {
 void HWPrimary::HandleThermal(char *data) {
   int64_t thermal_level = 0;
   if (!strncmp(data, "thermal_level=", strlen("thermal_level="))) {
-    thermal_level = strtoull(data + strlen("thermal_level="), NULL, 0);
+    thermal_level = strtoll(data + strlen("thermal_level="), NULL, 0);
   }
 
   DLOGI("Received thermal notification with thermal level = %d", thermal_level);
@@ -584,7 +584,7 @@ DisplayError HWPrimary::SetVSyncState(bool enable) {
 }
 
 DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
-  uint32_t mode = -1;
+  uint32_t mode = kModeDefault;
 
   switch (hw_display_mode) {
   case kModeVideo:
@@ -599,7 +599,7 @@ DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
     return kErrorParameters;
   }
 
-  if (Sys::ioctl_(device_fd_, MSMFB_LPM_ENABLE, &mode) < 0) {
+  if (Sys::ioctl_(device_fd_, INT(MSMFB_LPM_ENABLE), &mode) < 0) {
     IOCTL_LOGE(MSMFB_LPM_ENABLE, device_type_);
     return kErrorHardware;
   }
@@ -628,7 +628,7 @@ DisplayError HWPrimary::SetPanelBrightness(int level) {
     return kErrorUndefined;
   }
 
-  ssize_t ret = Sys::pwrite_(fd, buffer, bytes, 0);
+  ssize_t ret = Sys::pwrite_(fd, buffer, static_cast<size_t>(bytes), 0);
   if (ret <= 0) {
     DLOGV_IF(kTagDriverConfig, "Failed to write to node = %s, error = %s ", kBrightnessNode,
              strerror(errno));
@@ -690,7 +690,7 @@ DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
   for (int i(0); i < kMaxNumPPFeatures; i++) {
     version.pp_feature = feature_id_mapping[i];
 
-    if (Sys::ioctl_(device_fd_,  MSMFB_MDP_PP_GET_FEATURE_VERSION, &version) < 0) {
+    if (Sys::ioctl_(device_fd_,  INT(MSMFB_MDP_PP_GET_FEATURE_VERSION), &version) < 0) {
       IOCTL_LOGE(MSMFB_MDP_PP_GET_FEATURE_VERSION, device_type_);
       return kErrorHardware;
     }
@@ -716,7 +716,7 @@ DisplayError HWPrimary::SetPPFeatures(PPFeaturesConfig *feature_list) {
 
       if ((feature->feature_id_ < kMaxNumPPFeatures)) {
         HWColorManager::SetFeature[feature->feature_id_](*feature, &kernel_params);
-        if (Sys::ioctl_(device_fd_, MSMFB_MDP_PP, &kernel_params) < 0) {
+        if (Sys::ioctl_(device_fd_, INT(MSMFB_MDP_PP), &kernel_params) < 0) {
           IOCTL_LOGE(MSMFB_MDP_PP, device_type_);
 
           feature_list->Reset();

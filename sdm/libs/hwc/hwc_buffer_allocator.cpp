@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -69,7 +69,7 @@ DisplayError HWCBufferAllocator::AllocateBuffer(BufferInfo *buffer_info) {
     alloc_flags |= INT(GRALLOC_USAGE_PROTECTED);
     data.align = SECURE_ALIGN;
   } else {
-    data.align = getpagesize();
+    data.align = UINT32(getpagesize());
   }
 
   if (buffer_config.cache == false) {
@@ -103,7 +103,7 @@ DisplayError HWCBufferAllocator::AllocateBuffer(BufferInfo *buffer_info) {
   }
 
   alloc_buffer_info->fd = data.fd;
-  alloc_buffer_info->stride = aligned_width;
+  alloc_buffer_info->stride = UINT32(aligned_width);
   alloc_buffer_info->size = buffer_size;
 
   meta_buffer_info->base_addr = data.base;
@@ -151,7 +151,7 @@ DisplayError HWCBufferAllocator::FreeBuffer(BufferInfo *buffer_info) {
 }
 
 uint32_t HWCBufferAllocator::GetBufferSize(BufferInfo *buffer_info) {
-  uint32_t align = getpagesize();
+  uint32_t align = UINT32(getpagesize());
 
   const BufferConfig &buffer_config = buffer_info->buffer_config;
 

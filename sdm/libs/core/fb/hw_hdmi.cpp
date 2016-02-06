@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -213,7 +213,7 @@ DisplayError HWHDMI::ReadEDIDInfo() {
     char *tokens[edid_count_max] = { NULL };
     ParseLine(ptr, tokens, edid_count_max, &hdmi_mode_count_);
     for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
-      hdmi_modes_[i] = atoi(tokens[i]);
+      hdmi_modes_[i] = UINT32(atoi(tokens[i]));
     }
   }
 
@@ -450,9 +450,9 @@ void HWHDMI::ReadScanInfo() {
     return;
   }
 
-  hw_scan_info_.pt_scan_support = MapHWScanSupport(atoi(tokens[0]));
-  hw_scan_info_.it_scan_support = MapHWScanSupport(atoi(tokens[1]));
-  hw_scan_info_.cea_scan_support = MapHWScanSupport(atoi(tokens[2]));
+  hw_scan_info_.pt_scan_support = MapHWScanSupport(UINT32(atoi(tokens[0])));
+  hw_scan_info_.it_scan_support = MapHWScanSupport(UINT32(atoi(tokens[1])));
+  hw_scan_info_.cea_scan_support = MapHWScanSupport(UINT32(atoi(tokens[2])));
   DLOGI("PT %d IT %d CEA %d", hw_scan_info_.pt_scan_support, hw_scan_info_.it_scan_support,
         hw_scan_info_.cea_scan_support);
 }
@@ -577,7 +577,8 @@ void HWHDMI::SetSourceProductInformation(const char *node, const char *name) {
   }
 
   snprintf(sys_fs_path , sizeof(sys_fs_path), "%s%d/%s", fb_path_, hdmi_node_index, node);
-  length = HWDevice::SysFsWrite(sys_fs_path, property_value, strlen(property_value));
+  length = HWDevice::SysFsWrite(sys_fs_path, property_value,
+                                static_cast<ssize_t>(strlen(property_value)));
   if (length <= 0) {
     DLOGW("Failed to write %s = %s", node, property_value);
   }

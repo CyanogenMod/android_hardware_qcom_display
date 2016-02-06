@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -64,8 +64,8 @@ int HWCColorManager::CreatePayloadFromParcel(const android::Parcel &in, uint32_t
   uint32_t id(0);
   uint32_t size(0);
 
-  id = in.readInt32();
-  size = in.readInt32();
+  id = UINT32(in.readInt32());
+  size = UINT32(in.readInt32());
   if (size > 0 && size == in.dataAvail()) {
     const void *data = in.readInplace(size);
     const uint8_t *temp = reinterpret_cast<const uint8_t *>(data);
@@ -83,7 +83,7 @@ int HWCColorManager::CreatePayloadFromParcel(const android::Parcel &in, uint32_t
 
 void HWCColorManager::MarshallStructIntoParcel(const PPDisplayAPIPayload &data,
                                                android::Parcel *out_parcel) {
-  out_parcel->writeInt32(data.size);
+  out_parcel->writeInt32(INT32(data.size));
   if (data.payload)
     out_parcel->write(data.payload, data.size);
 }
@@ -259,7 +259,8 @@ int HWCColorManager::CreateSolidFillLayers(HWCDisplay *hwc_display) {
     // handle for solid fill layer with fd = -1.
     private_handle_t *handle =
         new private_handle_t(-1, 0, private_handle_t::PRIV_FLAGS_FRAMEBUFFER, BUFFER_TYPE_UI,
-                            HAL_PIXEL_FORMAT_RGBA_8888, primary_width, primary_height);
+                             HAL_PIXEL_FORMAT_RGBA_8888, INT32(primary_width),
+                             INT32(primary_height));
 
     if (!buf || !handle) {
       DLOGE("Failed to allocate memory.");
@@ -284,17 +285,18 @@ int HWCColorManager::CreateSolidFillLayers(HWCDisplay *hwc_display) {
 
   hwc_layer_1_t &layer = solid_fill_layers_->hwLayers[0];
   hwc_rect_t solid_fill_rect = {
-      INT(solid_fill_params_.rect.x), INT(solid_fill_params_.rect.y),
-      INT(solid_fill_params_.rect.x + solid_fill_params_.rect.width),
-      INT(solid_fill_params_.rect.y + solid_fill_params_.rect.height),
+      INT(solid_fill_params_.rect.x),
+      INT(solid_fill_params_.rect.y),
+      solid_fill_params_.rect.x + INT(solid_fill_params_.rect.width),
+      solid_fill_params_.rect.y + INT(solid_fill_params_.rect.height),
   };
 
   layer.compositionType = HWC_FRAMEBUFFER;
   layer.blending = HWC_BLENDING_PREMULT;
   layer.sourceCropf.left = solid_fill_params_.rect.x;
   layer.sourceCropf.top = solid_fill_params_.rect.y;
-  layer.sourceCropf.right = solid_fill_params_.rect.x + solid_fill_params_.rect.width;
-  layer.sourceCropf.bottom = solid_fill_params_.rect.y + solid_fill_params_.rect.height;
+  layer.sourceCropf.right = UINT32(solid_fill_params_.rect.x) + solid_fill_params_.rect.width;
+  layer.sourceCropf.bottom = UINT32(solid_fill_params_.rect.y) + solid_fill_params_.rect.height;
   layer.acquireFenceFd = -1;
   layer.releaseFenceFd = -1;
   layer.flags = 0;
@@ -371,7 +373,7 @@ HWCQDCMModeManager *HWCQDCMModeManager::CreateQDCMModeMgr() {
     }
 
     // retrieve system GPU idle timeout value for later to recover.
-    mode_mgr->entry_timeout_ = HWCDebugHandler::GetIdleTimeoutMs();
+    mode_mgr->entry_timeout_ = UINT32(HWCDebugHandler::GetIdleTimeoutMs());
 
     // acquire the binder handle to Android system PowerManager for later use.
     android::sp<android::IBinder> binder =
