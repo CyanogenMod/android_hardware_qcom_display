@@ -29,6 +29,11 @@ LOCAL_SRC_FILES               := gpu.cpp gralloc.cpp framebuffer.cpp mapper.cpp
 LOCAL_COPY_HEADERS_TO         := $(common_header_export_path)
 LOCAL_COPY_HEADERS            := gralloc_priv.h gr.h
 
+ifeq ($(TARGET_USE_COMPAT_GRALLOC_ALIGN),true)
+LOCAL_CFLAGS                  += -DUSE_16BYTE_GRALLOC_ALIGN
+endif
+
+
 include $(BUILD_SHARED_LIBRARY)
 
 # MemAlloc Library
