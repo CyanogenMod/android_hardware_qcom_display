@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -269,6 +269,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
                 }
               } else if (!strncmp(tokens[j], "pipe_ndx", strlen("pipe_ndx"))) {
                 pipe_caps.id = UINT32(atoi(tokens[j+1]));
+              } else if (!strncmp(tokens[j], "rects", strlen("rects"))) {
+                pipe_caps.max_rects = UINT32(atoi(tokens[j+1]));
               } else if (!strncmp(tokens[j], "fmts_supported", strlen("fmts_supported"))) {
                 char *tokens_fmt[max_count] = { NULL };
                 uint32_t token_fmt_count = 0;
