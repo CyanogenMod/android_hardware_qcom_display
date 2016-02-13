@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include <core/display_interface.h>
 #include <core/core_interface.h>
+#include <vector>
 
 namespace sdm {
 
@@ -66,10 +67,23 @@ enum HWDisplayPort {
   kPortEDP,
 };
 
+enum PipeType {
+  kPipeTypeUnused,
+  kPipeTypeVIG,
+  kPipeTypeRGB,
+  kPipeTypeDMA,
+  kPipeTypeCursor,
+};
+
 struct HWDynBwLimitInfo {
   uint32_t cur_mode = kBwDefault;
   uint32_t total_bw_limit[kBwModeMax] = { 0 };
   uint32_t pipe_bw_limit[kBwModeMax] = { 0 };
+};
+
+struct HWPipeCaps {
+  PipeType type = kPipeTypeUnused;
+  uint32_t id = 0;
 };
 
 struct HWResourceInfo {
@@ -111,6 +125,7 @@ struct HWResourceInfo {
   bool perf_calc = false;
   bool has_dyn_bw_support = false;
   HWDynBwLimitInfo dyn_bw_info;
+  std::vector<HWPipeCaps> hw_pipes;
 
   void Reset() { *this = HWResourceInfo(); }
 };

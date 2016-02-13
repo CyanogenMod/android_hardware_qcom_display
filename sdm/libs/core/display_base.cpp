@@ -535,11 +535,6 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
                          num_modes, active_index);
 
   DisplayConfigVariableInfo &info = attrib;
-  DumpImpl::AppendString(buffer, length, "\nres:%u x %u, dpi:%.2f x %.2f, fps:%u,"
-                         "vsync period: %u", info.x_pixels, info.y_pixels, info.x_dpi,
-                         info.y_dpi, info.fps, info.vsync_period_ns);
-
-  DumpImpl::AppendString(buffer, length, "\n");
 
   uint32_t num_hw_layers = 0;
   if (hw_layers_.info.stack) {
@@ -550,6 +545,18 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     DumpImpl::AppendString(buffer, length, "\nNo hardware layers programmed");
     return;
   }
+
+  LayerBuffer *out_buffer = hw_layers_.info.stack->output_buffer;
+  if (out_buffer) {
+    DumpImpl::AppendString(buffer, length, "\nres:%u x %u format: %s", out_buffer->width,
+                           out_buffer->height, GetName(out_buffer->format));
+  } else {
+    DumpImpl::AppendString(buffer, length, "\nres:%u x %u, dpi:%.2f x %.2f, fps:%u,"
+                           "vsync period: %u", info.x_pixels, info.y_pixels, info.x_dpi,
+                           info.y_dpi, info.fps, info.vsync_period_ns);
+  }
+
+  DumpImpl::AppendString(buffer, length, "\n");
 
   HWLayersInfo &layer_info = hw_layers_.info;
   LayerRect &l_roi = layer_info.left_partial_update;
