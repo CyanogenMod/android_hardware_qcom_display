@@ -47,22 +47,6 @@ const static int X_START_TABLE[] = {0,176,168,160,152,152,144,144,136,136,136,12
 
 const static int TABLE_SIZE = sizeof(X_START_TABLE) / sizeof(X_START_TABLE[0]);
 const static uint8_t MASK[8] = {0xff, 0, 0xff, 0, 0xff, 0, 0xff, 0};
-const static uint8x8_t MASK_8X8 = vld1_u8(MASK);
-const static uint8x8_t THREE_8X8 = vdup_n_u8(3);
-
-const static inline uint8x8_t renderSingleChannel(uint8x8x4_t pixelAbove, uint8x8x4_t pixelCenter,
-        uint8x8x4_t pixelBelow, int channel) {
-    uint8x8_t temp;
-    uint16x8_t temp1;
-    uint16x8_t temp2;
-    uint16x8_t temp3;
-
-    temp = vbsl_u8(MASK_8X8, pixelAbove.val[channel], pixelBelow.val[channel]);
-    temp1 = vmovl_u8(temp);
-    temp2 = vmull_u8(pixelCenter.val[channel], THREE_8X8);
-    temp3 = vaddq_u16(temp2, temp1);
-    return vshrn_n_u16(temp3, 2);
-}
 
 /*
  * Delta Real Panel Rending - Delta real pixel rending for Wearable device panel.
@@ -75,9 +59,11 @@ void deltaPanelRendering(uint8_t *pImage, int width, int height)
     int x, y;
     uint8_t *pData;
     int byteWidth;
-    uint32_t *pPixelAbove, *pPixelCenter, *pPixelBelow;
+    uint32_t *pPixelAbove, *pPixelCenter, *pPixelBelow, *pPixelEnd;
     int64_t diff;
     int xStart, xEnd;
+    const uint8x8_t MASK_8X8 = vld1_u8(MASK);
+    const uint8x8_t THREE_8X8 = vdup_n_u8(3);
 
     byteWidth = width * BYTE_PER_PIXEL;
     pData = pImage + byteWidth;
@@ -88,31 +74,63 @@ void deltaPanelRendering(uint8_t *pImage, int width, int height)
         xStart = X_START_TABLE[y];
         xEnd = X_LAST - X_START_TABLE[y];
         pPixelCenter = ((uint32_t*)pData) + xStart;
+        pPixelEnd = ((uint32_t*)pData) + xEnd;
         pPixelAbove = pPixelCenter - width;
         pPixelBelow = pPixelCenter + width;
 
         // process 8 pixels
-        for(x = xStart; x <= xEnd; x += 8)
+        while (pPixelCenter <= pPixelEnd)
         {
-            uint8x8x4_t pixelAbove = vld4_u8((uint8_t *)pPixelAbove);
-            uint8x8x4_t pixelCenter = vld4_u8((uint8_t *)pPixelCenter);
-            uint8x8x4_t pixelBelow = vld4_u8((uint8_t *)pPixelBelow);
-
+            __asm__ __volatile__ (
+                    "vld4.8 {d8-d11}, [%[above]]! \n"
+                    "vld4.8 {d12-d15}, [%[below]]! \n"
+                    "vld4.8 {d16-d19}, [%[center]] \n"
 #ifdef DELTA_PANEL_R
-            pixelCenter.val[0] = renderSingleChannel(pixelAbove, pixelCenter, pixelBelow, 0);
+                    "vbit d12, d8, %[mask] \n"
 #endif
-
 #ifdef DELTA_PANEL_G
-            pixelCenter.val[1] = renderSingleChannel(pixelAbove, pixelCenter, pixelBelow, 1);
+                    "vbit d13, d9, %[mask] \n"
 #endif
-
 #ifdef DELTA_PANEL_B
-            pixelCenter.val[2] = renderSingleChannel(pixelAbove, pixelCenter, pixelBelow, 2);
+                    "vbit d14, d10, %[mask] \n"
 #endif
-            vst4_u8((uint8_t *)pPixelCenter, pixelCenter);
-            pPixelAbove += 8;
-            pPixelCenter += 8;
-            pPixelBelow += 8;
+#ifdef DELTA_PANEL_R
+                    "vmovl.u8 q0, d12 \n"
+#endif
+#ifdef DELTA_PANEL_G
+                    "vmovl.u8 q1, d13 \n"
+#endif
+#ifdef DELTA_PANEL_B
+                    "vmovl.u8 q2, d14 \n"
+#endif
+#ifdef DELTA_PANEL_R
+                    "vmlal.u8 q0, d16, %[three] \n"
+#endif
+#ifdef DELTA_PANEL_G
+                    "vmlal.u8 q1, d17, %[three] \n"
+#endif
+#ifdef DELTA_PANEL_B
+                    "vmlal.u8 q2, d18, %[three] \n"
+#endif
+#ifdef DELTA_PANEL_R
+                    "vshrn.i16 d16, q0, #2 \n"
+#endif
+#ifdef DELTA_PANEL_G
+                    "vshrn.i16 d17, q1, #2 \n"
+#endif
+#ifdef DELTA_PANEL_B
+                    "vshrn.i16 d18, q2, #2 \n"
+#endif
+                    "vst4.8 {d16-d19}, [%[center]]! \n"
+                    : [above]"+&r"(pPixelAbove)
+                        , [below]"+&r"(pPixelBelow)
+                        , [center]"+&r"(pPixelCenter)
+                    : [mask]"w"(MASK_8X8)
+                        , [three]"w"(THREE_8X8)
+                    : "d8", "d9", "d10", "d11"
+                        , "d12", "d13", "d14", "d15"
+                        , "d16", "d17", "d18", "d19"
+                        , "q0", "q1", "q2", "memory");
         }
 
         pData += byteWidth;
