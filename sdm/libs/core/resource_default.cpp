@@ -36,38 +36,40 @@ namespace sdm {
 
 DisplayError ResourceDefault::Init(const HWResourceInfo &hw_res_info) {
   DisplayError error = kErrorNone;
-  uint32_t num_pipe = 0;
 
-  num_pipe = hw_res_info.num_vig_pipe + hw_res_info.num_rgb_pipe + hw_res_info.num_dma_pipe;
+  num_pipe_ = hw_res_info.num_vig_pipe + hw_res_info.num_rgb_pipe + hw_res_info.num_dma_pipe;
 
-  if (num_pipe > kPipeIdMax) {
-    DLOGE("Number of pipe is over the limit! %d", num_pipe);
+  if (!num_pipe_) {
+    DLOGE("Number of H/W pipes is Zero!");
     return kErrorParameters;
   }
 
-  num_pipe_ = num_pipe;
+  src_pipes_ = new SourcePipe[num_pipe_];
   hw_res_info_ = hw_res_info;
-  // Init pipe info
-  vig_pipes_ = &src_pipes_[0];
-  rgb_pipes_ = &src_pipes_[hw_res_info_.num_vig_pipe];
-  dma_pipes_ = &src_pipes_[hw_res_info_.num_vig_pipe + hw_res_info_.num_rgb_pipe];
 
-  for (uint32_t i = 0; i < hw_res_info_.num_vig_pipe; i++) {
-    vig_pipes_[i].type = kPipeTypeVIG;
-    vig_pipes_[i].index = i;
-    vig_pipes_[i].mdss_pipe_id = GetMdssPipeId(vig_pipes_[i].type, i);
-  }
+  // Priority order of pipes: VIG, RGB, DMA
+  uint32_t vig_index = 0;
+  uint32_t rgb_index = hw_res_info_.num_vig_pipe;
+  uint32_t dma_index = rgb_index + hw_res_info_.num_rgb_pipe;
 
-  for (uint32_t i = 0; i < hw_res_info_.num_rgb_pipe; i++) {
-    rgb_pipes_[i].type = kPipeTypeRGB;
-    rgb_pipes_[i].index = i + hw_res_info_.num_vig_pipe;
-    rgb_pipes_[i].mdss_pipe_id = GetMdssPipeId(rgb_pipes_[i].type, i);
-  }
-
-  for (uint32_t i = 0; i < hw_res_info_.num_dma_pipe; i++) {
-    dma_pipes_[i].type = kPipeTypeDMA;
-    dma_pipes_[i].index = i + hw_res_info_.num_vig_pipe + hw_res_info_.num_rgb_pipe;
-    dma_pipes_[i].mdss_pipe_id = GetMdssPipeId(dma_pipes_[i].type, i);
+  for (uint32_t i = 0; i < num_pipe_; i++) {
+    const HWPipeCaps &pipe_caps = hw_res_info_.hw_pipes.at(i);
+    if (pipe_caps.type == kPipeTypeVIG) {
+      src_pipes_[vig_index].type = kPipeTypeVIG;
+      src_pipes_[vig_index].index = i;
+      src_pipes_[vig_index].mdss_pipe_id = pipe_caps.id;
+      vig_index++;
+    } else if (pipe_caps.type == kPipeTypeRGB) {
+      src_pipes_[rgb_index].type = kPipeTypeRGB;
+      src_pipes_[rgb_index].index = i;
+      src_pipes_[rgb_index].mdss_pipe_id = pipe_caps.id;
+      rgb_index++;
+    } else if (pipe_caps.type == kPipeTypeDMA) {
+      src_pipes_[dma_index].type = kPipeTypeDMA;
+      src_pipes_[dma_index].index = i;
+      src_pipes_[dma_index].mdss_pipe_id = pipe_caps.id;
+      dma_index++;
+    }
   }
 
   for (uint32_t i = 0; i < num_pipe_; i++) {
@@ -86,14 +88,16 @@ DisplayError ResourceDefault::Init(const HWResourceInfo &hw_res_info) {
 
   // TODO(user): clean it up, query from driver for initial pipe status.
 #ifndef SDM_VIRTUAL_DRIVER
-  rgb_pipes_[0].owner = kPipeOwnerKernelMode;
-  rgb_pipes_[1].owner = kPipeOwnerKernelMode;
+  rgb_index = hw_res_info_.num_vig_pipe;
+  src_pipes_[rgb_index].owner = kPipeOwnerKernelMode;
+  src_pipes_[rgb_index + 1].owner = kPipeOwnerKernelMode;
 #endif
 
   return error;
 }
 
 DisplayError ResourceDefault::Deinit() {
+  delete[] src_pipes_;
   return kErrorNone;
 }
 
@@ -212,8 +216,8 @@ DisplayError ResourceDefault::Acquire(Handle display_ctx, HWLayers *hw_layers) {
     }
   }
 
-  uint32_t left_index = kPipeIdMax;
-  uint32_t right_index = kPipeIdMax;
+  uint32_t left_index = num_pipe_;
+  uint32_t right_index = num_pipe_;
   bool need_scale = false;
 
   struct HWLayerConfig &layer_config = hw_layers->config[0];
@@ -332,45 +336,9 @@ DisplayError ResourceDefault::SetMaxMixerStages(Handle display_ctx, uint32_t max
   return kErrorNone;
 }
 
-uint32_t ResourceDefault::GetMdssPipeId(PipeType type, uint32_t index) {
-  uint32_t mdss_id = kPipeIdMax;
-  switch (type) {
-  case kPipeTypeVIG:
-    if (index < 3) {
-      mdss_id = kPipeIdVIG0 + index;
-    } else if (index == 3) {
-      mdss_id = kPipeIdVIG3;
-    } else {
-      DLOGE("vig pipe index is over the limit! %d", index);
-    }
-    break;
-  case kPipeTypeRGB:
-    if (index < 3) {
-      mdss_id = kPipeIdRGB0 + index;
-    } else if (index == 3) {
-      mdss_id = kPipeIdRGB3;
-    } else {
-      DLOGE("rgb pipe index is over the limit! %d", index);
-    }
-    break;
-  case kPipeTypeDMA:
-    if (index < 2) {
-      mdss_id = kPipeIdDMA0 + index;
-    } else {
-      DLOGE("dma pipe index is over the limit! %d", index);
-    }
-    break;
-  default:
-    DLOGE("wrong pipe type! %d", type);
-    break;
-  }
-
-  return (1 << mdss_id);
-}
-
 uint32_t ResourceDefault::SearchPipe(HWBlockType hw_block_id, SourcePipe *src_pipes,
                                 uint32_t num_pipe) {
-  uint32_t index = kPipeIdMax;
+  uint32_t index = num_pipe_;
   SourcePipe *src_pipe;
 
   // search the pipe being used
@@ -392,16 +360,16 @@ uint32_t ResourceDefault::NextPipe(PipeType type, HWBlockType hw_block_id) {
 
   switch (type) {
   case kPipeTypeVIG:
-    src_pipes = vig_pipes_;
+    src_pipes = &src_pipes_[0];
     num_pipe = hw_res_info_.num_vig_pipe;
     break;
   case kPipeTypeRGB:
-    src_pipes = rgb_pipes_;
+    src_pipes = &src_pipes_[hw_res_info_.num_vig_pipe];
     num_pipe = hw_res_info_.num_rgb_pipe;
     break;
   case kPipeTypeDMA:
   default:
-    src_pipes = dma_pipes_;
+    src_pipes = &src_pipes_[hw_res_info_.num_vig_pipe + hw_res_info_.num_rgb_pipe];
     num_pipe = hw_res_info_.num_dma_pipe;
     break;
   }
@@ -410,7 +378,7 @@ uint32_t ResourceDefault::NextPipe(PipeType type, HWBlockType hw_block_id) {
 }
 
 uint32_t ResourceDefault::GetPipe(HWBlockType hw_block_id, bool need_scale) {
-  uint32_t index = kPipeIdMax;
+  uint32_t index = num_pipe_;
 
   // The default behavior is to assume RGB and VG pipes have scalars
   if (!need_scale) {

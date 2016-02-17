@@ -97,6 +97,11 @@ int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
+  if (content_list->numHwLayers <= 1) {
+    flush_ = true;
+    return 0;
+  }
+
   status = PrepareLayerStack(content_list);
   if (status) {
     return status;
