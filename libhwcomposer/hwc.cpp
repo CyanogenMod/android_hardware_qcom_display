@@ -893,25 +893,6 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         return -EINVAL;
     }
 
-    //From HWComposer
-    static const uint32_t DISPLAY_ATTRIBUTES[] = {
-        HWC_DISPLAY_VSYNC_PERIOD,
-        HWC_DISPLAY_WIDTH,
-        HWC_DISPLAY_HEIGHT,
-        HWC_DISPLAY_DPI_X,
-        HWC_DISPLAY_DPI_Y,
-#ifdef GET_DISPLAY_SECURE_STATUS_FROM_HWC
-        HWC_DISPLAY_SECURE,
-#endif
-#ifdef GET_FRAMEBUFFER_FORMAT_FROM_HWC
-        HWC_DISPLAY_FBFORMAT,
-#endif
-        HWC_DISPLAY_NO_ATTRIBUTE,
-    };
-
-    const size_t NUM_DISPLAY_ATTRIBUTES = (sizeof(DISPLAY_ATTRIBUTES) /
-            sizeof(DISPLAY_ATTRIBUTES)[0]);
-
     uint32_t xres = 0, yres = 0, refresh = 0, fps = 0;
     int ret = 0;
     if (hotPluggable) {
