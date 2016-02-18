@@ -1885,6 +1885,7 @@ bool configHwCursor(const int fd, int dpy, hwc_layer_1_t* layer) {
     int srcH = src.bottom - src.top;
     int dstW = dst.right - dst.left;
     int dstH = dst.bottom - dst.top;
+    bool updating = layerUpdating(layer);
 
     Whf whf(getWidth(hnd), getHeight(hnd), hnd->format);
     Dim crop(src.left, src.top, srcW, srcH);
@@ -1904,7 +1905,7 @@ bool configHwCursor(const int fd, int dpy, hwc_layer_1_t* layer) {
         dst.left, dst.top, dstW, dstH);
 
     return HWCursor::getInstance()->config(fd, (void*)hnd->base, pargs,
-                crop, dest);
+                crop, dest, updating);
 }
 
 void freeHwCursor(const int fd, int dpy) {
