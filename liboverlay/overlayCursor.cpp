@@ -44,12 +44,18 @@ HWCursor* HWCursor::getInstance() {
 }
 
 bool HWCursor::config(const int fd, void* base, PipeArgs& pargs,
-                    Dim& crop, Dim& dest) {
+                    Dim& crop, Dim& dest, bool updating) {
     bool ret = true;
     fb_cursor *cursor = &mfbCursor;
     fb_image cursorImage;
 
-    cursor->set = FB_CUR_SETIMAGE | FB_CUR_SETPOS;
+    cursor->set = FB_CUR_SETPOS;
+    if(updating) {
+        cursor->set |= FB_CUR_SETIMAGE;
+    } else {
+        cursor->set &= (uint16_t)~FB_CUR_SETIMAGE;
+    }
+
     cursor->enable = (uint16_t)1;
     cursor->rop = 0,
     cursor->mask = NULL;

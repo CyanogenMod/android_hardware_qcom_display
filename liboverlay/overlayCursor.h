@@ -43,7 +43,7 @@ class HWCursor {
 public:
     static HWCursor* getInstance();
     bool config(const int fd, void* base, PipeArgs& pargs, Dim& crop,
-            Dim& dest);
+            Dim& dest, bool updating);
     bool setPositionAsync(const int fd, int x, int y);
     bool free(const int fd);
     bool isCursorSet() { return mfbCursor.enable; }
