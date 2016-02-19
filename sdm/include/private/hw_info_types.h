@@ -138,6 +138,7 @@ struct HWResourceInfo {
   bool is_src_split = false;
   bool perf_calc = false;
   bool has_dyn_bw_support = false;
+  bool separate_rotator = false;
   HWDynBwLimitInfo dyn_bw_info;
   std::vector<HWPipeCaps> hw_pipes;
   FormatsMap supported_formats_map;

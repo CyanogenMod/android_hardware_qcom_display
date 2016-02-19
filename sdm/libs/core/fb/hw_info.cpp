@@ -244,6 +244,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
             hw_resource->perf_calc = true;
           } else if (!strncmp(tokens[i], "dynamic_bw_limit", strlen("dynamic_bw_limit"))) {
             hw_resource->has_dyn_bw_support = true;
+          } else if (!strncmp(tokens[i], "separate_rotator", strlen("separate_rotator"))) {
+            hw_resource->separate_rotator = true;
           }
         }
       } else if (!strncmp(tokens[0], "pipe_count", strlen("pipe_count"))) {
