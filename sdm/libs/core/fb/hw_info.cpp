@@ -323,7 +323,9 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->macrotile_nv12_factor, hw_resource->macrotile_factor,
         hw_resource->linear_factor, hw_resource->scale_factor, hw_resource->extra_fudge_factor);
 
-  GetHWRotatorInfo(hw_resource);
+  if (hw_resource->separate_rotator || hw_resource->num_dma_pipe) {
+    GetHWRotatorInfo(hw_resource);
+  }
 
   if (hw_resource->has_dyn_bw_support) {
     DisplayError ret = GetDynamicBWLimits(hw_resource);
