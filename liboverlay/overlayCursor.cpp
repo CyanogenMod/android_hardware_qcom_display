@@ -101,7 +101,7 @@ bool HWCursor::free(const int fd) {
     }
 
     cursor->enable = (uint16_t)0;
-
+    cursor->set = 0;
     if (!setCursor(fd)) {
         ALOGE("%s: Failed to free cursor hw", __FUNCTION__);
         ret = false;

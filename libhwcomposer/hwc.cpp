@@ -48,6 +48,7 @@ using namespace qQdcm;
 
 #define VSYNC_DEBUG 0
 #define POWER_MODE_DEBUG 1
+#define CURSOR_DEBUG 0
 
 static int hwc_device_open(const struct hw_module_t* module,
                            const char* name,
@@ -471,6 +472,17 @@ static int hwc_setCursorPositionAsync(struct hwc_composer_device_1* dev,
         int dpy, int x, int y) {
     int ret = -1;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    if(!validDisplay(dpy)) {
+        return -EINVAL;
+    }
+
+    if((x < 0) || (x > (int)ctx->dpyAttr[dpy].xres) ||
+       (y < 0) || (y > (int)ctx->dpyAttr[dpy].yres)) {
+        ALOGD_IF(CURSOR_DEBUG, "%s: Invalid cursor position x=%d y=%d",
+                __FUNCTION__,x,y);
+        return 0;
+    }
     switch(dpy) {
         case HWC_DISPLAY_PRIMARY:
         {
