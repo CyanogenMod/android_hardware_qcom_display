@@ -38,6 +38,8 @@ namespace qhwc {
 #define SPD_NAME_LENGTH                 16
 
 int HDMIDisplay::configure() {
+    char value[PROPERTY_VALUE_MAX];
+
     if(!openFrameBuffer()) {
         ALOGE("%s: Failed to open FB: %d", __FUNCTION__, mFbNum);
         return -1;
@@ -50,11 +52,18 @@ int HDMIDisplay::configure() {
     mActiveConfig = getUserConfig();
     if (mActiveConfig == -1) {
         //Get the best mode and set
-        mActiveConfig = getBestConfig();
+        property_get("hw.hdmi.s3d_enable", value, "0");
+        if (atoi(value) != 0) {
+            mActiveConfig = getBestConfig(HDMI_S3D_SIDE_BY_SIDE);
+            if (mActiveConfig == -1) {
+                mActiveConfig = getBestConfig(HDMI_S3D_NONE);
+            }
+        } else {
+            mActiveConfig = getBestConfig(HDMI_S3D_NONE);
+        }
     }
 
     // Read the system property to determine if downscale feature is enabled.
-    char value[PROPERTY_VALUE_MAX];
     mMDPDownscaleEnabled = false;
     if(property_get("sys.hwc.mdp_downscale_enabled", value, "false")
             && !strcmp(value, "true")) {
@@ -407,10 +416,63 @@ int HDMIDisplay::getUserConfig() {
     return -1;
 }
 
+void HDMIDisplay::getS3DConfigs(uint32_t* s3d_configs) {
+    char *saveptr_l1, *saveptr_l2, *saveptr_l3;
+    char *l1, *l2, *l3;
+    int edid_s3d_node;
+    ssize_t length = -1;
+    char edid_s3d_str[PAGE_SIZE] = {'\0'};
+
+    for (int i = 0; i < mModeCount; i++) {
+        s3d_configs[i] = 0;
+        SET_BIT(s3d_configs[i], HDMI_S3D_NONE);
+    }
+
+    edid_s3d_node = openDeviceNode("edid_3d_modes", O_RDONLY);
+    if (edid_s3d_node < 0) {
+        ALOGE_IF(DEBUG, "%s: open device node edid_3d_modes failed", __FUNCTION__);
+        return;
+    }
+
+    length = read(edid_s3d_node, edid_s3d_str, sizeof(edid_s3d_str)-1);
+    if (length <= 0) {
+        ALOGE_IF(DEBUG, "%s: read device node edid_3d_modes failed", __FUNCTION__);
+        close(edid_s3d_node);
+        return;
+    }
+
+    // Three level inception!
+    // The string looks like 16=SSH,4=FP:TAB:SSH,5=FP:SSH,31=FP:TAB:SSH
+    l1 = strtok_r(edid_s3d_str, ",", &saveptr_l1);
+    while (l1 != NULL) {
+        l2 = strtok_r(l1, "=", &saveptr_l2);
+        if (l2 != NULL) {
+            for (int index = 0; index < mModeCount; index++) {
+                if (mEDIDModes[index] == (int)atoi(l2)) {
+                    l3 = strtok_r(saveptr_l2, ":", &saveptr_l3);
+                    while (l3 != NULL) {
+                        if (strncmp("SSH", l3, strlen("SSH")) == 0) {
+                            SET_BIT(s3d_configs[index], HDMI_S3D_SIDE_BY_SIDE);
+                        } else if (strncmp("TAB", l3, strlen("TAB")) == 0) {
+                            SET_BIT(s3d_configs[index], HDMI_S3D_TOP_AND_BOTTOM);
+                        } else if (strncmp("FP", l3, strlen("FP")) == 0) {
+                            SET_BIT(s3d_configs[index], HDMI_S3D_FRAME_PACKING);
+                        }
+                        l3 = strtok_r(NULL, ":", &saveptr_l3);
+                    }
+                }
+            }
+            l1 = strtok_r(NULL, ",", &saveptr_l1);
+        }
+    }
+    close(edid_s3d_node);
+}
+
 // Get the index of the best mode for the current HD TV
-int HDMIDisplay::getBestConfig() {
-    int bestConfigIndex = 0;
+int HDMIDisplay::getBestConfig(int s3d_mode) {
+    int bestConfigIndex = -1;
     int edidMode = -1;
+    uint32_t* s3d_configs = NULL;
     struct msm_hdmi_mode_timing_info currentModeInfo = {0};
     struct msm_hdmi_mode_timing_info bestModeInfo = {0};
     bestModeInfo.video_format = 0;
@@ -419,6 +481,10 @@ int HDMIDisplay::getBestConfig() {
     bestModeInfo.refresh_rate = 0;
     bestModeInfo.ar = HDMI_RES_AR_INVALID;
 
+    // get S3D configs for all the modes
+    s3d_configs = new uint32_t[mModeCount];
+    getS3DConfigs(s3d_configs);
+
     // for all the timing info read, get the best config
     for (int configIndex = 0; configIndex < mModeCount; configIndex++) {
         currentModeInfo = mDisplayConfigs[configIndex];
@@ -426,6 +492,12 @@ int HDMIDisplay::getBestConfig() {
 
         if (!isValidMode(edidMode)) {
             ALOGD("%s EDID Mode %d is not supported", __FUNCTION__, edidMode);
+            continue;
+        }
+
+        if (!IS_BIT_SET(s3d_configs[configIndex], s3d_mode)) {
+            ALOGD("%s EDID Mode %d cannot support s3d mode %d", __FUNCTION__,
+                  edidMode, s3d_mode);
             continue;
         }
 
@@ -457,6 +529,10 @@ int HDMIDisplay::getBestConfig() {
         if (bestConfigIndex == configIndex) {
             bestModeInfo = mDisplayConfigs[bestConfigIndex];
         }
+    }
+    if (s3d_configs) {
+        delete [] s3d_configs;
+        s3d_configs = NULL;
     }
     return bestConfigIndex;
 }
