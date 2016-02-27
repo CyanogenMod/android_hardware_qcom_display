@@ -24,6 +24,10 @@
 #include <linux/fb.h>
 #include <video/msm_hdmi_modes.h>
 
+#define SET_BIT(value, bit) (value |= (1 << (bit)))
+#define CLEAR_BIT(value, bit) (value &= (~(1 << (bit))))
+#define IS_BIT_SET(value, bit) (value & (1 << (bit)))
+
 struct msm_hdmi_mode_timing_info;
 
 namespace qhwc {
@@ -79,7 +83,7 @@ private:
     bool isValidMode(int mode);
     int  getModeOrder(int mode);
     int  getUserConfig();
-    int  getBestConfig();
+    int  getBestConfig(int s3d_mode);
     bool isInterlacedMode(int mode);
     void resetInfo();
     void setAttributes();
@@ -90,6 +94,7 @@ private:
     void readConfigs();
     bool readResFile(char* configBuffer);
     bool writeS3DMode(int s3dMode);
+    void getS3DConfigs(uint32_t* s3d_configs);
 
     int mFd;
     int mFbNum;
