@@ -330,8 +330,8 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
     uint32_t num_visible_rects = 0;
     uint32_t num_dirty_rects = 0;
 
-    hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     if (i < num_hw_layers) {
+      hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
       num_visible_rects = INT32(hwc_layer.visibleRegionScreen.numRects);
       num_dirty_rects = INT32(hwc_layer.surfaceDamage.numRects);
     }
@@ -373,8 +373,9 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
     uint32_t num_dirty_rects = 0;
 
     if (i < num_hw_layers) {
-      num_visible_rects = UINT32(content_list->hwLayers[i].visibleRegionScreen.numRects);
-      num_dirty_rects = UINT32(content_list->hwLayers[i].surfaceDamage.numRects);
+      hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
+      num_visible_rects = UINT32(hwc_layer.visibleRegionScreen.numRects);
+      num_dirty_rects = UINT32(hwc_layer.surfaceDamage.numRects);
     }
 
     Layer &layer = layer_stack_.layers[i];
