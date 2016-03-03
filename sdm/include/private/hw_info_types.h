@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -29,9 +29,9 @@
 #include <core/display_interface.h>
 #include <core/core_interface.h>
 #include <vector>
+#include <map>
 
 namespace sdm {
-
 const int kMaxSDELayers = 16;   // Maximum number of layers that can be handled by hardware in a
                                 // given layer stack.
 
@@ -74,6 +74,19 @@ enum PipeType {
   kPipeTypeDMA,
   kPipeTypeCursor,
 };
+
+enum HWSubBlockType {
+  kHWVIGPipe,
+  kHWRGBPipe,
+  kHWDMAPipe,
+  kHWCursorPipe,
+  kHWRotatorInput,
+  kHWRotatorOutput,
+  kHWWBIntfOutput,
+  kHWSubBlockMax,
+};
+
+typedef std::map<HWSubBlockType, std::vector<LayerBufferFormat>> FormatsMap;
 
 struct HWDynBwLimitInfo {
   uint32_t cur_mode = kBwDefault;
@@ -126,6 +139,7 @@ struct HWResourceInfo {
   bool has_dyn_bw_support = false;
   HWDynBwLimitInfo dyn_bw_info;
   std::vector<HWPipeCaps> hw_pipes;
+  FormatsMap supported_formats_map;
 
   void Reset() { *this = HWResourceInfo(); }
 };

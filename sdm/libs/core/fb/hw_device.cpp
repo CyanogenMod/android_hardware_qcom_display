@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -254,17 +254,15 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         DLOGV_IF(kTagDriverConfig, "dst_rect [%d, %d, %d, %d]", mdp_layer.dst_rect.x,
                  mdp_layer.dst_rect.y, mdp_layer.dst_rect.w, mdp_layer.dst_rect.h);
         for (int j = 0; j < 4; j++) {
+          mdp_scale_data *scale = reinterpret_cast<mdp_scale_data*>(mdp_layer.scale);
           DLOGV_IF(kTagDriverConfig, "Scale Data[%d]: Phase=[%x %x %x %x] Pixel_Ext=[%d %d %d %d]",
-                 j, mdp_layer.scale->init_phase_x[j], mdp_layer.scale->phase_step_x[j],
-                 mdp_layer.scale->init_phase_y[j], mdp_layer.scale->phase_step_y[j],
-                 mdp_layer.scale->num_ext_pxls_left[j], mdp_layer.scale->num_ext_pxls_top[j],
-                 mdp_layer.scale->num_ext_pxls_right[j], mdp_layer.scale->num_ext_pxls_btm[j]);
+                 j, scale->init_phase_x[j], scale->phase_step_x[j], scale->init_phase_y[j],
+                 scale->phase_step_y[j], scale->num_ext_pxls_left[j], scale->num_ext_pxls_top[j],
+                 scale->num_ext_pxls_right[j], scale->num_ext_pxls_btm[j]);
           DLOGV_IF(kTagDriverConfig, "Fetch=[%d %d %d %d]  Repeat=[%d %d %d %d]  roi_width = %d",
-                 mdp_layer.scale->left_ftch[j], mdp_layer.scale->top_ftch[j],
-                 mdp_layer.scale->right_ftch[j], mdp_layer.scale->btm_ftch[j],
-                 mdp_layer.scale->left_rpt[j], mdp_layer.scale->top_rpt[j],
-                 mdp_layer.scale->right_rpt[j], mdp_layer.scale->btm_rpt[j],
-                 mdp_layer.scale->roi_w[j]);
+                 scale->left_ftch[j], scale->top_ftch[j], scale->right_ftch[j], scale->btm_ftch[j],
+                 scale->left_rpt[j], scale->top_rpt[j], scale->right_rpt[j], scale->btm_rpt[j],
+                 scale->roi_w[j]);
         }
         DLOGV_IF(kTagDriverConfig, "*************************************************************");
       }
