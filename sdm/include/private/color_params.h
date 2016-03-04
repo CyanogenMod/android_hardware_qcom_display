@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2015-2016, The Linux Foundataion. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -184,6 +184,18 @@ struct SDEPccCfg {
 
   static SDEPccCfg *Init(uint32_t arg __attribute__((__unused__)));
   SDEPccCfg *GetConfig() { return this; }
+};
+
+struct SDEDitherCfg {
+  uint32_t g_y_depth;
+  uint32_t r_cr_depth;
+  uint32_t b_cb_depth;
+  uint32_t length;
+  uint32_t dither_matrix[16];
+  uint32_t temporal_en;
+
+  static SDEDitherCfg *Init(uint32_t arg __attribute__((__unused__)));
+  SDEDitherCfg *GetConfig() { return this; }
 };
 
 struct SDEPaMemColorData {
