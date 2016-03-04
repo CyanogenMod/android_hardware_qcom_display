@@ -107,8 +107,11 @@ BlitEngineC2d::~BlitEngineC2d() {
 }
 
 int BlitEngineC2d::Init() {
-  hw_module_t const *module;
+  if (!blit_supported_) {
+    return -1;
+  }
 
+  hw_module_t const *module;
   if (hw_get_module("copybit", &module) == 0) {
     if (copybit_open(module, &blit_engine_c2d_) < 0) {
       DLOGI("CopyBitC2D Open failed.");
