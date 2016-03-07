@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -28,9 +28,10 @@
 #include <stdint.h>
 #include <core/display_interface.h>
 #include <core/core_interface.h>
+#include <vector>
+#include <map>
 
 namespace sdm {
-
 const int kMaxSDELayers = 16;   // Maximum number of layers that can be handled by hardware in a
                                 // given layer stack.
 
@@ -66,10 +67,36 @@ enum HWDisplayPort {
   kPortEDP,
 };
 
+enum PipeType {
+  kPipeTypeUnused,
+  kPipeTypeVIG,
+  kPipeTypeRGB,
+  kPipeTypeDMA,
+  kPipeTypeCursor,
+};
+
+enum HWSubBlockType {
+  kHWVIGPipe,
+  kHWRGBPipe,
+  kHWDMAPipe,
+  kHWCursorPipe,
+  kHWRotatorInput,
+  kHWRotatorOutput,
+  kHWWBIntfOutput,
+  kHWSubBlockMax,
+};
+
+typedef std::map<HWSubBlockType, std::vector<LayerBufferFormat>> FormatsMap;
+
 struct HWDynBwLimitInfo {
   uint32_t cur_mode = kBwDefault;
   uint32_t total_bw_limit[kBwModeMax] = { 0 };
   uint32_t pipe_bw_limit[kBwModeMax] = { 0 };
+};
+
+struct HWPipeCaps {
+  PipeType type = kPipeTypeUnused;
+  uint32_t id = 0;
 };
 
 struct HWResourceInfo {
@@ -111,6 +138,8 @@ struct HWResourceInfo {
   bool perf_calc = false;
   bool has_dyn_bw_support = false;
   HWDynBwLimitInfo dyn_bw_info;
+  std::vector<HWPipeCaps> hw_pipes;
+  FormatsMap supported_formats_map;
 
   void Reset() { *this = HWResourceInfo(); }
 };
@@ -126,6 +155,15 @@ struct HWSplitInfo {
   bool operator ==(const HWSplitInfo &split_info) {
     return !(operator !=(split_info));
   }
+};
+
+enum HWS3DMode {
+  kS3DModeNone,
+  kS3DModeLR,
+  kS3DModeRL,
+  kS3DModeTB,
+  kS3DModeFP,
+  kS3DModeMax,
 };
 
 struct HWPanelInfo {
@@ -146,6 +184,8 @@ struct HWPanelInfo {
   bool is_pluggable = false;          // Panel is pluggable
   HWSplitInfo split_info;             // Panel split configuration
   char panel_name[256] = {0};         // Panel name
+  HWS3DMode s3d_mode = kS3DModeNone;  // Panel's current s3d mode.
+  int panel_max_brightness = 0;       // Max panel brightness
 
   bool operator !=(const HWPanelInfo &panel_info) {
     return ((port != panel_info.port) || (mode != panel_info.mode) ||
@@ -157,7 +197,8 @@ struct HWPanelInfo {
             (needs_roi_merge != panel_info.needs_roi_merge) ||
             (dynamic_fps != panel_info.dynamic_fps) || (min_fps != panel_info.min_fps) ||
             (max_fps != panel_info.max_fps) || (is_primary_panel != panel_info.is_primary_panel) ||
-            (split_info != panel_info.split_info));
+            (split_info != panel_info.split_info) ||
+            (s3d_mode != panel_info.s3d_mode));
   }
 
   bool operator ==(const HWPanelInfo &panel_info) {
@@ -258,6 +299,8 @@ struct HWLayersInfo {
 
   uint32_t index[kMaxSDELayers];   // Indexes of the layers from the layer stack which need to be
                                    // programmed on hardware.
+  LayerRect updated_src_rect[kMaxSDELayers];  // Updated layer src rects in s3d mode
+  LayerRect updated_dst_rect[kMaxSDELayers];  // Updated layer dst rects in s3d mode
 
   uint32_t count = 0;              // Total number of layers which need to be set on hardware.
 
@@ -284,6 +327,7 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
   uint32_t v_back_porch = 0;   //!< Vertical back porch of panel
   uint32_t v_pulse_width = 0;  //!< Vertical pulse width of panel
   uint32_t h_total = 0;        //!< Total width of panel (hActive + hFP + hBP + hPulseWidth)
+  uint32_t s3d_config = 0;     //!< Stores the bit mask of S3D modes
 
   void Reset() { *this = HWDisplayAttributes(); }
 

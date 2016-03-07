@@ -56,28 +56,6 @@ class ResourceDefault : public ResourceInterface {
   DisplayError SetMaxBandwidthMode(HWBwModes mode);
 
  private:
-  enum PipeId {
-    kPipeIdVIG0,
-    kPipeIdVIG1,
-    kPipeIdVIG2,
-    kPipeIdRGB0,
-    kPipeIdRGB1,
-    kPipeIdRGB2,
-    kPipeIdDMA0,
-    kPipeIdDMA1,
-    kPipeIdVIG3,
-    kPipeIdRGB3,
-    kPipeIdMax,
-  };
-
-  enum PipeType {
-    kPipeTypeUnused,
-    kPipeTypeVIG,
-    kPipeTypeRGB,
-    kPipeTypeDMA,
-    kPipeTypeMax,
-  };
-
   enum PipeOwner {
     kPipeOwnerUserMode,       // Pipe state when it is available for reservation
     kPipeOwnerKernelMode,  // Pipe state when pipe is owned by kernel
@@ -96,7 +74,7 @@ class ResourceDefault : public ResourceInterface {
     HWBlockType hw_block_id;
     int priority;
 
-    SourcePipe() : type(kPipeTypeUnused), owner(kPipeOwnerUserMode), mdss_pipe_id(kPipeIdMax),
+    SourcePipe() : type(kPipeTypeUnused), owner(kPipeOwnerUserMode), mdss_pipe_id(0),
                   index(0), hw_block_id(kHWBlockMax), priority(0) { }
 
     inline void ResetState() { hw_block_id = kHWBlockMax;}
@@ -115,7 +93,6 @@ class ResourceDefault : public ResourceInterface {
     HWBlockContext() : is_in_use(false) { }
   };
 
-  uint32_t GetMdssPipeId(PipeType pipe_type, uint32_t index);
   uint32_t NextPipe(PipeType pipe_type, HWBlockType hw_block_id);
   uint32_t SearchPipe(HWBlockType hw_block_id, SourcePipe *src_pipes, uint32_t num_pipe);
   uint32_t GetPipe(HWBlockType hw_block_id, bool need_scale);
@@ -146,11 +123,8 @@ class ResourceDefault : public ResourceInterface {
   Locker locker_;
   HWResourceInfo hw_res_info_;
   HWBlockContext hw_block_ctx_[kHWBlockMax];
-  SourcePipe src_pipes_[kPipeIdMax];
+  SourcePipe *src_pipes_ = NULL;
   uint32_t num_pipe_ = 0;
-  SourcePipe *vig_pipes_ = NULL;
-  SourcePipe *rgb_pipes_ = NULL;
-  SourcePipe *dma_pipes_ = NULL;
 };
 
 }  // namespace sdm

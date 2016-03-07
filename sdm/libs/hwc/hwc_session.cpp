@@ -311,7 +311,7 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
 }
 
 int HWCSession::GetVsyncPeriod(int disp) {
-  SEQUENCE_ENTRY_SCOPE_LOCK(locker_);
+  SCOPE_LOCK(locker_);
   // default value
   int32_t vsync_period = 1000000000l / 60;
   const uint32_t attribute = HWC_DISPLAY_VSYNC_PERIOD;
@@ -1110,6 +1110,9 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel *input_parcel
   if (!color_mgr_) {
     return -1;
   }
+
+  pending_action.action = kNoAction;
+  pending_action.params = NULL;
 
   // Read display_id, payload_size and payload from in_parcel.
   ret = HWCColorManager::CreatePayloadFromParcel(*input_parcel, &display_id, &req_payload);

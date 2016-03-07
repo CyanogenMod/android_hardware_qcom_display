@@ -97,14 +97,17 @@ int HWCDisplayPrimary::Init() {
   return HWCDisplay::Init();
 }
 
-void HWCDisplayPrimary::ProcessBootAnimCompleted() {
-  char value[PROPERTY_VALUE_MAX];
+void HWCDisplayPrimary::ProcessBootAnimCompleted(hwc_display_contents_1_t *list) {
+  uint32_t numBootUpLayers = 0;
 
-  // Applying default mode after bootanimation is finished
-  property_get("init.svc.bootanim", value, "running");
-  if (!strncmp(value, "stopped", strlen("stopped"))) {
+  numBootUpLayers = static_cast<uint32_t>(Debug::GetBootAnimLayerCount());
+
+  if (numBootUpLayers == 0) {
+    numBootUpLayers = 2;
+  }
+
+  if (list->numHwLayers > numBootUpLayers) {
     boot_animation_completed_ = true;
-
     // one-shot action check if bootanimation completed then apply default display mode.
     if (display_intf_)
       display_intf_->ApplyDefaultDisplayMode();
@@ -116,7 +119,7 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
   DisplayError error = kErrorNone;
 
   if (!boot_animation_completed_)
-    ProcessBootAnimCompleted();
+    ProcessBootAnimCompleted(content_list);
 
   if (display_paused_) {
     MarkLayersForGPUBypass(content_list);
@@ -148,6 +151,11 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
 
   if (handle_idle_timeout_) {
     handle_idle_timeout_ = false;
+  }
+
+  if (content_list->numHwLayers <= 1) {
+    flush_ = true;
+    return 0;
   }
 
   status = PrepareLayerStack(content_list);

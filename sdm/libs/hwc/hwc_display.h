@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -29,6 +29,7 @@
 #include <core/core_interface.h>
 #include <qdMetaData.h>
 #include <private/color_params.h>
+#include <map>
 
 namespace sdm {
 
@@ -92,15 +93,6 @@ class HWCDisplay : public DisplayEventHandler {
   // Maximum number of layers supported by display manager.
   static const uint32_t kMaxLayerCount = 32;
 
-  // Structure to track memory allocation for layer stack (layers, rectangles) object.
-  struct LayerStackMemory {
-    static const size_t kSizeSteps = 1024;  // Default memory allocation.
-    uint8_t *raw;  // Pointer to byte array.
-    size_t size;  // Current number of allocated bytes.
-
-    LayerStackMemory() : raw(NULL), size(0) { }
-  };
-
   struct LayerCache {
     buffer_handle_t handle;
     uint8_t plane_alpha;
@@ -126,6 +118,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual DisplayError Refresh();
 
   virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
+  virtual void DeallocateLayerStack();
   virtual int PrePrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
@@ -148,7 +141,7 @@ class HWCDisplay : public DisplayEventHandler {
   DisplayError SetMetaData(const private_handle_t *pvt_handle, Layer *layer);
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
   void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
-  bool IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache);
+  bool IsLayerUpdating(hwc_display_contents_1_t *content_list, int layer_index);
   bool SingleLayerUpdating(uint32_t app_layer_count);
   uint32_t SanitizeRefreshRate(uint32_t req_refresh_rate);
 
@@ -163,7 +156,6 @@ class HWCDisplay : public DisplayEventHandler {
   int id_;
   bool needs_blit_;
   DisplayInterface *display_intf_ = NULL;
-  LayerStackMemory layer_stack_memory_;
   LayerStack layer_stack_;
   LayerStackCache layer_stack_cache_;
   bool flush_on_error_ = false;
@@ -189,6 +181,7 @@ class HWCDisplay : public DisplayEventHandler {
   bool solid_fill_enable_ = false;
   uint32_t solid_fill_color_ = 0;
   LayerRect display_rect_;
+  std::map<int, LayerBufferS3DFormat> s3d_format_hwc_to_sdm_;
 
  private:
   bool IsFrameBufferScaled();

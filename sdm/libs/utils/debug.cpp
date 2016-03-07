@@ -59,6 +59,13 @@ int Debug::GetIdleTimeoutMs() {
   return value;
 }
 
+int Debug::GetBootAnimLayerCount() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.boot_anim_layer_count", &value);
+
+  return value;
+}
+
 bool Debug::IsRotatorDownScaleDisabled() {
   int value = 0;
   debug_.debug_handler_->GetProperty("sdm.debug.rotator_downscale", &value);
