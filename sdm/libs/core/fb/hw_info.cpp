@@ -235,6 +235,10 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->scale_factor = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "xtra_ff_factor", strlen("xtra_ff_factor"))) {
         hw_resource->extra_fudge_factor = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "amortizable_threshold", strlen("amortizable_threshold"))) {
+        hw_resource->amortizable_threshold = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "system_overhead_lines", strlen("system_overhead_lines"))) {
+        hw_resource->system_overhead_lines = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "features", strlen("features"))) {
         for (uint32_t i = 0; i < token_count; i++) {
           if (!strncmp(tokens[i], "bwc", strlen("bwc"))) {
