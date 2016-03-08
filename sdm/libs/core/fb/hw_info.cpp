@@ -56,14 +56,14 @@ namespace sdm {
 // kDefaultFormatSupport contains the bit map of supported formats for each hw blocks.
 // For eg: if Cursor supports MDP_RGBA_8888[bit-13] and MDP_RGB_565[bit-0], then cursor pipe array
 // contains { 0x01[0-3], 0x00[4-7], 0x00[8-12], 0x01[13-16], 0x00[17-20], 0x00[21-24], 0x00[24-28] }
-const uint8_t HWInfo::kDefaultFormatSupport[kHWSubBlockMax][BITS_TO_BYTES(MDP_IMGTYPE_LIMIT)] = {
-  { 0xFF, 0xF5, 0x1C, 0x1E, 0x20, 0xFF, 0x01 },  // kHWVIGPipe
-  { 0x33, 0xE0, 0x00, 0x16, 0x00, 0xBF, 0x00 },  // kHWRGBPipe
-  { 0x33, 0xE0, 0x00, 0x16, 0x00, 0xBF, 0x00 },  // kHWDMAPipe
-  { 0x12, 0x60, 0x0C, 0x00, 0x00, 0x0F, 0x00 },  // kHWCursorPipe
-  { 0xFF, 0xF5, 0x1C, 0x1E, 0x20, 0xFF, 0x01 },  // kHWRotatorInput
-  { 0xFF, 0xF5, 0x1C, 0x1E, 0x20, 0xFF, 0x01 },  // kHWRotatorOutput
-  { 0x3F, 0xF4, 0x10, 0x1E, 0x20, 0xFF, 0x01 },  // kHWWBIntfOutput
+const uint8_t HWInfo::kDefaultFormatSupport[kHWSubBlockMax][BITS_TO_BYTES(MDP_IMGTYPE_LIMIT1)] = {
+  { 0xFF, 0xF5, 0x1C, 0x1E, 0x20, 0xFF, 0x01, 0x00, 0xFE, 0x1F },  // kHWVIGPipe
+  { 0x33, 0xE0, 0x00, 0x16, 0x00, 0xBF, 0x00, 0x00, 0xFE, 0x07 },  // kHWRGBPipe
+  { 0x33, 0xE0, 0x00, 0x16, 0x00, 0xBF, 0x00, 0x00, 0xFE, 0x07 },  // kHWDMAPipe
+  { 0x12, 0x60, 0x0C, 0x00, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00 },  // kHWCursorPipe
+  { 0xFF, 0xF5, 0x1C, 0x1E, 0x20, 0xFF, 0x01, 0x00, 0xFE, 0x1F },  // kHWRotatorInput
+  { 0xFF, 0xF5, 0x1C, 0x1E, 0x20, 0xFF, 0x01, 0x00, 0xFE, 0x1F },  // kHWRotatorOutput
+  { 0x3F, 0xF4, 0x10, 0x1E, 0x20, 0xFF, 0x01, 0x00, 0xAA, 0x16 },  // kHWWBIntfOutput
 };
 
 int HWInfo::ParseString(char *input, char *tokens[], const uint32_t max_token, const char *delim,
@@ -451,6 +451,18 @@ LayerBufferFormat HWInfo::GetSDMFormat(int mdp_format) {
   case MDP_Y_CBCR_H2V2_UBWC:       return kFormatYCbCr420SPVenusUbwc;
   case MDP_Y_CRCB_H2V2_VENUS:      return kFormatYCrCb420SemiPlanarVenus;
   case MDP_YCBYCR_H2V1:            return kFormatYCbCr422H2V1Packed;
+  case MDP_RGBA_1010102:           return kFormatRGBA1010102;
+  case MDP_ARGB_2101010:           return kFormatARGB2101010;
+  case MDP_RGBX_1010102:           return kFormatRGBX1010102;
+  case MDP_XRGB_2101010:           return kFormatXRGB2101010;
+  case MDP_BGRA_1010102:           return kFormatBGRA1010102;
+  case MDP_ABGR_2101010:           return kFormatABGR2101010;
+  case MDP_BGRX_1010102:           return kFormatBGRX1010102;
+  case MDP_XBGR_2101010:           return kFormatXBGR2101010;
+  case MDP_RGBA_1010102_UBWC:      return kFormatRGBA1010102Ubwc;
+  case MDP_RGBX_1010102_UBWC:      return kFormatRGBX1010102Ubwc;
+  case MDP_Y_CBCR_H2V2_P010:       return kFormatYCbCr420P010;
+  case MDP_Y_CBCR_H2V2_TP10_UBWC:  return kFormatYCbCr420TP10Ubwc;
   default:                         return kFormatInvalid;
   }
 }
@@ -459,14 +471,14 @@ void HWInfo::InitSupportedFormatMap(HWResourceInfo *hw_resource) {
   hw_resource->supported_formats_map.clear();
 
   for (int sub_blk_type = INT(kHWVIGPipe); sub_blk_type < INT(kHWSubBlockMax); sub_blk_type++) {
-    PopulateSupportedFormatMap(kDefaultFormatSupport[sub_blk_type], MDP_IMGTYPE_LIMIT,
+    PopulateSupportedFormatMap(kDefaultFormatSupport[sub_blk_type], MDP_IMGTYPE_LIMIT1,
                                (HWSubBlockType)sub_blk_type, hw_resource);
   }
 }
 
 void HWInfo::ParseFormats(char *tokens[], uint32_t token_count, HWSubBlockType sub_blk_type,
                           HWResourceInfo *hw_resource) {
-  if (token_count > BITS_TO_BYTES(MDP_IMGTYPE_LIMIT)) {
+  if (token_count > BITS_TO_BYTES(MDP_IMGTYPE_LIMIT1)) {
     return;
   }
 

@@ -58,6 +58,16 @@ enum LayerBufferFormat {
   kFormatRGBA8888Ubwc,  //!< UBWC aligned RGBA8888 format
   kFormatRGBX8888Ubwc,  //!< UBWC aligned RGBX8888 format
   kFormatBGR565Ubwc,    //!< UBWC aligned BGR565 format
+  kFormatRGBA1010102,   //!< 10-bits Red, Green, Blue, Alpha interleaved in RGBA order.
+  kFormatARGB2101010,   //!< 10-bits Alpha, Red, Green, Blue interleaved in ARGB order.
+  kFormatRGBX1010102,   //!< 10-bits Red, Green, Blue, Padding interleaved in RGBX order. No Alpha.
+  kFormatXRGB2101010,   //!< 10-bits Padding, Red, Green, Blue interleaved in XRGB order. No Alpha.
+  kFormatBGRA1010102,   //!< 10-bits Blue, Green, Red, Alpha interleaved in BGRA order.
+  kFormatABGR2101010,   //!< 10-bits Alpha, Blue, Green, Red interleaved in ABGR order.
+  kFormatBGRX1010102,   //!< 10-bits Blue, Green, Red, Padding interleaved in BGRX order. No Alpha.
+  kFormatXBGR2101010,   //!< 10-bits Padding, Blue, Green, Red interleaved in XBGR order. No Alpha.
+  kFormatRGBA1010102Ubwc,  //!< UBWC aligned RGBA1010102 format
+  kFormatRGBX1010102Ubwc,  //!< UBWC aligned RGBX1010102 format
 
   /* All YUV-Planar formats, Any new format will be added towards end of this group to maintain
      backward compatibility.
@@ -110,6 +120,15 @@ enum LayerBufferFormat {
   kFormatYCrCb420SemiPlanarVenus,     //!< Y-plane: y(0), y(1), y(2) ... y(n)
                                       //!< 2x2 subsampled interleaved UV-plane:
                                       //!<    v(0), u(0), v(2), u(2) ... v(n-1), u(n-1)
+
+  kFormatYCbCr420P010,                //!< 16 bit Y-plane with 5 MSB bits set to 0:
+                                      //!< y(0), y(1), y(2) ... y(n)
+                                      //!< 2x2 subsampled interleaved 10 bit UV-plane with
+                                      //!< 5 MSB bits set to 0:
+                                      //!<    u(0), v(0), u(2), v(2) ... u(n-1), v(n-1)
+                                      //!< aka P010.
+
+  kFormatYCbCr420TP10Ubwc,            //!< UBWC aligned YCbCr420TP10 format.
 
   /* All YUV-Packed formats, Any new format will be added towards end of this group to maintain
      backward compatibility.

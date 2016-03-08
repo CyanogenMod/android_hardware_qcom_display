@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -103,7 +103,6 @@ class BlitEngineC2d : public BlitEngine {
   int DrawRectUsingCopybit(hwc_layer_1_t *hwc_layer, Layer *layer, LayerRect blit_rect,
                            LayerRect blit_dest_Rect);
   void SetReleaseFence(int fence_fd);
-  bool IsUBWCFormat(LayerBufferFormat format);
   void DumpBlitTargetBuffer(int fd);
 
   copybit_device_t *blit_engine_c2d_;

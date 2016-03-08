@@ -518,6 +518,18 @@ DisplayError HWDevice::SetFormat(const LayerBufferFormat &source, uint32_t *targ
   case kFormatRGBX8888Ubwc:             *target = MDP_RGBX_8888_UBWC;    break;
   case kFormatBGR565Ubwc:               *target = MDP_RGB_565_UBWC;      break;
   case kFormatYCbCr420SPVenusUbwc:      *target = MDP_Y_CBCR_H2V2_UBWC;  break;
+  case kFormatRGBA1010102:              *target = MDP_RGBA_1010102;      break;
+  case kFormatARGB2101010:              *target = MDP_ARGB_2101010;      break;
+  case kFormatRGBX1010102:              *target = MDP_RGBX_1010102;      break;
+  case kFormatXRGB2101010:              *target = MDP_XRGB_2101010;      break;
+  case kFormatBGRA1010102:              *target = MDP_BGRA_1010102;      break;
+  case kFormatABGR2101010:              *target = MDP_ABGR_2101010;      break;
+  case kFormatBGRX1010102:              *target = MDP_BGRX_1010102;      break;
+  case kFormatXBGR2101010:              *target = MDP_XBGR_2101010;      break;
+  case kFormatRGBA1010102Ubwc:          *target = MDP_RGBA_1010102_UBWC; break;
+  case kFormatRGBX1010102Ubwc:          *target = MDP_RGBX_1010102_UBWC; break;
+  case kFormatYCbCr420P010:             *target = MDP_Y_CBCR_H2V2_P010;  break;
+  case kFormatYCbCr420TP10Ubwc:         *target = MDP_Y_CBCR_H2V2_TP10_UBWC; break;
   default:
     DLOGE("Unsupported format type %d", source);
     return kErrorParameters;
@@ -543,6 +555,16 @@ DisplayError HWDevice::SetStride(HWDeviceType device_type, LayerBufferFormat for
   case kFormatBGRX8888:
   case kFormatRGBA8888Ubwc:
   case kFormatRGBX8888Ubwc:
+  case kFormatRGBA1010102:
+  case kFormatARGB2101010:
+  case kFormatRGBX1010102:
+  case kFormatXRGB2101010:
+  case kFormatBGRA1010102:
+  case kFormatABGR2101010:
+  case kFormatBGRX1010102:
+  case kFormatXBGR2101010:
+  case kFormatRGBA1010102Ubwc:
+  case kFormatRGBX1010102Ubwc:
     *target = width * 4;
     break;
   case kFormatRGB888:
@@ -561,6 +583,8 @@ DisplayError HWDevice::SetStride(HWDeviceType device_type, LayerBufferFormat for
   case kFormatYCrCb420PlanarStride16:
   case kFormatYCbCr420SemiPlanar:
   case kFormatYCrCb420SemiPlanar:
+  case kFormatYCbCr420P010:
+  case kFormatYCbCr420TP10Ubwc:
     *target = width;
     break;
   case kFormatYCbCr422H2V1Packed:
