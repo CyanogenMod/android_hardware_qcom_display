@@ -111,7 +111,7 @@ DisplayError HWInfo::GetDynamicBWLimits(HWResourceInfo *hw_resource) {
 
   HWDynBwLimitInfo* bw_info = &hw_resource->dyn_bw_info;
   for (int index = 0; index < kBwModeMax; index++) {
-    bw_info->total_bw_limit[index] = hw_resource->max_bandwidth_low;
+    bw_info->total_bw_limit[index] = UINT32(hw_resource->max_bandwidth_low);
     bw_info->pipe_bw_limit[index] = hw_resource->max_pipe_bw;
   }
 
@@ -415,7 +415,7 @@ void HWInfo::PopulateSupportedFormatMap(const uint8_t *format_supported, uint32_
   vector <LayerBufferFormat> supported_sdm_formats;
   for (uint32_t mdp_format = 0; mdp_format < format_count; mdp_format++) {
     if (IS_BIT_SET(format_supported[mdp_format >> 3], (mdp_format & 7))) {
-      LayerBufferFormat sdm_format = GetSDMFormat(mdp_format);
+      LayerBufferFormat sdm_format = GetSDMFormat(INT(mdp_format));
       if (sdm_format != kFormatInvalid) {
         supported_sdm_formats.push_back(sdm_format);
       }

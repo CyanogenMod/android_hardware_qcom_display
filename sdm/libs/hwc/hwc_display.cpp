@@ -241,13 +241,13 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
   for (int i = 0; attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
     switch (attributes[i]) {
     case HWC_DISPLAY_VSYNC_PERIOD:
-      values[i] = variable_config.vsync_period_ns;
+      values[i] = INT32(variable_config.vsync_period_ns);
       break;
     case HWC_DISPLAY_WIDTH:
-      values[i] = variable_config.x_pixels;
+      values[i] = INT32(variable_config.x_pixels);
       break;
     case HWC_DISPLAY_HEIGHT:
-      values[i] = variable_config.y_pixels;
+      values[i] = INT32(variable_config.y_pixels);
       break;
     case HWC_DISPLAY_DPI_X:
       values[i] = INT32(variable_config.x_dpi * 1000.0f);
@@ -332,8 +332,8 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
 
     if (i < num_hw_layers) {
       hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-      num_visible_rects = INT32(hwc_layer.visibleRegionScreen.numRects);
-      num_dirty_rects = INT32(hwc_layer.surfaceDamage.numRects);
+      num_visible_rects = UINT32(hwc_layer.visibleRegionScreen.numRects);
+      num_dirty_rects = UINT32(hwc_layer.surfaceDamage.numRects);
     }
 
     // visible rectangles + dirty rectangles + blit rectangle
@@ -365,7 +365,7 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   // Layer array address
   layer_stack_ = LayerStack();
   layer_stack_.layers = reinterpret_cast<Layer *>(current_address);
-  layer_stack_.layer_count = INT32(num_hw_layers + blit_target_count);
+  layer_stack_.layer_count = UINT32(num_hw_layers + blit_target_count);
   current_address += (num_hw_layers + blit_target_count) * sizeof(Layer);
 
   for (size_t i = 0; i < num_hw_layers + blit_target_count; i++) {
@@ -402,8 +402,8 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
 
   if (pvt_handle) {
     layer_buffer->format = GetSDMFormat(pvt_handle->format, pvt_handle->flags);
-    layer_buffer->width = pvt_handle->width;
-    layer_buffer->height = pvt_handle->height;
+    layer_buffer->width = UINT32(pvt_handle->width);
+    layer_buffer->height = UINT32(pvt_handle->height);
 
     if (SetMetaData(pvt_handle, layer) != kErrorNone) {
       return -EINVAL;
@@ -452,8 +452,8 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
 
       AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(INT(x_pixels), INT(y_pixels), format,
                                                             usage, aligned_width, aligned_height);
-      layer_buffer->width = aligned_width;
-      layer_buffer->height = aligned_height;
+      layer_buffer->width = UINT32(aligned_width);
+      layer_buffer->height = UINT32(aligned_height);
       layer_buffer->format = GetSDMFormat(format, flags);
     }
   }
@@ -468,7 +468,7 @@ void HWCDisplay::CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
   if (pvt_handle) {
     layer_buffer->planes[0].fd = pvt_handle->fd;
     layer_buffer->planes[0].offset = pvt_handle->offset;
-    layer_buffer->planes[0].stride = pvt_handle->width;
+    layer_buffer->planes[0].stride = UINT32(pvt_handle->width);
   }
 
   // if swapinterval property is set to 0 then close and reset the acquireFd
@@ -560,8 +560,8 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     // For solid fill, only dest rect need to be specified.
     if (layer.flags.solid_fill) {
       LayerBuffer *input_buffer = layer.input_buffer;
-      input_buffer->width = layer.dst_rect.right - layer.dst_rect.left;
-      input_buffer->height = layer.dst_rect.bottom - layer.dst_rect.top;
+      input_buffer->width = UINT32(layer.dst_rect.right - layer.dst_rect.left);
+      input_buffer->height = UINT32(layer.dst_rect.bottom - layer.dst_rect.top);
       layer.src_rect.left = 0;
       layer.src_rect.top = 0;
       layer.src_rect.right = input_buffer->width;
@@ -573,7 +573,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     layer.flags.updating = true;
 
     if (num_hw_layers <= kMaxLayerCount) {
-      layer.flags.updating = IsLayerUpdating(content_list, i);
+      layer.flags.updating = IsLayerUpdating(content_list, INT32(i));
     }
 #ifdef QTI_BSP
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
@@ -838,7 +838,7 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
       return true;
     }
 
-    if ((layer.composition == kCompositionGPU) && IsLayerUpdating(content_list, i)) {
+    if ((layer.composition == kCompositionGPU) && IsLayerUpdating(content_list, INT32(i))) {
       return true;
     }
   }
@@ -1358,15 +1358,15 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
   }
 
   if (meta_data->operation & LINEAR_FORMAT) {
-    layer_buffer->format = GetSDMFormat(meta_data->linearFormat, 0);
+    layer_buffer->format = GetSDMFormat(INT32(meta_data->linearFormat), 0);
   }
 
   if (meta_data->operation & UPDATE_BUFFER_GEOMETRY) {
     int actual_width = pvt_handle->width;
     int actual_height = pvt_handle->height;
     AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(pvt_handle, actual_width, actual_height);
-    layer_buffer->width = actual_width;
-    layer_buffer->height = actual_height;
+    layer_buffer->width = UINT32(actual_width);
+    layer_buffer->height = UINT32(actual_height);
   }
 
   if (meta_data->operation & SET_SINGLE_BUFFER_MODE) {
@@ -1378,7 +1378,7 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
 
   if (meta_data->operation & S3D_FORMAT) {
     std::map<int, LayerBufferS3DFormat>::iterator it =
-                      s3d_format_hwc_to_sdm_.find(meta_data->s3dFormat);
+        s3d_format_hwc_to_sdm_.find(INT32(meta_data->s3dFormat));
     if (it != s3d_format_hwc_to_sdm_.end()) {
       layer->input_buffer->s3d_format = it->second;
     } else {
@@ -1454,7 +1454,7 @@ void HWCDisplay::SetSecureDisplay(bool secure_display_active) {
 }
 
 int HWCDisplay::SetActiveDisplayConfig(int config) {
-  return display_intf_->SetActiveConfig(config) == kErrorNone ? 0 : -1;
+  return display_intf_->SetActiveConfig(UINT32(config)) == kErrorNone ? 0 : -1;
 }
 
 int HWCDisplay::GetActiveDisplayConfig(uint32_t *config) {
@@ -1466,7 +1466,7 @@ int HWCDisplay::GetDisplayConfigCount(uint32_t *count) {
 }
 
 int HWCDisplay::GetDisplayAttributesForConfig(int config, DisplayConfigVariableInfo *attributes) {
-  return display_intf_->GetConfig(config, attributes) == kErrorNone ? 0 : -1;
+  return display_intf_->GetConfig(UINT32(config), attributes) == kErrorNone ? 0 : -1;
 }
 
 bool HWCDisplay::SingleLayerUpdating(uint32_t app_layer_count) {

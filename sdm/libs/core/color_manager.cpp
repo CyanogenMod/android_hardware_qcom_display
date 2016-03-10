@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2015 - 2016, The Linux Foundataion. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -57,7 +57,7 @@ void PPFeaturesConfig::Reset() {
 
 DisplayError PPFeaturesConfig::RetrieveNextFeature(PPFeatureInfo **feature) {
   DisplayError ret = kErrorNone;
-  int i(0);
+  uint32_t i(0);
 
   for (i = next_idx_; i < kMaxNumPPFeatures; i++) {
     if (feature_[i]) {
