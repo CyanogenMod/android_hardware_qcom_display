@@ -120,6 +120,14 @@ bool MDPComp::init(hwc_context_t *ctx) {
         sEnabled = true;
     }
 
+#ifdef DELTA_PANEL
+    if((property_get("ro.hwc.is_delta_panel", property, NULL) > 0) &&
+       (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+        (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+        sEnabled = false;
+    }
+#endif
+
     sEnableMixedMode = true;
     if((property_get("debug.mdpcomp.mixedmode.disable", property, NULL) > 0) &&
        (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||

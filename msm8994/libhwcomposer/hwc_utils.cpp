@@ -393,6 +393,8 @@ void initContext(hwc_context_t *ctx)
     // Initializing boot anim completed check to false
     ctx->mDefaultModeApplied = false;
 
+    ctx->mCoolColorTemperatureEnabled = false;
+
     // Initialize gpu perfomance hint related parameters
     property_get("sys.hwc.gpu_perf_mode", value, "0");
 #ifdef QCOM_BSP

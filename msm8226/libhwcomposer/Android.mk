@@ -30,4 +30,14 @@ LOCAL_SRC_FILES               := hwc.cpp          \
                                  hwc_dump_layers.cpp \
                                  hwc_ad.cpp \
                                  hwc_virtual.cpp
+
+ifeq ($(TARGET_USES_DELTA_PANEL),true)
+LOCAL_CFLAGS                  += -O3 -march=armv7-a -mfloat-abi=softfp -mfpu=neon
+LOCAL_CFLAGS                  += -DDELTA_PANEL
+LOCAL_CFLAGS                  += $(DELTA_PANEL_CFLAGS)
+LOCAL_LDLIBS                  := -llog -ldl
+LOCAL_ARM_MODE                := arm
+LOCAL_SRC_FILES               += hwc_delta_panel.cpp
+endif #TARGET_USES_DELTA_PANEL
+
 include $(BUILD_SHARED_LIBRARY)

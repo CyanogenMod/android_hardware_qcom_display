@@ -222,7 +222,11 @@ public:
     //Virtually we can support as many rotator sessions as possible, However
     // more number of rotator sessions leads to performance issues, so
     // restricting the max rotator session to 4
+#ifdef TARGET_SPECIFIC_MAX_ROT_SESSION
+    enum { MAX_ROT_SESS = TARGET_SPECIFIC_MAX_ROT_SESSION };
+#else
     enum { MAX_ROT_SESS = 4 };
+#endif
 
     ~RotMgr();
     void configBegin();

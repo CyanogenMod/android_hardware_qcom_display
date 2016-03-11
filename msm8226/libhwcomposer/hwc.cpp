@@ -39,12 +39,22 @@
 #include "hwc_ad.h"
 #include "profiler.h"
 #include "hwc_virtual.h"
+#ifdef DELTA_PANEL
+#include "hwc_delta_panel.h"
+#endif
 
 using namespace qhwc;
 using namespace overlay;
+#ifdef DELTA_PANEL
+using namespace gralloc;
+#endif
 
 #define VSYNC_DEBUG 0
 #define POWER_MODE_DEBUG 1
+
+#ifdef DELTA_PANEL
+static bool is_delta_panel = false;
+#endif
 
 static int hwc_device_open(const struct hw_module_t* module,
                            const char* name,
@@ -430,7 +440,7 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
     }
 
     Locker::Autolock _l(ctx->mDrawLock);
-    ALOGD_IF(POWER_MODE_DEBUG, "%s: Setting mode %d on display: %d",
+    ALOGV_IF(POWER_MODE_DEBUG, "%s: Setting mode %d on display: %d",
             __FUNCTION__, mode, dpy);
 
     switch(mode) {
@@ -501,7 +511,7 @@ static int hwc_setPowerMode(struct hwc_composer_device_1* dev, int dpy,
         return -EINVAL;
     }
 
-    ALOGD_IF(POWER_MODE_DEBUG, "%s: Done setting mode %d on display %d",
+    ALOGV_IF(POWER_MODE_DEBUG, "%s: Done setting mode %d on display %d",
             __FUNCTION__, mode, dpy);
     return ret;
 }
@@ -574,6 +584,19 @@ static int hwc_query(struct hwc_composer_device_1* dev,
 
 }
 
+#ifdef DELTA_PANEL
+/*
+ * Return the type of allocator -
+ * these are used for mapping/unmapping
+ */
+static IMemAlloc* getAllocator(int flags)
+{
+    IMemAlloc* memalloc;
+    IAllocController* alloc_ctrl = IAllocController::getInstance();
+    memalloc = alloc_ctrl->getAllocator(flags);
+    return memalloc;
+}
+#endif
 
 static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
     ATRACE_CALL();
@@ -592,6 +615,25 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
                 fd = ctx->mMDPComp[dpy]->drawOverlap(ctx, list);
         }
 
+        //TODO We dont check for SKIP flag on this layer because we need PAN
+        //always. Last layer is always FB
+        private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
+
+#ifdef DELTA_PANEL
+        if(true == is_delta_panel){
+            sync_wait(fbLayer->acquireFenceFd, 1000);
+            if(hnd) {
+                if(hnd->base) {
+                    deltaPanelRendering((unsigned char *)hnd->base, DELTA_PANEL_WIDTH,
+                            DELTA_PANEL_HEIGHT);
+                    IMemAlloc* memalloc = getAllocator(hnd->flags);
+                    memalloc->clean_buffer((void*)hnd->base, hnd->size, hnd->offset, hnd->fd,
+                            CACHE_CLEAN_AND_INVALIDATE);
+                }
+            }
+        }
+#endif
+
         if(list->numHwLayers > 1)
             hwc_sync(ctx, list, dpy, fd);
 
@@ -604,9 +646,6 @@ static int hwc_set_primary(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
             ret = -1;
         }
 
-        //TODO We dont check for SKIP flag on this layer because we need PAN
-        //always. Last layer is always FB
-        private_handle_t *hnd = (private_handle_t *)fbLayer->handle;
         if(copybitDone && ctx->mMDP.version >= qdutils::MDP_V4_0) {
             hnd = ctx->mCopyBit[dpy]->getCurrentRenderBuffer();
         }
@@ -923,6 +962,16 @@ static int hwc_device_open(const struct hw_module_t* module, const char* name,
         dev->device.setActiveConfig     = hwc_setActiveConfig;
         *device = &dev->device.common;
         status = 0;
+
+#ifdef DELTA_PANEL
+        char property[PROPERTY_VALUE_MAX];
+        if((property_get("ro.hwc.is_delta_panel", property, NULL) > 0) &&
+           (!strncmp(property, "1", PROPERTY_VALUE_MAX ) ||
+            (!strncasecmp(property,"true", PROPERTY_VALUE_MAX )))) {
+            ALOGD("%s: Display is delta panel", __FUNCTION__);
+            is_delta_panel = true;
+        }
+#endif
     }
     return status;
 }
