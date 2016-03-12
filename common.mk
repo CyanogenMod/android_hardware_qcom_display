@@ -1,6 +1,8 @@
 #Common headers
 display_top := $(call my-dir)
 
+use_hwc2 := false
+
 common_includes := $(display_top)/libqdutils
 common_includes += $(display_top)/libqservice
 common_includes += $(display_top)/libcopybit
