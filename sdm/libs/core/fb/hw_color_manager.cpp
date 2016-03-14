@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -52,6 +52,7 @@ DisplayError (*HWColorManager::SetFeature[])(const PPFeatureInfo &, msmfb_mdp_pp
         [kGlobalColorFeaturePaV2] = &HWColorManager::SetPAV2,
         [kGlobalColorFeatureDither] = &HWColorManager::SetDither,
         [kGlobalColorFeatureGamut] = &HWColorManager::SetGamut,
+        [kGlobalColorFeaturePADither] = &HWColorManager::SetPADither,
 };
 
 DisplayError HWColorManager::SetPCC(const PPFeatureInfo &feature, msmfb_mdp_pp *kernel_params) {
@@ -145,6 +146,15 @@ DisplayError HWColorManager::SetGamut(const PPFeatureInfo &feature, msmfb_mdp_pp
   kernel_params->data.gamut_cfg_data.block = MDP_LOGICAL_BLOCK_DISP_0 + feature.disp_id_;
   kernel_params->data.gamut_cfg_data.flags = feature.enable_flags_;
   kernel_params->data.gamut_cfg_data.cfg_payload = feature.GetConfigData();
+
+  return ret;
+}
+
+DisplayError HWColorManager::SetPADither(const PPFeatureInfo &feature,
+                                         msmfb_mdp_pp *kernel_params) {
+  DisplayError ret = kErrorNone;
+
+  // TODO(user): Kernel IOCTL preparation
 
   return ret;
 }
