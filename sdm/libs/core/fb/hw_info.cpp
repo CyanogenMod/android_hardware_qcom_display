@@ -53,7 +53,7 @@ const uint8_t HWInfo::kDefaultFormatSupport[kHWSubBlockMax][BITS_TO_BYTES(MDP_IM
   { 0x33, 0xE0, 0x00, 0x16, 0x00, 0xBF, 0x00 },  // kHWDMAPipe
   { 0x12, 0x60, 0x0C, 0x00, 0x00, 0x0F, 0x00 },  // kHWCursorPipe
   { 0xFF, 0xF5, 0x1C, 0x1E, 0x20, 0xFF, 0x01 },  // kHWRotatorInput
-  { 0x3F, 0xF4, 0x10, 0x1E, 0x20, 0xFF, 0x01 },  // kHWRotatorOutput
+  { 0xFF, 0xF5, 0x1C, 0x1E, 0x20, 0xFF, 0x01 },  // kHWRotatorOutput
   { 0x3F, 0xF4, 0x10, 0x1E, 0x20, 0xFF, 0x01 },  // kHWWBIntfOutput
 };
 
@@ -370,6 +370,7 @@ LayerBufferFormat HWInfo::GetSDMFormat(int mdp_format) {
   case MDP_BGR_565:                return kFormatBGR565;
   case MDP_RGBA_8888_UBWC:         return kFormatRGBA8888Ubwc;
   case MDP_RGBX_8888_UBWC:         return kFormatRGBX8888Ubwc;
+  case MDP_RGB_565_UBWC:           return kFormatBGR565Ubwc;
   case MDP_Y_CB_CR_H2V2:           return kFormatYCbCr420Planar;
   case MDP_Y_CR_CB_H2V2:           return kFormatYCrCb420Planar;
   case MDP_Y_CR_CB_GH2V2:          return kFormatYCrCb420PlanarStride16;
