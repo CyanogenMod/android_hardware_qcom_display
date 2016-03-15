@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -28,9 +28,10 @@
 #include <stdint.h>
 #include <core/display_interface.h>
 #include <core/core_interface.h>
+#include <vector>
+#include <map>
 
 namespace sdm {
-
 const int kMaxSDELayers = 16;   // Maximum number of layers that can be handled by hardware in a
                                 // given layer stack.
 
@@ -66,10 +67,36 @@ enum HWDisplayPort {
   kPortEDP,
 };
 
+enum PipeType {
+  kPipeTypeUnused,
+  kPipeTypeVIG,
+  kPipeTypeRGB,
+  kPipeTypeDMA,
+  kPipeTypeCursor,
+};
+
+enum HWSubBlockType {
+  kHWVIGPipe,
+  kHWRGBPipe,
+  kHWDMAPipe,
+  kHWCursorPipe,
+  kHWRotatorInput,
+  kHWRotatorOutput,
+  kHWWBIntfOutput,
+  kHWSubBlockMax,
+};
+
+typedef std::map<HWSubBlockType, std::vector<LayerBufferFormat>> FormatsMap;
+
 struct HWDynBwLimitInfo {
   uint32_t cur_mode = kBwDefault;
   uint32_t total_bw_limit[kBwModeMax] = { 0 };
   uint32_t pipe_bw_limit[kBwModeMax] = { 0 };
+};
+
+struct HWPipeCaps {
+  PipeType type = kPipeTypeUnused;
+  uint32_t id = 0;
 };
 
 struct HWResourceInfo {
@@ -111,6 +138,8 @@ struct HWResourceInfo {
   bool perf_calc = false;
   bool has_dyn_bw_support = false;
   HWDynBwLimitInfo dyn_bw_info;
+  std::vector<HWPipeCaps> hw_pipes;
+  FormatsMap supported_formats_map;
 
   void Reset() { *this = HWResourceInfo(); }
 };
@@ -156,6 +185,7 @@ struct HWPanelInfo {
   HWSplitInfo split_info;             // Panel split configuration
   char panel_name[256] = {0};         // Panel name
   HWS3DMode s3d_mode = kS3DModeNone;  // Panel's current s3d mode.
+  int panel_max_brightness = 0;       // Max panel brightness
 
   bool operator !=(const HWPanelInfo &panel_info) {
     return ((port != panel_info.port) || (mode != panel_info.mode) ||

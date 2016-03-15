@@ -153,6 +153,11 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
     handle_idle_timeout_ = false;
   }
 
+  if (content_list->numHwLayers <= 1) {
+    flush_ = true;
+    return 0;
+  }
+
   status = PrepareLayerStack(content_list);
   if (status) {
     return status;

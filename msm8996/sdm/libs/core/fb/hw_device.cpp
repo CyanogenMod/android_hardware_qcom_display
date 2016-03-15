@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -254,17 +254,15 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         DLOGV_IF(kTagDriverConfig, "dst_rect [%d, %d, %d, %d]", mdp_layer.dst_rect.x,
                  mdp_layer.dst_rect.y, mdp_layer.dst_rect.w, mdp_layer.dst_rect.h);
         for (int j = 0; j < 4; j++) {
+          mdp_scale_data *scale = reinterpret_cast<mdp_scale_data*>(mdp_layer.scale);
           DLOGV_IF(kTagDriverConfig, "Scale Data[%d]: Phase=[%x %x %x %x] Pixel_Ext=[%d %d %d %d]",
-                 j, mdp_layer.scale->init_phase_x[j], mdp_layer.scale->phase_step_x[j],
-                 mdp_layer.scale->init_phase_y[j], mdp_layer.scale->phase_step_y[j],
-                 mdp_layer.scale->num_ext_pxls_left[j], mdp_layer.scale->num_ext_pxls_top[j],
-                 mdp_layer.scale->num_ext_pxls_right[j], mdp_layer.scale->num_ext_pxls_btm[j]);
+                 j, scale->init_phase_x[j], scale->phase_step_x[j], scale->init_phase_y[j],
+                 scale->phase_step_y[j], scale->num_ext_pxls_left[j], scale->num_ext_pxls_top[j],
+                 scale->num_ext_pxls_right[j], scale->num_ext_pxls_btm[j]);
           DLOGV_IF(kTagDriverConfig, "Fetch=[%d %d %d %d]  Repeat=[%d %d %d %d]  roi_width = %d",
-                 mdp_layer.scale->left_ftch[j], mdp_layer.scale->top_ftch[j],
-                 mdp_layer.scale->right_ftch[j], mdp_layer.scale->btm_ftch[j],
-                 mdp_layer.scale->left_rpt[j], mdp_layer.scale->top_rpt[j],
-                 mdp_layer.scale->right_rpt[j], mdp_layer.scale->btm_rpt[j],
-                 mdp_layer.scale->roi_w[j]);
+                 scale->left_ftch[j], scale->top_ftch[j], scale->right_ftch[j], scale->btm_ftch[j],
+                 scale->left_rpt[j], scale->top_rpt[j], scale->right_rpt[j], scale->btm_rpt[j],
+                 scale->roi_w[j]);
         }
         DLOGV_IF(kTagDriverConfig, "*************************************************************");
       }
@@ -770,6 +768,7 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
   GetHWDisplayPortAndMode(device_node, &panel_info->port, &panel_info->mode);
   GetSplitInfo(device_node, panel_info);
   GetHWPanelNameByNode(device_node, panel_info);
+  GetHWPanelMaxBrightnessFromNode(panel_info);
 }
 
 void HWDevice::GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode) {
@@ -850,6 +849,30 @@ void HWDevice::GetSplitInfo(int device_node, HWPanelInfo *panel_info) {
   }
 
   Sys::fclose_(fileptr);
+}
+
+void HWDevice::GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info) {
+  char brightness[kMaxStringLength] = { 0 };
+  char kMaxBrightnessNode[64] = { 0 };
+
+  snprintf(kMaxBrightnessNode, sizeof(kMaxBrightnessNode), "%s",
+           "/sys/class/leds/lcd-backlight/max_brightness");
+
+  panel_info->panel_max_brightness = 0;
+  int fd = Sys::open_(kMaxBrightnessNode, O_RDONLY);
+  if (fd < 0) {
+    DLOGW("Failed to open max brightness node = %s, error = %s", kMaxBrightnessNode,
+          strerror(errno));
+    return;
+  }
+
+  if (Sys::pread_(fd, brightness, sizeof(brightness), 0) > 0) {
+    panel_info->panel_max_brightness = atoi(brightness);
+    DLOGW("Max brightness level = %d", panel_info->panel_max_brightness);
+  } else {
+    DLOGW("Failed to read max brightness level. error = %s", strerror(errno));
+  }
+  Sys::close_(fd);
 }
 
 int HWDevice::ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count) {
