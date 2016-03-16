@@ -2939,11 +2939,30 @@ void processBootAnimCompleted(hwc_context_t *ctx,
      * HWC_GEOMETRY_CHANGED fail in correctly identifying the
      * exact bootup transition to homescreen
      */
+    char cryptoState[PROPERTY_VALUE_MAX];
+    char voldDecryptState[PROPERTY_VALUE_MAX];
+    bool isEncrypted = false;
+    bool main_class_services_started = false;
+    if(property_get("ro.crypto.state", cryptoState, "unencrypted")) {
+        ALOGD_IF(HWC_UTILS_DEBUG, "%s: cryptostate= %s", \
+              __FUNCTION__, cryptoState);
+        if(!strcmp(cryptoState, "encrypted")) {
+            isEncrypted = true;
+            if(property_get("vold.decrypt", voldDecryptState, "") &&
+                  !strcmp(voldDecryptState, "trigger_restart_framework"))
+                main_class_services_started = true;
 
-    if(list->numHwLayers > numBootUpLayers) {
-        // Applying default mode after bootanimation is finished
+            ALOGD_IF(HWC_UTILS_DEBUG, "%s: vold= %s", __FUNCTION__, \
+                  voldDecryptState);
+        }
+    }
+    if((!isEncrypted ||(isEncrypted && main_class_services_started)) &&
+        (list->numHwLayers > numBootUpLayers)) {
+        // Applying default mode after bootanimation is finished And
+        // If Data is Encrypted, it is ready for access.
         ctx->mBootAnimCompleted = true;
         qdcmApplyDefaultAfterBootAnimationDone(ctx);
+        ALOGD_IF(HWC_UTILS_DEBUG, "%s: SettingDefaultMode ", __FUNCTION__);
     }
 }
 
@@ -3093,53 +3112,84 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
    const int HEIGHT_ALIGN = qdutils::MDPVersion::getInstance().getHeightAlign();
    int MIN_WIDTH = qdutils::MDPVersion::getInstance().getMinROIWidth();
    const int MIN_HEIGHT = qdutils::MDPVersion::getInstance().getMinROIHeight();
+   bool isPingPongSplitEnabled =
+           (qdutils::MDPVersion::getInstance().is8976() &&
+            qdutils::MDPVersion::getInstance().isPingPongSplit());
+   /* Assumptions:
+    * LEFT_ALIGN, WIDTH_ALIGN, TOP_ALIGN, HEIGHT_ALIGN are typically even */
 
-
-   if(qdutils::MDPVersion::getInstance().is8976() &&
-            qdutils::MDPVersion::getInstance().isPingPongSplit() &&
-           (t_roi.left < (boundary.right - boundary.left) / 2) &&
-           (t_roi.right > (boundary.right - boundary.left) / 2)) {
+   if(isPingPongSplitEnabled) {
        MIN_WIDTH *= 2;
-       if(((boundary.right - boundary.left) / 2 - t_roi.left) >
-               (t_roi.right - (boundary.right - boundary.left) / 2)) {
-           t_roi.right = (boundary.right - boundary.left) - t_roi.left;
+       const int boundarywidth = (boundary.right - boundary.left);
+       if(t_roi.left > boundarywidth/2) {
+           /* roi-left should be left of boundarywidth */
+           t_roi.left = boundarywidth - t_roi.left;
+       }
+       if(t_roi.right < boundarywidth/2) {
+           /* roi-right should be right of boundarywidth */
+           t_roi.right = boundarywidth - t_roi.right;
+       }
+
+       if((boundarywidth/2 - t_roi.left) > (t_roi.right - boundarywidth/2)) {
+           t_roi.right = boundarywidth - t_roi.left;
        } else {
-           t_roi.left = (boundary.right - boundary.left) - t_roi.right;
+           t_roi.left = boundarywidth - t_roi.right;
        }
    }
-   /* Align to minimum width recommended by the panel */
+
+   /* Ensure roi is of minimum width recommended by the panel */
    if((t_roi.right - t_roi.left) < MIN_WIDTH) {
        const int corWidth = MIN_WIDTH - (t_roi.right - t_roi.left);
        t_roi.left = t_roi.left - (corWidth >> 1);
        t_roi.right = t_roi.right + (corWidth >> 1) + (corWidth & 1);
+       if(isPingPongSplitEnabled)
+           t_roi.left -= (corWidth & 1);
 
        if(t_roi.left < boundary.left) {
            t_roi.left = boundary.left;
-           t_roi.right = t_roi.left + MIN_WIDTH;
+           if(isPingPongSplitEnabled)
+               t_roi.right = boundary.right;
+           else
+               t_roi.right = t_roi.left + MIN_WIDTH;
        } else if(t_roi.right > boundary.right) {
            t_roi.right = boundary.right;
-           t_roi.left = t_roi.right - MIN_WIDTH;
+           if(isPingPongSplitEnabled)
+               t_roi.left = boundary.left;
+           else
+               t_roi.left = t_roi.right - MIN_WIDTH;
        }
    }
 
-  /* Align to minimum height recommended by the panel */
+  /* Ensuire roi is of minimum height recommended by the panel */
    if((t_roi.bottom - t_roi.top) < MIN_HEIGHT) {
        const int corHeight = MIN_HEIGHT - (t_roi.bottom - t_roi.top);
        t_roi.top = t_roi.top - (corHeight >> 1);
        t_roi.bottom = t_roi.bottom + (corHeight >> 1) + (corHeight & 1);
+       if(isPingPongSplitEnabled)
+           t_roi.top -= (corHeight & 1);
 
        if(t_roi.top < boundary.top) {
            t_roi.top = boundary.top;
-           t_roi.bottom = t_roi.top + MIN_HEIGHT;
+           if(isPingPongSplitEnabled)
+               t_roi.bottom = boundary.bottom;
+           else
+               t_roi.bottom = t_roi.top + MIN_HEIGHT;
        } else if(t_roi.bottom > boundary.bottom) {
            t_roi.bottom = boundary.bottom;
-           t_roi.top = t_roi.bottom - MIN_HEIGHT;
+           if(isPingPongSplitEnabled)
+               t_roi.top = boundary.top;
+           else
+               t_roi.top = t_roi.bottom - MIN_HEIGHT;
        }
    }
 
    /* Align left and width to meet panel restrictions */
-   if(LEFT_ALIGN)
-       t_roi.left = t_roi.left - (t_roi.left % LEFT_ALIGN);
+   if(LEFT_ALIGN) {
+       const int alignedWidthDiff = (t_roi.left % LEFT_ALIGN);
+       t_roi.left -= alignedWidthDiff;
+       if(isPingPongSplitEnabled)
+           t_roi.right += alignedWidthDiff;
+   }
 
    if(WIDTH_ALIGN) {
        int width = t_roi.right - t_roi.left;
@@ -3152,24 +3202,22 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
        if(LEFT_ALIGN && (t_roi.left % LEFT_ALIGN)) {
            int errLeft = t_roi.left % LEFT_ALIGN;
            t_roi.left = t_roi.left - errLeft;
-           t_roi.right = t_roi.right + LEFT_ALIGN - errLeft;
+           t_roi.right = t_roi.right + WIDTH_ALIGN - errLeft;
        }
-       if(t_roi.right > boundary.right) {
-           t_roi.right = boundary.right;
-           t_roi.left = t_roi.right - alignWidth;
-
-           if(LEFT_ALIGN)
-               t_roi.left = t_roi.left - (t_roi.left % LEFT_ALIGN);
-
-       } else if(t_roi.left < boundary.left) {
+       if(t_roi.right > boundary.right || t_roi.left < boundary.left) {
+           //Give up and go for complete width
            t_roi.left = boundary.left;
-           t_roi.right = t_roi.left + alignWidth;
+           t_roi.right = boundary.right;
        }
    }
 
    /* Align top and height to meet panel restrictions */
-   if(TOP_ALIGN)
-       t_roi.top = t_roi.top - (t_roi.top % TOP_ALIGN);
+   if(TOP_ALIGN) {
+       const int alignedHeightDiff = (t_roi.top % TOP_ALIGN);
+       t_roi.top -= alignedHeightDiff;
+       if(isPingPongSplitEnabled)
+           t_roi.bottom += alignedHeightDiff;
+   }
 
    if(HEIGHT_ALIGN) {
        int height = t_roi.bottom - t_roi.top;
@@ -3182,18 +3230,12 @@ hwc_rect_t getSanitizeROI(struct hwc_rect roi, hwc_rect boundary)
        if(TOP_ALIGN && (t_roi.top % TOP_ALIGN)) {
            int errTop = t_roi.top % TOP_ALIGN;
            t_roi.top = t_roi.top - errTop;
-           t_roi.bottom = t_roi.bottom + TOP_ALIGN - errTop;
+           t_roi.bottom = t_roi.bottom + HEIGHT_ALIGN - errTop;
        }
-       if(t_roi.bottom > boundary.bottom) {
-           t_roi.bottom = boundary.bottom;
-           t_roi.top = t_roi.bottom - alignHeight;
-
-           if(TOP_ALIGN)
-               t_roi.top = t_roi.top - (t_roi.top % TOP_ALIGN);
-
-       } else if(t_roi.top < boundary.top) {
+       if(t_roi.bottom > boundary.bottom || t_roi.top < boundary.top) {
+           //Give up and go for complete height
            t_roi.top = boundary.top;
-           t_roi.bottom = t_roi.top + alignHeight;
+           t_roi.bottom = boundary.bottom;
        }
    }
 

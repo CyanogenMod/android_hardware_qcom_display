@@ -262,8 +262,8 @@ void  MDPVersion::updatePanelInfo() {
                     mPanelInfo.mPluggable = atoi(tokens[1]);
                     ALOGI("Pluggable: %d", mPanelInfo.mPluggable);
                 }
-                if(!strncmp(tokens[0], "is_pinpong_split",
-                            strlen("is_pinpong_split"))) {
+                if(!strncmp(tokens[0], "is_pingpong_split",
+                            strlen("is_pingpong_split"))) {
                     mPanelInfo.mPingPongSplit = atoi(tokens[1]);
                     ALOGI("PingPong Split: %d", mPanelInfo.mPingPongSplit);
                 }

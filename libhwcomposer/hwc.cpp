@@ -48,6 +48,7 @@ using namespace qQdcm;
 
 #define VSYNC_DEBUG 0
 #define POWER_MODE_DEBUG 1
+#define CURSOR_DEBUG 0
 
 static int hwc_device_open(const struct hw_module_t* module,
                            const char* name,
@@ -471,6 +472,17 @@ static int hwc_setCursorPositionAsync(struct hwc_composer_device_1* dev,
         int dpy, int x, int y) {
     int ret = -1;
     hwc_context_t* ctx = (hwc_context_t*)(dev);
+
+    if(!validDisplay(dpy)) {
+        return -EINVAL;
+    }
+
+    if((x < 0) || (x > (int)ctx->dpyAttr[dpy].xres) ||
+       (y < 0) || (y > (int)ctx->dpyAttr[dpy].yres)) {
+        ALOGD_IF(CURSOR_DEBUG, "%s: Invalid cursor position x=%d y=%d",
+                __FUNCTION__,x,y);
+        return 0;
+    }
     switch(dpy) {
         case HWC_DISPLAY_PRIMARY:
         {
@@ -892,25 +904,6 @@ int hwc_getDisplayAttributes(struct hwc_composer_device_1* dev, int disp,
         ALOGE("%s display (%d) is inactive", __FUNCTION__, disp);
         return -EINVAL;
     }
-
-    //From HWComposer
-    static const uint32_t DISPLAY_ATTRIBUTES[] = {
-        HWC_DISPLAY_VSYNC_PERIOD,
-        HWC_DISPLAY_WIDTH,
-        HWC_DISPLAY_HEIGHT,
-        HWC_DISPLAY_DPI_X,
-        HWC_DISPLAY_DPI_Y,
-#ifdef GET_DISPLAY_SECURE_STATUS_FROM_HWC
-        HWC_DISPLAY_SECURE,
-#endif
-#ifdef GET_FRAMEBUFFER_FORMAT_FROM_HWC
-        HWC_DISPLAY_FBFORMAT,
-#endif
-        HWC_DISPLAY_NO_ATTRIBUTE,
-    };
-
-    const size_t NUM_DISPLAY_ATTRIBUTES = (sizeof(DISPLAY_ATTRIBUTES) /
-            sizeof(DISPLAY_ATTRIBUTES)[0]);
 
     uint32_t xres = 0, yres = 0, refresh = 0, fps = 0;
     int ret = 0;
