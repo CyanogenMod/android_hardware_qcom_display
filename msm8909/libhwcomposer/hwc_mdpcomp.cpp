@@ -2006,9 +2006,6 @@ int MDPComp::prepare(hwc_context_t *ctx, hwc_display_contents_1_t* list) {
         mCurrentFrame.needsRedraw = false;
         setMDPCompLayerFlags(ctx, list);
         mCachedFrame.updateCounts(mCurrentFrame);
-#ifdef DYNAMIC_FPS
-        setDynRefreshRate(ctx, list);
-#endif
         return -1;
 
     }
