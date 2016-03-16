@@ -585,6 +585,7 @@ DisplayError HWDevice::SetStride(HWDeviceType device_type, LayerBufferFormat for
 void HWDevice::SetBlending(const LayerBlending &source, mdss_mdp_blend_op *target) {
   switch (source) {
   case kBlendingPremultiplied:  *target = BLEND_OP_PREMULTIPLIED;   break;
+  case kBlendingOpaque:         *target = BLEND_OP_OPAQUE;          break;
   case kBlendingCoverage:       *target = BLEND_OP_COVERAGE;        break;
   default:                      *target = BLEND_OP_NOT_DEFINED;     break;
   }
