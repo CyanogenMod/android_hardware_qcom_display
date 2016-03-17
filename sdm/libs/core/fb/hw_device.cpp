@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -254,17 +254,15 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         DLOGV_IF(kTagDriverConfig, "dst_rect [%d, %d, %d, %d]", mdp_layer.dst_rect.x,
                  mdp_layer.dst_rect.y, mdp_layer.dst_rect.w, mdp_layer.dst_rect.h);
         for (int j = 0; j < 4; j++) {
+          mdp_scale_data *scale = reinterpret_cast<mdp_scale_data*>(mdp_layer.scale);
           DLOGV_IF(kTagDriverConfig, "Scale Data[%d]: Phase=[%x %x %x %x] Pixel_Ext=[%d %d %d %d]",
-                 j, mdp_layer.scale->init_phase_x[j], mdp_layer.scale->phase_step_x[j],
-                 mdp_layer.scale->init_phase_y[j], mdp_layer.scale->phase_step_y[j],
-                 mdp_layer.scale->num_ext_pxls_left[j], mdp_layer.scale->num_ext_pxls_top[j],
-                 mdp_layer.scale->num_ext_pxls_right[j], mdp_layer.scale->num_ext_pxls_btm[j]);
+                 j, scale->init_phase_x[j], scale->phase_step_x[j], scale->init_phase_y[j],
+                 scale->phase_step_y[j], scale->num_ext_pxls_left[j], scale->num_ext_pxls_top[j],
+                 scale->num_ext_pxls_right[j], scale->num_ext_pxls_btm[j]);
           DLOGV_IF(kTagDriverConfig, "Fetch=[%d %d %d %d]  Repeat=[%d %d %d %d]  roi_width = %d",
-                 mdp_layer.scale->left_ftch[j], mdp_layer.scale->top_ftch[j],
-                 mdp_layer.scale->right_ftch[j], mdp_layer.scale->btm_ftch[j],
-                 mdp_layer.scale->left_rpt[j], mdp_layer.scale->top_rpt[j],
-                 mdp_layer.scale->right_rpt[j], mdp_layer.scale->btm_rpt[j],
-                 mdp_layer.scale->roi_w[j]);
+                 scale->left_ftch[j], scale->top_ftch[j], scale->right_ftch[j], scale->btm_ftch[j],
+                 scale->left_rpt[j], scale->top_rpt[j], scale->right_rpt[j], scale->btm_rpt[j],
+                 scale->roi_w[j]);
         }
         DLOGV_IF(kTagDriverConfig, "*************************************************************");
       }
@@ -294,7 +292,7 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
   }
 
   mdp_commit.flags |= MDP_VALIDATE_LAYER;
-  if (Sys::ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
+  if (Sys::ioctl_(device_fd_, INT(MSMFB_ATOMIC_COMMIT), &mdp_disp_commit_) < 0) {
     if (errno == ESHUTDOWN) {
       DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
       return kErrorShutDown;
@@ -411,11 +409,11 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
   }
 
   mdp_commit.release_fence = -1;
-  mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
+  mdp_commit.flags &= UINT32(~MDP_VALIDATE_LAYER);
   if (synchronous_commit_) {
     mdp_commit.flags |= MDP_COMMIT_WAIT_FOR_FINISH;
   }
-  if (Sys::ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
+  if (Sys::ioctl_(device_fd_, INT(MSMFB_ATOMIC_COMMIT), &mdp_disp_commit_) < 0) {
     if (errno == ESHUTDOWN) {
       DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
       return kErrorShutDown;
@@ -479,8 +477,8 @@ DisplayError HWDevice::Flush() {
   mdp_commit.input_layer_cnt = 0;
   mdp_commit.output_layer = NULL;
 
-  mdp_commit.flags &= ~MDP_VALIDATE_LAYER;
-  if (Sys::ioctl_(device_fd_, MSMFB_ATOMIC_COMMIT, &mdp_disp_commit_) < 0) {
+  mdp_commit.flags &= UINT32(~MDP_VALIDATE_LAYER);
+  if (Sys::ioctl_(device_fd_, INT(MSMFB_ATOMIC_COMMIT), &mdp_disp_commit_) < 0) {
     if (errno == ESHUTDOWN) {
       DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
       return kErrorShutDown;
@@ -585,6 +583,7 @@ DisplayError HWDevice::SetStride(HWDeviceType device_type, LayerBufferFormat for
 void HWDevice::SetBlending(const LayerBlending &source, mdss_mdp_blend_op *target) {
   switch (source) {
   case kBlendingPremultiplied:  *target = BLEND_OP_PREMULTIPLIED;   break;
+  case kBlendingOpaque:         *target = BLEND_OP_OPAQUE;          break;
   case kBlendingCoverage:       *target = BLEND_OP_COVERAGE;        break;
   default:                      *target = BLEND_OP_NOT_DEFINED;     break;
   }
@@ -756,9 +755,9 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
       } else if (!strncmp(tokens[0], "dyn_fps_en", strlen("dyn_fps_en"))) {
         panel_info->dynamic_fps = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "min_fps", strlen("min_fps"))) {
-        panel_info->min_fps = atoi(tokens[1]);
+        panel_info->min_fps = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_fps", strlen("max_fps"))) {
-        panel_info->max_fps = atoi(tokens[1]);
+        panel_info->max_fps = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "primary_panel", strlen("primary_panel"))) {
         panel_info->is_primary_panel = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "is_pluggable", strlen("is_pluggable"))) {
@@ -845,8 +844,8 @@ void HWDevice::GetSplitInfo(int device_node, HWPanelInfo *panel_info) {
   read = Sys::getline_(&line, &len, fileptr);
   if (read > 0) {
     if (!ParseLine(line, tokens, max_count, &token_count)) {
-      panel_info->split_info.left_split = atoi(tokens[0]);
-      panel_info->split_info.right_split = atoi(tokens[1]);
+      panel_info->split_info.left_split = UINT32(atoi(tokens[0]));
+      panel_info->split_info.right_split = UINT32(atoi(tokens[1]));
     }
   }
 
@@ -1024,15 +1023,15 @@ DisplayError HWDevice::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
   STRUCT_VAR(mdp_async_layer, async_layer);
   async_layer.flags = MDP_LAYER_ASYNC;
   async_layer.pipe_ndx = left_pipe->pipe_id;
-  async_layer.src.x = left_pipe->src_roi.left;
-  async_layer.src.y = left_pipe->src_roi.top;
-  async_layer.dst.x = x;
-  async_layer.dst.y = y;
+  async_layer.src.x = UINT32(left_pipe->src_roi.left);
+  async_layer.src.y = UINT32(left_pipe->src_roi.top);
+  async_layer.dst.x = UINT32(x);
+  async_layer.dst.y = UINT32(y);
 
   STRUCT_VAR(mdp_position_update, pos_update);
   pos_update.input_layer_cnt = 1;
   pos_update.input_layers = &async_layer;
-  if (Sys::ioctl_(device_fd_, MSMFB_ASYNC_POSITION_UPDATE, &pos_update) < 0) {
+  if (Sys::ioctl_(device_fd_, INT(MSMFB_ASYNC_POSITION_UPDATE), &pos_update) < 0) {
     if (errno == ESHUTDOWN) {
       DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
       return kErrorShutDown;
@@ -1097,8 +1096,8 @@ ssize_t HWDevice::SysFsWrite(const char* file_node, const char* value, ssize_t l
     DLOGW("Open failed = %s", file_node);
     return -1;
   }
-  ssize_t len = Sys::pwrite_(fd, value, length, 0);
-  if (length <= 0) {
+  ssize_t len = Sys::pwrite_(fd, value, static_cast<size_t>(length), 0);
+  if (len <= 0) {
     DLOGE("Write failed for path %s with value %s", file_node, value);
   }
   Sys::close_(fd);

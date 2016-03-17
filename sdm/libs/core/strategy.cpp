@@ -32,9 +32,10 @@
 namespace sdm {
 
 Strategy::Strategy(ExtensionInterface *extension_intf, DisplayType type,
-                   const HWResourceInfo &hw_resource_info, const HWPanelInfo &hw_panel_info)
+                   const HWResourceInfo &hw_resource_info, const HWPanelInfo &hw_panel_info,
+                   const HWDisplayAttributes &hw_display_attributes)
   : extension_intf_(extension_intf), display_type_(type), hw_resource_info_(hw_resource_info),
-    hw_panel_info_(hw_panel_info) {
+    hw_panel_info_(hw_panel_info), hw_display_attributes_(hw_display_attributes) {
 }
 
 DisplayError Strategy::Init() {
@@ -163,24 +164,21 @@ void Strategy::GenerateROI() {
     return;
   }
 
-  LayerStack *layer_stack = hw_layers_info_->stack;
-  LayerRect &dst_rect = layer_stack->layers[fb_layer_index_].dst_rect;
-  // The destination co-ordinates of the FB layer map to the panel and may be different than source
-  float fb_x_res = dst_rect.right - dst_rect.left;
-  float fb_y_res = dst_rect.bottom - dst_rect.top;
+  float disp_x_res = hw_display_attributes_.x_pixels;
+  float disp_y_res = hw_display_attributes_.y_pixels;
 
   if (!hw_resource_info_.is_src_split &&
-     ((fb_x_res > hw_resource_info_.max_mixer_width) ||
+     ((disp_x_res > hw_resource_info_.max_mixer_width) ||
      ((display_type_ == kPrimary) && hw_panel_info_.split_info.right_split))) {
     split_display = true;
   }
 
   if (split_display) {
     float left_split = FLOAT(hw_panel_info_.split_info.left_split);
-    hw_layers_info_->left_partial_update = (LayerRect) {0.0f, 0.0f, left_split, fb_y_res};
-    hw_layers_info_->right_partial_update = (LayerRect) {left_split, 0.0f, fb_x_res, fb_y_res};
+    hw_layers_info_->left_partial_update = (LayerRect) {0.0f, 0.0f, left_split, disp_y_res};
+    hw_layers_info_->right_partial_update = (LayerRect) {left_split, 0.0f, disp_x_res, disp_y_res};
   } else {
-    hw_layers_info_->left_partial_update = (LayerRect) {0.0f, 0.0f, fb_x_res, fb_y_res};
+    hw_layers_info_->left_partial_update = (LayerRect) {0.0f, 0.0f, disp_x_res, disp_y_res};
     hw_layers_info_->right_partial_update = (LayerRect) {0.0f, 0.0f, 0.0f, 0.0f};
   }
 }

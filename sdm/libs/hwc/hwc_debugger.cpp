@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -35,12 +35,12 @@
 namespace sdm {
 
 HWCDebugHandler HWCDebugHandler::debug_handler_;
-uint32_t HWCDebugHandler::debug_flags_ = 0x1;
-uint32_t HWCDebugHandler::verbose_level_ = 0x0;
+int32_t HWCDebugHandler::debug_flags_ = 0x1;
+int32_t HWCDebugHandler::verbose_level_ = 0x0;
 
 void HWCDebugHandler::DebugAll(bool enable, int verbose_level) {
   if (enable) {
-    debug_flags_ = 0xFFFFFFFF;
+    debug_flags_ = 0x7FFFFFFF;
     verbose_level_ = verbose_level;
   } else {
     debug_flags_ = 0x1;   // kTagNone should always be printed.

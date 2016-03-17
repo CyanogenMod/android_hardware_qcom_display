@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -81,7 +81,7 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
   }
 
   Strategy *&strategy = display_comp_ctx->strategy;
-  strategy = new Strategy(extension_intf_, type, hw_res_info_, hw_panel_info);
+  strategy = new Strategy(extension_intf_, type, hw_res_info_, hw_panel_info, attributes);
   if (!strategy) {
     DLOGE("Unable to create strategy");
     delete display_comp_ctx;
@@ -167,7 +167,7 @@ DisplayError CompManager::ReconfigureDisplay(Handle comp_handle,
 
   Strategy *&new_strategy = display_comp_ctx->strategy;
   display_comp_ctx->strategy = new Strategy(extension_intf_, display_comp_ctx->display_type,
-                                            hw_res_info_, hw_panel_info);
+                                            hw_res_info_, hw_panel_info, attributes);
   if (!display_comp_ctx->strategy) {
     DLOGE("Unable to create strategy.");
     return kErrorMemory;
@@ -418,7 +418,7 @@ bool CompManager::SupportLayerAsCursor(Handle comp_handle, HWLayers *hw_layers) 
     return supported;
   }
 
-  for (int32_t i = layer_stack->layer_count - 1; i >= 0; i--) {
+  for (int32_t i = INT32(layer_stack->layer_count - 1); i >= 0; i--) {
     Layer &layer = layer_stack->layers[i];
     if (layer.composition == kCompositionGPUTarget) {
       gpu_index = i;
