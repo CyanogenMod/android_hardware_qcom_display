@@ -155,8 +155,8 @@ void HWCDisplayExternal::ApplyScanAdjustment(hwc_rect_t *display_frame) {
     return;
   }
 
-  uint32_t new_panel_width = panel_width * UINT32(1.0f - width_ratio);
-  uint32_t new_panel_height = panel_height * UINT32(1.0f - height_ratio);
+  uint32_t new_panel_width = UINT32(panel_width * FLOAT(1.0f - width_ratio));
+  uint32_t new_panel_height = UINT32(panel_height * FLOAT(1.0f - height_ratio));
 
   int x_offset = INT((FLOAT(panel_width) * width_ratio) / 2.0f);
   int y_offset = INT((FLOAT(panel_height) * height_ratio) / 2.0f);
