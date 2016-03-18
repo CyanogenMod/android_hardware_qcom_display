@@ -263,6 +263,7 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
           read = Sys::getline_(&line, &len, fileptr);
           if (!ParseString(line, tokens, max_count, ": =\n", &token_count)) {
             HWPipeCaps pipe_caps;
+            pipe_caps.type = kPipeTypeUnused;
             for (uint32_t j = 0; j < token_count; j += 2) {
               if (!strncmp(tokens[j], "pipe_type", strlen("pipe_type"))) {
                 if (!strncmp(tokens[j+1], "vig", strlen("vig"))) {
