@@ -55,6 +55,7 @@
 
 #include <utils/constants.h>
 #include <utils/rect.h>
+#include <utils/formats.h>
 
 #include "blit_engine_c2d.h"
 #include "hwc_debugger.h"
@@ -265,6 +266,12 @@ int BlitEngineC2d::Prepare(LayerStack *layer_stack) {
     if (!blit_supported_) {
       return -1;
     }
+
+    // No 10 bit support for C2D
+    if (Is10BitFormat(layer.input_buffer->format)) {
+      return -1;
+    }
+
     if (layer.composition == kCompositionGPUTarget) {
       // Need FBT size for allocating buffers
       gpu_target_index = i;
@@ -556,18 +563,6 @@ int BlitEngineC2d::DrawRectUsingCopybit(hwc_layer_1_t *hwc_layer, Layer *layer,
   }
 
   return err;
-}
-
-bool BlitEngineC2d::IsUBWCFormat(LayerBufferFormat format) {
-  switch (format) {
-  case kFormatRGBA8888Ubwc:
-  case kFormatRGBX8888Ubwc:
-  case kFormatBGR565Ubwc:
-  case kFormatYCbCr420SPVenusUbwc:
-    return true;
-  default:
-    return false;
-  }
 }
 
 void BlitEngineC2d::DumpBlitTargetBuffer(int fd) {
