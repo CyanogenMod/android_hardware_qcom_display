@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013 - 2016 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -47,10 +47,12 @@ namespace qdutils {
 
 // Use this enum to specify the dpy parameters where needed
 enum {
-    DISPLAY_PRIMARY = 0,
-    DISPLAY_EXTERNAL,
-    DISPLAY_TERTIARY,
-    DISPLAY_VIRTUAL,
+    DISPLAY_PRIMARY = HWC_DISPLAY_PRIMARY,
+    DISPLAY_EXTERNAL = HWC_DISPLAY_EXTERNAL,
+#ifdef QTI_BSP
+    DISPLAY_TERTIARY = HWC_DISPLAY_TERTIARY,
+#endif
+    DISPLAY_VIRTUAL = HWC_DISPLAY_VIRTUAL,
 };
 
 // External Display states - used in setSecondaryDisplayStatus()
