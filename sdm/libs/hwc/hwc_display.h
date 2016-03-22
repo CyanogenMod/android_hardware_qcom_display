@@ -95,7 +95,7 @@ class HWCDisplay : public DisplayEventHandler {
 
   // Structure to track memory allocation for layer stack (layers, rectangles) object.
   struct LayerStackMemory {
-    static const size_t kSizeSteps = 1024;  // Default memory allocation.
+    static const size_t kSizeSteps = 4096;  // Default memory allocation.
     uint8_t *raw;  // Pointer to byte array.
     size_t size;  // Current number of allocated bytes.
 
