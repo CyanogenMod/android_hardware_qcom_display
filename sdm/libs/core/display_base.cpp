@@ -52,10 +52,9 @@ DisplayError DisplayBase::Init() {
   hw_panel_info_ = HWPanelInfo();
   hw_intf_->GetHWPanelInfo(&hw_panel_info_);
 
-  HWDisplayAttributes display_attrib;
   uint32_t active_index = 0;
   hw_intf_->GetActiveConfig(&active_index);
-  hw_intf_->GetDisplayAttributes(active_index, &display_attrib);
+  hw_intf_->GetDisplayAttributes(active_index, &display_attributes_);
 
   HWScaleLutInfo lut_info = {};
   error = comp_manager_->GetScaleLutConfig(&lut_info);
@@ -67,7 +66,7 @@ DisplayError DisplayBase::Init() {
     goto CleanupOnError;
   }
 
-  error = comp_manager_->RegisterDisplay(display_type_, display_attrib,
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_,
                                          hw_panel_info_, &display_comp_ctx_);
   if (error != kErrorNone) {
     goto CleanupOnError;
@@ -92,7 +91,7 @@ DisplayError DisplayBase::Init() {
   }
 
   color_mgr_ = ColorManagerProxy::CreateColorManagerProxy(display_type_, hw_intf_,
-                               display_attrib, hw_panel_info_);
+                               display_attributes_, hw_panel_info_);
   if (!color_mgr_) {
     DLOGW("Unable to create ColorManagerProxy for display = %d", display_type_);
   }
