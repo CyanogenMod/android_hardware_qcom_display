@@ -2,6 +2,14 @@ LOCAL_PATH := $(call my-dir)
 include $(LOCAL_PATH)/../common.mk
 include $(CLEAR_VARS)
 
+ifeq ($(QCPATH),)
+ifeq ($(BOARD_USES_HWC_QDCM_BLOB),true)
+#QCPATH is not set and the device uses hwcomposer.xyz blobs then exit
+LOCAL_BUILD_HWCOMPOSER := false
+endif
+endif
+
+ifneq ($(LOCAL_BUILD_HWCOMPOSER),false)
 LOCAL_MODULE                  := hwcomposer.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_RELATIVE_PATH    := hw
 LOCAL_MODULE_TAGS             := optional
@@ -60,3 +68,5 @@ LOCAL_SRC_FILES += hwc_qdcm_legacy.cpp
 endif
 
 include $(BUILD_SHARED_LIBRARY)
+
+endif
