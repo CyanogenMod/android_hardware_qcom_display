@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -61,7 +61,7 @@ struct MetaData_t {
     int32_t operation;
     int32_t interlaced;
     struct BufferDim_t bufferDim;
-    uint32_t refreshrate;
+    float refreshrate;
     enum ColorSpace_t colorSpace;
     enum IGC_t igc;
      /* Gralloc sets PRIV_SECURE_BUFFER flag to inform that the buffers are from
@@ -99,10 +99,26 @@ enum DispParamType {
     SET_SINGLE_BUFFER_MODE = 0x4000,
 };
 
+enum DispFetchParamType {
+    GET_PP_PARAM_INTERLACED = 0x0004,
+    GET_BUFFER_GEOMETRY = 0x0080,
+    GET_REFRESH_RATE = 0x0100,
+    GET_COLOR_SPACE = 0x0200,
+    GET_MAP_SECURE_BUFFER = 0x400,
+    GET_S3D_FORMAT = 0x800,
+    GET_LINEAR_FORMAT = 0x1000,
+    GET_IGC = 0x2000,
+    GET_SINGLE_BUFFER_MODE = 0x4000,
+};
+
 struct private_handle_t;
 int setMetaData(struct private_handle_t *handle, enum DispParamType paramType,
         void *param);
 
+int getMetaData(struct private_handle_t *handle, enum DispFetchParamType paramType,
+        void *param);
+
+int copyMetaData(struct private_handle_t *src, struct private_handle_t *dst);
 #ifdef __cplusplus
 }
 #endif
