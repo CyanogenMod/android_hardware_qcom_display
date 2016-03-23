@@ -19,4 +19,8 @@ LOCAL_SRC_FILES := \
       overlayWriteback.cpp \
       pipes/overlayGenPipe.cpp
 
+ifeq ($(TARGET_USES_DELTA_PANEL),true)
+LOCAL_CFLAGS                  += -DDELTA_PANEL
+endif #TARGET_USES_DELTA_PANEL
+
 include $(BUILD_SHARED_LIBRARY)
