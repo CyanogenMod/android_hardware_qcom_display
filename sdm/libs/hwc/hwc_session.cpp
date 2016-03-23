@@ -297,7 +297,13 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
       }
 
       if (hwc_session->hwc_display_[dpy]) {
-        hwc_session->hwc_display_[dpy]->Prepare(content_list);
+        if (!content_list) {
+          DLOGI("Display[%d] connected. content_list is null", dpy);
+        } else if (!content_list->numHwLayers) {
+          DLOGE("Display[%d] connected. numHwLayers is zero", dpy);
+        } else {
+          hwc_session->hwc_display_[dpy]->Prepare(content_list);
+        }
       }
     }
   }

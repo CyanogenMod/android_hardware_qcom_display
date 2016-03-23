@@ -62,6 +62,7 @@ enum PPGlobalColorFeatureID {
   kGlobalColorFeaturePaV2,
   kGlobalColorFeatureDither,
   kGlobalColorFeatureGamut,
+  kGlobalColorFeaturePADither,
   kMaxNumPPFeatures,
 };
 
@@ -99,7 +100,8 @@ struct PPFeatureVersion {
   static const uint32_t kSDEGamutV17 = 9;
   static const uint32_t kSDEPaV17 = 11;
   static const uint32_t kSDEPccV17 = 13;
-  static const uint32_t kSDELegacyPP = 15;
+  static const uint32_t kSDEPADitherV17 = 15;
+  static const uint32_t kSDELegacyPP = 17;
 
   uint32_t version[kMaxNumPPFeatures];
   PPFeatureVersion() { memset(version, 0, sizeof(version)); }
@@ -196,6 +198,28 @@ struct SDEDitherCfg {
 
   static SDEDitherCfg *Init(uint32_t arg __attribute__((__unused__)));
   SDEDitherCfg *GetConfig() { return this; }
+};
+
+struct SDEPADitherData {
+  uint32_t data_flags;
+  uint32_t matrix_size;
+  uint64_t matrix_data_addr;
+  uint32_t strength;
+  uint32_t offset_en;
+};
+
+class SDEPADitherWrapper : private SDEPADitherData {
+ public:
+  static SDEPADitherWrapper *Init(uint32_t arg __attribute__((__unused__)));
+  ~SDEPADitherWrapper() {
+    if (buffer_)
+      delete[] buffer_;
+  }
+  inline SDEPADitherData *GetConfig(void) { return this; }
+
+ private:
+  SDEPADitherWrapper() {}
+  uint32_t *buffer_ = NULL;
 };
 
 struct SDEPaMemColorData {
