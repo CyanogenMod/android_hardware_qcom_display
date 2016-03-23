@@ -90,6 +90,7 @@ class DisplayBase : public DisplayInterface {
   HWDeviceType hw_device_type_;
   HWInterface *hw_intf_ = NULL;
   HWPanelInfo hw_panel_info_;
+  HWDisplayAttributes display_attributes_;
   BufferSyncHandler *buffer_sync_handler_ = NULL;
   CompManager *comp_manager_ = NULL;
   RotatorInterface *rotator_intf_ = NULL;
