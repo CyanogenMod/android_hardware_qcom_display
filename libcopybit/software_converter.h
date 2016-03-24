@@ -31,10 +31,11 @@
 
 #include <copybit.h>
 #include "gralloc_priv.h"
-#include "gr.h"
 
 #define COPYBIT_SUCCESS 0
 #define COPYBIT_FAILURE -1
+
+#define ALIGN(x, y) (((x) + y - 1) & (~(y - 1)))
 
 int convertYV12toYCrCb420SP(const copybit_image_t *src,private_handle_t *yv12_handle);
 
