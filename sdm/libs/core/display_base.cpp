@@ -162,7 +162,7 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
 DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
   bool disable_partial_update = false;
-  uint32_t pending;
+  uint32_t pending = 0;
 
   if (!layer_stack) {
     return kErrorParameters;
@@ -179,7 +179,8 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
     return kErrorPermission;
   }
 
-  if (color_mgr_) {
+  // Request to disable partial update only if it is currently enabled.
+  if (color_mgr_ && partial_update_control_) {
     disable_partial_update = color_mgr_->NeedsPartialUpdateDisable();
     if (disable_partial_update) {
       ControlPartialUpdate(false, &pending);
@@ -484,7 +485,7 @@ DisplayError DisplayBase::ControlPartialUpdate(bool enable, uint32_t *pending) {
     return kErrorNotSupported;
   }
 
-  *pending = false;
+  *pending = 0;
   if (enable == partial_update_control_) {
     DLOGI("Same state transition is requested.");
     return kErrorNone;
@@ -496,7 +497,7 @@ DisplayError DisplayBase::ControlPartialUpdate(bool enable, uint32_t *pending) {
   if (!enable) {
     // If the request is to turn off feature, new draw call is required to have
     // the new setting into effect.
-    *pending = true;
+    *pending = 1;
   }
 
   return kErrorNone;
