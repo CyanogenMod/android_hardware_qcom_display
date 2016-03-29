@@ -708,7 +708,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
             ycbcr->chroma_step = 2;
         break;
 
-        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
+        /*case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
             // NV12_UBWC buffer has these 4 planes in the following sequence:
             // Y_Meta_Plane, Y_Plane, UV_Meta_Plane, UV_Plane
             unsigned int y_meta_stride, y_meta_height, y_meta_size;
@@ -734,7 +734,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
             ycbcr->ystride = y_stride;
             ycbcr->cstride = VENUS_UV_STRIDE(COLOR_FMT_NV12_UBWC, width);
             ycbcr->chroma_step = 2;
-        break;
+        break;*/
 
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         case HAL_PIXEL_FORMAT_YCrCb_422_SP:
