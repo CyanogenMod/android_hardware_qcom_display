@@ -65,6 +65,18 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int SetCursorPosition(int x, int y);
   virtual void SetSecureDisplay(bool secure_display_active);
 
+  // Captures frame output in the buffer specified by output_buffer_info. The API is
+  // non-blocking and the client is expected to check operation status later on.
+  // Returns -1 if the input is invalid.
+  virtual int FrameCaptureAsync(const BufferInfo& output_buffer_info, bool post_processed) {
+    return -1;
+  }
+  // Returns the status of frame capture operation requested with FrameCaptureAsync().
+  // -EAGAIN : No status obtain yet, call API again after another frame.
+  // < 0 : Operation happened but failed.
+  // 0 : Success.
+  virtual int GetFrameCaptureStatus() { return -EAGAIN; }
+
   // Display Configurations
   virtual int SetActiveDisplayConfig(int config);
   virtual int GetActiveDisplayConfig(uint32_t *config);
@@ -131,6 +143,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PostCommitLayerStack(hwc_display_contents_1_t *content_list);
+  virtual void DumpOutputBuffer(const BufferInfo& buffer_info, void *base, int fence);
   inline void SetRect(const hwc_rect_t &source, LayerRect *target);
   inline void SetRect(const hwc_frect_t &source, LayerRect *target);
   inline void SetComposition(const int32_t &source, LayerComposition *target);

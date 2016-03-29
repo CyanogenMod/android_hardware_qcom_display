@@ -146,7 +146,7 @@ int HWCSession::Init() {
   }
 
   // Create and power on primary display
-  status = HWCDisplayPrimary::Create(core_intf_, &hwc_procs_,
+  status = HWCDisplayPrimary::Create(core_intf_, buffer_allocator_, &hwc_procs_,
                                      &hwc_display_[HWC_DISPLAY_PRIMARY]);
   if (status) {
     CoreInterface::DestroyCore();

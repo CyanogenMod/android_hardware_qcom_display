@@ -39,6 +39,7 @@
 #include <utils/debug.h>
 #include <utils/sys.h>
 #include <core/display_interface.h>
+#include <linux/msm_mdp_ext.h>
 
 #include <string>
 
@@ -46,6 +47,14 @@
 #include "hw_color_manager.h"
 
 #define __CLASS__ "HWPrimary"
+
+#ifndef MDP_COMMIT_CWB_EN
+#define MDP_COMMIT_CWB_EN 0x800
+#endif
+
+#ifndef MDP_COMMIT_CWB_DSPP
+#define MDP_COMMIT_CWB_DSPP 0x1000
+#endif
 
 namespace sdm {
 
@@ -432,6 +441,8 @@ DisplayError HWPrimary::DozeSuspend() {
 }
 
 DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
+  LayerStack *stack = hw_layers->info.stack;
+
   HWDevice::ResetDisplayParams();
 
   mdp_layer_commit_v1 &mdp_commit = mdp_disp_commit_.commit_v1;
@@ -453,7 +464,58 @@ DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
     mdp_commit.right_roi.h = UINT32(right_roi.bottom - right_roi.top);
   }
 
+  if (stack->output_buffer && hw_resource_.has_concurrent_writeback) {
+    LayerBuffer *output_buffer = stack->output_buffer;
+    mdp_out_layer_.writeback_ndx = hw_resource_.writeback_index;
+    mdp_out_layer_.buffer.width = output_buffer->width;
+    mdp_out_layer_.buffer.height = output_buffer->height;
+    mdp_out_layer_.buffer.comp_ratio.denom = 1000;
+    mdp_out_layer_.buffer.comp_ratio.numer = UINT32(hw_layers->output_compression * 1000);
+    mdp_out_layer_.buffer.fence = -1;
+    SetFormat(output_buffer->format, &mdp_out_layer_.buffer.format);
+    mdp_commit.flags |= MDP_COMMIT_CWB_EN;
+    mdp_commit.flags |= (stack->flags.post_processed_output) ? MDP_COMMIT_CWB_DSPP : 0;
+    DLOGI_IF(kTagDriverConfig, "****************** Conc WB Output buffer Info ******************");
+    DLOGI_IF(kTagDriverConfig, "out_w %d, out_h %d, out_f %d, wb_id %d DSPP output %d",
+             mdp_out_layer_.buffer.width, mdp_out_layer_.buffer.height,
+             mdp_out_layer_.buffer.format, mdp_out_layer_.writeback_ndx,
+             stack->flags.post_processed_output);
+    DLOGI_IF(kTagDriverConfig, "****************************************************************");
+  }
+
   return HWDevice::Validate(hw_layers);
+}
+
+DisplayError HWPrimary::Commit(HWLayers *hw_layers) {
+  LayerBuffer *output_buffer = hw_layers->info.stack->output_buffer;
+
+  if (hw_resource_.has_concurrent_writeback && output_buffer) {
+    if (output_buffer->planes[0].fd >= 0) {
+      mdp_out_layer_.buffer.planes[0].fd = output_buffer->planes[0].fd;
+      mdp_out_layer_.buffer.planes[0].offset = output_buffer->planes[0].offset;
+      SetStride(device_type_, output_buffer->format, output_buffer->planes[0].stride,
+                &mdp_out_layer_.buffer.planes[0].stride);
+      mdp_out_layer_.buffer.plane_count = 1;
+      mdp_out_layer_.buffer.fence = -1;
+
+      DLOGI_IF(kTagDriverConfig, "****************** Conc WB Output buffer Info ****************");
+      DLOGI_IF(kTagDriverConfig, "out_fd %d, out_offset %d, out_stride %d",
+               mdp_out_layer_.buffer.planes[0].fd, mdp_out_layer_.buffer.planes[0].offset,
+               mdp_out_layer_.buffer.planes[0].stride);
+      DLOGI_IF(kTagDriverConfig, "**************************************************************");
+    } else {
+      DLOGE("Invalid output buffer fd");
+      return kErrorParameters;
+    }
+  }
+
+  DisplayError ret = HWDevice::Commit(hw_layers);
+
+  if (ret == kErrorNone && hw_resource_.has_concurrent_writeback && output_buffer) {
+    output_buffer->release_fence_fd = mdp_out_layer_.buffer.fence;
+  }
+
+  return ret;
 }
 
 void* HWPrimary::DisplayEventThread(void *context) {

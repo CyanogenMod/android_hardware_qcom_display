@@ -175,7 +175,18 @@ int HWCDisplayVirtual::Commit(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
-  DumpOutputBuffer(content_list);
+  if (dump_frame_count_ && !flush_ && dump_output_layer_) {
+    const private_handle_t *output_handle = (const private_handle_t *)(content_list->outbuf);
+    if (output_handle && output_handle->base) {
+      BufferInfo buffer_info;
+      buffer_info.buffer_config.width = static_cast<uint32_t>(output_handle->width);
+      buffer_info.buffer_config.height = static_cast<uint32_t>(output_handle->height);
+      buffer_info.buffer_config.format = GetSDMFormat(output_handle->format, output_handle->flags);
+      buffer_info.alloc_buffer_info.size = static_cast<uint32_t>(output_handle->size);
+      DumpOutputBuffer(buffer_info, reinterpret_cast<void *>(output_handle->base),
+                       layer_stack_.retire_fence_fd);
+    }
+  }
 
   status = HWCDisplay::PostCommitLayerStack(content_list);
   if (status) {
@@ -291,53 +302,6 @@ int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
   layer_stack_.output_buffer = output_buffer_;
 
   return status;
-}
-
-void HWCDisplayVirtual::DumpOutputBuffer(hwc_display_contents_1_t *content_list) {
-  const private_handle_t *output_handle = (const private_handle_t *)(content_list->outbuf);
-  char dir_path[PATH_MAX];
-
-  if (!dump_frame_count_ || flush_ || !dump_output_layer_) {
-    return;
-  }
-
-  snprintf(dir_path, sizeof(dir_path), "/data/misc/display/frame_dump_%s", GetDisplayString());
-
-  if (mkdir(dir_path, 777) != 0 && errno != EEXIST) {
-    DLOGW("Failed to create %s directory errno = %d, desc = %s", dir_path, errno, strerror(errno));
-    return;
-  }
-
-  // if directory exists already, need to explicitly change the permission.
-  if (errno == EEXIST && chmod(dir_path, 0777) != 0) {
-    DLOGW("Failed to change permissions on %s directory", dir_path);
-    return;
-  }
-
-  if (output_handle && output_handle->base) {
-    char dump_file_name[PATH_MAX];
-    size_t result = 0;
-
-    if (content_list->outbufAcquireFenceFd >= 0) {
-      int error = sync_wait(content_list->outbufAcquireFenceFd, 1000);
-      if (error < 0) {
-        DLOGW("sync_wait error errno = %d, desc = %s", errno,  strerror(errno));
-        return;
-      }
-    }
-
-    snprintf(dump_file_name, sizeof(dump_file_name), "%s/output_layer_%dx%d_%s_frame%d.raw",
-             dir_path, output_handle->width, output_handle->height,
-             GetHALPixelFormatString(output_handle->format), dump_frame_index_);
-
-    FILE* fp = fopen(dump_file_name, "w+");
-    if (fp) {
-      result = fwrite(reinterpret_cast<void *>(output_handle->base), output_handle->size, 1, fp);
-      fclose(fp);
-    }
-
-    DLOGI("Frame Dump of %s is %s", dump_file_name, result ? "Successful" : "Failed");
-  }
 }
 
 void HWCDisplayVirtual::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type) {

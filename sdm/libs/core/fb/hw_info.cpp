@@ -239,6 +239,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->amortizable_threshold = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "system_overhead_lines", strlen("system_overhead_lines"))) {
         hw_resource->system_overhead_lines = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "wb_intf_index", strlen("wb_intf_index"))) {
+        hw_resource->writeback_index = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "features", strlen("features"))) {
         for (uint32_t i = 0; i < token_count; i++) {
           if (!strncmp(tokens[i], "bwc", strlen("bwc"))) {
@@ -261,6 +263,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
             hw_resource->separate_rotator = true;
           } else if (!strncmp(tokens[i], "qseed3", strlen("qseed3"))) {
             hw_resource->has_qseed3 = true;
+          } else if (!strncmp(tokens[i], "concurrent_writeback", strlen("concurrent_writeback"))) {
+            hw_resource->has_concurrent_writeback = true;
           }
         }
       } else if (!strncmp(tokens[0], "pipe_count", strlen("pipe_count"))) {
@@ -319,9 +323,10 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->num_vig_pipe, hw_resource->num_dma_pipe, hw_resource->num_cursor_pipe);
   DLOGI("Upscale Ratio = %d, Downscale Ratio = %d, Blending Stages = %d", hw_resource->max_scale_up,
         hw_resource->max_scale_down, hw_resource->num_blending_stages);
-  DLOGI("BWC = %d, UBWC = %d, Decimation = %d, Tile Format = %d", hw_resource->has_bwc,
-        hw_resource->has_ubwc, hw_resource->has_decimation, hw_resource->has_macrotile);
   DLOGI("SourceSplit = %d QSEED3 = %d", hw_resource->is_src_split, hw_resource->has_qseed3);
+  DLOGI("BWC = %d, UBWC = %d, Decimation = %d, Tile Format = %d Concurrent Writeback = %d",
+        hw_resource->has_bwc, hw_resource->has_ubwc, hw_resource->has_decimation,
+        hw_resource->has_macrotile, hw_resource->has_concurrent_writeback);
   DLOGI("MaxLowBw = %" PRIu64 " , MaxHighBw = % " PRIu64 "", hw_resource->max_bandwidth_low,
         hw_resource->max_bandwidth_high);
   DLOGI("MaxPipeBw = %" PRIu64 " KBps, MaxSDEClock = % " PRIu64 " Hz, ClockFudgeFactor = %f",
@@ -332,6 +337,12 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
 
   if (hw_resource->separate_rotator || hw_resource->num_dma_pipe) {
     GetHWRotatorInfo(hw_resource);
+  }
+
+  // If the driver doesn't spell out the wb index, assume it to be the number of rotators,
+  // based on legacy implementation.
+  if (hw_resource->writeback_index == kHWBlockMax) {
+    hw_resource->writeback_index = hw_resource->hw_rot_info.num_rotator;
   }
 
   if (hw_resource->has_dyn_bw_support) {
