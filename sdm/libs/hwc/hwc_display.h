@@ -28,6 +28,7 @@
 #include <hardware/hwcomposer.h>
 #include <core/core_interface.h>
 #include <qdMetaData.h>
+#include <QService.h>
 #include <private/color_params.h>
 #include <map>
 
@@ -120,11 +121,12 @@ class HWCDisplay : public DisplayEventHandler {
   };
 
   HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id,
-             bool needs_blit);
+             bool needs_blit, qService::QService *qservice);
 
   // DisplayEventHandler methods
   virtual DisplayError VSync(const DisplayEventVSync &vsync);
   virtual DisplayError Refresh();
+  virtual DisplayError CECMessage(char *message);
 
   virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PrePrepareLayerStack(hwc_display_contents_1_t *content_list);
@@ -199,6 +201,7 @@ class HWCDisplay : public DisplayEventHandler {
   void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
   void ResetLayerCacheStack();
   BlitEngine *blit_engine_ = NULL;
+  qService::QService *qservice_ = NULL;
 };
 
 inline int HWCDisplay::Perform(uint32_t operation, ...) {

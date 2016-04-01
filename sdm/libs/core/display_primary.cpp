@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -45,7 +45,7 @@ DisplayError DisplayPrimary::Init() {
   SCOPE_LOCK(locker_);
 
   DisplayError error = HWPrimary::Create(&hw_intf_, hw_info_intf_,
-                                         DisplayBase::buffer_sync_handler_, this);
+                                         DisplayBase::buffer_sync_handler_);
 
   if (error != kErrorNone) {
     return error;
@@ -65,6 +65,13 @@ DisplayError DisplayPrimary::Init() {
       DLOGW("Retaining current display mode. Current = %d, Requested = %d", hw_panel_info_.mode,
             kModeVideo);
     }
+  }
+
+  error = HWEventsInterface::Create(INT(display_type_), this, &event_list_, &hw_events_intf_);
+  if (error != kErrorNone) {
+    DLOGE("Failed to create hardware events interface. Error = %d", error);
+    DisplayBase::Deinit();
+    HWPrimary::Destroy(hw_intf_);
   }
 
   return error;
