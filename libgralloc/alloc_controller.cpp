@@ -76,6 +76,7 @@ using namespace qdutils;
 using namespace android;
 
 ANDROID_SINGLETON_STATIC_INSTANCE(AdrenoMemInfo);
+ANDROID_SINGLETON_STATIC_INSTANCE(MDPCapabilityInfo);
 
 static void getYuvUBwcWidthHeight(int, int, int, int&, int&);
 static unsigned int getUBwcSize(int, int, int, const int, const int);
@@ -97,7 +98,17 @@ static bool useUncached(const int& usage) {
     return false;
 }
 
-//-------------- AdrenoMemInfo-----------------------//
+//------------- MDPCapabilityInfo-----------------------//
+MDPCapabilityInfo :: MDPCapabilityInfo() {
+  isMacroTileSupported = false;
+  qdutils::querySDEInfo(HAS_MACRO_TILE, &isMacroTileSupported);
+}
+
+int MDPCapabilityInfo :: isMacroTilingSupportedByMDP(){
+    return isMacroTileSupported;
+ }
+
+//------------- AdrenoMemInfo-----------------------//
 AdrenoMemInfo::AdrenoMemInfo()
 {
     LINK_adreno_compute_aligned_width_and_height = NULL;
@@ -516,13 +527,9 @@ IMemAlloc* IonController::getAllocator(int flags)
 bool isMacroTileEnabled(int format, int usage)
 {
     bool tileEnabled = false;
-    int isMacroTileSupportedByMDP = 0;
-
-    qdutils::querySDEInfo(HAS_MACRO_TILE, &isMacroTileSupportedByMDP);
-
     // Check whether GPU & MDSS supports MacroTiling feature
     if(AdrenoMemInfo::getInstance().isMacroTilingSupportedByGPU() &&
-       isMacroTileSupportedByMDP)
+       MDPCapabilityInfo::getInstance().isMacroTilingSupportedByMDP())
     {
         // check the format
         switch(format)
