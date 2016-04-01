@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2012-2014, 2016, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -55,7 +55,7 @@ void QService::connect(const sp<qClient::IQClient>& client) {
 }
 
 void QService::connect(const sp<qClient::IQHDMIClient>& client) {
-    ALOGD_IF(QSERVICE_DEBUG,"HWC client connected");
+    ALOGD_IF(QSERVICE_DEBUG,"HDMI client connected");
     mHDMIClient = client;
 }
 
@@ -82,7 +82,7 @@ void QService::onHdmiHotplug(int connected) {
         ALOGD_IF(QSERVICE_DEBUG, "%s: HDMI hotplug", __FUNCTION__);
         mHDMIClient->onHdmiHotplug(connected);
     } else {
-        ALOGE("%s: Failed to get a valid HDMI client", __FUNCTION__);
+        ALOGW("%s: Failed to get a valid HDMI client", __FUNCTION__);
     }
 }
 
@@ -91,7 +91,7 @@ void QService::onCECMessageReceived(char *msg, ssize_t len) {
         ALOGD_IF(QSERVICE_DEBUG, "%s: CEC message received", __FUNCTION__);
         mHDMIClient->onCECMessageRecieved(msg, len);
     } else {
-        ALOGE("%s: Failed to get a valid HDMI client", __FUNCTION__);
+        ALOGW("%s: Failed to get a valid HDMI client", __FUNCTION__);
     }
 }
 
