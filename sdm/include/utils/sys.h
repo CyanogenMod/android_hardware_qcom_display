@@ -25,6 +25,8 @@
 #ifndef __SYS_H__
 #define __SYS_H__
 
+#include <sys/eventfd.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <poll.h>
@@ -46,6 +48,9 @@ class Sys {
   typedef ssize_t (*getline)(char **lineptr, size_t *linelen, FILE *stream);
   typedef int (*pthread_cancel)(pthread_t thread);
   typedef int (*dup)(int fd);
+  typedef ssize_t (*read)(int, void *, size_t);
+  typedef ssize_t (*write)(int, const void *, size_t);
+  typedef int (*eventfd)(unsigned int, int);
 
   static ioctl ioctl_;
   static open open_;
@@ -58,6 +63,9 @@ class Sys {
   static getline getline_;
   static pthread_cancel pthread_cancel_;
   static dup dup_;
+  static read read_;
+  static write write_;
+  static eventfd eventfd_;
 };
 
 }  // namespace sdm
