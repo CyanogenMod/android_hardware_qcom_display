@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -117,11 +117,18 @@ enum LayerIGC {
   @sa Layer
 */
 struct LayerTransform {
-  float rotation;         //!< Left most pixel coordinate.
-  bool flip_horizontal;   //!< Mirror reversal of the layer across a horizontal axis.
-  bool flip_vertical;     //!< Mirror reversal of the layer across a vertical axis.
+  float rotation = 0.0f;  //!< Left most pixel coordinate.
+  bool flip_horizontal = false;  //!< Mirror reversal of the layer across a horizontal axis.
+  bool flip_vertical = false;  //!< Mirror reversal of the layer across a vertical axis.
 
-  LayerTransform() : rotation(0.0f), flip_horizontal(false), flip_vertical(false) { }
+  bool operator==(const LayerTransform& transform) const {
+    return (rotation == transform.rotation && flip_horizontal == transform.flip_horizontal &&
+            flip_vertical == transform.flip_vertical);
+  }
+
+  bool operator!=(const LayerTransform& transform) const {
+    return !operator==(transform);
+  }
 };
 
 /*! @brief This structure defines flags associated with a layer. The 1-bit flag can be set to ON(1)
@@ -214,7 +221,16 @@ struct LayerRect {
   float bottom = 0.0f;   //!< Bottom-most pixel coordinate.
 
   LayerRect() = default;
+
   LayerRect(float l, float t, float r, float b) : left(l), top(t), right(r), bottom(b) { }
+
+  bool operator==(const LayerRect& rect) const {
+    return left == rect.left && right == rect.right && top == rect.top && bottom == rect.bottom;
+  }
+
+  bool operator!=(const LayerRect& rect) const {
+    return !operator==(rect);
+  }
 };
 
 /*! @brief This structure defines an array of display layer rectangles.

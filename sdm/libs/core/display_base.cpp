@@ -70,7 +70,7 @@ DisplayError DisplayBase::Init() {
   if (hw_info_intf_) {
     HWResourceInfo hw_resource_info = HWResourceInfo();
     hw_info_intf_->GetHWResourceInfo(&hw_resource_info);
-    int max_mixer_stages = hw_resource_info.num_blending_stages;
+    auto max_mixer_stages = hw_resource_info.num_blending_stages;
     int property_value = Debug::GetMaxPipesPerMixer(display_type_);
     if (property_value >= 0) {
       max_mixer_stages = MIN(UINT32(property_value), hw_resource_info.num_blending_stages);
@@ -142,8 +142,8 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
     return kErrorParameters;
   }
 
-  uint32_t gpu_target_layer_dst_xpixels = gpu_target_layer.dst_rect.right;
-  uint32_t gpu_target_layer_dst_ypixels = gpu_target_layer.dst_rect.bottom;
+  auto gpu_target_layer_dst_xpixels = gpu_target_layer.dst_rect.right;
+  auto gpu_target_layer_dst_ypixels = gpu_target_layer.dst_rect.bottom;
 
   HWDisplayAttributes display_attrib;
   uint32_t active_index = 0;
@@ -162,7 +162,7 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
 DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
   bool disable_partial_update = false;
-  uint32_t pending;
+  uint32_t pending = 0;
 
   if (!layer_stack) {
     return kErrorParameters;
@@ -179,7 +179,8 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
     return kErrorPermission;
   }
 
-  if (color_mgr_) {
+  // Request to disable partial update only if it is currently enabled.
+  if (color_mgr_ && partial_update_control_) {
     disable_partial_update = color_mgr_->NeedsPartialUpdateDisable();
     if (disable_partial_update) {
       ControlPartialUpdate(false, &pending);
@@ -484,7 +485,7 @@ DisplayError DisplayBase::ControlPartialUpdate(bool enable, uint32_t *pending) {
     return kErrorNotSupported;
   }
 
-  *pending = false;
+  *pending = 0;
   if (enable == partial_update_control_) {
     DLOGI("Same state transition is requested.");
     return kErrorNone;
@@ -496,7 +497,7 @@ DisplayError DisplayBase::ControlPartialUpdate(bool enable, uint32_t *pending) {
   if (!enable) {
     // If the request is to turn off feature, new draw call is required to have
     // the new setting into effect.
-    *pending = true;
+    *pending = 1;
   }
 
   return kErrorNone;
@@ -712,6 +713,18 @@ const char * DisplayBase::GetName(const LayerBufferFormat &format) {
   case kFormatYCrCb422H2V1SemiPlanar:   return "Y_CRCB_422_H2V2";
   case kFormatYCbCr420SPVenusUbwc:      return "Y_CBCR_420_VENUS_UBWC";
   case kFormatYCbCr422H2V1Packed:       return "YCBYCR_422_H2V1";
+  case kFormatRGBA1010102:              return "RGBA_1010102";
+  case kFormatARGB2101010:              return "ARGB_2101010";
+  case kFormatRGBX1010102:              return "RGBX_1010102";
+  case kFormatXRGB2101010:              return "XRGB_2101010";
+  case kFormatBGRA1010102:              return "BGRA_1010102";
+  case kFormatABGR2101010:              return "ABGR_2101010";
+  case kFormatBGRX1010102:              return "BGRX_1010102";
+  case kFormatXBGR2101010:              return "XBGR_2101010";
+  case kFormatRGBA1010102Ubwc:          return "RGBA_1010102_UBWC";
+  case kFormatRGBX1010102Ubwc:          return "RGBX_1010102_UBWC";
+  case kFormatYCbCr420P010:             return "Y_CBCR_420_P010";
+  case kFormatYCbCr420TP10Ubwc:         return "Y_CBCR_420_TP10_UBWC";
   default:                              return "UNKNOWN";
   }
 }
