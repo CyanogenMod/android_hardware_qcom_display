@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -118,7 +118,6 @@ class ResourceDefault : public ResourceInterface {
   DisplayError AlignPipeConfig(const Layer &layer, HWPipeInfo *left_pipe, HWPipeInfo *right_pipe);
   void ResourceStateLog(void);
   DisplayError CalculateDecimation(float downscale, uint8_t *decimation);
-  bool IsUBWCFormat(LayerBufferFormat format);
 
   Locker locker_;
   HWResourceInfo hw_res_info_;

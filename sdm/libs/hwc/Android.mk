@@ -5,15 +5,15 @@ LOCAL_MODULE                  := hwcomposer.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_RELATIVE_PATH    := hw
 LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := hardware/qcom/display/sdm/include/ \
-                                 hardware/qcom/display/libgralloc/ \
                                  hardware/qcom/display/libqservice/ \
                                  hardware/qcom/display/libqdutils/ \
                                  hardware/qcom/display/libcopybit/ \
                                  external/libcxx/include/
 
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
-                                 -Wall -Werror -std=c++11 -fcolor-diagnostics\
+                                 -Wall -Werror -Wconversion -std=c++11 -fcolor-diagnostics\
                                  -DLOG_TAG=\"SDM\" -DDEBUG_CALC_FPS
+LOCAL_CFLAGS                  += -isystem hardware/qcom/display/libgralloc
 LOCAL_CLANG                   := true
 
 # TODO: Move this to the common makefile

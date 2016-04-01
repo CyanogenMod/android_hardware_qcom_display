@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -297,7 +297,13 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
       }
 
       if (hwc_session->hwc_display_[dpy]) {
-        hwc_session->hwc_display_[dpy]->Prepare(content_list);
+        if (!content_list) {
+          DLOGI("Display[%d] connected. content_list is null", dpy);
+        } else if (!content_list->numHwLayers) {
+          DLOGE("Display[%d] connected. numHwLayers is zero", dpy);
+        } else {
+          hwc_session->hwc_display_[dpy]->Prepare(content_list);
+        }
       }
     }
   }
@@ -475,7 +481,7 @@ void HWCSession::Dump(hwc_composer_device_1 *device, char *buffer, int length) {
     return;
   }
 
-  DumpInterface::GetDump(buffer, length);
+  DumpInterface::GetDump(buffer, UINT32(length));
 }
 
 int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint32_t *configs,
@@ -859,7 +865,7 @@ android::status_t HWCSession::HandleGetActiveDisplayConfig(const android::Parcel
     uint32_t config = 0;
     error = hwc_display_[dpy]->GetActiveDisplayConfig(&config);
     if (error == 0) {
-      output_parcel->writeInt32(config);
+      output_parcel->writeInt32(INT(config));
     }
   }
 
@@ -879,7 +885,7 @@ android::status_t HWCSession::HandleGetDisplayConfigCount(const android::Parcel 
   if (hwc_display_[dpy]) {
     error = hwc_display_[dpy]->GetDisplayConfigCount(&count);
     if (error == 0) {
-      output_parcel->writeInt32(count);
+      output_parcel->writeInt32(INT(count));
     }
   }
 
@@ -901,9 +907,9 @@ android::status_t HWCSession::HandleGetDisplayAttributesForConfig(const android:
   if (hwc_display_[dpy]) {
     error = hwc_display_[dpy]->GetDisplayAttributesForConfig(config, &attributes);
     if (error == 0) {
-      output_parcel->writeInt32(attributes.vsync_period_ns);
-      output_parcel->writeInt32(attributes.x_pixels);
-      output_parcel->writeInt32(attributes.y_pixels);
+      output_parcel->writeInt32(INT(attributes.vsync_period_ns));
+      output_parcel->writeInt32(INT(attributes.x_pixels));
+      output_parcel->writeInt32(INT(attributes.y_pixels));
       output_parcel->writeFloat(attributes.x_dpi);
       output_parcel->writeFloat(attributes.y_dpi);
       output_parcel->writeInt32(0);  // Panel type, unsupported.
@@ -1274,7 +1280,7 @@ void HWCSession::ResetPanel() {
   }
 
   DLOGI("Restoring power mode on primary");
-  uint32_t mode = hwc_display_[HWC_DISPLAY_PRIMARY]->GetLastPowerMode();
+  int32_t mode = INT(hwc_display_[HWC_DISPLAY_PRIMARY]->GetLastPowerMode());
   status = hwc_display_[HWC_DISPLAY_PRIMARY]->SetPowerMode(mode);
   if (status) {
     DLOGE("Setting power mode = %d on primary failed with error = %d", mode, status);
@@ -1336,7 +1342,7 @@ int HWCSession::HotPlugHandler(bool connected) {
     // trigger screen refresh to ensure sufficient resources are available to process new
     // new display connection.
     hwc_procs_->invalidate(hwc_procs_);
-    int32_t vsync_period = GetVsyncPeriod(HWC_DISPLAY_PRIMARY);
+    uint32_t vsync_period = UINT32(GetVsyncPeriod(HWC_DISPLAY_PRIMARY));
     usleep(vsync_period * 2 / 1000);
   }
   // notify client
