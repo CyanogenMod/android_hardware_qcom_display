@@ -58,10 +58,8 @@ HWDevice::HWDevice(BufferSyncHandler *buffer_sync_handler)
     buffer_sync_handler_(buffer_sync_handler), synchronous_commit_(false) {
 }
 
-DisplayError HWDevice::Init(HWEventHandler *eventhandler) {
+DisplayError HWDevice::Init() {
   char device_name[64] = {0};
-
-  event_handler_ = eventhandler;
 
   // Read the fb node index
   fb_node_index_ = GetFBNodeIndex(device_type_);

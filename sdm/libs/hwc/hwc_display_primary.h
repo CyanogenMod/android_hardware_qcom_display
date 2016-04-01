@@ -41,7 +41,8 @@ class HWCDisplayPrimary : public HWCDisplay {
   };
 
   static int Create(CoreInterface *core_intf, BufferAllocator *buffer_allocator,
-                    hwc_procs_t const **hwc_procs, HWCDisplay **hwc_display);
+                    hwc_procs_t const **hwc_procs, qService::QService *qservice,
+                    HWCDisplay **hwc_display);
   static void Destroy(HWCDisplay *hwc_display);
   virtual int Init();
   virtual int Prepare(hwc_display_contents_1_t *content_list);
@@ -56,7 +57,7 @@ class HWCDisplayPrimary : public HWCDisplay {
 
  private:
   HWCDisplayPrimary(CoreInterface *core_intf, BufferAllocator *buffer_allocator,
-                    hwc_procs_t const **hwc_procs);
+                    hwc_procs_t const **hwc_procs, qService::QService *qservice);
   void SetMetaDataRefreshRateFlag(bool enable);
   virtual DisplayError SetDisplayMode(uint32_t mode);
   void ProcessBootAnimCompleted(hwc_display_contents_1_t *content_list);

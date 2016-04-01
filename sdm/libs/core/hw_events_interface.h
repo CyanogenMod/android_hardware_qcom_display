@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, 2016, The Linux Foundation. All rights reserved.
+* Copyright (c) 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -22,32 +22,27 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __HWC_DISPLAY_EXTERNAL_H__
-#define __HWC_DISPLAY_EXTERNAL_H__
+#ifndef __HW_EVENTS_INTERFACE_H__
+#define __HW_EVENTS_INTERFACE_H__
 
-#include "hwc_display.h"
+#include <private/hw_info_types.h>
+#include <inttypes.h>
+#include <utility>
+#include <vector>
 
 namespace sdm {
 
-class HWCDisplayExternal : public HWCDisplay {
+class HWEventsInterface {
  public:
-  static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, uint32_t primary_width,
-                    uint32_t primary_height, qService::QService *qservice,
-                    HWCDisplay **hwc_display);
-  static void Destroy(HWCDisplay *hwc_display);
-  virtual int Prepare(hwc_display_contents_1_t *content_list);
-  virtual int Commit(hwc_display_contents_1_t *content_list);
-  virtual void SetSecureDisplay(bool secure_display_active);
+  static DisplayError Create(int fb_num, HWEventHandler *event_handler,
+                             std::vector<const char *> *event_list, HWEventsInterface **intf);
+  static DisplayError Destroy(HWEventsInterface *intf);
 
- private:
-  HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
-                     qService::QService *qservice);
-  void ApplyScanAdjustment(hwc_rect_t *display_frame);
-  static void GetDownscaleResolution(uint32_t primary_width, uint32_t primary_height,
-                                     uint32_t *virtual_width, uint32_t *virtual_height);
+ protected:
+  virtual ~HWEventsInterface() { }
 };
 
 }  // namespace sdm
 
-#endif  // __HWC_DISPLAY_EXTERNAL_H__
+#endif  // __HW_EVENTS_INTERFACE_H__
 

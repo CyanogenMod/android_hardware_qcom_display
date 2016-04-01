@@ -116,11 +116,12 @@ int HWCSession::Init() {
 
   // Start QService and connect to it.
   qService::QService::init();
-  android::sp<qService::IQService> qservice = android::interface_cast<qService::IQService>(
+  android::sp<qService::IQService> iqservice = android::interface_cast<qService::IQService>(
                 android::defaultServiceManager()->getService(android::String16(qservice_name)));
 
-  if (qservice.get()) {
-    qservice->connect(android::sp<qClient::IQClient>(this));
+  if (iqservice.get()) {
+    iqservice->connect(android::sp<qClient::IQClient>(this));
+    qservice_ = reinterpret_cast<qService::QService* >(iqservice.get());
   } else {
     DLOGE("Failed to acquire %s", qservice_name);
     return -EINVAL;
@@ -146,7 +147,7 @@ int HWCSession::Init() {
   }
 
   // Create and power on primary display
-  status = HWCDisplayPrimary::Create(core_intf_, buffer_allocator_, &hwc_procs_,
+  status = HWCDisplayPrimary::Create(core_intf_, buffer_allocator_, &hwc_procs_, qservice_,
                                      &hwc_display_[HWC_DISPLAY_PRIMARY]);
   if (status) {
     CoreInterface::DestroyCore();
@@ -596,7 +597,7 @@ int HWCSession::ConnectDisplay(int disp, hwc_display_contents_1_t *content_list)
 
   if (disp == HWC_DISPLAY_EXTERNAL) {
     status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, primary_width, primary_height,
-                                        &hwc_display_[disp]);
+                                        qservice_, &hwc_display_[disp]);
   } else if (disp == HWC_DISPLAY_VIRTUAL) {
     status = HWCDisplayVirtual::Create(core_intf_, &hwc_procs_, primary_width, primary_height,
                                        content_list, &hwc_display_[disp]);
@@ -1358,6 +1359,8 @@ int HWCSession::HotPlugHandler(bool connected) {
   if (notify_hotplug) {
     hwc_procs_->hotplug(hwc_procs_, HWC_DISPLAY_EXTERNAL, connected);
   }
+
+  qservice_->onHdmiHotplug(INT(connected));
 
   return 0;
 }

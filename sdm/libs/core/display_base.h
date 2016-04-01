@@ -34,6 +34,7 @@
 #include "hw_interface.h"
 #include "comp_manager.h"
 #include "color_manager.h"
+#include "hw_events_interface.h"
 
 namespace sdm {
 
@@ -103,6 +104,7 @@ class DisplayBase : public DisplayInterface {
   HWInfoInterface *hw_info_intf_ = NULL;
   ColorManagerProxy *color_mgr_ = NULL;  // each display object owns its ColorManagerProxy
   bool partial_update_control_ = true;
+  HWEventsInterface *hw_events_intf_ = NULL;
 
  private:
   // Unused
