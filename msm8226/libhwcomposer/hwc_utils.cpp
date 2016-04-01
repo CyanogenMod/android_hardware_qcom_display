@@ -966,6 +966,7 @@ bool isRotatorSupportedFormat(private_handle_t *hnd) {
     // TODO: Add more formats in future, if mdp driver adds support
     switch(hnd->format) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_RGBX_8888:
         case HAL_PIXEL_FORMAT_RGB_565:
         case HAL_PIXEL_FORMAT_RGB_888:
         case HAL_PIXEL_FORMAT_BGRA_8888:

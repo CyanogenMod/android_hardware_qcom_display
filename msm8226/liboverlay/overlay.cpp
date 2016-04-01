@@ -218,12 +218,13 @@ utils::eDest Overlay::getPipe_8x26(const PipeSpecs& pipeSpecs) {
                Try for DMA pipe for FB first, if FB does not have scaling*/
             if (not pipeSpecs.needsScaling) {
                 dest = nextPipe(OV_MDP_PIPE_DMA, pipeSpecs.dpy, pipeSpecs.mixer);
-            } else {
+            }
+            if (dest == OV_INVALID) {
                 dest = nextPipe(OV_MDP_PIPE_RGB, pipeSpecs.dpy, pipeSpecs.mixer);
-                if (dest == OV_INVALID) {
-                    // FB needs scaling, and RGB pipe is not available - try VG
-                    dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
-                }
+            }
+            if (dest == OV_INVALID) {
+                // FB needs scaling, and RGB pipe is not available - try VG
+                dest = nextPipe(OV_MDP_PIPE_VG, pipeSpecs.dpy, pipeSpecs.mixer);
             }
         }
         if(dest == OV_INVALID and (not pipeSpecs.needsScaling) and
