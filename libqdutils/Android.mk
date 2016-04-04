@@ -15,6 +15,7 @@ LOCAL_SRC_FILES               := profiler.cpp mdp_version.cpp \
                                  comptype.cpp qd_utils.cpp \
                                  cb_utils.cpp display_config.cpp \
                                  cb_swap_rect.cpp
+LOCAL_CLANG := false
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
@@ -29,5 +30,6 @@ LOCAL_CFLAGS                    := $(common_flags)
 LOCAL_CFLAGS                    += -DLOG_TAG=\"DisplayMetaData\"
 LOCAL_MODULE_TAGS               := optional
 LOCAL_MODULE                    := libqdMetaData
+LOCAL_CLANG := false
 include $(BUILD_SHARED_LIBRARY)
 

@@ -18,6 +18,7 @@ LOCAL_SHARED_LIBRARIES += libskia
 endif #TARGET_USES_QCOM_BSP
 
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhwcomposer\"
+LOCAL_CLANG := false
 #Enable Dynamic FPS if PHASE_OFFSET is not set
 ifeq ($(VSYNC_EVENT_PHASE_OFFSET_NS),)
     LOCAL_CFLAGS += -DDYNAMIC_FPS

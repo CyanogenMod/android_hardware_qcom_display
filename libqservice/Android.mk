@@ -16,4 +16,5 @@ LOCAL_COPY_HEADERS            := IQService.h \
                                  IQClient.h
 
 
+LOCAL_CLANG := false
 include $(BUILD_SHARED_LIBRARY)
