@@ -469,6 +469,7 @@ void HWCDisplay::CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
     layer_buffer->planes[0].fd = pvt_handle->fd;
     layer_buffer->planes[0].offset = pvt_handle->offset;
     layer_buffer->planes[0].stride = UINT32(pvt_handle->width);
+    layer_buffer->size = pvt_handle->size;
   }
 
   // if swapinterval property is set to 0 then close and reset the acquireFd
@@ -482,11 +483,6 @@ void HWCDisplay::CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
 int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
   if (shutdown_pending_) {
     return 0;
-  }
-
-  if (!content_list || !content_list->numHwLayers) {
-    DLOGW("Invalid content list");
-    return -EINVAL;
   }
 
   size_t num_hw_layers = content_list->numHwLayers;
@@ -956,12 +952,15 @@ LayerBufferFormat HWCDisplay::GetSDMFormat(const int32_t &source, const int flag
   LayerBufferFormat format = kFormatInvalid;
   if (flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED) {
     switch (source) {
-    case HAL_PIXEL_FORMAT_RGBA_8888:          format = kFormatRGBA8888Ubwc;            break;
-    case HAL_PIXEL_FORMAT_RGBX_8888:          format = kFormatRGBX8888Ubwc;            break;
-    case HAL_PIXEL_FORMAT_BGR_565:            format = kFormatBGR565Ubwc;              break;
+    case HAL_PIXEL_FORMAT_RGBA_8888:           format = kFormatRGBA8888Ubwc;            break;
+    case HAL_PIXEL_FORMAT_RGBX_8888:           format = kFormatRGBX8888Ubwc;            break;
+    case HAL_PIXEL_FORMAT_BGR_565:             format = kFormatBGR565Ubwc;              break;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
-    case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:    format = kFormatYCbCr420SPVenusUbwc;     break;
+    case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:     format = kFormatYCbCr420SPVenusUbwc;     break;
+    case HAL_PIXEL_FORMAT_RGBA_1010102:        format = kFormatRGBA1010102Ubwc;         break;
+    case HAL_PIXEL_FORMAT_RGBX_1010102:        format = kFormatRGBX1010102Ubwc;         break;
+    case HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC: format = kFormatYCbCr420TP10Ubwc;        break;
     default:
       DLOGE("Unsupported format type for UBWC %d", source);
       return kFormatInvalid;
@@ -988,6 +987,16 @@ LayerBufferFormat HWCDisplay::GetSDMFormat(const int32_t &source, const int flag
   case HAL_PIXEL_FORMAT_YCbCr_420_SP:             format = kFormatYCbCr420SemiPlanar;       break;
   case HAL_PIXEL_FORMAT_YCbCr_422_SP:             format = kFormatYCbCr422H2V1SemiPlanar;   break;
   case HAL_PIXEL_FORMAT_YCbCr_422_I:              format = kFormatYCbCr422H2V1Packed;       break;
+  case HAL_PIXEL_FORMAT_RGBA_1010102:             format = kFormatRGBA1010102;              break;
+  case HAL_PIXEL_FORMAT_ARGB_2101010:             format = kFormatARGB2101010;              break;
+  case HAL_PIXEL_FORMAT_RGBX_1010102:             format = kFormatRGBX1010102;              break;
+  case HAL_PIXEL_FORMAT_XRGB_2101010:             format = kFormatXRGB2101010;              break;
+  case HAL_PIXEL_FORMAT_BGRA_1010102:             format = kFormatBGRA1010102;              break;
+  case HAL_PIXEL_FORMAT_ABGR_2101010:             format = kFormatABGR2101010;              break;
+  case HAL_PIXEL_FORMAT_BGRX_1010102:             format = kFormatBGRX1010102;              break;
+  case HAL_PIXEL_FORMAT_XBGR_2101010:             format = kFormatXBGR2101010;              break;
+  case HAL_PIXEL_FORMAT_YCbCr_420_P010:           format = kFormatYCbCr420P010;             break;
+  case HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC:      format = kFormatYCbCr420TP10Ubwc;         break;
   default:
     DLOGW("Unsupported format type = %d", source);
     return kFormatInvalid;
@@ -1098,6 +1107,26 @@ const char *HWCDisplay::GetHALPixelFormatString(int format) {
     return "YCrCb_420_SP_VENUS";
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
     return "YCbCr_420_SP_VENUS_UBWC";
+  case HAL_PIXEL_FORMAT_RGBA_1010102:
+    return "RGBA_1010102";
+  case HAL_PIXEL_FORMAT_ARGB_2101010:
+    return "ARGB_2101010";
+  case HAL_PIXEL_FORMAT_RGBX_1010102:
+    return "RGBX_1010102";
+  case HAL_PIXEL_FORMAT_XRGB_2101010:
+    return "XRGB_2101010";
+  case HAL_PIXEL_FORMAT_BGRA_1010102:
+    return "BGRA_1010102";
+  case HAL_PIXEL_FORMAT_ABGR_2101010:
+    return "ABGR_2101010";
+  case HAL_PIXEL_FORMAT_BGRX_1010102:
+    return "BGRX_1010102";
+  case HAL_PIXEL_FORMAT_XBGR_2101010:
+    return "XBGR_2101010";
+  case HAL_PIXEL_FORMAT_YCbCr_420_P010:
+    return "YCbCr_420_P010";
+  case HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC:
+    return "YCbCr_420_TP10_UBWC";
   default:
     return "Unknown pixel format";
   }

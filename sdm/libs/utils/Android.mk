@@ -11,6 +11,7 @@ LOCAL_CFLAGS                  := -Wno-missing-field-initializers \
 LOCAL_CLANG                   := true
 LOCAL_SRC_FILES               := debug.cpp \
                                  rect.cpp \
-                                 sys.cpp
+                                 sys.cpp \
+                                 formats.cpp
 
 include $(BUILD_SHARED_LIBRARY)

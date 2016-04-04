@@ -26,6 +26,7 @@
 #include <utils/constants.h>
 #include <utils/debug.h>
 #include <utils/rect.h>
+#include <utils/formats.h>
 #include <dlfcn.h>
 
 #include "resource_default.h"
@@ -890,19 +891,6 @@ DisplayError ResourceDefault::ValidateCursorPosition(Handle display_ctx, HWLayer
 
 DisplayError ResourceDefault::SetMaxBandwidthMode(HWBwModes mode) {
   return kErrorNotSupported;
-}
-
-bool ResourceDefault::IsUBWCFormat(LayerBufferFormat format) {
-  switch (format) {
-  case kFormatRGBA8888Ubwc:
-  case kFormatRGBX8888Ubwc:
-  case kFormatBGR565Ubwc:
-  case kFormatYCbCr420SPVenusUbwc:
-    return true;
-  default:
-    break;
-  }
-  return false;
 }
 
 }  // namespace sdm
