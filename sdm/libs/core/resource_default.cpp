@@ -893,4 +893,8 @@ DisplayError ResourceDefault::SetMaxBandwidthMode(HWBwModes mode) {
   return kErrorNotSupported;
 }
 
+DisplayError ResourceDefault::GetScaleLutConfig(HWScaleLutInfo *lut_info) {
+  return kErrorNone;
+}
+
 }  // namespace sdm

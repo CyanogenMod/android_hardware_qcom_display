@@ -255,6 +255,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
             hw_resource->has_dyn_bw_support = true;
           } else if (!strncmp(tokens[i], "separate_rotator", strlen("separate_rotator"))) {
             hw_resource->separate_rotator = true;
+          } else if (!strncmp(tokens[i], "qseed3", strlen("qseed3"))) {
+            hw_resource->has_qseed3 = true;
           }
         }
       } else if (!strncmp(tokens[0], "pipe_count", strlen("pipe_count"))) {
@@ -315,7 +317,7 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->max_scale_down, hw_resource->num_blending_stages);
   DLOGI("BWC = %d, UBWC = %d, Decimation = %d, Tile Format = %d", hw_resource->has_bwc,
         hw_resource->has_ubwc, hw_resource->has_decimation, hw_resource->has_macrotile);
-  DLOGI("SourceSplit = %d", hw_resource->is_src_split);
+  DLOGI("SourceSplit = %d QSEED3 = %d", hw_resource->is_src_split, hw_resource->has_qseed3);
   DLOGI("MaxLowBw = %" PRIu64 " , MaxHighBw = % " PRIu64 "", hw_resource->max_bandwidth_low,
         hw_resource->max_bandwidth_high);
   DLOGI("MaxPipeBw = %" PRIu64 " KBps, MaxSDEClock = % " PRIu64 " Hz, ClockFudgeFactor = %f",
