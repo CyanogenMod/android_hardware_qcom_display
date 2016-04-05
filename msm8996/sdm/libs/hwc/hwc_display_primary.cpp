@@ -114,13 +114,11 @@ void HWCDisplayPrimary::ProcessBootAnimCompleted(hwc_display_contents_1_t *list)
   bool isEncrypted = false;
   bool main_class_services_started = false;
   if (property_get("ro.crypto.state", cryptoState, "unencrypted")) {
-    DLOGI("%s: cryptostate= %s", __FUNCTION__, cryptoState);
     if (!strcmp(cryptoState, "encrypted")) {
       isEncrypted = true;
       if (property_get("vold.decrypt", voldDecryptState, "") &&
             !strcmp(voldDecryptState, "trigger_restart_framework"))
         main_class_services_started = true;
-      DLOGI("%s: vold= %s", __FUNCTION__, voldDecryptState);
     }
   }
   if ((!isEncrypted ||(isEncrypted && main_class_services_started)) &&
