@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011 - 2016, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,6 +109,17 @@
 #define HAL_PIXEL_FORMAT_NV21_ZSL                0x113
 #define HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS      0x114
 #define HAL_PIXEL_FORMAT_BGR_565                 0x115
+#define HAL_PIXEL_FORMAT_RGBA_1010102            0x116
+#define HAL_PIXEL_FORMAT_ARGB_2101010            0x117
+#define HAL_PIXEL_FORMAT_RGBX_1010102            0x118
+#define HAL_PIXEL_FORMAT_XRGB_2101010            0x119
+#define HAL_PIXEL_FORMAT_BGRA_1010102            0x11A
+#define HAL_PIXEL_FORMAT_ABGR_2101010            0x11B
+#define HAL_PIXEL_FORMAT_BGRX_1010102            0x11C
+#define HAL_PIXEL_FORMAT_XBGR_2101010            0x11D
+#define HAL_PIXEL_FORMAT_YCbCr_420_P010          0x11F
+#define HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC     0x120
+
 #define HAL_PIXEL_FORMAT_INTERLACE               0x180
 
 //v4l2_fourcc('Y', 'U', 'Y', 'L'). 24 bpp YUYV 4:2:2 10 bit per component

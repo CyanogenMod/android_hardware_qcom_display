@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -155,16 +155,20 @@ void HWCDisplayExternal::ApplyScanAdjustment(hwc_rect_t *display_frame) {
     return;
   }
 
-  uint32_t new_panel_width = panel_width * (1.0f - width_ratio);
-  uint32_t new_panel_height = panel_height * (1.0f - height_ratio);
+  uint32_t new_panel_width = panel_width * UINT32(1.0f - width_ratio);
+  uint32_t new_panel_height = panel_height * UINT32(1.0f - height_ratio);
 
   int x_offset = INT((FLOAT(panel_width) * width_ratio) / 2.0f);
   int y_offset = INT((FLOAT(panel_height) * height_ratio) / 2.0f);
 
-  display_frame->left = ((display_frame->left * new_panel_width) / panel_width) + x_offset;
-  display_frame->top = ((display_frame->top * new_panel_height) / panel_height) + y_offset;
-  display_frame->right = ((display_frame->right * new_panel_width) / panel_width) + x_offset;
-  display_frame->bottom = ((display_frame->bottom * new_panel_height) / panel_height) + y_offset;
+  display_frame->left = (display_frame->left * INT32(new_panel_width) / INT32(panel_width))
+                        + x_offset;
+  display_frame->top = (display_frame->top * INT32(new_panel_height) / INT32(panel_height)) +
+                       y_offset;
+  display_frame->right = ((display_frame->right * INT32(new_panel_width)) / INT32(panel_width)) +
+                         x_offset;
+  display_frame->bottom = ((display_frame->bottom * INT32(new_panel_height)) / INT32(panel_height))
+                          + y_offset;
 }
 
 void HWCDisplayExternal::SetSecureDisplay(bool secure_display_active) {
