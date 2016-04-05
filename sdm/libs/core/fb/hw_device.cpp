@@ -226,8 +226,14 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         SetRect(pipe_info->dst_roi, &mdp_layer.dst_rect);
         SetMDPFlags(layer, is_rotator_used, is_cursor_pipe_used, &mdp_layer.flags);
         SetCSC(layer.csc, &mdp_layer.color_space);
-        if (pipe_info->set_igc) {
+        if (pipe_info->flags & kIGC) {
           SetIGC(layer, mdp_layer_count);
+        }
+        if (pipe_info->flags & kMultiRect) {
+          mdp_layer.flags |= MDP_LAYER_MULTIRECT_ENABLE;
+          if (pipe_info->flags & kMultiRectParallelMode) {
+            mdp_layer.flags |= MDP_LAYER_MULTIRECT_PARALLEL_MODE;
+          }
         }
         mdp_layer.bg_color = layer.solid_fill_color;
 
