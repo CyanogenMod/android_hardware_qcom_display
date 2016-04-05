@@ -60,6 +60,6 @@ ifeq ($(call is-vendor-board-platform,QCOM),true)
 # available in the build tree.
 # If the macro is not present, the headers are picked from hardware/qcom/msmXXXX
 # failing which, they are picked from bionic.
-    common_deps += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
-    kernel_includes += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
-endif
+    common_deps += $(BOARD_KERNEL_HEADER_DEPENDENCIES)
+    kernel_includes += $(BOARD_KERNEL_HEADER_DIR)
+endif 
