@@ -1,8 +1,10 @@
 #Common headers
-common_includes := $(LOCAL_PATH)/../libgralloc
-common_includes += $(LOCAL_PATH)/../libcopybit
-common_includes += $(LOCAL_PATH)/../libqdutils
-common_includes += $(LOCAL_PATH)/../libqservice
+display_top := $(call my-dir)
+
+common_includes := $(display_top)/libqdutils
+common_includes += $(display_top)/libqservice
+common_includes += $(display_top)/libcopybit
+common_includes += $(display_top)/sdm/include
 
 common_header_export_path := qcom/display
 
@@ -12,6 +14,7 @@ common_libs := liblog libutils libcutils libhardware
 #Common C flags
 common_flags := -DDEBUG_CALC_FPS -Wno-missing-field-initializers
 common_flags += -Wconversion -Wall -Werror
+common_flags += -isystem $(display_top)/libgralloc
 
 ifeq ($(TARGET_USES_POST_PROCESSING),true)
     common_flags     += -DUSES_POST_PROCESSING
@@ -41,7 +44,8 @@ endif
 ifneq ($(call is-platform-sdk-version-at-least,18),true)
     common_flags += -DANDROID_JELLYBEAN_MR1=1
 endif
-ifeq ($(call is-vendor-board-platform,QCOM),true)
+
+ifeq ($(TARGET_COMPILE_WITH_MSM_KERNEL),true)
 # This check is to pick the kernel headers from the right location.
 # If the macro above is defined, we make the assumption that we have the kernel
 # available in the build tree.
