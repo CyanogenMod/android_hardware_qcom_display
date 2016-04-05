@@ -61,6 +61,7 @@ class CompManager : public DumpImpl {
   bool SupportLayerAsCursor(Handle display_ctx, HWLayers *hw_layers);
   bool CanSetIdleTimeout(Handle display_ctx);
   DisplayError SetMaxBandwidthMode(HWBwModes mode);
+  DisplayError GetScaleLutConfig(HWScaleLutInfo *lut_info);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);

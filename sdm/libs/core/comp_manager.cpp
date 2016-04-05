@@ -475,5 +475,9 @@ bool CompManager::CanSetIdleTimeout(Handle display_ctx) {
   return false;
 }
 
+DisplayError CompManager::GetScaleLutConfig(HWScaleLutInfo *lut_info) {
+  return resource_intf_->GetScaleLutConfig(lut_info);
+}
+
 }  // namespace sdm
 
