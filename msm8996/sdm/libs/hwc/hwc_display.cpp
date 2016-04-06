@@ -51,6 +51,18 @@
 
 namespace sdm {
 
+static void AssignLayerRegionsAddress(LayerRectArray *region, uint32_t rect_count,
+                                      uint8_t **base_address) {
+  if (rect_count) {
+    region->rect = reinterpret_cast<LayerRect *>(*base_address);
+    for (uint32_t i = 0; i < rect_count; i++) {
+      region->rect[i] = LayerRect();
+    }
+    *base_address += rect_count * sizeof(LayerRect);
+  }
+  region->count = rect_count;
+}
+
 static void ApplyDeInterlaceAdjustment(Layer *layer) {
   // De-interlacing adjustment
   if (layer->input_buffer->flags.interlace) {
@@ -120,7 +132,10 @@ int HWCDisplay::Deinit() {
     return -EINVAL;
   }
 
-  DeallocateLayerStack();
+  if (layer_stack_memory_.raw) {
+    delete[] layer_stack_memory_.raw;
+    layer_stack_memory_.raw = NULL;
+  }
 
   delete framebuffer_config_;
 
@@ -226,13 +241,13 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
   for (int i = 0; attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
     switch (attributes[i]) {
     case HWC_DISPLAY_VSYNC_PERIOD:
-      values[i] = variable_config.vsync_period_ns;
+      values[i] = INT32(variable_config.vsync_period_ns);
       break;
     case HWC_DISPLAY_WIDTH:
-      values[i] = variable_config.x_pixels;
+      values[i] = INT32(variable_config.x_pixels);
       break;
     case HWC_DISPLAY_HEIGHT:
-      values[i] = variable_config.y_pixels;
+      values[i] = INT32(variable_config.y_pixels);
       break;
     case HWC_DISPLAY_DPI_X:
       values[i] = INT32(variable_config.x_dpi * 1000.0f);
@@ -295,8 +310,6 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
     return -EINVAL;
   }
 
-  DeallocateLayerStack();
-
   size_t num_hw_layers = content_list->numHwLayers;
   uint32_t blit_target_count = 0;
 
@@ -304,76 +317,82 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
     blit_target_count = kMaxBlitTargetLayers;
   }
 
-  layer_stack_.layer_count = UINT32(num_hw_layers + blit_target_count);
-  layer_stack_.layers = new Layer[layer_stack_.layer_count];
-  if (!layer_stack_.layers) {
-    return -ENOMEM;
-  }
+  // Allocate memory for
+  //  a) total number of layers
+  //  b) buffer handle for each layer
+  //  c) number of visible rectangles in each layer
+  //  d) number of dirty rectangles in each layer
+  //  e) number of blit rectangles in each layer
+  size_t required_size = (num_hw_layers + blit_target_count) *
+                         (sizeof(Layer) + sizeof(LayerBuffer));
 
-  for (size_t i = 0; i < layer_stack_.layer_count; i++) {
+  for (size_t i = 0; i < num_hw_layers + blit_target_count; i++) {
     uint32_t num_visible_rects = 0;
     uint32_t num_dirty_rects = 0;
 
-    hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
-    Layer &layer = layer_stack_.layers[i];
+    if (i < num_hw_layers) {
+      hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
+      num_visible_rects = UINT32(hwc_layer.visibleRegionScreen.numRects);
+      num_dirty_rects = UINT32(hwc_layer.surfaceDamage.numRects);
+    }
 
-    layer.input_buffer = new LayerBuffer;
-    if (!layer.input_buffer) {
+    // visible rectangles + dirty rectangles + blit rectangle
+    size_t num_rects = num_visible_rects + num_dirty_rects + blit_target_count;
+    required_size += num_rects * sizeof(LayerRect);
+  }
+
+  // Layer array may be large enough to hold current number of layers.
+  // If not, re-allocate it now.
+  if (layer_stack_memory_.size < required_size) {
+    if (layer_stack_memory_.raw) {
+      delete[] layer_stack_memory_.raw;
+      layer_stack_memory_.size = 0;
+    }
+
+    // Allocate in multiple of kSizeSteps.
+    required_size = ROUND_UP(required_size, layer_stack_memory_.kSizeSteps);
+    layer_stack_memory_.raw = new uint8_t[required_size];
+    if (!layer_stack_memory_.raw) {
       return -ENOMEM;
     }
 
+    layer_stack_memory_.size = required_size;
+  }
+
+  // Assign memory addresses now.
+  uint8_t *current_address = layer_stack_memory_.raw;
+
+  // Layer array address
+  layer_stack_ = LayerStack();
+  layer_stack_.layers = reinterpret_cast<Layer *>(current_address);
+  layer_stack_.layer_count = UINT32(num_hw_layers + blit_target_count);
+  current_address += (num_hw_layers + blit_target_count) * sizeof(Layer);
+
+  for (size_t i = 0; i < num_hw_layers + blit_target_count; i++) {
+    uint32_t num_visible_rects = 0;
+    uint32_t num_dirty_rects = 0;
+
     if (i < num_hw_layers) {
-      num_visible_rects = hwc_layer.visibleRegionScreen.numRects;
-      num_dirty_rects = hwc_layer.surfaceDamage.numRects;
+      hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
+      num_visible_rects = UINT32(hwc_layer.visibleRegionScreen.numRects);
+      num_dirty_rects = UINT32(hwc_layer.surfaceDamage.numRects);
     }
 
-    if (num_visible_rects) {
-      layer.visible_regions.rect = new LayerRect[num_visible_rects];
-      if (!layer.visible_regions.rect) {
-        return -ENOMEM;
-      }
-      layer.visible_regions.count = num_visible_rects;
-    }
+    Layer &layer = layer_stack_.layers[i];
+    layer = Layer();
 
-    if (num_dirty_rects) {
-      layer.dirty_regions.rect = new LayerRect[num_dirty_rects];
-      if (!layer.dirty_regions.rect) {
-        return -ENOMEM;
-      }
-      layer.dirty_regions.count = num_dirty_rects;
-    }
+    // Layer buffer handle address
+    layer.input_buffer = reinterpret_cast<LayerBuffer *>(current_address);
+    *layer.input_buffer = LayerBuffer();
+    current_address += sizeof(LayerBuffer);
 
-    if (blit_target_count) {
-      layer.blit_regions.rect = new LayerRect[blit_target_count];
-      if (!layer.blit_regions.rect) {
-        return -ENOMEM;
-      }
-      layer.blit_regions.count = blit_target_count;
-    }
+    // Visible/Dirty/Blit rectangle address
+    AssignLayerRegionsAddress(&layer.visible_regions, num_visible_rects, &current_address);
+    AssignLayerRegionsAddress(&layer.dirty_regions, num_dirty_rects, &current_address);
+    AssignLayerRegionsAddress(&layer.blit_regions, blit_target_count, &current_address);
   }
 
   return 0;
-}
-
-void HWCDisplay::DeallocateLayerStack() {
-  if (!layer_stack_.layers) {
-    return;
-  }
-
-  for (size_t i = 0; i < layer_stack_.layer_count; i++) {
-    Layer &layer = layer_stack_.layers[i];
-
-    delete layer.input_buffer;
-    delete[] layer.visible_regions.rect;
-    delete[] layer.dirty_regions.rect;
-    delete[] layer.blit_regions.rect;
-  }
-
-  delete[] layer_stack_.layers;
-
-  // Reset layer stack to default values always. This will ensure that calling
-  // Allocate or Deallocate method twice does not result in unexpected behavior.
-  layer_stack_ = LayerStack();
 }
 
 int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
@@ -383,8 +402,8 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
 
   if (pvt_handle) {
     layer_buffer->format = GetSDMFormat(pvt_handle->format, pvt_handle->flags);
-    layer_buffer->width = pvt_handle->width;
-    layer_buffer->height = pvt_handle->height;
+    layer_buffer->width = UINT32(pvt_handle->width);
+    layer_buffer->height = UINT32(pvt_handle->height);
 
     if (SetMetaData(pvt_handle, layer) != kErrorNone) {
       return -EINVAL;
@@ -433,8 +452,8 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
 
       AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(INT(x_pixels), INT(y_pixels), format,
                                                             usage, aligned_width, aligned_height);
-      layer_buffer->width = aligned_width;
-      layer_buffer->height = aligned_height;
+      layer_buffer->width = UINT32(aligned_width);
+      layer_buffer->height = UINT32(aligned_height);
       layer_buffer->format = GetSDMFormat(format, flags);
     }
   }
@@ -449,7 +468,8 @@ void HWCDisplay::CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
   if (pvt_handle) {
     layer_buffer->planes[0].fd = pvt_handle->fd;
     layer_buffer->planes[0].offset = pvt_handle->offset;
-    layer_buffer->planes[0].stride = pvt_handle->width;
+    layer_buffer->planes[0].stride = UINT32(pvt_handle->width);
+    layer_buffer->size = pvt_handle->size;
   }
 
   // if swapinterval property is set to 0 then close and reset the acquireFd
@@ -463,11 +483,6 @@ void HWCDisplay::CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer) {
 int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
   if (shutdown_pending_) {
     return 0;
-  }
-
-  if (!content_list || !content_list->numHwLayers) {
-    DLOGW("Invalid content list");
-    return -EINVAL;
   }
 
   size_t num_hw_layers = content_list->numHwLayers;
@@ -541,8 +556,8 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     // For solid fill, only dest rect need to be specified.
     if (layer.flags.solid_fill) {
       LayerBuffer *input_buffer = layer.input_buffer;
-      input_buffer->width = layer.dst_rect.right - layer.dst_rect.left;
-      input_buffer->height = layer.dst_rect.bottom - layer.dst_rect.top;
+      input_buffer->width = UINT32(layer.dst_rect.right - layer.dst_rect.left);
+      input_buffer->height = UINT32(layer.dst_rect.bottom - layer.dst_rect.top);
       layer.src_rect.left = 0;
       layer.src_rect.top = 0;
       layer.src_rect.right = input_buffer->width;
@@ -554,7 +569,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     layer.flags.updating = true;
 
     if (num_hw_layers <= kMaxLayerCount) {
-      layer.flags.updating = IsLayerUpdating(content_list, i);
+      layer.flags.updating = IsLayerUpdating(content_list, INT32(i));
     }
 #ifdef QTI_BSP
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
@@ -819,7 +834,7 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
       return true;
     }
 
-    if ((layer.composition == kCompositionGPU) && IsLayerUpdating(content_list, i)) {
+    if ((layer.composition == kCompositionGPU) && IsLayerUpdating(content_list, INT32(i))) {
       return true;
     }
   }
@@ -937,12 +952,15 @@ LayerBufferFormat HWCDisplay::GetSDMFormat(const int32_t &source, const int flag
   LayerBufferFormat format = kFormatInvalid;
   if (flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED) {
     switch (source) {
-    case HAL_PIXEL_FORMAT_RGBA_8888:          format = kFormatRGBA8888Ubwc;            break;
-    case HAL_PIXEL_FORMAT_RGBX_8888:          format = kFormatRGBX8888Ubwc;            break;
-    case HAL_PIXEL_FORMAT_BGR_565:            format = kFormatBGR565Ubwc;              break;
+    case HAL_PIXEL_FORMAT_RGBA_8888:           format = kFormatRGBA8888Ubwc;            break;
+    case HAL_PIXEL_FORMAT_RGBX_8888:           format = kFormatRGBX8888Ubwc;            break;
+    case HAL_PIXEL_FORMAT_BGR_565:             format = kFormatBGR565Ubwc;              break;
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
     case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
-    case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:    format = kFormatYCbCr420SPVenusUbwc;     break;
+    case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:     format = kFormatYCbCr420SPVenusUbwc;     break;
+    case HAL_PIXEL_FORMAT_RGBA_1010102:        format = kFormatRGBA1010102Ubwc;         break;
+    case HAL_PIXEL_FORMAT_RGBX_1010102:        format = kFormatRGBX1010102Ubwc;         break;
+    case HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC: format = kFormatYCbCr420TP10Ubwc;        break;
     default:
       DLOGE("Unsupported format type for UBWC %d", source);
       return kFormatInvalid;
@@ -969,6 +987,16 @@ LayerBufferFormat HWCDisplay::GetSDMFormat(const int32_t &source, const int flag
   case HAL_PIXEL_FORMAT_YCbCr_420_SP:             format = kFormatYCbCr420SemiPlanar;       break;
   case HAL_PIXEL_FORMAT_YCbCr_422_SP:             format = kFormatYCbCr422H2V1SemiPlanar;   break;
   case HAL_PIXEL_FORMAT_YCbCr_422_I:              format = kFormatYCbCr422H2V1Packed;       break;
+  case HAL_PIXEL_FORMAT_RGBA_1010102:             format = kFormatRGBA1010102;              break;
+  case HAL_PIXEL_FORMAT_ARGB_2101010:             format = kFormatARGB2101010;              break;
+  case HAL_PIXEL_FORMAT_RGBX_1010102:             format = kFormatRGBX1010102;              break;
+  case HAL_PIXEL_FORMAT_XRGB_2101010:             format = kFormatXRGB2101010;              break;
+  case HAL_PIXEL_FORMAT_BGRA_1010102:             format = kFormatBGRA1010102;              break;
+  case HAL_PIXEL_FORMAT_ABGR_2101010:             format = kFormatABGR2101010;              break;
+  case HAL_PIXEL_FORMAT_BGRX_1010102:             format = kFormatBGRX1010102;              break;
+  case HAL_PIXEL_FORMAT_XBGR_2101010:             format = kFormatXBGR2101010;              break;
+  case HAL_PIXEL_FORMAT_YCbCr_420_P010:           format = kFormatYCbCr420P010;             break;
+  case HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC:      format = kFormatYCbCr420TP10Ubwc;         break;
   default:
     DLOGW("Unsupported format type = %d", source);
     return kFormatInvalid;
@@ -1079,6 +1107,26 @@ const char *HWCDisplay::GetHALPixelFormatString(int format) {
     return "YCrCb_420_SP_VENUS";
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
     return "YCbCr_420_SP_VENUS_UBWC";
+  case HAL_PIXEL_FORMAT_RGBA_1010102:
+    return "RGBA_1010102";
+  case HAL_PIXEL_FORMAT_ARGB_2101010:
+    return "ARGB_2101010";
+  case HAL_PIXEL_FORMAT_RGBX_1010102:
+    return "RGBX_1010102";
+  case HAL_PIXEL_FORMAT_XRGB_2101010:
+    return "XRGB_2101010";
+  case HAL_PIXEL_FORMAT_BGRA_1010102:
+    return "BGRA_1010102";
+  case HAL_PIXEL_FORMAT_ABGR_2101010:
+    return "ABGR_2101010";
+  case HAL_PIXEL_FORMAT_BGRX_1010102:
+    return "BGRX_1010102";
+  case HAL_PIXEL_FORMAT_XBGR_2101010:
+    return "XBGR_2101010";
+  case HAL_PIXEL_FORMAT_YCbCr_420_P010:
+    return "YCbCr_420_P010";
+  case HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC:
+    return "YCbCr_420_TP10_UBWC";
   default:
     return "Unknown pixel format";
   }
@@ -1339,15 +1387,15 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
   }
 
   if (meta_data->operation & LINEAR_FORMAT) {
-    layer_buffer->format = GetSDMFormat(meta_data->linearFormat, 0);
+    layer_buffer->format = GetSDMFormat(INT32(meta_data->linearFormat), 0);
   }
 
   if (meta_data->operation & UPDATE_BUFFER_GEOMETRY) {
     int actual_width = pvt_handle->width;
     int actual_height = pvt_handle->height;
     AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(pvt_handle, actual_width, actual_height);
-    layer_buffer->width = actual_width;
-    layer_buffer->height = actual_height;
+    layer_buffer->width = UINT32(actual_width);
+    layer_buffer->height = UINT32(actual_height);
   }
 
   if (meta_data->operation & SET_SINGLE_BUFFER_MODE) {
@@ -1359,7 +1407,7 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
 
   if (meta_data->operation & S3D_FORMAT) {
     std::map<int, LayerBufferS3DFormat>::iterator it =
-                      s3d_format_hwc_to_sdm_.find(meta_data->s3dFormat);
+        s3d_format_hwc_to_sdm_.find(INT32(meta_data->s3dFormat));
     if (it != s3d_format_hwc_to_sdm_.end()) {
       layer->input_buffer->s3d_format = it->second;
     } else {
@@ -1435,7 +1483,7 @@ void HWCDisplay::SetSecureDisplay(bool secure_display_active) {
 }
 
 int HWCDisplay::SetActiveDisplayConfig(int config) {
-  return display_intf_->SetActiveConfig(config) == kErrorNone ? 0 : -1;
+  return display_intf_->SetActiveConfig(UINT32(config)) == kErrorNone ? 0 : -1;
 }
 
 int HWCDisplay::GetActiveDisplayConfig(uint32_t *config) {
@@ -1447,7 +1495,7 @@ int HWCDisplay::GetDisplayConfigCount(uint32_t *count) {
 }
 
 int HWCDisplay::GetDisplayAttributesForConfig(int config, DisplayConfigVariableInfo *attributes) {
-  return display_intf_->GetConfig(config, attributes) == kErrorNone ? 0 : -1;
+  return display_intf_->GetConfig(UINT32(config), attributes) == kErrorNone ? 0 : -1;
 }
 
 bool HWCDisplay::SingleLayerUpdating(uint32_t app_layer_count) {

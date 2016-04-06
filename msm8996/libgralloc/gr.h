@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011 - 2016, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ int getRgbDataAddress(private_handle_t* pHnd, void** rgb_data);
 // To query if UBWC is enabled, based on format and usage flags
 bool isUBwcEnabled(int format, int usage);
 
-// Function to check if the format is an uncompressed RGB format
+// Function to check if the format is an RGB format
 bool isUncompressedRgbFormat(int format);
 
 /*****************************************************************************/

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -26,6 +26,7 @@
 #include <utils/constants.h>
 #include <utils/debug.h>
 #include <utils/rect.h>
+#include <utils/formats.h>
 #include <dlfcn.h>
 
 #include "resource_default.h"
@@ -73,7 +74,7 @@ DisplayError ResourceDefault::Init(const HWResourceInfo &hw_res_info) {
   }
 
   for (uint32_t i = 0; i < num_pipe_; i++) {
-    src_pipes_[i].priority = i;
+    src_pipes_[i].priority = INT(i);
   }
 
   DLOGI("hw_rev=%x, DMA=%d RGB=%d VIG=%d", hw_res_info_.hw_revision, hw_res_info_.num_dma_pipe,
@@ -634,8 +635,11 @@ DisplayError ResourceDefault::ValidateLayerParams(const Layer &layer) {
   }
 
   // Make sure source in integral only if it is a non secure layer.
-  if (!input_buffer->flags.secure && (src.left - roundf(src.left) || src.top - roundf(src.top) ||
-      src.right - roundf(src.right) || src.bottom - roundf(src.bottom))) {
+  if (!input_buffer->flags.secure &&
+      ((src.left - roundf(src.left) != 0.0f) ||
+       (src.top - roundf(src.top) != 0.0f) ||
+       (src.right - roundf(src.right) != 0.0f) ||
+       (src.bottom - roundf(src.bottom) != 0.0f))) {
     DLOGV_IF(kTagResources, "Input ROI is not integral");
     return kErrorNotSupported;
   }
@@ -887,19 +891,6 @@ DisplayError ResourceDefault::ValidateCursorPosition(Handle display_ctx, HWLayer
 
 DisplayError ResourceDefault::SetMaxBandwidthMode(HWBwModes mode) {
   return kErrorNotSupported;
-}
-
-bool ResourceDefault::IsUBWCFormat(LayerBufferFormat format) {
-  switch (format) {
-  case kFormatRGBA8888Ubwc:
-  case kFormatRGBX8888Ubwc:
-  case kFormatBGR565Ubwc:
-  case kFormatYCbCr420SPVenusUbwc:
-    return true;
-  default:
-    break;
-  }
-  return false;
 }
 
 }  // namespace sdm

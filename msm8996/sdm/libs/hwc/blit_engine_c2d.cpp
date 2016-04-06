@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -55,11 +55,18 @@
 
 #include <utils/constants.h>
 #include <utils/rect.h>
+#include <utils/formats.h>
 
 #include "blit_engine_c2d.h"
 #include "hwc_debugger.h"
 
 #define __CLASS__ "BlitEngineC2D"
+
+// TODO(user): Remove pragma after fixing sign conversion errors
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#endif
 
 namespace sdm {
 
@@ -259,6 +266,12 @@ int BlitEngineC2d::Prepare(LayerStack *layer_stack) {
     if (!blit_supported_) {
       return -1;
     }
+
+    // No 10 bit support for C2D
+    if (Is10BitFormat(layer.input_buffer->format)) {
+      return -1;
+    }
+
     if (layer.composition == kCompositionGPUTarget) {
       // Need FBT size for allocating buffers
       gpu_target_index = i;
@@ -526,7 +539,7 @@ int BlitEngineC2d::DrawRectUsingCopybit(hwc_layer_1_t *hwc_layer, Layer *layer,
   blit_engine_c2d_->set_parameter(blit_engine_c2d_, COPYBIT_FRAMEBUFFER_HEIGHT,
                                   target_buffer->height);
   int transform = 0;
-  if (layer->transform.rotation) transform |= COPYBIT_TRANSFORM_ROT_90;
+  if (layer->transform.rotation != 0.0f) transform |= COPYBIT_TRANSFORM_ROT_90;
   if (layer->transform.flip_horizontal) transform |= COPYBIT_TRANSFORM_FLIP_H;
   if (layer->transform.flip_vertical) transform |= COPYBIT_TRANSFORM_FLIP_V;
   blit_engine_c2d_->set_parameter(blit_engine_c2d_, COPYBIT_TRANSFORM, transform);
@@ -550,18 +563,6 @@ int BlitEngineC2d::DrawRectUsingCopybit(hwc_layer_1_t *hwc_layer, Layer *layer,
   }
 
   return err;
-}
-
-bool BlitEngineC2d::IsUBWCFormat(LayerBufferFormat format) {
-  switch (format) {
-  case kFormatRGBA8888Ubwc:
-  case kFormatRGBX8888Ubwc:
-  case kFormatBGR565Ubwc:
-  case kFormatYCbCr420SPVenusUbwc:
-    return true;
-  default:
-    return false;
-  }
 }
 
 void BlitEngineC2d::DumpBlitTargetBuffer(int fd) {
@@ -593,4 +594,7 @@ void BlitEngineC2d::DumpBlitTargetBuffer(int fd) {
 }
 
 }  // namespace sdm
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 

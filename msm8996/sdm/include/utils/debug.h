@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -63,7 +63,7 @@ class Debug {
   static inline DebugHandler* Get() { return debug_.debug_handler_; }
   static int GetSimulationFlag();
   static int GetHDMIResolution();
-  static int GetIdleTimeoutMs();
+  static uint32_t GetIdleTimeoutMs();
   static int GetBootAnimLayerCount();
   static bool IsRotatorDownScaleDisabled();
   static bool IsDecimationDisabled();
