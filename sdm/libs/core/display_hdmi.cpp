@@ -320,18 +320,18 @@ void DisplayHDMI::SetS3DMode(LayerStack *layer_stack) {
   HWPanelInfo panel_info;
   HWDisplayAttributes display_attributes;
   uint32_t active_index = 0;
-  uint32_t layer_count = layer_stack->layer_count;
+  uint32_t layer_count = UINT32(layer_stack->layers.size());
 
   // S3D mode is supported for the following scenarios:
   // 1. Layer stack containing only one s3d layer which is not skip
   // 2. Layer stack containing only one secure layer along with one s3d layer
   for (uint32_t i = 0; i < layer_count; i++) {
-    Layer &layer = layer_stack->layers[i];
-    LayerBuffer *layer_buffer = layer.input_buffer;
+    Layer *layer = layer_stack->layers.at(i);
+    LayerBuffer *layer_buffer = layer->input_buffer;
 
     if (layer_buffer->s3d_format != kS3dFormatNone) {
       s3d_layer_count++;
-      if (s3d_layer_count > 1 || layer.flags.skip) {
+      if (s3d_layer_count > 1 || layer->flags.skip) {
         s3d_mode = kS3DModeNone;
         break;
       }

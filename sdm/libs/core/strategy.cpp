@@ -78,14 +78,16 @@ DisplayError Strategy::Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempt
 
   uint32_t i = 0;
   LayerStack *layer_stack = hw_layers_info_->stack;
-  for (; i < layer_stack->layer_count; i++) {
-    if (layer_stack->layers[i].composition == kCompositionGPUTarget) {
+  uint32_t layer_count = UINT32(layer_stack->layers.size());
+
+  for (; i < layer_count; i++) {
+    if (layer_stack->layers.at(i)->composition == kCompositionGPUTarget) {
       fb_layer_index_ = i;
       break;
     }
   }
 
-  if (i == layer_stack->layer_count) {
+  if (i == layer_count) {
     return kErrorUndefined;
   }
 
@@ -136,11 +138,12 @@ DisplayError Strategy::GetNextStrategy(StrategyConstraints *constraints) {
   uint32_t &hw_layer_count = hw_layers_info_->count;
   hw_layer_count = 0;
 
-  for (uint32_t i = 0; i < layer_stack->layer_count; i++) {
-    LayerComposition &composition = layer_stack->layers[i].composition;
+  for (uint32_t i = 0; i < layer_stack->layers.size(); i++) {
+    Layer *layer = layer_stack->layers.at(i);
+    LayerComposition &composition = layer->composition;
     if (composition == kCompositionGPUTarget) {
-      hw_layers_info_->updated_src_rect[hw_layer_count] = layer_stack->layers[i].src_rect;
-      hw_layers_info_->updated_dst_rect[hw_layer_count] = layer_stack->layers[i].dst_rect;
+      hw_layers_info_->updated_src_rect[hw_layer_count] = layer->src_rect;
+      hw_layers_info_->updated_dst_rect[hw_layer_count] = layer->dst_rect;
       hw_layers_info_->index[hw_layer_count++] = i;
     } else if (composition != kCompositionBlitTarget) {
       composition = kCompositionGPU;

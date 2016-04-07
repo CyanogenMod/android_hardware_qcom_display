@@ -34,6 +34,8 @@
 #include <stdint.h>
 #include <utils/constants.h>
 
+#include <vector>
+
 #include "layer_buffer.h"
 #include "sdm_types.h"
 
@@ -264,23 +266,23 @@ struct Layer {
                                                    //!< should be preserved between Prepare() and
                                                    //!< Commit() calls.
 
-  LayerRect src_rect;                              //!< Rectangular area of the layer buffer to
+  LayerRect src_rect = {};                         //!< Rectangular area of the layer buffer to
                                                    //!< consider for composition.
 
-  LayerRect dst_rect;                              //!< The target position where the frame will be
+  LayerRect dst_rect = {};                         //!< The target position where the frame will be
                                                    //!< displayed. Cropping rectangle is scaled to
                                                    //!< fit into this rectangle. The origin is the
                                                    //!< top-left corner of the screen.
 
-  LayerRectArray visible_regions;                  //!< Visible rectangular areas in screen space.
+  std::vector<LayerRect> visible_regions = {};     //!< Visible rectangular areas in screen space.
                                                    //!< The visible region includes areas overlapped
                                                    //!< by a translucent layer.
 
-  LayerRectArray dirty_regions;                    //!< Rectangular areas in the current frames
+  std::vector<LayerRect> dirty_regions = {};       //!< Rectangular areas in the current frames
                                                    //!< that have changed in comparison to
                                                    //!< previous frame.
 
-  LayerRectArray blit_regions;                     //!< Rectangular areas of this layer which need
+  std::vector<LayerRect> blit_regions = {};        //!< Rectangular areas of this layer which need
                                                    //!< to be composed to blit target. Display
                                                    //!< device will update blit rectangles if a
                                                    //!< layer composition is set as hybrid. Nth blit
@@ -291,7 +293,7 @@ struct Layer {
                                                     //!< applied on the layer buffer during
                                                     //!< composition.
 
-  LayerTransform transform;                        //!< Rotation/Flip operations which need to be
+  LayerTransform transform = {};                   //!< Rotation/Flip operations which need to be
                                                    //!< applied to the layer buffer during
                                                    //!< composition.
 
@@ -322,8 +324,7 @@ struct Layer {
   @sa DisplayInterface::Commit
 */
 struct LayerStack {
-  Layer *layers = NULL;                //!< Array of layers.
-  uint32_t layer_count = 0;            //!< Total number of layers.
+  std::vector<Layer *> layers = {};    //!< Vector of layer pointers.
 
   int retire_fence_fd = -1;            //!< File descriptor referring to a sync fence object which
                                        //!< will be signaled when this composited frame has been

@@ -117,15 +117,6 @@ class HWCDisplay : public DisplayEventHandler {
   // Maximum number of layers supported by display manager.
   static const uint32_t kMaxLayerCount = 32;
 
-  // Structure to track memory allocation for layer stack (layers, rectangles) object.
-  struct LayerStackMemory {
-    static const size_t kSizeSteps = 4096;  // Default memory allocation.
-    uint8_t *raw;  // Pointer to byte array.
-    size_t size;  // Current number of allocated bytes.
-
-    LayerStackMemory() : raw(NULL), size(0) { }
-  };
-
   struct LayerCache {
     buffer_handle_t handle;
     uint8_t plane_alpha;
@@ -151,7 +142,8 @@ class HWCDisplay : public DisplayEventHandler {
   virtual DisplayError Refresh();
   virtual DisplayError CECMessage(char *message);
 
-  virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
+  int AllocateLayerStack(hwc_display_contents_1_t *content_list);
+  void FreeLayerStack();
   virtual int PrePrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
@@ -190,7 +182,6 @@ class HWCDisplay : public DisplayEventHandler {
   int id_;
   bool needs_blit_ = false;
   DisplayInterface *display_intf_ = NULL;
-  LayerStackMemory layer_stack_memory_;
   LayerStack layer_stack_;
   LayerStackCache layer_stack_cache_;
   bool flush_on_error_ = false;

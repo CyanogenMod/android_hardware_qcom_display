@@ -28,6 +28,8 @@
 #include <utils/formats.h>
 #include <utils/rect.h>
 
+#include <vector>
+
 #include "display_base.h"
 #include "hw_info_interface.h"
 
@@ -124,18 +126,18 @@ DisplayError DisplayBase::Deinit() {
 
 DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
   uint32_t i = 0;
-  Layer *layers = layer_stack->layers;
+  std::vector<Layer *>layers = layer_stack->layers;
 
   // TODO(user): Remove this check once we have query display attributes on virtual display
   if (display_type_ == kVirtual) {
     return kErrorNone;
   }
-
-  while (i < layer_stack->layer_count && (layers[i].composition != kCompositionGPUTarget)) {
+  uint32_t layer_count = UINT32(layers.size());
+  while ((i < layer_count) && (layers.at(i)->composition != kCompositionGPUTarget)) {
     i++;
   }
 
-  if (i >= layer_stack->layer_count) {
+  if (i >= layer_count) {
     DLOGE("Either layer count is zero or GPU target layer is not present");
     return kErrorParameters;
   }
@@ -143,20 +145,20 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
   uint32_t gpu_target_index = i;
 
   // Check GPU target layer
-  Layer &gpu_target_layer = layer_stack->layers[gpu_target_index];
+  Layer *gpu_target_layer = layers.at(gpu_target_index);
 
-  if (!IsValid(gpu_target_layer.src_rect)) {
+  if (!IsValid(gpu_target_layer->src_rect)) {
     DLOGE("Invalid src rect for GPU target layer");
     return kErrorParameters;
   }
 
-  if (!IsValid(gpu_target_layer.dst_rect)) {
+  if (!IsValid(gpu_target_layer->dst_rect)) {
     DLOGE("Invalid dst rect for GPU target layer");
     return kErrorParameters;
   }
 
-  auto gpu_target_layer_dst_xpixels = gpu_target_layer.dst_rect.right;
-  auto gpu_target_layer_dst_ypixels = gpu_target_layer.dst_rect.bottom;
+  auto gpu_target_layer_dst_xpixels = gpu_target_layer->dst_rect.right;
+  auto gpu_target_layer_dst_ypixels = gpu_target_layer->dst_rect.bottom;
 
   HWDisplayAttributes display_attrib;
   uint32_t active_index = 0;
@@ -594,13 +596,13 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
 
   for (uint32_t i = 0; i < num_hw_layers; i++) {
     uint32_t layer_index = hw_layers_.info.index[i];
-    Layer &layer = hw_layers_.info.stack->layers[layer_index];
-    LayerBuffer *input_buffer = layer.input_buffer;
+    Layer *layer = hw_layers_.info.stack->layers.at(layer_index);
+    LayerBuffer *input_buffer = layer->input_buffer;
     HWLayerConfig &layer_config = hw_layers_.config[i];
     HWRotatorSession &hw_rotator_session = layer_config.hw_rotator_session;
 
     char idx[8] = { 0 };
-    const char *comp_type = GetName(layer.composition);
+    const char *comp_type = GetName(layer->composition);
     const char *buffer_format = GetFormatString(input_buffer->format);
     const char *rotate_split[2] = { "Rot-1", "Rot-2" };
     const char *comp_split[2] = { "Comp-1", "Comp-2" };
@@ -648,10 +650,10 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
       LayerRect &dst_roi = pipe.dst_roi;
 
       snprintf(z_order, sizeof(z_order), "%d", pipe.z_order);
-      snprintf(flags, sizeof(flags), "0x%08x", layer.flags.flags);
+      snprintf(flags, sizeof(flags), "0x%08x", layer->flags.flags);
       snprintf(decimation, sizeof(decimation), "%3d x %3d", pipe.horizontal_decimation,
                pipe.vertical_decimation);
-      snprintf(csc, sizeof(csc), "%d", layer.csc);
+      snprintf(csc, sizeof(csc), "%d", layer->csc);
 
       DumpImpl::AppendString(buffer, length, format, idx, comp_type, comp_split[count],
                              "-", pipe.pipe_id, input_buffer->width, input_buffer->height,
