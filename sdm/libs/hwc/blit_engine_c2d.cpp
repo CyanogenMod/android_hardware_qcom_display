@@ -101,8 +101,6 @@ BlitEngineC2d::BlitEngineC2d() {
     blit_target_buffer_[i] = NULL;
     release_fence_fd_[i] = -1;
   }
-
-  HWCDebugHandler::Get()->GetProperty("persist.hwc.blit.comp", &blit_supported_);
 }
 
 BlitEngineC2d::~BlitEngineC2d() {
@@ -114,10 +112,6 @@ BlitEngineC2d::~BlitEngineC2d() {
 }
 
 int BlitEngineC2d::Init() {
-  if (!blit_supported_) {
-    return -1;
-  }
-
   hw_module_t const *module;
   if (hw_get_module("copybit", &module) == 0) {
     if (copybit_open(module, &blit_engine_c2d_) < 0) {
@@ -263,9 +257,6 @@ int BlitEngineC2d::Prepare(LayerStack *layer_stack) {
 
   for (i = 0; i < layer_stack->layer_count; i++) {
     Layer &layer = layer_stack->layers[i];
-    if (!blit_supported_) {
-      return -1;
-    }
 
     // No 10 bit support for C2D
     if (Is10BitFormat(layer.input_buffer->format)) {

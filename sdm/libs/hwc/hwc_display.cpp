@@ -101,7 +101,9 @@ int HWCDisplay::Init() {
     return -EINVAL;
   }
 
-  if (needs_blit_) {
+  int blit_enabled = 0;
+  HWCDebugHandler::Get()->GetProperty("persist.hwc.blit.comp", &blit_enabled);
+  if (needs_blit_ && blit_enabled) {
     blit_engine_ = new BlitEngineC2d();
     if (!blit_engine_) {
       DLOGI("Create Blit Engine C2D failed");
@@ -326,7 +328,7 @@ int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   size_t num_hw_layers = content_list->numHwLayers;
   uint32_t blit_target_count = 0;
 
-  if (needs_blit_ && blit_engine_) {
+  if (blit_engine_) {
     blit_target_count = kMaxBlitTargetLayers;
   }
 
@@ -608,6 +610,8 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
   // Prepare the Blit Target
   if (blit_engine_) {
+  // TODO(user): Fix this to enable BLIT
+#if 0
     int ret = blit_engine_->Prepare(&layer_stack_);
     if (ret) {
       // Blit engine cannot handle this layer stack, hence set the layer stack
@@ -616,6 +620,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     } else {
       use_blit_comp_ = true;
     }
+#endif
   }
 
   // Configure layer stack
@@ -839,7 +844,8 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
         return true;
     }
 
-    if (layer.composition == kCompositionGPUTarget) {
+    if (layer.composition == kCompositionGPUTarget ||
+        layer.composition == kCompositionBlitTarget) {
       continue;
     }
 

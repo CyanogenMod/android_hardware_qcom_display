@@ -188,7 +188,7 @@ class HWCDisplay : public DisplayEventHandler {
   hwc_procs_t const **hwc_procs_;
   DisplayType type_;
   int id_;
-  bool needs_blit_;
+  bool needs_blit_ = false;
   DisplayInterface *display_intf_ = NULL;
   LayerStackMemory layer_stack_memory_;
   LayerStack layer_stack_;
