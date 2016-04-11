@@ -84,11 +84,10 @@ static bool canFallback(int usage, bool triedSystem)
  * read or written in software. Any combination with a _RARELY_ flag will be
  * treated as uncached. */
 static bool useUncached(const int& usage) {
-    if((usage & GRALLOC_USAGE_PRIVATE_UNCACHED) or
-            ((usage & GRALLOC_USAGE_SW_WRITE_MASK) ==
-            GRALLOC_USAGE_SW_WRITE_RARELY) or
-            ((usage & GRALLOC_USAGE_SW_READ_MASK) ==
-            GRALLOC_USAGE_SW_READ_RARELY))
+    if ((usage & GRALLOC_USAGE_PROTECTED) or
+       (usage & GRALLOC_USAGE_PRIVATE_UNCACHED) or
+       ((usage & GRALLOC_USAGE_SW_WRITE_MASK) == GRALLOC_USAGE_SW_WRITE_RARELY) or
+       ((usage & GRALLOC_USAGE_SW_READ_MASK) == GRALLOC_USAGE_SW_READ_RARELY))
         return true;
 
     return false;
@@ -383,20 +382,13 @@ int IonController::allocate(alloc_data& data, int usage)
         ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
 
     if(usage & GRALLOC_USAGE_PROTECTED) {
-        if (usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
-            ionFlags |= ION_HEAP(ION_CP_MM_HEAP_ID);
-            ionFlags |= ION_SECURE;
+        ionFlags |= ION_HEAP(ION_CP_MM_HEAP_ID);
+        ionFlags |= ION_SECURE;
 #ifdef ION_FLAG_ALLOW_NON_CONTIG
-            if (!(usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY)) {
-                ionFlags |= ION_FLAG_ALLOW_NON_CONTIG;
-            }
-#endif
-        } else {
-            // for targets/OEMs which do not need HW level protection
-            // do not set ion secure flag & MM heap. Fallback to IOMMU heap.
-            ionFlags |= ION_HEAP(ION_IOMMU_HEAP_ID);
-            data.allocType |= private_handle_t::PRIV_FLAGS_PROTECTED_BUFFER;
+        if (!(usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY)) {
+            ionFlags |= ION_FLAG_ALLOW_NON_CONTIG;
         }
+#endif
     } else if(usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
         //MM Heap is exclusively a secure heap.
         //If it is used for non secure cases, fallback to IOMMU heap
