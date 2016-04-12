@@ -24,7 +24,6 @@ include $(BUILD_COPY_HEADERS)
 LOCAL_MODULE                  := copybit.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_RELATIVE_PATH    := hw
 LOCAL_MODULE_TAGS             := optional
-LOCAL_CLANG := false
 LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libdl libmemalloc
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdcopybit\"

@@ -7,7 +7,6 @@ LOCAL_MODULE_TAGS             := optional
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libui libbinder libqservice
 LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdutils\"
-LOCAL_CLANG := false
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_COPY_HEADERS_TO         := $(common_header_export_path)
 LOCAL_COPY_HEADERS            := display_config.h mdp_version.h
@@ -23,7 +22,6 @@ include $(CLEAR_VARS)
 LOCAL_COPY_HEADERS_TO           := $(common_header_export_path)
 LOCAL_COPY_HEADERS              := qdMetaData.h
 LOCAL_SHARED_LIBRARIES          := liblog libcutils
-LOCAL_CLANG := false
 LOCAL_C_INCLUDES                := $(common_includes)
 LOCAL_ADDITIONAL_DEPENDENCIES   := $(common_deps)
 LOCAL_SRC_FILES                 := qdMetaData.cpp

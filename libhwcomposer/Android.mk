@@ -61,5 +61,5 @@ endif
 else
 LOCAL_SRC_FILES += hwc_qdcm_legacy.cpp
 endif
-LOCAL_CLANG := false
+
 include $(BUILD_SHARED_LIBRARY)
