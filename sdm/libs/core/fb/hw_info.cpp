@@ -355,12 +355,17 @@ DisplayError HWInfo::GetHWRotatorInfo(HWResourceInfo *hw_resource) {
 
 DisplayError HWInfo::GetMDSSRotatorInfo(HWResourceInfo *hw_resource) {
   FILE *fileptr = NULL;
-  char *stringbuffer = reinterpret_cast<char *>(malloc(sizeof(char) * kMaxStringLength));
   uint32_t token_count = 0;
   const uint32_t max_count = 10;
   char *tokens[max_count] = { NULL };
   size_t len = kMaxStringLength;
   ssize_t read = 0;
+  char *stringbuffer = reinterpret_cast<char *>(malloc(sizeof(char) * kMaxStringLength));
+
+  if (stringbuffer == NULL) {
+    DLOGE("Failed to allocate stringbuffer");
+    return kErrorMemory;
+  }
 
   snprintf(stringbuffer, sizeof(char) * kMaxStringLength, "%s", kRotatorCapsPath);
   fileptr = Sys::fopen_(stringbuffer, "r");
