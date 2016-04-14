@@ -117,6 +117,7 @@ class HWCColorManager {
   int SetSolidFill(const void *params, bool enable, HWCDisplay *hwc_display);
   bool SolidFillLayersPrepare(hwc_display_contents_1_t **displays, HWCDisplay *hwc_display);
   bool SolidFillLayersSet(hwc_display_contents_1_t **displays, HWCDisplay *hwc_display);
+  int SetFrameCapture(void *params, bool enable, HWCDisplay *hwc_display);
 
  protected:
   int CreateSolidFillLayers(HWCDisplay *hwc_display);
@@ -134,6 +135,8 @@ class HWCColorManager {
   bool solid_fill_enable_ = false;
   PPColorFillParams solid_fill_params_;
   hwc_display_contents_1_t *solid_fill_layers_ = NULL;
+  HWCBufferAllocator *buffer_allocator_ = NULL;
+  BufferInfo buffer_info;
   Locker locker_;
 };
 
