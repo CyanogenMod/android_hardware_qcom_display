@@ -39,8 +39,14 @@
 namespace sdm {
 
 int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
-                               uint32_t primary_width, uint32_t primary_height,
                                qService::QService *qservice, HWCDisplay **hwc_display) {
+  return Create(core_intf, hwc_procs, 0, 0, qservice, false, hwc_display);
+}
+
+int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                               uint32_t primary_width, uint32_t primary_height,
+                               qService::QService *qservice, bool use_primary_res,
+                               HWCDisplay **hwc_display) {
   uint32_t external_width = 0;
   uint32_t external_height = 0;
 
@@ -53,10 +59,19 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
 
   hwc_display_external->GetPanelResolution(&external_width, &external_height);
 
-  int downscale_enabled = 0;
-  HWCDebugHandler::Get()->GetProperty("sdm.debug.downscale_external", &downscale_enabled);
-  if (downscale_enabled) {
-    GetDownscaleResolution(primary_width, primary_height, &external_width, &external_height);
+  if (primary_width && primary_height) {
+    // use_primary_res means HWCDisplayExternal should directly set framebuffer resolution to the
+    // provided primary_width and primary_height
+    if (use_primary_res) {
+      external_width = primary_width;
+      external_height = primary_height;
+    } else {
+      int downscale_enabled = 0;
+      HWCDebugHandler::Get()->GetProperty("sdm.debug.downscale_external", &downscale_enabled);
+      if (downscale_enabled) {
+        GetDownscaleResolution(primary_width, primary_height, &external_width, &external_height);
+      }
+    }
   }
 
   status = hwc_display_external->SetFrameBufferResolution(external_width, external_height);
@@ -77,7 +92,8 @@ void HWCDisplayExternal::Destroy(HWCDisplay *hwc_display) {
 
 HWCDisplayExternal::HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
                                        qService::QService *qservice)
-  : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL, false, qservice) {
+  : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL, false, qservice,
+               DISPLAY_CLASS_EXTERNAL) {
 }
 
 int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {

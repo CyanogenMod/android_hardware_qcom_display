@@ -49,6 +49,7 @@
 #include "hwc_buffer_sync_handler.h"
 #include "hwc_session.h"
 #include "hwc_debugger.h"
+#include "hwc_display_null.h"
 #include "hwc_display_primary.h"
 #include "hwc_display_virtual.h"
 
@@ -146,9 +147,33 @@ int HWCSession::Init() {
     return -EINVAL;
   }
 
-  // Create and power on primary display
-  status = HWCDisplayPrimary::Create(core_intf_, buffer_allocator_, &hwc_procs_, qservice_,
-                                     &hwc_display_[HWC_DISPLAY_PRIMARY]);
+  // Read which display is first, and create it and store it in primary slot
+  HWDisplayInterfaceInfo hw_disp_info;
+  error = core_intf_->GetFirstDisplayInterfaceType(&hw_disp_info);
+  if (error == kErrorNone) {
+    if (hw_disp_info.type == kHDMI) {
+      // HDMI is primary display. If already connected, then create it and store in
+      // primary display slot. If not connected, create a NULL display for now.
+      if (hw_disp_info.is_connected) {
+        status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, qservice_,
+                                            &hwc_display_[HWC_DISPLAY_PRIMARY]);
+      } else {
+        // NullDisplay simply closes all its fences, and advertizes a standard
+        // resolution to SurfaceFlinger
+        status = HWCDisplayNull::Create(core_intf_, &hwc_procs_,
+                                        &hwc_display_[HWC_DISPLAY_PRIMARY]);
+      }
+    } else {
+        // Create and power on primary display
+        status = HWCDisplayPrimary::Create(core_intf_, buffer_allocator_, &hwc_procs_, qservice_,
+                                           &hwc_display_[HWC_DISPLAY_PRIMARY]);
+    }
+  } else {
+        // Create and power on primary display
+        status = HWCDisplayPrimary::Create(core_intf_, buffer_allocator_, &hwc_procs_, qservice_,
+                                           &hwc_display_[HWC_DISPLAY_PRIMARY]);
+  }
+
   if (status) {
     CoreInterface::DestroyCore();
     return status;
@@ -597,7 +622,7 @@ int HWCSession::ConnectDisplay(int disp, hwc_display_contents_1_t *content_list)
 
   if (disp == HWC_DISPLAY_EXTERNAL) {
     status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, primary_width, primary_height,
-                                        qservice_, &hwc_display_[disp]);
+                                        qservice_, false, &hwc_display_[disp]);
   } else if (disp == HWC_DISPLAY_VIRTUAL) {
     status = HWCDisplayVirtual::Create(core_intf_, &hwc_procs_, primary_width, primary_height,
                                        content_list, &hwc_display_[disp]);
@@ -1307,6 +1332,7 @@ void HWCSession::ResetPanel() {
 int HWCSession::HotPlugHandler(bool connected) {
   int status = 0;
   bool notify_hotplug = false;
+  bool hdmi_primary = false;
 
   // To prevent sending events to client while a lock is held, acquire scope locks only within
   // below scope so that those get automatically unlocked after the scope ends.
@@ -1318,36 +1344,112 @@ int HWCSession::HotPlugHandler(bool connected) {
       return -1;
     }
 
-    if (connected) {
-      if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-        DLOGE("HDMI is already connected");
-        return -1;
-      }
 
-      // Connect external display if virtual display is not connected.
-      // Else, defer external display connection and process it when virtual display
-      // tears down; Do not notify SurfaceFlinger since connection is deferred now.
-      if (!hwc_display_[HWC_DISPLAY_VIRTUAL]) {
-        status = ConnectDisplay(HWC_DISPLAY_EXTERNAL, NULL);
+    HWCDisplay *primary_display = hwc_display_[HWC_DISPLAY_PRIMARY];
+    HWCDisplay *external_display = NULL;
+    HWCDisplay *null_display = NULL;
+
+    if (primary_display->GetDisplayClass() == DISPLAY_CLASS_EXTERNAL) {
+        external_display = static_cast<HWCDisplayExternal *>(hwc_display_[HWC_DISPLAY_PRIMARY]);
+    } else if (primary_display->GetDisplayClass() == DISPLAY_CLASS_NULL) {
+        null_display = static_cast<HWCDisplayNull *>(hwc_display_[HWC_DISPLAY_PRIMARY]);
+    }
+
+    if (external_display || null_display) {
+      hdmi_primary = true;
+    }
+
+    // If primary display connected is a NULL display, then replace it with the external display
+    if (connected) {
+      // If we are in HDMI as primary and the primary display just got plugged in
+      if (null_display) {
+        assert(hdmi_primary);
+        uint32_t primary_width, primary_height;
+        null_display->GetFrameBufferResolution(&primary_width, &primary_height);
+        delete null_display;
+        hwc_display_[HWC_DISPLAY_PRIMARY] = NULL;
+
+        // Create external display with a forced framebuffer resolution to that of what the NULL
+        // display had. This is necessary because SurfaceFlinger does not dynamically update
+        // framebuffer resolution once it reads it at bootup. So we always have to have the NULL
+        // display/external display both at the bootup resolution.
+        int status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, primary_width,
+                                                primary_height, qservice_, true,
+                                                &hwc_display_[HWC_DISPLAY_PRIMARY]);
         if (status) {
-          return status;
+          DLOGE("Could not create external display");
+          return -1;
         }
-        notify_hotplug = true;
+
+        // Next, go ahead and enable vsync on external display. This is expliclity required
+        // because in HDMI as primary case, SurfaceFlinger may not be aware of underlying
+        // changing display. and thus may not explicitly enable vsync
+
+        status = hwc_display_[HWC_DISPLAY_PRIMARY]->EventControl(HWC_EVENT_VSYNC, true);
+        if (status) {
+          DLOGE("Error enabling vsync for HDMI as primary case");
+        }
+        // Don't do hotplug notification for HDMI as primary case for now
+        notify_hotplug = false;
       } else {
-        DLOGI("Virtual display is connected, pending connection");
-        external_pending_connect_ = true;
+        if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
+            DLOGE("HDMI is already connected");
+            return -1;
+        }
+
+        // Connect external display if virtual display is not connected.
+        // Else, defer external display connection and process it when virtual display
+        // tears down; Do not notify SurfaceFlinger since connection is deferred now.
+        if (!hwc_display_[HWC_DISPLAY_VIRTUAL]) {
+            status = ConnectDisplay(HWC_DISPLAY_EXTERNAL, NULL);
+            if (status) {
+            return status;
+            }
+            notify_hotplug = true;
+        } else {
+            DLOGI("Virtual display is connected, pending connection");
+            external_pending_connect_ = true;
+        }
       }
     } else {
       // Do not return error if external display is not in connected status.
       // Due to virtual display concurrency, external display connection might be still pending
       // but hdmi got disconnected before pending connection could be processed.
-      if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-        status = DisconnectDisplay(HWC_DISPLAY_EXTERNAL);
-        notify_hotplug = true;
+
+      if (hdmi_primary) {
+        assert(external_display != NULL);
+        uint32_t x_res, y_res;
+        external_display->GetFrameBufferResolution(&x_res, &y_res);
+        // Need to manually disable VSYNC as SF is not aware of connect/disconnect cases
+        // for HDMI as primary
+        external_display->EventControl(HWC_EVENT_VSYNC, false);
+        HWCDisplayExternal::Destroy(external_display);
+
+        HWCDisplayNull *null_display;
+
+        int status = HWCDisplayNull::Create(core_intf_, &hwc_procs_,
+                                            reinterpret_cast<HWCDisplay **>(&null_display));
+
+        if (status) {
+          DLOGE("Could not create Null display when primary got disconnected");
+          return -1;
+        }
+
+        null_display->SetResolution(x_res, y_res);
+        hwc_display_[HWC_DISPLAY_PRIMARY] = null_display;
+
+        // Don't do hotplug notification for HDMI as primary case for now
+        notify_hotplug = false;
+      } else {
+        if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
+            status = DisconnectDisplay(HWC_DISPLAY_EXTERNAL);
+            notify_hotplug = true;
+        }
+        external_pending_connect_ = false;
       }
-      external_pending_connect_ = false;
     }
   }
+
   if (connected && notify_hotplug) {
     // trigger screen refresh to ensure sufficient resources are available to process new
     // new display connection.

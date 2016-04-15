@@ -85,8 +85,8 @@ HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf,
                                      BufferAllocator *buffer_allocator,
                                      hwc_procs_t const **hwc_procs,
                                      qService::QService *qservice)
-  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true, qservice),
-    buffer_allocator_(buffer_allocator), cpu_hint_(NULL) {
+  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true, qservice,
+               DISPLAY_CLASS_PRIMARY), buffer_allocator_(buffer_allocator), cpu_hint_(NULL) {
 }
 
 int HWCDisplayPrimary::Init() {
