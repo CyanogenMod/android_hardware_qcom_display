@@ -67,7 +67,7 @@ class DisplayHDMI : public DisplayBase, DumpImpl, HWEventHandler {
   virtual DisplayError SetCursorPosition(int x, int y);
 
   // Implement the HWEventHandlers
-  virtual DisplayError VSync(int64_t timestamp) { return kErrorNone; }
+  virtual DisplayError VSync(int64_t timestamp);
   virtual DisplayError Blank(bool blank) { return kErrorNone; }
   virtual void IdleTimeout() { }
   virtual void ThermalEvent(int64_t thermal_level) { }
@@ -81,7 +81,8 @@ class DisplayHDMI : public DisplayBase, DumpImpl, HWEventHandler {
   Locker locker_;
   HWScanSupport scan_support_;
   std::map<LayerBufferS3DFormat, HWS3DMode> s3d_format_to_mode_;
-  std::vector<const char *> event_list_ = {"cec/rd_msg", "thread_exit"};
+  std::vector<const char *> event_list_ = {"vsync_event", "idle_notify", "cec/rd_msg",
+                                           "thread_exit"};
 };
 
 }  // namespace sdm

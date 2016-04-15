@@ -33,6 +33,7 @@ LOCAL_SHARED_LIBRARIES        := libsdmcore libqservice libbinder libhardware li
 
 LOCAL_SRC_FILES               := hwc_session.cpp \
                                  hwc_display.cpp \
+                                 hwc_display_null.cpp \
                                  hwc_display_primary.cpp \
                                  hwc_display_external.cpp \
                                  hwc_display_virtual.cpp \

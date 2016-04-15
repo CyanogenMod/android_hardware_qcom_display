@@ -32,8 +32,10 @@ namespace sdm {
 class HWCDisplayExternal : public HWCDisplay {
  public:
   static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, uint32_t primary_width,
-                    uint32_t primary_height, qService::QService *qservice,
+                    uint32_t primary_height, qService::QService *qservice, bool use_primary_res,
                     HWCDisplay **hwc_display);
+  static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                    qService::QService *qservice, HWCDisplay **hwc_display);
   static void Destroy(HWCDisplay *hwc_display);
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);

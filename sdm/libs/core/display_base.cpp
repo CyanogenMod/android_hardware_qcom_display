@@ -769,4 +769,15 @@ DisplayError DisplayBase::GetPanelBrightness(int *level) {
   return kErrorNotSupported;
 }
 
+DisplayError DisplayBase::SetVSyncState(bool enable) {
+  DisplayError error = kErrorNone;
+  if (vsync_enable_ != enable) {
+    error = hw_intf_->SetVSyncState(enable);
+    if (error == kErrorNone) {
+      vsync_enable_ = enable;
+    }
+  }
+  return error;
+}
+
 }  // namespace sdm

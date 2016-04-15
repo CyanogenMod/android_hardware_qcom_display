@@ -34,6 +34,7 @@ class HWVirtual : public HWDevice {
   static DisplayError Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
                              BufferSyncHandler *buffer_sync_handler);
   static DisplayError Destroy(HWInterface *intf);
+  virtual DisplayError SetVSyncState(bool enable) { return kErrorNotSupported; }
 
  protected:
   HWVirtual(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);

@@ -79,8 +79,8 @@ void HWCDisplayPrimary::Destroy(HWCDisplay *hwc_display) {
 HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf,
                                      hwc_procs_t const **hwc_procs,
                                      qService::QService *qservice)
-  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true, qservice),
-               cpu_hint_(NULL) {
+  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true, qservice,
+               DISPLAY_CLASS_PRIMARY), cpu_hint_(NULL) {
 }
 
 int HWCDisplayPrimary::Init() {

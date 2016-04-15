@@ -1052,7 +1052,12 @@ DisplayError HWDevice::SetPPFeatures(PPFeaturesConfig *feature_list) {
 }
 
 DisplayError HWDevice::SetVSyncState(bool enable) {
-  return kErrorNotSupported;
+  int vsync_on = enable ? 1 : 0;
+  if (Sys::ioctl_(device_fd_, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) < 0) {
+    IOCTL_LOGE(MSMFB_OVERLAY_VSYNC_CTRL, device_type_);
+    return kErrorHardware;
+  }
+  return kErrorNone;
 }
 
 void HWDevice::SetIdleTimeoutMs(uint32_t timeout_ms) {

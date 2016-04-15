@@ -166,7 +166,7 @@ DisplayError DisplayHDMI::SetActiveConfig(uint32_t index) {
 
 DisplayError DisplayHDMI::SetVSyncState(bool enable) {
   SCOPE_LOCK(locker_);
-  return kErrorNotSupported;
+  return DisplayBase::SetVSyncState(enable);
 }
 
 void DisplayHDMI::SetIdleTimeoutMs(uint32_t timeout_ms) { }
@@ -366,6 +366,16 @@ void DisplayHDMI::SetS3DMode(LayerStack *layer_stack) {
 
 void DisplayHDMI::CECMessage(char *message) {
   event_handler_->CECMessage(message);
+}
+
+DisplayError DisplayHDMI::VSync(int64_t timestamp) {
+  if (vsync_enable_) {
+    DisplayEventVSync vsync;
+    vsync.timestamp = timestamp;
+    event_handler_->VSync(vsync);
+  }
+
+  return kErrorNone;
 }
 
 }  // namespace sdm

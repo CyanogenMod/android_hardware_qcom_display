@@ -193,15 +193,7 @@ DisplayError DisplayPrimary::SetActiveConfig(uint32_t index) {
 
 DisplayError DisplayPrimary::SetVSyncState(bool enable) {
   SCOPE_LOCK(locker_);
-  DisplayError error = kErrorNone;
-  if (vsync_enable_ != enable) {
-    error = hw_intf_->SetVSyncState(enable);
-    if (error == kErrorNone) {
-      vsync_enable_ = enable;
-    }
-  }
-
-  return error;
+  return DisplayBase::SetVSyncState(enable);
 }
 
 void DisplayPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
