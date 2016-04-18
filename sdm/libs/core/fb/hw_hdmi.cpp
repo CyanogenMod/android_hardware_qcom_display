@@ -260,6 +260,7 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
   }
 
   GetDisplayS3DSupport(index, display_attributes);
+  display_attributes->is_yuv = IS_BIT_SET(timing_mode->pixel_formats, 1);
 
   return kErrorNone;
 }

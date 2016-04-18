@@ -85,8 +85,9 @@ typedef struct DisplayAttributes {
     float xdpi;
     float ydpi;
     char panel_type;
+    bool is_yuv;
     DisplayAttributes() : vsync_period(0), xres(0), yres(0), xdpi(0.0f),
-            ydpi(0.0f), panel_type(0) {}
+            ydpi(0.0f), panel_type(0), is_yuv(false) {}
 } DisplayAttributes_t;
 
 //=============================================================================
