@@ -939,6 +939,7 @@ android::status_t HWCSession::HandleGetDisplayAttributesForConfig(const android:
       output_parcel->writeFloat(attributes.x_dpi);
       output_parcel->writeFloat(attributes.y_dpi);
       output_parcel->writeInt32(0);  // Panel type, unsupported.
+      output_parcel->writeInt32(attributes.is_yuv);
     }
   }
 
