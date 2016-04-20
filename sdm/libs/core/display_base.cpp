@@ -188,6 +188,10 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
     }
   }
 
+  if (one_frame_full_roi_) {
+    ControlPartialUpdate(false, &pending);
+  }
+
   // Clean hw layers for reuse.
   hw_layers_ = HWLayers();
   hw_layers_.info.stack = layer_stack;
@@ -229,6 +233,11 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
   if (disable_partial_update) {
     ControlPartialUpdate(true, &pending);
+  }
+
+  if (one_frame_full_roi_) {
+    ControlPartialUpdate(true, &pending);
+    one_frame_full_roi_ = false;
   }
 
   return error;
@@ -453,12 +462,18 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
     return error;
   }
 
+  hw_intf_->GetHWPanelInfo(&hw_panel_info_);
+
   if (display_comp_ctx_) {
     comp_manager_->UnregisterDisplay(display_comp_ctx_);
   }
 
   error = comp_manager_->RegisterDisplay(display_type_, attrib, hw_panel_info_,
                                          &display_comp_ctx_);
+
+  if (error == kErrorNone && partial_update_control_) {
+    one_frame_full_roi_ = true;
+  }
 
   return error;
 }

@@ -110,6 +110,7 @@ class DisplayBase : public DisplayInterface {
   HWEventsInterface *hw_events_intf_ = NULL;
 
  private:
+  bool one_frame_full_roi_ = false;
   // Unused
   virtual DisplayError GetConfig(DisplayConfigFixedInfo *variable_info) {
     return kErrorNone;
