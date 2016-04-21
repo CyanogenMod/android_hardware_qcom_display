@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014,2016 The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -49,7 +49,6 @@ class HWCDisplayVirtual : public HWCDisplay {
  private:
   HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
   int SetOutputBuffer(hwc_display_contents_1_t *content_list);
-  void DumpOutputBuffer(hwc_display_contents_1_t *content_list);
 
   bool dump_output_layer_;
   LayerBuffer *output_buffer_;

@@ -32,6 +32,7 @@
 #include <gralloc_priv.h>
 #include <gr.h>
 #include <utils/constants.h>
+#include <utils/formats.h>
 #include <utils/rect.h>
 #include <utils/debug.h>
 #include <sync/sync.h>
@@ -73,8 +74,10 @@ static void ApplyDeInterlaceAdjustment(Layer *layer) {
 }
 
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
-                       int id, bool needs_blit)
-  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit) {
+                       int id, bool needs_blit, qService::QService *qservice,
+                       DisplayClass display_class)
+  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit),
+    qservice_(qservice), display_class_(display_class) {
 }
 
 int HWCDisplay::Init() {
@@ -302,6 +305,16 @@ DisplayError HWCDisplay::VSync(const DisplayEventVSync &vsync) {
 
 DisplayError HWCDisplay::Refresh() {
   return kErrorNotSupported;
+}
+
+DisplayError HWCDisplay::CECMessage(char *message) {
+  if (qservice_) {
+    qservice_->onCECMessageReceived(message, 0);
+  } else {
+    DLOGW("Qservice instance not available.");
+  }
+
+  return kErrorNone;
 }
 
 int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
@@ -1057,6 +1070,48 @@ void HWCDisplay::DumpInputBuffers(hwc_display_contents_1_t *content_list) {
   }
 }
 
+void HWCDisplay::DumpOutputBuffer(const BufferInfo& buffer_info, void *base, int fence) {
+  char dir_path[PATH_MAX];
+
+  snprintf(dir_path, sizeof(dir_path), "/data/misc/display/frame_dump_%s", GetDisplayString());
+
+  if (mkdir(dir_path, 777) != 0 && errno != EEXIST) {
+    DLOGW("Failed to create %s directory errno = %d, desc = %s", dir_path, errno, strerror(errno));
+    return;
+  }
+
+  // if directory exists already, need to explicitly change the permission.
+  if (errno == EEXIST && chmod(dir_path, 0777) != 0) {
+    DLOGW("Failed to change permissions on %s directory", dir_path);
+    return;
+  }
+
+  if (base) {
+    char dump_file_name[PATH_MAX];
+    size_t result = 0;
+
+    if (fence >= 0) {
+      int error = sync_wait(fence, 1000);
+      if (error < 0) {
+        DLOGW("sync_wait error errno = %d, desc = %s", errno,  strerror(errno));
+        return;
+      }
+    }
+
+    snprintf(dump_file_name, sizeof(dump_file_name), "%s/output_layer_%dx%d_%s_frame%d.raw",
+             dir_path, buffer_info.buffer_config.width, buffer_info.buffer_config.height,
+             GetFormatString(buffer_info.buffer_config.format), dump_frame_index_);
+
+    FILE* fp = fopen(dump_file_name, "w+");
+    if (fp) {
+      result = fwrite(base, buffer_info.alloc_buffer_info.size, 1, fp);
+      fclose(fp);
+    }
+
+    DLOGI("Frame Dump of %s is %s", dump_file_name, result ? "Successful" : "Failed");
+  }
+}
+
 const char *HWCDisplay::GetHALPixelFormatString(int format) {
   switch (format) {
   case HAL_PIXEL_FORMAT_RGBA_8888:
@@ -1128,7 +1183,7 @@ const char *HWCDisplay::GetHALPixelFormatString(int format) {
   case HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC:
     return "YCbCr_420_TP10_UBWC";
   default:
-    return "Unknown pixel format";
+    return "Unknown_format";
   }
 }
 
@@ -1525,6 +1580,10 @@ uint32_t HWCDisplay::SanitizeRefreshRate(uint32_t req_refresh_rate) {
   }
 
   return refresh_rate;
+}
+
+DisplayClass HWCDisplay::GetDisplayClass() {
+  return display_class_;
 }
 
 }  // namespace sdm

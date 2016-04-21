@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -34,6 +34,7 @@
 #include "hw_interface.h"
 #include "comp_manager.h"
 #include "color_manager.h"
+#include "hw_events_interface.h"
 
 namespace sdm {
 
@@ -73,6 +74,7 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError SetCursorPosition(int x, int y);
   virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
   virtual DisplayError GetPanelBrightness(int *level);
+  virtual DisplayError SetVSyncState(bool enable);
 
  protected:
   // DumpImpl method
@@ -80,7 +82,6 @@ class DisplayBase : public DisplayInterface {
 
   bool IsRotationRequired(HWLayers *hw_layers);
   const char *GetName(const LayerComposition &composition);
-  const char *GetName(const LayerBufferFormat &format);
   DisplayError ValidateGPUTarget(LayerStack *layer_stack);
 
   DisplayType display_type_;
@@ -104,6 +105,7 @@ class DisplayBase : public DisplayInterface {
   HWInfoInterface *hw_info_intf_ = NULL;
   ColorManagerProxy *color_mgr_ = NULL;  // each display object owns its ColorManagerProxy
   bool partial_update_control_ = true;
+  HWEventsInterface *hw_events_intf_ = NULL;
 
  private:
   // Unused

@@ -164,6 +164,8 @@ struct HWResourceInfo {
   uint32_t linear_factor = 0;
   uint32_t scale_factor = 0;
   uint32_t extra_fudge_factor = 0;
+  uint32_t amortizable_threshold = 0;
+  uint32_t system_overhead_lines = 0;
   bool has_bwc = false;
   bool has_ubwc = false;
   bool has_decimation = false;
@@ -174,6 +176,8 @@ struct HWResourceInfo {
   bool has_dyn_bw_support = false;
   bool separate_rotator = false;
   bool has_qseed3 = false;
+  bool has_concurrent_writeback = false;
+  uint32_t writeback_index = kHWBlockMax;
   HWDynBwLimitInfo dyn_bw_info;
   std::vector<HWPipeCaps> hw_pipes;
   FormatsMap supported_formats_map;

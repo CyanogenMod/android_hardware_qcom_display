@@ -70,6 +70,7 @@ DisplayError DisplayHDMI::Init() {
   error = DisplayBase::Init();
   if (error != kErrorNone) {
     HWHDMI::Destroy(hw_intf_);
+    return error;
   }
 
   GetScanSupport();
@@ -85,6 +86,14 @@ DisplayError DisplayHDMI::Init() {
                             (kS3dFormatTopBottom, kS3DModeTB));
   s3d_format_to_mode_.insert(std::pair<LayerBufferS3DFormat, HWS3DMode>
                             (kS3dFormatFramePacking, kS3DModeFP));
+
+  error = HWEventsInterface::Create(INT(display_type_), this, &event_list_, &hw_events_intf_);
+  if (error != kErrorNone) {
+    DisplayBase::Deinit();
+    HWHDMI::Destroy(hw_intf_);
+    DLOGE("Failed to create hardware events interface. Error = %d", error);
+  }
+
   return error;
 }
 
@@ -157,7 +166,7 @@ DisplayError DisplayHDMI::SetActiveConfig(uint32_t index) {
 
 DisplayError DisplayHDMI::SetVSyncState(bool enable) {
   SCOPE_LOCK(locker_);
-  return kErrorNotSupported;
+  return DisplayBase::SetVSyncState(enable);
 }
 
 void DisplayHDMI::SetIdleTimeoutMs(uint32_t timeout_ms) { }
@@ -353,6 +362,20 @@ void DisplayHDMI::SetS3DMode(LayerStack *layer_stack) {
     comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, panel_info);
     hw_panel_info_ = panel_info;
   }
+}
+
+void DisplayHDMI::CECMessage(char *message) {
+  event_handler_->CECMessage(message);
+}
+
+DisplayError DisplayHDMI::VSync(int64_t timestamp) {
+  if (vsync_enable_) {
+    DisplayEventVSync vsync;
+    vsync.timestamp = timestamp;
+    event_handler_->VSync(vsync);
+  }
+
+  return kErrorNone;
 }
 
 }  // namespace sdm

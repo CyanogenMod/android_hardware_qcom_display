@@ -203,6 +203,9 @@ struct LayerStackFlags {
       uint32_t s3d_mode_present : 1;  //!< This flag will be set to true, if the current layer
                                       //!< stack contains s3d layer, and the layer stack can enter
                                       //!< s3d mode.
+
+      uint32_t post_processed_output : 1;  // If output_buffer should contain post processed output
+                                           // This applies only to primary displays currently
     };
 
     uint32_t flags = 0;               //!< For initialization purpose only.

@@ -84,7 +84,7 @@ DisplayError HWHDMI::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
   HWHDMI *hw_fb_hdmi = NULL;
 
   hw_fb_hdmi = new HWHDMI(buffer_sync_handler, hw_info_intf);
-  error = hw_fb_hdmi->Init(NULL);
+  error = hw_fb_hdmi->Init();
   if (error != kErrorNone) {
     delete hw_fb_hdmi;
   } else {
@@ -108,13 +108,13 @@ HWHDMI::HWHDMI(BufferSyncHandler *buffer_sync_handler,  HWInfoInterface *hw_info
   HWDevice::hw_info_intf_ = hw_info_intf;
 }
 
-DisplayError HWHDMI::Init(HWEventHandler *eventhandler) {
+DisplayError HWHDMI::Init() {
   DisplayError error = kErrorNone;
 
   SetSourceProductInformation("vendor_name", "ro.product.manufacturer");
   SetSourceProductInformation("product_description", "ro.product.name");
 
-  error = HWDevice::Init(eventhandler);
+  error = HWDevice::Init();
   if (error != kErrorNone) {
     return error;
   }

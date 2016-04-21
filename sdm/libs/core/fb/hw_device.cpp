@@ -58,10 +58,8 @@ HWDevice::HWDevice(BufferSyncHandler *buffer_sync_handler)
     buffer_sync_handler_(buffer_sync_handler), synchronous_commit_(false) {
 }
 
-DisplayError HWDevice::Init(HWEventHandler *eventhandler) {
+DisplayError HWDevice::Init() {
   char device_name[64] = {0};
-
-  event_handler_ = eventhandler;
 
   // Read the fb node index
   fb_node_index_ = GetFBNodeIndex(device_type_);
@@ -256,12 +254,10 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
     }
   }
 
+  // TODO(user): This block should move to the derived class
   if (device_type_ == kDeviceVirtual) {
     LayerBuffer *output_buffer = hw_layers->info.stack->output_buffer;
-    // Fill WB index for virtual based on number of rotator WB blocks present in the HW.
-    // Eg: If 2 WB rotator blocks available, the WB index for virtual will be 2, as the
-    // indexing of WB blocks start from 0.
-    mdp_out_layer_.writeback_ndx = hw_resource_.hw_rot_info.num_rotator;
+    mdp_out_layer_.writeback_ndx = hw_resource_.writeback_index;
     mdp_out_layer_.buffer.width = output_buffer->width;
     mdp_out_layer_.buffer.height = output_buffer->height;
     if (output_buffer->flags.secure) {
@@ -372,6 +368,7 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
     }
   }
 
+  // TODO(user): Move to derived class
   if (device_type_ == kDeviceVirtual) {
     LayerBuffer *output_buffer = hw_layers->info.stack->output_buffer;
 
@@ -945,6 +942,7 @@ void HWDevice::ResetDisplayParams() {
   memset(&mdp_disp_commit_, 0, sizeof(mdp_disp_commit_));
   memset(&mdp_in_layers_, 0, sizeof(mdp_in_layers_));
   memset(&mdp_out_layer_, 0, sizeof(mdp_out_layer_));
+  mdp_out_layer_.buffer.fence = -1;
   hw_scale_->ResetScaleParams();
   memset(&pp_params_, 0, sizeof(pp_params_));
   memset(&igc_lut_data_, 0, sizeof(igc_lut_data_));
@@ -1032,7 +1030,12 @@ DisplayError HWDevice::SetPPFeatures(PPFeaturesConfig *feature_list) {
 }
 
 DisplayError HWDevice::SetVSyncState(bool enable) {
-  return kErrorNotSupported;
+  int vsync_on = enable ? 1 : 0;
+  if (Sys::ioctl_(device_fd_, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) < 0) {
+    IOCTL_LOGE(MSMFB_OVERLAY_VSYNC_CTRL, device_type_);
+    return kErrorHardware;
+  }
+  return kErrorNone;
 }
 
 void HWDevice::SetIdleTimeoutMs(uint32_t timeout_ms) {

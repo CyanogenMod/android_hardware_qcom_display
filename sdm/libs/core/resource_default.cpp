@@ -27,6 +27,7 @@
 #include <utils/debug.h>
 #include <utils/rect.h>
 #include <utils/formats.h>
+#include <utils/sys.h>
 #include <dlfcn.h>
 
 #include "resource_default.h"
@@ -310,6 +311,9 @@ DisplayError ResourceDefault::PostCommit(Handle display_ctx, HWLayers *hw_layers
       }
     }
   }
+
+  if (hw_layers->info.sync_handle >= 0)
+    Sys::close_(hw_layers->info.sync_handle);
 
   display_resource_ctx->frame_count++;
 

@@ -235,6 +235,12 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->scale_factor = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "xtra_ff_factor", strlen("xtra_ff_factor"))) {
         hw_resource->extra_fudge_factor = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "amortizable_threshold", strlen("amortizable_threshold"))) {
+        hw_resource->amortizable_threshold = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "system_overhead_lines", strlen("system_overhead_lines"))) {
+        hw_resource->system_overhead_lines = UINT32(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "wb_intf_index", strlen("wb_intf_index"))) {
+        hw_resource->writeback_index = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "features", strlen("features"))) {
         for (uint32_t i = 0; i < token_count; i++) {
           if (!strncmp(tokens[i], "bwc", strlen("bwc"))) {
@@ -257,6 +263,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
             hw_resource->separate_rotator = true;
           } else if (!strncmp(tokens[i], "qseed3", strlen("qseed3"))) {
             hw_resource->has_qseed3 = true;
+          } else if (!strncmp(tokens[i], "concurrent_writeback", strlen("concurrent_writeback"))) {
+            hw_resource->has_concurrent_writeback = true;
           }
         }
       } else if (!strncmp(tokens[0], "pipe_count", strlen("pipe_count"))) {
@@ -315,9 +323,10 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->num_vig_pipe, hw_resource->num_dma_pipe, hw_resource->num_cursor_pipe);
   DLOGI("Upscale Ratio = %d, Downscale Ratio = %d, Blending Stages = %d", hw_resource->max_scale_up,
         hw_resource->max_scale_down, hw_resource->num_blending_stages);
-  DLOGI("BWC = %d, UBWC = %d, Decimation = %d, Tile Format = %d", hw_resource->has_bwc,
-        hw_resource->has_ubwc, hw_resource->has_decimation, hw_resource->has_macrotile);
   DLOGI("SourceSplit = %d QSEED3 = %d", hw_resource->is_src_split, hw_resource->has_qseed3);
+  DLOGI("BWC = %d, UBWC = %d, Decimation = %d, Tile Format = %d Concurrent Writeback = %d",
+        hw_resource->has_bwc, hw_resource->has_ubwc, hw_resource->has_decimation,
+        hw_resource->has_macrotile, hw_resource->has_concurrent_writeback);
   DLOGI("MaxLowBw = %" PRIu64 " , MaxHighBw = % " PRIu64 "", hw_resource->max_bandwidth_low,
         hw_resource->max_bandwidth_high);
   DLOGI("MaxPipeBw = %" PRIu64 " KBps, MaxSDEClock = % " PRIu64 " Hz, ClockFudgeFactor = %f",
@@ -328,6 +337,12 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
 
   if (hw_resource->separate_rotator || hw_resource->num_dma_pipe) {
     GetHWRotatorInfo(hw_resource);
+  }
+
+  // If the driver doesn't spell out the wb index, assume it to be the number of rotators,
+  // based on legacy implementation.
+  if (hw_resource->writeback_index == kHWBlockMax) {
+    hw_resource->writeback_index = hw_resource->hw_rot_info.num_rotator;
   }
 
   if (hw_resource->has_dyn_bw_support) {
@@ -507,6 +522,58 @@ void HWInfo::PopulateSupportedFormatMap(const uint8_t *format_supported, uint32_
 
   hw_resource->supported_formats_map.erase(sub_blk_type);
   hw_resource->supported_formats_map.insert(make_pair(sub_blk_type, supported_sdm_formats));
+}
+
+DisplayError HWInfo::GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_disp_info) {
+  char *stringbuffer = reinterpret_cast<char *>(malloc(kMaxStringLength));
+  if (stringbuffer == NULL) {
+    DLOGE("Failed to allocate Stringbuffer");
+    return kErrorMemory;
+  }
+
+  char *line = stringbuffer;
+  size_t len = kMaxStringLength;
+  ssize_t read;
+
+  FILE *fileptr = Sys::fopen_("/sys/class/graphics/fb0/msm_fb_type", "r");
+  if (!fileptr) {
+    free(stringbuffer);
+    return kErrorHardware;
+  }
+
+  if ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
+    if (!strncmp(line, "dtv panel", strlen("dtv panel"))) {
+      hw_disp_info->type = kHDMI;
+      DLOGI("First display is HDMI");
+    } else {
+      hw_disp_info->type = kPrimary;
+      DLOGI("First display is internal display");
+    }
+  } else {
+    free(stringbuffer);
+    fclose(fileptr);
+    return kErrorHardware;
+  }
+
+  fclose(fileptr);
+
+  fileptr = Sys::fopen_("/sys/class/graphics/fb0/connected", "r");
+  if (!fileptr) {
+    // If fb0 is for a DSI/connected panel, then connected node will not exist
+    hw_disp_info->is_connected = true;
+  } else {
+    if ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
+        hw_disp_info->is_connected =  (!strncmp(line, "1", strlen("1")));
+    } else {
+        fclose(fileptr);
+        free(stringbuffer);
+        return kErrorHardware;
+    }
+    fclose(fileptr);
+  }
+
+  free(stringbuffer);
+  return kErrorNone;
 }
 
 }  // namespace sdm

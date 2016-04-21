@@ -78,7 +78,7 @@ class HWDevice : public HWInterface {
   virtual DisplayError SetScaleLutConfig(HWScaleLutInfo *lut_info);
 
   // For HWDevice derivatives
-  virtual DisplayError Init(HWEventHandler *eventhandler);
+  virtual DisplayError Init();
   virtual DisplayError Deinit();
 
   enum {
@@ -88,7 +88,6 @@ class HWDevice : public HWInterface {
 
   static const int kMaxStringLength = 1024;
   static const int kNumPhysicalDisplays = 2;
-  static const int kNumDisplayEvents = 4;
 
   void DumpLayerCommit(const mdp_layer_commit &layer_commit);
   DisplayError SetFormat(const LayerBufferFormat &source, uint32_t *target);
@@ -117,8 +116,6 @@ class HWDevice : public HWInterface {
   bool EnableHotPlugDetection(int enable);
   ssize_t SysFsWrite(const char* file_node, const char* value, ssize_t length);
 
-  // Store the Device EventHandler - used for callback
-  HWEventHandler *event_handler_;
   HWResourceInfo hw_resource_;
   HWPanelInfo hw_panel_info_;
   HWInfoInterface *hw_info_intf_;
