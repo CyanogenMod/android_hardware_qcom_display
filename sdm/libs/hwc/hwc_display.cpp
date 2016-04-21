@@ -484,11 +484,6 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     return 0;
   }
 
-  if (!content_list || !content_list->numHwLayers) {
-    DLOGW("Invalid content list");
-    return -EINVAL;
-  }
-
   size_t num_hw_layers = content_list->numHwLayers;
 
   use_blit_comp_ = false;
