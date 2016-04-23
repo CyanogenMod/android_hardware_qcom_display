@@ -66,7 +66,9 @@ class HWCDisplay : public DisplayEventHandler {
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
-  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending) {
+    return kErrorNotSupported;
+  }
   virtual uint32_t GetLastPowerMode();
   virtual int SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels);
   virtual void GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels);
@@ -136,6 +138,9 @@ class HWCDisplay : public DisplayEventHandler {
   virtual uint32_t RoundToStandardFPS(float fps);
   virtual uint32_t SanitizeRefreshRate(uint32_t req_refresh_rate);
   virtual void PrepareDynamicRefreshRate(Layer *layer);
+  virtual DisplayError DisablePartialUpdateOneFrame() {
+    return kErrorNotSupported;
+  }
   inline void SetRect(const hwc_rect_t &source, LayerRect *target);
   inline void SetRect(const hwc_frect_t &source, LayerRect *target);
   inline void SetComposition(const int32_t &source, LayerComposition *target);

@@ -174,9 +174,12 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
 }
 
 DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
+  SCOPE_LOCK(locker_);
+  return PrepareLocked(layer_stack);
+}
+
+DisplayError DisplayBase::PrepareLocked(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
-  bool disable_partial_update = false;
-  uint32_t pending = 0;
 
   if (!layer_stack) {
     return kErrorParameters;
@@ -193,16 +196,13 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
     return kErrorPermission;
   }
 
-  // Request to disable partial update only if it is currently enabled.
-  if (color_mgr_ && partial_update_control_) {
-    disable_partial_update = color_mgr_->NeedsPartialUpdateDisable();
-    if (disable_partial_update) {
-      ControlPartialUpdate(false, &pending);
-    }
+  if (color_mgr_ && color_mgr_->NeedsPartialUpdateDisable()) {
+    DisablePartialUpdateOneFrameLocked();
   }
 
-  if (one_frame_full_roi_) {
-    ControlPartialUpdate(false, &pending);
+  if (partial_update_control_ == false || disable_pu_one_frame_) {
+    comp_manager_->ControlPartialUpdate(display_comp_ctx_, false /* enable */);
+    disable_pu_one_frame_ = false;
   }
 
   // Clean hw layers for reuse.
@@ -244,14 +244,6 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   }
 
   comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
-  if (disable_partial_update) {
-    ControlPartialUpdate(true, &pending);
-  }
-
-  if (one_frame_full_roi_) {
-    ControlPartialUpdate(true, &pending);
-    one_frame_full_roi_ = false;
-  }
 
   return error;
 }
@@ -312,6 +304,10 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
     if (error != kErrorNone) {
       return error;
     }
+  }
+
+  if (partial_update_control_) {
+    comp_manager_->ControlPartialUpdate(display_comp_ctx_, true /* enable */);
   }
 
   error = comp_manager_->PostCommit(display_comp_ctx_, &hw_layers_);
@@ -455,6 +451,11 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 }
 
 DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
+  SCOPE_LOCK(locker_);
+  return SetActiveConfigLocked(index);
+}
+
+DisplayError DisplayBase::SetActiveConfigLocked(uint32_t index) {
   DisplayError error = kErrorNone;
   uint32_t active_index = 0;
 
@@ -484,11 +485,16 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
   error = comp_manager_->RegisterDisplay(display_type_, attrib, hw_panel_info_,
                                          &display_comp_ctx_);
 
-  if (error == kErrorNone && partial_update_control_) {
-    one_frame_full_roi_ = true;
+  if (error == kErrorNone) {
+    DisablePartialUpdateOneFrameLocked();
   }
 
   return error;
+}
+
+DisplayError DisplayBase::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
+  SCOPE_LOCK(locker_);
+  return SetActiveConfigLocked(variable_info);
 }
 
 DisplayError DisplayBase::SetMaxMixerStages(uint32_t max_mixer_stages) {
@@ -504,32 +510,13 @@ DisplayError DisplayBase::SetMaxMixerStages(uint32_t max_mixer_stages) {
 }
 
 DisplayError DisplayBase::ControlPartialUpdate(bool enable, uint32_t *pending) {
-  if (!pending) {
-    return kErrorParameters;
-  }
+  SCOPE_LOCK(locker_);
+  return ControlPartialUpdateLocked(enable, pending);
+}
 
-  if (!hw_panel_info_.partial_update) {
-    // Nothing to be done.
-    DLOGI("partial update is not applicable for display=%d", display_type_);
-    return kErrorNotSupported;
-  }
-
-  *pending = 0;
-  if (enable == partial_update_control_) {
-    DLOGI("Same state transition is requested.");
-    return kErrorNone;
-  }
-
-  partial_update_control_ = enable;
-  comp_manager_->ControlPartialUpdate(display_comp_ctx_, enable);
-
-  if (!enable) {
-    // If the request is to turn off feature, new draw call is required to have
-    // the new setting into effect.
-    *pending = 1;
-  }
-
-  return kErrorNone;
+DisplayError DisplayBase::DisablePartialUpdateOneFrame() {
+  SCOPE_LOCK(locker_);
+  return DisablePartialUpdateOneFrameLocked();
 }
 
 DisplayError DisplayBase::SetDisplayMode(uint32_t mode) {

@@ -69,11 +69,6 @@ DisplayError DisplayVirtual::Deinit() {
   return error;
 }
 
-DisplayError DisplayVirtual::Prepare(LayerStack *layer_stack) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::Prepare(layer_stack);
-}
-
 DisplayError DisplayVirtual::Commit(LayerStack *layer_stack) {
   SCOPE_LOCK(locker_);
   return DisplayBase::Commit(layer_stack);
@@ -122,8 +117,7 @@ DisplayError DisplayVirtual::SetDisplayState(DisplayState state) {
   return DisplayBase::SetDisplayState(state);
 }
 
-DisplayError DisplayVirtual::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
-  SCOPE_LOCK(locker_);
+DisplayError DisplayVirtual::SetActiveConfigLocked(DisplayConfigVariableInfo *variable_info) {
   DisplayError error = kErrorNone;
 
   if (!variable_info) {
@@ -147,11 +141,6 @@ DisplayError DisplayVirtual::SetActiveConfig(DisplayConfigVariableInfo *variable
   }
 
   return error;
-}
-
-DisplayError DisplayVirtual::SetActiveConfig(uint32_t index) {
-  SCOPE_LOCK(locker_);
-  return kErrorNotSupported;
 }
 
 DisplayError DisplayVirtual::SetVSyncState(bool enable) {

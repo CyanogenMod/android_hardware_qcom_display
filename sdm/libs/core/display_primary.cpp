@@ -86,11 +86,6 @@ DisplayError DisplayPrimary::Deinit() {
   return error;
 }
 
-DisplayError DisplayPrimary::Prepare(LayerStack *layer_stack) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::Prepare(layer_stack);
-}
-
 DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
   SCOPE_LOCK(locker_);
   DisplayError error = kErrorNone;
@@ -181,16 +176,6 @@ DisplayError DisplayPrimary::SetDisplayState(DisplayState state) {
   return kErrorNone;
 }
 
-DisplayError DisplayPrimary::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
-  SCOPE_LOCK(locker_);
-  return kErrorNotSupported;
-}
-
-DisplayError DisplayPrimary::SetActiveConfig(uint32_t index) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetActiveConfig(index);
-}
-
 DisplayError DisplayPrimary::SetVSyncState(bool enable) {
   SCOPE_LOCK(locker_);
   return DisplayBase::SetVSyncState(enable);
@@ -214,22 +199,16 @@ DisplayError DisplayPrimary::SetMaxMixerStages(uint32_t max_mixer_stages) {
 DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
   SCOPE_LOCK(locker_);
   DisplayError error = kErrorNone;
-  HWDisplayMode hw_display_mode = kModeDefault;
+  HWDisplayMode hw_display_mode = static_cast<HWDisplayMode>(mode);
+  uint32_t pending = 0;
 
   if (!active_) {
     DLOGW("Invalid display state = %d. Panel must be on.", state_);
     return kErrorNotSupported;
   }
 
-  switch (mode) {
-  case kModeVideo:
-    hw_display_mode = kModeVideo;
-    break;
-  case kModeCommand:
-    hw_display_mode = kModeCommand;
-    break;
-  default:
-    DLOGW("Invalid panel mode parameters. Requested = %d", mode);
+  if (hw_display_mode != kModeCommand && hw_display_mode != kModeVideo) {
+    DLOGW("Invalid panel mode parameters. Requested = %d", hw_display_mode);
     return kErrorParameters;
   }
 
@@ -246,16 +225,11 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
     return error;
   }
 
-  // Disable PU if the previous PU state is on when switching to video mode, and re-enable PU when
-  // switching back to command mode.
-  bool toggle_partial_update = !(hw_display_mode == kModeVideo);
-  if (partial_update_control_) {
-    comp_manager_->ControlPartialUpdate(display_comp_ctx_, toggle_partial_update);
-  }
-
-  if (hw_display_mode == kModeVideo) {
+  if (mode == kModeVideo) {
+    ControlPartialUpdateLocked(false /* enable */, &pending);
     hw_intf_->SetIdleTimeoutMs(idle_timeout_ms_);
-  } else if (hw_display_mode == kModeCommand) {
+  } else if (mode == kModeCommand) {
+    ControlPartialUpdateLocked(true /* enable */, &pending);
     hw_intf_->SetIdleTimeoutMs(0);
   }
 
@@ -360,6 +334,40 @@ void DisplayPrimary::ThermalEvent(int64_t thermal_level) {
 DisplayError DisplayPrimary::GetPanelBrightness(int *level) {
   SCOPE_LOCK(locker_);
   return hw_intf_->GetPanelBrightness(level);
+}
+
+DisplayError DisplayPrimary::ControlPartialUpdateLocked(bool enable, uint32_t *pending) {
+  if (!pending) {
+    return kErrorParameters;
+  }
+
+  if (!hw_panel_info_.partial_update) {
+    // Nothing to be done.
+    DLOGI("partial update is not applicable for display=%d", display_type_);
+    return kErrorNotSupported;
+  }
+
+  *pending = 0;
+  if (enable == partial_update_control_) {
+    DLOGI("Same state transition is requested.");
+    return kErrorNone;
+  }
+
+  partial_update_control_ = enable;
+
+  if (!enable) {
+    // If the request is to turn off feature, new draw call is required to have
+    // the new setting into effect.
+    *pending = 1;
+  }
+
+  return kErrorNone;
+}
+
+DisplayError DisplayPrimary::DisablePartialUpdateOneFrameLocked() {
+  disable_pu_one_frame_ = true;
+
+  return kErrorNone;
 }
 
 }  // namespace sdm

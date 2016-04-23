@@ -42,7 +42,6 @@ class DisplayHDMI : public DisplayBase, DumpImpl, HWEventHandler {
               RotatorInterface *rotator_intf);
   virtual DisplayError Init();
   virtual DisplayError Deinit();
-  virtual DisplayError Prepare(LayerStack *layer_stack);
   virtual DisplayError Commit(LayerStack *layer_stack);
   virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
@@ -51,8 +50,6 @@ class DisplayHDMI : public DisplayBase, DumpImpl, HWEventHandler {
   virtual DisplayError GetActiveConfig(uint32_t *index);
   virtual DisplayError GetVSyncState(bool *enabled);
   virtual DisplayError SetDisplayState(DisplayState state);
-  virtual DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info);
-  virtual DisplayError SetActiveConfig(uint32_t index);
   virtual DisplayError SetVSyncState(bool enable);
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
@@ -74,11 +71,11 @@ class DisplayHDMI : public DisplayBase, DumpImpl, HWEventHandler {
   virtual void CECMessage(char *message);
 
  private:
+  virtual DisplayError PrepareLocked(LayerStack *layer_stack);
   virtual uint32_t GetBestConfig(HWS3DMode s3d_mode);
   virtual void GetScanSupport();
   virtual void SetS3DMode(LayerStack *layer_stack);
 
-  Locker locker_;
   HWScanSupport scan_support_;
   std::map<LayerBufferS3DFormat, HWS3DMode> s3d_format_to_mode_;
   std::vector<const char *> event_list_ = {"vsync_event", "idle_notify", "cec/rd_msg",

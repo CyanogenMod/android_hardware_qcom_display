@@ -341,6 +341,11 @@ class DisplayInterface {
   */
   virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending) = 0;
 
+  /*! @brief Method to disable partial update for at least 1 frame.
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError DisablePartialUpdateOneFrame() = 0;
+
   /*! @brief Method to set the mode of the primary display.
 
     @param[in] mode the new display mode.
