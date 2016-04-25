@@ -201,7 +201,9 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
 
 class MDPCapabilityInfo : public android::Singleton <MDPCapabilityInfo>
 {
-    int isMacroTileSupported;
+    int isMacroTileSupported = 0;
+    int isUBwcSupported = 0;
+
     public:
         MDPCapabilityInfo();
         /*
@@ -210,8 +212,14 @@ class MDPCapabilityInfo : public android::Singleton <MDPCapabilityInfo>
         * @return  1 : supported
         *          0 : not supported
         */
-        int isMacroTilingSupportedByMDP();
-
+        int isMacroTilingSupportedByMDP() { return isMacroTileSupported; }
+        /*
+        * Function to return whether MDP supports UBWC feature
+        *
+        * @return  1 : supported
+        *          0 : not supported
+        */
+        int isUBwcSupportedByMDP() { return isUBwcSupported; }
 };
 
 #endif /* GR_H_ */
