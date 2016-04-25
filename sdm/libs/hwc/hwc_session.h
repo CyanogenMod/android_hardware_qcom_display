@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -28,7 +28,6 @@
 #include <hardware/hwcomposer.h>
 #include <core/core_interface.h>
 #include <utils/locker.h>
-#include <IQClient.h>
 
 #include "hwc_display_primary.h"
 #include "hwc_display_external.h"
@@ -140,6 +139,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   bool new_bw_mode_ = false;
   bool need_invalidate_ = false;
   int bw_mode_release_fd_ = -1;
+  qService::QService *qservice_ = NULL;
 };
 
 }  // namespace sdm

@@ -426,5 +426,57 @@ void HWInfo::PopulateSupportedFormatMap(const uint8_t *format_supported, uint32_
   hw_resource->supported_formats_map.insert(make_pair(sub_blk_type, supported_sdm_formats));
 }
 
+DisplayError HWInfo::GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_disp_info) {
+  char *stringbuffer = reinterpret_cast<char *>(malloc(kMaxStringLength));
+  if (stringbuffer == NULL) {
+    DLOGE("Failed to allocate Stringbuffer");
+    return kErrorMemory;
+  }
+
+  char *line = stringbuffer;
+  size_t len = kMaxStringLength;
+  ssize_t read;
+
+  FILE *fileptr = Sys::fopen_("/sys/class/graphics/fb0/msm_fb_type", "r");
+  if (!fileptr) {
+    free(stringbuffer);
+    return kErrorHardware;
+  }
+
+  if ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
+    if (!strncmp(line, "dtv panel", strlen("dtv panel"))) {
+      hw_disp_info->type = kHDMI;
+      DLOGI("First display is HDMI");
+    } else {
+      hw_disp_info->type = kPrimary;
+      DLOGI("First display is internal display");
+    }
+  } else {
+    free(stringbuffer);
+    fclose(fileptr);
+    return kErrorHardware;
+  }
+
+  fclose(fileptr);
+
+  fileptr = Sys::fopen_("/sys/class/graphics/fb0/connected", "r");
+  if (!fileptr) {
+    // If fb0 is for a DSI/connected panel, then connected node will not exist
+    hw_disp_info->is_connected = true;
+  } else {
+    if ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
+        hw_disp_info->is_connected =  (!strncmp(line, "1", strlen("1")));
+    } else {
+        fclose(fileptr);
+        free(stringbuffer);
+        return kErrorHardware;
+    }
+    fclose(fileptr);
+  }
+
+  free(stringbuffer);
+  return kErrorNone;
+}
+
 }  // namespace sdm
 

@@ -106,6 +106,8 @@ DisplayError DisplayBase::Deinit() {
 
   comp_manager_->UnregisterDisplay(display_comp_ctx_);
 
+  HWEventsInterface::Destroy(hw_events_intf_);
+
   return kErrorNone;
 }
 
@@ -765,6 +767,17 @@ DisplayError DisplayBase::GetRefreshRateRange(uint32_t *min_refresh_rate,
 
 DisplayError DisplayBase::GetPanelBrightness(int *level) {
   return kErrorNotSupported;
+}
+
+DisplayError DisplayBase::SetVSyncState(bool enable) {
+  DisplayError error = kErrorNone;
+  if (vsync_enable_ != enable) {
+    error = hw_intf_->SetVSyncState(enable);
+    if (error == kErrorNone) {
+      vsync_enable_ = enable;
+    }
+  }
+  return error;
 }
 
 }  // namespace sdm

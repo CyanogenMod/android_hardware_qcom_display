@@ -73,8 +73,10 @@ static void ApplyDeInterlaceAdjustment(Layer *layer) {
 }
 
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
-                       int id, bool needs_blit)
-  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit) {
+                       int id, bool needs_blit, qService::QService *qservice,
+                       DisplayClass display_class)
+  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit),
+    qservice_(qservice), display_class_(display_class) {
 }
 
 int HWCDisplay::Init() {
@@ -302,6 +304,16 @@ DisplayError HWCDisplay::VSync(const DisplayEventVSync &vsync) {
 
 DisplayError HWCDisplay::Refresh() {
   return kErrorNotSupported;
+}
+
+DisplayError HWCDisplay::CECMessage(char *message) {
+  if (qservice_) {
+    qservice_->onCECMessageReceived(message, 0);
+  } else {
+    DLOGW("Qservice instance not available.");
+  }
+
+  return kErrorNone;
 }
 
 int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
@@ -1491,6 +1503,10 @@ uint32_t HWCDisplay::SanitizeRefreshRate(uint32_t req_refresh_rate) {
   }
 
   return refresh_rate;
+}
+
+DisplayClass HWCDisplay::GetDisplayClass() {
+  return display_class_;
 }
 
 }  // namespace sdm

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -24,6 +24,8 @@
 
 #ifndef __DISPLAY_PRIMARY_H__
 #define __DISPLAY_PRIMARY_H__
+
+#include <vector>
 
 #include "display_base.h"
 #include "dump_impl.h"
@@ -68,10 +70,13 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
   virtual DisplayError Blank(bool blank);
   virtual void IdleTimeout();
   virtual void ThermalEvent(int64_t thermal_level);
+  virtual void CECMessage(char *message) { }
 
  private:
   Locker locker_;
   uint32_t idle_timeout_ms_ = 0;
+  std::vector<const char *> event_list_ = {"vsync_event", "show_blank_event", "idle_notify",
+                                           "msm_fb_thermal_level", "thread_exit"};
 };
 
 }  // namespace sdm

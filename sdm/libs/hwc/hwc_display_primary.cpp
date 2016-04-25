@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -39,12 +39,12 @@
 namespace sdm {
 
 int HWCDisplayPrimary::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
-                              HWCDisplay **hwc_display) {
+                              qService::QService *qservice, HWCDisplay **hwc_display) {
   int status = 0;
   uint32_t primary_width = 0;
   uint32_t primary_height = 0;
 
-  HWCDisplay *hwc_display_primary = new HWCDisplayPrimary(core_intf, hwc_procs);
+  HWCDisplay *hwc_display_primary = new HWCDisplayPrimary(core_intf, hwc_procs, qservice);
   status = hwc_display_primary->Init();
   if (status) {
     delete hwc_display_primary;
@@ -76,8 +76,11 @@ void HWCDisplayPrimary::Destroy(HWCDisplay *hwc_display) {
   delete hwc_display;
 }
 
-HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true), cpu_hint_(NULL) {
+HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf,
+                                     hwc_procs_t const **hwc_procs,
+                                     qService::QService *qservice)
+  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true, qservice,
+               DISPLAY_CLASS_PRIMARY), cpu_hint_(NULL) {
 }
 
 int HWCDisplayPrimary::Init() {

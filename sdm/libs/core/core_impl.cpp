@@ -212,5 +212,9 @@ DisplayError CoreImpl::SetMaxBandwidthMode(HWBwModes mode) {
   return comp_mgr_.SetMaxBandwidthMode(mode);
 }
 
+DisplayError CoreImpl::GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_disp_info) {
+  return hw_info_intf_->GetFirstDisplayInterfaceType(hw_disp_info);
+}
+
 }  // namespace sdm
 

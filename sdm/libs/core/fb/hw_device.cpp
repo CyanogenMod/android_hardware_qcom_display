@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -58,11 +58,9 @@ HWDevice::HWDevice(BufferSyncHandler *buffer_sync_handler)
     buffer_sync_handler_(buffer_sync_handler), synchronous_commit_(false) {
 }
 
-DisplayError HWDevice::Init(HWEventHandler *eventhandler) {
+DisplayError HWDevice::Init() {
   DisplayError error = kErrorNone;
   char device_name[64] = {0};
-
-  event_handler_ = eventhandler;
 
   // Read the fb node index
   fb_node_index_ = GetFBNodeIndex(device_type_);
@@ -1054,7 +1052,12 @@ DisplayError HWDevice::SetPPFeatures(PPFeaturesConfig *feature_list) {
 }
 
 DisplayError HWDevice::SetVSyncState(bool enable) {
-  return kErrorNotSupported;
+  int vsync_on = enable ? 1 : 0;
+  if (Sys::ioctl_(device_fd_, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) < 0) {
+    IOCTL_LOGE(MSMFB_OVERLAY_VSYNC_CTRL, device_type_);
+    return kErrorHardware;
+  }
+  return kErrorNone;
 }
 
 void HWDevice::SetIdleTimeoutMs(uint32_t timeout_ms) {

@@ -28,12 +28,23 @@
 #include <hardware/hwcomposer.h>
 #include <core/core_interface.h>
 #include <qdMetaData.h>
+#include <QService.h>
 #include <private/color_params.h>
 #include <map>
 
 namespace sdm {
 
 class BlitEngine;
+
+// Subclasses set this to their type. This has to be different from DisplayType.
+// This is to avoid RTTI and dynamic_cast
+enum DisplayClass {
+  DISPLAY_CLASS_PRIMARY,
+  DISPLAY_CLASS_EXTERNAL,
+  DISPLAY_CLASS_VIRTUAL,
+  DISPLAY_CLASS_NULL
+};
+
 
 class HWCDisplay : public DisplayEventHandler {
  public:
@@ -78,6 +89,7 @@ class HWCDisplay : public DisplayEventHandler {
                            PPDisplayAPIPayload *out_payload,
                            PPPendingParams *pending_action);
   int GetVisibleDisplayRect(hwc_rect_t* rect);
+  DisplayClass GetDisplayClass();
 
  protected:
   enum DisplayStatus {
@@ -120,11 +132,12 @@ class HWCDisplay : public DisplayEventHandler {
   };
 
   HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id,
-             bool needs_blit);
+             bool needs_blit, qService::QService *qservice, DisplayClass display_class);
 
   // DisplayEventHandler methods
   virtual DisplayError VSync(const DisplayEventVSync &vsync);
   virtual DisplayError Refresh();
+  virtual DisplayError CECMessage(char *message);
 
   virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PrePrepareLayerStack(hwc_display_contents_1_t *content_list);
@@ -199,6 +212,8 @@ class HWCDisplay : public DisplayEventHandler {
   void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
   void ResetLayerCacheStack();
   BlitEngine *blit_engine_ = NULL;
+  qService::QService *qservice_ = NULL;
+  DisplayClass display_class_;
 };
 
 inline int HWCDisplay::Perform(uint32_t operation, ...) {
