@@ -219,4 +219,22 @@ void PPHWAttributes::Set(const HWResourceInfo &hw_res,
   }
 }
 
+DisplayError ColorManagerProxy::ColorMgrGetNumOfModes(uint32_t *mode_cnt) {
+  return color_intf_->ColorIntfGetNumDisplayModes(&pp_features_, 0, mode_cnt);
+}
+
+DisplayError ColorManagerProxy::ColorMgrGetModes(uint32_t *mode_cnt,
+                                                 SDEDisplayMode *modes) {
+  return color_intf_->ColorIntfEnumerateDisplayModes(&pp_features_, 0, modes, mode_cnt);
+}
+
+DisplayError ColorManagerProxy::ColorMgrSetMode(int32_t color_mode_id) {
+  return color_intf_->ColorIntfSetDisplayMode(&pp_features_, 0, color_mode_id);
+}
+
+DisplayError ColorManagerProxy::ColorMgrSetColorTransform(uint32_t length,
+                                                          const double *trans_data) {
+  return color_intf_->ColorIntfSetColorTransform(&pp_features_, 0, length, trans_data);
+}
+
 }  // namespace sdm

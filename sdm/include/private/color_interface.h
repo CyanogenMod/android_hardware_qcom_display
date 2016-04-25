@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2015-2016, The Linux Foundataion. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -59,6 +59,20 @@ class ColorInterface {
                                             PPPendingParams *pending_action) = 0;
 
   virtual DisplayError ApplyDefaultDisplayMode(PPFeaturesConfig *out_features) = 0;
+
+  virtual DisplayError ColorIntfSetColorTransform(PPFeaturesConfig *out_features,
+                                                uint32_t disp_id, uint32_t length,
+                                                const double *trans_data) = 0;
+
+  virtual DisplayError ColorIntfSetDisplayMode(PPFeaturesConfig *out_features,
+                                             uint32_t disp_id, int32_t mode_id) = 0;
+
+  virtual DisplayError ColorIntfGetNumDisplayModes(PPFeaturesConfig *out_features,
+                                                 uint32_t disp_id, uint32_t *mode_cnt) = 0;
+
+  virtual DisplayError ColorIntfEnumerateDisplayModes(PPFeaturesConfig *out_features,
+                                                uint32_t disp_id, SDEDisplayMode *modes,
+                                                uint32_t *mode_cnt) = 0;
 
  protected:
   virtual ~ColorInterface() {}
