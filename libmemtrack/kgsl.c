@@ -85,7 +85,7 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
     while (1) {
         unsigned long size, mapsize;
         char line_type[7];
-        char flags[8];
+        char flags[9];
         char line_usage[19];
         int ret;
 
@@ -97,7 +97,7 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
          *  gpuaddr useraddr     size    id flags       type            usage sglen mapsize
          * 545ba000 545ba000     4096     1 -----pY     gpumem      arraybuffer     1  4096
          */
-        ret = sscanf(line, "%*x %*x %lu %*d %7s %6s %18s %*d %lu\n",
+        ret = sscanf(line, "%*x %*x %lu %*d %8s %6s %18s %*d %lu\n",
                      &size, flags, line_type, line_usage, &mapsize);
         if (ret != 5) {
             continue;
