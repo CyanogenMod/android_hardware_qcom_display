@@ -53,8 +53,9 @@ DisplayError Strategy::Init() {
       return error;
     }
 
-    error = extension_intf_->CreatePartialUpdate(display_type_, hw_resource_info_,
-                                                 hw_panel_info_, &partial_update_intf_);
+    error = extension_intf_->CreatePartialUpdate(display_type_, hw_resource_info_, hw_panel_info_,
+                                                 mixer_attributes_, display_attributes_,
+                                                 &partial_update_intf_);
   }
 
   return kErrorNone;
@@ -82,7 +83,6 @@ DisplayError Strategy::Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempt
   uint32_t i = 0;
   LayerStack *layer_stack = hw_layers_info_->stack;
   uint32_t layer_count = UINT32(layer_stack->layers.size());
-
   for (; i < layer_count; i++) {
     if (layer_stack->layers.at(i)->composition == kCompositionGPUTarget) {
       fb_layer_index_ = i;
@@ -210,8 +210,9 @@ DisplayError Strategy::Reconfigure(const HWPanelInfo &hw_panel_info,
     partial_update_intf_ = NULL;
   }
 
-  extension_intf_->CreatePartialUpdate(display_type_, hw_resource_info_,
-                                       hw_panel_info_, &partial_update_intf_);
+  extension_intf_->CreatePartialUpdate(display_type_, hw_resource_info_, hw_panel_info_,
+                                       mixer_attributes_, display_attributes_,
+                                       &partial_update_intf_);
 
   return strategy_intf_->Reconfigure(hw_panel_info_.mode, hw_panel_info_.s3d_mode, mixer_attributes,
                                      fb_config);

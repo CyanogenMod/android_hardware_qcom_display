@@ -54,6 +54,8 @@ class ExtensionInterface {
  public:
   virtual DisplayError CreatePartialUpdate(DisplayType type, const HWResourceInfo &hw_resource_info,
                                            const HWPanelInfo &hw_panel_info,
+                                           const HWMixerAttributes &mixer_attributes,
+                                           const HWDisplayAttributes &display_attributes,
                                            PartialUpdateInterface **interface) = 0;
   virtual DisplayError DestroyPartialUpdate(PartialUpdateInterface *interface) = 0;
 
