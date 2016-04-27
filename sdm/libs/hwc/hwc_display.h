@@ -28,12 +28,23 @@
 #include <hardware/hwcomposer.h>
 #include <core/core_interface.h>
 #include <qdMetaData.h>
+#include <QService.h>
 #include <private/color_params.h>
 #include <map>
 
 namespace sdm {
 
 class BlitEngine;
+
+// Subclasses set this to their type. This has to be different from DisplayType.
+// This is to avoid RTTI and dynamic_cast
+enum DisplayClass {
+  DISPLAY_CLASS_PRIMARY,
+  DISPLAY_CLASS_EXTERNAL,
+  DISPLAY_CLASS_VIRTUAL,
+  DISPLAY_CLASS_NULL
+};
+
 
 class HWCDisplay : public DisplayEventHandler {
  public:
@@ -65,6 +76,18 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int SetCursorPosition(int x, int y);
   virtual void SetSecureDisplay(bool secure_display_active);
 
+  // Captures frame output in the buffer specified by output_buffer_info. The API is
+  // non-blocking and the client is expected to check operation status later on.
+  // Returns -1 if the input is invalid.
+  virtual int FrameCaptureAsync(const BufferInfo& output_buffer_info, bool post_processed) {
+    return -1;
+  }
+  // Returns the status of frame capture operation requested with FrameCaptureAsync().
+  // -EAGAIN : No status obtain yet, call API again after another frame.
+  // < 0 : Operation happened but failed.
+  // 0 : Success.
+  virtual int GetFrameCaptureStatus() { return -EAGAIN; }
+
   // Display Configurations
   virtual int SetActiveDisplayConfig(int config);
   virtual int GetActiveDisplayConfig(uint32_t *config);
@@ -78,6 +101,7 @@ class HWCDisplay : public DisplayEventHandler {
                            PPDisplayAPIPayload *out_payload,
                            PPPendingParams *pending_action);
   int GetVisibleDisplayRect(hwc_rect_t* rect);
+  DisplayClass GetDisplayClass();
 
  protected:
   enum DisplayStatus {
@@ -92,15 +116,6 @@ class HWCDisplay : public DisplayEventHandler {
 
   // Maximum number of layers supported by display manager.
   static const uint32_t kMaxLayerCount = 32;
-
-  // Structure to track memory allocation for layer stack (layers, rectangles) object.
-  struct LayerStackMemory {
-    static const size_t kSizeSteps = 4096;  // Default memory allocation.
-    uint8_t *raw;  // Pointer to byte array.
-    size_t size;  // Current number of allocated bytes.
-
-    LayerStackMemory() : raw(NULL), size(0) { }
-  };
 
   struct LayerCache {
     buffer_handle_t handle;
@@ -120,17 +135,20 @@ class HWCDisplay : public DisplayEventHandler {
   };
 
   HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id,
-             bool needs_blit);
+             bool needs_blit, qService::QService *qservice, DisplayClass display_class);
 
   // DisplayEventHandler methods
   virtual DisplayError VSync(const DisplayEventVSync &vsync);
   virtual DisplayError Refresh();
+  virtual DisplayError CECMessage(char *message);
 
-  virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
+  int AllocateLayerStack(hwc_display_contents_1_t *content_list);
+  void FreeLayerStack();
   virtual int PrePrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PostCommitLayerStack(hwc_display_contents_1_t *content_list);
+  virtual void DumpOutputBuffer(const BufferInfo& buffer_info, void *base, int fence);
   inline void SetRect(const hwc_rect_t &source, LayerRect *target);
   inline void SetRect(const hwc_frect_t &source, LayerRect *target);
   inline void SetComposition(const int32_t &source, LayerComposition *target);
@@ -162,9 +180,8 @@ class HWCDisplay : public DisplayEventHandler {
   hwc_procs_t const **hwc_procs_;
   DisplayType type_;
   int id_;
-  bool needs_blit_;
+  bool needs_blit_ = false;
   DisplayInterface *display_intf_ = NULL;
-  LayerStackMemory layer_stack_memory_;
   LayerStack layer_stack_;
   LayerStackCache layer_stack_cache_;
   bool flush_on_error_ = false;
@@ -199,6 +216,8 @@ class HWCDisplay : public DisplayEventHandler {
   void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
   void ResetLayerCacheStack();
   BlitEngine *blit_engine_ = NULL;
+  qService::QService *qservice_ = NULL;
+  DisplayClass display_class_;
 };
 
 inline int HWCDisplay::Perform(uint32_t operation, ...) {

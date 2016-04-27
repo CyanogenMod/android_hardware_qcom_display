@@ -36,6 +36,7 @@ namespace sdm {
 
 bool IsUBWCFormat(LayerBufferFormat format);
 bool Is10BitFormat(LayerBufferFormat format);
+const char *GetFormatString(const LayerBufferFormat &format);
 
 }  // namespace sdm
 

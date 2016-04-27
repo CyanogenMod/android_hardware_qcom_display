@@ -51,7 +51,7 @@ class ResourceDefault : public ResourceInterface {
   virtual DisplayError SetMaxMixerStages(Handle display_ctx, uint32_t max_mixer_stages);
   virtual DisplayError ValidateScaling(const LayerRect &crop, const LayerRect &dst,
                                        bool rotate90, bool ubwc_tiled, bool use_rotator_downscale);
-  DisplayError ValidateCursorConfig(Handle display_ctx, const Layer& layer, bool is_top);
+  DisplayError ValidateCursorConfig(Handle display_ctx, const Layer *layer, bool is_top);
   DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers, int x, int y);
   DisplayError SetMaxBandwidthMode(HWBwModes mode);
 
@@ -105,7 +105,7 @@ class ResourceDefault : public ResourceInterface {
                              const LayerRect &src_rect, const LayerRect &dst_rect,
                              HWLayerConfig *layer_config);
   bool CalculateCropRects(const LayerRect &scissor, LayerRect *crop, LayerRect *dst);
-  DisplayError ValidateLayerParams(const Layer &layer);
+  DisplayError ValidateLayerParams(const Layer *layer);
   DisplayError ValidateDimensions(const LayerRect &crop, const LayerRect &dst);
   DisplayError ValidatePipeParams(HWPipeInfo *pipe_info, bool ubwc_tiled);
   DisplayError ValidateDownScaling(float scale_x, float scale_y, bool ubwc_tiled);
@@ -115,7 +115,8 @@ class ResourceDefault : public ResourceInterface {
   DisplayError SetDecimationFactor(HWPipeInfo *pipe);
   void SplitRect(const LayerRect &src_rect, const LayerRect &dst_rect, LayerRect *src_left,
                 LayerRect *dst_left, LayerRect *src_right, LayerRect *dst_right);
-  DisplayError AlignPipeConfig(const Layer &layer, HWPipeInfo *left_pipe, HWPipeInfo *right_pipe);
+  DisplayError AlignPipeConfig(const Layer *layer, HWPipeInfo *left_pipe,
+                               HWPipeInfo *right_pipe);
   void ResourceStateLog(void);
   DisplayError CalculateDecimation(float downscale, uint8_t *decimation);
   DisplayError GetScaleLutConfig(HWScaleLutInfo *lut_info);

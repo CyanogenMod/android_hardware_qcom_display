@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 The Linux Foundation. All rights reserved.
+* Copyright (c) 2014, 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -58,7 +58,7 @@ enum {
     CEC_OFFSET_RECEIVER_ID,
     CEC_OFFSET_OPCODE,
     CEC_OFFSET_OPERAND,
-    CEC_OFFSET_FRAME_LENGTH = 18,
+    CEC_OFFSET_FRAME_LENGTH = 17,
     CEC_OFFSET_RETRANSMIT,
 };
 
@@ -413,8 +413,7 @@ static int cec_enable(cec_context_t *ctx, int enable)
 {
     ssize_t err;
     // Enable CEC
-    // TODO: Set to 0x3 to enable CEC wakeup once driver has support
-    int value = enable ? 0x1 : 0x0;
+    int value = enable ? 0x3 : 0x0;
     err = write_int_to_node(ctx, "cec/enable", value);
     if(err < 0) {
         ALOGE("%s: Failed to toggle CEC: enable: %d",

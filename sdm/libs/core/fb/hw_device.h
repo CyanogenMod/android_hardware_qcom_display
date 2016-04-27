@@ -78,7 +78,7 @@ class HWDevice : public HWInterface {
   virtual DisplayError SetScaleLutConfig(HWScaleLutInfo *lut_info);
 
   // For HWDevice derivatives
-  virtual DisplayError Init(HWEventHandler *eventhandler);
+  virtual DisplayError Init();
   virtual DisplayError Deinit();
 
   enum {
@@ -88,7 +88,6 @@ class HWDevice : public HWInterface {
 
   static const int kMaxStringLength = 1024;
   static const int kNumPhysicalDisplays = 2;
-  static const int kNumDisplayEvents = 4;
 
   void DumpLayerCommit(const mdp_layer_commit &layer_commit);
   DisplayError SetFormat(const LayerBufferFormat &source, uint32_t *target);
@@ -96,7 +95,7 @@ class HWDevice : public HWInterface {
                          uint32_t width, uint32_t *target);
   void SetBlending(const LayerBlending &source, mdss_mdp_blend_op *target);
   void SetRect(const LayerRect &source, mdp_rect *target);
-  void SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
+  void SetMDPFlags(const Layer *layer, const bool &is_rotator_used,
                    bool is_cursor_pipe_used, uint32_t *mdp_flags);
   // Retrieves HW FrameBuffer Node Index
   int GetFBNodeIndex(HWDeviceType device_type);
@@ -111,14 +110,12 @@ class HWDevice : public HWInterface {
   int ParseLine(char *input, const char *delim, char *tokens[],
                 const uint32_t max_token, uint32_t *count);
   void ResetDisplayParams();
-  void SetCSC(LayerCSC source, mdp_color_space *color_space);
-  void SetIGC(const Layer &layer, uint32_t index);
+  void SetCSC(const LayerCSC source, mdp_color_space *color_space);
+  void SetIGC(const Layer *layer, uint32_t index);
 
   bool EnableHotPlugDetection(int enable);
   ssize_t SysFsWrite(const char* file_node, const char* value, ssize_t length);
 
-  // Store the Device EventHandler - used for callback
-  HWEventHandler *event_handler_;
   HWResourceInfo hw_resource_;
   HWPanelInfo hw_panel_info_;
   HWInfoInterface *hw_info_intf_;
