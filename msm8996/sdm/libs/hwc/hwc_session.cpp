@@ -1168,6 +1168,15 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel *input_parcel
       if (HWC_DISPLAY_PRIMARY == display_id)
         ret = hwc_display_[HWC_DISPLAY_PRIMARY]->SetPanelBrightness(*brightness_value);
       break;
+    case kEnableFrameCapture:
+      ret = color_mgr_->SetFrameCapture(pending_action.params,
+                                        true, hwc_display_[HWC_DISPLAY_PRIMARY]);
+      hwc_procs_->invalidate(hwc_procs_);
+      break;
+    case kDisableFrameCapture:
+      ret = color_mgr_->SetFrameCapture(pending_action.params,
+                                        false, hwc_display_[HWC_DISPLAY_PRIMARY]);
+      break;
     case kNoAction:
       break;
     default:

@@ -28,6 +28,7 @@ LOCAL_SRC_FILES               := core_interface.cpp \
                                  $(LOCAL_HW_INTF_PATH)/hw_primary.cpp \
                                  $(LOCAL_HW_INTF_PATH)/hw_hdmi.cpp \
                                  $(LOCAL_HW_INTF_PATH)/hw_virtual.cpp \
-                                 $(LOCAL_HW_INTF_PATH)/hw_color_manager.cpp
+                                 $(LOCAL_HW_INTF_PATH)/hw_color_manager.cpp \
+                                 $(LOCAL_HW_INTF_PATH)/hw_scale.cpp
 
 include $(BUILD_SHARED_LIBRARY)

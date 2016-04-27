@@ -59,7 +59,6 @@ HWDevice::HWDevice(BufferSyncHandler *buffer_sync_handler)
 }
 
 DisplayError HWDevice::Init(HWEventHandler *eventhandler) {
-  DisplayError error = kErrorNone;
   char device_name[64] = {0};
 
   event_handler_ = eventhandler;
@@ -84,10 +83,12 @@ DisplayError HWDevice::Init(HWEventHandler *eventhandler) {
     return kErrorResources;
   }
 
-  return error;
+  return HWScale::Create(&hw_scale_, hw_resource_.has_qseed3);
 }
 
 DisplayError HWDevice::Deinit() {
+  HWScale::Destroy(hw_scale_);
+
   if (device_fd_ >= 0) {
     Sys::close_(device_fd_);
     device_fd_ = -1;
@@ -232,13 +233,9 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         }
         mdp_layer.bg_color = layer.solid_fill_color;
 
-        if (pipe_info->scale_data.enable_pixel_ext) {
-          SetHWScaleData(pipe_info->scale_data, mdp_layer_count);
-          mdp_layer.flags |= MDP_LAYER_ENABLE_PIXEL_EXT;
-        }
-
-        // Send scale data to MDP driver
-        mdp_layer.scale = GetScaleDataRef(mdp_layer_count);
+        // HWScaleData to MDP driver
+        hw_scale_->SetHWScaleData(pipe_info->scale_data, mdp_layer_count, &mdp_layer);
+        mdp_layer.scale = hw_scale_->GetScaleDataRef(mdp_layer_count);
         mdp_layer_count++;
 
         DLOGV_IF(kTagDriverConfig, "******************* Layer[%d] %s pipe Input ******************",
@@ -253,17 +250,7 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
                  mdp_layer.src_rect.y, mdp_layer.src_rect.w, mdp_layer.src_rect.h);
         DLOGV_IF(kTagDriverConfig, "dst_rect [%d, %d, %d, %d]", mdp_layer.dst_rect.x,
                  mdp_layer.dst_rect.y, mdp_layer.dst_rect.w, mdp_layer.dst_rect.h);
-        for (int j = 0; j < 4; j++) {
-          mdp_scale_data *scale = reinterpret_cast<mdp_scale_data*>(mdp_layer.scale);
-          DLOGV_IF(kTagDriverConfig, "Scale Data[%d]: Phase=[%x %x %x %x] Pixel_Ext=[%d %d %d %d]",
-                 j, scale->init_phase_x[j], scale->phase_step_x[j], scale->init_phase_y[j],
-                 scale->phase_step_y[j], scale->num_ext_pxls_left[j], scale->num_ext_pxls_top[j],
-                 scale->num_ext_pxls_right[j], scale->num_ext_pxls_btm[j]);
-          DLOGV_IF(kTagDriverConfig, "Fetch=[%d %d %d %d]  Repeat=[%d %d %d %d]  roi_width = %d",
-                 scale->left_ftch[j], scale->top_ftch[j], scale->right_ftch[j], scale->btm_ftch[j],
-                 scale->left_rpt[j], scale->top_rpt[j], scale->right_rpt[j], scale->btm_rpt[j],
-                 scale->roi_w[j]);
-        }
+        hw_scale_->DumpScaleData(mdp_layer.scale);
         DLOGV_IF(kTagDriverConfig, "*************************************************************");
       }
     }
@@ -958,7 +945,7 @@ void HWDevice::ResetDisplayParams() {
   memset(&mdp_disp_commit_, 0, sizeof(mdp_disp_commit_));
   memset(&mdp_in_layers_, 0, sizeof(mdp_in_layers_));
   memset(&mdp_out_layer_, 0, sizeof(mdp_out_layer_));
-  memset(&scale_data_, 0, sizeof(scale_data_));
+  hw_scale_->ResetScaleParams();
   memset(&pp_params_, 0, sizeof(pp_params_));
   memset(&igc_lut_data_, 0, sizeof(igc_lut_data_));
 
@@ -971,37 +958,6 @@ void HWDevice::ResetDisplayParams() {
   mdp_disp_commit_.commit_v1.output_layer = &mdp_out_layer_;
   mdp_disp_commit_.commit_v1.release_fence = -1;
   mdp_disp_commit_.commit_v1.retire_fence = -1;
-}
-
-void HWDevice::SetHWScaleData(const ScaleData &scale, uint32_t index) {
-  mdp_scale_data *mdp_scale = GetScaleDataRef(index);
-  mdp_scale->enable_pxl_ext = scale.enable_pixel_ext;
-
-  for (int i = 0; i < 4; i++) {
-    const HWPlane &plane = scale.plane[i];
-    mdp_scale->init_phase_x[i] = plane.init_phase_x;
-    mdp_scale->phase_step_x[i] = plane.phase_step_x;
-    mdp_scale->init_phase_y[i] = plane.init_phase_y;
-    mdp_scale->phase_step_y[i] = plane.phase_step_y;
-
-    mdp_scale->num_ext_pxls_left[i] = plane.left.extension;
-    mdp_scale->left_ftch[i] = plane.left.overfetch;
-    mdp_scale->left_rpt[i] = plane.left.repeat;
-
-    mdp_scale->num_ext_pxls_top[i] = plane.top.extension;
-    mdp_scale->top_ftch[i] = plane.top.overfetch;
-    mdp_scale->top_rpt[i] = plane.top.repeat;
-
-    mdp_scale->num_ext_pxls_right[i] = plane.right.extension;
-    mdp_scale->right_ftch[i] = plane.right.overfetch;
-    mdp_scale->right_rpt[i] = plane.right.repeat;
-
-    mdp_scale->num_ext_pxls_btm[i] = plane.bottom.extension;
-    mdp_scale->btm_ftch[i] = plane.bottom.overfetch;
-    mdp_scale->btm_rpt[i] = plane.bottom.repeat;
-
-    mdp_scale->roi_w[i] = plane.roi_width;
-  }
 }
 
 void HWDevice::SetCSC(LayerCSC source, mdp_color_space *color_space) {
@@ -1131,6 +1087,41 @@ ssize_t HWDevice::SysFsWrite(const char* file_node, const char* value, ssize_t l
 
 DisplayError HWDevice::SetS3DMode(HWS3DMode s3d_mode) {
   return kErrorNotSupported;
+}
+
+DisplayError HWDevice::SetScaleLutConfig(HWScaleLutInfo *lut_info) {
+  STRUCT_VAR(mdp_scale_luts_info, mdp_lut_info);
+  STRUCT_VAR(mdp_set_cfg, cfg);
+
+  if (!hw_resource_.has_qseed3) {
+    DLOGV_IF(kTagDriverConfig, "No support for QSEED3 luts");
+    return kErrorNone;
+  }
+
+  if (!lut_info->dir_lut_size && !lut_info->dir_lut && !lut_info->cir_lut_size &&
+      !lut_info->cir_lut && !lut_info->sep_lut_size && !lut_info->sep_lut) {
+      // HWSupports QSEED3, but LutInfo is invalid as scalar is disabled by property or
+      // its loading failed. Driver will use default settings/filter
+      return kErrorNone;
+  }
+
+  mdp_lut_info.dir_lut_size = lut_info->dir_lut_size;
+  mdp_lut_info.dir_lut = lut_info->dir_lut;
+  mdp_lut_info.cir_lut_size = lut_info->cir_lut_size;
+  mdp_lut_info.cir_lut = lut_info->cir_lut;
+  mdp_lut_info.sep_lut_size = lut_info->sep_lut_size;
+  mdp_lut_info.sep_lut = lut_info->sep_lut;
+
+  cfg.flags = MDP_QSEED3_LUT_CFG;
+  cfg.len = sizeof(mdp_scale_luts_info);
+  cfg.payload = reinterpret_cast<uint64_t>(&mdp_lut_info);
+
+  if (Sys::ioctl_(device_fd_, MSMFB_MDP_SET_CFG, &cfg) < 0) {
+    IOCTL_LOGE(MSMFB_MDP_SET_CFG, device_type_);
+    return kErrorHardware;
+  }
+
+  return kErrorNone;
 }
 
 }  // namespace sdm
