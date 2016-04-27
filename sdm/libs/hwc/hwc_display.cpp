@@ -659,6 +659,10 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     Layer &layer = layer_stack_.layers[i];
     LayerComposition composition = layer.composition;
+    private_handle_t* pvt_handle  = static_cast<private_handle_t*>
+      (const_cast<native_handle_t*>(hwc_layer.handle));
+    MetaData_t *meta_data = pvt_handle ?
+      reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata) : NULL;
 
     if ((composition == kCompositionSDE) || (composition == kCompositionHybrid) ||
         (composition == kCompositionBlit)) {
@@ -670,6 +674,14 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
       layer_stack_cache_.in_use = true;
     }
     SetComposition(composition, &hwc_layer.compositionType);
+
+    if(meta_data != NULL) {
+      if (composition == kCompositionGPUS3D) {
+        meta_data->s3dRender.DisplayId = uint32_t(id_);
+        meta_data->s3dRender.GpuRender = 1;
+        meta_data->s3dRender.GpuS3dFormat = layer.input_buffer->s3d_format;
+      }
+    }
   }
 
   CacheLayerStackInfo(content_list);
@@ -918,6 +930,7 @@ void HWCDisplay::SetComposition(const LayerComposition &source, int32_t *target)
   switch (source) {
   case kCompositionGPUTarget:   *target = HWC_FRAMEBUFFER_TARGET; break;
   case kCompositionGPU:         *target = HWC_FRAMEBUFFER;        break;
+  case kCompositionGPUS3D:      *target = HWC_FRAMEBUFFER;        break;
   case kCompositionHWCursor:    *target = HWC_CURSOR_OVERLAY;     break;
   default:                      *target = HWC_OVERLAY;            break;
   }

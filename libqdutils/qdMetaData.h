@@ -57,6 +57,12 @@ struct BufferDim_t {
     int32_t sliceHeight;
 };
 
+struct S3DSFRender_t {
+    uint32_t DisplayId;
+    uint32_t GpuRender;
+    uint32_t GpuS3dFormat;
+};
+
 struct MetaData_t {
     int32_t operation;
     int32_t interlaced;
@@ -79,6 +85,8 @@ struct MetaData_t {
     /* Set by graphics to indicate that this buffer will be written to but not
      * swapped out */
     uint32_t isSingleBufferMode;
+    /* Indicate GPU to help draw S3D layer on dedicate display device */
+    struct S3DSFRender_t s3dRender;
 };
 
 enum DispParamType {
@@ -97,6 +105,7 @@ enum DispParamType {
     LINEAR_FORMAT = 0x1000,
     SET_IGC = 0x2000,
     SET_SINGLE_BUFFER_MODE = 0x4000,
+    SET_S3D_RENDER = 0x8000,
 };
 
 enum DispFetchParamType {
@@ -109,6 +118,7 @@ enum DispFetchParamType {
     GET_LINEAR_FORMAT = 0x1000,
     GET_IGC = 0x2000,
     GET_SINGLE_BUFFER_MODE = 0x4000,
+    GET_S3D_RENDER = 0x8000,
 };
 
 struct private_handle_t;
@@ -119,6 +129,9 @@ int getMetaData(struct private_handle_t *handle, enum DispFetchParamType paramTy
         void *param);
 
 int copyMetaData(struct private_handle_t *src, struct private_handle_t *dst);
+
+int clearMetaData(struct private_handle_t *handle, enum DispParamType paramType);
+
 #ifdef __cplusplus
 }
 #endif
