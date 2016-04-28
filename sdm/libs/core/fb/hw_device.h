@@ -36,6 +36,14 @@
 #define IOCTL_LOGE(ioctl, type) DLOGE("ioctl %s, device = %d errno = %d, desc = %s", #ioctl, \
                                       type, errno, strerror(errno))
 
+#ifndef MDP_LAYER_MULTIRECT_ENABLE
+#define MDP_LAYER_MULTIRECT_ENABLE 0
+#endif
+
+#ifndef MDP_LAYER_MULTIRECT_PARALLEL_MODE
+#define MDP_LAYER_MULTIRECT_PARALLEL_MODE 0
+#endif
+
 namespace sdm {
 class HWInfoInterface;
 
