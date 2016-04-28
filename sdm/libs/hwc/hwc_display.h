@@ -31,6 +31,7 @@
 #include <QService.h>
 #include <private/color_params.h>
 #include <map>
+#include <vector>
 
 namespace sdm {
 
@@ -117,23 +118,6 @@ class HWCDisplay : public DisplayEventHandler {
   // Maximum number of layers supported by display manager.
   static const uint32_t kMaxLayerCount = 32;
 
-  struct LayerCache {
-    buffer_handle_t handle;
-    uint8_t plane_alpha;
-    LayerComposition composition;
-
-    LayerCache() : handle(NULL), plane_alpha(0xff), composition(kCompositionGPU) { }
-  };
-
-  struct LayerStackCache {
-    LayerCache layer_cache[kMaxLayerCount];
-    uint32_t layer_count;
-    bool animating;
-    bool in_use;
-
-    LayerStackCache() : layer_count(0), animating(false), in_use(false) { }
-  };
-
   HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id,
              bool needs_blit, qService::QService *qservice, DisplayClass display_class);
 
@@ -168,10 +152,10 @@ class HWCDisplay : public DisplayEventHandler {
   DisplayError SetIGC(IGC_t source, LayerIGC *target);
   DisplayError SetMetaData(const private_handle_t *pvt_handle, Layer *layer);
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
-  void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
-  bool IsLayerUpdating(hwc_display_contents_1_t *content_list, int layer_index);
+  bool IsLayerUpdating(hwc_display_contents_1_t *content_list, const Layer *layer);
   bool SingleLayerUpdating(uint32_t app_layer_count);
   bool SingleVideoLayerUpdating(uint32_t app_layer_count);
+  bool IsSurfaceUpdated(const std::vector<LayerRect> &dirty_regions);
 
   enum {
     INPUT_LAYER_DUMP,
@@ -185,7 +169,6 @@ class HWCDisplay : public DisplayEventHandler {
   bool needs_blit_ = false;
   DisplayInterface *display_intf_ = NULL;
   LayerStack layer_stack_;
-  LayerStackCache layer_stack_cache_;
   bool flush_on_error_ = false;
   bool flush_ = false;
   uint32_t dump_frame_count_ = 0;
@@ -210,13 +193,13 @@ class HWCDisplay : public DisplayEventHandler {
   uint32_t solid_fill_color_ = 0;
   LayerRect display_rect_;
   std::map<int, LayerBufferS3DFormat> s3d_format_hwc_to_sdm_;
+  bool animating_ = false;
 
  private:
   bool IsFrameBufferScaled();
   void DumpInputBuffers(hwc_display_contents_1_t *content_list);
   int PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
   void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
-  void ResetLayerCacheStack();
   BlitEngine *blit_engine_ = NULL;
   qService::QService *qservice_ = NULL;
   DisplayClass display_class_;

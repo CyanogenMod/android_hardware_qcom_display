@@ -110,7 +110,7 @@ DisplayError Strategy::Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempt
 }
 
 DisplayError Strategy::Stop() {
-  if (extn_start_success_) {
+  if (strategy_intf_) {
     return strategy_intf_->Stop();
   }
 
@@ -186,5 +186,26 @@ void Strategy::GenerateROI() {
   }
 }
 
-}  // namespace sdm
+DisplayError Strategy::Reconfigure(const HWPanelInfo &hw_panel_info,
+                         const HWDisplayAttributes &hw_display_attributes) {
+  hw_panel_info_ = hw_panel_info;
+  hw_display_attributes_ = hw_display_attributes;
 
+  if (!extension_intf_) {
+    return kErrorNone;
+  }
+
+  // TODO(user): PU Intf will not be created for video mode panels, hence re-evaluate if
+  // reconfigure is needed.
+  if (partial_update_intf_) {
+    extension_intf_->DestroyPartialUpdate(partial_update_intf_);
+    partial_update_intf_ = NULL;
+  }
+
+  extension_intf_->CreatePartialUpdate(display_type_, hw_resource_info_,
+                                       hw_panel_info_, &partial_update_intf_);
+
+  return strategy_intf_->Reconfigure(hw_panel_info_.mode, hw_panel_info_.s3d_mode);
+}
+
+}  // namespace sdm
