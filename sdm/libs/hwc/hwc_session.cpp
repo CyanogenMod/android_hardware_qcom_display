@@ -154,6 +154,7 @@ int HWCSession::Init() {
     if (hw_disp_info.type == kHDMI) {
       // HDMI is primary display. If already connected, then create it and store in
       // primary display slot. If not connected, create a NULL display for now.
+      HWCDebugHandler::Get()->SetProperty("persist.sys.is_hdmi_primary", "1");
       if (hw_disp_info.is_connected) {
         status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, qservice_,
                                             &hwc_display_[HWC_DISPLAY_PRIMARY]);

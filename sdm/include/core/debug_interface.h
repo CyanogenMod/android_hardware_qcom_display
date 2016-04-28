@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -126,6 +126,15 @@ class DebugHandler {
    @return \link DisplayError \endlink
   */
   virtual DisplayError GetProperty(const char *property_name, char *value) = 0;
+
+  /*! @brief Method to set a property to a given string value.
+
+   @param[in] property_name name of the property
+   @param[in] value new value of the property name
+
+   @return \link DisplayError \endlink
+  */
+  virtual DisplayError SetProperty(const char *property_name, const char *value) = 0;
 
  protected:
   virtual ~DebugHandler() { }

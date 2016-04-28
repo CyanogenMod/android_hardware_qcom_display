@@ -181,5 +181,13 @@ DisplayError HWCDebugHandler::GetProperty(const char *property_name, char *value
   return kErrorNotSupported;
 }
 
+DisplayError HWCDebugHandler::SetProperty(const char *property_name, const char *value) {
+  if (property_set(property_name, value) == 0) {
+    return kErrorNone;
+  }
+
+  return kErrorNotSupported;
+}
+
 }  // namespace sdm
 
