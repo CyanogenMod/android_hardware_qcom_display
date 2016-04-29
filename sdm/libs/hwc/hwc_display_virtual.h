@@ -50,8 +50,8 @@ class HWCDisplayVirtual : public HWCDisplay {
   HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
   int SetOutputBuffer(hwc_display_contents_1_t *content_list);
 
-  bool dump_output_layer_;
-  LayerBuffer *output_buffer_;
+  bool dump_output_layer_ = false;
+  LayerBuffer *output_buffer_ = NULL;
 };
 
 inline bool HWCDisplayVirtual::IsValidContentList(hwc_display_contents_1_t *content_list) {

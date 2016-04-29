@@ -41,6 +41,11 @@ class HWCDisplayExternal : public HWCDisplay {
   virtual int Commit(hwc_display_contents_1_t *content_list);
   virtual void SetSecureDisplay(bool secure_display_active);
 
+ protected:
+  virtual uint32_t RoundToStandardFPS(float fps);
+  virtual void PrepareDynamicRefreshRate(Layer *layer);
+  int drc_enabled_ = 0;
+
  private:
   HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
                      qService::QService *qservice);

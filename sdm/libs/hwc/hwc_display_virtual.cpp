@@ -97,8 +97,7 @@ void HWCDisplayVirtual::Destroy(HWCDisplay *hwc_display) {
 
 HWCDisplayVirtual::HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
   : HWCDisplay(core_intf, hwc_procs, kVirtual, HWC_DISPLAY_VIRTUAL, false, NULL,
-               DISPLAY_CLASS_VIRTUAL),
-    dump_output_layer_(false), output_buffer_(NULL) {
+               DISPLAY_CLASS_VIRTUAL) {
 }
 
 int HWCDisplayVirtual::Init() {
@@ -120,6 +119,7 @@ int HWCDisplayVirtual::Deinit() {
 
   if (output_buffer_) {
     delete output_buffer_;
+    output_buffer_ = NULL;
   }
 
   return status;

@@ -112,6 +112,12 @@ enum HWBlendingFilter {
   kBlendFilterMax,
 };
 
+enum HWPipeFlags {
+  kIGC = 0x01,
+  kMultiRect = 0x02,
+  kMultiRectParallelMode = 0x04,
+};
+
 typedef std::map<HWSubBlockType, std::vector<LayerBufferFormat>> FormatsMap;
 
 struct HWDynBwLimitInfo {
@@ -389,7 +395,7 @@ struct HWPipeInfo {
   uint8_t vertical_decimation = 0;
   HWScaleData scale_data;
   uint32_t z_order = 0;
-  bool set_igc = false;
+  uint8_t flags = 0;
   bool valid = false;
 
   void Reset() { *this = HWPipeInfo(); }
@@ -449,7 +455,8 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
             (vsync_period_ns != attributes.vsync_period_ns) ||
             (v_front_porch != attributes.v_front_porch) ||
             (v_back_porch != attributes.v_back_porch) ||
-            (v_pulse_width != attributes.v_pulse_width));
+            (v_pulse_width != attributes.v_pulse_width) ||
+            (is_yuv != attributes.is_yuv));
   }
 
   bool operator ==(const HWDisplayAttributes &attributes) {

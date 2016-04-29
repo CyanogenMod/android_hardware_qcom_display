@@ -190,12 +190,31 @@ DisplayError DisplayHDMI::IsScalingValid(const LayerRect &crop, const LayerRect 
 DisplayError DisplayHDMI::GetRefreshRateRange(uint32_t *min_refresh_rate,
                                               uint32_t *max_refresh_rate) {
   SCOPE_LOCK(locker_);
-  return DisplayBase::GetRefreshRateRange(min_refresh_rate, max_refresh_rate);
+  DisplayError error = kErrorNone;
+
+  if (hw_panel_info_.min_fps && hw_panel_info_.max_fps) {
+    *min_refresh_rate = hw_panel_info_.min_fps;
+    *max_refresh_rate = hw_panel_info_.max_fps;
+  } else {
+    error = DisplayBase::GetRefreshRateRange(min_refresh_rate, max_refresh_rate);
+  }
+
+  return error;
 }
 
 DisplayError DisplayHDMI::SetRefreshRate(uint32_t refresh_rate) {
   SCOPE_LOCK(locker_);
-  return kErrorNotSupported;
+
+  if (!active_) {
+    return kErrorPermission;
+  }
+
+  DisplayError error = hw_intf_->SetRefreshRate(refresh_rate);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  return kErrorNone;
 }
 
 bool DisplayHDMI::IsUnderscanSupported() {
@@ -320,18 +339,18 @@ void DisplayHDMI::SetS3DMode(LayerStack *layer_stack) {
   HWPanelInfo panel_info;
   HWDisplayAttributes display_attributes;
   uint32_t active_index = 0;
-  uint32_t layer_count = layer_stack->layer_count;
+  uint32_t layer_count = UINT32(layer_stack->layers.size());
 
   // S3D mode is supported for the following scenarios:
   // 1. Layer stack containing only one s3d layer which is not skip
   // 2. Layer stack containing only one secure layer along with one s3d layer
   for (uint32_t i = 0; i < layer_count; i++) {
-    Layer &layer = layer_stack->layers[i];
-    LayerBuffer *layer_buffer = layer.input_buffer;
+    Layer *layer = layer_stack->layers.at(i);
+    LayerBuffer *layer_buffer = layer->input_buffer;
 
     if (layer_buffer->s3d_format != kS3dFormatNone) {
       s3d_layer_count++;
-      if (s3d_layer_count > 1 || layer.flags.skip) {
+      if (s3d_layer_count > 1 || layer->flags.skip) {
         s3d_mode = kS3DModeNone;
         break;
       }
@@ -358,9 +377,10 @@ void DisplayHDMI::SetS3DMode(LayerStack *layer_stack) {
   hw_intf_->GetActiveConfig(&active_index);
   hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
 
-  if (panel_info != hw_panel_info_) {
+  if (panel_info != hw_panel_info_ || display_attributes != display_attributes_) {
     comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, panel_info);
     hw_panel_info_ = panel_info;
+    display_attributes_ = display_attributes;
   }
 }
 

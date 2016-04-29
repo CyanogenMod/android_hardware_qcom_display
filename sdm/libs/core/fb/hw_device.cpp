@@ -181,13 +181,13 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
-    Layer &layer = stack->layers[layer_index];
-    LayerBuffer *input_buffer = layer.input_buffer;
+    Layer *layer = stack->layers.at(layer_index);
+    LayerBuffer *input_buffer = layer->input_buffer;
     HWPipeInfo *left_pipe = &hw_layers->config[i].left_pipe;
     HWPipeInfo *right_pipe = &hw_layers->config[i].right_pipe;
     HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
     bool is_rotator_used = (hw_rotator_session->hw_block_count != 0);
-    bool is_cursor_pipe_used = (hw_layer_info.use_hw_cursor & layer.flags.cursor);
+    bool is_cursor_pipe_used = (hw_layer_info.use_hw_cursor & layer->flags.cursor);
 
     for (uint32_t count = 0; count < 2; count++) {
       HWPipeInfo *pipe_info = (count == 0) ? left_pipe : right_pipe;
@@ -206,7 +206,7 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         mdp_buffer.comp_ratio.denom = 1000;
         mdp_buffer.comp_ratio.numer = UINT32(hw_layers->config[i].compression * 1000);
 
-        if (layer.flags.solid_fill) {
+        if (layer->flags.solid_fill) {
           mdp_buffer.format = MDP_ARGB_8888;
         } else {
           error = SetFormat(input_buffer->format, &mdp_buffer.format);
@@ -214,10 +214,10 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
             return error;
           }
         }
-        mdp_layer.alpha = layer.plane_alpha;
+        mdp_layer.alpha = layer->plane_alpha;
         mdp_layer.z_order = UINT16(pipe_info->z_order);
         mdp_layer.transp_mask = 0xffffffff;
-        SetBlending(layer.blending, &mdp_layer.blend_op);
+        SetBlending(layer->blending, &mdp_layer.blend_op);
         mdp_layer.pipe_ndx = pipe_info->pipe_id;
         mdp_layer.horz_deci = pipe_info->horizontal_decimation;
         mdp_layer.vert_deci = pipe_info->vertical_decimation;
@@ -225,11 +225,17 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         SetRect(pipe_info->src_roi, &mdp_layer.src_rect);
         SetRect(pipe_info->dst_roi, &mdp_layer.dst_rect);
         SetMDPFlags(layer, is_rotator_used, is_cursor_pipe_used, &mdp_layer.flags);
-        SetCSC(layer.csc, &mdp_layer.color_space);
-        if (pipe_info->set_igc) {
+        SetCSC(layer->csc, &mdp_layer.color_space);
+        if (pipe_info->flags & kIGC) {
           SetIGC(layer, mdp_layer_count);
         }
-        mdp_layer.bg_color = layer.solid_fill_color;
+        if (pipe_info->flags & kMultiRect) {
+          mdp_layer.flags |= MDP_LAYER_MULTIRECT_ENABLE;
+          if (pipe_info->flags & kMultiRectParallelMode) {
+            mdp_layer.flags |= MDP_LAYER_MULTIRECT_PARALLEL_MODE;
+          }
+        }
+        mdp_layer.bg_color = layer->solid_fill_color;
 
         // HWScaleData to MDP driver
         hw_scale_->SetHWScaleData(pipe_info->scale_data, mdp_layer_count, &mdp_layer);
@@ -325,7 +331,7 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
-    LayerBuffer *input_buffer = stack->layers[layer_index].input_buffer;
+    LayerBuffer *input_buffer = stack->layers.at(layer_index)->input_buffer;
     HWPipeInfo *left_pipe = &hw_layers->config[i].left_pipe;
     HWPipeInfo *right_pipe = &hw_layers->config[i].right_pipe;
     HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
@@ -418,7 +424,7 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
 
   for (uint32_t i = 0; i < hw_layer_info.count; i++) {
     uint32_t layer_index = hw_layer_info.index[i];
-    LayerBuffer *input_buffer = stack->layers[layer_index].input_buffer;
+    LayerBuffer *input_buffer = stack->layers.at(layer_index)->input_buffer;
     HWRotatorSession *hw_rotator_session = &hw_layers->config[i].hw_rotator_session;
 
     if (hw_rotator_session->hw_block_count) {
@@ -604,18 +610,18 @@ void HWDevice::SetRect(const LayerRect &source, mdp_rect *target) {
   target->h = UINT32(source.bottom) - target->y;
 }
 
-void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
+void HWDevice::SetMDPFlags(const Layer *layer, const bool &is_rotator_used,
                            bool is_cursor_pipe_used, uint32_t *mdp_flags) {
-  LayerBuffer *input_buffer = layer.input_buffer;
+  const LayerBuffer *input_buffer = layer->input_buffer;
 
   // Flips will be taken care by rotator, if layer uses rotator for downscale/rotation. So ignore
   // flip flags for MDP.
   if (!is_rotator_used) {
-    if (layer.transform.flip_vertical) {
+    if (layer->transform.flip_vertical) {
       *mdp_flags |= MDP_LAYER_FLIP_UD;
     }
 
-    if (layer.transform.flip_horizontal) {
+    if (layer->transform.flip_horizontal) {
       *mdp_flags |= MDP_LAYER_FLIP_LR;
     }
 
@@ -632,11 +638,11 @@ void HWDevice::SetMDPFlags(const Layer &layer, const bool &is_rotator_used,
     *mdp_flags |= MDP_LAYER_SECURE_DISPLAY_SESSION;
   }
 
-  if (layer.flags.solid_fill) {
+  if (layer->flags.solid_fill) {
     *mdp_flags |= MDP_LAYER_SOLID_FILL;
   }
 
-  if (hw_panel_info_.mode != kModeCommand && layer.flags.cursor && is_cursor_pipe_used) {
+  if (hw_panel_info_.mode != kModeCommand && layer->flags.cursor && is_cursor_pipe_used) {
     // command mode panels does not support async position update
     *mdp_flags |= MDP_LAYER_ASYNC;
   }
@@ -966,12 +972,12 @@ void HWDevice::SetCSC(LayerCSC source, mdp_color_space *color_space) {
   }
 }
 
-void HWDevice::SetIGC(const Layer &layer, uint32_t index) {
+void HWDevice::SetIGC(const Layer *layer, uint32_t index) {
   mdp_input_layer &mdp_layer = mdp_in_layers_[index];
   mdp_overlay_pp_params &pp_params = pp_params_[index];
   mdp_igc_lut_data_v1_7 &igc_lut_data = igc_lut_data_[index];
 
-  switch (layer.igc) {
+  switch (layer->igc) {
   case kIGCsRGB:
     igc_lut_data.table_fmt = mdp_igc_srgb;
     pp_params.igc_cfg.ops = MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;

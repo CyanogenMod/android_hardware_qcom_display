@@ -28,6 +28,8 @@
 #include <utils/formats.h>
 #include <utils/rect.h>
 
+#include <vector>
+
 #include "display_base.h"
 #include "hw_info_interface.h"
 
@@ -50,10 +52,9 @@ DisplayError DisplayBase::Init() {
   hw_panel_info_ = HWPanelInfo();
   hw_intf_->GetHWPanelInfo(&hw_panel_info_);
 
-  HWDisplayAttributes display_attrib;
   uint32_t active_index = 0;
   hw_intf_->GetActiveConfig(&active_index);
-  hw_intf_->GetDisplayAttributes(active_index, &display_attrib);
+  hw_intf_->GetDisplayAttributes(active_index, &display_attributes_);
 
   HWScaleLutInfo lut_info = {};
   error = comp_manager_->GetScaleLutConfig(&lut_info);
@@ -65,7 +66,7 @@ DisplayError DisplayBase::Init() {
     goto CleanupOnError;
   }
 
-  error = comp_manager_->RegisterDisplay(display_type_, display_attrib,
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_,
                                          hw_panel_info_, &display_comp_ctx_);
   if (error != kErrorNone) {
     goto CleanupOnError;
@@ -90,7 +91,7 @@ DisplayError DisplayBase::Init() {
   }
 
   color_mgr_ = ColorManagerProxy::CreateColorManagerProxy(display_type_, hw_intf_,
-                               display_attrib, hw_panel_info_);
+                               display_attributes_, hw_panel_info_);
   if (!color_mgr_) {
     DLOGW("Unable to create ColorManagerProxy for display = %d", display_type_);
   }
@@ -124,18 +125,18 @@ DisplayError DisplayBase::Deinit() {
 
 DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
   uint32_t i = 0;
-  Layer *layers = layer_stack->layers;
+  std::vector<Layer *>layers = layer_stack->layers;
 
   // TODO(user): Remove this check once we have query display attributes on virtual display
   if (display_type_ == kVirtual) {
     return kErrorNone;
   }
-
-  while (i < layer_stack->layer_count && (layers[i].composition != kCompositionGPUTarget)) {
+  uint32_t layer_count = UINT32(layers.size());
+  while ((i < layer_count) && (layers.at(i)->composition != kCompositionGPUTarget)) {
     i++;
   }
 
-  if (i >= layer_stack->layer_count) {
+  if (i >= layer_count) {
     DLOGE("Either layer count is zero or GPU target layer is not present");
     return kErrorParameters;
   }
@@ -143,20 +144,20 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
   uint32_t gpu_target_index = i;
 
   // Check GPU target layer
-  Layer &gpu_target_layer = layer_stack->layers[gpu_target_index];
+  Layer *gpu_target_layer = layers.at(gpu_target_index);
 
-  if (!IsValid(gpu_target_layer.src_rect)) {
+  if (!IsValid(gpu_target_layer->src_rect)) {
     DLOGE("Invalid src rect for GPU target layer");
     return kErrorParameters;
   }
 
-  if (!IsValid(gpu_target_layer.dst_rect)) {
+  if (!IsValid(gpu_target_layer->dst_rect)) {
     DLOGE("Invalid dst rect for GPU target layer");
     return kErrorParameters;
   }
 
-  auto gpu_target_layer_dst_xpixels = gpu_target_layer.dst_rect.right;
-  auto gpu_target_layer_dst_ypixels = gpu_target_layer.dst_rect.bottom;
+  auto gpu_target_layer_dst_xpixels = gpu_target_layer->dst_rect.right;
+  auto gpu_target_layer_dst_ypixels = gpu_target_layer->dst_rect.bottom;
 
   HWDisplayAttributes display_attrib;
   uint32_t active_index = 0;
@@ -200,6 +201,10 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
     }
   }
 
+  if (one_frame_full_roi_) {
+    ControlPartialUpdate(false, &pending);
+  }
+
   // Clean hw layers for reuse.
   hw_layers_ = HWLayers();
   hw_layers_.info.stack = layer_stack;
@@ -241,6 +246,11 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
   if (disable_partial_update) {
     ControlPartialUpdate(true, &pending);
+  }
+
+  if (one_frame_full_roi_) {
+    ControlPartialUpdate(true, &pending);
+    one_frame_full_roi_ = false;
   }
 
   return error;
@@ -465,12 +475,18 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
     return error;
   }
 
+  hw_intf_->GetHWPanelInfo(&hw_panel_info_);
+
   if (display_comp_ctx_) {
     comp_manager_->UnregisterDisplay(display_comp_ctx_);
   }
 
   error = comp_manager_->RegisterDisplay(display_type_, attrib, hw_panel_info_,
                                          &display_comp_ctx_);
+
+  if (error == kErrorNone && partial_update_control_) {
+    one_frame_full_roi_ = true;
+  }
 
   return error;
 }
@@ -594,13 +610,13 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
 
   for (uint32_t i = 0; i < num_hw_layers; i++) {
     uint32_t layer_index = hw_layers_.info.index[i];
-    Layer &layer = hw_layers_.info.stack->layers[layer_index];
-    LayerBuffer *input_buffer = layer.input_buffer;
+    Layer *layer = hw_layers_.info.stack->layers.at(layer_index);
+    LayerBuffer *input_buffer = layer->input_buffer;
     HWLayerConfig &layer_config = hw_layers_.config[i];
     HWRotatorSession &hw_rotator_session = layer_config.hw_rotator_session;
 
     char idx[8] = { 0 };
-    const char *comp_type = GetName(layer.composition);
+    const char *comp_type = GetName(layer->composition);
     const char *buffer_format = GetFormatString(input_buffer->format);
     const char *rotate_split[2] = { "Rot-1", "Rot-2" };
     const char *comp_split[2] = { "Comp-1", "Comp-2" };
@@ -648,10 +664,10 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
       LayerRect &dst_roi = pipe.dst_roi;
 
       snprintf(z_order, sizeof(z_order), "%d", pipe.z_order);
-      snprintf(flags, sizeof(flags), "0x%08x", layer.flags.flags);
+      snprintf(flags, sizeof(flags), "0x%08x", layer->flags.flags);
       snprintf(decimation, sizeof(decimation), "%3d x %3d", pipe.horizontal_decimation,
                pipe.vertical_decimation);
-      snprintf(csc, sizeof(csc), "%d", layer.csc);
+      snprintf(csc, sizeof(csc), "%d", layer->csc);
 
       DumpImpl::AppendString(buffer, length, format, idx, comp_type, comp_split[count],
                              "-", pipe.pipe_id, input_buffer->width, input_buffer->height,

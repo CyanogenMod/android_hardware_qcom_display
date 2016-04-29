@@ -49,6 +49,7 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
                                HWCDisplay **hwc_display) {
   uint32_t external_width = 0;
   uint32_t external_height = 0;
+  int drc_enabled = 0;
 
   HWCDisplay *hwc_display_external = new HWCDisplayExternal(core_intf, hwc_procs, qservice);
   int status = hwc_display_external->Init();
@@ -80,6 +81,9 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
     return status;
   }
 
+  HWCDebugHandler::Get()->GetProperty("sdm.hdmi.drc_enabled", &(drc_enabled));
+  reinterpret_cast<HWCDisplayExternal *>(hwc_display_external)->drc_enabled_ = drc_enabled;
+
   *hwc_display = hwc_display_external;
 
   return status;
@@ -98,6 +102,7 @@ HWCDisplayExternal::HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t con
 
 int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
   int status = 0;
+  DisplayError error = kErrorNone;
 
   if (secure_display_active_) {
     MarkLayersForGPUBypass(content_list);
@@ -118,6 +123,18 @@ int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
     flush_ = true;
     return 0;
   }
+
+  bool one_video_updating_layer = SingleVideoLayerUpdating(UINT32(content_list->numHwLayers - 1));
+
+  if (current_refresh_rate_ != metadata_refresh_rate_ && one_video_updating_layer && drc_enabled_) {
+    error = display_intf_->SetRefreshRate(metadata_refresh_rate_);
+  }
+
+  if (error == kErrorNone) {
+    // On success, set current refresh rate to new refresh rate
+    current_refresh_rate_ = metadata_refresh_rate_;
+  }
+
 
   status = PrepareLayerStack(content_list);
   if (status) {
@@ -218,6 +235,37 @@ void HWCDisplayExternal::GetDownscaleResolution(uint32_t primary_width, uint32_t
       Swap(primary_height, primary_width);
     }
     AdjustSourceResolution(primary_width, primary_height, non_primary_width, non_primary_height);
+  }
+}
+
+uint32_t HWCDisplayExternal::RoundToStandardFPS(float fps) {
+  static const uint32_t standard_fps[] = {23976, 24000, 25000, 29970, 30000, 50000, 59940, 60000};
+  static const uint32_t mapping_fps[] = {59940, 60000, 60000, 59940, 60000, 50000, 59940, 60000};
+  uint32_t frame_rate = (uint32_t)(fps * 1000);
+
+  int count = INT(sizeof(standard_fps) / sizeof(standard_fps[0]));
+  for (int i = 0; i < count; i++) {
+    // Most likely used for video, the fps for frames should be stable from video side.
+    if (standard_fps[i] > frame_rate) {
+      if (i > 0) {
+        if ((standard_fps[i] - frame_rate) > (frame_rate - standard_fps[i-1])) {
+          return mapping_fps[i-1];
+        } else {
+          return mapping_fps[i];
+        }
+      } else {
+        return mapping_fps[i];
+      }
+    }
+  }
+
+  return standard_fps[count - 1];
+}
+
+void HWCDisplayExternal::PrepareDynamicRefreshRate(Layer *layer) {
+  if (layer->input_buffer->flags.video) {
+    metadata_refresh_rate_ = SanitizeRefreshRate(layer->frame_rate);
+    layer->frame_rate = current_refresh_rate_;
   }
 }
 
