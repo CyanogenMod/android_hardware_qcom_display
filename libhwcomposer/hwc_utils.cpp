@@ -480,7 +480,7 @@ uint32_t roundOff(uint32_t refreshRate) {
     int count =  (int) (sizeof(stdRefreshRates)/sizeof(stdRefreshRates[0]));
     uint32_t rate = refreshRate;
     for(int i=0; i< count; i++) {
-        if(abs(stdRefreshRates[i] - refreshRate) < 2) {
+        if((stdRefreshRates[i] - refreshRate) < 2) {
             // Most likely used for video, the fps can fluctuate
             // Ex: b/w 29 and 30 for 30 fps clip
             rate = stdRefreshRates[i];
@@ -1220,7 +1220,7 @@ bool isRotationDoable(hwc_context_t *ctx, private_handle_t *hnd) {
     // Rotate layers, if it is not secure display buffer and not
     // for the MDP versions below MDP5
     if((!isSecureDisplayBuffer(hnd) && isRotatorSupportedFormat(hnd) &&
-        !ctx->mMDP.version < qdutils::MDSS_V5)
+        !(ctx->mMDP.version < qdutils::MDSS_V5))
                    || isYuvBuffer(hnd)) {
         return true;
     }

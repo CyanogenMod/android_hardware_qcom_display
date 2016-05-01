@@ -28,6 +28,7 @@
 #include <overlayCursor.h>
 #include "hwc_copybit.h"
 #include "qd_utils.h"
+#include <utils/Vector.h>
 
 using namespace overlay;
 using namespace qdutils;
@@ -1095,7 +1096,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         return false;
     }
     private_handle_t *renderBuf = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
-    Whf layerWhf[numPTORLayersFound]; // To store w,h,f of PTOR layers
+    Vector<Whf> layerWhf; // To store w,h,f of PTOR layers
 
     // Store the blending mode, planeAlpha, and transform of PTOR layers
     int32_t blending[numPTORLayersFound];
@@ -1115,7 +1116,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         // Store & update w, h, format of PTOR layer
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         Whf whf(hnd->width, hnd->height, hnd->format, hnd->size);
-        layerWhf[j] = whf;
+        layerWhf.insertAt(whf, j);
         hnd->width = renderBuf->width;
         hnd->height = renderBuf->height;
         hnd->format = renderBuf->format;
@@ -1178,9 +1179,10 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         int idx = ctx->mPtorInfo.layerIndex[i];
         hwc_layer_1_t* layer = &list->hwLayers[idx];
         private_handle_t *hnd = (private_handle_t *)list->hwLayers[idx].handle;
-        hnd->width = layerWhf[i].w;
-        hnd->height = layerWhf[i].h;
-        hnd->format = layerWhf[i].format;
+        Whf whf = layerWhf.itemAt(i);
+        hnd->width = whf.w;
+        hnd->height = whf.h;
+        hnd->format = whf.format;
         layer->blending = blending[i];
         layer->planeAlpha = planeAlpha[i];
         layer->transform = transform[i];
@@ -1251,8 +1253,6 @@ bool MDPComp::cacheBasedComp(hwc_context_t *ctx,
         reset(ctx);
         return false;
     }
-
-    int mdpCount = mCurrentFrame.mdpCount;
 
     if(sEnableYUVsplit){
         adjustForSourceSplit(ctx, list);
@@ -1472,7 +1472,7 @@ bool MDPComp::mdpOnlyLayersComp(hwc_context_t *ctx,
         /* Bail out if we are processing only secured video/ui layers
          * and we dont have any */
         if(secureOnly) {
-            ALOGD_IF(isDebug(), "%s: No secure video/ui layers");
+            ALOGD_IF(isDebug(), "%s: No secure video/ui layers", __FUNCTION__);
             return false;
         }
         /* No Idle fall back for secure video/ui layers and if there is only
@@ -2032,16 +2032,12 @@ bool MDPComp::hwLimitationsCheck(hwc_context_t* ctx,
 
 static bool validForCursor(hwc_context_t* ctx, int dpy, hwc_layer_1_t* layer) {
     private_handle_t *hnd = (private_handle_t *)layer->handle;
-    hwc_rect dst = layer->displayFrame;
     hwc_rect src = integerizeSourceCrop(layer->sourceCropf);
     int srcW = src.right - src.left;
     int srcH = src.bottom - src.top;
-    int dstW = dst.right - dst.left;
-    int dstH = dst.bottom - dst.top;
     qdutils::MDPVersion &mdpVersion = qdutils::MDPVersion::getInstance();
     uint32_t maxCursorSize = mdpVersion.getMaxCursorSize();
     uint32_t numHwCursors = mdpVersion.getCursorPipes();
-    bool primarySplit = isDisplaySplit(ctx, HWC_DISPLAY_PRIMARY);
     uint32_t cursorPipesNeeded = 1; // One cursor pipe needed(default)
     bool ret = false;
 
