@@ -352,6 +352,7 @@ static void setS3DMode(hwc_context_t* ctx, int mode) {
 
 static status_t setActiveConfig(hwc_context_t* ctx, const Parcel *inParcel,
         Parcel *outParcel) {
+    (void)outParcel;
     uint32_t index = inParcel->readInt32();
     int dpy = inParcel->readInt32();
     //Currently only primary supported

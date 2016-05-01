@@ -842,7 +842,7 @@ int hwc_getDisplayConfigs(struct hwc_composer_device_1* dev, int disp,
     }
 
     if (*numConfigs <= 0) {
-        ALOGE("%s Invalid number of configs (%d)", __FUNCTION__, *numConfigs);
+        ALOGE("%s Invalid number of configs (%zu)", __FUNCTION__, *numConfigs);
         return -EINVAL;
     }
 
