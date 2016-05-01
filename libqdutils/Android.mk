@@ -15,6 +15,8 @@ LOCAL_SRC_FILES               := profiler.cpp mdp_version.cpp \
                                  comptype.cpp qd_utils.cpp \
                                  cb_utils.cpp display_config.cpp \
                                  cb_swap_rect.cpp
+LOCAL_CLANG_CFLAGS            += -Wno-sign-conversion
+
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
