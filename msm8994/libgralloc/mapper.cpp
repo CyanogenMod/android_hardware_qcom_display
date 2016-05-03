@@ -55,6 +55,27 @@ static IMemAlloc* getAllocator(int flags)
     return memalloc;
 }
 
+static int gralloc_map_metadata(buffer_handle_t handle) {
+    private_handle_t* hnd = (private_handle_t*)handle;
+    hnd->base_metadata = 0;
+    IMemAlloc* memalloc = getAllocator(hnd->flags) ;
+    void *mappedAddress = MAP_FAILED;
+    unsigned int size = 0;
+    if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
+        mappedAddress = MAP_FAILED;
+        size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
+        int ret = memalloc->map_buffer(&mappedAddress, size,
+                                       hnd->offset_metadata, hnd->fd_metadata);
+        if(ret || mappedAddress == MAP_FAILED) {
+            ALOGE("Could not mmap metadata for handle %p, fd=%d (%s)",
+                  hnd, hnd->fd_metadata, strerror(errno));
+            return -errno;
+        }
+        hnd->base_metadata = uint64_t(mappedAddress) + hnd->offset_metadata;
+    }
+    return 0;
+}
+
 static int gralloc_map(gralloc_module_t const* module,
                        buffer_handle_t handle)
 {
@@ -68,7 +89,6 @@ static int gralloc_map(gralloc_module_t const* module,
     IMemAlloc* memalloc = getAllocator(hnd->flags) ;
     void *mappedAddress = MAP_FAILED;
     hnd->base = 0;
-    hnd->base_metadata = 0;
 
     // Dont map framebuffer and secure buffers
     if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) &&
@@ -83,23 +103,18 @@ static int gralloc_map(gralloc_module_t const* module,
         }
 
         hnd->base = uint64_t(mappedAddress) + hnd->offset;
+    } else {
+        // Cannot map secure buffers or framebuffers, but still need to map
+        // metadata for secure buffers.
+        // If mapping a secure buffers fails, the framework needs to get
+        // an error code.
+        err = -EINVAL;
     }
 
     //Allow mapping of metadata for all buffers including secure ones, but not
     //of framebuffer
-    if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
-        mappedAddress = MAP_FAILED;
-        size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
-        err = memalloc->map_buffer(&mappedAddress, size,
-                                       hnd->offset_metadata, hnd->fd_metadata);
-        if(err || mappedAddress == MAP_FAILED) {
-            ALOGE("Could not mmap handle %p, fd=%d (%s)",
-                  handle, hnd->fd_metadata, strerror(errno));
-            return -errno;
-        }
-        hnd->base_metadata = uint64_t(mappedAddress) + hnd->offset_metadata;
-    }
-    return 0;
+    err = gralloc_map_metadata(handle);
+    return err;
 }
 
 static int gralloc_unmap(gralloc_module_t const* module,
@@ -152,21 +167,11 @@ int gralloc_register_buffer(gralloc_module_t const* module,
     ATRACE_CALL();
     if (!module || private_handle_t::validate(handle) < 0)
         return -EINVAL;
-
-    /* NOTE: we need to initialize the buffer as not mapped/not locked
-     * because it shouldn't when this function is called the first time
-     * in a new process. Ideally these flags shouldn't be part of the
-     * handle, but instead maintained in the kernel or at least
-     * out-of-line
-     */
-
-    int err = gralloc_map(module, handle);
-    if (err) {
-        ALOGE("%s: gralloc_map failed", __FUNCTION__);
-        return err;
-    }
-
-    return 0;
+    // The base address received via IPC is invalid in this process
+    // Reset it to 0 here since it will be mapped in lock()
+    private_handle_t* hnd = (private_handle_t*)handle;
+    hnd->base = 0;
+    return gralloc_map_metadata(handle);
 }
 
 int gralloc_unregister_buffer(gralloc_module_t const* module,
