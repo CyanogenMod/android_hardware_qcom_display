@@ -66,8 +66,7 @@ int gpu_context_t::gralloc_alloc_buffer(size_t size, int usage,
 
     /* force 1MB alignment selectively for secure buffers, MDP5 onwards */
 #ifdef MDSS_TARGET
-    if ((usage & GRALLOC_USAGE_PROTECTED) &&
-        (usage & GRALLOC_USAGE_PRIVATE_MM_HEAP)) {
+    if (usage & GRALLOC_USAGE_PROTECTED) {
         data.align = ALIGN((int) data.align, SZ_1M);
         size = ALIGN(size, data.align);
     }
