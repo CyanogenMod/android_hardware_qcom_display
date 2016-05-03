@@ -159,14 +159,14 @@ class HWCDisplay : public DisplayEventHandler {
     OUTPUT_LAYER_DUMP,
   };
 
-  CoreInterface *core_intf_;
-  HWCCallbacks *callbacks_;
+  CoreInterface *core_intf_ = nullptr;
+  HWCCallbacks *callbacks_  = nullptr;
   DisplayType type_;
   hwc2_display_t id_;
   bool needs_blit_ = false;
   DisplayInterface *display_intf_ = NULL;
   LayerStack layer_stack_;
-  HWCLayer *client_target_;                             // Also known as framebuffer target
+  HWCLayer *client_target_ = nullptr;                   // Also known as framebuffer target
   std::map<hwc2_layer_t, HWCLayer *> layer_map_;        // Look up by Id - TODO
   std::multiset<HWCLayer *, SortLayersByZ> layer_set_;  // Maintain a set sorted by Z
   std::map<hwc2_layer_t, HWC2::Composition> layer_changes_;
@@ -202,7 +202,7 @@ class HWCDisplay : public DisplayEventHandler {
   BlitEngine *blit_engine_ = NULL;
   qService::QService *qservice_ = NULL;
   DisplayClass display_class_;
-  int32_t stored_retire_fence_;
+  int32_t stored_retire_fence_ = -1;
   uint32_t geometry_changes_ = GeometryChanges::kNone;
 };
 

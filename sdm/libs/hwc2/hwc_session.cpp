@@ -391,9 +391,8 @@ int32_t HWCSession::RegisterCallback(hwc2_device_t *device, int32_t descriptor,
   auto desc = static_cast<HWC2::Callback>(descriptor);
   auto error = hwc_session->callbacks_.Register(desc, callback_data, pointer);
   DLOGD("Registering callback: %s", to_string(desc).c_str());
-  // TODO(user): The hotplug should only be called when the HOTPLUG callback is registered
-  // However, this causes SurfaceFlinger to behave weirdly - investigate further.
-  hwc_session->callbacks_.Hotplug(HWC_DISPLAY_PRIMARY, HWC2::Connection::Connected);
+  if (descriptor == HWC2_CALLBACK_HOTPLUG)
+    hwc_session->callbacks_.Hotplug(HWC_DISPLAY_PRIMARY, HWC2::Connection::Connected);
   return INT32(error);
 }
 
