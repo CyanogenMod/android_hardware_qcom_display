@@ -340,6 +340,14 @@ static int32_t GetDozeSupport(hwc2_device_t *device, hwc2_display_t display, int
   return HWC2_ERROR_NONE;
 }
 
+static int32_t GetHdrCapabilities(hwc2_device_t* device, hwc2_display_t display,
+                                  uint32_t* out_num_types, int32_t* out_types,
+                                  float* out_max_luminance, float* out_max_average_luminance,
+                                  float* out_min_luminance) {
+  *out_num_types = 0;
+  return HWC2_ERROR_NONE;
+}
+
 static uint32_t GetMaxVirtualDisplayCount(hwc2_device_t *device) {
   return 1;
 }
@@ -570,6 +578,8 @@ hwc2_function_pointer_t HWCSession::GetFunction(struct hwc2_device *device,
       return AsFP<HWC2_PFN_GET_DISPLAY_REQUESTS>(GetDisplayRequests);
     case HWC2::FunctionDescriptor::GetDisplayType:
       return AsFP<HWC2_PFN_GET_DISPLAY_TYPE>(GetDisplayType);
+    case HWC2::FunctionDescriptor::GetHdrCapabilities:
+      return AsFP<HWC2_PFN_GET_HDR_CAPABILITIES>(GetHdrCapabilities);
     case HWC2::FunctionDescriptor::GetDozeSupport:
       return AsFP<HWC2_PFN_GET_DOZE_SUPPORT>(GetDozeSupport);
     case HWC2::FunctionDescriptor::GetMaxVirtualDisplayCount:
