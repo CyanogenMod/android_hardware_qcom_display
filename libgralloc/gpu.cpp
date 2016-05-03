@@ -64,8 +64,7 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
     else
         data.align = getpagesize();
 
-    if ((usage & GRALLOC_USAGE_PROTECTED) &&
-        (usage & GRALLOC_USAGE_PRIVATE_MM_HEAP)) {
+    if (usage & GRALLOC_USAGE_PROTECTED) {
             if (usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY) {
                 /* The alignment here reflects qsee mmu V7L/V8L requirement */
                 data.align = SZ_2M;
