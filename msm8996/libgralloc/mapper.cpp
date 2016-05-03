@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016, The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,6 +55,27 @@ static IMemAlloc* getAllocator(int flags)
     return memalloc;
 }
 
+static int gralloc_map_metadata(buffer_handle_t handle) {
+    private_handle_t* hnd = (private_handle_t*)handle;
+    hnd->base_metadata = 0;
+    IMemAlloc* memalloc = getAllocator(hnd->flags) ;
+    void *mappedAddress = MAP_FAILED;
+    unsigned int size = 0;
+    if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
+        mappedAddress = MAP_FAILED;
+        size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
+        int ret = memalloc->map_buffer(&mappedAddress, size,
+                                       hnd->offset_metadata, hnd->fd_metadata);
+        if(ret || mappedAddress == MAP_FAILED) {
+            ALOGE("Could not mmap metadata for handle %p, fd=%d (%s)",
+                  hnd, hnd->fd_metadata, strerror(errno));
+            return -errno;
+        }
+        hnd->base_metadata = uint64_t(mappedAddress) + hnd->offset_metadata;
+    }
+    return 0;
+}
+
 static int gralloc_map(gralloc_module_t const* module,
                        buffer_handle_t handle)
 {
@@ -68,7 +89,6 @@ static int gralloc_map(gralloc_module_t const* module,
     IMemAlloc* memalloc = getAllocator(hnd->flags) ;
     void *mappedAddress = MAP_FAILED;
     hnd->base = 0;
-    hnd->base_metadata = 0;
 
     // Dont map framebuffer and secure buffers
     if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) &&
@@ -83,23 +103,21 @@ static int gralloc_map(gralloc_module_t const* module,
         }
 
         hnd->base = uint64_t(mappedAddress) + hnd->offset;
+    } else {
+        // Cannot map secure buffers or framebuffers, but still need to map
+        // metadata for secure buffers.
+        // If mapping a secure buffers fails, the framework needs to get
+        // an error code.
+        err = -EACCES;
     }
 
     //Allow mapping of metadata for all buffers including secure ones, but not
     //of framebuffer
-    if (!(hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER)) {
-        mappedAddress = MAP_FAILED;
-        size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
-        err = memalloc->map_buffer(&mappedAddress, size,
-                                       hnd->offset_metadata, hnd->fd_metadata);
-        if(err || mappedAddress == MAP_FAILED) {
-            ALOGE("Could not mmap handle %p, fd=%d (%s)",
-                  handle, hnd->fd_metadata, strerror(errno));
-            return -errno;
-        }
-        hnd->base_metadata = uint64_t(mappedAddress) + hnd->offset_metadata;
+    int metadata_err = gralloc_map_metadata(handle);
+    if (!err) {
+        err = metadata_err;
     }
-    return 0;
+    return err;
 }
 
 static int gralloc_unmap(gralloc_module_t const* module,
@@ -153,20 +171,11 @@ int gralloc_register_buffer(gralloc_module_t const* module,
     if (!module || private_handle_t::validate(handle) < 0)
         return -EINVAL;
 
-    /* NOTE: we need to initialize the buffer as not mapped/not locked
-     * because it shouldn't when this function is called the first time
-     * in a new process. Ideally these flags shouldn't be part of the
-     * handle, but instead maintained in the kernel or at least
-     * out-of-line
-     */
-
-    int err = gralloc_map(module, handle);
-    if (err) {
-        ALOGE("%s: gralloc_map failed", __FUNCTION__);
-        return err;
-    }
-
-    return 0;
+    int err =  gralloc_map(module, handle);
+    /* Do not fail register_buffer for secure buffers*/
+    if (err == -EACCES)
+        err = 0;
+    return err;
 }
 
 int gralloc_unregister_buffer(gralloc_module_t const* module,
