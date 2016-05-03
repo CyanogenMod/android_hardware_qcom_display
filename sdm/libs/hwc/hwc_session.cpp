@@ -155,9 +155,11 @@ int HWCSession::Init() {
       // HDMI is primary display. If already connected, then create it and store in
       // primary display slot. If not connected, create a NULL display for now.
       HWCDebugHandler::Get()->SetProperty("persist.sys.is_hdmi_primary", "1");
+      is_hdmi_primary_ = true;
       if (hw_disp_info.is_connected) {
         status = HWCDisplayExternal::Create(core_intf_, &hwc_procs_, qservice_,
                                             &hwc_display_[HWC_DISPLAY_PRIMARY]);
+        is_hdmi_yuv_ = IsDisplayYUV(HWC_DISPLAY_PRIMARY);
       } else {
         // NullDisplay simply closes all its fences, and advertizes a standard
         // resolution to SurfaceFlinger
@@ -165,14 +167,14 @@ int HWCSession::Init() {
                                         &hwc_display_[HWC_DISPLAY_PRIMARY]);
       }
     } else {
-        // Create and power on primary display
-        status = HWCDisplayPrimary::Create(core_intf_, &hwc_procs_, qservice_,
-                                           &hwc_display_[HWC_DISPLAY_PRIMARY]);
+      // Create and power on primary display
+      status = HWCDisplayPrimary::Create(core_intf_, &hwc_procs_, qservice_,
+                                         &hwc_display_[HWC_DISPLAY_PRIMARY]);
     }
   } else {
-        // Create and power on primary display
-        status = HWCDisplayPrimary::Create(core_intf_, &hwc_procs_, qservice_,
-                                           &hwc_display_[HWC_DISPLAY_PRIMARY]);
+    // Create and power on primary display
+    status = HWCDisplayPrimary::Create(core_intf_, &hwc_procs_, qservice_,
+                                       &hwc_display_[HWC_DISPLAY_PRIMARY]);
   }
 
   if (status) {
@@ -301,8 +303,11 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
       // If virtual display content list is invalid, disconnect virtual display if connected.
       // If external display connection is pending, connect external display when virtual
       // display is destroyed.
+      // If HDMI is primary and the output format is YUV then ignore the virtual display
+      // content list.
       if (dpy == HWC_DISPLAY_VIRTUAL) {
-        if (hwc_session->hwc_display_[HWC_DISPLAY_EXTERNAL]) {
+        if (hwc_session->hwc_display_[HWC_DISPLAY_EXTERNAL] ||
+                (hwc_session->is_hdmi_primary_ && hwc_session->is_hdmi_yuv_)) {
           continue;
         }
 
@@ -430,6 +435,30 @@ void HWCSession::CloseAcquireFds(hwc_display_contents_1_t *content_list) {
       outbufAcquireFenceFd = -1;
     }
   }
+}
+
+bool HWCSession::IsDisplayYUV(int disp) {
+  int error = -EINVAL;
+  bool is_yuv = false;
+  DisplayConfigVariableInfo attributes = {};
+
+  if (disp < 0 || disp >= HWC_NUM_DISPLAY_TYPES || !hwc_display_[disp]) {
+    DLOGE("Invalid input parameters. Display = %d", disp);
+    return is_yuv;
+  }
+
+  uint32_t active_config = 0;
+  error = hwc_display_[disp]->GetActiveDisplayConfig(&active_config);
+  if (!error) {
+    error = hwc_display_[disp]->GetDisplayAttributesForConfig(INT(active_config), &attributes);
+    if (error == 0) {
+      is_yuv = attributes.is_yuv;
+    } else {
+      DLOGW("Error querying display attributes. Display = %d, Config = %d", disp, active_config);
+    }
+  }
+
+  return is_yuv;
 }
 
 int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event, int enable) {
@@ -1325,7 +1354,6 @@ void HWCSession::ResetPanel() {
 int HWCSession::HotPlugHandler(bool connected) {
   int status = 0;
   bool notify_hotplug = false;
-  bool hdmi_primary = false;
 
   // To prevent sending events to client while a lock is held, acquire scope locks only within
   // below scope so that those get automatically unlocked after the scope ends.
@@ -1343,20 +1371,15 @@ int HWCSession::HotPlugHandler(bool connected) {
     HWCDisplay *null_display = NULL;
 
     if (primary_display->GetDisplayClass() == DISPLAY_CLASS_EXTERNAL) {
-        external_display = static_cast<HWCDisplayExternal *>(hwc_display_[HWC_DISPLAY_PRIMARY]);
+      external_display = static_cast<HWCDisplayExternal *>(hwc_display_[HWC_DISPLAY_PRIMARY]);
     } else if (primary_display->GetDisplayClass() == DISPLAY_CLASS_NULL) {
-        null_display = static_cast<HWCDisplayNull *>(hwc_display_[HWC_DISPLAY_PRIMARY]);
-    }
-
-    if (external_display || null_display) {
-      hdmi_primary = true;
+      null_display = static_cast<HWCDisplayNull *>(hwc_display_[HWC_DISPLAY_PRIMARY]);
     }
 
     // If primary display connected is a NULL display, then replace it with the external display
     if (connected) {
       // If we are in HDMI as primary and the primary display just got plugged in
-      if (null_display) {
-        assert(hdmi_primary);
+      if (is_hdmi_primary_ && null_display) {
         uint32_t primary_width, primary_height;
         null_display->GetFrameBufferResolution(&primary_width, &primary_height);
         delete null_display;
@@ -1374,6 +1397,8 @@ int HWCSession::HotPlugHandler(bool connected) {
           return -1;
         }
 
+        is_hdmi_yuv_ = IsDisplayYUV(HWC_DISPLAY_PRIMARY);
+
         // Next, go ahead and enable vsync on external display. This is expliclity required
         // because in HDMI as primary case, SurfaceFlinger may not be aware of underlying
         // changing display. and thus may not explicitly enable vsync
@@ -1386,22 +1411,22 @@ int HWCSession::HotPlugHandler(bool connected) {
         notify_hotplug = false;
       } else {
         if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-            DLOGE("HDMI is already connected");
-            return -1;
+          DLOGE("HDMI is already connected");
+          return -1;
         }
 
         // Connect external display if virtual display is not connected.
         // Else, defer external display connection and process it when virtual display
         // tears down; Do not notify SurfaceFlinger since connection is deferred now.
         if (!hwc_display_[HWC_DISPLAY_VIRTUAL]) {
-            status = ConnectDisplay(HWC_DISPLAY_EXTERNAL, NULL);
-            if (status) {
+          status = ConnectDisplay(HWC_DISPLAY_EXTERNAL, NULL);
+          if (status) {
             return status;
-            }
-            notify_hotplug = true;
+          }
+          notify_hotplug = true;
         } else {
-            DLOGI("Virtual display is connected, pending connection");
-            external_pending_connect_ = true;
+          DLOGI("Virtual display is connected, pending connection");
+          external_pending_connect_ = true;
         }
       }
     } else {
@@ -1409,8 +1434,7 @@ int HWCSession::HotPlugHandler(bool connected) {
       // Due to virtual display concurrency, external display connection might be still pending
       // but hdmi got disconnected before pending connection could be processed.
 
-      if (hdmi_primary) {
-        assert(external_display != NULL);
+      if (is_hdmi_primary_ && external_display) {
         uint32_t x_res, y_res;
         external_display->GetFrameBufferResolution(&x_res, &y_res);
         // Need to manually disable VSYNC as SF is not aware of connect/disconnect cases
@@ -1435,8 +1459,8 @@ int HWCSession::HotPlugHandler(bool connected) {
         notify_hotplug = false;
       } else {
         if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
-            status = DisconnectDisplay(HWC_DISPLAY_EXTERNAL);
-            notify_hotplug = true;
+          status = DisconnectDisplay(HWC_DISPLAY_EXTERNAL);
+          notify_hotplug = true;
         }
         external_pending_connect_ = false;
       }
