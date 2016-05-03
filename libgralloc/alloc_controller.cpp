@@ -78,11 +78,10 @@ static bool canFallback(int usage, bool triedSystem)
  * read or written in software. Any combination with a _RARELY_ flag will be
  * treated as uncached. */
 static bool useUncached(const int& usage) {
-    if((usage & GRALLOC_USAGE_PRIVATE_UNCACHED) or
-            ((usage & GRALLOC_USAGE_SW_WRITE_MASK) ==
-            GRALLOC_USAGE_SW_WRITE_RARELY) or
-            ((usage & GRALLOC_USAGE_SW_READ_MASK) ==
-            GRALLOC_USAGE_SW_READ_RARELY))
+    if ((usage & GRALLOC_USAGE_PROTECTED) or
+        (usage & GRALLOC_USAGE_PRIVATE_UNCACHED) or
+        ((usage & GRALLOC_USAGE_SW_WRITE_MASK) == GRALLOC_USAGE_SW_WRITE_RARELY) or
+        ((usage & GRALLOC_USAGE_SW_READ_MASK) ==  GRALLOC_USAGE_SW_READ_RARELY))
         return true;
 
     return false;
