@@ -71,7 +71,6 @@ class HWCLayer {
   HWC2::Error SetLayerVisibleRegion(hwc_region_t visible);
   HWC2::Error SetLayerZOrder(uint32_t z);
   void SetComposition(const LayerComposition &source);
-  bool CompositionChanged(void) { return composition_changed_; }
   HWC2::Composition GetCompositionType() { return composition_; }
   uint32_t GetGeometryChanges() { return geometry_changes_; }
   void ResetGeometryChanges() { geometry_changes_ = GeometryChanges::kNone; }
@@ -87,7 +86,6 @@ class HWCLayer {
   std::queue<int32_t> release_fences_;
 
   HWC2::Composition composition_ = HWC2::Composition::Device;
-  bool composition_changed_ = false;
   uint32_t geometry_changes_ = GeometryChanges::kNone;
 
   void SetRect(const hwc_rect_t &source, LayerRect *target);

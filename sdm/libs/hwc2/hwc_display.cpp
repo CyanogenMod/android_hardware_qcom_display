@@ -535,8 +535,11 @@ HWC2::Error HWCDisplay::PrepareLayerStack(uint32_t *out_num_types, uint32_t *out
     if (!needs_fb_refresh && composition == kCompositionGPU) {
       composition = kCompositionSDE;
     }
+    HWC2::Composition current_hwc_composition  = hwc_layer->GetCompositionType();
+    // Convert the SDM layer composition to HWC2 type
     hwc_layer->SetComposition(composition);
-    if (hwc_layer->CompositionChanged()) {
+    // Update the changes list only if the HWC2 comp type changed from the previous cycle
+    if (current_hwc_composition != hwc_layer->GetCompositionType()) {
       layer_changes_[hwc_layer->GetId()] = hwc_layer->GetCompositionType();
     }
   }

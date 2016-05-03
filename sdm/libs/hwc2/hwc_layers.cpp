@@ -480,11 +480,7 @@ void HWCLayer::SetComposition(const LayerComposition &source) {
   if (layer_->composition == kCompositionSDE && layer_->flags.solid_fill != 0) {
     composition = HWC2::Composition::SolidColor;
   }
-  if (composition != composition_) {
-    // Composition changed for this layer
-    composition_changed_ = true;
-    composition_ = composition;
-  }
+  composition_ = composition;
 }
 void HWCLayer::PushReleaseFence(int32_t fence) {
   release_fences_.push(fence);
