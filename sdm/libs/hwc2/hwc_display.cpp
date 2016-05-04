@@ -596,6 +596,10 @@ HWC2::Error HWCDisplay::GetDisplayRequests(int32_t *out_display_requests,
   // Use for sharing blit buffers and
   // writing wfd buffer directly to output if there is full GPU composition
   // and no color conversion needed
+  if (!validated_) {
+    DLOGW("Display is not validated");
+    return HWC2::Error::NotValidated;
+  }
   *out_display_requests = 0;
   *out_num_elements = UINT32(layer_requests_.size());
   if (out_layers != nullptr && out_layer_requests != nullptr) {
