@@ -166,8 +166,6 @@ HWC2::Error HWCDisplay::DestroyLayer(hwc2_layer_t layer_id) {
 }
 
 void HWCDisplay::BuildLayerStack() {
-  // TODO(user): Validate
-  validated_ = true;
   layer_stack_ = LayerStack();
   display_rect_ = LayerRect();
   metadata_refresh_rate_ = 0;
@@ -626,6 +624,7 @@ HWC2::Error HWCDisplay::CommitLayerStack(void) {
   if (!flush_) {
     DisplayError error = kErrorUndefined;
     error = display_intf_->Commit(&layer_stack_);
+    validated_ = false;
 
     if (error == kErrorNone) {
       // A commit is successfully submitted, start flushing on failure now onwards.
