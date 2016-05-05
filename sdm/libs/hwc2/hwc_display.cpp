@@ -128,10 +128,10 @@ int HWCDisplay::Deinit() {
 
 // LayerStack operations
 HWC2::Error HWCDisplay::CreateLayer(hwc2_layer_t *out_layer_id) {
-  auto layer = *layer_set_.emplace(new HWCLayer(id_));
+  HWCLayer *layer = *layer_set_.emplace(new HWCLayer(id_));
   layer_map_.emplace(std::make_pair(layer->GetId(), layer));
   *out_layer_id = layer->GetId();
-  geometry_changes_ = GeometryChanges::kAdded;
+  geometry_changes_ |= GeometryChanges::kAdded;
   return HWC2::Error::None;
 }
 
@@ -161,7 +161,7 @@ HWC2::Error HWCDisplay::DestroyLayer(hwc2_layer_t layer_id) {
     }
   }
 
-  geometry_changes_ = GeometryChanges::kRemoved;
+  geometry_changes_ |= GeometryChanges::kRemoved;
   return HWC2::Error::None;
 }
 
@@ -535,8 +535,11 @@ HWC2::Error HWCDisplay::PrepareLayerStack(uint32_t *out_num_types, uint32_t *out
     if (!needs_fb_refresh && composition == kCompositionGPU) {
       composition = kCompositionSDE;
     }
+    HWC2::Composition current_hwc_composition  = hwc_layer->GetCompositionType();
+    // Convert the SDM layer composition to HWC2 type
     hwc_layer->SetComposition(composition);
-    if (hwc_layer->CompositionChanged()) {
+    // Update the changes list only if the HWC2 comp type changed from the previous cycle
+    if (current_hwc_composition != hwc_layer->GetCompositionType()) {
       layer_changes_[hwc_layer->GetId()] = hwc_layer->GetCompositionType();
     }
   }
@@ -1357,6 +1360,7 @@ void HWCDisplay::CloseAcquireFds() {
     auto layer = hwc_layer->GetSDMLayer();
     if (layer->input_buffer->acquire_fence_fd >= 0) {
       close(layer->input_buffer->acquire_fence_fd);
+      layer->input_buffer->acquire_fence_fd = -1;
     }
   }
   int32_t &client_target_acquire_fence =
