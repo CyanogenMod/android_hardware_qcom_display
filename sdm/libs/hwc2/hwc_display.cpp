@@ -29,6 +29,7 @@
 #include <cutils/properties.h>
 #include <map>
 #include <string>
+#include <sstream>
 #include <utility>
 
 #include "hwc_display.h"
@@ -1381,4 +1382,22 @@ void HWCDisplay::CloseAcquireFds() {
   }
 }
 
+std::string HWCDisplay::Dump() {
+  std::ostringstream os;
+  os << "-------------------------------" << std::endl;
+  os << "HWC2 LayerDump:" << std::endl;
+  for (auto layer : layer_set_) {
+    auto sdm_layer = layer->GetSDMLayer();
+    os << "-------------------------------" << std::endl;
+    os << "layer_id: " << layer->GetId() << std::endl;
+    os << "\tz: " << layer->GetZ() << std::endl;
+    os << "\tcomposition: " << to_string(layer->GetCompositionType()).c_str() << std::endl;
+    os << "\tplane_alpha: " << std::to_string(sdm_layer->plane_alpha).c_str() << std::endl;
+    os << "\tformat: " << GetFormatString(sdm_layer->input_buffer->format) << std::endl;
+    os << "\tbuffer_id: " << std::hex << "0x" << sdm_layer->input_buffer->buffer_id << std::dec
+       << std::endl;
+  }
+  os << "-------------------------------" << std::endl;
+  return os.str();
+}
 }  // namespace sdm
