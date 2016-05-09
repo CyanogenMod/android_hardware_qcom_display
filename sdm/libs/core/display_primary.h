@@ -52,7 +52,6 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
   virtual DisplayError SetDisplayMode(uint32_t mode);
-  virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
   virtual bool IsUnderscanSupported();
@@ -69,9 +68,15 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
   virtual void CECMessage(char *message) { }
 
  private:
+  virtual DisplayError PrepareLocked(LayerStack *layer_stack);
   virtual DisplayError CommitLocked(LayerStack *layer_stack);
   virtual DisplayError ControlPartialUpdateLocked(bool enable, uint32_t *pending);
   virtual DisplayError DisablePartialUpdateOneFrameLocked();
+  virtual DisplayError SetMixerResolutionLocked(uint32_t width, uint32_t height);
+
+  bool NeedsMixerReconfiguration(LayerStack *layer_stack, uint32_t *new_mixer_width,
+                                 uint32_t *new_mixer_height);
+  DisplayError ReconfigureMixer(uint32_t width, uint32_t height);
 
   uint32_t idle_timeout_ms_ = 0;
   std::vector<const char *> event_list_ = {"vsync_event", "show_blank_event", "idle_notify",

@@ -58,7 +58,10 @@ class ExtensionInterface {
   virtual DisplayError DestroyPartialUpdate(PartialUpdateInterface *interface) = 0;
 
   virtual DisplayError CreateStrategyExtn(DisplayType type, HWDisplayMode mode,
-                                          HWS3DMode s3d_mode, StrategyInterface **interface) = 0;
+                                          HWS3DMode s3d_mode,
+                                          const HWMixerAttributes &mixer_attributes,
+                                          const DisplayConfigVariableInfo &fb_config,
+                                          StrategyInterface **interface) = 0;
   virtual DisplayError DestroyStrategyExtn(StrategyInterface *interface) = 0;
 
   virtual DisplayError CreateResourceExtn(const HWResourceInfo &hw_resource_info,

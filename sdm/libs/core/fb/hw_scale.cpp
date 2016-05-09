@@ -47,11 +47,16 @@ DisplayError HWScale::Destroy(HWScale *intf) {
 }
 
 void HWScaleV1::SetHWScaleData(const HWScaleData &scale_data, uint32_t index,
-                               mdp_input_layer *mdp_layer) {
+                               mdp_layer_commit_v1 *mdp_commit, HWSubBlockType sub_block_type) {
   if (!scale_data.enable.scale) {
     return;
   }
 
+  if (sub_block_type == kHWDestinationScalar) {
+    return;
+  }
+
+  mdp_input_layer *mdp_layer = &mdp_commit->input_layers[index];
   mdp_layer->flags |= MDP_LAYER_ENABLE_PIXEL_EXT;
   mdp_scale_data *mdp_scale = &scale_data_v1_.at(index);
   mdp_scale->enable_pxl_ext = scale_data.enable.scale;
@@ -84,8 +89,12 @@ void HWScaleV1::SetHWScaleData(const HWScaleData &scale_data, uint32_t index,
   return;
 }
 
-void* HWScaleV1::GetScaleDataRef(uint32_t index) {
-  return &scale_data_v1_.at(index);
+void* HWScaleV1::GetScaleDataRef(uint32_t index, HWSubBlockType sub_block_type) {
+  if (sub_block_type != kHWDestinationScalar) {
+    return &scale_data_v1_.at(index);
+  }
+
+  return NULL;
 }
 
 void HWScaleV1::DumpScaleData(void *mdp_scale) {
@@ -112,14 +121,32 @@ void HWScaleV1::DumpScaleData(void *mdp_scale) {
 }
 
 void HWScaleV2::SetHWScaleData(const HWScaleData &scale_data, uint32_t index,
-                               mdp_input_layer *mdp_layer) {
+                               mdp_layer_commit_v1 *mdp_commit, HWSubBlockType sub_block_type) {
   if (!scale_data.enable.scale && !scale_data.enable.direction_detection &&
       !scale_data.enable.detail_enhance ) {
     return;
   }
 
-  mdp_scale_data_v2 *mdp_scale = &scale_data_v2_.at(index);
-  mdp_layer->flags |= MDP_LAYER_ENABLE_QSEED3_SCALE;
+  mdp_scale_data_v2 *mdp_scale;
+  if (sub_block_type != kHWDestinationScalar) {
+    mdp_input_layer *mdp_layer = &mdp_commit->input_layers[index];
+    mdp_layer->flags |= MDP_LAYER_ENABLE_QSEED3_SCALE;
+    mdp_scale = &scale_data_v2_.at(index);
+  } else {
+    mdp_scale_data_v2 mdp_dest_scale;
+    mdp_destination_scaler_data *dest_scalar =
+      reinterpret_cast<mdp_destination_scaler_data *>(mdp_commit->dest_scaler);
+
+    dest_scalar[index].flags = MDP_DESTSCALER_ENABLE;
+
+    if (scale_data.enable.detail_enhance) {
+      dest_scalar[index].flags |= MDP_DESTSCALER_ENHANCER_UPDATE;
+    }
+
+    dest_scale_data_v2_.insert(std::make_pair(index, mdp_dest_scale));
+    mdp_scale = &dest_scale_data_v2_[index];
+  }
+
   mdp_scale->enable = (scale_data.enable.scale ? ENABLE_SCALE : 0) |
                       (scale_data.enable.direction_detection ? ENABLE_DIRECTION_DETECTION : 0) |
                       (scale_data.enable.detail_enhance ? ENABLE_DETAIL_ENHANCE : 0);
@@ -206,8 +233,12 @@ void HWScaleV2::SetHWScaleData(const HWScaleData &scale_data, uint32_t index,
   return;
 }
 
-void* HWScaleV2::GetScaleDataRef(uint32_t index) {
-  return &scale_data_v2_.at(index);
+void* HWScaleV2::GetScaleDataRef(uint32_t index, HWSubBlockType sub_block_type) {
+  if (sub_block_type != kHWDestinationScalar) {
+    return &scale_data_v2_.at(index);
+  } else {
+    return &dest_scale_data_v2_[index];
+  }
 }
 
 uint32_t HWScaleV2::GetMDPScalingFilter(HWScalingFilter filter_cfg) {

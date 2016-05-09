@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -113,8 +113,6 @@ DisplayError DisplayVirtual::SetDisplayState(DisplayState state) {
 }
 
 DisplayError DisplayVirtual::SetActiveConfigLocked(DisplayConfigVariableInfo *variable_info) {
-  DisplayError error = kErrorNone;
-
   if (!variable_info) {
     return kErrorParameters;
   }
@@ -123,19 +121,17 @@ DisplayError DisplayVirtual::SetActiveConfigLocked(DisplayConfigVariableInfo *va
   display_attributes_.y_pixels = variable_info->y_pixels;
   display_attributes_.fps = variable_info->fps;
 
+  HWMixerAttributes mixer_attributes;
+  mixer_attributes.width = variable_info->x_pixels;;
+  mixer_attributes.height = variable_info->y_pixels;
   // if display is already connected, unregister display from composition manager and register
   // the display with new configuration.
   if (display_comp_ctx_) {
     comp_manager_->UnregisterDisplay(display_comp_ctx_);
   }
 
-  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_, hw_panel_info_,
-                                         &display_comp_ctx_);
-  if (error != kErrorNone) {
-    return error;
-  }
-
-  return error;
+  return comp_manager_->RegisterDisplay(display_type_, display_attributes_, hw_panel_info_,
+                                        mixer_attributes, fb_config_, &display_comp_ctx_);
 }
 
 DisplayError DisplayVirtual::SetVSyncState(bool enable) {
@@ -153,12 +149,6 @@ DisplayError DisplayVirtual::SetMaxMixerStages(uint32_t max_mixer_stages) {
 DisplayError DisplayVirtual::SetDisplayMode(uint32_t mode) {
   SCOPE_LOCK(locker_);
   return DisplayBase::SetDisplayMode(mode);
-}
-
-DisplayError DisplayVirtual::IsScalingValid(const LayerRect &crop, const LayerRect &dst,
-                                            bool rotate90) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::IsScalingValid(crop, dst, rotate90);
 }
 
 DisplayError DisplayVirtual::GetRefreshRateRange(uint32_t *min_refresh_rate,

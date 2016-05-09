@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -51,7 +51,6 @@ class DisplayVirtual : public DisplayBase, DumpImpl {
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
   virtual DisplayError SetDisplayMode(uint32_t mode);
-  virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
   virtual bool IsUnderscanSupported();
@@ -64,7 +63,6 @@ class DisplayVirtual : public DisplayBase, DumpImpl {
     return kErrorNotSupported;
   }
   virtual DisplayError SetActiveConfigLocked(DisplayConfigVariableInfo *variable_info);
-  HWDisplayAttributes display_attributes_;
 };
 
 }  // namespace sdm

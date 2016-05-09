@@ -164,12 +164,6 @@ DisplayError DisplayHDMI::SetDisplayMode(uint32_t mode) {
   return DisplayBase::SetDisplayMode(mode);
 }
 
-DisplayError DisplayHDMI::IsScalingValid(const LayerRect &crop, const LayerRect &dst,
-                                         bool rotate90) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::IsScalingValid(crop, dst, rotate90);
-}
-
 DisplayError DisplayHDMI::GetRefreshRateRange(uint32_t *min_refresh_rate,
                                               uint32_t *max_refresh_rate) {
   SCOPE_LOCK(locker_);
@@ -319,9 +313,6 @@ DisplayError DisplayHDMI::SetCursorPosition(int x, int y) {
 void DisplayHDMI::SetS3DMode(LayerStack *layer_stack) {
   uint32_t s3d_layer_count = 0;
   HWS3DMode s3d_mode = kS3DModeNone;
-  HWPanelInfo panel_info;
-  HWDisplayAttributes display_attributes;
-  uint32_t active_index = 0;
   uint32_t layer_count = UINT32(layer_stack->layers.size());
 
   // S3D mode is supported for the following scenarios:
@@ -356,15 +347,7 @@ void DisplayHDMI::SetS3DMode(LayerStack *layer_stack) {
     layer_stack->flags.s3d_mode_present = true;
   }
 
-  hw_intf_->GetHWPanelInfo(&panel_info);
-  hw_intf_->GetActiveConfig(&active_index);
-  hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
-
-  if (panel_info != hw_panel_info_ || display_attributes != display_attributes_) {
-    comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, panel_info);
-    hw_panel_info_ = panel_info;
-    display_attributes_ = display_attributes;
-  }
+  DisplayBase::ReconfigureDisplay();
 }
 
 void DisplayHDMI::CECMessage(char *message) {

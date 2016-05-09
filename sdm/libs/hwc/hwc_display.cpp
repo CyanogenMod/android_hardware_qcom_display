@@ -83,13 +83,6 @@ int HWCDisplay::Init() {
     swap_interval_zero_ = true;
   }
 
-  framebuffer_config_ = new DisplayConfigVariableInfo();
-  if (!framebuffer_config_) {
-    DLOGV("Failed to allocate memory for custom framebuffer config.");
-    core_intf_->DestroyDisplay(display_intf_);
-    return -EINVAL;
-  }
-
   int blit_enabled = 0;
   HWCDebugHandler::Get()->GetProperty("persist.hwc.blit.comp", &blit_enabled);
   if (needs_blit_ && blit_enabled) {
@@ -125,8 +118,6 @@ int HWCDisplay::Deinit() {
     DLOGE("Display destroy failed. Error = %d", error);
     return -EINVAL;
   }
-
-  delete framebuffer_config_;
 
   if (blit_engine_) {
     blit_engine_->DeInit();
@@ -224,11 +215,17 @@ int HWCDisplay::GetDisplayConfigs(uint32_t *configs, size_t *num_configs) {
   return 0;
 }
 
-int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values) {
-  DisplayConfigVariableInfo variable_config = *framebuffer_config_;
+int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *display_attributes,
+                                     int32_t *values) {
+  DisplayConfigVariableInfo variable_config;
+  DisplayError error = display_intf_->GetFrameBufferConfig(&variable_config);
+  if (error != kErrorNone) {
+    DLOGV("Get variable config failed. Error = %d", error);
+    return -EINVAL;
+  }
 
-  for (int i = 0; attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
-    switch (attributes[i]) {
+  for (int i = 0; display_attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
+    switch (display_attributes[i]) {
     case HWC_DISPLAY_VSYNC_PERIOD:
       values[i] = INT32(variable_config.vsync_period_ns);
       break;
@@ -245,7 +242,7 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
       values[i] = INT32(variable_config.y_dpi * 1000.0f);
       break;
     default:
-      DLOGW("Spurious attribute type = %d", attributes[i]);
+      DLOGW("Spurious attribute type = %d", display_attributes[i]);
       return -EINVAL;
     }
   }
@@ -259,6 +256,10 @@ int HWCDisplay::GetActiveConfig() {
 
 int HWCDisplay::SetActiveConfig(int index) {
   return -1;
+}
+
+DisplayError HWCDisplay::SetMixerResolution(uint32_t width, uint32_t height) {
+  return kErrorNotSupported;
 }
 
 void HWCDisplay::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type) {
@@ -450,7 +451,6 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     }
 
     hwc_rect_t scaled_display_frame = hwc_layer.displayFrame;
-    ScaleDisplayFrame(&scaled_display_frame);
     ApplyScanAdjustment(&scaled_display_frame);
 
     SetRect(scaled_display_frame, &layer->dst_rect);
@@ -1032,108 +1032,49 @@ const char *HWCDisplay::GetDisplayString() {
 }
 
 int HWCDisplay::SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels) {
-  if (x_pixels <= 0 || y_pixels <= 0) {
-    DLOGV("Unsupported config: x_pixels=%d, y_pixels=%d", x_pixels, y_pixels);
-    return -EINVAL;
-  }
-
-  if (framebuffer_config_->x_pixels == x_pixels && framebuffer_config_->y_pixels == y_pixels) {
-    return 0;
-  }
-
-  DisplayConfigVariableInfo active_config;
-  uint32_t active_config_index = 0;
-  display_intf_->GetActiveConfig(&active_config_index);
-  DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
+  DisplayConfigVariableInfo fb_config;
+  DisplayError error = display_intf_->GetFrameBufferConfig(&fb_config);
   if (error != kErrorNone) {
-    DLOGV("GetConfig variable info failed. Error = %d", error);
+    DLOGV("Get frame buffer config failed. Error = %d", error);
     return -EINVAL;
   }
 
-  if (active_config.x_pixels <= 0 || active_config.y_pixels <= 0) {
-    DLOGV("Invalid panel resolution (%dx%d)", active_config.x_pixels, active_config.y_pixels);
-    return -EINVAL;
-  }
+  fb_config.x_pixels = x_pixels;
+  fb_config.y_pixels = y_pixels;
 
-  // Create rects to represent the new source and destination crops
-  LayerRect crop = LayerRect(0, 0, FLOAT(x_pixels), FLOAT(y_pixels));
-  LayerRect dst = LayerRect(0, 0, FLOAT(active_config.x_pixels), FLOAT(active_config.y_pixels));
-  // Set rotate90 to false since this is taken care of during regular composition.
-  bool rotate90 = false;
-  error = display_intf_->IsScalingValid(crop, dst, rotate90);
+  error = display_intf_->SetFrameBufferConfig(fb_config);
   if (error != kErrorNone) {
-    DLOGV("Unsupported resolution: (%dx%d)", x_pixels, y_pixels);
+    DLOGV("Set frame buffer config failed. Error = %d", error);
     return -EINVAL;
   }
 
-  framebuffer_config_->x_pixels = x_pixels;
-  framebuffer_config_->y_pixels = y_pixels;
-  framebuffer_config_->vsync_period_ns = active_config.vsync_period_ns;
-  framebuffer_config_->x_dpi = active_config.x_dpi;
-  framebuffer_config_->y_dpi = active_config.y_dpi;
-
-  DLOGI("New framebuffer resolution (%dx%d)", framebuffer_config_->x_pixels,
-        framebuffer_config_->y_pixels);
+  DLOGI("New framebuffer resolution (%dx%d)", x_pixels, y_pixels);
 
   return 0;
 }
 
 void HWCDisplay::GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
-  *x_pixels = framebuffer_config_->x_pixels;
-  *y_pixels = framebuffer_config_->y_pixels;
+  DisplayConfigVariableInfo fb_config;
+  display_intf_->GetFrameBufferConfig(&fb_config);
+
+  *x_pixels = fb_config.x_pixels;
+  *y_pixels = fb_config.y_pixels;
 }
 
-void HWCDisplay::ScaleDisplayFrame(hwc_rect_t *display_frame) {
-  if (!IsFrameBufferScaled()) {
-    return;
-  }
-
-  uint32_t active_config_index = 0;
-  display_intf_->GetActiveConfig(&active_config_index);
-  DisplayConfigVariableInfo active_config;
-  DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
-  if (error != kErrorNone) {
-    DLOGE("GetConfig variable info failed. Error = %d", error);
-    return;
-  }
-
-  float custom_x_pixels = FLOAT(framebuffer_config_->x_pixels);
-  float custom_y_pixels = FLOAT(framebuffer_config_->y_pixels);
-  float active_x_pixels = FLOAT(active_config.x_pixels);
-  float active_y_pixels = FLOAT(active_config.y_pixels);
-  float x_pixels_ratio = active_x_pixels / custom_x_pixels;
-  float y_pixels_ratio = active_y_pixels / custom_y_pixels;
-  float layer_width = FLOAT(display_frame->right - display_frame->left);
-  float layer_height = FLOAT(display_frame->bottom - display_frame->top);
-
-  display_frame->left = INT(x_pixels_ratio * FLOAT(display_frame->left));
-  display_frame->top = INT(y_pixels_ratio * FLOAT(display_frame->top));
-  display_frame->right = INT(FLOAT(display_frame->left) + layer_width * x_pixels_ratio);
-  display_frame->bottom = INT(FLOAT(display_frame->top) + layer_height * y_pixels_ratio);
+DisplayError HWCDisplay::GetMixerResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
+  return display_intf_->GetMixerResolution(x_pixels, y_pixels);
 }
 
-bool HWCDisplay::IsFrameBufferScaled() {
-  if (framebuffer_config_->x_pixels == 0 || framebuffer_config_->y_pixels == 0) {
-    return false;
-  }
-  uint32_t panel_x_pixels = 0;
-  uint32_t panel_y_pixels = 0;
-  GetPanelResolution(&panel_x_pixels, &panel_y_pixels);
-  return (framebuffer_config_->x_pixels != panel_x_pixels) ||
-          (framebuffer_config_->y_pixels != panel_y_pixels);
-}
 
 void HWCDisplay::GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
-  DisplayConfigVariableInfo active_config;
-  uint32_t active_config_index = 0;
-  display_intf_->GetActiveConfig(&active_config_index);
-  DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
-  if (error != kErrorNone) {
-    DLOGE("GetConfig variable info failed. Error = %d", error);
-    return;
-  }
-  *x_pixels = active_config.x_pixels;
-  *y_pixels = active_config.y_pixels;
+  DisplayConfigVariableInfo display_config;
+  uint32_t active_index = 0;
+
+  display_intf_->GetActiveConfig(&active_index);
+  display_intf_->GetConfig(active_index, &display_config);
+
+  *x_pixels = display_config.x_pixels;
+  *y_pixels = display_config.y_pixels;
 }
 
 int HWCDisplay::SetDisplayStatus(uint32_t display_status) {
@@ -1355,8 +1296,9 @@ int HWCDisplay::GetDisplayConfigCount(uint32_t *count) {
   return display_intf_->GetNumVariableInfoConfigs(count) == kErrorNone ? 0 : -1;
 }
 
-int HWCDisplay::GetDisplayAttributesForConfig(int config, DisplayConfigVariableInfo *attributes) {
-  return display_intf_->GetConfig(UINT32(config), attributes) == kErrorNone ? 0 : -1;
+int HWCDisplay::GetDisplayAttributesForConfig(int config,
+                                            DisplayConfigVariableInfo *display_attributes) {
+  return display_intf_->GetConfig(UINT32(config), display_attributes) == kErrorNone ? 0 : -1;
 }
 
 // TODO(user): HWC needs to know updating for dyn_fps, cpu hint features,

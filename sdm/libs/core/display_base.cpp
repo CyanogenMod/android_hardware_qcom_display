@@ -56,6 +56,18 @@ DisplayError DisplayBase::Init() {
   uint32_t active_index = 0;
   hw_intf_->GetActiveConfig(&active_index);
   hw_intf_->GetDisplayAttributes(active_index, &display_attributes_);
+  fb_config_ = display_attributes_;
+
+  HWMixerAttributes mixer_attributes;
+  error = hw_intf_->GetMixerAttributes(&mixer_attributes);
+  if (error != kErrorNone) {
+    return error;
+  }
+  mixer_attributes_ = mixer_attributes;
+
+  // Override x_pixels and y_pixels of frame buffer with mixer width and height
+  fb_config_.x_pixels = mixer_attributes.width;
+  fb_config_.y_pixels = mixer_attributes.height;
 
   HWScaleLutInfo lut_info = {};
   error = comp_manager_->GetScaleLutConfig(&lut_info);
@@ -67,8 +79,8 @@ DisplayError DisplayBase::Init() {
     goto CleanupOnError;
   }
 
-  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_,
-                                         hw_panel_info_, &display_comp_ctx_);
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_, hw_panel_info_,
+                                         mixer_attributes, fb_config_, &display_comp_ctx_);
   if (error != kErrorNone) {
     goto CleanupOnError;
   }
@@ -161,17 +173,24 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
     return kErrorParameters;
   }
 
-  auto gpu_target_layer_dst_xpixels = gpu_target_layer->dst_rect.right;
-  auto gpu_target_layer_dst_ypixels = gpu_target_layer->dst_rect.bottom;
+  float layer_mixer_width = FLOAT(mixer_attributes_.width);
+  float layer_mixer_height = FLOAT(mixer_attributes_.height);
+  float fb_width = FLOAT(fb_config_.x_pixels);
+  float fb_height = FLOAT(fb_config_.y_pixels);
+  LayerRect src_domain = (LayerRect){0.0f, 0.0f, fb_width, fb_height};
+  LayerRect dst_domain = (LayerRect){0.0f, 0.0f, layer_mixer_width, layer_mixer_height};
+  LayerRect out_rect = gpu_target_layer->dst_rect;
 
-  HWDisplayAttributes display_attrib;
-  uint32_t active_index = 0;
-  hw_intf_->GetActiveConfig(&active_index);
-  hw_intf_->GetDisplayAttributes(active_index, &display_attrib);
+  ScaleRect(src_domain, dst_domain, gpu_target_layer->dst_rect, &out_rect);
 
-  if (gpu_target_layer_dst_xpixels > display_attrib.x_pixels ||
-    gpu_target_layer_dst_ypixels > display_attrib.y_pixels) {
-    DLOGE("GPU target layer dst rect is not with in limits");
+  auto gpu_target_layer_dst_xpixels = out_rect.right - out_rect.left;
+  auto gpu_target_layer_dst_ypixels = out_rect.bottom - out_rect.top;
+
+  if (gpu_target_layer_dst_xpixels > mixer_attributes_.width ||
+    gpu_target_layer_dst_ypixels > mixer_attributes_.height) {
+    DLOGE("GPU target layer dst rect is not with in limits gpu wxh %fx%f mixer wxh %dx%d",
+    gpu_target_layer_dst_xpixels, gpu_target_layer_dst_ypixels, mixer_attributes_.width,
+    mixer_attributes_.height);
     return kErrorParameters;
   }
 
@@ -255,13 +274,13 @@ DisplayError DisplayBase::PrepareLocked(LayerStack *layer_stack) {
 DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
   SCOPE_LOCK(locker_);
 
-  if (!layer_stack) {
-    return kErrorParameters;
-  }
-
   if (!active_) {
     pending_commit_ = false;
     return kErrorPermission;
+  }
+
+  if (!layer_stack) {
+    return kErrorParameters;
   }
 
   if (!pending_commit_) {
@@ -481,26 +500,7 @@ DisplayError DisplayBase::SetActiveConfigLocked(uint32_t index) {
     return error;
   }
 
-  HWDisplayAttributes attrib;
-  error = hw_intf_->GetDisplayAttributes(index, &attrib);
-  if (error != kErrorNone) {
-    return error;
-  }
-
-  hw_intf_->GetHWPanelInfo(&hw_panel_info_);
-
-  if (display_comp_ctx_) {
-    comp_manager_->UnregisterDisplay(display_comp_ctx_);
-  }
-
-  error = comp_manager_->RegisterDisplay(display_type_, attrib, hw_panel_info_,
-                                         &display_comp_ctx_);
-
-  if (error == kErrorNone) {
-    DisablePartialUpdateOneFrameLocked();
-  }
-
-  return error;
+  return ReconfigureDisplay();
 }
 
 DisplayError DisplayBase::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
@@ -532,11 +532,6 @@ DisplayError DisplayBase::DisablePartialUpdateOneFrame() {
 
 DisplayError DisplayBase::SetDisplayMode(uint32_t mode) {
   return kErrorNotSupported;
-}
-
-DisplayError DisplayBase::IsScalingValid(const LayerRect &crop, const LayerRect &dst,
-                                         bool rotate90) {
-  return comp_manager_->ValidateScaling(crop, dst, rotate90);
 }
 
 DisplayError DisplayBase::SetPanelBrightness(int level) {
@@ -869,6 +864,132 @@ DisplayError DisplayBase::SetVSyncState(bool enable) {
     }
   }
   return error;
+}
+
+DisplayError DisplayBase::ReconfigureDisplay() {
+  DisplayError error = kErrorNone;
+  HWDisplayAttributes display_attributes;
+  HWMixerAttributes mixer_attributes;
+  HWPanelInfo hw_panel_info;
+  uint32_t active_index = 0;
+
+  error = hw_intf_->GetActiveConfig(&active_index);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  error = hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  error = hw_intf_->GetMixerAttributes(&mixer_attributes);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  error = hw_intf_->GetHWPanelInfo(&hw_panel_info);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  if (display_attributes == display_attributes_ && mixer_attributes == mixer_attributes_ &&
+      hw_panel_info == hw_panel_info_) {
+    return kErrorNone;
+  }
+
+  error = comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, hw_panel_info,
+                                            mixer_attributes, fb_config_);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  if (mixer_attributes != mixer_attributes_) {
+    DisablePartialUpdateOneFrameLocked();
+  }
+
+  display_attributes_ = display_attributes;
+  mixer_attributes_ = mixer_attributes;
+  hw_panel_info_ = hw_panel_info;
+
+  return kErrorNone;
+}
+
+DisplayError DisplayBase::SetMixerResolution(uint32_t width, uint32_t height) {
+  SCOPE_LOCK(locker_);
+  return SetMixerResolutionLocked(width, height);
+}
+
+DisplayError DisplayBase::GetMixerResolution(uint32_t *width, uint32_t *height) {
+  SCOPE_LOCK(locker_);
+  return GetMixerResolutionLocked(width, height);
+}
+
+DisplayError DisplayBase::GetMixerResolutionLocked(uint32_t *width, uint32_t *height) {
+  if (!width || !height) {
+    return kErrorParameters;
+  }
+
+  *width = mixer_attributes_.width;
+  *height = mixer_attributes_.height;
+
+  return kErrorNone;
+}
+
+DisplayError DisplayBase::SetFrameBufferConfig(const DisplayConfigVariableInfo &variable_info) {
+  SCOPE_LOCK(locker_);
+  return SetFrameBufferConfigLocked(variable_info);
+}
+
+DisplayError DisplayBase::SetFrameBufferConfigLocked(
+                                   const DisplayConfigVariableInfo &variable_info) {
+  uint32_t width = variable_info.x_pixels;
+  uint32_t height = variable_info.y_pixels;
+
+  if (width == 0 || height == 0) {
+    DLOGE("Unsupported resolution: (%dx%d)", width, height);
+    return kErrorParameters;
+  }
+
+  // Create rects to represent the new source and destination crops
+  LayerRect crop = LayerRect(0, 0, FLOAT(width), FLOAT(height));
+  LayerRect dst = LayerRect(0, 0, FLOAT(mixer_attributes_.width), FLOAT(mixer_attributes_.height));
+  // Set rotate90 to false since this is taken care of during regular composition.
+  bool rotate90 = false;
+
+  DisplayError error = comp_manager_->ValidateScaling(crop, dst, rotate90);
+  if (error != kErrorNone) {
+    DLOGE("Unsupported resolution: (%dx%d)", width, height);
+    return kErrorParameters;
+  }
+
+  error =  comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes_, hw_panel_info_,
+                                             mixer_attributes_, variable_info);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  fb_config_.x_pixels = width;
+  fb_config_.y_pixels = height;
+
+  DLOGI("New framebuffer resolution (%dx%d)", fb_config_.x_pixels, fb_config_.y_pixels);
+
+  return kErrorNone;
+}
+
+DisplayError DisplayBase::GetFrameBufferConfig(DisplayConfigVariableInfo *variable_info) {
+  SCOPE_LOCK(locker_);
+  return GetFrameBufferConfigLocked(variable_info);
+}
+
+DisplayError DisplayBase::GetFrameBufferConfigLocked(DisplayConfigVariableInfo *variable_info) {
+  if (!variable_info) {
+    return kErrorParameters;
+  }
+
+  *variable_info = fb_config_;
+
+  return kErrorNone;
 }
 
 }  // namespace sdm

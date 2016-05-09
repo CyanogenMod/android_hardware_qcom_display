@@ -53,7 +53,6 @@ class DisplayHDMI : public DisplayBase, DumpImpl, HWEventHandler {
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
   virtual DisplayError SetDisplayMode(uint32_t mode);
-  virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
   virtual bool IsUnderscanSupported();

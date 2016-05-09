@@ -356,13 +356,6 @@ class DisplayInterface {
   */
   virtual DisplayError SetDisplayMode(uint32_t mode) = 0;
 
-  /*! @brief Method to determine whether scaling for a custom resolution is valid.
-
-    @return \link DisplayError \endlink
-  */
-  virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst,
-                                      bool rotate90) = 0;
-
   /*! @brief Method to get the min and max refresh rate of a display.
 
     @param[out] min and max refresh rate.
@@ -471,6 +464,40 @@ class DisplayInterface {
     @return \link DisplayError \endlink
   */
   virtual DisplayError GetPanelBrightness(int *level) = 0;
+
+  /*! @brief Method to set layer mixer resolution.
+
+    @param[in] width layer mixer width
+    @param[in] height layer mixer height
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError SetMixerResolution(uint32_t width, uint32_t height) = 0;
+
+  /*! @brief Method to get layer mixer resolution.
+
+    @param[out] width layer mixer width
+    @param[out] height layer mixer height
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError GetMixerResolution(uint32_t *width, uint32_t *height) = 0;
+
+  /*! @brief Method to set  frame buffer configuration.
+
+    @param[in] variable_info \link DisplayConfigVariableInfo \endlink
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError SetFrameBufferConfig(const DisplayConfigVariableInfo &variable_info) = 0;
+
+  /*! @brief Method to get frame buffer configuration.
+
+    @param[out] variable_info \link DisplayConfigVariableInfo \endlink
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError GetFrameBufferConfig(DisplayConfigVariableInfo *variable_info) = 0;
 
  protected:
   virtual ~DisplayInterface() { }
