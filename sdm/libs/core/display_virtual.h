@@ -40,7 +40,6 @@ class DisplayVirtual : public DisplayBase, DumpImpl {
                  RotatorInterface *rotator_intf);
   virtual DisplayError Init();
   virtual DisplayError Deinit();
-  virtual DisplayError Commit(LayerStack *layer_stack);
   virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);

@@ -86,9 +86,9 @@ DisplayError DisplayPrimary::Deinit() {
   return error;
 }
 
-DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
-  SCOPE_LOCK(locker_);
+DisplayError DisplayPrimary::CommitLocked(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
+
   HWPanelInfo panel_info;
   HWDisplayAttributes display_attributes;
   uint32_t active_index = 0;
@@ -100,7 +100,7 @@ DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
 
   bool set_idle_timeout = comp_manager_->CanSetIdleTimeout(display_comp_ctx_);
 
-  error = DisplayBase::Commit(layer_stack);
+  error = DisplayBase::CommitLocked(layer_stack);
   if (error != kErrorNone) {
     return error;
   }

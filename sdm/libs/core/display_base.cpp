@@ -180,25 +180,24 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
 
 DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   SCOPE_LOCK(locker_);
+
+  if (!active_) {
+    return kErrorPermission;
+  }
+
+  if (!layer_stack) {
+    return kErrorParameters;
+  }
+
   return PrepareLocked(layer_stack);
 }
 
 DisplayError DisplayBase::PrepareLocked(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
 
-  if (!layer_stack) {
-    return kErrorParameters;
-  }
-
-  pending_commit_ = false;
-
   error = ValidateGPUTarget(layer_stack);
   if (error != kErrorNone) {
     return error;
-  }
-
-  if (!active_) {
-    return kErrorPermission;
   }
 
   if (color_mgr_ && color_mgr_->NeedsPartialUpdateDisable()) {
@@ -254,13 +253,14 @@ DisplayError DisplayBase::PrepareLocked(LayerStack *layer_stack) {
 }
 
 DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
-  DisplayError error = kErrorNone;
+  SCOPE_LOCK(locker_);
 
   if (!layer_stack) {
     return kErrorParameters;
   }
 
   if (!active_) {
+    pending_commit_ = false;
     return kErrorPermission;
   }
 
@@ -270,6 +270,12 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
   }
 
   pending_commit_ = false;
+
+  return CommitLocked(layer_stack);
+}
+
+DisplayError DisplayBase::CommitLocked(LayerStack *layer_stack) {
+  DisplayError error = kErrorNone;
 
   // Layer stack attributes has changed, need to Reconfigure, currently in use for Hybrid Comp
   if (layer_stack->flags.attributes_changed) {

@@ -69,11 +69,6 @@ DisplayError DisplayVirtual::Deinit() {
   return error;
 }
 
-DisplayError DisplayVirtual::Commit(LayerStack *layer_stack) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::Commit(layer_stack);
-}
-
 DisplayError DisplayVirtual::Flush() {
   SCOPE_LOCK(locker_);
   return DisplayBase::Flush();

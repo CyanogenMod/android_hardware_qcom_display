@@ -55,7 +55,7 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError Init();
   virtual DisplayError Deinit();
   DisplayError Prepare(LayerStack *layer_stack) final;
-  virtual DisplayError Commit(LayerStack *layer_stack);
+  DisplayError Commit(LayerStack *layer_stack) final;
   virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
@@ -88,6 +88,7 @@ class DisplayBase : public DisplayInterface {
 
  protected:
   virtual DisplayError PrepareLocked(LayerStack *layer_stack);
+  virtual DisplayError CommitLocked(LayerStack *layer_stack);
   virtual DisplayError SetActiveConfigLocked(uint32_t index);
   virtual DisplayError SetActiveConfigLocked(DisplayConfigVariableInfo *variable_info) {
     return kErrorNotSupported;

@@ -41,7 +41,6 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
                  RotatorInterface *rotator_intf);
   virtual DisplayError Init();
   virtual DisplayError Deinit();
-  virtual DisplayError Commit(LayerStack *layer_stack);
   virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
@@ -70,6 +69,7 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
   virtual void CECMessage(char *message) { }
 
  private:
+  virtual DisplayError CommitLocked(LayerStack *layer_stack);
   virtual DisplayError ControlPartialUpdateLocked(bool enable, uint32_t *pending);
   virtual DisplayError DisablePartialUpdateOneFrameLocked();
 

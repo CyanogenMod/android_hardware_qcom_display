@@ -112,11 +112,6 @@ DisplayError DisplayHDMI::PrepareLocked(LayerStack *layer_stack) {
   return DisplayBase::PrepareLocked(layer_stack);
 }
 
-DisplayError DisplayHDMI::Commit(LayerStack *layer_stack) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::Commit(layer_stack);
-}
-
 DisplayError DisplayHDMI::Flush() {
   SCOPE_LOCK(locker_);
   return DisplayBase::Flush();
