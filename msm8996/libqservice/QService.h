@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2012-2013, 2016, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -50,8 +50,8 @@ public:
     virtual android::status_t dispatch(uint32_t command,
             const android::Parcel* data,
             android::Parcel* reply);
-    void onHdmiHotplug(int connected);
-    void onCECMessageReceived(char *msg, ssize_t len);
+    virtual void onHdmiHotplug(int connected);
+    virtual void onCECMessageReceived(char *msg, ssize_t len);
     static void init();
 private:
     QService();

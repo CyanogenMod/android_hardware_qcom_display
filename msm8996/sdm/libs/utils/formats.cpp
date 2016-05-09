@@ -68,5 +68,51 @@ bool Is10BitFormat(LayerBufferFormat format) {
   }
 }
 
+const char *GetFormatString(const LayerBufferFormat &format) {
+  switch (format) {
+  case kFormatARGB8888:                 return "ARGB_8888";
+  case kFormatRGBA8888:                 return "RGBA_8888";
+  case kFormatBGRA8888:                 return "BGRA_8888";
+  case kFormatXRGB8888:                 return "XRGB_8888";
+  case kFormatRGBX8888:                 return "RGBX_8888";
+  case kFormatBGRX8888:                 return "BGRX_8888";
+  case kFormatRGBA5551:                 return "RGBA_5551";
+  case kFormatRGBA4444:                 return "RGBA_4444";
+  case kFormatRGB888:                   return "RGB_888";
+  case kFormatBGR888:                   return "BGR_888";
+  case kFormatRGB565:                   return "RGB_565";
+  case kFormatBGR565:                   return "BGR_565";
+  case kFormatRGBA8888Ubwc:             return "RGBA_8888_UBWC";
+  case kFormatRGBX8888Ubwc:             return "RGBX_8888_UBWC";
+  case kFormatBGR565Ubwc:               return "BGR_565_UBWC";
+  case kFormatYCbCr420Planar:           return "Y_CB_CR_420";
+  case kFormatYCrCb420Planar:           return "Y_CR_CB_420";
+  case kFormatYCrCb420PlanarStride16:   return "Y_CR_CB_420_STRIDE16";
+  case kFormatYCbCr420SemiPlanar:       return "Y_CBCR_420";
+  case kFormatYCrCb420SemiPlanar:       return "Y_CRCB_420";
+  case kFormatYCbCr420SemiPlanarVenus:  return "Y_CBCR_420_VENUS";
+  case kFormatYCrCb420SemiPlanarVenus:  return "Y_CRCB_420_VENUS";
+  case kFormatYCbCr422H1V2SemiPlanar:   return "Y_CBCR_422_H1V2";
+  case kFormatYCrCb422H1V2SemiPlanar:   return "Y_CRCB_422_H1V2";
+  case kFormatYCbCr422H2V1SemiPlanar:   return "Y_CBCR_422_H2V1";
+  case kFormatYCrCb422H2V1SemiPlanar:   return "Y_CRCB_422_H2V2";
+  case kFormatYCbCr420SPVenusUbwc:      return "Y_CBCR_420_VENUS_UBWC";
+  case kFormatYCbCr422H2V1Packed:       return "YCBYCR_422_H2V1";
+  case kFormatRGBA1010102:              return "RGBA_1010102";
+  case kFormatARGB2101010:              return "ARGB_2101010";
+  case kFormatRGBX1010102:              return "RGBX_1010102";
+  case kFormatXRGB2101010:              return "XRGB_2101010";
+  case kFormatBGRA1010102:              return "BGRA_1010102";
+  case kFormatABGR2101010:              return "ABGR_2101010";
+  case kFormatBGRX1010102:              return "BGRX_1010102";
+  case kFormatXBGR2101010:              return "XBGR_2101010";
+  case kFormatRGBA1010102Ubwc:          return "RGBA_1010102_UBWC";
+  case kFormatRGBX1010102Ubwc:          return "RGBX_1010102_UBWC";
+  case kFormatYCbCr420P010:             return "Y_CBCR_420_P010";
+  case kFormatYCbCr420TP10Ubwc:         return "Y_CBCR_420_TP10_UBWC";
+  default:                              return "UNKNOWN";
+  }
+}
+
 }  // namespace sdm
 

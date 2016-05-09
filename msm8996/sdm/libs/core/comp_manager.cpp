@@ -219,7 +219,7 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
 
   // Avoid idle fallback, if there is only one app layer.
   // TODO(user): App layer count will change for hybrid composition
-  uint32_t app_layer_count = hw_layers->info.stack->layer_count - 1;
+  uint32_t app_layer_count = UINT32(hw_layers->info.stack->layers.size()) - 1;
   if ((app_layer_count > 1 && display_comp_ctx->idle_fallback) || display_comp_ctx->fallback_) {
     // Handle the idle timeout by falling back
     constraints->safe_mode = true;
@@ -433,9 +433,9 @@ bool CompManager::SupportLayerAsCursor(Handle comp_handle, HWLayers *hw_layers) 
     return supported;
   }
 
-  for (int32_t i = INT32(layer_stack->layer_count - 1); i >= 0; i--) {
-    Layer &layer = layer_stack->layers[i];
-    if (layer.composition == kCompositionGPUTarget) {
+  for (int32_t i = INT32(layer_stack->layers.size() - 1); i >= 0; i--) {
+    Layer *layer = layer_stack->layers.at(UINT32(i));
+    if (layer->composition == kCompositionGPUTarget) {
       gpu_index = i;
       break;
     }
@@ -443,9 +443,9 @@ bool CompManager::SupportLayerAsCursor(Handle comp_handle, HWLayers *hw_layers) 
   if (gpu_index <= 0) {
     return supported;
   }
-  Layer &cursor_layer = layer_stack->layers[gpu_index - 1];
-  if (cursor_layer.flags.cursor && resource_intf_->ValidateCursorConfig(display_resource_ctx,
-                                   cursor_layer, true) == kErrorNone) {
+  Layer *cursor_layer = layer_stack->layers.at(UINT32(gpu_index) - 1);
+  if (cursor_layer->flags.cursor && resource_intf_->ValidateCursorConfig(display_resource_ctx,
+                                    cursor_layer, true) == kErrorNone) {
     supported = true;
   }
 

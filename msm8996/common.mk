@@ -1,6 +1,8 @@
 #Common headers
 display_top := $(call my-dir)
 
+use_hwc2 := false
+
 common_includes := $(display_top)/libqdutils
 common_includes += $(display_top)/libqservice
 common_includes += $(display_top)/libcopybit
@@ -37,13 +39,10 @@ common_deps  :=
 kernel_includes :=
 
 # Executed only on QCOM BSPs
-ifeq ($(TARGET_USES_QCOM_BSP),true)
+#ifeq ($(TARGET_USES_QCOM_BSP),true)
 # Enable QCOM Display features
-    common_flags += -DQCOM_BSP
-endif
-ifneq ($(call is-platform-sdk-version-at-least,18),true)
-    common_flags += -DANDROID_JELLYBEAN_MR1=1
-endif
+#    common_flags += -DQTI_BSP
+#endif
 
 ifeq ($(TARGET_COMPILE_WITH_MSM_KERNEL),true)
 # This check is to pick the kernel headers from the right location.

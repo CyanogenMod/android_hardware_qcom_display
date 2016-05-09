@@ -26,6 +26,7 @@
 #define __HW_INFO_H__
 
 #include <core/sdm_types.h>
+#include <core/core_interface.h>
 #include <private/hw_info_types.h>
 #include <linux/msm_mdp.h>
 #include "hw_info_interface.h"
@@ -39,6 +40,7 @@ namespace sdm {
 class HWInfo: public HWInfoInterface {
  public:
   virtual DisplayError GetHWResourceInfo(HWResourceInfo *hw_resource);
+  virtual DisplayError GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_disp_info);
 
  private:
   virtual DisplayError GetHWRotatorInfo(HWResourceInfo *hw_resource);

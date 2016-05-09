@@ -25,7 +25,10 @@
 #include <stdio.h>
 #include <utils/constants.h>
 #include <utils/debug.h>
+#include <utils/formats.h>
 #include <utils/rect.h>
+
+#include <vector>
 
 #include "display_base.h"
 #include "hw_info_interface.h"
@@ -116,23 +119,25 @@ DisplayError DisplayBase::Deinit() {
 
   comp_manager_->UnregisterDisplay(display_comp_ctx_);
 
+  HWEventsInterface::Destroy(hw_events_intf_);
+
   return kErrorNone;
 }
 
 DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
   uint32_t i = 0;
-  Layer *layers = layer_stack->layers;
+  std::vector<Layer *>layers = layer_stack->layers;
 
   // TODO(user): Remove this check once we have query display attributes on virtual display
   if (display_type_ == kVirtual) {
     return kErrorNone;
   }
-
-  while (i < layer_stack->layer_count && (layers[i].composition != kCompositionGPUTarget)) {
+  uint32_t layer_count = UINT32(layers.size());
+  while ((i < layer_count) && (layers.at(i)->composition != kCompositionGPUTarget)) {
     i++;
   }
 
-  if (i >= layer_stack->layer_count) {
+  if (i >= layer_count) {
     DLOGE("Either layer count is zero or GPU target layer is not present");
     return kErrorParameters;
   }
@@ -140,20 +145,20 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
   uint32_t gpu_target_index = i;
 
   // Check GPU target layer
-  Layer &gpu_target_layer = layer_stack->layers[gpu_target_index];
+  Layer *gpu_target_layer = layers.at(gpu_target_index);
 
-  if (!IsValid(gpu_target_layer.src_rect)) {
+  if (!IsValid(gpu_target_layer->src_rect)) {
     DLOGE("Invalid src rect for GPU target layer");
     return kErrorParameters;
   }
 
-  if (!IsValid(gpu_target_layer.dst_rect)) {
+  if (!IsValid(gpu_target_layer->dst_rect)) {
     DLOGE("Invalid dst rect for GPU target layer");
     return kErrorParameters;
   }
 
-  auto gpu_target_layer_dst_xpixels = gpu_target_layer.dst_rect.right;
-  auto gpu_target_layer_dst_ypixels = gpu_target_layer.dst_rect.bottom;
+  auto gpu_target_layer_dst_xpixels = gpu_target_layer->dst_rect.right;
+  auto gpu_target_layer_dst_ypixels = gpu_target_layer->dst_rect.bottom;
 
   HWDisplayAttributes display_attrib;
   uint32_t active_index = 0;
@@ -560,7 +565,7 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
   LayerBuffer *out_buffer = hw_layers_.info.stack->output_buffer;
   if (out_buffer) {
     DumpImpl::AppendString(buffer, length, "\nres:%u x %u format: %s", out_buffer->width,
-                           out_buffer->height, GetName(out_buffer->format));
+                           out_buffer->height, GetFormatString(out_buffer->format));
   } else {
     DumpImpl::AppendString(buffer, length, "\nres:%u x %u, dpi:%.2f x %.2f, fps:%u,"
                            "vsync period: %u", info.x_pixels, info.y_pixels, info.x_dpi,
@@ -591,14 +596,14 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
 
   for (uint32_t i = 0; i < num_hw_layers; i++) {
     uint32_t layer_index = hw_layers_.info.index[i];
-    Layer &layer = hw_layers_.info.stack->layers[layer_index];
-    LayerBuffer *input_buffer = layer.input_buffer;
+    Layer *layer = hw_layers_.info.stack->layers.at(layer_index);
+    LayerBuffer *input_buffer = layer->input_buffer;
     HWLayerConfig &layer_config = hw_layers_.config[i];
     HWRotatorSession &hw_rotator_session = layer_config.hw_rotator_session;
 
     char idx[8] = { 0 };
-    const char *comp_type = GetName(layer.composition);
-    const char *buffer_format = GetName(input_buffer->format);
+    const char *comp_type = GetName(layer->composition);
+    const char *buffer_format = GetFormatString(input_buffer->format);
     const char *rotate_split[2] = { "Rot-1", "Rot-2" };
     const char *comp_split[2] = { "Comp-1", "Comp-2" };
 
@@ -626,7 +631,7 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
 
     if (hw_rotator_session.hw_block_count > 0) {
       input_buffer = &hw_rotator_session.output_buffer;
-      buffer_format = GetName(input_buffer->format);
+      buffer_format = GetFormatString(input_buffer->format);
     }
 
     for (uint32_t count = 0; count < 2; count++) {
@@ -645,10 +650,10 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
       LayerRect &dst_roi = pipe.dst_roi;
 
       snprintf(z_order, sizeof(z_order), "%d", pipe.z_order);
-      snprintf(flags, sizeof(flags), "0x%08x", layer.flags.flags);
+      snprintf(flags, sizeof(flags), "0x%08x", layer->flags.flags);
       snprintf(decimation, sizeof(decimation), "%3d x %3d", pipe.horizontal_decimation,
                pipe.vertical_decimation);
-      snprintf(csc, sizeof(csc), "%d", layer.csc);
+      snprintf(csc, sizeof(csc), "%d", layer->csc);
 
       DumpImpl::AppendString(buffer, length, format, idx, comp_type, comp_split[count],
                              "-", pipe.pipe_id, input_buffer->width, input_buffer->height,
@@ -690,52 +695,6 @@ const char * DisplayBase::GetName(const LayerComposition &composition) {
   case kCompositionGPUTarget:   return "GPU_TARGET";
   case kCompositionBlitTarget:  return "BLIT_TARGET";
   default:                      return "UNKNOWN";
-  }
-}
-
-const char * DisplayBase::GetName(const LayerBufferFormat &format) {
-  switch (format) {
-  case kFormatARGB8888:                 return "ARGB_8888";
-  case kFormatRGBA8888:                 return "RGBA_8888";
-  case kFormatBGRA8888:                 return "BGRA_8888";
-  case kFormatXRGB8888:                 return "XRGB_8888";
-  case kFormatRGBX8888:                 return "RGBX_8888";
-  case kFormatBGRX8888:                 return "BGRX_8888";
-  case kFormatRGBA5551:                 return "RGBA_5551";
-  case kFormatRGBA4444:                 return "RGBA_4444";
-  case kFormatRGB888:                   return "RGB_888";
-  case kFormatBGR888:                   return "BGR_888";
-  case kFormatRGB565:                   return "RGB_565";
-  case kFormatBGR565:                   return "BGR_565";
-  case kFormatRGBA8888Ubwc:             return "RGBA_8888_UBWC";
-  case kFormatRGBX8888Ubwc:             return "RGBX_8888_UBWC";
-  case kFormatBGR565Ubwc:               return "BGR_565_UBWC";
-  case kFormatYCbCr420Planar:           return "Y_CB_CR_420";
-  case kFormatYCrCb420Planar:           return "Y_CR_CB_420";
-  case kFormatYCrCb420PlanarStride16:   return "Y_CR_CB_420_STRIDE16";
-  case kFormatYCbCr420SemiPlanar:       return "Y_CBCR_420";
-  case kFormatYCrCb420SemiPlanar:       return "Y_CRCB_420";
-  case kFormatYCbCr420SemiPlanarVenus:  return "Y_CBCR_420_VENUS";
-  case kFormatYCrCb420SemiPlanarVenus:  return "Y_CRCB_420_VENUS";
-  case kFormatYCbCr422H1V2SemiPlanar:   return "Y_CBCR_422_H1V2";
-  case kFormatYCrCb422H1V2SemiPlanar:   return "Y_CRCB_422_H1V2";
-  case kFormatYCbCr422H2V1SemiPlanar:   return "Y_CBCR_422_H2V1";
-  case kFormatYCrCb422H2V1SemiPlanar:   return "Y_CRCB_422_H2V2";
-  case kFormatYCbCr420SPVenusUbwc:      return "Y_CBCR_420_VENUS_UBWC";
-  case kFormatYCbCr422H2V1Packed:       return "YCBYCR_422_H2V1";
-  case kFormatRGBA1010102:              return "RGBA_1010102";
-  case kFormatARGB2101010:              return "ARGB_2101010";
-  case kFormatRGBX1010102:              return "RGBX_1010102";
-  case kFormatXRGB2101010:              return "XRGB_2101010";
-  case kFormatBGRA1010102:              return "BGRA_1010102";
-  case kFormatABGR2101010:              return "ABGR_2101010";
-  case kFormatBGRX1010102:              return "BGRX_1010102";
-  case kFormatXBGR2101010:              return "XBGR_2101010";
-  case kFormatRGBA1010102Ubwc:          return "RGBA_1010102_UBWC";
-  case kFormatRGBX1010102Ubwc:          return "RGBX_1010102_UBWC";
-  case kFormatYCbCr420P010:             return "Y_CBCR_420_P010";
-  case kFormatYCbCr420TP10Ubwc:         return "Y_CBCR_420_TP10_UBWC";
-  default:                              return "UNKNOWN";
   }
 }
 
@@ -788,6 +747,17 @@ DisplayError DisplayBase::GetRefreshRateRange(uint32_t *min_refresh_rate,
 
 DisplayError DisplayBase::GetPanelBrightness(int *level) {
   return kErrorNotSupported;
+}
+
+DisplayError DisplayBase::SetVSyncState(bool enable) {
+  DisplayError error = kErrorNone;
+  if (vsync_enable_ != enable) {
+    error = hw_intf_->SetVSyncState(enable);
+    if (error == kErrorNone) {
+      vsync_enable_ = enable;
+    }
+  }
+  return error;
 }
 
 }  // namespace sdm
