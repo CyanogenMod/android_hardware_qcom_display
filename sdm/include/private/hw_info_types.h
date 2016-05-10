@@ -417,6 +417,7 @@ struct HWLayersInfo {
                                    // programmed on hardware.
   LayerRect updated_src_rect[kMaxSDELayers];  // Updated layer src rects in s3d mode
   LayerRect updated_dst_rect[kMaxSDELayers];  // Updated layer dst rects in s3d mode
+  bool updating[kMaxSDELayers] = {0};  // Updated by strategy, considering plane_alpha+updating
 
   uint32_t count = 0;              // Total number of layers which need to be set on hardware.
 

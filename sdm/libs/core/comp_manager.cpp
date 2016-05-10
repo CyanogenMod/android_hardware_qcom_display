@@ -164,25 +164,14 @@ DisplayError CompManager::ReconfigureDisplay(Handle comp_handle,
 
   DisplayError error = kErrorNone;
   if (display_comp_ctx->strategy) {
-    display_comp_ctx->strategy->Deinit();
-    delete display_comp_ctx->strategy;
-    display_comp_ctx->strategy = NULL;
-  }
-
-  Strategy *&new_strategy = display_comp_ctx->strategy;
-  display_comp_ctx->strategy = new Strategy(extension_intf_, display_comp_ctx->display_type,
-                                            hw_res_info_, hw_panel_info, attributes);
-  if (!display_comp_ctx->strategy) {
-    DLOGE("Unable to create strategy.");
-    return kErrorMemory;
-  }
-
-  error = new_strategy->Init();
-  if (error != kErrorNone) {
-    DLOGE("Unable to initialize strategy.");
-    delete display_comp_ctx->strategy;
-    display_comp_ctx->strategy = NULL;
-    return error;
+    error = display_comp_ctx->strategy->Reconfigure(hw_panel_info, attributes);
+    if (error != kErrorNone) {
+      DLOGE("Unable to Reconfigure strategy.");
+      display_comp_ctx->strategy->Deinit();
+      delete display_comp_ctx->strategy;
+      display_comp_ctx->strategy = NULL;
+      return error;
+    }
   }
 
   // For HDMI S3D mode, set max_layers_ to 0 so that primary display would fall back
