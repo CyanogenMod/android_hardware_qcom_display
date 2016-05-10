@@ -235,7 +235,7 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
             aligned_w = ALIGN(width, 16);
             break;
         case HAL_PIXEL_FORMAT_RAW10:
-            aligned_w = ALIGN(width * 10 /8, 16);
+            aligned_w = ALIGN(width * 10 / 8, 8);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
             aligned_w = ALIGN(width, 128);
@@ -413,6 +413,10 @@ IAllocController* IAllocController::getInstance(void)
 IonController::IonController()
 {
     allocateIonMem();
+
+    char property[PROPERTY_VALUE_MAX];
+    property_get("video.disable.ubwc", property, "0");
+    mDisableUBWCForEncode = atoi(property);
 }
 
 void IonController::allocateIonMem()
@@ -905,6 +909,11 @@ bool isUBwcEnabled(int format, int usage)
     // Allow UBWC, if client is using an explicitly defined UBWC pixel format.
     if (isUBwcFormat(format))
         return true;
+
+    if ((usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) &&
+        gralloc::IAllocController::getInstance()->isDisableUBWCForEncoder()) {
+            return false;
+    }
 
     // Allow UBWC, if an OpenGL client sets UBWC usage flag and GPU plus MDP
     // support the format. OR if a non-OpenGL client like Rotator, sets UBWC

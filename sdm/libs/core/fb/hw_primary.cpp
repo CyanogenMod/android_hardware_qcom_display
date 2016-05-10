@@ -669,9 +669,15 @@ DisplayError HWPrimary::SetAutoRefresh(bool enable) {
   char buffer[kWriteLength] = {'\0'};
   ssize_t bytes = snprintf(buffer, kWriteLength, "%d", enable);
 
+  if (enable == auto_refresh_) {
+    return kErrorNone;
+  }
+
   if (HWDevice::SysFsWrite(kAutoRefreshNode, buffer, bytes) <= 0) {  // Returns bytes written
     return kErrorUndefined;
   }
+
+  auto_refresh_ = enable;
 
   return kErrorNone;
 }

@@ -57,6 +57,7 @@
 #include <utils/rect.h>
 
 #include "blit_engine_c2d.h"
+#include "hwc_debugger.h"
 
 #define __CLASS__ "BlitEngineC2D"
 
@@ -88,11 +89,13 @@ int BlitEngineC2d::RegionIterator::iterate(copybit_region_t const *self, copybit
   return 0;
 }
 
-BlitEngineC2d::BlitEngineC2d() : blit_active_(false), dump_frame_count_(0), dump_frame_index_(0) {
+BlitEngineC2d::BlitEngineC2d() {
   for (uint32_t i = 0; i < kNumBlitTargetBuffers; i++) {
     blit_target_buffer_[i] = NULL;
     release_fence_fd_[i] = -1;
   }
+
+  HWCDebugHandler::Get()->GetProperty("persist.hwc.blit.comp", &blit_supported_);
 }
 
 BlitEngineC2d::~BlitEngineC2d() {
@@ -104,8 +107,11 @@ BlitEngineC2d::~BlitEngineC2d() {
 }
 
 int BlitEngineC2d::Init() {
-  hw_module_t const *module;
+  if (!blit_supported_) {
+    return -1;
+  }
 
+  hw_module_t const *module;
   if (hw_get_module("copybit", &module) == 0) {
     if (copybit_open(module, &blit_engine_c2d_) < 0) {
       DLOGI("CopyBitC2D Open failed.");
@@ -250,8 +256,7 @@ int BlitEngineC2d::Prepare(LayerStack *layer_stack) {
 
   for (i = 0; i < layer_stack->layer_count; i++) {
     Layer &layer = layer_stack->layers[i];
-    if (IsUBWCFormat(layer.input_buffer->format)) {
-      // UBWC is not currently supported
+    if (!blit_supported_) {
       return -1;
     }
     if (layer.composition == kCompositionGPUTarget) {

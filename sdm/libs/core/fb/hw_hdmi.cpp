@@ -36,6 +36,9 @@
 #include <linux/videodev2.h>
 #include <utils/debug.h>
 #include <utils/sys.h>
+#include <vector>
+#include <map>
+#include <utility>
 
 #include "hw_hdmi.h"
 
@@ -142,6 +145,17 @@ DisplayError HWHDMI::Init(HWEventHandler *eventhandler) {
 
   ReadScanInfo();
 
+  s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
+                             (kS3DModeNone, HDMI_S3D_NONE));
+  s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
+                             (kS3DModeLR, HDMI_S3D_SIDE_BY_SIDE));
+  s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
+                             (kS3DModeRL, HDMI_S3D_SIDE_BY_SIDE));
+  s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
+                             (kS3DModeTB, HDMI_S3D_TOP_AND_BOTTOM));
+  s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
+                             (kS3DModeFP, HDMI_S3D_FRAME_PACKING));
+
   return error;
 }
 
@@ -245,6 +259,8 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
     display_attributes->h_total += h_blanking;
   }
 
+  GetDisplayS3DSupport(index, display_attributes);
+
   return kErrorNone;
 }
 
@@ -300,6 +316,19 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
   }
 
   active_config_index_ = index;
+
+  // Get the supported s3d modes for current active config index
+  HWDisplayAttributes attrib;
+  GetDisplayS3DSupport(index, &attrib);
+  supported_s3d_modes_.clear();
+  supported_s3d_modes_.push_back(kS3DModeNone);
+  for (uint32_t mode = kS3DModeNone + 1; mode < kS3DModeMax; mode ++) {
+    if (IS_BIT_SET(attrib.s3d_config, (HWS3DMode)mode)) {
+      supported_s3d_modes_.push_back((HWS3DMode)mode);
+    }
+  }
+
+  SetS3DMode(kS3DModeNone);
 
   return kErrorNone;
 }
@@ -552,6 +581,118 @@ void HWHDMI::SetSourceProductInformation(const char *node, const char *name) {
   if (length <= 0) {
     DLOGW("Failed to write %s = %s", node, property_value);
   }
+}
+
+DisplayError HWHDMI::GetDisplayS3DSupport(uint32_t index,
+                                          HWDisplayAttributes *attrib) {
+  ssize_t length = -1;
+  char edid_s3d_str[kPageSize] = {'\0'};
+  char edid_s3d_path[kMaxStringLength] = {'\0'};
+  snprintf(edid_s3d_path, sizeof(edid_s3d_path), "%s%d/edid_3d_modes", fb_path_, fb_node_index_);
+
+  if (index > hdmi_mode_count_) {
+    return kErrorNotSupported;
+  }
+
+  SET_BIT(attrib->s3d_config, kS3DModeNone);
+
+  // Three level inception!
+  // The string looks like 16=SSH,4=FP:TAB:SSH,5=FP:SSH,32=FP:TAB:SSH
+  char *saveptr_l1, *saveptr_l2, *saveptr_l3;
+  char *l1, *l2, *l3;
+
+  int edid_s3d_node = Sys::open_(edid_s3d_path, O_RDONLY);
+  if (edid_s3d_node < 0) {
+    DLOGW("%s could not be opened : %s", edid_s3d_path, strerror(errno));
+    return kErrorNotSupported;
+  }
+
+  length = Sys::pread_(edid_s3d_node, edid_s3d_str, sizeof(edid_s3d_str)-1, 0);
+  if (length <= 0) {
+    Sys::close_(edid_s3d_node);
+    return kErrorNotSupported;
+  }
+
+  l1 = strtok_r(edid_s3d_str, ",", &saveptr_l1);
+  while (l1 != NULL) {
+    l2 = strtok_r(l1, "=", &saveptr_l2);
+    if (l2 != NULL) {
+      if (hdmi_modes_[index] == (uint32_t)atoi(l2)) {
+          l3 = strtok_r(saveptr_l2, ":", &saveptr_l3);
+          while (l3 != NULL) {
+            if (strncmp("SSH", l3, strlen("SSH")) == 0) {
+              SET_BIT(attrib->s3d_config, kS3DModeLR);
+              SET_BIT(attrib->s3d_config, kS3DModeRL);
+            } else if (strncmp("TAB", l3, strlen("TAB")) == 0) {
+              SET_BIT(attrib->s3d_config, kS3DModeTB);
+            } else if (strncmp("FP", l3, strlen("FP")) == 0) {
+              SET_BIT(attrib->s3d_config, kS3DModeFP);
+            }
+            l3 = strtok_r(NULL, ":", &saveptr_l3);
+          }
+      }
+    }
+    l1 = strtok_r(NULL, ",", &saveptr_l1);
+  }
+
+  Sys::close_(edid_s3d_node);
+  return kErrorNone;
+}
+
+bool HWHDMI::IsSupportedS3DMode(HWS3DMode s3d_mode) {
+  for (uint32_t i = 0; i < supported_s3d_modes_.size(); i++) {
+    if (supported_s3d_modes_[i] == s3d_mode) {
+      return true;
+    }
+  }
+  return false;
+}
+
+DisplayError HWHDMI::SetS3DMode(HWS3DMode s3d_mode) {
+  if (!IsSupportedS3DMode(s3d_mode)) {
+    DLOGW("S3D mode is not supported s3d_mode = %d", s3d_mode);
+    return kErrorNotSupported;
+  }
+
+  std::map<HWS3DMode, msm_hdmi_s3d_mode>::iterator it = s3d_mode_sdm_to_mdp_.find(s3d_mode);
+  if (it == s3d_mode_sdm_to_mdp_.end()) {
+    return kErrorNotSupported;
+  }
+  msm_hdmi_s3d_mode s3d_mdp_mode = it->second;
+
+  if (active_mdp_s3d_mode_ == s3d_mdp_mode) {
+    // HDMI_S3D_SIDE_BY_SIDE is an mdp mapping for kS3DModeLR and kS3DModeRL s3d modes. So no need
+    // to update the s3d_mode node. hw_panel_info needs to be updated to differentiate these two s3d
+    // modes in strategy
+    hw_panel_info_.s3d_mode = s3d_mode;
+    return kErrorNone;
+  }
+
+  ssize_t length = -1;
+  char s3d_mode_path[kMaxStringLength] = {'\0'};
+  char s3d_mode_string[kMaxStringLength] = {'\0'};
+  snprintf(s3d_mode_path, sizeof(s3d_mode_path), "%s%d/s3d_mode", fb_path_, fb_node_index_);
+
+  int s3d_mode_node = Sys::open_(s3d_mode_path, O_RDWR);
+  if (s3d_mode_node < 0) {
+    DLOGW("%s could not be opened : %s", s3d_mode_path, strerror(errno));
+    return kErrorNotSupported;
+  }
+
+  snprintf(s3d_mode_string, sizeof(s3d_mode_string), "%d", s3d_mdp_mode);
+  length = Sys::pwrite_(s3d_mode_node, s3d_mode_string, sizeof(s3d_mode_string), 0);
+  if (length <= 0) {
+    DLOGW("Failed to write into s3d node: %s", strerror(errno));
+    Sys::close_(s3d_mode_node);
+    return kErrorNotSupported;
+  }
+
+  active_mdp_s3d_mode_ = s3d_mdp_mode;
+  hw_panel_info_.s3d_mode = s3d_mode;
+  Sys::close_(s3d_mode_node);
+
+  DLOGI_IF(kTagDriverConfig, "s3d mode %d", hw_panel_info_.s3d_mode);
+  return kErrorNone;
 }
 
 }  // namespace sdm
