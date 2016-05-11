@@ -307,7 +307,11 @@ static int32_t GetClientTargetSupport(hwc2_device_t *device, hwc2_display_t disp
                                          width, height, format, dataspace);
 }
 
-// TODO(user): GetColorModes
+static int32_t GetColorModes(hwc2_device_t *device, hwc2_display_t display, uint32_t *out_num_modes,
+                             int32_t /*android_color_mode_t*/ *out_modes) {
+  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::GetColorModes, out_num_modes,
+                                         out_modes);
+}
 
 static int32_t GetDisplayAttribute(hwc2_device_t *device, hwc2_display_t display,
                                    hwc2_config_t config, int32_t int_attribute,
@@ -418,7 +422,20 @@ static int32_t SetClientTarget(hwc2_device_t *device, hwc2_display_t display,
                                          acquire_fence, dataspace);
 }
 
-// TODO(user): SetColorMode, SetColorTransform
+int32_t HWCSession::SetColorMode(hwc2_device_t *device, hwc2_display_t display,
+                                 int32_t /*android_color_mode_t*/ mode) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetColorMode, mode);
+}
+
+int32_t HWCSession::SetColorTransform(hwc2_device_t *device, hwc2_display_t display,
+                                      const float *matrix,
+                                      int32_t /*android_color_transform_t*/ hint) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+  android_color_transform_t transform_hint = static_cast<android_color_transform_t>(hint);
+  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetColorTransform, matrix,
+                                         transform_hint);
+}
 
 static int32_t SetCursorPosition(hwc2_device_t *device, hwc2_display_t display, hwc2_layer_t layer,
                                  int32_t x, int32_t y) {
@@ -583,8 +600,8 @@ hwc2_function_pointer_t HWCSession::GetFunction(struct hwc2_device *device,
       return AsFP<HWC2_PFN_GET_CHANGED_COMPOSITION_TYPES>(GetChangedCompositionTypes);
     case HWC2::FunctionDescriptor::GetClientTargetSupport:
       return AsFP<HWC2_PFN_GET_CLIENT_TARGET_SUPPORT>(GetClientTargetSupport);
-    // case HWC2::FunctionDescriptor::GetColorModes:
-    // TODO(user): Support later
+    case HWC2::FunctionDescriptor::GetColorModes:
+      return AsFP<HWC2_PFN_GET_COLOR_MODES>(GetColorModes);
     case HWC2::FunctionDescriptor::GetDisplayAttribute:
       return AsFP<HWC2_PFN_GET_DISPLAY_ATTRIBUTE>(GetDisplayAttribute);
     case HWC2::FunctionDescriptor::GetDisplayConfigs:
@@ -611,10 +628,10 @@ hwc2_function_pointer_t HWCSession::GetFunction(struct hwc2_device *device,
       return AsFP<HWC2_PFN_SET_ACTIVE_CONFIG>(SetActiveConfig);
     case HWC2::FunctionDescriptor::SetClientTarget:
       return AsFP<HWC2_PFN_SET_CLIENT_TARGET>(SetClientTarget);
-    // TODO(user): Support later
-    // case HWC2::FunctionDescriptor::SetColorMode:
-    // case HWC2::FunctionDescriptor::SetColorTransform:
-    // break;
+    case HWC2::FunctionDescriptor::SetColorMode:
+      return AsFP<HWC2_PFN_SET_COLOR_MODE>(SetColorMode);
+    case HWC2::FunctionDescriptor::SetColorTransform:
+      return AsFP<HWC2_PFN_SET_COLOR_TRANSFORM>(SetColorTransform);
     case HWC2::FunctionDescriptor::SetCursorPosition:
       return AsFP<HWC2_PFN_SET_CURSOR_POSITION>(SetCursorPosition);
     case HWC2::FunctionDescriptor::SetLayerBlendMode:

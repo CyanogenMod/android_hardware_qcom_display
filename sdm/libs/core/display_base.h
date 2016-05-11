@@ -31,6 +31,10 @@
 #include <private/color_interface.h>
 #include <utils/locker.h>
 
+#include <map>
+#include <string>
+#include <vector>
+
 #include "hw_interface.h"
 #include "comp_manager.h"
 #include "color_manager.h"
@@ -72,6 +76,10 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
                                             PPDisplayAPIPayload *out_payload,
                                             PPPendingParams *pending_action);
+  virtual DisplayError GetColorModeCount(uint32_t *mode_count);
+  virtual DisplayError GetColorModes(uint32_t *mode_count, std::vector<std::string> *color_modes);
+  virtual DisplayError SetColorMode(const std::string &color_mode);
+  virtual DisplayError SetColorTransform(const uint32_t length, const double *color_transform);
   virtual DisplayError ApplyDefaultDisplayMode(void);
   virtual DisplayError SetCursorPosition(int x, int y);
   virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
@@ -122,6 +130,11 @@ class DisplayBase : public DisplayInterface {
   bool partial_update_control_ = true;
   HWEventsInterface *hw_events_intf_ = NULL;
   bool disable_pu_one_frame_ = false;
+  uint32_t num_color_modes_ = 0;
+  SDEDisplayMode *color_modes_ = NULL;
+  int32_t color_mode_ = 0;
+  typedef std::map<std::string, SDEDisplayMode *> ColorModeMap;
+  ColorModeMap color_mode_map_ = {};
 
  private:
   // Unused

@@ -30,6 +30,8 @@
 #ifndef __HWC_DISPLAY_PRIMARY_H__
 #define __HWC_DISPLAY_PRIMARY_H__
 
+#include <string>
+
 #include "cpuhint.h"
 #include "hwc_display.h"
 
@@ -52,6 +54,9 @@ class HWCDisplayPrimary : public HWCDisplay {
   virtual int Init();
   virtual HWC2::Error Validate(uint32_t *out_num_types, uint32_t *out_num_requests);
   virtual HWC2::Error Present(int32_t *out_retire_fence);
+  virtual HWC2::Error GetColorModes(uint32_t *out_num_modes, int32_t *out_modes);
+  virtual HWC2::Error SetColorMode(int32_t /*android_color_mode_t*/ mode);
+  virtual HWC2::Error SetColorTransform(const float *matrix, android_color_transform_t hint);
   virtual int Perform(uint32_t operation, ...);
   virtual void SetSecureDisplay(bool secure_display_active);
   virtual DisplayError Refresh();
