@@ -44,27 +44,29 @@ int HWCDisplayVirtual::Create(CoreInterface *core_intf, HWCCallbacks *callbacks,
                               uint32_t height, int32_t *format, HWCDisplay **hwc_display) {
   int status = 0;
   HWCDisplayVirtual *hwc_display_virtual = new HWCDisplayVirtual(core_intf, callbacks);
-  uint32_t virtual_width = 0, virtual_height = 0;
 
   // TODO(user): Populate format correctly
+  DLOGI("Creating virtual display: w: %d h:%d format:0x%x", width, height, *format);
 
   status = hwc_display_virtual->Init();
   if (status) {
+    DLOGW("Failed to initialize virtual display");
     delete hwc_display_virtual;
     return status;
   }
 
   status = INT32(hwc_display_virtual->SetPowerMode(HWC2::PowerMode::On));
   if (status) {
+    DLOGW("Failed to set power mode on virtual display");
     Destroy(hwc_display_virtual);
     return status;
   }
 
-  hwc_display_virtual->GetMixerResolution(&virtual_width, &virtual_height);
-
+  // TODO(user): Validate that we support this width/height
   status = hwc_display_virtual->SetFrameBufferResolution(width, height);
 
   if (status) {
+    DLOGW("Failed to set virtual display FB resolution");
     Destroy(hwc_display_virtual);
     return status;
   }
@@ -85,12 +87,16 @@ HWCDisplayVirtual::HWCDisplayVirtual(CoreInterface *core_intf, HWCCallbacks *cal
 }
 
 int HWCDisplayVirtual::Init() {
+  output_buffer_ = new LayerBuffer();
   return HWCDisplay::Init();
 }
 
 int HWCDisplayVirtual::Deinit() {
   int status = 0;
-
+  if (output_buffer_) {
+    delete output_buffer_;
+    output_buffer_ = nullptr;
+  }
   status = HWCDisplay::Deinit();
 
   return status;
@@ -105,6 +111,7 @@ HWC2::Error HWCDisplayVirtual::Validate(uint32_t *out_num_types, uint32_t *out_n
   }
 
   BuildLayerStack();
+  layer_stack_.output_buffer = output_buffer_;
   status = PrepareLayerStack(out_num_types, out_num_requests);
   return status;
 }
@@ -135,6 +142,13 @@ HWC2::Error HWCDisplayVirtual::Present(int32_t *out_retire_fence) {
       }
 
       status = HWCDisplay::PostCommitLayerStack(out_retire_fence);
+      // On Virtual displays, use the output buffer release fence as the retire fence
+      // Close the layer stack retire fence as it is unused
+      if (layer_stack_.output_buffer) {
+        stored_retire_fence_ = layer_stack_.output_buffer->release_fence_fd;
+        close(layer_stack_.retire_fence_fd);
+        layer_stack_.retire_fence_fd = -1;
+      }
     }
   }
   CloseAcquireFds();
@@ -142,6 +156,9 @@ HWC2::Error HWCDisplayVirtual::Present(int32_t *out_retire_fence) {
 }
 
 HWC2::Error HWCDisplayVirtual::SetOutputBuffer(buffer_handle_t buf, int32_t release_fence) {
+  if (buf == nullptr || release_fence == 0) {
+    return HWC2::Error::BadParameter;
+  }
   const private_handle_t *output_handle = static_cast<const private_handle_t *>(buf);
 
   // Fill output buffer parameters (width, height, format, plane information, fence)
@@ -182,7 +199,6 @@ HWC2::Error HWCDisplayVirtual::SetOutputBuffer(buffer_handle_t buf, int32_t rele
     output_buffer_->planes[0].stride = UINT32(output_handle->width);
   }
 
-  layer_stack_.output_buffer = output_buffer_;
   return HWC2::Error::None;
 }
 

@@ -255,13 +255,13 @@ class HWCDisplay : public DisplayEventHandler {
   bool validated_ = false;
   bool color_tranform_failed_ = false;
   HWCColorMode *color_mode_ = NULL;
+  int32_t stored_retire_fence_ = -1;
 
  private:
   void DumpInputBuffers(void);
   BlitEngine *blit_engine_ = NULL;
   qService::QService *qservice_ = NULL;
   DisplayClass display_class_;
-  int32_t stored_retire_fence_ = -1;
   uint32_t geometry_changes_ = GeometryChanges::kNone;
 };
 

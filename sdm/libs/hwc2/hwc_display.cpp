@@ -1214,7 +1214,7 @@ const char *HWCDisplay::GetDisplayString() {
 
 int HWCDisplay::SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels) {
   if (x_pixels <= 0 || y_pixels <= 0) {
-    DLOGV("Unsupported config: x_pixels=%d, y_pixels=%d", x_pixels, y_pixels);
+    DLOGW("Unsupported config: x_pixels=%d, y_pixels=%d", x_pixels, y_pixels);
     return -EINVAL;
   }
 

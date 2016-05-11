@@ -237,6 +237,8 @@ int32_t HWCSession::CreateLayer(hwc2_device_t *device, hwc2_display_t display,
 
 int32_t HWCSession::CreateVirtualDisplay(hwc2_device_t *device, uint32_t width, uint32_t height,
                                          int32_t *format, hwc2_display_t *out_display_id) {
+  // TODO(user): Handle concurrency with HDMI
+  SCOPE_LOCK(locker_);
   if (!device) {
     return HWC2_ERROR_BAD_DISPLAY;
   }
@@ -245,6 +247,7 @@ int32_t HWCSession::CreateVirtualDisplay(hwc2_device_t *device, uint32_t width, 
   auto status = hwc_session->CreateVirtualDisplayObject(width, height, format);
   if (status == HWC2::Error::None)
     *out_display_id = HWC_DISPLAY_VIRTUAL;
+  DLOGI("Created virtual display id:% " PRIu64 " with res: %dx%d", *out_display_id, width, height);
   return INT32(status);
 }
 
@@ -255,10 +258,12 @@ int32_t HWCSession::DestroyLayer(hwc2_device_t *device, hwc2_display_t display,
 }
 
 int32_t HWCSession::DestroyVirtualDisplay(hwc2_device_t *device, hwc2_display_t display) {
+  SCOPE_LOCK(locker_);
   if (!device) {
     return HWC2_ERROR_BAD_DISPLAY;
   }
 
+  DLOGI("Destroying virtual display id:%" PRIu64, display);
   auto *hwc_session = static_cast<HWCSession *>(device);
 
   if (hwc_session->hwc_display_[display]) {
