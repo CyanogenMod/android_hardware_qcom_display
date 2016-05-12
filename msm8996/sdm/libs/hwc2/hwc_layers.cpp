@@ -26,10 +26,6 @@
 
 namespace sdm {
 
-bool SortLayersByZ::operator()(const HWCLayer *lhs, const HWCLayer *rhs) {
-  return lhs->GetZ() < rhs->GetZ();
-}
-
 std::atomic<hwc2_layer_t> HWCLayer::next_id_(1);
 
 // Layer operations
@@ -170,7 +166,7 @@ HWC2::Error HWCLayer::SetLayerDisplayFrame(hwc_rect_t frame) {
 
 HWC2::Error HWCLayer::SetLayerPlaneAlpha(float alpha) {
   // Conversion of float alpha in range 0.0 to 1.0 similar to the HWC Adapter
-  layer_->plane_alpha = static_cast<uint8_t>(255.0f * alpha + 0.5f);
+  layer_->plane_alpha = static_cast<uint8_t>(std::round(255.0f * alpha));
   geometry_changes_ |= kPlaneAlpha;
   return HWC2::Error::None;
 }
@@ -337,6 +333,36 @@ LayerBufferFormat HWCLayer::GetSDMFormat(const int32_t &source, const int flags)
     case HAL_PIXEL_FORMAT_YCbCr_422_I:
       format = kFormatYCbCr422H2V1Packed;
       break;
+    case HAL_PIXEL_FORMAT_RGBA_1010102:
+      format = kFormatRGBA1010102;
+      break;
+    case HAL_PIXEL_FORMAT_ARGB_2101010:
+      format = kFormatARGB2101010;
+      break;
+    case HAL_PIXEL_FORMAT_RGBX_1010102:
+      format = kFormatRGBX1010102;
+      break;
+    case HAL_PIXEL_FORMAT_XRGB_2101010:
+      format = kFormatXRGB2101010;
+      break;
+    case HAL_PIXEL_FORMAT_BGRA_1010102:
+      format = kFormatBGRA1010102;
+      break;
+    case HAL_PIXEL_FORMAT_ABGR_2101010:
+      format = kFormatABGR2101010;
+      break;
+    case HAL_PIXEL_FORMAT_BGRX_1010102:
+      format = kFormatBGRX1010102;
+      break;
+    case HAL_PIXEL_FORMAT_XBGR_2101010:
+      format = kFormatXBGR2101010;
+      break;
+    case HAL_PIXEL_FORMAT_YCbCr_420_P010:
+      format = kFormatYCbCr420P010;
+      break;
+    case HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC:
+      format = kFormatYCbCr420TP10Ubwc;
+      break;
     default:
       DLOGW("Unsupported format type = %d", source);
       return kFormatInvalid;
@@ -480,11 +506,7 @@ void HWCLayer::SetComposition(const LayerComposition &source) {
   if (layer_->composition == kCompositionSDE && layer_->flags.solid_fill != 0) {
     composition = HWC2::Composition::SolidColor;
   }
-  if (composition != composition_) {
-    // Composition changed for this layer
-    composition_changed_ = true;
-    composition_ = composition;
-  }
+  composition_ = composition;
 }
 void HWCLayer::PushReleaseFence(int32_t fence) {
   release_fences_.push(fence);

@@ -38,16 +38,16 @@
 namespace sdm {
 
 enum GeometryChanges {
-  kNone = 0x00,
-  kBlendMode = 0x01,
-  kDataspace = 0x02,
-  kDisplayFrame = 0x04,
-  kPlaneAlpha = 0x08,
-  kSourceCrop = 0x0A,
-  kTransform = 0x10,
-  kZOrder = 0x12,
-  kAdded = 0x14,
-  kRemoved = 0x18,
+  kNone         = 0x000,
+  kBlendMode    = 0x001,
+  kDataspace    = 0x002,
+  kDisplayFrame = 0x004,
+  kPlaneAlpha   = 0x008,
+  kSourceCrop   = 0x010,
+  kTransform    = 0x020,
+  kZOrder       = 0x040,
+  kAdded        = 0x080,
+  kRemoved      = 0x100,
 };
 
 class HWCLayer {
@@ -71,7 +71,6 @@ class HWCLayer {
   HWC2::Error SetLayerVisibleRegion(hwc_region_t visible);
   HWC2::Error SetLayerZOrder(uint32_t z);
   void SetComposition(const LayerComposition &source);
-  bool CompositionChanged(void) { return composition_changed_; }
   HWC2::Composition GetCompositionType() { return composition_; }
   uint32_t GetGeometryChanges() { return geometry_changes_; }
   void ResetGeometryChanges() { geometry_changes_ = GeometryChanges::kNone; }
@@ -87,7 +86,6 @@ class HWCLayer {
   std::queue<int32_t> release_fences_;
 
   HWC2::Composition composition_ = HWC2::Composition::Device;
-  bool composition_changed_ = false;
   uint32_t geometry_changes_ = GeometryChanges::kNone;
 
   void SetRect(const hwc_rect_t &source, LayerRect *target);
@@ -102,7 +100,9 @@ class HWCLayer {
 };
 
 struct SortLayersByZ {
-  bool operator()(const HWCLayer *lhs, const HWCLayer *rhs);
+  bool operator()(const HWCLayer *lhs, const HWCLayer *rhs) {
+    return lhs->GetZ() < rhs->GetZ();
+  }
 };
 
 }  // namespace sdm

@@ -340,6 +340,14 @@ static int32_t GetDozeSupport(hwc2_device_t *device, hwc2_display_t display, int
   return HWC2_ERROR_NONE;
 }
 
+static int32_t GetHdrCapabilities(hwc2_device_t* device, hwc2_display_t display,
+                                  uint32_t* out_num_types, int32_t* out_types,
+                                  float* out_max_luminance, float* out_max_average_luminance,
+                                  float* out_min_luminance) {
+  *out_num_types = 0;
+  return HWC2_ERROR_NONE;
+}
+
 static uint32_t GetMaxVirtualDisplayCount(hwc2_device_t *device) {
   return 1;
 }
@@ -383,9 +391,8 @@ int32_t HWCSession::RegisterCallback(hwc2_device_t *device, int32_t descriptor,
   auto desc = static_cast<HWC2::Callback>(descriptor);
   auto error = hwc_session->callbacks_.Register(desc, callback_data, pointer);
   DLOGD("Registering callback: %s", to_string(desc).c_str());
-  // TODO(user): The hotplug should only be called when the HOTPLUG callback is registered
-  // However, this causes SurfaceFlinger to behave weirdly - investigate further.
-  hwc_session->callbacks_.Hotplug(HWC_DISPLAY_PRIMARY, HWC2::Connection::Connected);
+  if (descriptor == HWC2_CALLBACK_HOTPLUG)
+    hwc_session->callbacks_.Hotplug(HWC_DISPLAY_PRIMARY, HWC2::Connection::Connected);
   return INT32(error);
 }
 
@@ -570,6 +577,8 @@ hwc2_function_pointer_t HWCSession::GetFunction(struct hwc2_device *device,
       return AsFP<HWC2_PFN_GET_DISPLAY_REQUESTS>(GetDisplayRequests);
     case HWC2::FunctionDescriptor::GetDisplayType:
       return AsFP<HWC2_PFN_GET_DISPLAY_TYPE>(GetDisplayType);
+    case HWC2::FunctionDescriptor::GetHdrCapabilities:
+      return AsFP<HWC2_PFN_GET_HDR_CAPABILITIES>(GetHdrCapabilities);
     case HWC2::FunctionDescriptor::GetDozeSupport:
       return AsFP<HWC2_PFN_GET_DOZE_SUPPORT>(GetDozeSupport);
     case HWC2::FunctionDescriptor::GetMaxVirtualDisplayCount:
