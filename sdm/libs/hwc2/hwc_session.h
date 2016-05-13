@@ -82,8 +82,11 @@ class HWCSession : hwc2_device_t, public qClient::BnQClient {
 
   // HWC2 Functions that require a concrete implementation in hwc session
   // and hence need to be member functions
+  static int32_t CreateLayer(hwc2_device_t *device, hwc2_display_t display,
+                             hwc2_layer_t *out_layer_id);
   static int32_t CreateVirtualDisplay(hwc2_device_t *device, uint32_t width, uint32_t height,
                                       hwc2_display_t *out_display_id);
+  static int32_t DestroyLayer(hwc2_device_t *device, hwc2_display_t display, hwc2_layer_t layer);
   static int32_t DestroyVirtualDisplay(hwc2_device_t *device, hwc2_display_t display);
   static int32_t PresentDisplay(hwc2_device_t *device, hwc2_display_t display,
                                 int32_t *out_retire_fence);
@@ -92,6 +95,9 @@ class HWCSession : hwc2_device_t, public qClient::BnQClient {
                                   hwc2_function_pointer_t pointer);
   static int32_t SetOutputBuffer(hwc2_device_t *device, hwc2_display_t display,
                                  buffer_handle_t buffer, int32_t releaseFence);
+  static int32_t SetLayerZOrder(hwc2_device_t *device, hwc2_display_t display, hwc2_layer_t layer,
+                                uint32_t z);
+  static int32_t SetPowerMode(hwc2_device_t *device, hwc2_display_t display, int32_t int_mode);
   static int32_t ValidateDisplay(hwc2_device_t *device, hwc2_display_t display,
                                  uint32_t *out_num_types, uint32_t *out_num_requests);
 

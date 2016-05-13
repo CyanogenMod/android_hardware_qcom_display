@@ -228,9 +228,10 @@ static int32_t AcceptDisplayChanges(hwc2_device_t *device, hwc2_display_t displa
   return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::AcceptDisplayChanges);
 }
 
-static int32_t CreateLayer(hwc2_device_t *device, hwc2_display_t display,
-                           hwc2_layer_t *out_layer_id) {
-  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::CreateLayer, out_layer_id);
+int32_t HWCSession::CreateLayer(hwc2_device_t *device, hwc2_display_t display,
+                                hwc2_layer_t *out_layer_id) {
+  SCOPE_LOCK(locker_);
+  return CallDisplayFunction(device, display, &HWCDisplay::CreateLayer, out_layer_id);
 }
 
 int32_t HWCSession::CreateVirtualDisplay(hwc2_device_t *device, uint32_t width, uint32_t height,
@@ -246,8 +247,10 @@ int32_t HWCSession::CreateVirtualDisplay(hwc2_device_t *device, uint32_t width, 
   return INT32(status);
 }
 
-static int32_t DestroyLayer(hwc2_device_t *device, hwc2_display_t display, hwc2_layer_t layer) {
-  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::DestroyLayer, layer);
+int32_t HWCSession::DestroyLayer(hwc2_device_t *device, hwc2_display_t display,
+                                 hwc2_layer_t layer) {
+  SCOPE_LOCK(locker_);
+  return CallDisplayFunction(device, display, &HWCDisplay::DestroyLayer, layer);
 }
 
 int32_t HWCSession::DestroyVirtualDisplay(hwc2_device_t *device, hwc2_display_t display) {
@@ -481,9 +484,10 @@ static int32_t SetLayerVisibleRegion(hwc2_device_t *device, hwc2_display_t displ
                                        visible);
 }
 
-static int32_t SetLayerZOrder(hwc2_device_t *device, hwc2_display_t display, hwc2_layer_t layer,
-                              uint32_t z) {
-  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetLayerZOrder, layer, z);
+int32_t HWCSession::SetLayerZOrder(hwc2_device_t *device, hwc2_display_t display,
+                                   hwc2_layer_t layer, uint32_t z) {
+  SCOPE_LOCK(locker_);
+  return CallDisplayFunction(device, display, &HWCDisplay::SetLayerZOrder, layer, z);
 }
 
 int32_t HWCSession::SetOutputBuffer(hwc2_device_t *device, hwc2_display_t display,
@@ -502,9 +506,10 @@ int32_t HWCSession::SetOutputBuffer(hwc2_device_t *device, hwc2_display_t displa
   }
 }
 
-static int32_t SetPowerMode(hwc2_device_t *device, hwc2_display_t display, int32_t int_mode) {
+int32_t HWCSession::SetPowerMode(hwc2_device_t *device, hwc2_display_t display, int32_t int_mode) {
   auto mode = static_cast<HWC2::PowerMode>(int_mode);
-  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetPowerMode, mode);
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+  return CallDisplayFunction(device, display, &HWCDisplay::SetPowerMode, mode);
 }
 
 static int32_t SetVsyncEnabled(hwc2_device_t *device, hwc2_display_t display, int32_t int_enabled) {
@@ -538,6 +543,11 @@ int32_t HWCSession::ValidateDisplay(hwc2_device_t *device, hwc2_display_t displa
     }
 
     status = hwc_session->hwc_display_[display]->Validate(out_num_types, out_num_requests);
+  }
+  // If validate fails, cancel the sequence lock so that other operations
+  // (such as Dump or SetPowerMode) may succeed without blocking on the condition
+  if (status != HWC2::Error::None) {
+    SEQUENCE_CANCEL_SCOPE_LOCK(locker_);
   }
   return INT32(status);
 }

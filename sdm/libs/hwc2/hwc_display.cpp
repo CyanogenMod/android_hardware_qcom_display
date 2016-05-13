@@ -166,8 +166,6 @@ HWC2::Error HWCDisplay::DestroyLayer(hwc2_layer_t layer_id) {
 }
 
 void HWCDisplay::BuildLayerStack() {
-  // TODO(user): Validate
-  validated_ = true;
   layer_stack_ = LayerStack();
   display_rect_ = LayerRect();
   metadata_refresh_rate_ = 0;
@@ -444,6 +442,13 @@ HWC2::Error HWCDisplay::GetActiveConfig(hwc2_config_t *out_config) {
 
 HWC2::Error HWCDisplay::SetClientTarget(buffer_handle_t target, int32_t acquire_fence,
                                         int32_t dataspace) {
+  // TODO(user): SurfaceFlinger gives us a null pointer here when doing full SDE composition
+  // The error is problematic for layer caching as it would overwrite our cached client target.
+  // Reported bug 28569722 to resolve this.
+  // For now, continue to use the last valid buffer reported to us for layer caching.
+  if (target == nullptr) {
+    return HWC2::Error::None;
+  }
   client_target_->SetLayerBuffer(target, acquire_fence);
   // Ignoring dataspace for now
   return HWC2::Error::None;
@@ -591,6 +596,10 @@ HWC2::Error HWCDisplay::GetDisplayRequests(int32_t *out_display_requests,
   // Use for sharing blit buffers and
   // writing wfd buffer directly to output if there is full GPU composition
   // and no color conversion needed
+  if (!validated_) {
+    DLOGW("Display is not validated");
+    return HWC2::Error::NotValidated;
+  }
   *out_display_requests = 0;
   *out_num_elements = UINT32(layer_requests_.size());
   if (out_layers != nullptr && out_layer_requests != nullptr) {
@@ -619,6 +628,7 @@ HWC2::Error HWCDisplay::CommitLayerStack(void) {
   if (!flush_) {
     DisplayError error = kErrorUndefined;
     error = display_intf_->Commit(&layer_stack_);
+    validated_ = false;
 
     if (error == kErrorNone) {
       // A commit is successfully submitted, start flushing on failure now onwards.
