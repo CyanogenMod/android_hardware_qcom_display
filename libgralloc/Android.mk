@@ -46,8 +46,4 @@ LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdmemalloc\"
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps) $(kernel_deps)
 LOCAL_SRC_FILES               := ionalloc.cpp alloc_controller.cpp
 
-ifeq ($(TARGET_USE_COMPAT_GRALLOC_ALIGN),true)
-LOCAL_CFLAGS += -DDISABLE_GET_PIXEL_ALIGNMENT
-endif
-
 include $(BUILD_SHARED_LIBRARY)
