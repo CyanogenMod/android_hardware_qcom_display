@@ -93,7 +93,6 @@ AdrenoMemInfo::AdrenoMemInfo()
 {
     LINK_adreno_compute_aligned_width_and_height = NULL;
     LINK_adreno_compute_padding = NULL;
-    LINK_adreno_get_gpu_pixel_alignment = NULL;
 
     libadreno_utils = ::dlopen("libadreno_utils.so", RTLD_NOW);
     if (libadreno_utils) {
@@ -101,8 +100,6 @@ AdrenoMemInfo::AdrenoMemInfo()
             ::dlsym(libadreno_utils, "compute_aligned_width_and_height");
         *(void **)&LINK_adreno_compute_padding = ::dlsym(libadreno_utils,
                                            "compute_surface_padding");
-        *(void **)&LINK_adreno_get_gpu_pixel_alignment =
-                ::dlsym(libadreno_utils, "get_gpu_pixel_alignment");
     }
 }
 
@@ -167,22 +164,16 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(int width, int height, int format,
             }
         }
     } else {
-        int alignment = 32;
         switch (format)
         {
             case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
-                aligned_w = ALIGN(width, alignment);
+                aligned_w = ALIGN(width, 32);
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
                 aligned_w = ALIGN(width, 128);
                 break;
             case HAL_PIXEL_FORMAT_YCbCr_420_SP:
             case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-                if (LINK_adreno_get_gpu_pixel_alignment) {
-                    alignment = LINK_adreno_get_gpu_pixel_alignment();
-                }
-                aligned_w = ALIGN(width, alignment);
-                break;
             case HAL_PIXEL_FORMAT_YV12:
             case HAL_PIXEL_FORMAT_YCbCr_422_SP:
             case HAL_PIXEL_FORMAT_YCrCb_422_SP:
