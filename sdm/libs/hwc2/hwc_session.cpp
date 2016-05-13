@@ -34,6 +34,7 @@
 #include <utils/debug.h>
 #include <sync/sync.h>
 #include <profiler.h>
+#include <string>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
@@ -268,15 +269,22 @@ int32_t HWCSession::DestroyVirtualDisplay(hwc2_device_t *device, hwc2_display_t 
   }
 }
 
-static void Dump(hwc2_device_t *device, uint32_t *out_size, char *out_buffer) {
+void HWCSession::Dump(hwc2_device_t *device, uint32_t *out_size, char *out_buffer) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!device) {
     return;
   }
+  auto *hwc_session = static_cast<HWCSession *>(device);
 
   if (out_buffer == nullptr) {
-    *out_size = 4096;  // TODO(user): Adjust required dump size
+    *out_size = 8192;  // TODO(user): Adjust required dump size
   } else {
-    DumpInterface::GetDump(out_buffer, 4096);  // TODO(user): Fix this workaround
+    char sdm_dump[4096];
+    DumpInterface::GetDump(sdm_dump, 4096);  // TODO(user): Fix this workaround
+    std::string s = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY]->Dump();
+    s += sdm_dump;
+    s.copy(out_buffer, s.size(), 0);
     *out_size = sizeof(out_buffer);
   }
 }
@@ -568,7 +576,7 @@ hwc2_function_pointer_t HWCSession::GetFunction(struct hwc2_device *device,
     case HWC2::FunctionDescriptor::DestroyVirtualDisplay:
       return AsFP<HWC2_PFN_DESTROY_VIRTUAL_DISPLAY>(HWCSession::DestroyVirtualDisplay);
     case HWC2::FunctionDescriptor::Dump:
-      return AsFP<HWC2_PFN_DUMP>(Dump);
+      return AsFP<HWC2_PFN_DUMP>(HWCSession::Dump);
     case HWC2::FunctionDescriptor::GetActiveConfig:
       return AsFP<HWC2_PFN_GET_ACTIVE_CONFIG>(GetActiveConfig);
     case HWC2::FunctionDescriptor::GetChangedCompositionTypes:

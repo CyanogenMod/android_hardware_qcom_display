@@ -88,6 +88,7 @@ class HWCSession : hwc2_device_t, public qClient::BnQClient {
                                       hwc2_display_t *out_display_id);
   static int32_t DestroyLayer(hwc2_device_t *device, hwc2_display_t display, hwc2_layer_t layer);
   static int32_t DestroyVirtualDisplay(hwc2_device_t *device, hwc2_display_t display);
+  static void Dump(hwc2_device_t *device, uint32_t *out_size, char *out_buffer);
   static int32_t PresentDisplay(hwc2_device_t *device, hwc2_display_t display,
                                 int32_t *out_retire_fence);
   static int32_t RegisterCallback(hwc2_device_t *device, int32_t descriptor,
