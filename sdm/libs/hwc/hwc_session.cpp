@@ -433,8 +433,6 @@ void HWCSession::CloseAcquireFds(hwc_display_contents_1_t *content_list) {
 }
 
 int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event, int enable) {
-  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
-
   if (!device) {
     return -EINVAL;
   }
