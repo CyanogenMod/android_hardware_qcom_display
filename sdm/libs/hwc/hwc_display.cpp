@@ -595,7 +595,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
       layer_stack_.flags.cursor_present = true;
     }
 
-    PrepareDynamicRefreshRate(layer);
+    PrepareDynamicRefreshRate(&layer);
 
     layer.input_buffer->buffer_id = reinterpret_cast<uint64_t>(hwc_layer.handle);
   }
@@ -1474,7 +1474,7 @@ bool HWCDisplay::SingleVideoLayerUpdating(uint32_t app_layer_count) {
   uint32_t updating_count = 0;
 
   for (uint i = 0; i < app_layer_count; i++) {
-    Layer *layer = layer_stack_.layers[i];
+    Layer *layer = &layer_stack_.layers[i];
     if (layer->flags.updating && (layer->input_buffer->flags.video == true)) {
       updating_count++;
     }

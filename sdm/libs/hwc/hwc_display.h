@@ -144,7 +144,6 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PostCommitLayerStack(hwc_display_contents_1_t *content_list);
-  virtual void DumpOutputBuffer(const BufferInfo& buffer_info, void *base, int fence);
   virtual uint32_t RoundToStandardFPS(float fps);
   virtual uint32_t SanitizeRefreshRate(uint32_t req_refresh_rate);
   virtual void PrepareDynamicRefreshRate(Layer *layer);
