@@ -91,6 +91,7 @@ class HWInterface {
   virtual DisplayError OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) = 0;
   virtual DisplayError GetPanelBrightness(int *level) = 0;
   virtual DisplayError SetAutoRefresh(bool enable) = 0;
+  virtual DisplayError SetS3DMode(HWS3DMode s3d_mode) = 0;
 
  protected:
   virtual ~HWInterface() { }

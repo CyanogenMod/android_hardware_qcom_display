@@ -39,7 +39,6 @@ class HWVirtual : public HWDevice {
   HWVirtual(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
   virtual DisplayError Init(HWEventHandler *eventhandler);
   virtual DisplayError Validate(HWLayers *hw_layers);
-  virtual DisplayError Flush();
 };
 
 }  // namespace sdm

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -22,7 +22,6 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "hw_info.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,16 +31,37 @@
 #include <utils/constants.h>
 #include <utils/debug.h>
 #include <utils/sys.h>
+#include <vector>
+#include <utility>
+#include <map>
+#include <memory>
+#include "hw_info.h"
 
 #define __CLASS__ "HWInfo"
 
+using std::vector;
+using std::map;
+
 namespace sdm {
 
-int HWInfo::ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count) {
+// kDefaultFormatSupport contains the bit map of supported formats for each hw blocks.
+// For eg: if Cursor supports MDP_RGBA_8888[bit-13] and MDP_RGB_565[bit-0], then cursor pipe array
+// contains { 0x01[0-3], 0x00[4-7], 0x00[8-12], 0x01[13-16], 0x00[17-20], 0x00[21-24], 0x00[24-28] }
+const uint8_t HWInfo::kDefaultFormatSupport[kHWSubBlockMax][BITS_TO_BYTES(MDP_IMGTYPE_LIMIT)] = {
+  { 0xFF, 0xF5, 0x1C, 0x1E, 0x20, 0xFF, 0x01 },  // kHWVIGPipe
+  { 0x33, 0xE0, 0x00, 0x16, 0x00, 0xBF, 0x00 },  // kHWRGBPipe
+  { 0x33, 0xE0, 0x00, 0x16, 0x00, 0xBF, 0x00 },  // kHWDMAPipe
+  { 0x12, 0x60, 0x0C, 0x00, 0x00, 0x0F, 0x00 },  // kHWCursorPipe
+  { 0xFF, 0xF5, 0x1C, 0x1E, 0x20, 0xFF, 0x01 },  // kHWRotatorInput
+  { 0x3F, 0xF4, 0x10, 0x1E, 0x20, 0xFF, 0x01 },  // kHWRotatorOutput
+  { 0x3F, 0xF4, 0x10, 0x1E, 0x20, 0xFF, 0x01 },  // kHWWBIntfOutput
+};
+
+int HWInfo::ParseString(char *input, char *tokens[], const uint32_t max_token, const char *delim,
+                        uint32_t *count) {
   char *tmp_token = NULL;
   char *temp_ptr;
   uint32_t index = 0;
-  const char *delim = ", =\n";
   if (!input) {
     return -1;
   }
@@ -105,7 +125,7 @@ DisplayError HWInfo::GetDynamicBWLimits(HWResourceInfo *hw_resource) {
   ssize_t read;
   char *line = stringbuffer;
   while ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
-    if (!ParseLine(line, tokens, max_count, &token_count)) {
+    if (!ParseString(line, tokens, max_count, ":, =\n", &token_count)) {
       if (!strncmp(tokens[0], "default_pipe", strlen("default_pipe"))) {
         bw_info->pipe_bw_limit[kBwDefault] = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "camera_pipe", strlen("camera_pipe"))) {
@@ -139,7 +159,7 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
   const char *fb_path = "/sys/devices/virtual/graphics/fb";
   FILE *fileptr = NULL;
   uint32_t token_count = 0;
-  const uint32_t max_count = 10;
+  const uint32_t max_count = 256;
   char *tokens[max_count] = { NULL };
   char *stringbuffer = reinterpret_cast<char *>(malloc(kMaxStringLength));
 
@@ -157,23 +177,23 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
     return kErrorHardware;
   }
 
+  InitSupportedFormatMap(hw_resource);
+
   size_t len = kMaxStringLength;
   ssize_t read;
   char *line = stringbuffer;
   hw_resource->hw_version = kHWMdssVersion5;
   while ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
     // parse the line and update information accordingly
-    if (!ParseLine(line, tokens, max_count, &token_count)) {
+    if (!ParseString(line, tokens, max_count, ":, =\n", &token_count)) {
       if (!strncmp(tokens[0], "hw_rev", strlen("hw_rev"))) {
         hw_resource->hw_revision = UINT32(atoi(tokens[1]));  // HW Rev, v1/v2
-      } else if (!strncmp(tokens[0], "rgb_pipes", strlen("rgb_pipes"))) {
-        hw_resource->num_rgb_pipe = UINT8(atoi(tokens[1]));
-      } else if (!strncmp(tokens[0], "vig_pipes", strlen("vig_pipes"))) {
-        hw_resource->num_vig_pipe = UINT8(atoi(tokens[1]));
-      } else if (!strncmp(tokens[0], "dma_pipes", strlen("dma_pipes"))) {
-        hw_resource->num_dma_pipe = UINT8(atoi(tokens[1]));
-      } else if (!strncmp(tokens[0], "cursor_pipes", strlen("cursor_pipes"))) {
-        hw_resource->num_cursor_pipe = UINT8(atoi(tokens[1]));
+      } else if (!strncmp(tokens[0], "rot_input_fmts", strlen("rot_input_fmts"))) {
+        ParseFormats(&tokens[1], (token_count - 1), kHWRotatorInput, hw_resource);
+      } else if (!strncmp(tokens[0], "rot_output_fmts", strlen("rot_output_fmts"))) {
+        ParseFormats(&tokens[1], (token_count - 1), kHWRotatorOutput, hw_resource);
+      } else if (!strncmp(tokens[0], "wb_output_fmts", strlen("wb_output_fmts"))) {
+        ParseFormats(&tokens[1], (token_count - 1), kHWWBIntfOutput, hw_resource);
       } else if (!strncmp(tokens[0], "blending_stages", strlen("blending_stages"))) {
         hw_resource->num_blending_stages = UINT8(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_downscale_ratio", strlen("max_downscale_ratio"))) {
@@ -226,6 +246,48 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
             hw_resource->has_dyn_bw_support = true;
           }
         }
+      } else if (!strncmp(tokens[0], "pipe_count", strlen("pipe_count"))) {
+        uint32_t pipe_count = UINT8(atoi(tokens[1]));
+        for (uint32_t i = 0; i < pipe_count; i++) {
+          read = Sys::getline_(&line, &len, fileptr);
+          if (!ParseString(line, tokens, max_count, ": =\n", &token_count)) {
+            HWPipeCaps pipe_caps;
+            for (uint32_t j = 0; j < token_count; j += 2) {
+              if (!strncmp(tokens[j], "pipe_type", strlen("pipe_type"))) {
+                if (!strncmp(tokens[j+1], "vig", strlen("vig"))) {
+                  pipe_caps.type = kPipeTypeVIG;
+                  hw_resource->num_vig_pipe++;
+                } else if (!strncmp(tokens[j+1], "rgb", strlen("rgb"))) {
+                  pipe_caps.type = kPipeTypeRGB;
+                  hw_resource->num_rgb_pipe++;
+                } else if (!strncmp(tokens[j+1], "dma", strlen("dma"))) {
+                  pipe_caps.type = kPipeTypeDMA;
+                  hw_resource->num_dma_pipe++;
+                } else if (!strncmp(tokens[j+1], "cursor", strlen("cursor"))) {
+                  pipe_caps.type = kPipeTypeCursor;
+                  hw_resource->num_cursor_pipe++;
+                }
+              } else if (!strncmp(tokens[j], "pipe_ndx", strlen("pipe_ndx"))) {
+                pipe_caps.id = UINT32(atoi(tokens[j+1]));
+              } else if (!strncmp(tokens[j], "fmts_supported", strlen("fmts_supported"))) {
+                char *tokens_fmt[max_count] = { NULL };
+                uint32_t token_fmt_count = 0;
+                if (!ParseString(tokens[j+1], tokens_fmt, max_count, ",\n", &token_fmt_count)) {
+                  if (pipe_caps.type == kPipeTypeVIG) {
+                    ParseFormats(tokens_fmt, token_fmt_count, kHWVIGPipe, hw_resource);
+                  } else if (pipe_caps.type == kPipeTypeRGB) {
+                    ParseFormats(tokens_fmt, token_fmt_count, kHWRGBPipe, hw_resource);
+                  } else if (pipe_caps.type == kPipeTypeDMA) {
+                    ParseFormats(tokens_fmt, token_fmt_count, kHWDMAPipe, hw_resource);
+                  } else if (pipe_caps.type == kPipeTypeCursor) {
+                    ParseFormats(tokens_fmt, token_fmt_count, kHWCursorPipe, hw_resource);
+                  }
+                }
+              }
+            }
+            hw_resource->hw_pipes.push_back(pipe_caps);
+          }
+        }
       }
     }
   }
@@ -259,7 +321,7 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
   }
 
   while ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
-    if (!ParseLine(line, tokens, max_count, &token_count)) {
+    if (!ParseString(line, tokens, max_count, ":, =\n", &token_count)) {
       if (!strncmp(tokens[0], "wb_count", strlen("wb_count"))) {
         hw_resource->num_rotator = UINT8(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "downscale", strlen("downscale"))) {
@@ -290,6 +352,78 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
   }
 
   return kErrorNone;
+}
+
+LayerBufferFormat HWInfo::GetSDMFormat(int mdp_format) {
+  switch (mdp_format) {
+  case MDP_ARGB_8888:              return kFormatARGB8888;
+  case MDP_RGBA_8888:              return kFormatRGBA8888;
+  case MDP_BGRA_8888:              return kFormatBGRA8888;
+  case MDP_XRGB_8888:              return kFormatXRGB8888;
+  case MDP_RGBX_8888:              return kFormatRGBX8888;
+  case MDP_BGRX_8888:              return kFormatBGRX8888;
+  case MDP_RGBA_5551:              return kFormatRGBA5551;
+  case MDP_RGBA_4444:              return kFormatRGBA4444;
+  case MDP_RGB_888:                return kFormatRGB888;
+  case MDP_BGR_888:                return kFormatBGR888;
+  case MDP_RGB_565:                return kFormatRGB565;
+  case MDP_BGR_565:                return kFormatBGR565;
+  case MDP_RGBA_8888_UBWC:         return kFormatRGBA8888Ubwc;
+  case MDP_RGBX_8888_UBWC:         return kFormatRGBX8888Ubwc;
+  case MDP_Y_CB_CR_H2V2:           return kFormatYCbCr420Planar;
+  case MDP_Y_CR_CB_H2V2:           return kFormatYCrCb420Planar;
+  case MDP_Y_CR_CB_GH2V2:          return kFormatYCrCb420PlanarStride16;
+  case MDP_Y_CBCR_H2V2:            return kFormatYCbCr420SemiPlanar;
+  case MDP_Y_CRCB_H2V2:            return kFormatYCrCb420SemiPlanar;
+  case MDP_Y_CBCR_H2V2_VENUS:      return kFormatYCbCr420SemiPlanarVenus;
+  case MDP_Y_CBCR_H1V2:            return kFormatYCbCr422H1V2SemiPlanar;
+  case MDP_Y_CRCB_H1V2:            return kFormatYCrCb422H1V2SemiPlanar;
+  case MDP_Y_CBCR_H2V1:            return kFormatYCbCr422H2V1SemiPlanar;
+  case MDP_Y_CRCB_H2V1:            return kFormatYCrCb422H2V1SemiPlanar;
+  case MDP_Y_CBCR_H2V2_UBWC:       return kFormatYCbCr420SPVenusUbwc;
+  case MDP_Y_CRCB_H2V2_VENUS:      return kFormatYCrCb420SemiPlanarVenus;
+  case MDP_YCBYCR_H2V1:            return kFormatYCbCr422H2V1Packed;
+  default:                         return kFormatInvalid;
+  }
+}
+
+void HWInfo::InitSupportedFormatMap(HWResourceInfo *hw_resource) {
+  hw_resource->supported_formats_map.clear();
+
+  for (int sub_blk_type = INT(kHWVIGPipe); sub_blk_type < INT(kHWSubBlockMax); sub_blk_type++) {
+    PopulateSupportedFormatMap(kDefaultFormatSupport[sub_blk_type], MDP_IMGTYPE_LIMIT,
+                               (HWSubBlockType)sub_blk_type, hw_resource);
+  }
+}
+
+void HWInfo::ParseFormats(char *tokens[], uint32_t token_count, HWSubBlockType sub_blk_type,
+                          HWResourceInfo *hw_resource) {
+  if (token_count > BITS_TO_BYTES(MDP_IMGTYPE_LIMIT)) {
+    return;
+  }
+
+  std::unique_ptr<uint8_t[]> format_supported(new uint8_t[token_count]);
+  for (uint32_t i = 0; i < token_count; i++) {
+    format_supported[i] = UINT8(atoi(tokens[i]));
+  }
+
+  PopulateSupportedFormatMap(format_supported.get(), (token_count << 3), sub_blk_type, hw_resource);
+}
+
+void HWInfo::PopulateSupportedFormatMap(const uint8_t *format_supported, uint32_t format_count,
+                                        HWSubBlockType sub_blk_type, HWResourceInfo *hw_resource) {
+  vector <LayerBufferFormat> supported_sdm_formats;
+  for (uint32_t mdp_format = 0; mdp_format < format_count; mdp_format++) {
+    if (IS_BIT_SET(format_supported[mdp_format >> 3], (mdp_format & 7))) {
+      LayerBufferFormat sdm_format = GetSDMFormat(mdp_format);
+      if (sdm_format != kFormatInvalid) {
+        supported_sdm_formats.push_back(sdm_format);
+      }
+    }
+  }
+
+  hw_resource->supported_formats_map.erase(sub_blk_type);
+  hw_resource->supported_formats_map.insert(make_pair(sub_blk_type, supported_sdm_formats));
 }
 
 }  // namespace sdm

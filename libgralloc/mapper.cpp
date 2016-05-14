@@ -467,27 +467,17 @@ int gralloc_perform(struct gralloc_module_t const* module,
             } break;
 
         case GRALLOC_MODULE_PERFORM_SET_IGC:
-            {
-                private_handle_t* hnd = va_arg(args, private_handle_t*);
-                uint32_t igc = va_arg(args, uint32_t);
-                if (!private_handle_t::validate(hnd)) {
-                    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
-                    if (metadata) {
-                        metadata->igc = (IGC_t) igc;
-                        metadata->operation |= SET_IGC;
-                        res = 0;
-                    }
-                }
-            } break;
+            res = 0;
+            break;
 
         case GRALLOC_MODULE_PERFORM_SET_SINGLE_BUFFER_MODE:
             {
                 private_handle_t* hnd =  va_arg(args, private_handle_t*);
                 uint32_t *enable = va_arg(args, uint32_t*);
-                if (private_handle_t::validate(hnd)) {
-                    return res;
+                if (!private_handle_t::validate(hnd)) {
+                    setMetaData(hnd, SET_SINGLE_BUFFER_MODE, enable);
+                    res = 0;
                 }
-                setMetaData(hnd, SET_SINGLE_BUFFER_MODE, enable);
             } break;
         default:
             break;
