@@ -39,6 +39,7 @@
 #include <cutils/properties.h>
 #include <map>
 #include <utility>
+#include <vector>
 
 #include "hwc_display.h"
 #include "hwc_debugger.h"
@@ -522,7 +523,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     layer->flags.updating = true;
 
     if (num_hw_layers <= kMaxLayerCount) {
-      layer->flags.updating = IsLayerUpdating(content_list, INT32(i));
+      layer->flags.updating = IsLayerUpdating(content_list, layer);
     }
 #ifdef QTI_BSP
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
@@ -593,13 +594,6 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     flush_ = true;
   }
 
-  // If current draw cycle has different set of layers updating in comparison to previous cycle,
-  // cache content using GPU again.
-  // If set of updating layers remains same, use cached buffer and replace layers marked for GPU
-  // composition with SDE so that SurfaceFlinger does not compose them. Set cache inuse here.
-  bool needs_fb_refresh = NeedsFrameBufferRefresh(content_list);
-  layer_stack_cache_.in_use = false;
-
   for (size_t i = 0; i < num_hw_layers; i++) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     Layer *layer = layer_stack_.layers.at(i);
@@ -609,15 +603,8 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
         (composition == kCompositionBlit)) {
       hwc_layer.hints |= HWC_HINT_CLEAR_FB;
     }
-
-    if (!needs_fb_refresh && composition == kCompositionGPU) {
-      composition = kCompositionSDE;
-      layer_stack_cache_.in_use = true;
-    }
     SetComposition(composition, &hwc_layer.compositionType);
   }
-
-  CacheLayerStackInfo(content_list);
 
   return 0;
 }
@@ -712,7 +699,7 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
       // framebuffer layer throughout animation and do not allow framework to do eglswapbuffer on
       // framebuffer target. So graphics doesn't close the release fence fd of framebuffer target,
       // Hence close the release fencefd of framebuffer target here.
-      if (layer->composition == kCompositionGPUTarget && layer_stack_cache_.animating) {
+      if (layer->composition == kCompositionGPUTarget && animating_) {
         close(hwc_layer.releaseFenceFd);
         hwc_layer.releaseFenceFd = -1;
       }
@@ -725,8 +712,7 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
   }
 
   if (!flush_) {
-    layer_stack_cache_.animating = layer_stack_.flags.animating;
-
+    animating_ = layer_stack_.flags.animating;
     // if swapinterval property is set to 0 then close and reset the list retire fence
     if (swap_interval_zero_) {
       close(layer_stack_.retire_fence_fd);
@@ -745,98 +731,13 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
   return status;
 }
 
-
-bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
-  uint32_t num_hw_layers = UINT32(content_list->numHwLayers);
-
-  // Handle ongoing animation and end here, start is handled below
-  if (layer_stack_cache_.animating) {
-      if (!layer_stack_.flags.animating) {
-        // Animation is ending.
-        return true;
-      } else {
-        // Animation is going on.
-        return false;
-      }
-  }
-
-  // Frame buffer needs to be refreshed for the following reasons:
-  // 1. Any layer is marked skip in the current layer stack.
-  // 2. Any layer is added/removed/layer properties changes in the current layer stack.
-  // 3. Any layer handle is changed and it is marked for GPU composition
-  // 4. Any layer's current composition is different from previous composition.
-  if (layer_stack_.flags.skip_present || layer_stack_.flags.geometry_changed) {
-    return true;
-  }
-
-  for (uint32_t i = 0; i < num_hw_layers; i++) {
-    Layer *layer = layer_stack_.layers.at(i);
-    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
-
-    // need FB refresh for s3d case
-    if (layer->input_buffer->s3d_format != kS3dFormatNone) {
-        return true;
-    }
-
-    if (layer->composition == kCompositionGPUTarget ||
-        layer->composition == kCompositionBlitTarget) {
-      continue;
-    }
-
-    if (layer_cache.composition != layer->composition) {
-      return true;
-    }
-
-    if ((layer->composition == kCompositionGPU) && IsLayerUpdating(content_list, INT32(i))) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-bool HWCDisplay::IsLayerUpdating(hwc_display_contents_1_t *content_list, int layer_index) {
-  hwc_layer_1_t &hwc_layer = content_list->hwLayers[layer_index];
-  LayerCache &layer_cache = layer_stack_cache_.layer_cache[layer_index];
-
-  const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
-  const MetaData_t *meta_data = pvt_handle ?
-    reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata) : NULL;
-
+bool HWCDisplay::IsLayerUpdating(hwc_display_contents_1_t *content_list, const Layer *layer) {
   // Layer should be considered updating if
   //   a) layer is in single buffer mode, or
-  //   b) layer handle has changed, or
-  //   c) layer plane alpha has changed, or
-  //   d) layer stack geometry has changed
-  return ((meta_data && (meta_data->operation & SET_SINGLE_BUFFER_MODE) &&
-              meta_data->isSingleBufferMode) ||
-          (layer_cache.handle != hwc_layer.handle) ||
-          (layer_cache.plane_alpha != hwc_layer.planeAlpha) ||
-          (content_list->flags & HWC_GEOMETRY_CHANGED));
-}
-
-void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
-  uint32_t layer_count = UINT32(layer_stack_.layers.size());
-
-  if (layer_count > kMaxLayerCount || layer_stack_.flags.animating) {
-    ResetLayerCacheStack();
-    return;
-  }
-
-  for (uint32_t i = 0; i < layer_count; i++) {
-    Layer *layer = layer_stack_.layers.at(i);
-    if (layer->composition == kCompositionGPUTarget ||
-        layer->composition == kCompositionBlitTarget) {
-      continue;
-    }
-
-    LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
-    layer_cache.handle = content_list->hwLayers[i].handle;
-    layer_cache.plane_alpha = content_list->hwLayers[i].planeAlpha;
-    layer_cache.composition = layer->composition;
-  }
-
-  layer_stack_cache_.layer_count = layer_count;
+  //   b) valid dirty_regions(android specific hint for updating status), or
+  //   c) layer stack geometry has changed
+  return (layer->flags.single_buffer || IsSurfaceUpdated(layer->dirty_regions) ||
+         (layer_stack_.flags.geometry_changed));
 }
 
 void HWCDisplay::SetRect(const hwc_rect_t &source, LayerRect *target) {
@@ -1447,16 +1348,6 @@ int HWCDisplay::GetVisibleDisplayRect(hwc_rect_t* visible_rect) {
   return 0;
 }
 
-void HWCDisplay::ResetLayerCacheStack() {
-  uint32_t layer_count = layer_stack_cache_.layer_count;
-  for (uint32_t i = 0; i < layer_count; i++) {
-    layer_stack_cache_.layer_cache[i] = LayerCache();
-  }
-  layer_stack_cache_.layer_count = 0;
-  layer_stack_cache_.animating = false;
-  layer_stack_cache_.in_use = false;
-}
-
 void HWCDisplay::SetSecureDisplay(bool secure_display_active) {
   secure_display_active_ = secure_display_active;
   return;
@@ -1478,6 +1369,8 @@ int HWCDisplay::GetDisplayAttributesForConfig(int config, DisplayConfigVariableI
   return display_intf_->GetConfig(UINT32(config), attributes) == kErrorNone ? 0 : -1;
 }
 
+// TODO(user): HWC needs to know updating for dyn_fps, cpu hint features,
+// once the features are moved to SDM, the two functions below can be removed.
 bool HWCDisplay::SingleLayerUpdating(uint32_t app_layer_count) {
   uint32_t updating_count = 0;
 
@@ -1546,6 +1439,14 @@ void HWCDisplay::PrepareDynamicRefreshRate(Layer *layer) {
   } else {
     layer->frame_rate = current_refresh_rate_;
   }
+}
+
+bool HWCDisplay::IsSurfaceUpdated(const std::vector<LayerRect> &dirty_regions) {
+  // based on dirty_regions determine if its updating
+  // dirty_rect count = 0 - whole layer - updating.
+  // dirty_rect count = 1 or more valid rects - updating.
+  // dirty_rect count = 1 with (0,0,0,0) - not updating.
+  return (dirty_regions.empty() || IsValid(dirty_regions.at(0)));
 }
 
 }  // namespace sdm
