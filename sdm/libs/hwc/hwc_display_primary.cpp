@@ -108,10 +108,29 @@ void HWCDisplayPrimary::ProcessBootAnimCompleted(hwc_display_contents_1_t *list)
   if (numBootUpLayers == 0) {
     numBootUpLayers = 2;
   }
-
-  if (list->numHwLayers > numBootUpLayers) {
+  /* All other checks namely "init.svc.bootanim" or
+  * HWC_GEOMETRY_CHANGED fail in correctly identifying the
+  * exact bootup transition to homescreen
+  */
+  char cryptoState[PROPERTY_VALUE_MAX];
+  char voldDecryptState[PROPERTY_VALUE_MAX];
+  bool isEncrypted = false;
+  bool main_class_services_started = false;
+  if (property_get("ro.crypto.state", cryptoState, "unencrypted")) {
+    DLOGI("%s: cryptostate= %s", __FUNCTION__, cryptoState);
+    if (!strcmp(cryptoState, "encrypted")) {
+      isEncrypted = true;
+      if (property_get("vold.decrypt", voldDecryptState, "") &&
+            !strcmp(voldDecryptState, "trigger_restart_framework"))
+        main_class_services_started = true;
+      DLOGI("%s: vold= %s", __FUNCTION__, voldDecryptState);
+    }
+  }
+  if ((!isEncrypted ||(isEncrypted && main_class_services_started)) &&
+    (list->numHwLayers > numBootUpLayers)) {
     boot_animation_completed_ = true;
-    // one-shot action check if bootanimation completed then apply default display mode.
+    // Applying default mode after bootanimation is finished And
+    // If Data is Encrypted, it is ready for access.
     if (display_intf_)
       display_intf_->ApplyDefaultDisplayMode();
   }

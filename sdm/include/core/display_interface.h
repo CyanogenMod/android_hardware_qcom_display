@@ -96,6 +96,7 @@ struct DisplayConfigVariableInfo {
   float y_dpi = 0.0f;             //!< Dots per inch in Y-direction.
   uint32_t fps = 0;               //!< Frame rate per second.
   uint32_t vsync_period_ns = 0;   //!< VSync period in nanoseconds.
+  bool is_yuv = false;            //!< If the display output is in YUV format.
 };
 
 /*! @brief Event data associated with VSync event.

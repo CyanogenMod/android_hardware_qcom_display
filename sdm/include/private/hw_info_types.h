@@ -339,7 +339,8 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
             (vsync_period_ns != attributes.vsync_period_ns) ||
             (v_front_porch != attributes.v_front_porch) ||
             (v_back_porch != attributes.v_back_porch) ||
-            (v_pulse_width != attributes.v_pulse_width));
+            (v_pulse_width != attributes.v_pulse_width) ||
+            (is_yuv != attributes.is_yuv));
   }
 
   bool operator ==(const HWDisplayAttributes &attributes) {

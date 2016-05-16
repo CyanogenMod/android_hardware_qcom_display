@@ -260,6 +260,7 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
   }
 
   GetDisplayS3DSupport(index, display_attributes);
+  display_attributes->is_yuv = IS_BIT_SET(timing_mode->pixel_formats, 1);
 
   return kErrorNone;
 }
@@ -316,6 +317,8 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
   }
 
   active_config_index_ = index;
+
+  frame_rate_ = timing_mode->refresh_rate;
 
   // Get the supported s3d modes for current active config index
   HWDisplayAttributes attrib;
@@ -692,6 +695,62 @@ DisplayError HWHDMI::SetS3DMode(HWS3DMode s3d_mode) {
   Sys::close_(s3d_mode_node);
 
   DLOGI_IF(kTagDriverConfig, "s3d mode %d", hw_panel_info_.s3d_mode);
+  return kErrorNone;
+}
+
+DisplayError HWHDMI::SetRefreshRate(uint32_t refresh_rate) {
+  char mode_path[kMaxStringLength] = {0};
+  char node_path[kMaxStringLength] = {0};
+  uint32_t mode = kModeHFP;
+
+  if (refresh_rate == frame_rate_) {
+    return kErrorNone;
+  }
+
+  snprintf(mode_path, sizeof(mode_path), "%s%d/msm_fb_dfps_mode", fb_path_, fb_node_index_);
+  snprintf(node_path, sizeof(node_path), "%s%d/dynamic_fps", fb_path_, fb_node_index_);
+
+  int fd_mode = Sys::open_(mode_path, O_WRONLY);
+  if (fd_mode < 0) {
+    DLOGE("Failed to open %s with error %s", node_path, strerror(errno));
+    return kErrorFileDescriptor;
+  }
+
+  char dfps_mode[kMaxStringLength];
+  snprintf(dfps_mode, sizeof(dfps_mode), "%d", mode);
+  DLOGI_IF(kTagDriverConfig, "Setting dfps_mode  = %d", mode);
+  ssize_t len = Sys::pwrite_(fd_mode, dfps_mode, strlen(dfps_mode), 0);
+  if (len < 0) {
+    DLOGE("Failed to enable dfps mode %d with error %s", mode, strerror(errno));
+    Sys::close_(fd_mode);
+    return kErrorUndefined;
+  }
+  Sys::close_(fd_mode);
+
+  int fd_node = Sys::open_(node_path, O_WRONLY);
+  if (fd_node < 0) {
+    DLOGE("Failed to open %s with error %s", node_path, strerror(errno));
+    return kErrorFileDescriptor;
+  }
+
+  char refresh_rate_string[kMaxStringLength];
+  snprintf(refresh_rate_string, sizeof(refresh_rate_string), "%d", refresh_rate);
+  DLOGI_IF(kTagDriverConfig, "Setting refresh rate = %d", refresh_rate);
+  len = Sys::pwrite_(fd_node, refresh_rate_string, strlen(refresh_rate_string), 0);
+  if (len < 0) {
+    DLOGE("Failed to write %d with error %s", refresh_rate, strerror(errno));
+    Sys::close_(fd_node);
+    return kErrorUndefined;
+  }
+  Sys::close_(fd_node);
+
+  DisplayError error = ReadTimingInfo();
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  frame_rate_ = refresh_rate;
+
   return kErrorNone;
 }
 

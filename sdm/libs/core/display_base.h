@@ -90,6 +90,7 @@ class DisplayBase : public DisplayInterface {
   HWDeviceType hw_device_type_;
   HWInterface *hw_intf_ = NULL;
   HWPanelInfo hw_panel_info_;
+  HWDisplayAttributes display_attributes_;
   BufferSyncHandler *buffer_sync_handler_ = NULL;
   CompManager *comp_manager_ = NULL;
   RotatorInterface *rotator_intf_ = NULL;
@@ -109,6 +110,7 @@ class DisplayBase : public DisplayInterface {
   HWEventsInterface *hw_events_intf_ = NULL;
 
  private:
+  bool one_frame_full_roi_ = false;
   // Unused
   virtual DisplayError GetConfig(DisplayConfigFixedInfo *variable_info) {
     return kErrorNone;

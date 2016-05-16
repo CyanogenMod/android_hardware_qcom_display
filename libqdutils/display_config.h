@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013 - 2016 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -47,10 +47,12 @@ namespace qdutils {
 
 // Use this enum to specify the dpy parameters where needed
 enum {
-    DISPLAY_PRIMARY = 0,
-    DISPLAY_EXTERNAL,
-    DISPLAY_TERTIARY,
-    DISPLAY_VIRTUAL,
+    DISPLAY_PRIMARY = HWC_DISPLAY_PRIMARY,
+    DISPLAY_EXTERNAL = HWC_DISPLAY_EXTERNAL,
+#ifdef QTI_BSP
+    DISPLAY_TERTIARY = HWC_DISPLAY_TERTIARY,
+#endif
+    DISPLAY_VIRTUAL = HWC_DISPLAY_VIRTUAL,
 };
 
 // External Display states - used in setSecondaryDisplayStatus()
@@ -83,8 +85,9 @@ typedef struct DisplayAttributes {
     float xdpi;
     float ydpi;
     char panel_type;
+    bool is_yuv;
     DisplayAttributes() : vsync_period(0), xres(0), yres(0), xdpi(0.0f),
-            ydpi(0.0f), panel_type(0) {}
+            ydpi(0.0f), panel_type(0), is_yuv(false) {}
 } DisplayAttributes_t;
 
 //=============================================================================
