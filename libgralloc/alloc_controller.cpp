@@ -88,11 +88,10 @@ static unsigned int getUBwcSize(int, int, int, const int, const int);
  * read or written in software. Any combination with a _RARELY_ flag will be
  * treated as uncached. */
 static bool useUncached(const int& usage) {
-    if((usage & GRALLOC_USAGE_PRIVATE_UNCACHED) or
-            ((usage & GRALLOC_USAGE_SW_WRITE_MASK) ==
-            GRALLOC_USAGE_SW_WRITE_RARELY) or
-            ((usage & GRALLOC_USAGE_SW_READ_MASK) ==
-            GRALLOC_USAGE_SW_READ_RARELY))
+    if ((usage & GRALLOC_USAGE_PROTECTED) or
+        (usage & GRALLOC_USAGE_PRIVATE_UNCACHED) or
+        ((usage & GRALLOC_USAGE_SW_WRITE_MASK) == GRALLOC_USAGE_SW_WRITE_RARELY) or
+        ((usage & GRALLOC_USAGE_SW_READ_MASK) ==  GRALLOC_USAGE_SW_READ_RARELY))
         return true;
 
     return false;
@@ -458,23 +457,16 @@ int IonController::allocate(alloc_data& data, int usage)
     data.allocType = 0;
 
     if(usage & GRALLOC_USAGE_PROTECTED) {
-        if (usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
-            if (usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY) {
-                ionHeapId = ION_HEAP(SD_HEAP_ID);
-                /*
-                 * There is currently no flag in ION for Secure Display
-                 * VM. Please add it to the define once available.
-                */
-                ionFlags |= ION_SD_FLAGS;
-            } else {
-                ionHeapId = ION_HEAP(CP_HEAP_ID);
-                ionFlags |= ION_CP_FLAGS;
-            }
+        if (usage & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY) {
+            ionHeapId = ION_HEAP(SD_HEAP_ID);
+            /*
+             * There is currently no flag in ION for Secure Display
+             * VM. Please add it to the define once available.
+             */
+            ionFlags |= ION_SD_FLAGS;
         } else {
-            // for targets/OEMs which do not need HW level protection
-            // do not set ion secure flag & MM heap. Fallback to system heap.
-            ionHeapId |= ION_HEAP(ION_SYSTEM_HEAP_ID);
-            data.allocType |= private_handle_t::PRIV_FLAGS_PROTECTED_BUFFER;
+            ionHeapId = ION_HEAP(CP_HEAP_ID);
+            ionFlags |= ION_CP_FLAGS;
         }
     } else if(usage & GRALLOC_USAGE_PRIVATE_MM_HEAP) {
         //MM Heap is exclusively a secure heap.
