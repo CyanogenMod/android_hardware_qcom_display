@@ -27,6 +27,7 @@
 #include <private/color_params.h>
 #include <map>
 #include <set>
+#include <string>
 #include <queue>
 #include <utility>
 #include "hwc_callbacks.h"
