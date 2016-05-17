@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C)2012-2015, The Linux Foundation. All rights reserved.
+ * Copyright (C)2012-2016, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -565,7 +565,7 @@ struct gpu_hint_info {
     // system level flag to enable gpu_perf_mode
     bool mGpuPerfModeEnable;
     // Stores the current GPU performance mode DEFAULT/HIGH
-    bool mCurrGPUPerfMode;
+    uint32_t mCurrGPUPerfMode;
     // Stores the compositon state GPU, MDP or IDLE_FALLBACK
     bool mCompositionState;
     // Stores the EGLContext of current process

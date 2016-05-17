@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C) 2012-2014, The Linux Foundation All rights reserved.
+ * Copyright (C) 2012-2014,2016, The Linux Foundation All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -79,7 +79,7 @@ namespace qhwc {
 // Std refresh rates for digital videos- 24p, 30p, 48p and 60p
 uint32_t stdRefreshRates[] = { 30, 24, 48, 60 };
 
-static uint32_t getFBformat(fb_var_screeninfo vinfo) {
+static uint32_t getFBformat(fb_var_screeninfo /*vinfo*/) {
     uint32_t fbformat = HAL_PIXEL_FORMAT_RGBA_8888;
 
 #ifdef GET_FRAMEBUFFER_FORMAT_FROM_HWC
@@ -1266,7 +1266,7 @@ bool isRotationDoable(hwc_context_t *ctx, private_handle_t *hnd) {
     // Rotate layers, if it is YUV type or rendered by CPU and not
     // for the MDP versions below MDP5
     if((isCPURendered(hnd) && isRotatorSupportedFormat(hnd) &&
-        !ctx->mMDP.version < qdutils::MDSS_V5)
+        !(ctx->mMDP.version < qdutils::MDSS_V5))
                    || isYuvBuffer(hnd)) {
         return true;
     }
@@ -2577,6 +2577,9 @@ void setGPUHint(hwc_context_t* ctx, hwc_display_contents_1_t* list) {
         }
         gpuHint->mCompositionState = COMPOSITION_STATE_MDP;
     }
+#else
+    (void) ctx;
+    (void) list;
 #endif
 }
 
@@ -2596,7 +2599,6 @@ bool isPeripheral(const hwc_rect_t& rect1, const hwc_rect_t& rect2) {
 
 void processBootAnimCompleted(hwc_context_t *ctx) {
     char value[PROPERTY_VALUE_MAX];
-    int ret = -1;
 
     // Applying default mode after bootanimation is finished
     property_get("init.svc.bootanim", value, "running");
@@ -2874,7 +2876,6 @@ void handle_offline(hwc_context_t* ctx, int dpy) {
 bool loadEglLib(hwc_context_t* ctx) {
     bool success = false;
 #ifdef QTI_BSP
-    const char* error;
     dlerror();
 
     ctx->mEglLib = dlopen("libEGL_adreno.so", RTLD_NOW);
@@ -2895,6 +2896,8 @@ bool loadEglLib(hwc_context_t* ctx) {
     } else {
         ALOGE("Couldn't load libEGL: %s", dlerror());
     }
+#else
+    (void) ctx;
 #endif
     return success;
 }

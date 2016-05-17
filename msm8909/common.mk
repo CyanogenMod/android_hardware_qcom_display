@@ -19,7 +19,7 @@ common_libs := liblog libutils libcutils libhardware
 
 #Common C flags
 common_flags := -DDEBUG_CALC_FPS -Wno-missing-field-initializers
-common_flags += -Wconversion -Wall -Werror
+common_flags += -Wconversion -Wall -Werror -Wno-sign-conversion
 
 ifeq ($(ARCH_ARM_HAVE_NEON),true)
     common_flags += -D__ARM_HAVE_NEON
@@ -63,3 +63,5 @@ ifeq ($(call is-vendor-board-platform,QCOM),true)
     common_deps += $(BOARD_KERNEL_HEADER_DEPENDENCIES)
     kernel_includes += $(BOARD_KERNEL_HEADER_DIR)
 endif 
+
+common_clang_flags := true

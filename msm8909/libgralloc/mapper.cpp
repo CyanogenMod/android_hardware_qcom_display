@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014,2016 The Linux Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -116,13 +116,13 @@ static int gralloc_unmap(gralloc_module_t const* module,
         if(memalloc != NULL) {
             err = memalloc->unmap_buffer(base, size, hnd->offset);
             if (err) {
-                ALOGE("Could not unmap memory at address %p", base);
+                ALOGE("Could not unmap memory at address %p", (void*)base);
             }
             base = (void*)hnd->base_metadata;
             size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
             err = memalloc->unmap_buffer(base, size, hnd->offset_metadata);
             if (err) {
-                ALOGE("Could not unmap memory at address %p", base);
+                ALOGE("Could not unmap memory at address %p", (void*)base);
             }
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014,2016 Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -242,7 +242,7 @@ void HwcDebug::logLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
     }
 
     if (hnd)
-        getHalPixelFormatStr(hnd->format, pixFormatStr);
+        getHalPixelFormatStr(hnd->format, pixFormatStr, sizeof(pixFormatStr));
 
     // Log Line 1
     ALOGI("Display[%s] Layer[%zu] SrcBuff[%dx%d] SrcCrop[%dl, %dt, %dr, %db] "
@@ -314,7 +314,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
         return;
     }
 
-    getHalPixelFormatStr(hnd->format, pixFormatStr);
+    getHalPixelFormatStr(hnd->format, pixFormatStr, sizeof(pixFormatStr));
 #ifdef QTI_BSP
     if (needDumpPng && hnd->base) {
         bool bResult = false;
@@ -377,73 +377,72 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
     }
 }
 
-void HwcDebug::getHalPixelFormatStr(int format, char pixFormatStr[])
+void HwcDebug::getHalPixelFormatStr(int format, char pixFormatStr[], size_t arraySize)
 {
     if (!pixFormatStr)
         return;
 
     switch(format) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
-            strlcpy(pixFormatStr, "RGBA_8888", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "RGBA_8888", arraySize);
             break;
         case HAL_PIXEL_FORMAT_RGBX_8888:
-            strlcpy(pixFormatStr, "RGBX_8888", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "RGBX_8888", arraySize);
             break;
         case HAL_PIXEL_FORMAT_RGB_888:
-            strlcpy(pixFormatStr, "RGB_888", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "RGB_888", arraySize);
             break;
         case HAL_PIXEL_FORMAT_RGB_565:
-            strlcpy(pixFormatStr, "RGB_565", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "RGB_565", arraySize);
             break;
         case HAL_PIXEL_FORMAT_BGRA_8888:
-            strlcpy(pixFormatStr, "BGRA_8888", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "BGRA_8888", arraySize);
             break;
         case HAL_PIXEL_FORMAT_YV12:
-            strlcpy(pixFormatStr, "YV12", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "YV12", arraySize);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
-            strlcpy(pixFormatStr, "YCbCr_422_SP_NV16", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "YCbCr_422_SP_NV16", arraySize);
             break;
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-            strlcpy(pixFormatStr, "YCrCb_420_SP_NV21", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "YCrCb_420_SP_NV21", arraySize);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_422_I:
-            strlcpy(pixFormatStr, "YCbCr_422_I_YUY2", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "YCbCr_422_I_YUY2", arraySize);
             break;
         case HAL_PIXEL_FORMAT_YCrCb_422_I:
-            strlcpy(pixFormatStr, "YCrCb_422_I_YVYU", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "YCrCb_422_I_YVYU", arraySize);
             break;
         case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
-            strlcpy(pixFormatStr, "NV12_ENCODEABLE", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "NV12_ENCODEABLE", arraySize);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
             strlcpy(pixFormatStr, "YCbCr_420_SP_TILED_TILE_4x2",
-                   sizeof(pixFormatStr));
+                   arraySize);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-            strlcpy(pixFormatStr, "YCbCr_420_SP", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "YCbCr_420_SP", arraySize);
             break;
         case HAL_PIXEL_FORMAT_YCrCb_420_SP_ADRENO:
-            strlcpy(pixFormatStr, "YCrCb_420_SP_ADRENO", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "YCrCb_420_SP_ADRENO", arraySize);
             break;
         case HAL_PIXEL_FORMAT_YCrCb_422_SP:
-            strlcpy(pixFormatStr, "YCrCb_422_SP", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "YCrCb_422_SP", arraySize);
             break;
         case HAL_PIXEL_FORMAT_R_8:
-            strlcpy(pixFormatStr, "R_8", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "R_8", arraySize);
             break;
         case HAL_PIXEL_FORMAT_RG_88:
-            strlcpy(pixFormatStr, "RG_88", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "RG_88", arraySize);
             break;
         case HAL_PIXEL_FORMAT_INTERLACE:
-            strlcpy(pixFormatStr, "INTERLACE", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "INTERLACE", arraySize);
             break;
         case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
-            strlcpy(pixFormatStr, "YCbCr_420_SP_VENUS", sizeof(pixFormatStr));
+            strlcpy(pixFormatStr, "YCbCr_420_SP_VENUS", arraySize);
             break;
         default:
-            size_t len = sizeof(pixFormatStr);
-            snprintf(pixFormatStr, len, "Unknown0x%X", format);
+            snprintf(pixFormatStr, arraySize, "Unknown0x%X", format);
             break;
     }
 }
