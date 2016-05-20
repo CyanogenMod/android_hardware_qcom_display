@@ -225,9 +225,9 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         SetRect(pipe_info->src_roi, &mdp_layer.src_rect);
         SetRect(pipe_info->dst_roi, &mdp_layer.dst_rect);
         SetMDPFlags(layer, is_rotator_used, is_cursor_pipe_used, &mdp_layer.flags);
-        SetCSC(layer->csc, &mdp_layer.color_space);
+        SetCSC(layer->input_buffer->csc, &mdp_layer.color_space);
         if (pipe_info->flags & kIGC) {
-          SetIGC(layer, mdp_layer_count);
+          SetIGC(layer->input_buffer, mdp_layer_count);
         }
         if (pipe_info->flags & kMultiRect) {
           mdp_layer.flags |= MDP_LAYER_MULTIRECT_ENABLE;
@@ -273,6 +273,9 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
     }
     mdp_out_layer_.buffer.comp_ratio.denom = 1000;
     mdp_out_layer_.buffer.comp_ratio.numer = UINT32(hw_layers->output_compression * 1000);
+#ifdef OUT_LAYER_COLOR_SPACE
+    SetCSC(output_buffer->csc, &mdp_out_layer_.color_space);
+#endif
     SetFormat(output_buffer->format, &mdp_out_layer_.buffer.format);
 
     DLOGI_IF(kTagDriverConfig, "********************* Output buffer Info ************************");
@@ -980,12 +983,12 @@ void HWDevice::SetCSC(LayerCSC source, mdp_color_space *color_space) {
   }
 }
 
-void HWDevice::SetIGC(const Layer *layer, uint32_t index) {
+void HWDevice::SetIGC(const LayerBuffer *layer_buffer, uint32_t index) {
   mdp_input_layer &mdp_layer = mdp_in_layers_[index];
   mdp_overlay_pp_params &pp_params = pp_params_[index];
   mdp_igc_lut_data_v1_7 &igc_lut_data = igc_lut_data_[index];
 
-  switch (layer->igc) {
+  switch (layer_buffer->igc) {
   case kIGCsRGB:
     igc_lut_data.table_fmt = mdp_igc_srgb;
     pp_params.igc_cfg.ops = MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;

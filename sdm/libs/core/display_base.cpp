@@ -660,7 +660,7 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
       snprintf(flags, sizeof(flags), "0x%08x", layer->flags.flags);
       snprintf(decimation, sizeof(decimation), "%3d x %3d", pipe.horizontal_decimation,
                pipe.vertical_decimation);
-      snprintf(csc, sizeof(csc), "%d", layer->csc);
+      snprintf(csc, sizeof(csc), "%d", layer->input_buffer->csc);
 
       DumpImpl::AppendString(buffer, length, format, idx, comp_type, comp_split[count],
                              "-", pipe.pipe_id, input_buffer->width, input_buffer->height,

@@ -121,7 +121,7 @@ class HWDevice : public HWInterface {
                 const uint32_t max_token, uint32_t *count);
   void ResetDisplayParams();
   void SetCSC(const LayerCSC source, mdp_color_space *color_space);
-  void SetIGC(const Layer *layer, uint32_t index);
+  void SetIGC(const LayerBuffer *layer_buffer, uint32_t index);
 
   bool EnableHotPlugDetection(int enable);
   ssize_t SysFsWrite(const char* file_node, const char* value, ssize_t length);
