@@ -20,7 +20,11 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL liboverlay \
                                  libdl libmemalloc libqservice libsync \
                                  libbinder libmedia
 
-LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhwcomposer\"
+LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhwcomposer\" -Wno-absolute-value \
+                                 -Wno-float-conversion
+
+LOCAL_CLANG                   := true
+
 ifeq ($(TARGET_USES_QCOM_BSP),true)
 LOCAL_SHARED_LIBRARIES += libskia
 ifeq ($(GET_FRAMEBUFFER_FORMAT_FROM_HWC),true)
@@ -62,10 +66,5 @@ endif
 ifeq ($(TARGET_SUPPORTS_ANDROID_WEAR), true)
     LOCAL_CFLAGS += -DSUPPORT_BLIT_TO_FB
 endif
-
-# TODO Re-enable clang once the below error is fixed
-#hardware/qcom/display/msm8909/libhwcomposer/hwc_mdpcomp.cpp:1026:17: error: variable length array of non-POD element type 'overlay::utils::Whf'
-#    Whf layerWhf[numPTORLayersFound]; // To store w,h,f of PTOR layers
-LOCAL_CLANG := false
 
 include $(BUILD_SHARED_LIBRARY)

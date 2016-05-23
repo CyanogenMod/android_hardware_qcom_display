@@ -227,6 +227,8 @@ bool CopyBit::prepareSwapRect(hwc_context_t *ctx,
            canUseSwapRect = 1;
 #ifdef QTI_BSP
            dirtyRect = getUnion(dirtyRect, calculateDirtyRect(&layer,fullFrame));
+#else
+          (void)fullFrame;
 #endif
            displayRect = getUnion(displayRect, layer.displayFrame);
        }

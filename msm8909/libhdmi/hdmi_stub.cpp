@@ -43,6 +43,7 @@ HDMIDisplay::~HDMIDisplay() {
 
 void HDMIDisplay::setHPD(uint32_t value) {
     ALOGV("%s stub", __FUNCTION__);
+    (void) value;
 }
 
 bool HDMIDisplay::isHDMIPrimaryDisplay() {
@@ -77,6 +78,8 @@ int HDMIDisplay::teardown() {
 void HDMIDisplay::setPrimaryAttributes(uint32_t primaryWidth,
                                        uint32_t primaryHeight) {
     ALOGV("%s stub", __FUNCTION__);
+    (void) primaryWidth;
+    (void) primaryHeight;
 }
 
 };

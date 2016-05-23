@@ -314,4 +314,8 @@ inline bool MdpData::play(int fd, uint32_t offset) {
 
 } // overlay
 
+inline bool isEqual(float f1, float f2) {
+        return ((int)(f1*100) == (int)(f2*100)) ? true : false;
+}
+
 #endif // OVERLAY_MDP_H

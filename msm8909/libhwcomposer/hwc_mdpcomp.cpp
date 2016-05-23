@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2016, The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
  *
@@ -1023,7 +1023,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         return false;
     }
     private_handle_t *renderBuf = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
-    Whf layerWhf[numPTORLayersFound]; // To store w,h,f of PTOR layers
+    Whf layerWhf[MAX_PTOR_LAYERS]; // To store w,h,f of PTOR layers
 
     // Store the blending mode, planeAlpha, and transform of PTOR layers
     int32_t blending[numPTORLayersFound];
