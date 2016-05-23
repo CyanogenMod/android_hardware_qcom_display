@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
- * Copyright (c) 2010-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2010-2016, The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -191,22 +191,22 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
                         struct hw_device_t** device);
 
 static struct hw_module_methods_t copybit_module_methods = {
-open:  open_copybit
+    .open = open_copybit,
 };
 
 /*
  * The COPYBIT Module
  */
 struct copybit_module_t HAL_MODULE_INFO_SYM = {
-common: {
-tag: HARDWARE_MODULE_TAG,
-     version_major: 1,
-     version_minor: 0,
-     id: COPYBIT_HARDWARE_MODULE_ID,
-     name: "QCT COPYBIT C2D 2.0 Module",
-     author: "Qualcomm",
-     methods: &copybit_module_methods
-        }
+    .common = {
+        .tag =  HARDWARE_MODULE_TAG,
+        .version_major = 1,
+        .version_minor = 0,
+        .id = COPYBIT_HARDWARE_MODULE_ID,
+        .name = "QCT COPYBIT C2D 2.0 Module",
+        .author = "Qualcomm",
+        .methods =  &copybit_module_methods
+    }
 };
 
 
@@ -903,27 +903,6 @@ static int get(struct copybit_device_t *dev, int name)
             value = -EINVAL;
     }
     return value;
-}
-
-static int is_alpha(int cformat)
-{
-    int alpha = 0;
-    switch (cformat & 0xFF) {
-        case C2D_COLOR_FORMAT_8888_ARGB:
-        case C2D_COLOR_FORMAT_8888_RGBA:
-        case C2D_COLOR_FORMAT_5551_RGBA:
-        case C2D_COLOR_FORMAT_4444_ARGB:
-            alpha = 1;
-            break;
-        default:
-            alpha = 0;
-            break;
-    }
-
-    if(alpha && (cformat&C2D_FORMAT_DISABLE_ALPHA))
-        alpha = 0;
-
-    return alpha;
 }
 
 /* Function to check if we need a temporary buffer for the blit.
