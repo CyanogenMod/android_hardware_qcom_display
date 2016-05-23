@@ -7,6 +7,7 @@ LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libbinder
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdqservice\"
+LOCAL_CLANG                   := $(common_clang_flags)
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
 LOCAL_SRC_FILES               := QService.cpp \
                                  IQService.cpp \
