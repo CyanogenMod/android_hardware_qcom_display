@@ -20,13 +20,15 @@
 #include <fcntl.h>
 #include <cutils/properties.h>
 #include <sys/mman.h>
-
 #include "gr.h"
 #include "gpu.h"
 #include "memalloc.h"
 #include "alloc_controller.h"
 #include <qdMetaData.h>
 
+#ifdef USE_PREFERRED_CAMERA_FORMAT
+#include <QCameraFormat.h>
+#endif
 using namespace gralloc;
 
 #define SZ_1M 0x100000
@@ -279,15 +281,26 @@ int gpu_context_t::alloc_impl(int w, int h, int format, int usage,
             grallocFormat = HAL_PIXEL_FORMAT_NV21_ZSL; //NV21 ZSL
         else if(usage & GRALLOC_USAGE_HW_CAMERA_READ)
             grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
-        else if(usage & GRALLOC_USAGE_HW_CAMERA_WRITE)
+        else if(usage & GRALLOC_USAGE_HW_CAMERA_WRITE) {
             grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP; //NV21
-        else if(usage & GRALLOC_USAGE_HW_COMPOSER)
+#ifdef USE_PREFERRED_CAMERA_FORMAT
+            if (format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
+               grallocFormat = PREFERRED_YCBCR_420_888_CAMERA_FORMAT; //NV21
+           } else {
+               grallocFormat = PREFERRED_IMPLEMENTATION_DEFINED_CAMERA_FORMAT; //NV12 preview
+           }
+#endif
+        } else if(usage & GRALLOC_USAGE_HW_COMPOSER)
             //XXX: If we still haven't set a format, default to RGBA8888
             grallocFormat = HAL_PIXEL_FORMAT_RGBA_8888;
         //If no other usage flags are detected, default the
         //flexible YUV format to NV21.
-        else if(format == HAL_PIXEL_FORMAT_YCbCr_420_888)
+        else if(format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
             grallocFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP;
+#ifdef USE_PREFERRED_CAMERA_FORMAT
+            grallocFormat = PREFERRED_YCBCR_420_888_CAMERA_FORMAT; //NV21
+#endif
+        }
     }
 
     getGrallocInformationFromFormat(grallocFormat, &bufferType);

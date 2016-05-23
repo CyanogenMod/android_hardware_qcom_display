@@ -24,6 +24,10 @@ LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libmemalloc
 LOCAL_SHARED_LIBRARIES        += libqdutils libGLESv1_CM
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\"
+ifeq ($(USE_PREFERRED_CAMERA_FORMAT),true)
+LOCAL_CFLAGS                  += -DUSE_PREFERRED_CAMERA_FORMAT
+LOCAL_C_INCLUDES              += $(TARGET_OUT_HEADERS)/qcom/camera
+endif
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps) $(kernel_deps)
 LOCAL_SRC_FILES               := gpu.cpp gralloc.cpp framebuffer.cpp mapper.cpp
 LOCAL_COPY_HEADERS_TO         := $(common_header_export_path)
