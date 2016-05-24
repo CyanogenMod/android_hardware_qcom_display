@@ -43,8 +43,8 @@
 
 #define __CLASS__ "HWCDisplay"
 
-#if 0
-#include <exhwcomposer_defs.h>
+#ifdef QCOM_BSP
+#include <hardware/display_defs.h>
 #endif
 
 namespace sdm {
@@ -245,7 +245,7 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
     case HWC_DISPLAY_DPI_Y:
       values[i] = INT32(variable_config.y_dpi * 1000.0f);
       break;
-#if 0
+#ifdef QCOM_BSP
     case HWC_DISPLAY_SECURE:
       values[i] = INT32(true);  // For backward compatibility. All Physical displays are secure
       break;
@@ -570,7 +570,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
       LayerCache layer_cache = layer_stack_cache_.layer_cache[i];
       layer.flags.updating = IsLayerUpdating(hwc_layer, layer_cache);
     }
-#if 0
+#ifdef QCOM_BSP
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
       layer_stack_.flags.animating = true;
     }
