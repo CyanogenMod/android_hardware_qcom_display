@@ -554,7 +554,7 @@ DisplayError HWInfo::GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_dis
   size_t len = kMaxStringLength;
   ssize_t read;
 
-  FILE *fileptr = Sys::fopen_("/sys/class/graphics/fb0/msm_fb_type", "r");
+  FILE *fileptr = Sys::fopen_("/sys/devices/virtual/graphics/fb0/msm_fb_type", "r");
   if (!fileptr) {
     free(stringbuffer);
     return kErrorHardware;
@@ -570,13 +570,13 @@ DisplayError HWInfo::GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_dis
     }
   } else {
     free(stringbuffer);
-    fclose(fileptr);
+    Sys::fclose_(fileptr);
     return kErrorHardware;
   }
 
-  fclose(fileptr);
+  Sys::fclose_(fileptr);
 
-  fileptr = Sys::fopen_("/sys/class/graphics/fb0/connected", "r");
+  fileptr = Sys::fopen_("/sys/devices/virtual/graphics/fb0/connected", "r");
   if (!fileptr) {
     // If fb0 is for a DSI/connected panel, then connected node will not exist
     hw_disp_info->is_connected = true;
@@ -584,11 +584,11 @@ DisplayError HWInfo::GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_dis
     if ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
         hw_disp_info->is_connected =  (!strncmp(line, "1", strlen("1")));
     } else {
-        fclose(fileptr);
+        Sys::fclose_(fileptr);
         free(stringbuffer);
         return kErrorHardware;
     }
-    fclose(fileptr);
+    Sys::fclose_(fileptr);
   }
 
   free(stringbuffer);
