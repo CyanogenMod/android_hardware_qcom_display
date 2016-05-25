@@ -45,6 +45,7 @@
 #define DLOGV_IF(tag, format, ...) DLOG(tag, Verbose, format, ##__VA_ARGS__)
 
 #define DLOGE(format, ...) DLOGE_IF(kTagNone, format, ##__VA_ARGS__)
+#define DLOGD(format, ...) DLOGD_IF(kTagNone, format, ##__VA_ARGS__)
 #define DLOGW(format, ...) DLOGW_IF(kTagNone, format, ##__VA_ARGS__)
 #define DLOGI(format, ...) DLOGI_IF(kTagNone, format, ##__VA_ARGS__)
 #define DLOGV(format, ...) DLOGV_IF(kTagNone, format, ##__VA_ARGS__)
