@@ -50,7 +50,7 @@ class DisplayBase : public DisplayInterface {
   virtual ~DisplayBase() { }
   virtual DisplayError Init();
   virtual DisplayError Deinit();
-  virtual DisplayError Prepare(LayerStack *layer_stack);
+  DisplayError Prepare(LayerStack *layer_stack) final;
   virtual DisplayError Commit(LayerStack *layer_stack);
   virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
@@ -59,9 +59,11 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError GetActiveConfig(uint32_t *index);
   virtual DisplayError GetVSyncState(bool *enabled);
   virtual DisplayError SetDisplayState(DisplayState state);
-  virtual DisplayError SetActiveConfig(uint32_t index);
+  DisplayError SetActiveConfig(uint32_t index) final;
+  DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info) final;
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
-  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
+  DisplayError ControlPartialUpdate(bool enable, uint32_t *pending) final;
+  DisplayError DisablePartialUpdateOneFrame() final;
   virtual DisplayError SetDisplayMode(uint32_t mode);
   virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual bool IsUnderscanSupported();
@@ -77,6 +79,17 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError SetVSyncState(bool enable);
 
  protected:
+  virtual DisplayError PrepareLocked(LayerStack *layer_stack);
+  virtual DisplayError SetActiveConfigLocked(uint32_t index);
+  virtual DisplayError SetActiveConfigLocked(DisplayConfigVariableInfo *variable_info) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError ControlPartialUpdateLocked(bool enable, uint32_t *pending) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError DisablePartialUpdateOneFrameLocked() {
+    return kErrorNotSupported;
+  }
   // DumpImpl method
   void AppendDump(char *buffer, uint32_t length);
 
@@ -84,6 +97,7 @@ class DisplayBase : public DisplayInterface {
   const char *GetName(const LayerComposition &composition);
   DisplayError ValidateGPUTarget(LayerStack *layer_stack);
 
+  Locker locker_;
   DisplayType display_type_;
   DisplayEventHandler *event_handler_ = NULL;
   HWDeviceType hw_device_type_;
@@ -107,9 +121,9 @@ class DisplayBase : public DisplayInterface {
   ColorManagerProxy *color_mgr_ = NULL;  // each display object owns its ColorManagerProxy
   bool partial_update_control_ = true;
   HWEventsInterface *hw_events_intf_ = NULL;
+  bool disable_pu_one_frame_ = false;
 
  private:
-  bool one_frame_full_roi_ = false;
   // Unused
   virtual DisplayError GetConfig(DisplayConfigFixedInfo *variable_info) {
     return kErrorNone;

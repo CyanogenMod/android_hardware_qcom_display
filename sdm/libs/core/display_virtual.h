@@ -40,7 +40,6 @@ class DisplayVirtual : public DisplayBase, DumpImpl {
                  RotatorInterface *rotator_intf);
   virtual DisplayError Init();
   virtual DisplayError Deinit();
-  virtual DisplayError Prepare(LayerStack *layer_stack);
   virtual DisplayError Commit(LayerStack *layer_stack);
   virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
@@ -49,8 +48,6 @@ class DisplayVirtual : public DisplayBase, DumpImpl {
   virtual DisplayError GetActiveConfig(uint32_t *index);
   virtual DisplayError GetVSyncState(bool *enabled);
   virtual DisplayError SetDisplayState(DisplayState state);
-  virtual DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info);
-  virtual DisplayError SetActiveConfig(uint32_t index);
   virtual DisplayError SetVSyncState(bool enable);
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
@@ -64,7 +61,10 @@ class DisplayVirtual : public DisplayBase, DumpImpl {
   virtual DisplayError SetCursorPosition(int x, int y);
 
  private:
-  Locker locker_;
+  virtual DisplayError SetActiveConfigLocked(uint32_t index) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError SetActiveConfigLocked(DisplayConfigVariableInfo *variable_info);
   HWDisplayAttributes display_attributes_;
 };
 
