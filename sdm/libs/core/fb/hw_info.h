@@ -56,9 +56,11 @@ class HWInfo: public HWInfoInterface {
   static const int kHWCapabilitiesNode = 0;
   static const uint8_t kDefaultFormatSupport[kHWSubBlockMax][BITS_TO_BYTES(MDP_IMGTYPE_LIMIT1)];
   static constexpr const char *kRotatorCapsPath = "/sys/devices/virtual/rotator/mdss_rotator/caps";
+  static constexpr const char *kBWModeBitmap
+                                  = "/sys/devices/virtual/graphics/fb0/mdp/bw_mode_bitmap";
 
-  static int ParseString(char *input, char *tokens[], const uint32_t max_token, const char *delim,
-                         uint32_t *count);
+  static int ParseString(const char *input, char *tokens[], const uint32_t max_token,
+                         const char *delim, uint32_t *count);
   DisplayError GetDynamicBWLimits(HWResourceInfo *hw_resource);
   LayerBufferFormat GetSDMFormat(int mdp_format);
   void InitSupportedFormatMap(HWResourceInfo *hw_resource);

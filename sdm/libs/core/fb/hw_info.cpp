@@ -49,7 +49,7 @@
 using std::vector;
 using std::map;
 using std::string;
-using std::ifstream;
+using std::fstream;
 using std::to_string;
 
 namespace sdm {
@@ -67,15 +67,15 @@ const uint8_t HWInfo::kDefaultFormatSupport[kHWSubBlockMax][BITS_TO_BYTES(MDP_IM
   { 0x3F, 0xF4, 0x10, 0x1E, 0x20, 0xFF, 0x01, 0x00, 0xAA, 0x16 },  // kHWWBIntfOutput
 };
 
-int HWInfo::ParseString(char *input, char *tokens[], const uint32_t max_token, const char *delim,
-                        uint32_t *count) {
+int HWInfo::ParseString(const char *input, char *tokens[], const uint32_t max_token,
+                        const char *delim, uint32_t *count) {
   char *tmp_token = NULL;
   char *temp_ptr;
   uint32_t index = 0;
   if (!input) {
     return -1;
   }
-  tmp_token = strtok_r(input, delim, &temp_ptr);
+  tmp_token = strtok_r(const_cast<char *>(input), delim, &temp_ptr);
   while (tmp_token && index < max_token) {
     tokens[index++] = tmp_token;
     tmp_token = strtok_r(NULL, delim, &temp_ptr);
@@ -107,15 +107,9 @@ DisplayError HWInfoInterface::Destroy(HWInfoInterface *intf) {
 }
 
 DisplayError HWInfo::GetDynamicBWLimits(HWResourceInfo *hw_resource) {
-  const char *bw_info_node = "/sys/devices/virtual/graphics/fb0/mdp/bw_mode_bitmap";
-  FILE *fileptr = NULL;
-  uint32_t token_count = 0;
-  const uint32_t max_count = kBwModeMax;
-  char *tokens[max_count] = { NULL };
-  fileptr = Sys::fopen_(bw_info_node, "r");
-
-  if (!fileptr) {
-    DLOGE("File '%s' not found", bw_info_node);
+  Sys::fstream fs(kBWModeBitmap, fstream::in);
+  if (!fs.is_open()) {
+    DLOGE("File '%s' not found", kBWModeBitmap);
     return kErrorHardware;
   }
 
@@ -125,17 +119,12 @@ DisplayError HWInfo::GetDynamicBWLimits(HWResourceInfo *hw_resource) {
     bw_info->pipe_bw_limit[index] = hw_resource->max_pipe_bw;
   }
 
-  char *stringbuffer = reinterpret_cast<char *>(malloc(kMaxStringLength));
-  if (stringbuffer == NULL) {
-    DLOGE("Failed to allocate stringbuffer");
-    return kErrorMemory;
-  }
-
-  size_t len = kMaxStringLength;
-  ssize_t read;
-  char *line = stringbuffer;
-  while ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
-    if (!ParseString(line, tokens, max_count, ":, =\n", &token_count)) {
+  uint32_t token_count = 0;
+  const uint32_t max_count = kBwModeMax;
+  char *tokens[max_count] = { NULL };
+  string line;
+  while (Sys::getline_(fs, line)) {
+    if (!ParseString(line.c_str(), tokens, max_count, ":, =\n", &token_count)) {
       if (!strncmp(tokens[0], "default_pipe", strlen("default_pipe"))) {
         bw_info->pipe_bw_limit[kBwDefault] = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "camera_pipe", strlen("camera_pipe"))) {
@@ -155,47 +144,30 @@ DisplayError HWInfo::GetDynamicBWLimits(HWResourceInfo *hw_resource) {
       }
     }
   }
-  free(stringbuffer);
-  Sys::fclose_(fileptr);
 
   return kErrorNone;
 }
 
 DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
-  if (!hw_resource) {
-    DLOGE("HWResourceInfo pointer in invalid.");
-    return kErrorParameters;
-  }
-  const char *fb_path = "/sys/devices/virtual/graphics/fb";
-  FILE *fileptr = NULL;
-  uint32_t token_count = 0;
-  const uint32_t max_count = 256;
-  char *tokens[max_count] = { NULL };
-  char *stringbuffer = reinterpret_cast<char *>(malloc(kMaxStringLength));
+  string fb_path = "/sys/devices/virtual/graphics/fb"
+                      + to_string(kHWCapabilitiesNode) + "/mdp/caps";
 
-  if (stringbuffer == NULL) {
-    DLOGE("Failed to allocate stringbuffer");
-    return kErrorMemory;
-  }
-
-  snprintf(stringbuffer , kMaxStringLength, "%s%d/mdp/caps", fb_path, kHWCapabilitiesNode);
-  fileptr = Sys::fopen_(stringbuffer, "r");
-
-  if (!fileptr) {
-    DLOGE("File '%s' not found", stringbuffer);
-    free(stringbuffer);
+  Sys::fstream fs(fb_path, fstream::in);
+  if (!fs.is_open()) {
+    DLOGE("File '%s' not found", fb_path.c_str());
     return kErrorHardware;
   }
 
   InitSupportedFormatMap(hw_resource);
-
-  size_t len = kMaxStringLength;
-  ssize_t read;
-  char *line = stringbuffer;
   hw_resource->hw_version = kHWMdssVersion5;
-  while ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
+
+  uint32_t token_count = 0;
+  const uint32_t max_count = 256;
+  char *tokens[max_count] = { NULL };
+  string line;
+  while (Sys::getline_(fs, line)) {
     // parse the line and update information accordingly
-    if (!ParseString(line, tokens, max_count, ":, =\n", &token_count)) {
+    if (!ParseString(line.c_str(), tokens, max_count, ":, =\n", &token_count)) {
       if (!strncmp(tokens[0], "hw_rev", strlen("hw_rev"))) {
         hw_resource->hw_revision = UINT32(atoi(tokens[1]));  // HW Rev, v1/v2
       } else if (!strncmp(tokens[0], "rot_input_fmts", strlen("rot_input_fmts"))) {
@@ -281,8 +253,8 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
       } else if (!strncmp(tokens[0], "pipe_count", strlen("pipe_count"))) {
         uint32_t pipe_count = UINT8(atoi(tokens[1]));
         for (uint32_t i = 0; i < pipe_count; i++) {
-          read = Sys::getline_(&line, &len, fileptr);
-          if (!ParseString(line, tokens, max_count, ": =\n", &token_count)) {
+          Sys::getline_(fs, line);
+          if (!ParseString(line.c_str(), tokens, max_count, ": =\n", &token_count)) {
             HWPipeCaps pipe_caps;
             pipe_caps.type = kPipeTypeUnused;
             for (uint32_t j = 0; j < token_count; j += 2) {
@@ -334,8 +306,6 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
   } else {
     ::dlclose(extension_lib);
   }
-
-  Sys::fclose_(fileptr);
 
   DLOGI("SDE Version = %d, SDE Revision = %x, RGB = %d, VIG = %d, DMA = %d, Cursor = %d",
         hw_resource->hw_version, hw_resource->hw_revision, hw_resource->num_rgb_pipe,
@@ -390,26 +360,20 @@ DisplayError HWInfo::GetHWRotatorInfo(HWResourceInfo *hw_resource) {
 }
 
 DisplayError HWInfo::GetMDSSRotatorInfo(HWResourceInfo *hw_resource) {
-  FILE *fileptr = NULL;
-  char *stringbuffer = reinterpret_cast<char *>(malloc(sizeof(char) * kMaxStringLength));
-  uint32_t token_count = 0;
-  const uint32_t max_count = 10;
-  char *tokens[max_count] = { NULL };
-  size_t len = kMaxStringLength;
-  ssize_t read = 0;
-
-  snprintf(stringbuffer, sizeof(char) * kMaxStringLength, "%s", kRotatorCapsPath);
-  fileptr = Sys::fopen_(stringbuffer, "r");
-
-  if (!fileptr) {
-    DLOGW("File '%s' not found", stringbuffer);
-    free(stringbuffer);
+  Sys::fstream fs(kRotatorCapsPath, fstream::in);
+  if (!fs.is_open()) {
+    DLOGW("File '%s' not found", kRotatorCapsPath);
     return kErrorNotSupported;
   }
 
+  uint32_t token_count = 0;
+  const uint32_t max_count = 10;
+  char *tokens[max_count] = { NULL };
+  string line;
+
   hw_resource->hw_rot_info.type = HWRotatorInfo::ROT_TYPE_MDSS;
-  while ((read = Sys::getline_(&stringbuffer, &len, fileptr)) != -1) {
-    if (!ParseString(stringbuffer, tokens, max_count, ":, =\n", &token_count)) {
+  while (Sys::getline_(fs, line)) {
+    if (!ParseString(line.c_str(), tokens, max_count, ":, =\n", &token_count)) {
       if (!strncmp(tokens[0], "wb_count", strlen("wb_count"))) {
         hw_resource->hw_rot_info.num_rotator = UINT8(atoi(tokens[1]));
         hw_resource->hw_rot_info.device_path = "/dev/mdss_rotator";
@@ -419,9 +383,6 @@ DisplayError HWInfo::GetMDSSRotatorInfo(HWResourceInfo *hw_resource) {
     }
   }
 
-  Sys::fclose_(fileptr);
-  free(stringbuffer);
-
   DLOGI("MDSS Rotator: Count = %d, Downscale = %d", hw_resource->hw_rot_info.num_rotator,
         hw_resource->hw_rot_info.has_downscale);
 
@@ -430,28 +391,27 @@ DisplayError HWInfo::GetMDSSRotatorInfo(HWResourceInfo *hw_resource) {
 
 DisplayError HWInfo::GetV4L2RotatorInfo(HWResourceInfo *hw_resource) {
   const uint32_t kMaxV4L2Nodes = 64;
-  size_t len = kMaxStringLength;
-  char *line = reinterpret_cast<char *>(malloc(sizeof(char) * len));
   bool found = false;
 
   for (uint32_t i = 0; (i < kMaxV4L2Nodes) && (false == found); i++) {
     string path = "/sys/class/video4linux/video" + to_string(i) + "/name";
-    FILE *fileptr = Sys::fopen_(path.c_str(), "r");
-    if (fileptr) {
-      if ((Sys::getline_(&line, &len, fileptr) != -1) &&
-          (!strncmp(line, "sde_rotator", strlen("sde_rotator")))) {
-         hw_resource->hw_rot_info.device_path = string("/dev/video" + to_string(i));
-         hw_resource->hw_rot_info.num_rotator++;
-         hw_resource->hw_rot_info.type = HWRotatorInfo::ROT_TYPE_V4L2;
-         hw_resource->hw_rot_info.has_downscale = true;
-         // We support only 1 rotator
-         found = true;
-      }
-      Sys::fclose_(fileptr);
+    Sys::fstream fs(path, fstream::in);
+    if (!fs.is_open()) {
+      continue;
+    }
+
+    string line;
+    if (Sys::getline_(fs, line) &&
+        (!strncmp(line.c_str(), "sde_rotator", strlen("sde_rotator")))) {
+       hw_resource->hw_rot_info.device_path = string("/dev/video" + to_string(i));
+       hw_resource->hw_rot_info.num_rotator++;
+       hw_resource->hw_rot_info.type = HWRotatorInfo::ROT_TYPE_V4L2;
+       hw_resource->hw_rot_info.has_downscale = true;
+       // We support only 1 rotator
+       found = true;
     }
   }
 
-  free(line);
   DLOGI("V4L2 Rotator: Count = %d, Downscale = %d", hw_resource->hw_rot_info.num_rotator,
         hw_resource->hw_rot_info.has_downscale);
 
@@ -544,54 +504,35 @@ void HWInfo::PopulateSupportedFormatMap(const uint8_t *format_supported, uint32_
 }
 
 DisplayError HWInfo::GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_disp_info) {
-  char *stringbuffer = reinterpret_cast<char *>(malloc(kMaxStringLength));
-  if (stringbuffer == NULL) {
-    DLOGE("Failed to allocate Stringbuffer");
-    return kErrorMemory;
-  }
-
-  char *line = stringbuffer;
-  size_t len = kMaxStringLength;
-  ssize_t read;
-
-  FILE *fileptr = Sys::fopen_("/sys/devices/virtual/graphics/fb0/msm_fb_type", "r");
-  if (!fileptr) {
-    free(stringbuffer);
+  Sys::fstream fs("/sys/devices/virtual/graphics/fb0/msm_fb_type", fstream::in);
+  if (!fs.is_open()) {
     return kErrorHardware;
   }
 
-  if ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
-    if (!strncmp(line, "dtv panel", strlen("dtv panel"))) {
-      hw_disp_info->type = kHDMI;
-      DLOGI("First display is HDMI");
-    } else {
-      hw_disp_info->type = kPrimary;
-      DLOGI("First display is internal display");
-    }
+  string line;
+  if (!Sys::getline_(fs, line)) {
+    return kErrorHardware;
+  }
+
+  if (!strncmp(line.c_str(), "dtv panel", strlen("dtv panel"))) {
+    hw_disp_info->type = kHDMI;
+    DLOGI("First display is HDMI");
   } else {
-    free(stringbuffer);
-    Sys::fclose_(fileptr);
-    return kErrorHardware;
+    hw_disp_info->type = kPrimary;
+    DLOGI("First display is internal display");
   }
 
-  Sys::fclose_(fileptr);
-
-  fileptr = Sys::fopen_("/sys/devices/virtual/graphics/fb0/connected", "r");
-  if (!fileptr) {
-    // If fb0 is for a DSI/connected panel, then connected node will not exist
+  fs.open("/sys/devices/virtual/graphics/fb0/connected", fstream::in);
+  if (!fs.is_open()) {
     hw_disp_info->is_connected = true;
   } else {
-    if ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
-        hw_disp_info->is_connected =  (!strncmp(line, "1", strlen("1")));
-    } else {
-        Sys::fclose_(fileptr);
-        free(stringbuffer);
-        return kErrorHardware;
+    if (!Sys::getline_(fs, line)) {
+      return kErrorHardware;
     }
-    Sys::fclose_(fileptr);
+
+    hw_disp_info->is_connected =  (!strncmp(line.c_str(), "1", strlen("1")));
   }
 
-  free(stringbuffer);
   return kErrorNone;
 }
 

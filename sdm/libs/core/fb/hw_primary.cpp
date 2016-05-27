@@ -60,6 +60,8 @@
 namespace sdm {
 
 using std::string;
+using std::to_string;
+using std::fstream;
 
 DisplayError HWPrimary::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
                                BufferSyncHandler *buffer_sync_handler) {
@@ -122,37 +124,28 @@ DisplayError HWPrimary::Init() {
 
 bool HWPrimary::GetCurrentModeFromSysfs(size_t *curr_x_pixels, size_t *curr_y_pixels) {
   bool ret = false;
-  size_t len = kPageSize;
-  string mode_path = string(fb_path_) + string("0/mode");
+  string mode_path = fb_path_ + string("0/mode");
 
-  FILE *fd = Sys::fopen_(mode_path.c_str(), "r");
-  if (fd) {
-    char *buffer = static_cast<char *>(calloc(len, sizeof(char)));
+  Sys::fstream fs(mode_path, fstream::in);
+  if (!fs.is_open()) {
+    return false;
+  }
 
-    if (buffer == NULL) {
-      DLOGW("Failed to allocate memory");
-      Sys::fclose_(fd);
-      return false;
+  string line;
+  if (Sys::getline_(fs, line)) {
+    // String is of form "U:1600x2560p-0". Documentation/fb/modedb.txt in
+    // kernel has more info on the format.
+    size_t xpos = line.find(':');
+    size_t ypos = line.find('x');
+
+    if (xpos == string::npos || ypos == string::npos) {
+      DLOGI("Resolution switch not supported");
+    } else {
+      *curr_x_pixels = static_cast<size_t>(atoi(line.c_str() + xpos + 1));
+      *curr_y_pixels = static_cast<size_t>(atoi(line.c_str() + ypos + 1));
+      DLOGI("Current Config: %u x %u", *curr_x_pixels, *curr_y_pixels);
+      ret = true;
     }
-
-    if (Sys::getline_(&buffer, &len, fd) > 0) {
-      // String is of form "U:1600x2560p-0". Documentation/fb/modedb.txt in
-      // kernel has more info on the format.
-      size_t xpos = string(buffer).find(':');
-      size_t ypos = string(buffer).find('x');
-
-      if (xpos == string::npos || ypos == string::npos) {
-        DLOGI("Resolution switch not supported");
-      } else {
-        *curr_x_pixels = static_cast<size_t>(atoi(buffer + xpos + 1));
-        *curr_y_pixels = static_cast<size_t>(atoi(buffer + ypos + 1));
-        DLOGI("Current Config: %u x %u", *curr_x_pixels, *curr_y_pixels);
-        ret = true;
-      }
-    }
-
-    free(buffer);
-    Sys::fclose_(fd);
   }
 
   return ret;
@@ -161,48 +154,39 @@ bool HWPrimary::GetCurrentModeFromSysfs(size_t *curr_x_pixels, size_t *curr_y_pi
 void HWPrimary::InitializeConfigs() {
   size_t curr_x_pixels = 0;
   size_t curr_y_pixels = 0;
-  size_t len = kPageSize;
-  string modes_path = string(fb_path_) + string("0/modes");
 
   if (!GetCurrentModeFromSysfs(&curr_x_pixels, &curr_y_pixels)) {
     return;
   }
 
-  FILE *fd = Sys::fopen_(modes_path.c_str(), "r");
-  if (fd) {
-    char *buffer = static_cast<char *>(calloc(len, sizeof(char)));
+  string modes_path = string(fb_path_) + string("0/modes");
 
-    if (buffer == NULL) {
-      DLOGW("Failed to allocate memory");
-      Sys::fclose_(fd);
-      return;
-    }
-
-    while (Sys::getline_(&buffer, &len, fd) > 0) {
-      DisplayConfigVariableInfo config;
-      size_t xpos = string(buffer).find(':');
-      size_t ypos = string(buffer).find('x');
-
-      if (xpos == string::npos || ypos == string::npos) {
-        continue;
-      }
-
-      config.x_pixels = UINT32(atoi(buffer + xpos + 1));
-      config.y_pixels = UINT32(atoi(buffer + ypos + 1));
-      DLOGI("Found mode %d x %d", config.x_pixels, config.y_pixels);
-      display_configs_.push_back(config);
-      display_config_strings_.push_back(string(buffer));
-
-      if (curr_x_pixels == config.x_pixels && curr_y_pixels == config.y_pixels) {
-        active_config_index_ = UINT32(display_configs_.size() - 1);
-        DLOGI("Active config index %u", active_config_index_);
-      }
-    }
-
-    free(buffer);
-    Sys::fclose_(fd);
-  } else {
+  Sys::fstream fs(modes_path, fstream::in);
+  if (!fs.is_open()) {
     DLOGI("Unable to process modes");
+    return;
+  }
+
+  string line;
+  while (Sys::getline_(fs, line)) {
+    DisplayConfigVariableInfo config;
+    size_t xpos = line.find(':');
+    size_t ypos = line.find('x');
+
+    if (xpos == string::npos || ypos == string::npos) {
+      continue;
+    }
+
+    config.x_pixels = UINT32(atoi(line.c_str() + xpos + 1));
+    config.y_pixels = UINT32(atoi(line.c_str() + ypos + 1));
+    DLOGI("Found mode %d x %d", config.x_pixels, config.y_pixels);
+    display_configs_.push_back(config);
+    display_config_strings_.push_back(string(line.c_str()));
+
+    if (curr_x_pixels == config.x_pixels && curr_y_pixels == config.y_pixels) {
+      active_config_index_ = UINT32(display_configs_.size() - 1);
+      DLOGI("Active config index %u", active_config_index_);
+    }
   }
 }
 
