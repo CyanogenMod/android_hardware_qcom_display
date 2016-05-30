@@ -34,6 +34,7 @@
 #include <core/sdm_types.h>
 #include <utils/locker.h>
 #include <private/color_interface.h>
+#include <utils/sys.h>
 #include <utils/debug.h>
 #include "hw_interface.h"
 
@@ -78,7 +79,7 @@ class ColorManagerProxy {
                     const HWPanelInfo &info);
 
  private:
-  static void *color_lib_;
+  static DynLib color_lib_;
   static CreateColorInterface create_intf_;
   static DestroyColorInterface destroy_intf_;
   static HWResourceInfo hw_res_info_;

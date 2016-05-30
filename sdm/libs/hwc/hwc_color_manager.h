@@ -36,6 +36,7 @@
 #include <binder/BinderService.h>
 #include <core/sdm_types.h>
 #include <utils/locker.h>
+#include <utils/sys.h>
 
 namespace sdm {
 
@@ -125,8 +126,8 @@ class HWCColorManager {
   static uint32_t Get8BitsARGBColorValue(const PPColorFillParams &params);
 
  private:
-  void *color_apis_lib_ = NULL;
-  void *diag_client_lib_ = NULL;
+  DynLib color_apis_lib_;
+  DynLib diag_client_lib_;
   void *color_apis_ = NULL;
   QDCMDiagInit qdcm_diag_init_ = NULL;
   QDCMDiagDeInit qdcm_diag_deinit_ = NULL;

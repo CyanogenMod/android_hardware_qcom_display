@@ -300,11 +300,9 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
   }
 
   // Disable destination scalar count to 0 if extension library is not present
-  void *extension_lib = ::dlopen("libsdmextension.so", RTLD_NOW);
-  if (!extension_lib) {
+  DynLib extension_lib;
+  if (!extension_lib.Open("libsdmextension.so")) {
     hw_resource->hw_dest_scalar_info.count = 0;
-  } else {
-    ::dlclose(extension_lib);
   }
 
   DLOGI("SDE Version = %d, SDE Revision = %x, RGB = %d, VIG = %d, DMA = %d, Cursor = %d",

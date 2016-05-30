@@ -92,15 +92,12 @@ HWCColorManager *HWCColorManager::CreateColorManager() {
   HWCColorManager *color_mgr = new HWCColorManager();
 
   if (color_mgr) {
-    void *&color_lib = color_mgr->color_apis_lib_;
     // Load display API interface library. And retrieve color API function tables.
-    color_lib = ::dlopen(DISPLAY_API_INTERFACE_LIBRARY_NAME, RTLD_NOW);
-    if (color_lib) {
-      color_mgr->color_apis_ = ::dlsym(color_lib, DISPLAY_API_FUNC_TABLES);
-      if (!color_mgr->color_apis_) {
+    DynLib &color_apis_lib = color_mgr->color_apis_lib_;
+    if (color_apis_lib.Open(DISPLAY_API_INTERFACE_LIBRARY_NAME)) {
+      if (!color_apis_lib.Sym(DISPLAY_API_FUNC_TABLES, &color_mgr->color_apis_)) {
         DLOGE("Fail to retrieve = %s from %s", DISPLAY_API_FUNC_TABLES,
               DISPLAY_API_INTERFACE_LIBRARY_NAME);
-        ::dlclose(color_lib);
         delete color_mgr;
         return NULL;
       }
@@ -112,18 +109,14 @@ HWCColorManager *HWCColorManager::CreateColorManager() {
     DLOGI("Successfully loaded %s", DISPLAY_API_INTERFACE_LIBRARY_NAME);
 
     // Load diagclient library and invokes its entry point to pass in display APIs.
-    void *&diag_lib = color_mgr->diag_client_lib_;
-    diag_lib = ::dlopen(QDCM_DIAG_CLIENT_LIBRARY_NAME, RTLD_NOW);
-    if (diag_lib) {
-      *(reinterpret_cast<void **>(&color_mgr->qdcm_diag_init_)) =
-          ::dlsym(diag_lib, INIT_QDCM_DIAG_CLIENT_NAME);
-      *(reinterpret_cast<void **>(&color_mgr->qdcm_diag_deinit_)) =
-          ::dlsym(diag_lib, DEINIT_QDCM_DIAG_CLIENT_NAME);
-
-      if (!color_mgr->qdcm_diag_init_ || !color_mgr->qdcm_diag_deinit_) {
+    DynLib &diag_client_lib = color_mgr->diag_client_lib_;
+    if (diag_client_lib.Open(QDCM_DIAG_CLIENT_LIBRARY_NAME)) {
+      if (!diag_client_lib.Sym(INIT_QDCM_DIAG_CLIENT_NAME,
+                               reinterpret_cast<void **>(&color_mgr->qdcm_diag_init_)) ||
+        !diag_client_lib.Sym(DEINIT_QDCM_DIAG_CLIENT_NAME,
+                               reinterpret_cast<void **>(&color_mgr->qdcm_diag_deinit_))) {
         DLOGE("Fail to retrieve = %s from %s", INIT_QDCM_DIAG_CLIENT_NAME,
               QDCM_DIAG_CLIENT_LIBRARY_NAME);
-        ::dlclose(diag_lib);
       } else {
         // invoke Diag Client entry point to initialize.
         color_mgr->qdcm_diag_init_(color_mgr->color_apis_);
@@ -151,12 +144,6 @@ void HWCColorManager::DestroyColorManager() {
   }
   if (qdcm_diag_deinit_) {
     qdcm_diag_deinit_();
-  }
-  if (diag_client_lib_) {
-    ::dlclose(diag_client_lib_);
-  }
-  if (color_apis_lib_) {
-    ::dlclose(color_apis_lib_);
   }
   delete this;
 }

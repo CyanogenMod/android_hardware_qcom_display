@@ -62,5 +62,33 @@ bool Sys::getline_(fstream &fs, std::string &line) {
 
 #endif  // SDM_VIRTUAL_DRIVER
 
+DynLib::~DynLib() {
+  Close();
+}
+
+bool DynLib::Open(const char *lib_name) {
+  Close();
+  lib_ = ::dlopen(lib_name, RTLD_NOW);
+
+  return (*this);
+}
+
+bool DynLib::Sym(const char *func_name, void **func_ptr) {
+  if (lib_) {
+    *func_ptr = ::dlsym(lib_, func_name);
+  } else {
+    *func_ptr = NULL;
+  }
+
+  return (*func_ptr != NULL);
+}
+
+void DynLib::Close() {
+  if (lib_) {
+    ::dlclose(lib_);
+    lib_ = NULL;
+  }
+}
+
 }  // namespace sdm
 

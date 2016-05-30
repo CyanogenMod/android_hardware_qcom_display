@@ -26,6 +26,7 @@
 #define __SYS_H__
 
 #include <sys/eventfd.h>
+#include <dlfcn.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -73,6 +74,20 @@ class Sys {
   static read read_;
   static write write_;
   static eventfd eventfd_;
+};
+
+class DynLib {
+ public:
+  ~DynLib();
+  bool Open(const char *lib_name);
+  bool Sym(const char *func_name, void **func_ptr);
+  const char * Error() { return ::dlerror(); }
+  operator bool() const { return lib_ != NULL; }
+
+ private:
+  void Close();
+
+  void *lib_ = NULL;
 };
 
 }  // namespace sdm
