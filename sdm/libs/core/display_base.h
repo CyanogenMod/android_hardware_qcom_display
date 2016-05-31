@@ -103,15 +103,11 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError DisablePartialUpdateOneFrameLocked() {
     return kErrorNotSupported;
   }
-  virtual DisplayError SetMixerResolutionLocked(uint32_t width, uint32_t height) {
-    return kErrorNotSupported;
-  }
+  virtual DisplayError SetMixerResolutionLocked(uint32_t width, uint32_t height);
   virtual DisplayError GetMixerResolutionLocked(uint32_t *width, uint32_t *height);
   virtual DisplayError SetFrameBufferConfigLocked(const DisplayConfigVariableInfo &variable_info);
   virtual DisplayError GetFrameBufferConfigLocked(DisplayConfigVariableInfo *variable_info);
-  virtual DisplayError SetDetailEnhancerDataLocked(const DisplayDetailEnhancerData &de_data) {
-    return kErrorNotSupported;
-  }
+  virtual DisplayError SetDetailEnhancerDataLocked(const DisplayDetailEnhancerData &de_data);
 
   // DumpImpl method
   void AppendDump(char *buffer, uint32_t length);
@@ -120,6 +116,10 @@ class DisplayBase : public DisplayInterface {
   const char *GetName(const LayerComposition &composition);
   DisplayError ValidateGPUTarget(LayerStack *layer_stack);
   DisplayError ReconfigureDisplay();
+  bool NeedsMixerReconfiguration(LayerStack *layer_stack, uint32_t *new_mixer_width,
+                                 uint32_t *new_mixer_height);
+  DisplayError ReconfigureMixer(uint32_t width, uint32_t height);
+
 
   Locker locker_;
   DisplayType display_type_;

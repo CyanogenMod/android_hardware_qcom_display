@@ -84,12 +84,8 @@ class HWDevice : public HWInterface {
   virtual DisplayError SetAutoRefresh(bool enable) { return kErrorNone; }
   virtual DisplayError SetS3DMode(HWS3DMode s3d_mode);
   virtual DisplayError SetScaleLutConfig(HWScaleLutInfo *lut_info);
-  virtual DisplayError SetMixerAttributes(const HWMixerAttributes &mixer_attributes) {
-    return kErrorNotSupported;
-  }
-  virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes) {
-    return kErrorNotSupported;
-  }
+  virtual DisplayError SetMixerAttributes(const HWMixerAttributes &mixer_attributes);
+  virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes);
 
   // For HWDevice derivatives
   virtual DisplayError Init();
@@ -147,6 +143,9 @@ class HWDevice : public HWInterface {
   mdp_output_layer mdp_out_layer_;
   const char *device_name_;
   bool synchronous_commit_;
+  HWDisplayAttributes display_attributes_ = {};
+  HWMixerAttributes mixer_attributes_ = {};
+  mdp_destination_scaler_data *mdp_dest_scalar_data_ = NULL;
 };
 
 }  // namespace sdm
