@@ -481,5 +481,15 @@ DisplayError CompManager::GetScaleLutConfig(HWScaleLutInfo *lut_info) {
   return resource_intf_->GetScaleLutConfig(lut_info);
 }
 
+DisplayError CompManager::SetDetailEnhancerData(Handle display_ctx,
+                                                const DisplayDetailEnhancerData &de_data) {
+  SCOPE_LOCK(locker_);
+
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+
+  return resource_intf_->SetDetailEnhancerData(display_comp_ctx->display_resource_ctx, de_data);
+}
+
 }  // namespace sdm
 

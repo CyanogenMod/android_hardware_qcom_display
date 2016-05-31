@@ -448,5 +448,16 @@ bool DisplayPrimary::NeedsMixerReconfiguration(LayerStack *layer_stack, uint32_t
   return false;
 }
 
+DisplayError DisplayPrimary::SetDetailEnhancerDataLocked(const DisplayDetailEnhancerData &de_data) {
+  DisplayError error = comp_manager_->SetDetailEnhancerData(display_comp_ctx_, de_data);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  DisablePartialUpdateOneFrameLocked();
+
+  return kErrorNone;
+}
+
 }  // namespace sdm
 

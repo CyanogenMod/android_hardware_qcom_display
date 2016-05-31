@@ -992,4 +992,9 @@ DisplayError DisplayBase::GetFrameBufferConfigLocked(DisplayConfigVariableInfo *
   return kErrorNone;
 }
 
+DisplayError DisplayBase::SetDetailEnhancerData(const DisplayDetailEnhancerData &de_data) {
+  SCOPE_LOCK(locker_);
+  return SetDetailEnhancerDataLocked(de_data);
+}
+
 }  // namespace sdm

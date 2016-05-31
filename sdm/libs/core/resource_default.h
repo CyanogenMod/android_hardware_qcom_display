@@ -59,6 +59,8 @@ class ResourceDefault : public ResourceInterface {
   DisplayError ValidateCursorConfig(Handle display_ctx, const Layer *layer, bool is_top);
   DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers, int x, int y);
   DisplayError SetMaxBandwidthMode(HWBwModes mode);
+  virtual DisplayError SetDetailEnhancerData(Handle display_ctx,
+                                             const DisplayDetailEnhancerData &de_data);
 
  private:
   enum PipeOwner {

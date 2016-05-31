@@ -66,6 +66,7 @@ class CompManager : public DumpImpl {
   bool CanSetIdleTimeout(Handle display_ctx);
   DisplayError SetMaxBandwidthMode(HWBwModes mode);
   DisplayError GetScaleLutConfig(HWScaleLutInfo *lut_info);
+  DisplayError SetDetailEnhancerData(Handle display_ctx, const DisplayDetailEnhancerData &de_data);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);

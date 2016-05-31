@@ -904,4 +904,9 @@ DisplayError ResourceDefault::GetScaleLutConfig(HWScaleLutInfo *lut_info) {
   return kErrorNone;
 }
 
+DisplayError ResourceDefault::SetDetailEnhancerData(Handle display_ctx,
+                                                    const DisplayDetailEnhancerData &de_data) {
+  return kErrorNotSupported;
+}
+
 }  // namespace sdm

@@ -91,15 +91,6 @@ enum HWSubBlockType {
   kHWSubBlockMax,
 };
 
-// y/RGB & UV Scaling Filters
-enum HWScalingFilter {
-  kScalingFilterEdgeDirected,
-  kScalingFilterCircular,
-  kScalingFilterSeparable,
-  kScalingFilterBilinear,
-  kScalingFilterMax,
-};
-
 enum HWAlphaInterpolation {
   kInterpolationPixelRepeat,
   kInterpolationBilinear,
@@ -316,16 +307,7 @@ struct HWScaleLutInfo {
   uint64_t sep_lut = 0;
 };
 
-struct HWDetailEnhanceData {
-  uint32_t enable = 0;
-  int16_t sharpen_level1 = 0;
-  int16_t sharpen_level2 = 0;
-  uint16_t clip = 0;
-  uint16_t limit = 0;
-  uint16_t thr_quiet = 0;
-  uint16_t thr_dieout = 0;
-  uint16_t thr_low = 0;
-  uint16_t thr_high = 0;
+struct HWDetailEnhanceData : DisplayDetailEnhancerData {
   uint16_t prec_shift = 0;
   int16_t adjust_a[MAX_DETAIL_ENHANCE_CURVE] = {0};
   int16_t adjust_b[MAX_DETAIL_ENHANCE_CURVE] = {0};
@@ -370,8 +352,8 @@ struct HWScaleData {
   uint32_t dst_height = 0;
   HWPlane plane[MAX_PLANES];
   // scale_v2_data fields
-  HWScalingFilter y_rgb_filter_cfg = kScalingFilterEdgeDirected;
-  HWScalingFilter uv_filter_cfg = kScalingFilterEdgeDirected;
+  ScalingFilterConfig y_rgb_filter_cfg = kFilterEdgeDirected;
+  ScalingFilterConfig uv_filter_cfg = kFilterEdgeDirected;
   HWAlphaInterpolation alpha_filter_cfg = kInterpolationPixelRepeat;
   HWBlendingFilter blend_cfg = kBlendFilterCircular;
 

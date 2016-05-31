@@ -241,19 +241,19 @@ void* HWScaleV2::GetScaleDataRef(uint32_t index, HWSubBlockType sub_block_type) 
   }
 }
 
-uint32_t HWScaleV2::GetMDPScalingFilter(HWScalingFilter filter_cfg) {
+uint32_t HWScaleV2::GetMDPScalingFilter(ScalingFilterConfig filter_cfg) {
   switch (filter_cfg) {
-  case kScalingFilterEdgeDirected:
+  case kFilterEdgeDirected:
     return FILTER_EDGE_DIRECTED_2D;
-  case kScalingFilterCircular:
+  case kFilterCircular:
     return FILTER_CIRCULAR_2D;
-  case kScalingFilterSeparable:
+  case kFilterSeparable:
     return FILTER_SEPARABLE_1D;
-  case kScalingFilterBilinear:
+  case kFilterBilinear:
     return FILTER_BILINEAR;
   default:
     DLOGE("Invalid Scaling Filter");
-    return kScalingFilterMax;
+    return kFilterMax;
   }
 }
 

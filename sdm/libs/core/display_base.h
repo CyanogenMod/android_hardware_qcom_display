@@ -88,6 +88,7 @@ class DisplayBase : public DisplayInterface {
   DisplayError GetMixerResolution(uint32_t *width, uint32_t *height) final;
   DisplayError SetFrameBufferConfig(const DisplayConfigVariableInfo &variable_info) final;
   DisplayError GetFrameBufferConfig(DisplayConfigVariableInfo *variable_info) final;
+  DisplayError SetDetailEnhancerData(const DisplayDetailEnhancerData &de_data) final;
 
  protected:
   virtual DisplayError PrepareLocked(LayerStack *layer_stack);
@@ -108,6 +109,9 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError GetMixerResolutionLocked(uint32_t *width, uint32_t *height);
   virtual DisplayError SetFrameBufferConfigLocked(const DisplayConfigVariableInfo &variable_info);
   virtual DisplayError GetFrameBufferConfigLocked(DisplayConfigVariableInfo *variable_info);
+  virtual DisplayError SetDetailEnhancerDataLocked(const DisplayDetailEnhancerData &de_data) {
+    return kErrorNotSupported;
+  }
 
   // DumpImpl method
   void AppendDump(char *buffer, uint32_t length);

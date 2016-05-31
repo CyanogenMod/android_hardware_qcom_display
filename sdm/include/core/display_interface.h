@@ -76,6 +76,48 @@ enum DisplayState {
                     //!< if VSync is enabled. Contents are not rendered in this state.
 };
 
+/*! @brief This enum represents flags to override detail enhancer parameters.
+
+  @sa DisplayInterface::SetDetailEnhancerData
+*/
+enum DetailEnhancerOverrideFlags {
+  kOverrideDEEnable            = 0x1,     // Specifies to enable detail enhancer
+  kOverrideDESharpen1          = 0x2,     // Specifies user defined Sharpening/smooth for noise
+  kOverrideDESharpen2          = 0x4,     // Specifies user defined Sharpening/smooth for signal
+  kOverrideDEClip              = 0x8,     // Specifies user defined DE clip shift
+  kOverrideDELimit             = 0x10,    // Specifies user defined DE limit value
+  kOverrideDEThrQuiet          = 0x20,    // Specifies user defined DE quiet threshold
+  kOverrideDEThrDieout         = 0x40,    // Specifies user defined DE dieout threshold
+  kOverrideDEThrLow            = 0x80,    // Specifies user defined DE low threshold
+  kOverrideDEThrHigh           = 0x100,   // Specifies user defined DE high threshold
+  kOverrideDEFilterConfig      = 0x200,   // Specifies user defined scaling filter config
+  kOverrideDEMax               = 0xFFFFFFFF,
+};
+
+/*! @brief This enum represents Y/RGB scaling filter configuration.
+
+  @sa DisplayInterface::SetDetailEnhancerData
+*/
+enum ScalingFilterConfig {
+  kFilterEdgeDirected,
+  kFilterCircular,
+  kFilterSeparable,
+  kFilterBilinear,
+  kFilterMax,
+};
+
+/*! @brief This enum represents the quality level of the content.
+
+  @sa DisplayInterface::SetDetailEnhancerData
+*/
+enum ContentQuality {
+  kContentQualityUnknown,  // Default: high artifact and noise
+  kContentQualityLow,      // Low quality content, high artifact and noise,
+  kContentQualityMedium,   // Medium quality, medium artifact and noise,
+  kContentQualityHigh,     // High quality content, low artifact and noise
+  kContentQualityMax,
+};
+
 /*! @brief This structure defines configuration for fixed properties of a display device.
 
   @sa DisplayInterface::GetConfig
@@ -107,6 +149,30 @@ struct DisplayConfigVariableInfo {
 */
 struct DisplayEventVSync {
   int64_t timestamp = 0;    //!< System monotonic clock timestamp in nanoseconds.
+};
+
+/*! @brief The structure defines the user input for detail enhancer module.
+
+  @sa DisplayInterface::SetDetailEnhancerData
+*/
+struct DisplayDetailEnhancerData {
+  uint32_t override_flags = 0;        // flags to specify which data to be set.
+  uint16_t enable = 0;                // Detail enchancer enable
+  int16_t sharpen_level1 = 0;         // Sharpening/smooth strenght for noise
+  int16_t sharpen_level2 = 0;         // Sharpening/smooth strenght for signal
+  uint16_t clip = 0;                  // DE clip shift
+  uint16_t limit = 0;                 // DE limit value
+  uint16_t thr_quiet = 0;             // DE quiet threshold
+  uint16_t thr_dieout = 0;            // DE dieout threshold
+  uint16_t thr_low = 0;               // DE low threshold
+  uint16_t thr_high = 0;              // DE high threshold
+  int32_t sharp_factor = 50;          // sharp_factor specifies sharpness/smoothness level,
+                                      // range -100..100 positive for sharpness and negative for
+                                      // smoothness
+  ContentQuality quality_level = kContentQualityUnknown;
+                                      // Specifies context quality level
+  ScalingFilterConfig filter_config = kFilterEdgeDirected;
+                                      // Y/RGB filter configuration
 };
 
 /*! @brief Display device event handler implemented by the client.
@@ -498,6 +564,14 @@ class DisplayInterface {
     @return \link DisplayError \endlink
   */
   virtual DisplayError GetFrameBufferConfig(DisplayConfigVariableInfo *variable_info) = 0;
+
+  /*! @brief Method to set detail enhancement data.
+
+    @param[in] de_data \link DisplayDetailEnhancerData \endlink
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError SetDetailEnhancerData(const DisplayDetailEnhancerData &de_data) = 0;
 
  protected:
   virtual ~DisplayInterface() { }

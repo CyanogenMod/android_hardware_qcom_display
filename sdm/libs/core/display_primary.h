@@ -73,6 +73,7 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
   virtual DisplayError ControlPartialUpdateLocked(bool enable, uint32_t *pending);
   virtual DisplayError DisablePartialUpdateOneFrameLocked();
   virtual DisplayError SetMixerResolutionLocked(uint32_t width, uint32_t height);
+  virtual DisplayError SetDetailEnhancerDataLocked(const DisplayDetailEnhancerData &de_data);
 
   bool NeedsMixerReconfiguration(LayerStack *layer_stack, uint32_t *new_mixer_width,
                                  uint32_t *new_mixer_height);

@@ -58,6 +58,8 @@ class ResourceInterface {
                                               int x, int y) = 0;
   virtual DisplayError SetMaxBandwidthMode(HWBwModes mode) = 0;
   virtual DisplayError GetScaleLutConfig(HWScaleLutInfo *lut_info) = 0;
+  virtual DisplayError SetDetailEnhancerData(Handle display_ctx,
+                                             const DisplayDetailEnhancerData &de_data) = 0;
 
  protected:
   virtual ~ResourceInterface() { }

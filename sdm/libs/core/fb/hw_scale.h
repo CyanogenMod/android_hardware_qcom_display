@@ -76,7 +76,7 @@ class HWScaleV2 : public HWScale {
 
  private:
   uint32_t GetMDPAlphaInterpolation(HWAlphaInterpolation alpha_filter_cfg);
-  uint32_t GetMDPScalingFilter(HWScalingFilter filter_cfg);
+  uint32_t GetMDPScalingFilter(ScalingFilterConfig filter_cfg);
 };
 
 }  // namespace sdm
