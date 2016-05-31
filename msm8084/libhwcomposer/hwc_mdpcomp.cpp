@@ -505,9 +505,11 @@ void MDPCompNonSplit::generateROI(hwc_context_t *ctx,
 
     for(int index = 0; index < numAppLayers; index++ ) {
         hwc_layer_1_t* layer = &list->hwLayers[index];
+
         if (layerUpdating(layer) ||
                 isYuvBuffer((private_handle_t *)layer->handle)) {
-            hwc_rect_t dirtyRect = (struct hwc_rect){0, 0, 0, 0};;
+            hwc_rect_t dirtyRect = getIntersection(layer->displayFrame,
+                                                    fullFrame);
             if(!needsScaling(layer) && !layer->transform) {
                 dirtyRect = calculateDirtyRect(layer, fullFrame);
             }
@@ -612,9 +614,12 @@ void MDPCompSplit::generateROI(hwc_context_t *ctx,
     for(int index = 0; index < numAppLayers; index++ ) {
         hwc_layer_1_t* layer = &list->hwLayers[index];
         private_handle_t *hnd = (private_handle_t *)layer->handle;
+
         if (layerUpdating(layer) || isYuvBuffer(hnd)) {
-            hwc_rect_t l_dirtyRect = (struct hwc_rect){0, 0, 0, 0};
-            hwc_rect_t r_dirtyRect = (struct hwc_rect){0, 0, 0, 0};
+            hwc_rect_t l_dirtyRect = getIntersection(layer->displayFrame,
+                                        l_frame);
+            hwc_rect_t r_dirtyRect = getIntersection(layer->displayFrame,
+                                        r_frame);
 
             if(!needsScaling(layer) && !layer->transform) {
                 l_dirtyRect = calculateDirtyRect(layer, l_frame);
