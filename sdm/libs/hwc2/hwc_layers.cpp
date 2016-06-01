@@ -89,6 +89,7 @@ HWC2::Error HWCLayer::SetLayerBuffer(buffer_handle_t buffer, int32_t acquire_fen
 
 HWC2::Error HWCLayer::SetLayerSurfaceDamage(hwc_region_t damage) {
   auto num_dirty_rects = damage.numRects;
+  layer_->dirty_regions.clear();
   if (num_dirty_rects > 0) {
     for (uint32_t i = 0; i <= damage.numRects; i++) {
       LayerRect rect;
@@ -128,7 +129,7 @@ HWC2::Error HWCLayer::SetLayerColor(hwc_color_t color) {
 
 HWC2::Error HWCLayer::SetLayerCompositionType(HWC2::Composition type) {
   layer_->flags = {};   // Reset earlier flags
-  composition_ = type;  // Used to compute changes
+  client_requested_ = type;
   switch (type) {
     case HWC2::Composition::Client:
       layer_->flags.skip = true;
@@ -213,6 +214,7 @@ HWC2::Error HWCLayer::SetLayerTransform(HWC2::Transform transform) {
 
 HWC2::Error HWCLayer::SetLayerVisibleRegion(hwc_region_t visible) {
   auto num_dirty_rects = visible.numRects;
+  layer_->visible_regions.clear();
   if (num_dirty_rects > 0) {
     for (uint32_t i = 0; i <= visible.numRects; i++) {
       LayerRect rect;
@@ -490,24 +492,26 @@ uint32_t HWCLayer::RoundToStandardFPS(float fps) {
   return frame_rate;
 }
 
-void HWCLayer::SetComposition(const LayerComposition &source) {
-  auto composition = HWC2::Composition::Invalid;
-  switch (source) {
+void HWCLayer::SetComposition(const LayerComposition &sdm_composition) {
+  auto hwc_composition = HWC2::Composition::Invalid;
+  switch (sdm_composition) {
     case kCompositionGPU:
-      composition = HWC2::Composition::Client;
+      hwc_composition = HWC2::Composition::Client;
       break;
     case kCompositionHWCursor:
-      composition = HWC2::Composition::Cursor;
+      hwc_composition = HWC2::Composition::Cursor;
       break;
     default:
-      composition = HWC2::Composition::Device;
+      hwc_composition = HWC2::Composition::Device;
       break;
   }
   // Update solid fill composition
-  if (layer_->composition == kCompositionSDE && layer_->flags.solid_fill != 0) {
-    composition = HWC2::Composition::SolidColor;
+  if (sdm_composition == kCompositionSDE && layer_->flags.solid_fill != 0) {
+    hwc_composition = HWC2::Composition::SolidColor;
   }
-  composition_ = composition;
+  device_selected_ = hwc_composition;
+
+  return;
 }
 void HWCLayer::PushReleaseFence(int32_t fence) {
   release_fences_.push(fence);

@@ -70,8 +70,9 @@ class HWCLayer {
   HWC2::Error SetLayerTransform(HWC2::Transform transform);
   HWC2::Error SetLayerVisibleRegion(hwc_region_t visible);
   HWC2::Error SetLayerZOrder(uint32_t z);
-  void SetComposition(const LayerComposition &source);
-  HWC2::Composition GetCompositionType() { return composition_; }
+  void SetComposition(const LayerComposition &sdm_composition);
+  HWC2::Composition GetClientRequestedCompositionType() { return client_requested_; }
+  HWC2::Composition GetDeviceSelectedCompositionType() { return device_selected_; }
   uint32_t GetGeometryChanges() { return geometry_changes_; }
   void ResetGeometryChanges() { geometry_changes_ = GeometryChanges::kNone; }
   void PushReleaseFence(int32_t fence);
@@ -85,7 +86,10 @@ class HWCLayer {
   static std::atomic<hwc2_layer_t> next_id_;
   std::queue<int32_t> release_fences_;
 
-  HWC2::Composition composition_ = HWC2::Composition::Device;
+  // Composition requested by client(SF)
+  HWC2::Composition client_requested_ = HWC2::Composition::Device;
+  // Composition selected by SDM
+  HWC2::Composition device_selected_ = HWC2::Composition::Device;
   uint32_t geometry_changes_ = GeometryChanges::kNone;
 
   void SetRect(const hwc_rect_t &source, LayerRect *target);

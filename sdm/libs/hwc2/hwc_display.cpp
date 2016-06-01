@@ -332,6 +332,8 @@ void HWCDisplay::BuildLayerStack() {
   // TODO(user): Add blit target layers
   for (auto hwc_layer : layer_set_) {
     Layer *layer = hwc_layer->GetSDMLayer();
+    // set default composition as GPU for SDM
+    layer->composition = kCompositionGPU;
 
     if (swap_interval_zero_) {
       if (layer->input_buffer->acquire_fence_fd >= 0) {
@@ -708,18 +710,24 @@ HWC2::Error HWCDisplay::PrepareLayerStack(uint32_t *out_num_types, uint32_t *out
     if (!needs_fb_refresh && composition == kCompositionGPU) {
       composition = kCompositionSDE;
     }
-    HWC2::Composition current_hwc_composition  = hwc_layer->GetCompositionType();
+    HWC2::Composition requested_composition = hwc_layer->GetClientRequestedCompositionType();
     // Convert the SDM layer composition to HWC2 type
     hwc_layer->SetComposition(composition);
-    // Update the changes list only if the HWC2 comp type changed from the previous cycle
-    if (current_hwc_composition != hwc_layer->GetCompositionType()) {
-      layer_changes_[hwc_layer->GetId()] = hwc_layer->GetCompositionType();
+    HWC2::Composition device_composition  = hwc_layer->GetDeviceSelectedCompositionType();
+    // Update the changes list only if the requested composition is different from SDM comp type
+    // TODO(user): Take Care of other comptypes(BLIT)
+    if (requested_composition != device_composition) {
+      layer_changes_[hwc_layer->GetId()] = device_composition;
     }
   }
   *out_num_types = UINT32(layer_changes_.size());
   *out_num_requests = UINT32(layer_requests_.size());
   validated_ = true;
-  return HWC2::Error::None;
+  if (*out_num_types > 0) {
+    return HWC2::Error::HasChanges;
+  } else {
+    return HWC2::Error::None;
+  }
 }
 
 HWC2::Error HWCDisplay::AcceptDisplayChanges() {
@@ -731,6 +739,10 @@ HWC2::Error HWCDisplay::AcceptDisplayChanges() {
 
 HWC2::Error HWCDisplay::GetChangedCompositionTypes(uint32_t *out_num_elements,
                                                    hwc2_layer_t *out_layers, int32_t *out_types) {
+  if (!validated_) {
+    DLOGW("Display is not validated");
+    return HWC2::Error::NotValidated;
+  }
   *out_num_elements = UINT32(layer_changes_.size());
   if (out_layers != nullptr && out_types != nullptr) {
     int i = 0;
@@ -846,6 +858,7 @@ HWC2::Error HWCDisplay::PostCommitLayerStack(int32_t *out_retire_fence) {
         layer_buffer->release_fence_fd = -1;
       } else if (layer->composition != kCompositionGPU) {
         hwc_layer->PushReleaseFence(layer_buffer->release_fence_fd);
+        layer_buffer->release_fence_fd = -1;
       }
     }
 
@@ -1568,7 +1581,10 @@ std::string HWCDisplay::Dump() {
     os << "-------------------------------" << std::endl;
     os << "layer_id: " << layer->GetId() << std::endl;
     os << "\tz: " << layer->GetZ() << std::endl;
-    os << "\tcomposition: " << to_string(layer->GetCompositionType()).c_str() << std::endl;
+    os << "\tclient(SF) composition: " <<
+          to_string(layer->GetClientRequestedCompositionType()).c_str() << std::endl;
+    os << "\tdevice(SDM) composition: " <<
+          to_string(layer->GetDeviceSelectedCompositionType()).c_str() << std::endl;
     os << "\tplane_alpha: " << std::to_string(sdm_layer->plane_alpha).c_str() << std::endl;
     os << "\tformat: " << GetFormatString(sdm_layer->input_buffer->format) << std::endl;
     os << "\tbuffer_id: " << std::hex << "0x" << sdm_layer->input_buffer->buffer_id << std::dec
