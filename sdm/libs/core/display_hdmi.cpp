@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -70,6 +70,7 @@ DisplayError DisplayHDMI::Init() {
   error = DisplayBase::Init();
   if (error != kErrorNone) {
     HWHDMI::Destroy(hw_intf_);
+    return error;
   }
 
   GetScanSupport();
@@ -85,6 +86,14 @@ DisplayError DisplayHDMI::Init() {
                             (kS3dFormatTopBottom, kS3DModeTB));
   s3d_format_to_mode_.insert(std::pair<LayerBufferS3DFormat, HWS3DMode>
                             (kS3dFormatFramePacking, kS3DModeFP));
+
+  error = HWEventsInterface::Create(INT(display_type_), this, &event_list_, &hw_events_intf_);
+  if (error != kErrorNone) {
+    DisplayBase::Deinit();
+    HWHDMI::Destroy(hw_intf_);
+    DLOGE("Failed to create hardware events interface. Error = %d", error);
+  }
+
   return error;
 }
 
@@ -157,7 +166,7 @@ DisplayError DisplayHDMI::SetActiveConfig(uint32_t index) {
 
 DisplayError DisplayHDMI::SetVSyncState(bool enable) {
   SCOPE_LOCK(locker_);
-  return kErrorNotSupported;
+  return DisplayBase::SetVSyncState(enable);
 }
 
 void DisplayHDMI::SetIdleTimeoutMs(uint32_t timeout_ms) { }
@@ -181,12 +190,31 @@ DisplayError DisplayHDMI::IsScalingValid(const LayerRect &crop, const LayerRect 
 DisplayError DisplayHDMI::GetRefreshRateRange(uint32_t *min_refresh_rate,
                                               uint32_t *max_refresh_rate) {
   SCOPE_LOCK(locker_);
-  return DisplayBase::GetRefreshRateRange(min_refresh_rate, max_refresh_rate);
+  DisplayError error = kErrorNone;
+
+  if (hw_panel_info_.min_fps && hw_panel_info_.max_fps) {
+    *min_refresh_rate = hw_panel_info_.min_fps;
+    *max_refresh_rate = hw_panel_info_.max_fps;
+  } else {
+    error = DisplayBase::GetRefreshRateRange(min_refresh_rate, max_refresh_rate);
+  }
+
+  return error;
 }
 
 DisplayError DisplayHDMI::SetRefreshRate(uint32_t refresh_rate) {
   SCOPE_LOCK(locker_);
-  return kErrorNotSupported;
+
+  if (!active_) {
+    return kErrorPermission;
+  }
+
+  DisplayError error = hw_intf_->SetRefreshRate(refresh_rate);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  return kErrorNone;
 }
 
 bool DisplayHDMI::IsUnderscanSupported() {
@@ -349,10 +377,25 @@ void DisplayHDMI::SetS3DMode(LayerStack *layer_stack) {
   hw_intf_->GetActiveConfig(&active_index);
   hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
 
-  if (panel_info != hw_panel_info_) {
+  if (panel_info != hw_panel_info_ || display_attributes != display_attributes_) {
     comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, panel_info);
     hw_panel_info_ = panel_info;
+    display_attributes_ = display_attributes;
   }
+}
+
+void DisplayHDMI::CECMessage(char *message) {
+  event_handler_->CECMessage(message);
+}
+
+DisplayError DisplayHDMI::VSync(int64_t timestamp) {
+  if (vsync_enable_) {
+    DisplayEventVSync vsync;
+    vsync.timestamp = timestamp;
+    event_handler_->VSync(vsync);
+  }
+
+  return kErrorNone;
 }
 
 }  // namespace sdm

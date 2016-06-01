@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014, 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -32,14 +32,23 @@ namespace sdm {
 class HWCDisplayExternal : public HWCDisplay {
  public:
   static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, uint32_t primary_width,
-                    uint32_t primary_height, HWCDisplay **hwc_display);
+                    uint32_t primary_height, qService::QService *qservice, bool use_primary_res,
+                    HWCDisplay **hwc_display);
+  static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                    qService::QService *qservice, HWCDisplay **hwc_display);
   static void Destroy(HWCDisplay *hwc_display);
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
   virtual void SetSecureDisplay(bool secure_display_active);
 
+ protected:
+  virtual uint32_t RoundToStandardFPS(float fps);
+  virtual void PrepareDynamicRefreshRate(Layer *layer);
+  int drc_enabled_ = 0;
+
  private:
-  HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
+  HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                     qService::QService *qservice);
   void ApplyScanAdjustment(hwc_rect_t *display_frame);
   static void GetDownscaleResolution(uint32_t primary_width, uint32_t primary_height,
                                      uint32_t *virtual_width, uint32_t *virtual_height);

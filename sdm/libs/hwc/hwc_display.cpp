@@ -49,10 +49,6 @@
 
 #define __CLASS__ "HWCDisplay"
 
-#if 0
-#include <exhwcomposer_defs.h>
-#endif
-
 namespace sdm {
 
 static void AssignLayerRegionsAddress(LayerRectArray *region, uint32_t rect_count,
@@ -77,8 +73,10 @@ static void ApplyDeInterlaceAdjustment(Layer *layer) {
 }
 
 HWCDisplay::HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type,
-                       int id, bool needs_blit)
-  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit) {
+                       int id, bool needs_blit, qService::QService *qservice,
+                       DisplayClass display_class)
+  : core_intf_(core_intf), hwc_procs_(hwc_procs), type_(type), id_(id), needs_blit_(needs_blit),
+    qservice_(qservice), display_class_(display_class) {
 }
 
 int HWCDisplay::Init() {
@@ -308,6 +306,16 @@ DisplayError HWCDisplay::Refresh() {
   return kErrorNotSupported;
 }
 
+DisplayError HWCDisplay::CECMessage(char *message) {
+  if (qservice_) {
+    qservice_->onCECMessageReceived(message, 0);
+  } else {
+    DLOGW("Qservice instance not available.");
+  }
+
+  return kErrorNone;
+}
+
 int HWCDisplay::AllocateLayerStack(hwc_display_contents_1_t *content_list) {
   if (!content_list || !content_list->numHwLayers) {
     DLOGW("Invalid content list");
@@ -488,11 +496,6 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     return 0;
   }
 
-  if (!content_list || !content_list->numHwLayers) {
-    DLOGW("Invalid content list");
-    return -EINVAL;
-  }
-
   size_t num_hw_layers = content_list->numHwLayers;
 
   use_blit_comp_ = false;
@@ -592,11 +595,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
       layer_stack_.flags.cursor_present = true;
     }
 
-    if (layer.frame_rate > metadata_refresh_rate_) {
-      metadata_refresh_rate_ = SanitizeRefreshRate(layer.frame_rate);
-    } else {
-      layer.frame_rate = current_refresh_rate_;
-    }
+    PrepareDynamicRefreshRate(&layer);
 
     layer.input_buffer->buffer_id = reinterpret_cast<uint64_t>(hwc_layer.handle);
   }
@@ -1290,21 +1289,6 @@ void HWCDisplay::MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list) 
   }
 }
 
-uint32_t HWCDisplay::RoundToStandardFPS(uint32_t fps) {
-  static const uint32_t standard_fps[4] = {30, 24, 48, 60};
-
-  int count = INT(sizeof(standard_fps) / sizeof(standard_fps[0]));
-  for (int i = 0; i < count; i++) {
-    if ((standard_fps[i] - fps) < 2) {
-      // Most likely used for video, the fps can fluctuate
-      // Ex: b/w 29 and 30 for 30 fps clip
-      return standard_fps[i];
-    }
-  }
-
-  return fps;
-}
-
 void HWCDisplay::ApplyScanAdjustment(hwc_rect_t *display_frame) {
 }
 
@@ -1486,6 +1470,35 @@ bool HWCDisplay::SingleLayerUpdating(uint32_t app_layer_count) {
   return (updating_count == 1);
 }
 
+bool HWCDisplay::SingleVideoLayerUpdating(uint32_t app_layer_count) {
+  uint32_t updating_count = 0;
+
+  for (uint i = 0; i < app_layer_count; i++) {
+    Layer *layer = &layer_stack_.layers[i];
+    if (layer->flags.updating && (layer->input_buffer->flags.video == true)) {
+      updating_count++;
+    }
+  }
+
+  return (updating_count == 1);
+}
+
+uint32_t HWCDisplay::RoundToStandardFPS(float fps) {
+  static const uint32_t standard_fps[4] = {30, 24, 48, 60};
+  uint32_t frame_rate = (uint32_t)(fps);
+
+  int count = INT(sizeof(standard_fps) / sizeof(standard_fps[0]));
+  for (int i = 0; i < count; i++) {
+    if ((standard_fps[i] - frame_rate) < 2) {
+      // Most likely used for video, the fps can fluctuate
+      // Ex: b/w 29 and 30 for 30 fps clip
+      return standard_fps[i];
+    }
+  }
+
+  return frame_rate;
+}
+
 uint32_t HWCDisplay::SanitizeRefreshRate(uint32_t req_refresh_rate) {
   uint32_t refresh_rate = req_refresh_rate;
 
@@ -1500,6 +1513,18 @@ uint32_t HWCDisplay::SanitizeRefreshRate(uint32_t req_refresh_rate) {
   }
 
   return refresh_rate;
+}
+
+DisplayClass HWCDisplay::GetDisplayClass() {
+  return display_class_;
+}
+
+void HWCDisplay::PrepareDynamicRefreshRate(Layer *layer) {
+  if (layer->frame_rate > metadata_refresh_rate_) {
+    metadata_refresh_rate_ = SanitizeRefreshRate(layer->frame_rate);
+  } else {
+    layer->frame_rate = current_refresh_rate_;
+  }
 }
 
 }  // namespace sdm

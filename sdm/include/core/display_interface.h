@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -96,6 +96,7 @@ struct DisplayConfigVariableInfo {
   float y_dpi = 0.0f;             //!< Dots per inch in Y-direction.
   uint32_t fps = 0;               //!< Frame rate per second.
   uint32_t vsync_period_ns = 0;   //!< VSync period in nanoseconds.
+  bool is_yuv = false;            //!< If the display output is in YUV format.
 };
 
 /*! @brief Event data associated with VSync event.
@@ -143,6 +144,16 @@ class DisplayEventHandler {
     @sa DisplayInterface::Commit
   */
   virtual DisplayError Refresh() = 0;
+
+  /*! @brief Event handler for CEC messages.
+
+    @details This event is dispatched to send CEC messages to the CEC HAL.
+
+    @param[in] message message to be sent
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError CECMessage(char *message) = 0;
 
  protected:
   virtual ~DisplayEventHandler() { }

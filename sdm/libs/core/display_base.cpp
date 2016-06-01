@@ -49,12 +49,11 @@ DisplayError DisplayBase::Init() {
   hw_panel_info_ = HWPanelInfo();
   hw_intf_->GetHWPanelInfo(&hw_panel_info_);
 
-  HWDisplayAttributes display_attrib;
   uint32_t active_index = 0;
   hw_intf_->GetActiveConfig(&active_index);
-  hw_intf_->GetDisplayAttributes(active_index, &display_attrib);
+  hw_intf_->GetDisplayAttributes(active_index, &display_attributes_);
 
-  error = comp_manager_->RegisterDisplay(display_type_, display_attrib,
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_,
                                          hw_panel_info_, &display_comp_ctx_);
   if (error != kErrorNone) {
     goto CleanupOnError;
@@ -79,7 +78,7 @@ DisplayError DisplayBase::Init() {
   }
 
   color_mgr_ = ColorManagerProxy::CreateColorManagerProxy(display_type_, hw_intf_,
-                               display_attrib, hw_panel_info_);
+                               display_attributes_, hw_panel_info_);
   if (!color_mgr_) {
     DLOGW("Unable to create ColorManagerProxy for display = %d", display_type_);
   }
@@ -105,6 +104,8 @@ DisplayError DisplayBase::Deinit() {
   }
 
   comp_manager_->UnregisterDisplay(display_comp_ctx_);
+
+  HWEventsInterface::Destroy(hw_events_intf_);
 
   return kErrorNone;
 }
@@ -162,7 +163,7 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
 DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
   bool disable_partial_update = false;
-  uint32_t pending;
+  uint32_t pending = 0;
 
   if (!layer_stack) {
     return kErrorParameters;
@@ -179,11 +180,16 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
     return kErrorPermission;
   }
 
-  if (color_mgr_) {
+  // Request to disable partial update only if it is currently enabled.
+  if (color_mgr_ && partial_update_control_) {
     disable_partial_update = color_mgr_->NeedsPartialUpdateDisable();
     if (disable_partial_update) {
       ControlPartialUpdate(false, &pending);
     }
+  }
+
+  if (one_frame_full_roi_) {
+    ControlPartialUpdate(false, &pending);
   }
 
   // Clean hw layers for reuse.
@@ -227,6 +233,11 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
   if (disable_partial_update) {
     ControlPartialUpdate(true, &pending);
+  }
+
+  if (one_frame_full_roi_) {
+    ControlPartialUpdate(true, &pending);
+    one_frame_full_roi_ = false;
   }
 
   return error;
@@ -451,12 +462,18 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
     return error;
   }
 
+  hw_intf_->GetHWPanelInfo(&hw_panel_info_);
+
   if (display_comp_ctx_) {
     comp_manager_->UnregisterDisplay(display_comp_ctx_);
   }
 
   error = comp_manager_->RegisterDisplay(display_type_, attrib, hw_panel_info_,
                                          &display_comp_ctx_);
+
+  if (error == kErrorNone && partial_update_control_) {
+    one_frame_full_roi_ = true;
+  }
 
   return error;
 }
@@ -484,7 +501,7 @@ DisplayError DisplayBase::ControlPartialUpdate(bool enable, uint32_t *pending) {
     return kErrorNotSupported;
   }
 
-  *pending = false;
+  *pending = 0;
   if (enable == partial_update_control_) {
     DLOGI("Same state transition is requested.");
     return kErrorNone;
@@ -496,7 +513,7 @@ DisplayError DisplayBase::ControlPartialUpdate(bool enable, uint32_t *pending) {
   if (!enable) {
     // If the request is to turn off feature, new draw call is required to have
     // the new setting into effect.
-    *pending = true;
+    *pending = 1;
   }
 
   return kErrorNone;
@@ -765,6 +782,17 @@ DisplayError DisplayBase::GetRefreshRateRange(uint32_t *min_refresh_rate,
 
 DisplayError DisplayBase::GetPanelBrightness(int *level) {
   return kErrorNotSupported;
+}
+
+DisplayError DisplayBase::SetVSyncState(bool enable) {
+  DisplayError error = kErrorNone;
+  if (vsync_enable_ != enable) {
+    error = hw_intf_->SetVSyncState(enable);
+    if (error == kErrorNone) {
+      vsync_enable_ = enable;
+    }
+  }
+  return error;
 }
 
 }  // namespace sdm

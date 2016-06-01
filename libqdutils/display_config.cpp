@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
+* Copyright (c) 2013-2014, 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -253,6 +253,7 @@ DisplayAttributes getDisplayAttributes(int configIndex, int /*dpy*/) {
             dpyattr.xdpi = outParcel.readFloat();
             dpyattr.ydpi = outParcel.readFloat();
             dpyattr.panel_type = (char) outParcel.readInt32();
+            dpyattr.is_yuv = outParcel.readInt32();
             ALOGI("%s() Received attrs for index %d: xres %d, yres %d",
                     __FUNCTION__, configIndex, dpyattr.xres, dpyattr.yres);
         } else {

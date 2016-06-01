@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -88,6 +88,18 @@ enum HWBwModes {
   kBwModeMax,      //!< Limiter for maximum available bandwidth modes.
 };
 
+
+/*! @brief Information on hardware for the first display
+
+  @details This structure returns the display type of the first display on the device
+  (internal display or HDMI etc) and whether it is currently connected,
+
+*/
+struct HWDisplayInterfaceInfo {
+  DisplayType type;
+  bool is_connected;
+};
+
 /*! @brief Display core interface.
 
   @details This class defines display core interfaces. It contains methods which client shall use
@@ -171,6 +183,18 @@ class CoreInterface {
 
    */
     virtual DisplayError SetMaxBandwidthMode(HWBwModes mode) = 0;
+
+  /*! @brief Method to get characteristics of the first display.
+
+    @details Client shall use this method to determine if the first display is HDMI, and whether
+    it is currently connected.
+
+    @param[in] hw_disp_info structure that this method will fill up with info.
+
+    @return \link DisplayError \endlink
+
+   */
+    virtual DisplayError GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_disp_info) = 0;
 
 
  protected:
