@@ -96,6 +96,7 @@ class HWPrimary : public HWDevice {
   uint32_t active_config_index_ = 0;
   const char *kBrightnessNode = "/sys/class/leds/lcd-backlight/brightness";
   const char *kAutoRefreshNode = "/sys/devices/virtual/graphics/fb0/msm_cmd_autorefresh_en";
+  bool auto_refresh_ = false;
 };
 
 }  // namespace sdm

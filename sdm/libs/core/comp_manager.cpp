@@ -81,7 +81,7 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
   }
 
   Strategy *&strategy = display_comp_ctx->strategy;
-  strategy = new Strategy(extension_intf_, type, hw_res_info_, hw_panel_info);
+  strategy = new Strategy(extension_intf_, type, hw_res_info_, hw_panel_info, attributes);
   if (!strategy) {
     DLOGE("Unable to create strategy");
     delete display_comp_ctx;
@@ -140,6 +140,10 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
   CLEAR_BIT(registered_displays_, display_comp_ctx->display_type);
   CLEAR_BIT(configured_displays_, display_comp_ctx->display_type);
 
+  if (display_comp_ctx->display_type == kHDMI) {
+    max_layers_ = kMaxSDELayers;
+  }
+
   DLOGV_IF(kTagCompManager, "registered display bit mask 0x%x, configured display bit mask 0x%x, " \
            "display type %d", registered_displays_, configured_displays_,
            display_comp_ctx->display_type);
@@ -167,7 +171,7 @@ DisplayError CompManager::ReconfigureDisplay(Handle comp_handle,
 
   Strategy *&new_strategy = display_comp_ctx->strategy;
   display_comp_ctx->strategy = new Strategy(extension_intf_, display_comp_ctx->display_type,
-                                            hw_res_info_, hw_panel_info);
+                                            hw_res_info_, hw_panel_info, attributes);
   if (!display_comp_ctx->strategy) {
     DLOGE("Unable to create strategy.");
     return kErrorMemory;
@@ -181,6 +185,16 @@ DisplayError CompManager::ReconfigureDisplay(Handle comp_handle,
     return error;
   }
 
+  // For HDMI S3D mode, set max_layers_ to 0 so that primary display would fall back
+  // to GPU composition to release pipes for HDMI.
+  if (display_comp_ctx->display_type == kHDMI) {
+    if (hw_panel_info.s3d_mode != kS3DModeNone) {
+      max_layers_ = 0;
+    } else {
+      max_layers_ = kMaxSDELayers;
+    }
+  }
+
   return error;
 }
 
@@ -191,6 +205,7 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
 
   constraints->safe_mode = safe_mode_;
   constraints->use_cursor = false;
+  constraints->max_layers = max_layers_;
 
   // Limit 2 layer SDE Comp on HDMI/Virtual
   if (display_comp_ctx->display_type != kPrimary) {
@@ -418,7 +433,7 @@ bool CompManager::SupportLayerAsCursor(Handle comp_handle, HWLayers *hw_layers) 
     return supported;
   }
 
-  for (int32_t i = layer_stack->layer_count; i >= 0; i--) {
+  for (int32_t i = layer_stack->layer_count - 1; i >= 0; i--) {
     Layer &layer = layer_stack->layers[i];
     if (layer.composition == kCompositionGPUTarget) {
       gpu_index = i;

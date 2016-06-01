@@ -192,6 +192,10 @@ struct LayerStackFlags {
                                       //!< stack contains cursor layer.
 
       uint32_t single_buffered_layer_present : 1;    //!< Set if stack has single buffered layer
+
+      uint32_t s3d_mode_present : 1;  //!< This flag will be set to true, if the current layer
+                                      //!< stack contains s3d layer, and the layer stack can enter
+                                      //!< s3d mode.
     };
 
     uint32_t flags = 0;               //!< For initialization purpose only.
