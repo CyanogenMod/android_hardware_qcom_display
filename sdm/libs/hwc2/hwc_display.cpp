@@ -381,12 +381,12 @@ void HWCDisplay::BuildLayerStack() {
       layer->frame_rate = current_refresh_rate_;
     }
     display_rect_ = Union(display_rect_, layer->dst_rect);
-    // TODO(user): Set correctly when implementing caching
-    layer->flags.updating = true;
     geometry_changes_ |= hwc_layer->GetGeometryChanges();
+    layer->flags.updating = IsLayerUpdating(layer);
 
     layer_stack_.layers.push_back(layer);
   }
+  // TODO(user): Set correctly when SDM supports geometry_changes as bitmask
   layer_stack_.flags.geometry_changed = UINT32(geometry_changes_ > 0);
   // Append client target to the layer stack
   layer_stack_.layers.push_back(client_target_->GetSDMLayer());
@@ -693,11 +693,6 @@ HWC2::Error HWCDisplay::PrepareLayerStack(uint32_t *out_num_types, uint32_t *out
     flush_ = true;
   }
 
-  // If current draw cycle has different set of layers updating in comparison to previous cycle,
-  // cache content using GPU again.
-  // If set of updating layers remains same, use cached buffer and replace layers marked for GPU
-  // composition with SDE so that SurfaceFlinger does not compose them. Set cache inuse here.
-  bool needs_fb_refresh = NeedsFrameBufferRefresh();
   for (auto hwc_layer : layer_set_) {
     Layer *layer = hwc_layer->GetSDMLayer();
     LayerComposition &composition = layer->composition;
@@ -707,11 +702,8 @@ HWC2::Error HWCDisplay::PrepareLayerStack(uint32_t *out_num_types, uint32_t *out
       layer_requests_[hwc_layer->GetId()] = HWC2::LayerRequest::ClearClientTarget;
     }
 
-    if (!needs_fb_refresh && composition == kCompositionGPU) {
-      composition = kCompositionSDE;
-    }
     HWC2::Composition requested_composition = hwc_layer->GetClientRequestedCompositionType();
-    // Convert the SDM layer composition to HWC2 type
+    // Set SDM composition to HWC2 type in HWCLayer
     hwc_layer->SetComposition(composition);
     HWC2::Composition device_composition  = hwc_layer->GetDeviceSelectedCompositionType();
     // Update the changes list only if the requested composition is different from SDM comp type
@@ -886,31 +878,6 @@ HWC2::Error HWCDisplay::PostCommitLayerStack(int32_t *out_retire_fence) {
   flush_ = false;
 
   return status;
-}
-
-bool HWCDisplay::NeedsFrameBufferRefresh(void) {
-  // Frame buffer needs to be refreshed for the following reasons:
-  // 1. Any layer is marked skip in the current layer stack.
-  // 2. Any layer is added/removed/layer properties changes in the current layer stack.
-  // 3. Any layer handle is changed and it is marked for GPU composition
-  // 4. Any layer's current composition is different from previous composition.
-  if (layer_stack_.flags.skip_present || layer_stack_.flags.geometry_changed) {
-    return true;
-  }
-
-  for (auto layer : layer_stack_.layers) {
-    // need FB refresh for s3d case
-    if (layer->input_buffer->s3d_format != kS3dFormatNone) {
-      return true;
-    }
-
-    if (layer->composition == kCompositionGPUTarget ||
-        layer->composition == kCompositionBlitTarget) {
-      continue;
-    }
-  }
-
-  return false;
 }
 
 void HWCDisplay::SetIdleTimeoutMs(uint32_t timeout_ms) {
@@ -1533,6 +1500,24 @@ bool HWCDisplay::SingleLayerUpdating(void) {
   }
 
   return (updating_count == 1);
+}
+
+bool HWCDisplay::IsLayerUpdating(const Layer *layer) {
+  // Layer should be considered updating if
+  //   a) layer is in single buffer mode, or
+  //   b) valid dirty_regions(android specific hint for updating status), or
+  //   c) layer stack geometry has changed (TODO(user): Remove when SDM accepts
+  //      geometry_changed as bit fields).
+  return (layer->flags.single_buffer || IsSurfaceUpdated(layer->dirty_regions) ||
+          geometry_changes_);
+}
+
+bool HWCDisplay::IsSurfaceUpdated(const std::vector<LayerRect> &dirty_regions) {
+  // based on dirty_regions determine if its updating
+  // dirty_rect count = 0 - whole layer - updating.
+  // dirty_rect count = 1 or more valid rects - updating.
+  // dirty_rect count = 1 with (0,0,0,0) - not updating.
+  return (dirty_regions.empty() || IsValid(dirty_regions.at(0)));
 }
 
 uint32_t HWCDisplay::SanitizeRefreshRate(uint32_t req_refresh_rate) {

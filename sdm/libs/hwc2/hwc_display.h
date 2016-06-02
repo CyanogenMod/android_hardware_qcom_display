@@ -200,8 +200,9 @@ class HWCDisplay : public DisplayEventHandler {
   void MarkLayersForGPUBypass(void);
   void MarkLayersForClientComposition(void);
   virtual void ApplyScanAdjustment(hwc_rect_t *display_frame);
-  bool NeedsFrameBufferRefresh(void);
   bool SingleLayerUpdating(void);
+  bool IsSurfaceUpdated(const std::vector<LayerRect> &dirty_regions);
+  bool IsLayerUpdating(const Layer *layer);
   uint32_t SanitizeRefreshRate(uint32_t req_refresh_rate);
   virtual void CloseAcquireFds();
 

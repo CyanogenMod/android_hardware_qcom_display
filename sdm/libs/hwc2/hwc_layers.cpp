@@ -101,20 +101,25 @@ HWC2::Error HWCLayer::SetLayerSurfaceDamage(hwc_region_t damage) {
 }
 
 HWC2::Error HWCLayer::SetLayerBlendMode(HWC2::BlendMode mode) {
+  LayerBlending blending = kBlendingPremultiplied;
   switch (mode) {
     case HWC2::BlendMode::Coverage:
-      layer_->blending = kBlendingCoverage;
+      blending = kBlendingCoverage;
       break;
     case HWC2::BlendMode::Premultiplied:
-      layer_->blending = kBlendingPremultiplied;
+      blending = kBlendingPremultiplied;
       break;
     case HWC2::BlendMode::None:
-      layer_->blending = kBlendingOpaque;
+      blending = kBlendingOpaque;
       break;
     default:
       return HWC2::Error::BadParameter;
   }
-  geometry_changes_ |= kBlendMode;
+
+  if (layer_->blending != blending) {
+    geometry_changes_ |= kBlendMode;
+    layer_->blending = blending;
+  }
   return HWC2::Error::None;
 }
 
@@ -148,8 +153,7 @@ HWC2::Error HWCLayer::SetLayerCompositionType(HWC2::Composition type) {
     default:
       return HWC2::Error::Unsupported;
   }
-  // TODO(user): Check if this should be set here or somewhere else
-  layer_->flags.updating = true;
+
   return HWC2::Error::None;
 }
 
@@ -160,55 +164,73 @@ HWC2::Error HWCLayer::SetLayerDataspace(int32_t dataspace) {
 }
 
 HWC2::Error HWCLayer::SetLayerDisplayFrame(hwc_rect_t frame) {
-  SetRect(frame, &layer_->dst_rect);
-  geometry_changes_ |= kDisplayFrame;
+  LayerRect dst_rect = {};
+  SetRect(frame, &dst_rect);
+  if (layer_->dst_rect != dst_rect) {
+    geometry_changes_ |= kDisplayFrame;
+    layer_->dst_rect = dst_rect;
+  }
   return HWC2::Error::None;
 }
 
 HWC2::Error HWCLayer::SetLayerPlaneAlpha(float alpha) {
   // Conversion of float alpha in range 0.0 to 1.0 similar to the HWC Adapter
-  layer_->plane_alpha = static_cast<uint8_t>(std::round(255.0f * alpha));
-  geometry_changes_ |= kPlaneAlpha;
+  uint8_t plane_alpha = static_cast<uint8_t>(std::round(255.0f * alpha));
+  if (layer_->plane_alpha != plane_alpha) {
+    geometry_changes_ |= kPlaneAlpha;
+    layer_->plane_alpha = plane_alpha;
+  }
+
   return HWC2::Error::None;
 }
 
 HWC2::Error HWCLayer::SetLayerSourceCrop(hwc_frect_t crop) {
-  SetRect(crop, &layer_->src_rect);
-  geometry_changes_ |= kSourceCrop;
+  LayerRect src_rect = {};
+  SetRect(crop, &src_rect);
+  if (layer_->src_rect != src_rect) {
+    geometry_changes_ |= kSourceCrop;
+    layer_->src_rect = src_rect;
+  }
+
   return HWC2::Error::None;
 }
 
 HWC2::Error HWCLayer::SetLayerTransform(HWC2::Transform transform) {
+  LayerTransform layer_transform = {};
   switch (transform) {
     case HWC2::Transform::FlipH:
-      layer_->transform.flip_horizontal = true;
+      layer_transform.flip_horizontal = true;
       break;
     case HWC2::Transform::FlipV:
-      layer_->transform.flip_vertical = true;
+      layer_transform.flip_vertical = true;
       break;
     case HWC2::Transform::Rotate90:
-      layer_->transform.rotation = 90.0f;
+      layer_transform.rotation = 90.0f;
       break;
     case HWC2::Transform::Rotate180:
-      layer_->transform.rotation = 180.0f;
+      layer_transform.rotation = 180.0f;
       break;
     case HWC2::Transform::Rotate270:
-      layer_->transform.rotation = 270.0f;
+      layer_transform.rotation = 270.0f;
       break;
     case HWC2::Transform::FlipHRotate90:
-      layer_->transform.rotation = 90.0f;
-      layer_->transform.flip_horizontal = true;
+      layer_transform.rotation = 90.0f;
+      layer_transform.flip_horizontal = true;
       break;
     case HWC2::Transform::FlipVRotate90:
-      layer_->transform.rotation = 90.0f;
-      layer_->transform.flip_vertical = true;
+      layer_transform.rotation = 90.0f;
+      layer_transform.flip_vertical = true;
       break;
     default:
-      layer_->transform.rotation = 0.0f;
-      layer_->transform.flip_horizontal = false;
-      layer_->transform.flip_vertical = false;
+      layer_transform.rotation = 0.0f;
+      layer_transform.flip_horizontal = false;
+      layer_transform.flip_vertical = false;
   }
-  geometry_changes_ |= kTransform;
+
+  if (layer_->transform != layer_transform) {
+    geometry_changes_ |= kTransform;
+    layer_->transform = layer_transform;
+  }
   return HWC2::Error::None;
 }
 
@@ -227,8 +249,10 @@ HWC2::Error HWCLayer::SetLayerVisibleRegion(hwc_region_t visible) {
 }
 
 HWC2::Error HWCLayer::SetLayerZOrder(uint32_t z) {
-  z_ = z;
-  geometry_changes_ |= kZOrder;
+  if (z_ != z) {
+    geometry_changes_ |= kZOrder;
+    z_ = z;
+  }
   return HWC2::Error::None;
 }
 
