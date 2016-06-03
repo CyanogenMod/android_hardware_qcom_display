@@ -236,13 +236,13 @@ int32_t HWCSession::CreateLayer(hwc2_device_t *device, hwc2_display_t display,
 }
 
 int32_t HWCSession::CreateVirtualDisplay(hwc2_device_t *device, uint32_t width, uint32_t height,
-                                         hwc2_display_t *out_display_id) {
+                                         int32_t *format, hwc2_display_t *out_display_id) {
   if (!device) {
     return HWC2_ERROR_BAD_DISPLAY;
   }
 
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
-  auto status = hwc_session->CreateVirtualDisplayObject(width, height);
+  auto status = hwc_session->CreateVirtualDisplayObject(width, height, format);
   if (status == HWC2::Error::None)
     *out_display_id = HWC_DISPLAY_VIRTUAL;
   return INT32(status);
@@ -417,9 +417,10 @@ static int32_t SetActiveConfig(hwc2_device_t *device, hwc2_display_t display,
 }
 
 static int32_t SetClientTarget(hwc2_device_t *device, hwc2_display_t display,
-                               buffer_handle_t target, int32_t acquire_fence, int32_t dataspace) {
+                               buffer_handle_t target, int32_t acquire_fence,
+                               int32_t dataspace, hwc_region_t damage) {
   return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetClientTarget, target,
-                                         acquire_fence, dataspace);
+                                         acquire_fence, dataspace, damage);
 }
 
 int32_t HWCSession::SetColorMode(hwc2_device_t *device, hwc2_display_t display,
@@ -678,11 +679,12 @@ hwc2_function_pointer_t HWCSession::GetFunction(struct hwc2_device *device,
 
 // TODO(user): handle locking
 
-HWC2::Error HWCSession::CreateVirtualDisplayObject(uint32_t width, uint32_t height) {
+HWC2::Error HWCSession::CreateVirtualDisplayObject(uint32_t width, uint32_t height,
+                                                   int32_t *format) {
   if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
     return HWC2::Error::NoResources;
   }
-  auto status = HWCDisplayVirtual::Create(core_intf_, &callbacks_, width, height,
+  auto status = HWCDisplayVirtual::Create(core_intf_, &callbacks_, width, height, format,
                                           &hwc_display_[HWC_DISPLAY_VIRTUAL]);
   // TODO(user): validate width and height support
   if (status)

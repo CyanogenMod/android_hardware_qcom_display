@@ -136,7 +136,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual HWC2::Error GetActiveConfig(hwc2_config_t *out_config);
   virtual HWC2::Error SetActiveConfig(hwc2_config_t config);
   virtual HWC2::Error SetClientTarget(buffer_handle_t target, int32_t acquire_fence,
-                                      int32_t dataspace);
+                                      int32_t dataspace, hwc_region_t damage);
   virtual HWC2::Error SetColorMode(int32_t /*android_color_mode_t*/ mode) {
     return HWC2::Error::Unsupported;
   }

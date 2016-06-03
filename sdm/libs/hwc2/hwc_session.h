@@ -42,7 +42,7 @@ class HWCSession : hwc2_device_t, public qClient::BnQClient {
   explicit HWCSession(const hw_module_t *module);
   int Init();
   int Deinit();
-  HWC2::Error CreateVirtualDisplayObject(uint32_t width, uint32_t height);
+  HWC2::Error CreateVirtualDisplayObject(uint32_t width, uint32_t height, int32_t *format);
 
   template <typename... Args>
   static int32_t CallDisplayFunction(hwc2_device_t *device, hwc2_display_t display,
@@ -85,7 +85,7 @@ class HWCSession : hwc2_device_t, public qClient::BnQClient {
   static int32_t CreateLayer(hwc2_device_t *device, hwc2_display_t display,
                              hwc2_layer_t *out_layer_id);
   static int32_t CreateVirtualDisplay(hwc2_device_t *device, uint32_t width, uint32_t height,
-                                      hwc2_display_t *out_display_id);
+                                      int32_t *format, hwc2_display_t *out_display_id);
   static int32_t DestroyLayer(hwc2_device_t *device, hwc2_display_t display, hwc2_layer_t layer);
   static int32_t DestroyVirtualDisplay(hwc2_device_t *device, hwc2_display_t display);
   static void Dump(hwc2_device_t *device, uint32_t *out_size, char *out_buffer);

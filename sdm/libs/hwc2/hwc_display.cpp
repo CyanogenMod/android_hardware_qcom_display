@@ -609,7 +609,7 @@ HWC2::Error HWCDisplay::GetActiveConfig(hwc2_config_t *out_config) {
 }
 
 HWC2::Error HWCDisplay::SetClientTarget(buffer_handle_t target, int32_t acquire_fence,
-                                        int32_t dataspace) {
+                                        int32_t dataspace, hwc_region_t damage) {
   // TODO(user): SurfaceFlinger gives us a null pointer here when doing full SDE composition
   // The error is problematic for layer caching as it would overwrite our cached client target.
   // Reported bug 28569722 to resolve this.
@@ -618,6 +618,7 @@ HWC2::Error HWCDisplay::SetClientTarget(buffer_handle_t target, int32_t acquire_
     return HWC2::Error::None;
   }
   client_target_->SetLayerBuffer(target, acquire_fence);
+  client_target_->SetLayerSurfaceDamage(damage);
   // Ignoring dataspace for now
   return HWC2::Error::None;
 }

@@ -41,10 +41,12 @@
 namespace sdm {
 
 int HWCDisplayVirtual::Create(CoreInterface *core_intf, HWCCallbacks *callbacks, uint32_t width,
-                              uint32_t height, HWCDisplay **hwc_display) {
+                              uint32_t height, int32_t *format, HWCDisplay **hwc_display) {
   int status = 0;
   HWCDisplayVirtual *hwc_display_virtual = new HWCDisplayVirtual(core_intf, callbacks);
   uint32_t virtual_width = 0, virtual_height = 0;
+
+  // TODO(user): Populate format correctly
 
   status = hwc_display_virtual->Init();
   if (status) {

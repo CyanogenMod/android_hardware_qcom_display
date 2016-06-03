@@ -39,7 +39,7 @@ namespace sdm {
 class HWCDisplayVirtual : public HWCDisplay {
  public:
   static int Create(CoreInterface *core_intf, HWCCallbacks *callbacks, uint32_t primary_width,
-                    uint32_t primary_height, HWCDisplay **hwc_display);
+                    uint32_t primary_height, int32_t *format, HWCDisplay **hwc_display);
   static void Destroy(HWCDisplay *hwc_display);
   virtual int Init();
   virtual int Deinit();
