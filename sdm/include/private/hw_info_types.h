@@ -34,6 +34,8 @@
 #include <bitset>
 
 namespace sdm {
+using std::string;
+
 const int kMaxSDELayers = 16;   // Maximum number of layers that can be handled by hardware in a
                                 // given layer stack.
 #define MAX_PLANES 4
@@ -61,15 +63,6 @@ enum HWDisplayMode {
   kModeDefault,
   kModeVideo,
   kModeCommand,
-};
-
-enum HWDisplayPort {
-  kPortDefault,
-  kPortDSI,
-  kPortDTv,
-  kPortWriteBack,
-  kPortLVDS,
-  kPortEDP,
 };
 
 enum PipeType {
@@ -215,7 +208,7 @@ enum HWS3DMode {
 };
 
 struct HWPanelInfo {
-  HWDisplayPort port = kPortDefault;  // Display port
+  DisplayPort port = kPortDefault;    // Display port
   HWDisplayMode mode = kModeDefault;  // Display mode
   bool partial_update = false;        // Partial update feature
   int left_align = 0;                 // ROI left alignment restriction

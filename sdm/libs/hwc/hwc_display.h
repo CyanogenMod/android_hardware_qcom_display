@@ -117,6 +117,7 @@ class HWCDisplay : public DisplayEventHandler {
                            PPPendingParams *pending_action);
   int GetVisibleDisplayRect(hwc_rect_t* rect);
   DisplayClass GetDisplayClass();
+  int GetDisplayPort(DisplayPort *port);
 
  protected:
   enum DisplayStatus {

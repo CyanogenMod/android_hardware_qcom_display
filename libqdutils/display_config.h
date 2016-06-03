@@ -76,18 +76,26 @@ enum {
     COMMAND_MODE,
 };
 
+enum {
+    DISPLAY_PORT_DEFAULT = 0,
+    DISPLAY_PORT_DSI,
+    DISPLAY_PORT_DTV,
+    DISPLAY_PORT_WRITEBACK,
+    DISPLAY_PORT_LVDS,
+    DISPLAY_PORT_EDP,
+    DISPLAY_PORT_DP,
+};
+
 // Display Attributes that are available to clients of this library
 // Not to be confused with a similar struct in hwc_utils (in the hwc namespace)
 typedef struct DisplayAttributes {
-    uint32_t vsync_period; //nanoseconds
-    uint32_t xres;
-    uint32_t yres;
-    float xdpi;
-    float ydpi;
-    char panel_type;
-    bool is_yuv;
-    DisplayAttributes() : vsync_period(0), xres(0), yres(0), xdpi(0.0f),
-            ydpi(0.0f), panel_type(0), is_yuv(false) {}
+    uint32_t vsync_period = 0; //nanoseconds
+    uint32_t xres = 0;
+    uint32_t yres = 0;
+    float xdpi = 0.0f;
+    float ydpi = 0.0f;
+    int panel_type = DISPLAY_PORT_DEFAULT;
+    bool is_yuv = false;
 } DisplayAttributes_t;
 
 //=============================================================================

@@ -115,7 +115,7 @@ class HWDevice : public HWInterface {
   void PopulateHWPanelInfo();
   void GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info);
   void GetHWPanelNameByNode(int device_node, HWPanelInfo *panel_info);
-  void GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode);
+  void GetHWDisplayPortAndMode(int device_node, HWPanelInfo *panel_info);
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
   void GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info);
   int ParseLine(const char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
