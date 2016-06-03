@@ -297,7 +297,7 @@ struct Layer {
                                                    //!< applied to the layer buffer during
                                                    //!< composition.
 
-  uint8_t plane_alpha = 0;                         //!< Alpha value applied to the whole layer.
+  uint8_t plane_alpha = 0xff;                      //!< Alpha value applied to the whole layer.
                                                    //!< Value of each pixel is computed as:
                                                    //!<    if(kBlendingPremultiplied) {
                                                    //!<      pixel.RGB = pixel.RGB * planeAlpha/255

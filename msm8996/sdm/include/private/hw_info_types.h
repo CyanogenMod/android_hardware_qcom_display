@@ -417,6 +417,7 @@ struct HWLayersInfo {
                                    // programmed on hardware.
   LayerRect updated_src_rect[kMaxSDELayers];  // Updated layer src rects in s3d mode
   LayerRect updated_dst_rect[kMaxSDELayers];  // Updated layer dst rects in s3d mode
+  bool updating[kMaxSDELayers] = {0};  // Updated by strategy, considering plane_alpha+updating
 
   uint32_t count = 0;              // Total number of layers which need to be set on hardware.
 
@@ -455,7 +456,8 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
             (vsync_period_ns != attributes.vsync_period_ns) ||
             (v_front_porch != attributes.v_front_porch) ||
             (v_back_porch != attributes.v_back_porch) ||
-            (v_pulse_width != attributes.v_pulse_width));
+            (v_pulse_width != attributes.v_pulse_width) ||
+            (is_yuv != attributes.is_yuv));
   }
 
   bool operator ==(const HWDisplayAttributes &attributes) {

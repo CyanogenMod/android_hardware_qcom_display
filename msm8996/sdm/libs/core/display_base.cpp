@@ -28,6 +28,7 @@
 #include <utils/formats.h>
 #include <utils/rect.h>
 
+#include <string>
 #include <vector>
 
 #include "display_base.h"
@@ -52,10 +53,9 @@ DisplayError DisplayBase::Init() {
   hw_panel_info_ = HWPanelInfo();
   hw_intf_->GetHWPanelInfo(&hw_panel_info_);
 
-  HWDisplayAttributes display_attrib;
   uint32_t active_index = 0;
   hw_intf_->GetActiveConfig(&active_index);
-  hw_intf_->GetDisplayAttributes(active_index, &display_attrib);
+  hw_intf_->GetDisplayAttributes(active_index, &display_attributes_);
 
   HWScaleLutInfo lut_info = {};
   error = comp_manager_->GetScaleLutConfig(&lut_info);
@@ -67,7 +67,7 @@ DisplayError DisplayBase::Init() {
     goto CleanupOnError;
   }
 
-  error = comp_manager_->RegisterDisplay(display_type_, display_attrib,
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_,
                                          hw_panel_info_, &display_comp_ctx_);
   if (error != kErrorNone) {
     goto CleanupOnError;
@@ -92,7 +92,7 @@ DisplayError DisplayBase::Init() {
   }
 
   color_mgr_ = ColorManagerProxy::CreateColorManagerProxy(display_type_, hw_intf_,
-                               display_attrib, hw_panel_info_);
+                               display_attributes_, hw_panel_info_);
   if (!color_mgr_) {
     DLOGW("Unable to create ColorManagerProxy for display = %d", display_type_);
   }
@@ -110,6 +110,10 @@ CleanupOnError:
 DisplayError DisplayBase::Deinit() {
   if (rotator_intf_) {
     rotator_intf_->UnregisterDisplay(display_rotator_ctx_);
+  }
+
+  if (color_modes_) {
+    delete[] color_modes_;
   }
 
   if (color_mgr_) {
@@ -202,6 +206,10 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
     }
   }
 
+  if (one_frame_full_roi_) {
+    ControlPartialUpdate(false, &pending);
+  }
+
   // Clean hw layers for reuse.
   hw_layers_ = HWLayers();
   hw_layers_.info.stack = layer_stack;
@@ -243,6 +251,11 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
   if (disable_partial_update) {
     ControlPartialUpdate(true, &pending);
+  }
+
+  if (one_frame_full_roi_) {
+    ControlPartialUpdate(true, &pending);
+    one_frame_full_roi_ = false;
   }
 
   return error;
@@ -467,12 +480,18 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
     return error;
   }
 
+  hw_intf_->GetHWPanelInfo(&hw_panel_info_);
+
   if (display_comp_ctx_) {
     comp_manager_->UnregisterDisplay(display_comp_ctx_);
   }
 
   error = comp_manager_->RegisterDisplay(display_type_, attrib, hw_panel_info_,
                                          &display_comp_ctx_);
+
+  if (error == kErrorNone && partial_update_control_) {
+    one_frame_full_roi_ = true;
+  }
 
   return error;
 }
@@ -705,6 +724,105 @@ DisplayError DisplayBase::ColorSVCRequestRoute(const PPDisplayAPIPayload &in_pay
     return color_mgr_->ColorSVCRequestRoute(in_payload, out_payload, pending_action);
   else
     return kErrorParameters;
+}
+
+DisplayError DisplayBase::GetColorModeCount(uint32_t *mode_count) {
+  if (!mode_count) {
+    return kErrorParameters;
+  }
+
+  if (!color_mgr_) {
+    return kErrorNotSupported;
+  }
+
+  DisplayError error = color_mgr_->ColorMgrGetNumOfModes(&num_color_modes_);
+  if (error != kErrorNone || !num_color_modes_) {
+    return kErrorNotSupported;
+  }
+
+  DLOGI("Number of color modes = %d", num_color_modes_);
+  *mode_count = num_color_modes_;
+
+  return kErrorNone;
+}
+
+DisplayError DisplayBase::GetColorModes(uint32_t *mode_count,
+                                        std::vector<std::string> *color_modes) {
+  if (!mode_count || !color_modes) {
+    return kErrorParameters;
+  }
+
+  if (!color_mgr_) {
+    return kErrorNotSupported;
+  }
+
+  if (color_modes_ == NULL) {
+    color_modes_ = new SDEDisplayMode[num_color_modes_];
+
+    DisplayError error = color_mgr_->ColorMgrGetModes(&num_color_modes_, color_modes_);
+    if (error != kErrorNone) {
+      DLOGE("Failed");
+      return error;
+    }
+    for (uint32_t i = 0; i < num_color_modes_; i++) {
+      DLOGV_IF(kTagQDCM, "Color Mode[%d]: Name = %s mode_id = %d", i, color_modes_[i].name,
+               color_modes_[i].id);
+      color_mode_map_.insert(std::make_pair(color_modes_[i].name, &color_modes_[i]));
+    }
+  }
+
+  for (uint32_t i = 0; i < num_color_modes_; i++) {
+    DLOGV_IF(kTagQDCM, "Color Mode[%d]: Name = %s mode_id = %d", i, color_modes_[i].name,
+             color_modes_[i].id);
+    color_modes->at(i) = color_modes_[i].name;
+  }
+
+  return kErrorNone;
+}
+
+DisplayError DisplayBase::SetColorMode(const std::string &color_mode) {
+  if (!color_mgr_) {
+    return kErrorNotSupported;
+  }
+
+  DLOGV_IF(kTagQDCM, "Color Mode = %s", color_mode.c_str());
+
+  ColorModeMap::iterator it = color_mode_map_.find(color_mode);
+  if (it == color_mode_map_.end()) {
+    DLOGE("Failed: Unknown Mode : %s", color_mode.c_str());
+    return kErrorNotSupported;
+  }
+
+  SDEDisplayMode *sde_display_mode = it->second;
+  if (color_mode_ == sde_display_mode->id) {
+    DLOGV_IF(kTagQDCM, "Same mode requested");
+    return kErrorNone;
+  }
+
+  DLOGV_IF(kTagQDCM, "Color Mode Name = %s corresponding mode_id = %d", sde_display_mode->name,
+           sde_display_mode->id);
+  DisplayError error = kErrorNone;
+  error = color_mgr_->ColorMgrSetMode(sde_display_mode->id);
+  if (error != kErrorNone) {
+    DLOGE("Failed for mode id = %d", sde_display_mode->id);
+    return error;
+  }
+
+  color_mode_ = sde_display_mode->id;
+
+  return error;
+}
+
+DisplayError DisplayBase::SetColorTransform(const uint32_t length, const double *color_transform) {
+  if (!color_mgr_) {
+    return kErrorNotSupported;
+  }
+
+  if (!color_transform) {
+    return kErrorParameters;
+  }
+
+  return color_mgr_->ColorMgrSetColorTransform(length, color_transform);
 }
 
 DisplayError DisplayBase::ApplyDefaultDisplayMode() {

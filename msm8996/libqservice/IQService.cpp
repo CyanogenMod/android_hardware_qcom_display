@@ -79,8 +79,6 @@ IMPLEMENT_META_INTERFACE(QService, "android.display.IQService");
 
 // ----------------------------------------------------------------------
 
-static void getProcName(int pid, char *buf, int size);
-
 status_t BnQService::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
@@ -89,10 +87,6 @@ status_t BnQService::onTransact(
     IPCThreadState* ipc = IPCThreadState::self();
     const int callerPid = ipc->getCallingPid();
     const int callerUid = ipc->getCallingUid();
-    const int MAX_BUF_SIZE = 1024;
-    char callingProcName[MAX_BUF_SIZE] = {0};
-
-    getProcName(callerPid, callingProcName, MAX_BUF_SIZE);
 
     const bool permission = (callerUid == AID_MEDIA ||
             callerUid == AID_GRAPHICS ||
@@ -103,9 +97,8 @@ status_t BnQService::onTransact(
     if (code == CONNECT_HWC_CLIENT) {
         CHECK_INTERFACE(IQService, data, reply);
         if(callerUid != AID_GRAPHICS) {
-            ALOGE("display.qservice CONNECT_HWC_CLIENT access denied: \
-                    pid=%d uid=%d process=%s",
-                    callerPid, callerUid, callingProcName);
+            ALOGE("display.qservice CONNECT_HWC_CLIENT access denied: pid=%d uid=%d",
+                   callerPid, callerUid);
             return PERMISSION_DENIED;
         }
         sp<IQClient> client =
@@ -115,9 +108,8 @@ status_t BnQService::onTransact(
     } else if(code == CONNECT_HDMI_CLIENT) {
         CHECK_INTERFACE(IQService, data, reply);
         if(callerUid != AID_SYSTEM && callerUid != AID_ROOT) {
-            ALOGE("display.qservice CONNECT_HDMI_CLIENT access denied: \
-                    pid=%d uid=%d process=%s",
-                    callerPid, callerUid, callingProcName);
+            ALOGE("display.qservice CONNECT_HDMI_CLIENT access denied: pid=%d uid=%d",
+                   callerPid, callerUid);
             return PERMISSION_DENIED;
         }
         sp<IQHDMIClient> client =
@@ -126,9 +118,8 @@ status_t BnQService::onTransact(
         return NO_ERROR;
     } else if (code > COMMAND_LIST_START && code < COMMAND_LIST_END) {
         if(!permission) {
-            ALOGE("display.qservice access denied: command=%d\
-                  pid=%d uid=%d process=%s", code, callerPid,
-                  callerUid, callingProcName);
+            ALOGE("display.qservice access denied: command=%d pid=%d uid=%d",
+                   code, callerPid, callerUid);
             return PERMISSION_DENIED;
         }
         CHECK_INTERFACE(IQService, data, reply);
@@ -136,22 +127,6 @@ status_t BnQService::onTransact(
         return NO_ERROR;
     } else {
         return BBinder::onTransact(code, data, reply, flags);
-    }
-}
-
-//Helper
-static void getProcName(int pid, char *buf, int size) {
-    int fd = -1;
-    snprintf(buf, size, "/proc/%d/cmdline", pid);
-    fd = open(buf, O_RDONLY);
-    if (fd < 0) {
-        strlcpy(buf, "Unknown", size);
-    } else {
-        ssize_t len = read(fd, buf, size - 1);
-        if (len >= 0)
-           buf[len] = 0;
-
-        close(fd);
     }
 }
 

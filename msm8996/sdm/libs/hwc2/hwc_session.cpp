@@ -34,6 +34,7 @@
 #include <utils/debug.h>
 #include <sync/sync.h>
 #include <profiler.h>
+#include <string>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
@@ -228,9 +229,10 @@ static int32_t AcceptDisplayChanges(hwc2_device_t *device, hwc2_display_t displa
   return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::AcceptDisplayChanges);
 }
 
-static int32_t CreateLayer(hwc2_device_t *device, hwc2_display_t display,
-                           hwc2_layer_t *out_layer_id) {
-  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::CreateLayer, out_layer_id);
+int32_t HWCSession::CreateLayer(hwc2_device_t *device, hwc2_display_t display,
+                                hwc2_layer_t *out_layer_id) {
+  SCOPE_LOCK(locker_);
+  return CallDisplayFunction(device, display, &HWCDisplay::CreateLayer, out_layer_id);
 }
 
 int32_t HWCSession::CreateVirtualDisplay(hwc2_device_t *device, uint32_t width, uint32_t height,
@@ -246,8 +248,10 @@ int32_t HWCSession::CreateVirtualDisplay(hwc2_device_t *device, uint32_t width, 
   return INT32(status);
 }
 
-static int32_t DestroyLayer(hwc2_device_t *device, hwc2_display_t display, hwc2_layer_t layer) {
-  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::DestroyLayer, layer);
+int32_t HWCSession::DestroyLayer(hwc2_device_t *device, hwc2_display_t display,
+                                 hwc2_layer_t layer) {
+  SCOPE_LOCK(locker_);
+  return CallDisplayFunction(device, display, &HWCDisplay::DestroyLayer, layer);
 }
 
 int32_t HWCSession::DestroyVirtualDisplay(hwc2_device_t *device, hwc2_display_t display) {
@@ -265,15 +269,22 @@ int32_t HWCSession::DestroyVirtualDisplay(hwc2_device_t *device, hwc2_display_t 
   }
 }
 
-static void Dump(hwc2_device_t *device, uint32_t *out_size, char *out_buffer) {
+void HWCSession::Dump(hwc2_device_t *device, uint32_t *out_size, char *out_buffer) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+
   if (!device) {
     return;
   }
+  auto *hwc_session = static_cast<HWCSession *>(device);
 
   if (out_buffer == nullptr) {
-    *out_size = 4096;  // TODO(user): Adjust required dump size
+    *out_size = 8192;  // TODO(user): Adjust required dump size
   } else {
-    DumpInterface::GetDump(out_buffer, 4096);  // TODO(user): Fix this workaround
+    char sdm_dump[4096];
+    DumpInterface::GetDump(sdm_dump, 4096);  // TODO(user): Fix this workaround
+    std::string s = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY]->Dump();
+    s += sdm_dump;
+    s.copy(out_buffer, s.size(), 0);
     *out_size = sizeof(out_buffer);
   }
 }
@@ -296,7 +307,11 @@ static int32_t GetClientTargetSupport(hwc2_device_t *device, hwc2_display_t disp
                                          width, height, format, dataspace);
 }
 
-// TODO(user): GetColorModes
+static int32_t GetColorModes(hwc2_device_t *device, hwc2_display_t display, uint32_t *out_num_modes,
+                             int32_t /*android_color_mode_t*/ *out_modes) {
+  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::GetColorModes, out_num_modes,
+                                         out_modes);
+}
 
 static int32_t GetDisplayAttribute(hwc2_device_t *device, hwc2_display_t display,
                                    hwc2_config_t config, int32_t int_attribute,
@@ -407,7 +422,20 @@ static int32_t SetClientTarget(hwc2_device_t *device, hwc2_display_t display,
                                          acquire_fence, dataspace);
 }
 
-// TODO(user): SetColorMode, SetColorTransform
+int32_t HWCSession::SetColorMode(hwc2_device_t *device, hwc2_display_t display,
+                                 int32_t /*android_color_mode_t*/ mode) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetColorMode, mode);
+}
+
+int32_t HWCSession::SetColorTransform(hwc2_device_t *device, hwc2_display_t display,
+                                      const float *matrix,
+                                      int32_t /*android_color_transform_t*/ hint) {
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+  android_color_transform_t transform_hint = static_cast<android_color_transform_t>(hint);
+  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetColorTransform, matrix,
+                                         transform_hint);
+}
 
 static int32_t SetCursorPosition(hwc2_device_t *device, hwc2_display_t display, hwc2_layer_t layer,
                                  int32_t x, int32_t y) {
@@ -481,9 +509,10 @@ static int32_t SetLayerVisibleRegion(hwc2_device_t *device, hwc2_display_t displ
                                        visible);
 }
 
-static int32_t SetLayerZOrder(hwc2_device_t *device, hwc2_display_t display, hwc2_layer_t layer,
-                              uint32_t z) {
-  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetLayerZOrder, layer, z);
+int32_t HWCSession::SetLayerZOrder(hwc2_device_t *device, hwc2_display_t display,
+                                   hwc2_layer_t layer, uint32_t z) {
+  SCOPE_LOCK(locker_);
+  return CallDisplayFunction(device, display, &HWCDisplay::SetLayerZOrder, layer, z);
 }
 
 int32_t HWCSession::SetOutputBuffer(hwc2_device_t *device, hwc2_display_t display,
@@ -502,9 +531,10 @@ int32_t HWCSession::SetOutputBuffer(hwc2_device_t *device, hwc2_display_t displa
   }
 }
 
-static int32_t SetPowerMode(hwc2_device_t *device, hwc2_display_t display, int32_t int_mode) {
+int32_t HWCSession::SetPowerMode(hwc2_device_t *device, hwc2_display_t display, int32_t int_mode) {
   auto mode = static_cast<HWC2::PowerMode>(int_mode);
-  return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetPowerMode, mode);
+  SEQUENCE_WAIT_SCOPE_LOCK(locker_);
+  return CallDisplayFunction(device, display, &HWCDisplay::SetPowerMode, mode);
 }
 
 static int32_t SetVsyncEnabled(hwc2_device_t *device, hwc2_display_t display, int32_t int_enabled) {
@@ -539,6 +569,11 @@ int32_t HWCSession::ValidateDisplay(hwc2_device_t *device, hwc2_display_t displa
 
     status = hwc_session->hwc_display_[display]->Validate(out_num_types, out_num_requests);
   }
+  // If validate fails, cancel the sequence lock so that other operations
+  // (such as Dump or SetPowerMode) may succeed without blocking on the condition
+  if (status != HWC2::Error::None) {
+    SEQUENCE_CANCEL_SCOPE_LOCK(locker_);
+  }
   return INT32(status);
 }
 
@@ -558,15 +593,15 @@ hwc2_function_pointer_t HWCSession::GetFunction(struct hwc2_device *device,
     case HWC2::FunctionDescriptor::DestroyVirtualDisplay:
       return AsFP<HWC2_PFN_DESTROY_VIRTUAL_DISPLAY>(HWCSession::DestroyVirtualDisplay);
     case HWC2::FunctionDescriptor::Dump:
-      return AsFP<HWC2_PFN_DUMP>(Dump);
+      return AsFP<HWC2_PFN_DUMP>(HWCSession::Dump);
     case HWC2::FunctionDescriptor::GetActiveConfig:
       return AsFP<HWC2_PFN_GET_ACTIVE_CONFIG>(GetActiveConfig);
     case HWC2::FunctionDescriptor::GetChangedCompositionTypes:
       return AsFP<HWC2_PFN_GET_CHANGED_COMPOSITION_TYPES>(GetChangedCompositionTypes);
     case HWC2::FunctionDescriptor::GetClientTargetSupport:
       return AsFP<HWC2_PFN_GET_CLIENT_TARGET_SUPPORT>(GetClientTargetSupport);
-    // case HWC2::FunctionDescriptor::GetColorModes:
-    // TODO(user): Support later
+    case HWC2::FunctionDescriptor::GetColorModes:
+      return AsFP<HWC2_PFN_GET_COLOR_MODES>(GetColorModes);
     case HWC2::FunctionDescriptor::GetDisplayAttribute:
       return AsFP<HWC2_PFN_GET_DISPLAY_ATTRIBUTE>(GetDisplayAttribute);
     case HWC2::FunctionDescriptor::GetDisplayConfigs:
@@ -593,10 +628,10 @@ hwc2_function_pointer_t HWCSession::GetFunction(struct hwc2_device *device,
       return AsFP<HWC2_PFN_SET_ACTIVE_CONFIG>(SetActiveConfig);
     case HWC2::FunctionDescriptor::SetClientTarget:
       return AsFP<HWC2_PFN_SET_CLIENT_TARGET>(SetClientTarget);
-    // TODO(user): Support later
-    // case HWC2::FunctionDescriptor::SetColorMode:
-    // case HWC2::FunctionDescriptor::SetColorTransform:
-    // break;
+    case HWC2::FunctionDescriptor::SetColorMode:
+      return AsFP<HWC2_PFN_SET_COLOR_MODE>(SetColorMode);
+    case HWC2::FunctionDescriptor::SetColorTransform:
+      return AsFP<HWC2_PFN_SET_COLOR_TRANSFORM>(SetColorTransform);
     case HWC2::FunctionDescriptor::SetCursorPosition:
       return AsFP<HWC2_PFN_SET_CURSOR_POSITION>(SetCursorPosition);
     case HWC2::FunctionDescriptor::SetLayerBlendMode:

@@ -148,5 +148,13 @@ bool Debug::GetProperty(const char* property_name, char* value) {
   return true;
 }
 
+bool Debug::SetProperty(const char* property_name, const char* value) {
+  if (debug_.debug_handler_->SetProperty(property_name, value) != kErrorNone) {
+    return false;
+  }
+
+  return true;
+}
+
 }  // namespace sdm
 

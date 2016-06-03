@@ -34,6 +34,10 @@
 #include <stdarg.h>
 #include <sys/mman.h>
 
+#include <map>
+#include <string>
+#include <vector>
+
 #include "hwc_display_primary.h"
 #include "hwc_debugger.h"
 
@@ -103,7 +107,13 @@ int HWCDisplayPrimary::Init() {
     use_metadata_refresh_rate_ = false;
   }
 
-  return HWCDisplay::Init();
+  int status = HWCDisplay::Init();
+  if (status) {
+    return status;
+  }
+  color_mode_ = new HWCColorMode(display_intf_);
+
+  return INT(color_mode_->Init());
 }
 
 void HWCDisplayPrimary::ProcessBootAnimCompleted() {
@@ -151,6 +161,11 @@ HWC2::Error HWCDisplayPrimary::Validate(uint32_t *out_num_types, uint32_t *out_n
   if (display_paused_) {
     MarkLayersForGPUBypass();
     return status;
+  }
+
+  if (color_tranform_failed_) {
+    // Must fall back to client composition
+    MarkLayersForClientComposition();
   }
 
   // Fill in the remaining blanks in the layers and add them to the SDM layerstack
@@ -210,6 +225,48 @@ HWC2::Error HWCDisplayPrimary::Present(int32_t *out_retire_fence) {
     }
   }
   CloseAcquireFds();
+  return status;
+}
+
+HWC2::Error HWCDisplayPrimary::GetColorModes(uint32_t *out_num_modes,
+                                             int32_t /*android_color_mode_t*/ *out_modes) {
+  if (out_modes == nullptr) {
+    *out_num_modes = color_mode_->GetColorModeCount();
+  } else {
+    color_mode_->GetColorModes(out_num_modes, out_modes);
+  }
+
+  return HWC2::Error::None;
+}
+
+HWC2::Error HWCDisplayPrimary::SetColorMode(int32_t /*android_color_mode_t*/ mode) {
+  auto status = color_mode_->SetColorMode(mode);
+  if (status != HWC2::Error::None) {
+    DLOGE("failed for mode = %d", mode);
+    return status;
+  }
+
+  callbacks_->Refresh(HWC_DISPLAY_PRIMARY);
+
+  return status;
+}
+
+HWC2::Error HWCDisplayPrimary::SetColorTransform(const float *matrix,
+                                                 android_color_transform_t hint) {
+  if (!matrix) {
+    return HWC2::Error::BadParameter;
+  }
+
+  auto status = color_mode_->SetColorTransform(matrix, hint);
+  if (status != HWC2::Error::None) {
+    DLOGE("failed for hint = %d", hint);
+    color_tranform_failed_ = true;
+    return status;
+  }
+
+  callbacks_->Refresh(HWC_DISPLAY_PRIMARY);
+  color_tranform_failed_ = false;
+
   return status;
 }
 

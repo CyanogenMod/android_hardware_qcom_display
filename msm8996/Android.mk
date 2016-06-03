@@ -1,6 +1,11 @@
-display-hals := libgralloc libcopybit liblight libmemtrack libqservice libqdutils
-display-hals += hdmi_cec
+display-hals := libcopybit liblight libmemtrack libqservice libqdutils
+ifneq ($(TARGET_USES_GRALLOC1), true)
+    display-hals += libgralloc
+else
+    display-hals += libgralloc1
+endif
 
+display-hals += hdmi_cec
 sdm-libs := sdm/libs
 display-hals += $(sdm-libs)/utils $(sdm-libs)/core $(sdm-libs)/hwc $(sdm-libs)/hwc2
 

@@ -474,19 +474,20 @@ DisplayError HWCLayer::SetIGC(IGC_t source, LayerIGC *target) {
   return kErrorNone;
 }
 
-uint32_t HWCLayer::RoundToStandardFPS(uint32_t fps) {
-  static const uint32_t standard_fps[4] = {30, 24, 48, 60};
+uint32_t HWCLayer::RoundToStandardFPS(float fps) {
+  static const uint32_t standard_fps[4] = {24, 30, 48, 60};
+  uint32_t frame_rate = (uint32_t)(fps);
 
   int count = INT(sizeof(standard_fps) / sizeof(standard_fps[0]));
   for (int i = 0; i < count; i++) {
-    if ((standard_fps[i] - fps) < 2) {
+    if ((standard_fps[i] - frame_rate) < 2) {
       // Most likely used for video, the fps can fluctuate
       // Ex: b/w 29 and 30 for 30 fps clip
       return standard_fps[i];
     }
   }
 
-  return fps;
+  return frame_rate;
 }
 
 void HWCLayer::SetComposition(const LayerComposition &source) {
