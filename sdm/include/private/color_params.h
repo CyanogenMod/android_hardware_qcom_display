@@ -315,6 +315,13 @@ struct SDEPgcLUTData {
   uint32_t *c2_data = NULL;
 };
 
+struct SDEDisplayMode {
+  static const int kMaxModeNameSize = 256;
+  int32_t id = -1;
+  uint32_t type = 0;
+  char name[kMaxModeNameSize] = {0};
+};
+
 // Wrapper on HW block config data structure to encapsulate the details of allocating
 // and destroying from the caller.
 class SDEGamutCfgWrapper : private SDEGamutCfg {

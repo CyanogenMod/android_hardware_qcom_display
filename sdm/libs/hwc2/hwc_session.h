@@ -101,6 +101,10 @@ class HWCSession : hwc2_device_t, public qClient::BnQClient {
   static int32_t SetPowerMode(hwc2_device_t *device, hwc2_display_t display, int32_t int_mode);
   static int32_t ValidateDisplay(hwc2_device_t *device, hwc2_display_t display,
                                  uint32_t *out_num_types, uint32_t *out_num_requests);
+  static int32_t SetColorMode(hwc2_device_t *device, hwc2_display_t display,
+                              int32_t /*android_color_mode_t*/ mode);
+  static int32_t SetColorTransform(hwc2_device_t *device, hwc2_display_t display,
+                                   const float *matrix, int32_t /*android_color_transform_t*/ hint);
 
  private:
   static const int kExternalConnectionTimeoutMs = 500;

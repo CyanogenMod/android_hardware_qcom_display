@@ -28,6 +28,7 @@
 #include <utils/formats.h>
 #include <utils/rect.h>
 
+#include <string>
 #include <vector>
 
 #include "display_base.h"
@@ -111,6 +112,10 @@ DisplayError DisplayBase::Deinit() {
     rotator_intf_->UnregisterDisplay(display_rotator_ctx_);
   }
 
+  if (color_modes_) {
+    delete[] color_modes_;
+  }
+
   if (color_mgr_) {
     delete color_mgr_;
     color_mgr_ = NULL;
@@ -174,9 +179,12 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
 }
 
 DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
+  SCOPE_LOCK(locker_);
+  return PrepareLocked(layer_stack);
+}
+
+DisplayError DisplayBase::PrepareLocked(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
-  bool disable_partial_update = false;
-  uint32_t pending = 0;
 
   if (!layer_stack) {
     return kErrorParameters;
@@ -193,16 +201,13 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
     return kErrorPermission;
   }
 
-  // Request to disable partial update only if it is currently enabled.
-  if (color_mgr_ && partial_update_control_) {
-    disable_partial_update = color_mgr_->NeedsPartialUpdateDisable();
-    if (disable_partial_update) {
-      ControlPartialUpdate(false, &pending);
-    }
+  if (color_mgr_ && color_mgr_->NeedsPartialUpdateDisable()) {
+    DisablePartialUpdateOneFrameLocked();
   }
 
-  if (one_frame_full_roi_) {
-    ControlPartialUpdate(false, &pending);
+  if (partial_update_control_ == false || disable_pu_one_frame_) {
+    comp_manager_->ControlPartialUpdate(display_comp_ctx_, false /* enable */);
+    disable_pu_one_frame_ = false;
   }
 
   // Clean hw layers for reuse.
@@ -244,14 +249,6 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   }
 
   comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
-  if (disable_partial_update) {
-    ControlPartialUpdate(true, &pending);
-  }
-
-  if (one_frame_full_roi_) {
-    ControlPartialUpdate(true, &pending);
-    one_frame_full_roi_ = false;
-  }
 
   return error;
 }
@@ -312,6 +309,10 @@ DisplayError DisplayBase::Commit(LayerStack *layer_stack) {
     if (error != kErrorNone) {
       return error;
     }
+  }
+
+  if (partial_update_control_) {
+    comp_manager_->ControlPartialUpdate(display_comp_ctx_, true /* enable */);
   }
 
   error = comp_manager_->PostCommit(display_comp_ctx_, &hw_layers_);
@@ -455,6 +456,11 @@ DisplayError DisplayBase::SetDisplayState(DisplayState state) {
 }
 
 DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
+  SCOPE_LOCK(locker_);
+  return SetActiveConfigLocked(index);
+}
+
+DisplayError DisplayBase::SetActiveConfigLocked(uint32_t index) {
   DisplayError error = kErrorNone;
   uint32_t active_index = 0;
 
@@ -484,11 +490,16 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
   error = comp_manager_->RegisterDisplay(display_type_, attrib, hw_panel_info_,
                                          &display_comp_ctx_);
 
-  if (error == kErrorNone && partial_update_control_) {
-    one_frame_full_roi_ = true;
+  if (error == kErrorNone) {
+    DisablePartialUpdateOneFrameLocked();
   }
 
   return error;
+}
+
+DisplayError DisplayBase::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
+  SCOPE_LOCK(locker_);
+  return SetActiveConfigLocked(variable_info);
 }
 
 DisplayError DisplayBase::SetMaxMixerStages(uint32_t max_mixer_stages) {
@@ -504,32 +515,13 @@ DisplayError DisplayBase::SetMaxMixerStages(uint32_t max_mixer_stages) {
 }
 
 DisplayError DisplayBase::ControlPartialUpdate(bool enable, uint32_t *pending) {
-  if (!pending) {
-    return kErrorParameters;
-  }
+  SCOPE_LOCK(locker_);
+  return ControlPartialUpdateLocked(enable, pending);
+}
 
-  if (!hw_panel_info_.partial_update) {
-    // Nothing to be done.
-    DLOGI("partial update is not applicable for display=%d", display_type_);
-    return kErrorNotSupported;
-  }
-
-  *pending = 0;
-  if (enable == partial_update_control_) {
-    DLOGI("Same state transition is requested.");
-    return kErrorNone;
-  }
-
-  partial_update_control_ = enable;
-  comp_manager_->ControlPartialUpdate(display_comp_ctx_, enable);
-
-  if (!enable) {
-    // If the request is to turn off feature, new draw call is required to have
-    // the new setting into effect.
-    *pending = 1;
-  }
-
-  return kErrorNone;
+DisplayError DisplayBase::DisablePartialUpdateOneFrame() {
+  SCOPE_LOCK(locker_);
+  return DisablePartialUpdateOneFrameLocked();
 }
 
 DisplayError DisplayBase::SetDisplayMode(uint32_t mode) {
@@ -719,6 +711,105 @@ DisplayError DisplayBase::ColorSVCRequestRoute(const PPDisplayAPIPayload &in_pay
     return color_mgr_->ColorSVCRequestRoute(in_payload, out_payload, pending_action);
   else
     return kErrorParameters;
+}
+
+DisplayError DisplayBase::GetColorModeCount(uint32_t *mode_count) {
+  if (!mode_count) {
+    return kErrorParameters;
+  }
+
+  if (!color_mgr_) {
+    return kErrorNotSupported;
+  }
+
+  DisplayError error = color_mgr_->ColorMgrGetNumOfModes(&num_color_modes_);
+  if (error != kErrorNone || !num_color_modes_) {
+    return kErrorNotSupported;
+  }
+
+  DLOGI("Number of color modes = %d", num_color_modes_);
+  *mode_count = num_color_modes_;
+
+  return kErrorNone;
+}
+
+DisplayError DisplayBase::GetColorModes(uint32_t *mode_count,
+                                        std::vector<std::string> *color_modes) {
+  if (!mode_count || !color_modes) {
+    return kErrorParameters;
+  }
+
+  if (!color_mgr_) {
+    return kErrorNotSupported;
+  }
+
+  if (color_modes_ == NULL) {
+    color_modes_ = new SDEDisplayMode[num_color_modes_];
+
+    DisplayError error = color_mgr_->ColorMgrGetModes(&num_color_modes_, color_modes_);
+    if (error != kErrorNone) {
+      DLOGE("Failed");
+      return error;
+    }
+    for (uint32_t i = 0; i < num_color_modes_; i++) {
+      DLOGV_IF(kTagQDCM, "Color Mode[%d]: Name = %s mode_id = %d", i, color_modes_[i].name,
+               color_modes_[i].id);
+      color_mode_map_.insert(std::make_pair(color_modes_[i].name, &color_modes_[i]));
+    }
+  }
+
+  for (uint32_t i = 0; i < num_color_modes_; i++) {
+    DLOGV_IF(kTagQDCM, "Color Mode[%d]: Name = %s mode_id = %d", i, color_modes_[i].name,
+             color_modes_[i].id);
+    color_modes->at(i) = color_modes_[i].name;
+  }
+
+  return kErrorNone;
+}
+
+DisplayError DisplayBase::SetColorMode(const std::string &color_mode) {
+  if (!color_mgr_) {
+    return kErrorNotSupported;
+  }
+
+  DLOGV_IF(kTagQDCM, "Color Mode = %s", color_mode.c_str());
+
+  ColorModeMap::iterator it = color_mode_map_.find(color_mode);
+  if (it == color_mode_map_.end()) {
+    DLOGE("Failed: Unknown Mode : %s", color_mode.c_str());
+    return kErrorNotSupported;
+  }
+
+  SDEDisplayMode *sde_display_mode = it->second;
+  if (color_mode_ == sde_display_mode->id) {
+    DLOGV_IF(kTagQDCM, "Same mode requested");
+    return kErrorNone;
+  }
+
+  DLOGV_IF(kTagQDCM, "Color Mode Name = %s corresponding mode_id = %d", sde_display_mode->name,
+           sde_display_mode->id);
+  DisplayError error = kErrorNone;
+  error = color_mgr_->ColorMgrSetMode(sde_display_mode->id);
+  if (error != kErrorNone) {
+    DLOGE("Failed for mode id = %d", sde_display_mode->id);
+    return error;
+  }
+
+  color_mode_ = sde_display_mode->id;
+
+  return error;
+}
+
+DisplayError DisplayBase::SetColorTransform(const uint32_t length, const double *color_transform) {
+  if (!color_mgr_) {
+    return kErrorNotSupported;
+  }
+
+  if (!color_transform) {
+    return kErrorParameters;
+  }
+
+  return color_mgr_->ColorMgrSetColorTransform(length, color_transform);
 }
 
 DisplayError DisplayBase::ApplyDefaultDisplayMode() {

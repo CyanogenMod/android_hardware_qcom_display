@@ -31,6 +31,10 @@
 #include <private/color_interface.h>
 #include <utils/locker.h>
 
+#include <map>
+#include <string>
+#include <vector>
+
 #include "hw_interface.h"
 #include "comp_manager.h"
 #include "color_manager.h"
@@ -50,7 +54,7 @@ class DisplayBase : public DisplayInterface {
   virtual ~DisplayBase() { }
   virtual DisplayError Init();
   virtual DisplayError Deinit();
-  virtual DisplayError Prepare(LayerStack *layer_stack);
+  DisplayError Prepare(LayerStack *layer_stack) final;
   virtual DisplayError Commit(LayerStack *layer_stack);
   virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
@@ -59,9 +63,11 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError GetActiveConfig(uint32_t *index);
   virtual DisplayError GetVSyncState(bool *enabled);
   virtual DisplayError SetDisplayState(DisplayState state);
-  virtual DisplayError SetActiveConfig(uint32_t index);
+  DisplayError SetActiveConfig(uint32_t index) final;
+  DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info) final;
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
-  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
+  DisplayError ControlPartialUpdate(bool enable, uint32_t *pending) final;
+  DisplayError DisablePartialUpdateOneFrame() final;
   virtual DisplayError SetDisplayMode(uint32_t mode);
   virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual bool IsUnderscanSupported();
@@ -70,6 +76,10 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
                                             PPDisplayAPIPayload *out_payload,
                                             PPPendingParams *pending_action);
+  virtual DisplayError GetColorModeCount(uint32_t *mode_count);
+  virtual DisplayError GetColorModes(uint32_t *mode_count, std::vector<std::string> *color_modes);
+  virtual DisplayError SetColorMode(const std::string &color_mode);
+  virtual DisplayError SetColorTransform(const uint32_t length, const double *color_transform);
   virtual DisplayError ApplyDefaultDisplayMode(void);
   virtual DisplayError SetCursorPosition(int x, int y);
   virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
@@ -77,6 +87,17 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError SetVSyncState(bool enable);
 
  protected:
+  virtual DisplayError PrepareLocked(LayerStack *layer_stack);
+  virtual DisplayError SetActiveConfigLocked(uint32_t index);
+  virtual DisplayError SetActiveConfigLocked(DisplayConfigVariableInfo *variable_info) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError ControlPartialUpdateLocked(bool enable, uint32_t *pending) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError DisablePartialUpdateOneFrameLocked() {
+    return kErrorNotSupported;
+  }
   // DumpImpl method
   void AppendDump(char *buffer, uint32_t length);
 
@@ -84,6 +105,7 @@ class DisplayBase : public DisplayInterface {
   const char *GetName(const LayerComposition &composition);
   DisplayError ValidateGPUTarget(LayerStack *layer_stack);
 
+  Locker locker_;
   DisplayType display_type_;
   DisplayEventHandler *event_handler_ = NULL;
   HWDeviceType hw_device_type_;
@@ -107,9 +129,14 @@ class DisplayBase : public DisplayInterface {
   ColorManagerProxy *color_mgr_ = NULL;  // each display object owns its ColorManagerProxy
   bool partial_update_control_ = true;
   HWEventsInterface *hw_events_intf_ = NULL;
+  bool disable_pu_one_frame_ = false;
+  uint32_t num_color_modes_ = 0;
+  SDEDisplayMode *color_modes_ = NULL;
+  int32_t color_mode_ = 0;
+  typedef std::map<std::string, SDEDisplayMode *> ColorModeMap;
+  ColorModeMap color_mode_map_ = {};
 
  private:
-  bool one_frame_full_roi_ = false;
   // Unused
   virtual DisplayError GetConfig(DisplayConfigFixedInfo *variable_info) {
     return kErrorNone;

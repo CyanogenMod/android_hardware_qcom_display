@@ -106,12 +106,10 @@ DisplayError DisplayHDMI::Deinit() {
   return error;
 }
 
-DisplayError DisplayHDMI::Prepare(LayerStack *layer_stack) {
-  SCOPE_LOCK(locker_);
-
+DisplayError DisplayHDMI::PrepareLocked(LayerStack *layer_stack) {
   SetS3DMode(layer_stack);
 
-  return DisplayBase::Prepare(layer_stack);
+  return DisplayBase::PrepareLocked(layer_stack);
 }
 
 DisplayError DisplayHDMI::Commit(LayerStack *layer_stack) {
@@ -152,16 +150,6 @@ DisplayError DisplayHDMI::GetVSyncState(bool *enabled) {
 DisplayError DisplayHDMI::SetDisplayState(DisplayState state) {
   SCOPE_LOCK(locker_);
   return DisplayBase::SetDisplayState(state);
-}
-
-DisplayError DisplayHDMI::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
-  SCOPE_LOCK(locker_);
-  return kErrorNotSupported;
-}
-
-DisplayError DisplayHDMI::SetActiveConfig(uint32_t index) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetActiveConfig(index);
 }
 
 DisplayError DisplayHDMI::SetVSyncState(bool enable) {

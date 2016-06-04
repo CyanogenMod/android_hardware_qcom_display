@@ -34,6 +34,8 @@
 #define __DISPLAY_INTERFACE_H__
 
 #include <stdint.h>
+#include <string>
+#include <vector>
 
 #include "layer_stack.h"
 #include "sdm_types.h"
@@ -341,6 +343,11 @@ class DisplayInterface {
   */
   virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending) = 0;
 
+  /*! @brief Method to disable partial update for at least 1 frame.
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError DisablePartialUpdateOneFrame() = 0;
+
   /*! @brief Method to set the mode of the primary display.
 
     @param[in] mode the new display mode.
@@ -406,6 +413,41 @@ class DisplayInterface {
   virtual DisplayError ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
                                             PPDisplayAPIPayload *out_payload,
                                             PPPendingParams *pending_action) = 0;
+
+  /*! @brief Method to request the number of color modes supported.
+
+    @param[out] mode_count Number of modes
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError GetColorModeCount(uint32_t *mode_count) = 0;
+
+  /*! @brief Method to request the information of supported color modes.
+
+    @param[inout] mode_count Number of updated modes
+    @param[out] vector of mode strings
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError GetColorModes(uint32_t *mode_count,
+                                     std::vector<std::string> *color_modes) = 0;
+
+  /*! @brief Method to set the color mode
+
+    @param[in] mode_name Mode name which needs to be set
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError SetColorMode(const std::string &color_mode) = 0;
+
+  /*! @brief Method to set the color transform
+
+    @param[in] length Mode name which needs to be set
+    @param[in] color_transform  4x4 Matrix for color transform
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError SetColorTransform(const uint32_t length, const double *color_transform) = 0;
 
   /*! @brief Method to request applying default display mode.
 

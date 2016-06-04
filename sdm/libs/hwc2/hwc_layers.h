@@ -96,7 +96,7 @@ class HWCLayer {
   DisplayError SetMetaData(const private_handle_t *pvt_handle, Layer *layer);
   DisplayError SetCSC(ColorSpace_t source, LayerCSC *target);
   DisplayError SetIGC(IGC_t source, LayerIGC *target);
-  uint32_t RoundToStandardFPS(uint32_t fps);
+  uint32_t RoundToStandardFPS(float fps);
 };
 
 struct SortLayersByZ {
