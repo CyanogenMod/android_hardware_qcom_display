@@ -37,11 +37,16 @@ class ResourceDefault : public ResourceInterface {
  public:
   DisplayError Init(const HWResourceInfo &hw_resource_info);
   DisplayError Deinit();
-  virtual DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
-                                       const HWPanelInfo &hw_panel_info, Handle *display_ctx);
+  virtual DisplayError RegisterDisplay(DisplayType type,
+                                       const HWDisplayAttributes &display_attributes,
+                                       const HWPanelInfo &hw_panel_info,
+                                       const HWMixerAttributes &mixer_attributes,
+                                       Handle *display_ctx);
   virtual DisplayError UnregisterDisplay(Handle display_ctx);
-  virtual void ReconfigureDisplay(Handle display_ctx, const HWDisplayAttributes &attributes,
-                                  const HWPanelInfo &hw_panel_info);
+  virtual DisplayError ReconfigureDisplay(Handle display_ctx,
+                                          const HWDisplayAttributes &display_attributes,
+                                          const HWPanelInfo &hw_panel_info,
+                                          const HWMixerAttributes &mixer_attributes);
   virtual DisplayError Start(Handle display_ctx);
   virtual DisplayError Stop(Handle display_ctx);
   virtual DisplayError Acquire(Handle display_ctx, HWLayers *hw_layers);
@@ -54,6 +59,8 @@ class ResourceDefault : public ResourceInterface {
   DisplayError ValidateCursorConfig(Handle display_ctx, const Layer *layer, bool is_top);
   DisplayError ValidateCursorPosition(Handle display_ctx, HWLayers *hw_layers, int x, int y);
   DisplayError SetMaxBandwidthMode(HWBwModes mode);
+  virtual DisplayError SetDetailEnhancerData(Handle display_ctx,
+                                             const DisplayDetailEnhancerData &de_data);
 
  private:
   enum PipeOwner {
@@ -84,6 +91,7 @@ class ResourceDefault : public ResourceInterface {
     HWDisplayAttributes display_attributes;
     HWBlockType hw_block_id;
     uint64_t frame_count;
+    HWMixerAttributes mixer_attributes;
 
     DisplayResourceContext() : hw_block_id(kHWBlockMax), frame_count(0) { }
   };

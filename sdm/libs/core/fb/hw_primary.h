@@ -65,6 +65,8 @@ class HWPrimary : public HWDevice {
   virtual DisplayError SetPPFeatures(PPFeaturesConfig *feature_list);
   virtual DisplayError GetPanelBrightness(int *level);
   virtual DisplayError SetAutoRefresh(bool enable);
+  virtual DisplayError SetMixerAttributes(const HWMixerAttributes &mixer_attributes);
+  virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes);
 
  private:
   // Panel modes for the MSMFB_LPM_ENABLE ioctl
@@ -77,6 +79,8 @@ class HWPrimary : public HWDevice {
   void InitializeConfigs();
   bool IsResolutionSwitchEnabled() { return !display_configs_.empty(); }
   bool GetCurrentModeFromSysfs(size_t *curr_x_pixels, size_t *curr_y_pixels);
+  void UpdateMixerAttributes();
+  void ResetDisplayParams();
 
   HWDisplayAttributes display_attributes_;
   std::vector<DisplayConfigVariableInfo> display_configs_;
@@ -85,6 +89,8 @@ class HWPrimary : public HWDevice {
   const char *kBrightnessNode = "/sys/class/leds/lcd-backlight/brightness";
   const char *kAutoRefreshNode = "/sys/devices/virtual/graphics/fb0/msm_cmd_autorefresh_en";
   bool auto_refresh_ = false;
+  HWMixerAttributes mixer_attributes_ = {};
+  mdp_destination_scaler_data *mdp_dest_scalar_data_ = NULL;
 };
 
 }  // namespace sdm

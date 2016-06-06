@@ -41,11 +41,15 @@ class CompManager : public DumpImpl {
   DisplayError Init(const HWResourceInfo &hw_res_info_, ExtensionInterface *extension_intf,
                   BufferSyncHandler *buffer_sync_handler);
   DisplayError Deinit();
-  DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
-                               const HWPanelInfo &hw_panel_info, Handle *res_mgr_hnd);
+  DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &display_attributes,
+                               const HWPanelInfo &hw_panel_info,
+                               const HWMixerAttributes &mixer_attributes,
+                               const DisplayConfigVariableInfo &fb_config, Handle *res_mgr_hnd);
   DisplayError UnregisterDisplay(Handle res_mgr_hnd);
-  DisplayError ReconfigureDisplay(Handle display_ctx, const HWDisplayAttributes &attributes,
-                                  const HWPanelInfo &hw_panel_info);
+  DisplayError ReconfigureDisplay(Handle display_ctx, const HWDisplayAttributes &display_attributes,
+                                  const HWPanelInfo &hw_panel_info,
+                                  const HWMixerAttributes &mixer_attributes,
+                                  const DisplayConfigVariableInfo &fb_config);
   void PrePrepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError Prepare(Handle display_ctx, HWLayers *hw_layers);
   DisplayError PostPrepare(Handle display_ctx, HWLayers *hw_layers);
@@ -62,6 +66,7 @@ class CompManager : public DumpImpl {
   bool CanSetIdleTimeout(Handle display_ctx);
   DisplayError SetMaxBandwidthMode(HWBwModes mode);
   DisplayError GetScaleLutConfig(HWScaleLutInfo *lut_info);
+  DisplayError SetDetailEnhancerData(Handle display_ctx, const DisplayDetailEnhancerData &de_data);
 
   // DumpImpl method
   virtual void AppendDump(char *buffer, uint32_t length);

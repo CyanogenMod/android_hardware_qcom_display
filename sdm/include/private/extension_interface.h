@@ -54,11 +54,16 @@ class ExtensionInterface {
  public:
   virtual DisplayError CreatePartialUpdate(DisplayType type, const HWResourceInfo &hw_resource_info,
                                            const HWPanelInfo &hw_panel_info,
+                                           const HWMixerAttributes &mixer_attributes,
+                                           const HWDisplayAttributes &display_attributes,
                                            PartialUpdateInterface **interface) = 0;
   virtual DisplayError DestroyPartialUpdate(PartialUpdateInterface *interface) = 0;
 
   virtual DisplayError CreateStrategyExtn(DisplayType type, HWDisplayMode mode,
-                                          HWS3DMode s3d_mode, StrategyInterface **interface) = 0;
+                                          HWS3DMode s3d_mode,
+                                          const HWMixerAttributes &mixer_attributes,
+                                          const DisplayConfigVariableInfo &fb_config,
+                                          StrategyInterface **interface) = 0;
   virtual DisplayError DestroyStrategyExtn(StrategyInterface *interface) = 0;
 
   virtual DisplayError CreateResourceExtn(const HWResourceInfo &hw_resource_info,

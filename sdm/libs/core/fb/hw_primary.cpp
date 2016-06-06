@@ -40,6 +40,7 @@
 #include <utils/sys.h>
 #include <core/display_interface.h>
 #include <linux/msm_mdp_ext.h>
+#include <utils/rect.h>
 
 #include <string>
 
@@ -99,10 +100,17 @@ DisplayError HWPrimary::Init() {
     return error;
   }
 
+  uint32_t dest_scalar_count = hw_resource_.hw_dest_scalar_info.count;
+  if (dest_scalar_count) {
+    mdp_dest_scalar_data_ = new mdp_destination_scaler_data[dest_scalar_count];
+  }
+
   error = PopulateDisplayAttributes();
   if (error != kErrorNone) {
     return error;
   }
+
+  UpdateMixerAttributes();
 
   // Disable HPD at start if HDMI is external, it will be enabled later when the display powers on
   // This helps for framework reboot or adb shell stop/start
@@ -199,6 +207,8 @@ void HWPrimary::InitializeConfigs() {
 }
 
 DisplayError HWPrimary::Deinit() {
+  delete [] mdp_dest_scalar_data_;
+
   return HWDevice::Deinit();
 }
 
@@ -273,8 +283,6 @@ DisplayError HWPrimary::PopulateDisplayAttributes() {
   display_attributes_.vsync_period_ns = UINT32(1000000000L / display_attributes_.fps);
   display_attributes_.is_device_split = (hw_panel_info_.split_info.left_split ||
       (var_screeninfo.xres > hw_resource_.max_mixer_width)) ? true : false;
-  display_attributes_.split_left = hw_panel_info_.split_info.left_split ?
-      hw_panel_info_.split_info.left_split : display_attributes_.x_pixels / 2;
   display_attributes_.h_total += display_attributes_.is_device_split ? h_blanking : 0;
 
   return kErrorNone;
@@ -305,6 +313,7 @@ DisplayError HWPrimary::SetDisplayAttributes(uint32_t index) {
     DLOGI("Successfully set config %u", index);
     PopulateHWPanelInfo();
     PopulateDisplayAttributes();
+    UpdateMixerAttributes();
     active_config_index_ = index;
   } else {
     DLOGE("Writing config index %u failed with error: %s", index, strerror(errno));
@@ -381,15 +390,27 @@ DisplayError HWPrimary::DozeSuspend() {
   return kErrorNone;
 }
 
-DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
-  LayerStack *stack = hw_layers->info.stack;
+void HWPrimary::ResetDisplayParams() {
+  uint32_t dst_scalar_cnt = hw_resource_.hw_dest_scalar_info.count;
 
   HWDevice::ResetDisplayParams();
 
+  if (mdp_dest_scalar_data_) {
+    memset(mdp_dest_scalar_data_, 0, sizeof(mdp_dest_scalar_data_) * dst_scalar_cnt);
+    mdp_disp_commit_.commit_v1.dest_scaler = mdp_dest_scalar_data_;
+  }
+}
+
+DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
+  HWLayersInfo &hw_layer_info = hw_layers->info;
+  LayerStack *stack = hw_layer_info.stack;
+
+  ResetDisplayParams();
+
   mdp_layer_commit_v1 &mdp_commit = mdp_disp_commit_.commit_v1;
 
-  LayerRect left_roi = hw_layers->info.left_partial_update;
-  LayerRect right_roi = hw_layers->info.right_partial_update;
+  LayerRect left_roi = hw_layer_info.left_partial_update;
+  LayerRect right_roi = hw_layer_info.right_partial_update;
   mdp_commit.left_roi.x = UINT32(left_roi.left);
   mdp_commit.left_roi.y = UINT32(left_roi.top);
   mdp_commit.left_roi.w = UINT32(left_roi.right - left_roi.left);
@@ -398,8 +419,8 @@ DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
   // SDM treats ROI as one full coordinate system.
   // In case source split is disabled, However, Driver assumes Mixer to operate in
   // different co-ordinate system.
-  if (!hw_resource_.is_src_split) {
-    mdp_commit.right_roi.x = UINT32(right_roi.left) - hw_panel_info_.split_info.left_split;
+  if (!hw_resource_.is_src_split && IsValid(right_roi)) {
+    mdp_commit.right_roi.x = UINT32(right_roi.left) - mixer_attributes_.split_left;
     mdp_commit.right_roi.y = UINT32(right_roi.top);
     mdp_commit.right_roi.w = UINT32(right_roi.right - right_roi.left);
     mdp_commit.right_roi.h = UINT32(right_roi.bottom - right_roi.top);
@@ -423,6 +444,40 @@ DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
              stack->flags.post_processed_output);
     DLOGI_IF(kTagDriverConfig, "****************************************************************");
   }
+
+  uint32_t index = 0;
+  for (uint32_t i = 0; i < hw_resource_.hw_dest_scalar_info.count; i++) {
+    DestScaleInfoMap::iterator it = hw_layer_info.dest_scale_info_map.find(i);
+
+    if (it == hw_layer_info.dest_scale_info_map.end()) {
+      continue;
+    }
+
+    HWDestScaleInfo *dest_scale_info = it->second;
+
+    mdp_destination_scaler_data *dest_scalar_data = &mdp_dest_scalar_data_[index];
+    hw_scale_->SetHWScaleData(dest_scale_info->scale_data, index, &mdp_commit,
+                              kHWDestinationScalar);
+
+    if (dest_scale_info->scale_update) {
+      dest_scalar_data->flags |= MDP_DESTSCALER_SCALE_UPDATE;
+    }
+
+    dest_scalar_data->dest_scaler_ndx = i;
+    dest_scalar_data->lm_width = dest_scale_info->mixer_width;
+    dest_scalar_data->lm_height = dest_scale_info->mixer_height;
+    dest_scalar_data->scale = reinterpret_cast <uint64_t>
+      (hw_scale_->GetScaleDataRef(index, kHWDestinationScalar));
+
+    index++;
+
+    DLOGV_IF(kTagDriverConfig, "************************ DestScalar[%d] **************************",
+             dest_scalar_data->dest_scaler_ndx);
+    DLOGV_IF(kTagDriverConfig, "Mixer WxH %dx%d", dest_scalar_data->lm_width,
+             dest_scalar_data->lm_height);
+    DLOGI_IF(kTagDriverConfig, "*****************************************************************");
+  }
+  mdp_commit.dest_scaler_cnt = UINT32(hw_layer_info.dest_scale_info_map.size());
 
   return HWDevice::Validate(hw_layers);
 }
@@ -638,6 +693,77 @@ DisplayError HWPrimary::SetPPFeatures(PPFeaturesConfig *feature_list) {
   feature_list->Reset();
 
   return kErrorNone;
+}
+
+DisplayError HWPrimary::SetMixerAttributes(const HWMixerAttributes &mixer_attributes) {
+  if (IsResolutionSwitchEnabled() || !hw_resource_.hw_dest_scalar_info.count) {
+    return kErrorNotSupported;
+  }
+
+  if (mixer_attributes.width > display_attributes_.x_pixels ||
+      mixer_attributes.height > display_attributes_.y_pixels) {
+    DLOGW("Input resolution exceeds display resolution! input: res %dx%d display: res %dx%d",
+          mixer_attributes.width, mixer_attributes.height, display_attributes_.x_pixels,
+          display_attributes_.y_pixels);
+    return kErrorNotSupported;
+  }
+
+  uint32_t max_input_width = hw_resource_.hw_dest_scalar_info.max_input_width;
+  if (display_attributes_.is_device_split) {
+    max_input_width *= 2;
+  }
+
+  if (mixer_attributes.width > max_input_width) {
+    DLOGW("Input width exceeds width limit! input_width %d width_limit %d", mixer_attributes.width,
+          max_input_width);
+    return kErrorNotSupported;
+  }
+
+  float mixer_aspect_ratio = FLOAT(mixer_attributes.width) / FLOAT(mixer_attributes.height);
+  float display_aspect_ratio =
+    FLOAT(display_attributes_.x_pixels) / FLOAT(display_attributes_.y_pixels);
+
+  if (display_aspect_ratio != mixer_aspect_ratio) {
+    DLOGW("Aspect ratio mismatch! input: res %dx%d display: res %dx%d", mixer_attributes.width,
+          mixer_attributes.height, display_attributes_.x_pixels, display_attributes_.y_pixels);
+    return kErrorNotSupported;
+  }
+
+  float scale_x = FLOAT(display_attributes_.x_pixels) / FLOAT(mixer_attributes.width);
+  float scale_y = FLOAT(display_attributes_.y_pixels) / FLOAT(mixer_attributes.height);
+  float max_scale_up = hw_resource_.hw_dest_scalar_info.max_scale_up;
+  if (scale_x > max_scale_up || scale_y > max_scale_up) {
+    DLOGW("Up scaling ratio exceeds for destination scalar upscale limit scale_x %f scale_y %f " \
+          "max_scale_up %f", scale_x, scale_y, max_scale_up);
+    return kErrorNotSupported;
+  }
+
+  float mixer_split_ratio = FLOAT(mixer_attributes_.split_left) / FLOAT(mixer_attributes_.width);
+
+  mixer_attributes_ = mixer_attributes;
+  mixer_attributes_.split_left = mixer_attributes_.width;
+  if (display_attributes_.is_device_split) {
+    mixer_attributes_.split_left = UINT32(FLOAT(mixer_attributes.width) * mixer_split_ratio);
+  }
+
+  return kErrorNone;
+}
+
+DisplayError HWPrimary::GetMixerAttributes(HWMixerAttributes *mixer_attributes) {
+  if (!mixer_attributes) {
+    return kErrorParameters;
+  }
+
+  *mixer_attributes = mixer_attributes_;
+
+  return kErrorNone;
+}
+
+void HWPrimary::UpdateMixerAttributes() {
+  mixer_attributes_.width = display_attributes_.x_pixels;
+  mixer_attributes_.height = display_attributes_.y_pixels;
+  mixer_attributes_.split_left = display_attributes_.is_device_split ?
+      hw_panel_info_.split_info.left_split : mixer_attributes_.width;
 }
 
 }  // namespace sdm

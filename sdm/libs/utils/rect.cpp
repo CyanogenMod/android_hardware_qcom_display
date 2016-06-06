@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -196,6 +196,41 @@ void SplitTopBottom(const LayerRect &in_rect, uint32_t split_count, uint32_t ali
     Log(kTagRotator, "Adjusted Top", out_rects[0]);
     Log(kTagRotator, "Adjusted Bottom", out_rects[1]);
   }
+}
+
+void ScaleRect(const LayerRect &src_domain, const LayerRect &dst_domain, const LayerRect &in_rect,
+               LayerRect *out_rect) {
+  if (!IsValid(src_domain) || !IsValid(dst_domain) || !IsValid(in_rect)) {
+    return;
+  }
+
+  float src_domain_width = src_domain.right - src_domain.left;
+  float src_domain_height = src_domain.bottom - src_domain.top;
+  float dst_domain_width = dst_domain.right - dst_domain.left;
+  float dst_domain_height = dst_domain.bottom - dst_domain.top;
+
+  float width_ratio = dst_domain_width / src_domain_width;
+  float height_ratio = dst_domain_height / src_domain_height;
+
+  out_rect->left = width_ratio * in_rect.left;
+  out_rect->top = height_ratio * in_rect.top;
+  out_rect->right = width_ratio * in_rect.right;
+  out_rect->bottom = height_ratio * in_rect.bottom;
+}
+
+RectOrientation GetOrientation(const LayerRect &in_rect) {
+  if (!IsValid(in_rect)) {
+    return kOrientationUnknown;
+  }
+
+  float input_width = in_rect.right - in_rect.left;
+  float input_height = in_rect.bottom - in_rect.top;
+
+  if (input_width < input_height) {
+    return kOrientationPortrait;
+  }
+
+  return kOrientationLandscape;
 }
 
 }  // namespace sdm
