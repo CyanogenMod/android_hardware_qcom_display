@@ -618,6 +618,12 @@ HWC2::Error HWCDisplay::SetClientTarget(buffer_handle_t target, int32_t acquire_
   if (target == nullptr) {
     return HWC2::Error::None;
   }
+
+  if (acquire_fence == 0) {
+    DLOGE("acquire_fence is zero");
+    return HWC2::Error::BadParameter;
+  }
+
   client_target_->SetLayerBuffer(target, acquire_fence);
   client_target_->SetLayerSurfaceDamage(damage);
   // Ignoring dataspace for now

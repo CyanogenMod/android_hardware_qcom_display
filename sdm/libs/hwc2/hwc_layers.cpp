@@ -58,6 +58,11 @@ HWC2::Error HWCLayer::SetLayerBuffer(buffer_handle_t buffer, int32_t acquire_fen
     return HWC2::Error::BadParameter;
   }
 
+  if (acquire_fence == 0) {
+    DLOGE("acquire_fence is zero");
+    return HWC2::Error::BadParameter;
+  }
+
   const private_handle_t *handle = static_cast<const private_handle_t *>(buffer);
   LayerBuffer *layer_buffer = layer_->input_buffer;
   layer_buffer->width = UINT32(handle->width);
