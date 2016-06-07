@@ -572,7 +572,7 @@ int32_t HWCSession::ValidateDisplay(hwc2_device_t *device, hwc2_display_t displa
   }
   // If validate fails, cancel the sequence lock so that other operations
   // (such as Dump or SetPowerMode) may succeed without blocking on the condition
-  if (status != HWC2::Error::None) {
+  if (status == HWC2::Error::BadDisplay) {
     SEQUENCE_CANCEL_SCOPE_LOCK(locker_);
   }
   return INT32(status);
