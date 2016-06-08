@@ -60,7 +60,7 @@ int HWCDisplayVirtual::Create(CoreInterface *core_intf, HWCCallbacks *callbacks,
     return status;
   }
 
-  hwc_display_virtual->GetPanelResolution(&virtual_width, &virtual_height);
+  hwc_display_virtual->GetMixerResolution(&virtual_width, &virtual_height);
 
   status = hwc_display_virtual->SetFrameBufferResolution(width, height);
 

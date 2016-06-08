@@ -80,6 +80,8 @@ class HWCDisplayPrimary : public HWCDisplay {
   void HandleFrameOutput();
   void HandleFrameCapture();
   void HandleFrameDump();
+  DisplayError SetMixerResolution(uint32_t width, uint32_t height);
+  DisplayError GetMixerResolution(uint32_t *width, uint32_t *height);
 
   BufferAllocator *buffer_allocator_ = nullptr;
   CPUHint *cpu_hint_ = nullptr;

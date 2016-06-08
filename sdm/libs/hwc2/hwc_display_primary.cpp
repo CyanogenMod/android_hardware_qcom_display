@@ -60,7 +60,7 @@ int HWCDisplayPrimary::Create(CoreInterface *core_intf, BufferAllocator *buffer_
     return status;
   }
 
-  hwc_display_primary->GetPanelResolution(&primary_width, &primary_height);
+  hwc_display_primary->GetMixerResolution(&primary_width, &primary_height);
   int width = 0, height = 0;
   HWCDebugHandler::Get()->GetProperty("sdm.fb_size_width", &width);
   HWCDebugHandler::Get()->GetProperty("sdm.fb_size_height", &height);
@@ -536,5 +536,13 @@ DisplayError HWCDisplayPrimary::DisablePartialUpdateOneFrame() {
   return error;
 }
 
+
+DisplayError HWCDisplayPrimary::SetMixerResolution(uint32_t width, uint32_t height) {
+  return display_intf_->SetMixerResolution(width, height);
+}
+
+DisplayError HWCDisplayPrimary::GetMixerResolution(uint32_t *width, uint32_t *height) {
+  return display_intf_->GetMixerResolution(width, height);
+}
 
 }  // namespace sdm
