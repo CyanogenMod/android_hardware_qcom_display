@@ -1380,6 +1380,7 @@ void HWCSession::ResetPanel() {
 int HWCSession::HotPlugHandler(bool connected) {
   int status = 0;
   bool notify_hotplug = false;
+  bool refresh_screen = false;
 
   // To prevent sending events to client while a lock is held, acquire scope locks only within
   // below scope so that those get automatically unlocked after the scope ends.
@@ -1423,6 +1424,11 @@ int HWCSession::HotPlugHandler(bool connected) {
           return -1;
         }
 
+        status = hwc_display_[HWC_DISPLAY_PRIMARY]->SetPowerMode(HWC_POWER_MODE_NORMAL);
+        if (status) {
+          DLOGE("power-on on primary failed with error = %d", status);
+        }
+
         is_hdmi_yuv_ = IsDisplayYUV(HWC_DISPLAY_PRIMARY);
 
         // Next, go ahead and enable vsync on external display. This is expliclity required
@@ -1435,6 +1441,7 @@ int HWCSession::HotPlugHandler(bool connected) {
         }
         // Don't do hotplug notification for HDMI as primary case for now
         notify_hotplug = false;
+        refresh_screen = true;
       } else {
         if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
           DLOGE("HDMI is already connected");
@@ -1493,7 +1500,7 @@ int HWCSession::HotPlugHandler(bool connected) {
     }
   }
 
-  if (connected && notify_hotplug) {
+  if (connected && (notify_hotplug || refresh_screen)) {
     // trigger screen refresh to ensure sufficient resources are available to process new
     // new display connection.
     hwc_procs_->invalidate(hwc_procs_);
