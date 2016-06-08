@@ -412,9 +412,6 @@ void HWCDisplayPrimary::HandleFrameCapture() {
   frame_capture_buffer_queued_ = false;
   post_processed_output_ = false;
   output_buffer_ = {};
-
-  uint32_t pending = 0;  // Just a temporary to satisfy the API
-  ControlPartialUpdate(true /* enable */, &pending);
 }
 
 void HWCDisplayPrimary::HandleFrameDump() {
@@ -443,9 +440,6 @@ void HWCDisplayPrimary::HandleFrameDump() {
     output_buffer_ = {};
     output_buffer_info_ = {};
     output_buffer_base_ = nullptr;
-
-    uint32_t pending = 0;  // Just a temporary to satisfy the API
-    ControlPartialUpdate(true /* enable */, &pending);
   }
 }
 
@@ -483,8 +477,7 @@ void HWCDisplayPrimary::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_lay
 
   output_buffer_base_ = buffer;
   post_processed_output_ = true;
-  uint32_t pending = 0;  // Just a temporary to satisfy the API
-  ControlPartialUpdate(false /* enable */, &pending);
+  DisablePartialUpdateOneFrame();
 }
 
 int HWCDisplayPrimary::FrameCaptureAsync(const BufferInfo &output_buffer_info,
@@ -518,11 +511,30 @@ int HWCDisplayPrimary::FrameCaptureAsync(const BufferInfo &output_buffer_info,
   frame_capture_buffer_queued_ = true;
   // Status is only cleared on a new call to dump and remains valid otherwise
   frame_capture_status_ = -EAGAIN;
-
-  uint32_t pending = 0;  // Just a temporary to satisfy the API
-  ControlPartialUpdate(false /* enable */, &pending);
+  DisablePartialUpdateOneFrame();
 
   return 0;
 }
+
+DisplayError HWCDisplayPrimary::ControlPartialUpdate(bool enable, uint32_t *pending) {
+  DisplayError error = kErrorNone;
+
+  if (display_intf_) {
+    error = display_intf_->ControlPartialUpdate(enable, pending);
+  }
+
+  return error;
+}
+
+DisplayError HWCDisplayPrimary::DisablePartialUpdateOneFrame() {
+  DisplayError error = kErrorNone;
+
+  if (display_intf_) {
+    error = display_intf_->DisablePartialUpdateOneFrame();
+  }
+
+  return error;
+}
+
 
 }  // namespace sdm

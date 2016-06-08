@@ -92,7 +92,9 @@ class HWCDisplay : public DisplayEventHandler {
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
-  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending) {
+    return kErrorNotSupported;
+  }
   virtual HWC2::PowerMode GetLastPowerMode();
   virtual int SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels);
   virtual void GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels);
@@ -193,6 +195,9 @@ class HWCDisplay : public DisplayEventHandler {
   virtual HWC2::Error PrepareLayerStack(uint32_t *out_num_types, uint32_t *out_num_requests);
   virtual HWC2::Error CommitLayerStack(void);
   virtual HWC2::Error PostCommitLayerStack(int32_t *out_retire_fence);
+  virtual DisplayError DisablePartialUpdateOneFrame() {
+    return kErrorNotSupported;
+  }
   LayerBufferFormat GetSDMFormat(const int32_t &source, const int flags);
   const char *GetHALPixelFormatString(int format);
   const char *GetDisplayString();
