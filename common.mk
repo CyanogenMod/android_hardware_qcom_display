@@ -2,6 +2,9 @@
 display_top := $(call my-dir)
 
 use_hwc2 := false
+ifeq ($(TARGET_USES_HWC2), true)
+    use_hwc2 := true
+endif
 
 common_includes := $(display_top)/libqdutils
 common_includes += $(display_top)/libqservice
