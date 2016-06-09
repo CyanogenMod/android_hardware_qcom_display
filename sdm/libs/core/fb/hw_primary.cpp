@@ -230,7 +230,7 @@ DisplayError HWPrimary::PopulateDisplayAttributes() {
   DTRACE_SCOPED();
 
   // Variable screen info
-  STRUCT_VAR(fb_var_screeninfo, var_screeninfo);
+  fb_var_screeninfo var_screeninfo = {};
 
   if (Sys::ioctl_(device_fd_, FBIOGET_VSCREENINFO, &var_screeninfo) < 0) {
     IOCTL_LOGE(FBIOGET_VSCREENINFO, device_type_);
@@ -238,7 +238,7 @@ DisplayError HWPrimary::PopulateDisplayAttributes() {
   }
 
   // Frame rate
-  STRUCT_VAR(msmfb_metadata, meta_data);
+  msmfb_metadata meta_data = {};
   meta_data.op = metadata_op_frame_rate;
   if (Sys::ioctl_(device_fd_, MSMFB_METADATA_GET, &meta_data) < 0) {
     IOCTL_LOGE(MSMFB_METADATA_GET, device_type_);
@@ -584,7 +584,7 @@ DisplayError HWPrimary::SetAutoRefresh(bool enable) {
 }
 
 DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
-  STRUCT_VAR(mdp_pp_feature_version, version);
+  mdp_pp_feature_version version = {};
 
   uint32_t feature_id_mapping[kMaxNumPPFeatures] = { PCC, IGC, GC, GC, PA, DITHER, GAMUT };
 
@@ -603,7 +603,7 @@ DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
 
 // It was entered with PPFeaturesConfig::locker_ being hold.
 DisplayError HWPrimary::SetPPFeatures(PPFeaturesConfig *feature_list) {
-  STRUCT_VAR(msmfb_mdp_pp, kernel_params);
+  msmfb_mdp_pp kernel_params = {};
   int ret = 0;
   PPFeatureInfo *feature = NULL;
 

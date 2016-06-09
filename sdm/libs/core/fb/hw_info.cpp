@@ -57,7 +57,8 @@ namespace sdm {
 // kDefaultFormatSupport contains the bit map of supported formats for each hw blocks.
 // For eg: if Cursor supports MDP_RGBA_8888[bit-13] and MDP_RGB_565[bit-0], then cursor pipe array
 // contains { 0x01[0-3], 0x00[4-7], 0x00[8-12], 0x01[13-16], 0x00[17-20], 0x00[21-24], 0x00[24-28] }
-const uint8_t HWInfo::kDefaultFormatSupport[kHWSubBlockMax][BITS_TO_BYTES(MDP_IMGTYPE_LIMIT1)] = {
+const std::bitset<8> HWInfo::kDefaultFormatSupport[kHWSubBlockMax][
+                                                      BITS_TO_BYTES(MDP_IMGTYPE_LIMIT1)] = {
   { 0xFF, 0xF5, 0x1C, 0x1E, 0x20, 0xFF, 0x01, 0x00, 0xFE, 0x1F },  // kHWVIGPipe
   { 0x33, 0xE0, 0x00, 0x16, 0x00, 0xBF, 0x00, 0x00, 0xFE, 0x07 },  // kHWRGBPipe
   { 0x33, 0xE0, 0x00, 0x16, 0x00, 0xBF, 0x00, 0x00, 0xFE, 0x07 },  // kHWDMAPipe
@@ -477,7 +478,7 @@ void HWInfo::ParseFormats(char *tokens[], uint32_t token_count, HWSubBlockType s
     return;
   }
 
-  std::unique_ptr<uint8_t[]> format_supported(new uint8_t[token_count]);
+  std::unique_ptr<std::bitset<8>[]> format_supported(new std::bitset<8>[token_count]);
   for (uint32_t i = 0; i < token_count; i++) {
     format_supported[i] = UINT8(atoi(tokens[i]));
   }
@@ -485,11 +486,12 @@ void HWInfo::ParseFormats(char *tokens[], uint32_t token_count, HWSubBlockType s
   PopulateSupportedFormatMap(format_supported.get(), (token_count << 3), sub_blk_type, hw_resource);
 }
 
-void HWInfo::PopulateSupportedFormatMap(const uint8_t *format_supported, uint32_t format_count,
-                                        HWSubBlockType sub_blk_type, HWResourceInfo *hw_resource) {
+void HWInfo::PopulateSupportedFormatMap(const std::bitset<8> *format_supported,
+                                        uint32_t format_count, HWSubBlockType sub_blk_type,
+                                        HWResourceInfo *hw_resource) {
   vector <LayerBufferFormat> supported_sdm_formats;
   for (uint32_t mdp_format = 0; mdp_format < format_count; mdp_format++) {
-    if (IS_BIT_SET(format_supported[mdp_format >> 3], (mdp_format & 7))) {
+    if (format_supported[mdp_format >> 3][mdp_format & 7]) {
       LayerBufferFormat sdm_format = GetSDMFormat(INT(mdp_format));
       if (sdm_format != kFormatInvalid) {
         supported_sdm_formats.push_back(sdm_format);

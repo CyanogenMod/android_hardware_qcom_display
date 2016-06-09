@@ -27,9 +27,9 @@
 #include <utils/debug.h>
 #include <utils/formats.h>
 #include <utils/rect.h>
-
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #include "display_base.h"
 #include "hw_info_interface.h"
@@ -98,7 +98,7 @@ DisplayError DisplayBase::Init() {
     auto max_mixer_stages = hw_resource_info.num_blending_stages;
     int property_value = Debug::GetMaxPipesPerMixer(display_type_);
     if (property_value >= 0) {
-      max_mixer_stages = MIN(UINT32(property_value), hw_resource_info.num_blending_stages);
+      max_mixer_stages = std::min(UINT32(property_value), hw_resource_info.num_blending_stages);
     }
     DisplayBase::SetMaxMixerStages(max_mixer_stages);
   }
@@ -1000,7 +1000,7 @@ bool DisplayBase::NeedsMixerReconfiguration(LayerStack *layer_stack, uint32_t *n
     if (layer_orientation != kOrientationUnknown &&
         fb_orientation != kOrientationUnknown) {
       if (layer_orientation != fb_orientation) {
-        Swap(layer_width, layer_height);
+        std::swap(layer_width, layer_height);
       }
     }
 

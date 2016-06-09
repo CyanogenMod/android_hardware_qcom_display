@@ -71,7 +71,8 @@ static bool MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
 
   info->grayscale = V4L2_PIX_FMT_RGB24;
   // If the mode supports YUV420 set grayscale to the FOURCC value for YUV420.
-  if (IS_BIT_SET(mode->pixel_formats, 1)) {
+  std::bitset<32> pixel_formats = mode->pixel_formats;
+  if (pixel_formats[1]) {
     info->grayscale = V4L2_PIX_FMT_NV12;
   }
 
@@ -235,9 +236,6 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
     return kErrorNotSupported;
   }
 
-  // Variable screen info
-  STRUCT_VAR(fb_var_screeninfo, var_screeninfo);
-
   // Get the resolution info from the look up table
   msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[0];
   for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
@@ -266,7 +264,9 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
   }
 
   GetDisplayS3DSupport(index, display_attributes);
-  display_attributes->is_yuv = IS_BIT_SET(timing_mode->pixel_formats, 1);
+  std::bitset<32> pixel_formats = timing_mode->pixel_formats;
+
+  display_attributes->is_yuv = pixel_formats[1];
 
   return kErrorNone;
 }
@@ -279,7 +279,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
   }
 
   // Variable screen info
-  STRUCT_VAR(fb_var_screeninfo, vscreeninfo);
+  fb_var_screeninfo vscreeninfo = {};
   if (Sys::ioctl_(device_fd_, FBIOGET_VSCREENINFO, &vscreeninfo) < 0) {
     IOCTL_LOGE(FBIOGET_VSCREENINFO, device_type_);
     return kErrorHardware;
@@ -303,7 +303,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
     return kErrorParameters;
   }
 
-  STRUCT_VAR(msmfb_metadata, metadata);
+  msmfb_metadata metadata = {};
   metadata.op = metadata_op_vic;
   metadata.data.video_info_code = timing_mode->video_format;
   if (Sys::ioctl_(device_fd_, MSMFB_METADATA_SET, &metadata) < 0) {
@@ -333,7 +333,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
   supported_s3d_modes_.clear();
   supported_s3d_modes_.push_back(kS3DModeNone);
   for (uint32_t mode = kS3DModeNone + 1; mode < kS3DModeMax; mode ++) {
-    if (IS_BIT_SET(display_attributes_.s3d_config, (HWS3DMode)mode)) {
+    if (display_attributes_.s3d_config[(HWS3DMode)mode]) {
       supported_s3d_modes_.push_back((HWS3DMode)mode);
     }
   }
@@ -605,7 +605,7 @@ DisplayError HWHDMI::GetDisplayS3DSupport(uint32_t index,
     return kErrorNotSupported;
   }
 
-  SET_BIT(attrib->s3d_config, kS3DModeNone);
+  attrib->s3d_config[kS3DModeNone] = 1;
 
   // Three level inception!
   // The string looks like 16=SSH,4=FP:TAB:SSH,5=FP:SSH,32=FP:TAB:SSH
@@ -632,12 +632,12 @@ DisplayError HWHDMI::GetDisplayS3DSupport(uint32_t index,
           l3 = strtok_r(saveptr_l2, ":", &saveptr_l3);
           while (l3 != NULL) {
             if (strncmp("SSH", l3, strlen("SSH")) == 0) {
-              SET_BIT(attrib->s3d_config, kS3DModeLR);
-              SET_BIT(attrib->s3d_config, kS3DModeRL);
+              attrib->s3d_config[kS3DModeLR] = 1;
+              attrib->s3d_config[kS3DModeRL] = 1;
             } else if (strncmp("TAB", l3, strlen("TAB")) == 0) {
-              SET_BIT(attrib->s3d_config, kS3DModeTB);
+              attrib->s3d_config[kS3DModeTB] = 1;
             } else if (strncmp("FP", l3, strlen("FP")) == 0) {
-              SET_BIT(attrib->s3d_config, kS3DModeFP);
+              attrib->s3d_config[kS3DModeFP] = 1;
             }
             l3 = strtok_r(NULL, ":", &saveptr_l3);
           }

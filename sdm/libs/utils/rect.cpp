@@ -30,6 +30,7 @@
 #include <math.h>
 #include <utils/rect.h>
 #include <utils/constants.h>
+#include <algorithm>
 
 #define __CLASS__ "RectUtils"
 
@@ -65,10 +66,10 @@ LayerRect Intersection(const LayerRect &rect1, const LayerRect &rect2) {
     return LayerRect();
   }
 
-  res.left = MAX(rect1.left, rect2.left);
-  res.top = MAX(rect1.top, rect2.top);
-  res.right = MIN(rect1.right, rect2.right);
-  res.bottom = MIN(rect1.bottom, rect2.bottom);
+  res.left = std::max(rect1.left, rect2.left);
+  res.top = std::max(rect1.top, rect2.top);
+  res.right = std::min(rect1.right, rect2.right);
+  res.bottom = std::min(rect1.bottom, rect2.bottom);
 
   if (!IsValid(res)) {
     return LayerRect();
@@ -130,10 +131,10 @@ LayerRect Union(const LayerRect &rect1, const LayerRect &rect2) {
     return rect1;
   }
 
-  res.left = MIN(rect1.left, rect2.left);
-  res.top = MIN(rect1.top, rect2.top);
-  res.right = MAX(rect1.right, rect2.right);
-  res.bottom = MAX(rect1.bottom, rect2.bottom);
+  res.left = std::min(rect1.left, rect2.left);
+  res.top = std::min(rect1.top, rect2.top);
+  res.right = std::max(rect1.right, rect2.right);
+  res.bottom = std::max(rect1.bottom, rect2.bottom);
 
   return res;
 }
@@ -148,7 +149,7 @@ void SplitLeftRight(const LayerRect &in_rect, uint32_t split_count, uint32_t ali
   for (uint32_t count = 0; count < split_count; count++) {
     float aligned_right = rect_temp.left + aligned_width;
     out_rects[count].left = rect_temp.left;
-    out_rects[count].right = MIN(rect_temp.right, aligned_right);
+    out_rects[count].right = std::min(rect_temp.right, aligned_right);
     out_rects[count].top = rect_temp.top;
     out_rects[count].bottom = rect_temp.bottom;
 
@@ -178,7 +179,7 @@ void SplitTopBottom(const LayerRect &in_rect, uint32_t split_count, uint32_t ali
   for (uint32_t count = 0; count < split_count; count++) {
     float aligned_bottom = rect_temp.top + aligned_height;
     out_rects[count].top = rect_temp.top;
-    out_rects[count].bottom = MIN(rect_temp.bottom, aligned_bottom);
+    out_rects[count].bottom = std::min(rect_temp.bottom, aligned_bottom);
     out_rects[count].left = rect_temp.left;
     out_rects[count].right = rect_temp.right;
 

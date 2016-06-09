@@ -1017,7 +1017,7 @@ DisplayError HWDevice::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
   uint32_t cursor_index = count - 1;
   HWPipeInfo *left_pipe = &hw_layers->config[cursor_index].left_pipe;
 
-  STRUCT_VAR(mdp_async_layer, async_layer);
+  mdp_async_layer async_layer = {};
   async_layer.flags = MDP_LAYER_ASYNC;
   async_layer.pipe_ndx = left_pipe->pipe_id;
   async_layer.src.x = UINT32(left_pipe->src_roi.left);
@@ -1025,7 +1025,7 @@ DisplayError HWDevice::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
   async_layer.dst.x = UINT32(x);
   async_layer.dst.y = UINT32(y);
 
-  STRUCT_VAR(mdp_position_update, pos_update);
+  mdp_position_update pos_update = {};
   pos_update.input_layer_cnt = 1;
   pos_update.input_layers = &async_layer;
   if (Sys::ioctl_(device_fd_, INT(MSMFB_ASYNC_POSITION_UPDATE), &pos_update) < 0) {
@@ -1112,8 +1112,8 @@ DisplayError HWDevice::SetS3DMode(HWS3DMode s3d_mode) {
 }
 
 DisplayError HWDevice::SetScaleLutConfig(HWScaleLutInfo *lut_info) {
-  STRUCT_VAR(mdp_scale_luts_info, mdp_lut_info);
-  STRUCT_VAR(mdp_set_cfg, cfg);
+  mdp_scale_luts_info mdp_lut_info = {};
+  mdp_set_cfg cfg = {};
 
   if (!hw_resource_.has_qseed3) {
     DLOGV_IF(kTagDriverConfig, "No support for QSEED3 luts");
