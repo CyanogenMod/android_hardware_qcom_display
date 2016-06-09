@@ -236,15 +236,18 @@ int32_t HWCSession::CreateLayer(hwc2_device_t *device, hwc2_display_t display,
 }
 
 int32_t HWCSession::CreateVirtualDisplay(hwc2_device_t *device, uint32_t width, uint32_t height,
-                                         hwc2_display_t *out_display_id) {
+                                         int32_t *format, hwc2_display_t *out_display_id) {
+  // TODO(user): Handle concurrency with HDMI
+  SCOPE_LOCK(locker_);
   if (!device) {
     return HWC2_ERROR_BAD_DISPLAY;
   }
 
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
-  auto status = hwc_session->CreateVirtualDisplayObject(width, height);
+  auto status = hwc_session->CreateVirtualDisplayObject(width, height, format);
   if (status == HWC2::Error::None)
     *out_display_id = HWC_DISPLAY_VIRTUAL;
+  DLOGI("Created virtual display id:% " PRIu64 " with res: %dx%d", *out_display_id, width, height);
   return INT32(status);
 }
 
@@ -255,10 +258,12 @@ int32_t HWCSession::DestroyLayer(hwc2_device_t *device, hwc2_display_t display,
 }
 
 int32_t HWCSession::DestroyVirtualDisplay(hwc2_device_t *device, hwc2_display_t display) {
+  SCOPE_LOCK(locker_);
   if (!device) {
     return HWC2_ERROR_BAD_DISPLAY;
   }
 
+  DLOGI("Destroying virtual display id:%" PRIu64, display);
   auto *hwc_session = static_cast<HWCSession *>(device);
 
   if (hwc_session->hwc_display_[display]) {
@@ -417,9 +422,10 @@ static int32_t SetActiveConfig(hwc2_device_t *device, hwc2_display_t display,
 }
 
 static int32_t SetClientTarget(hwc2_device_t *device, hwc2_display_t display,
-                               buffer_handle_t target, int32_t acquire_fence, int32_t dataspace) {
+                               buffer_handle_t target, int32_t acquire_fence,
+                               int32_t dataspace, hwc_region_t damage) {
   return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetClientTarget, target,
-                                         acquire_fence, dataspace);
+                                         acquire_fence, dataspace, damage);
 }
 
 int32_t HWCSession::SetColorMode(hwc2_device_t *device, hwc2_display_t display,
@@ -571,7 +577,7 @@ int32_t HWCSession::ValidateDisplay(hwc2_device_t *device, hwc2_display_t displa
   }
   // If validate fails, cancel the sequence lock so that other operations
   // (such as Dump or SetPowerMode) may succeed without blocking on the condition
-  if (status != HWC2::Error::None) {
+  if (status == HWC2::Error::BadDisplay) {
     SEQUENCE_CANCEL_SCOPE_LOCK(locker_);
   }
   return INT32(status);
@@ -678,11 +684,12 @@ hwc2_function_pointer_t HWCSession::GetFunction(struct hwc2_device *device,
 
 // TODO(user): handle locking
 
-HWC2::Error HWCSession::CreateVirtualDisplayObject(uint32_t width, uint32_t height) {
+HWC2::Error HWCSession::CreateVirtualDisplayObject(uint32_t width, uint32_t height,
+                                                   int32_t *format) {
   if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
     return HWC2::Error::NoResources;
   }
-  auto status = HWCDisplayVirtual::Create(core_intf_, &callbacks_, width, height,
+  auto status = HWCDisplayVirtual::Create(core_intf_, &callbacks_, width, height, format,
                                           &hwc_display_[HWC_DISPLAY_VIRTUAL]);
   // TODO(user): validate width and height support
   if (status)
@@ -829,6 +836,10 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     case qService::IQService::GET_BW_TRANSACTION_STATUS:
       status = GetBWTransactionStatus(input_parcel, output_parcel);
       break;
+
+  case qService::IQService::SET_LAYER_MIXER_RESOLUTION:
+    status = SetMixerResolution(input_parcel);
+    break;
 
     default:
       DLOGW("QService command = %d is not supported", command);
@@ -996,25 +1007,26 @@ android::status_t HWCSession::HandleGetDisplayConfigCount(const android::Parcel 
   return error;
 }
 
-android::status_t HWCSession::HandleGetDisplayAttributesForConfig(
-    const android::Parcel *input_parcel, android::Parcel *output_parcel) {
+android::status_t HWCSession::HandleGetDisplayAttributesForConfig(const android::Parcel
+                                                                  *input_parcel,
+                                                                  android::Parcel *output_parcel) {
   int config = input_parcel->readInt32();
   int dpy = input_parcel->readInt32();
   int error = android::BAD_VALUE;
-  DisplayConfigVariableInfo attributes;
+  DisplayConfigVariableInfo display_attributes;
 
   if (dpy > HWC_DISPLAY_VIRTUAL) {
     return android::BAD_VALUE;
   }
 
   if (hwc_display_[dpy]) {
-    error = hwc_display_[dpy]->GetDisplayAttributesForConfig(config, &attributes);
+    error = hwc_display_[dpy]->GetDisplayAttributesForConfig(config, &display_attributes);
     if (error == 0) {
-      output_parcel->writeInt32(INT(attributes.vsync_period_ns));
-      output_parcel->writeInt32(INT(attributes.x_pixels));
-      output_parcel->writeInt32(INT(attributes.y_pixels));
-      output_parcel->writeFloat(attributes.x_dpi);
-      output_parcel->writeFloat(attributes.y_dpi);
+      output_parcel->writeInt32(INT(display_attributes.vsync_period_ns));
+      output_parcel->writeInt32(INT(display_attributes.x_pixels));
+      output_parcel->writeInt32(INT(display_attributes.y_pixels));
+      output_parcel->writeFloat(display_attributes.x_dpi);
+      output_parcel->writeFloat(display_attributes.y_dpi);
       output_parcel->writeInt32(0);  // Panel type, unsupported.
     }
   }
@@ -1165,6 +1177,31 @@ void HWCSession::SetFrameDumpConfig(const android::Parcel *input_parcel) {
       hwc_display_[HWC_DISPLAY_VIRTUAL]->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
   }
+}
+
+android::status_t HWCSession::SetMixerResolution(const android::Parcel *input_parcel) {
+  DisplayError error = kErrorNone;
+  uint32_t dpy = UINT32(input_parcel->readInt32());
+
+  if (dpy != HWC_DISPLAY_PRIMARY) {
+    DLOGI("Resoulution change not supported for this display %d", dpy);
+    return -EINVAL;
+  }
+
+  if (!hwc_display_[HWC_DISPLAY_PRIMARY]) {
+    DLOGI("Primary display is not initialized");
+    return -EINVAL;
+  }
+
+  uint32_t width = UINT32(input_parcel->readInt32());
+  uint32_t height = UINT32(input_parcel->readInt32());
+
+  error = hwc_display_[HWC_DISPLAY_PRIMARY]->SetMixerResolution(width, height);
+  if (error != kErrorNone) {
+    return -EINVAL;
+  }
+
+  return 0;
 }
 
 void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {

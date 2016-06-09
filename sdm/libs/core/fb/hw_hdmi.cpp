@@ -119,6 +119,11 @@ DisplayError HWHDMI::Init() {
     return error;
   }
 
+  uint32_t dest_scalar_count = hw_resource_.hw_dest_scalar_info.count;
+  if (dest_scalar_count) {
+    mdp_dest_scalar_data_ = new mdp_destination_scaler_data[dest_scalar_count];
+  }
+
   error = ReadEDIDInfo();
   if (error != kErrorNone) {
     Deinit();
@@ -164,6 +169,8 @@ DisplayError HWHDMI::Deinit() {
   if (supported_video_modes_) {
     delete[] supported_video_modes_;
   }
+
+  delete [] mdp_dest_scalar_data_;
 
   return HWDevice::Deinit();
 }
@@ -252,6 +259,7 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
   display_attributes->y_dpi = 0;
   display_attributes->fps = timing_mode->refresh_rate / 1000;
   display_attributes->vsync_period_ns = UINT32(1000000000L / display_attributes->fps);
+  display_attributes->is_device_split = false;
   if (display_attributes->x_pixels > hw_resource_.max_mixer_width) {
     display_attributes->is_device_split = true;
     display_attributes->h_total += h_blanking;
@@ -318,13 +326,14 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
 
   frame_rate_ = timing_mode->refresh_rate;
 
-  // Get the supported s3d modes for current active config index
-  HWDisplayAttributes attrib;
-  GetDisplayS3DSupport(index, &attrib);
+  // Get the display attributes for current active config index
+  GetDisplayAttributes(active_config_index_, &display_attributes_);
+  UpdateMixerAttributes();
+
   supported_s3d_modes_.clear();
   supported_s3d_modes_.push_back(kS3DModeNone);
   for (uint32_t mode = kS3DModeNone + 1; mode < kS3DModeMax; mode ++) {
-    if (IS_BIT_SET(attrib.s3d_config, (HWS3DMode)mode)) {
+    if (IS_BIT_SET(display_attributes_.s3d_config, (HWS3DMode)mode)) {
       supported_s3d_modes_.push_back((HWS3DMode)mode);
     }
   }
@@ -748,25 +757,19 @@ DisplayError HWHDMI::SetRefreshRate(uint32_t refresh_rate) {
     return error;
   }
 
+  GetDisplayAttributes(active_config_index_, &display_attributes_);
+  UpdateMixerAttributes();
+
   frame_rate_ = refresh_rate;
 
   return kErrorNone;
 }
 
-DisplayError HWHDMI::GetMixerAttributes(HWMixerAttributes *mixer_attributes) {
-  if (!mixer_attributes) {
-    return kErrorParameters;
-  }
-
-  HWDisplayAttributes display_attributes;
-  GetDisplayAttributes(active_config_index_, &display_attributes);
-
-  mixer_attributes->width = display_attributes.x_pixels;
-  mixer_attributes->height = display_attributes.y_pixels;
-  mixer_attributes->split_left = display_attributes.is_device_split ?
-      (display_attributes.x_pixels / 2) : mixer_attributes->width;
-
-  return kErrorNone;
+void HWHDMI::UpdateMixerAttributes() {
+  mixer_attributes_.width = display_attributes_.x_pixels;
+  mixer_attributes_.height = display_attributes_.y_pixels;
+  mixer_attributes_.split_left = display_attributes_.is_device_split ?
+      (display_attributes_.x_pixels / 2) : mixer_attributes_.width;
 }
 
 }  // namespace sdm

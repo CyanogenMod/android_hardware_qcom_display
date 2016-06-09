@@ -231,12 +231,6 @@ int HWCDisplay::Init() {
     swap_interval_zero_ = true;
   }
 
-  framebuffer_config_ = new DisplayConfigVariableInfo();
-  if (!framebuffer_config_) {
-    DLOGV("Failed to allocate memory for custom framebuffer config.");
-    core_intf_->DestroyDisplay(display_intf_);
-    return -EINVAL;
-  }
 
   client_target_ = new HWCLayer(id_);
   int blit_enabled = 0;
@@ -267,7 +261,6 @@ int HWCDisplay::Deinit() {
     return -EINVAL;
   }
 
-  delete framebuffer_config_;
   delete client_target_;
 
   if (blit_engine_) {
@@ -332,6 +325,8 @@ void HWCDisplay::BuildLayerStack() {
   // TODO(user): Add blit target layers
   for (auto hwc_layer : layer_set_) {
     Layer *layer = hwc_layer->GetSDMLayer();
+    // set default composition as GPU for SDM
+    layer->composition = kCompositionGPU;
 
     if (swap_interval_zero_) {
       if (layer->input_buffer->acquire_fence_fd >= 0) {
@@ -366,7 +361,6 @@ void HWCDisplay::BuildLayerStack() {
     // TODO(user): Move to a getter if this is needed at other places
     hwc_rect_t scaled_display_frame = {INT(layer->dst_rect.left), INT(layer->dst_rect.top),
                                        INT(layer->dst_rect.right), INT(layer->dst_rect.bottom)};
-    ScaleDisplayFrame(&scaled_display_frame);
     ApplyScanAdjustment(&scaled_display_frame);
     hwc_layer->SetLayerDisplayFrame(scaled_display_frame);
     ApplyDeInterlaceAdjustment(layer);
@@ -379,12 +373,12 @@ void HWCDisplay::BuildLayerStack() {
       layer->frame_rate = current_refresh_rate_;
     }
     display_rect_ = Union(display_rect_, layer->dst_rect);
-    // TODO(user): Set correctly when implementing caching
-    layer->flags.updating = true;
     geometry_changes_ |= hwc_layer->GetGeometryChanges();
+    layer->flags.updating = IsLayerUpdating(layer);
 
     layer_stack_.layers.push_back(layer);
   }
+  // TODO(user): Set correctly when SDM supports geometry_changes as bitmask
   layer_stack_.flags.geometry_changed = UINT32(geometry_changes_ > 0);
   // Append client target to the layer stack
   layer_stack_.layers.push_back(client_target_->GetSDMLayer());
@@ -501,9 +495,11 @@ HWC2::Error HWCDisplay::SetPowerMode(HWC2::PowerMode mode) {
 
 HWC2::Error HWCDisplay::GetClientTargetSupport(uint32_t width, uint32_t height, int32_t format,
                                                int32_t dataspace) {
+  DisplayConfigVariableInfo variable_config;
+  display_intf_->GetFrameBufferConfig(&variable_config);
   // TODO(user): Support scaled configurations, other formats and other dataspaces
   if (format != HAL_PIXEL_FORMAT_RGBA_8888 || dataspace != HAL_DATASPACE_UNKNOWN ||
-      width != framebuffer_config_->x_pixels || height != framebuffer_config_->y_pixels) {
+      width != variable_config.x_pixels || height != variable_config.y_pixels) {
     return HWC2::Error::Unsupported;
   } else {
     return HWC2::Error::None;
@@ -533,7 +529,12 @@ HWC2::Error HWCDisplay::GetDisplayConfigs(uint32_t *out_num_configs, hwc2_config
 
 HWC2::Error HWCDisplay::GetDisplayAttribute(hwc2_config_t config, HWC2::Attribute attribute,
                                             int32_t *out_value) {
-  DisplayConfigVariableInfo variable_config = *framebuffer_config_;
+  DisplayConfigVariableInfo variable_config;
+  DisplayError error = display_intf_->GetFrameBufferConfig(&variable_config);
+  if (error != kErrorNone) {
+    DLOGV("Get variable config failed. Error = %d", error);
+    return HWC2::Error::BadDisplay;
+  }
 
   switch (attribute) {
     case HWC2::Attribute::VsyncPeriod:
@@ -609,7 +610,7 @@ HWC2::Error HWCDisplay::GetActiveConfig(hwc2_config_t *out_config) {
 }
 
 HWC2::Error HWCDisplay::SetClientTarget(buffer_handle_t target, int32_t acquire_fence,
-                                        int32_t dataspace) {
+                                        int32_t dataspace, hwc_region_t damage) {
   // TODO(user): SurfaceFlinger gives us a null pointer here when doing full SDE composition
   // The error is problematic for layer caching as it would overwrite our cached client target.
   // Reported bug 28569722 to resolve this.
@@ -617,7 +618,14 @@ HWC2::Error HWCDisplay::SetClientTarget(buffer_handle_t target, int32_t acquire_
   if (target == nullptr) {
     return HWC2::Error::None;
   }
+
+  if (acquire_fence == 0) {
+    DLOGE("acquire_fence is zero");
+    return HWC2::Error::BadParameter;
+  }
+
   client_target_->SetLayerBuffer(target, acquire_fence);
+  client_target_->SetLayerSurfaceDamage(damage);
   // Ignoring dataspace for now
   return HWC2::Error::None;
 }
@@ -625,6 +633,10 @@ HWC2::Error HWCDisplay::SetClientTarget(buffer_handle_t target, int32_t acquire_
 HWC2::Error HWCDisplay::SetActiveConfig(hwc2_config_t config) {
   // We have only one config right now - do nothing
   return HWC2::Error::None;
+}
+
+DisplayError HWCDisplay::SetMixerResolution(uint32_t width, uint32_t height) {
+  return kErrorNotSupported;
 }
 
 void HWCDisplay::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type) {
@@ -691,11 +703,6 @@ HWC2::Error HWCDisplay::PrepareLayerStack(uint32_t *out_num_types, uint32_t *out
     flush_ = true;
   }
 
-  // If current draw cycle has different set of layers updating in comparison to previous cycle,
-  // cache content using GPU again.
-  // If set of updating layers remains same, use cached buffer and replace layers marked for GPU
-  // composition with SDE so that SurfaceFlinger does not compose them. Set cache inuse here.
-  bool needs_fb_refresh = NeedsFrameBufferRefresh();
   for (auto hwc_layer : layer_set_) {
     Layer *layer = hwc_layer->GetSDMLayer();
     LayerComposition &composition = layer->composition;
@@ -705,21 +712,24 @@ HWC2::Error HWCDisplay::PrepareLayerStack(uint32_t *out_num_types, uint32_t *out
       layer_requests_[hwc_layer->GetId()] = HWC2::LayerRequest::ClearClientTarget;
     }
 
-    if (!needs_fb_refresh && composition == kCompositionGPU) {
-      composition = kCompositionSDE;
-    }
-    HWC2::Composition current_hwc_composition  = hwc_layer->GetCompositionType();
-    // Convert the SDM layer composition to HWC2 type
+    HWC2::Composition requested_composition = hwc_layer->GetClientRequestedCompositionType();
+    // Set SDM composition to HWC2 type in HWCLayer
     hwc_layer->SetComposition(composition);
-    // Update the changes list only if the HWC2 comp type changed from the previous cycle
-    if (current_hwc_composition != hwc_layer->GetCompositionType()) {
-      layer_changes_[hwc_layer->GetId()] = hwc_layer->GetCompositionType();
+    HWC2::Composition device_composition  = hwc_layer->GetDeviceSelectedCompositionType();
+    // Update the changes list only if the requested composition is different from SDM comp type
+    // TODO(user): Take Care of other comptypes(BLIT)
+    if (requested_composition != device_composition) {
+      layer_changes_[hwc_layer->GetId()] = device_composition;
     }
   }
   *out_num_types = UINT32(layer_changes_.size());
   *out_num_requests = UINT32(layer_requests_.size());
   validated_ = true;
-  return HWC2::Error::None;
+  if (*out_num_types > 0) {
+    return HWC2::Error::HasChanges;
+  } else {
+    return HWC2::Error::None;
+  }
 }
 
 HWC2::Error HWCDisplay::AcceptDisplayChanges() {
@@ -731,6 +741,10 @@ HWC2::Error HWCDisplay::AcceptDisplayChanges() {
 
 HWC2::Error HWCDisplay::GetChangedCompositionTypes(uint32_t *out_num_elements,
                                                    hwc2_layer_t *out_layers, int32_t *out_types) {
+  if (!validated_) {
+    DLOGW("Display is not validated");
+    return HWC2::Error::NotValidated;
+  }
   *out_num_elements = UINT32(layer_changes_.size());
   if (out_layers != nullptr && out_types != nullptr) {
     int i = 0;
@@ -846,6 +860,7 @@ HWC2::Error HWCDisplay::PostCommitLayerStack(int32_t *out_retire_fence) {
         layer_buffer->release_fence_fd = -1;
       } else if (layer->composition != kCompositionGPU) {
         hwc_layer->PushReleaseFence(layer_buffer->release_fence_fd);
+        layer_buffer->release_fence_fd = -1;
       }
     }
 
@@ -875,31 +890,6 @@ HWC2::Error HWCDisplay::PostCommitLayerStack(int32_t *out_retire_fence) {
   return status;
 }
 
-bool HWCDisplay::NeedsFrameBufferRefresh(void) {
-  // Frame buffer needs to be refreshed for the following reasons:
-  // 1. Any layer is marked skip in the current layer stack.
-  // 2. Any layer is added/removed/layer properties changes in the current layer stack.
-  // 3. Any layer handle is changed and it is marked for GPU composition
-  // 4. Any layer's current composition is different from previous composition.
-  if (layer_stack_.flags.skip_present || layer_stack_.flags.geometry_changed) {
-    return true;
-  }
-
-  for (auto layer : layer_stack_.layers) {
-    // need FB refresh for s3d case
-    if (layer->input_buffer->s3d_format != kS3dFormatNone) {
-      return true;
-    }
-
-    if (layer->composition == kCompositionGPUTarget ||
-        layer->composition == kCompositionBlitTarget) {
-      continue;
-    }
-  }
-
-  return false;
-}
-
 void HWCDisplay::SetIdleTimeoutMs(uint32_t timeout_ms) {
   return;
 }
@@ -909,16 +899,6 @@ DisplayError HWCDisplay::SetMaxMixerStages(uint32_t max_mixer_stages) {
 
   if (display_intf_) {
     error = display_intf_->SetMaxMixerStages(max_mixer_stages);
-  }
-
-  return error;
-}
-
-DisplayError HWCDisplay::ControlPartialUpdate(bool enable, uint32_t *pending) {
-  DisplayError error = kErrorNone;
-
-  if (display_intf_) {
-    error = display_intf_->ControlPartialUpdate(enable, pending);
   }
 
   return error;
@@ -1234,45 +1214,29 @@ const char *HWCDisplay::GetDisplayString() {
 
 int HWCDisplay::SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels) {
   if (x_pixels <= 0 || y_pixels <= 0) {
-    DLOGV("Unsupported config: x_pixels=%d, y_pixels=%d", x_pixels, y_pixels);
+    DLOGW("Unsupported config: x_pixels=%d, y_pixels=%d", x_pixels, y_pixels);
     return -EINVAL;
   }
 
-  if (framebuffer_config_->x_pixels == x_pixels && framebuffer_config_->y_pixels == y_pixels) {
-    return 0;
-  }
-
-  DisplayConfigVariableInfo active_config;
-  uint32_t active_config_index = 0;
-  display_intf_->GetActiveConfig(&active_config_index);
-  DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
+  DisplayConfigVariableInfo fb_config;
+  DisplayError error = display_intf_->GetFrameBufferConfig(&fb_config);
   if (error != kErrorNone) {
-    DLOGV("GetConfig variable info failed. Error = %d", error);
+    DLOGV("Get frame buffer config failed. Error = %d", error);
     return -EINVAL;
   }
 
-  if (active_config.x_pixels <= 0 || active_config.y_pixels <= 0) {
-    DLOGV("Invalid panel resolution (%dx%d)", active_config.x_pixels, active_config.y_pixels);
+  fb_config.x_pixels = x_pixels;
+  fb_config.y_pixels = y_pixels;
+
+  error = display_intf_->SetFrameBufferConfig(fb_config);
+  if (error != kErrorNone) {
+    DLOGV("Set frame buffer config failed. Error = %d", error);
     return -EINVAL;
   }
 
   // Create rects to represent the new source and destination crops
   LayerRect crop = LayerRect(0, 0, FLOAT(x_pixels), FLOAT(y_pixels));
-  LayerRect dst = LayerRect(0, 0, FLOAT(active_config.x_pixels), FLOAT(active_config.y_pixels));
-  // Set rotate90 to false since this is taken care of during regular composition.
-  bool rotate90 = false;
-  error = display_intf_->IsScalingValid(crop, dst, rotate90);
-  if (error != kErrorNone) {
-    DLOGV("Unsupported resolution: (%dx%d)", x_pixels, y_pixels);
-    return -EINVAL;
-  }
-
-  framebuffer_config_->x_pixels = x_pixels;
-  framebuffer_config_->y_pixels = y_pixels;
-  framebuffer_config_->vsync_period_ns = active_config.vsync_period_ns;
-  framebuffer_config_->x_dpi = active_config.x_dpi;
-  framebuffer_config_->y_dpi = active_config.y_dpi;
-
+  LayerRect dst = LayerRect(0, 0, FLOAT(fb_config.x_pixels), FLOAT(fb_config.y_pixels));
   auto client_target_layer = client_target_->GetSDMLayer();
   client_target_layer->src_rect = crop;
   client_target_layer->dst_rect = dst;
@@ -1298,68 +1262,32 @@ int HWCDisplay::SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels) {
   client_target_layer->input_buffer->height = UINT32(aligned_height);
   client_target_layer->plane_alpha = 255;
 
-  DLOGI("New framebuffer resolution (%dx%d)", framebuffer_config_->x_pixels,
-        framebuffer_config_->y_pixels);
+  DLOGI("New framebuffer resolution (%dx%d)", fb_config.x_pixels, fb_config.y_pixels);
 
   return 0;
 }
 
 void HWCDisplay::GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
-  *x_pixels = framebuffer_config_->x_pixels;
-  *y_pixels = framebuffer_config_->y_pixels;
+  DisplayConfigVariableInfo fb_config;
+  display_intf_->GetFrameBufferConfig(&fb_config);
+
+  *x_pixels = fb_config.x_pixels;
+  *y_pixels = fb_config.y_pixels;
 }
 
-void HWCDisplay::ScaleDisplayFrame(hwc_rect_t *display_frame) {
-  if (!IsFrameBufferScaled()) {
-    return;
-  }
-
-  uint32_t active_config_index = 0;
-  display_intf_->GetActiveConfig(&active_config_index);
-  DisplayConfigVariableInfo active_config;
-  DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
-  if (error != kErrorNone) {
-    DLOGE("GetConfig variable info failed. Error = %d", error);
-    return;
-  }
-
-  float custom_x_pixels = FLOAT(framebuffer_config_->x_pixels);
-  float custom_y_pixels = FLOAT(framebuffer_config_->y_pixels);
-  float active_x_pixels = FLOAT(active_config.x_pixels);
-  float active_y_pixels = FLOAT(active_config.y_pixels);
-  float x_pixels_ratio = active_x_pixels / custom_x_pixels;
-  float y_pixels_ratio = active_y_pixels / custom_y_pixels;
-  float layer_width = FLOAT(display_frame->right - display_frame->left);
-  float layer_height = FLOAT(display_frame->bottom - display_frame->top);
-
-  display_frame->left = INT(x_pixels_ratio * FLOAT(display_frame->left));
-  display_frame->top = INT(y_pixels_ratio * FLOAT(display_frame->top));
-  display_frame->right = INT(FLOAT(display_frame->left) + layer_width * x_pixels_ratio);
-  display_frame->bottom = INT(FLOAT(display_frame->top) + layer_height * y_pixels_ratio);
-}
-
-bool HWCDisplay::IsFrameBufferScaled() {
-  if (framebuffer_config_->x_pixels == 0 || framebuffer_config_->y_pixels == 0) {
-    return false;
-  }
-  uint32_t panel_x_pixels = 0;
-  uint32_t panel_y_pixels = 0;
-  GetPanelResolution(&panel_x_pixels, &panel_y_pixels);
-  return (framebuffer_config_->x_pixels != panel_x_pixels) ||
-         (framebuffer_config_->y_pixels != panel_y_pixels);
+DisplayError HWCDisplay::GetMixerResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
+  return display_intf_->GetMixerResolution(x_pixels, y_pixels);
 }
 
 void HWCDisplay::GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
-  DisplayConfigVariableInfo active_config;
-  uint32_t active_config_index = 0;
-  display_intf_->GetActiveConfig(&active_config_index);
-  DisplayError error = display_intf_->GetConfig(active_config_index, &active_config);
-  if (error != kErrorNone) {
-    DLOGE("GetConfig variable info failed. Error = %d", error);
-    return;
-  }
-  *x_pixels = active_config.x_pixels;
-  *y_pixels = active_config.y_pixels;
+  DisplayConfigVariableInfo display_config;
+  uint32_t active_index = 0;
+
+  display_intf_->GetActiveConfig(&active_index);
+  display_intf_->GetConfig(active_index, &display_config);
+
+  *x_pixels = display_config.x_pixels;
+  *y_pixels = display_config.y_pixels;
 }
 
 int HWCDisplay::SetDisplayStatus(uint32_t display_status) {
@@ -1505,8 +1433,9 @@ int HWCDisplay::GetDisplayConfigCount(uint32_t *count) {
   return display_intf_->GetNumVariableInfoConfigs(count) == kErrorNone ? 0 : -1;
 }
 
-int HWCDisplay::GetDisplayAttributesForConfig(int config, DisplayConfigVariableInfo *attributes) {
-  return display_intf_->GetConfig(UINT32(config), attributes) == kErrorNone ? 0 : -1;
+int HWCDisplay::GetDisplayAttributesForConfig(int config,
+                                            DisplayConfigVariableInfo *display_attributes) {
+  return display_intf_->GetConfig(UINT32(config), display_attributes) == kErrorNone ? 0 : -1;
 }
 
 bool HWCDisplay::SingleLayerUpdating(void) {
@@ -1520,6 +1449,24 @@ bool HWCDisplay::SingleLayerUpdating(void) {
   }
 
   return (updating_count == 1);
+}
+
+bool HWCDisplay::IsLayerUpdating(const Layer *layer) {
+  // Layer should be considered updating if
+  //   a) layer is in single buffer mode, or
+  //   b) valid dirty_regions(android specific hint for updating status), or
+  //   c) layer stack geometry has changed (TODO(user): Remove when SDM accepts
+  //      geometry_changed as bit fields).
+  return (layer->flags.single_buffer || IsSurfaceUpdated(layer->dirty_regions) ||
+          geometry_changes_);
+}
+
+bool HWCDisplay::IsSurfaceUpdated(const std::vector<LayerRect> &dirty_regions) {
+  // based on dirty_regions determine if its updating
+  // dirty_rect count = 0 - whole layer - updating.
+  // dirty_rect count = 1 or more valid rects - updating.
+  // dirty_rect count = 1 with (0,0,0,0) - not updating.
+  return (dirty_regions.empty() || IsValid(dirty_regions.at(0)));
 }
 
 uint32_t HWCDisplay::SanitizeRefreshRate(uint32_t req_refresh_rate) {
@@ -1568,7 +1515,10 @@ std::string HWCDisplay::Dump() {
     os << "-------------------------------" << std::endl;
     os << "layer_id: " << layer->GetId() << std::endl;
     os << "\tz: " << layer->GetZ() << std::endl;
-    os << "\tcomposition: " << to_string(layer->GetCompositionType()).c_str() << std::endl;
+    os << "\tclient(SF) composition: " <<
+          to_string(layer->GetClientRequestedCompositionType()).c_str() << std::endl;
+    os << "\tdevice(SDM) composition: " <<
+          to_string(layer->GetDeviceSelectedCompositionType()).c_str() << std::endl;
     os << "\tplane_alpha: " << std::to_string(sdm_layer->plane_alpha).c_str() << std::endl;
     os << "\tformat: " << GetFormatString(sdm_layer->input_buffer->format) << std::endl;
     os << "\tbuffer_id: " << std::hex << "0x" << sdm_layer->input_buffer->buffer_id << std::dec

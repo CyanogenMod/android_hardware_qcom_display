@@ -92,15 +92,19 @@ class HWCDisplay : public DisplayEventHandler {
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
-  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending) {
+    return kErrorNotSupported;
+  }
   virtual HWC2::PowerMode GetLastPowerMode();
   virtual int SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels);
   virtual void GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels);
-  virtual void GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels);
   virtual int SetDisplayStatus(uint32_t display_status);
   virtual int OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
   virtual int Perform(uint32_t operation, ...);
   virtual void SetSecureDisplay(bool secure_display_active);
+  virtual DisplayError SetMixerResolution(uint32_t width, uint32_t height);
+  virtual DisplayError GetMixerResolution(uint32_t *width, uint32_t *height);
+  virtual void GetPanelResolution(uint32_t *width, uint32_t *height);
   virtual std::string Dump(void);
 
   // Captures frame output in the buffer specified by output_buffer_info. The API is
@@ -119,7 +123,8 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int SetActiveDisplayConfig(int config);
   virtual int GetActiveDisplayConfig(uint32_t *config);
   virtual int GetDisplayConfigCount(uint32_t *count);
-  virtual int GetDisplayAttributesForConfig(int config, DisplayConfigVariableInfo *attributes);
+  virtual int GetDisplayAttributesForConfig(int config,
+                                            DisplayConfigVariableInfo *display_attributes);
 
   int SetPanelBrightness(int level);
   int GetPanelBrightness(int *level);
@@ -136,7 +141,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual HWC2::Error GetActiveConfig(hwc2_config_t *out_config);
   virtual HWC2::Error SetActiveConfig(hwc2_config_t config);
   virtual HWC2::Error SetClientTarget(buffer_handle_t target, int32_t acquire_fence,
-                                      int32_t dataspace);
+                                      int32_t dataspace, hwc_region_t damage);
   virtual HWC2::Error SetColorMode(int32_t /*android_color_mode_t*/ mode) {
     return HWC2::Error::Unsupported;
   }
@@ -193,15 +198,18 @@ class HWCDisplay : public DisplayEventHandler {
   virtual HWC2::Error PrepareLayerStack(uint32_t *out_num_types, uint32_t *out_num_requests);
   virtual HWC2::Error CommitLayerStack(void);
   virtual HWC2::Error PostCommitLayerStack(int32_t *out_retire_fence);
+  virtual DisplayError DisablePartialUpdateOneFrame() {
+    return kErrorNotSupported;
+  }
   LayerBufferFormat GetSDMFormat(const int32_t &source, const int flags);
   const char *GetHALPixelFormatString(int format);
   const char *GetDisplayString();
-  void ScaleDisplayFrame(hwc_rect_t *display_frame);
   void MarkLayersForGPUBypass(void);
   void MarkLayersForClientComposition(void);
   virtual void ApplyScanAdjustment(hwc_rect_t *display_frame);
-  bool NeedsFrameBufferRefresh(void);
   bool SingleLayerUpdating(void);
+  bool IsSurfaceUpdated(const std::vector<LayerRect> &dirty_regions);
+  bool IsLayerUpdating(const Layer *layer);
   uint32_t SanitizeRefreshRate(uint32_t req_refresh_rate);
   virtual void CloseAcquireFds();
 
@@ -229,7 +237,6 @@ class HWCDisplay : public DisplayEventHandler {
   bool dump_input_layers_ = false;
   HWC2::PowerMode last_power_mode_;
   bool swap_interval_zero_ = false;
-  DisplayConfigVariableInfo *framebuffer_config_ = NULL;
   bool display_paused_ = false;
   uint32_t min_refresh_rate_ = 0;
   uint32_t max_refresh_rate_ = 0;
@@ -248,14 +255,13 @@ class HWCDisplay : public DisplayEventHandler {
   bool validated_ = false;
   bool color_tranform_failed_ = false;
   HWCColorMode *color_mode_ = NULL;
+  int32_t stored_retire_fence_ = -1;
 
  private:
-  bool IsFrameBufferScaled();
   void DumpInputBuffers(void);
   BlitEngine *blit_engine_ = NULL;
   qService::QService *qservice_ = NULL;
   DisplayClass display_class_;
-  int32_t stored_retire_fence_ = -1;
   uint32_t geometry_changes_ = GeometryChanges::kNone;
 };
 

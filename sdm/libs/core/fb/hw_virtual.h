@@ -35,6 +35,12 @@ class HWVirtual : public HWDevice {
                              BufferSyncHandler *buffer_sync_handler);
   static DisplayError Destroy(HWInterface *intf);
   virtual DisplayError SetVSyncState(bool enable) { return kErrorNotSupported; }
+  virtual DisplayError SetMixerAttributes(const HWMixerAttributes &mixer_attributes) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes) {
+    return kErrorNotSupported;
+  }
 
  protected:
   HWVirtual(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);

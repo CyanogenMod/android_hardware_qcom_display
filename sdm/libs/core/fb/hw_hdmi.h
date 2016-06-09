@@ -69,7 +69,6 @@ class HWHDMI : public HWDevice {
   virtual DisplayError Validate(HWLayers *hw_layers);
   virtual DisplayError SetS3DMode(HWS3DMode s3d_mode);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
-  virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes);
 
  private:
   DisplayError ReadEDIDInfo();
@@ -84,6 +83,7 @@ class HWHDMI : public HWDevice {
   DisplayError GetDisplayS3DSupport(uint32_t num_modes,
                                     HWDisplayAttributes *attrib);
   bool IsSupportedS3DMode(HWS3DMode s3d_mode);
+  void UpdateMixerAttributes();
 
   uint32_t hdmi_mode_count_;
   uint32_t hdmi_modes_[256];

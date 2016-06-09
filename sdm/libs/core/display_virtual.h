@@ -63,6 +63,15 @@ class DisplayVirtual : public DisplayBase, DumpImpl {
     return kErrorNotSupported;
   }
   virtual DisplayError SetActiveConfigLocked(DisplayConfigVariableInfo *variable_info);
+  virtual DisplayError SetMixerResolutionLocked(uint32_t width, uint32_t height) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError GetMixerResolutionLocked(uint32_t *width, uint32_t *height) {
+    return kErrorNotSupported;
+  }
+  virtual DisplayError SetDetailEnhancerDataLocked(const DisplayDetailEnhancerData &de_data) {
+    return kErrorNotSupported;
+  }
 };
 
 }  // namespace sdm
