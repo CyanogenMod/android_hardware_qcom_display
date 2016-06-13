@@ -119,12 +119,15 @@ static void setPaddingRound(hwc_context_t *ctx, int numDisplays,
  * to make this function self-contained */
 static void setDMAState(hwc_context_t *ctx, int numDisplays,
                         hwc_display_contents_1_t** displays) {
-
-    ctx->isDMAStateChanging = false;
-    if(ctx->mRotMgr->getNumActiveSessions() == 0)
-        Overlay::setDMAMode(Overlay::DMA_LINE_MODE);
-
-    for(int dpy = 0; dpy < numDisplays; dpy++) {
+ int NeedsRotationDpy = 0;
+ int BufferMirrorDpy = 0;
+ for(int dpy = 0; dpy < numDisplays; dpy++) {
+      ctx->isDMAStateChanging[dpy] = false;
+ }
+ if(ctx->mRotMgr->getNumActiveSessions() == 0) {
+     Overlay::setDMAMode(Overlay::DMA_LINE_MODE);
+ }
+ for(int dpy = 0; dpy < numDisplays; dpy++) {
         hwc_display_contents_1_t *list = displays[dpy];
         if (LIKELY(list && list->numHwLayers > 0)) {
             for(size_t layerIndex = 0; layerIndex < list->numHwLayers;
@@ -137,15 +140,26 @@ static void setDMAState(hwc_context_t *ctx, int numDisplays,
 
                     /* If a layer requires rotation, set the DMA state
                      * to BLOCK_MODE */
-
+                    /* If primary alone holds the DMA and its state changes then
+                       set DMA state changing to primary only */
                     if (canUseRotator(ctx, dpy) &&
                         (has90Transform(layer) || getRotDownscale(ctx, layer))
                         && isRotationDoable(ctx, hnd)) {
                         if(not (ctx->mOverlay->isDMAMultiplexingSupported() &&
                                           dpy)) {
-                            if(ctx->mOverlay->isPipeTypeAttached(
-                                             overlay::utils::OV_MDP_PIPE_DMA))
-                                ctx->isDMAStateChanging = true;
+                            if(ctx->mOverlay->isPipeTypeAttachedToDisplay(
+                                             overlay::utils::OV_MDP_PIPE_DMA, dpy)) {
+                                ctx->isDMAStateChanging[dpy] = true;
+                            }else {
+                                  NeedsRotationDpy = dpy;
+                                  for(int i = 0; i < numDisplays; i++) {
+                                      if ((i != dpy)&& ctx->mOverlay->isPipeTypeAttachedToDisplay(
+                                           overlay::utils::OV_MDP_PIPE_DMA, i)) {
+                                              ctx->isDMAStateChanging[i] = true;
+                                              ctx->isDMAStateChanging[NeedsRotationDpy] = true;
+                                      }
+                                  }
+                             }
                         }
                         Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
                     }
@@ -161,9 +175,18 @@ static void setDMAState(hwc_context_t *ctx, int numDisplays,
                    ctx->mExtOrientation = atoi(value);*/
 
                 if(ctx->mExtOrientation || ctx->mBufferMirrorMode) {
-                    if(ctx->mOverlay->isPipeTypeAttached(
-                                         overlay::utils::OV_MDP_PIPE_DMA)) {
-                        ctx->isDMAStateChanging = true;
+                    if(ctx->mOverlay->isPipeTypeAttachedToDisplay(
+                                         overlay::utils::OV_MDP_PIPE_DMA, dpy)) {
+                        ctx->isDMAStateChanging[dpy] = true;
+                    }else {
+                          BufferMirrorDpy = dpy;
+                          for(int i = 0; i < numDisplays; i++) {
+                            if ((i != dpy)&& ctx->mOverlay->isPipeTypeAttachedToDisplay(
+                              overlay::utils::OV_MDP_PIPE_DMA, i)) {
+                                ctx->isDMAStateChanging[i] = true;
+                                ctx->isDMAStateChanging[BufferMirrorDpy] = true;
+                            }
+                        }
                     }
                     Overlay::setDMAMode(Overlay::DMA_BLOCK_MODE);
                 }
