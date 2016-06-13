@@ -626,7 +626,7 @@ struct hwc_context_t {
     //Drawing round when we use GPU
     bool isPaddingRound;
     // Used to mark composition cycle when DMA state change is required
-    bool isDMAStateChanging;
+    bool isDMAStateChanging[HWC_NUM_DISPLAY_TYPES];
     // External Orientation
     int mExtOrientation;
     //Flags the transition of a video session
