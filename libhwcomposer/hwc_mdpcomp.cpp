@@ -478,7 +478,7 @@ bool MDPComp::isFrameDoable(hwc_context_t *ctx) {
     if(!isEnabled()) {
         ALOGD_IF(isDebug(),"%s: MDP Comp. not enabled.", __FUNCTION__);
         ret = false;
-    } else if (ctx->isDMAStateChanging) {
+    } else if (ctx->isDMAStateChanging[mDpy]) {
         // Bail out if a padding round has been invoked in order to switch DMA
         // state to block mode. We need this to cater for the case when a layer
         // requires rotation in the current frame.
