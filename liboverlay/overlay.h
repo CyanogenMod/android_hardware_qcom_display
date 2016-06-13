@@ -119,6 +119,10 @@ public:
      * displays
      */
     bool isPipeTypeAttached(utils::eMdpPipeType type);
+    /* Returns if any of the requested pipe type is attached
+     * to the display
+     */
+    bool isPipeTypeAttachedToDisplay(utils::eMdpPipeType type, int dpy);
     /* Compare pipe priorities and return
      * true - A swap is needed to fix the priority.
      * false - Good, priority wise.
