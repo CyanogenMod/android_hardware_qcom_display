@@ -282,6 +282,16 @@ void Overlay::endAllSessions() {
     }
 }
 
+bool Overlay::isPipeTypeAttachedToDisplay(eMdpPipeType type,int dpy) {
+    for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
+        if(type == PipeBook::getPipeType((eDest)i) &&
+                mPipeBook[i].mDisplay == dpy) {
+            return true;
+        }
+     }
+     return false;
+  }
+
 bool Overlay::isPipeTypeAttached(eMdpPipeType type) {
     for(int i = 0; i < PipeBook::NUM_PIPES; i++) {
         if(type == PipeBook::getPipeType((eDest)i) &&
