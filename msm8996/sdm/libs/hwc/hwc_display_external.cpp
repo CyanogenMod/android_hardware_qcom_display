@@ -50,7 +50,6 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
   uint32_t external_width = 0;
   uint32_t external_height = 0;
   int drc_enabled = 0;
-  DisplayError error = kErrorNone;
 
   HWCDisplay *hwc_display_external = new HWCDisplayExternal(core_intf, hwc_procs, qservice);
   int status = hwc_display_external->Init();
@@ -59,10 +58,7 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
     return status;
   }
 
-  error = hwc_display_external->GetMixerResolution(&external_width, &external_height);
-  if (error != kErrorNone) {
-    return -EINVAL;
-  }
+  hwc_display_external->GetPanelResolution(&external_width, &external_height);
 
   if (primary_width && primary_height) {
     // use_primary_res means HWCDisplayExternal should directly set framebuffer resolution to the
@@ -184,28 +180,28 @@ void HWCDisplayExternal::ApplyScanAdjustment(hwc_rect_t *display_frame) {
     return;
   }
 
-  uint32_t mixer_width = 0;
-  uint32_t mixer_height = 0;
-  GetMixerResolution(&mixer_width, &mixer_height);
+  uint32_t panel_width = 0;
+  uint32_t panel_height = 0;
+  GetPanelResolution(&panel_width, &panel_height);
 
-  if (mixer_width == 0 || mixer_height == 0) {
-    DLOGV("Invalid mixer dimensions (%d, %d)", mixer_width, mixer_height);
+  if (panel_width == 0 || panel_height == 0) {
+    DLOGV("Invalid panel dimensions (%d, %d)", panel_width, panel_height);
     return;
   }
 
-  uint32_t new_mixer_width = UINT32(mixer_width * FLOAT(1.0f - width_ratio));
-  uint32_t new_mixer_height = UINT32(mixer_height * FLOAT(1.0f - height_ratio));
+  uint32_t new_panel_width = UINT32(panel_width * FLOAT(1.0f - width_ratio));
+  uint32_t new_panel_height = UINT32(panel_height * FLOAT(1.0f - height_ratio));
 
-  int x_offset = INT((FLOAT(mixer_width) * width_ratio) / 2.0f);
-  int y_offset = INT((FLOAT(mixer_height) * height_ratio) / 2.0f);
+  int x_offset = INT((FLOAT(panel_width) * width_ratio) / 2.0f);
+  int y_offset = INT((FLOAT(panel_height) * height_ratio) / 2.0f);
 
-  display_frame->left = (display_frame->left * INT32(new_mixer_width) / INT32(mixer_width))
+  display_frame->left = (display_frame->left * INT32(new_panel_width) / INT32(panel_width))
                         + x_offset;
-  display_frame->top = (display_frame->top * INT32(new_mixer_height) / INT32(mixer_height)) +
+  display_frame->top = (display_frame->top * INT32(new_panel_height) / INT32(panel_height)) +
                        y_offset;
-  display_frame->right = ((display_frame->right * INT32(new_mixer_width)) / INT32(mixer_width)) +
+  display_frame->right = ((display_frame->right * INT32(new_panel_width)) / INT32(panel_width)) +
                          x_offset;
-  display_frame->bottom = ((display_frame->bottom * INT32(new_mixer_height)) / INT32(mixer_height))
+  display_frame->bottom = ((display_frame->bottom * INT32(new_panel_height)) / INT32(panel_height))
                           + y_offset;
 }
 

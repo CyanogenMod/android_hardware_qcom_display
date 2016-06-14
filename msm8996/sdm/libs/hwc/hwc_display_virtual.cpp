@@ -67,7 +67,7 @@ int HWCDisplayVirtual::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_
     return status;
   }
 
-  hwc_display_virtual->GetMixerResolution(&virtual_width, &virtual_height);
+  hwc_display_virtual->GetPanelResolution(&virtual_width, &virtual_height);
 
   if (content_list->numHwLayers < 1) {
     Destroy(hwc_display_virtual);

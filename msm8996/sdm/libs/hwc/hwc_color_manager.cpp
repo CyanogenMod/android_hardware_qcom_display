@@ -254,7 +254,7 @@ int HWCColorManager::CreateSolidFillLayers(HWCDisplay *hwc_display) {
     uint32_t primary_width = 0;
     uint32_t primary_height = 0;
 
-    hwc_display->GetMixerResolution(&primary_width, &primary_height);
+    hwc_display->GetPanelResolution(&primary_width, &primary_height);
     uint8_t *buf = new uint8_t[size]();
     // handle for solid fill layer with fd = -1.
     private_handle_t *handle =

@@ -41,6 +41,8 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
                  RotatorInterface *rotator_intf);
   virtual DisplayError Init();
   virtual DisplayError Deinit();
+  virtual DisplayError Prepare(LayerStack *layer_stack);
+  virtual DisplayError Commit(LayerStack *layer_stack);
   virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
@@ -48,10 +50,13 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
   virtual DisplayError GetActiveConfig(uint32_t *index);
   virtual DisplayError GetVSyncState(bool *enabled);
   virtual DisplayError SetDisplayState(DisplayState state);
+  virtual DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info);
+  virtual DisplayError SetActiveConfig(uint32_t index);
   virtual DisplayError SetVSyncState(bool enable);
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
   virtual DisplayError SetDisplayMode(uint32_t mode);
+  virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
   virtual bool IsUnderscanSupported();
@@ -68,17 +73,7 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
   virtual void CECMessage(char *message) { }
 
  private:
-  virtual DisplayError PrepareLocked(LayerStack *layer_stack);
-  virtual DisplayError CommitLocked(LayerStack *layer_stack);
-  virtual DisplayError ControlPartialUpdateLocked(bool enable, uint32_t *pending);
-  virtual DisplayError DisablePartialUpdateOneFrameLocked();
-  virtual DisplayError SetMixerResolutionLocked(uint32_t width, uint32_t height);
-  virtual DisplayError SetDetailEnhancerDataLocked(const DisplayDetailEnhancerData &de_data);
-
-  bool NeedsMixerReconfiguration(LayerStack *layer_stack, uint32_t *new_mixer_width,
-                                 uint32_t *new_mixer_height);
-  DisplayError ReconfigureMixer(uint32_t width, uint32_t height);
-
+  Locker locker_;
   uint32_t idle_timeout_ms_ = 0;
   std::vector<const char *> event_list_ = {"vsync_event", "show_blank_event", "idle_notify",
                                            "msm_fb_thermal_level", "thread_exit"};

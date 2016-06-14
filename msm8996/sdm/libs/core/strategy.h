@@ -34,8 +34,7 @@ class Strategy {
  public:
   Strategy(ExtensionInterface *extension_intf, DisplayType type,
            const HWResourceInfo &hw_resource_info, const HWPanelInfo &hw_panel_info,
-           const HWMixerAttributes &mixer_attributes, const HWDisplayAttributes &display_attributes,
-           const DisplayConfigVariableInfo &fb_config);
+           const HWDisplayAttributes &hw_display_attributes);
 
   DisplayError Init();
   DisplayError Deinit();
@@ -45,9 +44,7 @@ class Strategy {
   DisplayError GetNextStrategy(StrategyConstraints *constraints);
   DisplayError Stop();
   DisplayError Reconfigure(const HWPanelInfo &hw_panel_info,
-                           const HWDisplayAttributes &hw_display_attributes,
-                           const HWMixerAttributes &mixer_attributes,
-                           const DisplayConfigVariableInfo &fb_config);
+                           const HWDisplayAttributes &hw_display_attributes);
 
  private:
   void GenerateROI();
@@ -59,9 +56,7 @@ class Strategy {
   HWResourceInfo hw_resource_info_;
   HWPanelInfo hw_panel_info_;
   HWLayersInfo *hw_layers_info_ = NULL;
-  HWMixerAttributes mixer_attributes_ = {};
-  HWDisplayAttributes display_attributes_ = {};
-  DisplayConfigVariableInfo fb_config_ = {};
+  HWDisplayAttributes hw_display_attributes_;
   uint32_t fb_layer_index_ = 0;
   bool extn_start_success_ = false;
   bool tried_default_ = false;

@@ -91,6 +91,15 @@ enum HWSubBlockType {
   kHWSubBlockMax,
 };
 
+// y/RGB & UV Scaling Filters
+enum HWScalingFilter {
+  kScalingFilterEdgeDirected,
+  kScalingFilterCircular,
+  kScalingFilterSeparable,
+  kScalingFilterBilinear,
+  kScalingFilterMax,
+};
+
 enum HWAlphaInterpolation {
   kInterpolationPixelRepeat,
   kInterpolationBilinear,
@@ -131,13 +140,6 @@ struct HWRotatorInfo {
   std::string device_path = "";
 
   void Reset() { *this = HWRotatorInfo(); }
-};
-
-struct HWDestScalarInfo {
-  uint32_t count = 0;
-  uint32_t max_input_width = 0;
-  uint32_t max_output_width = 0;
-  uint32_t max_scale_up = 1;
 };
 
 struct HWResourceInfo {
@@ -186,7 +188,6 @@ struct HWResourceInfo {
   std::vector<HWPipeCaps> hw_pipes;
   FormatsMap supported_formats_map;
   HWRotatorInfo hw_rot_info;
-  HWDestScalarInfo hw_dest_scalar_info;
 
   void Reset() { *this = HWResourceInfo(); }
 };
@@ -307,7 +308,16 @@ struct HWScaleLutInfo {
   uint64_t sep_lut = 0;
 };
 
-struct HWDetailEnhanceData : DisplayDetailEnhancerData {
+struct HWDetailEnhanceData {
+  uint32_t enable = 0;
+  int16_t sharpen_level1 = 0;
+  int16_t sharpen_level2 = 0;
+  uint16_t clip = 0;
+  uint16_t limit = 0;
+  uint16_t thr_quiet = 0;
+  uint16_t thr_dieout = 0;
+  uint16_t thr_low = 0;
+  uint16_t thr_high = 0;
   uint16_t prec_shift = 0;
   int16_t adjust_a[MAX_DETAIL_ENHANCE_CURVE] = {0};
   int16_t adjust_b[MAX_DETAIL_ENHANCE_CURVE] = {0};
@@ -352,8 +362,8 @@ struct HWScaleData {
   uint32_t dst_height = 0;
   HWPlane plane[MAX_PLANES];
   // scale_v2_data fields
-  ScalingFilterConfig y_rgb_filter_cfg = kFilterEdgeDirected;
-  ScalingFilterConfig uv_filter_cfg = kFilterEdgeDirected;
+  HWScalingFilter y_rgb_filter_cfg = kScalingFilterEdgeDirected;
+  HWScalingFilter uv_filter_cfg = kScalingFilterEdgeDirected;
   HWAlphaInterpolation alpha_filter_cfg = kInterpolationPixelRepeat;
   HWBlendingFilter blend_cfg = kBlendFilterCircular;
 
@@ -375,15 +385,6 @@ struct HWScaleData {
 
   HWDetailEnhanceData detail_enhance;
 };
-
-struct HWDestScaleInfo {
-  uint32_t mixer_width = 0;
-  uint32_t mixer_height = 0;
-  bool scale_update = false;
-  HWScaleData scale_data = {};
-};
-
-typedef std::map<uint32_t, HWDestScaleInfo *> DestScaleInfoMap;
 
 struct HWPipeInfo {
   uint32_t pipe_id = 0;
@@ -426,7 +427,6 @@ struct HWLayersInfo {
   LayerRect right_partial_update;  // Right ROI.
 
   bool use_hw_cursor = false;      // Indicates that HWCursor pipe needs to be used for cursor layer
-  DestScaleInfoMap dest_scale_info_map = {};
 };
 
 struct HWLayers {
@@ -439,6 +439,7 @@ struct HWLayers {
 
 struct HWDisplayAttributes : DisplayConfigVariableInfo {
   bool is_device_split = false;
+  uint32_t split_left = 0;
   uint32_t v_front_porch = 0;  //!< Vertical front porch of panel
   uint32_t v_back_porch = 0;   //!< Vertical back porch of panel
   uint32_t v_pulse_width = 0;  //!< Vertical pulse width of panel
@@ -447,44 +448,20 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
 
   void Reset() { *this = HWDisplayAttributes(); }
 
-  bool operator !=(const HWDisplayAttributes &display_attributes) {
-    return ((is_device_split != display_attributes.is_device_split) ||
-            (x_pixels != display_attributes.x_pixels) ||
-            (y_pixels != display_attributes.y_pixels) ||
-            (x_dpi != display_attributes.x_dpi) ||
-            (y_dpi != display_attributes.y_dpi) ||
-            (fps != display_attributes.fps) ||
-            (vsync_period_ns != display_attributes.vsync_period_ns) ||
-            (v_front_porch != display_attributes.v_front_porch) ||
-            (v_back_porch != display_attributes.v_back_porch) ||
-            (v_pulse_width != display_attributes.v_pulse_width) ||
-            (is_yuv != display_attributes.is_yuv));
+  bool operator !=(const HWDisplayAttributes &attributes) {
+    return ((is_device_split != attributes.is_device_split) ||
+            (split_left != attributes.split_left) ||
+            (x_pixels != attributes.x_pixels) || (y_pixels != attributes.y_pixels) ||
+            (x_dpi != attributes.x_dpi) || (y_dpi != attributes.y_dpi) || (fps != attributes.fps) ||
+            (vsync_period_ns != attributes.vsync_period_ns) ||
+            (v_front_porch != attributes.v_front_porch) ||
+            (v_back_porch != attributes.v_back_porch) ||
+            (v_pulse_width != attributes.v_pulse_width) ||
+            (is_yuv != attributes.is_yuv));
   }
 
-  bool operator ==(const HWDisplayAttributes &display_attributes) {
-    return !(operator !=(display_attributes));
-  }
-};
-
-struct HWMixerAttributes {
-  uint32_t width = 0;                                  // Layer mixer width
-  uint32_t height = 0;                                 // Layer mixer height
-  uint32_t split_left = 0;
-  LayerBufferFormat output_format = kFormatRGB101010;  // Layer mixer output format
-
-  bool operator !=(const HWMixerAttributes &mixer_attributes) {
-    return ((width != mixer_attributes.width) ||
-            (height != mixer_attributes.height) ||
-            (output_format != mixer_attributes.output_format) ||
-            (split_left != mixer_attributes.split_left));
-  }
-
-  bool operator ==(const HWMixerAttributes &mixer_attributes) {
-    return !(operator !=(mixer_attributes));
-  }
-
-  bool IsValid() {
-    return (width > 0 && height > 0);
+  bool operator ==(const HWDisplayAttributes &attributes) {
+    return !(operator !=(attributes));
   }
 };
 

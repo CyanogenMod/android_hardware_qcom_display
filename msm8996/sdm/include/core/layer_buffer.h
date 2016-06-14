@@ -68,7 +68,6 @@ enum LayerBufferFormat {
   kFormatXBGR2101010,   //!< 10-bits Padding, Blue, Green, Red interleaved in XBGR order. No Alpha.
   kFormatRGBA1010102Ubwc,  //!< UBWC aligned RGBA1010102 format
   kFormatRGBX1010102Ubwc,  //!< UBWC aligned RGBX1010102 format
-  kFormatRGB101010,     // 10-bits Red, Green, Blue, interleaved in RGB order. No Alpha.
 
   /* All YUV-Planar formats, Any new format will be added towards end of this group to maintain
      backward compatibility.

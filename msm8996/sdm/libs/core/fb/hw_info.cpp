@@ -31,7 +31,6 @@
 #include <utils/constants.h>
 #include <utils/debug.h>
 #include <utils/sys.h>
-#include <dlfcn.h>
 
 #include <algorithm>
 #include <iostream>
@@ -242,16 +241,6 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         hw_resource->system_overhead_lines = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "wb_intf_index", strlen("wb_intf_index"))) {
         hw_resource->writeback_index = UINT32(atoi(tokens[1]));
-      } else if (!strncmp(tokens[0], "dest_scaler_count", strlen("dest_scaler_count"))) {
-        hw_resource->hw_dest_scalar_info.count = UINT32(atoi(tokens[1]));
-      } else if (!strncmp(tokens[0], "max_dest_scale_up", strlen("max_dest_scale_up"))) {
-        hw_resource->hw_dest_scalar_info.max_scale_up = UINT32(atoi(tokens[1]));
-      } else if (!strncmp(tokens[0], "max_dest_scaler_input_width",
-                 strlen("max_dest_scaler_input_width"))) {
-        hw_resource->hw_dest_scalar_info.max_input_width = UINT32(atoi(tokens[1]));
-      } else if (!strncmp(tokens[0], "max_dest_scaler_output_width",
-                 strlen("max_dest_scaler_output_width"))) {
-        hw_resource->hw_dest_scalar_info.max_output_width = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "features", strlen("features"))) {
         for (uint32_t i = 0; i < token_count; i++) {
           if (!strncmp(tokens[i], "bwc", strlen("bwc"))) {
@@ -325,14 +314,6 @@ DisplayError HWInfo::GetHWResourceInfo(HWResourceInfo *hw_resource) {
         }
       }
     }
-  }
-
-  // Disable destination scalar count to 0 if extension library is not present
-  void *extension_lib = ::dlopen("libsdmextension.so", RTLD_NOW);
-  if (!extension_lib) {
-    hw_resource->hw_dest_scalar_info.count = 0;
-  } else {
-    ::dlclose(extension_lib);
   }
 
   Sys::fclose_(fileptr);

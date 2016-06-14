@@ -32,16 +32,11 @@ namespace sdm {
 
 class ResourceInterface {
  public:
-  virtual DisplayError RegisterDisplay(DisplayType type,
-                                       const HWDisplayAttributes &display_attributes,
-                                       const HWPanelInfo &hw_panel_info,
-                                       const HWMixerAttributes &mixer_attributes,
-                                       Handle *display_ctx) = 0;
+  virtual DisplayError RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
+                                       const HWPanelInfo &hw_panel_info, Handle *display_ctx) = 0;
   virtual DisplayError UnregisterDisplay(Handle display_ctx) = 0;
-  virtual DisplayError ReconfigureDisplay(Handle display_ctx,
-                                          const HWDisplayAttributes &display_attributes,
-                                          const HWPanelInfo &hw_panel_info,
-                                          const HWMixerAttributes &mixer_attributes) = 0;
+  virtual void ReconfigureDisplay(Handle display_ctx, const HWDisplayAttributes &attributes,
+                                  const HWPanelInfo &hw_panel_info) = 0;
   virtual DisplayError Start(Handle display_ctx) = 0;
   virtual DisplayError Stop(Handle display_ctx) = 0;
   virtual DisplayError Acquire(Handle display_ctx, HWLayers *hw_layers) = 0;
@@ -58,8 +53,6 @@ class ResourceInterface {
                                               int x, int y) = 0;
   virtual DisplayError SetMaxBandwidthMode(HWBwModes mode) = 0;
   virtual DisplayError GetScaleLutConfig(HWScaleLutInfo *lut_info) = 0;
-  virtual DisplayError SetDetailEnhancerData(Handle display_ctx,
-                                             const DisplayDetailEnhancerData &de_data) = 0;
 
  protected:
   virtual ~ResourceInterface() { }
