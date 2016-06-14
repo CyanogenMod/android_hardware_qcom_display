@@ -68,7 +68,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   static int GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint32_t *configs,
                                size_t *numConfigs);
   static int GetDisplayAttributes(hwc_composer_device_1 *device, int disp, uint32_t config,
-                                  const uint32_t *display_attributes, int32_t *values);
+                                  const uint32_t *attributes, int32_t *values);
   static int GetActiveConfig(hwc_composer_device_1 *device, int disp);
   static int SetActiveConfig(hwc_composer_device_1 *device, int disp, int index);
   static int SetCursorPositionAsync(hwc_composer_device_1 *device, int disp, int x, int y);
@@ -123,8 +123,6 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
                                           android::Parcel *output_parcel);
   android::status_t GetBWTransactionStatus(const android::Parcel *input_parcel,
                                           android::Parcel *output_parcel);
-  android::status_t SetMixerResolution(const android::Parcel *input_parcel);
-
   static Locker locker_;
   CoreInterface *core_intf_ = NULL;
   hwc_procs_t hwc_procs_default_;

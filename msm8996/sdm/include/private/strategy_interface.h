@@ -48,9 +48,7 @@ class StrategyInterface {
   virtual DisplayError Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempts) = 0;
   virtual DisplayError GetNextStrategy(StrategyConstraints *constraints) = 0;
   virtual DisplayError Stop() = 0;
-  virtual DisplayError Reconfigure(HWDisplayMode mode, HWS3DMode s3d_mode,
-                                   const HWMixerAttributes &mixer_attributes,
-                                   const DisplayConfigVariableInfo &fb_config) = 0;
+  virtual DisplayError Reconfigure(HWDisplayMode mode, HWS3DMode s3d_mode) = 0;
 
  protected:
   virtual ~StrategyInterface() { }

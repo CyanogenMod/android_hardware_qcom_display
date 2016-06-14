@@ -56,7 +56,7 @@ int HWCDisplayPrimary::Create(CoreInterface *core_intf, BufferAllocator *buffer_
     return status;
   }
 
-  hwc_display_primary->GetMixerResolution(&primary_width, &primary_height);
+  hwc_display_primary->GetPanelResolution(&primary_width, &primary_height);
   int width = 0, height = 0;
   HWCDebugHandler::Get()->GetProperty("sdm.fb_size_width", &width);
   HWCDebugHandler::Get()->GetProperty("sdm.fb_size_height", &height);
@@ -382,6 +382,9 @@ void HWCDisplayPrimary::HandleFrameCapture() {
   frame_capture_buffer_queued_ = false;
   post_processed_output_ = false;
   output_buffer_ = {};
+
+  uint32_t pending = 0;  // Just a temporary to satisfy the API
+  ControlPartialUpdate(true  /* enable */, &pending);
 }
 
 void HWCDisplayPrimary::HandleFrameDump() {
@@ -410,6 +413,9 @@ void HWCDisplayPrimary::HandleFrameDump() {
     output_buffer_ = {};
     output_buffer_info_ = {};
     output_buffer_base_ = nullptr;
+
+    uint32_t pending = 0;  // Just a temporary to satisfy the API
+    ControlPartialUpdate(true  /* enable */, &pending);
   }
 }
 
@@ -448,7 +454,8 @@ void HWCDisplayPrimary::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_lay
 
   output_buffer_base_ = buffer;
   post_processed_output_ = true;
-  DisablePartialUpdateOneFrame();
+  uint32_t pending = 0;  // Just a temporary to satisfy the API
+  ControlPartialUpdate(false  /* enable */, &pending);
 }
 
 int HWCDisplayPrimary::FrameCaptureAsync(const BufferInfo& output_buffer_info,
@@ -482,37 +489,11 @@ int HWCDisplayPrimary::FrameCaptureAsync(const BufferInfo& output_buffer_info,
   frame_capture_buffer_queued_ = true;
   // Status is only cleared on a new call to dump and remains valid otherwise
   frame_capture_status_ = -EAGAIN;
-  DisablePartialUpdateOneFrame();
+
+  uint32_t pending = 0;  // Just a temporary to satisfy the API
+  ControlPartialUpdate(false  /* enable */, &pending);
 
   return 0;
-}
-
-DisplayError HWCDisplayPrimary::ControlPartialUpdate(bool enable, uint32_t *pending) {
-  DisplayError error = kErrorNone;
-
-  if (display_intf_) {
-    error = display_intf_->ControlPartialUpdate(enable, pending);
-  }
-
-  return error;
-}
-
-DisplayError HWCDisplayPrimary::DisablePartialUpdateOneFrame() {
-  DisplayError error = kErrorNone;
-
-  if (display_intf_) {
-    error = display_intf_->DisablePartialUpdateOneFrame();
-  }
-
-  return error;
-}
-
-DisplayError HWCDisplayPrimary::SetMixerResolution(uint32_t width, uint32_t height) {
-  return display_intf_->SetMixerResolution(width, height);
-}
-
-DisplayError HWCDisplayPrimary::GetMixerResolution(uint32_t *width, uint32_t *height) {
-  return display_intf_->GetMixerResolution(width, height);
 }
 
 }  // namespace sdm

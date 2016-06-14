@@ -42,6 +42,8 @@ class DisplayHDMI : public DisplayBase, DumpImpl, HWEventHandler {
               RotatorInterface *rotator_intf);
   virtual DisplayError Init();
   virtual DisplayError Deinit();
+  virtual DisplayError Prepare(LayerStack *layer_stack);
+  virtual DisplayError Commit(LayerStack *layer_stack);
   virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
@@ -49,10 +51,13 @@ class DisplayHDMI : public DisplayBase, DumpImpl, HWEventHandler {
   virtual DisplayError GetActiveConfig(uint32_t *index);
   virtual DisplayError GetVSyncState(bool *enabled);
   virtual DisplayError SetDisplayState(DisplayState state);
+  virtual DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info);
+  virtual DisplayError SetActiveConfig(uint32_t index);
   virtual DisplayError SetVSyncState(bool enable);
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
   virtual DisplayError SetDisplayMode(uint32_t mode);
+  virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
   virtual bool IsUnderscanSupported();
@@ -69,11 +74,11 @@ class DisplayHDMI : public DisplayBase, DumpImpl, HWEventHandler {
   virtual void CECMessage(char *message);
 
  private:
-  virtual DisplayError PrepareLocked(LayerStack *layer_stack);
   virtual uint32_t GetBestConfig(HWS3DMode s3d_mode);
   virtual void GetScanSupport();
   virtual void SetS3DMode(LayerStack *layer_stack);
 
+  Locker locker_;
   HWScanSupport scan_support_;
   std::map<LayerBufferS3DFormat, HWS3DMode> s3d_format_to_mode_;
   std::vector<const char *> event_list_ = {"vsync_event", "idle_notify", "cec/rd_msg",

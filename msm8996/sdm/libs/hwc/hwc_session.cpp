@@ -555,10 +555,10 @@ int HWCSession::GetDisplayConfigs(hwc_composer_device_1 *device, int disp, uint3
 }
 
 int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, uint32_t config,
-                                     const uint32_t *display_attributes, int32_t *values) {
+                                     const uint32_t *attributes, int32_t *values) {
   SCOPE_LOCK(locker_);
 
-  if (!device || !display_attributes || !values) {
+  if (!device || !attributes || !values) {
     return -EINVAL;
   }
 
@@ -569,8 +569,7 @@ int HWCSession::GetDisplayAttributes(hwc_composer_device_1 *device, int disp, ui
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
   int status = -EINVAL;
   if (hwc_session->hwc_display_[disp]) {
-    status = hwc_session->hwc_display_[disp]->GetDisplayAttributes(config, display_attributes,
-                                                                   values);
+    status = hwc_session->hwc_display_[disp]->GetDisplayAttributes(config, attributes, values);
   }
 
   return status;
@@ -776,10 +775,6 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
     status = GetBWTransactionStatus(input_parcel, output_parcel);
     break;
 
-  case qService::IQService::SET_LAYER_MIXER_RESOLUTION:
-    status = SetMixerResolution(input_parcel);
-    break;
-
   default:
     DLOGW("QService command = %d is not supported", command);
     return -EINVAL;
@@ -952,22 +947,22 @@ android::status_t HWCSession::HandleGetDisplayAttributesForConfig(const android:
   int config = input_parcel->readInt32();
   int dpy = input_parcel->readInt32();
   int error = android::BAD_VALUE;
-  DisplayConfigVariableInfo display_attributes;
+  DisplayConfigVariableInfo attributes;
 
   if (dpy > HWC_DISPLAY_VIRTUAL) {
     return android::BAD_VALUE;
   }
 
   if (hwc_display_[dpy]) {
-    error = hwc_display_[dpy]->GetDisplayAttributesForConfig(config, &display_attributes);
+    error = hwc_display_[dpy]->GetDisplayAttributesForConfig(config, &attributes);
     if (error == 0) {
-      output_parcel->writeInt32(INT(display_attributes.vsync_period_ns));
-      output_parcel->writeInt32(INT(display_attributes.x_pixels));
-      output_parcel->writeInt32(INT(display_attributes.y_pixels));
-      output_parcel->writeFloat(display_attributes.x_dpi);
-      output_parcel->writeFloat(display_attributes.y_dpi);
+      output_parcel->writeInt32(INT(attributes.vsync_period_ns));
+      output_parcel->writeInt32(INT(attributes.x_pixels));
+      output_parcel->writeInt32(INT(attributes.y_pixels));
+      output_parcel->writeFloat(attributes.x_dpi);
+      output_parcel->writeFloat(attributes.y_dpi);
       output_parcel->writeInt32(0);  // Panel type, unsupported.
-      output_parcel->writeInt32(display_attributes.is_yuv);
+      output_parcel->writeInt32(attributes.is_yuv);
     }
   }
 
@@ -1119,31 +1114,6 @@ void HWCSession::SetFrameDumpConfig(const android::Parcel *input_parcel) {
       hwc_display_[HWC_DISPLAY_VIRTUAL]->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
   }
-}
-
-android::status_t HWCSession::SetMixerResolution(const android::Parcel *input_parcel) {
-  DisplayError error = kErrorNone;
-  uint32_t dpy = UINT32(input_parcel->readInt32());
-
-  if (dpy != HWC_DISPLAY_PRIMARY) {
-    DLOGI("Resoulution change not supported for this display %d", dpy);
-    return -EINVAL;
-  }
-
-  if (!hwc_display_[HWC_DISPLAY_PRIMARY]) {
-    DLOGI("Primary display is not initialized");
-    return -EINVAL;
-  }
-
-  uint32_t width = UINT32(input_parcel->readInt32());
-  uint32_t height = UINT32(input_parcel->readInt32());
-
-  error = hwc_display_[HWC_DISPLAY_PRIMARY]->SetMixerResolution(width, height);
-  if (error != kErrorNone) {
-    return -EINVAL;
-  }
-
-  return 0;
 }
 
 void HWCSession::DynamicDebug(const android::Parcel *input_parcel) {

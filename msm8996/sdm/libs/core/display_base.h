@@ -54,8 +54,8 @@ class DisplayBase : public DisplayInterface {
   virtual ~DisplayBase() { }
   virtual DisplayError Init();
   virtual DisplayError Deinit();
-  DisplayError Prepare(LayerStack *layer_stack) final;
-  DisplayError Commit(LayerStack *layer_stack) final;
+  virtual DisplayError Prepare(LayerStack *layer_stack);
+  virtual DisplayError Commit(LayerStack *layer_stack);
   virtual DisplayError Flush();
   virtual DisplayError GetDisplayState(DisplayState *state);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
@@ -63,12 +63,11 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError GetActiveConfig(uint32_t *index);
   virtual DisplayError GetVSyncState(bool *enabled);
   virtual DisplayError SetDisplayState(DisplayState state);
-  DisplayError SetActiveConfig(uint32_t index) final;
-  DisplayError SetActiveConfig(DisplayConfigVariableInfo *variable_info) final;
+  virtual DisplayError SetActiveConfig(uint32_t index);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
-  DisplayError ControlPartialUpdate(bool enable, uint32_t *pending) final;
-  DisplayError DisablePartialUpdateOneFrame() final;
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
   virtual DisplayError SetDisplayMode(uint32_t mode);
+  virtual DisplayError IsScalingValid(const LayerRect &crop, const LayerRect &dst, bool rotate90);
   virtual bool IsUnderscanSupported();
   virtual DisplayError SetPanelBrightness(int level);
   virtual DisplayError OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
@@ -84,49 +83,21 @@ class DisplayBase : public DisplayInterface {
   virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
   virtual DisplayError GetPanelBrightness(int *level);
   virtual DisplayError SetVSyncState(bool enable);
-  DisplayError SetMixerResolution(uint32_t width, uint32_t height) final;
-  DisplayError GetMixerResolution(uint32_t *width, uint32_t *height) final;
-  DisplayError SetFrameBufferConfig(const DisplayConfigVariableInfo &variable_info) final;
-  DisplayError GetFrameBufferConfig(DisplayConfigVariableInfo *variable_info) final;
-  DisplayError SetDetailEnhancerData(const DisplayDetailEnhancerData &de_data) final;
 
  protected:
-  virtual DisplayError PrepareLocked(LayerStack *layer_stack);
-  virtual DisplayError CommitLocked(LayerStack *layer_stack);
-  virtual DisplayError SetActiveConfigLocked(uint32_t index);
-  virtual DisplayError SetActiveConfigLocked(DisplayConfigVariableInfo *variable_info) {
-    return kErrorNotSupported;
-  }
-  virtual DisplayError ControlPartialUpdateLocked(bool enable, uint32_t *pending) {
-    return kErrorNotSupported;
-  }
-  virtual DisplayError DisablePartialUpdateOneFrameLocked() {
-    return kErrorNotSupported;
-  }
-  virtual DisplayError SetMixerResolutionLocked(uint32_t width, uint32_t height) {
-    return kErrorNotSupported;
-  }
-  virtual DisplayError GetMixerResolutionLocked(uint32_t *width, uint32_t *height);
-  virtual DisplayError SetFrameBufferConfigLocked(const DisplayConfigVariableInfo &variable_info);
-  virtual DisplayError GetFrameBufferConfigLocked(DisplayConfigVariableInfo *variable_info);
-  virtual DisplayError SetDetailEnhancerDataLocked(const DisplayDetailEnhancerData &de_data) {
-    return kErrorNotSupported;
-  }
-
   // DumpImpl method
   void AppendDump(char *buffer, uint32_t length);
 
   bool IsRotationRequired(HWLayers *hw_layers);
   const char *GetName(const LayerComposition &composition);
   DisplayError ValidateGPUTarget(LayerStack *layer_stack);
-  DisplayError ReconfigureDisplay();
 
-  Locker locker_;
   DisplayType display_type_;
   DisplayEventHandler *event_handler_ = NULL;
   HWDeviceType hw_device_type_;
   HWInterface *hw_intf_ = NULL;
   HWPanelInfo hw_panel_info_;
+  HWDisplayAttributes display_attributes_;
   BufferSyncHandler *buffer_sync_handler_ = NULL;
   CompManager *comp_manager_ = NULL;
   RotatorInterface *rotator_intf_ = NULL;
@@ -144,17 +115,14 @@ class DisplayBase : public DisplayInterface {
   ColorManagerProxy *color_mgr_ = NULL;  // each display object owns its ColorManagerProxy
   bool partial_update_control_ = true;
   HWEventsInterface *hw_events_intf_ = NULL;
-  bool disable_pu_one_frame_ = false;
   uint32_t num_color_modes_ = 0;
   SDEDisplayMode *color_modes_ = NULL;
   int32_t color_mode_ = 0;
   typedef std::map<std::string, SDEDisplayMode *> ColorModeMap;
   ColorModeMap color_mode_map_ = {};
-  HWDisplayAttributes display_attributes_ = {};
-  HWMixerAttributes mixer_attributes_ = {};
-  DisplayConfigVariableInfo fb_config_ = {};
 
  private:
+  bool one_frame_full_roi_ = false;
   // Unused
   virtual DisplayError GetConfig(DisplayConfigFixedInfo *variable_info) {
     return kErrorNone;

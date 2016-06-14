@@ -104,9 +104,8 @@ DisplayError ResourceDefault::Deinit() {
 }
 
 DisplayError ResourceDefault::RegisterDisplay(DisplayType type,
-                                              const HWDisplayAttributes &display_attributes,
+                                              const HWDisplayAttributes &attributes,
                                               const HWPanelInfo &hw_panel_info,
-                                              const HWMixerAttributes &mixer_attributes,
                                               Handle *display_ctx) {
   DisplayError error = kErrorNone;
 
@@ -140,9 +139,12 @@ DisplayError ResourceDefault::RegisterDisplay(DisplayType type,
 
   hw_block_ctx_[hw_block_id].is_in_use = true;
 
-  display_resource_ctx->display_attributes = display_attributes;
+  display_resource_ctx->display_attributes = attributes;
   display_resource_ctx->hw_block_id = hw_block_id;
-  display_resource_ctx->mixer_attributes = mixer_attributes;
+
+  if (!display_resource_ctx->display_attributes.is_device_split) {
+    display_resource_ctx->display_attributes.split_left = attributes.x_pixels;
+  }
 
   *display_ctx = display_resource_ctx;
   return error;
@@ -160,19 +162,14 @@ DisplayError ResourceDefault::UnregisterDisplay(Handle display_ctx) {
   return kErrorNone;
 }
 
-DisplayError ResourceDefault::ReconfigureDisplay(Handle display_ctx,
-                                                 const HWDisplayAttributes &display_attributes,
-                                                 const HWPanelInfo &hw_panel_info,
-                                                 const HWMixerAttributes &mixer_attributes) {
+void ResourceDefault::ReconfigureDisplay(Handle display_ctx, const HWDisplayAttributes &attributes,
+                                    const HWPanelInfo &hw_panel_info) {
   SCOPE_LOCK(locker_);
 
   DisplayResourceContext *display_resource_ctx =
                           reinterpret_cast<DisplayResourceContext *>(display_ctx);
 
-  display_resource_ctx->display_attributes = display_attributes;
-  display_resource_ctx->mixer_attributes = mixer_attributes;
-
-  return kErrorNone;
+  display_resource_ctx->display_attributes = attributes;
 }
 
 DisplayError ResourceDefault::Start(Handle display_ctx) {
@@ -450,20 +447,20 @@ DisplayError ResourceDefault::SrcSplitConfig(DisplayResourceContext *display_res
 DisplayError ResourceDefault::DisplaySplitConfig(DisplayResourceContext *display_resource_ctx,
                                             const LayerRect &src_rect, const LayerRect &dst_rect,
                                             HWLayerConfig *layer_config) {
-  HWMixerAttributes &mixer_attributes = display_resource_ctx->mixer_attributes;
+  HWDisplayAttributes &display_attributes = display_resource_ctx->display_attributes;
 
   // for display split case
   HWPipeInfo *left_pipe = &layer_config->left_pipe;
   HWPipeInfo *right_pipe = &layer_config->right_pipe;
   LayerRect scissor_left, scissor_right, dst_left, crop_left, crop_right, dst_right;
 
-  scissor_left.right = FLOAT(mixer_attributes.split_left);
-  scissor_left.bottom = FLOAT(mixer_attributes.height);
+  scissor_left.right = FLOAT(display_attributes.split_left);
+  scissor_left.bottom = FLOAT(display_attributes.y_pixels);
 
-  scissor_right.left = FLOAT(mixer_attributes.split_left);
+  scissor_right.left = FLOAT(display_attributes.split_left);
   scissor_right.top = 0.0f;
-  scissor_right.right = FLOAT(mixer_attributes.width);
-  scissor_right.bottom = FLOAT(mixer_attributes.height);
+  scissor_right.right = FLOAT(display_attributes.x_pixels);
+  scissor_right.bottom = FLOAT(display_attributes.y_pixels);
 
   crop_left = src_rect;
   dst_left = dst_rect;
@@ -902,11 +899,6 @@ DisplayError ResourceDefault::SetMaxBandwidthMode(HWBwModes mode) {
 
 DisplayError ResourceDefault::GetScaleLutConfig(HWScaleLutInfo *lut_info) {
   return kErrorNone;
-}
-
-DisplayError ResourceDefault::SetDetailEnhancerData(Handle display_ctx,
-                                                    const DisplayDetailEnhancerData &de_data) {
-  return kErrorNotSupported;
 }
 
 }  // namespace sdm

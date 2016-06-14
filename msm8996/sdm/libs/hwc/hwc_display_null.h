@@ -48,8 +48,7 @@ class HWCDisplayNull : public HWCDisplay {
     return HWCDisplay::GetDisplayConfigs(configs, num_configs);
   }
 
-  virtual int GetDisplayAttributes(uint32_t config, const uint32_t *display_attributes,
-                                   int32_t *values);
+  virtual int GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values);
   virtual int GetActiveConfig() { return 0; }
   virtual int SetActiveConfig(int index) { return -1; }
 
@@ -80,8 +79,7 @@ class HWCDisplayNull : public HWCDisplay {
   virtual int SetActiveDisplayConfig(int config) { return 0; }
   virtual int GetActiveDisplayConfig(uint32_t *config) { return -1; }
   virtual int GetDisplayConfigCount(uint32_t *count) { return -1; }
-  virtual int GetDisplayAttributesForConfig(int config,
-                                            DisplayConfigVariableInfo *display_attributes) {
+  virtual int GetDisplayAttributesForConfig(int config, DisplayConfigVariableInfo *attributes) {
     return -1;
   }
   virtual bool IsValidContentList(hwc_display_contents_1_t *content_list) {

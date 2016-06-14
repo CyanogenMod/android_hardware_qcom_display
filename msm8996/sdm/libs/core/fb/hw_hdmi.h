@@ -69,7 +69,6 @@ class HWHDMI : public HWDevice {
   virtual DisplayError Validate(HWLayers *hw_layers);
   virtual DisplayError SetS3DMode(HWS3DMode s3d_mode);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);
-  virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes);
 
  private:
   DisplayError ReadEDIDInfo();

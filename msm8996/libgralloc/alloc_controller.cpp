@@ -99,9 +99,13 @@ static bool useUncached(const int& usage) {
 
 //------------- MDPCapabilityInfo-----------------------//
 MDPCapabilityInfo :: MDPCapabilityInfo() {
+  isMacroTileSupported = false;
   qdutils::querySDEInfo(HAS_MACRO_TILE, &isMacroTileSupported);
-  qdutils::querySDEInfo(HAS_UBWC, &isUBwcSupported);
 }
+
+int MDPCapabilityInfo :: isMacroTilingSupportedByMDP(){
+    return isMacroTileSupported;
+ }
 
 //------------- AdrenoMemInfo-----------------------//
 AdrenoMemInfo::AdrenoMemInfo()
@@ -928,23 +932,20 @@ static bool isUBwcFormat(int format)
 
 static bool isUBwcSupported(int format)
 {
-    if (MDPCapabilityInfo::getInstance().isUBwcSupportedByMDP()) {
-        // Existing HAL formats with UBWC support
-        switch(format)
-        {
-            case HAL_PIXEL_FORMAT_BGR_565:
-            case HAL_PIXEL_FORMAT_RGBA_8888:
-            case HAL_PIXEL_FORMAT_RGBX_8888:
-            case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
-            case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
-            case HAL_PIXEL_FORMAT_RGBA_1010102:
-            case HAL_PIXEL_FORMAT_RGBX_1010102:
-                return true;
-            default:
-                break;
-        }
+    // Existing HAL formats with UBWC support
+    switch(format)
+    {
+        case HAL_PIXEL_FORMAT_BGR_565:
+        case HAL_PIXEL_FORMAT_RGBA_8888:
+        case HAL_PIXEL_FORMAT_RGBX_8888:
+        case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
+        case HAL_PIXEL_FORMAT_RGBA_1010102:
+        case HAL_PIXEL_FORMAT_RGBX_1010102:
+            return true;
+        default:
+            return false;
     }
-    return false;
 }
 
 bool isUBwcEnabled(int format, int usage)

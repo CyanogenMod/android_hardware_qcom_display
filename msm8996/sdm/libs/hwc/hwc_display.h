@@ -59,28 +59,23 @@ class HWCDisplay : public DisplayEventHandler {
 
   // Framebuffer configurations
   virtual int GetDisplayConfigs(uint32_t *configs, size_t *num_configs);
-  virtual int GetDisplayAttributes(uint32_t config, const uint32_t *display_attributes,
-                                   int32_t *values);
+  virtual int GetDisplayAttributes(uint32_t config, const uint32_t *attributes, int32_t *values);
   virtual int GetActiveConfig();
   virtual int SetActiveConfig(int index);
 
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
   virtual DisplayError SetMaxMixerStages(uint32_t max_mixer_stages);
-  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending) {
-    return kErrorNotSupported;
-  }
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
   virtual uint32_t GetLastPowerMode();
   virtual int SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels);
   virtual void GetFrameBufferResolution(uint32_t *x_pixels, uint32_t *y_pixels);
+  virtual void GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels);
   virtual int SetDisplayStatus(uint32_t display_status);
   virtual int OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
   virtual int Perform(uint32_t operation, ...);
   virtual int SetCursorPosition(int x, int y);
   virtual void SetSecureDisplay(bool secure_display_active);
-  virtual DisplayError SetMixerResolution(uint32_t width, uint32_t height);
-  virtual DisplayError GetMixerResolution(uint32_t *width, uint32_t *height);
-  virtual void GetPanelResolution(uint32_t *width, uint32_t *height);
 
   // Captures frame output in the buffer specified by output_buffer_info. The API is
   // non-blocking and the client is expected to check operation status later on.
@@ -98,8 +93,7 @@ class HWCDisplay : public DisplayEventHandler {
   virtual int SetActiveDisplayConfig(int config);
   virtual int GetActiveDisplayConfig(uint32_t *config);
   virtual int GetDisplayConfigCount(uint32_t *count);
-  virtual int GetDisplayAttributesForConfig(int config,
-                                            DisplayConfigVariableInfo *display_attributes);
+  virtual int GetDisplayAttributesForConfig(int config, DisplayConfigVariableInfo *attributes);
 
   int SetPanelBrightness(int level);
   int GetPanelBrightness(int *level);
@@ -142,9 +136,6 @@ class HWCDisplay : public DisplayEventHandler {
   virtual uint32_t RoundToStandardFPS(float fps);
   virtual uint32_t SanitizeRefreshRate(uint32_t req_refresh_rate);
   virtual void PrepareDynamicRefreshRate(Layer *layer);
-  virtual DisplayError DisablePartialUpdateOneFrame() {
-    return kErrorNotSupported;
-  }
   inline void SetRect(const hwc_rect_t &source, LayerRect *target);
   inline void SetRect(const hwc_frect_t &source, LayerRect *target);
   inline void SetComposition(const int32_t &source, LayerComposition *target);
@@ -154,6 +145,7 @@ class HWCDisplay : public DisplayEventHandler {
   LayerBufferFormat GetSDMFormat(const int32_t &source, const int flags);
   const char *GetHALPixelFormatString(int format);
   const char *GetDisplayString();
+  void ScaleDisplayFrame(hwc_rect_t *display_frame);
   void MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list);
   virtual void ApplyScanAdjustment(hwc_rect_t *display_frame);
   DisplayError SetCSC(ColorSpace_t source, LayerCSC *target);
@@ -184,6 +176,7 @@ class HWCDisplay : public DisplayEventHandler {
   bool dump_input_layers_ = false;
   uint32_t last_power_mode_;
   bool swap_interval_zero_ = false;
+  DisplayConfigVariableInfo *framebuffer_config_ = NULL;
   bool display_paused_ = false;
   uint32_t min_refresh_rate_ = 0;
   uint32_t max_refresh_rate_ = 0;
@@ -203,6 +196,7 @@ class HWCDisplay : public DisplayEventHandler {
   bool animating_ = false;
 
  private:
+  bool IsFrameBufferScaled();
   void DumpInputBuffers(hwc_display_contents_1_t *content_list);
   int PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
   void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
