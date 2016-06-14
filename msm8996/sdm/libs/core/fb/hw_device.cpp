@@ -238,8 +238,10 @@ DisplayError HWDevice::Validate(HWLayers *hw_layers) {
         mdp_layer.bg_color = layer->solid_fill_color;
 
         // HWScaleData to MDP driver
-        hw_scale_->SetHWScaleData(pipe_info->scale_data, mdp_layer_count, &mdp_layer);
-        mdp_layer.scale = hw_scale_->GetScaleDataRef(mdp_layer_count);
+        hw_scale_->SetHWScaleData(pipe_info->scale_data, mdp_layer_count, &mdp_commit,
+                                  pipe_info->sub_block_type);
+        mdp_layer.scale = hw_scale_->GetScaleDataRef(mdp_layer_count, pipe_info->sub_block_type);
+
         mdp_layer_count++;
 
         DLOGV_IF(kTagDriverConfig, "******************* Layer[%d] %s pipe Input ******************",

@@ -252,10 +252,8 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
   display_attributes->y_dpi = 0;
   display_attributes->fps = timing_mode->refresh_rate / 1000;
   display_attributes->vsync_period_ns = UINT32(1000000000L / display_attributes->fps);
-  display_attributes->split_left = display_attributes->x_pixels;
   if (display_attributes->x_pixels > hw_resource_.max_mixer_width) {
     display_attributes->is_device_split = true;
-    display_attributes->split_left = display_attributes->x_pixels / 2;
     display_attributes->h_total += h_blanking;
   }
 
@@ -751,6 +749,22 @@ DisplayError HWHDMI::SetRefreshRate(uint32_t refresh_rate) {
   }
 
   frame_rate_ = refresh_rate;
+
+  return kErrorNone;
+}
+
+DisplayError HWHDMI::GetMixerAttributes(HWMixerAttributes *mixer_attributes) {
+  if (!mixer_attributes) {
+    return kErrorParameters;
+  }
+
+  HWDisplayAttributes display_attributes;
+  GetDisplayAttributes(active_config_index_, &display_attributes);
+
+  mixer_attributes->width = display_attributes.x_pixels;
+  mixer_attributes->height = display_attributes.y_pixels;
+  mixer_attributes->split_left = display_attributes.is_device_split ?
+      (display_attributes.x_pixels / 2) : mixer_attributes->width;
 
   return kErrorNone;
 }

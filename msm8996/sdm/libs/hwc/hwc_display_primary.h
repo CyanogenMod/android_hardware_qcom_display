@@ -54,12 +54,14 @@ class HWCDisplayPrimary : public HWCDisplay {
   virtual void SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type);
   virtual int FrameCaptureAsync(const BufferInfo& output_buffer_info, bool post_processed);
   virtual int GetFrameCaptureStatus() { return frame_capture_status_; }
+  virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
 
  private:
   HWCDisplayPrimary(CoreInterface *core_intf, BufferAllocator *buffer_allocator,
                     hwc_procs_t const **hwc_procs, qService::QService *qservice);
   void SetMetaDataRefreshRateFlag(bool enable);
   virtual DisplayError SetDisplayMode(uint32_t mode);
+  virtual DisplayError DisablePartialUpdateOneFrame();
   void ProcessBootAnimCompleted(hwc_display_contents_1_t *content_list);
   void SetQDCMSolidFillInfo(bool enable, uint32_t color);
   void ToggleCPUHint(bool set);
@@ -68,6 +70,8 @@ class HWCDisplayPrimary : public HWCDisplay {
   void HandleFrameOutput();
   void HandleFrameCapture();
   void HandleFrameDump();
+  DisplayError SetMixerResolution(uint32_t width, uint32_t height);
+  DisplayError GetMixerResolution(uint32_t *width, uint32_t *height);
 
   BufferAllocator *buffer_allocator_ = nullptr;
   CPUHint *cpu_hint_ = nullptr;

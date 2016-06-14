@@ -97,12 +97,12 @@ int HWCDisplayNull::Commit(hwc_display_contents_1_t *content_list) {
 
 #define NULL_DISPLAY_FPS 60
 
-int HWCDisplayNull::GetDisplayAttributes(uint32_t config, const uint32_t *attributes,
+int HWCDisplayNull::GetDisplayAttributes(uint32_t config, const uint32_t *display_attributes,
                                          int32_t *values) {
-  for (int i = 0; attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
+  for (int i = 0; display_attributes[i] != HWC_DISPLAY_NO_ATTRIBUTE; i++) {
     // We fake display resolution as 1080P by default, though it can be overriden through a call to
     // SetResolution(), and DPI as 160, though what the DPI value does is not clear
-    switch (attributes[i]) {
+    switch (display_attributes[i]) {
     case HWC_DISPLAY_VSYNC_PERIOD:
       values[i] = INT32(1000000000L / NULL_DISPLAY_FPS);
       break;

@@ -30,6 +30,7 @@
 
 #include <cstring>
 #include <array>
+#include <map>
 
 namespace sdm {
 
@@ -39,8 +40,8 @@ class HWScale {
   static DisplayError Destroy(HWScale *intf);
 
   virtual void SetHWScaleData(const HWScaleData &scale, uint32_t index,
-                              mdp_input_layer *mdp_layer) = 0;
-  virtual void* GetScaleDataRef(uint32_t index) = 0;
+                              mdp_layer_commit_v1 *mdp_commit, HWSubBlockType sub_block_type) = 0;
+  virtual void* GetScaleDataRef(uint32_t index, HWSubBlockType sub_block_type) = 0;
   virtual void DumpScaleData(void *mdp_scale) = 0;
   virtual void ResetScaleParams() = 0;
  protected:
@@ -50,8 +51,8 @@ class HWScale {
 class HWScaleV1 : public HWScale {
  public:
   virtual void SetHWScaleData(const HWScaleData &scale, uint32_t index,
-                              mdp_input_layer *mdp_layer);
-  virtual void* GetScaleDataRef(uint32_t index);
+                              mdp_layer_commit_v1 *mdp_commit, HWSubBlockType sub_block_type);
+  virtual void* GetScaleDataRef(uint32_t index, HWSubBlockType sub_block_type);
   virtual void DumpScaleData(void *mdp_scale);
   virtual void ResetScaleParams() { scale_data_v1_ = {}; }
 
@@ -63,18 +64,19 @@ class HWScaleV1 : public HWScale {
 class HWScaleV2 : public HWScale {
  public:
   virtual void SetHWScaleData(const HWScaleData &scale, uint32_t index,
-                              mdp_input_layer *mdp_layer);
-  virtual void* GetScaleDataRef(uint32_t index);
+                              mdp_layer_commit_v1 *mdp_commit, HWSubBlockType sub_block_type);
+  virtual void* GetScaleDataRef(uint32_t index, HWSubBlockType sub_block_type);
   virtual void DumpScaleData(void *mdp_scale);
-  virtual void ResetScaleParams() { scale_data_v2_ = {}; }
+  virtual void ResetScaleParams() { scale_data_v2_ = {}; dest_scale_data_v2_ = {}; }
 
  protected:
   ~HWScaleV2() {}
   std::array<mdp_scale_data_v2, (kMaxSDELayers * 2)> scale_data_v2_ = {};
+  std::map<uint32_t, mdp_scale_data_v2> dest_scale_data_v2_ = {};
 
  private:
   uint32_t GetMDPAlphaInterpolation(HWAlphaInterpolation alpha_filter_cfg);
-  uint32_t GetMDPScalingFilter(HWScalingFilter filter_cfg);
+  uint32_t GetMDPScalingFilter(ScalingFilterConfig filter_cfg);
 };
 
 }  // namespace sdm

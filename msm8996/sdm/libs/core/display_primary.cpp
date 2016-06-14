@@ -24,6 +24,11 @@
 
 #include <utils/constants.h>
 #include <utils/debug.h>
+#include <utils/rect.h>
+#include <map>
+#include <algorithm>
+#include <functional>
+#include <vector>
 
 #include "display_primary.h"
 #include "hw_interface.h"
@@ -86,17 +91,25 @@ DisplayError DisplayPrimary::Deinit() {
   return error;
 }
 
-DisplayError DisplayPrimary::Prepare(LayerStack *layer_stack) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::Prepare(layer_stack);
+DisplayError DisplayPrimary::PrepareLocked(LayerStack *layer_stack) {
+  DisplayError error = kErrorNone;
+  uint32_t new_mixer_width = 0;
+  uint32_t new_mixer_height = 0;
+  uint32_t display_width = display_attributes_.x_pixels;
+  uint32_t display_height = display_attributes_.y_pixels;
+
+  if (NeedsMixerReconfiguration(layer_stack, &new_mixer_width, &new_mixer_height)) {
+    error = ReconfigureMixer(new_mixer_width, new_mixer_height);
+    if (error != kErrorNone) {
+      ReconfigureMixer(display_width, display_height);
+    }
+  }
+
+  return DisplayBase::PrepareLocked(layer_stack);
 }
 
-DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
-  SCOPE_LOCK(locker_);
+DisplayError DisplayPrimary::CommitLocked(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
-  HWPanelInfo panel_info;
-  HWDisplayAttributes display_attributes;
-  uint32_t active_index = 0;
 
   // Enabling auto refresh is async and needs to happen before commit ioctl
   if (hw_panel_info_.mode == kModeCommand) {
@@ -105,19 +118,12 @@ DisplayError DisplayPrimary::Commit(LayerStack *layer_stack) {
 
   bool set_idle_timeout = comp_manager_->CanSetIdleTimeout(display_comp_ctx_);
 
-  error = DisplayBase::Commit(layer_stack);
+  error = DisplayBase::CommitLocked(layer_stack);
   if (error != kErrorNone) {
     return error;
   }
 
-  hw_intf_->GetHWPanelInfo(&panel_info);
-  hw_intf_->GetActiveConfig(&active_index);
-  hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
-
-  if (panel_info != hw_panel_info_) {
-    error = comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, panel_info);
-    hw_panel_info_ = panel_info;
-  }
+  DisplayBase::ReconfigureDisplay();
 
   if (hw_panel_info_.mode == kModeVideo) {
     if (set_idle_timeout && !layer_stack->flags.single_buffered_layer_present) {
@@ -181,16 +187,6 @@ DisplayError DisplayPrimary::SetDisplayState(DisplayState state) {
   return kErrorNone;
 }
 
-DisplayError DisplayPrimary::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
-  SCOPE_LOCK(locker_);
-  return kErrorNotSupported;
-}
-
-DisplayError DisplayPrimary::SetActiveConfig(uint32_t index) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetActiveConfig(index);
-}
-
 DisplayError DisplayPrimary::SetVSyncState(bool enable) {
   SCOPE_LOCK(locker_);
   return DisplayBase::SetVSyncState(enable);
@@ -214,22 +210,16 @@ DisplayError DisplayPrimary::SetMaxMixerStages(uint32_t max_mixer_stages) {
 DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
   SCOPE_LOCK(locker_);
   DisplayError error = kErrorNone;
-  HWDisplayMode hw_display_mode = kModeDefault;
+  HWDisplayMode hw_display_mode = static_cast<HWDisplayMode>(mode);
+  uint32_t pending = 0;
 
   if (!active_) {
     DLOGW("Invalid display state = %d. Panel must be on.", state_);
     return kErrorNotSupported;
   }
 
-  switch (mode) {
-  case kModeVideo:
-    hw_display_mode = kModeVideo;
-    break;
-  case kModeCommand:
-    hw_display_mode = kModeCommand;
-    break;
-  default:
-    DLOGW("Invalid panel mode parameters. Requested = %d", mode);
+  if (hw_display_mode != kModeCommand && hw_display_mode != kModeVideo) {
+    DLOGW("Invalid panel mode parameters. Requested = %d", hw_display_mode);
     return kErrorParameters;
   }
 
@@ -246,16 +236,11 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
     return error;
   }
 
-  // Disable PU if the previous PU state is on when switching to video mode, and re-enable PU when
-  // switching back to command mode.
-  bool toggle_partial_update = !(hw_display_mode == kModeVideo);
-  if (partial_update_control_) {
-    comp_manager_->ControlPartialUpdate(display_comp_ctx_, toggle_partial_update);
-  }
-
-  if (hw_display_mode == kModeVideo) {
+  if (mode == kModeVideo) {
+    ControlPartialUpdateLocked(false /* enable */, &pending);
     hw_intf_->SetIdleTimeoutMs(idle_timeout_ms_);
-  } else if (hw_display_mode == kModeCommand) {
+  } else if (mode == kModeCommand) {
+    ControlPartialUpdateLocked(true /* enable */, &pending);
     hw_intf_->SetIdleTimeoutMs(0);
   }
 
@@ -265,12 +250,6 @@ DisplayError DisplayPrimary::SetDisplayMode(uint32_t mode) {
 DisplayError DisplayPrimary::SetPanelBrightness(int level) {
   SCOPE_LOCK(locker_);
   return hw_intf_->SetPanelBrightness(level);
-}
-
-DisplayError DisplayPrimary::IsScalingValid(const LayerRect &crop, const LayerRect &dst,
-                                            bool rotate90) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::IsScalingValid(crop, dst, rotate90);
 }
 
 DisplayError DisplayPrimary::GetRefreshRateRange(uint32_t *min_refresh_rate,
@@ -305,21 +284,7 @@ DisplayError DisplayPrimary::SetRefreshRate(uint32_t refresh_rate) {
     return error;
   }
 
-  HWDisplayAttributes display_attributes;
-  uint32_t active_index = 0;
-  error = hw_intf_->GetActiveConfig(&active_index);
-  if (error != kErrorNone) {
-    return error;
-  }
-
-  error = hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
-  if (error != kErrorNone) {
-    return error;
-  }
-
-  comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes, hw_panel_info_);
-
-  return kErrorNone;
+  return DisplayBase::ReconfigureDisplay();
 }
 
 void DisplayPrimary::AppendDump(char *buffer, uint32_t length) {
@@ -360,6 +325,138 @@ void DisplayPrimary::ThermalEvent(int64_t thermal_level) {
 DisplayError DisplayPrimary::GetPanelBrightness(int *level) {
   SCOPE_LOCK(locker_);
   return hw_intf_->GetPanelBrightness(level);
+}
+
+DisplayError DisplayPrimary::ControlPartialUpdateLocked(bool enable, uint32_t *pending) {
+  if (!pending) {
+    return kErrorParameters;
+  }
+
+  if (!hw_panel_info_.partial_update) {
+    // Nothing to be done.
+    DLOGI("partial update is not applicable for display=%d", display_type_);
+    return kErrorNotSupported;
+  }
+
+  *pending = 0;
+  if (enable == partial_update_control_) {
+    DLOGI("Same state transition is requested.");
+    return kErrorNone;
+  }
+
+  partial_update_control_ = enable;
+
+  if (!enable) {
+    // If the request is to turn off feature, new draw call is required to have
+    // the new setting into effect.
+    *pending = 1;
+  }
+
+  return kErrorNone;
+}
+
+DisplayError DisplayPrimary::DisablePartialUpdateOneFrameLocked() {
+  disable_pu_one_frame_ = true;
+
+  return kErrorNone;
+}
+
+DisplayError DisplayPrimary::SetMixerResolutionLocked(uint32_t width, uint32_t height) {
+  return ReconfigureMixer(width, height);
+}
+
+DisplayError DisplayPrimary::ReconfigureMixer(uint32_t width, uint32_t height) {
+  DisplayError error = kErrorNone;
+
+  HWMixerAttributes mixer_attributes;
+  mixer_attributes.width = width;
+  mixer_attributes.height = height;
+
+  error = hw_intf_->SetMixerAttributes(mixer_attributes);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  return DisplayBase::ReconfigureDisplay();
+}
+
+bool DisplayPrimary::NeedsMixerReconfiguration(LayerStack *layer_stack, uint32_t *new_mixer_width,
+                                               uint32_t *new_mixer_height) {
+  uint32_t layer_count = UINT32(layer_stack->layers.size());
+
+  uint32_t fb_width  = fb_config_.x_pixels;
+  uint32_t fb_height  = fb_config_.y_pixels;
+  uint32_t fb_area = fb_width * fb_height;
+  LayerRect fb_rect = (LayerRect) {0.0f, 0.0f, FLOAT(fb_width), FLOAT(fb_height)};
+  uint32_t mixer_width = mixer_attributes_.width;
+  uint32_t mixer_height = mixer_attributes_.height;
+
+  RectOrientation fb_orientation = GetOrientation(fb_rect);
+  uint32_t max_layer_area = 0;
+  uint32_t max_area_layer_index = 0;
+  std::vector<Layer *> layers = layer_stack->layers;
+
+  for (uint32_t i = 0; i < layer_count; i++) {
+    Layer *layer = layers.at(i);
+    LayerBuffer *layer_buffer = layer->input_buffer;
+
+    if (!layer_buffer->flags.video) {
+      continue;
+    }
+
+    uint32_t layer_width = UINT32(layer->src_rect.right - layer->src_rect.left);
+    uint32_t layer_height = UINT32(layer->src_rect.bottom - layer->src_rect.top);
+    uint32_t layer_area = layer_width * layer_height;
+
+    if (layer_area > max_layer_area) {
+      max_layer_area = layer_area;
+      max_area_layer_index = i;
+    }
+  }
+
+  if (max_layer_area > fb_area) {
+    Layer *layer = layers.at(max_area_layer_index);
+
+    uint32_t layer_width = UINT32(layer->src_rect.right - layer->src_rect.left);
+    uint32_t layer_height = UINT32(layer->src_rect.bottom - layer->src_rect.top);
+    LayerRect layer_rect = (LayerRect){0.0f, 0.0f, FLOAT(layer_width), FLOAT(layer_height)};
+
+    RectOrientation layer_orientation = GetOrientation(layer_rect);
+    if (layer_orientation != kOrientationUnknown &&
+        fb_orientation != kOrientationUnknown) {
+      if (layer_orientation != fb_orientation) {
+        Swap(layer_width, layer_height);
+      }
+    }
+
+    // Align the width and height according to fb's aspect ratio
+    layer_width = UINT32((FLOAT(fb_width) / FLOAT(fb_height)) * layer_height);
+
+    *new_mixer_width = layer_width;
+    *new_mixer_height = layer_height;
+
+    return true;
+  } else {
+    if (fb_width != mixer_width || fb_height != mixer_height) {
+      *new_mixer_width = fb_width;
+      *new_mixer_height = fb_height;
+
+      return true;
+    }
+  }
+
+  return false;
+}
+
+DisplayError DisplayPrimary::SetDetailEnhancerDataLocked(const DisplayDetailEnhancerData &de_data) {
+  DisplayError error = comp_manager_->SetDetailEnhancerData(display_comp_ctx_, de_data);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  DisablePartialUpdateOneFrameLocked();
+
+  return kErrorNone;
 }
 
 }  // namespace sdm
