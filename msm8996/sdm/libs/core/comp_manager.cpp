@@ -69,8 +69,12 @@ DisplayError CompManager::Deinit() {
   return kErrorNone;
 }
 
-DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttributes &attributes,
-                                          const HWPanelInfo &hw_panel_info, Handle *display_ctx) {
+DisplayError CompManager::RegisterDisplay(DisplayType type,
+                                          const HWDisplayAttributes &display_attributes,
+                                          const HWPanelInfo &hw_panel_info,
+                                          const HWMixerAttributes &mixer_attributes,
+                                          const DisplayConfigVariableInfo &fb_config,
+                                          Handle *display_ctx) {
   SCOPE_LOCK(locker_);
 
   DisplayError error = kErrorNone;
@@ -81,7 +85,8 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
   }
 
   Strategy *&strategy = display_comp_ctx->strategy;
-  strategy = new Strategy(extension_intf_, type, hw_res_info_, hw_panel_info, attributes);
+  strategy = new Strategy(extension_intf_, type, hw_res_info_, hw_panel_info, mixer_attributes,
+                          display_attributes, fb_config);
   if (!strategy) {
     DLOGE("Unable to create strategy");
     delete display_comp_ctx;
@@ -95,7 +100,7 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
     return error;
   }
 
-  error = resource_intf_->RegisterDisplay(type, attributes, hw_panel_info,
+  error = resource_intf_->RegisterDisplay(type, display_attributes, hw_panel_info, mixer_attributes,
                                           &display_comp_ctx->display_resource_ctx);
   if (error != kErrorNone) {
     strategy->Deinit();
@@ -154,17 +159,25 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
 }
 
 DisplayError CompManager::ReconfigureDisplay(Handle comp_handle,
-                                             const HWDisplayAttributes &attributes,
-                                             const HWPanelInfo &hw_panel_info) {
+                                             const HWDisplayAttributes &display_attributes,
+                                             const HWPanelInfo &hw_panel_info,
+                                             const HWMixerAttributes &mixer_attributes,
+                                             const DisplayConfigVariableInfo &fb_config) {
+  SCOPE_LOCK(locker_);
+
+  DisplayError error = kErrorNone;
   DisplayCompositionContext *display_comp_ctx =
                              reinterpret_cast<DisplayCompositionContext *>(comp_handle);
 
-  resource_intf_->ReconfigureDisplay(display_comp_ctx->display_resource_ctx, attributes,
-                                     hw_panel_info);
+  error = resource_intf_->ReconfigureDisplay(display_comp_ctx->display_resource_ctx,
+                                             display_attributes, hw_panel_info, mixer_attributes);
+  if (error != kErrorNone) {
+    return error;
+  }
 
-  DisplayError error = kErrorNone;
   if (display_comp_ctx->strategy) {
-    error = display_comp_ctx->strategy->Reconfigure(hw_panel_info, attributes);
+    error = display_comp_ctx->strategy->Reconfigure(hw_panel_info, display_attributes,
+                                                    mixer_attributes, fb_config);
     if (error != kErrorNone) {
       DLOGE("Unable to Reconfigure strategy.");
       display_comp_ctx->strategy->Deinit();
@@ -466,6 +479,16 @@ bool CompManager::CanSetIdleTimeout(Handle display_ctx) {
 
 DisplayError CompManager::GetScaleLutConfig(HWScaleLutInfo *lut_info) {
   return resource_intf_->GetScaleLutConfig(lut_info);
+}
+
+DisplayError CompManager::SetDetailEnhancerData(Handle display_ctx,
+                                                const DisplayDetailEnhancerData &de_data) {
+  SCOPE_LOCK(locker_);
+
+  DisplayCompositionContext *display_comp_ctx =
+                             reinterpret_cast<DisplayCompositionContext *>(display_ctx);
+
+  return resource_intf_->SetDetailEnhancerData(display_comp_ctx->display_resource_ctx, de_data);
 }
 
 }  // namespace sdm
