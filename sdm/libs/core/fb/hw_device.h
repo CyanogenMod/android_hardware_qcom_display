@@ -131,7 +131,6 @@ class HWDevice : public HWInterface {
   HWInfoInterface *hw_info_intf_;
   int fb_node_index_;
   const char *fb_path_;
-  bool hotplug_enabled_;
   BufferSyncHandler *buffer_sync_handler_;
   int device_fd_;
   HWDeviceType device_type_;

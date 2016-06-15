@@ -112,9 +112,10 @@ DisplayError HWPrimary::Init() {
 
   UpdateMixerAttributes();
 
-  // Disable HPD at start if HDMI is external, it will be enabled later when the display powers on
+  // Need to enable HPD, but toggle at start when HDMI is external
   // This helps for framework reboot or adb shell stop/start
   EnableHotPlugDetection(0);
+  EnableHotPlugDetection(1);
   InitializeConfigs();
 
   return error;

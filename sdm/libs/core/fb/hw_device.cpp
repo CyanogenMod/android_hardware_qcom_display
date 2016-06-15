@@ -54,7 +54,7 @@
 namespace sdm {
 
 HWDevice::HWDevice(BufferSyncHandler *buffer_sync_handler)
-  : fb_node_index_(-1), fb_path_("/sys/devices/virtual/graphics/fb"), hotplug_enabled_(false),
+  : fb_node_index_(-1), fb_path_("/sys/devices/virtual/graphics/fb"),
     buffer_sync_handler_(buffer_sync_handler), synchronous_commit_(false) {
 }
 
@@ -133,11 +133,6 @@ DisplayError HWDevice::PowerOn() {
     }
     IOCTL_LOGE(FB_BLANK_UNBLANK, device_type_);
     return kErrorHardware;
-  }
-
-  // Need to turn on HPD
-  if (!hotplug_enabled_) {
-    hotplug_enabled_ = EnableHotPlugDetection(1);
   }
 
   return kErrorNone;
