@@ -94,20 +94,8 @@ int HWCSession::Init() {
     return -EINVAL;
   }
 
-  buffer_allocator_ = new HWCBufferAllocator();
-  if (buffer_allocator_ == NULL) {
-    DLOGE("Display core initialization failed due to no memory");
-    return -ENOMEM;
-  }
-
-  buffer_sync_handler_ = new HWCBufferSyncHandler();
-  if (buffer_sync_handler_ == NULL) {
-    DLOGE("Display core initialization failed due to no memory");
-    return -ENOMEM;
-  }
-
-  DisplayError error = CoreInterface::CreateCore(HWCDebugHandler::Get(), buffer_allocator_,
-                                                 buffer_sync_handler_, &core_intf_);
+  DisplayError error = CoreInterface::CreateCore(HWCDebugHandler::Get(), &buffer_allocator_,
+                                                 &buffer_sync_handler_, &core_intf_);
   if (error != kErrorNone) {
     DLOGE("Display core initialization failed. Error = %d", error);
     return -EINVAL;
@@ -125,7 +113,7 @@ int HWCSession::Init() {
                                         &hwc_display_[HWC_DISPLAY_PRIMARY]);
   } else {
     // Create and power on primary display
-    status = HWCDisplayPrimary::Create(core_intf_, buffer_allocator_, &callbacks_, qservice_,
+    status = HWCDisplayPrimary::Create(core_intf_, &buffer_allocator_, &callbacks_, qservice_,
                                        &hwc_display_[HWC_DISPLAY_PRIMARY]);
   }
 

@@ -71,31 +71,25 @@ DisplayError CoreImpl::Init() {
     goto CleanupOnError;
   }
 
-  hw_resource_ = new HWResourceInfo();
-  if (!hw_resource_) {
-    error = kErrorMemory;
-    goto CleanupOnError;
-  }
-
-  error = hw_info_intf_->GetHWResourceInfo(hw_resource_);
+  error = hw_info_intf_->GetHWResourceInfo(&hw_resource_);
   if (error != kErrorNone) {
     goto CleanupOnError;
   }
 
-  error = comp_mgr_.Init(*hw_resource_, extension_intf_, buffer_sync_handler_);
+  error = comp_mgr_.Init(hw_resource_, extension_intf_, buffer_sync_handler_);
   if (error != kErrorNone) {
     goto CleanupOnError;
   }
 
-  if (extension_intf_ && hw_resource_->hw_rot_info.num_rotator) {
-    error = extension_intf_->CreateRotator(hw_resource_->hw_rot_info, buffer_allocator_,
+  if (extension_intf_ && hw_resource_.hw_rot_info.num_rotator) {
+    error = extension_intf_->CreateRotator(hw_resource_.hw_rot_info, buffer_allocator_,
                                            buffer_sync_handler_, &rotator_intf_);
     if (error != kErrorNone) {
       DLOGW("rotation is not supported");
     }
   }
 
-  error = ColorManagerProxy::Init(*hw_resource_);
+  error = ColorManagerProxy::Init(hw_resource_);
   // if failed, doesn't affect display core functionalities.
   if (error != kErrorNone) {
     DLOGW("Unable creating color manager and continue without it.");
@@ -108,17 +102,13 @@ CleanupOnError:
     HWInfoInterface::Destroy(hw_info_intf_);
   }
 
-  if (hw_resource_) {
-    delete hw_resource_;
-  }
-
   return error;
 }
 
 DisplayError CoreImpl::Deinit() {
   SCOPE_LOCK(locker_);
 
-  if (extension_intf_ && hw_resource_->hw_rot_info.num_rotator) {
+  if (extension_intf_ && hw_resource_.hw_rot_info.num_rotator) {
     extension_intf_->DestroyRotator(rotator_intf_);
   }
 
@@ -126,10 +116,6 @@ DisplayError CoreImpl::Deinit() {
 
   comp_mgr_.Deinit();
   HWInfoInterface::Destroy(hw_info_intf_);
-
-  if (hw_resource_) {
-    delete hw_resource_;
-  }
 
   return kErrorNone;
 }

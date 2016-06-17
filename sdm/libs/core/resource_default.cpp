@@ -47,7 +47,7 @@ DisplayError ResourceDefault::Init(const HWResourceInfo &hw_res_info) {
     return kErrorParameters;
   }
 
-  src_pipes_ = new SourcePipe[num_pipe_];
+  src_pipes_.resize(num_pipe_);
   hw_res_info_ = hw_res_info;
 
   // Priority order of pipes: VIG, RGB, DMA
@@ -100,7 +100,6 @@ DisplayError ResourceDefault::Init(const HWResourceInfo &hw_res_info) {
 }
 
 DisplayError ResourceDefault::Deinit() {
-  delete[] src_pipes_;
   return kErrorNone;
 }
 

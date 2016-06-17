@@ -122,10 +122,6 @@ DisplayError DisplayBase::Deinit() {
     rotator_intf_->UnregisterDisplay(display_rotator_ctx_);
   }
 
-  if (color_modes_) {
-    delete[] color_modes_;
-  }
-
   if (color_mgr_) {
     delete color_mgr_;
     color_mgr_ = NULL;
@@ -742,14 +738,15 @@ DisplayError DisplayBase::GetColorModes(uint32_t *mode_count,
     return kErrorNotSupported;
   }
 
-  if (color_modes_ == NULL) {
-    color_modes_ = new SDEDisplayMode[num_color_modes_];
+  if (!color_modes_.size()) {
+    color_modes_.resize(num_color_modes_);
 
-    DisplayError error = color_mgr_->ColorMgrGetModes(&num_color_modes_, color_modes_);
+    DisplayError error = color_mgr_->ColorMgrGetModes(&num_color_modes_, color_modes_.data());
     if (error != kErrorNone) {
       DLOGE("Failed");
       return error;
     }
+
     for (uint32_t i = 0; i < num_color_modes_; i++) {
       DLOGV_IF(kTagQDCM, "Color Mode[%d]: Name = %s mode_id = %d", i, color_modes_[i].name,
                color_modes_[i].id);

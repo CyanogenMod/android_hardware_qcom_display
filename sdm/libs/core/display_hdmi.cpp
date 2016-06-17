@@ -26,6 +26,7 @@
 #include <utils/debug.h>
 #include <map>
 #include <utility>
+#include <vector>
 
 #include "display_hdmi.h"
 #include "hw_interface.h"
@@ -230,7 +231,7 @@ uint32_t DisplayHDMI::GetBestConfig(HWS3DMode s3d_mode) {
   hw_intf_->GetNumDisplayAttributes(&num_modes);
 
   // Get display attribute for each mode
-  HWDisplayAttributes *attrib = new HWDisplayAttributes[num_modes];
+  std::vector<HWDisplayAttributes> attrib(num_modes);
   for (index = 0; index < num_modes; index++) {
     hw_intf_->GetDisplayAttributes(index, &attrib[index]);
   }
@@ -265,7 +266,6 @@ uint32_t DisplayHDMI::GetBestConfig(HWS3DMode s3d_mode) {
     DLOGW("%s, could not support S3D mode from EDID info. S3D mode is %d",
           __FUNCTION__, s3d_mode);
   }
-  delete[] attrib;
 
   // Used for changing HDMI Resolution - override the best with user set config
   uint32_t user_config = UINT32(Debug::GetHDMIResolution());

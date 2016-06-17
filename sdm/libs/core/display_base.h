@@ -146,7 +146,7 @@ class DisplayBase : public DisplayInterface {
   HWEventsInterface *hw_events_intf_ = NULL;
   bool disable_pu_one_frame_ = false;
   uint32_t num_color_modes_ = 0;
-  SDEDisplayMode *color_modes_ = NULL;
+  std::vector<SDEDisplayMode> color_modes_;
   typedef std::map<std::string, SDEDisplayMode *> ColorModeMap;
   ColorModeMap color_mode_map_ = {};
   HWDisplayAttributes display_attributes_ = {};

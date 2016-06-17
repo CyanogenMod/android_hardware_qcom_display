@@ -28,6 +28,7 @@
 #include <core/display_interface.h>
 #include <private/resource_interface.h>
 #include <utils/locker.h>
+#include <vector>
 
 #include "hw_interface.h"
 
@@ -132,7 +133,7 @@ class ResourceDefault : public ResourceInterface {
   Locker locker_;
   HWResourceInfo hw_res_info_;
   HWBlockContext hw_block_ctx_[kHWBlockMax];
-  SourcePipe *src_pipes_ = NULL;
+  std::vector<SourcePipe> src_pipes_;
   uint32_t num_pipe_ = 0;
 };
 
