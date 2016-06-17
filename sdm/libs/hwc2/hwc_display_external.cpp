@@ -30,6 +30,7 @@
 #include <cutils/properties.h>
 #include <utils/constants.h>
 #include <utils/debug.h>
+#include <algorithm>
 
 #include "hwc_display_external.h"
 #include "hwc_debugger.h"
@@ -201,7 +202,7 @@ void HWCDisplayExternal::GetDownscaleResolution(uint32_t primary_width, uint32_t
 
   if (primary_area > non_primary_area) {
     if (primary_height > primary_width) {
-      Swap(primary_height, primary_width);
+      std::swap(primary_height, primary_width);
     }
     AdjustSourceResolution(primary_width, primary_height, non_primary_width, non_primary_height);
   }

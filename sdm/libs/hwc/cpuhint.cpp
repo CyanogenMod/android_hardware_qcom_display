@@ -38,13 +38,6 @@
 
 namespace sdm {
 
-CPUHint::~CPUHint() {
-  if (lib_handle_) {
-    dlclose(lib_handle_);
-    lib_handle_ = NULL;
-  }
-}
-
 DisplayError CPUHint::Init(HWCDebugHandler *debug_handler) {
   char path[PROPERTY_VALUE_MAX];
   if (debug_handler->GetProperty("ro.vendor.extension_library", path) != kErrorNone) {
@@ -61,19 +54,17 @@ DisplayError CPUHint::Init(HWCDebugHandler *debug_handler) {
 
   DLOGI("CPU Hint Pre-enable Window %d", pre_enable_window);
   pre_enable_window_ = pre_enable_window;
-  lib_handle_ = dlopen(path, RTLD_NOW);
 
-  if (lib_handle_) {
-    *(reinterpret_cast<void **>(&fn_lock_acquire_)) = dlsym(lib_handle_, "perf_lock_acq");
-    *(reinterpret_cast<void **>(&fn_lock_release_)) = dlsym(lib_handle_, "perf_lock_rel");
-    if (!fn_lock_acquire_ || !fn_lock_release_) {
+  if (vendor_ext_lib_.Open(path)) {
+    if (!vendor_ext_lib_.Sym("perf_lock_acq", reinterpret_cast<void **>(&fn_lock_acquire_)) ||
+        !vendor_ext_lib_.Sym("perf_lock_rel", reinterpret_cast<void **>(&fn_lock_release_))) {
       DLOGW("Failed to load symbols for Vendor Extension Library");
       return kErrorNotSupported;
     }
     DLOGI("Successfully Loaded Vendor Extension Library symbols");
     enabled_ = true;
   } else {
-    DLOGW("Failed to open %s : %s", path, dlerror());
+    DLOGW("Failed to open %s : %s", path, vendor_ext_lib_.Error());
   }
 
   return kErrorNone;

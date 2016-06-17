@@ -110,7 +110,7 @@ DisplayError CompManager::RegisterDisplay(DisplayType type,
     return error;
   }
 
-  SET_BIT(registered_displays_, type);
+  registered_displays_[type] = 1;
   display_comp_ctx->display_type = type;
   *display_ctx = display_comp_ctx;
   // New non-primary display device has been added, so move the composition mode to safe mode until
@@ -120,7 +120,7 @@ DisplayError CompManager::RegisterDisplay(DisplayType type,
   }
 
   DLOGV_IF(kTagCompManager, "registered display bit mask 0x%x, configured display bit mask 0x%x, " \
-           "display type %d", registered_displays_, configured_displays_,
+           "display type %d", registered_displays_.to_ulong(), configured_displays_.to_ulong(),
            display_comp_ctx->display_type);
 
   return kErrorNone;
@@ -142,15 +142,15 @@ DisplayError CompManager::UnregisterDisplay(Handle comp_handle) {
   strategy->Deinit();
   delete strategy;
 
-  CLEAR_BIT(registered_displays_, display_comp_ctx->display_type);
-  CLEAR_BIT(configured_displays_, display_comp_ctx->display_type);
+  registered_displays_[display_comp_ctx->display_type] = 0;
+  configured_displays_[display_comp_ctx->display_type] = 0;
 
   if (display_comp_ctx->display_type == kHDMI) {
     max_layers_ = kMaxSDELayers;
   }
 
   DLOGV_IF(kTagCompManager, "registered display bit mask 0x%x, configured display bit mask 0x%x, " \
-           "display type %d", registered_displays_, configured_displays_,
+           "display type %d", registered_displays_.to_ulong(), configured_displays_.to_ulong(),
            display_comp_ctx->display_type);
 
   delete display_comp_ctx;
@@ -327,9 +327,9 @@ DisplayError CompManager::PostCommit(Handle display_ctx, HWLayers *hw_layers) {
   DisplayError error = kErrorNone;
   DisplayCompositionContext *display_comp_ctx =
                              reinterpret_cast<DisplayCompositionContext *>(display_ctx);
-  SET_BIT(configured_displays_, display_comp_ctx->display_type);
+  configured_displays_[display_comp_ctx->display_type] = 1;
   if (configured_displays_ == registered_displays_) {
-      safe_mode_ = false;
+    safe_mode_ = false;
   }
 
   error = resource_intf_->PostCommit(display_comp_ctx->display_resource_ctx, hw_layers);

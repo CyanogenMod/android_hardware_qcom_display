@@ -116,8 +116,8 @@ class HWDevice : public HWInterface {
   void GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode);
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
   void GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info);
-  int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
-  int ParseLine(char *input, const char *delim, char *tokens[],
+  int ParseLine(const char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
+  int ParseLine(const char *input, const char *delim, char *tokens[],
                 const uint32_t max_token, uint32_t *count);
   void ResetDisplayParams();
   void SetCSC(const LayerCSC source, mdp_color_space *color_space);

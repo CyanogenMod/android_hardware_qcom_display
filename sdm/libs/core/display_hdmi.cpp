@@ -237,14 +237,14 @@ uint32_t DisplayHDMI::GetBestConfig(HWS3DMode s3d_mode) {
 
   // Select best config for s3d_mode. If s3d is not enabled, s3d_mode is kS3DModeNone
   for (index = 0; index < num_modes; index ++) {
-    if (IS_BIT_SET(attrib[index].s3d_config, s3d_mode)) {
+    if (attrib[index].s3d_config[s3d_mode]) {
       break;
     }
   }
   if (index < num_modes) {
     best_index = UINT32(index);
     for (size_t index = best_index + 1; index < num_modes; index ++) {
-      if (!IS_BIT_SET(attrib[index].s3d_config, s3d_mode))
+      if (!attrib[index].s3d_config[s3d_mode])
         continue;
 
       // From the available configs, select the best

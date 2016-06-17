@@ -45,11 +45,16 @@
 #include <utils/sys.h>
 #include <vector>
 #include <algorithm>
+#include <string>
 
 #include "hw_device.h"
 #include "hw_info_interface.h"
 
 #define __CLASS__ "HWDevice"
+
+using std::string;
+using std::to_string;
+using std::fstream;
 
 namespace sdm {
 
@@ -726,61 +731,43 @@ void HWDevice::PopulateHWPanelInfo() {
 }
 
 void HWDevice::GetHWPanelNameByNode(int device_node, HWPanelInfo *panel_info) {
-  if (!panel_info) {
-    DLOGE("PanelInfo pointer in invalid.");
-    return;
-  }
-  char *string_buffer = reinterpret_cast<char*>(malloc(sizeof(char) * kMaxStringLength));
-  if (!string_buffer) {
-    DLOGE("Failed to allocated string_buffer memory");
-    return;
-  }
-  snprintf(string_buffer, kMaxStringLength, "%s%d/msm_fb_panel_info", fb_path_, device_node);
-  FILE *fileptr = Sys::fopen_(string_buffer, "r");
-  if (!fileptr) {
-    DLOGW("Failed to open msm_fb_panel_info node device node %d", device_node);
-  } else {
-    size_t len = kMaxStringLength;
+  string file_name = fb_path_ + to_string(device_node) + "/msm_fb_panel_info";
 
-    while ((Sys::getline_(&string_buffer, &len, fileptr)) != -1) {
-      uint32_t token_count = 0;
-      const uint32_t max_count = 10;
-      char *tokens[max_count] = { NULL };
-      if (!ParseLine(string_buffer, "=\n", tokens, max_count, &token_count)) {
-        if (!strncmp(tokens[0], "panel_name", strlen("panel_name"))) {
-          snprintf(panel_info->panel_name, sizeof(panel_info->panel_name), "%s", tokens[1]);
-          break;
-        }
-      }
-    }
-    Sys::fclose_(fileptr);
-  }
-  free(string_buffer);
-}
-
-void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
-  if (!panel_info) {
-    DLOGE("PanelInfo pointer in invalid.");
-    return;
-  }
-  char stringbuffer[kMaxStringLength];
-  FILE *fileptr = NULL;
-  snprintf(stringbuffer, sizeof(stringbuffer), "%s%d/msm_fb_panel_info", fb_path_, device_node);
-  fileptr = Sys::fopen_(stringbuffer, "r");
-  if (!fileptr) {
+  Sys::fstream fs(file_name, fstream::in);
+  if (!fs.is_open()) {
     DLOGW("Failed to open msm_fb_panel_info node device node %d", device_node);
     return;
   }
 
-  char *line = stringbuffer;
-  size_t len = kMaxStringLength;
-  ssize_t read;
-
-  while ((read = Sys::getline_(&line, &len, fileptr)) != -1) {
+  string line;
+  while (Sys::getline_(fs, line)) {
     uint32_t token_count = 0;
     const uint32_t max_count = 10;
     char *tokens[max_count] = { NULL };
-    if (!ParseLine(line, tokens, max_count, &token_count)) {
+    if (!ParseLine(line.c_str(), "=\n", tokens, max_count, &token_count)) {
+      if (!strncmp(tokens[0], "panel_name", strlen("panel_name"))) {
+        snprintf(panel_info->panel_name, sizeof(panel_info->panel_name), "%s", tokens[1]);
+        break;
+      }
+    }
+  }
+}
+
+void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
+  string file_name = fb_path_ + to_string(device_node) + "/msm_fb_panel_info";
+
+  Sys::fstream fs(file_name, fstream::in);
+  if (!fs.is_open()) {
+    DLOGW("Failed to open msm_fb_panel_info node device node %d", device_node);
+    return;
+  }
+
+  string line;
+  while (Sys::getline_(fs, line)) {
+    uint32_t token_count = 0;
+    const uint32_t max_count = 10;
+    char *tokens[max_count] = { NULL };
+    if (!ParseLine(line.c_str(), tokens, max_count, &token_count)) {
       if (!strncmp(tokens[0], "pu_en", strlen("pu_en"))) {
         panel_info->partial_update = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "xstart", strlen("xstart"))) {
@@ -810,7 +797,7 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
       }
     }
   }
-  Sys::fclose_(fileptr);
+
   GetHWDisplayPortAndMode(device_node, &panel_info->port, &panel_info->mode);
   GetSplitInfo(device_node, panel_info);
   GetHWPanelNameByNode(device_node, panel_info);
@@ -820,81 +807,64 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
 void HWDevice::GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode) {
   *port = kPortDefault;
   *mode = kModeDefault;
-  char *stringbuffer = reinterpret_cast<char*>(malloc(sizeof(char) * kMaxStringLength));
-  if (!stringbuffer) {
-    DLOGE("Failed to allocated string_buffer memory");
+
+  string file_name = fb_path_ + to_string(device_node) + "/msm_fb_type";
+
+  Sys::fstream fs(file_name, fstream::in);
+  if (!fs.is_open()) {
+    DLOGW("File not found %s", file_name.c_str());
     return;
   }
 
-  snprintf(stringbuffer, kMaxStringLength, "%s%d/msm_fb_type", fb_path_, device_node);
-  FILE *fileptr = Sys::fopen_(stringbuffer, "r");
-  if (!fileptr) {
-    DLOGW("File not found %s", stringbuffer);
-    free(stringbuffer);
+  string line;
+  if (!Sys::getline_(fs, line)) {
     return;
   }
 
-  size_t len = kMaxStringLength;
-  ssize_t read = Sys::getline_(&stringbuffer, &len, fileptr);
-  if (read == -1) {
-    Sys::fclose_(fileptr);
-    free(stringbuffer);
-    return;
-  }
-  if ((strncmp(stringbuffer, "mipi dsi cmd panel", strlen("mipi dsi cmd panel")) == 0)) {
+  if ((strncmp(line.c_str(), "mipi dsi cmd panel", strlen("mipi dsi cmd panel")) == 0)) {
     *port = kPortDSI;
     *mode = kModeCommand;
-  } else if ((strncmp(stringbuffer, "mipi dsi video panel", strlen("mipi dsi video panel")) == 0)) {
+  } else if ((strncmp(line.c_str(), "mipi dsi video panel", strlen("mipi dsi video panel")) == 0)) {
     *port = kPortDSI;
     *mode = kModeVideo;
-  } else if ((strncmp(stringbuffer, "lvds panel", strlen("lvds panel")) == 0)) {
+  } else if ((strncmp(line.c_str(), "lvds panel", strlen("lvds panel")) == 0)) {
     *port = kPortLVDS;
     *mode = kModeVideo;
-  } else if ((strncmp(stringbuffer, "edp panel", strlen("edp panel")) == 0)) {
+  } else if ((strncmp(line.c_str(), "edp panel", strlen("edp panel")) == 0)) {
     *port = kPortEDP;
     *mode = kModeVideo;
-  } else if ((strncmp(stringbuffer, "dtv panel", strlen("dtv panel")) == 0)) {
+  } else if ((strncmp(line.c_str(), "dtv panel", strlen("dtv panel")) == 0)) {
     *port = kPortDTv;
     *mode = kModeVideo;
-  } else if ((strncmp(stringbuffer, "writeback panel", strlen("writeback panel")) == 0)) {
+  } else if ((strncmp(line.c_str(), "writeback panel", strlen("writeback panel")) == 0)) {
     *port = kPortWriteBack;
     *mode = kModeCommand;
   }
-  Sys::fclose_(fileptr);
-  free(stringbuffer);
 
   return;
 }
 
 void HWDevice::GetSplitInfo(int device_node, HWPanelInfo *panel_info) {
-  char stringbuffer[kMaxStringLength];
-  FILE *fileptr = NULL;
-  uint32_t token_count = 0;
-  const uint32_t max_count = 10;
-  char *tokens[max_count] = { NULL };
-
   // Split info - for MDSS Version 5 - No need to check version here
-  snprintf(stringbuffer , sizeof(stringbuffer), "%s%d/msm_fb_split", fb_path_, device_node);
-  fileptr = Sys::fopen_(stringbuffer, "r");
-  if (!fileptr) {
-    DLOGW("File not found %s", stringbuffer);
+  string file_name = fb_path_ + to_string(device_node) + "/msm_fb_split";
+
+  Sys::fstream fs(file_name, fstream::in);
+  if (!fs.is_open()) {
+    DLOGW("File not found %s", file_name.c_str());
     return;
   }
 
-  char *line = stringbuffer;
-  size_t len = kMaxStringLength;
-  ssize_t read;
-
   // Format "left right" space as delimiter
-  read = Sys::getline_(&line, &len, fileptr);
-  if (read > 0) {
-    if (!ParseLine(line, tokens, max_count, &token_count)) {
+  uint32_t token_count = 0;
+  const uint32_t max_count = 10;
+  char *tokens[max_count] = { NULL };
+  string line;
+  if (Sys::getline_(fs, line)) {
+    if (!ParseLine(line.c_str(), tokens, max_count, &token_count)) {
       panel_info->split_info.left_split = UINT32(atoi(tokens[0]));
       panel_info->split_info.right_split = UINT32(atoi(tokens[1]));
     }
   }
-
-  Sys::fclose_(fileptr);
 }
 
 void HWDevice::GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info) {
@@ -921,7 +891,8 @@ void HWDevice::GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info) {
   Sys::close_(fd);
 }
 
-int HWDevice::ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count) {
+int HWDevice::ParseLine(const char *input, char *tokens[], const uint32_t max_token,
+                        uint32_t *count) {
   char *tmp_token = NULL;
   char *temp_ptr;
   uint32_t index = 0;
@@ -929,7 +900,7 @@ int HWDevice::ParseLine(char *input, char *tokens[], const uint32_t max_token, u
   if (!input) {
     return -1;
   }
-  tmp_token = strtok_r(input, delim, &temp_ptr);
+  tmp_token = strtok_r(const_cast<char *>(input), delim, &temp_ptr);
   while (tmp_token && index < max_token) {
     tokens[index++] = tmp_token;
     tmp_token = strtok_r(NULL, delim, &temp_ptr);
@@ -939,7 +910,7 @@ int HWDevice::ParseLine(char *input, char *tokens[], const uint32_t max_token, u
   return 0;
 }
 
-int HWDevice::ParseLine(char *input, const char *delim, char *tokens[],
+int HWDevice::ParseLine(const char *input, const char *delim, char *tokens[],
                         const uint32_t max_token, uint32_t *count) {
   char *tmp_token = NULL;
   char *temp_ptr;
@@ -947,7 +918,7 @@ int HWDevice::ParseLine(char *input, const char *delim, char *tokens[],
   if (!input) {
     return -1;
   }
-  tmp_token = strtok_r(input, delim, &temp_ptr);
+  tmp_token = strtok_r(const_cast<char *>(input), delim, &temp_ptr);
   while (tmp_token && index < max_token) {
     tokens[index++] = tmp_token;
     tmp_token = strtok_r(NULL, delim, &temp_ptr);
@@ -1041,7 +1012,7 @@ DisplayError HWDevice::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
   uint32_t cursor_index = count - 1;
   HWPipeInfo *left_pipe = &hw_layers->config[cursor_index].left_pipe;
 
-  STRUCT_VAR(mdp_async_layer, async_layer);
+  mdp_async_layer async_layer = {};
   async_layer.flags = MDP_LAYER_ASYNC;
   async_layer.pipe_ndx = left_pipe->pipe_id;
   async_layer.src.x = UINT32(left_pipe->src_roi.left);
@@ -1049,7 +1020,7 @@ DisplayError HWDevice::SetCursorPosition(HWLayers *hw_layers, int x, int y) {
   async_layer.dst.x = UINT32(x);
   async_layer.dst.y = UINT32(y);
 
-  STRUCT_VAR(mdp_position_update, pos_update);
+  mdp_position_update pos_update = {};
   pos_update.input_layer_cnt = 1;
   pos_update.input_layers = &async_layer;
   if (Sys::ioctl_(device_fd_, INT(MSMFB_ASYNC_POSITION_UPDATE), &pos_update) < 0) {
@@ -1136,8 +1107,8 @@ DisplayError HWDevice::SetS3DMode(HWS3DMode s3d_mode) {
 }
 
 DisplayError HWDevice::SetScaleLutConfig(HWScaleLutInfo *lut_info) {
-  STRUCT_VAR(mdp_scale_luts_info, mdp_lut_info);
-  STRUCT_VAR(mdp_set_cfg, cfg);
+  mdp_scale_luts_info mdp_lut_info = {};
+  mdp_set_cfg cfg = {};
 
   if (!hw_resource_.has_qseed3) {
     DLOGV_IF(kTagDriverConfig, "No support for QSEED3 luts");
