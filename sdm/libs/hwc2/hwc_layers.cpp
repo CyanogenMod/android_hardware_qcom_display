@@ -229,8 +229,9 @@ HWC2::Error HWCLayer::SetLayerTransform(HWC2::Transform transform) {
       layer_transform.rotation = 90.0f;
       layer_transform.flip_vertical = true;
       break;
-    default:
-      return HWC2::Error::BadParameter;
+    case HWC2::Transform::None:
+      // do nothing
+      break;
   }
 
   if (layer_->transform != layer_transform) {
