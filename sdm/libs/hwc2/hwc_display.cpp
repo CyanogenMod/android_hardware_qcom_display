@@ -870,19 +870,21 @@ HWC2::Error HWCDisplay::PostCommitLayerStack(int32_t *out_retire_fence) {
     }
   }
 
+  *out_retire_fence = stored_retire_fence_;
   if (!flush_) {
     // if swapinterval property is set to 0 then close and reset the list retire fence
     if (swap_interval_zero_) {
       close(layer_stack_.retire_fence_fd);
       layer_stack_.retire_fence_fd = -1;
     }
-    *out_retire_fence = stored_retire_fence_;
     stored_retire_fence_ = layer_stack_.retire_fence_fd;
 
     if (dump_frame_count_) {
       dump_frame_count_--;
       dump_frame_index_++;
     }
+  } else {
+    stored_retire_fence_ = -1;
   }
   geometry_changes_ = GeometryChanges::kNone;
   flush_ = false;
