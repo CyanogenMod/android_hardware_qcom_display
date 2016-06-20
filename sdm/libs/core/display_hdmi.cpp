@@ -44,7 +44,7 @@ DisplayHDMI::DisplayHDMI(DisplayEventHandler *event_handler, HWInfoInterface *hw
 }
 
 DisplayError DisplayHDMI::Init() {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
 
   DisplayError error = HWHDMI::Create(&hw_intf_, hw_info_intf_,
                                       DisplayBase::buffer_sync_handler_);
@@ -98,7 +98,7 @@ DisplayError DisplayHDMI::Init() {
 }
 
 DisplayError DisplayHDMI::Deinit() {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
 
   DisplayError error = DisplayBase::Deinit();
   HWHDMI::Destroy(hw_intf_);
@@ -106,7 +106,8 @@ DisplayError DisplayHDMI::Deinit() {
   return error;
 }
 
-DisplayError DisplayHDMI::PrepareLocked(LayerStack *layer_stack) {
+DisplayError DisplayHDMI::Prepare(LayerStack *layer_stack) {
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   DisplayError error = kErrorNone;
   uint32_t new_mixer_width = 0;
   uint32_t new_mixer_height = 0;
@@ -122,64 +123,12 @@ DisplayError DisplayHDMI::PrepareLocked(LayerStack *layer_stack) {
 
   SetS3DMode(layer_stack);
 
-  return DisplayBase::PrepareLocked(layer_stack);
-}
-
-DisplayError DisplayHDMI::Flush() {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::Flush();
-}
-
-DisplayError DisplayHDMI::GetDisplayState(DisplayState *state) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetDisplayState(state);
-}
-
-DisplayError DisplayHDMI::GetNumVariableInfoConfigs(uint32_t *count) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetNumVariableInfoConfigs(count);
-}
-
-DisplayError DisplayHDMI::GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetConfig(index, variable_info);
-}
-
-DisplayError DisplayHDMI::GetActiveConfig(uint32_t *index) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetActiveConfig(index);
-}
-
-DisplayError DisplayHDMI::GetVSyncState(bool *enabled) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetVSyncState(enabled);
-}
-
-DisplayError DisplayHDMI::SetDisplayState(DisplayState state) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetDisplayState(state);
-}
-
-DisplayError DisplayHDMI::SetVSyncState(bool enable) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetVSyncState(enable);
-}
-
-void DisplayHDMI::SetIdleTimeoutMs(uint32_t timeout_ms) { }
-
-DisplayError DisplayHDMI::SetMaxMixerStages(uint32_t max_mixer_stages) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetMaxMixerStages(max_mixer_stages);
-}
-
-DisplayError DisplayHDMI::SetDisplayMode(uint32_t mode) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetDisplayMode(mode);
+  return DisplayBase::Prepare(layer_stack);
 }
 
 DisplayError DisplayHDMI::GetRefreshRateRange(uint32_t *min_refresh_rate,
                                               uint32_t *max_refresh_rate) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   DisplayError error = kErrorNone;
 
   if (hw_panel_info_.min_fps && hw_panel_info_.max_fps) {
@@ -193,7 +142,7 @@ DisplayError DisplayHDMI::GetRefreshRateRange(uint32_t *min_refresh_rate,
 }
 
 DisplayError DisplayHDMI::SetRefreshRate(uint32_t refresh_rate) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
 
   if (!active_) {
     return kErrorPermission;
@@ -208,17 +157,12 @@ DisplayError DisplayHDMI::SetRefreshRate(uint32_t refresh_rate) {
 }
 
 bool DisplayHDMI::IsUnderscanSupported() {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::IsUnderscanSupported();
-}
-
-DisplayError DisplayHDMI::SetPanelBrightness(int level) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetPanelBrightness(level);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
+  return underscan_supported_;
 }
 
 DisplayError DisplayHDMI::OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   return hw_intf_->OnMinHdcpEncryptionLevelChange(min_enc_level);
 }
 
@@ -311,16 +255,6 @@ void DisplayHDMI::GetScanSupport() {
   } else {
     scan_support_ = scan_info.it_scan_support;
   }
-}
-
-void DisplayHDMI::AppendDump(char *buffer, uint32_t length) {
-  SCOPE_LOCK(locker_);
-  DisplayBase::AppendDump(buffer, length);
-}
-
-DisplayError DisplayHDMI::SetCursorPosition(int x, int y) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetCursorPosition(x, y);
 }
 
 void DisplayHDMI::SetS3DMode(LayerStack *layer_stack) {
