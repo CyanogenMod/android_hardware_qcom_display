@@ -33,7 +33,13 @@
 #include <sys/mman.h>
 #include <stdlib.h>
 #include <fcntl.h>
+
+#ifdef _ANDROID_
 #include <cutils/log.h>
+#else
+#include <log/log.h>
+#endif
+
 #include <errno.h>
 #include <utils/Trace.h>
 #include "gralloc_priv.h"
@@ -185,7 +191,9 @@ int IonAlloc::clean_buffer(void *base, unsigned int size, unsigned int offset,
         int fd, int op)
 {
     ATRACE_CALL();
+#ifdef _ANDROID_
     ATRACE_INT("operation id", op);
+#endif
     struct ion_flush_data flush_data;
     struct ion_fd_data fd_data;
     struct ion_handle_data handle_data;
