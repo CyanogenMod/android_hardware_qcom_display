@@ -487,6 +487,11 @@ int HWCSession::SetPowerMode(hwc_composer_device_1 *device, int disp, int mode) 
   if (hwc_session->hwc_display_[disp]) {
     status = hwc_session->hwc_display_[disp]->SetPowerMode(mode);
   }
+  if (disp == HWC_DISPLAY_PRIMARY && hwc_session->hwc_display_[HWC_DISPLAY_VIRTUAL]) {
+    // Set the power mode for virtual display while setting power mode for primary, as SF
+    // does not invoke SetPowerMode() for virtual display.
+    status = hwc_session->hwc_display_[HWC_DISPLAY_VIRTUAL]->SetPowerMode(mode);
+  }
 
   return status;
 }

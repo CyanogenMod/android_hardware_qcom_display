@@ -107,6 +107,19 @@ DisplayError DisplayHDMI::Deinit() {
 }
 
 DisplayError DisplayHDMI::PrepareLocked(LayerStack *layer_stack) {
+  DisplayError error = kErrorNone;
+  uint32_t new_mixer_width = 0;
+  uint32_t new_mixer_height = 0;
+  uint32_t display_width = display_attributes_.x_pixels;
+  uint32_t display_height = display_attributes_.y_pixels;
+
+  if (NeedsMixerReconfiguration(layer_stack, &new_mixer_width, &new_mixer_height)) {
+    error = ReconfigureMixer(new_mixer_width, new_mixer_height);
+    if (error != kErrorNone) {
+      ReconfigureMixer(display_width, display_height);
+    }
+  }
+
   SetS3DMode(layer_stack);
 
   return DisplayBase::PrepareLocked(layer_stack);

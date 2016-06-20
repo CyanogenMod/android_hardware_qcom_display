@@ -72,12 +72,6 @@ class DisplayPrimary : public DisplayBase, DumpImpl, HWEventHandler {
   virtual DisplayError CommitLocked(LayerStack *layer_stack);
   virtual DisplayError ControlPartialUpdateLocked(bool enable, uint32_t *pending);
   virtual DisplayError DisablePartialUpdateOneFrameLocked();
-  virtual DisplayError SetMixerResolutionLocked(uint32_t width, uint32_t height);
-  virtual DisplayError SetDetailEnhancerDataLocked(const DisplayDetailEnhancerData &de_data);
-
-  bool NeedsMixerReconfiguration(LayerStack *layer_stack, uint32_t *new_mixer_width,
-                                 uint32_t *new_mixer_height);
-  DisplayError ReconfigureMixer(uint32_t width, uint32_t height);
 
   uint32_t idle_timeout_ms_ = 0;
   std::vector<const char *> event_list_ = {"vsync_event", "show_blank_event", "idle_notify",
