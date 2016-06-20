@@ -887,7 +887,7 @@ void HWDevice::GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info) {
 
   if (Sys::pread_(fd, brightness, sizeof(brightness), 0) > 0) {
     panel_info->panel_max_brightness = atoi(brightness);
-    DLOGW("Max brightness level = %d", panel_info->panel_max_brightness);
+    DLOGI("Max brightness level = %d", panel_info->panel_max_brightness);
   } else {
     DLOGW("Failed to read max brightness level. error = %s", strerror(errno));
   }
