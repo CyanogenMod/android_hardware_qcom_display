@@ -31,6 +31,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <bitset>
 
 namespace sdm {
 const int kMaxSDELayers = 16;   // Maximum number of layers that can be handled by hardware in a
@@ -443,7 +444,7 @@ struct HWDisplayAttributes : DisplayConfigVariableInfo {
   uint32_t v_back_porch = 0;   //!< Vertical back porch of panel
   uint32_t v_pulse_width = 0;  //!< Vertical pulse width of panel
   uint32_t h_total = 0;        //!< Total width of panel (hActive + hFP + hBP + hPulseWidth)
-  uint32_t s3d_config = 0;     //!< Stores the bit mask of S3D modes
+  std::bitset<32> s3d_config;  //!< Stores the bit mask of S3D modes
 
   void Reset() { *this = HWDisplayAttributes(); }
 

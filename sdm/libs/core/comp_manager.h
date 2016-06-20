@@ -28,6 +28,7 @@
 #include <core/display_interface.h>
 #include <private/extension_interface.h>
 #include <utils/locker.h>
+#include <bitset>
 
 #include "strategy.h"
 #include "resource_default.h"
@@ -91,8 +92,8 @@ class CompManager : public DumpImpl {
   Locker locker_;
   ResourceInterface *resource_intf_ = NULL;
   ResourceDefault resource_default_;
-  uint32_t registered_displays_ = 0;    // Stores the bit mask of registered displays
-  uint32_t configured_displays_ = 0;    // Stores the bit mask of sucessfully configured displays
+  std::bitset<kDisplayMax> registered_displays_;  // Bit mask of registered displays
+  std::bitset<kDisplayMax> configured_displays_;  // Bit mask of sucessfully configured displays
   bool safe_mode_ = false;              // Flag to notify all displays to be in resource crunch
                                         // mode, where strategy manager chooses the best strategy
                                         // that uses optimal number of pipes for each display

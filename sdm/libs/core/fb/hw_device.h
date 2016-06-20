@@ -116,12 +116,12 @@ class HWDevice : public HWInterface {
   void GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode);
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
   void GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info);
-  int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
-  int ParseLine(char *input, const char *delim, char *tokens[],
+  int ParseLine(const char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
+  int ParseLine(const char *input, const char *delim, char *tokens[],
                 const uint32_t max_token, uint32_t *count);
   void ResetDisplayParams();
   void SetCSC(const LayerCSC source, mdp_color_space *color_space);
-  void SetIGC(const Layer *layer, uint32_t index);
+  void SetIGC(const LayerBuffer *layer_buffer, uint32_t index);
 
   bool EnableHotPlugDetection(int enable);
   ssize_t SysFsWrite(const char* file_node, const char* value, ssize_t length);
@@ -131,7 +131,6 @@ class HWDevice : public HWInterface {
   HWInfoInterface *hw_info_intf_;
   int fb_node_index_;
   const char *fb_path_;
-  bool hotplug_enabled_;
   BufferSyncHandler *buffer_sync_handler_;
   int device_fd_;
   HWDeviceType device_type_;

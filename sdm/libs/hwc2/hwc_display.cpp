@@ -733,7 +733,7 @@ HWC2::Error HWCDisplay::PrepareLayerStack(uint32_t *out_num_types, uint32_t *out
 }
 
 HWC2::Error HWCDisplay::AcceptDisplayChanges() {
-  if (!validated_) {
+  if (!validated_ && !layer_set_.empty()) {
     return HWC2::Error::NotValidated;
   }
   return HWC2::Error::None;
@@ -741,6 +741,10 @@ HWC2::Error HWCDisplay::AcceptDisplayChanges() {
 
 HWC2::Error HWCDisplay::GetChangedCompositionTypes(uint32_t *out_num_elements,
                                                    hwc2_layer_t *out_layers, int32_t *out_types) {
+  if (layer_set_.empty()) {
+    return HWC2::Error::None;
+  }
+
   if (!validated_) {
     DLOGW("Display is not validated");
     return HWC2::Error::NotValidated;
@@ -778,6 +782,10 @@ HWC2::Error HWCDisplay::GetDisplayRequests(int32_t *out_display_requests,
   // Use for sharing blit buffers and
   // writing wfd buffer directly to output if there is full GPU composition
   // and no color conversion needed
+  if (layer_set_.empty()) {
+    return HWC2::Error::None;
+  }
+
   if (!validated_) {
     DLOGW("Display is not validated");
     return HWC2::Error::NotValidated;
@@ -796,7 +804,7 @@ HWC2::Error HWCDisplay::GetDisplayRequests(int32_t *out_display_requests,
 }
 
 HWC2::Error HWCDisplay::CommitLayerStack(void) {
-  if (shutdown_pending_) {
+  if (shutdown_pending_ || layer_set_.empty()) {
     return HWC2::Error::None;
   }
 
@@ -870,19 +878,21 @@ HWC2::Error HWCDisplay::PostCommitLayerStack(int32_t *out_retire_fence) {
     }
   }
 
+  *out_retire_fence = stored_retire_fence_;
   if (!flush_) {
     // if swapinterval property is set to 0 then close and reset the list retire fence
     if (swap_interval_zero_) {
       close(layer_stack_.retire_fence_fd);
       layer_stack_.retire_fence_fd = -1;
     }
-    *out_retire_fence = stored_retire_fence_;
     stored_retire_fence_ = layer_stack_.retire_fence_fd;
 
     if (dump_frame_count_) {
       dump_frame_count_--;
       dump_frame_index_++;
     }
+  } else {
+    stored_retire_fence_ = -1;
   }
   geometry_changes_ = GeometryChanges::kNone;
   flush_ = false;
@@ -1512,6 +1522,7 @@ std::string HWCDisplay::Dump() {
   os << "HWC2 LayerDump:" << std::endl;
   for (auto layer : layer_set_) {
     auto sdm_layer = layer->GetSDMLayer();
+    auto transform = sdm_layer->transform;
     os << "-------------------------------" << std::endl;
     os << "layer_id: " << layer->GetId() << std::endl;
     os << "\tz: " << layer->GetZ() << std::endl;
@@ -1521,6 +1532,8 @@ std::string HWCDisplay::Dump() {
           to_string(layer->GetDeviceSelectedCompositionType()).c_str() << std::endl;
     os << "\tplane_alpha: " << std::to_string(sdm_layer->plane_alpha).c_str() << std::endl;
     os << "\tformat: " << GetFormatString(sdm_layer->input_buffer->format) << std::endl;
+    os << "\ttransform: rot: " << transform.rotation << " flip_h: " << transform.flip_horizontal <<
+          " flip_v: "<< transform.flip_vertical << std::endl;
     os << "\tbuffer_id: " << std::hex << "0x" << sdm_layer->input_buffer->buffer_id << std::dec
        << std::endl;
   }

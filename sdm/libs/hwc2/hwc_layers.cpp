@@ -213,10 +213,13 @@ HWC2::Error HWCLayer::SetLayerTransform(HWC2::Transform transform) {
       layer_transform.rotation = 90.0f;
       break;
     case HWC2::Transform::Rotate180:
-      layer_transform.rotation = 180.0f;
+      layer_transform.flip_horizontal = true;
+      layer_transform.flip_vertical = true;
       break;
     case HWC2::Transform::Rotate270:
-      layer_transform.rotation = 270.0f;
+      layer_transform.rotation = 90.0f;
+      layer_transform.flip_horizontal = true;
+      layer_transform.flip_vertical = true;
       break;
     case HWC2::Transform::FlipHRotate90:
       layer_transform.rotation = 90.0f;
@@ -226,10 +229,9 @@ HWC2::Error HWCLayer::SetLayerTransform(HWC2::Transform transform) {
       layer_transform.rotation = 90.0f;
       layer_transform.flip_vertical = true;
       break;
-    default:
-      layer_transform.rotation = 0.0f;
-      layer_transform.flip_horizontal = false;
-      layer_transform.flip_vertical = false;
+    case HWC2::Transform::None:
+      // do nothing
+      break;
   }
 
   if (layer_->transform != layer_transform) {

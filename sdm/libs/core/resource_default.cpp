@@ -29,6 +29,7 @@
 #include <utils/formats.h>
 #include <utils/sys.h>
 #include <dlfcn.h>
+#include <algorithm>
 
 #include "resource_default.h"
 
@@ -268,7 +269,7 @@ DisplayError ResourceDefault::Acquire(Handle display_ctx, HWLayers *hw_layers) {
 
   if (src_pipes_[right_index].priority < src_pipes_[left_index].priority) {
     // Swap pipe based on priority
-    Swap(left_index, right_index);
+    std::swap(left_index, right_index);
   }
 
   // assign dual pipes

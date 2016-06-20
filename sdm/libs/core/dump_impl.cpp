@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014, 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -59,14 +59,15 @@ DumpImpl::~DumpImpl() {
 
 void DumpImpl::AppendString(char *buffer, uint32_t length, const char *format, ...) {
   uint32_t filled = UINT32(strlen(buffer));
-  if (filled >= length) {
+  // Reserve one byte for null terminating character
+  if ((filled + 1) >= length) {
     return;
   }
   buffer += filled;
 
   va_list list;
   va_start(list, format);
-  vsnprintf(buffer, length - filled, format, list);
+  vsnprintf(buffer, length - filled -1, format, list);
 }
 
 // Every object is created or destroyed through display core only, which itself protects the

@@ -197,7 +197,6 @@ HWC2::Error HWCDisplayPrimary::Validate(uint32_t *out_num_types, uint32_t *out_n
     handle_idle_timeout_ = false;
   }
 
-  // TODO(user): Validate this
   if (layer_set_.empty()) {
     flush_ = true;
     return status;
