@@ -39,7 +39,7 @@
 #include <qdMetaData.h>
 #include <utils/Singleton.h>
 #include <utils/Mutex.h>
-
+#include <algorithm>
 
 #ifdef VENUS_COLOR_FORMAT
 #include <media/msm_media_info.h>
