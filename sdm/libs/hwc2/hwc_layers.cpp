@@ -434,13 +434,13 @@ DisplayError HWCLayer::SetMetaData(const private_handle_t *pvt_handle, Layer *la
   }
 
   if (meta_data->operation & UPDATE_COLOR_SPACE) {
-    if (SetCSC(meta_data->colorSpace, &layer->csc) != kErrorNone) {
+    if (SetCSC(meta_data->colorSpace, &layer_buffer->csc) != kErrorNone) {
       return kErrorNotSupported;
     }
   }
 
   if (meta_data->operation & SET_IGC) {
-    if (SetIGC(meta_data->igc, &layer->igc) != kErrorNone) {
+    if (SetIGC(meta_data->igc, &layer_buffer->igc) != kErrorNone) {
       return kErrorNotSupported;
     }
   }
