@@ -288,7 +288,12 @@ void HWCSession::Dump(hwc2_device_t *device, uint32_t *out_size, char *out_buffe
   } else {
     char sdm_dump[4096];
     DumpInterface::GetDump(sdm_dump, 4096);  // TODO(user): Fix this workaround
-    std::string s = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY]->Dump();
+    std::string s("");
+    for (int id = HWC_DISPLAY_PRIMARY; id <= HWC_DISPLAY_VIRTUAL; id++) {
+      if (hwc_session->hwc_display_[id]) {
+        s += hwc_session->hwc_display_[id]->Dump();
+      }
+    }
     s += sdm_dump;
     s.copy(out_buffer, s.size(), 0);
     *out_size = sizeof(out_buffer);
