@@ -58,16 +58,14 @@ DisplayError DisplayBase::Init() {
   hw_intf_->GetDisplayAttributes(active_index, &display_attributes_);
   fb_config_ = display_attributes_;
 
-  HWMixerAttributes mixer_attributes;
-  error = hw_intf_->GetMixerAttributes(&mixer_attributes);
+  error = hw_intf_->GetMixerAttributes(&mixer_attributes_);
   if (error != kErrorNone) {
     return error;
   }
-  mixer_attributes_ = mixer_attributes;
 
   // Override x_pixels and y_pixels of frame buffer with mixer width and height
-  fb_config_.x_pixels = mixer_attributes.width;
-  fb_config_.y_pixels = mixer_attributes.height;
+  fb_config_.x_pixels = mixer_attributes_.width;
+  fb_config_.y_pixels = mixer_attributes_.height;
 
   HWScaleLutInfo lut_info = {};
   error = comp_manager_->GetScaleLutConfig(&lut_info);
@@ -80,7 +78,7 @@ DisplayError DisplayBase::Init() {
   }
 
   error = comp_manager_->RegisterDisplay(display_type_, display_attributes_, hw_panel_info_,
-                                         mixer_attributes, fb_config_, &display_comp_ctx_);
+                                         mixer_attributes_, fb_config_, &display_comp_ctx_);
   if (error != kErrorNone) {
     goto CleanupOnError;
   }

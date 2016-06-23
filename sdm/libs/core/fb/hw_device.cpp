@@ -124,6 +124,10 @@ DisplayError HWDevice::SetDisplayAttributes(uint32_t index) {
   return kErrorNone;
 }
 
+DisplayError HWDevice::SetDisplayAttributes(const HWDisplayAttributes &display_attributes) {
+  return kErrorNotSupported;
+}
+
 DisplayError HWDevice::GetConfigIndex(uint32_t mode, uint32_t *index) {
   return kErrorNone;
 }

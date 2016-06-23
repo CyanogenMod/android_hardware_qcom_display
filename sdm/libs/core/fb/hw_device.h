@@ -59,6 +59,7 @@ class HWDevice : public HWInterface {
                                             HWDisplayAttributes *display_attributes);
   virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info);
   virtual DisplayError SetDisplayAttributes(uint32_t index);
+  virtual DisplayError SetDisplayAttributes(const HWDisplayAttributes &display_attributes);
   virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
   virtual DisplayError PowerOn();
   virtual DisplayError PowerOff();
