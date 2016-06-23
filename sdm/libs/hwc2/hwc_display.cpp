@@ -308,6 +308,7 @@ HWC2::Error HWCDisplay::DestroyLayer(hwc2_layer_t layer_id) {
   for (auto current = z_range.first; current != z_range.second; ++current) {
     if (*current == layer) {
       current = layer_set_.erase(current);
+      delete layer;
       break;
     }
   }
