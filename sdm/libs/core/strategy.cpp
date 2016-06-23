@@ -175,7 +175,7 @@ void Strategy::GenerateROI() {
 
   if (!hw_resource_info_.is_src_split &&
      ((layer_mixer_width > hw_resource_info_.max_mixer_width) ||
-     ((display_type_ == kPrimary) && hw_panel_info_.split_info.right_split))) {
+     ((hw_panel_info_.is_primary_panel) && hw_panel_info_.split_info.right_split))) {
     split_display = true;
   }
 
