@@ -44,6 +44,7 @@
 #include <utils/debug.h>
 #include <sync/sync.h>
 #include <profiler.h>
+#include <bitset>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
@@ -1034,10 +1035,10 @@ android::status_t HWCSession::SetDisplayMode(const android::Parcel *input_parcel
 
 android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_parcel) {
   DisplayError error = kErrorNone;
-  uint32_t bit_mask_display_type = UINT32(input_parcel->readInt32());
+  std::bitset<32> bit_mask_display_type = UINT32(input_parcel->readInt32());
   uint32_t max_mixer_stages = UINT32(input_parcel->readInt32());
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_PRIMARY)) {
+  if (bit_mask_display_type[HWC_DISPLAY_PRIMARY]) {
     if (hwc_display_[HWC_DISPLAY_PRIMARY]) {
       error = hwc_display_[HWC_DISPLAY_PRIMARY]->SetMaxMixerStages(max_mixer_stages);
       if (error != kErrorNone) {
@@ -1046,7 +1047,7 @@ android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_par
     }
   }
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_EXTERNAL)) {
+  if (bit_mask_display_type[HWC_DISPLAY_EXTERNAL]) {
     if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
       error = hwc_display_[HWC_DISPLAY_EXTERNAL]->SetMaxMixerStages(max_mixer_stages);
       if (error != kErrorNone) {
@@ -1055,7 +1056,7 @@ android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_par
     }
   }
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_VIRTUAL)) {
+  if (bit_mask_display_type[HWC_DISPLAY_VIRTUAL]) {
     if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
       error = hwc_display_[HWC_DISPLAY_VIRTUAL]->SetMaxMixerStages(max_mixer_stages);
       if (error != kErrorNone) {
@@ -1104,22 +1105,22 @@ android::status_t HWCSession::GetBWTransactionStatus(const android::Parcel *inpu
 
 void HWCSession::SetFrameDumpConfig(const android::Parcel *input_parcel) {
   uint32_t frame_dump_count = UINT32(input_parcel->readInt32());
-  uint32_t bit_mask_display_type = UINT32(input_parcel->readInt32());
+  std::bitset<32> bit_mask_display_type = UINT32(input_parcel->readInt32());
   uint32_t bit_mask_layer_type = UINT32(input_parcel->readInt32());
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_PRIMARY)) {
+  if (bit_mask_display_type[HWC_DISPLAY_PRIMARY]) {
     if (hwc_display_[HWC_DISPLAY_PRIMARY]) {
       hwc_display_[HWC_DISPLAY_PRIMARY]->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
   }
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_EXTERNAL)) {
+  if (bit_mask_display_type[HWC_DISPLAY_EXTERNAL]) {
     if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
       hwc_display_[HWC_DISPLAY_EXTERNAL]->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
   }
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_VIRTUAL)) {
+  if (bit_mask_display_type[HWC_DISPLAY_VIRTUAL]) {
     if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
       hwc_display_[HWC_DISPLAY_VIRTUAL]->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }

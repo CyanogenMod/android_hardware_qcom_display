@@ -50,6 +50,7 @@ class HWCDisplayVirtual : public HWCDisplay {
 
  private:
   HWCDisplayVirtual(CoreInterface *core_intf, HWCCallbacks *callbacks);
+  int SetConfig(uint32_t width, uint32_t height);
 
   bool dump_output_layer_ = false;
   LayerBuffer *output_buffer_ = NULL;

@@ -40,24 +40,9 @@
 #define INT32(exp) static_cast<int32_t>(exp)
 #define UINT64(exp) static_cast<uint64_t>(exp)
 
-#define STRUCT_VAR(struct_name, var_name) \
-          struct struct_name var_name; \
-          memset(&var_name, 0, sizeof(var_name));
-
-#define STRUCT_VAR_ARRAY(struct_name, var_name, num_var) \
-          struct struct_name var_name[num_var]; \
-          memset(&var_name[0], 0, sizeof(var_name));
-
 #define ROUND_UP(number, step) ((((number) + ((step) - 1)) / (step)) * (step))
 
-#define SET_BIT(value, bit) (value |= (1 << (bit)))
-#define CLEAR_BIT(value, bit) (value &= (~(1 << (bit))))
-#define IS_BIT_SET(value, bit) (value & (1 << (bit)))
-
 #define BITMAP(bit) (1 << (bit))
-
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 #define ROUND_UP_ALIGN_DOWN(value, a) FLOAT(FloorToMultipleOf(UINT32(value + 0.5f), UINT32(a)))
 #define ROUND_UP_ALIGN_UP(value, a) FLOAT(CeilToMultipleOf(UINT32(value + 0.5f), UINT32(a)))
@@ -68,13 +53,6 @@
 
 #define BITS_PER_BYTE 8
 #define BITS_TO_BYTES(x) (((x) + (BITS_PER_BYTE - 1)) / (BITS_PER_BYTE))
-
-template <class T>
-inline void Swap(T &a, T &b) {
-  T c(a);
-  a = b;
-  b = c;
-}
 
 // factor value should be in powers of 2(eg: 1, 2, 4, 8)
 template <class T1, class T2>

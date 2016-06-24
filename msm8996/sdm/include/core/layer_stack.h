@@ -95,25 +95,6 @@ enum LayerComposition {
                             //!< Blit target layers shall be after GPU target layer in layer stack.
 };
 
-/*! @brief This enum represents display layer color space conversion (CSC) matrix types.
-
-  @sa Layer
-*/
-enum LayerCSC {
-  kCSCLimitedRange601,    //!< 601 limited range color space.
-  kCSCFullRange601,       //!< 601 full range color space.
-  kCSCLimitedRange709,    //!< 709 limited range color space.
-};
-
-/*! @brief This enum represents display layer inverse gamma correction (IGC) types.
-
-  @sa Layer
-*/
-enum LayerIGC {
-  kIGCNotSpecified,       //!< IGC is not specified.
-  kIGCsRGB,               //!< sRGB IGC type.
-};
-
 /*! @brief This structure defines rotation and flip values for a display layer.
 
   @sa Layer
@@ -306,10 +287,6 @@ struct Layer {
 
   uint32_t frame_rate = 0;                         //!< Rate at which frames are being updated for
                                                    //!< this layer.
-
-  LayerCSC csc = kCSCLimitedRange601;              //!< Color Space of the layer.
-
-  LayerIGC igc = kIGCNotSpecified;                 //!< IGC that will be applied on this layer.
 
   uint32_t solid_fill_color = 0;                   //!< Solid color used to fill the layer when
                                                    //!< no content is associated with the layer.

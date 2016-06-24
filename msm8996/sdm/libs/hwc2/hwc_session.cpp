@@ -35,6 +35,7 @@
 #include <sync/sync.h>
 #include <profiler.h>
 #include <string>
+#include <bitset>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
@@ -287,7 +288,12 @@ void HWCSession::Dump(hwc2_device_t *device, uint32_t *out_size, char *out_buffe
   } else {
     char sdm_dump[4096];
     DumpInterface::GetDump(sdm_dump, 4096);  // TODO(user): Fix this workaround
-    std::string s = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY]->Dump();
+    std::string s("");
+    for (int id = HWC_DISPLAY_PRIMARY; id <= HWC_DISPLAY_VIRTUAL; id++) {
+      if (hwc_session->hwc_display_[id]) {
+        s += hwc_session->hwc_display_[id]->Dump();
+      }
+    }
     s += sdm_dump;
     s.copy(out_buffer, s.size(), 0);
     *out_size = sizeof(out_buffer);
@@ -313,7 +319,8 @@ static int32_t GetClientTargetSupport(hwc2_device_t *device, hwc2_display_t disp
 }
 
 static int32_t GetColorModes(hwc2_device_t *device, hwc2_display_t display, uint32_t *out_num_modes,
-                             int32_t /*android_color_mode_t*/ *out_modes) {
+                             int32_t /*android_color_mode_t*/ *int_out_modes) {
+  auto out_modes = reinterpret_cast<android_color_mode_t *>(int_out_modes);
   return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::GetColorModes, out_num_modes,
                                          out_modes);
 }
@@ -429,7 +436,8 @@ static int32_t SetClientTarget(hwc2_device_t *device, hwc2_display_t display,
 }
 
 int32_t HWCSession::SetColorMode(hwc2_device_t *device, hwc2_display_t display,
-                                 int32_t /*android_color_mode_t*/ mode) {
+                                 int32_t /*android_color_mode_t*/ int_mode) {
+  auto mode = static_cast<android_color_mode_t>(int_mode);
   SEQUENCE_WAIT_SCOPE_LOCK(locker_);
   return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetColorMode, mode);
 }
@@ -837,9 +845,13 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
       status = GetBWTransactionStatus(input_parcel, output_parcel);
       break;
 
-  case qService::IQService::SET_LAYER_MIXER_RESOLUTION:
-    status = SetMixerResolution(input_parcel);
-    break;
+    case qService::IQService::SET_LAYER_MIXER_RESOLUTION:
+      status = SetMixerResolution(input_parcel);
+      break;
+
+    case qService::IQService::SET_COLOR_MODE:
+      status = SetColorModeOverride(input_parcel);
+      break;
 
     default:
       DLOGW("QService command = %d is not supported", command);
@@ -1087,10 +1099,10 @@ android::status_t HWCSession::SetDisplayMode(const android::Parcel *input_parcel
 
 android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_parcel) {
   DisplayError error = kErrorNone;
-  uint32_t bit_mask_display_type = UINT32(input_parcel->readInt32());
+  std::bitset<32> bit_mask_display_type = UINT32(input_parcel->readInt32());
   uint32_t max_mixer_stages = UINT32(input_parcel->readInt32());
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_PRIMARY)) {
+  if (bit_mask_display_type[HWC_DISPLAY_PRIMARY]) {
     if (hwc_display_[HWC_DISPLAY_PRIMARY]) {
       error = hwc_display_[HWC_DISPLAY_PRIMARY]->SetMaxMixerStages(max_mixer_stages);
       if (error != kErrorNone) {
@@ -1099,7 +1111,7 @@ android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_par
     }
   }
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_EXTERNAL)) {
+  if (bit_mask_display_type[HWC_DISPLAY_EXTERNAL]) {
     if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
       error = hwc_display_[HWC_DISPLAY_EXTERNAL]->SetMaxMixerStages(max_mixer_stages);
       if (error != kErrorNone) {
@@ -1108,7 +1120,7 @@ android::status_t HWCSession::SetMaxMixerStages(const android::Parcel *input_par
     }
   }
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_VIRTUAL)) {
+  if (bit_mask_display_type[HWC_DISPLAY_VIRTUAL]) {
     if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
       error = hwc_display_[HWC_DISPLAY_VIRTUAL]->SetMaxMixerStages(max_mixer_stages);
       if (error != kErrorNone) {
@@ -1157,22 +1169,22 @@ android::status_t HWCSession::GetBWTransactionStatus(const android::Parcel *inpu
 
 void HWCSession::SetFrameDumpConfig(const android::Parcel *input_parcel) {
   uint32_t frame_dump_count = UINT32(input_parcel->readInt32());
-  uint32_t bit_mask_display_type = UINT32(input_parcel->readInt32());
+  std::bitset<32> bit_mask_display_type = UINT32(input_parcel->readInt32());
   uint32_t bit_mask_layer_type = UINT32(input_parcel->readInt32());
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_PRIMARY)) {
+  if (bit_mask_display_type[HWC_DISPLAY_PRIMARY]) {
     if (hwc_display_[HWC_DISPLAY_PRIMARY]) {
       hwc_display_[HWC_DISPLAY_PRIMARY]->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
   }
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_EXTERNAL)) {
+  if (bit_mask_display_type[HWC_DISPLAY_EXTERNAL]) {
     if (hwc_display_[HWC_DISPLAY_EXTERNAL]) {
       hwc_display_[HWC_DISPLAY_EXTERNAL]->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
   }
 
-  if (IS_BIT_SET(bit_mask_display_type, HWC_DISPLAY_VIRTUAL)) {
+  if (bit_mask_display_type[HWC_DISPLAY_VIRTUAL]) {
     if (hwc_display_[HWC_DISPLAY_VIRTUAL]) {
       hwc_display_[HWC_DISPLAY_VIRTUAL]->SetFrameDumpConfig(frame_dump_count, bit_mask_layer_type);
     }
@@ -1201,6 +1213,16 @@ android::status_t HWCSession::SetMixerResolution(const android::Parcel *input_pa
     return -EINVAL;
   }
 
+  return 0;
+}
+
+android::status_t HWCSession::SetColorModeOverride(const android::Parcel *input_parcel) {
+  auto display = static_cast<hwc2_display_t >(input_parcel->readInt32());
+  auto mode = static_cast<android_color_mode_t>(input_parcel->readInt32());
+  auto device = static_cast<hwc2_device_t *>(this);
+  auto err = CallDisplayFunction(device, display, &HWCDisplay::SetColorMode, mode);
+  if (err != HWC2_ERROR_NONE)
+    return -EINVAL;
   return 0;
 }
 

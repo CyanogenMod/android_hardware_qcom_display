@@ -38,9 +38,8 @@ class HWVirtual : public HWDevice {
   virtual DisplayError SetMixerAttributes(const HWMixerAttributes &mixer_attributes) {
     return kErrorNotSupported;
   }
-  virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes) {
-    return kErrorNotSupported;
-  }
+  virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes);
+  virtual DisplayError SetDisplayAttributes(const HWDisplayAttributes &display_attributes);
 
  protected:
   HWVirtual(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);

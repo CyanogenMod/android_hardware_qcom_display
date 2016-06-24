@@ -56,6 +56,7 @@
 #include <utils/constants.h>
 #include <utils/rect.h>
 #include <utils/formats.h>
+#include <algorithm>
 
 #include "blit_engine_c2d.h"
 #include "hwc_debugger.h"
@@ -341,7 +342,7 @@ int BlitEngineC2d::PreCommit(hwc_display_contents_1_t *content_list, LayerStack 
     AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width, height,
                                  INT(HAL_PIXEL_FORMAT_RGBA_8888), usage, width, height);
 
-    target_width = MAX(target_width, width);
+    target_width = std::max(target_width, width);
     target_height += height;
 
     // Left will be zero always

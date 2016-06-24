@@ -59,6 +59,7 @@ class HWDevice : public HWInterface {
                                             HWDisplayAttributes *display_attributes);
   virtual DisplayError GetHWPanelInfo(HWPanelInfo *panel_info);
   virtual DisplayError SetDisplayAttributes(uint32_t index);
+  virtual DisplayError SetDisplayAttributes(const HWDisplayAttributes &display_attributes);
   virtual DisplayError GetConfigIndex(uint32_t mode, uint32_t *index);
   virtual DisplayError PowerOn();
   virtual DisplayError PowerOff();
@@ -116,12 +117,12 @@ class HWDevice : public HWInterface {
   void GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode);
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
   void GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info);
-  int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
-  int ParseLine(char *input, const char *delim, char *tokens[],
+  int ParseLine(const char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
+  int ParseLine(const char *input, const char *delim, char *tokens[],
                 const uint32_t max_token, uint32_t *count);
   void ResetDisplayParams();
   void SetCSC(const LayerCSC source, mdp_color_space *color_space);
-  void SetIGC(const Layer *layer, uint32_t index);
+  void SetIGC(const LayerBuffer *layer_buffer, uint32_t index);
 
   bool EnableHotPlugDetection(int enable);
   ssize_t SysFsWrite(const char* file_node, const char* value, ssize_t length);

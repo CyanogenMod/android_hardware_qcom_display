@@ -113,25 +113,55 @@ DisplayError DisplayVirtual::SetDisplayState(DisplayState state) {
 }
 
 DisplayError DisplayVirtual::SetActiveConfigLocked(DisplayConfigVariableInfo *variable_info) {
+  DisplayError error = kErrorNone;
+
   if (!variable_info) {
     return kErrorParameters;
   }
 
-  display_attributes_.x_pixels = variable_info->x_pixels;
-  display_attributes_.y_pixels = variable_info->y_pixels;
-  display_attributes_.fps = variable_info->fps;
-
+  HWDisplayAttributes display_attributes;
   HWMixerAttributes mixer_attributes;
-  mixer_attributes.width = variable_info->x_pixels;;
-  mixer_attributes.height = variable_info->y_pixels;
+  DisplayConfigVariableInfo fb_config = *variable_info;
+
+  display_attributes.x_pixels = variable_info->x_pixels;
+  display_attributes.y_pixels = variable_info->y_pixels;
+  display_attributes.fps = variable_info->fps;
+
+  if (display_attributes == display_attributes_) {
+    return kErrorNone;
+  }
+
+  error = hw_intf_->SetDisplayAttributes(display_attributes);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  error = hw_intf_->GetMixerAttributes(&mixer_attributes);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  // Override x_pixels and y_pixels of frame buffer with mixer width and height
+  fb_config.x_pixels = mixer_attributes.width;
+  fb_config.y_pixels = mixer_attributes.height;
+
   // if display is already connected, unregister display from composition manager and register
   // the display with new configuration.
   if (display_comp_ctx_) {
     comp_manager_->UnregisterDisplay(display_comp_ctx_);
   }
 
-  return comp_manager_->RegisterDisplay(display_type_, display_attributes_, hw_panel_info_,
-                                        mixer_attributes, fb_config_, &display_comp_ctx_);
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes, hw_panel_info_,
+                                         mixer_attributes, fb_config, &display_comp_ctx_);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  display_attributes_ = display_attributes;
+  mixer_attributes_ = mixer_attributes;
+  fb_config_ = fb_config;
+
+  return kErrorNone;
 }
 
 DisplayError DisplayVirtual::SetVSyncState(bool enable) {
