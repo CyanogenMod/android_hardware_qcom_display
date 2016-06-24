@@ -93,14 +93,11 @@ HWC2::Error HWCLayer::SetLayerBuffer(buffer_handle_t buffer, int32_t acquire_fen
 }
 
 HWC2::Error HWCLayer::SetLayerSurfaceDamage(hwc_region_t damage) {
-  auto num_dirty_rects = damage.numRects;
   layer_->dirty_regions.clear();
-  if (num_dirty_rects > 0) {
-    for (uint32_t i = 0; i <= damage.numRects; i++) {
-      LayerRect rect;
-      SetRect(damage.rects[i], &rect);
-      layer_->dirty_regions.push_back(rect);
-    }
+  for (uint32_t i = 0; i < damage.numRects; i++) {
+    LayerRect rect;
+    SetRect(damage.rects[i], &rect);
+    layer_->dirty_regions.push_back(rect);
   }
   return HWC2::Error::None;
 }
@@ -242,14 +239,11 @@ HWC2::Error HWCLayer::SetLayerTransform(HWC2::Transform transform) {
 }
 
 HWC2::Error HWCLayer::SetLayerVisibleRegion(hwc_region_t visible) {
-  auto num_dirty_rects = visible.numRects;
   layer_->visible_regions.clear();
-  if (num_dirty_rects > 0) {
-    for (uint32_t i = 0; i <= visible.numRects; i++) {
-      LayerRect rect;
-      SetRect(visible.rects[i], &rect);
-      layer_->visible_regions.push_back(rect);
-    }
+  for (uint32_t i = 0; i < visible.numRects; i++) {
+    LayerRect rect;
+    SetRect(visible.rects[i], &rect);
+    layer_->visible_regions.push_back(rect);
   }
 
   return HWC2::Error::None;
