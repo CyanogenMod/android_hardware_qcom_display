@@ -74,5 +74,32 @@ DisplayError HWVirtual::Validate(HWLayers *hw_layers) {
   return HWDevice::Validate(hw_layers);
 }
 
+DisplayError HWVirtual::GetMixerAttributes(HWMixerAttributes *mixer_attributes) {
+  if (!mixer_attributes) {
+    return kErrorParameters;
+  }
+
+  mixer_attributes->width = display_attributes_.x_pixels;
+  mixer_attributes->height = display_attributes_.y_pixels;
+  mixer_attributes_.split_left = display_attributes_.is_device_split ?
+      (display_attributes_.x_pixels / 2) : mixer_attributes_.width;
+
+  return kErrorNone;
+}
+
+DisplayError HWVirtual::SetDisplayAttributes(const HWDisplayAttributes &display_attributes) {
+  if (display_attributes.x_pixels == 0 || display_attributes.y_pixels == 0) {
+    return kErrorParameters;
+  }
+
+  display_attributes_ = display_attributes;
+
+  if (display_attributes_.x_pixels > hw_resource_.max_mixer_width) {
+    display_attributes_.is_device_split = true;
+  }
+
+  return kErrorNone;
+}
+
 }  // namespace sdm
 

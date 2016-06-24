@@ -29,6 +29,7 @@
 #include <private/extension_interface.h>
 #include <private/color_interface.h>
 #include <utils/locker.h>
+#include <utils/sys.h>
 
 #include "hw_interface.h"
 #include "comp_manager.h"
@@ -68,7 +69,7 @@ class CoreImpl : public CoreInterface {
   CompManager comp_mgr_;
   HWInfoInterface *hw_info_intf_ = NULL;
   RotatorInterface *rotator_intf_ = NULL;
-  void *extension_lib_ = NULL;
+  DynLib extension_lib_;
   ExtensionInterface *extension_intf_ = NULL;
   CreateExtensionInterface create_extension_intf_ = NULL;
   DestroyExtensionInterface destroy_extension_intf_ = NULL;

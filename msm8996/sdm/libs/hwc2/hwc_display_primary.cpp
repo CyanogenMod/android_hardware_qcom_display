@@ -129,20 +129,24 @@ void HWCDisplayPrimary::ProcessBootAnimCompleted() {
   * HWC_GEOMETRY_CHANGED fail in correctly identifying the
   * exact bootup transition to homescreen
   */
-  char cryptoState[PROPERTY_VALUE_MAX];
-  char voldDecryptState[PROPERTY_VALUE_MAX];
+  char property[PROPERTY_VALUE_MAX];
   bool isEncrypted = false;
   bool main_class_services_started = false;
-  if (property_get("ro.crypto.state", cryptoState, "unencrypted")) {
-    if (!strcmp(cryptoState, "encrypted")) {
+  property_get("ro.crypto.state", property, "unencrypted");
+  if (!strcmp(property, "encrypted")) {
+    property_get("ro.crypto.type", property, "block");
+    if (!strcmp(property, "block")) {
       isEncrypted = true;
-      if (property_get("vold.decrypt", voldDecryptState, "") &&
-          !strcmp(voldDecryptState, "trigger_restart_framework"))
+      property_get("vold.decrypt", property, "");
+      if (!strcmp(property, "trigger_restart_framework")) {
         main_class_services_started = true;
+      }
     }
   }
+
   if ((!isEncrypted || (isEncrypted && main_class_services_started)) &&
       (layer_set_.size() > numBootUpLayers)) {
+    DLOGI("Applying default mode");
     boot_animation_completed_ = true;
     // Applying default mode after bootanimation is finished And
     // If Data is Encrypted, it is ready for access.
@@ -228,7 +232,7 @@ HWC2::Error HWCDisplayPrimary::Present(int32_t *out_retire_fence) {
 }
 
 HWC2::Error HWCDisplayPrimary::GetColorModes(uint32_t *out_num_modes,
-                                             int32_t /*android_color_mode_t*/ *out_modes) {
+                                             android_color_mode_t *out_modes) {
   if (out_modes == nullptr) {
     *out_num_modes = color_mode_->GetColorModeCount();
   } else {
@@ -238,7 +242,7 @@ HWC2::Error HWCDisplayPrimary::GetColorModes(uint32_t *out_num_modes,
   return HWC2::Error::None;
 }
 
-HWC2::Error HWCDisplayPrimary::SetColorMode(int32_t /*android_color_mode_t*/ mode) {
+HWC2::Error HWCDisplayPrimary::SetColorMode(android_color_mode_t mode) {
   auto status = color_mode_->SetColorMode(mode);
   if (status != HWC2::Error::None) {
     DLOGE("failed for mode = %d", mode);

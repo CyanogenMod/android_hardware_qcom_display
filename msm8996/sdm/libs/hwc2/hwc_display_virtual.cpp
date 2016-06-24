@@ -62,6 +62,12 @@ int HWCDisplayVirtual::Create(CoreInterface *core_intf, HWCCallbacks *callbacks,
     return status;
   }
 
+  status = hwc_display_virtual->SetConfig(width, height);
+  if (status) {
+    Destroy(hwc_display_virtual);
+    return status;
+  }
+
   // TODO(user): Validate that we support this width/height
   status = hwc_display_virtual->SetFrameBufferResolution(width, height);
 
@@ -153,6 +159,15 @@ HWC2::Error HWCDisplayVirtual::Present(int32_t *out_retire_fence) {
   }
   CloseAcquireFds();
   return status;
+}
+
+int HWCDisplayVirtual::SetConfig(uint32_t width, uint32_t height) {
+  DisplayConfigVariableInfo variable_info;
+  variable_info.x_pixels = width;
+  variable_info.y_pixels = height;
+  // TODO(user): Need to get the framerate of primary display and update it.
+  variable_info.fps = 60;
+  return display_intf_->SetActiveConfig(&variable_info);
 }
 
 HWC2::Error HWCDisplayVirtual::SetOutputBuffer(buffer_handle_t buf, int32_t release_fence) {

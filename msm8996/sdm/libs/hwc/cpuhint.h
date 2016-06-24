@@ -31,6 +31,7 @@
 #define __CPUHINT_H__
 
 #include <core/sdm_types.h>
+#include <utils/sys.h>
 
 namespace sdm {
 
@@ -38,7 +39,6 @@ class HWCDebugHandler;
 
 class CPUHint {
  public:
-  ~CPUHint();
   DisplayError Init(HWCDebugHandler *debug_handler);
   void Set();
   void Reset();
@@ -51,7 +51,7 @@ class CPUHint {
   int frame_countdown_ = 0;
   int lock_handle_ = 0;
   bool lock_acquired_ = false;
-  void *lib_handle_ = NULL;
+  DynLib vendor_ext_lib_;
   int (*fn_lock_acquire_)(int handle, int duration, int *hints, int num_args) = NULL;
   int (*fn_lock_release_)(int value) = NULL;
 };
