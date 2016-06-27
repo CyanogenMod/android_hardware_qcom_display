@@ -166,6 +166,8 @@ class HWCSession : hwc2_device_t, public qClient::BnQClient {
                                            android::Parcel *output_parcel);
   android::status_t SetMixerResolution(const android::Parcel *input_parcel);
 
+  android::status_t SetColorModeOverride(const android::Parcel *input_parcel);
+
   static Locker locker_;
   CoreInterface *core_intf_ = NULL;
   HWCDisplay *hwc_display_[HWC_NUM_DISPLAY_TYPES] = {NULL};
