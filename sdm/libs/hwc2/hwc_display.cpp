@@ -76,7 +76,7 @@ uint32_t HWCColorMode::GetColorModeCount() {
 }
 
 HWC2::Error HWCColorMode::GetColorModes(uint32_t *out_num_modes,
-                                        int32_t /*android_color_mode_t*/ *out_modes) {
+                                        android_color_mode_t *out_modes) {
   auto it = color_mode_transform_map_.begin();
   for (auto i = 0; it != color_mode_transform_map_.end(); it++, i++) {
     out_modes[i] = it->first;
@@ -86,7 +86,7 @@ HWC2::Error HWCColorMode::GetColorModes(uint32_t *out_num_modes,
   return HWC2::Error::None;
 }
 
-HWC2::Error HWCColorMode::SetColorMode(int32_t /*android_color_mode_t*/ mode) {
+HWC2::Error HWCColorMode::SetColorMode(android_color_mode_t mode) {
   // first mode in 2D matrix is the mode (identity)
   auto status = HandleColorModeTransform(mode, current_color_transform_, color_matrix_);
   if (status != HWC2::Error::None) {
@@ -112,7 +112,7 @@ HWC2::Error HWCColorMode::SetColorTransform(const float *matrix, android_color_t
   return status;
 }
 
-HWC2::Error HWCColorMode::HandleColorModeTransform(int32_t /*android_color_mode_t*/ mode,
+HWC2::Error HWCColorMode::HandleColorModeTransform(android_color_mode_t mode,
                                                    android_color_transform_t hint,
                                                    const double *matrix) {
   android_color_transform_t transform_hint = hint;
@@ -165,7 +165,7 @@ void HWCColorMode::PopulateColorModes() {
   DisplayError error = display_intf_->GetColorModeCount(&color_mode_count);
   if (error != kErrorNone || (color_mode_count == 0)) {
     DLOGW("GetColorModeCount failed, use native color mode");
-    PopulateTransform(0, "native_identity");
+    PopulateTransform(HAL_COLOR_MODE_NATIVE, "native_identity");
     return;
   }
 
@@ -177,24 +177,24 @@ void HWCColorMode::PopulateColorModes() {
   for (uint32_t i = 0; i < color_mode_count; i++) {
     std::string &mode_string = color_modes.at(i);
     DLOGI("Color Mode[%d] = %s", i, mode_string.c_str());
-    if (mode_string.find("native") != std::string::npos) {
-      // TODO(user): replace numbers(0,1..) with android_color_mode_t
-      PopulateTransform(0, mode_string);
-    } else if (mode_string.find("srgb") != std::string::npos) {
-      PopulateTransform(1, mode_string);
-    } else if (mode_string.find("adobe") != std::string::npos) {
-      PopulateTransform(2, mode_string);
-    } else if (mode_string.find("dci3") != std::string::npos) {
-      PopulateTransform(3, mode_string);
+    if (mode_string.find("hal_native") != std::string::npos) {
+      PopulateTransform(HAL_COLOR_MODE_NATIVE, mode_string);
+    } else if (mode_string.find("hal_srgb") != std::string::npos) {
+      PopulateTransform(HAL_COLOR_MODE_SRGB, mode_string);
+    } else if (mode_string.find("hal_adobe") != std::string::npos) {
+      PopulateTransform(HAL_COLOR_MODE_ADOBE_RGB, mode_string);
+    } else if (mode_string.find("hal_dci_p3") != std::string::npos) {
+      PopulateTransform(HAL_COLOR_MODE_DCI_P3, mode_string);
     }
   }
 }
 
-void HWCColorMode::PopulateTransform(const int32_t &mode, const std::string &color_transform) {
+void HWCColorMode::PopulateTransform(const android_color_mode_t &mode,
+                                     const std::string &color_transform) {
   // TODO(user): Check the substring from QDCM
   if (color_transform.find("identity") != std::string::npos) {
     color_mode_transform_map_[mode][HAL_COLOR_TRANSFORM_IDENTITY] = color_transform;
-  } else if (color_transform.find("artitrary") != std::string::npos) {
+  } else if (color_transform.find("arbitrary") != std::string::npos) {
     // no color mode for arbitrary
   } else if (color_transform.find("inverse") != std::string::npos) {
     color_mode_transform_map_[mode][HAL_COLOR_TRANSFORM_VALUE_INVERSE] = color_transform;
@@ -511,9 +511,9 @@ HWC2::Error HWCDisplay::GetClientTargetSupport(uint32_t width, uint32_t height, 
   }
 }
 
-HWC2::Error HWCDisplay::GetColorModes(uint32_t *out_num_modes, int32_t *out_modes) {
+HWC2::Error HWCDisplay::GetColorModes(uint32_t *out_num_modes, android_color_mode_t *out_modes) {
   if (out_modes) {
-    out_modes[0] = 0;  // TODO(user): Change to android_color_mode_t
+    out_modes[0] = HAL_COLOR_MODE_NATIVE;
   }
   *out_num_modes = 1;
 

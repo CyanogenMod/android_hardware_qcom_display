@@ -319,7 +319,8 @@ static int32_t GetClientTargetSupport(hwc2_device_t *device, hwc2_display_t disp
 }
 
 static int32_t GetColorModes(hwc2_device_t *device, hwc2_display_t display, uint32_t *out_num_modes,
-                             int32_t /*android_color_mode_t*/ *out_modes) {
+                             int32_t /*android_color_mode_t*/ *int_out_modes) {
+  auto out_modes = reinterpret_cast<android_color_mode_t *>(int_out_modes);
   return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::GetColorModes, out_num_modes,
                                          out_modes);
 }
@@ -435,7 +436,8 @@ static int32_t SetClientTarget(hwc2_device_t *device, hwc2_display_t display,
 }
 
 int32_t HWCSession::SetColorMode(hwc2_device_t *device, hwc2_display_t display,
-                                 int32_t /*android_color_mode_t*/ mode) {
+                                 int32_t /*android_color_mode_t*/ int_mode) {
+  auto mode = static_cast<android_color_mode_t>(int_mode);
   SEQUENCE_WAIT_SCOPE_LOCK(locker_);
   return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetColorMode, mode);
 }
