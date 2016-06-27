@@ -171,6 +171,8 @@ int HWCDisplayVirtual::Commit(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
+  CommitOutputBufferParams(content_list);
+
   status = HWCDisplay::CommitLayerStack(content_list);
   if (status) {
     return status;
@@ -259,13 +261,8 @@ int HWCDisplayVirtual::SetOutputSliceFromMetadata(hwc_display_contents_1_t *cont
 }
 
 int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
-  int status = 0;
-
   const private_handle_t *output_handle =
         static_cast<const private_handle_t *>(content_list->outbuf);
-
-  // Fill output buffer parameters (width, height, format, plane information, fence)
-  output_buffer_->acquire_fence_fd = content_list->outbufAcquireFenceFd;
 
   if (output_handle) {
     int output_handle_format = output_handle->format;
@@ -293,16 +290,26 @@ int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
     if (output_handle->flags & private_handle_t::PRIV_FLAGS_SECURE_BUFFER) {
       output_buffer_->flags.secure = 1;
     }
+  }
 
+  layer_stack_.output_buffer = output_buffer_;
+
+  return 0;
+}
+
+void HWCDisplayVirtual::CommitOutputBufferParams(hwc_display_contents_1_t *content_list) {
+  const private_handle_t *output_handle =
+        static_cast<const private_handle_t *>(content_list->outbuf);
+
+  // Fill output buffer parameters (width, height, format, plane information, fence)
+  output_buffer_->acquire_fence_fd = content_list->outbufAcquireFenceFd;
+
+  if (output_handle) {
     // ToDo: Need to extend for non-RGB formats
     output_buffer_->planes[0].fd = output_handle->fd;
     output_buffer_->planes[0].offset = output_handle->offset;
     output_buffer_->planes[0].stride = UINT32(output_handle->width);
   }
-
-  layer_stack_.output_buffer = output_buffer_;
-
-  return status;
 }
 
 void HWCDisplayVirtual::SetFrameDumpConfig(uint32_t count, uint32_t bit_mask_layer_type) {
