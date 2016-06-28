@@ -308,6 +308,7 @@ HWC2::Error HWCDisplay::DestroyLayer(hwc2_layer_t layer_id) {
   for (auto current = z_range.first; current != z_range.second; ++current) {
     if (*current == layer) {
       current = layer_set_.erase(current);
+      delete layer;
       break;
     }
   }
@@ -1519,7 +1520,7 @@ void HWCDisplay::CloseAcquireFds() {
 std::string HWCDisplay::Dump() {
   std::ostringstream os;
   os << "-------------------------------" << std::endl;
-  os << "HWC2 LayerDump:" << std::endl;
+  os << "HWC2 LayerDump display_id: " << id_ << std::endl;
   for (auto layer : layer_set_) {
     auto sdm_layer = layer->GetSDMLayer();
     auto transform = sdm_layer->transform;
@@ -1537,7 +1538,6 @@ std::string HWCDisplay::Dump() {
     os << "\tbuffer_id: " << std::hex << "0x" << sdm_layer->input_buffer->buffer_id << std::dec
        << std::endl;
   }
-  os << "-------------------------------" << std::endl;
   return os.str();
 }
 }  // namespace sdm
