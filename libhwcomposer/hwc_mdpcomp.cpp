@@ -909,9 +909,7 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
     }
 
     uint32_t totalDirtyArea = 0;
-    bool computeDirtyArea = not (list->flags & HWC_GEOMETRY_CHANGED) and
-            not isYuvPresent(ctx, mDpy) and
-            numAppLayers > 1;
+    bool computeDirtyArea = CanOptimizeForSmallUpdate(ctx, mDpy, list);
 
     for(int i = 0; i < numAppLayers; ++i) {
         hwc_layer_1_t* layer = &list->hwLayers[i];
@@ -933,7 +931,6 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
                 (transform & HWC_TRANSFORM_FLIP_H) && (!isYuvBuffer(hnd)))
             return false;
 
-#ifdef QTI_BSP
         if(computeDirtyArea and layerUpdating(layer)) {
             if(needsScaling(layer)) {
                 totalDirtyArea = 0;
@@ -948,7 +945,6 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
                         * (dirtyRect.bottom - dirtyRect.top);
             }
         }
-#endif
     }
 
     if(totalDirtyArea) {

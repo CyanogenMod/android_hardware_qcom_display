@@ -361,6 +361,9 @@ bool layerUpdating(const hwc_layer_1_t* layer);
 hwc_rect_t calculateDirtyRect(const hwc_layer_1_t* layer,
                                        hwc_rect_t& scissor);
 
+/* Can use GLES for small updates */
+bool CanOptimizeForSmallUpdate(hwc_context_t* ctx,
+           int dpy,hwc_display_contents_1_t* list);
 
 // returns true if Action safe dimensions are set and target supports Actionsafe
 bool isActionSafePresent(hwc_context_t *ctx, int dpy);
