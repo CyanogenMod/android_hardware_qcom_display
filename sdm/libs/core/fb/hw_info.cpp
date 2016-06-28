@@ -522,8 +522,10 @@ DisplayError HWInfo::GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_dis
     DLOGI("First display is internal display");
   }
 
+  fs.close();
   fs.open("/sys/devices/virtual/graphics/fb0/connected", fstream::in);
   if (!fs.is_open()) {
+    // If fb0 is for a DSI/connected panel, then connected node will not exist.
     hw_disp_info->is_connected = true;
   } else {
     if (!Sys::getline_(fs, line)) {
