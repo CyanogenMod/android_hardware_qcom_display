@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -38,12 +38,12 @@ struct DisplayConfigVariableInfo;
 class HWPrimary : public HWDevice {
  public:
   static DisplayError Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
-                             BufferSyncHandler *buffer_sync_handler, HWEventHandler *eventhandler);
+                             BufferSyncHandler *buffer_sync_handler);
   static DisplayError Destroy(HWInterface *intf);
 
  protected:
   HWPrimary(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
-  virtual DisplayError Init(HWEventHandler *eventhandler);
+  virtual DisplayError Init();
   virtual DisplayError Deinit();
   virtual DisplayError GetNumDisplayAttributes(uint32_t *count);
   virtual DisplayError GetActiveConfig(uint32_t *active_config);
@@ -72,30 +72,18 @@ class HWPrimary : public HWDevice {
     kModeLPMCommand,
   };
 
-  // Event Thread to receive vsync/blank events
-  static void* DisplayEventThread(void *context);
-  void* DisplayEventThreadHandler();
-
-  void HandleVSync(char *data);
-  void HandleBlank(char *data);
-  void HandleIdleTimeout(char *data);
-  void HandleThermal(char *data);
   DisplayError PopulateDisplayAttributes();
   void InitializeConfigs();
   bool IsResolutionSwitchEnabled() { return !display_configs_.empty(); }
   bool GetCurrentModeFromSysfs(size_t *curr_x_pixels, size_t *curr_y_pixels);
 
-  pollfd poll_fds_[kNumDisplayEvents];
-  pthread_t event_thread_;
-  const char *event_thread_name_ = "SDM_EventThread";
-  bool fake_vsync_ = false;
-  bool exit_threads_ = false;
   HWDisplayAttributes display_attributes_;
   std::vector<DisplayConfigVariableInfo> display_configs_;
   std::vector<std::string> display_config_strings_;
   uint32_t active_config_index_ = 0;
   const char *kBrightnessNode = "/sys/class/leds/lcd-backlight/brightness";
   const char *kAutoRefreshNode = "/sys/devices/virtual/graphics/fb0/msm_cmd_autorefresh_en";
+  bool auto_refresh_ = false;
 };
 
 }  // namespace sdm

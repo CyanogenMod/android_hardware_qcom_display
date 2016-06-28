@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
+* Copyright (c) 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -22,27 +22,27 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __HW_VIRTUAL_H__
-#define __HW_VIRTUAL_H__
+#ifndef __HW_EVENTS_INTERFACE_H__
+#define __HW_EVENTS_INTERFACE_H__
 
-#include "hw_device.h"
+#include <private/hw_info_types.h>
+#include <inttypes.h>
+#include <utility>
+#include <vector>
 
 namespace sdm {
 
-class HWVirtual : public HWDevice {
+class HWEventsInterface {
  public:
-  static DisplayError Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
-                             BufferSyncHandler *buffer_sync_handler);
-  static DisplayError Destroy(HWInterface *intf);
-  virtual DisplayError SetVSyncState(bool enable) { return kErrorNotSupported; }
+  static DisplayError Create(int fb_num, HWEventHandler *event_handler,
+                             std::vector<const char *> *event_list, HWEventsInterface **intf);
+  static DisplayError Destroy(HWEventsInterface *intf);
 
  protected:
-  HWVirtual(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
-  virtual DisplayError Init();
-  virtual DisplayError Validate(HWLayers *hw_layers);
+  virtual ~HWEventsInterface() { }
 };
 
 }  // namespace sdm
 
-#endif  // __HW_VIRTUAL_H__
+#endif  // __HW_EVENTS_INTERFACE_H__
 

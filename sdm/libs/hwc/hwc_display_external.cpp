@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -39,12 +39,19 @@
 namespace sdm {
 
 int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                               qService::QService *qservice, HWCDisplay **hwc_display) {
+  return Create(core_intf, hwc_procs, 0, 0, qservice, false, hwc_display);
+}
+
+int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
                                uint32_t primary_width, uint32_t primary_height,
+                               qService::QService *qservice, bool use_primary_res,
                                HWCDisplay **hwc_display) {
   uint32_t external_width = 0;
   uint32_t external_height = 0;
+  int drc_enabled = 0;
 
-  HWCDisplay *hwc_display_external = new HWCDisplayExternal(core_intf, hwc_procs);
+  HWCDisplay *hwc_display_external = new HWCDisplayExternal(core_intf, hwc_procs, qservice);
   int status = hwc_display_external->Init();
   if (status) {
     delete hwc_display_external;
@@ -53,10 +60,19 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
 
   hwc_display_external->GetPanelResolution(&external_width, &external_height);
 
-  int downscale_enabled = 0;
-  HWCDebugHandler::Get()->GetProperty("sdm.debug.downscale_external", &downscale_enabled);
-  if (downscale_enabled) {
-    GetDownscaleResolution(primary_width, primary_height, &external_width, &external_height);
+  if (primary_width && primary_height) {
+    // use_primary_res means HWCDisplayExternal should directly set framebuffer resolution to the
+    // provided primary_width and primary_height
+    if (use_primary_res) {
+      external_width = primary_width;
+      external_height = primary_height;
+    } else {
+      int downscale_enabled = 0;
+      HWCDebugHandler::Get()->GetProperty("sdm.debug.downscale_external", &downscale_enabled);
+      if (downscale_enabled) {
+        GetDownscaleResolution(primary_width, primary_height, &external_width, &external_height);
+      }
+    }
   }
 
   status = hwc_display_external->SetFrameBufferResolution(external_width, external_height);
@@ -64,6 +80,9 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
     Destroy(hwc_display_external);
     return status;
   }
+
+  HWCDebugHandler::Get()->GetProperty("sdm.hdmi.drc_enabled", &(drc_enabled));
+  reinterpret_cast<HWCDisplayExternal *>(hwc_display_external)->drc_enabled_ = drc_enabled;
 
   *hwc_display = hwc_display_external;
 
@@ -75,12 +94,15 @@ void HWCDisplayExternal::Destroy(HWCDisplay *hwc_display) {
   delete hwc_display;
 }
 
-HWCDisplayExternal::HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL, false) {
+HWCDisplayExternal::HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                                       qService::QService *qservice)
+  : HWCDisplay(core_intf, hwc_procs, kHDMI, HWC_DISPLAY_EXTERNAL, false, qservice,
+               DISPLAY_CLASS_EXTERNAL) {
 }
 
 int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
   int status = 0;
+  DisplayError error = kErrorNone;
 
   if (secure_display_active_) {
     MarkLayersForGPUBypass(content_list);
@@ -97,6 +119,23 @@ int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
     return status;
   }
 
+  if (content_list->numHwLayers <= 1) {
+    flush_ = true;
+    return 0;
+  }
+
+  bool one_video_updating_layer = SingleVideoLayerUpdating(UINT32(content_list->numHwLayers - 1));
+
+  if (current_refresh_rate_ != metadata_refresh_rate_ && one_video_updating_layer && drc_enabled_) {
+    error = display_intf_->SetRefreshRate(metadata_refresh_rate_);
+  }
+
+  if (error == kErrorNone) {
+    // On success, set current refresh rate to new refresh rate
+    current_refresh_rate_ = metadata_refresh_rate_;
+  }
+
+
   status = PrepareLayerStack(content_list);
   if (status) {
     return status;
@@ -109,7 +148,6 @@ int HWCDisplayExternal::Commit(hwc_display_contents_1_t *content_list) {
   int status = 0;
 
   if (secure_display_active_) {
-    CloseAcquireFences(content_list);
     return status;
   }
 
@@ -151,13 +189,16 @@ void HWCDisplayExternal::ApplyScanAdjustment(hwc_rect_t *display_frame) {
     return;
   }
 
+  uint32_t new_panel_width = panel_width * (1.0f - width_ratio);
+  uint32_t new_panel_height = panel_height * (1.0f - height_ratio);
+
   int x_offset = INT((FLOAT(panel_width) * width_ratio) / 2.0f);
   int y_offset = INT((FLOAT(panel_height) * height_ratio) / 2.0f);
 
-  display_frame->left = display_frame->left + x_offset;
-  display_frame->top = display_frame->top + y_offset;
-  display_frame->right = display_frame->right - x_offset;
-  display_frame->bottom = display_frame->bottom - y_offset;
+  display_frame->left = ((display_frame->left * new_panel_width) / panel_width) + x_offset;
+  display_frame->top = ((display_frame->top * new_panel_height) / panel_height) + y_offset;
+  display_frame->right = ((display_frame->right * new_panel_width) / panel_width) + x_offset;
+  display_frame->bottom = ((display_frame->bottom * new_panel_height) / panel_height) + y_offset;
 }
 
 void HWCDisplayExternal::SetSecureDisplay(bool secure_display_active) {
@@ -190,6 +231,37 @@ void HWCDisplayExternal::GetDownscaleResolution(uint32_t primary_width, uint32_t
       Swap(primary_height, primary_width);
     }
     AdjustSourceResolution(primary_width, primary_height, non_primary_width, non_primary_height);
+  }
+}
+
+uint32_t HWCDisplayExternal::RoundToStandardFPS(float fps) {
+  static const uint32_t standard_fps[] = {23976, 24000, 25000, 29970, 30000, 50000, 59940, 60000};
+  static const uint32_t mapping_fps[] = {59940, 60000, 60000, 59940, 60000, 50000, 59940, 60000};
+  uint32_t frame_rate = (uint32_t)(fps * 1000);
+
+  int count = INT(sizeof(standard_fps) / sizeof(standard_fps[0]));
+  for (int i = 0; i < count; i++) {
+    // Most likely used for video, the fps for frames should be stable from video side.
+    if (standard_fps[i] > frame_rate) {
+      if (i > 0) {
+        if ((standard_fps[i] - frame_rate) > (frame_rate - standard_fps[i-1])) {
+          return mapping_fps[i-1];
+        } else {
+          return mapping_fps[i];
+        }
+      } else {
+        return mapping_fps[i];
+      }
+    }
+  }
+
+  return standard_fps[count - 1];
+}
+
+void HWCDisplayExternal::PrepareDynamicRefreshRate(Layer *layer) {
+  if (layer->input_buffer->flags.video) {
+    metadata_refresh_rate_ = SanitizeRefreshRate(layer->frame_rate);
+    layer->frame_rate = current_refresh_rate_;
   }
 }
 

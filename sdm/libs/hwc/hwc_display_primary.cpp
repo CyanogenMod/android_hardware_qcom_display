@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -39,12 +39,12 @@
 namespace sdm {
 
 int HWCDisplayPrimary::Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
-                              HWCDisplay **hwc_display) {
+                              qService::QService *qservice, HWCDisplay **hwc_display) {
   int status = 0;
   uint32_t primary_width = 0;
   uint32_t primary_height = 0;
 
-  HWCDisplay *hwc_display_primary = new HWCDisplayPrimary(core_intf, hwc_procs);
+  HWCDisplay *hwc_display_primary = new HWCDisplayPrimary(core_intf, hwc_procs, qservice);
   status = hwc_display_primary->Init();
   if (status) {
     delete hwc_display_primary;
@@ -76,8 +76,11 @@ void HWCDisplayPrimary::Destroy(HWCDisplay *hwc_display) {
   delete hwc_display;
 }
 
-HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true), cpu_hint_(NULL) {
+HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf,
+                                     hwc_procs_t const **hwc_procs,
+                                     qService::QService *qservice)
+  : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true, qservice,
+               DISPLAY_CLASS_PRIMARY), cpu_hint_(NULL) {
 }
 
 int HWCDisplayPrimary::Init() {
@@ -97,15 +100,37 @@ int HWCDisplayPrimary::Init() {
   return HWCDisplay::Init();
 }
 
-void HWCDisplayPrimary::ProcessBootAnimCompleted() {
-  char value[PROPERTY_VALUE_MAX];
+void HWCDisplayPrimary::ProcessBootAnimCompleted(hwc_display_contents_1_t *list) {
+  uint32_t numBootUpLayers = 0;
 
-  // Applying default mode after bootanimation is finished
-  property_get("init.svc.bootanim", value, "running");
-  if (!strncmp(value, "stopped", strlen("stopped"))) {
+  numBootUpLayers = static_cast<uint32_t>(Debug::GetBootAnimLayerCount());
+
+  if (numBootUpLayers == 0) {
+    numBootUpLayers = 2;
+  }
+  /* All other checks namely "init.svc.bootanim" or
+  * HWC_GEOMETRY_CHANGED fail in correctly identifying the
+  * exact bootup transition to homescreen
+  */
+  char cryptoState[PROPERTY_VALUE_MAX];
+  char voldDecryptState[PROPERTY_VALUE_MAX];
+  bool isEncrypted = false;
+  bool main_class_services_started = false;
+  if (property_get("ro.crypto.state", cryptoState, "unencrypted")) {
+    DLOGI("%s: cryptostate= %s", __FUNCTION__, cryptoState);
+    if (!strcmp(cryptoState, "encrypted")) {
+      isEncrypted = true;
+      if (property_get("vold.decrypt", voldDecryptState, "") &&
+            !strcmp(voldDecryptState, "trigger_restart_framework"))
+        main_class_services_started = true;
+      DLOGI("%s: vold= %s", __FUNCTION__, voldDecryptState);
+    }
+  }
+  if ((!isEncrypted ||(isEncrypted && main_class_services_started)) &&
+    (list->numHwLayers > numBootUpLayers)) {
     boot_animation_completed_ = true;
-
-    // one-shot action check if bootanimation completed then apply default display mode.
+    // Applying default mode after bootanimation is finished And
+    // If Data is Encrypted, it is ready for access.
     if (display_intf_)
       display_intf_->ApplyDefaultDisplayMode();
   }
@@ -113,9 +138,10 @@ void HWCDisplayPrimary::ProcessBootAnimCompleted() {
 
 int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
   int status = 0;
+  DisplayError error = kErrorNone;
 
   if (!boot_animation_completed_)
-    ProcessBootAnimCompleted();
+    ProcessBootAnimCompleted(content_list);
 
   if (display_paused_) {
     MarkLayersForGPUBypass(content_list);
@@ -136,7 +162,10 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
   ToggleCPUHint(one_updating_layer);
 
   uint32_t refresh_rate = GetOptimalRefreshRate(one_updating_layer);
-  DisplayError error = display_intf_->SetRefreshRate(refresh_rate);
+  if (current_refresh_rate_ != refresh_rate) {
+    error = display_intf_->SetRefreshRate(refresh_rate);
+  }
+
   if (error == kErrorNone) {
     // On success, set current refresh rate to new refresh rate
     current_refresh_rate_ = refresh_rate;
@@ -144,6 +173,11 @@ int HWCDisplayPrimary::Prepare(hwc_display_contents_1_t *content_list) {
 
   if (handle_idle_timeout_) {
     handle_idle_timeout_ = false;
+  }
+
+  if (content_list->numHwLayers <= 1) {
+    flush_ = true;
+    return 0;
   }
 
   status = PrepareLayerStack(content_list);
@@ -164,7 +198,6 @@ int HWCDisplayPrimary::Commit(hwc_display_contents_1_t *content_list) {
       close(content_list->outbufAcquireFenceFd);
       content_list->outbufAcquireFenceFd = -1;
     }
-    CloseAcquireFences(content_list);
 
     DisplayError error = display_intf_->Flush();
     if (error != kErrorNone) {

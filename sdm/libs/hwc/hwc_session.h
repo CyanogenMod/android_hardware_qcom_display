@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -28,7 +28,6 @@
 #include <hardware/hwcomposer.h>
 #include <core/core_interface.h>
 #include <utils/locker.h>
-#include <IQClient.h>
 
 #include "hwc_display_primary.h"
 #include "hwc_display_external.h"
@@ -73,6 +72,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   static int GetActiveConfig(hwc_composer_device_1 *device, int disp);
   static int SetActiveConfig(hwc_composer_device_1 *device, int disp, int index);
   static int SetCursorPositionAsync(hwc_composer_device_1 *device, int disp, int x, int y);
+  static void CloseAcquireFds(hwc_display_contents_1_t *content_list);
 
   // Uevent thread
   static void* HWCUeventThread(void *context);
@@ -83,6 +83,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   int ConnectDisplay(int disp, hwc_display_contents_1_t *content_list);
   int DisconnectDisplay(int disp);
   void HandleSecureDisplaySession(hwc_display_contents_1_t **displays);
+  int GetVsyncPeriod(int disp);
 
   // QClient methods
   virtual android::status_t notifyCallback(uint32_t command, const android::Parcel *input_parcel,
@@ -138,6 +139,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   bool new_bw_mode_ = false;
   bool need_invalidate_ = false;
   int bw_mode_release_fd_ = -1;
+  qService::QService *qservice_ = NULL;
 };
 
 }  // namespace sdm

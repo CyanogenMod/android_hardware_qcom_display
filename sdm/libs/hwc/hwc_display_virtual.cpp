@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -96,7 +96,8 @@ void HWCDisplayVirtual::Destroy(HWCDisplay *hwc_display) {
 }
 
 HWCDisplayVirtual::HWCDisplayVirtual(CoreInterface *core_intf, hwc_procs_t const **hwc_procs)
-  : HWCDisplay(core_intf, hwc_procs, kVirtual, HWC_DISPLAY_VIRTUAL, false),
+  : HWCDisplay(core_intf, hwc_procs, kVirtual, HWC_DISPLAY_VIRTUAL, false, NULL,
+               DISPLAY_CLASS_VIRTUAL),
     dump_output_layer_(false), output_buffer_(NULL) {
 }
 
@@ -163,15 +164,6 @@ int HWCDisplayVirtual::Prepare(hwc_display_contents_1_t *content_list) {
 int HWCDisplayVirtual::Commit(hwc_display_contents_1_t *content_list) {
   int status = 0;
   if (display_paused_) {
-    if (content_list->outbufAcquireFenceFd >= 0) {
-      // If we do not handle the frame set retireFenceFd to outbufAcquireFenceFd,
-      // which will make sure the framework waits on it and closes it.
-      content_list->retireFenceFd = dup(content_list->outbufAcquireFenceFd);
-      close(content_list->outbufAcquireFenceFd);
-      content_list->outbufAcquireFenceFd = -1;
-    }
-    CloseAcquireFences(content_list);
-
     DisplayError error = display_intf_->Flush();
     if (error != kErrorNone) {
       DLOGE("Flush failed. Error = %d", error);
@@ -189,11 +181,6 @@ int HWCDisplayVirtual::Commit(hwc_display_contents_1_t *content_list) {
   status = HWCDisplay::PostCommitLayerStack(content_list);
   if (status) {
     return status;
-  }
-
-  if (content_list->outbufAcquireFenceFd >= 0) {
-    close(content_list->outbufAcquireFenceFd);
-    content_list->outbufAcquireFenceFd = -1;
   }
 
   return 0;

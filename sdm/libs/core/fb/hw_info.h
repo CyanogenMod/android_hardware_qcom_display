@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -26,7 +26,9 @@
 #define __HW_INFO_H__
 
 #include <core/sdm_types.h>
+#include <core/core_interface.h>
 #include <private/hw_info_types.h>
+#include <linux/msm_mdp.h>
 #include "hw_info_interface.h"
 
 namespace sdm {
@@ -34,6 +36,7 @@ namespace sdm {
 class HWInfo: public HWInfoInterface {
  public:
   virtual DisplayError GetHWResourceInfo(HWResourceInfo *hw_resource);
+  virtual DisplayError GetFirstDisplayInterfaceType(HWDisplayInterfaceInfo *hw_disp_info);
 
  private:
   // TODO(user): Read Mdss version from the driver
@@ -43,9 +46,17 @@ class HWInfo: public HWInfoInterface {
   // However, we rely on reading the capabalities from fbO since this
   // is guaranteed to be available.
   static const int kHWCapabilitiesNode = 0;
+  static const uint8_t kDefaultFormatSupport[kHWSubBlockMax][BITS_TO_BYTES(MDP_IMGTYPE_LIMIT)];
 
-  static int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
+  static int ParseString(char *input, char *tokens[], const uint32_t max_token, const char *delim,
+                         uint32_t *count);
   DisplayError GetDynamicBWLimits(HWResourceInfo *hw_resource);
+  LayerBufferFormat GetSDMFormat(int mdp_format);
+  void InitSupportedFormatMap(HWResourceInfo *hw_resource);
+  void ParseFormats(char *tokens[], uint32_t token_count, HWSubBlockType sub_block_type,
+                    HWResourceInfo *hw_resource);
+  void PopulateSupportedFormatMap(const uint8_t *format_supported, uint32_t format_count,
+                                  HWSubBlockType sub_blk_type, HWResourceInfo *hw_resource);
 };
 
 }  // namespace sdm

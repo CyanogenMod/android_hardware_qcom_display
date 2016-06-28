@@ -22,27 +22,61 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __HW_VIRTUAL_H__
-#define __HW_VIRTUAL_H__
+#ifndef __HW_EVENTS_H__
+#define __HW_EVENTS_H__
 
-#include "hw_device.h"
+#include <sys/poll.h>
+#include <string>
+#include <vector>
+#include <map>
+#include <utility>
+
+#include "hw_interface.h"
+#include "hw_events_interface.h"
 
 namespace sdm {
 
-class HWVirtual : public HWDevice {
+class HWEvents : public HWEventsInterface {
  public:
-  static DisplayError Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
-                             BufferSyncHandler *buffer_sync_handler);
-  static DisplayError Destroy(HWInterface *intf);
-  virtual DisplayError SetVSyncState(bool enable) { return kErrorNotSupported; }
+  DisplayError Init(int fb_num, HWEventHandler *event_handler,
+                    std::vector<const char *> *event_list);
+  DisplayError Deinit();
 
- protected:
-  HWVirtual(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
-  virtual DisplayError Init();
-  virtual DisplayError Validate(HWLayers *hw_layers);
+ private:
+  static const int kMaxStringLength = 1024;
+
+  typedef void (HWEvents::*EventParser)(char *);
+
+  struct HWEventData {
+    const char* event_name = NULL;
+    EventParser event_parser = NULL;
+  };
+
+  static void* DisplayEventThread(void *context);
+  void* DisplayEventHandler();
+  void HandleVSync(char *data);
+  void HandleBlank(char *data) { }
+  void HandleIdleTimeout(char *data);
+  void HandleThermal(char *data);
+  void HandleCECMessage(char *data);
+  void HandleThreadExit(char *data) { }
+  void PopulateHWEventData();
+  DisplayError SetEventParser(const char *event_name, HWEventData *event_data);
+  pollfd InitializePollFd(HWEventData *event_data);
+
+  HWEventHandler *event_handler_ = NULL;
+  std::vector<const char *> *event_list_ = NULL;
+  std::vector<HWEventData> event_data_list_ = {};
+  pollfd *poll_fds_ = NULL;
+  pthread_t event_thread_;
+  std::string event_thread_name_ = "SDM_EventThread";
+  bool exit_threads_ = false;
+  const char* fb_path_ = "/sys/devices/virtual/graphics/fb";
+  int fb_num_ = -1;
+  int exit_fd_ = -1;
 };
 
 }  // namespace sdm
 
-#endif  // __HW_VIRTUAL_H__
+#endif  // __HW_EVENTS_H__
 

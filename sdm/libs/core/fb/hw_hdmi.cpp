@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -36,6 +36,9 @@
 #include <linux/videodev2.h>
 #include <utils/debug.h>
 #include <utils/sys.h>
+#include <vector>
+#include <map>
+#include <utility>
 
 #include "hw_hdmi.h"
 
@@ -81,7 +84,7 @@ DisplayError HWHDMI::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
   HWHDMI *hw_fb_hdmi = NULL;
 
   hw_fb_hdmi = new HWHDMI(buffer_sync_handler, hw_info_intf);
-  error = hw_fb_hdmi->Init(NULL);
+  error = hw_fb_hdmi->Init();
   if (error != kErrorNone) {
     delete hw_fb_hdmi;
   } else {
@@ -105,13 +108,13 @@ HWHDMI::HWHDMI(BufferSyncHandler *buffer_sync_handler,  HWInfoInterface *hw_info
   HWDevice::hw_info_intf_ = hw_info_intf;
 }
 
-DisplayError HWHDMI::Init(HWEventHandler *eventhandler) {
+DisplayError HWHDMI::Init() {
   DisplayError error = kErrorNone;
 
   SetSourceProductInformation("vendor_name", "ro.product.manufacturer");
   SetSourceProductInformation("product_description", "ro.product.name");
 
-  error = HWDevice::Init(eventhandler);
+  error = HWDevice::Init();
   if (error != kErrorNone) {
     return error;
   }
@@ -141,6 +144,17 @@ DisplayError HWHDMI::Init(HWEventHandler *eventhandler) {
   }
 
   ReadScanInfo();
+
+  s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
+                             (kS3DModeNone, HDMI_S3D_NONE));
+  s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
+                             (kS3DModeLR, HDMI_S3D_SIDE_BY_SIDE));
+  s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
+                             (kS3DModeRL, HDMI_S3D_SIDE_BY_SIDE));
+  s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
+                             (kS3DModeTB, HDMI_S3D_TOP_AND_BOTTOM));
+  s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
+                             (kS3DModeFP, HDMI_S3D_FRAME_PACKING));
 
   return error;
 }
@@ -245,6 +259,9 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
     display_attributes->h_total += h_blanking;
   }
 
+  GetDisplayS3DSupport(index, display_attributes);
+  display_attributes->is_yuv = IS_BIT_SET(timing_mode->pixel_formats, 1);
+
   return kErrorNone;
 }
 
@@ -300,6 +317,21 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
   }
 
   active_config_index_ = index;
+
+  frame_rate_ = timing_mode->refresh_rate;
+
+  // Get the supported s3d modes for current active config index
+  HWDisplayAttributes attrib;
+  GetDisplayS3DSupport(index, &attrib);
+  supported_s3d_modes_.clear();
+  supported_s3d_modes_.push_back(kS3DModeNone);
+  for (uint32_t mode = kS3DModeNone + 1; mode < kS3DModeMax; mode ++) {
+    if (IS_BIT_SET(attrib.s3d_config, (HWS3DMode)mode)) {
+      supported_s3d_modes_.push_back((HWS3DMode)mode);
+    }
+  }
+
+  SetS3DMode(kS3DModeNone);
 
   return kErrorNone;
 }
@@ -552,6 +584,174 @@ void HWHDMI::SetSourceProductInformation(const char *node, const char *name) {
   if (length <= 0) {
     DLOGW("Failed to write %s = %s", node, property_value);
   }
+}
+
+DisplayError HWHDMI::GetDisplayS3DSupport(uint32_t index,
+                                          HWDisplayAttributes *attrib) {
+  ssize_t length = -1;
+  char edid_s3d_str[kPageSize] = {'\0'};
+  char edid_s3d_path[kMaxStringLength] = {'\0'};
+  snprintf(edid_s3d_path, sizeof(edid_s3d_path), "%s%d/edid_3d_modes", fb_path_, fb_node_index_);
+
+  if (index > hdmi_mode_count_) {
+    return kErrorNotSupported;
+  }
+
+  SET_BIT(attrib->s3d_config, kS3DModeNone);
+
+  // Three level inception!
+  // The string looks like 16=SSH,4=FP:TAB:SSH,5=FP:SSH,32=FP:TAB:SSH
+  char *saveptr_l1, *saveptr_l2, *saveptr_l3;
+  char *l1, *l2, *l3;
+
+  int edid_s3d_node = Sys::open_(edid_s3d_path, O_RDONLY);
+  if (edid_s3d_node < 0) {
+    DLOGW("%s could not be opened : %s", edid_s3d_path, strerror(errno));
+    return kErrorNotSupported;
+  }
+
+  length = Sys::pread_(edid_s3d_node, edid_s3d_str, sizeof(edid_s3d_str)-1, 0);
+  if (length <= 0) {
+    Sys::close_(edid_s3d_node);
+    return kErrorNotSupported;
+  }
+
+  l1 = strtok_r(edid_s3d_str, ",", &saveptr_l1);
+  while (l1 != NULL) {
+    l2 = strtok_r(l1, "=", &saveptr_l2);
+    if (l2 != NULL) {
+      if (hdmi_modes_[index] == (uint32_t)atoi(l2)) {
+          l3 = strtok_r(saveptr_l2, ":", &saveptr_l3);
+          while (l3 != NULL) {
+            if (strncmp("SSH", l3, strlen("SSH")) == 0) {
+              SET_BIT(attrib->s3d_config, kS3DModeLR);
+              SET_BIT(attrib->s3d_config, kS3DModeRL);
+            } else if (strncmp("TAB", l3, strlen("TAB")) == 0) {
+              SET_BIT(attrib->s3d_config, kS3DModeTB);
+            } else if (strncmp("FP", l3, strlen("FP")) == 0) {
+              SET_BIT(attrib->s3d_config, kS3DModeFP);
+            }
+            l3 = strtok_r(NULL, ":", &saveptr_l3);
+          }
+      }
+    }
+    l1 = strtok_r(NULL, ",", &saveptr_l1);
+  }
+
+  Sys::close_(edid_s3d_node);
+  return kErrorNone;
+}
+
+bool HWHDMI::IsSupportedS3DMode(HWS3DMode s3d_mode) {
+  for (uint32_t i = 0; i < supported_s3d_modes_.size(); i++) {
+    if (supported_s3d_modes_[i] == s3d_mode) {
+      return true;
+    }
+  }
+  return false;
+}
+
+DisplayError HWHDMI::SetS3DMode(HWS3DMode s3d_mode) {
+  if (!IsSupportedS3DMode(s3d_mode)) {
+    DLOGW("S3D mode is not supported s3d_mode = %d", s3d_mode);
+    return kErrorNotSupported;
+  }
+
+  std::map<HWS3DMode, msm_hdmi_s3d_mode>::iterator it = s3d_mode_sdm_to_mdp_.find(s3d_mode);
+  if (it == s3d_mode_sdm_to_mdp_.end()) {
+    return kErrorNotSupported;
+  }
+  msm_hdmi_s3d_mode s3d_mdp_mode = it->second;
+
+  if (active_mdp_s3d_mode_ == s3d_mdp_mode) {
+    // HDMI_S3D_SIDE_BY_SIDE is an mdp mapping for kS3DModeLR and kS3DModeRL s3d modes. So no need
+    // to update the s3d_mode node. hw_panel_info needs to be updated to differentiate these two s3d
+    // modes in strategy
+    hw_panel_info_.s3d_mode = s3d_mode;
+    return kErrorNone;
+  }
+
+  ssize_t length = -1;
+  char s3d_mode_path[kMaxStringLength] = {'\0'};
+  char s3d_mode_string[kMaxStringLength] = {'\0'};
+  snprintf(s3d_mode_path, sizeof(s3d_mode_path), "%s%d/s3d_mode", fb_path_, fb_node_index_);
+
+  int s3d_mode_node = Sys::open_(s3d_mode_path, O_RDWR);
+  if (s3d_mode_node < 0) {
+    DLOGW("%s could not be opened : %s", s3d_mode_path, strerror(errno));
+    return kErrorNotSupported;
+  }
+
+  snprintf(s3d_mode_string, sizeof(s3d_mode_string), "%d", s3d_mdp_mode);
+  length = Sys::pwrite_(s3d_mode_node, s3d_mode_string, sizeof(s3d_mode_string), 0);
+  if (length <= 0) {
+    DLOGW("Failed to write into s3d node: %s", strerror(errno));
+    Sys::close_(s3d_mode_node);
+    return kErrorNotSupported;
+  }
+
+  active_mdp_s3d_mode_ = s3d_mdp_mode;
+  hw_panel_info_.s3d_mode = s3d_mode;
+  Sys::close_(s3d_mode_node);
+
+  DLOGI_IF(kTagDriverConfig, "s3d mode %d", hw_panel_info_.s3d_mode);
+  return kErrorNone;
+}
+
+DisplayError HWHDMI::SetRefreshRate(uint32_t refresh_rate) {
+  char mode_path[kMaxStringLength] = {0};
+  char node_path[kMaxStringLength] = {0};
+  uint32_t mode = kModeHFP;
+
+  if (refresh_rate == frame_rate_) {
+    return kErrorNone;
+  }
+
+  snprintf(mode_path, sizeof(mode_path), "%s%d/msm_fb_dfps_mode", fb_path_, fb_node_index_);
+  snprintf(node_path, sizeof(node_path), "%s%d/dynamic_fps", fb_path_, fb_node_index_);
+
+  int fd_mode = Sys::open_(mode_path, O_WRONLY);
+  if (fd_mode < 0) {
+    DLOGE("Failed to open %s with error %s", node_path, strerror(errno));
+    return kErrorFileDescriptor;
+  }
+
+  char dfps_mode[kMaxStringLength];
+  snprintf(dfps_mode, sizeof(dfps_mode), "%d", mode);
+  DLOGI_IF(kTagDriverConfig, "Setting dfps_mode  = %d", mode);
+  ssize_t len = Sys::pwrite_(fd_mode, dfps_mode, strlen(dfps_mode), 0);
+  if (len < 0) {
+    DLOGE("Failed to enable dfps mode %d with error %s", mode, strerror(errno));
+    Sys::close_(fd_mode);
+    return kErrorUndefined;
+  }
+  Sys::close_(fd_mode);
+
+  int fd_node = Sys::open_(node_path, O_WRONLY);
+  if (fd_node < 0) {
+    DLOGE("Failed to open %s with error %s", node_path, strerror(errno));
+    return kErrorFileDescriptor;
+  }
+
+  char refresh_rate_string[kMaxStringLength];
+  snprintf(refresh_rate_string, sizeof(refresh_rate_string), "%d", refresh_rate);
+  DLOGI_IF(kTagDriverConfig, "Setting refresh rate = %d", refresh_rate);
+  len = Sys::pwrite_(fd_node, refresh_rate_string, strlen(refresh_rate_string), 0);
+  if (len < 0) {
+    DLOGE("Failed to write %d with error %s", refresh_rate, strerror(errno));
+    Sys::close_(fd_node);
+    return kErrorUndefined;
+  }
+  Sys::close_(fd_node);
+
+  DisplayError error = ReadTimingInfo();
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  frame_rate_ = refresh_rate;
+
+  return kErrorNone;
 }
 
 }  // namespace sdm

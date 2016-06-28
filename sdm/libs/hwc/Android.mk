@@ -13,12 +13,18 @@ LOCAL_C_INCLUDES              := $(call project-path-for,qcom-display)/sdm/inclu
 
 LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
                                  -Wall -Werror -std=c++11 -fcolor-diagnostics\
-                                 -DLOG_TAG=\"SDM\"
+                                 -DLOG_TAG=\"SDM\" -DDEBUG_CALC_FPS
 LOCAL_CLANG                   := true
 
 # TODO: Move this to the common makefile
 ifeq ($(call is-board-platform-in-list, msm8996),true)
     LOCAL_CFLAGS += -DMASTER_SIDE_CP
+endif
+
+
+ifeq ($(TARGET_USES_QCOM_BSP),true)
+# Enable QCOM Display features
+LOCAL_CFLAGS += -DQTI_BSP
 endif
 
 LOCAL_SHARED_LIBRARIES        := libsdmcore libqservice libbinder libhardware libhardware_legacy \
@@ -27,6 +33,7 @@ LOCAL_SHARED_LIBRARIES        := libsdmcore libqservice libbinder libhardware li
 
 LOCAL_SRC_FILES               := hwc_session.cpp \
                                  hwc_display.cpp \
+                                 hwc_display_null.cpp \
                                  hwc_display_primary.cpp \
                                  hwc_display_external.cpp \
                                  hwc_display_virtual.cpp \

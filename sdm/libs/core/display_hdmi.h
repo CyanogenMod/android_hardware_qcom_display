@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -25,6 +25,9 @@
 #ifndef __DISPLAY_HDMI_H__
 #define __DISPLAY_HDMI_H__
 
+#include <vector>
+#include <map>
+
 #include "display_base.h"
 #include "dump_impl.h"
 
@@ -32,7 +35,7 @@ namespace sdm {
 
 class HWHDMIInterface;
 
-class DisplayHDMI : public DisplayBase, DumpImpl {
+class DisplayHDMI : public DisplayBase, DumpImpl, HWEventHandler {
  public:
   DisplayHDMI(DisplayEventHandler *event_handler, HWInfoInterface *hw_info_intf,
               BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
@@ -63,12 +66,23 @@ class DisplayHDMI : public DisplayBase, DumpImpl {
   virtual void AppendDump(char *buffer, uint32_t length);
   virtual DisplayError SetCursorPosition(int x, int y);
 
+  // Implement the HWEventHandlers
+  virtual DisplayError VSync(int64_t timestamp);
+  virtual DisplayError Blank(bool blank) { return kErrorNone; }
+  virtual void IdleTimeout() { }
+  virtual void ThermalEvent(int64_t thermal_level) { }
+  virtual void CECMessage(char *message);
+
  private:
-  virtual int GetBestConfig();
+  virtual int GetBestConfig(HWS3DMode s3d_mode);
   virtual void GetScanSupport();
+  virtual void SetS3DMode(LayerStack *layer_stack);
 
   Locker locker_;
   HWScanSupport scan_support_;
+  std::map<LayerBufferS3DFormat, HWS3DMode> s3d_format_to_mode_;
+  std::vector<const char *> event_list_ = {"vsync_event", "idle_notify", "cec/rd_msg",
+                                           "thread_exit"};
 };
 
 }  // namespace sdm

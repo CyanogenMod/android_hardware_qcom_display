@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -73,9 +73,10 @@ class HWDevice : public HWInterface {
   virtual DisplayError OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
   virtual DisplayError GetPanelBrightness(int *level);
   virtual DisplayError SetAutoRefresh(bool enable) { return kErrorNone; }
+  virtual DisplayError SetS3DMode(HWS3DMode s3d_mode);
 
   // For HWDevice derivatives
-  virtual DisplayError Init(HWEventHandler *eventhandler);
+  virtual DisplayError Init();
   virtual DisplayError Deinit();
 
   enum {
@@ -85,7 +86,6 @@ class HWDevice : public HWInterface {
 
   static const int kMaxStringLength = 1024;
   static const int kNumPhysicalDisplays = 2;
-  static const int kNumDisplayEvents = 4;
 
   void DumpLayerCommit(const mdp_layer_commit &layer_commit);
   DisplayError SetFormat(const LayerBufferFormat &source, uint32_t *target);
@@ -103,6 +103,7 @@ class HWDevice : public HWInterface {
   void GetHWPanelNameByNode(int device_node, HWPanelInfo *panel_info);
   void GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode);
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
+  void GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info);
   int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
   int ParseLine(char *input, const char *delim, char *tokens[],
                 const uint32_t max_token, uint32_t *count);
@@ -115,8 +116,6 @@ class HWDevice : public HWInterface {
   bool EnableHotPlugDetection(int enable);
   ssize_t SysFsWrite(const char* file_node, const char* value, ssize_t length);
 
-  // Store the Device EventHandler - used for callback
-  HWEventHandler *event_handler_;
   HWResourceInfo hw_resource_;
   HWPanelInfo hw_panel_info_;
   HWInfoInterface *hw_info_intf_;

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2015 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -52,13 +52,12 @@ namespace sdm {
 using std::string;
 
 DisplayError HWPrimary::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
-                               BufferSyncHandler *buffer_sync_handler,
-                               HWEventHandler *eventhandler) {
+                               BufferSyncHandler *buffer_sync_handler) {
   DisplayError error = kErrorNone;
   HWPrimary *hw_primary = NULL;
 
   hw_primary = new HWPrimary(buffer_sync_handler, hw_info_intf);
-  error = hw_primary->Init(eventhandler);
+  error = hw_primary->Init();
   if (error != kErrorNone) {
     delete hw_primary;
   } else {
@@ -83,70 +82,23 @@ HWPrimary::HWPrimary(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw
   HWDevice::hw_info_intf_ = hw_info_intf;
 }
 
-DisplayError HWPrimary::Init(HWEventHandler *eventhandler) {
+DisplayError HWPrimary::Init() {
   DisplayError error = kErrorNone;
-  char node_path[kMaxStringLength] = { 0 };
-  char data[kMaxStringLength] = { 0 };
-  const char *event_name[kNumDisplayEvents] = {"vsync_event", "show_blank_event", "idle_notify",
-                                               "msm_fb_thermal_level"};
 
-  error = HWDevice::Init(eventhandler);
+  error = HWDevice::Init();
   if (error != kErrorNone) {
-    goto CleanupOnError;
+    return error;
   }
 
   error = PopulateDisplayAttributes();
   if (error != kErrorNone) {
-    goto CleanupOnError;
-  }
-
-  // Open nodes for polling
-  for (int event = 0; event < kNumDisplayEvents; event++) {
-    poll_fds_[event].fd = -1;
-  }
-
-  if (!fake_vsync_) {
-    for (int event = 0; event < kNumDisplayEvents; event++) {
-      pollfd &poll_fd = poll_fds_[event];
-
-      snprintf(node_path, sizeof(node_path), "%s%d/%s", fb_path_, fb_node_index_,
-               event_name[event]);
-
-      poll_fd.fd = Sys::open_(node_path, O_RDONLY);
-      if (poll_fd.fd < 0) {
-        DLOGE("open failed for event=%d, error=%s", event, strerror(errno));
-        error = kErrorHardware;
-        goto CleanupOnError;
-      }
-
-      // Read once on all fds to clear data on all fds.
-      Sys::pread_(poll_fd.fd, data , kMaxStringLength, 0);
-      poll_fd.events = POLLPRI | POLLERR;
-    }
-  }
-
-  // Start the Event thread
-  if (pthread_create(&event_thread_, NULL, &DisplayEventThread, this) < 0) {
-    DLOGE("Failed to start %s, error = %s", event_thread_name_);
-    error = kErrorResources;
-    goto CleanupOnError;
+    return error;
   }
 
   // Disable HPD at start if HDMI is external, it will be enabled later when the display powers on
   // This helps for framework reboot or adb shell stop/start
   EnableHotPlugDetection(0);
   InitializeConfigs();
-
-  return kErrorNone;
-
-CleanupOnError:
-  // Close all poll fds
-  for (int event = 0; event < kNumDisplayEvents; event++) {
-    int &fd = poll_fds_[event].fd;
-    if (fd >= 0) {
-      Sys::close_(fd);
-    }
-  }
 
   return error;
 }
@@ -238,17 +190,6 @@ void HWPrimary::InitializeConfigs() {
 }
 
 DisplayError HWPrimary::Deinit() {
-  exit_threads_ = true;
-  Sys::pthread_cancel_(event_thread_);
-  pthread_join(event_thread_, NULL);
-
-  for (int event = 0; event < kNumDisplayEvents; event++) {
-    int &fd = poll_fds_[event].fd;
-    if (fd >= 0) {
-      Sys::close_(fd);
-    }
-  }
-
   return HWDevice::Deinit();
 }
 
@@ -456,95 +397,6 @@ DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
   return HWDevice::Validate(hw_layers);
 }
 
-void* HWPrimary::DisplayEventThread(void *context) {
-  if (context) {
-    return reinterpret_cast<HWPrimary *>(context)->DisplayEventThreadHandler();
-  }
-
-  return NULL;
-}
-
-void* HWPrimary::DisplayEventThreadHandler() {
-  char data[kMaxStringLength] = {0};
-
-  prctl(PR_SET_NAME, event_thread_name_, 0, 0, 0);
-  setpriority(PRIO_PROCESS, 0, kThreadPriorityUrgent);
-
-  if (fake_vsync_) {
-    while (!exit_threads_) {
-      // Fake vsync is used only when set explicitly through a property(todo) or when
-      // the vsync timestamp node cannot be opened at bootup. There is no
-      // fallback to fake vsync from the true vsync loop, ever, as the
-      // condition can easily escape detection.
-      // Also, fake vsync is delivered only for the primary display.
-      usleep(16666);
-      STRUCT_VAR(timeval, time_now);
-      gettimeofday(&time_now, NULL);
-      uint64_t ts = uint64_t(time_now.tv_sec)*1000000000LL +uint64_t(time_now.tv_usec)*1000LL;
-
-      // Send Vsync event for primary display(0)
-      event_handler_->VSync(ts);
-    }
-
-    pthread_exit(0);
-  }
-
-  typedef void (HWPrimary::*EventHandler)(char*);
-  EventHandler event_handler[kNumDisplayEvents] = { &HWPrimary::HandleVSync,
-                                                    &HWPrimary::HandleBlank,
-                                                    &HWPrimary::HandleIdleTimeout,
-                                                    &HWPrimary::HandleThermal };
-
-  while (!exit_threads_) {
-    int error = Sys::poll_(poll_fds_, kNumDisplayEvents, -1);
-    if (error <= 0) {
-      DLOGW("poll failed. error = %s", strerror(errno));
-      continue;
-    }
-
-    for (int event = 0; event < kNumDisplayEvents; event++) {
-      pollfd &poll_fd = poll_fds_[event];
-
-      if (poll_fd.revents & POLLPRI) {
-        if (Sys::pread_(poll_fd.fd, data, kMaxStringLength, 0) > 0) {
-          (this->*event_handler[event])(data);
-        }
-      }
-    }
-  }
-
-  pthread_exit(0);
-
-  return NULL;
-}
-
-void HWPrimary::HandleVSync(char *data) {
-  int64_t timestamp = 0;
-  if (!strncmp(data, "VSYNC=", strlen("VSYNC="))) {
-    timestamp = strtoull(data + strlen("VSYNC="), NULL, 0);
-  }
-  event_handler_->VSync(timestamp);
-}
-
-void HWPrimary::HandleBlank(char *data) {
-  // TODO(user): Need to send blank Event
-}
-
-void HWPrimary::HandleIdleTimeout(char *data) {
-  event_handler_->IdleTimeout();
-}
-
-void HWPrimary::HandleThermal(char *data) {
-  int64_t thermal_level = 0;
-  if (!strncmp(data, "thermal_level=", strlen("thermal_level="))) {
-    thermal_level = strtoull(data + strlen("thermal_level="), NULL, 0);
-  }
-
-  DLOGI("Received thermal notification with thermal level = %d", thermal_level);
-
-  event_handler_->ThermalEvent(thermal_level);
-}
-
 void HWPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
   char node_path[kMaxStringLength] = {0};
 
@@ -573,14 +425,7 @@ void HWPrimary::SetIdleTimeoutMs(uint32_t timeout_ms) {
 
 DisplayError HWPrimary::SetVSyncState(bool enable) {
   DTRACE_SCOPED();
-
-  int vsync_on = enable ? 1 : 0;
-  if (Sys::ioctl_(device_fd_, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) < 0) {
-    IOCTL_LOGE(MSMFB_OVERLAY_VSYNC_CTRL, device_type_);
-    return kErrorHardware;
-  }
-
-  return kErrorNone;
+  return HWDevice::SetVSyncState(enable);
 }
 
 DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
@@ -669,9 +514,15 @@ DisplayError HWPrimary::SetAutoRefresh(bool enable) {
   char buffer[kWriteLength] = {'\0'};
   ssize_t bytes = snprintf(buffer, kWriteLength, "%d", enable);
 
+  if (enable == auto_refresh_) {
+    return kErrorNone;
+  }
+
   if (HWDevice::SysFsWrite(kAutoRefreshNode, buffer, bytes) <= 0) {  // Returns bytes written
     return kErrorUndefined;
   }
+
+  auto_refresh_ = enable;
 
   return kErrorNone;
 }

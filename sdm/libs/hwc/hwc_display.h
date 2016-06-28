@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -28,11 +28,23 @@
 #include <hardware/hwcomposer.h>
 #include <core/core_interface.h>
 #include <qdMetaData.h>
+#include <QService.h>
 #include <private/color_params.h>
+#include <map>
 
 namespace sdm {
 
 class BlitEngine;
+
+// Subclasses set this to their type. This has to be different from DisplayType.
+// This is to avoid RTTI and dynamic_cast
+enum DisplayClass {
+  DISPLAY_CLASS_PRIMARY,
+  DISPLAY_CLASS_EXTERNAL,
+  DISPLAY_CLASS_VIRTUAL,
+  DISPLAY_CLASS_NULL
+};
+
 
 class HWCDisplay : public DisplayEventHandler {
  public:
@@ -77,6 +89,7 @@ class HWCDisplay : public DisplayEventHandler {
                            PPDisplayAPIPayload *out_payload,
                            PPPendingParams *pending_action);
   int GetVisibleDisplayRect(hwc_rect_t* rect);
+  DisplayClass GetDisplayClass();
 
  protected:
   enum DisplayStatus {
@@ -94,7 +107,7 @@ class HWCDisplay : public DisplayEventHandler {
 
   // Structure to track memory allocation for layer stack (layers, rectangles) object.
   struct LayerStackMemory {
-    static const size_t kSizeSteps = 1024;  // Default memory allocation.
+    static const size_t kSizeSteps = 4096;  // Default memory allocation.
     uint8_t *raw;  // Pointer to byte array.
     size_t size;  // Current number of allocated bytes.
 
@@ -119,17 +132,21 @@ class HWCDisplay : public DisplayEventHandler {
   };
 
   HWCDisplay(CoreInterface *core_intf, hwc_procs_t const **hwc_procs, DisplayType type, int id,
-             bool needs_blit);
+             bool needs_blit, qService::QService *qservice, DisplayClass display_class);
 
   // DisplayEventHandler methods
   virtual DisplayError VSync(const DisplayEventVSync &vsync);
   virtual DisplayError Refresh();
+  virtual DisplayError CECMessage(char *message);
 
   virtual int AllocateLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PrePrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PrepareLayerStack(hwc_display_contents_1_t *content_list);
   virtual int CommitLayerStack(hwc_display_contents_1_t *content_list);
   virtual int PostCommitLayerStack(hwc_display_contents_1_t *content_list);
+  virtual uint32_t RoundToStandardFPS(float fps);
+  virtual uint32_t SanitizeRefreshRate(uint32_t req_refresh_rate);
+  virtual void PrepareDynamicRefreshRate(Layer *layer);
   inline void SetRect(const hwc_rect_t &source, LayerRect *target);
   inline void SetRect(const hwc_frect_t &source, LayerRect *target);
   inline void SetComposition(const int32_t &source, LayerComposition *target);
@@ -141,17 +158,15 @@ class HWCDisplay : public DisplayEventHandler {
   const char *GetDisplayString();
   void ScaleDisplayFrame(hwc_rect_t *display_frame);
   void MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list);
-  void CloseAcquireFences(hwc_display_contents_1_t *content_list);
-  uint32_t RoundToStandardFPS(uint32_t fps);
   virtual void ApplyScanAdjustment(hwc_rect_t *display_frame);
   DisplayError SetCSC(ColorSpace_t source, LayerCSC *target);
   DisplayError SetIGC(IGC_t source, LayerIGC *target);
   DisplayError SetMetaData(const private_handle_t *pvt_handle, Layer *layer);
   bool NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list);
   void CacheLayerStackInfo(hwc_display_contents_1_t *content_list);
-  bool IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache);
+  bool IsLayerUpdating(hwc_display_contents_1_t *content_list, int layer_index);
   bool SingleLayerUpdating(uint32_t app_layer_count);
-  uint32_t SanitizeRefreshRate(uint32_t req_refresh_rate);
+  bool SingleVideoLayerUpdating(uint32_t app_layer_count);
 
   enum {
     INPUT_LAYER_DUMP,
@@ -190,6 +205,7 @@ class HWCDisplay : public DisplayEventHandler {
   bool solid_fill_enable_ = false;
   uint32_t solid_fill_color_ = 0;
   LayerRect display_rect_;
+  std::map<int, LayerBufferS3DFormat> s3d_format_hwc_to_sdm_;
 
  private:
   bool IsFrameBufferScaled();
@@ -198,6 +214,8 @@ class HWCDisplay : public DisplayEventHandler {
   void CommitLayerParams(hwc_layer_1_t *hwc_layer, Layer *layer);
   void ResetLayerCacheStack();
   BlitEngine *blit_engine_ = NULL;
+  qService::QService *qservice_ = NULL;
+  DisplayClass display_class_;
 };
 
 inline int HWCDisplay::Perform(uint32_t operation, ...) {

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014, 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -41,7 +41,7 @@ class HWCDisplayPrimary : public HWCDisplay {
   };
 
   static int Create(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
-                    HWCDisplay **hwc_display);
+                    qService::QService *qservice, HWCDisplay **hwc_display);
   static void Destroy(HWCDisplay *hwc_display);
   virtual int Init();
   virtual int Prepare(hwc_display_contents_1_t *content_list);
@@ -52,10 +52,11 @@ class HWCDisplayPrimary : public HWCDisplay {
   virtual void SetIdleTimeoutMs(uint32_t timeout_ms);
 
  private:
-  HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs);
+  HWCDisplayPrimary(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
+                    qService::QService *qservice);
   void SetMetaDataRefreshRateFlag(bool enable);
   virtual DisplayError SetDisplayMode(uint32_t mode);
-  void ProcessBootAnimCompleted();
+  void ProcessBootAnimCompleted(hwc_display_contents_1_t *content_list);
   void SetQDCMSolidFillInfo(bool enable, uint32_t color);
   void ToggleCPUHint(bool set);
   void ForceRefreshRate(uint32_t refresh_rate);

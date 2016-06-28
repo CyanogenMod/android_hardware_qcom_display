@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -49,12 +49,11 @@ DisplayError DisplayBase::Init() {
   hw_panel_info_ = HWPanelInfo();
   hw_intf_->GetHWPanelInfo(&hw_panel_info_);
 
-  HWDisplayAttributes display_attrib;
   uint32_t active_index = 0;
   hw_intf_->GetActiveConfig(&active_index);
-  hw_intf_->GetDisplayAttributes(active_index, &display_attrib);
+  hw_intf_->GetDisplayAttributes(active_index, &display_attributes_);
 
-  error = comp_manager_->RegisterDisplay(display_type_, display_attrib,
+  error = comp_manager_->RegisterDisplay(display_type_, display_attributes_,
                                          hw_panel_info_, &display_comp_ctx_);
   if (error != kErrorNone) {
     goto CleanupOnError;
@@ -79,7 +78,7 @@ DisplayError DisplayBase::Init() {
   }
 
   color_mgr_ = ColorManagerProxy::CreateColorManagerProxy(display_type_, hw_intf_,
-                               display_attrib, hw_panel_info_);
+                               display_attributes_, hw_panel_info_);
   if (!color_mgr_) {
     DLOGW("Unable to create ColorManagerProxy for display = %d", display_type_);
   }
@@ -105,6 +104,8 @@ DisplayError DisplayBase::Deinit() {
   }
 
   comp_manager_->UnregisterDisplay(display_comp_ctx_);
+
+  HWEventsInterface::Destroy(hw_events_intf_);
 
   return kErrorNone;
 }
@@ -162,7 +163,7 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
 DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   DisplayError error = kErrorNone;
   bool disable_partial_update = false;
-  uint32_t pending;
+  uint32_t pending = 0;
 
   if (!layer_stack) {
     return kErrorParameters;
@@ -179,11 +180,16 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
     return kErrorPermission;
   }
 
-  if (color_mgr_) {
+  // Request to disable partial update only if it is currently enabled.
+  if (color_mgr_ && partial_update_control_) {
     disable_partial_update = color_mgr_->NeedsPartialUpdateDisable();
     if (disable_partial_update) {
       ControlPartialUpdate(false, &pending);
     }
+  }
+
+  if (one_frame_full_roi_) {
+    ControlPartialUpdate(false, &pending);
   }
 
   // Clean hw layers for reuse.
@@ -227,6 +233,11 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
   comp_manager_->PostPrepare(display_comp_ctx_, &hw_layers_);
   if (disable_partial_update) {
     ControlPartialUpdate(true, &pending);
+  }
+
+  if (one_frame_full_roi_) {
+    ControlPartialUpdate(true, &pending);
+    one_frame_full_roi_ = false;
   }
 
   return error;
@@ -451,12 +462,18 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
     return error;
   }
 
+  hw_intf_->GetHWPanelInfo(&hw_panel_info_);
+
   if (display_comp_ctx_) {
     comp_manager_->UnregisterDisplay(display_comp_ctx_);
   }
 
   error = comp_manager_->RegisterDisplay(display_type_, attrib, hw_panel_info_,
                                          &display_comp_ctx_);
+
+  if (error == kErrorNone && partial_update_control_) {
+    one_frame_full_roi_ = true;
+  }
 
   return error;
 }
@@ -484,7 +501,7 @@ DisplayError DisplayBase::ControlPartialUpdate(bool enable, uint32_t *pending) {
     return kErrorNotSupported;
   }
 
-  *pending = false;
+  *pending = 0;
   if (enable == partial_update_control_) {
     DLOGI("Same state transition is requested.");
     return kErrorNone;
@@ -496,7 +513,7 @@ DisplayError DisplayBase::ControlPartialUpdate(bool enable, uint32_t *pending) {
   if (!enable) {
     // If the request is to turn off feature, new draw call is required to have
     // the new setting into effect.
-    *pending = true;
+    *pending = 1;
   }
 
   return kErrorNone;
@@ -535,11 +552,6 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
                          num_modes, active_index);
 
   DisplayConfigVariableInfo &info = attrib;
-  DumpImpl::AppendString(buffer, length, "\nres:%u x %u, dpi:%.2f x %.2f, fps:%u,"
-                         "vsync period: %u", info.x_pixels, info.y_pixels, info.x_dpi,
-                         info.y_dpi, info.fps, info.vsync_period_ns);
-
-  DumpImpl::AppendString(buffer, length, "\n");
 
   uint32_t num_hw_layers = 0;
   if (hw_layers_.info.stack) {
@@ -550,6 +562,18 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     DumpImpl::AppendString(buffer, length, "\nNo hardware layers programmed");
     return;
   }
+
+  LayerBuffer *out_buffer = hw_layers_.info.stack->output_buffer;
+  if (out_buffer) {
+    DumpImpl::AppendString(buffer, length, "\nres:%u x %u format: %s", out_buffer->width,
+                           out_buffer->height, GetName(out_buffer->format));
+  } else {
+    DumpImpl::AppendString(buffer, length, "\nres:%u x %u, dpi:%.2f x %.2f, fps:%u,"
+                           "vsync period: %u", info.x_pixels, info.y_pixels, info.x_dpi,
+                           info.y_dpi, info.fps, info.vsync_period_ns);
+  }
+
+  DumpImpl::AppendString(buffer, length, "\n");
 
   HWLayersInfo &layer_info = hw_layers_.info;
   LayerRect &l_roi = layer_info.left_partial_update;
@@ -562,9 +586,9 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
                            INT(r_roi.top), INT(r_roi.right), INT(r_roi.bottom));
   }
 
-  const char *header  = "\n| Idx |  Comp Type  |  Split | WB |  Pipe |    W x H    |          Format          |  Src Rect (L T R B) |  Dst Rect (L T R B) |  Z |    Flags   | Deci(HxV) |";  //NOLINT
-  const char *newline = "\n|-----|-------------|--------|----|-------|-------------|--------------------------|---------------------|---------------------|----|------------|-----------|";  //NOLINT
-  const char *format  = "\n| %3s | %11s "     "| %6s " "| %2s | 0x%03x | %4d x %4d | %24s "                  "| %4d %4d %4d %4d "  "| %4d %4d %4d %4d "  "| %2s | %10s "   "| %9s |";  //NOLINT
+  const char *header  = "\n| Idx |  Comp Type  |  Split | WB |  Pipe |    W x H    |          Format          |  Src Rect (L T R B) |  Dst Rect (L T R B) |  Z |    Flags   | Deci(HxV) | CS |";  //NOLINT
+  const char *newline = "\n|-----|-------------|--------|----|-------|-------------|--------------------------|---------------------|---------------------|----|------------|-----------|----|";  //NOLINT
+  const char *format  = "\n| %3s | %11s "     "| %6s " "| %2s | 0x%03x | %4d x %4d | %24s "                  "| %4d %4d %4d %4d "  "| %4d %4d %4d %4d "  "| %2s | %10s "   "| %9s | %2s |";  //NOLINT
 
   DumpImpl::AppendString(buffer, length, "\n");
   DumpImpl::AppendString(buffer, length, newline);
@@ -587,7 +611,7 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     snprintf(idx, sizeof(idx), "%d", layer_index);
 
     for (uint32_t count = 0; count < hw_rotator_session.hw_block_count; count++) {
-      char writeback_id[8];
+      char writeback_id[8] = { 0 };
       HWRotateInfo &rotate = hw_rotator_session.hw_rotate_info[count];
       LayerRect &src_roi = rotate.src_roi;
       LayerRect &dst_roi = rotate.dst_roi;
@@ -599,7 +623,7 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
                              input_buffer->height, buffer_format, INT(src_roi.left),
                              INT(src_roi.top), INT(src_roi.right), INT(src_roi.bottom),
                              INT(dst_roi.left), INT(dst_roi.top), INT(dst_roi.right),
-                             INT(dst_roi.bottom), "-", "-    ", "-    ");
+                             INT(dst_roi.bottom), "-", "-    ", "-    ", "-");
 
       // print the below only once per layer block, fill with spaces for rest.
       idx[0] = 0;
@@ -612,9 +636,11 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
     }
 
     for (uint32_t count = 0; count < 2; count++) {
-      char decimation[16];
-      char flags[16];
-      char z_order[8];
+      char decimation[16] = { 0 };
+      char flags[16] = { 0 };
+      char z_order[8] = { 0 };
+      char csc[8] = { 0 };
+
       HWPipeInfo &pipe = (count == 0) ? layer_config.left_pipe : layer_config.right_pipe;
 
       if (!pipe.valid) {
@@ -628,13 +654,14 @@ void DisplayBase::AppendDump(char *buffer, uint32_t length) {
       snprintf(flags, sizeof(flags), "0x%08x", layer.flags.flags);
       snprintf(decimation, sizeof(decimation), "%3d x %3d", pipe.horizontal_decimation,
                pipe.vertical_decimation);
+      snprintf(csc, sizeof(csc), "%d", layer.csc);
 
       DumpImpl::AppendString(buffer, length, format, idx, comp_type, comp_split[count],
                              "-", pipe.pipe_id, input_buffer->width, input_buffer->height,
                              buffer_format, INT(src_roi.left), INT(src_roi.top),
                              INT(src_roi.right), INT(src_roi.bottom), INT(dst_roi.left),
                              INT(dst_roi.top), INT(dst_roi.right), INT(dst_roi.bottom),
-                             z_order, flags, decimation);
+                             z_order, flags, decimation, csc);
 
       // print the below only once per layer block, fill with spaces for rest.
       idx[0] = 0;
@@ -695,6 +722,7 @@ const char * DisplayBase::GetName(const LayerBufferFormat &format) {
   case kFormatYCbCr420SemiPlanar:       return "Y_CBCR_420";
   case kFormatYCrCb420SemiPlanar:       return "Y_CRCB_420";
   case kFormatYCbCr420SemiPlanarVenus:  return "Y_CBCR_420_VENUS";
+  case kFormatYCrCb420SemiPlanarVenus:  return "Y_CRCB_420_VENUS";
   case kFormatYCbCr422H1V2SemiPlanar:   return "Y_CBCR_422_H1V2";
   case kFormatYCrCb422H1V2SemiPlanar:   return "Y_CRCB_422_H1V2";
   case kFormatYCbCr422H2V1SemiPlanar:   return "Y_CBCR_422_H2V1";
@@ -754,6 +782,17 @@ DisplayError DisplayBase::GetRefreshRateRange(uint32_t *min_refresh_rate,
 
 DisplayError DisplayBase::GetPanelBrightness(int *level) {
   return kErrorNotSupported;
+}
+
+DisplayError DisplayBase::SetVSyncState(bool enable) {
+  DisplayError error = kErrorNone;
+  if (vsync_enable_ != enable) {
+    error = hw_intf_->SetVSyncState(enable);
+    if (error == kErrorNone) {
+      vsync_enable_ = enable;
+    }
+  }
+  return error;
 }
 
 }  // namespace sdm
