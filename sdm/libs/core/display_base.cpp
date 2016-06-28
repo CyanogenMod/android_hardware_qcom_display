@@ -780,10 +780,6 @@ DisplayError DisplayBase::SetColorMode(const std::string &color_mode) {
   }
 
   SDEDisplayMode *sde_display_mode = it->second;
-  if (color_mode_ == sde_display_mode->id) {
-    DLOGV_IF(kTagQDCM, "Same mode requested");
-    return kErrorNone;
-  }
 
   DLOGV_IF(kTagQDCM, "Color Mode Name = %s corresponding mode_id = %d", sde_display_mode->name,
            sde_display_mode->id);
@@ -793,8 +789,6 @@ DisplayError DisplayBase::SetColorMode(const std::string &color_mode) {
     DLOGE("Failed for mode id = %d", sde_display_mode->id);
     return error;
   }
-
-  color_mode_ = sde_display_mode->id;
 
   return error;
 }

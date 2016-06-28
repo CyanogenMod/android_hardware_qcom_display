@@ -147,7 +147,6 @@ class DisplayBase : public DisplayInterface {
   bool disable_pu_one_frame_ = false;
   uint32_t num_color_modes_ = 0;
   SDEDisplayMode *color_modes_ = NULL;
-  int32_t color_mode_ = 0;
   typedef std::map<std::string, SDEDisplayMode *> ColorModeMap;
   ColorModeMap color_mode_map_ = {};
   HWDisplayAttributes display_attributes_ = {};
