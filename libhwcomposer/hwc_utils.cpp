@@ -1556,6 +1556,21 @@ hwc_rect_t calculateDirtyRect(const hwc_layer_1_t* layer,
      return dirtyRect;
 }
 
+bool CanOptimizeForSmallUpdate(hwc_context_t* ctx,
+        int dpy,hwc_display_contents_1_t* list) {
+    bool ret = false;
+    const int numAppLayers = ctx->listStats[dpy].numAppLayers;
+
+    if(ctx->mMDP.panel == MIPI_CMD_PANEL)
+        return ret;
+
+    if(not (list->flags & HWC_GEOMETRY_CHANGED) and
+        not isYuvPresent(ctx, dpy) and numAppLayers > 1)
+        ret = true;
+
+    return ret;
+}
+
 hwc_rect_t moveRect(const hwc_rect_t& rect, const int& x_off, const int& y_off)
 {
     hwc_rect_t res;
