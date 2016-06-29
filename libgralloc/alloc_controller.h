@@ -56,6 +56,8 @@ class IAllocController {
 
     virtual IMemAlloc* getAllocator(int flags) = 0;
 
+    virtual bool isDisableUBWCForEncoder();
+
     virtual ~IAllocController() {};
 
     static IAllocController* getInstance(void);
@@ -72,10 +74,15 @@ class IonController : public IAllocController {
 
     virtual IMemAlloc* getAllocator(int flags);
 
+    virtual bool isDisableUBWCForEncoder() {
+        return mDisableUBWCForEncode;
+    }
+
     IonController();
 
     private:
     IonAlloc* mIonAlloc;
+    bool mDisableUBWCForEncode;
     void allocateIonMem();
 
 };

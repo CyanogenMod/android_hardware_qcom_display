@@ -43,6 +43,7 @@
 #include <display_config.h>
 #include <utils/debug.h>
 #include <sync/sync.h>
+#include <profiler.h>
 
 #include "hwc_buffer_allocator.h"
 #include "hwc_buffer_sync_handler.h"
@@ -302,12 +303,24 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
   }
 
   if (hotplug_connect) {
+    // notify client
     hwc_procs->hotplug(hwc_procs, HWC_DISPLAY_EXTERNAL, true);
-    hwc_procs->invalidate(hwc_procs);
   }
-
   // Return 0, else client will go into bad state
   return 0;
+}
+
+int HWCSession::GetVsyncPeriod(int disp) {
+  SCOPE_LOCK(locker_);
+  // default value
+  int32_t vsync_period = 1000000000l / 60;
+  const uint32_t attribute = HWC_DISPLAY_VSYNC_PERIOD;
+
+  if (hwc_display_[disp]) {
+    hwc_display_[disp]->GetDisplayAttributes(0, &attribute, &vsync_period);
+  }
+
+  return vsync_period;
 }
 
 int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
@@ -337,25 +350,10 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
     // Drop virtual display composition if virtual display object could not be created
     // due to HDMI concurrency.
     if (dpy == HWC_DISPLAY_VIRTUAL && !hwc_session->hwc_display_[HWC_DISPLAY_VIRTUAL]) {
-      if (!content_list) {
-        continue;
+      CloseAcquireFds(content_list);
+      if (content_list) {
+        content_list->retireFenceFd = -1;
       }
-
-      for (size_t i = 0; i < content_list->numHwLayers; i++) {
-        int &acquireFenceFd = content_list->hwLayers[i].acquireFenceFd;
-        if (acquireFenceFd >= 0) {
-          close(acquireFenceFd);
-          acquireFenceFd = -1;
-        }
-      }
-
-      int &outbufAcquireFenceFd = content_list->outbufAcquireFenceFd;
-      if (outbufAcquireFenceFd >= 0) {
-        close(outbufAcquireFenceFd);
-        outbufAcquireFenceFd = -1;
-      }
-
-      content_list->retireFenceFd = -1;
 
       continue;
     }
@@ -363,6 +361,7 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
     if (hwc_session->hwc_display_[dpy]) {
       hwc_session->hwc_display_[dpy]->Commit(content_list);
     }
+    CloseAcquireFds(content_list);
   }
 
   if (hwc_session->new_bw_mode_) {
@@ -374,8 +373,30 @@ int HWCSession::Set(hwc_composer_device_1 *device, size_t num_displays,
     hwc_session->bw_mode_release_fd_ = dup(content_list->retireFenceFd);
   }
 
+  // This is only indicative of how many times SurfaceFlinger posts
+  // frames to the display.
+  CALC_FPS();
+
   // Return 0, else client will go into bad state
   return 0;
+}
+
+void HWCSession::CloseAcquireFds(hwc_display_contents_1_t *content_list) {
+  if (content_list) {
+    for (size_t i = 0; i < content_list->numHwLayers; i++) {
+      int &acquireFenceFd = content_list->hwLayers[i].acquireFenceFd;
+      if (acquireFenceFd >= 0) {
+        close(acquireFenceFd);
+        acquireFenceFd = -1;
+      }
+    }
+
+    int &outbufAcquireFenceFd = content_list->outbufAcquireFenceFd;
+    if (outbufAcquireFenceFd >= 0) {
+      close(outbufAcquireFenceFd);
+      outbufAcquireFenceFd = -1;
+    }
+  }
 }
 
 int HWCSession::EventControl(hwc_composer_device_1 *device, int disp, int event, int enable) {
@@ -1090,6 +1111,9 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel *input_parcel
     return -1;
   }
 
+  pending_action.action = kNoAction;
+  pending_action.params = NULL;
+
   // Read display_id, payload_size and payload from in_parcel.
   ret = HWCColorManager::CreatePayloadFromParcel(*input_parcel, &display_id, &req_payload);
   if (!ret) {
@@ -1308,13 +1332,17 @@ int HWCSession::HotPlugHandler(bool connected) {
       external_pending_connect_ = false;
     }
   }
-
-  // notify client and trigger a screen refresh
+  if (connected && notify_hotplug) {
+    // trigger screen refresh to ensure sufficient resources are available to process new
+    // new display connection.
+    hwc_procs_->invalidate(hwc_procs_);
+    int32_t vsync_period = GetVsyncPeriod(HWC_DISPLAY_PRIMARY);
+    usleep(vsync_period * 2 / 1000);
+  }
+  // notify client
   if (notify_hotplug) {
     hwc_procs_->hotplug(hwc_procs_, HWC_DISPLAY_EXTERNAL, connected);
   }
-
-  hwc_procs_->invalidate(hwc_procs_);
 
   return 0;
 }
