@@ -126,15 +126,14 @@ int HWCDisplayExternal::Prepare(hwc_display_contents_1_t *content_list) {
 
   bool one_video_updating_layer = SingleVideoLayerUpdating(UINT32(content_list->numHwLayers - 1));
 
-  if (current_refresh_rate_ != metadata_refresh_rate_ && one_video_updating_layer && drc_enabled_) {
-    error = display_intf_->SetRefreshRate(metadata_refresh_rate_);
+  uint32_t refresh_rate = GetOptimalRefreshRate(one_video_updating_layer);
+  if (current_refresh_rate_ != refresh_rate) {
+    error = display_intf_->SetRefreshRate(refresh_rate);
+    if (error == kErrorNone) {
+      // On success, set current refresh rate to new refresh rate
+      current_refresh_rate_ = refresh_rate;
+    }
   }
-
-  if (error == kErrorNone) {
-    // On success, set current refresh rate to new refresh rate
-    current_refresh_rate_ = metadata_refresh_rate_;
-  }
-
 
   status = PrepareLayerStack(content_list);
   if (status) {
@@ -239,6 +238,11 @@ uint32_t HWCDisplayExternal::RoundToStandardFPS(float fps) {
   static const uint32_t mapping_fps[] = {59940, 60000, 60000, 59940, 60000, 50000, 59940, 60000};
   uint32_t frame_rate = (uint32_t)(fps * 1000);
 
+  // process non valid
+  if (frame_rate == 0) {
+    return current_refresh_rate_;
+  }
+
   int count = INT(sizeof(standard_fps) / sizeof(standard_fps[0]));
   for (int i = 0; i < count; i++) {
     // Most likely used for video, the fps for frames should be stable from video side.
@@ -260,9 +264,50 @@ uint32_t HWCDisplayExternal::RoundToStandardFPS(float fps) {
 
 void HWCDisplayExternal::PrepareDynamicRefreshRate(Layer *layer) {
   if (layer->input_buffer->flags.video) {
-    metadata_refresh_rate_ = SanitizeRefreshRate(layer->frame_rate);
+    if (layer->frame_rate != 0) {
+      metadata_refresh_rate_ = SanitizeRefreshRate(layer->frame_rate);
+    } else {
+      metadata_refresh_rate_ = current_refresh_rate_;
+    }
     layer->frame_rate = current_refresh_rate_;
   }
+}
+
+void HWCDisplayExternal::ForceRefreshRate(uint32_t refresh_rate) {
+  if ((refresh_rate && (refresh_rate < min_refresh_rate_ || refresh_rate > max_refresh_rate_)) ||
+       force_refresh_rate_ == refresh_rate) {
+    // Cannot honor force refresh rate, as its beyond the range or new request is same
+    return;
+  }
+
+  force_refresh_rate_ = refresh_rate;
+}
+
+uint32_t HWCDisplayExternal::GetOptimalRefreshRate(bool one_updating_layer) {
+  if (force_refresh_rate_) {
+    return force_refresh_rate_;
+  } else if (one_updating_layer && drc_enabled_) {
+    return metadata_refresh_rate_;
+  }
+
+  return max_refresh_rate_;
+}
+
+int HWCDisplayExternal::Perform(uint32_t operation, ...) {
+  va_list args;
+  va_start(args, operation);
+  int val = va_arg(args, int32_t);
+  va_end(args);
+  switch (operation) {
+    case SET_BINDER_DYN_REFRESH_RATE:
+      ForceRefreshRate(UINT32(val));
+      break;
+    default:
+      DLOGW("Invalid operation %d", operation);
+      return -EINVAL;
+  }
+
+  return 0;
 }
 
 }  // namespace sdm
