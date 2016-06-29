@@ -73,6 +73,7 @@ class HWDevice : public HWInterface {
   virtual DisplayError OnMinHdcpEncryptionLevelChange(uint32_t min_enc_level);
   virtual DisplayError GetPanelBrightness(int *level);
   virtual DisplayError SetAutoRefresh(bool enable) { return kErrorNone; }
+  virtual DisplayError SetS3DMode(HWS3DMode s3d_mode);
 
   // For HWDevice derivatives
   virtual DisplayError Init(HWEventHandler *eventhandler);
@@ -103,6 +104,7 @@ class HWDevice : public HWInterface {
   void GetHWPanelNameByNode(int device_node, HWPanelInfo *panel_info);
   void GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode);
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
+  void GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info);
   int ParseLine(char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
   int ParseLine(char *input, const char *delim, char *tokens[],
                 const uint32_t max_token, uint32_t *count);

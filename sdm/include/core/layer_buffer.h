@@ -107,6 +107,10 @@ enum LayerBufferFormat {
 
   kFormatYCbCr420SPVenusUbwc,         //!< UBWC aligned YCbCr420SemiPlanarVenus format
 
+  kFormatYCrCb420SemiPlanarVenus,     //!< Y-plane: y(0), y(1), y(2) ... y(n)
+                                      //!< 2x2 subsampled interleaved UV-plane:
+                                      //!<    v(0), u(0), v(2), u(2) ... v(n-1), u(n-1)
+
   /* All YUV-Packed formats, Any new format will be added towards end of this group to maintain
      backward compatibility.
   */
@@ -116,6 +120,19 @@ enum LayerBufferFormat {
                                       //!<    y(n-1), u(n-1), y(n), v(n-1)
 
   kFormatInvalid = 0xFFFFFFFF,
+};
+
+
+/*! @brief This enum represents different types of 3D formats supported.
+
+  @sa LayerBufferS3DFormat
+*/
+enum LayerBufferS3DFormat {
+  kS3dFormatNone,            //!< Layer buffer content is not 3D content.
+  kS3dFormatLeftRight,       //!< Left and Right view of a 3D content stitched left and right.
+  kS3dFormatRightLeft,       //!< Right and Left view of a 3D content stitched left and right.
+  kS3dFormatTopBottom,       //!< Left and RightView of a 3D content stitched top and bottom.
+  kS3dFormatFramePacking     //!< Left and right view of 3D content coded in consecutive frames.
 };
 
 /*! @brief This structure defines a color sample plane belonging to a buffer format. RGB buffer
@@ -149,13 +166,12 @@ struct LayerBufferFlags {
       uint32_t interlace : 1;       //!< This flag shall be set by the client to indicate that
                                     //!< the buffer has interlaced content.
 
-      uint32_t secure_display : 1;
-                                    //!< This flag shall be set by the client to indicate that the
+      uint32_t secure_display : 1;  //!< This flag shall be set by the client to indicate that the
                                     //!< secure display session is in progress. Secure display
                                     //!< session can not coexist with non-secure session.
-      };
+    };
 
-      uint32_t flags = 0;           //!< For initialization purpose only.
+    uint32_t flags = 0;             //!< For initialization purpose only.
                                     //!< Client shall not refer to it directly.
   };
 };
@@ -198,6 +214,11 @@ struct LayerBuffer {
                                 //!< read/write.
 
   LayerBufferFlags flags;       //!< Flags associated with this buffer.
+
+  LayerBufferS3DFormat s3d_format = kS3dFormatNone;
+                                //!< Represents the format of the buffer content in 3D.
+  uint64_t buffer_id __attribute__((aligned(8))) = 0;
+                                //!< Specifies the buffer id.
 };
 
 }  // namespace sdm
