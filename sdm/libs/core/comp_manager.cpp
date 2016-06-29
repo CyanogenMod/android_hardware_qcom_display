@@ -418,7 +418,7 @@ bool CompManager::SupportLayerAsCursor(Handle comp_handle, HWLayers *hw_layers) 
     return supported;
   }
 
-  for (int32_t i = layer_stack->layer_count; i >= 0; i--) {
+  for (int32_t i = layer_stack->layer_count - 1; i >= 0; i--) {
     Layer &layer = layer_stack->layers[i];
     if (layer.composition == kCompositionGPUTarget) {
       gpu_index = i;
