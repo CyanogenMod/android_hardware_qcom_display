@@ -108,6 +108,17 @@ class BufferAllocator {
   */
   virtual DisplayError FreeBuffer(BufferInfo *buffer_info) = 0;
 
+
+  /*! @brief Method to get the buffer size.
+
+    @details This method returns buffer size for a specific configuration mentioned in buffer info.
+
+    @param[in] buffer_info \link BufferInfo \endlink
+
+    @return \link unsigned int \endlink
+  */
+  virtual uint32_t GetBufferSize(BufferInfo *buffer_info) = 0;
+
  protected:
   virtual ~BufferAllocator() { }
 };

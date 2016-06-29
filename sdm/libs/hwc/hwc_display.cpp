@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -36,10 +36,16 @@
 #include <utils/debug.h>
 #include <sync/sync.h>
 #include <cutils/properties.h>
+#include <map>
+#include <utility>
 
 #include "hwc_display.h"
 #include "hwc_debugger.h"
 #include "blit_engine_c2d.h"
+
+#ifdef QTI_BSP
+#include <hardware/display_defs.h>
+#endif
 
 #define __CLASS__ "HWCDisplay"
 
@@ -111,6 +117,14 @@ int HWCDisplay::Init() {
 
   display_intf_->GetRefreshRateRange(&min_refresh_rate_, &max_refresh_rate_);
   current_refresh_rate_ = max_refresh_rate_;
+
+  s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_NO_3D, kS3dFormatNone));
+  s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_3D_SIDE_BY_SIDE_L_R,
+                                kS3dFormatLeftRight));
+  s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_3D_SIDE_BY_SIDE_R_L,
+                                kS3dFormatRightLeft));
+  s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_3D_TOP_BOTTOM,
+                                kS3dFormatTopBottom));
 
   return 0;
 }
@@ -245,11 +259,6 @@ int HWCDisplay::GetDisplayAttributes(uint32_t config, const uint32_t *attributes
     case HWC_DISPLAY_DPI_Y:
       values[i] = INT32(variable_config.y_dpi * 1000.0f);
       break;
-#if 0
-    case HWC_DISPLAY_SECURE:
-      values[i] = INT32(true);  // For backward compatibility. All Physical displays are secure
-      break;
-#endif
     default:
       DLOGW("Spurious attribute type = %d", attributes[i]);
       return -EINVAL;
@@ -567,8 +576,7 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     layer.flags.updating = true;
 
     if (num_hw_layers <= kMaxLayerCount) {
-      LayerCache layer_cache = layer_stack_cache_.layer_cache[i];
-      layer.flags.updating = IsLayerUpdating(hwc_layer, layer_cache);
+      layer.flags.updating = IsLayerUpdating(content_list, i);
     }
 #if 0
     if (hwc_layer.flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
@@ -588,6 +596,8 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
     } else {
       layer.frame_rate = current_refresh_rate_;
     }
+
+    layer.input_buffer->buffer_id = reinterpret_cast<uint64_t>(hwc_layer.handle);
   }
 
   // Prepare the Blit Target
@@ -794,8 +804,15 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
 bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
+  // Handle ongoing animation and end here, start is handled below
   if (layer_stack_cache_.animating) {
-      return false;
+      if (!layer_stack_.flags.animating) {
+        // Animation is ending.
+        return true;
+      } else {
+        // Animation is going on.
+        return false;
+      }
   }
 
   // Frame buffer needs to be refreshed for the following reasons:
@@ -808,9 +825,13 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
   }
 
   for (uint32_t i = 0; i < layer_count; i++) {
-    hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     Layer &layer = layer_stack_.layers[i];
     LayerCache &layer_cache = layer_stack_cache_.layer_cache[i];
+
+    // need FB refresh for s3d case
+    if (layer.input_buffer->s3d_format != kS3dFormatNone) {
+        return true;
+    }
 
     if (layer.composition == kCompositionGPUTarget) {
       continue;
@@ -820,7 +841,7 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
       return true;
     }
 
-    if ((layer.composition == kCompositionGPU) && IsLayerUpdating(hwc_layer, layer_cache)) {
+    if ((layer.composition == kCompositionGPU) && IsLayerUpdating(content_list, i)) {
       return true;
     }
   }
@@ -828,22 +849,30 @@ bool HWCDisplay::NeedsFrameBufferRefresh(hwc_display_contents_1_t *content_list)
   return false;
 }
 
-bool HWCDisplay::IsLayerUpdating(const hwc_layer_1_t &hwc_layer, const LayerCache &layer_cache) {
+bool HWCDisplay::IsLayerUpdating(hwc_display_contents_1_t *content_list, int layer_index) {
+  hwc_layer_1_t &hwc_layer = content_list->hwLayers[layer_index];
+  LayerCache &layer_cache = layer_stack_cache_.layer_cache[layer_index];
+
   const private_handle_t *pvt_handle = static_cast<const private_handle_t *>(hwc_layer.handle);
   const MetaData_t *meta_data = pvt_handle ?
     reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata) : NULL;
 
-  // If a layer is in single buffer mode, it should be considered as updating always
+  // Layer should be considered updating if
+  //   a) layer is in single buffer mode, or
+  //   b) layer handle has changed, or
+  //   c) layer plane alpha has changed, or
+  //   d) layer stack geometry has changed
   return ((meta_data && (meta_data->operation & SET_SINGLE_BUFFER_MODE) &&
-            meta_data->isSingleBufferMode) ||
+              meta_data->isSingleBufferMode) ||
           (layer_cache.handle != hwc_layer.handle) ||
-          (layer_cache.plane_alpha != hwc_layer.planeAlpha));
+          (layer_cache.plane_alpha != hwc_layer.planeAlpha) ||
+          (content_list->flags & HWC_GEOMETRY_CHANGED));
 }
 
 void HWCDisplay::CacheLayerStackInfo(hwc_display_contents_1_t *content_list) {
   uint32_t layer_count = layer_stack_.layer_count;
 
-  if (layer_count > kMaxLayerCount) {
+  if (layer_count > kMaxLayerCount || layer_stack_.flags.animating) {
     ResetLayerCacheStack();
     return;
   }
@@ -955,6 +984,7 @@ LayerBufferFormat HWCDisplay::GetSDMFormat(const int32_t &source, const int flag
   case HAL_PIXEL_FORMAT_BGR_565:                  format = kFormatBGR565;                   break;
   case HAL_PIXEL_FORMAT_NV12_ENCODEABLE:
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:       format = kFormatYCbCr420SemiPlanarVenus;  break;
+  case HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS:       format = kFormatYCrCb420SemiPlanarVenus;  break;
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:  format = kFormatYCbCr420SPVenusUbwc;      break;
   case HAL_PIXEL_FORMAT_YV12:                     format = kFormatYCrCb420PlanarStride16;   break;
   case HAL_PIXEL_FORMAT_YCrCb_420_SP:             format = kFormatYCrCb420SemiPlanar;       break;
@@ -1067,6 +1097,8 @@ const char *HWCDisplay::GetHALPixelFormatString(int format) {
     return "INTERLACE";
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS:
     return "YCbCr_420_SP_VENUS";
+  case HAL_PIXEL_FORMAT_YCrCb_420_SP_VENUS:
+    return "YCrCb_420_SP_VENUS";
   case HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC:
     return "YCbCr_420_SP_VENUS_UBWC";
   default:
@@ -1194,6 +1226,7 @@ void HWCDisplay::GetPanelResolution(uint32_t *x_pixels, uint32_t *y_pixels) {
 
 int HWCDisplay::SetDisplayStatus(uint32_t display_status) {
   int status = 0;
+  const hwc_procs_t *hwc_procs = *hwc_procs_;
 
   switch (display_status) {
   case kDisplayStatusResume:
@@ -1209,6 +1242,11 @@ int HWCDisplay::SetDisplayStatus(uint32_t display_status) {
   default:
     DLOGW("Invalid display status %d", display_status);
     return -EINVAL;
+  }
+
+  if (display_status == kDisplayStatusResume ||
+      display_status == kDisplayStatusPause) {
+    hwc_procs->invalidate(hwc_procs);
   }
 
   return status;
@@ -1248,15 +1286,6 @@ void HWCDisplay::MarkLayersForGPUBypass(hwc_display_contents_1_t *content_list) 
   for (size_t i = 0 ; i < (content_list->numHwLayers - 1); i++) {
     hwc_layer_1_t *layer = &content_list->hwLayers[i];
     layer->compositionType = HWC_OVERLAY;
-  }
-}
-
-void HWCDisplay::CloseAcquireFences(hwc_display_contents_1_t *content_list) {
-  for (size_t i = 0; i < content_list->numHwLayers; i++) {
-    if (content_list->hwLayers[i].acquireFenceFd >= 0) {
-      close(content_list->hwLayers[i].acquireFenceFd);
-      content_list->hwLayers[i].acquireFenceFd = -1;
-    }
   }
 }
 
@@ -1350,6 +1379,16 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
     layer_stack_.flags.single_buffered_layer_present |= meta_data->isSingleBufferMode;
   }
 
+  if (meta_data->operation & S3D_FORMAT) {
+    std::map<int, LayerBufferS3DFormat>::iterator it =
+                      s3d_format_hwc_to_sdm_.find(meta_data->s3dFormat);
+    if (it != s3d_format_hwc_to_sdm_.end()) {
+      layer->input_buffer->s3d_format = it->second;
+    } else {
+      DLOGW("Invalid S3D format %d", meta_data->s3dFormat);
+    }
+  }
+
   return kErrorNone;
 }
 
@@ -1368,7 +1407,9 @@ int HWCDisplay::GetPanelBrightness(int *level) {
 }
 
 int HWCDisplay::ToggleScreenUpdates(bool enable) {
+  const hwc_procs_t *hwc_procs = *hwc_procs_;
   display_paused_ = enable ? false : true;
+  hwc_procs->invalidate(hwc_procs);
   return 0;
 }
 

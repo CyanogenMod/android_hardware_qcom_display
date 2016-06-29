@@ -138,6 +138,8 @@ DisplayError Strategy::GetNextStrategy(StrategyConstraints *constraints) {
   for (uint32_t i = 0; i < layer_stack->layer_count; i++) {
     LayerComposition &composition = layer_stack->layers[i].composition;
     if (composition == kCompositionGPUTarget) {
+      hw_layers_info_->updated_src_rect[hw_layer_count] = layer_stack->layers[i].src_rect;
+      hw_layers_info_->updated_dst_rect[hw_layer_count] = layer_stack->layers[i].dst_rect;
       hw_layers_info_->index[hw_layer_count++] = i;
     } else if (composition != kCompositionBlitTarget) {
       composition = kCompositionGPU;
