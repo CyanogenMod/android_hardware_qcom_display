@@ -698,13 +698,103 @@ DisplayError HWHDMI::SetS3DMode(HWS3DMode s3d_mode) {
   return kErrorNone;
 }
 
+DisplayError HWHDMI::GetDynamicFrameRateMode(uint32_t refresh_rate, uint32_t *mode,
+                                             DynamicFPSData *data, uint32_t *config_index) {
+  msm_hdmi_mode_timing_info *cur = NULL;
+  msm_hdmi_mode_timing_info *dst = NULL;
+  uint32_t i = 0;
+  int pre_refresh_rate_diff = 0;
+  bool pre_unstd_mode = false;
+
+  for (i = 0; i < hdmi_mode_count_; i++) {
+    msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[i];
+    if (timing_mode->video_format == hdmi_modes_[active_config_index_]) {
+      cur = timing_mode;
+      break;
+    }
+  }
+
+  if (cur == NULL) {
+    DLOGE("can't find timing info for active config index(%d)", active_config_index_);
+    return kErrorUndefined;
+  }
+
+  if (cur->refresh_rate != frame_rate_) {
+    pre_unstd_mode = true;
+  }
+
+  if (i >= hdmi_mode_count_) {
+    return kErrorNotSupported;
+  }
+
+  dst = cur;
+  pre_refresh_rate_diff = static_cast<int>(dst->refresh_rate) - static_cast<int>(refresh_rate);
+
+  for (i = 0; i < hdmi_mode_count_; i++) {
+    msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[i];
+    if (cur->active_h == timing_mode->active_h &&
+       cur->active_v == timing_mode->active_v &&
+       cur->pixel_formats == timing_mode->pixel_formats ) {
+      int cur_refresh_rate_diff = static_cast<int>(timing_mode->refresh_rate) -
+                                  static_cast<int>(refresh_rate);
+      if (abs(pre_refresh_rate_diff) > abs(cur_refresh_rate_diff)) {
+        pre_refresh_rate_diff = cur_refresh_rate_diff;
+        dst = timing_mode;
+      }
+    }
+  }
+
+  if (dst == NULL) {
+    DLOGE("can't find timing mode switch to");
+    return kErrorUndefined;
+  }
+
+  GetConfigIndex(dst->video_format, config_index);
+
+  data->hor_front_porch = dst->front_porch_h;
+  data->hor_back_porch = dst->back_porch_h;
+  data->hor_pulse_width = dst->pulse_width_h;
+  data->clk_rate_hz = dst->pixel_freq;
+  data->fps = refresh_rate;
+
+  if (dst->front_porch_h != cur->front_porch_h) {
+    *mode = kModeHFP;
+  }
+
+  if (dst->refresh_rate != refresh_rate || dst->pixel_freq != cur->pixel_freq) {
+    if (*mode == kModeHFP) {
+      if (dst->refresh_rate != refresh_rate) {
+        *mode = kModeHFPCalcClock;
+      } else {
+        *mode = kModeClockHFP;
+      }
+    } else {
+        *mode = kModeClock;
+    }
+  }
+
+  if (pre_unstd_mode && (*mode == kModeHFP)) {
+    *mode = kModeClockHFP;
+  }
+
+  return kErrorNone;
+}
+
 DisplayError HWHDMI::SetRefreshRate(uint32_t refresh_rate) {
   char mode_path[kMaxStringLength] = {0};
   char node_path[kMaxStringLength] = {0};
-  uint32_t mode = kModeHFP;
+  uint32_t mode = kModeClock;
+  uint32_t config_index = 0;
+  DynamicFPSData data;
+  DisplayError error = kErrorNone;
 
   if (refresh_rate == frame_rate_) {
-    return kErrorNone;
+    return error;
+  }
+
+  error = GetDynamicFrameRateMode(refresh_rate, &mode, &data, &config_index);
+  if (error != kErrorNone) {
+    return error;
   }
 
   snprintf(mode_path, sizeof(mode_path), "%s%d/msm_fb_dfps_mode", fb_path_, fb_node_index_);
@@ -712,7 +802,7 @@ DisplayError HWHDMI::SetRefreshRate(uint32_t refresh_rate) {
 
   int fd_mode = Sys::open_(mode_path, O_WRONLY);
   if (fd_mode < 0) {
-    DLOGE("Failed to open %s with error %s", node_path, strerror(errno));
+    DLOGE("Failed to open %s with error %s", mode_path, strerror(errno));
     return kErrorFileDescriptor;
   }
 
@@ -734,8 +824,14 @@ DisplayError HWHDMI::SetRefreshRate(uint32_t refresh_rate) {
   }
 
   char refresh_rate_string[kMaxStringLength];
-  snprintf(refresh_rate_string, sizeof(refresh_rate_string), "%d", refresh_rate);
-  DLOGI_IF(kTagDriverConfig, "Setting refresh rate = %d", refresh_rate);
+  if (mode == kModeHFP || mode == kModeClock) {
+    snprintf(refresh_rate_string, sizeof(refresh_rate_string), "%d", refresh_rate);
+    DLOGI_IF(kTagDriverConfig, "Setting refresh rate = %d", refresh_rate);
+  } else {
+    snprintf(refresh_rate_string, sizeof(refresh_rate_string), "%d %d %d %d %d",
+             data.hor_front_porch, data.hor_back_porch, data.hor_pulse_width,
+             data.clk_rate_hz, data.fps);
+  }
   len = Sys::pwrite_(fd_node, refresh_rate_string, strlen(refresh_rate_string), 0);
   if (len < 0) {
     DLOGE("Failed to write %d with error %s", refresh_rate, strerror(errno));
@@ -744,12 +840,21 @@ DisplayError HWHDMI::SetRefreshRate(uint32_t refresh_rate) {
   }
   Sys::close_(fd_node);
 
-  DisplayError error = ReadTimingInfo();
+  error = ReadTimingInfo();
   if (error != kErrorNone) {
     return error;
   }
 
+//  GetDisplayAttributes(config_index, &display_attributes_);
+//  UpdateMixerAttributes();
+
   frame_rate_ = refresh_rate;
+  active_config_index_ = config_index;
+
+  DLOGI_IF(kTagDriverConfig, "config_index(%d) Mode(%d) frame_rate(%d)",
+           config_index,
+           mode,
+           frame_rate_);
 
   return kErrorNone;
 }
