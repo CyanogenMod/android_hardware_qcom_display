@@ -437,6 +437,8 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
 
     if (hw_rotator_session->hw_block_count) {
       input_buffer = &hw_rotator_session->output_buffer;
+      input_buffer->release_fence_fd = Sys::dup_(mdp_commit.release_fence);
+      continue;
     }
 
     // Make sure the release fence is duplicated only once for each buffer.
