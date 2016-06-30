@@ -1475,7 +1475,8 @@ bool HWCDisplay::SingleVideoLayerUpdating(uint32_t app_layer_count) {
 
   for (uint i = 0; i < app_layer_count; i++) {
     Layer *layer = &layer_stack_.layers[i];
-    if (layer->flags.updating && (layer->input_buffer->flags.video == true)) {
+    if (layer->flags.updating && (layer->input_buffer->flags.video == true) &&
+       (layer->input_buffer->s3d_format == kS3dFormatNone)) {
       updating_count++;
     }
   }
