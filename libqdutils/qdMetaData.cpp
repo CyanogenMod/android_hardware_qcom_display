@@ -90,6 +90,9 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
         case SET_S3D_RENDER:
             data->s3dRender = *((S3DSFRender_t *)param);
             break;
+        case SET_FRC_INFO:
+            data->frc = *((FrameRateControl_t *)param);
+            break;
         default:
             ALOGE("Unknown paramType %d", paramType);
             break;
@@ -188,6 +191,9 @@ int getMetaData(private_handle_t *handle, DispFetchParamType paramType,
             break;
         case GET_S3D_RENDER:
             *((S3DSFRender_t *)param) = data->s3dRender;
+            break;
+        case GET_FRC_INFO:
+            *((FrameRateControl_t *)param) = data->frc;
             break;
         default:
             ALOGE("Unknown paramType %d", paramType);
