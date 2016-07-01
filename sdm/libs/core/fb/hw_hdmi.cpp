@@ -220,6 +220,12 @@ DisplayError HWHDMI::ReadEDIDInfo() {
   return kErrorNone;
 }
 
+void HWHDMI::PopulateHWPanelInfo() {
+  HWDevice::PopulateHWPanelInfo();
+  hw_panel_info_.s3d_mode = active_s3d_mode_;
+  DLOGI("S3DMode = %d", hw_panel_info_.s3d_mode);
+}
+
 DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
                                           HWDisplayAttributes *display_attributes) {
   DTRACE_SCOPED();
@@ -652,6 +658,10 @@ bool HWHDMI::IsSupportedS3DMode(HWS3DMode s3d_mode) {
 }
 
 DisplayError HWHDMI::SetS3DMode(HWS3DMode s3d_mode) {
+  if (active_s3d_mode_ == s3d_mode) {
+    return kErrorNone;
+  }
+
   if (!IsSupportedS3DMode(s3d_mode)) {
     DLOGW("S3D mode is not supported s3d_mode = %d", s3d_mode);
     return kErrorNotSupported;
@@ -662,14 +672,6 @@ DisplayError HWHDMI::SetS3DMode(HWS3DMode s3d_mode) {
     return kErrorNotSupported;
   }
   msm_hdmi_s3d_mode s3d_mdp_mode = it->second;
-
-  if (active_mdp_s3d_mode_ == s3d_mdp_mode) {
-    // HDMI_S3D_SIDE_BY_SIDE is an mdp mapping for kS3DModeLR and kS3DModeRL s3d modes. So no need
-    // to update the s3d_mode node. hw_panel_info needs to be updated to differentiate these two s3d
-    // modes in strategy
-    hw_panel_info_.s3d_mode = s3d_mode;
-    return kErrorNone;
-  }
 
   ssize_t length = -1;
   char s3d_mode_path[kMaxStringLength] = {'\0'};
@@ -690,7 +692,7 @@ DisplayError HWHDMI::SetS3DMode(HWS3DMode s3d_mode) {
     return kErrorNotSupported;
   }
 
-  active_mdp_s3d_mode_ = s3d_mdp_mode;
+  active_s3d_mode_ = s3d_mode;
   hw_panel_info_.s3d_mode = s3d_mode;
   Sys::close_(s3d_mode_node);
 
@@ -844,9 +846,6 @@ DisplayError HWHDMI::SetRefreshRate(uint32_t refresh_rate) {
   if (error != kErrorNone) {
     return error;
   }
-
-//  GetDisplayAttributes(config_index, &display_attributes_);
-//  UpdateMixerAttributes();
 
   frame_rate_ = refresh_rate;
   active_config_index_ = config_index;
