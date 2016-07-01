@@ -42,7 +42,7 @@ DisplayVirtual::DisplayVirtual(DisplayEventHandler *event_handler, HWInfoInterfa
 }
 
 DisplayError DisplayVirtual::Init() {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
 
   DisplayError error = HWVirtual::Create(&hw_intf_, hw_info_intf_,
                                          DisplayBase::buffer_sync_handler_);
@@ -61,7 +61,7 @@ DisplayError DisplayVirtual::Init() {
 }
 
 DisplayError DisplayVirtual::Deinit() {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
 
   DisplayError error = DisplayBase::Deinit();
   HWVirtual::Destroy(hw_intf_);
@@ -69,56 +69,32 @@ DisplayError DisplayVirtual::Deinit() {
   return error;
 }
 
-DisplayError DisplayVirtual::Flush() {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::Flush();
-}
-
-DisplayError DisplayVirtual::GetDisplayState(DisplayState *state) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetDisplayState(state);
-}
-
 DisplayError DisplayVirtual::GetNumVariableInfoConfigs(uint32_t *count) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   *count = 1;
   return kErrorNone;
 }
 
 DisplayError DisplayVirtual::GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   *variable_info = display_attributes_;
   return kErrorNone;
 }
 
 DisplayError DisplayVirtual::GetActiveConfig(uint32_t *index) {
-  SCOPE_LOCK(locker_);
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
   *index = 0;
   return kErrorNone;
 }
 
-DisplayError DisplayVirtual::GetVSyncState(bool *enabled) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetVSyncState(enabled);
-}
-
-bool DisplayVirtual::IsUnderscanSupported() {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::IsUnderscanSupported();
-}
-
-DisplayError DisplayVirtual::SetDisplayState(DisplayState state) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetDisplayState(state);
-}
-
-DisplayError DisplayVirtual::SetActiveConfigLocked(DisplayConfigVariableInfo *variable_info) {
-  DisplayError error = kErrorNone;
+DisplayError DisplayVirtual::SetActiveConfig(DisplayConfigVariableInfo *variable_info) {
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
 
   if (!variable_info) {
     return kErrorParameters;
   }
 
+  DisplayError error = kErrorNone;
   HWDisplayAttributes display_attributes;
   HWMixerAttributes mixer_attributes;
   DisplayConfigVariableInfo fb_config = *variable_info;
@@ -162,49 +138,6 @@ DisplayError DisplayVirtual::SetActiveConfigLocked(DisplayConfigVariableInfo *va
   fb_config_ = fb_config;
 
   return kErrorNone;
-}
-
-DisplayError DisplayVirtual::SetVSyncState(bool enable) {
-  SCOPE_LOCK(locker_);
-  return kErrorNotSupported;
-}
-
-void DisplayVirtual::SetIdleTimeoutMs(uint32_t timeout_ms) { }
-
-DisplayError DisplayVirtual::SetMaxMixerStages(uint32_t max_mixer_stages) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetMaxMixerStages(max_mixer_stages);
-}
-
-DisplayError DisplayVirtual::SetDisplayMode(uint32_t mode) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetDisplayMode(mode);
-}
-
-DisplayError DisplayVirtual::GetRefreshRateRange(uint32_t *min_refresh_rate,
-                                                 uint32_t *max_refresh_rate) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::GetRefreshRateRange(min_refresh_rate, max_refresh_rate);
-}
-
-DisplayError DisplayVirtual::SetRefreshRate(uint32_t refresh_rate) {
-  SCOPE_LOCK(locker_);
-  return kErrorNotSupported;
-}
-
-DisplayError DisplayVirtual::SetPanelBrightness(int level) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetPanelBrightness(level);
-}
-
-void DisplayVirtual::AppendDump(char *buffer, uint32_t length) {
-  SCOPE_LOCK(locker_);
-  DisplayBase::AppendDump(buffer, length);
-}
-
-DisplayError DisplayVirtual::SetCursorPosition(int x, int y) {
-  SCOPE_LOCK(locker_);
-  return DisplayBase::SetCursorPosition(x, y);
 }
 
 }  // namespace sdm
