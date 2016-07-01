@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -123,6 +123,13 @@ bool Debug::IsRotatorSplitDisabled() {
 bool Debug::IsScalarDisabled() {
   int value = 0;
   debug_.debug_handler_->GetProperty("sdm.debug.disable_scalar", &value);
+
+  return (value == 1);
+}
+
+bool Debug::IsFrcEnabled() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.debug.enable_frc", &value);
 
   return (value == 1);
 }

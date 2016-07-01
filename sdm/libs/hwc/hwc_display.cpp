@@ -1392,6 +1392,12 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
     }
   }
 
+  if (meta_data->operation & SET_FRC_INFO) {
+    layer->frc_info.enable = meta_data->frc.enable;
+    layer->frc_info.frame_cnt = meta_data->frc.counter;
+    layer->frc_info.timestamp = meta_data->frc.timestamp;
+  }
+
   return kErrorNone;
 }
 
