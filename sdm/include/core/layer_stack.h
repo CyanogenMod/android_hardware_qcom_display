@@ -66,6 +66,10 @@ enum LayerComposition {
                             //!< device will mark the layer for GPU composition if it can not handle
                             //!< it completely.
 
+  kCompositionGPUS3D,       //!< This layer will be drawn onto the target buffer in s3d mode by GPU.
+                            //!< Display device will mark the layer for GPU composition if it can not
+                            //!< handle it completely.
+
   kCompositionSDE,          //!< This layer will be handled by SDE. It must not be composed by GPU.
 
   kCompositionHWCursor,     //!< This layer will be handled by SDE using HWCursor. It must not be

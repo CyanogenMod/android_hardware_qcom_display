@@ -289,7 +289,7 @@ int HWCSession::Prepare(hwc_composer_device_1 *device, size_t num_displays,
 
     if (hwc_session->color_mgr_) {
       HWCDisplay *primary_display = hwc_session->hwc_display_[HWC_DISPLAY_PRIMARY];
-      if (primary_display) {
+      if (primary_display && !hwc_session->is_hdmi_primary_) {
         int ret = hwc_session->color_mgr_->SolidFillLayersPrepare(displays, primary_display);
         if (ret)
           return 0;
