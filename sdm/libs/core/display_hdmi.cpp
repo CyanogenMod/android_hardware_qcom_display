@@ -154,7 +154,7 @@ DisplayError DisplayHDMI::SetRefreshRate(uint32_t refresh_rate) {
     return error;
   }
 
-  return kErrorNone;
+  return DisplayBase::ReconfigureDisplay();
 }
 
 bool DisplayHDMI::IsUnderscanSupported() {

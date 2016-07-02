@@ -109,6 +109,7 @@ class HWHDMI : public HWDevice {
 
   DisplayError GetDynamicFrameRateMode(uint32_t refresh_rate, uint32_t*mode,
                                        DynamicFPSData *data, uint32_t *config_index);
+  static const int kThresholdRefreshRate = 1000;
   vector<uint32_t> hdmi_modes_;
   // Holds the hdmi timing information. Ex: resolution, fps etc.,
   vector<msm_hdmi_mode_timing_info> supported_video_modes_;
