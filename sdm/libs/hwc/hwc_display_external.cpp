@@ -51,6 +51,7 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
   uint32_t external_width = 0;
   uint32_t external_height = 0;
   int drc_enabled = 0;
+  int drc_reset_fps_enabled = 0;
   DisplayError error = kErrorNone;
 
   HWCDisplay *hwc_display_external = new HWCDisplayExternal(core_intf, hwc_procs, qservice);
@@ -88,6 +89,10 @@ int HWCDisplayExternal::Create(CoreInterface *core_intf, hwc_procs_t const **hwc
 
   HWCDebugHandler::Get()->GetProperty("sdm.hdmi.drc_enabled", &(drc_enabled));
   reinterpret_cast<HWCDisplayExternal *>(hwc_display_external)->drc_enabled_ = drc_enabled;
+
+  HWCDebugHandler::Get()->GetProperty("sdm.hdmi.drc_reset_fps", &(drc_reset_fps_enabled));
+  reinterpret_cast<HWCDisplayExternal *>(hwc_display_external)->drc_reset_fps_enabled_ =
+                                                                drc_reset_fps_enabled;
 
   *hwc_display = hwc_display_external;
 
@@ -297,6 +302,12 @@ uint32_t HWCDisplayExternal::GetOptimalRefreshRate(bool one_updating_layer) {
     return force_refresh_rate_;
   } else if (one_updating_layer && drc_enabled_) {
     return metadata_refresh_rate_;
+  }
+
+  if (drc_reset_fps_enabled_) {
+    DisplayConfigVariableInfo fb_config;
+    display_intf_->GetFrameBufferConfig(&fb_config);
+    return (fb_config.fps * 1000);
   }
 
   return current_refresh_rate_;
