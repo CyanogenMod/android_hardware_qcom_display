@@ -746,9 +746,8 @@ DisplayError HWHDMI::GetDynamicFrameRateMode(uint32_t refresh_rate, uint32_t *mo
     }
   }
 
-  if (dst == NULL) {
-    DLOGE("can't find timing mode switch to");
-    return kErrorUndefined;
+  if (pre_refresh_rate_diff > kThresholdRefreshRate) {
+    return kErrorNotSupported;
   }
 
   GetConfigIndex(dst->video_format, config_index);
