@@ -232,7 +232,7 @@ HWC2::Error HWCDisplayPrimary::Present(int32_t *out_retire_fence) {
 }
 
 HWC2::Error HWCDisplayPrimary::GetColorModes(uint32_t *out_num_modes,
-                                             int32_t /*android_color_mode_t*/ *out_modes) {
+                                             android_color_mode_t *out_modes) {
   if (out_modes == nullptr) {
     *out_num_modes = color_mode_->GetColorModeCount();
   } else {
@@ -242,7 +242,7 @@ HWC2::Error HWCDisplayPrimary::GetColorModes(uint32_t *out_num_modes,
   return HWC2::Error::None;
 }
 
-HWC2::Error HWCDisplayPrimary::SetColorMode(int32_t /*android_color_mode_t*/ mode) {
+HWC2::Error HWCDisplayPrimary::SetColorMode(android_color_mode_t mode) {
   auto status = color_mode_->SetColorMode(mode);
   if (status != HWC2::Error::None) {
     DLOGE("failed for mode = %d", mode);

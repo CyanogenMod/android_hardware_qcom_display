@@ -94,20 +94,8 @@ int HWCSession::Init() {
     return -EINVAL;
   }
 
-  buffer_allocator_ = new HWCBufferAllocator();
-  if (buffer_allocator_ == NULL) {
-    DLOGE("Display core initialization failed due to no memory");
-    return -ENOMEM;
-  }
-
-  buffer_sync_handler_ = new HWCBufferSyncHandler();
-  if (buffer_sync_handler_ == NULL) {
-    DLOGE("Display core initialization failed due to no memory");
-    return -ENOMEM;
-  }
-
-  DisplayError error = CoreInterface::CreateCore(HWCDebugHandler::Get(), buffer_allocator_,
-                                                 buffer_sync_handler_, &core_intf_);
+  DisplayError error = CoreInterface::CreateCore(HWCDebugHandler::Get(), &buffer_allocator_,
+                                                 &buffer_sync_handler_, &core_intf_);
   if (error != kErrorNone) {
     DLOGE("Display core initialization failed. Error = %d", error);
     return -EINVAL;
@@ -125,7 +113,7 @@ int HWCSession::Init() {
                                         &hwc_display_[HWC_DISPLAY_PRIMARY]);
   } else {
     // Create and power on primary display
-    status = HWCDisplayPrimary::Create(core_intf_, buffer_allocator_, &callbacks_, qservice_,
+    status = HWCDisplayPrimary::Create(core_intf_, &buffer_allocator_, &callbacks_, qservice_,
                                        &hwc_display_[HWC_DISPLAY_PRIMARY]);
   }
 
@@ -319,7 +307,8 @@ static int32_t GetClientTargetSupport(hwc2_device_t *device, hwc2_display_t disp
 }
 
 static int32_t GetColorModes(hwc2_device_t *device, hwc2_display_t display, uint32_t *out_num_modes,
-                             int32_t /*android_color_mode_t*/ *out_modes) {
+                             int32_t /*android_color_mode_t*/ *int_out_modes) {
+  auto out_modes = reinterpret_cast<android_color_mode_t *>(int_out_modes);
   return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::GetColorModes, out_num_modes,
                                          out_modes);
 }
@@ -435,7 +424,8 @@ static int32_t SetClientTarget(hwc2_device_t *device, hwc2_display_t display,
 }
 
 int32_t HWCSession::SetColorMode(hwc2_device_t *device, hwc2_display_t display,
-                                 int32_t /*android_color_mode_t*/ mode) {
+                                 int32_t /*android_color_mode_t*/ int_mode) {
+  auto mode = static_cast<android_color_mode_t>(int_mode);
   SEQUENCE_WAIT_SCOPE_LOCK(locker_);
   return HWCSession::CallDisplayFunction(device, display, &HWCDisplay::SetColorMode, mode);
 }
@@ -843,9 +833,13 @@ android::status_t HWCSession::notifyCallback(uint32_t command, const android::Pa
       status = GetBWTransactionStatus(input_parcel, output_parcel);
       break;
 
-  case qService::IQService::SET_LAYER_MIXER_RESOLUTION:
-    status = SetMixerResolution(input_parcel);
-    break;
+    case qService::IQService::SET_LAYER_MIXER_RESOLUTION:
+      status = SetMixerResolution(input_parcel);
+      break;
+
+    case qService::IQService::SET_COLOR_MODE:
+      status = SetColorModeOverride(input_parcel);
+      break;
 
     default:
       DLOGW("QService command = %d is not supported", command);
@@ -1207,6 +1201,16 @@ android::status_t HWCSession::SetMixerResolution(const android::Parcel *input_pa
     return -EINVAL;
   }
 
+  return 0;
+}
+
+android::status_t HWCSession::SetColorModeOverride(const android::Parcel *input_parcel) {
+  auto display = static_cast<hwc2_display_t >(input_parcel->readInt32());
+  auto mode = static_cast<android_color_mode_t>(input_parcel->readInt32());
+  auto device = static_cast<hwc2_device_t *>(this);
+  auto err = CallDisplayFunction(device, display, &HWCDisplay::SetColorMode, mode);
+  if (err != HWC2_ERROR_NONE)
+    return -EINVAL;
   return 0;
 }
 

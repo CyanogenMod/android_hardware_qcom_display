@@ -120,10 +120,7 @@ DisplayError HWHDMI::Init() {
     return error;
   }
 
-  uint32_t dest_scalar_count = hw_resource_.hw_dest_scalar_info.count;
-  if (dest_scalar_count) {
-    mdp_dest_scalar_data_ = new mdp_destination_scaler_data[dest_scalar_count];
-  }
+  mdp_dest_scalar_data_.resize(hw_resource_.hw_dest_scalar_info.count);
 
   error = ReadEDIDInfo();
   if (error != kErrorNone) {
@@ -134,13 +131,6 @@ DisplayError HWHDMI::Init() {
   if (!IsResolutionFilePresent()) {
     Deinit();
     return kErrorHardware;
-  }
-
-  // Mode look-up table for HDMI
-  supported_video_modes_ = new msm_hdmi_mode_timing_info[hdmi_mode_count_];
-  if (!supported_video_modes_) {
-    Deinit();
-    return kErrorMemory;
   }
 
   error = ReadTimingInfo();
@@ -166,18 +156,11 @@ DisplayError HWHDMI::Init() {
 }
 
 DisplayError HWHDMI::Deinit() {
-  hdmi_mode_count_ = 0;
-  if (supported_video_modes_) {
-    delete[] supported_video_modes_;
-  }
-
-  delete [] mdp_dest_scalar_data_;
-
   return HWDevice::Deinit();
 }
 
 DisplayError HWHDMI::GetNumDisplayAttributes(uint32_t *count) {
-  *count = hdmi_mode_count_;
+  *count = UINT32(hdmi_modes_.size());
   if (*count <= 0) {
     return kErrorHardware;
   }
@@ -219,8 +202,14 @@ DisplayError HWHDMI::ReadEDIDInfo() {
     char *ptr = edid_str;
     const uint32_t edid_count_max = 128;
     char *tokens[edid_count_max] = { NULL };
-    ParseLine(ptr, tokens, edid_count_max, &hdmi_mode_count_);
-    for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
+    uint32_t hdmi_mode_count = 0;
+
+    ParseLine(ptr, tokens, edid_count_max, &hdmi_mode_count);
+
+    supported_video_modes_.resize(hdmi_mode_count);
+
+    hdmi_modes_.resize(hdmi_mode_count);
+    for (uint32_t i = 0; i < hdmi_mode_count; i++) {
       hdmi_modes_[i] = UINT32(atoi(tokens[i]));
     }
   }
@@ -232,13 +221,13 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
                                           HWDisplayAttributes *display_attributes) {
   DTRACE_SCOPED();
 
-  if (index > hdmi_mode_count_) {
+  if (index >= hdmi_modes_.size()) {
     return kErrorNotSupported;
   }
 
   // Get the resolution info from the look up table
   msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[0];
-  for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
+  for (uint32_t i = 0; i < hdmi_modes_.size(); i++) {
     msm_hdmi_mode_timing_info *cur = &supported_video_modes_[i];
     if (cur->video_format == hdmi_modes_[index]) {
       timing_mode = cur;
@@ -274,7 +263,7 @@ DisplayError HWHDMI::GetDisplayAttributes(uint32_t index,
 DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
   DTRACE_SCOPED();
 
-  if (index > hdmi_mode_count_) {
+  if (index > hdmi_modes_.size()) {
     return kErrorNotSupported;
   }
 
@@ -291,7 +280,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
         vscreeninfo.upper_margin, vscreeninfo.pixclock/1000000);
 
   msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[0];
-  for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
+  for (uint32_t i = 0; i < hdmi_modes_.size(); i++) {
     msm_hdmi_mode_timing_info *cur = &supported_video_modes_[i];
     if (cur->video_format == hdmi_modes_[index]) {
       timing_mode = cur;
@@ -345,7 +334,7 @@ DisplayError HWHDMI::SetDisplayAttributes(uint32_t index) {
 
 DisplayError HWHDMI::GetConfigIndex(uint32_t mode, uint32_t *index) {
   // Check if the mode is valid and return corresponding index
-  for (uint32_t i = 0; i < hdmi_mode_count_; i++) {
+  for (uint32_t i = 0; i < hdmi_modes_.size(); i++) {
     if (hdmi_modes_[i] == mode) {
       *index = i;
       DLOGI("Index = %d for config = %d", *index, mode);
@@ -371,7 +360,7 @@ DisplayError HWHDMI::GetHWScanInfo(HWScanInfo *scan_info) {
 }
 
 DisplayError HWHDMI::GetVideoFormat(uint32_t config_index, uint32_t *video_format) {
-  if (config_index > hdmi_mode_count_) {
+  if (config_index > hdmi_modes_.size()) {
     return kErrorNotSupported;
   }
 
@@ -531,7 +520,7 @@ DisplayError HWHDMI::ReadTimingInfo() {
       break;
     }
 
-    while (info->video_format && size < kPageSize && config_index < hdmi_mode_count_) {
+    while (info->video_format && size < kPageSize && config_index < hdmi_modes_.size()) {
       supported_video_modes_[config_index] = *info;
       size += sizeof(msm_hdmi_mode_timing_info);
 
@@ -601,7 +590,7 @@ DisplayError HWHDMI::GetDisplayS3DSupport(uint32_t index,
   char edid_s3d_path[kMaxStringLength] = {'\0'};
   snprintf(edid_s3d_path, sizeof(edid_s3d_path), "%s%d/edid_3d_modes", fb_path_, fb_node_index_);
 
-  if (index > hdmi_mode_count_) {
+  if (index > hdmi_modes_.size()) {
     return kErrorNotSupported;
   }
 

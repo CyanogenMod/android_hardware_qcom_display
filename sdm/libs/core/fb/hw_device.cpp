@@ -954,7 +954,6 @@ bool HWDevice::EnableHotPlugDetection(int enable) {
 }
 
 void HWDevice::ResetDisplayParams() {
-  uint32_t dst_scalar_cnt = hw_resource_.hw_dest_scalar_info.count;
   memset(&mdp_disp_commit_, 0, sizeof(mdp_disp_commit_));
   memset(&mdp_in_layers_, 0, sizeof(mdp_in_layers_));
   memset(&mdp_out_layer_, 0, sizeof(mdp_out_layer_));
@@ -963,8 +962,8 @@ void HWDevice::ResetDisplayParams() {
   memset(&pp_params_, 0, sizeof(pp_params_));
   memset(&igc_lut_data_, 0, sizeof(igc_lut_data_));
 
-  if (mdp_dest_scalar_data_) {
-    memset(mdp_dest_scalar_data_, 0, sizeof(mdp_dest_scalar_data_) * dst_scalar_cnt);
+  for (size_t i = 0; i < mdp_dest_scalar_data_.size(); i++) {
+    mdp_dest_scalar_data_[i] = {};
   }
 
   for (uint32_t i = 0; i < kMaxSDELayers * 2; i++) {
@@ -976,7 +975,7 @@ void HWDevice::ResetDisplayParams() {
   mdp_disp_commit_.commit_v1.output_layer = &mdp_out_layer_;
   mdp_disp_commit_.commit_v1.release_fence = -1;
   mdp_disp_commit_.commit_v1.retire_fence = -1;
-  mdp_disp_commit_.commit_v1.dest_scaler = mdp_dest_scalar_data_;
+  mdp_disp_commit_.commit_v1.dest_scaler = mdp_dest_scalar_data_.data();
 }
 
 void HWDevice::SetCSC(LayerCSC source, mdp_color_space *color_space) {

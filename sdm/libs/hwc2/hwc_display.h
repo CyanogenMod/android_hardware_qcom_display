@@ -55,17 +55,17 @@ class HWCColorMode {
   HWC2::Error Init();
   HWC2::Error DeInit();
   uint32_t GetColorModeCount();
-  HWC2::Error GetColorModes(uint32_t *out_num_modes, int32_t /*android_color_mode_t*/ *out_modes);
-  HWC2::Error SetColorMode(int32_t /*android_color_mode_t*/ mode);
+  HWC2::Error GetColorModes(uint32_t *out_num_modes, android_color_mode_t *out_modes);
+  HWC2::Error SetColorMode(android_color_mode_t mode);
   HWC2::Error SetColorTransform(const float *matrix, android_color_transform_t hint);
 
  private:
   static const uint32_t kColorTransformMatrixCount = 16;
 
-  HWC2::Error HandleColorModeTransform(int32_t /*android_color_mode_t*/ mode,
+  HWC2::Error HandleColorModeTransform(android_color_mode_t mode,
                                        android_color_transform_t hint, const double *matrix);
   void PopulateColorModes();
-  void PopulateTransform(const int32_t &mode, const std::string &color_mode);
+  void PopulateTransform(const android_color_mode_t &mode, const std::string &color_mode);
   template <class T>
   void CopyColorTransformMatrix(const T *input_matrix, double *output_matrix) {
     for (uint32_t i = 0; i < kColorTransformMatrixCount; i++) {
@@ -74,11 +74,10 @@ class HWCColorMode {
   }
 
   DisplayInterface *display_intf_ = NULL;
-  int32_t current_color_mode_ = 0;  // android_color_mode_t
+  android_color_mode_t current_color_mode_ = HAL_COLOR_MODE_NATIVE;
   android_color_transform_t current_color_transform_ = HAL_COLOR_TRANSFORM_IDENTITY;
   typedef std::map<android_color_transform_t, std::string> TransformMap;
-  // TODO(user): change int32_t to android_color_mode_t when defined
-  std::map<int32_t, TransformMap> color_mode_transform_map_ = {};
+  std::map<android_color_mode_t, TransformMap> color_mode_transform_map_ = {};
   double color_matrix_[kColorTransformMatrixCount] = {0};
 };
 
@@ -142,13 +141,13 @@ class HWCDisplay : public DisplayEventHandler {
   virtual HWC2::Error SetActiveConfig(hwc2_config_t config);
   virtual HWC2::Error SetClientTarget(buffer_handle_t target, int32_t acquire_fence,
                                       int32_t dataspace, hwc_region_t damage);
-  virtual HWC2::Error SetColorMode(int32_t /*android_color_mode_t*/ mode) {
+  virtual HWC2::Error SetColorMode(android_color_mode_t mode) {
     return HWC2::Error::Unsupported;
   }
   virtual HWC2::Error SetColorTransform(const float *matrix, android_color_transform_t hint) {
     return HWC2::Error::Unsupported;
   }
-  virtual HWC2::Error HandleColorModeTransform(int32_t /*android_color_mode_t*/ mode,
+  virtual HWC2::Error HandleColorModeTransform(android_color_mode_t mode,
                                                android_color_transform_t hint,
                                                const double *matrix) {
     return HWC2::Error::Unsupported;
@@ -158,7 +157,7 @@ class HWCDisplay : public DisplayEventHandler {
                                           int32_t *out_value);
   virtual HWC2::Error GetClientTargetSupport(uint32_t width, uint32_t height, int32_t format,
                                              int32_t dataspace);
-  virtual HWC2::Error GetColorModes(uint32_t *outNumModes, int32_t *outModes);
+  virtual HWC2::Error GetColorModes(uint32_t *outNumModes, android_color_mode_t *outModes);
   virtual HWC2::Error GetChangedCompositionTypes(uint32_t *out_num_elements,
                                                  hwc2_layer_t *out_layers, int32_t *out_types);
   virtual HWC2::Error GetDisplayRequests(int32_t *out_display_requests, uint32_t *out_num_elements,

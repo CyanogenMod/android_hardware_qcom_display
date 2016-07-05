@@ -74,7 +74,7 @@ class HWCDisplayPrimary : public HWCDisplay {
   DisplayError GetMixerResolution(uint32_t *width, uint32_t *height);
 
   BufferAllocator *buffer_allocator_ = nullptr;
-  CPUHint *cpu_hint_ = nullptr;
+  CPUHint cpu_hint_;
   bool handle_idle_timeout_ = false;
 
   // Primary output buffer configuration

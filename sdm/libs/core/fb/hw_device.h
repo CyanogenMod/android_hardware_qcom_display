@@ -29,6 +29,7 @@
 #include <linux/msm_mdp_ext.h>
 #include <linux/mdss_rotator.h>
 #include <pthread.h>
+#include <vector>
 
 #include "hw_interface.h"
 #include "hw_scale.h"
@@ -145,7 +146,7 @@ class HWDevice : public HWInterface {
   bool synchronous_commit_;
   HWDisplayAttributes display_attributes_ = {};
   HWMixerAttributes mixer_attributes_ = {};
-  mdp_destination_scaler_data *mdp_dest_scalar_data_ = NULL;
+  std::vector<mdp_destination_scaler_data> mdp_dest_scalar_data_;
 };
 
 }  // namespace sdm
