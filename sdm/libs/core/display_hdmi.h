@@ -41,7 +41,6 @@ class DisplayHDMI : public DisplayBase, HWEventHandler {
               BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
               RotatorInterface *rotator_intf);
   virtual DisplayError Init();
-  virtual DisplayError Deinit();
   virtual DisplayError Prepare(LayerStack *layer_stack);
   virtual DisplayError GetRefreshRateRange(uint32_t *min_refresh_rate, uint32_t *max_refresh_rate);
   virtual DisplayError SetRefreshRate(uint32_t refresh_rate);

@@ -28,7 +28,6 @@
 #include "display_virtual.h"
 #include "hw_interface.h"
 #include "hw_info_interface.h"
-#include "fb/hw_virtual.h"
 
 #define __CLASS__ "DisplayVirtual"
 
@@ -44,8 +43,8 @@ DisplayVirtual::DisplayVirtual(DisplayEventHandler *event_handler, HWInfoInterfa
 DisplayError DisplayVirtual::Init() {
   lock_guard<recursive_mutex> obj(recursive_mutex_);
 
-  DisplayError error = HWVirtual::Create(&hw_intf_, hw_info_intf_,
-                                         DisplayBase::buffer_sync_handler_);
+  DisplayError error = HWInterface::Create(kVirtual, hw_info_intf_, buffer_sync_handler_,
+                                           &hw_intf_);
   if (error != kErrorNone) {
     return error;
   }
@@ -54,17 +53,8 @@ DisplayError DisplayVirtual::Init() {
 
   error = DisplayBase::Init();
   if (error != kErrorNone) {
-    HWVirtual::Destroy(hw_intf_);
+    HWInterface::Destroy(hw_intf_);
   }
-
-  return error;
-}
-
-DisplayError DisplayVirtual::Deinit() {
-  lock_guard<recursive_mutex> obj(recursive_mutex_);
-
-  DisplayError error = DisplayBase::Deinit();
-  HWVirtual::Destroy(hw_intf_);
 
   return error;
 }

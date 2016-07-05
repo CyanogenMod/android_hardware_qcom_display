@@ -49,9 +49,13 @@ namespace sdm {
 class HWInfoInterface;
 
 class HWDevice : public HWInterface {
+ public:
+  virtual ~HWDevice() {}
+  virtual DisplayError Init();
+  virtual DisplayError Deinit();
+
  protected:
   explicit HWDevice(BufferSyncHandler *buffer_sync_handler);
-  virtual ~HWDevice() {}
 
   // From HWInterface
   virtual DisplayError GetActiveConfig(uint32_t *active_config);
@@ -88,10 +92,6 @@ class HWDevice : public HWInterface {
   virtual DisplayError SetScaleLutConfig(HWScaleLutInfo *lut_info);
   virtual DisplayError SetMixerAttributes(const HWMixerAttributes &mixer_attributes);
   virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes);
-
-  // For HWDevice derivatives
-  virtual DisplayError Init();
-  virtual DisplayError Deinit();
 
   enum {
     kHWEventVSync,

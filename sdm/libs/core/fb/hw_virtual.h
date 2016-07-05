@@ -31,9 +31,7 @@ namespace sdm {
 
 class HWVirtual : public HWDevice {
  public:
-  static DisplayError Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
-                             BufferSyncHandler *buffer_sync_handler);
-  static DisplayError Destroy(HWInterface *intf);
+  HWVirtual(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
   virtual DisplayError SetVSyncState(bool enable) { return kErrorNotSupported; }
   virtual DisplayError SetMixerAttributes(const HWMixerAttributes &mixer_attributes) {
     return kErrorNotSupported;
@@ -42,7 +40,6 @@ class HWVirtual : public HWDevice {
   virtual DisplayError SetDisplayAttributes(const HWDisplayAttributes &display_attributes);
 
  protected:
-  HWVirtual(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
   virtual DisplayError Init();
   virtual DisplayError Validate(HWLayers *hw_layers);
 };
