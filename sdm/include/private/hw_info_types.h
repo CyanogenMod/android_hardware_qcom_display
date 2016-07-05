@@ -158,7 +158,6 @@ struct HWSplitInfo {
 };
 
 enum HWS3DMode {
-  kS3DModeInvalid = -1,
   kS3DModeNone,
   kS3DModeLR,
   kS3DModeRL,
@@ -185,7 +184,7 @@ struct HWPanelInfo {
   bool is_pluggable = false;          // Panel is pluggable
   HWSplitInfo split_info;             // Panel split configuration
   char panel_name[256] = {0};         // Panel name
-  HWS3DMode s3d_mode = kS3DModeInvalid;  // Panel's current s3d mode.
+  HWS3DMode s3d_mode = kS3DModeNone;  // Panel's current s3d mode.
   int panel_max_brightness = 0;       // Max panel brightness
 
   bool operator !=(const HWPanelInfo &panel_info) {
