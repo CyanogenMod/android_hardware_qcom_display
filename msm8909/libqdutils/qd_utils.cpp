@@ -31,7 +31,20 @@
 #define QD_UTILS_DEBUG 0
 
 namespace qdutils {
+#ifdef HDMI_STUB
+int getHDMINode(void)
+{
+    ALOGD_IF(QD_UTILS_DEBUG, "%s: HDMI_STUB\n", __func__);
+    return -1;
+}
 
+int getEdidRawData(char *buffer)
+{
+    ALOGD_IF(QD_UTILS_DEBUG, "%s: HDMI_STUB\n", __func__);
+    (void) buffer;
+    return 0;
+}
+#else
 int getHDMINode(void)
 {
     FILE *displayDeviceFP = NULL;
@@ -91,6 +104,7 @@ int getEdidRawData(char *buffer)
     close(edidFile);
     return size;
 }
+#endif
 
 /* Calculates the aspect ratio for based on src & dest */
 void getAspectRatioPosition(int destWidth, int destHeight, int srcWidth,
