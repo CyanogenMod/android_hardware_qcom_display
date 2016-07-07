@@ -107,6 +107,8 @@ class HWHDMI : public HWDevice {
   DisplayError GetDynamicFrameRateMode(uint32_t refresh_rate, uint32_t*mode,
                                        DynamicFPSData *data, uint32_t *config_index);
   void PopulateHWPanelInfo();
+
+  static const int kThresholdRefreshRate = 1000;
   uint32_t hdmi_mode_count_;
   uint32_t hdmi_modes_[256];
   // Holds the hdmi timing information. Ex: resolution, fps etc.,
@@ -116,7 +118,7 @@ class HWHDMI : public HWDevice {
   std::map<HWS3DMode, msm_hdmi_s3d_mode> s3d_mode_sdm_to_mdp_;
   std::vector<HWS3DMode> supported_s3d_modes_;
   // Reset this variable to ensure valid S3D configuration is set.
-  HWS3DMode active_s3d_mode_ = kS3DModeNone;
+  int active_mdp_s3d_mode_ = -1;
   uint32_t frame_rate_ = 0;
 };
 
