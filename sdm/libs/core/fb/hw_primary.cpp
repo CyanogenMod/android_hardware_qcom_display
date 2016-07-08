@@ -587,7 +587,12 @@ DisplayError HWPrimary::SetAutoRefresh(bool enable) {
 DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
   mdp_pp_feature_version version = {};
 
+#ifdef PA_DITHER
+  uint32_t feature_id_mapping[kMaxNumPPFeatures] = { PCC, IGC, GC, GC, PA,
+                                                     DITHER, GAMUT, PA_DITHER };
+#else
   uint32_t feature_id_mapping[kMaxNumPPFeatures] = { PCC, IGC, GC, GC, PA, DITHER, GAMUT };
+#endif
 
   for (int i(0); i < kMaxNumPPFeatures; i++) {
     version.pp_feature = feature_id_mapping[i];
