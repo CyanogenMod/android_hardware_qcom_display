@@ -28,6 +28,12 @@
 #include <cutils/native_handle.h>
 #include <utils/Singleton.h>
 
+#ifndef _ANDROID_
+#undef PAGE_SHIFT
+#undef PAGE_SIZE
+#define PAGE_SHIFT      12
+#define PAGE_SIZE       (1 << PAGE_SHIFT)
+#endif
 /*****************************************************************************/
 
 struct private_module_t;

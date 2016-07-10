@@ -28,7 +28,15 @@
 
 #include <cutils/native_handle.h>
 
+#ifdef _ANDROID_
 #include <cutils/log.h>
+#else
+#include <log/log.h>
+#undef PAGE_SHIFT
+#undef PAGE_SIZE
+#define PAGE_SHIFT      12
+#define PAGE_SIZE       (1 << PAGE_SHIFT)
+#endif
 
 #define ROUND_UP_PAGESIZE(x) ( (((unsigned long)(x)) + PAGE_SIZE-1)  & \
                                (~(PAGE_SIZE-1)) )
