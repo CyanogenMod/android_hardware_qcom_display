@@ -61,11 +61,12 @@ int querySDEInfo(HWQueryType type, int *value) {
     case HAS_MACRO_TILE:
         featureName = "tile_format";
         break;
-
     case HAS_UBWC:
         featureName = "ubwc";
         break;
-
+    case HAS_WB_UBWC:
+        featureName = "wb_ubwc";
+        break;
     default:
         ALOGE("Invalid query type %d", type);
         return -EINVAL;

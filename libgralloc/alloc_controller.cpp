@@ -101,6 +101,7 @@ static bool useUncached(const int& usage) {
 MDPCapabilityInfo :: MDPCapabilityInfo() {
   qdutils::querySDEInfo(HAS_MACRO_TILE, &isMacroTileSupported);
   qdutils::querySDEInfo(HAS_UBWC, &isUBwcSupported);
+  qdutils::querySDEInfo(HAS_WB_UBWC, &isWBUBWCSupported);
 }
 
 //------------- AdrenoMemInfo-----------------------//
