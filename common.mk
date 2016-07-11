@@ -8,7 +8,10 @@ endif
 
 common_includes := $(display_top)/libqdutils
 common_includes += $(display_top)/libqservice
-common_includes += $(display_top)/libcopybit
+ifneq ($(TARGET_IS_HEADLESS), true)
+    common_includes += $(display_top)/libcopybit
+endif
+
 common_includes += $(display_top)/sdm/include
 
 common_header_export_path := qcom/display
@@ -16,9 +19,15 @@ common_header_export_path := qcom/display
 #Common libraries external to display HAL
 common_libs := liblog libutils libcutils libhardware
 
+ifeq ($(TARGET_IS_HEADLESS), true)
+    LOCAL_CLANG := false
+else
+    LOCAL_CLANG := true
+endif
+
 #Common C flags
 common_flags := -DDEBUG_CALC_FPS -Wno-missing-field-initializers
-common_flags += -Wconversion -Wall -Werror
+common_flags += -Wconversion -Wall -Werror -std=c++11
 ifneq ($(TARGET_USES_GRALLOC1), true)
     common_flags += -isystem $(display_top)/libgralloc
 else
@@ -50,6 +59,10 @@ kernel_includes :=
 # Enable QCOM Display features
 #    common_flags += -DQTI_BSP
 # endif
+
+ifeq ($(TARGET_IS_HEADLESS),true)
+    common_flags += -DTARGET_HEADLESS
+endif
 
 ifeq ($(TARGET_COMPILE_WITH_MSM_KERNEL),true)
 # This check is to pick the kernel headers from the right location.

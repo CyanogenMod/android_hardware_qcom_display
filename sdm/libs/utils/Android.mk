@@ -5,10 +5,7 @@ include $(LOCAL_PATH)/../../../common.mk
 LOCAL_MODULE                  := libsdmutils
 LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := $(common_includes)
-LOCAL_CFLAGS                  := -Wno-missing-field-initializers \
-                                 -std=c++11 -fcolor-diagnostics\
-                                 -DLOG_TAG=\"SDM\" $(common_flags)
-LOCAL_CLANG                   := true
+LOCAL_CFLAGS                  := -DLOG_TAG=\"SDM\" $(common_flags)
 LOCAL_SRC_FILES               := debug.cpp \
                                  rect.cpp \
                                  sys.cpp \
