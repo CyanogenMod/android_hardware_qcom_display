@@ -91,4 +91,8 @@ inline android::status_t setBufferMirrorMode(uint32_t enable) {
     return sendSingleParam(qService::IQService::BUFFER_MIRRORMODE, enable);
 }
 
+inline android::status_t setCameraLaunchStatus(uint32_t on) {
+    return sendSingleParam(qService::IQService::SET_CAMERA_STATUS, on);
+}
+
 #endif /* end of include guard: QSERVICEUTILS_H */

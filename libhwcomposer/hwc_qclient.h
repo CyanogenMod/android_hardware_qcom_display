@@ -33,6 +33,7 @@
 #include <utils/Errors.h>
 #include <sys/types.h>
 #include <cutils/log.h>
+#include <utils/RefBase.h>
 #include <binder/IServiceManager.h>
 #include <media/IMediaDeathNotifier.h>
 #include <IQClient.h>
@@ -51,6 +52,13 @@ public:
             const android::Parcel* inParcel,
             android::Parcel* outParcel);
 
+    //Notifies camera service death
+    class CamDeathNotifier : public IBinder::DeathRecipient {
+    public:
+        CamDeathNotifier(){}
+        virtual void binderDied(const android::wp<IBinder>& who);
+    };
+
 private:
     //Notifies of Media Player death
     class MPDeathNotifier : public android::IMediaDeathNotifier {
@@ -62,6 +70,7 @@ private:
 
     hwc_context_t *mHwcContext;
     const android::sp<android::IMediaDeathNotifier> mMPDeathNotifier;
+    const android::sp<QClient::CamDeathNotifier>  mCamDeathNotifier;
 };
 }; // namespace qClient
 #endif // ANDROID_QCLIENT_H
