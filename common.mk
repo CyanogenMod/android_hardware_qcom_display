@@ -55,10 +55,10 @@ common_deps  :=
 kernel_includes :=
 
 # Executed only on QCOM BSPs
-# ifeq ($(TARGET_USES_QCOM_BSP),true)
+ifeq ($(TARGET_USES_QCOM_BSP),true)
 # Enable QCOM Display features
-#    common_flags += -DQTI_BSP
-# endif
+   common_flags += -DQTI_BSP
+endif
 
 ifeq ($(TARGET_IS_HEADLESS),true)
     common_flags += -DTARGET_HEADLESS
