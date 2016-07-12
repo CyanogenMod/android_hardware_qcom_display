@@ -39,7 +39,7 @@
 #include <qdMetaData.h>
 #include <utils/Singleton.h>
 #include <utils/Mutex.h>
-
+#include <algorithm>
 
 #ifdef VENUS_COLOR_FORMAT
 #include <media/msm_media_info.h>
@@ -101,6 +101,7 @@ static bool useUncached(const int& usage) {
 MDPCapabilityInfo :: MDPCapabilityInfo() {
   qdutils::querySDEInfo(HAS_MACRO_TILE, &isMacroTileSupported);
   qdutils::querySDEInfo(HAS_UBWC, &isUBwcSupported);
+  qdutils::querySDEInfo(HAS_WB_UBWC, &isWBUBWCSupported);
 }
 
 //------------- AdrenoMemInfo-----------------------//

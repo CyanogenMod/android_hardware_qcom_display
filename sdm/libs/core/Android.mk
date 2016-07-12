@@ -5,12 +5,9 @@ include $(LOCAL_PATH)/../../../common.mk
 LOCAL_MODULE                  := libsdmcore
 LOCAL_MODULE_TAGS             := optional
 LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
-LOCAL_CFLAGS                  := -Wno-missing-field-initializers -Wno-unused-parameter \
-                                 -std=c++11 -fcolor-diagnostics\
-                                 -DLOG_TAG=\"SDM\" $(common_flags)
-LOCAL_CLANG                   := true
+LOCAL_CFLAGS                  := -Wno-unused-parameter -DLOG_TAG=\"SDM\" $(common_flags)
 LOCAL_HW_INTF_PATH            := fb
-LOCAL_SHARED_LIBRARIES        := libdl libsdmutils libc++
+LOCAL_SHARED_LIBRARIES        := libdl libsdmutils
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps) $(kernel_deps)
 LOCAL_SRC_FILES               := core_interface.cpp \
                                  core_impl.cpp \
