@@ -32,14 +32,6 @@ namespace sdm {
 
 class HWCDisplayPrimary : public HWCDisplay {
  public:
-  enum {
-    SET_METADATA_DYN_REFRESH_RATE,
-    SET_BINDER_DYN_REFRESH_RATE,
-    SET_DISPLAY_MODE,
-    SET_QDCM_SOLID_FILL_INFO,
-    UNSET_QDCM_SOLID_FILL_INFO,
-  };
-
   static int Create(CoreInterface *core_intf, BufferAllocator *buffer_allocator,
                     hwc_procs_t const **hwc_procs, qService::QService *qservice,
                     HWCDisplay **hwc_display);

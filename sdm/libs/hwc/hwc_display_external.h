@@ -40,6 +40,7 @@ class HWCDisplayExternal : public HWCDisplay {
   virtual int Prepare(hwc_display_contents_1_t *content_list);
   virtual int Commit(hwc_display_contents_1_t *content_list);
   virtual void SetSecureDisplay(bool secure_display_active);
+  virtual int Perform(uint32_t operation, ...);
 
  protected:
   virtual uint32_t RoundToStandardFPS(float fps);
@@ -52,6 +53,8 @@ class HWCDisplayExternal : public HWCDisplay {
   void ApplyScanAdjustment(hwc_rect_t *display_frame);
   static void GetDownscaleResolution(uint32_t primary_width, uint32_t primary_height,
                                      uint32_t *virtual_width, uint32_t *virtual_height);
+  void ForceRefreshRate(uint32_t refresh_rate);
+  uint32_t GetOptimalRefreshRate(bool one_updating_layer);
 };
 
 }  // namespace sdm
