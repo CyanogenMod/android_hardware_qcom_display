@@ -141,14 +141,14 @@ void HWEvents::PopulateHWEventData() {
 }
 
 DisplayError HWEvents::Init(int fb_num, HWEventHandler *event_handler,
-                            std::vector<const char *> *event_list) {
+                            vector<const char *> *event_list) {
   if (!event_handler)
     return kErrorParameters;
 
   event_handler_ = event_handler;
   fb_num_ = fb_num;
   event_list_ = event_list;
-  poll_fds_ = new pollfd[event_list_->size()];
+  poll_fds_.resize(event_list_->size());
   event_thread_name_ += " - " + std::to_string(fb_num_);
 
   PopulateHWEventData();
@@ -178,10 +178,6 @@ DisplayError HWEvents::Deinit() {
     poll_fds_[i].fd = -1;
   }
 
-  delete [] poll_fds_;
-
-  poll_fds_ = 0;
-
   return kErrorNone;
 }
 
@@ -200,7 +196,7 @@ void* HWEvents::DisplayEventHandler() {
   setpriority(PRIO_PROCESS, 0, kThreadPriorityUrgent);
 
   while (!exit_threads_) {
-    int error = Sys::poll_(poll_fds_, UINT32(event_list_->size()), -1);
+    int error = Sys::poll_(poll_fds_.data(), UINT32(event_list_->size()), -1);
 
     if (error <= 0) {
       DLOGW("poll failed. error = %s", strerror(errno));

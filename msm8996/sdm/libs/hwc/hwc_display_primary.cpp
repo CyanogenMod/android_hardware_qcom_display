@@ -86,15 +86,11 @@ HWCDisplayPrimary::HWCDisplayPrimary(CoreInterface *core_intf,
                                      hwc_procs_t const **hwc_procs,
                                      qService::QService *qservice)
   : HWCDisplay(core_intf, hwc_procs, kPrimary, HWC_DISPLAY_PRIMARY, true, qservice,
-               DISPLAY_CLASS_PRIMARY), buffer_allocator_(buffer_allocator), cpu_hint_(NULL) {
+               DISPLAY_CLASS_PRIMARY), buffer_allocator_(buffer_allocator) {
 }
 
 int HWCDisplayPrimary::Init() {
-  cpu_hint_ = new CPUHint();
-  if (cpu_hint_->Init(static_cast<HWCDebugHandler*>(HWCDebugHandler::Get())) != kErrorNone) {
-    delete cpu_hint_;
-    cpu_hint_ = NULL;
-  }
+  cpu_hint_.Init(static_cast<HWCDebugHandler*>(HWCDebugHandler::Get()));
 
   use_metadata_refresh_rate_ = true;
   int disable_metadata_dynfps = 0;
@@ -289,14 +285,10 @@ void HWCDisplayPrimary::SetQDCMSolidFillInfo(bool enable, uint32_t color) {
 }
 
 void HWCDisplayPrimary::ToggleCPUHint(bool set) {
-  if (!cpu_hint_) {
-    return;
-  }
-
   if (set) {
-    cpu_hint_->Set();
+    cpu_hint_.Set();
   } else {
-    cpu_hint_->Reset();
+    cpu_hint_.Reset();
   }
 }
 

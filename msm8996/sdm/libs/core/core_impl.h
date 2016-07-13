@@ -65,7 +65,7 @@ class CoreImpl : public CoreInterface {
   Locker locker_;
   BufferAllocator *buffer_allocator_;
   BufferSyncHandler *buffer_sync_handler_;
-  HWResourceInfo *hw_resource_ = NULL;
+  HWResourceInfo hw_resource_;
   CompManager comp_mgr_;
   HWInfoInterface *hw_info_intf_ = NULL;
   RotatorInterface *rotator_intf_ = NULL;
