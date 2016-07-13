@@ -234,9 +234,13 @@ int32_t HWCSession::CreateVirtualDisplay(hwc2_device_t *device, uint32_t width, 
 
   HWCSession *hwc_session = static_cast<HWCSession *>(device);
   auto status = hwc_session->CreateVirtualDisplayObject(width, height, format);
-  if (status == HWC2::Error::None)
+  if (status == HWC2::Error::None) {
     *out_display_id = HWC_DISPLAY_VIRTUAL;
-  DLOGI("Created virtual display id:% " PRIu64 " with res: %dx%d", *out_display_id, width, height);
+    DLOGI("Created virtual display id:% " PRIu64 " with res: %dx%d",
+          *out_display_id, width, height);
+  } else {
+    DLOGE("Failed to create virtual display: %s", to_string(status).c_str());
+  }
   return INT32(status);
 }
 
@@ -257,6 +261,7 @@ int32_t HWCSession::DestroyVirtualDisplay(hwc2_device_t *device, hwc2_display_t 
 
   if (hwc_session->hwc_display_[display]) {
     HWCDisplayVirtual::Destroy(hwc_session->hwc_display_[display]);
+    hwc_session->hwc_display_[display] = nullptr;
     return HWC2_ERROR_NONE;
   } else {
     return HWC2_ERROR_BAD_DISPLAY;
