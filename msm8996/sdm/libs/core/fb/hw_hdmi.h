@@ -33,6 +33,8 @@
 
 namespace sdm {
 
+using std::vector;
+
 class HWHDMI : public HWDevice {
  public:
   static DisplayError Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
@@ -85,14 +87,13 @@ class HWHDMI : public HWDevice {
   bool IsSupportedS3DMode(HWS3DMode s3d_mode);
   void UpdateMixerAttributes();
 
-  uint32_t hdmi_mode_count_;
-  uint32_t hdmi_modes_[256];
+  vector<uint32_t> hdmi_modes_;
   // Holds the hdmi timing information. Ex: resolution, fps etc.,
-  msm_hdmi_mode_timing_info *supported_video_modes_;
+  vector<msm_hdmi_mode_timing_info> supported_video_modes_;
   HWScanInfo hw_scan_info_;
   uint32_t active_config_index_;
   std::map<HWS3DMode, msm_hdmi_s3d_mode> s3d_mode_sdm_to_mdp_;
-  std::vector<HWS3DMode> supported_s3d_modes_;
+  vector<HWS3DMode> supported_s3d_modes_;
   int active_mdp_s3d_mode_ = HDMI_S3D_NONE;
   uint32_t frame_rate_ = 0;
 };

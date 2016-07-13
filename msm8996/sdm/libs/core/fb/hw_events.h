@@ -36,10 +36,12 @@
 
 namespace sdm {
 
+using std::vector;
+
 class HWEvents : public HWEventsInterface {
  public:
   DisplayError Init(int fb_num, HWEventHandler *event_handler,
-                    std::vector<const char *> *event_list);
+                    vector<const char *> *event_list);
   DisplayError Deinit();
 
  private:
@@ -65,9 +67,9 @@ class HWEvents : public HWEventsInterface {
   pollfd InitializePollFd(HWEventData *event_data);
 
   HWEventHandler *event_handler_ = NULL;
-  std::vector<const char *> *event_list_ = NULL;
-  std::vector<HWEventData> event_data_list_ = {};
-  pollfd *poll_fds_ = NULL;
+  vector<const char *> *event_list_ = NULL;
+  vector<HWEventData> event_data_list_ = {};
+  vector<pollfd> poll_fds_;
   pthread_t event_thread_;
   std::string event_thread_name_ = "SDM_EventThread";
   bool exit_threads_ = false;

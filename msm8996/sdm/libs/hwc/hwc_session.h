@@ -133,8 +133,8 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   pthread_t uevent_thread_;
   bool uevent_thread_exit_ = false;
   const char *uevent_thread_name_ = "HWC_UeventThread";
-  HWCBufferAllocator *buffer_allocator_ = NULL;
-  HWCBufferSyncHandler *buffer_sync_handler_ = NULL;
+  HWCBufferAllocator buffer_allocator_;
+  HWCBufferSyncHandler buffer_sync_handler_;
   HWCColorManager *color_mgr_ = NULL;
   bool reset_panel_ = false;
   bool secure_display_active_ = false;

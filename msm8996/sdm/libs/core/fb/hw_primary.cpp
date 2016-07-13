@@ -102,10 +102,7 @@ DisplayError HWPrimary::Init() {
     return error;
   }
 
-  uint32_t dest_scalar_count = hw_resource_.hw_dest_scalar_info.count;
-  if (dest_scalar_count) {
-    mdp_dest_scalar_data_ = new mdp_destination_scaler_data[dest_scalar_count];
-  }
+  mdp_dest_scalar_data_.resize(hw_resource_.hw_dest_scalar_info.count);
 
   error = PopulateDisplayAttributes();
   if (error != kErrorNone) {
@@ -192,8 +189,6 @@ void HWPrimary::InitializeConfigs() {
 }
 
 DisplayError HWPrimary::Deinit() {
-  delete [] mdp_dest_scalar_data_;
-
   return HWDevice::Deinit();
 }
 
