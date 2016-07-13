@@ -26,7 +26,16 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#ifdef _ANDROID_
 #include <cutils/log.h>
+#else
+#include <log/log.h>
+#undef PAGE_SHIFT
+#undef PAGE_SIZE
+#define PAGE_SHIFT      12
+#define PAGE_SIZE       (1 << PAGE_SHIFT)
+#endif
+
 #include <linux/msm_mdp.h>
 #include "mdp_version.h"
 #include "qd_utils.h"

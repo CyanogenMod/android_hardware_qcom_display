@@ -22,12 +22,12 @@ libgralloc_la_SOURCES = gpu.cpp \
 			gpu.h
 
 
-libgralloc_la_LDFLAGS = -lstdc++ -lpthread @GLIB_LIBS@ -shared -version-info 1:0:0
+libgralloc_la_LDFLAGS = -lstdc++ -lpthread  -shared -version-info 1:0:0
 libgralloc_la_LDFLAGS += -lcutils -llog -lhardware 
-libgralloc_la_CPPFLAGS = -DUSE_GLIB -DANDROID $(AM_CFLAGS) $(AM_CPPFLAGS) @GLIB_CFLAGS@ -DLOG_TAG=\"qdgralloc\"
-libgralloc_la_CFLAGS = -DUSE_GLIB -DANDROID $(AM_CFLAGS) $(AM_CPPFLAGS) @GLIB_CFLAGS@ -DLOG_TAG=\"qdgralloc\"
+libgralloc_la_CPPFLAGS = $(AM_CFLAGS) $(AM_CPPFLAGS) -DLOG_TAG=\"qdgralloc\"
+libgralloc_la_CFLAGS = $(AM_CFLAGS) $(AM_CPPFLAGS) -DLOG_TAG=\"qdgralloc\"
 
-libgralloc_la_LIBADD = ./../libqdutils/libqdmetadata.la libmemalloc.la
+libgralloc_la_LIBADD = ./../libqdutils/libqdutils.la ./../libqdutils/libqdMetaData.la libmemalloc.la
 
 libmemalloc_la_SOURCES = ionalloc.cpp \
 			alloc_controller.cpp \
@@ -37,8 +37,8 @@ libmemalloc_la_SOURCES = ionalloc.cpp \
 			alloc_controller.h \
 			gr.h
 
-libmemalloc_la_LDFLAGS = -lstdc++ -lpthread @GLIB_LIBS@ -shared -version-info 1:0:0
+libmemalloc_la_LDFLAGS = -lstdc++ -lpthread -shared -version-info 1:0:0
 libmemalloc_la_LDFLAGS += -lcutils -llog -lhardware -ldl
-libmemalloc_la_CPPFLAGS = -DUSE_GLIB -DANDROID $(AM_CFLAGS) $(AM_CPPFLAGS) @GLIB_CFLAGS@ -DLOG_TAG=\"qdmemalloc\"
-libmemalloc_la_CFLAGS = -DUSE_GLIB -DANDROID $(AM_CFLAGS) $(AM_CPPFLAGS) @GLIB_CFLAGS@ -DLOG_TAG=\"qdmemalloc\"
+libmemalloc_la_CPPFLAGS = $(AM_CFLAGS) $(AM_CPPFLAGS) -DLOG_TAG=\"qdmemalloc\"
+libmemalloc_la_CFLAGS = $(AM_CFLAGS) $(AM_CPPFLAGS) -DLOG_TAG=\"qdmemalloc\"
 lib_LTLIBRARIES = libmemalloc.la libgralloc.la 
