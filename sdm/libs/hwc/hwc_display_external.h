@@ -46,6 +46,7 @@ class HWCDisplayExternal : public HWCDisplay {
   virtual uint32_t RoundToStandardFPS(float fps);
   virtual void PrepareDynamicRefreshRate(Layer *layer);
   int drc_enabled_ = 0;
+  int drc_reset_fps_enabled_ = 0;
 
  private:
   HWCDisplayExternal(CoreInterface *core_intf, hwc_procs_t const **hwc_procs,
