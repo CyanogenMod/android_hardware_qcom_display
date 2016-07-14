@@ -158,6 +158,7 @@ HWC2::Error HWCDisplayVirtual::Present(int32_t *out_retire_fence) {
     }
   }
   CloseAcquireFds();
+  close(output_buffer_->acquire_fence_fd);
   return status;
 }
 
