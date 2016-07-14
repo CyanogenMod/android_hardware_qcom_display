@@ -290,7 +290,7 @@ uint32_t HWCDisplayExternal::GetOptimalRefreshRate(bool one_updating_layer) {
     return metadata_refresh_rate_;
   }
 
-  return (framebuffer_config_->fps * 1000);
+  return current_refresh_rate_;
 }
 
 int HWCDisplayExternal::Perform(uint32_t operation, ...) {
