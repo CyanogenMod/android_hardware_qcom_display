@@ -19,5 +19,5 @@ LOCAL_SRC_FILES := \
       overlayWriteback.cpp \
       overlayCursor.cpp \
       pipes/overlayGenPipe.cpp
-LOCAL_CLANG := false
+
 include $(BUILD_SHARED_LIBRARY)

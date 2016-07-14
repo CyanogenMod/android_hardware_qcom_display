@@ -1027,9 +1027,9 @@ void setListStats(hwc_context_t *ctx,
         if(ctx->mWindowboxFeature && dpy && isAIVVideoLayer(layer)) {
             ctx->listStats[dpy].mAIVVideoMode = true;
         }
-        /*if (layer->flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
+        if (layer->flags & HWC_SCREENSHOT_ANIMATOR_LAYER) {
             ctx->listStats[dpy].isDisplayAnimating = true;
-        }*/
+        }
         if(isSecureDisplayBuffer(hnd)) {
             ctx->listStats[dpy].secureUI = true;
         }
@@ -1641,7 +1641,7 @@ int hwc_sync(hwc_context_t *ctx, hwc_display_contents_1_t* list, int dpy,
     for(uint32_t i = 0; i < list->numHwLayers; i++) {
         if(list->hwLayers[i].compositionType == HWC_OVERLAY ||
 #ifdef QTI_BSP
-           //list->hwLayers[i].compositionType == HWC_BLIT ||
+           list->hwLayers[i].compositionType == HWC_BLIT ||
 #endif
            list->hwLayers[i].compositionType == HWC_FRAMEBUFFER_TARGET) {
             //Populate releaseFenceFds.

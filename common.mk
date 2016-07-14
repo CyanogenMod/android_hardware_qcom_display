@@ -36,7 +36,7 @@ kernel_includes :=
 # Executed only on QCOM BSPs
 ifeq ($(TARGET_USES_QCOM_BSP),true)
 # Enable QCOM Display features
-    #common_flags += -DQTI_BSP
+    common_flags += -DQTI_BSP
 endif
 
 ifeq ($(TARGET_COMPILE_WITH_MSM_KERNEL),true)
