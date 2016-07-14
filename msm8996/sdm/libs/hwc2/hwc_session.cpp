@@ -200,9 +200,10 @@ int HWCSession::Close(hw_device_t *device) {
 
 void HWCSession::GetCapabilities(struct hwc2_device *device, uint32_t *outCount,
                                  int32_t *outCapabilities) {
-  if (outCapabilities == NULL) {
-    *outCount = 0;
+  if (outCapabilities != nullptr && *outCount >= 1) {
+    outCapabilities[0] = HWC2_CAPABILITY_SKIP_CLIENT_COLOR_TRANSFORM;
   }
+  *outCount = 1;
 }
 
 template <typename PFN, typename T>
