@@ -174,6 +174,8 @@ HWC2::Error HWCDisplayPrimary::Validate(uint32_t *out_num_types, uint32_t *out_n
 
   // Fill in the remaining blanks in the layers and add them to the SDM layerstack
   BuildLayerStack();
+  // Checks and replaces layer stack for solid fill
+  SolidFillPrepare();
 
   bool pending_output_dump = dump_frame_count_ && dump_output_to_file_;
 
@@ -224,9 +226,11 @@ HWC2::Error HWCDisplayPrimary::Present(int32_t *out_retire_fence) {
     status = HWCDisplay::CommitLayerStack();
     if (status == HWC2::Error::None) {
       HandleFrameOutput();
+      SolidFillCommit();
       status = HWCDisplay::PostCommitLayerStack(out_retire_fence);
     }
   }
+
   CloseAcquireFds();
   return status;
 }
@@ -276,28 +280,40 @@ HWC2::Error HWCDisplayPrimary::SetColorTransform(const float *matrix,
 int HWCDisplayPrimary::Perform(uint32_t operation, ...) {
   va_list args;
   va_start(args, operation);
-  int val = va_arg(args, int32_t);
-  va_end(args);
+  int val = 0;
+  LayerRect *rect = NULL;
+
   switch (operation) {
     case SET_METADATA_DYN_REFRESH_RATE:
+      val = va_arg(args, int32_t);
       SetMetaDataRefreshRateFlag(val);
       break;
     case SET_BINDER_DYN_REFRESH_RATE:
+      val = va_arg(args, int32_t);
       ForceRefreshRate(UINT32(val));
       break;
     case SET_DISPLAY_MODE:
+      val = va_arg(args, int32_t);
       SetDisplayMode(UINT32(val));
       break;
     case SET_QDCM_SOLID_FILL_INFO:
+      val = va_arg(args, int32_t);
       SetQDCMSolidFillInfo(true, UINT32(val));
       break;
     case UNSET_QDCM_SOLID_FILL_INFO:
+      val = va_arg(args, int32_t);
       SetQDCMSolidFillInfo(false, UINT32(val));
+      break;
+    case SET_QDCM_SOLID_FILL_RECT:
+      rect = va_arg(args, LayerRect*);
+      solid_fill_rect_ = *rect;
       break;
     default:
       DLOGW("Invalid operation %d", operation);
+      va_end(args);
       return -EINVAL;
   }
+  va_end(args);
 
   return 0;
 }

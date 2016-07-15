@@ -387,10 +387,9 @@ int32_t HWCSession::PresentDisplay(hwc2_device_t *device, hwc2_display_t display
   if (!device) {
     return HWC2_ERROR_BAD_DISPLAY;
   }
-  // TODO(user): Handle solid fill layers
+
   auto status = HWC2::Error::BadDisplay;
   // TODO(user): Handle virtual display/HDMI concurrency
-
   if (hwc_session->hwc_display_[display]) {
     status = hwc_session->hwc_display_[display]->Present(out_retire_fence);
     // This is only indicative of how many times SurfaceFlinger posts
