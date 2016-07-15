@@ -45,6 +45,7 @@ class HWCDisplayPrimary : public HWCDisplay {
     SET_DISPLAY_MODE,
     SET_QDCM_SOLID_FILL_INFO,
     UNSET_QDCM_SOLID_FILL_INFO,
+    SET_QDCM_SOLID_FILL_RECT,
   };
 
   static int Create(CoreInterface *core_intf, BufferAllocator *buffer_allocator,

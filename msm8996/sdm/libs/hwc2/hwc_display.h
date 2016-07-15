@@ -130,9 +130,12 @@ class HWCDisplay : public DisplayEventHandler {
   int ToggleScreenUpdates(bool enable);
   int ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload, PPDisplayAPIPayload *out_payload,
                            PPPendingParams *pending_action);
+  void SolidFillPrepare();
+  void SolidFillCommit();
   DisplayClass GetDisplayClass();
   int GetVisibleDisplayRect(hwc_rect_t *rect);
   void BuildLayerStack(void);
+  void BuildSolidFillStack(void);
   HWCLayer *GetHWCLayer(hwc2_layer_t layer);
 
   // HWC2 APIs
@@ -249,6 +252,8 @@ class HWCDisplay : public DisplayEventHandler {
   bool secure_display_active_ = false;
   bool skip_prepare_ = false;
   bool solid_fill_enable_ = false;
+  Layer *solid_fill_layer_ = NULL;
+  LayerRect solid_fill_rect_ = {};
   uint32_t solid_fill_color_ = 0;
   LayerRect display_rect_;
   bool validated_ = false;
