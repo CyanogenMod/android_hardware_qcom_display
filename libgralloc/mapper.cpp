@@ -28,7 +28,12 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 
+#ifdef _ANDROID_
 #include <cutils/log.h>
+#else
+#include <log/log.h>
+#endif
+
 #include <cutils/atomic.h>
 #include <utils/Trace.h>
 

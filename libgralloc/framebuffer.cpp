@@ -16,8 +16,11 @@
  */
 
 #include <sys/mman.h>
-
+#ifdef _ANDROID_
 #include <cutils/log.h>
+#else
+#include <log/log.h>
+#endif
 #include <cutils/properties.h>
 #include <dlfcn.h>
 
@@ -34,13 +37,17 @@
 #include <linux/fb.h>
 #include <linux/msm_mdp.h>
 
+#ifdef _ANDROID_
 #include <GLES/gl.h>
+#endif
 
 #include "gralloc_priv.h"
 #include "fb_priv.h"
 #include "gr.h"
 #include <cutils/properties.h>
+#ifdef _ANDROID_
 #include <profiler.h>
+#endif
 
 #define EVEN_OUT(x) if (x & 0x0001) {x--;}
 
@@ -99,8 +106,9 @@ static int fb_compositionComplete(struct framebuffer_device_t* dev)
     if(!dev) {
         return -1;
     }
+#ifdef _ANDROID_
     glFinish();
-
+#endif
     return 0;
 }
 
@@ -312,8 +320,9 @@ int mapFrameBufferLocked(framebuffer_device_t *dev)
     module->ydpi = ydpi;
     module->fps = fps;
     module->swapInterval = 1;
-
+#ifdef _ANDROID_
     CALC_INIT();
+#endif
 
     /*
      * map the framebuffer

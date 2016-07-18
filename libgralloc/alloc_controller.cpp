@@ -26,8 +26,11 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#ifdef _ANDROID_ 
 #include <cutils/log.h>
+#else
+#include <log/log.h>
+#endif
 #include <fcntl.h>
 #include <dlfcn.h>
 #include "gralloc_priv.h"

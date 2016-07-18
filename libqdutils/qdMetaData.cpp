@@ -30,7 +30,12 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/mman.h>
+
+#ifdef _ANDROID_
 #include <cutils/log.h>
+#else
+#include <log/log.h>
+#endif
 #include <gralloc_priv.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
