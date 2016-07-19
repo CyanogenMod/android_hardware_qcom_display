@@ -410,7 +410,7 @@ static void setCameraStatus(hwc_context_t* ctx,
     screenRefresh(ctx);
 }
 
-void QClient::CamDeathNotifier::binderDied(const wp<IBinder>& who) {
+void QClient::CamDeathNotifier::binderDied(const wp<IBinder>& /*who*/) {
     //If Cameraservice abruptly gone, reset mdss bw caps
     //This new cap will be applicable from next frame onwards
     if(!updateDisplayBWCapForCam(false)) {
