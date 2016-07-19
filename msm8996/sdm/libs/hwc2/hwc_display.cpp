@@ -884,6 +884,8 @@ HWC2::Error HWCDisplay::PostCommitLayerStack(int32_t *out_retire_fence) {
       } else if (layer->composition != kCompositionGPU) {
         hwc_layer->PushReleaseFence(layer_buffer->release_fence_fd);
         layer_buffer->release_fence_fd = -1;
+      } else {
+        hwc_layer->PushReleaseFence(-1);
       }
     }
 
