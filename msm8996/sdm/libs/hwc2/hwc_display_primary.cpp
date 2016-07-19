@@ -159,9 +159,6 @@ HWC2::Error HWCDisplayPrimary::Validate(uint32_t *out_num_types, uint32_t *out_n
   auto status = HWC2::Error::None;
   DisplayError error = kErrorNone;
 
-  if (!boot_animation_completed_)
-    ProcessBootAnimCompleted();
-
   if (display_paused_) {
     MarkLayersForGPUBypass();
     return status;
