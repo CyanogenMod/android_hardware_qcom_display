@@ -744,7 +744,7 @@ DisplayError HWHDMI::GetDynamicFrameRateMode(uint32_t refresh_rate, uint32_t *mo
     }
   }
 
-  if (pre_refresh_rate_diff > kThresholdRefreshRate) {
+  if (abs(pre_refresh_rate_diff) > kThresholdRefreshRate) {
     return kErrorNotSupported;
   }
 

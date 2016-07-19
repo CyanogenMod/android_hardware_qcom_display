@@ -1172,7 +1172,6 @@ int HWCDisplay::SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels) {
   framebuffer_config_->vsync_period_ns = active_config.vsync_period_ns;
   framebuffer_config_->x_dpi = active_config.x_dpi;
   framebuffer_config_->y_dpi = active_config.y_dpi;
-  framebuffer_config_->fps = active_config.fps;
 
   DLOGI("New framebuffer resolution (%dx%d)", framebuffer_config_->x_pixels,
         framebuffer_config_->y_pixels);
