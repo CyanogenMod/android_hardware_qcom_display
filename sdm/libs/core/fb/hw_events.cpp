@@ -80,7 +80,7 @@ DisplayError HWEventsInterface::Destroy(HWEventsInterface *intf) {
 pollfd HWEvents::InitializePollFd(HWEventData *event_data) {
   char node_path[kMaxStringLength] = {0};
   char data[kMaxStringLength] = {0};
-  pollfd poll_fd;
+  pollfd poll_fd = {0};
   poll_fd.fd = -1;
 
   if (!strncmp(event_data->event_name, "thread_exit", strlen("thread_exit"))) {

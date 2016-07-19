@@ -389,6 +389,16 @@ void HWCDisplay::BuildLayerStack() {
   layer_stack_.layers.push_back(client_target_->GetSDMLayer());
 }
 
+void HWCDisplay::BuildSolidFillStack() {
+  layer_stack_ = LayerStack();
+  display_rect_ = LayerRect();
+
+  layer_stack_.layers.push_back(solid_fill_layer_);
+  layer_stack_.flags.geometry_changed = 1U;
+  // Append client target to the layer stack
+  layer_stack_.layers.push_back(client_target_->GetSDMLayer());
+}
+
 HWC2::Error HWCDisplay::SetLayerZOrder(hwc2_layer_t layer_id, uint32_t z) {
   const auto map_layer = layer_map_.find(layer_id);
   if (map_layer == layer_map_.end()) {
@@ -1416,6 +1426,68 @@ int HWCDisplay::ColorSVCRequestRoute(const PPDisplayAPIPayload &in_payload,
   return ret;
 }
 
+void HWCDisplay::SolidFillPrepare() {
+  if (solid_fill_enable_) {
+    if (solid_fill_layer_ == NULL) {
+      // Create a dummy layer here
+      solid_fill_layer_ = new Layer();
+      solid_fill_layer_->input_buffer = new LayerBuffer();
+    }
+    uint32_t primary_width = 0, primary_height = 0;
+    GetMixerResolution(&primary_width, &primary_height);
+
+    LayerBuffer *layer_buffer = solid_fill_layer_->input_buffer;
+    layer_buffer->width = primary_width;
+    layer_buffer->height = primary_height;
+    layer_buffer->acquire_fence_fd = -1;
+    layer_buffer->release_fence_fd = -1;
+
+    LayerRect rect;
+    rect.top = 0; rect.left = 0;
+    rect.right = primary_width;
+    rect.bottom = primary_height;
+
+    solid_fill_layer_->composition = kCompositionGPU;
+    solid_fill_layer_->src_rect = rect;
+    solid_fill_layer_->dst_rect = rect;
+
+    solid_fill_layer_->blending = kBlendingPremultiplied;
+    solid_fill_layer_->solid_fill_color = solid_fill_color_;
+    solid_fill_layer_->frame_rate = 60;
+    solid_fill_layer_->visible_regions.push_back(solid_fill_layer_->dst_rect);
+    solid_fill_layer_->flags.updating = 1;
+    solid_fill_layer_->flags.solid_fill = true;
+  } else {
+    // delete the dummy layer
+    if (solid_fill_layer_) {
+      delete solid_fill_layer_->input_buffer;
+    }
+    delete solid_fill_layer_;
+    solid_fill_layer_ = NULL;
+  }
+
+  if (solid_fill_enable_ && solid_fill_layer_) {
+    BuildSolidFillStack();
+    MarkLayersForGPUBypass();
+  }
+
+  return;
+}
+
+void HWCDisplay::SolidFillCommit() {
+  if (solid_fill_enable_ && solid_fill_layer_) {
+    LayerBuffer *layer_buffer = solid_fill_layer_->input_buffer;
+    if (layer_buffer->release_fence_fd > 0) {
+      close(layer_buffer->release_fence_fd);
+      layer_buffer->release_fence_fd = -1;
+    }
+    if (layer_stack_.retire_fence_fd > 0) {
+      close(layer_stack_.retire_fence_fd);
+      layer_stack_.retire_fence_fd = -1;
+    }
+  }
+}
+
 int HWCDisplay::GetVisibleDisplayRect(hwc_rect_t *visible_rect) {
   if (!IsValid(display_rect_)) {
     return -EINVAL;
@@ -1456,7 +1528,7 @@ int HWCDisplay::GetDisplayAttributesForConfig(int config,
 bool HWCDisplay::SingleLayerUpdating(void) {
   uint32_t updating_count = 0;
 
-  for (uint i = 0; i < layer_set_.size(); i++) {
+  for (uint i = 0; i < layer_stack_.layers.size(); i++) {
     auto layer = layer_stack_.layers.at(i);
     if (layer->flags.updating) {
       updating_count++;
