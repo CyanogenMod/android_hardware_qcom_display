@@ -168,6 +168,8 @@ void HWPrimary::InitializeConfigs() {
   string line;
   while (Sys::getline_(fs, line)) {
     DisplayConfigVariableInfo config;
+    // std::getline (unlike ::getline) removes \n while driver expects it in mode, so add back
+    line += '\n';
     size_t xpos = line.find(':');
     size_t ypos = line.find('x');
 
