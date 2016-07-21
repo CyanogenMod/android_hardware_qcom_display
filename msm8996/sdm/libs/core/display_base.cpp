@@ -691,7 +691,7 @@ DisplayError DisplayBase::GetColorModeCount(uint32_t *mode_count) {
     return kErrorNotSupported;
   }
 
-  DLOGI("Number of color modes = %d", num_color_modes_);
+  DLOGV_IF(kTagQDCM, "Number of modes from color manager = %d", num_color_modes_);
   *mode_count = num_color_modes_;
 
   return kErrorNone;
@@ -720,7 +720,15 @@ DisplayError DisplayBase::GetColorModes(uint32_t *mode_count,
     for (uint32_t i = 0; i < num_color_modes_; i++) {
       DLOGV_IF(kTagQDCM, "Color Mode[%d]: Name = %s mode_id = %d", i, color_modes_[i].name,
                color_modes_[i].id);
-      color_mode_map_.insert(std::make_pair(color_modes_[i].name, &color_modes_[i]));
+      auto it = color_mode_map_.find(color_modes_[i].name);
+      if (it != color_mode_map_.end()) {
+        if (it->second->id < color_modes_[i].id) {
+          color_mode_map_.erase(it);
+          color_mode_map_.insert(std::make_pair(color_modes_[i].name, &color_modes_[i]));
+        }
+      } else {
+        color_mode_map_.insert(std::make_pair(color_modes_[i].name, &color_modes_[i]));
+      }
     }
   }
 
@@ -749,7 +757,7 @@ DisplayError DisplayBase::SetColorMode(const std::string &color_mode) {
 
   SDEDisplayMode *sde_display_mode = it->second;
 
-  DLOGV_IF(kTagQDCM, "Color Mode Name = %s corresponding mode_id = %d", sde_display_mode->name,
+  DLOGD("Color Mode Name = %s corresponding mode_id = %d", sde_display_mode->name,
            sde_display_mode->id);
   DisplayError error = kErrorNone;
   error = color_mgr_->ColorMgrSetMode(sde_display_mode->id);

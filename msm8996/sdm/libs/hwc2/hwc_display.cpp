@@ -169,14 +169,14 @@ void HWCColorMode::PopulateColorModes() {
     return;
   }
 
-  DLOGI("Color Modes supported count = %d", color_mode_count);
+  DLOGV_IF(kTagQDCM, "Color Modes supported count = %d", color_mode_count);
 
   std::vector<std::string> color_modes(color_mode_count);
   error = display_intf_->GetColorModes(&color_mode_count, &color_modes);
 
   for (uint32_t i = 0; i < color_mode_count; i++) {
     std::string &mode_string = color_modes.at(i);
-    DLOGI("Color Mode[%d] = %s", i, mode_string.c_str());
+    DLOGV_IF(kTagQDCM, "Color Mode[%d] = %s", i, mode_string.c_str());
     if (mode_string.find("hal_native") != std::string::npos) {
       PopulateTransform(HAL_COLOR_MODE_NATIVE, mode_string);
     } else if (mode_string.find("hal_srgb") != std::string::npos) {
