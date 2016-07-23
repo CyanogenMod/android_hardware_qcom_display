@@ -87,6 +87,11 @@ DisplayError DisplayHDMI::Init() {
   s3d_format_to_mode_.insert(std::pair<LayerBufferS3DFormat, HWS3DMode>
                             (kS3dFormatFramePacking, kS3DModeFP));
 
+  /* currently FRC is only supported by HDMI as primary devices */
+  if (Debug::IsFrcEnabled()) {
+    frc_supported_ = hw_panel_info_.is_primary_panel;
+  }
+
   error = HWEventsInterface::Create(INT(display_type_), this, &event_list_, &hw_events_intf_);
   if (error != kErrorNone) {
     DisplayBase::Deinit();

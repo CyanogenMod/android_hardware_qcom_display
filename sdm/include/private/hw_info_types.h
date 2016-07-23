@@ -310,6 +310,7 @@ struct HWLayersInfo {
   LayerRect right_partial_update;  // Right ROI.
 
   bool use_hw_cursor = false;      // Indicates that HWCursor pipe needs to be used for cursor layer
+  LayerFrcInfo frc_info;           // FRC info of this layer stack
 };
 
 struct HWLayers {
