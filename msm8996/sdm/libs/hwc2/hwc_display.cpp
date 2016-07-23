@@ -369,8 +369,17 @@ void HWCDisplay::BuildLayerStack() {
     ApplyScanAdjustment(&scaled_display_frame);
     hwc_layer->SetLayerDisplayFrame(scaled_display_frame);
     ApplyDeInterlaceAdjustment(layer);
-    // TODO(user): Verify if we still need to configure the solid fill layerbuffer,
-    // it should already have a valid dst_rect by this point
+    // SDM requires these details even for solid fill
+    if (layer->flags.solid_fill) {
+      LayerBuffer *layer_buffer = layer->input_buffer;
+      uint32_t display_width = 0, display_height = 0;
+      GetMixerResolution(&display_width, &display_height);
+      layer_buffer->width = display_width;
+      layer_buffer->height = display_height;
+      layer_buffer->acquire_fence_fd = -1;
+      layer_buffer->release_fence_fd = -1;
+      layer->src_rect = layer->dst_rect;
+    }
 
     if (layer->frame_rate > metadata_refresh_rate_) {
       metadata_refresh_rate_ = SanitizeRefreshRate(layer->frame_rate);
