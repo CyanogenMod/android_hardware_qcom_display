@@ -53,8 +53,8 @@
 namespace sdm {
 
 uint32_t HWCColorManager::Get8BitsARGBColorValue(const PPColorFillParams &params) {
-  uint32_t argb_color = ((params.color.r << 16) & 0xff0000) | ((params.color.g) & 0xff)
-                        | ((params.color.b << 8) & 0xff00);
+  uint32_t argb_color = ((params.color.r << 16) & 0xff0000) | ((params.color.g << 8) & 0xff00) |
+                        ((params.color.b) & 0xff);
   return argb_color;
 }
 
