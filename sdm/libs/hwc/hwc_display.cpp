@@ -1321,7 +1321,7 @@ bool HWCDisplay::SingleVideoLayerUpdating(uint32_t app_layer_count) {
 
   for (uint i = 0; i < app_layer_count; i++) {
     Layer *layer = layer_stack_.layers[i];
-    // TODO(user):disable DRC feature in S3D playbacl case.S3D video
+    // TODO(user): disable DRC feature in S3D playbacl case.S3D video
     // need play in dedicate resolution and fps, if DRC switch the
     // mode to an non S3D supported mode, it would break S3D playback.
     // Need figure out a way to make S3D and DRC co-exist.
