@@ -486,16 +486,24 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
     // For dim layers, SurfaceFlinger
     //    - converts planeAlpha to per pixel alpha,
-    //    - sets RGB color to 000,
+    //    - sets appropriate RGB color,
     //    - sets planeAlpha to 0xff,
     //    - blending to Premultiplied.
     // This can be achieved at hardware by
-    //    - solid fill ARGB to 0xff000000,
+    //    - solid fill ARGB to appropriate value,
     //    - incoming planeAlpha,
     //    - blending to Coverage.
     if (hwc_layer.flags & kDimLayer) {
       layer->input_buffer->format = kFormatARGB8888;
       layer->solid_fill_color = 0xff000000;
+#ifdef QTI_BSP
+      // Get ARGB color from HWC Dim Layer color
+      uint32_t a = UINT32(hwc_layer.color.a) << 24;
+      uint32_t r = UINT32(hwc_layer.color.r) << 16;
+      uint32_t g = UINT32(hwc_layer.color.g) << 8;
+      uint32_t b = UINT32(hwc_layer.color.b);
+      layer->solid_fill_color = a | r | g | b;
+#endif
       SetBlending(HWC_BLENDING_COVERAGE, &layer->blending);
     } else {
       SetBlending(hwc_layer.blending, &layer->blending);
