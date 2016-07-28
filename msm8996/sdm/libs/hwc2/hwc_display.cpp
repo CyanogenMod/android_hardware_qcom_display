@@ -360,9 +360,15 @@ void HWCDisplay::BuildLayerStack() {
       layer_stack_.flags.skip_present = true;
     }
 
-    if (layer->flags.cursor) {
-      layer_stack_.flags.cursor_present = true;
+
+    if (hwc_layer->GetClientRequestedCompositionType() == HWC2::Composition::Cursor) {
+      // Currently we support only one HWCursor & only at top most z-order
+      if ((*layer_set_.rbegin())->GetId() == hwc_layer->GetId()) {
+        layer->flags.cursor = true;
+        layer_stack_.flags.cursor_present = true;
+      }
     }
+
     // TODO(user): Move to a getter if this is needed at other places
     hwc_rect_t scaled_display_frame = {INT(layer->dst_rect.left), INT(layer->dst_rect.top),
                                        INT(layer->dst_rect.right), INT(layer->dst_rect.bottom)};

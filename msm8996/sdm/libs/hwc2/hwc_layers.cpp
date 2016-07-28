@@ -147,7 +147,6 @@ HWC2::Error HWCLayer::SetLayerCompositionType(HWC2::Composition type) {
       layer_->flags.solid_fill = true;
       break;
     case HWC2::Composition::Cursor:
-      layer_->flags.cursor = true;
       break;
     case HWC2::Composition::Invalid:
       return HWC2::Error::BadParameter;
