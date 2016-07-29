@@ -154,13 +154,11 @@ static void handle_uevent(hwc_context_t* ctx, const char* udata, int len)
                 //This block will force composition to close fb2 in above
                 //example.
                 ctx->dpyAttr[dpy].isConfiguring = true;
-                ctx->mDrawLock.unlock();
-
                 ctx->proc->invalidate(ctx->proc);
+                // Wait for 1 composition cycle to finish
+                ctx->mDrawLock.wait();
+                ctx->mDrawLock.unlock();
             }
-            //2 cycles for slower content
-            usleep(ctx->dpyAttr[HWC_DISPLAY_PRIMARY].vsync_period
-                   * 2 / 1000);
 
             if(isVDConnected(ctx)) {
                 // Do not initiate WFD teardown if WFD architecture is based
