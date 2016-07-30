@@ -1303,7 +1303,7 @@ int HWCDisplay::GetDisplayAttributesForConfig(int config,
 
 // TODO(user): HWC needs to know updating for dyn_fps, cpu hint features,
 // once the features are moved to SDM, the two functions below can be removed.
-bool HWCDisplay::SingleLayerUpdating(uint32_t app_layer_count) {
+uint32_t HWCDisplay::GetUpdatingLayersCount(uint32_t app_layer_count) {
   uint32_t updating_count = 0;
 
   for (uint i = 0; i < app_layer_count; i++) {
@@ -1313,7 +1313,7 @@ bool HWCDisplay::SingleLayerUpdating(uint32_t app_layer_count) {
     }
   }
 
-  return (updating_count == 1);
+  return updating_count;
 }
 
 bool HWCDisplay::SingleVideoLayerUpdating(uint32_t app_layer_count) {
