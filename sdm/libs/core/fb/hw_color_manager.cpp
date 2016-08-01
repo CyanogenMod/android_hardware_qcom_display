@@ -153,9 +153,13 @@ DisplayError HWColorManager::SetGamut(const PPFeatureInfo &feature, msmfb_mdp_pp
 DisplayError HWColorManager::SetPADither(const PPFeatureInfo &feature,
                                          msmfb_mdp_pp *kernel_params) {
   DisplayError ret = kErrorNone;
-
-  // TODO(user): Kernel IOCTL preparation
-
+#ifdef PA_DITHER
+  kernel_params->op = mdp_op_pa_dither_cfg;
+  kernel_params->data.dither_cfg_data.version = feature.feature_version_;
+  kernel_params->data.dither_cfg_data.block = MDP_LOGICAL_BLOCK_DISP_0 + feature.disp_id_;
+  kernel_params->data.dither_cfg_data.flags = feature.enable_flags_;
+  kernel_params->data.dither_cfg_data.cfg_payload = feature.GetConfigData();
+#endif
   return ret;
 }
 

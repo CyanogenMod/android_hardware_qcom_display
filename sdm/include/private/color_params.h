@@ -247,7 +247,7 @@ struct SDEDitherCfg {
 };
 
 struct SDEPADitherData {
-  uint32_t data_flags;
+  uint64_t data_flags;
   uint32_t matrix_size;
   uint64_t matrix_data_addr;
   uint32_t strength;
