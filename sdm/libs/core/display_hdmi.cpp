@@ -214,6 +214,26 @@ DisplayError DisplayHDMI::SetRefreshRate(uint32_t refresh_rate) {
     return error;
   }
 
+  HWDisplayAttributes display_attributes;
+  uint32_t active_index = 0;
+  error = hw_intf_->GetActiveConfig(&active_index);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  error = hw_intf_->GetDisplayAttributes(active_index, &display_attributes);
+  if (error != kErrorNone) {
+    return error;
+  }
+
+  if (display_attributes != display_attributes_) {
+    error = comp_manager_->ReconfigureDisplay(display_comp_ctx_, display_attributes,
+                                              hw_panel_info_);
+    if (error != kErrorNone) {
+      return error;
+    }
+    display_attributes_ = display_attributes;
+  }
   return kErrorNone;
 }
 

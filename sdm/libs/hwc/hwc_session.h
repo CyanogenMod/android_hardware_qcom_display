@@ -73,6 +73,7 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   static int SetActiveConfig(hwc_composer_device_1 *device, int disp, int index);
   static int SetCursorPositionAsync(hwc_composer_device_1 *device, int disp, int x, int y);
   static void CloseAcquireFds(hwc_display_contents_1_t *content_list);
+  bool IsDisplayYUV(int disp);
 
   // Uevent thread
   static void* HWCUeventThread(void *context);
@@ -140,6 +141,8 @@ class HWCSession : hwc_composer_device_1_t, public qClient::BnQClient {
   bool need_invalidate_ = false;
   int bw_mode_release_fd_ = -1;
   qService::QService *qservice_ = NULL;
+  bool is_hdmi_primary_ = false;
+  bool is_hdmi_yuv_ = false;
 };
 
 }  // namespace sdm

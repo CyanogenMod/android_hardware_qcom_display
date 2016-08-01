@@ -106,11 +106,12 @@ DisplayError CompManager::RegisterDisplay(DisplayType type, const HWDisplayAttri
   }
 
   SET_BIT(registered_displays_, type);
+  display_comp_ctx->is_primary_panel = hw_panel_info.is_primary_panel;
   display_comp_ctx->display_type = type;
   *display_ctx = display_comp_ctx;
   // New non-primary display device has been added, so move the composition mode to safe mode until
   // resources for the added display is configured properly.
-  if (type != kPrimary) {
+  if (!display_comp_ctx->is_primary_panel) {
     safe_mode_ = true;
   }
 
@@ -207,8 +208,8 @@ void CompManager::PrepareStrategyConstraints(Handle comp_handle, HWLayers *hw_la
   constraints->use_cursor = false;
   constraints->max_layers = max_layers_;
 
-  // Limit 2 layer SDE Comp on HDMI/Virtual
-  if (display_comp_ctx->display_type != kPrimary) {
+  // Limit 2 layer SDE Comp if its not a Primary Display
+  if (!display_comp_ctx->is_primary_panel) {
     constraints->max_layers = 2;
   }
 

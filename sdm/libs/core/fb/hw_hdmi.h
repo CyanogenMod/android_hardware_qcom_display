@@ -49,7 +49,27 @@ class HWHDMI : public HWDevice {
     kModeVFP,
     // Switch framerate by tuning horizontal front porch
     kModeHFP,
+    // Switch framerate by tuning horizontal front porch and clock
+    kModeClockHFP,
+    // Switch framerate by tuning horizontal front porch and re-caculate clock
+    kModeHFPCalcClock,
     kModeMAX
+  };
+
+  /**
+   * struct DynamicFPSData - defines dynamic fps related data
+   * @hor_front_porch: horizontal front porch
+   * @hor_back_porch: horizontal back porch
+   * @hor_pulse_width: horizontal pulse width
+   * @clk_rate_hz: panel clock rate in HZ
+   * @fps: frames per second
+   */
+  struct DynamicFPSData {
+    uint32_t hor_front_porch;
+    uint32_t hor_back_porch;
+    uint32_t hor_pulse_width;
+    uint32_t clk_rate_hz;
+    uint32_t fps;
   };
 
   HWHDMI(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
@@ -84,6 +104,11 @@ class HWHDMI : public HWDevice {
                                     HWDisplayAttributes *attrib);
   bool IsSupportedS3DMode(HWS3DMode s3d_mode);
 
+  DisplayError GetDynamicFrameRateMode(uint32_t refresh_rate, uint32_t*mode,
+                                       DynamicFPSData *data, uint32_t *config_index);
+  void PopulateHWPanelInfo();
+
+  static const int kThresholdRefreshRate = 1000;
   uint32_t hdmi_mode_count_;
   uint32_t hdmi_modes_[256];
   // Holds the hdmi timing information. Ex: resolution, fps etc.,
@@ -92,7 +117,8 @@ class HWHDMI : public HWDevice {
   uint32_t active_config_index_;
   std::map<HWS3DMode, msm_hdmi_s3d_mode> s3d_mode_sdm_to_mdp_;
   std::vector<HWS3DMode> supported_s3d_modes_;
-  int active_mdp_s3d_mode_ = HDMI_S3D_NONE;
+  // Reset this variable to ensure valid S3D configuration is set.
+  int active_mdp_s3d_mode_ = -1;
   uint32_t frame_rate_ = 0;
 };
 
