@@ -1095,6 +1095,10 @@ DisplayError HWDevice::SetPPFeatures(PPFeaturesConfig *feature_list) {
 DisplayError HWDevice::SetVSyncState(bool enable) {
   int vsync_on = enable ? 1 : 0;
   if (Sys::ioctl_(device_fd_, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
     IOCTL_LOGE(MSMFB_OVERLAY_VSYNC_CTRL, device_type_);
     return kErrorHardware;
   }
@@ -1183,6 +1187,10 @@ DisplayError HWDevice::SetScaleLutConfig(HWScaleLutInfo *lut_info) {
   cfg.payload = reinterpret_cast<uint64_t>(&mdp_lut_info);
 
   if (Sys::ioctl_(device_fd_, MSMFB_MDP_SET_CFG, &cfg) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
     IOCTL_LOGE(MSMFB_MDP_SET_CFG, device_type_);
     return kErrorHardware;
   }
