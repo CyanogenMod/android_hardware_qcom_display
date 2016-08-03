@@ -89,30 +89,34 @@ struct MetaData_t {
     /* The supported formats are defined in gralloc_priv.h to
      * support legacy code*/
     uint32_t s3dFormat;
+    /* Set by camera to program the VT Timestamp */
+    uint64_t vtTimeStamp;
 };
 
 enum DispParamType {
-    PP_PARAM_HSIC       = 0x0001,
-    PP_PARAM_SHARPNESS  = 0x0002,
-    PP_PARAM_INTERLACED = 0x0004,
-    PP_PARAM_VID_INTFC  = 0x0008,
-    PP_PARAM_IGC        = 0x0010,
-    PP_PARAM_SHARP2     = 0x0020,
-    PP_PARAM_TIMESTAMP  = 0x0040,
+    PP_PARAM_HSIC          = 0x0001,
+    PP_PARAM_SHARPNESS     = 0x0002,
+    PP_PARAM_INTERLACED    = 0x0004,
+    PP_PARAM_VID_INTFC     = 0x0008,
+    PP_PARAM_IGC           = 0x0010,
+    PP_PARAM_SHARP2        = 0x0020,
+    PP_PARAM_TIMESTAMP     = 0x0040,
     UPDATE_BUFFER_GEOMETRY = 0x0080,
-    UPDATE_REFRESH_RATE = 0x0100,
-    UPDATE_COLOR_SPACE = 0x0200,
-    MAP_SECURE_BUFFER = 0x400,
-    S3D_FORMAT = 0x800,
+    UPDATE_REFRESH_RATE    = 0x0100,
+    UPDATE_COLOR_SPACE     = 0x0200,
+    MAP_SECURE_BUFFER      = 0x0400,
+    S3D_FORMAT             = 0x0800,
+    SET_VT_TIMESTAMP       = 0x1000,
 };
 
 enum DispFetchParamType {
     GET_PP_PARAM_INTERLACED = 0x0004,
-    GET_BUFFER_GEOMETRY = 0x0080,
-    GET_REFRESH_RATE = 0x0100,
-    GET_COLOR_SPACE = 0x0200,
-    GET_MAP_SECURE_BUFFER = 0x400,
-    GET_S3D_FORMAT = 0x800,
+    GET_BUFFER_GEOMETRY     = 0x0080,
+    GET_REFRESH_RATE        = 0x0100,
+    GET_COLOR_SPACE         = 0x0200,
+    GET_MAP_SECURE_BUFFER   = 0x0400,
+    GET_S3D_FORMAT          = 0x0800,
+    GET_VT_TIMESTAMP        = 0x1000,
 };
 
 struct private_handle_t;
