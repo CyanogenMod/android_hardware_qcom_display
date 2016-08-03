@@ -60,7 +60,7 @@ HWCColorMode::HWCColorMode(DisplayInterface *display_intf) : display_intf_(displ
 
 HWC2::Error HWCColorMode::Init() {
   PopulateColorModes();
-  return HWC2::Error::None;
+  return SetColorMode(HAL_COLOR_MODE_NATIVE);
 }
 
 HWC2::Error HWCColorMode::DeInit() {
