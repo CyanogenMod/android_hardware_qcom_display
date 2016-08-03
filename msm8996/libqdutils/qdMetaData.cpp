@@ -87,6 +87,9 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
         case SET_SINGLE_BUFFER_MODE:
             data->isSingleBufferMode = *((uint32_t *)param);
             break;
+        case SET_VT_TIMESTAMP:
+            data->vtTimeStamp = *((uint64_t *)param);
+            break;
         default:
             ALOGE("Unknown paramType %d", paramType);
             break;
@@ -148,6 +151,9 @@ int getMetaData(private_handle_t *handle, DispFetchParamType paramType,
             break;
         case GET_SINGLE_BUFFER_MODE:
             *((uint32_t *)param) = data->isSingleBufferMode ;
+            break;
+        case GET_VT_TIMESTAMP:
+            *((uint64_t *)param) = data->vtTimeStamp;
             break;
         default:
             ALOGE("Unknown paramType %d", paramType);
