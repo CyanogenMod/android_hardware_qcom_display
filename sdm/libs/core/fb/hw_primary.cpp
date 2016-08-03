@@ -168,6 +168,8 @@ void HWPrimary::InitializeConfigs() {
   string line;
   while (Sys::getline_(fs, line)) {
     DisplayConfigVariableInfo config;
+    // std::getline (unlike ::getline) removes \n while driver expects it in mode, so add back
+    line += '\n';
     size_t xpos = line.find(':');
     size_t ypos = line.find('x');
 
@@ -585,7 +587,12 @@ DisplayError HWPrimary::SetAutoRefresh(bool enable) {
 DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
   mdp_pp_feature_version version = {};
 
+#ifdef PA_DITHER
+  uint32_t feature_id_mapping[kMaxNumPPFeatures] = { PCC, IGC, GC, GC, PA,
+                                                     DITHER, GAMUT, PA_DITHER };
+#else
   uint32_t feature_id_mapping[kMaxNumPPFeatures] = { PCC, IGC, GC, GC, PA, DITHER, GAMUT };
+#endif
 
   for (int i(0); i < kMaxNumPPFeatures; i++) {
     version.pp_feature = feature_id_mapping[i];
