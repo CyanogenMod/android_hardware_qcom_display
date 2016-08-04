@@ -48,6 +48,9 @@
 #include <string>
 
 #include "hw_device.h"
+#include "hw_primary.h"
+#include "hw_hdmi.h"
+#include "hw_virtual.h"
 #include "hw_info_interface.h"
 
 #define __CLASS__ "HWDevice"
@@ -57,6 +60,46 @@ using std::to_string;
 using std::fstream;
 
 namespace sdm {
+
+DisplayError HWInterface::Create(DisplayType type, HWInfoInterface *hw_info_intf,
+                                        BufferSyncHandler *buffer_sync_handler,
+                                        HWInterface **intf) {
+  DisplayError error = kErrorNone;
+  HWDevice *hw = nullptr;
+
+  switch (type) {
+    case kPrimary:
+      hw = new HWPrimary(buffer_sync_handler, hw_info_intf);
+      break;
+    case kHDMI:
+      hw = new HWHDMI(buffer_sync_handler, hw_info_intf);
+      break;
+    case kVirtual:
+      hw = new HWVirtual(buffer_sync_handler, hw_info_intf);
+      break;
+    default:
+      DLOGE("Undefined display type");
+      return kErrorUndefined;
+  }
+
+  error = hw->Init();
+  if (error != kErrorNone) {
+    delete hw;
+    DLOGE("Init on HW Intf type %d failed", type);
+    return error;
+  }
+  *intf = hw;
+
+  return error;
+}
+
+DisplayError HWInterface::Destroy(HWInterface *intf) {
+  HWDevice *hw = static_cast<HWDevice *>(intf);
+  hw->Deinit();
+  delete hw;
+
+  return kErrorNone;
+}
 
 HWDevice::HWDevice(BufferSyncHandler *buffer_sync_handler)
   : fb_node_index_(-1), fb_path_("/sys/devices/virtual/graphics/fb"),

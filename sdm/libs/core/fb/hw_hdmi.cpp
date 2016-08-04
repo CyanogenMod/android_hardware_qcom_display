@@ -79,29 +79,6 @@ static bool MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
   return true;
 }
 
-DisplayError HWHDMI::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
-                            BufferSyncHandler *buffer_sync_handler) {
-  DisplayError error = kErrorNone;
-  HWHDMI *hw_fb_hdmi = NULL;
-
-  hw_fb_hdmi = new HWHDMI(buffer_sync_handler, hw_info_intf);
-  error = hw_fb_hdmi->Init();
-  if (error != kErrorNone) {
-    delete hw_fb_hdmi;
-  } else {
-    *intf = hw_fb_hdmi;
-  }
-  return error;
-}
-
-DisplayError HWHDMI::Destroy(HWInterface *intf) {
-  HWHDMI *hw_fb_hdmi = static_cast<HWHDMI *>(intf);
-  hw_fb_hdmi->Deinit();
-  delete hw_fb_hdmi;
-
-  return kErrorNone;
-}
-
 HWHDMI::HWHDMI(BufferSyncHandler *buffer_sync_handler,  HWInfoInterface *hw_info_intf)
   : HWDevice(buffer_sync_handler), hw_scan_info_(), active_config_index_(0) {
   HWDevice::device_type_ = kDeviceHDMI;
@@ -153,10 +130,6 @@ DisplayError HWHDMI::Init() {
                              (kS3DModeFP, HDMI_S3D_FRAME_PACKING));
 
   return error;
-}
-
-DisplayError HWHDMI::Deinit() {
-  return HWDevice::Deinit();
 }
 
 DisplayError HWHDMI::GetNumDisplayAttributes(uint32_t *count) {
