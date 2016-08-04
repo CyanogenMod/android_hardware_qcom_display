@@ -958,6 +958,11 @@ bool isUBwcEnabled(int format, int usage)
             return false;
     }
 
+    // Workaround for bug 30191188/ CR 1047578
+    if ((usage & GRALLOC_USAGE_HW_VIDEO_ENCODER) && (usage & GRALLOC_USAGE_HW_COMPOSER)) {
+        return false;
+    }
+
     // Allow UBWC, if an OpenGL client sets UBWC usage flag and GPU plus MDP
     // support the format. OR if a non-OpenGL client like Rotator, sets UBWC
     // usage flag and MDP supports the format.
