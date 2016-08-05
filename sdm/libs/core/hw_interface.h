@@ -31,6 +31,8 @@
 #include <utils/constants.h>
 #include <core/buffer_sync_handler.h>
 
+#include "hw_info_interface.h"
+
 namespace sdm {
 
 enum HWScanSupport {
@@ -64,6 +66,10 @@ class HWEventHandler {
 
 class HWInterface {
  public:
+  static DisplayError Create(DisplayType type, HWInfoInterface *hw_info_intf,
+                             BufferSyncHandler *buffer_sync_handler, HWInterface **intf);
+  static DisplayError Destroy(HWInterface *intf);
+
   virtual DisplayError GetActiveConfig(uint32_t *active_config) = 0;
   virtual DisplayError GetNumDisplayAttributes(uint32_t *count) = 0;
   virtual DisplayError GetDisplayAttributes(uint32_t index,

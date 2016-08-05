@@ -33,7 +33,6 @@
 #include "display_primary.h"
 #include "hw_interface.h"
 #include "hw_info_interface.h"
-#include "fb/hw_primary.h"
 
 #define __CLASS__ "DisplayPrimary"
 
@@ -49,16 +48,15 @@ DisplayPrimary::DisplayPrimary(DisplayEventHandler *event_handler, HWInfoInterfa
 DisplayError DisplayPrimary::Init() {
   lock_guard<recursive_mutex> obj(recursive_mutex_);
 
-  DisplayError error = HWPrimary::Create(&hw_intf_, hw_info_intf_,
-                                         DisplayBase::buffer_sync_handler_);
-
+  DisplayError error = HWInterface::Create(kPrimary, hw_info_intf_, buffer_sync_handler_,
+                                           &hw_intf_);
   if (error != kErrorNone) {
     return error;
   }
 
   error = DisplayBase::Init();
   if (error != kErrorNone) {
-    HWPrimary::Destroy(hw_intf_);
+    HWInterface::Destroy(hw_intf_);
     return error;
   }
 
@@ -76,17 +74,8 @@ DisplayError DisplayPrimary::Init() {
   if (error != kErrorNone) {
     DLOGE("Failed to create hardware events interface. Error = %d", error);
     DisplayBase::Deinit();
-    HWPrimary::Destroy(hw_intf_);
+    HWInterface::Destroy(hw_intf_);
   }
-
-  return error;
-}
-
-DisplayError DisplayPrimary::Deinit() {
-  lock_guard<recursive_mutex> obj(recursive_mutex_);
-
-  DisplayError error = DisplayBase::Deinit();
-  HWPrimary::Destroy(hw_intf_);
 
   return error;
 }

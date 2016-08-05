@@ -130,8 +130,8 @@ DisplayError DisplayBase::Deinit() {
   }
 
   comp_manager_->UnregisterDisplay(display_comp_ctx_);
-
   HWEventsInterface::Destroy(hw_events_intf_);
+  HWInterface::Destroy(hw_intf_);
 
   return kErrorNone;
 }

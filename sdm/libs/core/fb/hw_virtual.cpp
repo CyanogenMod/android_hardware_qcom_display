@@ -34,30 +34,6 @@
 
 namespace sdm {
 
-DisplayError HWVirtual::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
-                               BufferSyncHandler *buffer_sync_handler) {
-  DisplayError error = kErrorNone;
-  HWVirtual *hw_virtual = NULL;
-
-  hw_virtual = new HWVirtual(buffer_sync_handler, hw_info_intf);
-  error = hw_virtual->Init();
-  if (error != kErrorNone) {
-    delete hw_virtual;
-  } else {
-    *intf = hw_virtual;
-  }
-
-  return error;
-}
-
-DisplayError HWVirtual::Destroy(HWInterface *intf) {
-  HWVirtual *hw_virtual = static_cast<HWVirtual *>(intf);
-  hw_virtual->Deinit();
-  delete hw_virtual;
-
-  return kErrorNone;
-}
-
 HWVirtual::HWVirtual(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf)
   : HWDevice(buffer_sync_handler) {
   HWDevice::device_type_ = kDeviceVirtual;

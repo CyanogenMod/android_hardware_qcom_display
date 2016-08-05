@@ -37,9 +37,7 @@ using std::vector;
 
 class HWHDMI : public HWDevice {
  public:
-  static DisplayError Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
-                             BufferSyncHandler *buffer_sync_handler);
-  static DisplayError Destroy(HWInterface *intf);
+  HWHDMI(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
 
  protected:
   enum HWFramerateUpdate {
@@ -74,9 +72,7 @@ class HWHDMI : public HWDevice {
     uint32_t fps;
   };
 
-  HWHDMI(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf);
   virtual DisplayError Init();
-  virtual DisplayError Deinit();
   virtual DisplayError GetNumDisplayAttributes(uint32_t *count);
   // Requirement to call this only after the first config has been explicitly set by client
   virtual DisplayError GetActiveConfig(uint32_t *active_config);

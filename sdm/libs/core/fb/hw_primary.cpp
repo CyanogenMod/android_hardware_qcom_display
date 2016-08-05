@@ -63,30 +63,6 @@ using std::string;
 using std::to_string;
 using std::fstream;
 
-DisplayError HWPrimary::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
-                               BufferSyncHandler *buffer_sync_handler) {
-  DisplayError error = kErrorNone;
-  HWPrimary *hw_primary = NULL;
-
-  hw_primary = new HWPrimary(buffer_sync_handler, hw_info_intf);
-  error = hw_primary->Init();
-  if (error != kErrorNone) {
-    delete hw_primary;
-  } else {
-    *intf = hw_primary;
-  }
-
-  return error;
-}
-
-DisplayError HWPrimary::Destroy(HWInterface *intf) {
-  HWPrimary *hw_primary = static_cast<HWPrimary *>(intf);
-  hw_primary->Deinit();
-  delete hw_primary;
-
-  return kErrorNone;
-}
-
 HWPrimary::HWPrimary(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf)
   : HWDevice(buffer_sync_handler) {
   HWDevice::device_type_ = kDevicePrimary;
@@ -188,10 +164,6 @@ void HWPrimary::InitializeConfigs() {
       DLOGI("Active config index %u", active_config_index_);
     }
   }
-}
-
-DisplayError HWPrimary::Deinit() {
-  return HWDevice::Deinit();
 }
 
 DisplayError HWPrimary::GetNumDisplayAttributes(uint32_t *count) {
@@ -513,7 +485,7 @@ DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
 }
 
 DisplayError HWPrimary::SetPanelBrightness(int level) {
-  char buffer[MAX_SYSFS_COMMAND_LENGTH] = {0};
+  char buffer[kMaxSysfsCommandLength] = {0};
 
   DLOGV_IF(kTagDriverConfig, "Set brightness level to %d", level);
   int fd = Sys::open_(kBrightnessNode, O_RDWR);
@@ -523,7 +495,7 @@ DisplayError HWPrimary::SetPanelBrightness(int level) {
     return kErrorFileDescriptor;
   }
 
-  int32_t bytes = snprintf(buffer, MAX_SYSFS_COMMAND_LENGTH, "%d\n", level);
+  int32_t bytes = snprintf(buffer, kMaxSysfsCommandLength, "%d\n", level);
   if (bytes < 0) {
     DLOGV_IF(kTagDriverConfig, "Failed to copy new brightness level = %d", level);
     Sys::close_(fd);

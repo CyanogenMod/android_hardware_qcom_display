@@ -40,7 +40,6 @@ class DisplayPrimary : public DisplayBase, HWEventHandler {
                  BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
                  RotatorInterface *rotator_intf);
   virtual DisplayError Init();
-  virtual DisplayError Deinit();
   virtual DisplayError Prepare(LayerStack *layer_stack);
   virtual DisplayError Commit(LayerStack *layer_stack);
   virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
