@@ -99,6 +99,13 @@ int Debug::GetMaxPipesPerMixer(DisplayType display_type) {
   return value;
 }
 
+int Debug::GetMaxVideoUpscale() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.video_max_upscale", &value);
+
+  return value;
+}
+
 bool Debug::IsVideoModeEnabled() {
   int value = 0;
   debug_.debug_handler_->GetProperty("sdm.video_mode_panel", &value);
