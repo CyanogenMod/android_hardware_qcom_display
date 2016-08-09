@@ -839,6 +839,7 @@ static int hwc_set(hwc_composer_device_1 *dev,
     MDPComp::resetIdleFallBack();
     ctx->mVideoTransFlag = false;
     //Was locked at the beginning of prepare
+    ctx->mDrawLock.signal();
     ctx->mDrawLock.unlock();
     return ret;
 }
