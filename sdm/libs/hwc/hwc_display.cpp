@@ -1394,4 +1394,9 @@ bool HWCDisplay::IsSurfaceUpdated(const std::vector<LayerRect> &dirty_regions) {
   return (dirty_regions.empty() || IsValid(dirty_regions.at(0)));
 }
 
+int HWCDisplay::GetDisplayPort(DisplayPort *port) {
+  return display_intf_->GetDisplayPort(port) == kErrorNone ? 0 : -1;
+}
+
+
 }  // namespace sdm

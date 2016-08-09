@@ -92,6 +92,7 @@ status_t BnQService::onTransact(
             callerUid == AID_GRAPHICS ||
             callerUid == AID_ROOT ||
             callerUid == AID_CAMERASERVER ||
+            callerUid == AID_AUDIO ||
             callerUid == AID_SYSTEM);
 
     if (code == CONNECT_HWC_CLIENT) {

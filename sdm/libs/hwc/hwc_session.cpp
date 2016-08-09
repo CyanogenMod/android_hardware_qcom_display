@@ -940,6 +940,41 @@ android::status_t HWCSession::HandleGetDisplayConfigCount(const android::Parcel 
   return error;
 }
 
+android::status_t HWCSession::SetDisplayPort(DisplayPort sdm_disp_port, int *hwc_disp_port) {
+  if (!hwc_disp_port) {
+    return -EINVAL;
+  }
+
+  switch (sdm_disp_port) {
+    case kPortDSI:
+      *hwc_disp_port = qdutils::DISPLAY_PORT_DSI;
+      break;
+    case kPortDTV:
+      *hwc_disp_port = qdutils::DISPLAY_PORT_DTV;
+      break;
+    case kPortLVDS:
+      *hwc_disp_port = qdutils::DISPLAY_PORT_LVDS;
+      break;
+    case kPortEDP:
+      *hwc_disp_port = qdutils::DISPLAY_PORT_EDP;
+      break;
+    case kPortWriteBack:
+      *hwc_disp_port = qdutils::DISPLAY_PORT_WRITEBACK;
+      break;
+    case kPortDP:
+      *hwc_disp_port = qdutils::DISPLAY_PORT_DP;
+      break;
+    case kPortDefault:
+      *hwc_disp_port = qdutils::DISPLAY_PORT_DEFAULT;
+      break;
+    default:
+      DLOGE("Invalid sdm display port %d", sdm_disp_port);
+      return -EINVAL;
+  }
+
+  return 0;
+}
+
 android::status_t HWCSession::HandleGetDisplayAttributesForConfig(const android::Parcel
                                                                   *input_parcel,
                                                                   android::Parcel *output_parcel) {
@@ -947,6 +982,8 @@ android::status_t HWCSession::HandleGetDisplayAttributesForConfig(const android:
   int dpy = input_parcel->readInt32();
   int error = android::BAD_VALUE;
   DisplayConfigVariableInfo display_attributes;
+  DisplayPort sdm_disp_port = kPortDefault;
+  int hwc_disp_port = qdutils::DISPLAY_PORT_DEFAULT;
 
   if (dpy > HWC_DISPLAY_VIRTUAL) {
     return android::BAD_VALUE;
@@ -955,12 +992,16 @@ android::status_t HWCSession::HandleGetDisplayAttributesForConfig(const android:
   if (hwc_display_[dpy]) {
     error = hwc_display_[dpy]->GetDisplayAttributesForConfig(config, &display_attributes);
     if (error == 0) {
+      hwc_display_[dpy]->GetDisplayPort(&sdm_disp_port);
+
+      SetDisplayPort(sdm_disp_port, &hwc_disp_port);
+
       output_parcel->writeInt32(INT(display_attributes.vsync_period_ns));
       output_parcel->writeInt32(INT(display_attributes.x_pixels));
       output_parcel->writeInt32(INT(display_attributes.y_pixels));
       output_parcel->writeFloat(display_attributes.x_dpi);
       output_parcel->writeFloat(display_attributes.y_dpi);
-      output_parcel->writeInt32(0);  // Panel type, unsupported.
+      output_parcel->writeInt32(hwc_disp_port);
       output_parcel->writeInt32(display_attributes.is_yuv);
     }
   }

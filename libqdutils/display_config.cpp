@@ -78,7 +78,7 @@ int getDisplayAttributes(int dpy, DisplayAttributes_t& dpyattr) {
         dpyattr.yres = outParcel.readInt32();
         dpyattr.xdpi = outParcel.readFloat();
         dpyattr.ydpi = outParcel.readFloat();
-        dpyattr.panel_type = (char) outParcel.readInt32();
+        dpyattr.panel_type = outParcel.readInt32();
     } else {
         ALOGE("%s() failed with err %d", __FUNCTION__, err);
     }
@@ -237,7 +237,7 @@ int setActiveConfig(int configIndex, int /*dpy*/) {
 }
 
 DisplayAttributes getDisplayAttributes(int configIndex, int /*dpy*/) {
-    DisplayAttributes dpyattr;
+    DisplayAttributes dpyattr = {};
     sp<IQService> binder = getBinder();
     if(binder != NULL) {
         Parcel inParcel, outParcel;
@@ -252,7 +252,7 @@ DisplayAttributes getDisplayAttributes(int configIndex, int /*dpy*/) {
             dpyattr.yres = outParcel.readInt32();
             dpyattr.xdpi = outParcel.readFloat();
             dpyattr.ydpi = outParcel.readFloat();
-            dpyattr.panel_type = (char) outParcel.readInt32();
+            dpyattr.panel_type = outParcel.readInt32();
             dpyattr.is_yuv = outParcel.readInt32();
             ALOGI("%s() Received attrs for index %d: xres %d, yres %d",
                     __FUNCTION__, configIndex, dpyattr.xres, dpyattr.yres);

@@ -848,13 +848,16 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
     }
   }
 
-  GetHWDisplayPortAndMode(device_node, &panel_info->port, &panel_info->mode);
+  GetHWDisplayPortAndMode(device_node, panel_info);
   GetSplitInfo(device_node, panel_info);
   GetHWPanelNameByNode(device_node, panel_info);
   GetHWPanelMaxBrightnessFromNode(panel_info);
 }
 
-void HWDevice::GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode) {
+void HWDevice::GetHWDisplayPortAndMode(int device_node, HWPanelInfo *panel_info) {
+  DisplayPort *port = &panel_info->port;
+  HWDisplayMode *mode = &panel_info->mode;
+
   *port = kPortDefault;
   *mode = kModeDefault;
 
@@ -884,11 +887,14 @@ void HWDevice::GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWD
     *port = kPortEDP;
     *mode = kModeVideo;
   } else if ((strncmp(line.c_str(), "dtv panel", strlen("dtv panel")) == 0)) {
-    *port = kPortDTv;
+    *port = kPortDTV;
     *mode = kModeVideo;
   } else if ((strncmp(line.c_str(), "writeback panel", strlen("writeback panel")) == 0)) {
     *port = kPortWriteBack;
     *mode = kModeCommand;
+  } else if ((strncmp(line.c_str(), "dp panel", strlen("dp panel")) == 0)) {
+    *port = kPortDP;
+    *mode = kModeVideo;
   }
 
   return;

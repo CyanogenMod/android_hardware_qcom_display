@@ -1038,4 +1038,16 @@ DisplayError DisplayBase::SetDetailEnhancerData(const DisplayDetailEnhancerData 
   return kErrorNone;
 }
 
+DisplayError DisplayBase::GetDisplayPort(DisplayPort *port) {
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
+
+  if (!port) {
+    return kErrorParameters;
+  }
+
+  *port = hw_panel_info_.port;
+
+  return kErrorNone;
+}
+
 }  // namespace sdm
