@@ -103,6 +103,11 @@ enum HWPipeFlags {
   kMultiRectParallelMode = 0x04,
 };
 
+enum HWAVRModes {
+  kContinuousMode,  // Mode to enable AVR feature for every frame.
+  kOneShotMode,     // Mode to enable AVR feature for particular frame.
+};
+
 typedef std::map<HWSubBlockType, std::vector<LayerBufferFormat>> FormatsMap;
 
 struct HWDynBwLimitInfo {
@@ -181,6 +186,7 @@ struct HWResourceInfo {
   FormatsMap supported_formats_map;
   HWRotatorInfo hw_rot_info;
   HWDestScalarInfo hw_dest_scalar_info;
+  bool has_avr = false;
 
   void Reset() { *this = HWResourceInfo(); }
 };
@@ -219,6 +225,7 @@ struct HWPanelInfo {
   int min_roi_height = 0;             // Min height needed for ROI
   bool needs_roi_merge = false;       // Merge ROI's of both the DSI's
   bool dynamic_fps = false;           // Panel Supports dynamic fps
+  bool dfps_porch_mode = false;       // dynamic fps VFP or HFP mode
   uint32_t min_fps = 0;               // Min fps supported by panel
   uint32_t max_fps = 0;               // Max fps supported by panel
   bool is_primary_panel = false;      // Panel is primary display
@@ -237,6 +244,7 @@ struct HWPanelInfo {
             (min_roi_height != panel_info.min_roi_height) ||
             (needs_roi_merge != panel_info.needs_roi_merge) ||
             (dynamic_fps != panel_info.dynamic_fps) || (min_fps != panel_info.min_fps) ||
+            (dfps_porch_mode != panel_info.dfps_porch_mode) ||
             (max_fps != panel_info.max_fps) || (is_primary_panel != panel_info.is_primary_panel) ||
             (split_info != panel_info.split_info) ||
             (s3d_mode != panel_info.s3d_mode));
@@ -379,6 +387,11 @@ struct HWDestScaleInfo {
 
 typedef std::map<uint32_t, HWDestScaleInfo *> DestScaleInfoMap;
 
+struct HWAVRInfo {
+  bool enable = false;                // Flag to Enable AVR feature
+  HWAVRModes mode = kContinuousMode;  // Specifies the AVR mode
+};
+
 struct HWPipeInfo {
   uint32_t pipe_id = 0;
   HWSubBlockType sub_block_type = kHWSubBlockMax;
@@ -429,6 +442,7 @@ struct HWLayers {
   float output_compression = 1.0f;
   uint32_t bandwidth = 0;
   uint32_t clock = 0;
+  HWAVRInfo hw_avr_info = {};
 };
 
 struct HWDisplayAttributes : DisplayConfigVariableInfo {

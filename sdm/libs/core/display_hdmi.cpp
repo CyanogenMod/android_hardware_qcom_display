@@ -114,6 +114,9 @@ DisplayError DisplayHDMI::Prepare(LayerStack *layer_stack) {
 
   SetS3DMode(layer_stack);
 
+  // Clean hw layers for reuse.
+  hw_layers_ = HWLayers();
+
   return DisplayBase::Prepare(layer_stack);
 }
 

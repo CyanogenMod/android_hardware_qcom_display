@@ -57,6 +57,14 @@
 #define MDP_COMMIT_CWB_DSPP 0x1000
 #endif
 
+#ifndef MDP_COMMIT_AVR_EN
+#define MDP_COMMIT_AVR_EN 0x08
+#endif
+
+#ifndef MDP_COMMIT_AVR_ONE_SHOT_MODE
+#define MDP_COMMIT_AVR_ONE_SHOT_MODE 0x10
+#endif
+
 namespace sdm {
 
 using std::string;
@@ -391,6 +399,10 @@ DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
     DLOGI_IF(kTagDriverConfig, "****************************************************************");
   }
 
+  if (hw_resource_.has_avr) {
+    SetAVRFlags(hw_layers->hw_avr_info, &mdp_commit.flags);
+  }
+
   return HWDevice::Validate(hw_layers);
 }
 
@@ -625,6 +637,16 @@ void HWPrimary::UpdateMixerAttributes() {
   mixer_attributes_.height = display_attributes_.y_pixels;
   mixer_attributes_.split_left = display_attributes_.is_device_split ?
       hw_panel_info_.split_info.left_split : mixer_attributes_.width;
+}
+
+void HWPrimary::SetAVRFlags(const HWAVRInfo &hw_avr_info, uint32_t *avr_flags) {
+  if (hw_avr_info.enable) {
+    *avr_flags |= MDP_COMMIT_AVR_EN;
+  }
+
+  if (hw_avr_info.mode == kOneShotMode) {
+    *avr_flags |= MDP_COMMIT_AVR_ONE_SHOT_MODE;
+  }
 }
 
 }  // namespace sdm
