@@ -159,7 +159,7 @@ int gpu_context_t::gralloc_alloc_buffer(unsigned int size, int usage,
         hnd->offset = data.offset;
         hnd->base = (uint64_t)(data.base) + data.offset;
         hnd->gpuaddr = 0;
-        ColorSpace_t colorSpace = ITU_R_601;
+        ColorSpace_t colorSpace = ITU_R_601_FR;
         setMetaData(hnd, UPDATE_COLOR_SPACE, (void*) &colorSpace);
 
         *pHandle = hnd;
