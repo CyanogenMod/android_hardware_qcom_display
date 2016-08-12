@@ -57,6 +57,7 @@ int (*MDPComp::sPerfLockAcquire)(int, int, int*, int) = NULL;
 int (*MDPComp::sPerfLockRelease)(int value) = NULL;
 int MDPComp::sPerfHintWindow = -1;
 float MDPComp::sDownscaleThreshold = 1.0;
+int MDPComp::sDirtyAreaThreshold = 5;
 
 enum AllocOrder { FORMAT_YUV, FORMAT_RGB, FORMAT_MAX };
 
@@ -219,6 +220,10 @@ bool MDPComp::init(hwc_context_t *ctx) {
 
     if(property_get("persist.hwc.downscale_threshold", property, "1.0") > 0) {
         sDownscaleThreshold = (float)atof(property);
+    }
+
+    if(property_get("persist.hwc.dirty.threshold", property, "5") > 0) {
+        sDirtyAreaThreshold = atoi(property);
     }
 
     return true;
@@ -951,7 +956,7 @@ bool MDPComp::tryFullFrame(hwc_context_t *ctx,
     if(totalDirtyArea) {
         const uint32_t fbArea = ctx->dpyAttr[mDpy].xres *
                 ctx->dpyAttr[mDpy].yres;
-        if(totalDirtyArea < (fbArea / 20)) {
+        if(totalDirtyArea < ((fbArea / 100) * sDirtyAreaThreshold)) {
             ALOGD_IF(isDebug(), "%s: Small update, bailing out. Dirty area %u",
                     __FUNCTION__, totalDirtyArea);
             return false;
