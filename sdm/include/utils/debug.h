@@ -69,11 +69,13 @@ class Debug {
   static bool IsRotatorDownScaleDisabled();
   static bool IsDecimationDisabled();
   static int GetMaxPipesPerMixer(DisplayType display_type);
+  static int GetMaxVideoUpscale();
   static bool IsVideoModeEnabled();
   static bool IsRotatorUbwcDisabled();
   static bool IsRotatorSplitDisabled();
   static bool IsScalarDisabled();
   static bool IsUbwcTiledFrameBuffer();
+  static bool IsAVRDisabled();
   static bool GetProperty(const char *property_name, char *value);
   static bool SetProperty(const char *property_name, const char *value);
 

@@ -146,7 +146,7 @@ class Locker {
     ts.tv_sec = tv.tv_sec + ms/1000;
     ts.tv_nsec = tv.tv_usec*1000 + (ms%1000)*1000000;
     ts.tv_sec += ts.tv_nsec/1000000000L;
-    ts.tv_nsec += ts.tv_nsec%1000000000L;
+    ts.tv_nsec %= 1000000000L;
     return pthread_cond_timedwait(&condition_, &mutex_, &ts);
   }
 

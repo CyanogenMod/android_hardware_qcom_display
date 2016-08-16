@@ -144,16 +144,16 @@ struct PPDisplayAPIPayload {
     return ret;
   }
 
-  DisplayError CreatePayloadBytes(uint8_t *output, uint32_t size_in_bytes) {
+  DisplayError CreatePayloadBytes(uint32_t size_in_bytes, uint8_t **output) {
     DisplayError ret = kErrorNone;
 
     payload = new uint8_t[size_in_bytes]();
     if (!payload) {
       ret = kErrorMemory;
-      output = NULL;
+      *output = NULL;
     } else {
       this->size = size_in_bytes;
-      output = payload;
+      *output = payload;
       own_payload = true;
     }
     return ret;

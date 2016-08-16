@@ -39,6 +39,7 @@ class DisplayVirtual : public DisplayBase {
                  BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
                  RotatorInterface *rotator_intf);
   virtual DisplayError Init();
+  virtual DisplayError Prepare(LayerStack *layer_stack);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
   virtual DisplayError GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info);
   virtual DisplayError GetActiveConfig(uint32_t *index);

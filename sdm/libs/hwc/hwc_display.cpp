@@ -486,16 +486,24 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
     // For dim layers, SurfaceFlinger
     //    - converts planeAlpha to per pixel alpha,
-    //    - sets RGB color to 000,
+    //    - sets appropriate RGB color,
     //    - sets planeAlpha to 0xff,
     //    - blending to Premultiplied.
     // This can be achieved at hardware by
-    //    - solid fill ARGB to 0xff000000,
+    //    - solid fill ARGB to appropriate value,
     //    - incoming planeAlpha,
     //    - blending to Coverage.
     if (hwc_layer.flags & kDimLayer) {
       layer->input_buffer->format = kFormatARGB8888;
       layer->solid_fill_color = 0xff000000;
+#ifdef QTI_BSP
+      // Get ARGB color from HWC Dim Layer color
+      uint32_t a = UINT32(hwc_layer.color.a) << 24;
+      uint32_t r = UINT32(hwc_layer.color.r) << 16;
+      uint32_t g = UINT32(hwc_layer.color.g) << 8;
+      uint32_t b = UINT32(hwc_layer.color.b);
+      layer->solid_fill_color = a | r | g | b;
+#endif
       SetBlending(HWC_BLENDING_COVERAGE, &layer->blending);
     } else {
       SetBlending(hwc_layer.blending, &layer->blending);
@@ -581,8 +589,9 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
         // To prevent surfaceflinger infinite wait, flush the previous frame during Commit()
         // so that previous buffer and fences are released, and override the error.
         flush_ = true;
+      } else {
+        DLOGI("Prepare failed for Display = %d Error = %d", type_, error);
       }
-
       return 0;
     }
   } else {
@@ -658,6 +667,8 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
         // To prevent surfaceflinger infinite wait, flush the previous frame during Commit()
         // so that previous buffer and fences are released, and override the error.
         flush_ = true;
+      } else {
+        DLOGI("Commit failed for Display = %d Error = %d", type_, error);
       }
     }
   }
@@ -1385,5 +1396,10 @@ bool HWCDisplay::IsSurfaceUpdated(const std::vector<LayerRect> &dirty_regions) {
   // dirty_rect count = 1 with (0,0,0,0) - not updating.
   return (dirty_regions.empty() || IsValid(dirty_regions.at(0)));
 }
+
+int HWCDisplay::GetDisplayPort(DisplayPort *port) {
+  return display_intf_->GetDisplayPort(port) == kErrorNone ? 0 : -1;
+}
+
 
 }  // namespace sdm
