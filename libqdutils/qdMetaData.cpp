@@ -38,16 +38,12 @@
 
 int setMetaData(private_handle_t *handle, DispParamType paramType,
                                                     void *param) {
-    if (!handle) {
-        ALOGE("%s: Private handle is null!", __func__);
+    if (private_handle_t::validate(handle)) {
+        ALOGE("%s: Private handle is invalid! handle=%p", __func__, handle);
         return -1;
     }
     if (handle->fd_metadata == -1) {
         ALOGE("%s: Bad fd for extra data!", __func__);
-        return -1;
-    }
-    if (!param) {
-        ALOGE("%s: input param is null!", __func__);
         return -1;
     }
     unsigned long size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
@@ -58,6 +54,12 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
         return -1;
     }
     MetaData_t *data = reinterpret_cast <MetaData_t *>(base);
+    // If parameter is NULL reset the specific MetaData Key
+    if (!param) {
+       data->operation &= ~paramType;
+       return munmap(base, size);
+    }
+
     data->operation |= paramType;
     switch (paramType) {
         case PP_PARAM_INTERLACED:
