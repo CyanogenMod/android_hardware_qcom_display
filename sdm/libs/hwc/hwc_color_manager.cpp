@@ -259,7 +259,8 @@ int HWCColorManager::CreateSolidFillLayers(HWCDisplay *hwc_display) {
     // handle for solid fill layer with fd = -1.
     private_handle_t *handle =
         new private_handle_t(-1, 0, private_handle_t::PRIV_FLAGS_FRAMEBUFFER, BUFFER_TYPE_UI,
-                            HAL_PIXEL_FORMAT_RGBA_8888, primary_width, primary_height);
+                            HAL_PIXEL_FORMAT_RGBA_8888, primary_width, primary_height,
+                            primary_width, primary_height);
 
     if (!buf || !handle) {
       DLOGE("Failed to allocate memory.");
