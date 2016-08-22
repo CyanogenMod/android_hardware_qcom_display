@@ -269,12 +269,19 @@ int HWCDisplayVirtual::SetOutputBuffer(hwc_display_contents_1_t *content_list) {
       return -EINVAL;
     }
 
-    int output_buffer_width, output_buffer_height;
-    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(output_handle, output_buffer_width,
-                                                          output_buffer_height);
+    int aligned_width, aligned_height;
+    int real_width, real_height;
 
-    output_buffer_->width = output_buffer_width;
-    output_buffer_->height = output_buffer_height;
+    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(output_handle, aligned_width,
+                                                          aligned_height);
+    AdrenoMemInfo::getInstance().getRealWidthAndHeight(output_handle, real_width, real_height);
+
+    output_buffer_->width = aligned_width;
+    output_buffer_->height = aligned_height;
+
+    output_buffer_->real_width = real_width;
+    output_buffer_->real_height = real_height;
+
     output_buffer_->flags.secure = 0;
     output_buffer_->flags.video = 0;
 

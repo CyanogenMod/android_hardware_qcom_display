@@ -183,8 +183,10 @@ struct LayerBufferFlags {
   @sa LayerStack
 */
 struct LayerBuffer {
-  uint32_t width = 0;           //!< Actual width of the Layer that this buffer is for.
-  uint32_t height = 0;          //!< Actual height of the Layer that this buffer is for.
+  uint32_t width = 0;           //!< Aligned width of the Layer that this buffer is for.
+  uint32_t height = 0;          //!< Aligned height of the Layer that this buffer is for.
+  uint32_t real_width = 0;      //!< Real width of the Layer that this buffer is for.
+  uint32_t real_height = 0;     //!< Real height of the Layer that this buffer is for.
   LayerBufferFormat format = kFormatRGBA8888;     //!< Format of the buffer content.
   LayerBufferPlane planes[4];   //!< Array of planes that this buffer contains. RGB buffer formats
                                 //!< have 1 plane whereas YUV buffer formats may have upto 4 planes.
