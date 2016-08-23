@@ -97,7 +97,7 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
          *  gpuaddr useraddr     size    id flags       type            usage sglen mapsize
          * 545ba000 545ba000     4096     1 -----pY     gpumem      arraybuffer     1  4096
          */
-        ret = sscanf(line, "%*x %*x %lu %*d %8s %6s %18s %*d %lu\n",
+        ret = sscanf(line, "%*x %*lx %lu %*d %8s %6s %18s %*d %lu\n",
                      &size, flags, line_type, line_usage, &mapsize);
         if (ret != 5) {
             continue;
@@ -112,7 +112,7 @@ int kgsl_memtrack_get_memory(pid_t pid, enum memtrack_type type,
                 unaccounted_size += size;
 
         } else if (type == MEMTRACK_TYPE_GRAPHICS && strcmp(line_type, "ion") == 0) {
-            if ( !(is_surfaceflinger == false && strcmp(line_usage, "egl_surface") == 0)) {
+            if (!is_surfaceflinger || strcmp(line_usage, "egl_image") != 0) {
                 unaccounted_size += size;
             }
         }
