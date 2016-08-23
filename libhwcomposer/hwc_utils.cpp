@@ -1191,6 +1191,7 @@ void setListStats(hwc_context_t *ctx,
     ctx->dpyAttr[dpy].mActionSafePresent = isActionSafePresent(ctx, dpy);
     ctx->listStats[dpy].renderBufIndexforABC = -1;
     ctx->listStats[dpy].secureRGBCount = 0;
+    ctx->listStats[dpy].secureYUVCount = 0;
     ctx->listStats[dpy].refreshRateRequest = ctx->dpyAttr[dpy].refreshRate;
     ctx->listStats[dpy].cursorLayerPresent = false;
     uint32_t refreshRate = 0;
@@ -1242,6 +1243,9 @@ void setListStats(hwc_context_t *ctx,
                 int& secureRGBCount = ctx->listStats[dpy].secureRGBCount;
                 ctx->listStats[dpy].secureRGBIndices[secureRGBCount] = (int)i;
                 secureRGBCount++;
+            } else {
+                int& secureYUVCount = ctx->listStats[dpy].secureYUVCount;
+                secureYUVCount++;
             }
         }
 
