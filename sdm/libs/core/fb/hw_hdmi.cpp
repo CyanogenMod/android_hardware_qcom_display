@@ -75,6 +75,16 @@ static bool MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
     info->grayscale = V4L2_PIX_FMT_NV12;
   }
 
+  if (!mode->active_low_h)
+    info->sync |= FB_SYNC_HOR_HIGH_ACT;
+  else
+    info->sync &= ~FB_SYNC_HOR_HIGH_ACT;
+
+  if (!mode->active_low_v)
+    info->sync |= FB_SYNC_VERT_HIGH_ACT;
+  else
+    info->sync &= ~FB_SYNC_VERT_HIGH_ACT;
+
   return true;
 }
 
