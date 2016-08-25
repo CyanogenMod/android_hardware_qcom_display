@@ -134,17 +134,14 @@ HWC2::Error HWCLayer::SetLayerColor(hwc_color_t color) {
 }
 
 HWC2::Error HWCLayer::SetLayerCompositionType(HWC2::Composition type) {
-  layer_->flags = {};   // Reset earlier flags
   client_requested_ = type;
   switch (type) {
     case HWC2::Composition::Client:
-      layer_->flags.skip = true;
       break;
     case HWC2::Composition::Device:
       // We try and default to this in SDM
       break;
     case HWC2::Composition::SolidColor:
-      layer_->flags.solid_fill = true;
       break;
     case HWC2::Composition::Cursor:
       break;
