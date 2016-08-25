@@ -1174,6 +1174,7 @@ static int stretch_copybit_internal(
     bufferInfo dst_info;
     populate_buffer_info(dst, dst_info);
     private_handle_t* dst_hnd = new private_handle_t(-1, 0, 0, 0, dst_info.format,
+                                                     dst_info.width, dst_info.height,
                                                      dst_info.width, dst_info.height);
     if (dst_hnd == NULL) {
         ALOGE("%s: dst_hnd is null", __FUNCTION__);
@@ -1254,6 +1255,7 @@ static int stretch_copybit_internal(
     bufferInfo src_info;
     populate_buffer_info(src, src_info);
     private_handle_t* src_hnd = new private_handle_t(-1, 0, 0, 0, src_info.format,
+                                                 src_info.width, src_info.height,
                                                  src_info.width, src_info.height);
     if (NULL == src_hnd) {
         ALOGE("%s: src_hnd is null", __FUNCTION__);

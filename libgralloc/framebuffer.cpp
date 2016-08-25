@@ -352,8 +352,9 @@ int mapFrameBufferLocked(framebuffer_device_t *dev)
     // Create framebuffer handle using the ION fd
     module->framebuffer = new private_handle_t(fd, fbSize,
                                         private_handle_t::PRIV_FLAGS_USES_ION,
-                                        BUFFER_TYPE_UI,
-                                        module->fbFormat, info.xres, info.yres);
+                                        BUFFER_TYPE_UI, module->fbFormat,
+                                        info.xres, info.yres,
+                                        info.xres, info.yres);
     module->framebuffer->base = uint64_t(vaddr);
     memset(vaddr, 0, fbSize);
     //Enable vsync
