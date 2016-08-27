@@ -330,6 +330,13 @@ void HWCDisplay::BuildLayerStack() {
   // TODO(user): Add blit target layers
   for (auto hwc_layer : layer_set_) {
     Layer *layer = hwc_layer->GetSDMLayer();
+    layer->flags = {};   // Reset earlier flags
+    if (hwc_layer->GetClientRequestedCompositionType() == HWC2::Composition::Client) {
+      layer->flags.skip = true;
+    } else if (hwc_layer->GetClientRequestedCompositionType() == HWC2::Composition::SolidColor) {
+      layer->flags.solid_fill = true;
+    }
+
     // set default composition as GPU for SDM
     layer->composition = kCompositionGPU;
 
@@ -765,6 +772,12 @@ HWC2::Error HWCDisplay::PrepareLayerStack(uint32_t *out_num_types, uint32_t *out
 HWC2::Error HWCDisplay::AcceptDisplayChanges() {
   if (!validated_ && !layer_set_.empty()) {
     return HWC2::Error::NotValidated;
+  }
+
+  for (const auto& change : layer_changes_) {
+    auto hwc_layer = layer_map_[change.first];
+    auto composition = change.second;
+    hwc_layer->UpdateClientCompositionType(composition);
   }
   return HWC2::Error::None;
 }
