@@ -43,7 +43,7 @@ HWCLayer::~HWCLayer() {
     close(release_fences_.front());
     release_fences_.pop();
   }
-
+  close(ion_fd_);
   if (layer_) {
     if (layer_->input_buffer) {
       delete (layer_->input_buffer);
@@ -64,6 +64,16 @@ HWC2::Error HWCLayer::SetLayerBuffer(buffer_handle_t buffer, int32_t acquire_fen
   }
 
   const private_handle_t *handle = static_cast<const private_handle_t *>(buffer);
+
+  // Validate and dup ion fd from surfaceflinger
+  // This works around bug 30281222
+  if (handle->fd < 0) {
+    return HWC2::Error::BadParameter;
+  } else {
+    close(ion_fd_);
+    ion_fd_ = dup(handle->fd);
+  }
+
   LayerBuffer *layer_buffer = layer_->input_buffer;
   layer_buffer->width = UINT32(handle->width);
   layer_buffer->height = UINT32(handle->height);
@@ -83,7 +93,7 @@ HWC2::Error HWCLayer::SetLayerBuffer(buffer_handle_t buffer, int32_t acquire_fen
     layer_buffer->flags.secure_display = true;
   }
 
-  layer_buffer->planes[0].fd = handle->fd;
+  layer_buffer->planes[0].fd = ion_fd_;
   layer_buffer->planes[0].offset = handle->offset;
   layer_buffer->planes[0].stride = UINT32(handle->width);
   layer_buffer->acquire_fence_fd = acquire_fence;
