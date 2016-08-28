@@ -63,7 +63,7 @@ extern int gralloc_perform(struct gralloc_module_t const* module,
 
 // HAL module methods
 static struct hw_module_methods_t gralloc_module_methods = {
-    .open = gralloc_device_open
+    .open = gralloc_device_open,
 };
 
 // HAL module initialize
