@@ -86,6 +86,7 @@ class HWCLayer {
   const hwc2_display_t display_id_;
   static std::atomic<hwc2_layer_t> next_id_;
   std::queue<int32_t> release_fences_;
+  int ion_fd_ = -1;
 
   // Composition requested by client(SF)
   HWC2::Composition client_requested_ = HWC2::Composition::Device;
