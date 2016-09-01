@@ -82,7 +82,7 @@ static void getProcName(int pid, char *buf, int size);
 status_t BnQService::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
-    // IPC should be from mediaserver only
+    // IPC should be from certain processes only
     IPCThreadState* ipc = IPCThreadState::self();
     const int callerPid = ipc->getCallingPid();
     const int callerUid = ipc->getCallingUid();
@@ -91,7 +91,10 @@ status_t BnQService::onTransact(
 
     getProcName(callerPid, callingProcName, MAX_BUF_SIZE);
 
-    const bool permission = (callerUid == AID_MEDIA);
+    const bool permission = (callerUid == AID_MEDIA ||
+            callerUid == AID_GRAPHICS ||
+            callerUid == AID_ROOT ||
+            callerUid == AID_SYSTEM);
 
     switch(code) {
         case SECURING: {
