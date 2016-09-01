@@ -1851,12 +1851,13 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
         bool secureOnly, FrameInfo& frame) {
     int nYuvCount = ctx->listStats[mDpy].yuvCount;
     int nVGpipes = qdutils::MDPVersion::getInstance().getVGPipes();
+    int nSecureYUVCount = ctx->listStats[mDpy].secureYUVCount;
 
     /* If number of YUV layers in the layer list is more than the number of
        VG pipes available in the target (non-split), try to program maximum
        possible number of YUV layers to MDP, instead of falling back to GPU
-       completely.*/
-    nYuvCount = (nYuvCount > nVGpipes) ? nVGpipes : nYuvCount;
+       completely. Also try to allocate VG pipe for secure layer as much as
+       possible */
     if(nYuvCount > MAX_NUM_APP_LAYERS) return;
 
     for(int index = 0;index < nYuvCount; index++){
@@ -1867,6 +1868,9 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
             continue;
         }
 
+        if(nVGpipes <= 0)
+            break;
+
         if(!isYUVDoable(ctx, layer)) {
             if(!frame.isFBComposed[nYuvIndex]) {
                 frame.isFBComposed[nYuvIndex] = true;
@@ -1875,8 +1879,13 @@ void MDPComp::updateYUV(hwc_context_t* ctx, hwc_display_contents_1_t* list,
         } else {
             if(frame.isFBComposed[nYuvIndex]) {
                 private_handle_t *hnd = (private_handle_t *)layer->handle;
-                if(!secureOnly || isSecureBuffer(hnd) ||
-                        isProtectedBuffer(hnd)) {
+                if(isSecureBuffer(hnd) || isProtectedBuffer(hnd)) {
+                    nSecureYUVCount--;
+                    nVGpipes--;
+                    frame.isFBComposed[nYuvIndex] = false;
+                    frame.fbCount--;
+                } else if (!secureOnly && (nVGpipes > nSecureYUVCount)) {
+                    nVGpipes--;
                     frame.isFBComposed[nYuvIndex] = false;
                     frame.fbCount--;
                 }
