@@ -140,6 +140,14 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
                             int tileEnabled, int& alignedw, int &alignedh);
 
     /*
+     * Function to compute real width and real height based on
+     * private handle
+     *
+     * @return real width, real height
+     */
+    void getRealWidthAndHeight(const private_handle_t *hnd, int& real_w, int& real_h);
+
+    /*
      * Function to return whether GPU support MacroTile feature
      *
      * @return >0 : supported

@@ -49,6 +49,8 @@ namespace sdm {
                       bool flip_horizontal, LayerRect *out_rects);
   void SplitTopBottom(const LayerRect &in_rect, uint32_t split_count, uint32_t align_y,
                       bool flip_horizontal, LayerRect *out_rects);
+  void MapRect(const LayerRect &src_domain, const LayerRect &dst_domain, const LayerRect &in_rect,
+               LayerRect *out_rect);
 }  // namespace sdm
 
 #endif  // __RECT_H__

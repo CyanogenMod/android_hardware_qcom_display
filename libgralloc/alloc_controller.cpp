@@ -173,6 +173,17 @@ void AdrenoMemInfo::getAlignedWidthAndHeight(const private_handle_t *hnd, int& a
 
 }
 
+void AdrenoMemInfo::getRealWidthAndHeight(const private_handle_t *hnd, int& real_w, int& real_h) {
+    MetaData_t *metadata = (MetaData_t *)hnd->base_metadata;
+    if(metadata && metadata->operation & UPDATE_BUFFER_GEOMETRY) {
+        real_w = metadata->bufferDim.sliceWidth;
+        real_h = metadata->bufferDim.sliceHeight;
+    } else {
+        real_w = hnd->real_width;
+        real_h = hnd->real_height;
+    }
+}
+
 bool isUncompressedRgbFormat(int format)
 {
     bool is_rgb_format = false;
@@ -693,6 +704,16 @@ unsigned int getBufferSizeAndDimensions(int width, int height, int format,
     return size;
 }
 
+void getAlignedWidthAndHeight(int width, int height, int format,
+        int usage, int& alignedw, int &alignedh)
+{
+    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width,
+            height,
+            format,
+            usage,
+            alignedw,
+            alignedh);
+}
 
 void getBufferAttributes(int width, int height, int format, int usage,
         int& alignedw, int &alignedh, int& tiled, unsigned int& size)
@@ -714,6 +735,8 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
     int width = hnd->width;
     int height = hnd->height;
     int format = hnd->format;
+    int real_width = hnd->real_width;
+    int real_height = hnd->real_height;
 
     unsigned int ystride, cstride;
     unsigned int alignment = 4096;
@@ -734,8 +757,11 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
             usage = GRALLOC_USAGE_PRIVATE_ALLOC_UBWC;
         }
 
-        AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(metadata->bufferDim.sliceWidth,
-                   metadata->bufferDim.sliceHeight, format, usage, width, height);
+        real_width = metadata->bufferDim.sliceWidth;
+        real_height = metadata->bufferDim.sliceHeight;
+
+        AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(real_width, real_height,
+                                                              format, usage, width, height);
     }
 
     // Get the chroma offsets from the handle width/height. We take advantage
@@ -762,16 +788,16 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
             unsigned int y_stride, y_height, y_size;
             unsigned int c_meta_stride, c_meta_height, c_meta_size;
 
-            y_meta_stride = VENUS_Y_META_STRIDE(COLOR_FMT_NV12_UBWC, width);
-            y_meta_height = VENUS_Y_META_SCANLINES(COLOR_FMT_NV12_UBWC, height);
+            y_meta_stride = VENUS_Y_META_STRIDE(COLOR_FMT_NV12_UBWC, real_width);
+            y_meta_height = VENUS_Y_META_SCANLINES(COLOR_FMT_NV12_UBWC, real_height);
             y_meta_size = ALIGN((y_meta_stride * y_meta_height), alignment);
 
-            y_stride = VENUS_Y_STRIDE(COLOR_FMT_NV12_UBWC, width);
-            y_height = VENUS_Y_SCANLINES(COLOR_FMT_NV12_UBWC, height);
+            y_stride = VENUS_Y_STRIDE(COLOR_FMT_NV12_UBWC, real_width);
+            y_height = VENUS_Y_SCANLINES(COLOR_FMT_NV12_UBWC, real_height);
             y_size = ALIGN((y_stride * y_height), alignment);
 
-            c_meta_stride = VENUS_UV_META_STRIDE(COLOR_FMT_NV12_UBWC, width);
-            c_meta_height = VENUS_UV_META_SCANLINES(COLOR_FMT_NV12_UBWC, height);
+            c_meta_stride = VENUS_UV_META_STRIDE(COLOR_FMT_NV12_UBWC, real_width);
+            c_meta_height = VENUS_UV_META_SCANLINES(COLOR_FMT_NV12_UBWC, real_height);
             c_meta_size = ALIGN((c_meta_stride * c_meta_height), alignment);
 
             ycbcr->y  = (void*)(hnd->base + y_meta_size);
@@ -779,7 +805,7 @@ int getYUVPlaneInfo(private_handle_t* hnd, struct android_ycbcr* ycbcr)
             ycbcr->cr = (void*)(hnd->base + y_meta_size + y_size +
                                 c_meta_size + 1);
             ycbcr->ystride = y_stride;
-            ycbcr->cstride = VENUS_UV_STRIDE(COLOR_FMT_NV12_UBWC, width);
+            ycbcr->cstride = VENUS_UV_STRIDE(COLOR_FMT_NV12_UBWC, real_width);
             ycbcr->chroma_step = 2;
         break;
 
@@ -856,7 +882,7 @@ int alloc_buffer(private_handle_t **pHnd, int w, int h, int format, int usage)
 
     private_handle_t* hnd = new private_handle_t(data.fd, data.size,
                                                  data.allocType, 0, format,
-                                                 alignedw, alignedh);
+                                                 alignedw, alignedh, w, h);
     hnd->base = (uint64_t) data.base;
     hnd->offset = data.offset;
     hnd->gpuaddr = 0;
