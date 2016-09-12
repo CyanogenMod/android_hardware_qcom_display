@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * Copyright (C)2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (C)2012-2014,2016 The Linux Foundation. All rights reserved.
  *
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
@@ -35,6 +35,10 @@
 #include "mdp_version.h"
 #include <overlayUtils.h>
 #include <overlayRotator.h>
+
+#ifdef QTI_BSP
+#include <hardware/display_defs.h>
+#endif
 
 #define ALIGN_TO(x, align)     (((x) + ((align)-1)) & ~((align)-1))
 #define LIKELY( exp )       (__builtin_expect( (exp) != 0, true  ))
@@ -272,10 +276,10 @@ inline hwc_rect_t integerizeSourceCrop(const hwc_frect_t& cropF) {
 }
 
 inline bool isNonIntegralSourceCrop(const hwc_frect_t& cropF) {
-    if((cropF.left - roundf(cropF.left)) > 0     ||
-       (cropF.top - roundf(cropF.top)) > 0       ||
-       (cropF.right - roundf(cropF.right)) > 0   ||
-       (cropF.bottom - roundf(cropF.bottom)) > 0)
+    if(cropF.left - roundf(cropF.left)     ||
+       cropF.top - roundf(cropF.top)       ||
+       cropF.right - roundf(cropF.right)   ||
+       cropF.bottom - roundf(cropF.bottom))
         return true;
     else
         return false;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016, The Linux Foundation. All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -600,7 +600,7 @@ unsigned int getSize(int format, int width, int height, int usage,
             size = alignedw * alignedh * ASTC_BLOCK_SIZE;
             break;
         default:
-            ALOGE("Unrecognized pixel format: 0x%x", __FUNCTION__, format);
+            ALOGE("%s: Unrecognized pixel format: 0x%x", __FUNCTION__, format);
             return 0;
     }
     return size;
@@ -889,7 +889,7 @@ static unsigned int getUBwcMetaBufferSize(int width, int height, int bpp)
     meta_width = ALIGN(((width + block_width - 1) / block_width), 64);
 
     // Align meta buffer size to 4K
-    size = ((meta_width * meta_height), 4096);
+    size = ALIGN((meta_width * meta_height), 4096);
     return size;
 }
 
