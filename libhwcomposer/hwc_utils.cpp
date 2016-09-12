@@ -1009,7 +1009,6 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].refreshRateRequest = ctx->dpyAttr[dpy].refreshRate;
     ctx->listStats[dpy].cursorLayerPresent = false;
     uint32_t refreshRate = 0;
-    qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
     int s3dFormat = HAL_NO_3D;
     int s3dLayerCount = 0;
 
@@ -1087,6 +1086,7 @@ void setListStats(hwc_context_t *ctx,
             ctx->listStats[dpy].preMultipliedAlpha = true;
 
 #ifdef DYNAMIC_FPS
+        qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
         if (!dpy && mdpHw.isDynFpsSupported() && ctx->mUseMetaDataRefreshRate){
             //dyn fps: get refreshrate from metadata
             //Support multiple refresh rates if they are same
