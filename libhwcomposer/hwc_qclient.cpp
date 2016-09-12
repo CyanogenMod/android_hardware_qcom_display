@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2013-14, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2013-14,2016 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -351,8 +351,7 @@ static void setS3DMode(hwc_context_t* ctx, int mode) {
 }
 
 static status_t setActiveConfig(hwc_context_t* ctx, const Parcel *inParcel,
-        Parcel *outParcel) {
-    (void)outParcel;
+        Parcel * /*outParcel*/) {
     uint32_t index = inParcel->readInt32();
     int dpy = inParcel->readInt32();
     //Currently only primary supported
