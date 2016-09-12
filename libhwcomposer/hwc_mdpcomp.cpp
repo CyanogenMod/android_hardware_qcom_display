@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2015, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2012-2016, The Linux Foundation. All rights reserved.
  * Not a Contribution, Apache license notifications and license are retained
  * for attribution purposes only.
  *
@@ -28,7 +28,6 @@
 #include <overlayCursor.h>
 #include "hwc_copybit.h"
 #include "qd_utils.h"
-#include <utils/Vector.h>
 
 using namespace overlay;
 using namespace qdutils;
@@ -1096,7 +1095,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         return false;
     }
     private_handle_t *renderBuf = ctx->mCopyBit[mDpy]->getCurrentRenderBuffer();
-    Vector<Whf> layerWhf; // To store w,h,f of PTOR layers
+    Whf layerWhf[MAX_PTOR_LAYERS]; // To store w,h,f of PTOR layers
 
     // Store the blending mode, planeAlpha, and transform of PTOR layers
     int32_t blending[numPTORLayersFound];
@@ -1116,7 +1115,7 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         // Store & update w, h, format of PTOR layer
         private_handle_t *hnd = (private_handle_t *)layer->handle;
         Whf whf(hnd->width, hnd->height, hnd->format, hnd->size);
-        layerWhf.insertAt(whf, j);
+        layerWhf[j] = whf;
         hnd->width = renderBuf->width;
         hnd->height = renderBuf->height;
         hnd->format = renderBuf->format;
@@ -1179,10 +1178,9 @@ bool MDPComp::fullMDPCompWithPTOR(hwc_context_t *ctx,
         int idx = ctx->mPtorInfo.layerIndex[i];
         hwc_layer_1_t* layer = &list->hwLayers[idx];
         private_handle_t *hnd = (private_handle_t *)list->hwLayers[idx].handle;
-        Whf whf = layerWhf.itemAt(i);
-        hnd->width = whf.w;
-        hnd->height = whf.h;
-        hnd->format = whf.format;
+        hnd->width = layerWhf[i].w;
+        hnd->height = layerWhf[i].h;
+        hnd->format = layerWhf[i].format;
         layer->blending = blending[i];
         layer->planeAlpha = planeAlpha[i];
         layer->transform = transform[i];
@@ -1472,7 +1470,7 @@ bool MDPComp::mdpOnlyLayersComp(hwc_context_t *ctx,
         /* Bail out if we are processing only secured video/ui layers
          * and we dont have any */
         if(secureOnly) {
-            ALOGD_IF(isDebug(), "%s: No secure video/ui layers", __FUNCTION__);
+            ALOGD_IF(isDebug(), "%s: No secure video/ui layers",__FUNCTION__);
             return false;
         }
         /* No Idle fall back for secure video/ui layers and if there is only

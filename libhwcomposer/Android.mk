@@ -12,13 +12,13 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL liboverlay \
                                  libhdmi libqdutils libhardware_legacy \
                                  libdl libmemalloc libqservice libsync \
                                  libbinder libmedia
-LOCAL_CLANG_CFLAGS            += -Wno-gnu-designator -Wno-sign-conversion
 
 ifeq ($(TARGET_USES_QCOM_BSP),true)
 LOCAL_SHARED_LIBRARIES += libskia
 endif #TARGET_USES_QCOM_BSP
 
-LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhwcomposer\"
+LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhwcomposer\" -Wno-absolute-value \
+                                 -Wno-float-conversion -Wno-unused-parameter
 #Enable Dynamic FPS if PHASE_OFFSET is not set
 ifeq ($(VSYNC_EVENT_PHASE_OFFSET_NS),)
     LOCAL_CFLAGS += -DDYNAMIC_FPS
