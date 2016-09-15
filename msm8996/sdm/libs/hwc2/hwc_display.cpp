@@ -401,7 +401,11 @@ void HWCDisplay::BuildLayerStack() {
     }
     display_rect_ = Union(display_rect_, layer->dst_rect);
     geometry_changes_ |= hwc_layer->GetGeometryChanges();
-    layer->flags.updating = IsLayerUpdating(layer);
+
+    layer->flags.updating = true;
+    if (layer_set_.size() <= kMaxLayerCount) {
+      layer->flags.updating = IsLayerUpdating(layer);
+    }
 
     layer_stack_.layers.push_back(layer);
   }
