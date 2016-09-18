@@ -1343,7 +1343,7 @@ void* HWCSession::HWCUeventThreadHandler() {
 int HWCSession::GetEventValue(const char *uevent_data, int length, const char *event_info) {
   const char *iterator_str = uevent_data;
   while (((iterator_str - uevent_data) <= length) && (*iterator_str)) {
-    char *pstr = strstr(iterator_str, event_info);
+    const char *pstr = strstr(iterator_str, event_info);
     if (pstr != NULL) {
       return (atoi(iterator_str + strlen(event_info)));
     }
