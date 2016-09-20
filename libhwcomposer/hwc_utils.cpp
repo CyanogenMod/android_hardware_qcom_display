@@ -1089,7 +1089,6 @@ void setListStats(hwc_context_t *ctx,
     ctx->listStats[dpy].secureRGBCount = 0;
     ctx->listStats[dpy].refreshRateRequest = ctx->dpyAttr[dpy].refreshRate;
     uint32_t refreshRate = 0;
-    qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
 
     ctx->listStats[dpy].mAIVVideoMode = false;
     resetROI(ctx, dpy);
@@ -1150,6 +1149,7 @@ void setListStats(hwc_context_t *ctx,
             ctx->listStats[dpy].preMultipliedAlpha = true;
 
 #ifdef DYNAMIC_FPS
+        qdutils::MDPVersion& mdpHw = qdutils::MDPVersion::getInstance();
         if (!dpy && mdpHw.isDynFpsSupported() && ctx->mUseMetaDataRefreshRate){
             /* Dyn fps: get refreshrate from metadata */
             MetaData_t *mdata = hnd ? (MetaData_t *)hnd->base_metadata : NULL;
