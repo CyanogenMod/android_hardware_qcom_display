@@ -40,7 +40,6 @@ class DisplayPrimary : public DisplayBase, HWEventHandler {
                  BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
                  RotatorInterface *rotator_intf);
   virtual DisplayError Init();
-  virtual DisplayError Deinit();
   virtual DisplayError Prepare(LayerStack *layer_stack);
   virtual DisplayError Commit(LayerStack *layer_stack);
   virtual DisplayError ControlPartialUpdate(bool enable, uint32_t *pending);
@@ -61,9 +60,12 @@ class DisplayPrimary : public DisplayBase, HWEventHandler {
   virtual void CECMessage(char *message) { }
 
  private:
+  bool NeedsAVREnable();
+
   uint32_t idle_timeout_ms_ = 0;
   std::vector<const char *> event_list_ = {"vsync_event", "show_blank_event", "idle_notify",
                                            "msm_fb_thermal_level", "thread_exit"};
+  bool avr_prop_disabled_ = false;
 };
 
 }  // namespace sdm

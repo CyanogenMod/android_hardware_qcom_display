@@ -259,7 +259,8 @@ struct LayerBuffer {
   LayerBufferFlags flags;       //!< Flags associated with this buffer.
 
   LayerBufferS3DFormat s3d_format = kS3dFormatNone;
-                                //!< Represents the format of the buffer content in 3D.
+                                //!< Represents the format of the buffer content in 3D. This field
+                                //!< could be modified by both client and SDM.
   uint64_t buffer_id __attribute__((aligned(8))) = 0;
                                 //!< Specifies the buffer id.
 };

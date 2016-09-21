@@ -57,35 +57,19 @@
 #define MDP_COMMIT_CWB_DSPP 0x1000
 #endif
 
+#ifndef MDP_COMMIT_AVR_EN
+#define MDP_COMMIT_AVR_EN 0x08
+#endif
+
+#ifndef MDP_COMMIT_AVR_ONE_SHOT_MODE
+#define MDP_COMMIT_AVR_ONE_SHOT_MODE 0x10
+#endif
+
 namespace sdm {
 
 using std::string;
 using std::to_string;
 using std::fstream;
-
-DisplayError HWPrimary::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
-                               BufferSyncHandler *buffer_sync_handler) {
-  DisplayError error = kErrorNone;
-  HWPrimary *hw_primary = NULL;
-
-  hw_primary = new HWPrimary(buffer_sync_handler, hw_info_intf);
-  error = hw_primary->Init();
-  if (error != kErrorNone) {
-    delete hw_primary;
-  } else {
-    *intf = hw_primary;
-  }
-
-  return error;
-}
-
-DisplayError HWPrimary::Destroy(HWInterface *intf) {
-  HWPrimary *hw_primary = static_cast<HWPrimary *>(intf);
-  hw_primary->Deinit();
-  delete hw_primary;
-
-  return kErrorNone;
-}
 
 HWPrimary::HWPrimary(BufferSyncHandler *buffer_sync_handler, HWInfoInterface *hw_info_intf)
   : HWDevice(buffer_sync_handler) {
@@ -168,6 +152,8 @@ void HWPrimary::InitializeConfigs() {
   string line;
   while (Sys::getline_(fs, line)) {
     DisplayConfigVariableInfo config;
+    // std::getline (unlike ::getline) removes \n while driver expects it in mode, so add back
+    line += '\n';
     size_t xpos = line.find(':');
     size_t ypos = line.find('x');
 
@@ -186,10 +172,6 @@ void HWPrimary::InitializeConfigs() {
       DLOGI("Active config index %u", active_config_index_);
     }
   }
-}
-
-DisplayError HWPrimary::Deinit() {
-  return HWDevice::Deinit();
 }
 
 DisplayError HWPrimary::GetNumDisplayAttributes(uint32_t *count) {
@@ -417,6 +399,10 @@ DisplayError HWPrimary::Validate(HWLayers *hw_layers) {
     DLOGI_IF(kTagDriverConfig, "****************************************************************");
   }
 
+  if (hw_resource_.has_avr) {
+    SetAVRFlags(hw_layers->hw_avr_info, &mdp_commit.flags);
+  }
+
   return HWDevice::Validate(hw_layers);
 }
 
@@ -511,7 +497,7 @@ DisplayError HWPrimary::SetDisplayMode(const HWDisplayMode hw_display_mode) {
 }
 
 DisplayError HWPrimary::SetPanelBrightness(int level) {
-  char buffer[MAX_SYSFS_COMMAND_LENGTH] = {0};
+  char buffer[kMaxSysfsCommandLength] = {0};
 
   DLOGV_IF(kTagDriverConfig, "Set brightness level to %d", level);
   int fd = Sys::open_(kBrightnessNode, O_RDWR);
@@ -521,7 +507,7 @@ DisplayError HWPrimary::SetPanelBrightness(int level) {
     return kErrorFileDescriptor;
   }
 
-  int32_t bytes = snprintf(buffer, MAX_SYSFS_COMMAND_LENGTH, "%d\n", level);
+  int32_t bytes = snprintf(buffer, kMaxSysfsCommandLength, "%d\n", level);
   if (bytes < 0) {
     DLOGV_IF(kTagDriverConfig, "Failed to copy new brightness level = %d", level);
     Sys::close_(fd);
@@ -585,7 +571,12 @@ DisplayError HWPrimary::SetAutoRefresh(bool enable) {
 DisplayError HWPrimary::GetPPFeaturesVersion(PPFeatureVersion *vers) {
   mdp_pp_feature_version version = {};
 
+#ifdef PA_DITHER
+  uint32_t feature_id_mapping[kMaxNumPPFeatures] = { PCC, IGC, GC, GC, PA,
+                                                     DITHER, GAMUT, PA_DITHER };
+#else
   uint32_t feature_id_mapping[kMaxNumPPFeatures] = { PCC, IGC, GC, GC, PA, DITHER, GAMUT };
+#endif
 
   for (int i(0); i < kMaxNumPPFeatures; i++) {
     version.pp_feature = feature_id_mapping[i];
@@ -646,6 +637,16 @@ void HWPrimary::UpdateMixerAttributes() {
   mixer_attributes_.height = display_attributes_.y_pixels;
   mixer_attributes_.split_left = display_attributes_.is_device_split ?
       hw_panel_info_.split_info.left_split : mixer_attributes_.width;
+}
+
+void HWPrimary::SetAVRFlags(const HWAVRInfo &hw_avr_info, uint32_t *avr_flags) {
+  if (hw_avr_info.enable) {
+    *avr_flags |= MDP_COMMIT_AVR_EN;
+  }
+
+  if (hw_avr_info.mode == kOneShotMode) {
+    *avr_flags |= MDP_COMMIT_AVR_ONE_SHOT_MODE;
+  }
 }
 
 }  // namespace sdm

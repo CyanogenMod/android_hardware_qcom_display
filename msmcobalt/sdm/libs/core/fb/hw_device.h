@@ -49,9 +49,13 @@ namespace sdm {
 class HWInfoInterface;
 
 class HWDevice : public HWInterface {
+ public:
+  virtual ~HWDevice() {}
+  virtual DisplayError Init();
+  virtual DisplayError Deinit();
+
  protected:
   explicit HWDevice(BufferSyncHandler *buffer_sync_handler);
-  virtual ~HWDevice() {}
 
   // From HWInterface
   virtual DisplayError GetActiveConfig(uint32_t *active_config);
@@ -89,10 +93,6 @@ class HWDevice : public HWInterface {
   virtual DisplayError SetMixerAttributes(const HWMixerAttributes &mixer_attributes);
   virtual DisplayError GetMixerAttributes(HWMixerAttributes *mixer_attributes);
 
-  // For HWDevice derivatives
-  virtual DisplayError Init();
-  virtual DisplayError Deinit();
-
   enum {
     kHWEventVSync,
     kHWEventBlank,
@@ -100,6 +100,9 @@ class HWDevice : public HWInterface {
 
   static const int kMaxStringLength = 1024;
   static const int kNumPhysicalDisplays = 2;
+  // This indicates the number of fb devices created in the driver for all interfaces. Any addition
+  // of new fb devices should be added here.
+  static const int kFBNodeMax = 4;
 
   void DumpLayerCommit(const mdp_layer_commit &layer_commit);
   DisplayError SetFormat(const LayerBufferFormat &source, uint32_t *target);
@@ -115,7 +118,7 @@ class HWDevice : public HWInterface {
   void PopulateHWPanelInfo();
   void GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info);
   void GetHWPanelNameByNode(int device_node, HWPanelInfo *panel_info);
-  void GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode);
+  void GetHWDisplayPortAndMode(int device_node, HWPanelInfo *panel_info);
   void GetSplitInfo(int device_node, HWPanelInfo *panel_info);
   void GetHWPanelMaxBrightnessFromNode(HWPanelInfo *panel_info);
   int ParseLine(const char *input, char *tokens[], const uint32_t max_token, uint32_t *count);
@@ -127,6 +130,7 @@ class HWDevice : public HWInterface {
 
   bool EnableHotPlugDetection(int enable);
   ssize_t SysFsWrite(const char* file_node, const char* value, ssize_t length);
+  bool IsFBNodeConnected(int fb_node);
 
   HWResourceInfo hw_resource_;
   HWPanelInfo hw_panel_info_;

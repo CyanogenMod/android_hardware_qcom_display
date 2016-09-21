@@ -87,6 +87,43 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
         case SET_SINGLE_BUFFER_MODE:
             data->isSingleBufferMode = *((uint32_t *)param);
             break;
+        case SET_S3D_COMP:
+            data->s3dComp = *((S3DGpuComp_t *)param);
+            break;
+        default:
+            ALOGE("Unknown paramType %d", paramType);
+            break;
+    }
+    if(munmap(base, size))
+        ALOGE("%s: failed to unmap ptr %p, err %d", __func__, (void*)base,
+                                                                        errno);
+    return 0;
+}
+
+int clearMetaData(private_handle_t *handle, DispParamType paramType) {
+    if (!handle) {
+        ALOGE("%s: Private handle is null!", __func__);
+        return -1;
+    }
+    if (handle->fd_metadata == -1) {
+        ALOGE("%s: Bad fd for extra data!", __func__);
+        return -1;
+    }
+
+    unsigned long size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
+    void *base = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED,
+        handle->fd_metadata, 0);
+    if (base == reinterpret_cast<void*>(MAP_FAILED)) {
+        ALOGE("%s: mmap() failed: error is %s!", __func__, strerror(errno));
+        return -1;
+    }
+    MetaData_t *data = reinterpret_cast <MetaData_t *>(base);
+    data->operation &= ~paramType;
+    switch (paramType) {
+        case SET_S3D_COMP:
+            data->s3dComp.displayId = -1;
+            data->s3dComp.s3dMode = 0;
+            break;
         default:
             ALOGE("Unknown paramType %d", paramType);
             break;
@@ -120,7 +157,6 @@ int getMetaData(private_handle_t *handle, DispFetchParamType paramType,
     }
 
     MetaData_t *data = reinterpret_cast <MetaData_t *>(base);
-    data->operation |= paramType;
     switch (paramType) {
         case GET_PP_PARAM_INTERLACED:
             *((int32_t *)param) = data->interlaced;
@@ -148,6 +184,9 @@ int getMetaData(private_handle_t *handle, DispFetchParamType paramType,
             break;
         case GET_SINGLE_BUFFER_MODE:
             *((uint32_t *)param) = data->isSingleBufferMode ;
+            break;
+        case GET_S3D_COMP:
+            *((S3DGpuComp_t *)param) = data->s3dComp;
             break;
         default:
             ALOGE("Unknown paramType %d", paramType);

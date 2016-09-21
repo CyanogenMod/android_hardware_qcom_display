@@ -48,6 +48,9 @@
 #include <string>
 
 #include "hw_device.h"
+#include "hw_primary.h"
+#include "hw_hdmi.h"
+#include "hw_virtual.h"
 #include "hw_info_interface.h"
 
 #define __CLASS__ "HWDevice"
@@ -57,6 +60,46 @@ using std::to_string;
 using std::fstream;
 
 namespace sdm {
+
+DisplayError HWInterface::Create(DisplayType type, HWInfoInterface *hw_info_intf,
+                                        BufferSyncHandler *buffer_sync_handler,
+                                        HWInterface **intf) {
+  DisplayError error = kErrorNone;
+  HWDevice *hw = nullptr;
+
+  switch (type) {
+    case kPrimary:
+      hw = new HWPrimary(buffer_sync_handler, hw_info_intf);
+      break;
+    case kHDMI:
+      hw = new HWHDMI(buffer_sync_handler, hw_info_intf);
+      break;
+    case kVirtual:
+      hw = new HWVirtual(buffer_sync_handler, hw_info_intf);
+      break;
+    default:
+      DLOGE("Undefined display type");
+      return kErrorUndefined;
+  }
+
+  error = hw->Init();
+  if (error != kErrorNone) {
+    delete hw;
+    DLOGE("Init on HW Intf type %d failed", type);
+    return error;
+  }
+  *intf = hw;
+
+  return error;
+}
+
+DisplayError HWInterface::Destroy(HWInterface *intf) {
+  HWDevice *hw = static_cast<HWDevice *>(intf);
+  hw->Deinit();
+  delete hw;
+
+  return kErrorNone;
+}
 
 HWDevice::HWDevice(BufferSyncHandler *buffer_sync_handler)
   : fb_node_index_(-1), fb_path_("/sys/devices/virtual/graphics/fb"),
@@ -472,6 +515,8 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
 
     if (hw_rotator_session->hw_block_count) {
       input_buffer = &hw_rotator_session->output_buffer;
+      input_buffer->release_fence_fd = Sys::dup_(mdp_commit.release_fence);
+      continue;
     }
 
     // Make sure the release fence is duplicated only once for each buffer.
@@ -692,7 +737,7 @@ void HWDevice::SetMDPFlags(const Layer *layer, const bool &is_rotator_used,
 }
 
 int HWDevice::GetFBNodeIndex(HWDeviceType device_type) {
-  for (int i = 0; i <= kDeviceVirtual; i++) {
+  for (int i = 0; i < kFBNodeMax; i++) {
     HWPanelInfo panel_info;
     GetHWPanelInfoByNode(i, &panel_info);
     switch (device_type) {
@@ -703,7 +748,9 @@ int HWDevice::GetFBNodeIndex(HWDeviceType device_type) {
       break;
     case kDeviceHDMI:
       if (panel_info.is_pluggable == true) {
-        return i;
+        if (IsFBNodeConnected(i)) {
+          return i;
+        }
       }
       break;
     case kDeviceVirtual:
@@ -793,6 +840,8 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
         panel_info->needs_roi_merge = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "dyn_fps_en", strlen("dyn_fps_en"))) {
         panel_info->dynamic_fps = atoi(tokens[1]);
+      } else if (!strncmp(tokens[0], "dfps_porch_mode", strlen("dfps_porch_mode"))) {
+        panel_info->dfps_porch_mode = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "min_fps", strlen("min_fps"))) {
         panel_info->min_fps = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_fps", strlen("max_fps"))) {
@@ -805,13 +854,16 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
     }
   }
 
-  GetHWDisplayPortAndMode(device_node, &panel_info->port, &panel_info->mode);
+  GetHWDisplayPortAndMode(device_node, panel_info);
   GetSplitInfo(device_node, panel_info);
   GetHWPanelNameByNode(device_node, panel_info);
   GetHWPanelMaxBrightnessFromNode(panel_info);
 }
 
-void HWDevice::GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWDisplayMode *mode) {
+void HWDevice::GetHWDisplayPortAndMode(int device_node, HWPanelInfo *panel_info) {
+  DisplayPort *port = &panel_info->port;
+  HWDisplayMode *mode = &panel_info->mode;
+
   *port = kPortDefault;
   *mode = kModeDefault;
 
@@ -841,11 +893,14 @@ void HWDevice::GetHWDisplayPortAndMode(int device_node, HWDisplayPort *port, HWD
     *port = kPortEDP;
     *mode = kModeVideo;
   } else if ((strncmp(line.c_str(), "dtv panel", strlen("dtv panel")) == 0)) {
-    *port = kPortDTv;
+    *port = kPortDTV;
     *mode = kModeVideo;
   } else if ((strncmp(line.c_str(), "writeback panel", strlen("writeback panel")) == 0)) {
     *port = kPortWriteBack;
     *mode = kModeCommand;
+  } else if ((strncmp(line.c_str(), "dp panel", strlen("dp panel")) == 0)) {
+    *port = kPortDP;
+    *mode = kModeVideo;
   }
 
   return;
@@ -937,17 +992,20 @@ int HWDevice::ParseLine(const char *input, const char *delim, char *tokens[],
 
 bool HWDevice::EnableHotPlugDetection(int enable) {
   char hpdpath[kMaxStringLength];
-  int hdmi_node_index = GetFBNodeIndex(kDeviceHDMI);
-  if (hdmi_node_index < 0) {
-    return false;
-  }
-
-  snprintf(hpdpath , sizeof(hpdpath), "%s%d/hpd", fb_path_, hdmi_node_index);
-
   char value = enable ? '1' : '0';
-  ssize_t length = SysFsWrite(hpdpath, &value, sizeof(value));
-  if (length <= 0) {
-    return false;
+
+  // Enable HPD for all pluggable devices.
+  for (int i = 0; i < kFBNodeMax; i++) {
+    HWPanelInfo panel_info;
+    GetHWPanelInfoByNode(i, &panel_info);
+    if (panel_info.is_pluggable == true) {
+      snprintf(hpdpath , sizeof(hpdpath), "%s%d/hpd", fb_path_, i);
+
+      ssize_t length = SysFsWrite(hpdpath, &value, sizeof(value));
+      if (length <= 0) {
+        return false;
+      }
+    }
   }
 
   return true;
@@ -1052,6 +1110,10 @@ DisplayError HWDevice::SetPPFeatures(PPFeaturesConfig *feature_list) {
 DisplayError HWDevice::SetVSyncState(bool enable) {
   int vsync_on = enable ? 1 : 0;
   if (Sys::ioctl_(device_fd_, MSMFB_OVERLAY_VSYNC_CTRL, &vsync_on) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
     IOCTL_LOGE(MSMFB_OVERLAY_VSYNC_CTRL, device_type_);
     return kErrorHardware;
   }
@@ -1108,6 +1170,23 @@ ssize_t HWDevice::SysFsWrite(const char* file_node, const char* value, ssize_t l
   return len;
 }
 
+bool HWDevice::IsFBNodeConnected(int fb_node) {
+  string file_name = fb_path_ + to_string(fb_node) + "/connected";
+
+  Sys::fstream fs(file_name, fstream::in);
+  if (!fs.is_open()) {
+    DLOGW("File not found %s", file_name.c_str());
+    return false;
+  }
+
+  string line;
+  if (!Sys::getline_(fs, line)) {
+    return false;
+  }
+
+  return atoi(line.c_str());
+}
+
 DisplayError HWDevice::SetS3DMode(HWS3DMode s3d_mode) {
   return kErrorNotSupported;
 }
@@ -1140,6 +1219,10 @@ DisplayError HWDevice::SetScaleLutConfig(HWScaleLutInfo *lut_info) {
   cfg.payload = reinterpret_cast<uint64_t>(&mdp_lut_info);
 
   if (Sys::ioctl_(device_fd_, MSMFB_MDP_SET_CFG, &cfg) < 0) {
+    if (errno == ESHUTDOWN) {
+      DLOGI_IF(kTagDriverConfig, "Driver is processing shutdown sequence");
+      return kErrorShutDown;
+    }
     IOCTL_LOGE(MSMFB_MDP_SET_CFG, device_type_);
     return kErrorHardware;
   }

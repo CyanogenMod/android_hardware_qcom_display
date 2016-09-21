@@ -99,6 +99,13 @@ int Debug::GetMaxPipesPerMixer(DisplayType display_type) {
   return value;
 }
 
+int Debug::GetMaxVideoUpscale() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.video_max_upscale", &value);
+
+  return value;
+}
+
 bool Debug::IsVideoModeEnabled() {
   int value = 0;
   debug_.debug_handler_->GetProperty("sdm.video_mode_panel", &value);
@@ -138,6 +145,20 @@ bool Debug::IsUbwcTiledFrameBuffer() {
   }
 
   return (ubwc_framebuffer == 1);
+}
+
+bool Debug::IsAVRDisabled() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sdm.debug.disable_avr", &value);
+
+  return (value == 1);
+}
+
+bool Debug::IsExtAnimDisabled() {
+  int value = 0;
+  debug_.debug_handler_->GetProperty("sys.disable_ext_animation", &value);
+
+  return (value == 1);
 }
 
 bool Debug::GetProperty(const char* property_name, char* value) {

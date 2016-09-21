@@ -79,29 +79,6 @@ static bool MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
   return true;
 }
 
-DisplayError HWHDMI::Create(HWInterface **intf, HWInfoInterface *hw_info_intf,
-                            BufferSyncHandler *buffer_sync_handler) {
-  DisplayError error = kErrorNone;
-  HWHDMI *hw_fb_hdmi = NULL;
-
-  hw_fb_hdmi = new HWHDMI(buffer_sync_handler, hw_info_intf);
-  error = hw_fb_hdmi->Init();
-  if (error != kErrorNone) {
-    delete hw_fb_hdmi;
-  } else {
-    *intf = hw_fb_hdmi;
-  }
-  return error;
-}
-
-DisplayError HWHDMI::Destroy(HWInterface *intf) {
-  HWHDMI *hw_fb_hdmi = static_cast<HWHDMI *>(intf);
-  hw_fb_hdmi->Deinit();
-  delete hw_fb_hdmi;
-
-  return kErrorNone;
-}
-
 HWHDMI::HWHDMI(BufferSyncHandler *buffer_sync_handler,  HWInfoInterface *hw_info_intf)
   : HWDevice(buffer_sync_handler), hw_scan_info_(), active_config_index_(0) {
   HWDevice::device_type_ = kDeviceHDMI;
@@ -141,6 +118,12 @@ DisplayError HWHDMI::Init() {
 
   ReadScanInfo();
 
+  error = GetPanelS3DMode();
+  if (error != kErrorNone) {
+    Deinit();
+    return error;
+  }
+
   s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
                              (kS3DModeNone, HDMI_S3D_NONE));
   s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
@@ -153,10 +136,6 @@ DisplayError HWHDMI::Init() {
                              (kS3DModeFP, HDMI_S3D_FRAME_PACKING));
 
   return error;
-}
-
-DisplayError HWHDMI::Deinit() {
-  return HWDevice::Deinit();
 }
 
 DisplayError HWHDMI::GetNumDisplayAttributes(uint32_t *count) {
@@ -691,7 +670,41 @@ DisplayError HWHDMI::SetS3DMode(HWS3DMode s3d_mode) {
   hw_panel_info_.s3d_mode = s3d_mode;
   Sys::close_(s3d_mode_node);
 
-  DLOGI_IF(kTagDriverConfig, "s3d mode %d", hw_panel_info_.s3d_mode);
+  DLOGI_IF(kTagDriverConfig, "Set s3d mode %d", hw_panel_info_.s3d_mode);
+  return kErrorNone;
+}
+
+DisplayError HWHDMI::GetPanelS3DMode() {
+  ssize_t length = -1;
+  char s3d_mode_path[kMaxStringLength] = {'\0'};
+  char s3d_mode_string[kMaxStringLength] = {'\0'};
+  snprintf(s3d_mode_path, sizeof(s3d_mode_path), "%s%d/s3d_mode", fb_path_, fb_node_index_);
+  int panel_s3d_mode = 0;
+
+  int s3d_mode_node = Sys::open_(s3d_mode_path, O_RDWR);
+  if (s3d_mode_node < 0) {
+    DLOGE("%s could not be opened : %s", s3d_mode_path, strerror(errno));
+    return kErrorNotSupported;
+  }
+
+  length = Sys::pread_(s3d_mode_node, s3d_mode_string, sizeof(s3d_mode_string), 0);
+  if (length <= 0) {
+    DLOGE("Failed read s3d node: %s", strerror(errno));
+    Sys::close_(s3d_mode_node);
+    return kErrorNotSupported;
+  }
+
+  panel_s3d_mode = atoi(s3d_mode_string);
+  if (panel_s3d_mode < HDMI_S3D_NONE || panel_s3d_mode >= HDMI_S3D_MAX) {
+    Sys::close_(s3d_mode_node);
+    DLOGW("HDMI panel S3D mode is not supported panel_s3d_mode = %d", panel_s3d_mode);
+    return kErrorUndefined;
+  }
+
+  active_mdp_s3d_mode_  = static_cast<msm_hdmi_s3d_mode>(panel_s3d_mode);
+  Sys::close_(s3d_mode_node);
+
+  DLOGI_IF(kTagDriverConfig, "Get HDMI panel s3d mode %d", active_mdp_s3d_mode_);
   return kErrorNone;
 }
 

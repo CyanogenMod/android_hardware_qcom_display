@@ -130,34 +130,45 @@ DisplayError DisplayBase::Deinit() {
   }
 
   comp_manager_->UnregisterDisplay(display_comp_ctx_);
-
   HWEventsInterface::Destroy(hw_events_intf_);
+  HWInterface::Destroy(hw_intf_);
 
   return kErrorNone;
 }
 
-DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
-  uint32_t i = 0;
-  std::vector<Layer *>layers = layer_stack->layers;
+DisplayError DisplayBase::BuildLayerStackStats(LayerStack *layer_stack) {
+  std::vector<Layer *> &layers = layer_stack->layers;
+  HWLayersInfo &hw_layers_info = hw_layers_.info;
 
-  // TODO(user): Remove this check once we have query display attributes on virtual display
-  if (display_type_ == kVirtual) {
-    return kErrorNone;
-  }
-  uint32_t layer_count = UINT32(layers.size());
-  while ((i < layer_count) && (layers.at(i)->composition != kCompositionGPUTarget)) {
-    i++;
+  hw_layers_info.stack = layer_stack;
+
+  for (auto &layer : layers) {
+    if (layer->composition == kCompositionGPUTarget) {
+      hw_layers_info.gpu_target_index = hw_layers_info.app_layer_count;
+      break;
+    }
+    hw_layers_info.app_layer_count++;
   }
 
-  if (i >= layer_count) {
-    DLOGE("Either layer count is zero or GPU target layer is not present");
+  DLOGV_IF(kTagNone, "LayerStack layer_count: %d, app_layer_count: %d, gpu_target_index: %d, "
+           "display type: %d", layers.size(), hw_layers_info.app_layer_count,
+           hw_layers_info.gpu_target_index, display_type_);
+
+  if (!hw_layers_info.app_layer_count) {
+    DLOGE("Layer count is zero");
     return kErrorParameters;
   }
 
-  uint32_t gpu_target_index = i;
+  if (hw_layers_info.gpu_target_index) {
+    return ValidateGPUTargetParams();
+  }
 
-  // Check GPU target layer
-  Layer *gpu_target_layer = layers.at(gpu_target_index);
+  return kErrorNone;
+}
+
+DisplayError DisplayBase::ValidateGPUTargetParams() {
+  HWLayersInfo &hw_layers_info = hw_layers_.info;
+  Layer *gpu_target_layer = hw_layers_info.stack->layers.at(hw_layers_info.gpu_target_index);
 
   if (!IsValid(gpu_target_layer->src_rect)) {
     DLOGE("Invalid src rect for GPU target layer");
@@ -184,9 +195,9 @@ DisplayError DisplayBase::ValidateGPUTarget(LayerStack *layer_stack) {
 
   if (gpu_target_layer_dst_xpixels > mixer_attributes_.width ||
     gpu_target_layer_dst_ypixels > mixer_attributes_.height) {
-    DLOGE("GPU target layer dst rect is not with in limits gpu wxh %fx%f mixer wxh %dx%d",
-    gpu_target_layer_dst_xpixels, gpu_target_layer_dst_ypixels, mixer_attributes_.width,
-    mixer_attributes_.height);
+    DLOGE("GPU target layer dst rect is not with in limits gpu wxh %fx%f, mixer wxh %dx%d",
+                  gpu_target_layer_dst_xpixels, gpu_target_layer_dst_ypixels,
+                  mixer_attributes_.width, mixer_attributes_.height);
     return kErrorParameters;
   }
 
@@ -205,7 +216,7 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
     return kErrorParameters;
   }
 
-  error = ValidateGPUTarget(layer_stack);
+  error = BuildLayerStackStats(layer_stack);
   if (error != kErrorNone) {
     return error;
   }
@@ -218,11 +229,6 @@ DisplayError DisplayBase::Prepare(LayerStack *layer_stack) {
     comp_manager_->ControlPartialUpdate(display_comp_ctx_, false /* enable */);
     disable_pu_one_frame_ = false;
   }
-
-  // Clean hw layers for reuse.
-  hw_layers_ = HWLayers();
-  hw_layers_.info.stack = layer_stack;
-  hw_layers_.output_compression = 1.0f;
 
   comp_manager_->PrePrepare(display_comp_ctx_, &hw_layers_);
   while (true) {
@@ -1036,6 +1042,24 @@ DisplayError DisplayBase::SetDetailEnhancerData(const DisplayDetailEnhancerData 
   DisablePartialUpdateOneFrame();
 
   return kErrorNone;
+}
+
+DisplayError DisplayBase::GetDisplayPort(DisplayPort *port) {
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
+
+  if (!port) {
+    return kErrorParameters;
+  }
+
+  *port = hw_panel_info_.port;
+
+  return kErrorNone;
+}
+
+bool DisplayBase::IsPrimaryDisplay() {
+  lock_guard<recursive_mutex> obj(recursive_mutex_);
+
+  return hw_panel_info_.is_primary_panel;
 }
 
 }  // namespace sdm

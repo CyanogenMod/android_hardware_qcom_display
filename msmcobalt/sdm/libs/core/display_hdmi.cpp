@@ -31,7 +31,6 @@
 #include "display_hdmi.h"
 #include "hw_interface.h"
 #include "hw_info_interface.h"
-#include "fb/hw_hdmi.h"
 
 #define __CLASS__ "DisplayHDMI"
 
@@ -47,8 +46,8 @@ DisplayHDMI::DisplayHDMI(DisplayEventHandler *event_handler, HWInfoInterface *hw
 DisplayError DisplayHDMI::Init() {
   lock_guard<recursive_mutex> obj(recursive_mutex_);
 
-  DisplayError error = HWHDMI::Create(&hw_intf_, hw_info_intf_,
-                                      DisplayBase::buffer_sync_handler_);
+  DisplayError error = HWInterface::Create(kHDMI, hw_info_intf_, buffer_sync_handler_,
+                                           &hw_intf_);
   if (error != kErrorNone) {
     return error;
   }
@@ -65,12 +64,12 @@ DisplayError DisplayHDMI::Init() {
 
   error = hw_intf_->SetDisplayAttributes(active_mode_index);
   if (error != kErrorNone) {
-    HWHDMI::Destroy(hw_intf_);
+    HWInterface::Destroy(hw_intf_);
   }
 
   error = DisplayBase::Init();
   if (error != kErrorNone) {
-    HWHDMI::Destroy(hw_intf_);
+    HWInterface::Destroy(hw_intf_);
     return error;
   }
 
@@ -91,18 +90,9 @@ DisplayError DisplayHDMI::Init() {
   error = HWEventsInterface::Create(INT(display_type_), this, &event_list_, &hw_events_intf_);
   if (error != kErrorNone) {
     DisplayBase::Deinit();
-    HWHDMI::Destroy(hw_intf_);
+    HWInterface::Destroy(hw_intf_);
     DLOGE("Failed to create hardware events interface. Error = %d", error);
   }
-
-  return error;
-}
-
-DisplayError DisplayHDMI::Deinit() {
-  lock_guard<recursive_mutex> obj(recursive_mutex_);
-
-  DisplayError error = DisplayBase::Deinit();
-  HWHDMI::Destroy(hw_intf_);
 
   return error;
 }
@@ -123,6 +113,9 @@ DisplayError DisplayHDMI::Prepare(LayerStack *layer_stack) {
   }
 
   SetS3DMode(layer_stack);
+
+  // Clean hw layers for reuse.
+  hw_layers_ = HWLayers();
 
   return DisplayBase::Prepare(layer_stack);
 }

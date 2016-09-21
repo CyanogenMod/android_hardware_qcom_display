@@ -102,8 +102,9 @@ struct PPFeatureVersion {
   static const uint32_t kSDEGamutV17 = 9;
   static const uint32_t kSDEPaV17 = 11;
   static const uint32_t kSDEPccV17 = 13;
-  static const uint32_t kSDEPADitherV17 = 15;
-  static const uint32_t kSDELegacyPP = 17;
+  static const uint32_t kSDELegacyPP = 15;
+  static const uint32_t kSDEPADitherV17 = 16;
+  static const uint32_t kSDEIgcV30 = 17;
 
   uint32_t version[kMaxNumPPFeatures];
   PPFeatureVersion() { memset(version, 0, sizeof(version)); }
@@ -143,16 +144,16 @@ struct PPDisplayAPIPayload {
     return ret;
   }
 
-  DisplayError CreatePayloadBytes(uint8_t *output, uint32_t size_in_bytes) {
+  DisplayError CreatePayloadBytes(uint32_t size_in_bytes, uint8_t **output) {
     DisplayError ret = kErrorNone;
 
     payload = new uint8_t[size_in_bytes]();
     if (!payload) {
       ret = kErrorMemory;
-      output = NULL;
+      *output = NULL;
     } else {
       this->size = size_in_bytes;
-      output = payload;
+      *output = payload;
       own_payload = true;
     }
     return ret;
@@ -246,7 +247,7 @@ struct SDEDitherCfg {
 };
 
 struct SDEPADitherData {
-  uint32_t data_flags;
+  uint64_t data_flags;
   uint32_t matrix_size;
   uint64_t matrix_data_addr;
   uint32_t strength;
@@ -305,6 +306,15 @@ struct SDEIgcLUTData {
   uint32_t len = 0;
   uint32_t *c0_c1_data = NULL;
   uint32_t *c2_data = NULL;
+};
+
+struct SDEIgcV30LUTData {
+  static const int kMaxIgcLUTEntries = 256;
+  uint32_t table_fmt = 0;
+  uint32_t len = 0;
+  uint64_t c0_c1_data = 0;
+  uint64_t c2_data = 0;
+  uint32_t strength = 0;
 };
 
 struct SDEPgcLUTData {
@@ -374,6 +384,22 @@ class SDEIgcLUTWrapper : private SDEIgcLUTData {
 
  private:
   SDEIgcLUTWrapper() {}
+  uint32_t *buffer_ = NULL;
+};
+
+class SDEIgcV30LUTWrapper : private SDEIgcV30LUTData {
+ public:
+  static SDEIgcV30LUTWrapper *Init(uint32_t arg __attribute__((__unused__)));
+  ~SDEIgcV30LUTWrapper() {
+    if (buffer_)
+      delete[] buffer_;
+  }
+  inline SDEIgcV30LUTData *GetConfig(void) { return this; }
+
+ private:
+  SDEIgcV30LUTWrapper(const SDEIgcV30LUTWrapper& src) { /* do not create copies */ }
+  SDEIgcV30LUTWrapper& operator=(const SDEIgcV30LUTWrapper&) { return *this; }
+  SDEIgcV30LUTWrapper() {}
   uint32_t *buffer_ = NULL;
 };
 

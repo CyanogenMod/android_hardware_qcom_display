@@ -118,6 +118,20 @@ enum ContentQuality {
   kContentQualityMax,
 };
 
+/*! @brief This enum represents the display port.
+
+  @sa DisplayInterface::GetDisplayPort
+*/
+enum DisplayPort {
+  kPortDefault,
+  kPortDSI,        // Display is connected to DSI port.
+  kPortDTV,        // Display is connected to DTV port
+  kPortWriteBack,  // Display is connected to writeback port
+  kPortLVDS,       // Display is connected to LVDS port
+  kPortEDP,        // Display is connected to EDP port
+  kPortDP,         // Display is connected to DP port.
+};
+
 /*! @brief This structure defines configuration for fixed properties of a display device.
 
   @sa DisplayInterface::GetConfig
@@ -572,6 +586,20 @@ class DisplayInterface {
     @return \link DisplayError \endlink
   */
   virtual DisplayError SetDetailEnhancerData(const DisplayDetailEnhancerData &de_data) = 0;
+
+  /*! @brief Method to get display port information.
+
+    @param[out] port \link DisplayPort \endlink
+
+    @return \link DisplayError \endlink
+  */
+  virtual DisplayError GetDisplayPort(DisplayPort *port) = 0;
+
+  /*! @brief Method to query whether it is Primrary device.
+
+    @return \link Bool \endlink
+  */
+  virtual bool IsPrimaryDisplay() = 0;
 
  protected:
   virtual ~DisplayInterface() { }

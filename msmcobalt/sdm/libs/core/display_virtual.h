@@ -39,7 +39,7 @@ class DisplayVirtual : public DisplayBase {
                  BufferSyncHandler *buffer_sync_handler, CompManager *comp_manager,
                  RotatorInterface *rotator_intf);
   virtual DisplayError Init();
-  virtual DisplayError Deinit();
+  virtual DisplayError Prepare(LayerStack *layer_stack);
   virtual DisplayError GetNumVariableInfoConfigs(uint32_t *count);
   virtual DisplayError GetConfig(uint32_t index, DisplayConfigVariableInfo *variable_info);
   virtual DisplayError GetActiveConfig(uint32_t *index);
@@ -61,6 +61,11 @@ class DisplayVirtual : public DisplayBase {
   }
   virtual DisplayError SetDetailEnhancerData(const DisplayDetailEnhancerData &de_data) {
     return kErrorNotSupported;
+  }
+  virtual DisplayError ValidateGPUTargetParams() {
+    // TODO(user): Validate GPU target for virtual display when query display attributes
+    // on virtual display is functional.
+    return kErrorNone;
   }
 };
 

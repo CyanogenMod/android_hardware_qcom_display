@@ -62,7 +62,6 @@ class Strategy {
   HWMixerAttributes mixer_attributes_ = {};
   HWDisplayAttributes display_attributes_ = {};
   DisplayConfigVariableInfo fb_config_ = {};
-  uint32_t fb_layer_index_ = 0;
   bool extn_start_success_ = false;
   bool tried_default_ = false;
 };

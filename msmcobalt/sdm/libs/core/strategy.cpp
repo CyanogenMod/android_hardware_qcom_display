@@ -80,19 +80,6 @@ DisplayError Strategy::Start(HWLayersInfo *hw_layers_info, uint32_t *max_attempt
   hw_layers_info_ = hw_layers_info;
   extn_start_success_ = false;
   tried_default_ = false;
-  uint32_t i = 0;
-  LayerStack *layer_stack = hw_layers_info_->stack;
-  uint32_t layer_count = UINT32(layer_stack->layers.size());
-  for (; i < layer_count; i++) {
-    if (layer_stack->layers.at(i)->composition == kCompositionGPUTarget) {
-      fb_layer_index_ = i;
-      break;
-    }
-  }
-
-  if (i == layer_count) {
-    return kErrorUndefined;
-  }
 
   if (partial_update_intf_) {
     partial_update_intf_->ControlPartialUpdate(partial_update_enable);
@@ -130,6 +117,11 @@ DisplayError Strategy::GetNextStrategy(StrategyConstraints *constraints) {
     }
   }
 
+  // Default composition is not possible if GPU composition is not supported.
+  if (!hw_layers_info_->gpu_target_index) {
+    return kErrorNotSupported;
+  }
+
   // Default composition is already tried.
   if (tried_default_) {
     return kErrorUndefined;
@@ -141,24 +133,16 @@ DisplayError Strategy::GetNextStrategy(StrategyConstraints *constraints) {
   uint32_t &hw_layer_count = hw_layers_info_->count;
   hw_layer_count = 0;
 
-  for (uint32_t i = 0; i < layer_stack->layers.size(); i++) {
-    Layer *layer = layer_stack->layers.at(i);
-    LayerComposition &composition = layer->composition;
-    if (composition == kCompositionGPUTarget) {
-      hw_layers_info_->updated_src_rect[hw_layer_count] = layer->src_rect;
-      hw_layers_info_->updated_dst_rect[hw_layer_count] = layer->dst_rect;
-      hw_layers_info_->index[hw_layer_count++] = i;
-    } else if (composition != kCompositionBlitTarget) {
-      composition = kCompositionGPU;
-    }
+  for (uint32_t i = 0; i < hw_layers_info_->app_layer_count; i++) {
+    layer_stack->layers.at(i)->composition = kCompositionGPU;
   }
+
+  Layer *gpu_target_layer = layer_stack->layers.at(hw_layers_info_->gpu_target_index);
+  hw_layers_info_->updated_src_rect[hw_layer_count] = gpu_target_layer->src_rect;
+  hw_layers_info_->updated_dst_rect[hw_layer_count] = gpu_target_layer->dst_rect;
+  hw_layers_info_->index[hw_layer_count++] = hw_layers_info_->gpu_target_index;
 
   tried_default_ = true;
-
-  // There can be one and only one GPU target buffer.
-  if (hw_layer_count != 1) {
-    return kErrorParameters;
-  }
 
   return kErrorNone;
 }

@@ -109,6 +109,8 @@ int HWCDisplay::Init() {
   s3d_format_hwc_to_sdm_.insert(std::pair<int, LayerBufferS3DFormat>(HAL_3D_TOP_BOTTOM,
                                 kS3dFormatTopBottom));
 
+  disable_animation_ = Debug::IsExtAnimDisabled();
+
   return 0;
 }
 
@@ -486,16 +488,24 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
 
     // For dim layers, SurfaceFlinger
     //    - converts planeAlpha to per pixel alpha,
-    //    - sets RGB color to 000,
+    //    - sets appropriate RGB color,
     //    - sets planeAlpha to 0xff,
     //    - blending to Premultiplied.
     // This can be achieved at hardware by
-    //    - solid fill ARGB to 0xff000000,
+    //    - solid fill ARGB to appropriate value,
     //    - incoming planeAlpha,
     //    - blending to Coverage.
     if (hwc_layer.flags & kDimLayer) {
       layer->input_buffer->format = kFormatARGB8888;
       layer->solid_fill_color = 0xff000000;
+#ifdef QTI_BSP
+      // Get ARGB color from HWC Dim Layer color
+      uint32_t a = UINT32(hwc_layer.color.a) << 24;
+      uint32_t r = UINT32(hwc_layer.color.r) << 16;
+      uint32_t g = UINT32(hwc_layer.color.g) << 8;
+      uint32_t b = UINT32(hwc_layer.color.b);
+      layer->solid_fill_color = a | r | g | b;
+#endif
       SetBlending(HWC_BLENDING_COVERAGE, &layer->blending);
     } else {
       SetBlending(hwc_layer.blending, &layer->blending);
@@ -564,6 +574,19 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
   return 0;
 }
 
+void HWCDisplay::SetLayerS3DMode(const LayerBufferS3DFormat &source, uint32_t *target) {
+#ifdef QTI_BSP
+    switch (source) {
+    case kS3dFormatNone: *target = HWC_S3DMODE_NONE; break;
+    case kS3dFormatLeftRight: *target = HWC_S3DMODE_LR; break;
+    case kS3dFormatRightLeft: *target = HWC_S3DMODE_RL; break;
+    case kS3dFormatTopBottom: *target = HWC_S3DMODE_TB; break;
+    case kS3dFormatFramePacking: *target = HWC_S3DMODE_FP; break;
+    default: *target = HWC_S3DMODE_MAX; break;
+    }
+#endif
+}
+
 int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
   if (shutdown_pending_) {
     return 0;
@@ -581,8 +604,9 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
         // To prevent surfaceflinger infinite wait, flush the previous frame during Commit()
         // so that previous buffer and fences are released, and override the error.
         flush_ = true;
+      } else {
+        DLOGI("Prepare failed for Display = %d Error = %d", type_, error);
       }
-
       return 0;
     }
   } else {
@@ -598,12 +622,26 @@ int HWCDisplay::PrepareLayerStack(hwc_display_contents_1_t *content_list) {
     hwc_layer_1_t &hwc_layer = content_list->hwLayers[i];
     Layer *layer = layer_stack_.layers.at(i);
     LayerComposition composition = layer->composition;
+    private_handle_t* pvt_handle  = static_cast<private_handle_t*>
+      (const_cast<native_handle_t*>(hwc_layer.handle));
+    MetaData_t *meta_data = pvt_handle ?
+      reinterpret_cast<MetaData_t *>(pvt_handle->base_metadata) : NULL;
 
     if ((composition == kCompositionSDE) || (composition == kCompositionHybrid) ||
         (composition == kCompositionBlit)) {
       hwc_layer.hints |= HWC_HINT_CLEAR_FB;
     }
     SetComposition(composition, &hwc_layer.compositionType);
+
+    if (meta_data != NULL) {
+      if (composition == kCompositionGPUS3D) {
+        // Align HWC and client's dispaly ID in case of HDMI as primary
+        meta_data->s3dComp.displayId =
+          display_intf_->IsPrimaryDisplay() ? HWC_DISPLAY_PRIMARY: id_;
+        SetLayerS3DMode(layer->input_buffer->s3d_format,
+            &meta_data->s3dComp.s3dMode);
+      }
+    }
   }
 
   return 0;
@@ -658,6 +696,8 @@ int HWCDisplay::CommitLayerStack(hwc_display_contents_1_t *content_list) {
         // To prevent surfaceflinger infinite wait, flush the previous frame during Commit()
         // so that previous buffer and fences are released, and override the error.
         flush_ = true;
+      } else {
+        DLOGI("Commit failed for Display = %d Error = %d", type_, error);
       }
     }
   }
@@ -699,9 +739,11 @@ int HWCDisplay::PostCommitLayerStack(hwc_display_contents_1_t *content_list) {
       // framebuffer layer throughout animation and do not allow framework to do eglswapbuffer on
       // framebuffer target. So graphics doesn't close the release fence fd of framebuffer target,
       // Hence close the release fencefd of framebuffer target here.
-      if (layer->composition == kCompositionGPUTarget && animating_) {
-        close(hwc_layer.releaseFenceFd);
-        hwc_layer.releaseFenceFd = -1;
+      if (disable_animation_) {
+        if (layer->composition == kCompositionGPUTarget && animating_) {
+          close(hwc_layer.releaseFenceFd);
+          hwc_layer.releaseFenceFd = -1;
+        }
       }
     }
 
@@ -765,6 +807,7 @@ void HWCDisplay::SetComposition(const LayerComposition &source, int32_t *target)
   switch (source) {
   case kCompositionGPUTarget:   *target = HWC_FRAMEBUFFER_TARGET; break;
   case kCompositionGPU:         *target = HWC_FRAMEBUFFER;        break;
+  case kCompositionGPUS3D:      *target = HWC_FRAMEBUFFER;        break;
   case kCompositionHWCursor:    *target = HWC_CURSOR_OVERLAY;     break;
   default:                      *target = HWC_OVERLAY;            break;
   }
@@ -1303,7 +1346,7 @@ int HWCDisplay::GetDisplayAttributesForConfig(int config,
 
 // TODO(user): HWC needs to know updating for dyn_fps, cpu hint features,
 // once the features are moved to SDM, the two functions below can be removed.
-bool HWCDisplay::SingleLayerUpdating(uint32_t app_layer_count) {
+uint32_t HWCDisplay::GetUpdatingLayersCount(uint32_t app_layer_count) {
   uint32_t updating_count = 0;
 
   for (uint i = 0; i < app_layer_count; i++) {
@@ -1313,7 +1356,7 @@ bool HWCDisplay::SingleLayerUpdating(uint32_t app_layer_count) {
     }
   }
 
-  return (updating_count == 1);
+  return updating_count;
 }
 
 bool HWCDisplay::SingleVideoLayerUpdating(uint32_t app_layer_count) {
@@ -1321,7 +1364,7 @@ bool HWCDisplay::SingleVideoLayerUpdating(uint32_t app_layer_count) {
 
   for (uint i = 0; i < app_layer_count; i++) {
     Layer *layer = layer_stack_.layers[i];
-    // TODO(user):disable DRC feature in S3D playbacl case.S3D video
+    // TODO(user): disable DRC feature in S3D playbacl case.S3D video
     // need play in dedicate resolution and fps, if DRC switch the
     // mode to an non S3D supported mode, it would break S3D playback.
     // Need figure out a way to make S3D and DRC co-exist.
@@ -1385,5 +1428,10 @@ bool HWCDisplay::IsSurfaceUpdated(const std::vector<LayerRect> &dirty_regions) {
   // dirty_rect count = 1 with (0,0,0,0) - not updating.
   return (dirty_regions.empty() || IsValid(dirty_regions.at(0)));
 }
+
+int HWCDisplay::GetDisplayPort(DisplayPort *port) {
+  return display_intf_->GetDisplayPort(port) == kErrorNone ? 0 : -1;
+}
+
 
 }  // namespace sdm

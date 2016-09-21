@@ -33,7 +33,6 @@
 #include "display_primary.h"
 #include "hw_interface.h"
 #include "hw_info_interface.h"
-#include "fb/hw_primary.h"
 
 #define __CLASS__ "DisplayPrimary"
 
@@ -49,16 +48,15 @@ DisplayPrimary::DisplayPrimary(DisplayEventHandler *event_handler, HWInfoInterfa
 DisplayError DisplayPrimary::Init() {
   lock_guard<recursive_mutex> obj(recursive_mutex_);
 
-  DisplayError error = HWPrimary::Create(&hw_intf_, hw_info_intf_,
-                                         DisplayBase::buffer_sync_handler_);
-
+  DisplayError error = HWInterface::Create(kPrimary, hw_info_intf_, buffer_sync_handler_,
+                                           &hw_intf_);
   if (error != kErrorNone) {
     return error;
   }
 
   error = DisplayBase::Init();
   if (error != kErrorNone) {
-    HWPrimary::Destroy(hw_intf_);
+    HWInterface::Destroy(hw_intf_);
     return error;
   }
 
@@ -72,21 +70,14 @@ DisplayError DisplayPrimary::Init() {
     }
   }
 
+  avr_prop_disabled_ = Debug::IsAVRDisabled();
+
   error = HWEventsInterface::Create(INT(display_type_), this, &event_list_, &hw_events_intf_);
   if (error != kErrorNone) {
     DLOGE("Failed to create hardware events interface. Error = %d", error);
     DisplayBase::Deinit();
-    HWPrimary::Destroy(hw_intf_);
+    HWInterface::Destroy(hw_intf_);
   }
-
-  return error;
-}
-
-DisplayError DisplayPrimary::Deinit() {
-  lock_guard<recursive_mutex> obj(recursive_mutex_);
-
-  DisplayError error = DisplayBase::Deinit();
-  HWPrimary::Destroy(hw_intf_);
 
   return error;
 }
@@ -105,6 +96,10 @@ DisplayError DisplayPrimary::Prepare(LayerStack *layer_stack) {
       ReconfigureMixer(display_width, display_height);
     }
   }
+
+  // Clean hw layers for reuse.
+  hw_layers_ = HWLayers();
+  hw_layers_.hw_avr_info.enable = NeedsAVREnable();
 
   return DisplayBase::Prepare(layer_stack);
 }
@@ -303,6 +298,16 @@ DisplayError DisplayPrimary::DisablePartialUpdateOneFrame() {
   disable_pu_one_frame_ = true;
 
   return kErrorNone;
+}
+
+bool DisplayPrimary::NeedsAVREnable() {
+  if (avr_prop_disabled_) {
+    return false;
+  }
+
+  return (hw_panel_info_.mode == kModeVideo && ((hw_panel_info_.dynamic_fps &&
+          hw_panel_info_.dfps_porch_mode) || (!hw_panel_info_.dynamic_fps &&
+          hw_panel_info_.min_fps != hw_panel_info_.max_fps)));
 }
 
 }  // namespace sdm
