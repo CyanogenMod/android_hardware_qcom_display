@@ -47,17 +47,17 @@ static struct hw_module_methods_t memtrack_module_methods = {
 };
 
 struct memtrack_module HAL_MODULE_INFO_SYM = {
-    common: {
-        tag: HARDWARE_MODULE_TAG,
-        module_api_version: MEMTRACK_MODULE_API_VERSION_0_1,
-        hal_api_version: HARDWARE_HAL_API_VERSION,
-        id: MEMTRACK_HARDWARE_MODULE_ID,
-        name: "MSM Memory Tracker HAL",
-        author: "The Android Open Source Project",
-        methods: &memtrack_module_methods,
+    .common = {
+        .tag = HARDWARE_MODULE_TAG,
+        .module_api_version = MEMTRACK_MODULE_API_VERSION_0_1,
+        .hal_api_version = HARDWARE_HAL_API_VERSION,
+        .id = MEMTRACK_HARDWARE_MODULE_ID,
+        .name = "MSM Memory Tracker HAL",
+        .author = "The Android Open Source Project",
+        .methods = &memtrack_module_methods,
     },
 
-    init: msm_memtrack_init,
-    getMemory: msm_memtrack_get_memory,
+    .init = msm_memtrack_init,
+    .getMemory = msm_memtrack_get_memory,
 };
 

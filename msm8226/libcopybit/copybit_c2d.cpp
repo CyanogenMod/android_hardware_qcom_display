@@ -192,22 +192,22 @@ static int open_copybit(const struct hw_module_t* module, const char* name,
                         struct hw_device_t** device);
 
 static struct hw_module_methods_t copybit_module_methods = {
-open:  open_copybit
+    .open = open_copybit,
 };
 
 /*
  * The COPYBIT Module
  */
 struct copybit_module_t HAL_MODULE_INFO_SYM = {
-common: {
-tag: HARDWARE_MODULE_TAG,
-     version_major: 1,
-     version_minor: 0,
-     id: COPYBIT_HARDWARE_MODULE_ID,
-     name: "QCT COPYBIT C2D 2.0 Module",
-     author: "Qualcomm",
-     methods: &copybit_module_methods
-        }
+    .common = {
+        .tag = HARDWARE_MODULE_TAG,
+        .version_major = 1,
+        .version_minor = 0,
+        .id = COPYBIT_HARDWARE_MODULE_ID,
+        .name = "QCT COPYBIT C2D 2.0 Module",
+        .author = "Qualcomm",
+        .methods = &copybit_module_methods,
+    },
 };
 
 

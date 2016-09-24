@@ -45,7 +45,7 @@ static int hwc_device_open(const struct hw_module_t* module,
                            struct hw_device_t** device);
 
 static struct hw_module_methods_t hwc_module_methods = {
-    .open = hwc_device_open
+    .open = hwc_device_open,
 };
 
 hwc_module_t HAL_MODULE_INFO_SYM = {
@@ -59,7 +59,7 @@ hwc_module_t HAL_MODULE_INFO_SYM = {
         .methods = &hwc_module_methods,
         .dso = 0,
         .reserved = {0},
-    }
+    },
 };
 
 /*
