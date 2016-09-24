@@ -61,7 +61,7 @@ extern int gralloc_perform(struct gralloc_module_t const* module,
 
 // HAL module methods
 static struct hw_module_methods_t gralloc_module_methods = {
-    .open = gralloc_device_open
+    .open = gralloc_device_open,
 };
 
 // HAL module initialize
@@ -69,13 +69,14 @@ struct private_module_t HAL_MODULE_INFO_SYM = {
     .base = {
         .common = {
             .tag = HARDWARE_MODULE_TAG,
-            .module_api_version = GRALLOC_MODULE_API_VERSION_0_2,
-            .hal_api_version = 0,
+            .version_major = 1,
+            .version_minor = 0,
             .id = GRALLOC_HARDWARE_MODULE_ID,
             .name = "Graphics Memory Allocator Module",
             .author = "The Android Open Source Project",
             .methods = &gralloc_module_methods,
             .dso = 0,
+            .reserved = {0},
         },
         .registerBuffer = gralloc_register_buffer,
         .unregisterBuffer = gralloc_unregister_buffer,

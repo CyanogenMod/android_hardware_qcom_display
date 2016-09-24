@@ -61,37 +61,37 @@ extern int gralloc_perform(struct gralloc_module_t const* module,
 
 // HAL module methods
 static struct hw_module_methods_t gralloc_module_methods = {
-    open: gralloc_device_open
+    .open = gralloc_device_open,
 };
 
 // HAL module initialize
 struct private_module_t HAL_MODULE_INFO_SYM = {
-    base: {
-        common: {
-            tag: HARDWARE_MODULE_TAG,
-            version_major: 1,
-            version_minor: 0,
-            id: GRALLOC_HARDWARE_MODULE_ID,
-            name: "Graphics Memory Allocator Module",
-            author: "The Android Open Source Project",
-            methods: &gralloc_module_methods,
-            dso: 0,
-            reserved: {0},
+    .base = {
+        .common = {
+            .tag = HARDWARE_MODULE_TAG,
+            .version_major = 1,
+            .version_minor = 0,
+            .id = GRALLOC_HARDWARE_MODULE_ID,
+            .name = "Graphics Memory Allocator Module",
+            .author = "The Android Open Source Project",
+            .methods = &gralloc_module_methods,
+            .dso = 0,
+            .reserved = {0},
         },
-        registerBuffer: gralloc_register_buffer,
-        unregisterBuffer: gralloc_unregister_buffer,
-        lock: gralloc_lock,
-        unlock: gralloc_unlock,
-        perform: gralloc_perform,
-        lock_ycbcr: gralloc_lock_ycbcr,
+        .registerBuffer = gralloc_register_buffer,
+        .unregisterBuffer = gralloc_unregister_buffer,
+        .lock = gralloc_lock,
+        .unlock = gralloc_unlock,
+        .perform = gralloc_perform,
+        .lock_ycbcr = gralloc_lock_ycbcr,
     },
-    framebuffer: 0,
-    fbFormat: 0,
-    flags: 0,
-    numBuffers: 0,
-    bufferMask: 0,
-    lock: PTHREAD_MUTEX_INITIALIZER,
-    currentBuffer: 0,
+    .framebuffer = 0,
+    .fbFormat = 0,
+    .flags = 0,
+    .numBuffers = 0,
+    .bufferMask = 0,
+    .lock = PTHREAD_MUTEX_INITIALIZER,
+    .currentBuffer = 0,
 };
 
 // Open Gralloc device
