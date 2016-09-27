@@ -185,6 +185,9 @@ int copyMetaData(struct private_handle_t *src, struct private_handle_t *dst) {
         dst->fd_metadata, 0);
     if (base_dst == reinterpret_cast<void*>(MAP_FAILED)) {
         ALOGE("%s: dst mmap() failed: error is %s!", __func__, strerror(errno));
+        if(munmap(base_src, size))
+            ALOGE("%s: failed to unmap src ptr %p, err %d", __func__,
+                                             (void*)base_src, errno);
         return -1;
     }
 
