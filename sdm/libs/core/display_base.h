@@ -84,6 +84,7 @@ class DisplayBase : public DisplayInterface {
   const char *GetName(const LayerComposition &composition);
   const char *GetName(const LayerBufferFormat &format);
   DisplayError ValidateGPUTarget(LayerStack *layer_stack);
+  DisplayError UpdateFrcInfo(LayerStack *layer_stack);
 
   DisplayType display_type_;
   DisplayEventHandler *event_handler_ = NULL;
@@ -103,6 +104,7 @@ class DisplayBase : public DisplayInterface {
   bool pending_commit_ = false;
   bool vsync_enable_ = false;
   bool underscan_supported_ = false;
+  bool frc_supported_ = false;
   uint32_t max_mixer_stages_ = 0;
   HWInfoInterface *hw_info_intf_ = NULL;
   ColorManagerProxy *color_mgr_ = NULL;  // each display object owns its ColorManagerProxy

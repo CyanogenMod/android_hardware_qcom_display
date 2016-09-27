@@ -63,6 +63,15 @@ struct S3DSFRender_t {
     uint32_t GpuS3dFormat;
 };
 
+struct FrameRateControl_t {
+    /* Deterministic Frame Rate Control (FRC) */
+    int32_t enable;
+    /* video frame count */
+    uint32_t counter;
+    /* video timestamp */
+    int64_t timestamp;
+};
+
 struct MetaData_t {
     int32_t operation;
     int32_t interlaced;
@@ -87,10 +96,12 @@ struct MetaData_t {
     uint32_t isSingleBufferMode;
     /* Indicate GPU to help draw S3D layer on dedicate display device */
     struct S3DSFRender_t s3dRender;
+    /* Video frame info used by FRC */
+    struct FrameRateControl_t frc;
 };
 
 enum DispParamType {
-    UNUSED0             = 0x0001,
+    SET_FRC_INFO        = 0x0001,
     UNUSED1             = 0x0002,
     PP_PARAM_INTERLACED = 0x0004,
     UNUSED2             = 0x0008,
@@ -109,6 +120,7 @@ enum DispParamType {
 };
 
 enum DispFetchParamType {
+    GET_FRC_INFO            = 0x0001,
     GET_PP_PARAM_INTERLACED = 0x0004,
     GET_BUFFER_GEOMETRY = 0x0080,
     GET_REFRESH_RATE = 0x0100,

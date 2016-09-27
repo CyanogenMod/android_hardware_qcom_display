@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2014 - 2015, The Linux Foundation. All rights reserved.
+* Copyright (c) 2014 - 2016, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without modification, are permitted
 * provided that the following conditions are met:
@@ -230,6 +230,20 @@ struct LayerRectArray {
   uint32_t count = 0;      //!< Number of elements in the array.
 };
 
+/*! @brief This structure defines FRC info of display layer.
+
+  @sa LayerFrcInfo
+*/
+
+struct LayerFrcInfo {
+  /* Deterministic Frame Rate Control (FRC) */
+  int32_t enable;
+  /* video frame count */
+  uint32_t frame_cnt;
+  /* video timestamp */
+  int64_t timestamp;
+};
+
 /*! @brief This structure defines display layer object which contains layer properties and a drawing
   buffer.
 
@@ -293,6 +307,9 @@ struct Layer {
   LayerCSC csc = kCSCLimitedRange601;              //!< Color Space of the layer.
 
   LayerIGC igc = kIGCNotSpecified;                 //!< IGC that will be applied on this layer.
+
+  LayerFrcInfo frc_info;                           //!< FRC info which contains video frame count
+                                                   //!< and timestamp of this layer.
 
   uint32_t solid_fill_color = 0;                   //!< Solid color used to fill the layer when
                                                    //!< no content is associated with the layer.
