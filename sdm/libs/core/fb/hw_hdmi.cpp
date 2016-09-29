@@ -75,6 +75,16 @@ static bool MapHDMIDisplayTiming(const msm_hdmi_mode_timing_info *mode,
     info->grayscale = V4L2_PIX_FMT_NV12;
   }
 
+  if (!mode->active_low_h)
+    info->sync |= FB_SYNC_HOR_HIGH_ACT;
+  else
+    info->sync &= ~FB_SYNC_HOR_HIGH_ACT;
+
+  if (!mode->active_low_v)
+    info->sync |= FB_SYNC_VERT_HIGH_ACT;
+  else
+    info->sync &= ~FB_SYNC_VERT_HIGH_ACT;
+
   return true;
 }
 
@@ -733,8 +743,7 @@ DisplayError HWHDMI::GetDynamicFrameRateMode(uint32_t refresh_rate, uint32_t *mo
   for (i = 0; i < hdmi_mode_count_; i++) {
     msm_hdmi_mode_timing_info *timing_mode = &supported_video_modes_[i];
     if (cur->active_h == timing_mode->active_h &&
-       cur->active_v == timing_mode->active_v &&
-       cur->pixel_formats == timing_mode->pixel_formats ) {
+       cur->active_v == timing_mode->active_v) {
       int cur_refresh_rate_diff = static_cast<int>(timing_mode->refresh_rate) -
                                   static_cast<int>(refresh_rate);
       if (abs(pre_refresh_rate_diff) > abs(cur_refresh_rate_diff)) {
@@ -749,6 +758,12 @@ DisplayError HWHDMI::GetDynamicFrameRateMode(uint32_t refresh_rate, uint32_t *mo
   }
 
   GetConfigIndex(dst->video_format, config_index);
+
+  // When there is a change in pixel format set the mode using FBIOPUT_VSCREENINFO info ioctl.
+  if (cur->pixel_formats != dst->pixel_formats) {
+    *mode = kModeSuspendResume;
+    return kErrorNone;
+  }
 
   data->hor_front_porch = dst->front_porch_h;
   data->hor_back_porch = dst->back_porch_h;
@@ -794,6 +809,11 @@ DisplayError HWHDMI::SetRefreshRate(uint32_t refresh_rate) {
   error = GetDynamicFrameRateMode(refresh_rate, &mode, &data, &config_index);
   if (error != kErrorNone) {
     return error;
+  }
+
+  if (mode == kModeSuspendResume) {
+    SetDisplayAttributes(config_index);
+    return kErrorNone;
   }
 
   snprintf(mode_path, sizeof(mode_path), "%s%d/msm_fb_dfps_mode", fb_path_, fb_node_index_);
