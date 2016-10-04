@@ -71,3 +71,7 @@ ifeq ($(TARGET_COMPILE_WITH_MSM_KERNEL),true)
     common_deps += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
     kernel_includes += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 endif
+
+ifeq ($(TARGET_USES_SDM_LEGACY),true)
+    common_flags += -DSDM_LEGACY
+endif

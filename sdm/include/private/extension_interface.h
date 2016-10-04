@@ -54,15 +54,19 @@ class ExtensionInterface {
  public:
   virtual DisplayError CreatePartialUpdate(DisplayType type, const HWResourceInfo &hw_resource_info,
                                            const HWPanelInfo &hw_panel_info,
+#ifndef SDM_LEGACY
                                            const HWMixerAttributes &mixer_attributes,
                                            const HWDisplayAttributes &display_attributes,
+#endif
                                            PartialUpdateInterface **interface) = 0;
   virtual DisplayError DestroyPartialUpdate(PartialUpdateInterface *interface) = 0;
 
   virtual DisplayError CreateStrategyExtn(DisplayType type, HWDisplayMode mode,
                                           HWS3DMode s3d_mode,
+#ifndef SDM_LEGACY
                                           const HWMixerAttributes &mixer_attributes,
                                           const DisplayConfigVariableInfo &fb_config,
+#endif
                                           StrategyInterface **interface) = 0;
   virtual DisplayError DestroyStrategyExtn(StrategyInterface *interface) = 0;
 
@@ -71,7 +75,10 @@ class ExtensionInterface {
                                           BufferSyncHandler *buffer_sync_handler) = 0;
   virtual DisplayError DestroyResourceExtn(ResourceInterface *interface) = 0;
 
-  virtual DisplayError CreateRotator(const HWRotatorInfo &hw_rot_info,
+  virtual DisplayError CreateRotator(
+#ifndef SDM_LEGACY
+                                     const HWRotatorInfo &hw_rot_info,
+#endif
                                      BufferAllocator *buffer_allocator,
                                      BufferSyncHandler *buffer_sync_handler,
                                      RotatorInterface **intf) = 0;

@@ -82,7 +82,11 @@ DisplayError CoreImpl::Init() {
   }
 
   if (extension_intf_ && hw_resource_.hw_rot_info.num_rotator) {
-    error = extension_intf_->CreateRotator(hw_resource_.hw_rot_info, buffer_allocator_,
+    error = extension_intf_->CreateRotator(
+#ifndef SDM_LEGACY
+                                           hw_resource_.hw_rot_info,
+#endif
+                                           buffer_allocator_,
                                            buffer_sync_handler_, &rotator_intf_);
     if (error != kErrorNone) {
       DLOGW("rotation is not supported");

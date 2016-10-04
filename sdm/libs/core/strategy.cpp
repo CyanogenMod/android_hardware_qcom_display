@@ -46,15 +46,20 @@ DisplayError Strategy::Init() {
 
   if (extension_intf_) {
     error = extension_intf_->CreateStrategyExtn(display_type_, hw_panel_info_.mode,
-                                                hw_panel_info_.s3d_mode, mixer_attributes_,
-                                                fb_config_, &strategy_intf_);
+                                                hw_panel_info_.s3d_mode,
+#ifndef SDM_LEGACY
+                                                mixer_attributes_, fb_config_,
+#endif
+                                                &strategy_intf_);
     if (error != kErrorNone) {
       DLOGE("Failed to create strategy");
       return error;
     }
 
     error = extension_intf_->CreatePartialUpdate(display_type_, hw_resource_info_, hw_panel_info_,
+#ifndef SDM_LEGACY
                                                  mixer_attributes_, display_attributes_,
+#endif
                                                  &partial_update_intf_);
   }
 
@@ -211,7 +216,9 @@ DisplayError Strategy::Reconfigure(const HWPanelInfo &hw_panel_info,
   }
 
   extension_intf_->CreatePartialUpdate(display_type_, hw_resource_info_, hw_panel_info_,
+#ifndef SDM_LEGACY
                                        mixer_attributes_, display_attributes_,
+#endif
                                        &partial_update_intf_);
 
   return strategy_intf_->Reconfigure(hw_panel_info_.mode, hw_panel_info_.s3d_mode, mixer_attributes,
