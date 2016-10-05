@@ -77,7 +77,6 @@ class HWPrimary : public HWDevice {
   bool IsResolutionSwitchEnabled() { return !display_configs_.empty(); }
   bool GetCurrentModeFromSysfs(size_t *curr_x_pixels, size_t *curr_y_pixels);
   void UpdateMixerAttributes();
-  void SetAVRFlags(const HWAVRInfo &hw_avr_info, uint32_t *avr_flags);
 
   std::vector<DisplayConfigVariableInfo> display_configs_;
   std::vector<std::string> display_config_strings_;

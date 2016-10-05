@@ -836,8 +836,6 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
         panel_info->needs_roi_merge = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "dyn_fps_en", strlen("dyn_fps_en"))) {
         panel_info->dynamic_fps = atoi(tokens[1]);
-      } else if (!strncmp(tokens[0], "dfps_porch_mode", strlen("dfps_porch_mode"))) {
-        panel_info->dfps_porch_mode = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "min_fps", strlen("min_fps"))) {
         panel_info->min_fps = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_fps", strlen("max_fps"))) {

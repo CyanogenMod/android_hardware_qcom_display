@@ -75,7 +75,6 @@ class Debug {
   static bool IsRotatorSplitDisabled();
   static bool IsScalarDisabled();
   static bool IsUbwcTiledFrameBuffer();
-  static bool IsAVRDisabled();
   static bool GetProperty(const char *property_name, char *value);
   static bool SetProperty(const char *property_name, const char *value);
 

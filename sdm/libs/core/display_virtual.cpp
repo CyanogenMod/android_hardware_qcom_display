@@ -130,15 +130,5 @@ DisplayError DisplayVirtual::SetActiveConfig(DisplayConfigVariableInfo *variable
   return kErrorNone;
 }
 
-DisplayError DisplayVirtual::Prepare(LayerStack *layer_stack) {
-  lock_guard<recursive_mutex> obj(recursive_mutex_);
-
-  // Clean hw layers for reuse.
-  hw_layers_ = HWLayers();
-
-  return DisplayBase::Prepare(layer_stack);
-}
-
-
 }  // namespace sdm
 

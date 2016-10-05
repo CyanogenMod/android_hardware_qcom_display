@@ -70,8 +70,6 @@ DisplayError DisplayPrimary::Init() {
     }
   }
 
-  avr_prop_disabled_ = Debug::IsAVRDisabled();
-
   error = HWEventsInterface::Create(INT(display_type_), this, &event_list_, &hw_events_intf_);
   if (error != kErrorNone) {
     DLOGE("Failed to create hardware events interface. Error = %d", error);
@@ -96,10 +94,6 @@ DisplayError DisplayPrimary::Prepare(LayerStack *layer_stack) {
       ReconfigureMixer(display_width, display_height);
     }
   }
-
-  // Clean hw layers for reuse.
-  hw_layers_ = HWLayers();
-  hw_layers_.hw_avr_info.enable = NeedsAVREnable();
 
   return DisplayBase::Prepare(layer_stack);
 }
@@ -298,16 +292,6 @@ DisplayError DisplayPrimary::DisablePartialUpdateOneFrame() {
   disable_pu_one_frame_ = true;
 
   return kErrorNone;
-}
-
-bool DisplayPrimary::NeedsAVREnable() {
-  if (avr_prop_disabled_) {
-    return false;
-  }
-
-  return (hw_panel_info_.mode == kModeVideo && ((hw_panel_info_.dynamic_fps &&
-          hw_panel_info_.dfps_porch_mode) || (!hw_panel_info_.dynamic_fps &&
-          hw_panel_info_.min_fps != hw_panel_info_.max_fps)));
 }
 
 }  // namespace sdm
