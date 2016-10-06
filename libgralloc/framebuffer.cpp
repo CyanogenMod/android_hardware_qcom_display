@@ -36,7 +36,7 @@
 
 #include <GLES/gl.h>
 
-#include "gralloc_priv.h"
+#include <gralloc_priv.h>
 #include "fb_priv.h"
 #include "gr.h"
 #include <cutils/properties.h>

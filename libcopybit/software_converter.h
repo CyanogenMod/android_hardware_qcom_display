@@ -30,7 +30,7 @@
 
 
 #include <copybit.h>
-#include "gralloc_priv.h"
+#include <gralloc_priv.h>
 #include "gr.h"
 
 #define COPYBIT_SUCCESS 0

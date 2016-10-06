@@ -35,7 +35,7 @@
 
 #include <copybit.h>
 
-#include "gralloc_priv.h"
+#include <gralloc_priv.h>
 #include "software_converter.h"
 #include <qdMetaData.h>
 
