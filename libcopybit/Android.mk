@@ -24,10 +24,15 @@ include $(BUILD_COPY_HEADERS)
 LOCAL_MODULE                  := copybit.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_RELATIVE_PATH    := hw
 LOCAL_MODULE_TAGS             := optional
-LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
+LOCAL_C_INCLUDES              := $(common_includes)
+ifndef TARGET_PREBUILT_KERNEL
+LOCAL_C_INCLUDES              := $(kernel_includes)
+endif
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libdl libmemalloc
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdcopybit\" -Wno-sign-conversion
+ifndef TARGET_PREBUILT_KERNEL
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
+endif
 LOCAL_CLANG                   := true
 
 ifeq ($(TARGET_USES_C2D_COMPOSITION),true)

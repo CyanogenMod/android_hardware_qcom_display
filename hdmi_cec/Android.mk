@@ -10,7 +10,9 @@ LOCAL_SHARED_LIBRARIES        := $(common_libs) libqservice libbinder libqdutils
 
 LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhdmi_cec\" -Wno-sign-conversion
 LOCAL_CLANG                   := true
+ifndef TARGET_PREBUILT_KERNEL
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
+endif
 LOCAL_SRC_FILES               := qhdmi_cec.cpp \
                                  QHDMIClient.cpp
 include $(BUILD_SHARED_LIBRARY)
