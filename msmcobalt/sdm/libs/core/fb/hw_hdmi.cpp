@@ -118,11 +118,7 @@ DisplayError HWHDMI::Init() {
 
   ReadScanInfo();
 
-  error = GetPanelS3DMode();
-  if (error != kErrorNone) {
-    Deinit();
-    return error;
-  }
+  GetPanelS3DMode();
 
   s3d_mode_sdm_to_mdp_.insert(std::pair<HWS3DMode, msm_hdmi_s3d_mode>
                              (kS3DModeNone, HDMI_S3D_NONE));
@@ -577,8 +573,9 @@ DisplayError HWHDMI::GetDisplayS3DSupport(uint32_t index,
 
   // Three level inception!
   // The string looks like 16=SSH,4=FP:TAB:SSH,5=FP:SSH,32=FP:TAB:SSH
-  char *saveptr_l1, *saveptr_l2, *saveptr_l3;
-  char *l1, *l2, *l3;
+  // Initialize all the pointers to NULL to avoid crash in function strtok_r()
+  char *saveptr_l1 = NULL, *saveptr_l2 = NULL, *saveptr_l3 = NULL;
+  char *l1 = NULL, *l2 = NULL, *l3 = NULL;
 
   int edid_s3d_node = Sys::open_(edid_s3d_path, O_RDONLY);
   if (edid_s3d_node < 0) {
