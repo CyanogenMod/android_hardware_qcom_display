@@ -102,6 +102,10 @@ class HWCDisplay : public DisplayEventHandler {
   // 0 : Success.
   virtual int GetFrameCaptureStatus() { return -EAGAIN; }
 
+  virtual DisplayError SetDetailEnhancerConfig(const DisplayDetailEnhancerData &de_data) {
+    return kErrorNotSupported;
+  }
+
   // Display Configurations
   virtual int SetActiveDisplayConfig(int config);
   virtual int GetActiveDisplayConfig(uint32_t *config);

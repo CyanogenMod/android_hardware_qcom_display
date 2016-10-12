@@ -1287,6 +1287,11 @@ android::status_t HWCSession::QdcmCMDHandler(const android::Parcel *input_parcel
       ret = color_mgr_->SetFrameCapture(pending_action.params,
                                         false, hwc_display_[HWC_DISPLAY_PRIMARY]);
       break;
+    case kConfigureDetailedEnhancer:
+      ret = color_mgr_->SetDetailedEnhancer(pending_action.params,
+                                            hwc_display_[HWC_DISPLAY_PRIMARY]);
+      hwc_procs_->invalidate(hwc_procs_);
+      break;
     case kNoAction:
       break;
     default:

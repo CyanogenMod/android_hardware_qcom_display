@@ -38,16 +38,12 @@
 
 int setMetaData(private_handle_t *handle, DispParamType paramType,
                                                     void *param) {
-    if (!handle) {
-        ALOGE("%s: Private handle is null!", __func__);
+    if (private_handle_t::validate(handle)) {
+        ALOGE("%s: Private handle is invalid! handle=%p", __func__, handle);
         return -1;
     }
     if (handle->fd_metadata == -1) {
         ALOGE("%s: Bad fd for extra data!", __func__);
-        return -1;
-    }
-    if (!param) {
-        ALOGE("%s: input param is null!", __func__);
         return -1;
     }
     unsigned long size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
@@ -58,6 +54,12 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
         return -1;
     }
     MetaData_t *data = reinterpret_cast <MetaData_t *>(base);
+    // If parameter is NULL reset the specific MetaData Key
+    if (!param) {
+       data->operation &= ~paramType;
+       return munmap(base, size);
+    }
+
     data->operation |= paramType;
     switch (paramType) {
         case PP_PARAM_INTERLACED:
@@ -89,6 +91,9 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
             break;
         case SET_S3D_COMP:
             data->s3dComp = *((S3DGpuComp_t *)param);
+            break;
+        case SET_VT_TIMESTAMP:
+            data->vtTimeStamp = *((uint64_t *)param);
             break;
         default:
             ALOGE("Unknown paramType %d", paramType);
@@ -187,6 +192,9 @@ int getMetaData(private_handle_t *handle, DispFetchParamType paramType,
             break;
         case GET_S3D_COMP:
             *((S3DGpuComp_t *)param) = data->s3dComp;
+            break;
+        case GET_VT_TIMESTAMP:
+            *((uint64_t *)param) = data->vtTimeStamp;
             break;
         default:
             ALOGE("Unknown paramType %d", paramType);

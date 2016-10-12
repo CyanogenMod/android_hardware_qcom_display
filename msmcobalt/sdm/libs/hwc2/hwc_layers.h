@@ -72,6 +72,7 @@ class HWCLayer {
   HWC2::Error SetLayerZOrder(uint32_t z);
   void SetComposition(const LayerComposition &sdm_composition);
   HWC2::Composition GetClientRequestedCompositionType() { return client_requested_; }
+  void UpdateClientCompositionType(HWC2::Composition type) { client_requested_ = type; }
   HWC2::Composition GetDeviceSelectedCompositionType() { return device_selected_; }
   uint32_t GetGeometryChanges() { return geometry_changes_; }
   void ResetGeometryChanges() { geometry_changes_ = GeometryChanges::kNone; }
@@ -85,6 +86,7 @@ class HWCLayer {
   const hwc2_display_t display_id_;
   static std::atomic<hwc2_layer_t> next_id_;
   std::queue<int32_t> release_fences_;
+  int ion_fd_ = -1;
 
   // Composition requested by client(SF)
   HWC2::Composition client_requested_ = HWC2::Composition::Device;

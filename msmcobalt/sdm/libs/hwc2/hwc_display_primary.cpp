@@ -159,9 +159,6 @@ HWC2::Error HWCDisplayPrimary::Validate(uint32_t *out_num_types, uint32_t *out_n
   auto status = HWC2::Error::None;
   DisplayError error = kErrorNone;
 
-  if (!boot_animation_completed_)
-    ProcessBootAnimCompleted();
-
   if (display_paused_) {
     MarkLayersForGPUBypass();
     return status;
@@ -533,6 +530,16 @@ int HWCDisplayPrimary::FrameCaptureAsync(const BufferInfo &output_buffer_info,
   DisablePartialUpdateOneFrame();
 
   return 0;
+}
+
+DisplayError HWCDisplayPrimary::SetDetailEnhancerConfig
+                                   (const DisplayDetailEnhancerData &de_data) {
+  DisplayError error = kErrorNotSupported;
+
+  if (display_intf_) {
+    error = display_intf_->SetDetailEnhancerData(de_data);
+  }
+  return error;
 }
 
 DisplayError HWCDisplayPrimary::ControlPartialUpdate(bool enable, uint32_t *pending) {

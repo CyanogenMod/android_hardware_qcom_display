@@ -245,7 +245,8 @@ DisplayError HWPrimary::PopulateDisplayAttributes() {
   display_attributes_.vsync_period_ns = UINT32(1000000000L / display_attributes_.fps);
   display_attributes_.is_device_split = (hw_panel_info_.split_info.left_split ||
       (var_screeninfo.xres > hw_resource_.max_mixer_width)) ? true : false;
-  display_attributes_.h_total += display_attributes_.is_device_split ? h_blanking : 0;
+  display_attributes_.h_total += (display_attributes_.is_device_split ||
+    hw_panel_info_.ping_pong_split)? h_blanking : 0;
 
   return kErrorNone;
 }

@@ -29,7 +29,7 @@ LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wno-si
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps) $(kernel_deps)
 LOCAL_SRC_FILES               := gpu.cpp gralloc.cpp framebuffer.cpp mapper.cpp
 LOCAL_COPY_HEADERS_TO         := $(common_header_export_path)
-LOCAL_COPY_HEADERS            := gralloc_priv.h gr.h
+LOCAL_COPY_HEADERS            := gralloc_priv.h gr.h adreno_utils.h
 
 include $(BUILD_SHARED_LIBRARY)
 

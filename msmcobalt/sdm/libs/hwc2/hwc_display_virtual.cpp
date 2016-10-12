@@ -148,16 +148,10 @@ HWC2::Error HWCDisplayVirtual::Present(int32_t *out_retire_fence) {
       }
 
       status = HWCDisplay::PostCommitLayerStack(out_retire_fence);
-      // On Virtual displays, use the output buffer release fence as the retire fence
-      // Close the layer stack retire fence as it is unused
-      if (layer_stack_.output_buffer) {
-        stored_retire_fence_ = layer_stack_.output_buffer->release_fence_fd;
-        close(layer_stack_.retire_fence_fd);
-        layer_stack_.retire_fence_fd = -1;
-      }
     }
   }
   CloseAcquireFds();
+  close(output_buffer_->acquire_fence_fd);
   return status;
 }
 
@@ -180,6 +174,7 @@ HWC2::Error HWCDisplayVirtual::SetOutputBuffer(buffer_handle_t buf, int32_t rele
   output_buffer_->acquire_fence_fd = dup(release_fence);
 
   if (output_handle) {
+    output_handle_ = output_handle;
     output_buffer_->buffer_id = reinterpret_cast<uint64_t>(output_handle);
     int output_handle_format = output_handle->format;
 

@@ -50,6 +50,7 @@ enum PendingAction {
   kSetPanelBrightness = BITMAP(5),
   kEnableFrameCapture = BITMAP(6),
   kDisableFrameCapture = BITMAP(7),
+  kConfigureDetailedEnhancer = BITMAP(8),
   kNoAction = BITMAP(31),
 };
 
@@ -197,6 +198,46 @@ struct PPFrameCaptureData {
   uint8_t *buffer;
   uint32_t buffer_stride;
   uint32_t buffer_size;
+};
+
+static const uint32_t kDeTuningFlagSharpFactor = 0x01;
+static const uint32_t kDeTuningFlagClip = 0x02;
+static const uint32_t kDeTuningFlagThrQuiet = 0x04;
+static const uint32_t kDeTuningFlagThrDieout = 0x08;
+static const uint32_t kDeTuningFlagThrLow = 0x10;
+static const uint32_t kDeTuningFlagThrHigh = 0x20;
+static const uint32_t kDeTuningFlagContentQualLevel = 0x40;
+
+typedef enum {
+  kDeContentQualUnknown,
+  kDeContentQualLow,
+  kDeContentQualMedium,
+  kDeContentQualHigh,
+  kDeContentQualMax,
+} PPDEContentQualLevel;
+
+typedef enum {
+  kDeContentTypeUnknown,
+  kDeContentTypeVideo,
+  kDeContentTypeGraphics,
+  kDeContentTypeMax,
+} PPDEContentType;
+
+struct PPDETuningCfg {
+  uint32_t flags = 0;
+  int32_t sharp_factor = 0;
+  uint16_t thr_quiet = 0;
+  uint16_t thr_dieout = 0;
+  uint16_t thr_low = 0;
+  uint16_t thr_high = 0;
+  uint16_t clip = 0;
+  PPDEContentQualLevel quality = kDeContentQualUnknown;
+  PPDEContentType content_type = kDeContentTypeUnknown;
+};
+
+struct PPDETuningCfgData {
+  uint32_t cfg_en = 0;
+  PPDETuningCfg params;
 };
 
 struct SDEGamutCfg {
@@ -492,6 +533,7 @@ class PPFeaturesConfig {
 
   inline Locker &GetLocker(void) { return locker_; }
   inline PPFrameCaptureData *GetFrameCaptureData(void) { return &frame_capture_data; }
+  inline PPDETuningCfgData *GetDETuningCfgData(void) { return &de_tuning_data_; }
   // Once all features are consumed, destroy/release all TFeatureInfo<T> on the list,
   // then clear dirty_ flag and return the lock to the TFeatureInfo<T> producer.
   void Reset();
@@ -508,6 +550,7 @@ class PPFeaturesConfig {
   PPFeatureInfo *feature_[kMaxNumPPFeatures];  // reference to TFeatureInfo<T>.
   uint32_t next_idx_ = 0;
   PPFrameCaptureData frame_capture_data;
+  PPDETuningCfgData de_tuning_data_;
 };
 
 }  // namespace sdm

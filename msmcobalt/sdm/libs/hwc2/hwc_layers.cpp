@@ -43,7 +43,7 @@ HWCLayer::~HWCLayer() {
     close(release_fences_.front());
     release_fences_.pop();
   }
-
+  close(ion_fd_);
   if (layer_) {
     if (layer_->input_buffer) {
       delete (layer_->input_buffer);
@@ -64,6 +64,16 @@ HWC2::Error HWCLayer::SetLayerBuffer(buffer_handle_t buffer, int32_t acquire_fen
   }
 
   const private_handle_t *handle = static_cast<const private_handle_t *>(buffer);
+
+  // Validate and dup ion fd from surfaceflinger
+  // This works around bug 30281222
+  if (handle->fd < 0) {
+    return HWC2::Error::BadParameter;
+  } else {
+    close(ion_fd_);
+    ion_fd_ = dup(handle->fd);
+  }
+
   LayerBuffer *layer_buffer = layer_->input_buffer;
   layer_buffer->width = UINT32(handle->width);
   layer_buffer->height = UINT32(handle->height);
@@ -83,7 +93,7 @@ HWC2::Error HWCLayer::SetLayerBuffer(buffer_handle_t buffer, int32_t acquire_fen
     layer_buffer->flags.secure_display = true;
   }
 
-  layer_buffer->planes[0].fd = handle->fd;
+  layer_buffer->planes[0].fd = ion_fd_;
   layer_buffer->planes[0].offset = handle->offset;
   layer_buffer->planes[0].stride = UINT32(handle->width);
   layer_buffer->acquire_fence_fd = acquire_fence;
@@ -128,27 +138,22 @@ HWC2::Error HWCLayer::SetLayerBlendMode(HWC2::BlendMode mode) {
 HWC2::Error HWCLayer::SetLayerColor(hwc_color_t color) {
   layer_->solid_fill_color = GetUint32Color(color);
   layer_->input_buffer->format = kFormatARGB8888;
-  DLOGD("Layer color set to: %u", layer_->solid_fill_color);
-  DLOGD("[%" PRIu64 "][%" PRIu64 "] Layer color set to %u  %" PRIu64, display_id_, id_,
-        layer_->solid_fill_color);
+  DLOGV_IF(kTagCompManager, "[%" PRIu64 "][%" PRIu64 "] Layer color set to %x", display_id_, id_,
+           layer_->solid_fill_color);
   return HWC2::Error::None;
 }
 
 HWC2::Error HWCLayer::SetLayerCompositionType(HWC2::Composition type) {
-  layer_->flags = {};   // Reset earlier flags
   client_requested_ = type;
   switch (type) {
     case HWC2::Composition::Client:
-      layer_->flags.skip = true;
       break;
     case HWC2::Composition::Device:
       // We try and default to this in SDM
       break;
     case HWC2::Composition::SolidColor:
-      layer_->flags.solid_fill = true;
       break;
     case HWC2::Composition::Cursor:
-      layer_->flags.cursor = true;
       break;
     case HWC2::Composition::Invalid:
       return HWC2::Error::BadParameter;
@@ -278,7 +283,7 @@ uint32_t HWCLayer::GetUint32Color(const hwc_color_t &source) {
   uint32_t r = UINT32(source.r) << 16;
   uint32_t g = UINT32(source.g) << 8;
   uint32_t b = UINT32(source.b);
-  uint32_t color = a & r & g & b;
+  uint32_t color = a | r | g | b;
   return color;
 }
 

@@ -60,7 +60,7 @@ HWCColorMode::HWCColorMode(DisplayInterface *display_intf) : display_intf_(displ
 
 HWC2::Error HWCColorMode::Init() {
   PopulateColorModes();
-  return HWC2::Error::None;
+  return SetColorMode(HAL_COLOR_MODE_NATIVE);
 }
 
 HWC2::Error HWCColorMode::DeInit() {
@@ -169,14 +169,14 @@ void HWCColorMode::PopulateColorModes() {
     return;
   }
 
-  DLOGI("Color Modes supported count = %d", color_mode_count);
+  DLOGV_IF(kTagQDCM, "Color Modes supported count = %d", color_mode_count);
 
   std::vector<std::string> color_modes(color_mode_count);
   error = display_intf_->GetColorModes(&color_mode_count, &color_modes);
 
   for (uint32_t i = 0; i < color_mode_count; i++) {
     std::string &mode_string = color_modes.at(i);
-    DLOGI("Color Mode[%d] = %s", i, mode_string.c_str());
+    DLOGV_IF(kTagQDCM, "Color Mode[%d] = %s", i, mode_string.c_str());
     if (mode_string.find("hal_native") != std::string::npos) {
       PopulateTransform(HAL_COLOR_MODE_NATIVE, mode_string);
     } else if (mode_string.find("hal_srgb") != std::string::npos) {
@@ -330,6 +330,13 @@ void HWCDisplay::BuildLayerStack() {
   // TODO(user): Add blit target layers
   for (auto hwc_layer : layer_set_) {
     Layer *layer = hwc_layer->GetSDMLayer();
+    layer->flags = {};   // Reset earlier flags
+    if (hwc_layer->GetClientRequestedCompositionType() == HWC2::Composition::Client) {
+      layer->flags.skip = true;
+    } else if (hwc_layer->GetClientRequestedCompositionType() == HWC2::Composition::SolidColor) {
+      layer->flags.solid_fill = true;
+    }
+
     // set default composition as GPU for SDM
     layer->composition = kCompositionGPU;
 
@@ -360,17 +367,32 @@ void HWCDisplay::BuildLayerStack() {
       layer_stack_.flags.skip_present = true;
     }
 
-    if (layer->flags.cursor) {
-      layer_stack_.flags.cursor_present = true;
+    if (hwc_layer->GetClientRequestedCompositionType() == HWC2::Composition::Cursor) {
+      // Currently we support only one HWCursor & only at top most z-order
+      if ((*layer_set_.rbegin())->GetId() == hwc_layer->GetId()) {
+        layer->flags.cursor = true;
+        layer_stack_.flags.cursor_present = true;
+      }
     }
+
     // TODO(user): Move to a getter if this is needed at other places
     hwc_rect_t scaled_display_frame = {INT(layer->dst_rect.left), INT(layer->dst_rect.top),
                                        INT(layer->dst_rect.right), INT(layer->dst_rect.bottom)};
     ApplyScanAdjustment(&scaled_display_frame);
     hwc_layer->SetLayerDisplayFrame(scaled_display_frame);
     ApplyDeInterlaceAdjustment(layer);
-    // TODO(user): Verify if we still need to configure the solid fill layerbuffer,
-    // it should already have a valid dst_rect by this point
+    // SDM requires these details even for solid fill
+    if (layer->flags.solid_fill) {
+      LayerBuffer *layer_buffer = layer->input_buffer;
+      layer_buffer->width = UINT32(layer->dst_rect.right - layer->dst_rect.left);
+      layer_buffer->height = UINT32(layer->dst_rect.bottom - layer->dst_rect.top);
+      layer_buffer->acquire_fence_fd = -1;
+      layer_buffer->release_fence_fd = -1;
+      layer->src_rect.left = 0;
+      layer->src_rect.top = 0;
+      layer->src_rect.right = layer_buffer->width;
+      layer->src_rect.bottom = layer_buffer->height;
+    }
 
     if (layer->frame_rate > metadata_refresh_rate_) {
       metadata_refresh_rate_ = SanitizeRefreshRate(layer->frame_rate);
@@ -379,7 +401,11 @@ void HWCDisplay::BuildLayerStack() {
     }
     display_rect_ = Union(display_rect_, layer->dst_rect);
     geometry_changes_ |= hwc_layer->GetGeometryChanges();
-    layer->flags.updating = IsLayerUpdating(layer);
+
+    layer->flags.updating = true;
+    if (layer_set_.size() <= kMaxLayerCount) {
+      layer->flags.updating = IsLayerUpdating(layer);
+    }
 
     layer_stack_.layers.push_back(layer);
   }
@@ -751,6 +777,12 @@ HWC2::Error HWCDisplay::AcceptDisplayChanges() {
   if (!validated_ && !layer_set_.empty()) {
     return HWC2::Error::NotValidated;
   }
+
+  for (const auto& change : layer_changes_) {
+    auto hwc_layer = layer_map_[change.first];
+    auto composition = change.second;
+    hwc_layer->UpdateClientCompositionType(composition);
+  }
   return HWC2::Error::None;
 }
 
@@ -884,6 +916,8 @@ HWC2::Error HWCDisplay::PostCommitLayerStack(int32_t *out_retire_fence) {
       } else if (layer->composition != kCompositionGPU) {
         hwc_layer->PushReleaseFence(layer_buffer->release_fence_fd);
         layer_buffer->release_fence_fd = -1;
+      } else {
+        hwc_layer->PushReleaseFence(-1);
       }
     }
 
@@ -893,22 +927,21 @@ HWC2::Error HWCDisplay::PostCommitLayerStack(int32_t *out_retire_fence) {
     }
   }
 
-  *out_retire_fence = stored_retire_fence_;
+  *out_retire_fence = -1;
   if (!flush_) {
     // if swapinterval property is set to 0 then close and reset the list retire fence
     if (swap_interval_zero_) {
       close(layer_stack_.retire_fence_fd);
       layer_stack_.retire_fence_fd = -1;
     }
-    stored_retire_fence_ = layer_stack_.retire_fence_fd;
+    *out_retire_fence = layer_stack_.retire_fence_fd;
 
     if (dump_frame_count_) {
       dump_frame_count_--;
       dump_frame_index_++;
     }
-  } else {
-    stored_retire_fence_ = -1;
   }
+
   geometry_changes_ = GeometryChanges::kNone;
   flush_ = false;
 

@@ -226,6 +226,7 @@ struct HWPanelInfo {
   bool needs_roi_merge = false;       // Merge ROI's of both the DSI's
   bool dynamic_fps = false;           // Panel Supports dynamic fps
   bool dfps_porch_mode = false;       // dynamic fps VFP or HFP mode
+  bool ping_pong_split = false;       // Supports Ping pong split
   uint32_t min_fps = 0;               // Min fps supported by panel
   uint32_t max_fps = 0;               // Max fps supported by panel
   bool is_primary_panel = false;      // Panel is primary display
@@ -245,6 +246,7 @@ struct HWPanelInfo {
             (needs_roi_merge != panel_info.needs_roi_merge) ||
             (dynamic_fps != panel_info.dynamic_fps) || (min_fps != panel_info.min_fps) ||
             (dfps_porch_mode != panel_info.dfps_porch_mode) ||
+            (ping_pong_split != panel_info.ping_pong_split) ||
             (max_fps != panel_info.max_fps) || (is_primary_panel != panel_info.is_primary_panel) ||
             (split_info != panel_info.split_info) ||
             (s3d_mode != panel_info.s3d_mode));

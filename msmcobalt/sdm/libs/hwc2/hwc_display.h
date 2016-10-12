@@ -118,6 +118,10 @@ class HWCDisplay : public DisplayEventHandler {
   // 0 : Success.
   virtual int GetFrameCaptureStatus() { return -EAGAIN; }
 
+  virtual DisplayError SetDetailEnhancerConfig(const DisplayDetailEnhancerData &de_data) {
+    return kErrorNotSupported;
+  }
+
   // Display Configurations
   virtual int SetActiveDisplayConfig(int config);
   virtual int GetActiveDisplayConfig(uint32_t *config);
@@ -259,7 +263,6 @@ class HWCDisplay : public DisplayEventHandler {
   bool validated_ = false;
   bool color_tranform_failed_ = false;
   HWCColorMode *color_mode_ = NULL;
-  int32_t stored_retire_fence_ = -1;
 
  private:
   void DumpInputBuffers(void);

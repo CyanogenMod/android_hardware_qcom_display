@@ -483,6 +483,15 @@ int HWCDisplayPrimary::FrameCaptureAsync(const BufferInfo& output_buffer_info,
   return 0;
 }
 
+DisplayError HWCDisplayPrimary::SetDetailEnhancerConfig(
+                                    const DisplayDetailEnhancerData &de_data) {
+  DisplayError error = kErrorNotSupported;
+  if (display_intf_) {
+    error = display_intf_->SetDetailEnhancerData(de_data);
+  }
+  return error;
+}
+
 DisplayError HWCDisplayPrimary::ControlPartialUpdate(bool enable, uint32_t *pending) {
   DisplayError error = kErrorNone;
 

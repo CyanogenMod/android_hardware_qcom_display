@@ -36,6 +36,7 @@
 #include <cutils/log.h>
 #include <errno.h>
 #include <utils/Trace.h>
+#include <cutils/trace.h>
 #include "gralloc_priv.h"
 #include "ionalloc.h"
 

@@ -53,8 +53,8 @@
 namespace sdm {
 
 uint32_t HWCColorManager::Get8BitsARGBColorValue(const PPColorFillParams &params) {
-  uint32_t argb_color = ((params.color.r << 16) & 0xff0000) | ((params.color.g) & 0xff)
-                        | ((params.color.b << 8) & 0xff00);
+  uint32_t argb_color = ((params.color.r << 16) & 0xff0000) | ((params.color.g << 8) & 0xff00) |
+                        ((params.color.b) & 0xff);
   return argb_color;
 }
 
@@ -415,6 +415,76 @@ int HWCColorManager::SetFrameCapture(void *params, bool enable, HWCDisplay *hwc_
     }
   }
   return ret;
+}
+
+int HWCColorManager::SetDetailedEnhancer(void *params, HWCDisplay *hwc_display) {
+  SCOPE_LOCK(locker_);
+  DisplayError err = kErrorNone;
+  DisplayDetailEnhancerData de_data;
+
+  PPDETuningCfgData *de_tuning_cfg_data = reinterpret_cast<PPDETuningCfgData*>(params);
+  if (!de_tuning_cfg_data->cfg_en) {
+    de_data.override_flags = kOverrideDEEnable;
+    de_data.enable = 0;
+  } else {
+    de_data.override_flags = kOverrideDEEnable;
+    de_data.enable = 1;
+
+    if (de_tuning_cfg_data->params.flags & kDeTuningFlagSharpFactor) {
+      de_data.override_flags |= kOverrideDEEnable;
+      de_data.sharp_factor = de_tuning_cfg_data->params.sharp_factor;
+    }
+
+    if (de_tuning_cfg_data->params.flags & kDeTuningFlagClip) {
+      de_data.override_flags |= kOverrideDEEnable;
+      de_data.clip = de_tuning_cfg_data->params.clip;
+    }
+
+    if (de_tuning_cfg_data->params.flags & kDeTuningFlagThrQuiet) {
+      de_data.override_flags |= kOverrideDEEnable;
+      de_data.thr_quiet = de_tuning_cfg_data->params.thr_quiet;
+    }
+
+    if (de_tuning_cfg_data->params.flags & kDeTuningFlagThrDieout) {
+      de_data.override_flags |= kOverrideDEEnable;
+      de_data.thr_dieout = de_tuning_cfg_data->params.thr_dieout;
+    }
+
+    if (de_tuning_cfg_data->params.flags & kDeTuningFlagThrLow) {
+      de_data.override_flags |= kOverrideDEEnable;
+      de_data.thr_low = de_tuning_cfg_data->params.thr_low;
+    }
+
+    if (de_tuning_cfg_data->params.flags & kDeTuningFlagThrHigh) {
+      de_data.override_flags |= kOverrideDEEnable;
+      de_data.thr_high = de_tuning_cfg_data->params.thr_high;
+    }
+
+    if (de_tuning_cfg_data->params.flags & kDeTuningFlagContentQualLevel) {
+      de_data.override_flags |= kOverrideDEEnable;
+      switch (de_tuning_cfg_data->params.quality) {
+        case kDeContentQualLow:
+          de_data.quality_level = kContentQualityLow;
+          break;
+        case kDeContentQualMedium:
+          de_data.quality_level = kContentQualityMedium;
+          break;
+        case kDeContentQualHigh:
+          de_data.quality_level = kContentQualityHigh;
+          break;
+        case kDeContentQualUnknown:
+        default:
+          de_data.quality_level = kContentQualityUnknown;
+          break;
+      }
+    }
+  }
+  err = hwc_display->SetDetailEnhancerConfig(de_data);
+  if (err) {
+    DLOGW("SetDetailEnhancerConfig failed. err = %d", err);
+  }
+
+  return err;
 }
 
 const HWCQDCMModeManager::ActiveFeatureCMD HWCQDCMModeManager::kActiveFeatureCMD[] = {

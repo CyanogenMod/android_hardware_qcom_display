@@ -501,7 +501,12 @@ DisplayError HWDevice::Commit(HWLayers *hw_layers) {
   }
 
   stack->retire_fence_fd = mdp_commit.retire_fence;
-
+#ifdef VIDEO_MODE_DEFER_RETIRE_FENCE
+  if (hw_panel_info_.mode == kModeVideo) {
+    stack->retire_fence_fd = stored_retire_fence;
+    stored_retire_fence =  mdp_commit.retire_fence;
+  }
+#endif
   // MDP returns only one release fence for the entire layer stack. Duplicate this fence into all
   // layers being composed by MDP.
 
@@ -780,6 +785,7 @@ void HWDevice::PopulateHWPanelInfo() {
         hw_panel_info_.min_roi_width, hw_panel_info_.min_roi_height,
         hw_panel_info_.needs_roi_merge);
   DLOGI("FPS: min = %d, max =%d", hw_panel_info_.min_fps, hw_panel_info_.max_fps);
+  DLOGI("Ping Pong Split = %d",  hw_panel_info_.ping_pong_split);
   DLOGI("Left Split = %d, Right Split = %d", hw_panel_info_.split_info.left_split,
         hw_panel_info_.split_info.right_split);
 }
@@ -842,6 +848,8 @@ void HWDevice::GetHWPanelInfoByNode(int device_node, HWPanelInfo *panel_info) {
         panel_info->dynamic_fps = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "dfps_porch_mode", strlen("dfps_porch_mode"))) {
         panel_info->dfps_porch_mode = atoi(tokens[1]);
+      } else if (!strncmp(tokens[0], "is_pingpong_split", strlen("is_pingpong_split"))) {
+        panel_info->ping_pong_split = atoi(tokens[1]);
       } else if (!strncmp(tokens[0], "min_fps", strlen("min_fps"))) {
         panel_info->min_fps = UINT32(atoi(tokens[1]));
       } else if (!strncmp(tokens[0], "max_fps", strlen("max_fps"))) {
