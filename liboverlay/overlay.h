@@ -119,6 +119,10 @@ public:
      * displays
      */
     bool isPipeTypeAttached(utils::eMdpPipeType type);
+    /* Returns if any of the requested pipe type is attached
+     * to the display
+     */
+    bool isPipeTypeAttachedToDisplay(utils::eMdpPipeType type, int dpy);
     /* Compare pipe priorities and return
      * 1 if 1st pipe has a higher priority
      * 0 if both have the same priority

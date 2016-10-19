@@ -9,9 +9,17 @@ AM_CFLAGS = -Wundef \
          -fpic \
 		 -Wno-multichar \
 		-Wno-conversion
-libqdmetadata_la_SOURCES = qdMetaData.cpp \
-			   qdMetaData.h
-libqdmetadata_la_LDFLAGS = -lstdc++ -lpthread -lcutils -llog
-libqdmetadata_la_CPPFLAGS = -DUSE_GLIB -DANDROID $(AM_CFLAGS) $(AM_CPPFLAGS) @GLIB_CFLAGS@ -DLOG_TAG=\"qdmetadata\"
-libqdmetadata_la_CFLAGS = -DUSE_GLIB -DANDROID $(AM_CFLAGS) $(AM_CPPFLAGS) @GLIB_CFLAGS@ -DLOG_TAG=\"qdmetadata\"
-lib_LTLIBRARIES = libqdmetadata.la
+libqdMetaData_la_SOURCES = qdMetaData.cpp \
+                          qdMetaData.h 
+libqdMetaData_la_LDFLAGS = -lstdc++ -lpthread -lcutils -llog
+libqdMetaData_la_CPPFLAGS = $(AM_CFLAGS) $(AM_CPPFLAGS) -DLOG_TAG=\"qdMetaData\"
+libqdMetaData_la_CFLAGS = $(AM_CFLAGS) $(AM_CPPFLAGS) -DLOG_TAG=\"qdMetaData\"
+
+libqdutils_la_SOURCES = comptype.cpp \
+                         comptype.h \
+                         mdp_version.cpp \
+                         mdp_version.h 
+libqdutils_la_LDFLAGS = -lstdc++ -lpthread -lcutils -llog
+libqdutils_la_CPPFLAGS = $(AM_CFLAGS) $(AM_CPPFLAGS) -DLOG_TAG=\"qdutils\"
+libqdutils_la_CFLAGS = $(AM_CFLAGS) $(AM_CPPFLAGS) -DLOG_TAG=\"qdutils\"
+lib_LTLIBRARIES =libqdMetaData.la libqdutils.la
