@@ -35,8 +35,11 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <utils/Errors.h>
+#ifdef _ANDROID_
 #include <utils/Log.h>
-
+#else
+#include <log/log.h>
+#endif
 #include <linux/fb.h>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
