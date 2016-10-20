@@ -82,6 +82,7 @@ class HWCSession : hwc2_device_t, public qClient::BnQClient {
 
   // HWC2 Functions that require a concrete implementation in hwc session
   // and hence need to be member functions
+  static int32_t AcceptDisplayChanges(hwc2_device_t *device, hwc2_display_t display);
   static int32_t CreateLayer(hwc2_device_t *device, hwc2_display_t display,
                              hwc2_layer_t *out_layer_id);
   static int32_t CreateVirtualDisplay(hwc2_device_t *device, uint32_t width, uint32_t height,

@@ -783,7 +783,7 @@ HWC2::Error HWCDisplay::AcceptDisplayChanges() {
     auto composition = change.second;
 
     if (hwc_layer == nullptr) {
-      DLOGI("Null layer in HWCDisplay::AcceptDisplayChanges.");
+      DLOGW("Null layer: %" PRIu64, change.first);
     } else {
       hwc_layer->UpdateClientCompositionType(composition);
     }
