@@ -199,8 +199,8 @@ void SplitTopBottom(const LayerRect &in_rect, uint32_t split_count, uint32_t ali
   }
 }
 
-void ScaleRect(const LayerRect &src_domain, const LayerRect &dst_domain, const LayerRect &in_rect,
-               LayerRect *out_rect) {
+void MapRect(const LayerRect &src_domain, const LayerRect &dst_domain, const LayerRect &in_rect,
+             LayerRect *out_rect) {
   if (!IsValid(src_domain) || !IsValid(dst_domain) || !IsValid(in_rect)) {
     return;
   }
@@ -213,10 +213,10 @@ void ScaleRect(const LayerRect &src_domain, const LayerRect &dst_domain, const L
   float width_ratio = dst_domain_width / src_domain_width;
   float height_ratio = dst_domain_height / src_domain_height;
 
-  out_rect->left = width_ratio * in_rect.left;
-  out_rect->top = height_ratio * in_rect.top;
-  out_rect->right = width_ratio * in_rect.right;
-  out_rect->bottom = height_ratio * in_rect.bottom;
+  out_rect->left = dst_domain.left + (width_ratio * in_rect.left);
+  out_rect->top = dst_domain.top + (height_ratio * in_rect.top);
+  out_rect->right = dst_domain.left + (width_ratio * in_rect.right);
+  out_rect->bottom = dst_domain.top + (height_ratio * in_rect.bottom);
 }
 
 RectOrientation GetOrientation(const LayerRect &in_rect) {

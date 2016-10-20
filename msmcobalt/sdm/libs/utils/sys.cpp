@@ -45,6 +45,7 @@ int PthreadCancel(pthread_t /* thread */) {
 
 // Pointer to actual driver interfaces.
 Sys::ioctl Sys::ioctl_ = ::ioctl;
+Sys::access Sys::access_ = ::access;
 Sys::open Sys::open_ = ::open;
 Sys::close Sys::close_ = ::close;
 Sys::poll Sys::poll_ = ::poll;

@@ -20,9 +20,13 @@
 #ifndef __GRALLOC_PRIV_H__
 #define __GRALLOC_PRIV_H__
 
+#include <unistd.h>
 #include "gr_priv_handle.h"
 
-#define ROUND_UP_PAGESIZE(x) ((((unsigned int)(x)) + PAGE_SIZE - 1) & (~(PAGE_SIZE - 1)))
+#define ROUND_UP_PAGESIZE(x) roundUpToPageSize(x)
+inline unsigned int roundUpToPageSize(unsigned int x) {
+    return (x + (getpagesize()-1)) & ~(getpagesize()-1);
+}
 
 /* Gralloc usage bits indicating the type of allocation that should be used */
 /* Refer gralloc1_producer_usage_t & gralloc1_consumer_usage-t in gralloc1.h */
@@ -107,7 +111,6 @@
 #define HAL_PIXEL_FORMAT_BGRX_1010102 0x11C
 #define HAL_PIXEL_FORMAT_XBGR_2101010 0x11D
 #define HAL_PIXEL_FORMAT_YCbCr_420_P010 0x11F
-#define HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC 0x120
 
 #define HAL_PIXEL_FORMAT_INTERLACE 0x180
 
@@ -120,6 +123,7 @@
 
 // UBWC aligned Venus format
 #define HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC 0x7FA30C06
+#define HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC     0x7FA30C09
 
 // Khronos ASTC formats
 #define HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_4x4_KHR 0x93B0

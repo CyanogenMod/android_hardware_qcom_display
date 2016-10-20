@@ -107,12 +107,28 @@ HWDevice::HWDevice(BufferSyncHandler *buffer_sync_handler)
 }
 
 DisplayError HWDevice::Init() {
-  char device_name[64] = {0};
-
   // Read the fb node index
   fb_node_index_ = GetFBNodeIndex(device_type_);
   if (fb_node_index_ == -1) {
-    DLOGE("%s should be present", device_name_);
+    DLOGE("device type = %d should be present", device_type_);
+    return kErrorHardware;
+  }
+
+  const char *dev_name = NULL;
+  vector<string> dev_paths = {"/dev/graphics/fb", "/dev/fb"};
+  for (size_t i = 0; i < dev_paths.size(); i++) {
+    dev_paths[i] += to_string(fb_node_index_);
+    if (Sys::access_(dev_paths[i].c_str(), F_OK) >= 0) {
+      dev_name = dev_paths[i].c_str();
+      DLOGI("access(%s) successful", dev_name);
+      break;
+    }
+
+    DLOGI("access(%s), errno = %d, error = %s", dev_paths[i].c_str(), errno, strerror(errno));
+  }
+
+  if (!dev_name) {
+    DLOGE("access() failed for all possible paths");
     return kErrorHardware;
   }
 
@@ -122,10 +138,9 @@ DisplayError HWDevice::Init() {
   hw_resource_ = HWResourceInfo();
   hw_info_intf_->GetHWResourceInfo(&hw_resource_);
 
-  snprintf(device_name, sizeof(device_name), "%s%d", "/dev/graphics/fb", fb_node_index_);
-  device_fd_ = Sys::open_(device_name, O_RDWR);
+  device_fd_ = Sys::open_(dev_name, O_RDWR);
   if (device_fd_ < 0) {
-    DLOGE("open %s failed err = %d errstr = %s", device_name, errno,  strerror(errno));
+    DLOGE("open %s failed errno = %d, error = %s", dev_name, errno, strerror(errno));
     return kErrorResources;
   }
 

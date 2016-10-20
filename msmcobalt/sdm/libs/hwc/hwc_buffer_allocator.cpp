@@ -103,7 +103,10 @@ DisplayError HWCBufferAllocator::AllocateBuffer(BufferInfo *buffer_info) {
   }
 
   alloc_buffer_info->fd = data.fd;
+  // TODO(user): define stride for all planes and fix stride in bytes
   alloc_buffer_info->stride = UINT32(aligned_width);
+  alloc_buffer_info->aligned_width = UINT32(aligned_width);
+  alloc_buffer_info->aligned_height = UINT32(aligned_height);
   alloc_buffer_info->size = buffer_size;
 
   meta_buffer_info->base_addr = data.base;
@@ -138,6 +141,8 @@ DisplayError HWCBufferAllocator::FreeBuffer(BufferInfo *buffer_info) {
 
     alloc_buffer_info->fd = -1;
     alloc_buffer_info->stride = 0;
+    alloc_buffer_info->aligned_width = 0;
+    alloc_buffer_info->aligned_height = 0;
     alloc_buffer_info->size = 0;
 
     meta_buffer_info->base_addr = NULL;

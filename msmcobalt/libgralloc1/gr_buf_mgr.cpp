@@ -361,8 +361,8 @@ int BufferManager::GetHandleFlags(int format, gralloc1_producer_usage_t prod_usa
   return flags;
 }
 
-int BufferManager::AllocateBuffer(unsigned int size, int aligned_w, int aligned_h, int real_w,
-                                  int real_h, int format, int bufferType,
+int BufferManager::AllocateBuffer(unsigned int size, int aligned_w, int aligned_h, int unaligned_w,
+                                  int unaligned_h, int format, int bufferType,
                                   gralloc1_producer_usage_t prod_usage,
                                   gralloc1_consumer_usage_t cons_usage, buffer_handle_t *handle) {
   int err = 0;
@@ -405,7 +405,7 @@ int BufferManager::AllocateBuffer(unsigned int size, int aligned_w, int aligned_
   uint64_t eBaseAddr = (uint64_t)(e_data.base) + e_data.offset;
   private_handle_t *hnd = new private_handle_t(data.fd, size, flags, bufferType, format, aligned_w,
                                                aligned_h, e_data.fd, e_data.offset, eBaseAddr,
-                                               real_w, real_h, prod_usage, cons_usage);
+                                               unaligned_w, unaligned_h, prod_usage, cons_usage);
 
   hnd->offset = data.offset;
   hnd->base = (uint64_t)(data.base) + data.offset;
@@ -493,6 +493,7 @@ gralloc1_error_t BufferManager::Perform(int operation, va_list args) {
       private_handle_t *hnd = reinterpret_cast<private_handle_t *>(
           native_handle_create(private_handle_t::kNumFds, private_handle_t::NumInts()));
       if (hnd) {
+        unsigned int alignedw = 0, alignedh = 0;
         hnd->magic = private_handle_t::kMagic;
         hnd->fd = fd;
         hnd->flags = private_handle_t::PRIV_FLAGS_USES_ION;
@@ -500,8 +501,12 @@ gralloc1_error_t BufferManager::Perform(int operation, va_list args) {
         hnd->offset = offset;
         hnd->base = uint64_t(base) + offset;
         hnd->gpuaddr = 0;
-        hnd->width = width;
-        hnd->height = height;
+        BufferDescriptor descriptor(width, height, format);
+        allocator_->GetAlignedWidthAndHeight(descriptor, &alignedw, &alignedh);
+        hnd->unaligned_width = width;
+        hnd->unaligned_height = height;
+        hnd->width = alignedw;
+        hnd->height = alignedh;
         hnd->format = format;
         *handle = reinterpret_cast<native_handle_t *>(hnd);
       }

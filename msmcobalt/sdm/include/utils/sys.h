@@ -54,6 +54,7 @@ class Sys {
 #else
   typedef int (*ioctl)(int, int, ...);
 #endif
+  typedef int (*access)(const char *, int);
   typedef int (*open)(const char *, int, ...);
   typedef int (*close)(int);
   typedef int (*poll)(struct pollfd *, nfds_t, int);
@@ -68,6 +69,7 @@ class Sys {
   static bool getline_(fstream &fs, std::string &line);  // NOLINT
 
   static ioctl ioctl_;
+  static access access_;
   static open open_;
   static close close_;
   static poll poll_;

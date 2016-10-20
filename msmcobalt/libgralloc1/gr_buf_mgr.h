@@ -49,9 +49,10 @@ class BufferManager {
   int GetBufferType(int format);
   int AllocateBuffer(const BufferDescriptor &descriptor, buffer_handle_t *handle,
                      unsigned int bufferSize = 0);
-  int AllocateBuffer(unsigned int size, int aligned_w, int aligned_h, int real_w, int real_h,
-                     int format, int bufferType, gralloc1_producer_usage_t prod_usage,
-                     gralloc1_consumer_usage_t cons_usage, buffer_handle_t *handle);
+  int AllocateBuffer(unsigned int size, int aligned_w, int aligned_h, int unaligned_w,
+                     int unaligned_h, int format, int bufferType,
+                     gralloc1_producer_usage_t prod_usage, gralloc1_consumer_usage_t cons_usage,
+                     buffer_handle_t *handle);
   int GetDataAlignment(int format, gralloc1_producer_usage_t prod_usage,
                        gralloc1_consumer_usage_t cons_usage);
   int GetHandleFlags(int format, gralloc1_producer_usage_t prod_usage,

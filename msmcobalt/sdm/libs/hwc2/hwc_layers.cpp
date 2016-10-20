@@ -75,8 +75,18 @@ HWC2::Error HWCLayer::SetLayerBuffer(buffer_handle_t buffer, int32_t acquire_fen
   }
 
   LayerBuffer *layer_buffer = layer_->input_buffer;
-  layer_buffer->width = UINT32(handle->width);
-  layer_buffer->height = UINT32(handle->height);
+  int aligned_width, aligned_height;
+  int unaligned_width, unaligned_height;
+
+  AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(handle, aligned_width, aligned_height);
+  AdrenoMemInfo::getInstance().getUnalignedWidthAndHeight(handle, unaligned_width,
+                                                          unaligned_height);
+
+  layer_buffer->width = UINT32(aligned_width);
+  layer_buffer->height = UINT32(aligned_height);
+  layer_buffer->unaligned_width = UINT32(unaligned_width);
+  layer_buffer->unaligned_height = UINT32(unaligned_height);
+
   layer_buffer->format = GetSDMFormat(handle->format, handle->flags);
   if (SetMetaData(handle, layer_) != kErrorNone) {
     return HWC2::Error::BadLayer;
@@ -454,14 +464,6 @@ DisplayError HWCLayer::SetMetaData(const private_handle_t *pvt_handle, Layer *la
 
   if (meta_data->operation & LINEAR_FORMAT) {
     layer_buffer->format = GetSDMFormat(INT32(meta_data->linearFormat), 0);
-  }
-
-  if (meta_data->operation & UPDATE_BUFFER_GEOMETRY) {
-    int actual_width = pvt_handle->width;
-    int actual_height = pvt_handle->height;
-    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(pvt_handle, actual_width, actual_height);
-    layer_buffer->width = UINT32(actual_width);
-    layer_buffer->height = UINT32(actual_height);
   }
 
   if (meta_data->operation & S3D_FORMAT) {
