@@ -222,8 +222,12 @@ struct LayerBufferFlags {
   @sa LayerStack
 */
 struct LayerBuffer {
-  uint32_t width = 0;           //!< Actual width of the Layer that this buffer is for.
-  uint32_t height = 0;          //!< Actual height of the Layer that this buffer is for.
+  uint32_t width = 0;           //!< Aligned width of the Layer that this buffer is for.
+  uint32_t height = 0;          //!< Aligned height of the Layer that this buffer is for.
+  uint32_t unaligned_width = 0;
+                                //!< Unaligned width of the Layer that this buffer is for.
+  uint32_t unaligned_height = 0;
+                                //!< Unaligned height of the Layer that this buffer is for.
   uint32_t size = 0;            //!< Size of a single buffer (even if multiple clubbed together)
   LayerBufferFormat format = kFormatRGBA8888;     //!< Format of the buffer content.
   LayerCSC csc = kCSCFullRange601;                //!< Color Space of the layer.

@@ -61,7 +61,9 @@ struct BufferConfig {
 */
 struct AllocatedBufferInfo {
   int fd = -1;                   //!< Specifies the fd of the allocated buffer.
-  uint32_t stride = 0;           //!< Specifies aligned buffer width of the allocated buffer.
+  uint32_t stride = 0;           //!< Specifies allocated buffer stride in bytes.
+  uint32_t aligned_width = 0;    //!< Specifies aligned allocated buffer width in pixels.
+  uint32_t aligned_height = 0;   //!< Specifies aligned allocated buffer height in pixels.
   uint32_t size = 0;             //!< Specifies the size of the allocated buffer.
 };
 

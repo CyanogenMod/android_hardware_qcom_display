@@ -56,7 +56,7 @@ class IAllocController {
 
     virtual IMemAlloc* getAllocator(int flags) = 0;
 
-    virtual bool isDisableUBWCForEncoder();
+    virtual bool isDisableUBWCForEncoder() = 0;
 
     virtual ~IAllocController() {};
 

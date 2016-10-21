@@ -24,6 +24,7 @@
 #include <hardware/gralloc.h>
 #include <pthread.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include <cutils/native_handle.h>
 #include <utils/Singleton.h>
@@ -35,7 +36,7 @@ struct private_module_t;
 struct private_handle_t;
 
 inline unsigned int roundUpToPageSize(unsigned int x) {
-    return (x + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1);
+    return (x + (getpagesize()-1)) & ~(getpagesize()-1);
 }
 
 template <class Type>
@@ -138,6 +139,15 @@ class AdrenoMemInfo : public android::Singleton <AdrenoMemInfo>
      */
     void getGpuAlignedWidthHeight(int width, int height, int format,
                             int tileEnabled, int& alignedw, int &alignedh);
+
+    /*
+     * Function to compute unaligned width and unaligned height based on
+     * private handle
+     *
+     * @return unaligned width, unaligned height
+     */
+    void getUnalignedWidthAndHeight(const private_handle_t *hnd, int& unaligned_w,
+                            int& unaligned_h);
 
     /*
      * Function to return whether GPU support MacroTile feature

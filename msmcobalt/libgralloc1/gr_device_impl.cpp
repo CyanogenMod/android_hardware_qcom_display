@@ -298,8 +298,8 @@ gralloc1_error_t GrallocImpl::GetBufferDimensions(gralloc1_device_t *device, buf
   gralloc1_error_t status = CheckDeviceAndHandle(device, buffer);
   if (status == GRALLOC1_ERROR_NONE) {
     const private_handle_t *hnd = PRIV_HANDLE_CONST(buffer);
-    *outWidth = UINT(hnd->GetRealWidth());
-    *outHeight = UINT(hnd->GetRealHeight());
+    *outWidth = UINT(hnd->GetUnalignedWidth());
+    *outHeight = UINT(hnd->GetUnalignedHeight());
   }
 
   return status;

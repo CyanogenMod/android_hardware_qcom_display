@@ -1323,6 +1323,8 @@ int HWCDisplay::SetFrameBufferResolution(uint32_t x_pixels, uint32_t y_pixels) {
   client_target_layer->input_buffer->format = GetSDMFormat(format, flags);
   client_target_layer->input_buffer->width = UINT32(aligned_width);
   client_target_layer->input_buffer->height = UINT32(aligned_height);
+  client_target_layer->input_buffer->unaligned_width = x_pixels;
+  client_target_layer->input_buffer->unaligned_height = y_pixels;
   client_target_layer->plane_alpha = 255;
 
   DLOGI("New framebuffer resolution (%dx%d)", fb_config.x_pixels, fb_config.y_pixels);
@@ -1477,6 +1479,8 @@ void HWCDisplay::SolidFillPrepare() {
     LayerBuffer *layer_buffer = solid_fill_layer_->input_buffer;
     layer_buffer->width = primary_width;
     layer_buffer->height = primary_height;
+    layer_buffer->unaligned_width = primary_width;
+    layer_buffer->unaligned_height = primary_height;
     layer_buffer->acquire_fence_fd = -1;
     layer_buffer->release_fence_fd = -1;
 

@@ -346,8 +346,18 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer* layer) {
 
   if (pvt_handle) {
     layer_buffer->format = GetSDMFormat(pvt_handle->format, pvt_handle->flags);
-    layer_buffer->width = UINT32(pvt_handle->width);
-    layer_buffer->height = UINT32(pvt_handle->height);
+    int aligned_width, aligned_height;
+    int unaligned_width, unaligned_height;
+
+    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(pvt_handle, aligned_width,
+                                                          aligned_height);
+    AdrenoMemInfo::getInstance().getUnalignedWidthAndHeight(pvt_handle, unaligned_width,
+                                                            unaligned_height);
+
+    layer_buffer->width = UINT32(aligned_width);
+    layer_buffer->height = UINT32(aligned_height);
+    layer_buffer->unaligned_width = UINT32(unaligned_width);
+    layer_buffer->unaligned_height = UINT32(unaligned_height);
 
     if (SetMetaData(pvt_handle, layer) != kErrorNone) {
       return -EINVAL;
@@ -398,6 +408,8 @@ int HWCDisplay::PrepareLayerParams(hwc_layer_1_t *hwc_layer, Layer* layer) {
                                                             usage, aligned_width, aligned_height);
       layer_buffer->width = UINT32(aligned_width);
       layer_buffer->height = UINT32(aligned_height);
+      layer_buffer->unaligned_width = x_pixels;
+      layer_buffer->unaligned_height = y_pixels;
       layer_buffer->format = GetSDMFormat(format, flags);
     }
   }
@@ -522,6 +534,8 @@ int HWCDisplay::PrePrepareLayerStack(hwc_display_contents_1_t *content_list) {
       LayerBuffer *input_buffer = layer->input_buffer;
       input_buffer->width = UINT32(layer->dst_rect.right - layer->dst_rect.left);
       input_buffer->height = UINT32(layer->dst_rect.bottom - layer->dst_rect.top);
+      input_buffer->unaligned_width = input_buffer->width;
+      input_buffer->unaligned_height = input_buffer->height;
       layer->src_rect.left = 0;
       layer->src_rect.top = 0;
       layer->src_rect.right = input_buffer->width;
@@ -1243,14 +1257,6 @@ DisplayError HWCDisplay::SetMetaData(const private_handle_t *pvt_handle, Layer *
 
   if (meta_data->operation & LINEAR_FORMAT) {
     layer_buffer->format = GetSDMFormat(INT32(meta_data->linearFormat), 0);
-  }
-
-  if (meta_data->operation & UPDATE_BUFFER_GEOMETRY) {
-    int actual_width = pvt_handle->width;
-    int actual_height = pvt_handle->height;
-    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(pvt_handle, actual_width, actual_height);
-    layer_buffer->width = UINT32(actual_width);
-    layer_buffer->height = UINT32(actual_height);
   }
 
   if (meta_data->operation & SET_SINGLE_BUFFER_MODE) {

@@ -86,8 +86,8 @@ struct private_handle_t : public native_handle_t {
   uint64_t base_metadata __attribute__((aligned(8)));
 
   // added for gralloc1
-  int real_width;   // holds width client asked to allocate
-  int real_height;  // holds height client asked to allocate// holds width client asked to allocate
+  int unaligned_width;   // holds width client asked to allocate
+  int unaligned_height;  // holds height client asked to allocate
   gralloc1_producer_usage_t producer_usage __attribute__((aligned(8)));
   gralloc1_consumer_usage_t consumer_usage __attribute__((aligned(8)));
 
@@ -99,31 +99,48 @@ struct private_handle_t : public native_handle_t {
   }
 
   private_handle_t(int fd, unsigned int size, int flags, int buf_type, int format, int width,
-                   int height, int meta_fd = -1, unsigned int meta_offset = 0,
-                   uint64_t meta_base = 0, int rw = 0, int rh = 0,
-                   gralloc1_producer_usage_t prod_usage = GRALLOC1_PRODUCER_USAGE_NONE,
-                   gralloc1_consumer_usage_t cons_usage = GRALLOC1_CONSUMER_USAGE_NONE)
+                   int height)
       : fd(fd),
-        fd_metadata(meta_fd),
+        fd_metadata(-1),
         magic(kMagic),
         flags(flags),
         size(size),
         offset(0),
         buffer_type(buf_type),
         base(0),
-        offset_metadata(meta_offset),
+        offset_metadata(0),
         gpuaddr(0),
         format(format),
         width(width),
         height(height),
-        base_metadata(meta_base),
-        real_width(rw),
-        real_height(rh),
-        producer_usage(prod_usage),
-        consumer_usage(cons_usage) {
+        base_metadata(0),
+        unaligned_width(width),
+        unaligned_height(height),
+        producer_usage(GRALLOC1_PRODUCER_USAGE_NONE),
+        consumer_usage(GRALLOC1_CONSUMER_USAGE_NONE) {
     version = static_cast<int>(sizeof(native_handle));
     numInts = NumInts();
     numFds = kNumFds;
+  }
+
+  private_handle_t(int fd, unsigned int size, int flags, int buf_type, int format, int width,
+                   int height, int meta_fd, unsigned int meta_offset, uint64_t meta_base)
+      : private_handle_t(fd, size, flags, buf_type, format, width, height) {
+    fd_metadata = meta_fd;
+    offset_metadata = meta_offset;
+    base_metadata = meta_base;
+  }
+
+  private_handle_t(int fd, unsigned int size, int flags, int buf_type, int format, int width,
+                   int height, int meta_fd, unsigned int meta_offset, uint64_t meta_base,
+                   int unaligned_w , int unaligned_h,
+                   gralloc1_producer_usage_t prod_usage, gralloc1_consumer_usage_t cons_usage)
+      : private_handle_t(fd, size, flags, buf_type, format, width, height, meta_fd, meta_offset
+                         meta_base) {
+    unaligned_width = unaligned_w;
+    unaligned_height = unaligned_h;
+    producer_usage = prod_usage;
+    consumer_usage = cons_usage;
   }
 
   ~private_handle_t() {
@@ -151,9 +168,9 @@ struct private_handle_t : public native_handle_t {
     return 0;
   }
 
-  int GetRealWidth() const { return real_width; }
+  int GetUnalignedWidth() const { return unaligned_width; }
 
-  int GetRealHeight() const { return real_height; }
+  int GetUnalignedHeight() const { return unaligned_height; }
 
   int GetColorFormat() const { return format; }
 

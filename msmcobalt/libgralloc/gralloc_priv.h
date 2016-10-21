@@ -30,8 +30,8 @@
 
 #include <cutils/log.h>
 
-#define ROUND_UP_PAGESIZE(x) ( (((unsigned long)(x)) + PAGE_SIZE-1)  & \
-                               (~(PAGE_SIZE-1)) )
+#define ROUND_UP_PAGESIZE(x) (unsigned int)( ((x) + getpagesize()-1)  & \
+                                             (~(getpagesize()-1)) )
 
 /* Gralloc usage bits indicating the type of allocation that should be used */
 /* SYSTEM heap comes from kernel vmalloc (ION_SYSTEM_HEAP_ID)
@@ -118,7 +118,6 @@
 #define HAL_PIXEL_FORMAT_BGRX_1010102            0x11C
 #define HAL_PIXEL_FORMAT_XBGR_2101010            0x11D
 #define HAL_PIXEL_FORMAT_YCbCr_420_P010          0x11F
-#define HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC     0x120
 
 #define HAL_PIXEL_FORMAT_INTERLACE               0x180
 
@@ -131,6 +130,7 @@
 
 // UBWC aligned Venus format
 #define HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC 0x7FA30C06
+#define HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC     0x7FA30C09
 
 //Khronos ASTC formats
 #define HAL_PIXEL_FORMAT_COMPRESSED_RGBA_ASTC_4x4_KHR             0x93B0
@@ -233,9 +233,11 @@ struct private_handle_t : public native_handle {
         // The gpu address mapped into the mmu.
         uint64_t gpuaddr __attribute__((aligned(8)));
         int     format;
-        int     width;
-        int     height;
+        int     width;   // holds aligned width of the actual buffer allocated
+        int     height;  // holds aligned height of the  actual buffer allocated
         uint64_t base_metadata __attribute__((aligned(8)));
+        int unaligned_width;   // holds width client asked to allocate
+        int unaligned_height;  // holds height client asked to allocate
 
 #ifdef __cplusplus
         static const int sNumFds = 2;
@@ -246,18 +248,40 @@ struct private_handle_t : public native_handle {
         static const int sMagic = 'gmsm';
 
         private_handle_t(int fd, unsigned int size, int flags, int bufferType,
-                         int format, int width, int height, int eFd = -1,
-                         unsigned int eOffset = 0, uint64_t eBase = 0) :
-            fd(fd), fd_metadata(eFd), magic(sMagic),
+                int format, int width, int height) :
+            fd(fd), fd_metadata(-1), magic(sMagic),
             flags(flags), size(size), offset(0), bufferType(bufferType),
-            base(0), offset_metadata(eOffset), gpuaddr(0),
+            base(0), offset_metadata(0), gpuaddr(0),
             format(format), width(width), height(height),
-            base_metadata(eBase)
+            base_metadata(0), unaligned_width(width),
+            unaligned_height(height)
         {
             version = (int) sizeof(native_handle);
             numInts = sNumInts();
             numFds = sNumFds;
         }
+
+        private_handle_t(int fd, unsigned int size, int flags, int bufferType,
+                int format, int width, int height,
+                int eFd, unsigned int eOffset, uint64_t eBase) :
+            private_handle_t(fd, size, flags, bufferType, format, width, height)
+        {
+            fd_metadata = eFd;
+            offset_metadata = eOffset;
+            base_metadata = eBase;
+        }
+
+        private_handle_t(int fd, unsigned int size, int flags, int bufferType,
+                int format, int width, int height,
+                int eFd, unsigned int eOffset, uint64_t eBase,
+                int unaligned_w, int unaligned_h) :
+            private_handle_t(fd, size, flags, bufferType, format, width, height,
+                    eFd, eOffset, eBase)
+        {
+            unaligned_width = unaligned_w;
+            unaligned_height = unaligned_h;
+        }
+
         ~private_handle_t() {
             magic = 0;
         }

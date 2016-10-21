@@ -188,7 +188,7 @@ DisplayError DisplayBase::ValidateGPUTargetParams() {
   LayerRect dst_domain = (LayerRect){0.0f, 0.0f, layer_mixer_width, layer_mixer_height};
   LayerRect out_rect = gpu_target_layer->dst_rect;
 
-  ScaleRect(src_domain, dst_domain, gpu_target_layer->dst_rect, &out_rect);
+  MapRect(src_domain, dst_domain, gpu_target_layer->dst_rect, &out_rect);
 
   auto gpu_target_layer_dst_xpixels = out_rect.right - out_rect.left;
   auto gpu_target_layer_dst_ypixels = out_rect.bottom - out_rect.top;

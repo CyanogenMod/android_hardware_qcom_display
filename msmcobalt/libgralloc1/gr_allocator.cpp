@@ -670,6 +670,11 @@ void Allocator::GetYuvUBwcWidthAndHeight(int width, int height, int format, unsi
       *aligned_w = VENUS_Y_STRIDE(COLOR_FMT_NV12_UBWC, width);
       *aligned_h = VENUS_Y_SCANLINES(COLOR_FMT_NV12_UBWC, height);
       break;
+    case HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC:
+      // The macro returns the stride which is 4/3 times the width, hence * 3/4
+      *aligned_w = (VENUS_Y_STRIDE(COLOR_FMT_NV12_BPP10_UBWC, width) * 3) / 4;
+      *aligned_h = VENUS_Y_SCANLINES(COLOR_FMT_NV12_BPP10_UBWC, height);
+      break;
     default:
       ALOGE("%s: Unsupported pixel format: 0x%x", __FUNCTION__, format);
       *aligned_w = 0;

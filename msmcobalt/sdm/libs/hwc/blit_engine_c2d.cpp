@@ -282,8 +282,8 @@ int BlitEngineC2d::Prepare(LayerStack *layer_stack) {
   num_blit_target_ = layer_count - blit_target_start_index_;
 
   LayerBuffer *layer_buffer = layer_stack->layers.at(gpu_target_index)->input_buffer;
-  int fbwidth = INT(layer_buffer->width);
-  int fbheight = INT(layer_buffer->height);
+  int fbwidth = INT(layer_buffer->unaligned_width);
+  int fbheight = INT(layer_buffer->unaligned_height);
   if ((fbwidth < 0) || (fbheight < 0)) {
     return -1;
   }
@@ -294,10 +294,16 @@ int BlitEngineC2d::Prepare(LayerStack *layer_stack) {
   for (uint32_t j = 0; j < num_blit_target_; j++, k++) {
     Layer *layer = layer_stack->layers.at(k);
     LayerBuffer *layer_buffer = layer->input_buffer;
+    int aligned_w = 0;
+    int aligned_h = 0;
 
     // Set the buffer height and width
-    layer_buffer->width = fbwidth;
-    layer_buffer->height = fbheight/3;
+    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(fbwidth, fbheight/3,
+                   INT(HAL_PIXEL_FORMAT_RGBA_8888), 0, aligned_w, aligned_h);
+    layer_buffer->width = aligned_w;
+    layer_buffer->height = aligned_h;
+    layer_buffer->unaligned_width = fbwidth;
+    layer_buffer->unaligned_height = fbheight/3;
 
     layer->plane_alpha = 0xFF;
     layer->blending = kBlendingOpaque;
@@ -313,6 +319,8 @@ int BlitEngineC2d::PreCommit(hwc_display_contents_1_t *content_list, LayerStack 
   uint32_t num_app_layers = (uint32_t) content_list->numHwLayers-1;
   int target_width = 0;
   int target_height = 0;
+  int target_aligned_width = 0;
+  int target_aligned_height = 0;
   uint32_t processed_blit = 0;
   LayerRect dst_rects[kMaxBlitTargetLayers];
   bool blit_needed = false;
@@ -334,19 +342,24 @@ int BlitEngineC2d::PreCommit(hwc_display_contents_1_t *content_list, LayerStack 
     LayerRect &blit_src_rect = blit_layer->src_rect;
     int width = INT(layer->dst_rect.right - layer->dst_rect.left);
     int height = INT(layer->dst_rect.bottom - layer->dst_rect.top);
+    int aligned_w = 0;
+    int aligned_h = 0;
     usage = GRALLOC_USAGE_PRIVATE_IOMMU_HEAP | GRALLOC_USAGE_HW_TEXTURE;
     if (blit_engine_c2d_->get(blit_engine_c2d_, COPYBIT_UBWC_SUPPORT) > 0) {
       usage |= GRALLOC_USAGE_PRIVATE_ALLOC_UBWC;
     }
     // TODO(user): FrameBuffer is assumed to be RGBA
-    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width, height,
-                                 INT(HAL_PIXEL_FORMAT_RGBA_8888), usage, width, height);
-
     target_width = std::max(target_width, width);
     target_height += height;
 
+    AdrenoMemInfo::getInstance().getAlignedWidthAndHeight(width, height,
+                                 INT(HAL_PIXEL_FORMAT_RGBA_8888), usage, aligned_w, aligned_h);
+
+    target_aligned_width = std::max(target_aligned_width, aligned_w);
+    target_aligned_height += aligned_h;
+
     // Left will be zero always
-    dst_rects[processed_blit].top = FLOAT(target_height - height);
+    dst_rects[processed_blit].top = FLOAT(target_aligned_height - aligned_h);
     dst_rects[processed_blit].right = dst_rects[processed_blit].left +
                                       (layer->dst_rect.right - layer->dst_rect.left);
     dst_rects[processed_blit].bottom = (dst_rects[processed_blit].top +
@@ -367,8 +380,10 @@ int BlitEngineC2d::PreCommit(hwc_display_contents_1_t *content_list, LayerStack 
       Layer *layer = layer_stack->layers.at(j + content_list->numHwLayers);
       private_handle_t *target_buffer = blit_target_buffer_[current_blit_target_index_];
       // Set the fd information
-        layer->input_buffer->width = target_width;
-        layer->input_buffer->height = target_height;
+        layer->input_buffer->width = target_aligned_width;
+        layer->input_buffer->height = target_aligned_height;
+        layer->input_buffer->unaligned_width = target_width;
+        layer->input_buffer->unaligned_height = target_height;
       if (target_buffer->flags & private_handle_t::PRIV_FLAGS_UBWC_ALIGNED) {
           layer->input_buffer->format = kFormatRGBA8888Ubwc;
       }
