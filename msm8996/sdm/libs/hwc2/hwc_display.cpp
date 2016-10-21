@@ -774,7 +774,11 @@ HWC2::Error HWCDisplay::PrepareLayerStack(uint32_t *out_num_types, uint32_t *out
 }
 
 HWC2::Error HWCDisplay::AcceptDisplayChanges() {
-  if (!validated_ && !layer_set_.empty()) {
+  if (layer_set_.empty()) {
+    return HWC2::Error::None;
+  }
+
+  if (!validated_) {
     return HWC2::Error::NotValidated;
   }
 
